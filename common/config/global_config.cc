@@ -82,15 +82,16 @@ bool GlobalConfig::validate() {
 }
 
 void GlobalConfig::print( FILE *f ) {
+	int width = 13;
 	fprintf(
 		f,
 		"### Global Configuration ###\n"
-		"- %-21s : %u\n"
-		"- %-21s : %u\n"
-		"- %-21s : ",
-		"Key size", this->keySize,
-		"Chunk size", this->chunkSize,
-		"Erasure coding scheme"
+		"- %-*s : %u\n"
+		"- %-*s : %u\n"
+		"- %-*s : ",
+		width, "Key size", this->keySize,
+		width, "Chunk size", this->chunkSize,
+		width, "Coding scheme"
 	);
 	switch( this->codingScheme ) {
 		case CS_RAID0:
@@ -121,5 +122,12 @@ void GlobalConfig::print( FILE *f ) {
 			fprintf( f, "Undefined coding scheme\n" );
 			break;
 	}
+
+	fprintf( f, "- %-*s :\n", width, "Server List" );
+	for ( int i = 0, len = this->serverAddrs.size(); i < len; i++ ) {
+		fprintf( f, "  %d. ", ( i + 1 ) );
+		this->serverAddrs[ i ].print( f );
+	}
+
 	fprintf( f, "\n" );
 }

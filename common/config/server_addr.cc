@@ -52,16 +52,14 @@ bool ServerAddr::parse( const char *name, const char *addr ) {
 void ServerAddr::print( FILE *f ) {
 	struct in_addr addr;
 	char buf[ INET_ADDRSTRLEN ];
-	if ( this->name ) {
-		addr.s_addr = this->addr;
-		inet_ntop( AF_INET, &addr, buf, INET_ADDRSTRLEN );
-		fprintf(
-			f,
-			"[%s] %s://%s:%d\n",
-			this->name,
-			this->type == SOCK_STREAM ? "tcp" : "udp",
-			buf,
-			ntohs( this->port )
-		);
-	}
+	addr.s_addr = this->addr;
+	inet_ntop( AF_INET, &addr, buf, INET_ADDRSTRLEN );
+	fprintf(
+		f,
+		"[%s] %s://%s:%d\n",
+		this->name,
+		this->type == SOCK_STREAM ? "tcp" : "udp",
+		buf,
+		ntohs( this->port )
+	);
 }
