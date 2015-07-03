@@ -2,6 +2,7 @@
 #define __GLOBAL_CONFIG_HH__
 
 #include <vector>
+#include <cstdio>
 #include <stdint.h>
 #include "config.hh"
 #include "server_addr.hh"
@@ -18,6 +19,7 @@ public:
 
 	bool set( const char *, const char *, const char * );
 	bool validate();
+	void print( FILE * = stdout );
 };
 
 #endif

@@ -1,6 +1,7 @@
 #ifndef __BITMASK_ARRAY_HH__
 #define __BITMASK_ARRAY_HH__
 
+#include <cstdio>
 #include <stdint.h>
 
 class BitmaskArray {
@@ -16,8 +17,8 @@ public:
 	void set( size_t, size_t );
 	void unset( size_t, size_t );
 	bool check( size_t, size_t );
-	void print();
-	void printRaw();
+	void print( FILE *f = stdout );
+	void printRaw( FILE *f = stdout );
 	void clear( size_t );
 };
 

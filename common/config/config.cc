@@ -9,7 +9,8 @@ int Config::handler( void *data, const char *section, const char *name, const ch
 
 bool Config::parse( char *filename ) {
 	if ( ini_parse( filename, handler, this ) < 0 ) {
-		__ERROR__( "Config", "parse", "Cannot parse %s.", filename ); 
+		__ERROR__( "Config", "parse", "Cannot parse %s.", filename );
+		return false;
 	}
 	return this->validate();
 }

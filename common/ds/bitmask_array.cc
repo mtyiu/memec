@@ -39,25 +39,25 @@ bool BitmaskArray::check( size_t entry, size_t bit ) {
 	return ( *bitmask & ( 1l << ( index & 63 ) ) );
 }
 
-void BitmaskArray::print() {
+void BitmaskArray::print( FILE *f ) {
 	size_t entry, bit, index;
 	uint64_t *bitmask;
 
 	index = 0;
 	for ( entry = 0; entry < this->count; entry++ ) {
-		printf( "[%5lu]", entry );
+		fprintf( f, "[%5lu]", entry );
 		for ( bit = 0; bit < this->size; bit++, index++ ) {
 			bitmask = this->bitmasks + ( index >> 6 );
-			printf( " %c", ( *bitmask & ( 1l << ( index & 63 ) ) ) ? '1' : '0' );
+			fprintf( f, " %c", ( *bitmask & ( 1l << ( index & 63 ) ) ) ? '1' : '0' );
 		}
-		printf( "\n" );
+		fprintf( f, "\n" );
 	}
 }
 
-void BitmaskArray::printRaw() {
+void BitmaskArray::printRaw( FILE *f ) {
 	size_t i;
 	for ( i = 0; i < this->total; i++ ) {
-		printf( "[%5lu] %lu\n", i, this->bitmasks[ i ] );
+		fprintf( f, "[%5lu] %lu\n", i, this->bitmasks[ i ] );
 	}
 }
 

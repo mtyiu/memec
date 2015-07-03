@@ -5,11 +5,12 @@
 #include "server_addr.hh"
 
 ServerAddr::ServerAddr() {
-	this->name = NULL;
+	this->name[ 0 ] = 0;
+	this->name[ SERVER_NAME_MAX_LEN ] = 0;	
 }
 
 ServerAddr::ServerAddr( const char *name, unsigned long addr, unsigned short port, int type ) {
-	this->name = strdup( name );
+	strncpy( this->name, name, SERVER_NAME_MAX_LEN );
 	this->addr = addr;
 	this->port = port;
 	this->type = type;
@@ -44,17 +45,18 @@ bool ServerAddr::parse( const char *name, const char *addr ) {
 	inet_pton( AF_INET, ip, &inAddr );
 	this->addr = inAddr.s_addr;
 
-	this->name = strdup( name );
+	strncpy( this->name, name, SERVER_NAME_MAX_LEN );
 	return true;
 }
 
-void ServerAddr::print() {
+void ServerAddr::print( FILE *f ) {
 	struct in_addr addr;
 	char buf[ INET_ADDRSTRLEN ];
 	if ( this->name ) {
 		addr.s_addr = this->addr;
 		inet_ntop( AF_INET, &addr, buf, INET_ADDRSTRLEN );
-		printf(
+		fprintf(
+			f,
 			"[%s] %s://%s:%d\n",
 			this->name,
 			this->type == SOCK_STREAM ? "tcp" : "udp",
@@ -62,9 +64,4 @@ void ServerAddr::print() {
 			ntohs( this->port )
 		);
 	}
-}
-
-ServerAddr::~ServerAddr() {
-	if ( this->name )
-		free( this->name );
 }

@@ -1,6 +1,7 @@
 #ifndef __CONFIG_HH__
 #define __CONFIG_HH__
 
+#include <cstdio>
 #include <cstring>
 
 #define CFG_MATCH( s, n ) strcmp( section, s ) == 0 && strcmp( name, n ) == 0
@@ -17,6 +18,7 @@ public:
 
 	virtual bool set( const char *, const char *, const char * ) = 0;
 	virtual bool validate() = 0;
+	virtual void print( FILE * ) = 0;
 };
 
 #endif
