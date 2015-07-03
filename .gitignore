@@ -1,0 +1,4 @@
+*.o
+bin/coordinator
+bin/master
+bin/slave
