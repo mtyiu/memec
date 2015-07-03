@@ -40,12 +40,12 @@ bool BitmaskArray::check( size_t entry, size_t bit ) {
 }
 
 void BitmaskArray::print() {
-	int entry, bit, index;
+	size_t entry, bit, index;
 	uint64_t *bitmask;
 
 	index = 0;
 	for ( entry = 0; entry < this->count; entry++ ) {
-		printf( "[%5d]", entry );
+		printf( "[%5lu]", entry );
 		for ( bit = 0; bit < this->size; bit++, index++ ) {
 			bitmask = this->bitmasks + ( index >> 6 );
 			printf( " %c", ( *bitmask & ( 1l << ( index & 63 ) ) ) ? '1' : '0' );

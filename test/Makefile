@@ -1,4 +1,5 @@
 TARGET= \
+	common/config \
 	common/ds
 
 .PHONY: all $(TARGET)

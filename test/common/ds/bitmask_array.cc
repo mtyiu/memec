@@ -4,7 +4,6 @@
 #include "../../../common/ds/bitmask_array.hh"
 
 int main( int argc, char **argv ) {
-	int ret;
 	size_t size, count, entry, bit;
 	char op, buf[ 1024 ];
 	bool run = true;

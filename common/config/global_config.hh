@@ -1,0 +1,23 @@
+#ifndef __GLOBAL_CONFIG_HH__
+#define __GLOBAL_CONFIG_HH__
+
+#include <vector>
+#include <stdint.h>
+#include "config.hh"
+#include "server_addr.hh"
+#include "../coding/coding_scheme.hh"
+#include "../coding/coding_params.hh"
+
+class GlobalConfig : public Config {
+public:
+	uint32_t keySize;
+	uint32_t chunkSize;
+	CodingScheme codingScheme;
+	CodingParams codingParams;
+	std::vector<ServerAddr> serverAddrs;
+
+	bool set( const char *, const char *, const char * );
+	bool validate();
+};
+
+#endif
