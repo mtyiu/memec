@@ -1,11 +1,13 @@
 #include <cstdio>
 #include <cstdlib>
 #include <getopt.h>
+#include "coordinator.hh"
 
 int main( int argc, char **argv ) {
 	int opt, ret = 0;
 	bool verbose = false;
-	char *path = NULL, path_default[] = "config/local";
+	char *path = NULL, path_default[] = "bin/config/local";
+	Coordinator *coordinator = 0;
 	static struct option long_options[] = {
 		{ "path", required_argument, NULL, 'p' },
 		{ "help", no_argument, NULL, 'h' },
@@ -35,6 +37,15 @@ int main( int argc, char **argv ) {
 		}
 	}
 	path = path == NULL ? path_default : path;
+
+	/////////////////////////////////////
+	// Pass control to the Coordinator //
+	/////////////////////////////////////
+	coordinator = Coordinator::getInstance();
+	if ( coordinator->init( path, verbose ) ) {
+		fprintf( stderr, "Error: Cannot initialize coordinator.\n" );
+		return 1;
+	}
 
 	return 0;
 

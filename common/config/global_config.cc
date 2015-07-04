@@ -1,16 +1,27 @@
 #include <cstdlib>
 #include "global_config.hh"
 
+bool GlobalConfig::parse( const char *path ) {
+	return Config::parse( path, "global.ini" );
+}
+
 bool GlobalConfig::set( const char *section, const char *name, const char *value ) {
 	if ( match( section, "size" ) ) {
 		if ( match( name, "key_size" ) )
 			this->keySize = atoi( value );
 		else if ( match( name, "chunk_size" ) )
 			this->chunkSize = atoi( value );
+	} else if ( match( section, "coordinators" ) ) {
+		ServerAddr addr;
+		if ( addr.parse( name, value ) ) {
+			this->coordinators.push_back( addr );
+		} else {
+			return false;
+		}
 	} else if ( match( section, "slaves" ) ) {
 		ServerAddr addr;
 		if ( addr.parse( name, value ) ) {
-			this->serverAddrs.push_back( addr );
+			this->slaves.push_back( addr );
 		} else {
 			return false;
 		}
@@ -88,8 +99,11 @@ bool GlobalConfig::validate() {
 	if ( this->chunkSize > 16777216 ) // 2^24 bytes
 		CFG_PARSE_ERROR( "GlobalConfig", "Key size should be at most 16777216 bytes." );
 
-	if ( this->serverAddrs.empty() )
-		CFG_PARSE_ERROR( "GlobalConfig", "There should be at least one server." );
+	if ( this->coordinators.empty() )
+		CFG_PARSE_ERROR( "GlobalConfig", "There should be at least one coordinator." );
+
+	if ( this->slaves.empty() )
+		CFG_PARSE_ERROR( "GlobalConfig", "There should be at least one slave." );
 
 	switch( this->codingScheme ) {
 		case CS_RAID0:
@@ -165,7 +179,7 @@ bool GlobalConfig::validate() {
 }
 
 void GlobalConfig::print( FILE *f ) {
-	int width = 13;
+	int width = 16;
 	fprintf(
 		f,
 		"### Global Configuration ###\n"
@@ -206,10 +220,16 @@ void GlobalConfig::print( FILE *f ) {
 			break;
 	}
 
-	fprintf( f, "- %-*s :\n", width, "Server List" );
-	for ( int i = 0, len = this->serverAddrs.size(); i < len; i++ ) {
+	fprintf( f, "- %-*s :\n", width, "Coordinator List" );
+	for ( int i = 0, len = this->coordinators.size(); i < len; i++ ) {
 		fprintf( f, "  %d. ", ( i + 1 ) );
-		this->serverAddrs[ i ].print( f );
+		this->coordinators[ i ].print( f );
+	}
+
+	fprintf( f, "- %-*s :\n", width, "Slave List" );
+	for ( int i = 0, len = this->slaves.size(); i < len; i++ ) {
+		fprintf( f, "  %d. ", ( i + 1 ) );
+		this->slaves[ i ].print( f );
 	}
 
 	fprintf( f, "\n" );

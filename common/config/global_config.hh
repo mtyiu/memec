@@ -15,8 +15,10 @@ public:
 	uint32_t chunkSize;
 	CodingScheme codingScheme;
 	CodingParams codingParams;
-	std::vector<ServerAddr> serverAddrs;
-
+	std::vector<ServerAddr> coordinators;
+	std::vector<ServerAddr> slaves;
+	
+	bool parse( const char *path );
 	bool set( const char *section, const char *name, const char *value );
 	bool validate();
 	void print( FILE *f = stdout );

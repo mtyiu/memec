@@ -15,13 +15,13 @@
 
 class Config {
 protected:
+	bool parse( const char *path, const char *filename );
 	inline bool match( const char *r, const char *s ) {
 		return strcmp( r, s ) == 0;
 	}
 
 public:
 	static int handler( void *data, const char *section, const char *name, const char *value );
-	bool parse( const char *path, const char *filename );
 
 	virtual bool set( const char *section, const char *name, const char *value ) = 0;
 	virtual bool validate() = 0;

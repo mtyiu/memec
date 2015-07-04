@@ -5,15 +5,21 @@
 #include "server_addr.hh"
 
 ServerAddr::ServerAddr() {
+	this->initialized = false;
 	this->name[ 0 ] = 0;
 	this->name[ SERVER_NAME_MAX_LEN ] = 0;	
 }
 
 ServerAddr::ServerAddr( const char *name, unsigned long addr, unsigned short port, int type ) {
+	this->initialized = true;
 	strncpy( this->name, name, SERVER_NAME_MAX_LEN );
 	this->addr = addr;
 	this->port = port;
 	this->type = type;
+}
+
+bool ServerAddr::isInitialized() {
+	return this->initialized;
 }
 
 bool ServerAddr::parse( const char *name, const char *addr ) {
@@ -46,10 +52,16 @@ bool ServerAddr::parse( const char *name, const char *addr ) {
 	this->addr = inAddr.s_addr;
 
 	strncpy( this->name, name, SERVER_NAME_MAX_LEN );
+	this->initialized = true;
 	return true;
 }
 
 void ServerAddr::print( FILE *f ) {
+	if ( ! this->initialized ) {
+		fprintf( f, "(nil)\n" );
+		return;
+	}
+
 	struct in_addr addr;
 	char buf[ INET_ADDRSTRLEN ];
 	addr.s_addr = this->addr;
@@ -61,5 +73,14 @@ void ServerAddr::print( FILE *f ) {
 		this->type == SOCK_STREAM ? "tcp" : "udp",
 		buf,
 		ntohs( this->port )
+	);
+}
+
+bool ServerAddr::operator==( const ServerAddr &addr ) const {
+	return (
+		strncmp( this->name, addr.name, SERVER_NAME_MAX_LEN ) == 0 &&
+		this->addr == addr.addr &&
+		this->port == addr.port &&
+		this->type == addr.type
 	);
 }
