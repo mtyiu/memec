@@ -15,6 +15,7 @@ EXTERNAL_LIB= \
 	$(PLIO_SRC_ROOT)/common/config/global_config.o \
 	$(PLIO_SRC_ROOT)/common/config/server_addr.o \
 	$(PLIO_SRC_ROOT)/common/socket/socket.o \
+	$(PLIO_SRC_ROOT)/common/socket/epoll.o \
 	$(PLIO_SRC_ROOT)/lib/inih/ini.o
 
 .PHONY: clean

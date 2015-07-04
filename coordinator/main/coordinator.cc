@@ -6,18 +6,23 @@ Coordinator::Coordinator() {
 
 bool Coordinator::init( char *path, bool verbose ) {
 	bool ret;
-	// Parse configuration files
+	// Parse configuration files //
 	if ( ( ! ( ret = this->config.global.parse( path ) ) ) ||
+	     ( ! ( ret = this->config.coordinator.merge( this->config.global ) ) ) ||
 	     ( ! ( ret = this->config.coordinator.parse( path ) ) ) ||
 	     ( ! this->config.coordinator.validate( this->config.global.coordinators ) ) ) {
 		return false;
 	}
 
-	// Initialize modules
+	// Initialize modules //
+	/* Socket */
 	if ( ! this->socket.init(
 			this->config.coordinator.addr.type,
 			this->config.coordinator.addr.addr,
 			this->config.coordinator.addr.port
+		) || ! this->socket.prepare(
+			this->config.coordinator.epollMaxEvents,
+			this->config.coordinator.epollTimeout
 		) || ! this->socket.start() ) {
 		__ERROR__( "Coordinator", "init", "Cannot initialize socket." );
 		return false;

@@ -116,6 +116,27 @@ ssize_t Socket::recv( int sockfd, char *buf, size_t ulen, bool &connected, bool 
 	return bytes;
 }
 
+int Socket::accept( struct sockaddr_in *addrPtr, socklen_t *addrlenPtr ) {
+	struct sockaddr_in addr;
+	socklen_t addrlen;
+	int ret;
+	
+	addrlen = sizeof( addr );
+	ret = ::accept( this->sockfd, ( struct sockaddr * ) &addr, &addrlen );
+	if ( ret == -1 ) {
+		if ( errno != EAGAIN && errno != EWOULDBLOCK ) {
+			__ERROR__( "IOServer", "accept", "%s", strerror( errno ) );
+		}
+		return -1;
+	} else {
+		if ( addrPtr && addrlenPtr ) {
+			memcpy( addrPtr, &addr, sizeof( addr ) );
+			memcpy( addrlenPtr, &addrlen, sizeof( addrlen ) );
+		}
+		return ret;
+	}
+}
+
 bool Socket::init( int type, unsigned long addr, unsigned short port ) {
 	this->mode = SOCKET_MODE_UNDEFINED;
 	this->sockfd = socket( AF_INET, type, 0 );

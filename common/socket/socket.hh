@@ -25,25 +25,30 @@ protected:
 	inline bool setReuse();
 	inline bool setNoDelay();
 	inline bool setNonBlocking();
-	
+
 	bool listen();
 	bool connect();
 	ssize_t send( int sockfd, char *buf, size_t ulen, bool &connected );
 	ssize_t recv( int sockfd, char *buf, size_t ulen, bool &connected, bool wait );
+	int accept( struct sockaddr_in *addrPtr = 0, socklen_t *addrlenPtr = 0 );
 
 public:
+
 	bool init( int type, unsigned long addr, unsigned short port );
+	inline int getSocket() {
+		return this->sockfd;
+	}
 	virtual bool start() = 0;
 	virtual void stop();
 
 	// Utilities
-	bool hton_ip( char *ip, unsigned long &ret );
-	bool hton_port( char *port, unsigned short &ret );
-	unsigned short hton_port( unsigned short port );
+	static bool hton_ip( char *ip, unsigned long &ret );
+	static bool hton_port( char *port, unsigned short &ret );
+	static unsigned short hton_port( unsigned short port );
 
-	bool ntoh_ip( unsigned long ip, char *buf, size_t len );
-	bool ntoh_port( unsigned short port, char *buf, size_t len );
-	unsigned short ntoh_port( unsigned short port );
+	static bool ntoh_ip( unsigned long ip, char *buf, size_t len );
+	static bool ntoh_port( unsigned short port, char *buf, size_t len );
+	static unsigned short ntoh_port( unsigned short port );
 };
 
 #endif

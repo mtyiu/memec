@@ -13,6 +13,8 @@ class GlobalConfig : public Config {
 public:
 	uint32_t keySize;
 	uint32_t chunkSize;
+	uint32_t epollMaxEvents;
+	int epollTimeout;
 	CodingScheme codingScheme;
 	CodingParams codingParams;
 	std::vector<ServerAddr> coordinators;

@@ -11,20 +11,27 @@ bool GlobalConfig::set( const char *section, const char *name, const char *value
 			this->keySize = atoi( value );
 		else if ( match( name, "chunk_size" ) )
 			this->chunkSize = atoi( value );
+		else
+			return false;
+	} else if ( match( section, "epoll" ) ) {
+		if ( match( name, "max_events" ) )
+			this->epollMaxEvents = atoi( value );
+		else if ( match( name, "timeout" ) )
+			this->epollTimeout = atoi( value );
+		else
+			return false;
 	} else if ( match( section, "coordinators" ) ) {
 		ServerAddr addr;
-		if ( addr.parse( name, value ) ) {
+		if ( addr.parse( name, value ) )
 			this->coordinators.push_back( addr );
-		} else {
+		else
 			return false;
-		}
 	} else if ( match( section, "slaves" ) ) {
 		ServerAddr addr;
-		if ( addr.parse( name, value ) ) {
+		if ( addr.parse( name, value ) )
 			this->slaves.push_back( addr );
-		} else {
+		else
 			return false;
-		}
 	} else if ( match( section, "coding" ) ) {
 		if ( match( value, "raid0" ) ) {
 			this->codingScheme = CS_RAID0;
@@ -44,6 +51,8 @@ bool GlobalConfig::set( const char *section, const char *name, const char *value
 			this->codingScheme = CS_CAUCHY;
 		} else {
 			this->codingScheme = CS_UNDEFINED;
+			this->codingParams.setScheme( this->codingScheme );
+			return false;
 		}
 		this->codingParams.setScheme( this->codingScheme );
 	} else {
@@ -83,6 +92,8 @@ bool GlobalConfig::set( const char *section, const char *name, const char *value
 				this->codingParams.setM( atoi( value ) );
 			else if ( match( name, "c_w" ) )
 				this->codingParams.setW( atoi( value ) );
+		} else {
+			return false;
 		}
 	}
 	return true;
@@ -93,6 +104,12 @@ bool GlobalConfig::validate() {
 		CFG_PARSE_ERROR( "GlobalConfig", "Key size should be at least 8 bytes." );
 	if ( this->keySize > 255 )
 		CFG_PARSE_ERROR( "GlobalConfig", "Key size should be at most 255 bytes." );
+
+	if ( this->epollMaxEvents < 1 )
+		CFG_PARSE_ERROR( "GlobalConfig", "Maximum number of events in epoll should be at least 1." );
+
+	if ( this->epollTimeout < -1 )
+		CFG_PARSE_ERROR( "GlobalConfig", "The timeout value of epoll should be either -1 (infinite blocking), 0 (non-blocking) or a positive value (representing the number of milliseconds to block)." );
 
 	if ( this->chunkSize < this->keySize + 4 ) // 2^24 bytes
 		CFG_PARSE_ERROR( "GlobalConfig", "Chunk size should be at least %u bytes.", this->keySize + 4 );
@@ -179,15 +196,19 @@ bool GlobalConfig::validate() {
 }
 
 void GlobalConfig::print( FILE *f ) {
-	int width = 16;
+	int width = 30;
 	fprintf(
 		f,
 		"### Global Configuration ###\n"
 		"- %-*s : %u\n"
 		"- %-*s : %u\n"
+		"- %-*s : %u\n"
+		"- %-*s : %d\n"
 		"- %-*s : ",
 		width, "Key size", this->keySize,
 		width, "Chunk size", this->chunkSize,
+		width, "Maximum number of epoll events", this->epollMaxEvents,
+		width, "Timeout of epoll", this->epollTimeout,
 		width, "Coding scheme"
 	);
 	switch( this->codingScheme ) {
