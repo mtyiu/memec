@@ -5,7 +5,7 @@
 
 class CoordinatorConfig : public Config {
 public:
-	bool set( const char *, const char *, const char * );
+	bool set( const char *section, const char *name, const char *value );
 	bool validate();
 };
 

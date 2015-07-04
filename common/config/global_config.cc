@@ -78,6 +78,89 @@ bool GlobalConfig::set( const char *section, const char *name, const char *value
 }
 
 bool GlobalConfig::validate() {
+	if ( this->keySize < 8 )
+		CFG_PARSE_ERROR( "GlobalConfig", "Key size should be at least 8 bytes." );
+	if ( this->keySize > 255 )
+		CFG_PARSE_ERROR( "GlobalConfig", "Key size should be at most 255 bytes." );
+
+	if ( this->chunkSize < this->keySize + 4 ) // 2^24 bytes
+		CFG_PARSE_ERROR( "GlobalConfig", "Chunk size should be at least %u bytes.", this->keySize + 4 );
+	if ( this->chunkSize > 16777216 ) // 2^24 bytes
+		CFG_PARSE_ERROR( "GlobalConfig", "Key size should be at most 16777216 bytes." );
+
+	if ( this->serverAddrs.empty() )
+		CFG_PARSE_ERROR( "GlobalConfig", "There should be at least one server." );
+
+	switch( this->codingScheme ) {
+		case CS_RAID0:
+			if ( this->codingParams.getN() < 1 )
+				CFG_PARSE_ERROR( "GlobalConfig", "RAID-0: Parameter `n' should be at least 1." );
+			break;
+		case CS_RAID1:
+			if ( this->codingParams.getN() < 1 )
+				CFG_PARSE_ERROR( "GlobalConfig", "RAID-1: Parameter `n' should be at least 1." );
+			break;
+		case CS_RAID5:
+			if ( this->codingParams.getN() < 3 )
+				CFG_PARSE_ERROR( "GlobalConfig", "RAID-5: Parameter `n' should be at least 3." );
+			break;
+		case CS_RS:
+			{
+				uint32_t k = this->codingParams.getK(),
+				         m = this->codingParams.getM(),
+				         w = this->codingParams.getW();
+				if ( k < 1 )
+					CFG_PARSE_ERROR( "GlobalConfig", "Reed-Solomon Code: Parameter `k' should be at least 1." );
+				if ( m < 1 )
+					CFG_PARSE_ERROR( "GlobalConfig", "Reed-Solomon Code: Parameter `m' should be at least 1." );
+				if ( w != 8 && w != 16 && w != 32 )
+					CFG_PARSE_ERROR( "GlobalConfig", "Reed-Solomon Code: Parameter `w' should be either 8, 16 or 32." );
+				if ( w <= 16 && k + m > ( ( uint32_t ) 1 << w ) )
+					CFG_PARSE_ERROR( "GlobalConfig", "Reed-Solomon Code: Parameters `k', `m', and `w' should satisfy k + m <= ( 1 << w ) when w <= 16." );
+			}
+			break;
+		case CS_EMBR:
+			{
+				uint32_t n = this->codingParams.getN(),
+				         k = this->codingParams.getK(),
+				         w = this->codingParams.getW();
+				if ( n < 1 )
+					CFG_PARSE_ERROR( "GlobalConfig", "Exact Minimum Bandwidth Regenerating (E-MBR) Code: Parameter `n' should be at least 1." );
+				if ( k < 1 )
+					CFG_PARSE_ERROR( "GlobalConfig", "Exact Minimum Bandwidth Regenerating (E-MBR) Code: Parameter `k' should be at least 1." );
+				if ( w < 1 )
+					CFG_PARSE_ERROR( "GlobalConfig", "Exact Minimum Bandwidth Regenerating (E-MBR) Code: Parameter `w' should be at least 1." );
+			}
+			break;
+		case CS_RDP:
+			if ( this->codingParams.getN() < 2 )
+				CFG_PARSE_ERROR( "GlobalConfig", "Row-Diagonal Parity Code: Parameter `n' should be at least 2." );
+			break;
+		case CS_EVENODD:
+			if ( this->codingParams.getN() < 2 )
+				CFG_PARSE_ERROR( "GlobalConfig", "EVENODD Code: Parameter `n' should be at least 2." );
+			break;
+		case CS_CAUCHY:
+			{
+				uint32_t k = this->codingParams.getK(),
+				         m = this->codingParams.getM(),
+				         w = this->codingParams.getW();
+				if ( k < 1 )
+					CFG_PARSE_ERROR( "GlobalConfig", "Cauchy-based Reed-Solomon Code: Parameter `c_k' should be at least 1." );
+				if ( m < 1 )
+					CFG_PARSE_ERROR( "GlobalConfig", "Cauchy-based Reed-Solomon Code: Parameter `c_m' should be at least 1." );
+				if ( w < 1 )
+					CFG_PARSE_ERROR( "GlobalConfig", "Cauchy-based Reed-Solomon Code: Parameter `c_w' should be at least 1." );
+				if ( w > 32 )
+					CFG_PARSE_ERROR( "GlobalConfig", "Cauchy-based Reed-Solomon Code: Parameter `c_w' should be at most 32." );
+				if ( w < 30 && k + m > ( ( uint32_t ) 1 << w ) )
+					CFG_PARSE_ERROR( "GlobalConfig", "Cauchy-based Reed-Solomon Code: Parameters `c_k', `c_m', and `c_w' should satisfy c_k + c_m <= ( 1 << c_w ) when c_w < 30." );
+			}
+			break;
+		default:
+			CFG_PARSE_ERROR( "GlobalConfig", "Unsupported coding scheme." );
+			break;
+	}
 	return true;
 }
 

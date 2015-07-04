@@ -17,9 +17,9 @@ public:
 	CodingParams codingParams;
 	std::vector<ServerAddr> serverAddrs;
 
-	bool set( const char *, const char *, const char * );
+	bool set( const char *section, const char *name, const char *value );
 	bool validate();
-	void print( FILE * = stdout );
+	void print( FILE *f = stdout );
 };
 
 #endif

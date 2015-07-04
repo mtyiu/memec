@@ -12,14 +12,14 @@ private:
 	uint64_t *bitmasks;
 
 public:
-	BitmaskArray( size_t, size_t );
+	BitmaskArray( size_t size, size_t count );
 	~BitmaskArray();
-	void set( size_t, size_t );
-	void unset( size_t, size_t );
-	bool check( size_t, size_t );
+	void set(   size_t entry, size_t bit );
+	void unset( size_t entry, size_t bit );
+	bool check( size_t entry, size_t bit );
 	void print( FILE *f = stdout );
 	void printRaw( FILE *f = stdout );
-	void clear( size_t );
+	void clear( size_t entry );
 };
 
 #endif

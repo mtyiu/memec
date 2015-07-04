@@ -13,8 +13,8 @@ public:
 	int type;
 
 	ServerAddr();
+	ServerAddr( const char *name, unsigned long addr, unsigned short port, int type );
 	bool parse( const char *name, const char *addr );
-	ServerAddr( const char *, unsigned long, unsigned short, int );
 	void print( FILE *f = stdout );
 };
 

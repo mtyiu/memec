@@ -1,4 +1,6 @@
 *.o
+*.dSYM
+*.swp
 bin/coordinator
 bin/master
 bin/slave
