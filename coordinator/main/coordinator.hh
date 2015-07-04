@@ -3,6 +3,7 @@
 
 #include <cstdio>
 #include "../config/coordinator_config.hh"
+#include "../socket/coordinator_socket.hh"
 #include "../../common/config/global_config.hh"
 
 class Coordinator {
@@ -11,6 +12,7 @@ private:
 		GlobalConfig global;
 		CoordinatorConfig coordinator;
 	} config;
+	CoordinatorSocket socket;
 
 	Coordinator();
 	// Do not implement

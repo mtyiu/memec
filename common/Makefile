@@ -7,6 +7,7 @@ OBJS= \
 	config/config.o \
 	config/global_config.o \
 	config/server_addr.o \
+	socket/socket.o \
 	ds/bitmask_array.o
 
 all: $(OBJS) 
