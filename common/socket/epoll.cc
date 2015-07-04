@@ -82,6 +82,7 @@ bool EPoll::start( bool (*handler)( int, uint32_t, void * ), void *data ) {
 			this->isRunning = false;
 			return false;
 		}
+		__ERROR__( "EPoll", "start", "numEvents = %d", numEvents );
 		for ( i = 0; i < numEvents; i++ ) {
 			handler( events[ i ].data.fd, events[ i ].events, data );
 		}

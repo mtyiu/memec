@@ -7,7 +7,7 @@
 #include "../../common/config/config.hh"
 #include "../../common/config/global_config.hh"
 
-class CoordinatorConfig : public Config {
+class MasterConfig : public Config {
 public:
 	uint32_t epollMaxEvents;
 	int32_t epollTimeout;
@@ -17,7 +17,6 @@ public:
 	bool parse( const char *path );
 	bool set( const char *section, const char *name, const char *value );
 	bool validate();
-	bool validate( std::vector<ServerAddr> coordinators );
 	void print( FILE *f = stdout );
 };
 

@@ -2,7 +2,6 @@
 #define __ARRAY_MAP_HH__
 
 #include <vector>
-#include <iostream>
 
 template<typename KeyType, typename ValueType> class ArrayMap {
 private:

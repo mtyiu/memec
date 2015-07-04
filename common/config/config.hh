@@ -2,6 +2,7 @@
 #define __CONFIG_HH__
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include "../util/debug.hh"
 
@@ -15,6 +16,17 @@
 
 class Config {
 protected:
+	size_t serializedStringLength;
+	char *serializedString;
+
+	Config() {
+		this->serializedStringLength = 0;
+		this->serializedString = 0;
+	}
+	~Config() {
+		if ( this->serializedString )
+			::free( this->serializedString );
+	}
 	bool parse( const char *path, const char *filename );
 	inline bool match( const char *r, const char *s ) {
 		return strcmp( r, s ) == 0;
@@ -25,6 +37,8 @@ public:
 
 	virtual bool set( const char *section, const char *name, const char *value ) = 0;
 	virtual bool validate() = 0;
+	const char *serialize( size_t &serializedStringLength );
+	bool deserialize( const char *serializedString, size_t serializedStringLength );
 	virtual void print( FILE *f ) = 0;
 };
 

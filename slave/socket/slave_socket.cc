@@ -1,28 +1,22 @@
 #include <cerrno>
-#include "coordinator_socket.hh"
+#include "slave_socket.hh"
 #include "../../common/util/debug.hh"
 
-bool CoordinatorSocket::init( int type, unsigned long addr, unsigned short port, int maxEvents, int timeout, int numSlaves ) {
-	bool ret = (
+bool SlaveSocket::init( int type, unsigned long addr, unsigned short port, int maxEvents, int timeout ) {
+	return (
 		Socket::init( type, addr, port ) &&
 		this->listen() &&
 		this->epoll.init( maxEvents, timeout ) &&
 		this->epoll.add( this->sockfd, EPOLLIN | EPOLLET )
 	);
-	if ( ret ) {
-		this->temps.reserve( numSlaves );
-		this->masters.reserve( numSlaves );
-		this->slaves.reserve( numSlaves );
-	}
-	return ret;
 }
 
-bool CoordinatorSocket::start() {
-	return this->epoll.start( CoordinatorSocket::handler, this );
+bool SlaveSocket::start() {
+	return this->epoll.start( SlaveSocket::handler, this );
 }
 
-bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
-	CoordinatorSocket *socket = ( CoordinatorSocket * ) data;
+bool SlaveSocket::handler( int fd, uint32_t events, void *data ) {
+	SlaveSocket *socket = ( SlaveSocket * ) data;
 
 	if ( ( events & EPOLLERR ) || ( events & EPOLLHUP ) ) {
 		::close( fd );
@@ -34,7 +28,7 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 
 			if ( fd == -1 ) {
 				if ( errno != EAGAIN && errno != EWOULDBLOCK )
-					__ERROR__( "CoordinatorSocket", "handler", "%s", strerror( errno ) );
+					__ERROR__( "SlaveSocket", "handler", "%s", strerror( errno ) );
 				break;
 			}
 

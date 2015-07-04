@@ -14,7 +14,7 @@ public:
 	uint32_t keySize;
 	uint32_t chunkSize;
 	uint32_t epollMaxEvents;
-	int epollTimeout;
+	int32_t epollTimeout;
 	CodingScheme codingScheme;
 	CodingParams codingParams;
 	std::vector<ServerAddr> coordinators;

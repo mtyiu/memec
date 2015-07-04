@@ -29,7 +29,30 @@ bool Config::parse( const char *path, const char *filename ) {
 		__ERROR__( "Config", "parse", "Cannot parse %s.", fullPath );
 		return false;
 	}
+
+	// Copy the config file contents as the serialized string
+	FILE *f = fopen( fullPath, "r" );
+	fseek( f, 0L, SEEK_END );
+	this->serializedStringLength = ( size_t ) ftell( f );
+	fseek( f, 0L, SEEK_SET );
+	this->serializedString = ( char * ) malloc( this->serializedStringLength );
+	if ( fread( this->serializedString, 1, this->serializedStringLength, f ) != this->serializedStringLength ) {
+		__ERROR__( "Config", "parse", "Cannot read the whole configuration file." );
+	}
+	fclose( f );
+
 	free( fullPath );
 
 	return this->validate();
+}
+
+const char *Config::serialize( size_t &serializedStringLength ) {
+	serializedStringLength = this->serializedStringLength;
+	return this->serializedString;
+}
+
+bool Config::deserialize( const char *serializedString, size_t serializedStringLength ) {
+	this->serializedStringLength = serializedStringLength;
+	this->serializedString = strndup( serializedString, serializedStringLength );
+	return true;
 }

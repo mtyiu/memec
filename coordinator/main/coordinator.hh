@@ -6,12 +6,9 @@
 #include "../socket/coordinator_socket.hh"
 #include "../../common/config/global_config.hh"
 
+// Implement the singleton pattern
 class Coordinator {
 private:
-	struct {
-		GlobalConfig global;
-		CoordinatorConfig coordinator;
-	} config;
 	CoordinatorSocket socket;
 
 	Coordinator();
@@ -20,6 +17,11 @@ private:
 	void operator=( Coordinator const& );
 
 public:
+	struct {
+		GlobalConfig global;
+		CoordinatorConfig coordinator;
+	} config;
+	
 	static Coordinator *getInstance() {
 		static Coordinator coordinator;
 		return &coordinator;

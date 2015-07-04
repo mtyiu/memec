@@ -45,4 +45,5 @@ bool Coordinator::stop() {
 
 void Coordinator::print( FILE *f ) {
 	this->config.global.print( f );
+	this->config.coordinator.print( f );
 }
