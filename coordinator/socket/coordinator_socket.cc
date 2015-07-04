@@ -2,12 +2,19 @@
 #include "coordinator_socket.hh"
 #include "../../common/util/debug.hh"
 
-bool CoordinatorSocket::prepare( int maxEvents, int timeout ) {
-	return (
+bool CoordinatorSocket::init( int type, unsigned long addr, unsigned short port, int maxEvents, int timeout, int numSlaves ) {
+	bool ret = (
+		Socket::init( type, addr, port ) &&
 		this->listen() &&
 		this->epoll.init( maxEvents, timeout ) &&
 		this->epoll.add( this->sockfd, EPOLLIN | EPOLLET )
 	);
+	if ( ret ) {
+		this->temps.reserve( numSlaves );
+		this->masters.reserve( numSlaves );
+		this->slaves.reserve( numSlaves );
+	}
+	return ret;
 }
 
 bool CoordinatorSocket::start() {
@@ -20,8 +27,10 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 	if ( ( events & EPOLLERR ) || ( events & EPOLLHUP ) ) {
 		::close( fd );
 	} else if ( fd == socket->getSocket() ) {
+		struct sockaddr_in addr;
+		socklen_t addrlen;
 		while( 1 ) {
-			fd = socket->accept();
+			fd = socket->accept( &addr, &addrlen );
 
 			if ( fd == -1 ) {
 				if ( errno != EAGAIN && errno != EWOULDBLOCK )
@@ -29,9 +38,11 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 				break;
 			}
 
+			socket->temps.set( fd, addr, false );
 			socket->epoll.add( fd, EPOLLIN | EPOLLET );
-			__ERROR__( "CoordinatorSocket", "handler", "accept() returns %d", fd );
 		}
+	} else {
+
 	}
 	return true;
 }

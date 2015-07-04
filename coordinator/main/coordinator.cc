@@ -19,10 +19,10 @@ bool Coordinator::init( char *path, bool verbose ) {
 	if ( ! this->socket.init(
 			this->config.coordinator.addr.type,
 			this->config.coordinator.addr.addr,
-			this->config.coordinator.addr.port
-		) || ! this->socket.prepare(
+			this->config.coordinator.addr.port,
 			this->config.coordinator.epollMaxEvents,
-			this->config.coordinator.epollTimeout
+			this->config.coordinator.epollTimeout,
+			this->config.global.slaves.size()
 		) || ! this->socket.start() ) {
 		__ERROR__( "Coordinator", "init", "Cannot initialize socket." );
 		return false;

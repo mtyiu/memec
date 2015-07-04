@@ -102,8 +102,14 @@ ssize_t Socket::recv( int sockfd, char *buf, size_t ulen, bool &connected, bool 
 	do {
 		ret = ::recv( sockfd, buf + bytes, len - bytes, 0 );
 		if ( ret == -1 ) {
-			__ERROR__( "Socket", "recv", "%s", strerror( errno ) );
-			connected = false;
+			if ( errno != EAGAIN ) {
+				__ERROR__( "Socket", "recv", "%s", strerror( errno ) );
+				connected = false;
+			} else {
+				connected = true;
+				bytes += ret;
+				break;
+			}
 			return -1;
 		} else if ( ret == 0 ) {
 			connected = false;
@@ -158,6 +164,12 @@ bool Socket::init( int type, unsigned long addr, unsigned short port ) {
 
 void Socket::stop() {
 	::close( this->sockfd );
+}
+
+void Socket::print( FILE *f ) {
+	char buf[ 16 ];
+	Socket::ntoh_ip( this->addr.sin_addr.s_addr, buf, 16 );
+	fprintf( f, "[%4d] %s:%u\n", this->sockfd, buf, Socket::ntoh_port( this->addr.sin_port ) );
 }
 
 bool Socket::hton_ip( char *ip, unsigned long &ret ) {
