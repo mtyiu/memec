@@ -1,5 +1,5 @@
-#ifndef __COORDINATOR_CONFIG_HH__
-#define __COORDINATOR_CONFIG_HH__
+#ifndef __COORDINATOR_CONFIG_COORDINATOR_CONFIG_HH__
+#define __COORDINATOR_CONFIG_COORDINATOR_CONFIG_HH__
 
 #include <vector>
 #include <stdint.h>

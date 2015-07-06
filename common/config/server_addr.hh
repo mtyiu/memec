@@ -1,5 +1,5 @@
-#ifndef __SERVER_ADDR_HH__
-#define __SERVER_ADDR_HH__
+#ifndef __COMMON_CONFIG_SERVER_ADDR_HH__
+#define __COMMON_CONFIG_SERVER_ADDR_HH__
 
 #include <cstdio>
 

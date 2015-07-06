@@ -42,8 +42,12 @@ int main( int argc, char **argv ) {
 	// Pass control to the Coordinator //
 	/////////////////////////////////////
 	coordinator = Coordinator::getInstance();
-	if ( coordinator->init( path, verbose ) ) {
+	if ( ! coordinator->init( path, verbose ) ) {
 		fprintf( stderr, "Error: Cannot initialize coordinator.\n" );
+		return 1;
+	}
+	if ( ! coordinator->start() ) {
+		fprintf( stderr, "Error: Cannot start coordinator.\n" );
 		return 1;
 	}
 

@@ -1,13 +1,13 @@
-#ifndef __GLOBAL_CONFIG_HH__
-#define __GLOBAL_CONFIG_HH__
+#ifndef __COMMON_CONFIG_GLOBAL_CONFIG_HH__
+#define __COMMON_CONFIG_GLOBAL_CONFIG_HH__
 
 #include <vector>
 #include <cstdio>
 #include <stdint.h>
 #include "config.hh"
 #include "server_addr.hh"
-#include "../coding/coding_scheme.hh"
-#include "../coding/coding_params.hh"
+#include "../coding/scheme.hh"
+#include "../coding/params.hh"
 
 class GlobalConfig : public Config {
 public:

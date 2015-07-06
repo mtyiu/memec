@@ -16,14 +16,14 @@ bool Coordinator::init( char *path, bool verbose ) {
 
 	// Initialize modules //
 	/* Socket */
-	if ( ! this->socket.init(
+	if ( ! this->sockets.self.init(
 			this->config.coordinator.addr.type,
 			this->config.coordinator.addr.addr,
 			this->config.coordinator.addr.port,
 			this->config.coordinator.epollMaxEvents,
 			this->config.coordinator.epollTimeout,
 			this->config.global.slaves.size()
-		) || ! this->socket.start() ) {
+		) ) {
 		__ERROR__( "Coordinator", "init", "Cannot initialize socket." );
 		return false;
 	}
@@ -32,11 +32,15 @@ bool Coordinator::init( char *path, bool verbose ) {
 		this->config.global.print();
 		this->config.coordinator.print();
 	}
-	return false;
+	return true;
 }
 
 bool Coordinator::start() {
-	return false;
+	if ( ! this->sockets.self.start() ) {
+		__ERROR__( "Coordinator", "init", "Cannot start socket." );
+		return false;
+	}
+	return true;
 }
 
 bool Coordinator::stop() {

@@ -16,13 +16,13 @@ bool Slave::init( char *path, bool verbose ) {
 
 	// Initialize modules //
 	/* Socket */
-	if ( ! this->socket.init(
+	if ( ! this->sockets.self.init(
 			this->config.slave.addr.type,
 			this->config.slave.addr.addr,
 			this->config.slave.addr.port,
 			this->config.slave.epollMaxEvents,
 			this->config.slave.epollTimeout
-		) || ! this->socket.start() ) {
+		) ) {
 		__ERROR__( "Slave", "init", "Cannot initialize socket." );
 		return false;
 	}
@@ -31,11 +31,15 @@ bool Slave::init( char *path, bool verbose ) {
 		this->config.global.print();
 		this->config.slave.print();
 	}
-	return false;
+	return true;
 }
 
 bool Slave::start() {
-	return false;
+	if ( ! this->sockets.self.start() ) {
+		__ERROR__( "Slave", "init", "Cannot start socket." );
+		return false;
+	}
+	return true;
 }
 
 bool Slave::stop() {

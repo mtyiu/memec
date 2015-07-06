@@ -1,5 +1,5 @@
-#ifndef __ARRAY_MAP_HH__
-#define __ARRAY_MAP_HH__
+#ifndef __COMMON_DS_ARRAY_MAP_HH__
+#define __COMMON_DS_ARRAY_MAP_HH__
 
 #include <vector>
 

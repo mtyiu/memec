@@ -15,13 +15,13 @@ bool Master::init( char *path, bool verbose ) {
 
 	// Initialize modules //
 	/* Socket */
-	if ( ! this->socket.init(
+	if ( ! this->sockets.self.init(
 			this->config.master.addr.type,
 			this->config.master.addr.addr,
 			this->config.master.addr.port,
 			this->config.master.epollMaxEvents,
 			this->config.master.epollTimeout
-		) || ! this->socket.start() ) {
+		) ) {
 		__ERROR__( "Master", "init", "Cannot initialize socket." );
 		return false;
 	}
@@ -30,11 +30,20 @@ bool Master::init( char *path, bool verbose ) {
 		this->config.global.print();
 		this->config.master.print();
 	}
-	return false;
+	return true;
 }
 
 bool Master::start() {
-	return false;
+	if ( ! this->sockets.self.start() ) {
+		__ERROR__( "Master", "init", "Cannot start socket." );
+		return false;
+	}
+
+	// Connect to coordinators
+	for ( int i = 0, len = this->config.global.coordinators.size(); i < len; i++ ) {
+		this->config.global.coordinators[ i ];
+	}
+	return true;
 }
 
 bool Master::stop() {

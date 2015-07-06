@@ -1,5 +1,5 @@
-#ifndef __SOCKET_HH__
-#define __SOCKET_HH__
+#ifndef __COMMON_SOCKET_SOCKET_HH__
+#define __COMMON_SOCKET_SOCKET_HH__
 
 #ifndef SOL_TCP
 #define SOL_TCP IPPROTO_TCP
@@ -13,15 +13,14 @@
 enum SocketMode {
 	SOCKET_MODE_UNDEFINED,
 	SOCKET_MODE_LISTEN,
-	SOCKET_MODE_CONNECT,
-	SOCKET_MODE_MASTER_CLIENT,
-	SOCKET_MODE_SLAVE_CLIENT
+	SOCKET_MODE_CONNECT
 };
 
 class Socket {
 protected:
 	SocketMode mode;
 	int sockfd;
+	bool connected;
 	struct sockaddr_in addr;
 
 	bool setSockOpt( int level, int optionName );
@@ -37,6 +36,7 @@ protected:
 
 public:
 	bool init( int type, unsigned long addr, unsigned short port );
+	bool init( int sockfd, struct sockaddr_in addr );
 	inline int getSocket() {
 		return this->sockfd;
 	}

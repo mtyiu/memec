@@ -1,5 +1,5 @@
-#ifndef __TIME_HH__
-#define __TIME_HH__
+#ifndef __COMMON_UTIL_TIME_HH__
+#define __COMMON_UTIL_TIME_HH__
 
 #include <time.h>
 

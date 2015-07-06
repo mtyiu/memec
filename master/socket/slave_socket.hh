@@ -1,5 +1,5 @@
-#ifndef __COORDINATOR_SOCKET_SLAVE_SOCKET_HH__
-#define __COORDINATOR_SOCKET_SLAVE_SOCKET_HH__
+#ifndef __MASTER_SOCKET_SLAVE_SOCKET_HH__
+#define __MASTER_SOCKET_SLAVE_SOCKET_HH__
 
 #include "../../common/socket/socket.hh"
 

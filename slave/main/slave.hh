@@ -1,16 +1,23 @@
-#ifndef __MASTER_HH__
-#define __MASTER_HH__
+#ifndef __SLAVE_MAIN_SLAVE_HH__
+#define __SLAVE_MAIN_SLAVE_HH__
 
+#include <vector>
 #include <cstdio>
 #include "../config/slave_config.hh"
-// #include "../socket/coordinator_socket.hh"
+#include "../socket/coordinator_socket.hh"
+#include "../socket/master_socket.hh"
 #include "../socket/slave_socket.hh"
 #include "../../common/config/global_config.hh"
 
 // Implement the singleton pattern
 class Slave {
 private:
-	SlaveSocket socket;
+	struct {
+		SlaveSocket self;
+		std::vector<CoordinatorSocket> coordinators;
+		std::vector<MasterSocket> masters;
+		std::vector<SlaveSocket> slaves;
+	} sockets;
 
 	Slave();
 	// Do not implement

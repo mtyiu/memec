@@ -1,5 +1,5 @@
-#ifndef __BITMASK_ARRAY_HH__
-#define __BITMASK_ARRAY_HH__
+#ifndef __COMMON_DS_BITMASK_ARRAY_HH__
+#define __COMMON_DS_BITMASK_ARRAY_HH__
 
 #include <cstdio>
 #include <stdint.h>

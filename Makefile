@@ -8,7 +8,8 @@ all: $(TARGET)
 		if $(MAKE) -C $$dir; then \
 			echo "\033[1;32mSuccess\033[0;0m\n"; \
 		else \
-			echo "\033[1;31mFail\033[0;0m\n"; \
+			echo "\033[1;31mFail\n\n** Compilation terminated. **\033[0;0m\n"; \
+			break; \
 		fi; \
 	done
 

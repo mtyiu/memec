@@ -58,8 +58,10 @@ bool Socket::listen() {
 	}
 
 	this->mode = SOCKET_MODE_LISTEN;
+	this->connected = true;
 	return true;
 }
+
 bool Socket::connect() {
 	if ( this->mode != SOCKET_MODE_UNDEFINED ) {
 		__ERROR__( "Socket", "connect", "This mode of this socket is set before." );
@@ -145,6 +147,7 @@ int Socket::accept( struct sockaddr_in *addrPtr, socklen_t *addrlenPtr ) {
 
 bool Socket::init( int type, unsigned long addr, unsigned short port ) {
 	this->mode = SOCKET_MODE_UNDEFINED;
+	this->connected = false;
 	this->sockfd = socket( AF_INET, type, 0 );
 	if ( this->sockfd < 0 ) {
 		__ERROR__( "Socket", "init", "%s", strerror( errno ) );
@@ -160,6 +163,14 @@ bool Socket::init( int type, unsigned long addr, unsigned short port ) {
 		this->setNoDelay() &&
 		this->setNonBlocking()
 	);
+}
+
+bool Socket::init( int sockfd, struct sockaddr_in addr ) {
+	this->mode = SOCKET_MODE_CONNECT;
+	this->sockfd = sockfd;
+	this->addr = addr;
+	this->connected = true;
+	return true;
 }
 
 void Socket::stop() {

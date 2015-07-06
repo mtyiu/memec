@@ -1,5 +1,5 @@
-#ifndef __EPOLL_HH__
-#define __EPOLL_HH__
+#ifndef __COMMON_SOCKET_EPOLL_HH__
+#define __COMMON_SOCKET_EPOLL_HH__
 
 #include <sys/epoll.h>
 

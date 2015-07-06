@@ -42,8 +42,12 @@ int main( int argc, char **argv ) {
 	// Pass control to the Slave //
 	///////////////////////////////
 	slave = Slave::getInstance();
-	if ( slave->init( path, verbose ) ) {
+	if ( ! slave->init( path, verbose ) ) {
 		fprintf( stderr, "Error: Cannot initialize slave.\n" );
+		return 1;
+	}
+	if ( ! slave->start() ) {
+		fprintf( stderr, "Error: Cannot start slave.\n" );
 		return 1;
 	}
 

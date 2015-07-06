@@ -1,5 +1,5 @@
-#ifndef __MASTER_SOCKET_HH__
-#define __MASTER_SOCKET_HH__
+#ifndef __SLAVE_SOCKET_SLAVE_SOCKET_HH__
+#define __SLAVE_SOCKET_SLAVE_SOCKET_HH__
 
 #include <vector>
 #include "../../common/ds/array_map.hh"

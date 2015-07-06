@@ -42,8 +42,12 @@ int main( int argc, char **argv ) {
 	// Pass control to the Master //
 	////////////////////////////////
 	master = Master::getInstance();
-	if ( master->init( path, verbose ) ) {
+	if ( ! master->init( path, verbose ) ) {
 		fprintf( stderr, "Error: Cannot initialize master.\n" );
+		return 1;
+	}
+	if ( ! master->start() ) {
+		fprintf( stderr, "Error: Cannot start master.\n" );
 		return 1;
 	}
 

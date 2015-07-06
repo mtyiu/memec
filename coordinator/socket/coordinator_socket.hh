@@ -1,5 +1,5 @@
-#ifndef __COORDINATOR_SOCKET_HH__
-#define __COORDINATOR_SOCKET_HH__
+#ifndef __COORDINATOR_SOCKET_COORDINATOR_SOCKET_HH__
+#define __COORDINATOR_SOCKET_COORDINATOR_SOCKET_HH__
 
 #include <vector>
 #include "master_socket.hh"
@@ -11,9 +11,7 @@
 class CoordinatorSocket : public Socket {
 public:
 	EPoll epoll;
-	ArrayMap<int, struct sockaddr_in> temps;
-	ArrayMap<int, MasterSocket> masters;
-	ArrayMap<int, SlaveSocket> slaves;
+	ArrayMap<int, struct sockaddr_in> sockets;
 
 	bool init( int type, unsigned long addr, unsigned short port, int maxEvents, int timeout, int numSlaves );
 	bool start();

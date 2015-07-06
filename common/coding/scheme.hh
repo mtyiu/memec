@@ -1,5 +1,5 @@
-#ifndef __CODING_SCHEME_HH__
-#define __CODING_SCHEME_HH__
+#ifndef __COMMON_CODING_SCHEME_HH__
+#define __COMMON_CODING_SCHEME_HH__
 
 enum CodingScheme {
 	CS_UNDEFINED,

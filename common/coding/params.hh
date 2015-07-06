@@ -1,8 +1,8 @@
-#ifndef __CODING_PARAMS_HH__
-#define __CODING_PARAMS_HH__
+#ifndef __COMMON_CODING_PARAMS_HH__
+#define __COMMON_CODING_PARAMS_HH__
 
 #include <stdint.h>
-#include "coding_scheme.hh"
+#include "scheme.hh"
 
 class CodingParams {
 private:

@@ -1,15 +1,22 @@
-#ifndef __COORDINATOR_HH__
-#define __COORDINATOR_HH__
+#ifndef __COORDINATOR_MAIN_COORDINATOR_HH__
+#define __COORDINATOR_MAIN_COORDINATOR_HH__
 
+#include <vector>
 #include <cstdio>
 #include "../config/coordinator_config.hh"
 #include "../socket/coordinator_socket.hh"
+#include "../socket/master_socket.hh"
+#include "../socket/slave_socket.hh"
 #include "../../common/config/global_config.hh"
 
 // Implement the singleton pattern
 class Coordinator {
 private:
-	CoordinatorSocket socket;
+	struct {
+		CoordinatorSocket self;
+		std::vector<MasterSocket> masters;
+		std::vector<SlaveSocket> slaves;
+	} sockets;
 
 	Coordinator();
 	// Do not implement

@@ -1,9 +1,9 @@
-#ifndef __COORDINATOR_SOCKET_SLAVE_SOCKET_HH__
-#define __COORDINATOR_SOCKET_SLAVE_SOCKET_HH__
+#ifndef __MASTER_SOCKET_COORDINATOR_SOCKET_HH__
+#define __MASTER_SOCKET_COORDINATOR_SOCKET_HH__
 
 #include "../../common/socket/socket.hh"
 
-class SlaveSocket : public Socket {
+class CoordinatorSocket : public Socket {
 public:
 	bool start();
 	ssize_t send( char *buf, size_t ulen, bool &connected );

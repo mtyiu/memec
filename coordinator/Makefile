@@ -6,6 +6,7 @@ BIN=$(PLIO_SRC_ROOT)/bin/coordinator
 
 OBJS= \
 	config/coordinator_config.o \
+	protocol/protocol.o \
 	socket/coordinator_socket.o \
 	socket/master_socket.o \
 	socket/slave_socket.o \
@@ -16,6 +17,7 @@ EXTERNAL_LIB= \
 	$(PLIO_SRC_ROOT)/common/config/config.o \
 	$(PLIO_SRC_ROOT)/common/config/global_config.o \
 	$(PLIO_SRC_ROOT)/common/config/server_addr.o \
+	$(PLIO_SRC_ROOT)/common/protocol/protocol.o \
 	$(PLIO_SRC_ROOT)/common/socket/socket.o \
 	$(PLIO_SRC_ROOT)/common/socket/epoll.o \
 	$(PLIO_SRC_ROOT)/lib/inih/ini.o

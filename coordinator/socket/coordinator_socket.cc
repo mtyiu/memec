@@ -10,9 +10,7 @@ bool CoordinatorSocket::init( int type, unsigned long addr, unsigned short port,
 		this->epoll.add( this->sockfd, EPOLLIN | EPOLLET )
 	);
 	if ( ret ) {
-		this->temps.reserve( numSlaves );
-		this->masters.reserve( numSlaves );
-		this->slaves.reserve( numSlaves );
+		this->sockets.reserve( numSlaves );
 	}
 	return ret;
 }
@@ -38,7 +36,7 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 				break;
 			}
 
-			socket->temps.set( fd, addr, false );
+			socket->sockets.set( fd, addr, false );
 			socket->epoll.add( fd, EPOLLIN | EPOLLET );
 		}
 	} else {

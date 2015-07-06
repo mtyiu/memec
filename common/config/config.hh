@@ -1,5 +1,5 @@
-#ifndef __CONFIG_HH__
-#define __CONFIG_HH__
+#ifndef __COMMON_CONFIG_CONFIG_HH__
+#define __COMMON_CONFIG_CONFIG_HH__
 
 #include <cstdio>
 #include <cstdlib>
