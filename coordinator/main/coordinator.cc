@@ -37,7 +37,7 @@ bool Coordinator::init( char *path, bool verbose ) {
 
 bool Coordinator::start() {
 	if ( ! this->sockets.self.start() ) {
-		__ERROR__( "Coordinator", "init", "Cannot start socket." );
+		__ERROR__( "Coordinator", "start", "Cannot start socket." );
 		return false;
 	}
 	return true;

@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include "../config/server_addr.hh"
 
 enum SocketMode {
 	SOCKET_MODE_UNDEFINED,
@@ -35,7 +36,8 @@ protected:
 	int accept( struct sockaddr_in *addrPtr = 0, socklen_t *addrlenPtr = 0 );
 
 public:
-	bool init( int type, unsigned long addr, unsigned short port );
+	bool init( int type, unsigned long addr, unsigned short port, bool block = false );
+	bool init( ServerAddr addr );
 	bool init( int sockfd, struct sockaddr_in addr );
 	inline int getSocket() {
 		return this->sockfd;

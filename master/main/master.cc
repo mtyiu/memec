@@ -26,6 +26,20 @@ bool Master::init( char *path, bool verbose ) {
 		return false;
 	}
 
+	/* Vectors */
+	this->sockets.coordinators.reserve( this->config.global.coordinators.size() );
+	for ( int i = 0, len = this->config.global.coordinators.size(); i < len; i++ ) {
+		this->sockets.coordinators.push_back( CoordinatorSocket() );
+		this->sockets.coordinators[ i ].init( this->config.global.coordinators[ i ] );
+	}
+
+	this->sockets.slaves.reserve( this->config.global.slaves.size() );
+	for ( int i = 0, len = this->config.global.slaves.size(); i < len; i++ ) {
+		this->sockets.slaves.push_back( SlaveSocket() );
+		this->sockets.slaves[ i ].init( this->config.global.slaves[ i ] );
+	}
+
+	// Print debug messages //
 	if ( verbose ) {
 		this->config.global.print();
 		this->config.master.print();
@@ -34,14 +48,22 @@ bool Master::init( char *path, bool verbose ) {
 }
 
 bool Master::start() {
-	if ( ! this->sockets.self.start() ) {
-		__ERROR__( "Master", "init", "Cannot start socket." );
-		return false;
-	}
-
 	// Connect to coordinators
 	for ( int i = 0, len = this->config.global.coordinators.size(); i < len; i++ ) {
-		this->config.global.coordinators[ i ];
+		if ( ! this->sockets.coordinators[ i ].start() )
+			return false;
+	}
+
+	// Connect to slaves
+	for ( int i = 0, len = this->config.global.slaves.size(); i < len; i++ ) {
+		if ( ! this->sockets.slaves[ i ].start() )
+			return false;
+	}
+
+	// Start listening
+	if ( ! this->sockets.self.start() ) {
+		__ERROR__( "Master", "start", "Cannot start socket." );
+		return false;
 	}
 	return true;
 }

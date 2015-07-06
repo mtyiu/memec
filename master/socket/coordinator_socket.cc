@@ -1,7 +1,7 @@
 #include "coordinator_socket.hh"
 
 bool CoordinatorSocket::start() {
-	return true;
+	return this->connect();
 }
 
 ssize_t CoordinatorSocket::send( char *buf, size_t ulen, bool &connected ) {

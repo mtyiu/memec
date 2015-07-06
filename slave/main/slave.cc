@@ -27,6 +27,13 @@ bool Slave::init( char *path, bool verbose ) {
 		return false;
 	}
 
+	/* Vectors */
+	this->sockets.coordinators.reserve( this->config.global.coordinators.size() );
+	for ( int i = 0, len = this->config.global.coordinators.size(); i < len; i++ ) {
+		this->sockets.coordinators.push_back( CoordinatorSocket() );
+		this->sockets.coordinators[ i ].init( this->config.global.coordinators[ i ] );
+	}
+
 	if ( verbose ) {
 		this->config.global.print();
 		this->config.slave.print();
@@ -35,8 +42,15 @@ bool Slave::init( char *path, bool verbose ) {
 }
 
 bool Slave::start() {
+	// Connect to coordinators
+	for ( int i = 0, len = this->config.global.coordinators.size(); i < len; i++ ) {
+		if ( ! this->sockets.coordinators[ i ].start() )
+			return false;
+	}
+
+	// Start listening
 	if ( ! this->sockets.self.start() ) {
-		__ERROR__( "Slave", "init", "Cannot start socket." );
+		__ERROR__( "Slave", "start", "Cannot start socket." );
 		return false;
 	}
 	return true;

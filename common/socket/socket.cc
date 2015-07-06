@@ -74,7 +74,7 @@ bool Socket::connect() {
 	}
 
 	this->mode = SOCKET_MODE_CONNECT;
-	return true;
+	return this->setNonBlocking();
 }
 
 ssize_t Socket::send( int sockfd, char *buf, size_t ulen, bool &connected ) {
@@ -145,7 +145,7 @@ int Socket::accept( struct sockaddr_in *addrPtr, socklen_t *addrlenPtr ) {
 	}
 }
 
-bool Socket::init( int type, unsigned long addr, unsigned short port ) {
+bool Socket::init( int type, unsigned long addr, unsigned short port, bool block ) {
 	this->mode = SOCKET_MODE_UNDEFINED;
 	this->connected = false;
 	this->sockfd = socket( AF_INET, type, 0 );
@@ -158,11 +158,19 @@ bool Socket::init( int type, unsigned long addr, unsigned short port ) {
 	this->addr.sin_port = port;
 	this->addr.sin_addr.s_addr = addr;
 
+	if ( ! block ) {
+		if ( ! this->setNonBlocking() )
+			return false;
+	}
+
 	return (
 		this->setReuse() &&
-		this->setNoDelay() &&
-		this->setNonBlocking()
+		this->setNoDelay()
 	);
+}
+
+bool Socket::init( ServerAddr addr ) {
+	return this->init( addr.type, addr.addr, addr.port, true );
 }
 
 bool Socket::init( int sockfd, struct sockaddr_in addr ) {

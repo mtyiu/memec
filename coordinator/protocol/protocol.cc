@@ -1,5 +1,15 @@
 #include "protocol.hh"
 
+char *CoordinatorProtocol::resMasterRegister( size_t &size ) {
+	size = this->generateHeader(
+		PROTO_MAGIC_RESPONSE_SUCCESS,
+		PROTO_MAGIC_TO_MASTER,
+		PROTO_OPCODE_REGISTER,
+		0
+	);
+	return this->buffer.data;
+}
+
 char *CoordinatorProtocol::resMasterRegister( size_t &size, GlobalConfig &globalConfig, MasterConfig *masterConfig ) {
 	size_t length[ 3 ];
 	const char *serializedStrings[ 2 ];
@@ -32,6 +42,16 @@ char *CoordinatorProtocol::resMasterRegister( size_t &size, GlobalConfig &global
 		size += length[ 1 ];
 	}
 
+	return this->buffer.data;
+}
+
+char *CoordinatorProtocol::resSlaveRegister( size_t &size ) {
+	size = this->generateHeader(
+		PROTO_MAGIC_RESPONSE_SUCCESS,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_REGISTER,
+		0
+	);
 	return this->buffer.data;
 }
 

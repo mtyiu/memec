@@ -1,7 +1,7 @@
 #include "master_socket.hh"
 
 bool MasterSocket::start() {
-	return true;
+	return this->connect();
 }
 
 ssize_t MasterSocket::send( char *buf, size_t ulen, bool &connected ) {
