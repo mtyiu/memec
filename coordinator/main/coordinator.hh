@@ -8,16 +8,11 @@
 #include "../socket/master_socket.hh"
 #include "../socket/slave_socket.hh"
 #include "../../common/config/global_config.hh"
+#include "../../common/socket/epoll.hh"
 
 // Implement the singleton pattern
 class Coordinator {
 private:
-	struct {
-		CoordinatorSocket self;
-		std::vector<MasterSocket> masters;
-		std::vector<SlaveSocket> slaves;
-	} sockets;
-
 	Coordinator();
 	// Do not implement
 	Coordinator( Coordinator const& );
@@ -28,6 +23,13 @@ public:
 		GlobalConfig global;
 		CoordinatorConfig coordinator;
 	} config;
+
+	struct {
+		CoordinatorSocket self;
+		EPoll epoll;
+		std::vector<MasterSocket> masters;
+		std::vector<SlaveSocket> slaves;
+	} sockets;
 	
 	static Coordinator *getInstance() {
 		static Coordinator coordinator;

@@ -2,17 +2,17 @@
 #include "slave_socket.hh"
 #include "../../common/util/debug.hh"
 
-bool SlaveSocket::init( int type, unsigned long addr, unsigned short port, int maxEvents, int timeout ) {
+bool SlaveSocket::init( int type, unsigned long addr, unsigned short port, EPoll *epoll ) {
+	this->epoll = epoll;
 	return (
 		Socket::init( type, addr, port ) &&
 		this->listen() &&
-		this->epoll.init( maxEvents, timeout ) &&
-		this->epoll.add( this->sockfd, EPOLLIN | EPOLLET )
+		epoll->add( this->sockfd, EPOLLIN | EPOLLET )
 	);
 }
 
 bool SlaveSocket::start() {
-	return this->epoll.start( SlaveSocket::handler, this );
+	return this->epoll->start( SlaveSocket::handler, this );
 }
 
 bool SlaveSocket::handler( int fd, uint32_t events, void *data ) {
@@ -33,7 +33,7 @@ bool SlaveSocket::handler( int fd, uint32_t events, void *data ) {
 			}
 
 			socket->temps.set( fd, addr, false );
-			socket->epoll.add( fd, EPOLLIN | EPOLLET );
+			socket->epoll->add( fd, EPOLLIN | EPOLLET );
 		}
 	} else {
 	}

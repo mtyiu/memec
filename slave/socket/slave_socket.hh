@@ -8,10 +8,10 @@
 
 class SlaveSocket : public Socket {
 public:
-	EPoll epoll;
+	EPoll *epoll;
 	ArrayMap<int, struct sockaddr_in> temps;
 
-	bool init( int type, unsigned long addr, unsigned short port, int maxEvents, int timeout );
+	bool init( int type, unsigned long addr, unsigned short port, EPoll *epoll );
 	bool start();
 	static bool handler( int fd, uint32_t events, void *data );
 };

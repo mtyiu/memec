@@ -2,12 +2,12 @@
 #include "coordinator_socket.hh"
 #include "../../common/util/debug.hh"
 
-bool CoordinatorSocket::init( int type, unsigned long addr, unsigned short port, int maxEvents, int timeout, int numSlaves ) {
+bool CoordinatorSocket::init( int type, unsigned long addr, unsigned short port, int numSlaves, EPoll *epoll ) {
+	this->epoll = epoll;
 	bool ret = (
 		Socket::init( type, addr, port ) &&
 		this->listen() &&
-		this->epoll.init( maxEvents, timeout ) &&
-		this->epoll.add( this->sockfd, EPOLLIN | EPOLLET )
+		epoll->add( this->sockfd, EPOLLIN | EPOLLET )
 	);
 	if ( ret ) {
 		this->sockets.reserve( numSlaves );
@@ -16,7 +16,7 @@ bool CoordinatorSocket::init( int type, unsigned long addr, unsigned short port,
 }
 
 bool CoordinatorSocket::start() {
-	return this->epoll.start( CoordinatorSocket::handler, this );
+	return this->epoll->start( CoordinatorSocket::handler, this );
 }
 
 bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
@@ -37,7 +37,7 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 			}
 
 			socket->sockets.set( fd, addr, false );
-			socket->epoll.add( fd, EPOLLIN | EPOLLET );
+			socket->epoll->add( fd, EPOLLIN | EPOLLET );
 		}
 	} else {
 	}

@@ -2,17 +2,17 @@
 #include "master_socket.hh"
 #include "../../common/util/debug.hh"
 
-bool MasterSocket::init( int type, unsigned long addr, unsigned short port, int maxEvents, int timeout ) {
+bool MasterSocket::init( int type, unsigned long addr, unsigned short port, EPoll *epoll ) {
+	this->epoll = epoll;
 	return (
 		Socket::init( type, addr, port ) &&
 		this->listen() &&
-		this->epoll.init( maxEvents, timeout ) &&
-		this->epoll.add( this->sockfd, EPOLLIN | EPOLLET )
+		epoll->add( this->sockfd, EPOLLIN | EPOLLET )
 	);
 }
 
 bool MasterSocket::start() {
-	return this->epoll.start( MasterSocket::handler, this );
+	return this->epoll->start( MasterSocket::handler, this );
 }
 
 bool MasterSocket::handler( int fd, uint32_t events, void *data ) {
@@ -33,7 +33,7 @@ bool MasterSocket::handler( int fd, uint32_t events, void *data ) {
 			}
 
 			socket->temps.set( fd, addr, false );
-			socket->epoll.add( fd, EPOLLIN | EPOLLET );
+			socket->epoll->add( fd, EPOLLIN | EPOLLET );
 		}
 	} else {
 	}

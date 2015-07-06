@@ -10,10 +10,10 @@
 
 class CoordinatorSocket : public Socket {
 public:
-	EPoll epoll;
+	EPoll *epoll;
 	ArrayMap<int, struct sockaddr_in> sockets;
 
-	bool init( int type, unsigned long addr, unsigned short port, int maxEvents, int timeout, int numSlaves );
+	bool init( int type, unsigned long addr, unsigned short port, int numSlaves, EPoll *epoll );
 	bool start();
 	static bool handler( int fd, uint32_t events, void *data );
 };

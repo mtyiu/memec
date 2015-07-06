@@ -8,15 +8,11 @@
 #include "../socket/master_socket.hh"
 #include "../socket/slave_socket.hh"
 #include "../../common/config/global_config.hh"
+#include "../../common/socket/epoll.hh"
 
 // Implement the singleton pattern
 class Master {
 private:
-	struct {
-		MasterSocket self;
-		std::vector<CoordinatorSocket> coordinators;
-		std::vector<SlaveSocket> slaves;
-	} sockets;
 
 	Master();
 	// Do not implement
@@ -28,6 +24,13 @@ public:
 		GlobalConfig global;
 		MasterConfig master;
 	} config;
+
+	struct {
+		MasterSocket self;
+		EPoll epoll;
+		std::vector<CoordinatorSocket> coordinators;
+		std::vector<SlaveSocket> slaves;
+	} sockets;
 	
 	static Master *getInstance() {
 		static Master master;

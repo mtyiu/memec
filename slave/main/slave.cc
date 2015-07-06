@@ -16,12 +16,14 @@ bool Slave::init( char *path, bool verbose ) {
 
 	// Initialize modules //
 	/* Socket */
-	if ( ! this->sockets.self.init(
+	if ( ! this->sockets.epoll.init(
+			this->config.slave.epollMaxEvents,
+			this->config.slave.epollTimeout
+		) || ! this->sockets.self.init(
 			this->config.slave.addr.type,
 			this->config.slave.addr.addr,
 			this->config.slave.addr.port,
-			this->config.slave.epollMaxEvents,
-			this->config.slave.epollTimeout
+			&this->sockets.epoll
 		) ) {
 		__ERROR__( "Slave", "init", "Cannot initialize socket." );
 		return false;
