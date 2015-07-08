@@ -6,6 +6,7 @@ BIN=$(PLIO_SRC_ROOT)/bin/coordinator
 
 OBJS= \
 	config/coordinator_config.o \
+	event/event_queue.o \
 	protocol/protocol.o \
 	socket/coordinator_socket.o \
 	socket/master_socket.o \
