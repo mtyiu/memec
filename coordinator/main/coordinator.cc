@@ -17,12 +17,12 @@ bool Coordinator::init( char *path, bool verbose ) {
 	// Initialize modules //
 	/* Socket */
 	if ( ! this->sockets.epoll.init(
-			this->config.coordinator.epollMaxEvents,
-			this->config.coordinator.epollTimeout
+			this->config.coordinator.epoll.maxEvents,
+			this->config.coordinator.epoll.timeout
 		) || ! this->sockets.self.init(
-			this->config.coordinator.addr.type,
-			this->config.coordinator.addr.addr,
-			this->config.coordinator.addr.port,
+			this->config.coordinator.coordinator.addr.type,
+			this->config.coordinator.coordinator.addr.addr,
+			this->config.coordinator.coordinator.addr.port,
 			this->config.global.slaves.size(),
 			&this->sockets.epoll
 		) ) {

@@ -16,12 +16,12 @@ bool Master::init( char *path, bool verbose ) {
 	// Initialize modules //
 	/* Socket */
 	if ( ! this->sockets.epoll.init(
-			this->config.master.epollMaxEvents,
-			this->config.master.epollTimeout
+			this->config.master.epoll.maxEvents,
+			this->config.master.epoll.timeout
 		) || ! this->sockets.self.init(
-			this->config.master.addr.type,
-			this->config.master.addr.addr,
-			this->config.master.addr.port,
+			this->config.master.master.addr.type,
+			this->config.master.master.addr.addr,
+			this->config.master.master.addr.port,
 			&this->sockets.epoll
 		) ) {
 		__ERROR__( "Master", "init", "Cannot initialize socket." );

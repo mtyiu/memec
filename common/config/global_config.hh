@@ -11,14 +11,20 @@
 
 class GlobalConfig : public Config {
 public:
-	uint32_t keySize;
-	uint32_t chunkSize;
-	uint32_t epollMaxEvents;
-	int32_t epollTimeout;
-	CodingScheme codingScheme;
-	CodingParams codingParams;
+	struct {
+		uint32_t key;
+		uint32_t chunk;
+	} size;
+	struct {
+		uint32_t maxEvents;
+		int32_t timeout;
+	} epoll;
 	std::vector<ServerAddr> coordinators;
 	std::vector<ServerAddr> slaves;
+	struct {
+		CodingScheme scheme;
+		CodingParams params;
+	} coding;
 	
 	bool parse( const char *path );
 	bool set( const char *section, const char *name, const char *value );
