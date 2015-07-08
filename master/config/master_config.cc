@@ -37,13 +37,13 @@ bool MasterConfig::set( const char *section, const char *name, const char *value
 		else if ( match( name, "mixed" ) )
 			this->eventQueue.size.mixed = atoi( value );
 		else if ( match( name, "application" ) )
-			this->eventQueue.size.application = atoi( value );
+			this->eventQueue.size.separated.application = atoi( value );
 		else if ( match( name, "coordinator" ) )
-			this->eventQueue.size.coordinator = atoi( value );
+			this->eventQueue.size.separated.coordinator = atoi( value );
 		else if ( match( name, "master" ) )
-			this->eventQueue.size.master = atoi( value );
+			this->eventQueue.size.separated.master = atoi( value );
 		else if ( match( name, "slave" ) )
-			this->eventQueue.size.slave = atoi( value );
+			this->eventQueue.size.separated.slave = atoi( value );
 		else
 			return false;
 	} else {
@@ -71,13 +71,13 @@ bool MasterConfig::validate() {
 				CFG_PARSE_ERROR( "MasterConfig", "The size of the event queue should be at least the number of workers." );
 			break;
 		case EVENT_QUEUE_TYPE_SEPARATED:
-			if ( this->eventQueue.size.application < this->master.workers )
+			if ( this->eventQueue.size.separated.application < this->master.workers )
 				CFG_PARSE_ERROR( "MasterConfig", "The size of the application event queue should be at least the number of workers." );
-			if ( this->eventQueue.size.coordinator < this->master.workers )
+			if ( this->eventQueue.size.separated.coordinator < this->master.workers )
 				CFG_PARSE_ERROR( "MasterConfig", "The size of the coordinator event queue should be at least the number of workers." );
-			if ( this->eventQueue.size.master < this->master.workers )
+			if ( this->eventQueue.size.separated.master < this->master.workers )
 				CFG_PARSE_ERROR( "MasterConfig", "The size of the master event queue should be at least the number of workers." );
-			if ( this->eventQueue.size.slave < this->master.workers )
+			if ( this->eventQueue.size.separated.slave < this->master.workers )
 				CFG_PARSE_ERROR( "MasterConfig", "The size of the slave event queue should be at least the number of workers." );
 			break;
 		default:
@@ -121,10 +121,10 @@ void MasterConfig::print( FILE *f ) {
 			"\t- %-*s : %u\n"
 			"\t- %-*s : %u\n"
 			"\t- %-*s : %u\n",
-			width, "Size for application", this->eventQueue.size.application,
-			width, "Size for coordinator", this->eventQueue.size.coordinator,
-			width, "Size for master", this->eventQueue.size.master,
-			width, "Size for slave", this->eventQueue.size.slave
+			width, "Size for application", this->eventQueue.size.separated.application,
+			width, "Size for coordinator", this->eventQueue.size.separated.coordinator,
+			width, "Size for master", this->eventQueue.size.separated.master,
+			width, "Size for slave", this->eventQueue.size.separated.slave
 		);
 	}
 

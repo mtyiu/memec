@@ -21,12 +21,14 @@ public:
 	struct {
 		EventQueueType type;
 		bool block;
-		struct {
+		union {
 			uint32_t mixed;
-			uint32_t application;
-			uint32_t coordinator;
-			uint32_t master;
-			uint32_t slave;
+			struct {
+				uint32_t application;
+				uint32_t coordinator;
+				uint32_t master;
+				uint32_t slave;
+			} separated;
 		} size;
 	} eventQueue;
 
