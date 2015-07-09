@@ -2,7 +2,7 @@
 #define __COMMON_CODING_CODING_PARAMS_HH__
 
 #include <stdint.h>
-#include "scheme.hh"
+#include "coding_scheme.hh"
 
 class CodingParams {
 private:

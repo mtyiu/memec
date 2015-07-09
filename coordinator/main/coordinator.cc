@@ -49,9 +49,12 @@ bool Coordinator::init( char *path, bool verbose ) {
 		);
 		this->workers.reserve( this->config.coordinator.workers.number.mixed );
 		for ( int i = 0, len = this->config.coordinator.workers.number.mixed; i < len; i++ ) {
-			this->workers[ i ].init();
+			this->workers.push_back( CoordinatorWorker() );
+			this->workers[ i ].init( WORKER_ROLE_MIXED, &this->eventQueue );
 		}
 	} else {
+		this->workers.reserve( this->config.coordinator.workers.number.separated.total );
+
 		this->eventQueue.separated.application = new EventQueue<ApplicationEvent>(
 			this->config.coordinator.eventQueue.size.separated.application,
 			this->config.coordinator.eventQueue.block
@@ -69,9 +72,22 @@ bool Coordinator::init( char *path, bool verbose ) {
 			this->config.coordinator.eventQueue.block
 		);
 
-		this->workers.reserve( this->config.coordinator.workers.number.separated.total );
-		for ( int i = 0, len = this->config.coordinator.workers.number.separated.total; i < len; i++ ) {
-			this->workers[ i ].init();
+		int index = 0;
+		for ( int i = 0, len = this->config.coordinator.workers.number.separated.application; i < len; i++, index++ ) {
+			this->workers.push_back( CoordinatorWorker() );
+			this->workers[ index ].init( WORKER_ROLE_APPLICATION, &this->eventQueue );
+		}
+		for ( int i = 0, len = this->config.coordinator.workers.number.separated.coordinator; i < len; i++, index++ ) {
+			this->workers.push_back( CoordinatorWorker() );
+			this->workers[ index ].init( WORKER_ROLE_COORDINATOR, &this->eventQueue );
+		}
+		for ( int i = 0, len = this->config.coordinator.workers.number.separated.master; i < len; i++, index++ ) {
+			this->workers.push_back( CoordinatorWorker() );
+			this->workers[ index ].init( WORKER_ROLE_MASTER, &this->eventQueue );
+		}
+		for ( int i = 0, len = this->config.coordinator.workers.number.separated.slave; i < len; i++, index++ ) {
+			this->workers.push_back( CoordinatorWorker() );
+			this->workers[ index ].init( WORKER_ROLE_SLAVE, &this->eventQueue );
 		}
 	}
 
@@ -84,24 +100,32 @@ bool Coordinator::init( char *path, bool verbose ) {
 }
 
 bool Coordinator::start() {
-	/* Sockets */
-	if ( ! this->sockets.self.start() ) {
-		__ERROR__( "Coordinator", "start", "Cannot start socket." );
-		return false;
-	}
-
 	/* Workers and event queues */
 	if ( this->config.coordinator.workers.type == WORKER_TYPE_MIXED ) {
 		this->eventQueue.mixed->start();
-		for ( int i = 0, len = this->config.coordinator.workers.number.mixed; i < len; i++ )
-			this->workers[ i ].start();
+		for ( int i = 0, len = this->config.coordinator.workers.number.mixed; i < len; i++ ) {
+			if ( this->workers[ i ].start() ) {
+				this->workers[ i ].debug();
+			}
+		}
 	} else {
 		this->eventQueue.separated.application->start();
 		this->eventQueue.separated.coordinator->start();
 		this->eventQueue.separated.master->start();
 		this->eventQueue.separated.slave->start();
-		for ( int i = 0, len = this->config.coordinator.workers.number.separated.total; i < len; i++ )
-			this->workers[ i ].start();
+		for ( int i = 0, len = this->config.coordinator.workers.number.separated.total; i < len; i++ ) {
+			if ( this->workers[ i ].start() ) {
+				this->workers[ i ].debug();
+			}
+		}
+	}
+
+	/* Sockets */
+	if ( ! this->sockets.self.start() ) {
+		__ERROR__( "Coordinator", "start", "Cannot start socket." );
+		return false;
+	} else {
+		this->sockets.self.debug();
 	}
 
 	return true;
