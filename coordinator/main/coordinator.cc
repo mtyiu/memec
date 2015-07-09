@@ -3,6 +3,7 @@
 #include "coordinator.hh"
 
 Coordinator::Coordinator() {
+	this->isRunning = false;
 	memset( &this->eventQueue, 0, sizeof( this->eventQueue ) );
 }
 
@@ -15,6 +16,12 @@ void Coordinator::free() {
 		delete this->eventQueue.separated.master;
 		delete this->eventQueue.separated.slave;
 	}
+}
+
+void Coordinator::signalHandler( int signal ) {
+	Signal::setHandler();
+	Coordinator::getInstance()->stop();
+	fclose( stdin );
 }
 
 bool Coordinator::init( char *path, bool verbose ) {
@@ -92,6 +99,9 @@ bool Coordinator::init( char *path, bool verbose ) {
 		}
 	}
 
+	// Set signal handlers //
+	Signal::setHandler( Coordinator::signalHandler );
+
 	// Show configuration //
 	if ( verbose ) {
 		this->config.global.print();
@@ -130,11 +140,15 @@ bool Coordinator::start() {
 	}
 
 	this->startTime = start_timer();
+	this->isRunning = true;
 
 	return true;
 }
 
 bool Coordinator::stop() {
+	if ( ! this->isRunning )
+		return false; 
+
 	int i, len;
 
 	/* Sockets */
@@ -166,6 +180,8 @@ bool Coordinator::stop() {
 		this->sockets.slaves[ i ].stop();
 
 	this->free();
+	this->isRunning = false;
+	printf( "\nBye.\n" );
 	return true;
 }
 
@@ -189,7 +205,7 @@ void Coordinator::interactive() {
 	int i, len;
 
 	this->help();
-	while( 1 ) {
+	while( this->isRunning ) {
 		valid = false;
 		printf( "> " );
 		fflush( stdout );

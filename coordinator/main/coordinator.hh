@@ -11,11 +11,13 @@
 #include "../worker/worker.hh"
 #include "../../common/config/global_config.hh"
 #include "../../common/socket/epoll.hh"
+#include "../../common/signal/signal.hh"
 #include "../../common/util/time.hh"
 
 // Implement the singleton pattern
 class Coordinator {
 private:
+	bool isRunning;
 	struct timespec startTime;
 	std::vector<CoordinatorWorker> workers;
 
@@ -47,6 +49,8 @@ public:
 		static Coordinator coordinator;
 		return &coordinator;
 	}
+
+	static void signalHandler( int signal );
 
 	bool init( char *path, bool verbose );
 	bool start();

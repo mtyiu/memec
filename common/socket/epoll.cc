@@ -114,5 +114,5 @@ void EPoll::stop() {
 
 void EPoll::stop( pthread_t tid ) {
 	this->stop();
-	int ret = pthread_kill( tid, SIG_EPOLL );
+	pthread_kill( tid, SIG_EPOLL );
 }
