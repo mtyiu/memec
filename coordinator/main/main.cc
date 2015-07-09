@@ -50,6 +50,8 @@ int main( int argc, char **argv ) {
 		fprintf( stderr, "Error: Cannot start coordinator.\n" );
 		return 1;
 	}
+	coordinator->interactive();
+	coordinator->stop();
 
 	return 0;
 

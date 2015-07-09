@@ -1,9 +1,12 @@
 #ifndef __COMMON_SOCKET_EPOLL_HH__
 #define __COMMON_SOCKET_EPOLL_HH__
 
+#include <pthread.h>
+#include <signal.h>
 #include <sys/epoll.h>
 
 #define EPOLL_MAX_EVENTS 64
+#define SIG_EPOLL	SIGUSR1
 
 class EPoll {
 private:
@@ -21,6 +24,7 @@ public:
 	bool remove( int fd );
 	bool start( bool (*handler)( int, uint32_t, void * ), void *data );
 	void stop();
+	void stop( pthread_t tid );
 };
 
 #endif

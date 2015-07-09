@@ -36,8 +36,10 @@ void *CoordinatorWorker::run( void *argv ) {
 #define COORDINATOR_WORKER_EVENT_LOOP(_EVENT_TYPE_, _EVENT_QUEUE_) \
 	do { \
 		_EVENT_TYPE_ event; \
-		while( worker->getIsRunning() || _EVENT_QUEUE_->extract( event ) ) { \
-			worker->dispatch( event ); \
+		bool ret; \
+		while( worker->getIsRunning() | ( ret = _EVENT_QUEUE_->extract( event ) ) ) { \
+			if ( ret ) \
+				worker->dispatch( event ); \
 		} \
 	} while( 0 )
 

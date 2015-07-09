@@ -35,7 +35,7 @@ bool CoordinatorSocket::start() {
 
 void CoordinatorSocket::stop() {
 	if ( this->isRunning ) {
-		this->epoll->stop();
+		this->epoll->stop( this->tid );
 		this->isRunning = false;
 		pthread_join( this->tid, 0 );
 	}

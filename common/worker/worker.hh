@@ -18,7 +18,7 @@ public:
 	}
 
 	inline void join() {
-		pthread_join( this->tid, NULL );
+		pthread_join( this->tid, 0 );
 	}
 
 	inline bool getIsRunning() {

@@ -1,5 +1,6 @@
 #include <cstdlib>
 #include <cerrno>
+#include <sys/signalfd.h>
 #include "epoll.hh"
 #include "../util/debug.hh"
 
@@ -73,20 +74,35 @@ bool EPoll::start( bool (*handler)( int, uint32_t, void * ), void *data ) {
 	if ( this->efd == -1 )
 		return false;
 
-	int i, numEvents;
+	int i, sfd, numEvents;
+	sigset_t sigmask;
+
+	// Set signal fd
+	sigemptyset( &sigmask );
+	sigaddset( &sigmask, SIG_EPOLL );
+	if ( ( sfd = signalfd( -1, &sigmask, 0 ) ) == -1 ) {
+		__ERROR__( "EPoll", "start", "%s", strerror( errno ) );
+		return false;
+	}
+	this->add( sfd, EPOLLIN | EPOLLET );
+
+	// Start polling
 	this->isRunning = true;
 	while( this->isRunning ) {
-		numEvents = epoll_wait( this->efd, this->events, this->maxEvents, this->timeout );
+		numEvents = epoll_pwait( this->efd, this->events, this->maxEvents, this->timeout, &sigmask );
 		if ( numEvents == -1 ) {
 			__ERROR__( "EPoll", "start", "%s", strerror( errno ) );
 			this->isRunning = false;
 			return false;
 		}
-		__ERROR__( "EPoll", "start", "numEvents = %d", numEvents );
 		for ( i = 0; i < numEvents; i++ ) {
-			handler( events[ i ].data.fd, events[ i ].events, data );
+			if ( events[ i ].data.fd != sfd )
+				handler( events[ i ].data.fd, events[ i ].events, data );
+			else
+				this->timeout = 0;
 		}
 	}
+	::free( this->events );
 	return true;
 }
 
@@ -94,5 +110,9 @@ void EPoll::stop() {
 	if ( this->efd == -1 )
 		return;
 	this->isRunning = false;
-	::free( this->events );
+}
+
+void EPoll::stop( pthread_t tid ) {
+	this->stop();
+	int ret = pthread_kill( tid, SIG_EPOLL );
 }

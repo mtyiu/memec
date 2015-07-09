@@ -1,4 +1,5 @@
 #include <cstring>
+#include <ctype.h>
 #include "coordinator.hh"
 
 Coordinator::Coordinator() {
@@ -128,19 +129,23 @@ bool Coordinator::start() {
 		this->sockets.self.debug();
 	}
 
+	this->startTime = start_timer();
+
 	return true;
 }
 
 bool Coordinator::stop() {
 	int i, len;
+
+	/* Sockets */
+	this->sockets.self.stop();
+
 	/* Workers */
 	len = this->workers.size();
 	for ( i = len - 1; i >= 0; i-- )
 		this->workers[ i ].stop();
-	for ( i = len - 1; i >= 0; i-- )
-		this->workers[ i ].join();
 
-	/* Workers and event queues */
+	/* Event queues */
 	if ( this->config.coordinator.workers.type == WORKER_TYPE_MIXED ) {
 		this->eventQueue.mixed->stop();
 	} else {
@@ -150,9 +155,11 @@ bool Coordinator::stop() {
 		this->eventQueue.separated.slave->stop();
 	}
 
+	/* Workers */
+	for ( i = len - 1; i >= 0; i-- )
+		this->workers[ i ].join();
+
 	/* Sockets */
-	this->sockets.epoll.stop();
-	this->sockets.self.stop();
 	for ( i = 0, len = this->sockets.masters.size(); i < len; i++ )
 		this->sockets.masters[ i ].stop();
 	for ( i = 0, len = this->sockets.slaves.size(); i < len; i++ )
@@ -162,7 +169,84 @@ bool Coordinator::stop() {
 	return true;
 }
 
+double Coordinator::getElapsedTime() {
+	return get_elapsed_time( this->startTime );
+}
+
 void Coordinator::print( FILE *f ) {
 	this->config.global.print( f );
 	this->config.coordinator.print( f );
 }
+
+void Coordinator::debug( FILE *f ) {
+
+}
+
+void Coordinator::interactive() {
+	char buf[ 4096 ];
+	char *command;
+	bool valid;
+	int i, len;
+
+	this->help();
+	while( 1 ) {
+		valid = false;
+		printf( "> " );
+		fflush( stdout );
+		if ( ! fgets( buf, sizeof( buf ), stdin ) ) {
+			printf( "\n" );
+			break;
+		}
+
+		// Trim
+		len = strnlen( buf, sizeof( buf ) );
+		for ( i = len - 1; i >= 0; i-- ) {
+			if ( isspace( buf[ i ] ) )
+				buf[ i ] = '\0';
+			else
+				break;
+		}
+
+		command = buf;
+		while( isspace( command[ 0 ] ) ) {
+			command++;
+		}
+		if ( strlen( command ) == 0 )
+			continue;
+
+		if ( strcmp( command, "help" ) == 0 ) {
+			valid = true;
+			this->help();
+		} else if ( strcmp( command, "exit" ) == 0 ) {
+			break;
+		} else if ( strcmp( command, "info" ) == 0 ) {
+			valid = true;
+			this->print();
+		} else if ( strcmp( command, "debug" ) == 0 ) {
+			valid = true;
+			this->debug();
+		} else if ( strcmp( command, "time" ) == 0 ) {
+			valid = true;
+			this->time();
+		} else {
+			valid = false;
+		}
+
+		if ( ! valid ) {
+			fprintf( stderr, "Invalid command!\n" );
+		}
+	}
+}
+
+void Coordinator::help() {
+
+}
+
+void Coordinator::info() {
+
+}
+
+void Coordinator::time() {
+	printf( "Elapsed time: %12.6lf s\n", this->getElapsedTime() );
+}
+

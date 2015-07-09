@@ -13,10 +13,6 @@ protected:
 	bool isRunning;
 	RingBuffer<EventType> *queue;
 
-	void free() {
-		delete this->queue;
-	}
-
 public:
 	EventQueue( size_t size, bool block = true ) {
 		this->config.size = size;
@@ -25,17 +21,20 @@ public:
 		this->queue = new RingBuffer<EventType>( size, block );
 	}
 
+	~EventQueue() {
+		delete this->queue;
+	}
+
 	bool start() {
-		this->isRunning = isRunning;
+		this->isRunning = true;
 		return true;
 	}
 
 	void stop() {
 		if ( ! this->isRunning )
 			return;
-
+		this->queue->Stop();
 		this->isRunning = false;
-		this->free();
 	}
 
 	void debug( FILE *f = stdout ) {
@@ -43,11 +42,15 @@ public:
 	}
 
 	bool insert( EventType event ) {
-		return this->queue->Insert( &event, sizeof( EventType ) ) == 0;
+		if ( this->isRunning )
+			return this->queue->Insert( &event, sizeof( EventType ) ) == 0;
+		return false;
 	}
 
 	bool extract( EventType &event ) {
-		return this->queue->Extract( &event ) == 0;
+		bool ret;
+		ret = this->queue->Extract( &event ) == 0;
+		return ret;
 	}
 };
 

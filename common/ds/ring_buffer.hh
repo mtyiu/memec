@@ -85,9 +85,6 @@ public:
 			pthread_cond_wait(&cvFull, &mAccess);
 		}
 		pthread_mutex_unlock(&mAccess);
-	}
-
-	void Terminate() {
 		pthread_cond_broadcast(&cvEmpty);
 	}
 };
