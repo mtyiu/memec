@@ -11,14 +11,13 @@ private:
 	CoordinatorEventQueue *eventQueue;
 
 	void free();
-	static void *run( void *args );
+	static void *run( void *argv );
 
 public:
-	CoordinatorWorker();
 	bool init();
 	bool start();
 	void stop();
-	void debug( FILE *f = stdout );
+	void debug();
 };
 
 #endif

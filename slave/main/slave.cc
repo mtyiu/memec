@@ -36,6 +36,7 @@ bool Slave::init( char *path, bool verbose ) {
 		this->sockets.coordinators[ i ].init( this->config.global.coordinators[ i ] );
 	}
 
+	// Show configuration //
 	if ( verbose ) {
 		this->config.global.print();
 		this->config.slave.print();

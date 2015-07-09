@@ -18,9 +18,7 @@ public:
 	}
 
 	inline void join() {
-		if ( this->isRunning )
-			pthread_join( this->tid, NULL );
-		this->isRunning = false;
+		pthread_join( this->tid, NULL );
 	}
 
 	inline bool getIsRunning() {
@@ -33,7 +31,7 @@ public:
 
 	virtual bool start() = 0;
 	virtual void stop() = 0;
-	virtual void debug( FILE *f = stdout ) = 0;
+	virtual void debug() = 0;
 };
 
 #endif

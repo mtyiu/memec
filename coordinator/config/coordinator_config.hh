@@ -6,20 +6,31 @@
 #include "../../common/config/server_addr.hh"
 #include "../../common/config/config.hh"
 #include "../../common/config/global_config.hh"
-#include "../../common/event/event_queue_type.hh"
+#include "../../common/worker/worker_type.hh"
 
 class CoordinatorConfig : public Config {
 public:
 	struct {
 		ServerAddr addr;
-		uint8_t workers;
 	} coordinator;
 	struct {
 		uint32_t maxEvents;
 		int32_t timeout;
 	} epoll;
 	struct {
-		EventQueueType type;
+		WorkerType type;
+		struct {
+			uint8_t mixed;
+			struct {
+				uint16_t total;
+				uint8_t application;
+				uint8_t coordinator;
+				uint8_t master;
+				uint8_t slave;
+			} separated;
+		} number;
+	} workers;
+	struct {
 		bool block;
 		struct {
 			uint32_t mixed;

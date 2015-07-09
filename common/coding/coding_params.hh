@@ -1,5 +1,5 @@
-#ifndef __COMMON_CODING_PARAMS_HH__
-#define __COMMON_CODING_PARAMS_HH__
+#ifndef __COMMON_CODING_CODING_PARAMS_HH__
+#define __COMMON_CODING_CODING_PARAMS_HH__
 
 #include <stdint.h>
 #include "scheme.hh"

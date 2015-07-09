@@ -41,7 +41,7 @@ bool Master::init( char *path, bool verbose ) {
 		this->sockets.slaves[ i ].init( this->config.global.slaves[ i ] );
 	}
 
-	// Print debug messages //
+	// Show configuration //
 	if ( verbose ) {
 		this->config.global.print();
 		this->config.master.print();

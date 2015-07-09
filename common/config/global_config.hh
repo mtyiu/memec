@@ -6,8 +6,8 @@
 #include <stdint.h>
 #include "config.hh"
 #include "server_addr.hh"
-#include "../coding/scheme.hh"
-#include "../coding/params.hh"
+#include "../coding/coding_scheme.hh"
+#include "../coding/coding_params.hh"
 
 class GlobalConfig : public Config {
 public:
