@@ -4,21 +4,19 @@
 #include <vector>
 #include <cstdio>
 #include "../config/coordinator_config.hh"
-#include "../event/mixed_event.hh"
-#include "../event/application_event.hh"
-#include "../event/coordinator_event.hh"
-#include "../event/master_event.hh"
-#include "../event/slave_event.hh"
+#include "../event/event_queue.hh"
 #include "../socket/coordinator_socket.hh"
 #include "../socket/master_socket.hh"
 #include "../socket/slave_socket.hh"
+#include "../worker/worker.hh"
 #include "../../common/config/global_config.hh"
-#include "../../common/event/event_queue.hh"
 #include "../../common/socket/epoll.hh"
 
 // Implement the singleton pattern
 class Coordinator {
 private:
+	std::vector<CoordinatorWorker> workers;
+
 	Coordinator();
 	// Do not implement
 	Coordinator( Coordinator const& );
@@ -37,15 +35,7 @@ public:
 		std::vector<MasterSocket> masters;
 		std::vector<SlaveSocket> slaves;
 	} sockets;
-	union {
-		EventQueue<MixedEvent> *mixed;
-		struct {
-			EventQueue<ApplicationEvent> *application;
-			EventQueue<CoordinatorEvent> *coordinator;
-			EventQueue<MasterEvent> *master;
-			EventQueue<SlaveEvent> *slave;
-		} separated;
-	} eventQueue;
+	CoordinatorEventQueue eventQueue;
 	
 	static Coordinator *getInstance() {
 		static Coordinator coordinator;

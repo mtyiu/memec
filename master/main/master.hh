@@ -24,7 +24,6 @@ public:
 		GlobalConfig global;
 		MasterConfig master;
 	} config;
-
 	struct {
 		MasterSocket self;
 		EPoll epoll;
