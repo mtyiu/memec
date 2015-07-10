@@ -23,7 +23,7 @@ void CoordinatorWorker::dispatch( CoordinatorEvent event ) {
 }
 
 void CoordinatorWorker::dispatch( MasterEvent event ) {
-	bool connected;
+	bool connected, isSend;
 	ssize_t ret;
 	struct {
 		size_t size;
@@ -33,23 +33,30 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 	switch( event.type ) {
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
 			buffer.data = this->protocol.resRegisterMaster( buffer.size, true );
+			isSend = true;
 			break;
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resRegisterMaster( buffer.size, false );
+			isSend = true;
 			break;
 		default:
 			return;
 	}
 
-	ret = event.socket->send( buffer.data, buffer.size, connected );
+	if ( isSend ) {
+		ret = event.socket->send( buffer.data, buffer.size, connected );
+		if ( ret != ( ssize_t ) buffer.size )
+			__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+	} else {
+
+	}
+
 	if ( ! connected )
 		__ERROR__( "CoordinatorWorker", "dispatch", "The master is disconnected." );
-	if ( ret != ( ssize_t ) buffer.size )
-		__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 }
 
 void CoordinatorWorker::dispatch( SlaveEvent event ) {
-	bool connected;
+	bool connected, isSend;
 	ssize_t ret;
 	struct {
 		size_t size;
@@ -59,19 +66,24 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 	switch( event.type ) {
 		case SLAVE_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
 			buffer.data = this->protocol.resRegisterSlave( buffer.size, true );
+			isSend = true;
 			break;
 		case SLAVE_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resRegisterSlave( buffer.size, false );
+			isSend = true;
 			break;
 		default:
 			return;
 	}
 
-	ret = event.socket->send( buffer.data, buffer.size, connected );
+	if ( isSend ) {
+		ret = event.socket->send( buffer.data, buffer.size, connected );
+		if ( ret != ( ssize_t ) buffer.size )
+			__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+	}
+	
 	if ( ! connected )
 		__ERROR__( "CoordinatorWorker", "dispatch", "The slave is disconnected." );
-	if ( ret != ( ssize_t ) buffer.size )
-		__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 }
 
 void CoordinatorWorker::free() {

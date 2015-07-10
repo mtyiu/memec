@@ -1,7 +1,6 @@
 #ifndef __COORDINATOR_EVENT_MIXED_EVENT_HH__
 #define __COORDINATOR_EVENT_MIXED_EVENT_HH__
 
-#include "application_event.hh"
 #include "coordinator_event.hh"
 #include "master_event.hh"
 #include "slave_event.hh"

@@ -3,6 +3,7 @@
 #include "slave_peer_socket.hh"
 
 bool SlavePeerSocket::start() {
+	this->registered = false;
 	if ( this->connect() ) {
 		Slave *slave = Slave::getInstance();
 		SlavePeerEvent event;
@@ -16,6 +17,13 @@ bool SlavePeerSocket::start() {
 ssize_t SlavePeerSocket::send( char *buf, size_t ulen, bool &connected ) {
 	return Socket::send( this->sockfd, buf, ulen, connected );
 }
+
 ssize_t SlavePeerSocket::recv( char *buf, size_t ulen, bool &connected, bool wait ) {
 	return Socket::recv( this->sockfd, buf, ulen, connected, wait );
+}
+
+void SlavePeerSocket::print( FILE *f ) {
+	char buf[ 16 ];
+	Socket::ntoh_ip( this->addr.sin_addr.s_addr, buf, 16 );
+	fprintf( f, "[%4d] %s:%u (%sconnected / %sregistered)\n", this->sockfd, buf, Socket::ntoh_port( this->addr.sin_port ), this->connected ? "" : "not ", this->registered ? "" : "not " );
 }

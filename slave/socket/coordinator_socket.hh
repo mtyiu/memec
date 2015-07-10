@@ -5,9 +5,12 @@
 
 class CoordinatorSocket : public Socket {
 public:
+	bool registered;
+	
 	bool start();
 	ssize_t send( char *buf, size_t ulen, bool &connected );
 	ssize_t recv( char *buf, size_t ulen, bool &connected, bool wait );
+	void print( FILE *f = stdout );
 };
 
 #endif

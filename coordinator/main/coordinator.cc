@@ -61,7 +61,6 @@ bool Coordinator::init( char *path, bool verbose ) {
 		}
 	} else {
 		this->workers.reserve( this->config.coordinator.workers.number.separated.total );
-
 		this->eventQueue.init(
 			this->config.coordinator.eventQueue.block,
 			this->config.coordinator.eventQueue.size.separated.coordinator,

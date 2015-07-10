@@ -7,13 +7,10 @@ class CoordinatorSocket : public Socket {
 public:
 	bool registered;
 
-	CoordinatorSocket();
 	bool start();
 	ssize_t send( char *buf, size_t ulen, bool &connected );
 	ssize_t recv( char *buf, size_t ulen, bool &connected, bool wait );
-
-	void isRegistered( bool registered );
-	bool isRegistered();
+	void print( FILE *f = stdout );
 };
 
 #endif

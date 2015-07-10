@@ -47,7 +47,7 @@ bool Slave::init( char *path, bool verbose ) {
 		CoordinatorSocket socket;
 		int fd;
 
-		socket.init( this->config.global.coordinators[ i ] );
+		socket.init( this->config.global.coordinators[ i ], &this->sockets.epoll );
 		fd = socket.getSocket();
 		this->sockets.coordinators.set( fd, socket );
 	}
@@ -58,7 +58,7 @@ bool Slave::init( char *path, bool verbose ) {
 		SlavePeerSocket socket;
 		int fd;
 
-		socket.init( this->config.global.slaves[ i ] );
+		socket.init( this->config.global.slaves[ i ], &this->sockets.epoll );
 		fd = socket.getSocket();
 		this->sockets.slavePeers.set( fd, socket );
 	}
@@ -80,7 +80,6 @@ bool Slave::init( char *path, bool verbose ) {
 		}
 	} else {
 		this->workers.reserve( this->config.slave.workers.number.separated.total );
-
 		this->eventQueue.init(
 			this->config.slave.eventQueue.block,
 			this->config.slave.eventQueue.size.separated.coordinator,

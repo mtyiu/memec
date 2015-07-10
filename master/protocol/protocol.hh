@@ -7,6 +7,7 @@ class MasterProtocol : public Protocol {
 public:
 	MasterProtocol() : Protocol( ROLE_MASTER ) {}
 	char *reqRegisterCoordinator( size_t &size );
+	char *reqRegisterSlave( size_t &size );
 	char *resRegisterApplication( size_t &size, bool success );
 };
 

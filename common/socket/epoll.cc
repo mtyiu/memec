@@ -84,7 +84,7 @@ bool EPoll::start( bool (*handler)( int, uint32_t, void * ), void *data ) {
 		__ERROR__( "EPoll", "start", "%s", strerror( errno ) );
 		return false;
 	}
-	this->add( sfd, EPOLLIN | EPOLLET );
+	this->add( sfd, EPOLL_EVENT_SET );
 
 	// Start polling
 	this->isRunning = true;

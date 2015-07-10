@@ -17,7 +17,7 @@ bool MasterSocket::init( int type, unsigned long addr, unsigned short port, EPol
 	return (
 		Socket::init( type, addr, port ) &&
 		this->listen() &&
-		epoll->add( this->sockfd, EPOLLIN | EPOLLET )
+		epoll->add( this->sockfd, EPOLL_EVENT_SET )
 	);
 }
 
@@ -89,7 +89,7 @@ bool MasterSocket::handler( int fd, uint32_t events, void *data ) {
 				break;
 			}
 			socket->sockets.set( fd, addr, false );
-			socket->epoll->add( fd, EPOLLIN | EPOLLRDHUP | EPOLLET );
+			socket->epoll->add( fd, EPOLL_EVENT_SET );
 		}
 	///////////////////////////////////////////////////////////////////////////
 	} else {
@@ -106,12 +106,11 @@ bool MasterSocket::handler( int fd, uint32_t events, void *data ) {
 				__ERROR__( "MasterSocket", "handler", "Cannot receive message." );
 				return false;
 			} else if ( ( size_t ) ret == socket->buffer.size ) {
-				uint8_t magic, from, opcode;
-				uint32_t length;
-				socket->protocol.parseHeader( socket->buffer.data, socket->buffer.size, magic, from, opcode, length );
+				ProtocolHeader header;
+				socket->protocol.parseHeader( socket->buffer.data, socket->buffer.size, header );
 				// Register message expected
-				if ( magic == PROTO_MAGIC_REQUEST && opcode == PROTO_OPCODE_REGISTER ) {
-					if ( from == PROTO_MAGIC_FROM_APPLICATION ) {
+				if ( header.magic == PROTO_MAGIC_REQUEST && header.opcode == PROTO_OPCODE_REGISTER ) {
+					if ( header.from == PROTO_MAGIC_FROM_APPLICATION ) {
 						ApplicationSocket applicationSocket;
 						applicationSocket.init( fd, *addr );
 						master->sockets.applications.set( fd, applicationSocket );
@@ -120,9 +119,12 @@ bool MasterSocket::handler( int fd, uint32_t events, void *data ) {
 						event.resRegister( master->sockets.applications.get( fd ) );
 						master->eventQueue.insert( event );
 					} else {
+						socket->sockets.removeAt( index );
+						::close( fd );
 						__ERROR__( "MasterSocket", "handler", "Invalid register message source." );
 						return false;
 					}
+					socket->sockets.removeAt( index );
 				} else {
 					__ERROR__( "MasterSocket", "handler", "Invalid register message." );
 					return false;

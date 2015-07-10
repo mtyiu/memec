@@ -173,8 +173,13 @@ bool Socket::init( int type, unsigned long addr, unsigned short port, bool block
 	);
 }
 
-bool Socket::init( ServerAddr addr ) {
-	return this->init( addr.type, addr.addr, addr.port, true );
+bool Socket::init( ServerAddr addr, EPoll *epoll ) {
+	if ( this->init( addr.type, addr.addr, addr.port, true ) ) {
+		if ( epoll )
+			epoll->add( this->sockfd, EPOLL_EVENT_SET );
+		return true;
+	}
+	return false;
 }
 
 bool Socket::init( int sockfd, struct sockaddr_in addr ) {

@@ -23,7 +23,7 @@ void SlaveWorker::dispatch( MixedEvent event ) {
 }
 
 void SlaveWorker::dispatch( CoordinatorEvent event ) {
-	bool connected;
+	bool connected, isSend;
 	ssize_t ret;
 	struct {
 		size_t size;
@@ -33,20 +33,56 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 	switch( event.type ) {
 		case COORDINATOR_EVENT_TYPE_REGISTER_REQUEST:
 			buffer.data = this->protocol.reqRegisterCoordinator( buffer.size );
+			isSend = true;
+			break;
+		case COORDINATOR_EVENT_TYPE_PENDING:
+			isSend = false;
 			break;
 		default:
 			return;
 	}
 
-	ret = event.socket->send( buffer.data, buffer.size, connected );
+	if ( isSend ) {
+		ret = event.socket->send( buffer.data, buffer.size, connected );
+		if ( ret != ( ssize_t ) buffer.size )
+			__ERROR__( "SlaveWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+	} else {
+		ProtocolHeader header;
+
+		ret = event.socket->recv( this->protocol.buffer.data, PROTO_HEADER_SIZE, connected, true );
+		if ( ret == PROTO_HEADER_SIZE && connected ) {
+			this->protocol.parseHeader( this->protocol.buffer.data, ret, header );
+			// Validate message
+			if ( header.from != PROTO_MAGIC_FROM_COORDINATOR ) {
+				__ERROR__( "SlaveWorker", "dispatch", "Invalid message source from coordinator." );
+				return;
+			}
+			switch( header.opcode ) {
+				case PROTO_OPCODE_REGISTER:
+					switch( header.magic ) {
+						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							event.socket->registered = true;
+							break;
+						case PROTO_MAGIC_RESPONSE_FAILURE:
+							__ERROR__( "SlaveWorker", "dispatch", "Failed to register with coordinator." );
+							break;
+						default:
+							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from coordinator." );
+							break;
+					}
+					break;
+				default:
+					__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from coordinator." );
+					return;
+			}
+		}
+	}
 	if ( ! connected )
-		__ERROR__( "CoordinatorWorker", "dispatch", "The coordinator is disconnected." );
-	if ( ret != ( ssize_t ) buffer.size )
-		__ERROR__( "SlaveWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+		__ERROR__( "SlaveWorker", "dispatch", "The coordinator is disconnected." );
 }
 
 void SlaveWorker::dispatch( MasterEvent event ) {
-	bool connected;
+	bool connected, isSend;
 	ssize_t ret;
 	struct {
 		size_t size;
@@ -56,26 +92,33 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 	switch( event.type ) {
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
 			buffer.data = this->protocol.resRegisterMaster( buffer.size, true );
+			isSend = true;
 			break;
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resRegisterMaster( buffer.size, false );
+			isSend = true;
 			break;
 		default:
 			return;
 	}
 
-	ret = event.socket->send( buffer.data, buffer.size, connected );
+	if ( isSend ) {
+		ret = event.socket->send( buffer.data, buffer.size, connected );
+		if ( ret != ( ssize_t ) buffer.size )
+			__ERROR__( "SlaveWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+	} else {
+		
+	}
+
 	if ( ! connected )
 		__ERROR__( "SlaveWorker", "dispatch", "The master is disconnected." );
-	if ( ret != ( ssize_t ) buffer.size )
-		__ERROR__( "SlaveWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 }
 
 void SlaveWorker::dispatch( SlaveEvent event ) {
 }
 
 void SlaveWorker::dispatch( SlavePeerEvent event ) {
-	bool connected;
+	bool connected, isSend;
 	ssize_t ret;
 	struct {
 		size_t size;
@@ -85,22 +128,32 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 	switch( event.type ) {
 		case SLAVE_PEER_EVENT_TYPE_REGISTER_REQUEST:
 			buffer.data = this->protocol.reqRegisterSlavePeer( buffer.size );
+			isSend = true;
 			break;
 		case SLAVE_PEER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
 			buffer.data = this->protocol.resRegisterSlavePeer( buffer.size, true );
+			isSend = true;
 			break;
 		case SLAVE_PEER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resRegisterSlavePeer( buffer.size, false );
+			isSend = true;
+			break;
+		case SLAVE_PEER_EVENT_TYPE_PENDING:
+			isSend = false;
 			break;
 		default:
 			return;
 	}
 
-	ret = event.socket->send( buffer.data, buffer.size, connected );
+	if ( isSend ) {
+		ret = event.socket->send( buffer.data, buffer.size, connected );
+		if ( ret != ( ssize_t ) buffer.size )
+			__ERROR__( "SlaveWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+	} else {
+
+	}
 	if ( ! connected )
 		__ERROR__( "SlaveWorker", "dispatch", "The slave is disconnected." );
-	if ( ret != ( ssize_t ) buffer.size )
-		__ERROR__( "SlaveWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 }
 
 void SlaveWorker::free() {

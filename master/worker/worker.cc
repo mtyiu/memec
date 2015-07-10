@@ -23,7 +23,7 @@ void MasterWorker::dispatch( MixedEvent event ) {
 }
 
 void MasterWorker::dispatch( ApplicationEvent event ) {
-	bool connected;
+	bool connected, isSend;
 	ssize_t ret;
 	struct {
 		size_t size;
@@ -33,23 +33,30 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 	switch( event.type ) {
 		case APPLICATION_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
 			buffer.data = this->protocol.resRegisterApplication( buffer.size, true );
+			isSend = true;
 			break;
 		case APPLICATION_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resRegisterApplication( buffer.size, false );
+			isSend = true;
 			break;
 		default:
 			return;
 	}
 
-	ret = event.socket->send( buffer.data, buffer.size, connected );
+	if ( isSend ) {
+		ret = event.socket->send( buffer.data, buffer.size, connected );
+		if ( ret != ( ssize_t ) buffer.size )
+			__ERROR__( "MasterWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+	} else {
+
+	}
+
 	if ( ! connected )
 		__ERROR__( "MasterWorker", "dispatch", "The application is disconnected." );
-	if ( ret != ( ssize_t ) buffer.size )
-		__ERROR__( "MasterWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 }
 
 void MasterWorker::dispatch( CoordinatorEvent event ) {
-	bool connected;
+	bool connected, isSend;
 	ssize_t ret;
 	struct {
 		size_t size;
@@ -59,24 +66,114 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 	switch( event.type ) {
 		case COORDINATOR_EVENT_TYPE_REGISTER_REQUEST:
 			buffer.data = this->protocol.reqRegisterCoordinator( buffer.size );
+			isSend = true;
+			break;
+		case COORDINATOR_EVENT_TYPE_PENDING:
+			isSend = false;
 			break;
 		default:
 			return;
 	}
 
-	ret = event.socket->send( buffer.data, buffer.size, connected );
+	if ( isSend ) {
+		ret = event.socket->send( buffer.data, buffer.size, connected );
+		if ( ret != ( ssize_t ) buffer.size )
+			__ERROR__( "MasterWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+	} else {
+		ProtocolHeader header;
+
+		ret = event.socket->recv( this->protocol.buffer.data, PROTO_HEADER_SIZE, connected, true );
+		if ( ret == PROTO_HEADER_SIZE && connected ) {
+			this->protocol.parseHeader( this->protocol.buffer.data, ret, header );
+			// Validate message
+			if ( header.from != PROTO_MAGIC_FROM_COORDINATOR ) {
+				__ERROR__( "MasterWorker", "dispatch", "Invalid message source from coordinator." );
+				return;
+			}
+			switch( header.opcode ) {
+				case PROTO_OPCODE_REGISTER:
+					switch( header.magic ) {
+						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							event.socket->registered = true;
+							break;
+						case PROTO_MAGIC_RESPONSE_FAILURE:
+							__ERROR__( "MasterWorker", "dispatch", "Failed to register with coordinator." );
+							break;
+						default:
+							__ERROR__( "MasterWorker", "dispatch", "Invalid magic code from coordinator." );
+							break;
+					}
+					break;
+				default:
+					__ERROR__( "MasterWorker", "dispatch", "Invalid opcode from coordinator." );
+					return;
+			}
+		}
+	}
 	if ( ! connected )
 		__ERROR__( "MasterWorker", "dispatch", "The coordinator is disconnected." );
-	if ( ret != ( ssize_t ) buffer.size )
-		__ERROR__( "MasterWorker", "dispatch", "The number of bytes sent (%lu bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 }
 
 void MasterWorker::dispatch( MasterEvent event ) {
-
 }
 
 void MasterWorker::dispatch( SlaveEvent event ) {
+	bool connected, isSend;
+	ssize_t ret;
+	struct {
+		size_t size;
+		char *data;
+	} buffer;
 
+	switch( event.type ) {
+		case SLAVE_EVENT_TYPE_REGISTER_REQUEST:
+			buffer.data = this->protocol.reqRegisterSlave( buffer.size );
+			isSend = true;
+			break;
+		case SLAVE_EVENT_TYPE_PENDING:
+			isSend = false;
+			break;
+		default:
+			return;
+	}
+
+	if ( isSend ) {
+		ret = event.socket->send( buffer.data, buffer.size, connected );
+		if ( ret != ( ssize_t ) buffer.size )
+			__ERROR__( "MasterWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+	} else {
+		ProtocolHeader header;
+
+		ret = event.socket->recv( this->protocol.buffer.data, PROTO_HEADER_SIZE, connected, true );
+		if ( ret == PROTO_HEADER_SIZE && connected ) {
+			this->protocol.parseHeader( this->protocol.buffer.data, ret, header );
+			// Validate message
+			if ( header.from != PROTO_MAGIC_FROM_SLAVE ) {
+				__ERROR__( "MasterWorker", "dispatch", "Invalid message source from slave." );
+				return;
+			}
+			switch( header.opcode ) {
+				case PROTO_OPCODE_REGISTER:
+					switch( header.magic ) {
+						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							event.socket->registered = true;
+							break;
+						case PROTO_MAGIC_RESPONSE_FAILURE:
+							__ERROR__( "MasterWorker", "dispatch", "Failed to register with slave." );
+							break;
+						default:
+							__ERROR__( "MasterWorker", "dispatch", "Invalid magic code from slave." );
+							break;
+					}
+					break;
+				default:
+					__ERROR__( "MasterWorker", "dispatch", "Invalid opcode from slave." );
+					return;
+			}
+		}
+	}
+	if ( ! connected )
+		__ERROR__( "MasterWorker", "dispatch", "The slave is disconnected." );
 }
 
 

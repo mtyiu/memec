@@ -17,7 +17,7 @@ bool CoordinatorSocket::init( int type, unsigned long addr, unsigned short port,
 	bool ret = (
 		Socket::init( type, addr, port ) &&
 		this->listen() &&
-		epoll->add( this->sockfd, EPOLLIN | EPOLLET )
+		epoll->add( this->sockfd, EPOLL_EVENT_SET )
 	);
 	if ( ret ) {
 		this->sockets.reserve( numSlaves );
@@ -90,7 +90,7 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 				break;
 			}
 			socket->sockets.set( fd, addr, false );
-			socket->epoll->add( fd, EPOLLIN | EPOLLET );
+			socket->epoll->add( fd, EPOLL_EVENT_SET );
 		}
 	///////////////////////////////////////////////////////////////////////////
 	} else {
@@ -107,12 +107,11 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 				__ERROR__( "CoordinatorSocket", "handler", "Cannot receive message." );
 				return false;
 			} else if ( ( size_t ) ret == socket->buffer.size ) {
-				uint8_t magic, from, opcode;
-				uint32_t length;
-				socket->protocol.parseHeader( socket->buffer.data, socket->buffer.size, magic, from, opcode, length );
+				ProtocolHeader header;
+				socket->protocol.parseHeader( socket->buffer.data, socket->buffer.size, header );
 				// Register message expected
-				if ( magic == PROTO_MAGIC_REQUEST && opcode == PROTO_OPCODE_REGISTER ) {
-					if ( from == PROTO_MAGIC_FROM_MASTER ) {
+				if ( header.magic == PROTO_MAGIC_REQUEST && header.opcode == PROTO_OPCODE_REGISTER ) {
+					if ( header.from == PROTO_MAGIC_FROM_MASTER ) {
 						MasterSocket masterSocket;
 						masterSocket.init( fd, *addr );
 						coordinator->sockets.masters.set( fd, masterSocket );
@@ -120,7 +119,7 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 						MasterEvent event;
 						event.resRegister( coordinator->sockets.masters.get( fd ) );
 						coordinator->eventQueue.insert( event );
-					} else if ( from == PROTO_MAGIC_FROM_SLAVE ) {
+					} else if ( header.from == PROTO_MAGIC_FROM_SLAVE ) {
 						SlaveSocket slaveSocket;
 						slaveSocket.init( fd, *addr );
 						coordinator->sockets.slaves.set( fd, slaveSocket );
@@ -129,9 +128,12 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 						event.resRegister( coordinator->sockets.slaves.get( fd ) );
 						coordinator->eventQueue.insert( event );
 					} else {
+						socket->sockets.removeAt( index );
+						::close( fd );
 						__ERROR__( "CoordinatorSocket", "handler", "Invalid register message source." );
 						return false;
 					}
+					socket->sockets.removeAt( index );
 				} else {
 					__ERROR__( "CoordinatorSocket", "handler", "Invalid register message." );
 					return false;

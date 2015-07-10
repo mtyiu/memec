@@ -5,8 +5,9 @@
 #include <signal.h>
 #include <sys/epoll.h>
 
-#define EPOLL_MAX_EVENTS 64
-#define SIG_EPOLL	SIGUSR1
+#define EPOLL_MAX_EVENTS	64
+#define SIG_EPOLL			SIGUSR1
+#define EPOLL_EVENT_SET		EPOLLIN | EPOLLET | EPOLLRDHUP
 
 class EPoll {
 private:

@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include "epoll.hh"
 #include "../config/server_addr.hh"
 
 enum SocketMode {
@@ -37,14 +38,14 @@ protected:
 
 public:
 	bool init( int type, unsigned long addr, unsigned short port, bool block = false );
-	bool init( ServerAddr addr );
+	bool init( ServerAddr addr, EPoll *epoll );
 	bool init( int sockfd, struct sockaddr_in addr );
 	inline int getSocket() {
 		return this->sockfd;
 	}
 	virtual bool start() = 0;
 	virtual void stop();
-	void print( FILE *f = stdout );
+	virtual void print( FILE *f = stdout );
 
 	// Utilities
 	static bool hton_ip( char *ip, unsigned long &ret );

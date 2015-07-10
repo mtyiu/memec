@@ -105,6 +105,16 @@ bool Protocol::parseHeader( char *buf, size_t size, uint8_t &magic, uint8_t &fro
 	return true;
 }
 
+bool Protocol::parseHeader( char *buf, size_t size, struct ProtocolHeader &header ) {
+	return this->parseHeader(
+		buf, size,
+		header.magic,
+		header.from,
+		header.opcode,
+		header.length
+	);
+}
+
 size_t Protocol::getSuggestedBufferSize( uint32_t keySize, uint32_t chunkSize ) {
 	size_t ret = (
 		PROTO_HEADER_SIZE +

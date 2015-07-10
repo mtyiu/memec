@@ -55,10 +55,16 @@ enum Role {
 	ROLE_SLAVE
 };
 
+struct ProtocolHeader {
+	uint8_t magic, from, opcode;
+	uint32_t length;
+};
+
 class Protocol {
 protected:
 	uint8_t from, to;
 
+	bool parseHeader( char *buf, size_t size, uint8_t &magic, uint8_t &from, uint8_t &opcode, uint32_t &length );
 	size_t generateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t length );
 
 public:
@@ -70,7 +76,7 @@ public:
 	Protocol( Role role );
 	bool init( size_t size = 0 );
 	void free();
-	bool parseHeader( char *buf, size_t size, uint8_t &magic, uint8_t &from, uint8_t &opcode, uint32_t &length );
+	bool parseHeader( char *buf, size_t size, struct ProtocolHeader &header );
 	static size_t getSuggestedBufferSize( uint32_t keySize, uint32_t chunkSize );
 };
 
