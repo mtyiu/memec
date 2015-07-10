@@ -3,7 +3,6 @@
 #include "../util/debug.hh"
 
 #define PROTO_BUF_MIN_SIZE		65536
-#define PROTO_HEADER_SIZE		8
 #define PROTO_KEY_VALUE_SIZE	4 // 1 byte for key size, 3 bytes for value size
 
 size_t Protocol::generateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t length ) {

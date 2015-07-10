@@ -1,8 +1,8 @@
 #include "protocol.hh"
 
-char *CoordinatorProtocol::resMasterRegister( size_t &size ) {
+char *CoordinatorProtocol::resMasterRegister( size_t &size, bool success ) {
 	size = this->generateHeader(
-		PROTO_MAGIC_RESPONSE_SUCCESS,
+		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_MASTER,
 		PROTO_OPCODE_REGISTER,
 		0
@@ -45,9 +45,9 @@ char *CoordinatorProtocol::resMasterRegister( size_t &size, GlobalConfig &global
 	return this->buffer.data;
 }
 
-char *CoordinatorProtocol::resSlaveRegister( size_t &size ) {
+char *CoordinatorProtocol::resSlaveRegister( size_t &size, bool success ) {
 	size = this->generateHeader(
-		PROTO_MAGIC_RESPONSE_SUCCESS,
+		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_REGISTER,
 		0

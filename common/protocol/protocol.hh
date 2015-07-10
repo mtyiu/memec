@@ -33,6 +33,11 @@
 #define PROTO_OPCODE_REGISTER			0x00
 #define PROTO_OPCODE_GET_CONFIG			0x01
 
+/****************
+ * Internal use *
+ ****************/
+#define PROTO_HEADER_SIZE				8
+
 #include <stdint.h>
 #include <arpa/inet.h>
 
@@ -45,14 +50,15 @@ enum Role {
 class Protocol {
 protected:
 	uint8_t from, to;
+
+	size_t generateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t length );
+
+public:
 	struct {
 		size_t size;
 		char *data;
 	} buffer;
 
-	size_t generateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t length );
-
-public:
 	Protocol( Role role );
 	bool init( size_t size = 0 );
 	void free();

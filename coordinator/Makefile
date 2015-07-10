@@ -7,6 +7,8 @@ BIN=$(PLIO_SRC_ROOT)/bin/coordinator
 OBJS= \
 	config/coordinator_config.o \
 	event/coordinator_event.o \
+	event/master_event.o \
+	event/slave_event.o \
 	protocol/protocol.o \
 	socket/coordinator_socket.o \
 	socket/master_socket.o \

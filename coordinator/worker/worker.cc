@@ -27,20 +27,77 @@ void CoordinatorWorker::dispatch( ApplicationEvent event ) {
 }
 
 void CoordinatorWorker::dispatch( CoordinatorEvent event ) {
-
+	switch( event.type ) {
+		default:
+			break;
+	}
 }
 
 void CoordinatorWorker::dispatch( MasterEvent event ) {
+	bool isResponse = false;
+	struct {
+		size_t size;
+		char *data;
+	} buffer;
 
+	switch( event.type ) {
+		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
+			buffer.data = this->protocol.resMasterRegister( buffer.size, true );
+			isResponse = true;
+			break;
+		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resMasterRegister( buffer.size, false );
+			isResponse = true;
+			break;
+		case MASTER_EVENT_TYPE_PENDING:
+			break;
+		default:
+			return;
+	}
+
+	if ( isResponse ) {
+		bool connected;
+		event.socket->send( buffer.data, buffer.size, connected );
+
+		if ( ! connected )
+			__ERROR__( "CoordinatorWorker", "dispatch", "The master is disconnected." );
+	}
 }
 
 void CoordinatorWorker::dispatch( SlaveEvent event ) {
+	bool isResponse = false;
+	struct {
+		size_t size;
+		char *data;
+	} buffer;
 
+	switch( event.type ) {
+		case SLAVE_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
+			buffer.data = this->protocol.resSlaveRegister( buffer.size, true );
+			isResponse = true;
+			break;
+		case SLAVE_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resSlaveRegister( buffer.size, false );
+			isResponse = true;
+			break;
+		case SLAVE_EVENT_TYPE_PENDING:
+			isResponse = false;
+			break;
+		default:
+			return;
+	}
+
+	if ( isResponse ) {
+		bool connected;
+		event.socket->send( buffer.data, buffer.size, connected );
+
+		if ( ! connected )
+			__ERROR__( "CoordinatorWorker", "dispatch", "The slave is disconnected." );
+	}
 }
 
-
 void CoordinatorWorker::free() {
-
+	this->protocol.free();
 }
 
 void *CoordinatorWorker::run( void *argv ) {

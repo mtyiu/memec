@@ -22,8 +22,10 @@ public:
 		this->values.reserve( n );
 	}
 
-	ValueType *get( KeyType &key ) {
+	ValueType *get( KeyType &key, int *indexPtr = 0 ) {
 		int index = this->indexOf( key );
+		if ( indexPtr )
+			*indexPtr = index;
 		return index == -1 ? 0 : &this->values[ index ];
 	}
 
@@ -47,6 +49,12 @@ public:
 		int index = this->indexOf( key );
 		if ( index == -1 )
 			return false;
+		this->keys.erase( this->keys.begin() + index );
+		this->values.erase( this->values.begin() + index );
+		return true;
+	}
+
+	bool removeAt( int index ) {
 		this->keys.erase( this->keys.begin() + index );
 		this->values.erase( this->values.begin() + index );
 		return true;

@@ -5,18 +5,13 @@
 #include "../../common/event/event.hh"
 
 enum CoordinatorEventType {
-	COORDINATOR_EVENT_TYPE_REGISTER_REQUEST,
-	COORDINATOR_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS,
-	COORDINATOR_EVENT_TYPE_REGISTER_RESPONSE_FAILURE
+	COORDINATOR_EVENT_TYPE_UNDEFINED
 };
 
 class CoordinatorEvent : public Event {
 public:
 	CoordinatorEventType type;
 	CoordinatorSocket *socket;
-
-	void reqRegister( CoordinatorSocket *socket );
-	void resRegister( CoordinatorSocket *socket, bool success );
 };
 
 #endif
