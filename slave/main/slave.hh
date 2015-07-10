@@ -8,6 +8,7 @@
 #include "../socket/coordinator_socket.hh"
 #include "../socket/master_socket.hh"
 #include "../socket/slave_socket.hh"
+#include "../socket/slave_peer_socket.hh"
 #include "../worker/worker.hh"
 #include "../../common/config/global_config.hh"
 #include "../../common/ds/array_map.hh"
@@ -43,7 +44,7 @@ public:
 		EPoll epoll;
 		ArrayMap<int, CoordinatorSocket> coordinators;
 		ArrayMap<int, MasterSocket> masters;
-		ArrayMap<int, SlaveSocket> slaves;
+		ArrayMap<int, SlavePeerSocket> slavePeers;
 	} sockets;
 	SlaveEventQueue eventQueue;
 	

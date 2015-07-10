@@ -16,8 +16,8 @@ public:
 	MasterEventType type;
 	MasterSocket *socket;
 
-	void pending( MasterSocket *socket );
 	void resRegister( MasterSocket *socket, bool success = true );
+	void pending( MasterSocket *socket );
 };
 
 #endif

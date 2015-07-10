@@ -18,11 +18,12 @@ void Slave::signalHandler( int signal ) {
 
 bool Slave::init( char *path, bool verbose ) {
 	bool ret;
+	int mySlaveIndex;
 	// Parse configuration files //
 	if ( ( ! ( ret = this->config.global.parse( path ) ) ) ||
 	     ( ! ( ret = this->config.slave.merge( this->config.global ) ) ) ||
 	     ( ! ( ret = this->config.slave.parse( path ) ) ) ||
-	     ( ! this->config.slave.validate( this->config.global.slaves ) ) ) {
+	     ( ( mySlaveIndex = this->config.slave.validate( this->config.global.slaves ) ) == -1 ) ) {
 		return false;
 	}
 
@@ -50,15 +51,17 @@ bool Slave::init( char *path, bool verbose ) {
 		fd = socket.getSocket();
 		this->sockets.coordinators.set( fd, socket );
 	}
-	// this->sockets.slaves.reserve( this->config.global.slaves.size() );
-	// for ( int i = 0, len = this->config.global.slaves.size(); i < len; i++ ) {
-	// 	SlaveSocket socket;
-	// 	int fd;
+	this->sockets.slavePeers.reserve( this->config.global.slaves.size() - 1 );
+	for ( int i = 0, len = this->config.global.slaves.size(); i < len; i++ ) {
+		if ( i == mySlaveIndex )
+			continue;
+		SlavePeerSocket socket;
+		int fd;
 
-	// 	socket.init( this->config.global.slaves[ i ] );
-	// 	fd = socket.getSocket();
-	// 	this->sockets.slaves.set( fd, socket );
-	// }
+		socket.init( this->config.global.slaves[ i ] );
+		fd = socket.getSocket();
+		this->sockets.slavePeers.set( fd, socket );
+	}
 
 	/* Workers and event queues */
 	if ( this->config.slave.workers.type == WORKER_TYPE_MIXED ) {
@@ -80,10 +83,10 @@ bool Slave::init( char *path, bool verbose ) {
 
 		this->eventQueue.init(
 			this->config.slave.eventQueue.block,
-			this->config.slave.eventQueue.size.separated.application,
 			this->config.slave.eventQueue.size.separated.coordinator,
 			this->config.slave.eventQueue.size.separated.master,
-			this->config.slave.eventQueue.size.separated.slave
+			this->config.slave.eventQueue.size.separated.slave,
+			this->config.slave.eventQueue.size.separated.slavePeer
 		);
 
 		int index = 0;
@@ -97,10 +100,10 @@ bool Slave::init( char *path, bool verbose ) {
 			); \
 		}
 
-		WORKER_INIT_LOOP( application, WORKER_ROLE_APPLICATION )
 		WORKER_INIT_LOOP( coordinator, WORKER_ROLE_COORDINATOR )
 		WORKER_INIT_LOOP( master, WORKER_ROLE_MASTER )
 		WORKER_INIT_LOOP( slave, WORKER_ROLE_SLAVE )
+		WORKER_INIT_LOOP( slave, WORKER_ROLE_SLAVE_PEER )
 #undef WORKER_INIT_LOOP
 	}
 
@@ -176,6 +179,10 @@ bool Slave::stop() {
 	/* Sockets */
 	for ( i = 0, len = this->sockets.coordinators.size(); i < len; i++ )
 		this->sockets.coordinators[ i ].stop();
+	for ( i = 0, len = this->sockets.masters.size(); i < len; i++ )
+		this->sockets.masters[ i ].stop();
+	for ( i = 0, len = this->sockets.slavePeers.size(); i < len; i++ )
+		this->sockets.slavePeers[ i ].stop();
 
 	this->free();
 	this->isRunning = false;

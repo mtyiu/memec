@@ -64,7 +64,6 @@ bool Coordinator::init( char *path, bool verbose ) {
 
 		this->eventQueue.init(
 			this->config.coordinator.eventQueue.block,
-			this->config.coordinator.eventQueue.size.separated.application,
 			this->config.coordinator.eventQueue.size.separated.coordinator,
 			this->config.coordinator.eventQueue.size.separated.master,
 			this->config.coordinator.eventQueue.size.separated.slave
@@ -81,7 +80,6 @@ bool Coordinator::init( char *path, bool verbose ) {
 			); \
 		}
 
-		WORKER_INIT_LOOP( application, WORKER_ROLE_APPLICATION )
 		WORKER_INIT_LOOP( coordinator, WORKER_ROLE_COORDINATOR )
 		WORKER_INIT_LOOP( master, WORKER_ROLE_MASTER )
 		WORKER_INIT_LOOP( slave, WORKER_ROLE_SLAVE )

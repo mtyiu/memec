@@ -1,6 +1,6 @@
 #include "protocol.hh"
 
-char *CoordinatorProtocol::resMasterRegister( size_t &size, bool success ) {
+char *CoordinatorProtocol::resRegisterMaster( size_t &size, bool success ) {
 	size = this->generateHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_MASTER,
@@ -10,7 +10,7 @@ char *CoordinatorProtocol::resMasterRegister( size_t &size, bool success ) {
 	return this->buffer.data;
 }
 
-char *CoordinatorProtocol::resMasterRegister( size_t &size, GlobalConfig &globalConfig, MasterConfig *masterConfig ) {
+char *CoordinatorProtocol::resRegisterMaster( size_t &size, GlobalConfig &globalConfig, MasterConfig *masterConfig ) {
 	size_t length[ 3 ];
 	const char *serializedStrings[ 2 ];
 
@@ -45,7 +45,7 @@ char *CoordinatorProtocol::resMasterRegister( size_t &size, GlobalConfig &global
 	return this->buffer.data;
 }
 
-char *CoordinatorProtocol::resSlaveRegister( size_t &size, bool success ) {
+char *CoordinatorProtocol::resRegisterSlave( size_t &size, bool success ) {
 	size = this->generateHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_SLAVE,
@@ -55,7 +55,7 @@ char *CoordinatorProtocol::resSlaveRegister( size_t &size, bool success ) {
 	return this->buffer.data;
 }
 
-char *CoordinatorProtocol::resSlaveRegister( size_t &size, GlobalConfig &globalConfig, SlaveConfig *slaveConfig ) {
+char *CoordinatorProtocol::resRegisterSlave( size_t &size, GlobalConfig &globalConfig, SlaveConfig *slaveConfig ) {
 	size_t length[ 3 ];
 	const char *serializedStrings[ 2 ];
 

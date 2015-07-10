@@ -12,7 +12,6 @@ class MixedEvent : public Event {
 public:
 	EventType type;
 	union {
-		ApplicationEvent application;
 		CoordinatorEvent coordinator;
 		MasterEvent master;
 		SlaveEvent slave;
@@ -24,7 +23,6 @@ public:
 		this->event._FIELD_ = event; \
 	}
 
-	MIXED_EVENT_SET( ApplicationEvent, EVENT_TYPE_APPLICATION, application )
 	MIXED_EVENT_SET( CoordinatorEvent, EVENT_TYPE_COORDINATOR, coordinator )
 	MIXED_EVENT_SET( MasterEvent, EVENT_TYPE_MASTER, master )
 	MIXED_EVENT_SET( SlaveEvent, EVENT_TYPE_SLAVE, slave )

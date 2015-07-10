@@ -26,8 +26,6 @@ public:
 	void stop();
 	void debug();
 
-	ssize_t recv( int sockfd, char *buf, size_t ulen, bool &connected, bool wait = false );
-
 	static void *run( void *argv );
 	static bool handler( int fd, uint32_t events, void *data );
 };

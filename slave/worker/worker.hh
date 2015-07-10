@@ -14,10 +14,10 @@ private:
 	SlaveProtocol protocol;
 
 	void dispatch( MixedEvent event );
-	void dispatch( ApplicationEvent event );
 	void dispatch( CoordinatorEvent event );
 	void dispatch( MasterEvent event );
 	void dispatch( SlaveEvent event );
+	void dispatch( SlavePeerEvent event );
 	void free();
 	static void *run( void *argv );
 

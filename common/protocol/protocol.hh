@@ -12,19 +12,27 @@
 /************************
  *  Magic byte (1 byte) *
  ************************/
-// (Bit: 0-3) //
-#define PROTO_MAGIC_REQUEST				0x01
-#define PROTO_MAGIC_RESPONSE_SUCCESS	0x02
-#define PROTO_MAGIC_RESPONSE_FAILURE	0x03
-#define PROTO_MAGIC_HEARTBEAT			0x04
-// (Bit: 4-5) //
-#define PROTO_MAGIC_FROM_COORDINATOR	0x10
-#define PROTO_MAGIC_FROM_MASTER			0x20
-#define PROTO_MAGIC_FROM_SLAVE			0x30
- // (Bit: 6-7) //
-#define PROTO_MAGIC_TO_COORDINATOR		0x40
-#define PROTO_MAGIC_TO_MASTER			0x80
-#define PROTO_MAGIC_TO_SLAVE			0xC0
+// (Bit: 0-2) //
+#define PROTO_MAGIC_HEARTBEAT			0x00 // -----000
+#define PROTO_MAGIC_REQUEST				0x01 // -----001
+#define PROTO_MAGIC_RESPONSE_SUCCESS	0x02 // -----010
+#define PROTO_MAGIC_RESPONSE_FAILURE	0x03 // -----011
+#define PROTO_MAGIC_RESERVED_1			0x04 // -----100
+#define PROTO_MAGIC_RESERVED_2			0x05 // -----101
+#define PROTO_MAGIC_RESERVED_3			0x06 // -----110
+#define PROTO_MAGIC_RESERVED_4			0x07 // -----111
+
+// (Bit: 3-4) //
+#define PROTO_MAGIC_FROM_APPLICATION	0x00 // ---00---
+#define PROTO_MAGIC_FROM_COORDINATOR	0x08 // ---01---
+#define PROTO_MAGIC_FROM_MASTER			0x10 // ---10---
+#define PROTO_MAGIC_FROM_SLAVE			0x18 // ---11---
+ // (Bit: 5-6) //
+#define PROTO_MAGIC_TO_APPLICATION		0x00 // -00-----
+#define PROTO_MAGIC_TO_COORDINATOR		0x50 // -01-----
+#define PROTO_MAGIC_TO_MASTER			0x40 // -10-----
+#define PROTO_MAGIC_TO_SLAVE			0x60 // -11-----
+// (Bit: 7): Reserved //
 
 /*******************
  * Opcode (1 byte) *

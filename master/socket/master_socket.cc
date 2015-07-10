@@ -1,5 +1,6 @@
 #include <cerrno>
 #include "master_socket.hh"
+#include "../main/master.hh"
 #include "../../common/util/debug.hh"
 
 #define SOCKET_COLOR YELLOW
@@ -8,6 +9,7 @@ MasterSocket::MasterSocket() {
 	this->isRunning = false;
 	this->tid = 0;
 	this->epoll = 0;
+	this->buffer.size = PROTO_HEADER_SIZE;
 }
 
 bool MasterSocket::init( int type, unsigned long addr, unsigned short port, EPoll *epoll ) {
@@ -49,25 +51,107 @@ void *MasterSocket::run( void *argv ) {
 
 bool MasterSocket::handler( int fd, uint32_t events, void *data ) {
 	MasterSocket *socket = ( MasterSocket * ) data;
+	static Master *master = Master::getInstance();
 
-	if ( ( events & EPOLLERR ) || ( events & EPOLLHUP ) ) {
-		::close( fd );
+	///////////////////////////////////////////////////////////////////////////
+	if ( ( events & EPOLLERR ) || ( events & EPOLLHUP ) || ( events & EPOLLRDHUP ) ) {
+		// Find the socket in the lists
+		int index;
+		if ( socket->sockets.get( fd, &index ) ) {
+			socket->sockets.removeAt( index );
+			::close( fd );
+		} else {
+			ApplicationSocket *applicationSocket = master->sockets.applications.get( fd );
+			CoordinatorSocket *coordinatorSocket = applicationSocket ? 0 : master->sockets.coordinators.get( fd );
+			SlaveSocket *slaveSocket = ( applicationSocket || coordinatorSocket ) ? 0 : master->sockets.slaves.get( fd );
+			if ( applicationSocket ) {
+				applicationSocket->stop();
+			} else if ( coordinatorSocket ) {
+				coordinatorSocket->stop();
+			} else if ( slaveSocket ) {
+				slaveSocket->stop();
+			} else {
+				__ERROR__( "MasterSocket", "handler", "Unknown socket." );
+				return false;
+			}
+		}
+	///////////////////////////////////////////////////////////////////////////
 	} else if ( fd == socket->getSocket() ) {
 		struct sockaddr_in addr;
 		socklen_t addrlen;
 		while( 1 ) {
 			fd = socket->accept( &addr, &addrlen );
-
 			if ( fd == -1 ) {
-				if ( errno != EAGAIN && errno != EWOULDBLOCK )
+				if ( errno != EAGAIN && errno != EWOULDBLOCK ) {
 					__ERROR__( "MasterSocket", "handler", "%s", strerror( errno ) );
+					return false;
+				}
 				break;
 			}
-
 			socket->sockets.set( fd, addr, false );
-			socket->epoll->add( fd, EPOLLIN | EPOLLET );
+			socket->epoll->add( fd, EPOLLIN | EPOLLRDHUP | EPOLLET );
 		}
+	///////////////////////////////////////////////////////////////////////////
 	} else {
+		int index;
+		struct sockaddr_in *addr;
+		if ( ( addr = socket->sockets.get( fd, &index ) ) ) {
+			// Read message immediately and add to appropriate socket list such that all "add" operations originate from the epoll thread
+			// Only application register message is expected
+			bool connected;
+			ssize_t ret;
+			
+			ret = socket->recv( fd, socket->buffer.data, socket->buffer.size, connected, true );
+			if ( ret < 0 ) {
+				__ERROR__( "MasterSocket", "handler", "Cannot receive message." );
+				return false;
+			} else if ( ( size_t ) ret == socket->buffer.size ) {
+				uint8_t magic, from, opcode;
+				uint32_t length;
+				socket->protocol.parseHeader( socket->buffer.data, socket->buffer.size, magic, from, opcode, length );
+				// Register message expected
+				if ( magic == PROTO_MAGIC_REQUEST && opcode == PROTO_OPCODE_REGISTER ) {
+					if ( from == PROTO_MAGIC_FROM_APPLICATION ) {
+						ApplicationSocket applicationSocket;
+						applicationSocket.init( fd, *addr );
+						master->sockets.applications.set( fd, applicationSocket );
+
+						ApplicationEvent event;
+						event.resRegister( master->sockets.applications.get( fd ) );
+						master->eventQueue.insert( event );
+					} else {
+						__ERROR__( "MasterSocket", "handler", "Invalid register message source." );
+						return false;
+					}
+				} else {
+					__ERROR__( "MasterSocket", "handler", "Invalid register message." );
+					return false;
+				}
+			} else {
+				__ERROR__( "MasterSocket", "handler", "Message corrupted." );
+				return false;
+			}
+		} else {
+			ApplicationSocket *applicationSocket = master->sockets.applications.get( fd );
+			CoordinatorSocket *coordinatorSocket = applicationSocket ? 0 : master->sockets.coordinators.get( fd );
+			SlaveSocket *slaveSocket = ( applicationSocket || coordinatorSocket ) ? 0 : master->sockets.slaves.get( fd );
+			if ( applicationSocket ) {
+				ApplicationEvent event;
+				event.pending( applicationSocket );
+				master->eventQueue.insert( event );
+			} else if ( coordinatorSocket ) {
+				CoordinatorEvent event;
+				event.pending( coordinatorSocket );
+				master->eventQueue.insert( event );
+			} else if ( slaveSocket ) {
+				SlaveEvent event;
+				event.pending( slaveSocket );
+				master->eventQueue.insert( event );
+			} else {
+				__ERROR__( "MasterSocket", "handler", "Unknown socket." );
+				return false;
+			}
+		}
 	}
 	return true;
 }

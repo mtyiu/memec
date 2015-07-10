@@ -8,7 +8,16 @@ bool MasterConfig::merge( GlobalConfig &globalConfig ) {
 }
 
 bool MasterConfig::parse( const char *path ) {
-	return Config::parse( path, "master.ini" );
+	if ( Config::parse( path, "master.ini" ) ) {
+		if ( this->workers.type == WORKER_TYPE_SEPARATED )
+			this->workers.number.separated.total = 
+				this->workers.number.separated.application +
+				this->workers.number.separated.coordinator +
+				this->workers.number.separated.master +
+				this->workers.number.separated.slave;
+		return true;
+	}
+	return false;
 }
 
 bool MasterConfig::set( const char *section, const char *name, const char *value ) {

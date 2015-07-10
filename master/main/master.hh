@@ -4,6 +4,7 @@
 #include <cstdio>
 #include "../config/master_config.hh"
 #include "../event/event_queue.hh"
+#include "../socket/application_socket.hh"
 #include "../socket/coordinator_socket.hh"
 #include "../socket/master_socket.hh"
 #include "../socket/slave_socket.hh"
@@ -40,6 +41,7 @@ public:
 	struct {
 		MasterSocket self;
 		EPoll epoll;
+		ArrayMap<int, ApplicationSocket> applications;
 		ArrayMap<int, CoordinatorSocket> coordinators;
 		ArrayMap<int, SlaveSocket> slaves;
 	} sockets;

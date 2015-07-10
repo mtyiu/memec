@@ -1,7 +1,16 @@
+#include "../event/slave_event.hh"
+#include "../main/master.hh"
 #include "slave_socket.hh"
 
 bool SlaveSocket::start() {
-	return this->connect();
+	if ( this->connect() ) {
+		Master *master = Master::getInstance();
+		SlaveEvent event;
+		event.reqRegister( this );
+		master->eventQueue.insert( event );
+		return true;
+	}
+	return false;
 }
 
 ssize_t SlaveSocket::send( char *buf, size_t ulen, bool &connected ) {

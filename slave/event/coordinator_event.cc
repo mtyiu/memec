@@ -5,7 +5,7 @@ void CoordinatorEvent::reqRegister( CoordinatorSocket *socket ) {
 	this->socket = socket;
 }
 
-void CoordinatorEvent::resRegister( CoordinatorSocket *socket, bool success ) {
-	this->type = success ? COORDINATOR_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS : COORDINATOR_EVENT_TYPE_REGISTER_RESPONSE_FAILURE;
+void CoordinatorEvent::pending( CoordinatorSocket *socket ) {
+	this->type = COORDINATOR_EVENT_TYPE_PENDING;
 	this->socket = socket;
 }

@@ -11,7 +11,6 @@ bool CoordinatorConfig::parse( const char *path ) {
 	if ( Config::parse( path, "coordinator.ini" ) ) {
 		if ( this->workers.type == WORKER_TYPE_SEPARATED )
 			this->workers.number.separated.total = 
-				this->workers.number.separated.application +
 				this->workers.number.separated.coordinator +
 				this->workers.number.separated.master +
 				this->workers.number.separated.slave;
@@ -40,8 +39,6 @@ bool CoordinatorConfig::set( const char *section, const char *name, const char *
 				this->workers.type = WORKER_TYPE_UNDEFINED;
 		} else if ( match( name, "mixed" ) )
 			this->workers.number.mixed = atoi( value );
-		else if ( match( name, "application" ) )
-			this->workers.number.separated.application = atoi( value );
 		else if ( match( name, "coordinator" ) )
 			this->workers.number.separated.coordinator = atoi( value );
 		else if ( match( name, "master" ) )
@@ -55,8 +52,6 @@ bool CoordinatorConfig::set( const char *section, const char *name, const char *
 			this->eventQueue.block = ! match( value, "false" );
 		else if ( match( name, "mixed" ) )
 			this->eventQueue.size.mixed = atoi( value );
-		else if ( match( name, "application" ) )
-			this->eventQueue.size.separated.application = atoi( value );
 		else if ( match( name, "coordinator" ) )
 			this->eventQueue.size.separated.coordinator = atoi( value );
 		else if ( match( name, "master" ) )
@@ -89,8 +84,6 @@ bool CoordinatorConfig::validate() {
 				CFG_PARSE_ERROR( "CoordinatorConfig", "The size of the event queue should be at least the number of workers." );
 			break;
 		case WORKER_TYPE_SEPARATED:
-			if ( this->workers.number.separated.application < 1 )
-				CFG_PARSE_ERROR( "CoordinatorConfig", "The number of application workers should be at least 1." );
 			if ( this->workers.number.separated.coordinator < 1 )
 				CFG_PARSE_ERROR( "CoordinatorConfig", "The number of coordinator workers should be at least 1." );
 			if ( this->workers.number.separated.master < 1 )
@@ -98,8 +91,6 @@ bool CoordinatorConfig::validate() {
 			if ( this->workers.number.separated.slave < 1 )
 				CFG_PARSE_ERROR( "CoordinatorConfig", "The number of slave workers should be at least 1." );
 
-			if ( this->eventQueue.size.separated.application < this->workers.number.separated.application )
-				CFG_PARSE_ERROR( "CoordinatorConfig", "The size of the application event queue should be at least the number of workers." );
 			if ( this->eventQueue.size.separated.coordinator < this->workers.number.separated.coordinator )
 				CFG_PARSE_ERROR( "CoordinatorConfig", "The size of the coordinator event queue should be at least the number of workers." );
 			if ( this->eventQueue.size.separated.master < this->workers.number.separated.master )
@@ -164,19 +155,15 @@ void CoordinatorConfig::print( FILE *f ) {
 			"\t- %-*s : %u\n"
 			"\t- %-*s : %u\n"
 			"\t- %-*s : %u\n"
-			"\t- %-*s : %u\n"
 			"- Event queues\n"
 			"\t- %-*s : %s\n"
 			"\t- %-*s : %u\n"
 			"\t- %-*s : %u\n"
-			"\t- %-*s : %u\n"
 			"\t- %-*s : %u\n",
-			width, "Number of application workers", this->workers.number.separated.application,
 			width, "Number of coordinator workers", this->workers.number.separated.coordinator,
 			width, "Number of master workers", this->workers.number.separated.master,
 			width, "Number of slave workers", this->workers.number.separated.slave,
 			width, "Blocking?", this->eventQueue.block ? "Yes" : "No",
-			width, "Size for application", this->eventQueue.size.separated.application,
 			width, "Size for coordinator", this->eventQueue.size.separated.coordinator,
 			width, "Size for master", this->eventQueue.size.separated.master,
 			width, "Size for slave", this->eventQueue.size.separated.slave

@@ -7,10 +7,14 @@ BIN=$(PLIO_SRC_ROOT)/bin/slave
 OBJS= \
 	config/slave_config.o \
 	event/coordinator_event.o \
+	event/master_event.o \
+	event/slave_event.o \
+	event/slave_peer_event.o \
 	protocol/protocol.o \
 	socket/coordinator_socket.o \
 	socket/master_socket.o \
 	socket/slave_socket.o \
+	socket/slave_peer_socket.o \
 	worker/worker.o \
 	main/slave.o \
 	main/main.o

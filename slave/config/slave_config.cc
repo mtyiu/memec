@@ -11,10 +11,10 @@ bool SlaveConfig::parse( const char *path ) {
 	if ( Config::parse( path, "slave.ini" ) ) {
 		if ( this->workers.type == WORKER_TYPE_SEPARATED )
 			this->workers.number.separated.total = 
-				this->workers.number.separated.application +
 				this->workers.number.separated.coordinator +
 				this->workers.number.separated.master +
-				this->workers.number.separated.slave;
+				this->workers.number.separated.slave + 
+				this->workers.number.separated.slavePeer;
 		return true;
 	}
 	return false;
@@ -40,14 +40,14 @@ bool SlaveConfig::set( const char *section, const char *name, const char *value 
 				this->workers.type = WORKER_TYPE_UNDEFINED;
 		} else if ( match( name, "mixed" ) )
 			this->workers.number.mixed = atoi( value );
-		else if ( match( name, "application" ) )
-			this->workers.number.separated.application = atoi( value );
 		else if ( match( name, "coordinator" ) )
 			this->workers.number.separated.coordinator = atoi( value );
 		else if ( match( name, "master" ) )
 			this->workers.number.separated.master = atoi( value );
 		else if ( match( name, "slave" ) )
 			this->workers.number.separated.slave = atoi( value );
+		else if ( match( name, "slave_peer" ) )
+			this->workers.number.separated.slavePeer = atoi( value );
 		else
 			return false;
 	} else if ( match( section, "event_queue" ) ) {
@@ -55,14 +55,14 @@ bool SlaveConfig::set( const char *section, const char *name, const char *value 
 			this->eventQueue.block = ! match( value, "false" );
 		else if ( match( name, "mixed" ) )
 			this->eventQueue.size.mixed = atoi( value );
-		else if ( match( name, "application" ) )
-			this->eventQueue.size.separated.application = atoi( value );
 		else if ( match( name, "coordinator" ) )
 			this->eventQueue.size.separated.coordinator = atoi( value );
 		else if ( match( name, "master" ) )
 			this->eventQueue.size.separated.master = atoi( value );
 		else if ( match( name, "slave" ) )
 			this->eventQueue.size.separated.slave = atoi( value );
+		else if ( match( name, "slave_peer" ) )
+			this->eventQueue.size.separated.slavePeer = atoi( value );
 		else
 			return false;
 	} else {
@@ -89,23 +89,23 @@ bool SlaveConfig::validate() {
 				CFG_PARSE_ERROR( "CoordinatorConfig", "The size of the event queue should be at least the number of workers." );
 			break;
 		case WORKER_TYPE_SEPARATED:
-			if ( this->workers.number.separated.application < 1 )
-				CFG_PARSE_ERROR( "CoordinatorConfig", "The number of application workers should be at least 1." );
 			if ( this->workers.number.separated.coordinator < 1 )
 				CFG_PARSE_ERROR( "CoordinatorConfig", "The number of coordinator workers should be at least 1." );
 			if ( this->workers.number.separated.master < 1 )
 				CFG_PARSE_ERROR( "CoordinatorConfig", "The number of master workers should be at least 1." );
 			if ( this->workers.number.separated.slave < 1 )
 				CFG_PARSE_ERROR( "CoordinatorConfig", "The number of slave workers should be at least 1." );
+			if ( this->workers.number.separated.slavePeer < 1 )
+				CFG_PARSE_ERROR( "CoordinatorConfig", "The number of slave peer workers should be at least 1." );
 
-			if ( this->eventQueue.size.separated.application < this->workers.number.separated.application )
-				CFG_PARSE_ERROR( "CoordinatorConfig", "The size of the application event queue should be at least the number of workers." );
 			if ( this->eventQueue.size.separated.coordinator < this->workers.number.separated.coordinator )
 				CFG_PARSE_ERROR( "CoordinatorConfig", "The size of the coordinator event queue should be at least the number of workers." );
 			if ( this->eventQueue.size.separated.master < this->workers.number.separated.master )
 				CFG_PARSE_ERROR( "CoordinatorConfig", "The size of the master event queue should be at least the number of workers." );
 			if ( this->eventQueue.size.separated.slave < this->workers.number.separated.slave )
 				CFG_PARSE_ERROR( "CoordinatorConfig", "The size of the slave event queue should be at least the number of workers." );
+			if ( this->eventQueue.size.separated.slavePeer < this->workers.number.separated.slavePeer )
+				CFG_PARSE_ERROR( "CoordinatorConfig", "The size of the slave peer event queue should be at least the number of workers." );
 			break;
 		default:
 			CFG_PARSE_ERROR( "CoordinatorConfig", "The type of event queue should be either \"mixed\" or \"separated\"." );
@@ -114,15 +114,15 @@ bool SlaveConfig::validate() {
 	return true;
 }
 
-bool SlaveConfig::validate( std::vector<ServerAddr> slaves ) {
+int SlaveConfig::validate( std::vector<ServerAddr> slaves ) {
 	if ( this->validate() ) {
 		for ( int i = 0, len = slaves.size(); i < len; i++ ) {
 			if ( this->slave.addr == slaves[ i ] )
-				return true;
+				return i;
 		}
 		CFG_PARSE_ERROR( "SlaveConfig", "The assigned address does not match with the global slave list." );
 	}
-	return false;
+	return -1;
 }
 
 void SlaveConfig::print( FILE *f ) {
@@ -171,15 +171,15 @@ void SlaveConfig::print( FILE *f ) {
 			"\t- %-*s : %u\n"
 			"\t- %-*s : %u\n"
 			"\t- %-*s : %u\n",
-			width, "Number of application workers", this->workers.number.separated.application,
 			width, "Number of coordinator workers", this->workers.number.separated.coordinator,
 			width, "Number of master workers", this->workers.number.separated.master,
 			width, "Number of slave workers", this->workers.number.separated.slave,
+			width, "Number of slave peer workers", this->workers.number.separated.slavePeer,
 			width, "Blocking?", this->eventQueue.block ? "Yes" : "No",
-			width, "Size for application", this->eventQueue.size.separated.application,
 			width, "Size for coordinator", this->eventQueue.size.separated.coordinator,
 			width, "Size for master", this->eventQueue.size.separated.master,
-			width, "Size for slave", this->eventQueue.size.separated.slave
+			width, "Size for slave", this->eventQueue.size.separated.slave,
+			width, "Size for slave peer", this->eventQueue.size.separated.slavePeer
 		);
 	}
 

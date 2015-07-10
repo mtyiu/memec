@@ -14,7 +14,6 @@ private:
 	CoordinatorProtocol protocol;
 
 	void dispatch( MixedEvent event );
-	void dispatch( ApplicationEvent event );
 	void dispatch( CoordinatorEvent event );
 	void dispatch( MasterEvent event );
 	void dispatch( SlaveEvent event );

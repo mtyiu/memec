@@ -3,10 +3,10 @@
 
 #include <stdint.h>
 #include "mixed_event.hh"
-#include "application_event.hh"
 #include "coordinator_event.hh"
 #include "master_event.hh"
 #include "slave_event.hh"
+#include "slave_peer_event.hh"
 #include "../../common/event/event_queue.hh"
 
 class SlaveEventQueue {
@@ -14,18 +14,18 @@ public:
 	bool isMixed;
 	EventQueue<MixedEvent> *mixed;
 	struct {
-		EventQueue<ApplicationEvent> *application;
 		EventQueue<CoordinatorEvent> *coordinator;
 		EventQueue<MasterEvent> *master;
 		EventQueue<SlaveEvent> *slave;
+		EventQueue<SlavePeerEvent> *slavePeer;
 	} separated;
 
 	SlaveEventQueue() {
 		this->mixed = 0;
-		this->separated.application = 0;
 		this->separated.coordinator = 0;
 		this->separated.master = 0;
 		this->separated.slave = 0;
+		this->separated.slavePeer = 0;
 	}
 
 	void init( bool block, uint32_t mixed ) {
@@ -33,22 +33,22 @@ public:
 		this->mixed = new EventQueue<MixedEvent>( mixed, block );
 	}
 
-	void init( bool block, uint32_t application, uint32_t coordinator, uint32_t master, uint32_t slave ) {
+	void init( bool block, uint32_t coordinator, uint32_t master, uint32_t slave, uint32_t slavePeer ) {
 		this->isMixed = false;
-		this->separated.application = new EventQueue<ApplicationEvent>( application, block );
 		this->separated.coordinator = new EventQueue<CoordinatorEvent>( coordinator, block );
 		this->separated.master = new EventQueue<MasterEvent>( master, block );
 		this->separated.slave = new EventQueue<SlaveEvent>( slave, block );
+		this->separated.slavePeer = new EventQueue<SlavePeerEvent>( slave, block );
 	}
 
 	void start() {
 		if ( this->isMixed ) {
 			this->mixed->start();
 		} else {
-			this->separated.application->start();
 			this->separated.coordinator->start();
 			this->separated.master->start();
 			this->separated.slave->start();
+			this->separated.slavePeer->start();
 		}
 	}
 
@@ -56,10 +56,10 @@ public:
 		if ( this->isMixed ) {
 			this->mixed->stop();
 		} else {
-			this->separated.application->stop();
 			this->separated.coordinator->stop();
 			this->separated.master->stop();
 			this->separated.slave->stop();
+			this->separated.slavePeer->stop();
 		}
 	}
 
@@ -67,10 +67,10 @@ public:
 		if ( this->isMixed ) {
 			delete this->mixed;
 		} else {
-			delete this->separated.application;
 			delete this->separated.coordinator;
 			delete this->separated.master;
 			delete this->separated.slave;
+			delete this->separated.slavePeer;
 		}
 	}
 
@@ -85,10 +85,10 @@ public:
 		} \
 	}
 
-	SLAVE_EVENT_QUEUE_INSERT( ApplicationEvent, application )
 	SLAVE_EVENT_QUEUE_INSERT( CoordinatorEvent, coordinator )
 	SLAVE_EVENT_QUEUE_INSERT( MasterEvent, master )
 	SLAVE_EVENT_QUEUE_INSERT( SlaveEvent, slave )
+	SLAVE_EVENT_QUEUE_INSERT( SlavePeerEvent, slavePeer )
 #undef SLAVE_EVENT_QUEUE_INSERT
 };
 

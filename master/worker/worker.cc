@@ -23,26 +23,52 @@ void MasterWorker::dispatch( MixedEvent event ) {
 }
 
 void MasterWorker::dispatch( ApplicationEvent event ) {
+	bool connected;
+	ssize_t ret;
+	struct {
+		size_t size;
+		char *data;
+	} buffer;
 
+	switch( event.type ) {
+		case APPLICATION_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
+			buffer.data = this->protocol.resRegisterApplication( buffer.size, true );
+			break;
+		case APPLICATION_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resRegisterApplication( buffer.size, false );
+			break;
+		default:
+			return;
+	}
+
+	ret = event.socket->send( buffer.data, buffer.size, connected );
+	if ( ! connected )
+		__ERROR__( "MasterWorker", "dispatch", "The application is disconnected." );
+	if ( ret != ( ssize_t ) buffer.size )
+		__ERROR__( "MasterWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 }
 
 void MasterWorker::dispatch( CoordinatorEvent event ) {
-	char *buf;
-	size_t size;
-	bool connected, ret;
+	bool connected;
+	ssize_t ret;
+	struct {
+		size_t size;
+		char *data;
+	} buffer;
 
 	switch( event.type ) {
 		case COORDINATOR_EVENT_TYPE_REGISTER_REQUEST:
-			buf = this->protocol.reqRegisterCoordinator( size );
-			ret = event.socket->send( buf, size, connected );
-			break;
-		case COORDINATOR_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
-			break;
-		case COORDINATOR_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
+			buffer.data = this->protocol.reqRegisterCoordinator( buffer.size );
 			break;
 		default:
-			break;
+			return;
 	}
+
+	ret = event.socket->send( buffer.data, buffer.size, connected );
+	if ( ! connected )
+		__ERROR__( "MasterWorker", "dispatch", "The coordinator is disconnected." );
+	if ( ret != ( ssize_t ) buffer.size )
+		__ERROR__( "MasterWorker", "dispatch", "The number of bytes sent (%lu bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 }
 
 void MasterWorker::dispatch( MasterEvent event ) {
@@ -55,7 +81,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 
 
 void MasterWorker::free() {
-
+	this->protocol.free();
 }
 
 void *MasterWorker::run( void *argv ) {
@@ -68,9 +94,8 @@ void *MasterWorker::run( void *argv ) {
 		_EVENT_TYPE_ event; \
 		bool ret; \
 		while( worker->getIsRunning() | ( ret = _EVENT_QUEUE_->extract( event ) ) ) { \
-			if ( ret ) { \
+			if ( ret ) \
 				worker->dispatch( event ); \
-			} \
 		} \
 	} while( 0 )
 

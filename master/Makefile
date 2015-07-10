@@ -6,8 +6,12 @@ BIN=$(PLIO_SRC_ROOT)/bin/master
 
 OBJS= \
 	config/master_config.o \
+	event/application_event.o \
 	event/coordinator_event.o \
+	event/master_event.o \
+	event/slave_event.o \
 	protocol/protocol.o \
+	socket/application_socket.o \
 	socket/coordinator_socket.o \
 	socket/master_socket.o \
 	socket/slave_socket.o \

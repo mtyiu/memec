@@ -7,6 +7,8 @@ class SlaveProtocol : public Protocol {
 public:
 	SlaveProtocol() : Protocol( ROLE_SLAVE ) {}
 	char *reqRegisterCoordinator( size_t &size );
-	// char *resRegisterCoordinator( size_t &size );
+	char *reqRegisterSlavePeer( size_t &size );
+	char *resRegisterMaster( size_t &size, bool success );
+	char *resRegisterSlavePeer( size_t &size, bool success );
 };
 #endif

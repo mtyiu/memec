@@ -187,7 +187,6 @@ bool Socket::init( int sockfd, struct sockaddr_in addr ) {
 
 void Socket::stop() {
 	::close( this->sockfd );
-	__ERROR__( "Socket", "stop", "Stopped" );
 }
 
 void Socket::print( FILE *f ) {

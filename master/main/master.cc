@@ -118,15 +118,13 @@ bool Master::start() {
 	this->eventQueue.start();
 	if ( this->config.master.workers.type == WORKER_TYPE_MIXED ) {
 		for ( int i = 0, len = this->config.master.workers.number.mixed; i < len; i++ ) {
-			if ( this->workers[ i ].start() ) {
+			if ( this->workers[ i ].start() )
 				this->workers[ i ].debug();
-			}
 		}
 	} else {
 		for ( int i = 0, len = this->config.master.workers.number.separated.total; i < len; i++ ) {
-			if ( this->workers[ i ].start() ) {
+			if ( this->workers[ i ].start() )
 				this->workers[ i ].debug();
-			}
 		}
 	}
 
@@ -177,6 +175,8 @@ bool Master::stop() {
 		this->workers[ i ].join();
 
 	/* Sockets */
+	for ( i = 0, len = this->sockets.applications.size(); i < len; i++ )
+		this->sockets.applications[ i ].stop();
 	for ( i = 0, len = this->sockets.coordinators.size(); i < len; i++ )
 		this->sockets.coordinators[ i ].stop();
 	for ( i = 0, len = this->sockets.slaves.size(); i < len; i++ )

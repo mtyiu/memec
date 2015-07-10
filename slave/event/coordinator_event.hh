@@ -6,8 +6,7 @@
 
 enum CoordinatorEventType {
 	COORDINATOR_EVENT_TYPE_REGISTER_REQUEST,
-	COORDINATOR_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS,
-	COORDINATOR_EVENT_TYPE_REGISTER_RESPONSE_FAILURE
+	COORDINATOR_EVENT_TYPE_PENDING
 };
 
 class CoordinatorEvent : public Event {
@@ -16,7 +15,7 @@ public:
 	CoordinatorSocket *socket;
 
 	void reqRegister( CoordinatorSocket *socket );
-	void resRegister( CoordinatorSocket *socket, bool success );
+	void pending( CoordinatorSocket *socket );
 };
 
 #endif

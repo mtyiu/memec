@@ -8,7 +8,7 @@
 size_t Protocol::generateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t length ) {
 	size_t bytes = 0;
 
-	this->buffer.data[ 0 ] = ( ( magic & 0x0F ) | ( this->from & 0x30 ) | ( to & 0xC0 ) );
+	this->buffer.data[ 0 ] = ( ( magic & 0x07 ) | ( this->from & 0x18 ) | ( to & 0x60 ) );
 	this->buffer.data[ 1 ] = opcode & 0xFF;
 	this->buffer.data[ 2 ] = 0;
 	this->buffer.data[ 3 ] = 0;
@@ -47,8 +47,6 @@ bool Protocol::init( size_t size ) {
 	if ( ! this->buffer.data ) {
 		__ERROR__( "Protocol", "init", "Cannot allocate memory." );
 		return false;
-	} else {
-		__ERROR__( "Protocol", "init", "Allocated %lu bytes.", size );
 	}
 	return true;
 }
@@ -67,23 +65,24 @@ bool Protocol::parseHeader( char *buf, size_t size, uint8_t &magic, uint8_t &fro
 
 	uint8_t to;
 	
-	magic = buf[ 0 ] & 0x0F;
-	from = buf[ 0 ] & 0x30;
-	to = buf[ 0 ] & 0xC0;
+	magic = buf[ 0 ] & 0x07;
+	from = buf[ 0 ] & 0x18;
+	to = buf[ 0 ] & 0x60;
 	opcode = buf[ 1 ] & 0xFF;
 	length = ntohl( *( ( uint32_t * )( buf + 4 ) ) );
 
 	switch( magic ) {
+		case PROTO_MAGIC_HEARTBEAT:
 		case PROTO_MAGIC_REQUEST:
 		case PROTO_MAGIC_RESPONSE_SUCCESS:
 		case PROTO_MAGIC_RESPONSE_FAILURE:
-		case PROTO_MAGIC_HEARTBEAT:
 			break;
 		default:
 			return false;
 	}
 
 	switch( from ) {
+		case PROTO_MAGIC_FROM_APPLICATION:
 		case PROTO_MAGIC_FROM_COORDINATOR:
 		case PROTO_MAGIC_FROM_MASTER:
 		case PROTO_MAGIC_FROM_SLAVE:

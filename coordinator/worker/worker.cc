@@ -5,9 +5,6 @@
 
 void CoordinatorWorker::dispatch( MixedEvent event ) {
 	switch( event.type ) {
-		case EVENT_TYPE_APPLICATION:
-			this->dispatch( event.event.application );
-			break;
 		case EVENT_TYPE_COORDINATOR:
 			this->dispatch( event.event.coordinator );
 			break;
@@ -18,23 +15,16 @@ void CoordinatorWorker::dispatch( MixedEvent event ) {
 			this->dispatch( event.event.slave );
 			break;
 		default:
-			break;
+			return;
 	}
-}
-
-void CoordinatorWorker::dispatch( ApplicationEvent event ) {
-
 }
 
 void CoordinatorWorker::dispatch( CoordinatorEvent event ) {
-	switch( event.type ) {
-		default:
-			break;
-	}
 }
 
 void CoordinatorWorker::dispatch( MasterEvent event ) {
-	bool isResponse = false;
+	bool connected;
+	ssize_t ret;
 	struct {
 		size_t size;
 		char *data;
@@ -42,30 +32,25 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 
 	switch( event.type ) {
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
-			buffer.data = this->protocol.resMasterRegister( buffer.size, true );
-			isResponse = true;
+			buffer.data = this->protocol.resRegisterMaster( buffer.size, true );
 			break;
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resMasterRegister( buffer.size, false );
-			isResponse = true;
-			break;
-		case MASTER_EVENT_TYPE_PENDING:
+			buffer.data = this->protocol.resRegisterMaster( buffer.size, false );
 			break;
 		default:
 			return;
 	}
 
-	if ( isResponse ) {
-		bool connected;
-		event.socket->send( buffer.data, buffer.size, connected );
-
-		if ( ! connected )
-			__ERROR__( "CoordinatorWorker", "dispatch", "The master is disconnected." );
-	}
+	ret = event.socket->send( buffer.data, buffer.size, connected );
+	if ( ! connected )
+		__ERROR__( "CoordinatorWorker", "dispatch", "The master is disconnected." );
+	if ( ret != ( ssize_t ) buffer.size )
+		__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 }
 
 void CoordinatorWorker::dispatch( SlaveEvent event ) {
-	bool isResponse = false;
+	bool connected;
+	ssize_t ret;
 	struct {
 		size_t size;
 		char *data;
@@ -73,27 +58,20 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 
 	switch( event.type ) {
 		case SLAVE_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
-			buffer.data = this->protocol.resSlaveRegister( buffer.size, true );
-			isResponse = true;
+			buffer.data = this->protocol.resRegisterSlave( buffer.size, true );
 			break;
 		case SLAVE_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resSlaveRegister( buffer.size, false );
-			isResponse = true;
-			break;
-		case SLAVE_EVENT_TYPE_PENDING:
-			isResponse = false;
+			buffer.data = this->protocol.resRegisterSlave( buffer.size, false );
 			break;
 		default:
 			return;
 	}
 
-	if ( isResponse ) {
-		bool connected;
-		event.socket->send( buffer.data, buffer.size, connected );
-
-		if ( ! connected )
-			__ERROR__( "CoordinatorWorker", "dispatch", "The slave is disconnected." );
-	}
+	ret = event.socket->send( buffer.data, buffer.size, connected );
+	if ( ! connected )
+		__ERROR__( "CoordinatorWorker", "dispatch", "The slave is disconnected." );
+	if ( ret != ( ssize_t ) buffer.size )
+		__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 }
 
 void CoordinatorWorker::free() {
@@ -110,10 +88,8 @@ void *CoordinatorWorker::run( void *argv ) {
 		_EVENT_TYPE_ event; \
 		bool ret; \
 		while( worker->getIsRunning() | ( ret = _EVENT_QUEUE_->extract( event ) ) ) { \
-			if ( ret ) { \
-				__ERROR__( "CoordinatorWorker", "run", "Retrieved an event." ); \
+			if ( ret ) \
 				worker->dispatch( event ); \
-			} \
 		} \
 	} while( 0 )
 
@@ -122,12 +98,6 @@ void *CoordinatorWorker::run( void *argv ) {
 			COORDINATOR_WORKER_EVENT_LOOP(
 				MixedEvent,
 				eventQueue->mixed
-			);
-			break;
-		case WORKER_ROLE_APPLICATION:
-			COORDINATOR_WORKER_EVENT_LOOP(
-				ApplicationEvent,
-				eventQueue->separated.application
 			);
 			break;
 		case WORKER_ROLE_COORDINATOR:
@@ -187,9 +157,6 @@ void CoordinatorWorker::debug() {
 	switch( this->role ) {
 		case WORKER_ROLE_MIXED:
 			strcpy( role, "Mixed" );
-			break;
-		case WORKER_ROLE_APPLICATION:
-			strcpy( role, "Application" );
 			break;
 		case WORKER_ROLE_COORDINATOR:
 			strcpy( role, "Coordinator" );

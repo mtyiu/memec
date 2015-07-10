@@ -39,16 +39,11 @@ void CoordinatorSocket::stop() {
 		this->epoll->stop( this->tid );
 		this->isRunning = false;
 		pthread_join( this->tid, 0 );
-		__ERROR__( "CoordinatorSocket", "stop", "Stopped" );
 	}
 }
 
 void CoordinatorSocket::debug() {
 	__DEBUG__( SOCKET_COLOR, "CoordinatorSocket", "debug", "CoordinatorSocket thread for epoll #%lu is %srunning.", this->tid, this->isRunning ? "" : "not " );
-}
-
-ssize_t CoordinatorSocket::recv( int sockfd, char *buf, size_t ulen, bool &connected, bool wait ) {
-	return Socket::recv( sockfd, buf, ulen, connected, wait );
 }
 
 void *CoordinatorSocket::run( void *argv ) {
@@ -63,7 +58,7 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 	static Coordinator *coordinator = Coordinator::getInstance();
 
 	///////////////////////////////////////////////////////////////////////////
-	if ( ( events & EPOLLERR ) || ( events & EPOLLHUP ) ) {
+	if ( ( events & EPOLLERR ) || ( events & EPOLLHUP ) || ( events & EPOLLRDHUP ) ) {
 		// Find the socket in the lists
 		int index;
 		if ( socket->sockets.get( fd, &index ) ) {
@@ -103,6 +98,7 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 		struct sockaddr_in *addr;
 		if ( ( addr = socket->sockets.get( fd, &index ) ) ) {
 			// Read message immediately and add to appropriate socket list such that all "add" operations originate from the epoll thread
+			// Only master or slave register message is expected
 			bool connected;
 			ssize_t ret;
 			
