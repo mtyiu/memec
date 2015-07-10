@@ -41,7 +41,7 @@ public:
 		fprintf( f, "%d / %u", this->queue->GetCount(), this->size );
 	}
 
-	bool insert( EventType event ) {
+	bool insert( EventType &event ) {
 		if ( this->isRunning )
 			return this->queue->Insert( &event, sizeof( EventType ) ) == 0;
 		return false;

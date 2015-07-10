@@ -1,7 +1,15 @@
+#include "../event/coordinator_event.hh"
+#include "../main/master.hh"
 #include "coordinator_socket.hh"
 
 bool CoordinatorSocket::start() {
-	return this->connect();
+	if ( this->connect() ) {
+		Master *master = Master::getInstance();
+		CoordinatorEvent event;
+		event.reqRegister( this );		
+		return true;
+	}
+	return false;
 }
 
 ssize_t CoordinatorSocket::send( char *buf, size_t ulen, bool &connected ) {

@@ -4,18 +4,10 @@
 
 Master::Master() {
 	this->isRunning = false;
-	memset( &this->eventQueue, 0, sizeof( this->eventQueue ) );
 }
 
 void Master::free() {
-	if ( this->config.master.workers.type == WORKER_TYPE_MIXED ) {
-		delete this->eventQueue.mixed;
-	} else {
-		delete this->eventQueue.separated.application;
-		delete this->eventQueue.separated.coordinator;
-		delete this->eventQueue.separated.master;
-		delete this->eventQueue.separated.slave;
-	}
+	this->eventQueue.free();
 }
 
 void Master::signalHandler( int signal ) {
@@ -60,9 +52,9 @@ bool Master::init( char *path, bool verbose ) {
 	}
 	/* Workers and event queues */
 	if ( this->config.master.workers.type == WORKER_TYPE_MIXED ) {
-		this->eventQueue.mixed = new EventQueue<MixedEvent>(
-			this->config.master.eventQueue.size.mixed,
-			this->config.master.eventQueue.block
+		this->eventQueue.init(
+			this->config.master.eventQueue.block,
+			this->config.master.eventQueue.size.mixed
 		);
 		this->workers.reserve( this->config.master.workers.number.mixed );
 		for ( int i = 0, len = this->config.master.workers.number.mixed; i < len; i++ ) {
@@ -76,21 +68,12 @@ bool Master::init( char *path, bool verbose ) {
 	} else {
 		this->workers.reserve( this->config.master.workers.number.separated.total );
 
-		this->eventQueue.separated.application = new EventQueue<ApplicationEvent>(
+		this->eventQueue.init(
+			this->config.master.eventQueue.block,
 			this->config.master.eventQueue.size.separated.application,
-			this->config.master.eventQueue.block
-		);
-		this->eventQueue.separated.coordinator = new EventQueue<CoordinatorEvent>(
 			this->config.master.eventQueue.size.separated.coordinator,
-			this->config.master.eventQueue.block
-		);
-		this->eventQueue.separated.master = new EventQueue<MasterEvent>(
 			this->config.master.eventQueue.size.separated.master,
-			this->config.master.eventQueue.block
-		);
-		this->eventQueue.separated.slave = new EventQueue<SlaveEvent>(
-			this->config.master.eventQueue.size.separated.slave,
-			this->config.master.eventQueue.block
+			this->config.master.eventQueue.size.separated.slave
 		);
 
 		int index = 0;
@@ -140,7 +123,23 @@ bool Master::init( char *path, bool verbose ) {
 }
 
 bool Master::start() {
-	/* Sockets */
+	/* Workers and event queues */
+	this->eventQueue.start();
+	if ( this->config.master.workers.type == WORKER_TYPE_MIXED ) {
+		for ( int i = 0, len = this->config.master.workers.number.mixed; i < len; i++ ) {
+			if ( this->workers[ i ].start() ) {
+				this->workers[ i ].debug();
+			}
+		}
+	} else {
+		for ( int i = 0, len = this->config.master.workers.number.separated.total; i < len; i++ ) {
+			if ( this->workers[ i ].start() ) {
+				this->workers[ i ].debug();
+			}
+		}
+	}
+
+	/* Socket */
 	// Connect to coordinators
 	for ( int i = 0, len = this->config.global.coordinators.size(); i < len; i++ ) {
 		if ( ! this->sockets.coordinators[ i ].start() )
@@ -151,28 +150,6 @@ bool Master::start() {
 		if ( ! this->sockets.slaves[ i ].start() )
 			return false;
 	}
-
-	/* Workers and event queues */
-	if ( this->config.master.workers.type == WORKER_TYPE_MIXED ) {
-		this->eventQueue.mixed->start();
-		for ( int i = 0, len = this->config.master.workers.number.mixed; i < len; i++ ) {
-			if ( this->workers[ i ].start() ) {
-				this->workers[ i ].debug();
-			}
-		}
-	} else {
-		this->eventQueue.separated.application->start();
-		this->eventQueue.separated.coordinator->start();
-		this->eventQueue.separated.master->start();
-		this->eventQueue.separated.slave->start();
-		for ( int i = 0, len = this->config.master.workers.number.separated.total; i < len; i++ ) {
-			if ( this->workers[ i ].start() ) {
-				this->workers[ i ].debug();
-			}
-		}
-	}
-
-	/* Socket */
 	// Start listening
 	if ( ! this->sockets.self.start() ) {
 		__ERROR__( "Master", "start", "Cannot start socket." );
@@ -202,14 +179,7 @@ bool Master::stop() {
 		this->workers[ i ].stop();
 
 	/* Event queues */
-	if ( this->config.master.workers.type == WORKER_TYPE_MIXED ) {
-		this->eventQueue.mixed->stop();
-	} else {
-		this->eventQueue.separated.application->stop();
-		this->eventQueue.separated.coordinator->stop();
-		this->eventQueue.separated.master->stop();
-		this->eventQueue.separated.slave->stop();
-	}
+	this->eventQueue.stop();
 
 	/* Workers */
 	for ( i = len - 1; i >= 0; i-- )

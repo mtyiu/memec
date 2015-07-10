@@ -4,7 +4,7 @@
 #include <vector>
 #include <cstdio>
 #include "../config/master_config.hh"
-#include "../event/event_queue.hh"
+#include "../event/master_event_queue.hh"
 #include "../socket/coordinator_socket.hh"
 #include "../socket/master_socket.hh"
 #include "../socket/slave_socket.hh"

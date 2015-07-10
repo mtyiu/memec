@@ -143,13 +143,6 @@ bool Slave::init( char *path, bool verbose ) {
 }
 
 bool Slave::start() {
-	/* Sockets */
-	// Connect to coordinators
-	for ( int i = 0, len = this->config.global.coordinators.size(); i < len; i++ ) {
-		if ( ! this->sockets.coordinators[ i ].start() )
-			return false;
-	}
-
 	/* Workers and event queues */
 	if ( this->config.slave.workers.type == WORKER_TYPE_MIXED ) {
 		this->eventQueue.mixed->start();
@@ -170,7 +163,12 @@ bool Slave::start() {
 		}
 	}
 
-	/* Socket */
+	/* Sockets */
+	// Connect to coordinators
+	for ( int i = 0, len = this->config.global.coordinators.size(); i < len; i++ ) {
+		if ( ! this->sockets.coordinators[ i ].start() )
+			return false;
+	}
 	// Start listening
 	if ( ! this->sockets.self.start() ) {
 		__ERROR__( "Slave", "start", "Cannot start socket." );
