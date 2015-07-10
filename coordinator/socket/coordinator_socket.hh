@@ -3,8 +3,6 @@
 
 #include <vector>
 #include <pthread.h>
-#include "master_socket.hh"
-#include "slave_socket.hh"
 #include "../../common/ds/array_map.hh"
 #include "../../common/socket/socket.hh"
 #include "../../common/socket/epoll.hh"
@@ -12,8 +10,8 @@
 class CoordinatorSocket : public Socket {
 public:
 	bool isRunning;
-	EPoll *epoll;
 	pthread_t tid;
+	EPoll *epoll;
 	ArrayMap<int, struct sockaddr_in> sockets;
 
 	CoordinatorSocket();
@@ -21,7 +19,7 @@ public:
 	bool start();
 	void stop();
 	void debug();
-	static void* run( void *argv );
+	static void *run( void *argv );
 	static bool handler( int fd, uint32_t events, void *data );
 };
 

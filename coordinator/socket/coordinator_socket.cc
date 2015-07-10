@@ -6,8 +6,8 @@
 
 CoordinatorSocket::CoordinatorSocket() {
 	this->isRunning = false;
-	this->epoll = 0;
 	this->tid = 0;
+	this->epoll = 0;
 }
 
 bool CoordinatorSocket::init( int type, unsigned long addr, unsigned short port, int numSlaves, EPoll *epoll ) {
@@ -24,7 +24,6 @@ bool CoordinatorSocket::init( int type, unsigned long addr, unsigned short port,
 }
 
 bool CoordinatorSocket::start() {
-	this->isRunning = true;
 	if ( pthread_create( &this->tid, NULL, CoordinatorSocket::run, ( void * ) this ) != 0 ) {
 		__ERROR__( "CoordinatorSocket", "start", "Cannot start CoordinatorSocket thread." );
 		return false;

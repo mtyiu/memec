@@ -50,6 +50,8 @@ int main( int argc, char **argv ) {
 		fprintf( stderr, "Error: Cannot start master.\n" );
 		return 1;
 	}
+	master->interactive();
+	master->stop();
 
 	return 0;
 

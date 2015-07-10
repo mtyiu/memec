@@ -1,5 +1,5 @@
-#ifndef __COORDINATOR_EVENT_EVENT_QUEUE_HH__
-#define __COORDINATOR_EVENT_EVENT_QUEUE_HH__
+#ifndef __MASTER_EVENT_EVENT_QUEUE_HH__
+#define __MASTER_EVENT_EVENT_QUEUE_HH__
 
 #include "mixed_event.hh"
 #include "application_event.hh"
@@ -16,6 +16,6 @@ typedef union {
 		EventQueue<MasterEvent> *master;
 		EventQueue<SlaveEvent> *slave;
 	} separated;
-} CoordinatorEventQueue;
+} MasterEventQueue;
 
 #endif

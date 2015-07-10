@@ -2,6 +2,14 @@
 #include "master_socket.hh"
 #include "../../common/util/debug.hh"
 
+#define SOCKET_COLOR YELLOW
+
+MasterSocket::MasterSocket() {
+	this->isRunning = false;
+	this->tid = 0;
+	this->epoll = 0;
+}
+
 bool MasterSocket::init( int type, unsigned long addr, unsigned short port, EPoll *epoll ) {
 	this->epoll = epoll;
 	return (
@@ -12,7 +20,31 @@ bool MasterSocket::init( int type, unsigned long addr, unsigned short port, EPol
 }
 
 bool MasterSocket::start() {
-	return this->epoll->start( MasterSocket::handler, this );
+	if ( pthread_create( &this->tid, NULL, MasterSocket::run, ( void * ) this ) != 0 ) {
+		__ERROR__( "MasterSocket", "start", "Cannot start MasterSocket thread." );
+		return false;
+	}
+	this->isRunning = true;
+	return true;
+}
+
+void MasterSocket::stop() {
+	if ( this->isRunning ) {
+		this->epoll->stop( this->tid );
+		this->isRunning = false;
+		pthread_join( this->tid, 0 );
+	}
+}
+
+void MasterSocket::debug() {
+	__DEBUG__( SOCKET_COLOR, "MasterSocket", "debug", "MasterSocket thread for epoll #%lu is %srunning.", this->tid, this->isRunning ? "" : "not " );
+}
+
+void *MasterSocket::run( void *argv ) {
+	MasterSocket *socket = ( MasterSocket * ) argv;
+	socket->epoll->start( MasterSocket::handler, socket );
+	pthread_exit( 0 );
+	return 0;
 }
 
 bool MasterSocket::handler( int fd, uint32_t events, void *data ) {

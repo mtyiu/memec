@@ -55,10 +55,9 @@ public:
 	bool init( char *path, bool verbose );
 	bool start();
 	bool stop();
-	double getElapsedTime();
 	void print( FILE *f = stdout );
 	void debug( FILE *f = stdout );
-
+	double getElapsedTime();
 	void interactive();
 };
 

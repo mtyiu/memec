@@ -50,6 +50,8 @@ int main( int argc, char **argv ) {
 		fprintf( stderr, "Error: Cannot start slave.\n" );
 		return 1;
 	}
+	slave->interactive();
+	slave->stop();
 
 	return 0;
 

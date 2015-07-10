@@ -10,6 +10,7 @@ OBJS= \
 	socket/coordinator_socket.o \
 	socket/master_socket.o \
 	socket/slave_socket.o \
+	worker/worker.o \
 	main/slave.o \
 	main/main.o
 

@@ -35,7 +35,7 @@ bool Coordinator::init( char *path, bool verbose ) {
 	}
 
 	// Initialize modules //
-	/* Sockets */
+	/* Socket */
 	if ( ! this->sockets.epoll.init(
 			this->config.coordinator.epoll.maxEvents,
 			this->config.coordinator.epoll.timeout
@@ -265,4 +265,3 @@ void Coordinator::info() {
 void Coordinator::time() {
 	printf( "Elapsed time: %12.6lf s\n", this->getElapsedTime() );
 }
-

@@ -4,20 +4,33 @@
 #include <vector>
 #include <cstdio>
 #include "../config/master_config.hh"
+#include "../event/event_queue.hh"
 #include "../socket/coordinator_socket.hh"
 #include "../socket/master_socket.hh"
 #include "../socket/slave_socket.hh"
+#include "../worker/worker.hh"
 #include "../../common/config/global_config.hh"
 #include "../../common/socket/epoll.hh"
+#include "../../common/signal/signal.hh"
+#include "../../common/util/time.hh"
 
 // Implement the singleton pattern
 class Master {
 private:
+	bool isRunning;
+	struct timespec startTime;
+	std::vector<MasterWorker> workers;
 
 	Master();
 	// Do not implement
 	Master( Master const& );
 	void operator=( Master const& );
+
+	void free();
+	// Commands
+	void help();
+	void info();
+	void time();
 
 public:
 	struct {
@@ -30,16 +43,22 @@ public:
 		std::vector<CoordinatorSocket> coordinators;
 		std::vector<SlaveSocket> slaves;
 	} sockets;
+	MasterEventQueue eventQueue;
 	
 	static Master *getInstance() {
 		static Master master;
 		return &master;
 	}
 
+	static void signalHandler( int signal );
+
 	bool init( char *path, bool verbose );
 	bool start();
 	bool stop();
 	void print( FILE *f = stdout );
+	void debug( FILE *f = stdout );
+	double getElapsedTime();
+	void interactive();
 };
 
 #endif
