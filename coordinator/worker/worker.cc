@@ -83,7 +83,13 @@ void *CoordinatorWorker::run( void *argv ) {
 	return 0;
 }
 
-bool CoordinatorWorker::init( WorkerRole role, CoordinatorEventQueue *eventQueue ) {
+bool CoordinatorWorker::init( GlobalConfig &config, WorkerRole role, CoordinatorEventQueue *eventQueue ) {
+	this->protocol.init(
+		Protocol::getSuggestedBufferSize(
+			config.size.key,
+			config.size.chunk
+		)
+	);
 	this->role = role;
 	this->eventQueue = eventQueue;
 	return role != WORKER_ROLE_UNDEFINED;

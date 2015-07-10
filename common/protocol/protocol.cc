@@ -2,6 +2,10 @@
 #include "protocol.hh"
 #include "../util/debug.hh"
 
+#define PROTO_BUF_MIN_SIZE		65536
+#define PROTO_HEADER_SIZE		8
+#define PROTO_KEY_VALUE_SIZE	4 // 1 byte for key size, 3 bytes for value size
+
 size_t Protocol::generateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t length ) {
 	size_t bytes = 0;
 
@@ -38,10 +42,24 @@ Protocol::Protocol( Role role ) {
 	}
 }
 
-bool Protocol::init( size_t size, char *data ) {
+bool Protocol::init( size_t size ) {
 	this->buffer.size = size;
-	this->buffer.data = data;
+	this->buffer.data = ( char * ) ::malloc( size );
+	if ( ! this->buffer.data ) {
+		__ERROR__( "Protocol", "init", "Cannot allocate memory." );
+		return false;
+	} else {
+		__ERROR__( "Protocol", "init", "Allocated %lu bytes.", size );
+	}
 	return true;
+}
+
+void Protocol::free() {
+	if ( ! this->buffer.data )
+		return;
+	::free( this->buffer.data );
+	this->buffer.size = 0;
+	this->buffer.data = 0;
 }
 
 bool Protocol::parseHeader( char *buf, size_t size, uint8_t &magic, uint8_t &from, uint8_t &opcode, uint32_t &length ) {
@@ -87,4 +105,24 @@ bool Protocol::parseHeader( char *buf, size_t size, uint8_t &magic, uint8_t &fro
 	}
 
 	return true;
+}
+
+size_t Protocol::getSuggestedBufferSize( uint32_t keySize, uint32_t chunkSize ) {
+	size_t ret = (
+		PROTO_HEADER_SIZE +
+		PROTO_KEY_VALUE_SIZE +
+		keySize +
+		chunkSize
+	);
+	// Set ret = ceil( ret / 4096 ) * 4096
+	if ( ret & 4095 ) { // 0xFFF
+		ret >>= 12;
+		ret += 1;
+		ret <<= 12;
+	}
+	// Set ret = ret * 2
+	ret <<= 1;
+	if ( ret < PROTO_BUF_MIN_SIZE )
+		ret = PROTO_BUF_MIN_SIZE;
+	return ret;
 }

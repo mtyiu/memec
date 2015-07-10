@@ -3,12 +3,15 @@
 
 #include "worker_role.hh"
 #include "../event/event_queue.hh"
+#include "../protocol/protocol.hh"
 #include "../../common/worker/worker.hh"
+#include "../../common/config/global_config.hh"
 
 class MasterWorker : public Worker {
 private:
 	WorkerRole role;
 	MasterEventQueue *eventQueue;
+	MasterProtocol protocol;
 
 	void dispatch( MixedEvent event );
 	void dispatch( ApplicationEvent event );
@@ -19,7 +22,7 @@ private:
 	static void *run( void *argv );
 
 public:
-	bool init( WorkerRole role, MasterEventQueue *eventQueue );
+	bool init( GlobalConfig &config, WorkerRole role, MasterEventQueue *eventQueue );
 	bool start();
 	void stop();
 	void debug();

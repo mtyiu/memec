@@ -83,7 +83,13 @@ void *SlaveWorker::run( void *argv ) {
 	return 0;
 }
 
-bool SlaveWorker::init( WorkerRole role, SlaveEventQueue *eventQueue ) {
+bool SlaveWorker::init( GlobalConfig &config, WorkerRole role, SlaveEventQueue *eventQueue ) {
+	this->protocol.init(
+		Protocol::getSuggestedBufferSize(
+			config.size.key,
+			config.size.chunk
+		)
+	);
 	this->role = role;
 	this->eventQueue = eventQueue;
 	return role != WORKER_ROLE_UNDEFINED;

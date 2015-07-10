@@ -54,9 +54,10 @@ protected:
 
 public:
 	Protocol( Role role );
-	bool init( size_t size, char *data );
+	bool init( size_t size = 0 );
+	void free();
 	bool parseHeader( char *buf, size_t size, uint8_t &magic, uint8_t &from, uint8_t &opcode, uint32_t &length );
-
+	static size_t getSuggestedBufferSize( uint32_t keySize, uint32_t chunkSize );
 };
 
 #endif

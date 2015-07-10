@@ -67,7 +67,11 @@ bool Master::init( char *path, bool verbose ) {
 		this->workers.reserve( this->config.master.workers.number.mixed );
 		for ( int i = 0, len = this->config.master.workers.number.mixed; i < len; i++ ) {
 			this->workers.push_back( MasterWorker() );
-			this->workers[ i ].init( WORKER_ROLE_MIXED, &this->eventQueue );
+			this->workers[ i ].init(
+				this->config.global,
+				WORKER_ROLE_MIXED,
+				&this->eventQueue
+			);
 		}
 	} else {
 		this->workers.reserve( this->config.master.workers.number.separated.total );
@@ -92,19 +96,35 @@ bool Master::init( char *path, bool verbose ) {
 		int index = 0;
 		for ( int i = 0, len = this->config.master.workers.number.separated.application; i < len; i++, index++ ) {
 			this->workers.push_back( MasterWorker() );
-			this->workers[ index ].init( WORKER_ROLE_APPLICATION, &this->eventQueue );
+			this->workers[ index ].init(
+				this->config.global,
+				WORKER_ROLE_APPLICATION,
+				&this->eventQueue
+			);
 		}
 		for ( int i = 0, len = this->config.master.workers.number.separated.coordinator; i < len; i++, index++ ) {
 			this->workers.push_back( MasterWorker() );
-			this->workers[ index ].init( WORKER_ROLE_COORDINATOR, &this->eventQueue );
+			this->workers[ index ].init(
+				this->config.global,
+				WORKER_ROLE_COORDINATOR,
+				&this->eventQueue
+			);
 		}
 		for ( int i = 0, len = this->config.master.workers.number.separated.master; i < len; i++, index++ ) {
 			this->workers.push_back( MasterWorker() );
-			this->workers[ index ].init( WORKER_ROLE_MASTER, &this->eventQueue );
+			this->workers[ index ].init(
+				this->config.global,
+				WORKER_ROLE_MASTER,
+				&this->eventQueue
+			);
 		}
 		for ( int i = 0, len = this->config.master.workers.number.separated.slave; i < len; i++, index++ ) {
 			this->workers.push_back( MasterWorker() );
-			this->workers[ index ].init( WORKER_ROLE_SLAVE, &this->eventQueue );
+			this->workers[ index ].init(
+				this->config.global,
+				WORKER_ROLE_SLAVE,
+				&this->eventQueue
+			);
 		}
 	}
 
