@@ -42,13 +42,21 @@ bool Master::init( char *path, bool verbose ) {
 	/* Vectors and other sockets */
 	this->sockets.coordinators.reserve( this->config.global.coordinators.size() );
 	for ( int i = 0, len = this->config.global.coordinators.size(); i < len; i++ ) {
-		this->sockets.coordinators.push_back( CoordinatorSocket() );
-		this->sockets.coordinators[ i ].init( this->config.global.coordinators[ i ] );
+		CoordinatorSocket socket;
+		int fd;
+		
+		socket.init( this->config.global.coordinators[ i ] );
+		fd = socket.getSocket();
+		this->sockets.coordinators.set( fd, socket );
 	}
 	this->sockets.slaves.reserve( this->config.global.slaves.size() );
 	for ( int i = 0, len = this->config.global.slaves.size(); i < len; i++ ) {
-		this->sockets.slaves.push_back( SlaveSocket() );
-		this->sockets.slaves[ i ].init( this->config.global.slaves[ i ] );
+		SlaveSocket socket;
+		int fd;
+
+		socket.init( this->config.global.slaves[ i ] );
+		fd = socket.getSocket();
+		this->sockets.slaves.set( fd, socket );
 	}
 	/* Workers and event queues */
 	if ( this->config.master.workers.type == WORKER_TYPE_MIXED ) {
@@ -77,38 +85,21 @@ bool Master::init( char *path, bool verbose ) {
 		);
 
 		int index = 0;
-		for ( int i = 0, len = this->config.master.workers.number.separated.application; i < len; i++, index++ ) {
-			this->workers.push_back( MasterWorker() );
-			this->workers[ index ].init(
-				this->config.global,
-				WORKER_ROLE_APPLICATION,
-				&this->eventQueue
-			);
+#define WORKER_INIT_LOOP( _FIELD_, _CONSTANT_ ) \
+		for ( int i = 0, len = this->config.master.workers.number.separated._FIELD_; i < len; i++, index++ ) { \
+			this->workers.push_back( MasterWorker() ); \
+			this->workers[ index ].init( \
+				this->config.global, \
+				_CONSTANT_, \
+				&this->eventQueue \
+			); \
 		}
-		for ( int i = 0, len = this->config.master.workers.number.separated.coordinator; i < len; i++, index++ ) {
-			this->workers.push_back( MasterWorker() );
-			this->workers[ index ].init(
-				this->config.global,
-				WORKER_ROLE_COORDINATOR,
-				&this->eventQueue
-			);
-		}
-		for ( int i = 0, len = this->config.master.workers.number.separated.master; i < len; i++, index++ ) {
-			this->workers.push_back( MasterWorker() );
-			this->workers[ index ].init(
-				this->config.global,
-				WORKER_ROLE_MASTER,
-				&this->eventQueue
-			);
-		}
-		for ( int i = 0, len = this->config.master.workers.number.separated.slave; i < len; i++, index++ ) {
-			this->workers.push_back( MasterWorker() );
-			this->workers[ index ].init(
-				this->config.global,
-				WORKER_ROLE_SLAVE,
-				&this->eventQueue
-			);
-		}
+
+		WORKER_INIT_LOOP( application, WORKER_ROLE_APPLICATION )
+		WORKER_INIT_LOOP( coordinator, WORKER_ROLE_COORDINATOR )
+		WORKER_INIT_LOOP( master, WORKER_ROLE_MASTER )
+		WORKER_INIT_LOOP( slave, WORKER_ROLE_SLAVE )
+#undef WORKER_INIT_LOOP
 	}
 
 	// Set signal handlers //

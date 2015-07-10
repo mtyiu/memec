@@ -6,6 +6,7 @@ BIN=$(PLIO_SRC_ROOT)/bin/slave
 
 OBJS= \
 	config/slave_config.o \
+	event/coordinator_event.o \
 	protocol/protocol.o \
 	socket/coordinator_socket.o \
 	socket/master_socket.o \

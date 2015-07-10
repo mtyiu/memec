@@ -1,15 +1,15 @@
 #ifndef __MASTER_MAIN_MASTER_HH__
 #define __MASTER_MAIN_MASTER_HH__
 
-#include <vector>
 #include <cstdio>
 #include "../config/master_config.hh"
-#include "../event/master_event_queue.hh"
+#include "../event/event_queue.hh"
 #include "../socket/coordinator_socket.hh"
 #include "../socket/master_socket.hh"
 #include "../socket/slave_socket.hh"
 #include "../worker/worker.hh"
 #include "../../common/config/global_config.hh"
+#include "../../common/ds/array_map.hh"
 #include "../../common/socket/epoll.hh"
 #include "../../common/signal/signal.hh"
 #include "../../common/util/time.hh"
@@ -40,8 +40,8 @@ public:
 	struct {
 		MasterSocket self;
 		EPoll epoll;
-		std::vector<CoordinatorSocket> coordinators;
-		std::vector<SlaveSocket> slaves;
+		ArrayMap<int, CoordinatorSocket> coordinators;
+		ArrayMap<int, SlaveSocket> slaves;
 	} sockets;
 	MasterEventQueue eventQueue;
 	

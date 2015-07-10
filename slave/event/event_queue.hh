@@ -1,6 +1,7 @@
 #ifndef __SLAVE_EVENT_SLAVE_EVENT_QUEUE_HH__
 #define __SLAVE_EVENT_SLAVE_EVENT_QUEUE_HH__
 
+#include <stdint.h>
 #include "mixed_event.hh"
 #include "application_event.hh"
 #include "coordinator_event.hh"

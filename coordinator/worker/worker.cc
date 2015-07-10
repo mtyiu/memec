@@ -4,7 +4,22 @@
 #define WORKER_COLOR	YELLOW
 
 void CoordinatorWorker::dispatch( MixedEvent event ) {
-
+	switch( event.type ) {
+		case EVENT_TYPE_APPLICATION:
+			this->dispatch( event.event.application );
+			break;
+		case EVENT_TYPE_COORDINATOR:
+			this->dispatch( event.event.coordinator );
+			break;
+		case EVENT_TYPE_MASTER:
+			this->dispatch( event.event.master );
+			break;
+		case EVENT_TYPE_SLAVE:
+			this->dispatch( event.event.slave );
+			break;
+		default:
+			break;
+	}
 }
 
 void CoordinatorWorker::dispatch( ApplicationEvent event ) {
@@ -38,8 +53,10 @@ void *CoordinatorWorker::run( void *argv ) {
 		_EVENT_TYPE_ event; \
 		bool ret; \
 		while( worker->getIsRunning() | ( ret = _EVENT_QUEUE_->extract( event ) ) ) { \
-			if ( ret ) \
+			if ( ret ) { \
+				__ERROR__( "CoordinatorWorker", "run", "Retrieved an event." ); \
 				worker->dispatch( event ); \
+			} \
 		} \
 	} while( 0 )
 

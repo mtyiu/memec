@@ -27,7 +27,15 @@ public:
 		return index == -1 ? 0 : &this->values[ index ];
 	}
 
-	bool set( KeyType &key, ValueType &value, bool check = true ) {
+	ValueType &operator[]( const int index ) {
+		return this->values[ index ];
+	}
+
+	size_t size() {
+		return this->values.size();
+	}
+
+	bool set( KeyType &key, ValueType &value, bool check = false ) {
 		if ( check && this->indexOf( key ) != -1 )
 			return false;
 		this->keys.push_back( key );

@@ -1,7 +1,16 @@
+#include "../event/coordinator_event.hh"
+#include "../main/slave.hh"
 #include "coordinator_socket.hh"
 
 bool CoordinatorSocket::start() {
-	return this->connect();
+	if ( this->connect() ) {
+		Slave *slave = Slave::getInstance();
+		CoordinatorEvent event;
+		event.reqRegister( this );
+		slave->eventQueue.insert( event );
+		return true;
+	}
+	return false;
 }
 
 ssize_t CoordinatorSocket::send( char *buf, size_t ulen, bool &connected ) {

@@ -2,7 +2,7 @@
 #define __SLAVE_WORKER_WORKER_HH__
 
 #include "worker_role.hh"
-#include "../event/slave_event_queue.hh"
+#include "../event/event_queue.hh"
 #include "../protocol/protocol.hh"
 #include "../../common/worker/worker.hh"
 #include "../../common/config/global_config.hh"

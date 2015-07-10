@@ -4,7 +4,22 @@
 #define WORKER_COLOR	YELLOW
 
 void SlaveWorker::dispatch( MixedEvent event ) {
-
+	switch( event.type ) {
+		case EVENT_TYPE_APPLICATION:
+			this->dispatch( event.event.application );
+			break;
+		case EVENT_TYPE_COORDINATOR:
+			this->dispatch( event.event.coordinator );
+			break;
+		case EVENT_TYPE_MASTER:
+			this->dispatch( event.event.master );
+			break;
+		case EVENT_TYPE_SLAVE:
+			this->dispatch( event.event.slave );
+			break;
+		default:
+			break;
+	}
 }
 
 void SlaveWorker::dispatch( ApplicationEvent event ) {
@@ -12,7 +27,22 @@ void SlaveWorker::dispatch( ApplicationEvent event ) {
 }
 
 void SlaveWorker::dispatch( CoordinatorEvent event ) {
+	char *buf;
+	size_t size;
+	bool connected, ret;
 
+	switch( event.type ) {
+		case COORDINATOR_EVENT_TYPE_REGISTER_REQUEST:
+			buf = this->protocol.reqRegisterCoordinator( size );
+			ret = event.socket->send( buf, size, connected );
+			break;
+		case COORDINATOR_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
+			break;
+		case COORDINATOR_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
+			break;
+		default:
+			break;
+	}
 }
 
 void SlaveWorker::dispatch( MasterEvent event ) {
@@ -38,8 +68,9 @@ void *SlaveWorker::run( void *argv ) {
 		_EVENT_TYPE_ event; \
 		bool ret; \
 		while( worker->getIsRunning() | ( ret = _EVENT_QUEUE_->extract( event ) ) ) { \
-			if ( ret ) \
+			if ( ret ) { \
 				worker->dispatch( event ); \
+			} \
 		} \
 	} while( 0 )
 

@@ -61,7 +61,6 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 		socklen_t addrlen;
 		while( 1 ) {
 			fd = socket->accept( &addr, &addrlen );
-
 			if ( fd == -1 ) {
 				if ( errno != EAGAIN && errno != EWOULDBLOCK )
 					__ERROR__( "CoordinatorSocket", "handler", "%s", strerror( errno ) );

@@ -1,6 +1,7 @@
-#ifndef __COORDINATOR_EVENT_COORDINATOR_EVENT_QUEUE_HH__
-#define __COORDINATOR_EVENT_COORDINATOR_EVENT_QUEUE_HH__
+#ifndef __MASTER_EVENT_MASTER_EVENT_QUEUE_HH__
+#define __MASTER_EVENT_MASTER_EVENT_QUEUE_HH__
 
+#include <stdint.h>
 #include "mixed_event.hh"
 #include "application_event.hh"
 #include "coordinator_event.hh"
@@ -8,7 +9,7 @@
 #include "slave_event.hh"
 #include "../../common/event/event_queue.hh"
 
-class CoordinatorEventQueue {
+class MasterEventQueue {
 public:
 	bool isMixed;
 	EventQueue<MixedEvent> *mixed;
@@ -19,7 +20,7 @@ public:
 		EventQueue<SlaveEvent> *slave;
 	} separated;
 
-	CoordinatorEventQueue() {
+	MasterEventQueue() {
 		this->mixed = 0;
 		this->separated.application = 0;
 		this->separated.coordinator = 0;
@@ -73,7 +74,7 @@ public:
 		}
 	}
 
-#define COORDINATOR_EVENT_QUEUE_INSERT(_EVENT_TYPE_, _EVENT_QUEUE_) \
+#define MASTER_EVENT_QUEUE_INSERT(_EVENT_TYPE_, _EVENT_QUEUE_) \
 	bool insert( _EVENT_TYPE_ &event ) { \
 		if ( this->isMixed ) { \
 			MixedEvent mixedEvent; \
@@ -84,11 +85,11 @@ public:
 		} \
 	}
 
-	COORDINATOR_EVENT_QUEUE_INSERT( ApplicationEvent, application )
-	COORDINATOR_EVENT_QUEUE_INSERT( CoordinatorEvent, coordinator )
-	COORDINATOR_EVENT_QUEUE_INSERT( MasterEvent, master )
-	COORDINATOR_EVENT_QUEUE_INSERT( SlaveEvent, slave )
-#undef COORDINATOR_EVENT_QUEUE_INSERT
+	MASTER_EVENT_QUEUE_INSERT( ApplicationEvent, application )
+	MASTER_EVENT_QUEUE_INSERT( CoordinatorEvent, coordinator )
+	MASTER_EVENT_QUEUE_INSERT( MasterEvent, master )
+	MASTER_EVENT_QUEUE_INSERT( SlaveEvent, slave )
+#undef MASTER_EVENT_QUEUE_INSERT
 };
 
 #endif

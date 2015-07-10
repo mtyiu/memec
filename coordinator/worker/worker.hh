@@ -2,7 +2,7 @@
 #define __COORDINATOR_WORKER_WORKER_HH__
 
 #include "worker_role.hh"
-#include "../event/coordinator_event_queue.hh"
+#include "../event/event_queue.hh"
 #include "../protocol/protocol.hh"
 #include "../../common/worker/worker.hh"
 #include "../../common/config/global_config.hh"

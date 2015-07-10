@@ -4,12 +4,13 @@
 #include <vector>
 #include <cstdio>
 #include "../config/slave_config.hh"
-#include "../event/slave_event_queue.hh"
+#include "../event/event_queue.hh"
 #include "../socket/coordinator_socket.hh"
 #include "../socket/master_socket.hh"
 #include "../socket/slave_socket.hh"
 #include "../worker/worker.hh"
 #include "../../common/config/global_config.hh"
+#include "../../common/ds/array_map.hh"
 #include "../../common/socket/epoll.hh"
 #include "../../common/signal/signal.hh"
 #include "../../common/util/time.hh"
@@ -40,9 +41,9 @@ public:
 	struct {
 		SlaveSocket self;
 		EPoll epoll;
-		std::vector<CoordinatorSocket> coordinators;
-		std::vector<MasterSocket> masters;
-		std::vector<SlaveSocket> slaves;
+		ArrayMap<int, CoordinatorSocket> coordinators;
+		ArrayMap<int, MasterSocket> masters;
+		ArrayMap<int, SlaveSocket> slaves;
 	} sockets;
 	SlaveEventQueue eventQueue;
 	

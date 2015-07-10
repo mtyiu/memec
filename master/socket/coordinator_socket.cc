@@ -2,11 +2,16 @@
 #include "../main/master.hh"
 #include "coordinator_socket.hh"
 
+CoordinatorSocket::CoordinatorSocket() {
+	this->registered = false;
+}
+
 bool CoordinatorSocket::start() {
 	if ( this->connect() ) {
 		Master *master = Master::getInstance();
 		CoordinatorEvent event;
-		event.reqRegister( this );		
+		event.reqRegister( this );
+		master->eventQueue.insert( event );
 		return true;
 	}
 	return false;
