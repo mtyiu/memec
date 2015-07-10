@@ -12,7 +12,7 @@ public:
 	bool isRunning;
 	pthread_t tid;
 	EPoll *epoll;
-	ArrayMap<int, struct sockaddr_in> temps;
+	ArrayMap<int, struct sockaddr_in> sockets;
 
 	SlaveSocket();
 	bool init( int type, unsigned long addr, unsigned short port, EPoll *epoll );

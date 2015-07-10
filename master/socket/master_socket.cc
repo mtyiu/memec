@@ -64,7 +64,7 @@ bool MasterSocket::handler( int fd, uint32_t events, void *data ) {
 				break;
 			}
 
-			socket->temps.set( fd, addr, false );
+			socket->sockets.set( fd, addr, false );
 			socket->epoll->add( fd, EPOLLIN | EPOLLET );
 		}
 	} else {
