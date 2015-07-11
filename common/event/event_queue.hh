@@ -37,8 +37,8 @@ public:
 		this->isRunning = false;
 	}
 
-	void debug( FILE *f = stdout ) {
-		fprintf( f, "%d / %u", this->queue->GetCount(), this->size );
+	void print( FILE *f = stdout ) {
+		fprintf( f, "%d / %lu\n", this->queue->GetCount(), this->config.size );
 	}
 
 	bool insert( EventType &event ) {

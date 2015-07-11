@@ -24,7 +24,8 @@ public:
 	bool init( int type, unsigned long addr, unsigned short port, int numSlaves, EPoll *epoll );
 	bool start();
 	void stop();
-	void debug();
+	void print( FILE *f = stdout );
+	void printThread( FILE *f = stdout );
 
 	static void *run( void *argv );
 	static bool handler( int fd, uint32_t events, void *data );

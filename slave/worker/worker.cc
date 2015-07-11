@@ -240,7 +240,7 @@ void SlaveWorker::stop() {
 	this->isRunning = false;
 }
 
-void SlaveWorker::debug() {
+void SlaveWorker::print( FILE *f ) {
 	char role[ 16 ];
 	switch( this->role ) {
 		case WORKER_ROLE_MIXED:
@@ -261,5 +261,5 @@ void SlaveWorker::debug() {
 		default:
 			return;
 	}
-	__DEBUG__( WORKER_COLOR, "SlaveWorker", "debug", "%s worker thread #%lu is %srunning.", role, this->tid, this->isRunning ? "" : "not " );
+	fprintf( f, "%11s worker (Thread ID = %lu): %srunning\n", role, this->tid, this->isRunning ? "" : "not " );
 }

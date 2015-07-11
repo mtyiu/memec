@@ -25,5 +25,9 @@ ssize_t SlaveSocket::recv( char *buf, size_t ulen, bool &connected, bool wait ) 
 void SlaveSocket::print( FILE *f ) {
 	char buf[ 16 ];
 	Socket::ntoh_ip( this->addr.sin_addr.s_addr, buf, 16 );
-	fprintf( f, "[%4d] %s:%u (%sconnected / %sregistered)\n", this->sockfd, buf, Socket::ntoh_port( this->addr.sin_port ), this->connected ? "" : "not ", this->registered ? "" : "not " );
+	fprintf( f, "[%4d] %s:%u ", this->sockfd, buf, Socket::ntoh_port( this->addr.sin_port ) );
+	if ( this->connected )
+		fprintf( f, "(connected %s registered)\n", this->registered ? "and" : "but not" );
+	else
+		fprintf( f, "(disconnected)\n" );
 }

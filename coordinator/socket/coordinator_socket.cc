@@ -42,8 +42,14 @@ void CoordinatorSocket::stop() {
 	}
 }
 
-void CoordinatorSocket::debug() {
-	__DEBUG__( SOCKET_COLOR, "CoordinatorSocket", "debug", "CoordinatorSocket thread for epoll #%lu is %srunning.", this->tid, this->isRunning ? "" : "not " );
+void CoordinatorSocket::print( FILE *f ) {
+	char buf[ 16 ];
+	Socket::ntoh_ip( this->addr.sin_addr.s_addr, buf, 16 );
+	fprintf( f, "[%4d] %s:%u (%slistening)\n", this->sockfd, buf, Socket::ntoh_port( this->addr.sin_port ), this->isRunning ? "" : "not " );
+}
+
+void CoordinatorSocket::printThread( FILE *f ) {
+	fprintf( f, "CoordinatorSocket thread for epoll (#%lu): %srunning\n", this->tid, this->isRunning ? "" : "not " );
 }
 
 void *CoordinatorSocket::run( void *argv ) {

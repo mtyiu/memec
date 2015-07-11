@@ -31,7 +31,7 @@ public:
 
 	virtual bool start() = 0;
 	virtual void stop() = 0;
-	virtual void debug() = 0;
+	virtual void print( FILE *f = stdout ) = 0;
 };
 
 #endif

@@ -1,6 +1,7 @@
 #ifndef __COORDINATOR_WORKER_WORKER_HH__
 #define __COORDINATOR_WORKER_WORKER_HH__
 
+#include <cstdio>
 #include "worker_role.hh"
 #include "../event/event_queue.hh"
 #include "../protocol/protocol.hh"
@@ -24,7 +25,7 @@ public:
 	bool init( GlobalConfig &config, WorkerRole role, CoordinatorEventQueue *eventQueue );
 	bool start();
 	void stop();
-	void debug();
+	void print( FILE *f = stdout );
 
 	inline WorkerRole getRole() {
 		return this->role;

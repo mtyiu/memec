@@ -38,8 +38,14 @@ void MasterSocket::stop() {
 	}
 }
 
-void MasterSocket::debug() {
-	__DEBUG__( SOCKET_COLOR, "MasterSocket", "debug", "MasterSocket thread for epoll #%lu is %srunning.", this->tid, this->isRunning ? "" : "not " );
+void MasterSocket::print( FILE *f ) {
+	char buf[ 16 ];
+	Socket::ntoh_ip( this->addr.sin_addr.s_addr, buf, 16 );
+	fprintf( f, "[%4d] %s:%u (%slistening)\n", this->sockfd, buf, Socket::ntoh_port( this->addr.sin_port ), this->isRunning ? "" : "not " );
+}
+
+void MasterSocket::printThread( FILE *f ) {
+	fprintf( f, "MasterSocket thread for epoll (#%lu): %srunning\n", this->tid, this->isRunning ? "" : "not " );
 }
 
 void *MasterSocket::run( void *argv ) {

@@ -38,8 +38,14 @@ void SlaveSocket::stop() {
 	}
 }
 
-void SlaveSocket::debug() {
-	__DEBUG__( SOCKET_COLOR, "SlaveSocket", "debug", "SlaveSocket thread for epoll #%lu is %srunning.", this->tid, this->isRunning ? "" : "not " );
+void SlaveSocket::print( FILE *f ) {
+	char buf[ 16 ];
+	Socket::ntoh_ip( this->addr.sin_addr.s_addr, buf, 16 );
+	fprintf( f, "[%4d] %s:%u (%slistening)\n", this->sockfd, buf, Socket::ntoh_port( this->addr.sin_port ), this->isRunning ? "" : "not " );
+}
+
+void SlaveSocket::printThread( FILE *f ) {
+	fprintf( f, "SlaveSocket thread for epoll (#%lu): %srunning\n", this->tid, this->isRunning ? "" : "not " );
 }
 
 void *SlaveSocket::run( void *argv ) {

@@ -31,7 +31,6 @@ private:
 	void free();
 	// Commands
 	void help();
-	void info();
 	void time();
 
 public:
@@ -58,7 +57,7 @@ public:
 	bool init( char *path, bool verbose );
 	bool start();
 	bool stop();
-	void print( FILE *f = stdout );
+	void info( FILE *f = stdout );
 	void debug( FILE *f = stdout );
 	double getElapsedTime();
 	void interactive();

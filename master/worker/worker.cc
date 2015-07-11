@@ -261,7 +261,7 @@ void MasterWorker::stop() {
 	this->isRunning = false;
 }
 
-void MasterWorker::debug() {
+void MasterWorker::print( FILE *f ) {
 	char role[ 16 ];
 	switch( this->role ) {
 		case WORKER_ROLE_MIXED:
@@ -282,5 +282,5 @@ void MasterWorker::debug() {
 		default:
 			return;
 	}
-	__DEBUG__( WORKER_COLOR, "MasterWorker", "debug", "%s worker thread #%lu is %srunning.", role, this->tid, this->isRunning ? "" : "not " );
+	fprintf( f, "%11s worker (Thread ID = %lu): %srunning\n", role, this->tid, this->isRunning ? "" : "not " );
 }

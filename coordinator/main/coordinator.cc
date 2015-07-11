@@ -89,10 +89,8 @@ bool Coordinator::init( char *path, bool verbose ) {
 	Signal::setHandler( Coordinator::signalHandler );
 
 	// Show configuration //
-	if ( verbose ) {
-		this->config.global.print();
-		this->config.coordinator.print();
-	}
+	if ( verbose )
+		this->info();
 	return true;
 }
 
@@ -101,15 +99,11 @@ bool Coordinator::start() {
 	this->eventQueue.start();
 	if ( this->config.coordinator.workers.type == WORKER_TYPE_MIXED ) {
 		for ( int i = 0, len = this->config.coordinator.workers.number.mixed; i < len; i++ ) {
-			if ( this->workers[ i ].start() ) {
-				this->workers[ i ].debug();
-			}
+			this->workers[ i ].start();
 		}
 	} else {
 		for ( int i = 0, len = this->config.coordinator.workers.number.separated.total; i < len; i++ ) {
-			if ( this->workers[ i ].start() ) {
-				this->workers[ i ].debug();
-			}
+			this->workers[ i ].start();
 		}
 	}
 
@@ -117,8 +111,6 @@ bool Coordinator::start() {
 	if ( ! this->sockets.self.start() ) {
 		__ERROR__( "Coordinator", "start", "Cannot start socket." );
 		return false;
-	} else {
-		this->sockets.self.debug();
 	}
 
 	this->startTime = start_timer();
@@ -164,13 +156,44 @@ double Coordinator::getElapsedTime() {
 	return get_elapsed_time( this->startTime );
 }
 
-void Coordinator::print( FILE *f ) {
+void Coordinator::info( FILE *f ) {
 	this->config.global.print( f );
 	this->config.coordinator.print( f );
 }
 
 void Coordinator::debug( FILE *f ) {
+	int i, len;
 
+	fprintf( f, "Coordinator socket\n------------------\n" );
+	this->sockets.self.print( f );
+
+	fprintf( f, "\nMaster sockets\n--------------\n" );
+	for ( i = 0, len = this->sockets.masters.size(); i < len; i++ ) {
+		fprintf( f, "%d. ", i + 1 );
+		this->sockets.masters[ i ].print( f );
+	}
+	if ( len == 0 ) fprintf( f, "(None)\n" );
+
+	fprintf( f, "\nSlave sockets\n-------------\n" );
+	for ( i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
+		fprintf( f, "%d. ", i + 1 );
+		this->sockets.slaves[ i ].print( f );
+	}
+	if ( len == 0 ) fprintf( f, "(None)\n" );
+
+	fprintf( f, "\nCoordinator event queue\n-----------------------\n" );
+	this->eventQueue.print( f );
+
+	fprintf( f, "\nWorkers\n-------\n" );
+	for ( i = 0, len = this->workers.size(); i < len; i++ ) {
+		fprintf( f, "%d. ", i + 1 );
+		this->workers[ i ].print( f );
+	}
+
+	fprintf( f, "\nOther threads\n--------------\n" );
+	this->sockets.self.printThread();
+
+	fprintf( f, "\n" );
 }
 
 void Coordinator::interactive() {
@@ -212,7 +235,7 @@ void Coordinator::interactive() {
 			break;
 		} else if ( strcmp( command, "info" ) == 0 ) {
 			valid = true;
-			this->print();
+			this->info();
 		} else if ( strcmp( command, "debug" ) == 0 ) {
 			valid = true;
 			this->debug();
@@ -230,13 +253,19 @@ void Coordinator::interactive() {
 }
 
 void Coordinator::help() {
-
-}
-
-void Coordinator::info() {
-
+	fprintf(
+		stdout,
+		"Supported commands:\n"
+		"- help: Show this help message\n"
+		"- info: Show configuration\n"
+		"- debug: Show debug messages\n"
+		"- time: Show elapsed time\n"
+		"- exit: Terminate this client\n"
+	);
+	fflush( stdout );
 }
 
 void Coordinator::time() {
-	printf( "Elapsed time: %12.6lf s\n", this->getElapsedTime() );
+	fprintf( stdout, "Elapsed time: %12.6lf s\n", this->getElapsedTime() );
+	fflush( stdout );
 }

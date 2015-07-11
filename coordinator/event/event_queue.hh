@@ -67,6 +67,20 @@ public:
 		}
 	}
 
+	void print( FILE *f = stdout ) {
+		if ( this->isMixed ) {
+			fprintf( f, "[Mixed] " );
+			this->mixed->print( f );
+		} else {
+			fprintf( f, "[Coordinator] " );
+			this->separated.coordinator->print( f );
+			fprintf( f, "[     Master] " );
+			this->separated.master->print( f );
+			fprintf( f, "[      Slave] " );
+			this->separated.slave->print( f );
+		}
+	}
+
 #define COORDINATOR_EVENT_QUEUE_INSERT(_EVENT_TYPE_, _EVENT_QUEUE_) \
 	bool insert( _EVENT_TYPE_ &event ) { \
 		if ( this->isMixed ) { \

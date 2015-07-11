@@ -69,11 +69,13 @@ bool Socket::connect() {
 	}
 
 	if ( ::connect( this->sockfd, ( struct sockaddr * ) &this->addr, sizeof( this->addr ) ) != 0 ) {
+		this->connected = false;
 		__ERROR__( "Socket", "connect", "%s", strerror( errno ) );
 		return false;
 	}
 
 	this->mode = SOCKET_MODE_CONNECT;
+	this->connected = true;
 	return this->setNonBlocking();
 }
 
@@ -98,6 +100,7 @@ ssize_t Socket::send( int sockfd, char *buf, size_t ulen, bool &connected ) {
 	} while ( bytes < len );
 	if ( connected && bytes > 0 )
 		__DEBUG__( MAGENTA, "Socket", "send", "Sent %ld bytes.", bytes );
+	this->connected = connected;
 	return bytes;
 }
 
@@ -125,6 +128,7 @@ ssize_t Socket::recv( int sockfd, char *buf, size_t ulen, bool &connected, bool 
 	} while ( wait && bytes < len );
 	if ( connected && bytes > 0 )
 		__DEBUG__( MAGENTA, "Socket", "recv", "Received %ld bytes.", bytes );
+	this->connected = connected;
 	return bytes;
 }
 
@@ -192,12 +196,13 @@ bool Socket::init( int sockfd, struct sockaddr_in addr ) {
 
 void Socket::stop() {
 	::close( this->sockfd );
+	this->connected = false;
 }
 
 void Socket::print( FILE *f ) {
 	char buf[ 16 ];
 	Socket::ntoh_ip( this->addr.sin_addr.s_addr, buf, 16 );
-	fprintf( f, "[%4d] %s:%u\n", this->sockfd, buf, Socket::ntoh_port( this->addr.sin_port ) );
+	fprintf( f, "[%4d] %s:%u (%sconnected)\n", this->sockfd, buf, Socket::ntoh_port( this->addr.sin_port ), this->connected ? "" : "dis" );
 }
 
 bool Socket::hton_ip( char *ip, unsigned long &ret ) {

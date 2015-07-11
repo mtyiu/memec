@@ -110,10 +110,8 @@ bool Slave::init( char *path, bool verbose ) {
 	Signal::setHandler( Slave::signalHandler );
 
 	// Show configuration //
-	if ( verbose ) {
-		this->config.global.print();
-		this->config.slave.print();
-	}
+	if ( verbose )
+		this->info();
 	return true;
 }
 
@@ -122,15 +120,11 @@ bool Slave::start() {
 	this->eventQueue.start();
 	if ( this->config.slave.workers.type == WORKER_TYPE_MIXED ) {
 		for ( int i = 0, len = this->config.slave.workers.number.mixed; i < len; i++ ) {
-			if ( this->workers[ i ].start() ) {
-				this->workers[ i ].debug();
-			}
+			this->workers[ i ].start();
 		}
 	} else {
 		for ( int i = 0, len = this->config.slave.workers.number.separated.total; i < len; i++ ) {
-			if ( this->workers[ i ].start() ) {
-				this->workers[ i ].debug();
-			}
+			this->workers[ i ].start();
 		}
 	}
 
@@ -144,8 +138,6 @@ bool Slave::start() {
 	if ( ! this->sockets.self.start() ) {
 		__ERROR__( "Slave", "start", "Cannot start socket." );
 		return false;
-	} else {
-		this->sockets.self.debug();
 	}
 
 	this->startTime = start_timer();
@@ -193,13 +185,51 @@ double Slave::getElapsedTime() {
 	return get_elapsed_time( this->startTime );
 }
 
-void Slave::print( FILE *f ) {
+void Slave::info( FILE *f ) {
 	this->config.global.print( f );
 	this->config.slave.print( f );
 }
 
 void Slave::debug( FILE *f ) {
+	int i, len;
 
+	fprintf( f, "Slave socket\n------------\n" );
+	this->sockets.self.print( f );
+
+	fprintf( f, "\nCoordinator sockets\n-------------------\n" );
+	for ( i = 0, len = this->sockets.coordinators.size(); i < len; i++ ) {
+		fprintf( f, "%d. ", i + 1 );
+		this->sockets.coordinators[ i ].print( f );
+	}
+	if ( len == 0 ) fprintf( f, "(None)\n" );
+
+	fprintf( f, "\nMaster sockets\n---------------\n" );
+	for ( i = 0, len = this->sockets.masters.size(); i < len; i++ ) {
+		fprintf( f, "%d. ", i + 1 );
+		this->sockets.masters[ i ].print( f );
+	}
+	if ( len == 0 ) fprintf( f, "(None)\n" );
+
+	fprintf( f, "\nSlave peer sockets\n------------------\n" );
+	for ( i = 0, len = this->sockets.slavePeers.size(); i < len; i++ ) {
+		fprintf( f, "%d. ", i + 1 );
+		this->sockets.slavePeers[ i ].print( f );
+	}
+	if ( len == 0 ) fprintf( f, "(None)\n" );
+
+	fprintf( f, "\nSlave event queue\n-----------------\n" );
+	this->eventQueue.print( f );
+
+	fprintf( f, "\nWorkers\n-------\n" );
+	for ( i = 0, len = this->workers.size(); i < len; i++ ) {
+		fprintf( f, "%d. ", i + 1 );
+		this->workers[ i ].print( f );
+	}
+
+	fprintf( f, "\nOther threads\n--------------\n" );
+	this->sockets.self.printThread();
+
+	fprintf( f, "\n" );
 }
 
 void Slave::interactive() {
@@ -241,7 +271,7 @@ void Slave::interactive() {
 			break;
 		} else if ( strcmp( command, "info" ) == 0 ) {
 			valid = true;
-			this->print();
+			this->info();
 		} else if ( strcmp( command, "debug" ) == 0 ) {
 			valid = true;
 			this->debug();
@@ -259,13 +289,19 @@ void Slave::interactive() {
 }
 
 void Slave::help() {
-
-}
-
-void Slave::info() {
-
+	fprintf(
+		stdout,
+		"Supported commands:\n"
+		"- help: Show this help message\n"
+		"- info: Show configuration\n"
+		"- debug: Show debug messages\n"
+		"- time: Show elapsed time\n"
+		"- exit: Terminate this client\n"
+	);
+	fflush( stdout );
 }
 
 void Slave::time() {
-	printf( "Elapsed time: %12.6lf s\n", this->getElapsedTime() );
+	fprintf( stdout, "Elapsed time: %12.6lf s\n", this->getElapsedTime() );
+	fflush( stdout );
 }

@@ -105,10 +105,8 @@ bool Master::init( char *path, bool verbose ) {
 	Signal::setHandler( Master::signalHandler );
 
 	// Show configuration //
-	if ( verbose ) {
-		this->config.global.print();
-		this->config.master.print();
-	}
+	if ( verbose )
+		this->info();
 	return true;
 }
 
@@ -117,13 +115,11 @@ bool Master::start() {
 	this->eventQueue.start();
 	if ( this->config.master.workers.type == WORKER_TYPE_MIXED ) {
 		for ( int i = 0, len = this->config.master.workers.number.mixed; i < len; i++ ) {
-			if ( this->workers[ i ].start() )
-				this->workers[ i ].debug();
+			this->workers[ i ].start();
 		}
 	} else {
 		for ( int i = 0, len = this->config.master.workers.number.separated.total; i < len; i++ ) {
-			if ( this->workers[ i ].start() )
-				this->workers[ i ].debug();
+			this->workers[ i ].start();
 		}
 	}
 
@@ -142,8 +138,6 @@ bool Master::start() {
 	if ( ! this->sockets.self.start() ) {
 		__ERROR__( "Master", "start", "Cannot start socket." );
 		return false;
-	} else {
-		this->sockets.self.debug();
 	}
 
 	this->startTime = start_timer();
@@ -191,14 +185,52 @@ double Master::getElapsedTime() {
 	return get_elapsed_time( this->startTime );
 }
 
-void Master::print( FILE *f ) {
+void Master::info( FILE *f ) {
 	this->config.global.print( f );
 	this->config.master.print( f );
 }
 
 
 void Master::debug( FILE *f ) {
+	int i, len;
 
+	fprintf( f, "Master socket\n-------------\n" );
+	this->sockets.self.print( f );
+
+	fprintf( f, "\nApplication sockets\n-------------------\n" );
+	for ( i = 0, len = this->sockets.applications.size(); i < len; i++ ) {
+		fprintf( f, "%d. ", i + 1 );
+		this->sockets.applications[ i ].print( f );
+	}
+	if ( len == 0 ) fprintf( f, "(None)\n" );
+
+	fprintf( f, "\nCoordinator sockets\n-------------------\n" );
+	for ( i = 0, len = this->sockets.coordinators.size(); i < len; i++ ) {
+		fprintf( f, "%d. ", i + 1 );
+		this->sockets.coordinators[ i ].print( f );
+	}
+	if ( len == 0 ) fprintf( f, "(None)\n" );
+
+	fprintf( f, "\nSlave sockets\n-------------\n" );
+	for ( i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
+		fprintf( f, "%d. ", i + 1 );
+		this->sockets.slaves[ i ].print( f );
+	}
+	if ( len == 0 ) fprintf( f, "(None)\n" );
+
+	fprintf( f, "\nMaster event queue\n------------------\n" );
+	this->eventQueue.print( f );
+
+	fprintf( f, "\nWorkers\n-------\n" );
+	for ( i = 0, len = this->workers.size(); i < len; i++ ) {
+		fprintf( f, "%d. ", i + 1 );
+		this->workers[ i ].print( f );
+	}
+
+	fprintf( f, "\nOther threads\n--------------\n" );
+	this->sockets.self.printThread();
+
+	fprintf( f, "\n" );
 }
 
 void Master::interactive() {
@@ -240,7 +272,7 @@ void Master::interactive() {
 			break;
 		} else if ( strcmp( command, "info" ) == 0 ) {
 			valid = true;
-			this->print();
+			this->info();
 		} else if ( strcmp( command, "debug" ) == 0 ) {
 			valid = true;
 			this->debug();
@@ -258,13 +290,19 @@ void Master::interactive() {
 }
 
 void Master::help() {
-
-}
-
-void Master::info() {
-
+	fprintf(
+		stdout,
+		"Supported commands:\n"
+		"- help: Show this help message\n"
+		"- info: Show configuration\n"
+		"- debug: Show debug messages\n"
+		"- time: Show elapsed time\n"
+		"- exit: Terminate this client\n"
+	);
+	fflush( stdout );
 }
 
 void Master::time() {
-	printf( "Elapsed time: %12.6lf s\n", this->getElapsedTime() );
+	fprintf( stdout, "Elapsed time: %12.6lf s\n", this->getElapsedTime() );
+	fflush( stdout );
 }
