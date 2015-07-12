@@ -1,7 +1,8 @@
 TARGET= \
 	common/config \
 	common/ds \
-	common/protocol
+	common/protocol \
+	temp
 
 .PHONY: all $(TARGET)
 
