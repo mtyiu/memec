@@ -55,12 +55,22 @@ public:
 	}
 };
 
-int pickMin( int *weight, int numSlaves ) {
-	int min = weight[ 0 ], index = 0;
-	for ( int i = 0; i < numSlaves; i++ ) {
+int pickMin( int *weight, int numSlaves, int *selected, int selectedCount ) {
+	bool isSelected = false;
+	int i, j, min = weight[ 0 ], index = 0;
+	for ( i = 0; i < numSlaves; i++ ) {
+		isSelected = false;
 		if ( weight[ i ] < min ) {
-			min = weight[ i ];
-			index = i;
+			for ( j = 0; j < selectedCount; j++ ) {
+				if ( i == selected[ j ] ) {
+					isSelected = true;
+					break;
+				}
+			}
+			if ( ! isSelected ) {
+				min = weight[ i ];
+				index = i;
+			}
 		}
 	}
 	return index;
@@ -91,12 +101,12 @@ StripeList **generate( int numLists, int numSlaves, int n, int k, bool verbose =
 			memcpy( cost[ i ], cost[ i - 1 ], sizeof( int ) * numSlaves );
 		}
 		for ( j = 0; j < n - k; j++ ) {
-			list[ i ]->parity[ j ] = pickMin( load[ i ], numSlaves );
+			list[ i ]->parity[ j ] = pickMin( load[ i ], numSlaves, list[ i ]->parity, j );
 			load[ i ][ list[ i ]->parity[ j ] ] += k;
 			cost[ i ][ list[ i ]->parity[ j ] ] += 1;
 		}
 		for ( j = 0; j < k; j++ ) {
-			list[ i ]->data[ j ] = pickMin( load[ i ], numSlaves );
+			list[ i ]->data[ j ] = pickMin( load[ i ], numSlaves, list[ i ]->data, j );
 			load[ i ][ list[ i ]->data[ j ] ] += 1;
 			cost[ i ][ list[ i ]->data[ j ] ] += 1;
 		}
@@ -128,9 +138,14 @@ StripeList **generate( int numLists, int numSlaves, int n, int k, bool verbose =
 		}
 		average /= numSlaves;
 		printf( " (min: %d, max: %d, average: %.1lf)\n", min, max, average );
+		if ( max - min > k ) {
+			printf( "*** Property violated: max - min > k ! ***\n" );
+			goto terminate;
+		}
 	}
 	printf( "\n" );
 
+	/*
 	printf( "Storage cost:\n" );
 	for ( i = verbose ? 0 : numLists - 1; i < numLists; i++ ) {
 		if ( verbose )
@@ -148,6 +163,7 @@ StripeList **generate( int numLists, int numSlaves, int n, int k, bool verbose =
 		printf( " (min: %d, max: %d, average: %.1lf)\n", min, max, average );
 	}
 	printf( "\n" );
+	*/
 
 	printf( "Number of unique stripe list:\n" );
 	printf( "%lu\n\n", count.size() );
@@ -165,6 +181,7 @@ StripeList **generate( int numLists, int numSlaves, int n, int k, bool verbose =
 	average /= ( int ) count.size();
 	printf( " (min: %d, max: %d, average: %.1lf)\n", min, max, average );
 
+terminate:
 	for ( i = 0; i < numLists; i++ ) {
 		delete[] load[ i ];
 		delete[] cost[ i ];
@@ -191,7 +208,7 @@ int main( int argc, char **argv ) {
 		goto usage;
 	}
 	
-	list = generate( numLists, numSlaves, n, k );
+	list = generate( numLists, numSlaves, n, k, true );
 	for ( i = 0; i < numLists; i++ )
 		delete list[ i ];
 	delete[] list;

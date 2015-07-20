@@ -8,6 +8,7 @@ Master::Master() {
 
 void Master::free() {
 	this->eventQueue.free();
+	delete this->stripeList;
 }
 
 void Master::signalHandler( int signal ) {
@@ -100,6 +101,13 @@ bool Master::init( char *path, bool verbose ) {
 		WORKER_INIT_LOOP( slave, WORKER_ROLE_SLAVE )
 #undef WORKER_INIT_LOOP
 	}
+	/* Stripe list */
+	this->stripeList = new StripeList<SlaveSocket>(
+		this->config.global.coding.params.getDataChunkCount(),
+		this->config.global.coding.params.getParityChunkCount(),
+		this->config.global.stripeList.count,
+		this->sockets.slaves.values
+	);
 
 	// Set signal handlers //
 	Signal::setHandler( Master::signalHandler );

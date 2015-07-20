@@ -16,6 +16,9 @@ public:
 		uint32_t chunk;
 	} size;
 	struct {
+		uint32_t count;
+	} stripeList;
+	struct {
 		uint32_t maxEvents;
 		int32_t timeout;
 	} epoll;

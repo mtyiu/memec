@@ -119,6 +119,65 @@ public:
 				return 0;
 		}
 	}
+
+	inline uint32_t getRS_K() {
+		if ( this->scheme == CS_EMBR ) {
+			uint32_t n = this->getN();
+			uint32_t k = this->getK();
+			return ( k * ( n - 1 ) - k * ( k - 1 ) / 2 );
+		}
+		return 0;
+	}
+
+	inline uint32_t getRS_M() {
+		if ( this->scheme == CS_EMBR ) {
+			uint32_t n = this->getN();
+			uint32_t k = this->getK();
+			return ( n * ( n - 1 ) / 2 - k * ( 2 * n - k - 1 ) / 2 );
+		}
+		return 0;
+	}
+
+	inline uint32_t getDataChunkCount() {
+		switch( this->scheme ) {
+			case CS_RAID0:
+			case CS_RAID1:
+				return this->getN();
+			case CS_RAID5:
+				return this->getN() - 1;
+			case CS_RS:
+				return this->getK();
+			case CS_EMBR:
+				return this->getRS_K();
+			case CS_RDP:
+				return this->getN() - 2;
+			case CS_EVENODD:
+				return this->getN() - 2;
+			case CS_CAUCHY:
+				return this->getK();
+			default:
+				return 0;
+		}
+	}
+
+	inline uint32_t getParityChunkCount() {
+		switch( this->scheme ) {
+			case CS_RAID5:
+				return 1;
+			case CS_RS:
+				return this->getM();
+			case CS_EMBR:
+				return this->getRS_M();
+			case CS_RDP:
+				return 2;
+			case CS_EVENODD:
+				return 2;
+			case CS_CAUCHY:
+				return this->getM();
+			default:
+				return 0;
+		}
+	}
 };
 
 #endif

@@ -4,7 +4,7 @@
 #include <vector>
 
 template<typename KeyType, typename ValueType> class ArrayMap {
-private:
+public:
 	std::vector<KeyType> keys;
 	std::vector<ValueType> values;
 
@@ -16,7 +16,6 @@ private:
 		return -1;
 	}
 
-public:
 	void reserve( int n ) {
 		this->keys.reserve( n );
 		this->values.reserve( n );

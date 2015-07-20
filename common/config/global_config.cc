@@ -13,6 +13,11 @@ bool GlobalConfig::set( const char *section, const char *name, const char *value
 			this->size.chunk = atoi( value );
 		else
 			return false;
+	} else if ( match( section, "stripe_list" ) ) {
+		if ( match( name, "count" ) )
+			this->stripeList.count = atoi( value );
+		else
+			return false;
 	} else if ( match( section, "epoll" ) ) {
 		if ( match( name, "max_events" ) )
 			this->epoll.maxEvents = atoi( value );
@@ -104,6 +109,9 @@ bool GlobalConfig::validate() {
 		CFG_PARSE_ERROR( "GlobalConfig", "Key size should be at least 8 bytes." );
 	if ( this->size.key > 255 )
 		CFG_PARSE_ERROR( "GlobalConfig", "Key size should be at most 255 bytes." );
+
+	if ( this->stripeList.count < 1 )
+		CFG_PARSE_ERROR( "GlobalConfig", "The number of stripe lists should be at least 1." );
 
 	if ( this->epoll.maxEvents < 1 )
 		CFG_PARSE_ERROR( "GlobalConfig", "Maximum number of events in epoll should be at least 1." );
@@ -203,6 +211,8 @@ void GlobalConfig::print( FILE *f ) {
 		"- Size\n"
 		"\t- %-*s : %u\n"
 		"\t- %-*s : %u\n"
+		"- Stripe list\n"
+		"\t- %-*s : %u\n"
 		"- epoll settings\n"
 		"\t- %-*s : %u\n"
 		"\t- %-*s : %d\n"
@@ -210,6 +220,7 @@ void GlobalConfig::print( FILE *f ) {
 		"\t- %-*s : ",
 		width, "Key size", this->size.key,
 		width, "Chunk size", this->size.chunk,
+		width, "Count", this->stripeList.count,
 		width, "Maximum number of events", this->epoll.maxEvents,
 		width, "Timeout", this->epoll.timeout,
 		width, "Coding scheme"

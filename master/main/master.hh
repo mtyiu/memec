@@ -11,6 +11,7 @@
 #include "../worker/worker.hh"
 #include "../../common/config/global_config.hh"
 #include "../../common/ds/array_map.hh"
+#include "../../common/ds/stripe_list.hh"
 #include "../../common/socket/epoll.hh"
 #include "../../common/signal/signal.hh"
 #include "../../common/util/time.hh"
@@ -45,6 +46,7 @@ public:
 		ArrayMap<int, SlaveSocket> slaves;
 	} sockets;
 	MasterEventQueue eventQueue;
+	StripeList<SlaveSocket> *stripeList;
 	
 	static Master *getInstance() {
 		static Master master;
