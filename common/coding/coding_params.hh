@@ -178,6 +178,10 @@ public:
 				return 0;
 		}
 	}
+
+	inline uint32_t getChunkCount() {
+		return this->getDataChunkCount() + this->getParityChunkCount();
+	}
 };
 
 #endif

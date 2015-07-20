@@ -103,8 +103,8 @@ bool Master::init( char *path, bool verbose ) {
 	}
 	/* Stripe list */
 	this->stripeList = new StripeList<SlaveSocket>(
+		this->config.global.coding.params.getChunkCount(),
 		this->config.global.coding.params.getDataChunkCount(),
-		this->config.global.coding.params.getParityChunkCount(),
 		this->config.global.stripeList.count,
 		this->sockets.slaves.values
 	);
@@ -196,8 +196,8 @@ double Master::getElapsedTime() {
 void Master::info( FILE *f ) {
 	this->config.global.print( f );
 	this->config.master.print( f );
+	this->stripeList->print( f );
 }
-
 
 void Master::debug( FILE *f ) {
 	int i, len;
