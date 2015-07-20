@@ -39,6 +39,9 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 			buffer.data = this->protocol.resRegisterApplication( buffer.size, false );
 			isSend = true;
 			break;
+		case APPLICATION_EVENT_TYPE_PENDING:
+			isSend = false;
+			break;
 		default:
 			return;
 	}
@@ -48,7 +51,17 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "MasterWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 	} else {
-
+		// Parse requests from applications
+		ProtocolHeader header;
+		ret = event.socket->recv(
+			this->protocol.buffer.data,
+			this->protocol.buffer.size,
+			connected,
+			false
+		);
+		if ( ! this->protocol.parseHeader( header ) ) {
+			__ERROR__( "MasterWorker", "dispatch", "Undefined message." );
+		}
 	}
 
 	if ( ! connected )

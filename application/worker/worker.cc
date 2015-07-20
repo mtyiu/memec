@@ -26,10 +26,31 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 		size_t size;
 		char *data;
 	} buffer;
+	size_t valueSize;
 
 	switch( event.type ) {
 		case MASTER_EVENT_TYPE_REGISTER_REQUEST:
 			buffer.data = this->protocol.reqRegisterMaster( buffer.size );
+			isSend = true;
+			break;
+		case MASTER_EVENT_TYPE_SET_REQUEST:
+			// Read contents from file
+			valueSize = ::read( event.message.set.fd, this->buffer.value, this->buffer.valueSize );
+			buffer.data = this->protocol.reqSet(
+				buffer.size,
+				event.message.set.key,
+				event.message.set.keySize,
+				this->buffer.value,
+				valueSize
+			);
+			isSend = true;
+			break;
+		case MASTER_EVENT_TYPE_GET_REQUEST:
+			buffer.data = this->protocol.reqGet(
+				buffer.size,
+				event.message.get.key,
+				event.message.get.keySize
+			);
 			isSend = true;
 			break;
 		case MASTER_EVENT_TYPE_PENDING:
@@ -81,6 +102,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 
 void ApplicationWorker::free() {
 	this->protocol.free();
+	delete[] this->buffer.value;
 }
 
 void *ApplicationWorker::run( void *argv ) {
@@ -127,6 +149,9 @@ void *ApplicationWorker::run( void *argv ) {
 }
 
 bool ApplicationWorker::init( ApplicationConfig &config, WorkerRole role, ApplicationEventQueue *eventQueue ) {
+	this->buffer.value = new char[ config.size.chunk ];
+	this->buffer.valueSize = config.size.chunk;
+
 	this->protocol.init(
 		Protocol::getSuggestedBufferSize(
 			config.size.key,

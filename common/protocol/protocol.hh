@@ -41,6 +41,23 @@
 #define PROTO_OPCODE_REGISTER			0x00
 #define PROTO_OPCODE_GET_CONFIG			0x01
 
+// Application <-> Master //
+#define PROTO_OPCODE_GET				0x02
+#define PROTO_OPCODE_SET				0x03
+#define PROTO_OPCODE_REPLACE			0x04
+#define PROTO_OPCODE_UPDATE				0x05
+#define PROTO_OPCODE_DELETE				0x06
+#define PROTO_OPCODE_FLUSH				0x07
+
+/*********************
+ * Key size (1 byte) *
+ *********************/
+#define MAXIMUM_KEY_SIZE				255
+/***********************
+ * Value size (3 byte) *
+ ***********************/
+ #define MAXIMUM_VALUE_SIZE				16777215
+
 /****************
  * Internal use *
  ****************/
@@ -67,6 +84,7 @@ protected:
 
 	bool parseHeader( char *buf, size_t size, uint8_t &magic, uint8_t &from, uint8_t &opcode, uint32_t &length );
 	size_t generateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t length );
+	size_t generateKeyValuePacket( uint8_t magic, uint8_t to, uint8_t opcode, uint8_t keySize, char *key, uint32_t valueSize = 0, char *value = 0 );
 
 public:
 	struct {
@@ -78,6 +96,7 @@ public:
 	bool init( size_t size = 0 );
 	void free();
 	bool parseHeader( char *buf, size_t size, struct ProtocolHeader &header );
+	bool parseHeader( struct ProtocolHeader &header );
 	static size_t getSuggestedBufferSize( uint32_t keySize, uint32_t chunkSize );
 };
 

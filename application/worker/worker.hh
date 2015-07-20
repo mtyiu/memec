@@ -13,6 +13,10 @@ private:
 	WorkerRole role;
 	ApplicationEventQueue *eventQueue;
 	ApplicationProtocol protocol;
+	struct {
+		char *value;
+		uint32_t valueSize;
+	} buffer;
 
 	void dispatch( MixedEvent event );
 	void dispatch( ApplicationEvent event );

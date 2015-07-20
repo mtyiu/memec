@@ -20,6 +20,35 @@ size_t Protocol::generateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint
 	return bytes;
 }
 
+size_t Protocol::generateKeyValuePacket( uint8_t magic, uint8_t to, uint8_t opcode, uint8_t keySize, char *key, uint32_t valueSize, char *value ) {
+	char *buf = this->buffer.data + PROTO_HEADER_SIZE;
+	size_t bytes = this->generateHeader( magic, to, opcode, keySize + valueSize );
+
+	buf[ 0 ] = keySize;
+
+	if ( valueSize && value ) {
+		valueSize = htonl( valueSize );
+		buf[ 1 ] = ( valueSize >> 16 ) & 0xFF;
+		buf[ 2 ] = ( valueSize >> 8 ) & 0xFF;
+		buf[ 3 ] = valueSize & 0xFF;
+		valueSize = ntohl( valueSize );
+
+		buf += 4;
+		memcpy( buf, key, keySize );
+		buf += keySize;
+		memcpy( buf, value, valueSize );
+
+		bytes += 4 + keySize + valueSize;
+	} else {
+		buf += 1;
+		memcpy( buf, key, keySize );
+
+		bytes += 1 + keySize;
+	}
+
+	return bytes;
+}
+
 Protocol::Protocol( Role role ) {
 	this->buffer.size = 0;
 	this->buffer.data = 0;
@@ -101,6 +130,12 @@ bool Protocol::parseHeader( char *buf, size_t size, uint8_t &magic, uint8_t &fro
 	switch( opcode ) {
 		case PROTO_OPCODE_REGISTER:
 		case PROTO_OPCODE_GET_CONFIG:
+		case PROTO_OPCODE_GET:
+		case PROTO_OPCODE_SET:
+		case PROTO_OPCODE_REPLACE:
+		case PROTO_OPCODE_UPDATE:
+		case PROTO_OPCODE_DELETE:
+		case PROTO_OPCODE_FLUSH:
 			break;
 		default:
 			return false;
@@ -112,6 +147,17 @@ bool Protocol::parseHeader( char *buf, size_t size, uint8_t &magic, uint8_t &fro
 bool Protocol::parseHeader( char *buf, size_t size, struct ProtocolHeader &header ) {
 	return this->parseHeader(
 		buf, size,
+		header.magic,
+		header.from,
+		header.opcode,
+		header.length
+	);
+}
+
+bool Protocol::parseHeader( struct ProtocolHeader &header ) {
+	return this->parseHeader(
+		this->buffer.data,
+		this->buffer.size,
 		header.magic,
 		header.from,
 		header.opcode,

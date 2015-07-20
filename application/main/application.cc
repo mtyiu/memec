@@ -330,47 +330,22 @@ void Application::interactive() {
 }
 
 bool Application::set( char *key, char *path ) {
-	ssize_t size;
+	int fd;
 	MasterEvent event;
-	char *value;
 
-	FILE *f = fopen( path, "rb" );
-	if ( ! f ) {
-		__ERROR__( "Application", "set", "Cannot read file: \"%s\" for key \"%s\".", path, key );
+	fd = ::open( path, O_RDONLY );
+	if ( fd == -1 ) {
+		__ERROR__( "Application", "set", "%s", strerror( errno ) );
 		return false;
 	}
 
-	// Prepare read buffer
-	fseek( f, 0L, SEEK_END );
-	size = ftell( f );
-	fseek( f, 0L, SEEK_SET );
-
-	if ( size == -1 ) {
-		__ERROR__( "Application", "set", "Cannot get file size." );
-		return false;
-	}
-
-	value = ( char * ) ::malloc( size );
-	if ( ! value ) {
-		__ERROR__( "Application", "set", "Cannot allocate memory." );
-		return false;
-	}
 	key = strdup( key );
 	if ( ! key ) {
 		__ERROR__( "Application", "set", "Cannot allocate memory." );
 		return false;
 	}
 
-	if ( fread( value, 1, size, f ) != ( size_t ) size ) {
-		__ERROR__( "Application", "set", "Cannot read the file contents." );
-		::free( value );
-		return false;
-	}
-
-	fclose( f );
-
-	// Put the data into event queue
-	event.reqSet( &this->sockets.masters[ 0 ], key, value, ( size_t ) size );
+	event.reqSet( &this->sockets.masters[ 0 ], key, strlen( key ), fd );
 	this->eventQueue.insert( event );
 
 	return true;
@@ -392,7 +367,7 @@ bool Application::get( char *key, char *path ) {
 		return false;
 	}
 
-	event.reqGet( &this->sockets.masters[ 0 ], key, fd );
+	event.reqGet( &this->sockets.masters[ 0 ], key, strlen( key ), fd );
 	this->eventQueue.insert( event );
 
 	return true;

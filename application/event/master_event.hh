@@ -18,18 +18,20 @@ public:
 	MasterSocket *socket;
 	union {
 		struct {
-			char *key, *value;
-			size_t size;
+			char *key;
+			uint32_t keySize;
+			int fd;
 		} set;
 		struct {
 			char *key;
+			uint32_t keySize;
 			int fd;
 		} get;
 	} message;
 
 	void reqRegister( MasterSocket *socket );
-	void reqSet( MasterSocket *socket, char *key, char *value, size_t size );
-	void reqGet( MasterSocket *socket, char *key, int fd );
+	void reqSet( MasterSocket *socket, char *key, uint32_t keySize, int fd );
+	void reqGet( MasterSocket *socket, char *key, uint32_t keySize, int fd );
 	void pending( MasterSocket *socket );
 };
 

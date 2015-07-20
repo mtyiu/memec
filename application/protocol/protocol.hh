@@ -7,6 +7,8 @@ class ApplicationProtocol : public Protocol {
 public:
 	ApplicationProtocol() : Protocol( ROLE_APPLICATION ) {}
 	char *reqRegisterMaster( size_t &size );
+	char *reqSet( size_t &size, char *key, uint8_t keySize, char *value, uint32_t valueSize );
+	char *reqGet( size_t &size, char *key, uint8_t keySize );
 };
 
 #endif
