@@ -1,4 +1,4 @@
-TARGET=lib common coordinator master slave test
+TARGET=lib common coordinator master slave application test
 
 .PHONY: all $(TARGET)
 

@@ -84,38 +84,38 @@ bool MasterConfig::validate() {
 	switch( this->workers.type ) {
 		case WORKER_TYPE_MIXED:
 			if ( this->workers.number.mixed < 1 )
-				CFG_PARSE_ERROR( "CoordinatorConfig", "The number of workers should be at least 1." );
+				CFG_PARSE_ERROR( "MasterConfig", "The number of workers should be at least 1." );
 			if ( this->eventQueue.size.mixed < this->workers.number.mixed )
-				CFG_PARSE_ERROR( "CoordinatorConfig", "The size of the event queue should be at least the number of workers." );
+				CFG_PARSE_ERROR( "MasterConfig", "The size of the event queue should be at least the number of workers." );
 			break;
 		case WORKER_TYPE_SEPARATED:
 			if ( this->workers.number.separated.application < 1 )
-				CFG_PARSE_ERROR( "CoordinatorConfig", "The number of application workers should be at least 1." );
+				CFG_PARSE_ERROR( "MasterConfig", "The number of application workers should be at least 1." );
 			if ( this->workers.number.separated.coordinator < 1 )
-				CFG_PARSE_ERROR( "CoordinatorConfig", "The number of coordinator workers should be at least 1." );
+				CFG_PARSE_ERROR( "MasterConfig", "The number of coordinator workers should be at least 1." );
 			if ( this->workers.number.separated.master < 1 )
-				CFG_PARSE_ERROR( "CoordinatorConfig", "The number of master workers should be at least 1." );
+				CFG_PARSE_ERROR( "MasterConfig", "The number of master workers should be at least 1." );
 			if ( this->workers.number.separated.slave < 1 )
-				CFG_PARSE_ERROR( "CoordinatorConfig", "The number of slave workers should be at least 1." );
+				CFG_PARSE_ERROR( "MasterConfig", "The number of slave workers should be at least 1." );
 
 			if ( this->eventQueue.size.separated.application < this->workers.number.separated.application )
-				CFG_PARSE_ERROR( "CoordinatorConfig", "The size of the application event queue should be at least the number of workers." );
+				CFG_PARSE_ERROR( "MasterConfig", "The size of the application event queue should be at least the number of workers." );
 			if ( this->eventQueue.size.separated.coordinator < this->workers.number.separated.coordinator )
-				CFG_PARSE_ERROR( "CoordinatorConfig", "The size of the coordinator event queue should be at least the number of workers." );
+				CFG_PARSE_ERROR( "MasterConfig", "The size of the coordinator event queue should be at least the number of workers." );
 			if ( this->eventQueue.size.separated.master < this->workers.number.separated.master )
-				CFG_PARSE_ERROR( "CoordinatorConfig", "The size of the master event queue should be at least the number of workers." );
+				CFG_PARSE_ERROR( "MasterConfig", "The size of the master event queue should be at least the number of workers." );
 			if ( this->eventQueue.size.separated.slave < this->workers.number.separated.slave )
-				CFG_PARSE_ERROR( "CoordinatorConfig", "The size of the slave event queue should be at least the number of workers." );
+				CFG_PARSE_ERROR( "MasterConfig", "The size of the slave event queue should be at least the number of workers." );
 			break;
 		default:
-			CFG_PARSE_ERROR( "CoordinatorConfig", "The type of event queue should be either \"mixed\" or \"separated\"." );
+			CFG_PARSE_ERROR( "MasterConfig", "The type of event queue should be either \"mixed\" or \"separated\"." );
 	}
 
 	return true;
 }
 
 void MasterConfig::print( FILE *f ) {
-	int width = 24;
+	int width = 29;
 	fprintf(
 		f,
 		"### Master Configuration ###\n"

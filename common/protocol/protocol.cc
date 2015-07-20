@@ -24,6 +24,10 @@ Protocol::Protocol( Role role ) {
 	this->buffer.size = 0;
 	this->buffer.data = 0;
 	switch( role ) {
+		case ROLE_APPLICATION:
+			this->from = PROTO_MAGIC_FROM_APPLICATION;
+			this->to = PROTO_MAGIC_TO_APPLICATION;
+			break;
 		case ROLE_COORDINATOR:
 			this->from = PROTO_MAGIC_FROM_COORDINATOR;
 			this->to = PROTO_MAGIC_TO_COORDINATOR;

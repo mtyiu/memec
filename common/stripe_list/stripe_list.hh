@@ -24,8 +24,8 @@ private:
 		for ( size_t i = 0; i < this->numSlaves; i++ ) {
 			if (
 				(
-					this->weight[ i ] < minWeight || 
-					this->weight[ i ] == minWeight && this->cost[ i ] < minCost
+					( this->weight[ i ] < minWeight ) || 
+					( this->weight[ i ] == minWeight && this->cost[ i ] < minCost )
 				) &&
 				! this->data.check( listIndex, i ) && // The slave should not be selected before
 				! this->parity.check( listIndex, i ) // The slave should not be selected before

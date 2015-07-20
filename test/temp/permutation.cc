@@ -7,9 +7,7 @@ unsigned long choose( int n, int k ) {
 }
 
 int main( int argc, char **argv ) {
-	int numServers, n, k, i, j;
-	unsigned long tmp[ 2 ];
-	struct timespec ts;
+	int numServers, n, k;
 
 	if ( argc <= 3 )
 		goto usage;

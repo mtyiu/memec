@@ -50,6 +50,7 @@
 #include <arpa/inet.h>
 
 enum Role {
+	ROLE_APPLICATION,
 	ROLE_COORDINATOR,
 	ROLE_MASTER,
 	ROLE_SLAVE
