@@ -51,7 +51,7 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 
 		ret = event.socket->recv( this->protocol.buffer.data, PROTO_HEADER_SIZE, connected, true );
 		if ( ret == PROTO_HEADER_SIZE && connected ) {
-			this->protocol.parseHeader( this->protocol.buffer.data, ret, header );
+			this->protocol.parseHeader( header, this->protocol.buffer.data, ret );
 			// Validate message
 			if ( header.from != PROTO_MAGIC_FROM_COORDINATOR ) {
 				__ERROR__( "SlaveWorker", "dispatch", "Invalid message source from coordinator." );

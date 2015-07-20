@@ -11,7 +11,7 @@ char *ApplicationProtocol::reqRegisterMaster( size_t &size ) {
 }
 
 char *ApplicationProtocol::reqSet( size_t &size, char *key, uint8_t keySize, char *value, uint32_t valueSize ) {
-	size = this->generateKeyValuePacket(
+	size = this->generateKeyValueHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_MASTER,
 		PROTO_OPCODE_SET,
@@ -24,7 +24,7 @@ char *ApplicationProtocol::reqSet( size_t &size, char *key, uint8_t keySize, cha
 }
 
 char *ApplicationProtocol::reqGet( size_t &size, char *key, uint8_t keySize ) {
-	size = this->generateKeyValuePacket(
+	size = this->generateKeyHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_MASTER,
 		PROTO_OPCODE_GET,

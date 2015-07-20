@@ -31,7 +31,7 @@ char *MasterProtocol::resRegisterApplication( size_t &size, bool success ) {
 }
 
 char *MasterProtocol::resSet( size_t &size, bool success, uint8_t keySize, char *key ) {
-	size = this->generateKeyValuePacket(
+	size = this->generateKeyHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_APPLICATION,
 		PROTO_OPCODE_SET,
@@ -42,7 +42,7 @@ char *MasterProtocol::resSet( size_t &size, bool success, uint8_t keySize, char 
 }
 
 char *MasterProtocol::resGet( size_t &size, bool success, uint8_t keySize, char *key, uint32_t valueSize, char *value ) {
-	size = this->generateKeyValuePacket(
+	size = this->generateKeyValueHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_APPLICATION,
 		PROTO_OPCODE_GET,

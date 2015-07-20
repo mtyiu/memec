@@ -62,6 +62,8 @@
  * Internal use *
  ****************/
 #define PROTO_HEADER_SIZE				8
+#define PROTO_KEY_SIZE					1
+#define PROTO_KEY_VALUE_SIZE			4
 
 #include <stdint.h>
 #include <arpa/inet.h>
@@ -74,17 +76,33 @@ enum Role {
 };
 
 struct ProtocolHeader {
-	uint8_t magic, from, opcode;
+	uint8_t magic, from, to, opcode;
 	uint32_t length;
+};
+
+struct KeyHeader {
+	uint8_t keySize;
+	char *key;
+};
+
+struct KeyValueHeader {
+	uint8_t keySize;
+	uint32_t valueSize;
+	char *key;
+	char *value;
 };
 
 class Protocol {
 protected:
 	uint8_t from, to;
 
-	bool parseHeader( char *buf, size_t size, uint8_t &magic, uint8_t &from, uint8_t &opcode, uint32_t &length );
 	size_t generateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t length );
-	size_t generateKeyValuePacket( uint8_t magic, uint8_t to, uint8_t opcode, uint8_t keySize, char *key, uint32_t valueSize = 0, char *value = 0 );
+	size_t generateKeyHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint8_t keySize, char *key );
+	size_t generateKeyValueHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint8_t keySize, char *key, uint32_t valueSize, char *value );
+
+	bool parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t &opcode, uint32_t &length, char *buf, size_t size );
+	bool parseKeyHeader( size_t offset, uint8_t &keySize, char *&key, char *buf, size_t size );
+	bool parseKeyValueHeader( size_t offset, uint8_t &keySize, char *&key, uint32_t &valueSize, char *&value, char *buf, size_t size );
 
 public:
 	struct {
@@ -95,8 +113,10 @@ public:
 	Protocol( Role role );
 	bool init( size_t size = 0 );
 	void free();
-	bool parseHeader( char *buf, size_t size, struct ProtocolHeader &header );
-	bool parseHeader( struct ProtocolHeader &header );
+	bool parseHeader( struct ProtocolHeader &header, char *buf = 0, size_t size = 0 );
+	bool parseKeyHeader( struct KeyHeader &header, size_t offset, char *buf = 0, size_t size = 0 );
+	bool parseKeyValueHeader( struct KeyValueHeader &header, size_t offset, char *buf = 0, size_t size = 0 );
+
 	static size_t getSuggestedBufferSize( uint32_t keySize, uint32_t chunkSize );
 };
 

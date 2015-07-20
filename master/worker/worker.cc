@@ -61,6 +61,44 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 		);
 		if ( ! this->protocol.parseHeader( header ) ) {
 			__ERROR__( "MasterWorker", "dispatch", "Undefined message." );
+		} else {
+			if (
+				header.magic != PROTO_MAGIC_REQUEST ||
+				header.from != PROTO_MAGIC_FROM_APPLICATION ||
+				header.to != PROTO_MAGIC_TO_MASTER
+			) {
+				__ERROR__( "MasterWorker", "dispatch", "Invalid protocol header." );
+			}
+
+			struct KeyHeader keyHeader;
+			struct KeyValueHeader keyValueHeader;
+			switch( header.opcode ) {
+				case PROTO_OPCODE_GET:
+					if ( this->protocol.parseKeyHeader( keyHeader, PROTO_HEADER_SIZE ) ) {
+						__DEBUG__(
+							BLUE, "MasterWorker", "dispatch",
+							"[GET] Key: %.*s (key size = %u).",
+							( int ) keyHeader.keySize,
+							keyHeader.key,
+							keyHeader.keySize
+						);
+					}
+					break;
+				case PROTO_OPCODE_SET:
+					if ( this->protocol.parseKeyValueHeader( keyValueHeader, PROTO_HEADER_SIZE ) ) {
+						__DEBUG__(
+							BLUE, "MasterWorker", "dispatch",
+							"[SET] Key: %.*s (key size = %u); Value: %.*s (value size = %u)",
+							( int ) keyValueHeader.keySize,
+							keyValueHeader.key,
+							keyValueHeader.keySize,
+							( int ) keyValueHeader.valueSize,
+							keyValueHeader.value,
+							keyValueHeader.valueSize
+						);
+					}
+					break;
+			}
 		}
 	}
 
@@ -97,7 +135,7 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 
 		ret = event.socket->recv( this->protocol.buffer.data, PROTO_HEADER_SIZE, connected, true );
 		if ( ret == PROTO_HEADER_SIZE && connected ) {
-			this->protocol.parseHeader( this->protocol.buffer.data, ret, header );
+			this->protocol.parseHeader( header, this->protocol.buffer.data, ret );
 			// Validate message
 			if ( header.from != PROTO_MAGIC_FROM_COORDINATOR ) {
 				__ERROR__( "MasterWorker", "dispatch", "Invalid message source from coordinator." );
@@ -159,7 +197,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 
 		ret = event.socket->recv( this->protocol.buffer.data, PROTO_HEADER_SIZE, connected, true );
 		if ( ret == PROTO_HEADER_SIZE && connected ) {
-			this->protocol.parseHeader( this->protocol.buffer.data, ret, header );
+			this->protocol.parseHeader( header, this->protocol.buffer.data, ret );
 			// Validate message
 			if ( header.from != PROTO_MAGIC_FROM_SLAVE ) {
 				__ERROR__( "MasterWorker", "dispatch", "Invalid message source from slave." );

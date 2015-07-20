@@ -114,7 +114,7 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 				return false;
 			} else if ( ( size_t ) ret == socket->buffer.size ) {
 				ProtocolHeader header;
-				socket->protocol.parseHeader( socket->buffer.data, socket->buffer.size, header );
+				socket->protocol.parseHeader( header, socket->buffer.data, socket->buffer.size );
 				// Register message expected
 				if ( header.magic == PROTO_MAGIC_REQUEST && header.opcode == PROTO_OPCODE_REGISTER ) {
 					if ( header.from == PROTO_MAGIC_FROM_MASTER ) {
