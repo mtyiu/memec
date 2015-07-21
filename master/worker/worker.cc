@@ -3,6 +3,9 @@
 
 #define WORKER_COLOR	YELLOW
 
+MasterEventQueue *MasterWorker::eventQueue;
+StripeList<SlaveSocket> *MasterWorker::stripeList;
+
 void MasterWorker::dispatch( MixedEvent event ) {
 	switch( event.type ) {
 		case EVENT_TYPE_APPLICATION:
@@ -72,7 +75,12 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 
 			struct KeyHeader keyHeader;
 			struct KeyValueHeader keyValueHeader;
+
 			switch( header.opcode ) {
+				SlaveSocket *dataSockets[ 3 ];
+				SlaveSocket *paritySockets;
+				unsigned int index;
+
 				case PROTO_OPCODE_GET:
 					if ( this->protocol.parseKeyHeader( keyHeader, PROTO_HEADER_SIZE ) ) {
 						__DEBUG__(
@@ -82,6 +90,29 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 							keyHeader.key,
 							keyHeader.keySize
 						);
+
+						index = MasterWorker::stripeList->get(
+							keyHeader.key,
+							( size_t ) keyHeader.keySize,
+							dataSockets,
+							&paritySockets,
+							true
+						);
+
+						// Test for consistent hashing to stripe list
+						printf(
+							"Key: %.*s hashes to ((",
+							( int ) keyHeader.keySize,
+							keyHeader.key
+						);
+						for ( int i = 0; i < 3; i++ ) {
+							if ( i > 0 )
+								printf( ", " );
+							dataSockets[ i ]->printAddress();
+						}
+						printf( ", (" );
+						paritySockets->printAddress();
+						printf( "))\n" );
 					}
 					break;
 				case PROTO_OPCODE_SET:
@@ -287,7 +318,13 @@ void *MasterWorker::run( void *argv ) {
 	return 0;
 }
 
-bool MasterWorker::init( GlobalConfig &config, WorkerRole role, MasterEventQueue *eventQueue ) {
+bool MasterWorker::init( MasterEventQueue *eventQueue, StripeList<SlaveSocket> *stripeList ) {
+	MasterWorker::eventQueue = eventQueue;
+	MasterWorker::stripeList = stripeList;
+	return true;
+}
+
+bool MasterWorker::init( GlobalConfig &config, WorkerRole role ) {
 	this->protocol.init(
 		Protocol::getSuggestedBufferSize(
 			config.size.key,
@@ -295,7 +332,6 @@ bool MasterWorker::init( GlobalConfig &config, WorkerRole role, MasterEventQueue
 		)
 	);
 	this->role = role;
-	this->eventQueue = eventQueue;
 	return role != WORKER_ROLE_UNDEFINED;
 }
 

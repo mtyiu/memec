@@ -205,6 +205,12 @@ void Socket::print( FILE *f ) {
 	fprintf( f, "[%4d] %s:%u (%sconnected)\n", this->sockfd, buf, Socket::ntoh_port( this->addr.sin_port ), this->connected ? "" : "dis" );
 }
 
+void Socket::printAddress( FILE *f ) {
+	char buf[ 16 ];
+	Socket::ntoh_ip( this->addr.sin_addr.s_addr, buf, 16 );
+	fprintf( f, "%s:%u", buf, Socket::ntoh_port( this->addr.sin_port ) );
+}
+
 bool Socket::hton_ip( char *ip, unsigned long &ret ) {
 	struct in_addr addr;
 	switch( inet_pton( AF_INET, ip, &addr ) ) {

@@ -4,7 +4,11 @@
 #include <vector>
 #include <cstdio>
 #include <cstring>
+#include <cassert>
+#include "../ds/array_map.hh"
 #include "../ds/bitmask_array.hh"
+#include "../hash/consistent_hash.hh"
+#include "../hash/hash_func.hh"
 
 // Need to know n, k, number of stripe list requested, number of slaves, mapped slaves
 template <class T> class StripeList {
@@ -12,10 +16,11 @@ private:
 	uint32_t n, k;
 	size_t numLists, numSlaves;
 	bool generated;
-	BitmaskArray data;
-	BitmaskArray parity;
+	BitmaskArray data, parity;
 	unsigned int *weight, *cost;
-	std::vector<T> *slaves; // Mapping bitmask to slaves
+	std::vector<T> *slaves;
+	ConsistentHash<T *> ring;
+	std::vector<T **> lists;
 
 	inline int pickMin( int listIndex ) {
 		int index = 0;
@@ -46,21 +51,27 @@ private:
 		size_t i, j;
 
 		for ( i = 0; i < this->numLists; i++ ) {
+			T **list = this->lists[ i ];
 			for ( j = 0; j < this->n - this->k; j++ ) {
 				index = pickMin( i );
 				printf( "%d ", index );
 				this->parity.set( i, index );
 				this->weight[ index ] += this->k;
 				this->cost[ index ] += 1;
+
+				list[ this->k + j ] = &this->slaves->at( index );
 			}
-			printf( "/ " );
+			printf( " / " );
 			for ( j = 0; j < this->k; j++ ) {
 				index = pickMin( i );
 				printf( "%d ", index );
 				this->data.set( i, index );
 				this->weight[ index ] += 1;
 				this->cost[ index ] += 1;
+
+				list[ j ] = &this->slaves->at( index );
 			}
+			this->ring.add( list );
 			printf( "\n" );
 		}
 		this->generated = true;
@@ -72,14 +83,32 @@ public:
 		this->k = k;
 		this->numLists = numLists;
 		this->numSlaves = slaves.size();
+		this->generated = false;
 		this->weight = new unsigned int[ numSlaves ];
 		this->cost = new unsigned int[ numSlaves ];
 		this->slaves = &slaves;
+		this->lists.reserve( numLists );
+		for ( uint32_t i = 0; i < numLists; i++ )
+			this->lists.push_back( new T*[ n ] );
 
 		memset( this->weight, 0, sizeof( unsigned int ) * numSlaves );
 		memset( this->cost, 0, sizeof( unsigned int ) * numSlaves );
 
 		this->generate();
+	}
+
+	unsigned int get( const char *key, size_t keySize, T **data, T **parity = 0, bool full = false ) {
+		unsigned int index = HashFunc::hash( key, keySize ) % this->k;
+		fprintf( stderr, "index = %u\n", index );
+		T **ret = this->ring.get( key, keySize );
+		for ( size_t i = 0; i < this->n - this->k; i++ )
+			parity[ i ] = ret[ this->k + i ];
+		if ( full )
+			for ( size_t i = 0; i < this->k; i++ )
+				data[ i ] = ret[ i ];
+		else
+			*data = ret[ index ];
+		return index;
 	}
 
 	void print( FILE *f = stdout ) {
@@ -116,16 +145,13 @@ public:
 		fprintf( f, "\n- Cost vector   :" );
 		for ( size_t i = 0; i < this->numSlaves; i++ )
 			fprintf( f, " %d", this->cost[ i ] );
-
-		fprintf( f, "\n- Data Bitmask array:\n" );
-		this->data.print( f );
-		fprintf( f, "\n- Parity Bitmask array:\n" );
-		this->parity.print( f );
 	}
 
 	~StripeList() {
 		delete[] this->weight;
 		delete[] this->cost;
+		for ( uint32_t i = 0; i < this->numLists; i++ )
+			delete[] this->lists[ i ];
 	}
 };
 

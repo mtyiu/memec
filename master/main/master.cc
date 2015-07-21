@@ -66,12 +66,12 @@ bool Master::init( char *path, bool verbose ) {
 			this->config.master.eventQueue.size.mixed
 		);
 		this->workers.reserve( this->config.master.workers.number.mixed );
+		MasterWorker::init( &this->eventQueue, this->stripeList );
 		for ( int i = 0, len = this->config.master.workers.number.mixed; i < len; i++ ) {
 			this->workers.push_back( MasterWorker() );
 			this->workers[ i ].init(
 				this->config.global,
-				WORKER_ROLE_MIXED,
-				&this->eventQueue
+				WORKER_ROLE_MIXED
 			);
 		}
 	} else {
@@ -90,11 +90,11 @@ bool Master::init( char *path, bool verbose ) {
 			this->workers.push_back( MasterWorker() ); \
 			this->workers[ index ].init( \
 				this->config.global, \
-				_CONSTANT_, \
-				&this->eventQueue \
+				_CONSTANT_ \
 			); \
 		}
 
+		MasterWorker::init( &this->eventQueue, this->stripeList );
 		WORKER_INIT_LOOP( application, WORKER_ROLE_APPLICATION )
 		WORKER_INIT_LOOP( coordinator, WORKER_ROLE_COORDINATOR )
 		WORKER_INIT_LOOP( master, WORKER_ROLE_MASTER )
@@ -119,6 +119,7 @@ bool Master::init( char *path, bool verbose ) {
 }
 
 bool Master::start() {
+	bool ret = true;
 	/* Workers and event queues */
 	this->eventQueue.start();
 	if ( this->config.master.workers.type == WORKER_TYPE_MIXED ) {
@@ -135,23 +136,23 @@ bool Master::start() {
 	// Connect to coordinators
 	for ( int i = 0, len = this->config.global.coordinators.size(); i < len; i++ ) {
 		if ( ! this->sockets.coordinators[ i ].start() )
-			return false;
+			ret = false;
 	}
 	// Connect to slaves
 	for ( int i = 0, len = this->config.global.slaves.size(); i < len; i++ ) {
 		if ( ! this->sockets.slaves[ i ].start() )
-			return false;
+			ret = false;
 	}
 	// Start listening
 	if ( ! this->sockets.self.start() ) {
 		__ERROR__( "Master", "start", "Cannot start socket." );
-		return false;
+		ret = false;
 	}
 
 	this->startTime = start_timer();
 	this->isRunning = true;
 
-	return true;
+	return ret;
 }
 
 bool Master::stop() {

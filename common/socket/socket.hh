@@ -46,6 +46,7 @@ public:
 	virtual bool start() = 0;
 	virtual void stop();
 	virtual void print( FILE *f = stdout );
+	void printAddress( FILE *f = stdout );
 
 	// Utilities
 	static bool hton_ip( char *ip, unsigned long &ret );

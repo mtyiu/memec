@@ -48,7 +48,7 @@ int main( int argc, char **argv ) {
 	}
 	if ( ! master->start() ) {
 		fprintf( stderr, "Error: Cannot start master.\n" );
-		return 1;
+		// return 1;
 	}
 	master->interactive();
 	master->stop();
