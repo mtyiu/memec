@@ -59,6 +59,13 @@ bool Master::init( char *path, bool verbose ) {
 		fd = socket.getSocket();
 		this->sockets.slaves.set( fd, socket );
 	}
+	/* Stripe list */
+	this->stripeList = new StripeList<SlaveSocket>(
+		this->config.global.coding.params.getChunkCount(),
+		this->config.global.coding.params.getDataChunkCount(),
+		this->config.global.stripeList.count,
+		this->sockets.slaves.values
+	);
 	/* Workers and event queues */
 	if ( this->config.master.workers.type == WORKER_TYPE_MIXED ) {
 		this->eventQueue.init(
@@ -101,13 +108,6 @@ bool Master::init( char *path, bool verbose ) {
 		WORKER_INIT_LOOP( slave, WORKER_ROLE_SLAVE )
 #undef WORKER_INIT_LOOP
 	}
-	/* Stripe list */
-	this->stripeList = new StripeList<SlaveSocket>(
-		this->config.global.coding.params.getChunkCount(),
-		this->config.global.coding.params.getDataChunkCount(),
-		this->config.global.stripeList.count,
-		this->sockets.slaves.values
-	);
 
 	// Set signal handlers //
 	Signal::setHandler( Master::signalHandler );

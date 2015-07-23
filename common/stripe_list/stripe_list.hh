@@ -99,7 +99,7 @@ public:
 
 	unsigned int get( const char *key, size_t keySize, T **data, T **parity = 0, bool full = false ) {
 		unsigned int index = HashFunc::hash( key, keySize ) % this->k;
-		fprintf( stderr, "index = %u\n", index );
+		printf( "index = %u\n", index );
 		T **ret = this->ring.get( key, keySize );
 		for ( size_t i = 0; i < this->n - this->k; i++ )
 			parity[ i ] = ret[ this->k + i ];
@@ -145,6 +145,8 @@ public:
 		fprintf( f, "\n- Cost vector   :" );
 		for ( size_t i = 0; i < this->numSlaves; i++ )
 			fprintf( f, " %d", this->cost[ i ] );
+
+		fprintf( f, "\n" );
 	}
 
 	~StripeList() {

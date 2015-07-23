@@ -109,6 +109,8 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 							if ( i > 0 )
 								printf( ", " );
 							dataSockets[ i ]->printAddress();
+							if ( i == index )
+								printf( "*" );
 						}
 						printf( ", (" );
 						paritySockets->printAddress();
