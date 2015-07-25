@@ -7,7 +7,7 @@ char *SlaveProtocol::reqRegisterCoordinator( size_t &size ) {
 		PROTO_OPCODE_REGISTER,
 		0
 	);
-	return this->buffer.data;
+	return this->buffer.send;
 }
 
 char *SlaveProtocol::reqRegisterSlavePeer( size_t &size ) {
@@ -17,7 +17,7 @@ char *SlaveProtocol::reqRegisterSlavePeer( size_t &size ) {
 		PROTO_OPCODE_REGISTER,
 		0
 	);
-	return this->buffer.data;
+	return this->buffer.send;
 }
 
 char *SlaveProtocol::resRegisterMaster( size_t &size, bool success ) {
@@ -27,7 +27,7 @@ char *SlaveProtocol::resRegisterMaster( size_t &size, bool success ) {
 		PROTO_OPCODE_REGISTER,
 		0
 	);
-	return this->buffer.data;
+	return this->buffer.send;
 }
 
 char *SlaveProtocol::resRegisterSlavePeer( size_t &size, bool success ) {
@@ -37,5 +37,5 @@ char *SlaveProtocol::resRegisterSlavePeer( size_t &size, bool success ) {
 		PROTO_OPCODE_REGISTER,
 		0
 	);
-	return this->buffer.data;
+	return this->buffer.send;
 }

@@ -7,7 +7,7 @@ char *ApplicationProtocol::reqRegisterMaster( size_t &size ) {
 		PROTO_OPCODE_REGISTER,
 		0
 	);
-	return this->buffer.data;
+	return this->buffer.send;
 }
 
 char *ApplicationProtocol::reqSet( size_t &size, char *key, uint8_t keySize, char *value, uint32_t valueSize ) {
@@ -20,7 +20,7 @@ char *ApplicationProtocol::reqSet( size_t &size, char *key, uint8_t keySize, cha
 		valueSize,
 		value
 	);
-	return this->buffer.data;
+	return this->buffer.send;
 }
 
 char *ApplicationProtocol::reqGet( size_t &size, char *key, uint8_t keySize ) {
@@ -31,5 +31,5 @@ char *ApplicationProtocol::reqGet( size_t &size, char *key, uint8_t keySize ) {
 		keySize,
 		key
 	);
-	return this->buffer.data;
+	return this->buffer.send;
 }

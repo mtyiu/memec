@@ -99,15 +99,21 @@ public:
 
 	unsigned int get( const char *key, size_t keySize, T **data, T **parity = 0, bool full = false ) {
 		unsigned int index = HashFunc::hash( key, keySize ) % this->k;
-		printf( "index = %u\n", index );
 		T **ret = this->ring.get( key, keySize );
-		for ( size_t i = 0; i < this->n - this->k; i++ )
-			parity[ i ] = ret[ this->k + i ];
-		if ( full )
-			for ( size_t i = 0; i < this->k; i++ )
-				data[ i ] = ret[ i ];
-		else
-			*data = ret[ index ];
+		if ( parity ) {
+			for ( size_t i = 0; i < this->n - this->k; i++ ) {
+				parity[ i ] = ret[ this->k + i ];
+			}
+		}
+		if ( data ) {
+			if ( full ) {
+				for ( size_t i = 0; i < this->k; i++ ) {
+					data[ i ] = ret[ i ];
+				}
+			} else {
+				*data = ret[ index ];
+			}
+		}
 		return index;
 	}
 

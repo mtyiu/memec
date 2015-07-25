@@ -14,6 +14,11 @@ class MasterWorker : public Worker {
 private:
 	WorkerRole role;
 	MasterProtocol protocol;
+	// Temporary variables
+	SlaveSocket **dataSlaveSockets;
+	SlaveSocket **paritySlaveSockets;
+	uint32_t dataChunkCount;
+	uint32_t parityChunkCount;
 	static MasterEventQueue *eventQueue;
 	static StripeList<SlaveSocket> *stripeList;
 

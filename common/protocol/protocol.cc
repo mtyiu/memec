@@ -8,20 +8,20 @@
 size_t Protocol::generateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t length ) {
 	size_t bytes = 0;
 
-	this->buffer.data[ 0 ] = ( ( magic & 0x07 ) | ( this->from & 0x18 ) | ( to & 0x60 ) );
-	this->buffer.data[ 1 ] = opcode & 0xFF;
-	this->buffer.data[ 2 ] = 0;
-	this->buffer.data[ 3 ] = 0;
+	this->buffer.send[ 0 ] = ( ( magic & 0x07 ) | ( this->from & 0x18 ) | ( to & 0x60 ) );
+	this->buffer.send[ 1 ] = opcode & 0xFF;
+	this->buffer.send[ 2 ] = 0;
+	this->buffer.send[ 3 ] = 0;
 	bytes += 4;
 
-	*( ( uint32_t * )( this->buffer.data + bytes ) ) = htonl( length );
+	*( ( uint32_t * )( this->buffer.send + bytes ) ) = htonl( length );
 	bytes += 4;
 
 	return bytes;
 }
 
 size_t Protocol::generateKeyHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint8_t keySize, char *key ) {
-	char *buf = this->buffer.data + PROTO_HEADER_SIZE;
+	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader( magic, to, opcode, keySize );
 
 	buf[ 0 ] = keySize;
@@ -35,19 +35,16 @@ size_t Protocol::generateKeyHeader( uint8_t magic, uint8_t to, uint8_t opcode, u
 }
 
 size_t Protocol::generateKeyValueHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint8_t keySize, char *key, uint32_t valueSize, char *value ) {
-	char *buf = this->buffer.data + PROTO_HEADER_SIZE;
+	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader( magic, to, opcode, keySize + valueSize );
 
 	buf[ 0 ] = keySize;
 
 	valueSize = htonl( valueSize );
-	printf( "%u\n", valueSize );
 	buf[ 1 ] = ( valueSize >> 24 ) & 0xFF;
 	buf[ 2 ] = ( valueSize >> 16 ) & 0xFF;
 	buf[ 3 ] = ( valueSize >> 8 ) & 0xFF;
 	valueSize = ntohl( valueSize );
-
-	printf( "%u: %u %u %u\n", valueSize, buf[ 1 ], buf[ 2 ], buf[ 3 ] );
 
 	buf += 4;
 	memcpy( buf, key, keySize );
@@ -147,7 +144,8 @@ bool Protocol::parseKeyValueHeader( size_t offset, uint8_t &keySize, char *&key,
 
 Protocol::Protocol( Role role ) {
 	this->buffer.size = 0;
-	this->buffer.data = 0;
+	this->buffer.send = 0;
+	this->buffer.recv = 0;
 	switch( role ) {
 		case ROLE_APPLICATION:
 			this->from = PROTO_MAGIC_FROM_APPLICATION;
@@ -172,8 +170,14 @@ Protocol::Protocol( Role role ) {
 
 bool Protocol::init( size_t size ) {
 	this->buffer.size = size;
-	this->buffer.data = ( char * ) ::malloc( size );
-	if ( ! this->buffer.data ) {
+	this->buffer.send = ( char * ) ::malloc( size );
+	if ( ! this->buffer.send ) {
+		__ERROR__( "Protocol", "init", "Cannot allocate memory." );
+		return false;
+	}
+
+	this->buffer.recv = ( char * ) ::malloc( size );
+	if ( ! this->buffer.recv ) {
 		__ERROR__( "Protocol", "init", "Cannot allocate memory." );
 		return false;
 	}
@@ -181,16 +185,18 @@ bool Protocol::init( size_t size ) {
 }
 
 void Protocol::free() {
-	if ( ! this->buffer.data )
-		return;
-	::free( this->buffer.data );
+	if ( this->buffer.send )
+		::free( this->buffer.send );
+	if ( this->buffer.recv )
+		::free( this->buffer.recv );
 	this->buffer.size = 0;
-	this->buffer.data = 0;
+	this->buffer.send = 0;
+	this->buffer.recv = 0;
 }
 
 bool Protocol::parseHeader( struct ProtocolHeader &header, char *buf, size_t size ) {
 	if ( ! buf || ! size ) {
-		buf = this->buffer.data;
+		buf = this->buffer.recv;
 		size = this->buffer.size;
 	}
 	return this->parseHeader(
@@ -205,7 +211,7 @@ bool Protocol::parseHeader( struct ProtocolHeader &header, char *buf, size_t siz
 
 bool Protocol::parseKeyHeader( struct KeyHeader &header, size_t offset, char *buf, size_t size ) {
 	if ( ! buf || ! size ) {
-		buf = this->buffer.data;
+		buf = this->buffer.recv;
 		size = this->buffer.size;
 	}
 	return this->parseKeyHeader(
@@ -218,7 +224,7 @@ bool Protocol::parseKeyHeader( struct KeyHeader &header, size_t offset, char *bu
 
 bool Protocol::parseKeyValueHeader( struct KeyValueHeader &header, size_t offset, char *buf, size_t size ) {
 	if ( ! buf || ! size ) {
-		buf = this->buffer.data;
+		buf = this->buffer.recv;
 		size = this->buffer.size;
 	}
 	return this->parseKeyValueHeader(

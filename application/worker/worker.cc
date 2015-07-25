@@ -67,9 +67,9 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 	} else {
 		ProtocolHeader header;
 
-		ret = event.socket->recv( this->protocol.buffer.data, PROTO_HEADER_SIZE, connected, true );
+		ret = event.socket->recv( this->protocol.buffer.recv, PROTO_HEADER_SIZE, connected, true );
 		if ( ret == PROTO_HEADER_SIZE && connected ) {
-			this->protocol.parseHeader( header, this->protocol.buffer.data, ret );
+			this->protocol.parseHeader( header, this->protocol.buffer.recv, ret );
 			// Validate message
 			if ( header.from != PROTO_MAGIC_FROM_MASTER ) {
 				__ERROR__( "ApplicationWorker", "dispatch", "Invalid message source from master." );

@@ -57,7 +57,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 		// Parse requests from applications
 		ProtocolHeader header;
 		ret = event.socket->recv(
-			this->protocol.buffer.data,
+			this->protocol.buffer.recv,
 			this->protocol.buffer.size,
 			connected,
 			false
@@ -75,12 +75,9 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 
 			struct KeyHeader keyHeader;
 			struct KeyValueHeader keyValueHeader;
+			bool success = false;
 
 			switch( header.opcode ) {
-				SlaveSocket *dataSockets[ 3 ];
-				SlaveSocket *paritySockets;
-				unsigned int index;
-
 				case PROTO_OPCODE_GET:
 					if ( this->protocol.parseKeyHeader( keyHeader, PROTO_HEADER_SIZE ) ) {
 						__DEBUG__(
@@ -90,31 +87,19 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 							keyHeader.key,
 							keyHeader.keySize
 						);
+						buffer.data = this->protocol.reqGet(
+							buffer.size,
+							keyHeader.key,
+							keyHeader.keySize
+						);
 
-						index = MasterWorker::stripeList->get(
+						MasterWorker::stripeList->get(
 							keyHeader.key,
 							( size_t ) keyHeader.keySize,
-							dataSockets,
-							&paritySockets,
-							true
+							this->dataSlaveSockets
 						);
 
-						// Test for consistent hashing to stripe list
-						printf(
-							"Key: %.*s hashes to ((",
-							( int ) keyHeader.keySize,
-							keyHeader.key
-						);
-						for ( int i = 0; i < 3; i++ ) {
-							if ( i > 0 )
-								printf( ", " );
-							dataSockets[ i ]->printAddress();
-							if ( i == index )
-								printf( "*" );
-						}
-						printf( ", (" );
-						paritySockets->printAddress();
-						printf( "))\n" );
+						success = true;
 					}
 					break;
 				case PROTO_OPCODE_SET:
@@ -129,9 +114,54 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 							keyValueHeader.value,
 							keyValueHeader.valueSize
 						);
+						buffer.data = this->protocol.reqSet(
+							buffer.size,
+							keyValueHeader.key,
+							keyValueHeader.keySize,
+							keyValueHeader.value,
+							keyValueHeader.valueSize
+						);
+
+						MasterWorker::stripeList->get(
+							keyValueHeader.key,
+							( size_t ) keyValueHeader.keySize,
+							this->dataSlaveSockets
+						);
+
+						success = true;
 					}
 					break;
-			}
+			}			
+
+			
+			// Test for consistent hashing to stripe list
+			// printf(
+			// 	"Key: %.*s hashes to ((",
+			// 	( int ) keyHeader.keySize,
+			// 	keyHeader.key
+			// );
+			// for ( uint32_t i = 0; i < this->dataChunkCount; i++ ) {
+			// 	if ( i > 0 )
+			// 		printf( ", " );
+			// 	this->dataSlaveSockets[ i ]->printAddress();
+			// 	if ( i == index )
+			// 		printf( "*" );
+			// }
+			// printf( ", (" );
+			// for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
+			// 	if ( i > 0 )
+			// 		printf( ", " );
+			// 	this->paritySlaveSockets[ i ]->printAddress();
+			// }
+			// printf( "))\n" );
+
+			if ( ! success )
+				return;
+
+			// Send request
+			ret = this->dataSlaveSockets[ 0 ]->send( buffer.data, buffer.size, connected );
+			if ( ret != ( ssize_t ) buffer.size )
+				__ERROR__( "ApplicationWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 		}
 	}
 
@@ -166,9 +196,9 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 	} else {
 		ProtocolHeader header;
 
-		ret = event.socket->recv( this->protocol.buffer.data, PROTO_HEADER_SIZE, connected, true );
+		ret = event.socket->recv( this->protocol.buffer.recv, PROTO_HEADER_SIZE, connected, true );
 		if ( ret == PROTO_HEADER_SIZE && connected ) {
-			this->protocol.parseHeader( header, this->protocol.buffer.data, ret );
+			this->protocol.parseHeader( header, this->protocol.buffer.recv, ret );
 			// Validate message
 			if ( header.from != PROTO_MAGIC_FROM_COORDINATOR ) {
 				__ERROR__( "MasterWorker", "dispatch", "Invalid message source from coordinator." );
@@ -228,9 +258,9 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 	} else {
 		ProtocolHeader header;
 
-		ret = event.socket->recv( this->protocol.buffer.data, PROTO_HEADER_SIZE, connected, true );
+		ret = event.socket->recv( this->protocol.buffer.recv, PROTO_HEADER_SIZE, connected, true );
 		if ( ret == PROTO_HEADER_SIZE && connected ) {
-			this->protocol.parseHeader( header, this->protocol.buffer.data, ret );
+			this->protocol.parseHeader( header, this->protocol.buffer.recv, ret );
 			// Validate message
 			if ( header.from != PROTO_MAGIC_FROM_SLAVE ) {
 				__ERROR__( "MasterWorker", "dispatch", "Invalid message source from slave." );
@@ -260,9 +290,10 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 		__ERROR__( "MasterWorker", "dispatch", "The slave is disconnected." );
 }
 
-
 void MasterWorker::free() {
 	this->protocol.free();
+	delete[] this->dataSlaveSockets;
+	delete[] this->paritySlaveSockets;
 }
 
 void *MasterWorker::run( void *argv ) {
@@ -333,6 +364,10 @@ bool MasterWorker::init( GlobalConfig &config, WorkerRole role ) {
 			config.size.chunk
 		)
 	);
+	this->dataChunkCount = config.coding.params.getDataChunkCount();
+	this->parityChunkCount = config.coding.params.getParityChunkCount();
+	this->dataSlaveSockets = new SlaveSocket*[ this->dataChunkCount ];
+	this->paritySlaveSockets = new SlaveSocket*[ this->parityChunkCount ];
 	this->role = role;
 	return role != WORKER_ROLE_UNDEFINED;
 }

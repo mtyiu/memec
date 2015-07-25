@@ -7,7 +7,7 @@ char *CoordinatorProtocol::resRegisterMaster( size_t &size, bool success ) {
 		PROTO_OPCODE_REGISTER,
 		0
 	);
-	return this->buffer.data;
+	return this->buffer.send;
 }
 
 char *CoordinatorProtocol::resRegisterMaster( size_t &size, GlobalConfig &globalConfig, MasterConfig *masterConfig ) {
@@ -28,21 +28,21 @@ char *CoordinatorProtocol::resRegisterMaster( size_t &size, GlobalConfig &global
 		length[ 0 ] + length[ 1 ] + length[ 2 ] * 2
 	);
 
-	*( ( uint32_t * )( this->buffer.data + size ) ) = htonl( length[ 0 ] );
+	*( ( uint32_t * )( this->buffer.send + size ) ) = htonl( length[ 0 ] );
 	size += length[ 2 ];
 
-	*( ( uint32_t * )( this->buffer.data + size ) ) = htonl( length[ 1 ] );
+	*( ( uint32_t * )( this->buffer.send + size ) ) = htonl( length[ 1 ] );
 	size += length[ 2 ];
 
-	memcpy( this->buffer.data + size, serializedStrings[ 0 ], length[ 0 ] );
+	memcpy( this->buffer.send + size, serializedStrings[ 0 ], length[ 0 ] );
 	size += length[ 0 ];
 
 	if ( length[ 1 ] ) {
-		memcpy( this->buffer.data + size, serializedStrings[ 1 ], length[ 1 ] );
+		memcpy( this->buffer.send + size, serializedStrings[ 1 ], length[ 1 ] );
 		size += length[ 1 ];
 	}
 
-	return this->buffer.data;
+	return this->buffer.send;
 }
 
 char *CoordinatorProtocol::resRegisterSlave( size_t &size, bool success ) {
@@ -52,7 +52,7 @@ char *CoordinatorProtocol::resRegisterSlave( size_t &size, bool success ) {
 		PROTO_OPCODE_REGISTER,
 		0
 	);
-	return this->buffer.data;
+	return this->buffer.send;
 }
 
 char *CoordinatorProtocol::resRegisterSlave( size_t &size, GlobalConfig &globalConfig, SlaveConfig *slaveConfig ) {
@@ -73,19 +73,19 @@ char *CoordinatorProtocol::resRegisterSlave( size_t &size, GlobalConfig &globalC
 		length[ 0 ] + length[ 1 ] + length[ 2 ] * 2
 	);
 
-	*( ( uint32_t * )( this->buffer.data + size ) ) = htonl( length[ 0 ] );
+	*( ( uint32_t * )( this->buffer.send + size ) ) = htonl( length[ 0 ] );
 	size += length[ 2 ];
 
-	*( ( uint32_t * )( this->buffer.data + size ) ) = htonl( length[ 1 ] );
+	*( ( uint32_t * )( this->buffer.send + size ) ) = htonl( length[ 1 ] );
 	size += length[ 2 ];
 
-	memcpy( this->buffer.data + size, serializedStrings[ 0 ], length[ 0 ] );
+	memcpy( this->buffer.send + size, serializedStrings[ 0 ], length[ 0 ] );
 	size += length[ 0 ];
 
 	if ( length[ 1 ] ) {
-		memcpy( this->buffer.data + size, serializedStrings[ 1 ], length[ 1 ] );
+		memcpy( this->buffer.send + size, serializedStrings[ 1 ], length[ 1 ] );
 		size += length[ 1 ];
 	}
 
-	return this->buffer.data;
+	return this->buffer.send;
 }

@@ -7,7 +7,7 @@ char *MasterProtocol::reqRegisterCoordinator( size_t &size ) {
 		PROTO_OPCODE_REGISTER,
 		0
 	);
-	return this->buffer.data;
+	return this->buffer.send;
 }
 
 char *MasterProtocol::reqRegisterSlave( size_t &size ) {
@@ -17,7 +17,31 @@ char *MasterProtocol::reqRegisterSlave( size_t &size ) {
 		PROTO_OPCODE_REGISTER,
 		0
 	);
-	return this->buffer.data;
+	return this->buffer.send;
+}
+
+char *MasterProtocol::reqSet( size_t &size, char *key, uint8_t keySize, char *value, uint32_t valueSize ) {
+	size = this->generateKeyValueHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_SET,
+		keySize,
+		key,
+		valueSize,
+		value
+	);
+	return this->buffer.send;
+}
+
+char *MasterProtocol::reqGet( size_t &size, char *key, uint8_t keySize ) {
+	size = this->generateKeyHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_GET,
+		keySize,
+		key
+	);
+	return this->buffer.send;
 }
 
 char *MasterProtocol::resRegisterApplication( size_t &size, bool success ) {
@@ -27,7 +51,7 @@ char *MasterProtocol::resRegisterApplication( size_t &size, bool success ) {
 		PROTO_OPCODE_REGISTER,
 		0
 	);
-	return this->buffer.data;
+	return this->buffer.send;
 }
 
 char *MasterProtocol::resSet( size_t &size, bool success, uint8_t keySize, char *key ) {
@@ -38,7 +62,7 @@ char *MasterProtocol::resSet( size_t &size, bool success, uint8_t keySize, char 
 		keySize,
 		key
 	);
-	return this->buffer.data;
+	return this->buffer.send;
 }
 
 char *MasterProtocol::resGet( size_t &size, bool success, uint8_t keySize, char *key, uint32_t valueSize, char *value ) {
@@ -51,5 +75,5 @@ char *MasterProtocol::resGet( size_t &size, bool success, uint8_t keySize, char 
 		valueSize,
 		value
 	);
-	return this->buffer.data;
+	return this->buffer.send;
 }

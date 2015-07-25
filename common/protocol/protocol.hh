@@ -107,7 +107,8 @@ protected:
 public:
 	struct {
 		size_t size;
-		char *data;
+		char *send;
+		char *recv;
 	} buffer;
 
 	Protocol( Role role );

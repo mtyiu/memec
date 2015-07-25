@@ -49,9 +49,9 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 	} else {
 		ProtocolHeader header;
 
-		ret = event.socket->recv( this->protocol.buffer.data, PROTO_HEADER_SIZE, connected, true );
+		ret = event.socket->recv( this->protocol.buffer.recv, PROTO_HEADER_SIZE, connected, true );
 		if ( ret == PROTO_HEADER_SIZE && connected ) {
-			this->protocol.parseHeader( header, this->protocol.buffer.data, ret );
+			this->protocol.parseHeader( header, this->protocol.buffer.recv, ret );
 			// Validate message
 			if ( header.from != PROTO_MAGIC_FROM_COORDINATOR ) {
 				__ERROR__( "SlaveWorker", "dispatch", "Invalid message source from coordinator." );
@@ -98,6 +98,9 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 			buffer.data = this->protocol.resRegisterMaster( buffer.size, false );
 			isSend = true;
 			break;
+		case MASTER_EVENT_TYPE_PENDING:
+			isSend = false;
+			break;
 		default:
 			return;
 	}
@@ -107,7 +110,56 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "SlaveWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 	} else {
-		
+		// Parse requests from applications
+		ProtocolHeader header;
+		ret = event.socket->recv(
+			this->protocol.buffer.recv,
+			this->protocol.buffer.size,
+			connected,
+			false
+		);
+		if ( ! this->protocol.parseHeader( header ) ) {
+			__ERROR__( "SlaveWorker", "dispatch", "Undefined message." );
+		} else {
+			if (
+				header.magic != PROTO_MAGIC_REQUEST ||
+				header.from != PROTO_MAGIC_FROM_MASTER ||
+				header.to != PROTO_MAGIC_TO_SLAVE
+			) {
+				__ERROR__( "SlaveWorker", "dispatch", "Invalid protocol header." );
+			}
+
+			struct KeyHeader keyHeader;
+			struct KeyValueHeader keyValueHeader;
+
+			switch( header.opcode ) {
+				case PROTO_OPCODE_GET:
+					if ( this->protocol.parseKeyHeader( keyHeader, PROTO_HEADER_SIZE ) ) {
+						__DEBUG__(
+							BLUE, "SlaveWorker", "dispatch",
+							"[GET] Key: %.*s (key size = %u).",
+							( int ) keyHeader.keySize,
+							keyHeader.key,
+							keyHeader.keySize
+						);
+					}
+					break;
+				case PROTO_OPCODE_SET:
+					if ( this->protocol.parseKeyValueHeader( keyValueHeader, PROTO_HEADER_SIZE ) ) {
+						__DEBUG__(
+							BLUE, "SlaveWorker", "dispatch",
+							"[SET] Key: %.*s (key size = %u); Value: %.*s (value size = %u)",
+							( int ) keyValueHeader.keySize,
+							keyValueHeader.key,
+							keyValueHeader.keySize,
+							( int ) keyValueHeader.valueSize,
+							keyValueHeader.value,
+							keyValueHeader.valueSize
+						);
+					}
+					break;
+			}
+		}
 	}
 
 	if ( ! connected )
