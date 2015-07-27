@@ -54,17 +54,14 @@ private:
 			T **list = this->lists[ i ];
 			for ( j = 0; j < this->n - this->k; j++ ) {
 				index = pickMin( i );
-				printf( "%d ", index );
 				this->parity.set( i, index );
 				this->weight[ index ] += this->k;
 				this->cost[ index ] += 1;
 
 				list[ this->k + j ] = &this->slaves->at( index );
 			}
-			printf( " / " );
 			for ( j = 0; j < this->k; j++ ) {
 				index = pickMin( i );
-				printf( "%d ", index );
 				this->data.set( i, index );
 				this->weight[ index ] += 1;
 				this->cost[ index ] += 1;
@@ -72,7 +69,6 @@ private:
 				list[ j ] = &this->slaves->at( index );
 			}
 			this->ring.add( list );
-			printf( "\n" );
 		}
 		this->generated = true;
 	}

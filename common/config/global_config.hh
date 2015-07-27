@@ -25,6 +25,9 @@ public:
 	std::vector<ServerAddr> coordinators;
 	std::vector<ServerAddr> slaves;
 	struct {
+		uint16_t chunksPerList;
+	} buffer;
+	struct {
 		CodingScheme scheme;
 		CodingParams params;
 	} coding;

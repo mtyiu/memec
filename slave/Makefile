@@ -5,6 +5,7 @@ LIBS=-pthread
 BIN=$(PLIO_SRC_ROOT)/bin/slave
 
 OBJS= \
+	buffer/chunk_buffer.o \
 	config/slave_config.o \
 	event/coordinator_event.o \
 	event/master_event.o \
@@ -23,6 +24,8 @@ EXTERNAL_LIB= \
 	$(PLIO_SRC_ROOT)/common/config/config.o \
 	$(PLIO_SRC_ROOT)/common/config/global_config.o \
 	$(PLIO_SRC_ROOT)/common/config/server_addr.o \
+	$(PLIO_SRC_ROOT)/common/ds/bitmask_array.o \
+	$(PLIO_SRC_ROOT)/common/ds/chunk.o \
 	$(PLIO_SRC_ROOT)/common/protocol/protocol.o \
 	$(PLIO_SRC_ROOT)/common/socket/socket.o \
 	$(PLIO_SRC_ROOT)/common/socket/epoll.o \

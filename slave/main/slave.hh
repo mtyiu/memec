@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <cstdio>
+#include "../buffer/chunk_buffer.hh"
 #include "../config/slave_config.hh"
 #include "../event/event_queue.hh"
 #include "../socket/coordinator_socket.hh"
@@ -49,6 +50,7 @@ public:
 	} sockets;
 	SlaveEventQueue eventQueue;
 	StripeList<SlavePeerSocket> *stripeList;
+	ChunkBuffer *chunkBuffer;
 	
 	static Slave *getInstance() {
 		static Slave slave;

@@ -9,6 +9,7 @@ Slave::Slave() {
 void Slave::free() {
 	this->eventQueue.free();
 	delete this->stripeList;
+	delete this->chunkBuffer;
 }
 
 void Slave::signalHandler( int signal ) {
@@ -54,8 +55,6 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 	}
 	this->sockets.slavePeers.reserve( this->config.global.slaves.size() );
 	for ( int i = 0, len = this->config.global.slaves.size(); i < len; i++ ) {
-		// if ( i == mySlaveIndex )
-		// 	continue;
 		SlavePeerSocket socket;
 		int fd;
 
@@ -64,11 +63,16 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 		this->sockets.slavePeers.set( fd, socket );
 	}
 	/* Stripe list */
-	this->stripeList = new StripeList<SlaveSocket>(
+	this->stripeList = new StripeList<SlavePeerSocket>(
 		this->config.global.coding.params.getChunkCount(),
 		this->config.global.coding.params.getDataChunkCount(),
 		this->config.global.stripeList.count,
 		this->sockets.slavePeers.values
+	);
+	/* Chunk buffer */
+	this->chunkBuffer = new ChunkBuffer(
+		this->config.global.buffer.chunksPerList,
+		this->config.slave.cache.chunks
 	);
 	/* Workers and event queues */
 	if ( this->config.slave.workers.type == WORKER_TYPE_MIXED ) {
@@ -181,6 +185,9 @@ bool Slave::stop() {
 		this->sockets.masters[ i ].stop();
 	for ( i = 0, len = this->sockets.slavePeers.size(); i < len; i++ )
 		this->sockets.slavePeers[ i ].stop();
+
+	/* Chunk buffer */
+	this->chunkBuffer->stop();
 
 	this->free();
 	this->isRunning = false;

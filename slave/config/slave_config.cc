@@ -42,6 +42,11 @@ bool SlaveConfig::set( const char *section, const char *name, const char *value 
 			this->epoll.timeout = atoi( value );
 		else
 			return false;
+	} else if ( match( section, "cache" ) ) {
+		if ( match( name, "chunks" ) )
+			this->cache.chunks = atoi( value );
+		else
+			return false;
 	} else if ( match( section, "workers" ) ) {
 		if ( match( name, "type" ) ) {
 			if ( match( value, "mixed" ) )
@@ -92,6 +97,9 @@ bool SlaveConfig::validate() {
 
 	if ( this->epoll.timeout < -1 )
 		CFG_PARSE_ERROR( "SlaveConfig", "The timeout value of epoll should be either -1 (infinite blocking), 0 (non-blocking) or a positive value (representing the number of milliseconds to block)." );
+
+	if ( this->cache.chunks < 1 )
+		CFG_PARSE_ERROR( "SlaveConfig", "The size of chunk cache should be greater than 0." );
 
 	switch( this->workers.type ) {
 		case WORKER_TYPE_MIXED:
@@ -152,10 +160,13 @@ void SlaveConfig::print( FILE *f ) {
 		"- epoll settings\n"
 		"\t- %-*s : %u\n"
 		"\t- %-*s : %d\n"
+		"- Cache\n"
+		"\t- %-*s : %u\n"
 		"- Workers\n"
 		"\t- %-*s : %s\n",
 		width, "Maximum number of events", this->epoll.maxEvents,
 		width, "Timeout", this->epoll.timeout,
+		width, "Chunks", this->cache.chunks,
 		width, "Type", this->workers.type == WORKER_TYPE_MIXED ? "Mixed" : "Separated"
 	);
 

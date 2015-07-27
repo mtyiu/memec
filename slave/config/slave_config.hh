@@ -19,6 +19,9 @@ public:
 		int32_t timeout;
 	} epoll;
 	struct {
+		uint16_t chunks;
+	} cache;
+	struct {
 		WorkerType type;
 		struct {
 			uint8_t mixed;

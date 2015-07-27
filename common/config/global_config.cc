@@ -37,6 +37,11 @@ bool GlobalConfig::set( const char *section, const char *name, const char *value
 			this->slaves.push_back( addr );
 		else
 			return false;
+	} else if ( match( section, "buffer" ) ) {
+		if ( match( name, "chunks_per_list" ) )
+			this->buffer.chunksPerList = atoi( value );
+		else
+			return false;
 	} else if ( match( section, "coding" ) ) {
 		if ( match( value, "raid0" ) ) {
 			this->coding.scheme = CS_RAID0;
@@ -130,6 +135,9 @@ bool GlobalConfig::validate() {
 	if ( this->slaves.empty() )
 		CFG_PARSE_ERROR( "GlobalConfig", "There should be at least one slave." );
 
+	if ( this->buffer.chunksPerList < 1 )
+		CFG_PARSE_ERROR( "GlobalConfig", "The number of temporary chunks per stripe list should be at least 1." );
+
 	switch( this->coding.scheme ) {
 		case CS_RAID0:
 			if ( this->coding.params.getN() < 1 )
@@ -216,6 +224,8 @@ void GlobalConfig::print( FILE *f ) {
 		"- epoll settings\n"
 		"\t- %-*s : %u\n"
 		"\t- %-*s : %d\n"
+		"- Buffer\n"
+		"\t- %-*s : %u\n"
 		"- Coding\n"
 		"\t- %-*s : ",
 		width, "Key size", this->size.key,
@@ -223,6 +233,7 @@ void GlobalConfig::print( FILE *f ) {
 		width, "Count", this->stripeList.count,
 		width, "Maximum number of events", this->epoll.maxEvents,
 		width, "Timeout", this->epoll.timeout,
+		width, "Chunks per list", this->buffer.chunksPerList,
 		width, "Coding scheme"
 	);
 	switch( this->coding.scheme ) {
