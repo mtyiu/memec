@@ -19,6 +19,18 @@ bool CoordinatorConfig::parse( const char *path ) {
 	return false;
 }
 
+bool CoordinatorConfig::override( OptionList &options ) {
+	bool ret = true;
+	for ( int i = 0, size = options.size(); i < size; i++ ) {
+		ret &= this->set(
+			options[ i ].section,
+			options[ i ].name,
+			options[ i ].value
+		);
+	}
+	return ret;
+}
+
 bool CoordinatorConfig::set( const char *section, const char *name, const char *value ) {
 	if ( match( section, "coordinator" ) ) {
 		return this->coordinator.addr.parse( name, value );

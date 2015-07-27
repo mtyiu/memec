@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include "../../common/config/server_addr.hh"
 #include "../../common/config/config.hh"
+#include "../../common/util/option.hh"
 #include "../../common/worker/worker_type.hh"
 
 class ApplicationConfig : public Config {
@@ -41,6 +42,7 @@ public:
 	std::vector<ServerAddr> masters;
 
 	bool parse( const char *path );
+	bool override( OptionList &options );
 	bool set( const char *section, const char *name, const char *value );
 	bool validate();
 	void print( FILE *f = stdout );

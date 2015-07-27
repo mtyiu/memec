@@ -46,10 +46,10 @@ bool Application::epollHandler( int fd, uint32_t events, void *data ) {
 	return true;
 }
 
-bool Application::init( char *path, bool verbose ) {
-	bool ret;
+bool Application::init( char *path, OptionList &options, bool verbose ) {
 	// Parse configuration files //
-	if ( ! ( ret = this->config.application.parse( path ) ) ) {
+	if ( ( ! this->config.application.parse( path ) ) ||
+	     ( ! this->config.application.override( options ) ) ) {
 		return false;
 	}
 

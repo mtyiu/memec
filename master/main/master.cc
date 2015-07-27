@@ -17,12 +17,12 @@ void Master::signalHandler( int signal ) {
 	fclose( stdin );
 }
 
-bool Master::init( char *path, bool verbose ) {
-	bool ret;
+bool Master::init( char *path, OptionList &options, bool verbose ) {
 	// Parse configuration files //
-	if ( ( ! ( ret = this->config.global.parse( path ) ) ) ||
-	     ( ! ( ret = this->config.master.merge( this->config.global ) ) ) ||
-	     ( ! ( ret = this->config.master.parse( path ) ) ) ) {
+	if ( ( ! this->config.global.parse( path ) ) ||
+	     ( ! this->config.master.merge( this->config.global ) ) ||
+	     ( ! this->config.master.parse( path ) ) ||
+	     ( ! this->config.master.override( options ) ) ) {
 		return false;
 	}
 

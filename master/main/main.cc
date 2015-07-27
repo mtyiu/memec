@@ -2,14 +2,18 @@
 #include <cstdlib>
 #include <getopt.h>
 #include "master.hh"
+#include "../../common/util/option.hh"
 
 int main( int argc, char **argv ) {
 	int opt, ret = 0;
 	bool verbose = false;
 	char *path = NULL, path_default[] = "bin/config/local";
 	Master *master = 0;
+	OptionList options;
+	struct option_t tmpOption;
 	static struct option long_options[] = {
 		{ "path", required_argument, NULL, 'p' },
+		{ "option", required_argument, NULL, 'o' },
 		{ "help", no_argument, NULL, 'h' },
 		{ "verbose", no_argument, NULL, 'v' },
 		{ 0, 0, 0, 0 }
@@ -20,11 +24,25 @@ int main( int argc, char **argv ) {
 	//////////////////////////////////
 	opterr = 0;
 	while( ( opt = getopt_long( argc, argv,
-	                            "p:hv",
+	                            "p:o:hv",
 	                            long_options, NULL ) ) != -1 ) {
 		switch( opt ) {
 			case 'p':
 				path = optarg;
+				break;
+			case 'o':
+				tmpOption.section = 0;
+				tmpOption.name = 0;
+				tmpOption.value = 0;
+				for ( int i = optind - 1, j = 0; i < argc && argv[ i ][ 0 ] != '-'; i++, j++ ) {
+					switch( j ) {
+						case 0: tmpOption.section = argv[ i ]; break;
+						case 1: tmpOption.name = argv[ i ]; break;
+						case 2: tmpOption.value = argv[ i ]; break;
+					}
+				}
+				if ( tmpOption.value )
+					options.push_back( tmpOption );
 				break;
 			case 'h':
 				ret = 0;
@@ -42,7 +60,7 @@ int main( int argc, char **argv ) {
 	// Pass control to the Master //
 	////////////////////////////////
 	master = Master::getInstance();
-	if ( ! master->init( path, verbose ) ) {
+	if ( ! master->init( path, options, verbose ) ) {
 		fprintf( stderr, "Error: Cannot initialize master.\n" );
 		return 1;
 	}
@@ -63,6 +81,7 @@ usage:
 		"Mandatory arguments to long options are mandatory for short "
 		"options too.\n"
 		"  -p, --path         Specify the path to the directory containing the config files\n"
+		"  -o, --option       Override the options in the config file of master\n"
 		"  -v, --verbose      Show configuration\n"
 		"  -h, --help         Display this help and exit\n",
 		argv[ 0 ]

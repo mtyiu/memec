@@ -14,6 +14,7 @@
 #include "../../common/ds/array_map.hh"
 #include "../../common/socket/epoll.hh"
 #include "../../common/signal/signal.hh"
+#include "../../common/util/option.hh"
 #include "../../common/util/time.hh"
 
 // Implement the singleton pattern
@@ -54,7 +55,7 @@ public:
 
 	static void signalHandler( int signal );
 
-	bool init( char *path, bool verbose );
+	bool init( char *path, OptionList &options, bool verbose );
 	bool start();
 	bool stop();
 	void info( FILE *f = stdout );

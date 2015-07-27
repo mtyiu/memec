@@ -20,6 +20,18 @@ bool MasterConfig::parse( const char *path ) {
 	return false;
 }
 
+bool MasterConfig::override( OptionList &options ) {
+	bool ret = true;
+	for ( int i = 0, size = options.size(); i < size; i++ ) {
+		ret &= this->set(
+			options[ i ].section,
+			options[ i ].name,
+			options[ i ].value
+		);
+	}
+	return ret;
+}
+
 bool MasterConfig::set( const char *section, const char *name, const char *value ) {
 	if ( match( section, "master" ) ) {
 		return this->master.addr.parse( name, value );

@@ -20,6 +20,18 @@ bool SlaveConfig::parse( const char *path ) {
 	return false;
 }
 
+bool SlaveConfig::override( OptionList &options ) {
+	bool ret = true;
+	for ( int i = 0, size = options.size(); i < size; i++ ) {
+		ret &= this->set(
+			options[ i ].section,
+			options[ i ].name,
+			options[ i ].value
+		);
+	}
+	return ret;
+}
+
 bool SlaveConfig::set( const char *section, const char *name, const char *value ) {
 	if ( match( section, "slave" ) ) {
 		return this->slave.addr.parse( name, value );

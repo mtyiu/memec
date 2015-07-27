@@ -16,13 +16,13 @@ void Slave::signalHandler( int signal ) {
 	fclose( stdin );
 }
 
-bool Slave::init( char *path, bool verbose ) {
-	bool ret;
+bool Slave::init( char *path, OptionList &options, bool verbose ) {
 	int mySlaveIndex;
 	// Parse configuration files //
-	if ( ( ! ( ret = this->config.global.parse( path ) ) ) ||
-	     ( ! ( ret = this->config.slave.merge( this->config.global ) ) ) ||
-	     ( ! ( ret = this->config.slave.parse( path ) ) ) ||
+	if ( ( ! this->config.global.parse( path ) ) ||
+	     ( ! this->config.slave.merge( this->config.global ) ) ||
+	     ( ! this->config.slave.parse( path ) ) ||
+	     ( ! this->config.slave.override( options ) ) ||
 	     ( ( mySlaveIndex = this->config.slave.validate( this->config.global.slaves ) ) == -1 ) ) {
 		return false;
 	}

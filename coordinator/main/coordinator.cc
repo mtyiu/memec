@@ -16,12 +16,12 @@ void Coordinator::signalHandler( int signal ) {
 	fclose( stdin );
 }
 
-bool Coordinator::init( char *path, bool verbose ) {
-	bool ret;
+bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 	// Parse configuration files //
-	if ( ( ! ( ret = this->config.global.parse( path ) ) ) ||
-	     ( ! ( ret = this->config.coordinator.merge( this->config.global ) ) ) ||
-	     ( ! ( ret = this->config.coordinator.parse( path ) ) ) ||
+	if ( ( ! this->config.global.parse( path ) ) ||
+	     ( ! this->config.coordinator.merge( this->config.global ) ) ||
+	     ( ! this->config.coordinator.parse( path ) ) ||
+	     ( ! this->config.coordinator.override( options ) ) ||
 	     ( ! this->config.coordinator.validate( this->config.global.coordinators ) ) ) {
 		return false;
 	}

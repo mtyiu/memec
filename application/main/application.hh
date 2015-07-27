@@ -9,6 +9,7 @@
 #include "../../common/ds/array_map.hh"
 #include "../../common/socket/epoll.hh"
 #include "../../common/signal/signal.hh"
+#include "../../common/util/option.hh"
 #include "../../common/util/time.hh"
 
 // Implement the singleton pattern
@@ -50,7 +51,7 @@ public:
 	static void *run( void *argv );
 	static bool epollHandler( int fd, uint32_t events, void *data );
 
-	bool init( char *path, bool verbose );
+	bool init( char *path, OptionList &options, bool verbose );
 	bool start();
 	bool stop();
 	void info( FILE *f = stdout );
