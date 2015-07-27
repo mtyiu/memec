@@ -19,7 +19,7 @@ public:
 		int32_t timeout;
 	} epoll;
 	struct {
-		uint16_t chunks;
+		uint32_t chunks;
 	} cache;
 	struct {
 		WorkerType type;

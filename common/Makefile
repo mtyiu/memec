@@ -8,6 +8,7 @@ OBJS= \
 	config/global_config.o \
 	config/server_addr.o \
 	ds/bitmask_array.o \
+	ds/key_value.o \
 	protocol/protocol.o \
 	socket/socket.o \
 	socket/epoll.o
