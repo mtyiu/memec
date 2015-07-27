@@ -8,6 +8,7 @@ Slave::Slave() {
 
 void Slave::free() {
 	this->eventQueue.free();
+	delete this->stripeList;
 }
 
 void Slave::signalHandler( int signal ) {
@@ -51,10 +52,10 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 		fd = socket.getSocket();
 		this->sockets.coordinators.set( fd, socket );
 	}
-	this->sockets.slavePeers.reserve( this->config.global.slaves.size() - 1 );
+	this->sockets.slavePeers.reserve( this->config.global.slaves.size() );
 	for ( int i = 0, len = this->config.global.slaves.size(); i < len; i++ ) {
-		if ( i == mySlaveIndex )
-			continue;
+		// if ( i == mySlaveIndex )
+		// 	continue;
 		SlavePeerSocket socket;
 		int fd;
 
@@ -62,7 +63,13 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 		fd = socket.getSocket();
 		this->sockets.slavePeers.set( fd, socket );
 	}
-
+	/* Stripe list */
+	this->stripeList = new StripeList<SlaveSocket>(
+		this->config.global.coding.params.getChunkCount(),
+		this->config.global.coding.params.getDataChunkCount(),
+		this->config.global.stripeList.count,
+		this->sockets.slavePeers.values
+	);
 	/* Workers and event queues */
 	if ( this->config.slave.workers.type == WORKER_TYPE_MIXED ) {
 		this->eventQueue.init(
@@ -188,6 +195,7 @@ double Slave::getElapsedTime() {
 void Slave::info( FILE *f ) {
 	this->config.global.print( f );
 	this->config.slave.print( f );
+	this->stripeList->print( f );
 }
 
 void Slave::debug( FILE *f ) {

@@ -12,8 +12,9 @@
 #include "../worker/worker.hh"
 #include "../../common/config/global_config.hh"
 #include "../../common/ds/array_map.hh"
-#include "../../common/socket/epoll.hh"
 #include "../../common/signal/signal.hh"
+#include "../../common/socket/epoll.hh"
+#include "../../common/stripe_list/stripe_list.hh"
 #include "../../common/util/option.hh"
 #include "../../common/util/time.hh"
 
@@ -47,6 +48,7 @@ public:
 		ArrayMap<int, SlavePeerSocket> slavePeers;
 	} sockets;
 	SlaveEventQueue eventQueue;
+	StripeList<SlavePeerSocket> *stripeList;
 	
 	static Slave *getInstance() {
 		static Slave slave;
