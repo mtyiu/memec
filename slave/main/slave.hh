@@ -13,6 +13,8 @@
 #include "../worker/worker.hh"
 #include "../../common/config/global_config.hh"
 #include "../../common/ds/array_map.hh"
+#include "../../common/ds/chunk.hh"
+#include "../../common/ds/memory_pool.hh"
 #include "../../common/signal/signal.hh"
 #include "../../common/socket/epoll.hh"
 #include "../../common/stripe_list/stripe_list.hh"
@@ -51,6 +53,7 @@ public:
 	SlaveEventQueue eventQueue;
 	StripeList<SlavePeerSocket> *stripeList;
 	ChunkBuffer *chunkBuffer;
+	MemoryPool<Chunk> *chunkPool;
 	
 	static Slave *getInstance() {
 		static Slave slave;

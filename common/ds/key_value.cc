@@ -41,11 +41,11 @@ char *KeyValue::deserialize( char *data, char *&key, uint8_t &keySize, char *&va
 }
 
 bool compare( const KeyValue *v1, const KeyValue *v2 ) {
-	uint8_t keySize1 = ( uint8_t ) v1[ 0 ];
-	uint8_t keySize2 = ( uint8_t ) v2[ 0 ];
+	uint8_t keySize1 = ( uint8_t ) v1->data[ 0 ];
+	uint8_t keySize2 = ( uint8_t ) v2->data[ 0 ];
 
 	if ( keySize1 == keySize2 ) {
-		return strncmp( v1 + 4, v2 + 4, keySize1 ) == 0;
+		return strncmp( v1->data + 4, v2->data + 4, keySize1 ) == 0;
 	}
 	return false;
 }

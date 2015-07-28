@@ -17,6 +17,9 @@ public:
 	void set(   size_t entry, size_t bit );
 	void unset( size_t entry, size_t bit );
 	bool check( size_t entry, size_t bit );
+	void set(   size_t bit );
+	void unset( size_t bit );
+	bool check( size_t bit );
 	void print( FILE *f = stdout );
 	void printRaw( FILE *f = stdout );
 	void clear( size_t entry );

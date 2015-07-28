@@ -39,6 +39,18 @@ bool BitmaskArray::check( size_t entry, size_t bit ) {
 	return ( *bitmask & ( 1l << ( index & 63 ) ) );
 }
 
+void BitmaskArray::set(   size_t bit ) {
+	this->set( 0, bit );
+}
+
+void BitmaskArray::unset( size_t bit ) {
+	this->unset( 0, bit );
+}
+
+bool BitmaskArray::check( size_t bit ) {
+	return this->chunk( 0, bit );
+}
+
 void BitmaskArray::print( FILE *f ) {
 	size_t entry, bit, index;
 	uint64_t *bitmask;
