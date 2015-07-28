@@ -75,6 +75,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 
 			struct KeyHeader keyHeader;
 			struct KeyValueHeader keyValueHeader;
+			size_t listIndex;
 			bool success = false;
 
 			switch( header.opcode ) {
@@ -93,7 +94,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 							keyHeader.keySize
 						);
 
-						MasterWorker::stripeList->get(
+						listIndex = MasterWorker::stripeList->get(
 							keyHeader.key,
 							( size_t ) keyHeader.keySize,
 							this->dataSlaveSockets
@@ -122,7 +123,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 							keyValueHeader.valueSize
 						);
 
-						MasterWorker::stripeList->get(
+						listIndex = MasterWorker::stripeList->get(
 							keyValueHeader.key,
 							( size_t ) keyValueHeader.keySize,
 							this->dataSlaveSockets

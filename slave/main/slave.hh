@@ -5,6 +5,8 @@
 #include <vector>
 #include <cstdio>
 #include "../buffer/chunk_buffer.hh"
+#include "../buffer/data_chunk_buffer.hh"
+#include "../buffer/parity_chunk_buffer.hh"
 #include "../config/slave_config.hh"
 #include "../event/event_queue.hh"
 #include "../socket/coordinator_socket.hh"
@@ -38,6 +40,7 @@ private:
 
 	void free();
 	// Commands
+	void dump();
 	void help();
 	void time();
 
@@ -59,7 +62,7 @@ public:
 	SlaveEventQueue eventQueue;
 	StripeList<SlavePeerSocket> *stripeList;
 	std::vector<StripeListIndex> stripeListIndex;
-	ChunkBuffer *chunkBuffer;
+	ChunkBuffer **chunkBuffer;
 	MemoryPool<Chunk> *chunkPool;
 	
 	static Slave *getInstance() {

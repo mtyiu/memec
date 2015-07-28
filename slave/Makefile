@@ -6,6 +6,8 @@ BIN=$(PLIO_SRC_ROOT)/bin/slave
 
 OBJS= \
 	buffer/chunk_buffer.o \
+	buffer/data_chunk_buffer.o \
+	buffer/parity_chunk_buffer.o \
 	config/slave_config.o \
 	event/coordinator_event.o \
 	event/master_event.o \

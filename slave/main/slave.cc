@@ -9,7 +9,15 @@ Slave::Slave() {
 void Slave::free() {
 	this->eventQueue.free();
 	delete this->stripeList;
-	delete this->chunkBuffer;
+	for ( uint32_t i = 0, size = this->config.global.stripeList.count; i < size; i++ ) {
+		if ( this->chunkBuffer[ i ] ) {
+			if ( this->chunkBuffer[ i ]->isParity )
+				delete static_cast<ParityChunkBuffer *>( this->chunkBuffer[ i ] );
+			else
+				delete static_cast<DataChunkBuffer *>( this->chunkBuffer[ i ] );
+		}
+	}
+	delete[] this->chunkBuffer;
 }
 
 void Slave::signalHandler( int signal ) {
@@ -72,10 +80,24 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 	/* Stripe list index */
 	this->stripeListIndex = this->stripeList->list( mySlaveIndex );
 	/* Chunk buffer */
-	this->chunkBuffer = new ChunkBuffer(
-		this->config.global.size.chunk,
-		this->config.global.buffer.chunksPerList
-	);
+	this->chunkBuffer = new ChunkBuffer*[ this->config.global.stripeList.count ];
+	for ( uint32_t i = 0, size = this->config.global.stripeList.count; i < size; i++ ) {
+		this->chunkBuffer[ i ] = 0;
+	}
+	for ( uint32_t i = 0, size = this->stripeListIndex.size(); i < size; i++ ) {
+		if ( this->stripeListIndex[ i ].isParity ) {
+			this->chunkBuffer[ this->stripeListIndex[ i ].list ] = new ParityChunkBuffer(
+				this->config.global.size.chunk,
+				this->config.global.buffer.chunksPerList,
+				this->config.global.coding.params.getDataChunkCount()
+			);
+		} else {
+			this->chunkBuffer[ this->stripeListIndex[ i ].list ] = new DataChunkBuffer(
+				this->config.global.size.chunk,
+				this->config.global.buffer.chunksPerList
+			);
+		}
+	}
 	/* Chunk pool */
 	this->chunkPool = MemoryPool<Chunk>::getInstance();
 	this->chunkPool->init(
@@ -199,7 +221,10 @@ bool Slave::stop() {
 		this->sockets.slavePeers[ i ].stop();
 
 	/* Chunk buffer */
-	this->chunkBuffer->stop();
+	for ( uint32_t i = 0, size = this->config.global.stripeList.count; i < size; i++ ) {
+		if ( this->chunkBuffer[ i ] )
+			this->chunkBuffer[ i ]->stop();
+	}
 
 	this->free();
 	this->isRunning = false;
@@ -314,6 +339,9 @@ void Slave::interactive() {
 		} else if ( strcmp( command, "debug" ) == 0 ) {
 			valid = true;
 			this->debug();
+		} else if ( strcmp( command, "dump" ) == 0 ) {
+			valid = true;
+			this->dump();
 		} else if ( strcmp( command, "time" ) == 0 ) {
 			valid = true;
 			this->time();
@@ -327,6 +355,18 @@ void Slave::interactive() {
 	}
 }
 
+void Slave::dump() {
+	fprintf( stdout, "List of key-value pairs:\n------------------------\n" );
+	if ( ! this->map.keyValue.size() ) {
+		fprintf( stdout, "(None)\n" );
+	} else {
+		for ( std::map<Key, KeyValue *>::iterator it = this->map.keyValue.begin(); it != this->map.keyValue.end(); it++ ) {
+			fprintf( stdout, "%.*s --> %p\n", it->first.size, it->first.data, it->second );
+		}
+	}
+	fprintf( stdout, "\n" );
+}
+
 void Slave::help() {
 	fprintf(
 		stdout,
@@ -334,6 +374,7 @@ void Slave::help() {
 		"- help: Show this help message\n"
 		"- info: Show configuration\n"
 		"- debug: Show debug messages\n"
+		"- dump: Dump all key-value pairs\n"
 		"- time: Show elapsed time\n"
 		"- exit: Terminate this client\n"
 	);

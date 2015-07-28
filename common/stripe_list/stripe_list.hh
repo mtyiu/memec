@@ -18,14 +18,14 @@ typedef struct {
 
 // Need to know n, k, number of stripe list requested, number of slaves, mapped slaves
 template <class T> class StripeList {
-private:
+protected:
 	uint32_t n, k;
 	size_t numLists, numSlaves;
 	bool generated;
 	BitmaskArray data, parity;
 	unsigned int *weight, *cost;
 	std::vector<T> *slaves;
-	ConsistentHash<T *> ring;
+	ConsistentHash<size_t> ring;
 	std::vector<T **> lists;
 
 	inline int pickMin( int listIndex ) {
@@ -74,7 +74,7 @@ private:
 
 				list[ j ] = &this->slaves->at( index );
 			}
-			this->ring.add( list );
+			this->ring.add( i );
 		}
 		this->generated = true;
 	}
@@ -99,9 +99,14 @@ public:
 		this->generate();
 	}
 
-	unsigned int get( const char *key, size_t keySize, T **data, T **parity = 0, bool full = false ) {
-		unsigned int index = HashFunc::hash( key, keySize ) % this->k;
-		T **ret = this->ring.get( key, keySize );
+	unsigned int get( const char *key, size_t keySize, T **data, T **parity = 0, unsigned int *index = 0, bool full = false ) {
+		unsigned int dataIndex = HashFunc::hash( key, keySize ) % this->k;
+		size_t listIndex = this->ring.get( key, keySize );
+		T **ret = this->lists[ listIndex ];
+
+		if ( index )
+			*index = dataIndex;
+
 		if ( parity ) {
 			for ( size_t i = 0; i < this->n - this->k; i++ ) {
 				parity[ i ] = ret[ this->k + i ];
@@ -113,10 +118,10 @@ public:
 					data[ i ] = ret[ i ];
 				}
 			} else {
-				*data = ret[ index ];
+				*data = ret[ dataIndex ];
 			}
 		}
-		return index;
+		return listIndex;
 	}
 
 	std::vector<StripeListIndex> list( size_t index ) {
