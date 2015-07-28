@@ -3,9 +3,11 @@
 
 #include <stdint.h>
 #include <arpa/inet.h>
+#include "key.hh"
 
 class KeyValue {
 public:
+	uint32_t stripeId;
 	char *data;
 
 	char *serialize( char *key, uint8_t keySize, char *value, uint32_t valueSize );

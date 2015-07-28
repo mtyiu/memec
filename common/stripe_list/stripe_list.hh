@@ -10,6 +10,12 @@
 #include "../hash/consistent_hash.hh"
 #include "../hash/hash_func.hh"
 
+typedef struct {
+	int list;
+	int entry;
+	bool isParity;
+} StripeListIndex;
+
 // Need to know n, k, number of stripe list requested, number of slaves, mapped slaves
 template <class T> class StripeList {
 private:
@@ -111,6 +117,38 @@ public:
 			}
 		}
 		return index;
+	}
+
+	std::vector<StripeListIndex> list( size_t index ) {
+		size_t i, j;
+		std::vector<StripeListIndex> ret;
+		for ( i = 0; i < this->numLists; i++ ) {
+			if ( this->data.check( i, index ) ) {
+				StripeListIndex s;
+				s.list = i;
+				s.entry = 0;
+				s.isParity = false;
+				for ( j = 0; j < this->numSlaves; j++ ) {
+					if ( j == index )
+						break;
+					if ( this->data.check( i, j ) )
+						s.entry++;
+				}
+				ret.push_back( s );
+			} else if ( this->parity.check( i, index ) ) {StripeListIndex s;
+				s.list = i;
+				s.entry = 0;
+				s.isParity = true;
+				for ( j = 0; j < this->numSlaves; j++ ) {
+					if ( j == index )
+						break;
+					if ( this->parity.check( i, j ) )
+						s.entry++;
+				}
+				ret.push_back( s );
+			}
+		}
+		return ret;
 	}
 
 	void print( FILE *f = stdout ) {

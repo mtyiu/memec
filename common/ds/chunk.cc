@@ -1,3 +1,4 @@
+#include <cstring>
 #include "chunk.hh"
 
 Chunk::Chunk() {
@@ -8,6 +9,7 @@ Chunk::Chunk() {
 
 void Chunk::init( uint32_t capacity ) {
 	this->data = new char[ capacity ];
+	memset( this->data, 0, capacity );
 }
 
 void Chunk::free() {

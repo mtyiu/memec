@@ -69,10 +69,12 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 		this->config.global.stripeList.count,
 		this->sockets.slavePeers.values
 	);
+	/* Stripe list index */
+	this->stripeListIndex = this->stripeList->list( mySlaveIndex );
 	/* Chunk buffer */
 	this->chunkBuffer = new ChunkBuffer(
-		this->config.global.buffer.chunksPerList,
-		this->config.slave.cache.chunks
+		this->config.global.size.chunk,
+		this->config.global.buffer.chunksPerList
 	);
 	/* Chunk pool */
 	this->chunkPool = MemoryPool<Chunk>::getInstance();
@@ -213,6 +215,18 @@ void Slave::info( FILE *f ) {
 	this->config.global.print( f );
 	this->config.slave.print( f );
 	this->stripeList->print( f );
+
+	fprintf( f, "\n### Stripe List Index ###\n" );
+	for ( int i = 0, size = this->stripeListIndex.size(); i < size; i++ ) {
+		fprintf(
+			f, "%d. List #%d: %s chunk #%d\n",
+			i + 1,
+			this->stripeListIndex[ i ].list + 1,
+			this->stripeListIndex[ i ].isParity ? "Parity" : "Data",
+			this->stripeListIndex[ i ].entry + 1
+		);
+	}
+	fprintf( f, "\n" );
 }
 
 void Slave::debug( FILE *f ) {

@@ -1,6 +1,7 @@
 #ifndef __SLAVE_MAIN_SLAVE_HH__
 #define __SLAVE_MAIN_SLAVE_HH__
 
+#include <map>
 #include <vector>
 #include <cstdio>
 #include "../buffer/chunk_buffer.hh"
@@ -14,6 +15,8 @@
 #include "../../common/config/global_config.hh"
 #include "../../common/ds/array_map.hh"
 #include "../../common/ds/chunk.hh"
+#include "../../common/ds/key.hh"
+#include "../../common/ds/key_value.hh"
 #include "../../common/ds/memory_pool.hh"
 #include "../../common/signal/signal.hh"
 #include "../../common/socket/epoll.hh"
@@ -50,8 +53,12 @@ public:
 		ArrayMap<int, MasterSocket> masters;
 		ArrayMap<int, SlavePeerSocket> slavePeers;
 	} sockets;
+	struct {
+		std::map<Key, KeyValue *> keyValue;
+	} map;
 	SlaveEventQueue eventQueue;
 	StripeList<SlavePeerSocket> *stripeList;
+	std::vector<StripeListIndex> stripeListIndex;
 	ChunkBuffer *chunkBuffer;
 	MemoryPool<Chunk> *chunkPool;
 	
