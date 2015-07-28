@@ -33,3 +33,9 @@ char *Chunk::deserialize() {
 	this->size = ntohl( this->size );
 	return this->data + 8;
 }
+
+bool Chunk::initFn( Chunk *chunk, void *argv ) {
+	uint32_t capacity = *( ( uint32_t * ) argv );
+	chunk->init( capacity );
+	return true;
+}

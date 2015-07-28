@@ -48,7 +48,7 @@ void BitmaskArray::unset( size_t bit ) {
 }
 
 bool BitmaskArray::check( size_t bit ) {
-	return this->chunk( 0, bit );
+	return this->check( 0, bit );
 }
 
 void BitmaskArray::print( FILE *f ) {

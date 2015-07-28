@@ -48,8 +48,9 @@ public:
 	}
 
 	// Convert bytes to capacity of memory pool
-	static size_t getCapacity( size_t bytes ) {
-		
+	static size_t getCapacity( size_t space, size_t extra ) {
+		size_t size = sizeof( T ) + extra;
+		return ( space / size );
 	}
 
 	void init( size_t capacity, bool ( *initFn )( T *, void * ) = NULL, void *argv = NULL ) {

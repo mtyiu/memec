@@ -76,6 +76,14 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 	);
 	/* Chunk pool */
 	this->chunkPool = MemoryPool<Chunk>::getInstance();
+	this->chunkPool->init(
+		MemoryPool<Chunk>::getCapacity(
+			this->config.slave.cache.chunks,
+			this->config.global.size.chunk
+		),
+		Chunk::initFn,
+		( void * ) &this->config.global.size.chunk
+	);
 	/* Workers and event queues */
 	if ( this->config.slave.workers.type == WORKER_TYPE_MIXED ) {
 		this->eventQueue.init(

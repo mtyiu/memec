@@ -15,6 +15,8 @@ public:
 	void free();
 	char *serialize();
 	char *deserialize();
+
+	static bool initFn( Chunk *chunk, void *argv );
 };
 
 #endif
