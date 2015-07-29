@@ -61,6 +61,17 @@ protected:
 
 		return dst;
 	}
+
+	inline Chunk *bitwiseXOR( Chunk *dst, Chunk *srcA, Chunk *srcB, uint32_t size ) {
+		this->bitwiseXOR(
+			dst->data,
+			srcA->data,
+			srcB->data,
+			size
+		);
+		dst->size = size > dst->size ? size : dst->size;
+		return dst;
+	}
 };
 
 /**
