@@ -1,6 +1,7 @@
 #include "data_chunk_buffer.hh"
+#include "../event/io_event.hh"
 
-DataChunkBuffer::DataChunkBuffer( MemoryPool<Chunk> *chunkPool, uint32_t capacity, uint32_t count ) : ChunkBuffer( chunkPool, capacity, count ) {
+DataChunkBuffer::DataChunkBuffer( uint32_t capacity, uint32_t count, uint32_t stripeId ) : ChunkBuffer( capacity, count, stripeId ) {
 	pthread_mutex_init( &this->lock, 0 );
 	this->sizes = new uint32_t[ this->count ];
 	for ( uint32_t i = 0; i < this->count; i++ )
@@ -29,10 +30,11 @@ KeyValue DataChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t
 
 	// Allocate memory in the selected chunk
 	pthread_mutex_lock( this->locks + index );
+	keyValue.chunk = this->chunks[ index ];
 	keyValue.data = this->chunks[ index ]->alloc( size );
 	this->sizes[ index ] += size;
 
-	if ( this->sizes[ index ] <= 4 + CHUNK_BUFFER_FLUSH_THRESHOLD ) {
+	if ( this->sizes[ index ] + 4 + CHUNK_BUFFER_FLUSH_THRESHOLD >= this->capacity ) {
 		this->flush( index, false );
 	}
 	pthread_mutex_unlock( this->locks + index );
@@ -58,8 +60,13 @@ uint32_t DataChunkBuffer::flush( bool lock ) {
 		}
 	}
 
-	// TODO: Seal operation
-	Chunk *chunk = this->chunks[ index ];
+	if ( lock )
+		pthread_mutex_lock( this->locks + index );
+	
+	this->flush( index, false );
+
+	if ( lock )
+		pthread_mutex_unlock( this->locks + index );
 
 	if ( lock )
 		pthread_mutex_unlock( &this->lock );
@@ -71,10 +78,30 @@ Chunk *DataChunkBuffer::flush( int index, bool lock ) {
 	if ( lock )
 		pthread_mutex_lock( &this->lock );
 
+	if ( lock )
+		pthread_mutex_lock( this->locks + index );
+	
 	Chunk *chunk = this->chunks[ index ];
+
+	// Append a flush event to the event queue
+	IOEvent ioEvent;
+	ioEvent.flush( chunk );
+	ChunkBuffer::eventQueue->insert( ioEvent );
+
+	// Get a new chunk
+	this->sizes[ index ] = 0;
+	this->chunks[ index ] = ChunkBuffer::chunkPool->malloc();
+	this->chunks[ index ]->clear();
+	this->chunks[ index ]->stripeId = this->stripeId;
+	this->stripeId++;
+
+	if ( lock )
+		pthread_mutex_unlock( this->locks + index );
 
 	if ( lock )
 		pthread_mutex_unlock( &this->lock );
+
+	return chunk;
 }
 
 void DataChunkBuffer::print( FILE *f ) {
@@ -93,11 +120,11 @@ void DataChunkBuffer::print( FILE *f ) {
 	);
 	for ( uint32_t i = 0; i < this->count; i++ ) {
 		uint32_t size = this->sizes[ i ];
-		occupied = ( double ) size / this->capacity;
+		occupied = ( double ) size / this->capacity * 100.0;
 		fprintf(
 			f,
-			"\t%u. %u / %u (%5.2lf%%)\n",
-			( i + 1 ), size, this->capacity, occupied
+			"\t%u. [#%u] %u / %u (%5.2lf%%)\n",
+			( i + 1 ), this->chunks[ i ]->stripeId, size, this->capacity, occupied
 		);
 	}
 }

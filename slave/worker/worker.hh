@@ -22,7 +22,9 @@ private:
 	static std::vector<MixedChunkBuffer *> *chunkBuffer;
 
 	void dispatch( MixedEvent event );
+	void dispatch( CodingEvent event );
 	void dispatch( CoordinatorEvent event );
+	void dispatch( IOEvent event );
 	void dispatch( MasterEvent event );
 	void dispatch( SlaveEvent event );
 	void dispatch( SlavePeerEvent event );

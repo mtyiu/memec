@@ -10,8 +10,14 @@ std::vector<MixedChunkBuffer *> *SlaveWorker::chunkBuffer;
 
 void SlaveWorker::dispatch( MixedEvent event ) {
 	switch( event.type ) {
+		case EVENT_TYPE_CODING:
+			this->dispatch( event.event.coding );
+			break;
 		case EVENT_TYPE_COORDINATOR:
 			this->dispatch( event.event.coordinator );
+			break;
+		case EVENT_TYPE_IO:
+			this->dispatch( event.event.io );
 			break;
 		case EVENT_TYPE_MASTER:
 			this->dispatch( event.event.master );
@@ -25,6 +31,9 @@ void SlaveWorker::dispatch( MixedEvent event ) {
 		default:
 			break;
 	}
+}
+
+void SlaveWorker::dispatch( CodingEvent event ) {
 }
 
 void SlaveWorker::dispatch( CoordinatorEvent event ) {
@@ -84,6 +93,10 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 	}
 	if ( ! connected )
 		__ERROR__( "SlaveWorker", "dispatch", "The coordinator is disconnected." );
+}
+
+void SlaveWorker::dispatch( IOEvent event ) {
+	__ERROR__( "SlaveWorker", "dispatch", "Received an I/O event." );
 }
 
 void SlaveWorker::dispatch( MasterEvent event ) {
@@ -262,10 +275,22 @@ void *SlaveWorker::run( void *argv ) {
 				eventQueue->mixed
 			);
 			break;
+		case WORKER_ROLE_CODING:
+			SLAVE_WORKER_EVENT_LOOP(
+				CodingEvent,
+				eventQueue->separated.coding
+			);
+			break;
 		case WORKER_ROLE_COORDINATOR:
 			SLAVE_WORKER_EVENT_LOOP(
 				CoordinatorEvent,
 				eventQueue->separated.coordinator
+			);
+			break;
+		case WORKER_ROLE_IO:
+			SLAVE_WORKER_EVENT_LOOP(
+				IOEvent,
+				eventQueue->separated.io
 			);
 			break;
 		case WORKER_ROLE_MASTER:
@@ -333,8 +358,14 @@ void SlaveWorker::print( FILE *f ) {
 		case WORKER_ROLE_MIXED:
 			strcpy( role, "Mixed" );
 			break;
+		case WORKER_ROLE_CODING:
+			strcpy( role, "Coding" );
+			break;
 		case WORKER_ROLE_COORDINATOR:
 			strcpy( role, "Coordinator" );
+			break;
+		case WORKER_ROLE_IO:
+			strcpy( role, "I/O" );
 			break;
 		case WORKER_ROLE_MASTER:
 			strcpy( role, "Master" );

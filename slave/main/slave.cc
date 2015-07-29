@@ -86,6 +86,7 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 		0
 	);
 	/* Chunk buffer */
+	ChunkBuffer::init( this->chunkPool, &this->eventQueue );
 	this->chunkBuffer.reserve( this->config.global.stripeList.count );
 	for ( uint32_t i = 0; i < this->config.global.stripeList.count; i++ )
 		this->chunkBuffer.push_back( 0 );
@@ -94,7 +95,6 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 		if ( this->stripeListIndex[ i ].isParity ) {
 			this->chunkBuffer[ index ] = new MixedChunkBuffer(
 				new ParityChunkBuffer(
-					this->chunkPool,
 					this->config.global.size.chunk,
 					this->config.global.buffer.chunksPerList,
 					this->config.global.coding.params.getDataChunkCount()
@@ -103,7 +103,6 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 		} else {
 			this->chunkBuffer[ index ] = new MixedChunkBuffer(
 				new DataChunkBuffer(
-					this->chunkPool,
 					this->config.global.size.chunk,
 					this->config.global.buffer.chunksPerList
 				)
@@ -134,7 +133,9 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 		this->workers.reserve( this->config.slave.workers.number.separated.total );
 		this->eventQueue.init(
 			this->config.slave.eventQueue.block,
+			this->config.slave.eventQueue.size.separated.coding,
 			this->config.slave.eventQueue.size.separated.coordinator,
+			this->config.slave.eventQueue.size.separated.io,
 			this->config.slave.eventQueue.size.separated.master,
 			this->config.slave.eventQueue.size.separated.slave,
 			this->config.slave.eventQueue.size.separated.slavePeer
@@ -156,10 +157,12 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 			); \
 		}
 
+		WORKER_INIT_LOOP( coding, WORKER_ROLE_CODING )
 		WORKER_INIT_LOOP( coordinator, WORKER_ROLE_COORDINATOR )
+		WORKER_INIT_LOOP( io, WORKER_ROLE_IO )
 		WORKER_INIT_LOOP( master, WORKER_ROLE_MASTER )
 		WORKER_INIT_LOOP( slave, WORKER_ROLE_SLAVE )
-		WORKER_INIT_LOOP( slave, WORKER_ROLE_SLAVE_PEER )
+		WORKER_INIT_LOOP( slavePeer, WORKER_ROLE_SLAVE_PEER )
 #undef WORKER_INIT_LOOP
 	}
 
