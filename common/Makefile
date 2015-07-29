@@ -4,10 +4,12 @@ PLIO_SRC_ROOT=..
 LIBS=-pthread
 
 OBJS= \
+	coding/raid5coding.o \
 	config/config.o \
 	config/global_config.o \
 	config/server_addr.o \
 	ds/bitmask_array.o \
+	ds/chunk.o \
 	ds/key_value.o \
 	protocol/protocol.o \
 	socket/socket.o \

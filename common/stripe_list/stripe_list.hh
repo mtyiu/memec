@@ -99,7 +99,7 @@ public:
 		this->generate();
 	}
 
-	unsigned int get( const char *key, size_t keySize, T **data, T **parity = 0, unsigned int *index = 0, bool full = false ) {
+	unsigned int get( const char *key, size_t keySize, T **data = 0, T **parity = 0, unsigned int *index = 0, bool full = false ) {
 		unsigned int dataIndex = HashFunc::hash( key, keySize ) % this->k;
 		size_t listIndex = this->ring.get( key, keySize );
 		T **ret = this->lists[ listIndex ];

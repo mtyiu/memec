@@ -1,6 +1,13 @@
 #include <cstring>
 #include "key_value.hh"
 
+Key KeyValue::key() {
+	Key key;
+	key.size = ( uint8_t ) this->data[ 0 ];
+	key.data = this->data + KEY_VALUE_METADATA_SIZE;
+	return key;
+}
+
 char *KeyValue::serialize( char *key, uint8_t keySize, char *value, uint32_t valueSize ) {
 	return KeyValue::serialize( this->data, key, keySize, value, valueSize );
 }
@@ -14,8 +21,8 @@ char *KeyValue::serialize( char *data, char *key, uint8_t keySize, char *value, 
 	data[ 3 ] = ( valueSize >> 8 ) & 0xFF;
 	valueSize = ntohl( valueSize );
 
-	memcpy( data + 4, key, keySize );
-	memcpy( data + 4 + keySize, value, valueSize );
+	memcpy( data + KEY_VALUE_METADATA_SIZE, key, keySize );
+	memcpy( data + KEY_VALUE_METADATA_SIZE + keySize, value, valueSize );
 
 	return data;
 }
@@ -33,9 +40,9 @@ char *KeyValue::deserialize( char *data, char *&key, uint8_t &keySize, char *&va
 	valueSize |= data[ 3 ] << 8;
 	valueSize = ntohl( valueSize );
 
-	key = data + 4;
+	key = data + KEY_VALUE_METADATA_SIZE;
 
-	value = data + 4 + keySize;
+	value = data + KEY_VALUE_METADATA_SIZE + keySize;
 
 	return data;
 }
@@ -45,7 +52,11 @@ bool compare( const KeyValue *v1, const KeyValue *v2 ) {
 	uint8_t keySize2 = ( uint8_t ) v2->data[ 0 ];
 
 	if ( keySize1 == keySize2 ) {
-		return strncmp( v1->data + 4, v2->data + 4, keySize1 ) == 0;
+		return strncmp(
+			v1->data + KEY_VALUE_METADATA_SIZE,
+			v2->data + KEY_VALUE_METADATA_SIZE,
+			keySize1
+		) == 0;
 	}
 	return false;
 }

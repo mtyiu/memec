@@ -75,7 +75,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 
 			struct KeyHeader keyHeader;
 			struct KeyValueHeader keyValueHeader;
-			size_t listIndex;
+			unsigned int dataIndex;
 			bool success = false;
 
 			switch( header.opcode ) {
@@ -94,10 +94,13 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 							keyHeader.keySize
 						);
 
-						listIndex = MasterWorker::stripeList->get(
+						MasterWorker::stripeList->get(
 							keyHeader.key,
 							( size_t ) keyHeader.keySize,
-							this->dataSlaveSockets
+							this->dataSlaveSockets,
+							this->paritySlaveSockets,
+							&dataIndex,
+							true
 						);
 
 						success = true;
@@ -107,12 +110,10 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 					if ( this->protocol.parseKeyValueHeader( keyValueHeader, PROTO_HEADER_SIZE ) ) {
 						__DEBUG__(
 							BLUE, "MasterWorker", "dispatch",
-							"[SET] Key: %.*s (key size = %u); Value: %.*s (value size = %u)",
+							"[SET] Key: %.*s (key size = %u); Value: (value size = %u)",
 							( int ) keyValueHeader.keySize,
 							keyValueHeader.key,
 							keyValueHeader.keySize,
-							( int ) keyValueHeader.valueSize,
-							keyValueHeader.value,
 							keyValueHeader.valueSize
 						);
 						buffer.data = this->protocol.reqSet(
@@ -123,10 +124,13 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 							keyValueHeader.valueSize
 						);
 
-						listIndex = MasterWorker::stripeList->get(
+						MasterWorker::stripeList->get(
 							keyValueHeader.key,
 							( size_t ) keyValueHeader.keySize,
-							this->dataSlaveSockets
+							this->dataSlaveSockets,
+							this->paritySlaveSockets,
+							&dataIndex,
+							true
 						);
 
 						success = true;
@@ -160,7 +164,10 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 				return;
 
 			// Send request
-			ret = this->dataSlaveSockets[ 0 ]->send( buffer.data, buffer.size, connected );
+			ret = this->dataSlaveSockets[ dataIndex ]->send( buffer.data, buffer.size, connected );
+			for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
+				ret = this->paritySlaveSockets[ i ]->send( buffer.data, buffer.size, connected );
+			}
 			if ( ret != ( ssize_t ) buffer.size )
 				__ERROR__( "ApplicationWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 		}

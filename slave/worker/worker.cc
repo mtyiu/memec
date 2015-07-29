@@ -3,10 +3,21 @@
 
 #define WORKER_COLOR	YELLOW
 
+SlaveEventQueue *SlaveWorker::eventQueue;
+StripeList<SlavePeerSocket> *SlaveWorker::stripeList;
+Map *SlaveWorker::map;
+std::vector<MixedChunkBuffer *> *SlaveWorker::chunkBuffer;
+
 void SlaveWorker::dispatch( MixedEvent event ) {
 	switch( event.type ) {
+		case EVENT_TYPE_CODING:
+			this->dispatch( event.event.coding );
+			break;
 		case EVENT_TYPE_COORDINATOR:
 			this->dispatch( event.event.coordinator );
+			break;
+		case EVENT_TYPE_IO:
+			this->dispatch( event.event.io );
 			break;
 		case EVENT_TYPE_MASTER:
 			this->dispatch( event.event.master );
@@ -20,6 +31,9 @@ void SlaveWorker::dispatch( MixedEvent event ) {
 		default:
 			break;
 	}
+}
+
+void SlaveWorker::dispatch( CodingEvent event ) {
 }
 
 void SlaveWorker::dispatch( CoordinatorEvent event ) {
@@ -81,6 +95,10 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 		__ERROR__( "SlaveWorker", "dispatch", "The coordinator is disconnected." );
 }
 
+void SlaveWorker::dispatch( IOEvent event ) {
+	__ERROR__( "SlaveWorker", "dispatch", "Received an I/O event." );
+}
+
 void SlaveWorker::dispatch( MasterEvent event ) {
 	bool connected, isSend;
 	ssize_t ret;
@@ -131,6 +149,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 
 			struct KeyHeader keyHeader;
 			struct KeyValueHeader keyValueHeader;
+			size_t listIndex;
 
 			switch( header.opcode ) {
 				case PROTO_OPCODE_GET:
@@ -146,16 +165,38 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 					break;
 				case PROTO_OPCODE_SET:
 					if ( this->protocol.parseKeyValueHeader( keyValueHeader, PROTO_HEADER_SIZE ) ) {
+						// __DEBUG__(
+						// 	BLUE, "SlaveWorker", "dispatch",
+						// 	"[SET] Key: %.*s (key size = %u); Value: %.*s (value size = %u)",
+						// 	( int ) keyValueHeader.keySize,
+						// 	keyValueHeader.key,
+						// 	keyValueHeader.keySize,
+						// 	( int ) keyValueHeader.valueSize,
+						// 	keyValueHeader.value,
+						// 	keyValueHeader.valueSize
+						// );
 						__DEBUG__(
 							BLUE, "SlaveWorker", "dispatch",
-							"[SET] Key: %.*s (key size = %u); Value: %.*s (value size = %u)",
+							"[SET] Key: %.*s (key size = %u); Value: (value size = %u)",
 							( int ) keyValueHeader.keySize,
 							keyValueHeader.key,
 							keyValueHeader.keySize,
-							( int ) keyValueHeader.valueSize,
+							keyValueHeader.valueSize
+						);
+
+						listIndex = SlaveWorker::stripeList->get(
+							keyValueHeader.key,
+							( size_t ) keyValueHeader.keySize
+						);
+
+						KeyValue keyValue = SlaveWorker::chunkBuffer->at( listIndex )->set(
+							keyValueHeader.key,
+							keyValueHeader.keySize,
 							keyValueHeader.value,
 							keyValueHeader.valueSize
 						);
+
+						map->keyValue[ keyValue.key() ] = keyValue;
 					}
 					break;
 			}
@@ -234,10 +275,22 @@ void *SlaveWorker::run( void *argv ) {
 				eventQueue->mixed
 			);
 			break;
+		case WORKER_ROLE_CODING:
+			SLAVE_WORKER_EVENT_LOOP(
+				CodingEvent,
+				eventQueue->separated.coding
+			);
+			break;
 		case WORKER_ROLE_COORDINATOR:
 			SLAVE_WORKER_EVENT_LOOP(
 				CoordinatorEvent,
 				eventQueue->separated.coordinator
+			);
+			break;
+		case WORKER_ROLE_IO:
+			SLAVE_WORKER_EVENT_LOOP(
+				IOEvent,
+				eventQueue->separated.io
 			);
 			break;
 		case WORKER_ROLE_MASTER:
@@ -267,7 +320,15 @@ void *SlaveWorker::run( void *argv ) {
 	return 0;
 }
 
-bool SlaveWorker::init( GlobalConfig &config, WorkerRole role, SlaveEventQueue *eventQueue ) {
+bool SlaveWorker::init( SlaveEventQueue *eventQueue, StripeList<SlavePeerSocket> *stripeList, Map *map, std::vector<MixedChunkBuffer *> *chunkBuffer ) {
+	SlaveWorker::eventQueue = eventQueue;
+	SlaveWorker::stripeList = stripeList;
+	SlaveWorker::map = map;
+	SlaveWorker::chunkBuffer = chunkBuffer;
+	return true;
+}
+
+bool SlaveWorker::init( GlobalConfig &config, WorkerRole role ) {
 	this->protocol.init(
 		Protocol::getSuggestedBufferSize(
 			config.size.key,
@@ -275,7 +336,6 @@ bool SlaveWorker::init( GlobalConfig &config, WorkerRole role, SlaveEventQueue *
 		)
 	);
 	this->role = role;
-	this->eventQueue = eventQueue;
 	return role != WORKER_ROLE_UNDEFINED;
 }
 
@@ -298,8 +358,14 @@ void SlaveWorker::print( FILE *f ) {
 		case WORKER_ROLE_MIXED:
 			strcpy( role, "Mixed" );
 			break;
+		case WORKER_ROLE_CODING:
+			strcpy( role, "Coding" );
+			break;
 		case WORKER_ROLE_COORDINATOR:
 			strcpy( role, "Coordinator" );
+			break;
+		case WORKER_ROLE_IO:
+			strcpy( role, "I/O" );
 			break;
 		case WORKER_ROLE_MASTER:
 			strcpy( role, "Master" );

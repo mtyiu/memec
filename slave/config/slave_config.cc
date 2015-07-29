@@ -11,7 +11,9 @@ bool SlaveConfig::parse( const char *path ) {
 	if ( Config::parse( path, "slave.ini" ) ) {
 		if ( this->workers.type == WORKER_TYPE_SEPARATED )
 			this->workers.number.separated.total = 
+				this->workers.number.separated.coding +
 				this->workers.number.separated.coordinator +
+				this->workers.number.separated.io +
 				this->workers.number.separated.master +
 				this->workers.number.separated.slave + 
 				this->workers.number.separated.slavePeer;
@@ -57,8 +59,12 @@ bool SlaveConfig::set( const char *section, const char *name, const char *value 
 				this->workers.type = WORKER_TYPE_UNDEFINED;
 		} else if ( match( name, "mixed" ) )
 			this->workers.number.mixed = atoi( value );
+		else if ( match( name, "coding" ) )
+			this->workers.number.separated.coding = atoi( value );
 		else if ( match( name, "coordinator" ) )
 			this->workers.number.separated.coordinator = atoi( value );
+		else if ( match( name, "io" ) )
+			this->workers.number.separated.io = atoi( value );
 		else if ( match( name, "master" ) )
 			this->workers.number.separated.master = atoi( value );
 		else if ( match( name, "slave" ) )
@@ -72,8 +78,12 @@ bool SlaveConfig::set( const char *section, const char *name, const char *value 
 			this->eventQueue.block = ! match( value, "false" );
 		else if ( match( name, "mixed" ) )
 			this->eventQueue.size.mixed = atoi( value );
+		else if ( match( name, "coding" ) )
+			this->eventQueue.size.separated.coding = atoi( value );
 		else if ( match( name, "coordinator" ) )
 			this->eventQueue.size.separated.coordinator = atoi( value );
+		else if ( match( name, "io" ) )
+			this->eventQueue.size.separated.io = atoi( value );
 		else if ( match( name, "master" ) )
 			this->eventQueue.size.separated.master = atoi( value );
 		else if ( match( name, "slave" ) )
@@ -109,8 +119,12 @@ bool SlaveConfig::validate() {
 				CFG_PARSE_ERROR( "SlaveConfig", "The size of the event queue should be at least the number of workers." );
 			break;
 		case WORKER_TYPE_SEPARATED:
+			if ( this->workers.number.separated.coding < 1 )
+				CFG_PARSE_ERROR( "SlaveConfig", "The number of coding workers should be at least 1." );
 			if ( this->workers.number.separated.coordinator < 1 )
 				CFG_PARSE_ERROR( "SlaveConfig", "The number of coordinator workers should be at least 1." );
+			if ( this->workers.number.separated.io < 1 )
+				CFG_PARSE_ERROR( "SlaveConfig", "The number of I/O workers should be at least 1." );
 			if ( this->workers.number.separated.master < 1 )
 				CFG_PARSE_ERROR( "SlaveConfig", "The number of master workers should be at least 1." );
 			if ( this->workers.number.separated.slave < 1 )
@@ -118,8 +132,12 @@ bool SlaveConfig::validate() {
 			if ( this->workers.number.separated.slavePeer < 1 )
 				CFG_PARSE_ERROR( "SlaveConfig", "The number of slave peer workers should be at least 1." );
 
+			if ( this->eventQueue.size.separated.coding < this->workers.number.separated.coding )
+				CFG_PARSE_ERROR( "SlaveConfig", "The size of the coding event queue should be at least the number of workers." );
 			if ( this->eventQueue.size.separated.coordinator < this->workers.number.separated.coordinator )
 				CFG_PARSE_ERROR( "SlaveConfig", "The size of the coordinator event queue should be at least the number of workers." );
+			if ( this->eventQueue.size.separated.io < this->workers.number.separated.io )
+				CFG_PARSE_ERROR( "SlaveConfig", "The size of the I/O event queue should be at least the number of workers." );
 			if ( this->eventQueue.size.separated.master < this->workers.number.separated.master )
 				CFG_PARSE_ERROR( "SlaveConfig", "The size of the master event queue should be at least the number of workers." );
 			if ( this->eventQueue.size.separated.slave < this->workers.number.separated.slave )
@@ -188,18 +206,26 @@ void SlaveConfig::print( FILE *f ) {
 			"\t- %-*s : %u\n"
 			"\t- %-*s : %u\n"
 			"\t- %-*s : %u\n"
+			"\t- %-*s : %u\n"
+			"\t- %-*s : %u\n"
 			"- Event queues\n"
 			"\t- %-*s : %s\n"
 			"\t- %-*s : %u\n"
 			"\t- %-*s : %u\n"
 			"\t- %-*s : %u\n"
+			"\t- %-*s : %u\n"
+			"\t- %-*s : %u\n"
 			"\t- %-*s : %u\n",
+			width, "Number of coding workers", this->workers.number.separated.coding,
 			width, "Number of coordinator workers", this->workers.number.separated.coordinator,
+			width, "Number of io workers", this->workers.number.separated.io,
 			width, "Number of master workers", this->workers.number.separated.master,
 			width, "Number of slave workers", this->workers.number.separated.slave,
 			width, "Number of slave peer workers", this->workers.number.separated.slavePeer,
 			width, "Blocking?", this->eventQueue.block ? "Yes" : "No",
+			width, "Size for coding", this->eventQueue.size.separated.coding,
 			width, "Size for coordinator", this->eventQueue.size.separated.coordinator,
+			width, "Size for I/O", this->eventQueue.size.separated.io,
 			width, "Size for master", this->eventQueue.size.separated.master,
 			width, "Size for slave", this->eventQueue.size.separated.slave,
 			width, "Size for slave peer", this->eventQueue.size.separated.slavePeer

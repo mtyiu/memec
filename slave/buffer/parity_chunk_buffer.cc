@@ -1,22 +1,20 @@
 #include "parity_chunk_buffer.hh"
 
-ParityChunkBuffer::ParityChunkBuffer( uint32_t capacity, uint32_t count, uint32_t dataChunkCount ) : ChunkBuffer( capacity, count ) {
-	this->isParity = true;
+ParityChunkBuffer::ParityChunkBuffer( uint32_t capacity, uint32_t count, uint32_t dataChunkCount, uint32_t stripeId ) : ChunkBuffer( capacity, count, stripeId ) {
 	this->dataChunkCount = dataChunkCount;
 	this->dataChunkBuffer = new DataChunkBuffer*[ dataChunkCount ];
-	for ( uint32_t i = 0; i < dataChunkCount; i++ ) {
+	for ( uint32_t i = 0; i < dataChunkCount; i++ )
 		this->dataChunkBuffer[ i ] = new DataChunkBuffer( capacity, count );
-	}
 }
 
-KeyValue ParityChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t valueSize, uint32_t dataIndex ) {
+KeyValue ParityChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t valueSize ) {
 	KeyValue ret;
 	/*
 	uint32_t size = 4 + keySize + valueSize, max = 0, tmp;
 	int index = -1;
 
 	pthread_mutex_lock( &this->lock );
-	for ( size_t i = 0, j = 0; i < this->chunksPerList; i++ ) {
+	for ( uint32_t i = 0, j = 0; i < this->chunksPerList; i++ ) {
 		j = dataIndex + i * this->dataChunkCount;
 		tmp = this->sizes[ j ] + size;
 		if ( tmp <= this->capacity ) {
@@ -35,8 +33,16 @@ KeyValue ParityChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32
 	return ret;
 }
 
-size_t ParityChunkBuffer::flush( bool lock ) {
+uint32_t ParityChunkBuffer::flush( bool lock ) {
 	return 0;
+}
+
+Chunk *ParityChunkBuffer::flush( int index, bool lock ) {
+	return 0;
+}
+
+void ParityChunkBuffer::print( FILE *f ) {
+
 }
 
 void ParityChunkBuffer::stop() {

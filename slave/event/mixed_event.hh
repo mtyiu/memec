@@ -1,7 +1,9 @@
 #ifndef __SLAVE_EVENT_MIXED_EVENT_HH__
 #define __SLAVE_EVENT_MIXED_EVENT_HH__
 
+#include "coding_event.hh"
 #include "coordinator_event.hh"
+#include "io_event.hh"
 #include "master_event.hh"
 #include "slave_event.hh"
 #include "slave_peer_event.hh"
@@ -12,7 +14,9 @@ class MixedEvent : public Event {
 public:
 	EventType type;
 	union {
+		CodingEvent coding;
 		CoordinatorEvent coordinator;
+		IOEvent io;
 		MasterEvent master;
 		SlaveEvent slave;
 		SlavePeerEvent slavePeer;
@@ -24,7 +28,9 @@ public:
 		this->event._FIELD_ = event; \
 	}
 
+	MIXED_EVENT_SET( CodingEvent, EVENT_TYPE_CODING, coding )
 	MIXED_EVENT_SET( CoordinatorEvent, EVENT_TYPE_COORDINATOR, coordinator )
+	MIXED_EVENT_SET( IOEvent, EVENT_TYPE_IO, io )
 	MIXED_EVENT_SET( MasterEvent, EVENT_TYPE_MASTER, master )
 	MIXED_EVENT_SET( SlaveEvent, EVENT_TYPE_SLAVE, slave )
 	MIXED_EVENT_SET( SlavePeerEvent, EVENT_TYPE_SLAVE_PEER, slavePeer )

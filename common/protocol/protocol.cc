@@ -46,12 +46,12 @@ size_t Protocol::generateKeyValueHeader( uint8_t magic, uint8_t to, uint8_t opco
 	buf[ 3 ] = ( valueSize >> 8 ) & 0xFF;
 	valueSize = ntohl( valueSize );
 
-	buf += 4;
+	buf += PROTO_KEY_VALUE_SIZE;
 	memcpy( buf, key, keySize );
 	buf += keySize;
 	memcpy( buf, value, valueSize );
 
-	bytes += 4 + keySize + valueSize;
+	bytes += PROTO_KEY_VALUE_SIZE + keySize + valueSize;
 
 	return bytes;
 }

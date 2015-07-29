@@ -2,6 +2,7 @@
 #define __SLAVE_EVENT_SLAVE_EVENT_HH__
 
 #include "../socket/slave_socket.hh"
+#include "../../common/ds/chunk.hh"
 #include "../../common/event/event.hh"
 
 enum SlaveEventType {
