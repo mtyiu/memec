@@ -31,6 +31,10 @@ KeyValue DataChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t
 	pthread_mutex_lock( this->locks + index );
 	keyValue.data = this->chunks[ index ]->alloc( size );
 	this->sizes[ index ] += size;
+
+	if ( this->sizes[ index ] <= 4 + CHUNK_BUFFER_FLUSH_THRESHOLD ) {
+		this->flush( index, false );
+	}
 	pthread_mutex_unlock( this->locks + index );
 	pthread_mutex_unlock( &this->lock );
 
@@ -55,11 +59,22 @@ uint32_t DataChunkBuffer::flush( bool lock ) {
 	}
 
 	// TODO: Seal operation
+	Chunk *chunk = this->chunks[ index ];
 
 	if ( lock )
 		pthread_mutex_unlock( &this->lock );
 
 	return index;
+}
+
+Chunk *DataChunkBuffer::flush( int index, bool lock ) {
+	if ( lock )
+		pthread_mutex_lock( &this->lock );
+
+	Chunk *chunk = this->chunks[ index ];
+
+	if ( lock )
+		pthread_mutex_unlock( &this->lock );
 }
 
 void DataChunkBuffer::print( FILE *f ) {

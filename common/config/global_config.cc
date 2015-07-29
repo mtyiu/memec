@@ -115,6 +115,11 @@ bool GlobalConfig::validate() {
 	if ( this->size.key > 255 )
 		CFG_PARSE_ERROR( "GlobalConfig", "Key size should be at most 255 bytes." );
 
+	if ( this->size.chunk < 32 )
+		CFG_PARSE_ERROR( "GlobalConfig", "Chunk size should be at least 32 bytes." );
+	if ( this->size.chunk % 8 != 0 )
+		CFG_PARSE_ERROR( "GlobalConfig", "Chunk size should be a multiple of 8." );
+
 	if ( this->stripeList.count < 1 )
 		CFG_PARSE_ERROR( "GlobalConfig", "The number of stripe lists should be at least 1." );
 

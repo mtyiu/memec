@@ -6,16 +6,20 @@
 
 class Chunk {
 public:
+	static uint32_t capacity;
 	uint32_t count;             // Number of key-value pair
 	uint32_t size;              // Occupied data
 	char *data;
 
 	Chunk();
-	void init( uint32_t capacity );
+	static void init( uint32_t capacity );
+	void init();
 	char *alloc( uint32_t size );
+	void update( bool isParity );
+	void clear();
 	void free();
-	char *serialize();
-	char *deserialize();
+	// char *serialize();
+	// char *deserialize();
 
 	static bool initFn( Chunk *chunk, void *argv );
 };

@@ -75,6 +75,7 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 	/* Stripe list index */
 	this->stripeListIndex = this->stripeList->list( mySlaveIndex );
 	/* Chunk pool */
+	Chunk::init( this->config.global.size.chunk );
 	this->chunkPool = MemoryPool<Chunk>::getInstance();
 	this->chunkPool->init(
 		MemoryPool<Chunk>::getCapacity(
@@ -82,7 +83,7 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 			this->config.global.size.chunk
 		),
 		Chunk::initFn,
-		( void * ) &this->config.global.size.chunk
+		0
 	);
 	/* Chunk buffer */
 	this->chunkBuffer.reserve( this->config.global.stripeList.count );

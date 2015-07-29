@@ -6,6 +6,7 @@
 #include "../ds/bitmask_array.hh"
 
 class Coding {
+protected:
 	/**
 	 * Encoding k data chunks to generate 1 parity chunk.
 	 *
@@ -30,6 +31,36 @@ class Coding {
 	 * @return        indicate whether the decoding is successful
 	 */
 	virtual bool decode( Chunk **chunks, BitmaskArray *bitmap ) = 0;
+
+	/**
+	 * Perform bitwise XOR.
+	 * @param dst  Output (XOR-ed value)
+	 * @param srcA Input 1
+	 * @param srcB Input 2
+	 * @param len  Size of the input
+	 * @return     Output (same as dst)
+	 */
+	inline char *bitwiseXOR( char *dst, char *srcA, char *srcB, uint32_t len ) {
+		uint64_t *srcA64 = ( uint64_t * ) srcA;
+		uint64_t *srcB64 = ( uint64_t * ) srcB;
+		uint64_t *dst64 = ( uint64_t * ) dst;
+
+		uint64_t xor64Count = len / sizeof( uint64_t );
+		uint64_t i = 0;
+
+		// Word-by-word XOR
+		for ( i = 0; i < xor64Count; i++ ) {
+			dst64[ i ] = srcA64[ i ] ^ srcB64[ i ];
+		}
+
+		i = xor64Count * sizeof( uint64_t );
+
+		for ( ; i < len; i++ ) {
+			dst[ i ] = srcA[ i ] ^ srcB[ i ];
+		}
+
+		return dst;
+	}
 };
 
 /**

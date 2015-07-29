@@ -37,6 +37,10 @@ uint32_t ParityChunkBuffer::flush( bool lock ) {
 	return 0;
 }
 
+Chunk *ParityChunkBuffer::flush( int index, bool lock ) {
+	return 0;
+}
+
 void ParityChunkBuffer::print( FILE *f ) {
 
 }
