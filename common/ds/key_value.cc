@@ -1,6 +1,13 @@
 #include <cstring>
 #include "key_value.hh"
 
+Key KeyValue::key() {
+	Key key;
+	key.size = ( uint8_t ) this->data[ 0 ];
+	key.data = this->data + 4;
+	return key;
+}
+
 char *KeyValue::serialize( char *key, uint8_t keySize, char *value, uint32_t valueSize ) {
 	return KeyValue::serialize( this->data, key, keySize, value, valueSize );
 }

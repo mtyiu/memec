@@ -3,6 +3,11 @@
 
 #define WORKER_COLOR	YELLOW
 
+SlaveEventQueue *SlaveWorker::eventQueue;
+StripeList<SlavePeerSocket> *SlaveWorker::stripeList;
+Map *SlaveWorker::map;
+std::vector<MixedChunkBuffer *> *SlaveWorker::chunkBuffer;
+
 void SlaveWorker::dispatch( MixedEvent event ) {
 	switch( event.type ) {
 		case EVENT_TYPE_COORDINATOR:
@@ -131,6 +136,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 
 			struct KeyHeader keyHeader;
 			struct KeyValueHeader keyValueHeader;
+			size_t listIndex;
 
 			switch( header.opcode ) {
 				case PROTO_OPCODE_GET:
@@ -156,6 +162,20 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 							keyValueHeader.value,
 							keyValueHeader.valueSize
 						);
+
+						listIndex = SlaveWorker::stripeList->get(
+							keyValueHeader.key,
+							( size_t ) keyValueHeader.keySize
+						);
+
+						KeyValue keyValue = SlaveWorker::chunkBuffer->at( listIndex )->set(
+							keyValueHeader.key,
+							keyValueHeader.keySize,
+							keyValueHeader.value,
+							keyValueHeader.valueSize
+						);
+
+						map->keyValue[ keyValue.key() ] = keyValue;
 					}
 					break;
 			}
@@ -267,7 +287,15 @@ void *SlaveWorker::run( void *argv ) {
 	return 0;
 }
 
-bool SlaveWorker::init( GlobalConfig &config, WorkerRole role, SlaveEventQueue *eventQueue ) {
+bool SlaveWorker::init( SlaveEventQueue *eventQueue, StripeList<SlavePeerSocket> *stripeList, Map *map, std::vector<MixedChunkBuffer *> *chunkBuffer ) {
+	SlaveWorker::eventQueue = eventQueue;
+	SlaveWorker::stripeList = stripeList;
+	SlaveWorker::map = map;
+	SlaveWorker::chunkBuffer = chunkBuffer;
+	return true;
+}
+
+bool SlaveWorker::init( GlobalConfig &config, WorkerRole role ) {
 	this->protocol.init(
 		Protocol::getSuggestedBufferSize(
 			config.size.key,
@@ -275,7 +303,6 @@ bool SlaveWorker::init( GlobalConfig &config, WorkerRole role, SlaveEventQueue *
 		)
 	);
 	this->role = role;
-	this->eventQueue = eventQueue;
 	return role != WORKER_ROLE_UNDEFINED;
 }
 

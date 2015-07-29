@@ -12,6 +12,7 @@ public:
 
 	Chunk();
 	void init( uint32_t capacity );
+	char *alloc( uint32_t size );
 	void free();
 	char *serialize();
 	char *deserialize();

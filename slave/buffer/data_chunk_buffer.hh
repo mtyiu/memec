@@ -9,9 +9,10 @@ private:
 	uint32_t *sizes;          // Occupied space for each chunk
 
 public:
-	DataChunkBuffer( uint32_t capacity, uint32_t count );
+	DataChunkBuffer( MemoryPool<Chunk> *chunkPool, uint32_t capacity, uint32_t count );
 	KeyValue set( char *key, uint8_t keySize, char *value, uint32_t valueSize );
-	size_t flush( bool lock = true );
+	uint32_t flush( bool lock = true );
+	void print( FILE *f = stdout );
 	void stop();
 	~DataChunkBuffer();
 };

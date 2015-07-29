@@ -4,9 +4,7 @@
 #include <map>
 #include <vector>
 #include <cstdio>
-#include "../buffer/chunk_buffer.hh"
-#include "../buffer/data_chunk_buffer.hh"
-#include "../buffer/parity_chunk_buffer.hh"
+#include "../buffer/mixed_chunk_buffer.hh"
 #include "../config/slave_config.hh"
 #include "../event/event_queue.hh"
 #include "../socket/coordinator_socket.hh"
@@ -20,6 +18,7 @@
 #include "../../common/ds/key.hh"
 #include "../../common/ds/key_value.hh"
 #include "../../common/ds/memory_pool.hh"
+#include "../../common/map/map.hh"
 #include "../../common/signal/signal.hh"
 #include "../../common/socket/epoll.hh"
 #include "../../common/stripe_list/stripe_list.hh"
@@ -56,14 +55,12 @@ public:
 		ArrayMap<int, MasterSocket> masters;
 		ArrayMap<int, SlavePeerSocket> slavePeers;
 	} sockets;
-	struct {
-		std::map<Key, KeyValue *> keyValue;
-	} map;
+	Map map;
 	SlaveEventQueue eventQueue;
 	StripeList<SlavePeerSocket> *stripeList;
 	std::vector<StripeListIndex> stripeListIndex;
-	ChunkBuffer **chunkBuffer;
 	MemoryPool<Chunk> *chunkPool;
+	std::vector<MixedChunkBuffer *> chunkBuffer;
 	
 	static Slave *getInstance() {
 		static Slave slave;

@@ -12,6 +12,13 @@ void Chunk::init( uint32_t capacity ) {
 	memset( this->data, 0, capacity );
 }
 
+char *Chunk::alloc( uint32_t size ) {
+	char *ret = this->data + this->size;
+	this->count++;
+	this->size += size;
+	return ret;
+}
+
 void Chunk::free() {
 	delete this->data;
 }

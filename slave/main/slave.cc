@@ -9,15 +9,10 @@ Slave::Slave() {
 void Slave::free() {
 	this->eventQueue.free();
 	delete this->stripeList;
-	for ( uint32_t i = 0, size = this->config.global.stripeList.count; i < size; i++ ) {
-		if ( this->chunkBuffer[ i ] ) {
-			if ( this->chunkBuffer[ i ]->isParity )
-				delete static_cast<ParityChunkBuffer *>( this->chunkBuffer[ i ] );
-			else
-				delete static_cast<DataChunkBuffer *>( this->chunkBuffer[ i ] );
-		}
+	for ( size_t i = 0, size = this->chunkBuffer.size(); i < size; i++ ) {
+		if ( this->chunkBuffer[ i ] )
+			delete this->chunkBuffer[ i ];
 	}
-	delete[] this->chunkBuffer;
 }
 
 void Slave::signalHandler( int signal ) {
@@ -79,25 +74,6 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 	);
 	/* Stripe list index */
 	this->stripeListIndex = this->stripeList->list( mySlaveIndex );
-	/* Chunk buffer */
-	this->chunkBuffer = new ChunkBuffer*[ this->config.global.stripeList.count ];
-	for ( uint32_t i = 0, size = this->config.global.stripeList.count; i < size; i++ ) {
-		this->chunkBuffer[ i ] = 0;
-	}
-	for ( uint32_t i = 0, size = this->stripeListIndex.size(); i < size; i++ ) {
-		if ( this->stripeListIndex[ i ].isParity ) {
-			this->chunkBuffer[ this->stripeListIndex[ i ].list ] = new ParityChunkBuffer(
-				this->config.global.size.chunk,
-				this->config.global.buffer.chunksPerList,
-				this->config.global.coding.params.getDataChunkCount()
-			);
-		} else {
-			this->chunkBuffer[ this->stripeListIndex[ i ].list ] = new DataChunkBuffer(
-				this->config.global.size.chunk,
-				this->config.global.buffer.chunksPerList
-			);
-		}
-	}
 	/* Chunk pool */
 	this->chunkPool = MemoryPool<Chunk>::getInstance();
 	this->chunkPool->init(
@@ -108,19 +84,49 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 		Chunk::initFn,
 		( void * ) &this->config.global.size.chunk
 	);
+	/* Chunk buffer */
+	this->chunkBuffer.reserve( this->config.global.stripeList.count );
+	for ( uint32_t i = 0; i < this->config.global.stripeList.count; i++ )
+		this->chunkBuffer.push_back( 0 );
+	for ( uint32_t i = 0, size = this->stripeListIndex.size(); i < size; i++ ) {
+		uint32_t index = this->stripeListIndex[ i ].list;
+		if ( this->stripeListIndex[ i ].isParity ) {
+			this->chunkBuffer[ index ] = new MixedChunkBuffer(
+				new ParityChunkBuffer(
+					this->chunkPool,
+					this->config.global.size.chunk,
+					this->config.global.buffer.chunksPerList,
+					this->config.global.coding.params.getDataChunkCount()
+				)
+			);
+		} else {
+			this->chunkBuffer[ index ] = new MixedChunkBuffer(
+				new DataChunkBuffer(
+					this->chunkPool,
+					this->config.global.size.chunk,
+					this->config.global.buffer.chunksPerList
+				)
+			);
+		}
+	}
 	/* Workers and event queues */
 	if ( this->config.slave.workers.type == WORKER_TYPE_MIXED ) {
 		this->eventQueue.init(
 			this->config.slave.eventQueue.block,
 			this->config.slave.eventQueue.size.mixed
 		);
+		SlaveWorker::init(
+			&this->eventQueue,
+			this->stripeList,
+			&this->map,
+			&this->chunkBuffer
+		);
 		this->workers.reserve( this->config.slave.workers.number.mixed );
 		for ( int i = 0, len = this->config.slave.workers.number.mixed; i < len; i++ ) {
 			this->workers.push_back( SlaveWorker() );
 			this->workers[ i ].init(
 				this->config.global,
-				WORKER_ROLE_MIXED,
-				&this->eventQueue
+				WORKER_ROLE_MIXED
 			);
 		}
 	} else {
@@ -132,6 +138,12 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 			this->config.slave.eventQueue.size.separated.slave,
 			this->config.slave.eventQueue.size.separated.slavePeer
 		);
+		SlaveWorker::init(
+			&this->eventQueue,
+			this->stripeList,
+			&this->map,
+			&this->chunkBuffer
+		);
 
 		int index = 0;
 #define WORKER_INIT_LOOP( _FIELD_, _CONSTANT_ ) \
@@ -139,8 +151,7 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 			this->workers.push_back( SlaveWorker() ); \
 			this->workers[ index ].init( \
 				this->config.global, \
-				_CONSTANT_, \
-				&this->eventQueue \
+				_CONSTANT_ \
 			); \
 		}
 
@@ -221,7 +232,7 @@ bool Slave::stop() {
 		this->sockets.slavePeers[ i ].stop();
 
 	/* Chunk buffer */
-	for ( uint32_t i = 0, size = this->config.global.stripeList.count; i < size; i++ ) {
+	for ( size_t i = 0, size = this->chunkBuffer.size(); i < size; i++ ) {
 		if ( this->chunkBuffer[ i ] )
 			this->chunkBuffer[ i ]->stop();
 	}
@@ -278,6 +289,16 @@ void Slave::debug( FILE *f ) {
 	for ( i = 0, len = this->sockets.slavePeers.size(); i < len; i++ ) {
 		fprintf( f, "%d. ", i + 1 );
 		this->sockets.slavePeers[ i ].print( f );
+	}
+	if ( len == 0 ) fprintf( f, "(None)\n" );
+
+	fprintf( f, "\nChunk buffer\n------------\n" );
+	for ( i = 0, len = this->chunkBuffer.size(); i < len; i++ ) {
+		if ( ! this->chunkBuffer[ i ] )
+			continue;
+		fprintf( f, "(#%d)\n", i + 1 );
+		this->chunkBuffer[ i ]->print( f );
+		fprintf( f, "\n" );
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
 
@@ -360,8 +381,8 @@ void Slave::dump() {
 	if ( ! this->map.keyValue.size() ) {
 		fprintf( stdout, "(None)\n" );
 	} else {
-		for ( std::map<Key, KeyValue *>::iterator it = this->map.keyValue.begin(); it != this->map.keyValue.end(); it++ ) {
-			fprintf( stdout, "%.*s --> %p\n", it->first.size, it->first.data, it->second );
+		for ( std::map<Key, KeyValue>::iterator it = this->map.keyValue.begin(); it != this->map.keyValue.end(); it++ ) {
+			fprintf( stdout, "%.*s --> %p\n", it->first.size, it->first.data, it->second.data );
 		}
 	}
 	fprintf( stdout, "\n" );

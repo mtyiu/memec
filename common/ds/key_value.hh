@@ -10,6 +10,7 @@ public:
 	uint32_t stripeId;
 	char *data;
 
+	Key key();
 	char *serialize( char *key, uint8_t keySize, char *value, uint32_t valueSize );
 	static char *serialize( char *data, char *key, uint8_t keySize, char *value, uint32_t valueSize );
 	

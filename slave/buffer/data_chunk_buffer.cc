@@ -1,21 +1,20 @@
 #include "data_chunk_buffer.hh"
 
-DataChunkBuffer::DataChunkBuffer( uint32_t capacity, uint32_t count ) : ChunkBuffer( capacity, count ) {
-	this->isParity = false;
+DataChunkBuffer::DataChunkBuffer( MemoryPool<Chunk> *chunkPool, uint32_t capacity, uint32_t count ) : ChunkBuffer( chunkPool, capacity, count ) {
 	pthread_mutex_init( &this->lock, 0 );
 	this->sizes = new uint32_t[ this->count ];
-	for ( uint32_t i = 0; i < this->count; i++ ) {
+	for ( uint32_t i = 0; i < this->count; i++ )
 		this->sizes[ i ] = 0;
-	}
 }
 
 KeyValue DataChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t valueSize ) {
-	KeyValue ret;
+	KeyValue keyValue;
 	uint32_t size = 4 + keySize + valueSize, max = 0, tmp;
 	int index = -1;
 
+	// Choose one chunk buffer with minimum free space
 	pthread_mutex_lock( &this->lock );
-	for ( size_t i = 0; i < this->count; i++ ) {
+	for ( uint32_t i = 0; i < this->count; i++ ) {
 		tmp = this->sizes[ i ] + size;
 		if ( tmp <= this->capacity ) {
 			if ( tmp > max ) {
@@ -27,19 +26,28 @@ KeyValue DataChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t
 	if ( index == -1 ) {
 		index = this->flush( false );
 	}
+
+	// Allocate memory in the selected chunk
+	pthread_mutex_lock( this->locks + index );
+	keyValue.data = this->chunks[ index ]->alloc( size );
+	this->sizes[ index ] += size;
+	pthread_mutex_unlock( this->locks + index );
 	pthread_mutex_unlock( &this->lock );
 
-	return ret;
+	// Copy data to the buffer
+	keyValue.serialize( key, keySize, value, valueSize );
+
+	return keyValue;
 }
 
-size_t DataChunkBuffer::flush( bool lock ) {
+uint32_t DataChunkBuffer::flush( bool lock ) {
 	if ( lock )
 		pthread_mutex_lock( &this->lock );
 
-	size_t index = 0;
+	uint32_t index = 0;
 	uint32_t max = this->sizes[ 0 ];
 
-	for ( size_t i = 1; i < this->count; i++ ) {
+	for ( uint32_t i = 1; i < this->count; i++ ) {
 		if ( this->sizes[ i ] > max ) {
 			this->sizes[ i ] = max;
 			index = i;
@@ -52,6 +60,31 @@ size_t DataChunkBuffer::flush( bool lock ) {
 		pthread_mutex_unlock( &this->lock );
 
 	return index;
+}
+
+void DataChunkBuffer::print( FILE *f ) {
+	int width = 16;
+	double occupied;
+	fprintf(
+		f,
+		"- %-*s : %s\n"
+		"- %-*s : %u\n"
+		"- %-*s : %u\n"
+		"- %-*s :\n",
+		width, "Role", "Data chunk buffer",
+		width, "Chunk size", this->capacity,
+		width, "Number of chunks", this->count,
+		width, "Statistics (occupied / total)"
+	);
+	for ( uint32_t i = 0; i < this->count; i++ ) {
+		uint32_t size = this->sizes[ i ];
+		occupied = ( double ) size / this->capacity;
+		fprintf(
+			f,
+			"\t%u. %u / %u (%5.2lf%%)\n",
+			( i + 1 ), size, this->capacity, occupied
+		);
+	}
 }
 
 void DataChunkBuffer::stop() {
