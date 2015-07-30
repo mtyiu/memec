@@ -11,6 +11,7 @@ struct CodingHandler {
         Raid5Coding2* raid5;
         RDPCoding* rdp;
         CauchyCoding* cauchy;
+        RSCoding* rs;
     };
 };
 
