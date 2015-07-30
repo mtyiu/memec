@@ -7,7 +7,7 @@ extern "C" {
 #include "../../lib/jerasure/include/galois.h"
 }
 
-const uint32_t RDPCoding::primeList[primeCount] = {
+const uint32_t RDPCoding::primeList[ primeCount ] = {
             2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 
             31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 
             73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 
@@ -31,11 +31,13 @@ void RDPCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t index )
     uint32_t k = this->_k;
     uint32_t p = this->_p;
     uint32_t chunkSize = this->_chunkSize;
-    uint32_t symbolSize= this->_symbolSize;
+    uint32_t symbolSize = this->_symbolSize;
 
     // first parity
     if ( index == 1 ) {
+
         this->_raid5Coding->encode( dataChunks, parityChunk, index );
+
     } else if ( index == 2 ) {
 
         // need the row parity for encoding the diagonal parity
@@ -52,10 +54,13 @@ void RDPCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t index )
         for ( uint32_t cidx = 0 ; cidx < k + 1 ; cidx ++ ) {
             // symbols within each data chunk
             for ( uint32_t sidx = 0 ; sidx < p - 1 ; sidx ++ ) {
+                uint32_t pidx = ( cidx + sidx ) % p;
                 uint32_t len = symbolSize;
+                // last symbol of each chunk is assume to be packed with zeros, 
+                // i.e. can be ignored in XOR operations
                 if ( sidx == p - 2 )  
                     len = chunkSize - sidx * symbolSize;
-                uint32_t pidx = ( cidx + sidx ) % p;
+
                 if ( cidx < k ) 
                     galois_region_xor ( dataChunks[ cidx ]->data + sidx * symbolSize , 
                             parityChunk->data + pidx * symbolSize , len );
@@ -78,7 +83,7 @@ bool RDPCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
     uint32_t k = this->_k;
     uint32_t p = this->_p;
     uint32_t chunkSize = this->_chunkSize;
-    uint32_t symbolSize= this->_symbolSize;
+    uint32_t symbolSize = this->_symbolSize;
     std::vector< uint32_t > failed;
 
     // check for failed disk
@@ -121,6 +126,7 @@ bool RDPCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
 
         uint32_t chunkToRRepair = failed[ 0 ];
         uint32_t chunkToDRepair = failed[ 1 ];
+
         // avoid the missing diagonal
         if ( failed[ 0 ] == 0 ) {
             chunkToDRepair = failed[ 0 ];
@@ -139,13 +145,14 @@ bool RDPCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
             // xor in both diagonal and row for data and row parities
             for ( uint32_t cidx = 0 ; cidx < k + 1 ; cidx ++ ) {
 
+                // skip the symbol to repair in the diagonal direction
                 if ( cidx == chunkToDRepair ) 
                     continue;
 
-                // diagonal
+                // figure out the symbol id contribute to the diagonal parity
                 sidx = ( didxToRepair + p - cidx ) % p;
 
-                // missing diagonal
+                // diagonal, max. idx of symbols (within a chunk) is p-2
                 if ( sidx != p - 1 ) {
                     len = ( sidx == p - 2 || sidxToRepair == p - 2 ) ? 
                             chunkSize - (p - 2) * symbolSize : symbolSize;
@@ -153,10 +160,11 @@ bool RDPCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
                             chunks[ chunkToDRepair ]->data + sidxToRepair * symbolSize, len );
                 }
 
+                // skip the symbol to repair in the row direction
                 if ( cidx == chunkToRRepair )
                     continue;
 
-                // row
+                // row, XOR symbols in the same row
                 sidx = sidxToRepair;
                 len = ( sidx == p - 2 ) ? 
                         chunkSize - (p - 2) * symbolSize : symbolSize;
@@ -165,13 +173,13 @@ bool RDPCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
 
             }
 
-            // diagonal (xor diagonal parity)
+            // diagonal, XOR the diagonal parity
             len = ( sidxToRepair == p - 2 || didxToRepair == p - 2 ) ? 
                     chunkSize - (p - 2) * symbolSize : symbolSize;
             galois_region_xor ( chunks[ k + 1 ]->data + didxToRepair * symbolSize,
                     chunks[ chunkToDRepair ]->data + sidxToRepair * symbolSize, len);
 
-            // row (add back the just recovered symbol from diagonal decoding)
+            // row, add back the just recovered symbol from diagonal decoding
             len = ( sidxToRepair == p - 2 ) ? 
                     chunkSize - (p - 2) * symbolSize : symbolSize;
             galois_region_xor ( chunks[ chunkToDRepair ]->data + sidxToRepair * symbolSize,
@@ -193,6 +201,7 @@ uint32_t RDPCoding::getPrime() {
     uint32_t k = this->_k;
     uint32_t start = 0, end = primeCount - 1, mid = ( start + end ) / 2;
 
+    // binary search on the list of prime numbers
     while (start < end) {
         mid = ( start + end ) / 2;
 
@@ -212,11 +221,14 @@ uint32_t RDPCoding::getPrime() {
 }
 
 uint32_t RDPCoding::getSymbolSize() {
-    // required to call getPrime before calling this function
+    // must call getPrime() prior to calling this function
     
+    // round up the size of chunkSize to p * the size of a symbol 
     uint32_t remain = this->_chunkSize % ( this->_p - 1 );
     if ( remain ) 
         remain = this->_p - 1 - remain;
+
+    // p - 1 symbols per chunk
     this->_symbolSize = ( this->_chunkSize + remain ) / ( this->_p - 1 );
 
     return this->_symbolSize;

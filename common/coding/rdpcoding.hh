@@ -7,15 +7,6 @@
 
 class RDPCoding : Coding {
 
-public:
-
-    RDPCoding ( uint32_t k = 0, uint32_t chunkSize = 0 );
-    ~ RDPCoding ();
-
-    void encode ( Chunk **dataChunks, Chunk *parityChunks, uint32_t index ); 
-
-    bool decode ( Chunk **chunks, BitmaskArray *chunkStatus );
-
 private:
 
     /**
@@ -42,7 +33,16 @@ private:
 
     // use some memory to save computation (assume k < 200)
     static const uint32_t primeCount = 46;
-    static const uint32_t primeList[primeCount];
+    static const uint32_t primeList[ primeCount ];
+
+public:
+
+    RDPCoding ( uint32_t k = 0, uint32_t chunkSize = 0 );
+    ~ RDPCoding ();
+
+    void encode ( Chunk **dataChunks, Chunk *parityChunk, uint32_t index ); 
+
+    bool decode ( Chunk **chunks, BitmaskArray *chunkStatus );
 
 };
 

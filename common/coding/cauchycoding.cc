@@ -95,7 +95,6 @@ bool CauchyCoding::decode( Chunk **chunks, BitmaskArray * chunkStatus ) {
         return true;
     }
 
-    // required for *erasure
     int *erasures = new int[ failed + 1 ];
     int pos = 0;
     
@@ -113,11 +112,12 @@ bool CauchyCoding::decode( Chunk **chunks, BitmaskArray * chunkStatus ) {
         }
     }
 
+    // required for jerasure
     erasures[ failed ] = -1;
     
     // decode
-    jerasure_schedule_decode_lazy(k, m, w, bitmatrix, erasures, data, code, 
-            chunkSize, chunkSize / w, 1);
+    jerasure_schedule_decode_lazy( k, m, w, bitmatrix, erasures, data, code, 
+            chunkSize, chunkSize / w, 1 );
 
     delete erasures;
     free( data );
@@ -129,18 +129,18 @@ bool CauchyCoding::decode( Chunk **chunks, BitmaskArray * chunkStatus ) {
 uint32_t CauchyCoding::getW() {
     uint32_t w = 1;
     // k + m >= 2 ^ w
-    while ( ( uint32_t ) (0x1 << w) < this->_k + this->_m ) {
+    while ( ( uint32_t ) ( 0x1 << w ) < this->_k + this->_m ) {
         w++;
     }
 
     // find a "w" such that, size of packet * w = chunk size
-    // TODO : allow more flexible choice of w, e.g. by padding chunks with zeros
+    // TODO : allow more flexibility on the choices of w, e.g. by padding chunks with zeros
     while ( this->_chunkSize % w ) {
         w++;
         if ( w > CAUCHY_W_LIMIT ) {
             fprintf( stderr, "Cannot find a suitable w for k=%d,m=%d,chunkSize=%u\n",
                     this->_k, this->_m, this->_chunkSize );
-            exit(-1);
+            exit( -1 );
         }
     }
 
@@ -166,7 +166,7 @@ void CauchyCoding::generateCodeMatrix() {
     if ( this ->_jmatrix == NULL ) {
         fprintf( stderr, "No coding matrix can be generated with k=%d, m=%d, w=%d\n", 
                 k, m, w );
-        exit(-1);
+        exit( -1 );
     }
 
     this->_jbitmatrix = jerasure_matrix_to_bitmatrix( k, m, w, this->_jmatrix );

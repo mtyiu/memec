@@ -27,12 +27,12 @@ void Raid5Coding2::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t inde
         return;
 
     // XOR all the chunks 
-    for ( uint32_t idx = 0; idx < k; idx++ ) {
+    for ( uint32_t idx = 0 ; idx < k ; idx++ ) {
         //fprintf( stderr, "XOR disk %d %d bytes [%x] on [%x]\n", idx , chunkSize, *(dataChunks[ idx ]->data), *(parityChunk->data) );
         if ( idx == 0 ) 
-            memcpy( parityChunk->data, dataChunks[idx]->data, chunkSize );
+            memcpy( parityChunk->data, dataChunks[ idx ]->data, chunkSize );
         else 
-            galois_region_xor ( dataChunks[idx]->data, parityChunk->data, chunkSize );
+            galois_region_xor ( dataChunks[ idx ]->data, parityChunk->data, chunkSize );
     }
 }
 
@@ -46,8 +46,8 @@ bool Raid5Coding2::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
         return false;
 
     // check if the data chunk lost can be recovered
-    for ( uint32_t idx = 0; idx < k; idx++ ) {
-        if ( chunkStatus->check(idx) == 0 ) {
+    for ( uint32_t idx = 0 ; idx < k ; idx++ ) {
+        if ( chunkStatus->check( idx ) == 0 ) {
             if ( failed == ( uint32_t ) -1 )
                 failed = idx;
             else
@@ -61,7 +61,7 @@ bool Raid5Coding2::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
     // decode for the lost chunk
     memset( chunks[ failed ]->data, 0, chunkSize );
 
-    for ( uint32_t idx = 0; idx < k + 1; idx++ ) {
+    for ( uint32_t idx = 0 ; idx < k + 1 ; idx++ ) {
         if ( idx == failed ) 
             continue;
         //fprintf( stderr, "XOR disk %d %d bytes [%x] on [%x]\n", idx , chunkSize, *(chunks[ idx ]->data), *(chunks[ failed ]->data) );

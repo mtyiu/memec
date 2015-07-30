@@ -5,15 +5,6 @@
 
 class CauchyCoding : Coding {
 
-public:
-    
-    CauchyCoding ( uint32_t k = 0, uint32_t m = 0, uint32_t chunkSize = 0 );
-    ~ CauchyCoding ();
-
-    void encode ( Chunk **dataChunks, Chunk *parityChunk, uint32_t index );
-
-    bool decode ( Chunk **chunks, BitmaskArray * chunkStatus );
-
 private:
 
     /**
@@ -41,6 +32,15 @@ private:
     int *_jbitmatrix;
     int **_jschedule;
     
+public:
+    
+    CauchyCoding ( uint32_t k = 0, uint32_t m = 0, uint32_t chunkSize = 0 );
+    ~ CauchyCoding ();
+
+    void encode ( Chunk **dataChunks, Chunk *parityChunk, uint32_t index );
+
+    bool decode ( Chunk **chunks, BitmaskArray * chunkStatus );
+
 };
 
 #endif
