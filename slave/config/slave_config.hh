@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <stdint.h>
+#include "../storage/storage_type.hh"
 #include "../../common/config/server_addr.hh"
 #include "../../common/config/config.hh"
 #include "../../common/config/global_config.hh"
@@ -50,6 +51,10 @@ public:
 			} separated;
 		} size;
 	} eventQueue;
+	struct {
+		StorageType type;
+		char path[ STORAGE_PATH_MAX ];
+	} storage;
 
 	bool merge( GlobalConfig &globalConfig );
 	bool parse( const char *path );
