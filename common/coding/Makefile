@@ -10,7 +10,8 @@ SRC_FILES=$(wildcard ../../lib/jerasure/src/*.c) $(wildcard ../../lib/gf_complet
 OBJS= \
 	raid5coding2.o \
 	rdpcoding.o \
-	cauchycoding.o
+	cauchycoding.o \
+	rscoding.o
 
 COBJS= $(foreach d,$(SRC_FILES),$(patsubst %.c,%.o,$d))
 

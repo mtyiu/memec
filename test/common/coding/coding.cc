@@ -16,7 +16,7 @@
 struct CodingHandler handle;
 
 void usage( char* argv ) {
-    fprintf( stderr, "Usage: %s [raid5|cauchy|rdp]\n", argv);
+    fprintf( stderr, "Usage: %s [raid5|cauchy|rdp|rs]\n", argv);
 }
 
 void printChunk( Chunk *chunk, uint32_t id = 0 ) {
@@ -42,6 +42,8 @@ bool parseInput( char* arg ) {
         handle.scheme = CS_CAUCHY;
     else if ( strcmp ( arg, "rdp" ) == 0 )
         handle.scheme = CS_RDP;
+    else if ( strcmp ( arg, "rs" ) == 0 )
+        handle.scheme = CS_RS;
     else
         return false;
 
@@ -114,6 +116,17 @@ int main( int argc, char **argv ) {
             failed.push_back( FAIL2 );
             failed.push_back( FAIL3 );
             break;
+        case CS_RS:
+            handle.rs = new RSCoding( C_K, C_M, CHUNK_SIZE );
+            printf( ">> encode K: %d   M: %d \n", C_K, C_M );
+            for (uint32_t idx = 0 ; idx < C_M ; idx ++ ) {
+                handle.rs->encode ( chunks, chunks[ C_K + idx ], idx + 1 );
+                //printChunk( chunks[ C_K + idx ] , C_K + idx );
+            }
+            failed.push_back( FAIL );
+            failed.push_back( FAIL2 );
+            failed.push_back( FAIL3 );
+            break;
         default:
             return -1;
     }
@@ -134,6 +147,9 @@ int main( int argc, char **argv ) {
             break;
         case CS_CAUCHY:
             handle.cauchy->decode ( chunks, &bitmap );
+            break;
+        case CS_RS:
+            handle.rs->decode ( chunks, &bitmap );
             break;
         default:
             return -1;
@@ -159,6 +175,9 @@ int main( int argc, char **argv ) {
                 break;
             case CS_CAUCHY:
                 handle.cauchy->decode ( chunks, &bitmap );
+                break;
+            case CS_RS:
+                handle.rs->decode ( chunks, &bitmap );
                 break;
             default:
                 return -1;
@@ -190,6 +209,9 @@ int main( int argc, char **argv ) {
         switch ( handle.scheme ) {
             case CS_CAUCHY:
                 handle.cauchy->decode ( chunks, &bitmap );
+                break;
+            case CS_RS:
+                handle.rs->decode ( chunks, &bitmap );
                 break;
             default:
                 return -1;
