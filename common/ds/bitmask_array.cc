@@ -39,6 +39,16 @@ bool BitmaskArray::check( size_t entry, size_t bit ) {
 	return ( *bitmask & ( 1l << ( index & 63 ) ) );
 }
 
+bool BitmaskArray::checkAllSet( size_t entry ) {
+	bool ret = true;
+	for ( size_t i = 0; i < this->size; i++ ) {
+		ret &= this->check( entry, i );
+		if ( ! ret )
+			return ret;
+	}
+	return ret;
+}
+
 void BitmaskArray::set(   size_t bit ) {
 	this->set( 0, bit );
 }

@@ -1,14 +1,15 @@
 #include "data_chunk_buffer.hh"
 #include "../event/io_event.hh"
 
-DataChunkBuffer::DataChunkBuffer( uint32_t capacity, uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) : ChunkBuffer( capacity, count, listId, stripeId, chunkId ) {
-	pthread_mutex_init( &this->lock, 0 );
+DataChunkBuffer::DataChunkBuffer( uint32_t capacity, uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId, void ( *flushFn )( Chunk *, void * ), void *argv ) : ChunkBuffer( capacity, count, listId, stripeId, chunkId ) {
+	this->flushFn = flushFn;
+	this->argv = argv;
 	this->sizes = new uint32_t[ this->count ];
 	for ( uint32_t i = 0; i < this->count; i++ )
 		this->sizes[ i ] = 0;
 }
 
-KeyValue DataChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t valueSize ) {
+KeyValue DataChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t valueSize, uint32_t chunkId ) {
 	KeyValue keyValue;
 	uint32_t size = 4 + keySize + valueSize, max = 0, tmp;
 	int index = -1;
@@ -71,28 +72,28 @@ uint32_t DataChunkBuffer::flush( bool lock ) {
 	
 	this->flush( index, false );
 
-	if ( lock )
+	if ( lock ) {
 		pthread_mutex_unlock( this->locks + index );
-
-	if ( lock )
 		pthread_mutex_unlock( &this->lock );
+	}
 
 	return index;
 }
 
 Chunk *DataChunkBuffer::flush( int index, bool lock ) {
-	if ( lock )
+	if ( lock ) {
 		pthread_mutex_lock( &this->lock );
-
-	if ( lock )
 		pthread_mutex_lock( this->locks + index );
+	}
 	
 	Chunk *chunk = this->chunks[ index ];
 
 	// Append a flush event to the event queue
-	IOEvent ioEvent;
-	ioEvent.flush( chunk );
-	ChunkBuffer::eventQueue->insert( ioEvent );
+	if ( ! this->flushFn ) {
+		IOEvent ioEvent;
+		ioEvent.flush( chunk );
+		ChunkBuffer::eventQueue->insert( ioEvent );
+	}
 
 	// Get a new chunk
 	this->sizes[ index ] = 0;
@@ -103,11 +104,14 @@ Chunk *DataChunkBuffer::flush( int index, bool lock ) {
 	this->chunks[ index ]->chunkId = this->chunkId;
 	this->stripeId++;
 
-	if ( lock )
+	if ( lock ) {
 		pthread_mutex_unlock( this->locks + index );
-
-	if ( lock )
 		pthread_mutex_unlock( &this->lock );
+	}
+
+	if ( this->flushFn ) {
+		this->flushFn( chunk, this->argv );
+	}
 
 	return chunk;
 }

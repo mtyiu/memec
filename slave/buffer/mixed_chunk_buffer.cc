@@ -10,13 +10,15 @@ MixedChunkBuffer::MixedChunkBuffer( ParityChunkBuffer *parityChunkBuffer ) {
 	this->buffer.parity = parityChunkBuffer;
 }
 
-KeyValue MixedChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t valueSize ) {
+KeyValue MixedChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t valueSize, bool &isParity, uint32_t dataChunkId ) {
 	switch( this->role ) {
 		case CBR_DATA:
+			isParity = false;
 			return this->buffer.data->set( key, keySize, value, valueSize );
 		case CBR_PARITY:
 		default:
-			return this->buffer.parity->set( key, keySize, value, valueSize );
+			isParity = true;
+			return this->buffer.parity->set( key, keySize, value, valueSize, dataChunkId );
 	}
 }
 

@@ -34,6 +34,13 @@ void SlaveWorker::dispatch( MixedEvent event ) {
 }
 
 void SlaveWorker::dispatch( CodingEvent event ) {
+	switch( event.type ) {
+		case CODING_EVENT_TYPE_ENCODE:
+			__ERROR__( "SlaveWorker", "dispatch", "Received an CODING_EVENT_TYPE_ENCODE event." );
+			break;
+		default:
+			return;
+	}
 }
 
 void SlaveWorker::dispatch( CoordinatorEvent event ) {
@@ -158,6 +165,8 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 			struct KeyHeader keyHeader;
 			struct KeyValueHeader keyValueHeader;
 			size_t listIndex;
+			uint32_t dataChunkId;
+			bool isParity;
 
 			switch( header.opcode ) {
 				case PROTO_OPCODE_GET:
@@ -194,17 +203,23 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 
 						listIndex = SlaveWorker::stripeList->get(
 							keyValueHeader.key,
-							( size_t ) keyValueHeader.keySize
+							( size_t ) keyValueHeader.keySize,
+							0, 0, &dataChunkId
 						);
 
-						KeyValue keyValue = SlaveWorker::chunkBuffer->at( listIndex )->set(
-							keyValueHeader.key,
-							keyValueHeader.keySize,
-							keyValueHeader.value,
-							keyValueHeader.valueSize
-						);
+						KeyValue keyValue = SlaveWorker::chunkBuffer
+							->at( listIndex )
+							->set(
+								keyValueHeader.key,
+								keyValueHeader.keySize,
+								keyValueHeader.value,
+								keyValueHeader.valueSize,
+								isParity,
+								dataChunkId
+							);
 
-						map->keyValue[ keyValue.key() ] = keyValue;
+						if ( ! isParity )
+							map->keyValue[ keyValue.key() ] = keyValue;
 					}
 					break;
 			}

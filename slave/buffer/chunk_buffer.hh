@@ -7,25 +7,28 @@
 #include "../../common/ds/chunk.hh"
 #include "../../common/ds/key_value.hh"
 #include "../../common/ds/memory_pool.hh"
+#include "../../common/ds/stripe.hh"
 
 #define CHUNK_BUFFER_FLUSH_THRESHOLD	4 // excluding metadata (4 bytes)
 
 class ChunkBuffer {
 protected:
-	uint32_t capacity;                   // Chunk size
-	uint32_t count;                      // Number of chunks
-	uint32_t listId;                     // List ID of this buffer
-	uint32_t stripeId;                   // Current stripe ID
-	uint32_t chunkId;                    // Chunk ID of this buffer
-	Chunk **chunks;                      // Allocated chunk buffer
-	pthread_mutex_t *locks;              // Lock for each chunk
-	static MemoryPool<Chunk> *chunkPool; // Memory pool for chunks
-	static SlaveEventQueue *eventQueue;  // Event queue
+	uint32_t capacity;                     // Chunk size
+	uint32_t count;                        // Number of chunks
+	uint32_t listId;                       // List ID of this buffer
+	uint32_t stripeId;                     // Current stripe ID
+	uint32_t chunkId;                      // Chunk ID of this buffer
+	pthread_mutex_t lock;                  // Lock for the whole buffer
+	pthread_mutex_t *locks;                // Lock for each chunk
+	Chunk **chunks;                        // Allocated chunk buffer
+	static MemoryPool<Chunk> *chunkPool;   // Memory pool for chunks
+	static MemoryPool<Stripe> *stripePool; // Memory pool for chunks
+	static SlaveEventQueue *eventQueue;    // Event queue
 
 public:
-	static void init( MemoryPool<Chunk> *chunkPool, SlaveEventQueue *eventQueue );
+	static void init( MemoryPool<Chunk> *chunkPool, MemoryPool<Stripe> *stripePool, SlaveEventQueue *eventQueue );
 	ChunkBuffer( uint32_t capacity, uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId );
-	virtual KeyValue set( char *key, uint8_t keySize, char *value, uint32_t valueSize ) = 0;
+	virtual KeyValue set( char *key, uint8_t keySize, char *value, uint32_t valueSize, uint32_t chunkId = 0 ) = 0;
 	virtual uint32_t flush( bool lock = true ) = 0;
 	virtual Chunk *flush( int index, bool lock = true ) = 0;
 	virtual void print( FILE *f = stdout ) = 0;

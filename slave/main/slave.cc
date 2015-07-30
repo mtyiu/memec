@@ -79,14 +79,26 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 	this->chunkPool = MemoryPool<Chunk>::getInstance();
 	this->chunkPool->init(
 		MemoryPool<Chunk>::getCapacity(
-			this->config.slave.cache.chunks,
+			this->config.slave.pool.chunks,
 			this->config.global.size.chunk
 		),
 		Chunk::initFn,
 		0
 	);
+	/* Stripe pool */
+	Stripe::init(
+		this->config.global.coding.params.getDataChunkCount(),
+		this->config.global.coding.params.getParityChunkCount()
+	);
+	this->stripePool = MemoryPool<Stripe>::getInstance();
+	this->stripePool->init(
+		MemoryPool<Stripe>::getCapacity(
+			this->config.slave.pool.stripe,
+			this->config.global.coding.params.getChunkCount() * sizeof( Chunk * )
+		)
+	);
 	/* Chunk buffer */
-	ChunkBuffer::init( this->chunkPool, &this->eventQueue );
+	ChunkBuffer::init( this->chunkPool, this->stripePool, &this->eventQueue );
 	this->chunkBuffer.reserve( this->config.global.stripeList.count );
 	for ( uint32_t i = 0; i < this->config.global.stripeList.count; i++ )
 		this->chunkBuffer.push_back( 0 );

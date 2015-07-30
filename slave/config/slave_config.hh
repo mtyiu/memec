@@ -21,7 +21,8 @@ public:
 	} epoll;
 	struct {
 		uint32_t chunks;
-	} cache;
+		uint32_t stripe;
+	} pool;
 	struct {
 		WorkerType type;
 		struct {
