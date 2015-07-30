@@ -4,6 +4,7 @@ PLIO_SRC_ROOT=..
 LIBS=-pthread
 
 OBJS= \
+	coding/coding.o \
 	coding/raid5coding.o \
 	config/config.o \
 	config/global_config.o \

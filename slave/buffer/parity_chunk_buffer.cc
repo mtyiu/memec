@@ -1,21 +1,25 @@
 #include "parity_chunk_buffer.hh"
 #include "../../common/util/debug.hh"
 
-ParityChunkBuffer::ParityChunkBuffer( uint32_t capacity, uint32_t count, uint32_t dataChunkCount, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) : ChunkBuffer( capacity, count, listId, stripeId, chunkId ) {
+ParityChunkBuffer::ParityChunkBuffer( uint32_t capacity, uint32_t count, uint32_t dataChunkCount, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) : ChunkBuffer( capacity, count, listId, stripeId, chunkId, true ) {
 
 	this->dataChunkCount = dataChunkCount;
-	this->dataChunks = new Chunk**[ dataChunkCount ];
+	this->dataChunks = new Chunk**[ count ];
 	this->dataChunkBuffer = new DataChunkBuffer*[ dataChunkCount ];
+	for ( uint32_t i = 0; i < count; i++ ) {
+		this->dataChunks[ i ] = new Chunk*[ dataChunkCount ];
+	}
 	for ( uint32_t i = 0; i < dataChunkCount; i++ ) {
-		this->dataChunks[ i ] = new Chunk*[ count ];
-		this->dataChunkBuffer[ i ] = new DataChunkBuffer( capacity, count, listId, stripeId++, i, ParityChunkBuffer::dataChunkFlushHandler, ( void * ) this );
+		this->dataChunkBuffer[ i ] = new DataChunkBuffer( capacity, count, listId, stripeId, i, ParityChunkBuffer::dataChunkFlushHandler, ( void * ) this );
 	}
 	this->status = new BitmaskArray( dataChunkCount, count );
 }
 
 ParityChunkBuffer::~ParityChunkBuffer() {
-	for ( uint32_t i = 0; i < dataChunkCount; i++ ) {
+	for ( uint32_t i = 0; i < this->count; i++ ) {
 		delete[] this->dataChunks[ i ];
+	}
+	for ( uint32_t i = 0; i < this->dataChunkCount; i++ ) {
 		delete[] this->dataChunkBuffer[ i ];
 	}
 	delete[] this->dataChunks;
@@ -95,7 +99,21 @@ Chunk *ParityChunkBuffer::flush( int index, bool lock ) {
 }
 
 void ParityChunkBuffer::print( FILE *f ) {
-
+	int width = 16;
+	fprintf(
+		f,
+		"- %-*s : %s\n"
+		"- %-*s : %u\n"
+		"- %-*s\n",
+		width, "Role", "Data chunk buffer",
+		width, "Chunk size", this->capacity,
+		width, "Bitmap"
+	);
+	this->status->print( f );
+	for ( uint32_t i = 0; i < this->dataChunkCount; i++ ) {
+		fprintf( f, "\n*** Data chunk #%u ***\n", i );
+		this->dataChunkBuffer[ i ]->print( f );
+	}
 }
 
 void ParityChunkBuffer::stop() {
@@ -103,8 +121,6 @@ void ParityChunkBuffer::stop() {
 
 void ParityChunkBuffer::flushData( Chunk *chunk ) {
 	int index = -1;
-
-	printf( "flushData()\n" );
 
 	pthread_mutex_lock( &this->lock );
 
@@ -125,7 +141,7 @@ void ParityChunkBuffer::flushData( Chunk *chunk ) {
 
 	pthread_mutex_lock( this->locks + index );
 	// Store the data chunks into temporary buffer
-	this->dataChunks[ chunk->chunkId ][ index ] = chunk;
+	this->dataChunks[ index ][ chunk->chunkId ] = chunk;
 	this->status->set( index, chunk->chunkId );
 
 	// Check whether a chunk is ready to be flushed

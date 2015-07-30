@@ -1,11 +1,15 @@
 #include "worker.hh"
+#include "../main/slave.hh"
 #include "../../common/util/debug.hh"
 
 #define WORKER_COLOR	YELLOW
 
+Coding *SlaveWorker::coding;
 SlaveEventQueue *SlaveWorker::eventQueue;
 StripeList<SlavePeerSocket> *SlaveWorker::stripeList;
 Map *SlaveWorker::map;
+MemoryPool<Chunk> *SlaveWorker::chunkPool;
+MemoryPool<Stripe> *SlaveWorker::stripePool;
 std::vector<MixedChunkBuffer *> *SlaveWorker::chunkBuffer;
 
 void SlaveWorker::dispatch( MixedEvent event ) {
@@ -34,9 +38,27 @@ void SlaveWorker::dispatch( MixedEvent event ) {
 }
 
 void SlaveWorker::dispatch( CodingEvent event ) {
+	Chunk **dataChunks, *parityChunk;
+	uint32_t parityChunkId;
+
 	switch( event.type ) {
 		case CODING_EVENT_TYPE_ENCODE:
 			__ERROR__( "SlaveWorker", "dispatch", "Received an CODING_EVENT_TYPE_ENCODE event." );
+			parityChunkId = event.message.stripe->get( dataChunks, parityChunk );
+			SlaveWorker::coding->encode( dataChunks, parityChunk, parityChunkId );
+
+			// Release memory for data chunks
+			for ( uint32_t i = 0; i < Stripe::dataChunkCount; i++ ) {
+				SlaveWorker::chunkPool->free( dataChunks[ i ] );
+			}
+
+			// Release memory for stripe
+			SlaveWorker::stripePool->free( event.message.stripe );
+
+			// Append a flush event to the event queue
+			IOEvent ioEvent;
+			ioEvent.flush( parityChunk );
+			SlaveWorker::eventQueue->insert( ioEvent );			
 			break;
 		default:
 			return;
@@ -347,11 +369,16 @@ void *SlaveWorker::run( void *argv ) {
 	return 0;
 }
 
-bool SlaveWorker::init( SlaveEventQueue *eventQueue, StripeList<SlavePeerSocket> *stripeList, Map *map, std::vector<MixedChunkBuffer *> *chunkBuffer ) {
-	SlaveWorker::eventQueue = eventQueue;
-	SlaveWorker::stripeList = stripeList;
-	SlaveWorker::map = map;
-	SlaveWorker::chunkBuffer = chunkBuffer;
+bool SlaveWorker::init() {
+	Slave *slave = Slave::getInstance();
+
+	SlaveWorker::coding = slave->coding;
+	SlaveWorker::eventQueue = &slave->eventQueue;
+	SlaveWorker::stripeList = slave->stripeList;
+	SlaveWorker::map = &slave->map;
+	SlaveWorker::chunkPool = slave->chunkPool;
+	SlaveWorker::stripePool = slave->stripePool;
+	SlaveWorker::chunkBuffer = &slave->chunkBuffer;
 	return true;
 }
 

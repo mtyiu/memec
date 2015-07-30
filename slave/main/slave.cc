@@ -7,8 +7,13 @@ Slave::Slave() {
 }
 
 void Slave::free() {
+	/* Event queue */
 	this->eventQueue.free();
+	/* Coding */
+	Coding::destroy( this->coding );
+	/* Stripe list */
 	delete this->stripeList;
+	/* Chunk buffer */
 	for ( size_t i = 0, size = this->chunkBuffer.size(); i < size; i++ ) {
 		if ( this->chunkBuffer[ i ] )
 			delete this->chunkBuffer[ i ];
@@ -65,6 +70,12 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 		fd = socket.getSocket();
 		this->sockets.slavePeers.set( fd, socket );
 	}
+	/* Coding */
+	this->coding = Coding::instantiate(
+		this->config.global.coding.scheme,
+		this->config.global.coding.params,
+		this->config.global.size.chunk
+	);
 	/* Stripe list */
 	this->stripeList = new StripeList<SlavePeerSocket>(
 		this->config.global.coding.params.getChunkCount(),
@@ -131,12 +142,7 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 			this->config.slave.eventQueue.block,
 			this->config.slave.eventQueue.size.mixed
 		);
-		SlaveWorker::init(
-			&this->eventQueue,
-			this->stripeList,
-			&this->map,
-			&this->chunkBuffer
-		);
+		SlaveWorker::init();
 		this->workers.reserve( this->config.slave.workers.number.mixed );
 		for ( int i = 0, len = this->config.slave.workers.number.mixed; i < len; i++ ) {
 			this->workers.push_back( SlaveWorker() );
@@ -157,12 +163,7 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 			this->config.slave.eventQueue.size.separated.slave,
 			this->config.slave.eventQueue.size.separated.slavePeer
 		);
-		SlaveWorker::init(
-			&this->eventQueue,
-			this->stripeList,
-			&this->map,
-			&this->chunkBuffer
-		);
+		SlaveWorker::init();
 
 		int index = 0;
 #define WORKER_INIT_LOOP( _FIELD_, _CONSTANT_ ) \

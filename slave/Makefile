@@ -28,6 +28,7 @@ OBJS= \
 	main/main.o
 
 EXTERNAL_LIB= \
+	$(wildcard $(PLIO_SRC_ROOT)/common/coding/*.o) \
 	$(PLIO_SRC_ROOT)/common/config/config.o \
 	$(PLIO_SRC_ROOT)/common/config/global_config.o \
 	$(PLIO_SRC_ROOT)/common/config/server_addr.o \
