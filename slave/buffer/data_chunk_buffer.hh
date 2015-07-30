@@ -9,7 +9,7 @@ private:
 	uint32_t *sizes;          // Occupied space for each chunk
 
 public:
-	DataChunkBuffer( uint32_t capacity, uint32_t count, uint32_t stripeId = 0 );
+	DataChunkBuffer( uint32_t capacity, uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId );
 	KeyValue set( char *key, uint8_t keySize, char *value, uint32_t valueSize );
 	uint32_t flush( bool lock = true );
 	Chunk *flush( int index, bool lock = true );

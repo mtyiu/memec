@@ -9,6 +9,7 @@ Chunk::Chunk() {
 	this->count = 0;
 	this->size = 0;
 	this->stripeId = 0;
+	this->isParity = false;
 }
 
 void Chunk::init( uint32_t capacity ) {
@@ -27,11 +28,12 @@ char *Chunk::alloc( uint32_t size ) {
 	return ret;
 }
 
-void Chunk::update( bool isParity ) {
+void Chunk::updateData() {
 	uint8_t keySize;
 	uint32_t valueSize, tmp;
 	char *key, *value, *ptr = this->data;
 
+	this->isParity = false;
 	while ( ptr < this->data + Chunk::capacity ) {
 		KeyValue::deserialize( ptr, key, keySize, value, valueSize );
 
@@ -42,6 +44,12 @@ void Chunk::update( bool isParity ) {
 
 		ptr += tmp;
 	}
+}
+
+void Chunk::updateParity( uint32_t offset, uint32_t length ) {
+	uint32_t size = offset + length;
+	if ( size > this->size )
+		this->size = size;
 }
 
 void Chunk::clear() {

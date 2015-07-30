@@ -21,6 +21,8 @@ OBJS= \
 	socket/master_socket.o \
 	socket/slave_socket.o \
 	socket/slave_peer_socket.o \
+	storage/storage.o \
+	storage/local_storage.o \
 	worker/worker.o \
 	main/slave.o \
 	main/main.o

@@ -1,3 +1,4 @@
+common/coding/coding
 common/config/global_config
 common/config/server_addr
 common/ds/bitmask_array

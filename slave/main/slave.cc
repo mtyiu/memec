@@ -91,20 +91,24 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 	for ( uint32_t i = 0; i < this->config.global.stripeList.count; i++ )
 		this->chunkBuffer.push_back( 0 );
 	for ( uint32_t i = 0, size = this->stripeListIndex.size(); i < size; i++ ) {
-		uint32_t index = this->stripeListIndex[ i ].list;
+		uint32_t listId = this->stripeListIndex[ i ].listId,
+		         stripeId = this->stripeListIndex[ i ].stripeId,
+		         chunkId = this->stripeListIndex[ i ].chunkId;
 		if ( this->stripeListIndex[ i ].isParity ) {
-			this->chunkBuffer[ index ] = new MixedChunkBuffer(
+			this->chunkBuffer[ listId ] = new MixedChunkBuffer(
 				new ParityChunkBuffer(
 					this->config.global.size.chunk,
 					this->config.global.buffer.chunksPerList,
-					this->config.global.coding.params.getDataChunkCount()
+					this->config.global.coding.params.getDataChunkCount(),
+					listId, stripeId, chunkId
 				)
 			);
 		} else {
-			this->chunkBuffer[ index ] = new MixedChunkBuffer(
+			this->chunkBuffer[ listId ] = new MixedChunkBuffer(
 				new DataChunkBuffer(
 					this->config.global.size.chunk,
-					this->config.global.buffer.chunksPerList
+					this->config.global.buffer.chunksPerList,
+					listId, stripeId, chunkId
 				)
 			);
 		}
@@ -126,6 +130,7 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 			this->workers.push_back( SlaveWorker() );
 			this->workers[ i ].init(
 				this->config.global,
+				this->config.slave,
 				WORKER_ROLE_MIXED
 			);
 		}
@@ -153,6 +158,7 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 			this->workers.push_back( SlaveWorker() ); \
 			this->workers[ index ].init( \
 				this->config.global, \
+				this->config.slave, \
 				_CONSTANT_ \
 			); \
 		}
@@ -261,9 +267,9 @@ void Slave::info( FILE *f ) {
 		fprintf(
 			f, "%d. List #%d: %s chunk #%d\n",
 			i + 1,
-			this->stripeListIndex[ i ].list + 1,
+			this->stripeListIndex[ i ].listId,
 			this->stripeListIndex[ i ].isParity ? "Parity" : "Data",
-			this->stripeListIndex[ i ].entry + 1
+			this->stripeListIndex[ i ].chunkId
 		);
 	}
 	fprintf( f, "\n" );

@@ -1,10 +1,10 @@
 #include "parity_chunk_buffer.hh"
 
-ParityChunkBuffer::ParityChunkBuffer( uint32_t capacity, uint32_t count, uint32_t dataChunkCount, uint32_t stripeId ) : ChunkBuffer( capacity, count, stripeId ) {
+ParityChunkBuffer::ParityChunkBuffer( uint32_t capacity, uint32_t count, uint32_t dataChunkCount, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) : ChunkBuffer( capacity, count, listId, stripeId, chunkId ) {
 	this->dataChunkCount = dataChunkCount;
 	this->dataChunkBuffer = new DataChunkBuffer*[ dataChunkCount ];
 	for ( uint32_t i = 0; i < dataChunkCount; i++ )
-		this->dataChunkBuffer[ i ] = new DataChunkBuffer( capacity, count );
+		this->dataChunkBuffer[ i ] = new DataChunkBuffer( capacity, count, listId, stripeId++, i );
 }
 
 KeyValue ParityChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t valueSize ) {

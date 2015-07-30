@@ -35,7 +35,10 @@ bool RAID5Coding::decode( Chunk **chunks, BitmaskArray *bitmap ) {
 	}
 
 	// Update chunk's internal counter
-	lostChunk->update( lostIndex == this->n - 1 );
+	if ( lostIndex == this->n - 1 )
+		lostChunk->updateParity();
+	else
+		lostChunk->updateData();
 
 	return true;
 }
