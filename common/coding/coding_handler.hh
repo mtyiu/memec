@@ -10,6 +10,7 @@ struct CodingHandler {
     union {
         Raid5Coding2* raid5;
         RDPCoding* rdp;
+        CauchyCoding* cauchy;
     };
 };
 
