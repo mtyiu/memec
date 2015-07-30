@@ -8,6 +8,7 @@ INCLUDE=-I../../lib/jerasure/include -I../../lib/gf_complete/include
 SRC_FILES=$(wildcard ../../lib/jerasure/src/*.c) $(wildcard ../../lib/gf_complete/src/*.c)
 
 OBJS= \
+	coding.o \
 	raid5coding2.o \
 	rdpcoding.o \
 	cauchycoding.o \

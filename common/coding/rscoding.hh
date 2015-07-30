@@ -3,7 +3,7 @@
 
 #include "coding.hh"
 
-class RSCoding : Coding {
+class RSCoding : public Coding {
 
 private:
 
