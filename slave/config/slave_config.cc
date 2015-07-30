@@ -1,4 +1,5 @@
 #include <cstdlib>
+#include <sys/stat.h>
 #include "slave_config.hh"
 
 bool SlaveConfig::merge( GlobalConfig &globalConfig ) {
@@ -92,6 +93,20 @@ bool SlaveConfig::set( const char *section, const char *name, const char *value 
 			this->eventQueue.size.separated.slavePeer = atoi( value );
 		else
 			return false;
+	} else if ( match( section, "storage" ) ) {
+		if ( match( name, "type" ) ) {
+			if ( match( value, "local" ) )
+				this->storage.type = STORAGE_TYPE_LOCAL;
+			else
+				this->storage.type = STORAGE_TYPE_UNDEFINED;
+		} else if ( match( name, "path" ) ) {
+			fprintf( stderr, "path = %s\n", value );
+			if ( strlen( value ) >= STORAGE_PATH_MAX )
+				return false;
+			strncpy( this->storage.path, value, STORAGE_PATH_MAX );
+		} else {
+			return false;
+		}
 	} else {
 		return false;
 	}
@@ -149,6 +164,16 @@ bool SlaveConfig::validate() {
 			CFG_PARSE_ERROR( "SlaveConfig", "The type of event queue should be either \"mixed\" or \"separated\"." );
 	}
 
+	if ( this->storage.type == STORAGE_TYPE_UNDEFINED )
+		CFG_PARSE_ERROR( "SlaveConfig", "The specified storage type is invalid." );
+
+	struct stat sb;
+	if ( stat( this->storage.path, &sb ) != 0 )
+		CFG_PARSE_ERROR( "SlaveConfig", "The specified storage path does not exist." );
+
+	if ( ! S_ISDIR( sb.st_mode ) )
+		CFG_PARSE_ERROR( "SlaveConfig", "The specified storage path is not a directory." );
+
 	return true;
 }
 
@@ -194,10 +219,15 @@ void SlaveConfig::print( FILE *f ) {
 			"\t- %-*s : %u\n"
 			"- Event queues\n"
 			"\t- %-*s : %s\n"
-			"\t- %-*s : %u\n",
+			"\t- %-*s : %u\n"
+			"- Storage\n"
+			"\t- %-*s : %s\n"
+			"\t- %-*s : %s\n",
 			width, "Number of workers", this->workers.number.mixed,
 			width, "Blocking?", this->eventQueue.block ? "Yes" : "No",
-			width, "Size", this->eventQueue.size.mixed
+			width, "Size", this->eventQueue.size.mixed,
+			width, "Type", this->storage.type == STORAGE_TYPE_LOCAL ? "Local" : "Undefined",
+			width, "Path", this->storage.path
 		);
 	} else {
 		fprintf(
@@ -215,7 +245,10 @@ void SlaveConfig::print( FILE *f ) {
 			"\t- %-*s : %u\n"
 			"\t- %-*s : %u\n"
 			"\t- %-*s : %u\n"
-			"\t- %-*s : %u\n",
+			"\t- %-*s : %u\n"
+			"- Storage\n"
+			"\t- %-*s : %s\n"
+			"\t- %-*s : %s\n",
 			width, "Number of coding workers", this->workers.number.separated.coding,
 			width, "Number of coordinator workers", this->workers.number.separated.coordinator,
 			width, "Number of io workers", this->workers.number.separated.io,
@@ -228,7 +261,9 @@ void SlaveConfig::print( FILE *f ) {
 			width, "Size for I/O", this->eventQueue.size.separated.io,
 			width, "Size for master", this->eventQueue.size.separated.master,
 			width, "Size for slave", this->eventQueue.size.separated.slave,
-			width, "Size for slave peer", this->eventQueue.size.separated.slavePeer
+			width, "Size for slave peer", this->eventQueue.size.separated.slavePeer,
+			width, "Type", this->storage.type == STORAGE_TYPE_LOCAL ? "Local" : "Undefined",
+			width, "Path", this->storage.path
 		);
 	}
 

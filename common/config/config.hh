@@ -6,6 +6,8 @@
 #include <cstring>
 #include "../util/debug.hh"
 
+#define STORAGE_PATH_MAX 256
+
 #define CFG_MATCH( s, n ) strcmp( section, s ) == 0 && strcmp( name, n ) == 0
 
 #define CFG_PARSE_ERROR(class_name, ...) \
