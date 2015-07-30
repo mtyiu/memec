@@ -3,7 +3,7 @@
 
 #include "coding.hh"
 
-class CauchyCoding : Coding {
+class CauchyCoding : public Coding {
 
 private:
 

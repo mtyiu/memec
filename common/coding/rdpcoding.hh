@@ -5,7 +5,7 @@
 #include "coding.hh"
 #include "raid5coding2.hh"
 
-class RDPCoding : Coding {
+class RDPCoding : public Coding {
 
 private:
 

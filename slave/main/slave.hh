@@ -12,6 +12,7 @@
 #include "../socket/slave_socket.hh"
 #include "../socket/slave_peer_socket.hh"
 #include "../worker/worker.hh"
+#include "../../common/coding/coding.hh"
 #include "../../common/config/global_config.hh"
 #include "../../common/ds/array_map.hh"
 #include "../../common/ds/chunk.hh"
@@ -58,6 +59,7 @@ public:
 	} sockets;
 	Map map;
 	SlaveEventQueue eventQueue;
+	Coding *coding;
 	StripeList<SlavePeerSocket> *stripeList;
 	std::vector<StripeListIndex> stripeListIndex;
 	MemoryPool<Chunk> *chunkPool;

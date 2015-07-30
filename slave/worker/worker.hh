@@ -9,7 +9,13 @@
 #include "../event/event_queue.hh"
 #include "../protocol/protocol.hh"
 #include "../storage/allstorage.hh"
+#include "../../common/coding/coding.hh"
 #include "../../common/config/global_config.hh"
+#include "../../common/ds/chunk.hh"
+#include "../../common/ds/key.hh"
+#include "../../common/ds/key_value.hh"
+#include "../../common/ds/memory_pool.hh"
+#include "../../common/ds/stripe.hh"
 #include "../../common/map/map.hh"
 #include "../../common/stripe_list/stripe_list.hh"
 #include "../../common/worker/worker.hh"
@@ -19,9 +25,12 @@ private:
 	WorkerRole role;
 	SlaveProtocol protocol;
 	Storage *storage;
+	static Coding *coding;
 	static SlaveEventQueue *eventQueue;
 	static StripeList<SlavePeerSocket> *stripeList;
 	static Map *map;
+	static MemoryPool<Chunk> *chunkPool;
+	static MemoryPool<Stripe> *stripePool;
 	static std::vector<MixedChunkBuffer *> *chunkBuffer;
 
 	void dispatch( MixedEvent event );
@@ -35,7 +44,7 @@ private:
 	static void *run( void *argv );
 
 public:
-	static bool init( SlaveEventQueue *eventQueue, StripeList<SlavePeerSocket> *stripeList, Map *map, std::vector<MixedChunkBuffer *> *chunkBuffer );
+	static bool init();
 	bool init( GlobalConfig &globalConfig, SlaveConfig &slaveConfig, WorkerRole role );
 	bool start();
 	void stop();

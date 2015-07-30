@@ -3,7 +3,7 @@
 
 #include "coding.hh"
 
-class Raid5Coding2: Coding {
+class Raid5Coding2 : public Coding {
 
 private:
     uint32_t _k;

@@ -1,7 +1,7 @@
 #include "data_chunk_buffer.hh"
 #include "../event/io_event.hh"
 
-DataChunkBuffer::DataChunkBuffer( uint32_t capacity, uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId, void ( *flushFn )( Chunk *, void * ), void *argv ) : ChunkBuffer( capacity, count, listId, stripeId, chunkId ) {
+DataChunkBuffer::DataChunkBuffer( uint32_t capacity, uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId, void ( *flushFn )( Chunk *, void * ), void *argv ) : ChunkBuffer( capacity, count, listId, stripeId, chunkId, false ) {
 	this->flushFn = flushFn;
 	this->argv = argv;
 	this->sizes = new uint32_t[ this->count ];
