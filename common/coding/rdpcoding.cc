@@ -18,7 +18,6 @@ const uint32_t RDPCoding::primeList[ primeCount ] = {
 RDPCoding::RDPCoding( uint32_t k, uint32_t chunkSize ) {
     this->_raid5Coding = new Raid5Coding2( k, chunkSize );
     this->_k = k;
-    this->_p = getPrime();
     this->_chunkSize = chunkSize;
     this->_symbolSize = getSymbolSize();
 }
@@ -55,12 +54,18 @@ void RDPCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t index )
             // symbols within each data chunk
             for ( uint32_t sidx = 0 ; sidx < p - 1 ; sidx ++ ) {
                 uint32_t pidx = ( cidx + sidx ) % p;
+
+                // missing diagonal
+                if ( pidx == p - 1 )
+                    continue;
+
                 uint32_t len = symbolSize;
                 // last symbol of each chunk is assume to be packed with zeros, 
                 // i.e. can be ignored in XOR operations
                 if ( sidx == p - 2 )  
                     len = chunkSize - sidx * symbolSize;
 
+                //fprintf( stderr, " encode (%d, %d) on (%d, %d) with len %d \n", cidx, sidx , p - 1, pidx, len );
                 if ( cidx < k ) 
                     galois_region_xor ( dataChunks[ cidx ]->data + sidx * symbolSize , 
                             parityChunk->data + pidx * symbolSize , len );
@@ -178,18 +183,26 @@ bool RDPCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
                     chunkSize - (p - 2) * symbolSize : symbolSize;
             galois_region_xor ( chunks[ k + 1 ]->data + didxToRepair * symbolSize,
                     chunks[ chunkToDRepair ]->data + sidxToRepair * symbolSize, len);
+            //fprintf( stderr, " decode (%d, %d) on (%d, %d) with len %d \n", k + 1, didxToRepair , chunkToDRepair , sidxToRepair, len );
 
             // row, add back the just recovered symbol from diagonal decoding
             len = ( sidxToRepair == p - 2 ) ? 
                     chunkSize - (p - 2) * symbolSize : symbolSize;
             galois_region_xor ( chunks[ chunkToDRepair ]->data + sidxToRepair * symbolSize,
                     chunks[ chunkToRRepair ]->data + sidxToRepair * symbolSize, len );
+            //fprintf( stderr, " decode (%d, %d) on (%d, %d) with len %d \n", chunkToDRepair, sidxToRepair , chunkToRRepair , sidxToRepair, len );
 
             recoveredSymbolCount += 2;       
 
             // search for next symbol to recover
             didxToRepair = ( chunkToRRepair + sidxToRepair ) % p;
             sidxToRepair = ( didxToRepair + p - chunkToDRepair ) % p;
+            // avoid missing diagonal
+            if ( didxToRepair == p - 1 ) {
+                std::swap( chunkToRRepair, chunkToDRepair );
+                didxToRepair = chunkToRRepair - 1;
+                sidxToRepair = ( didxToRepair + p - chunkToDRepair ) % p;
+            }
         }
 
     }
@@ -212,7 +225,7 @@ uint32_t RDPCoding::getPrime() {
             end  = mid + 1;
         } 
         if ( start + 1 == end ) {
-            this->_p = primeList [ end ];
+            this->_p = end;
             break;
         }
     }
@@ -221,15 +234,26 @@ uint32_t RDPCoding::getPrime() {
 }
 
 uint32_t RDPCoding::getSymbolSize() {
-    // must call getPrime() prior to calling this function
-    
-    // round up the size of chunkSize to p * the size of a symbol 
-    uint32_t remain = this->_chunkSize % ( this->_p - 1 );
-    if ( remain ) 
-        remain = this->_p - 1 - remain;
+    uint32_t pp = getPrime();
+    uint32_t chunkSize = this->_chunkSize;
 
     // p - 1 symbols per chunk
-    this->_symbolSize = ( this->_chunkSize + remain ) / ( this->_p - 1 );
+    // cannot support chunk sizes which are not multiples of ( p - 1 )
+    // since any remaining bytes will not be stored
+    while ( chunkSize % ( primeList[ pp ] - 1 ) && pp < primeCount ) {
+        pp ++;
+    }
+
+    if ( pp == primeCount ) {
+        fprintf( stderr, "Cannot find a prime number p > k+1 such that the size of chunk, %d, is a multiple of (p - 1)\n", chunkSize);
+        exit( -1 );
+    }
+    
+    this->_p = primeList[ pp ];
+    this->_symbolSize = ( this->_chunkSize ) / ( this->_p - 1 );
+
+    //fprintf( stderr, "symbol size %d\n", this->_symbolSize );
+    //fprintf( stderr, "p %d\n", this->_p );
 
     return this->_symbolSize;
 }

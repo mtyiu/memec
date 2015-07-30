@@ -10,10 +10,10 @@ class RDPCoding : Coding {
 private:
 
     /**
-     * Get the smallest prime number p > k + 1 for encoding
+     * Get the index to smallest prime number p > k + 1 for encoding in primeList
      * 
      * this->_p will be set
-     * @return  the smallest prime number p > k + 1
+     * @return  the index to the smallest prime number p > k + 1 in primeList
      */
     uint32_t getPrime ();
 
@@ -31,7 +31,7 @@ private:
     uint32_t _chunkSize;
     uint32_t _symbolSize;
 
-    // use some memory to save computation (assume k < 200)
+    // use some memory to save computation (assume p < 200)
     static const uint32_t primeCount = 46;
     static const uint32_t primeList[ primeCount ];
 
