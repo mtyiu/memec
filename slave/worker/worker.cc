@@ -97,6 +97,14 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 
 void SlaveWorker::dispatch( IOEvent event ) {
 	__ERROR__( "SlaveWorker", "dispatch", "Received an I/O event." );
+	switch( event.type ) {
+		case IO_EVENT_TYPE_FLUSH_CHUNK:
+			this->storage->write(
+				event.message.chunk,
+				true
+			);
+			break;
+	}
 }
 
 void SlaveWorker::dispatch( MasterEvent event ) {
@@ -250,6 +258,10 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 }
 
 void SlaveWorker::free() {
+	if ( this->storage ) {
+		this->storage->stop();
+		Storage::destroy( this->storage );
+	}
 	this->protocol.free();
 }
 
@@ -328,14 +340,24 @@ bool SlaveWorker::init( SlaveEventQueue *eventQueue, StripeList<SlavePeerSocket>
 	return true;
 }
 
-bool SlaveWorker::init( GlobalConfig &config, WorkerRole role ) {
+bool SlaveWorker::init( GlobalConfig &globalConfig, SlaveConfig &slaveConfig, WorkerRole role ) {
 	this->protocol.init(
 		Protocol::getSuggestedBufferSize(
-			config.size.key,
-			config.size.chunk
+			globalConfig.size.key,
+			globalConfig.size.chunk
 		)
 	);
 	this->role = role;
+	switch( this->role ) {
+		case WORKER_ROLE_MIXED:
+		case WORKER_ROLE_IO:
+			this->storage = Storage::instantiate( slaveConfig );
+			this->storage->start();
+			break;
+		default:
+			this->storage = 0;
+			break;
+	}
 	return role != WORKER_ROLE_UNDEFINED;
 }
 

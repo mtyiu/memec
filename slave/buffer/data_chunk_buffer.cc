@@ -1,7 +1,7 @@
 #include "data_chunk_buffer.hh"
 #include "../event/io_event.hh"
 
-DataChunkBuffer::DataChunkBuffer( uint32_t capacity, uint32_t count, uint32_t stripeId ) : ChunkBuffer( capacity, count, stripeId ) {
+DataChunkBuffer::DataChunkBuffer( uint32_t capacity, uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) : ChunkBuffer( capacity, count, listId, stripeId, chunkId ) {
 	pthread_mutex_init( &this->lock, 0 );
 	this->sizes = new uint32_t[ this->count ];
 	for ( uint32_t i = 0; i < this->count; i++ )
@@ -21,6 +21,9 @@ KeyValue DataChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t
 			if ( tmp > max ) {
 				max = tmp;
 				index = i;
+			} else if ( tmp == max ) {
+				if ( this->chunks[ i ]->stripeId < this->chunks[ index ]->stripeId )
+					index = i;
 			}
 		}
 	}
@@ -57,6 +60,9 @@ uint32_t DataChunkBuffer::flush( bool lock ) {
 		if ( this->sizes[ i ] > max ) {
 			this->sizes[ i ] = max;
 			index = i;
+		} else if ( this->sizes[ i ] == max ) {
+			if ( this->chunks[ i ]->stripeId < this->chunks[ index ]->stripeId )
+					index = i;
 		}
 	}
 
@@ -92,7 +98,9 @@ Chunk *DataChunkBuffer::flush( int index, bool lock ) {
 	this->sizes[ index ] = 0;
 	this->chunks[ index ] = ChunkBuffer::chunkPool->malloc();
 	this->chunks[ index ]->clear();
+	this->chunks[ index ]->listId = this->listId;
 	this->chunks[ index ]->stripeId = this->stripeId;
+	this->chunks[ index ]->chunkId = this->chunkId;
 	this->stripeId++;
 
 	if ( lock )

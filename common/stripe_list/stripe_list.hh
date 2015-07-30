@@ -11,8 +11,9 @@
 #include "../hash/hash_func.hh"
 
 typedef struct {
-	int list;
-	int entry;
+	int listId;
+	int stripeId;
+	int chunkId;
 	bool isParity;
 } StripeListIndex;
 
@@ -130,25 +131,27 @@ public:
 		for ( i = 0; i < this->numLists; i++ ) {
 			if ( this->data.check( i, index ) ) {
 				StripeListIndex s;
-				s.list = i;
-				s.entry = 0;
+				s.listId = i;
+				s.stripeId = 0;
+				s.chunkId = 0;
 				s.isParity = false;
 				for ( j = 0; j < this->numSlaves; j++ ) {
 					if ( j == index )
 						break;
 					if ( this->data.check( i, j ) )
-						s.entry++;
+						s.chunkId++;
 				}
 				ret.push_back( s );
 			} else if ( this->parity.check( i, index ) ) {StripeListIndex s;
-				s.list = i;
-				s.entry = 0;
+				s.listId = i;
+				s.stripeId = 0;
+				s.chunkId = this->k;
 				s.isParity = true;
 				for ( j = 0; j < this->numSlaves; j++ ) {
 					if ( j == index )
 						break;
 					if ( this->parity.check( i, j ) )
-						s.entry++;
+						s.chunkId++;
 				}
 				ret.push_back( s );
 			}

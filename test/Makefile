@@ -1,4 +1,5 @@
 TARGET= \
+	common/coding \
 	common/config \
 	common/ds \
 	common/protocol \

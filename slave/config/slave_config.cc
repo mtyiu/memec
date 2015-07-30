@@ -167,11 +167,11 @@ bool SlaveConfig::validate() {
 	if ( this->storage.type == STORAGE_TYPE_UNDEFINED )
 		CFG_PARSE_ERROR( "SlaveConfig", "The specified storage type is invalid." );
 
-	struct stat sb;
-	if ( stat( this->storage.path, &sb ) != 0 )
+	struct stat st;
+	if ( stat( this->storage.path, &st ) != 0 )
 		CFG_PARSE_ERROR( "SlaveConfig", "The specified storage path does not exist." );
 
-	if ( ! S_ISDIR( sb.st_mode ) )
+	if ( ! S_ISDIR( st.st_mode ) )
 		CFG_PARSE_ERROR( "SlaveConfig", "The specified storage path is not a directory." );
 
 	return true;
