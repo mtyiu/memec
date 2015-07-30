@@ -40,7 +40,7 @@ void RDPCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t index )
 
         // need the row parity for encoding the diagonal parity
         Chunk firstParity;
-        firstParity.init( chunkSize );
+        firstParity.data = new char[ chunkSize ];
 
         this->_raid5Coding->encode( dataChunks, &firstParity, index );
         
@@ -64,6 +64,8 @@ void RDPCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t index )
                             parityChunk->data + pidx * symbolSize , len );
             }
         }
+
+        delete firstParity.data;
 
     } else {
         // ignored

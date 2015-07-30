@@ -16,8 +16,14 @@ EXTERNAL_LIB=
 
 all: $(TARGETS) $(EXTERNAL_LIB)
 
-$(TARGETS): rdpcoding.cc 
+jobjs:
+	make -C $(PLIO_SRC_ROOT)/common/coding
+
+jobjs_clean:
+	make -C $(PLIO_SRC_ROOT)/common/coding clean
+
+$(TARGETS): % : %.cc jobjs
 	$(CC) $(CFLAGS) $(LIBS) -o $@ $< $(OBJS)
 
-clean:
+clean: jobjs_clean
 	rm -f $(TARGETS)
