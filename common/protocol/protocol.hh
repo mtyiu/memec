@@ -77,7 +77,7 @@ enum Role {
 
 struct ProtocolHeader {
 	uint8_t magic, from, to, opcode;
-	uint32_t length;
+	uint32_t length; // Content length
 };
 
 struct KeyHeader {
@@ -115,8 +115,8 @@ public:
 	bool init( size_t size = 0 );
 	void free();
 	bool parseHeader( struct ProtocolHeader &header, char *buf = 0, size_t size = 0 );
-	bool parseKeyHeader( struct KeyHeader &header, size_t offset, char *buf = 0, size_t size = 0 );
-	bool parseKeyValueHeader( struct KeyValueHeader &header, size_t offset, char *buf = 0, size_t size = 0 );
+	bool parseKeyHeader( struct KeyHeader &header, size_t offset = PROTO_HEADER_SIZE, char *buf = 0, size_t size = 0 );
+	bool parseKeyValueHeader( struct KeyValueHeader &header, size_t offset = PROTO_HEADER_SIZE, char *buf = 0, size_t size = 0 );
 
 	static size_t getSuggestedBufferSize( uint32_t keySize, uint32_t chunkSize );
 };

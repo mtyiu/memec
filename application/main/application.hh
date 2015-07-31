@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <pthread.h>
 #include "../config/application_config.hh"
+#include "../ds/pending.hh"
 #include "../socket/master_socket.hh"
 #include "../worker/worker.hh"
 #include "../../common/ds/array_map.hh"
@@ -40,6 +41,7 @@ public:
 		EPoll epoll;
 		ArrayMap<int, MasterSocket> masters;
 	} sockets;
+	Pending pending;
 	ApplicationEventQueue eventQueue;
 	
 	static Application *getInstance() {

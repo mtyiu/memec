@@ -73,7 +73,7 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 			this->config.master.eventQueue.size.mixed
 		);
 		this->workers.reserve( this->config.master.workers.number.mixed );
-		MasterWorker::init( &this->eventQueue, this->stripeList );
+		MasterWorker::init();
 		for ( int i = 0, len = this->config.master.workers.number.mixed; i < len; i++ ) {
 			this->workers.push_back( MasterWorker() );
 			this->workers[ i ].init(
@@ -101,7 +101,7 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 			); \
 		}
 
-		MasterWorker::init( &this->eventQueue, this->stripeList );
+		MasterWorker::init();
 		WORKER_INIT_LOOP( application, WORKER_ROLE_APPLICATION )
 		WORKER_INIT_LOOP( coordinator, WORKER_ROLE_COORDINATOR )
 		WORKER_INIT_LOOP( master, WORKER_ROLE_MASTER )
@@ -285,6 +285,9 @@ void Master::interactive() {
 		} else if ( strcmp( command, "debug" ) == 0 ) {
 			valid = true;
 			this->debug();
+		} else if ( strcmp( command, "pending" ) == 0 ) {
+			valid = true;
+			this->printPending();
 		} else if ( strcmp( command, "time" ) == 0 ) {
 			valid = true;
 			this->time();
@@ -298,6 +301,85 @@ void Master::interactive() {
 	}
 }
 
+void Master::printPending( FILE *f ) {
+	size_t i;
+	std::set<Key>::iterator it;
+	fprintf(
+		f,
+		"Pending requests for applications\n"
+		"---------------------------------\n"
+		"[SET] Pending: %lu\n",
+		this->pending.applications.set.size()
+	);
+
+	i = 1;
+	for (
+		it = this->pending.applications.set.begin();
+		it != this->pending.applications.set.end();
+		it++, i++
+	) {
+		const Key &key = *it;
+		fprintf( f, "%lu. Key: %.*s (size = %u); source: ", i, key.size, key.data, key.size );
+		( ( Socket * ) key.ptr )->printAddress( f );
+		fprintf( f, "\n" );
+	}
+
+	fprintf(
+		f,
+		"\n[GET] Pending: %lu\n",
+		this->pending.applications.get.size()
+	);
+	i = 1;
+	for (
+		it = this->pending.applications.get.begin();
+		it != this->pending.applications.get.end();
+		it++, i++
+	) {
+		const Key &key = *it;
+		fprintf( f, "%lu. Key: %.*s (size = %u); source: ", i, key.size, key.data, key.size );
+		( ( Socket * ) key.ptr )->printAddress( f );
+		fprintf( f, "\n" );
+	}
+
+
+	fprintf(
+		f,
+		"\n\nPending requests for slaves\n"
+		"---------------------------\n"
+		"[SET] Pending: %lu\n",
+		this->pending.slaves.set.size()
+	);
+
+	i = 1;
+	for (
+		it = this->pending.slaves.set.begin();
+		it != this->pending.slaves.set.end();
+		it++, i++
+	) {
+		const Key &key = *it;
+		fprintf( f, "%lu. Key: %.*s (size = %u); target: ", i, key.size, key.data, key.size );
+		( ( Socket * ) key.ptr )->printAddress( f );
+		fprintf( f, "\n" );
+	}
+
+	fprintf(
+		f,
+		"\n[GET] Pending: %lu\n",
+		this->pending.slaves.get.size()
+	);
+	i = 1;
+	for (
+		it = this->pending.slaves.get.begin();
+		it != this->pending.slaves.get.end();
+		it++, i++
+	) {
+		const Key &key = *it;
+		fprintf( f, "%lu. Key: %.*s (size = %u); target: ", i, key.size, key.data, key.size );
+		( ( Socket * ) key.ptr )->printAddress( f );
+		fprintf( f, "\n" );
+	}
+}
+
 void Master::help() {
 	fprintf(
 		stdout,
@@ -305,6 +387,7 @@ void Master::help() {
 		"- help: Show this help message\n"
 		"- info: Show configuration\n"
 		"- debug: Show debug messages\n"
+		"- pending: Show all pending requests\n"
 		"- time: Show elapsed time\n"
 		"- exit: Terminate this client\n"
 	);

@@ -53,10 +53,6 @@ public:
 	inline WorkerRole getRole() {
 		return this->role;
 	}
-
-	inline SlaveEventQueue *getEventQueue() {
-		return this->eventQueue;
-	}
 };
 
 #endif

@@ -137,7 +137,7 @@ void SlaveWorker::dispatch( IOEvent event ) {
 }
 
 void SlaveWorker::dispatch( MasterEvent event ) {
-	bool connected, isSend;
+	bool success = true, connected, isSend;
 	ssize_t ret;
 	struct {
 		size_t size;
@@ -146,15 +146,55 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 
 	switch( event.type ) {
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
-			buffer.data = this->protocol.resRegisterMaster( buffer.size, true );
+		case MASTER_EVENT_TYPE_GET_RESPONSE_SUCCESS:
+		case MASTER_EVENT_TYPE_SET_RESPONSE_SUCCESS:
+			success = true;
 			isSend = true;
 			break;
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resRegisterMaster( buffer.size, false );
+		case MASTER_EVENT_TYPE_GET_RESPONSE_FAILURE:
+		case MASTER_EVENT_TYPE_SET_RESPONSE_FAILURE:
+			success = false;
 			isSend = true;
 			break;
-		case MASTER_EVENT_TYPE_PENDING:
+		default:
 			isSend = false;
+			break;
+	}
+
+	switch( event.type ) {
+		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
+		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resRegisterMaster( buffer.size, success );
+			break;
+		case MASTER_EVENT_TYPE_GET_RESPONSE_SUCCESS:
+		{
+			char *key, *value;
+			uint8_t keySize;
+			uint32_t valueSize;
+
+			event.message.keyValue.deserialize( key, keySize, value, valueSize );
+			buffer.data = this->protocol.resGet( buffer.size, success, keySize, key, valueSize, value );
+		}
+			break;
+		case MASTER_EVENT_TYPE_GET_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resGet(
+				buffer.size,
+				success,
+				event.message.key.size,
+				event.message.key.data
+			);
+			break;
+		case MASTER_EVENT_TYPE_SET_RESPONSE_SUCCESS:
+		case MASTER_EVENT_TYPE_SET_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resSet(
+				buffer.size,
+				success,
+				event.message.key.size,
+				event.message.key.data
+			);
+			break;
+		case MASTER_EVENT_TYPE_PENDING:
 			break;
 		default:
 			return;
@@ -165,7 +205,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "SlaveWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 	} else {
-		// Parse requests from applications
+		// Parse requests from masters
 		ProtocolHeader header;
 		ret = event.socket->recv(
 			this->protocol.buffer.recv,
@@ -192,7 +232,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 
 			switch( header.opcode ) {
 				case PROTO_OPCODE_GET:
-					if ( this->protocol.parseKeyHeader( keyHeader, PROTO_HEADER_SIZE ) ) {
+					if ( this->protocol.parseKeyHeader( keyHeader ) ) {
 						__DEBUG__(
 							BLUE, "SlaveWorker", "dispatch",
 							"[GET] Key: %.*s (key size = %u).",
@@ -200,10 +240,26 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 							keyHeader.key,
 							keyHeader.keySize
 						);
+
+						// Find the key in map
+						std::map<Key, KeyValue>::iterator it;
+						Key key;
+
+						key.size = keyHeader.keySize;
+						key.data = keyHeader.key;
+						it = map->keyValue.find( key );
+						if ( it != map->keyValue.end() ) {
+							event.resGet( event.socket, it->second );
+						} else {
+							event.resGet( event.socket, key );
+						}
+
+						// Send the response immediately
+						this->dispatch( event );
 					}
 					break;
 				case PROTO_OPCODE_SET:
-					if ( this->protocol.parseKeyValueHeader( keyValueHeader, PROTO_HEADER_SIZE ) ) {
+					if ( this->protocol.parseKeyValueHeader( keyValueHeader ) ) {
 						// __DEBUG__(
 						// 	BLUE, "SlaveWorker", "dispatch",
 						// 	"[SET] Key: %.*s (key size = %u); Value: %.*s (value size = %u)",
@@ -239,9 +295,15 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 								isParity,
 								dataChunkId
 							);
+						Key key = keyValue.key();
 
 						if ( ! isParity )
-							map->keyValue[ keyValue.key() ] = keyValue;
+							map->keyValue[ key ] = keyValue;
+
+						event.resSet( event.socket, key );
+
+						// Send the response immediately
+						this->dispatch( event );
 					}
 					break;
 			}
@@ -305,7 +367,7 @@ void SlaveWorker::free() {
 void *SlaveWorker::run( void *argv ) {
 	SlaveWorker *worker = ( SlaveWorker * ) argv;
 	WorkerRole role = worker->getRole();
-	SlaveEventQueue *eventQueue = worker->getEventQueue();
+	SlaveEventQueue *eventQueue = SlaveWorker::eventQueue;
 
 #define SLAVE_WORKER_EVENT_LOOP(_EVENT_TYPE_, _EVENT_QUEUE_) \
 	do { \

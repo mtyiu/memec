@@ -11,8 +11,8 @@
 class CoordinatorWorker : public Worker {
 private:
 	WorkerRole role;
-	CoordinatorEventQueue *eventQueue;
 	CoordinatorProtocol protocol;
+	static CoordinatorEventQueue *eventQueue;
 
 	void dispatch( MixedEvent event );
 	void dispatch( CoordinatorEvent event );
@@ -22,17 +22,14 @@ private:
 	static void *run( void *argv );
 
 public:
-	bool init( GlobalConfig &config, WorkerRole role, CoordinatorEventQueue *eventQueue );
+	static bool init();
+	bool init( GlobalConfig &config, WorkerRole role );
 	bool start();
 	void stop();
 	void print( FILE *f = stdout );
 
 	inline WorkerRole getRole() {
 		return this->role;
-	}
-
-	inline CoordinatorEventQueue *getEventQueue() {
-		return this->eventQueue;
 	}
 };
 

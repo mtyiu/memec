@@ -1,7 +1,10 @@
 #include "worker.hh"
+#include "../main/coordinator.hh"
 #include "../../common/util/debug.hh"
 
 #define WORKER_COLOR	YELLOW
+
+CoordinatorEventQueue *CoordinatorWorker::eventQueue;
 
 void CoordinatorWorker::dispatch( MixedEvent event ) {
 	switch( event.type ) {
@@ -93,7 +96,7 @@ void CoordinatorWorker::free() {
 void *CoordinatorWorker::run( void *argv ) {
 	CoordinatorWorker *worker = ( CoordinatorWorker * ) argv;
 	WorkerRole role = worker->getRole();
-	CoordinatorEventQueue *eventQueue = worker->getEventQueue();
+	CoordinatorEventQueue *eventQueue = CoordinatorWorker::eventQueue;
 
 #define COORDINATOR_WORKER_EVENT_LOOP(_EVENT_TYPE_, _EVENT_QUEUE_) \
 	do { \
@@ -139,7 +142,15 @@ void *CoordinatorWorker::run( void *argv ) {
 	return 0;
 }
 
-bool CoordinatorWorker::init( GlobalConfig &config, WorkerRole role, CoordinatorEventQueue *eventQueue ) {
+bool CoordinatorWorker::init() {
+	Coordinator *coordinator = Coordinator::getInstance();
+
+	CoordinatorWorker::eventQueue = &coordinator->eventQueue;
+
+	return true;
+}
+
+bool CoordinatorWorker::init( GlobalConfig &config, WorkerRole role ) {
 	this->protocol.init(
 		Protocol::getSuggestedBufferSize(
 			config.size.key,
@@ -147,7 +158,6 @@ bool CoordinatorWorker::init( GlobalConfig &config, WorkerRole role, Coordinator
 		)
 	);
 	this->role = role;
-	this->eventQueue = eventQueue;
 	return role != WORKER_ROLE_UNDEFINED;
 }
 

@@ -78,13 +78,13 @@ bool Application::init( char *path, OptionList &options, bool verbose ) {
 			this->config.application.eventQueue.block,
 			this->config.application.eventQueue.size.mixed
 		);
+		ApplicationWorker::init();
 		this->workers.reserve( this->config.application.workers.number.mixed );
 		for ( int i = 0, len = this->config.application.workers.number.mixed; i < len; i++ ) {
 			this->workers.push_back( ApplicationWorker() );
 			this->workers[ i ].init(
 				this->config.application,
-				WORKER_ROLE_MIXED,
-				&this->eventQueue
+				WORKER_ROLE_MIXED
 			);
 		}
 	} else {
@@ -94,6 +94,7 @@ bool Application::init( char *path, OptionList &options, bool verbose ) {
 			this->config.application.eventQueue.size.separated.application,
 			this->config.application.eventQueue.size.separated.master
 		);
+		ApplicationWorker::init();
 
 		int index = 0;
 #define WORKER_INIT_LOOP( _FIELD_, _CONSTANT_ ) \
@@ -101,8 +102,7 @@ bool Application::init( char *path, OptionList &options, bool verbose ) {
 			this->workers.push_back( ApplicationWorker() ); \
 			this->workers[ index ].init( \
 				this->config.application, \
-				_CONSTANT_, \
-				&this->eventQueue \
+				_CONSTANT_ \
 			); \
 		}
 

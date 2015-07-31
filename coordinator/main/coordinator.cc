@@ -50,13 +50,13 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 			this->config.coordinator.eventQueue.block,
 			this->config.coordinator.eventQueue.size.mixed
 		);
+		CoordinatorWorker::init();
 		this->workers.reserve( this->config.coordinator.workers.number.mixed );
 		for ( int i = 0, len = this->config.coordinator.workers.number.mixed; i < len; i++ ) {
 			this->workers.push_back( CoordinatorWorker() );
 			this->workers[ i ].init(
 				this->config.global,
-				WORKER_ROLE_MIXED,
-				&this->eventQueue
+				WORKER_ROLE_MIXED
 			);
 		}
 	} else {
@@ -67,6 +67,7 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 			this->config.coordinator.eventQueue.size.separated.master,
 			this->config.coordinator.eventQueue.size.separated.slave
 		);
+		CoordinatorWorker::init();
 
 		int index = 0;
 #define WORKER_INIT_LOOP( _FIELD_, _CONSTANT_ ) \
@@ -74,8 +75,7 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 			this->workers.push_back( CoordinatorWorker() ); \
 			this->workers[ index ].init( \
 				this->config.global, \
-				_CONSTANT_, \
-				&this->eventQueue \
+				_CONSTANT_ \
 			); \
 		}
 
