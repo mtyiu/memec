@@ -32,7 +32,7 @@ private:
     uint32_t _symbolSize;
 
     // use some memory to save computation (assume p < 200)
-    static const uint32_t primeCount = 46;
+    static const uint32_t primeCount = 168;
     static const uint32_t primeList[ primeCount ];
 
 public:
