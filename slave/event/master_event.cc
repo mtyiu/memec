@@ -6,13 +6,13 @@ void MasterEvent::resRegister( MasterSocket *socket, bool success ) {
 }
 
 void MasterEvent::resGet( MasterSocket *socket, KeyValue &keyValue ) {
-	this->type = MASTER_EVENT_TYPE_SET_RESPONSE_SUCCESS;
+	this->type = MASTER_EVENT_TYPE_GET_RESPONSE_SUCCESS;
 	this->socket = socket;
 	this->message.keyValue = keyValue;
 }
 
 void MasterEvent::resGet( MasterSocket *socket, Key &key ) {
-	this->type = MASTER_EVENT_TYPE_SET_RESPONSE_FAILURE;
+	this->type = MASTER_EVENT_TYPE_GET_RESPONSE_FAILURE;
 	this->socket = socket;
 	this->message.key = key;
 }

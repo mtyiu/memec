@@ -337,7 +337,10 @@ void Master::printPending( FILE *f ) {
 	) {
 		const Key &key = *it;
 		fprintf( f, "%lu. Key: %.*s (size = %u); source: ", i, key.size, key.data, key.size );
-		( ( Socket * ) key.ptr )->printAddress( f );
+		if ( key.ptr )
+			( ( Socket * ) key.ptr )->printAddress( f );
+		else
+			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
 	}
 

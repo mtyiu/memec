@@ -395,7 +395,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 					// Check pending slave SET requests
 					key.ptr = 0;
 					it = MasterWorker::pending->slaves.set.lower_bound( key );
-					for ( pending = 0; key.equal( *it ); pending++, it++ );
+					for ( pending = 0; it != MasterWorker::pending->slaves.set.end() && key.equal( *it ); pending++, it++ );
 					__ERROR__( "MasterWorker", "dispatch", "Pending slave SET requests = %d.", pending );
 					if ( pending == 0 ) {
 						// Only send application SET response when the number of pending slave SET requests equal 0
