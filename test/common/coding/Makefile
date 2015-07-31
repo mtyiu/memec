@@ -4,7 +4,8 @@ PLIO_SRC_ROOT=../../..
 LIBS=
 
 TARGETS= \
-	coding
+	coding \
+	performance
 
 OBJS = \
 	$(wildcard $(PLIO_SRC_ROOT)/common/config/*.o) \
