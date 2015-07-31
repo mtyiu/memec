@@ -22,12 +22,12 @@ size_t Protocol::generateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint
 
 size_t Protocol::generateKeyHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint8_t keySize, char *key ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, keySize );
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_KEY_SIZE + keySize );
 
 	buf[ 0 ] = keySize;
 
 	buf += 1;
-	memcpy( buf, key, keySize );
+	memmove( buf, key, keySize );
 
 	bytes += 1 + keySize;
 
@@ -36,7 +36,7 @@ size_t Protocol::generateKeyHeader( uint8_t magic, uint8_t to, uint8_t opcode, u
 
 size_t Protocol::generateKeyValueHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint8_t keySize, char *key, uint32_t valueSize, char *value ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, keySize + valueSize );
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_KEY_VALUE_SIZE + keySize + valueSize );
 
 	buf[ 0 ] = keySize;
 
@@ -47,9 +47,10 @@ size_t Protocol::generateKeyValueHeader( uint8_t magic, uint8_t to, uint8_t opco
 	valueSize = ntohl( valueSize );
 
 	buf += PROTO_KEY_VALUE_SIZE;
-	memcpy( buf, key, keySize );
+	memmove( buf, key, keySize );
 	buf += keySize;
-	memcpy( buf, value, valueSize );
+	if ( valueSize )
+		memmove( buf, value, valueSize );
 
 	bytes += PROTO_KEY_VALUE_SIZE + keySize + valueSize;
 
@@ -137,7 +138,7 @@ bool Protocol::parseKeyValueHeader( size_t offset, uint8_t &keySize, char *&key,
 		return false;
 
 	key = ptr + PROTO_KEY_VALUE_SIZE;
-	value = key + keySize;
+	value = valueSize ? key + keySize : 0;
 
 	return true;
 }

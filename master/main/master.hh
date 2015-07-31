@@ -1,8 +1,10 @@
 #ifndef __MASTER_MAIN_MASTER_HH__
 #define __MASTER_MAIN_MASTER_HH__
 
+#include <set>
 #include <cstdio>
 #include "../config/master_config.hh"
+#include "../ds/pending.hh"
 #include "../event/event_queue.hh"
 #include "../socket/application_socket.hh"
 #include "../socket/coordinator_socket.hh"
@@ -11,6 +13,8 @@
 #include "../worker/worker.hh"
 #include "../../common/config/global_config.hh"
 #include "../../common/ds/array_map.hh"
+#include "../../common/ds/key.hh"
+#include "../../common/ds/key_value.hh"
 #include "../../common/stripe_list/stripe_list.hh"
 #include "../../common/socket/epoll.hh"
 #include "../../common/signal/signal.hh"
@@ -31,6 +35,7 @@ private:
 
 	void free();
 	// Commands
+	void printPending( FILE *f = stdout );
 	void help();
 	void time();
 
@@ -46,6 +51,7 @@ public:
 		ArrayMap<int, CoordinatorSocket> coordinators;
 		ArrayMap<int, SlaveSocket> slaves;
 	} sockets;
+	Pending pending;
 	MasterEventQueue eventQueue;
 	StripeList<SlaveSocket> *stripeList;
 	

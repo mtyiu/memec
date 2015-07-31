@@ -3,6 +3,7 @@
 
 #include <cstdio>
 #include "worker_role.hh"
+#include "../ds/pending.hh"
 #include "../event/event_queue.hh"
 #include "../protocol/protocol.hh"
 #include "../socket/slave_socket.hh"
@@ -19,6 +20,7 @@ private:
 	SlaveSocket **paritySlaveSockets;
 	uint32_t dataChunkCount;
 	uint32_t parityChunkCount;
+	static Pending *pending;
 	static MasterEventQueue *eventQueue;
 	static StripeList<SlaveSocket> *stripeList;
 
@@ -31,7 +33,7 @@ private:
 	static void *run( void *argv );
 
 public:
-	static bool init( MasterEventQueue *eventQueue, StripeList<SlaveSocket> *stripeList );
+	static bool init();
 	bool init( GlobalConfig &config, WorkerRole role );
 	bool start();
 	void stop();
@@ -39,10 +41,6 @@ public:
 
 	inline WorkerRole getRole() {
 		return this->role;
-	}
-
-	inline MasterEventQueue *getEventQueue() {
-		return this->eventQueue;
 	}
 };
 
