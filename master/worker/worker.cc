@@ -73,11 +73,12 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 				key.size, key.data,
 				valueSize, value
 			);
+			key.ptr = ( void * ) event.socket;
 			it = MasterWorker::pending->applications.get.find( key );
 			key = *it;
+			MasterWorker::pending->applications.get.erase( it );
 			key.free();
 			event.message.keyValue.free();
-			MasterWorker::pending->applications.get.erase( it );
 			break;
 		case APPLICATION_EVENT_TYPE_GET_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resGet(
@@ -88,8 +89,8 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 			);
 			it = MasterWorker::pending->applications.get.find( event.message.key );
 			key = *it;
-			key.free();
 			MasterWorker::pending->applications.get.erase( it );
+			key.free();
 			break;
 		case APPLICATION_EVENT_TYPE_SET_RESPONSE_SUCCESS:
 		case APPLICATION_EVENT_TYPE_SET_RESPONSE_FAILURE:
@@ -101,8 +102,8 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 			);
 			it = MasterWorker::pending->applications.set.find( event.message.key );
 			key = *it;
-			key.free();
 			MasterWorker::pending->applications.set.erase( it );
+			key.free();
 			break;
 		case APPLICATION_EVENT_TYPE_PENDING:
 			break;
@@ -441,7 +442,6 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 						applicationEvent.resGet( ( ApplicationSocket * ) ( *it ).ptr, key );
 					}
 					MasterWorker::eventQueue->insert( applicationEvent );
-					MasterWorker::pending->slaves.get.erase( it );
 
 					break;
 				default:
