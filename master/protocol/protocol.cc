@@ -1,5 +1,15 @@
 #include "protocol.hh"
 
+bool MasterProtocol::init( size_t size, uint32_t parityChunkCount ) {
+	this->status = new BitmaskArray( parityChunkCount, 1 );
+	return Protocol::init( size );
+}
+
+void MasterProtocol::free() {
+	delete this->status;
+	Protocol::free();
+}
+
 char *MasterProtocol::reqRegisterCoordinator( size_t &size ) {
 	size = this->generateHeader(
 		PROTO_MAGIC_REQUEST,
@@ -66,14 +76,24 @@ char *MasterProtocol::resSet( size_t &size, bool success, uint8_t keySize, char 
 }
 
 char *MasterProtocol::resGet( size_t &size, bool success, uint8_t keySize, char *key, uint32_t valueSize, char *value ) {
-	size = this->generateKeyValueHeader(
-		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
-		PROTO_MAGIC_TO_APPLICATION,
-		PROTO_OPCODE_GET,
-		keySize,
-		key,
-		valueSize,
-		value
-	);
+	if ( success ) {
+		size = this->generateKeyValueHeader(
+			PROTO_MAGIC_RESPONSE_SUCCESS,
+			PROTO_MAGIC_TO_APPLICATION,
+			PROTO_OPCODE_GET,
+			keySize,
+			key,
+			valueSize,
+			value
+		);
+	} else {
+		size = this->generateKeyHeader(
+			PROTO_MAGIC_RESPONSE_FAILURE,
+			PROTO_MAGIC_TO_APPLICATION,
+			PROTO_OPCODE_GET,
+			keySize,
+			key
+		);
+	}
 	return this->buffer.send;
 }

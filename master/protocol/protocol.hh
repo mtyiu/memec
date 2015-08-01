@@ -1,11 +1,17 @@
 #ifndef __MASTER_PROTOCOL_PROTOCOL_HH__
 #define __MASTER_PROTOCOL_PROTOCOL_HH__
 
+#include "../../common/ds/bitmask_array.hh"
 #include "../../common/protocol/protocol.hh"
 
 class MasterProtocol : public Protocol {
 public:
+	BitmaskArray *status; // Indicate which slave in the stripe is accessing the internal buffer
+
 	MasterProtocol() : Protocol( ROLE_MASTER ) {}
+	bool init( size_t size, uint32_t parityChunkCount );
+	void free();
+
 	// Coordinator
 	char *reqRegisterCoordinator( size_t &size );
 	// Slave

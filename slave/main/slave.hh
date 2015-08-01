@@ -41,9 +41,7 @@ private:
 
 	void free();
 	// Commands
-	void dump();
 	void help();
-	void time();
 
 public:
 	struct {
@@ -78,6 +76,8 @@ public:
 	bool stop();
 	void info( FILE *f = stdout );
 	void debug( FILE *f = stdout );
+	void dump();
+	void time();
 	double getElapsedTime();
 	void interactive();
 };

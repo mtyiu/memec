@@ -166,7 +166,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 
 					key.ptr = 0;
 					it = ApplicationWorker::pending->application.set.lower_bound( key );
-					if ( it == ApplicationWorker::pending->application.set.end() ) {
+					if ( it == ApplicationWorker::pending->application.set.end() || ! key.equal( *it ) ) {
 						__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending application SET request that matches the response. This message will be discarded." );
 						return;
 					}
@@ -191,25 +191,26 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 						key.ptr = ( void * ) event.socket;
 					} else {
 						this->protocol.parseKeyHeader( keyHeader );
-						key.size = keyValueHeader.keySize;
-						key.data = keyValueHeader.key;
+						key.size = keyHeader.keySize;
+						key.data = keyHeader.key;
 						key.ptr = ( void * ) event.socket;
 					}
 
 					it = ApplicationWorker::pending->masters.get.find( key );
 					if ( it == ApplicationWorker::pending->masters.get.end() ) {
-						__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending master GET request that matches the response. This message will be discarded." );
+						__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending master GET request that matches the response. This message will be discarded. (key = %.*s)", key.size, key.data );
 						return;
 					}
-					ApplicationWorker::pending->masters.set.erase( it );
+					ApplicationWorker::pending->masters.get.erase( it );
 
+					key.ptr = 0;
 					it = ApplicationWorker::pending->application.get.lower_bound( key );
-					if ( it == ApplicationWorker::pending->application.get.end() ) {
+					if ( it == ApplicationWorker::pending->application.get.end() || ! key.equal( *it ) ) {
 						__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending application GET request that matches the response. This message will be discarded." );
 						return;
 					}
 					key = *it;
-					ApplicationWorker::pending->application.set.erase( it );
+					ApplicationWorker::pending->application.get.erase( it );
 					fd = ( int )( uint64_t ) key.ptr;
 
 					if ( success ) {
@@ -221,7 +222,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 							__ERROR__( "ApplicationWorker", "dispatch", "The number of bytes written (%ld bytes) is not equal to the value size (%u bytes).", ret, keyValueHeader.valueSize );
 						}
 					} else {
-						__ERROR__( "ApplicationWorker", "dispatch", "The key: %.*s is NOT GET.", key.size, key.data );
+						__ERROR__( "ApplicationWorker", "dispatch", "The key: %.*s does not exist.", key.size, key.data );
 					}
 					::close( fd );
 					key.free();

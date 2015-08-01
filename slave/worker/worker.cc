@@ -262,16 +262,6 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 					break;
 				case PROTO_OPCODE_SET:
 					if ( this->protocol.parseKeyValueHeader( keyValueHeader ) ) {
-						// __DEBUG__(
-						// 	BLUE, "SlaveWorker", "dispatch",
-						// 	"[SET] Key: %.*s (key size = %u); Value: %.*s (value size = %u)",
-						// 	( int ) keyValueHeader.keySize,
-						// 	keyValueHeader.key,
-						// 	keyValueHeader.keySize,
-						// 	( int ) keyValueHeader.valueSize,
-						// 	keyValueHeader.value,
-						// 	keyValueHeader.valueSize
-						// );
 						__DEBUG__(
 							BLUE, "SlaveWorker", "dispatch",
 							"[SET] Key: %.*s (key size = %u); Value: (value size = %u)",

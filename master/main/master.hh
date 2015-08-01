@@ -37,7 +37,7 @@ private:
 	// Commands
 	void printPending( FILE *f = stdout );
 	void help();
-	void time();
+	// void time();
 
 public:
 	struct {
@@ -67,6 +67,7 @@ public:
 	bool stop();
 	void info( FILE *f = stdout );
 	void debug( FILE *f = stdout );
+	void time();
 	double getElapsedTime();
 	void interactive();
 };

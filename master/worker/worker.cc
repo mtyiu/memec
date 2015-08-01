@@ -222,13 +222,32 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 				return;
 
 			// Send request
-			ret = this->dataSlaveSockets[ dataIndex ]->send( buffer.data, buffer.size, connected );
-
 			if ( header.opcode == PROTO_OPCODE_SET ) {
+#define MASTER_WORKER_SEND_REPLICAS_PARALLEL
 				for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
+#ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
+					SlaveEvent slaveEvent;
+
+					this->protocol.status->set( i );
+					slaveEvent.send( this->paritySlaveSockets[ i ], &this->protocol, buffer.size, i );
+					MasterWorker::eventQueue->insert( slaveEvent );
+#else
 					ret = this->paritySlaveSockets[ i ]->send( buffer.data, buffer.size, connected );
+#endif
 				}
+
+				ret = this->dataSlaveSockets[ dataIndex ]->send( buffer.data, buffer.size, connected );	
+
+#ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
+				// Wait until all replicas are sent
+				for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
+					while( this->protocol.status->check( i ) ); // Busy waiting
+				}
+#endif
+			} else {
+				ret = this->dataSlaveSockets[ dataIndex ]->send( buffer.data, buffer.size, connected );	
 			}
+
 			if ( ret != ( ssize_t ) buffer.size )
 				__ERROR__( "ApplicationWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 		}
@@ -314,6 +333,11 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 			buffer.data = this->protocol.reqRegisterSlave( buffer.size );
 			isSend = true;
 			break;
+		case SLAVE_EVENT_TYPE_SEND:
+			buffer.data = event.message.send.protocol->buffer.send;
+			buffer.size = event.message.send.size;
+			isSend = true;
+			break;
 		case SLAVE_EVENT_TYPE_PENDING:
 			isSend = false;
 			break;
@@ -325,6 +349,9 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "MasterWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+
+		if ( event.type == SLAVE_EVENT_TYPE_SEND )
+			event.message.send.protocol->status->unset( event.message.send.index );
 	} else {
 		// Parse responses from slaves
 		ProtocolHeader header;
@@ -401,7 +428,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 					if ( pending == 0 ) {
 						// Only send application SET response when the number of pending slave SET requests equal 0
 						it = MasterWorker::pending->applications.set.lower_bound( key );
-						if ( it == MasterWorker::pending->applications.set.end() ) {
+						if ( it == MasterWorker::pending->applications.set.end() || ! key.equal( *it ) ) {
 							__ERROR__( "MasterWorker", "dispatch", "Cannot find a pending application SET request that matches the response. This message will be discarded." );
 							return;
 						}
@@ -411,10 +438,17 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 					}
 					break;
 				case PROTO_OPCODE_GET:
-					this->protocol.parseKeyValueHeader( keyValueHeader );
-					key.size = keyValueHeader.keySize;
-					key.data = keyValueHeader.key;
-					key.ptr = ( void * ) event.socket;
+					if ( success ) {
+						this->protocol.parseKeyValueHeader( keyValueHeader );
+						key.size = keyValueHeader.keySize;
+						key.data = keyValueHeader.key;
+						key.ptr = ( void * ) event.socket;
+					} else {
+						this->protocol.parseKeyHeader( keyHeader );
+						key.size = keyHeader.keySize;
+						key.data = keyHeader.key;
+						key.ptr = ( void * ) event.socket;
+					}
 					it = MasterWorker::pending->slaves.get.find( key );
 					if ( it == MasterWorker::pending->slaves.get.end() ) {
 						__ERROR__( "MasterWorker", "dispatch", "Cannot find a pending slave GET request that matches the response. This message will be discarded." );
@@ -423,7 +457,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 					MasterWorker::pending->slaves.get.erase( it );
 
 					it = MasterWorker::pending->applications.get.lower_bound( key );
-					if ( it == MasterWorker::pending->applications.get.end() ) {
+					if ( it == MasterWorker::pending->applications.get.end() || ! key.equal( *it ) ) {
 						__ERROR__( "MasterWorker", "dispatch", "Cannot find a pending application GET request that matches the response. This message will be discarded." );
 						return;
 					}
@@ -525,14 +559,15 @@ bool MasterWorker::init() {
 }
 
 bool MasterWorker::init( GlobalConfig &config, WorkerRole role ) {
+	this->dataChunkCount = config.coding.params.getDataChunkCount();
+	this->parityChunkCount = config.coding.params.getParityChunkCount();
 	this->protocol.init(
 		Protocol::getSuggestedBufferSize(
 			config.size.key,
 			config.size.chunk
-		)
+		),
+		this->parityChunkCount
 	);
-	this->dataChunkCount = config.coding.params.getDataChunkCount();
-	this->parityChunkCount = config.coding.params.getParityChunkCount();
 	this->dataSlaveSockets = new SlaveSocket*[ this->dataChunkCount ];
 	this->paritySlaveSockets = new SlaveSocket*[ this->parityChunkCount ];
 	this->role = role;
