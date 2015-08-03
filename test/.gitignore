@@ -1,5 +1,6 @@
 common/coding/coding
 common/coding/performance
+common/coding/basic_op_performance
 common/config/global_config
 common/config/server_addr
 common/ds/bitmask_array

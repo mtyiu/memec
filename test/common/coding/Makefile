@@ -2,9 +2,11 @@ CC=g++
 CFLAGS=-Wall -O2 -g
 PLIO_SRC_ROOT=../../..
 LIBS=
+INCLUDE=-I$(PLIO_SRC_ROOT)/lib/jerasure/include -I$(PLIO_SRC_ROOT)/lib/gf_complete/include
 
 TARGETS= \
 	coding \
+	basic_op_performance \
 	performance
 
 OBJS = \
@@ -24,7 +26,7 @@ jobjs_clean:
 	make -C $(PLIO_SRC_ROOT)/common/coding clean
 
 $(TARGETS): % : %.cc jobjs
-	$(CC) $(CFLAGS) $(LIBS) -o $@ $< $(OBJS)
+	$(CC) $(CFLAGS) $(INCLUDE) $(LIBS) -o $@ $< $(OBJS)
 
 clean: jobjs_clean
 	rm -f $(TARGETS)

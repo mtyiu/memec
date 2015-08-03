@@ -7,18 +7,23 @@
 #include "../../../common/coding/coding_handler.hh"
 #include "../../../common/util/time.hh"
 
-#define CHUNK_SIZE (4096)
-#define C_K (6)
-#define C_M (3)
+#define CHUNK_SIZE (8192)
+#define C_K (12)
+#define C_M (2)
 #define FAIL (2)
 #define FAIL2 (3)
 #define FAIL3 (4)
-#define ROUNDS (1000)
+#define ROUNDS (5000)
 
 struct CodingHandler handle;
 
 void usage( char* argv ) {
     fprintf( stderr, "Usage: %s [raid5|cauchy|rdp|rs]\n", argv);
+}
+
+void report( double duration ) {
+    printf( " %.4lf Kop/s\t", ROUNDS / 1000 / duration );
+    printf( " %.4lf MB/s\n", C_K * CHUNK_SIZE * ROUNDS / 1024.0 / 1024.0 / duration );
 }
 
 void printChunk( Chunk *chunk, uint32_t id = 0 ) {
@@ -114,30 +119,36 @@ int main( int argc, char **argv ) {
     }
 
     struct timespec st = start_timer();
+    uint32_t m = 0;
     for ( uint32_t round = 0 ; round < ROUNDS ; round ++ ) {
         switch ( handle.scheme ) {
             case CS_RAID5:
                 handle.raid5->encode ( chunks, chunks[ C_K ], 1 );
+                m = 1;
                 break;
             case CS_RDP:
                 handle.rdp->encode ( chunks, chunks[ C_K ], 1 );
                 handle.rdp->encode ( chunks, chunks[ C_K + 1 ], 2 );
+                m = 2;
                 break;
             case CS_CAUCHY:
                 for (uint32_t idx = 0 ; idx < C_M ; idx ++ ) {
                     handle.cauchy->encode ( chunks, chunks[ C_K + idx ], idx + 1 );
                 }
+                m = C_M;
                 break;
             case CS_RS:
                 for (uint32_t idx = 0 ; idx < C_M ; idx ++ ) {
                     handle.rs->encode ( chunks, chunks[ C_K + idx ], idx + 1 );
                 }
+                m = C_M;
                 break;
             default:
                 return -1;
         }
     }
-    printf( " %.4lf Kop/s\n", ROUNDS / 1000 / get_elapsed_time( st ) );
+    // report time per encoding operations
+    report( get_elapsed_time( st ) / m );
 
     memset ( readbuf , 0, CHUNK_SIZE * C_M ); 
     
@@ -164,7 +175,7 @@ int main( int argc, char **argv ) {
                 return -1;
         }
     }
-    printf( " %.4lf Kop/s\n", ROUNDS / 1000 / get_elapsed_time( st ) );
+    report( get_elapsed_time( st ) );
 
     // double failure
     if ( handle.scheme != CS_RAID5 ) {
@@ -191,7 +202,7 @@ int main( int argc, char **argv ) {
                     return -1;
             }
         }
-        printf( " %.4lf Kop/s\n", ROUNDS / 1000 / get_elapsed_time( st ) );
+        report( get_elapsed_time( st ) );
     }
 
     // triple failure
@@ -217,7 +228,7 @@ int main( int argc, char **argv ) {
                     return -1;
             }
         }
-        printf( " %.4lf Kop/s\n", ROUNDS / 1000 / get_elapsed_time( st ) );
+        report( get_elapsed_time( st ) );
 
     }
 

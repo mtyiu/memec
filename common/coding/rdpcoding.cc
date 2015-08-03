@@ -265,8 +265,8 @@ uint32_t RDPCoding::getSymbolSize() {
     this->_p = primeList[ pp ];
     this->_symbolSize = ( this->_chunkSize ) / ( this->_p - 1 );
 
-    fprintf( stderr, "symbol size %d\n", this->_symbolSize );
-    fprintf( stderr, "p %d\n", this->_p );
+    //fprintf( stderr, "symbol size %d\n", this->_symbolSize );
+    //fprintf( stderr, "p %d\n", this->_p );
 
     return this->_symbolSize;
 }
