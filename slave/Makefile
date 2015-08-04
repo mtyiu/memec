@@ -1,7 +1,7 @@
 CC=g++
 CFLAGS=-Wall -O2 -g
 PLIO_SRC_ROOT=..
-LIBS=-pthread -lrt
+LIBS=-pthread
 BIN=$(PLIO_SRC_ROOT)/bin/slave
 
 OBJS= \
@@ -41,7 +41,8 @@ EXTERNAL_LIB= \
 	$(PLIO_SRC_ROOT)/common/protocol/protocol.o \
 	$(PLIO_SRC_ROOT)/common/socket/socket.o \
 	$(PLIO_SRC_ROOT)/common/socket/epoll.o \
-	$(PLIO_SRC_ROOT)/lib/inih/ini.o
+	$(PLIO_SRC_ROOT)/lib/inih/ini.o \
+	-lrt
 
 .PHONY: clean
 
