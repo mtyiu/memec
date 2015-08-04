@@ -14,9 +14,6 @@ size_t Protocol::generateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint
 	this->buffer.send[ 3 ] = 0;
 	bytes += 4;
 
-	// TODO: Fix incorrect MAGIC_TO code
-	printf(" to = %u\n", this->buffer.send[ 0 ] & 0x60 );
-
 	*( ( uint32_t * )( this->buffer.send + bytes ) ) = htonl( length );
 	bytes += 4;
 
@@ -130,8 +127,6 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		default:
 			return false;
 	}
-
-	printf( "from = %u; to = %u; this->to = %u\n", from, to, this->to );
 
 	if ( to != this->to )
 		return false;

@@ -29,7 +29,7 @@
 #define PROTO_MAGIC_FROM_SLAVE			0x18 // ---11---
  // (Bit: 5-6) //
 #define PROTO_MAGIC_TO_APPLICATION		0x00 // -00-----
-#define PROTO_MAGIC_TO_COORDINATOR		0x50 // -01-----
+#define PROTO_MAGIC_TO_COORDINATOR		0x20 // -01-----
 #define PROTO_MAGIC_TO_MASTER			0x40 // -10-----
 #define PROTO_MAGIC_TO_SLAVE			0x60 // -11-----
 // (Bit: 7): Reserved //

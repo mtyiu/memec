@@ -22,6 +22,9 @@ public:
 		uint32_t maxEvents;
 		int32_t timeout;
 	} epoll;
+	struct {
+		uint32_t timeout;
+	} sync;
 	std::vector<ServerAddr> coordinators;
 	std::vector<ServerAddr> slaves;
 	struct {

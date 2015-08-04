@@ -8,7 +8,7 @@
 #include "../config/slave_config.hh"
 #include "../event/event_queue.hh"
 #include "../ds/map.hh"
-#include "../ds/load.hh"
+#include "../ds/slave_load.hh"
 #include "../protocol/protocol.hh"
 #include "../storage/allstorage.hh"
 #include "../../common/coding/coding.hh"
@@ -45,7 +45,7 @@ private:
 	static void *run( void *argv );
 
 public:
-	Load load;
+	SlaveLoad load;
 
 	static bool init();
 	bool init( GlobalConfig &globalConfig, SlaveConfig &slaveConfig, WorkerRole role );

@@ -12,7 +12,11 @@ public:
 	char *data;
 	void *ptr; // Extra data to be augmented to the object
 
-	void dup( uint8_t size, char *data, void *ptr = 0 ) {
+	void dup( uint8_t size = 0, char *data = 0, void *ptr = 0 ) {
+		if ( ! size )
+			size = this->size;
+		if ( ! data )
+			data = this->data;
 		this->size = size;
 		this->data = strndup( data, size );
 		this->ptr = ptr;

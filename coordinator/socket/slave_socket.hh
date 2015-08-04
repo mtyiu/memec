@@ -3,11 +3,13 @@
 
 #include <map>
 #include "../../common/ds/key.hh"
+#include "../../common/ds/load.hh"
 #include "../../common/ds/metadata.hh"
 #include "../../common/socket/socket.hh"
 
 class SlaveSocket : public Socket {
 public:
+	Load load;
 	// All stored keys
 	std::map<Key, Metadata> keys;
 

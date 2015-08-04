@@ -1,5 +1,6 @@
 #include <cstring>
 #include <ctype.h>
+#include <unistd.h>
 #include "slave.hh"
 
 Slave::Slave() {
@@ -30,9 +31,17 @@ void Slave::sync() {
 }
 
 void Slave::signalHandler( int signal ) {
-	Signal::setHandler();
-	Slave::getInstance()->stop();
-	fclose( stdin );
+	Slave *slave = Slave::getInstance();
+	switch( signal ) {
+		case SIGALRM:
+			slave->sync();
+			slave->alarm();
+			break;
+		default:
+			Signal::setHandler(); // disable signal handler
+			slave->stop();
+			fclose( stdin );
+	}
 }
 
 bool Slave::init( char *path, OptionList &options, bool verbose ) {
@@ -230,6 +239,9 @@ bool Slave::start() {
 
 	this->startTime = start_timer();
 	this->isRunning = true;
+
+	/* Alarm */
+	this->alarm();
 
 	return true;
 }
@@ -461,10 +473,14 @@ void Slave::time() {
 	fflush( stdout );
 }
 
+void Slave::alarm() {
+	::alarm( this->config.global.sync.timeout );
+}
+
 Load &Slave::aggregateLoad( FILE *f ) {
 	this->load.reset();
 	for ( int i = 0, len = this->workers.size(); i < len; i++ ) {
-		Load &load = this->workers[ i ].load;
+		SlaveLoad &load = this->workers[ i ].load;
 		this->load.aggregate( load );
 
 		if ( f ) {

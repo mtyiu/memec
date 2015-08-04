@@ -25,6 +25,11 @@ bool GlobalConfig::set( const char *section, const char *name, const char *value
 			this->epoll.timeout = atoi( value );
 		else
 			return false;
+	} else if ( match( section, "sync" ) ) {
+		if ( match( name, "timeout" ) )
+			this->sync.timeout = atoi( value );
+		else
+			return false;
 	} else if ( match( section, "coordinators" ) ) {
 		ServerAddr addr;
 		if ( addr.parse( name, value ) )
@@ -129,6 +134,9 @@ bool GlobalConfig::validate() {
 	if ( this->epoll.timeout < -1 )
 		CFG_PARSE_ERROR( "GlobalConfig", "The timeout value of epoll should be either -1 (infinite blocking), 0 (non-blocking) or a positive value (representing the number of milliseconds to block)." );
 
+	if ( this->sync.timeout < 1 )
+		CFG_PARSE_ERROR( "GlobalConfig", "The synchronization timeout should be at least 1 second." );
+
 	if ( this->size.chunk < this->size.key + 4 ) // 2^24 bytes
 		CFG_PARSE_ERROR( "GlobalConfig", "Chunk size should be at least %u bytes.", this->size.key + 4 );
 	if ( this->size.chunk > 16777216 ) // 2^24 bytes
@@ -229,6 +237,8 @@ void GlobalConfig::print( FILE *f ) {
 		"- epoll settings\n"
 		"\t- %-*s : %u\n"
 		"\t- %-*s : %d\n"
+		"- Synchronization\n"
+		"\t- %-*s : %u\n"
 		"- Buffer\n"
 		"\t- %-*s : %u\n"
 		"- Coding\n"
@@ -238,6 +248,7 @@ void GlobalConfig::print( FILE *f ) {
 		width, "Count", this->stripeList.count,
 		width, "Maximum number of events", this->epoll.maxEvents,
 		width, "Timeout", this->epoll.timeout,
+		width, "Timeout", this->sync.timeout,
 		width, "Chunks per list", this->buffer.chunksPerList,
 		width, "Coding scheme"
 	);

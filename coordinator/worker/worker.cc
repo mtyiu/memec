@@ -107,16 +107,45 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 				return;
 			}
 
-			// bool success = false;
+			bool success = false;
 
-			switch( header.opcode ) {
-				case PROTO_OPCODE_GET:
-					// if ( this->protocol.parseKeyHeader( keyHeader ) ) {
-					// 	success = true;
-					// }
-					break;
-				default:
-					return;
+			if ( header.opcode == PROTO_OPCODE_SYNC ) {
+				size_t bytes, offset, count = 0;
+				struct HeartbeatHeader heartbeatHeader;
+				struct SlaveSyncHeader slaveSyncHeader;
+
+				if ( this->protocol.parseHeartbeatHeader( heartbeatHeader ) ) {
+					success = true;
+					event.socket->load.ops.get = heartbeatHeader.get;
+					event.socket->load.ops.set = heartbeatHeader.set;
+					event.socket->load.ops.update = heartbeatHeader.update;
+					event.socket->load.ops.del = heartbeatHeader.del;
+
+					offset = PROTO_HEADER_SIZE + PROTO_HEARTBEAT_SIZE;
+					while ( offset < ( size_t ) ret ) {
+						if ( ! this->protocol.parseSlaveSyncHeader( slaveSyncHeader, bytes, offset ) )
+							break;
+						offset += bytes;
+						count++;
+
+						// Update metadata map
+						Key key;
+						key.size = slaveSyncHeader.keySize;
+						key.data = slaveSyncHeader.key;
+
+						Metadata metadata;
+						metadata.opcode = slaveSyncHeader.opcode;
+						metadata.listId = slaveSyncHeader.listId;
+						metadata.stripeId = slaveSyncHeader.stripeId;
+						metadata.chunkId = slaveSyncHeader.chunkId;
+
+						if ( event.socket->keys.find( key ) == event.socket->keys.end() )
+							key.dup();
+						event.socket->keys[ key ] = metadata;
+					}
+				}
+			} else {
+				return;
 			}
 		}
 	}

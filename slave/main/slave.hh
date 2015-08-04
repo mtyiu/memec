@@ -8,7 +8,7 @@
 #include "../config/slave_config.hh"
 #include "../event/event_queue.hh"
 #include "../ds/map.hh"
-#include "../ds/load.hh"
+#include "../ds/slave_load.hh"
 #include "../socket/coordinator_socket.hh"
 #include "../socket/master_socket.hh"
 #include "../socket/slave_socket.hh"
@@ -55,7 +55,7 @@ public:
 		ArrayMap<int, MasterSocket> masters;
 		ArrayMap<int, SlavePeerSocket> slavePeers;
 	} sockets;
-	Load load;
+	SlaveLoad load;
 	Map map;
 	SlaveEventQueue eventQueue;
 	Coding *coding;
@@ -79,6 +79,7 @@ public:
 	void debug( FILE *f = stdout );
 	void dump();
 	void time();
+	void alarm();
 	Load &aggregateLoad( FILE *f = 0 );
 	double getElapsedTime();
 	void interactive();
