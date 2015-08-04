@@ -1,7 +1,7 @@
 CC=g++
 CFLAGS=-Wall -O2 -g
 PLIO_SRC_ROOT=..
-LIBS=-pthread
+LIBS=-pthread -lrt
 BIN=$(PLIO_SRC_ROOT)/bin/coordinator
 
 OBJS= \
