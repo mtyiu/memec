@@ -57,6 +57,35 @@ size_t Protocol::generateKeyValueHeader( uint8_t magic, uint8_t to, uint8_t opco
 	return bytes;
 }
 
+size_t Protocol::generateKeyValueUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate ) {
+	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_KEY_VALUE_UPDATE_SIZE + keySize + valueUpdateSize );
+
+	buf[ 0 ] = keySize;
+
+	valueUpdateSize = htonl( valueUpdateSize );
+	buf[ 1 ] = ( valueUpdateSize >> 24 ) & 0xFF;
+	buf[ 2 ] = ( valueUpdateSize >> 16 ) & 0xFF;
+	buf[ 3 ] = ( valueUpdateSize >> 8 ) & 0xFF;
+	valueUpdateSize = ntohl( valueUpdateSize );
+
+	valueUpdateOffset = htonl( valueUpdateOffset );
+	buf[ 4 ] = ( valueUpdateOffset >> 24 ) & 0xFF;
+	buf[ 5 ] = ( valueUpdateOffset >> 16 ) & 0xFF;
+	buf[ 6 ] = ( valueUpdateOffset >> 8 ) & 0xFF;
+	valueUpdateOffset = ntohl( valueUpdateOffset );
+
+	buf += PROTO_KEY_VALUE_UPDATE_SIZE;
+	memmove( buf, key, keySize );
+	buf += keySize;
+	if ( valueUpdateSize )
+		memmove( buf, valueUpdate, valueUpdateSize );
+
+	bytes += PROTO_KEY_VALUE_UPDATE_SIZE + keySize + valueUpdateSize;
+
+	return bytes;
+}
+
 size_t Protocol::generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t opcode, struct HeartbeatHeader &header, std::map<Key, Metadata> &ops, size_t &count ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	std::map<Key, Metadata>::iterator it;
@@ -185,6 +214,32 @@ bool Protocol::parseKeyValueHeader( size_t offset, uint8_t &keySize, char *&key,
 	return true;
 }
 
+bool Protocol::parseKeyValueUpdateHeader( size_t offset, uint8_t &keySize, char *&key, uint32_t &valueUpdateOffset, uint32_t &valueUpdateSize, char *&valueUpdate, char *buf, size_t size ) {
+	if ( size < PROTO_KEY_VALUE_UPDATE_SIZE )
+		return false;
+
+	char *ptr = buf + offset;
+	keySize = ( uint8_t ) ptr[ 0 ];
+	valueUpdateSize = 0;
+	valueUpdateSize |= ptr[ 1 ] << 24;
+	valueUpdateSize |= ptr[ 2 ] << 16;
+	valueUpdateSize |= ptr[ 3 ] << 8;
+	valueUpdateSize = ntohl( valueUpdateSize );
+	valueUpdateOffset = 0;
+	valueUpdateOffset |= ptr[ 4 ] << 24;
+	valueUpdateOffset |= ptr[ 5 ] << 16;
+	valueUpdateOffset |= ptr[ 6 ] << 8;
+	valueUpdateOffset = ntohl( valueUpdateOffset );
+
+	if ( size < PROTO_KEY_VALUE_UPDATE_SIZE + keySize + valueUpdateSize )
+		return false;
+
+	key = ptr + PROTO_KEY_VALUE_UPDATE_SIZE;
+	valueUpdate = valueUpdateSize ? key + keySize : 0;
+
+	return true;
+}
+
 bool Protocol::parseHeartbeatHeader( size_t offset, uint32_t &get, uint32_t &set, uint32_t &update, uint32_t &del, char *buf, size_t size ) {
 	if ( size < PROTO_HEARTBEAT_SIZE )
 		return false;
@@ -308,6 +363,22 @@ bool Protocol::parseKeyValueHeader( struct KeyValueHeader &header, size_t offset
 		header.key,
 		header.valueSize,
 		header.value,
+		buf, size
+	);
+}
+
+bool Protocol::parseKeyValueUpdateHeader( struct KeyValueUpdateHeader &header, size_t offset, char *buf, size_t size ) {
+	if ( ! buf || ! size ) {
+		buf = this->buffer.recv;
+		size = this->buffer.size;
+	}
+	return this->parseKeyValueUpdateHeader(
+		offset,
+		header.keySize,
+		header.key,
+		header.valueUpdateSize,
+		header.valueUpdateOffset,
+		header.valueUpdate,
 		buf, size
 	);
 }

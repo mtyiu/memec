@@ -65,6 +65,7 @@
 #define PROTO_HEADER_SIZE				8
 #define PROTO_KEY_SIZE					1
 #define PROTO_KEY_VALUE_SIZE			4
+#define PROTO_KEY_VALUE_UPDATE_SIZE		7 // 4 + 3
 #define PROTO_HEARTBEAT_SIZE			16
 #define PROTO_SLAVE_SYNC_PER_SIZE		14 // ( 1 * 2 + 4 * 3 )
 
@@ -86,18 +87,6 @@ struct ProtocolHeader {
 	uint32_t length; // Content length
 };
 
-struct KeyHeader {
-	uint8_t keySize;
-	char *key;
-};
-
-struct KeyValueHeader {
-	uint8_t keySize;
-	uint32_t valueSize;
-	char *key;
-	char *value;
-};
-
 struct HeartbeatHeader {
 	uint32_t get;
 	uint32_t set;
@@ -114,6 +103,26 @@ struct SlaveSyncHeader {
 	char *key;
 };
 
+struct KeyHeader {
+	uint8_t keySize;
+	char *key;
+};
+
+struct KeyValueHeader {
+	uint8_t keySize;
+	uint32_t valueSize;
+	char *key;
+	char *value;
+};
+
+struct KeyValueUpdateHeader {
+	uint8_t keySize;
+	uint32_t valueUpdateOffset;
+	uint32_t valueUpdateSize;
+	char *key;
+	char *valueUpdate;
+};
+
 class Protocol {
 protected:
 	uint8_t from, to;
@@ -121,11 +130,13 @@ protected:
 	size_t generateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t length );
 	size_t generateKeyHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint8_t keySize, char *key );
 	size_t generateKeyValueHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint8_t keySize, char *key, uint32_t valueSize, char *value );
+	size_t generateKeyValueUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate );
 	size_t generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t opcode, struct HeartbeatHeader &header, std::map<Key, Metadata> &ops, size_t &count );
 
 	bool parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t &opcode, uint32_t &length, char *buf, size_t size );
 	bool parseKeyHeader( size_t offset, uint8_t &keySize, char *&key, char *buf, size_t size );
 	bool parseKeyValueHeader( size_t offset, uint8_t &keySize, char *&key, uint32_t &valueSize, char *&value, char *buf, size_t size );
+	bool parseKeyValueUpdateHeader( size_t offset, uint8_t &keySize, char *&key, uint32_t &valueUpdateOffset, uint32_t &valueUpdateSize, char *&valueUpdate, char *buf, size_t size );
 	bool parseHeartbeatHeader( size_t offset, uint32_t &get, uint32_t &set, uint32_t &update, uint32_t &del, char *buf, size_t size );
 	bool parseSlaveSyncHeader( size_t offset, uint8_t &keySize, uint8_t &opcode, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, char *&key, char *buf, size_t size );
 
@@ -142,6 +153,7 @@ public:
 	bool parseHeader( struct ProtocolHeader &header, char *buf = 0, size_t size = 0 );
 	bool parseKeyHeader( struct KeyHeader &header, size_t offset = PROTO_HEADER_SIZE, char *buf = 0, size_t size = 0 );
 	bool parseKeyValueHeader( struct KeyValueHeader &header, size_t offset = PROTO_HEADER_SIZE, char *buf = 0, size_t size = 0 );
+	bool parseKeyValueUpdateHeader( struct KeyValueUpdateHeader &header, size_t offset = PROTO_HEADER_SIZE, char *buf = 0, size_t size = 0 );
 	bool parseHeartbeatHeader( struct HeartbeatHeader &header, size_t offset = PROTO_HEADER_SIZE, char *buf = 0, size_t size = 0 );
 	bool parseSlaveSyncHeader( struct SlaveSyncHeader &header, size_t &bytes, size_t offset = PROTO_HEADER_SIZE + PROTO_HEARTBEAT_SIZE, char *buf = 0, size_t size = 0 );
 
