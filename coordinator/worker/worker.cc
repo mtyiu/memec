@@ -75,6 +75,9 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			buffer.data = this->protocol.resRegisterSlave( buffer.size, false );
 			isSend = true;
 			break;
+		case SLAVE_EVENT_TYPE_PENDING:
+			isSend = false;
+			break;
 		default:
 			return;
 	}
@@ -83,6 +86,39 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+	} else {
+		// Parse requests from slaves
+		ProtocolHeader header;
+		ret = event.socket->recv(
+			this->protocol.buffer.recv,
+			this->protocol.buffer.size,
+			connected,
+			false
+		);
+		if ( ! this->protocol.parseHeader( header ) ) {
+			__ERROR__( "CoordinatorWorker", "dispatch", "Undefined message." );
+		} else {
+			if (
+				( header.magic != PROTO_MAGIC_REQUEST && header.magic != PROTO_MAGIC_HEARTBEAT ) ||
+				header.from != PROTO_MAGIC_FROM_SLAVE ||
+				header.to != PROTO_MAGIC_TO_COORDINATOR
+			) {
+				__ERROR__( "CoordinatorWorker", "dispatch", "Invalid protocol header." );
+				return;
+			}
+
+			// bool success = false;
+
+			switch( header.opcode ) {
+				case PROTO_OPCODE_GET:
+					// if ( this->protocol.parseKeyHeader( keyHeader ) ) {
+					// 	success = true;
+					// }
+					break;
+				default:
+					return;
+			}
+		}
 	}
 	
 	if ( ! connected )

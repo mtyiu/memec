@@ -14,6 +14,9 @@ size_t Protocol::generateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint
 	this->buffer.send[ 3 ] = 0;
 	bytes += 4;
 
+	// TODO: Fix incorrect MAGIC_TO code
+	printf(" to = %u\n", this->buffer.send[ 0 ] & 0x60 );
+
 	*( ( uint32_t * )( this->buffer.send + bytes ) ) = htonl( length );
 	bytes += 4;
 
@@ -57,6 +60,47 @@ size_t Protocol::generateKeyValueHeader( uint8_t magic, uint8_t to, uint8_t opco
 	return bytes;
 }
 
+size_t Protocol::generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t opcode, struct HeartbeatHeader &header, std::map<Key, Metadata> &ops, size_t &count ) {
+	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
+	std::map<Key, Metadata>::iterator it;
+	size_t bytes = PROTO_HEADER_SIZE;
+	count = 0;
+
+	*( ( uint32_t * )( buf      ) ) = htonl( header.get );
+	*( ( uint32_t * )( buf +  4 ) ) = htonl( header.set );
+	*( ( uint32_t * )( buf +  8 ) ) = htonl( header.update );
+	*( ( uint32_t * )( buf + 12 ) ) = htonl( header.del );
+	buf += PROTO_HEARTBEAT_SIZE;
+	bytes += PROTO_HEARTBEAT_SIZE;
+
+	for ( it = ops.begin(); it != ops.end(); it++ ) {
+		const Key &key = it->first;
+		const Metadata &metadata = it->second;
+		if ( this->buffer.size >= bytes + PROTO_SLAVE_SYNC_PER_SIZE + key.size ) {
+			// Send buffer still has enough space for holding the current metadata
+			buf[ 0 ] = key.size;
+			buf[ 1 ] = metadata.opcode;
+			*( ( uint32_t * )( buf + 2 ) ) = htonl( metadata.listId );
+			*( ( uint32_t * )( buf + 6 ) ) = htonl( metadata.stripeId );
+			*( ( uint32_t * )( buf + 10 ) ) = htonl( metadata.chunkId );
+			
+			buf += PROTO_SLAVE_SYNC_PER_SIZE;
+			memmove( buf, key.data, key.size );
+			buf += key.size;
+			bytes += PROTO_SLAVE_SYNC_PER_SIZE + key.size;
+			count++;
+		} else {
+			break;
+		}
+	}
+	// Clear sent metadata
+	ops.erase( ops.begin(), it );
+
+	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE );
+
+	return bytes;
+}
+
 bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t &opcode, uint32_t &length, char *buf, size_t size ) {
 	if ( size < 8 )
 		return false;
@@ -87,12 +131,15 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 			return false;
 	}
 
+	printf( "from = %u; to = %u; this->to = %u\n", from, to, this->to );
+
 	if ( to != this->to )
 		return false;
 
 	switch( opcode ) {
 		case PROTO_OPCODE_REGISTER:
 		case PROTO_OPCODE_GET_CONFIG:
+		case PROTO_OPCODE_SYNC:
 		case PROTO_OPCODE_GET:
 		case PROTO_OPCODE_SET:
 		case PROTO_OPCODE_REPLACE:
@@ -139,6 +186,38 @@ bool Protocol::parseKeyValueHeader( size_t offset, uint8_t &keySize, char *&key,
 
 	key = ptr + PROTO_KEY_VALUE_SIZE;
 	value = valueSize ? key + keySize : 0;
+
+	return true;
+}
+
+bool Protocol::parseHeartbeatHeader( size_t offset, uint32_t &get, uint32_t &set, uint32_t &update, uint32_t &del, char *buf, size_t size ) {
+	if ( size < PROTO_HEARTBEAT_SIZE )
+		return false;
+
+	char *ptr = buf + offset;
+	get = ntohl( *( ( uint32_t * )( ptr ) ) );
+	set = ntohl( *( ( uint32_t * )( ptr + 4 ) ) );
+	update = ntohl( *( ( uint32_t * )( ptr + 8 ) ) );
+	del = ntohl( *( ( uint32_t * )( ptr + 12 ) ) );
+
+	return true;
+}
+
+bool Protocol::parseSlaveSyncHeader( size_t offset, uint8_t &keySize, uint8_t &opcode, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, char *&key, char *buf, size_t size ) {
+	if ( size < PROTO_SLAVE_SYNC_PER_SIZE )
+		return false;
+
+	char *ptr = buf + offset;
+	keySize = ( uint8_t ) ptr[ 0 ];
+	opcode = ( uint8_t ) ptr[ 1 ];
+	listId = ntohl( *( ( uint32_t * )( ptr + 2 ) ) );
+	stripeId = ntohl( *( ( uint32_t * )( ptr + 6 ) ) );
+	chunkId = ntohl( *( ( uint32_t * )( ptr + 10 ) ) );
+
+	if ( size < PROTO_SLAVE_SYNC_PER_SIZE + ( size_t ) keySize )
+		return false;
+
+	key = ptr + PROTO_SLAVE_SYNC_PER_SIZE;
 
 	return true;
 }
@@ -236,6 +315,40 @@ bool Protocol::parseKeyValueHeader( struct KeyValueHeader &header, size_t offset
 		header.value,
 		buf, size
 	);
+}
+
+bool Protocol::parseHeartbeatHeader( struct HeartbeatHeader &header, size_t offset, char *buf, size_t size ) {
+	if ( ! buf || ! size ) {
+		buf = this->buffer.recv;
+		size = this->buffer.size;
+	}
+	return this->parseHeartbeatHeader(
+		offset,
+		header.get,
+		header.set,
+		header.update,
+		header.del,
+		buf, size
+	);
+}
+
+bool Protocol::parseSlaveSyncHeader( struct SlaveSyncHeader &header, size_t &bytes, size_t offset, char *buf, size_t size ) {
+	if ( ! buf || ! size ) {
+		buf = this->buffer.recv;
+		size = this->buffer.size;
+	}
+	bool ret = this->parseSlaveSyncHeader(
+		offset,
+		header.keySize,
+		header.opcode,
+		header.listId,
+		header.stripeId,
+		header.chunkId,
+		header.key,
+		buf, size
+	);
+	bytes = PROTO_SLAVE_SYNC_PER_SIZE + header.keySize;
+	return ret;
 }
 
 size_t Protocol::getSuggestedBufferSize( uint32_t keySize, uint32_t chunkSize ) {

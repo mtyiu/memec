@@ -20,6 +20,15 @@ void Slave::free() {
 	}
 }
 
+void Slave::sync() {
+	CoordinatorEvent event;
+	for ( int i = 0, len = this->config.global.coordinators.size(); i < len; i++ ) {
+		// Can only sync with one coordinator
+		event.sync( &this->sockets.coordinators[ i ] );
+		this->eventQueue.insert( event );
+	}
+}
+
 void Slave::signalHandler( int signal ) {
 	Signal::setHandler();
 	Slave::getInstance()->stop();
@@ -386,6 +395,12 @@ void Slave::interactive() {
 		} else if ( strcmp( command, "dump" ) == 0 ) {
 			valid = true;
 			this->dump();
+		} else if ( strcmp( command, "sync" ) == 0 ) {
+			valid = true;
+			this->sync();
+		} else if ( strcmp( command, "load" ) == 0 ) {
+			valid = true;
+			this->aggregateLoad( stdout );
 		} else if ( strcmp( command, "time" ) == 0 ) {
 			valid = true;
 			this->time();
@@ -409,6 +424,20 @@ void Slave::dump() {
 		}
 	}
 	fprintf( stdout, "\n" );
+
+	fprintf( stdout, "List of metadata:\n------------------------\n" );
+	if ( ! this->map.metadata.size() ) {
+		fprintf( stdout, "(None)\n" );
+	} else {
+		for ( std::map<Key, Metadata>::iterator it = this->map.metadata.begin(); it != this->map.metadata.end(); it++ ) {
+			fprintf(
+				stdout, "%.*s --> (list: %u, stripe: %u, chunk: %u)\n",
+				it->first.size, it->first.data,
+				it->second.listId, it->second.stripeId, it->second.chunkId
+			);
+		}
+	}
+	fprintf( stdout, "\n" );
 }
 
 void Slave::help() {
@@ -419,6 +448,8 @@ void Slave::help() {
 		"- info: Show configuration\n"
 		"- debug: Show debug messages\n"
 		"- dump: Dump all key-value pairs\n"
+		"- sync: Synchronize with coordinator\n"
+		"- load: Show the load of each worker\n"
 		"- time: Show elapsed time\n"
 		"- exit: Terminate this client\n"
 	);
@@ -428,4 +459,23 @@ void Slave::help() {
 void Slave::time() {
 	fprintf( stdout, "Elapsed time: %12.6lf s\n", this->getElapsedTime() );
 	fflush( stdout );
+}
+
+Load &Slave::aggregateLoad( FILE *f ) {
+	this->load.reset();
+	for ( int i = 0, len = this->workers.size(); i < len; i++ ) {
+		Load &load = this->workers[ i ].load;
+		this->load.aggregate( load );
+
+		if ( f ) {
+			fprintf( f,	"Load of Worker #%d:\n-------------------\n", i + 1 );
+			load.print( f );
+			fprintf( f, "\n" );
+		}
+	}
+	if ( f ) {
+		fprintf( f,	"Aggregated load:\n----------------\n" );
+		this->load.print( f );
+	}
+	return this->load;
 }

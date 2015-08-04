@@ -7,6 +7,8 @@
 #include "../buffer/mixed_chunk_buffer.hh"
 #include "../config/slave_config.hh"
 #include "../event/event_queue.hh"
+#include "../ds/map.hh"
+#include "../ds/load.hh"
 #include "../socket/coordinator_socket.hh"
 #include "../socket/master_socket.hh"
 #include "../socket/slave_socket.hh"
@@ -16,11 +18,8 @@
 #include "../../common/config/global_config.hh"
 #include "../../common/ds/array_map.hh"
 #include "../../common/ds/chunk.hh"
-#include "../../common/ds/key.hh"
-#include "../../common/ds/key_value.hh"
 #include "../../common/ds/memory_pool.hh"
 #include "../../common/ds/stripe.hh"
-#include "../../common/map/map.hh"
 #include "../../common/signal/signal.hh"
 #include "../../common/socket/epoll.hh"
 #include "../../common/stripe_list/stripe_list.hh"
@@ -41,6 +40,7 @@ private:
 
 	void free();
 	// Commands
+	void sync();
 	void help();
 
 public:
@@ -55,6 +55,7 @@ public:
 		ArrayMap<int, MasterSocket> masters;
 		ArrayMap<int, SlavePeerSocket> slavePeers;
 	} sockets;
+	Load load;
 	Map map;
 	SlaveEventQueue eventQueue;
 	Coding *coding;
@@ -78,6 +79,7 @@ public:
 	void debug( FILE *f = stdout );
 	void dump();
 	void time();
+	Load &aggregateLoad( FILE *f = 0 );
 	double getElapsedTime();
 	void interactive();
 };

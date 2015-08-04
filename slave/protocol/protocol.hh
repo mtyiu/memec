@@ -7,6 +7,7 @@ class SlaveProtocol : public Protocol {
 public:
 	SlaveProtocol() : Protocol( ROLE_SLAVE ) {}
 	char *reqRegisterCoordinator( size_t &size );
+	char *sendHeartbeat( size_t &size, struct HeartbeatHeader &header, std::map<Key, Metadata> &metadataMap, size_t &count );
 	char *reqRegisterSlavePeer( size_t &size );
 	char *resRegisterMaster( size_t &size, bool success );
 	char *resRegisterSlavePeer( size_t &size, bool success );

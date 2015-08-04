@@ -133,6 +133,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 				header.to != PROTO_MAGIC_TO_MASTER
 			) {
 				__ERROR__( "MasterWorker", "dispatch", "Invalid protocol header." );
+				return;
 			}
 
 			struct KeyHeader keyHeader;

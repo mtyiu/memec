@@ -1,6 +1,7 @@
 #include "worker.hh"
 #include "../main/slave.hh"
 #include "../../common/util/debug.hh"
+#include "../../common/util/time.hh"
 
 #define WORKER_COLOR	YELLOW
 
@@ -68,14 +69,25 @@ void SlaveWorker::dispatch( CodingEvent event ) {
 void SlaveWorker::dispatch( CoordinatorEvent event ) {
 	bool connected, isSend;
 	ssize_t ret;
+	size_t count;
 	struct {
 		size_t size;
 		char *data;
 	} buffer;
+	struct timespec t = start_timer();
 
 	switch( event.type ) {
 		case COORDINATOR_EVENT_TYPE_REGISTER_REQUEST:
 			buffer.data = this->protocol.reqRegisterCoordinator( buffer.size );
+			isSend = true;
+			break;
+		case COORDINATOR_EVENT_TYPE_SYNC:
+			buffer.data = this->protocol.sendHeartbeat(
+				buffer.size,
+				Slave::getInstance()->aggregateLoad().ops,
+				SlaveWorker::map->ops,
+				count
+			);
 			isSend = true;
 			break;
 		case COORDINATOR_EVENT_TYPE_PENDING:
@@ -89,11 +101,25 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "SlaveWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+
+		if ( ret > 0 ) {
+			this->load.sentBytes += ret;
+			this->load.elapsedTime += get_elapsed_time( t );
+		}
+
+		if ( event.type == COORDINATOR_EVENT_TYPE_SYNC && SlaveWorker::map->ops.size() ) {
+			// Some metadata is not sent yet, continue to send
+			SlaveWorker::eventQueue->insert( event );
+		}
 	} else {
 		ProtocolHeader header;
 
 		ret = event.socket->recv( this->protocol.buffer.recv, PROTO_HEADER_SIZE, connected, true );
+
 		if ( ret == PROTO_HEADER_SIZE && connected ) {
+			this->load.recvBytes += ret;
+			this->load.elapsedTime += get_elapsed_time( t );
+
 			this->protocol.parseHeader( header, this->protocol.buffer.recv, ret );
 			// Validate message
 			if ( header.from != PROTO_MAGIC_FROM_COORDINATOR ) {
@@ -143,6 +169,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		size_t size;
 		char *data;
 	} buffer;
+	struct timespec t = start_timer();
 
 	switch( event.type ) {
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
@@ -206,6 +233,11 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "SlaveWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+
+		if ( ret > 0 ) {
+			this->load.sentBytes += ret;
+			this->load.elapsedTime += get_elapsed_time( t );
+		}
 	} else {
 		// Parse requests from masters
 		ProtocolHeader header;
@@ -215,6 +247,10 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 			connected,
 			false
 		);
+		if ( ret > 0 ) {
+			this->load.recvBytes += ret;
+			this->load.elapsedTime += get_elapsed_time( t );
+		}
 		if ( ! this->protocol.parseHeader( header ) ) {
 			__ERROR__( "SlaveWorker", "dispatch", "Undefined message." );
 		} else {
@@ -256,6 +292,8 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 							event.resGet( event.socket, key );
 						}
 
+						this->load.get();
+
 						// Send the response immediately
 						this->dispatch( event );
 					}
@@ -289,10 +327,23 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 							);
 						Key key = keyValue.key();
 
-						if ( ! isParity )
+						if ( ! isParity ) {
+							Metadata metadata;
+							metadata.opcode = PROTO_OPCODE_SET;
+							metadata.listId = keyValue.chunk->listId;
+							metadata.stripeId = keyValue.chunk->stripeId;
+							metadata.chunkId = keyValue.chunk->chunkId;
+							key.dup( key.size, key.data );
+
+							// Update mappings
+							map->metadata[ key ] = metadata;
 							map->keyValue[ key ] = keyValue;
+							map->ops[ key ] = metadata;
+						}
 
 						event.resSet( event.socket, key );
+
+						this->load.set();
 
 						// Send the response immediately
 						this->dispatch( event );

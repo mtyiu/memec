@@ -7,6 +7,8 @@
 #include "../buffer/mixed_chunk_buffer.hh"
 #include "../config/slave_config.hh"
 #include "../event/event_queue.hh"
+#include "../ds/map.hh"
+#include "../ds/load.hh"
 #include "../protocol/protocol.hh"
 #include "../storage/allstorage.hh"
 #include "../../common/coding/coding.hh"
@@ -16,7 +18,6 @@
 #include "../../common/ds/key_value.hh"
 #include "../../common/ds/memory_pool.hh"
 #include "../../common/ds/stripe.hh"
-#include "../../common/map/map.hh"
 #include "../../common/stripe_list/stripe_list.hh"
 #include "../../common/worker/worker.hh"
 
@@ -44,6 +45,8 @@ private:
 	static void *run( void *argv );
 
 public:
+	Load load;
+
 	static bool init();
 	bool init( GlobalConfig &globalConfig, SlaveConfig &slaveConfig, WorkerRole role );
 	bool start();

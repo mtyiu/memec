@@ -10,6 +10,7 @@ OBJS= \
 	buffer/parity_chunk_buffer.o \
 	buffer/mixed_chunk_buffer.o \
 	config/slave_config.o \
+	ds/load.o \
 	event/coding_event.o \
 	event/coordinator_event.o \
 	event/io_event.o \
