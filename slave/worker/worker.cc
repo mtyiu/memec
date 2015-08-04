@@ -264,11 +264,13 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 
 			struct KeyHeader keyHeader;
 			struct KeyValueHeader keyValueHeader;
-			size_t listIndex;
+			struct KeyValueUpdateHeader keyValueUpdateHeader;
+			uint32_t listIndex, dataIndex;
 			uint32_t dataChunkId;
 			bool isParity;
 
 			switch( header.opcode ) {
+				///////////////////////////////////////////////////////////////
 				case PROTO_OPCODE_GET:
 					if ( this->protocol.parseKeyHeader( keyHeader ) ) {
 						__DEBUG__(
@@ -298,6 +300,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 						this->dispatch( event );
 					}
 					break;
+				///////////////////////////////////////////////////////////////
 				case PROTO_OPCODE_SET:
 					if ( this->protocol.parseKeyValueHeader( keyValueHeader ) ) {
 						__DEBUG__(
@@ -349,6 +352,22 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 						this->dispatch( event );
 					}
 					break;
+				///////////////////////////////////////////////////////////////
+				case PROTO_OPCODE_UPDATE:
+					break;
+				///////////////////////////////////////////////////////////////
+				case PROTO_OPCODE_UPDATE_DELTA:
+					break;
+				///////////////////////////////////////////////////////////////
+				case PROTO_OPCODE_DELETE:
+					break;
+				///////////////////////////////////////////////////////////////
+				case PROTO_OPCODE_DELETE_DELTA:
+					break;
+				///////////////////////////////////////////////////////////////
+				default:
+					__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from master." );
+					return;
 			}
 		}
 	}

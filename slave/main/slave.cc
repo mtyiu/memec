@@ -84,6 +84,8 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 		SlavePeerSocket socket;
 		int fd;
 
+		socket.self = i == mySlaveIndex;
+
 		socket.init( this->config.global.slaves[ i ], &this->sockets.epoll );
 		fd = socket.getSocket();
 		this->sockets.slavePeers.set( fd, socket );

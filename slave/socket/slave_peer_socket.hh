@@ -6,6 +6,7 @@
 class SlavePeerSocket : public Socket {
 public:
 	bool registered;
+	bool self;
 	
 	bool start();
 	ssize_t send( char *buf, size_t ulen, bool &connected );

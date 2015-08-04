@@ -185,7 +185,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 						key.ptr = ( void * ) socket;
 						MasterWorker::pending->slaves.get.insert( key );
 
-						// Send requests
+						// Send GET request
 						ret = socket->send( buffer.data, buffer.size, connected );
 					} else {
 						return;
@@ -230,7 +230,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 							MasterWorker::pending->slaves.set.insert( key );
 						}
 
-						// Send requests
+						// Send SET requests
 #define MASTER_WORKER_SEND_REPLICAS_PARALLEL
 						for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
 #ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
@@ -294,7 +294,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 							MasterWorker::pending->slaves.update.insert( key );
 						}
 
-						// TODO: Send UPDATE requests
+						// Send UPDATE request
 					} else {
 						return;
 					}
@@ -324,19 +324,31 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 							true
 						);
 
+						socket = this->dataSlaveSockets[ dataIndex ];
+
+						for ( uint32_t i = 0; ! socket->ready(); i++ ) {
+							if ( i >= this->dataChunkCount + this->parityChunkCount ) {
+								__ERROR__( "MasterWorker", "dispatch", "Cannot find a slave for performing degraded read." );	
+							}
+							// Choose another slave to perform degraded read
+							socket = MasterWorker::stripeList->get( listIndex, dataIndex, i );
+						}
+
 						Key key;
 						key.dup( keyHeader.keySize, keyHeader.key, ( void * ) event.socket );
 						MasterWorker::pending->applications.del.insert( key );
 
-						key.ptr = ( void * ) this->dataSlaveSockets[ dataIndex ];
+						key.ptr = ( void * ) socket;
 						MasterWorker::pending->slaves.del.insert( key );
 
-						// TODO: Send DELETE requests
+						// Send DELETE requests
+						ret = socket->send( buffer.data, buffer.size, connected );
 					} else {
 						return;
 					}
 					break;
 				default:
+					__ERROR__( "MasterWorker", "dispatch", "Invalid opcode from application." );
 					return;
 			}
 

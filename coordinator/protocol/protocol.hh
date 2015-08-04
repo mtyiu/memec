@@ -9,8 +9,14 @@
 class CoordinatorProtocol : public Protocol {
 public:
 	CoordinatorProtocol() : Protocol( ROLE_COORDINATOR ) {}
+	
+	/* Master */
+	// Register
 	char *resRegisterMaster( size_t &size, bool success );
 	char *resRegisterMaster( size_t &size, GlobalConfig &globalConfig, MasterConfig *masterConfig = 0 );
+
+	/* Slave */
+	// Register
 	char *resRegisterSlave( size_t &size, bool success );
 	char *resRegisterSlave( size_t &size, GlobalConfig &globalConfig, SlaveConfig *slaveConfig = 0 );
 };

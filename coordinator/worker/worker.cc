@@ -113,7 +113,6 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 				struct SlaveSyncHeader slaveSyncHeader;
 
 				if ( this->protocol.parseHeartbeatHeader( heartbeatHeader ) ) {
-					success = true;
 					event.socket->load.ops.get = heartbeatHeader.get;
 					event.socket->load.ops.set = heartbeatHeader.set;
 					event.socket->load.ops.update = heartbeatHeader.update;
@@ -141,9 +140,11 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 							key.dup();
 						event.socket->keys[ key ] = metadata;
 					}
+				} else {
+					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid heartbeat protocol header." );
 				}
 			} else {
-				return;
+				__ERROR__( "CoordinatorWorker", "dispatch", "Invalid opcode from slave." );
 			}
 		}
 	}

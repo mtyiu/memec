@@ -22,30 +22,10 @@ char *SlaveProtocol::sendHeartbeat( size_t &size, struct HeartbeatHeader &header
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::reqRegisterSlavePeer( size_t &size ) {
-	size = this->generateHeader(
-		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
-		PROTO_OPCODE_REGISTER,
-		0
-	);
-	return this->buffer.send;
-}
-
 char *SlaveProtocol::resRegisterMaster( size_t &size, bool success ) {
 	size = this->generateHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_MASTER,
-		PROTO_OPCODE_REGISTER,
-		0
-	);
-	return this->buffer.send;
-}
-
-char *SlaveProtocol::resRegisterSlavePeer( size_t &size, bool success ) {
-	size = this->generateHeader(
-		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
-		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_REGISTER,
 		0
 	);
@@ -104,6 +84,26 @@ char *SlaveProtocol::resDelete( size_t &size, bool success, uint8_t keySize, cha
 		PROTO_OPCODE_DELETE,
 		keySize,
 		key
+	);
+	return this->buffer.send;
+}
+
+char *SlaveProtocol::reqRegisterSlavePeer( size_t &size ) {
+	size = this->generateHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_REGISTER,
+		0
+	);
+	return this->buffer.send;
+}
+
+char *SlaveProtocol::resRegisterSlavePeer( size_t &size, bool success ) {
+	size = this->generateHeader(
+		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_REGISTER,
+		0
 	);
 	return this->buffer.send;
 }

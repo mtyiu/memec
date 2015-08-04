@@ -68,6 +68,20 @@ char *MasterProtocol::reqUpdate( size_t &size, char *key, uint8_t keySize, char 
 	return this->buffer.send;
 }
 
+char *MasterProtocol::reqUpdateDelta( size_t &size, char *key, uint8_t keySize, char *valueDelta, uint32_t valueUpdateOffset, uint32_t valueUpdateSize ) {
+	size = this->generateKeyValueUpdateHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_UPDATE_DELTA,
+		keySize,
+		key,
+		valueUpdateOffset,
+		valueUpdateSize,
+		valueDelta
+	);
+	return this->buffer.send;
+}
+
 char *MasterProtocol::reqDelete( size_t &size, char *key, uint8_t keySize ) {
 	size = this->generateKeyHeader(
 		PROTO_MAGIC_REQUEST,
@@ -75,6 +89,19 @@ char *MasterProtocol::reqDelete( size_t &size, char *key, uint8_t keySize ) {
 		PROTO_OPCODE_DELETE,
 		keySize,
 		key
+	);
+	return this->buffer.send;
+}
+
+char *MasterProtocol::reqDeleteDelta( size_t &size, char *key, uint8_t keySize, char *valueDelta, uint32_t valueSize ) {
+	size = this->generateKeyValueHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_DELETE_DELTA,
+		keySize,
+		key,
+		valueSize,
+		valueDelta
 	);
 	return this->buffer.send;
 }

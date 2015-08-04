@@ -47,8 +47,10 @@
 #define PROTO_OPCODE_SET				0x02
 #define PROTO_OPCODE_REPLACE			0x03
 #define PROTO_OPCODE_UPDATE				0x04
-#define PROTO_OPCODE_DELETE				0x05
-#define PROTO_OPCODE_FLUSH				0x06
+#define PROTO_OPCODE_UPDATE_DELTA		0x05
+#define PROTO_OPCODE_DELETE				0x06
+#define PROTO_OPCODE_DELETE_DELTA		0x07
+#define PROTO_OPCODE_FLUSH				0x08
 
 /*********************
  * Key size (1 byte) *

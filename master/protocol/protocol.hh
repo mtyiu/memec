@@ -12,19 +12,34 @@ public:
 	bool init( size_t size, uint32_t parityChunkCount );
 	void free();
 
-	// Coordinator
+	/* Coordinator */
+	// Register
 	char *reqRegisterCoordinator( size_t &size );
-	// Slave
+	
+	/* Slave */
+	// Register
 	char *reqRegisterSlave( size_t &size );
+	// SET
 	char *reqSet( size_t &size, char *key, uint8_t keySize, char *value, uint32_t valueSize );
+	// GET
 	char *reqGet( size_t &size, char *key, uint8_t keySize );
+	// UPDATE
 	char *reqUpdate( size_t &size, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize );
+	char *reqUpdateDelta( size_t &size, char *key, uint8_t keySize, char *valueDelta, uint32_t valueUpdateOffset, uint32_t valueUpdateSize );
+	// DELETE
 	char *reqDelete( size_t &size, char *key, uint8_t keySize );
-	// Application
+	char *reqDeleteDelta( size_t &size, char *key, uint8_t keySize, char *valueDelta, uint32_t valueSize );
+	
+	/* Application */
+	// Register
 	char *resRegisterApplication( size_t &size, bool success );
+	// SET
 	char *resSet( size_t &size, bool success, uint8_t keySize, char *key );
+	// GET
 	char *resGet( size_t &size, bool success, uint8_t keySize, char *key, uint32_t valueSize = 0, char *value = 0 );
+	// UPDATE
 	char *resUpdate( size_t &size, bool success, uint8_t keySize, char *key );
+	// DELETE
 	char *resDelete( size_t &size, bool success, uint8_t keySize, char *key );
 };
 
