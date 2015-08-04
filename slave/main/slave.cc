@@ -430,10 +430,10 @@ void Slave::interactive() {
 
 void Slave::dump() {
 	fprintf( stdout, "List of key-value pairs:\n------------------------\n" );
-	if ( ! this->map.keyValue.size() ) {
+	if ( ! this->map.cache.size() ) {
 		fprintf( stdout, "(None)\n" );
 	} else {
-		for ( std::map<Key, KeyValue>::iterator it = this->map.keyValue.begin(); it != this->map.keyValue.end(); it++ ) {
+		for ( std::map<Key, KeyValue>::iterator it = this->map.cache.begin(); it != this->map.cache.end(); it++ ) {
 			fprintf( stdout, "%.*s --> %p\n", it->first.size, it->first.data, it->second.data );
 		}
 	}

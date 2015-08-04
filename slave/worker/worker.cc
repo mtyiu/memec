@@ -266,7 +266,6 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 			struct KeyValueHeader keyValueHeader;
 			struct KeyValueUpdateHeader keyValueUpdateHeader;
 			uint32_t listIndex, dataIndex;
-			uint32_t dataChunkId;
 			bool isParity;
 
 			switch( header.opcode ) {
@@ -287,8 +286,8 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 
 						key.size = keyHeader.keySize;
 						key.data = keyHeader.key;
-						it = map->keyValue.find( key );
-						if ( it != map->keyValue.end() ) {
+						it = map->cache.find( key );
+						if ( it != map->cache.end() ) {
 							event.resGet( event.socket, it->second );
 						} else {
 							event.resGet( event.socket, key );
@@ -315,7 +314,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 						listIndex = SlaveWorker::stripeList->get(
 							keyValueHeader.key,
 							( size_t ) keyValueHeader.keySize,
-							0, 0, &dataChunkId
+							0, 0, &dataIndex
 						);
 
 						KeyValue keyValue = SlaveWorker::chunkBuffer
@@ -326,7 +325,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 								keyValueHeader.value,
 								keyValueHeader.valueSize,
 								isParity,
-								dataChunkId
+								dataIndex
 							);
 						Key key = keyValue.key();
 
@@ -340,7 +339,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 
 							// Update mappings
 							map->metadata[ key ] = metadata;
-							map->keyValue[ key ] = keyValue;
+							map->cache[ key ] = keyValue;
 							map->ops[ key ] = metadata;
 						}
 

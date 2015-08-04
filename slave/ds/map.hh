@@ -10,7 +10,7 @@
 
 typedef struct {
 	std::map<Key, Metadata> metadata;
-	std::map<Key, KeyValue> keyValue;
+	std::map<Key, KeyValue> cache;
 
 	// Store the keys to be synchronized with coordinator
 	std::map<Key, Metadata> ops;

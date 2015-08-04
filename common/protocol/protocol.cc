@@ -168,7 +168,9 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_OPCODE_SET:
 		case PROTO_OPCODE_REPLACE:
 		case PROTO_OPCODE_UPDATE:
+		case PROTO_OPCODE_UPDATE_DELTA:
 		case PROTO_OPCODE_DELETE:
+		case PROTO_OPCODE_DELETE_DELTA:
 		case PROTO_OPCODE_FLUSH:
 			break;
 		default:

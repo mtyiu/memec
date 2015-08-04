@@ -39,8 +39,8 @@
  *******************/
 // Coordinator-specific opcodes //
 #define PROTO_OPCODE_REGISTER			0x00
-#define PROTO_OPCODE_GET_CONFIG			0x07
-#define PROTO_OPCODE_SYNC				0x08
+#define PROTO_OPCODE_GET_CONFIG			0x09
+#define PROTO_OPCODE_SYNC				0x10
 
 // Application <-> Master //
 #define PROTO_OPCODE_GET				0x01
