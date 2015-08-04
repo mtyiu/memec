@@ -20,9 +20,9 @@ enum SocketMode {
 
 class Socket {
 protected:
+	bool connected;
 	SocketMode mode;
 	int sockfd;
-	bool connected;
 	struct sockaddr_in addr;
 
 	bool setSockOpt( int level, int optionName );
@@ -45,6 +45,7 @@ public:
 	}
 	virtual bool start() = 0;
 	virtual void stop();
+	virtual bool ready();
 	virtual void print( FILE *f = stdout );
 	void printAddress( FILE *f = stdout );
 

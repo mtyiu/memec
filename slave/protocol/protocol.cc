@@ -85,3 +85,25 @@ char *SlaveProtocol::resGet( size_t &size, bool success, uint8_t keySize, char *
 	}
 	return this->buffer.send;
 }
+
+char *SlaveProtocol::resUpdate( size_t &size, bool success, uint8_t keySize, char *key ) {
+	size = this->generateKeyHeader(
+		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+		PROTO_MAGIC_TO_MASTER,
+		PROTO_OPCODE_UPDATE,
+		keySize,
+		key
+	);
+	return this->buffer.send;
+}
+
+char *SlaveProtocol::resDelete( size_t &size, bool success, uint8_t keySize, char *key ) {
+	size = this->generateKeyHeader(
+		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+		PROTO_MAGIC_TO_MASTER,
+		PROTO_OPCODE_DELETE,
+		keySize,
+		key
+	);
+	return this->buffer.send;
+}

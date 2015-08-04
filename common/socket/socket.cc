@@ -199,6 +199,10 @@ void Socket::stop() {
 	this->connected = false;
 }
 
+bool Socket::ready() {
+	return this->connected;
+}
+
 void Socket::print( FILE *f ) {
 	char buf[ 16 ];
 	Socket::ntoh_ip( this->addr.sin_addr.s_addr, buf, 16 );

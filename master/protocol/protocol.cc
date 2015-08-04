@@ -54,6 +54,31 @@ char *MasterProtocol::reqGet( size_t &size, char *key, uint8_t keySize ) {
 	return this->buffer.send;
 }
 
+char *MasterProtocol::reqUpdate( size_t &size, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize ) {
+	size = this->generateKeyValueUpdateHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_UPDATE,
+		keySize,
+		key,
+		valueUpdateOffset,
+		valueUpdateSize,
+		valueUpdate
+	);
+	return this->buffer.send;
+}
+
+char *MasterProtocol::reqDelete( size_t &size, char *key, uint8_t keySize ) {
+	size = this->generateKeyHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_DELETE,
+		keySize,
+		key
+	);
+	return this->buffer.send;
+}
+
 char *MasterProtocol::resRegisterApplication( size_t &size, bool success ) {
 	size = this->generateHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
@@ -95,5 +120,27 @@ char *MasterProtocol::resGet( size_t &size, bool success, uint8_t keySize, char 
 			key
 		);
 	}
+	return this->buffer.send;
+}
+
+char *MasterProtocol::resUpdate( size_t &size, bool success, uint8_t keySize, char *key ) {
+	size = this->generateKeyHeader(
+		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+		PROTO_MAGIC_TO_APPLICATION,
+		PROTO_OPCODE_UPDATE,
+		keySize,
+		key
+	);
+	return this->buffer.send;
+}
+
+char *MasterProtocol::resDelete( size_t &size, bool success, uint8_t keySize, char *key ) {
+	size = this->generateKeyHeader(
+		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+		PROTO_MAGIC_TO_APPLICATION,
+		PROTO_OPCODE_DELETE,
+		keySize,
+		key
+	);
 	return this->buffer.send;
 }

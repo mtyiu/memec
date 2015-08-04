@@ -138,10 +138,12 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 
 			struct KeyHeader keyHeader;
 			struct KeyValueHeader keyValueHeader;
-			unsigned int dataIndex;
-			bool success = false;
+			struct KeyValueUpdateHeader keyValueUpdateHeader;
+			uint32_t listIndex, dataIndex;
+			SlaveSocket *socket;
 
 			switch( header.opcode ) {
+				///////////////////////////////////////////////////////////////
 				case PROTO_OPCODE_GET:
 					if ( this->protocol.parseKeyHeader( keyHeader ) ) {
 						__DEBUG__(
@@ -157,7 +159,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 							keyHeader.keySize
 						);
 
-						MasterWorker::stripeList->get(
+						listIndex = MasterWorker::stripeList->get(
 							keyHeader.key,
 							( size_t ) keyHeader.keySize,
 							this->dataSlaveSockets,
@@ -166,16 +168,30 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 							true
 						);
 
+						socket = this->dataSlaveSockets[ dataIndex ];
+
+						for ( uint32_t i = 0; ! socket->ready(); i++ ) {
+							if ( i >= this->dataChunkCount + this->parityChunkCount ) {
+								__ERROR__( "MasterWorker", "dispatch", "Cannot find a slave for performing degraded read." );	
+							}
+							// Choose another slave to perform degraded read
+							socket = MasterWorker::stripeList->get( listIndex, dataIndex, i );
+						}
+
 						Key key;
 						key.dup( keyHeader.keySize, keyHeader.key, ( void * ) event.socket );
 						MasterWorker::pending->applications.get.insert( key );
 
-						key.ptr = ( void * ) this->dataSlaveSockets[ dataIndex ];
+						key.ptr = ( void * ) socket;
 						MasterWorker::pending->slaves.get.insert( key );
 
-						success = true;
+						// Send requests
+						ret = socket->send( buffer.data, buffer.size, connected );
+					} else {
+						return;
 					}
 					break;
+				///////////////////////////////////////////////////////////////
 				case PROTO_OPCODE_SET:
 					if ( this->protocol.parseKeyValueHeader( keyValueHeader ) ) {
 						__DEBUG__(
@@ -194,7 +210,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 							keyValueHeader.valueSize
 						);
 
-						MasterWorker::stripeList->get(
+						listIndex = MasterWorker::stripeList->get(
 							keyValueHeader.key,
 							( size_t ) keyValueHeader.keySize,
 							this->dataSlaveSockets,
@@ -214,39 +230,114 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 							MasterWorker::pending->slaves.set.insert( key );
 						}
 
-						success = true;
+						// Send requests
+#define MASTER_WORKER_SEND_REPLICAS_PARALLEL
+						for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
+#ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
+							SlaveEvent slaveEvent;
+							this->protocol.status->set( i );
+							slaveEvent.send( this->paritySlaveSockets[ i ], &this->protocol, buffer.size, i );
+							MasterWorker::eventQueue->insert( slaveEvent );
+#else
+							ret = this->paritySlaveSockets[ i ]->send( buffer.data, buffer.size, connected );
+#endif
+						}
+						ret = this->dataSlaveSockets[ dataIndex ]->send( buffer.data, buffer.size, connected );	
+#ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
+						// Wait until all replicas are sent
+						for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
+							while( this->protocol.status->check( i ) ); // Busy waiting
+						}
+#endif
+					} else {
+						return;
 					}
 					break;
-			}
+				///////////////////////////////////////////////////////////////
+				case PROTO_OPCODE_UPDATE:
+					if ( this->protocol.parseKeyValueUpdateHeader( keyValueUpdateHeader ) ) {
+						__DEBUG__(
+							BLUE, "MasterWorker", "dispatch",
+							"[SET] Key: %.*s (key size = %u); Value: (offset = %u, value update size = %u)",
+							( int ) keyValueUpdateHeader.keySize,
+							keyValueUpdateHeader.key,
+							keyValueUpdateHeader.keySize,
+							keyValueUpdateHeader.valueUpdateOffset,
+							keyValueUpdateHeader.valueUpdateSize
+						);
+						buffer.data = this->protocol.reqUpdate(
+							buffer.size,
+							keyValueUpdateHeader.key,
+							keyValueUpdateHeader.keySize,
+							keyValueUpdateHeader.valueUpdate,
+							keyValueUpdateHeader.valueUpdateOffset,
+							keyValueUpdateHeader.valueUpdateSize
+						);
 
-			if ( ! success )
-				return;
+						listIndex = MasterWorker::stripeList->get(
+							keyValueUpdateHeader.key,
+							( size_t ) keyValueUpdateHeader.keySize,
+							this->dataSlaveSockets,
+							this->paritySlaveSockets,
+							&dataIndex,
+							true
+						);
 
-			// Send request
-			if ( header.opcode == PROTO_OPCODE_SET ) {
-#define MASTER_WORKER_SEND_REPLICAS_PARALLEL
-				for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
-#ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
-					SlaveEvent slaveEvent;
+						Key key;
+						key.dup( keyValueUpdateHeader.keySize, keyValueUpdateHeader.key, ( void * ) event.socket );
+						MasterWorker::pending->applications.update.insert( key );
 
-					this->protocol.status->set( i );
-					slaveEvent.send( this->paritySlaveSockets[ i ], &this->protocol, buffer.size, i );
-					MasterWorker::eventQueue->insert( slaveEvent );
-#else
-					ret = this->paritySlaveSockets[ i ]->send( buffer.data, buffer.size, connected );
-#endif
-				}
+						key.ptr = ( void * ) this->dataSlaveSockets[ dataIndex ];
+						MasterWorker::pending->slaves.update.insert( key );
+						for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
+							key.ptr = ( void * ) this->paritySlaveSockets[ i ];
+							MasterWorker::pending->slaves.update.insert( key );
+						}
 
-				ret = this->dataSlaveSockets[ dataIndex ]->send( buffer.data, buffer.size, connected );	
+						// TODO: Send UPDATE requests
+					} else {
+						return;
+					}
+					break;
+				///////////////////////////////////////////////////////////////
+				case PROTO_OPCODE_DELETE:
+					if ( this->protocol.parseKeyHeader( keyHeader ) ) {
+						__DEBUG__(
+							BLUE, "MasterWorker", "dispatch",
+							"[DELETE] Key: %.*s (key size = %u).",
+							( int ) keyHeader.keySize,
+							keyHeader.key,
+							keyHeader.keySize
+						);
+						buffer.data = this->protocol.reqDelete(
+							buffer.size,
+							keyHeader.key,
+							keyHeader.keySize
+						);
 
-#ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
-				// Wait until all replicas are sent
-				for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
-					while( this->protocol.status->check( i ) ); // Busy waiting
-				}
-#endif
-			} else {
-				ret = this->dataSlaveSockets[ dataIndex ]->send( buffer.data, buffer.size, connected );	
+						listIndex = MasterWorker::stripeList->get(
+							keyHeader.key,
+							( size_t ) keyHeader.keySize,
+							this->dataSlaveSockets,
+							this->paritySlaveSockets,
+							&dataIndex,
+							true
+						);
+
+						Key key;
+						key.dup( keyHeader.keySize, keyHeader.key, ( void * ) event.socket );
+						MasterWorker::pending->applications.del.insert( key );
+
+						key.ptr = ( void * ) this->dataSlaveSockets[ dataIndex ];
+						MasterWorker::pending->slaves.del.insert( key );
+
+						// TODO: Send DELETE requests
+					} else {
+						return;
+					}
+					break;
+				default:
+					return;
 			}
 
 			if ( ret != ( ssize_t ) buffer.size )

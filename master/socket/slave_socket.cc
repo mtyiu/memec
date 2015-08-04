@@ -22,6 +22,10 @@ ssize_t SlaveSocket::recv( char *buf, size_t ulen, bool &connected, bool wait ) 
 	return Socket::recv( this->sockfd, buf, ulen, connected, wait );
 }
 
+bool SlaveSocket::ready() {
+	return this->connected && this->registered;
+}
+
 void SlaveSocket::print( FILE *f ) {
 	char buf[ 16 ];
 	Socket::ntoh_ip( this->addr.sin_addr.s_addr, buf, 16 );

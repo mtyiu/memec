@@ -20,20 +20,19 @@ typedef struct {
 // Need to know n, k, number of stripe list requested, number of slaves, mapped slaves
 template <class T> class StripeList {
 protected:
-	uint32_t n, k;
-	size_t numLists, numSlaves;
+	uint32_t n, k, numLists, numSlaves;
 	bool generated;
 	BitmaskArray data, parity;
 	unsigned int *weight, *cost;
 	std::vector<T> *slaves;
-	ConsistentHash<size_t> ring;
+	ConsistentHash<uint32_t> listRing;
 	std::vector<T **> lists;
 
-	inline int pickMin( int listIndex ) {
-		int index = 0;
+	inline uint32_t pickMin( int listIndex ) {
+		uint32_t index = 0;
 		unsigned int minWeight = this->weight[ 0 ];
 		unsigned int minCost = this->cost[ 0 ];
-		for ( size_t i = 0; i < this->numSlaves; i++ ) {
+		for ( uint32_t i = 0; i < this->numSlaves; i++ ) {
 			if (
 				(
 					( this->weight[ i ] < minWeight ) || 
@@ -54,8 +53,8 @@ protected:
 		if ( generated )
 			return;
 
-		int index;
-		size_t i, j;
+		uint32_t index;
+		uint32_t i, j;
 
 		for ( i = 0; i < this->numLists; i++ ) {
 			T **list = this->lists[ i ];
@@ -75,8 +74,9 @@ protected:
 
 				list[ j ] = &this->slaves->at( index );
 			}
-			this->ring.add( i );
+			this->listRing.add( i );
 		}
+
 		this->generated = true;
 	}
 
@@ -100,22 +100,22 @@ public:
 		this->generate();
 	}
 
-	unsigned int get( const char *key, size_t keySize, T **data = 0, T **parity = 0, unsigned int *index = 0, bool full = false ) {
-		unsigned int dataIndex = HashFunc::hash( key, keySize ) % this->k;
-		size_t listIndex = this->ring.get( key, keySize );
+	unsigned int get( const char *key, uint8_t keySize, T **data = 0, T **parity = 0, uint32_t *dataIndexPtr = 0, bool full = false ) {
+		uint32_t dataIndex = HashFunc::hash( key, keySize ) % this->k;
+		uint32_t listIndex = this->listRing.get( key, keySize );
 		T **ret = this->lists[ listIndex ];
 
-		if ( index )
-			*index = dataIndex;
+		if ( dataIndexPtr )
+			*dataIndexPtr = dataIndex;
 
 		if ( parity ) {
-			for ( size_t i = 0; i < this->n - this->k; i++ ) {
+			for ( uint32_t i = 0; i < this->n - this->k; i++ ) {
 				parity[ i ] = ret[ this->k + i ];
 			}
 		}
 		if ( data ) {
 			if ( full ) {
-				for ( size_t i = 0; i < this->k; i++ ) {
+				for ( uint32_t i = 0; i < this->k; i++ ) {
 					data[ i ] = ret[ i ];
 				}
 			} else {
@@ -125,8 +125,15 @@ public:
 		return listIndex;
 	}
 
-	std::vector<StripeListIndex> list( size_t index ) {
-		size_t i, j;
+	T *get( uint32_t listIndex, uint32_t dataIndex, uint32_t jump = 0 ) {
+		T **ret = this->lists[ listIndex ];
+		unsigned int index = HashFunc::hash( ( char * ) &dataIndex, sizeof( dataIndex ) );
+		index = ( index + jump ) % this->n;
+		return ret[ index ];
+	}
+
+	std::vector<StripeListIndex> list( uint32_t index ) {
+		uint32_t i, j;
 		std::vector<StripeListIndex> ret;
 		for ( i = 0; i < this->numLists; i++ ) {
 			if ( this->data.check( i, index ) ) {
@@ -160,7 +167,7 @@ public:
 	}
 
 	void print( FILE *f = stdout ) {
-		size_t i, j;
+		uint32_t i, j;
 		bool first;
 
 		if ( ! generated )
@@ -169,10 +176,10 @@ public:
 		fprintf( f, "### Stripe List ###\n" );
 		for ( i = 0; i < this->numLists; i++ ) {
 			first = true;
-			fprintf( f, "#%lu: ((", ( i + 1 ) );
+			fprintf( f, "#%u: ((", ( i + 1 ) );
 			for ( j = 0; j < this->numSlaves; j++ ) {
 				if ( this->data.check( i, j ) ) {
-					fprintf( f, "%s%lu", first ? "" : ", ", j );
+					fprintf( f, "%s%u", first ? "" : ", ", j );
 					first = false;
 				}
 			}
@@ -180,7 +187,7 @@ public:
 			first = true;
 			for ( j = 0; j < this->numSlaves; j++ ) {
 				if ( this->parity.check( i, j ) ) {
-					fprintf( f, "%s%lu", first ? "" : ", ", j );
+					fprintf( f, "%s%u", first ? "" : ", ", j );
 					first = false;
 				}
 			}
@@ -188,10 +195,10 @@ public:
 		}
 
 		fprintf( f, "\n- Weight vector :" );
-		for ( size_t i = 0; i < this->numSlaves; i++ )
+		for ( uint32_t i = 0; i < this->numSlaves; i++ )
 			fprintf( f, " %d", this->weight[ i ] );
 		fprintf( f, "\n- Cost vector   :" );
-		for ( size_t i = 0; i < this->numSlaves; i++ )
+		for ( uint32_t i = 0; i < this->numSlaves; i++ )
 			fprintf( f, " %d", this->cost[ i ] );
 
 		fprintf( f, "\n" );

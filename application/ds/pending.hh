@@ -8,10 +8,14 @@ typedef struct {
 	struct {
 		std::set<Key> get;
 		std::set<Key> set;
+		std::set<Key> update;
+		std::set<Key> del;
 	} application;
 	struct {
 		std::set<Key> get;
 		std::set<Key> set;
+		std::set<Key> update;
+		std::set<Key> del;
 	} masters;
 } Pending;
 

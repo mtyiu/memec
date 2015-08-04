@@ -107,8 +107,6 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 				return;
 			}
 
-			bool success = false;
-
 			if ( header.opcode == PROTO_OPCODE_SYNC ) {
 				size_t bytes, offset, count = 0;
 				struct HeartbeatHeader heartbeatHeader;
