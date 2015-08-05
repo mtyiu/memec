@@ -130,15 +130,15 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 						key.size = slaveSyncHeader.keySize;
 						key.data = slaveSyncHeader.key;
 
-						Metadata metadata;
-						metadata.opcode = slaveSyncHeader.opcode;
-						metadata.listId = slaveSyncHeader.listId;
-						metadata.stripeId = slaveSyncHeader.stripeId;
-						metadata.chunkId = slaveSyncHeader.chunkId;
+						OpMetadata opMetadata;
+						opMetadata.opcode = slaveSyncHeader.opcode;
+						opMetadata.listId = slaveSyncHeader.listId;
+						opMetadata.stripeId = slaveSyncHeader.stripeId;
+						opMetadata.chunkId = slaveSyncHeader.chunkId;
 
 						if ( event.socket->keys.find( key ) == event.socket->keys.end() )
 							key.dup();
-						event.socket->keys[ key ] = metadata;
+						event.socket->keys[ key ] = opMetadata;
 					}
 				} else {
 					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid heartbeat protocol header." );

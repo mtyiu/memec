@@ -27,7 +27,7 @@ ParityChunkBuffer::~ParityChunkBuffer() {
 	delete this->status;
 }
 
-KeyValue ParityChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t valueSize, uint32_t chunkId ) {
+KeyMetadata ParityChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t valueSize, uint32_t chunkId ) {
 	return this->dataChunkBuffer[ chunkId ]->set( key, keySize, value, valueSize );
 }
 
@@ -47,7 +47,7 @@ uint32_t ParityChunkBuffer::flush( bool lock ) {
 			index = i;
 			max = count;
 		} else if ( count == max ) {
-			if ( this->chunks[ i ]->stripeId < this->chunks[ index ]->stripeId )
+			if ( this->chunks[ i ]->metadata.stripeId < this->chunks[ index ]->metadata.stripeId )
 				index = i;
 		}
 	}
@@ -83,11 +83,13 @@ Chunk *ParityChunkBuffer::flush( int index, bool lock ) {
 	for ( uint32_t i = 0; i < this->dataChunkCount; i++ )
 		this->dataChunks[ index ][ i ] = 0;
 	this->status->clear( index );
-	this->chunks[ index ] = ChunkBuffer::chunkPool->malloc();
-	this->chunks[ index ]->clear();
-	this->chunks[ index ]->listId = this->listId;
-	this->chunks[ index ]->stripeId = this->stripeId;
-	this->chunks[ index ]->chunkId = this->chunkId;
+	Chunk *newChunk = ChunkBuffer::chunkPool->malloc();
+	newChunk->clear();
+	newChunk->metadata.listId = this->listId;
+	newChunk->metadata.stripeId = this->stripeId;
+	newChunk->metadata.chunkId = this->chunkId;
+	newChunk->isParity = false;
+	this->chunks[ index ] = newChunk;
 	this->stripeId++;
 
 	if ( lock ) {
@@ -126,8 +128,8 @@ void ParityChunkBuffer::flushData( Chunk *chunk ) {
 
 	// Find the stripe index
 	for ( uint32_t i = 0; i < this->count; i++ ) {
-		if ( this->chunks[ i ]->listId == chunk->listId &&
-		     this->chunks[ i ]->stripeId == chunk->stripeId ) {
+		if ( this->chunks[ i ]->metadata.listId == chunk->metadata.listId &&
+		     this->chunks[ i ]->metadata.stripeId == chunk->metadata.stripeId ) {
 			index = i;
 			break;
 		}
@@ -141,8 +143,8 @@ void ParityChunkBuffer::flushData( Chunk *chunk ) {
 
 	pthread_mutex_lock( this->locks + index );
 	// Store the data chunks into temporary buffer
-	this->dataChunks[ index ][ chunk->chunkId ] = chunk;
-	this->status->set( index, chunk->chunkId );
+	this->dataChunks[ index ][ chunk->metadata.chunkId ] = chunk;
+	this->status->set( index, chunk->metadata.chunkId );
 
 	// Check whether a chunk is ready to be flushed
 	if ( this->status->checkAllSet( index ) )

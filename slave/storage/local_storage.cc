@@ -74,9 +74,10 @@ bool LocalStorage::read( Chunk *chunk, uint32_t listId, uint32_t stripeId, uint3
 		__ERROR__( "LocalStorage", "read", "close(): %s", strerror( errno ) );
 	}
 
-	chunk->listId = listId;
-	chunk->stripeId = stripeId;
-	chunk->chunkId = chunkId;
+	chunk->status = CHUNK_STATUS_CACHED;
+	chunk->metadata.listId = listId;
+	chunk->metadata.stripeId = stripeId;
+	chunk->metadata.chunkId = chunkId;
 	chunk->isParity = isParity;
 	if ( isParity )
 		chunk->updateParity( offset, length );
@@ -92,9 +93,9 @@ ssize_t LocalStorage::write( Chunk *chunk, bool sync, long offset, size_t length
 	uint32_t size;
 
 	this->generatePath(
-		chunk->listId,
-		chunk->stripeId,
-		chunk->chunkId,
+		chunk->metadata.listId,
+		chunk->metadata.stripeId,
+		chunk->metadata.chunkId,
 		chunk->isParity
 	);
 
@@ -130,6 +131,8 @@ ssize_t LocalStorage::write( Chunk *chunk, bool sync, long offset, size_t length
 		if ( sync && ::syncfs( fd ) == -1 ) {
 			__ERROR__( "LocalStorage", "write", "syncfs(): %s", strerror( errno ) );
 		}
+
+		chunk->status = CHUNK_STATUS_CACHED;
 	}
 
 	if ( ::close( fd ) == -1 ) {

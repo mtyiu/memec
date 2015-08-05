@@ -86,9 +86,9 @@ size_t Protocol::generateKeyValueUpdateHeader( uint8_t magic, uint8_t to, uint8_
 	return bytes;
 }
 
-size_t Protocol::generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t opcode, struct HeartbeatHeader &header, std::map<Key, Metadata> &ops, size_t &count ) {
+size_t Protocol::generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t opcode, struct HeartbeatHeader &header, std::map<Key, OpMetadata> &ops, size_t &count ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
-	std::map<Key, Metadata>::iterator it;
+	std::map<Key, OpMetadata>::iterator it;
 	size_t bytes = PROTO_HEADER_SIZE;
 	count = 0;
 
@@ -101,14 +101,14 @@ size_t Protocol::generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t op
 
 	for ( it = ops.begin(); it != ops.end(); it++ ) {
 		const Key &key = it->first;
-		const Metadata &metadata = it->second;
+		const OpMetadata &opMetadata = it->second;
 		if ( this->buffer.size >= bytes + PROTO_SLAVE_SYNC_PER_SIZE + key.size ) {
 			// Send buffer still has enough space for holding the current metadata
 			buf[ 0 ] = key.size;
-			buf[ 1 ] = metadata.opcode;
-			*( ( uint32_t * )( buf + 2 ) ) = htonl( metadata.listId );
-			*( ( uint32_t * )( buf + 6 ) ) = htonl( metadata.stripeId );
-			*( ( uint32_t * )( buf + 10 ) ) = htonl( metadata.chunkId );
+			buf[ 1 ] = opMetadata.opcode;
+			*( ( uint32_t * )( buf + 2 ) ) = htonl( opMetadata.listId );
+			*( ( uint32_t * )( buf + 6 ) ) = htonl( opMetadata.stripeId );
+			*( ( uint32_t * )( buf + 10 ) ) = htonl( opMetadata.chunkId );
 			
 			buf += PROTO_SLAVE_SYNC_PER_SIZE;
 			memmove( buf, key.data, key.size );

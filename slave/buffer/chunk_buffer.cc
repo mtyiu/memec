@@ -1,13 +1,17 @@
 #include "chunk_buffer.hh"
+#include "../main/slave.hh"
 
 MemoryPool<Chunk> *ChunkBuffer::chunkPool;
 MemoryPool<Stripe> *ChunkBuffer::stripePool;
 SlaveEventQueue *ChunkBuffer::eventQueue;
+Map *ChunkBuffer::map;
 
-void ChunkBuffer::init( MemoryPool<Chunk> *chunkPool, MemoryPool<Stripe> *stripePool, SlaveEventQueue *eventQueue ) {
-	ChunkBuffer::chunkPool = chunkPool;
-	ChunkBuffer::stripePool = stripePool;
-	ChunkBuffer::eventQueue = eventQueue;
+void ChunkBuffer::init() {
+	Slave *slave = Slave::getInstance();
+	ChunkBuffer::chunkPool = slave->chunkPool;
+	ChunkBuffer::stripePool = slave->stripePool;
+	ChunkBuffer::eventQueue = &slave->eventQueue;
+	ChunkBuffer::map = &slave->map;
 }
 
 ChunkBuffer::ChunkBuffer( uint32_t capacity, uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isParity ) {
@@ -21,9 +25,11 @@ ChunkBuffer::ChunkBuffer( uint32_t capacity, uint32_t count, uint32_t listId, ui
 	this->chunks = new Chunk*[ count ];
 	ChunkBuffer::chunkPool->malloc( this->chunks, this->count );
 	for ( uint32_t i = 0; i < count; i++ ) {
-		this->chunks[ i ]->listId = this->listId;
-		this->chunks[ i ]->stripeId = this->stripeId;
-		this->chunks[ i ]->chunkId = this->chunkId;
+		Metadata &metadata = this->chunks[ i ]->metadata;
+		metadata.listId = this->listId;
+		metadata.stripeId = this->stripeId;
+		metadata.chunkId = this->chunkId;
+		map->cache[ metadata ] = this->chunks[ i ];
 		this->chunks[ i ]->isParity = isParity;
 		pthread_mutex_init( this->locks + i, 0 );
 		this->stripeId++;

@@ -258,7 +258,7 @@ void Coordinator::interactive() {
 void Coordinator::dump() {
 	FILE *f = stdout;
 	for ( size_t i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
-		std::map<Key, Metadata> &map = this->sockets.slaves[ i ].keys;
+		std::map<Key, OpMetadata> &map = this->sockets.slaves[ i ].keys;
 
 		fprintf( f, "Slave #%lu: ", i + 1 );
 		this->sockets.slaves[ i ].printAddress( f );
@@ -271,7 +271,7 @@ void Coordinator::dump() {
 		if ( ! map.size() ) {
 			fprintf( f, "(None)\n" );
 		} else {
-			for ( std::map<Key, Metadata>::iterator it = map.begin(); it != map.end(); it++ ) {
+			for ( std::map<Key, OpMetadata>::iterator it = map.begin(); it != map.end(); it++ ) {
 				fprintf(
 					f, "%.*s --> (list: %u, stripe: %u, chunk: %u)\n",
 					it->first.size, it->first.data,

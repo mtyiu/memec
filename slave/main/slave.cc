@@ -129,7 +129,7 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 		)
 	);
 	/* Chunk buffer */
-	ChunkBuffer::init( this->chunkPool, this->stripePool, &this->eventQueue );
+	ChunkBuffer::init();
 	this->chunkBuffer.reserve( this->config.global.stripeList.count );
 	for ( uint32_t i = 0; i < this->config.global.stripeList.count; i++ )
 		this->chunkBuffer.push_back( 0 );
@@ -430,24 +430,33 @@ void Slave::interactive() {
 
 void Slave::dump() {
 	fprintf( stdout, "List of key-value pairs:\n------------------------\n" );
-	if ( ! this->map.cache.size() ) {
+	if ( ! this->map.keys.size() ) {
 		fprintf( stdout, "(None)\n" );
 	} else {
-		for ( std::map<Key, KeyValue>::iterator it = this->map.cache.begin(); it != this->map.cache.end(); it++ ) {
-			fprintf( stdout, "%.*s --> %p\n", it->first.size, it->first.data, it->second.data );
+		for ( std::map<Key, KeyMetadata>::iterator it = this->map.keys.begin(); it != this->map.keys.end(); it++ ) {
+			fprintf(
+				stdout, "%.*s --> (list ID: %u, stripe ID: %u, chunk ID: %u, offset: %u, length: %u)\n",
+				it->first.size, it->first.data,
+				it->second.listId, it->second.stripeId, it->second.chunkId,
+				it->second.offset, it->second.length
+			);
 		}
 	}
 	fprintf( stdout, "\n" );
 
-	fprintf( stdout, "List of metadata:\n------------------------\n" );
-	if ( ! this->map.metadata.size() ) {
+	fprintf( stdout, "List of chunks in the cache:\n----------------------------\n" );
+	if ( ! this->map.cache.size() ) {
 		fprintf( stdout, "(None)\n" );
 	} else {
-		for ( std::map<Key, Metadata>::iterator it = this->map.metadata.begin(); it != this->map.metadata.end(); it++ ) {
+		for ( std::map<Metadata, Chunk *>::iterator it = this->map.cache.begin(); it != this->map.cache.end(); it++ ) {
 			fprintf(
-				stdout, "%.*s --> (list: %u, stripe: %u, chunk: %u)\n",
-				it->first.size, it->first.data,
-				it->second.listId, it->second.stripeId, it->second.chunkId
+				stdout, "(list ID: %u, stripe ID: %u, chunk ID: %u) --> %p (type: %s chunk, status: %s, count: %u, size: %u)\n",
+				it->first.listId, it->first.stripeId, it->first.chunkId,
+				it->second, it->second->isParity ? "parity" : "data",
+				( it->second->status == CHUNK_STATUS_EMPTY ? "empty" :
+					( it->second->status == CHUNK_STATUS_DIRTY ? "dirty" : "cached" )
+				),
+				it->second->count, it->second->size
 			);
 		}
 	}

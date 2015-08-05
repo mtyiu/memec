@@ -9,10 +9,11 @@ DataChunkBuffer::DataChunkBuffer( uint32_t capacity, uint32_t count, uint32_t li
 		this->sizes[ i ] = 0;
 }
 
-KeyValue DataChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t valueSize, uint32_t chunkId ) {
-	KeyValue keyValue;
+KeyMetadata DataChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t valueSize, uint32_t chunkId ) {
+	KeyMetadata keyMetadata;
 	uint32_t size = 4 + keySize + valueSize, max = 0, tmp;
 	int index = -1;
+	char *ptr;
 
 	// Choose one chunk buffer with minimum free space
 	pthread_mutex_lock( &this->lock );
@@ -23,7 +24,7 @@ KeyValue DataChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t
 				max = tmp;
 				index = i;
 			} else if ( tmp == max ) {
-				if ( this->chunks[ i ]->stripeId < this->chunks[ index ]->stripeId )
+				if ( this->chunks[ i ]->metadata.stripeId < this->chunks[ index ]->metadata.stripeId )
 					index = i;
 			}
 		}
@@ -34,20 +35,29 @@ KeyValue DataChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t
 
 	// Allocate memory in the selected chunk
 	pthread_mutex_lock( this->locks + index );
-	keyValue.chunk = this->chunks[ index ];
-	keyValue.data = this->chunks[ index ]->alloc( size );
+	Chunk *chunk = this->chunks[ index ];
+
+	// Set up key metadata
+	keyMetadata.listId = chunk->metadata.listId;
+	keyMetadata.stripeId = chunk->metadata.stripeId;
+	keyMetadata.chunkId = chunk->metadata.chunkId;
+	keyMetadata.length = size;
+
+	// Allocate memory from chunk
+	ptr = this->chunks[ index ]->alloc( size, keyMetadata.offset );
 	this->sizes[ index ] += size;
 
+	// Copy data to the buffer
+	KeyValue::serialize( ptr, key, keySize, value, valueSize );
+
+	// Flush if the current buffer is full
 	if ( this->sizes[ index ] + 4 + CHUNK_BUFFER_FLUSH_THRESHOLD >= this->capacity ) {
 		this->flush( index, false );
 	}
 	pthread_mutex_unlock( this->locks + index );
 	pthread_mutex_unlock( &this->lock );
 
-	// Copy data to the buffer
-	keyValue.serialize( key, keySize, value, valueSize );
-
-	return keyValue;
+	return keyMetadata;
 }
 
 uint32_t DataChunkBuffer::flush( bool lock ) {
@@ -62,7 +72,7 @@ uint32_t DataChunkBuffer::flush( bool lock ) {
 			this->sizes[ i ] = max;
 			index = i;
 		} else if ( this->sizes[ i ] == max ) {
-			if ( this->chunks[ i ]->stripeId < this->chunks[ index ]->stripeId )
+			if ( this->chunks[ i ]->metadata.stripeId < this->chunks[ index ]->metadata.stripeId )
 					index = i;
 		}
 	}
@@ -97,11 +107,13 @@ Chunk *DataChunkBuffer::flush( int index, bool lock ) {
 
 	// Get a new chunk
 	this->sizes[ index ] = 0;
-	this->chunks[ index ] = ChunkBuffer::chunkPool->malloc();
-	this->chunks[ index ]->clear();
-	this->chunks[ index ]->listId = this->listId;
-	this->chunks[ index ]->stripeId = this->stripeId;
-	this->chunks[ index ]->chunkId = this->chunkId;
+	Chunk *newChunk = ChunkBuffer::chunkPool->malloc();
+	newChunk->clear();
+	newChunk->metadata.listId = this->listId;
+	newChunk->metadata.stripeId = this->stripeId;
+	newChunk->metadata.chunkId = this->chunkId;
+	newChunk->isParity = false;
+	this->chunks[ index ] = newChunk;
 	this->stripeId++;
 
 	if ( lock ) {
@@ -136,7 +148,7 @@ void DataChunkBuffer::print( FILE *f ) {
 		fprintf(
 			f,
 			"\t%u. [#%u] %u / %u (%5.2lf%%)\n",
-			( i + 1 ), this->chunks[ i ]->stripeId, size, this->capacity, occupied
+			( i + 1 ), this->chunks[ i ]->metadata.stripeId, size, this->capacity, occupied
 		);
 	}
 }

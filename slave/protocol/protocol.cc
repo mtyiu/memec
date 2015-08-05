@@ -10,13 +10,13 @@ char *SlaveProtocol::reqRegisterCoordinator( size_t &size ) {
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::sendHeartbeat( size_t &size, struct HeartbeatHeader &header, std::map<Key, Metadata> &metadataMap, size_t &count ) {
+char *SlaveProtocol::sendHeartbeat( size_t &size, struct HeartbeatHeader &header, std::map<Key, OpMetadata> &opMetadataMap, size_t &count ) {
 	size = this->generateHeartbeatMessage(
 		PROTO_MAGIC_HEARTBEAT,
 		PROTO_MAGIC_TO_COORDINATOR,
 		PROTO_OPCODE_SYNC,
 		header,
-		metadataMap,
+		opMetadataMap,
 		count
 	);
 	return this->buffer.send;

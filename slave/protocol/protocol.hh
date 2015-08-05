@@ -11,7 +11,7 @@ public:
 	// Register
 	char *reqRegisterCoordinator( size_t &size );
 	// Heartbeat
-	char *sendHeartbeat( size_t &size, struct HeartbeatHeader &header, std::map<Key, Metadata> &metadataMap, size_t &count );
+	char *sendHeartbeat( size_t &size, struct HeartbeatHeader &header, std::map<Key, OpMetadata> &opMetadataMap, size_t &count );
 
 	/* Master */
 	// Register

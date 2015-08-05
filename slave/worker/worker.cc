@@ -281,14 +281,18 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 						);
 
 						// Find the key in map
-						std::map<Key, KeyValue>::iterator it;
+						std::map<Key, KeyMetadata>::iterator keysIt;
 						Key key;
 
 						key.size = keyHeader.keySize;
 						key.data = keyHeader.key;
-						it = map->cache.find( key );
-						if ( it != map->cache.end() ) {
-							event.resGet( event.socket, it->second );
+						keysIt = map->keys.find( key );
+						if ( keysIt != map->keys.end() ) {
+							std::map<Metadata, Chunk *>::iterator cacheIt;
+							cacheIt = map->cache.find( keysIt->second );
+
+							// TODO
+							// event.resGet( event.socket, it->second );
 						} else {
 							event.resGet( event.socket, key );
 						}
@@ -317,7 +321,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 							0, 0, &dataIndex
 						);
 
-						KeyValue keyValue = SlaveWorker::chunkBuffer
+						KeyMetadata keyMetadata = SlaveWorker::chunkBuffer
 							->at( listIndex )
 							->set(
 								keyValueHeader.key,
@@ -327,20 +331,19 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 								isParity,
 								dataIndex
 							);
-						Key key = keyValue.key();
+						Key key;
+						key.size = keyValueHeader.keySize;
+						key.data = keyValueHeader.key;
 
 						if ( ! isParity ) {
-							Metadata metadata;
-							metadata.opcode = PROTO_OPCODE_SET;
-							metadata.listId = keyValue.chunk->listId;
-							metadata.stripeId = keyValue.chunk->stripeId;
-							metadata.chunkId = keyValue.chunk->chunkId;
+							OpMetadata opMetadata;
+							opMetadata.clone( keyMetadata );
+							opMetadata.opcode = PROTO_OPCODE_SET;
 							key.dup( key.size, key.data );
 
 							// Update mappings
-							map->metadata[ key ] = metadata;
-							map->cache[ key ] = keyValue;
-							map->ops[ key ] = metadata;
+							map->keys[ key ] = keyMetadata;
+							map->ops[ key ] = opMetadata;
 						}
 
 						event.resSet( event.socket, key );

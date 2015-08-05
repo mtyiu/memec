@@ -10,7 +10,7 @@ MixedChunkBuffer::MixedChunkBuffer( ParityChunkBuffer *parityChunkBuffer ) {
 	this->buffer.parity = parityChunkBuffer;
 }
 
-KeyValue MixedChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t valueSize, bool &isParity, uint32_t dataChunkId ) {
+KeyMetadata MixedChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t valueSize, bool &isParity, uint32_t dataChunkId ) {
 	switch( this->role ) {
 		case CBR_DATA:
 			isParity = false;

@@ -11,7 +11,7 @@ private:
 
 public:
 	DataChunkBuffer( uint32_t capacity, uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId, void ( *flushFn )( Chunk *, void * ) = 0, void *argv = 0 );
-	KeyValue set( char *key, uint8_t keySize, char *value, uint32_t valueSize, uint32_t chunkId = 0 );
+	KeyMetadata set( char *key, uint8_t keySize, char *value, uint32_t valueSize, uint32_t chunkId = 0 );
 	uint32_t flush( bool lock = true );
 	Chunk *flush( int index, bool lock = true );
 	void print( FILE *f = stdout );

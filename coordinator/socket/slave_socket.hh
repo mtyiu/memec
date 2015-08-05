@@ -11,7 +11,7 @@ class SlaveSocket : public Socket {
 public:
 	Load load;
 	// All stored keys
-	std::map<Key, Metadata> keys;
+	std::map<Key, OpMetadata> keys;
 
 	bool start();
 	ssize_t send( char *buf, size_t ulen, bool &connected );
