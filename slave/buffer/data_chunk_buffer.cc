@@ -1,9 +1,10 @@
 #include "data_chunk_buffer.hh"
 #include "../event/io_event.hh"
 
-DataChunkBuffer::DataChunkBuffer( uint32_t capacity, uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId, void ( *flushFn )( Chunk *, void * ), void *argv ) : ChunkBuffer( capacity, count, listId, stripeId, chunkId, false ) {
+DataChunkBuffer::DataChunkBuffer( uint32_t capacity, uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId, void ( *flushFn )( Chunk *, void * ), void *argv, bool updateMap ) : ChunkBuffer( capacity, count, listId, stripeId, chunkId, false, updateMap ) {
 	this->flushFn = flushFn;
 	this->argv = argv;
+	this->updateMap = updateMap;
 	this->sizes = new uint32_t[ this->count ];
 	for ( uint32_t i = 0; i < this->count; i++ )
 		this->sizes[ i ] = 0;
@@ -113,6 +114,8 @@ Chunk *DataChunkBuffer::flush( int index, bool lock ) {
 	newChunk->metadata.stripeId = this->stripeId;
 	newChunk->metadata.chunkId = this->chunkId;
 	newChunk->isParity = false;
+	if ( this->updateMap )
+		ChunkBuffer::map->cache[ newChunk->metadata ] = newChunk;
 	this->chunks[ index ] = newChunk;
 	this->stripeId++;
 

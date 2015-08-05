@@ -10,7 +10,7 @@ ParityChunkBuffer::ParityChunkBuffer( uint32_t capacity, uint32_t count, uint32_
 		this->dataChunks[ i ] = new Chunk*[ dataChunkCount ];
 	}
 	for ( uint32_t i = 0; i < dataChunkCount; i++ ) {
-		this->dataChunkBuffer[ i ] = new DataChunkBuffer( capacity, count, listId, stripeId, i, ParityChunkBuffer::dataChunkFlushHandler, ( void * ) this );
+		this->dataChunkBuffer[ i ] = new DataChunkBuffer( capacity, count, listId, stripeId, i, ParityChunkBuffer::dataChunkFlushHandler, ( void * ) this, false );
 	}
 	this->status = new BitmaskArray( dataChunkCount, count );
 }
@@ -88,7 +88,8 @@ Chunk *ParityChunkBuffer::flush( int index, bool lock ) {
 	newChunk->metadata.listId = this->listId;
 	newChunk->metadata.stripeId = this->stripeId;
 	newChunk->metadata.chunkId = this->chunkId;
-	newChunk->isParity = false;
+	newChunk->isParity = true;
+	ChunkBuffer::map->cache[ newChunk->metadata ] = newChunk;
 	this->chunks[ index ] = newChunk;
 	this->stripeId++;
 

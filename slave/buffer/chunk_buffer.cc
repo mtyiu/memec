@@ -14,7 +14,7 @@ void ChunkBuffer::init() {
 	ChunkBuffer::map = &slave->map;
 }
 
-ChunkBuffer::ChunkBuffer( uint32_t capacity, uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isParity ) {
+ChunkBuffer::ChunkBuffer( uint32_t capacity, uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isParity, bool updateMap ) {
 	this->capacity = capacity;
 	this->count = count;
 	this->listId = listId;
@@ -29,7 +29,8 @@ ChunkBuffer::ChunkBuffer( uint32_t capacity, uint32_t count, uint32_t listId, ui
 		metadata.listId = this->listId;
 		metadata.stripeId = this->stripeId;
 		metadata.chunkId = this->chunkId;
-		map->cache[ metadata ] = this->chunks[ i ];
+		if ( updateMap )
+			ChunkBuffer::map->cache[ metadata ] = this->chunks[ i ];
 		this->chunks[ i ]->isParity = isParity;
 		pthread_mutex_init( this->locks + i, 0 );
 		this->stripeId++;
