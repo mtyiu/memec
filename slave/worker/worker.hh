@@ -15,7 +15,6 @@
 #include "../../common/config/global_config.hh"
 #include "../../common/ds/chunk.hh"
 #include "../../common/ds/key.hh"
-#include "../../common/ds/key_value.hh"
 #include "../../common/ds/memory_pool.hh"
 #include "../../common/ds/stripe.hh"
 #include "../../common/stripe_list/stripe_list.hh"

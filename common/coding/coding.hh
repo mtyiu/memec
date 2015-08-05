@@ -7,20 +7,9 @@
 #include "../ds/bitmask_array.hh"
 
 class Coding {
-protected:
-	/**
-	 * Perform bitwise XOR.
-	 * @param dst  Output (XOR-ed value)
-	 * @param srcA Input 1
-	 * @param srcB Input 2
-	 * @param len  Size of the input
-	 * @return     Output (same as dst)
-	 */
-	char *bitwiseXOR( char *dst, char *srcA, char *srcB, uint32_t len );
-	Chunk *bitwiseXOR( Chunk *dst, Chunk *srcA, Chunk *srcB, uint32_t size );
-
 public:
 	CodingScheme scheme;
+	static char *zeros;
 
 	virtual ~Coding();
 	/**
@@ -50,6 +39,17 @@ public:
 	
 	static Coding *instantiate( CodingScheme scheme, CodingParams &params, uint32_t chunkSize );
 	static void destroy( Coding *coding );
+
+	/**
+	 * Perform bitwise XOR.
+	 * @param dst  Output (XOR-ed value)
+	 * @param srcA Input 1
+	 * @param srcB Input 2
+	 * @param len  Size of the input
+	 * @return     Output (same as dst)
+	 */
+	static char *bitwiseXOR( char *dst, char *srcA, char *srcB, uint32_t len );
+	static Chunk *bitwiseXOR( Chunk *dst, Chunk *srcA, Chunk *srcB, uint32_t size );
 };
 
 /**

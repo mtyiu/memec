@@ -1,6 +1,7 @@
 #include <cstring>
 #include "chunk.hh"
 #include "key_value.hh"
+#include "../coding/coding.hh"
 
 uint32_t Chunk::capacity;
 
@@ -55,6 +56,23 @@ void Chunk::updateParity( uint32_t offset, uint32_t length ) {
 	this->isParity = true;
 	if ( size > this->size )
 		this->size = size;
+}
+
+void Chunk::computeDelta( char *delta, char *newData, uint32_t offset, uint32_t length, bool update ) {
+	Coding::bitwiseXOR(
+		delta,
+		this->data + offset, // original data
+		newData,             // new data
+		length
+	);
+	if ( update )
+		memcpy( this->data + offset, newData, length );
+}
+
+KeyValue Chunk::getKeyValue( uint32_t offset ) {
+	KeyValue ret;
+	ret.data = this->data + offset;
+	return ret;	
 }
 
 void Chunk::clear() {

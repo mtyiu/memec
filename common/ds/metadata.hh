@@ -9,10 +9,6 @@ public:
 	uint32_t stripeId;
 	uint32_t chunkId;
 
-	Metadata() {
-		this->clear();
-	}
-
 	void clear() {
 		this->listId = 0;
 		this->stripeId = 0;

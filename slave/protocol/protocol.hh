@@ -21,9 +21,15 @@ public:
 	// GET
 	char *resGet( size_t &size, bool success, uint8_t keySize, char *key, uint32_t valueSize = 0, char *value = 0 );
 	// UPDATE
-	char *resUpdate( size_t &size, bool success, uint8_t keySize, char *key );
+	char *resUpdate( size_t &size, uint8_t keySize, char *key, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, char *delta );
+	char *resUpdate( size_t &size, uint8_t keySize, char *key );
+	// UPDATE_CHUNK
+	char *resUpdateChunk( size_t &size, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length );
 	// DELETE
-	char *resDelete( size_t &size, bool success, uint8_t keySize, char *key );
+	char *resDelete( size_t &size, uint8_t keySize, char *key, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, char *delta );
+	char *resDelete( size_t &size, uint8_t keySize, char *key );
+	// DELETE_CHUNK
+	char *resDeleteChunk( size_t &size, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length );
 
 	/* Slave */
 	// Register

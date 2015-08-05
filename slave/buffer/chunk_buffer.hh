@@ -6,7 +6,6 @@
 #include "../ds/map.hh"
 #include "../event/event_queue.hh"
 #include "../../common/ds/chunk.hh"
-#include "../../common/ds/key_value.hh"
 #include "../../common/ds/memory_pool.hh"
 #include "../../common/ds/stripe.hh"
 

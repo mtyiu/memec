@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <arpa/inet.h>
 #include "metadata.hh"
+#include "key_value.hh"
 
 enum ChunkStatus {
 	CHUNK_STATUS_EMPTY, // Clean chunk (used in chunk buffer)
@@ -21,12 +22,19 @@ public:
 	bool isParity;              // Indicate whether the chunk is a parity chunk
 	char *data;                 // Buffer
 
+	// Initialization
 	Chunk();
 	static void init( uint32_t capacity );
 	void init();
 	char *alloc( uint32_t size, uint32_t &offset );
+	// Update internal counters for data and parity chunks
 	void updateData();
 	void updateParity( uint32_t offset = 0, uint32_t length = 0 );
+	// Compute delta
+	void computeDelta( char *delta, char *newData, uint32_t offset, uint32_t length, bool update = true );
+	// Get key-value pair
+	KeyValue getKeyValue( uint32_t offset );
+	// Reset internal status
 	void clear();
 	void free();
 

@@ -68,16 +68,12 @@ char *MasterProtocol::reqUpdate( size_t &size, char *key, uint8_t keySize, char 
 	return this->buffer.send;
 }
 
-char *MasterProtocol::reqUpdateDelta( size_t &size, char *key, uint8_t keySize, char *valueDelta, uint32_t valueUpdateOffset, uint32_t valueUpdateSize ) {
-	size = this->generateKeyValueUpdateHeader(
+char *MasterProtocol::reqUpdateChunk( size_t &size, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, char *delta ) {
+	size = this->generateChunkUpdateHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
-		PROTO_OPCODE_UPDATE_DELTA,
-		keySize,
-		key,
-		valueUpdateOffset,
-		valueUpdateSize,
-		valueDelta
+		PROTO_OPCODE_UPDATE_CHUNK,
+		listId, stripeId, chunkId, offset, length, delta
 	);
 	return this->buffer.send;
 }
@@ -93,15 +89,12 @@ char *MasterProtocol::reqDelete( size_t &size, char *key, uint8_t keySize ) {
 	return this->buffer.send;
 }
 
-char *MasterProtocol::reqDeleteDelta( size_t &size, char *key, uint8_t keySize, char *valueDelta, uint32_t valueSize ) {
-	size = this->generateKeyValueHeader(
+char *MasterProtocol::reqDeleteChunk( size_t &size, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, char *delta ) {
+	size = this->generateChunkUpdateHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
-		PROTO_OPCODE_DELETE_DELTA,
-		keySize,
-		key,
-		valueSize,
-		valueDelta
+		PROTO_OPCODE_DELETE_CHUNK,
+		listId, stripeId, chunkId, offset, length, delta
 	);
 	return this->buffer.send;
 }

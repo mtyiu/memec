@@ -25,10 +25,10 @@ public:
 	char *reqGet( size_t &size, char *key, uint8_t keySize );
 	// UPDATE
 	char *reqUpdate( size_t &size, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize );
-	char *reqUpdateDelta( size_t &size, char *key, uint8_t keySize, char *valueDelta, uint32_t valueUpdateOffset, uint32_t valueUpdateSize );
+	char *reqUpdateChunk( size_t &size, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, char *delta );
 	// DELETE
 	char *reqDelete( size_t &size, char *key, uint8_t keySize );
-	char *reqDeleteDelta( size_t &size, char *key, uint8_t keySize, char *valueDelta, uint32_t valueSize );
+	char *reqDeleteChunk( size_t &size, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, char *delta );
 	
 	/* Application */
 	// Register

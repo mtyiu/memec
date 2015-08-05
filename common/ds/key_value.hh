@@ -3,14 +3,12 @@
 
 #include <stdint.h>
 #include <arpa/inet.h>
-#include "chunk.hh"
 #include "key.hh"
 
 #define KEY_VALUE_METADATA_SIZE	4
 
 class KeyValue {
 public:
-	Chunk *chunk;
 	char *data;
 	void *ptr; // Extra data to be augmented to the object
 

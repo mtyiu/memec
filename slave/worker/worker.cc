@@ -175,12 +175,20 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_GET_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_SET_RESPONSE_SUCCESS:
+		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
+		case MASTER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_SUCCESS:
+		case MASTER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS:
+		case MASTER_EVENT_TYPE_DELETE_CHUNK_RESPONSE_SUCCESS:
 			success = true;
 			isSend = true;
 			break;
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
 		case MASTER_EVENT_TYPE_GET_RESPONSE_FAILURE:
 		case MASTER_EVENT_TYPE_SET_RESPONSE_FAILURE:
+		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
+		case MASTER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_FAILURE:
+		case MASTER_EVENT_TYPE_DELETE_RESPONSE_FAILURE:
+		case MASTER_EVENT_TYPE_DELETE_CHUNK_RESPONSE_FAILURE:
 			success = false;
 			isSend = true;
 			break;
@@ -190,10 +198,12 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 	}
 
 	switch( event.type ) {
+		// Register
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resRegisterMaster( buffer.size, success );
 			break;
+		// GET
 		case MASTER_EVENT_TYPE_GET_RESPONSE_SUCCESS:
 		{
 			char *key, *value;
@@ -214,6 +224,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 				event.message.key.data
 			);
 			break;
+		// SET
 		case MASTER_EVENT_TYPE_SET_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_SET_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resSet(
@@ -223,6 +234,75 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 				event.message.key.data
 			);
 			break;
+		// UPDATE
+		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
+			buffer.data = this->protocol.resUpdate(
+				buffer.size,
+				event.message.keyValueUpdate.key.size,
+				event.message.keyValueUpdate.key.data,
+				event.message.keyValueUpdate.metadata.listId,
+				event.message.keyValueUpdate.metadata.stripeId,
+				event.message.keyValueUpdate.metadata.chunkId,
+				event.message.keyValueUpdate.offset,
+				event.message.keyValueUpdate.length,
+				event.message.keyValueUpdate.delta
+			);
+			break;
+		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resUpdate(
+				buffer.size,
+				event.message.key.size,
+				event.message.key.data
+			);
+			break;
+		// UPDATE_CHUNK
+		case MASTER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_SUCCESS:
+		case MASTER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resUpdateChunk(
+				buffer.size,
+				success,
+				event.message.chunkUpdate.metadata.listId,
+				event.message.chunkUpdate.metadata.stripeId,
+				event.message.chunkUpdate.metadata.chunkId,
+				event.message.chunkUpdate.offset,
+				event.message.chunkUpdate.length
+			);
+			break;
+		// DELETE
+		case MASTER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS:
+			buffer.data = this->protocol.resDelete(
+				buffer.size,
+				event.message.keyValueUpdate.key.size,
+				event.message.keyValueUpdate.key.data,
+				event.message.keyValueUpdate.metadata.listId,
+				event.message.keyValueUpdate.metadata.stripeId,
+				event.message.keyValueUpdate.metadata.chunkId,
+				event.message.keyValueUpdate.offset,
+				event.message.keyValueUpdate.length,
+				event.message.keyValueUpdate.delta
+			);
+			break;
+		case MASTER_EVENT_TYPE_DELETE_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resDelete(
+				buffer.size,
+				event.message.key.size,
+				event.message.key.data
+			);
+			break;
+		// DELETE_CHUNK
+		case MASTER_EVENT_TYPE_DELETE_CHUNK_RESPONSE_SUCCESS:
+		case MASTER_EVENT_TYPE_DELETE_CHUNK_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resDeleteChunk(
+				buffer.size,
+				success,
+				event.message.chunkUpdate.metadata.listId,
+				event.message.chunkUpdate.metadata.stripeId,
+				event.message.chunkUpdate.metadata.chunkId,
+				event.message.chunkUpdate.offset,
+				event.message.chunkUpdate.length
+			);
+			break;
+		// Pending
 		case MASTER_EVENT_TYPE_PENDING:
 			break;
 		default:
@@ -265,6 +345,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 			struct KeyHeader keyHeader;
 			struct KeyValueHeader keyValueHeader;
 			struct KeyValueUpdateHeader keyValueUpdateHeader;
+			struct ChunkUpdateHeader chunkUpdateHeader;
 			uint32_t listIndex, dataIndex;
 			bool isParity;
 
@@ -290,9 +371,14 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 						if ( keysIt != map->keys.end() ) {
 							std::map<Metadata, Chunk *>::iterator cacheIt;
 							cacheIt = map->cache.find( keysIt->second );
-
-							// TODO
-							// event.resGet( event.socket, it->second );
+							if ( cacheIt != map->cache.end() ) {
+								KeyMetadata &keyMetadata = keysIt->second;
+								Chunk *chunk = cacheIt->second;
+								KeyValue keyValue = chunk->getKeyValue( keyMetadata.offset );
+								event.resGet( event.socket, keyValue );
+							} else {
+								event.resGet( event.socket, key );
+							}
 						} else {
 							event.resGet( event.socket, key );
 						}
@@ -301,6 +387,8 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 
 						// Send the response immediately
 						this->dispatch( event );
+					} else {
+						__ERROR__( "SlaveWorker", "dispatch", "Invalid GET request." );
 					}
 					break;
 				///////////////////////////////////////////////////////////////
@@ -352,19 +440,207 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 
 						// Send the response immediately
 						this->dispatch( event );
+					} else {
+						__ERROR__( "SlaveWorker", "dispatch", "Invalid SET request." );
 					}
 					break;
 				///////////////////////////////////////////////////////////////
 				case PROTO_OPCODE_UPDATE:
+					if ( this->protocol.parseKeyValueUpdateHeader( keyValueUpdateHeader ) ) {
+						__DEBUG__(
+							BLUE, "SlaveWorker", "dispatch",
+							"[UPDATE] Key: %.*s (key size = %u); Value: (update size = %u, offset = %u).",
+							( int ) keyValueUpdateHeader.keySize,
+							keyValueUpdateHeader.key,
+							keyValueUpdateHeader.keySize,
+							keyValueUpdateHeader.valueUpdateSize,
+							keyValueUpdateHeader.valueUpdateOffset
+						);
+
+						// Find the key in map
+						std::map<Key, KeyMetadata>::iterator keysIt;
+						Key key;
+
+						key.size = keyValueUpdateHeader.keySize;
+						key.data = keyValueUpdateHeader.key;
+						keysIt = map->keys.find( key );
+						if ( keysIt != map->keys.end() ) {
+							std::map<Metadata, Chunk *>::iterator cacheIt;
+							cacheIt = map->cache.find( keysIt->second );
+							if ( cacheIt != map->cache.end() ) {
+								KeyMetadata &keyMetadata = keysIt->second;
+								Chunk *chunk = cacheIt->second;
+								uint32_t offset; // relative to the chunk
+
+								offset = keyMetadata.offset + // chunk offset of the key-value pair
+								         PROTO_KEY_VALUE_SIZE + // key size + value size
+								         keyValueUpdateHeader.keySize + // key
+								         keyValueUpdateHeader.valueUpdateOffset; // offset of value update
+
+								// Compute delta and perform update
+								chunk->computeDelta(
+									keyValueUpdateHeader.valueUpdate, // delta
+									keyValueUpdateHeader.valueUpdate, // new data
+									offset, keyValueUpdateHeader.valueUpdateSize,
+									true // perform update
+								);
+								// Insert event
+								event.resUpdate(
+									event.socket, key,
+									chunk->metadata, offset,
+									keyValueUpdateHeader.valueUpdateSize,
+									keyValueUpdateHeader.valueUpdate
+								);
+							} else {
+								event.resUpdate( event.socket, key );
+							}
+						} else {
+							event.resUpdate( event.socket, key );
+						}
+
+						this->load.update();
+
+						// Send the response immediately
+						this->dispatch( event );
+					} else {
+						__ERROR__( "SlaveWorker", "dispatch", "Invalid UPDATE request." );
+					}
 					break;
 				///////////////////////////////////////////////////////////////
-				case PROTO_OPCODE_UPDATE_DELTA:
+				case PROTO_OPCODE_UPDATE_CHUNK:
+					if ( this->protocol.parseChunkUpdateHeader( chunkUpdateHeader ) ) {
+						__DEBUG__(
+							BLUE, "SlaveWorker", "dispatch",
+							"[UPDATE_CHUNK] List ID: %u; stripe ID: %u; chunk ID: %u; offset: %u; length: %u.",
+							chunkUpdateHeader.listId,
+							chunkUpdateHeader.stripeId,
+							chunkUpdateHeader.chunkId,
+							chunkUpdateHeader.offset,
+							chunkUpdateHeader.length
+						);
+
+						Metadata metadata;
+						metadata.listId = chunkUpdateHeader.listId;
+						metadata.stripeId = chunkUpdateHeader.stripeId;
+						metadata.chunkId = chunkUpdateHeader.chunkId;
+
+						std::map<Metadata, Chunk *>::iterator cacheIt;
+						cacheIt = map->cache.find( metadata );
+						if ( cacheIt != map->cache.end() ) {
+							Chunk *chunk = cacheIt->second;
+							// TODO: Perform parity chunk update
+							// ...
+							__ERROR__( "SlaveWorker", "dispatch", "TODO: UPDATE_CHUNK not yet implemented!" );
+							success = false;
+						} else {
+							success = false;
+						}
+						event.resUpdateChunk(
+							event.socket, metadata,
+							chunkUpdateHeader.offset,
+							chunkUpdateHeader.length,
+							success
+						);
+
+						this->load.update();
+
+						// Send the response immediately
+						this->dispatch( event );
+					} else {
+						__ERROR__( "SlaveWorker", "dispatch", "Invalid UPDATE_CHUNK request." );
+					}
 					break;
 				///////////////////////////////////////////////////////////////
 				case PROTO_OPCODE_DELETE:
+					if ( this->protocol.parseKeyHeader( keyHeader ) ) {
+						__DEBUG__(
+							BLUE, "SlaveWorker", "dispatch",
+							"[DELETE] Key: %.*s (key size = %u).",
+							( int ) keyHeader.keySize,
+							keyHeader.key,
+							keyHeader.keySize
+						);
+
+						// Find the key in map
+						std::map<Key, KeyMetadata>::iterator keysIt;
+						Key key;
+
+						key.size = keyHeader.keySize;
+						key.data = keyHeader.key;
+						keysIt = map->keys.find( key );
+						if ( keysIt != map->keys.end() ) {
+							std::map<Metadata, Chunk *>::iterator cacheIt;
+							cacheIt = map->cache.find( keysIt->second );
+							if ( cacheIt != map->cache.end() ) {
+								KeyMetadata &keyMetadata = keysIt->second;
+								Chunk *chunk = cacheIt->second;
+								KeyValue keyValue = chunk->getKeyValue( keyMetadata.offset );
+
+								event.resDelete(
+									event.socket, key,
+									chunk->metadata,
+									keyMetadata.offset,
+									keyValueUpdateHeader.valueUpdateSize,
+									keyValueUpdateHeader.valueUpdate
+								);
+							} else {
+								event.resDelete( event.socket, key );
+							}
+						} else {
+							event.resDelete( event.socket, key );
+						}
+
+						this->load.del();
+
+						// Send the response immediately
+						this->dispatch( event );
+					} else {
+						__ERROR__( "SlaveWorker", "dispatch", "Invalid DELETE request." );
+					}
 					break;
 				///////////////////////////////////////////////////////////////
-				case PROTO_OPCODE_DELETE_DELTA:
+				case PROTO_OPCODE_DELETE_CHUNK:
+					if ( this->protocol.parseChunkUpdateHeader( chunkUpdateHeader ) ) {
+						__DEBUG__(
+							BLUE, "SlaveWorker", "dispatch",
+							"[DELETE_CHUNK] List ID: %u; stripe ID: %u; chunk ID: %u; offset: %u; length: %u.",
+							chunkUpdateHeader.listId,
+							chunkUpdateHeader.stripeId,
+							chunkUpdateHeader.chunkId,
+							chunkUpdateHeader.offset,
+							chunkUpdateHeader.length
+						);
+
+						Metadata metadata;
+						metadata.listId = chunkUpdateHeader.listId;
+						metadata.stripeId = chunkUpdateHeader.stripeId;
+						metadata.chunkId = chunkUpdateHeader.chunkId;
+
+						std::map<Metadata, Chunk *>::iterator cacheIt;
+						cacheIt = map->cache.find( metadata );
+						if ( cacheIt != map->cache.end() ) {
+							Chunk *chunk = cacheIt->second;
+							// TODO: Perform parity chunk update
+							// ...
+							__ERROR__( "SlaveWorker", "dispatch", "TODO: DELETE_CHUNK not yet implemented!" );
+							success = false;
+						} else {
+							success = false;
+						}
+						event.resDeleteChunk(
+							event.socket, metadata,
+							chunkUpdateHeader.offset,
+							chunkUpdateHeader.length,
+							success
+						);
+
+						this->load.del();
+
+						// Send the response immediately
+						this->dispatch( event );
+					} else {
+						__ERROR__( "SlaveWorker", "dispatch", "Invalid DELETE_CHUNK request." );
+					}
 					break;
 				///////////////////////////////////////////////////////////////
 				default:
