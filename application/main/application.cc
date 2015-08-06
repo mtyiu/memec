@@ -270,8 +270,8 @@ void Application::interactive() {
 				ACTION_DELETE
 			} action = ACTION_UNDEFINDED;
 			char *token = 0, *key = 0, *path = 0;
-			uint32_t offset;
-			int count = 0, expectedTokens;
+			uint32_t offset = 0;
+			int count = 0, expectedTokens = 0;
 			bool ret;
 
 			while ( 1 ) {
@@ -418,7 +418,6 @@ bool Application::update( char *key, char *path, uint32_t offset ) {
 }
 
 bool Application::del( char *key ) {
-	int fd;
 	MasterEvent event;
 
 	key = strdup( key );

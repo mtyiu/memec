@@ -77,8 +77,8 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 				buffer.size,
 				event.message.update.key,
 				event.message.update.keySize,
-				event.message.update.offset,
 				this->buffer.value,
+				event.message.update.offset,
 				valueSize
 			);
 			isSend = true;
@@ -130,7 +130,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 					( void * ) ( uint64_t ) event.message.update.fd
 				);
 				keyValueUpdate.offset = event.message.update.offset;
-				keyValueUpdate.length = event.message.update.length;
+				keyValueUpdate.length = valueSize;
 				ApplicationWorker::pending->application.update.insert( keyValueUpdate );
 
 				keyValueUpdate.ptr = ( void * ) event.socket;
