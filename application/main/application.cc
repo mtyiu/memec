@@ -154,7 +154,7 @@ bool Application::start() {
 
 bool Application::stop() {
 	if ( ! this->isRunning )
-		return false; 
+		return false;
 
 	int i, len;
 
@@ -265,10 +265,13 @@ void Application::interactive() {
 			enum {
 				ACTION_UNDEFINDED,
 				ACTION_SET,
-				ACTION_GET
+				ACTION_GET,
+				ACTION_UPDATE,
+				ACTION_DELETE
 			} action = ACTION_UNDEFINDED;
 			char *token = 0, *key = 0, *path = 0;
-			int count = 0;
+			uint32_t offset;
+			int count = 0, expectedTokens;
 			bool ret;
 
 			while ( 1 ) {
@@ -283,16 +286,27 @@ void Application::interactive() {
 				}
 
 				if ( count == 0 ) {
-					if ( strcmp( token, "get" ) == 0 )
+					if ( strcmp( token, "get" ) == 0 ) {
 						action = ACTION_GET;
-					else if ( strcmp( token, "set" ) == 0 )
+						expectedTokens = 3;
+					} else if ( strcmp( token, "set" ) == 0 ) {
 						action = ACTION_SET;
-					else
+						expectedTokens = 3;
+					} else if ( strcmp( token, "update" ) == 0 ) {
+						action = ACTION_UPDATE;
+						expectedTokens = 4;
+					} else if ( strcmp( token, "del" ) == 0 ) {
+						action = ACTION_DELETE;
+						expectedTokens = 2;
+					} else {
 						break;
+					}
 				} else if ( count == 1 ) {
 					key = token;
 				} else if ( count == 2 ) {
 					path = token;
+				} else if ( count == 3 ) {
+					offset = atoi( token );
 				} else {
 					break;
 				}
@@ -300,7 +314,7 @@ void Application::interactive() {
 				count++;
 			}
 
-			if ( count < 3 ) {
+			if ( count != expectedTokens ) {
 				valid = false;
 			} else {
 				valid = true;
@@ -312,6 +326,14 @@ void Application::interactive() {
 					case ACTION_GET:
 						printf( "[GET] {%s} %s\n", key, path );
 						ret = this->get( key, path );
+						break;
+					case ACTION_UPDATE:
+						printf( "[UPDATE] {%s} %s at offset %u\n", key, path, offset );
+						ret = this->update( key, path, offset );
+						break;
+					case ACTION_DELETE:
+						printf( "[DELETE] {%s}\n", key );
+						ret = this->del( key );
 						break;
 					default:
 						ret = -1;
@@ -373,6 +395,44 @@ bool Application::get( char *key, char *path ) {
 	return true;
 }
 
+bool Application::update( char *key, char *path, uint32_t offset ) {
+	int fd;
+	MasterEvent event;
+
+	fd = ::open( path, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR );
+	if ( fd == -1 ) {
+		__ERROR__( "Application", "update", "%s", strerror( errno ) );
+		return false;
+	}
+
+	key = strdup( key );
+	if ( ! key ) {
+		__ERROR__( "Application", "update", "Cannot allocate memory." );
+		return false;
+	}
+
+	event.reqUpdate( &this->sockets.masters[ 0 ], key, strlen( key ), fd, offset );
+	this->eventQueue.insert( event );
+
+	return true;
+}
+
+bool Application::del( char *key ) {
+	int fd;
+	MasterEvent event;
+
+	key = strdup( key );
+	if ( ! key ) {
+		__ERROR__( "Application", "get", "Cannot allocate memory." );
+		return false;
+	}
+
+	event.reqDelete( &this->sockets.masters[ 0 ], key, strlen( key ) );
+	this->eventQueue.insert( event );
+
+	return true;
+}
+
 void Application::help() {
 	fprintf(
 		stdout,
@@ -384,7 +444,10 @@ void Application::help() {
 		"- exit: Terminate this client\n"
 		"- set [key] [src]: Upload the file at [src] with key [key]\n"
 		"- get [key] [dest]: Download the file with key [key] to the "
-		"destination [dest]\n\n"
+		"destination [dest]\n"
+		"- update [key] [src] [offset]: Update the data at [offset] with "
+		"the contents in [src]\n"
+		"- delete [key]: Delete the key [key]\n\n"
 	);
 	fflush( stdout );
 }

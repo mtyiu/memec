@@ -590,10 +590,11 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 								Chunk *chunk = cacheIt->second;
 								KeyValue keyValue = chunk->getKeyValue( keyMetadata.offset );
 
+								// TODO: Update data chunk
+
 								uint8_t keySize;
 								uint32_t valueSize;
 								char *keyStr, *value;
-
 								keyValue.deserialize( keyStr, keySize, value, valueSize );
 
 								event.resDelete(

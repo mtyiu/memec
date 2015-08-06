@@ -9,6 +9,8 @@ enum MasterEventType {
 	MASTER_EVENT_TYPE_REGISTER_REQUEST,
 	MASTER_EVENT_TYPE_SET_REQUEST,
 	MASTER_EVENT_TYPE_GET_REQUEST,
+	MASTER_EVENT_TYPE_UPDATE_REQUEST,
+	MASTER_EVENT_TYPE_DELETE_REQUEST,
 	MASTER_EVENT_TYPE_PENDING
 };
 
@@ -27,11 +29,23 @@ public:
 			uint32_t keySize;
 			int fd;
 		} get;
+		struct {
+			char *key;
+			uint32_t keySize;
+			uint32_t offset;
+			int fd;
+		} update;
+		struct {
+			char *key;
+			uint32_t keySize;
+		} del;
 	} message;
 
 	void reqRegister( MasterSocket *socket );
 	void reqSet( MasterSocket *socket, char *key, uint32_t keySize, int fd );
 	void reqGet( MasterSocket *socket, char *key, uint32_t keySize, int fd );
+	void reqUpdate( MasterSocket *socket, char *key, uint32_t keySize, int fd, uint32_t offset );
+	void reqDelete( MasterSocket *socket, char *key, uint32_t keySize );
 	void pending( MasterSocket *socket );
 };
 

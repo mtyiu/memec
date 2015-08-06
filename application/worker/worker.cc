@@ -64,6 +64,33 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 			);
 			isSend = true;
 			break;
+		case MASTER_EVENT_TYPE_UPDATE_REQUEST:
+			// Read contents from file
+			ret = ::read( event.message.update.fd, this->buffer.value, this->buffer.valueSize );
+			::close( event.message.update.fd );
+			if ( ret == -1 ) {
+				__ERROR__( "ApplicationWorker", "dispatch", "read(): %s.", strerror( errno ) );
+				return;
+			}
+			valueSize = ( size_t ) ret;
+			buffer.data = this->protocol.reqUpdate(
+				buffer.size,
+				event.message.update.key,
+				event.message.update.keySize,
+				event.message.update.offset,
+				this->buffer.value,
+				valueSize
+			);
+			isSend = true;
+			break;
+		case MASTER_EVENT_TYPE_DELETE_REQUEST:
+			buffer.data = this->protocol.reqDelete(
+				buffer.size,
+				event.message.del.key,
+				event.message.del.keySize
+			);
+			isSend = true;
+			break;
 		case MASTER_EVENT_TYPE_PENDING:
 			isSend = false;
 			break;
@@ -73,6 +100,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 
 	if ( isSend ) {
 		Key key;
+		KeyValueUpdate keyValueUpdate;
 		switch( event.type ) {
 			case MASTER_EVENT_TYPE_SET_REQUEST:
 				key.dup(
@@ -95,6 +123,26 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 				key.ptr = ( void * ) event.socket;
 				ApplicationWorker::pending->masters.get.insert( key );
 				break;
+			case MASTER_EVENT_TYPE_UPDATE_REQUEST:
+				keyValueUpdate.dup(
+					event.message.update.keySize,
+					event.message.update.key,
+					( void * ) ( uint64_t ) event.message.update.fd
+				);
+				keyValueUpdate.offset = event.message.update.offset;
+				keyValueUpdate.length = event.message.update.length;
+				ApplicationWorker::pending->application.update.insert( keyValueUpdate );
+
+				keyValueUpdate.ptr = ( void * ) event.socket;
+				ApplicationWorker::pending->masters.update.insert( keyValueUpdate );
+				break;
+			case MASTER_EVENT_TYPE_DELETE_REQUEST:
+				key.dup( event.message.del.keySize, event.message.del.key, 0 );
+				ApplicationWorker::pending->application.del.insert( key );
+
+				key.ptr = ( void * ) event.socket;
+				ApplicationWorker::pending->masters.del.insert( key );
+				break;
 			default:
 				break;
 		}
@@ -115,7 +163,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 			bool success;
 
 			this->protocol.parseHeader( header, this->protocol.buffer.recv, ret );
-			
+
 			// Validate message
 			if ( header.from != PROTO_MAGIC_FROM_MASTER ) {
 				__ERROR__( "ApplicationWorker", "dispatch", "Invalid message source from master." );
@@ -179,7 +227,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 					} else {
 						__ERROR__( "ApplicationWorker", "dispatch", "The key: %.*s is NOT SET.", key.size, key.data );
 					}
-					
+
 					key.free();
 
 					break;
@@ -225,6 +273,37 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 						__ERROR__( "ApplicationWorker", "dispatch", "The key: %.*s does not exist.", key.size, key.data );
 					}
 					::close( fd );
+					key.free();
+					break;
+				case PROTO_OPCODE_UPDATE:
+					break;
+				case PROTO_OPCODE_DELETE:
+					this->protocol.parseKeyHeader( keyHeader );
+					key.size = keyHeader.keySize;
+					key.data = keyHeader.key;
+					key.ptr = ( void * ) event.socket;
+
+					it = ApplicationWorker::pending->masters.del.find( key );
+					if ( it == ApplicationWorker::pending->masters.del.end() ) {
+						__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending master DELETE request that matches the response. This message will be discarded. (key = %.*s)", key.size, key.data );
+						return;
+					}
+					ApplicationWorker::pending->masters.del.erase( it );
+
+					key.ptr = 0;
+					it = ApplicationWorker::pending->application.del.lower_bound( key );
+					if ( it == ApplicationWorker::pending->application.del.end() || ! key.equal( *it ) ) {
+						__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending application DELETE request that matches the response. This message will be discarded." );
+						return;
+					}
+					key = *it;
+					ApplicationWorker::pending->application.del.erase( it );
+
+					if ( success ) {
+						__ERROR__( "ApplicationWorker", "dispatch", "The key: %.*s is DELETE successfully.", key.size, key.data );
+					} else {
+						__ERROR__( "ApplicationWorker", "dispatch", "The key: %.*s does not exist.", key.size, key.data );
+					}
 					key.free();
 					break;
 				default:

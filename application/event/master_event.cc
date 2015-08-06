@@ -17,8 +17,24 @@ void MasterEvent::reqGet( MasterSocket *socket, char *key, uint32_t keySize, int
 	this->type = MASTER_EVENT_TYPE_GET_REQUEST;
 	this->socket = socket;
 	this->message.get.key = key;
-	this->message.set.keySize = keySize;
+	this->message.get.keySize = keySize;
 	this->message.get.fd = fd;
+}
+
+void MasterEvent::reqUpdate( MasterSocket *socket, char *key, uint32_t keySize, int fd, uint32_t offset ) {
+	this->type = MASTER_EVENT_TYPE_UPDATE_REQUEST;
+	this->socket = socket;
+	this->message.update.key = key;
+	this->message.update.keySize = keySize;
+	this->message.update.offset = offset;
+	this->message.update.fd = fd;
+}
+
+void MasterEvent::reqDelete( MasterSocket *socket, char *key, uint32_t keySize ) {
+	this->type = MASTER_EVENT_TYPE_DELETE_REQUEST;
+	this->socket = socket;
+	this->message.del.key = key;
+	this->message.del.keySize = keySize;
 }
 
 void MasterEvent::pending( MasterSocket *socket ) {

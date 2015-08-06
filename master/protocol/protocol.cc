@@ -143,13 +143,13 @@ char *MasterProtocol::resGet( size_t &size, bool success, uint8_t keySize, char 
 	return this->buffer.send;
 }
 
-char *MasterProtocol::resUpdate( size_t &size, bool success, uint8_t keySize, char *key ) {
-	size = this->generateKeyHeader(
+char *MasterProtocol::resUpdate( size_t &size, bool success, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize ) {
+	size = this->generateKeyValueUpdateHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_APPLICATION,
 		PROTO_OPCODE_UPDATE,
-		keySize,
-		key
+		keySize, key,
+		valueUpdateOffset, valueUpdateSize, 0
 	);
 	return this->buffer.send;
 }

@@ -32,12 +32,14 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 	ssize_t ret;
 	uint32_t valueSize;
 	Key key;
+	KeyValueUpdate keyValueUpdate;
 	char *value;
 	struct {
 		size_t size;
 		char *data;
 	} buffer;
 	std::set<Key>::iterator it;
+	std::set<KeyValueUpdate>::iterator kvUpdateit;
 
 	switch( event.type ) {
 		case APPLICATION_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
@@ -103,6 +105,40 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 			it = MasterWorker::pending->applications.set.find( event.message.key );
 			key = *it;
 			MasterWorker::pending->applications.set.erase( it );
+			key.free();
+			break;
+		case APPLICATION_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
+		case APPLICATION_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resUpdate(
+				buffer.size,
+				success,
+				event.message.update.key.size,
+				event.message.update.key.data,
+				event.message.update.offset,
+				event.message.update.length
+			);
+			keyValueUpdate.size = event.message.update.key.size;
+			keyValueUpdate.data = event.message.update.key.data;
+			keyValueUpdate.ptr = event.socket;
+			keyValueUpdate.offset = event.message.update.offset;
+			keyValueUpdate.length = event.message.update.length;
+
+			kvUpdateit = MasterWorker::pending->applications.update.find( keyValueUpdate );
+			keyValueUpdate = *kvUpdateit;
+			MasterWorker::pending->applications.update.erase( kvUpdateit );
+			keyValueUpdate.free();
+			break;
+		case APPLICATION_EVENT_TYPE_DELETE_RESPONSE_SUCCESS:
+		case APPLICATION_EVENT_TYPE_DELETE_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resDelete(
+				buffer.size,
+				success,
+				event.message.key.size,
+				event.message.key.data
+			);
+			it = MasterWorker::pending->applications.del.find( event.message.key );
+			key = *it;
+			MasterWorker::pending->applications.del.erase( it );
 			key.free();
 			break;
 		case APPLICATION_EVENT_TYPE_PENDING:
@@ -310,12 +346,18 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 							socket = MasterWorker::stripeList->get( listIndex, dataIndex, i );
 						}
 
-						Key key;
-						key.dup( keyValueUpdateHeader.keySize, keyValueUpdateHeader.key, ( void * ) event.socket );
-						MasterWorker::pending->applications.update.insert( key );
+						KeyValueUpdate keyValueUpdate;
+						keyValueUpdate.dup(
+							keyValueUpdateHeader.keySize,
+							keyValueUpdateHeader.key,
+							( void * ) event.socket
+						);
+						keyValueUpdate.offset = keyValueUpdateHeader.valueUpdateOffset;
+						keyValueUpdate.length = keyValueUpdateHeader.valueUpdateSize;
+						MasterWorker::pending->applications.update.insert( keyValueUpdate );
 
-						key.ptr = ( void * ) socket;
-						MasterWorker::pending->slaves.update.insert( key );
+						keyValueUpdate.ptr = ( void * ) socket;
+						MasterWorker::pending->slaves.update.insert( keyValueUpdate );
 
 						// Send UPDATE request
 						ret = socket->send( buffer.data, buffer.size, connected );

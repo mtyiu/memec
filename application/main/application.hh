@@ -31,6 +31,8 @@ private:
 	void help();
 	bool set( char *key, char *path );
 	bool get( char *key, char *path );
+	bool update( char *key, char *path, uint32_t offset );
+	bool del( char *key );
 
 public:
 	struct {
@@ -42,7 +44,7 @@ public:
 	} sockets;
 	Pending pending;
 	ApplicationEventQueue eventQueue;
-	
+
 	static Application *getInstance() {
 		static Application application;
 		return &application;
