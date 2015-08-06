@@ -23,20 +23,27 @@ void MasterEvent::resSet( MasterSocket *socket, Key &key ) {
 	this->message.key = key;
 }
 
-void MasterEvent::resUpdate( MasterSocket *socket, Key &key, Metadata &metadata, uint32_t offset, uint32_t length, char *delta ) {
+void MasterEvent::resUpdate( MasterSocket *socket, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, Metadata &metadata, uint32_t offset, uint32_t length, char *delta ) {
 	this->type = MASTER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS;
 	this->socket = socket;
-	this->message.keyValueUpdate.key = key;
-	this->message.keyValueUpdate.metadata = metadata;
-	this->message.keyValueUpdate.offset = offset;
-	this->message.keyValueUpdate.length = length;
-	this->message.keyValueUpdate.delta = delta;
+	this->message.keyValueChunkUpdate.key = key;
+	this->message.keyValueChunkUpdate.valueUpdateOffset = valueUpdateOffset;
+	this->message.keyValueChunkUpdate.valueUpdateSize = valueUpdateSize;
+	this->message.keyValueChunkUpdate.metadata = metadata;
+	this->message.keyValueChunkUpdate.offset = offset;
+	this->message.keyValueChunkUpdate.length = length;
+	this->message.keyValueChunkUpdate.delta = delta;
 }
 
-void MasterEvent::resUpdate( MasterSocket *socket, Key &key ) {
+void MasterEvent::resUpdate( MasterSocket *socket, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize ) {
 	this->type = MASTER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE;
 	this->socket = socket;
-	this->message.key = key;
+	this->message.keyValueChunkUpdate.key = key;
+	this->message.keyValueChunkUpdate.valueUpdateOffset = valueUpdateOffset;
+	this->message.keyValueChunkUpdate.valueUpdateSize = valueUpdateSize;
+	this->message.keyValueChunkUpdate.offset = 0;
+	this->message.keyValueChunkUpdate.length = 0;
+	this->message.keyValueChunkUpdate.delta = 0;
 }
 
 void MasterEvent::resUpdateChunk( MasterSocket *socket, Metadata &metadata, uint32_t offset, uint32_t length, bool success ) {
@@ -50,11 +57,11 @@ void MasterEvent::resUpdateChunk( MasterSocket *socket, Metadata &metadata, uint
 void MasterEvent::resDelete( MasterSocket *socket, Key &key, Metadata &metadata, uint32_t offset, uint32_t length, char *delta ) {
 	this->type = MASTER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS;
 	this->socket = socket;
-	this->message.keyValueUpdate.key = key;
-	this->message.keyValueUpdate.metadata = metadata;
-	this->message.keyValueUpdate.offset = offset;
-	this->message.keyValueUpdate.length = length;
-	this->message.keyValueUpdate.delta = delta;
+	this->message.keyChunkUpdate.key = key;
+	this->message.keyChunkUpdate.metadata = metadata;
+	this->message.keyChunkUpdate.offset = offset;
+	this->message.keyChunkUpdate.length = length;
+	this->message.keyChunkUpdate.delta = delta;
 }
 
 void MasterEvent::resDelete( MasterSocket *socket, Key &key ) {

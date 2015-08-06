@@ -66,25 +66,26 @@ char *SlaveProtocol::resGet( size_t &size, bool success, uint8_t keySize, char *
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::resUpdate( size_t &size, uint8_t keySize, char *key, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, char *delta ) {
+char *SlaveProtocol::resUpdate( size_t &size, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, char *delta ) {
 	size = this->generateKeyChunkUpdateHeader(
 		PROTO_MAGIC_RESPONSE_SUCCESS,
 		PROTO_MAGIC_TO_MASTER,
 		PROTO_OPCODE_UPDATE,
 		keySize, key,
+		valueUpdateOffset, valueUpdateSize,
 		listId, stripeId, chunkId,
 		offset, length, delta
 	);
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::resUpdate( size_t &size, uint8_t keySize, char *key ) {
-	size = this->generateKeyHeader(
+char *SlaveProtocol::resUpdate( size_t &size, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize ) {
+	size = this->generateKeyValueUpdateHeader(
 		PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_MASTER,
 		PROTO_OPCODE_UPDATE,
-		keySize,
-		key
+		keySize, key,
+		valueUpdateOffset, valueUpdateSize, 0
 	);
 	return this->buffer.send;
 }

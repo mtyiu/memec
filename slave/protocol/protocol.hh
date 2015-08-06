@@ -6,7 +6,7 @@
 class SlaveProtocol : public Protocol {
 public:
 	SlaveProtocol() : Protocol( ROLE_SLAVE ) {}
-	
+
 	/* Coordinator */
 	// Register
 	char *reqRegisterCoordinator( size_t &size );
@@ -21,8 +21,8 @@ public:
 	// GET
 	char *resGet( size_t &size, bool success, uint8_t keySize, char *key, uint32_t valueSize = 0, char *value = 0 );
 	// UPDATE
-	char *resUpdate( size_t &size, uint8_t keySize, char *key, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, char *delta );
-	char *resUpdate( size_t &size, uint8_t keySize, char *key );
+	char *resUpdate( size_t &size, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, char *delta );
+	char *resUpdate( size_t &size, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize );
 	// UPDATE_CHUNK
 	char *resUpdateChunk( size_t &size, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length );
 	// DELETE

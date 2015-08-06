@@ -42,17 +42,29 @@ public:
 		Key key;
 		KeyValue keyValue;
 		struct {
+			// key-value update
 			Key key;
+			uint32_t valueUpdateOffset;
+			uint32_t valueUpdateSize;
+			// chunk update
 			Metadata metadata;
-			uint32_t offset;
+			uint32_t offset; // relative to chunk
 			uint32_t length;
 			char *delta;
-		} keyValueUpdate;
+		} keyValueChunkUpdate; // UPDATE
+		struct {
+			Key key;
+			// chunk update
+			Metadata metadata;
+			uint32_t offset; // relative to chunk
+			uint32_t length;
+			char *delta;
+		} keyChunkUpdate; // DELETE
 		struct {
 			Metadata metadata;
 			uint32_t offset;
 			uint32_t length;
-		} chunkUpdate;
+		} chunkUpdate; // DELETE_CHUNK
 	} message;
 
 	// Register
@@ -63,8 +75,8 @@ public:
 	// SET
 	void resSet( MasterSocket *socket, Key &key );
 	// UPDATE
-	void resUpdate( MasterSocket *socket, Key &key, Metadata &metadata, uint32_t offset, uint32_t length, char *delta );
-	void resUpdate( MasterSocket *socket, Key &key );
+	void resUpdate( MasterSocket *socket, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, Metadata &metadata, uint32_t offset, uint32_t length, char *delta );
+	void resUpdate( MasterSocket *socket, Key &key, uint32_t offset, uint32_t length );
 	// UPDATE_CHUNK
 	void resUpdateChunk( MasterSocket *socket, Metadata &metadata, uint32_t offset, uint32_t length, bool success = true );
 	// DELETE

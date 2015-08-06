@@ -35,7 +35,7 @@ protected:
 		for ( uint32_t i = 0; i < this->numSlaves; i++ ) {
 			if (
 				(
-					( this->weight[ i ] < minWeight ) || 
+					( this->weight[ i ] < minWeight ) ||
 					( this->weight[ i ] == minWeight && this->cost[ i ] < minCost )
 				) &&
 				! this->data.check( listIndex, i ) && // The slave should not be selected before
@@ -125,10 +125,12 @@ public:
 		return listIndex;
 	}
 
-	T *get( uint32_t listIndex, uint32_t dataIndex, uint32_t jump = 0 ) {
+	T *get( uint32_t listIndex, uint32_t dataIndex, uint32_t jump, uint32_t *slaveIndex = 0 ) {
 		T **ret = this->lists[ listIndex ];
 		unsigned int index = HashFunc::hash( ( char * ) &dataIndex, sizeof( dataIndex ) );
 		index = ( index + jump ) % this->n;
+		if ( slaveIndex )
+			*slaveIndex = index;
 		return ret[ index ];
 	}
 

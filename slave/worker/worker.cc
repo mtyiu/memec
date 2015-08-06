@@ -59,7 +59,7 @@ void SlaveWorker::dispatch( CodingEvent event ) {
 			// Append a flush event to the event queue
 			IOEvent ioEvent;
 			ioEvent.flush( parityChunk );
-			SlaveWorker::eventQueue->insert( ioEvent );			
+			SlaveWorker::eventQueue->insert( ioEvent );
 			break;
 		default:
 			return;
@@ -238,21 +238,25 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
 			buffer.data = this->protocol.resUpdate(
 				buffer.size,
-				event.message.keyValueUpdate.key.size,
-				event.message.keyValueUpdate.key.data,
-				event.message.keyValueUpdate.metadata.listId,
-				event.message.keyValueUpdate.metadata.stripeId,
-				event.message.keyValueUpdate.metadata.chunkId,
-				event.message.keyValueUpdate.offset,
-				event.message.keyValueUpdate.length,
-				event.message.keyValueUpdate.delta
+				event.message.keyValueChunkUpdate.key.size,
+				event.message.keyValueChunkUpdate.key.data,
+				event.message.keyValueChunkUpdate.valueUpdateOffset,
+				event.message.keyValueChunkUpdate.valueUpdateSize,
+				event.message.keyValueChunkUpdate.metadata.listId,
+				event.message.keyValueChunkUpdate.metadata.stripeId,
+				event.message.keyValueChunkUpdate.metadata.chunkId,
+				event.message.keyValueChunkUpdate.offset,
+				event.message.keyValueChunkUpdate.length,
+				event.message.keyValueChunkUpdate.delta
 			);
 			break;
 		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resUpdate(
 				buffer.size,
-				event.message.key.size,
-				event.message.key.data
+				event.message.keyValueChunkUpdate.key.size,
+				event.message.keyValueChunkUpdate.key.data,
+				event.message.keyValueChunkUpdate.valueUpdateOffset,
+				event.message.keyValueChunkUpdate.valueUpdateSize
 			);
 			break;
 		// UPDATE_CHUNK
@@ -272,14 +276,14 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		case MASTER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS:
 			buffer.data = this->protocol.resDelete(
 				buffer.size,
-				event.message.keyValueUpdate.key.size,
-				event.message.keyValueUpdate.key.data,
-				event.message.keyValueUpdate.metadata.listId,
-				event.message.keyValueUpdate.metadata.stripeId,
-				event.message.keyValueUpdate.metadata.chunkId,
-				event.message.keyValueUpdate.offset,
-				event.message.keyValueUpdate.length,
-				event.message.keyValueUpdate.delta
+				event.message.keyChunkUpdate.key.size,
+				event.message.keyChunkUpdate.key.data,
+				event.message.keyChunkUpdate.metadata.listId,
+				event.message.keyChunkUpdate.metadata.stripeId,
+				event.message.keyChunkUpdate.metadata.chunkId,
+				event.message.keyChunkUpdate.offset,
+				event.message.keyChunkUpdate.length,
+				event.message.keyChunkUpdate.delta
 			);
 			break;
 		case MASTER_EVENT_TYPE_DELETE_RESPONSE_FAILURE:
@@ -487,15 +491,25 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 								// Insert event
 								event.resUpdate(
 									event.socket, key,
+									keyValueUpdateHeader.valueUpdateOffset,
+									keyValueUpdateHeader.valueUpdateSize,
 									chunk->metadata, offset,
 									keyValueUpdateHeader.valueUpdateSize,
 									keyValueUpdateHeader.valueUpdate
 								);
 							} else {
-								event.resUpdate( event.socket, key );
+								event.resUpdate(
+									event.socket, key,
+									keyValueUpdateHeader.valueUpdateOffset,
+									keyValueUpdateHeader.valueUpdateSize
+								);
 							}
 						} else {
-							event.resUpdate( event.socket, key );
+							event.resUpdate(
+								event.socket, key,
+								keyValueUpdateHeader.valueUpdateOffset,
+								keyValueUpdateHeader.valueUpdateSize
+							);
 						}
 
 						this->load.update();
@@ -527,7 +541,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 						std::map<Metadata, Chunk *>::iterator cacheIt;
 						cacheIt = map->cache.find( metadata );
 						if ( cacheIt != map->cache.end() ) {
-							Chunk *chunk = cacheIt->second;
+							// Chunk *chunk = cacheIt->second;
 							// TODO: Perform parity chunk update
 							// ...
 							__ERROR__( "SlaveWorker", "dispatch", "TODO: UPDATE_CHUNK not yet implemented!" );
@@ -576,12 +590,18 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 								Chunk *chunk = cacheIt->second;
 								KeyValue keyValue = chunk->getKeyValue( keyMetadata.offset );
 
+								uint8_t keySize;
+								uint32_t valueSize;
+								char *keyStr, *value;
+
+								keyValue.deserialize( keyStr, keySize, value, valueSize );
+
 								event.resDelete(
 									event.socket, key,
 									chunk->metadata,
 									keyMetadata.offset,
-									keyValueUpdateHeader.valueUpdateSize,
-									keyValueUpdateHeader.valueUpdate
+									valueSize,
+									value
 								);
 							} else {
 								event.resDelete( event.socket, key );
@@ -619,7 +639,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 						std::map<Metadata, Chunk *>::iterator cacheIt;
 						cacheIt = map->cache.find( metadata );
 						if ( cacheIt != map->cache.end() ) {
-							Chunk *chunk = cacheIt->second;
+							// Chunk *chunk = cacheIt->second;
 							// TODO: Perform parity chunk update
 							// ...
 							__ERROR__( "SlaveWorker", "dispatch", "TODO: DELETE_CHUNK not yet implemented!" );

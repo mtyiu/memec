@@ -14,6 +14,10 @@ enum ApplicationEventType {
 	APPLICATION_EVENT_TYPE_GET_RESPONSE_FAILURE,
 	APPLICATION_EVENT_TYPE_SET_RESPONSE_SUCCESS,
 	APPLICATION_EVENT_TYPE_SET_RESPONSE_FAILURE,
+	APPLICATION_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS,
+	APPLICATION_EVENT_TYPE_UPDATE_RESPONSE_FAILURE,
+	APPLICATION_EVENT_TYPE_DELETE_RESPONSE_SUCCESS,
+	APPLICATION_EVENT_TYPE_DELETE_RESPONSE_FAILURE,
 	APPLICATION_EVENT_TYPE_PENDING
 };
 
@@ -24,12 +28,19 @@ public:
 	union {
 		Key key;
 		KeyValue keyValue;
+		struct {
+			uint32_t offset;
+			uint32_t length;
+			Key key;
+		} update;
 	} message;
 
 	void resRegister( ApplicationSocket *socket, bool success = true );
 	void resGet( ApplicationSocket *socket, KeyValue &keyValue );
 	void resGet( ApplicationSocket *socket, Key &key );
 	void resSet( ApplicationSocket *socket, Key &key, bool success );
+	void resUpdate( ApplicationSocket *socket, Key &key, uint32_t offset, uint32_t length, bool success );
+	void resDelete( ApplicationSocket *socket, Key &key, bool success );
 	void pending( ApplicationSocket *socket );
 };
 

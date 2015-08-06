@@ -26,10 +26,10 @@ size_t Protocol::generateKeyHeader( uint8_t magic, uint8_t to, uint8_t opcode, u
 
 	buf[ 0 ] = keySize;
 
-	buf += 1;
+	buf += PROTO_KEY_SIZE;
 	memmove( buf, key, keySize );
 
-	bytes += 1 + keySize;
+	bytes += PROTO_KEY_SIZE + keySize;
 
 	return bytes;
 }
@@ -78,25 +78,10 @@ size_t Protocol::generateKeyValueUpdateHeader( uint8_t magic, uint8_t to, uint8_
 	buf += PROTO_KEY_VALUE_UPDATE_SIZE;
 	memmove( buf, key, keySize );
 	buf += keySize;
-	if ( valueUpdateSize )
+	if ( valueUpdateSize && valueUpdate )
 		memmove( buf, valueUpdate, valueUpdateSize );
 
 	bytes += PROTO_KEY_VALUE_UPDATE_SIZE + keySize + valueUpdateSize;
-
-	return bytes;
-}
-
-size_t Protocol::generateChunkUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length ) {
-	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_CHUNK_UPDATE_SIZE + length );
-
-	*( ( uint32_t * )( buf      ) ) = htonl( listId );
-	*( ( uint32_t * )( buf +  4 ) ) = htonl( stripeId );
-	*( ( uint32_t * )( buf +  8 ) ) = htonl( chunkId );
-	*( ( uint32_t * )( buf + 12 ) ) = htonl( offset );
-	*( ( uint32_t * )( buf + 16 ) ) = htonl( length );
-
-	bytes += PROTO_CHUNK_UPDATE_SIZE;
 
 	return bytes;
 }
@@ -112,18 +97,36 @@ size_t Protocol::generateChunkUpdateHeader( uint8_t magic, uint8_t to, uint8_t o
 	*( ( uint32_t * )( buf + 16 ) ) = htonl( length );
 
 	buf += PROTO_CHUNK_UPDATE_SIZE;
-	memmove( buf, delta, length );
 
-	bytes += PROTO_CHUNK_UPDATE_SIZE + length;
+	if ( delta ) {
+		memmove( buf, delta, length );
+		bytes += PROTO_CHUNK_UPDATE_SIZE + length;
+	} else {
+		bytes += PROTO_CHUNK_UPDATE_SIZE;
+	}
 
 	return bytes;
 }
 
-size_t Protocol::generateKeyChunkUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint8_t keySize, char *key, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, char *delta ) {
+size_t Protocol::generateKeyChunkUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, char *delta ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_KEY_CHUNK_UPDATE_SIZE + length + keySize );
 
 	buf[ 0 ] = keySize;
+
+	valueUpdateSize = htonl( valueUpdateSize );
+	buf[ 1 ] = ( valueUpdateSize >> 24 ) & 0xFF;
+	buf[ 2 ] = ( valueUpdateSize >> 16 ) & 0xFF;
+	buf[ 3 ] = ( valueUpdateSize >> 8 ) & 0xFF;
+	valueUpdateSize = ntohl( valueUpdateSize );
+
+	valueUpdateOffset = htonl( valueUpdateOffset );
+	buf[ 4 ] = ( valueUpdateOffset >> 24 ) & 0xFF;
+	buf[ 5 ] = ( valueUpdateOffset >> 16 ) & 0xFF;
+	buf[ 6 ] = ( valueUpdateOffset >> 8 ) & 0xFF;
+	valueUpdateOffset = ntohl( valueUpdateOffset );
+	buf += 7;
+
 	memmove( buf, key, keySize );
 	buf += keySize;
 
@@ -133,7 +136,30 @@ size_t Protocol::generateKeyChunkUpdateHeader( uint8_t magic, uint8_t to, uint8_
 	*( ( uint32_t * )( buf + 12 ) ) = htonl( offset );
 	*( ( uint32_t * )( buf + 16 ) ) = htonl( length );
 
-	buf += PROTO_KEY_CHUNK_UPDATE_SIZE;
+	buf += 20;
+	memmove( buf, delta, length );
+
+	bytes += PROTO_KEY_VALUE_CHUNK_UPDATE_SIZE + length + keySize;
+
+	return bytes;
+}
+
+size_t Protocol::generateKeyChunkUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint8_t keySize, char *key, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, char *delta ) {
+	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_KEY_CHUNK_UPDATE_SIZE + length + keySize );
+
+	buf[ 0 ] = keySize;
+	buf++;
+	memmove( buf, key, keySize );
+	buf += keySize;
+
+	*( ( uint32_t * )( buf      ) ) = htonl( listId );
+	*( ( uint32_t * )( buf +  4 ) ) = htonl( stripeId );
+	*( ( uint32_t * )( buf +  8 ) ) = htonl( chunkId );
+	*( ( uint32_t * )( buf + 12 ) ) = htonl( offset );
+	*( ( uint32_t * )( buf + 16 ) ) = htonl( length );
+
+	buf += 20;
 	memmove( buf, delta, length );
 
 	bytes += PROTO_KEY_CHUNK_UPDATE_SIZE + length + keySize;
@@ -164,7 +190,7 @@ size_t Protocol::generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t op
 			*( ( uint32_t * )( buf + 2 ) ) = htonl( opMetadata.listId );
 			*( ( uint32_t * )( buf + 6 ) ) = htonl( opMetadata.stripeId );
 			*( ( uint32_t * )( buf + 10 ) ) = htonl( opMetadata.chunkId );
-			
+
 			buf += PROTO_SLAVE_SYNC_PER_SIZE;
 			memmove( buf, key.data, key.size );
 			buf += key.size;
@@ -312,6 +338,43 @@ bool Protocol::parseChunkUpdateHeader( size_t offset, uint32_t &listId, uint32_t
 		return false;
 
 	delta = updateLength ? ptr + PROTO_CHUNK_UPDATE_SIZE : 0;
+
+	return true;
+}
+
+bool Protocol::parseKeyChunkUpdateHeader( size_t offset, uint8_t &keySize, char *&key, uint32_t &valueUpdateOffset, uint32_t &valueUpdateSize, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &updateOffset, uint32_t &updateLength, char *&delta, char *buf, size_t size ) {
+	if ( size < PROTO_KEY_VALUE_CHUNK_UPDATE_SIZE )
+		return false;
+
+	char *ptr = buf + offset;
+	keySize = ( uint8_t ) ptr[ 0 ];
+	valueUpdateSize = 0;
+	valueUpdateSize |= ptr[ 1 ] << 24;
+	valueUpdateSize |= ptr[ 2 ] << 16;
+	valueUpdateSize |= ptr[ 3 ] << 8;
+	valueUpdateSize = ntohl( valueUpdateSize );
+	valueUpdateOffset = 0;
+	valueUpdateOffset |= ptr[ 4 ] << 24;
+	valueUpdateOffset |= ptr[ 5 ] << 16;
+	valueUpdateOffset |= ptr[ 6 ] << 8;
+	valueUpdateOffset = ntohl( valueUpdateOffset );
+
+	key = ptr + 7;
+	ptr += 7 + keySize;
+
+	if ( size < ( size_t ) 7 + keySize )
+		return false;
+
+	listId       = ntohl( *( ( uint32_t * )( ptr      ) ) );
+	stripeId     = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
+	chunkId      = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
+	updateOffset = ntohl( *( ( uint32_t * )( ptr + 12 ) ) );
+	updateLength = ntohl( *( ( uint32_t * )( ptr + 16 ) ) );
+
+	if ( size < PROTO_KEY_VALUE_CHUNK_UPDATE_SIZE + keySize + updateLength )
+		return false;
+
+	delta = updateLength ? ptr + PROTO_KEY_VALUE_CHUNK_UPDATE_SIZE + keySize : 0;
 
 	return true;
 }
@@ -475,8 +538,8 @@ bool Protocol::parseKeyValueUpdateHeader( struct KeyValueUpdateHeader &header, s
 		offset,
 		header.keySize,
 		header.key,
-		header.valueUpdateSize,
 		header.valueUpdateOffset,
+		header.valueUpdateSize,
 		header.valueUpdate,
 		buf, size
 	);
@@ -499,23 +562,40 @@ bool Protocol::parseChunkUpdateHeader( struct ChunkUpdateHeader &header, size_t 
 	);
 }
 
-bool Protocol::parseKeyChunkUpdateHeader( struct KeyChunkUpdateHeader &header, size_t offset, char *buf, size_t size ) {
+bool Protocol::parseKeyChunkUpdateHeader( struct KeyChunkUpdateHeader &header, bool withValueUpdate, size_t offset, char *buf, size_t size ) {
 	if ( ! buf || ! size ) {
 		buf = this->buffer.recv;
 		size = this->buffer.size;
 	}
-	return this->parseKeyChunkUpdateHeader(
-		offset,
-		header.keySize,
-		header.key,
-		header.listId,
-		header.stripeId,
-		header.chunkId,
-		header.offset,
-		header.length,
-		header.delta,
-		buf, size
-	);
+	if ( withValueUpdate ) {
+		return this->parseKeyChunkUpdateHeader(
+			offset,
+			header.keySize,
+			header.key,
+			header.valueUpdateOffset,
+			header.valueUpdateSize,
+			header.listId,
+			header.stripeId,
+			header.chunkId,
+			header.offset,
+			header.length,
+			header.delta,
+			buf, size
+		);
+	} else {
+		return this->parseKeyChunkUpdateHeader(
+			offset,
+			header.keySize,
+			header.key,
+			header.listId,
+			header.stripeId,
+			header.chunkId,
+			header.offset,
+			header.length,
+			header.delta,
+			buf, size
+		);
+	}
 }
 
 bool Protocol::parseHeartbeatHeader( struct HeartbeatHeader &header, size_t offset, char *buf, size_t size ) {
