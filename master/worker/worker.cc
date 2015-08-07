@@ -600,7 +600,6 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 					}
 					break;
 				case PROTO_OPCODE_SET:
-					printf( "PROTO_OPCODE_SET\n" );
 					if ( this->protocol.parseKeyHeader( keyHeader ) ) {
 						key.size = keyHeader.keySize;
 						key.data = keyHeader.key;
@@ -634,7 +633,6 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 					}
 					break;
 				case PROTO_OPCODE_GET:
-					printf( "PROTO_OPCODE_GET\n" );
 					if ( success ) {
 						if ( this->protocol.parseKeyValueHeader( keyValueHeader ) ) {
 							key.size = keyValueHeader.keySize;
@@ -684,7 +682,6 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 
 					break;
 				case PROTO_OPCODE_UPDATE:
-					printf( "PROTO_OPCODE_UPDATE\n" );
 					if ( success ) {
 						if ( this->protocol.parseKeyChunkUpdateHeader( keyChunkUpdateHeader, true ) ) {
 							// TODO

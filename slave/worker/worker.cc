@@ -587,21 +587,21 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 							if ( cacheIt != map->cache.end() ) {
 								KeyMetadata &keyMetadata = keysIt->second;
 								Chunk *chunk = cacheIt->second;
-								KeyValue keyValue = chunk->getKeyValue( keyMetadata.offset );
+								char *delta;
+								uint32_t deltaSize;
 
-								// TODO: Update data chunk
-
-								uint8_t keySize;
-								uint32_t valueSize;
-								char *keyStr, *value;
-								keyValue.deserialize( keyStr, keySize, value, valueSize );
+								// Update data chunk and map
+								delta = this->protocol.buffer.recv + PROTO_KEY_CHUNK_UPDATE_SIZE + key.size;
+								deltaSize = chunk->deleteKeyValue(
+									key, &map->keys, delta,
+									this->protocol.buffer.size - PROTO_KEY_CHUNK_UPDATE_SIZE - key.size
+								);
 
 								event.resDelete(
 									event.socket, key,
 									chunk->metadata,
 									keyMetadata.offset,
-									valueSize,
-									value
+									deltaSize, delta
 								);
 							} else {
 								event.resDelete( event.socket, key );

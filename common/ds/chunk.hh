@@ -1,9 +1,11 @@
 #ifndef __COMMON_DS_CHUNK_HH__
 #define __COMMON_DS_CHUNK_HH__
 
+#include <map>
 #include <stdint.h>
 #include <arpa/inet.h>
 #include "metadata.hh"
+#include "key.hh"
 #include "key_value.hh"
 
 enum ChunkStatus {
@@ -32,6 +34,8 @@ public:
 	void updateParity( uint32_t offset = 0, uint32_t length = 0 );
 	// Compute delta
 	void computeDelta( char *delta, char *newData, uint32_t offset, uint32_t length, bool update = true );
+	// Delete key
+	uint32_t deleteKeyValue( Key target, std::map<Key, KeyMetadata> *keys, char *delta, size_t deltaBufSize );
 	// Get key-value pair
 	KeyValue getKeyValue( uint32_t offset );
 	// Reset internal status
