@@ -28,6 +28,7 @@ private:
 
 	void free();
 	// Commands
+	void printPending( FILE *f = stdout );
 	void help();
 	bool set( char *key, char *path );
 	bool get( char *key, char *path );

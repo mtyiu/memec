@@ -59,7 +59,7 @@ size_t Protocol::generateKeyValueHeader( uint8_t magic, uint8_t to, uint8_t opco
 
 size_t Protocol::generateKeyValueUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_KEY_VALUE_UPDATE_SIZE + keySize + valueUpdateSize );
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_KEY_VALUE_UPDATE_SIZE + keySize + ( valueUpdate ? valueUpdateSize : 0 ) );
 
 	buf[ 0 ] = keySize;
 
@@ -78,10 +78,12 @@ size_t Protocol::generateKeyValueUpdateHeader( uint8_t magic, uint8_t to, uint8_
 	buf += PROTO_KEY_VALUE_UPDATE_SIZE;
 	memmove( buf, key, keySize );
 	buf += keySize;
-	if ( valueUpdateSize && valueUpdate )
+	if ( valueUpdateSize && valueUpdate ) {
 		memmove( buf, valueUpdate, valueUpdateSize );
-
-	bytes += PROTO_KEY_VALUE_UPDATE_SIZE + keySize + valueUpdateSize;
+		bytes += PROTO_KEY_VALUE_UPDATE_SIZE + keySize + valueUpdateSize;
+	} else {
+		bytes += PROTO_KEY_VALUE_UPDATE_SIZE + keySize;
+	}
 
 	return bytes;
 }

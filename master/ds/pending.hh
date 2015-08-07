@@ -57,6 +57,14 @@ public:
 
 		return this->length < k.length;
 	}
+
+	bool equal( const KeyValueUpdate &k ) const {
+		return (
+			Key::equal( k ) &&
+			this->offset == k.offset &&
+			this->length == k.length
+		);
+	}
 };
 
 typedef struct {

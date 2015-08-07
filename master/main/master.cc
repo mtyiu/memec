@@ -304,6 +304,7 @@ void Master::interactive() {
 void Master::printPending( FILE *f ) {
 	size_t i;
 	std::set<Key>::iterator it;
+	std::set<KeyValueUpdate>::iterator keyValueUpdateIt;
 	fprintf(
 		f,
 		"Pending requests for applications\n"
@@ -311,7 +312,6 @@ void Master::printPending( FILE *f ) {
 		"[SET] Pending: %lu\n",
 		this->pending.applications.set.size()
 	);
-
 	i = 1;
 	for (
 		it = this->pending.applications.set.begin();
@@ -333,6 +333,50 @@ void Master::printPending( FILE *f ) {
 	for (
 		it = this->pending.applications.get.begin();
 		it != this->pending.applications.get.end();
+		it++, i++
+	) {
+		const Key &key = *it;
+		fprintf( f, "%lu. Key: %.*s (size = %u); source: ", i, key.size, key.data, key.size );
+		if ( key.ptr )
+			( ( Socket * ) key.ptr )->printAddress( f );
+		else
+			fprintf( f, "(nil)\n" );
+		fprintf( f, "\n" );
+	}
+
+	fprintf(
+		f,
+		"\n[UPDATE] Pending: %lu\n",
+		this->pending.applications.update.size()
+	);
+	i = 1;
+	for (
+		keyValueUpdateIt = this->pending.applications.update.begin();
+		keyValueUpdateIt != this->pending.applications.update.end();
+		keyValueUpdateIt++, i++
+	) {
+		const KeyValueUpdate &keyValueUpdate = *keyValueUpdateIt;
+		fprintf(
+			f, "%lu. Key: %.*s (size = %u, offset = %u, length = %u); source: ",
+			i, keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
+			keyValueUpdate.offset, keyValueUpdate.length
+		);
+		if ( keyValueUpdate.ptr )
+			( ( Socket * ) keyValueUpdate.ptr )->printAddress( f );
+		else
+			fprintf( f, "(nil)\n" );
+		fprintf( f, "\n" );
+	}
+
+	fprintf(
+		f,
+		"\n[DELETE] Pending: %lu\n",
+		this->pending.applications.del.size()
+	);
+	i = 1;
+	for (
+		it = this->pending.applications.del.begin();
+		it != this->pending.applications.del.end();
 		it++, i++
 	) {
 		const Key &key = *it;
@@ -374,6 +418,47 @@ void Master::printPending( FILE *f ) {
 	for (
 		it = this->pending.slaves.get.begin();
 		it != this->pending.slaves.get.end();
+		it++, i++
+	) {
+		const Key &key = *it;
+		fprintf( f, "%lu. Key: %.*s (size = %u); target: ", i, key.size, key.data, key.size );
+		( ( Socket * ) key.ptr )->printAddress( f );
+		fprintf( f, "\n" );
+	}
+
+	fprintf(
+		f,
+		"\n[UPDATE] Pending: %lu\n",
+		this->pending.slaves.update.size()
+	);
+	i = 1;
+	for (
+		keyValueUpdateIt = this->pending.slaves.update.begin();
+		keyValueUpdateIt != this->pending.slaves.update.end();
+		keyValueUpdateIt++, i++
+	) {
+		const KeyValueUpdate &keyValueUpdate = *keyValueUpdateIt;
+		fprintf(
+			f, "%lu. Key: %.*s (size = %u, offset = %u, length = %u); target: ",
+			i, keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
+			keyValueUpdate.offset, keyValueUpdate.length
+		);
+		if ( keyValueUpdate.ptr )
+			( ( Socket * ) keyValueUpdate.ptr )->printAddress( f );
+		else
+			fprintf( f, "(nil)\n" );
+		fprintf( f, "\n" );
+	}
+
+	fprintf(
+		f,
+		"\n[DELETE] Pending: %lu\n",
+		this->pending.slaves.del.size()
+	);
+	i = 1;
+	for (
+		it = this->pending.slaves.del.begin();
+		it != this->pending.slaves.del.end();
 		it++, i++
 	) {
 		const Key &key = *it;

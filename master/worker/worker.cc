@@ -45,12 +45,16 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 		case APPLICATION_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
 		case APPLICATION_EVENT_TYPE_GET_RESPONSE_SUCCESS:
 		case APPLICATION_EVENT_TYPE_SET_RESPONSE_SUCCESS:
+		case APPLICATION_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
+		case APPLICATION_EVENT_TYPE_DELETE_RESPONSE_SUCCESS:
 			success = true;
 			isSend = true;
 			break;
 		case APPLICATION_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
 		case APPLICATION_EVENT_TYPE_GET_RESPONSE_FAILURE:
 		case APPLICATION_EVENT_TYPE_SET_RESPONSE_FAILURE:
+		case APPLICATION_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
+		case APPLICATION_EVENT_TYPE_DELETE_RESPONSE_FAILURE:
 			success = false;
 			isSend = true;
 			break;
@@ -691,10 +695,36 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 						}
 					} else {
 						if ( this->protocol.parseKeyValueUpdateHeader( keyValueUpdateHeader ) ) {
-							// TODO
-							key.size = keyHeader.keySize;
-							key.data = keyHeader.key;
-							key.ptr = ( void * ) event.socket;
+							KeyValueUpdate keyValueUpdate;
+							std::set<KeyValueUpdate>::iterator it;
+
+							keyValueUpdate.size = keyValueUpdateHeader.keySize;
+							keyValueUpdate.data = keyValueUpdateHeader.key;
+							keyValueUpdate.ptr = ( void * ) event.socket;
+							keyValueUpdate.offset = keyValueUpdateHeader.valueUpdateOffset;
+							keyValueUpdate.length = keyValueUpdateHeader.valueUpdateSize;
+
+							it = MasterWorker::pending->slaves.update.find( keyValueUpdate );
+							if ( it == MasterWorker::pending->slaves.update.end() ) {
+								__ERROR__( "MasterWorker", "dispatch", "Cannot find a pending slave UPDATE request that matches the response. This message will be discarded." );
+								return;
+							}
+
+							keyValueUpdate.ptr = 0;
+							it = MasterWorker::pending->applications.update.lower_bound( keyValueUpdate );
+							if ( it == MasterWorker::pending->applications.update.end() || ! keyValueUpdate.equal( *it ) ) {
+								__ERROR__( "MasterWorker", "dispatch", "Cannot find a pending application UPDATE request that matches the response. This message will be discarded." );
+								return;
+							}
+							keyValueUpdate = *it;
+							applicationEvent.resUpdate(
+								( ApplicationSocket * ) keyValueUpdate.ptr,
+								keyValueUpdate,
+								keyValueUpdate.offset,
+								keyValueUpdate.length,
+								false
+							);
+							MasterWorker::eventQueue->insert( applicationEvent );
 						} else {
 							__ERROR__( "MasterWorker", "dispatch", "Invalid key header for UPDATE." );
 							return;

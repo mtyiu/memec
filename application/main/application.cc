@@ -260,6 +260,9 @@ void Application::interactive() {
 		} else if ( strcmp( command, "time" ) == 0 ) {
 			valid = true;
 			this->time();
+		} else if ( strcmp( command, "pending" ) == 0 ) {
+			valid = true;
+			this->printPending();
 		} else {
 			// Get or set
 			enum {
@@ -351,6 +354,153 @@ void Application::interactive() {
 	}
 }
 
+void Application::printPending( FILE *f ) {
+	size_t i;
+	std::set<Key>::iterator it;
+	std::set<KeyValueUpdate>::iterator keyValueUpdateIt;
+	fprintf(
+		f,
+		"Pending requests for application\n"
+		"--------------------------------\n"
+		"[SET] Pending: %lu\n",
+		this->pending.application.set.size()
+	);
+
+	i = 1;
+	for (
+		it = this->pending.application.set.begin();
+		it != this->pending.application.set.end();
+		it++, i++
+	) {
+		const Key &key = *it;
+		fprintf( f, "%lu. Key: %.*s (size = %u)\n", i, key.size, key.data, key.size );
+	}
+
+	fprintf(
+		f,
+		"\n[GET] Pending: %lu\n",
+		this->pending.application.get.size()
+	);
+	i = 1;
+	for (
+		it = this->pending.application.get.begin();
+		it != this->pending.application.get.end();
+		it++, i++
+	) {
+		const Key &key = *it;
+		fprintf( f, "%lu. Key: %.*s (size = %u)\n", i, key.size, key.data, key.size );
+	}
+
+	fprintf(
+		f,
+		"\n[UPDATE] Pending: %lu\n",
+		this->pending.application.update.size()
+	);
+	i = 1;
+	for (
+		keyValueUpdateIt = this->pending.application.update.begin();
+		keyValueUpdateIt != this->pending.application.update.end();
+		keyValueUpdateIt++, i++
+	) {
+		const KeyValueUpdate &keyValueUpdate = *keyValueUpdateIt;
+		fprintf(
+			f, "%lu. Key: %.*s (size = %u, offset = %u, length = %u)\n",
+			i, keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
+			keyValueUpdate.offset, keyValueUpdate.length
+		);
+	}
+
+	fprintf(
+		f,
+		"\n[DELETE] Pending: %lu\n",
+		this->pending.application.del.size()
+	);
+	i = 1;
+	for (
+		it = this->pending.application.del.begin();
+		it != this->pending.application.del.end();
+		it++, i++
+	) {
+		const Key &key = *it;
+		fprintf( f, "%lu. Key: %.*s (size = %u)\n", i, key.size, key.data, key.size );
+	}
+
+
+	fprintf(
+		f,
+		"\n\nPending requests for master\n"
+		"---------------------------\n"
+		"[SET] Pending: %lu\n",
+		this->pending.masters.set.size()
+	);
+	i = 1;
+	for (
+		it = this->pending.masters.set.begin();
+		it != this->pending.masters.set.end();
+		it++, i++
+	) {
+		const Key &key = *it;
+		fprintf( f, "%lu. Key: %.*s (size = %u); target: ", i, key.size, key.data, key.size );
+		( ( Socket * ) key.ptr )->printAddress( f );
+		fprintf( f, "\n" );
+	}
+
+	fprintf(
+		f,
+		"\n[GET] Pending: %lu\n",
+		this->pending.masters.get.size()
+	);
+	i = 1;
+	for (
+		it = this->pending.masters.get.begin();
+		it != this->pending.masters.get.end();
+		it++, i++
+	) {
+		const Key &key = *it;
+		fprintf( f, "%lu. Key: %.*s (size = %u); target: ", i, key.size, key.data, key.size );
+		( ( Socket * ) key.ptr )->printAddress( f );
+		fprintf( f, "\n" );
+	}
+
+	fprintf(
+		f,
+		"\n[UPDATE] Pending: %lu\n",
+		this->pending.masters.update.size()
+	);
+	i = 1;
+	for (
+		keyValueUpdateIt = this->pending.masters.update.begin();
+		keyValueUpdateIt != this->pending.masters.update.end();
+		keyValueUpdateIt++, i++
+	) {
+		const KeyValueUpdate &keyValueUpdate = *keyValueUpdateIt;
+		fprintf(
+			f, "%lu. Key: %.*s (size = %u, offset = %u, length = %u); target: ",
+			i, keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
+			keyValueUpdate.offset, keyValueUpdate.length
+		);
+		( ( Socket * ) keyValueUpdate.ptr )->printAddress( f );
+		fprintf( f, "\n" );
+	}
+
+	fprintf(
+		f,
+		"\n[DELETE] Pending: %lu\n",
+		this->pending.masters.del.size()
+	);
+	i = 1;
+	for (
+		it = this->pending.masters.del.begin();
+		it != this->pending.masters.del.end();
+		it++, i++
+	) {
+		const Key &key = *it;
+		fprintf( f, "%lu. Key: %.*s (size = %u); target: ", i, key.size, key.data, key.size );
+		( ( Socket * ) key.ptr )->printAddress( f );
+		fprintf( f, "\n" );
+	}
+}
+
 bool Application::set( char *key, char *path ) {
 	int fd;
 	MasterEvent event;
@@ -439,6 +589,7 @@ void Application::help() {
 		"- help: Show this help message\n"
 		"- info: Show configuration\n"
 		"- debug: Show debug messages\n"
+		"- pending: Show all pending requests\n"
 		"- time: Show elapsed time\n"
 		"- exit: Terminate this client\n"
 		"- set [key] [src]: Upload the file at [src] with key [key]\n"
