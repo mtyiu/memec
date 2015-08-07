@@ -65,8 +65,15 @@ void Chunk::computeDelta( char *delta, char *newData, uint32_t offset, uint32_t 
 		newData,             // new data
 		length
 	);
-	if ( update )
-		memcpy( this->data + offset, newData, length );
+	if ( update ) {
+		Coding::bitwiseXOR(
+			this->data + offset,
+			this->data + offset, // original data
+			delta,             // new data
+			length
+		);	
+	}
+		// memcpy( this->data + offset, newData, length );
 }
 
 KeyValue Chunk::getKeyValue( uint32_t offset ) {

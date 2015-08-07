@@ -295,7 +295,7 @@ void Application::interactive() {
 					} else if ( strcmp( token, "update" ) == 0 ) {
 						action = ACTION_UPDATE;
 						expectedTokens = 4;
-					} else if ( strcmp( token, "del" ) == 0 ) {
+					} else if ( strcmp( token, "delete" ) == 0 ) {
 						action = ACTION_DELETE;
 						expectedTokens = 2;
 					} else {
@@ -399,7 +399,7 @@ bool Application::update( char *key, char *path, uint32_t offset ) {
 	int fd;
 	MasterEvent event;
 
-	fd = ::open( path, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR );
+	fd = ::open( path, O_RDONLY );
 	if ( fd == -1 ) {
 		__ERROR__( "Application", "update", "%s", strerror( errno ) );
 		return false;

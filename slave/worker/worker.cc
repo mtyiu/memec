@@ -210,10 +210,9 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 			uint8_t keySize;
 			uint32_t valueSize;
 
-			__ERROR__( "MasterWorker", "dispatch", "MASTER_EVENT_TYPE_GET_RESPONSE_SUCCESS: key size = %u, value size = %u.", keySize, valueSize );
-
 			event.message.keyValue.deserialize( key, keySize, value, valueSize );
 			buffer.data = this->protocol.resGet( buffer.size, success, keySize, key, valueSize, value );
+			__ERROR__( "SlaveWorker", "dispatch", "MASTER_EVENT_TYPE_GET_RESPONSE_SUCCESS: key size = %u, value size = %u. First byte: 0x%x", keySize, valueSize, buffer.data[ 0 ] );
 		}
 			break;
 		case MASTER_EVENT_TYPE_GET_RESPONSE_FAILURE:

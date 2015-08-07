@@ -274,13 +274,13 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 							socket = this->paritySlaveSockets[ i ];
 							if ( ! socket->ready() ) {
 								__ERROR__( "MasterWorker", "dispatch", "[Parity Slave #%u failed] Performing degraded SET.", i );
-							}
-							for ( uint32_t j = 0; ! socket->ready(); j++ ) {
-								if ( j >= this->dataChunkCount + this->parityChunkCount ) {
-									__ERROR__( "MasterWorker", "dispatch", "Cannot find a slave for performing degraded SET." );
+								for ( uint32_t j = 0; ! socket->ready(); j++ ) {
+									if ( j >= this->dataChunkCount + this->parityChunkCount ) {
+										__ERROR__( "MasterWorker", "dispatch", "Cannot find a slave for performing degraded SET." );
+									}
+									// Choose another slave to perform degraded update
+									socket = MasterWorker::stripeList->get( listIndex, i, j );
 								}
-								// Choose another slave to perform degraded update
-								socket = MasterWorker::stripeList->get( listIndex, j, i );
 							}
 
 #define MASTER_WORKER_SEND_REPLICAS_PARALLEL
@@ -293,6 +293,20 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 							ret = socket->send( buffer.data, buffer.size, connected );
 #endif
 						}
+
+						socket = this->dataSlaveSockets[ dataIndex ];
+						if ( ! socket->ready() ) {
+							__ERROR__( "MasterWorker", "dispatch", "[Data Slave #%u failed] Performing degraded SET.", dataIndex );
+							for ( uint32_t j = 0; ! socket->ready(); j++ ) {
+								if ( j >= this->dataChunkCount + this->parityChunkCount ) {
+									__ERROR__( "MasterWorker", "dispatch", "Cannot find a slave for performing degraded SET." );
+								}
+								// Choose another slave to perform degraded update
+								socket = MasterWorker::stripeList->get( listIndex, dataIndex, j );
+							}
+						}
+						ret = socket->send( buffer.data, buffer.size, connected );
+
 #ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
 						// Wait until all replicas are sent
 						for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
@@ -309,7 +323,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 					if ( this->protocol.parseKeyValueUpdateHeader( keyValueUpdateHeader ) ) {
 						__DEBUG__(
 							BLUE, "MasterWorker", "dispatch",
-							"[SET] Key: %.*s (key size = %u); Value: (offset = %u, value update size = %u)",
+							"[UPDATE] Key: %.*s (key size = %u); Value: (offset = %u, value update size = %u)",
 							( int ) keyValueUpdateHeader.keySize,
 							keyValueUpdateHeader.key,
 							keyValueUpdateHeader.keySize,
@@ -551,7 +565,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 
 			// Validate message
 			if ( header.from != PROTO_MAGIC_FROM_SLAVE ) {
-				__ERROR__( "MasterWorker", "dispatch", "Invalid message source from slave." );
+				__ERROR__( "MasterWorker", "dispatch", "Invalid message source from first byte: 0x%x.", this->protocol.buffer.recv[ 0 ] );
 				return;
 			}
 
@@ -586,54 +600,59 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 					}
 					break;
 				case PROTO_OPCODE_SET:
-					if ( ! this->protocol.parseKeyHeader( keyHeader ) ) {
-						__ERROR__( "MasterWorker", "dispatch", "Invalid key header for SET." );
-						return;
-					}
-					key.size = keyHeader.keySize;
-					key.data = keyHeader.key;
-					key.ptr = ( void * ) event.socket;
-					it = MasterWorker::pending->slaves.set.find( key );
-					if ( it == MasterWorker::pending->slaves.set.end() ) {
-						__ERROR__( "MasterWorker", "dispatch", "Cannot find a pending slave SET request that matches the response. This message will be discarded." );
-						return;
-					}
-					MasterWorker::pending->slaves.set.erase( it );
-
-					// Check pending slave SET requests
-					key.ptr = 0;
-					it = MasterWorker::pending->slaves.set.lower_bound( key );
-					for ( pending = 0; it != MasterWorker::pending->slaves.set.end() && key.equal( *it ); pending++, it++ );
-					__ERROR__( "MasterWorker", "dispatch", "Pending slave SET requests = %d.", pending );
-					if ( pending == 0 ) {
-						// Only send application SET response when the number of pending slave SET requests equal 0
-						it = MasterWorker::pending->applications.set.lower_bound( key );
-						if ( it == MasterWorker::pending->applications.set.end() || ! key.equal( *it ) ) {
-							__ERROR__( "MasterWorker", "dispatch", "Cannot find a pending application SET request that matches the response. This message will be discarded." );
-							return;
-						}
-						key = *it;
-						applicationEvent.resSet( ( ApplicationSocket * ) ( *it ).ptr, key, success );
-						MasterWorker::eventQueue->insert( applicationEvent );
-					}
-					break;
-				case PROTO_OPCODE_GET:
-					if ( success ) {
-						if ( this->protocol.parseKeyValueHeader( keyValueHeader ) ) {
-							__ERROR__( "MasterWorker", "dispatch", "Invalid key value header for GET." );
-							return;
-						}
-						key.size = keyValueHeader.keySize;
-						key.data = keyValueHeader.key;
-						key.ptr = ( void * ) event.socket;
-					} else {
-						if ( this->protocol.parseKeyHeader( keyHeader ) ) {
-							__ERROR__( "MasterWorker", "dispatch", "Invalid key header for GET." );
-							return;
-						}
+					printf( "PROTO_OPCODE_SET\n" );
+					if ( this->protocol.parseKeyHeader( keyHeader ) ) {
 						key.size = keyHeader.keySize;
 						key.data = keyHeader.key;
 						key.ptr = ( void * ) event.socket;
+						it = MasterWorker::pending->slaves.set.find( key );
+						if ( it == MasterWorker::pending->slaves.set.end() ) {
+							__ERROR__( "MasterWorker", "dispatch", "Cannot find a pending slave SET request that matches the response. This message will be discarded." );
+							return;
+						}
+						MasterWorker::pending->slaves.set.erase( it );
+
+						// Check pending slave SET requests
+						key.ptr = 0;
+						it = MasterWorker::pending->slaves.set.lower_bound( key );
+						for ( pending = 0; it != MasterWorker::pending->slaves.set.end() && key.equal( *it ); pending++, it++ );
+						__ERROR__( "MasterWorker", "dispatch", "Pending slave SET requests = %d.", pending );
+						if ( pending == 0 ) {
+							// Only send application SET response when the number of pending slave SET requests equal 0
+							it = MasterWorker::pending->applications.set.lower_bound( key );
+							if ( it == MasterWorker::pending->applications.set.end() || ! key.equal( *it ) ) {
+								__ERROR__( "MasterWorker", "dispatch", "Cannot find a pending application SET request that matches the response. This message will be discarded." );
+								return;
+							}
+							key = *it;
+							applicationEvent.resSet( ( ApplicationSocket * ) ( *it ).ptr, key, success );
+							MasterWorker::eventQueue->insert( applicationEvent );
+						}
+					} else {
+						__ERROR__( "MasterWorker", "dispatch", "Invalid key header for SET." );
+						return;
+					}
+					break;
+				case PROTO_OPCODE_GET:
+					printf( "PROTO_OPCODE_GET\n" );
+					if ( success ) {
+						if ( this->protocol.parseKeyValueHeader( keyValueHeader ) ) {
+							key.size = keyValueHeader.keySize;
+							key.data = keyValueHeader.key;
+							key.ptr = ( void * ) event.socket;
+						} else {
+							__ERROR__( "MasterWorker", "dispatch", "Invalid key value header for GET." );
+							return;
+						}
+					} else {
+						if ( this->protocol.parseKeyHeader( keyHeader ) ) {
+							key.size = keyHeader.keySize;
+							key.data = keyHeader.key;
+							key.ptr = ( void * ) event.socket;
+						} else {
+							__ERROR__( "MasterWorker", "dispatch", "Invalid key header for GET." );
+							return;
+						}
 					}
 					it = MasterWorker::pending->slaves.get.find( key );
 					if ( it == MasterWorker::pending->slaves.get.end() ) {
@@ -665,42 +684,58 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 
 					break;
 				case PROTO_OPCODE_UPDATE:
+					printf( "PROTO_OPCODE_UPDATE\n" );
 					if ( success ) {
-						if ( ! this->protocol.parseKeyChunkUpdateHeader( keyChunkUpdateHeader, true ) ) {
+						if ( this->protocol.parseKeyChunkUpdateHeader( keyChunkUpdateHeader, true ) ) {
+							// TODO
+						} else {
 							__ERROR__( "MasterWorker", "dispatch", "Invalid key chunk update header for UPDATE." );
 							return;
 						}
 					} else {
-						if ( ! this->protocol.parseKeyValueUpdateHeader( keyValueUpdateHeader ) ) {
+						if ( this->protocol.parseKeyValueUpdateHeader( keyValueUpdateHeader ) ) {
+							// TODO
+							key.size = keyHeader.keySize;
+							key.data = keyHeader.key;
+							key.ptr = ( void * ) event.socket;
+						} else {
 							__ERROR__( "MasterWorker", "dispatch", "Invalid key header for UPDATE." );
 							return;
 						}
-						key.size = keyHeader.keySize;
-						key.data = keyHeader.key;
-						key.ptr = ( void * ) event.socket;
 					}
 					break;
 				case PROTO_OPCODE_UPDATE_CHUNK:
-					if ( ! this->protocol.parseChunkUpdateHeader( chunkUpdateHeader ) ) {
+					printf( "PROTO_OPCODE_UPDATE_CHUNK\n" );
+					if ( this->protocol.parseChunkUpdateHeader( chunkUpdateHeader ) ) {
+						// TODO
+					} else {
 						__ERROR__( "MasterWorker", "dispatch", "Invalid chunk update header for UPDATE." );
 						return;
 					}
 					break;
 				case PROTO_OPCODE_DELETE:
+					printf( "PROTO_OPCODE_DELETE\n" );
 					if ( success ) {
-						if ( ! this->protocol.parseKeyChunkUpdateHeader( keyChunkUpdateHeader, false ) ) {
+						if ( this->protocol.parseKeyChunkUpdateHeader( keyChunkUpdateHeader, false ) ) {
+							// TODO
+						} else {
 							__ERROR__( "MasterWorker", "dispatch", "Invalid key chunk update header for DELETE." );
 							return;
 						}
 					} else {
-						if ( ! this->protocol.parseKeyHeader( keyHeader ) ) {
+						if ( this->protocol.parseKeyHeader( keyHeader ) ) {
+							// TODO
+						} else {
 							__ERROR__( "MasterWorker", "dispatch", "Invalid key header for DELETE." );
 							return;
 						}
 					}
 					break;
 				case PROTO_OPCODE_DELETE_CHUNK:
-					if ( ! this->protocol.parseChunkUpdateHeader( chunkUpdateHeader ) ) {
+					printf( "PROTO_OPCODE_DELETE_CHUNK\n" );
+					if ( this->protocol.parseChunkUpdateHeader( chunkUpdateHeader ) ) {
+						// TODO
+					} else {
 						__ERROR__( "MasterWorker", "dispatch", "Invalid chunk update header for DELETE." );
 						return;
 					}

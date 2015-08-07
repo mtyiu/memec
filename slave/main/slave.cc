@@ -485,7 +485,7 @@ void Slave::time() {
 }
 
 void Slave::alarm() {
-	::alarm( this->config.global.sync.timeout );
+	// ::alarm( this->config.global.sync.timeout );
 }
 
 Load &Slave::aggregateLoad( FILE *f ) {

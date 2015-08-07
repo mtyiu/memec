@@ -110,7 +110,7 @@ size_t Protocol::generateChunkUpdateHeader( uint8_t magic, uint8_t to, uint8_t o
 
 size_t Protocol::generateKeyChunkUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, char *delta ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_KEY_CHUNK_UPDATE_SIZE + length + keySize );
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_KEY_VALUE_CHUNK_UPDATE_SIZE + length + keySize );
 
 	buf[ 0 ] = keySize;
 
