@@ -134,6 +134,14 @@ public:
 		return ret[ index ];
 	}
 
+	T **get( uint32_t listIndex, T **parity ) {
+		T **ret = this->lists[ listIndex ];
+		for ( uint32_t i = 0; i < this->n - this->k; i++ ) {
+			parity[ i ] = ret[ this->k + i ];
+		}
+		return parity;
+	}
+
 	std::vector<StripeListIndex> list( uint32_t index ) {
 		uint32_t i, j;
 		std::vector<StripeListIndex> ret;

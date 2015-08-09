@@ -637,13 +637,15 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 						metadata.chunkId = chunkUpdateHeader.chunkId;
 
 						std::map<Metadata, Chunk *>::iterator cacheIt;
-						cacheIt = map->cache.find( metadata );
-						if ( cacheIt != map->cache.end() ) {
+						cacheIt = map->cache.lower_bound( metadata );
+						if ( cacheIt != map->cache.end() && metadata.matchStripe( cacheIt->first ) ) {
+							metadata = cacheIt->first;
 							// Chunk *chunk = cacheIt->second;
 							// TODO: Perform parity chunk update
 							// ...
 							__ERROR__( "SlaveWorker", "dispatch", "TODO: DELETE_CHUNK not yet implemented!" );
-							success = false;
+							metadata.chunkId = chunkUpdateHeader.chunkId;
+							success = true;
 						} else {
 							success = false;
 						}

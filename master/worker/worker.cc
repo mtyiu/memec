@@ -268,10 +268,6 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 
 						key.ptr = ( void * ) this->dataSlaveSockets[ dataIndex ];
 						MasterWorker::pending->slaves.set.insert( key );
-						for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
-							key.ptr = ( void * ) this->paritySlaveSockets[ i ];
-							MasterWorker::pending->slaves.set.insert( key );
-						}
 
 						// Send SET requests
 						for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
@@ -282,10 +278,13 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 									if ( j >= this->dataChunkCount + this->parityChunkCount ) {
 										__ERROR__( "MasterWorker", "dispatch", "Cannot find a slave for performing degraded SET." );
 									}
-									// Choose another slave to perform degraded update
-									socket = MasterWorker::stripeList->get( listIndex, i, j );
+									// Choose another slave to perform degraded SET
+									socket = MasterWorker::stripeList->get( listIndex, this->dataChunkCount + i, j );
 								}
 							}
+
+							key.ptr = ( void * ) this->paritySlaveSockets[ i ];
+							MasterWorker::pending->slaves.set.insert( key );
 
 #define MASTER_WORKER_SEND_REPLICAS_PARALLEL
 #ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
@@ -553,7 +552,9 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 		struct ChunkUpdateHeader chunkUpdateHeader;
 		struct KeyChunkUpdateHeader keyChunkUpdateHeader;
 		Key key;
+		ChunkUpdate chunkUpdate;
 		std::set<Key>::iterator it;
+		std::set<ChunkUpdate>::iterator chunkUpdateIt;
 		ApplicationEvent applicationEvent;
 
 		ret = event.socket->recv(
@@ -596,6 +597,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 			}
 
 			switch( header.opcode ) {
+				///////////////////////////////////////////////////////////////
 				case PROTO_OPCODE_REGISTER:
 					if ( success ) {
 						event.socket->registered = true;
@@ -603,6 +605,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 						__ERROR__( "MasterWorker", "dispatch", "Failed to register with slave." );
 					}
 					break;
+				///////////////////////////////////////////////////////////////
 				case PROTO_OPCODE_SET:
 					if ( this->protocol.parseKeyHeader( keyHeader ) ) {
 						key.size = keyHeader.keySize;
@@ -636,6 +639,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 						return;
 					}
 					break;
+				///////////////////////////////////////////////////////////////
 				case PROTO_OPCODE_GET:
 					if ( success ) {
 						if ( this->protocol.parseKeyValueHeader( keyValueHeader ) ) {
@@ -685,6 +689,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 					MasterWorker::eventQueue->insert( applicationEvent );
 
 					break;
+				///////////////////////////////////////////////////////////////
 				case PROTO_OPCODE_UPDATE:
 					if ( success ) {
 						if ( this->protocol.parseKeyChunkUpdateHeader( keyChunkUpdateHeader, true ) ) {
@@ -731,6 +736,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 						}
 					}
 					break;
+				///////////////////////////////////////////////////////////////
 				case PROTO_OPCODE_UPDATE_CHUNK:
 					printf( "PROTO_OPCODE_UPDATE_CHUNK\n" );
 					if ( this->protocol.parseChunkUpdateHeader( chunkUpdateHeader ) ) {
@@ -740,11 +746,94 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 						return;
 					}
 					break;
+				///////////////////////////////////////////////////////////////
 				case PROTO_OPCODE_DELETE:
 					printf( "PROTO_OPCODE_DELETE\n" );
 					if ( success ) {
 						if ( this->protocol.parseKeyChunkUpdateHeader( keyChunkUpdateHeader, false ) ) {
-							// TODO
+							__DEBUG__(
+								BLUE, "MasterWorker", "dispatch",
+								"[DELETE] Removed key: %.*s (key size = %u); list ID: %u, stripe ID: %u, chunk ID: %u; offset = %u, length = %u.",
+								( int ) keyChunkUpdateHeader.keySize,
+								keyChunkUpdateHeader.key,
+								keyChunkUpdateHeader.keySize,
+								keyChunkUpdateHeader.listId,
+								keyChunkUpdateHeader.stripeId,
+								keyChunkUpdateHeader.chunkId,
+								keyChunkUpdateHeader.offset,
+								keyChunkUpdateHeader.length
+							);
+							buffer.data = this->protocol.reqDeleteChunk(
+								buffer.size,
+								keyChunkUpdateHeader.listId,
+								keyChunkUpdateHeader.stripeId,
+								keyChunkUpdateHeader.chunkId,
+								keyChunkUpdateHeader.offset,
+								keyChunkUpdateHeader.length,
+								keyChunkUpdateHeader.delta
+							);
+
+							MasterWorker::stripeList->get(
+								keyChunkUpdateHeader.listId,
+								this->paritySlaveSockets
+							);
+
+							// Find the cooresponding request
+							key.size = keyChunkUpdateHeader.keySize;
+							key.data = keyChunkUpdateHeader.key;
+							key.ptr = ( void * ) event.socket;
+							it = MasterWorker::pending->slaves.del.find( key );
+							if ( it == MasterWorker::pending->slaves.del.end() ) {
+								__ERROR__( "MasterWorker", "dispatch", "Cannot find a pending slave DELETE request that matches the response. This message will be discarded." );
+								return;
+							}
+							key = *it;
+							MasterWorker::pending->slaves.del.erase( it );
+
+							chunkUpdate.listId = keyChunkUpdateHeader.listId;
+							chunkUpdate.stripeId = keyChunkUpdateHeader.stripeId;
+							chunkUpdate.chunkId = keyChunkUpdateHeader.chunkId;
+							chunkUpdate.offset = keyChunkUpdateHeader.offset;
+							chunkUpdate.length = keyChunkUpdateHeader.length;
+							chunkUpdate.keySize = key.size;
+							chunkUpdate.key = key.data;
+
+							for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
+								SlaveSocket *socket = this->paritySlaveSockets[ i ];
+								if ( ! socket->ready() ) {
+									__ERROR__( "MasterWorker", "dispatch", "[Parity Slave #%u failed] Performing degraded DELETE.", i );
+									for ( uint32_t j = 0; ! socket->ready(); j++ ) {
+										if ( j >= this->dataChunkCount + this->parityChunkCount ) {
+											__ERROR__( "MasterWorker", "dispatch", "Cannot find a slave for performing degraded DELETE." );
+										}
+										// Choose another slave to perform degraded delete
+										socket = MasterWorker::stripeList->get( keyChunkUpdateHeader.listId, this->dataChunkCount + i, j );
+									}
+								}
+
+								chunkUpdate.ptr = ( void * ) socket;
+								MasterWorker::pending->slaves.deleteChunk.insert( chunkUpdate );
+
+#ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
+								SlaveEvent slaveEvent;
+								this->protocol.status->set( i );
+								slaveEvent.send( socket, &this->protocol, buffer.size, i );
+								if ( i == this->parityChunkCount - 1 ) {
+									this->dispatch( slaveEvent );
+								} else {
+									MasterWorker::eventQueue->insert( slaveEvent );
+								}
+#else
+								ret = socket->send( buffer.data, buffer.size, connected );
+#endif
+							}
+
+#ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
+							// Wait until all requests are sent
+							for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
+								while( this->protocol.status->check( i ) ); // Busy waiting
+							}
+#endif
 						} else {
 							__ERROR__( "MasterWorker", "dispatch", "Invalid key chunk update header for DELETE." );
 							return;
@@ -758,15 +847,60 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 						}
 					}
 					break;
+				///////////////////////////////////////////////////////////////
 				case PROTO_OPCODE_DELETE_CHUNK:
 					printf( "PROTO_OPCODE_DELETE_CHUNK\n" );
 					if ( this->protocol.parseChunkUpdateHeader( chunkUpdateHeader ) ) {
-						// TODO
+						__DEBUG__(
+							BLUE, "MasterWorker", "dispatch",
+							"[DELETE_CHUNK] List ID: %u, stripe ID: %u, chunk ID: %u; offset = %u, length = %u.",
+							chunkUpdateHeader.listId,
+							chunkUpdateHeader.stripeId,
+							chunkUpdateHeader.chunkId,
+							chunkUpdateHeader.offset,
+							chunkUpdateHeader.length
+						);
+						chunkUpdate.listId = chunkUpdateHeader.listId;
+						chunkUpdate.stripeId = chunkUpdateHeader.stripeId;
+						chunkUpdate.chunkId = chunkUpdateHeader.chunkId;
+						chunkUpdate.offset = chunkUpdateHeader.offset;
+						chunkUpdate.length = chunkUpdateHeader.length;
+						chunkUpdate.keySize = 0;
+						chunkUpdate.key = 0;
+						chunkUpdate.ptr = ( void * ) event.socket;
+						chunkUpdateIt = MasterWorker::pending->slaves.deleteChunk.lower_bound( chunkUpdate );
+						if ( chunkUpdateIt == MasterWorker::pending->slaves.deleteChunk.end() || ! chunkUpdate.equal( *chunkUpdateIt ) ) {
+							__ERROR__( "MasterWorker", "dispatch", "Cannot find a pending slave DELETE_CHUNK request that matches the response. This message will be discarded." );
+							return;
+						}
+						chunkUpdate = *chunkUpdateIt;
+						MasterWorker::pending->slaves.deleteChunk.erase( chunkUpdateIt );
+
+						// Check pending slave DELETE_CHUNK requests
+						chunkUpdate.ptr = 0;
+						chunkUpdateIt = MasterWorker::pending->slaves.deleteChunk.lower_bound( chunkUpdate );
+						for ( pending = 0; chunkUpdateIt != MasterWorker::pending->slaves.deleteChunk.end() && chunkUpdate.equal( *chunkUpdateIt ); pending++, chunkUpdateIt++ );
+						__ERROR__( "MasterWorker", "dispatch", "Pending slave DELETE_CHUNK requests = %d.", pending );
+						if ( pending == 0 ) {
+							// Only send application DELETE response when the number of pending slave DELETE_CHUNK requests equal 0
+							key.size = chunkUpdate.keySize;
+							key.data = chunkUpdate.key;
+							it = MasterWorker::pending->applications.del.lower_bound( key );
+							if ( it == MasterWorker::pending->applications.set.end() || ! key.equal( *it ) ) {
+								__ERROR__( "MasterWorker", "dispatch", "Cannot find a pending application DELETE request that matches the response. This message will be discarded." );
+								return;
+							}
+							key = *it;
+							applicationEvent.resDelete( ( ApplicationSocket * ) ( *it ).ptr, key, success );
+							fprintf(stderr, "success = %s\n", success ? "true" : "false" );
+							MasterWorker::eventQueue->insert( applicationEvent );
+						}
 					} else {
-						__ERROR__( "MasterWorker", "dispatch", "Invalid chunk update header for DELETE." );
+						__ERROR__( "MasterWorker", "dispatch", "Invalid chunk update header for DELETE CHUNK." );
 						return;
 					}
 					break;
+				///////////////////////////////////////////////////////////////
 				default:
 					__ERROR__( "MasterWorker", "dispatch", "Invalid opcode from slave." );
 					return;

@@ -40,6 +40,17 @@ public:
 
 		return this->ptr < m.ptr;
 	}
+
+	bool equal( const ChunkUpdate &c ) const {
+		printf( "Metadata::equal( c ): %s\n", Metadata::equal( c ) ? "true" : "false" );
+		printf( "this->offset = %u vs. c.offset = %u\n", this->offset, c.offset );
+		printf( "this->length = %u vs. c.length = %u\n", this->length, c.length );
+		return (
+			Metadata::equal( c ) &&
+			this->offset == c.offset &&
+			this->length == c.length
+		);
+	}
 };
 
 class KeyValueUpdate : public Key {
