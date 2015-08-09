@@ -4,6 +4,8 @@
 
 #define WORKER_COLOR	YELLOW
 
+uint32_t MasterWorker::dataChunkCount;
+uint32_t MasterWorker::parityChunkCount;
 Pending *MasterWorker::pending;
 MasterEventQueue *MasterWorker::eventQueue;
 StripeList<SlaveSocket> *MasterWorker::stripeList;
@@ -213,7 +215,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 							__ERROR__( "MasterWorker", "dispatch", "[Data Slave #%u failed] Performing degraded GET.", dataIndex );
 						}
 						for ( uint32_t i = 0; ! socket->ready(); i++ ) {
-							if ( i >= this->dataChunkCount + this->parityChunkCount ) {
+							if ( i >= MasterWorker::dataChunkCount + MasterWorker::parityChunkCount ) {
 								__ERROR__( "MasterWorker", "dispatch", "Cannot find a slave for performing degraded GET." );
 							}
 							// Choose another slave to perform degraded read
@@ -270,16 +272,16 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 						MasterWorker::pending->slaves.set.insert( key );
 
 						// Send SET requests
-						for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
+						for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
 							socket = this->paritySlaveSockets[ i ];
 							if ( ! socket->ready() ) {
 								__ERROR__( "MasterWorker", "dispatch", "[Parity Slave #%u failed] Performing degraded SET.", i );
 								for ( uint32_t j = 0; ! socket->ready(); j++ ) {
-									if ( j >= this->dataChunkCount + this->parityChunkCount ) {
+									if ( j >= MasterWorker::dataChunkCount + MasterWorker::parityChunkCount ) {
 										__ERROR__( "MasterWorker", "dispatch", "Cannot find a slave for performing degraded SET." );
 									}
 									// Choose another slave to perform degraded SET
-									socket = MasterWorker::stripeList->get( listIndex, this->dataChunkCount + i, j );
+									socket = MasterWorker::stripeList->get( listIndex, MasterWorker::dataChunkCount + i, j );
 								}
 							}
 
@@ -301,7 +303,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 						if ( ! socket->ready() ) {
 							__ERROR__( "MasterWorker", "dispatch", "[Data Slave #%u failed] Performing degraded SET.", dataIndex );
 							for ( uint32_t j = 0; ! socket->ready(); j++ ) {
-								if ( j >= this->dataChunkCount + this->parityChunkCount ) {
+								if ( j >= MasterWorker::dataChunkCount + MasterWorker::parityChunkCount ) {
 									__ERROR__( "MasterWorker", "dispatch", "Cannot find a slave for performing degraded SET." );
 								}
 								// Choose another slave to perform degraded update
@@ -312,7 +314,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 
 #ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
 						// Wait until all replicas are sent
-						for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
+						for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
 							while( this->protocol.status->check( i ) ); // Busy waiting
 						}
 #endif
@@ -356,7 +358,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 							__ERROR__( "MasterWorker", "dispatch", "[Data Slave #%u failed] Performing degraded UPDATE.", dataIndex );
 						}
 						for ( uint32_t i = 0; ! socket->ready(); i++ ) {
-							if ( i >= this->dataChunkCount + this->parityChunkCount ) {
+							if ( i >= MasterWorker::dataChunkCount + MasterWorker::parityChunkCount ) {
 								__ERROR__( "MasterWorker", "dispatch", "Cannot find a slave for performing degraded UPDATE." );
 							}
 							// Choose another slave to perform degraded update
@@ -413,7 +415,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 							__ERROR__( "MasterWorker", "dispatch", "[Data Slave #%u failed] Performing degraded DELETE.", dataIndex );
 						}
 						for ( uint32_t i = 0; ! socket->ready(); i++ ) {
-							if ( i >= this->dataChunkCount + this->parityChunkCount ) {
+							if ( i >= MasterWorker::dataChunkCount + MasterWorker::parityChunkCount ) {
 								__ERROR__( "MasterWorker", "dispatch", "Cannot find a slave for performing degraded delete." );
 							}
 							// Choose another slave to perform degraded delete
@@ -748,16 +750,16 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 							chunkUpdate.keySize = keyValueUpdate.size;
 							chunkUpdate.key = keyValueUpdate.data;
 
-							for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
+							for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
 								SlaveSocket *socket = this->paritySlaveSockets[ i ];
 								if ( ! socket->ready() ) {
 									__ERROR__( "MasterWorker", "dispatch", "[Parity Slave #%u failed] Performing degraded UPDATE.", i );
 									for ( uint32_t j = 0; ! socket->ready(); j++ ) {
-										if ( j >= this->dataChunkCount + this->parityChunkCount ) {
+										if ( j >= MasterWorker::dataChunkCount + MasterWorker::parityChunkCount ) {
 											__ERROR__( "MasterWorker", "dispatch", "Cannot find a slave for performing degraded UPDATE." );
 										}
 										// Choose another slave to perform degraded update
-										socket = MasterWorker::stripeList->get( keyChunkUpdateHeader.listId, this->dataChunkCount + i, j );
+										socket = MasterWorker::stripeList->get( keyChunkUpdateHeader.listId, MasterWorker::dataChunkCount + i, j );
 									}
 								}
 
@@ -768,7 +770,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 								this->protocol.status->set( i );
 								slaveEvent.send( socket, &this->protocol, buffer.size, i );
 #ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
-								if ( i == this->parityChunkCount - 1 ) {
+								if ( i == MasterWorker::parityChunkCount - 1 ) {
 #endif
 									this->dispatch( slaveEvent );
 #ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
@@ -780,7 +782,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 
 #ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
 							// Wait until all requests are sent
-							for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
+							for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
 								while( this->protocol.status->check( i ) ); // Busy waiting
 							}
 #endif
@@ -939,16 +941,16 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 							chunkUpdate.keySize = key.size;
 							chunkUpdate.key = key.data;
 
-							for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
+							for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
 								SlaveSocket *socket = this->paritySlaveSockets[ i ];
 								if ( ! socket->ready() ) {
 									__ERROR__( "MasterWorker", "dispatch", "[Parity Slave #%u failed] Performing degraded DELETE.", i );
 									for ( uint32_t j = 0; ! socket->ready(); j++ ) {
-										if ( j >= this->dataChunkCount + this->parityChunkCount ) {
+										if ( j >= MasterWorker::dataChunkCount + MasterWorker::parityChunkCount ) {
 											__ERROR__( "MasterWorker", "dispatch", "Cannot find a slave for performing degraded DELETE." );
 										}
 										// Choose another slave to perform degraded delete
-										socket = MasterWorker::stripeList->get( keyChunkUpdateHeader.listId, this->dataChunkCount + i, j );
+										socket = MasterWorker::stripeList->get( keyChunkUpdateHeader.listId, MasterWorker::dataChunkCount + i, j );
 									}
 								}
 
@@ -959,7 +961,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 								SlaveEvent slaveEvent;
 								this->protocol.status->set( i );
 								slaveEvent.send( socket, &this->protocol, buffer.size, i );
-								if ( i == this->parityChunkCount - 1 ) {
+								if ( i == MasterWorker::parityChunkCount - 1 ) {
 									this->dispatch( slaveEvent );
 								} else {
 									MasterWorker::eventQueue->insert( slaveEvent );
@@ -971,7 +973,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 
 #ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
 							// Wait until all requests are sent
-							for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
+							for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
 								while( this->protocol.status->check( i ) ); // Busy waiting
 							}
 #endif
@@ -1114,6 +1116,8 @@ void *MasterWorker::run( void *argv ) {
 bool MasterWorker::init() {
 	Master *master = Master::getInstance();
 
+	MasterWorker::dataChunkCount = master->config.global.coding.params.getDataChunkCount();
+	MasterWorker::parityChunkCount = master->config.global.coding.params.getParityChunkCount();
 	MasterWorker::pending = &master->pending;
 	MasterWorker::eventQueue = &master->eventQueue;
 	MasterWorker::stripeList = master->stripeList;
@@ -1121,17 +1125,15 @@ bool MasterWorker::init() {
 }
 
 bool MasterWorker::init( GlobalConfig &config, WorkerRole role ) {
-	this->dataChunkCount = config.coding.params.getDataChunkCount();
-	this->parityChunkCount = config.coding.params.getParityChunkCount();
 	this->protocol.init(
 		Protocol::getSuggestedBufferSize(
 			config.size.key,
 			config.size.chunk
 		),
-		this->parityChunkCount
+		MasterWorker::parityChunkCount
 	);
-	this->dataSlaveSockets = new SlaveSocket*[ this->dataChunkCount ];
-	this->paritySlaveSockets = new SlaveSocket*[ this->parityChunkCount ];
+	this->dataSlaveSockets = new SlaveSocket*[ MasterWorker::dataChunkCount ];
+	this->paritySlaveSockets = new SlaveSocket*[ MasterWorker::parityChunkCount ];
 	this->role = role;
 	return role != WORKER_ROLE_UNDEFINED;
 }

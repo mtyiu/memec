@@ -5,6 +5,8 @@
 
 #define WORKER_COLOR	YELLOW
 
+uint32_t SlaveWorker::dataChunkCount;
+uint32_t SlaveWorker::parityChunkCount;
 Coding *SlaveWorker::coding;
 SlaveEventQueue *SlaveWorker::eventQueue;
 StripeList<SlavePeerSocket> *SlaveWorker::stripeList;
@@ -351,7 +353,8 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 			struct KeyValueUpdateHeader keyValueUpdateHeader;
 			struct ChunkUpdateHeader chunkUpdateHeader;
 			uint32_t listIndex, dataIndex;
-			bool isParity;
+			bool isParity, isRedirected = false;
+			SlavePeerSocket *target;
 
 			switch( header.opcode ) {
 				///////////////////////////////////////////////////////////////
@@ -364,6 +367,18 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 							keyHeader.key,
 							keyHeader.keySize
 						);
+
+						listIndex = SlaveWorker::stripeList->get(
+							keyHeader.key,
+							( size_t ) keyHeader.keySize,
+							&target
+						);
+
+						// Detect degraded GET
+						if ( ! target->self ) {
+							__DEBUG__( YELLOW, "SlaveWorker", "dispatch", "!!! Degraded GET request [not yet implemented] !!!" );
+							// TODO
+						}
 
 						// Find the key in map
 						std::map<Key, KeyMetadata>::iterator keysIt;
@@ -410,40 +425,55 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 						listIndex = SlaveWorker::stripeList->get(
 							keyValueHeader.key,
 							( size_t ) keyValueHeader.keySize,
-							0, 0, &dataIndex
+							&target, this->paritySlaveSockets, &dataIndex
 						);
 
-						KeyMetadata keyMetadata = SlaveWorker::chunkBuffer
-							->at( listIndex )
-							->set(
-								keyValueHeader.key,
-								keyValueHeader.keySize,
-								keyValueHeader.value,
-								keyValueHeader.valueSize,
-								isParity,
-								dataIndex
-							);
-						Key key;
-						key.size = keyValueHeader.keySize;
-						key.data = keyValueHeader.key;
+						// Detect degraded SET
+						if ( ! target->self ) {
+							isRedirected = true;
+							for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
+								if ( this->paritySlaveSockets[ i ]->self ) {
+									isRedirected = false;
+									break;
+								}
+							}
+							if ( isRedirected ) {
+								__DEBUG__( YELLOW, "SlaveWorker", "dispatch", "!!! Degraded SET request [not yet implemented] !!!" );
+							}
+							// TODO
+						} /* else */ {
+							KeyMetadata keyMetadata = SlaveWorker::chunkBuffer
+								->at( listIndex )
+								->set(
+									keyValueHeader.key,
+									keyValueHeader.keySize,
+									keyValueHeader.value,
+									keyValueHeader.valueSize,
+									isParity,
+									dataIndex
+								);
+							Key key;
+							key.size = keyValueHeader.keySize;
+							key.data = keyValueHeader.key;
 
-						if ( ! isParity ) {
-							OpMetadata opMetadata;
-							opMetadata.clone( keyMetadata );
-							opMetadata.opcode = PROTO_OPCODE_SET;
-							key.dup( key.size, key.data );
+							if ( ! isParity ) {
+								OpMetadata opMetadata;
+								opMetadata.clone( keyMetadata );
+								opMetadata.opcode = PROTO_OPCODE_SET;
+								key.dup( key.size, key.data );
 
-							// Update mappings
-							map->keys[ key ] = keyMetadata;
-							map->ops[ key ] = opMetadata;
+								// Update mappings
+								map->keys[ key ] = keyMetadata;
+								map->ops[ key ] = opMetadata;
+							}
+
+							event.resSet( event.socket, key );
+
+							this->load.set();
+
+							// Send the response immediately
+							this->dispatch( event );
 						}
-
-						event.resSet( event.socket, key );
-
-						this->load.set();
-
-						// Send the response immediately
-						this->dispatch( event );
 					} else {
 						__ERROR__( "SlaveWorker", "dispatch", "Invalid SET request." );
 					}
@@ -461,13 +491,23 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 							keyValueUpdateHeader.valueUpdateOffset
 						);
 
-						// Find the key in map
-						std::map<Key, KeyMetadata>::iterator keysIt;
-						Key key;
+						listIndex = SlaveWorker::stripeList->get(
+							keyValueHeader.key,
+							( size_t ) keyValueHeader.keySize,
+							&target
+						);
+						
+						// Detect degraded update
+						if ( ! target->self ) {
+							__DEBUG__( YELLOW, "SlaveWorker", "dispatch", "!!! Degraded UPDATE request [not yet implemented] !!!" );
+							// TODO
+						}
 
+						// Find the key in map
+						Key key;
 						key.size = keyValueUpdateHeader.keySize;
 						key.data = keyValueUpdateHeader.key;
-						keysIt = map->keys.find( key );
+						std::map<Key, KeyMetadata>::iterator keysIt = map->keys.find( key );
 						if ( keysIt != map->keys.end() ) {
 							std::map<Metadata, Chunk *>::iterator cacheIt;
 							cacheIt = map->cache.find( keysIt->second );
@@ -534,6 +574,24 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 							chunkUpdateHeader.valueUpdateOffset
 						);
 
+						SlaveWorker::stripeList->get(
+							chunkUpdateHeader.listId,
+							this->paritySlaveSockets
+						);
+
+						// Detect degraded SET
+						isRedirected = true;
+						for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
+							if ( this->paritySlaveSockets[ i ]->self ) {
+								isRedirected = false;
+								break;
+							}
+						}
+						if ( isRedirected ) {
+							__DEBUG__( YELLOW, "SlaveWorker", "dispatch", "!!! Degraded UPDATE_CHUNK request [not yet implemented] !!!" );
+							// TODO
+						}
+
 						Metadata metadata;
 						metadata.listId = chunkUpdateHeader.listId;
 						metadata.stripeId = chunkUpdateHeader.stripeId;
@@ -576,6 +634,18 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 							keyHeader.key,
 							keyHeader.keySize
 						);
+
+						listIndex = SlaveWorker::stripeList->get(
+							keyHeader.key,
+							( size_t ) keyHeader.keySize,
+							&target
+						);
+						
+						// Detect degraded update
+						if ( ! target->self ) {
+							__DEBUG__( YELLOW, "SlaveWorker", "dispatch", "!!! Degraded DELETE request [not yet implemented] !!!" );
+							// TODO
+						}
 
 						// Find the key in map
 						std::map<Key, KeyMetadata>::iterator keysIt;
@@ -633,6 +703,24 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 							chunkUpdateHeader.offset,
 							chunkUpdateHeader.length
 						);
+
+						SlaveWorker::stripeList->get(
+							chunkUpdateHeader.listId,
+							this->paritySlaveSockets
+						);
+
+						// Detect degraded SET
+						isRedirected = true;
+						for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
+							if ( this->paritySlaveSockets[ i ]->self ) {
+								isRedirected = false;
+								break;
+							}
+						}
+						if ( isRedirected ) {
+							__DEBUG__( YELLOW, "SlaveWorker", "dispatch", "!!! Degraded DELETE_CHUNK request [not yet implemented] !!!" );
+							// TODO
+						}
 
 						Metadata metadata;
 						metadata.listId = chunkUpdateHeader.listId;
@@ -799,6 +887,8 @@ void *SlaveWorker::run( void *argv ) {
 bool SlaveWorker::init() {
 	Slave *slave = Slave::getInstance();
 
+	SlaveWorker::dataChunkCount = slave->config.global.coding.params.getDataChunkCount();
+	SlaveWorker::parityChunkCount = slave->config.global.coding.params.getParityChunkCount();
 	SlaveWorker::coding = slave->coding;
 	SlaveWorker::eventQueue = &slave->eventQueue;
 	SlaveWorker::stripeList = slave->stripeList;
@@ -817,6 +907,8 @@ bool SlaveWorker::init( GlobalConfig &globalConfig, SlaveConfig &slaveConfig, Wo
 		)
 	);
 	this->role = role;
+	this->dataSlaveSockets = new SlavePeerSocket*[ SlaveWorker::dataChunkCount ];
+	this->paritySlaveSockets = new SlavePeerSocket*[ SlaveWorker::parityChunkCount ];
 	switch( this->role ) {
 		case WORKER_ROLE_MIXED:
 		case WORKER_ROLE_IO:

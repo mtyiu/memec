@@ -18,8 +18,8 @@ private:
 	// Temporary variables
 	SlaveSocket **dataSlaveSockets;
 	SlaveSocket **paritySlaveSockets;
-	uint32_t dataChunkCount;
-	uint32_t parityChunkCount;
+	static uint32_t dataChunkCount;
+	static uint32_t parityChunkCount;
 	static Pending *pending;
 	static MasterEventQueue *eventQueue;
 	static StripeList<SlaveSocket> *stripeList;

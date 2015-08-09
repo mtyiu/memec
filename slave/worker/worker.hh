@@ -25,6 +25,11 @@ private:
 	WorkerRole role;
 	SlaveProtocol protocol;
 	Storage *storage;
+	// Temporary variables
+	SlavePeerSocket **dataSlaveSockets;
+	SlavePeerSocket **paritySlaveSockets;
+	static uint32_t dataChunkCount;
+	static uint32_t parityChunkCount;
 	static Coding *coding;
 	static SlaveEventQueue *eventQueue;
 	static StripeList<SlavePeerSocket> *stripeList;
