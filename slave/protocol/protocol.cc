@@ -90,13 +90,14 @@ char *SlaveProtocol::resUpdate( size_t &size, uint8_t keySize, char *key, uint32
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::resUpdateChunk( size_t &size, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length ) {
+char *SlaveProtocol::resUpdateChunk( size_t &size, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t valueUpdateOffset ) {
 	size = this->generateChunkUpdateHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_MASTER,
 		PROTO_OPCODE_UPDATE_CHUNK,
 		listId, stripeId, chunkId,
-		offset, length
+		offset, length,
+		valueUpdateOffset
 	);
 	return this->buffer.send;
 }

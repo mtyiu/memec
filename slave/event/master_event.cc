@@ -46,12 +46,13 @@ void MasterEvent::resUpdate( MasterSocket *socket, Key &key, uint32_t valueUpdat
 	this->message.keyValueChunkUpdate.delta = 0;
 }
 
-void MasterEvent::resUpdateChunk( MasterSocket *socket, Metadata &metadata, uint32_t offset, uint32_t length, bool success ) {
+void MasterEvent::resUpdateChunk( MasterSocket *socket, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t valueUpdateOffset, bool success ) {
 	this->type = success ? MASTER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_SUCCESS : MASTER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_FAILURE;
 	this->socket = socket;
 	this->message.chunkUpdate.metadata = metadata;
 	this->message.chunkUpdate.offset = offset;
 	this->message.chunkUpdate.length = length;
+	this->message.chunkUpdate.valueUpdateOffset = valueUpdateOffset;
 }
 
 void MasterEvent::resDelete( MasterSocket *socket, Key &key, Metadata &metadata, uint32_t offset, uint32_t length, char *delta ) {

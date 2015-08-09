@@ -8,7 +8,8 @@
 
 class ChunkUpdate : public Metadata {
 public:
-	uint8_t offset, length, keySize;
+	uint32_t offset, length, valueUpdateOffset;
+	uint8_t keySize;
 	char *key;
 	void *ptr;
 
@@ -27,6 +28,11 @@ public:
 		if ( this->length > m.length )
 			return false;
 
+		if ( this->valueUpdateOffset < m.valueUpdateOffset )
+			return true;
+		if ( this->valueUpdateOffset > m.valueUpdateOffset )
+			return false;
+
 		if ( this->keySize < m.keySize )
 			return true;
 		if ( this->keySize > m.keySize )
@@ -42,11 +48,9 @@ public:
 	}
 
 	bool equal( const ChunkUpdate &c ) const {
-		printf( "Metadata::equal( c ): %s\n", Metadata::equal( c ) ? "true" : "false" );
-		printf( "this->offset = %u vs. c.offset = %u\n", this->offset, c.offset );
-		printf( "this->length = %u vs. c.length = %u\n", this->length, c.length );
 		return (
 			Metadata::equal( c ) &&
+			this->valueUpdateOffset == c.valueUpdateOffset &&
 			this->offset == c.offset &&
 			this->length == c.length
 		);

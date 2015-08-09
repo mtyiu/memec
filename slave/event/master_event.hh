@@ -64,6 +64,7 @@ public:
 			Metadata metadata;
 			uint32_t offset;
 			uint32_t length;
+			uint32_t valueUpdateOffset;
 		} chunkUpdate; // DELETE_CHUNK
 	} message;
 
@@ -78,7 +79,7 @@ public:
 	void resUpdate( MasterSocket *socket, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, Metadata &metadata, uint32_t offset, uint32_t length, char *delta );
 	void resUpdate( MasterSocket *socket, Key &key, uint32_t offset, uint32_t length );
 	// UPDATE_CHUNK
-	void resUpdateChunk( MasterSocket *socket, Metadata &metadata, uint32_t offset, uint32_t length, bool success = true );
+	void resUpdateChunk( MasterSocket *socket, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t valueUpdateOffset, bool success = true );
 	// DELETE
 	void resDelete( MasterSocket *socket, Key &key, Metadata &metadata, uint32_t offset, uint32_t length, char *delta );
 	void resDelete( MasterSocket *socket, Key &key );

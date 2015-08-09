@@ -68,12 +68,13 @@ char *MasterProtocol::reqUpdate( size_t &size, char *key, uint8_t keySize, char 
 	return this->buffer.send;
 }
 
-char *MasterProtocol::reqUpdateChunk( size_t &size, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, char *delta ) {
+char *MasterProtocol::reqUpdateChunk( size_t &size, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t valueUpdateOffset, char *delta ) {
 	size = this->generateChunkUpdateHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_UPDATE_CHUNK,
-		listId, stripeId, chunkId, offset, length, delta
+		listId, stripeId, chunkId, offset, length,
+		valueUpdateOffset, delta
 	);
 	return this->buffer.send;
 }

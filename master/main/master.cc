@@ -305,6 +305,7 @@ void Master::printPending( FILE *f ) {
 	size_t i;
 	std::set<Key>::iterator it;
 	std::set<KeyValueUpdate>::iterator keyValueUpdateIt;
+	std::set<ChunkUpdate>::iterator chunkUpdateIt;
 	fprintf(
 		f,
 		"Pending requests for applications\n"
@@ -452,6 +453,30 @@ void Master::printPending( FILE *f ) {
 
 	fprintf(
 		f,
+		"\n[UPDATE_CHUNK] Pending: %lu\n",
+		this->pending.slaves.updateChunk.size()
+	);
+	i = 1;
+	for (
+		chunkUpdateIt = this->pending.slaves.updateChunk.begin();
+		chunkUpdateIt != this->pending.slaves.updateChunk.end();
+		chunkUpdateIt++, i++
+	) {
+		const ChunkUpdate &chunkUpdate = *chunkUpdateIt;
+		fprintf(
+			f, "%lu. Key: %.*s (size = %u, offset = %u, length = %u, value update offset = %u); target: ",
+			i, chunkUpdate.keySize, chunkUpdate.key, chunkUpdate.keySize,
+			chunkUpdate.offset, chunkUpdate.length, chunkUpdate.valueUpdateOffset
+		);
+		if ( chunkUpdate.ptr )
+			( ( Socket * ) chunkUpdate.ptr )->printAddress( f );
+		else
+			fprintf( f, "(nil)\n" );
+		fprintf( f, "\n" );
+	}
+
+	fprintf(
+		f,
 		"\n[DELETE] Pending: %lu\n",
 		this->pending.slaves.del.size()
 	);
@@ -464,6 +489,30 @@ void Master::printPending( FILE *f ) {
 		const Key &key = *it;
 		fprintf( f, "%lu. Key: %.*s (size = %u); target: ", i, key.size, key.data, key.size );
 		( ( Socket * ) key.ptr )->printAddress( f );
+		fprintf( f, "\n" );
+	}
+
+	fprintf(
+		f,
+		"\n[DELETE_CHUNK] Pending: %lu\n",
+		this->pending.slaves.deleteChunk.size()
+	);
+	i = 1;
+	for (
+		chunkUpdateIt = this->pending.slaves.deleteChunk.begin();
+		chunkUpdateIt != this->pending.slaves.deleteChunk.end();
+		chunkUpdateIt++, i++
+	) {
+		const ChunkUpdate &chunkUpdate = *chunkUpdateIt;
+		fprintf(
+			f, "%lu. Key: %.*s (size = %u, offset = %u, length = %u); target: ",
+			i, chunkUpdate.keySize, chunkUpdate.key, chunkUpdate.keySize,
+			chunkUpdate.offset, chunkUpdate.length
+		);
+		if ( chunkUpdate.ptr )
+			( ( Socket * ) chunkUpdate.ptr )->printAddress( f );
+		else
+			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
 	}
 }

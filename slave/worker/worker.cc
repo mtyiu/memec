@@ -268,7 +268,8 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 				event.message.chunkUpdate.metadata.stripeId,
 				event.message.chunkUpdate.metadata.chunkId,
 				event.message.chunkUpdate.offset,
-				event.message.chunkUpdate.length
+				event.message.chunkUpdate.length,
+				event.message.chunkUpdate.valueUpdateOffset
 			);
 			break;
 		// DELETE
@@ -521,15 +522,16 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 					break;
 				///////////////////////////////////////////////////////////////
 				case PROTO_OPCODE_UPDATE_CHUNK:
-					if ( this->protocol.parseChunkUpdateHeader( chunkUpdateHeader ) ) {
+					if ( this->protocol.parseChunkUpdateHeader( chunkUpdateHeader, true ) ) {
 						__DEBUG__(
 							BLUE, "SlaveWorker", "dispatch",
-							"[UPDATE_CHUNK] List ID: %u; stripe ID: %u; chunk ID: %u; offset: %u; length: %u.",
+							"[UPDATE_CHUNK] List ID: %u; stripe ID: %u; chunk ID: %u; offset: %u; length: %u; value update offset: %u",
 							chunkUpdateHeader.listId,
 							chunkUpdateHeader.stripeId,
 							chunkUpdateHeader.chunkId,
 							chunkUpdateHeader.offset,
-							chunkUpdateHeader.length
+							chunkUpdateHeader.length,
+							chunkUpdateHeader.valueUpdateOffset
 						);
 
 						Metadata metadata;
@@ -538,13 +540,13 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 						metadata.chunkId = chunkUpdateHeader.chunkId;
 
 						std::map<Metadata, Chunk *>::iterator cacheIt;
-						cacheIt = map->cache.find( metadata );
-						if ( cacheIt != map->cache.end() ) {
+						cacheIt = map->cache.lower_bound( metadata );
+						if ( cacheIt != map->cache.end() && metadata.matchStripe( cacheIt->first ) ) {
 							// Chunk *chunk = cacheIt->second;
 							// TODO: Perform parity chunk update
 							// ...
 							__ERROR__( "SlaveWorker", "dispatch", "TODO: UPDATE_CHUNK not yet implemented!" );
-							success = false;
+							success = true;
 						} else {
 							success = false;
 						}
@@ -552,6 +554,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 							event.socket, metadata,
 							chunkUpdateHeader.offset,
 							chunkUpdateHeader.length,
+							chunkUpdateHeader.valueUpdateOffset,
 							success
 						);
 
@@ -620,7 +623,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 					break;
 				///////////////////////////////////////////////////////////////
 				case PROTO_OPCODE_DELETE_CHUNK:
-					if ( this->protocol.parseChunkUpdateHeader( chunkUpdateHeader ) ) {
+					if ( this->protocol.parseChunkUpdateHeader( chunkUpdateHeader, false ) ) {
 						__DEBUG__(
 							BLUE, "SlaveWorker", "dispatch",
 							"[DELETE_CHUNK] List ID: %u; stripe ID: %u; chunk ID: %u; offset: %u; length: %u.",

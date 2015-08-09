@@ -124,12 +124,14 @@ struct KeyValueUpdateHeader {
 }; // UPDATE request and UPDATE (fail) response
 
 #define PROTO_CHUNK_UPDATE_SIZE 20
+#define PROTO_CHUNK_UPDATE_WITH_VALUE_OFFSET_SIZE 23
 struct ChunkUpdateHeader {
 	uint32_t listId;
 	uint32_t stripeId;
 	uint32_t chunkId;
 	uint32_t offset;
 	uint32_t length;
+	uint32_t valueUpdateOffset; // 3 bytes, Only exist in UPDATE
 	char *delta;
 };
 
@@ -159,6 +161,7 @@ protected:
 	size_t generateKeyValueHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint8_t keySize, char *key, uint32_t valueSize, char *value );
 	size_t generateKeyValueUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate = 0 );
 	size_t generateChunkUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, char *delta = 0 );
+	size_t generateChunkUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t valueUpdateOffset, char *delta = 0 );
 	size_t generateKeyChunkUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, char *delta );
 	size_t generateKeyChunkUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint8_t keySize, char *key, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, char *delta );
 	size_t generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t opcode, struct HeartbeatHeader &header, std::map<Key, OpMetadata> &ops, size_t &count );
@@ -168,6 +171,7 @@ protected:
 	bool parseKeyValueHeader( size_t offset, uint8_t &keySize, char *&key, uint32_t &valueSize, char *&value, char *buf, size_t size );
 	bool parseKeyValueUpdateHeader( size_t offset, uint8_t &keySize, char *&key, uint32_t &valueUpdateOffset, uint32_t &valueUpdateSize, char *&valueUpdate, char *buf, size_t size );
 	bool parseChunkUpdateHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &updateOffset, uint32_t &updateLength, char *&delta, char *buf, size_t size );
+	bool parseChunkUpdateHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &updateOffset, uint32_t &updateLength, uint32_t &valueUpdateOffset, char *&delta, char *buf, size_t size );
 	bool parseKeyChunkUpdateHeader( size_t offset, uint8_t &keySize, char *&key, uint32_t &valueUpdateOffset, uint32_t &valueUpdateSize, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &updateOffset, uint32_t &updateLength, char *&delta, char *buf, size_t size );
 	bool parseKeyChunkUpdateHeader( size_t offset, uint8_t &keySize, char *&key, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &updateOffset, uint32_t &updateLength, char *&delta, char *buf, size_t size );
 	bool parseHeartbeatHeader( size_t offset, uint32_t &get, uint32_t &set, uint32_t &update, uint32_t &del, char *buf, size_t size );
@@ -187,7 +191,7 @@ public:
 	bool parseKeyHeader( struct KeyHeader &header, size_t offset = PROTO_HEADER_SIZE, char *buf = 0, size_t size = 0 );
 	bool parseKeyValueHeader( struct KeyValueHeader &header, size_t offset = PROTO_HEADER_SIZE, char *buf = 0, size_t size = 0 );
 	bool parseKeyValueUpdateHeader( struct KeyValueUpdateHeader &header, size_t offset = PROTO_HEADER_SIZE, char *buf = 0, size_t size = 0 );
-	bool parseChunkUpdateHeader( struct ChunkUpdateHeader &header, size_t offset = PROTO_HEADER_SIZE, char *buf = 0, size_t size = 0 );
+	bool parseChunkUpdateHeader( struct ChunkUpdateHeader &header, bool includeValueUpdateOffset, size_t offset = PROTO_HEADER_SIZE, char *buf = 0, size_t size = 0 );
 	bool parseKeyChunkUpdateHeader( struct KeyChunkUpdateHeader &header, bool withValueUpdate, size_t offset = PROTO_HEADER_SIZE, char *buf = 0, size_t size = 0 );
 	bool parseHeartbeatHeader( struct HeartbeatHeader &header, size_t offset = PROTO_HEADER_SIZE, char *buf = 0, size_t size = 0 );
 	bool parseSlaveSyncHeader( struct SlaveSyncHeader &header, size_t &bytes, size_t offset = PROTO_HEADER_SIZE + PROTO_HEARTBEAT_SIZE, char *buf = 0, size_t size = 0 );
