@@ -13,6 +13,7 @@ public:
 	~Stripe();
 	void set( Chunk **dataChunks, Chunk *parityChunk, uint32_t parityChunkId );
 	void set( Chunk **dataChunks, Chunk **parityChunks );
+	void set( Chunk *dataChunk, uint32_t dataChunkId, Chunk *parityChunk, uint32_t parityChunkId );
 	void get( Chunk **&dataChunks, Chunk **&parityChunks );
 	void get( Chunk **&dataChunks, Chunk *&parityChunk, uint32_t parityChunkId );
 	uint32_t get( Chunk **&dataChunks, Chunk *&parityChunk );

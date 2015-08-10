@@ -13,15 +13,17 @@ public:
 	void *ptr; // Extra data to be augmented to the object
 
 	Key key();
-	
+
 	void dup( char *key, uint8_t keySize, char *value, uint32_t valueSize, void *ptr = 0 );
+	void set( char *data, void *ptr = 0 );
+	void clear();
 	void free();
 
 	void setSize( uint8_t keySize, uint32_t valueSize );
 
 	char *serialize( char *key, uint8_t keySize, char *value, uint32_t valueSize );
 	static char *serialize( char *data, char *key, uint8_t keySize, char *value, uint32_t valueSize );
-	
+
 	char *deserialize( char *&key, uint8_t &keySize, char *&value, uint32_t &valueSize ) const;
 	static char *deserialize( char *data, char *&key, uint8_t &keySize, char *&value, uint32_t &valueSize );
 

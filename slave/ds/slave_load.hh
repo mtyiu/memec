@@ -13,6 +13,8 @@ public:
 	void reset();
 	void aggregate( SlaveLoad &l );
 	void print( FILE *f = stdout );
+	void updateChunk();
+	void delChunk();
 };
 
 #endif

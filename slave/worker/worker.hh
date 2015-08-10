@@ -26,6 +26,7 @@ private:
 	SlaveProtocol protocol;
 	Storage *storage;
 	// Temporary variables
+	Chunk *dataChunk, *parityChunk;
 	SlavePeerSocket **dataSlaveSockets;
 	SlavePeerSocket **paritySlaveSockets;
 	static uint32_t dataChunkCount;
@@ -45,6 +46,17 @@ private:
 	void dispatch( MasterEvent event );
 	void dispatch( SlaveEvent event );
 	void dispatch( SlavePeerEvent event );
+
+	bool isRedirectedRequest( char *key, uint8_t size, bool *isParity = 0, uint32_t *listIdPtr = 0, uint32_t *chunkIdPtr = 0 );
+	bool isRedirectedRequest( uint32_t listId );
+
+	bool handleGetRequest( MasterEvent event );
+	bool handleSetRequest( MasterEvent event );
+	bool handleUpdateRequest( MasterEvent event );
+	bool handleUpdateChunkRequest( MasterEvent event );
+	bool handleDeleteRequest( MasterEvent event );
+	bool handleDeleteChunkRequest( MasterEvent event );
+
 	void free();
 	static void *run( void *argv );
 

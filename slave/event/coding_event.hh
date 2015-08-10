@@ -14,9 +14,13 @@ public:
 	CodingEventType type;
 	union {
 		Stripe *stripe;
+		struct {
+			Stripe *stripe;
+		} delta;
 	} message;
 
 	void encode( Stripe *stripe );
+	void update( Chunk *chunk );
 };
 
 #endif

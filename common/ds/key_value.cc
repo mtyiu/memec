@@ -15,6 +15,16 @@ void KeyValue::dup( char *key, uint8_t keySize, char *value, uint32_t valueSize,
 	this->serialize( key, keySize, value, valueSize );
 }
 
+void KeyValue::set( char *data, void *ptr ) {
+	this->data = data;
+	this->ptr = ptr;
+}
+
+void KeyValue::clear() {
+	this->data = 0;
+	this->ptr = 0;
+}
+
 void KeyValue::free() {
 	if ( this->data )
 		::free( this->data );
@@ -23,7 +33,7 @@ void KeyValue::free() {
 
 void KeyValue::setSize( uint8_t keySize, uint32_t valueSize ) {
 	data[ 0 ] = ( char ) keySize;
-	
+
 	valueSize = htonl( valueSize );
 	data[ 1 ] = ( valueSize >> 24 ) & 0xFF;
 	data[ 2 ] = ( valueSize >> 16 ) & 0xFF;
@@ -37,7 +47,7 @@ char *KeyValue::serialize( char *key, uint8_t keySize, char *value, uint32_t val
 
 char *KeyValue::serialize( char *data, char *key, uint8_t keySize, char *value, uint32_t valueSize ) {
 	data[ 0 ] = ( char ) keySize;
-	
+
 	valueSize = htonl( valueSize );
 	data[ 1 ] = ( valueSize >> 24 ) & 0xFF;
 	data[ 2 ] = ( valueSize >> 16 ) & 0xFF;

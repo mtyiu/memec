@@ -1,4 +1,5 @@
 #include "stripe.hh"
+#include "../coding/coding.hh"
 #include "../util/debug.hh"
 
 uint32_t Stripe::dataChunkCount;
@@ -28,6 +29,16 @@ void Stripe::set( Chunk **dataChunks, Chunk **parityChunks ) {
 		this->chunks[ i ] = dataChunks[ i ];
 	for ( uint32_t i = 0; i < Stripe::parityChunkCount; i++ )
 		this->chunks[ Stripe::dataChunkCount + i ] = parityChunks[ i ];
+}
+
+void Stripe::set( Chunk *dataChunk, uint32_t dataChunkId, Chunk *parityChunk, uint32_t parityChunkId ) {
+	Chunk *zeros = Coding::zeros;
+	for ( uint32_t i = 0; i < Stripe::dataChunkCount; i++ )
+		this->chunks[ i ] = i == dataChunkId ? dataChunk : zeros;
+	for ( uint32_t i = 0; i < Stripe::parityChunkCount; i++ )
+		this->chunks[ Stripe::dataChunkCount + i ] =
+			( Stripe::dataChunkCount + i == parityChunkId )
+			? parityChunk : zeros;
 }
 
 void Stripe::get( Chunk **&dataChunks, Chunk **&parityChunks ) {

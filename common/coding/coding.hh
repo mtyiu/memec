@@ -9,7 +9,7 @@
 class Coding {
 public:
 	CodingScheme scheme;
-	static char *zeros;
+	static Chunk *zeros;
 
 	virtual ~Coding();
 	/**
@@ -30,13 +30,13 @@ public:
 
 	/**
 	 * Decode k data/parity chunks.
-	 * 
+	 *
 	 * @param  chunks array of data and parity chunks (assumed to have n = k + m entries); NULL if the chunk is lost and need to be recovered
 	 * @param  bitmap indicate which entries in the chunks array are available
 	 * @return        indicate whether the decoding is successful
 	 */
 	virtual bool decode( Chunk **chunks, BitmaskArray *bitmap ) = 0;
-	
+
 	static Coding *instantiate( CodingScheme scheme, CodingParams &params, uint32_t chunkSize );
 	static void destroy( Coding *coding );
 

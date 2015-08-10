@@ -214,7 +214,6 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 
 			event.message.keyValue.deserialize( key, keySize, value, valueSize );
 			buffer.data = this->protocol.resGet( buffer.size, success, keySize, key, valueSize, value );
-			__ERROR__( "SlaveWorker", "dispatch", "MASTER_EVENT_TYPE_GET_RESPONSE_SUCCESS: key size = %u, value size = %u. First byte: 0x%x", keySize, valueSize, buffer.data[ 0 ] );
 		}
 			break;
 		case MASTER_EVENT_TYPE_GET_RESPONSE_FAILURE:
@@ -348,414 +347,25 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 				__ERROR__( "SlaveWorker", "dispatch", "Invalid protocol header." );
 			}
 
-			struct KeyHeader keyHeader;
-			struct KeyValueHeader keyValueHeader;
-			struct KeyValueUpdateHeader keyValueUpdateHeader;
-			struct ChunkUpdateHeader chunkUpdateHeader;
-			uint32_t listIndex, dataIndex;
-			bool isParity, isRedirected = false;
-			SlavePeerSocket *target;
-
 			switch( header.opcode ) {
-				///////////////////////////////////////////////////////////////
 				case PROTO_OPCODE_GET:
-					if ( this->protocol.parseKeyHeader( keyHeader ) ) {
-						__DEBUG__(
-							BLUE, "SlaveWorker", "dispatch",
-							"[GET] Key: %.*s (key size = %u).",
-							( int ) keyHeader.keySize,
-							keyHeader.key,
-							keyHeader.keySize
-						);
-
-						listIndex = SlaveWorker::stripeList->get(
-							keyHeader.key,
-							( size_t ) keyHeader.keySize,
-							&target
-						);
-
-						// Detect degraded GET
-						if ( ! target->self ) {
-							__DEBUG__( YELLOW, "SlaveWorker", "dispatch", "!!! Degraded GET request [not yet implemented] !!!" );
-							// TODO
-						}
-
-						// Find the key in map
-						std::map<Key, KeyMetadata>::iterator keysIt;
-						Key key;
-
-						key.size = keyHeader.keySize;
-						key.data = keyHeader.key;
-						keysIt = map->keys.find( key );
-						if ( keysIt != map->keys.end() ) {
-							std::map<Metadata, Chunk *>::iterator cacheIt;
-							cacheIt = map->cache.find( keysIt->second );
-							if ( cacheIt != map->cache.end() ) {
-								KeyMetadata &keyMetadata = keysIt->second;
-								Chunk *chunk = cacheIt->second;
-								KeyValue keyValue = chunk->getKeyValue( keyMetadata.offset );
-								event.resGet( event.socket, keyValue );
-							} else {
-								event.resGet( event.socket, key );
-							}
-						} else {
-							event.resGet( event.socket, key );
-						}
-
-						this->load.get();
-
-						// Send the response immediately
-						this->dispatch( event );
-					} else {
-						__ERROR__( "SlaveWorker", "dispatch", "Invalid GET request." );
-					}
+					this->handleGetRequest( event );
 					break;
-				///////////////////////////////////////////////////////////////
 				case PROTO_OPCODE_SET:
-					if ( this->protocol.parseKeyValueHeader( keyValueHeader ) ) {
-						__DEBUG__(
-							BLUE, "SlaveWorker", "dispatch",
-							"[SET] Key: %.*s (key size = %u); Value: (value size = %u)",
-							( int ) keyValueHeader.keySize,
-							keyValueHeader.key,
-							keyValueHeader.keySize,
-							keyValueHeader.valueSize
-						);
-
-						listIndex = SlaveWorker::stripeList->get(
-							keyValueHeader.key,
-							( size_t ) keyValueHeader.keySize,
-							&target, this->paritySlaveSockets, &dataIndex
-						);
-
-						// Detect degraded SET
-						if ( ! target->self ) {
-							isRedirected = true;
-							for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
-								if ( this->paritySlaveSockets[ i ]->self ) {
-									isRedirected = false;
-									break;
-								}
-							}
-							if ( isRedirected ) {
-								__DEBUG__( YELLOW, "SlaveWorker", "dispatch", "!!! Degraded SET request [not yet implemented] !!!" );
-							}
-							// TODO
-						} /* else */ {
-							KeyMetadata keyMetadata = SlaveWorker::chunkBuffer
-								->at( listIndex )
-								->set(
-									keyValueHeader.key,
-									keyValueHeader.keySize,
-									keyValueHeader.value,
-									keyValueHeader.valueSize,
-									isParity,
-									dataIndex
-								);
-							Key key;
-							key.size = keyValueHeader.keySize;
-							key.data = keyValueHeader.key;
-
-							if ( ! isParity ) {
-								OpMetadata opMetadata;
-								opMetadata.clone( keyMetadata );
-								opMetadata.opcode = PROTO_OPCODE_SET;
-								key.dup( key.size, key.data );
-
-								// Update mappings
-								map->keys[ key ] = keyMetadata;
-								map->ops[ key ] = opMetadata;
-							}
-
-							event.resSet( event.socket, key );
-
-							this->load.set();
-
-							// Send the response immediately
-							this->dispatch( event );
-						}
-					} else {
-						__ERROR__( "SlaveWorker", "dispatch", "Invalid SET request." );
-					}
+					this->handleSetRequest( event );
 					break;
-				///////////////////////////////////////////////////////////////
 				case PROTO_OPCODE_UPDATE:
-					if ( this->protocol.parseKeyValueUpdateHeader( keyValueUpdateHeader ) ) {
-						__DEBUG__(
-							BLUE, "SlaveWorker", "dispatch",
-							"[UPDATE] Key: %.*s (key size = %u); Value: (update size = %u, offset = %u).",
-							( int ) keyValueUpdateHeader.keySize,
-							keyValueUpdateHeader.key,
-							keyValueUpdateHeader.keySize,
-							keyValueUpdateHeader.valueUpdateSize,
-							keyValueUpdateHeader.valueUpdateOffset
-						);
-
-						listIndex = SlaveWorker::stripeList->get(
-							keyValueHeader.key,
-							( size_t ) keyValueHeader.keySize,
-							&target
-						);
-						
-						// Detect degraded update
-						if ( ! target->self ) {
-							__DEBUG__( YELLOW, "SlaveWorker", "dispatch", "!!! Degraded UPDATE request [not yet implemented] !!!" );
-							// TODO
-						}
-
-						// Find the key in map
-						Key key;
-						key.size = keyValueUpdateHeader.keySize;
-						key.data = keyValueUpdateHeader.key;
-						std::map<Key, KeyMetadata>::iterator keysIt = map->keys.find( key );
-						if ( keysIt != map->keys.end() ) {
-							std::map<Metadata, Chunk *>::iterator cacheIt;
-							cacheIt = map->cache.find( keysIt->second );
-							if ( cacheIt != map->cache.end() ) {
-								KeyMetadata &keyMetadata = keysIt->second;
-								Chunk *chunk = cacheIt->second;
-								uint32_t offset; // relative to the chunk
-
-								offset = keyMetadata.offset + // chunk offset of the key-value pair
-								         PROTO_KEY_VALUE_SIZE + // key size + value size
-								         keyValueUpdateHeader.keySize + // key
-								         keyValueUpdateHeader.valueUpdateOffset; // offset of value update
-
-								// Compute delta and perform update
-								chunk->computeDelta(
-									keyValueUpdateHeader.valueUpdate, // delta
-									keyValueUpdateHeader.valueUpdate, // new data
-									offset, keyValueUpdateHeader.valueUpdateSize,
-									true // perform update
-								);
-								// Insert event
-								event.resUpdate(
-									event.socket, key,
-									keyValueUpdateHeader.valueUpdateOffset,
-									keyValueUpdateHeader.valueUpdateSize,
-									chunk->metadata, offset,
-									keyValueUpdateHeader.valueUpdateSize,
-									keyValueUpdateHeader.valueUpdate
-								);
-							} else {
-								event.resUpdate(
-									event.socket, key,
-									keyValueUpdateHeader.valueUpdateOffset,
-									keyValueUpdateHeader.valueUpdateSize
-								);
-							}
-						} else {
-							event.resUpdate(
-								event.socket, key,
-								keyValueUpdateHeader.valueUpdateOffset,
-								keyValueUpdateHeader.valueUpdateSize
-							);
-						}
-
-						this->load.update();
-
-						// Send the response immediately
-						this->dispatch( event );
-					} else {
-						__ERROR__( "SlaveWorker", "dispatch", "Invalid UPDATE request." );
-					}
+					this->handleUpdateRequest( event );
 					break;
-				///////////////////////////////////////////////////////////////
 				case PROTO_OPCODE_UPDATE_CHUNK:
-					if ( this->protocol.parseChunkUpdateHeader( chunkUpdateHeader, true ) ) {
-						__DEBUG__(
-							BLUE, "SlaveWorker", "dispatch",
-							"[UPDATE_CHUNK] List ID: %u; stripe ID: %u; chunk ID: %u; offset: %u; length: %u; value update offset: %u",
-							chunkUpdateHeader.listId,
-							chunkUpdateHeader.stripeId,
-							chunkUpdateHeader.chunkId,
-							chunkUpdateHeader.offset,
-							chunkUpdateHeader.length,
-							chunkUpdateHeader.valueUpdateOffset
-						);
-
-						SlaveWorker::stripeList->get(
-							chunkUpdateHeader.listId,
-							this->paritySlaveSockets
-						);
-
-						// Detect degraded SET
-						isRedirected = true;
-						for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
-							if ( this->paritySlaveSockets[ i ]->self ) {
-								isRedirected = false;
-								break;
-							}
-						}
-						if ( isRedirected ) {
-							__DEBUG__( YELLOW, "SlaveWorker", "dispatch", "!!! Degraded UPDATE_CHUNK request [not yet implemented] !!!" );
-							// TODO
-						}
-
-						Metadata metadata;
-						metadata.listId = chunkUpdateHeader.listId;
-						metadata.stripeId = chunkUpdateHeader.stripeId;
-						metadata.chunkId = chunkUpdateHeader.chunkId;
-
-						std::map<Metadata, Chunk *>::iterator cacheIt;
-						cacheIt = map->cache.lower_bound( metadata );
-						if ( cacheIt != map->cache.end() && metadata.matchStripe( cacheIt->first ) ) {
-							// Chunk *chunk = cacheIt->second;
-							// TODO: Perform parity chunk update
-							// ...
-							__ERROR__( "SlaveWorker", "dispatch", "TODO: UPDATE_CHUNK not yet implemented!" );
-							success = true;
-						} else {
-							success = false;
-						}
-						event.resUpdateChunk(
-							event.socket, metadata,
-							chunkUpdateHeader.offset,
-							chunkUpdateHeader.length,
-							chunkUpdateHeader.valueUpdateOffset,
-							success
-						);
-
-						this->load.update();
-
-						// Send the response immediately
-						this->dispatch( event );
-					} else {
-						__ERROR__( "SlaveWorker", "dispatch", "Invalid UPDATE_CHUNK request." );
-					}
+					this->handleUpdateChunkRequest( event );
 					break;
-				///////////////////////////////////////////////////////////////
 				case PROTO_OPCODE_DELETE:
-					if ( this->protocol.parseKeyHeader( keyHeader ) ) {
-						__DEBUG__(
-							BLUE, "SlaveWorker", "dispatch",
-							"[DELETE] Key: %.*s (key size = %u).",
-							( int ) keyHeader.keySize,
-							keyHeader.key,
-							keyHeader.keySize
-						);
-
-						listIndex = SlaveWorker::stripeList->get(
-							keyHeader.key,
-							( size_t ) keyHeader.keySize,
-							&target
-						);
-						
-						// Detect degraded update
-						if ( ! target->self ) {
-							__DEBUG__( YELLOW, "SlaveWorker", "dispatch", "!!! Degraded DELETE request [not yet implemented] !!!" );
-							// TODO
-						}
-
-						// Find the key in map
-						std::map<Key, KeyMetadata>::iterator keysIt;
-						Key key;
-
-						key.size = keyHeader.keySize;
-						key.data = keyHeader.key;
-						keysIt = map->keys.find( key );
-						if ( keysIt != map->keys.end() ) {
-							std::map<Metadata, Chunk *>::iterator cacheIt;
-							cacheIt = map->cache.find( keysIt->second );
-							if ( cacheIt != map->cache.end() ) {
-								KeyMetadata &keyMetadata = keysIt->second;
-								Chunk *chunk = cacheIt->second;
-								char *delta;
-								uint32_t deltaSize;
-
-								// Update data chunk and map
-								delta = this->protocol.buffer.recv + PROTO_KEY_CHUNK_UPDATE_SIZE + key.size;
-								deltaSize = chunk->deleteKeyValue(
-									key, &map->keys, delta,
-									this->protocol.buffer.size - PROTO_KEY_CHUNK_UPDATE_SIZE - key.size
-								);
-
-								event.resDelete(
-									event.socket, key,
-									chunk->metadata,
-									keyMetadata.offset,
-									deltaSize, delta
-								);
-							} else {
-								event.resDelete( event.socket, key );
-							}
-						} else {
-							event.resDelete( event.socket, key );
-						}
-
-						this->load.del();
-
-						// Send the response immediately
-						this->dispatch( event );
-					} else {
-						__ERROR__( "SlaveWorker", "dispatch", "Invalid DELETE request." );
-					}
+					this->handleDeleteRequest( event );
 					break;
-				///////////////////////////////////////////////////////////////
 				case PROTO_OPCODE_DELETE_CHUNK:
-					if ( this->protocol.parseChunkUpdateHeader( chunkUpdateHeader, false ) ) {
-						__DEBUG__(
-							BLUE, "SlaveWorker", "dispatch",
-							"[DELETE_CHUNK] List ID: %u; stripe ID: %u; chunk ID: %u; offset: %u; length: %u.",
-							chunkUpdateHeader.listId,
-							chunkUpdateHeader.stripeId,
-							chunkUpdateHeader.chunkId,
-							chunkUpdateHeader.offset,
-							chunkUpdateHeader.length
-						);
-
-						SlaveWorker::stripeList->get(
-							chunkUpdateHeader.listId,
-							this->paritySlaveSockets
-						);
-
-						// Detect degraded SET
-						isRedirected = true;
-						for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
-							if ( this->paritySlaveSockets[ i ]->self ) {
-								isRedirected = false;
-								break;
-							}
-						}
-						if ( isRedirected ) {
-							__DEBUG__( YELLOW, "SlaveWorker", "dispatch", "!!! Degraded DELETE_CHUNK request [not yet implemented] !!!" );
-							// TODO
-						}
-
-						Metadata metadata;
-						metadata.listId = chunkUpdateHeader.listId;
-						metadata.stripeId = chunkUpdateHeader.stripeId;
-						metadata.chunkId = chunkUpdateHeader.chunkId;
-
-						std::map<Metadata, Chunk *>::iterator cacheIt;
-						cacheIt = map->cache.lower_bound( metadata );
-						if ( cacheIt != map->cache.end() && metadata.matchStripe( cacheIt->first ) ) {
-							metadata = cacheIt->first;
-							// Chunk *chunk = cacheIt->second;
-							// TODO: Perform parity chunk update
-							// ...
-							__ERROR__( "SlaveWorker", "dispatch", "TODO: DELETE_CHUNK not yet implemented!" );
-							metadata.chunkId = chunkUpdateHeader.chunkId;
-							success = true;
-						} else {
-							success = false;
-						}
-						event.resDeleteChunk(
-							event.socket, metadata,
-							chunkUpdateHeader.offset,
-							chunkUpdateHeader.length,
-							success
-						);
-
-						this->load.del();
-
-						// Send the response immediately
-						this->dispatch( event );
-					} else {
-						__ERROR__( "SlaveWorker", "dispatch", "Invalid DELETE_CHUNK request." );
-					}
+					this->handleDeleteChunkRequest( event );
 					break;
-				///////////////////////////////////////////////////////////////
 				default:
 					__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from master." );
 					return;
@@ -809,12 +419,313 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		__ERROR__( "SlaveWorker", "dispatch", "The slave is disconnected." );
 }
 
+bool SlaveWorker::isRedirectedRequest( char *key, uint8_t size, bool *isParity, uint32_t *listIdPtr, uint32_t *chunkIdPtr ) {
+	SlavePeerSocket *target;
+	uint32_t listId, chunkId;
+	listId = SlaveWorker::stripeList->get( key, size, &target, isParity ? this->paritySlaveSockets : 0, &chunkId );
+	if ( listIdPtr ) *listIdPtr = listId;
+	if ( chunkIdPtr ) *chunkIdPtr = chunkId;
+	if ( ! target->self ) {
+		if ( isParity ) {
+			for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
+				if ( this->paritySlaveSockets[ i ]->self ) {
+					*isParity = true;
+					return false;
+				}
+			}
+			*isParity = false;
+			return false;
+		}
+		return false;
+	}
+	if ( isParity ) *isParity = false;
+	return true;
+}
+
+bool SlaveWorker::isRedirectedRequest( uint32_t listId ) {
+	SlaveWorker::stripeList->get( listId, this->paritySlaveSockets );
+	for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ )
+		if ( this->paritySlaveSockets[ i ]->self )
+			return false;
+	return true;
+}
+
+bool SlaveWorker::handleGetRequest( MasterEvent event ) {
+	struct KeyHeader header;
+	bool ret;
+	if ( ! this->protocol.parseKeyHeader( header ) ) {
+		__ERROR__( "SlaveWorker", "handleGetRequest", "Invalid GET request." );
+		return false;
+	}
+	__DEBUG__(
+		BLUE, "SlaveWorker", "handleGetRequest",
+		"[GET] Key: %.*s (key size = %u).",
+		( int ) header.keySize, header.key, header.keySize
+	);
+
+	// Detect degraded GET
+	if ( ! this->isRedirectedRequest( header.key, header.keySize ) ) {
+		__DEBUG__( YELLOW, "SlaveWorker", "dispatch", "!!! Degraded GET request [not yet implemented] !!!" );
+		// TODO
+	}
+
+	Key key;
+	KeyValue keyValue;
+	if ( map->findValueByKey( header.key, header.keySize, &keyValue, &key ) ) {
+		event.resGet( event.socket, keyValue );
+		ret = true;
+	} else {
+		event.resGet( event.socket, key );
+		ret = false;
+	}
+
+	this->load.get();
+	this->dispatch( event );
+
+	return ret;
+}
+
+bool SlaveWorker::handleSetRequest( MasterEvent event ) {
+	struct KeyValueHeader header;
+	if ( ! this->protocol.parseKeyValueHeader( header ) ) {
+		__ERROR__( "SlaveWorker", "handleSetRequest", "Invalid SET request." );
+		return false;
+	}
+	__DEBUG__(
+		BLUE, "SlaveWorker", "handleSetRequest",
+		"[SET] Key: %.*s (key size = %u); Value: (value size = %u)",
+		( int ) header.keySize, header.key, header.keySize, header.valueSize
+	);
+
+	// Detect degraded SET
+	bool isParity;
+	uint32_t listId, chunkId;
+	if ( ! this->isRedirectedRequest( header.key, header.keySize, &isParity, &listId, &chunkId ) && ! isParity ) {
+		__DEBUG__( YELLOW, "SlaveWorker", "dispatch", "!!! Degraded SET request [not yet implemented] !!!" );
+		// TODO
+	}
+
+	Key key;
+	KeyMetadata keyMetadata = SlaveWorker::chunkBuffer
+		->at( listId )
+		->set( header.key, header.keySize, header.value, header.valueSize,
+		       isParity, chunkId );
+
+	key.set( header.keySize, header.key );
+	if ( ! isParity )
+		map->insertKey( key, PROTO_OPCODE_SET, keyMetadata );
+
+	event.resSet( event.socket, key );
+	this->load.set();
+	this->dispatch( event );
+
+	return true;
+}
+
+bool SlaveWorker::handleUpdateRequest( MasterEvent event ) {
+	struct KeyValueUpdateHeader header;
+	bool ret;
+	if ( ! this->protocol.parseKeyValueUpdateHeader( header ) ) {
+		__ERROR__( "SlaveWorker", "dispatch", "Invalid UPDATE request." );
+		return false;
+	}
+	__DEBUG__(
+		BLUE, "SlaveWorker", "handleUpdateRequest",
+		"[UPDATE] Key: %.*s (key size = %u); Value: (update size = %u, offset = %u).",
+		( int ) header.keySize, header.key, header.keySize,
+		header.valueUpdateSize, header.valueUpdateOffset
+	);
+
+	// Detect degraded UPDATE
+	if ( ! this->isRedirectedRequest( header.key, header.keySize ) ) {
+		__DEBUG__( YELLOW, "SlaveWorker", "handleUpdateRequest", "!!! Degraded UPDATE request [not yet implemented] !!!" );
+		// TODO
+	}
+
+	Key key;
+	KeyValue keyValue;
+	KeyMetadata keyMetadata;
+	Metadata metadata;
+	Chunk *chunk;
+	if ( map->findValueByKey( header.key, header.keySize, &keyValue, &key, &keyMetadata, &metadata, &chunk ) ) {
+		uint32_t offset = keyMetadata.offset + PROTO_KEY_VALUE_SIZE + header.keySize + header.valueUpdateOffset;
+
+		// Compute delta and perform update
+		chunk->computeDelta(
+			header.valueUpdate, // delta
+			header.valueUpdate, // new data
+			offset, header.valueUpdateSize,
+			true // perform update
+		);
+
+		event.resUpdate(
+			event.socket, key,
+			header.valueUpdateOffset,
+			header.valueUpdateSize,
+			metadata, offset,
+			header.valueUpdateSize,
+			header.valueUpdate
+		);
+
+		ret = true;
+	} else {
+		event.resUpdate( event.socket, key, header.valueUpdateOffset, header.valueUpdateSize );
+		ret = false;
+	}
+
+	this->load.update();
+	this->dispatch( event );
+
+	return ret;
+}
+
+bool SlaveWorker::handleUpdateChunkRequest( MasterEvent event ) {
+	struct ChunkUpdateHeader header;
+	bool ret;
+	if ( ! this->protocol.parseChunkUpdateHeader( header, true ) ) {
+		__ERROR__( "SlaveWorker", "dispatch", "Invalid UPDATE_CHUNK request." );
+		return false;
+	}
+	__DEBUG__(
+		BLUE, "SlaveWorker", "handleUpdateChunkRequest",
+		"[UPDATE_CHUNK] List ID: %u; stripe ID: %u; chunk ID: %u; offset: %u; length: %u; value update offset: %u",
+		header.listId, header.stripeId, header.chunkId,
+		header.offset, header.length, header.valueUpdateOffset
+	);
+
+	// Detect degraded UPDATE_CHUNK
+	if ( ! this->isRedirectedRequest( header.listId ) ) {
+		__DEBUG__( YELLOW, "SlaveWorker", "handleUpdateChunkRequest", "!!! Degraded UPDATE_CHUNK request [not yet implemented] !!!" );
+		// TODO
+	}
+
+	Metadata metadata;
+	Chunk *chunk = map->findChunkById( header.listId, header.stripeId, header.chunkId, &metadata );
+	if ( chunk ) {
+		__ERROR__( "SlaveWorker", "handleUpdateChunkRequest", "TODO: UPDATE_CHUNK not yet implemented!" );
+		ret = true;
+	} else {
+		ret = false;
+	}
+
+	event.resUpdateChunk(
+		event.socket, metadata,
+		header.offset, header.length,
+		header.valueUpdateOffset, ret
+	);
+
+	this->load.updateChunk();
+	this->dispatch( event );
+
+	return ret;
+}
+
+bool SlaveWorker::handleDeleteRequest( MasterEvent event ) {
+	struct KeyHeader header;
+	bool ret;
+	if ( ! this->protocol.parseKeyHeader( header ) ) {
+		__ERROR__( "SlaveWorker", "dispatch", "Invalid DELETE request." );
+		return false;
+	}
+	__DEBUG__(
+		BLUE, "SlaveWorker", "handleDeleteRequest",
+		"[DELETE] Key: %.*s (key size = %u).",
+		( int ) header.keySize, header.key, header.keySize
+	);
+
+	// Detect degraded DELETE
+	if ( ! this->isRedirectedRequest( header.key, header.keySize ) ) {
+		__DEBUG__( YELLOW, "SlaveWorker", "handleDeleteRequest", "!!! Degraded DELETE request [not yet implemented] !!!" );
+		// TODO
+	}
+
+	Key key;
+	KeyValue keyValue;
+	KeyMetadata keyMetadata;
+	Metadata metadata;
+	Chunk *chunk;
+	if ( map->findValueByKey( header.key, header.keySize, &keyValue, &key, &keyMetadata, &metadata, &chunk ) ) {
+		uint32_t deltaSize;
+		char *delta;
+
+		// Update data chunk and map
+		delta = this->protocol.buffer.recv + PROTO_KEY_CHUNK_UPDATE_SIZE + key.size;
+		deltaSize = chunk->deleteKeyValue(
+			key, &map->keys, delta,
+			this->protocol.buffer.size - PROTO_KEY_CHUNK_UPDATE_SIZE - key.size
+		);
+
+		event.resDelete(
+			event.socket, key,
+			metadata, keyMetadata.offset,
+			deltaSize, delta
+		);
+
+		ret = true;
+	} else {
+		event.resDelete( event.socket, key );
+		ret = false;
+	}
+
+	this->load.del();
+	this->dispatch( event );
+
+	return ret;
+}
+
+bool SlaveWorker::handleDeleteChunkRequest( MasterEvent event ) {
+	struct ChunkUpdateHeader header;
+	bool ret;
+	if ( ! this->protocol.parseChunkUpdateHeader( header, false ) ) {
+		__ERROR__( "SlaveWorker", "dispatch", "Invalid DELETE_CHUNK request." );
+		return false;
+	}
+	__DEBUG__(
+		BLUE, "SlaveWorker", "handleDeleteChunkRequest",
+		"[DELETE_CHUNK] List ID: %u; stripe ID: %u; chunk ID: %u; offset: %u; length: %u.",
+		header.listId, header.stripeId, header.chunkId,
+		header.offset, header.length
+	);
+
+	// Detect degraded UPDATE_CHUNK
+	if ( ! this->isRedirectedRequest( header.listId ) ) {
+		__DEBUG__( YELLOW, "SlaveWorker", "handleDeleteChunkRequest", "!!! Degraded DELETE_CHUNK request [not yet implemented] !!!" );
+		// TODO
+	}
+
+	Metadata metadata;
+	Chunk *chunk = map->findChunkById( header.listId, header.stripeId, header.chunkId, &metadata );
+	if ( chunk ) {
+		__ERROR__( "SlaveWorker", "handleDeleteChunkRequest", "TODO: DELETE_CHUNK not yet implemented!" );
+		ret = true;
+	} else {
+		ret = false;
+	}
+
+	metadata.chunkId = header.chunkId;
+	event.resDeleteChunk(
+		event.socket, metadata,
+		header.offset, header.length, ret
+	);
+
+	this->load.delChunk();
+	this->dispatch( event );
+
+	return ret;
+}
+
 void SlaveWorker::free() {
 	if ( this->storage ) {
 		this->storage->stop();
 		Storage::destroy( this->storage );
 	}
 	this->protocol.free();
+	this->dataChunk->free();
+	this->parityChunk->free();
+	delete this->dataChunk;
+	delete this->parityChunk;
+	delete[] this->dataSlaveSockets;
+	delete[] this->paritySlaveSockets;
 }
 
 void *SlaveWorker::run( void *argv ) {
@@ -907,6 +818,10 @@ bool SlaveWorker::init( GlobalConfig &globalConfig, SlaveConfig &slaveConfig, Wo
 		)
 	);
 	this->role = role;
+	this->dataChunk = new Chunk();
+	this->parityChunk = new Chunk();
+	this->dataChunk->init( globalConfig.size.chunk );
+	this->parityChunk->init( globalConfig.size.chunk );
 	this->dataSlaveSockets = new SlavePeerSocket*[ SlaveWorker::dataChunkCount ];
 	this->paritySlaveSockets = new SlavePeerSocket*[ SlaveWorker::parityChunkCount ];
 	switch( this->role ) {

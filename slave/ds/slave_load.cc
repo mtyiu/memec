@@ -33,3 +33,11 @@ void SlaveLoad::print( FILE *f ) {
 	);
 	Load::print( f );
 }
+
+void SlaveLoad::updateChunk() {
+	this->ops.update++;
+}
+
+void SlaveLoad::delChunk() {
+	this->ops.del++;
+}

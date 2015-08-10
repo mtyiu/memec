@@ -12,7 +12,7 @@ public:
 	char *data;
 	void *ptr; // Extra data to be augmented to the object
 
-	void dup( uint8_t size = 0, char *data = 0, void *ptr = 0 ) {
+	inline void dup( uint8_t size = 0, char *data = 0, void *ptr = 0 ) {
 		if ( ! size )
 			size = this->size;
 		if ( ! data )
@@ -22,7 +22,13 @@ public:
 		this->ptr = ptr;
 	}
 
-	void free() {
+	inline void set( uint8_t size, char *data, void *ptr = 0 ) {
+		this->size = size;
+		this->data = data;
+		this->ptr = ptr;
+	}
+
+	inline void free() {
 		if ( this->data )
 			::free( this->data );
 		this->data = 0;

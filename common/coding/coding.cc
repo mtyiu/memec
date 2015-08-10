@@ -2,12 +2,16 @@
 #include "all_coding.hh"
 #include "../util/debug.hh"
 
-char *Coding::zeros;
+Chunk *Coding::zeros;
 
 Coding::~Coding() {}
 
 Coding *Coding::instantiate( CodingScheme scheme, CodingParams &params, uint32_t chunkSize ) {
-	zeros = new char[ chunkSize ];
+	// Initialize zero block
+	Coding::zeros = new Chunk();
+	Coding::zeros->init( chunkSize );
+	memset( Coding::zeros->data, 0, chunkSize );
+
 	switch( scheme ) {
 		case CS_RAID0:
 			break;

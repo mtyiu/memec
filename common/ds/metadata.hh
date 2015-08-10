@@ -15,6 +15,12 @@ public:
 		this->chunkId = 0;
 	}
 
+	void set( uint32_t listId, uint32_t stripeId, uint32_t chunkId ) {
+		this->listId = listId;
+		this->stripeId = stripeId;
+		this->chunkId = chunkId;
+	}
+
 	void clone( const Metadata &m ) {
 		this->listId = m.listId;
 		this->stripeId = m.stripeId;
