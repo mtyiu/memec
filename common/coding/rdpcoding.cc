@@ -88,7 +88,7 @@ void RDPCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t index )
             }
         }
 
-        delete firstParity.data;
+        delete [] firstParity.data;
 
     } else {
         // ignored

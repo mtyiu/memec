@@ -41,11 +41,11 @@ void CauchyCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t inde
         generateCodeMatrix();
 
     int** schedule = this->_jschedule;
-    char** data = ( char** ) malloc ( sizeof ( char* ) * k );
-    char** code = ( char** ) malloc ( sizeof ( char* ) * m );
+    char** data = new char* [ k ];
+    char** code = new char* [ m ];
 
     // use local buffer for encoding correctness
-    char* chunk = ( char * ) malloc ( sizeof( char ) * m * chunkSize );
+    char* chunk = new char [ m * chunkSize ]; 
 
     for ( uint32_t idx = 0 ; idx < k + m ; idx ++ ) {
         if ( idx < k ) {
@@ -61,9 +61,9 @@ void CauchyCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t inde
     jerasure_schedule_encode( k, m, w, schedule, data, code, chunkSize, 
             chunkSize / w );
 
-    free( data );
-    free( code );
-    free( chunk );
+    delete [] data;
+    delete [] code;
+    delete [] chunk;
 }
 
 bool CauchyCoding::decode( Chunk **chunks, BitmaskArray * chunkStatus ) {
@@ -95,11 +95,11 @@ bool CauchyCoding::decode( Chunk **chunks, BitmaskArray * chunkStatus ) {
         return true;
     }
 
-    int *erasures = new int[ failed + 1 ];
+    int *erasures = new int [ failed + 1 ];
     int pos = 0;
     
-    char** data = ( char** ) malloc ( sizeof( char* ) * k );
-    char** code = ( char** ) malloc ( sizeof( char* ) * m );
+    char** data = new char* [ k ];
+    char** code = new char* [ m ];
 
     for ( uint32_t idx = 0 ; idx < k + m ; idx ++ ) {
         if ( idx < k )
@@ -119,9 +119,9 @@ bool CauchyCoding::decode( Chunk **chunks, BitmaskArray * chunkStatus ) {
     jerasure_schedule_decode_lazy( k, m, w, bitmatrix, erasures, data, code, 
             chunkSize, chunkSize / w, 1 );
 
-    delete erasures;
-    free( data );
-    free( code );
+    delete [] erasures;
+    delete [] data;
+    delete [] code;
 
     return false;
 }
@@ -146,6 +146,7 @@ uint32_t CauchyCoding::getW() {
 
     // TODO : avoid bad choice of w
     this->_w = w;
+    //fprintf( stderr, "CRS: w = %d\n", w );
 
     return this->_w;
 }

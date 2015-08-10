@@ -39,11 +39,11 @@ void RSCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t index ) 
         generateCodeMatrix();
 
     int* matrix = this->_jmatrix;
-    char** data = ( char** ) malloc ( sizeof ( char* ) * k );
-    char** code = ( char** ) malloc ( sizeof ( char* ) * m );
+    char** data = new char* [ k ];
+    char** code = new char* [ m ];
 
     // use local buffer for encoding correctness
-    char* chunk = ( char * ) malloc ( sizeof( char ) * m * chunkSize );
+    char* chunk = new char [ m * chunkSize ];
 
     for ( uint32_t idx = 0 ; idx < k + m ; idx ++ ) {
         if ( idx < k ) {
@@ -58,9 +58,9 @@ void RSCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t index ) 
     // encode
     jerasure_matrix_encode( k, m, w, matrix, data, code, chunkSize ); 
 
-    free( data );
-    free( code );
-    free( chunk );
+    delete data;
+    delete code;
+    delete chunk;
 }
 
 bool RSCoding::decode( Chunk **chunks, BitmaskArray * chunkStatus ) {
@@ -94,8 +94,8 @@ bool RSCoding::decode( Chunk **chunks, BitmaskArray * chunkStatus ) {
     int *erasures = new int[ failed + 1 ];
     int pos = 0;
     
-    char** data = ( char** ) malloc ( sizeof( char* ) * k );
-    char** code = ( char** ) malloc ( sizeof( char* ) * m );
+    char** data = new char* [ k ];
+    char** code = new char* [ m ];
 
     for ( uint32_t idx = 0 ; idx < k + m ; idx ++ ) {
         if ( idx < k )
@@ -115,9 +115,9 @@ bool RSCoding::decode( Chunk **chunks, BitmaskArray * chunkStatus ) {
     jerasure_matrix_decode( k, m, w, matrix, 1, erasures, data, code, 
             chunkSize);
 
-    delete erasures;
-    free( data );
-    free( code );
+    delete [] erasures;
+    delete [] data;
+    delete [] code;
 
     return false;
 }
@@ -150,6 +150,7 @@ uint32_t RSCoding::getW() {
 
     // TODO : avoid bad choice of w
     this->_w = w;
+    //fprintf( stderr, "RS: w = %d\n", w );
 
     return this->_w;
 }
