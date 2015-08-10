@@ -10,7 +10,7 @@ Coding *Coding::instantiate( CodingScheme scheme, CodingParams &params, uint32_t
 	// Initialize zero block
 	Coding::zeros = new Chunk();
 	Coding::zeros->init( chunkSize );
-	memset( Coding::zeros->data, 0, chunkSize );
+	Coding::zeros->init();
 
 	switch( scheme ) {
 		case CS_RAID0:

@@ -62,7 +62,7 @@ public:
 		if ( metadataPtr ) *metadataPtr = metadata;
 
 		it = this->cache.lower_bound( metadata );
-		if ( it == this->cache.lower_bound( metadata ) || ! metadata.matchStripe( it->first ) )
+		if ( it == this->cache.end() || ! metadata.matchStripe( it->first ) )
 			return 0;
 		return it->second;
 	}

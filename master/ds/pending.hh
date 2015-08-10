@@ -13,6 +13,21 @@ public:
 	char *key;
 	void *ptr;
 
+	void set( uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, void *ptr = 0 ) {
+		this->listId = listId;
+		this->stripeId = stripeId;
+		this->chunkId = chunkId;
+		this->offset = offset;
+		this->length = length;
+		this->ptr = ptr;
+	}
+
+	void setKeyValueUpdate( uint8_t keySize, char *key, uint32_t valueUpdateOffset ) {
+		this->keySize = keySize;
+		this->key = key;
+		this->valueUpdateOffset = valueUpdateOffset;
+	}
+
 	bool operator<( const ChunkUpdate &m ) const {
 		int ret;
 		if ( ! Metadata::operator<( m ) )

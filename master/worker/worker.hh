@@ -29,6 +29,22 @@ private:
 	void dispatch( CoordinatorEvent event );
 	void dispatch( MasterEvent event );
 	void dispatch( SlaveEvent event );
+
+	SlaveSocket *getSlave( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded = false, bool *isDegraded = 0 );
+	SlaveSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded = false, bool *isDegraded = 0 );
+
+	bool handleGetRequest( ApplicationEvent event );
+	bool handleSetRequest( ApplicationEvent event );
+	bool handleUpdateRequest( ApplicationEvent event );
+	bool handleDeleteRequest( ApplicationEvent event );
+
+	bool handleGetResponse( SlaveEvent event, bool success );
+	bool handleSetResponse( SlaveEvent event, bool success );
+	bool handleUpdateResponse( SlaveEvent event, bool success );
+	bool handleUpdateChunkResponse( SlaveEvent event, bool success );
+	bool handleDeleteResponse( SlaveEvent event, bool success );
+	bool handleDeleteChunkResponse( SlaveEvent event, bool success );
+
 	void free();
 	static void *run( void *argv );
 

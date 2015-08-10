@@ -465,7 +465,7 @@ bool SlaveWorker::handleGetRequest( MasterEvent event ) {
 
 	// Detect degraded GET
 	if ( ! this->isRedirectedRequest( header.key, header.keySize ) ) {
-		__DEBUG__( YELLOW, "SlaveWorker", "dispatch", "!!! Degraded GET request [not yet implemented] !!!" );
+		__DEBUG__( YELLOW, "SlaveWorker", "handleGetRequest", "!!! Degraded GET request [not yet implemented] !!!" );
 		// TODO
 	}
 
@@ -501,7 +501,7 @@ bool SlaveWorker::handleSetRequest( MasterEvent event ) {
 	bool isParity;
 	uint32_t listId, chunkId;
 	if ( ! this->isRedirectedRequest( header.key, header.keySize, &isParity, &listId, &chunkId ) && ! isParity ) {
-		__DEBUG__( YELLOW, "SlaveWorker", "dispatch", "!!! Degraded SET request [not yet implemented] !!!" );
+		__DEBUG__( YELLOW, "SlaveWorker", "handleSetRequest", "!!! Degraded SET request [not yet implemented] !!!" );
 		// TODO
 	}
 
@@ -526,7 +526,7 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event ) {
 	struct KeyValueUpdateHeader header;
 	bool ret;
 	if ( ! this->protocol.parseKeyValueUpdateHeader( header ) ) {
-		__ERROR__( "SlaveWorker", "dispatch", "Invalid UPDATE request." );
+		__ERROR__( "SlaveWorker", "handleUpdateRequest", "Invalid UPDATE request." );
 		return false;
 	}
 	__DEBUG__(
@@ -566,7 +566,6 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event ) {
 			header.valueUpdateSize,
 			header.valueUpdate
 		);
-
 		ret = true;
 	} else {
 		event.resUpdate( event.socket, key, header.valueUpdateOffset, header.valueUpdateSize );
@@ -583,7 +582,7 @@ bool SlaveWorker::handleUpdateChunkRequest( MasterEvent event ) {
 	struct ChunkUpdateHeader header;
 	bool ret;
 	if ( ! this->protocol.parseChunkUpdateHeader( header, true ) ) {
-		__ERROR__( "SlaveWorker", "dispatch", "Invalid UPDATE_CHUNK request." );
+		__ERROR__( "SlaveWorker", "handleUpdateChunkRequest", "Invalid UPDATE_CHUNK request." );
 		return false;
 	}
 	__DEBUG__(
@@ -624,7 +623,7 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event ) {
 	struct KeyHeader header;
 	bool ret;
 	if ( ! this->protocol.parseKeyHeader( header ) ) {
-		__ERROR__( "SlaveWorker", "dispatch", "Invalid DELETE request." );
+		__ERROR__( "SlaveWorker", "handleDeleteRequest", "Invalid DELETE request." );
 		return false;
 	}
 	__DEBUG__(
@@ -644,7 +643,9 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event ) {
 	KeyMetadata keyMetadata;
 	Metadata metadata;
 	Chunk *chunk;
-	if ( map->findValueByKey( header.key, header.keySize, &keyValue, &key, &keyMetadata, &metadata, &chunk ) ) {
+
+	key.set( header.keySize, header.key );
+	if ( map->findValueByKey( header.key, header.keySize, &keyValue, 0, &keyMetadata, &metadata, &chunk ) ) {
 		uint32_t deltaSize;
 		char *delta;
 
@@ -677,7 +678,7 @@ bool SlaveWorker::handleDeleteChunkRequest( MasterEvent event ) {
 	struct ChunkUpdateHeader header;
 	bool ret;
 	if ( ! this->protocol.parseChunkUpdateHeader( header, false ) ) {
-		__ERROR__( "SlaveWorker", "dispatch", "Invalid DELETE_CHUNK request." );
+		__ERROR__( "SlaveWorker", "handleDeleteChunkRequest", "Invalid DELETE_CHUNK request." );
 		return false;
 	}
 	__DEBUG__(
