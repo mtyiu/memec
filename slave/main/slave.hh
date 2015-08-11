@@ -64,7 +64,7 @@ public:
 	MemoryPool<Chunk> *chunkPool;
 	MemoryPool<Stripe> *stripePool;
 	std::vector<MixedChunkBuffer *> chunkBuffer;
-	
+
 	static Slave *getInstance() {
 		static Slave slave;
 		return &slave;

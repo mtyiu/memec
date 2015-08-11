@@ -16,6 +16,9 @@ public:
 		ServerAddr addr;
 	} slave;
 	struct {
+		uint32_t timeout;
+	} slavePeers;
+	struct {
 		uint32_t maxEvents;
 		int32_t timeout;
 	} epoll;
