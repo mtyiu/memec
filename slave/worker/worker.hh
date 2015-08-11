@@ -31,6 +31,7 @@ private:
 	SlavePeerSocket **paritySlaveSockets;
 	static uint32_t dataChunkCount;
 	static uint32_t parityChunkCount;
+	static ServerAddr *slaveServerAddr;
 	static Coding *coding;
 	static SlaveEventQueue *eventQueue;
 	static StripeList<SlavePeerSocket> *stripeList;
@@ -46,6 +47,8 @@ private:
 	void dispatch( MasterEvent event );
 	void dispatch( SlaveEvent event );
 	void dispatch( SlavePeerEvent event );
+
+	bool handleSlavePeerRegisterRequest( SlavePeerSocket *socket, ProtocolHeader &header, ssize_t recvBytes );
 
 	bool isRedirectedRequest( char *key, uint8_t size, bool *isParity = 0, uint32_t *listIdPtr = 0, uint32_t *chunkIdPtr = 0 );
 	bool isRedirectedRequest( uint32_t listId );

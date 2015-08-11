@@ -2,6 +2,7 @@
 #define __SLAVE_PROTOCOL_PROTOCOL_HH__
 
 #include "../../common/protocol/protocol.hh"
+#include "../../common/config/server_addr.hh"
 
 class SlaveProtocol : public Protocol {
 public:
@@ -33,7 +34,7 @@ public:
 
 	/* Slave */
 	// Register
-	char *reqRegisterSlavePeer( size_t &size );
+	char *reqRegisterSlavePeer( size_t &size, ServerAddr *addr );
 	char *resRegisterSlavePeer( size_t &size, bool success );
 };
 #endif

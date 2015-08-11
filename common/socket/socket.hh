@@ -26,9 +26,9 @@ protected:
 	struct sockaddr_in addr;
 
 	bool setSockOpt( int level, int optionName );
-	inline bool setReuse();
-	inline bool setNoDelay();
-	inline bool setNonBlocking();
+	bool setReuse();
+	bool setNoDelay();
+	bool setNonBlocking();
 
 	bool listen();
 	bool connect();
@@ -37,12 +37,12 @@ protected:
 	int accept( struct sockaddr_in *addrPtr = 0, socklen_t *addrlenPtr = 0 );
 
 public:
-	bool init( int type, unsigned long addr, unsigned short port, bool block = false );
-	bool init( ServerAddr addr, EPoll *epoll );
-	bool init( int sockfd, struct sockaddr_in addr );
 	inline int getSocket() {
 		return this->sockfd;
 	}
+	bool init( int type, unsigned long addr, unsigned short port, bool block = false );
+	bool init( int sockfd, struct sockaddr_in addr );
+	virtual bool init( ServerAddr &addr, EPoll *epoll );
 	virtual bool start() = 0;
 	virtual void stop();
 	virtual bool ready();

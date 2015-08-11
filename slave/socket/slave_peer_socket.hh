@@ -4,11 +4,26 @@
 #include "../../common/socket/socket.hh"
 
 class SlavePeerSocket : public Socket {
+private:
+	bool active;
+	int recvSockFd;
+	struct sockaddr_in recvAddr;
+	char *identifier;
+	EPoll *epoll;
+
+	void registerTo();
+
 public:
 	bool registered;
 	bool self;
 
+	SlavePeerSocket();
+	bool init( ServerAddr &addr, EPoll *epoll, bool active );
 	bool start();
+	void stop();
+	void free();
+	bool isMatched( ServerAddr &serverAddr );
+	bool setRecvFd( int fd, struct sockaddr_in *addr );
 	ssize_t send( char *buf, size_t ulen, bool &connected );
 	ssize_t recv( char *buf, size_t ulen, bool &connected, bool wait );
 	void print( FILE *f = stdout );

@@ -136,12 +136,13 @@ char *SlaveProtocol::resDeleteChunk( size_t &size, bool success, uint32_t listId
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::reqRegisterSlavePeer( size_t &size ) {
-	size = this->generateHeader(
+char *SlaveProtocol::reqRegisterSlavePeer( size_t &size, ServerAddr *addr ) {
+	size = addr->serialize( this->buffer.send + PROTO_HEADER_SIZE );
+	size += this->generateHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_REGISTER,
-		0
+		size
 	);
 	return this->buffer.send;
 }
