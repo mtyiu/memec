@@ -2,27 +2,35 @@ GCC=gcc
 CC=g++
 CFLAGS=-Wall -O2 -g
 
-PLIO_SRC_ROOT=..
+PLIO_SRC_ROOT=../..
 LIBS=
-INCLUDE=-I../../lib/jerasure/include -I../../lib/gf_complete/include
-SRC_FILES=$(wildcard ../../lib/jerasure/src/*.c) $(wildcard ../../lib/gf_complete/src/*.c)
+JLIB_DIR=$(PLIO_SRC_ROOT)/lib/jerasure
+GFLIB_DIR=$(PLIO_SRC_ROOT)/lib/gf_complete
+INCLUDE=-I$(JLIB_DIR)/include -I$(GFLIB_DIR)/include
+JSRC_FILES=$(wildcard $(JLIB_DIR)/src/*.c) 
+GFSRC_FILES=$(wildcard $(GFLIB_DIR)/src/*.c)
 
 OBJS= \
 	coding.o \
 	raid5coding2.o \
 	rdpcoding.o \
 	cauchycoding.o \
-	rscoding.o
+	rscoding.o \
+	evenoddcoding.o
 
-COBJS= $(foreach d,$(SRC_FILES),$(patsubst %.c,%.o,$d))
+JOBJS= $(foreach d,$(JSRC_FILES),$(patsubst %.c,%.o,$(notdir $d)))
+GFOBJS= $(foreach d,$(GFSRC_FILES),$(patsubst %.c,%.o,$(notdir $d)))
 
-all: $(COBJS) $(OBJS)
+all: $(JOBJS) $(GFOBJS) $(OBJS) 
 
-$(COBJS): %.o: %.c
-	$(GCC) $(INCLUDE) -c -o $(@F) $<
+$(JOBJS): %.o: $(JLIB_DIR)/src/%.c
+	$(GCC) $(INCLUDE) -c -o $@ $<
+
+$(GFOBJS): %.o: $(GFLIB_DIR)/src/%.c
+	$(GCC) $(INCLUDE) -c -o $@ $<
 
 $(OBJS): %.o: %.cc %.hh
 	$(CC) $(CFLAGS) $(INCLUDE) $(LIBS) -c -o $@ $<
 
 clean:
-	rm -f $(foreach d,$(SRC_FILES),$(patsubst %.c,%.o,$(notdir $d))) $(OBJS)
+	rm -f $(foreach d,$(SRC_FILES),$(patsubst %.c,%.o,$(notdir $d))) $(JOBJS) $(GFOBJS)

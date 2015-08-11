@@ -12,6 +12,7 @@ struct CodingHandler {
         RDPCoding* rdp;
         CauchyCoding* cauchy;
         RSCoding* rs;
+        EvenOddCoding* evenodd;
     };
 };
 

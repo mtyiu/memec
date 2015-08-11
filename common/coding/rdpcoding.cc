@@ -62,7 +62,6 @@ void RDPCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t index )
         //  (0)  (1)   (2)   (3)   (4)   .....   (p)  (p+1)
         // -------------------------------------
         // D_0 | D_1 | D_2 | D_3 | P_r | [0] ... [0] | P_d
-        // [0]      ...      [0] | [0]   ...     [0] | P_d
         for ( uint32_t cidx = 0 ; cidx < k + 1 ; cidx ++ ) {
             // symbols within each data chunk
             for ( uint32_t sidx = 0 ; sidx < p - 1 ; sidx ++ ) {
@@ -118,8 +117,6 @@ bool RDPCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
     if ( failed.size() == 0 ) 
         return false;
 
-    uint32_t recoveredSymbolCount = 0;
-
     if ( failed.size() == 1 ) {
         // TODO : optimize for single failure recovery
 
@@ -153,7 +150,9 @@ bool RDPCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
         uint32_t didxToRepair = chunkToRRepair - 1;
         uint32_t sidxToRepair =  ( didxToRepair + p - chunkToDRepair ) % p;
 
-        while ( recoveredSymbolCount < ( p - 1 ) * failed.size() ) {
+        for ( uint32_t recoveredSymbolCount = 0;
+                recoveredSymbolCount < ( p - 1 ) * failed.size(); 
+                recoveredSymbolCount += 2 ) {
 
             uint32_t sidx, len;
         
@@ -204,8 +203,6 @@ bool RDPCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
             galois_region_xor ( chunks[ chunkToDRepair ]->data + sidxToRepair * symbolSize,
                     chunks[ chunkToRRepair ]->data + sidxToRepair * symbolSize, len );
             //fprintf( stderr, " decode (%d, %d) on (%d, %d) with len %d \n", chunkToDRepair, sidxToRepair , chunkToRRepair , sidxToRepair, len );
-
-            recoveredSymbolCount += 2;       
 
             // search for next symbol to recover
             didxToRepair = ( chunkToRRepair + sidxToRepair ) % p;

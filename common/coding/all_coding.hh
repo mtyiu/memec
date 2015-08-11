@@ -3,4 +3,5 @@
 #include "rdpcoding.hh"
 #include "cauchycoding.hh"
 #include "rscoding.hh"
+#include "evenoddcoding.hh"
 
