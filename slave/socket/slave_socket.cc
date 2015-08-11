@@ -106,7 +106,7 @@ bool SlaveSocket::handler( int fd, uint32_t events, void *data ) {
 			// Only master or slave register message is expected
 			bool connected;
 			ssize_t ret;
-			
+
 			ret = socket->recv( fd, socket->buffer.data, socket->buffer.size, connected, true );
 			if ( ret < 0 ) {
 				__ERROR__( "SlaveSocket", "handler", "Cannot receive message." );

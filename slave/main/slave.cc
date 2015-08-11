@@ -233,6 +233,14 @@ bool Slave::start() {
 		if ( ! this->sockets.coordinators[ i ].start() )
 			return false;
 	}
+	// Connect to slaves
+	sleep( this->config.slave.slavePeers.timeout );
+	for ( int i = 0, len = this->sockets.slavePeers.size(); i < len; i++ ) {
+		if ( this->sockets.slavePeers[ i ].self )
+			continue;
+		if ( ! this->sockets.slavePeers[ i ].start() )
+			return false;
+	}
 	// Start listening
 	if ( ! this->sockets.self.start() ) {
 		__ERROR__( "Slave", "start", "Cannot start socket." );
@@ -250,7 +258,7 @@ bool Slave::start() {
 
 bool Slave::stop() {
 	if ( ! this->isRunning )
-		return false; 
+		return false;
 
 	int i, len;
 

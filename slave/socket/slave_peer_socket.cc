@@ -7,6 +7,7 @@ bool SlavePeerSocket::start() {
 	if ( this->self )
 		return true;
 	this->registered = false;
+
 	if ( this->connect() ) {
 		Slave *slave = Slave::getInstance();
 		SlavePeerEvent event;

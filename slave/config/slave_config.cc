@@ -11,12 +11,12 @@ bool SlaveConfig::merge( GlobalConfig &globalConfig ) {
 bool SlaveConfig::parse( const char *path ) {
 	if ( Config::parse( path, "slave.ini" ) ) {
 		if ( this->workers.type == WORKER_TYPE_SEPARATED )
-			this->workers.number.separated.total = 
+			this->workers.number.separated.total =
 				this->workers.number.separated.coding +
 				this->workers.number.separated.coordinator +
 				this->workers.number.separated.io +
 				this->workers.number.separated.master +
-				this->workers.number.separated.slave + 
+				this->workers.number.separated.slave +
 				this->workers.number.separated.slavePeer;
 		return true;
 	}
@@ -38,6 +38,11 @@ bool SlaveConfig::override( OptionList &options ) {
 bool SlaveConfig::set( const char *section, const char *name, const char *value ) {
 	if ( match( section, "slave" ) ) {
 		return this->slave.addr.parse( name, value );
+	} else if ( match( section, "slave_peers" ) ) {
+		if ( match( name, "timeout" ) )
+			this->slavePeers.timeout = atoi( value );
+		else
+			return false;
 	} else if ( match( section, "epoll" ) ) {
 		if ( match( name, "max_events" ) )
 			this->epoll.maxEvents = atoi( value );
@@ -208,6 +213,8 @@ void SlaveConfig::print( FILE *f ) {
 		"- epoll settings\n"
 		"\t- %-*s : %u\n"
 		"\t- %-*s : %d\n"
+		"- Slave peer connections settings\n"
+		"\t- %-*s : %u\n"
 		"- Pool\n"
 		"\t- %-*s : %u\n"
 		"\t- %-*s : %u\n"
@@ -215,6 +222,7 @@ void SlaveConfig::print( FILE *f ) {
 		"\t- %-*s : %s\n",
 		width, "Maximum number of events", this->epoll.maxEvents,
 		width, "Timeout", this->epoll.timeout,
+		width, "Timeout", this->slavePeers.timeout,
 		width, "Chunks", this->pool.chunks,
 		width, "Stripes", this->pool.stripe,
 		width, "Type", this->workers.type == WORKER_TYPE_MIXED ? "Mixed" : "Separated"
