@@ -7,7 +7,7 @@
 
 class RDPCoding : public Coding {
 
-private:
+protected:
 
     /**
      * Get the index to smallest prime number p > k + 1 for encoding in primeList

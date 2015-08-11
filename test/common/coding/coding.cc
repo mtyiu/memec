@@ -7,16 +7,16 @@
 #include "../../../common/coding/coding_handler.hh"
 
 #define CHUNK_SIZE (4096)
-#define C_K (7)
-#define C_M (3)
-#define FAIL (0)
-#define FAIL2 (3)
+#define C_K (4)
+#define C_M (2)
+#define FAIL (1)
+#define FAIL2 (2)
 #define FAIL3 (5)
 
 struct CodingHandler handle;
 
 void usage( char* argv ) {
-    fprintf( stderr, "Usage: %s [raid5|cauchy|rdp|rs]\n", argv);
+    fprintf( stderr, "Usage: %s [raid5|cauchy|rdp|rs|evenodd]\n", argv);
 }
 
 void printChunk( Chunk *chunk, uint32_t id = 0 ) {
@@ -44,6 +44,8 @@ bool parseInput( char* arg ) {
         handle.scheme = CS_RDP;
     else if ( strcmp ( arg, "rs" ) == 0 )
         handle.scheme = CS_RS;
+    else if ( strcmp ( arg, "evenodd" ) == 0 )
+        handle.scheme = CS_EVENODD;
     else
         return false;
 
@@ -127,6 +129,16 @@ int main( int argc, char **argv ) {
             failed.push_back( FAIL2 );
             failed.push_back( FAIL3 );
             break;
+        case CS_EVENODD:
+            handle.evenodd = new EvenOddCoding( C_K, CHUNK_SIZE );
+            printf( ">> encode K: %d   M: 2 \n", C_K );
+            handle.evenodd->encode ( chunks, chunks[ C_K ], 1 );
+            handle.evenodd->encode ( chunks, chunks[ C_K + 1 ], 2 );
+            //printChunk( chunks[ C_K ] , C_K );
+            //printChunk( chunks[ C_K + 1 ] , C_K + 1 );
+            failed.push_back( FAIL );
+            failed.push_back( FAIL2 );
+            break;
         default:
             return -1;
     }
@@ -150,6 +162,9 @@ int main( int argc, char **argv ) {
             break;
         case CS_RS:
             handle.rs->decode ( chunks, &bitmap );
+            break;
+        case CS_EVENODD:
+            handle.evenodd->decode ( chunks, &bitmap );
             break;
         default:
             return -1;
@@ -179,6 +194,9 @@ int main( int argc, char **argv ) {
             case CS_RS:
                 handle.rs->decode ( chunks, &bitmap );
                 break;
+            case CS_EVENODD:
+                handle.evenodd->decode ( chunks, &bitmap );
+                break;
             default:
                 return -1;
         }
@@ -197,7 +215,7 @@ int main( int argc, char **argv ) {
     }
 
     // triple failure
-    if ( handle.scheme != CS_RAID5 && handle.scheme != CS_RDP && C_M > 2) {
+    if ( handle.scheme != CS_RAID5 && handle.scheme != CS_RDP && handle.scheme != CS_EVENODD && C_M > 2) {
         memset ( readbuf , 0, CHUNK_SIZE * C_M ); 
         printf( ">> fail disk %d, ", failed[ 0 ]);
         bitmap.unset ( failed[ 0 ], 0 );
