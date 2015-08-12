@@ -33,4 +33,4 @@ $(OBJS): %.o: %.cc %.hh
 	$(CC) $(CFLAGS) $(INCLUDE) $(LIBS) -c -o $@ $<
 
 clean:
-	rm -f $(foreach d,$(SRC_FILES),$(patsubst %.c,%.o,$(notdir $d))) $(JOBJS) $(GFOBJS)
+	rm -f $(OBJS) $(JOBJS) $(GFOBJS)
