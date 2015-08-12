@@ -67,7 +67,7 @@ bool EvenOddCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
     std::vector< uint32_t > failed;
 
     // check for failed disk
-    for ( uint32_t idx = 0; idx < k ; idx ++ ) {
+    for ( uint32_t idx = 0; idx < k+2 ; idx ++ ) {
         if ( chunkStatus->check( idx ) == 0 ) {
             if ( failed.size() < 2 )
                 failed.push_back( idx );
@@ -79,6 +79,11 @@ bool EvenOddCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
     // no data lost for decode
     if ( failed.size() == 0 ) 
         return false;
+
+    // zero out the chunks for XOR 
+    for ( uint32_t idx = 0 ; idx < failed.size() ; idx ++ ) {
+        memset( chunks[ failed[ idx ] ]->data, 0, chunkSize );
+    }
 
     char* s;
     // data chunk loss only
@@ -96,14 +101,49 @@ bool EvenOddCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
         this->_raid5Coding->decode ( chunks, chunkStatus );
         encode( chunks, chunks[ k + 1 ], 2 );
 
-    } else if ( failed [ 1 ] == k ) {
+    } else if ( failed[ 1 ] == k ) {
         // missing row parity ... find the diagonal that gives S directly
+        
+        // recover S first
+        uint32_t pidx =  ( failed[ 0 ] - 1 + p ) % p;
+        s = new char [ symbolSize ];
+        memset( s, 0, symbolSize );
+        // data symbols
+        for ( uint32_t cidx = 0 ; cidx < k ; cidx ++ ) {
+            if ( cidx == failed[ 0 ] )
+                continue;
+            uint32_t sidx = ( pidx + p - cidx ) % p;
+            galois_region_xor( chunks[ cidx ]->data + sidx * symbolSize, s , symbolSize );
+        }
+        // diagonal symbol
+        if ( pidx != p - 1 )
+            galois_region_xor( chunks[ k + 1 ]->data + pidx * symbolSize, s, symbolSize );
+
+        // recover data using diagonal parity and S
+        for ( uint32_t sidxToRepair = 0 ; sidxToRepair < p - 1 ; sidxToRepair ++ ) {
+            char* failedSymbol = chunks[ failed[ 0 ] ]->data + sidxToRepair * symbolSize;
+            pidx = ( failed[ 0 ] +  sidxToRepair ) % p;
+            for ( uint32_t cidx = 0 ; cidx < k ; cidx ++ ) {
+                if ( cidx == failed[ 0 ] )
+                    continue;
+                uint32_t sidx = ( pidx + p - cidx ) % p;
+                if ( sidx > p - 2 )
+                    continue;
+                galois_region_xor( chunks[ cidx ]->data + sidx * symbolSize, 
+                        failedSymbol, symbolSize );
+            }
+            if ( pidx != p - 1 ) 
+                galois_region_xor( chunks[ k + 1 ]->data + pidx * symbolSize, 
+                        failedSymbol, symbolSize );
+            galois_region_xor( s, failedSymbol, symbolSize );
+        }
+        
+        // recover row parity
+        encode( chunks, chunks[ k ], 1 );
+
+        delete [] s;
 
     } else {
-        // zero out the chunks for XOR 
-        for ( uint32_t idx = 0 ; idx < failed.size() ; idx ++ ) {
-            memset( chunks[ failed [ idx ] ]->data, 0, chunkSize );
-        }
 
         // get back S, xor all symbols in chunk[ k + 1 ] and chunk[ k ]
         s = new char [ symbolSize ];

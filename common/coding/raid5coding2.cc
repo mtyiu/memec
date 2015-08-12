@@ -46,7 +46,7 @@ bool Raid5Coding2::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
         return false;
 
     // check if the data chunk lost can be recovered
-    for ( uint32_t idx = 0 ; idx < k ; idx++ ) {
+    for ( uint32_t idx = 0 ; idx < k+1 ; idx++ ) {
         if ( chunkStatus->check( idx ) == 0 ) {
             if ( failed == ( uint32_t ) -1 )
                 failed = idx;
