@@ -407,12 +407,15 @@ slave_peer_parse_again:
 					case PROTO_OPCODE_UPDATE_CHUNK:
 						switch( header.magic ) {
 							case PROTO_MAGIC_REQUEST:
+								fprintf( stderr, "handleUpdateChunkRequest\n" );
 								this->handleUpdateChunkRequest( event );
 								break;
 							case PROTO_MAGIC_RESPONSE_SUCCESS:
+								fprintf( stderr, "handleUpdateChunkResponse\n" );
 								this->handleUpdateChunkResponse( event, true );
 								break;
 							case PROTO_MAGIC_RESPONSE_FAILURE:
+								fprintf( stderr, "handleUpdateChunkResponse\n" );
 								this->handleUpdateChunkResponse( event, false );
 								break;
 							default:
@@ -423,12 +426,15 @@ slave_peer_parse_again:
 					case PROTO_OPCODE_DELETE_CHUNK:
 						switch( header.magic ) {
 							case PROTO_MAGIC_REQUEST:
+								fprintf( stderr, "handleDeleteChunkRequest\n" );
 								this->handleDeleteChunkRequest( event );
 								break;
 							case PROTO_MAGIC_RESPONSE_SUCCESS:
+								fprintf( stderr, "handleDeleteChunkResponse\n" );
 								this->handleDeleteChunkResponse( event, true );
 								break;
 							case PROTO_MAGIC_RESPONSE_FAILURE:
+								fprintf( stderr, "handleDeleteChunkResponse\n" );
 								this->handleDeleteChunkResponse( event, false );
 								break;
 							default:
@@ -442,6 +448,7 @@ slave_peer_parse_again:
 				}
 
 				if ( ret > header.length + PROTO_HEADER_SIZE ) {
+					// printf( "ret: %ld --> %ld\n", ret, ret - header.length - PROTO_HEADER_SIZE );
 					ret = ret - header.length - PROTO_HEADER_SIZE;
 					memmove(
 						this->protocol.buffer.recv,
@@ -933,18 +940,17 @@ bool SlaveWorker::handleDeleteChunkRequest( SlavePeerEvent event ) {
 	return ret;
 }
 
-/*
 bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success ) {
 	struct ChunkUpdateHeader header;
-	if ( ! this->protocol.parseChunkUpdateHeader( header, true ) ) {
+	if ( ! this->protocol.parseChunkUpdateHeader( header ) ) {
 		__ERROR__( "SlaveWorker", "handleUpdateChunkResponse", "Invalid UPDATE_CHUNK response." );
 		return false;
 	}
 	__DEBUG__(
 		BLUE, "SlaveWorker", "handleUpdateChunkResponse",
-		"[UPDATE_CHUNK] List ID: %u, stripe ID: %u, chunk ID: %u; offset = %u, length = %u; value update offset = %u.",
+		"[UPDATE_CHUNK] List ID: %u, stripe ID: %u, chunk ID: %u; offset = %u, length = %u.",
 		header.listId, header.stripeId, header.chunkId,
-		header.offset, header.length, header.valueUpdateOffset
+		header.offset, header.length
 	);
 
 	std::set<ChunkUpdate>::iterator it;
@@ -955,7 +961,7 @@ bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success 
 		header.listId, header.stripeId, header.chunkId,
 		header.offset, header.length
 	);
-	chunkUpdate.setKeyValueUpdate( 0, 0, header.valueUpdateOffset );
+	chunkUpdate.setKeyValueUpdate( 0, 0, 0 );
 	chunkUpdate.ptr = ( void * ) event.socket;
 
 	it = SlaveWorker::pending->slavePeers.updateChunk.lower_bound( chunkUpdate );
@@ -973,7 +979,7 @@ bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success 
 	__ERROR__( "SlaveWorker", "handleUpdateChunkResponse", "Pending slave UPDATE_CHUNK requests = %d (%s).", pending, success ? "success" : "fail" );
 	if ( pending == 0 ) {
 		// Only send application UPDATE response when the number of pending slave UPDATE_CHUNK requests equal 0
-		ApplicationEvent applicationEvent;
+		MasterEvent masterEvent;
 		std::set<KeyValueUpdate>::iterator it;
 		KeyValueUpdate keyValueUpdate;
 		Key key;
@@ -981,26 +987,26 @@ bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success 
 		keyValueUpdate.set( chunkUpdate.keySize, chunkUpdate.key, 0 );
 		keyValueUpdate.offset = chunkUpdate.valueUpdateOffset;
 		keyValueUpdate.length = chunkUpdate.length;
-		it = SlaveWorker::pending->applications.update.lower_bound( keyValueUpdate );
-		if ( it == SlaveWorker::pending->applications.update.end() || ! keyValueUpdate.equal( *it ) ) {
-			__ERROR__( "SlaveWorker", "handleUpdateChunkResponse", "Cannot find a pending application UPDATE request that matches the response. This message will be discarded." );
+		it = SlaveWorker::pending->masters.update.lower_bound( keyValueUpdate );
+		if ( it == SlaveWorker::pending->masters.update.end() || ! keyValueUpdate.equal( *it ) ) {
+			__ERROR__( "SlaveWorker", "handleUpdateChunkResponse", "Cannot find a pending master UPDATE request that matches the response. This message will be discarded." );
 			return false;
 		}
 		keyValueUpdate = *it;
 
 		key.set( keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.ptr );
-		applicationEvent.resUpdate(
-			( ApplicationSocket * ) keyValueUpdate.ptr, key,
+		masterEvent.resUpdate(
+			( MasterSocket * ) keyValueUpdate.ptr, key,
 			keyValueUpdate.offset, keyValueUpdate.length, success
 		);
-		SlaveWorker::eventQueue->insert( applicationEvent );
+		SlaveWorker::eventQueue->insert( masterEvent );
 	}
 	return true;
 }
 
 bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success ) {
 	struct ChunkUpdateHeader header;
-	if ( ! this->protocol.parseChunkUpdateHeader( header, false ) ) {
+	if ( ! this->protocol.parseChunkUpdateHeader( header ) ) {
 		__ERROR__( "SlaveWorker", "handleDeleteChunkResponse", "Invalid DELETE_CHUNK response." );
 		return false;
 	}
@@ -1037,23 +1043,22 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success 
 	__ERROR__( "SlaveWorker", "handleDeleteChunkResponse", "Pending slave DELETE_CHUNK requests = %d.", pending );
 	if ( pending == 0 ) {
 		// Only send application DELETE response when the number of pending slave DELETE_CHUNK requests equal 0
-		ApplicationEvent applicationEvent;
+		MasterEvent masterEvent;
 		std::set<Key>::iterator it;
 		Key key;
 
 		key.set( chunkUpdate.keySize, chunkUpdate.key, 0 );
-		it = SlaveWorker::pending->applications.del.lower_bound( key );
-		if ( it == SlaveWorker::pending->applications.del.end() || ! key.equal( *it ) ) {
-			__ERROR__( "SlaveWorker", "handleDeleteChunkResponse", "Cannot find a pending application DELETE request that matches the response. This message will be discarded." );
+		it = SlaveWorker::pending->masters.del.lower_bound( key );
+		if ( it == SlaveWorker::pending->masters.del.end() || ! key.equal( *it ) ) {
+			__ERROR__( "SlaveWorker", "handleDeleteChunkResponse", "Cannot find a pending master DELETE request that matches the response. This message will be discarded." );
 			return false;
 		}
 		key = *it;
-		applicationEvent.resDelete( ( ApplicationSocket * ) key.ptr, key, success );
-		SlaveWorker::eventQueue->insert( applicationEvent );
+		masterEvent.resDelete( ( MasterSocket * ) key.ptr, key, success );
+		SlaveWorker::eventQueue->insert( masterEvent );
 	}
 	return true;
 }
-*/
 
 void SlaveWorker::free() {
 	if ( this->storage ) {

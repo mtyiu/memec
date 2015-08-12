@@ -328,7 +328,6 @@ void Slave::info( FILE *f ) {
 
 void Slave::debug( FILE *f ) {
 	int i, len;
-/*
 	fprintf( f, "Slave socket\n------------\n" );
 	this->sockets.self.print( f );
 
@@ -345,14 +344,14 @@ void Slave::debug( FILE *f ) {
 		this->sockets.masters[ i ].print( f );
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
-*/
+
 	fprintf( f, "\nSlave peer sockets\n------------------\n" );
 	for ( i = 0, len = this->sockets.slavePeers.size(); i < len; i++ ) {
 		fprintf( f, "%d. ", i + 1 );
 		this->sockets.slavePeers[ i ].print( f );
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
-/*
+
 	fprintf( f, "\nChunk buffer\n------------\n" );
 	for ( i = 0, len = this->chunkBuffer.size(); i < len; i++ ) {
 		if ( ! this->chunkBuffer[ i ] )
@@ -374,7 +373,7 @@ void Slave::debug( FILE *f ) {
 
 	fprintf( f, "\nOther threads\n--------------\n" );
 	this->sockets.self.printThread();
-*/
+
 	fprintf( f, "\n" );
 }
 

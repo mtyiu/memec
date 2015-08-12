@@ -98,8 +98,8 @@ ssize_t Socket::send( int sockfd, char *buf, size_t ulen, bool &connected ) {
 			bytes += ret;
 		}
 	} while ( bytes < len );
-	if ( connected && bytes > 0 )
-		__DEBUG__( MAGENTA, "Socket", "send", "Sent %ld bytes.", bytes );
+	// if ( connected && bytes > 0 )
+	// 	__DEBUG__( MAGENTA, "Socket", "send", "Sent %ld bytes.", bytes );
 	this->connected = connected;
 	return bytes;
 }
@@ -126,8 +126,8 @@ ssize_t Socket::recv( int sockfd, char *buf, size_t ulen, bool &connected, bool 
 			bytes += ret;
 		}
 	} while ( wait && bytes < len );
-	if ( connected && bytes > 0 )
-		__DEBUG__( MAGENTA, "Socket", "recv", "Received %ld bytes.", bytes );
+	// if ( connected && bytes > 0 )
+	// 	__DEBUG__( MAGENTA, "Socket", "recv", "Received %ld bytes.", bytes );
 	this->connected = connected;
 	return bytes;
 }
