@@ -6,9 +6,10 @@
 #include <cstdio>
 #include "../buffer/mixed_chunk_buffer.hh"
 #include "../config/slave_config.hh"
-#include "../event/event_queue.hh"
 #include "../ds/map.hh"
+#include "../ds/pending.hh"
 #include "../ds/slave_load.hh"
+#include "../event/event_queue.hh"
 #include "../socket/coordinator_socket.hh"
 #include "../socket/master_socket.hh"
 #include "../socket/slave_socket.hh"
@@ -40,6 +41,7 @@ private:
 
 	void free();
 	// Commands
+	void printPending( FILE *f = stdout );
 	void sync();
 	void help();
 
@@ -55,6 +57,7 @@ public:
 		ArrayMap<int, MasterSocket> masters;
 		ArrayMap<int, SlavePeerSocket> slavePeers;
 	} sockets;
+	Pending pending;
 	SlaveLoad load;
 	Map map;
 	SlaveEventQueue eventQueue;

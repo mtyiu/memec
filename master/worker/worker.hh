@@ -41,9 +41,7 @@ private:
 	bool handleGetResponse( SlaveEvent event, bool success );
 	bool handleSetResponse( SlaveEvent event, bool success );
 	bool handleUpdateResponse( SlaveEvent event, bool success );
-	bool handleUpdateChunkResponse( SlaveEvent event, bool success );
 	bool handleDeleteResponse( SlaveEvent event, bool success );
-	bool handleDeleteChunkResponse( SlaveEvent event, bool success );
 
 	void free();
 	static void *run( void *argv );

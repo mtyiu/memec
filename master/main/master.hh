@@ -54,7 +54,7 @@ public:
 	Pending pending;
 	MasterEventQueue eventQueue;
 	StripeList<SlaveSocket> *stripeList;
-	
+
 	static Master *getInstance() {
 		static Master master;
 		return &master;

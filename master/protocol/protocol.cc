@@ -1,12 +1,12 @@
 #include "protocol.hh"
 
 bool MasterProtocol::init( size_t size, uint32_t parityChunkCount ) {
-	this->status = new BitmaskArray( parityChunkCount, 1 );
+	this->status = new bool[ parityChunkCount ];
 	return Protocol::init( size );
 }
 
 void MasterProtocol::free() {
-	delete this->status;
+	delete[] this->status;
 	Protocol::free();
 }
 
@@ -68,17 +68,6 @@ char *MasterProtocol::reqUpdate( size_t &size, char *key, uint8_t keySize, char 
 	return this->buffer.send;
 }
 
-char *MasterProtocol::reqUpdateChunk( size_t &size, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t valueUpdateOffset, char *delta ) {
-	size = this->generateChunkUpdateHeader(
-		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
-		PROTO_OPCODE_UPDATE_CHUNK,
-		listId, stripeId, chunkId, offset, length,
-		valueUpdateOffset, delta
-	);
-	return this->buffer.send;
-}
-
 char *MasterProtocol::reqDelete( size_t &size, char *key, uint8_t keySize ) {
 	size = this->generateKeyHeader(
 		PROTO_MAGIC_REQUEST,
@@ -86,16 +75,6 @@ char *MasterProtocol::reqDelete( size_t &size, char *key, uint8_t keySize ) {
 		PROTO_OPCODE_DELETE,
 		keySize,
 		key
-	);
-	return this->buffer.send;
-}
-
-char *MasterProtocol::reqDeleteChunk( size_t &size, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, char *delta ) {
-	size = this->generateChunkUpdateHeader(
-		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
-		PROTO_OPCODE_DELETE_CHUNK,
-		listId, stripeId, chunkId, offset, length, delta
 	);
 	return this->buffer.send;
 }

@@ -6,7 +6,7 @@
 
 class MasterProtocol : public Protocol {
 public:
-	BitmaskArray *status; // Indicate which slave in the stripe is accessing the internal buffer
+	bool *status; // Indicate which slave in the stripe is accessing the internal buffer
 
 	MasterProtocol() : Protocol( ROLE_MASTER ) {}
 	bool init( size_t size, uint32_t parityChunkCount );
@@ -25,10 +25,8 @@ public:
 	char *reqGet( size_t &size, char *key, uint8_t keySize );
 	// UPDATE
 	char *reqUpdate( size_t &size, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize );
-	char *reqUpdateChunk( size_t &size, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t valueUpdateOffset, char *delta );
 	// DELETE
 	char *reqDelete( size_t &size, char *key, uint8_t keySize );
-	char *reqDeleteChunk( size_t &size, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, char *delta );
 
 	/* Application */
 	// Register

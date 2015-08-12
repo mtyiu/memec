@@ -8,6 +8,7 @@
 #include "../config/slave_config.hh"
 #include "../event/event_queue.hh"
 #include "../ds/map.hh"
+#include "../ds/pending.hh"
 #include "../ds/slave_load.hh"
 #include "../protocol/protocol.hh"
 #include "../storage/allstorage.hh"
@@ -20,6 +21,8 @@
 #include "../../common/stripe_list/stripe_list.hh"
 #include "../../common/worker/worker.hh"
 
+#define SLAVE_WORKER_SEND_REPLICAS_PARALLEL
+
 class SlaveWorker : public Worker {
 private:
 	WorkerRole role;
@@ -31,6 +34,7 @@ private:
 	SlavePeerSocket **paritySlaveSockets;
 	static uint32_t dataChunkCount;
 	static uint32_t parityChunkCount;
+	static Pending *pending;
 	static ServerAddr *slaveServerAddr;
 	static Coding *coding;
 	static SlaveEventQueue *eventQueue;
@@ -48,17 +52,22 @@ private:
 	void dispatch( SlaveEvent event );
 	void dispatch( SlavePeerEvent event );
 
-	bool handleSlavePeerRegisterRequest( SlavePeerSocket *socket, ProtocolHeader &header, ssize_t recvBytes );
-
 	bool isRedirectedRequest( char *key, uint8_t size, bool *isParity = 0, uint32_t *listIdPtr = 0, uint32_t *chunkIdPtr = 0 );
 	bool isRedirectedRequest( uint32_t listId );
+
+	SlavePeerSocket *getSlave( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded = false, bool *isDegraded = 0 );
+	SlavePeerSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded = false, bool *isDegraded = 0 );
 
 	bool handleGetRequest( MasterEvent event );
 	bool handleSetRequest( MasterEvent event );
 	bool handleUpdateRequest( MasterEvent event );
-	bool handleUpdateChunkRequest( MasterEvent event );
 	bool handleDeleteRequest( MasterEvent event );
-	bool handleDeleteChunkRequest( MasterEvent event );
+
+	bool handleSlavePeerRegisterRequest( SlavePeerSocket *socket, ProtocolHeader &header, ssize_t recvBytes );
+	bool handleUpdateChunkRequest( SlavePeerEvent event );
+	bool handleDeleteChunkRequest( SlavePeerEvent event );
+	bool handleUpdateChunkResponse( SlavePeerEvent event, bool success );
+	bool handleDeleteChunkResponse( SlavePeerEvent event, bool success );
 
 	void free();
 	static void *run( void *argv );

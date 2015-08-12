@@ -6,7 +6,11 @@
 
 class SlaveProtocol : public Protocol {
 public:
+	bool *status; // Indicate which slave in the stripe is accessing the internal buffer
+
 	SlaveProtocol() : Protocol( ROLE_SLAVE ) {}
+	bool init( size_t size, uint32_t parityChunkCount );
+	void free();
 
 	/* Coordinator */
 	// Register
@@ -22,19 +26,19 @@ public:
 	// GET
 	char *resGet( size_t &size, bool success, uint8_t keySize, char *key, uint32_t valueSize = 0, char *value = 0 );
 	// UPDATE
-	char *resUpdate( size_t &size, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, char *delta );
-	char *resUpdate( size_t &size, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize );
-	// UPDATE_CHUNK
-	char *resUpdateChunk( size_t &size, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t valueUpdateOffset );
+	char *resUpdate( size_t &size, bool success, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize );
 	// DELETE
-	char *resDelete( size_t &size, uint8_t keySize, char *key, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, char *delta );
-	char *resDelete( size_t &size, uint8_t keySize, char *key );
-	// DELETE_CHUNK
-	char *resDeleteChunk( size_t &size, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length );
+	char *resDelete( size_t &size, bool success, uint8_t keySize, char *key );
 
 	/* Slave */
 	// Register
 	char *reqRegisterSlavePeer( size_t &size, ServerAddr *addr );
 	char *resRegisterSlavePeer( size_t &size, bool success );
+	// UPDATE_CHUNK
+	char *reqUpdateChunk( size_t &size, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, char *delta );
+	char *resUpdateChunk( size_t &size, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length );
+	// DELETE_CHUNK
+	char *reqDeleteChunk( size_t &size, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, char *delta );
+	char *resDeleteChunk( size_t &size, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length );
 };
 #endif

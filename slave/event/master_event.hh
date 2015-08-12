@@ -4,7 +4,6 @@
 #include "../socket/master_socket.hh"
 #include "../../common/ds/key.hh"
 #include "../../common/ds/key_value.hh"
-#include "../../common/ds/metadata.hh"
 #include "../../common/event/event.hh"
 
 enum MasterEventType {
@@ -21,15 +20,9 @@ enum MasterEventType {
 	// UPDATE
 	MASTER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS,
 	MASTER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE,
-	// UPDATE_CHUNK
-	MASTER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_SUCCESS,
-	MASTER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_FAILURE,
 	// DELETE
 	MASTER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS,
 	MASTER_EVENT_TYPE_DELETE_RESPONSE_FAILURE,
-	// DELETE_CHUNK (offset)
-	MASTER_EVENT_TYPE_DELETE_CHUNK_RESPONSE_SUCCESS,
-	MASTER_EVENT_TYPE_DELETE_CHUNK_RESPONSE_FAILURE,
 	// Pending
 	MASTER_EVENT_TYPE_PENDING
 };
@@ -46,26 +39,7 @@ public:
 			Key key;
 			uint32_t valueUpdateOffset;
 			uint32_t valueUpdateSize;
-			// chunk update
-			Metadata metadata;
-			uint32_t offset; // relative to chunk
-			uint32_t length;
-			char *delta;
-		} keyValueChunkUpdate; // UPDATE
-		struct {
-			Key key;
-			// chunk update
-			Metadata metadata;
-			uint32_t offset; // relative to chunk
-			uint32_t length;
-			char *delta;
-		} keyChunkUpdate; // DELETE
-		struct {
-			Metadata metadata;
-			uint32_t offset;
-			uint32_t length;
-			uint32_t valueUpdateOffset;
-		} chunkUpdate; // DELETE_CHUNK
+		} keyValueUpdate;
 	} message;
 
 	// Register
@@ -74,18 +48,12 @@ public:
 	void resGet( MasterSocket *socket, KeyValue &keyValue );
 	void resGet( MasterSocket *socket, Key &key );
 	// SET
-	void resSet( MasterSocket *socket, Key &key );
+	void resSet( MasterSocket *socket, Key &key, bool success );
 	// UPDATE
-	void resUpdate( MasterSocket *socket, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, Metadata &metadata, uint32_t offset, uint32_t length, char *delta );
-	void resUpdate( MasterSocket *socket, Key &key, uint32_t offset, uint32_t length );
-	// UPDATE_CHUNK
-	void resUpdateChunk( MasterSocket *socket, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t valueUpdateOffset, bool success = true );
+	void resUpdate( MasterSocket *socket, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool success );
 	// DELETE
-	void resDelete( MasterSocket *socket, Key &key, Metadata &metadata, uint32_t offset, uint32_t length, char *delta );
-	void resDelete( MasterSocket *socket, Key &key );
-	// DELETE_CHUNK
-	void resDeleteChunk( MasterSocket *socket, Metadata &metadata, uint32_t offset, uint32_t length, bool success = true );
-
+	void resDelete( MasterSocket *socket, Key &key, bool success );
+	// Pending
 	void pending( MasterSocket *socket );
 };
 

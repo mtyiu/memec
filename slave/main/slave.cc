@@ -443,6 +443,129 @@ void Slave::interactive() {
 	}
 }
 
+void Slave::printPending( FILE *f ) {
+	size_t i;
+	std::set<Key>::iterator it;
+	std::set<KeyValueUpdate>::iterator keyValueUpdateIt;
+	std::set<ChunkUpdate>::iterator chunkUpdateIt;
+	fprintf(
+		f,
+		"Pending requests for masters\n"
+		"----------------------------\n"
+		"[GET] Pending: %lu\n",
+		this->pending.masters.get.size()
+	);
+	i = 1;
+	for (
+		it = this->pending.masters.get.begin();
+		it != this->pending.masters.get.end();
+		it++, i++
+	) {
+		const Key &key = *it;
+		fprintf( f, "%lu. Key: %.*s (size = %u); source: ", i, key.size, key.data, key.size );
+		if ( key.ptr )
+			( ( Socket * ) key.ptr )->printAddress( f );
+		else
+			fprintf( f, "(nil)\n" );
+		fprintf( f, "\n" );
+	}
+
+	fprintf(
+		f,
+		"\n[UPDATE] Pending: %lu\n",
+		this->pending.masters.update.size()
+	);
+	i = 1;
+	for (
+		keyValueUpdateIt = this->pending.masters.update.begin();
+		keyValueUpdateIt != this->pending.masters.update.end();
+		keyValueUpdateIt++, i++
+	) {
+		const KeyValueUpdate &keyValueUpdate = *keyValueUpdateIt;
+		fprintf(
+			f, "%lu. Key: %.*s (size = %u, offset = %u, length = %u); source: ",
+			i, keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
+			keyValueUpdate.offset, keyValueUpdate.length
+		);
+		if ( keyValueUpdate.ptr )
+			( ( Socket * ) keyValueUpdate.ptr )->printAddress( f );
+		else
+			fprintf( f, "(nil)\n" );
+		fprintf( f, "\n" );
+	}
+
+	fprintf(
+		f,
+		"\n[DELETE] Pending: %lu\n",
+		this->pending.masters.del.size()
+	);
+	i = 1;
+	for (
+		it = this->pending.masters.del.begin();
+		it != this->pending.masters.del.end();
+		it++, i++
+	) {
+		const Key &key = *it;
+		fprintf( f, "%lu. Key: %.*s (size = %u); source: ", i, key.size, key.data, key.size );
+		if ( key.ptr )
+			( ( Socket * ) key.ptr )->printAddress( f );
+		else
+			fprintf( f, "(nil)\n" );
+		fprintf( f, "\n" );
+	}
+
+
+	fprintf(
+		f,
+		"\n\nPending requests for slave peers\n"
+		"--------------------------------\n"
+		"[UPDATE_CHUNK] Pending: %lu\n",
+		this->pending.slavePeers.updateChunk.size()
+	);
+	i = 1;
+	for (
+		chunkUpdateIt = this->pending.slavePeers.updateChunk.begin();
+		chunkUpdateIt != this->pending.slavePeers.updateChunk.end();
+		chunkUpdateIt++, i++
+	) {
+		const ChunkUpdate &chunkUpdate = *chunkUpdateIt;
+		fprintf(
+			f, "%lu. Key: %.*s (size = %u, offset = %u, length = %u, value update offset = %u); target: ",
+			i, chunkUpdate.keySize, chunkUpdate.key, chunkUpdate.keySize,
+			chunkUpdate.offset, chunkUpdate.length, chunkUpdate.valueUpdateOffset
+		);
+		if ( chunkUpdate.ptr )
+			( ( Socket * ) chunkUpdate.ptr )->printAddress( f );
+		else
+			fprintf( f, "(nil)\n" );
+		fprintf( f, "\n" );
+	}
+
+	fprintf(
+		f,
+		"\n[DELETE_CHUNK] Pending: %lu\n",
+		this->pending.slavePeers.deleteChunk.size()
+	);
+	i = 1;
+	for (
+		chunkUpdateIt = this->pending.slavePeers.deleteChunk.begin();
+		chunkUpdateIt != this->pending.slavePeers.deleteChunk.end();
+		chunkUpdateIt++, i++
+	) {
+		const ChunkUpdate &chunkUpdate = *chunkUpdateIt;
+		fprintf(
+			f, "%lu. Key: %.*s (size = %u, offset = %u, length = %u); target: ",
+			i, chunkUpdate.keySize, chunkUpdate.key, chunkUpdate.keySize,
+			chunkUpdate.offset, chunkUpdate.length
+		);
+		if ( chunkUpdate.ptr )
+			( ( Socket * ) chunkUpdate.ptr )->printAddress( f );
+		else
+			fprintf( f, "(nil)\n" );
+		fprintf( f, "\n" );
+	}
+}
+
 void Slave::dump() {
 	fprintf( stdout, "List of key-value pairs:\n------------------------\n" );
 	if ( ! this->map.keys.size() ) {
@@ -500,7 +623,7 @@ void Slave::time() {
 }
 
 void Slave::alarm() {
-	// ::alarm( this->config.global.sync.timeout );
+	::alarm( this->config.global.sync.timeout );
 }
 
 Load &Slave::aggregateLoad( FILE *f ) {
