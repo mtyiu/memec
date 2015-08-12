@@ -13,7 +13,7 @@
  *  Magic byte (1 byte) *
  ************************/
 // (Bit: 0-2) //
-#define PROTO_MAGIC_HEARTBEAT			0x00 // -----000
+#define PROTO_MAGIC_HEARTBEAT				0x00 // -----000
 #define PROTO_MAGIC_REQUEST				0x01 // -----001
 #define PROTO_MAGIC_RESPONSE_SUCCESS	0x02 // -----010
 #define PROTO_MAGIC_RESPONSE_FAILURE	0x03 // -----011

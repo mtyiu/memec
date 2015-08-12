@@ -7,6 +7,7 @@
 
 uint32_t SlaveWorker::dataChunkCount;
 uint32_t SlaveWorker::parityChunkCount;
+ServerAddr *SlaveWorker::slaveServerAddr;
 Coding *SlaveWorker::coding;
 SlaveEventQueue *SlaveWorker::eventQueue;
 StripeList<SlavePeerSocket> *SlaveWorker::stripeList;
@@ -387,10 +388,11 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		size_t size;
 		char *data;
 	} buffer;
+	struct timespec t = start_timer();
 
 	switch( event.type ) {
 		case SLAVE_PEER_EVENT_TYPE_REGISTER_REQUEST:
-			buffer.data = this->protocol.reqRegisterSlavePeer( buffer.size );
+			buffer.data = this->protocol.reqRegisterSlavePeer( buffer.size, SlaveWorker::slaveServerAddr );
 			isSend = true;
 			break;
 		case SLAVE_PEER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
@@ -412,11 +414,94 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "SlaveWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
-	} else {
 
+		if ( ret > 0 ) {
+			this->load.sentBytes += ret;
+			this->load.elapsedTime += get_elapsed_time( t );
+		}
+	} else {
+		ProtocolHeader header;
+		ret = event.socket->recv(
+			this->protocol.buffer.recv,
+			this->protocol.buffer.size,
+			connected,
+			false
+		);
+		if ( ret > 0 ) {
+			this->load.recvBytes += ret;
+			this->load.elapsedTime += get_elapsed_time( t );
+		}
+slave_peer_parse_again:
+		if ( ! this->protocol.parseHeader( header ) ) {
+			__ERROR__( "SlaveWorker", "dispatch", "Undefined message." );
+		} else {
+			if (
+				header.from != PROTO_MAGIC_FROM_SLAVE ||
+				header.to != PROTO_MAGIC_TO_SLAVE
+			) {
+				__ERROR__( "SlaveWorker", "dispatch", "Invalid protocol header." );
+			}
+
+			switch ( header.opcode ) {
+				case PROTO_OPCODE_REGISTER:
+					switch( header.magic ) {
+						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							event.socket->registered = true;
+							break;
+						case PROTO_MAGIC_RESPONSE_FAILURE:
+							__ERROR__( "SlaveWorker", "dispatch", "Failed to register with slave." );
+							break;
+						case PROTO_MAGIC_REQUEST:
+							this->handleSlavePeerRegisterRequest( event.socket, header, ret );
+							if ( ret > header.length + PROTO_HEADER_SIZE ) {
+								memmove(
+									this->protocol.buffer.recv,
+									this->protocol.buffer.recv + header.length + PROTO_HEADER_SIZE,
+									ret - header.length - PROTO_HEADER_SIZE
+								);
+								goto slave_peer_parse_again;
+							}
+							break;
+						default:
+							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
+							break;
+					}
+					break;
+				default:
+					__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from slave: 0x%x.", header.opcode );
+					return;
+			}
+		}
 	}
 	if ( ! connected )
 		__ERROR__( "SlaveWorker", "dispatch", "The slave is disconnected." );
+}
+
+bool SlaveWorker::handleSlavePeerRegisterRequest( SlavePeerSocket *socket, ProtocolHeader &header, ssize_t recvBytes ) {
+	static Slave *slave = Slave::getInstance();
+	SlavePeerSocket *s = 0;
+	ServerAddr serverAddr;
+
+	if ( header.length > SERVER_ADDR_MESSSAGE_MAX_LEN ) {
+		__ERROR__( "SlaveWorker", "handleSlavePeerRegisterRequest", "Unexpected header size in slave registration." );
+		return false;
+	}
+
+	// Find the corresponding SlavePeerSocket
+	serverAddr.deserialize( this->protocol.buffer.recv + PROTO_HEADER_SIZE );
+	for ( int i = 0, len = slave->sockets.slavePeers.size(); i < len; i++ ) {
+		if ( slave->sockets.slavePeers[ i ].isMatched( serverAddr ) ) {
+			s = &slave->sockets.slavePeers[ i ];
+			break;
+		}
+	}
+
+	if ( s ) {
+		SlavePeerEvent event;
+		event.resRegister( s, true );
+		SlaveWorker::eventQueue->insert( event );
+	}
+	return true;
 }
 
 bool SlaveWorker::isRedirectedRequest( char *key, uint8_t size, bool *isParity, uint32_t *listIdPtr, uint32_t *chunkIdPtr ) {
@@ -801,6 +886,7 @@ bool SlaveWorker::init() {
 
 	SlaveWorker::dataChunkCount = slave->config.global.coding.params.getDataChunkCount();
 	SlaveWorker::parityChunkCount = slave->config.global.coding.params.getParityChunkCount();
+	SlaveWorker::slaveServerAddr = &slave->config.slave.slave.addr;
 	SlaveWorker::coding = slave->coding;
 	SlaveWorker::eventQueue = &slave->eventQueue;
 	SlaveWorker::stripeList = slave->stripeList;

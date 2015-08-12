@@ -10,10 +10,12 @@ SlaveSocket::SlaveSocket() {
 	this->tid = 0;
 	this->epoll = 0;
 	this->buffer.size = PROTO_HEADER_SIZE;
+	this->identifier = 0;
 }
 
-bool SlaveSocket::init( int type, unsigned long addr, unsigned short port, EPoll *epoll ) {
+bool SlaveSocket::init( int type, unsigned long addr, unsigned short port, char *name, EPoll *epoll ) {
 	this->epoll = epoll;
+	this->identifier = strdup( name );
 	return (
 		Socket::init( type, addr, port ) &&
 		this->listen() &&
@@ -35,6 +37,10 @@ void SlaveSocket::stop() {
 		this->epoll->stop( this->tid );
 		this->isRunning = false;
 		pthread_join( this->tid, 0 );
+	}
+	if ( this->identifier ) {
+		::free( this->identifier );
+		this->identifier = 0;
 	}
 }
 
@@ -70,6 +76,7 @@ bool SlaveSocket::handler( int fd, uint32_t events, void *data ) {
 			MasterSocket *masterSocket = slave->sockets.masters.get( fd );
 			CoordinatorSocket *coordinatorSocket = masterSocket ? 0 : slave->sockets.coordinators.get( fd );
 			SlavePeerSocket *slavePeerSocket = ( masterSocket || coordinatorSocket ) ? 0 : slave->sockets.slavePeers.get( fd );
+
 			if ( masterSocket ) {
 				masterSocket->stop();
 			} else if ( coordinatorSocket ) {
@@ -125,13 +132,43 @@ bool SlaveSocket::handler( int fd, uint32_t events, void *data ) {
 						event.resRegister( slave->sockets.masters.get( fd ) );
 						slave->eventQueue.insert( event );
 					} else if ( header.from == PROTO_MAGIC_FROM_SLAVE ) {
-						SlavePeerSocket slavePeerSocket;
-						slavePeerSocket.init( fd, *addr );
-						slave->sockets.slavePeers.set( fd, slavePeerSocket );
+						// Receive remaining message
+						char message[ SERVER_ADDR_MESSSAGE_MAX_LEN ];
+						SlavePeerSocket *s = 0;
+						ServerAddr serverAddr;
 
-						SlavePeerEvent event;
-						event.resRegister( slave->sockets.slavePeers.get( fd ) );
-						slave->eventQueue.insert( event );
+						if ( header.length > SERVER_ADDR_MESSSAGE_MAX_LEN ) {
+							__ERROR__( "SlaveSocket", "handler", "Unexpected header size in slave registration." );
+							goto slave_peer_recv_error;
+						}
+
+						ret = socket->recv( fd, message, header.length, connected, true );
+						if ( ret < 0 || ret != header.length ) {
+							__ERROR__( "SlaveSocket", "handler", "Cannot receive message." );
+							goto slave_peer_recv_error;
+						}
+
+						// Find the corresponding SlavePeerSocket
+						serverAddr.deserialize( message );
+						for ( int i = 0, len = slave->sockets.slavePeers.size(); i < len; i++ ) {
+							if ( slave->sockets.slavePeers[ i ].isMatched( serverAddr ) ) {
+								s = &slave->sockets.slavePeers[ i ];
+								s->setRecvFd( fd, addr );
+								break;
+							}
+						}
+
+						if ( s ) {
+							SlavePeerEvent event;
+							event.resRegister( s, true );
+							slave->eventQueue.insert( event );
+						} else {
+slave_peer_recv_error:
+							__ERROR__( "SlaveSocket", "handler", "Unexpected registration from slave." );
+							socket->sockets.removeAt( index );
+							::close( fd );
+							return false;
+						}
 					} else {
 						socket->sockets.removeAt( index );
 						::close( fd );
@@ -151,6 +188,7 @@ bool SlaveSocket::handler( int fd, uint32_t events, void *data ) {
 			MasterSocket *masterSocket = slave->sockets.masters.get( fd );
 			CoordinatorSocket *coordinatorSocket = masterSocket ? 0 : slave->sockets.coordinators.get( fd );
 			SlavePeerSocket *slavePeerSocket = ( masterSocket || coordinatorSocket ) ? 0 : slave->sockets.slavePeers.get( fd );
+
 			if ( masterSocket ) {
 				MasterEvent event;
 				event.pending( masterSocket );

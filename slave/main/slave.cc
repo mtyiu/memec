@@ -64,6 +64,7 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 			this->config.slave.slave.addr.type,
 			this->config.slave.slave.addr.addr,
 			this->config.slave.slave.addr.port,
+			this->config.slave.slave.addr.name,
 			&this->sockets.epoll
 		) ) {
 		__ERROR__( "Slave", "init", "Cannot initialize socket." );
@@ -86,7 +87,10 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 
 		socket.self = i == mySlaveIndex;
 
-		socket.init( this->config.global.slaves[ i ], &this->sockets.epoll );
+		socket.init(
+			this->config.global.slaves[ i ], &this->sockets.epoll,
+			i > mySlaveIndex // only create socket when my index is smaller than the slave peer
+		);
 		fd = socket.getSocket();
 		this->sockets.slavePeers.set( fd, socket );
 	}
@@ -231,15 +235,16 @@ bool Slave::start() {
 	// Connect to coordinators
 	for ( int i = 0, len = this->config.global.coordinators.size(); i < len; i++ ) {
 		if ( ! this->sockets.coordinators[ i ].start() )
-			return false;
+			__ERROR__( "Slave", "start", "Cannot connect to coordinator #%d.", i );
 	}
 	// Connect to slaves
 	sleep( this->config.slave.slavePeers.timeout );
 	for ( int i = 0, len = this->sockets.slavePeers.size(); i < len; i++ ) {
 		if ( this->sockets.slavePeers[ i ].self )
 			continue;
-		if ( ! this->sockets.slavePeers[ i ].start() )
-			return false;
+		if ( ! this->sockets.slavePeers[ i ].start() ) {
+			__ERROR__( "Slave", "start", "Cannot connect to slave peer #%d.", i );
+		}
 	}
 	// Start listening
 	if ( ! this->sockets.self.start() ) {
@@ -282,8 +287,10 @@ bool Slave::stop() {
 		this->sockets.coordinators[ i ].stop();
 	for ( i = 0, len = this->sockets.masters.size(); i < len; i++ )
 		this->sockets.masters[ i ].stop();
-	for ( i = 0, len = this->sockets.slavePeers.size(); i < len; i++ )
+	for ( i = 0, len = this->sockets.slavePeers.size(); i < len; i++ ) {
 		this->sockets.slavePeers[ i ].stop();
+		this->sockets.slavePeers[ i ].free();
+	}
 
 	/* Chunk buffer */
 	for ( size_t i = 0, size = this->chunkBuffer.size(); i < size; i++ ) {
@@ -321,7 +328,7 @@ void Slave::info( FILE *f ) {
 
 void Slave::debug( FILE *f ) {
 	int i, len;
-
+/*
 	fprintf( f, "Slave socket\n------------\n" );
 	this->sockets.self.print( f );
 
@@ -338,14 +345,14 @@ void Slave::debug( FILE *f ) {
 		this->sockets.masters[ i ].print( f );
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
-
+*/
 	fprintf( f, "\nSlave peer sockets\n------------------\n" );
 	for ( i = 0, len = this->sockets.slavePeers.size(); i < len; i++ ) {
 		fprintf( f, "%d. ", i + 1 );
 		this->sockets.slavePeers[ i ].print( f );
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
-
+/*
 	fprintf( f, "\nChunk buffer\n------------\n" );
 	for ( i = 0, len = this->chunkBuffer.size(); i < len; i++ ) {
 		if ( ! this->chunkBuffer[ i ] )
@@ -367,7 +374,7 @@ void Slave::debug( FILE *f ) {
 
 	fprintf( f, "\nOther threads\n--------------\n" );
 	this->sockets.self.printThread();
-
+*/
 	fprintf( f, "\n" );
 }
 
@@ -493,7 +500,7 @@ void Slave::time() {
 }
 
 void Slave::alarm() {
-	::alarm( this->config.global.sync.timeout );
+	// ::alarm( this->config.global.sync.timeout );
 }
 
 Load &Slave::aggregateLoad( FILE *f ) {

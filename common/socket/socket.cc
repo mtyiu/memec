@@ -136,7 +136,7 @@ int Socket::accept( struct sockaddr_in *addrPtr, socklen_t *addrlenPtr ) {
 	struct sockaddr_in addr;
 	socklen_t addrlen;
 	int ret;
-	
+
 	addrlen = sizeof( addr );
 	ret = ::accept( this->sockfd, ( struct sockaddr * ) &addr, &addrlen );
 	if ( ret == -1 ) {
@@ -177,7 +177,7 @@ bool Socket::init( int type, unsigned long addr, unsigned short port, bool block
 	);
 }
 
-bool Socket::init( ServerAddr addr, EPoll *epoll ) {
+bool Socket::init( ServerAddr &addr, EPoll *epoll ) {
 	if ( this->init( addr.type, addr.addr, addr.port, true ) ) {
 		if ( epoll )
 			epoll->add( this->sockfd, EPOLL_EVENT_SET );

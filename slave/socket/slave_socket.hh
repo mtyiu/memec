@@ -19,9 +19,10 @@ public:
 		size_t size;
 		char data[ PROTO_HEADER_SIZE ];
 	} buffer;
+	char *identifier;
 
 	SlaveSocket();
-	bool init( int type, unsigned long addr, unsigned short port, EPoll *epoll );
+	bool init( int type, unsigned long addr, unsigned short port, char *name, EPoll *epoll );
 	bool start();
 	void stop();
 	void print( FILE *f = stdout );
