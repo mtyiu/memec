@@ -11,7 +11,7 @@
 #define C_M (2)
 #define FAIL (1)
 #define FAIL2 (2)
-#define FAIL3 (5)
+#define FAIL3 (3)
 
 struct CodingHandler handle;
 
@@ -174,6 +174,8 @@ int main( int argc, char **argv ) {
         fprintf( stdout, "Data recovered\n" );
     } else {
         fprintf( stdout, "FAILED to recover data!! O: [%x] R: [%x]\n", *(buf + FAIL * CHUNK_SIZE), *(readbuf) );
+        printChunk( chunks[ failed[ 0 ] ], failed[ 0 ] );
+        return -1;
     }
 
     // double failure
@@ -205,12 +207,14 @@ int main( int argc, char **argv ) {
         } else {
             fprintf( stdout, "\nFAILED to recover data!! [%x] \n", *(buf + failed[ 0 ] * CHUNK_SIZE));
             printChunk( chunks[ failed[ 0 ] ], failed[ 0 ] );
+            return -1;
         }
         if ( memcmp ( readbuf + CHUNK_SIZE , buf + ( failed[ 1 ] ) * CHUNK_SIZE , CHUNK_SIZE ) == 0 ) {
             fprintf( stdout, "Data %d recovered\n", failed[ 1 ] );
         } else {
             fprintf( stdout, "FAILED to recover data!! [%x] \n", *(buf + failed[ 1 ] * CHUNK_SIZE));
             printChunk( chunks[ failed[ 1 ] ], failed[ 1 ] );
+            return -1;
         }
     }
 
@@ -239,18 +243,21 @@ int main( int argc, char **argv ) {
         } else {
             fprintf( stdout, "\nFAILED to recover data!! [%x] \n", *(buf + failed[ 0 ] * CHUNK_SIZE));
             printChunk( chunks[ failed[ 0 ] ], failed[ 0 ] );
+            return -1;
         }
         if ( memcmp ( readbuf + CHUNK_SIZE , buf + ( failed[ 1 ] ) * CHUNK_SIZE , CHUNK_SIZE ) == 0 ) {
             fprintf( stdout, "Data %d recovered ... ", failed[ 1 ] );
         } else {
             fprintf( stdout, "FAILED to recover data!! [%x] \n", *(buf + failed[ 1 ] * CHUNK_SIZE));
             printChunk( chunks[ failed[ 1 ] ], failed[ 1 ] );
+            return -1;
         }
         if ( memcmp ( readbuf + CHUNK_SIZE * 2, buf + ( failed[ 2 ] ) * CHUNK_SIZE , CHUNK_SIZE ) == 0 ) {
             fprintf( stdout, "Data %d recovered\n", failed[ 2 ] );
         } else {
             fprintf( stdout, "FAILED to recover data!! [%x] \n", *(buf + failed[ 2 ] * CHUNK_SIZE));
             printChunk( chunks[ failed[ 2 ] ], failed[ 2 ] );
+            return -1;
         }
     }
 

@@ -104,7 +104,7 @@ bool RDPCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
     std::vector< uint32_t > failed;
 
     // check for failed disk
-    for ( uint32_t idx = 0; idx < k ; idx ++ ) {
+    for ( uint32_t idx = 0; idx < k+2 ; idx ++ ) {
         if ( chunkStatus->check( idx ) == 0 ) {
             if ( failed.size() < 2 )
                 failed.push_back( idx );
