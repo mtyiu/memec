@@ -336,40 +336,41 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		if ( ret > 0 ) {
 			this->load.recvBytes += ret;
 			this->load.elapsedTime += get_elapsed_time( t );
-		}
-		if ( ! this->protocol.parseHeader( header ) ) {
-			__ERROR__( "SlaveWorker", "dispatch", "Undefined message." );
-		} else {
-			if (
-				header.magic != PROTO_MAGIC_REQUEST ||
-				header.from != PROTO_MAGIC_FROM_MASTER ||
-				header.to != PROTO_MAGIC_TO_SLAVE
-			) {
-				__ERROR__( "SlaveWorker", "dispatch", "Invalid protocol header." );
-			}
 
-			switch( header.opcode ) {
-				case PROTO_OPCODE_GET:
-					this->handleGetRequest( event );
-					break;
-				case PROTO_OPCODE_SET:
-					this->handleSetRequest( event );
-					break;
-				case PROTO_OPCODE_UPDATE:
-					this->handleUpdateRequest( event );
-					break;
-				case PROTO_OPCODE_UPDATE_CHUNK:
-					this->handleUpdateChunkRequest( event );
-					break;
-				case PROTO_OPCODE_DELETE:
-					this->handleDeleteRequest( event );
-					break;
-				case PROTO_OPCODE_DELETE_CHUNK:
-					this->handleDeleteChunkRequest( event );
-					break;
-				default:
-					__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from master." );
-					return;
+			if ( ! this->protocol.parseHeader( header ) ) {
+				__ERROR__( "SlaveWorker", "dispatch", "Undefined message." );
+			} else {
+				if (
+					header.magic != PROTO_MAGIC_REQUEST ||
+					header.from != PROTO_MAGIC_FROM_MASTER ||
+					header.to != PROTO_MAGIC_TO_SLAVE
+				) {
+					__ERROR__( "SlaveWorker", "dispatch", "Invalid protocol header." );
+				}
+
+				switch( header.opcode ) {
+					case PROTO_OPCODE_GET:
+						this->handleGetRequest( event );
+						break;
+					case PROTO_OPCODE_SET:
+						this->handleSetRequest( event );
+						break;
+					case PROTO_OPCODE_UPDATE:
+						this->handleUpdateRequest( event );
+						break;
+					case PROTO_OPCODE_UPDATE_CHUNK:
+						this->handleUpdateChunkRequest( event );
+						break;
+					case PROTO_OPCODE_DELETE:
+						this->handleDeleteRequest( event );
+						break;
+					case PROTO_OPCODE_DELETE_CHUNK:
+						this->handleDeleteChunkRequest( event );
+						break;
+					default:
+						__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from master." );
+						return;
+				}
 			}
 		}
 	}

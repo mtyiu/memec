@@ -95,60 +95,62 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			connected,
 			false
 		);
-		if ( ! this->protocol.parseHeader( header ) ) {
-			__ERROR__( "CoordinatorWorker", "dispatch", "Undefined message." );
-		} else {
-			if (
-				( header.magic != PROTO_MAGIC_REQUEST && header.magic != PROTO_MAGIC_HEARTBEAT ) ||
-				header.from != PROTO_MAGIC_FROM_SLAVE ||
-				header.to != PROTO_MAGIC_TO_COORDINATOR
-			) {
-				__ERROR__( "CoordinatorWorker", "dispatch", "Invalid protocol header." );
-				return;
-			}
+		if ( ret > 0 ) {
+			if ( ! this->protocol.parseHeader( header ) ) {
+				__ERROR__( "CoordinatorWorker", "dispatch", "Undefined message." );
+			} else {
+				if (
+					( header.magic != PROTO_MAGIC_REQUEST && header.magic != PROTO_MAGIC_HEARTBEAT ) ||
+					header.from != PROTO_MAGIC_FROM_SLAVE ||
+					header.to != PROTO_MAGIC_TO_COORDINATOR
+				) {
+					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid protocol header." );
+					return;
+				}
 
-			if ( header.opcode == PROTO_OPCODE_SYNC ) {
-				size_t bytes, offset, count = 0;
-				struct HeartbeatHeader heartbeatHeader;
-				struct SlaveSyncHeader slaveSyncHeader;
+				if ( header.opcode == PROTO_OPCODE_SYNC ) {
+					size_t bytes, offset, count = 0;
+					struct HeartbeatHeader heartbeatHeader;
+					struct SlaveSyncHeader slaveSyncHeader;
 
-				if ( this->protocol.parseHeartbeatHeader( heartbeatHeader ) ) {
-					event.socket->load.ops.get = heartbeatHeader.get;
-					event.socket->load.ops.set = heartbeatHeader.set;
-					event.socket->load.ops.update = heartbeatHeader.update;
-					event.socket->load.ops.del = heartbeatHeader.del;
+					if ( this->protocol.parseHeartbeatHeader( heartbeatHeader ) ) {
+						event.socket->load.ops.get = heartbeatHeader.get;
+						event.socket->load.ops.set = heartbeatHeader.set;
+						event.socket->load.ops.update = heartbeatHeader.update;
+						event.socket->load.ops.del = heartbeatHeader.del;
 
-					offset = PROTO_HEADER_SIZE + PROTO_HEARTBEAT_SIZE;
-					while ( offset < ( size_t ) ret ) {
-						if ( ! this->protocol.parseSlaveSyncHeader( slaveSyncHeader, bytes, offset ) )
-							break;
-						offset += bytes;
-						count++;
+						offset = PROTO_HEADER_SIZE + PROTO_HEARTBEAT_SIZE;
+						while ( offset < ( size_t ) ret ) {
+							if ( ! this->protocol.parseSlaveSyncHeader( slaveSyncHeader, bytes, offset ) )
+								break;
+							offset += bytes;
+							count++;
 
-						// Update metadata map
-						Key key;
-						key.size = slaveSyncHeader.keySize;
-						key.data = slaveSyncHeader.key;
+							// Update metadata map
+							Key key;
+							key.size = slaveSyncHeader.keySize;
+							key.data = slaveSyncHeader.key;
 
-						OpMetadata opMetadata;
-						opMetadata.opcode = slaveSyncHeader.opcode;
-						opMetadata.listId = slaveSyncHeader.listId;
-						opMetadata.stripeId = slaveSyncHeader.stripeId;
-						opMetadata.chunkId = slaveSyncHeader.chunkId;
+							OpMetadata opMetadata;
+							opMetadata.opcode = slaveSyncHeader.opcode;
+							opMetadata.listId = slaveSyncHeader.listId;
+							opMetadata.stripeId = slaveSyncHeader.stripeId;
+							opMetadata.chunkId = slaveSyncHeader.chunkId;
 
-						if ( event.socket->keys.find( key ) == event.socket->keys.end() )
-							key.dup();
-						event.socket->keys[ key ] = opMetadata;
+							if ( event.socket->keys.find( key ) == event.socket->keys.end() )
+								key.dup();
+							event.socket->keys[ key ] = opMetadata;
+						}
+					} else {
+						__ERROR__( "CoordinatorWorker", "dispatch", "Invalid heartbeat protocol header." );
 					}
 				} else {
-					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid heartbeat protocol header." );
+					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid opcode from slave." );
 				}
-			} else {
-				__ERROR__( "CoordinatorWorker", "dispatch", "Invalid opcode from slave." );
 			}
 		}
 	}
-	
+
 	if ( ! connected )
 		__ERROR__( "CoordinatorWorker", "dispatch", "The slave is disconnected." );
 }
