@@ -192,7 +192,6 @@ uint32_t EvenOddCoding::getPrime() {
         }
     }
 
-    printf("p %d\n", primeList[ this->_p ]);
     return this->_p;
 }
 
