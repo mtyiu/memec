@@ -166,38 +166,40 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 			connected,
 			false
 		);
-		if ( ! this->protocol.parseHeader( header ) ) {
-			__ERROR__( "MasterWorker", "dispatch", "Undefined message." );
-		} else {
-			if (
-				header.magic != PROTO_MAGIC_REQUEST ||
-				header.from != PROTO_MAGIC_FROM_APPLICATION ||
-				header.to != PROTO_MAGIC_TO_MASTER
-			) {
-				__ERROR__( "MasterWorker", "dispatch", "Invalid protocol header." );
-				return;
-			}
-
-			switch( header.opcode ) {
-				case PROTO_OPCODE_GET:
-					this->handleGetRequest( event );
-					break;
-				case PROTO_OPCODE_SET:
-					this->handleSetRequest( event );
-					break;
-				case PROTO_OPCODE_UPDATE:
-					this->handleUpdateRequest( event );
-					break;
-				case PROTO_OPCODE_DELETE:
-					this->handleDeleteRequest( event );
-					break;
-				default:
-					__ERROR__( "MasterWorker", "dispatch", "Invalid opcode from application." );
+		if ( ret > 0 ) {
+			if ( ! this->protocol.parseHeader( header ) ) {
+				__ERROR__( "MasterWorker", "dispatch", "Undefined message." );
+			} else {
+				if (
+					header.magic != PROTO_MAGIC_REQUEST ||
+					header.from != PROTO_MAGIC_FROM_APPLICATION ||
+					header.to != PROTO_MAGIC_TO_MASTER
+				) {
+					__ERROR__( "MasterWorker", "dispatch", "Invalid protocol header." );
 					return;
-			}
+				}
 
-			if ( ret != ( ssize_t ) buffer.size )
-				__ERROR__( "ApplicationWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+				switch( header.opcode ) {
+					case PROTO_OPCODE_GET:
+						this->handleGetRequest( event );
+						break;
+					case PROTO_OPCODE_SET:
+						this->handleSetRequest( event );
+						break;
+					case PROTO_OPCODE_UPDATE:
+						this->handleUpdateRequest( event );
+						break;
+					case PROTO_OPCODE_DELETE:
+						this->handleDeleteRequest( event );
+						break;
+					default:
+						__ERROR__( "MasterWorker", "dispatch", "Invalid opcode from application." );
+						return;
+				}
+
+				if ( ret != ( ssize_t ) buffer.size )
+					__ERROR__( "ApplicationWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+			}
 		}
 	}
 
