@@ -766,10 +766,10 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event ) {
 		SlaveWorker::pending->masters.del.insert( key );
 
 		// Update data chunk and map
-		delta = this->protocol.buffer.recv + PROTO_KEY_CHUNK_UPDATE_SIZE + key.size;
+		delta = this->protocol.buffer.recv + PROTO_KEY_SIZE + key.size;
 		deltaSize = chunk->deleteKeyValue(
 			key, &map->keys, delta,
-			this->protocol.buffer.size - PROTO_KEY_CHUNK_UPDATE_SIZE - key.size
+			this->protocol.buffer.size - PROTO_KEY_SIZE - key.size
 		);
 		chunkUpdate.set(
 			metadata.listId, metadata.stripeId, metadata.chunkId,
@@ -934,14 +934,14 @@ bool SlaveWorker::handleDeleteChunkRequest( SlavePeerEvent event ) {
 }
 
 /*
-bool MasterWorker::handleUpdateChunkResponse( SlaveEvent event, bool success ) {
+bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success ) {
 	struct ChunkUpdateHeader header;
 	if ( ! this->protocol.parseChunkUpdateHeader( header, true ) ) {
-		__ERROR__( "MasterWorker", "handleUpdateChunkResponse", "Invalid UPDATE_CHUNK response." );
+		__ERROR__( "SlaveWorker", "handleUpdateChunkResponse", "Invalid UPDATE_CHUNK response." );
 		return false;
 	}
 	__DEBUG__(
-		BLUE, "MasterWorker", "handleUpdateChunkResponse",
+		BLUE, "SlaveWorker", "handleUpdateChunkResponse",
 		"[UPDATE_CHUNK] List ID: %u, stripe ID: %u, chunk ID: %u; offset = %u, length = %u; value update offset = %u.",
 		header.listId, header.stripeId, header.chunkId,
 		header.offset, header.length, header.valueUpdateOffset
@@ -958,19 +958,19 @@ bool MasterWorker::handleUpdateChunkResponse( SlaveEvent event, bool success ) {
 	chunkUpdate.setKeyValueUpdate( 0, 0, header.valueUpdateOffset );
 	chunkUpdate.ptr = ( void * ) event.socket;
 
-	it = MasterWorker::pending->slavePeers.updateChunk.lower_bound( chunkUpdate );
-	if ( it == MasterWorker::pending->slavePeers.updateChunk.end() || ! chunkUpdate.equal( *it ) ) {
-		__ERROR__( "MasterWorker", "handleUpdateChunkResponse", "Cannot find a pending slave UPDATE_CHUNK request that matches the response. This message will be discarded." );
+	it = SlaveWorker::pending->slavePeers.updateChunk.lower_bound( chunkUpdate );
+	if ( it == SlaveWorker::pending->slavePeers.updateChunk.end() || ! chunkUpdate.equal( *it ) ) {
+		__ERROR__( "SlaveWorker", "handleUpdateChunkResponse", "Cannot find a pending slave UPDATE_CHUNK request that matches the response. This message will be discarded." );
 		return false;
 	}
 	chunkUpdate = *it;
-	MasterWorker::pending->slavePeers.updateChunk.erase( it );
+	SlaveWorker::pending->slavePeers.updateChunk.erase( it );
 
 	// Check pending slave UPDATE_CHUNK requests
 	chunkUpdate.ptr = 0;
-	it = MasterWorker::pending->slavePeers.updateChunk.lower_bound( chunkUpdate );
-	for ( pending = 0; it != MasterWorker::pending->slavePeers.updateChunk.end() && chunkUpdate.equal( *it ); pending++, it++ );
-	__ERROR__( "MasterWorker", "handleUpdateChunkResponse", "Pending slave UPDATE_CHUNK requests = %d (%s).", pending, success ? "success" : "fail" );
+	it = SlaveWorker::pending->slavePeers.updateChunk.lower_bound( chunkUpdate );
+	for ( pending = 0; it != SlaveWorker::pending->slavePeers.updateChunk.end() && chunkUpdate.equal( *it ); pending++, it++ );
+	__ERROR__( "SlaveWorker", "handleUpdateChunkResponse", "Pending slave UPDATE_CHUNK requests = %d (%s).", pending, success ? "success" : "fail" );
 	if ( pending == 0 ) {
 		// Only send application UPDATE response when the number of pending slave UPDATE_CHUNK requests equal 0
 		ApplicationEvent applicationEvent;
@@ -981,9 +981,9 @@ bool MasterWorker::handleUpdateChunkResponse( SlaveEvent event, bool success ) {
 		keyValueUpdate.set( chunkUpdate.keySize, chunkUpdate.key, 0 );
 		keyValueUpdate.offset = chunkUpdate.valueUpdateOffset;
 		keyValueUpdate.length = chunkUpdate.length;
-		it = MasterWorker::pending->applications.update.lower_bound( keyValueUpdate );
-		if ( it == MasterWorker::pending->applications.update.end() || ! keyValueUpdate.equal( *it ) ) {
-			__ERROR__( "MasterWorker", "handleUpdateChunkResponse", "Cannot find a pending application UPDATE request that matches the response. This message will be discarded." );
+		it = SlaveWorker::pending->applications.update.lower_bound( keyValueUpdate );
+		if ( it == SlaveWorker::pending->applications.update.end() || ! keyValueUpdate.equal( *it ) ) {
+			__ERROR__( "SlaveWorker", "handleUpdateChunkResponse", "Cannot find a pending application UPDATE request that matches the response. This message will be discarded." );
 			return false;
 		}
 		keyValueUpdate = *it;
@@ -993,19 +993,19 @@ bool MasterWorker::handleUpdateChunkResponse( SlaveEvent event, bool success ) {
 			( ApplicationSocket * ) keyValueUpdate.ptr, key,
 			keyValueUpdate.offset, keyValueUpdate.length, success
 		);
-		MasterWorker::eventQueue->insert( applicationEvent );
+		SlaveWorker::eventQueue->insert( applicationEvent );
 	}
 	return true;
 }
 
-bool MasterWorker::handleDeleteChunkResponse( SlaveEvent event, bool success ) {
+bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success ) {
 	struct ChunkUpdateHeader header;
 	if ( ! this->protocol.parseChunkUpdateHeader( header, false ) ) {
-		__ERROR__( "MasterWorker", "handleDeleteChunkResponse", "Invalid DELETE_CHUNK response." );
+		__ERROR__( "SlaveWorker", "handleDeleteChunkResponse", "Invalid DELETE_CHUNK response." );
 		return false;
 	}
 	__DEBUG__(
-		BLUE, "MasterWorker", "handleDeleteChunkResponse",
+		BLUE, "SlaveWorker", "handleDeleteChunkResponse",
 		"[DELETE_CHUNK] List ID: %u, stripe ID: %u, chunk ID: %u; offset = %u, length = %u.",
 		header.listId, header.stripeId, header.chunkId,
 		header.offset, header.length
@@ -1022,19 +1022,19 @@ bool MasterWorker::handleDeleteChunkResponse( SlaveEvent event, bool success ) {
 	chunkUpdate.setKeyValueUpdate( 0, 0, 0 );
 	chunkUpdate.ptr = ( void * ) event.socket;
 
-	it = MasterWorker::pending->slavePeers.deleteChunk.lower_bound( chunkUpdate );
-	if ( it == MasterWorker::pending->slavePeers.deleteChunk.end() || ! chunkUpdate.equal( *it ) ) {
-		__ERROR__( "MasterWorker", "handleDeleteChunkResponse", "Cannot find a pending slave DELETE_CHUNK request that matches the response. This message will be discarded." );
+	it = SlaveWorker::pending->slavePeers.deleteChunk.lower_bound( chunkUpdate );
+	if ( it == SlaveWorker::pending->slavePeers.deleteChunk.end() || ! chunkUpdate.equal( *it ) ) {
+		__ERROR__( "SlaveWorker", "handleDeleteChunkResponse", "Cannot find a pending slave DELETE_CHUNK request that matches the response. This message will be discarded." );
 		return false;
 	}
 	chunkUpdate = *it;
-	MasterWorker::pending->slavePeers.deleteChunk.erase( it );
+	SlaveWorker::pending->slavePeers.deleteChunk.erase( it );
 
 	// Check pending slave DELETE_CHUNK requests
 	chunkUpdate.ptr = 0;
-	it = MasterWorker::pending->slavePeers.deleteChunk.lower_bound( chunkUpdate );
-	for ( pending = 0; it != MasterWorker::pending->slavePeers.deleteChunk.end() && chunkUpdate.equal( *it ); pending++, it++ );
-	__ERROR__( "MasterWorker", "handleDeleteChunkResponse", "Pending slave DELETE_CHUNK requests = %d.", pending );
+	it = SlaveWorker::pending->slavePeers.deleteChunk.lower_bound( chunkUpdate );
+	for ( pending = 0; it != SlaveWorker::pending->slavePeers.deleteChunk.end() && chunkUpdate.equal( *it ); pending++, it++ );
+	__ERROR__( "SlaveWorker", "handleDeleteChunkResponse", "Pending slave DELETE_CHUNK requests = %d.", pending );
 	if ( pending == 0 ) {
 		// Only send application DELETE response when the number of pending slave DELETE_CHUNK requests equal 0
 		ApplicationEvent applicationEvent;
@@ -1042,14 +1042,14 @@ bool MasterWorker::handleDeleteChunkResponse( SlaveEvent event, bool success ) {
 		Key key;
 
 		key.set( chunkUpdate.keySize, chunkUpdate.key, 0 );
-		it = MasterWorker::pending->applications.del.lower_bound( key );
-		if ( it == MasterWorker::pending->applications.del.end() || ! key.equal( *it ) ) {
-			__ERROR__( "MasterWorker", "handleDeleteChunkResponse", "Cannot find a pending application DELETE request that matches the response. This message will be discarded." );
+		it = SlaveWorker::pending->applications.del.lower_bound( key );
+		if ( it == SlaveWorker::pending->applications.del.end() || ! key.equal( *it ) ) {
+			__ERROR__( "SlaveWorker", "handleDeleteChunkResponse", "Cannot find a pending application DELETE request that matches the response. This message will be discarded." );
 			return false;
 		}
 		key = *it;
 		applicationEvent.resDelete( ( ApplicationSocket * ) key.ptr, key, success );
-		MasterWorker::eventQueue->insert( applicationEvent );
+		SlaveWorker::eventQueue->insert( applicationEvent );
 	}
 	return true;
 }
