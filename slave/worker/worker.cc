@@ -430,46 +430,49 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		if ( ret > 0 ) {
 			this->load.recvBytes += ret;
 			this->load.elapsedTime += get_elapsed_time( t );
-		}
-slave_peer_parse_again:
-		if ( ! this->protocol.parseHeader( header ) ) {
-			__ERROR__( "SlaveWorker", "dispatch", "Undefined message." );
-		} else {
-			if (
-				header.from != PROTO_MAGIC_FROM_SLAVE ||
-				header.to != PROTO_MAGIC_TO_SLAVE
-			) {
-				__ERROR__( "SlaveWorker", "dispatch", "Invalid protocol header." );
-			}
 
-			switch ( header.opcode ) {
-				case PROTO_OPCODE_REGISTER:
-					switch( header.magic ) {
-						case PROTO_MAGIC_RESPONSE_SUCCESS:
-							event.socket->registered = true;
-							break;
-						case PROTO_MAGIC_RESPONSE_FAILURE:
-							__ERROR__( "SlaveWorker", "dispatch", "Failed to register with slave." );
-							break;
-						case PROTO_MAGIC_REQUEST:
-							this->handleSlavePeerRegisterRequest( event.socket, header, ret );
-							if ( ret > header.length + PROTO_HEADER_SIZE ) {
-								memmove(
-									this->protocol.buffer.recv,
-									this->protocol.buffer.recv + header.length + PROTO_HEADER_SIZE,
-									ret - header.length - PROTO_HEADER_SIZE
-								);
-								goto slave_peer_parse_again;
-							}
-							break;
-						default:
-							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
-							break;
-					}
-					break;
-				default:
-					__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from slave: 0x%x.", header.opcode );
-					return;
+slave_peer_parse_again:
+			if ( ! this->protocol.parseHeader( header ) ) {
+				__ERROR__( "SlaveWorker", "dispatch", "Undefined message." );
+			} else {
+				if (
+					header.from != PROTO_MAGIC_FROM_SLAVE ||
+					header.to != PROTO_MAGIC_TO_SLAVE
+				) {
+					__ERROR__( "SlaveWorker", "dispatch", "Invalid protocol header." );
+				}
+
+				switch ( header.opcode ) {
+					case PROTO_OPCODE_REGISTER:
+						switch( header.magic ) {
+							case PROTO_MAGIC_RESPONSE_SUCCESS:
+								event.socket->registered = true;
+								break;
+							case PROTO_MAGIC_RESPONSE_FAILURE:
+								__ERROR__( "SlaveWorker", "dispatch", "Failed to register with slave." );
+								break;
+							case PROTO_MAGIC_REQUEST:
+								this->handleSlavePeerRegisterRequest( event.socket, header, ret );
+								break;
+							default:
+								__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
+								break;
+						}
+						break;
+					default:
+						__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from slave: 0x%x.", header.opcode );
+						return;
+				}
+
+				if ( ret > header.length + PROTO_HEADER_SIZE ) {
+					ret = ret - header.length - PROTO_HEADER_SIZE;
+					memmove(
+						this->protocol.buffer.recv,
+						this->protocol.buffer.recv + header.length + PROTO_HEADER_SIZE,
+						ret
+					);
+					goto slave_peer_parse_again;
+				}
 			}
 		}
 	}
