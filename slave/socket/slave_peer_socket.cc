@@ -12,14 +12,27 @@ void SlavePeerSocket::registerTo() {
 
 SlavePeerSocket::SlavePeerSocket() {
 	this->identifier = 0;
+	this->received = false;
 	this->registered = false;
 	this->self = false;
 }
 
-bool SlavePeerSocket::init( ServerAddr &addr, EPoll *epoll, bool active ) {
+bool SlavePeerSocket::init( ServerAddr &addr, EPoll *epoll, bool active, bool self ) {
 	this->identifier = strdup( addr.name );
 	this->active = active;
+	this->self = self;
 	this->epoll = epoll;
+
+	if ( self || ! active ) {
+		this->mode = SOCKET_MODE_UNDEFINED;
+		this->connected = true;
+		this->sockfd = -1;
+		memset( &this->addr, 0, sizeof( this->addr ) );
+		this->addr.sin_family = AF_INET;
+		this->addr.sin_port = addr.port;
+		this->addr.sin_addr.s_addr = addr.addr;
+		return true;
+	}
 	return Socket::init( addr, epoll );
 }
 
@@ -58,19 +71,17 @@ bool SlavePeerSocket::isMatched( ServerAddr &serverAddr ) {
 }
 
 bool SlavePeerSocket::setRecvFd( int fd, struct sockaddr_in *addr ) {
-	this->recvSockFd = fd;
+	bool ret = false;
+	this->received = true;
 	this->recvAddr = *addr;
 
 	if ( fd != this->sockfd ) {
-		this->epoll->remove( fd );
-		dup2( fd, this->sockfd );
-		this->epoll->add( this->sockfd, EPOLL_EVENT_SET );
-		return true;
-	} else {
-		if ( ! this->registered )
-			this->registerTo();
-		return false;
+		this->sockfd = fd;
+		ret = true;
 	}
+	if ( ! this->registered )
+		this->registerTo();
+	return ret;
 }
 
 ssize_t SlavePeerSocket::send( char *buf, size_t ulen, bool &connected ) {
@@ -96,7 +107,11 @@ void SlavePeerSocket::print( FILE *f ) {
 	if ( this->self )
 		fprintf( f, "(self)\n" );
 	else if ( this->connected )
-		fprintf( f, "(connected %s registered, %s)\n", this->registered ? "and" : "but not", this->recvSockFd != -1 ? "bidirectional" : "unidirectional" );
+		fprintf( f,
+			"(connected %s registered, %s)\n",
+			this->registered ? "and" : "but not",
+			( this->active || this->received ) ? "bidirectional" : "unidirectional"
+		);
 	else
 		fprintf( f, "(disconnected)\n" );
 }

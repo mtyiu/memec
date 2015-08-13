@@ -117,36 +117,50 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 		}
 	} else {
 		ProtocolHeader header;
-
-		ret = event.socket->recv( this->protocol.buffer.recv, PROTO_HEADER_SIZE, connected, true );
-
-		if ( ret == PROTO_HEADER_SIZE && connected ) {
+		ret = event.socket->recv(
+			this->protocol.buffer.recv,
+			this->protocol.buffer.size,
+			connected,
+			false
+		);
+		buffer.data = this->protocol.buffer.recv;
+		buffer.size = ret > 0 ? ( size_t ) ret : 0;
+		if ( ret > 0 ) {
 			this->load.recvBytes += ret;
 			this->load.elapsedTime += get_elapsed_time( t );
-
-			this->protocol.parseHeader( header, this->protocol.buffer.recv, ret );
-			// Validate message
-			if ( header.from != PROTO_MAGIC_FROM_COORDINATOR ) {
-				__ERROR__( "SlaveWorker", "dispatch", "Invalid message source from coordinator." );
-				return;
-			}
-			switch( header.opcode ) {
-				case PROTO_OPCODE_REGISTER:
-					switch( header.magic ) {
-						case PROTO_MAGIC_RESPONSE_SUCCESS:
-							event.socket->registered = true;
-							break;
-						case PROTO_MAGIC_RESPONSE_FAILURE:
-							__ERROR__( "SlaveWorker", "dispatch", "Failed to register with coordinator." );
-							break;
-						default:
-							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from coordinator." );
-							break;
-					}
-					break;
-				default:
-					__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from coordinator." );
-					return;
+		}
+		while ( buffer.size > 0 ) {
+			if ( ! this->protocol.parseHeader( header, buffer.data, buffer.size ) ) {
+				__ERROR__( "SlaveWorker", "dispatch", "Undefined message (remaining bytes = %lu).", buffer.size );
+				break;
+			} else {
+				buffer.data += PROTO_HEADER_SIZE;
+				buffer.size -= PROTO_HEADER_SIZE;
+				// Validate message
+				if ( header.from != PROTO_MAGIC_FROM_COORDINATOR ) {
+					__ERROR__( "SlaveWorker", "dispatch", "Invalid message source from coordinator." );
+					continue;
+				}
+				switch( header.opcode ) {
+					case PROTO_OPCODE_REGISTER:
+						switch( header.magic ) {
+							case PROTO_MAGIC_RESPONSE_SUCCESS:
+								event.socket->registered = true;
+								break;
+							case PROTO_MAGIC_RESPONSE_FAILURE:
+								__ERROR__( "SlaveWorker", "dispatch", "Failed to register with coordinator." );
+								break;
+							default:
+								__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from coordinator." );
+								break;
+						}
+						break;
+					default:
+						__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from coordinator." );
+						return;
+				}
+				buffer.data += header.length;
+				buffer.size -= header.length;
 			}
 		}
 	}
@@ -275,38 +289,46 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 			connected,
 			false
 		);
+		buffer.data = this->protocol.buffer.recv;
+		buffer.size = ret > 0 ? ( size_t ) ret : 0;
 		if ( ret > 0 ) {
 			this->load.recvBytes += ret;
 			this->load.elapsedTime += get_elapsed_time( t );
-
-			if ( ! this->protocol.parseHeader( header ) ) {
-				__ERROR__( "SlaveWorker", "dispatch", "Undefined message." );
+		}
+		while ( buffer.size > 0 ) {
+			if ( ! this->protocol.parseHeader( header, buffer.data, buffer.size ) ) {
+				__ERROR__( "SlaveWorker", "dispatch", "Undefined message (remaining bytes = %lu).", buffer.size );
+				break;
 			} else {
+				buffer.data += PROTO_HEADER_SIZE;
+				buffer.size -= PROTO_HEADER_SIZE;
+				// Validate message
 				if (
 					header.magic != PROTO_MAGIC_REQUEST ||
-					header.from != PROTO_MAGIC_FROM_MASTER ||
-					header.to != PROTO_MAGIC_TO_SLAVE
+					header.from != PROTO_MAGIC_FROM_MASTER
 				) {
 					__ERROR__( "SlaveWorker", "dispatch", "Invalid protocol header." );
 				}
 
 				switch( header.opcode ) {
 					case PROTO_OPCODE_GET:
-						this->handleGetRequest( event );
+						this->handleGetRequest( event, buffer.data, buffer.size );
 						break;
 					case PROTO_OPCODE_SET:
-						this->handleSetRequest( event );
+						this->handleSetRequest( event, buffer.data, buffer.size );
 						break;
 					case PROTO_OPCODE_UPDATE:
-						this->handleUpdateRequest( event );
+						this->handleUpdateRequest( event, buffer.data, buffer.size );
 						break;
 					case PROTO_OPCODE_DELETE:
-						this->handleDeleteRequest( event );
+						this->handleDeleteRequest( event, buffer.data, buffer.size );
 						break;
 					default:
 						__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from master." );
 						return;
 				}
+				buffer.data += header.length;
+				buffer.size -= header.length;
 			}
 		}
 	}
@@ -375,15 +397,18 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		if ( ret > 0 ) {
 			this->load.recvBytes += ret;
 			this->load.elapsedTime += get_elapsed_time( t );
-
-slave_peer_parse_again:
-			if ( ! this->protocol.parseHeader( header ) ) {
-				__ERROR__( "SlaveWorker", "dispatch", "Undefined message." );
+		}
+		buffer.data = this->protocol.buffer.recv;
+		buffer.size = ret > 0 ? ( size_t ) ret : 0;
+		while ( buffer.size > 0 ) {
+			if ( ! this->protocol.parseHeader( header, buffer.data, buffer.size ) ) {
+				__ERROR__( "SlaveWorker", "dispatch", "Undefined message (remaining bytes = %lu).", buffer.size );
+				break;
 			} else {
-				if (
-					header.from != PROTO_MAGIC_FROM_SLAVE ||
-					header.to != PROTO_MAGIC_TO_SLAVE
-				) {
+				buffer.data += PROTO_HEADER_SIZE;
+				buffer.size -= PROTO_HEADER_SIZE;
+				// Validate message
+				if ( header.from != PROTO_MAGIC_FROM_SLAVE ) {
 					__ERROR__( "SlaveWorker", "dispatch", "Invalid protocol header." );
 				}
 
@@ -391,7 +416,7 @@ slave_peer_parse_again:
 					case PROTO_OPCODE_REGISTER:
 						switch( header.magic ) {
 							case PROTO_MAGIC_REQUEST:
-								this->handleSlavePeerRegisterRequest( event.socket, header, ret );
+								this->handleSlavePeerRegisterRequest( event.socket, buffer.data, buffer.size );
 								break;
 							case PROTO_MAGIC_RESPONSE_SUCCESS:
 								event.socket->registered = true;
@@ -408,15 +433,15 @@ slave_peer_parse_again:
 						switch( header.magic ) {
 							case PROTO_MAGIC_REQUEST:
 								fprintf( stderr, "handleUpdateChunkRequest\n" );
-								this->handleUpdateChunkRequest( event );
+								this->handleUpdateChunkRequest( event, buffer.data, buffer.size );
 								break;
 							case PROTO_MAGIC_RESPONSE_SUCCESS:
 								fprintf( stderr, "handleUpdateChunkResponse\n" );
-								this->handleUpdateChunkResponse( event, true );
+								this->handleUpdateChunkResponse( event, true, buffer.data, buffer.size );
 								break;
 							case PROTO_MAGIC_RESPONSE_FAILURE:
 								fprintf( stderr, "handleUpdateChunkResponse\n" );
-								this->handleUpdateChunkResponse( event, false );
+								this->handleUpdateChunkResponse( event, false, buffer.data, buffer.size );
 								break;
 							default:
 								__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
@@ -427,15 +452,15 @@ slave_peer_parse_again:
 						switch( header.magic ) {
 							case PROTO_MAGIC_REQUEST:
 								fprintf( stderr, "handleDeleteChunkRequest\n" );
-								this->handleDeleteChunkRequest( event );
+								this->handleDeleteChunkRequest( event, buffer.data, buffer.size );
 								break;
 							case PROTO_MAGIC_RESPONSE_SUCCESS:
 								fprintf( stderr, "handleDeleteChunkResponse\n" );
-								this->handleDeleteChunkResponse( event, true );
+								this->handleDeleteChunkResponse( event, true, buffer.data, buffer.size );
 								break;
 							case PROTO_MAGIC_RESPONSE_FAILURE:
 								fprintf( stderr, "handleDeleteChunkResponse\n" );
-								this->handleDeleteChunkResponse( event, false );
+								this->handleDeleteChunkResponse( event, false, buffer.data, buffer.size );
 								break;
 							default:
 								__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
@@ -446,17 +471,8 @@ slave_peer_parse_again:
 						__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from slave: 0x%x.", header.opcode );
 						return;
 				}
-
-				if ( ret > header.length + PROTO_HEADER_SIZE ) {
-					// printf( "ret: %ld --> %ld\n", ret, ret - header.length - PROTO_HEADER_SIZE );
-					ret = ret - header.length - PROTO_HEADER_SIZE;
-					memmove(
-						this->protocol.buffer.recv,
-						this->protocol.buffer.recv + header.length + PROTO_HEADER_SIZE,
-						ret
-					);
-					goto slave_peer_parse_again;
-				}
+				buffer.data += header.length;
+				buffer.size -= header.length;
 			}
 		}
 	}
@@ -550,10 +566,10 @@ SlavePeerSocket *SlaveWorker::getSlaves( char *data, uint8_t size, uint32_t &lis
 	return ret;
 }
 
-bool SlaveWorker::handleGetRequest( MasterEvent event ) {
+bool SlaveWorker::handleGetRequest( MasterEvent event, char *buf, size_t size ) {
 	struct KeyHeader header;
 	bool ret;
-	if ( ! this->protocol.parseKeyHeader( header ) ) {
+	if ( ! this->protocol.parseKeyHeader( header, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleGetRequest", "Invalid GET request." );
 		return false;
 	}
@@ -585,9 +601,9 @@ bool SlaveWorker::handleGetRequest( MasterEvent event ) {
 	return ret;
 }
 
-bool SlaveWorker::handleSetRequest( MasterEvent event ) {
+bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size ) {
 	struct KeyValueHeader header;
-	if ( ! this->protocol.parseKeyValueHeader( header ) ) {
+	if ( ! this->protocol.parseKeyValueHeader( header, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleSetRequest", "Invalid SET request." );
 		return false;
 	}
@@ -622,10 +638,10 @@ bool SlaveWorker::handleSetRequest( MasterEvent event ) {
 	return true;
 }
 
-bool SlaveWorker::handleUpdateRequest( MasterEvent event ) {
+bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size ) {
 	struct KeyValueUpdateHeader header;
 	bool ret;
-	if ( ! this->protocol.parseKeyValueUpdateHeader( header ) ) {
+	if ( ! this->protocol.parseKeyValueUpdateHeader( header, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleUpdateRequest", "Invalid UPDATE request." );
 		return false;
 	}
@@ -728,10 +744,10 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event ) {
 	return ret;
 }
 
-bool SlaveWorker::handleDeleteRequest( MasterEvent event ) {
+bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size ) {
 	struct KeyHeader header;
 	bool ret;
-	if ( ! this->protocol.parseKeyHeader( header ) ) {
+	if ( ! this->protocol.parseKeyHeader( header, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleDeleteRequest", "Invalid DELETE request." );
 		return false;
 	}
@@ -832,18 +848,13 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event ) {
 	return ret;
 }
 
-bool SlaveWorker::handleSlavePeerRegisterRequest( SlavePeerSocket *socket, ProtocolHeader &header, ssize_t recvBytes ) {
+bool SlaveWorker::handleSlavePeerRegisterRequest( SlavePeerSocket *socket, char *buf, size_t size ) {
 	static Slave *slave = Slave::getInstance();
 	SlavePeerSocket *s = 0;
 	ServerAddr serverAddr;
 
-	if ( header.length > SERVER_ADDR_MESSSAGE_MAX_LEN ) {
-		__ERROR__( "SlaveWorker", "handleSlavePeerRegisterRequest", "Unexpected header size in slave registration." );
-		return false;
-	}
-
 	// Find the corresponding SlavePeerSocket
-	serverAddr.deserialize( this->protocol.buffer.recv + PROTO_HEADER_SIZE );
+	serverAddr.deserialize( buf );
 	for ( int i = 0, len = slave->sockets.slavePeers.size(); i < len; i++ ) {
 		if ( slave->sockets.slavePeers[ i ].isMatched( serverAddr ) ) {
 			s = &slave->sockets.slavePeers[ i ];
@@ -859,10 +870,10 @@ bool SlaveWorker::handleSlavePeerRegisterRequest( SlavePeerSocket *socket, Proto
 	return true;
 }
 
-bool SlaveWorker::handleUpdateChunkRequest( SlavePeerEvent event ) {
+bool SlaveWorker::handleUpdateChunkRequest( SlavePeerEvent event, char *buf, size_t size ) {
 	struct ChunkUpdateHeader header;
 	bool ret;
-	if ( ! this->protocol.parseChunkUpdateHeader( header, true ) ) {
+	if ( ! this->protocol.parseChunkUpdateHeader( header, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleUpdateChunkRequest", "Invalid UPDATE_CHUNK request." );
 		return false;
 	}
@@ -899,10 +910,10 @@ bool SlaveWorker::handleUpdateChunkRequest( SlavePeerEvent event ) {
 	return ret;
 }
 
-bool SlaveWorker::handleDeleteChunkRequest( SlavePeerEvent event ) {
+bool SlaveWorker::handleDeleteChunkRequest( SlavePeerEvent event, char *buf, size_t size ) {
 	struct ChunkUpdateHeader header;
 	bool ret;
-	if ( ! this->protocol.parseChunkUpdateHeader( header, false ) ) {
+	if ( ! this->protocol.parseChunkUpdateHeader( header, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleDeleteChunkRequest", "Invalid DELETE_CHUNK request." );
 		return false;
 	}
@@ -940,9 +951,9 @@ bool SlaveWorker::handleDeleteChunkRequest( SlavePeerEvent event ) {
 	return ret;
 }
 
-bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success ) {
+bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
 	struct ChunkUpdateHeader header;
-	if ( ! this->protocol.parseChunkUpdateHeader( header ) ) {
+	if ( ! this->protocol.parseChunkUpdateHeader( header, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleUpdateChunkResponse", "Invalid UPDATE_CHUNK response." );
 		return false;
 	}
@@ -1004,9 +1015,9 @@ bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success 
 	return true;
 }
 
-bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success ) {
+bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
 	struct ChunkUpdateHeader header;
-	if ( ! this->protocol.parseChunkUpdateHeader( header ) ) {
+	if ( ! this->protocol.parseChunkUpdateHeader( header, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleDeleteChunkResponse", "Invalid DELETE_CHUNK response." );
 		return false;
 	}

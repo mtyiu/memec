@@ -84,12 +84,11 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 	for ( int i = 0, len = this->config.global.slaves.size(); i < len; i++ ) {
 		SlavePeerSocket socket;
 		int fd;
-
-		socket.self = i == mySlaveIndex;
-
 		socket.init(
-			this->config.global.slaves[ i ], &this->sockets.epoll,
-			i > mySlaveIndex // only create socket when my index is smaller than the slave peer
+			this->config.global.slaves[ i ],
+			&this->sockets.epoll,
+			i > mySlaveIndex, // only create socket when my index is smaller than the slave peer
+			i == mySlaveIndex // indicate whether this is a self-socket
 		);
 		fd = socket.getSocket();
 		this->sockets.slavePeers.set( fd, socket );
@@ -327,7 +326,7 @@ void Slave::info( FILE *f ) {
 }
 
 void Slave::debug( FILE *f ) {
-	int i, len;
+	int i, len;/*
 	fprintf( f, "Slave socket\n------------\n" );
 	this->sockets.self.print( f );
 
@@ -337,7 +336,7 @@ void Slave::debug( FILE *f ) {
 		this->sockets.coordinators[ i ].print( f );
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
-
+*/
 	fprintf( f, "\nMaster sockets\n---------------\n" );
 	for ( i = 0, len = this->sockets.masters.size(); i < len; i++ ) {
 		fprintf( f, "%d. ", i + 1 );
@@ -351,7 +350,7 @@ void Slave::debug( FILE *f ) {
 		this->sockets.slavePeers[ i ].print( f );
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
-
+/*
 	fprintf( f, "\nChunk buffer\n------------\n" );
 	for ( i = 0, len = this->chunkBuffer.size(); i < len; i++ ) {
 		if ( ! this->chunkBuffer[ i ] )
@@ -374,7 +373,7 @@ void Slave::debug( FILE *f ) {
 	fprintf( f, "\nOther threads\n--------------\n" );
 	this->sockets.self.printThread();
 
-	fprintf( f, "\n" );
+	fprintf( f, "\n" );*/
 }
 
 void Slave::interactive() {

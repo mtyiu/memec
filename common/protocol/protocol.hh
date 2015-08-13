@@ -165,12 +165,12 @@ public:
 	bool init( size_t size = 0 );
 	void free();
 	bool parseHeader( struct ProtocolHeader &header, char *buf = 0, size_t size = 0 );
-	bool parseKeyHeader( struct KeyHeader &header, size_t offset = PROTO_HEADER_SIZE, char *buf = 0, size_t size = 0 );
-	bool parseKeyValueHeader( struct KeyValueHeader &header, size_t offset = PROTO_HEADER_SIZE, char *buf = 0, size_t size = 0 );
-	bool parseKeyValueUpdateHeader( struct KeyValueUpdateHeader &header, size_t offset = PROTO_HEADER_SIZE, char *buf = 0, size_t size = 0 );
-	bool parseChunkUpdateHeader( struct ChunkUpdateHeader &header, size_t offset = PROTO_HEADER_SIZE, char *buf = 0, size_t size = 0 );
-	bool parseHeartbeatHeader( struct HeartbeatHeader &header, size_t offset = PROTO_HEADER_SIZE, char *buf = 0, size_t size = 0 );
-	bool parseSlaveSyncHeader( struct SlaveSyncHeader &header, size_t &bytes, size_t offset = PROTO_HEADER_SIZE + PROTO_HEARTBEAT_SIZE, char *buf = 0, size_t size = 0 );
+	bool parseKeyHeader( struct KeyHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
+	bool parseKeyValueHeader( struct KeyValueHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
+	bool parseKeyValueUpdateHeader( struct KeyValueUpdateHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
+	bool parseChunkUpdateHeader( struct ChunkUpdateHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
+	bool parseHeartbeatHeader( struct HeartbeatHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
+	bool parseSlaveSyncHeader( struct SlaveSyncHeader &header, size_t &bytes, char *buf = 0, size_t size = 0, size_t offset = PROTO_HEADER_SIZE + PROTO_HEARTBEAT_SIZE );
 
 	static size_t getSuggestedBufferSize( uint32_t keySize, uint32_t chunkSize );
 };

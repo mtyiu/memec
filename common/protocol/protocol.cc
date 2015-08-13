@@ -384,7 +384,7 @@ bool Protocol::parseHeader( struct ProtocolHeader &header, char *buf, size_t siz
 	);
 }
 
-bool Protocol::parseKeyHeader( struct KeyHeader &header, size_t offset, char *buf, size_t size ) {
+bool Protocol::parseKeyHeader( struct KeyHeader &header, char *buf, size_t size, size_t offset ) {
 	if ( ! buf || ! size ) {
 		buf = this->buffer.recv;
 		size = this->buffer.size;
@@ -397,7 +397,7 @@ bool Protocol::parseKeyHeader( struct KeyHeader &header, size_t offset, char *bu
 	);
 }
 
-bool Protocol::parseKeyValueHeader( struct KeyValueHeader &header, size_t offset, char *buf, size_t size ) {
+bool Protocol::parseKeyValueHeader( struct KeyValueHeader &header, char *buf, size_t size, size_t offset ) {
 	if ( ! buf || ! size ) {
 		buf = this->buffer.recv;
 		size = this->buffer.size;
@@ -412,7 +412,7 @@ bool Protocol::parseKeyValueHeader( struct KeyValueHeader &header, size_t offset
 	);
 }
 
-bool Protocol::parseKeyValueUpdateHeader( struct KeyValueUpdateHeader &header, size_t offset, char *buf, size_t size ) {
+bool Protocol::parseKeyValueUpdateHeader( struct KeyValueUpdateHeader &header, char *buf, size_t size, size_t offset ) {
 	if ( ! buf || ! size ) {
 		buf = this->buffer.recv;
 		size = this->buffer.size;
@@ -428,7 +428,7 @@ bool Protocol::parseKeyValueUpdateHeader( struct KeyValueUpdateHeader &header, s
 	);
 }
 
-bool Protocol::parseChunkUpdateHeader( struct ChunkUpdateHeader &header, size_t offset, char *buf, size_t size ) {
+bool Protocol::parseChunkUpdateHeader( struct ChunkUpdateHeader &header, char *buf, size_t size, size_t offset ) {
 	if ( ! buf || ! size ) {
 		buf = this->buffer.recv;
 		size = this->buffer.size;
@@ -445,7 +445,7 @@ bool Protocol::parseChunkUpdateHeader( struct ChunkUpdateHeader &header, size_t 
 	);
 }
 
-bool Protocol::parseHeartbeatHeader( struct HeartbeatHeader &header, size_t offset, char *buf, size_t size ) {
+bool Protocol::parseHeartbeatHeader( struct HeartbeatHeader &header, char *buf, size_t size, size_t offset ) {
 	if ( ! buf || ! size ) {
 		buf = this->buffer.recv;
 		size = this->buffer.size;
@@ -460,7 +460,7 @@ bool Protocol::parseHeartbeatHeader( struct HeartbeatHeader &header, size_t offs
 	);
 }
 
-bool Protocol::parseSlaveSyncHeader( struct SlaveSyncHeader &header, size_t &bytes, size_t offset, char *buf, size_t size ) {
+bool Protocol::parseSlaveSyncHeader( struct SlaveSyncHeader &header, size_t &bytes, char *buf, size_t size, size_t offset ) {
 	if ( ! buf || ! size ) {
 		buf = this->buffer.recv;
 		size = this->buffer.size;

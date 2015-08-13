@@ -58,16 +58,16 @@ private:
 	SlavePeerSocket *getSlave( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded = false, bool *isDegraded = 0 );
 	SlavePeerSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded = false, bool *isDegraded = 0 );
 
-	bool handleGetRequest( MasterEvent event );
-	bool handleSetRequest( MasterEvent event );
-	bool handleUpdateRequest( MasterEvent event );
-	bool handleDeleteRequest( MasterEvent event );
+	bool handleGetRequest( MasterEvent event, char *buf, size_t size );
+	bool handleSetRequest( MasterEvent event, char *buf, size_t size );
+	bool handleUpdateRequest( MasterEvent event, char *buf, size_t size );
+	bool handleDeleteRequest( MasterEvent event, char *buf, size_t size );
 
-	bool handleSlavePeerRegisterRequest( SlavePeerSocket *socket, ProtocolHeader &header, ssize_t recvBytes );
-	bool handleUpdateChunkRequest( SlavePeerEvent event );
-	bool handleDeleteChunkRequest( SlavePeerEvent event );
-	bool handleUpdateChunkResponse( SlavePeerEvent event, bool success );
-	bool handleDeleteChunkResponse( SlavePeerEvent event, bool success );
+	bool handleSlavePeerRegisterRequest( SlavePeerSocket *socket, char *buf, size_t size );
+	bool handleUpdateChunkRequest( SlavePeerEvent event, char *buf, size_t size );
+	bool handleDeleteChunkRequest( SlavePeerEvent event, char *buf, size_t size );
+	bool handleUpdateChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
+	bool handleDeleteChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 
 	void free();
 	static void *run( void *argv );

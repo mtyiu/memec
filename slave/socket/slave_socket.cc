@@ -101,6 +101,7 @@ bool SlaveSocket::handler( int fd, uint32_t events, void *data ) {
 				}
 				break;
 			}
+			SlaveSocket::setNonBlocking( fd );
 			socket->sockets.set( fd, addr, false );
 			socket->epoll->add( fd, EPOLL_EVENT_SET );
 		}
@@ -153,6 +154,8 @@ bool SlaveSocket::handler( int fd, uint32_t events, void *data ) {
 						for ( int i = 0, len = slave->sockets.slavePeers.size(); i < len; i++ ) {
 							if ( slave->sockets.slavePeers[ i ].isMatched( serverAddr ) ) {
 								s = &slave->sockets.slavePeers[ i ];
+								int oldFd = s->getSocket();
+								slave->sockets.slavePeers.replaceKey( oldFd, fd );
 								s->setRecvFd( fd, addr );
 								break;
 							}

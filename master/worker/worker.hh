@@ -33,15 +33,15 @@ private:
 	SlaveSocket *getSlave( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded = false, bool *isDegraded = 0 );
 	SlaveSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded = false, bool *isDegraded = 0 );
 
-	bool handleGetRequest( ApplicationEvent event );
-	bool handleSetRequest( ApplicationEvent event );
-	bool handleUpdateRequest( ApplicationEvent event );
-	bool handleDeleteRequest( ApplicationEvent event );
+	bool handleGetRequest( ApplicationEvent event, char *buf, size_t size );
+	bool handleSetRequest( ApplicationEvent event, char *buf, size_t size );
+	bool handleUpdateRequest( ApplicationEvent event, char *buf, size_t size );
+	bool handleDeleteRequest( ApplicationEvent event, char *buf, size_t size );
 
-	bool handleGetResponse( SlaveEvent event, bool success );
-	bool handleSetResponse( SlaveEvent event, bool success );
-	bool handleUpdateResponse( SlaveEvent event, bool success );
-	bool handleDeleteResponse( SlaveEvent event, bool success );
+	bool handleGetResponse( SlaveEvent event, bool success, char *buf, size_t size );
+	bool handleSetResponse( SlaveEvent event, bool success, char *buf, size_t size );
+	bool handleUpdateResponse( SlaveEvent event, bool success, char *buf, size_t size );
+	bool handleDeleteResponse( SlaveEvent event, bool success, char *buf, size_t size );
 
 	void free();
 	static void *run( void *argv );

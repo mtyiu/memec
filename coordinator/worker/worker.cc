@@ -95,25 +95,31 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			connected,
 			false
 		);
-		if ( ret > 0 ) {
-			if ( ! this->protocol.parseHeader( header ) ) {
-				__ERROR__( "CoordinatorWorker", "dispatch", "Undefined message." );
+		buffer.data = this->protocol.buffer.recv;
+		buffer.size = ret > 0 ? ( size_t ) ret : 0;
+		while( buffer.size > 0 ) {
+			if ( ! this->protocol.parseHeader( header, buffer.data, buffer.size ) ) {
+				__ERROR__( "CoordinatorWorker", "dispatch", "Undefined message (remaining bytes = %lu).", buffer.size );
 			} else {
-				if (
-					( header.magic != PROTO_MAGIC_REQUEST && header.magic != PROTO_MAGIC_HEARTBEAT ) ||
-					header.from != PROTO_MAGIC_FROM_SLAVE ||
-					header.to != PROTO_MAGIC_TO_COORDINATOR
-				) {
-					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid protocol header." );
-					return;
+				buffer.data += PROTO_HEADER_SIZE;
+				buffer.size -= PROTO_HEADER_SIZE;
+				// Validate message
+				if ( header.from != PROTO_MAGIC_FROM_SLAVE ) {
+					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid message source from slave." );
+					continue;
 				}
 
 				if ( header.opcode == PROTO_OPCODE_SYNC ) {
+					if ( header.magic != PROTO_MAGIC_HEARTBEAT ) {
+							__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );
+							continue;
+					}
+
 					size_t bytes, offset, count = 0;
 					struct HeartbeatHeader heartbeatHeader;
 					struct SlaveSyncHeader slaveSyncHeader;
 
-					if ( this->protocol.parseHeartbeatHeader( heartbeatHeader ) ) {
+					if ( this->protocol.parseHeartbeatHeader( heartbeatHeader, buffer.data, buffer.size ) ) {
 						event.socket->load.ops.get = heartbeatHeader.get;
 						event.socket->load.ops.set = heartbeatHeader.set;
 						event.socket->load.ops.update = heartbeatHeader.update;
@@ -121,7 +127,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 
 						offset = PROTO_HEADER_SIZE + PROTO_HEARTBEAT_SIZE;
 						while ( offset < ( size_t ) ret ) {
-							if ( ! this->protocol.parseSlaveSyncHeader( slaveSyncHeader, bytes, offset ) )
+							if ( ! this->protocol.parseSlaveSyncHeader( slaveSyncHeader, bytes, buffer.data, buffer.size, offset ) )
 								break;
 							offset += bytes;
 							count++;
@@ -147,6 +153,8 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 				} else {
 					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid opcode from slave." );
 				}
+				buffer.data += header.length;
+				buffer.size -= header.length;
 			}
 		}
 	}

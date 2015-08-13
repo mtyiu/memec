@@ -28,16 +28,20 @@ bool Socket::setNoDelay() {
 }
 
 bool Socket::setNonBlocking() {
+	return Socket::setNonBlocking( this->sockfd );
+}
+
+bool Socket::setNonBlocking( int fd ) {
 	int flags;
 
-	flags = fcntl( this->sockfd, F_GETFL, 0 );
+	flags = fcntl( fd, F_GETFL, 0 );
 	if ( flags == -1 ) {
 		__ERROR__( "Socket", "setNonBlocking", "fcntl(): %s", strerror( errno ) );
 		return false;
 	}
 
 	flags |= O_NONBLOCK;
-	if ( fcntl( this->sockfd, F_SETFL, flags ) == -1 ) {
+	if ( fcntl( fd, F_SETFL, flags ) == -1 ) {
 		__ERROR__( "Socket", "setNonBlocking", "fcntl(): %s", strerror( errno ) );
 		return false;
 	}
@@ -98,8 +102,8 @@ ssize_t Socket::send( int sockfd, char *buf, size_t ulen, bool &connected ) {
 			bytes += ret;
 		}
 	} while ( bytes < len );
-	// if ( connected && bytes > 0 )
-	// 	__DEBUG__( MAGENTA, "Socket", "send", "Sent %ld bytes.", bytes );
+	if ( connected && bytes > 0 )
+		__DEBUG__( MAGENTA, "Socket", "send", "Sent %ld bytes.", bytes );
 	this->connected = connected;
 	return bytes;
 }
@@ -112,12 +116,11 @@ ssize_t Socket::recv( int sockfd, char *buf, size_t ulen, bool &connected, bool 
 			if ( errno != EAGAIN ) {
 				__ERROR__( "Socket", "recv", "%s", strerror( errno ) );
 				connected = false;
+				break;
 			} else {
 				connected = true;
-				bytes += ret;
-				break;
+				if ( ! wait ) break;
 			}
-			return -1;
 		} else if ( ret == 0 ) {
 			connected = false;
 			break;
@@ -125,9 +128,9 @@ ssize_t Socket::recv( int sockfd, char *buf, size_t ulen, bool &connected, bool 
 			connected = true;
 			bytes += ret;
 		}
-	} while ( wait && bytes < len );
-	// if ( connected && bytes > 0 )
-	// 	__DEBUG__( MAGENTA, "Socket", "recv", "Received %ld bytes.", bytes );
+	} while ( bytes < len );
+	if ( connected && bytes > 0 )
+		__DEBUG__( MAGENTA, "Socket", "recv", "Received %ld bytes.", bytes );
 	this->connected = connected;
 	return bytes;
 }
@@ -151,6 +154,11 @@ int Socket::accept( struct sockaddr_in *addrPtr, socklen_t *addrlenPtr ) {
 		}
 		return ret;
 	}
+}
+
+Socket::Socket() {
+	this->pending.size = 0;
+	pthread_mutex_init( &this->pending.lock, 0 );
 }
 
 bool Socket::init( int type, unsigned long addr, unsigned short port, bool block ) {

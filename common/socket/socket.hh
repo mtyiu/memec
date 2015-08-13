@@ -6,6 +6,7 @@
 #endif
 
 #include <cstdio>
+#include <pthread.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -24,6 +25,11 @@ protected:
 	SocketMode mode;
 	int sockfd;
 	struct sockaddr_in addr;
+	struct {
+		char data[ 4096 ];
+		size_t size;
+		pthread_mutex_t lock;
+	} pending;
 
 	bool setSockOpt( int level, int optionName );
 	bool setReuse();
@@ -40,6 +46,7 @@ public:
 	inline int getSocket() {
 		return this->sockfd;
 	}
+	Socket();
 	bool init( int type, unsigned long addr, unsigned short port, bool block = false );
 	bool init( int sockfd, struct sockaddr_in addr );
 	virtual bool init( ServerAddr &addr, EPoll *epoll );
@@ -50,6 +57,7 @@ public:
 	void printAddress( FILE *f = stdout );
 
 	// Utilities
+	static bool setNonBlocking( int fd );
 	static bool hton_ip( char *ip, unsigned long &ret );
 	static bool hton_port( char *port, unsigned short &ret );
 	static unsigned short hton_port( unsigned short port );

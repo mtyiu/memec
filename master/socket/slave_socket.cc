@@ -19,7 +19,8 @@ ssize_t SlaveSocket::send( char *buf, size_t ulen, bool &connected ) {
 }
 
 ssize_t SlaveSocket::recv( char *buf, size_t ulen, bool &connected, bool wait ) {
-	return Socket::recv( this->sockfd, buf, ulen, connected, wait );
+	ssize_t ret = Socket::recv( this->sockfd, buf, ulen, connected, wait );
+	return ret;
 }
 
 bool SlaveSocket::ready() {

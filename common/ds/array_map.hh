@@ -32,6 +32,15 @@ public:
 		return this->values[ index ];
 	}
 
+	bool replaceKey( KeyType &oldKey, KeyType &newKey ) {
+		int index = this->indexOf( oldKey );
+		if ( index != -1 ) {
+			this->keys[ index ] = newKey;
+			return true;
+		}
+		return false;
+	}
+
 	size_t size() {
 		return this->values.size();
 	}

@@ -6,7 +6,7 @@
 class SlavePeerSocket : public Socket {
 private:
 	bool active;
-	int recvSockFd;
+	bool received;
 	struct sockaddr_in recvAddr;
 	char *identifier;
 	EPoll *epoll;
@@ -18,7 +18,7 @@ public:
 	bool self;
 
 	SlavePeerSocket();
-	bool init( ServerAddr &addr, EPoll *epoll, bool active );
+	bool init( ServerAddr &addr, EPoll *epoll, bool active, bool self );
 	bool start();
 	void stop();
 	void free();

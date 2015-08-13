@@ -94,6 +94,7 @@ bool MasterSocket::handler( int fd, uint32_t events, void *data ) {
 				}
 				break;
 			}
+			MasterSocket::setNonBlocking( fd );
 			socket->sockets.set( fd, addr, false );
 			socket->epoll->add( fd, EPOLL_EVENT_SET );
 		}
@@ -106,7 +107,7 @@ bool MasterSocket::handler( int fd, uint32_t events, void *data ) {
 			// Only application register message is expected
 			bool connected;
 			ssize_t ret;
-			
+
 			ret = socket->recv( fd, socket->buffer.data, socket->buffer.size, connected, true );
 			if ( ret < 0 ) {
 				__ERROR__( "MasterSocket", "handler", "Cannot receive message." );
