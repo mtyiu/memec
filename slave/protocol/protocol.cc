@@ -119,44 +119,48 @@ char *SlaveProtocol::resRegisterSlavePeer( size_t &size, bool success ) {
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::reqUpdateChunk( size_t &size, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, char *delta ) {
+char *SlaveProtocol::reqUpdateChunk( size_t &size, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta ) {
 	size = this->generateChunkUpdateHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_UPDATE_CHUNK,
-		listId, stripeId, chunkId, offset, length, delta
+		listId, stripeId, chunkId,
+		offset, length, updatingChunkId,
+		delta
 	);
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::resUpdateChunk( size_t &size, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length ) {
+char *SlaveProtocol::resUpdateChunk( size_t &size, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId ) {
 	size = this->generateChunkUpdateHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_UPDATE_CHUNK,
 		listId, stripeId, chunkId,
-		offset, length
+		offset, length, updatingChunkId
 	);
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::reqDeleteChunk( size_t &size, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, char *delta ) {
+char *SlaveProtocol::reqDeleteChunk( size_t &size, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta ) {
 	size = this->generateChunkUpdateHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_DELETE_CHUNK,
-		listId, stripeId, chunkId, offset, length, delta
+		listId, stripeId, chunkId,
+		offset, length, updatingChunkId,
+		delta
 	);
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::resDeleteChunk( size_t &size, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length ) {
+char *SlaveProtocol::resDeleteChunk( size_t &size, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId ) {
 	size = this->generateChunkUpdateHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_DELETE_CHUNK,
 		listId, stripeId, chunkId,
-		offset, length
+		offset, length, updatingChunkId
 	);
 	return this->buffer.send;
 }

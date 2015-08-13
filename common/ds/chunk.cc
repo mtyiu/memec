@@ -31,7 +31,7 @@ char *Chunk::alloc( uint32_t size, uint32_t &offset ) {
 	this->status = CHUNK_STATUS_DIRTY;
 	this->count++;
 	this->size += size;
-	
+
 	return ret;
 }
 
@@ -45,7 +45,7 @@ void Chunk::updateData() {
 		KeyValue::deserialize( ptr, key, keySize, value, valueSize );
 
 		tmp = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
-		
+
 		this->count++;
 		this->size += tmp;
 
@@ -74,7 +74,7 @@ void Chunk::computeDelta( char *delta, char *newData, uint32_t offset, uint32_t 
 			this->data + offset, // original data
 			delta,               // new data
 			length
-		);	
+		);
 	}
 }
 
@@ -143,7 +143,7 @@ uint32_t Chunk::deleteKeyValue( Key target, std::map<Key, KeyMetadata> *keys, ch
 KeyValue Chunk::getKeyValue( uint32_t offset ) {
 	KeyValue ret;
 	ret.data = this->data + offset;
-	return ret;	
+	return ret;
 }
 
 void Chunk::clear() {

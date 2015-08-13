@@ -53,7 +53,7 @@ private:
 	void dispatch( SlavePeerEvent event );
 
 	bool isRedirectedRequest( char *key, uint8_t size, bool *isParity = 0, uint32_t *listIdPtr = 0, uint32_t *chunkIdPtr = 0 );
-	bool isRedirectedRequest( uint32_t listId );
+	bool isRedirectedRequest( uint32_t listId, uint32_t updatingChunkId );
 
 	SlavePeerSocket *getSlave( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded = false, bool *isDegraded = 0 );
 	SlavePeerSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded = false, bool *isDegraded = 0 );

@@ -13,13 +13,13 @@ enum SlavePeerEventType {
 	SLAVE_PEER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS,
 	SLAVE_PEER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE,
 	// UPDATE_CHUNK
+	SLAVE_PEER_EVENT_TYPE_UPDATE_CHUNK_REQUEST,
 	SLAVE_PEER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_SUCCESS,
 	SLAVE_PEER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_FAILURE,
 	// DELETE_CHUNK
+	SLAVE_PEER_EVENT_TYPE_DELETE_CHUNK_REQUEST,
 	SLAVE_PEER_EVENT_TYPE_DELETE_CHUNK_RESPONSE_SUCCESS,
 	SLAVE_PEER_EVENT_TYPE_DELETE_CHUNK_RESPONSE_FAILURE,
-	// Send
-	SLAVE_PEER_EVENT_TYPE_SEND,
 	// Pending
 	SLAVE_PEER_EVENT_TYPE_PENDING
 };
@@ -33,6 +33,9 @@ public:
 			Metadata metadata;
 			uint32_t offset;
 			uint32_t length;
+			uint32_t updatingChunkId;
+			char *delta;
+			volatile bool *status;
 		} chunkUpdate;
 		struct {
 			size_t size;
@@ -44,12 +47,12 @@ public:
 	// Register
 	void reqRegister( SlavePeerSocket *socket );
 	void resRegister( SlavePeerSocket *socket, bool success = true );
-	// UPDATE
-	void resUpdateChunk( SlavePeerSocket *socket, Metadata &metadata, uint32_t offset, uint32_t length, bool success );
-	// DELETE
-	void resDeleteChunk( SlavePeerSocket *socket, Metadata &metadata, uint32_t offset, uint32_t length, bool success );
-	// Send
-	void send( SlavePeerSocket *socket, SlaveProtocol *protocol, size_t size, size_t index );
+	// UPDATE_CHUNK
+	void reqUpdateChunk( SlavePeerSocket *socket, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, volatile bool *status, char *delta );
+	void resUpdateChunk( SlavePeerSocket *socket, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, bool success );
+	// DELETE_CHUNK
+	void reqDeleteChunk( SlavePeerSocket *socket, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, volatile bool *status, char *delta );
+	void resDeleteChunk( SlavePeerSocket *socket, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, bool success );
 	// Pending
 	void pending( SlavePeerSocket *socket );
 };

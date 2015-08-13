@@ -12,7 +12,7 @@ for i in {1..4}; do
 		"bin/slave -v -o slave slave${i} tcp://127.0.0.1:911${i} -o storage path /tmp/plio/slave${i} $(printf '\r')"
 done
 
-sleep 5
+sleep 3
 
 screen -S master -p 0 -X stuff "bin/master -v $(printf '\r')"
 sleep ${SLEEP_TIME}

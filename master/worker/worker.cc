@@ -82,9 +82,13 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 				valueSize, value
 			);
 			key.ptr = ( void * ) event.socket;
+
+			pthread_mutex_lock( &MasterWorker::pending->applications.getLock );
 			it = MasterWorker::pending->applications.get.find( key );
 			key = *it;
 			MasterWorker::pending->applications.get.erase( it );
+			pthread_mutex_unlock( &MasterWorker::pending->applications.getLock );
+
 			key.free();
 			event.message.keyValue.free();
 			break;
@@ -95,9 +99,13 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 				event.message.key.size,
 				event.message.key.data
 			);
+
+			pthread_mutex_lock( &MasterWorker::pending->applications.getLock );
 			it = MasterWorker::pending->applications.get.find( event.message.key );
 			key = *it;
 			MasterWorker::pending->applications.get.erase( it );
+			pthread_mutex_unlock( &MasterWorker::pending->applications.getLock );
+
 			key.free();
 			break;
 		case APPLICATION_EVENT_TYPE_SET_RESPONSE_SUCCESS:
@@ -108,9 +116,13 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 				event.message.key.size,
 				event.message.key.data
 			);
+
+			pthread_mutex_lock( &MasterWorker::pending->applications.setLock );
 			it = MasterWorker::pending->applications.set.find( event.message.key );
 			key = *it;
 			MasterWorker::pending->applications.set.erase( it );
+			pthread_mutex_unlock( &MasterWorker::pending->applications.setLock );
+
 			key.free();
 			break;
 		case APPLICATION_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
@@ -129,9 +141,12 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 			keyValueUpdate.offset = event.message.update.offset;
 			keyValueUpdate.length = event.message.update.length;
 
+			pthread_mutex_lock( &MasterWorker::pending->applications.updateLock );
 			kvUpdateit = MasterWorker::pending->applications.update.find( keyValueUpdate );
 			keyValueUpdate = *kvUpdateit;
 			MasterWorker::pending->applications.update.erase( kvUpdateit );
+			pthread_mutex_unlock( &MasterWorker::pending->applications.updateLock );
+
 			keyValueUpdate.free();
 			break;
 		case APPLICATION_EVENT_TYPE_DELETE_RESPONSE_SUCCESS:
@@ -142,9 +157,13 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 				event.message.key.size,
 				event.message.key.data
 			);
+
+			pthread_mutex_lock( &MasterWorker::pending->applications.delLock );
 			it = MasterWorker::pending->applications.del.find( event.message.key );
 			key = *it;
 			MasterWorker::pending->applications.del.erase( it );
+			pthread_mutex_unlock( &MasterWorker::pending->applications.delLock );
+
 			key.free();
 			break;
 		case APPLICATION_EVENT_TYPE_PENDING:
@@ -482,10 +501,16 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 	buffer.data = this->protocol.reqGet( buffer.size, header.key, header.keySize );
 
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
+
+	pthread_mutex_lock( &MasterWorker::pending->applications.getLock );
 	MasterWorker::pending->applications.get.insert( key );
+	pthread_mutex_unlock( &MasterWorker::pending->applications.getLock );
 
 	key.ptr = ( void * ) socket;
+
+	pthread_mutex_lock( &MasterWorker::pending->slaves.getLock );
 	MasterWorker::pending->slaves.get.insert( key );
+	pthread_mutex_unlock( &MasterWorker::pending->slaves.getLock );
 
 	// Send GET request
 	sentBytes = socket->send( buffer.data, buffer.size, connected );
@@ -535,17 +560,25 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 	buffer.data = this->protocol.reqSet( buffer.size, header.key, header.keySize, header.value, header.valueSize );
 
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
+
+	pthread_mutex_lock( &MasterWorker::pending->applications.setLock );
 	MasterWorker::pending->applications.set.insert( key );
+	pthread_mutex_unlock( &MasterWorker::pending->applications.setLock );
 
 	key.ptr = ( void * ) socket;
+
+	pthread_mutex_lock( &MasterWorker::pending->slaves.setLock );
 	MasterWorker::pending->slaves.set.insert( key );
+	pthread_mutex_unlock( &MasterWorker::pending->slaves.setLock );
 
 	// Send SET requests
 	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
 		key.ptr = ( void * ) this->paritySlaveSockets[ i ];
-		MasterWorker::pending->slaves.set.insert( key );
 
-#define MASTER_WORKER_SEND_REPLICAS_PARALLEL
+		pthread_mutex_lock( &MasterWorker::pending->slaves.setLock );
+		MasterWorker::pending->slaves.set.insert( key );
+		pthread_mutex_unlock( &MasterWorker::pending->slaves.setLock );
+
 #ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
 		SlaveEvent slaveEvent;
 		this->protocol.status[ i ] = true;
@@ -621,10 +654,15 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 	keyValueUpdate.dup( header.keySize, header.key, ( void * ) event.socket );
 	keyValueUpdate.offset = header.valueUpdateOffset;
 	keyValueUpdate.length = header.valueUpdateSize;
+
+	pthread_mutex_lock( &MasterWorker::pending->applications.updateLock );
 	MasterWorker::pending->applications.update.insert( keyValueUpdate );
+	pthread_mutex_unlock( &MasterWorker::pending->applications.updateLock );
 
 	keyValueUpdate.ptr = ( void * ) socket;
+	pthread_mutex_lock( &MasterWorker::pending->slaves.updateLock );
 	MasterWorker::pending->slaves.update.insert( keyValueUpdate );
+	pthread_mutex_unlock( &MasterWorker::pending->slaves.updateLock );
 
 	// Send UPDATE request
 	sentBytes = socket->send( buffer.data, buffer.size, connected );
@@ -675,10 +713,14 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 	buffer.data = this->protocol.reqDelete( buffer.size, header.key, header.keySize );
 
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
+	pthread_mutex_lock( &MasterWorker::pending->applications.delLock );
 	MasterWorker::pending->applications.del.insert( key );
+	pthread_mutex_unlock( &MasterWorker::pending->applications.delLock );
 
 	key.ptr = ( void * ) socket;
+	pthread_mutex_lock( &MasterWorker::pending->slaves.delLock );
 	MasterWorker::pending->slaves.del.insert( key );
+	pthread_mutex_unlock( &MasterWorker::pending->slaves.delLock );
 
 	// Send DELETE requests
 	sentBytes = socket->send( buffer.data, buffer.size, connected );
@@ -715,21 +757,27 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, char *buf,
 	std::set<Key>::iterator it;
 	ApplicationEvent applicationEvent;
 
+	pthread_mutex_lock( &MasterWorker::pending->slaves.getLock );
 	it = MasterWorker::pending->slaves.get.find( key );
 	if ( it == MasterWorker::pending->slaves.get.end() ) {
 		__ERROR__( "MasterWorker", "handleGetResponse", "Cannot find a pending slave GET request that matches the response. This message will be discarded." );
 		if ( success ) keyValue.free();
+		pthread_mutex_unlock( &MasterWorker::pending->slaves.getLock );
 		return false;
 	}
 	MasterWorker::pending->slaves.get.erase( it );
+	pthread_mutex_unlock( &MasterWorker::pending->slaves.getLock );
 
 	key.ptr = 0;
+	pthread_mutex_lock( &MasterWorker::pending->applications.getLock );
 	it = MasterWorker::pending->applications.get.lower_bound( key );
 	if ( it == MasterWorker::pending->applications.get.end() || ! key.equal( *it ) ) {
 		__ERROR__( "MasterWorker", "handleGetResponse", "Cannot find a pending application GET request that matches the response. This message will be discarded." );
 		if ( success ) keyValue.free();
+		pthread_mutex_unlock( &MasterWorker::pending->applications.getLock );
 		return false;
 	}
+	pthread_mutex_unlock( &MasterWorker::pending->applications.getLock );
 	key = *it;
 
 	if ( success )
@@ -753,9 +801,13 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 	Key key;
 
 	key.set( header.keySize, header.key, ( void * ) event.socket );
+
+	pthread_mutex_lock( &MasterWorker::pending->slaves.setLock );
 	it = MasterWorker::pending->slaves.set.find( key );
 	if ( it == MasterWorker::pending->slaves.set.end() ) {
 		__ERROR__( "MasterWorker", "handleSetResponse", "Cannot find a pending slave SET request that matches the response. This message will be discarded." );
+
+		pthread_mutex_unlock( &MasterWorker::pending->slaves.setLock );
 		return false;
 	}
 	MasterWorker::pending->slaves.set.erase( it );
@@ -765,14 +817,19 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 	it = MasterWorker::pending->slaves.set.lower_bound( key );
 	for ( pending = 0; it != MasterWorker::pending->slaves.set.end() && key.equal( *it ); pending++, it++ );
 	__ERROR__( "MasterWorker", "handleSetResponse", "Pending slave SET requests = %d.", pending );
+	pthread_mutex_unlock( &MasterWorker::pending->slaves.setLock );
 
 	if ( pending == 0 ) {
 		// Only send application SET response when the number of pending slave SET requests equal 0
+		pthread_mutex_lock( &MasterWorker::pending->applications.setLock );
 		it = MasterWorker::pending->applications.set.lower_bound( key );
 		if ( it == MasterWorker::pending->applications.set.end() || ! key.equal( *it ) ) {
 			__ERROR__( "MasterWorker", "handleSetResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded." );
+
+			pthread_mutex_unlock( &MasterWorker::pending->applications.setLock );
 			return false;
 		}
+		pthread_mutex_unlock( &MasterWorker::pending->applications.setLock );
 		key = *it;
 		applicationEvent.resSet( ( ApplicationSocket * ) key.ptr, key, success );
 		MasterWorker::eventQueue->insert( applicationEvent );
@@ -803,18 +860,26 @@ bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, char *b
 	keyValueUpdate.offset = header.valueUpdateOffset;
 	keyValueUpdate.length = header.valueUpdateSize;
 
+	pthread_mutex_lock( &MasterWorker::pending->slaves.updateLock );
 	it = MasterWorker::pending->slaves.update.find( keyValueUpdate );
 	if ( it == MasterWorker::pending->slaves.update.end() ) {
 		__ERROR__( "MasterWorker", "handleUpdateResponse", "Cannot find a pending slave UPDATE request that matches the response. This message will be discarded." );
+
+		pthread_mutex_unlock( &MasterWorker::pending->slaves.updateLock );
 		return false;
 	}
+	pthread_mutex_unlock( &MasterWorker::pending->slaves.updateLock );
 
 	keyValueUpdate.ptr = 0;
+	pthread_mutex_lock( &MasterWorker::pending->applications.updateLock );
 	it = MasterWorker::pending->applications.update.lower_bound( keyValueUpdate );
 	if ( it == MasterWorker::pending->applications.update.end() || ! keyValueUpdate.equal( *it ) ) {
 		__ERROR__( "MasterWorker", "handleUpdateResponse", "Cannot find a pending application UPDATE request that matches the response. This message will be discarded." );
+
+		pthread_mutex_unlock( &MasterWorker::pending->applications.updateLock );
 		return false;
 	}
+	pthread_mutex_unlock( &MasterWorker::pending->applications.updateLock );
 
 	keyValueUpdate = *it;
 	applicationEvent.resUpdate(
@@ -842,19 +907,27 @@ bool MasterWorker::handleDeleteResponse( SlaveEvent event, bool success, char *b
 
 	key.set( header.keySize, header.key, ( void * ) event.socket );
 
+	pthread_mutex_lock( &MasterWorker::pending->slaves.delLock );
 	it = MasterWorker::pending->slaves.del.find( key );
 	if ( it == MasterWorker::pending->slaves.del.end() ) {
 		__ERROR__( "MasterWorker", "handleDeleteResponse", "Cannot find a pending slave DELETE request that matches the response. This message will be discarded." );
+
+		pthread_mutex_unlock( &MasterWorker::pending->slaves.delLock );
 		return false;
 	}
 	MasterWorker::pending->slaves.del.erase( it );
+	pthread_mutex_unlock( &MasterWorker::pending->slaves.delLock );
 
 	key.ptr = 0;
+	pthread_mutex_lock( &MasterWorker::pending->applications.delLock );
 	it = MasterWorker::pending->applications.del.lower_bound( key );
 	if ( it == MasterWorker::pending->applications.del.end() || ! key.equal( *it ) ) {
 		__ERROR__( "MasterWorker", "handleDeleteResponse", "Cannot find a pending application DELETE request that matches the response. This message will be discarded." );
+
+		pthread_mutex_unlock( &MasterWorker::pending->applications.delLock );
 		return false;
 	}
+	pthread_mutex_unlock( &MasterWorker::pending->applications.delLock );
 	key = *it;
 
 	applicationEvent.resDelete( ( ApplicationSocket * ) key.ptr, key, success );

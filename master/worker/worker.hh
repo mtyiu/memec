@@ -1,4 +1,4 @@
-	#ifndef __MASTER_WORKER_WORKER_HH__
+#ifndef __MASTER_WORKER_WORKER_HH__
 #define __MASTER_WORKER_WORKER_HH__
 
 #include <cstdio>
@@ -10,6 +10,8 @@
 #include "../../common/worker/worker.hh"
 #include "../../common/config/global_config.hh"
 #include "../../common/stripe_list/stripe_list.hh"
+
+#define MASTER_WORKER_SEND_REPLICAS_PARALLEL
 
 class MasterWorker : public Worker {
 private:
