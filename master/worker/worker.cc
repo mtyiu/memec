@@ -316,8 +316,9 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "MasterWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 
-		if ( event.type == SLAVE_EVENT_TYPE_SEND )
+		if ( event.type == SLAVE_EVENT_TYPE_SEND ) {
 			event.message.send.protocol->status[ event.message.send.index ] = false;
+		}
 	} else {
 		// Parse responses from slaves
 		ProtocolHeader header;
@@ -548,6 +549,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 #ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
 		SlaveEvent slaveEvent;
 		this->protocol.status[ i ] = true;
+
 		slaveEvent.send( this->paritySlaveSockets[ i ], &this->protocol, buffer.size, i );
 		MasterWorker::eventQueue->insert( slaveEvent );
 #else

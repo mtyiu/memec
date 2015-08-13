@@ -6,7 +6,7 @@
 
 class MasterProtocol : public Protocol {
 public:
-	bool *status; // Indicate which slave in the stripe is accessing the internal buffer
+	volatile bool *status; // Indicate which slave in the stripe is accessing the internal buffer
 
 	MasterProtocol() : Protocol( ROLE_MASTER ) {}
 	bool init( size_t size, uint32_t parityChunkCount );
