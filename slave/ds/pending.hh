@@ -113,18 +113,36 @@ public:
 	}
 };
 
-typedef struct {
+class Pending {
+public:
 	struct {
 		std::set<Key> get;
 		std::set<KeyValueUpdate> update;
 		std::set<Key> del;
+		pthread_mutex_t getLock;
+		pthread_mutex_t updateLock;
+		pthread_mutex_t delLock;
 	} masters;
    struct {
-		std::set<ChunkUpdate> updateChunk;
-		std::set<ChunkUpdate> deleteChunk;
 		std::set<ChunkRequest> getChunk;
 		std::set<ChunkRequest> setChunk;
+		std::set<ChunkUpdate> updateChunk;
+		std::set<ChunkUpdate> deleteChunk;
+		pthread_mutex_t getLock;
+		pthread_mutex_t setLock;
+		pthread_mutex_t updateLock;
+		pthread_mutex_t delLock;
 	} slavePeers;
-} Pending;
+
+	Pending() {
+		pthread_mutex_init( &this->masters.getLock, 0 );
+		pthread_mutex_init( &this->masters.updateLock, 0 );
+		pthread_mutex_init( &this->masters.delLock, 0 );
+		pthread_mutex_init( &this->slavePeers.getLock, 0 );
+		pthread_mutex_init( &this->slavePeers.setLock, 0 );
+		pthread_mutex_init( &this->slavePeers.updateLock, 0 );
+		pthread_mutex_init( &this->slavePeers.delLock, 0 );
+	}
+};
 
 #endif

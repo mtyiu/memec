@@ -760,9 +760,9 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, char *buf,
 	pthread_mutex_lock( &MasterWorker::pending->slaves.getLock );
 	it = MasterWorker::pending->slaves.get.find( key );
 	if ( it == MasterWorker::pending->slaves.get.end() ) {
+		pthread_mutex_unlock( &MasterWorker::pending->slaves.getLock );
 		__ERROR__( "MasterWorker", "handleGetResponse", "Cannot find a pending slave GET request that matches the response. This message will be discarded." );
 		if ( success ) keyValue.free();
-		pthread_mutex_unlock( &MasterWorker::pending->slaves.getLock );
 		return false;
 	}
 	MasterWorker::pending->slaves.get.erase( it );
@@ -772,13 +772,13 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, char *buf,
 	pthread_mutex_lock( &MasterWorker::pending->applications.getLock );
 	it = MasterWorker::pending->applications.get.lower_bound( key );
 	if ( it == MasterWorker::pending->applications.get.end() || ! key.equal( *it ) ) {
+		pthread_mutex_unlock( &MasterWorker::pending->applications.getLock );
 		__ERROR__( "MasterWorker", "handleGetResponse", "Cannot find a pending application GET request that matches the response. This message will be discarded." );
 		if ( success ) keyValue.free();
-		pthread_mutex_unlock( &MasterWorker::pending->applications.getLock );
 		return false;
 	}
-	pthread_mutex_unlock( &MasterWorker::pending->applications.getLock );
 	key = *it;
+	pthread_mutex_unlock( &MasterWorker::pending->applications.getLock );
 
 	if ( success )
 		applicationEvent.resGet( ( ApplicationSocket * ) key.ptr, keyValue );
@@ -805,9 +805,8 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 	pthread_mutex_lock( &MasterWorker::pending->slaves.setLock );
 	it = MasterWorker::pending->slaves.set.find( key );
 	if ( it == MasterWorker::pending->slaves.set.end() ) {
-		__ERROR__( "MasterWorker", "handleSetResponse", "Cannot find a pending slave SET request that matches the response. This message will be discarded." );
-
 		pthread_mutex_unlock( &MasterWorker::pending->slaves.setLock );
+		__ERROR__( "MasterWorker", "handleSetResponse", "Cannot find a pending slave SET request that matches the response. This message will be discarded." );
 		return false;
 	}
 	MasterWorker::pending->slaves.set.erase( it );
@@ -816,21 +815,21 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 	key.ptr = 0;
 	it = MasterWorker::pending->slaves.set.lower_bound( key );
 	for ( pending = 0; it != MasterWorker::pending->slaves.set.end() && key.equal( *it ); pending++, it++ );
-	__ERROR__( "MasterWorker", "handleSetResponse", "Pending slave SET requests = %d.", pending );
 	pthread_mutex_unlock( &MasterWorker::pending->slaves.setLock );
+	__ERROR__( "MasterWorker", "handleSetResponse", "Pending slave SET requests = %d.", pending );
 
 	if ( pending == 0 ) {
 		// Only send application SET response when the number of pending slave SET requests equal 0
 		pthread_mutex_lock( &MasterWorker::pending->applications.setLock );
 		it = MasterWorker::pending->applications.set.lower_bound( key );
 		if ( it == MasterWorker::pending->applications.set.end() || ! key.equal( *it ) ) {
-			__ERROR__( "MasterWorker", "handleSetResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded." );
-
 			pthread_mutex_unlock( &MasterWorker::pending->applications.setLock );
+			__ERROR__( "MasterWorker", "handleSetResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded." );
 			return false;
 		}
-		pthread_mutex_unlock( &MasterWorker::pending->applications.setLock );
 		key = *it;
+		pthread_mutex_unlock( &MasterWorker::pending->applications.setLock );
+
 		applicationEvent.resSet( ( ApplicationSocket * ) key.ptr, key, success );
 		MasterWorker::eventQueue->insert( applicationEvent );
 	}
@@ -863,9 +862,8 @@ bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, char *b
 	pthread_mutex_lock( &MasterWorker::pending->slaves.updateLock );
 	it = MasterWorker::pending->slaves.update.find( keyValueUpdate );
 	if ( it == MasterWorker::pending->slaves.update.end() ) {
-		__ERROR__( "MasterWorker", "handleUpdateResponse", "Cannot find a pending slave UPDATE request that matches the response. This message will be discarded." );
-
 		pthread_mutex_unlock( &MasterWorker::pending->slaves.updateLock );
+		__ERROR__( "MasterWorker", "handleUpdateResponse", "Cannot find a pending slave UPDATE request that matches the response. This message will be discarded." );
 		return false;
 	}
 	pthread_mutex_unlock( &MasterWorker::pending->slaves.updateLock );
@@ -874,9 +872,8 @@ bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, char *b
 	pthread_mutex_lock( &MasterWorker::pending->applications.updateLock );
 	it = MasterWorker::pending->applications.update.lower_bound( keyValueUpdate );
 	if ( it == MasterWorker::pending->applications.update.end() || ! keyValueUpdate.equal( *it ) ) {
-		__ERROR__( "MasterWorker", "handleUpdateResponse", "Cannot find a pending application UPDATE request that matches the response. This message will be discarded." );
-
 		pthread_mutex_unlock( &MasterWorker::pending->applications.updateLock );
+		__ERROR__( "MasterWorker", "handleUpdateResponse", "Cannot find a pending application UPDATE request that matches the response. This message will be discarded." );
 		return false;
 	}
 	pthread_mutex_unlock( &MasterWorker::pending->applications.updateLock );
@@ -910,9 +907,8 @@ bool MasterWorker::handleDeleteResponse( SlaveEvent event, bool success, char *b
 	pthread_mutex_lock( &MasterWorker::pending->slaves.delLock );
 	it = MasterWorker::pending->slaves.del.find( key );
 	if ( it == MasterWorker::pending->slaves.del.end() ) {
-		__ERROR__( "MasterWorker", "handleDeleteResponse", "Cannot find a pending slave DELETE request that matches the response. This message will be discarded." );
-
 		pthread_mutex_unlock( &MasterWorker::pending->slaves.delLock );
+		__ERROR__( "MasterWorker", "handleDeleteResponse", "Cannot find a pending slave DELETE request that matches the response. This message will be discarded." );
 		return false;
 	}
 	MasterWorker::pending->slaves.del.erase( it );
@@ -922,13 +918,12 @@ bool MasterWorker::handleDeleteResponse( SlaveEvent event, bool success, char *b
 	pthread_mutex_lock( &MasterWorker::pending->applications.delLock );
 	it = MasterWorker::pending->applications.del.lower_bound( key );
 	if ( it == MasterWorker::pending->applications.del.end() || ! key.equal( *it ) ) {
-		__ERROR__( "MasterWorker", "handleDeleteResponse", "Cannot find a pending application DELETE request that matches the response. This message will be discarded." );
-
 		pthread_mutex_unlock( &MasterWorker::pending->applications.delLock );
+		__ERROR__( "MasterWorker", "handleDeleteResponse", "Cannot find a pending application DELETE request that matches the response. This message will be discarded." );
 		return false;
 	}
-	pthread_mutex_unlock( &MasterWorker::pending->applications.delLock );
 	key = *it;
+	pthread_mutex_unlock( &MasterWorker::pending->applications.delLock );
 
 	applicationEvent.resDelete( ( ApplicationSocket * ) key.ptr, key, success );
 	MasterWorker::eventQueue->insert( applicationEvent );

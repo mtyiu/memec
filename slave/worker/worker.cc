@@ -628,19 +628,18 @@ bool SlaveWorker::isRedirectedRequest( char *key, uint8_t size, bool *isParity, 
 				}
 			}
 			*isParity = false;
-			return false;
 		}
-		return false;
+		return true;
 	}
 	if ( isParity ) *isParity = false;
-	return true;
+	return false;
 }
 
 bool SlaveWorker::isRedirectedRequest( uint32_t listId, uint32_t updatingChunkId ) {
 	SlaveWorker::stripeList->get( listId, this->paritySlaveSockets );
 	for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ )
 		if ( this->paritySlaveSockets[ i ]->self )
-			return updatingChunkId == i + SlaveWorker::dataChunkCount;
+			return updatingChunkId != i + SlaveWorker::dataChunkCount;
 	return true;
 }
 
@@ -712,18 +711,18 @@ bool SlaveWorker::handleGetRequest( MasterEvent event, char *buf, size_t size ) 
 		( int ) header.keySize, header.key, header.keySize
 	);
 
-	// Detect degraded GET
-	if ( ! this->isRedirectedRequest( header.key, header.keySize ) ) {
-		__DEBUG__( YELLOW, "SlaveWorker", "handleGetRequest", "!!! Degraded GET request [not yet implemented] !!!" );
-		// TODO
-	}
-
 	Key key;
 	KeyValue keyValue;
 	if ( map->findValueByKey( header.key, header.keySize, &keyValue, &key ) ) {
 		event.resGet( event.socket, keyValue );
 		ret = true;
 	} else {
+		// Detect degraded GET
+		if ( this->isRedirectedRequest( header.key, header.keySize ) ) {
+			__DEBUG__( YELLOW, "SlaveWorker", "handleGetRequest", "!!! Degraded GET request [not yet implemented] !!!" );
+			// TODO
+		}
+
 		event.resGet( event.socket, key );
 		ret = false;
 	}
@@ -749,7 +748,7 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size ) 
 	// Detect degraded SET
 	bool isParity;
 	uint32_t listId, chunkId;
-	if ( ! this->isRedirectedRequest( header.key, header.keySize, &isParity, &listId, &chunkId ) && ! isParity ) {
+	if ( this->isRedirectedRequest( header.key, header.keySize, &isParity, &listId, &chunkId ) && ! isParity ) {
 		__DEBUG__( YELLOW, "SlaveWorker", "handleSetRequest", "!!! Degraded SET request [not yet implemented] !!!" );
 		// TODO
 	}
@@ -786,7 +785,7 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 	);
 
 	// Detect degraded UPDATE
-	if ( ! this->isRedirectedRequest( header.key, header.keySize ) ) {
+	if ( this->isRedirectedRequest( header.key, header.keySize ) ) {
 		__DEBUG__( YELLOW, "SlaveWorker", "handleUpdateRequest", "!!! Degraded UPDATE request [not yet implemented] !!!" );
 		// TODO
 	}
@@ -810,7 +809,10 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 		keyValueUpdate.dup( header.keySize, header.key, ( void * ) event.socket );
 		keyValueUpdate.offset = header.valueUpdateOffset;
 		keyValueUpdate.length = header.valueUpdateSize;
+
+		pthread_mutex_lock( &SlaveWorker::pending->masters.updateLock );
 		SlaveWorker::pending->masters.update.insert( keyValueUpdate );
+		pthread_mutex_unlock( &SlaveWorker::pending->masters.updateLock );
 
 		// Compute delta and perform update
 		chunk->computeDelta(
@@ -835,7 +837,10 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 		// Send UPDATE_CHUNK requests to parity slaves
 		for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
 			key.ptr = ( void * ) this->paritySlaveSockets[ i ];
+
+			pthread_mutex_lock( &SlaveWorker::pending->slavePeers.updateLock );
 			SlaveWorker::pending->slavePeers.updateChunk.insert( chunkUpdate );
+			pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.updateLock );
 
 			SlavePeerEvent slavePeerEvent;
 			slavePeerEvent.reqUpdateChunk(
@@ -885,7 +890,7 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 	);
 
 	// Detect degraded DELETE
-	if ( ! this->isRedirectedRequest( header.key, header.keySize ) ) {
+	if ( this->isRedirectedRequest( header.key, header.keySize ) ) {
 		__DEBUG__( YELLOW, "SlaveWorker", "handleDeleteRequest", "!!! Degraded DELETE request [not yet implemented] !!!" );
 		// TODO
 	}
@@ -909,7 +914,10 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 
 		// Add the current request to the pending set
 		key.dup( header.keySize, header.key, ( void * ) event.socket );
+
+		pthread_mutex_lock( &SlaveWorker::pending->masters.delLock );
 		SlaveWorker::pending->masters.del.insert( key );
+		pthread_mutex_unlock( &SlaveWorker::pending->masters.delLock );
 
 		// Update data chunk and map
 		delta = this->protocol.buffer.recv + PROTO_KEY_SIZE + key.size;
@@ -933,7 +941,10 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 
 		for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
 			key.ptr = ( void * ) this->paritySlaveSockets[ i ];
+
+			pthread_mutex_lock( &SlaveWorker::pending->slavePeers.delLock );
 			SlaveWorker::pending->slavePeers.deleteChunk.insert( chunkUpdate );
+			pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.delLock );
 
 			SlavePeerEvent slavePeerEvent;
 			slavePeerEvent.reqDeleteChunk(
@@ -1006,7 +1017,7 @@ bool SlaveWorker::handleUpdateChunkRequest( SlavePeerEvent event, char *buf, siz
 	);
 
 	// Detect degraded UPDATE_CHUNK
-	if ( ! this->isRedirectedRequest( header.listId, header.updatingChunkId ) ) {
+	if ( this->isRedirectedRequest( header.listId, header.updatingChunkId ) ) {
 		__DEBUG__( YELLOW, "SlaveWorker", "handleUpdateChunkRequest", "!!! Degraded UPDATE_CHUNK request [not yet implemented] !!!" );
 		// TODO
 	}
@@ -1047,7 +1058,7 @@ bool SlaveWorker::handleDeleteChunkRequest( SlavePeerEvent event, char *buf, siz
 	);
 
 	// Detect degraded UPDATE_CHUNK
-	if ( ! this->isRedirectedRequest( header.listId, header.updatingChunkId ) ) {
+	if ( this->isRedirectedRequest( header.listId, header.updatingChunkId ) ) {
 		__DEBUG__( YELLOW, "SlaveWorker", "handleDeleteChunkRequest", "!!! Degraded DELETE_CHUNK request [not yet implemented] !!!" );
 		// TODO
 	}
@@ -1154,8 +1165,10 @@ bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success,
 	chunkUpdate.setKeyValueUpdate( 0, 0, 0 );
 	chunkUpdate.ptr = ( void * ) event.socket;
 
+	pthread_mutex_lock( &SlaveWorker::pending->slavePeers.updateLock );
 	it = SlaveWorker::pending->slavePeers.updateChunk.lower_bound( chunkUpdate );
 	if ( it == SlaveWorker::pending->slavePeers.updateChunk.end() || ! chunkUpdate.equal( *it ) ) {
+		pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.updateLock );
 		__ERROR__( "SlaveWorker", "handleUpdateChunkResponse", "Cannot find a pending slave UPDATE_CHUNK request that matches the response. This message will be discarded." );
 		return false;
 	}
@@ -1166,6 +1179,8 @@ bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success,
 	chunkUpdate.ptr = 0;
 	it = SlaveWorker::pending->slavePeers.updateChunk.lower_bound( chunkUpdate );
 	for ( pending = 0; it != SlaveWorker::pending->slavePeers.updateChunk.end() && chunkUpdate.equal( *it ); pending++, it++ );
+	pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.updateLock );
+
 	__ERROR__( "SlaveWorker", "handleUpdateChunkResponse", "Pending slave UPDATE_CHUNK requests = %d (%s).", pending, success ? "success" : "fail" );
 	if ( pending == 0 ) {
 		// Only send application UPDATE response when the number of pending slave UPDATE_CHUNK requests equal 0
@@ -1177,12 +1192,16 @@ bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success,
 		keyValueUpdate.set( chunkUpdate.keySize, chunkUpdate.key, 0 );
 		keyValueUpdate.offset = chunkUpdate.valueUpdateOffset;
 		keyValueUpdate.length = chunkUpdate.length;
+
+		pthread_mutex_lock( &SlaveWorker::pending->masters.updateLock );
 		it = SlaveWorker::pending->masters.update.lower_bound( keyValueUpdate );
 		if ( it == SlaveWorker::pending->masters.update.end() || ! keyValueUpdate.equal( *it ) ) {
+			pthread_mutex_unlock( &SlaveWorker::pending->masters.updateLock );
 			__ERROR__( "SlaveWorker", "handleUpdateChunkResponse", "Cannot find a pending master UPDATE request that matches the response. This message will be discarded." );
 			return false;
 		}
 		keyValueUpdate = *it;
+		pthread_mutex_unlock( &SlaveWorker::pending->masters.updateLock );
 
 		key.set( keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.ptr );
 		masterEvent.resUpdate(
@@ -1218,8 +1237,10 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 	chunkUpdate.setKeyValueUpdate( 0, 0, 0 );
 	chunkUpdate.ptr = ( void * ) event.socket;
 
+	pthread_mutex_lock( &SlaveWorker::pending->slavePeers.delLock );
 	it = SlaveWorker::pending->slavePeers.deleteChunk.lower_bound( chunkUpdate );
 	if ( it == SlaveWorker::pending->slavePeers.deleteChunk.end() || ! chunkUpdate.equal( *it ) ) {
+		pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.delLock );
 		__ERROR__( "SlaveWorker", "handleDeleteChunkResponse", "Cannot find a pending slave DELETE_CHUNK request that matches the response. This message will be discarded." );
 		return false;
 	}
@@ -1230,6 +1251,8 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 	chunkUpdate.ptr = 0;
 	it = SlaveWorker::pending->slavePeers.deleteChunk.lower_bound( chunkUpdate );
 	for ( pending = 0; it != SlaveWorker::pending->slavePeers.deleteChunk.end() && chunkUpdate.equal( *it ); pending++, it++ );
+	pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.delLock );
+
 	__ERROR__( "SlaveWorker", "handleDeleteChunkResponse", "Pending slave DELETE_CHUNK requests = %d.", pending );
 	if ( pending == 0 ) {
 		// Only send application DELETE response when the number of pending slave DELETE_CHUNK requests equal 0
@@ -1238,12 +1261,16 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 		Key key;
 
 		key.set( chunkUpdate.keySize, chunkUpdate.key, 0 );
+
+		pthread_mutex_lock( &SlaveWorker::pending->masters.delLock );
 		it = SlaveWorker::pending->masters.del.lower_bound( key );
 		if ( it == SlaveWorker::pending->masters.del.end() || ! key.equal( *it ) ) {
+			pthread_mutex_unlock( &SlaveWorker::pending->masters.delLock );
 			__ERROR__( "SlaveWorker", "handleDeleteChunkResponse", "Cannot find a pending master DELETE request that matches the response. This message will be discarded." );
 			return false;
 		}
 		key = *it;
+		pthread_mutex_unlock( &SlaveWorker::pending->masters.delLock );
 		masterEvent.resDelete( ( MasterSocket * ) key.ptr, key, success );
 		SlaveWorker::eventQueue->insert( masterEvent );
 	}
@@ -1287,8 +1314,10 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 		);
 	}
 
+	pthread_mutex_lock( &SlaveWorker::pending->slavePeers.getLock );
 	it = SlaveWorker::pending->slavePeers.getChunk.lower_bound( chunkRequest );
 	if ( it == SlaveWorker::pending->slavePeers.getChunk.end() || ! chunkRequest.equal( *it ) ) {
+		pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.getLock );
 		__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot find a pending slave GET_CHUNK request that matches the response. This message will be discarded." );
 		return false;
 	}
@@ -1300,6 +1329,8 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 	chunkRequest.socket = 0;
 	it = SlaveWorker::pending->slavePeers.getChunk.lower_bound( chunkRequest );
 	for ( pending = 0; it != SlaveWorker::pending->slavePeers.getChunk.end() && chunkRequest.matchStripe( *it ); pending++, it++ );
+	pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.getLock );
+
 	__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Pending slave GET_CHUNK requests = %d (%s).", pending, success ? "success" : "fail" );
 	if ( pending == 0 ) {
 		__ERROR__( "SlaveWorker", "handleGetChunkResponse", "What should be done after all GET_CHUNK requests return?" );
@@ -1328,13 +1359,16 @@ bool SlaveWorker::handleSetChunkResponse( SlavePeerEvent event, bool success, ch
 		event.socket, 0 // ptr
 	);
 
+	pthread_mutex_lock( &SlaveWorker::pending->slavePeers.setLock );
 	it = SlaveWorker::pending->slavePeers.setChunk.lower_bound( chunkRequest );
 	if ( it == SlaveWorker::pending->slavePeers.setChunk.end() || ! chunkRequest.equal( *it ) ) {
+		pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.setLock );
 		__ERROR__( "SlaveWorker", "handleSetChunkResponse", "Cannot find a pending slave SET_CHUNK request that matches the response. This message will be discarded." );
 		return false;
 	}
 	chunkRequest = *it;
 	SlaveWorker::pending->slavePeers.setChunk.erase( it );
+	pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.setLock );
 
 	// TODO: What should we do next?
 
@@ -1351,6 +1385,7 @@ void SlaveWorker::free() {
 	this->parityChunk->free();
 	delete this->dataChunk;
 	delete this->parityChunk;
+	delete[] this->chunks;
 	delete[] this->dataSlaveSockets;
 	delete[] this->paritySlaveSockets;
 }
@@ -1450,6 +1485,7 @@ bool SlaveWorker::init( GlobalConfig &globalConfig, SlaveConfig &slaveConfig, Wo
 	this->role = role;
 	this->dataChunk = new Chunk();
 	this->parityChunk = new Chunk();
+	this->chunks = new Chunk*[ SlaveWorker::dataChunkCount + SlaveWorker::parityChunkCount ];
 	this->dataChunk->init( globalConfig.size.chunk );
 	this->parityChunk->init( globalConfig.size.chunk );
 	this->dataSlaveSockets = new SlavePeerSocket*[ SlaveWorker::dataChunkCount ];

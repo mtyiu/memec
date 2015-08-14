@@ -9,9 +9,14 @@
 #include "key_value.hh"
 
 enum ChunkStatus {
-	CHUNK_STATUS_EMPTY, // Clean chunk (used in chunk buffer)
-	CHUNK_STATUS_DIRTY, // Some data is written and the chunk should be flushed later
-	CHUNK_STATUS_CACHED // The chunk contains data that is already flushed to disk
+	// Clean chunk (used in chunk buffer)
+	CHUNK_STATUS_EMPTY,
+	// Some data is written and the chunk should be flushed later
+	CHUNK_STATUS_DIRTY,
+	// The chunk contains data that is already flushed to disk
+	CHUNK_STATUS_CACHED,
+	// Reconstructed using k other chunks
+	CHUNK_STATUS_RECONSTRUCTED
 };
 
 class Chunk {

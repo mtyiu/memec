@@ -29,7 +29,7 @@ private:
 	SlaveProtocol protocol;
 	Storage *storage;
 	// Temporary variables
-	Chunk *dataChunk, *parityChunk;
+	Chunk *dataChunk, *parityChunk, **chunks;
 	SlavePeerSocket **dataSlaveSockets;
 	SlavePeerSocket **paritySlaveSockets;
 	static uint32_t dataChunkCount;
