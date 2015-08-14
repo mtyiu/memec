@@ -89,6 +89,11 @@ public:
 
 	inline uint32_t getK() {
 		switch( this->scheme ) {
+            case CS_RAID5:
+                return this->get( 0 ) - 1;
+            case CS_RDP:
+            case CS_EVENODD:
+                return this->get( 0 ) - 2;
 			case CS_RS:
 			case CS_CAUCHY:
 				return this->get( 0 );

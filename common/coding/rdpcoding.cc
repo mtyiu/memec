@@ -3,10 +3,6 @@
 #include <cstring>
 #include "rdpcoding.hh"
 
-extern "C" {
-#include "../../lib/jerasure/include/galois.h"
-}
-
 const uint32_t RDPCoding::primeList[ primeCount ] = {
             2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 
             31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 
@@ -29,7 +25,8 @@ const uint32_t RDPCoding::primeList[ primeCount ] = {
 
 
 RDPCoding::RDPCoding( uint32_t k, uint32_t chunkSize ) {
-    this->_raid5Coding = new Raid5Coding2( k, chunkSize );
+    this->_raid5Coding = new RAID5Coding();
+    this->_raid5Coding->init( k + 1 );
     this->_k = k;
     this->_chunkSize = chunkSize;
     this->_symbolSize = getSymbolSize();
@@ -55,6 +52,7 @@ void RDPCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t index )
         // need the row parity for encoding the diagonal parity
         Chunk firstParity;
         firstParity.data = new char[ chunkSize ];
+        firstParity.size = chunkSize;
 
         this->_raid5Coding->encode( dataChunks, &firstParity, index );
         
@@ -71,19 +69,15 @@ void RDPCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t index )
                 if ( pidx == p - 1 )
                     continue;
 
-                uint32_t len = symbolSize;
-                // last symbol of each chunk is assume to be packed with zeros, 
-                // i.e. can be ignored in XOR operations
-                if ( sidx == p - 2 )  
-                    len = chunkSize - sidx * symbolSize;
-
-                //fprintf( stderr, " encode (%d, %d) on (%d, %d) with len %d \n", cidx, sidx , p - 1, pidx, len );
+                //fprintf( stderr, " encode (%d, %d) on (%d, %d) with len %d \n", cidx, sidx , p - 1, pidx, symbolSize );
                 if ( cidx < k ) 
-                    galois_region_xor ( dataChunks[ cidx ]->data + sidx * symbolSize , 
-                            parityChunk->data + pidx * symbolSize , len );
+                    this->bitwiseXOR( parityChunk->data + pidx * symbolSize, 
+                            dataChunks[ cidx ]->data + sidx * symbolSize, 
+                            parityChunk->data + pidx * symbolSize, symbolSize );
                 else 
-                    galois_region_xor ( firstParity.data + sidx * symbolSize , 
-                            parityChunk->data + pidx * symbolSize , len );
+                    this->bitwiseXOR( parityChunk->data + pidx * symbolSize, 
+                            firstParity.data + sidx * symbolSize, 
+                            parityChunk->data + pidx * symbolSize, symbolSize );
             }
         }
 
@@ -148,13 +142,13 @@ bool RDPCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
             chunkToRRepair = failed[ 1 ];
         }
         uint32_t didxToRepair = chunkToRRepair - 1;
-        uint32_t sidxToRepair =  ( didxToRepair + p - chunkToDRepair ) % p;
+        uint32_t sidxToRepair = ( didxToRepair + p - chunkToDRepair ) % p;
 
         for ( uint32_t recoveredSymbolCount = 0;
                 recoveredSymbolCount < ( p - 1 ) * failed.size(); 
                 recoveredSymbolCount += 2 ) {
 
-            uint32_t sidx, len;
+            uint32_t sidx;
         
             //fprintf( stderr, "repair symbol (%d,%d) (%d,%d)\n", chunkToDRepair, 
             //        sidxToRepair, chunkToRRepair, sidxToRepair );
@@ -171,10 +165,11 @@ bool RDPCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
 
                 // diagonal, max. idx of symbols (within a chunk) is p-2
                 if ( sidx != p - 1 ) {
-                    len = ( sidx == p - 2 || sidxToRepair == p - 2 ) ? 
-                            chunkSize - (p - 2) * symbolSize : symbolSize;
-                    galois_region_xor ( chunks[ cidx ]->data + sidx * symbolSize, 
-                            chunks[ chunkToDRepair ]->data + sidxToRepair * symbolSize, len );
+                    this->bitwiseXOR( chunks[ chunkToDRepair ]->data + sidxToRepair * symbolSize,
+                            chunks[ cidx ]->data + sidx * symbolSize,
+                            chunks[ chunkToDRepair ]->data + sidxToRepair * symbolSize,
+                            symbolSize );
+
                 }
 
                 // skip the symbol to repair in the row direction
@@ -183,25 +178,22 @@ bool RDPCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
 
                 // row, XOR symbols in the same row
                 sidx = sidxToRepair;
-                len = ( sidx == p - 2 ) ? 
-                        chunkSize - (p - 2) * symbolSize : symbolSize;
-                galois_region_xor ( chunks[ cidx ]->data + sidxToRepair * symbolSize,
-                        chunks[ chunkToRRepair ]->data + sidxToRepair * symbolSize, len );
+                this->bitwiseXOR( chunks[ chunkToRRepair ]->data + sidxToRepair * symbolSize,
+                        chunks[ cidx ]->data  + sidxToRepair * symbolSize,
+                        chunks[ chunkToRRepair ]->data + sidxToRepair * symbolSize, symbolSize );
 
             }
 
             // diagonal, XOR the diagonal parity
-            len = ( sidxToRepair == p - 2 || didxToRepair == p - 2 ) ? 
-                    chunkSize - (p - 2) * symbolSize : symbolSize;
-            galois_region_xor ( chunks[ k + 1 ]->data + didxToRepair * symbolSize,
-                    chunks[ chunkToDRepair ]->data + sidxToRepair * symbolSize, len);
+            this->bitwiseXOR( chunks[ chunkToDRepair ]->data + sidxToRepair * symbolSize,
+                    chunks[ k + 1 ]->data + didxToRepair * symbolSize,
+                    chunks[ chunkToDRepair ]->data + sidxToRepair * symbolSize, symbolSize );
             //fprintf( stderr, " decode (%d, %d) on (%d, %d) with len %d \n", k + 1, didxToRepair , chunkToDRepair , sidxToRepair, len );
 
             // row, add back the just recovered symbol from diagonal decoding
-            len = ( sidxToRepair == p - 2 ) ? 
-                    chunkSize - (p - 2) * symbolSize : symbolSize;
-            galois_region_xor ( chunks[ chunkToDRepair ]->data + sidxToRepair * symbolSize,
-                    chunks[ chunkToRRepair ]->data + sidxToRepair * symbolSize, len );
+            this->bitwiseXOR ( chunks[ chunkToRRepair ]->data + sidxToRepair * symbolSize,
+                    chunks[ chunkToDRepair ]->data + sidxToRepair * symbolSize,
+                    chunks[ chunkToRRepair ]->data + sidxToRepair * symbolSize, symbolSize );
             //fprintf( stderr, " decode (%d, %d) on (%d, %d) with len %d \n", chunkToDRepair, sidxToRepair , chunkToRRepair , sidxToRepair, len );
 
             // search for next symbol to recover

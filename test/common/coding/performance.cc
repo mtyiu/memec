@@ -4,18 +4,21 @@
 #include "../../../common/ds/bitmask_array.hh"
 #include "../../../common/coding/coding_scheme.hh"
 #include "../../../common/coding/all_coding.hh"
-#include "../../../common/coding/coding_handler.hh"
+#include "../../../common/coding/coding_params.hh"
 #include "../../../common/util/time.hh"
 
 #define CHUNK_SIZE (8192)
-#define C_K (12)
+#define C_K (4)
 #define C_M (2)
-#define FAIL (2)
-#define FAIL2 (3)
-#define FAIL3 (4)
+#define FAIL (0)
+#define FAIL2 (1)
+#define FAIL3 (3)
 #define ROUNDS (5000)
 
-struct CodingHandler handle;
+Coding* handle;
+CodingParams params;
+CodingScheme scheme;
+
 
 void usage( char* argv ) {
     fprintf( stderr, "Usage: %s [raid5|cauchy|rdp|rs|evenodd]\n", argv);
@@ -43,17 +46,22 @@ void printChunk( Chunk *chunk, uint32_t id = 0 ) {
 }
 
 bool parseInput( char* arg ) {
-    if ( strcmp ( arg, "raid5" ) == 0 )
-        handle.scheme = CS_RAID5;
-    else if ( strcmp ( arg, "cauchy" ) == 0 )
-        handle.scheme = CS_CAUCHY;
-    else if ( strcmp ( arg, "rdp" ) == 0 )
-        handle.scheme = CS_RDP;
-    else if ( strcmp ( arg, "rs" ) == 0 )
-        handle.scheme = CS_RS;
-    else if ( strcmp ( arg, "evenodd" ) == 0 )
-        handle.scheme = CS_EVENODD;
-    else
+    if ( strcmp ( arg, "raid5" ) == 0 ) {
+        params.setScheme ( CS_RAID5 );
+        scheme  = CS_RAID5;
+    } else if ( strcmp ( arg, "cauchy" ) == 0 ) {
+        params.setScheme ( CS_CAUCHY );
+        scheme  = CS_CAUCHY;
+    } else if ( strcmp ( arg, "rdp" ) == 0 ) {
+        params.setScheme ( CS_RDP );
+        scheme  = CS_RDP;
+    } else if ( strcmp ( arg, "rs" ) == 0 ) {
+        params.setScheme ( CS_RS );
+        scheme  = CS_RS;
+    } else if ( strcmp ( arg, "evenodd" ) == 0 ) {
+        params.setScheme ( CS_EVENODD );
+        scheme  = CS_EVENODD;
+    } else
         return false;
 
     return true;
@@ -82,6 +90,7 @@ int main( int argc, char **argv ) {
         if ( idx % 2 == 0 ) {
             chunks[ idx / 2 ] = ( Chunk* ) malloc ( sizeof( Chunk ) );
             chunks[ idx / 2 ]->data = buf + ( idx / 2 ) * CHUNK_SIZE;
+            chunks[ idx / 2 ]->size = CHUNK_SIZE;
 
             // mark the chunk status
             bitmap.set ( idx / 2 , 0 );
@@ -92,6 +101,7 @@ int main( int argc, char **argv ) {
         memset( buf + idx * CHUNK_SIZE, 0, CHUNK_SIZE );
         chunks[ idx ] = ( Chunk* ) malloc ( sizeof( Chunk ) );
         chunks[ idx ]->data = buf + idx * CHUNK_SIZE;
+        chunks[ idx ]->size = CHUNK_SIZE;
         bitmap.set ( idx  , 0 );
     }
 
@@ -99,63 +109,41 @@ int main( int argc, char **argv ) {
     failed.push_back( FAIL );
     failed.push_back( FAIL2 );
     failed.push_back( FAIL3 );
-    switch ( handle.scheme ) {
+    
+    uint32_t m = 0;
+    switch ( scheme ) {
         case CS_RAID5:
-            handle.raid5 = new Raid5Coding2( C_K, CHUNK_SIZE );
+            m = 1;
             printf( ">> encode K: %d   M: 1   ", C_K );
             break;
         case CS_RDP:
-            handle.rdp = new RDPCoding( C_K, CHUNK_SIZE );
+            m = 2;
             printf( ">> encode K: %d   M: 2   ", C_K );
             break;
         case CS_CAUCHY:
-            handle.cauchy = new CauchyCoding( C_K, C_M, CHUNK_SIZE );
+            m = C_M;
             printf( ">> encode K: %d   M: %d   ", C_K, C_M );
             break;
         case CS_RS:
-            handle.rs = new RSCoding( C_K, C_M, CHUNK_SIZE );
+            m = C_M;
             printf( ">> encode K: %d   M: %d   ", C_K, C_M );
             break;
         case CS_EVENODD:
-            handle.evenodd = new EvenOddCoding( C_K, CHUNK_SIZE );
+            m = 2;
             printf( ">> encode K: %d   M: 2   ", C_K );
             break;
         default:
             return -1;
     }
+    params.setK( C_K );
+    params.setN( C_K + m );
+    params.setM( m );
+    handle = Coding::instantiate( scheme, params, CHUNK_SIZE );
 
     struct timespec st = start_timer();
-    uint32_t m = 0;
     for ( uint32_t round = 0 ; round < ROUNDS ; round ++ ) {
-        switch ( handle.scheme ) {
-            case CS_RAID5:
-                handle.raid5->encode ( chunks, chunks[ C_K ], 1 );
-                m = 1;
-                break;
-            case CS_RDP:
-                handle.rdp->encode ( chunks, chunks[ C_K ], 1 );
-                handle.rdp->encode ( chunks, chunks[ C_K + 1 ], 2 );
-                m = 2;
-                break;
-            case CS_CAUCHY:
-                for (uint32_t idx = 0 ; idx < C_M ; idx ++ ) {
-                    handle.cauchy->encode ( chunks, chunks[ C_K + idx ], idx + 1 );
-                }
-                m = C_M;
-                break;
-            case CS_RS:
-                for (uint32_t idx = 0 ; idx < C_M ; idx ++ ) {
-                    handle.rs->encode ( chunks, chunks[ C_K + idx ], idx + 1 );
-                }
-                m = C_M;
-                break;
-            case CS_EVENODD:
-                handle.evenodd->encode ( chunks, chunks[ C_K ], 1 );
-                handle.evenodd->encode ( chunks, chunks[ C_K + 1 ], 2 );
-                m = 2;
-                break;
-            default:
-                return -1;
+        for (uint32_t idx = 0 ; idx < m ; idx ++ ) {
+            handle->encode( chunks, chunks[ C_K + idx ], idx + 1 );
         }
     }
     // report time per encoding operations
@@ -169,30 +157,17 @@ int main( int argc, char **argv ) {
 
     st = start_timer();
     for ( uint32_t round = 0 ; round < ROUNDS ; round ++ ) {
-        switch ( handle.scheme ) {
-            case CS_RAID5:
-                handle.raid5->decode ( chunks, &bitmap );
-                break;
-            case CS_RDP:
-                handle.rdp->decode ( chunks, &bitmap );
-                break;
-            case CS_CAUCHY:
-                handle.cauchy->decode ( chunks, &bitmap );
-                break;
-            case CS_RS:
-                handle.rs->decode ( chunks, &bitmap );
-                break;
-            case CS_EVENODD:
-                handle.evenodd->decode ( chunks, &bitmap );
-                break;
-            default:
-                return -1;
-        }
+        handle->decode ( chunks, &bitmap );
     }
     report( get_elapsed_time( st ) );
 
+    // reset size to avoid change in size by key-value compaction 
+    for ( uint32_t idx = 0 ; idx < C_K ; idx ++ ) {
+        chunks[ idx ]->size = CHUNK_SIZE;
+    }
+
     // double failure
-    if ( handle.scheme != CS_RAID5 ) {
+    if ( scheme != CS_RAID5 ) {
         memset ( readbuf , 0, CHUNK_SIZE * C_M ); 
         printf( ">> fail disk %d, ", failed[ 0 ]);
         bitmap.unset ( failed[ 0 ], 0 );
@@ -202,28 +177,18 @@ int main( int argc, char **argv ) {
 
         st = start_timer();
         for ( uint32_t round = 0 ; round < ROUNDS ; round ++ ) {
-            switch ( handle.scheme ) {
-                case CS_RDP:
-                    handle.rdp->decode ( chunks, &bitmap );
-                    break;
-                case CS_CAUCHY:
-                    handle.cauchy->decode ( chunks, &bitmap );
-                    break;
-                case CS_RS:
-                    handle.rs->decode ( chunks, &bitmap );
-                    break;
-                case CS_EVENODD:
-                    handle.evenodd->decode ( chunks, &bitmap );
-                    break;
-                default:
-                    return -1;
-            }
+            handle->decode ( chunks, &bitmap );
         }
         report( get_elapsed_time( st ) );
     }
 
+    // reset size to avoid change in size by key-value compaction 
+    for ( uint32_t idx = 0 ; idx < C_K ; idx ++ ) {
+        chunks[ idx ]->size = CHUNK_SIZE;
+    }
+
     // triple failure
-    if ( handle.scheme != CS_RAID5 && handle.scheme != CS_RDP && handle.scheme != CS_EVENODD && C_M > 2) {
+    if ( scheme != CS_RAID5 && scheme != CS_RDP && scheme != CS_EVENODD && C_M > 2) {
         memset ( readbuf , 0, CHUNK_SIZE * C_M ); 
         printf( ">> fail disk %d, ", failed[ 0 ]);
         bitmap.unset ( failed[ 0 ], 0 );
@@ -234,29 +199,20 @@ int main( int argc, char **argv ) {
         chunks[ failed[ 2 ] ]->data = readbuf + CHUNK_SIZE * 2;
         st = start_timer();
         for ( uint32_t round = 0 ; round < ROUNDS ; round ++ ) {
-            switch ( handle.scheme ) {
-                case CS_CAUCHY:
-                    handle.cauchy->decode ( chunks, &bitmap );
-                    break;
-                case CS_RS:
-                    handle.rs->decode ( chunks, &bitmap );
-                    break;
-                default:
-                    return -1;
-            }
+            handle->decode ( chunks, &bitmap );
         }
         report( get_elapsed_time( st ) );
 
     }
 
     // clean up
-    //free( buf );
-    //free( readbuf );
-    //for ( uint32_t idx = 0 ; idx < C_M + C_K ; idx ++ ) {
-    //    chunks[ idx ]->data = NULL;
-    //    free(chunks[ idx ]);
-    //}
-    //free( chunks );
+    free( buf );
+    free( readbuf );
+    for ( uint32_t idx = 0 ; idx < C_M + C_K ; idx ++ ) {
+        chunks[ idx ]->data = NULL;
+        free(chunks[ idx ]);
+    }
+    free( chunks );
 
     return 0;
 }

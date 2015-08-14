@@ -2,7 +2,6 @@
 #define __COMMON_CODING_EVENODDCODING_HH__
 
 #include "coding.hh"
-#include "raid5coding2.hh"
 #include "rdpcoding.hh"
 
 class EvenOddCoding : public RDPCoding {

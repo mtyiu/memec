@@ -3,7 +3,7 @@
 
 #include <vector>
 #include "coding.hh"
-#include "raid5coding2.hh"
+#include "raid5coding.hh"
 
 class RDPCoding : public Coding {
 
@@ -25,7 +25,7 @@ protected:
      */
     uint32_t getSymbolSize();
 
-    Raid5Coding2* _raid5Coding;
+    RAID5Coding* _raid5Coding;
     uint32_t _k;
     uint32_t _p;
     uint32_t _chunkSize;

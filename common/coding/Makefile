@@ -12,7 +12,7 @@ GFSRC_FILES=$(wildcard $(GFLIB_DIR)/src/*.c)
 
 OBJS= \
 	coding.o \
-	raid5coding2.o \
+	raid5coding.o \
 	rdpcoding.o \
 	cauchycoding.o \
 	rscoding.o \

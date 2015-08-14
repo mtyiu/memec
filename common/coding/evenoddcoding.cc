@@ -1,10 +1,6 @@
 #include <vector>
 #include "evenoddcoding.hh"
 
-extern "C" {
-#include "../../lib/jerasure/include/galois.h"
-}
-
 EvenOddCoding::EvenOddCoding( uint32_t k, uint32_t chunkSize ) :
         RDPCoding( k, chunkSize ) {
     this->_symbolSize = getSymbolSize();
@@ -38,10 +34,11 @@ void EvenOddCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t ind
 
                 // missing diagonal
                 if ( pidx == p - 1 ) {
-                    galois_region_xor ( dataChunks[ cidx ]->data + sidx * symbolSize , 
-                            s , symbolSize );
+                    this->bitwiseXOR( s, dataChunks[ cidx ]->data + sidx * symbolSize,
+                            s, symbolSize );
                 } else {
-                    galois_region_xor ( dataChunks[ cidx ]->data + sidx * symbolSize , 
+                    this->bitwiseXOR( parityChunk->data + pidx * symbolSize, 
+                            dataChunks[ cidx ]->data + sidx * symbolSize,
                             parityChunk->data + pidx * symbolSize , symbolSize );
                 }
             }
@@ -50,7 +47,8 @@ void EvenOddCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t ind
 
         // add S back
         for ( uint32_t sidx = 0 ; sidx < p - 1 ; sidx ++ ) {
-            galois_region_xor ( s, parityChunk->data + sidx * symbolSize , symbolSize );
+            this->bitwiseXOR( parityChunk->data + sidx * symbolSize, s, 
+                    parityChunk->data + sidx * symbolSize, symbolSize );
         }
 
         delete [] s;
@@ -113,11 +111,11 @@ bool EvenOddCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
             if ( cidx == failed[ 0 ] )
                 continue;
             uint32_t sidx = ( pidx + p - cidx ) % p;
-            galois_region_xor( chunks[ cidx ]->data + sidx * symbolSize, s , symbolSize );
+            this->bitwiseXOR( s, chunks[ cidx ]->data + sidx * symbolSize, s , symbolSize );
         }
         // diagonal symbol
         if ( pidx != p - 1 )
-            galois_region_xor( chunks[ k + 1 ]->data + pidx * symbolSize, s, symbolSize );
+            this->bitwiseXOR( s, chunks[ k + 1 ]->data + pidx * symbolSize, s , symbolSize );
 
         // recover data using diagonal parity and S
         for ( uint32_t sidxToRepair = 0 ; sidxToRepair < p - 1 ; sidxToRepair ++ ) {
@@ -129,13 +127,13 @@ bool EvenOddCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
                 uint32_t sidx = ( pidx + p - cidx ) % p;
                 if ( sidx > p - 2 )
                     continue;
-                galois_region_xor( chunks[ cidx ]->data + sidx * symbolSize, 
+                this->bitwiseXOR( failedSymbol, chunks[ cidx ]->data + sidx * symbolSize, 
                         failedSymbol, symbolSize );
             }
             if ( pidx != p - 1 ) 
-                galois_region_xor( chunks[ k + 1 ]->data + pidx * symbolSize, 
+                this->bitwiseXOR( failedSymbol, chunks[ k + 1 ]->data + pidx * symbolSize, 
                         failedSymbol, symbolSize );
-            galois_region_xor( s, failedSymbol, symbolSize );
+            this->bitwiseXOR( failedSymbol, s, failedSymbol, symbolSize );
         }
         
         // recover row parity
@@ -149,11 +147,11 @@ bool EvenOddCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
         s = new char [ symbolSize ];
         // first symbol
         memcpy( s, chunks[ k ]->data, symbolSize );
-        galois_region_xor( chunks[ k + 1 ]->data, s, symbolSize );
+        this->bitwiseXOR( s, chunks[ k + 1 ]->data, s, symbolSize );
         // remainging symbols
         for ( uint32_t sidx = 1 ; sidx < p - 1 ; sidx ++ ) {
-            galois_region_xor( chunks[ k ]->data + sidx * symbolSize, s, symbolSize );
-            galois_region_xor( chunks[ k + 1 ]->data + sidx * symbolSize, s, symbolSize );
+            this->bitwiseXOR( s, chunks[ k ]->data + sidx * symbolSize, s, symbolSize );
+            this->bitwiseXOR( s, chunks[ k + 1 ]->data + sidx * symbolSize, s, symbolSize );
         }
 
         uint32_t idx = 1;
@@ -177,16 +175,16 @@ bool EvenOddCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
                 if ( sidx == sidxToRepair || sidx == p - 1 )
                     continue;
 
-                galois_region_xor( chunks[ cidx ]->data + sidx * symbolSize, 
+                this->bitwiseXOR( symbolToRepair, chunks[ cidx ]->data + sidx * symbolSize, 
                         symbolToRepair, symbolSize );
             }
             // diagonal parity symbols
             if ( pidx != p - 1 ) {
-                galois_region_xor( chunks[ k + 1 ]->data + pidx * symbolSize, 
+                this->bitwiseXOR( symbolToRepair, chunks[ k + 1 ]->data + pidx * symbolSize, 
                         symbolToRepair, symbolSize );
             }
             // S
-            galois_region_xor( s, symbolToRepair, symbolSize );
+            this->bitwiseXOR( symbolToRepair, s, symbolToRepair, symbolSize );
 
             // row
             cidxToRepair = failed[ ( idx + 1 ) % 2 ];
@@ -195,7 +193,7 @@ bool EvenOddCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
             for ( uint32_t cidx = 0 ; cidx < k + 1 ; cidx ++ ) {
                 if ( cidx == cidxToRepair )
                     continue;
-                galois_region_xor( chunks[ cidx ]->data + sidxToRepair * symbolSize, 
+                this->bitwiseXOR( symbolToRepair, chunks[ cidx ]->data + sidxToRepair * symbolSize, 
                         symbolToRepair, symbolSize );
             }
 
