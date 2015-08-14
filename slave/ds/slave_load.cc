@@ -41,3 +41,11 @@ void SlaveLoad::updateChunk() {
 void SlaveLoad::delChunk() {
 	this->ops.del++;
 }
+
+void SlaveLoad::getChunk() {
+	this->ops.get++;
+}
+
+void SlaveLoad::setChunk() {
+	this->ops.set++;
+}

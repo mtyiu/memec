@@ -191,37 +191,37 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 			if ( ! this->protocol.parseHeader( header, buffer.data, buffer.size ) ) {
 				__ERROR__( "MasterWorker", "dispatch", "Undefined message (remaining bytes = %lu).", buffer.size );
 				break;
-			} else {
-				buffer.data += PROTO_HEADER_SIZE;
-				buffer.size -= PROTO_HEADER_SIZE;
-				if (
-					header.magic != PROTO_MAGIC_REQUEST ||
-					header.from != PROTO_MAGIC_FROM_APPLICATION
-				) {
-					__ERROR__( "MasterWorker", "dispatch", "Invalid protocol header." );
-					return;
-				}
-
-				switch( header.opcode ) {
-					case PROTO_OPCODE_GET:
-						this->handleGetRequest( event, buffer.data, buffer.size );
-						break;
-					case PROTO_OPCODE_SET:
-						this->handleSetRequest( event, buffer.data, buffer.size );
-						break;
-					case PROTO_OPCODE_UPDATE:
-						this->handleUpdateRequest( event, buffer.data, buffer.size );
-						break;
-					case PROTO_OPCODE_DELETE:
-						this->handleDeleteRequest( event, buffer.data, buffer.size );
-						break;
-					default:
-						__ERROR__( "MasterWorker", "dispatch", "Invalid opcode from application." );
-						return;
-				}
-				buffer.data += header.length;
-				buffer.size -= header.length;
 			}
+
+			buffer.data += PROTO_HEADER_SIZE;
+			buffer.size -= PROTO_HEADER_SIZE;
+			if (
+				header.magic != PROTO_MAGIC_REQUEST ||
+				header.from != PROTO_MAGIC_FROM_APPLICATION
+			) {
+				__ERROR__( "MasterWorker", "dispatch", "Invalid protocol header." );
+				return;
+			}
+
+			switch( header.opcode ) {
+				case PROTO_OPCODE_GET:
+					this->handleGetRequest( event, buffer.data, buffer.size );
+					break;
+				case PROTO_OPCODE_SET:
+					this->handleSetRequest( event, buffer.data, buffer.size );
+					break;
+				case PROTO_OPCODE_UPDATE:
+					this->handleUpdateRequest( event, buffer.data, buffer.size );
+					break;
+				case PROTO_OPCODE_DELETE:
+					this->handleDeleteRequest( event, buffer.data, buffer.size );
+					break;
+				default:
+					__ERROR__( "MasterWorker", "dispatch", "Invalid opcode from application." );
+					return;
+			}
+			buffer.data += header.length;
+			buffer.size -= header.length;
 		}
 	}
 
@@ -267,35 +267,35 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 			if ( ! this->protocol.parseHeader( header, buffer.data, buffer.size ) ) {
 				__ERROR__( "MasterWorker", "dispatch", "Undefined message (remaining bytes = %lu).", buffer.size );
 				break;
-			} else {
-				buffer.data += PROTO_HEADER_SIZE;
-				buffer.size -= PROTO_HEADER_SIZE;
-				// Validate message
-				if ( header.from != PROTO_MAGIC_FROM_COORDINATOR ) {
-					__ERROR__( "MasterWorker", "dispatch", "Invalid message source from coordinator." );
-					continue;
-				}
-				switch( header.opcode ) {
-					case PROTO_OPCODE_REGISTER:
-						switch( header.magic ) {
-							case PROTO_MAGIC_RESPONSE_SUCCESS:
-								event.socket->registered = true;
-								break;
-							case PROTO_MAGIC_RESPONSE_FAILURE:
-								__ERROR__( "MasterWorker", "dispatch", "Failed to register with coordinator." );
-								break;
-							default:
-								__ERROR__( "MasterWorker", "dispatch", "Invalid magic code from coordinator." );
-								break;
-						}
-						break;
-					default:
-						__ERROR__( "MasterWorker", "dispatch", "Invalid opcode from coordinator." );
-						continue;
-				}
-				buffer.data += header.length;
-				buffer.size -= header.length;
 			}
+
+			buffer.data += PROTO_HEADER_SIZE;
+			buffer.size -= PROTO_HEADER_SIZE;
+			// Validate message
+			if ( header.from != PROTO_MAGIC_FROM_COORDINATOR ) {
+				__ERROR__( "MasterWorker", "dispatch", "Invalid message source from coordinator." );
+				continue;
+			}
+			switch( header.opcode ) {
+				case PROTO_OPCODE_REGISTER:
+					switch( header.magic ) {
+						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							event.socket->registered = true;
+							break;
+						case PROTO_MAGIC_RESPONSE_FAILURE:
+							__ERROR__( "MasterWorker", "dispatch", "Failed to register with coordinator." );
+							break;
+						default:
+							__ERROR__( "MasterWorker", "dispatch", "Invalid magic code from coordinator." );
+							break;
+					}
+					break;
+				default:
+					__ERROR__( "MasterWorker", "dispatch", "Invalid opcode from coordinator." );
+					continue;
+			}
+			buffer.data += header.length;
+			buffer.size -= header.length;
 		}
 	}
 	if ( ! connected )
@@ -353,55 +353,55 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 			if ( ! this->protocol.parseHeader( header, buffer.data, buffer.size ) ) {
 				__ERROR__( "MasterWorker", "dispatch", "Undefined message (remaining bytes = %lu).", buffer.size );
 				break;
-			} else {
-				buffer.data += PROTO_HEADER_SIZE;
-				buffer.size -= PROTO_HEADER_SIZE;
-				// Validate message
-				if ( header.from != PROTO_MAGIC_FROM_SLAVE ) {
-					__ERROR__( "MasterWorker", "dispatch", "Invalid message source from slave." );
-					continue;
-				}
-
-				bool success;
-				switch( header.magic ) {
-					case PROTO_MAGIC_RESPONSE_SUCCESS:
-						success = true;
-						break;
-					case PROTO_MAGIC_RESPONSE_FAILURE:
-						success = false;
-						break;
-					default:
-						__ERROR__( "MasterWorker", "dispatch", "Invalid magic code from slave." );
-						continue;
-				}
-
-				switch( header.opcode ) {
-					case PROTO_OPCODE_REGISTER:
-						if ( success ) {
-							event.socket->registered = true;
-						} else {
-							__ERROR__( "MasterWorker", "dispatch", "Failed to register with slave." );
-						}
-						break;
-					case PROTO_OPCODE_GET:
-						this->handleGetResponse( event, success, buffer.data, buffer.size );
-						break;
-					case PROTO_OPCODE_SET:
-						this->handleSetResponse( event, success, buffer.data, buffer.size );
-						break;
-					case PROTO_OPCODE_UPDATE:
-						this->handleUpdateResponse( event, success, buffer.data, buffer.size );
-						break;
-					case PROTO_OPCODE_DELETE:
-						this->handleDeleteResponse( event, success, buffer.data, buffer.size );
-						break;
-					default:
-						__ERROR__( "MasterWorker", "dispatch", "Invalid opcode from slave." );
-						continue;
-				}
-				buffer.data += header.length;
-				buffer.size -= header.length;
 			}
+
+			buffer.data += PROTO_HEADER_SIZE;
+			buffer.size -= PROTO_HEADER_SIZE;
+			// Validate message
+			if ( header.from != PROTO_MAGIC_FROM_SLAVE ) {
+				__ERROR__( "MasterWorker", "dispatch", "Invalid message source from slave." );
+				continue;
+			}
+
+			bool success;
+			switch( header.magic ) {
+				case PROTO_MAGIC_RESPONSE_SUCCESS:
+					success = true;
+					break;
+				case PROTO_MAGIC_RESPONSE_FAILURE:
+					success = false;
+					break;
+				default:
+					__ERROR__( "MasterWorker", "dispatch", "Invalid magic code from slave." );
+					continue;
+			}
+
+			switch( header.opcode ) {
+				case PROTO_OPCODE_REGISTER:
+					if ( success ) {
+						event.socket->registered = true;
+					} else {
+						__ERROR__( "MasterWorker", "dispatch", "Failed to register with slave." );
+					}
+					break;
+				case PROTO_OPCODE_GET:
+					this->handleGetResponse( event, success, buffer.data, buffer.size );
+					break;
+				case PROTO_OPCODE_SET:
+					this->handleSetResponse( event, success, buffer.data, buffer.size );
+					break;
+				case PROTO_OPCODE_UPDATE:
+					this->handleUpdateResponse( event, success, buffer.data, buffer.size );
+					break;
+				case PROTO_OPCODE_DELETE:
+					this->handleDeleteResponse( event, success, buffer.data, buffer.size );
+					break;
+				default:
+					__ERROR__( "MasterWorker", "dispatch", "Invalid opcode from slave." );
+					continue;
+			}
+			buffer.data += header.length;
+			buffer.size -= header.length;
 		}
 	}
 	if ( ! connected )

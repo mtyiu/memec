@@ -15,6 +15,8 @@ public:
 	void print( FILE *f = stdout );
 	void updateChunk();
 	void delChunk();
+	void getChunk();
+	void setChunk();
 };
 
 #endif

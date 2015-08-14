@@ -133,35 +133,35 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 			if ( ! this->protocol.parseHeader( header, buffer.data, buffer.size ) ) {
 				__ERROR__( "SlaveWorker", "dispatch", "Undefined message (remaining bytes = %lu).", buffer.size );
 				break;
-			} else {
-				buffer.data += PROTO_HEADER_SIZE;
-				buffer.size -= PROTO_HEADER_SIZE;
-				// Validate message
-				if ( header.from != PROTO_MAGIC_FROM_COORDINATOR ) {
-					__ERROR__( "SlaveWorker", "dispatch", "Invalid message source from coordinator." );
-					continue;
-				}
-				switch( header.opcode ) {
-					case PROTO_OPCODE_REGISTER:
-						switch( header.magic ) {
-							case PROTO_MAGIC_RESPONSE_SUCCESS:
-								event.socket->registered = true;
-								break;
-							case PROTO_MAGIC_RESPONSE_FAILURE:
-								__ERROR__( "SlaveWorker", "dispatch", "Failed to register with coordinator." );
-								break;
-							default:
-								__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from coordinator." );
-								break;
-						}
-						break;
-					default:
-						__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from coordinator." );
-						return;
-				}
-				buffer.data += header.length;
-				buffer.size -= header.length;
 			}
+
+			buffer.data += PROTO_HEADER_SIZE;
+			buffer.size -= PROTO_HEADER_SIZE;
+			// Validate message
+			if ( header.from != PROTO_MAGIC_FROM_COORDINATOR ) {
+				__ERROR__( "SlaveWorker", "dispatch", "Invalid message source from coordinator." );
+				continue;
+			}
+			switch( header.opcode ) {
+				case PROTO_OPCODE_REGISTER:
+					switch( header.magic ) {
+						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							event.socket->registered = true;
+							break;
+						case PROTO_MAGIC_RESPONSE_FAILURE:
+							__ERROR__( "SlaveWorker", "dispatch", "Failed to register with coordinator." );
+							break;
+						default:
+							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from coordinator." );
+							break;
+					}
+					break;
+				default:
+					__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from coordinator." );
+					return;
+			}
+			buffer.data += PROTO_HEADER_SIZE + header.length;
+			buffer.size -= PROTO_HEADER_SIZE + header.length;
 		}
 	}
 	if ( ! connected )
@@ -297,37 +297,37 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 			if ( ! this->protocol.parseHeader( header, buffer.data, buffer.size ) ) {
 				__ERROR__( "SlaveWorker", "dispatch", "Undefined message (remaining bytes = %lu).", buffer.size );
 				break;
-			} else {
-				buffer.data += PROTO_HEADER_SIZE;
-				buffer.size -= PROTO_HEADER_SIZE;
-				// Validate message
-				if (
-					header.magic != PROTO_MAGIC_REQUEST ||
-					header.from != PROTO_MAGIC_FROM_MASTER
-				) {
-					__ERROR__( "SlaveWorker", "dispatch", "Invalid protocol header." );
-				}
-
-				switch( header.opcode ) {
-					case PROTO_OPCODE_GET:
-						this->handleGetRequest( event, buffer.data, buffer.size );
-						break;
-					case PROTO_OPCODE_SET:
-						this->handleSetRequest( event, buffer.data, buffer.size );
-						break;
-					case PROTO_OPCODE_UPDATE:
-						this->handleUpdateRequest( event, buffer.data, buffer.size );
-						break;
-					case PROTO_OPCODE_DELETE:
-						this->handleDeleteRequest( event, buffer.data, buffer.size );
-						break;
-					default:
-						__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from master." );
-						return;
-				}
-				buffer.data += header.length;
-				buffer.size -= header.length;
 			}
+
+			buffer.data += PROTO_HEADER_SIZE;
+			buffer.size -= PROTO_HEADER_SIZE;
+			// Validate message
+			if (
+				header.magic != PROTO_MAGIC_REQUEST ||
+				header.from != PROTO_MAGIC_FROM_MASTER
+			) {
+				__ERROR__( "SlaveWorker", "dispatch", "Invalid protocol header." );
+			}
+
+			switch( header.opcode ) {
+				case PROTO_OPCODE_GET:
+					this->handleGetRequest( event, buffer.data, buffer.size );
+					break;
+				case PROTO_OPCODE_SET:
+					this->handleSetRequest( event, buffer.data, buffer.size );
+					break;
+				case PROTO_OPCODE_UPDATE:
+					this->handleUpdateRequest( event, buffer.data, buffer.size );
+					break;
+				case PROTO_OPCODE_DELETE:
+					this->handleDeleteRequest( event, buffer.data, buffer.size );
+					break;
+				default:
+					__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from master." );
+					return;
+			}
+			buffer.data += header.length;
+			buffer.size -= header.length;
 		}
 	}
 
@@ -499,76 +499,114 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 			if ( ! this->protocol.parseHeader( header, buffer.data, buffer.size ) ) {
 				__ERROR__( "SlaveWorker", "dispatch", "Undefined message (remaining bytes = %lu).", buffer.size );
 				break;
-			} else {
-				buffer.data += PROTO_HEADER_SIZE;
-				buffer.size -= PROTO_HEADER_SIZE;
-				// Validate message
-				if ( header.from != PROTO_MAGIC_FROM_SLAVE ) {
-					__ERROR__( "SlaveWorker", "dispatch", "Invalid protocol header." );
-				}
-
-				switch ( header.opcode ) {
-					case PROTO_OPCODE_REGISTER:
-						switch( header.magic ) {
-							case PROTO_MAGIC_REQUEST:
-								this->handleSlavePeerRegisterRequest( event.socket, buffer.data, buffer.size );
-								break;
-							case PROTO_MAGIC_RESPONSE_SUCCESS:
-								event.socket->registered = true;
-								break;
-							case PROTO_MAGIC_RESPONSE_FAILURE:
-								__ERROR__( "SlaveWorker", "dispatch", "Failed to register with slave." );
-								break;
-							default:
-								__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
-								break;
-						}
-						break;
-					case PROTO_OPCODE_UPDATE_CHUNK:
-						switch( header.magic ) {
-							case PROTO_MAGIC_REQUEST:
-								fprintf( stderr, "handleUpdateChunkRequest\n" );
-								this->handleUpdateChunkRequest( event, buffer.data, buffer.size );
-								break;
-							case PROTO_MAGIC_RESPONSE_SUCCESS:
-								fprintf( stderr, "handleUpdateChunkResponse\n" );
-								this->handleUpdateChunkResponse( event, true, buffer.data, buffer.size );
-								break;
-							case PROTO_MAGIC_RESPONSE_FAILURE:
-								fprintf( stderr, "handleUpdateChunkResponse\n" );
-								this->handleUpdateChunkResponse( event, false, buffer.data, buffer.size );
-								break;
-							default:
-								__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
-								break;
-						}
-						break;
-					case PROTO_OPCODE_DELETE_CHUNK:
-						switch( header.magic ) {
-							case PROTO_MAGIC_REQUEST:
-								fprintf( stderr, "handleDeleteChunkRequest\n" );
-								this->handleDeleteChunkRequest( event, buffer.data, buffer.size );
-								break;
-							case PROTO_MAGIC_RESPONSE_SUCCESS:
-								fprintf( stderr, "handleDeleteChunkResponse\n" );
-								this->handleDeleteChunkResponse( event, true, buffer.data, buffer.size );
-								break;
-							case PROTO_MAGIC_RESPONSE_FAILURE:
-								fprintf( stderr, "handleDeleteChunkResponse\n" );
-								this->handleDeleteChunkResponse( event, false, buffer.data, buffer.size );
-								break;
-							default:
-								__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
-								break;
-						}
-						break;
-					default:
-						__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from slave: 0x%x.", header.opcode );
-						return;
-				}
-				buffer.data += header.length;
-				buffer.size -= header.length;
 			}
+
+			buffer.data += PROTO_HEADER_SIZE;
+			buffer.size -= PROTO_HEADER_SIZE;
+			// Validate message
+			if ( header.from != PROTO_MAGIC_FROM_SLAVE ) {
+				__ERROR__( "SlaveWorker", "dispatch", "Invalid protocol header." );
+			}
+
+			switch ( header.opcode ) {
+				case PROTO_OPCODE_REGISTER:
+					switch( header.magic ) {
+						case PROTO_MAGIC_REQUEST:
+							this->handleSlavePeerRegisterRequest( event.socket, buffer.data, buffer.size );
+							break;
+						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							event.socket->registered = true;
+							break;
+						case PROTO_MAGIC_RESPONSE_FAILURE:
+							__ERROR__( "SlaveWorker", "dispatch", "Failed to register with slave." );
+							break;
+						default:
+							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
+							break;
+					}
+					break;
+				case PROTO_OPCODE_UPDATE_CHUNK:
+					switch( header.magic ) {
+						case PROTO_MAGIC_REQUEST:
+							fprintf( stderr, "handleUpdateChunkRequest\n" );
+							this->handleUpdateChunkRequest( event, buffer.data, buffer.size );
+							break;
+						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							fprintf( stderr, "handleUpdateChunkResponse\n" );
+							this->handleUpdateChunkResponse( event, true, buffer.data, buffer.size );
+							break;
+						case PROTO_MAGIC_RESPONSE_FAILURE:
+							fprintf( stderr, "handleUpdateChunkResponse\n" );
+							this->handleUpdateChunkResponse( event, false, buffer.data, buffer.size );
+							break;
+						default:
+							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
+							break;
+					}
+					break;
+				case PROTO_OPCODE_DELETE_CHUNK:
+					switch( header.magic ) {
+						case PROTO_MAGIC_REQUEST:
+							fprintf( stderr, "handleDeleteChunkRequest\n" );
+							this->handleDeleteChunkRequest( event, buffer.data, buffer.size );
+							break;
+						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							fprintf( stderr, "handleDeleteChunkResponse\n" );
+							this->handleDeleteChunkResponse( event, true, buffer.data, buffer.size );
+							break;
+						case PROTO_MAGIC_RESPONSE_FAILURE:
+							fprintf( stderr, "handleDeleteChunkResponse\n" );
+							this->handleDeleteChunkResponse( event, false, buffer.data, buffer.size );
+							break;
+						default:
+							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
+							break;
+					}
+					break;
+				case PROTO_OPCODE_GET_CHUNK:
+					switch( header.magic ) {
+						case PROTO_MAGIC_REQUEST:
+							fprintf( stderr, "handleGetChunkRequest\n" );
+							this->handleGetChunkRequest( event, buffer.data, buffer.size );
+							break;
+						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							fprintf( stderr, "handleGetChunkResponse\n" );
+							this->handleGetChunkResponse( event, true, buffer.data, buffer.size );
+							break;
+						case PROTO_MAGIC_RESPONSE_FAILURE:
+							fprintf( stderr, "handleGetChunkResponse\n" );
+							this->handleGetChunkResponse( event, false, buffer.data, buffer.size );
+							break;
+						default:
+							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
+							break;
+					}
+					break;
+				case PROTO_OPCODE_SET_CHUNK:
+					switch( header.magic ) {
+						case PROTO_MAGIC_REQUEST:
+							fprintf( stderr, "handleSetChunkRequest\n" );
+							this->handleSetChunkRequest( event, buffer.data, buffer.size );
+							break;
+						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							fprintf( stderr, "handleSetChunkResponse\n" );
+							this->handleSetChunkResponse( event, true, buffer.data, buffer.size );
+							break;
+						case PROTO_MAGIC_RESPONSE_FAILURE:
+							fprintf( stderr, "handleSetChunkResponse\n" );
+							this->handleSetChunkResponse( event, false, buffer.data, buffer.size );
+							break;
+						default:
+							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
+							break;
+					}
+					break;
+				default:
+					__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from slave: 0x%x.", header.opcode );
+					return;
+			}
+			buffer.data += header.length;
+			buffer.size -= header.length;
 		}
 	}
 	if ( ! connected )
@@ -1036,6 +1074,62 @@ bool SlaveWorker::handleDeleteChunkRequest( SlavePeerEvent event, char *buf, siz
 	return ret;
 }
 
+bool SlaveWorker::handleGetChunkRequest( SlavePeerEvent event, char *buf, size_t size ) {
+	struct ChunkHeader header;
+	bool ret;
+	if ( ! this->protocol.parseChunkHeader( header, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleGetChunkRequest", "Invalid GET_CHUNK request." );
+		return false;
+	}
+	__DEBUG__(
+		BLUE, "SlaveWorker", "handleGetChunkRequest",
+		"[GET_CHUNK] List ID: %u; stripe ID: %u; chunk ID: %u.",
+		header.listId, header.stripeId, header.chunkId
+	);
+
+	Metadata metadata;
+	Chunk *chunk = map->findChunkById( header.listId, header.stripeId, header.chunkId, &metadata );
+	if ( chunk ) {
+		__ERROR__( "SlaveWorker", "handleGetChunkRequest", "TODO: GET_CHUNK not yet implemented!" );
+		ret = true;
+	} else {
+		ret = false;
+	}
+
+	event.resGetChunk( event.socket, metadata, ret, chunk );
+	this->load.getChunk();
+	this->dispatch( event );
+
+	return ret;
+}
+
+bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, char *buf, size_t size ) {
+	struct ChunkDataHeader header;
+	bool ret;
+	if ( ! this->protocol.parseChunkDataHeader( header, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleSetChunkRequest", "Invalid SET_CHUNK request." );
+		return false;
+	}
+	__DEBUG__(
+		BLUE, "SlaveWorker", "handleSetChunkRequest",
+		"[SET_CHUNK] List ID: %u; stripe ID: %u; chunk ID: %u; chunk size = %u.",
+		header.listId, header.stripeId, header.chunkId, header.size
+	);
+
+	Metadata metadata;
+	metadata.listId = header.listId;
+	metadata.stripeId = header.stripeId;
+	metadata.chunkId = header.chunkId;
+	__ERROR__( "SlaveWorker", "handleSetChunkRequest", "TODO: SET_CHUNK not yet implemented!" );
+	ret = false;
+
+	event.resSetChunk( event.socket, metadata, ret );
+	this->load.setChunk();
+	this->dispatch( event );
+
+	return ret;
+}
+
 bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
 	struct ChunkUpdateHeader header;
 	if ( ! this->protocol.parseChunkUpdateHeader( header, buf, size ) ) {
@@ -1153,6 +1247,97 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 		masterEvent.resDelete( ( MasterSocket * ) key.ptr, key, success );
 		SlaveWorker::eventQueue->insert( masterEvent );
 	}
+	return true;
+}
+
+bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
+	int pending;
+	std::set<ChunkRequest>::iterator it;
+	ChunkRequest chunkRequest;
+
+	if ( success ) {
+		struct ChunkDataHeader header;
+		if ( ! this->protocol.parseChunkDataHeader( header, buf, size ) ) {
+			__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Invalid GET_CHUNK (success) response." );
+			return false;
+		}
+		__DEBUG__(
+			BLUE, "SlaveWorker", "handleGetChunkResponse",
+			"[GET_CHUNK (success)] List ID: %u, stripe ID: %u, chunk ID: %u; chunk size = %u.",
+			header.listId, header.stripeId, header.chunkId, header.size
+		);
+		chunkRequest.set(
+			header.listId, header.stripeId, header.chunkId,
+			event.socket, 0 // ptr
+		);
+	} else {
+		struct ChunkHeader header;
+		if ( ! this->protocol.parseChunkHeader( header, buf, size ) ) {
+			__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Invalid GET_CHUNK (failure) response." );
+			return false;
+		}
+		__DEBUG__(
+			BLUE, "SlaveWorker", "handleGetChunkResponse",
+			"[GET_CHUNK (failure)] List ID: %u, stripe ID: %u, chunk ID: %u.",
+			header.listId, header.stripeId, header.chunkId
+		);
+		chunkRequest.set(
+			header.listId, header.stripeId, header.chunkId,
+			event.socket, 0 // ptr
+		);
+	}
+
+	it = SlaveWorker::pending->slavePeers.getChunk.lower_bound( chunkRequest );
+	if ( it == SlaveWorker::pending->slavePeers.getChunk.end() || ! chunkRequest.equal( *it ) ) {
+		__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot find a pending slave GET_CHUNK request that matches the response. This message will be discarded." );
+		return false;
+	}
+	chunkRequest = *it;
+	SlaveWorker::pending->slavePeers.getChunk.erase( it );
+
+	// Check pending slave GET_CHUNK requests
+	chunkRequest.chunkId = 0;
+	chunkRequest.socket = 0;
+	it = SlaveWorker::pending->slavePeers.getChunk.lower_bound( chunkRequest );
+	for ( pending = 0; it != SlaveWorker::pending->slavePeers.getChunk.end() && chunkRequest.matchStripe( *it ); pending++, it++ );
+	__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Pending slave GET_CHUNK requests = %d (%s).", pending, success ? "success" : "fail" );
+	if ( pending == 0 ) {
+		__ERROR__( "SlaveWorker", "handleGetChunkResponse", "What should be done after all GET_CHUNK requests return?" );
+	}
+	return true;
+}
+
+bool SlaveWorker::handleSetChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
+	struct ChunkHeader header;
+	if ( ! this->protocol.parseChunkHeader( header, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleSetChunkResponse", "Invalid SET_CHUNK response." );
+		return false;
+	}
+	__DEBUG__(
+		BLUE, "SlaveWorker", "handleSetChunkResponse",
+		"[SET_CHUNK (%s)] List ID: %u, stripe ID: %u, chunk ID: %u.",
+		success ? "success" : "failure",
+		header.listId, header.stripeId, header.chunkId
+	);
+
+	std::set<ChunkRequest>::iterator it;
+	ChunkRequest chunkRequest;
+
+	chunkRequest.set(
+		header.listId, header.stripeId, header.chunkId,
+		event.socket, 0 // ptr
+	);
+
+	it = SlaveWorker::pending->slavePeers.setChunk.lower_bound( chunkRequest );
+	if ( it == SlaveWorker::pending->slavePeers.setChunk.end() || ! chunkRequest.equal( *it ) ) {
+		__ERROR__( "SlaveWorker", "handleSetChunkResponse", "Cannot find a pending slave SET_CHUNK request that matches the response. This message will be discarded." );
+		return false;
+	}
+	chunkRequest = *it;
+	SlaveWorker::pending->slavePeers.setChunk.erase( it );
+
+	// TODO: What should we do next?
+
 	return true;
 }
 

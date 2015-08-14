@@ -174,190 +174,190 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 			if ( ! this->protocol.parseHeader( header, buffer.data, buffer.size ) ) {
 				__ERROR__( "ApplicationWorker", "dispatch", "Undefined message (remaining bytes = %lu).", buffer.size );
 				break;
-			} else {
-				buffer.data += PROTO_HEADER_SIZE;
-				buffer.size -= PROTO_HEADER_SIZE;
-				if ( header.from != PROTO_MAGIC_FROM_MASTER ) {
-					__ERROR__( "ApplicationWorker", "dispatch", "Invalid message source from master." );
+			}
+
+			buffer.data += PROTO_HEADER_SIZE;
+			buffer.size -= PROTO_HEADER_SIZE;
+			if ( header.from != PROTO_MAGIC_FROM_MASTER ) {
+				__ERROR__( "ApplicationWorker", "dispatch", "Invalid message source from master." );
+				return;
+			}
+			bool success;
+			switch( header.magic ) {
+				case PROTO_MAGIC_RESPONSE_SUCCESS:
+					success = true;
+					break;
+				case PROTO_MAGIC_RESPONSE_FAILURE:
+					success = false;
+					break;
+				default:
+					__ERROR__( "ApplicationWorker", "dispatch", "Invalid magic code from master." );
 					return;
-				}
-				bool success;
-				switch( header.magic ) {
-					case PROTO_MAGIC_RESPONSE_SUCCESS:
-						success = true;
-						break;
-					case PROTO_MAGIC_RESPONSE_FAILURE:
-						success = false;
-						break;
-					default:
-						__ERROR__( "ApplicationWorker", "dispatch", "Invalid magic code from master." );
+			}
+
+			switch( header.opcode ) {
+				case PROTO_OPCODE_REGISTER:
+					if ( success ) {
+						event.socket->registered = true;
+					} else {
+						__ERROR__( "ApplicationWorker", "dispatch", "Failed to register with master." );
+					}
+					break;
+				case PROTO_OPCODE_SET:
+					this->protocol.parseKeyHeader( keyHeader, buffer.data, buffer.size );
+					key.size = keyHeader.keySize;
+					key.data = keyHeader.key;
+					key.ptr = ( void * ) event.socket;
+					it = ApplicationWorker::pending->masters.set.find( key );
+					if ( it == ApplicationWorker::pending->masters.set.end() ) {
+						__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending master SET request that matches the response. This message will be discarded." );
 						return;
-				}
+					}
+					ApplicationWorker::pending->masters.set.erase( it );
 
-				switch( header.opcode ) {
-					case PROTO_OPCODE_REGISTER:
-						if ( success ) {
-							event.socket->registered = true;
+					key.ptr = 0;
+					it = ApplicationWorker::pending->application.set.lower_bound( key );
+					if ( it == ApplicationWorker::pending->application.set.end() || ! key.equal( *it ) ) {
+						__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending application SET request that matches the response. This message will be discarded." );
+						return;
+					}
+					key = *it;
+					ApplicationWorker::pending->application.set.erase( it );
+
+					// Report result
+					if ( success ) {
+						__ERROR__( "ApplicationWorker", "dispatch", "The key: %.*s is SET successfully.", key.size, key.data );
+					} else {
+						__ERROR__( "ApplicationWorker", "dispatch", "The key: %.*s is NOT SET.", key.size, key.data );
+					}
+
+					key.free();
+
+					break;
+				case PROTO_OPCODE_GET:
+					if ( success ) {
+						if ( this->protocol.parseKeyValueHeader( keyValueHeader, buffer.data, buffer.size ) ) {
+							key.size = keyValueHeader.keySize;
+							key.data = keyValueHeader.key;
+							key.ptr = ( void * ) event.socket;
 						} else {
-							__ERROR__( "ApplicationWorker", "dispatch", "Failed to register with master." );
-						}
-						break;
-					case PROTO_OPCODE_SET:
-						this->protocol.parseKeyHeader( keyHeader, buffer.data, buffer.size );
-						key.size = keyHeader.keySize;
-						key.data = keyHeader.key;
-						key.ptr = ( void * ) event.socket;
-						it = ApplicationWorker::pending->masters.set.find( key );
-						if ( it == ApplicationWorker::pending->masters.set.end() ) {
-							__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending master SET request that matches the response. This message will be discarded." );
+							__ERROR__( "ApplicationWorker", "dispatch", "Invalid key value header for GET." );
 							return;
 						}
-						ApplicationWorker::pending->masters.set.erase( it );
-
-						key.ptr = 0;
-						it = ApplicationWorker::pending->application.set.lower_bound( key );
-						if ( it == ApplicationWorker::pending->application.set.end() || ! key.equal( *it ) ) {
-							__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending application SET request that matches the response. This message will be discarded." );
-							return;
-						}
-						key = *it;
-						ApplicationWorker::pending->application.set.erase( it );
-
-						// Report result
-						if ( success ) {
-							__ERROR__( "ApplicationWorker", "dispatch", "The key: %.*s is SET successfully.", key.size, key.data );
-						} else {
-							__ERROR__( "ApplicationWorker", "dispatch", "The key: %.*s is NOT SET.", key.size, key.data );
-						}
-
-						key.free();
-
-						break;
-					case PROTO_OPCODE_GET:
-						if ( success ) {
-							if ( this->protocol.parseKeyValueHeader( keyValueHeader, buffer.data, buffer.size ) ) {
-								key.size = keyValueHeader.keySize;
-								key.data = keyValueHeader.key;
-								key.ptr = ( void * ) event.socket;
-							} else {
-								__ERROR__( "ApplicationWorker", "dispatch", "Invalid key value header for GET." );
-								return;
-							}
-						} else {
-							if ( this->protocol.parseKeyHeader( keyHeader, buffer.data, buffer.size ) ) {
-								key.size = keyHeader.keySize;
-								key.data = keyHeader.key;
-								key.ptr = ( void * ) event.socket;
-							} else {
-								__ERROR__( "ApplicationWorker", "dispatch", "Invalid key header for GET." );
-								return;
-							}
-						}
-
-						it = ApplicationWorker::pending->masters.get.find( key );
-						if ( it == ApplicationWorker::pending->masters.get.end() ) {
-							__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending master GET request that matches the response. This message will be discarded. (key = %.*s)", key.size, key.data );
-							return;
-						}
-						ApplicationWorker::pending->masters.get.erase( it );
-
-						key.ptr = 0;
-						it = ApplicationWorker::pending->application.get.lower_bound( key );
-						if ( it == ApplicationWorker::pending->application.get.end() || ! key.equal( *it ) ) {
-							__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending application GET request that matches the response. This message will be discarded." );
-							return;
-						}
-						key = *it;
-						ApplicationWorker::pending->application.get.erase( it );
-						fd = ( int )( uint64_t ) key.ptr;
-
-						if ( success ) {
-							ret = ::write( fd, keyValueHeader.value, keyValueHeader.valueSize );
-							__ERROR__( "ApplicationWorker", "dispatch", "The key: %.*s is GET successfully.", key.size, key.data );
-							if ( ret == -1 ) {
-								__ERROR__( "ApplicationWorker", "dispatch", "write(): %s.", strerror( errno ) );
-							} else if ( ret < keyValueHeader.valueSize ) {
-								__ERROR__( "ApplicationWorker", "dispatch", "The number of bytes written (%ld bytes) is not equal to the value size (%u bytes).", ret, keyValueHeader.valueSize );
-							}
-						} else {
-							__ERROR__( "ApplicationWorker", "dispatch", "The key: %.*s does not exist.", key.size, key.data );
-						}
-						::close( fd );
-						key.free();
-						break;
-					case PROTO_OPCODE_UPDATE:
-						if ( this->protocol.parseKeyValueUpdateHeader( keyValueUpdateHeader, buffer.data, buffer.size ) ) {
-							keyValueUpdate.size = keyValueUpdateHeader.keySize;
-							keyValueUpdate.data = keyValueUpdateHeader.key;
-							keyValueUpdate.offset = keyValueUpdateHeader.valueUpdateOffset;
-							keyValueUpdate.length = keyValueUpdateHeader.valueUpdateSize;
-							keyValueUpdate.ptr = ( void * ) event.socket;
-
-							keyValueUpdateIt = ApplicationWorker::pending->masters.update.find( keyValueUpdate );
-							if ( keyValueUpdateIt == ApplicationWorker::pending->masters.update.end() ) {
-								__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending master UPDATE request that matches the response. This message will be discarded. (key = %.*s)", keyValueUpdate.size, keyValueUpdate.data );
-								return;
-							}
-							ApplicationWorker::pending->masters.update.erase( keyValueUpdateIt );
-
-							keyValueUpdate.ptr = 0;
-							keyValueUpdateIt = ApplicationWorker::pending->application.update.lower_bound( keyValueUpdate );
-							if ( keyValueUpdateIt == ApplicationWorker::pending->application.update.end() || ! keyValueUpdate.equal( *keyValueUpdateIt ) ) {
-								__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending application UPDATE request that matches the response. This message will be discarded. (key = %.*s, size = %u)", keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size );
-								return;
-							}
-							keyValueUpdate = *keyValueUpdateIt;
-							ApplicationWorker::pending->application.update.erase( keyValueUpdateIt );
-
-							if ( success ) {
-								__ERROR__( "ApplicationWorker", "dispatch", "The key: %.*s is UPDATE successfully.", keyValueUpdate.size, keyValueUpdate.data );
-							} else {
-								__ERROR__( "ApplicationWorker", "dispatch", "The key: %.*s does not exist.", keyValueUpdate.size, keyValueUpdate.data );
-							}
-							keyValueUpdate.free();
-						} else {
-							__ERROR__( "ApplicationWorker", "dispatch", "Invalid key value update header for UPDATE." );
-						}
-						break;
-					case PROTO_OPCODE_DELETE:
+					} else {
 						if ( this->protocol.parseKeyHeader( keyHeader, buffer.data, buffer.size ) ) {
 							key.size = keyHeader.keySize;
 							key.data = keyHeader.key;
 							key.ptr = ( void * ) event.socket;
-
-							it = ApplicationWorker::pending->masters.del.find( key );
-							if ( it == ApplicationWorker::pending->masters.del.end() ) {
-								__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending master DELETE request that matches the response. This message will be discarded. (key = %.*s)", key.size, key.data );
-								return;
-							}
-							ApplicationWorker::pending->masters.del.erase( it );
-
-							key.ptr = 0;
-							it = ApplicationWorker::pending->application.del.lower_bound( key );
-							if ( it == ApplicationWorker::pending->application.del.end() || ! key.equal( *it ) ) {
-								__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending application DELETE request that matches the response. This message will be discarded." );
-								return;
-							}
-							key = *it;
-							ApplicationWorker::pending->application.del.erase( it );
-
-							if ( success ) {
-								__ERROR__( "ApplicationWorker", "dispatch", "The key: %.*s is DELETE successfully.", key.size, key.data );
-							} else {
-								__ERROR__( "ApplicationWorker", "dispatch", "The key: %.*s does not exist.", key.size, key.data );
-							}
-							key.free();
 						} else {
-							__ERROR__( "ApplicationWorker", "dispatch", "Invalid key header for DELETE." );
+							__ERROR__( "ApplicationWorker", "dispatch", "Invalid key header for GET." );
+							return;
 						}
-						break;
-					default:
-						__ERROR__( "ApplicationWorker", "dispatch", "Invalid opcode from master." );
+					}
+
+					it = ApplicationWorker::pending->masters.get.find( key );
+					if ( it == ApplicationWorker::pending->masters.get.end() ) {
+						__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending master GET request that matches the response. This message will be discarded. (key = %.*s)", key.size, key.data );
 						return;
-				}
-				buffer.data += header.length;
-				buffer.size -= header.length;
+					}
+					ApplicationWorker::pending->masters.get.erase( it );
+
+					key.ptr = 0;
+					it = ApplicationWorker::pending->application.get.lower_bound( key );
+					if ( it == ApplicationWorker::pending->application.get.end() || ! key.equal( *it ) ) {
+						__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending application GET request that matches the response. This message will be discarded." );
+						return;
+					}
+					key = *it;
+					ApplicationWorker::pending->application.get.erase( it );
+					fd = ( int )( uint64_t ) key.ptr;
+
+					if ( success ) {
+						ret = ::write( fd, keyValueHeader.value, keyValueHeader.valueSize );
+						__ERROR__( "ApplicationWorker", "dispatch", "The key: %.*s is GET successfully.", key.size, key.data );
+						if ( ret == -1 ) {
+							__ERROR__( "ApplicationWorker", "dispatch", "write(): %s.", strerror( errno ) );
+						} else if ( ret < keyValueHeader.valueSize ) {
+							__ERROR__( "ApplicationWorker", "dispatch", "The number of bytes written (%ld bytes) is not equal to the value size (%u bytes).", ret, keyValueHeader.valueSize );
+						}
+					} else {
+						__ERROR__( "ApplicationWorker", "dispatch", "The key: %.*s does not exist.", key.size, key.data );
+					}
+					::close( fd );
+					key.free();
+					break;
+				case PROTO_OPCODE_UPDATE:
+					if ( this->protocol.parseKeyValueUpdateHeader( keyValueUpdateHeader, buffer.data, buffer.size ) ) {
+						keyValueUpdate.size = keyValueUpdateHeader.keySize;
+						keyValueUpdate.data = keyValueUpdateHeader.key;
+						keyValueUpdate.offset = keyValueUpdateHeader.valueUpdateOffset;
+						keyValueUpdate.length = keyValueUpdateHeader.valueUpdateSize;
+						keyValueUpdate.ptr = ( void * ) event.socket;
+
+						keyValueUpdateIt = ApplicationWorker::pending->masters.update.find( keyValueUpdate );
+						if ( keyValueUpdateIt == ApplicationWorker::pending->masters.update.end() ) {
+							__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending master UPDATE request that matches the response. This message will be discarded. (key = %.*s)", keyValueUpdate.size, keyValueUpdate.data );
+							return;
+						}
+						ApplicationWorker::pending->masters.update.erase( keyValueUpdateIt );
+
+						keyValueUpdate.ptr = 0;
+						keyValueUpdateIt = ApplicationWorker::pending->application.update.lower_bound( keyValueUpdate );
+						if ( keyValueUpdateIt == ApplicationWorker::pending->application.update.end() || ! keyValueUpdate.equal( *keyValueUpdateIt ) ) {
+							__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending application UPDATE request that matches the response. This message will be discarded. (key = %.*s, size = %u)", keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size );
+							return;
+						}
+						keyValueUpdate = *keyValueUpdateIt;
+						ApplicationWorker::pending->application.update.erase( keyValueUpdateIt );
+
+						if ( success ) {
+							__ERROR__( "ApplicationWorker", "dispatch", "The key: %.*s is UPDATE successfully.", keyValueUpdate.size, keyValueUpdate.data );
+						} else {
+							__ERROR__( "ApplicationWorker", "dispatch", "The key: %.*s does not exist.", keyValueUpdate.size, keyValueUpdate.data );
+						}
+						keyValueUpdate.free();
+					} else {
+						__ERROR__( "ApplicationWorker", "dispatch", "Invalid key value update header for UPDATE." );
+					}
+					break;
+				case PROTO_OPCODE_DELETE:
+					if ( this->protocol.parseKeyHeader( keyHeader, buffer.data, buffer.size ) ) {
+						key.size = keyHeader.keySize;
+						key.data = keyHeader.key;
+						key.ptr = ( void * ) event.socket;
+
+						it = ApplicationWorker::pending->masters.del.find( key );
+						if ( it == ApplicationWorker::pending->masters.del.end() ) {
+							__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending master DELETE request that matches the response. This message will be discarded. (key = %.*s)", key.size, key.data );
+							return;
+						}
+						ApplicationWorker::pending->masters.del.erase( it );
+
+						key.ptr = 0;
+						it = ApplicationWorker::pending->application.del.lower_bound( key );
+						if ( it == ApplicationWorker::pending->application.del.end() || ! key.equal( *it ) ) {
+							__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending application DELETE request that matches the response. This message will be discarded." );
+							return;
+						}
+						key = *it;
+						ApplicationWorker::pending->application.del.erase( it );
+
+						if ( success ) {
+							__ERROR__( "ApplicationWorker", "dispatch", "The key: %.*s is DELETE successfully.", key.size, key.data );
+						} else {
+							__ERROR__( "ApplicationWorker", "dispatch", "The key: %.*s does not exist.", key.size, key.data );
+						}
+						key.free();
+					} else {
+						__ERROR__( "ApplicationWorker", "dispatch", "Invalid key header for DELETE." );
+					}
+					break;
+				default:
+					__ERROR__( "ApplicationWorker", "dispatch", "Invalid opcode from master." );
+					return;
 			}
+			buffer.data += header.length;
+			buffer.size -= header.length;
 		}
 	}
 	if ( ! connected )

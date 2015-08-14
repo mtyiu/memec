@@ -17,7 +17,7 @@ enum ChunkStatus {
 class Chunk {
 public:
 	static uint32_t capacity;   // Chunk size
-	ChunkStatus status;			// Current status of the chunk
+	ChunkStatus status;         // Current status of the chunk
 	uint32_t count;             // Number of key-value pair
 	uint32_t size;              // Occupied data
 	Metadata metadata;          // Metadata (list ID, stripe ID, chunk ID)

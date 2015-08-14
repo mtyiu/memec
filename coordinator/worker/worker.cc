@@ -100,62 +100,63 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 		while( buffer.size > 0 ) {
 			if ( ! this->protocol.parseHeader( header, buffer.data, buffer.size ) ) {
 				__ERROR__( "CoordinatorWorker", "dispatch", "Undefined message (remaining bytes = %lu).", buffer.size );
-			} else {
-				buffer.data += PROTO_HEADER_SIZE;
-				buffer.size -= PROTO_HEADER_SIZE;
-				// Validate message
-				if ( header.from != PROTO_MAGIC_FROM_SLAVE ) {
-					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid message source from slave." );
-					continue;
+				break;
+			}
+
+			buffer.data += PROTO_HEADER_SIZE;
+			buffer.size -= PROTO_HEADER_SIZE;
+			// Validate message
+			if ( header.from != PROTO_MAGIC_FROM_SLAVE ) {
+				__ERROR__( "CoordinatorWorker", "dispatch", "Invalid message source from slave." );
+				continue;
+			}
+
+			if ( header.opcode == PROTO_OPCODE_SYNC ) {
+				if ( header.magic != PROTO_MAGIC_HEARTBEAT ) {
+						__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );
+						continue;
 				}
 
-				if ( header.opcode == PROTO_OPCODE_SYNC ) {
-					if ( header.magic != PROTO_MAGIC_HEARTBEAT ) {
-							__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );
-							continue;
-					}
+				size_t bytes, offset, count = 0;
+				struct HeartbeatHeader heartbeatHeader;
+				struct SlaveSyncHeader slaveSyncHeader;
 
-					size_t bytes, offset, count = 0;
-					struct HeartbeatHeader heartbeatHeader;
-					struct SlaveSyncHeader slaveSyncHeader;
+				if ( this->protocol.parseHeartbeatHeader( heartbeatHeader, buffer.data, buffer.size ) ) {
+					event.socket->load.ops.get = heartbeatHeader.get;
+					event.socket->load.ops.set = heartbeatHeader.set;
+					event.socket->load.ops.update = heartbeatHeader.update;
+					event.socket->load.ops.del = heartbeatHeader.del;
 
-					if ( this->protocol.parseHeartbeatHeader( heartbeatHeader, buffer.data, buffer.size ) ) {
-						event.socket->load.ops.get = heartbeatHeader.get;
-						event.socket->load.ops.set = heartbeatHeader.set;
-						event.socket->load.ops.update = heartbeatHeader.update;
-						event.socket->load.ops.del = heartbeatHeader.del;
+					offset = PROTO_HEADER_SIZE + PROTO_HEARTBEAT_SIZE;
+					while ( offset < ( size_t ) ret ) {
+						if ( ! this->protocol.parseSlaveSyncHeader( slaveSyncHeader, bytes, buffer.data, buffer.size, offset ) )
+							break;
+						offset += bytes;
+						count++;
 
-						offset = PROTO_HEADER_SIZE + PROTO_HEARTBEAT_SIZE;
-						while ( offset < ( size_t ) ret ) {
-							if ( ! this->protocol.parseSlaveSyncHeader( slaveSyncHeader, bytes, buffer.data, buffer.size, offset ) )
-								break;
-							offset += bytes;
-							count++;
+						// Update metadata map
+						Key key;
+						key.size = slaveSyncHeader.keySize;
+						key.data = slaveSyncHeader.key;
 
-							// Update metadata map
-							Key key;
-							key.size = slaveSyncHeader.keySize;
-							key.data = slaveSyncHeader.key;
+						OpMetadata opMetadata;
+						opMetadata.opcode = slaveSyncHeader.opcode;
+						opMetadata.listId = slaveSyncHeader.listId;
+						opMetadata.stripeId = slaveSyncHeader.stripeId;
+						opMetadata.chunkId = slaveSyncHeader.chunkId;
 
-							OpMetadata opMetadata;
-							opMetadata.opcode = slaveSyncHeader.opcode;
-							opMetadata.listId = slaveSyncHeader.listId;
-							opMetadata.stripeId = slaveSyncHeader.stripeId;
-							opMetadata.chunkId = slaveSyncHeader.chunkId;
-
-							if ( event.socket->keys.find( key ) == event.socket->keys.end() )
-								key.dup();
-							event.socket->keys[ key ] = opMetadata;
-						}
-					} else {
-						__ERROR__( "CoordinatorWorker", "dispatch", "Invalid heartbeat protocol header." );
+						if ( event.socket->keys.find( key ) == event.socket->keys.end() )
+							key.dup();
+						event.socket->keys[ key ] = opMetadata;
 					}
 				} else {
-					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid opcode from slave." );
+					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid heartbeat protocol header." );
 				}
-				buffer.data += header.length;
-				buffer.size -= header.length;
+			} else {
+				__ERROR__( "CoordinatorWorker", "dispatch", "Invalid opcode from slave." );
 			}
+			buffer.data += header.length;
+			buffer.size -= header.length;
 		}
 	}
 

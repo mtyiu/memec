@@ -1,6 +1,7 @@
 #ifndef __SLAVE_DS_PENDING_HH__
 #define __SLAVE_DS_PENDING_HH__
 
+#include "../socket/slave_peer_socket.hh"
 #include "../../common/ds/metadata.hh"
 #include "../../common/ds/pending.hh"
 
@@ -70,6 +71,48 @@ public:
 	}
 };
 
+class ChunkRequest : public Metadata {
+public:
+	SlavePeerSocket *socket;
+	void *ptr;
+
+	void set( uint32_t listId, uint32_t stripeId, uint32_t chunkId, SlavePeerSocket *socket, void *ptr = 0 ) {
+		this->listId = listId;
+		this->stripeId = stripeId;
+		this->chunkId = chunkId;
+		this->socket = socket;
+		this->ptr = ptr;
+	}
+
+	bool operator<( const ChunkRequest &m ) const {
+		if ( ! Metadata::operator<( m ) )
+			return false;
+
+		if ( this->socket < m.socket )
+			return true;
+		if ( this->socket > m.socket )
+			return false;
+
+		return this->ptr < m.ptr;
+	}
+
+	bool equal( const ChunkRequest &c ) const {
+		return (
+			Metadata::equal( c ) &&
+			this->socket == c.socket &&
+			this->ptr == c.ptr
+		);
+	}
+
+	bool matchStripe( const ChunkRequest &c ) const {
+		return (
+			this->listId == c.listId &&
+			this->stripeId == c.stripeId &&
+			this->ptr == c.ptr
+		);
+	}
+};
+
 typedef struct {
 	struct {
 		std::set<Key> get;
@@ -77,9 +120,10 @@ typedef struct {
 		std::set<Key> del;
 	} masters;
    struct {
-		// std::set<ChunkUpdate> getChunk;
 		std::set<ChunkUpdate> updateChunk;
 		std::set<ChunkUpdate> deleteChunk;
+		std::set<ChunkRequest> getChunk;
+		std::set<ChunkRequest> setChunk;
 	} slavePeers;
 } Pending;
 

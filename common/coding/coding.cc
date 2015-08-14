@@ -20,13 +20,13 @@ Coding *Coding::instantiate( CodingScheme scheme, CodingParams &params, uint32_t
 		case CS_RAID5:
 			return new Raid5Coding2( params.getDataChunkCount(), chunkSize );
 		case CS_RS:
-			break;
+			return new RSCoding( params.getK(), params.getM(), chunkSize );
 		case CS_EMBR:
 			break;
 		case CS_RDP:
 			return new RDPCoding( params.getK(), chunkSize );
 		case CS_EVENODD:
-			break;
+			return new EvenOddCoding( params.getK(), chunkSize );
 		case CS_CAUCHY:
 			return new CauchyCoding( params.getK(), params.getM(), chunkSize );
 		default:
@@ -47,6 +47,7 @@ void Coding::destroy( Coding *coding ) {
 			delete static_cast<Raid5Coding2 *>( coding );
 			break;
 		case CS_RS:
+			delete static_cast<RSCoding *>( coding );
 			break;
 		case CS_EMBR:
 			break;
@@ -54,6 +55,7 @@ void Coding::destroy( Coding *coding ) {
 			delete static_cast<RDPCoding *>( coding );
 			break;
 		case CS_EVENODD:
+			delete static_cast<EvenOddCoding *>( coding );
 			break;
 		case CS_CAUCHY:
 			delete static_cast<CauchyCoding *>( coding );
