@@ -271,6 +271,28 @@ bool Protocol::parseKeyValueHeader( size_t offset, uint8_t &keySize, char *&key,
 	return true;
 }
 
+bool Protocol::parseKeyValueUpdateHeader( size_t offset, uint8_t &keySize, char *&key, uint32_t &valueUpdateOffset, uint32_t &valueUpdateSize, char *buf, size_t size ) {
+	if ( size < PROTO_KEY_VALUE_UPDATE_SIZE )
+		return false;
+
+	char *ptr = buf + offset;
+	keySize = ( uint8_t ) ptr[ 0 ];
+	valueUpdateSize = 0;
+	valueUpdateSize |= ptr[ 1 ] << 24;
+	valueUpdateSize |= ptr[ 2 ] << 16;
+	valueUpdateSize |= ptr[ 3 ] << 8;
+	valueUpdateSize = ntohl( valueUpdateSize );
+	valueUpdateOffset = 0;
+	valueUpdateOffset |= ptr[ 4 ] << 24;
+	valueUpdateOffset |= ptr[ 5 ] << 16;
+	valueUpdateOffset |= ptr[ 6 ] << 8;
+	valueUpdateOffset = ntohl( valueUpdateOffset );
+
+	key = ptr + PROTO_KEY_VALUE_UPDATE_SIZE;
+
+	return true;
+}
+
 bool Protocol::parseKeyValueUpdateHeader( size_t offset, uint8_t &keySize, char *&key, uint32_t &valueUpdateOffset, uint32_t &valueUpdateSize, char *&valueUpdate, char *buf, size_t size ) {
 	if ( size < PROTO_KEY_VALUE_UPDATE_SIZE )
 		return false;
@@ -293,6 +315,21 @@ bool Protocol::parseKeyValueUpdateHeader( size_t offset, uint8_t &keySize, char 
 
 	key = ptr + PROTO_KEY_VALUE_UPDATE_SIZE;
 	valueUpdate = valueUpdateSize ? key + keySize : 0;
+
+	return true;
+}
+
+bool Protocol::parseChunkUpdateHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &updateOffset, uint32_t &updateLength, uint32_t &updatingChunkId, char *buf, size_t size ) {
+	if ( size < PROTO_CHUNK_UPDATE_SIZE )
+		return false;
+
+	char *ptr = buf + offset;
+	listId          = ntohl( *( ( uint32_t * )( ptr      ) ) );
+	stripeId        = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
+	chunkId         = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
+	updateOffset    = ntohl( *( ( uint32_t * )( ptr + 12 ) ) );
+	updateLength    = ntohl( *( ( uint32_t * )( ptr + 16 ) ) );
+	updatingChunkId = ntohl( *( ( uint32_t * )( ptr + 20 ) ) );
 
 	return true;
 }
@@ -475,38 +512,65 @@ bool Protocol::parseKeyValueHeader( struct KeyValueHeader &header, char *buf, si
 	);
 }
 
-bool Protocol::parseKeyValueUpdateHeader( struct KeyValueUpdateHeader &header, char *buf, size_t size, size_t offset ) {
+bool Protocol::parseKeyValueUpdateHeader( struct KeyValueUpdateHeader &header, bool withValueUpdate, char *buf, size_t size, size_t offset ) {
 	if ( ! buf || ! size ) {
 		buf = this->buffer.recv;
 		size = this->buffer.size;
 	}
-	return this->parseKeyValueUpdateHeader(
-		offset,
-		header.keySize,
-		header.key,
-		header.valueUpdateOffset,
-		header.valueUpdateSize,
-		header.valueUpdate,
-		buf, size
-	);
+	if ( withValueUpdate ) {
+		return this->parseKeyValueUpdateHeader(
+			offset,
+			header.keySize,
+			header.key,
+			header.valueUpdateOffset,
+			header.valueUpdateSize,
+			header.valueUpdate,
+			buf, size
+		);
+	} else {
+		header.valueUpdate = 0;
+		return this->parseKeyValueUpdateHeader(
+			offset,
+			header.keySize,
+			header.key,
+			header.valueUpdateOffset,
+			header.valueUpdateSize,
+			buf, size
+		);
+	}
 }
 
-bool Protocol::parseChunkUpdateHeader( struct ChunkUpdateHeader &header, char *buf, size_t size, size_t offset ) {
+bool Protocol::parseChunkUpdateHeader( struct ChunkUpdateHeader &header, bool withDelta, char *buf, size_t size, size_t offset ) {
 	if ( ! buf || ! size ) {
 		buf = this->buffer.recv;
 		size = this->buffer.size;
 	}
-	return this->parseChunkUpdateHeader(
-		offset,
-		header.listId,
-		header.stripeId,
-		header.chunkId,
-		header.offset,
-		header.length,
-		header.updatingChunkId,
-		header.delta,
-		buf, size
-	);
+	if ( withDelta ) {
+		return this->parseChunkUpdateHeader(
+			offset,
+			header.listId,
+			header.stripeId,
+			header.chunkId,
+			header.offset,
+			header.length,
+			header.updatingChunkId,
+			header.delta,
+			buf, size
+		);
+	} else {
+		header.delta = 0;
+		return this->parseChunkUpdateHeader(
+			offset,
+			header.listId,
+			header.stripeId,
+			header.chunkId,
+			header.offset,
+			header.length,
+			header.updatingChunkId,
+			buf, size
+		);
+	}
+
 }
 
 bool Protocol::parseChunkHeader( struct ChunkHeader &header, char *buf, size_t size, size_t offset ) {

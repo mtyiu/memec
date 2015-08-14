@@ -326,7 +326,7 @@ void Slave::info( FILE *f ) {
 }
 
 void Slave::debug( FILE *f ) {
-	int i, len;/*
+	int i, len;
 	fprintf( f, "Slave socket\n------------\n" );
 	this->sockets.self.print( f );
 
@@ -336,7 +336,7 @@ void Slave::debug( FILE *f ) {
 		this->sockets.coordinators[ i ].print( f );
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
-*/
+
 	fprintf( f, "\nMaster sockets\n---------------\n" );
 	for ( i = 0, len = this->sockets.masters.size(); i < len; i++ ) {
 		fprintf( f, "%d. ", i + 1 );
@@ -350,7 +350,7 @@ void Slave::debug( FILE *f ) {
 		this->sockets.slavePeers[ i ].print( f );
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
-/*
+
 	fprintf( f, "\nChunk buffer\n------------\n" );
 	for ( i = 0, len = this->chunkBuffer.size(); i < len; i++ ) {
 		if ( ! this->chunkBuffer[ i ] )
@@ -373,7 +373,7 @@ void Slave::debug( FILE *f ) {
 	fprintf( f, "\nOther threads\n--------------\n" );
 	this->sockets.self.printThread();
 
-	fprintf( f, "\n" );*/
+	fprintf( f, "\n" );
 }
 
 void Slave::interactive() {
@@ -422,6 +422,9 @@ void Slave::interactive() {
 		} else if ( strcmp( command, "dump" ) == 0 ) {
 			valid = true;
 			this->dump();
+		} else if ( strcmp( command, "pending" ) == 0 ) {
+			valid = true;
+			this->printPending();
 		} else if ( strcmp( command, "sync" ) == 0 ) {
 			valid = true;
 			this->sync();
@@ -446,6 +449,7 @@ void Slave::printPending( FILE *f ) {
 	std::set<Key>::iterator it;
 	std::set<KeyValueUpdate>::iterator keyValueUpdateIt;
 	std::set<ChunkUpdate>::iterator chunkUpdateIt;
+	std::set<ChunkRequest>::iterator chunkRequestIt;
 	fprintf(
 		f,
 		"Pending requests for masters\n"
@@ -558,6 +562,52 @@ void Slave::printPending( FILE *f ) {
 		);
 		if ( chunkUpdate.ptr )
 			( ( Socket * ) chunkUpdate.ptr )->printAddress( f );
+		else
+			fprintf( f, "(nil)\n" );
+		fprintf( f, "\n" );
+	}
+
+	fprintf(
+		f,
+		"\n[GET_CHUNK] Pending: %lu\n",
+		this->pending.slavePeers.getChunk.size()
+	);
+	i = 1;
+	for (
+		chunkRequestIt = this->pending.slavePeers.getChunk.begin();
+		chunkRequestIt != this->pending.slavePeers.getChunk.end();
+		chunkRequestIt++, i++
+	) {
+		const ChunkRequest &chunkRequest = *chunkRequestIt;
+		fprintf(
+			f, "%lu. List ID: %u, stripe ID: %u, chunk ID: %u; target: ",
+			i, chunkRequest.listId, chunkRequest.stripeId, chunkRequest.chunkId
+		);
+		if ( chunkRequest.socket )
+			chunkRequest.socket->printAddress( f );
+		else
+			fprintf( f, "(nil)\n" );
+		fprintf( f, "\n" );
+	}
+
+	fprintf(
+		f,
+		"\n[SET_CHUNK] Pending: %lu\n",
+		this->pending.slavePeers.setChunk.size()
+	);
+	i = 1;
+	for (
+		chunkRequestIt = this->pending.slavePeers.setChunk.begin();
+		chunkRequestIt != this->pending.slavePeers.setChunk.end();
+		chunkRequestIt++, i++
+	) {
+		const ChunkRequest &chunkRequest = *chunkRequestIt;
+		fprintf(
+			f, "%lu. List ID: %u, stripe ID: %u, chunk ID: %u; target: ",
+			i, chunkRequest.listId, chunkRequest.stripeId, chunkRequest.chunkId
+		);
+		if ( chunkRequest.socket )
+			chunkRequest.socket->printAddress( f );
 		else
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );

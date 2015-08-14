@@ -160,8 +160,8 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 					__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from coordinator." );
 					return;
 			}
-			buffer.data += PROTO_HEADER_SIZE + header.length;
-			buffer.size -= PROTO_HEADER_SIZE + header.length;
+			buffer.data += header.length;
+			buffer.size -= header.length;
 		}
 	}
 	if ( ! connected )
@@ -773,7 +773,7 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size ) 
 bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size ) {
 	struct KeyValueUpdateHeader header;
 	bool ret;
-	if ( ! this->protocol.parseKeyValueUpdateHeader( header, buf, size ) ) {
+	if ( ! this->protocol.parseKeyValueUpdateHeader( header, true, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleUpdateRequest", "Invalid UPDATE request." );
 		return false;
 	}
@@ -1004,7 +1004,7 @@ bool SlaveWorker::handleSlavePeerRegisterRequest( SlavePeerSocket *socket, char 
 bool SlaveWorker::handleUpdateChunkRequest( SlavePeerEvent event, char *buf, size_t size ) {
 	struct ChunkUpdateHeader header;
 	bool ret;
-	if ( ! this->protocol.parseChunkUpdateHeader( header, buf, size ) ) {
+	if ( ! this->protocol.parseChunkUpdateHeader( header, true, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleUpdateChunkRequest", "Invalid UPDATE_CHUNK request." );
 		return false;
 	}
@@ -1046,7 +1046,7 @@ bool SlaveWorker::handleUpdateChunkRequest( SlavePeerEvent event, char *buf, siz
 bool SlaveWorker::handleDeleteChunkRequest( SlavePeerEvent event, char *buf, size_t size ) {
 	struct ChunkUpdateHeader header;
 	bool ret;
-	if ( ! this->protocol.parseChunkUpdateHeader( header, buf, size ) ) {
+	if ( ! this->protocol.parseChunkUpdateHeader( header, true, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleDeleteChunkRequest", "Invalid DELETE_CHUNK request." );
 		return false;
 	}
@@ -1143,7 +1143,7 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, char *buf, size_t
 
 bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
 	struct ChunkUpdateHeader header;
-	if ( ! this->protocol.parseChunkUpdateHeader( header, buf, size ) ) {
+	if ( ! this->protocol.parseChunkUpdateHeader( header, false, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleUpdateChunkResponse", "Invalid UPDATE_CHUNK response." );
 		return false;
 	}
@@ -1215,7 +1215,7 @@ bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success,
 
 bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
 	struct ChunkUpdateHeader header;
-	if ( ! this->protocol.parseChunkUpdateHeader( header, buf, size ) ) {
+	if ( ! this->protocol.parseChunkUpdateHeader( header, false, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleDeleteChunkResponse", "Invalid DELETE_CHUNK response." );
 		return false;
 	}

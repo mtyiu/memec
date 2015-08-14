@@ -611,7 +611,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 
 bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_t size ) {
 	struct KeyValueUpdateHeader header;
-	if ( ! this->protocol.parseKeyValueUpdateHeader( header, buf, size ) ) {
+	if ( ! this->protocol.parseKeyValueUpdateHeader( header, true, buf, size ) ) {
 		__ERROR__( "MasterWorker", "handleUpdateRequest", "Invalid UPDATE request." );
 		return false;
 	}
@@ -838,7 +838,7 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 
 bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, char *buf, size_t size ) {
 	struct KeyValueUpdateHeader header;
-	if ( ! this->protocol.parseKeyValueUpdateHeader( header, buf, size ) ) {
+	if ( ! this->protocol.parseKeyValueUpdateHeader( header, false, buf, size ) ) {
 		__ERROR__( "MasterWorker", "handleUpdateResponse", "Invalid UPDATE Response." );
 		return false;
 	}
