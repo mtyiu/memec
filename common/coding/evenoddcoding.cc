@@ -3,7 +3,7 @@
 
 EvenOddCoding::EvenOddCoding( uint32_t k, uint32_t chunkSize ) :
         RDPCoding( k, chunkSize ) {
-    this->_symbolSize = getSymbolSize();
+    this->_symbolSize = this->getSymbolSize();
 }
 
 EvenOddCoding::~EvenOddCoding() {
@@ -65,7 +65,7 @@ bool EvenOddCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
     std::vector< uint32_t > failed;
 
     // check for failed disk
-    for ( uint32_t idx = 0; idx < k+2 ; idx ++ ) {
+    for ( uint32_t idx = 0 ; idx < k + 2 ; idx ++ ) {
         if ( chunkStatus->check( idx ) == 0 ) {
             if ( failed.size() < 2 )
                 failed.push_back( idx );
@@ -90,14 +90,14 @@ bool EvenOddCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
 
         // diagonal parity, or data/row parity
         if ( failed[ 0 ] == k + 1 )
-            encode( chunks, chunks[ k + 1 ], 2 );
+            this->encode( chunks, chunks[ k + 1 ], 2 );
         else
-            this->_raid5Coding->decode ( chunks, chunkStatus );
+            this->_raid5Coding->decode( chunks, chunkStatus );
 
     } else if ( failed[ 1 ] == k + 1 ) {
         
-        this->_raid5Coding->decode ( chunks, chunkStatus );
-        encode( chunks, chunks[ k + 1 ], 2 );
+        this->_raid5Coding->decode( chunks, chunkStatus );
+        this->encode( chunks, chunks[ k + 1 ], 2 );
 
     } else if ( failed[ 1 ] == k ) {
         // missing row parity ... find the diagonal that gives S directly
@@ -137,7 +137,7 @@ bool EvenOddCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
         }
         
         // recover row parity
-        encode( chunks, chunks[ k ], 1 );
+        this->encode( chunks, chunks[ k ], 1 );
 
         delete [] s;
 
@@ -234,7 +234,7 @@ uint32_t EvenOddCoding::getPrime() {
 }
 
 uint32_t EvenOddCoding::getSymbolSize() {
-    uint32_t pp = getPrime();
+    uint32_t pp = this->getPrime();
     uint32_t chunkSize = this->_chunkSize;
 
     // p - 1 symbols per chunk

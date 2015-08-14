@@ -25,6 +25,14 @@ protected:
      */
     uint32_t getSymbolSize();
 
+    /**
+     * XOR chunks (RAID-5)
+     *
+     * @param chunks data and parity chunks involved
+     * @param target index of the target chunk to encode / decode
+     */
+    void performXOR( Chunk **chunks, uint32_t target );
+
     RAID5Coding* _raid5Coding;
     uint32_t _k;
     uint32_t _p;

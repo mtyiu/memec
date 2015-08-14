@@ -29,7 +29,7 @@ RDPCoding::RDPCoding( uint32_t k, uint32_t chunkSize ) {
     this->_raid5Coding->init( k + 1 );
     this->_k = k;
     this->_chunkSize = chunkSize;
-    this->_symbolSize = getSymbolSize();
+    this->_symbolSize = this->getSymbolSize();
 }
 
 RDPCoding::~RDPCoding() {
@@ -54,7 +54,8 @@ void RDPCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t index )
         firstParity.data = new char[ chunkSize ];
         firstParity.size = chunkSize;
 
-        this->_raid5Coding->encode( dataChunks, &firstParity, index );
+        memset( firstParity.data, 0, chunkSize );
+        this->_raid5Coding->encode( dataChunks, &firstParity, 1 );
         
         // XOR symbols for diagonal parity, assume 
         //  (0)  (1)   (2)   (3)   (4)   .....   (p)  (p+1)
@@ -98,7 +99,7 @@ bool RDPCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
     std::vector< uint32_t > failed;
 
     // check for failed disk
-    for ( uint32_t idx = 0; idx < k+2 ; idx ++ ) {
+    for ( uint32_t idx = 0 ; idx < k + 2 ; idx ++ ) {
         if ( chunkStatus->check( idx ) == 0 ) {
             if ( failed.size() < 2 )
                 failed.push_back( idx );
@@ -116,15 +117,19 @@ bool RDPCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
 
         // diagonal parity, or data/row parity
         if ( failed[ 0 ] == k + 1 )
-            encode( chunks, chunks[ k + 1 ], 2 );
+            this->encode( chunks, chunks[ k + 1 ], 2 );
         else
-            this->_raid5Coding->decode ( chunks, chunkStatus );
+            //this->_raid5Coding->decode ( chunks, chunkStatus );
+            // Work-aound: avoid updateData() in raid5
+            this->performXOR( chunks, failed[ 0 ] );
 
     } else if ( failed[ 1 ] == k + 1 ) {
 
         // data/row parity + diagonal parity
-        this->_raid5Coding->decode ( chunks, chunkStatus );
-        encode( chunks, chunks[ k + 1 ], 2 );
+        //this->_raid5Coding->decode ( chunks, chunkStatus );
+        // Work-aound: avoid updateData() in raid5
+        this->performXOR( chunks, failed[ 0 ] );
+        this->encode( chunks, chunks[ k + 1 ], 2 );
 
     } else {
 
@@ -236,7 +241,7 @@ uint32_t RDPCoding::getPrime() {
 }
 
 uint32_t RDPCoding::getSymbolSize() {
-    uint32_t pp = getPrime();
+    uint32_t pp = this->getPrime();
     uint32_t chunkSize = this->_chunkSize;
 
     // p - 1 symbols per chunk
@@ -260,3 +265,18 @@ uint32_t RDPCoding::getSymbolSize() {
     return this->_symbolSize;
 }
 
+void RDPCoding::performXOR( Chunk **chunks, uint32_t target ) {
+    uint32_t k = this->_k;
+
+    if ( target < 0 || target > k ) {
+        fprintf( stderr, "Cannot encode row parity index (%u) out of range!\n", 
+                target );
+        return;
+    }
+    for ( uint32_t cidx = 0 ; cidx < k + 1 ; cidx ++ ) {
+        if ( cidx == target )
+            continue;
+        this->bitwiseXOR( chunks[ target ], chunks[ cidx ], chunks[ target ], 
+                chunks[ cidx ]->size );
+    }
+}
