@@ -323,7 +323,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 					key.free();
 					break;
 				case PROTO_OPCODE_UPDATE:
-					if ( this->protocol.parseKeyValueUpdateHeader( keyValueUpdateHeader, buffer.data, buffer.size ) ) {
+					if ( this->protocol.parseKeyValueUpdateHeader( keyValueUpdateHeader, false, buffer.data, buffer.size ) ) {
 						keyValueUpdate.size = keyValueUpdateHeader.keySize;
 						keyValueUpdate.data = keyValueUpdateHeader.key;
 						keyValueUpdate.offset = keyValueUpdateHeader.valueUpdateOffset;

@@ -169,7 +169,9 @@ protected:
 	bool parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t &opcode, uint32_t &length, char *buf, size_t size );
 	bool parseKeyHeader( size_t offset, uint8_t &keySize, char *&key, char *buf, size_t size );
 	bool parseKeyValueHeader( size_t offset, uint8_t &keySize, char *&key, uint32_t &valueSize, char *&value, char *buf, size_t size );
+	bool parseKeyValueUpdateHeader( size_t offset, uint8_t &keySize, char *&key, uint32_t &valueUpdateOffset, uint32_t &valueUpdateSize, char *buf, size_t size );
 	bool parseKeyValueUpdateHeader( size_t offset, uint8_t &keySize, char *&key, uint32_t &valueUpdateOffset, uint32_t &valueUpdateSize, char *&valueUpdate, char *buf, size_t size );
+	bool parseChunkUpdateHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &updateOffset, uint32_t &updateLength, uint32_t &updatingChunkId, char *buf, size_t size );
 	bool parseChunkUpdateHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &updateOffset, uint32_t &updateLength, uint32_t &updatingChunkId, char *&delta, char *buf, size_t size );
 	bool parseChunkHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, char *buf, size_t size );
 	bool parseChunkDataHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &chunkSize, char *&chunkData, char *buf, size_t size );
@@ -189,8 +191,8 @@ public:
 	bool parseHeader( struct ProtocolHeader &header, char *buf = 0, size_t size = 0 );
 	bool parseKeyHeader( struct KeyHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
 	bool parseKeyValueHeader( struct KeyValueHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
-	bool parseKeyValueUpdateHeader( struct KeyValueUpdateHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
-	bool parseChunkUpdateHeader( struct ChunkUpdateHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
+	bool parseKeyValueUpdateHeader( struct KeyValueUpdateHeader &header, bool withValueUpdate, char *buf = 0, size_t size = 0, size_t offset = 0 );
+	bool parseChunkUpdateHeader( struct ChunkUpdateHeader &header, bool withDelta, char *buf = 0, size_t size = 0, size_t offset = 0 );
 	bool parseChunkHeader( struct ChunkHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
 	bool parseChunkDataHeader( struct ChunkDataHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
 	bool parseHeartbeatHeader( struct HeartbeatHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
