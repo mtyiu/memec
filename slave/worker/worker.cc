@@ -181,7 +181,7 @@ void SlaveWorker::dispatch( IOEvent event ) {
 }
 
 void SlaveWorker::dispatch( MasterEvent event ) {
-	bool success = true, connected, isSend;
+	bool success = true, connected, isSend = true;
 	ssize_t ret;
 	struct {
 		size_t size;
@@ -196,7 +196,6 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS:
 			success = true;
-			isSend = true;
 			break;
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
 		case MASTER_EVENT_TYPE_GET_RESPONSE_FAILURE:
@@ -204,7 +203,6 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
 		case MASTER_EVENT_TYPE_DELETE_RESPONSE_FAILURE:
 			success = false;
-			isSend = true;
 			break;
 		default:
 			isSend = false;
@@ -341,7 +339,7 @@ void SlaveWorker::dispatch( SlaveEvent event ) {
 }
 
 void SlaveWorker::dispatch( SlavePeerEvent event ) {
-	bool connected, isSend;
+	bool success, connected, isSend;
 	ssize_t ret;
 	struct {
 		size_t size;
@@ -349,10 +347,14 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 	} buffer;
 	struct timespec t = start_timer();
 
+	isSend = ( event.type != SLAVE_PEER_EVENT_TYPE_PENDING );
+	success = false;
 	switch( event.type ) {
+		//////////////
+		// Requests //
+		//////////////
 		case SLAVE_PEER_EVENT_TYPE_REGISTER_REQUEST:
 			buffer.data = this->protocol.reqRegisterSlavePeer( buffer.size, SlaveWorker::slaveServerAddr );
-			isSend = true;
 			break;
 		case SLAVE_PEER_EVENT_TYPE_UPDATE_CHUNK_REQUEST:
 			buffer.data = this->protocol.reqUpdateChunk(
@@ -365,7 +367,6 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				event.message.chunkUpdate.updatingChunkId,
 				event.message.chunkUpdate.delta
 			);
-			isSend = true;
 			break;
 		case SLAVE_PEER_EVENT_TYPE_DELETE_CHUNK_REQUEST:
 			buffer.data = this->protocol.reqDeleteChunk(
@@ -378,18 +379,90 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				event.message.chunkUpdate.updatingChunkId,
 				event.message.chunkUpdate.delta
 			);
-			isSend = true;
 			break;
+		case SLAVE_PEER_EVENT_TYPE_GET_CHUNK_REQUEST:
+			buffer.data = this->protocol.reqGetChunk(
+				buffer.size,
+				event.message.chunk.metadata.listId,
+				event.message.chunk.metadata.stripeId,
+				event.message.chunk.metadata.chunkId
+			);
+			break;
+		case SLAVE_PEER_EVENT_TYPE_SET_CHUNK_REQUEST:
+			buffer.data = this->protocol.reqSetChunk(
+				buffer.size,
+				event.message.chunk.metadata.listId,
+				event.message.chunk.metadata.stripeId,
+				event.message.chunk.metadata.chunkId,
+				event.message.chunk.chunk->size,
+				event.message.chunk.chunk->data
+			);
+			break;
+		///////////////
+		// Responses //
+		///////////////
+		// Register
 		case SLAVE_PEER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
-			buffer.data = this->protocol.resRegisterSlavePeer( buffer.size, true );
-			isSend = true;
-			break;
+			success = true; // default is false
 		case SLAVE_PEER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resRegisterSlavePeer( buffer.size, false );
-			isSend = true;
+			buffer.data = this->protocol.resRegisterSlavePeer( buffer.size, success );
 			break;
+		// UPDATE_CHUNK
+		case SLAVE_PEER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_SUCCESS:
+			success = true; // default is false
+		case SLAVE_PEER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resUpdateChunk(
+				buffer.size, success,
+				event.message.chunkUpdate.metadata.listId,
+				event.message.chunkUpdate.metadata.stripeId,
+				event.message.chunkUpdate.metadata.chunkId,
+				event.message.chunkUpdate.offset,
+				event.message.chunkUpdate.length,
+				event.message.chunkUpdate.updatingChunkId
+			);
+			break;
+		// DELETE_CHUNK
+		case SLAVE_PEER_EVENT_TYPE_DELETE_CHUNK_RESPONSE_SUCCESS:
+			success = true; // default is false
+		case SLAVE_PEER_EVENT_TYPE_DELETE_CHUNK_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resDeleteChunk(
+				buffer.size, success,
+				event.message.chunkUpdate.metadata.listId,
+				event.message.chunkUpdate.metadata.stripeId,
+				event.message.chunkUpdate.metadata.chunkId,
+				event.message.chunkUpdate.offset,
+				event.message.chunkUpdate.length,
+				event.message.chunkUpdate.updatingChunkId
+			);
+			break;
+		// GET_CHUNK
+		case SLAVE_PEER_EVENT_TYPE_GET_CHUNK_RESPONSE_SUCCESS:
+			success = true; // default is false
+		case SLAVE_PEER_EVENT_TYPE_GET_CHUNK_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resGetChunk(
+				buffer.size, success,
+				event.message.chunk.metadata.listId,
+				event.message.chunk.metadata.stripeId,
+				event.message.chunk.metadata.chunkId,
+				event.message.chunk.chunk->size,
+				event.message.chunk.chunk->data
+			);
+			break;
+		// SET_CHUNK
+		case SLAVE_PEER_EVENT_TYPE_SET_CHUNK_RESPONSE_SUCCESS:
+			success = true; // default is false
+		case SLAVE_PEER_EVENT_TYPE_SET_CHUNK_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resSetChunk(
+				buffer.size, success,
+				event.message.chunk.metadata.listId,
+				event.message.chunk.metadata.stripeId,
+				event.message.chunk.metadata.chunkId
+			);
+			break;
+		/////////////
+		// Pending //
+		/////////////
 		case SLAVE_PEER_EVENT_TYPE_PENDING:
-			isSend = false;
 			break;
 		default:
 			return;

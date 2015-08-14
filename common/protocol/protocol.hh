@@ -13,53 +13,54 @@
  *  Magic byte (1 byte) *
  ************************/
 // (Bit: 0-2) //
-#define PROTO_MAGIC_HEARTBEAT			0x00 // -----000
-#define PROTO_MAGIC_REQUEST				0x01 // -----001
-#define PROTO_MAGIC_RESPONSE_SUCCESS	0x02 // -----010
-#define PROTO_MAGIC_RESPONSE_FAILURE	0x03 // -----011
-#define PROTO_MAGIC_RESERVED_1			0x04 // -----100
-#define PROTO_MAGIC_RESERVED_2			0x05 // -----101
-#define PROTO_MAGIC_RESERVED_3			0x06 // -----110
-#define PROTO_MAGIC_RESERVED_4			0x07 // -----111
-
+#define PROTO_MAGIC_HEARTBEAT          0x00 // -----000
+#define PROTO_MAGIC_REQUEST            0x01 // -----001
+#define PROTO_MAGIC_RESPONSE_SUCCESS   0x02 // -----010
+#define PROTO_MAGIC_RESPONSE_FAILURE   0x03 // -----011
+#define PROTO_MAGIC_RESERVED_1         0x04 // -----100
+#define PROTO_MAGIC_RESERVED_2         0x05 // -----101
+#define PROTO_MAGIC_RESERVED_3         0x06 // -----110
+#define PROTO_MAGIC_RESERVED_4         0x07 // -----111
 // (Bit: 3-4) //
-#define PROTO_MAGIC_FROM_APPLICATION	0x00 // ---00---
-#define PROTO_MAGIC_FROM_COORDINATOR	0x08 // ---01---
-#define PROTO_MAGIC_FROM_MASTER			0x10 // ---10---
-#define PROTO_MAGIC_FROM_SLAVE			0x18 // ---11---
+#define PROTO_MAGIC_FROM_APPLICATION   0x00 // ---00---
+#define PROTO_MAGIC_FROM_COORDINATOR   0x08 // ---01---
+#define PROTO_MAGIC_FROM_MASTER        0x10 // ---10---
+#define PROTO_MAGIC_FROM_SLAVE         0x18 // ---11---
  // (Bit: 5-6) //
-#define PROTO_MAGIC_TO_APPLICATION		0x00 // -00-----
-#define PROTO_MAGIC_TO_COORDINATOR		0x20 // -01-----
-#define PROTO_MAGIC_TO_MASTER			0x40 // -10-----
-#define PROTO_MAGIC_TO_SLAVE			0x60 // -11-----
+#define PROTO_MAGIC_TO_APPLICATION     0x00 // -00-----
+#define PROTO_MAGIC_TO_COORDINATOR     0x20 // -01-----
+#define PROTO_MAGIC_TO_MASTER          0x40 // -10-----
+#define PROTO_MAGIC_TO_SLAVE           0x60 // -11-----
 // (Bit: 7): Reserved //
 
 /*******************
  * Opcode (1 byte) *
  *******************/
 // Coordinator-specific opcodes //
-#define PROTO_OPCODE_REGISTER			0x00
-#define PROTO_OPCODE_GET_CONFIG			0x09
-#define PROTO_OPCODE_SYNC				0x10
+#define PROTO_OPCODE_REGISTER          0x00
+#define PROTO_OPCODE_GET_CONFIG        0x09
+#define PROTO_OPCODE_SYNC              0x10
 
-// Application <-> Master //
-#define PROTO_OPCODE_GET				0x01
-#define PROTO_OPCODE_SET				0x02
-#define PROTO_OPCODE_REPLACE			0x03
-#define PROTO_OPCODE_UPDATE				0x04
-#define PROTO_OPCODE_UPDATE_CHUNK		0x05
-#define PROTO_OPCODE_DELETE				0x06
-#define PROTO_OPCODE_DELETE_CHUNK		0x07
-#define PROTO_OPCODE_FLUSH				0x08
+// Application <-> Master or Master <-> Slave //
+#define PROTO_OPCODE_GET               0x01
+#define PROTO_OPCODE_SET               0x02
+#define PROTO_OPCODE_UPDATE            0x03
+#define PROTO_OPCODE_DELETE            0x04
+
+// Slave <-> Slave //
+#define PROTO_OPCODE_UPDATE_CHUNK      0x05
+#define PROTO_OPCODE_DELETE_CHUNK      0x06
+#define PROTO_OPCODE_GET_CHUNK         0x07
+#define PROTO_OPCODE_SET_CHUNK         0x08
 
 /*********************
  * Key size (1 byte) *
  *********************/
-#define MAXIMUM_KEY_SIZE				255
+#define MAXIMUM_KEY_SIZE 255
 /***********************
  * Value size (3 byte) *
  ***********************/
- #define MAXIMUM_VALUE_SIZE				16777215
+ #define MAXIMUM_VALUE_SIZE 16777215
 
 #include <map>
 #include <stdint.h>
@@ -134,6 +135,22 @@ struct ChunkUpdateHeader {
 	char *delta;
 };
 
+#define PROTO_CHUNK_SIZE 12
+struct ChunkHeader {
+   uint32_t listId;
+	uint32_t stripeId;
+	uint32_t chunkId;
+};
+
+#define PROTO_CHUNK_DATA_SIZE 16
+struct ChunkDataHeader {
+   uint32_t listId;
+	uint32_t stripeId;
+	uint32_t chunkId;
+   uint32_t size;
+   char *data;
+};
+
 ///////////////////////////////////////////////////////////////////////////////
 
 class Protocol {
@@ -145,6 +162,8 @@ protected:
 	size_t generateKeyValueHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint8_t keySize, char *key, uint32_t valueSize, char *value );
 	size_t generateKeyValueUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate = 0 );
 	size_t generateChunkUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta = 0 );
+   size_t generateChunkHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId );
+   size_t generateChunkDataHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t chunkSize, char *chunkData );
 	size_t generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t opcode, struct HeartbeatHeader &header, std::map<Key, OpMetadata> &ops, size_t &count );
 
 	bool parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t &opcode, uint32_t &length, char *buf, size_t size );
@@ -152,6 +171,8 @@ protected:
 	bool parseKeyValueHeader( size_t offset, uint8_t &keySize, char *&key, uint32_t &valueSize, char *&value, char *buf, size_t size );
 	bool parseKeyValueUpdateHeader( size_t offset, uint8_t &keySize, char *&key, uint32_t &valueUpdateOffset, uint32_t &valueUpdateSize, char *&valueUpdate, char *buf, size_t size );
 	bool parseChunkUpdateHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &updateOffset, uint32_t &updateLength, uint32_t &updatingChunkId, char *&delta, char *buf, size_t size );
+	bool parseChunkHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, char *buf, size_t size );
+	bool parseChunkDataHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &chunkSize, char *&chunkData, char *buf, size_t size );
 	bool parseHeartbeatHeader( size_t offset, uint32_t &get, uint32_t &set, uint32_t &update, uint32_t &del, char *buf, size_t size );
 	bool parseSlaveSyncHeader( size_t offset, uint8_t &keySize, uint8_t &opcode, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, char *&key, char *buf, size_t size );
 
@@ -170,6 +191,8 @@ public:
 	bool parseKeyValueHeader( struct KeyValueHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
 	bool parseKeyValueUpdateHeader( struct KeyValueUpdateHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
 	bool parseChunkUpdateHeader( struct ChunkUpdateHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
+	bool parseChunkHeader( struct ChunkHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
+	bool parseChunkDataHeader( struct ChunkDataHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
 	bool parseHeartbeatHeader( struct HeartbeatHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
 	bool parseSlaveSyncHeader( struct SlaveSyncHeader &header, size_t &bytes, char *buf = 0, size_t size = 0, size_t offset = PROTO_HEADER_SIZE + PROTO_HEARTBEAT_SIZE );
 

@@ -40,5 +40,11 @@ public:
 	// DELETE_CHUNK
 	char *reqDeleteChunk( size_t &size, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta );
 	char *resDeleteChunk( size_t &size, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId );
+	// GET_CHUNK
+	char *reqGetChunk( size_t &size, uint32_t listId, uint32_t stripeId, uint32_t chunkId );
+	char *resGetChunk( size_t &size, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t chunkSize = 0, char *chunkData = 0 );
+	// SET_CHUNK
+	char *reqSetChunk( size_t &size, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t chunkSize, char *chunkData );
+	char *resSetChunk( size_t &size, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId );
 };
 #endif
