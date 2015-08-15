@@ -12,6 +12,9 @@
 #define FAIL (0)
 #define FAIL2 (1)
 #define FAIL3 (3)
+// range of data modified within a chunk
+#define MODIFY_ST (1000)
+#define MODIFY_ED (2000)
 
 Coding* handle;
 CodingParams params;
@@ -135,6 +138,45 @@ int main( int argc, char **argv ) {
         handle->encode( chunks, chunks[ C_K + idx ], idx + 1 );
     }
     printf( " done.\n");
+
+#if defined(TEST_DELTA) && FAIL < C_K 
+    // always modifies the first data chunk to be lost to test if parities are correctly updated
+    // use read buf to hold the data delta and the parity delta
+    memset ( readbuf , 0, CHUNK_SIZE * C_M ); 
+    Chunk* shadowParity = new Chunk();
+    shadowParity->data = readbuf + CHUNK_SIZE;
+    // zero block
+    char *zero = new char [ CHUNK_SIZE ];
+    memset( zero, 0, CHUNK_SIZE );
+    printf( "delta at chunk %u from %u to %u\n", failed[ 0 ], MODIFY_ST, MODIFY_ED );
+    // pointers to the start of data delta and modified data
+    char *odata = chunks[ failed[ 0 ] ]->data + MODIFY_ST;
+    char *ndata = readbuf + MODIFY_ST;
+    uint32_t len = MODIFY_ED - MODIFY_ST;
+    // get data delta
+    memcpy( ndata , odata, len );
+    memset( odata, 1, len );
+    Coding::bitwiseXOR( ndata, odata, ndata, len );
+    // zero unmodified data chunks
+    for ( uint32_t idx = 0 ; idx < C_K ; idx ++ ) {
+        if ( idx == failed[ 0 ] )
+            chunks[ failed[ 0 ] ]->data = readbuf;
+        else
+            chunks[ idx ]->data = zero;
+    }
+    // get parity delta
+    for ( uint32_t idx = 0 ; idx < m ; idx ++ ) {
+        memset(shadowParity->data, 0, CHUNK_SIZE);
+        handle->encode( chunks, shadowParity, idx + 1, failed[ 0 ] * CHUNK_SIZE + MODIFY_ST, failed[ 0 ] * CHUNK_SIZE + MODIFY_ED );
+        Coding::bitwiseXOR( chunks[ C_K + idx ], shadowParity, chunks[ C_K + idx ], CHUNK_SIZE );
+    }
+    // restore the data chunks
+    for ( uint32_t idx = 0 ; idx < C_K ; idx ++ ) {
+        chunks[ idx ]->data = buf + idx * CHUNK_SIZE;
+    }
+    delete [] shadowParity;
+    delete [] zero;
+#endif
 
     memset ( readbuf , 0, CHUNK_SIZE * C_M ); 
     

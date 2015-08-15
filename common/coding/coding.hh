@@ -25,8 +25,10 @@ public:
 	 * @param data   array of data chunks (assumed to have k entries)
 	 * @param parity buffer for storing the encoded parity chunk
 	 * @param index  indicate which parity chunk should be generated (e.g., index = 2 if the 2nd parity chunk is needed)
+	 * @param startOff starting offset of the modified range of data in the stripe
+	 * @param endOff starting offset of the unmodified range of data following the range of modified data 
 	 */
-	virtual void encode( Chunk **data, Chunk *parity, uint32_t index ) = 0;
+	virtual void encode( Chunk **data, Chunk *parity, uint32_t index, uint32_t startOff = 0, uint32_t endOff = 0 ) = 0;
 
 	/**
 	 * Decode k data/parity chunks.

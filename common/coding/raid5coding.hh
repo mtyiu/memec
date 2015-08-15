@@ -9,7 +9,7 @@ private:
 
 public:
 	bool init( uint32_t n );
-	void encode( Chunk **data, Chunk *parity, uint32_t index );
+	void encode( Chunk **data, Chunk *parity, uint32_t index, uint32_t startOff = 0, uint32_t endOff = 0);
 	bool decode( Chunk **chunks, BitmaskArray *bitmap );
 };
 

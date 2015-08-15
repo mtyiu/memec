@@ -35,17 +35,18 @@ RDPCoding::RDPCoding( uint32_t k, uint32_t chunkSize ) {
 RDPCoding::~RDPCoding() {
 }
 
-void RDPCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t index ) {
+void RDPCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t index, uint32_t startOff, uint32_t endOff ) {
 
     uint32_t k = this->_k;
     uint32_t p = this->_p;
     uint32_t chunkSize = this->_chunkSize;
     uint32_t symbolSize = this->_symbolSize;
+    uint32_t size = ( endOff == 0 )? 0 : endOff - startOff;
 
     // first parity
     if ( index == 1 ) {
 
-        this->_raid5Coding->encode( dataChunks, parityChunk, index );
+        this->_raid5Coding->encode( dataChunks, parityChunk, index, startOff, endOff );
 
     } else if ( index == 2 ) {
 
@@ -62,23 +63,34 @@ void RDPCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t index )
         // -------------------------------------
         // D_0 | D_1 | D_2 | D_3 | P_r | [0] ... [0] | P_d
         for ( uint32_t cidx = 0 ; cidx < k + 1 ; cidx ++ ) {
+            // skip unmodified chunks 
+            if ( size > 0 && cidx < k && ( ( cidx + 1 ) * chunkSize < startOff || cidx * chunkSize > endOff ) )
+                continue;
             // symbols within each data chunk
             for ( uint32_t sidx = 0 ; sidx < p - 1 ; sidx ++ ) {
+                // skip unmodified symbols
+                uint32_t symbolOff = cidx * chunkSize + sidx * symbolSize;
+                if ( size > 0 && cidx < k && ( symbolOff + symbolSize < startOff || symbolOff > endOff ) )
+                    continue;
+
                 uint32_t pidx = ( cidx + sidx ) % p;
+                uint32_t offset = ( size > 0 && cidx < k )? ( startOff > symbolOff ) ? startOff - symbolOff : 0 : 0; 
+                uint32_t len = ( size > 0 && cidx < k )? endOff - ( symbolOff + offset ): symbolSize;
+                len = ( len + offset > symbolSize )? symbolSize - offset : len;
 
                 // missing diagonal
                 if ( pidx == p - 1 )
                     continue;
 
-                //fprintf( stderr, " encode (%d, %d) on (%d, %d) with len %d \n", cidx, sidx , p - 1, pidx, symbolSize );
+                //fprintf( stderr, " encode (%d, %d) on (%d, %d) with off %d len %d \n", cidx, sidx , p - 1, pidx, offset, len );
                 if ( cidx < k ) 
-                    this->bitwiseXOR( parityChunk->data + pidx * symbolSize, 
-                            dataChunks[ cidx ]->data + sidx * symbolSize, 
-                            parityChunk->data + pidx * symbolSize, symbolSize );
+                    this->bitwiseXOR( parityChunk->data + pidx * symbolSize + offset, 
+                            dataChunks[ cidx ]->data + sidx * symbolSize + offset, 
+                            parityChunk->data + pidx * symbolSize + offset, len );
                 else 
-                    this->bitwiseXOR( parityChunk->data + pidx * symbolSize, 
-                            firstParity.data + sidx * symbolSize, 
-                            parityChunk->data + pidx * symbolSize, symbolSize );
+                    this->bitwiseXOR( parityChunk->data + pidx * symbolSize + offset, 
+                            firstParity.data + sidx * symbolSize + offset, 
+                            parityChunk->data + pidx * symbolSize + offset, len );
             }
         }
 
@@ -228,11 +240,11 @@ uint32_t RDPCoding::getPrime() {
         if ( primeList [ mid ] < k + 1 ) {
             start = mid;
         } 
-        if ( mid + 1 < primeCount && primeList [ mid + 1 ] >= k + 1 ) {
-            end  = mid + 1;
+        if ( primeList [ mid ] >= k + 1 ) {
+            end  = mid;
         } 
         if ( start + 1 == end ) {
-            this->_p = end;
+            this->_p = ( primeList[ start ] >= k + 1 )? start : end;
             break;
         }
     }

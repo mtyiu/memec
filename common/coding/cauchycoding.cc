@@ -31,7 +31,7 @@ CauchyCoding::~CauchyCoding() {
     free( this->_jschedule );
 }
 
-void CauchyCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t index ) {
+void CauchyCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t index, uint32_t startOff, uint32_t endOff ) {
     uint32_t k = this->_k;
     uint32_t m = this->_m;
     uint32_t w = this->_w;

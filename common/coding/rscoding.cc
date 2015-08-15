@@ -29,7 +29,7 @@ RSCoding::~RSCoding() {
     free( this->_jmatrix );
 }
 
-void RSCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t index ) {
+void RSCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t index, uint32_t startOff, uint32_t endOff ) {
     uint32_t k = this->_k;
     uint32_t m = this->_m;
     uint32_t w = this->_w;

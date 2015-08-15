@@ -5,7 +5,7 @@ bool RAID5Coding::init( uint32_t n ) {
 	return true;
 }
 
-void RAID5Coding::encode( Chunk **data, Chunk *parity, uint32_t index ) {
+void RAID5Coding::encode( Chunk **data, Chunk *parity, uint32_t index, uint32_t startOff, uint32_t endOff ) {
 	for ( uint32_t i = 0; i < this->n - 1; i++ )
 		this->bitwiseXOR( parity, parity, data[ i ], data[ i ]->size );
 }

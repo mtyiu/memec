@@ -48,7 +48,7 @@ public:
     RDPCoding ( uint32_t k = 0, uint32_t chunkSize = 0 );
     ~ RDPCoding ();
 
-    void encode ( Chunk **dataChunks, Chunk *parityChunk, uint32_t index ); 
+    void encode ( Chunk **dataChunks, Chunk *parityChunk, uint32_t index, uint32_t startOff = 0, uint32_t endOff = 0 ); 
 
     bool decode ( Chunk **chunks, BitmaskArray *chunkStatus );
 

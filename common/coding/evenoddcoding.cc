@@ -9,11 +9,13 @@ EvenOddCoding::EvenOddCoding( uint32_t k, uint32_t chunkSize ) :
 EvenOddCoding::~EvenOddCoding() {
 }
 
-void EvenOddCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t index ) {
+void EvenOddCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t index, uint32_t startOff, uint32_t endOff ) {
 
     uint32_t k = this->_k;
     uint32_t p = this->_p;
+    uint32_t chunkSize = this->_chunkSize;
     uint32_t symbolSize = this->_symbolSize;
+    uint32_t size = ( endOff == 0 )? 0 : endOff - startOff;
 
     if ( index == 1 ) {
 
@@ -30,19 +32,27 @@ void EvenOddCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t ind
         for ( uint32_t sidx = 0 ; sidx < p - 1 ; sidx ++ ) {
             // symbols within each data chunk
             for ( uint32_t cidx = 0 ; cidx < k ; cidx ++ ) {
-                uint32_t pidx = ( cidx + sidx ) % p;
+                // skip unmodified symbols
+                uint32_t symbolOff = cidx * chunkSize + sidx * symbolSize;
+                if ( size > 0 && ( symbolOff + symbolSize < startOff || symbolOff > endOff ) )
+                    continue;
 
+                uint32_t pidx = ( cidx + sidx ) % p;
+                uint32_t offset = ( size > 0 )? ( startOff > symbolOff ) ? startOff - symbolOff : 0 : 0; 
+                uint32_t len = ( size > 0 )? endOff - ( symbolOff + offset ) : symbolSize;
+                len = ( len + offset > symbolSize )? symbolSize - offset : len;
+
+                //fprintf( stderr, " encode (%d, %d) on (%d, %d) with off %d len %d \n", cidx, sidx , p - 1, pidx, offset, len );
                 // missing diagonal
                 if ( pidx == p - 1 ) {
-                    this->bitwiseXOR( s, dataChunks[ cidx ]->data + sidx * symbolSize,
-                            s, symbolSize );
+                    this->bitwiseXOR( s + offset, dataChunks[ cidx ]->data + sidx * symbolSize + offset,
+                            s + offset, len );
                 } else {
-                    this->bitwiseXOR( parityChunk->data + pidx * symbolSize, 
-                            dataChunks[ cidx ]->data + sidx * symbolSize,
-                            parityChunk->data + pidx * symbolSize , symbolSize );
+                    this->bitwiseXOR( parityChunk->data + pidx * symbolSize + offset, 
+                            dataChunks[ cidx ]->data + sidx * symbolSize + offset,
+                            parityChunk->data + pidx * symbolSize + offset, len );
                 }
             }
-
         }
 
         // add S back
@@ -221,11 +231,11 @@ uint32_t EvenOddCoding::getPrime() {
         if ( primeList [ mid ] < k ) {
             start = mid;
         } 
-        if ( mid + 1 < primeCount && primeList [ mid + 1 ] >= k ) {
-            end  = mid + 1;
+        if ( primeList [ mid ] >= k ) {
+            end  = mid;
         } 
         if ( start + 1 == end ) {
-            this->_p = end;
+            this->_p = ( primeList[ start ] >= k && primeList[ start ] != 2 )? start : end;
             break;
         }
     }
@@ -245,7 +255,7 @@ uint32_t EvenOddCoding::getSymbolSize() {
     }
 
     if ( pp == primeCount ) {
-        fprintf( stderr, "Cannot find a prime number p > k+1 such that the size of chunk, %d, is a multiple of (p - 1)\n", chunkSize);
+        fprintf( stderr, "Cannot find a prime number p > k such that the size of chunk, %d, is a multiple of (p - 1)\n", chunkSize);
         exit( -1 );
     }
     
