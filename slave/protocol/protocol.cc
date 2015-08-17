@@ -1,7 +1,7 @@
 #include "protocol.hh"
 
-bool SlaveProtocol::init( size_t size, uint32_t parityChunkCount ) {
-	this->status = new bool[ parityChunkCount ];
+bool SlaveProtocol::init( size_t size, uint32_t dataChunkCount ) {
+	this->status = new bool[ dataChunkCount ];
 	return Protocol::init( size );
 }
 

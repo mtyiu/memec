@@ -134,10 +134,15 @@ public:
 		return ret[ index ];
 	}
 
-	T **get( uint32_t listIndex, T **parity ) {
+	T **get( uint32_t listIndex, T **parity, T **data = 0 ) {
 		T **ret = this->lists[ listIndex ];
 		for ( uint32_t i = 0; i < this->n - this->k; i++ ) {
 			parity[ i ] = ret[ this->k + i ];
+		}
+		if ( data ) {
+			for ( uint32_t i = 0; i < this->k; i++ ) {
+				data[ i ] = ret[ i ];
+			}
 		}
 		return parity;
 	}
@@ -159,7 +164,8 @@ public:
 						s.chunkId++;
 				}
 				ret.push_back( s );
-			} else if ( this->parity.check( i, index ) ) {StripeListIndex s;
+			} else if ( this->parity.check( i, index ) ) {
+				StripeListIndex s;
 				s.listId = i;
 				s.stripeId = 0;
 				s.chunkId = this->k;

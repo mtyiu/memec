@@ -35,6 +35,39 @@ char *Chunk::alloc( uint32_t size, uint32_t &offset ) {
 	return ret;
 }
 
+void Chunk::loadFromGetChunkRequest( uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isParity, char *data, uint32_t size ) {
+	this->status = CHUNK_STATUS_FROM_GET_CHUNK;
+	this->size = size;
+	this->metadata.set( listId, stripeId, chunkId );
+	this->isParity = isParity;
+	memcpy( this->data, data, size );
+}
+
+void Chunk::swap( Chunk *c ) {
+	Chunk tmp;
+
+	tmp.status = c->status;
+	tmp.count = c->count;
+	tmp.size = c->size;
+	tmp.metadata = c->metadata;
+	tmp.isParity = c->isParity;
+	tmp.data = c->data;
+
+	c->status = this->status;
+	c->count = this->count;
+	c->size = this->size;
+	c->metadata = this->metadata;
+	c->isParity = this->isParity;
+	c->data = this->data;
+
+	this->status = tmp.status;
+	this->count = tmp.count;
+	this->size = tmp.size;
+	this->metadata = tmp.metadata;
+	this->isParity = tmp.isParity;
+	this->data = tmp.data;
+}
+
 void Chunk::updateData() {
 	uint8_t keySize;
 	uint32_t valueSize, tmp;
@@ -43,6 +76,8 @@ void Chunk::updateData() {
 	this->isParity = false;
 	while ( ptr < this->data + Chunk::capacity ) {
 		KeyValue::deserialize( ptr, key, keySize, value, valueSize );
+		if ( keySize == 0 && valueSize == 0 )
+			break;
 
 		tmp = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
 
@@ -150,6 +185,17 @@ void Chunk::clear() {
 	this->status = CHUNK_STATUS_EMPTY;
 	this->count = 0;
 	this->size = 0;
+	memset( this->data, 0, Chunk::capacity );
+}
+
+void Chunk::setReconstructed( uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isParity ) {
+	this->status = CHUNK_STATUS_RECONSTRUCTED;
+	this->count = 0;
+	this->size = 0;
+	this->metadata.listId = listId;
+	this->metadata.stripeId = stripeId;
+	this->metadata.chunkId = chunkId;
+	this->isParity = isParity;
 	memset( this->data, 0, Chunk::capacity );
 }
 

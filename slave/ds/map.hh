@@ -76,6 +76,42 @@ public:
 		opMetadata.opcode = opcode;
 		this->ops[ key ] = opMetadata;
 	}
+
+	void setChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, Chunk *chunk, bool insertKeys = false ) {
+		Metadata metadata;
+		metadata.set( listId, stripeId, chunkId );
+		this->cache[ metadata ] = chunk;
+		if ( insertKeys ) {
+			chunk->updateData();
+
+			char *ptr = chunk->data;
+			char *keyPtr, *valuePtr;
+			uint8_t keySize;
+			uint32_t valueSize, offset = 0, size;
+
+			while( ptr < chunk->data + Chunk::capacity ) {
+				KeyValue::deserialize( ptr, keyPtr, keySize, valuePtr, valueSize );
+				if ( keySize == 0 && valueSize == 0 )
+					break;
+
+				Key key;
+				KeyMetadata keyMetadata;
+
+				size = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
+
+				key.set( keySize, keyPtr );
+				keyMetadata.set( listId, stripeId, chunkId );
+				keyMetadata.offset = offset;
+				keyMetadata.length = size;
+
+				offset += size;
+
+				this->keys[ key ] = keyMetadata;
+
+				ptr += size;
+			}
+		}
+	}
 };
 
 #endif

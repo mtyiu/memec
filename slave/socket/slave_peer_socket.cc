@@ -55,6 +55,10 @@ void SlavePeerSocket::stop() {
 	Socket::stop();
 }
 
+bool SlavePeerSocket::ready() {
+	return this->self || ( Socket::ready() );
+}
+
 void SlavePeerSocket::free() {
 	if ( this->identifier ) {
 		::free( this->identifier );

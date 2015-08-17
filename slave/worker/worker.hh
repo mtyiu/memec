@@ -29,7 +29,10 @@ private:
 	SlaveProtocol protocol;
 	Storage *storage;
 	// Temporary variables
-	Chunk *dataChunk, *parityChunk, **chunks;
+	BitmaskArray *chunkStatus;
+	Chunk *dataChunk, *parityChunk;
+	Chunk **chunks;
+	Chunk *freeChunks;
 	SlavePeerSocket **dataSlaveSockets;
 	SlavePeerSocket **paritySlaveSockets;
 	static uint32_t dataChunkCount;
@@ -39,6 +42,7 @@ private:
 	static Coding *coding;
 	static SlaveEventQueue *eventQueue;
 	static StripeList<SlavePeerSocket> *stripeList;
+	static std::vector<StripeListIndex> *stripeListIndex;
 	static Map *map;
 	static MemoryPool<Chunk> *chunkPool;
 	static MemoryPool<Stripe> *stripePool;
@@ -72,6 +76,8 @@ private:
 	bool handleDeleteChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleGetChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleSetChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
+
+	bool performDegradedRead( uint32_t listId, uint32_t stripeId, uint32_t lostChunkId, uint8_t opcode, Key *key, KeyValueUpdate *keyValueUpdate = 0 );
 
 	void free();
 	static void *run( void *argv );

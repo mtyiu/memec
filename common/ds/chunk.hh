@@ -15,8 +15,12 @@ enum ChunkStatus {
 	CHUNK_STATUS_DIRTY,
 	// The chunk contains data that is already flushed to disk
 	CHUNK_STATUS_CACHED,
+	// The chunk is retrieved from surviving node using GET_CHUNK
+	CHUNK_STATUS_FROM_GET_CHUNK,
 	// Reconstructed using k other chunks
-	CHUNK_STATUS_RECONSTRUCTED
+	CHUNK_STATUS_RECONSTRUCTED,
+	// Temporary use
+	CHUNK_STATUS_TEMPORARY
 };
 
 class Chunk {
@@ -34,6 +38,8 @@ public:
 	static void init( uint32_t capacity );
 	void init();
 	char *alloc( uint32_t size, uint32_t &offset );
+	void loadFromGetChunkRequest( uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isParity, char *data, uint32_t size );
+	void swap( Chunk *c );
 	// Update internal counters for data and parity chunks
 	void updateData();
 	void updateParity( uint32_t offset = 0, uint32_t length = 0 );
@@ -45,6 +51,7 @@ public:
 	KeyValue getKeyValue( uint32_t offset );
 	// Reset internal status
 	void clear();
+	void setReconstructed( uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isParity );
 	void free();
 
 	static bool initFn( Chunk *chunk, void *argv );

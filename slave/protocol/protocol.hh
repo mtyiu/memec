@@ -9,7 +9,7 @@ public:
 	volatile bool *status; // Indicate which slave in the stripe is accessing the internal buffer
 
 	SlaveProtocol() : Protocol( ROLE_SLAVE ) {}
-	bool init( size_t size, uint32_t parityChunkCount );
+	bool init( size_t size, uint32_t dataChunkCount );
 	void free();
 
 	/* Coordinator */

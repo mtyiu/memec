@@ -21,6 +21,7 @@ public:
 	bool init( ServerAddr &addr, EPoll *epoll, bool active, bool self );
 	bool start();
 	void stop();
+	bool ready();
 	void free();
 	bool isMatched( ServerAddr &serverAddr );
 	bool setRecvFd( int fd, struct sockaddr_in *addr );

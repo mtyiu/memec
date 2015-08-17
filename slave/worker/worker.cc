@@ -12,6 +12,7 @@ ServerAddr *SlaveWorker::slaveServerAddr;
 Coding *SlaveWorker::coding;
 SlaveEventQueue *SlaveWorker::eventQueue;
 StripeList<SlavePeerSocket> *SlaveWorker::stripeList;
+std::vector<StripeListIndex> *SlaveWorker::stripeListIndex;
 Map *SlaveWorker::map;
 MemoryPool<Chunk> *SlaveWorker::chunkPool;
 MemoryPool<Stripe> *SlaveWorker::stripePool;
@@ -64,6 +65,9 @@ void SlaveWorker::dispatch( CodingEvent event ) {
 			IOEvent ioEvent;
 			ioEvent.flush( parityChunk );
 			SlaveWorker::eventQueue->insert( ioEvent );
+			break;
+		case CODING_EVENT_TYPE_DECODE:
+			SlaveWorker::coding->decode( event.message.decode.chunks, event.message.decode.status );
 			break;
 		default:
 			return;
@@ -718,9 +722,11 @@ bool SlaveWorker::handleGetRequest( MasterEvent event, char *buf, size_t size ) 
 		ret = true;
 	} else {
 		// Detect degraded GET
-		if ( this->isRedirectedRequest( header.key, header.keySize ) ) {
+		uint32_t listId, chunkId;
+		if ( this->isRedirectedRequest( header.key, header.keySize, 0, &listId, &chunkId ) ) {
 			__DEBUG__( YELLOW, "SlaveWorker", "handleGetRequest", "!!! Degraded GET request [not yet implemented] !!!" );
 			// TODO
+			this->performDegradedRead( listId, 0, chunkId, PROTO_OPCODE_GET, &key ); // Need to know the stripe ID
 		}
 
 		event.resGet( event.socket, key );
@@ -1100,12 +1106,7 @@ bool SlaveWorker::handleGetChunkRequest( SlavePeerEvent event, char *buf, size_t
 
 	Metadata metadata;
 	Chunk *chunk = map->findChunkById( header.listId, header.stripeId, header.chunkId, &metadata );
-	if ( chunk ) {
-		__ERROR__( "SlaveWorker", "handleGetChunkRequest", "TODO: GET_CHUNK not yet implemented!" );
-		ret = true;
-	} else {
-		ret = false;
-	}
+	ret = chunk;
 
 	event.resGetChunk( event.socket, metadata, ret, chunk );
 	this->load.getChunk();
@@ -1279,11 +1280,12 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 
 bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
 	int pending;
-	std::set<ChunkRequest>::iterator it;
+	std::set<ChunkRequest>::iterator it, tmp;
 	ChunkRequest chunkRequest;
 
 	if ( success ) {
 		struct ChunkDataHeader header;
+		// Parse header
 		if ( ! this->protocol.parseChunkDataHeader( header, buf, size ) ) {
 			__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Invalid GET_CHUNK (success) response." );
 			return false;
@@ -1295,8 +1297,124 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 		);
 		chunkRequest.set(
 			header.listId, header.stripeId, header.chunkId,
-			event.socket, 0 // ptr
+			event.socket, 0 // chunk
 		);
+
+		// Find the corresponding GET_CHUNK request from the pending set
+		pthread_mutex_lock( &SlaveWorker::pending->slavePeers.getLock );
+		it = SlaveWorker::pending->slavePeers.getChunk.find( chunkRequest );
+		if ( it == SlaveWorker::pending->slavePeers.getChunk.end() || ! chunkRequest.equal( *it ) ) {
+			pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.getLock );
+			__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot find a pending slave GET_CHUNK request that matches the response. This message will be discarded." );
+			return false;
+		}
+
+		// Store the chunk into the buffer
+		it->chunk = SlaveWorker::chunkPool->malloc();
+		it->chunk->loadFromGetChunkRequest(
+			header.listId, header.stripeId, header.chunkId,
+			header.chunkId >= SlaveWorker::dataChunkCount, // isParity
+			header.data, header.size
+		);
+
+		// Prepare stripe buffer
+		for ( uint32_t i = 0, total = SlaveWorker::dataChunkCount + SlaveWorker::parityChunkCount; i < total; i++ ) {
+			this->chunks[ i ] = 0;
+		}
+
+		// Check remaining slave GET_CHUNK requests in the pending set
+		chunkRequest.chunkId = 0;
+		chunkRequest.socket = 0;
+		chunkRequest.chunk = 0;
+		it = SlaveWorker::pending->slavePeers.getChunk.lower_bound( chunkRequest );
+		tmp = it;
+		for ( pending = 0; it != SlaveWorker::pending->slavePeers.getChunk.end() && chunkRequest.matchStripe( *it ); it++ ) {
+			if ( ! it->chunk ) { // The chunk is not received yet
+				pending++;
+			} else {
+				this->chunks[ it->chunkId ] = it->chunk;
+			}
+		}
+		__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Pending slave GET_CHUNK requests = %d (%s).", pending, success ? "success" : "fail" );
+		if ( pending == 0 )
+			SlaveWorker::pending->slavePeers.getChunk.erase( tmp, it );
+		pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.getLock );
+
+		if ( pending == 0 ) {
+			std::set<DegradedOp>::iterator degradedOpsIt;
+			DegradedOp op;
+			op.set( chunkRequest.listId, chunkRequest.stripeId, 0, 0 );
+
+			// Set up chunk buffer for storing reconstructed chunks
+			for ( uint32_t i = 0, j = 0, total = SlaveWorker::dataChunkCount + SlaveWorker::parityChunkCount; i < total; i++ ) {
+				if ( ! this->chunks[ i ] ) {
+					this->freeChunks[ j ].setReconstructed(
+						chunkRequest.listId, chunkRequest.stripeId, i,
+						i >= SlaveWorker::dataChunkCount
+					);
+					this->freeChunks[ j ].status = CHUNK_STATUS_TEMPORARY;
+					this->chunkStatus->unset( i );
+					j++;
+				} else {
+					this->chunkStatus->set( i );
+				}
+			}
+
+			// Decode to reconstruct the lost chunk
+			CodingEvent codingEvent;
+			codingEvent.decode( this->chunks, this->chunkStatus );
+			this->dispatch( codingEvent );
+
+			// Respond the original GET/UPDATE/DELETE operation using the reconstructed data
+			pthread_mutex_lock( &SlaveWorker::pending->slavePeers.degradedOpsLock );
+			degradedOpsIt = SlaveWorker::pending->slavePeers.degradedOps.lower_bound( op );
+			for ( pending = 0; degradedOpsIt != SlaveWorker::pending->slavePeers.degradedOps.end() && op.matchStripe( *degradedOpsIt ); degradedOpsIt++ ) {
+				const DegradedOp &op = *degradedOpsIt;
+				// Find the chunk from the map
+				Chunk *chunk = SlaveWorker::map->findChunkById( op.listId, op.stripeId, op.chunkId );
+				if ( ! chunk ) {
+					this->chunks[ op.chunkId ]->status = CHUNK_STATUS_RECONSTRUCTED;
+
+					chunk = SlaveWorker::chunkPool->malloc();
+					chunk->swap( this->chunks[ op.chunkId ] );
+
+					SlaveWorker::map->setChunk(
+						op.listId, op.stripeId, op.chunkId, chunk,
+						op.chunkId >= SlaveWorker::dataChunkCount
+					);
+				}
+
+				// Send response
+				switch( degradedOpsIt->opcode ) {
+					case PROTO_OPCODE_GET:
+						fprintf( stderr, "TODO: GET\n" );
+						break;
+					case PROTO_OPCODE_UPDATE:
+						fprintf( stderr, "TODO: UPDATE\n" );
+						break;
+					case PROTO_OPCODE_DELETE:
+						fprintf( stderr, "TODO: DELETE\n" );
+						break;
+				}
+			}
+			pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.degradedOpsLock );
+
+			// Return chunks to chunk pool
+			for ( uint32_t i = 0, total = SlaveWorker::dataChunkCount + SlaveWorker::parityChunkCount; i < total; i++ ) {
+				fprintf( stderr, "i = %u; chunk = %p\n", i, this->chunks[ i ] );
+				switch( this->chunks[ i ]->status ) {
+					case CHUNK_STATUS_FROM_GET_CHUNK:
+						SlaveWorker::chunkPool->free( this->chunks[ i ] );
+						this->chunks[ i ] = 0;
+						break;
+					case CHUNK_STATUS_RECONSTRUCTED:
+						break;
+					default:
+						break;
+				}
+			}
+		}
+		return true;
 	} else {
 		struct ChunkHeader header;
 		if ( ! this->protocol.parseChunkHeader( header, buf, size ) ) {
@@ -1310,32 +1428,21 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 		);
 		chunkRequest.set(
 			header.listId, header.stripeId, header.chunkId,
-			event.socket, 0 // ptr
+			event.socket, 0 // chunk
 		);
-	}
 
-	pthread_mutex_lock( &SlaveWorker::pending->slavePeers.getLock );
-	it = SlaveWorker::pending->slavePeers.getChunk.lower_bound( chunkRequest );
-	if ( it == SlaveWorker::pending->slavePeers.getChunk.end() || ! chunkRequest.equal( *it ) ) {
+		pthread_mutex_lock( &SlaveWorker::pending->slavePeers.getLock );
+		it = SlaveWorker::pending->slavePeers.getChunk.lower_bound( chunkRequest );
+		if ( it == SlaveWorker::pending->slavePeers.getChunk.end() || ! chunkRequest.equal( *it ) ) {
+			pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.getLock );
+			__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot find a pending slave GET_CHUNK request that matches the response. This message will be discarded." );
+			return false;
+		}
+		SlaveWorker::pending->slavePeers.getChunk.erase( it );
 		pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.getLock );
-		__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot find a pending slave GET_CHUNK request that matches the response. This message will be discarded." );
+
 		return false;
 	}
-	chunkRequest = *it;
-	SlaveWorker::pending->slavePeers.getChunk.erase( it );
-
-	// Check pending slave GET_CHUNK requests
-	chunkRequest.chunkId = 0;
-	chunkRequest.socket = 0;
-	it = SlaveWorker::pending->slavePeers.getChunk.lower_bound( chunkRequest );
-	for ( pending = 0; it != SlaveWorker::pending->slavePeers.getChunk.end() && chunkRequest.matchStripe( *it ); pending++, it++ );
-	pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.getLock );
-
-	__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Pending slave GET_CHUNK requests = %d (%s).", pending, success ? "success" : "fail" );
-	if ( pending == 0 ) {
-		__ERROR__( "SlaveWorker", "handleGetChunkResponse", "What should be done after all GET_CHUNK requests return?" );
-	}
-	return true;
 }
 
 bool SlaveWorker::handleSetChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
@@ -1375,17 +1482,99 @@ bool SlaveWorker::handleSetChunkResponse( SlavePeerEvent event, bool success, ch
 	return true;
 }
 
+bool SlaveWorker::performDegradedRead( uint32_t listId, uint32_t stripeId, uint32_t lostChunkId, uint8_t opcode, Key *key, KeyValueUpdate *keyValueUpdate ) {
+	SlaveWorker::stripeList->get( listId, this->paritySlaveSockets, this->dataSlaveSockets );
+
+	// Check whether the number of surviving nodes >= k
+	uint32_t selected = 0;
+	for ( uint32_t i = 0, total = SlaveWorker::dataChunkCount + SlaveWorker::parityChunkCount; i < total; i++ ) {
+		// Never get from the overloaded slave (even if it is still "ready")
+		if ( i == lostChunkId )
+			continue;
+		if ( i < SlaveWorker::dataChunkCount ) {
+			if ( this->dataSlaveSockets[ i ]->ready() )
+				selected++;
+		} else {
+			if ( this->paritySlaveSockets[ i - SlaveWorker::dataChunkCount ]->ready() )
+				selected++;
+		}
+	}
+	if ( selected < SlaveWorker::dataChunkCount ) {
+		__ERROR__( "SlaveWorker", "performDegradedRead", "The number of surviving nodes is less than k. The data cannot be recovered." );
+		return false;
+	}
+
+	// Add to degraded operation pending set
+	DegradedOp op;
+	op.set( listId, stripeId, lostChunkId, opcode );
+	if ( opcode == PROTO_OPCODE_UPDATE )
+		op.data.keyValueUpdate = *keyValueUpdate;
+	else
+		op.data.key = *key;
+	pthread_mutex_lock( &SlaveWorker::pending->slavePeers.degradedOpsLock );
+	SlaveWorker::pending->slavePeers.degradedOps.insert( op );
+	pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.degradedOpsLock );
+
+	// Send GET_CHUNK requests to surviving nodes
+	Metadata metadata;
+	SlavePeerEvent event;
+	SlavePeerSocket *socket;
+	metadata.set( listId, stripeId, 0 );
+	selected = 0;
+	for ( uint32_t i = 0, total = SlaveWorker::dataChunkCount + SlaveWorker::parityChunkCount; i < total; i++ ) {
+		if ( selected >= SlaveWorker::dataChunkCount - 1 )
+			break;
+		if ( i == lostChunkId )
+			continue;
+
+		socket = 0;
+		if ( i < SlaveWorker::dataChunkCount ) {
+			if ( this->dataSlaveSockets[ i ]->ready() )
+				socket = this->dataSlaveSockets[ i ];
+		} else {
+			if ( this->paritySlaveSockets[ i - SlaveWorker::dataChunkCount ]->ready() )
+				socket = paritySlaveSockets[ i - SlaveWorker::dataChunkCount ];
+		}
+
+		if ( socket ) {
+			selected++;
+
+			// Add to pending GET_CHUNK request set
+			ChunkRequest chunkRequest;
+			chunkRequest.set( listId, stripeId, i, socket );
+			chunkRequest.chunk = 0;
+
+			pthread_mutex_lock( &SlaveWorker::pending->slavePeers.getLock );
+			SlaveWorker::pending->slavePeers.getChunk.insert( chunkRequest );
+			pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.getLock );
+
+			metadata.chunkId = i;
+			event.reqGetChunk( socket, metadata );
+			SlaveWorker::eventQueue->insert( event );
+		}
+	}
+
+	if ( selected >= SlaveWorker::dataChunkCount - 1 ) {
+		// Pick the local chunk
+		__ERROR__( "SlaveWorker", "performDegradedRead", "TODO:: __Pick the local chunk__" );
+		return true;
+	}
+	return false;
+}
+
 void SlaveWorker::free() {
 	if ( this->storage ) {
 		this->storage->stop();
 		Storage::destroy( this->storage );
 	}
 	this->protocol.free();
+	delete this->chunkStatus;
 	this->dataChunk->free();
 	this->parityChunk->free();
 	delete this->dataChunk;
 	delete this->parityChunk;
 	delete[] this->chunks;
+	delete[] this->freeChunks;
 	delete[] this->dataSlaveSockets;
 	delete[] this->paritySlaveSockets;
 }
@@ -1467,6 +1656,7 @@ bool SlaveWorker::init() {
 	SlaveWorker::coding = slave->coding;
 	SlaveWorker::eventQueue = &slave->eventQueue;
 	SlaveWorker::stripeList = slave->stripeList;
+	SlaveWorker::stripeListIndex = &slave->stripeListIndex;
 	SlaveWorker::map = &slave->map;
 	SlaveWorker::chunkPool = slave->chunkPool;
 	SlaveWorker::stripePool = slave->stripePool;
@@ -1480,12 +1670,18 @@ bool SlaveWorker::init( GlobalConfig &globalConfig, SlaveConfig &slaveConfig, Wo
 			globalConfig.size.key,
 			globalConfig.size.chunk
 		),
-		SlaveWorker::parityChunkCount
+		SlaveWorker::dataChunkCount
 	);
 	this->role = role;
+	this->chunkStatus = new BitmaskArray( SlaveWorker::dataChunkCount + SlaveWorker::parityChunkCount, 1 );
 	this->dataChunk = new Chunk();
 	this->parityChunk = new Chunk();
 	this->chunks = new Chunk*[ SlaveWorker::dataChunkCount + SlaveWorker::parityChunkCount ];
+	this->freeChunks = new Chunk[ SlaveWorker::dataChunkCount ];
+	for( uint32_t i = 0; i < SlaveWorker::dataChunkCount; i++ ) {
+		this->freeChunks[ i ].init( globalConfig.size.chunk );
+		this->freeChunks[ i ].init();
+	}
 	this->dataChunk->init( globalConfig.size.chunk );
 	this->parityChunk->init( globalConfig.size.chunk );
 	this->dataSlaveSockets = new SlavePeerSocket*[ SlaveWorker::dataChunkCount ];
