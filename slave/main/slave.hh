@@ -41,7 +41,6 @@ private:
 
 	void free();
 	// Commands
-	void printPending( FILE *f = stdout );
 	void sync();
 	void help();
 
@@ -81,6 +80,7 @@ public:
 	void info( FILE *f = stdout );
 	void debug( FILE *f = stdout );
 	void dump();
+	void printPending( FILE *f = stdout );
 	void time();
 	void alarm();
 	Load &aggregateLoad( FILE *f = 0 );

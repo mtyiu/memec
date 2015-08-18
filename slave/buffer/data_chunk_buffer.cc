@@ -80,7 +80,7 @@ uint32_t DataChunkBuffer::flush( bool lock ) {
 
 	if ( lock )
 		pthread_mutex_lock( this->locks + index );
-	
+
 	this->flush( index, false );
 
 	if ( lock ) {
@@ -96,7 +96,7 @@ Chunk *DataChunkBuffer::flush( int index, bool lock ) {
 		pthread_mutex_lock( &this->lock );
 		pthread_mutex_lock( this->locks + index );
 	}
-	
+
 	Chunk *chunk = this->chunks[ index ];
 
 	// Append a flush event to the event queue

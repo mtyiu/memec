@@ -52,6 +52,7 @@ bool SlavePeerSocket::start() {
 }
 
 void SlavePeerSocket::stop() {
+	printf( "fd = %d is stopping...\n", this->sockfd );
 	Socket::stop();
 }
 

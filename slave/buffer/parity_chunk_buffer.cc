@@ -54,7 +54,7 @@ uint32_t ParityChunkBuffer::flush( bool lock ) {
 
 	if ( lock )
 		pthread_mutex_lock( this->locks + index );
-	
+
 	this->flush( index, false );
 
 	if ( lock ) {
@@ -69,10 +69,11 @@ Chunk *ParityChunkBuffer::flush( int index, bool lock ) {
 		pthread_mutex_lock( &this->lock );
 		pthread_mutex_lock( this->locks + index );
 	}
-	
+
 	Chunk *chunk = this->chunks[ index ];
 	Stripe *stripe = ChunkBuffer::stripePool->malloc();
 	stripe->set( this->dataChunks[ index ], chunk, this->chunkId );
+	chunk->size = stripe->getMaxDataChunkSize();
 
 	// Append an encode event to the event queue
 	CodingEvent codingEvent;

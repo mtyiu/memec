@@ -77,11 +77,13 @@ public:
 		this->ops[ key ] = opMetadata;
 	}
 
-	void setChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, Chunk *chunk, bool insertKeys = false ) {
+	void setChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, Chunk *chunk, bool isParity = false ) {
 		Metadata metadata;
 		metadata.set( listId, stripeId, chunkId );
 		this->cache[ metadata ] = chunk;
-		if ( insertKeys ) {
+		if ( isParity ) {
+			chunk->updateParity();
+		} else {
 			chunk->updateData();
 
 			char *ptr = chunk->data;

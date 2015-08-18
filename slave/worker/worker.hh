@@ -37,6 +37,7 @@ private:
 	SlavePeerSocket **paritySlaveSockets;
 	static uint32_t dataChunkCount;
 	static uint32_t parityChunkCount;
+	static uint32_t chunkCount;
 	static Pending *pending;
 	static ServerAddr *slaveServerAddr;
 	static Coding *coding;

@@ -7,6 +7,7 @@
 
 uint32_t SlaveWorker::dataChunkCount;
 uint32_t SlaveWorker::parityChunkCount;
+uint32_t SlaveWorker::chunkCount;
 Pending *SlaveWorker::pending;
 ServerAddr *SlaveWorker::slaveServerAddr;
 Coding *SlaveWorker::coding;
@@ -532,15 +533,12 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				case PROTO_OPCODE_UPDATE_CHUNK:
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
-							fprintf( stderr, "handleUpdateChunkRequest\n" );
 							this->handleUpdateChunkRequest( event, buffer.data, buffer.size );
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
-							fprintf( stderr, "handleUpdateChunkResponse\n" );
 							this->handleUpdateChunkResponse( event, true, buffer.data, buffer.size );
 							break;
 						case PROTO_MAGIC_RESPONSE_FAILURE:
-							fprintf( stderr, "handleUpdateChunkResponse\n" );
 							this->handleUpdateChunkResponse( event, false, buffer.data, buffer.size );
 							break;
 						default:
@@ -551,15 +549,12 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				case PROTO_OPCODE_DELETE_CHUNK:
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
-							fprintf( stderr, "handleDeleteChunkRequest\n" );
 							this->handleDeleteChunkRequest( event, buffer.data, buffer.size );
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
-							fprintf( stderr, "handleDeleteChunkResponse\n" );
 							this->handleDeleteChunkResponse( event, true, buffer.data, buffer.size );
 							break;
 						case PROTO_MAGIC_RESPONSE_FAILURE:
-							fprintf( stderr, "handleDeleteChunkResponse\n" );
 							this->handleDeleteChunkResponse( event, false, buffer.data, buffer.size );
 							break;
 						default:
@@ -665,7 +660,7 @@ SlavePeerSocket *SlaveWorker::getSlave( char *data, uint8_t size, uint32_t &list
 		return ret;
 
 	if ( allowDegraded ) {
-		for ( uint32_t i = 0; i < SlaveWorker::dataChunkCount + SlaveWorker::parityChunkCount; i++ ) {
+		for ( uint32_t i = 0; i < SlaveWorker::chunkCount; i++ ) {
 			ret = SlaveWorker::stripeList->get( listId, chunkId, i );
 			if ( ret->ready() )
 				return ret;
@@ -687,12 +682,12 @@ SlavePeerSocket *SlaveWorker::getSlaves( char *data, uint8_t size, uint32_t &lis
 				return 0;
 			if ( isDegraded ) *isDegraded = true;
 
-			for ( uint32_t i = 0; i < SlaveWorker::dataChunkCount + SlaveWorker::parityChunkCount; i++ ) {
+			for ( uint32_t i = 0; i < SlaveWorker::chunkCount; i++ ) {
 				SlavePeerSocket *s = SlaveWorker::stripeList->get( listId, chunkId, i );
 				if ( s->ready() ) {
 					this->paritySlaveSockets[ i ] = s;
 					break;
-				} else if ( i == SlaveWorker::dataChunkCount + SlaveWorker::parityChunkCount - 1 ) {
+				} else if ( i == SlaveWorker::chunkCount - 1 ) {
 					__ERROR__( "SlaveWorker", "getSlave", "Cannot find a slave for performing degraded operation." );
 					return 0;
 				}
@@ -1318,7 +1313,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 		);
 
 		// Prepare stripe buffer
-		for ( uint32_t i = 0, total = SlaveWorker::dataChunkCount + SlaveWorker::parityChunkCount; i < total; i++ ) {
+		for ( uint32_t i = 0, total = SlaveWorker::chunkCount; i < total; i++ ) {
 			this->chunks[ i ] = 0;
 		}
 
@@ -1346,13 +1341,14 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 			op.set( chunkRequest.listId, chunkRequest.stripeId, 0, 0 );
 
 			// Set up chunk buffer for storing reconstructed chunks
-			for ( uint32_t i = 0, j = 0, total = SlaveWorker::dataChunkCount + SlaveWorker::parityChunkCount; i < total; i++ ) {
+			for ( uint32_t i = 0, j = 0; i < SlaveWorker::chunkCount; i++ ) {
 				if ( ! this->chunks[ i ] ) {
 					this->freeChunks[ j ].setReconstructed(
 						chunkRequest.listId, chunkRequest.stripeId, i,
 						i >= SlaveWorker::dataChunkCount
 					);
 					this->freeChunks[ j ].status = CHUNK_STATUS_TEMPORARY;
+					this->chunks[ i ] = this->freeChunks + j;
 					this->chunkStatus->unset( i );
 					j++;
 				} else {
@@ -1364,6 +1360,23 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 			CodingEvent codingEvent;
 			codingEvent.decode( this->chunks, this->chunkStatus );
 			this->dispatch( codingEvent );
+
+			uint32_t maxChunkSize = 0, chunkSize;
+			for ( uint32_t i = 0; i < SlaveWorker::dataChunkCount; i++ ) {
+				chunkSize = this->chunks[ i ]->status == CHUNK_STATUS_RECONSTRUCTED ?
+				            this->chunks[ i ]->updateData() :
+				            this->chunks[ i ]->size;
+				if ( chunkSize > maxChunkSize )
+					maxChunkSize = chunkSize;
+			}
+
+			for ( uint32_t i = SlaveWorker::dataChunkCount; i < SlaveWorker::chunkCount; i++ ) {
+				if ( this->chunks[ i ]->status == CHUNK_STATUS_RECONSTRUCTED ) {
+					this->chunks[ i ]->size = maxChunkSize;
+				} else if ( this->chunks[ i ]->size != maxChunkSize ) {
+					__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Parity chunk size mismatch (chunk ID = %u): %u vs. %u.", i, this->chunks[ i ]->size, maxChunkSize );
+				}
+			}
 
 			// Respond the original GET/UPDATE/DELETE operation using the reconstructed data
 			pthread_mutex_lock( &SlaveWorker::pending->slavePeers.degradedOpsLock );
@@ -1400,8 +1413,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 			pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.degradedOpsLock );
 
 			// Return chunks to chunk pool
-			for ( uint32_t i = 0, total = SlaveWorker::dataChunkCount + SlaveWorker::parityChunkCount; i < total; i++ ) {
-				fprintf( stderr, "i = %u; chunk = %p\n", i, this->chunks[ i ] );
+			for ( uint32_t i = 0; i < SlaveWorker::chunkCount; i++ ) {
 				switch( this->chunks[ i ]->status ) {
 					case CHUNK_STATUS_FROM_GET_CHUNK:
 						SlaveWorker::chunkPool->free( this->chunks[ i ] );
@@ -1487,17 +1499,15 @@ bool SlaveWorker::performDegradedRead( uint32_t listId, uint32_t stripeId, uint3
 
 	// Check whether the number of surviving nodes >= k
 	uint32_t selected = 0;
-	for ( uint32_t i = 0, total = SlaveWorker::dataChunkCount + SlaveWorker::parityChunkCount; i < total; i++ ) {
+	SlavePeerSocket *socket = 0;
+	for ( uint32_t i = 0; i < SlaveWorker::chunkCount; i++ ) {
 		// Never get from the overloaded slave (even if it is still "ready")
 		if ( i == lostChunkId )
 			continue;
-		if ( i < SlaveWorker::dataChunkCount ) {
-			if ( this->dataSlaveSockets[ i ]->ready() )
-				selected++;
-		} else {
-			if ( this->paritySlaveSockets[ i - SlaveWorker::dataChunkCount ]->ready() )
-				selected++;
-		}
+		socket = ( i < SlaveWorker::dataChunkCount ) ?
+		         ( this->dataSlaveSockets[ i ] ) :
+		         ( this->paritySlaveSockets[ i - SlaveWorker::dataChunkCount ] );
+		if ( socket->ready() ) selected++;
 	}
 	if ( selected < SlaveWorker::dataChunkCount ) {
 		__ERROR__( "SlaveWorker", "performDegradedRead", "The number of surviving nodes is less than k. The data cannot be recovered." );
@@ -1518,32 +1528,35 @@ bool SlaveWorker::performDegradedRead( uint32_t listId, uint32_t stripeId, uint3
 	// Send GET_CHUNK requests to surviving nodes
 	Metadata metadata;
 	SlavePeerEvent event;
-	SlavePeerSocket *socket;
 	metadata.set( listId, stripeId, 0 );
 	selected = 0;
-	for ( uint32_t i = 0, total = SlaveWorker::dataChunkCount + SlaveWorker::parityChunkCount; i < total; i++ ) {
-		if ( selected >= SlaveWorker::dataChunkCount - 1 )
+	for ( uint32_t i = 0; i < SlaveWorker::chunkCount; i++ ) {
+	// for ( uint32_t i = SlaveWorker::chunkCount - 1; i >= 0; i-- ) {
+		if ( selected >= SlaveWorker::dataChunkCount )
 			break;
 		if ( i == lostChunkId )
 			continue;
 
-		socket = 0;
-		if ( i < SlaveWorker::dataChunkCount ) {
-			if ( this->dataSlaveSockets[ i ]->ready() )
-				socket = this->dataSlaveSockets[ i ];
-		} else {
-			if ( this->paritySlaveSockets[ i - SlaveWorker::dataChunkCount ]->ready() )
-				socket = paritySlaveSockets[ i - SlaveWorker::dataChunkCount ];
-		}
+		socket = ( i < SlaveWorker::dataChunkCount ) ?
+		         ( this->dataSlaveSockets[ i ] ) :
+		         ( this->paritySlaveSockets[ i - SlaveWorker::dataChunkCount ] );
 
-		if ( socket ) {
-			selected++;
+		// Add to pending GET_CHUNK request set
 
-			// Add to pending GET_CHUNK request set
+		if ( socket->self ) {
+			ChunkRequest chunkRequest;
+			chunkRequest.set( listId, stripeId, i, socket );
+			chunkRequest.chunk = SlaveWorker::map->findChunkById( listId,
+			 stripeId, i );
+ 			// Add to pending GET_CHUNK request set
+ 			pthread_mutex_lock( &SlaveWorker::pending->slavePeers.getLock );
+ 			SlaveWorker::pending->slavePeers.getChunk.insert( chunkRequest );
+ 			pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.getLock );
+		} else if ( socket->ready() ) {
 			ChunkRequest chunkRequest;
 			chunkRequest.set( listId, stripeId, i, socket );
 			chunkRequest.chunk = 0;
-
+			// Add to pending GET_CHUNK request set
 			pthread_mutex_lock( &SlaveWorker::pending->slavePeers.getLock );
 			SlaveWorker::pending->slavePeers.getChunk.insert( chunkRequest );
 			pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.getLock );
@@ -1552,14 +1565,10 @@ bool SlaveWorker::performDegradedRead( uint32_t listId, uint32_t stripeId, uint3
 			event.reqGetChunk( socket, metadata );
 			SlaveWorker::eventQueue->insert( event );
 		}
+		selected++;
 	}
 
-	if ( selected >= SlaveWorker::dataChunkCount - 1 ) {
-		// Pick the local chunk
-		__ERROR__( "SlaveWorker", "performDegradedRead", "TODO:: __Pick the local chunk__" );
-		return true;
-	}
-	return false;
+	return ( selected >= SlaveWorker::dataChunkCount );
 }
 
 void SlaveWorker::free() {
@@ -1651,6 +1660,7 @@ bool SlaveWorker::init() {
 
 	SlaveWorker::dataChunkCount = slave->config.global.coding.params.getDataChunkCount();
 	SlaveWorker::parityChunkCount = slave->config.global.coding.params.getParityChunkCount();
+	SlaveWorker::chunkCount = SlaveWorker::dataChunkCount + SlaveWorker::parityChunkCount;
 	SlaveWorker::pending = &slave->pending;
 	SlaveWorker::slaveServerAddr = &slave->config.slave.slave.addr;
 	SlaveWorker::coding = slave->coding;
@@ -1673,10 +1683,10 @@ bool SlaveWorker::init( GlobalConfig &globalConfig, SlaveConfig &slaveConfig, Wo
 		SlaveWorker::dataChunkCount
 	);
 	this->role = role;
-	this->chunkStatus = new BitmaskArray( SlaveWorker::dataChunkCount + SlaveWorker::parityChunkCount, 1 );
+	this->chunkStatus = new BitmaskArray( SlaveWorker::chunkCount, 1 );
 	this->dataChunk = new Chunk();
 	this->parityChunk = new Chunk();
-	this->chunks = new Chunk*[ SlaveWorker::dataChunkCount + SlaveWorker::parityChunkCount ];
+	this->chunks = new Chunk*[ SlaveWorker::chunkCount ];
 	this->freeChunks = new Chunk[ SlaveWorker::dataChunkCount ];
 	for( uint32_t i = 0; i < SlaveWorker::dataChunkCount; i++ ) {
 		this->freeChunks[ i ].init( globalConfig.size.chunk );

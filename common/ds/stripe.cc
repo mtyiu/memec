@@ -63,6 +63,15 @@ uint32_t Stripe::get( Chunk **&dataChunks, Chunk *&parityChunk ) {
 	return 0;
 }
 
+uint32_t Stripe::getMaxDataChunkSize() {
+	uint32_t ret = 0;
+	for ( uint32_t i = 0; i < Stripe::dataChunkCount; i++ ) {
+		if ( ret < this->chunks[ i ]->size )
+			ret = this->chunks[ i ]->size;
+	}
+	return ret;
+}
+
 void Stripe::init( uint32_t dataChunkCount, uint32_t parityChunkCount ) {
 	Stripe::dataChunkCount = dataChunkCount;
 	Stripe::parityChunkCount = parityChunkCount;

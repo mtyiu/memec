@@ -34,13 +34,5 @@ bool RAID5Coding::decode( Chunk **chunks, BitmaskArray *bitmap ) {
 		this->bitwiseXOR( lostChunk, lostChunk, chunks[ i ], chunks[ i ]->size );
 	}
 
-	// Update chunk's internal counter
-	/*
-	if ( lostIndex == this->n - 1 )
-		lostChunk->updateParity();
-	else
-		lostChunk->updateData();
-	*/
-
 	return true;
 }

@@ -41,8 +41,8 @@ public:
 	void loadFromGetChunkRequest( uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isParity, char *data, uint32_t size );
 	void swap( Chunk *c );
 	// Update internal counters for data and parity chunks
-	void updateData();
-	void updateParity( uint32_t offset = 0, uint32_t length = 0 );
+	uint32_t updateData();
+	uint32_t updateParity( uint32_t offset = 0, uint32_t length = 0 );
 	// Compute delta
 	void computeDelta( char *delta, char *newData, uint32_t offset, uint32_t length, bool update = true );
 	// Delete key

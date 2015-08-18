@@ -17,6 +17,7 @@ public:
 	void get( Chunk **&dataChunks, Chunk **&parityChunks );
 	void get( Chunk **&dataChunks, Chunk *&parityChunk, uint32_t parityChunkId );
 	uint32_t get( Chunk **&dataChunks, Chunk *&parityChunk );
+	uint32_t getMaxDataChunkSize();
 
 	static void init( uint32_t dataChunkCount, uint32_t parityChunkCount );
 };

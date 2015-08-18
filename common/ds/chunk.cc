@@ -68,7 +68,7 @@ void Chunk::swap( Chunk *c ) {
 	this->data = tmp.data;
 }
 
-void Chunk::updateData() {
+uint32_t Chunk::updateData() {
 	uint8_t keySize;
 	uint32_t valueSize, tmp;
 	char *key, *value, *ptr = this->data;
@@ -86,13 +86,15 @@ void Chunk::updateData() {
 
 		ptr += tmp;
 	}
+	return this->size;
 }
 
-void Chunk::updateParity( uint32_t offset, uint32_t length ) {
+uint32_t Chunk::updateParity( uint32_t offset, uint32_t length ) {
 	uint32_t size = offset + length;
 	this->isParity = true;
 	if ( size > this->size )
 		this->size = size;
+	return this->size;
 }
 
 void Chunk::computeDelta( char *delta, char *newData, uint32_t offset, uint32_t length, bool update ) {

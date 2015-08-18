@@ -85,7 +85,9 @@ public:
 	}
 
 	bool operator<( const ChunkRequest &m ) const {
-		if ( ! Metadata::operator<( m ) )
+		if ( Metadata::operator<( m ) )
+			return true;
+		if ( this->chunkId > m.chunkId )
 			return false;
 
 		// Do not compare the chunk pointer
