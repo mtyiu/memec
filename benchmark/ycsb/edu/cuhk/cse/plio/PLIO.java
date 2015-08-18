@@ -57,12 +57,12 @@ public class PLIO {
       bytes = this.read( Protocol.PROTO_HEADER_SIZE );
       if ( bytes == Protocol.PROTO_HEADER_SIZE ) {
          this.protocol.parseHeader( bytes );
-         System.out.println( "success" );
       }
       return true;
    }
 
-   public boolean disconnect() {
+   public boolean disconnect() throws Exception {
+      this.socket.close();
       return true;
    }
 
