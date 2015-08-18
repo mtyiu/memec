@@ -565,15 +565,12 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				case PROTO_OPCODE_GET_CHUNK:
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
-							fprintf( stderr, "handleGetChunkRequest\n" );
 							this->handleGetChunkRequest( event, buffer.data, buffer.size );
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
-							fprintf( stderr, "handleGetChunkResponse\n" );
 							this->handleGetChunkResponse( event, true, buffer.data, buffer.size );
 							break;
 						case PROTO_MAGIC_RESPONSE_FAILURE:
-							fprintf( stderr, "handleGetChunkResponse\n" );
 							this->handleGetChunkResponse( event, false, buffer.data, buffer.size );
 							break;
 						default:
@@ -584,24 +581,21 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				case PROTO_OPCODE_SET_CHUNK:
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
-							fprintf( stderr, "handleSetChunkRequest\n" );
 							this->handleSetChunkRequest( event, buffer.data, buffer.size );
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
-							fprintf( stderr, "handleSetChunkResponse\n" );
 							this->handleSetChunkResponse( event, true, buffer.data, buffer.size );
 							break;
 						case PROTO_MAGIC_RESPONSE_FAILURE:
-							fprintf( stderr, "handleSetChunkResponse\n" );
 							this->handleSetChunkResponse( event, false, buffer.data, buffer.size );
 							break;
 						default:
-							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
+							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave." );
 							break;
 					}
 					break;
 				default:
-					__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from slave: 0x%x.", header.opcode );
+					__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from slave." );
 					return;
 			}
 			buffer.data += header.length;
@@ -719,18 +713,23 @@ bool SlaveWorker::handleGetRequest( MasterEvent event, char *buf, size_t size ) 
 		// Detect degraded GET
 		uint32_t listId, chunkId;
 		if ( this->isRedirectedRequest( header.key, header.keySize, 0, &listId, &chunkId ) ) {
-			__DEBUG__( YELLOW, "SlaveWorker", "handleGetRequest", "!!! Degraded GET request [not yet implemented] !!!" );
-			// TODO
-			this->performDegradedRead( listId, 0, chunkId, PROTO_OPCODE_GET, &key ); // Need to know the stripe ID
+			Key key;
+			key.dup( header.keySize, header.key, ( void * ) event.socket );
+
+			pthread_mutex_lock( &SlaveWorker::pending->masters.getLock );
+			SlaveWorker::pending->masters.get.insert( key );
+			pthread_mutex_unlock( &SlaveWorker::pending->masters.getLock );
+
+			// Need to know the stripe ID
+			this->performDegradedRead( listId, 0, chunkId, PROTO_OPCODE_GET, &key );
+			ret = false;
+		} else {
+			event.resGet( event.socket, key );
+			ret = false;
+			this->dispatch( event );
 		}
-
-		event.resGet( event.socket, key );
-		ret = false;
 	}
-
 	this->load.get();
-	this->dispatch( event );
-
 	return ret;
 }
 
@@ -1336,7 +1335,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 		pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.getLock );
 
 		if ( pending == 0 ) {
-			std::set<DegradedOp>::iterator degradedOpsIt;
+			std::set<DegradedOp>::iterator degradedOpsIt, degradedOpsBeginIt;
 			DegradedOp op;
 			op.set( chunkRequest.listId, chunkRequest.stripeId, 0, 0 );
 
@@ -1372,6 +1371,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 
 			for ( uint32_t i = SlaveWorker::dataChunkCount; i < SlaveWorker::chunkCount; i++ ) {
 				if ( this->chunks[ i ]->status == CHUNK_STATUS_RECONSTRUCTED ) {
+					this->chunks[ i ]->isParity = true;
 					this->chunks[ i ]->size = maxChunkSize;
 				} else if ( this->chunks[ i ]->size != maxChunkSize ) {
 					__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Parity chunk size mismatch (chunk ID = %u): %u vs. %u.", i, this->chunks[ i ]->size, maxChunkSize );
@@ -1380,7 +1380,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 
 			// Respond the original GET/UPDATE/DELETE operation using the reconstructed data
 			pthread_mutex_lock( &SlaveWorker::pending->slavePeers.degradedOpsLock );
-			degradedOpsIt = SlaveWorker::pending->slavePeers.degradedOps.lower_bound( op );
+			degradedOpsBeginIt = degradedOpsIt = SlaveWorker::pending->slavePeers.degradedOps.lower_bound( op );
 			for ( pending = 0; degradedOpsIt != SlaveWorker::pending->slavePeers.degradedOps.end() && op.matchStripe( *degradedOpsIt ); degradedOpsIt++ ) {
 				const DegradedOp &op = *degradedOpsIt;
 				// Find the chunk from the map
@@ -1398,18 +1398,35 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 				}
 
 				// Send response
-				switch( degradedOpsIt->opcode ) {
-					case PROTO_OPCODE_GET:
-						fprintf( stderr, "TODO: GET\n" );
-						break;
-					case PROTO_OPCODE_UPDATE:
-						fprintf( stderr, "TODO: UPDATE\n" );
-						break;
-					case PROTO_OPCODE_DELETE:
-						fprintf( stderr, "TODO: DELETE\n" );
-						break;
+				if ( degradedOpsIt->opcode == PROTO_OPCODE_GET ) {
+					Key key = op.data.key;
+					std::set<Key>::iterator it;
+
+					pthread_mutex_lock( &SlaveWorker::pending->masters.getLock );
+					it = SlaveWorker::pending->masters.get.lower_bound( key );
+					if ( it == SlaveWorker::pending->masters.get.end() || ! key.equal( *it ) ) {
+						pthread_mutex_unlock( &SlaveWorker::pending->masters.getLock );
+						__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot find a pending master GET request that matches the response. This message will be discarded." );
+						continue;
+					}
+					key = *it;
+					SlaveWorker::pending->masters.get.erase( it );
+					pthread_mutex_unlock( &SlaveWorker::pending->masters.getLock );
+
+					MasterEvent event;
+					KeyValue keyValue;
+
+					if ( SlaveWorker::map->findValueByKey( key.data, key.size, &keyValue ) )
+						event.resGet( ( MasterSocket * ) key.ptr, keyValue );
+					else
+						event.resGet( ( MasterSocket * ) key.ptr, key );
+					this->dispatch( event );
+					key.free();
+				} else if ( degradedOpsIt->opcode == PROTO_OPCODE_UPDATE ) {
+				} else if ( degradedOpsIt->opcode == PROTO_OPCODE_DELETE ) {
 				}
 			}
+			SlaveWorker::pending->slavePeers.degradedOps.erase( degradedOpsBeginIt, degradedOpsIt );
 			pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.degradedOpsLock );
 
 			// Return chunks to chunk pool

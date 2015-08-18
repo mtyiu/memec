@@ -61,8 +61,8 @@ public:
 		metadata.set( listId, stripeId, chunkId );
 		if ( metadataPtr ) *metadataPtr = metadata;
 
-		it = this->cache.lower_bound( metadata );
-		if ( it == this->cache.end() || ! metadata.matchStripe( it->first ) )
+		it = this->cache.find( metadata );
+		if ( it == this->cache.end() )
 			return 0;
 		return it->second;
 	}
@@ -81,11 +81,7 @@ public:
 		Metadata metadata;
 		metadata.set( listId, stripeId, chunkId );
 		this->cache[ metadata ] = chunk;
-		if ( isParity ) {
-			chunk->updateParity();
-		} else {
-			chunk->updateData();
-
+		if ( ! isParity ) {
 			char *ptr = chunk->data;
 			char *keyPtr, *valuePtr;
 			uint8_t keySize;
