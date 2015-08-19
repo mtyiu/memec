@@ -35,9 +35,9 @@ void KeyValue::setSize( uint8_t keySize, uint32_t valueSize ) {
 	data[ 0 ] = ( char ) keySize;
 
 	valueSize = htonl( valueSize );
-	data[ 1 ] = ( valueSize >> 24 ) & 0xFF;
-	data[ 2 ] = ( valueSize >> 16 ) & 0xFF;
-	data[ 3 ] = ( valueSize >> 8 ) & 0xFF;
+	data[ 1 ] = ( valueSize >> 16 ) & 0xFF;
+	data[ 2 ] = ( valueSize >>  8 ) & 0xFF;
+	data[ 3 ] = ( valueSize       ) & 0xFF;
 	valueSize = ntohl( valueSize );
 }
 
@@ -49,9 +49,9 @@ char *KeyValue::serialize( char *data, char *key, uint8_t keySize, char *value, 
 	data[ 0 ] = ( char ) keySize;
 
 	valueSize = htonl( valueSize );
-	data[ 1 ] = ( valueSize >> 24 ) & 0xFF;
-	data[ 2 ] = ( valueSize >> 16 ) & 0xFF;
-	data[ 3 ] = ( valueSize >> 8 ) & 0xFF;
+	data[ 1 ] = ( valueSize >> 16 ) & 0xFF;
+	data[ 2 ] = ( valueSize >>  8 ) & 0xFF;
+	data[ 3 ] = ( valueSize       ) & 0xFF;
 	valueSize = ntohl( valueSize );
 
 	memcpy( data + KEY_VALUE_METADATA_SIZE, key, keySize );
@@ -68,9 +68,10 @@ char *KeyValue::deserialize( char *data, char *&key, uint8_t &keySize, char *&va
 	keySize = ( uint8_t ) data[ 0 ];
 
 	valueSize = 0;
-	valueSize |= data[ 1 ] << 24;
-	valueSize |= data[ 2 ] << 16;
-	valueSize |= data[ 3 ] << 8;
+	unsigned char *tmp = ( unsigned char * ) &valueSize;
+	tmp[ 1 ] = data[ 1 ];
+	tmp[ 2 ] = data[ 2 ];
+	tmp[ 3 ] = data[ 3 ];
 	valueSize = ntohl( valueSize );
 
 	key = data + KEY_VALUE_METADATA_SIZE;

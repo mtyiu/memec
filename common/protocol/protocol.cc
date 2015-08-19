@@ -41,9 +41,10 @@ size_t Protocol::generateKeyValueHeader( uint8_t magic, uint8_t to, uint8_t opco
 	buf[ 0 ] = keySize;
 
 	valueSize = htonl( valueSize );
-	buf[ 1 ] = ( valueSize >> 24 ) & 0xFF;
-	buf[ 2 ] = ( valueSize >> 16 ) & 0xFF;
-	buf[ 3 ] = ( valueSize >> 8 ) & 0xFF;
+	unsigned char *tmp = ( unsigned char * ) &valueSize;
+	buf[ 1 ] = tmp[ 1 ];
+	buf[ 2 ] = tmp[ 2 ];
+	buf[ 3 ] = tmp[ 3 ];
 	valueSize = ntohl( valueSize );
 
 	buf += PROTO_KEY_VALUE_SIZE;
@@ -63,16 +64,18 @@ size_t Protocol::generateKeyValueUpdateHeader( uint8_t magic, uint8_t to, uint8_
 
 	buf[ 0 ] = keySize;
 
+	unsigned char *tmp;
 	valueUpdateSize = htonl( valueUpdateSize );
-	buf[ 1 ] = ( valueUpdateSize >> 24 ) & 0xFF;
-	buf[ 2 ] = ( valueUpdateSize >> 16 ) & 0xFF;
-	buf[ 3 ] = ( valueUpdateSize >> 8 ) & 0xFF;
-	valueUpdateSize = ntohl( valueUpdateSize );
-
 	valueUpdateOffset = htonl( valueUpdateOffset );
-	buf[ 4 ] = ( valueUpdateOffset >> 24 ) & 0xFF;
-	buf[ 5 ] = ( valueUpdateOffset >> 16 ) & 0xFF;
-	buf[ 6 ] = ( valueUpdateOffset >> 8 ) & 0xFF;
+	tmp = ( unsigned char * ) &valueUpdateSize;
+	buf[ 1 ] = tmp[ 1 ];
+	buf[ 2 ] = tmp[ 2 ];
+	buf[ 3 ] = tmp[ 3 ];
+	tmp = ( unsigned char * ) &valueUpdateOffset;
+	buf[ 4 ] = tmp[ 1 ];
+	buf[ 5 ] = tmp[ 2 ];
+	buf[ 6 ] = tmp[ 3 ];
+	valueUpdateSize = ntohl( valueUpdateSize );
 	valueUpdateOffset = ntohl( valueUpdateOffset );
 
 	buf += PROTO_KEY_VALUE_UPDATE_SIZE;
@@ -255,11 +258,13 @@ bool Protocol::parseKeyValueHeader( size_t offset, uint8_t &keySize, char *&key,
 		return false;
 
 	char *ptr = buf + offset;
+	unsigned char *tmp;
 	keySize = ( uint8_t ) ptr[ 0 ];
 	valueSize = 0;
-	valueSize |= ptr[ 1 ] << 24;
-	valueSize |= ptr[ 2 ] << 16;
-	valueSize |= ptr[ 3 ] << 8;
+	tmp = ( unsigned char * ) &valueSize;
+	tmp[ 1 ] = ptr[ 1 ];
+	tmp[ 2 ] = ptr[ 2 ];
+	tmp[ 3 ] = ptr[ 3 ];
 	valueSize = ntohl( valueSize );
 
 	if ( size < PROTO_KEY_VALUE_SIZE + keySize + valueSize )
@@ -276,16 +281,21 @@ bool Protocol::parseKeyValueUpdateHeader( size_t offset, uint8_t &keySize, char 
 		return false;
 
 	char *ptr = buf + offset;
+	unsigned char *tmp;
 	keySize = ( uint8_t ) ptr[ 0 ];
+
 	valueUpdateSize = 0;
-	valueUpdateSize |= ptr[ 1 ] << 24;
-	valueUpdateSize |= ptr[ 2 ] << 16;
-	valueUpdateSize |= ptr[ 3 ] << 8;
+	tmp = ( unsigned char * ) &valueUpdateSize;
+	tmp[ 1 ] = ptr[ 1 ];
+	tmp[ 2 ] = ptr[ 2 ];
+	tmp[ 3 ] = ptr[ 3 ];
 	valueUpdateSize = ntohl( valueUpdateSize );
+
 	valueUpdateOffset = 0;
-	valueUpdateOffset |= ptr[ 4 ] << 24;
-	valueUpdateOffset |= ptr[ 5 ] << 16;
-	valueUpdateOffset |= ptr[ 6 ] << 8;
+	tmp = ( unsigned char * ) &valueUpdateOffset;
+	tmp[ 1 ] = ptr[ 4 ];
+	tmp[ 2 ] = ptr[ 5 ];
+	tmp[ 3 ] = ptr[ 6 ];
 	valueUpdateOffset = ntohl( valueUpdateOffset );
 
 	key = ptr + PROTO_KEY_VALUE_UPDATE_SIZE;
@@ -298,16 +308,21 @@ bool Protocol::parseKeyValueUpdateHeader( size_t offset, uint8_t &keySize, char 
 		return false;
 
 	char *ptr = buf + offset;
+	unsigned char *tmp;
 	keySize = ( uint8_t ) ptr[ 0 ];
+
 	valueUpdateSize = 0;
-	valueUpdateSize |= ptr[ 1 ] << 24;
-	valueUpdateSize |= ptr[ 2 ] << 16;
-	valueUpdateSize |= ptr[ 3 ] << 8;
+	tmp = ( unsigned char * ) &valueUpdateSize;
+	tmp[ 1 ] = ptr[ 1 ];
+	tmp[ 2 ] = ptr[ 2 ];
+	tmp[ 3 ] = ptr[ 3 ];
 	valueUpdateSize = ntohl( valueUpdateSize );
+
 	valueUpdateOffset = 0;
-	valueUpdateOffset |= ptr[ 4 ] << 24;
-	valueUpdateOffset |= ptr[ 5 ] << 16;
-	valueUpdateOffset |= ptr[ 6 ] << 8;
+	tmp = ( unsigned char * ) &valueUpdateOffset;
+	tmp[ 1 ] = ptr[ 4 ];
+	tmp[ 2 ] = ptr[ 5 ];
+	tmp[ 3 ] = ptr[ 6 ];
 	valueUpdateOffset = ntohl( valueUpdateOffset );
 
 	if ( size < PROTO_KEY_VALUE_UPDATE_SIZE + keySize + valueUpdateSize )

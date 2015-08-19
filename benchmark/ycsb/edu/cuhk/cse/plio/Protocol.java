@@ -5,8 +5,6 @@ public class Protocol {
    private byte from;
 
    private static final int PROTO_BUF_MIN_SIZE = 65536;
-   public static final byte PROTO_HEADER_SIZE = 8;
-   public static final byte PROTO_KEY_VALUE_SIZE = 4;
 
    /************************
     *  Magic byte (1 byte) *
@@ -60,6 +58,13 @@ public class Protocol {
     * Value size (3 byte) *
     ***********************/
    public static final int MAXIMUM_VALUE_SIZE = 16777215;
+   /************************
+    * Protocol header size *
+    ************************/
+   public static final byte PROTO_HEADER_SIZE           = 8;
+   public static final byte PROTO_KEY_SIZE              = 1;
+   public static final byte PROTO_KEY_VALUE_SIZE        = 4;
+   public static final byte PROTO_KEY_VALUE_UPDATE_SIZE = 7;
 
    public static int getSuggestedBufferSize( int keySize, int chunkSize ) {
       int ret = PROTO_HEADER_SIZE + PROTO_KEY_VALUE_SIZE + keySize + chunkSize;
@@ -89,11 +94,73 @@ public class Protocol {
       this.buf[ 1 ] = ( byte )( opcode & 0xFF );
    	this.buf[ 2 ] = 0;
    	this.buf[ 3 ] = 0;
-      this.buf[ 4 ] = ( byte )( length >> 24 );
-      this.buf[ 5 ] = ( byte )( length >> 16 );
-      this.buf[ 6 ] = ( byte )( length >>  8 );
-      this.buf[ 7 ] = ( byte )( length       );
+      this.buf[ 4 ] = ( byte )( ( length >> 24 ) & 0xFF );
+      this.buf[ 5 ] = ( byte )( ( length >> 16 ) & 0xFF );
+      this.buf[ 6 ] = ( byte )( ( length >>  8 ) & 0xFF );
+      this.buf[ 7 ] = ( byte )( ( length       ) & 0xFF );
       return PROTO_HEADER_SIZE;
+   }
+
+   public int generateKeyHeader( byte magic, byte to, byte opcode, int keySize, byte[] key ) {
+      int ret = this.generateHeader( magic, to, opcode, PROTO_KEY_SIZE + keySize );
+
+      this.buf[ ret ] = ( byte )( keySize & 0xFF );
+      ret++;
+
+      System.arraycopy( key, 0, this.buf, ret, keySize );
+      ret += keySize;
+
+      return ret;
+   }
+
+   public int generateKeyValueHeader( byte magic, byte to, byte opcode, int keySize, byte[] key, int valueSize, byte[] value ) {
+      int ret = this.generateHeader( magic, to, opcode, PROTO_KEY_VALUE_SIZE + keySize + valueSize );
+
+      this.buf[ ret     ] = ( byte )( keySize & 0xFF );
+      this.buf[ ret + 1 ] = ( byte )( ( valueSize >> 16 ) & 0xFF );
+      this.buf[ ret + 2 ] = ( byte )( ( valueSize >>  8 ) & 0xFF );
+      this.buf[ ret + 3 ] = ( byte )( ( valueSize       ) & 0xFF );
+      ret += PROTO_KEY_VALUE_SIZE;
+
+      System.out.println(
+         ( valueSize & 0xFF ) + ": " +
+         this.buf[ ret + 1 ] + " " +
+         this.buf[ ret + 2 ] + " " +
+         this.buf[ ret + 3 ]
+      );
+
+      System.arraycopy( key, 0, this.buf, ret, keySize );
+      ret += keySize;
+
+      if ( valueSize > 0 ) {
+         System.arraycopy( value, 0, this.buf, ret, valueSize );
+         ret += valueSize;
+      }
+
+      return ret;
+   }
+
+   public int generateKeyValueUpdateHeader( byte magic, byte to, byte opcode, int keySize, byte[] key, int valueUpdateOffset, int valueUpdateSize, byte[] valueUpdate ) {
+      int ret = this.generateHeader( magic, to, opcode, PROTO_KEY_VALUE_UPDATE_SIZE + keySize + ( valueUpdate != null ? valueUpdateSize : 0 ) );
+
+      this.buf[ ret     ] = ( byte )( keySize & 0xFF );
+      this.buf[ ret + 1 ] = ( byte )( ( valueUpdateSize   >> 16 ) & 0xFF );
+      this.buf[ ret + 2 ] = ( byte )( ( valueUpdateSize   >>  8 ) & 0xFF );
+      this.buf[ ret + 3 ] = ( byte )( ( valueUpdateSize         ) & 0xFF );
+      this.buf[ ret + 4 ] = ( byte )( ( valueUpdateOffset >> 16 ) & 0xFF );
+      this.buf[ ret + 5 ] = ( byte )( ( valueUpdateOffset >>  8 ) & 0xFF );
+      this.buf[ ret + 6 ] = ( byte )( ( valueUpdateOffset       ) & 0xFF );
+      ret += PROTO_KEY_VALUE_UPDATE_SIZE;
+
+      System.arraycopy( key, 0, this.buf, ret, keySize );
+      ret += keySize;
+
+      if ( valueUpdateSize > 0 && valueUpdate != null ) {
+         System.arraycopy( valueUpdate, 0, this.buf, ret, valueUpdateSize );
+         ret += valueUpdateSize;
+      }
+
+      return ret;
    }
 
    public boolean parseHeader( int size ) {
@@ -107,10 +174,10 @@ public class Protocol {
       from   = ( byte )( this.buf[ 0 ] & 0x18 );
       to     = ( byte )( this.buf[ 0 ] & 0x60 );
       opcode = ( byte )( this.buf[ 1 ] & 0xFF );
-      length = ( this.buf[ 4 ] << 24 ) |
-               ( this.buf[ 5 ] << 16 ) |
-               ( this.buf[ 6 ] <<  8 ) |
-               ( this.buf[ 7 ]       );
+      length = ( ( this.buf[ 4 ] << 24 ) & 0xFF ) |
+               ( ( this.buf[ 5 ] << 16 ) & 0xFF ) |
+               ( ( this.buf[ 6 ] <<  8 ) & 0xFF ) |
+               ( ( this.buf[ 7 ]       ) & 0xFF );
 
       System.err.print( "(magic, from, to, opcode, length) = \n\t(" );
 

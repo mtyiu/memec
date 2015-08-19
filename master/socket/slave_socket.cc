@@ -15,12 +15,15 @@ bool SlaveSocket::start() {
 }
 
 ssize_t SlaveSocket::send( char *buf, size_t ulen, bool &connected ) {
-	return Socket::send( this->sockfd, buf, ulen, connected );
+	ssize_t bytes = Socket::send( this->sockfd, buf, ulen, connected );
+	__DEBUG__( MAGENTA, "SlaveSocket", "send", "Sent %ld bytes...", bytes );
+	return bytes;
 }
 
 ssize_t SlaveSocket::recv( char *buf, size_t ulen, bool &connected, bool wait ) {
-	ssize_t ret = Socket::recv( this->sockfd, buf, ulen, connected, wait );
-	return ret;
+	ssize_t bytes = Socket::recv( this->sockfd, buf, ulen, connected, wait );
+	__DEBUG__( MAGENTA, "SlaveSocket", "recv", "Received %ld bytes...", bytes );
+	return bytes;
 }
 
 bool SlaveSocket::ready() {

@@ -192,6 +192,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 				__ERROR__( "MasterWorker", "dispatch", "Undefined message (remaining bytes = %lu).", buffer.size );
 				break;
 			}
+			__DEBUG__( YELLOW, "MasterWorker", "dispatch", "header.length = %u", header.length );
 
 			buffer.data += PROTO_HEADER_SIZE;
 			buffer.size -= PROTO_HEADER_SIZE;
