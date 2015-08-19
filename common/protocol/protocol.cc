@@ -52,7 +52,6 @@ size_t Protocol::generateKeyValueHeader( uint8_t magic, uint8_t to, uint8_t opco
 	buf += keySize;
 	if ( valueSize )
 		memmove( buf, value, valueSize );
-
 	bytes += PROTO_KEY_VALUE_SIZE + keySize + valueSize;
 
 	return bytes;

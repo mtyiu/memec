@@ -66,6 +66,162 @@ public class Protocol {
    public static final byte PROTO_KEY_VALUE_SIZE        = 4;
    public static final byte PROTO_KEY_VALUE_UPDATE_SIZE = 7;
 
+   public static class Header {
+      public byte magic, from, to, opcode;
+      public int length;
+
+      public boolean isSuccessful() {
+         return this.magic == PROTO_MAGIC_RESPONSE_SUCCESS;
+      }
+
+      public String toString() {
+         String ret = "(";
+         switch( magic ) {
+            case PROTO_MAGIC_HEARTBEAT:
+               ret += "PROTO_MAGIC_HEARTBEAT, ";
+               break;
+      		case PROTO_MAGIC_REQUEST:
+               ret += "PROTO_MAGIC_REQUEST, ";
+               break;
+      		case PROTO_MAGIC_RESPONSE_SUCCESS:
+               ret += "PROTO_MAGIC_RESPONSE_SUCCESS, ";
+               break;
+      		case PROTO_MAGIC_RESPONSE_FAILURE:
+               ret += "PROTO_MAGIC_RESPONSE_FAILURE, ";
+      			break;
+      		default:
+      			return "";
+         }
+
+         switch( from ) {
+            case PROTO_MAGIC_FROM_APPLICATION:
+               ret += "PROTO_MAGIC_FROM_APPLICATION, ";
+               break;
+      		case PROTO_MAGIC_FROM_COORDINATOR:
+               ret += "PROTO_MAGIC_FROM_COORDINATOR, ";
+               break;
+      		case PROTO_MAGIC_FROM_MASTER:
+               ret += "PROTO_MAGIC_FROM_MASTER, ";
+               break;
+      		case PROTO_MAGIC_FROM_SLAVE:
+               ret += "PROTO_MAGIC_FROM_SLAVE, ";
+               break;
+            default:
+               return ret;
+         }
+
+         switch( to ) {
+            case PROTO_MAGIC_TO_APPLICATION:
+               ret += "PROTO_MAGIC_TO_APPLICATION, ";
+               break;
+      		case PROTO_MAGIC_TO_COORDINATOR:
+               ret += "PROTO_MAGIC_TO_COORDINATOR, ";
+               break;
+      		case PROTO_MAGIC_TO_MASTER:
+               ret += "PROTO_MAGIC_TO_MASTER, ";
+               break;
+      		case PROTO_MAGIC_TO_SLAVE:
+               ret += "PROTO_MAGIC_TO_SLAVE, ";
+               break;
+            default:
+               return ret;
+         }
+
+         switch( opcode ) {
+            case PROTO_OPCODE_REGISTER:
+               ret += "PROTO_OPCODE_REGISTER";
+               break;
+      		case PROTO_OPCODE_GET_CONFIG:
+               ret += "PROTO_OPCODE_GET_CONFIG";
+               break;
+      		case PROTO_OPCODE_SYNC:
+               ret += "PROTO_OPCODE_SYNC";
+               break;
+      		case PROTO_OPCODE_GET:
+               ret += "PROTO_OPCODE_GET";
+               break;
+      		case PROTO_OPCODE_SET:
+               ret += "PROTO_OPCODE_SET";
+               break;
+      		case PROTO_OPCODE_UPDATE:
+               ret += "PROTO_OPCODE_UPDATE";
+               break;
+      		case PROTO_OPCODE_DELETE:
+               ret += "PROTO_OPCODE_DELETE";
+               break;
+      		case PROTO_OPCODE_UPDATE_CHUNK:
+               ret += "PROTO_OPCODE_UPDATE_CHUNK";
+               break;
+      		case PROTO_OPCODE_DELETE_CHUNK:
+               ret += "PROTO_OPCODE_DELETE_CHUNK";
+               break;
+      		case PROTO_OPCODE_GET_CHUNK:
+               ret += "PROTO_OPCODE_GET_CHUNK";
+               break;
+      		case PROTO_OPCODE_SET_CHUNK:
+               ret += "PROTO_OPCODE_SET_CHUNK";
+               break;
+      		default:
+      			return ret;
+         }
+
+         ret += ", " + length + ")";
+
+         return ret;
+      }
+   }
+
+   public static class KeyHeader {
+      public int keySize;
+      public int keyPos;
+      byte[] data;
+
+      public String key() {
+         return new String( data, keyPos, keySize );
+      }
+
+      public String toString() {
+         return "Key: " + key() + " (key size: " + keySize + ")";
+      }
+   }
+
+   public static class KeyValueHeader {
+      public int keySize, valueSize;
+      public int keyPos, valuePos;
+      byte[] data;
+
+      public String key() {
+         return new String( data, keyPos, keySize );
+      }
+
+      public String value() {
+         return new String( data, valuePos, valueSize );
+      }
+
+      public String toString() {
+         return "Key: " + key() + " (key size: " + keySize + "); Value: " + value() + " (value size: " + valueSize + ")";
+      }
+   }
+
+   public static class KeyValueUpdateHeader {
+      public int keySize, valueUpdateSize, valueUpdateOffset;
+      public int keyPos;
+      byte[] data;
+
+      public String key() {
+         return new String( data, keyPos, keySize );
+      }
+
+      public String toString() {
+         return "Key: " + key() + " (key size: " + keySize + "); Value update: (value update size: " + valueUpdateSize + "; offset: " + valueUpdateOffset + ")";
+      }
+   }
+
+   public Header header = new Header();
+   public KeyHeader keyHeader = new KeyHeader();
+   public KeyValueHeader keyValueHeader = new KeyValueHeader();
+   public KeyValueUpdateHeader keyValueUpdateHeader = new KeyValueUpdateHeader();
+
    public static int getSuggestedBufferSize( int keySize, int chunkSize ) {
       int ret = PROTO_HEADER_SIZE + PROTO_KEY_VALUE_SIZE + keySize + chunkSize;
       if ( ( ret & 4095 ) > 0 ) {
@@ -84,6 +240,9 @@ public class Protocol {
    public Protocol( int keySize, int chunkSize ) {
       this.buf = new byte[ Protocol.getSuggestedBufferSize( keySize, chunkSize ) ];
       this.from = PROTO_MAGIC_FROM_APPLICATION;
+      this.keyHeader.data = this.buf;
+      this.keyValueHeader.data = this.buf;
+      this.keyValueUpdateHeader.data = this.buf;
    }
 
    public int generateHeader( byte magic, byte to, byte opcode, int length ) {
@@ -120,14 +279,8 @@ public class Protocol {
       this.buf[ ret + 1 ] = ( byte )( ( valueSize >> 16 ) & 0xFF );
       this.buf[ ret + 2 ] = ( byte )( ( valueSize >>  8 ) & 0xFF );
       this.buf[ ret + 3 ] = ( byte )( ( valueSize       ) & 0xFF );
-      ret += PROTO_KEY_VALUE_SIZE;
 
-      System.out.println(
-         ( valueSize & 0xFF ) + ": " +
-         this.buf[ ret + 1 ] + " " +
-         this.buf[ ret + 2 ] + " " +
-         this.buf[ ret + 3 ]
-      );
+      ret += PROTO_KEY_VALUE_SIZE;
 
       System.arraycopy( key, 0, this.buf, ret, keySize );
       ret += keySize;
@@ -166,111 +319,129 @@ public class Protocol {
    public boolean parseHeader( int size ) {
       byte magic, from, to, opcode;
       int length;
+      long tmp;
 
       if ( size < PROTO_HEADER_SIZE )
          return false;
 
-      magic  = ( byte )( this.buf[ 0 ] & 0x07 );
-      from   = ( byte )( this.buf[ 0 ] & 0x18 );
-      to     = ( byte )( this.buf[ 0 ] & 0x60 );
-      opcode = ( byte )( this.buf[ 1 ] & 0xFF );
-      length = ( ( this.buf[ 4 ] << 24 ) & 0xFF ) |
-               ( ( this.buf[ 5 ] << 16 ) & 0xFF ) |
-               ( ( this.buf[ 6 ] <<  8 ) & 0xFF ) |
-               ( ( this.buf[ 7 ]       ) & 0xFF );
+      header.magic  = ( byte )( this.buf[ 0 ] & 0x07 );
+      header.from   = ( byte )( this.buf[ 0 ] & 0x18 );
+      header.to     = ( byte )( this.buf[ 0 ] & 0x60 );
+      header.opcode = ( byte )( this.buf[ 1 ] & 0xFF );
+      tmp           = ( ( ( ( long ) this.buf[ 4 ] ) & 0xFF ) << 24 ) |
+                      ( ( ( ( long ) this.buf[ 5 ] ) & 0xFF ) << 16 ) |
+                      ( ( ( ( long ) this.buf[ 6 ] ) & 0xFF ) <<  8 ) |
+                      ( ( ( ( long ) this.buf[ 7 ] ) & 0xFF )       );
+      header.length = ( int ) tmp;
 
-      System.err.print( "(magic, from, to, opcode, length) = \n\t(" );
-
-      switch( magic ) {
+      switch( header.magic ) {
          case PROTO_MAGIC_HEARTBEAT:
-            System.err.print( "PROTO_MAGIC_HEARTBEAT, " );
-            break;
    		case PROTO_MAGIC_REQUEST:
-            System.err.print( "PROTO_MAGIC_REQUEST, " );
-            break;
    		case PROTO_MAGIC_RESPONSE_SUCCESS:
-            System.err.print( "PROTO_MAGIC_RESPONSE_SUCCESS, " );
-            break;
    		case PROTO_MAGIC_RESPONSE_FAILURE:
-            System.err.print( "PROTO_MAGIC_RESPONSE_FAILURE, " );
-   			break;
+            break;
    		default:
    			return false;
       }
 
-      switch( from ) {
+      switch( header.from ) {
          case PROTO_MAGIC_FROM_APPLICATION:
-            System.err.print( "PROTO_MAGIC_FROM_APPLICATION, " );
-            break;
    		case PROTO_MAGIC_FROM_COORDINATOR:
-            System.err.print( "PROTO_MAGIC_FROM_COORDINATOR, " );
-            break;
    		case PROTO_MAGIC_FROM_MASTER:
-            System.err.print( "PROTO_MAGIC_FROM_MASTER, " );
-            break;
    		case PROTO_MAGIC_FROM_SLAVE:
-            System.err.print( "PROTO_MAGIC_FROM_SLAVE, " );
             break;
          default:
             return false;
       }
 
-      switch( to ) {
+      switch( header.to ) {
          case PROTO_MAGIC_TO_APPLICATION:
-            System.err.print( "PROTO_MAGIC_TO_APPLICATION, " );
-            break;
    		case PROTO_MAGIC_TO_COORDINATOR:
-            System.err.print( "PROTO_MAGIC_TO_COORDINATOR, " );
-            break;
    		case PROTO_MAGIC_TO_MASTER:
-            System.err.print( "PROTO_MAGIC_TO_MASTER, " );
-            break;
    		case PROTO_MAGIC_TO_SLAVE:
-            System.err.print( "PROTO_MAGIC_TO_SLAVE, " );
             break;
          default:
             return false;
       }
 
-      switch( opcode ) {
+      switch( header.opcode ) {
          case PROTO_OPCODE_REGISTER:
-            System.err.print( "PROTO_OPCODE_REGISTER" );
-            break;
    		case PROTO_OPCODE_GET_CONFIG:
-            System.err.print( "PROTO_OPCODE_GET_CONFIG" );
-            break;
    		case PROTO_OPCODE_SYNC:
-            System.err.print( "PROTO_OPCODE_SYNC" );
-            break;
    		case PROTO_OPCODE_GET:
-            System.err.print( "PROTO_OPCODE_GET" );
-            break;
    		case PROTO_OPCODE_SET:
-            System.err.print( "PROTO_OPCODE_SET" );
-            break;
    		case PROTO_OPCODE_UPDATE:
-            System.err.print( "PROTO_OPCODE_UPDATE" );
-            break;
    		case PROTO_OPCODE_DELETE:
-            System.err.print( "PROTO_OPCODE_DELETE" );
-            break;
    		case PROTO_OPCODE_UPDATE_CHUNK:
-            System.err.print( "PROTO_OPCODE_UPDATE_CHUNK" );
-            break;
    		case PROTO_OPCODE_DELETE_CHUNK:
-            System.err.print( "PROTO_OPCODE_DELETE_CHUNK" );
-            break;
    		case PROTO_OPCODE_GET_CHUNK:
-            System.err.print( "PROTO_OPCODE_GET_CHUNK" );
-            break;
    		case PROTO_OPCODE_SET_CHUNK:
-            System.err.print( "PROTO_OPCODE_SET_CHUNK" );
             break;
    		default:
    			return false;
       }
 
-      System.err.println( ", " + length + ")" );
+      return true;
+   }
+
+   public boolean parseKeyHeader( int size, int offset ) {
+      if ( size < PROTO_KEY_SIZE )
+         return false;
+
+      keyHeader.keySize = this.buf[ offset ];
+
+      if ( size < PROTO_KEY_SIZE + keyHeader.keySize )
+         return false;
+
+      keyHeader.keyPos = offset + PROTO_KEY_SIZE;
+
+      return true;
+   }
+
+   public boolean parseKeyValueHeader( int size, int offset ) {
+      if ( size < PROTO_KEY_VALUE_SIZE )
+         return false;
+
+      long tmp;
+
+      keyValueHeader.keySize = this.buf[ offset ];
+
+      tmp = ( ( ( ( long ) this.buf[ offset + 1 ] ) & 0xFF ) << 16 ) |
+            ( ( ( ( long ) this.buf[ offset + 2 ] ) & 0xFF ) <<  8 ) |
+            ( ( ( ( long ) this.buf[ offset + 3 ] ) & 0xFF )       );
+      keyValueHeader.valueSize = ( int ) tmp;
+
+      if ( size < PROTO_KEY_VALUE_SIZE + keyValueHeader.keySize + keyValueHeader.valueSize )
+         return false;
+
+      keyValueHeader.keyPos = offset + PROTO_KEY_VALUE_SIZE;
+      keyValueHeader.valuePos = keyValueHeader.keyPos + keyValueHeader.keySize;
+
+      return true;
+   }
+
+   public boolean parseKeyValueUpdateHeader( int size, int offset ) {
+      if ( size < PROTO_KEY_VALUE_UPDATE_SIZE )
+         return false;
+
+      long tmp;
+
+      keyValueUpdateHeader.keySize = this.buf[ offset ];
+
+      tmp = ( ( ( ( long ) this.buf[ offset + 1 ] ) & 0xFF ) << 16 ) |
+            ( ( ( ( long ) this.buf[ offset + 2 ] ) & 0xFF ) <<  8 ) |
+            ( ( ( ( long ) this.buf[ offset + 3 ] ) & 0xFF )       );
+      keyValueUpdateHeader.valueUpdateSize = ( int ) tmp;
+
+      tmp = ( ( ( ( long ) this.buf[ offset + 4 ] ) & 0xFF ) << 16 ) |
+            ( ( ( ( long ) this.buf[ offset + 5 ] ) & 0xFF ) <<  8 ) |
+            ( ( ( ( long ) this.buf[ offset + 6 ] ) & 0xFF )       );
+      keyValueUpdateHeader.valueUpdateOffset = ( int ) tmp;
+
+      if ( size < PROTO_KEY_VALUE_UPDATE_SIZE + keyValueUpdateHeader.keySize )
+         return false;
+
+      keyValueUpdateHeader.keyPos = offset + PROTO_KEY_VALUE_UPDATE_SIZE;
 
       return true;
    }

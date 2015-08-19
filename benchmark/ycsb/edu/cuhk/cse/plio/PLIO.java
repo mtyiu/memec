@@ -3,7 +3,7 @@ package edu.cuhk.cse.plio;
 import java.net.Socket;
 import java.net.UnknownHostException;
 
-import java.io.InputStream;
+import java.io.BufferedInputStream;
 import java.io.OutputStream;
 import java.io.IOException;
 
@@ -12,8 +12,9 @@ public class PLIO {
    private String host;
    private int port;
    private Socket socket;
-   private InputStream in;
+   private BufferedInputStream in;
    private OutputStream out;
+   private static final boolean isDebugMode = true;
 
    public PLIO( int keySize, int chunkSize, String host, int port ) {
       this.protocol = new Protocol( keySize, chunkSize );
@@ -25,11 +26,15 @@ public class PLIO {
       int recvBytes = 0, ret;
       do {
          ret = this.in.read( this.protocol.buf, recvBytes, size - recvBytes );
-         System.err.println( "read() returns " + ret );
          if ( ret > 0 )
             recvBytes += ret;
       } while ( ret >= 0 && recvBytes < size );
       return recvBytes;
+   }
+
+   private void debug( String s ) {
+      if ( isDebugMode )
+         System.out.println( "\n" + s );
    }
 
    public boolean connect() {
@@ -44,7 +49,7 @@ public class PLIO {
       }
 
       try {
-         this.in = this.socket.getInputStream();
+         this.in = new BufferedInputStream( this.socket.getInputStream() );
       } catch( IOException e ) {
          System.err.println( "PLIO.connect(): [Error] Unable to get socket's input stream." );
          System.exit( 1 );
@@ -78,6 +83,7 @@ public class PLIO {
       }
       if ( bytes == Protocol.PROTO_HEADER_SIZE ) {
          this.protocol.parseHeader( bytes );
+         this.debug( this.protocol.header );
       }
       return true;
    }
@@ -129,6 +135,23 @@ public class PLIO {
       }
       if ( bytes == Protocol.PROTO_HEADER_SIZE ) {
          this.protocol.parseHeader( bytes );
+         this.debug( this.protocol.header );
+      }
+
+      try {
+         bytes = this.read( this.protocol.header.length );
+      } catch( IOException e ) {
+         System.err.println( "PLIO.get(): [Warning] Unable to read GET response from master." );
+         return false;
+      }
+      if ( bytes == this.protocol.header.length ) {
+         if ( this.protocol.header.isSuccessful() ) {
+            this.protocol.parseKeyValueHeader( bytes, 0 );
+            this.debug( this.protocol.keyValueHeader );
+         } else {
+            this.protocol.parseKeyHeader( bytes, 0 );
+            this.debug( this.protocol.keyHeader );
+         }
       }
       return true;
    }
@@ -157,6 +180,18 @@ public class PLIO {
       }
       if ( bytes == Protocol.PROTO_HEADER_SIZE ) {
          this.protocol.parseHeader( bytes );
+         this.debug( this.protocol.header );
+      }
+
+      try {
+         bytes = this.read( this.protocol.header.length );
+      } catch( IOException e ) {
+         System.err.println( "PLIO.set(): [Warning] Unable to read SET response from master." );
+         return false;
+      }
+      if ( bytes == this.protocol.header.length ) {
+         this.protocol.parseKeyHeader( bytes, 0 );
+         this.debug( this.protocol.keyHeader );
       }
       return true;
    }
@@ -184,6 +219,18 @@ public class PLIO {
       }
       if ( bytes == Protocol.PROTO_HEADER_SIZE ) {
          this.protocol.parseHeader( bytes );
+         this.debug( this.protocol.header );
+      }
+
+      try {
+         bytes = this.read( this.protocol.header.length );
+      } catch( IOException e ) {
+         System.err.println( "PLIO.update(): [Warning] Unable to read UPDATE response from master." );
+         return false;
+      }
+      if ( bytes == this.protocol.header.length ) {
+         this.protocol.parseKeyValueUpdateHeader( bytes, 0 );
+         this.debug( this.protocol.keyValueUpdateHeader );
       }
       return true;
    }
@@ -210,6 +257,18 @@ public class PLIO {
       }
       if ( bytes == Protocol.PROTO_HEADER_SIZE ) {
          this.protocol.parseHeader( bytes );
+         this.debug( this.protocol.header );
+      }
+
+      try {
+         bytes = this.read( this.protocol.header.length );
+      } catch( IOException e ) {
+         System.err.println( "PLIO.delete(): [Warning] Unable to read DELETE response from master." );
+         return false;
+      }
+      if ( bytes == this.protocol.header.length ) {
+         this.protocol.parseKeyHeader( bytes, 0 );
+         this.debug( this.protocol.keyHeader );
       }
       return true;
    }

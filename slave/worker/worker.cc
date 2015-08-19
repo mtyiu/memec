@@ -226,9 +226,12 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 			char *key, *value;
 			uint8_t keySize;
 			uint32_t valueSize;
-
 			event.message.keyValue.deserialize( key, keySize, value, valueSize );
-			buffer.data = this->protocol.resGet( buffer.size, success, keySize, key, valueSize, value );
+			buffer.data = this->protocol.resGet(
+				buffer.size, success,
+				keySize, key,
+				valueSize, value
+			);
 		}
 			break;
 		case MASTER_EVENT_TYPE_GET_RESPONSE_FAILURE:
@@ -709,6 +712,7 @@ bool SlaveWorker::handleGetRequest( MasterEvent event, char *buf, size_t size ) 
 	if ( map->findValueByKey( header.key, header.keySize, &keyValue, &key ) ) {
 		event.resGet( event.socket, keyValue );
 		ret = true;
+		this->dispatch( event );
 	} else {
 		// Detect degraded GET
 		uint32_t listId, chunkId;
