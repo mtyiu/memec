@@ -16,6 +16,10 @@ public class PLIO {
    private OutputStream out;
    private static final boolean isDebugMode = true;
 
+   public static int DEFAULT_PORT = 9110;
+   public static int DEFAULT_KEY_SIZE = 255;
+   public static int DEFAULT_CHUNK_SIZE = 4096;
+
    public PLIO( int keySize, int chunkSize, String host, int port ) {
       this.protocol = new Protocol( keySize, chunkSize );
       this.host = host;
@@ -83,7 +87,7 @@ public class PLIO {
       }
       if ( bytes == Protocol.PROTO_HEADER_SIZE ) {
          this.protocol.parseHeader( bytes );
-         this.debug( this.protocol.header );
+         this.debug( this.protocol.header.toString() );
       }
       return true;
    }
@@ -97,7 +101,7 @@ public class PLIO {
       return true;
    }
 
-   public boolean get( String key ) {
+   public String get( String key ) {
       return this.get( key.getBytes(), key.length() );
    }
 
@@ -113,7 +117,7 @@ public class PLIO {
       return this.delete( key.getBytes(), key.length() );
    }
 
-   public boolean get( byte[] key, int keySize ) {
+   public String get( byte[] key, int keySize ) {
       int bytes = this.protocol.generateKeyHeader(
          Protocol.PROTO_MAGIC_REQUEST,
          Protocol.PROTO_MAGIC_TO_MASTER,
@@ -124,36 +128,38 @@ public class PLIO {
          this.out.write( this.protocol.buf, 0, bytes );
       } catch( IOException e ) {
          System.err.println( "PLIO.get(): [Warning] Unable to send GET request to master." );
-         return false;
+         return null;
       }
 
       try {
          bytes = this.read( Protocol.PROTO_HEADER_SIZE );
       } catch( IOException e ) {
          System.err.println( "PLIO.get(): [Warning] Unable to read GET response from master." );
-         return false;
+         return null;
       }
       if ( bytes == Protocol.PROTO_HEADER_SIZE ) {
          this.protocol.parseHeader( bytes );
-         this.debug( this.protocol.header );
+         this.debug( this.protocol.header.toString() );
       }
 
       try {
          bytes = this.read( this.protocol.header.length );
       } catch( IOException e ) {
          System.err.println( "PLIO.get(): [Warning] Unable to read GET response from master." );
-         return false;
+         return null;
       }
       if ( bytes == this.protocol.header.length ) {
          if ( this.protocol.header.isSuccessful() ) {
             this.protocol.parseKeyValueHeader( bytes, 0 );
-            this.debug( this.protocol.keyValueHeader );
+            this.debug( this.protocol.keyValueHeader.toString() );
+            return this.protocol.keyValueHeader.value();
          } else {
             this.protocol.parseKeyHeader( bytes, 0 );
-            this.debug( this.protocol.keyHeader );
+            this.debug( this.protocol.keyHeader.toString() );
+            return null;
          }
       }
-      return true;
+      return null;
    }
 
    public boolean set( byte[] key, int keySize, byte[] value, int valueSize ) {
@@ -180,7 +186,7 @@ public class PLIO {
       }
       if ( bytes == Protocol.PROTO_HEADER_SIZE ) {
          this.protocol.parseHeader( bytes );
-         this.debug( this.protocol.header );
+         this.debug( this.protocol.header.toString() );
       }
 
       try {
@@ -191,7 +197,7 @@ public class PLIO {
       }
       if ( bytes == this.protocol.header.length ) {
          this.protocol.parseKeyHeader( bytes, 0 );
-         this.debug( this.protocol.keyHeader );
+         this.debug( this.protocol.keyHeader.toString() );
       }
       return true;
    }
@@ -219,7 +225,7 @@ public class PLIO {
       }
       if ( bytes == Protocol.PROTO_HEADER_SIZE ) {
          this.protocol.parseHeader( bytes );
-         this.debug( this.protocol.header );
+         this.debug( this.protocol.header.toString() );
       }
 
       try {
@@ -230,7 +236,7 @@ public class PLIO {
       }
       if ( bytes == this.protocol.header.length ) {
          this.protocol.parseKeyValueUpdateHeader( bytes, 0 );
-         this.debug( this.protocol.keyValueUpdateHeader );
+         this.debug( this.protocol.keyValueUpdateHeader.toString() );
       }
       return true;
    }
@@ -257,7 +263,7 @@ public class PLIO {
       }
       if ( bytes == Protocol.PROTO_HEADER_SIZE ) {
          this.protocol.parseHeader( bytes );
-         this.debug( this.protocol.header );
+         this.debug( this.protocol.header.toString() );
       }
 
       try {
@@ -268,7 +274,7 @@ public class PLIO {
       }
       if ( bytes == this.protocol.header.length ) {
          this.protocol.parseKeyHeader( bytes, 0 );
-         this.debug( this.protocol.keyHeader );
+         this.debug( this.protocol.keyHeader.toString() );
       }
       return true;
    }
