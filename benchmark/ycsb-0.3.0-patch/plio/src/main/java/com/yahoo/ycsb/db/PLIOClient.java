@@ -66,17 +66,24 @@ public class PLIOClient extends DB {
 
 	@Override
 	public int read( String table, String key, Set<String> fields, HashMap<String, ByteIterator> result ) {
-		String value = plio.get( key );
-		if ( value != null ) {
-			result.put( key, new StringByteIterator( value ) );
-			return OK;
+		int ret = OK;
+		for ( String f : fields ) {
+			String value = plio.get( table + ":" + key + ":" + f );
+			if ( value == null )
+				ret = ERROR;
+			result.put( f, new StringByteIterator( value ) );
 		}
-		return ERROR;
+		return ret;
 	}
 
 	@Override
 	public int insert( String table, String key, HashMap<String, ByteIterator> values ) {
-		return plio.set( key, values.get( key ).toString() ) ? OK : ERROR;
+		int ret = OK;
+		for ( Map.Entry<String, ByteIterator> entry : values.entrySet() ) {
+			if ( ! plio.set( table + ":" + key + ":" + entry.getKey(), entry.getValue().toString() ) )
+				ret = ERROR;
+		}
+		return ret;
 	}
 
 	@Override
@@ -86,12 +93,17 @@ public class PLIOClient extends DB {
 
 	@Override
 	public int update( String table, String key, HashMap<String, ByteIterator> values ) {
-		return plio.update( key, values.get( key ).toString(), 0 ) ? OK : ERROR;
+		int ret = OK;
+		for ( Map.Entry<String, ByteIterator> entry : values.entrySet() ) {
+			if ( ! plio.update( table + ":" + key + ":" + entry.getKey(), entry.getValue().toString(), 0 ) )
+				ret = ERROR;
+		}
+		return ret;
 	}
 
 	@Override
 	public int scan( String table, String startKey, int recordCount, Set<String> fields, Vector<HashMap<String, ByteIterator>> result ) {
-		return 0;
+		return ERROR;
 	}
 
 }
