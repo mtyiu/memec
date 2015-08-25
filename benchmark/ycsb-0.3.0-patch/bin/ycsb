@@ -70,6 +70,7 @@ DATABASES = {
     "plio"         : "com.yahoo.ycsb.db.PLIOClient",
     "redis"        : "com.yahoo.ycsb.db.RedisClient",
     "tarantool"    : "com.yahoo.ycsb.db.TarantoolClient",
+    "tachyon"      : "com.yahoo.ycsb.db.TachyonClient",
     "voldemort"    : "com.yahoo.ycsb.db.VoldemortClient"
 }
 
