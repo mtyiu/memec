@@ -108,6 +108,7 @@ LICENSE file.
     <module>infinispan</module>
     <module>jdbc</module>
     <!--<module>mapkeeper</module>-->
+    <module>memcached</module>
     <module>mongodb</module>
     <!--module>nosqldb</module-->
     <module>orientdb</module>
