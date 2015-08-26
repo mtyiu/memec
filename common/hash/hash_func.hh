@@ -9,7 +9,7 @@ public:
 		unsigned int hardener  = 1176845762;
 		while ( n ) {
 			hash *= scale;
-			hash += *data;
+			hash += *data++;
 			n--;
 		}
 		return hash ^ hardener;

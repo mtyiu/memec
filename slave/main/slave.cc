@@ -615,6 +615,7 @@ void Slave::printPending( FILE *f ) {
 }
 
 void Slave::dump() {
+	/*
 	fprintf( stdout, "List of key-value pairs:\n------------------------\n" );
 	if ( ! this->map.keys.size() ) {
 		fprintf( stdout, "(None)\n" );
@@ -629,6 +630,8 @@ void Slave::dump() {
 		}
 	}
 	fprintf( stdout, "\n" );
+	*/
+	fprintf( stdout, "Number of key-value pairs: %u\n", this->map.keys.size() );
 
 	fprintf( stdout, "List of chunks in the cache:\n----------------------------\n" );
 	if ( ! this->map.cache.size() ) {
