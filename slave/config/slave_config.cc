@@ -107,7 +107,6 @@ bool SlaveConfig::set( const char *section, const char *name, const char *value 
 			else
 				this->storage.type = STORAGE_TYPE_UNDEFINED;
 		} else if ( match( name, "path" ) ) {
-			fprintf( stderr, "path = %s\n", value );
 			if ( strlen( value ) >= STORAGE_PATH_MAX )
 				return false;
 			strncpy( this->storage.path, value, STORAGE_PATH_MAX );

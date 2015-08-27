@@ -1,29 +1,38 @@
 #ifndef __SLAVE_BUFFER_PARITY_CHUNK_BUFFER_HH__
 #define __SLAVE_BUFFER_PARITY_CHUNK_BUFFER_HH__
 
+#include <set>
 #include "chunk_buffer.hh"
-#include "data_chunk_buffer.hh"
+#include "dummy_data_chunk_buffer.hh"
 #include "../../common/ds/bitmask_array.hh"
+
+class ParityChunkWrapper {
+public:
+	uint32_t pending;
+	pthread_mutex_t lock;
+	Chunk *chunk;
+
+	ParityChunkWrapper();
+};
 
 class ParityChunkBuffer : public ChunkBuffer {
 private:
-	uint32_t dataChunkCount;  // Number of data chunks per stripe
-	Chunk ***dataChunks;      // Use dataChunks[ chunkId ][ stripe index ] to retrieve a chunk in a stripe
-	DataChunkBuffer **dataChunkBuffer;
-	BitmaskArray *status;
+	// k data chunk buffer in total to emulate the status in each data slave
+	DummyDataChunkBuffer **dummyDataChunkBuffer;
+	// Map stripe ID to ParityChunk objects
+	std::map<uint32_t, ParityChunkWrapper> chunks;
 
 public:
-	ParityChunkBuffer( uint32_t capacity, uint32_t count, uint32_t dataChunkCount, uint32_t listId, uint32_t stripeId, uint32_t chunkId );
-	KeyMetadata set( char *key, uint8_t keySize, char *value, uint32_t valueSize, uint32_t chunkId );
-	uint32_t flush( bool lock = true );
-	Chunk *flush( int index, bool lock = true );
+	ParityChunkBuffer( uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId );
+	ParityChunkWrapper &getWrapper( uint32_t stripeId );
+	void set( char *key, uint8_t keySize, char *value, uint32_t valueSize, uint32_t chunkId );
+	void flush( uint32_t stripeId, Chunk *chunk );
 	void print( FILE *f = stdout );
 	void stop();
 	~ParityChunkBuffer();
 
-	void flushData( Chunk *chunk );
-	Chunk *flushData( uint32_t chunkId, int index, bool lock = true );
-	static void dataChunkFlushHandler( Chunk *chunk, void *argv );
+	void flushData( uint32_t stripeId );
+	static void dataChunkFlushHandler( uint32_t stripeId, void *argv );
 };
 
 #endif

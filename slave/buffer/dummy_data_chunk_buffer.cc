@@ -1,22 +1,47 @@
-#include "data_chunk_buffer.hh"
-#include "../event/io_event.hh"
-#include "../main/slave.hh"
+#include "dummy_data_chunk_buffer.hh"
 
-DataChunkBuffer::DataChunkBuffer( uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) : ChunkBuffer( listId, stripeId, chunkId ) {
+DummyDataChunk::DummyDataChunk() {
+	this->status = CHUNK_STATUS_EMPTY;
+	this->count = 0;
+	this->size = 0;
+}
+
+void DummyDataChunk::alloc( uint32_t size, uint32_t &offset ) {
+	offset = this->size;
+
+	this->status = CHUNK_STATUS_DIRTY;
+	this->count++;
+	this->size += size;
+}
+
+void DummyDataChunk::clear() {
+	this->status = CHUNK_STATUS_EMPTY;
+	this->count = 0;
+	this->size = 0;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+DummyDataChunkBuffer::DummyDataChunkBuffer( uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId, void ( *flushFn )( uint32_t, void * ), void *argv ) {
 	this->count = count;
+	this->listId = listId;
+	this->stripeId = stripeId;
+	this->chunkId = chunkId;
+	pthread_mutex_init( &this->lock, 0 );
 	this->locks = new pthread_mutex_t[ count ];
-	this->chunks = new Chunk*[ count ];
+	this->chunks = new DummyDataChunk*[ count ];
 	this->sizes = new uint32_t[ count ];
-
-	ChunkBuffer::chunkPool->malloc( this->chunks, this->count );
+	this->flushFn = flushFn;
+	this->argv = argv;
 	for ( uint32_t i = 0; i < count; i++ ) {
 		pthread_mutex_init( this->locks + i, 0 );
+
+		this->chunks[ i ] = new DummyDataChunk();
 
 		Metadata &metadata = this->chunks[ i ]->metadata;
 		metadata.listId = this->listId;
 		metadata.stripeId = this->stripeId;
 		metadata.chunkId = this->chunkId;
-		ChunkBuffer::map->cache[ metadata ] = this->chunks[ i ];
 
 		this->sizes[ i ] = 0;
 
@@ -24,11 +49,9 @@ DataChunkBuffer::DataChunkBuffer( uint32_t count, uint32_t listId, uint32_t stri
 	}
 }
 
-KeyMetadata DataChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode ) {
-	KeyMetadata keyMetadata;
-	uint32_t size = 4 + keySize + valueSize, max = 0, tmp;
+uint32_t DummyDataChunkBuffer::set( uint32_t size, uint32_t &offset ) {
+	uint32_t max = 0, tmp, ret;
 	int index = -1;
-	char *ptr;
 
 	// Choose one chunk buffer with minimum free space
 	pthread_mutex_lock( &this->lock );
@@ -49,20 +72,13 @@ KeyMetadata DataChunkBuffer::set( char *key, uint8_t keySize, char *value, uint3
 
 	// Allocate memory in the selected chunk
 	pthread_mutex_lock( this->locks + index );
-	Chunk *chunk = this->chunks[ index ];
+	DummyDataChunk *chunk = this->chunks[ index ];
 
-	// Set up key metadata
-	keyMetadata.listId = chunk->metadata.listId;
-	keyMetadata.stripeId = chunk->metadata.stripeId;
-	keyMetadata.chunkId = chunk->metadata.chunkId;
-	keyMetadata.length = size;
+	ret = chunk->metadata.stripeId;
 
 	// Allocate memory from chunk
-	ptr = this->chunks[ index ]->alloc( size, keyMetadata.offset );
+	this->chunks[ index ]->alloc( size, offset );
 	this->sizes[ index ] += size;
-
-	// Copy data to the buffer
-	KeyValue::serialize( ptr, key, keySize, value, valueSize );
 
 	// Flush if the current buffer is full
 	if ( this->sizes[ index ] + 4 + CHUNK_BUFFER_FLUSH_THRESHOLD >= ChunkBuffer::capacity )
@@ -70,15 +86,10 @@ KeyMetadata DataChunkBuffer::set( char *key, uint8_t keySize, char *value, uint3
 	pthread_mutex_unlock( this->locks + index );
 	pthread_mutex_unlock( &this->lock );
 
-	// Update key map
-	Key keyObj;
-	keyObj.set( keySize, key );
-	ChunkBuffer::map->insertKey( keyObj, opcode, keyMetadata );
-
-	return keyMetadata;
+	return ret; // the ID of the selected stripe
 }
 
-uint32_t DataChunkBuffer::flush( bool lock ) {
+uint32_t DummyDataChunkBuffer::flush( bool lock ) {
 	if ( lock )
 		pthread_mutex_lock( &this->lock );
 
@@ -108,29 +119,23 @@ uint32_t DataChunkBuffer::flush( bool lock ) {
 	return index;
 }
 
-Chunk *DataChunkBuffer::flush( int index, bool lock ) {
+uint32_t DummyDataChunkBuffer::flush( int index, bool lock ) {
 	if ( lock ) {
 		pthread_mutex_lock( &this->lock );
 		pthread_mutex_lock( this->locks + index );
 	}
 
-	Chunk *chunk = this->chunks[ index ];
+	DummyDataChunk *chunk = this->chunks[ index ];
+	uint32_t ret = chunk->metadata.stripeId;
 
-	// Append a flush event to the event queue
-	IOEvent ioEvent;
-	ioEvent.flush( chunk );
-	ChunkBuffer::eventQueue->insert( ioEvent );
+	this->flushFn( ret, this->argv );
 
-	// Get a new chunk
+	// Reset the dummy data chunk
 	this->sizes[ index ] = 0;
-	Chunk *newChunk = ChunkBuffer::chunkPool->malloc();
-	newChunk->clear();
-	newChunk->metadata.listId = this->listId;
-	newChunk->metadata.stripeId = this->stripeId;
-	newChunk->metadata.chunkId = this->chunkId;
-	newChunk->isParity = false;
-	ChunkBuffer::map->cache[ newChunk->metadata ] = newChunk;
-	this->chunks[ index ] = newChunk;
+	chunk->clear();
+	chunk->metadata.listId = this->listId;
+	chunk->metadata.stripeId = this->stripeId;
+	chunk->metadata.chunkId = this->chunkId;
 	this->stripeId++;
 
 	if ( lock ) {
@@ -138,11 +143,11 @@ Chunk *DataChunkBuffer::flush( int index, bool lock ) {
 		pthread_mutex_unlock( &this->lock );
 	}
 
-	return chunk;
+	return ret;
 }
 
-void DataChunkBuffer::print( FILE *f ) {
-	int width = 16;
+void DummyDataChunkBuffer::print( FILE *f ) {
+   int width = 16;
 	double occupied;
 	fprintf(
 		f,
@@ -150,7 +155,7 @@ void DataChunkBuffer::print( FILE *f ) {
 		"- %-*s : %u\n"
 		"- %-*s : %u\n"
 		"- %-*s :\n",
-		width, "Role", "Data chunk buffer",
+		width, "Role", "Dummy Data chunk buffer",
 		width, "Chunk size", ChunkBuffer::capacity,
 		width, "Number of chunks", this->count,
 		width, "Statistics (occupied / total)"
@@ -166,10 +171,9 @@ void DataChunkBuffer::print( FILE *f ) {
 	}
 }
 
-void DataChunkBuffer::stop() {}
-
-DataChunkBuffer::~DataChunkBuffer() {
-	this->chunkPool->free( this->chunks, this->count );
+DummyDataChunkBuffer::~DummyDataChunkBuffer() {
+	for ( uint32_t i = 0; i < this->count; i++ )
+		delete this->chunks[ i ];
 	delete[] this->locks;
 	delete[] this->chunks;
 	delete[] this->sizes;

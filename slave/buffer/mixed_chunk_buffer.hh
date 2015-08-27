@@ -20,9 +20,7 @@ public:
 
 	MixedChunkBuffer( DataChunkBuffer *dataChunkBuffer );
 	MixedChunkBuffer( ParityChunkBuffer *parityChunkBuffer );
-	KeyMetadata set( char *key, uint8_t keySize, char *value, uint32_t valueSize, bool &isParity, uint32_t dataChunkId = 0 );
-	uint32_t flush( bool lock = true );
-	Chunk *flush( int index, bool lock = true );
+	void set( char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode, uint32_t chunkId );
 	void print( FILE *f = stdout );
 	void stop();
 	~MixedChunkBuffer();

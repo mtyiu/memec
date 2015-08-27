@@ -1,165 +1,77 @@
 #include "parity_chunk_buffer.hh"
 #include "../../common/util/debug.hh"
 
-ParityChunkBuffer::ParityChunkBuffer( uint32_t capacity, uint32_t count, uint32_t dataChunkCount, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) : ChunkBuffer( capacity, count, listId, stripeId, chunkId, true ) {
-
-	this->dataChunkCount = dataChunkCount;
-	this->dataChunks = new Chunk**[ count ];
-	this->dataChunkBuffer = new DataChunkBuffer*[ dataChunkCount ];
-	for ( uint32_t i = 0; i < count; i++ ) {
-		this->dataChunks[ i ] = new Chunk*[ dataChunkCount ];
-	}
-	for ( uint32_t i = 0; i < dataChunkCount; i++ ) {
-		this->dataChunkBuffer[ i ] = new DataChunkBuffer( capacity, count, listId, stripeId, i, ParityChunkBuffer::dataChunkFlushHandler, ( void * ) this, false );
-	}
-	this->status = new BitmaskArray( dataChunkCount, count );
+ParityChunkWrapper::ParityChunkWrapper() {
+	this->pending = ChunkBuffer::dataChunkCount;
+	pthread_mutex_init( &this->lock, 0 );
+	this->chunk = 0;
 }
 
-ParityChunkBuffer::~ParityChunkBuffer() {
-	for ( uint32_t i = 0; i < this->count; i++ ) {
-		delete[] this->dataChunks[ i ];
+///////////////////////////////////////////////////////////////////////////////
+
+ParityChunkBuffer::ParityChunkBuffer( uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) : ChunkBuffer( listId, stripeId, chunkId ) {
+	this->dummyDataChunkBuffer = new DummyDataChunkBuffer*[ ChunkBuffer::dataChunkCount ];
+	for ( uint32_t i = 0; i < ChunkBuffer::dataChunkCount; i++ ) {
+		this->dummyDataChunkBuffer[ i ] = new DummyDataChunkBuffer( count, listId, stripeId, chunkId, ParityChunkBuffer::dataChunkFlushHandler, this );
 	}
-	for ( uint32_t i = 0; i < this->dataChunkCount; i++ ) {
-		delete[] this->dataChunkBuffer[ i ];
-	}
-	delete[] this->dataChunks;
-	delete[] this->dataChunkBuffer;
-	delete this->status;
 }
 
-KeyMetadata ParityChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t valueSize, uint32_t chunkId ) {
-	return this->dataChunkBuffer[ chunkId ]->set( key, keySize, value, valueSize );
+ParityChunkWrapper &ParityChunkBuffer::getWrapper( uint32_t stripeId ) {
+	pthread_mutex_lock( &this->lock );
+	std::map<uint32_t, ParityChunkWrapper>::iterator it = this->chunks.find( stripeId );
+	if ( it == this->chunks.end() ) {
+		ParityChunkWrapper wrapper;
+		wrapper.chunk = ChunkBuffer::chunkPool->malloc();
+		this->chunks[ stripeId ] = wrapper;
+		it = this->chunks.find( stripeId );
+	}
+	ParityChunkWrapper &wrapper = it->second;
+	pthread_mutex_unlock( &this->lock );
+	return wrapper;
 }
 
-uint32_t ParityChunkBuffer::flush( bool lock ) {
-	if ( lock )
-		pthread_mutex_lock( &this->lock );
+void ParityChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t valueSize, uint32_t chunkId ) {
+	uint32_t offset, size = 4 + keySize + valueSize;
+	uint32_t stripeId = this->dummyDataChunkBuffer[ chunkId ]->set( size, offset );
+	ParityChunkWrapper &wrapper = this->getWrapper( stripeId );
 
-	uint32_t index = 0, max = 0, count;
+	pthread_mutex_lock( &wrapper.lock );
 
-	for ( uint32_t i = 0; i < this->count; i++ ) {
-		count = 0;
-		for ( uint32_t j = 0; j < this->dataChunkCount; j++ ) {
-			if ( this->status->check( i, j ) )
-				count++;
-		}
-		if ( count > max ) {
-			index = i;
-			max = count;
-		} else if ( count == max ) {
-			if ( this->chunks[ i ]->metadata.stripeId < this->chunks[ index ]->metadata.stripeId )
-				index = i;
-		}
-	}
+	// Compute parity delta
 
-	if ( lock )
-		pthread_mutex_lock( this->locks + index );
+	// Update the parity chunk
 
-	this->flush( index, false );
-
-	if ( lock ) {
-		pthread_mutex_unlock( this->locks + index );
-		pthread_mutex_unlock( &this->lock );
-	}
-	return index;
+	pthread_mutex_unlock( &wrapper.lock );
 }
 
-Chunk *ParityChunkBuffer::flush( int index, bool lock ) {
-	if ( lock ) {
-		pthread_mutex_lock( &this->lock );
-		pthread_mutex_lock( this->locks + index );
-	}
-
-	Chunk *chunk = this->chunks[ index ];
-	Stripe *stripe = ChunkBuffer::stripePool->malloc();
-	stripe->set( this->dataChunks[ index ], chunk, this->chunkId );
-	chunk->size = stripe->getMaxDataChunkSize();
-
-	// Append an encode event to the event queue
-	CodingEvent codingEvent;
-	codingEvent.encode( stripe );
-	ChunkBuffer::eventQueue->insert( codingEvent );
-
-	// Get a new chunk
-	for ( uint32_t i = 0; i < this->dataChunkCount; i++ )
-		this->dataChunks[ index ][ i ] = 0;
-	this->status->clear( index );
-	Chunk *newChunk = ChunkBuffer::chunkPool->malloc();
-	newChunk->clear();
-	newChunk->metadata.listId = this->listId;
-	newChunk->metadata.stripeId = this->stripeId;
-	newChunk->metadata.chunkId = this->chunkId;
-	newChunk->isParity = true;
-	ChunkBuffer::map->cache[ newChunk->metadata ] = newChunk;
-	this->chunks[ index ] = newChunk;
-	this->stripeId++;
-
-	if ( lock ) {
-		pthread_mutex_unlock( &this->lock );
-		pthread_mutex_unlock( this->locks + index );
-	}
-
-	return chunk;
+void ParityChunkBuffer::flush( uint32_t stripeId, Chunk *chunk ) {
+	// Append a flush event to the event queue
+	IOEvent ioEvent;
+	ioEvent.flush( chunk );
+	ChunkBuffer::eventQueue->insert( ioEvent );
 }
 
 void ParityChunkBuffer::print( FILE *f ) {
-	int width = 16;
-	fprintf(
-		f,
-		"- %-*s : %s\n"
-		"- %-*s : %u\n"
-		"- %-*s\n",
-		width, "Role", "Data chunk buffer",
-		width, "Chunk size", this->capacity,
-		width, "Bitmap"
-	);
-	this->status->print( f );
-	for ( uint32_t i = 0; i < this->dataChunkCount; i++ ) {
-		fprintf( f, "\n*** Data chunk #%u ***\n", i );
-		this->dataChunkBuffer[ i ]->print( f );
-	}
 }
 
-void ParityChunkBuffer::stop() {
+void ParityChunkBuffer::stop() {}
+
+ParityChunkBuffer::~ParityChunkBuffer() {
+	for ( uint32_t i = 0; i < ChunkBuffer::dataChunkCount; i++ )
+		delete this->dummyDataChunkBuffer[ i ];
+	delete[] this->dummyDataChunkBuffer;
 }
 
-void ParityChunkBuffer::flushData( Chunk *chunk ) {
-	int index = -1;
+void ParityChunkBuffer::flushData( uint32_t stripeId ) {
+	ParityChunkWrapper &wrapper = this->getWrapper( stripeId );
 
-	pthread_mutex_lock( &this->lock );
-
-	// Find the stripe index
-	for ( uint32_t i = 0; i < this->count; i++ ) {
-		if ( this->chunks[ i ]->metadata.listId == chunk->metadata.listId &&
-		     this->chunks[ i ]->metadata.stripeId == chunk->metadata.stripeId ) {
-			index = i;
-			break;
-		}
-	}
-
-	if ( index == -1 ) {
-		__ERROR__( "ParityChunkBuffer", "flushData", "Cannot find the stripe in parity chunk buffer." );
-		pthread_mutex_unlock( &this->lock );
-		return;
-	}
-
-	pthread_mutex_lock( this->locks + index );
-	// Store the data chunks into temporary buffer
-	this->dataChunks[ index ][ chunk->metadata.chunkId ] = chunk;
-	this->status->set( index, chunk->metadata.chunkId );
-
-	// Check whether a chunk is ready to be flushed
-	if ( this->status->checkAllSet( index ) )
-		this->flush( index, false );
-	pthread_mutex_unlock( this->locks + index );
-
-	pthread_mutex_unlock( &this->lock );
+	pthread_mutex_lock( &wrapper.lock );
+	wrapper.pending--;
+	if ( wrapper.pending == 0 )
+		this->flush( stripeId, wrapper.chunk );
+	pthread_mutex_unlock( &wrapper.lock );
 }
 
-Chunk *ParityChunkBuffer::flushData( uint32_t chunkId, int index, bool lock ) {
-	return this->dataChunkBuffer[ chunkId ]->flush( index, true );
-}
-
-void ParityChunkBuffer::dataChunkFlushHandler( Chunk *chunk, void *argv ) {
-	( ( ParityChunkBuffer * ) argv )->flushData( chunk );
+void ParityChunkBuffer::dataChunkFlushHandler( uint32_t stripeId, void *argv ) {
+	( ( ParityChunkBuffer * ) argv )->flushData( stripeId );
 }

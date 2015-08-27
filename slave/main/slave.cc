@@ -143,16 +143,13 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 		if ( this->stripeListIndex[ i ].isParity ) {
 			this->chunkBuffer[ listId ] = new MixedChunkBuffer(
 				new ParityChunkBuffer(
-					this->config.global.size.chunk,
 					this->config.global.buffer.chunksPerList,
-					this->config.global.coding.params.getDataChunkCount(),
 					listId, stripeId, chunkId
 				)
 			);
 		} else {
 			this->chunkBuffer[ listId ] = new MixedChunkBuffer(
 				new DataChunkBuffer(
-					this->config.global.size.chunk,
 					this->config.global.buffer.chunksPerList,
 					listId, stripeId, chunkId
 				)
@@ -631,7 +628,7 @@ void Slave::dump() {
 	}
 	fprintf( stdout, "\n" );
 	*/
-	fprintf( stdout, "Number of key-value pairs: %u\n", this->map.keys.size() );
+	fprintf( stdout, "Number of key-value pairs: %lu\n\n", this->map.keys.size() );
 
 	fprintf( stdout, "List of chunks in the cache:\n----------------------------\n" );
 	if ( ! this->map.cache.size() ) {

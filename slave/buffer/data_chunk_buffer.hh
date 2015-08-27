@@ -5,14 +5,14 @@
 
 class DataChunkBuffer : public ChunkBuffer {
 private:
-	uint32_t *sizes;           // Occupied space for each chunk
-	void ( *flushFn )( Chunk *, void * );
-	void *argv;
-	bool updateMap;
+	uint32_t count;                        // Number of chunks
+	pthread_mutex_t *locks;                // Lock for each chunk
+	Chunk **chunks;                        // Allocated chunk buffer
+	uint32_t *sizes;                       // Occupied space for each chunk
 
 public:
-	DataChunkBuffer( uint32_t capacity, uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId, void ( *flushFn )( Chunk *, void * ) = 0, void *argv = 0, bool updateMap = true );
-	KeyMetadata set( char *key, uint8_t keySize, char *value, uint32_t valueSize, uint32_t chunkId = 0 );
+	DataChunkBuffer( uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId );
+	KeyMetadata set( char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode );
 	uint32_t flush( bool lock = true );
 	Chunk *flush( int index, bool lock = true );
 	void print( FILE *f = stdout );
