@@ -24,6 +24,7 @@ protected:
 	bool connected;
 	SocketMode mode;
 	int sockfd;
+	int type;
 	struct sockaddr_in addr;
 	struct {
 		char data[ 4096 ];
@@ -55,6 +56,9 @@ public:
 	virtual bool ready();
 	virtual void print( FILE *f = stdout );
 	void printAddress( FILE *f = stdout );
+	struct sockaddr_in getAddr();
+	bool equal( Socket &s );
+	bool equal( unsigned long addr, unsigned short port );
 
 	// Utilities
 	static bool setNonBlocking( int fd );

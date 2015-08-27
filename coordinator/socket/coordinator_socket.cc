@@ -131,8 +131,13 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 						slaveSocket.init( fd, *addr );
 						coordinator->sockets.slaves.set( fd, slaveSocket );
 
+						SlaveSocket *s = coordinator->sockets.slaves.get( fd );
+
 						SlaveEvent event;
-						event.resRegister( coordinator->sockets.slaves.get( fd ) );
+						event.resRegister( s );
+						coordinator->eventQueue.insert( event );
+
+						event.announceSlaveConnected( s );
 						coordinator->eventQueue.insert( event );
 					} else {
 						socket->sockets.removeAt( index );

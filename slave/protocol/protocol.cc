@@ -32,6 +32,14 @@ char *SlaveProtocol::sendHeartbeat( size_t &size, struct HeartbeatHeader &header
 	return this->buffer.send;
 }
 
+bool SlaveProtocol::parseSlaveConnectedMessage( unsigned long &addr, unsigned short &port, char *buf, size_t size ) {
+	if ( size < sizeof( addr ) + sizeof( port ) )
+		return false;
+	addr = *( ( unsigned long * ) buf );
+	port = *( ( unsigned short * )( buf + sizeof( addr ) ) );
+	return true;
+}
+
 char *SlaveProtocol::resRegisterMaster( size_t &size, bool success ) {
 	size = this->generateHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,

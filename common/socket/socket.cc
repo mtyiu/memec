@@ -169,6 +169,7 @@ bool Socket::init( int type, unsigned long addr, unsigned short port, bool block
 		__ERROR__( "Socket", "init", "%s", strerror( errno ) );
 		return false;
 	}
+	this->type = type;
 	memset( &this->addr, 0, sizeof( this->addr ) );
 	this->addr.sin_family = AF_INET;
 	this->addr.sin_port = port;
@@ -221,6 +222,22 @@ void Socket::printAddress( FILE *f ) {
 	char buf[ 16 ];
 	Socket::ntoh_ip( this->addr.sin_addr.s_addr, buf, 16 );
 	fprintf( f, "%s:%u", buf, Socket::ntoh_port( this->addr.sin_port ) );
+}
+
+struct sockaddr_in Socket::getAddr() {
+	return this->addr;
+}
+
+bool Socket::equal( Socket &s ) {
+	struct sockaddr_in saddr = s.getAddr();
+	return this->equal( saddr.sin_addr.s_addr, saddr.sin_port );
+}
+
+bool Socket::equal( unsigned long addr, unsigned short port ) {
+	return (
+		this->addr.sin_port == port &&
+		this->addr.sin_addr.s_addr == addr
+	);
 }
 
 bool Socket::hton_ip( char *ip, unsigned long &ret ) {

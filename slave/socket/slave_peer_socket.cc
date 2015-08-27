@@ -1,3 +1,4 @@
+#include <cerrno>
 #include "slave_peer_socket.hh"
 #include "../event/slave_peer_event.hh"
 #include "../main/slave.hh"
@@ -17,23 +18,20 @@ SlavePeerSocket::SlavePeerSocket() {
 	this->self = false;
 }
 
-bool SlavePeerSocket::init( ServerAddr &addr, EPoll *epoll, bool active, bool self ) {
+bool SlavePeerSocket::init( ServerAddr &addr, EPoll *epoll, bool self ) {
 	this->identifier = strdup( addr.name );
-	this->active = active;
 	this->self = self;
 	this->epoll = epoll;
 
-	if ( self || ! active ) {
-		this->mode = SOCKET_MODE_UNDEFINED;
-		this->connected = true;
-		this->sockfd = -1;
-		memset( &this->addr, 0, sizeof( this->addr ) );
-		this->addr.sin_family = AF_INET;
-		this->addr.sin_port = addr.port;
-		this->addr.sin_addr.s_addr = addr.addr;
-		return true;
-	}
-	return Socket::init( addr, epoll );
+	this->mode = SOCKET_MODE_UNDEFINED;
+	this->connected = self;
+	this->sockfd = -1;
+	memset( &this->addr, 0, sizeof( this->addr ) );
+	this->type = addr.type;
+	this->addr.sin_family = AF_INET;
+	this->addr.sin_port = addr.port;
+	this->addr.sin_addr.s_addr = addr.addr;
+	return true;
 }
 
 bool SlavePeerSocket::start() {
@@ -41,19 +39,31 @@ bool SlavePeerSocket::start() {
 		return true;
 	this->registered = false;
 
-	if ( this->active ) {
-		if ( this->connect() ) {
-			this->registerTo();
-			return true;
-		}
+	this->sockfd = socket( AF_INET, this->type, 0 );
+	if ( this->sockfd < 0 ) {
+		__ERROR__( "SlavePeerSocket", "start", "%s", strerror( errno ) );
 		return false;
 	}
-	return true;
+
+	if ( ! this->setNonBlocking() )
+		return false;
+
+	this->setReuse();
+	this->setNoDelay();
+
+	this->epoll->add( this->sockfd, EPOLL_EVENT_SET );
+
+	if ( this->connect() ) {
+		this->registerTo();
+		return true;
+	}
+	return false;
 }
 
 void SlavePeerSocket::stop() {
 	printf( "fd = %d is stopping...\n", this->sockfd );
-	Socket::stop();
+	if ( this->sockfd != -1 )
+		Socket::stop();
 }
 
 bool SlavePeerSocket::ready() {
@@ -115,7 +125,7 @@ void SlavePeerSocket::print( FILE *f ) {
 		fprintf( f,
 			"(connected %s registered, %s)\n",
 			this->registered ? "and" : "but not",
-			( this->active || this->received ) ? "bidirectional" : "unidirectional"
+			this->received ? "bidirectional" : "unidirectional"
 		);
 	else
 		fprintf( f, "(disconnected)\n" );

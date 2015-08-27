@@ -2,6 +2,7 @@
 #define __COMMON_DS_ARRAY_MAP_HH__
 
 #include <vector>
+#include <pthread.h>
 
 template<typename KeyType, typename ValueType> class ArrayMap {
 public:

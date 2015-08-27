@@ -161,6 +161,22 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 							break;
 					}
 					break;
+				case PROTO_OPCODE_SLAVE_CONNECTED:
+				{
+					unsigned long addr;
+					unsigned short port;
+					char buf1[ 16 ], buf2[ 16 ];
+
+					this->protocol.parseSlaveConnectedMessage( addr, port, buffer.data, buffer.size );
+					for ( uint32_t i = 0; i < sizeof( addr ) + sizeof( port ); i++ ) {
+						printf( "%d ", buffer.data[ i ] );
+					}
+					Socket::ntoh_ip( addr, buf1, 16 );
+					Socket::ntoh_port( port, buf2, 16 );
+
+					printf( "Slave: %s:%s is connected!\n", buf1, buf2 );
+				}
+					break;
 				default:
 					__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from coordinator." );
 					return;

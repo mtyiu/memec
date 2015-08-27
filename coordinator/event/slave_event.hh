@@ -8,6 +8,7 @@ enum SlaveEventType {
 	SLAVE_EVENT_TYPE_UNDEFINED,
 	SLAVE_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS,
 	SLAVE_EVENT_TYPE_REGISTER_RESPONSE_FAILURE,
+	SLAVE_EVENT_TYPE_ANNOUNCE_SLAVE_CONNECTED,
 	SLAVE_EVENT_TYPE_PENDING
 };
 
@@ -18,6 +19,7 @@ public:
 
 	void pending( SlaveSocket *socket );
 	void resRegister( SlaveSocket *socket, bool success = true );
+	void announceSlaveConnected( SlaveSocket *socket );
 };
 
 #endif

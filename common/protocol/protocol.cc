@@ -199,6 +199,7 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_MAGIC_REQUEST:
 		case PROTO_MAGIC_RESPONSE_SUCCESS:
 		case PROTO_MAGIC_RESPONSE_FAILURE:
+		case PROTO_MAGIC_ANNOUNCEMENT:
 			break;
 		default:
 			return false;
@@ -221,6 +222,7 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_OPCODE_REGISTER:
 		case PROTO_OPCODE_GET_CONFIG:
 		case PROTO_OPCODE_SYNC:
+		case PROTO_OPCODE_SLAVE_CONNECTED:
 		case PROTO_OPCODE_GET:
 		case PROTO_OPCODE_SET:
 		case PROTO_OPCODE_UPDATE:

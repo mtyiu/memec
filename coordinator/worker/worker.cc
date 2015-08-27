@@ -78,11 +78,30 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 		case SLAVE_EVENT_TYPE_PENDING:
 			isSend = false;
 			break;
+		case SLAVE_EVENT_TYPE_ANNOUNCE_SLAVE_CONNECTED:
+			isSend = false;
+			break;
 		default:
 			return;
 	}
 
-	if ( isSend ) {
+	if ( event.type == SLAVE_EVENT_TYPE_ANNOUNCE_SLAVE_CONNECTED ) {
+		ArrayMap<int, SlaveSocket> &slaves = Coordinator::getInstance()->sockets.slaves;
+
+		buffer.data = this->protocol.announceSlaveConnected( buffer.size, event.socket );
+
+		connected = true;
+
+		for ( uint32_t i = 0; i < slaves.size(); i++ ) {
+			SlaveSocket &slave = slaves.values[ i ];
+			if ( event.socket->equal( slave ) )
+				continue; // No need to tell the new socket
+
+			ret = slave.send( buffer.data, buffer.size, connected );
+			if ( ret != ( ssize_t ) buffer.size )
+				__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+		}
+	} else if ( isSend ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );

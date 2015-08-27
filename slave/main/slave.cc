@@ -83,14 +83,12 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 	this->sockets.slavePeers.reserve( this->config.global.slaves.size() );
 	for ( int i = 0, len = this->config.global.slaves.size(); i < len; i++ ) {
 		SlavePeerSocket socket;
-		int fd;
 		socket.init(
 			this->config.global.slaves[ i ],
 			&this->sockets.epoll,
-			i > mySlaveIndex, // only create socket when my index is smaller than the slave peer
 			i == mySlaveIndex // indicate whether this is a self-socket
 		);
-		fd = socket.getSocket();
+		int fd = -1;
 		this->sockets.slavePeers.set( fd, socket );
 	}
 	/* Coding */
@@ -233,15 +231,16 @@ bool Slave::start() {
 		if ( ! this->sockets.coordinators[ i ].start() )
 			__ERROR__( "Slave", "start", "Cannot connect to coordinator #%d.", i );
 	}
-	// Connect to slaves
-	sleep( this->config.slave.slavePeers.timeout );
-	for ( int i = 0, len = this->sockets.slavePeers.size(); i < len; i++ ) {
-		if ( this->sockets.slavePeers[ i ].self )
-			continue;
-		if ( ! this->sockets.slavePeers[ i ].start() ) {
-			__ERROR__( "Slave", "start", "Cannot connect to slave peer #%d.", i );
-		}
-	}
+	// Do not connect to slaves until a slave connected message is announcement by the coordinator
+	// sleep( this->config.slave.slavePeers.timeout );
+	// for ( int i = 0, len = this->sockets.slavePeers.size(); i < len; i++ ) {
+	// 	if ( this->sockets.slavePeers[ i ].self )
+	// 		continue;
+	// 	if ( ! this->sockets.slavePeers[ i ].start() ) {
+	// 		__ERROR__( "Slave", "start", "Cannot connect to slave peer #%d.", i );
+	// 	}
+	// }
+
 	// Start listening
 	if ( ! this->sockets.self.start() ) {
 		__ERROR__( "Slave", "start", "Cannot start socket." );

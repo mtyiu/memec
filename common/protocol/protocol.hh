@@ -17,7 +17,7 @@
 #define PROTO_MAGIC_REQUEST            0x01 // -----001
 #define PROTO_MAGIC_RESPONSE_SUCCESS   0x02 // -----010
 #define PROTO_MAGIC_RESPONSE_FAILURE   0x03 // -----011
-#define PROTO_MAGIC_RESERVED_1         0x04 // -----100
+#define PROTO_MAGIC_ANNOUNCEMENT       0x04 // -----100
 #define PROTO_MAGIC_RESERVED_2         0x05 // -----101
 #define PROTO_MAGIC_RESERVED_3         0x06 // -----110
 #define PROTO_MAGIC_RESERVED_4         0x07 // -----111
@@ -40,6 +40,7 @@
 #define PROTO_OPCODE_REGISTER          0x00
 #define PROTO_OPCODE_GET_CONFIG        0x09
 #define PROTO_OPCODE_SYNC              0x10
+#define PROTO_OPCODE_SLAVE_CONNECTED   0x11
 
 // Application <-> Master or Master <-> Slave //
 #define PROTO_OPCODE_GET               0x01

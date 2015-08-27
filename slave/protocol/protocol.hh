@@ -17,6 +17,7 @@ public:
 	char *reqRegisterCoordinator( size_t &size );
 	// Heartbeat
 	char *sendHeartbeat( size_t &size, struct HeartbeatHeader &header, std::map<Key, OpMetadata> &opMetadataMap, size_t &count );
+	bool parseSlaveConnectedMessage( unsigned long &addr, unsigned short &port, char *buf, size_t size );
 
 	/* Master */
 	// Register

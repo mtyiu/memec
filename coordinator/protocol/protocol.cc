@@ -89,3 +89,21 @@ char *CoordinatorProtocol::resRegisterSlave( size_t &size, GlobalConfig &globalC
 
 	return this->buffer.send;
 }
+
+char *CoordinatorProtocol::announceSlaveConnected( size_t &size, SlaveSocket *socket ) {
+	struct sockaddr_in addr = socket->getAddr();
+	size = this->generateHeader(
+		PROTO_MAGIC_ANNOUNCEMENT,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_SLAVE_CONNECTED,
+		sizeof( addr.sin_addr.s_addr ) + sizeof( addr.sin_port )
+	);
+	*( ( unsigned long * )( this->buffer.send + PROTO_HEADER_SIZE ) ) = addr.sin_addr.s_addr;
+	*( ( unsigned short * )( this->buffer.send + PROTO_HEADER_SIZE + sizeof( addr.sin_addr.s_addr ) ) ) = addr.sin_port;
+	size += sizeof( addr.sin_addr.s_addr ) + sizeof( addr.sin_port );
+
+	for ( uint32_t i = 0; i < sizeof( addr.sin_addr.s_addr ) + sizeof( addr.sin_port ); i++ ) {
+		printf( "%d ", this->buffer.send[ PROTO_HEADER_SIZE + i ] );
+	}
+	return this->buffer.send;
+}
