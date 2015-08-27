@@ -26,6 +26,7 @@ public:
 	ParityChunkBuffer( uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId );
 	ParityChunkWrapper &getWrapper( uint32_t stripeId );
 	void set( char *key, uint8_t keySize, char *value, uint32_t valueSize, uint32_t chunkId, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk );
+	void update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, char *dataDelta, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk );
 	void flush( uint32_t stripeId, Chunk *chunk );
 	void print( FILE *f = stdout );
 	void stop();

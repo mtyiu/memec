@@ -22,6 +22,16 @@ void MixedChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t va
 	}
 }
 
+void MixedChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, char *dataDelta, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk ) {
+	switch( this->role ) {
+		case CBR_PARITY:
+			this->buffer.parity->update( stripeId, chunkId, offset, size, dataDelta, dataChunks, dataChunk, parityChunk );
+			break;
+		default:
+			return;
+	}
+}
+
 void MixedChunkBuffer::stop() {
 	switch( this->role ) {
 		case CBR_DATA:

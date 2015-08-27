@@ -21,6 +21,7 @@ public:
 	MixedChunkBuffer( DataChunkBuffer *dataChunkBuffer );
 	MixedChunkBuffer( ParityChunkBuffer *parityChunkBuffer );
 	void set( char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode, uint32_t chunkId, Chunk **chunks = 0, Chunk *dataChunk = 0, Chunk *parityChunk = 0 );
+	void update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, char *dataDelta, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk );
 	void print( FILE *f = stdout );
 	void stop();
 	~MixedChunkBuffer();

@@ -759,7 +759,8 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size ) 
 
 	SlaveWorker::chunkBuffer->at( listId )->set(
 		header.key, header.keySize, header.value, header.valueSize, PROTO_OPCODE_SET, chunkId,
-		this->chunks, this->dataChunk, this->parityChunk );
+		this->chunks, this->dataChunk, this->parityChunk
+	);
 
 	Key key;
 	key.set( header.keySize, header.key );
@@ -1020,16 +1021,18 @@ bool SlaveWorker::handleUpdateChunkRequest( SlavePeerEvent event, char *buf, siz
 	if ( this->isRedirectedRequest( header.listId, header.updatingChunkId ) ) {
 		__DEBUG__( YELLOW, "SlaveWorker", "handleUpdateChunkRequest", "!!! Degraded UPDATE_CHUNK request [not yet implemented] !!!" );
 		// TODO
+		ret = false;
+	} else {
+		SlaveWorker::chunkBuffer->at( header.listId )->update(
+			header.stripeId, header.chunkId,
+			header.offset, header.length, header.delta,
+			this->chunks, this->dataChunk, this->parityChunk
+		);
+		ret = true;
 	}
 
 	Metadata metadata;
-	Chunk *chunk = map->findChunkById( header.listId, header.stripeId, header.chunkId, &metadata );
-	if ( chunk ) {
-		__ERROR__( "SlaveWorker", "handleUpdateChunkRequest", "TODO: UPDATE_CHUNK not yet implemented!" );
-		ret = true;
-	} else {
-		ret = false;
-	}
+	metadata.set( header.listId, header.stripeId, header.chunkId );
 
 	event.resUpdateChunk(
 		event.socket, metadata,
@@ -1061,18 +1064,19 @@ bool SlaveWorker::handleDeleteChunkRequest( SlavePeerEvent event, char *buf, siz
 	if ( this->isRedirectedRequest( header.listId, header.updatingChunkId ) ) {
 		__DEBUG__( YELLOW, "SlaveWorker", "handleDeleteChunkRequest", "!!! Degraded DELETE_CHUNK request [not yet implemented] !!!" );
 		// TODO
+		ret = false;
+	} else {
+		SlaveWorker::chunkBuffer->at( header.listId )->update(
+			header.stripeId, header.chunkId,
+			header.offset, header.length, header.delta,
+			this->chunks, this->dataChunk, this->parityChunk
+		);
+		ret = true;
 	}
 
 	Metadata metadata;
-	Chunk *chunk = map->findChunkById( header.listId, header.stripeId, header.chunkId, &metadata );
-	if ( chunk ) {
-		__ERROR__( "SlaveWorker", "handleDeleteChunkRequest", "TODO: DELETE_CHUNK not yet implemented!" );
-		ret = true;
-	} else {
-		ret = false;
-	}
+	metadata.set( header.listId, header.stripeId, header.chunkId );
 
-	metadata.chunkId = header.chunkId;
 	event.resDeleteChunk(
 		event.socket, metadata,
 		header.offset, header.length,

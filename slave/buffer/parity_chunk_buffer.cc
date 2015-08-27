@@ -69,6 +69,37 @@ void ParityChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t v
 	pthread_mutex_unlock( &wrapper.lock );
 }
 
+void ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, char *dataDelta, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk ) {
+	ParityChunkWrapper &wrapper = this->getWrapper( stripeId );
+
+	// Prepare data delta
+	dataChunk->clear();
+	parityChunk->clear();
+	dataChunk->size = offset + size;
+	memcpy( dataChunk->data + offset, dataDelta, size );
+
+	// Prepare the stripe
+	for ( uint32_t i = 0; i < ChunkBuffer::dataChunkCount; i++ )
+		dataChunks[ i ] = Coding::zeros;
+	dataChunks[ chunkId ] = dataChunk;
+
+	// Compute parity delta
+	ChunkBuffer::coding->encode( dataChunks, parityChunk, this->chunkId, offset, offset + size );
+
+	pthread_mutex_lock( &wrapper.lock );
+	wrapper.chunk->status = CHUNK_STATUS_DIRTY;
+	if ( offset + size > wrapper.chunk->size )
+		wrapper.chunk->size = offset + size;
+	// Update the parity chunk
+	Coding::bitwiseXOR(
+		wrapper.chunk->data,
+		wrapper.chunk->data,
+		parityChunk->data,
+		ChunkBuffer::capacity
+	);
+	pthread_mutex_unlock( &wrapper.lock );
+}
+
 void ParityChunkBuffer::flush( uint32_t stripeId, Chunk *chunk ) {
 	// Append a flush event to the event queue
 	IOEvent ioEvent;
