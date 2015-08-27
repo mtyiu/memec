@@ -2,6 +2,7 @@
 #define __COMMON_CONFIG_SERVER_ADDR_HH__
 
 #include <cstdio>
+#include <stdint.h>
 
 #define SERVER_NAME_MAX_LEN				255
 #define SERVER_ADDR_MESSSAGE_MAX_LEN	SERVER_NAME_MAX_LEN + 1 + 4 + 2
@@ -12,12 +13,12 @@ private:
 
 public:
 	char name[ SERVER_NAME_MAX_LEN + 1 ];
-	unsigned long addr;
-	unsigned short port;
+	uint32_t addr;
+	uint16_t port;
 	int type;
 
 	ServerAddr();
-	ServerAddr( const char *name, unsigned long addr, unsigned short port, int type );
+	ServerAddr( const char *name, uint32_t addr, uint16_t port, int type );
 	bool isInitialized();
 	bool parse( const char *name, const char *addr );
 	size_t serialize( char *message );

@@ -48,7 +48,7 @@ public:
 		return this->sockfd;
 	}
 	Socket();
-	bool init( int type, unsigned long addr, unsigned short port, bool block = false );
+	bool init( int type, uint32_t addr, uint16_t port, bool block = false );
 	bool init( int sockfd, struct sockaddr_in addr );
 	virtual bool init( ServerAddr &addr, EPoll *epoll );
 	virtual bool start() = 0;
@@ -58,17 +58,17 @@ public:
 	void printAddress( FILE *f = stdout );
 	struct sockaddr_in getAddr();
 	bool equal( Socket &s );
-	bool equal( unsigned long addr, unsigned short port );
+	bool equal( uint32_t addr, uint16_t port );
 
 	// Utilities
 	static bool setNonBlocking( int fd );
-	static bool hton_ip( char *ip, unsigned long &ret );
-	static bool hton_port( char *port, unsigned short &ret );
-	static unsigned short hton_port( unsigned short port );
+	static bool hton_ip( char *ip, uint32_t &ret );
+	static bool hton_port( char *port, uint16_t &ret );
+	static uint16_t hton_port( uint16_t port );
 
-	static bool ntoh_ip( unsigned long ip, char *buf, size_t len );
-	static bool ntoh_port( unsigned short port, char *buf, size_t len );
-	static unsigned short ntoh_port( unsigned short port );
+	static bool ntoh_ip( uint32_t ip, char *buf, size_t len );
+	static bool ntoh_port( uint16_t port, char *buf, size_t len );
+	static uint16_t ntoh_port( uint16_t port );
 };
 
 #endif

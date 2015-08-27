@@ -240,7 +240,7 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 
 	switch( event.type ) {
 		case COORDINATOR_EVENT_TYPE_REGISTER_REQUEST:
-			buffer.data = this->protocol.reqRegisterCoordinator( buffer.size );
+			buffer.data = this->protocol.reqRegisterCoordinator( buffer.size, event.message.address.addr, event.message.address.port );
 			isSend = true;
 			break;
 		case COORDINATOR_EVENT_TYPE_PENDING:
@@ -316,7 +316,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 
 	switch( event.type ) {
 		case SLAVE_EVENT_TYPE_REGISTER_REQUEST:
-			buffer.data = this->protocol.reqRegisterSlave( buffer.size );
+			buffer.data = this->protocol.reqRegisterSlave( buffer.size, event.message.address.addr, event.message.address.port );
 			isSend = true;
 			break;
 		case SLAVE_EVENT_TYPE_SEND:

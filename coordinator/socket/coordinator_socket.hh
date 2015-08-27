@@ -17,11 +17,11 @@ public:
 	CoordinatorProtocol protocol;
 	struct {
 		size_t size;
-		char data[ PROTO_HEADER_SIZE ];
+		char data[ PROTO_HEADER_SIZE + 4 + 2 ];
 	} buffer;
 
 	CoordinatorSocket();
-	bool init( int type, unsigned long addr, unsigned short port, int numSlaves, EPoll *epoll );
+	bool init( int type, uint32_t addr, uint16_t port, int numSlaves, EPoll *epoll );
 	bool start();
 	void stop();
 	void print( FILE *f = stdout );

@@ -34,26 +34,27 @@ bool SlavePeerSocket::init( ServerAddr &addr, EPoll *epoll, bool self ) {
 	return true;
 }
 
-bool SlavePeerSocket::start() {
+int SlavePeerSocket::init() {
 	if ( this->self )
-		return true;
+		return 0;
 	this->registered = false;
 
 	this->sockfd = socket( AF_INET, this->type, 0 );
 	if ( this->sockfd < 0 ) {
 		__ERROR__( "SlavePeerSocket", "start", "%s", strerror( errno ) );
-		return false;
+		return -1;
 	}
-
-	if ( ! this->setNonBlocking() )
-		return false;
 
 	this->setReuse();
 	this->setNoDelay();
 
-	this->epoll->add( this->sockfd, EPOLL_EVENT_SET );
+	return this->sockfd;
+}
 
+bool SlavePeerSocket::start() {
 	if ( this->connect() ) {
+		this->received = true;
+		this->epoll->add( this->sockfd, EPOLL_EVENT_SET );
 		this->registerTo();
 		return true;
 	}
@@ -104,7 +105,9 @@ ssize_t SlavePeerSocket::send( char *buf, size_t ulen, bool &connected ) {
 		__ERROR__( "SlavePeerSocket", "send", "send() should not be called for self-socket!" );
 		return 0;
 	}
-	return Socket::send( this->sockfd, buf, ulen, connected );
+	ssize_t bytes = Socket::send( this->sockfd, buf, ulen, connected );
+	__DEBUG__( MAGENTA, "SlavePeerSocket", "send", "Sent %ld bytes...", bytes );
+	return bytes;
 }
 
 ssize_t SlavePeerSocket::recv( char *buf, size_t ulen, bool &connected, bool wait ) {
@@ -112,7 +115,9 @@ ssize_t SlavePeerSocket::recv( char *buf, size_t ulen, bool &connected, bool wai
 		__ERROR__( "SlavePeerSocket", "recv", "recv() should not be called for self-socket!" );
 		return 0;
 	}
-	return Socket::recv( this->sockfd, buf, ulen, connected, wait );
+	ssize_t bytes = Socket::recv( this->sockfd, buf, ulen, connected, wait );
+	__DEBUG__( MAGENTA, "SlavePeerSocket", "recv", "Received %ld bytes...", bytes );
+	return bytes;
 }
 
 void SlavePeerSocket::print( FILE *f ) {

@@ -14,11 +14,11 @@ public:
 
 	/* Coordinator */
 	// Register
-	char *reqRegisterCoordinator( size_t &size );
+	char *reqRegisterCoordinator( size_t &size, uint32_t addr, uint16_t port );
 
 	/* Slave */
 	// Register
-	char *reqRegisterSlave( size_t &size );
+	char *reqRegisterSlave( size_t &size, uint32_t addr, uint16_t port );
 	// SET
 	char *reqSet( size_t &size, char *key, uint8_t keySize, char *value, uint32_t valueSize );
 	// GET

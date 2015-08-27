@@ -18,6 +18,7 @@ public:
 
 	SlavePeerSocket();
 	bool init( ServerAddr &addr, EPoll *epoll, bool self );
+	int init();
 	bool start();
 	void stop();
 	bool ready();

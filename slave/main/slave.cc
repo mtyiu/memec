@@ -26,7 +26,7 @@ void Slave::sync() {
 	for ( int i = 0, len = this->config.global.coordinators.size(); i < len; i++ ) {
 		// Can only sync with one coordinator
 		event.sync( &this->sockets.coordinators[ i ] );
-		this->eventQueue.insert( event );
+		// this->eventQueue.insert( event );
 	}
 }
 
@@ -232,14 +232,6 @@ bool Slave::start() {
 			__ERROR__( "Slave", "start", "Cannot connect to coordinator #%d.", i );
 	}
 	// Do not connect to slaves until a slave connected message is announcement by the coordinator
-	// sleep( this->config.slave.slavePeers.timeout );
-	// for ( int i = 0, len = this->sockets.slavePeers.size(); i < len; i++ ) {
-	// 	if ( this->sockets.slavePeers[ i ].self )
-	// 		continue;
-	// 	if ( ! this->sockets.slavePeers[ i ].start() ) {
-	// 		__ERROR__( "Slave", "start", "Cannot connect to slave peer #%d.", i );
-	// 	}
-	// }
 
 	// Start listening
 	if ( ! this->sockets.self.start() ) {

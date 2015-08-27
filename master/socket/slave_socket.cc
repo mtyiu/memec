@@ -7,7 +7,7 @@ bool SlaveSocket::start() {
 	if ( this->connect() ) {
 		Master *master = Master::getInstance();
 		SlaveEvent event;
-		event.reqRegister( this );
+		event.reqRegister( this, master->config.master.master.addr.addr, master->config.master.master.addr.port );
 		master->eventQueue.insert( event );
 		return true;
 	}

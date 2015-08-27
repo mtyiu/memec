@@ -8,6 +8,7 @@
 uint32_t SlaveWorker::dataChunkCount;
 uint32_t SlaveWorker::parityChunkCount;
 uint32_t SlaveWorker::chunkCount;
+ArrayMap<int, SlavePeerSocket> *SlaveWorker::slavePeers;
 Pending *SlaveWorker::pending;
 ServerAddr *SlaveWorker::slaveServerAddr;
 Coding *SlaveWorker::coding;
@@ -87,7 +88,7 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 
 	switch( event.type ) {
 		case COORDINATOR_EVENT_TYPE_REGISTER_REQUEST:
-			buffer.data = this->protocol.reqRegisterCoordinator( buffer.size );
+			buffer.data = this->protocol.reqRegisterCoordinator( buffer.size, event.message.address.addr, event.message.address.port );
 			isSend = true;
 			break;
 		case COORDINATOR_EVENT_TYPE_SYNC:
@@ -162,20 +163,7 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 					}
 					break;
 				case PROTO_OPCODE_SLAVE_CONNECTED:
-				{
-					unsigned long addr;
-					unsigned short port;
-					char buf1[ 16 ], buf2[ 16 ];
-
-					this->protocol.parseSlaveConnectedMessage( addr, port, buffer.data, buffer.size );
-					for ( uint32_t i = 0; i < sizeof( addr ) + sizeof( port ); i++ ) {
-						printf( "%d ", buffer.data[ i ] );
-					}
-					Socket::ntoh_ip( addr, buf1, 16 );
-					Socket::ntoh_port( port, buf2, 16 );
-
-					printf( "Slave: %s:%s is connected!\n", buf1, buf2 );
-				}
+					this->handleSlaveConnectedMsg( event, buffer.data, buffer.size );
 					break;
 				default:
 					__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from coordinator." );
@@ -378,6 +366,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		// Requests //
 		//////////////
 		case SLAVE_PEER_EVENT_TYPE_REGISTER_REQUEST:
+			printf( "[REQ] Register slave peer: sending\n" );
 			buffer.data = this->protocol.reqRegisterSlavePeer( buffer.size, SlaveWorker::slaveServerAddr );
 			break;
 		case SLAVE_PEER_EVENT_TYPE_UPDATE_CHUNK_REQUEST:
@@ -427,6 +416,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		///////////////
 		// Register
 		case SLAVE_PEER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
+			printf( "[RESP] Register slave peer: sending\n" );
 			success = true; // default is false
 		case SLAVE_PEER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resRegisterSlavePeer( buffer.size, success );
@@ -536,9 +526,11 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				case PROTO_OPCODE_REGISTER:
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
+							printf( "[REQ] Register slave peer: received\n" );
 							this->handleSlavePeerRegisterRequest( event.socket, buffer.data, buffer.size );
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							printf( "[RESP] Register slave peer: received\n" );
 							event.socket->registered = true;
 							break;
 						case PROTO_MAGIC_RESPONSE_FAILURE:
@@ -708,6 +700,41 @@ SlavePeerSocket *SlaveWorker::getSlaves( char *data, uint8_t size, uint32_t &lis
 		}
 	}
 	return ret;
+}
+
+bool SlaveWorker::handleSlaveConnectedMsg( CoordinatorEvent event, char *buf, size_t size ) {
+	struct AddressHeader header;
+	if ( ! this->protocol.parseAddressHeader( header, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleSlaveConnectedMsg", "Invalid address header." );
+		return false;
+	}
+
+	char tmp[ 22 ];
+	Socket::ntoh_ip( header.addr, tmp, 16 );
+	Socket::ntoh_port( header.port, tmp + 16, 6 );
+	__DEBUG__( YELLOW, "SlaveWorker", "handleSlaveConnectedMsg", "Slave: %s:%s is connected.", tmp, tmp + 16 );
+
+	// Find the slave peer socket in the array map
+	int index = -1;
+	for ( int i = 0, len = slavePeers->values.size(); i < len; i++ ) {
+		if ( slavePeers->values[ i ].equal( header.addr, header.port ) ) {
+			index = i;
+			break;
+		}
+	}
+	if ( index == -1 ) {
+		__ERROR__( "SlaveWorker", "handleSlaveConnectedMsg", "The slave is not in the list. Ignoring this slave..." );
+		return false;
+	}
+
+	// Update sockfd in the array Map
+	int sockfd = slavePeers->values[ index ].init();
+	slavePeers->keys[ index ] = sockfd;
+
+	// Connect to the slave peer
+	slavePeers->values[ index ].start();
+
+	return true;
 }
 
 bool SlaveWorker::handleGetRequest( MasterEvent event, char *buf, size_t size ) {
@@ -997,24 +1024,28 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 }
 
 bool SlaveWorker::handleSlavePeerRegisterRequest( SlavePeerSocket *socket, char *buf, size_t size ) {
-	static Slave *slave = Slave::getInstance();
-	SlavePeerSocket *s = 0;
-	ServerAddr serverAddr;
+	struct AddressHeader header;
+	if ( ! this->protocol.parseAddressHeader( header, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleSlavePeerRegisterRequest", "Invalid address header." );
+		return false;
+	}
 
-	// Find the corresponding SlavePeerSocket
-	serverAddr.deserialize( buf );
-	for ( int i = 0, len = slave->sockets.slavePeers.size(); i < len; i++ ) {
-		if ( slave->sockets.slavePeers[ i ].isMatched( serverAddr ) ) {
-			s = &slave->sockets.slavePeers[ i ];
+	// Find the slave peer socket in the array map
+	int index = -1;
+	for ( int i = 0, len = slavePeers->values.size(); i < len; i++ ) {
+		if ( slavePeers->values[ i ].equal( header.addr, header.port ) ) {
+			index = i;
 			break;
 		}
 	}
-
-	if ( s ) {
-		SlavePeerEvent event;
-		event.resRegister( s, true );
-		SlaveWorker::eventQueue->insert( event );
+	if ( index == -1 ) {
+		__ERROR__( "SlaveWorker", "handleSlavePeerRegisterRequest", "The slave is not in the list. Ignoring this slave..." );
+		return false;
 	}
+
+	SlavePeerEvent event;
+	event.resRegister( &slavePeers->values[ index ], true );
+	SlaveWorker::eventQueue->insert( event );
 	return true;
 }
 
@@ -1698,6 +1729,7 @@ bool SlaveWorker::init() {
 	SlaveWorker::dataChunkCount = slave->config.global.coding.params.getDataChunkCount();
 	SlaveWorker::parityChunkCount = slave->config.global.coding.params.getParityChunkCount();
 	SlaveWorker::chunkCount = SlaveWorker::dataChunkCount + SlaveWorker::parityChunkCount;
+	SlaveWorker::slavePeers = &slave->sockets.slavePeers;
 	SlaveWorker::pending = &slave->pending;
 	SlaveWorker::slaveServerAddr = &slave->config.slave.slave.addr;
 	SlaveWorker::coding = slave->coding;

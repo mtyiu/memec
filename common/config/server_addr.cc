@@ -10,7 +10,7 @@ ServerAddr::ServerAddr() {
 	this->name[ SERVER_NAME_MAX_LEN ] = 0;
 }
 
-ServerAddr::ServerAddr( const char *name, unsigned long addr, unsigned short port, int type ) {
+ServerAddr::ServerAddr( const char *name, uint32_t addr, uint16_t port, int type ) {
 	this->initialized = true;
 	strncpy( this->name, name, SERVER_NAME_MAX_LEN );
 	this->addr = addr;
@@ -57,15 +57,15 @@ bool ServerAddr::parse( const char *name, const char *addr ) {
 }
 
 size_t ServerAddr::serialize( char *message ) {
-	*( ( unsigned long  * )( message     ) ) = htonl( this->addr );
-	*( ( unsigned short * )( message + 4 ) ) = htons( this->port );
+	*( ( uint32_t * )( message     ) ) = htonl( this->addr );
+	*( ( uint16_t * )( message + 4 ) ) = htons( this->port );
 	strcpy( message + 6, this->name );
 	return 6 + strlen( this->name ) + 1;
 }
 
 size_t ServerAddr::deserialize( const char *message ) {
-	this->addr = ntohl( *( ( unsigned long  * )( message     ) ) );
-	this->port = ntohs( *( ( unsigned short * )( message + 4 ) ) );
+	this->addr = ntohl( *( ( uint32_t * )( message     ) ) );
+	this->port = ntohs( *( ( uint16_t * )( message + 4 ) ) );
 	strncpy( this->name, message + 6, SERVER_NAME_MAX_LEN + 1 );
 	return 6 + strlen( this->name ) + 1;
 }

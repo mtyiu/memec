@@ -21,7 +21,7 @@ public:
 	} buffer;
 
 	MasterSocket();
-	bool init( int type, unsigned long addr, unsigned short port, EPoll *epoll );
+	bool init( int type, uint32_t addr, uint16_t port, EPoll *epoll );
 	bool start();
 	void stop();
 	void print( FILE *f = stdout );

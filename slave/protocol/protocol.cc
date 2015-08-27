@@ -10,12 +10,12 @@ void SlaveProtocol::free() {
 	Protocol::free();
 }
 
-char *SlaveProtocol::reqRegisterCoordinator( size_t &size ) {
-	size = this->generateHeader(
+char *SlaveProtocol::reqRegisterCoordinator( size_t &size, uint32_t addr, uint16_t port ) {
+	size = this->generateAddressHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_COORDINATOR,
 		PROTO_OPCODE_REGISTER,
-		0
+		addr, port
 	);
 	return this->buffer.send;
 }
@@ -30,14 +30,6 @@ char *SlaveProtocol::sendHeartbeat( size_t &size, struct HeartbeatHeader &header
 		count
 	);
 	return this->buffer.send;
-}
-
-bool SlaveProtocol::parseSlaveConnectedMessage( unsigned long &addr, unsigned short &port, char *buf, size_t size ) {
-	if ( size < sizeof( addr ) + sizeof( port ) )
-		return false;
-	addr = *( ( unsigned long * ) buf );
-	port = *( ( unsigned short * )( buf + sizeof( addr ) ) );
-	return true;
 }
 
 char *SlaveProtocol::resRegisterMaster( size_t &size, bool success ) {
@@ -107,12 +99,11 @@ char *SlaveProtocol::resDelete( size_t &size, bool success, uint8_t keySize, cha
 }
 
 char *SlaveProtocol::reqRegisterSlavePeer( size_t &size, ServerAddr *addr ) {
-	size = addr->serialize( this->buffer.send + PROTO_HEADER_SIZE );
-	size += this->generateHeader(
+	size = this->generateAddressHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_REGISTER,
-		size
+		addr->addr, addr->port
 	);
 	return this->buffer.send;
 }

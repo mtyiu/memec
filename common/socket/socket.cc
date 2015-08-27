@@ -161,7 +161,7 @@ Socket::Socket() {
 	pthread_mutex_init( &this->pending.lock, 0 );
 }
 
-bool Socket::init( int type, unsigned long addr, unsigned short port, bool block ) {
+bool Socket::init( int type, uint32_t addr, uint16_t port, bool block ) {
 	this->mode = SOCKET_MODE_UNDEFINED;
 	this->connected = false;
 	this->sockfd = socket( AF_INET, type, 0 );
@@ -233,14 +233,14 @@ bool Socket::equal( Socket &s ) {
 	return this->equal( saddr.sin_addr.s_addr, saddr.sin_port );
 }
 
-bool Socket::equal( unsigned long addr, unsigned short port ) {
+bool Socket::equal( uint32_t addr, uint16_t port ) {
 	return (
 		this->addr.sin_port == port &&
 		this->addr.sin_addr.s_addr == addr
 	);
 }
 
-bool Socket::hton_ip( char *ip, unsigned long &ret ) {
+bool Socket::hton_ip( char *ip, uint32_t &ret ) {
 	struct in_addr addr;
 	switch( inet_pton( AF_INET, ip, &addr ) ) {
 		case 1:
@@ -256,7 +256,7 @@ bool Socket::hton_ip( char *ip, unsigned long &ret ) {
 	}
 }
 
-bool Socket::hton_port( char *port, unsigned short &ret ) {
+bool Socket::hton_port( char *port, uint16_t &ret ) {
 	int tmp;
 	switch( sscanf( port, "%d", &tmp ) ) {
 		case 1:
@@ -264,21 +264,21 @@ bool Socket::hton_port( char *port, unsigned short &ret ) {
 				__ERROR__( "Socket", "hton_port", "The port number is invalid." );
 				return false;
 			}
-			ret = ( unsigned short ) tmp;
+			ret = ( uint16_t ) tmp;
 			ret = htons( ret );
 			return true;
 		case 0:
 		default:
-			__ERROR__( "Socket", "hton_port", "The port number cannot be converted into an unsigned short." );
+			__ERROR__( "Socket", "hton_port", "The port number cannot be converted into an uint16_t." );
 			return false;
 	}
 }
 
-unsigned short Socket::hton_port( unsigned short port ) {
+uint16_t Socket::hton_port( uint16_t port ) {
 	return htons( port );
 }
 
-bool Socket::ntoh_ip( unsigned long ip, char *buf, size_t len ) {
+bool Socket::ntoh_ip( uint32_t ip, char *buf, size_t len ) {
 	struct in_addr addr;
 	addr.s_addr = ip;
 	if ( ! inet_ntop( AF_INET, &addr, buf, len ) ) {
@@ -288,7 +288,7 @@ bool Socket::ntoh_ip( unsigned long ip, char *buf, size_t len ) {
 	return true;
 }
 
-bool Socket::ntoh_port( unsigned short port, char *buf, size_t len ) {
+bool Socket::ntoh_port( uint16_t port, char *buf, size_t len ) {
 	port = ntohs( port );
 	if ( snprintf( buf, len, "%hu", port ) <= 0 ) {
 		return false;
@@ -296,6 +296,6 @@ bool Socket::ntoh_port( unsigned short port, char *buf, size_t len ) {
 	return true;
 }
 
-unsigned short Socket::ntoh_port( unsigned short port ) {
+uint16_t Socket::ntoh_port( uint16_t port ) {
 	return ntohs( port );
 }

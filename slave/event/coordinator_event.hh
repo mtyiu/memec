@@ -14,8 +14,14 @@ class CoordinatorEvent : public Event {
 public:
 	CoordinatorEventType type;
 	CoordinatorSocket *socket;
+	union {
+		struct {
+			uint32_t addr;
+			uint16_t port;
+		} address;
+	} message;
 
-	void reqRegister( CoordinatorSocket *socket );
+	void reqRegister( CoordinatorSocket *socket, uint32_t addr, uint16_t port );
 	void sync( CoordinatorSocket *socket );
 	void pending( CoordinatorSocket *socket );
 };

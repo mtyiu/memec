@@ -184,6 +184,19 @@ size_t Protocol::generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t op
 	return bytes;
 }
 
+size_t Protocol::generateAddressHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t addr, uint16_t port ) {
+	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_ADDRESS_SIZE );
+
+	// Already in network-byte order
+	*( ( uint32_t * )( buf     ) ) = addr;
+	*( ( uint16_t * )( buf + 4 ) ) = port;
+
+	bytes += PROTO_ADDRESS_SIZE;
+
+	return bytes;
+}
+
 bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t &opcode, uint32_t &length, char *buf, size_t size ) {
 	if ( size < 8 )
 		return false;
@@ -433,6 +446,17 @@ bool Protocol::parseSlaveSyncHeader( size_t offset, uint8_t &keySize, uint8_t &o
 	return true;
 }
 
+bool Protocol::parseAddressHeader( size_t offset, uint32_t &addr, uint16_t &port, char *buf, size_t size ) {
+	if ( size < PROTO_ADDRESS_SIZE )
+		return false;
+
+	char *ptr = buf + offset;
+	addr = *( ( uint32_t * )( ptr     ) );
+	port = *( ( uint16_t * )( ptr + 4 ) );
+
+	return true;
+}
+
 Protocol::Protocol( Role role ) {
 	this->buffer.size = 0;
 	this->buffer.send = 0;
@@ -651,6 +675,19 @@ bool Protocol::parseSlaveSyncHeader( struct SlaveSyncHeader &header, size_t &byt
 	);
 	bytes = PROTO_SLAVE_SYNC_PER_SIZE + header.keySize;
 	return ret;
+}
+
+bool Protocol::parseAddressHeader( struct AddressHeader &header, char *buf, size_t size, size_t offset ) {
+	if ( ! buf || ! size ) {
+		buf = this->buffer.recv;
+		size = this->buffer.size;
+	}
+	return this->parseAddressHeader(
+		offset,
+		header.addr,
+		header.port,
+		buf, size
+	);
 }
 
 size_t Protocol::getSuggestedBufferSize( uint32_t keySize, uint32_t chunkSize ) {

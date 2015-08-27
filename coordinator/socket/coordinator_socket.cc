@@ -9,10 +9,10 @@ CoordinatorSocket::CoordinatorSocket() {
 	this->isRunning = false;
 	this->tid = 0;
 	this->epoll = 0;
-	this->buffer.size = PROTO_HEADER_SIZE;
+	this->buffer.size = PROTO_HEADER_SIZE + 4 + 2;
 }
 
-bool CoordinatorSocket::init( int type, unsigned long addr, unsigned short port, int numSlaves, EPoll *epoll ) {
+bool CoordinatorSocket::init( int type, uint32_t addr, uint16_t port, int numSlaves, EPoll *epoll ) {
 	this->epoll = epoll;
 	bool ret = (
 		Socket::init( type, addr, port ) &&
@@ -115,12 +115,15 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 				return false;
 			} else if ( ( size_t ) ret == socket->buffer.size ) {
 				ProtocolHeader header;
-				socket->protocol.parseHeader( header, socket->buffer.data, socket->buffer.size );
+				bool ret = socket->protocol.parseHeader( header, socket->buffer.data, socket->buffer.size );
 				// Register message expected
-				if ( header.magic == PROTO_MAGIC_REQUEST && header.opcode == PROTO_OPCODE_REGISTER ) {
+				if ( ret && header.magic == PROTO_MAGIC_REQUEST && header.opcode == PROTO_OPCODE_REGISTER ) {
+					struct AddressHeader addressHeader;
+					socket->protocol.parseAddressHeader( addressHeader, socket->buffer.data + PROTO_HEADER_SIZE, socket->buffer.size - PROTO_HEADER_SIZE );
 					if ( header.from == PROTO_MAGIC_FROM_MASTER ) {
 						MasterSocket masterSocket;
 						masterSocket.init( fd, *addr );
+						masterSocket.setListenAddr( addressHeader.addr, addressHeader.port );
 						coordinator->sockets.masters.set( fd, masterSocket );
 
 						MasterEvent event;
@@ -129,6 +132,7 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 					} else if ( header.from == PROTO_MAGIC_FROM_SLAVE ) {
 						SlaveSocket slaveSocket;
 						slaveSocket.init( fd, *addr );
+						slaveSocket.setListenAddr( addressHeader.addr, addressHeader.port );
 						coordinator->sockets.slaves.set( fd, slaveSocket );
 
 						SlaveSocket *s = coordinator->sockets.slaves.get( fd );

@@ -12,7 +12,7 @@ MasterSocket::MasterSocket() {
 	this->buffer.size = PROTO_HEADER_SIZE;
 }
 
-bool MasterSocket::init( int type, unsigned long addr, unsigned short port, EPoll *epoll ) {
+bool MasterSocket::init( int type, uint32_t addr, uint16_t port, EPoll *epoll ) {
 	this->epoll = epoll;
 	return (
 		Socket::init( type, addr, port ) &&

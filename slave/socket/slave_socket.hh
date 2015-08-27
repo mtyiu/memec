@@ -17,12 +17,12 @@ public:
 	SlaveProtocol protocol;
 	struct {
 		size_t size;
-		char data[ PROTO_HEADER_SIZE ];
+		char data[ PROTO_HEADER_SIZE + 4 + 2 ];
 	} buffer;
 	char *identifier;
 
 	SlaveSocket();
-	bool init( int type, unsigned long addr, unsigned short port, char *name, EPoll *epoll );
+	bool init( int type, uint32_t addr, uint16_t port, char *name, EPoll *epoll );
 	bool start();
 	void stop();
 	void print( FILE *f = stdout );

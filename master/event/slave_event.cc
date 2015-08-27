@@ -1,8 +1,10 @@
 #include "slave_event.hh"
 
-void SlaveEvent::reqRegister( SlaveSocket *socket ) {
+void SlaveEvent::reqRegister( SlaveSocket *socket, uint32_t addr, uint16_t port ) {
 	this->type = SLAVE_EVENT_TYPE_REGISTER_REQUEST;
 	this->socket = socket;
+	this->message.address.addr = addr;
+	this->message.address.port = port;
 }
 
 void SlaveEvent::send( SlaveSocket *socket, MasterProtocol *protocol, size_t size, size_t index ) {

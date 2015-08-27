@@ -38,6 +38,7 @@ private:
 	static uint32_t dataChunkCount;
 	static uint32_t parityChunkCount;
 	static uint32_t chunkCount;
+	static ArrayMap<int, SlavePeerSocket> *slavePeers;
 	static Pending *pending;
 	static ServerAddr *slaveServerAddr;
 	static Coding *coding;
@@ -62,6 +63,8 @@ private:
 
 	SlavePeerSocket *getSlave( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded = false, bool *isDegraded = 0 );
 	SlavePeerSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded = false, bool *isDegraded = 0 );
+
+	bool handleSlaveConnectedMsg( CoordinatorEvent event, char *buf, size_t size );
 
 	bool handleGetRequest( MasterEvent event, char *buf, size_t size );
 	bool handleSetRequest( MasterEvent event, char *buf, size_t size );

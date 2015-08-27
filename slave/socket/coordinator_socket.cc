@@ -7,7 +7,7 @@ bool CoordinatorSocket::start() {
 	if ( this->connect() ) {
 		Slave *slave = Slave::getInstance();
 		CoordinatorEvent event;
-		event.reqRegister( this );
+		event.reqRegister( this, slave->config.slave.slave.addr.addr, slave->config.slave.slave.addr.port );
 		slave->eventQueue.insert( event );
 		return true;
 	}

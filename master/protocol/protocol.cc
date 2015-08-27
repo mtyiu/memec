@@ -10,22 +10,22 @@ void MasterProtocol::free() {
 	Protocol::free();
 }
 
-char *MasterProtocol::reqRegisterCoordinator( size_t &size ) {
-	size = this->generateHeader(
+char *MasterProtocol::reqRegisterCoordinator( size_t &size, uint32_t addr, uint16_t port ) {
+	size = this->generateAddressHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_COORDINATOR,
 		PROTO_OPCODE_REGISTER,
-		0
+		addr, port
 	);
 	return this->buffer.send;
 }
 
-char *MasterProtocol::reqRegisterSlave( size_t &size ) {
-	size = this->generateHeader(
+char *MasterProtocol::reqRegisterSlave( size_t &size, uint32_t addr, uint16_t port ) {
+	size = this->generateAddressHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_REGISTER,
-		0
+		addr, port
 	);
 	return this->buffer.send;
 }
