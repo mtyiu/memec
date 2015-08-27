@@ -10,14 +10,14 @@ MixedChunkBuffer::MixedChunkBuffer( ParityChunkBuffer *parityChunkBuffer ) {
 	this->buffer.parity = parityChunkBuffer;
 }
 
-void MixedChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode, uint32_t chunkId ) {
+void MixedChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode, uint32_t chunkId, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk ) {
 	switch( this->role ) {
 		case CBR_DATA:
 			this->buffer.data->set( key, keySize, value, valueSize, opcode );
 			break;
 		case CBR_PARITY:
 		default:
-			this->buffer.parity->set( key, keySize, value, valueSize, chunkId );
+			this->buffer.parity->set( key, keySize, value, valueSize, chunkId, dataChunks, dataChunk, parityChunk );
 			break;
 	}
 }

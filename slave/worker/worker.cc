@@ -757,7 +757,9 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size ) 
 		// TODO
 	}
 
-	SlaveWorker::chunkBuffer->at( listId )->set( header.key, header.keySize, header.value, header.valueSize, PROTO_OPCODE_SET, chunkId );
+	SlaveWorker::chunkBuffer->at( listId )->set(
+		header.key, header.keySize, header.value, header.valueSize, PROTO_OPCODE_SET, chunkId,
+		this->chunks, this->dataChunk, this->parityChunk );
 
 	Key key;
 	key.set( header.keySize, header.key );
@@ -1709,6 +1711,8 @@ bool SlaveWorker::init( GlobalConfig &globalConfig, SlaveConfig &slaveConfig, Wo
 	}
 	this->dataChunk->init( globalConfig.size.chunk );
 	this->parityChunk->init( globalConfig.size.chunk );
+	this->dataChunk->init();
+	this->parityChunk->init();
 	this->dataSlaveSockets = new SlavePeerSocket*[ SlaveWorker::dataChunkCount ];
 	this->paritySlaveSockets = new SlavePeerSocket*[ SlaveWorker::parityChunkCount ];
 	switch( this->role ) {

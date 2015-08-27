@@ -3,6 +3,7 @@
 
 uint32_t ChunkBuffer::capacity;
 uint32_t ChunkBuffer::dataChunkCount;
+Coding *ChunkBuffer::coding;
 MemoryPool<Chunk> *ChunkBuffer::chunkPool;
 MemoryPool<Stripe> *ChunkBuffer::stripePool;
 SlaveEventQueue *ChunkBuffer::eventQueue;
@@ -12,6 +13,7 @@ void ChunkBuffer::init() {
 	Slave *slave = Slave::getInstance();
 	ChunkBuffer::capacity = slave->config.global.size.chunk;
 	ChunkBuffer::dataChunkCount = slave->config.global.coding.params.getDataChunkCount();
+	ChunkBuffer::coding = slave->coding;
 	ChunkBuffer::chunkPool = slave->chunkPool;
 	ChunkBuffer::stripePool = slave->stripePool;
 	ChunkBuffer::eventQueue = &slave->eventQueue;

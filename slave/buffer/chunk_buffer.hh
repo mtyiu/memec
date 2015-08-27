@@ -5,6 +5,7 @@
 #include <pthread.h>
 #include "../ds/map.hh"
 #include "../event/event_queue.hh"
+#include "../../common/coding/coding.hh"
 #include "../../common/ds/chunk.hh"
 #include "../../common/ds/memory_pool.hh"
 #include "../../common/ds/stripe.hh"
@@ -18,6 +19,7 @@ protected:
 	uint32_t chunkId;                      // Chunk ID of this buffer
 	pthread_mutex_t lock;                  // Lock for the whole buffer
 
+	static Coding *coding;                 // Coding module
 	static MemoryPool<Chunk> *chunkPool;   // Memory pool for chunks
 	static MemoryPool<Stripe> *stripePool; // Memory pool for chunks
 	static SlaveEventQueue *eventQueue;    // Event queue
