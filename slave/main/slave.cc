@@ -529,8 +529,9 @@ void Slave::printPending( FILE *f ) {
 	) {
 		const ChunkUpdate &chunkUpdate = *chunkUpdateIt;
 		fprintf(
-			f, "%lu. Key: %.*s (size = %u, offset = %u, length = %u, value update offset = %u); target: ",
-			i, chunkUpdate.keySize, chunkUpdate.key, chunkUpdate.keySize,
+			f, "%lu. List ID: %u, stripe ID: %u, chunk ID: %u; Key: %.*s (key size = %u, offset = %u, length = %u, value update offset = %u); target: ",
+			i, chunkUpdate.listId, chunkUpdate.stripeId, chunkUpdate.chunkId,
+			chunkUpdate.keySize, chunkUpdate.key, chunkUpdate.keySize,
 			chunkUpdate.offset, chunkUpdate.length, chunkUpdate.valueUpdateOffset
 		);
 		if ( chunkUpdate.ptr )
@@ -553,8 +554,9 @@ void Slave::printPending( FILE *f ) {
 	) {
 		const ChunkUpdate &chunkUpdate = *chunkUpdateIt;
 		fprintf(
-			f, "%lu. Key: %.*s (size = %u, offset = %u, length = %u); target: ",
-			i, chunkUpdate.keySize, chunkUpdate.key, chunkUpdate.keySize,
+			f, "%lu. List ID: %u, stripe ID: %u, chunk ID: %u; Key: %.*s (key size = %u, offset = %u, length = %u); target: ",
+			i, chunkUpdate.listId, chunkUpdate.stripeId, chunkUpdate.chunkId,
+			chunkUpdate.keySize, chunkUpdate.key, chunkUpdate.keySize,
 			chunkUpdate.offset, chunkUpdate.length
 		);
 		if ( chunkUpdate.ptr )

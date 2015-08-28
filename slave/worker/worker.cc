@@ -851,12 +851,7 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 		keyValueUpdate.length = header.valueUpdateSize;
 
 		pthread_mutex_lock( &SlaveWorker::pending->masters.updateLock );
-		std::pair<std::set<KeyValueUpdate>::iterator, bool> result = SlaveWorker::pending->masters.update.insert( keyValueUpdate );
-		if ( ! result.second ) {
-			printf( "-------------------------- update: fail (existed key: %.*s (size = %u) vs. %.*s (size = %u))\n", result.first->size, result.first->data, result.first->size, header.keySize, header.key, header.keySize );
-			printf( "<1: %s\n", *result.first < keyValueUpdate ? "yes" : "no" );
-			printf( "<2: %s\n", keyValueUpdate < *result.first ? "yes" : "no" );
-		}
+		SlaveWorker::pending->masters.update.insert( keyValueUpdate );
 		pthread_mutex_unlock( &SlaveWorker::pending->masters.updateLock );
 
 		// Compute delta and perform update
@@ -881,7 +876,7 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 
 		// Send UPDATE_CHUNK requests to parity slaves
 		for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
-			key.ptr = ( void * ) this->paritySlaveSockets[ i ];
+			chunkUpdate.ptr = ( void * ) this->paritySlaveSockets[ i ];
 
 			pthread_mutex_lock( &SlaveWorker::pending->slavePeers.updateLock );
 			SlaveWorker::pending->slavePeers.updateChunk.insert( chunkUpdate );
@@ -1244,10 +1239,11 @@ bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success,
 		it = SlaveWorker::pending->masters.update.lower_bound( keyValueUpdate );
 		if ( it == SlaveWorker::pending->masters.update.end() || ! keyValueUpdate.equal( *it ) ) {
 			pthread_mutex_unlock( &SlaveWorker::pending->masters.updateLock );
-			__ERROR__( "SlaveWorker", "handleUpdateChunkResponse", "Cannot find a pending master UPDATE request that matches the response. This message will be discarded (key = %.*s, offset = %u, length = %u).", keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.offset, keyValueUpdate.length );
+			__ERROR__( "SlaveWorker", "handleUpdateChunkResponse", "Cannot find a pending master UPDATE request that matches the response. This message will be discarded." );
 			return false;
 		}
 		keyValueUpdate = *it;
+		SlaveWorker::pending->masters.update.erase( it );
 		pthread_mutex_unlock( &SlaveWorker::pending->masters.updateLock );
 
 		key.set( keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.ptr );

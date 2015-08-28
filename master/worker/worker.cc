@@ -867,6 +867,7 @@ bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, char *b
 		__ERROR__( "MasterWorker", "handleUpdateResponse", "Cannot find a pending slave UPDATE request that matches the response. This message will be discarded." );
 		return false;
 	}
+	MasterWorker::pending->slaves.update.erase( it );
 	pthread_mutex_unlock( &MasterWorker::pending->slaves.updateLock );
 
 	keyValueUpdate.ptr = 0;
