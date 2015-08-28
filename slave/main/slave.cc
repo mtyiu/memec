@@ -317,7 +317,6 @@ void Slave::info( FILE *f ) {
 
 void Slave::debug( FILE *f ) {
 	int i, len;
-	/*
 	fprintf( f, "Slave socket\n------------\n" );
 	this->sockets.self.print( f );
 
@@ -365,7 +364,6 @@ void Slave::debug( FILE *f ) {
 	this->sockets.self.printThread();
 
 	fprintf( f, "\n" );
-	*/
 
 	fprintf( f, "\nSlave peer sockets\n------------------\n" );
 	for ( i = 0, len = this->sockets.slavePeers.size(); i < len; i++ ) {

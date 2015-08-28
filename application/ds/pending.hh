@@ -10,7 +10,10 @@ public:
 	uint32_t offset, length;
 
 	bool operator<( const KeyValueUpdate &k ) const {
-		if ( ! Key::operator<( k ) )
+		if ( Key::operator<( k ) )
+			return true;
+
+		if ( this->ptr > k.ptr )
 			return false;
 
 		if ( this->offset < k.offset )

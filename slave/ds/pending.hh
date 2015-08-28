@@ -29,7 +29,10 @@ public:
 
 	bool operator<( const ChunkUpdate &m ) const {
 		int ret;
-		if ( ! Metadata::operator<( m ) )
+		if ( Metadata::operator<( m ) )
+			return true;
+
+		if ( this->chunkId > m.chunkId )
 			return false;
 
 		if ( this->offset < m.offset )
@@ -128,6 +131,9 @@ public:
 	bool operator<( const DegradedOp &m ) const {
 		if ( Metadata::operator<( m ) )
 			return true;
+
+		if ( this->chunkId > m.chunkId )
+			return false;
 
 		if ( this->listId == m.listId && this->stripeId == m.stripeId && this->chunkId == m.chunkId ) {
 			if ( this->opcode < m.opcode )

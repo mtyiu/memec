@@ -47,11 +47,13 @@ public:
 			return true;
 		if ( this->size > k.size )
 			return false;
+
 		ret = strncmp( this->data, k.data, this->size );
 		if ( ret < 0 )
 			return true;
 		if ( ret > 0 )
 			return false;
+
 		return this->ptr < k.ptr;
 	}
 };

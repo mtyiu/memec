@@ -108,6 +108,42 @@ void ParityChunkBuffer::flush( uint32_t stripeId, Chunk *chunk ) {
 }
 
 void ParityChunkBuffer::print( FILE *f ) {
+	int width = 16;
+	int numPending = 0;
+	double occupied;
+
+	fprintf(
+		f,
+		"- %-*s : %s\n"
+		"- %-*s : %u\n"
+		"- %-*s :\n",
+		width, "Role", "Dummy Data chunk buffer",
+		width, "Chunk size", ChunkBuffer::capacity,
+		width, "Statistics (occupied / total)"
+	);
+	for (
+		std::map<uint32_t, ParityChunkWrapper>::iterator it = this->chunks.begin();
+		it != this->chunks.end();
+		it++
+	) {
+		ParityChunkWrapper &wrapper = it->second;
+		if ( wrapper.pending ) {
+			numPending++;
+			occupied = ( double ) wrapper.chunk->size / ChunkBuffer::capacity * 100.0;
+			fprintf(
+				f,
+				"\t%u. [#%u] %u / %u (%5.2lf%%) (pending: %u)\n",
+				numPending, wrapper.chunk->metadata.stripeId, wrapper.chunk->size, ChunkBuffer::capacity, occupied,
+				wrapper.pending
+			);
+			// The pending number does not necessarily equal to the number of data chunks in the dummy data chunk buffer as they may not have been allocated!
+		}
+	}
+
+	for ( uint32_t i = 0; i < ChunkBuffer::dataChunkCount; i++ ) {
+		fprintf( f, "\n*** Dummy Data chunk #%u ***\n", i );
+		this->dummyDataChunkBuffer[ i ]->print( f );
+	}
 }
 
 void ParityChunkBuffer::stop() {}
