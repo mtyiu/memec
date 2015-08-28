@@ -20,8 +20,10 @@ EXTERNAL_LIB= \
 	$(PLIO_SRC_ROOT)/common/protocol/protocol.o \
 	$(PLIO_SRC_ROOT)/common/socket/socket.o \
 	$(PLIO_SRC_ROOT)/common/socket/epoll.o \
+	$(PLIO_SRC_ROOT)/lib/death_handler/death_handler.o \
 	$(PLIO_SRC_ROOT)/lib/inih/ini.o \
-	-lrt
+	-lrt \
+	-ldl
 
 .PHONY: clean
 

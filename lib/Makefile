@@ -1,5 +1,6 @@
 TARGET= \
-	inih
+	inih \
+	death_handler
 
 .PHONY: all $(TARGET)
 

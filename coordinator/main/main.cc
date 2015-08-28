@@ -3,6 +3,7 @@
 #include <getopt.h>
 #include "coordinator.hh"
 #include "../../common/util/option.hh"
+#include "../../lib/death_handler/death_handler.h"
 
 int main( int argc, char **argv ) {
 	int opt, ret = 0;
@@ -18,6 +19,7 @@ int main( int argc, char **argv ) {
 		{ "verbose", no_argument, NULL, 'v' },
 		{ 0, 0, 0, 0 }
 	};
+	Debug::DeathHandler dh;
 
 	//////////////////////////////////
 	// Parse command-line arguments //
@@ -86,6 +88,6 @@ usage:
 		"  -h, --help         Display this help and exit\n",
 		argv[ 0 ]
 	);
-	
+
 	return ret;
 }
