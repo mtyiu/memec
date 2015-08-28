@@ -780,11 +780,11 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size ) 
 		__ERROR__( "SlaveWorker", "handleSetRequest", "Invalid SET request." );
 		return false;
 	}
-	__DEBUG__(
-		BLUE, "SlaveWorker", "handleSetRequest",
-		"[SET] Key: %.*s (key size = %u); Value: (value size = %u)",
-		( int ) header.keySize, header.key, header.keySize, header.valueSize
-	);
+	// __ERROR__(
+	// 	"SlaveWorker", "handleSetRequest",
+	// 	"[SET] Key: %.*s (key size = %u); Value: (value size = %u)",
+	// 	( int ) header.keySize, header.key, header.keySize, header.valueSize
+	// );
 
 	// Detect degraded SET
 	bool isParity;
@@ -794,7 +794,7 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size ) 
 		// TODO
 	}
 
-	printf( "Reading chunk buffer #%u...\n", listId );
+	// printf( "Reading chunk buffer #%u...\n", listId );
 	SlaveWorker::chunkBuffer->at( listId )->set(
 		header.key, header.keySize, header.value, header.valueSize, PROTO_OPCODE_SET, chunkId,
 		this->chunks, this->dataChunk, this->parityChunk

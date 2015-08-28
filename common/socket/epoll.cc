@@ -91,6 +91,8 @@ bool EPoll::start( bool (*handler)( int, uint32_t, void * ), void *data ) {
 	while( this->isRunning ) {
 		numEvents = epoll_pwait( this->efd, this->events, this->maxEvents, this->timeout, &sigmask );
 		if ( numEvents == -1 ) {
+			if ( errno == EINTR )
+				continue; // A signal interrupted epoll_pwait(); simply ignore it!
 			__ERROR__( "EPoll", "start", "%s", strerror( errno ) );
 			this->isRunning = false;
 			return false;

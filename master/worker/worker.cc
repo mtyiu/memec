@@ -795,6 +795,11 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 		__ERROR__( "MasterWorker", "handleSetResponse", "Invalid SET response." );
 		return false;
 	}
+	// __ERROR__(
+	// 	"MasterWorker", "handleSetResponse",
+	// 	"[SET] Key: %.*s (key size = %u)",
+	// 	( int ) header.keySize, header.key, header.keySize
+	// );
 
 	int pending;
 	std::set<Key>::iterator it;
@@ -817,7 +822,7 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 	it = MasterWorker::pending->slaves.set.lower_bound( key );
 	for ( pending = 0; it != MasterWorker::pending->slaves.set.end() && key.equal( *it ); pending++, it++ );
 	pthread_mutex_unlock( &MasterWorker::pending->slaves.setLock );
-	__ERROR__( "MasterWorker", "handleSetResponse", "Pending slave SET requests = %d.", pending );
+	// __ERROR__( "MasterWorker", "handleSetResponse", "Pending slave SET requests = %d.", pending );
 
 	if ( pending == 0 ) {
 		// Only send application SET response when the number of pending slave SET requests equal 0
