@@ -6,13 +6,9 @@ bool MasterSocket::start() {
 }
 
 ssize_t MasterSocket::send( char *buf, size_t ulen, bool &connected ) {
-	ssize_t bytes = Socket::send( this->sockfd, buf, ulen, connected );
-	__DEBUG__( MAGENTA, "MasterSocket", "send", "Sent %ld bytes...", bytes );
-	return bytes;
+	return Socket::send( this->sockfd, buf, ulen, connected );
 }
 
 ssize_t MasterSocket::recv( char *buf, size_t ulen, bool &connected, bool wait ) {
-	ssize_t bytes = Socket::recv( this->sockfd, buf, ulen, connected, wait );
-	__DEBUG__( MAGENTA, "MasterSocket", "recv", "Received %ld bytes...", bytes );
-	return bytes;
+	return Socket::recv( this->sockfd, buf, ulen, connected, wait );
 }

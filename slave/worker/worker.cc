@@ -51,7 +51,6 @@ void SlaveWorker::dispatch( CodingEvent event ) {
 
 	switch( event.type ) {
 		case CODING_EVENT_TYPE_ENCODE:
-			__ERROR__( "SlaveWorker", "dispatch", "Received an CODING_EVENT_TYPE_ENCODE event." );
 			parityChunkId = event.message.stripe->get( dataChunks, parityChunk );
 			SlaveWorker::coding->encode( dataChunks, parityChunk, parityChunkId );
 
@@ -178,7 +177,6 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 }
 
 void SlaveWorker::dispatch( IOEvent event ) {
-	__ERROR__( "SlaveWorker", "dispatch", "Received an I/O event." );
 	switch( event.type ) {
 		case IO_EVENT_TYPE_FLUSH_CHUNK:
 			this->storage->write(

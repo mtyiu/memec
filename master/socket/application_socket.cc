@@ -6,12 +6,8 @@ bool ApplicationSocket::start() {
 }
 
 ssize_t ApplicationSocket::send( char *buf, size_t ulen, bool &connected ) {
-	ssize_t bytes = Socket::send( this->sockfd, buf, ulen, connected );
-	__DEBUG__( MAGENTA, "ApplicationSocket", "send", "Sent %ld bytes...", bytes );
-	return bytes;
+	return Socket::send( this->sockfd, buf, ulen, connected );
 }
 ssize_t ApplicationSocket::recv( char *buf, size_t ulen, bool &connected, bool wait ) {
-	ssize_t bytes = Socket::recv( this->sockfd, buf, ulen, connected, wait );
-	__DEBUG__( MAGENTA, "ApplicationSocket", "recv", "Received %ld bytes...", bytes );
-	return bytes;
+	return Socket::recv( this->sockfd, buf, ulen, connected, wait );
 }

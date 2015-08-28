@@ -87,7 +87,7 @@ public class PLIO {
       }
       if ( bytes == Protocol.PROTO_HEADER_SIZE ) {
          this.protocol.parseHeader( bytes );
-         this.debug( this.protocol.header.toString() );
+         // this.debug( this.protocol.header.toString() );
       }
       return true;
    }
@@ -139,7 +139,7 @@ public class PLIO {
       }
       if ( bytes == Protocol.PROTO_HEADER_SIZE ) {
          this.protocol.parseHeader( bytes );
-         this.debug( this.protocol.header.toString() );
+         // this.debug( this.protocol.header.toString() );
       }
 
       try {
@@ -151,11 +151,11 @@ public class PLIO {
       if ( bytes == this.protocol.header.length ) {
          if ( this.protocol.header.isSuccessful() ) {
             this.protocol.parseKeyValueHeader( bytes, 0 );
-            this.debug( this.protocol.keyValueHeader.toString() );
+            // this.debug( this.protocol.keyValueHeader.toString() );
             return this.protocol.keyValueHeader.value();
          } else {
             this.protocol.parseKeyHeader( bytes, 0 );
-            this.debug( this.protocol.keyHeader.toString() );
+            // this.debug( this.protocol.keyHeader.toString() );
             return null;
          }
       }
@@ -170,7 +170,6 @@ public class PLIO {
          keySize, key,
          valueSize, value
       );
-      System.out.println( "set() is sending " + bytes + " bytes." );
       try {
          this.out.write( this.protocol.buf, 0, bytes );
       } catch( IOException e ) {
@@ -186,7 +185,7 @@ public class PLIO {
       }
       if ( bytes == Protocol.PROTO_HEADER_SIZE ) {
          this.protocol.parseHeader( bytes );
-         this.debug( this.protocol.header.toString() );
+         // this.debug( this.protocol.header.toString() );
       }
 
       try {
@@ -197,7 +196,7 @@ public class PLIO {
       }
       if ( bytes == this.protocol.header.length ) {
          this.protocol.parseKeyHeader( bytes, 0 );
-         this.debug( this.protocol.keyHeader.toString() );
+         // this.debug( this.protocol.keyHeader.toString() );
       }
       return true;
    }
@@ -225,7 +224,7 @@ public class PLIO {
       }
       if ( bytes == Protocol.PROTO_HEADER_SIZE ) {
          this.protocol.parseHeader( bytes );
-         this.debug( this.protocol.header.toString() );
+         // this.debug( this.protocol.header.toString() );
       }
 
       try {
@@ -236,7 +235,7 @@ public class PLIO {
       }
       if ( bytes == this.protocol.header.length ) {
          this.protocol.parseKeyValueUpdateHeader( bytes, 0 );
-         this.debug( this.protocol.keyValueUpdateHeader.toString() );
+         // this.debug( this.protocol.keyValueUpdateHeader.toString() );
       }
       return true;
    }
@@ -263,7 +262,7 @@ public class PLIO {
       }
       if ( bytes == Protocol.PROTO_HEADER_SIZE ) {
          this.protocol.parseHeader( bytes );
-         this.debug( this.protocol.header.toString() );
+         // this.debug( this.protocol.header.toString() );
       }
 
       try {
@@ -274,7 +273,7 @@ public class PLIO {
       }
       if ( bytes == this.protocol.header.length ) {
          this.protocol.parseKeyHeader( bytes, 0 );
-         this.debug( this.protocol.keyHeader.toString() );
+         // this.debug( this.protocol.keyHeader.toString() );
       }
       return true;
    }
