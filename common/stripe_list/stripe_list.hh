@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstring>
 #include <cassert>
+#include <stdint.h>
 #include "../ds/array_map.hh"
 #include "../ds/bitmask_array.hh"
 #include "../hash/consistent_hash.hh"
@@ -192,7 +193,7 @@ public:
 		fprintf( f, "### Stripe List ###\n" );
 		for ( i = 0; i < this->numLists; i++ ) {
 			first = true;
-			fprintf( f, "#%u: ((", ( i + 1 ) );
+			fprintf( f, "#%u: ((", i );
 			for ( j = 0; j < this->numSlaves; j++ ) {
 				if ( this->data.check( i, j ) ) {
 					fprintf( f, "%s%u", first ? "" : ", ", j );
@@ -216,6 +217,10 @@ public:
 		fprintf( f, "\n- Cost vector   :" );
 		for ( uint32_t i = 0; i < this->numSlaves; i++ )
 			fprintf( f, " %d", this->cost[ i ] );
+
+		fprintf( f, "\n\n" );
+
+		this->listRing.print( f );
 
 		fprintf( f, "\n" );
 	}

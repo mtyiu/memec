@@ -794,7 +794,6 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size ) 
 		// TODO
 	}
 
-	// printf( "Reading chunk buffer #%u...\n", listId );
 	SlaveWorker::chunkBuffer->at( listId )->set(
 		header.key, header.keySize, header.value, header.valueSize, PROTO_OPCODE_SET, chunkId,
 		this->chunks, this->dataChunk, this->parityChunk

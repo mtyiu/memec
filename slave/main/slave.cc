@@ -305,8 +305,7 @@ void Slave::info( FILE *f ) {
 	fprintf( f, "\n### Stripe List Index ###\n" );
 	for ( int i = 0, size = this->stripeListIndex.size(); i < size; i++ ) {
 		fprintf(
-			f, "%d. List #%d: %s chunk #%d\n",
-			i + 1,
+			f, "%d. List #%d: %s chunk #%d\n", i,
 			this->stripeListIndex[ i ].listId,
 			this->stripeListIndex[ i ].isParity ? "Parity" : "Data",
 			this->stripeListIndex[ i ].chunkId

@@ -22,7 +22,7 @@ public:
 		unsigned int n = n1 + n2;
 		while ( n ) {
 			hash *= scale;
-			if ( n < n1 )
+			if ( n > n2 )
 				hash += *data1++;
 			else
 				hash += *data2++;
@@ -38,9 +38,9 @@ public:
 		unsigned int n = n1 + n2 + n3;
 		while ( n ) {
 			hash *= scale;
-			if ( n < n1 )
+			if ( n > n2 + n3 )
 				hash += *data1++;
-			else if ( n < n1 + n2 )
+			else if ( n > n3 )
 				hash += *data2++;
 			else
 				hash += *data3++;

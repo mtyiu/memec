@@ -61,6 +61,24 @@ public:
 			it = this->ring.begin();
 		return it->second;
 	}
+
+	void print( FILE *f = stdout ) {
+		fprintf( f,
+			"Consistent Hash Ring\n"
+			"--------------------\n"
+		);
+		unsigned int i = 0;
+		for (
+			typename std::map<unsigned int, T>::iterator it = this->ring.begin();
+			it != this->ring.end();
+			it++
+		) {
+			fprintf( f,
+				"%u. %u |--> %u\n",
+				++i, it->first, it->second
+			);
+		}
+	}
 };
 
 #endif
