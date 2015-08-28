@@ -32,6 +32,8 @@ protected:
 		pthread_mutex_t lock;
 	} pending;
 
+	static EPoll *epoll;
+
 	bool setSockOpt( int level, int optionName );
 	bool setReuse();
 	bool setNoDelay();
@@ -48,6 +50,7 @@ public:
 		return this->sockfd;
 	}
 	Socket();
+	static void init( EPoll *epoll );
 	bool init( int type, uint32_t addr, uint16_t port, bool block = false );
 	bool init( int sockfd, struct sockaddr_in addr );
 	virtual bool init( ServerAddr &addr, EPoll *epoll );

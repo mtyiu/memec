@@ -19,7 +19,7 @@ bool SlaveSocket::init( int type, uint32_t addr, uint16_t port, char *name, EPol
 	return (
 		Socket::init( type, addr, port ) &&
 		this->listen() &&
-		epoll->add( this->sockfd, EPOLL_EVENT_SET )
+		epoll->add( this->sockfd, EPOLL_EVENT_LISTEN )
 	);
 }
 
@@ -150,7 +150,6 @@ bool SlaveSocket::handler( int fd, uint32_t events, void *data ) {
 						}
 
 						if ( s ) {
-							printf( "[REQ] Register slave peer: received\n" );
 							SlavePeerEvent event;
 							event.resRegister( s, true );
 							slave->eventQueue.insert( event );
@@ -176,9 +175,10 @@ bool SlaveSocket::handler( int fd, uint32_t events, void *data ) {
 				return false;
 			}
 		} else {
+			int index;
 			MasterSocket *masterSocket = slave->sockets.masters.get( fd );
 			CoordinatorSocket *coordinatorSocket = masterSocket ? 0 : slave->sockets.coordinators.get( fd );
-			SlavePeerSocket *slavePeerSocket = ( masterSocket || coordinatorSocket ) ? 0 : slave->sockets.slavePeers.get( fd );
+			SlavePeerSocket *slavePeerSocket = ( masterSocket || coordinatorSocket ) ? 0 : slave->sockets.slavePeers.get( fd, &index );
 
 			if ( masterSocket ) {
 				MasterEvent event;
@@ -193,7 +193,7 @@ bool SlaveSocket::handler( int fd, uint32_t events, void *data ) {
 				event.pending( slavePeerSocket );
 				slave->eventQueue.insert( event );
 			} else {
-				__ERROR__( "SlaveSocket", "handler", "Unknown socket." );
+				__ERROR__( "SlaveSocket", "handler", "Unknown socket: fd = %d.", fd );
 				return false;
 			}
 		}

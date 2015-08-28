@@ -17,7 +17,7 @@ bool MasterSocket::init( int type, uint32_t addr, uint16_t port, EPoll *epoll ) 
 	return (
 		Socket::init( type, addr, port ) &&
 		this->listen() &&
-		epoll->add( this->sockfd, EPOLL_EVENT_SET )
+		epoll->add( this->sockfd, EPOLL_EVENT_LISTEN )
 	);
 }
 

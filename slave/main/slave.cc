@@ -71,6 +71,7 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 		return false;
 	}
 	/* Vectors and other sockets */
+	Socket::init( &this->sockets.epoll );
 	this->sockets.coordinators.reserve( this->config.global.coordinators.size() );
 	for ( int i = 0, len = this->config.global.coordinators.size(); i < len; i++ ) {
 		CoordinatorSocket socket;
@@ -83,13 +84,14 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 	this->sockets.slavePeers.reserve( this->config.global.slaves.size() );
 	for ( int i = 0, len = this->config.global.slaves.size(); i < len; i++ ) {
 		SlavePeerSocket socket;
+		int tmpfd = - ( i + 1 );
 		socket.init(
+			tmpfd,
 			this->config.global.slaves[ i ],
 			&this->sockets.epoll,
 			i == mySlaveIndex // indicate whether this is a self-socket
 		);
-		int fd = -1;
-		this->sockets.slavePeers.set( fd, socket );
+		this->sockets.slavePeers.set( tmpfd, socket );
 	}
 	/* Coding */
 	this->coding = Coding::instantiate(
@@ -315,6 +317,7 @@ void Slave::info( FILE *f ) {
 
 void Slave::debug( FILE *f ) {
 	int i, len;
+	/*
 	fprintf( f, "Slave socket\n------------\n" );
 	this->sockets.self.print( f );
 
@@ -362,6 +365,14 @@ void Slave::debug( FILE *f ) {
 	this->sockets.self.printThread();
 
 	fprintf( f, "\n" );
+	*/
+
+	fprintf( f, "\nSlave peer sockets\n------------------\n" );
+	for ( i = 0, len = this->sockets.slavePeers.size(); i < len; i++ ) {
+		fprintf( f, "%d. ", i + 1 );
+		this->sockets.slavePeers[ i ].print( f );
+	}
+	if ( len == 0 ) fprintf( f, "(None)\n" );
 }
 
 void Slave::interactive() {

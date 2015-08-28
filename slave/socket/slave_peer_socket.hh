@@ -13,17 +13,16 @@ private:
 	void registerTo();
 
 public:
-	bool registered;
+	volatile bool registered;
 	bool self;
 
 	SlavePeerSocket();
-	bool init( ServerAddr &addr, EPoll *epoll, bool self );
+	bool init( int tmpfd, ServerAddr &addr, EPoll *epoll, bool self );
 	int init();
 	bool start();
 	void stop();
 	bool ready();
 	void free();
-	bool isMatched( ServerAddr &serverAddr );
 	bool setRecvFd( int fd, struct sockaddr_in *addr );
 	ssize_t send( char *buf, size_t ulen, bool &connected );
 	ssize_t recv( char *buf, size_t ulen, bool &connected, bool wait );

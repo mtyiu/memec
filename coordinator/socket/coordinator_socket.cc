@@ -17,7 +17,7 @@ bool CoordinatorSocket::init( int type, uint32_t addr, uint16_t port, int numSla
 	bool ret = (
 		Socket::init( type, addr, port ) &&
 		this->listen() &&
-		epoll->add( this->sockfd, EPOLL_EVENT_SET )
+		epoll->add( this->sockfd, EPOLL_EVENT_LISTEN )
 	);
 	if ( ret ) {
 		this->sockets.reserve( numSlaves );

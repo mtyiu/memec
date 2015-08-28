@@ -18,14 +18,14 @@ SlavePeerSocket::SlavePeerSocket() {
 	this->self = false;
 }
 
-bool SlavePeerSocket::init( ServerAddr &addr, EPoll *epoll, bool self ) {
+bool SlavePeerSocket::init( int tmpfd, ServerAddr &addr, EPoll *epoll, bool self ) {
 	this->identifier = strdup( addr.name );
 	this->self = self;
 	this->epoll = epoll;
 
 	this->mode = SOCKET_MODE_UNDEFINED;
 	this->connected = self;
-	this->sockfd = -1;
+	this->sockfd = tmpfd;
 	memset( &this->addr, 0, sizeof( this->addr ) );
 	this->type = addr.type;
 	this->addr.sin_family = AF_INET;
@@ -78,14 +78,6 @@ void SlavePeerSocket::free() {
 	}
 }
 
-bool SlavePeerSocket::isMatched( ServerAddr &serverAddr ) {
-	return (
-		serverAddr.addr == this->addr.sin_addr.s_addr &&
-		serverAddr.port == this->addr.sin_port &&
-		strcmp( serverAddr.name, this->identifier ) == 0
-	);
-}
-
 bool SlavePeerSocket::setRecvFd( int fd, struct sockaddr_in *addr ) {
 	bool ret = false;
 	this->received = true;
@@ -105,9 +97,7 @@ ssize_t SlavePeerSocket::send( char *buf, size_t ulen, bool &connected ) {
 		__ERROR__( "SlavePeerSocket", "send", "send() should not be called for self-socket!" );
 		return 0;
 	}
-	ssize_t bytes = Socket::send( this->sockfd, buf, ulen, connected );
-	__DEBUG__( MAGENTA, "SlavePeerSocket", "send", "Sent %ld bytes...", bytes );
-	return bytes;
+	return Socket::send( this->sockfd, buf, ulen, connected );
 }
 
 ssize_t SlavePeerSocket::recv( char *buf, size_t ulen, bool &connected, bool wait ) {
@@ -115,9 +105,7 @@ ssize_t SlavePeerSocket::recv( char *buf, size_t ulen, bool &connected, bool wai
 		__ERROR__( "SlavePeerSocket", "recv", "recv() should not be called for self-socket!" );
 		return 0;
 	}
-	ssize_t bytes = Socket::recv( this->sockfd, buf, ulen, connected, wait );
-	__DEBUG__( MAGENTA, "SlavePeerSocket", "recv", "Received %ld bytes...", bytes );
-	return bytes;
+	return Socket::recv( this->sockfd, buf, ulen, connected, wait );
 }
 
 void SlavePeerSocket::print( FILE *f ) {

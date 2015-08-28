@@ -63,6 +63,7 @@ bool Application::init( char *path, OptionList &options, bool verbose ) {
 		return false;
 	}
 	/* Vectors and other sockets */
+	Socket::init( &this->sockets.epoll );
 	this->sockets.masters.reserve( this->config.application.masters.size() );
 	for ( int i = 0, len = this->config.application.masters.size(); i < len; i++ ) {
 		MasterSocket socket;

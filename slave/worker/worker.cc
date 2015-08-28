@@ -366,7 +366,6 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		// Requests //
 		//////////////
 		case SLAVE_PEER_EVENT_TYPE_REGISTER_REQUEST:
-			printf( "[REQ] Register slave peer: sending\n" );
 			buffer.data = this->protocol.reqRegisterSlavePeer( buffer.size, SlaveWorker::slaveServerAddr );
 			break;
 		case SLAVE_PEER_EVENT_TYPE_UPDATE_CHUNK_REQUEST:
@@ -416,7 +415,6 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		///////////////
 		// Register
 		case SLAVE_PEER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
-			printf( "[RESP] Register slave peer: sending\n" );
 			success = true; // default is false
 		case SLAVE_PEER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resRegisterSlavePeer( buffer.size, success );
@@ -526,11 +524,9 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				case PROTO_OPCODE_REGISTER:
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
-							printf( "[REQ] Register slave peer: received\n" );
 							this->handleSlavePeerRegisterRequest( event.socket, buffer.data, buffer.size );
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
-							printf( "[RESP] Register slave peer: received\n" );
 							event.socket->registered = true;
 							break;
 						case PROTO_MAGIC_RESPONSE_FAILURE:

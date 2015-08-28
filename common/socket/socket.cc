@@ -9,6 +9,8 @@
 #include "socket.hh"
 #include "../util/debug.hh"
 
+EPoll *Socket::epoll;
+
 bool Socket::setSockOpt( int level, int optionName ) {
 	int optionValue = 1;
 	socklen_t optionLength = sizeof( optionValue );
@@ -114,7 +116,7 @@ ssize_t Socket::recv( int sockfd, char *buf, size_t ulen, bool &connected, bool 
 		ret = ::recv( sockfd, buf + bytes, len - bytes, 0 );
 		if ( ret == -1 ) {
 			if ( errno != EAGAIN ) {
-				__ERROR__( "Socket", "recv", "%s", strerror( errno ) );
+				__ERROR__( "Socket", "recv", "[%d] %s", this->sockfd, strerror( errno ) );
 				connected = false;
 				break;
 			} else {
@@ -132,6 +134,8 @@ ssize_t Socket::recv( int sockfd, char *buf, size_t ulen, bool &connected, bool 
 	// if ( connected && bytes > 0 )
 	// 	__DEBUG__( MAGENTA, "Socket", "recv", "Received %ld bytes.", bytes );
 	this->connected = connected;
+	if ( connected )
+		Socket::epoll->modify( sockfd, EPOLL_EVENT_SET );
 	return bytes;
 }
 
@@ -159,6 +163,10 @@ int Socket::accept( struct sockaddr_in *addrPtr, socklen_t *addrlenPtr ) {
 Socket::Socket() {
 	this->pending.size = 0;
 	pthread_mutex_init( &this->pending.lock, 0 );
+}
+
+void Socket::init( EPoll *epoll ) {
+	Socket::epoll = epoll;
 }
 
 bool Socket::init( int type, uint32_t addr, uint16_t port, bool block ) {

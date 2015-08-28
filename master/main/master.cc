@@ -41,6 +41,7 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 		return false;
 	}
 	/* Vectors and other sockets */
+	Socket::init( &this->sockets.epoll );
 	this->sockets.coordinators.reserve( this->config.global.coordinators.size() );
 	for ( int i = 0, len = this->config.global.coordinators.size(); i < len; i++ ) {
 		CoordinatorSocket socket;

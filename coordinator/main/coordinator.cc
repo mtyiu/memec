@@ -42,6 +42,7 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 		return false;
 	}
 	/* Vectors and other sockets */
+	Socket::init( &this->sockets.epoll );
 	this->sockets.masters.reserve( this->config.global.slaves.size() );
 	this->sockets.slaves.reserve( this->config.global.slaves.size() );
 	/* Workers and event queues */
@@ -121,7 +122,7 @@ bool Coordinator::start() {
 
 bool Coordinator::stop() {
 	if ( ! this->isRunning )
-		return false; 
+		return false;
 
 	int i, len;
 
