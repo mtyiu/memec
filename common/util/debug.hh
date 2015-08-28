@@ -41,7 +41,20 @@
 #else
 
 #define __DEBUG__(color, class_name, func, ...)
-#define __ERROR__(class_name, func, ...)
+
+#define __ERROR__(class_name, func, ...) do { \
+		int _len; \
+		char _buf[ DEBUG_STR_BUF_SIZE ]; \
+		_len = snprintf( _buf, DEBUG_STR_BUF_SIZE, "%s[%s::%s()] ", RED, \
+		                class_name, func ); \
+		_len += snprintf( _buf + _len, DEBUG_STR_BUF_SIZE - _len, __VA_ARGS__ ); \
+		if ( DEBUG_STR_BUF_SIZE - _len > ( int ) strlen( RESET ) ) \
+			_len += snprintf( _buf + _len, DEBUG_STR_BUF_SIZE - _len, RESET ); \
+		_len += snprintf( _buf + _len, DEBUG_STR_BUF_SIZE - _len, "\n" ); \
+		if ( ::write( 2, _buf, _len ) != _len ) { \
+			fprintf( stderr, "Cannot write debug message.\n" ); \
+		} \
+	} while( 0 )
 
 #endif
 

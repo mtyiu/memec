@@ -5,7 +5,7 @@ SLEEP_TIME=0.4
 screen -S coordinator -p 0 -X stuff "bin/coordinator -v $(printf '\r')"
 sleep ${SLEEP_TIME}
 
-for i in {1..4}; do
+for i in {1..8}; do
 	rm -rf /tmp/plio/slave${i}
 	mkdir -p /tmp/plio/slave${i} 2> /dev/null
 	screen -S slave${i} -p 0 -X stuff \
