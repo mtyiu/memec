@@ -14,14 +14,26 @@ Coding *Coding::instantiate( CodingScheme scheme, CodingParams &params, uint32_t
 
 	switch( scheme ) {
 		case CS_RAID0:
-			break;
+		{
+            RAID0Coding *coding;
+            coding = new RAID0Coding();
+            coding->init( params.getN() );
+			return coding;
+		}
 		case CS_RAID1:
-			break;
+		{
+            RAID1Coding *coding;
+            coding = new RAID1Coding();
+            coding->init( params.getN() );
+			return coding;
+		}
 		case CS_RAID5:
-            RAID5Coding *coding; 
+		{
+            RAID5Coding *coding;
             coding = new RAID5Coding();
             coding->init( params.getN() );
             return coding;
+		}
 		case CS_RS:
 			return new RSCoding( params.getK(), params.getM(), chunkSize );
 		case CS_EMBR:
@@ -43,8 +55,10 @@ Coding *Coding::instantiate( CodingScheme scheme, CodingParams &params, uint32_t
 void Coding::destroy( Coding *coding ) {
 	switch( coding->scheme ) {
 		case CS_RAID0:
+			delete static_cast<RAID0Coding *>( coding );
 			break;
 		case CS_RAID1:
+			delete static_cast<RAID1Coding *>( coding );
 			break;
 		case CS_RAID5:
 			delete static_cast<RAID5Coding *>( coding );

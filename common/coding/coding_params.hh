@@ -146,8 +146,9 @@ public:
 	inline uint32_t getDataChunkCount() {
 		switch( this->scheme ) {
 			case CS_RAID0:
-			case CS_RAID1:
 				return this->getN();
+			case CS_RAID1:
+				return 1;
 			case CS_RAID5:
 				return this->getN() - 1;
 			case CS_RS:
@@ -167,6 +168,10 @@ public:
 
 	inline uint32_t getParityChunkCount() {
 		switch( this->scheme ) {
+			case CS_RAID0:
+				return 0;
+			case CS_RAID1:
+				return this->getN() - 1;
 			case CS_RAID5:
 				return 1;
 			case CS_RS:

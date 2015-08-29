@@ -4,8 +4,6 @@ PLIO_SRC_ROOT=..
 LIBS=-pthread
 
 OBJS= \
-	coding/coding.o \
-	coding/raid5coding.o \
 	config/config.o \
 	config/global_config.o \
 	config/server_addr.o \
@@ -18,8 +16,8 @@ OBJS= \
 	socket/socket.o \
 	socket/epoll.o
 
-all: $(OBJS) 
-	$(MAKE) -C coding 
+all: $(OBJS)
+	$(MAKE) -C coding
 
 %.o: %.cc %.hh
 	$(CC) $(CFLAGS) $(INCLUDE) $(LIBS) -c -o $@ $<

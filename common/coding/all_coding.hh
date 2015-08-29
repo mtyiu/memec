@@ -1,7 +1,8 @@
 #include "coding.hh"
+#include "raid0coding.hh"
+#include "raid1coding.hh"
 #include "raid5coding.hh"
 #include "rdpcoding.hh"
 #include "cauchycoding.hh"
 #include "rscoding.hh"
 #include "evenoddcoding.hh"
-
