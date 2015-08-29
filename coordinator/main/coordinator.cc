@@ -142,10 +142,15 @@ bool Coordinator::stop() {
 		this->workers[ i ].join();
 
 	/* Sockets */
+	pthread_mutex_lock( &this->sockets.masters.lock );
 	for ( i = 0, len = this->sockets.masters.size(); i < len; i++ )
 		this->sockets.masters[ i ].stop();
+	pthread_mutex_unlock( &this->sockets.masters.lock );
+
+	pthread_mutex_lock( &this->sockets.slaves.lock );
 	for ( i = 0, len = this->sockets.slaves.size(); i < len; i++ )
 		this->sockets.slaves[ i ].stop();
+	pthread_mutex_unlock( &this->sockets.slaves.lock );
 
 	this->free();
 	this->isRunning = false;

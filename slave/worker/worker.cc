@@ -685,7 +685,7 @@ bool SlaveWorker::handleSlaveConnectedMsg( CoordinatorEvent event, char *buf, si
 
 	// Find the slave peer socket in the array map
 	int index = -1;
-	for ( int i = 0, len = slavePeers->values.size(); i < len; i++ ) {
+	for ( int i = 0, len = slavePeers->size(); i < len; i++ ) {
 		if ( slavePeers->values[ i ].equal( header.addr, header.port ) ) {
 			index = i;
 			break;
