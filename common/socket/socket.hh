@@ -43,6 +43,8 @@ protected:
 	bool connect();
 	ssize_t send( int sockfd, char *buf, size_t ulen, bool &connected );
 	ssize_t recv( int sockfd, char *buf, size_t ulen, bool &connected, bool wait = false );
+	ssize_t recvRem( int sockfd, char *buf, size_t ulen, char *prevBuf, size_t prevSize, bool &connected );
+	bool done( int sockfd );
 	int accept( struct sockaddr_in *addrPtr = 0, socklen_t *addrlenPtr = 0 );
 
 public:

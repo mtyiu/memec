@@ -122,6 +122,8 @@ bool MasterSocket::handler( int fd, uint32_t events, void *data ) {
 						applicationSocket.init( fd, *addr );
 						master->sockets.applications.set( fd, applicationSocket );
 
+						socket->done( fd ); // The socket is valid
+
 						ApplicationEvent event;
 						event.resRegister( master->sockets.applications.get( fd ) );
 						master->eventQueue.insert( event );

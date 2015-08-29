@@ -126,6 +126,8 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 						masterSocket.setListenAddr( addressHeader.addr, addressHeader.port );
 						coordinator->sockets.masters.set( fd, masterSocket );
 
+						socket->done( fd ); // The socket is valid
+
 						MasterEvent event;
 						event.resRegister( coordinator->sockets.masters.get( fd ) );
 						coordinator->eventQueue.insert( event );
@@ -134,6 +136,8 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 						slaveSocket.init( fd, *addr );
 						slaveSocket.setListenAddr( addressHeader.addr, addressHeader.port );
 						coordinator->sockets.slaves.set( fd, slaveSocket );
+
+						socket->done( fd ); // The socket is valid
 
 						SlaveSocket *s = coordinator->sockets.slaves.get( fd );
 

@@ -186,37 +186,21 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 		std::set<KeyValueUpdate>::iterator keyValueUpdateIt;
 		int fd;
 
-		ret = event.socket->recv(
-			this->protocol.buffer.recv,
-			this->protocol.buffer.size,
-			connected,
-			false
-		);
-		buffer.data = this->protocol.buffer.recv;
-		buffer.size = ret > 0 ? ( size_t ) ret : 0;
+		WORKER_RECEIVE_FROM_EVENT_SOCKET();
 		while ( buffer.size > 0 ) {
-			if ( ! this->protocol.parseHeader( header, buffer.data, buffer.size ) ) {
-				__ERROR__( "ApplicationWorker", "dispatch", "Undefined message (remaining bytes = %lu).", buffer.size );
-				break;
-			}
+			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "ApplicationWorker" );
 
 			buffer.data += PROTO_HEADER_SIZE;
 			buffer.size -= PROTO_HEADER_SIZE;
 			if ( header.from != PROTO_MAGIC_FROM_MASTER ) {
 				__ERROR__( "ApplicationWorker", "dispatch", "Invalid message source from master." );
-				return;
+				break;
 			}
 			bool success;
-			switch( header.magic ) {
-				case PROTO_MAGIC_RESPONSE_SUCCESS:
-					success = true;
-					break;
-				case PROTO_MAGIC_RESPONSE_FAILURE:
-					success = false;
-					break;
-				default:
-					__ERROR__( "ApplicationWorker", "dispatch", "Invalid magic code from master." );
-					return;
+			success = header.magic == PROTO_MAGIC_RESPONSE_SUCCESS;
+			if ( ! success && header.magic != PROTO_MAGIC_RESPONSE_FAILURE ) {
+				__ERROR__( "ApplicationWorker", "dispatch", "Invalid magic code from master." );
+				break;
 			}
 
 			switch( header.opcode ) {
@@ -237,7 +221,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 					it = ApplicationWorker::pending->masters.set.find( key );
 					if ( it == ApplicationWorker::pending->masters.set.end() ) {
 						__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending master SET request that matches the response. This message will be discarded." );
-						return;
+						goto quit_1;
 					}
 					ApplicationWorker::pending->masters.set.erase( it );
 					pthread_mutex_unlock( &ApplicationWorker::pending->masters.setLock );
@@ -248,7 +232,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 					it = ApplicationWorker::pending->application.set.lower_bound( key );
 					if ( it == ApplicationWorker::pending->application.set.end() || ! key.equal( *it ) ) {
 						__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending application SET request that matches the response. This message will be discarded." );
-						return;
+						goto quit_1;
 					}
 					key = *it;
 					ApplicationWorker::pending->application.set.erase( it );
@@ -272,7 +256,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 							key.ptr = ( void * ) event.socket;
 						} else {
 							__ERROR__( "ApplicationWorker", "dispatch", "Invalid key value header for GET." );
-							return;
+							goto quit_1;
 						}
 					} else {
 						if ( this->protocol.parseKeyHeader( keyHeader, buffer.data, buffer.size ) ) {
@@ -281,7 +265,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 							key.ptr = ( void * ) event.socket;
 						} else {
 							__ERROR__( "ApplicationWorker", "dispatch", "Invalid key header for GET." );
-							return;
+							goto quit_1;
 						}
 					}
 
@@ -289,7 +273,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 					it = ApplicationWorker::pending->masters.get.find( key );
 					if ( it == ApplicationWorker::pending->masters.get.end() ) {
 						__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending master GET request that matches the response. This message will be discarded. (key = %.*s)", key.size, key.data );
-						return;
+						goto quit_1;
 					}
 					ApplicationWorker::pending->masters.get.erase( it );
 					pthread_mutex_unlock( &ApplicationWorker::pending->masters.getLock );
@@ -300,7 +284,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 					it = ApplicationWorker::pending->application.get.lower_bound( key );
 					if ( it == ApplicationWorker::pending->application.get.end() || ! key.equal( *it ) ) {
 						__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending application GET request that matches the response. This message will be discarded." );
-						return;
+						goto quit_1;
 					}
 					key = *it;
 					ApplicationWorker::pending->application.get.erase( it );
@@ -334,7 +318,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 						keyValueUpdateIt = ApplicationWorker::pending->masters.update.find( keyValueUpdate );
 						if ( keyValueUpdateIt == ApplicationWorker::pending->masters.update.end() ) {
 							__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending master UPDATE request that matches the response. This message will be discarded. (key = %.*s)", keyValueUpdate.size, keyValueUpdate.data );
-							return;
+							goto quit_1;
 						}
 						ApplicationWorker::pending->masters.update.erase( keyValueUpdateIt );
 						pthread_mutex_unlock( &ApplicationWorker::pending->masters.updateLock );
@@ -345,7 +329,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 						keyValueUpdateIt = ApplicationWorker::pending->application.update.lower_bound( keyValueUpdate );
 						if ( keyValueUpdateIt == ApplicationWorker::pending->application.update.end() || ! keyValueUpdate.equal( *keyValueUpdateIt ) ) {
 							__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending application UPDATE request that matches the response. This message will be discarded. (key = %.*s, size = %u)", keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size );
-							return;
+							goto quit_1;
 						}
 						keyValueUpdate = *keyValueUpdateIt;
 						ApplicationWorker::pending->application.update.erase( keyValueUpdateIt );
@@ -371,7 +355,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 						it = ApplicationWorker::pending->masters.del.find( key );
 						if ( it == ApplicationWorker::pending->masters.del.end() ) {
 							__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending master DELETE request that matches the response. This message will be discarded. (key = %.*s)", key.size, key.data );
-							return;
+							goto quit_1;
 						}
 						ApplicationWorker::pending->masters.del.erase( it );
 						pthread_mutex_unlock( &ApplicationWorker::pending->masters.delLock );
@@ -382,7 +366,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 						it = ApplicationWorker::pending->application.del.lower_bound( key );
 						if ( it == ApplicationWorker::pending->application.del.end() || ! key.equal( *it ) ) {
 							__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending application DELETE request that matches the response. This message will be discarded." );
-							return;
+							goto quit_1;
 						}
 						key = *it;
 						ApplicationWorker::pending->application.del.erase( it );
@@ -400,11 +384,13 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 					break;
 				default:
 					__ERROR__( "ApplicationWorker", "dispatch", "Invalid opcode from master." );
-					return;
+					goto quit_1;
 			}
+quit_1:
 			buffer.data += header.length;
 			buffer.size -= header.length;
 		}
+		if ( connected ) event.socket->done();
 	}
 	if ( ! connected )
 		__ERROR__( "ApplicationWorker", "dispatch", "The master is disconnected." );

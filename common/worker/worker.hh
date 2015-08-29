@@ -4,6 +4,46 @@
 #include <cstdio>
 #include <pthread.h>
 
+#define WORKER_RECEIVE_FROM_EVENT_SOCKET() \
+	ret = event.socket->recv( \
+		this->protocol.buffer.recv, \
+		this->protocol.buffer.size, \
+		connected, \
+		false \
+	); \
+	buffer.data = this->protocol.buffer.recv; \
+	buffer.size = ret > 0 ? ( size_t ) ret : 0
+
+#define WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET(worker_name) \
+	if ( buffer.size < PROTO_HEADER_SIZE ) { \
+		ret = event.socket->recvRem( \
+			this->protocol.buffer.recv, \
+			PROTO_HEADER_SIZE, \
+			buffer.data, \
+			buffer.size, \
+			connected \
+		); \
+		buffer.data = this->protocol.buffer.recv; \
+		buffer.size = ret > 0 ? ( size_t ) ret : 0; \
+	} \
+	if ( ! connected || ! buffer.size ) break; \
+	if ( ! this->protocol.parseHeader( header, buffer.data, buffer.size ) ) { \
+		__ERROR__( worker_name, "dispatch", "Undefined message (remaining bytes = %lu).", buffer.size ); \
+		break; \
+	} \
+	if ( buffer.size < PROTO_HEADER_SIZE + header.length ) { \
+		ret = event.socket->recvRem( \
+			this->protocol.buffer.recv, \
+			PROTO_HEADER_SIZE + header.length, \
+			buffer.data, \
+			buffer.size, \
+			connected \
+		); \
+		buffer.data = this->protocol.buffer.recv; \
+		buffer.size = ret > 0 ? ( size_t ) ret : 0; \
+	} \
+	if ( ! connected ) break;
+
 class Worker {
 protected:
 	bool isRunning;

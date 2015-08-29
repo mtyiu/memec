@@ -108,32 +108,22 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 	} else {
 		// Parse requests from slaves
 		ProtocolHeader header;
-		ret = event.socket->recv(
-			this->protocol.buffer.recv,
-			this->protocol.buffer.size,
-			connected,
-			false
-		);
-		buffer.data = this->protocol.buffer.recv;
-		buffer.size = ret > 0 ? ( size_t ) ret : 0;
+		WORKER_RECEIVE_FROM_EVENT_SOCKET();
 		while( buffer.size > 0 ) {
-			if ( ! this->protocol.parseHeader( header, buffer.data, buffer.size ) ) {
-				__ERROR__( "CoordinatorWorker", "dispatch", "Undefined message (remaining bytes = %lu).", buffer.size );
-				break;
-			}
+			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "CoordinatorWorker" );
 
 			buffer.data += PROTO_HEADER_SIZE;
 			buffer.size -= PROTO_HEADER_SIZE;
 			// Validate message
 			if ( header.from != PROTO_MAGIC_FROM_SLAVE ) {
 				__ERROR__( "CoordinatorWorker", "dispatch", "Invalid message source from slave." );
-				continue;
+				goto quit_1;
 			}
 
 			if ( header.opcode == PROTO_OPCODE_SYNC ) {
 				if ( header.magic != PROTO_MAGIC_HEARTBEAT ) {
-						__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );
-						continue;
+					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );
+					goto quit_1;
 				}
 
 				size_t bytes, offset, count = 0;
@@ -174,9 +164,11 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			} else {
 				__ERROR__( "CoordinatorWorker", "dispatch", "Invalid opcode from slave." );
 			}
+quit_1:
 			buffer.data += header.length;
 			buffer.size -= header.length;
 		}
+		if ( connected ) event.socket->done();
 	}
 
 	if ( ! connected )

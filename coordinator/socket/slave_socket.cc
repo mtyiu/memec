@@ -16,3 +16,11 @@ ssize_t SlaveSocket::send( char *buf, size_t ulen, bool &connected ) {
 ssize_t SlaveSocket::recv( char *buf, size_t ulen, bool &connected, bool wait ) {
 	return Socket::recv( this->sockfd, buf, ulen, connected, wait );
 }
+
+ssize_t SlaveSocket::recvRem( char *buf, size_t expected, char *prevBuf, size_t prevSize, bool &connected ) {
+	return Socket::recvRem( this->sockfd, buf, expected, prevBuf, prevSize, connected );
+}
+
+bool SlaveSocket::done() {
+	return Socket::done( this->sockfd );
+}

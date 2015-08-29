@@ -108,6 +108,14 @@ ssize_t SlavePeerSocket::recv( char *buf, size_t ulen, bool &connected, bool wai
 	return Socket::recv( this->sockfd, buf, ulen, connected, wait );
 }
 
+ssize_t SlavePeerSocket::recvRem( char *buf, size_t expected, char *prevBuf, size_t prevSize, bool &connected ) {
+	return Socket::recvRem( this->sockfd, buf, expected, prevBuf, prevSize, connected );
+}
+
+bool SlavePeerSocket::done() {
+	return Socket::done( this->sockfd );
+}
+
 void SlavePeerSocket::print( FILE *f ) {
 	char buf[ 16 ];
 	Socket::ntoh_ip( this->addr.sin_addr.s_addr, buf, 16 );

@@ -134,9 +134,22 @@ ssize_t Socket::recv( int sockfd, char *buf, size_t ulen, bool &connected, bool 
 	// if ( connected && bytes > 0 )
 	// 	__DEBUG__( MAGENTA, "Socket", "recv", "Received %ld bytes.", bytes );
 	this->connected = connected;
-	if ( connected )
-		Socket::epoll->modify( sockfd, EPOLL_EVENT_SET );
 	return bytes;
+}
+
+ssize_t Socket::recvRem( int sockfd, char *buf, size_t expected, char *prevBuf, size_t prevSize, bool &connected ) {
+	ssize_t bytes;
+	if ( buf != prevBuf )
+		memmove( buf, prevBuf, prevSize );
+	buf += prevSize;
+	expected -= prevSize;
+	bytes = prevSize;
+	bytes += this->recv( sockfd, buf, expected, connected, true );
+	return bytes;
+}
+
+bool Socket::done( int sockfd ) {
+	return Socket::epoll->modify( sockfd, EPOLL_EVENT_SET );
 }
 
 int Socket::accept( struct sockaddr_in *addrPtr, socklen_t *addrlenPtr ) {

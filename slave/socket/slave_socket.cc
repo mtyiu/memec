@@ -133,6 +133,8 @@ bool SlaveSocket::handler( int fd, uint32_t events, void *data ) {
 						// Ignore the address header for master socket
 						slave->sockets.masters.set( fd, masterSocket );
 
+						socket->done( fd ); // The socket is valid
+
 						MasterEvent event;
 						event.resRegister( slave->sockets.masters.get( fd ) );
 						slave->eventQueue.insert( event );
@@ -145,6 +147,8 @@ bool SlaveSocket::handler( int fd, uint32_t events, void *data ) {
 								int oldFd = s->getSocket();
 								slave->sockets.slavePeers.replaceKey( oldFd, fd );
 								s->setRecvFd( fd, addr );
+
+								socket->done( fd ); // The socket is valid
 								break;
 							}
 						}

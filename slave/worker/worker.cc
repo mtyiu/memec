@@ -122,55 +122,47 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 		}
 	} else {
 		ProtocolHeader header;
-		ret = event.socket->recv(
-			this->protocol.buffer.recv,
-			this->protocol.buffer.size,
-			connected,
-			false
-		);
-		buffer.data = this->protocol.buffer.recv;
-		buffer.size = ret > 0 ? ( size_t ) ret : 0;
+		WORKER_RECEIVE_FROM_EVENT_SOCKET();
 		if ( ret > 0 ) {
 			this->load.recvBytes += ret;
 			this->load.elapsedTime += get_elapsed_time( t );
 		}
 		while ( buffer.size > 0 ) {
-			if ( ! this->protocol.parseHeader( header, buffer.data, buffer.size ) ) {
-				__ERROR__( "SlaveWorker", "dispatch", "Undefined message (remaining bytes = %lu).", buffer.size );
-				break;
-			}
+			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "SlaveWorker" );
 
 			buffer.data += PROTO_HEADER_SIZE;
 			buffer.size -= PROTO_HEADER_SIZE;
 			// Validate message
 			if ( header.from != PROTO_MAGIC_FROM_COORDINATOR ) {
 				__ERROR__( "SlaveWorker", "dispatch", "Invalid message source from coordinator." );
-				continue;
+			} else {
+				switch( header.opcode ) {
+					case PROTO_OPCODE_REGISTER:
+						switch( header.magic ) {
+							case PROTO_MAGIC_RESPONSE_SUCCESS:
+								event.socket->registered = true;
+								break;
+							case PROTO_MAGIC_RESPONSE_FAILURE:
+								__ERROR__( "SlaveWorker", "dispatch", "Failed to register with coordinator." );
+								break;
+							default:
+								__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from coordinator." );
+								break;
+						}
+						break;
+					case PROTO_OPCODE_SLAVE_CONNECTED:
+						this->handleSlaveConnectedMsg( event, buffer.data, buffer.size );
+						break;
+					default:
+						__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from coordinator." );
+						break;
+				}
 			}
-			switch( header.opcode ) {
-				case PROTO_OPCODE_REGISTER:
-					switch( header.magic ) {
-						case PROTO_MAGIC_RESPONSE_SUCCESS:
-							event.socket->registered = true;
-							break;
-						case PROTO_MAGIC_RESPONSE_FAILURE:
-							__ERROR__( "SlaveWorker", "dispatch", "Failed to register with coordinator." );
-							break;
-						default:
-							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from coordinator." );
-							break;
-					}
-					break;
-				case PROTO_OPCODE_SLAVE_CONNECTED:
-					this->handleSlaveConnectedMsg( event, buffer.data, buffer.size );
-					break;
-				default:
-					__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from coordinator." );
-					return;
-			}
+
 			buffer.data += header.length;
 			buffer.size -= header.length;
 		}
+		if ( connected ) event.socket->done();
 	}
 	if ( ! connected )
 		__ERROR__( "SlaveWorker", "dispatch", "The coordinator is disconnected." );
@@ -294,56 +286,43 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 	} else {
 		// Parse requests from masters
 		ProtocolHeader header;
-		ret = event.socket->recv(
-			this->protocol.buffer.recv,
-			this->protocol.buffer.size,
-			connected,
-			false
-		);
-		buffer.data = this->protocol.buffer.recv;
-		buffer.size = ret > 0 ? ( size_t ) ret : 0;
+		WORKER_RECEIVE_FROM_EVENT_SOCKET();
 		if ( ret > 0 ) {
 			this->load.recvBytes += ret;
 			this->load.elapsedTime += get_elapsed_time( t );
 		}
 		while ( buffer.size > 0 ) {
-			if ( ! this->protocol.parseHeader( header, buffer.data, buffer.size ) ) {
-				__ERROR__( "SlaveWorker", "dispatch", "Undefined message (remaining bytes = %lu).", buffer.size );
-				break;
-			}
+			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "SlaveWorker" );
 
 			buffer.data += PROTO_HEADER_SIZE;
 			buffer.size -= PROTO_HEADER_SIZE;
 			// Validate message
-			if (
-				header.magic != PROTO_MAGIC_REQUEST ||
-				header.from != PROTO_MAGIC_FROM_MASTER
-			) {
+			if ( header.magic != PROTO_MAGIC_REQUEST || header.from != PROTO_MAGIC_FROM_MASTER ) {
 				__ERROR__( "SlaveWorker", "dispatch", "Invalid protocol header." );
-			}
-
-			switch( header.opcode ) {
-				case PROTO_OPCODE_GET:
-					this->handleGetRequest( event, buffer.data, buffer.size );
-					break;
-				case PROTO_OPCODE_SET:
-					this->handleSetRequest( event, buffer.data, buffer.size );
-					break;
-				case PROTO_OPCODE_UPDATE:
-					this->handleUpdateRequest( event, buffer.data, buffer.size );
-					break;
-				case PROTO_OPCODE_DELETE:
-					this->handleDeleteRequest( event, buffer.data, buffer.size );
-					break;
-				default:
-					__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from master." );
-					return;
+			} else {
+				switch( header.opcode ) {
+					case PROTO_OPCODE_GET:
+						this->handleGetRequest( event, buffer.data, buffer.size );
+						break;
+					case PROTO_OPCODE_SET:
+						this->handleSetRequest( event, buffer.data, buffer.size );
+						break;
+					case PROTO_OPCODE_UPDATE:
+						this->handleUpdateRequest( event, buffer.data, buffer.size );
+						break;
+					case PROTO_OPCODE_DELETE:
+						this->handleDeleteRequest( event, buffer.data, buffer.size );
+						break;
+					default:
+						__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from master." );
+						break;
+				}
 			}
 			buffer.data += header.length;
 			buffer.size -= header.length;
 		}
+		if ( connected ) event.socket->done();
 	}
-
 	if ( ! connected )
 		__ERROR__( "SlaveWorker", "dispatch", "The master is disconnected." );
 }
@@ -496,29 +475,20 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 			*event.message.chunkUpdate.status = false;
 	} else {
 		ProtocolHeader header;
-		ret = event.socket->recv(
-			this->protocol.buffer.recv,
-			this->protocol.buffer.size,
-			connected,
-			false
-		);
+		WORKER_RECEIVE_FROM_EVENT_SOCKET();
 		if ( ret > 0 ) {
 			this->load.recvBytes += ret;
 			this->load.elapsedTime += get_elapsed_time( t );
 		}
-		buffer.data = this->protocol.buffer.recv;
-		buffer.size = ret > 0 ? ( size_t ) ret : 0;
 		while ( buffer.size > 0 ) {
-			if ( ! this->protocol.parseHeader( header, buffer.data, buffer.size ) ) {
-				__ERROR__( "SlaveWorker", "dispatch", "Undefined message (remaining bytes = %lu).", buffer.size );
-				break;
-			}
+			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "SlaveWorker" );
 
 			buffer.data += PROTO_HEADER_SIZE;
 			buffer.size -= PROTO_HEADER_SIZE;
 			// Validate message
 			if ( header.from != PROTO_MAGIC_FROM_SLAVE ) {
 				__ERROR__( "SlaveWorker", "dispatch", "Invalid protocol header." );
+				goto quit_1;
 			}
 
 			switch ( header.opcode ) {
@@ -604,11 +574,13 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 					break;
 				default:
 					__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from slave." );
-					return;
+					goto quit_1;
 			}
+quit_1:
 			buffer.data += header.length;
 			buffer.size -= header.length;
 		}
+		if ( connected ) event.socket->done();
 	}
 	if ( ! connected )
 		__ERROR__( "SlaveWorker", "dispatch", "The slave is disconnected." );
@@ -780,7 +752,7 @@ bool SlaveWorker::handleGetRequest( MasterEvent event, char *buf, size_t size ) 
 bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size ) {
 	struct KeyValueHeader header;
 	if ( ! this->protocol.parseKeyValueHeader( header, buf, size ) ) {
-		__ERROR__( "SlaveWorker", "handleSetRequest", "Invalid SET request." );
+		__ERROR__( "SlaveWorker", "handleSetRequest", "Invalid SET request (size = %lu).", size );
 		return false;
 	}
 	// __ERROR__(
