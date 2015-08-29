@@ -805,7 +805,7 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 		pthread_mutex_unlock( &MasterWorker::pending->applications.setLock );
 
 		applicationEvent.resSet( ( ApplicationSocket * ) key.ptr, key, success );
-		// MasterWorker::eventQueue->insert( applicationEvent );
+		MasterWorker::eventQueue->insert( applicationEvent );
 	}
 	return true;
 }
