@@ -1,0 +1,12 @@
+#ifndef __COMMON_REMAP_REMAP_STATUS_HH__
+#define __COMMON_REMAP_REMAP_STATUS_HH__
+
+enum RemapStatus {
+    REMAP_UNDEFINED,
+    REMAP_NONE,
+    REMAP_PREPARE_START,
+    REMAP_START,
+    REMAP_END
+};
+
+#endif
