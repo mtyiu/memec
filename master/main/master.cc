@@ -313,6 +313,8 @@ void Master::printPending( FILE *f ) {
 	size_t i;
 	std::set<Key>::iterator it;
 	std::set<KeyValueUpdate>::iterator keyValueUpdateIt;
+
+	pthread_mutex_lock( &this->pending.applications.setLock );
 	fprintf(
 		f,
 		"Pending requests for applications\n"
@@ -331,7 +333,9 @@ void Master::printPending( FILE *f ) {
 		( ( Socket * ) key.ptr )->printAddress( f );
 		fprintf( f, "\n" );
 	}
+	pthread_mutex_unlock( &this->pending.applications.setLock );
 
+	pthread_mutex_lock( &this->pending.applications.getLock );
 	fprintf(
 		f,
 		"\n[GET] Pending: %lu\n",
@@ -351,7 +355,9 @@ void Master::printPending( FILE *f ) {
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
 	}
+	pthread_mutex_unlock( &this->pending.applications.getLock );
 
+	pthread_mutex_lock( &this->pending.applications.updateLock );
 	fprintf(
 		f,
 		"\n[UPDATE] Pending: %lu\n",
@@ -375,7 +381,9 @@ void Master::printPending( FILE *f ) {
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
 	}
+	pthread_mutex_unlock( &this->pending.applications.updateLock );
 
+	pthread_mutex_lock( &this->pending.applications.delLock );
 	fprintf(
 		f,
 		"\n[DELETE] Pending: %lu\n",
@@ -395,8 +403,9 @@ void Master::printPending( FILE *f ) {
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
 	}
+	pthread_mutex_unlock( &this->pending.applications.delLock );
 
-
+	pthread_mutex_lock( &this->pending.slaves.setLock );
 	fprintf(
 		f,
 		"\n\nPending requests for slaves\n"
@@ -416,7 +425,9 @@ void Master::printPending( FILE *f ) {
 		( ( Socket * ) key.ptr )->printAddress( f );
 		fprintf( f, "\n" );
 	}
+	pthread_mutex_unlock( &this->pending.slaves.setLock );
 
+	pthread_mutex_lock( &this->pending.slaves.getLock );
 	fprintf(
 		f,
 		"\n[GET] Pending: %lu\n",
@@ -433,7 +444,9 @@ void Master::printPending( FILE *f ) {
 		( ( Socket * ) key.ptr )->printAddress( f );
 		fprintf( f, "\n" );
 	}
+	pthread_mutex_unlock( &this->pending.slaves.getLock );
 
+	pthread_mutex_lock( &this->pending.slaves.updateLock );
 	fprintf(
 		f,
 		"\n[UPDATE] Pending: %lu\n",
@@ -457,7 +470,9 @@ void Master::printPending( FILE *f ) {
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
 	}
+	pthread_mutex_unlock( &this->pending.slaves.updateLock );
 
+	pthread_mutex_lock( &this->pending.slaves.delLock );
 	fprintf(
 		f,
 		"\n[DELETE] Pending: %lu\n",
@@ -474,6 +489,7 @@ void Master::printPending( FILE *f ) {
 		( ( Socket * ) key.ptr )->printAddress( f );
 		fprintf( f, "\n" );
 	}
+	pthread_mutex_unlock( &this->pending.slaves.delLock );
 }
 
 void Master::help() {
