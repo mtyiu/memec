@@ -43,6 +43,8 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 	}
 	/* Vectors and other sockets */
 	Socket::init( &this->sockets.epoll );
+	MasterSocket::setArrayMap( &this->sockets.masters );
+	SlaveSocket::setArrayMap( &this->sockets.slaves );
 	this->sockets.masters.reserve( this->config.global.slaves.size() );
 	this->sockets.slaves.reserve( this->config.global.slaves.size() );
 	/* Workers and event queues */
@@ -142,15 +144,13 @@ bool Coordinator::stop() {
 		this->workers[ i ].join();
 
 	/* Sockets */
-	pthread_mutex_lock( &this->sockets.masters.lock );
 	for ( i = 0, len = this->sockets.masters.size(); i < len; i++ )
-		this->sockets.masters[ i ].stop();
-	pthread_mutex_unlock( &this->sockets.masters.lock );
+		this->sockets.masters[ i ]->stop();
+	this->sockets.masters.clear();
 
-	pthread_mutex_lock( &this->sockets.slaves.lock );
 	for ( i = 0, len = this->sockets.slaves.size(); i < len; i++ )
-		this->sockets.slaves[ i ].stop();
-	pthread_mutex_unlock( &this->sockets.slaves.lock );
+		this->sockets.slaves[ i ]->stop();
+	this->sockets.slaves.clear();
 
 	this->free();
 	this->isRunning = false;
@@ -176,14 +176,14 @@ void Coordinator::debug( FILE *f ) {
 	fprintf( f, "\nMaster sockets\n--------------\n" );
 	for ( i = 0, len = this->sockets.masters.size(); i < len; i++ ) {
 		fprintf( f, "%d. ", i + 1 );
-		this->sockets.masters[ i ].print( f );
+		this->sockets.masters[ i ]->print( f );
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
 
 	fprintf( f, "\nSlave sockets\n-------------\n" );
 	for ( i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
 		fprintf( f, "%d. ", i + 1 );
-		this->sockets.slaves[ i ].print( f );
+		this->sockets.slaves[ i ]->print( f );
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
 
@@ -264,14 +264,14 @@ void Coordinator::interactive() {
 void Coordinator::dump() {
 	FILE *f = stdout;
 	for ( size_t i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
-		std::map<Key, OpMetadata> &map = this->sockets.slaves[ i ].keys;
+		std::map<Key, OpMetadata> &map = this->sockets.slaves[ i ]->keys;
 
 		fprintf( f, "Slave #%lu: ", i + 1 );
-		this->sockets.slaves[ i ].printAddress( f );
+		this->sockets.slaves[ i ]->printAddress( f );
 		fprintf( f, "\n----------------------------------------\n" );
 
 		fprintf( f, "[Load]\n" );
-		this->sockets.slaves[ i ].load.print( f );
+		this->sockets.slaves[ i ]->load.print( f );
 
 		fprintf( f, "\n[List of metadata]\n" );
 		if ( ! map.size() ) {

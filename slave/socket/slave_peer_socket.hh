@@ -1,10 +1,13 @@
 #ifndef __SLAVE_SOCKET_SLAVE_PEER_SOCKET_HH__
 #define __SLAVE_SOCKET_SLAVE_PEER_SOCKET_HH__
 
+#include "../../common/ds/array_map.hh"
 #include "../../common/socket/socket.hh"
 
 class SlavePeerSocket : public Socket {
 private:
+	static ArrayMap<int, SlavePeerSocket> *slavePeers;
+
 	bool received;
 	struct sockaddr_in recvAddr;
 	char *identifier;
@@ -17,6 +20,7 @@ public:
 	bool self;
 
 	SlavePeerSocket();
+	static void setArrayMap( ArrayMap<int, SlavePeerSocket> *slavePeers );
 	bool init( int tmpfd, ServerAddr &addr, EPoll *epoll, bool self );
 	int init();
 	bool start();

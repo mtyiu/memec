@@ -36,7 +36,7 @@ bool Application::epollHandler( int fd, uint32_t events, void *data ) {
 		return false;
 	}
 
-	if ( ( events & EPOLLERR ) || ( events & EPOLLHUP ) || ( events & EPOLLRDHUP ) ) {
+	if ( ! ( events & EPOLLIN ) && ( ( events & EPOLLERR ) || ( events & EPOLLHUP ) || ( events & EPOLLRDHUP ) ) ) {
 		masterSocket->stop();
 	} else {
 		MasterEvent event;
@@ -64,13 +64,14 @@ bool Application::init( char *path, OptionList &options, bool verbose ) {
 	}
 	/* Vectors and other sockets */
 	Socket::init( &this->sockets.epoll );
+	MasterSocket::setArrayMap( &this->sockets.masters );
 	this->sockets.masters.reserve( this->config.application.masters.size() );
 	for ( int i = 0, len = this->config.application.masters.size(); i < len; i++ ) {
-		MasterSocket socket;
+		MasterSocket *socket = new MasterSocket();
 		int fd;
 
-		socket.init( this->config.application.masters[ i ], &this->sockets.epoll );
-		fd = socket.getSocket();
+		socket->init( this->config.application.masters[ i ], &this->sockets.epoll );
+		fd = socket->getSocket();
 		this->sockets.masters.set( fd, socket );
 	}
 	/* Workers and event queues */
@@ -143,7 +144,7 @@ bool Application::start() {
 	/* Socket */
 	// Connect to masters
 	for ( int i = 0, len = this->config.application.masters.size(); i < len; i++ ) {
-		if ( ! this->sockets.masters[ i ].start() )
+		if ( ! this->sockets.masters[ i ]->start() )
 			return false;
 	}
 
@@ -177,7 +178,8 @@ bool Application::stop() {
 
 	/* Sockets */
 	for ( i = 0, len = this->sockets.masters.size(); i < len; i++ )
-		this->sockets.masters[ i ].stop();
+		this->sockets.masters[ i ]->stop();
+	this->sockets.masters.clear();
 
 	this->free();
 	this->isRunning = false;
@@ -199,7 +201,7 @@ void Application::debug( FILE *f ) {
 	fprintf( f, "\nMaster sockets\n-------------\n" );
 	for ( i = 0, len = this->sockets.masters.size(); i < len; i++ ) {
 		fprintf( f, "%d. ", i + 1 );
-		this->sockets.masters[ i ].print( f );
+		this->sockets.masters[ i ]->print( f );
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
 
@@ -518,7 +520,7 @@ bool Application::set( char *key, char *path ) {
 		return false;
 	}
 
-	event.reqSet( &this->sockets.masters[ 0 ], key, strlen( key ), fd );
+	event.reqSet( this->sockets.masters[ 0 ], key, strlen( key ), fd );
 	this->eventQueue.insert( event );
 
 	return true;
@@ -540,7 +542,7 @@ bool Application::get( char *key, char *path ) {
 		return false;
 	}
 
-	event.reqGet( &this->sockets.masters[ 0 ], key, strlen( key ), fd );
+	event.reqGet( this->sockets.masters[ 0 ], key, strlen( key ), fd );
 	this->eventQueue.insert( event );
 
 	return true;
@@ -562,7 +564,7 @@ bool Application::update( char *key, char *path, uint32_t offset ) {
 		return false;
 	}
 
-	event.reqUpdate( &this->sockets.masters[ 0 ], key, strlen( key ), fd, offset );
+	event.reqUpdate( this->sockets.masters[ 0 ], key, strlen( key ), fd, offset );
 	this->eventQueue.insert( event );
 
 	return true;
@@ -577,7 +579,7 @@ bool Application::del( char *key ) {
 		return false;
 	}
 
-	event.reqDelete( &this->sockets.masters[ 0 ], key, strlen( key ) );
+	event.reqDelete( this->sockets.masters[ 0 ], key, strlen( key ) );
 	this->eventQueue.insert( event );
 
 	return true;

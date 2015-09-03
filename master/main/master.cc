@@ -42,22 +42,26 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 	}
 	/* Vectors and other sockets */
 	Socket::init( &this->sockets.epoll );
+	ApplicationSocket::setArrayMap( &this->sockets.applications );
+	CoordinatorSocket::setArrayMap( &this->sockets.coordinators );
+	SlaveSocket::setArrayMap( &this->sockets.slaves );
+	// this->sockets.applications.reserve( 20000 );
 	this->sockets.coordinators.reserve( this->config.global.coordinators.size() );
 	for ( int i = 0, len = this->config.global.coordinators.size(); i < len; i++ ) {
-		CoordinatorSocket socket;
+		CoordinatorSocket *socket = new CoordinatorSocket();
 		int fd;
 
-		socket.init( this->config.global.coordinators[ i ], &this->sockets.epoll );
-		fd = socket.getSocket();
+		socket->init( this->config.global.coordinators[ i ], &this->sockets.epoll );
+		fd = socket->getSocket();
 		this->sockets.coordinators.set( fd, socket );
 	}
 	this->sockets.slaves.reserve( this->config.global.slaves.size() );
 	for ( int i = 0, len = this->config.global.slaves.size(); i < len; i++ ) {
-		SlaveSocket socket;
+		SlaveSocket *socket = new SlaveSocket();
 		int fd;
 
-		socket.init( this->config.global.slaves[ i ], &this->sockets.epoll );
-		fd = socket.getSocket();
+		socket->init( this->config.global.slaves[ i ], &this->sockets.epoll );
+		fd = socket->getSocket();
 		this->sockets.slaves.set( fd, socket );
 	}
 	/* Stripe list */
@@ -136,12 +140,12 @@ bool Master::start() {
 	/* Socket */
 	// Connect to coordinators
 	for ( int i = 0, len = this->config.global.coordinators.size(); i < len; i++ ) {
-		if ( ! this->sockets.coordinators[ i ].start() )
+		if ( ! this->sockets.coordinators[ i ]->start() )
 			ret = false;
 	}
 	// Connect to slaves
 	for ( int i = 0, len = this->config.global.slaves.size(); i < len; i++ ) {
-		if ( ! this->sockets.slaves[ i ].start() )
+		if ( ! this->sockets.slaves[ i ]->start() )
 			ret = false;
 	}
 	// Start listening
@@ -179,11 +183,14 @@ bool Master::stop() {
 
 	/* Sockets */
 	for ( i = 0, len = this->sockets.applications.size(); i < len; i++ )
-		this->sockets.applications[ i ].stop();
+		this->sockets.applications[ i ]->stop();
+	this->sockets.applications.clear();
 	for ( i = 0, len = this->sockets.coordinators.size(); i < len; i++ )
-		this->sockets.coordinators[ i ].stop();
+		this->sockets.coordinators[ i ]->stop();
+	this->sockets.coordinators.clear();
 	for ( i = 0, len = this->sockets.slaves.size(); i < len; i++ )
-		this->sockets.slaves[ i ].stop();
+		this->sockets.slaves[ i ]->stop();
+	this->sockets.slaves.clear();
 
 	this->free();
 	this->isRunning = false;
@@ -210,21 +217,21 @@ void Master::debug( FILE *f ) {
 	fprintf( f, "\nApplication sockets\n-------------------\n" );
 	for ( i = 0, len = this->sockets.applications.size(); i < len; i++ ) {
 		fprintf( f, "%d. ", i + 1 );
-		this->sockets.applications[ i ].print( f );
+		this->sockets.applications[ i ]->print( f );
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
 
 	fprintf( f, "\nCoordinator sockets\n-------------------\n" );
 	for ( i = 0, len = this->sockets.coordinators.size(); i < len; i++ ) {
 		fprintf( f, "%d. ", i + 1 );
-		this->sockets.coordinators[ i ].print( f );
+		this->sockets.coordinators[ i ]->print( f );
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
 
 	fprintf( f, "\nSlave sockets\n-------------\n" );
 	for ( i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
 		fprintf( f, "%d. ", i + 1 );
-		this->sockets.slaves[ i ].print( f );
+		this->sockets.slaves[ i ]->print( f );
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
 

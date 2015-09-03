@@ -1,7 +1,18 @@
 #include "slave_socket.hh"
 
+ArrayMap<int, SlaveSocket> *SlaveSocket::slaves;
+
+void SlaveSocket::setArrayMap( ArrayMap<int, SlaveSocket> *slaves ) {
+	SlaveSocket::slaves = slaves;
+}
+
 bool SlaveSocket::start() {
 	return this->connect();
+}
+
+void SlaveSocket::stop() {
+	SlaveSocket::slaves->remove( this->sockfd );
+	Socket::stop();
 }
 
 void SlaveSocket::setListenAddr( uint32_t addr, uint16_t port ) {

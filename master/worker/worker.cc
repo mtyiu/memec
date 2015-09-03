@@ -117,13 +117,12 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 				event.message.key.data
 			);
 
-			pthread_mutex_lock( &MasterWorker::pending->applications.setLock );
-			it = MasterWorker::pending->applications.set.find( event.message.key );
-			key = *it;
-			MasterWorker::pending->applications.set.erase( it );
-			pthread_mutex_unlock( &MasterWorker::pending->applications.setLock );
-
-			key.free();
+			event.message.key.free();
+			if ( ! event.socket ) {
+				fprintf( stderr, "event.socket is NULL\n" );
+			} else if ( event.socket->getSocket() == 0 ) {
+				fprintf( stderr, "sockfd == 0\n" );
+			}
 			break;
 		case APPLICATION_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
 		case APPLICATION_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
@@ -512,6 +511,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		listId, chunkId, true, &isDegraded
 	);
 	if ( ! socket ) {
+		// TODO
 		Key key;
 		key.set( header.keySize, header.key );
 		event.resSet( event.socket, key, false );
@@ -530,24 +530,28 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
 
-	pthread_mutex_lock( &MasterWorker::pending->applications.setLock );
-	MasterWorker::pending->applications.set.insert( key );
-	pthread_mutex_unlock( &MasterWorker::pending->applications.setLock );
+	std::pair<std::set<Key>::iterator, bool> p;
 
-	key.ptr = ( void * ) socket;
+	pthread_mutex_lock( &MasterWorker::pending->applications.setLock );
+	p = MasterWorker::pending->applications.set.insert( key );
+	pthread_mutex_unlock( &MasterWorker::pending->applications.setLock );
+	if ( ! p.second ) {
+		__ERROR__( "Master", "handleSetRequest", "Cannot insert key into application's pending set for SET: %.*s (key size = %u); Value: (value size = %u)\n", ( int ) header.keySize, header.key, header.keySize, header.valueSize );
+		return false;
+	}
 
 	pthread_mutex_lock( &MasterWorker::pending->slaves.setLock );
-	MasterWorker::pending->slaves.set.insert( key );
+	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount + 1; i++ ) {
+		key.ptr = ( void * )( i == 0 ? socket : this->paritySlaveSockets[ i - 1 ] );
+		p = MasterWorker::pending->slaves.set.insert( key );
+		if ( ! p.second ) {
+			__ERROR__( "Master", "handleSetRequest", "Cannot insert key into slave's pending set for SET: %.*s (key size = %u); Value: (value size = %u) [slave (i = %u)]\n", ( int ) header.keySize, header.key, header.keySize, header.valueSize, i );
+		}
+	}
 	pthread_mutex_unlock( &MasterWorker::pending->slaves.setLock );
 
 	// Send SET requests
 	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
-		key.ptr = ( void * ) this->paritySlaveSockets[ i ];
-
-		pthread_mutex_lock( &MasterWorker::pending->slaves.setLock );
-		MasterWorker::pending->slaves.set.insert( key );
-		pthread_mutex_unlock( &MasterWorker::pending->slaves.setLock );
-
 #ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
 		SlaveEvent slaveEvent;
 		this->protocol.status[ i ] = true;
@@ -781,6 +785,12 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 	if ( it == MasterWorker::pending->slaves.set.end() ) {
 		pthread_mutex_unlock( &MasterWorker::pending->slaves.setLock );
 		__ERROR__( "MasterWorker", "handleSetResponse", "Cannot find a pending slave SET request that matches the response. This message will be discarded." );
+		__ERROR__(
+			"MasterWorker", "handleSetResponse",
+			"[SET] Key: %.*s (key size = %u)",
+			( int ) header.keySize, header.key, header.keySize
+		);
+		Master::getInstance()->printPending();
 		return false;
 	}
 	MasterWorker::pending->slaves.set.erase( it );
@@ -794,14 +804,21 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 
 	if ( pending == 0 ) {
 		// Only send application SET response when the number of pending slave SET requests equal 0
+		key.ptr = 0;
 		pthread_mutex_lock( &MasterWorker::pending->applications.setLock );
 		it = MasterWorker::pending->applications.set.lower_bound( key );
 		if ( it == MasterWorker::pending->applications.set.end() || ! key.equal( *it ) ) {
 			pthread_mutex_unlock( &MasterWorker::pending->applications.setLock );
 			__ERROR__( "MasterWorker", "handleSetResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded." );
+			__ERROR__(
+				"MasterWorker", "handleSetResponse",
+				"[SET] Key: %.*s (key size = %u)",
+				( int ) header.keySize, header.key, header.keySize
+			);
 			return false;
 		}
 		key = *it;
+		MasterWorker::pending->applications.set.erase( it );
 		pthread_mutex_unlock( &MasterWorker::pending->applications.setLock );
 
 		applicationEvent.resSet( ( ApplicationSocket * ) key.ptr, key, success );

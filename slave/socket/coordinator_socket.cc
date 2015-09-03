@@ -2,6 +2,12 @@
 #include "../main/slave.hh"
 #include "coordinator_socket.hh"
 
+ArrayMap<int, CoordinatorSocket> *CoordinatorSocket::coordinators;
+
+void CoordinatorSocket::setArrayMap( ArrayMap<int, CoordinatorSocket> *coordinators ) {
+	CoordinatorSocket::coordinators = coordinators;
+}
+
 bool CoordinatorSocket::start() {
 	this->registered = false;
 	if ( this->connect() ) {
@@ -12,6 +18,11 @@ bool CoordinatorSocket::start() {
 		return true;
 	}
 	return false;
+}
+
+void CoordinatorSocket::stop() {
+	// CoordinatorSocket::coordinators->remove( this->sockfd );
+	Socket::stop();
 }
 
 ssize_t CoordinatorSocket::send( char *buf, size_t ulen, bool &connected ) {

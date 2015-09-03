@@ -686,7 +686,7 @@ bool SlaveWorker::handleSlaveConnectedMsg( CoordinatorEvent event, char *buf, si
 	// Find the slave peer socket in the array map
 	int index = -1;
 	for ( int i = 0, len = slavePeers->size(); i < len; i++ ) {
-		if ( slavePeers->values[ i ].equal( header.addr, header.port ) ) {
+		if ( slavePeers->values[ i ]->equal( header.addr, header.port ) ) {
 			index = i;
 			break;
 		}
@@ -697,11 +697,11 @@ bool SlaveWorker::handleSlaveConnectedMsg( CoordinatorEvent event, char *buf, si
 	}
 
 	// Update sockfd in the array Map
-	int sockfd = slavePeers->values[ index ].init();
+	int sockfd = slavePeers->values[ index ]->init();
 	slavePeers->keys[ index ] = sockfd;
 
 	// Connect to the slave peer
-	slavePeers->values[ index ].start();
+	slavePeers->values[ index ]->start();
 
 	return true;
 }
@@ -1002,7 +1002,7 @@ bool SlaveWorker::handleSlavePeerRegisterRequest( SlavePeerSocket *socket, char 
 	// Find the slave peer socket in the array map
 	int index = -1;
 	for ( int i = 0, len = slavePeers->values.size(); i < len; i++ ) {
-		if ( slavePeers->values[ i ].equal( header.addr, header.port ) ) {
+		if ( slavePeers->values[ i ]->equal( header.addr, header.port ) ) {
 			index = i;
 			break;
 		}
@@ -1013,7 +1013,7 @@ bool SlaveWorker::handleSlavePeerRegisterRequest( SlavePeerSocket *socket, char 
 	}
 
 	SlavePeerEvent event;
-	event.resRegister( &slavePeers->values[ index ], true );
+	event.resRegister( slavePeers->values[ index ], true );
 	SlaveWorker::eventQueue->insert( event );
 	return true;
 }

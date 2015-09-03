@@ -17,8 +17,10 @@ char *CoordinatorProtocol::resRegisterMaster( size_t &size, GlobalConfig &global
 	serializedStrings[ 0 ] = globalConfig.serialize( length[ 0 ] );
 	if ( masterConfig )
 		serializedStrings[ 1 ] = masterConfig->serialize( length[ 1 ] );
-	else
+	else {
+		serializedStrings[ 1 ] = 0;
 		length[ 1 ] = 0;
+	}
 	length[ 2 ] = sizeof( uint32_t );
 
 	size = this->generateHeader(
@@ -62,8 +64,10 @@ char *CoordinatorProtocol::resRegisterSlave( size_t &size, GlobalConfig &globalC
 	serializedStrings[ 0 ] = globalConfig.serialize( length[ 0 ] );
 	if ( slaveConfig )
 		serializedStrings[ 1 ] = slaveConfig->serialize( length[ 1 ] );
-	else
+	else {
+		serializedStrings[ 1 ] = 0;
 		length[ 1 ] = 0;
+	}
 	length[ 2 ] = sizeof( uint32_t );
 
 	size = this->generateHeader(

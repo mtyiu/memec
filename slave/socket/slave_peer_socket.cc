@@ -4,6 +4,12 @@
 #include "../main/slave.hh"
 #include "../../common/util/debug.hh"
 
+ArrayMap<int, SlavePeerSocket> *SlavePeerSocket::slavePeers;
+
+void SlavePeerSocket::setArrayMap( ArrayMap<int, SlavePeerSocket> *slavePeers ) {
+	SlavePeerSocket::slavePeers = slavePeers;
+}
+
 void SlavePeerSocket::registerTo() {
 	Slave *slave = Slave::getInstance();
 	SlavePeerEvent event;
@@ -63,8 +69,8 @@ bool SlavePeerSocket::start() {
 
 void SlavePeerSocket::stop() {
 	printf( "fd = %d is stopping...\n", this->sockfd );
-	if ( this->sockfd != -1 )
-		Socket::stop();
+	// SlavePeerSocket::slavePeers->remove( this->sockfd );
+	Socket::stop();
 }
 
 bool SlavePeerSocket::ready() {

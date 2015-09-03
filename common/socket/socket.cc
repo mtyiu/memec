@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <cstring>
 #include <cerrno>
+#include <cassert>
 #include <climits>
 #include <fcntl.h>
 #include <sys/socket.h>
@@ -93,7 +94,7 @@ ssize_t Socket::send( int sockfd, char *buf, size_t ulen, bool &connected ) {
 			if ( errno == EWOULDBLOCK ) {
 				continue;
 			}
-			__ERROR__( "Socket", "send", "%s", strerror( errno ) );
+			__ERROR__( "Socket", "send", "%s (fd = %d)", strerror( errno ), sockfd );
 			connected = false;
 			return -1;
 		} else if ( ret == 0 ) {
@@ -107,6 +108,7 @@ ssize_t Socket::send( int sockfd, char *buf, size_t ulen, bool &connected ) {
 	// if ( connected && bytes > 0 )
 	// 	__DEBUG__( MAGENTA, "Socket", "send", "Sent %ld bytes.", bytes );
 	this->connected = connected;
+	if ( ! connected ) this->stop();
 	return bytes;
 }
 
@@ -134,6 +136,7 @@ ssize_t Socket::recv( int sockfd, char *buf, size_t ulen, bool &connected, bool 
 	// if ( connected && bytes > 0 )
 	// 	__DEBUG__( MAGENTA, "Socket", "recv", "Received %ld bytes.", bytes );
 	this->connected = connected;
+	if ( ! connected ) this->stop();
 	return bytes;
 }
 
@@ -171,11 +174,6 @@ int Socket::accept( struct sockaddr_in *addrPtr, socklen_t *addrlenPtr ) {
 		}
 		return ret;
 	}
-}
-
-Socket::Socket() {
-	this->pending.size = 0;
-	pthread_mutex_init( &this->pending.lock, 0 );
 }
 
 void Socket::init( EPoll *epoll ) {
@@ -217,6 +215,7 @@ bool Socket::init( ServerAddr &addr, EPoll *epoll ) {
 }
 
 bool Socket::init( int sockfd, struct sockaddr_in addr ) {
+	assert( sockfd != 0 );
 	this->mode = SOCKET_MODE_CONNECT;
 	this->sockfd = sockfd;
 	this->addr = addr;
@@ -225,7 +224,9 @@ bool Socket::init( int sockfd, struct sockaddr_in addr ) {
 }
 
 void Socket::stop() {
+	if ( this->sockfd == -1 ) return;
 	::close( this->sockfd );
+	this->sockfd = -1;
 	this->connected = false;
 }
 
@@ -249,8 +250,8 @@ struct sockaddr_in Socket::getAddr() {
 	return this->addr;
 }
 
-bool Socket::equal( Socket &s ) {
-	struct sockaddr_in saddr = s.getAddr();
+bool Socket::equal( Socket *s ) {
+	struct sockaddr_in saddr = s->getAddr();
 	return this->equal( saddr.sin_addr.s_addr, saddr.sin_port );
 }
 

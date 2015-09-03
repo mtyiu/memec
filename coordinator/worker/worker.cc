@@ -94,11 +94,11 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 
 		pthread_mutex_lock( &slaves.lock );
 		for ( uint32_t i = 0; i < slaves.size(); i++ ) {
-			SlaveSocket &slave = slaves.values[ i ];
+			SlaveSocket *slave = slaves.values[ i ];
 			if ( event.socket->equal( slave ) )
 				continue; // No need to tell the new socket
 
-			ret = slave.send( buffer.data, buffer.size, connected );
+			ret = slave->send( buffer.data, buffer.size, connected );
 			if ( ret != ( ssize_t ) buffer.size )
 				__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 		}
