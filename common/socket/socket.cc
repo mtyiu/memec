@@ -262,6 +262,8 @@ bool Socket::equal( uint32_t addr, uint16_t port ) {
 	);
 }
 
+Socket::~Socket() {}
+
 bool Socket::hton_ip( char *ip, uint32_t &ret ) {
 	struct in_addr addr;
 	switch( inet_pton( AF_INET, ip, &addr ) ) {

@@ -4,8 +4,7 @@
 
 Key KeyValue::key() {
 	Key key;
-	key.size = ( uint8_t ) this->data[ 0 ];
-	key.data = this->data + KEY_VALUE_METADATA_SIZE;
+	key.set( ( uint8_t ) this->data[ 0 ], this->data + KEY_VALUE_METADATA_SIZE, 0 );
 	return key;
 }
 

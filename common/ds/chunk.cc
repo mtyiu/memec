@@ -149,9 +149,7 @@ uint32_t Chunk::deleteKeyValue( Key target, std::map<Key, KeyMetadata> *keys, ch
 		// Retrieve metadata for the current key-value pair
 		KeyValue::deserialize( src, key, keySize, value, valueSize );
 		Key tmp;
-		tmp.size = keySize;
-		tmp.data = key;
-		tmp.ptr = 0;
+		tmp.set( keySize, key, 0 );
 
 		it = keys->find( tmp );
 		assert( it != keys->end() );

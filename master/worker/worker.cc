@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include "worker.hh"
 #include "../main/master.hh"
 #include "../../common/util/debug.hh"
@@ -73,15 +74,15 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 			break;
 		case APPLICATION_EVENT_TYPE_GET_RESPONSE_SUCCESS:
 			event.message.keyValue.deserialize(
-				key.data, key.size,
+				value, key.size,
 				value, valueSize
 			);
 			buffer.data = this->protocol.resGet(
 				buffer.size, success,
-				key.size, key.data,
+				key.size, value,
 				valueSize, value
 			);
-			key.ptr = ( void * ) event.socket;
+			key.set( key.size, value, ( void * ) event.socket );
 
 			pthread_mutex_lock( &MasterWorker::pending->applications.getLock );
 			it = MasterWorker::pending->applications.get.find( key );
@@ -116,13 +117,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 				event.message.key.size,
 				event.message.key.data
 			);
-
 			event.message.key.free();
-			if ( ! event.socket ) {
-				fprintf( stderr, "event.socket is NULL\n" );
-			} else if ( event.socket->getSocket() == 0 ) {
-				fprintf( stderr, "sockfd == 0\n" );
-			}
 			break;
 		case APPLICATION_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
 		case APPLICATION_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
@@ -134,9 +129,11 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 				event.message.update.offset,
 				event.message.update.length
 			);
-			keyValueUpdate.size = event.message.update.key.size;
-			keyValueUpdate.data = event.message.update.key.data;
-			keyValueUpdate.ptr = event.socket;
+			keyValueUpdate.set(
+				event.message.update.key.size,
+				event.message.update.key.data,
+				event.socket
+			);
 			keyValueUpdate.offset = event.message.update.offset;
 			keyValueUpdate.length = event.message.update.length;
 
@@ -212,7 +209,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 	}
 
 	if ( ! connected )
-		__ERROR__( "MasterWorker", "dispatch", "The application is disconnected." );
+		__DEBUG__( RED, "MasterWorker", "dispatch", "The application is disconnected." );
 }
 
 void MasterWorker::dispatch( CoordinatorEvent event ) {
@@ -790,9 +787,9 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 			"[SET] Key: %.*s (key size = %u)",
 			( int ) header.keySize, header.key, header.keySize
 		);
-		Master::getInstance()->printPending();
 		return false;
 	}
+	key = *it;
 	MasterWorker::pending->slaves.set.erase( it );
 
 	// Check pending slave SET requests

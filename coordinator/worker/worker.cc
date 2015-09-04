@@ -147,8 +147,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 
 						// Update metadata map
 						Key key;
-						key.size = slaveSyncHeader.keySize;
-						key.data = slaveSyncHeader.key;
+						key.set( slaveSyncHeader.keySize, slaveSyncHeader.key, 0 );
 
 						OpMetadata opMetadata;
 						opMetadata.opcode = slaveSyncHeader.opcode;

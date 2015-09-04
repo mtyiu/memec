@@ -331,6 +331,13 @@ void Master::printPending( FILE *f ) {
 		const Key &key = *it;
 		fprintf( f, "%lu. Key: %.*s (size = %u); source: ", i, key.size, key.data, key.size );
 		( ( Socket * ) key.ptr )->printAddress( f );
+
+		for ( uint8_t i = 0; i < key.size; i++ ) {
+			if ( ! isprint( key.data[ i ] ) ) {
+				fprintf( f, " %u", i );
+			}
+		}
+
 		fprintf( f, "\n" );
 	}
 	pthread_mutex_unlock( &this->pending.applications.setLock );

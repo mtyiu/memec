@@ -58,6 +58,7 @@ public:
 	struct sockaddr_in getAddr();
 	bool equal( Socket *s );
 	bool equal( uint32_t addr, uint16_t port );
+	virtual ~Socket();
 
 	// Utilities
 	static bool setNonBlocking( int fd );
