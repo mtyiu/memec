@@ -4,6 +4,7 @@ ArrayMap<int, SlaveSocket> *SlaveSocket::slaves;
 
 void SlaveSocket::setArrayMap( ArrayMap<int, SlaveSocket> *slaves ) {
 	SlaveSocket::slaves = slaves;
+	slaves->needsDelete = false;
 }
 
 bool SlaveSocket::start() {
@@ -13,6 +14,7 @@ bool SlaveSocket::start() {
 void SlaveSocket::stop() {
 	SlaveSocket::slaves->remove( this->sockfd );
 	Socket::stop();
+	delete this;
 }
 
 void SlaveSocket::setListenAddr( uint32_t addr, uint16_t port ) {

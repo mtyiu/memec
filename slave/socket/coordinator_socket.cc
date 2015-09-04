@@ -6,6 +6,7 @@ ArrayMap<int, CoordinatorSocket> *CoordinatorSocket::coordinators;
 
 void CoordinatorSocket::setArrayMap( ArrayMap<int, CoordinatorSocket> *coordinators ) {
 	CoordinatorSocket::coordinators = coordinators;
+	coordinators->needsDelete = false;
 }
 
 bool CoordinatorSocket::start() {
@@ -23,6 +24,7 @@ bool CoordinatorSocket::start() {
 void CoordinatorSocket::stop() {
 	// CoordinatorSocket::coordinators->remove( this->sockfd );
 	Socket::stop();
+	// delete this;
 }
 
 ssize_t CoordinatorSocket::send( char *buf, size_t ulen, bool &connected ) {

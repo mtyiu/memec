@@ -6,6 +6,7 @@ ArrayMap<int, SlaveSocket> *SlaveSocket::slaves;
 
 void SlaveSocket::setArrayMap( ArrayMap<int, SlaveSocket> *slaves ) {
 	SlaveSocket::slaves = slaves;
+	slaves->needsDelete = false;
 }
 
 bool SlaveSocket::start() {
@@ -23,6 +24,7 @@ bool SlaveSocket::start() {
 void SlaveSocket::stop() {
 	// SlaveSocket::slaves->remove( this->sockfd );
 	Socket::stop();
+	// delete this;
 }
 
 ssize_t SlaveSocket::send( char *buf, size_t ulen, bool &connected ) {

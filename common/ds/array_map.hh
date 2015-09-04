@@ -23,10 +23,12 @@ private:
 public:
 	std::vector<KeyType> keys;
 	std::vector<ValueType *> values;
+	bool needsDelete;
 	pthread_mutex_t lock;
 
 	ArrayMap() {
 		pthread_mutex_init( &this->lock, 0 );
+		this->needsDelete = true;
 	}
 
 	void reserve( int n ) {
@@ -86,7 +88,7 @@ public:
 		this->keys.erase( this->keys.begin() + index );
 		this->values.erase( this->values.begin() + index );
 		pthread_mutex_unlock( &this->lock );
-		delete val;
+		if ( needsDelete ) delete val;
 		return true;
 	}
 
@@ -96,8 +98,8 @@ public:
 		val = this->values[ index ];
 		this->keys.erase( this->keys.begin() + index );
 		this->values.erase( this->values.begin() + index );
-		pthread_mutex_unlock( &this->lock );;
-		delete val;
+		pthread_mutex_unlock( &this->lock );
+		if ( needsDelete ) delete val;
 		return true;
 	}
 

@@ -11,6 +11,7 @@ SlaveSocket::SlaveSocket() {
 	this->epoll = 0;
 	this->buffer.size = PROTO_HEADER_SIZE + 4 + 2;
 	this->identifier = 0;
+	this->sockets.needsDelete = true;
 }
 
 bool SlaveSocket::init( int type, uint32_t addr, uint16_t port, char *name, EPoll *epoll ) {

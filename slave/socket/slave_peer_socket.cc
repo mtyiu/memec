@@ -8,6 +8,7 @@ ArrayMap<int, SlavePeerSocket> *SlavePeerSocket::slavePeers;
 
 void SlavePeerSocket::setArrayMap( ArrayMap<int, SlavePeerSocket> *slavePeers ) {
 	SlavePeerSocket::slavePeers = slavePeers;
+	slavePeers->needsDelete = false;
 }
 
 void SlavePeerSocket::registerTo() {
@@ -71,6 +72,7 @@ void SlavePeerSocket::stop() {
 	printf( "fd = %d is stopping...\n", this->sockfd );
 	// SlavePeerSocket::slavePeers->remove( this->sockfd );
 	Socket::stop();
+	// delete this;
 }
 
 bool SlavePeerSocket::ready() {

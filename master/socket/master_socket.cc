@@ -10,6 +10,7 @@ MasterSocket::MasterSocket() {
 	this->tid = 0;
 	this->epoll = 0;
 	this->buffer.size = PROTO_HEADER_SIZE;
+	this->sockets.needsDelete = true;
 }
 
 bool MasterSocket::init( int type, uint32_t addr, uint16_t port, EPoll *epoll ) {

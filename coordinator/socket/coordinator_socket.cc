@@ -10,6 +10,7 @@ CoordinatorSocket::CoordinatorSocket() {
 	this->tid = 0;
 	this->epoll = 0;
 	this->buffer.size = PROTO_HEADER_SIZE + 4 + 2;
+	this->sockets.needsDelete = true;
 }
 
 bool CoordinatorSocket::init( int type, uint32_t addr, uint16_t port, int numSlaves, EPoll *epoll ) {

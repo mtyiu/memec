@@ -5,6 +5,7 @@ ArrayMap<int, ApplicationSocket> *ApplicationSocket::applications;
 
 void ApplicationSocket::setArrayMap( ArrayMap<int, ApplicationSocket> *applications ) {
 	ApplicationSocket::applications = applications;
+	applications->needsDelete = false;
 }
 
 bool ApplicationSocket::start() {
@@ -14,6 +15,7 @@ bool ApplicationSocket::start() {
 void ApplicationSocket::stop() {
 	ApplicationSocket::applications->remove( this->sockfd );
 	Socket::stop();
+	delete this;
 }
 
 ssize_t ApplicationSocket::send( char *buf, size_t ulen, bool &connected ) {
