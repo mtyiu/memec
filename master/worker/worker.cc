@@ -208,8 +208,10 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 		if ( connected ) event.socket->done();
 	}
 
-	if ( ! connected )
+	if ( ! connected ) {
 		__DEBUG__( RED, "MasterWorker", "dispatch", "The application is disconnected." );
+		// delete event.socket;
+	}
 }
 
 void MasterWorker::dispatch( CoordinatorEvent event ) {

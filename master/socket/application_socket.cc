@@ -8,14 +8,26 @@ void ApplicationSocket::setArrayMap( ArrayMap<int, ApplicationSocket> *applicati
 	applications->needsDelete = false;
 }
 
+ApplicationSocket::ApplicationSocket() {
+	pthread_mutex_init( &this->lock, 0 );
+	this->stopped = false;
+}
+
 bool ApplicationSocket::start() {
 	return this->connect();
 }
 
 void ApplicationSocket::stop() {
-	ApplicationSocket::applications->remove( this->sockfd );
-	Socket::stop();
-	delete this;
+	// if ( this->sockfd == -1 ) return;
+	// pthread_mutex_lock( &this->lock );
+	{ // if ( ! this->stopped ) {
+		// fprintf( stderr, "Releasing ApplicationSocket: 0x%p\n", this );
+		ApplicationSocket::applications->remove( this->sockfd );
+		Socket::stop();
+		delete this;
+		// this->stopped = true;
+	}
+	// pthread_mutex_unlock( &this->lock );
 }
 
 ssize_t ApplicationSocket::send( char *buf, size_t ulen, bool &connected ) {

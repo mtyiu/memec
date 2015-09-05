@@ -7,9 +7,12 @@
 class ApplicationSocket : public Socket {
 private:
 	static ArrayMap<int, ApplicationSocket> *applications;
+	pthread_mutex_t lock;
+	bool stopped;
 
 public:
 	static void setArrayMap( ArrayMap<int, ApplicationSocket> *applications );
+	ApplicationSocket();
 	bool start();
 	void stop();
 	ssize_t send( char *buf, size_t ulen, bool &connected );

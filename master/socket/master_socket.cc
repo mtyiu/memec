@@ -122,6 +122,7 @@ bool MasterSocket::handler( int fd, uint32_t events, void *data ) {
 				if ( header.magic == PROTO_MAGIC_REQUEST && header.opcode == PROTO_OPCODE_REGISTER ) {
 					if ( header.from == PROTO_MAGIC_FROM_APPLICATION ) {
 						ApplicationSocket *applicationSocket = new ApplicationSocket();
+						// fprintf( stderr, "new ApplicationSocket: 0x%p\n", applicationSocket );
 						applicationSocket->init( fd, *addr );
 						master->sockets.applications.set( fd, applicationSocket );
 
