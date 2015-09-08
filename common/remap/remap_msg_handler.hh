@@ -10,7 +10,7 @@
 
 #define MAX_MESSLEN     1024
 #define MAX_SPREAD_NAME 1024
-#define MAX_GROUP_NUM   2
+#define MAX_GROUP_NUM   10
 #define GROUP_NAME      "plio"
 #define MSG_TYPE        FIFO_MESS
 
@@ -27,6 +27,8 @@ protected:
     uint32_t msgCount;
 
     bool isConnected;
+
+    pthread_rwlock_t stlock;
     RemapStatus status;
 
     inline void increMsgCount() {
@@ -37,28 +39,22 @@ protected:
         this->msgCount--;
     }
 
-    static inline bool isRegularMessage( int msgType ) {
-        return ( msgType && REGULAR_MESS );
+    static inline bool isRegularMessage( int service ) {
+        return ( service & REGULAR_MESS );
     }
 
-    static inline bool isMemberJoin( int msgType ) {
-        return ( msgType && CAUSED_BY_JOIN );
+    static inline bool isMemberJoin( int service ) {
+        return ( service & CAUSED_BY_JOIN );
     }
 
-    static inline bool isMemberLeave( int msgType ) {
-        return ( ( msgType && CAUSED_BY_LEAVE ) || 
-                ( msgType && CAUSED_BY_DISCONNECT ) );
+    static inline bool isMemberLeave( int service ) {
+        return ( ( service & CAUSED_BY_LEAVE ) || 
+                ( service & CAUSED_BY_DISCONNECT ) );
     }
 
 public:
-    RemapMsgHandler() {
-        this->reader = -1;
-        this->isConnected = false;
-        this->msgCount = 0;
-        this->group = ( char* ) GROUP_NAME;
-    }
-
-    ~RemapMsgHandler() {} 
+    RemapMsgHandler();
+    virtual ~RemapMsgHandler();
     
     inline bool getIsConnected () {
         return this->isConnected;

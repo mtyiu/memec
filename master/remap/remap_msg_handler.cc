@@ -3,7 +3,7 @@
 #include "../../common/remap/remap_group.hh"
 #include "remap_msg_handler.hh"
 
-MasterRemapMsgHandler::MasterRemapMsgHandler() :
+MasterRemapMsgHandler::MasterRemapMsgHandler() : 
         RemapMsgHandler() {
     this->group = ( char* )MASTER_GROUP;
 }
@@ -12,6 +12,7 @@ MasterRemapMsgHandler::~MasterRemapMsgHandler() {
 }
 
 bool MasterRemapMsgHandler::init( const char *user ) { 
+    //fprintf( stderr, "master joins as %s\n", user );
     return RemapMsgHandler::init( "4803@localhost", user ) ;
 }
 
@@ -31,7 +32,7 @@ bool MasterRemapMsgHandler::start() {
 
     // read message using a background thread
     if ( pthread_create( &this->reader, NULL, MasterRemapMsgHandler::readMessages, this ) < 0 ){
-        fprintf( stderr, "Failed to start reading messages\n" );
+        fprintf( stderr, "Master FAILED to start reading messages\n" );
         return false;
     }
     this->isListening = true;
@@ -57,6 +58,7 @@ bool MasterRemapMsgHandler::ackRemap() {
     int len = 0, ret = -1;
     RemapStatus signal = REMAP_UNDEFINED;
 
+    pthread_rwlock_wrlock( &this->stlock );
     switch ( this->status ) {
         case REMAP_PREPARE_START:
             signal = REMAP_WAIT_START;
@@ -65,6 +67,7 @@ bool MasterRemapMsgHandler::ackRemap() {
             signal = REMAP_WAIT_END;
             break;
         default:
+            pthread_rwlock_unlock( &this->stlock );
             return false;
     }
     len = sprintf( buf, "%d\n", signal );
@@ -72,6 +75,7 @@ bool MasterRemapMsgHandler::ackRemap() {
     if ( ret == len ) {
         this->status = signal;
     }
+    pthread_rwlock_unlock( &this->stlock );
 
     return true;
 }
@@ -88,11 +92,14 @@ void *MasterRemapMsgHandler::readMessages( void *argv ) {
     // handler messages
     while ( myself->isListening && ret >= 0 ) {
         ret = SP_receive( myself->mbox, &service, sender, MAX_GROUP_NUM, &groups, targetGroups, &msgType, &endian, MAX_MESSLEN, msg);
-        if ( ret > 0 && myself->isRegularMessage( msgType ) ) {
+        if ( ret > 0 && myself->isRegularMessage( service ) ) {
             // change status accordingly
             myself->setStatus( msg, ret );
             myself->increMsgCount();
         }
+    }
+    if ( ret < 0 ) {
+        fprintf( stderr, "master reader extis with error code %d\n", ret );
     }
 
     return ( void* ) &myself->msgCount;
@@ -113,5 +120,7 @@ void MasterRemapMsgHandler::setStatus( char* msg , int len ) {
             return;   
     }
 
+    pthread_rwlock_wrlock( &this->stlock );
     this->status = signal;
+    pthread_rwlock_unlock( &this->stlock );
 }

@@ -5,5 +5,7 @@ common/config/global_config
 common/config/server_addr
 common/ds/bitmask_array
 common/protocol/protocol
+common/remap/coordinator_remap
+common/remap/master_remap
 temp/permutation
 temp/stripe_list

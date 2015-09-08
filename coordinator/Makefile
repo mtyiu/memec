@@ -10,6 +10,7 @@ OBJS= \
 	event/master_event.o \
 	event/slave_event.o \
 	protocol/protocol.o \
+	remap/remap_msg_handler.o \
 	socket/coordinator_socket.o \
 	socket/master_socket.o \
 	socket/slave_socket.o \
@@ -23,12 +24,14 @@ EXTERNAL_LIB= \
 	$(PLIO_SRC_ROOT)/common/config/server_addr.o \
 	$(PLIO_SRC_ROOT)/common/ds/load.o \
 	$(PLIO_SRC_ROOT)/common/protocol/protocol.o \
+	$(PLIO_SRC_ROOT)/common/remap/remap_msg_handler.o \
 	$(PLIO_SRC_ROOT)/common/socket/socket.o \
 	$(PLIO_SRC_ROOT)/common/socket/epoll.o \
 	$(PLIO_SRC_ROOT)/lib/death_handler/death_handler.o \
 	$(PLIO_SRC_ROOT)/lib/inih/ini.o \
 	-lrt \
-	-ldl
+	-ldl \
+	-ltspread
 
 .PHONY: clean
 

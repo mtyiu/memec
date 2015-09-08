@@ -1,7 +1,16 @@
 #include <cstring>
 #include "remap_msg_handler.hh"
 
-static sp_time spTimeout = { 2, 0 };
+RemapMsgHandler::RemapMsgHandler() {
+    this->reader = -1;
+    this->isConnected = false;
+    this->msgCount = 0;
+    this->group = ( char* ) GROUP_NAME;
+    pthread_rwlock_init( &this->stlock, NULL );
+}
+
+RemapMsgHandler::~RemapMsgHandler() {
+}
 
 bool RemapMsgHandler::init( const char *spread, const char *user ) {
 
@@ -15,12 +24,14 @@ bool RemapMsgHandler::init( const char *spread, const char *user ) {
         memset( this->user + MAX_SPREAD_NAME - 1, 0, 1 );
     }
 
+    pthread_rwlock_wrlock( &this->stlock );
     this->status = REMAP_NONE;
+    pthread_rwlock_unlock( &this->stlock );
     this->msgCount = 0;
 
     // construct the spread name, username
     // connect to spread daemon
-    int ret = SP_connect_timeout( this->spread, this->user, 0, 1, &mbox, privateGroup, spTimeout );
+    int ret = SP_connect( this->spread, this->user, 0, 1, &mbox, privateGroup );
     if ( ret != ACCEPT_SESSION ) {
         fprintf( stderr, "Cannot establish a session with spread daemon!\n" );
         SP_error( ret );

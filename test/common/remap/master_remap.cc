@@ -4,25 +4,43 @@
 
 #define TIME_OUT 1
 
-int main () {
+int main ( int argc, char **argv ) {
+
+    if ( argc < 2 ) {
+        fprintf( stderr, "Usage: %s name_identified\n", argv[0] );
+        return 1;
+    }
+
     MasterRemapMsgHandler* mh = new MasterRemapMsgHandler();
-    mh->init( "master01" );
+    char namebuf[64];
+
+    fprintf( stderr, "START testing master remapping message handler\n");
+    // init. the hanlder with a user name
+    sprintf( namebuf, "%s%s", MASTER_PREFIX, argv[1] );
+    mh->init( namebuf );
+    // start listening to incomming messages from coordinator (via spread daemon)
     if ( ! mh->start() ) {
-        fprintf( stderr, "Cannot start reading message with message handler\n" );
+        fprintf( stderr, "!! Cannot start reading message with message handler !!\n" );
     } else { 
+        // simulate the flow of start/end of remapping phase
         while ( mh->getStatus() != REMAP_PREPARE_START ) 
             sleep( TIME_OUT );
+        fprintf( stderr, ".. Acknowledge start of remapping phase\n" );
         mh->ackRemap();
         while ( mh->getStatus() != REMAP_PREPARE_END )
             sleep( TIME_OUT );
+        fprintf( stderr, ".. Acknowledge end of remapping phase\n" );
         mh->ackRemap();
         while ( mh->getStatus() != REMAP_NONE )
             sleep( TIME_OUT );
+        fprintf( stderr, "... Stop listening to incomming messages\n" );
         mh->stop();
     }
+    // stop listening and disconnect from spread daemon
     mh->quit();
-
     delete mh;
+
+    fprintf( stderr, "END testing master remapping message handler\n");
 
     return 0;
 }
