@@ -90,6 +90,8 @@ public:
 		if ( this->isMixed ) {
 			fprintf( f, "[Mixed] " );
 			this->mixed->print( f );
+			fprintf( f, "[Mixed (Prioritized)] " );
+			this->priority.mixed->print( f );
 		} else {
 			fprintf( f, "[Application] " );
 			this->separated.application->print( f );

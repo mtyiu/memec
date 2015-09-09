@@ -57,19 +57,18 @@ public:
 	}
 
 	void setReferenceCount( uint32_t count ) {
+		fprintf( stderr, "{%lu} [%p] set referenceCount: %u\n", pthread_self(), this, count );
 		this->referenceCount = count;
-	}
-
-	void increment() {
-		this->referenceCount++;
 	}
 
 	bool decrement() {
 		bool ret;
+		uint32_t prev;
 
 		pthread_mutex_lock( &this->lock );
+		prev = this->referenceCount;
 		this->referenceCount--;
-		fprintf( stderr, "referenceCount = %u\n", this->referenceCount );
+		fprintf( stderr, "{%lu} [%p] referenceCount = %u ---> %u\n", pthread_self(), this, prev, this->referenceCount );
 		ret = this->referenceCount == 0;
 		pthread_mutex_unlock( &this->lock );
 
@@ -102,12 +101,6 @@ public:
 
 	Packet *malloc() {
 		Packet *packet = this->pool->malloc();
-		return packet;
-	}
-
-	Packet *mallocAndSet( char *data, size_t size ) {
-		Packet *packet = this->pool->malloc();
-		packet->write( data, size );
 		return packet;
 	}
 
