@@ -87,10 +87,12 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 	}
 
 	/* Remapping message handler */
-	char coordName[ 11 ];
-	memset( coordName, 0, 11 );
-	sprintf( coordName, "%s%03d", COORD_PREFIX, this->config.coordinator.coordinator.addr.port % 1000 );
-	remapMsgHandler.init( this->config.global.spreadd.addr, this->config.global.spreadd.port, coordName );
+	if ( this->config.global.spreadd.enabled ) {
+		char coordName[ 11 ];
+		memset( coordName, 0, 11 );
+		sprintf( coordName, "%s%03d", COORD_PREFIX, this->config.coordinator.coordinator.addr.port % 1000 );
+		remapMsgHandler.init( this->config.global.spreadd.addr.addr, this->config.global.spreadd.addr.port, coordName );
+	}
 
 	// Set signal handlers //
 	Signal::setHandler( Coordinator::signalHandler );
@@ -121,7 +123,7 @@ bool Coordinator::start() {
 	}
 
 	/* Remapping message handler */
-	if ( ! this->remapMsgHandler.start() ) {
+	if ( this->config.global.spreadd.enabled && ! this->remapMsgHandler.start() ) {
 		__ERROR__( "Coordinator", "start", "Cannot start remapping message handler." );
 		return false;
 	}
@@ -165,8 +167,10 @@ bool Coordinator::stop() {
 	pthread_mutex_unlock( &this->sockets.slaves.lock );
 
 	/* Remapping message handler */
-	this->remapMsgHandler.stop();
-	this->remapMsgHandler.quit();
+	if ( this->config.global.spreadd.enabled ) {
+		this->remapMsgHandler.stop();
+		this->remapMsgHandler.quit();
+	}
 
 	this->free();
 	this->isRunning = false;
