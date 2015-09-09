@@ -19,8 +19,8 @@ bool MasterRemapMsgHandler::init( const int ip, const int port, const char *user
     memset( addrbuf, 0, 32 );
     addr.s_addr = ip;
     inet_ntop( AF_INET, &addr, ipstr, INET_ADDRSTRLEN );
-    sprintf( addrbuf, "%u@%s", port, ipstr );
-    return RemapMsgHandler::init( "4803@localhost", user ) ;
+    sprintf( addrbuf, "%u@%s", ntohs( port ), ipstr );
+    return RemapMsgHandler::init( addrbuf , user ) ;
 }
 
 void MasterRemapMsgHandler::quit() {

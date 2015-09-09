@@ -25,7 +25,7 @@ bool CoordinatorRemapMsgHandler::init( const int ip, const int port, const char 
     memset( addrbuf, 0, 32 );
     addr.s_addr = ip;
     inet_ntop( AF_INET, &addr, ipstr, INET_ADDRSTRLEN );
-    sprintf( addrbuf, "%u@%s", port, ipstr );
+    sprintf( addrbuf, "%u@%s", ntohs( port ), ipstr );
     RemapMsgHandler::init( addrbuf , user );
 
     this->isListening = false;
