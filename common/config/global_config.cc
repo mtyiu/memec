@@ -42,6 +42,12 @@ bool GlobalConfig::set( const char *section, const char *name, const char *value
 			this->slaves.push_back( addr );
 		else
 			return false;
+	} else if ( match( section, "spreadd" ) ) {
+		ServerAddr addr;
+		if ( addr.parse( name, value ) )
+			this->spreadd = addr;
+		else
+			return false;
 	} else if ( match( section, "buffer" ) ) {
 		if ( match( name, "chunks_per_list" ) )
 			this->buffer.chunksPerList = atoi( value );

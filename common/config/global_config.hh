@@ -27,6 +27,7 @@ public:
 	} sync;
 	std::vector<ServerAddr> coordinators;
 	std::vector<ServerAddr> slaves;
+    ServerAddr spreadd;
 	struct {
 		uint16_t chunksPerList;
 	} buffer;

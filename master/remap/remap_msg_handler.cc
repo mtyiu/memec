@@ -1,5 +1,7 @@
-#include <pthread.h>
 #include <cstdlib>
+#include <arpa/inet.h>
+#include <pthread.h>
+#include <string.h>
 #include "../../common/remap/remap_group.hh"
 #include "remap_msg_handler.hh"
 
@@ -11,8 +13,13 @@ MasterRemapMsgHandler::MasterRemapMsgHandler() :
 MasterRemapMsgHandler::~MasterRemapMsgHandler() {
 }
 
-bool MasterRemapMsgHandler::init( const char *user ) { 
-    //fprintf( stderr, "master joins as %s\n", user );
+bool MasterRemapMsgHandler::init( const int ip, const int port, const char *user ) { 
+    char addrbuf[ 32 ], ipstr[ INET_ADDRSTRLEN ];
+    struct in_addr addr;
+    memset( addrbuf, 0, 32 );
+    addr.s_addr = ip;
+    inet_ntop( AF_INET, &addr, ipstr, INET_ADDRSTRLEN );
+    sprintf( addrbuf, "%u@%s", port, ipstr );
     return RemapMsgHandler::init( "4803@localhost", user ) ;
 }
 

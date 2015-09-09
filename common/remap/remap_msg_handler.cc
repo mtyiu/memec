@@ -40,7 +40,6 @@ bool RemapMsgHandler::init( const char *spread, const char *user ) {
 
     // join the group
     ret = SP_join( mbox, this->group );
-    fprintf( stderr, "Join %s\n", this->group );
     if ( ret != 0 ) {
         fprintf( stderr, "Cannot join the group %s!\n", this->group );
         SP_error( ret );

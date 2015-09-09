@@ -1,3 +1,4 @@
+#include <arpa/inet.h>
 #include <unistd.h>
 #include "../../../common/remap/remap_status.hh"
 #include "../../../master/remap/remap_msg_handler.hh"
@@ -15,9 +16,12 @@ int main ( int argc, char **argv ) {
     char namebuf[64];
 
     fprintf( stderr, "START testing master remapping message handler\n");
-    // init. the hanlder with a user name
+    // init. the hanlder with an address and a user name
+    struct in_addr addr;
+    inet_pton( AF_INET, "127.0.0.1", &addr); 
     sprintf( namebuf, "%s%s", MASTER_PREFIX, argv[1] );
-    mh->init( namebuf );
+
+    mh->init( addr.s_addr, 4803, namebuf );
     // start listening to incomming messages from coordinator (via spread daemon)
     if ( ! mh->start() ) {
         fprintf( stderr, "!! Cannot start reading message with message handler !!\n" );

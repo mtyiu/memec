@@ -4,6 +4,7 @@
 #include <cstdio>
 #include "../config/coordinator_config.hh"
 #include "../event/event_queue.hh"
+#include "../remap/remap_msg_handler.hh"
 #include "../socket/coordinator_socket.hh"
 #include "../socket/master_socket.hh"
 #include "../socket/slave_socket.hh"
@@ -21,6 +22,8 @@ private:
 	bool isRunning;
 	struct timespec startTime;
 	std::vector<CoordinatorWorker> workers;
+
+	CoordinatorRemapMsgHandler remapMsgHandler;
 
 	Coordinator();
 	// Do not implement

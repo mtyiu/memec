@@ -36,7 +36,7 @@ public:
     CoordinatorRemapMsgHandler();
     ~CoordinatorRemapMsgHandler();
 
-    bool init( const char *user = NULL );
+    bool init( const int ip, const int port, const char *user = NULL );
     void quit();
 
     bool start();

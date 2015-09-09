@@ -86,6 +86,12 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 #undef WORKER_INIT_LOOP
 	}
 
+	/* Remapping message handler */
+	char coordName[ 11 ];
+	memset( coordName, 0, 11 );
+	sprintf( coordName, "%s%03d", COORD_PREFIX, this->config.coordinator.coordinator.addr.port % 1000 );
+	remapMsgHandler.init( this->config.global.spreadd.addr, this->config.global.spreadd.port, coordName );
+
 	// Set signal handlers //
 	Signal::setHandler( Coordinator::signalHandler );
 
@@ -111,6 +117,12 @@ bool Coordinator::start() {
 	/* Sockets */
 	if ( ! this->sockets.self.start() ) {
 		__ERROR__( "Coordinator", "start", "Cannot start socket." );
+		return false;
+	}
+
+	/* Remapping message handler */
+	if ( ! this->remapMsgHandler.start() ) {
+		__ERROR__( "Coordinator", "start", "Cannot start remapping message handler." );
 		return false;
 	}
 
@@ -151,6 +163,10 @@ bool Coordinator::stop() {
 	for ( i = 0, len = this->sockets.slaves.size(); i < len; i++ )
 		this->sockets.slaves[ i ].stop();
 	pthread_mutex_unlock( &this->sockets.slaves.lock );
+
+	/* Remapping message handler */
+	this->remapMsgHandler.stop();
+	this->remapMsgHandler.quit();
 
 	this->free();
 	this->isRunning = false;

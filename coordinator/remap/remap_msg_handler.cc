@@ -1,7 +1,8 @@
 #include <cstring>
 #include <cstdlib>
-#include <unistd.h>
+#include <arpa/inet.h>
 #include <sp.h>
+#include <unistd.h>
 #include "remap_msg_handler.hh"
 #include "../../common/remap/remap_group.hh"
 
@@ -18,8 +19,15 @@ CoordinatorRemapMsgHandler::CoordinatorRemapMsgHandler() :
 CoordinatorRemapMsgHandler::~CoordinatorRemapMsgHandler() {
 }
 
-bool CoordinatorRemapMsgHandler::init( const char *user ) {
-    RemapMsgHandler::init( "4803@localhost" , user );
+bool CoordinatorRemapMsgHandler::init( const int ip, const int port, const char *user ) {
+    char addrbuf[ 32 ], ipstr[ INET_ADDRSTRLEN ];
+    struct in_addr addr;
+    memset( addrbuf, 0, 32 );
+    addr.s_addr = ip;
+    inet_ntop( AF_INET, &addr, ipstr, INET_ADDRSTRLEN );
+    sprintf( addrbuf, "%u@%s", port, ipstr );
+    RemapMsgHandler::init( addrbuf , user );
+
     this->isListening = false;
     return ( SP_join( this->mbox, MASTER_GROUP ) == 0 );
 }

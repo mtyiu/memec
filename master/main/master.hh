@@ -6,6 +6,7 @@
 #include "../config/master_config.hh"
 #include "../ds/pending.hh"
 #include "../event/event_queue.hh"
+#include "../remap/remap_msg_handler.hh"
 #include "../socket/application_socket.hh"
 #include "../socket/coordinator_socket.hh"
 #include "../socket/master_socket.hh"
@@ -27,6 +28,8 @@ private:
 	bool isRunning;
 	struct timespec startTime;
 	std::vector<MasterWorker> workers;
+
+	MasterRemapMsgHandler remapMsgHandler;
 
 	Master();
 	// Do not implement
