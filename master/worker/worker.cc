@@ -963,6 +963,10 @@ void *MasterWorker::run( void *argv ) {
 
 	switch ( role ) {
 		case WORKER_ROLE_MIXED:
+			// MASTER_WORKER_EVENT_LOOP(
+			// 	MixedEvent,
+			// 	eventQueue->mixed
+			// );
 		{
 			MixedEvent event;
 			bool ret;

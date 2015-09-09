@@ -755,11 +755,11 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size ) 
 		__ERROR__( "SlaveWorker", "handleSetRequest", "Invalid SET request (size = %lu).", size );
 		return false;
 	}
-	// __ERROR__(
-	// 	"SlaveWorker", "handleSetRequest",
-	// 	"[SET] Key: %.*s (key size = %u); Value: (value size = %u)",
-	// 	( int ) header.keySize, header.key, header.keySize, header.valueSize
-	// );
+	__DEBUG__(
+		BLUE, "SlaveWorker", "handleSetRequest",
+		"[SET] Key: %.*s (key size = %u); Value: (value size = %u)",
+		( int ) header.keySize, header.key, header.keySize, header.valueSize
+	);
 
 	// Detect degraded SET
 	bool isParity;
