@@ -39,7 +39,8 @@ char *MasterProtocol::reqSet( size_t &size, char *key, uint8_t keySize, char *va
 		keySize,
 		key,
 		valueSize,
-		value
+		value,
+		buf
 	);
 	return buf;
 }

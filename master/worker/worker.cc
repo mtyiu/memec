@@ -526,6 +526,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 
 #ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
 	Packet *packet = MasterWorker::packetPool->malloc();
+	packet->setReferenceCount( 1 + MasterWorker::parityChunkCount );
 	buffer.data = packet->data;
 	this->protocol.reqSet( buffer.size, header.key, header.keySize, header.value, header.valueSize, buffer.data );
 	packet->size = buffer.size;

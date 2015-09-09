@@ -29,7 +29,7 @@ public:
 
 	bool init( uint32_t capacity ) {
 		this->capacity = capacity;
-		this->data = new char[ size ];
+		this->data = new char[ capacity ];
 		return true;
 	}
 
@@ -56,6 +56,10 @@ public:
 		return true;
 	}
 
+	void setReferenceCount( uint32_t count ) {
+		this->referenceCount = count;
+	}
+
 	void increment() {
 		this->referenceCount++;
 	}
@@ -65,6 +69,7 @@ public:
 
 		pthread_mutex_lock( &this->lock );
 		this->referenceCount--;
+		fprintf( stderr, "referenceCount = %u\n", this->referenceCount );
 		ret = this->referenceCount == 0;
 		pthread_mutex_unlock( &this->lock );
 
@@ -97,13 +102,11 @@ public:
 
 	Packet *malloc() {
 		Packet *packet = this->pool->malloc();
-		packet->increment();
 		return packet;
 	}
 
 	Packet *mallocAndSet( char *data, size_t size ) {
 		Packet *packet = this->pool->malloc();
-		packet->increment();
 		packet->write( data, size );
 		return packet;
 	}
