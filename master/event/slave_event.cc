@@ -7,12 +7,10 @@ void SlaveEvent::reqRegister( SlaveSocket *socket, uint32_t addr, uint16_t port 
 	this->message.address.port = port;
 }
 
-void SlaveEvent::send( SlaveSocket *socket, MasterProtocol *protocol, size_t size, size_t index ) {
+void SlaveEvent::send( SlaveSocket *socket, Packet *packet ) {
 	this->type = SLAVE_EVENT_TYPE_SEND;
 	this->socket = socket;
-	this->message.send.protocol = protocol;
-	this->message.send.size = size;
-	this->message.send.index = index;
+	this->message.send.packet = packet;
 }
 
 void SlaveEvent::pending( SlaveSocket *socket ) {

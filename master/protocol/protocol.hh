@@ -20,7 +20,7 @@ public:
 	// Register
 	char *reqRegisterSlave( size_t &size, uint32_t addr, uint16_t port );
 	// SET
-	char *reqSet( size_t &size, char *key, uint8_t keySize, char *value, uint32_t valueSize );
+	char *reqSet( size_t &size, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf = 0 );
 	// GET
 	char *reqGet( size_t &size, char *key, uint8_t keySize );
 	// UPDATE

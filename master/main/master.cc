@@ -71,8 +71,15 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 		this->config.global.stripeList.count,
 		this->sockets.slaves.values
 	);
-	/* Workers and event queues */
+	/* Workers, packet pool and event queues */
 	if ( this->config.master.workers.type == WORKER_TYPE_MIXED ) {
+		this->packetPool.init(
+			this->config.master.workers.number.mixed,
+			Protocol::getSuggestedBufferSize(
+				this->config.global.size.key,
+				this->config.global.size.chunk
+			)
+		);
 		this->eventQueue.init(
 			this->config.master.eventQueue.block,
 			this->config.master.eventQueue.size.mixed
@@ -87,6 +94,13 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 			);
 		}
 	} else {
+		this->packetPool.init(
+			this->config.master.workers.number.mixed,
+			Protocol::getSuggestedBufferSize(
+				this->config.global.size.key,
+				this->config.global.size.chunk
+			)
+		);
 		this->workers.reserve( this->config.master.workers.number.separated.total );
 		this->eventQueue.init(
 			this->config.master.eventQueue.block,

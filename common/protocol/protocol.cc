@@ -5,13 +5,14 @@
 #define PROTO_BUF_MIN_SIZE		65536
 #define PROTO_KEY_VALUE_SIZE	4 // 1 byte for key size, 3 bytes for value size
 
-size_t Protocol::generateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t length ) {
+size_t Protocol::generateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t length, char *sendBuf ) {
 	size_t bytes = 0;
+	if ( ! sendBuf ) sendBuf = this->buffer.send;
 
-	this->buffer.send[ 0 ] = ( ( magic & 0x07 ) | ( this->from & 0x18 ) | ( to & 0x60 ) );
-	this->buffer.send[ 1 ] = opcode & 0xFF;
-	this->buffer.send[ 2 ] = 0;
-	this->buffer.send[ 3 ] = 0;
+	sendBuf[ 0 ] = ( ( magic & 0x07 ) | ( this->from & 0x18 ) | ( to & 0x60 ) );
+	sendBuf[ 1 ] = opcode & 0xFF;
+	sendBuf[ 2 ] = 0;
+	sendBuf[ 3 ] = 0;
 	bytes += 4;
 
 	*( ( uint32_t * )( this->buffer.send + bytes ) ) = htonl( length );
@@ -34,9 +35,10 @@ size_t Protocol::generateKeyHeader( uint8_t magic, uint8_t to, uint8_t opcode, u
 	return bytes;
 }
 
-size_t Protocol::generateKeyValueHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint8_t keySize, char *key, uint32_t valueSize, char *value ) {
-	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_KEY_VALUE_SIZE + keySize + valueSize );
+size_t Protocol::generateKeyValueHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint8_t keySize, char *key, uint32_t valueSize, char *value, char *sendBuf ) {
+	if ( ! sendBuf ) sendBuf = this->buffer.send;
+	char *buf = sendBuf + PROTO_HEADER_SIZE;
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_KEY_VALUE_SIZE + keySize + valueSize, sendBuf );
 
 	buf[ 0 ] = keySize;
 

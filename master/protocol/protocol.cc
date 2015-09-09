@@ -30,7 +30,8 @@ char *MasterProtocol::reqRegisterSlave( size_t &size, uint32_t addr, uint16_t po
 	return this->buffer.send;
 }
 
-char *MasterProtocol::reqSet( size_t &size, char *key, uint8_t keySize, char *value, uint32_t valueSize ) {
+char *MasterProtocol::reqSet( size_t &size, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf ) {
+	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateKeyValueHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
@@ -40,7 +41,7 @@ char *MasterProtocol::reqSet( size_t &size, char *key, uint8_t keySize, char *va
 		valueSize,
 		value
 	);
-	return this->buffer.send;
+	return buf;
 }
 
 char *MasterProtocol::reqGet( size_t &size, char *key, uint8_t keySize ) {

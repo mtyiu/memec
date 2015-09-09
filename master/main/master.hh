@@ -15,6 +15,7 @@
 #include "../../common/ds/array_map.hh"
 #include "../../common/ds/key.hh"
 #include "../../common/ds/key_value.hh"
+#include "../../common/ds/packet_pool.hh"
 #include "../../common/stripe_list/stripe_list.hh"
 #include "../../common/socket/epoll.hh"
 #include "../../common/signal/signal.hh"
@@ -53,6 +54,7 @@ public:
 	Pending pending;
 	MasterEventQueue eventQueue;
 	StripeList<SlaveSocket> *stripeList;
+	PacketPool packetPool;
 
 	static Master *getInstance() {
 		static Master master;

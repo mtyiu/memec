@@ -10,6 +10,7 @@ uint32_t MasterWorker::parityChunkCount;
 Pending *MasterWorker::pending;
 MasterEventQueue *MasterWorker::eventQueue;
 StripeList<SlaveSocket> *MasterWorker::stripeList;
+PacketPool *MasterWorker::packetPool;
 
 void MasterWorker::dispatch( MixedEvent event ) {
 	switch( event.type ) {
@@ -295,8 +296,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 			isSend = true;
 			break;
 		case SLAVE_EVENT_TYPE_SEND:
-			buffer.data = event.message.send.protocol->buffer.send;
-			buffer.size = event.message.send.size;
+			event.message.send.packet->read( buffer.data, buffer.size );
 			isSend = true;
 			break;
 		case SLAVE_EVENT_TYPE_PENDING:
@@ -312,7 +312,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 			__ERROR__( "MasterWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 
 		if ( event.type == SLAVE_EVENT_TYPE_SEND ) {
-			event.message.send.protocol->status[ event.message.send.index ] = false;
+			MasterWorker::packetPool->free( event.message.send.packet );
 		}
 	} else {
 		// Parse responses from slaves
@@ -502,7 +502,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 	);
 
 	uint32_t listId, chunkId;
-	bool isDegraded, connected;
+	bool isDegraded;
 	SlaveSocket *socket;
 
 	socket = this->getSlaves(
@@ -523,9 +523,18 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		char *data;
 	} buffer;
 	Key key;
+
+#ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
+	Packet *packet = MasterWorker::packetPool->malloc();
+	buffer.data = packet->data;
+	this->protocol.reqSet( buffer.size, header.key, header.keySize, header.value, header.valueSize, buffer.data );
+	packet->size = buffer.size;
+#else
+	bool connected;
 	ssize_t sentBytes;
 
 	buffer.data = this->protocol.reqSet( buffer.size, header.key, header.keySize, header.value, header.valueSize );
+#endif
 
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
 
@@ -553,9 +562,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
 #ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
 		SlaveEvent slaveEvent;
-		this->protocol.status[ i ] = true;
-
-		slaveEvent.send( this->paritySlaveSockets[ i ], &this->protocol, buffer.size, i );
+		slaveEvent.send( this->paritySlaveSockets[ i ], packet );
 		MasterWorker::eventQueue->insert( slaveEvent );
 #else
 		sentBytes = this->paritySlaveSockets[ i ]->send( buffer.data, buffer.size, connected );
@@ -565,16 +572,15 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 #endif
 	}
 
+#ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
+	SlaveEvent slaveEvent;
+	slaveEvent.send( socket, packet );
+	this->dispatch( slaveEvent );
+#else
 	sentBytes = socket->send( buffer.data, buffer.size, connected );
 	if ( sentBytes != ( ssize_t ) buffer.size ) {
 		__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 		return false;
-	}
-
-#ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
-	// Wait until all replicas are sent
-	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
-		while( this->protocol.status[ i ] ); // Busy waiting
 	}
 #endif
 
@@ -991,6 +997,7 @@ bool MasterWorker::init() {
 	MasterWorker::pending = &master->pending;
 	MasterWorker::eventQueue = &master->eventQueue;
 	MasterWorker::stripeList = master->stripeList;
+	MasterWorker::packetPool = &master->packetPool;
 	return true;
 }
 

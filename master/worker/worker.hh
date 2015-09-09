@@ -10,6 +10,7 @@
 #include "../../common/worker/worker.hh"
 #include "../../common/config/global_config.hh"
 #include "../../common/stripe_list/stripe_list.hh"
+#include "../../common/ds/packet_pool.hh"
 
 #define MASTER_WORKER_SEND_REPLICAS_PARALLEL
 
@@ -25,6 +26,7 @@ private:
 	static Pending *pending;
 	static MasterEventQueue *eventQueue;
 	static StripeList<SlaveSocket> *stripeList;
+	static PacketPool *packetPool;
 
 	void dispatch( MixedEvent event );
 	void dispatch( ApplicationEvent event );

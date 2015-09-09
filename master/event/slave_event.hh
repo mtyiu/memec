@@ -3,6 +3,7 @@
 
 #include "../protocol/protocol.hh"
 #include "../socket/slave_socket.hh"
+#include "../../common/ds/packet_pool.hh"
 #include "../../common/event/event.hh"
 
 enum SlaveEventType {
@@ -22,14 +23,12 @@ public:
 			uint16_t port;
 		} address;
 		struct {
-			size_t size;
-			size_t index;
-			MasterProtocol *protocol;
+			Packet *packet;
 		} send;
 	} message;
 
 	void reqRegister( SlaveSocket *socket, uint32_t addr, uint16_t port );
-	void send( SlaveSocket *socket, MasterProtocol *protocol, size_t size, size_t index );
+	void send( SlaveSocket *socket, Packet *packet );
 	void pending( SlaveSocket *socket );
 };
 

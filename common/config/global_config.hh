@@ -34,7 +34,7 @@ public:
 		CodingScheme scheme;
 		CodingParams params;
 	} coding;
-	
+
 	bool parse( const char *path );
 	bool set( const char *section, const char *name, const char *value );
 	bool validate();
