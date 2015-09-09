@@ -82,7 +82,7 @@ public class PLIO {
       try {
          bytes = this.read( Protocol.PROTO_HEADER_SIZE );
       } catch( IOException e ) {
-         System.err.println( "PLIO.connect(): [Warning] Unable to read response from master." );
+         System.err.println( "PLIO.connect(): [Error] Unable to read response from master." );
          return false;
       }
       if ( bytes == Protocol.PROTO_HEADER_SIZE ) {
@@ -102,19 +102,25 @@ public class PLIO {
    }
 
    public String get( String key ) {
-      return this.get( key.getBytes(), key.length() );
+      byte[] k = key.getBytes();
+      return this.get( k, k.length );
    }
 
    public boolean set( String key, String value ) {
-      return this.set( key.getBytes(), key.length(), value.getBytes(), value.length() );
+      byte[] k = key.getBytes();
+      byte[] v = value.getBytes();
+      return this.set( k, k.length, v, v.length );
    }
 
    public boolean update( String key, String value, int offset ) {
-      return this.update( key.getBytes(), key.length(), value.getBytes(), offset, value.length() );
+      byte[] k = key.getBytes();
+      byte[] v = value.getBytes();
+      return this.update( k, k.length, v, offset, v.length );
    }
 
    public boolean delete( String key ) {
-      return this.delete( key.getBytes(), key.length() );
+      byte[] k = key.getBytes();
+      return this.delete( k, k.length );
    }
 
    public String get( byte[] key, int keySize ) {
@@ -127,14 +133,14 @@ public class PLIO {
       try {
          this.out.write( this.protocol.buf, 0, bytes );
       } catch( IOException e ) {
-         System.err.println( "PLIO.get(): [Warning] Unable to send GET request to master." );
+         System.err.println( "PLIO.get(): [Error] Unable to send GET request to master." );
          return null;
       }
 
       try {
          bytes = this.read( Protocol.PROTO_HEADER_SIZE );
       } catch( IOException e ) {
-         System.err.println( "PLIO.get(): [Warning] Unable to read GET response from master." );
+         System.err.println( "PLIO.get(): [Error] Unable to read GET response from master." );
          return null;
       }
       if ( bytes == Protocol.PROTO_HEADER_SIZE ) {
@@ -145,18 +151,19 @@ public class PLIO {
       try {
          bytes = this.read( this.protocol.header.length );
       } catch( IOException e ) {
-         System.err.println( "PLIO.get(): [Warning] Unable to read GET response from master." );
+         System.err.println( "PLIO.get(): [Error] Unable to read GET response from master." );
          return null;
       }
       if ( bytes == this.protocol.header.length ) {
          if ( this.protocol.header.isSuccessful() ) {
             this.protocol.parseKeyValueHeader( bytes, 0 );
             // this.debug( this.protocol.keyValueHeader.toString() );
-            return this.protocol.keyValueHeader.value();
+            if ( this.protocol.keyValueHeader.match( key, keySize ) )
+               return this.protocol.keyValueHeader.value();
+            System.err.println( "PLIO.get(): [Error] The response does not match with the key." );
          } else {
             this.protocol.parseKeyHeader( bytes, 0 );
             // this.debug( this.protocol.keyHeader.toString() );
-            return null;
          }
       }
       return null;
@@ -173,14 +180,14 @@ public class PLIO {
       try {
          this.out.write( this.protocol.buf, 0, bytes );
       } catch( IOException e ) {
-         System.err.println( "PLIO.set(): [Warning] Unable to send SET request to master." );
+         System.err.println( "PLIO.set(): [Error] Unable to send SET request to master." );
          return false;
       }
 
       try {
          bytes = this.read( Protocol.PROTO_HEADER_SIZE );
       } catch( IOException e ) {
-         System.err.println( "PLIO.set(): [Warning] Unable to read SET response from master." );
+         System.err.println( "PLIO.set(): [Error] Unable to read SET response from master." );
          return false;
       }
       if ( bytes == Protocol.PROTO_HEADER_SIZE ) {
@@ -191,14 +198,21 @@ public class PLIO {
       try {
          bytes = this.read( this.protocol.header.length );
       } catch( IOException e ) {
-         System.err.println( "PLIO.set(): [Warning] Unable to read SET response from master." );
+         System.err.println( "PLIO.set(): [Error] Unable to read SET response from master." );
          return false;
       }
       if ( bytes == this.protocol.header.length ) {
          this.protocol.parseKeyHeader( bytes, 0 );
          // this.debug( this.protocol.keyHeader.toString() );
+         if ( this.protocol.header.isSuccessful() ) {
+            if ( this.protocol.keyHeader.match( key, keySize ) ) {
+               return true;
+            } else {
+               System.err.println( "PLIO.set(): [Error] The response does not match with the key." );
+            }
+         }
       }
-      return true;
+      return false;
    }
 
    public boolean update( byte[] key, int keySize, byte[] valueUpdate, int valueUpdateOffset, int valueUpdateSize ) {
@@ -212,14 +226,14 @@ public class PLIO {
       try {
          this.out.write( this.protocol.buf, 0, bytes );
       } catch( IOException e ) {
-         System.err.println( "PLIO.update(): [Warning] Unable to send UPDATE request to master." );
+         System.err.println( "PLIO.update(): [Error] Unable to send UPDATE request to master." );
          return false;
       }
 
       try {
          bytes = this.read( Protocol.PROTO_HEADER_SIZE );
       } catch( IOException e ) {
-         System.err.println( "PLIO.update(): [Warning] Unable to read UPDATE response from master." );
+         System.err.println( "PLIO.update(): [Error] Unable to read UPDATE response from master." );
          return false;
       }
       if ( bytes == Protocol.PROTO_HEADER_SIZE ) {
@@ -230,14 +244,20 @@ public class PLIO {
       try {
          bytes = this.read( this.protocol.header.length );
       } catch( IOException e ) {
-         System.err.println( "PLIO.update(): [Warning] Unable to read UPDATE response from master." );
+         System.err.println( "PLIO.update(): [Error] Unable to read UPDATE response from master." );
          return false;
       }
       if ( bytes == this.protocol.header.length ) {
          this.protocol.parseKeyValueUpdateHeader( bytes, 0 );
          // this.debug( this.protocol.keyValueUpdateHeader.toString() );
+         if ( this.protocol.header.isSuccessful() ) {
+            if ( this.protocol.keyValueUpdateHeader.match( key, keySize ) )
+               return true;
+            else
+               System.err.println( "PLIO.update(): [Error] The response does not match with the key." );
+         }
       }
-      return true;
+      return false;
    }
 
    public boolean delete( byte[] key, int keySize ) {
@@ -250,14 +270,14 @@ public class PLIO {
       try {
          this.out.write( this.protocol.buf, 0, bytes );
       } catch( IOException e ) {
-         System.err.println( "PLIO.delete(): [Warning] Unable to send DELETE request to master." );
+         System.err.println( "PLIO.delete(): [Error] Unable to send DELETE request to master." );
          return false;
       }
 
       try {
          bytes = this.read( Protocol.PROTO_HEADER_SIZE );
       } catch( IOException e ) {
-         System.err.println( "PLIO.delete(): [Warning] Unable to read DELETE response from master." );
+         System.err.println( "PLIO.delete(): [Error] Unable to read DELETE response from master." );
          return false;
       }
       if ( bytes == Protocol.PROTO_HEADER_SIZE ) {
@@ -268,13 +288,20 @@ public class PLIO {
       try {
          bytes = this.read( this.protocol.header.length );
       } catch( IOException e ) {
-         System.err.println( "PLIO.delete(): [Warning] Unable to read DELETE response from master." );
+         System.err.println( "PLIO.delete(): [Error] Unable to read DELETE response from master." );
          return false;
       }
       if ( bytes == this.protocol.header.length ) {
          this.protocol.parseKeyHeader( bytes, 0 );
          // this.debug( this.protocol.keyHeader.toString() );
+         if ( this.protocol.header.isSuccessful() ) {
+            if ( this.protocol.keyHeader.match( key, keySize ) ) {
+               return true;
+            } else {
+               System.err.println( "PLIO.delete(): [Error] The response does not match with the key." );
+            }
+         }
       }
-      return true;
+      return false;
    }
 }

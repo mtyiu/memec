@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctype.h>
 #include <stdint.h>
 
 class Key {
@@ -18,7 +19,8 @@ public:
 		if ( ! data )
 			data = this->data;
 		this->size = size;
-		this->data = strndup( data, size );
+		this->data = ( char * ) malloc( size );
+		memcpy( this->data, data, size );
 		this->ptr = ptr;
 	}
 
@@ -29,6 +31,7 @@ public:
 	}
 
 	inline void free() {
+		return;
 		if ( this->data )
 			::free( this->data );
 		this->data = 0;

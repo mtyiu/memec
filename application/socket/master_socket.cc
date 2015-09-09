@@ -2,6 +2,13 @@
 #include "../main/application.hh"
 #include "master_socket.hh"
 
+ArrayMap<int, MasterSocket> *MasterSocket::masters;
+
+void MasterSocket::setArrayMap( ArrayMap<int, MasterSocket> *masters ) {
+	MasterSocket::masters = masters;
+	masters->needsDelete = false;
+}
+
 bool MasterSocket::start() {
 	this->registered = false;
 	if ( this->connect() ) {
@@ -12,6 +19,12 @@ bool MasterSocket::start() {
 		return true;
 	}
 	return false;
+}
+
+void MasterSocket::stop() {
+	// MasterSocket::masters->remove( this->sockfd );
+	Socket::stop();
+	// delete this;
 }
 
 ssize_t MasterSocket::send( char *buf, size_t ulen, bool &connected ) {

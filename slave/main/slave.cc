@@ -22,12 +22,12 @@ void Slave::free() {
 }
 
 void Slave::sync() {
-	CoordinatorEvent event;
-	for ( int i = 0, len = this->config.global.coordinators.size(); i < len; i++ ) {
-		// Can only sync with one coordinator
-		event.sync( &this->sockets.coordinators[ i ] );
-		// this->eventQueue.insert( event );
-	}
+	// CoordinatorEvent event;
+	// for ( int i = 0, len = this->config.global.coordinators.size(); i < len; i++ ) {
+	// 	// Can only sync with one coordinator
+	// 	event.sync( this->sockets.coordinators[ i ] );
+	// 	this->eventQueue.insert( event );
+	// }
 }
 
 void Slave::signalHandler( int signal ) {
@@ -72,20 +72,23 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 	}
 	/* Vectors and other sockets */
 	Socket::init( &this->sockets.epoll );
+	CoordinatorSocket::setArrayMap( &this->sockets.coordinators );
+	MasterSocket::setArrayMap( &this->sockets.masters );
+	SlavePeerSocket::setArrayMap( &this->sockets.slavePeers );
 	this->sockets.coordinators.reserve( this->config.global.coordinators.size() );
 	for ( int i = 0, len = this->config.global.coordinators.size(); i < len; i++ ) {
-		CoordinatorSocket socket;
+		CoordinatorSocket *socket = new CoordinatorSocket();
 		int fd;
 
-		socket.init( this->config.global.coordinators[ i ], &this->sockets.epoll );
-		fd = socket.getSocket();
+		socket->init( this->config.global.coordinators[ i ], &this->sockets.epoll );
+		fd = socket->getSocket();
 		this->sockets.coordinators.set( fd, socket );
 	}
 	this->sockets.slavePeers.reserve( this->config.global.slaves.size() );
 	for ( int i = 0, len = this->config.global.slaves.size(); i < len; i++ ) {
-		SlavePeerSocket socket;
+		SlavePeerSocket *socket = new SlavePeerSocket();
 		int tmpfd = - ( i + 1 );
-		socket.init(
+		socket->init(
 			tmpfd,
 			this->config.global.slaves[ i ],
 			&this->sockets.epoll,
@@ -230,7 +233,7 @@ bool Slave::start() {
 	/* Sockets */
 	// Connect to coordinators
 	for ( int i = 0, len = this->config.global.coordinators.size(); i < len; i++ ) {
-		if ( ! this->sockets.coordinators[ i ].start() )
+		if ( ! this->sockets.coordinators[ i ]->start() )
 			__ERROR__( "Slave", "start", "Cannot connect to coordinator #%d.", i );
 	}
 	// Do not connect to slaves until a slave connected message is announcement by the coordinator
@@ -273,13 +276,16 @@ bool Slave::stop() {
 
 	/* Sockets */
 	for ( i = 0, len = this->sockets.coordinators.size(); i < len; i++ )
-		this->sockets.coordinators[ i ].stop();
+		this->sockets.coordinators[ i ]->stop();
+	this->sockets.coordinators.clear();
 	for ( i = 0, len = this->sockets.masters.size(); i < len; i++ )
-		this->sockets.masters[ i ].stop();
+		this->sockets.masters[ i ]->stop();
+	this->sockets.masters.clear();
 	for ( i = 0, len = this->sockets.slavePeers.size(); i < len; i++ ) {
-		this->sockets.slavePeers[ i ].stop();
-		this->sockets.slavePeers[ i ].free();
+		this->sockets.slavePeers[ i ]->stop();
+		this->sockets.slavePeers[ i ]->free();
 	}
+	this->sockets.slavePeers.clear();
 
 	/* Chunk buffer */
 	for ( size_t i = 0, size = this->chunkBuffer.size(); i < size; i++ ) {
@@ -322,21 +328,21 @@ void Slave::debug( FILE *f ) {
 	fprintf( f, "\nCoordinator sockets\n-------------------\n" );
 	for ( i = 0, len = this->sockets.coordinators.size(); i < len; i++ ) {
 		fprintf( f, "%d. ", i + 1 );
-		this->sockets.coordinators[ i ].print( f );
+		this->sockets.coordinators[ i ]->print( f );
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
 
 	fprintf( f, "\nMaster sockets\n---------------\n" );
 	for ( i = 0, len = this->sockets.masters.size(); i < len; i++ ) {
 		fprintf( f, "%d. ", i + 1 );
-		this->sockets.masters[ i ].print( f );
+		this->sockets.masters[ i ]->print( f );
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
 
 	fprintf( f, "\nSlave peer sockets\n------------------\n" );
 	for ( i = 0, len = this->sockets.slavePeers.size(); i < len; i++ ) {
 		fprintf( f, "%d. ", i + 1 );
-		this->sockets.slavePeers[ i ].print( f );
+		this->sockets.slavePeers[ i ]->print( f );
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
 
@@ -367,7 +373,7 @@ void Slave::debug( FILE *f ) {
 	fprintf( f, "\nSlave peer sockets\n------------------\n" );
 	for ( i = 0, len = this->sockets.slavePeers.size(); i < len; i++ ) {
 		fprintf( f, "%d. ", i + 1 );
-		this->sockets.slavePeers[ i ].print( f );
+		this->sockets.slavePeers[ i ]->print( f );
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
 }

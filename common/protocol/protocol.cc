@@ -168,7 +168,7 @@ size_t Protocol::generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t op
 			*( ( uint32_t * )( buf + 10 ) ) = htonl( opMetadata.chunkId );
 
 			buf += PROTO_SLAVE_SYNC_PER_SIZE;
-			memmove( buf, key.data, key.size );
+			memcpy( buf, key.data, key.size );
 			buf += key.size;
 			bytes += PROTO_SLAVE_SYNC_PER_SIZE + key.size;
 			count++;

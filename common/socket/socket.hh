@@ -26,11 +26,6 @@ protected:
 	int sockfd;
 	int type;
 	struct sockaddr_in addr;
-	struct {
-		char data[ 4096 ];
-		size_t size;
-		pthread_mutex_t lock;
-	} pending;
 
 	static EPoll *epoll;
 
@@ -51,7 +46,6 @@ public:
 	inline int getSocket() {
 		return this->sockfd;
 	}
-	Socket();
 	static void init( EPoll *epoll );
 	bool init( int type, uint32_t addr, uint16_t port, bool block = false );
 	bool init( int sockfd, struct sockaddr_in addr );
@@ -62,8 +56,9 @@ public:
 	virtual void print( FILE *f = stdout );
 	void printAddress( FILE *f = stdout );
 	struct sockaddr_in getAddr();
-	bool equal( Socket &s );
+	bool equal( Socket *s );
 	bool equal( uint32_t addr, uint16_t port );
+	virtual ~Socket();
 
 	// Utilities
 	static bool setNonBlocking( int fd );

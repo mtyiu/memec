@@ -183,6 +183,17 @@ public class Protocol {
       public String toString() {
          return "Key: " + key() + " (key size: " + keySize + ")";
       }
+
+      public boolean match( byte[] k, int len ) {
+         if ( len == this.keySize ) {
+            for ( int i = 0; i < len; i++ ) {
+               if ( k[ i ] != this.data[ keyPos + i ] )
+                  return false;
+            }
+            return true;
+         }
+         return false;
+      }
    }
 
    public static class KeyValueHeader {
@@ -201,6 +212,17 @@ public class Protocol {
       public String toString() {
          return "Key: " + key() + " (key size: " + keySize + "); Value: " + value() + " (value size: " + valueSize + ")";
       }
+
+      public boolean match( byte[] k, int len ) {
+         if ( len == this.keySize ) {
+            for ( int i = 0; i < len; i++ ) {
+               if ( k[ i ] != this.data[ keyPos + i ] )
+                  return false;
+            }
+            return true;
+         }
+         return false;
+      }
    }
 
    public static class KeyValueUpdateHeader {
@@ -214,6 +236,17 @@ public class Protocol {
 
       public String toString() {
          return "Key: " + key() + " (key size: " + keySize + "); Value update: (value update size: " + valueUpdateSize + "; offset: " + valueUpdateOffset + ")";
+      }
+
+      public boolean match( byte[] k, int len ) {
+         if ( len == this.keySize ) {
+            for ( int i = 0; i < len; i++ ) {
+               if ( k[ i ] != this.data[ keyPos + i ] )
+                  return false;
+            }
+            return true;
+         }
+         return false;
       }
    }
 

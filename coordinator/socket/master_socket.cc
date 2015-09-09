@@ -1,7 +1,20 @@
 #include "master_socket.hh"
 
+ArrayMap<int, MasterSocket> *MasterSocket::masters;
+
+void MasterSocket::setArrayMap( ArrayMap<int, MasterSocket> *masters ) {
+	MasterSocket::masters = masters;
+	masters->needsDelete = false;
+}
+
 bool MasterSocket::start() {
 	return this->connect();
+}
+
+void MasterSocket::stop() {
+	MasterSocket::masters->remove( this->sockfd );
+	Socket::stop();
+	delete this;
 }
 
 void MasterSocket::setListenAddr( uint32_t addr, uint16_t port ) {

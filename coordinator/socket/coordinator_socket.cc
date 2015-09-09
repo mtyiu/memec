@@ -10,6 +10,7 @@ CoordinatorSocket::CoordinatorSocket() {
 	this->tid = 0;
 	this->epoll = 0;
 	this->buffer.size = PROTO_HEADER_SIZE + 4 + 2;
+	this->sockets.needsDelete = true;
 }
 
 bool CoordinatorSocket::init( int type, uint32_t addr, uint16_t port, int numSlaves, EPoll *epoll ) {
@@ -64,12 +65,12 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 	static Coordinator *coordinator = Coordinator::getInstance();
 
 	///////////////////////////////////////////////////////////////////////////
-	if ( ( events & EPOLLERR ) || ( events & EPOLLHUP ) || ( events & EPOLLRDHUP ) ) {
+	if ( ! ( events & EPOLLIN ) && ( ( events & EPOLLERR ) || ( events & EPOLLHUP ) || ( events & EPOLLRDHUP ) ) ) {
 		// Find the socket in the lists
 		int index;
 		if ( socket->sockets.get( fd, &index ) ) {
-			socket->sockets.removeAt( index );
 			::close( fd );
+			socket->sockets.removeAt( index );
 		} else {
 			MasterSocket *masterSocket = coordinator->sockets.masters.get( fd );
 			SlaveSocket *slaveSocket = masterSocket ? 0 : coordinator->sockets.slaves.get( fd );
@@ -84,11 +85,13 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 		}
 	///////////////////////////////////////////////////////////////////////////
 	} else if ( fd == socket->getSocket() ) {
-		struct sockaddr_in addr;
+		struct sockaddr_in *addr;
 		socklen_t addrlen;
 		while( 1 ) {
-			fd = socket->accept( &addr, &addrlen );
+			addr = new struct sockaddr_in;
+			fd = socket->accept( addr, &addrlen );
 			if ( fd == -1 ) {
+				delete addr;
 				if ( errno != EAGAIN && errno != EWOULDBLOCK ) {
 					__ERROR__( "CoordinatorSocket", "handler", "%s", strerror( errno ) );
 					return false;
@@ -121,39 +124,38 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 					struct AddressHeader addressHeader;
 					socket->protocol.parseAddressHeader( addressHeader, socket->buffer.data + PROTO_HEADER_SIZE, socket->buffer.size - PROTO_HEADER_SIZE );
 					if ( header.from == PROTO_MAGIC_FROM_MASTER ) {
-						MasterSocket masterSocket;
-						masterSocket.init( fd, *addr );
-						masterSocket.setListenAddr( addressHeader.addr, addressHeader.port );
+						MasterSocket *masterSocket = new MasterSocket();
+						masterSocket->init( fd, *addr );
+						masterSocket->setListenAddr( addressHeader.addr, addressHeader.port );
 						coordinator->sockets.masters.set( fd, masterSocket );
+						socket->sockets.removeAt( index );
 
 						socket->done( fd ); // The socket is valid
 
 						MasterEvent event;
-						event.resRegister( coordinator->sockets.masters.get( fd ) );
+						event.resRegister( masterSocket );
 						coordinator->eventQueue.insert( event );
 					} else if ( header.from == PROTO_MAGIC_FROM_SLAVE ) {
-						SlaveSocket slaveSocket;
-						slaveSocket.init( fd, *addr );
-						slaveSocket.setListenAddr( addressHeader.addr, addressHeader.port );
+						SlaveSocket *slaveSocket = new SlaveSocket();
+						slaveSocket->init( fd, *addr );
+						slaveSocket->setListenAddr( addressHeader.addr, addressHeader.port );
 						coordinator->sockets.slaves.set( fd, slaveSocket );
+						socket->sockets.removeAt( index );
 
 						socket->done( fd ); // The socket is valid
 
-						SlaveSocket *s = coordinator->sockets.slaves.get( fd );
-
 						SlaveEvent event;
-						event.resRegister( s );
+						event.resRegister( slaveSocket );
 						coordinator->eventQueue.insert( event );
 
-						event.announceSlaveConnected( s );
+						event.announceSlaveConnected( slaveSocket );
 						coordinator->eventQueue.insert( event );
 					} else {
-						socket->sockets.removeAt( index );
 						::close( fd );
+						socket->sockets.removeAt( index );
 						__ERROR__( "CoordinatorSocket", "handler", "Invalid register message source." );
 						return false;
 					}
-					socket->sockets.removeAt( index );
 				} else {
 					__ERROR__( "CoordinatorSocket", "handler", "Invalid register message." );
 					return false;

@@ -38,7 +38,6 @@ private:
 
 	void free();
 	// Commands
-	void printPending( FILE *f = stdout );
 	void help();
 	// void time();
 
@@ -70,6 +69,7 @@ public:
 	bool stop();
 	void info( FILE *f = stdout );
 	void debug( FILE *f = stdout );
+	void printPending( FILE *f = stdout );
 	void time();
 	double getElapsedTime();
 	void interactive();

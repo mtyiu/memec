@@ -42,22 +42,26 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 	}
 	/* Vectors and other sockets */
 	Socket::init( &this->sockets.epoll );
+	ApplicationSocket::setArrayMap( &this->sockets.applications );
+	CoordinatorSocket::setArrayMap( &this->sockets.coordinators );
+	SlaveSocket::setArrayMap( &this->sockets.slaves );
+	// this->sockets.applications.reserve( 20000 );
 	this->sockets.coordinators.reserve( this->config.global.coordinators.size() );
 	for ( int i = 0, len = this->config.global.coordinators.size(); i < len; i++ ) {
-		CoordinatorSocket socket;
+		CoordinatorSocket *socket = new CoordinatorSocket();
 		int fd;
 
-		socket.init( this->config.global.coordinators[ i ], &this->sockets.epoll );
-		fd = socket.getSocket();
+		socket->init( this->config.global.coordinators[ i ], &this->sockets.epoll );
+		fd = socket->getSocket();
 		this->sockets.coordinators.set( fd, socket );
 	}
 	this->sockets.slaves.reserve( this->config.global.slaves.size() );
 	for ( int i = 0, len = this->config.global.slaves.size(); i < len; i++ ) {
-		SlaveSocket socket;
+		SlaveSocket *socket = new SlaveSocket();
 		int fd;
 
-		socket.init( this->config.global.slaves[ i ], &this->sockets.epoll );
-		fd = socket.getSocket();
+		socket->init( this->config.global.slaves[ i ], &this->sockets.epoll );
+		fd = socket->getSocket();
 		this->sockets.slaves.set( fd, socket );
 	}
 	/* Stripe list */
@@ -144,12 +148,12 @@ bool Master::start() {
 	/* Socket */
 	// Connect to coordinators
 	for ( int i = 0, len = this->config.global.coordinators.size(); i < len; i++ ) {
-		if ( ! this->sockets.coordinators[ i ].start() )
+		if ( ! this->sockets.coordinators[ i ]->start() )
 			ret = false;
 	}
 	// Connect to slaves
 	for ( int i = 0, len = this->config.global.slaves.size(); i < len; i++ ) {
-		if ( ! this->sockets.slaves[ i ].start() )
+		if ( ! this->sockets.slaves[ i ]->start() )
 			ret = false;
 	}
 	// Start listening
@@ -193,11 +197,14 @@ bool Master::stop() {
 
 	/* Sockets */
 	for ( i = 0, len = this->sockets.applications.size(); i < len; i++ )
-		this->sockets.applications[ i ].stop();
+		this->sockets.applications[ i ]->stop();
+	this->sockets.applications.clear();
 	for ( i = 0, len = this->sockets.coordinators.size(); i < len; i++ )
-		this->sockets.coordinators[ i ].stop();
+		this->sockets.coordinators[ i ]->stop();
+	this->sockets.coordinators.clear();
 	for ( i = 0, len = this->sockets.slaves.size(); i < len; i++ )
-		this->sockets.slaves[ i ].stop();
+		this->sockets.slaves[ i ]->stop();
+	this->sockets.slaves.clear();
 
 	 /* Remapping message handler */
 	if ( this->config.global.spreadd.enabled ) {
@@ -230,21 +237,21 @@ void Master::debug( FILE *f ) {
 	fprintf( f, "\nApplication sockets\n-------------------\n" );
 	for ( i = 0, len = this->sockets.applications.size(); i < len; i++ ) {
 		fprintf( f, "%d. ", i + 1 );
-		this->sockets.applications[ i ].print( f );
+		this->sockets.applications[ i ]->print( f );
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
 
 	fprintf( f, "\nCoordinator sockets\n-------------------\n" );
 	for ( i = 0, len = this->sockets.coordinators.size(); i < len; i++ ) {
 		fprintf( f, "%d. ", i + 1 );
-		this->sockets.coordinators[ i ].print( f );
+		this->sockets.coordinators[ i ]->print( f );
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
 
 	fprintf( f, "\nSlave sockets\n-------------\n" );
 	for ( i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
 		fprintf( f, "%d. ", i + 1 );
-		this->sockets.slaves[ i ].print( f );
+		this->sockets.slaves[ i ]->print( f );
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
 
@@ -326,6 +333,8 @@ void Master::printPending( FILE *f ) {
 	size_t i;
 	std::set<Key>::iterator it;
 	std::set<KeyValueUpdate>::iterator keyValueUpdateIt;
+
+	pthread_mutex_lock( &this->pending.applications.setLock );
 	fprintf(
 		f,
 		"Pending requests for applications\n"
@@ -342,9 +351,18 @@ void Master::printPending( FILE *f ) {
 		const Key &key = *it;
 		fprintf( f, "%lu. Key: %.*s (size = %u); source: ", i, key.size, key.data, key.size );
 		( ( Socket * ) key.ptr )->printAddress( f );
+
+		for ( uint8_t i = 0; i < key.size; i++ ) {
+			if ( ! isprint( key.data[ i ] ) ) {
+				fprintf( f, " %u", i );
+			}
+		}
+
 		fprintf( f, "\n" );
 	}
+	pthread_mutex_unlock( &this->pending.applications.setLock );
 
+	pthread_mutex_lock( &this->pending.applications.getLock );
 	fprintf(
 		f,
 		"\n[GET] Pending: %lu\n",
@@ -364,7 +382,9 @@ void Master::printPending( FILE *f ) {
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
 	}
+	pthread_mutex_unlock( &this->pending.applications.getLock );
 
+	pthread_mutex_lock( &this->pending.applications.updateLock );
 	fprintf(
 		f,
 		"\n[UPDATE] Pending: %lu\n",
@@ -388,7 +408,9 @@ void Master::printPending( FILE *f ) {
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
 	}
+	pthread_mutex_unlock( &this->pending.applications.updateLock );
 
+	pthread_mutex_lock( &this->pending.applications.delLock );
 	fprintf(
 		f,
 		"\n[DELETE] Pending: %lu\n",
@@ -408,8 +430,9 @@ void Master::printPending( FILE *f ) {
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
 	}
+	pthread_mutex_unlock( &this->pending.applications.delLock );
 
-
+	pthread_mutex_lock( &this->pending.slaves.setLock );
 	fprintf(
 		f,
 		"\n\nPending requests for slaves\n"
@@ -429,7 +452,9 @@ void Master::printPending( FILE *f ) {
 		( ( Socket * ) key.ptr )->printAddress( f );
 		fprintf( f, "\n" );
 	}
+	pthread_mutex_unlock( &this->pending.slaves.setLock );
 
+	pthread_mutex_lock( &this->pending.slaves.getLock );
 	fprintf(
 		f,
 		"\n[GET] Pending: %lu\n",
@@ -446,7 +471,9 @@ void Master::printPending( FILE *f ) {
 		( ( Socket * ) key.ptr )->printAddress( f );
 		fprintf( f, "\n" );
 	}
+	pthread_mutex_unlock( &this->pending.slaves.getLock );
 
+	pthread_mutex_lock( &this->pending.slaves.updateLock );
 	fprintf(
 		f,
 		"\n[UPDATE] Pending: %lu\n",
@@ -470,7 +497,9 @@ void Master::printPending( FILE *f ) {
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
 	}
+	pthread_mutex_unlock( &this->pending.slaves.updateLock );
 
+	pthread_mutex_lock( &this->pending.slaves.delLock );
 	fprintf(
 		f,
 		"\n[DELETE] Pending: %lu\n",
@@ -487,6 +516,7 @@ void Master::printPending( FILE *f ) {
 		( ( Socket * ) key.ptr )->printAddress( f );
 		fprintf( f, "\n" );
 	}
+	pthread_mutex_unlock( &this->pending.slaves.delLock );
 }
 
 void Master::help() {

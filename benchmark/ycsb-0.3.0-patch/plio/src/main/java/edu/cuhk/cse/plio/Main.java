@@ -78,9 +78,9 @@ public class Main {
             } else {
                plio.set(
                   tokens[ 1 ].getBytes(),
-                  tokens[ 1 ].length(),
+                  tokens[ 1 ].getBytes().length,
                   tokens[ 2 ].getBytes(),
-                  tokens[ 2 ].length()
+                  tokens[ 2 ].getBytes().length
                );
             }
          //////////////////////////////////////////////////////////////////////
@@ -93,7 +93,7 @@ public class Main {
                System.err.printf( "[GET] {%s} %s\n", tokens[ 1 ], tokens[ 2 ] );
                plio.get(
                   tokens[ 1 ].getBytes(),
-                  tokens[ 1 ].length()
+                  tokens[ 1 ].getBytes().length
                );
             } else {
                if ( tokens.length != 2 ) {
@@ -103,7 +103,7 @@ public class Main {
                System.err.printf( "[GET] {%s}\n", tokens[ 1 ] );
                plio.get(
                   tokens[ 1 ].getBytes(),
-                  tokens[ 1 ].length()
+                  tokens[ 1 ].getBytes().length
                );
             }
 
@@ -125,10 +125,10 @@ public class Main {
             } else {
                plio.update(
                   tokens[ 1 ].getBytes(),
-                  tokens[ 1 ].length(),
+                  tokens[ 1 ].getBytes().length,
                   tokens[ 2 ].getBytes(),
                   offset,
-                  tokens[ 2 ].length()
+                  tokens[ 2 ].getBytes().length
                );
             }
          //////////////////////////////////////////////////////////////////////
@@ -140,7 +140,7 @@ public class Main {
             System.err.printf( "[DELETE] {%s}\n", tokens[ 1 ] );
             plio.delete(
                tokens[ 1 ].getBytes(),
-               tokens[ 1 ].length()
+               tokens[ 1 ].getBytes().length
             );
          //////////////////////////////////////////////////////////////////////
          } else if ( tokens[ 0 ].equals( "help" ) ) {

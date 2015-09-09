@@ -6,3 +6,4 @@ bin/coordinator
 bin/master
 bin/slave
 .remote-sync.json
+.sync-config.cson

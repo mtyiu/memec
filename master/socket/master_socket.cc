@@ -10,6 +10,7 @@ MasterSocket::MasterSocket() {
 	this->tid = 0;
 	this->epoll = 0;
 	this->buffer.size = PROTO_HEADER_SIZE;
+	this->sockets.needsDelete = true;
 }
 
 bool MasterSocket::init( int type, uint32_t addr, uint16_t port, EPoll *epoll ) {
@@ -60,12 +61,12 @@ bool MasterSocket::handler( int fd, uint32_t events, void *data ) {
 	static Master *master = Master::getInstance();
 
 	///////////////////////////////////////////////////////////////////////////
-	if ( ( events & EPOLLERR ) || ( events & EPOLLHUP ) || ( events & EPOLLRDHUP ) ) {
+	if ( ! ( events & EPOLLIN ) && ( ( events & EPOLLERR ) || ( events & EPOLLHUP ) || ( events & EPOLLRDHUP ) ) ) {
 		// Find the socket in the lists
 		int index;
 		if ( socket->sockets.get( fd, &index ) ) {
-			socket->sockets.removeAt( index );
 			::close( fd );
+			socket->sockets.removeAt( index );
 		} else {
 			ApplicationSocket *applicationSocket = master->sockets.applications.get( fd );
 			CoordinatorSocket *coordinatorSocket = applicationSocket ? 0 : master->sockets.coordinators.get( fd );
@@ -83,11 +84,13 @@ bool MasterSocket::handler( int fd, uint32_t events, void *data ) {
 		}
 	///////////////////////////////////////////////////////////////////////////
 	} else if ( fd == socket->getSocket() ) {
-		struct sockaddr_in addr;
+		struct sockaddr_in *addr;
 		socklen_t addrlen;
 		while( 1 ) {
-			fd = socket->accept( &addr, &addrlen );
+			addr = new struct sockaddr_in;
+			fd = socket->accept( addr, &addrlen );
 			if ( fd == -1 ) {
+				delete addr;
 				if ( errno != EAGAIN && errno != EWOULDBLOCK ) {
 					__ERROR__( "MasterSocket", "handler", "%s", strerror( errno ) );
 					return false;
@@ -118,22 +121,24 @@ bool MasterSocket::handler( int fd, uint32_t events, void *data ) {
 				// Register message expected
 				if ( header.magic == PROTO_MAGIC_REQUEST && header.opcode == PROTO_OPCODE_REGISTER ) {
 					if ( header.from == PROTO_MAGIC_FROM_APPLICATION ) {
-						ApplicationSocket applicationSocket;
-						applicationSocket.init( fd, *addr );
+						ApplicationSocket *applicationSocket = new ApplicationSocket();
+						// fprintf( stderr, "new ApplicationSocket: 0x%p\n", applicationSocket );
+						applicationSocket->init( fd, *addr );
 						master->sockets.applications.set( fd, applicationSocket );
+
+						socket->sockets.removeAt( index );
 
 						socket->done( fd ); // The socket is valid
 
 						ApplicationEvent event;
-						event.resRegister( master->sockets.applications.get( fd ) );
+						event.resRegister( applicationSocket );
 						master->eventQueue.insert( event );
 					} else {
-						socket->sockets.removeAt( index );
 						::close( fd );
+						socket->sockets.removeAt( index );
 						__ERROR__( "MasterSocket", "handler", "Invalid register message source." );
 						return false;
 					}
-					socket->sockets.removeAt( index );
 				} else {
 					__ERROR__( "MasterSocket", "handler", "Invalid register message." );
 					return false;

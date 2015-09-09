@@ -25,7 +25,7 @@ protected:
 	bool generated;
 	BitmaskArray data, parity;
 	unsigned int *weight, *cost;
-	std::vector<T> *slaves;
+	std::vector<T *> *slaves;
 	ConsistentHash<uint32_t> listRing;
 	std::vector<T **> lists;
 
@@ -65,7 +65,7 @@ protected:
 				this->weight[ index ] += this->k;
 				this->cost[ index ] += 1;
 
-				list[ this->k + j ] = &this->slaves->at( index );
+				list[ this->k + j ] = this->slaves->at( index );
 			}
 			for ( j = 0; j < this->k; j++ ) {
 				index = pickMin( i );
@@ -73,7 +73,7 @@ protected:
 				this->weight[ index ] += 1;
 				this->cost[ index ] += 1;
 
-				list[ j ] = &this->slaves->at( index );
+				list[ j ] = this->slaves->at( index );
 			}
 			this->listRing.add( i );
 		}
@@ -82,7 +82,7 @@ protected:
 	}
 
 public:
-	StripeList( uint32_t n, uint32_t k, uint32_t numLists, std::vector<T> &slaves ) : data( slaves.size(), numLists ), parity( slaves.size(), numLists ) {
+	StripeList( uint32_t n, uint32_t k, uint32_t numLists, std::vector<T *> &slaves ) : data( slaves.size(), numLists ), parity( slaves.size(), numLists ) {
 		this->n = n;
 		this->k = k;
 		this->numLists = numLists;

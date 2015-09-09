@@ -2,6 +2,13 @@
 #include "../main/master.hh"
 #include "slave_socket.hh"
 
+ArrayMap<int, SlaveSocket> *SlaveSocket::slaves;
+
+void SlaveSocket::setArrayMap( ArrayMap<int, SlaveSocket> *slaves ) {
+	SlaveSocket::slaves = slaves;
+	slaves->needsDelete = false;
+}
+
 bool SlaveSocket::start() {
 	this->registered = false;
 	if ( this->connect() ) {
@@ -12,6 +19,12 @@ bool SlaveSocket::start() {
 		return true;
 	}
 	return false;
+}
+
+void SlaveSocket::stop() {
+	// SlaveSocket::slaves->remove( this->sockfd );
+	Socket::stop();
+	// delete this;
 }
 
 ssize_t SlaveSocket::send( char *buf, size_t ulen, bool &connected ) {
