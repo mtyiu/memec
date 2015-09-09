@@ -82,7 +82,8 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 		);
 		this->eventQueue.init(
 			this->config.master.eventQueue.block,
-			this->config.master.eventQueue.size.mixed
+			this->config.master.eventQueue.size.mixed,
+			this->config.master.eventQueue.size.pMixed
 		);
 		this->workers.reserve( this->config.master.workers.number.mixed );
 		MasterWorker::init();

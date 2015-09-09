@@ -502,7 +502,8 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 	);
 
 	uint32_t listId, chunkId;
-	bool isDegraded;
+	bool isDegraded, connected;
+	ssize_t sentBytes;
 	SlaveSocket *socket;
 
 	socket = this->getSlaves(
@@ -525,15 +526,17 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 	Key key;
 
 #ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
-	Packet *packet = MasterWorker::packetPool->malloc();
-	packet->setReferenceCount( 1 + MasterWorker::parityChunkCount );
-	buffer.data = packet->data;
-	this->protocol.reqSet( buffer.size, header.key, header.keySize, header.value, header.valueSize, buffer.data );
-	packet->size = buffer.size;
+	Packet *packet = 0;
+	if ( MasterWorker::parityChunkCount ) {
+		packet = MasterWorker::packetPool->malloc();
+		packet->setReferenceCount( 1 + MasterWorker::parityChunkCount );
+		buffer.data = packet->data;
+		this->protocol.reqSet( buffer.size, header.key, header.keySize, header.value, header.valueSize, buffer.data );
+		packet->size = buffer.size;
+	} else {
+		buffer.data = this->protocol.reqSet( buffer.size, header.key, header.keySize, header.value, header.valueSize );
+	}
 #else
-	bool connected;
-	ssize_t sentBytes;
-
 	buffer.data = this->protocol.reqSet( buffer.size, header.key, header.keySize, header.value, header.valueSize );
 #endif
 
@@ -560,30 +563,38 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 	pthread_mutex_unlock( &MasterWorker::pending->slaves.setLock );
 
 	// Send SET requests
-	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
+	if ( MasterWorker::parityChunkCount ) {
 #ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
+		for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
+			SlaveEvent slaveEvent;
+			slaveEvent.send( this->paritySlaveSockets[ i ], packet );
+			MasterWorker::eventQueue->prioritizedInsert( slaveEvent );
+		}
+
 		SlaveEvent slaveEvent;
-		slaveEvent.send( this->paritySlaveSockets[ i ], packet );
-		MasterWorker::eventQueue->insert( slaveEvent );
+		slaveEvent.send( socket, packet );
+		this->dispatch( slaveEvent );
 #else
-		sentBytes = this->paritySlaveSockets[ i ]->send( buffer.data, buffer.size, connected );
+		for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
+			sentBytes = this->paritySlaveSockets[ i ]->send( buffer.data, buffer.size, connected );
+			if ( sentBytes != ( ssize_t ) buffer.size ) {
+				__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
+			}
+		}
+
+		sentBytes = socket->send( buffer.data, buffer.size, connected );
 		if ( sentBytes != ( ssize_t ) buffer.size ) {
 			__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
+			return false;
 		}
 #endif
+	} else {
+		sentBytes = socket->send( buffer.data, buffer.size, connected );
+		if ( sentBytes != ( ssize_t ) buffer.size ) {
+			__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
+			return false;
+		}
 	}
-
-#ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
-	SlaveEvent slaveEvent;
-	slaveEvent.send( socket, packet );
-	this->dispatch( slaveEvent );
-#else
-	sentBytes = socket->send( buffer.data, buffer.size, connected );
-	if ( sentBytes != ( ssize_t ) buffer.size ) {
-		__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
-		return false;
-	}
-#endif
 
 	return true;
 }
@@ -952,10 +963,14 @@ void *MasterWorker::run( void *argv ) {
 
 	switch ( role ) {
 		case WORKER_ROLE_MIXED:
-			MASTER_WORKER_EVENT_LOOP(
-				MixedEvent,
-				eventQueue->mixed
-			);
+		{
+			MixedEvent event;
+			bool ret;
+			while( worker->getIsRunning() | ( ret = eventQueue->extractMixed( event ) ) ) {
+				if ( ret )
+					worker->dispatch( event );
+			}
+		}
 			break;
 		case WORKER_ROLE_APPLICATION:
 			MASTER_WORKER_EVENT_LOOP(

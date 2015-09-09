@@ -14,6 +14,13 @@ public:
 	bool isMixed;
 	EventQueue<MixedEvent> *mixed;
 	struct {
+		 // High priority
+		EventQueue<MixedEvent> *mixed;
+		pthread_mutex_t lock;
+		uint32_t capacity;
+		uint32_t count;
+	} priority;
+	struct {
 		EventQueue<ApplicationEvent> *application;
 		EventQueue<CoordinatorEvent> *coordinator;
 		EventQueue<MasterEvent> *master;
@@ -22,15 +29,20 @@ public:
 
 	MasterEventQueue() {
 		this->mixed = 0;
+		this->priority.mixed = 0;
+		this->priority.count = 0;
 		this->separated.application = 0;
 		this->separated.coordinator = 0;
 		this->separated.master = 0;
 		this->separated.slave = 0;
 	}
 
-	void init( bool block, uint32_t mixed ) {
+	void init( bool block, uint32_t mixed, uint32_t pMixed ) {
 		this->isMixed = true;
 		this->mixed = new EventQueue<MixedEvent>( mixed, block );
+		this->priority.mixed = new EventQueue<MixedEvent>( pMixed, block );
+		this->priority.capacity = pMixed;
+		pthread_mutex_init( &this->priority.lock, 0 );
 	}
 
 	void init( bool block, uint32_t application, uint32_t coordinator, uint32_t master, uint32_t slave ) {
@@ -106,6 +118,47 @@ public:
 	MASTER_EVENT_QUEUE_INSERT( MasterEvent, master )
 	MASTER_EVENT_QUEUE_INSERT( SlaveEvent, slave )
 #undef MASTER_EVENT_QUEUE_INSERT
+
+	bool prioritizedInsert( SlaveEvent &event ) {
+		if ( this->isMixed ) {
+			MixedEvent mixedEvent;
+			mixedEvent.set( event );
+			if ( pthread_mutex_trylock( &this->priority.lock ) == 0 ) {
+				// Locked
+				if ( this->priority.count < this->priority.capacity ) {
+					this->priority.count++;
+					bool ret = this->priority.mixed->insert( mixedEvent );
+					pthread_mutex_unlock( &this->priority.lock );
+					return ret;
+				} else {
+					pthread_mutex_unlock( &this->priority.lock );
+					return this->mixed->insert( mixedEvent );
+				}
+			} else {
+				return this->mixed->insert( mixedEvent );
+			}
+		} else {
+			return this->separated.slave->insert( event );
+		}
+	}
+
+	bool extractMixed( MixedEvent &event ) {
+		bool ret;
+		if ( pthread_mutex_trylock( &this->priority.lock ) == 0 ) {
+			// Locked
+			if ( this->priority.count ) {
+				ret = this->priority.mixed->extract( event );
+				this->priority.count--;
+				pthread_mutex_unlock( &this->priority.lock );
+				return ret;
+			} else {
+				pthread_mutex_unlock( &this->priority.lock );
+				return this->mixed->extract( event );
+			}
+		} else {
+			return this->mixed->extract( event );
+		}
+	}
 };
 
 #endif

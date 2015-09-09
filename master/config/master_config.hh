@@ -35,6 +35,7 @@ public:
 		bool block;
 		struct {
 			uint32_t mixed;
+			uint32_t pMixed;
 			struct {
 				uint32_t application;
 				uint32_t coordinator;
