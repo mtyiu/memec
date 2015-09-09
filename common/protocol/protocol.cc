@@ -15,7 +15,7 @@ size_t Protocol::generateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint
 	sendBuf[ 3 ] = 0;
 	bytes += 4;
 
-	*( ( uint32_t * )( this->buffer.send + bytes ) ) = htonl( length );
+	*( ( uint32_t * )( sendBuf + bytes ) ) = htonl( length );
 	bytes += 4;
 
 	return bytes;
