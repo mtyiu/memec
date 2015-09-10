@@ -508,8 +508,9 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 
 	socket = this->getSlaves(
 		header.key, header.keySize,
-		listId, chunkId, true, &isDegraded
+		listId, chunkId, /* allowDegraded */ false, &isDegraded
 	);
+
 	if ( ! socket ) {
 		// TODO
 		Key key;

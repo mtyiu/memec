@@ -57,18 +57,14 @@ public:
 	}
 
 	void setReferenceCount( uint32_t count ) {
-		fprintf( stderr, "{%lu} [%p] set referenceCount: %u\n", pthread_self(), this, count );
 		this->referenceCount = count;
 	}
 
 	bool decrement() {
 		bool ret;
-		uint32_t prev;
 
 		pthread_mutex_lock( &this->lock );
-		prev = this->referenceCount;
 		this->referenceCount--;
-		fprintf( stderr, "{%lu} [%p] referenceCount = %u ---> %u\n", pthread_self(), this, prev, this->referenceCount );
 		ret = this->referenceCount == 0;
 		pthread_mutex_unlock( &this->lock );
 

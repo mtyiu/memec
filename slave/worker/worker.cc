@@ -765,10 +765,15 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size ) 
 	bool isParity;
 	uint32_t listId, chunkId;
 	if ( this->isRedirectedRequest( header.key, header.keySize, &isParity, &listId, &chunkId ) && ! isParity ) {
-		__DEBUG__( YELLOW, "SlaveWorker", "handleSetRequest", "!!! Degraded SET request [not yet implemented] !!!" );
+		__ERROR__( "SlaveWorker", "handleSetRequest", "!!! Degraded SET request [not yet implemented] !!!" );
 		// TODO
 	}
 
+	if ( ! SlaveWorker::chunkBuffer->at( listId ) ) {
+		Slave::getInstance()->info();
+		fprintf( stderr, "Key: %.*s ---> listId = %u, chunkId = %u, isParity = %s\n", ( int ) header.keySize, header.key, listId, chunkId, isParity ? "true" : "false" );
+		return false;
+	}
 	SlaveWorker::chunkBuffer->at( listId )->set(
 		header.key, header.keySize, header.value, header.valueSize, PROTO_OPCODE_SET, chunkId,
 		this->chunks, this->dataChunk, this->parityChunk
@@ -799,7 +804,7 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 
 	// Detect degraded UPDATE
 	if ( this->isRedirectedRequest( header.key, header.keySize ) ) {
-		__DEBUG__( YELLOW, "SlaveWorker", "handleUpdateRequest", "!!! Degraded UPDATE request [not yet implemented] !!!" );
+		__ERROR__( "SlaveWorker", "handleUpdateRequest", "!!! Degraded UPDATE request [not yet implemented] !!!" );
 		// TODO
 	}
 
@@ -904,7 +909,7 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 
 	// Detect degraded DELETE
 	if ( this->isRedirectedRequest( header.key, header.keySize ) ) {
-		__DEBUG__( YELLOW, "SlaveWorker", "handleDeleteRequest", "!!! Degraded DELETE request [not yet implemented] !!!" );
+		__ERROR__( "SlaveWorker", "handleDeleteRequest", "!!! Degraded DELETE request [not yet implemented] !!!" );
 		// TODO
 	}
 
@@ -1035,7 +1040,7 @@ bool SlaveWorker::handleUpdateChunkRequest( SlavePeerEvent event, char *buf, siz
 
 	// Detect degraded UPDATE_CHUNK
 	if ( this->isRedirectedRequest( header.listId, header.updatingChunkId ) ) {
-		__DEBUG__( YELLOW, "SlaveWorker", "handleUpdateChunkRequest", "!!! Degraded UPDATE_CHUNK request [not yet implemented] !!!" );
+		__ERROR__( "SlaveWorker", "handleUpdateChunkRequest", "!!! Degraded UPDATE_CHUNK request [not yet implemented] !!!" );
 		// TODO
 		ret = false;
 	} else {
@@ -1078,7 +1083,7 @@ bool SlaveWorker::handleDeleteChunkRequest( SlavePeerEvent event, char *buf, siz
 
 	// Detect degraded UPDATE_CHUNK
 	if ( this->isRedirectedRequest( header.listId, header.updatingChunkId ) ) {
-		__DEBUG__( YELLOW, "SlaveWorker", "handleDeleteChunkRequest", "!!! Degraded DELETE_CHUNK request [not yet implemented] !!!" );
+		__ERROR__( "SlaveWorker", "handleDeleteChunkRequest", "!!! Degraded DELETE_CHUNK request [not yet implemented] !!!" );
 		// TODO
 		ret = false;
 	} else {

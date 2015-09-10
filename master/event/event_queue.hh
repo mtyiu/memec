@@ -56,6 +56,7 @@ public:
 	void start() {
 		if ( this->isMixed ) {
 			this->mixed->start();
+			this->priority.mixed->start();
 		} else {
 			this->separated.application->start();
 			this->separated.coordinator->start();
@@ -67,6 +68,7 @@ public:
 	void stop() {
 		if ( this->isMixed ) {
 			this->mixed->stop();
+			this->priority.mixed->stop();
 		} else {
 			this->separated.application->stop();
 			this->separated.coordinator->stop();
@@ -78,6 +80,7 @@ public:
 	void free() {
 		if ( this->isMixed ) {
 			delete this->mixed;
+			delete this->priority.mixed;
 		} else {
 			delete this->separated.application;
 			delete this->separated.coordinator;
@@ -149,8 +152,8 @@ public:
 		if ( pthread_mutex_trylock( &this->priority.lock ) == 0 ) {
 			// Locked
 			if ( this->priority.count ) {
-				ret = this->priority.mixed->extract( event );
 				this->priority.count--;
+				ret = this->priority.mixed->extract( event );
 				pthread_mutex_unlock( &this->priority.lock );
 				return ret;
 			} else {
