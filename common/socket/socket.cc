@@ -95,7 +95,7 @@ ssize_t Socket::send( int sockfd, char *buf, size_t ulen, bool &connected ) {
 			if ( errno == EWOULDBLOCK ) {
 				continue;
 			}
-			__ERROR__( "Socket", "send", "%s (fd = %d)", strerror( errno ), sockfd );
+			__ERROR__( "Socket", "send", "[%d] %s", sockfd, strerror( errno ) );
 			connected = false;
 			pthread_mutex_unlock( &this->writeLock );
 			return -1;
@@ -121,7 +121,7 @@ ssize_t Socket::recv( int sockfd, char *buf, size_t ulen, bool &connected, bool 
 		ret = ::recv( sockfd, buf + bytes, len - bytes, 0 );
 		if ( ret == -1 ) {
 			if ( errno != EAGAIN ) {
-				__ERROR__( "Socket", "recv", "[%d] %s", this->sockfd, strerror( errno ) );
+				__ERROR__( "Socket", "recv", "[%d] %s", sockfd, strerror( errno ) );
 				connected = false;
 				break;
 			} else {

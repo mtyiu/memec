@@ -24,7 +24,6 @@ public:
 	bool init( int tmpfd, ServerAddr &addr, EPoll *epoll, bool self );
 	int init();
 	bool start();
-	void stop();
 	bool ready();
 	void free();
 	bool setRecvFd( int fd, struct sockaddr_in *addr );

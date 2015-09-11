@@ -15,7 +15,8 @@ bool MasterSocket::start() {
 void MasterSocket::stop() {
 	MasterSocket::masters->remove( this->sockfd );
 	Socket::stop();
-	delete this;
+	// TODO: Fix memory leakage!
+	// delete this;
 }
 
 ssize_t MasterSocket::send( char *buf, size_t ulen, bool &connected ) {

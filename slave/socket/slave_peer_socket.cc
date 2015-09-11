@@ -68,13 +68,6 @@ bool SlavePeerSocket::start() {
 	return false;
 }
 
-void SlavePeerSocket::stop() {
-	printf( "fd = %d is stopping...\n", this->sockfd );
-	// SlavePeerSocket::slavePeers->remove( this->sockfd );
-	Socket::stop();
-	// delete this;
-}
-
 bool SlavePeerSocket::ready() {
 	return this->self || ( Socket::ready() );
 }

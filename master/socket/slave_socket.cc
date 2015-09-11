@@ -21,12 +21,6 @@ bool SlaveSocket::start() {
 	return false;
 }
 
-void SlaveSocket::stop() {
-	// SlaveSocket::slaves->remove( this->sockfd );
-	Socket::stop();
-	// delete this;
-}
-
 ssize_t SlaveSocket::send( char *buf, size_t ulen, bool &connected ) {
 	return Socket::send( this->sockfd, buf, ulen, connected );
 }

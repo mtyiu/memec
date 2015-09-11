@@ -14,7 +14,8 @@ bool SlaveSocket::start() {
 void SlaveSocket::stop() {
 	SlaveSocket::slaves->remove( this->sockfd );
 	Socket::stop();
-	delete this;
+	// TODO: Fix memory leakage!
+	// delete this;
 }
 
 void SlaveSocket::setListenAddr( uint32_t addr, uint16_t port ) {

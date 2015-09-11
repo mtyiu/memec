@@ -14,7 +14,8 @@ bool MasterSocket::start() {
 void MasterSocket::stop() {
 	MasterSocket::masters->remove( this->sockfd );
 	Socket::stop();
-	delete this;
+	// TODO: Fix memory leakage!
+	// delete this;
 }
 
 void MasterSocket::setListenAddr( uint32_t addr, uint16_t port ) {

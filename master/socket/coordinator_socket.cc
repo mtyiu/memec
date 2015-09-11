@@ -21,12 +21,6 @@ bool CoordinatorSocket::start() {
 	return false;
 }
 
-void CoordinatorSocket::stop() {
-	// CoordinatorSocket::coordinators->remove( this->sockfd );
-	Socket::stop();
-	// delete this;
-}
-
 ssize_t CoordinatorSocket::send( char *buf, size_t ulen, bool &connected ) {
 	return Socket::send( this->sockfd, buf, ulen, connected );
 }
