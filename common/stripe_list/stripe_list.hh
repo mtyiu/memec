@@ -30,9 +30,9 @@ protected:
 	std::vector<T **> lists;
 
 	inline uint32_t pickMin( int listIndex ) {
-		uint32_t index = 0;
-		unsigned int minWeight = this->weight[ 0 ];
-		unsigned int minCost = this->cost[ 0 ];
+		int32_t index = -1;
+		uint32_t minWeight = UINT32_MAX;
+		uint32_t minCost = UINT32_MAX;
 		for ( uint32_t i = 0; i < this->numSlaves; i++ ) {
 			if (
 				(
@@ -47,7 +47,11 @@ protected:
 				index = i;
 			}
 		}
-		return index;
+		if ( index == -1 ) {
+			fprintf( stderr, "Cannot assign a slave for stripe list #%d.", listIndex );
+			return 0;
+		}
+		return ( uint32_t ) index;
 	}
 
 	void generate( bool verbose = false ) {

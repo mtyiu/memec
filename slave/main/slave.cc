@@ -336,7 +336,7 @@ void Slave::debug( FILE *f ) {
 
 	fprintf( f, "\nChunk pool\n----------\n" );
 	fprintf(
-		f, "Count : %lu / %u\n",
+		f, "Count : %lu / %lu\n",
 		this->chunkPool->getCount(),
 		MemoryPool<Chunk>::getCapacity(
 			this->config.slave.pool.chunks,
