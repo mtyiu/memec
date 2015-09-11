@@ -4,12 +4,15 @@
 #include <vector>
 #include <cstdio>
 #include <cstring>
-#include <cassert>
 #include <stdint.h>
 #include "../ds/array_map.hh"
 #include "../ds/bitmask_array.hh"
 #include "../hash/consistent_hash.hh"
 #include "../hash/hash_func.hh"
+
+#ifndef UINT32_MAX
+#define UINT32_MAX 0xFFFFFFFF
+#endif
 
 typedef struct {
 	int listId;

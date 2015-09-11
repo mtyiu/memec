@@ -26,6 +26,7 @@ protected:
 	int sockfd;
 	int type;
 	struct sockaddr_in addr;
+	pthread_mutex_t readLock, writeLock;
 
 	static EPoll *epoll;
 
@@ -47,6 +48,7 @@ public:
 		return this->sockfd;
 	}
 	static void init( EPoll *epoll );
+	Socket();
 	bool init( int type, uint32_t addr, uint16_t port, bool block = false );
 	bool init( int sockfd, struct sockaddr_in addr );
 	virtual bool init( ServerAddr &addr, EPoll *epoll );

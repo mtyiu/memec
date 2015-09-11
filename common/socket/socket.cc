@@ -88,6 +88,7 @@ bool Socket::connect() {
 
 ssize_t Socket::send( int sockfd, char *buf, size_t ulen, bool &connected ) {
 	ssize_t ret = 0, bytes = 0, len = ulen;
+	pthread_mutex_lock( &this->writeLock );
 	do {
 		ret = ::send( sockfd, buf + bytes, len - bytes, 0 );
 		if ( ret == -1 ) {
@@ -96,6 +97,7 @@ ssize_t Socket::send( int sockfd, char *buf, size_t ulen, bool &connected ) {
 			}
 			__ERROR__( "Socket", "send", "%s (fd = %d)", strerror( errno ), sockfd );
 			connected = false;
+			pthread_mutex_unlock( &this->writeLock );
 			return -1;
 		} else if ( ret == 0 ) {
 			connected = false;
@@ -105,6 +107,7 @@ ssize_t Socket::send( int sockfd, char *buf, size_t ulen, bool &connected ) {
 			bytes += ret;
 		}
 	} while ( bytes < len );
+	pthread_mutex_unlock( &this->writeLock );
 	// if ( connected && bytes > 0 )
 	// 	__DEBUG__( MAGENTA, "Socket", "send", "Sent %ld bytes.", bytes );
 	this->connected = connected;
@@ -178,6 +181,11 @@ int Socket::accept( struct sockaddr_in *addrPtr, socklen_t *addrlenPtr ) {
 
 void Socket::init( EPoll *epoll ) {
 	Socket::epoll = epoll;
+}
+
+Socket::Socket() {
+	pthread_mutex_init( &this->readLock, 0 );
+	pthread_mutex_init( &this->writeLock, 0 );
 }
 
 bool Socket::init( int type, uint32_t addr, uint16_t port, bool block ) {
