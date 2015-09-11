@@ -1,4 +1,5 @@
 #include "protocol.hh"
+#include "../../common/util/debug.hh"
 
 bool MasterProtocol::init( size_t size, uint32_t parityChunkCount ) {
 	this->status = new bool[ parityChunkCount ];
@@ -17,6 +18,55 @@ char *MasterProtocol::reqRegisterCoordinator( size_t &size, uint32_t addr, uint1
 		PROTO_OPCODE_REGISTER,
 		addr, port
 	);
+	return this->buffer.send;
+}
+
+char *MasterProtocol::reqPushLoadStats( 
+		size_t &size, 
+		ArrayMap< ServerAddr, Latency > *slaveGetLatency, 
+		ArrayMap< ServerAddr, Latency > *slaveSetLatency ) 
+{
+
+	size = this->generateLoadStatsHeader(
+		PROTO_MAGIC_LOADING_STATS,
+		PROTO_MAGIC_TO_COORDINATOR,
+		slaveGetLatency->size(),
+		slaveSetLatency->size()
+	);
+
+	// TODO only send the stats of most heavily loaded slave in case buffer overflows
+
+	uint32_t addr, sec, usec;
+	uint16_t port;
+
+	for ( uint32_t i = 0; i < slaveGetLatency->size() + slaveSetLatency->size(); i++ ) {
+		// serialize the loading stats
+		if ( i < slaveGetLatency->size() ) {
+			addr = slaveGetLatency->keys[ i ].addr; 
+			port = slaveGetLatency->keys[ i ].port;
+			sec = slaveGetLatency->values[ i ]->sec; 
+			usec = slaveGetLatency->values[ i ]->usec; 
+		} else {
+			addr = slaveSetLatency->keys[ i ].addr; 
+			port = slaveSetLatency->keys[ i ].port;
+			sec = slaveSetLatency->values[ i ]->sec; 
+			usec = slaveSetLatency->values[ i ]->usec; 
+		}
+
+		*( ( uint32_t * )( this->buffer.send + size ) ) = htonl( addr );
+		size += sizeof( addr );
+		*( ( uint16_t * )( this->buffer.send + size ) ) = htons( port );
+		size += sizeof( port );
+		*( ( uint32_t * )( this->buffer.send + size ) ) = htonl( sec );
+		size += sizeof( sec );
+		*( ( uint32_t * )( this->buffer.send + size ) ) = htonl( usec );
+		size += sizeof( usec );
+	}
+
+	if ( size > PROTO_BUF_MIN_SIZE ) {
+		__DEBUG__( CYAN, "MasterProtocol" , "Warning: Load stats exceeds minimum buffer size!\n" );
+	}
+
 	return this->buffer.send;
 }
 

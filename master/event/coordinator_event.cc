@@ -7,6 +7,17 @@ void CoordinatorEvent::reqRegister( CoordinatorSocket *socket, uint32_t addr, ui
 	this->message.address.port = port;
 }
 
+void CoordinatorEvent::reqSendLoadStats( 
+		CoordinatorSocket *socket, 
+		ArrayMap< ServerAddr, Latency > *slaveGetLatency,
+		ArrayMap< ServerAddr, Latency > *slaveSetLatency ) 
+{
+	this->type = COORDINATOR_EVENT_TYPE_PUSH_LOAD_STATS;
+	this->socket = socket;
+	this->message.loading.slaveGetLatency = slaveGetLatency;
+	this->message.loading.slaveSetLatency = slaveSetLatency;
+}
+
 void CoordinatorEvent::pending( CoordinatorSocket *socket ) {
 	this->type = COORDINATOR_EVENT_TYPE_PENDING;
 	this->socket = socket;

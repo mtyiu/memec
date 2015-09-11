@@ -6,15 +6,120 @@ Master::Master() {
 	this->isRunning = false;
 }
 
+void Master::updateSlavesCurrentLoading() {
+	int index = 0;
+	Latency *tempLatency = NULL;
+
+	pthread_mutex_lock( &this->slaveLoading.pastLock );
+
+	// GET
+	ArrayMap< ServerAddr, std::set< Latency > > &pastGet = this->slaveLoading.past.get;
+	ArrayMap< ServerAddr, Latency > &currentGet = this->slaveLoading.current.get;
+	for ( uint32_t i = 0; i < pastGet.size(); i++ ) {
+		ServerAddr &slaveAddr = pastGet.keys[ i ];
+		Latency *currentLatency = currentGet.get ( slaveAddr, &index );
+		if ( index == -1 ) {
+			tempLatency = new Latency();
+			tempLatency->set( *pastGet.values[ i ] );
+			currentGet.set( slaveAddr, tempLatency );
+		} else {
+			currentLatency->set( *pastGet.values[ i ] );
+		}
+	}
+
+	// SET
+	ArrayMap< ServerAddr, std::set< Latency > > &pastSet = this->slaveLoading.past.set;
+	ArrayMap< ServerAddr, Latency > &currentSet = this->slaveLoading.current.set;
+	for ( uint32_t i = 0; i < pastSet.size(); i++ ) {
+		ServerAddr &slaveAddr = pastSet.keys[ i ];
+		Latency *currentLatency = currentSet.get ( slaveAddr, &index );
+		if ( index == -1 ) {
+			tempLatency->set( *pastGet.values[ i ] );
+			currentGet.set( slaveAddr, tempLatency );
+		} else {
+			currentLatency->set( *pastSet.values[ i ] );
+		}
+	}
+
+	pthread_mutex_unlock( &this->slaveLoading.pastLock );
+}
+
+void Master::updateSlavesCumulativeLoading () {
+	int index = 0;
+	Latency *tempLatency = NULL;
+
+	pthread_mutex_lock( &this->slaveLoading.pastLock );
+
+	// GET
+	ArrayMap< ServerAddr, Latency > &currentGet = this->slaveLoading.current.get;
+	ArrayMap< ServerAddr, Latency > &cumulativeGet = this->slaveLoading.cumulative.get;
+	for ( uint32_t i = 0; i < currentGet.size(); i++ ) {
+		ServerAddr &slaveAddr = currentGet.keys[ i ];
+		Latency *currentLatency = cumulativeGet.values[ i ];
+		Latency *cumulativeLatency = cumulativeGet.get ( slaveAddr, &index );
+		if ( index == -1 ) {
+			tempLatency->set ( *currentLatency );
+			cumulativeGet.set( slaveAddr, tempLatency );
+		} else {
+			cumulativeLatency->aggregate( currentLatency );
+		}
+	}
+	
+	// SET 
+	ArrayMap< ServerAddr, Latency > &currentSet = this->slaveLoading.current.set;
+	ArrayMap< ServerAddr, Latency > &cumulativeSet = this->slaveLoading.cumulative.set;
+	for ( uint32_t i = 0; i < currentSet.size(); i++ ) {
+		ServerAddr &slaveAddr = currentSet.keys[ i ];
+		Latency *currentLatency = cumulativeSet.values[ i ];
+		Latency *cumulativeLatency = cumulativeSet.get ( slaveAddr, &index );
+		if ( index == -1 ) {
+			tempLatency = new Latency();
+			tempLatency->set ( *currentLatency );
+			cumulativeSet.set( slaveAddr, tempLatency );
+		} else {
+			cumulativeLatency->aggregate( currentLatency );
+		}
+	}
+
+	pthread_mutex_unlock( &this->slaveLoading.pastLock );
+}
+
 void Master::free() {
 	this->eventQueue.free();
 	delete this->stripeList;
 }
 
 void Master::signalHandler( int signal ) {
-	Signal::setHandler();
-	Master::getInstance()->stop();
-	fclose( stdin );
+	//Signal::setHandler();
+	Master *master = Master::getInstance();
+	ArrayMap<int, CoordinatorSocket> &sockets = master->sockets.coordinators;
+	switch ( signal ) {
+		case SIGALRM:
+			// update the loading stats
+			master->updateSlavesCurrentLoading();
+			master->updateSlavesCumulativeLoading();
+
+			// ask workers to send the loading stats to coordinators
+			CoordinatorEvent event;
+			pthread_mutex_lock( &sockets.lock );
+			for ( uint32_t i = 0; i < sockets.size(); i++ ) {
+				event.reqSendLoadStats( 
+					sockets.values[ i ], 
+					&master->slaveLoading.cumulative.get,
+					&master->slaveLoading.cumulative.set 
+				);
+				master->eventQueue.insert( event );
+			}
+			pthread_mutex_unlock( &sockets.lock );
+
+			// set next update alarm 
+			alarm ( master->config.master.loadingStats.updateInterval );
+			break;
+		default:
+			master->stop();
+			fclose( stdin );
+			break;
+	}
 }
 
 bool Master::init( char *path, OptionList &options, bool verbose ) {
@@ -122,6 +227,15 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 		remapMsgHandler.init( this->config.global.spreadd.addr.addr, this->config.global.spreadd.addr.port, masterName );
 	}
 
+	/* Loading statistics update */
+	pthread_mutex_init ( &this->slaveLoading.pastLock, NULL );
+	this->slaveLoading.past.get.clear();
+	this->slaveLoading.past.set.clear();
+	this->slaveLoading.current.get.clear();
+	this->slaveLoading.current.set.clear();
+	this->slaveLoading.cumulative.get.clear();
+	this->slaveLoading.cumulative.set.clear();
+
 	// Set signal handlers //
 	Signal::setHandler( Master::signalHandler );
 
@@ -171,6 +285,10 @@ bool Master::start() {
 	this->startTime = start_timer();
 	this->isRunning = true;
 
+	/* Loading statistics update */
+	//fprintf( stderr, "Update loading stats every %d seconds\n", this->config.master.loadingStats.updateInterval );
+	alarm ( this->config.master.loadingStats.updateInterval );
+
 	return ret;
 }
 
@@ -211,6 +329,9 @@ bool Master::stop() {
 		this->remapMsgHandler.stop();
 		this->remapMsgHandler.quit();
 	}
+
+	/* Loading statistics update */
+	alarm ( 0 );
 
 	this->free();
 	this->isRunning = false;

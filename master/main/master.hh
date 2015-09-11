@@ -16,6 +16,7 @@
 #include "../../common/ds/array_map.hh"
 #include "../../common/ds/key.hh"
 #include "../../common/ds/key_value.hh"
+#include "../../common/ds/latency.hh"
 #include "../../common/stripe_list/stripe_list.hh"
 #include "../../common/socket/epoll.hh"
 #include "../../common/signal/signal.hh"
@@ -30,11 +31,30 @@ private:
 	std::vector<MasterWorker> workers;
 
 	MasterRemapMsgHandler remapMsgHandler;
+	struct {
+		struct {
+			ArrayMap< ServerAddr, std::set< Latency > > get;
+			ArrayMap< ServerAddr, std::set< Latency > > set;
+		} past;
+		struct {
+			ArrayMap< ServerAddr, Latency > get;
+			ArrayMap< ServerAddr, Latency > set;
+		} current;
+		struct {
+			ArrayMap< ServerAddr, Latency > get;
+			ArrayMap< ServerAddr, Latency > set;
+		} cumulative;
+		pthread_mutex_t pastLock;
+	} slaveLoading;
 
 	Master();
 	// Do not implement
 	Master( Master const& );
 	void operator=( Master const& );
+
+	// helper function to update slave stats
+	void updateSlavesCurrentLoading();
+	void updateSlavesCumulativeLoading();
 
 	void free();
 	// Commands

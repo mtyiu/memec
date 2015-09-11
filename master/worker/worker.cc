@@ -227,6 +227,14 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 			buffer.data = this->protocol.reqRegisterCoordinator( buffer.size, event.message.address.addr, event.message.address.port );
 			isSend = true;
 			break;
+		case COORDINATOR_EVENT_TYPE_PUSH_LOAD_STATS:
+			buffer.data = this->protocol.reqPushLoadStats( 
+				buffer.size, 
+				event.message.loading.slaveGetLatency, 
+				event.message.loading.slaveSetLatency 
+			);
+			isSend = true;
+			break;
 		case COORDINATOR_EVENT_TYPE_PENDING:
 			isSend = false;
 			break;

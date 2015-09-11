@@ -2,8 +2,10 @@
 #define __COORDINATOR_PROTOCOL_PROTOCOL_HH__
 
 #include "../socket/slave_socket.hh"
+#include "../../common/ds/latency.hh"
 #include "../../common/protocol/protocol.hh"
 #include "../../common/config/global_config.hh"
+#include "../../common/config/server_addr.hh"
 #include "../../master/config/master_config.hh"
 #include "../../slave/config/slave_config.hh"
 
@@ -15,6 +17,13 @@ public:
 	// Register
 	char *resRegisterMaster( size_t &size, bool success );
 	char *resRegisterMaster( size_t &size, GlobalConfig &globalConfig, MasterConfig *masterConfig = 0 );
+	// Load statistics
+	bool parseLoadingStats( 
+		const LoadStatsHeader& loadStatsHeader, 
+		ArrayMap< ServerAddr, Latency >& slaveGetLatency,
+		ArrayMap< ServerAddr, Latency >& slaveSetLatency,
+		char* buffer, uint32_t size
+	);
 
 	/* Slave */
 	// Register

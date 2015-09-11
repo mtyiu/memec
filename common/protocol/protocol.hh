@@ -18,7 +18,7 @@
 #define PROTO_MAGIC_RESPONSE_SUCCESS   0x02 // -----010
 #define PROTO_MAGIC_RESPONSE_FAILURE   0x03 // -----011
 #define PROTO_MAGIC_ANNOUNCEMENT	   0x04 // -----100
-#define PROTO_MAGIC_RESERVED_2		 0x05 // -----101
+#define PROTO_MAGIC_LOADING_STATS 	   0x05 // -----101
 #define PROTO_MAGIC_RESERVED_3		 0x06 // -----110
 #define PROTO_MAGIC_RESERVED_4		 0x07 // -----111
 // (Bit: 3-4) //
@@ -158,6 +158,14 @@ struct AddressHeader {
 	uint16_t port;
 };
 
+#define PROTO_LOAD_STATS_SIZE 8
+struct LoadStatsHeader {
+	uint32_t slaveGetCount;
+	uint32_t slaveSetCount;
+};
+
+#define PROTO_BUF_MIN_SIZE		65536
+
 ///////////////////////////////////////////////////////////////////////////////
 
 class Protocol {
@@ -173,6 +181,7 @@ protected:
 	size_t generateChunkDataHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t chunkSize, char *chunkData );
 	size_t generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t opcode, struct HeartbeatHeader &header, std::map<Key, OpMetadata> &ops, size_t &count );
 	size_t generateAddressHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t addr, uint16_t port );
+	size_t generateLoadStatsHeader( uint8_t magic, uint8_t to, uint32_t slaveGetCount, uint32_t slaveSetCount );
 
 	bool parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t &opcode, uint32_t &length, char *buf, size_t size );
 	bool parseKeyHeader( size_t offset, uint8_t &keySize, char *&key, char *buf, size_t size );
@@ -186,6 +195,7 @@ protected:
 	bool parseHeartbeatHeader( size_t offset, uint32_t &get, uint32_t &set, uint32_t &update, uint32_t &del, char *buf, size_t size );
 	bool parseSlaveSyncHeader( size_t offset, uint8_t &keySize, uint8_t &opcode, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, char *&key, char *buf, size_t size );
 	bool parseAddressHeader( size_t offset, uint32_t &addr, uint16_t &port, char *buf, size_t size );
+	bool parseLoadStatsHeader( size_t offset, uint32_t &slaveGetCount, uint32_t &slaveSetCount, char *buf, size_t size );
 
 public:
 	struct {
@@ -207,6 +217,7 @@ public:
 	bool parseHeartbeatHeader( struct HeartbeatHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
 	bool parseSlaveSyncHeader( struct SlaveSyncHeader &header, size_t &bytes, char *buf = 0, size_t size = 0, size_t offset = PROTO_HEADER_SIZE + PROTO_HEARTBEAT_SIZE );
 	bool parseAddressHeader( struct AddressHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
+	bool parseLoadStatsHeader( struct LoadStatsHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
 
 	static size_t getSuggestedBufferSize( uint32_t keySize, uint32_t chunkSize );
 };
