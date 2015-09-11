@@ -40,7 +40,7 @@ public:
 	void init( bool block, uint32_t mixed, uint32_t pMixed ) {
 		this->isMixed = true;
 		this->mixed = new EventQueue<MixedEvent>( mixed, block );
-		this->priority.mixed = new EventQueue<MixedEvent>( pMixed, block );
+		this->priority.mixed = new EventQueue<MixedEvent>( pMixed, false );
 		this->priority.capacity = pMixed;
 		pthread_mutex_init( &this->priority.lock, 0 );
 	}
@@ -128,11 +128,12 @@ public:
 		if ( this->isMixed ) {
 			MixedEvent mixedEvent;
 			mixedEvent.set( event );
-			if ( pthread_mutex_trylock( &this->priority.lock ) == 0 ) {
+			if ( pthread_mutex_lock( &this->priority.lock ) == 0 ) {
 				// Locked
 				if ( this->priority.count < this->priority.capacity ) {
 					this->priority.count++;
 					bool ret = this->priority.mixed->insert( mixedEvent );
+					// fprintf( stderr, "prioritizedInsert(): Inserting into priority queue...count = %u\n", this->priority.count );
 					pthread_mutex_unlock( &this->priority.lock );
 					return ret;
 				} else {
@@ -148,11 +149,21 @@ public:
 	}
 
 	bool extractMixed( MixedEvent &event ) {
+		if ( this->priority.mixed->extract( event ) ) {
+			pthread_mutex_lock( &this->priority.lock );
+			this->priority.count--;
+			pthread_mutex_unlock( &this->priority.lock );
+			return true;
+		} else {
+			return this->mixed->extract( event );
+		}
+		/*
 		bool ret;
-		if ( pthread_mutex_trylock( &this->priority.lock ) == 0 ) {
+		if ( pthread_mutex_lock( &this->priority.lock ) == 0 ) {
 			// Locked
 			if ( this->priority.count ) {
 				this->priority.count--;
+				// fprintf( stderr, "extractMixed     (): Extracting into priority queue...count = %u\n", this->priority.count );
 				ret = this->priority.mixed->extract( event );
 				pthread_mutex_unlock( &this->priority.lock );
 				return ret;
@@ -163,6 +174,7 @@ public:
 		} else {
 			return this->mixed->extract( event );
 		}
+		*/
 	}
 };
 

@@ -122,18 +122,6 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 		Chunk::initFn,
 		0
 	);
-	/* Stripe pool */
-	Stripe::init(
-		this->config.global.coding.params.getDataChunkCount(),
-		this->config.global.coding.params.getParityChunkCount()
-	);
-	this->stripePool = MemoryPool<Stripe>::getInstance();
-	this->stripePool->init(
-		MemoryPool<Stripe>::getCapacity(
-			this->config.slave.pool.stripe,
-			this->config.global.coding.params.getChunkCount() * sizeof( Chunk * )
-		)
-	);
 	/* Chunk buffer */
 	ChunkBuffer::init();
 	this->chunkBuffer.reserve( this->config.global.stripeList.count );
@@ -345,6 +333,16 @@ void Slave::debug( FILE *f ) {
 		this->sockets.slavePeers[ i ]->print( f );
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
+
+	fprintf( f, "\nChunk pool\n----------\n" );
+	fprintf(
+		f, "Count : %lu / %u\n",
+		this->chunkPool->getCount(),
+		MemoryPool<Chunk>::getCapacity(
+			this->config.slave.pool.chunks,
+			this->config.global.size.chunk
+		)
+	);
 
 	fprintf( f, "\nChunk buffer\n------------\n" );
 	for ( i = 0, len = this->chunkBuffer.size(); i < len; i++ ) {

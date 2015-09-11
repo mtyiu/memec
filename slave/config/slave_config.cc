@@ -53,8 +53,6 @@ bool SlaveConfig::set( const char *section, const char *name, const char *value 
 	} else if ( match( section, "pool" ) ) {
 		if ( match( name, "chunks" ) )
 			this->pool.chunks = atoi( value );
-		else if ( match( name, "stripe" ) )
-			this->pool.stripe = atoi( value );
 		else
 			return false;
 	} else if ( match( section, "workers" ) ) {
@@ -131,9 +129,6 @@ bool SlaveConfig::validate() {
 
 	if ( this->pool.chunks < 1 )
 		CFG_PARSE_ERROR( "SlaveConfig", "The size of chunk pool should be greater than 0." );
-
-	if ( this->pool.stripe < 1 )
-		CFG_PARSE_ERROR( "SlaveConfig", "The size of stripe pool should be greater than 0." );
 
 	switch( this->workers.type ) {
 		case WORKER_TYPE_MIXED:
@@ -216,14 +211,12 @@ void SlaveConfig::print( FILE *f ) {
 		"\t- %-*s : %u\n"
 		"- Pool\n"
 		"\t- %-*s : %u\n"
-		"\t- %-*s : %u\n"
 		"- Workers\n"
 		"\t- %-*s : %s\n",
 		width, "Maximum number of events", this->epoll.maxEvents,
 		width, "Timeout", this->epoll.timeout,
 		width, "Timeout", this->slavePeers.timeout,
 		width, "Chunks", this->pool.chunks,
-		width, "Stripes", this->pool.stripe,
 		width, "Type", this->workers.type == WORKER_TYPE_MIXED ? "Mixed" : "Separated"
 	);
 

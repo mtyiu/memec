@@ -182,21 +182,26 @@ bool Master::stop() {
 	int i, len;
 
 	/* Sockets */
+	printf( "Stopping self-sockets...\n" );
 	this->sockets.self.stop();
 
 	/* Workers */
+	printf( "Stopping workers...\n" );
 	len = this->workers.size();
 	for ( i = len - 1; i >= 0; i-- )
 		this->workers[ i ].stop();
 
 	/* Event queues */
+	printf( "Stopping event queues...\n" );
 	this->eventQueue.stop();
 
 	/* Workers */
+	printf( "Stopping workers...\n" );
 	for ( i = len - 1; i >= 0; i-- )
 		this->workers[ i ].join();
 
 	/* Sockets */
+	printf( "Stopping sockets...\n" );
 	for ( i = 0, len = this->sockets.applications.size(); i < len; i++ )
 		this->sockets.applications[ i ]->stop();
 	this->sockets.applications.clear();
@@ -207,6 +212,7 @@ bool Master::stop() {
 		this->sockets.slaves[ i ]->stop();
 	this->sockets.slaves.clear();
 
+	printf( "Freeing...\n" );
 	this->free();
 	this->isRunning = false;
 	printf( "\nBye.\n" );
@@ -252,6 +258,9 @@ void Master::debug( FILE *f ) {
 
 	fprintf( f, "\nMaster event queue\n------------------\n" );
 	this->eventQueue.print( f );
+
+	fprintf( f, "\nPacket pool\n-----------\n" );
+	this->packetPool.print( f );
 
 	fprintf( f, "\nWorkers\n-------\n" );
 	for ( i = 0, len = this->workers.size(); i < len; i++ ) {

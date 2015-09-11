@@ -20,7 +20,6 @@
 #include "../../common/ds/array_map.hh"
 #include "../../common/ds/chunk.hh"
 #include "../../common/ds/memory_pool.hh"
-#include "../../common/ds/stripe.hh"
 #include "../../common/signal/signal.hh"
 #include "../../common/socket/epoll.hh"
 #include "../../common/stripe_list/stripe_list.hh"
@@ -64,7 +63,6 @@ public:
 	StripeList<SlavePeerSocket> *stripeList;
 	std::vector<StripeListIndex> stripeListIndex;
 	MemoryPool<Chunk> *chunkPool;
-	MemoryPool<Stripe> *stripePool;
 	std::vector<MixedChunkBuffer *> chunkBuffer;
 
 	static Slave *getInstance() {

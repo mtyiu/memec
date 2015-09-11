@@ -11,7 +11,6 @@ OBJS= \
 	ds/chunk.o \
 	ds/key_value.o \
 	ds/load.o \
-	ds/stripe.o \
 	protocol/protocol.o \
 	socket/socket.o \
 	socket/epoll.o

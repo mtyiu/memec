@@ -24,7 +24,6 @@ public:
 	} epoll;
 	struct {
 		uint32_t chunks;
-		uint32_t stripe;
 	} pool;
 	struct {
 		WorkerType type;

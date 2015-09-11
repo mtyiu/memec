@@ -12,7 +12,7 @@
 #include "../../common/stripe_list/stripe_list.hh"
 #include "../../common/ds/packet_pool.hh"
 
-// #define MASTER_WORKER_SEND_REPLICAS_PARALLEL
+#define MASTER_WORKER_SEND_REPLICAS_PARALLEL
 
 class MasterWorker : public Worker {
 private:

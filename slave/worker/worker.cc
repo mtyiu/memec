@@ -17,7 +17,6 @@ StripeList<SlavePeerSocket> *SlaveWorker::stripeList;
 std::vector<StripeListIndex> *SlaveWorker::stripeListIndex;
 Map *SlaveWorker::map;
 MemoryPool<Chunk> *SlaveWorker::chunkPool;
-MemoryPool<Stripe> *SlaveWorker::stripePool;
 std::vector<MixedChunkBuffer *> *SlaveWorker::chunkBuffer;
 
 void SlaveWorker::dispatch( MixedEvent event ) {
@@ -46,27 +45,7 @@ void SlaveWorker::dispatch( MixedEvent event ) {
 }
 
 void SlaveWorker::dispatch( CodingEvent event ) {
-	Chunk **dataChunks, *parityChunk;
-	uint32_t parityChunkId;
-
 	switch( event.type ) {
-		case CODING_EVENT_TYPE_ENCODE:
-			parityChunkId = event.message.stripe->get( dataChunks, parityChunk );
-			SlaveWorker::coding->encode( dataChunks, parityChunk, parityChunkId );
-
-			// Release memory for data chunks
-			for ( uint32_t i = 0; i < Stripe::dataChunkCount; i++ ) {
-				SlaveWorker::chunkPool->free( dataChunks[ i ] );
-			}
-
-			// Release memory for stripe
-			SlaveWorker::stripePool->free( event.message.stripe );
-
-			// Append a flush event to the event queue
-			IOEvent ioEvent;
-			ioEvent.flush( parityChunk );
-			SlaveWorker::eventQueue->insert( ioEvent );
-			break;
 		case CODING_EVENT_TYPE_DECODE:
 			SlaveWorker::coding->decode( event.message.decode.chunks, event.message.decode.status );
 			break;
@@ -1713,7 +1692,6 @@ bool SlaveWorker::init() {
 	SlaveWorker::stripeListIndex = &slave->stripeListIndex;
 	SlaveWorker::map = &slave->map;
 	SlaveWorker::chunkPool = slave->chunkPool;
-	SlaveWorker::stripePool = slave->stripePool;
 	SlaveWorker::chunkBuffer = &slave->chunkBuffer;
 	return true;
 }

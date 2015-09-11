@@ -80,6 +80,7 @@ public:
 class PacketPool {
 private:
 	MemoryPool<Packet> *pool;
+	size_t capacity;
 
 public:
 	PacketPool() {
@@ -93,6 +94,7 @@ public:
 	void init( size_t capacity, size_t size ) {
 		this->pool = MemoryPool<Packet>::getInstance();
 		this->pool->init( capacity, Packet::initFn, ( void * ) &size );
+		this->capacity = capacity;
 	}
 
 	Packet *malloc() {
@@ -104,6 +106,10 @@ public:
 		if ( packet->decrement() ) { // Reference count == 0
 			this->pool->free( packet );
 		}
+	}
+
+	void print( FILE *f ) {
+		fprintf( f, "Count : %lu / %lu\n", this->pool->getCount(), this->capacity );
 	}
 };
 

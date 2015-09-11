@@ -136,6 +136,10 @@ public:
 
 		return ret;
 	}
+
+	size_t getCount() {
+		return this->count;
+	}
 };
 
 #endif

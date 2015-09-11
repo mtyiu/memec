@@ -17,7 +17,6 @@
 #include "../../common/ds/chunk.hh"
 #include "../../common/ds/key.hh"
 #include "../../common/ds/memory_pool.hh"
-#include "../../common/ds/stripe.hh"
 #include "../../common/stripe_list/stripe_list.hh"
 #include "../../common/worker/worker.hh"
 
@@ -47,7 +46,6 @@ private:
 	static std::vector<StripeListIndex> *stripeListIndex;
 	static Map *map;
 	static MemoryPool<Chunk> *chunkPool;
-	static MemoryPool<Stripe> *stripePool;
 	static std::vector<MixedChunkBuffer *> *chunkBuffer;
 
 	void dispatch( MixedEvent event );

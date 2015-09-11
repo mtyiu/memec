@@ -8,7 +8,6 @@
 #include "../../common/coding/coding.hh"
 #include "../../common/ds/chunk.hh"
 #include "../../common/ds/memory_pool.hh"
-#include "../../common/ds/stripe.hh"
 
 #define CHUNK_BUFFER_FLUSH_THRESHOLD	4 // excluding metadata (4 bytes)
 
@@ -21,7 +20,6 @@ protected:
 
 	static Coding *coding;                 // Coding module
 	static MemoryPool<Chunk> *chunkPool;   // Memory pool for chunks
-	static MemoryPool<Stripe> *stripePool; // Memory pool for chunks
 	static SlaveEventQueue *eventQueue;    // Event queue
 	static Map *map;                       // Maps in slave
 

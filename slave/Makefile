@@ -38,7 +38,6 @@ EXTERNAL_LIB= \
 	$(PLIO_SRC_ROOT)/common/ds/chunk.o \
 	$(PLIO_SRC_ROOT)/common/ds/key_value.o \
 	$(PLIO_SRC_ROOT)/common/ds/load.o \
-	$(PLIO_SRC_ROOT)/common/ds/stripe.o \
 	$(PLIO_SRC_ROOT)/common/protocol/protocol.o \
 	$(PLIO_SRC_ROOT)/common/socket/socket.o \
 	$(PLIO_SRC_ROOT)/common/socket/epoll.o \
