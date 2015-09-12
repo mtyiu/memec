@@ -2,6 +2,11 @@
 
 YCSB_PATH=~/mtyiu/ycsb/0.3.0
 
+if [ $# != 1 ]; then
+	echo "Usage: $0 [Number of threads]"
+	exit 1
+fi
+
 ${YCSB_PATH}/bin/ycsb \
 	load plio \
 	-s \

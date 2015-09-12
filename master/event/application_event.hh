@@ -4,6 +4,7 @@
 #include "../socket/application_socket.hh"
 #include "../../common/ds/key.hh"
 #include "../../common/ds/key_value.hh"
+#include "../../common/ds/pending.hh"
 #include "../../common/event/event.hh"
 
 enum ApplicationEventType {
@@ -25,22 +26,19 @@ class ApplicationEvent : public Event {
 public:
 	ApplicationEventType type;
 	ApplicationSocket *socket;
+	bool needsFree;
 	union {
 		Key key;
 		KeyValue keyValue;
-		struct {
-			uint32_t offset;
-			uint32_t length;
-			Key key;
-		} update;
+		KeyValueUpdate keyValueUpdate;
 	} message;
 
 	void resRegister( ApplicationSocket *socket, bool success = true );
-	void resGet( ApplicationSocket *socket, KeyValue &keyValue );
-	void resGet( ApplicationSocket *socket, Key &key );
-	void resSet( ApplicationSocket *socket, Key &key, bool success );
-	void resUpdate( ApplicationSocket *socket, Key &key, uint32_t offset, uint32_t length, bool success );
-	void resDelete( ApplicationSocket *socket, Key &key, bool success );
+	void resGet( ApplicationSocket *socket, KeyValue &keyValue, bool needsFree = true );
+	void resGet( ApplicationSocket *socket, Key &key, bool needsFree = true );
+	void resSet( ApplicationSocket *socket, Key &key, bool success, bool needsFree = true );
+	void resUpdate( ApplicationSocket *socket, KeyValueUpdate &keyValueUpdate, bool success, bool needsFree = true );
+	void resDelete( ApplicationSocket *socket, Key &key, bool success, bool needsFree = true );
 	void pending( ApplicationSocket *socket );
 };
 

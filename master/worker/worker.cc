@@ -36,7 +36,6 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 	ssize_t ret;
 	uint32_t valueSize;
 	Key key;
-	KeyValueUpdate keyValueUpdate;
 	char *value;
 	struct {
 		size_t size;
@@ -75,24 +74,16 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 			break;
 		case APPLICATION_EVENT_TYPE_GET_RESPONSE_SUCCESS:
 			event.message.keyValue.deserialize(
-				value, key.size,
+				key.data, key.size,
 				value, valueSize
 			);
 			buffer.data = this->protocol.resGet(
 				buffer.size, success,
-				key.size, value,
+				key.size, key.data,
 				valueSize, value
 			);
-			key.set( key.size, value, ( void * ) event.socket );
-
-			pthread_mutex_lock( &MasterWorker::pending->applications.getLock );
-			it = MasterWorker::pending->applications.get.find( key );
-			key = *it;
-			MasterWorker::pending->applications.get.erase( it );
-			pthread_mutex_unlock( &MasterWorker::pending->applications.getLock );
-
-			key.free();
-			event.message.keyValue.free();
+			if ( event.needsFree )
+				event.message.keyValue.free();
 			break;
 		case APPLICATION_EVENT_TYPE_GET_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resGet(
@@ -101,14 +92,8 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 				event.message.key.size,
 				event.message.key.data
 			);
-
-			pthread_mutex_lock( &MasterWorker::pending->applications.getLock );
-			it = MasterWorker::pending->applications.get.find( event.message.key );
-			key = *it;
-			MasterWorker::pending->applications.get.erase( it );
-			pthread_mutex_unlock( &MasterWorker::pending->applications.getLock );
-
-			key.free();
+			if ( event.needsFree )
+				event.message.key.free();
 			break;
 		case APPLICATION_EVENT_TYPE_SET_RESPONSE_SUCCESS:
 		case APPLICATION_EVENT_TYPE_SET_RESPONSE_FAILURE:
@@ -118,33 +103,21 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 				event.message.key.size,
 				event.message.key.data
 			);
-			event.message.key.free();
+			if ( event.needsFree )
+				event.message.key.free();
 			break;
 		case APPLICATION_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
 		case APPLICATION_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resUpdate(
 				buffer.size,
 				success,
-				event.message.update.key.size,
-				event.message.update.key.data,
-				event.message.update.offset,
-				event.message.update.length
+				event.message.keyValueUpdate.size,
+				event.message.keyValueUpdate.data,
+				event.message.keyValueUpdate.offset,
+				event.message.keyValueUpdate.length
 			);
-			keyValueUpdate.set(
-				event.message.update.key.size,
-				event.message.update.key.data,
-				event.socket
-			);
-			keyValueUpdate.offset = event.message.update.offset;
-			keyValueUpdate.length = event.message.update.length;
-
-			pthread_mutex_lock( &MasterWorker::pending->applications.updateLock );
-			kvUpdateit = MasterWorker::pending->applications.update.find( keyValueUpdate );
-			keyValueUpdate = *kvUpdateit;
-			MasterWorker::pending->applications.update.erase( kvUpdateit );
-			pthread_mutex_unlock( &MasterWorker::pending->applications.updateLock );
-
-			keyValueUpdate.free();
+			if ( event.needsFree )
+				event.message.keyValueUpdate.free();
 			break;
 		case APPLICATION_EVENT_TYPE_DELETE_RESPONSE_SUCCESS:
 		case APPLICATION_EVENT_TYPE_DELETE_RESPONSE_FAILURE:
@@ -154,14 +127,8 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 				event.message.key.size,
 				event.message.key.data
 			);
-
-			pthread_mutex_lock( &MasterWorker::pending->applications.delLock );
-			it = MasterWorker::pending->applications.del.find( event.message.key );
-			key = *it;
-			MasterWorker::pending->applications.del.erase( it );
-			pthread_mutex_unlock( &MasterWorker::pending->applications.delLock );
-
-			key.free();
+			if ( event.needsFree )
+				event.message.key.free();
 			break;
 		case APPLICATION_EVENT_TYPE_PENDING:
 			break;
@@ -453,7 +420,7 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 	if ( ! socket ) {
 		Key key;
 		key.set( header.keySize, header.key );
-		event.resGet( event.socket, key );
+		event.resGet( event.socket, key, false );
 		this->dispatch( event );
 		return false;
 	}
@@ -515,7 +482,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		// TODO
 		Key key;
 		key.set( header.keySize, header.key );
-		event.resSet( event.socket, key, false );
+		event.resSet( event.socket, key, false, false );
 		this->dispatch( event );
 		return false;
 	}
@@ -623,9 +590,11 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 	);
 
 	if ( ! socket ) {
-		Key key;
-		key.set( header.keySize, header.key );
-		event.resUpdate( event.socket, key, header.valueUpdateOffset, header.valueUpdateSize, false );
+		KeyValueUpdate keyValueUpdate;
+		keyValueUpdate.set( header.keySize, header.key, event.socket );
+		keyValueUpdate.offset = header.valueUpdateOffset;
+		keyValueUpdate.length = header.valueUpdateSize;
+		event.resUpdate( event.socket, keyValueUpdate, false, false );
 		this->dispatch( event );
 		return false;
 	}
@@ -689,7 +658,7 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 	if ( ! socket ) {
 		Key key;
 		key.set( header.keySize, header.key );
-		event.resDelete( event.socket, key, false );
+		event.resDelete( event.socket, key, false, false );
 		this->dispatch( event );
 		return false;
 	}
@@ -769,12 +738,15 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, char *buf,
 		return false;
 	}
 	key = *it;
+	MasterWorker::pending->applications.get.erase( it );
 	pthread_mutex_unlock( &MasterWorker::pending->applications.getLock );
 
-	if ( success )
+	if ( success ) {
+		key.free();
 		applicationEvent.resGet( ( ApplicationSocket * ) key.ptr, keyValue );
-	else
+	} else {
 		applicationEvent.resGet( ( ApplicationSocket * ) key.ptr, key );
+	}
 	MasterWorker::eventQueue->insert( applicationEvent );
 	return true;
 }
@@ -886,16 +858,11 @@ bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, char *b
 		__ERROR__( "MasterWorker", "handleUpdateResponse", "Cannot find a pending application UPDATE request that matches the response. This message will be discarded." );
 		return false;
 	}
+	keyValueUpdate = *it;
+	MasterWorker::pending->applications.update.erase( it );
 	pthread_mutex_unlock( &MasterWorker::pending->applications.updateLock );
 
-	keyValueUpdate = *it;
-	applicationEvent.resUpdate(
-		( ApplicationSocket * ) keyValueUpdate.ptr,
-		keyValueUpdate,
-		keyValueUpdate.offset,
-		keyValueUpdate.length,
-		success
-	);
+	applicationEvent.resUpdate( ( ApplicationSocket * ) keyValueUpdate.ptr, keyValueUpdate, success );
 	MasterWorker::eventQueue->insert( applicationEvent );
 
 	return true;
@@ -933,6 +900,7 @@ bool MasterWorker::handleDeleteResponse( SlaveEvent event, bool success, char *b
 		return false;
 	}
 	key = *it;
+	MasterWorker::pending->applications.del.erase( it );
 	pthread_mutex_unlock( &MasterWorker::pending->applications.delLock );
 
 	applicationEvent.resDelete( ( ApplicationSocket * ) key.ptr, key, success );
