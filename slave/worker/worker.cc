@@ -18,6 +18,7 @@ std::vector<StripeListIndex> *SlaveWorker::stripeListIndex;
 Map *SlaveWorker::map;
 MemoryPool<Chunk> *SlaveWorker::chunkPool;
 std::vector<MixedChunkBuffer *> *SlaveWorker::chunkBuffer;
+PacketPool *SlaveWorker::packetPool;
 
 void SlaveWorker::dispatch( MixedEvent event ) {
 	switch( event.type ) {
@@ -1627,10 +1628,18 @@ void *SlaveWorker::run( void *argv ) {
 
 	switch ( role ) {
 		case WORKER_ROLE_MIXED:
-			SLAVE_WORKER_EVENT_LOOP(
-				MixedEvent,
-				eventQueue->mixed
-			);
+			// SLAVE_WORKER_EVENT_LOOP(
+			// 	MixedEvent,
+			// 	eventQueue->mixed
+			// );
+		{
+			MixedEvent event;
+			bool ret;
+			while( worker->getIsRunning() | ( ret = eventQueue->extractMixed( event ) ) ) {
+				if ( ret )
+					worker->dispatch( event );
+			}
+		}
 			break;
 		case WORKER_ROLE_CODING:
 			SLAVE_WORKER_EVENT_LOOP(
@@ -1693,6 +1702,7 @@ bool SlaveWorker::init() {
 	SlaveWorker::map = &slave->map;
 	SlaveWorker::chunkPool = slave->chunkPool;
 	SlaveWorker::chunkBuffer = &slave->chunkBuffer;
+	SlaveWorker::packetPool = &slave->packetPool;
 	return true;
 }
 

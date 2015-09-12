@@ -84,6 +84,8 @@ bool SlaveConfig::set( const char *section, const char *name, const char *value 
 			this->eventQueue.block = ! match( value, "false" );
 		else if ( match( name, "mixed" ) )
 			this->eventQueue.size.mixed = atoi( value );
+		else if ( match( name, "prioritized_mixed" ) )
+			this->eventQueue.size.pMixed = atoi( value );
 		else if ( match( name, "coding" ) )
 			this->eventQueue.size.separated.coding = atoi( value );
 		else if ( match( name, "coordinator" ) )
@@ -136,6 +138,8 @@ bool SlaveConfig::validate() {
 				CFG_PARSE_ERROR( "SlaveConfig", "The number of workers should be at least 1." );
 			if ( this->eventQueue.size.mixed < this->workers.number.mixed )
 				CFG_PARSE_ERROR( "SlaveConfig", "The size of the event queue should be at least the number of workers." );
+			if ( this->eventQueue.size.pMixed < this->workers.number.mixed )
+				CFG_PARSE_ERROR( "SlaveConfig", "The size of the prioritized event queue should be at least the number of workers." );
 			break;
 		case WORKER_TYPE_SEPARATED:
 			if ( this->workers.number.separated.coding < 1 )
@@ -226,13 +230,13 @@ void SlaveConfig::print( FILE *f ) {
 			"\t- %-*s : %u\n"
 			"- Event queues\n"
 			"\t- %-*s : %s\n"
-			"\t- %-*s : %u\n"
+			"\t- %-*s : %u; %u (prioritized)\n"
 			"- Storage\n"
 			"\t- %-*s : %s\n"
 			"\t- %-*s : %s\n",
 			width, "Number of workers", this->workers.number.mixed,
 			width, "Blocking?", this->eventQueue.block ? "Yes" : "No",
-			width, "Size", this->eventQueue.size.mixed,
+			width, "Size", this->eventQueue.size.mixed, this->eventQueue.size.pMixed,
 			width, "Type", this->storage.type == STORAGE_TYPE_LOCAL ? "Local" : "Undefined",
 			width, "Path", this->storage.path
 		);

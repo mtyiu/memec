@@ -30,6 +30,7 @@ public:
 	MasterEventQueue() {
 		this->mixed = 0;
 		this->priority.mixed = 0;
+		this->priority.capacity = 0;
 		this->priority.count = 0;
 		this->separated.application = 0;
 		this->separated.coordinator = 0;
@@ -133,7 +134,6 @@ public:
 				if ( this->priority.count < this->priority.capacity ) {
 					this->priority.count++;
 					bool ret = this->priority.mixed->insert( mixedEvent );
-					// fprintf( stderr, "prioritizedInsert(): Inserting into priority queue...count = %u\n", this->priority.count );
 					pthread_mutex_unlock( &this->priority.lock );
 					return ret;
 				} else {
@@ -157,24 +157,6 @@ public:
 		} else {
 			return this->mixed->extract( event );
 		}
-		/*
-		bool ret;
-		if ( pthread_mutex_lock( &this->priority.lock ) == 0 ) {
-			// Locked
-			if ( this->priority.count ) {
-				this->priority.count--;
-				// fprintf( stderr, "extractMixed     (): Extracting into priority queue...count = %u\n", this->priority.count );
-				ret = this->priority.mixed->extract( event );
-				pthread_mutex_unlock( &this->priority.lock );
-				return ret;
-			} else {
-				pthread_mutex_unlock( &this->priority.lock );
-				return this->mixed->extract( event );
-			}
-		} else {
-			return this->mixed->extract( event );
-		}
-		*/
 	}
 };
 

@@ -150,7 +150,7 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 	/* Workers, packet pool and event queues */
 	if ( this->config.slave.workers.type == WORKER_TYPE_MIXED ) {
 		this->packetPool.init(
-			this->config.slave.workers.number.mixed,
+			this->config.slave.workers.number.mixed * this->config.global.coding.params.getChunkCount(),
 			Protocol::getSuggestedBufferSize(
 				this->config.global.size.key,
 				this->config.global.size.chunk
@@ -158,7 +158,8 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 		);
 		this->eventQueue.init(
 			this->config.slave.eventQueue.block,
-			this->config.slave.eventQueue.size.mixed
+			this->config.slave.eventQueue.size.mixed,
+			this->config.slave.eventQueue.size.pMixed
 		);
 		SlaveWorker::init();
 		this->workers.reserve( this->config.slave.workers.number.mixed );
@@ -172,7 +173,7 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 		}
 	} else {
 		this->packetPool.init(
-			this->config.slave.workers.number.separated.total,
+			this->config.slave.workers.number.separated.total * this->config.global.coding.params.getChunkCount(),
 			Protocol::getSuggestedBufferSize(
 				this->config.global.size.key,
 				this->config.global.size.chunk

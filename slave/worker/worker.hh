@@ -17,6 +17,7 @@
 #include "../../common/ds/chunk.hh"
 #include "../../common/ds/key.hh"
 #include "../../common/ds/memory_pool.hh"
+#include "../../common/ds/packet_pool.hh"
 #include "../../common/stripe_list/stripe_list.hh"
 #include "../../common/worker/worker.hh"
 
