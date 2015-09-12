@@ -12,7 +12,7 @@ ${YCSB_PATH}/bin/ycsb \
 	-p fieldlength=100 \
 	-p recordcount=1000000 \
 	-p threadcount=4 \
-	-p plio.host=137.189.88.46 \
+	-p plio.host=192.168.0.19 \
 	-p plio.port=9112 \
 	-p plio.key_size=255 \
 	-p plio.chunk_size=4096
