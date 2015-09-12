@@ -328,30 +328,6 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		case SLAVE_PEER_EVENT_TYPE_REGISTER_REQUEST:
 			buffer.data = this->protocol.reqRegisterSlavePeer( buffer.size, SlaveWorker::slaveServerAddr );
 			break;
-		case SLAVE_PEER_EVENT_TYPE_UPDATE_CHUNK_REQUEST:
-			buffer.data = this->protocol.reqUpdateChunk(
-				buffer.size,
-				event.message.chunkUpdate.metadata.listId,
-				event.message.chunkUpdate.metadata.stripeId,
-				event.message.chunkUpdate.metadata.chunkId,
-				event.message.chunkUpdate.offset,
-				event.message.chunkUpdate.length,
-				event.message.chunkUpdate.updatingChunkId,
-				event.message.chunkUpdate.delta
-			);
-			break;
-		case SLAVE_PEER_EVENT_TYPE_DELETE_CHUNK_REQUEST:
-			buffer.data = this->protocol.reqDeleteChunk(
-				buffer.size,
-				event.message.chunkUpdate.metadata.listId,
-				event.message.chunkUpdate.metadata.stripeId,
-				event.message.chunkUpdate.metadata.chunkId,
-				event.message.chunkUpdate.offset,
-				event.message.chunkUpdate.length,
-				event.message.chunkUpdate.updatingChunkId,
-				event.message.chunkUpdate.delta
-			);
-			break;
 		case SLAVE_PEER_EVENT_TYPE_GET_CHUNK_REQUEST:
 			buffer.data = this->protocol.reqGetChunk(
 				buffer.size,
@@ -431,6 +407,12 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				event.message.chunk.metadata.chunkId
 			);
 			break;
+		//////////
+		// Send //
+		//////////
+		case SLAVE_PEER_EVENT_TYPE_SEND:
+			event.message.send.packet->read( buffer.data, buffer.size );
+			break;
 		/////////////
 		// Pending //
 		/////////////
@@ -450,9 +432,9 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 			this->load.elapsedTime += get_elapsed_time( t );
 		}
 
-		if ( event.type == SLAVE_PEER_EVENT_TYPE_UPDATE_CHUNK_REQUEST ||
-		     event.type == SLAVE_PEER_EVENT_TYPE_DELETE_CHUNK_REQUEST )
-			*event.message.chunkUpdate.status = false;
+		if ( event.type == SLAVE_PEER_EVENT_TYPE_SEND ) {
+			SlaveWorker::packetPool->free( event.message.send.packet );
+		}
 	} else {
 		ProtocolHeader header;
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();
@@ -795,10 +777,6 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 	Chunk *chunk;
 	if ( map->findValueByKey( header.key, header.keySize, &keyValue, &key, &keyMetadata, &metadata, &chunk ) ) {
 		uint32_t offset = keyMetadata.offset + PROTO_KEY_VALUE_SIZE + header.keySize + header.valueUpdateOffset;
-#ifndef SLAVE_WORKER_SEND_REPLICAS_PARALLEL
-		ssize_t sentBytes;
-		bool connected;
-#endif
 		bool isDegraded;
 		KeyValueUpdate keyValueUpdate;
 		ChunkUpdate chunkUpdate;
@@ -836,32 +814,39 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 		for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
 			chunkUpdate.ptr = ( void * ) this->paritySlaveSockets[ i ];
 
+			// Insert into pending set
 			pthread_mutex_lock( &SlaveWorker::pending->slavePeers.updateLock );
 			SlaveWorker::pending->slavePeers.updateChunk.insert( chunkUpdate );
 			pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.updateLock );
 
-			SlavePeerEvent slavePeerEvent;
-			slavePeerEvent.reqUpdateChunk(
-				this->paritySlaveSockets[ i ],
-				metadata, offset, header.valueUpdateSize,
-				SlaveWorker::dataChunkCount + i, this->protocol.status + i,
-				header.valueUpdate
+			// Prepare UPDATE_CHUNK request
+			size_t size;
+			Packet *packet = SlaveWorker::packetPool->malloc();
+			packet->setReferenceCount( 1 );
+			this->protocol.reqUpdateChunk(
+				size,
+				metadata.listId,
+				metadata.stripeId,
+				metadata.chunkId,
+				offset,
+				header.valueUpdateSize, // length
+				SlaveWorker::dataChunkCount + i, // updatingChunkId
+				header.valueUpdate,
+				packet->data
 			);
+			packet->size = ( uint32_t ) size;
+
+			// Insert into event queue
+			SlavePeerEvent slavePeerEvent;
+			slavePeerEvent.send( this->paritySlaveSockets[ i ], packet );
 
 #ifdef SLAVE_WORKER_SEND_REPLICAS_PARALLEL
-			this->protocol.status[ i ] = true;
-			SlaveWorker::eventQueue->insert( slavePeerEvent );
+			SlaveWorker::eventQueue->prioritizedInsert( slavePeerEvent );
 #else
 			this->dispatch( slavePeerEvent );
 #endif
 		}
 
-#ifdef SLAVE_WORKER_SEND_REPLICAS_PARALLEL
-		// Wait until all replicas are sent
-		for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
-			while( this->protocol.status[ i ] ); // Busy waiting
-		}
-#endif
 		ret = true;
 	} else {
 		event.resUpdate( event.socket, key, header.valueUpdateOffset, header.valueUpdateSize, false );
@@ -898,15 +883,9 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 	KeyMetadata keyMetadata;
 	Metadata metadata;
 	Chunk *chunk;
-
-	key.set( header.keySize, header.key );
 	if ( map->findValueByKey( header.key, header.keySize, &keyValue, 0, &keyMetadata, &metadata, &chunk ) ) {
 		uint32_t deltaSize;
 		char *delta;
-#ifndef SLAVE_WORKER_SEND_REPLICAS_PARALLEL
-		ssize_t sentBytes;
-		bool connected;
-#endif
 		bool isDegraded;
 		ChunkUpdate chunkUpdate;
 
@@ -937,6 +916,7 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 			true, &isDegraded
 		);
 
+		// Send DELETE_CHUNK requests to parity slaves
 		for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
 			key.ptr = ( void * ) this->paritySlaveSockets[ i ];
 
@@ -944,32 +924,42 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 			SlaveWorker::pending->slavePeers.deleteChunk.insert( chunkUpdate );
 			pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.delLock );
 
-			SlavePeerEvent slavePeerEvent;
-			slavePeerEvent.reqDeleteChunk(
-				this->paritySlaveSockets[ i ],
-				metadata, keyMetadata.offset, deltaSize,
-				SlaveWorker::dataChunkCount + i, this->protocol.status + i,
-				delta
+			// Prepare DELETE_CHUNK request
+			size_t size;
+			Packet *packet = SlaveWorker::packetPool->malloc();
+			packet->setReferenceCount( 1 );
+			this->protocol.reqDeleteChunk(
+				size,
+				metadata.listId,
+				metadata.stripeId,
+				metadata.chunkId,
+				keyMetadata.offset,
+				deltaSize,
+				SlaveWorker::dataChunkCount + i,
+				delta,
+				packet->data
 			);
+			packet->size = ( uint32_t ) size;
+
+			// Insert into event queue
+			SlavePeerEvent slavePeerEvent;
+			slavePeerEvent.send( this->paritySlaveSockets[ i ], packet );
+
 #ifdef SLAVE_WORKER_SEND_REPLICAS_PARALLEL
-			this->protocol.status[ i ] = true;
-			SlaveWorker::eventQueue->insert( slavePeerEvent );
+			if ( i == SlaveWorker::parityChunkCount - 1 )
+				this->dispatch( slavePeerEvent );
+			else
+				SlaveWorker::eventQueue->prioritizedInsert( slavePeerEvent );
 #else
 			this->dispatch( slavePeerEvent );
 #endif
 		}
 
-#ifdef SLAVE_WORKER_SEND_REPLICAS_PARALLEL
-		// Wait until all replicas are sent
-		for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
-			while( this->protocol.status[ i ] ); // Busy waiting
-		}
-#endif
 		ret = true;
 	} else {
-		ret = false;
 		event.resDelete( event.socket, key, false );
 		this->dispatch( event );
+		ret = false;
 	}
 
 	this->load.del();

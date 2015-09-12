@@ -35,10 +35,10 @@ public:
 	char *reqRegisterSlavePeer( size_t &size, ServerAddr *addr );
 	char *resRegisterSlavePeer( size_t &size, bool success );
 	// UPDATE_CHUNK
-	char *reqUpdateChunk( size_t &size, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta );
+	char *reqUpdateChunk( size_t &size, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta, char *buf = 0 );
 	char *resUpdateChunk( size_t &size, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId );
 	// DELETE_CHUNK
-	char *reqDeleteChunk( size_t &size, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta );
+	char *reqDeleteChunk( size_t &size, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta, char *buf = 0 );
 	char *resDeleteChunk( size_t &size, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId );
 	// GET_CHUNK
 	char *reqGetChunk( size_t &size, uint32_t listId, uint32_t stripeId, uint32_t chunkId );

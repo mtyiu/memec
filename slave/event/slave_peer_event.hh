@@ -5,6 +5,7 @@
 #include "../socket/slave_peer_socket.hh"
 #include "../../common/ds/metadata.hh"
 #include "../../common/ds/chunk.hh"
+#include "../../common/ds/packet_pool.hh"
 #include "../../common/event/event.hh"
 
 enum SlavePeerEventType {
@@ -14,11 +15,9 @@ enum SlavePeerEventType {
 	SLAVE_PEER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS,
 	SLAVE_PEER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE,
 	// UPDATE_CHUNK
-	SLAVE_PEER_EVENT_TYPE_UPDATE_CHUNK_REQUEST,
 	SLAVE_PEER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_SUCCESS,
 	SLAVE_PEER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_FAILURE,
 	// DELETE_CHUNK
-	SLAVE_PEER_EVENT_TYPE_DELETE_CHUNK_REQUEST,
 	SLAVE_PEER_EVENT_TYPE_DELETE_CHUNK_RESPONSE_SUCCESS,
 	SLAVE_PEER_EVENT_TYPE_DELETE_CHUNK_RESPONSE_FAILURE,
 	// GET_CHUNK
@@ -29,6 +28,8 @@ enum SlavePeerEventType {
 	SLAVE_PEER_EVENT_TYPE_SET_CHUNK_REQUEST,
 	SLAVE_PEER_EVENT_TYPE_SET_CHUNK_RESPONSE_SUCCESS,
 	SLAVE_PEER_EVENT_TYPE_SET_CHUNK_RESPONSE_FAILURE,
+	// Send
+	SLAVE_PEER_EVENT_TYPE_SEND,
 	// Pending
 	SLAVE_PEER_EVENT_TYPE_PENDING
 };
@@ -43,8 +44,6 @@ public:
 			uint32_t offset;
 			uint32_t length;
 			uint32_t updatingChunkId;
-			char *delta;
-			volatile bool *status;
 		} chunkUpdate;
 		struct {
 			Metadata metadata;
@@ -52,9 +51,7 @@ public:
 			Chunk *chunk;
 		} chunk;
 		struct {
-			size_t size;
-			size_t index;
-			SlaveProtocol *protocol;
+			Packet *packet;
 		} send;
 	} message;
 
@@ -62,10 +59,8 @@ public:
 	void reqRegister( SlavePeerSocket *socket );
 	void resRegister( SlavePeerSocket *socket, bool success = true );
 	// UPDATE_CHUNK
-	void reqUpdateChunk( SlavePeerSocket *socket, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, volatile bool *status, char *delta );
 	void resUpdateChunk( SlavePeerSocket *socket, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, bool success );
 	// DELETE_CHUNK
-	void reqDeleteChunk( SlavePeerSocket *socket, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, volatile bool *status, char *delta );
 	void resDeleteChunk( SlavePeerSocket *socket, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, bool success );
 	// GET_CHUNK
 	void reqGetChunk( SlavePeerSocket *socket, Metadata &metadata, volatile bool *status = 0 );
@@ -73,6 +68,8 @@ public:
 	// SET_CHUNK
 	void reqSetChunk( SlavePeerSocket *socket, Metadata &metadata, Chunk *chunk, volatile bool *status = 0 );
 	void resSetChunk( SlavePeerSocket *socket, Metadata &metadata, bool success );
+	// Send
+	void send( SlavePeerSocket *socket, Packet *packet );
 	// Pending
 	void pending( SlavePeerSocket *socket );
 };

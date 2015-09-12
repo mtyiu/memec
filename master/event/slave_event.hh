@@ -9,7 +9,7 @@
 enum SlaveEventType {
 	SLAVE_EVENT_TYPE_UNDEFINED,
 	SLAVE_EVENT_TYPE_REGISTER_REQUEST,
-	SLAVE_EVENT_TYPE_SEND, // send data in the provided protocol buffer
+	SLAVE_EVENT_TYPE_SEND,
 	SLAVE_EVENT_TYPE_PENDING
 };
 
