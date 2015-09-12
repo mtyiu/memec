@@ -7,7 +7,7 @@ ${YCSB_PATH}/bin/ycsb \
 	-s \
 	-P ${YCSB_PATH}/workloads/workloada \
 	-p fieldcount=1 \
-	-p readallfields=true \
+	-p readallfields=false \
 	-p scanproportion=0 \
 	-p fieldlength=100 \
 	-p recordcount=1000000 \
