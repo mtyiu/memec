@@ -1,9 +1,9 @@
 #!/bin/bash
 
-BASE_DIR=${HOME}/mtyiu
+BASE_PATH=${HOME}/mtyiu
 
-rm -rf ${BASE_DIR}/results
-rm ${BASE_DIR}/scripts
+rm -rf ${BASE_PATH}/results
+rm ${BASE_PATH}/scripts
 
-mkdir ${BASE_DIR}/results
-ln -s ${BASE_DIR}/plio/scripts/ncs/ ${BASE_DIR}/scripts
+mkdir ${BASE_PATH}/results
+ln -s ${BASE_PATH}/plio/scripts/ncs/ ${BASE_PATH}/scripts

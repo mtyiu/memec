@@ -1,24 +1,27 @@
 #!/bin/bash
 
+BASE_PATH=${HOME}/mtyiu
+BOOTSTRAP_SCRIPT_PATH=${BASE_PATH}/scripts/bootstrap
+
 SLEEP_TIME=2
 
 if [ $# -gt 0 ]; then
 	echo "*** Warning: Debug mode is enabled. ***"
 fi
 
-ssh hpc9 "screen -S coordinator -p 0 -X stuff \"$(printf '\r\r')cd ~/mtyiu; scripts/bootstrap/start-plio-coordinator.sh ${1}$(printf '\r\r')\""
+ssh hpc9 "screen -S coordinator -p 0 -X stuff \"$(printf '\r\r')${BOOTSTRAP_SCRIPT_PATH}/start-plio-coordinator.sh ${1}$(printf '\r\r')\""
 
 sleep ${SLEEP_TIME}
 
 for i in {1..6}; do
 	port=$(expr $i + 9110)
 	node_id=$(expr $i + 8)
-	ssh hpc${node_id} "screen -S slave$i -p 0 -X stuff \"$(printf '\r\r')cd ~/mtyiu; scripts/bootstrap/start-plio-slave.sh ${1}$(printf '\r\r')\"" &
+	ssh hpc${node_id} "screen -S slave$i -p 0 -X stuff \"$(printf '\r\r')${BOOTSTRAP_SCRIPT_PATH}/start-plio-slave.sh ${1}$(printf '\r\r')\"" &
 done
 
 sleep ${SLEEP_TIME}
 
-ssh hpc15 "screen -S master -p 0 -X stuff \"$(printf '\r\r')cd ~/mtyiu; scripts/bootstrap/start-plio-master.sh ${1}$(printf '\r\r')\""
+ssh hpc15 "screen -S master -p 0 -X stuff \"$(printf '\r\r')${BOOTSTRAP_SCRIPT_PATH}/start-plio-master.sh ${1}$(printf '\r\r')\""
 
 sleep ${SLEEP_TIME}
 

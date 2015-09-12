@@ -1,31 +1,32 @@
 #!/bin/bash
 
-SLEEP_TIME=2
+BASE_PATH=${HOME}/mtyiu
+BOOTSTRAP_SCRIPT_PATH=${BASE_PATH}/scripts/bootstrap
+
+SLEEP_TIME=1
 
 if [ $# -gt 0 ]; then
 	echo "*** Warning: Debug mode is enabled. ***"
 fi
 
-ssh hpc9 "screen -S coordinator -p 0 -X stuff \"$(printf '\r\r')cd ~/mtyiu; scripts/bootstrap/start-plio-coordinator.sh ${1}$(printf '\r\r')\""
+ssh testbed-node10 "screen -S coordinator -p 0 -X stuff \"$(printf '\r\r')${BOOTSTRAP_SCRIPT_PATH}/start-plio-coordinator.sh ${1}$(printf '\r\r')\""
 
 sleep ${SLEEP_TIME}
 
-for i in {1..6}; do
-	port=$(expr $i + 9110)
-	node_id=$(expr $i + 8)
-	ssh hpc${node_id} "screen -S slave$i -p 0 -X stuff \"$(printf '\r\r')cd ~/mtyiu; scripts/bootstrap/start-plio-slave.sh ${1}$(printf '\r\r')\"" &
+for i in {1..8}; do
+	ssh testbed-node$i "screen -S slave$i -p 0 -X stuff \"$(printf '\r\r')${BOOTSTRAP_SCRIPT_PATH}/start-plio-slave.sh ${1}$(printf '\r\r')\""
 done
 
 sleep ${SLEEP_TIME}
 
-ssh hpc15 "screen -S master -p 0 -X stuff \"$(printf '\r\r')cd ~/mtyiu; scripts/bootstrap/start-plio-master.sh ${1}$(printf '\r\r')\""
+ssh testbed-node9 "screen -S master -p 0 -X stuff \"$(printf '\r\r')${BOOTSTRAP_SCRIPT_PATH}/start-plio-master.sh ${1}$(printf '\r\r')\""
 
 sleep ${SLEEP_TIME}
 
 read -p "Press Enter to terminate all instances..."
 
-for i in {9..15}; do
-	ssh hpc$i 'killall -9 application coordinator master slave ycsb >&/dev/null' &
+for i in {1..10}; do
+	ssh testbed-node$i 'killall -9 application coordinator master slave ycsb 1>&2 2> /dev/null' &
 done
 
 sleep ${SLEEP_TIME}
@@ -37,13 +38,12 @@ else
 	TERM_COMMAND="$(printf '\r\r')clear$(printf '\r')"
 fi
 
-for i in {1..6}; do
-	node_id=$(expr $i + 8)
-	ssh hpc${node_id} "screen -S slave$i -p 0 -X stuff \"${TERM_COMMAND}\"" &
+for i in {1..8}; do
+	ssh testbed-node$i "screen -S slave$i -p 0 -X stuff \"${TERM_COMMAND}\"" &
 done
-ssh hpc15 "screen -S master -p 0 -X stuff \"${TERM_COMMAND}\"" &
-ssh hpc15 "screen -S ycsb -p 0 -X stuff \"${TERM_COMMAND}\"" &
-ssh hpc9 "screen -S coordinator -p 0 -X stuff \"${TERM_COMMAND}\"" &
+ssh testbed-node9 "screen -S master -p 0 -X stuff \"${TERM_COMMAND}\"" &
+ssh testbed-node9 "screen -S ycsb -p 0 -X stuff \"${TERM_COMMAND}\"" &
+ssh testbed-node10 "screen -S coordinator -p 0 -X stuff \"${TERM_COMMAND}\"" &
 
 sleep ${SLEEP_TIME}
 

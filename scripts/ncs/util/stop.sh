@@ -2,8 +2,8 @@
 
 SLEEP_TIME=1
 
-for i in {9..15}; do
-	ssh hpc$i 'killall -9 application coordinator master slave ycsb >& /dev/null' &
+for i in {1..10}; do
+	ssh testbed-node$i 'killall -9 application coordinator master slave ycsb 1>&2 2> /dev/null' &
 done
 
 sleep ${SLEEP_TIME}
@@ -15,13 +15,12 @@ else
 	TERM_COMMAND="$(printf '\r\r')clear$(printf '\r')"
 fi
 
-for i in {1..7}; do
-	node_index=$(expr $i + 8)
-	ssh hpc${node_index} "screen -S slave$i -p 0 -X stuff \"${TERM_COMMAND}\"" &
+for i in {1..8}; do
+	ssh testbed-node$i "screen -S slave$i -p 0 -X stuff \"${TERM_COMMAND}\"" &
 done
-ssh hpc9 "screen -S master -p 0 -X stuff \"${TERM_COMMAND}\"" &
-ssh hpc9 "screen -S ycsb -p 0 -X stuff \"${TERM_COMMAND}\"" &
-ssh hpc9 "screen -S coordinator -p 0 -X stuff \"${TERM_COMMAND}\"" &
+ssh testbed-node9 "screen -S master -p 0 -X stuff \"${TERM_COMMAND}\"" &
+ssh testbed-node9 "screen -S ycsb -p 0 -X stuff \"${TERM_COMMAND}\"" &
+ssh testbed-node10 "screen -S coordinator -p 0 -X stuff \"${TERM_COMMAND}\"" &
 
 sleep ${SLEEP_TIME}
 
