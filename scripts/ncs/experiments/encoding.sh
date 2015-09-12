@@ -11,6 +11,8 @@ for c in $coding; do
 
 	sed -i "s/^scheme=.*$/scheme=$c/g" ${PLIO_PATH}/bin/config/ncs/global.ini
 
+	${BASE_PATH}/scripts/util/rsync.sh
+
 	mkdir -p ${BASE_PATH}/results/encoding/$c
 
 	for t in $threads; do
@@ -23,5 +25,7 @@ for c in $coding; do
 		echo "Finished experiment with coding scheme = $c and thread count = $t..."
 	done
 done
-	
+
 sed -i "s/^scheme=.*$/scheme=raid0/g" ${PLIO_PATH}/bin/config/ncs/global.ini
+
+${BASE_PATH}/scripts/util/rsync.sh
