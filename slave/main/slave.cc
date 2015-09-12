@@ -147,8 +147,15 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 			);
 		}
 	}
-	/* Workers and event queues */
+	/* Workers, packet pool and event queues */
 	if ( this->config.slave.workers.type == WORKER_TYPE_MIXED ) {
+		this->packetPool.init(
+			this->config.slave.workers.number.mixed,
+			Protocol::getSuggestedBufferSize(
+				this->config.global.size.key,
+				this->config.global.size.chunk
+			)
+		);
 		this->eventQueue.init(
 			this->config.slave.eventQueue.block,
 			this->config.slave.eventQueue.size.mixed
@@ -164,6 +171,13 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 			);
 		}
 	} else {
+		this->packetPool.init(
+			this->config.slave.workers.number.separated.total,
+			Protocol::getSuggestedBufferSize(
+				this->config.global.size.key,
+				this->config.global.size.chunk
+			)
+		);
 		this->workers.reserve( this->config.slave.workers.number.separated.total );
 		this->eventQueue.init(
 			this->config.slave.eventQueue.block,
@@ -356,6 +370,9 @@ void Slave::debug( FILE *f ) {
 
 	fprintf( f, "\nSlave event queue\n-----------------\n" );
 	this->eventQueue.print( f );
+
+	fprintf( f, "\nPacket pool\n-----------\n" );
+	this->packetPool.print( f );
 
 	fprintf( f, "\nWorkers\n-------\n" );
 	for ( i = 0, len = this->workers.size(); i < len; i++ ) {

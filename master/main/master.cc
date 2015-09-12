@@ -96,7 +96,7 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 		}
 	} else {
 		this->packetPool.init(
-			this->config.master.workers.number.mixed,
+			this->config.master.workers.number.separated.total,
 			Protocol::getSuggestedBufferSize(
 				this->config.global.size.key,
 				this->config.global.size.chunk

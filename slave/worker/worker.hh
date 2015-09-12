@@ -47,6 +47,7 @@ private:
 	static Map *map;
 	static MemoryPool<Chunk> *chunkPool;
 	static std::vector<MixedChunkBuffer *> *chunkBuffer;
+	static PacketPool *packetPool;
 
 	void dispatch( MixedEvent event );
 	void dispatch( CodingEvent event );

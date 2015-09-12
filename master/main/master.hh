@@ -53,8 +53,8 @@ public:
 	} sockets;
 	Pending pending;
 	MasterEventQueue eventQueue;
-	StripeList<SlaveSocket> *stripeList;
 	PacketPool packetPool;
+	StripeList<SlaveSocket> *stripeList;
 
 	static Master *getInstance() {
 		static Master master;

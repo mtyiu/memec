@@ -20,6 +20,7 @@
 #include "../../common/ds/array_map.hh"
 #include "../../common/ds/chunk.hh"
 #include "../../common/ds/memory_pool.hh"
+#include "../../common/ds/packet_pool.hh"
 #include "../../common/signal/signal.hh"
 #include "../../common/socket/epoll.hh"
 #include "../../common/stripe_list/stripe_list.hh"
@@ -59,6 +60,7 @@ public:
 	SlaveLoad load;
 	Map map;
 	SlaveEventQueue eventQueue;
+	PacketPool packetPool;
 	Coding *coding;
 	StripeList<SlavePeerSocket> *stripeList;
 	std::vector<StripeListIndex> stripeListIndex;
