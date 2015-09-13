@@ -23,18 +23,20 @@ void MasterEvent::resSet( MasterSocket *socket, Key &key, bool success ) {
 	this->message.key = key;
 }
 
-void MasterEvent::resUpdate( MasterSocket *socket, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool success ) {
+void MasterEvent::resUpdate( MasterSocket *socket, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool success, bool needsFree ) {
 	this->type = success ? MASTER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS : MASTER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE;
 	this->socket = socket;
 	this->message.keyValueUpdate.key = key;
 	this->message.keyValueUpdate.valueUpdateOffset = valueUpdateOffset;
 	this->message.keyValueUpdate.valueUpdateSize = valueUpdateSize;
+	this->needsFree = needsFree;
 }
 
-void MasterEvent::resDelete( MasterSocket *socket, Key &key, bool success ) {
+void MasterEvent::resDelete( MasterSocket *socket, Key &key, bool success, bool needsFree ) {
 	this->type = success ? MASTER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS : MASTER_EVENT_TYPE_DELETE_RESPONSE_FAILURE;
 	this->socket = socket;
 	this->message.key = key;
+	this->needsFree = needsFree;
 }
 
 void MasterEvent::pending( MasterSocket *socket ) {

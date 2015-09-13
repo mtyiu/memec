@@ -237,6 +237,9 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 				event.message.keyValueUpdate.valueUpdateOffset,
 				event.message.keyValueUpdate.valueUpdateSize
 			);
+
+			if ( event.needsFree )
+				event.message.keyValueUpdate.key.free();
 			break;
 		// DELETE
 		case MASTER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS:
@@ -246,6 +249,9 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 				event.message.key.size,
 				event.message.key.data
 			);
+
+			if ( event.needsFree )
+				event.message.key.free();
 			break;
 		// Pending
 		case MASTER_EVENT_TYPE_PENDING:
@@ -695,10 +701,10 @@ bool SlaveWorker::handleGetRequest( MasterEvent event, char *buf, size_t size ) 
 			key.dup( header.keySize, header.key, ( void * ) event.socket );
 
 			pthread_mutex_lock( &SlaveWorker::pending->masters.getLock );
-			SlaveWorker::pending->masters.get.insert( key );
+			SlaveWorker::pending->masters.get.insert( key ); // TODO: Need to free the key after use
 			pthread_mutex_unlock( &SlaveWorker::pending->masters.getLock );
 
-			// Need to know the stripe ID
+			// TODO: Need to know the stripe ID
 			this->performDegradedRead( listId, 0, chunkId, PROTO_OPCODE_GET, &key );
 			ret = false;
 		} else {
@@ -731,11 +737,6 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size ) 
 		// TODO
 	}
 
-	if ( ! SlaveWorker::chunkBuffer->at( listId ) ) {
-		Slave::getInstance()->info();
-		fprintf( stderr, "Key: %.*s ---> listId = %u, chunkId = %u, isParity = %s\n", ( int ) header.keySize, header.key, listId, chunkId, isParity ? "true" : "false" );
-		return false;
-	}
 	SlaveWorker::chunkBuffer->at( listId )->set(
 		header.key, header.keySize, header.value, header.valueSize, PROTO_OPCODE_SET, chunkId,
 		this->chunks, this->dataChunk, this->parityChunk
@@ -781,6 +782,21 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 		KeyValueUpdate keyValueUpdate;
 		ChunkUpdate chunkUpdate;
 
+		// Compute delta and perform update
+		chunk->computeDelta(
+			header.valueUpdate, // delta
+			header.valueUpdate, // new data
+			offset, header.valueUpdateSize,
+			true // perform update
+		);
+
+		if ( SlaveWorker::parityChunkCount == 0 ) {
+			// TODO: Send UPDATE response to master immediately
+			event.resUpdate( event.socket, key, header.valueUpdateOffset, header.valueUpdateSize, true, false );
+			this->dispatch( event );
+			return true;
+		}
+
 		// Add the current request to the pending set
 		keyValueUpdate.dup( header.keySize, header.key, ( void * ) event.socket );
 		keyValueUpdate.offset = header.valueUpdateOffset;
@@ -790,19 +806,6 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 		SlaveWorker::pending->masters.update.insert( keyValueUpdate );
 		pthread_mutex_unlock( &SlaveWorker::pending->masters.updateLock );
 
-		// Compute delta and perform update
-		chunk->computeDelta(
-			header.valueUpdate, // delta
-			header.valueUpdate, // new data
-			offset, header.valueUpdateSize,
-			true // perform update
-		);
-		chunkUpdate.set(
-			metadata.listId, metadata.stripeId, metadata.chunkId,
-			offset, header.valueUpdateSize
-		);
-		chunkUpdate.setKeyValueUpdate( keyValueUpdate.size, keyValueUpdate.data, header.valueUpdateOffset );
-
 		// Find parity slaves
 		this->getSlaves(
 			header.key, header.keySize,
@@ -810,10 +813,13 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 			true, &isDegraded
 		);
 
+		chunkUpdate.set(
+			metadata.listId, metadata.stripeId, metadata.chunkId,
+			offset, header.valueUpdateSize
+		);
+		chunkUpdate.setKeyValueUpdate( keyValueUpdate.size, keyValueUpdate.data, header.valueUpdateOffset );
+
 		// Send UPDATE_CHUNK requests to parity slaves
-		if ( SlaveWorker::parityChunkCount == 0 ) {
-			fprintf( stderr, "TODO: Send UPDATE response to master immediately!\n" );
-		}
 		for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
 			chunkUpdate.chunkId = SlaveWorker::dataChunkCount + i; // updatingChunkId
 			chunkUpdate.ptr = ( void * ) this->paritySlaveSockets[ i ];
@@ -822,6 +828,7 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 			pthread_mutex_lock( &SlaveWorker::pending->slavePeers.updateLock );
 			SlaveWorker::pending->slavePeers.updateChunk.insert( chunkUpdate );
 			pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.updateLock );
+			// Slave::getInstance()->printPending();
 
 			// Prepare UPDATE_CHUNK request
 			size_t size;
@@ -897,11 +904,15 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 		ChunkUpdate chunkUpdate;
 
 		// Add the current request to the pending set
-		key.dup( header.keySize, header.key, ( void * ) event.socket );
+		if ( SlaveWorker::parityChunkCount == 0 ) {
+			key.set( header.keySize, header.key, ( void * ) event.socket );
+		} else {
+			key.dup( header.keySize, header.key, ( void * ) event.socket );
 
-		pthread_mutex_lock( &SlaveWorker::pending->masters.delLock );
-		SlaveWorker::pending->masters.del.insert( key );
-		pthread_mutex_unlock( &SlaveWorker::pending->masters.delLock );
+			pthread_mutex_lock( &SlaveWorker::pending->masters.delLock );
+			SlaveWorker::pending->masters.del.insert( key );
+			pthread_mutex_unlock( &SlaveWorker::pending->masters.delLock );
+		}
 
 		// Update data chunk and map
 		delta = this->protocol.buffer.recv + PROTO_KEY_SIZE + key.size;
@@ -910,6 +921,15 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 			key, &map->keys, delta,
 			this->protocol.buffer.size - PROTO_KEY_SIZE - key.size
 		);
+
+		// Send DELETE_CHUNK requests to parity slaves
+		if ( SlaveWorker::parityChunkCount == 0 ) {
+			// TODO: Send DELETE response to master immediately!
+			event.resDelete( event.socket, key, true, false );
+			this->dispatch( event );
+			return true;
+		}
+
 		chunkUpdate.set(
 			metadata.listId, metadata.stripeId, metadata.chunkId,
 			keyMetadata.offset, deltaSize
@@ -923,10 +943,6 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 			true, &isDegraded
 		);
 
-		// Send DELETE_CHUNK requests to parity slaves
-		if ( SlaveWorker::parityChunkCount == 0 ) {
-			fprintf( stderr, "TODO: Send DELETE response to master immediately!\n" );
-		}
 		for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
 			chunkUpdate.chunkId = SlaveWorker::dataChunkCount + i; // updatingChunkId
 			chunkUpdate.ptr = ( void * ) this->paritySlaveSockets[ i ];
@@ -1160,7 +1176,7 @@ bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success,
 	int pending;
 
 	chunkUpdate.set(
-		header.listId, header.stripeId, header.updatingChunkId,
+		header.listId, header.stripeId, header.updatingChunkId, // header.chunkId,
 		header.offset, header.length
 	);
 	chunkUpdate.setKeyValueUpdate( 0, 0, 0 );
@@ -1170,7 +1186,7 @@ bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success,
 	it = SlaveWorker::pending->slavePeers.updateChunk.lower_bound( chunkUpdate );
 	if ( it == SlaveWorker::pending->slavePeers.updateChunk.end() || ! chunkUpdate.equal( *it ) ) {
 		pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.updateLock );
-		__ERROR__( "SlaveWorker", "handleUpdateChunkResponse", "Cannot find a pending slave UPDATE_CHUNK request that matches the response. This message will be discarded." );
+		__ERROR__( "SlaveWorker", "handleUpdateChunkResponse", "Cannot find a pending slave UPDATE_CHUNK request that matches the response. This message will be discarded. (%u, %u, %u); updatingChunkId = %u; offset = %u, length = %u.", header.listId, header.stripeId, header.chunkId, header.updatingChunkId, header.offset, header.length );
 		return false;
 	}
 	chunkUpdate = *it;

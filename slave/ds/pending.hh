@@ -200,8 +200,8 @@ public:
 		std::set<DegradedOp> degradedOps;
 		std::set<ChunkRequest> getChunk;
 		std::set<ChunkRequest> setChunk;
-		std::set<ChunkUpdate> updateChunk;
-		std::set<ChunkUpdate> deleteChunk;
+		std::multiset<ChunkUpdate> updateChunk;
+		std::multiset<ChunkUpdate> deleteChunk;
 		pthread_mutex_t degradedOpsLock;
 		pthread_mutex_t getLock;
 		pthread_mutex_t setLock;

@@ -2,20 +2,21 @@
 
 YCSB_PATH=~/mtyiu/ycsb/0.3.0
 
-if [ $# != 1 ]; then
-	echo "Usage: $0 [Number of threads]"
+if [ $# != 2 ]; then
+	echo "Usage: $0 [Number of threads] [Workload]"
 	exit 1
 fi
 
 ${YCSB_PATH}/bin/ycsb \
 	run plio \
 	-s \
-	-P ${YCSB_PATH}/workloads/workloada \
+	-P ${YCSB_PATH}/workloads/$2 \
 	-p fieldcount=1 \
 	-p readallfields=false \
 	-p scanproportion=0 \
 	-p fieldlength=100 \
 	-p recordcount=1000000 \
+	-p operationcount=1000000 \
 	-p threadcount=$1 \
 	-p plio.host=137.189.88.46 \
 	-p plio.port=9112 \

@@ -30,6 +30,7 @@ enum MasterEventType {
 class MasterEvent : public Event {
 public:
 	MasterEventType type;
+	bool needsFree;
 	MasterSocket *socket;
 	union {
 		Key key;
@@ -50,9 +51,9 @@ public:
 	// SET
 	void resSet( MasterSocket *socket, Key &key, bool success );
 	// UPDATE
-	void resUpdate( MasterSocket *socket, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool success );
+	void resUpdate( MasterSocket *socket, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool success, bool needsFree = true );
 	// DELETE
-	void resDelete( MasterSocket *socket, Key &key, bool success );
+	void resDelete( MasterSocket *socket, Key &key, bool success, bool needsFree = true );
 	// Pending
 	void pending( MasterSocket *socket );
 };
