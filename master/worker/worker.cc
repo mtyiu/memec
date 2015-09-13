@@ -510,23 +510,14 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
 
-	std::pair<std::set<Key>::iterator, bool> p;
-
 	pthread_mutex_lock( &MasterWorker::pending->applications.setLock );
-	p = MasterWorker::pending->applications.set.insert( key );
+	MasterWorker::pending->applications.set.insert( key );
 	pthread_mutex_unlock( &MasterWorker::pending->applications.setLock );
-	if ( ! p.second ) {
-		__ERROR__( "Master", "handleSetRequest", "Cannot insert key into application's pending set for SET: %.*s (key size = %u); Value: (value size = %u)\n", ( int ) header.keySize, header.key, header.keySize, header.valueSize );
-		return false;
-	}
 
 	pthread_mutex_lock( &MasterWorker::pending->slaves.setLock );
 	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount + 1; i++ ) {
 		key.ptr = ( void * )( i == 0 ? socket : this->paritySlaveSockets[ i - 1 ] );
-		p = MasterWorker::pending->slaves.set.insert( key );
-		if ( ! p.second ) {
-			__ERROR__( "Master", "handleSetRequest", "Cannot insert key into slave's pending set for SET: %.*s (key size = %u); Value: (value size = %u) [slave (i = %u)]\n", ( int ) header.keySize, header.key, header.keySize, header.valueSize, i );
-		}
+		MasterWorker::pending->slaves.set.insert( key );
 	}
 	pthread_mutex_unlock( &MasterWorker::pending->slaves.setLock );
 
@@ -721,7 +712,7 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, char *buf,
 	it = MasterWorker::pending->slaves.get.find( key );
 	if ( it == MasterWorker::pending->slaves.get.end() ) {
 		pthread_mutex_unlock( &MasterWorker::pending->slaves.getLock );
-		__ERROR__( "MasterWorker", "handleGetResponse", "Cannot find a pending slave GET request that matches the response. This message will be discarded." );
+		__ERROR__( "MasterWorker", "handleGetResponse", "Cannot find a pending slave GET request that matches the response. This message will be discarded (key = %.*s).", key.size, key.data );
 		if ( success ) keyValue.free();
 		return false;
 	}

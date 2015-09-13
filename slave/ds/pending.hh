@@ -29,9 +29,18 @@ public:
 
 	bool operator<( const ChunkUpdate &m ) const {
 		int ret;
-		if ( Metadata::operator<( m ) )
+		if ( this->listId < m.listId )
 			return true;
+		if ( this->listId > m.listId )
+			return false;
 
+		if ( this->stripeId < m.stripeId )
+			return true;
+		if ( this->stripeId > m.stripeId )
+			return false;
+
+		if ( this->chunkId < m.chunkId )
+			return true;
 		if ( this->chunkId > m.chunkId )
 			return false;
 
@@ -88,7 +97,17 @@ public:
 	}
 
 	bool operator<( const ChunkRequest &m ) const {
-		if ( Metadata::operator<( m ) )
+		if ( this->listId < m.listId )
+			return true;
+		if ( this->listId > m.listId )
+			return false;
+
+		if ( this->stripeId < m.stripeId )
+			return true;
+		if ( this->stripeId > m.stripeId )
+			return false;
+
+		if ( this->chunkId < m.chunkId )
 			return true;
 		if ( this->chunkId > m.chunkId )
 			return false;
@@ -129,25 +148,32 @@ public:
 	}
 
 	bool operator<( const DegradedOp &m ) const {
-		if ( Metadata::operator<( m ) )
+		if ( this->listId < m.listId )
 			return true;
+		if ( this->listId > m.listId )
+			return false;
 
+		if ( this->stripeId < m.stripeId )
+			return true;
+		if ( this->stripeId > m.stripeId )
+			return false;
+
+		if ( this->chunkId < m.chunkId )
+			return true;
 		if ( this->chunkId > m.chunkId )
 			return false;
 
-		if ( this->listId == m.listId && this->stripeId == m.stripeId && this->chunkId == m.chunkId ) {
-			if ( this->opcode < m.opcode )
-				return true;
-			if ( this->opcode > m.opcode )
-				return false;
+		if ( this->opcode < m.opcode )
+			return true;
+		if ( this->opcode > m.opcode )
+			return false;
 
-			switch( this->opcode ) {
-				case PROTO_OPCODE_GET:
-				case PROTO_OPCODE_DELETE:
-					return ( this->data.key < m.data.key );
-				case PROTO_OPCODE_UPDATE:
-					return ( this->data.keyValueUpdate < m.data.keyValueUpdate );
-			}
+		switch( this->opcode ) {
+			case PROTO_OPCODE_GET:
+			case PROTO_OPCODE_DELETE:
+				return ( this->data.key < m.data.key );
+			case PROTO_OPCODE_UPDATE:
+				return ( this->data.keyValueUpdate < m.data.keyValueUpdate );
 		}
 		return false;
 	}
@@ -163,8 +189,8 @@ public:
 class Pending {
 public:
 	struct {
-		std::set<Key> get;
-		std::set<KeyValueUpdate> update;
+		std::multiset<Key> get;
+		std::multiset<KeyValueUpdate> update;
 		std::set<Key> del;
 		pthread_mutex_t getLock;
 		pthread_mutex_t updateLock;

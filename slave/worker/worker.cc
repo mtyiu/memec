@@ -811,7 +811,11 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 		);
 
 		// Send UPDATE_CHUNK requests to parity slaves
+		if ( SlaveWorker::parityChunkCount == 0 ) {
+			fprintf( stderr, "TODO: Send UPDATE response to master immediately!\n" );
+		}
 		for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
+			chunkUpdate.chunkId = SlaveWorker::dataChunkCount + i; // updatingChunkId
 			chunkUpdate.ptr = ( void * ) this->paritySlaveSockets[ i ];
 
 			// Insert into pending set
@@ -841,7 +845,10 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 			slavePeerEvent.send( this->paritySlaveSockets[ i ], packet );
 
 #ifdef SLAVE_WORKER_SEND_REPLICAS_PARALLEL
-			SlaveWorker::eventQueue->prioritizedInsert( slavePeerEvent );
+			if ( i == SlaveWorker::parityChunkCount - 1 )
+				this->dispatch( slavePeerEvent );
+			else
+				SlaveWorker::eventQueue->prioritizedInsert( slavePeerEvent );
 #else
 			this->dispatch( slavePeerEvent );
 #endif
@@ -917,8 +924,12 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 		);
 
 		// Send DELETE_CHUNK requests to parity slaves
+		if ( SlaveWorker::parityChunkCount == 0 ) {
+			fprintf( stderr, "TODO: Send DELETE response to master immediately!\n" );
+		}
 		for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
-			key.ptr = ( void * ) this->paritySlaveSockets[ i ];
+			chunkUpdate.chunkId = SlaveWorker::dataChunkCount + i; // updatingChunkId
+			chunkUpdate.ptr = ( void * ) this->paritySlaveSockets[ i ];
 
 			pthread_mutex_lock( &SlaveWorker::pending->slavePeers.delLock );
 			SlaveWorker::pending->slavePeers.deleteChunk.insert( chunkUpdate );
@@ -1149,7 +1160,7 @@ bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success,
 	int pending;
 
 	chunkUpdate.set(
-		header.listId, header.stripeId, header.chunkId,
+		header.listId, header.stripeId, header.updatingChunkId,
 		header.offset, header.length
 	);
 	chunkUpdate.setKeyValueUpdate( 0, 0, 0 );
@@ -1171,7 +1182,7 @@ bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success,
 	for ( pending = 0; it != SlaveWorker::pending->slavePeers.updateChunk.end() && chunkUpdate.equal( *it ); pending++, it++ );
 	pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.updateLock );
 
-	__ERROR__( "SlaveWorker", "handleUpdateChunkResponse", "Pending slave UPDATE_CHUNK requests = %d (%s).", pending, success ? "success" : "fail" );
+	__DEBUG__( BLUE, "SlaveWorker", "handleUpdateChunkResponse", "Pending slave UPDATE_CHUNK requests = %d (%s).", pending, success ? "success" : "fail" );
 	if ( pending == 0 ) {
 		// Only send application UPDATE response when the number of pending slave UPDATE_CHUNK requests equal 0
 		MasterEvent masterEvent;
@@ -1222,7 +1233,7 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 	int pending;
 
 	chunkUpdate.set(
-		header.listId, header.stripeId, header.chunkId,
+		header.listId, header.stripeId, header.updatingChunkId,
 		header.offset, header.length
 	);
 	chunkUpdate.setKeyValueUpdate( 0, 0, 0 );

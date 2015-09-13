@@ -10,9 +10,20 @@ public:
 	uint32_t offset, length;
 
 	bool operator<( const KeyValueUpdate &k ) const {
-		if ( Key::operator<( k ) )
+		int ret;
+		if ( this->size < k.size )
 			return true;
+		if ( this->size > k.size )
+			return false;
 
+		ret = strncmp( this->data, k.data, this->size );
+		if ( ret < 0 )
+			return true;
+		if ( ret > 0 )
+			return false;
+
+		if ( this->ptr < k.ptr )
+			return true;
 		if ( this->ptr > k.ptr )
 			return false;
 

@@ -19,9 +19,9 @@ public:
 		pthread_mutex_t delLock;
 	} applications;
 	struct {
-		std::set<Key> get;
+		std::multiset<Key> get;
 		std::set<Key> set;
-		std::set<KeyValueUpdate> update;
+		std::multiset<KeyValueUpdate> update;
 		std::set<Key> del;
 		pthread_mutex_t getLock;
 		pthread_mutex_t setLock;
