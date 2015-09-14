@@ -19,7 +19,7 @@ private:
 		// 	// Wait until all memory is returned
 		// 	pthread_cond_wait( &this->cvEmpty, &this->mAccess );
 		// }
-		for ( size_t i = 0; i < this->capacity; i++ ) {
+		for ( uint64_t i = 0; i < this->capacity; i++ ) {
 			delete poolBackup[ i ];
 		}
 		delete[] pool;
@@ -27,10 +27,10 @@ private:
 		pthread_mutex_unlock( &this->mAccess );
 	}
 
-	volatile size_t readIndex;
-	volatile size_t writeIndex;
-	volatile size_t count; // current number of occupied elements
-	volatile size_t capacity;
+	volatile uint64_t readIndex;
+	volatile uint64_t writeIndex;
+	volatile uint64_t count; // current number of occupied elements
+	volatile uint64_t capacity;
 
 	pthread_mutex_t mAccess;
 	pthread_cond_t cvEmpty;
@@ -43,17 +43,17 @@ public:
 		return &memoryPool;
 	}
 
-	inline size_t nextVal( size_t x ) {
+	inline uint64_t nextVal( uint64_t x ) {
 		return ( ( x + 1 ) >= this->capacity ? 0 : x + 1 );
 	}
 
 	// Convert bytes to capacity of memory pool
-	static size_t getCapacity( size_t space, size_t extra ) {
-		size_t size = sizeof( T ) + extra;
+	static uint64_t getCapacity( uint64_t space, uint64_t extra ) {
+		uint64_t size = sizeof( T ) + extra;
 		return ( space / size );
 	}
 
-	void init( size_t capacity, bool ( *initFn )( T *, void * ) = NULL, void *argv = NULL ) {
+	void init( uint64_t capacity, bool ( *initFn )( T *, void * ) = NULL, void *argv = NULL ) {
 		this->readIndex = 0;
 		this->writeIndex = 0;
 		this->count = 0;
@@ -69,7 +69,7 @@ public:
 			exit( 1 );
 		}
 
-		for ( size_t i = 0; i < capacity; i++ ) {
+		for ( uint64_t i = 0; i < capacity; i++ ) {
 			this->pool[ i ] = new T();
 			this->poolBackup[ i ] = this->pool[ i ];
 			if ( ! this->pool[ i ] ) {
@@ -82,7 +82,7 @@ public:
 		}
 	}
 
-	T *malloc( T **buffer = 0, size_t count = 0 ) {
+	T *malloc( T **buffer = 0, uint64_t count = 0 ) {
 		T *ret = 0;
 
 		pthread_mutex_lock( &this->mAccess );
@@ -93,7 +93,7 @@ public:
 		}
 
 		if ( buffer && count ) {
-			for ( size_t i = 0; i < count; i++ ) {
+			for ( uint64_t i = 0; i < count; i++ ) {
 				buffer[ i ] = this->pool[ this->readIndex ];
 				this->readIndex = nextVal( this->readIndex );
 				this->count++;
@@ -109,7 +109,7 @@ public:
 		return ret;
 	}
 
-	size_t free( T *buffer ) {
+	uint64_t free( T *buffer ) {
 		pthread_mutex_lock( &this->mAccess );
 		assert( this->count != 0 );
 		this->pool[ this->writeIndex ] = buffer;
@@ -120,11 +120,11 @@ public:
 		return 1;
 	}
 
-	size_t free( T **buffer, size_t count ) {
-		size_t ret = 0;
+	uint64_t free( T **buffer, uint64_t count ) {
+		uint64_t ret = 0;
 
 		pthread_mutex_lock( &this->mAccess );
-		for ( size_t i = 0; i < count; i++ ) {
+		for ( uint64_t i = 0; i < count; i++ ) {
 			assert( this->count != 0 );
 			this->pool[ this->writeIndex ] = buffer[ i ];
 			this->writeIndex = nextVal( this->writeIndex );
@@ -137,7 +137,7 @@ public:
 		return ret;
 	}
 
-	size_t getCount() {
+	uint64_t getCount() {
 		return this->count;
 	}
 };

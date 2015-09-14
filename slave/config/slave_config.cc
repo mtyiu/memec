@@ -52,7 +52,7 @@ bool SlaveConfig::set( const char *section, const char *name, const char *value 
 			return false;
 	} else if ( match( section, "pool" ) ) {
 		if ( match( name, "chunks" ) )
-			this->pool.chunks = atoi( value );
+			this->pool.chunks = atoll( value );
 		else
 			return false;
 	} else if ( match( section, "workers" ) ) {
@@ -214,7 +214,7 @@ void SlaveConfig::print( FILE *f ) {
 		"- Slave peer connections settings\n"
 		"\t- %-*s : %u\n"
 		"- Pool\n"
-		"\t- %-*s : %u\n"
+		"\t- %-*s : %lu\n"
 		"- Workers\n"
 		"\t- %-*s : %s\n",
 		width, "Maximum number of events", this->epoll.maxEvents,
