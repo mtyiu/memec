@@ -27,6 +27,10 @@ public:
 	} sync;
 	std::vector<ServerAddr> coordinators;
 	std::vector<ServerAddr> slaves;
+    struct {
+		bool enabled;
+		ServerAddr addr;
+	} spreadd;
 	struct {
 		uint16_t chunksPerList;
 	} buffer;

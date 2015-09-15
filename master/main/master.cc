@@ -129,6 +129,14 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 #undef WORKER_INIT_LOOP
 	}
 
+	/* Remapping message handler */
+	if ( this->config.global.spreadd.enabled ) {
+		char masterName[ 11 ];
+		memset( masterName, 0, 11 );
+		sprintf( masterName, "%s%03d", MASTER_PREFIX, this->config.master.master.addr.port % 1000 );
+		remapMsgHandler.init( this->config.global.spreadd.addr.addr, this->config.global.spreadd.addr.port, masterName );
+	}
+
 	// Set signal handlers //
 	Signal::setHandler( Master::signalHandler );
 
@@ -166,6 +174,12 @@ bool Master::start() {
 	// Start listening
 	if ( ! this->sockets.self.start() ) {
 		__ERROR__( "Master", "start", "Cannot start socket." );
+		ret = false;
+	}
+
+	/* Remapping message handler */
+	if ( this->config.global.spreadd.enabled && ! this->remapMsgHandler.start() ) {
+		__ERROR__( "Master", "start", "Cannot start remapping message handler." );
 		ret = false;
 	}
 
@@ -211,6 +225,12 @@ bool Master::stop() {
 	for ( i = 0, len = this->sockets.slaves.size(); i < len; i++ )
 		this->sockets.slaves[ i ]->stop();
 	this->sockets.slaves.clear();
+
+	 /* Remapping message handler */
+	if ( this->config.global.spreadd.enabled ) {
+		this->remapMsgHandler.stop();
+		this->remapMsgHandler.quit();
+	}
 
 	printf( "Freeing...\n" );
 	this->free();

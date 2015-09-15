@@ -3,6 +3,7 @@ TARGET= \
 	common/config \
 	common/ds \
 	common/protocol \
+	common/remap \
 	temp
 
 .PHONY: all $(TARGET)
