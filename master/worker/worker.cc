@@ -1,9 +1,12 @@
+#include <ctime>
 #include <ctype.h>
+#include <utility>
 #include "worker.hh"
 #include "../main/master.hh"
 #include "../../common/util/debug.hh"
 
 #define WORKER_COLOR	YELLOW
+#define GIGA			( 1000 * 1000 * 1000 )
 
 uint32_t MasterWorker::dataChunkCount;
 uint32_t MasterWorker::parityChunkCount;
@@ -487,6 +490,17 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 	MasterWorker::pending->slaves.get.insert( key );
 	pthread_mutex_unlock( &MasterWorker::pending->slaves.getLock );
 
+	// Mark the time when request is sent
+	sockaddr_in socketAddr = socket->getAddr();
+	ServerAddr slaveAddr;
+	slaveAddr.addr = socketAddr.sin_addr.s_addr;
+	slaveAddr.port= socketAddr.sin_port;
+
+	KeyLatencyStartTime klst = { slaveAddr, time ( NULL ) };
+	pthread_mutex_lock( &MasterWorker::pending->stats.getLock );
+	MasterWorker::pending->stats.get.insert( std::make_pair( key, klst ) );
+	pthread_mutex_unlock( &MasterWorker::pending->stats.getLock );
+
 	// Send GET request
 	sentBytes = socket->send( buffer.data, buffer.size, connected );
 	if ( sentBytes != ( ssize_t ) buffer.size ) {
@@ -759,6 +773,32 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, char *buf,
 	}
 	key = *it;
 	pthread_mutex_unlock( &MasterWorker::pending->applications.getLock );
+
+	// TODO Mark the elapse time as latency
+	pthread_mutex_lock( &MasterWorker::pending->stats.getLock );
+	std::map<Key, KeyLatencyStartTime>::iterator lit = MasterWorker::pending->stats.get.find( key );
+	if ( lit == MasterWorker::pending->stats.get.end() ) {
+		__DEBUG__( "MasterWorker", "handleGetResponse", "Cannot find a pending stats GET request that matches the response." );
+	} else {
+		int index = -1;
+		Master* master = Master::getInstance();
+		master->slaveLoading.past.get.get( lit->second.addr, &index );
+		// init. the set if it is not there
+		if ( index == -1 ) {
+			master->slaveLoading.past.get.set( lit->second.addr, new std::set<Latency>() );
+		}
+		// TODO insert the latency to the set
+		// TODO use time when Response came, i.e. event created for latency cal.
+		struct timespec currentTime;
+		clock_gettime( CLOCK_REALTIME, &currentTime);
+		double elapseTime = currentTime.tv_sec - lit->second.sttime.tv_sec + ( currentTime.tv_nsec - lit->second.sttime.tv_nsec ) / GIGA  ;
+		Latency latency = Latency ( ( double ) elapseTime );
+		fprintf( stderr, " latency add %us %uus for ", latency.sec, latency.usec );
+		lit->second.addr.print( stderr );
+		std::set< Latency > *latencyPool = master->slaveLoading.past.get.get( lit->second.addr ); 
+		latencyPool->insert( latency );
+	}
+	pthread_mutex_lock( &MasterWorker::pending->stats.getLock );
 
 	if ( success )
 		applicationEvent.resGet( ( ApplicationSocket * ) key.ptr, keyValue );

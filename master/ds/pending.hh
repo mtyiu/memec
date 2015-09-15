@@ -1,9 +1,11 @@
 #ifndef __MASTER_DS_PENDING_HH__
 #define __MASTER_DS_PENDING_HH__
 
+#include <map>
 #include <set>
 #include <cstring>
 #include <pthread.h>
+#include "stats.hh"
 #include "../../common/ds/pending.hh"
 
 class Pending {
@@ -28,6 +30,12 @@ public:
 		pthread_mutex_t updateLock;
 		pthread_mutex_t delLock;
 	} slaves;
+	struct {
+		std::map<Key, KeyLatencyStartTime> get;
+		std::map<Key, KeyLatencyStartTime> set;
+		pthread_mutex_t getLock;
+		pthread_mutex_t setLock;
+	} stats;
 
 	Pending() {
 		pthread_mutex_init( &this->applications.getLock, 0 );

@@ -1,6 +1,7 @@
 #ifndef __MASTER_MAIN_MASTER_HH__
 #define __MASTER_MAIN_MASTER_HH__
 
+#include <map>
 #include <set>
 #include <cstdio>
 #include "../config/master_config.hh"
@@ -31,21 +32,6 @@ private:
 	std::vector<MasterWorker> workers;
 
 	MasterRemapMsgHandler remapMsgHandler;
-	struct {
-		struct {
-			ArrayMap< ServerAddr, std::set< Latency > > get;
-			ArrayMap< ServerAddr, std::set< Latency > > set;
-		} past;
-		struct {
-			ArrayMap< ServerAddr, Latency > get;
-			ArrayMap< ServerAddr, Latency > set;
-		} current;
-		struct {
-			ArrayMap< ServerAddr, Latency > get;
-			ArrayMap< ServerAddr, Latency > set;
-		} cumulative;
-		pthread_mutex_t pastLock;
-	} slaveLoading;
 
 	Master();
 	// Do not implement
@@ -76,6 +62,22 @@ public:
 	Pending pending;
 	MasterEventQueue eventQueue;
 	StripeList<SlaveSocket> *stripeList;
+
+	struct {
+		struct {
+			ArrayMap< ServerAddr, std::set< Latency > > get;
+			ArrayMap< ServerAddr, std::set< Latency > > set;
+		} past;
+		struct {
+			ArrayMap< ServerAddr, Latency > get;
+			ArrayMap< ServerAddr, Latency > set;
+		} current;
+		struct {
+			ArrayMap< ServerAddr, Latency > get;
+			ArrayMap< ServerAddr, Latency > set;
+		} cumulative;
+		pthread_mutex_t pastLock;
+	} slaveLoading;
 
 	static Master *getInstance() {
 		static Master master;
