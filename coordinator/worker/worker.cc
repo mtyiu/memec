@@ -42,6 +42,9 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 			buffer.data = this->protocol.resRegisterMaster( buffer.size, false );
 			isSend = true;
 			break;
+		case MASTER_EVENT_TYPE_PENDING:
+			isSend = false;
+			break;
 		default:
 			return;
 	}
@@ -51,6 +54,43 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 	} else {
+		ProtocolHeader header;
+		WORKER_RECEIVE_FROM_EVENT_SOCKET();
+		while( buffer.size > 0 ) {
+			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "CoordinatorWorker" );
+
+			buffer.data += PROTO_HEADER_SIZE;
+			buffer.size -= PROTO_HEADER_SIZE;
+
+			// Validate message
+			if ( header.from != PROTO_MAGIC_FROM_MASTER ) {
+				__ERROR__( "CoordinatorWorker", "dispatch", "Invalid message source from master." );
+			}
+
+			struct LoadStatsHeader loadStatsHeader;
+			ArrayMap< ServerAddr, Latency > getLatency;
+			ArrayMap< ServerAddr, Latency > setLatency;
+
+			switch ( header.magic ) {
+				case PROTO_MAGIC_LOADING_STATS:
+					this->protocol.parseLoadStatsHeader( loadStatsHeader, buffer.data, buffer.size );
+					if ( ! this->protocol.parseLoadingStats( loadStatsHeader, getLatency, setLatency, buffer.data, buffer.size ) )
+						__ERROR__( "CoordinatorWorker", "dispatch", "Invalid amount of data received from master." );
+					//fprintf( stderr, "get stats GET %d SET %d\n", loadStatsHeader.slaveGetCount, loadStatsHeader.slaveSetCount );
+					break;
+				case PROTO_MAGIC_REQUEST:
+					goto quit_1;
+				default:
+					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from master." );
+					goto quit_1;
+			}
+
+quit_1:
+			buffer.data += header.length;
+			buffer.size -= header.length;
+		}
+
+		if ( connected ) event.socket->done();
 
 	}
 

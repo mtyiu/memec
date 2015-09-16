@@ -1,6 +1,7 @@
 #ifndef __MASTER_MAIN_MASTER_HH__
 #define __MASTER_MAIN_MASTER_HH__
 
+#include <map>
 #include <set>
 #include <cstdio>
 #include "../config/master_config.hh"
@@ -17,6 +18,7 @@
 #include "../../common/ds/key.hh"
 #include "../../common/ds/key_value.hh"
 #include "../../common/ds/packet_pool.hh"
+#include "../../common/ds/latency.hh"
 #include "../../common/stripe_list/stripe_list.hh"
 #include "../../common/socket/epoll.hh"
 #include "../../common/signal/signal.hh"
@@ -36,6 +38,10 @@ private:
 	// Do not implement
 	Master( Master const& );
 	void operator=( Master const& );
+
+	// helper function to update slave stats
+	void updateSlavesCurrentLoading();
+	void updateSlavesCumulativeLoading();
 
 	void free();
 	// Commands
@@ -58,6 +64,22 @@ public:
 	MasterEventQueue eventQueue;
 	PacketPool packetPool;
 	StripeList<SlaveSocket> *stripeList;
+
+	struct {
+		struct {
+			ArrayMap< ServerAddr, std::set< Latency > > get;
+			ArrayMap< ServerAddr, std::set< Latency > > set;
+		} past;
+		struct {
+			ArrayMap< ServerAddr, Latency > get;
+			ArrayMap< ServerAddr, Latency > set;
+		} current;
+		struct {
+			ArrayMap< ServerAddr, Latency > get;
+			ArrayMap< ServerAddr, Latency > set;
+		} cumulative;
+		pthread_mutex_t loadLock;
+	} slaveLoading;
 
 	static Master *getInstance() {
 		static Master master;

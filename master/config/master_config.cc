@@ -79,6 +79,11 @@ bool MasterConfig::set( const char *section, const char *name, const char *value
 			this->eventQueue.size.separated.slave = atoi( value );
 		else
 			return false;
+	} else if ( match( section, "loadingStats" ) ) {
+		if ( match ( name, "updateInterval" ) )
+			this->loadingStats.updateInterval = atoi( value );
+		else 
+			return false;
 	} else {
 		return false;
 	}
@@ -187,6 +192,12 @@ void MasterConfig::print( FILE *f ) {
 			width, "Size for slave", this->eventQueue.size.separated.slave
 		);
 	}
+	fprintf(
+		f,
+		"Loading statistics\n"
+		"\t- %-*s : %u\n",
+		width, "Update interval (seconds)", this->loadingStats.updateInterval
+	);
 
 	fprintf( f, "\n" );
 }

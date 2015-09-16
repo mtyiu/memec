@@ -1,9 +1,12 @@
+#include <ctime>
 #include <ctype.h>
+#include <utility>
 #include "worker.hh"
 #include "../main/master.hh"
 #include "../../common/util/debug.hh"
 
 #define WORKER_COLOR	YELLOW
+#define GIGA			( 1000 * 1000 * 1000 )
 
 uint32_t MasterWorker::dataChunkCount;
 uint32_t MasterWorker::parityChunkCount;
@@ -193,6 +196,15 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 	switch( event.type ) {
 		case COORDINATOR_EVENT_TYPE_REGISTER_REQUEST:
 			buffer.data = this->protocol.reqRegisterCoordinator( buffer.size, event.message.address.addr, event.message.address.port );
+			isSend = true;
+			break;
+		case COORDINATOR_EVENT_TYPE_PUSH_LOAD_STATS:
+			// TODO lock the latency when constructing msg ??
+			buffer.data = this->protocol.reqPushLoadStats(
+				buffer.size,
+				event.message.loading.slaveGetLatency,
+				event.message.loading.slaveSetLatency
+			);
 			isSend = true;
 			break;
 		case COORDINATOR_EVENT_TYPE_PENDING:
@@ -446,6 +458,18 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 	MasterWorker::pending->slaves.get.insert( key );
 	pthread_mutex_unlock( &MasterWorker::pending->slaves.getLock );
 
+	// Mark the time when request is sent
+	sockaddr_in socketAddr = socket->getAddr();
+	ServerAddr slaveAddr;
+	slaveAddr.addr = socketAddr.sin_addr.s_addr;
+	slaveAddr.port= socketAddr.sin_port;
+
+	KeyLatencyStartTime klst = { slaveAddr };
+	clock_gettime( CLOCK_REALTIME, &klst.sttime );
+	pthread_mutex_lock( &MasterWorker::pending->stats.getLock );
+	MasterWorker::pending->stats.get.insert( std::make_pair( key, klst ) );
+	pthread_mutex_unlock( &MasterWorker::pending->stats.getLock );
+
 	// Send GET request
 	sentBytes = socket->send( buffer.data, buffer.size, connected );
 	if ( sentBytes != ( ssize_t ) buffer.size ) {
@@ -523,8 +547,19 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 
 	// Send SET requests
 	if ( MasterWorker::parityChunkCount ) {
-#ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
 		for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
+			// Mark the time when request is sent
+			sockaddr_in socketAddr = this->paritySlaveSockets[ i ]->getAddr();
+			ServerAddr slaveAddr;
+			slaveAddr.addr = socketAddr.sin_addr.s_addr;
+			slaveAddr.port= socketAddr.sin_port;
+
+			KeyLatencyStartTime klst = { slaveAddr, time ( NULL ) };
+			pthread_mutex_lock( &MasterWorker::pending->stats.setLock );
+			MasterWorker::pending->stats.set.insert( std::make_pair( key, klst ) );
+			pthread_mutex_unlock( &MasterWorker::pending->stats.setLock );
+
+#ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
 			SlaveEvent slaveEvent;
 			slaveEvent.send( this->paritySlaveSockets[ i ], packet );
 			MasterWorker::eventQueue->prioritizedInsert( slaveEvent );
@@ -534,7 +569,6 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		slaveEvent.send( socket, packet );
 		this->dispatch( slaveEvent );
 #else
-		for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
 			sentBytes = this->paritySlaveSockets[ i ]->send( buffer.data, buffer.size, connected );
 			if ( sentBytes != ( ssize_t ) buffer.size ) {
 				__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
@@ -554,6 +588,18 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 			return false;
 		}
 	}
+
+	// Mark the time when request is sent
+	sockaddr_in socketAddr = socket->getAddr();
+	ServerAddr slaveAddr;
+	slaveAddr.addr = socketAddr.sin_addr.s_addr;
+	slaveAddr.port = socketAddr.sin_port;
+
+	KeyLatencyStartTime klst = { slaveAddr };
+
+	pthread_mutex_lock( &MasterWorker::pending->stats.setLock );
+	MasterWorker::pending->stats.set.insert( std::make_pair( key, klst ) );
+	pthread_mutex_unlock( &MasterWorker::pending->stats.setLock );
 
 	return true;
 }
@@ -720,6 +766,33 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, char *buf,
 	MasterWorker::pending->slaves.get.erase( it );
 	pthread_mutex_unlock( &MasterWorker::pending->slaves.getLock );
 
+	// Mark the elapse time as latency
+	Master* master = Master::getInstance();
+	if ( master->config.master.loadingStats.updateInterval > 0 ) {
+		pthread_mutex_lock( &MasterWorker::pending->stats.getLock );
+		std::map<Key, KeyLatencyStartTime>::iterator lit = MasterWorker::pending->stats.get.find( key );
+		if ( lit == MasterWorker::pending->stats.get.end() ) {
+			__DEBUG__( "MasterWorker", "handleGetResponse", "Cannot find a pending stats GET request that matches the response." );
+		} else {
+			int index = -1;
+			std::set<Latency> *latencyPool = master->slaveLoading.past.get.get( lit->second.addr, &index );
+			// init. the set if it is not there
+			if ( index == -1 ) {
+				master->slaveLoading.past.get.set( lit->second.addr, new std::set<Latency>() );
+			}
+			// insert the latency to the set
+			// TODO use time when Response came, i.e. event created for latency cal.
+			struct timespec currentTime;
+			clock_gettime( CLOCK_REALTIME, &currentTime );
+			double elapseTime = currentTime.tv_sec - lit->second.sttime.tv_sec + ( currentTime.tv_nsec - lit->second.sttime.tv_nsec ) / GIGA  ;
+			Latency latency = Latency ( ( double ) elapseTime );
+			if ( index == -1 )
+				latencyPool = master->slaveLoading.past.get.get( lit->second.addr );
+			latencyPool->insert( latency );
+		}
+		pthread_mutex_unlock( &MasterWorker::pending->stats.getLock );
+	}
+
 	key.ptr = 0;
 	pthread_mutex_lock( &MasterWorker::pending->applications.getLock );
 	it = MasterWorker::pending->applications.get.lower_bound( key );
@@ -777,11 +850,39 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 	key = *it;
 	MasterWorker::pending->slaves.set.erase( it );
 
+	// Mark the elapse time as latency
+	Master* master = Master::getInstance();
+	if ( master->config.master.loadingStats.updateInterval > 0 ) {
+		pthread_mutex_lock( &MasterWorker::pending->stats.setLock );
+		std::map<Key, KeyLatencyStartTime>::iterator lit = MasterWorker::pending->stats.set.find( key );
+		if ( lit == MasterWorker::pending->stats.set.end() ) {
+			__DEBUG__( "MasterWorker", "handleGetResponse", "Cannot find a pending stats GET request that matches the response." );
+		} else {
+			int index = -1;
+			std::set< Latency > *latencyPool = master->slaveLoading.past.set.get( lit->second.addr, &index );
+			// init. the set if it is not there
+			if ( index == -1 ) {
+				master->slaveLoading.past.set.set( lit->second.addr, new std::set<Latency>() );
+			}
+			// insert the latency to the set
+			// TODO use time when Response came, i.e. event created for latency cal.
+			struct timespec currentTime;
+			clock_settime( CLOCK_REALTIME, &currentTime);
+			double elapseTime = currentTime.tv_sec - lit->second.sttime.tv_sec + ( currentTime.tv_nsec - lit->second.sttime.tv_nsec ) / GIGA  ;
+			Latency latency = Latency ( ( double ) elapseTime );
+			if ( index == -1 )
+				latencyPool = master->slaveLoading.past.set.get( lit->second.addr );
+			latencyPool->insert( latency );
+		}
+		pthread_mutex_unlock( &MasterWorker::pending->stats.setLock );
+	}
+
 	// Check pending slave SET requests
 	key.ptr = 0;
 	it = MasterWorker::pending->slaves.set.lower_bound( key );
 	for ( pending = 0; it != MasterWorker::pending->slaves.set.end() && key.equal( *it ); pending++, it++ );
 	pthread_mutex_unlock( &MasterWorker::pending->slaves.setLock );
+
 	// __ERROR__( "MasterWorker", "handleSetResponse", "Pending slave SET requests = %d.", pending );
 
 	if ( pending == 0 ) {

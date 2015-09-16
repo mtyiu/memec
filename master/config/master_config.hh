@@ -44,6 +44,9 @@ public:
 			} separated;
 		} size;
 	} eventQueue;
+	struct {
+		uint32_t updateInterval;
+	} loadingStats;
 
 	bool merge( GlobalConfig &globalConfig );
 	bool parse( const char *path );

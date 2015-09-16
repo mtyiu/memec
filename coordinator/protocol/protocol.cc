@@ -47,6 +47,39 @@ char *CoordinatorProtocol::resRegisterMaster( size_t &size, GlobalConfig &global
 	return this->buffer.send;
 }
 
+bool CoordinatorProtocol::parseLoadingStats( 
+		const LoadStatsHeader& loadStatsHeader, 
+		ArrayMap< ServerAddr, Latency >& slaveGetLatency,
+		ArrayMap< ServerAddr, Latency >& slaveSetLatency,
+		char* buffer, uint32_t size )
+{
+	ServerAddr addr; 
+	Latency *tempLatency;
+
+	uint32_t recordSize = sizeof( uint32_t ) * 3 + sizeof( uint16_t );
+
+	// check if the all stats are received properly
+	if ( size < ( loadStatsHeader.slaveGetCount + loadStatsHeader.slaveSetCount ) * recordSize )
+		return false;
+
+	for ( uint32_t i = 0; i < loadStatsHeader.slaveGetCount + loadStatsHeader.slaveSetCount; i++ ) {
+		addr.addr = ntohl( *( uint32_t * )( buffer ) );
+		addr.port = ntohs( *( uint16_t * )( buffer + sizeof( uint32_t ) ) );
+		tempLatency = new Latency();
+		tempLatency->sec = ntohl( *( uint32_t * )( buffer + sizeof( uint32_t ) + sizeof( uint16_t ) ) );
+		tempLatency->usec = ntohl( *( uint32_t * )( buffer + sizeof( uint32_t ) * 2 + sizeof( uint16_t ) ) );
+
+		if ( i < loadStatsHeader.slaveGetCount )
+			slaveGetLatency.set( addr, tempLatency );
+		else
+			slaveSetLatency.set( addr, tempLatency );
+		
+		buffer += recordSize;
+	}
+
+	return true;
+}
+
 char *CoordinatorProtocol::resRegisterSlave( size_t &size, bool success ) {
 	size = this->generateHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,

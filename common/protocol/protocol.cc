@@ -2,7 +2,6 @@
 #include "protocol.hh"
 #include "../util/debug.hh"
 
-#define PROTO_BUF_MIN_SIZE		65536
 #define PROTO_KEY_VALUE_SIZE	4 // 1 byte for key size, 3 bytes for value size
 
 size_t Protocol::generateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t length, char *sendBuf ) {
@@ -200,6 +199,18 @@ size_t Protocol::generateAddressHeader( uint8_t magic, uint8_t to, uint8_t opcod
 	return bytes;
 }
 
+size_t Protocol::generateLoadStatsHeader( uint8_t magic, uint8_t to, uint32_t slaveGetCount, uint32_t slaveSetCount ) {
+	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
+	size_t bytes = this->generateHeader( magic, to , 0, PROTO_LOAD_STATS_SIZE );
+	
+	*( ( uint32_t * )( buf ) ) = htonl( slaveGetCount );
+	*( ( uint32_t * )( buf + sizeof( uint32_t ) ) ) = htonl( slaveSetCount );
+
+	bytes += PROTO_LOAD_STATS_SIZE;
+
+	return bytes;
+}
+
 bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t &opcode, uint32_t &length, char *buf, size_t size ) {
 	if ( size < 8 )
 		return false;
@@ -216,6 +227,7 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_MAGIC_RESPONSE_SUCCESS:
 		case PROTO_MAGIC_RESPONSE_FAILURE:
 		case PROTO_MAGIC_ANNOUNCEMENT:
+		case PROTO_MAGIC_LOADING_STATS:
 			break;
 		default:
 			return false;
@@ -247,6 +259,8 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_OPCODE_DELETE_CHUNK:
 		case PROTO_OPCODE_GET_CHUNK:
 		case PROTO_OPCODE_SET_CHUNK:
+		case PROTO_OPCODE_MASTER_PUSH_STATS:
+		case PROTO_OPCODE_COORDINATOR_PUSH_STATS:
 			break;
 		default:
 			return false;
@@ -456,6 +470,16 @@ bool Protocol::parseAddressHeader( size_t offset, uint32_t &addr, uint16_t &port
 	char *ptr = buf + offset;
 	addr = *( ( uint32_t * )( ptr     ) );
 	port = *( ( uint16_t * )( ptr + 4 ) );
+
+	return true;
+}
+
+bool Protocol::parseLoadStatsHeader( size_t offset, uint32_t &slaveGetCount, uint32_t &slaveSetCount, char *buf, size_t size ) {
+	if ( size < PROTO_LOAD_STATS_SIZE )
+		return false;
+	
+	slaveGetCount = ntohl( *( ( uint32_t * )( buf + offset ) ) );
+	slaveSetCount = ntohl( *( ( uint32_t * )( buf + offset + sizeof( uint32_t ) ) ) );
 
 	return true;
 }
@@ -689,6 +713,19 @@ bool Protocol::parseAddressHeader( struct AddressHeader &header, char *buf, size
 		offset,
 		header.addr,
 		header.port,
+		buf, size
+	);
+}
+
+bool Protocol::parseLoadStatsHeader( struct LoadStatsHeader &header, char *buf, size_t size, size_t offset ) {
+	if ( ! buf || ! size ) {
+		buf = this->buffer.recv;
+		size = this->buffer.size;
+	}
+	return this->parseLoadStatsHeader(
+		offset,
+		header.slaveGetCount,
+		header.slaveSetCount,
 		buf, size
 	);
 }

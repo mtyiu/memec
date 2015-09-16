@@ -16,7 +16,7 @@ int main( int argc, char **argv ) {
 	scanf( "%u", &num );
 
 	while( 1 ) {
-		printf( "\r%lu", idGenerator.nextVal( num ) );
+		printf( "\r%u", idGenerator.nextVal( num ) );
 	}
 	return 0;
 }

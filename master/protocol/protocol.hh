@@ -1,7 +1,10 @@
 #ifndef __MASTER_PROTOCOL_PROTOCOL_HH__
 #define __MASTER_PROTOCOL_PROTOCOL_HH__
 
+#include "../../common/config/server_addr.hh"
+#include "../../common/ds/array_map.hh"
 #include "../../common/ds/bitmask_array.hh"
+#include "../../common/ds/latency.hh"
 #include "../../common/protocol/protocol.hh"
 
 class MasterProtocol : public Protocol {
@@ -15,6 +18,8 @@ public:
 	/* Coordinator */
 	// Register
 	char *reqRegisterCoordinator( size_t &size, uint32_t addr, uint16_t port );
+	// Loading statistics
+	char *reqPushLoadStats( size_t &size, ArrayMap< ServerAddr, Latency > *slaveGetLatency, ArrayMap< ServerAddr, Latency > *slaveSetLatency );
 
 	/* Slave */
 	// Register

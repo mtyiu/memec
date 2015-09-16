@@ -11,6 +11,7 @@ OBJS= \
 	ds/bitmask_array.o \
 	ds/chunk.o \
 	ds/key_value.o \
+	ds/latency.o \
 	ds/load.o \
 	protocol/protocol.o \
 	remap/remap_msg_handler.o \
