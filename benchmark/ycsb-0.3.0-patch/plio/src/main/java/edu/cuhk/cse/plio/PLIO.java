@@ -76,11 +76,13 @@ public class PLIO {
 		}
 
 		// Prepare register message
+		int id = this.nextVal();
 		int bytes = this.protocol.generateHeader(
 			Protocol.PROTO_MAGIC_REQUEST,
 			Protocol.PROTO_MAGIC_TO_MASTER,
 			Protocol.PROTO_OPCODE_REGISTER,
-			0
+			0,
+			id
 		);
 		try {
 			this.out.write( this.protocol.buf, 0, bytes );
@@ -97,9 +99,16 @@ public class PLIO {
 		}
 		if ( bytes == Protocol.PROTO_HEADER_SIZE ) {
 			this.protocol.parseHeader( bytes );
+			if ( this.protocol.header.id != id ) {
+				System.err.println( "PLIO.connect(): [Error] The response does not match the request ID." );
+				return false;
+			}
+			return true;
 			// this.debug( this.protocol.header.toString() );
+		} else {
+			System.err.println( "PLIO.connect(): [Error] Header length mismatch: " + bytes + " vs. " + this.protocol.header.length + "." );
+			return false;
 		}
-		return true;
 	}
 
 	public boolean disconnect() {

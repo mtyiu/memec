@@ -51,7 +51,7 @@ public class Main {
 		if ( args.length > 4 )
 			fileMode = ! args[ 4 ].equals( "console" );
 
-		plio = new PLIO( keySize, chunkSize, host, port );
+		plio = new PLIO( keySize, chunkSize, host, port, 0 );
 		boolean run = plio.connect();
 
 		Scanner scanner = new Scanner( System.in );
