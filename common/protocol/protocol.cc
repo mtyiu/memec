@@ -256,6 +256,8 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_OPCODE_DELETE_CHUNK:
 		case PROTO_OPCODE_GET_CHUNK:
 		case PROTO_OPCODE_SET_CHUNK:
+		case PROTO_OPCODE_MASTER_PUSH_STATS:
+		case PROTO_OPCODE_COORDINATOR_PUSH_STATS:
 			break;
 		default:
 			return false;

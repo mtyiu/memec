@@ -7,81 +7,75 @@ Master::Master() {
 }
 
 void Master::updateSlavesCurrentLoading() {
-	int index = 0;
+
+	int index = -1;
 	Latency *tempLatency = NULL;
 
-	pthread_mutex_lock( &this->slaveLoading.pastLock );
+	pthread_mutex_lock( &this->slaveLoading.loadLock );
 
-	// GET
+#define UPDATE_LATENCY( _SRC_, _DST_, _SRC_VAL_TYPE_, _DST_OP_, _CHECK_EXIST_ ) \
+	for ( uint32_t i = 0; i < _SRC_.size(); i++ ) { \
+		ServerAddr &slaveAddr = _SRC_.keys[ i ]; \
+		_SRC_VAL_TYPE_ *srcLatency = _SRC_.values[ i ]; \
+		Latency *dstLatency = NULL; \
+		if ( _CHECK_EXIST_ ) { \
+			dstLatency = _DST_.get( slaveAddr, &index ); \
+		} else { \
+			index = -1; \
+		} \
+		if ( index == -1 ) { \
+			tempLatency = new Latency(); \
+			tempLatency->set( *srcLatency ); \
+			_DST_.set( slaveAddr, tempLatency ); \
+		} else { \
+			dstLatency->_DST_OP_( *srcLatency ); \
+		} \
+	} 
+
 	ArrayMap< ServerAddr, std::set< Latency > > &pastGet = this->slaveLoading.past.get;
 	ArrayMap< ServerAddr, Latency > &currentGet = this->slaveLoading.current.get;
-	for ( uint32_t i = 0; i < pastGet.size(); i++ ) {
-		ServerAddr &slaveAddr = pastGet.keys[ i ];
-		Latency *currentLatency = currentGet.get ( slaveAddr, &index );
-		if ( index == -1 ) {
-			tempLatency = new Latency();
-			tempLatency->set( *pastGet.values[ i ] );
-			currentGet.set( slaveAddr, tempLatency );
-		} else {
-			currentLatency->set( *pastGet.values[ i ] );
-		}
-	}
-
-	// SET
 	ArrayMap< ServerAddr, std::set< Latency > > &pastSet = this->slaveLoading.past.set;
 	ArrayMap< ServerAddr, Latency > &currentSet = this->slaveLoading.current.set;
-	for ( uint32_t i = 0; i < pastSet.size(); i++ ) {
-		ServerAddr &slaveAddr = pastSet.keys[ i ];
-		Latency *currentLatency = currentSet.get ( slaveAddr, &index );
-		if ( index == -1 ) {
-			tempLatency->set( *pastGet.values[ i ] );
-			currentGet.set( slaveAddr, tempLatency );
-		} else {
-			currentLatency->set( *pastSet.values[ i ] );
-		}
-	}
+	//fprintf( stderr, "past %lu %lu current %lu %lu\n", pastGet.size(), pastSet.size(), currentGet.size(), currentSet.size() );
 
-	pthread_mutex_unlock( &this->slaveLoading.pastLock );
+	// reset the current stats before update
+	currentGet.clear();
+	currentSet.clear();
+
+	// GET
+	UPDATE_LATENCY( pastGet, currentGet, std::set<Latency>, set, false );
+
+	// SET
+	UPDATE_LATENCY( pastSet, currentSet, std::set<Latency>, set, false );
+
+	// reset past stats
+	pastGet.clear();
+	pastSet.clear();
+
+	pthread_mutex_unlock( &this->slaveLoading.loadLock );
 }
 
 void Master::updateSlavesCumulativeLoading () {
-	int index = 0;
+	int index = -1;
 	Latency *tempLatency = NULL;
 
-	pthread_mutex_lock( &this->slaveLoading.pastLock );
+	pthread_mutex_lock( &this->slaveLoading.loadLock );
 
-	// GET
 	ArrayMap< ServerAddr, Latency > &currentGet = this->slaveLoading.current.get;
 	ArrayMap< ServerAddr, Latency > &cumulativeGet = this->slaveLoading.cumulative.get;
-	for ( uint32_t i = 0; i < currentGet.size(); i++ ) {
-		ServerAddr &slaveAddr = currentGet.keys[ i ];
-		Latency *currentLatency = cumulativeGet.values[ i ];
-		Latency *cumulativeLatency = cumulativeGet.get ( slaveAddr, &index );
-		if ( index == -1 ) {
-			tempLatency->set ( *currentLatency );
-			cumulativeGet.set( slaveAddr, tempLatency );
-		} else {
-			cumulativeLatency->aggregate( currentLatency );
-		}
-	}
-	
-	// SET 
 	ArrayMap< ServerAddr, Latency > &currentSet = this->slaveLoading.current.set;
 	ArrayMap< ServerAddr, Latency > &cumulativeSet = this->slaveLoading.cumulative.set;
-	for ( uint32_t i = 0; i < currentSet.size(); i++ ) {
-		ServerAddr &slaveAddr = currentSet.keys[ i ];
-		Latency *currentLatency = cumulativeSet.values[ i ];
-		Latency *cumulativeLatency = cumulativeSet.get ( slaveAddr, &index );
-		if ( index == -1 ) {
-			tempLatency = new Latency();
-			tempLatency->set ( *currentLatency );
-			cumulativeSet.set( slaveAddr, tempLatency );
-		} else {
-			cumulativeLatency->aggregate( currentLatency );
-		}
-	}
+	//fprintf( stderr, "cumulative %lu %lu current %lu %lu\n", cumulativeGet.size(), cumulativeSet.size(), currentGet.size(), currentSet.size() );
 
-	pthread_mutex_unlock( &this->slaveLoading.pastLock );
+	// GET
+	UPDATE_LATENCY( currentGet, cumulativeGet, Latency, aggregate, true );
+	
+	// SET 
+	UPDATE_LATENCY( currentSet, cumulativeSet, Latency, aggregate, true );
+
+#undef UPDATE_LATENCY
+
+	pthread_mutex_unlock( &this->slaveLoading.loadLock );
 }
 
 void Master::free() {
@@ -100,6 +94,7 @@ void Master::signalHandler( int signal ) {
 			master->updateSlavesCumulativeLoading();
 
 			// ask workers to send the loading stats to coordinators
+			pthread_mutex_lock( &master->slaveLoading.loadLock );
 			CoordinatorEvent event;
 			pthread_mutex_lock( &sockets.lock );
 			for ( uint32_t i = 0; i < sockets.size(); i++ ) {
@@ -111,6 +106,7 @@ void Master::signalHandler( int signal ) {
 				master->eventQueue.insert( event );
 			}
 			pthread_mutex_unlock( &sockets.lock );
+			pthread_mutex_unlock( &master->slaveLoading.loadLock );
 
 			// set next update alarm 
 			alarm ( master->config.master.loadingStats.updateInterval );
@@ -228,13 +224,15 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 	}
 
 	/* Loading statistics update */
-	pthread_mutex_init ( &this->slaveLoading.pastLock, NULL );
-	this->slaveLoading.past.get.clear();
-	this->slaveLoading.past.set.clear();
-	this->slaveLoading.current.get.clear();
-	this->slaveLoading.current.set.clear();
-	this->slaveLoading.cumulative.get.clear();
-	this->slaveLoading.cumulative.set.clear();
+	if ( this->config.master.loadingStats.updateInterval > 0 ) {
+		pthread_mutex_init ( &this->slaveLoading.loadLock, NULL );
+		this->slaveLoading.past.get.clear();
+		this->slaveLoading.past.set.clear();
+		this->slaveLoading.current.get.clear();
+		this->slaveLoading.current.set.clear();
+		this->slaveLoading.cumulative.get.clear();
+		this->slaveLoading.cumulative.set.clear();
+	}
 
 	// Set signal handlers //
 	Signal::setHandler( Master::signalHandler );

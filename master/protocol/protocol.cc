@@ -34,23 +34,25 @@ char *MasterProtocol::reqPushLoadStats(
 		slaveSetLatency->size()
 	);
 
-	// TODO only send the stats of most heavily loaded slave in case buffer overflows
+	// TODO only send stats of most heavily loaded slave in case buffer overflows
 
 	uint32_t addr, sec, usec;
 	uint16_t port;
 
+#define SET_FIELDS_VAR( _SRC_ ) \
+	addr = _SRC_->keys[ idx ].addr; \
+	port = _SRC_->keys[ idx ].port; \
+	sec = _SRC_->values[ idx ]->sec; \
+	usec = _SRC_->values[ idx ]->sec; \
+
 	for ( uint32_t i = 0; i < slaveGetLatency->size() + slaveSetLatency->size(); i++ ) {
+		uint32_t idx = i;
 		// serialize the loading stats
 		if ( i < slaveGetLatency->size() ) {
-			addr = slaveGetLatency->keys[ i ].addr; 
-			port = slaveGetLatency->keys[ i ].port;
-			sec = slaveGetLatency->values[ i ]->sec; 
-			usec = slaveGetLatency->values[ i ]->usec; 
+			SET_FIELDS_VAR( slaveGetLatency );
 		} else {
-			addr = slaveSetLatency->keys[ i ].addr; 
-			port = slaveSetLatency->keys[ i ].port;
-			sec = slaveSetLatency->values[ i ]->sec; 
-			usec = slaveSetLatency->values[ i ]->usec; 
+			idx = i - slaveGetLatency->size();
+			SET_FIELDS_VAR( slaveSetLatency );
 		}
 
 		*( ( uint32_t * )( this->buffer.send + size ) ) = htonl( addr );
@@ -62,6 +64,8 @@ char *MasterProtocol::reqPushLoadStats(
 		*( ( uint32_t * )( this->buffer.send + size ) ) = htonl( usec );
 		size += sizeof( usec );
 	}
+
+#undef SET_FIELDS_VAR
 
 	if ( size > PROTO_BUF_MIN_SIZE ) {
 		__DEBUG__( CYAN, "MasterProtocol" , "Warning: Load stats exceeds minimum buffer size!\n" );

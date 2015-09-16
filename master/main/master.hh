@@ -76,7 +76,7 @@ public:
 			ArrayMap< ServerAddr, Latency > get;
 			ArrayMap< ServerAddr, Latency > set;
 		} cumulative;
-		pthread_mutex_t pastLock;
+		pthread_mutex_t loadLock;
 	} slaveLoading;
 
 	static Master *getInstance() {

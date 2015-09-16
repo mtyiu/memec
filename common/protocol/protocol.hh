@@ -41,6 +41,8 @@
 #define PROTO_OPCODE_GET_CONFIG		0x09
 #define PROTO_OPCODE_SYNC			  0x10
 #define PROTO_OPCODE_SLAVE_CONNECTED   0x11
+#define PROTO_OPCODE_MASTER_PUSH_STATS		0x12
+#define PROTO_OPCODE_COORDINATOR_PUSH_STATS		0x13
 
 // Application <-> Master or Master <-> Slave //
 #define PROTO_OPCODE_GET			   0x01
