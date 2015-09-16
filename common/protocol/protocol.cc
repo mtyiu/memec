@@ -1,4 +1,6 @@
 #include <cstdlib>
+#include <sys/types.h>
+#include <signal.h>
 #include "protocol.hh"
 #include "../util/debug.hh"
 
@@ -10,9 +12,7 @@ size_t Protocol::generateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint
 
 	sendBuf[ 0 ] = ( ( magic & 0x07 ) | ( this->from & 0x18 ) | ( to & 0x60 ) );
 	sendBuf[ 1 ] = opcode & 0xFF;
-	sendBuf[ 2 ] = 0;
-	sendBuf[ 3 ] = 0;
-	bytes += 4;
+	bytes = 2;
 
 	*( ( uint32_t * )( sendBuf + bytes ) ) = htonl( length );
 	bytes += 4;
@@ -222,8 +222,8 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 	from = buf[ 0 ] & 0x18;
 	to = buf[ 0 ] & 0x60;
 	opcode = buf[ 1 ] & 0xFF;
-	length = ntohl( *( ( uint32_t * )( buf + 4 ) ) );
-	id = ntohl( *( ( uint32_t * )( buf + 8 ) ) );
+	length = ntohl( *( ( uint32_t * )( buf + 2 ) ) );
+	id = ntohl( *( ( uint32_t * )( buf + 6 ) ) );
 
 	switch( magic ) {
 		case PROTO_MAGIC_HEARTBEAT:
@@ -234,6 +234,7 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_MAGIC_LOADING_STATS:
 			break;
 		default:
+			fprintf( stderr, "Error #1\n" );
 			return false;
 	}
 
@@ -244,11 +245,14 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_MAGIC_FROM_SLAVE:
 			break;
 		default:
+			fprintf( stderr, "Error #2\n" );
 			return false;
 	}
 
-	if ( to != this->to )
+	if ( to != this->to ) {
+		fprintf( stderr, "Error #3\n" );
 		return false;
+	}
 
 	switch( opcode ) {
 		case PROTO_OPCODE_REGISTER:
@@ -267,6 +271,7 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_OPCODE_COORDINATOR_PUSH_STATS:
 			break;
 		default:
+			fprintf( stderr, "Error #4\n" );
 			return false;
 	}
 

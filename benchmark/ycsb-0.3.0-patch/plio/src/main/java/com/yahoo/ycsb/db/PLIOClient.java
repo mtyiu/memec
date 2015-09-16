@@ -17,15 +17,15 @@ import edu.cuhk.cse.plio.PLIO;
 import edu.cuhk.cse.plio.Protocol;
 
 public class PLIOClient extends DB {
-   // Properties
+	// Properties
 	public static final String HOST_PROPERTY = "plio.host";
 	public static final String PORT_PROPERTY = "plio.port";
 	public static final String KEY_SIZE_PROPERTY = "plio.key_size";
 	public static final String CHUNK_SIZE_PROPERTY = "plio.chunk_size";
-   // Return values
-   public static final int OK = 0;
-   public static final int ERROR = -1;
-   public static final int NOT_FOUND = -2;
+	// Return values
+	public static final int OK = 0;
+	public static final int ERROR = -1;
+	public static final int NOT_FOUND = -2;
 
 	private PLIO plio;
 

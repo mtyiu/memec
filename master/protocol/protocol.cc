@@ -148,8 +148,8 @@ char *MasterProtocol::resRegisterApplication( size_t &size, uint32_t id, bool su
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_APPLICATION,
 		PROTO_OPCODE_REGISTER,
-		id,
-		0
+		0, // length
+		id
 	);
 	return this->buffer.send;
 }

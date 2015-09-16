@@ -9,7 +9,7 @@ CoordinatorSocket::CoordinatorSocket() {
 	this->isRunning = false;
 	this->tid = 0;
 	this->epoll = 0;
-	this->buffer.size = PROTO_HEADER_SIZE + 4 + 2;
+	this->buffer.size = PROTO_HEADER_SIZE + PROTO_ADDRESS_SIZE;
 	this->sockets.needsDelete = true;
 }
 

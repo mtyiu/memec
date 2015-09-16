@@ -17,7 +17,7 @@ public:
 	SlaveProtocol protocol;
 	struct {
 		size_t size;
-		char data[ PROTO_HEADER_SIZE + 4 + 2 ];
+		char data[ PROTO_HEADER_SIZE + PROTO_ADDRESS_SIZE ];
 	} buffer;
 	char *identifier;
 

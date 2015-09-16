@@ -39,8 +39,8 @@ char *SlaveProtocol::resRegisterMaster( size_t &size, uint32_t id, bool success 
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_MASTER,
 		PROTO_OPCODE_REGISTER,
-		id,
-		0
+		0, // length
+		id
 	);
 	return this->buffer.send;
 }
@@ -122,9 +122,10 @@ char *SlaveProtocol::resRegisterSlavePeer( size_t &size, uint32_t id, bool succe
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_REGISTER,
-		id,
-		0
+		0, // length
+		id
 	);
+	printf( "resRegisterSlavePeer: size = %lu\n", size );
 	return this->buffer.send;
 }
 

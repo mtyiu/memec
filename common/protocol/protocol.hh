@@ -5,8 +5,8 @@
  * Packet format:
  * - Magic byte (1 byte)
  * - Opcode (1 byte)
- * - Reserved (2 bytes)
  * - Message length (4 bytes)
+ * - Message ID (4 bytes)
  ***************************************/
 
 /************************
@@ -80,7 +80,7 @@ enum Role {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#define PROTO_HEADER_SIZE 12
+#define PROTO_HEADER_SIZE 10
 struct ProtocolHeader {
 	uint8_t magic, from, to, opcode;
 	uint32_t length; // Content length
