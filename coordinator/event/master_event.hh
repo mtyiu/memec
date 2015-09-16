@@ -14,9 +14,10 @@ enum MasterEventType {
 class MasterEvent : public Event {
 public:
 	MasterEventType type;
+	uint32_t id;
 	MasterSocket *socket;
 
-	void resRegister( MasterSocket *socket, bool success = true );
+	void resRegister( MasterSocket *socket, uint32_t id, bool success = true );
 	void pending( MasterSocket *socket );
 };
 

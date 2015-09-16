@@ -1,30 +1,35 @@
 #include "master_event.hh"
 
-void MasterEvent::resRegister( MasterSocket *socket, bool success ) {
+void MasterEvent::resRegister( MasterSocket *socket, uint32_t id, bool success ) {
 	this->type = success ? MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS : MASTER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE;
+	this->id = id;
 	this->socket = socket;
 }
 
-void MasterEvent::resGet( MasterSocket *socket, KeyValue &keyValue ) {
+void MasterEvent::resGet( MasterSocket *socket, uint32_t id, KeyValue &keyValue ) {
 	this->type = MASTER_EVENT_TYPE_GET_RESPONSE_SUCCESS;
+	this->id = id;
 	this->socket = socket;
 	this->message.keyValue = keyValue;
 }
 
-void MasterEvent::resGet( MasterSocket *socket, Key &key ) {
+void MasterEvent::resGet( MasterSocket *socket, uint32_t id, Key &key ) {
 	this->type = MASTER_EVENT_TYPE_GET_RESPONSE_FAILURE;
+	this->id = id;
 	this->socket = socket;
 	this->message.key = key;
 }
 
-void MasterEvent::resSet( MasterSocket *socket, Key &key, bool success ) {
+void MasterEvent::resSet( MasterSocket *socket, uint32_t id, Key &key, bool success ) {
 	this->type = success ? MASTER_EVENT_TYPE_SET_RESPONSE_SUCCESS : MASTER_EVENT_TYPE_SET_RESPONSE_FAILURE;
+	this->id = id;
 	this->socket = socket;
 	this->message.key = key;
 }
 
-void MasterEvent::resUpdate( MasterSocket *socket, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool success, bool needsFree ) {
+void MasterEvent::resUpdate( MasterSocket *socket, uint32_t id, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool success, bool needsFree ) {
 	this->type = success ? MASTER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS : MASTER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE;
+	this->id = id;
 	this->socket = socket;
 	this->message.keyValueUpdate.key = key;
 	this->message.keyValueUpdate.valueUpdateOffset = valueUpdateOffset;
@@ -32,8 +37,9 @@ void MasterEvent::resUpdate( MasterSocket *socket, Key &key, uint32_t valueUpdat
 	this->needsFree = needsFree;
 }
 
-void MasterEvent::resDelete( MasterSocket *socket, Key &key, bool success, bool needsFree ) {
+void MasterEvent::resDelete( MasterSocket *socket, uint32_t id, Key &key, bool success, bool needsFree ) {
 	this->type = success ? MASTER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS : MASTER_EVENT_TYPE_DELETE_RESPONSE_FAILURE;
+	this->id = id;
 	this->socket = socket;
 	this->message.key = key;
 	this->needsFree = needsFree;

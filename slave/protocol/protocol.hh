@@ -14,37 +14,37 @@ public:
 
 	/* Coordinator */
 	// Register
-	char *reqRegisterCoordinator( size_t &size, uint32_t addr, uint16_t port );
+	char *reqRegisterCoordinator( size_t &size, uint32_t id, uint32_t addr, uint16_t port );
 	// Heartbeat
-	char *sendHeartbeat( size_t &size, struct HeartbeatHeader &header, std::map<Key, OpMetadata> &opMetadataMap, size_t &count );
+	char *sendHeartbeat( size_t &size, uint32_t id, struct HeartbeatHeader &header, std::map<Key, OpMetadata> &opMetadataMap, size_t &count );
 
 	/* Master */
 	// Register
-	char *resRegisterMaster( size_t &size, bool success );
+	char *resRegisterMaster( size_t &size, uint32_t id, bool success );
 	// SET
-	char *resSet( size_t &size, bool success, uint8_t keySize, char *key );
+	char *resSet( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key );
 	// GET
-	char *resGet( size_t &size, bool success, uint8_t keySize, char *key, uint32_t valueSize = 0, char *value = 0 );
+	char *resGet( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key, uint32_t valueSize = 0, char *value = 0 );
 	// UPDATE
-	char *resUpdate( size_t &size, bool success, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize );
+	char *resUpdate( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize );
 	// DELETE
-	char *resDelete( size_t &size, bool success, uint8_t keySize, char *key );
+	char *resDelete( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key );
 
 	/* Slave */
 	// Register
-	char *reqRegisterSlavePeer( size_t &size, ServerAddr *addr );
-	char *resRegisterSlavePeer( size_t &size, bool success );
+	char *reqRegisterSlavePeer( size_t &size, uint32_t id, ServerAddr *addr );
+	char *resRegisterSlavePeer( size_t &size, uint32_t id, bool success );
 	// UPDATE_CHUNK
-	char *reqUpdateChunk( size_t &size, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta, char *buf = 0 );
-	char *resUpdateChunk( size_t &size, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId );
+	char *reqUpdateChunk( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta, char *buf = 0 );
+	char *resUpdateChunk( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId );
 	// DELETE_CHUNK
-	char *reqDeleteChunk( size_t &size, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta, char *buf = 0 );
-	char *resDeleteChunk( size_t &size, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId );
+	char *reqDeleteChunk( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta, char *buf = 0 );
+	char *resDeleteChunk( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId );
 	// GET_CHUNK
-	char *reqGetChunk( size_t &size, uint32_t listId, uint32_t stripeId, uint32_t chunkId );
-	char *resGetChunk( size_t &size, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t chunkSize = 0, char *chunkData = 0 );
+	char *reqGetChunk( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId );
+	char *resGetChunk( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t chunkSize = 0, char *chunkData = 0 );
 	// SET_CHUNK
-	char *reqSetChunk( size_t &size, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t chunkSize, char *chunkData );
-	char *resSetChunk( size_t &size, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId );
+	char *reqSetChunk( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t chunkSize, char *chunkData );
+	char *resSetChunk( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId );
 };
 #endif

@@ -19,6 +19,7 @@
 #include "../../common/config/global_config.hh"
 #include "../../common/ds/array_map.hh"
 #include "../../common/ds/chunk.hh"
+#include "../../common/ds/id_generator.hh"
 #include "../../common/ds/memory_pool.hh"
 #include "../../common/ds/packet_pool.hh"
 #include "../../common/signal/signal.hh"
@@ -56,6 +57,7 @@ public:
 		ArrayMap<int, MasterSocket> masters;
 		ArrayMap<int, SlavePeerSocket> slavePeers;
 	} sockets;
+	IDGenerator idGenerator;
 	Pending pending;
 	SlaveLoad load;
 	Map map;

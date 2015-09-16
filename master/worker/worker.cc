@@ -8,8 +8,11 @@
 #define WORKER_COLOR	YELLOW
 #define GIGA			( 1000 * 1000 * 1000 )
 
+#define TODO_ID	0xFFFFFFFF
+
 uint32_t MasterWorker::dataChunkCount;
 uint32_t MasterWorker::parityChunkCount;
+IDGenerator *MasterWorker::idGenerator;
 Pending *MasterWorker::pending;
 MasterEventQueue *MasterWorker::eventQueue;
 StripeList<SlaveSocket> *MasterWorker::stripeList;
@@ -73,7 +76,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 	switch( event.type ) {
 		case APPLICATION_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
 		case APPLICATION_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resRegisterApplication( buffer.size, success );
+			buffer.data = this->protocol.resRegisterApplication( buffer.size, event.id, success );
 			break;
 		case APPLICATION_EVENT_TYPE_GET_RESPONSE_SUCCESS:
 			event.message.keyValue.deserialize(
@@ -81,7 +84,9 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 				value, valueSize
 			);
 			buffer.data = this->protocol.resGet(
-				buffer.size, success,
+				buffer.size,
+				event.id,
+				success,
 				key.size, key.data,
 				valueSize, value
 			);
@@ -91,6 +96,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 		case APPLICATION_EVENT_TYPE_GET_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resGet(
 				buffer.size,
+				event.id,
 				success,
 				event.message.key.size,
 				event.message.key.data
@@ -102,6 +108,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 		case APPLICATION_EVENT_TYPE_SET_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resSet(
 				buffer.size,
+				event.id,
 				success,
 				event.message.key.size,
 				event.message.key.data
@@ -113,6 +120,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 		case APPLICATION_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resUpdate(
 				buffer.size,
+				event.id,
 				success,
 				event.message.keyValueUpdate.size,
 				event.message.keyValueUpdate.data,
@@ -126,6 +134,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 		case APPLICATION_EVENT_TYPE_DELETE_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resDelete(
 				buffer.size,
+				event.id,
 				success,
 				event.message.key.size,
 				event.message.key.data
@@ -155,6 +164,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 			if ( header.magic != PROTO_MAGIC_REQUEST || header.from != PROTO_MAGIC_FROM_APPLICATION ) {
 				__ERROR__( "MasterWorker", "dispatch", "Invalid protocol header." );
 			} else {
+				event.id = header.id;
 				switch( header.opcode ) {
 					case PROTO_OPCODE_GET:
 						this->handleGetRequest( event, buffer.data, buffer.size );
@@ -187,21 +197,31 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 
 void MasterWorker::dispatch( CoordinatorEvent event ) {
 	bool connected, isSend;
+	uint32_t requestId;
 	ssize_t ret;
 	struct {
 		size_t size;
 		char *data;
 	} buffer;
 
+	if ( event.type != COORDINATOR_EVENT_TYPE_PENDING )
+		requestId = MasterWorker::idGenerator->nextVal( this->workerId );
+
 	switch( event.type ) {
 		case COORDINATOR_EVENT_TYPE_REGISTER_REQUEST:
-			buffer.data = this->protocol.reqRegisterCoordinator( buffer.size, event.message.address.addr, event.message.address.port );
+			buffer.data = this->protocol.reqRegisterCoordinator(
+				buffer.size,
+				requestId,
+				event.message.address.addr,
+				event.message.address.port
+			);
 			isSend = true;
 			break;
 		case COORDINATOR_EVENT_TYPE_PUSH_LOAD_STATS:
 			// TODO lock the latency when constructing msg ??
 			buffer.data = this->protocol.reqPushLoadStats(
 				buffer.size,
+				requestId,
 				event.message.loading.slaveGetLatency,
 				event.message.loading.slaveSetLatency
 			);
@@ -263,15 +283,24 @@ void MasterWorker::dispatch( MasterEvent event ) {
 
 void MasterWorker::dispatch( SlaveEvent event ) {
 	bool connected, isSend;
+	uint32_t requestId;
 	ssize_t ret;
 	struct {
 		size_t size;
 		char *data;
 	} buffer;
 
+	if ( event.type != SLAVE_EVENT_TYPE_PENDING )
+		requestId = MasterWorker::idGenerator->nextVal( this->workerId );
+
 	switch( event.type ) {
 		case SLAVE_EVENT_TYPE_REGISTER_REQUEST:
-			buffer.data = this->protocol.reqRegisterSlave( buffer.size, event.message.address.addr, event.message.address.port );
+			buffer.data = this->protocol.reqRegisterSlave(
+				buffer.size,
+				requestId,
+				event.message.address.addr,
+				event.message.address.port
+			);
 			isSend = true;
 			break;
 		case SLAVE_EVENT_TYPE_SEND:
@@ -432,7 +461,7 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 	if ( ! socket ) {
 		Key key;
 		key.set( header.keySize, header.key );
-		event.resGet( event.socket, key, false );
+		event.resGet( event.socket, event.id, key, false );
 		this->dispatch( event );
 		return false;
 	}
@@ -443,8 +472,9 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 	} buffer;
 	Key key;
 	ssize_t sentBytes;
+	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
 
-	buffer.data = this->protocol.reqGet( buffer.size, header.key, header.keySize );
+	buffer.data = this->protocol.reqGet( buffer.size, requestId, header.key, header.keySize );
 
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
 
@@ -506,7 +536,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		// TODO
 		Key key;
 		key.set( header.keySize, header.key );
-		event.resSet( event.socket, key, false, false );
+		event.resSet( event.socket, event.id, key, false, false );
 		this->dispatch( event );
 		return false;
 	}
@@ -516,6 +546,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		char *data;
 	} buffer;
 	Key key;
+	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
 
 #ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
 	Packet *packet = 0;
@@ -523,13 +554,13 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		packet = MasterWorker::packetPool->malloc();
 		packet->setReferenceCount( 1 + MasterWorker::parityChunkCount );
 		buffer.data = packet->data;
-		this->protocol.reqSet( buffer.size, header.key, header.keySize, header.value, header.valueSize, buffer.data );
+		this->protocol.reqSet( buffer.size, requestId, header.key, header.keySize, header.value, header.valueSize, buffer.data );
 		packet->size = buffer.size;
 	} else {
-		buffer.data = this->protocol.reqSet( buffer.size, header.key, header.keySize, header.value, header.valueSize );
+		buffer.data = this->protocol.reqSet( buffer.size, requestId, header.key, header.keySize, header.value, header.valueSize );
 	}
 #else
-	buffer.data = this->protocol.reqSet( buffer.size, header.key, header.keySize, header.value, header.valueSize );
+	buffer.data = this->protocol.reqSet( buffer.size, requestId, header.key, header.keySize, header.value, header.valueSize );
 #endif
 
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
@@ -631,7 +662,7 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 		keyValueUpdate.set( header.keySize, header.key, event.socket );
 		keyValueUpdate.offset = header.valueUpdateOffset;
 		keyValueUpdate.length = header.valueUpdateSize;
-		event.resUpdate( event.socket, keyValueUpdate, false, false );
+		event.resUpdate( event.socket, event.id, keyValueUpdate, false, false );
 		this->dispatch( event );
 		return false;
 	}
@@ -642,9 +673,11 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 	} buffer;
 	KeyValueUpdate keyValueUpdate;
 	ssize_t sentBytes;
+	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
 
 	buffer.data = this->protocol.reqUpdate(
-		buffer.size, header.key, header.keySize,
+		buffer.size, requestId,
+		header.key, header.keySize,
 		header.valueUpdate, header.valueUpdateOffset, header.valueUpdateSize
 	);
 
@@ -696,7 +729,7 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 	if ( ! socket ) {
 		Key key;
 		key.set( header.keySize, header.key );
-		event.resDelete( event.socket, key, false, false );
+		event.resDelete( event.socket, event.id, key, false, false );
 		this->dispatch( event );
 		return false;
 	}
@@ -707,8 +740,9 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 	} buffer;
 	Key key;
 	ssize_t sentBytes;
+	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
 
-	buffer.data = this->protocol.reqDelete( buffer.size, header.key, header.keySize );
+	buffer.data = this->protocol.reqDelete( buffer.size, requestId, header.key, header.keySize );
 
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
 	pthread_mutex_lock( &MasterWorker::pending->applications.delLock );
@@ -808,9 +842,9 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, char *buf,
 
 	if ( success ) {
 		key.free();
-		applicationEvent.resGet( ( ApplicationSocket * ) key.ptr, keyValue );
+		applicationEvent.resGet( ( ApplicationSocket * ) key.ptr, TODO_ID, keyValue );
 	} else {
-		applicationEvent.resGet( ( ApplicationSocket * ) key.ptr, key );
+		applicationEvent.resGet( ( ApplicationSocket * ) key.ptr, TODO_ID, key );
 	}
 	MasterWorker::eventQueue->insert( applicationEvent );
 	return true;
@@ -904,7 +938,7 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 		MasterWorker::pending->applications.set.erase( it );
 		pthread_mutex_unlock( &MasterWorker::pending->applications.setLock );
 
-		applicationEvent.resSet( ( ApplicationSocket * ) key.ptr, key, success );
+		applicationEvent.resSet( ( ApplicationSocket * ) key.ptr, TODO_ID, key, success );
 		MasterWorker::eventQueue->insert( applicationEvent );
 	}
 	return true;
@@ -955,7 +989,7 @@ bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, char *b
 	MasterWorker::pending->applications.update.erase( it );
 	pthread_mutex_unlock( &MasterWorker::pending->applications.updateLock );
 
-	applicationEvent.resUpdate( ( ApplicationSocket * ) keyValueUpdate.ptr, keyValueUpdate, success );
+	applicationEvent.resUpdate( ( ApplicationSocket * ) keyValueUpdate.ptr, TODO_ID, keyValueUpdate, success );
 	MasterWorker::eventQueue->insert( applicationEvent );
 
 	return true;
@@ -996,7 +1030,7 @@ bool MasterWorker::handleDeleteResponse( SlaveEvent event, bool success, char *b
 	MasterWorker::pending->applications.del.erase( it );
 	pthread_mutex_unlock( &MasterWorker::pending->applications.delLock );
 
-	applicationEvent.resDelete( ( ApplicationSocket * ) key.ptr, key, success );
+	applicationEvent.resDelete( ( ApplicationSocket * ) key.ptr, TODO_ID, key, success );
 	MasterWorker::eventQueue->insert( applicationEvent );
 
 	return true;
@@ -1074,6 +1108,7 @@ void *MasterWorker::run( void *argv ) {
 bool MasterWorker::init() {
 	Master *master = Master::getInstance();
 
+	MasterWorker::idGenerator = &master->idGenerator;
 	MasterWorker::dataChunkCount = master->config.global.coding.params.getDataChunkCount();
 	MasterWorker::parityChunkCount = master->config.global.coding.params.getParityChunkCount();
 	MasterWorker::pending = &master->pending;
@@ -1083,7 +1118,7 @@ bool MasterWorker::init() {
 	return true;
 }
 
-bool MasterWorker::init( GlobalConfig &config, WorkerRole role ) {
+bool MasterWorker::init( GlobalConfig &config, WorkerRole role, uint32_t workerId ) {
 	this->protocol.init(
 		Protocol::getSuggestedBufferSize(
 			config.size.key,
@@ -1094,6 +1129,7 @@ bool MasterWorker::init( GlobalConfig &config, WorkerRole role ) {
 	this->dataSlaveSockets = new SlaveSocket*[ MasterWorker::dataChunkCount ];
 	this->paritySlaveSockets = new SlaveSocket*[ MasterWorker::parityChunkCount ];
 	this->role = role;
+	this->workerId = workerId;
 	return role != WORKER_ROLE_UNDEFINED;
 }
 

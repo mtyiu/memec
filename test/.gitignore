@@ -4,6 +4,7 @@ common/coding/basic_op_performance
 common/config/global_config
 common/config/server_addr
 common/ds/bitmask_array
+common/ds/id_generator
 common/protocol/protocol
 common/remap/coordinator_remap
 common/remap/master_remap

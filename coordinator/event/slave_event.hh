@@ -15,10 +15,11 @@ enum SlaveEventType {
 class SlaveEvent : public Event {
 public:
 	SlaveEventType type;
+	uint32_t id;
 	SlaveSocket *socket;
 
 	void pending( SlaveSocket *socket );
-	void resRegister( SlaveSocket *socket, bool success = true );
+	void resRegister( SlaveSocket *socket, uint32_t id, bool success = true );
 	void announceSlaveConnected( SlaveSocket *socket );
 };
 

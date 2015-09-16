@@ -5,6 +5,7 @@
 
 #define WORKER_COLOR	YELLOW
 
+IDGenerator *ApplicationWorker::idGenerator;
 ApplicationEventQueue *ApplicationWorker::eventQueue;
 Pending *ApplicationWorker::pending;
 
@@ -26,6 +27,7 @@ void ApplicationWorker::dispatch( ApplicationEvent event ) {
 
 void ApplicationWorker::dispatch( MasterEvent event ) {
 	bool connected, isSend;
+	uint32_t requestId;
 	ssize_t ret;
 	struct {
 		size_t size;
@@ -33,9 +35,12 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 	} buffer;
 	size_t valueSize;
 
+	if ( event.type != MASTER_EVENT_TYPE_PENDING )
+		requestId = ApplicationWorker::idGenerator->nextVal( this->workerId );
+
 	switch( event.type ) {
 		case MASTER_EVENT_TYPE_REGISTER_REQUEST:
-			buffer.data = this->protocol.reqRegisterMaster( buffer.size );
+			buffer.data = this->protocol.reqRegisterMaster( buffer.size, requestId );
 			isSend = true;
 			break;
 		case MASTER_EVENT_TYPE_SET_REQUEST:
@@ -49,6 +54,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 			valueSize = ( size_t ) ret;
 			buffer.data = this->protocol.reqSet(
 				buffer.size,
+				requestId,
 				event.message.set.key,
 				event.message.set.keySize,
 				this->buffer.value,
@@ -59,6 +65,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 		case MASTER_EVENT_TYPE_GET_REQUEST:
 			buffer.data = this->protocol.reqGet(
 				buffer.size,
+				requestId,
 				event.message.get.key,
 				event.message.get.keySize
 			);
@@ -75,6 +82,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 			valueSize = ( size_t ) ret;
 			buffer.data = this->protocol.reqUpdate(
 				buffer.size,
+				requestId,
 				event.message.update.key,
 				event.message.update.keySize,
 				this->buffer.value,
@@ -86,6 +94,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 		case MASTER_EVENT_TYPE_DELETE_REQUEST:
 			buffer.data = this->protocol.reqDelete(
 				buffer.size,
+				requestId,
 				event.message.del.key,
 				event.message.del.keySize
 			);
@@ -448,16 +457,16 @@ void *ApplicationWorker::run( void *argv ) {
 bool ApplicationWorker::init() {
 	Application *application = Application::getInstance();
 
+	ApplicationWorker::idGenerator = &application->idGenerator;
 	ApplicationWorker::eventQueue = &application->eventQueue;
 	ApplicationWorker::pending = &application->pending;
 
 	return true;
 }
 
-bool ApplicationWorker::init( ApplicationConfig &config, WorkerRole role ) {
+bool ApplicationWorker::init( ApplicationConfig &config, WorkerRole role, uint32_t workerId ) {
 	this->buffer.value = new char[ config.size.chunk ];
 	this->buffer.valueSize = config.size.chunk;
-
 	this->protocol.init(
 		Protocol::getSuggestedBufferSize(
 			config.size.key,
@@ -465,6 +474,7 @@ bool ApplicationWorker::init( ApplicationConfig &config, WorkerRole role ) {
 		)
 	);
 	this->role = role;
+	this->workerId = workerId;
 	return role != WORKER_ROLE_UNDEFINED;
 }
 

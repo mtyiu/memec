@@ -15,6 +15,7 @@
 #include "../worker/worker.hh"
 #include "../../common/config/global_config.hh"
 #include "../../common/ds/array_map.hh"
+#include "../../common/ds/id_generator.hh"
 #include "../../common/ds/key.hh"
 #include "../../common/ds/key_value.hh"
 #include "../../common/ds/packet_pool.hh"
@@ -60,6 +61,7 @@ public:
 		ArrayMap<int, CoordinatorSocket> coordinators;
 		ArrayMap<int, SlaveSocket> slaves;
 	} sockets;
+	IDGenerator idGenerator;
 	Pending pending;
 	MasterEventQueue eventQueue;
 	PacketPool packetPool;

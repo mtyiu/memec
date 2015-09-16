@@ -5,13 +5,15 @@ void SlavePeerEvent::reqRegister( SlavePeerSocket *socket ) {
 	this->socket = socket;
 }
 
-void SlavePeerEvent::resRegister( SlavePeerSocket *socket, bool success ) {
+void SlavePeerEvent::resRegister( SlavePeerSocket *socket, uint32_t id, bool success ) {
 	this->type = success ? SLAVE_PEER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE;
+	this->id = id;
 	this->socket = socket;
 }
 
-void SlavePeerEvent::resUpdateChunk( SlavePeerSocket *socket, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, bool success ) {
+void SlavePeerEvent::resUpdateChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, bool success ) {
 	this->type = success ? SLAVE_PEER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_FAILURE;
+	this->id = id;
 	this->socket = socket;
 	this->message.chunkUpdate.metadata = metadata;
 	this->message.chunkUpdate.offset = offset;
@@ -19,8 +21,9 @@ void SlavePeerEvent::resUpdateChunk( SlavePeerSocket *socket, Metadata &metadata
 	this->message.chunkUpdate.updatingChunkId = updatingChunkId;
 }
 
-void SlavePeerEvent::resDeleteChunk( SlavePeerSocket *socket, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, bool success ) {
+void SlavePeerEvent::resDeleteChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, bool success ) {
 	this->type = success ? SLAVE_PEER_EVENT_TYPE_DELETE_CHUNK_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_DELETE_CHUNK_RESPONSE_FAILURE;
+	this->id = id;
 	this->socket = socket;
 	this->message.chunkUpdate.metadata = metadata;
 	this->message.chunkUpdate.offset = offset;
@@ -36,8 +39,9 @@ void SlavePeerEvent::reqGetChunk( SlavePeerSocket *socket, Metadata &metadata, v
 	this->message.chunk.chunk = 0;
 }
 
-void SlavePeerEvent::resGetChunk( SlavePeerSocket *socket, Metadata &metadata, bool success, Chunk *chunk ) {
+void SlavePeerEvent::resGetChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, bool success, Chunk *chunk ) {
 	this->type = success ? SLAVE_PEER_EVENT_TYPE_GET_CHUNK_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_GET_CHUNK_RESPONSE_FAILURE;
+	this->id = id;
 	this->socket = socket;
 	this->message.chunk.metadata = metadata;
 	this->message.chunk.status = 0;
@@ -52,8 +56,9 @@ void SlavePeerEvent::reqSetChunk( SlavePeerSocket *socket, Metadata &metadata, C
 	this->message.chunk.status = status;
 }
 
-void SlavePeerEvent::resSetChunk( SlavePeerSocket *socket, Metadata &metadata, bool success ) {
+void SlavePeerEvent::resSetChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, bool success ) {
 	this->type = success ? SLAVE_PEER_EVENT_TYPE_SET_CHUNK_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_SET_CHUNK_RESPONSE_FAILURE;
+	this->id = id;
 	this->socket = socket;
 	this->message.chunk.metadata = metadata;
 	this->message.chunk.status = 0;

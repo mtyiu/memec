@@ -131,7 +131,7 @@ bool MasterSocket::handler( int fd, uint32_t events, void *data ) {
 						socket->done( fd ); // The socket is valid
 
 						ApplicationEvent event;
-						event.resRegister( applicationSocket );
+						event.resRegister( applicationSocket, header.id );
 						master->eventQueue.insert( event );
 					} else {
 						::close( fd );

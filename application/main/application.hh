@@ -8,6 +8,7 @@
 #include "../socket/master_socket.hh"
 #include "../worker/worker.hh"
 #include "../../common/ds/array_map.hh"
+#include "../../common/ds/id_generator.hh"
 #include "../../common/socket/epoll.hh"
 #include "../../common/signal/signal.hh"
 #include "../../common/util/option.hh"
@@ -43,6 +44,7 @@ public:
 		EPoll epoll;
 		ArrayMap<int, MasterSocket> masters;
 	} sockets;
+	IDGenerator idGenerator;
 	Pending pending;
 	ApplicationEventQueue eventQueue;
 

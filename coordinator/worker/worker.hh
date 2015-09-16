@@ -7,11 +7,14 @@
 #include "../protocol/protocol.hh"
 #include "../../common/worker/worker.hh"
 #include "../../common/config/global_config.hh"
+#include "../../common/ds/id_generator.hh"
 
 class CoordinatorWorker : public Worker {
 private:
+	uint32_t workerId;
 	WorkerRole role;
 	CoordinatorProtocol protocol;
+	static IDGenerator *idGenerator;
 	static CoordinatorEventQueue *eventQueue;
 
 	void dispatch( MixedEvent event );
@@ -23,7 +26,7 @@ private:
 
 public:
 	static bool init();
-	bool init( GlobalConfig &config, WorkerRole role );
+	bool init( GlobalConfig &config, WorkerRole role, uint32_t workerId );
 	bool start();
 	void stop();
 	void print( FILE *f = stdout );

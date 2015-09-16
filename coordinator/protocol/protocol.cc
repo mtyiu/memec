@@ -1,15 +1,17 @@
 #include "protocol.hh"
 
-char *CoordinatorProtocol::resRegisterMaster( size_t &size, bool success ) {
+char *CoordinatorProtocol::resRegisterMaster( size_t &size, uint32_t id, bool success ) {
 	size = this->generateHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_MASTER,
 		PROTO_OPCODE_REGISTER,
-		0
+		0, // length
+		id
 	);
 	return this->buffer.send;
 }
 
+/*
 char *CoordinatorProtocol::resRegisterMaster( size_t &size, GlobalConfig &globalConfig, MasterConfig *masterConfig ) {
 	size_t length[ 3 ];
 	const char *serializedStrings[ 2 ];
@@ -46,14 +48,15 @@ char *CoordinatorProtocol::resRegisterMaster( size_t &size, GlobalConfig &global
 
 	return this->buffer.send;
 }
+*/
 
-bool CoordinatorProtocol::parseLoadingStats( 
-		const LoadStatsHeader& loadStatsHeader, 
+bool CoordinatorProtocol::parseLoadingStats(
+		const LoadStatsHeader& loadStatsHeader,
 		ArrayMap< ServerAddr, Latency >& slaveGetLatency,
 		ArrayMap< ServerAddr, Latency >& slaveSetLatency,
 		char* buffer, uint32_t size )
 {
-	ServerAddr addr; 
+	ServerAddr addr;
 	Latency *tempLatency;
 
 	uint32_t recordSize = sizeof( uint32_t ) * 3 + sizeof( uint16_t );
@@ -73,23 +76,25 @@ bool CoordinatorProtocol::parseLoadingStats(
 			slaveGetLatency.set( addr, tempLatency );
 		else
 			slaveSetLatency.set( addr, tempLatency );
-		
+
 		buffer += recordSize;
 	}
 
 	return true;
 }
 
-char *CoordinatorProtocol::resRegisterSlave( size_t &size, bool success ) {
+char *CoordinatorProtocol::resRegisterSlave( size_t &size, uint32_t id, bool success ) {
 	size = this->generateHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_REGISTER,
-		0
+		0, // length
+		id
 	);
 	return this->buffer.send;
 }
 
+/*
 char *CoordinatorProtocol::resRegisterSlave( size_t &size, GlobalConfig &globalConfig, SlaveConfig *slaveConfig ) {
 	size_t length[ 3 ];
 	const char *serializedStrings[ 2 ];
@@ -126,12 +131,14 @@ char *CoordinatorProtocol::resRegisterSlave( size_t &size, GlobalConfig &globalC
 
 	return this->buffer.send;
 }
+*/
 
-char *CoordinatorProtocol::announceSlaveConnected( size_t &size, SlaveSocket *socket ) {
+char *CoordinatorProtocol::announceSlaveConnected( size_t &size, uint32_t id, SlaveSocket *socket ) {
 	size = this->generateAddressHeader(
 		PROTO_MAGIC_ANNOUNCEMENT,
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_SLAVE_CONNECTED,
+		id,
 		socket->listenAddr.addr,
 		socket->listenAddr.port
 	);

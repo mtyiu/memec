@@ -79,6 +79,7 @@ void Master::updateSlavesCumulativeLoading () {
 }
 
 void Master::free() {
+	this->idGenerator.free();
 	this->eventQueue.free();
 	delete this->stripeList;
 }
@@ -172,8 +173,9 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 		this->config.global.stripeList.count,
 		this->sockets.slaves.values
 	);
-	/* Workers, packet pool and event queues */
+	/* Workers, ID generator, packet pool and event queues */
 	if ( this->config.master.workers.type == WORKER_TYPE_MIXED ) {
+		this->idGenerator.init( this->config.master.workers.number.mixed );
 		this->packetPool.init(
 			this->config.master.workers.number.mixed,
 			Protocol::getSuggestedBufferSize(
@@ -192,10 +194,12 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 			this->workers.push_back( MasterWorker() );
 			this->workers[ i ].init(
 				this->config.global,
-				WORKER_ROLE_MIXED
+				WORKER_ROLE_MIXED,
+				i // worker ID
 			);
 		}
 	} else {
+		this->idGenerator.init( this->config.master.workers.number.separated.total );
 		this->packetPool.init(
 			this->config.master.workers.number.separated.total,
 			Protocol::getSuggestedBufferSize(
@@ -218,7 +222,8 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 			this->workers.push_back( MasterWorker() ); \
 			this->workers[ index ].init( \
 				this->config.global, \
-				_CONSTANT_ \
+				_CONSTANT_, \
+				index \
 			); \
 		}
 

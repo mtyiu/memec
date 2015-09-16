@@ -37,6 +37,7 @@ enum SlavePeerEventType {
 class SlavePeerEvent : public Event {
 public:
 	SlavePeerEventType type;
+	uint32_t id;
 	SlavePeerSocket *socket;
 	struct {
 		struct {
@@ -57,17 +58,17 @@ public:
 
 	// Register
 	void reqRegister( SlavePeerSocket *socket );
-	void resRegister( SlavePeerSocket *socket, bool success = true );
+	void resRegister( SlavePeerSocket *socket, uint32_t id, bool success = true );
 	// UPDATE_CHUNK
-	void resUpdateChunk( SlavePeerSocket *socket, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, bool success );
+	void resUpdateChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, bool success );
 	// DELETE_CHUNK
-	void resDeleteChunk( SlavePeerSocket *socket, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, bool success );
+	void resDeleteChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, bool success );
 	// GET_CHUNK
 	void reqGetChunk( SlavePeerSocket *socket, Metadata &metadata, volatile bool *status = 0 );
-	void resGetChunk( SlavePeerSocket *socket, Metadata &metadata, bool success, Chunk *chunk = 0 );
+	void resGetChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, bool success, Chunk *chunk = 0 );
 	// SET_CHUNK
 	void reqSetChunk( SlavePeerSocket *socket, Metadata &metadata, Chunk *chunk, volatile bool *status = 0 );
-	void resSetChunk( SlavePeerSocket *socket, Metadata &metadata, bool success );
+	void resSetChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, bool success );
 	// Send
 	void send( SlavePeerSocket *socket, Packet *packet );
 	// Pending

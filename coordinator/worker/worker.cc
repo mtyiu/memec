@@ -4,6 +4,7 @@
 
 #define WORKER_COLOR	YELLOW
 
+IDGenerator *CoordinatorWorker::idGenerator;
 CoordinatorEventQueue *CoordinatorWorker::eventQueue;
 
 void CoordinatorWorker::dispatch( MixedEvent event ) {
@@ -35,11 +36,11 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 
 	switch( event.type ) {
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
-			buffer.data = this->protocol.resRegisterMaster( buffer.size, true );
+			buffer.data = this->protocol.resRegisterMaster( buffer.size, event.id, true );
 			isSend = true;
 			break;
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resRegisterMaster( buffer.size, false );
+			buffer.data = this->protocol.resRegisterMaster( buffer.size, event.id, false );
 			isSend = true;
 			break;
 		case MASTER_EVENT_TYPE_PENDING:
@@ -108,11 +109,11 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 
 	switch( event.type ) {
 		case SLAVE_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
-			buffer.data = this->protocol.resRegisterSlave( buffer.size, true );
+			buffer.data = this->protocol.resRegisterSlave( buffer.size, event.id, true );
 			isSend = true;
 			break;
 		case SLAVE_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resRegisterSlave( buffer.size, false );
+			buffer.data = this->protocol.resRegisterSlave( buffer.size, event.id, false );
 			isSend = true;
 			break;
 		case SLAVE_EVENT_TYPE_PENDING:
@@ -127,8 +128,9 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 
 	if ( event.type == SLAVE_EVENT_TYPE_ANNOUNCE_SLAVE_CONNECTED ) {
 		ArrayMap<int, SlaveSocket> &slaves = Coordinator::getInstance()->sockets.slaves;
+		uint32_t requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
 
-		buffer.data = this->protocol.announceSlaveConnected( buffer.size, event.socket );
+		buffer.data = this->protocol.announceSlaveConnected( buffer.size, requestId, event.socket );
 
 		connected = true;
 
@@ -272,12 +274,13 @@ void *CoordinatorWorker::run( void *argv ) {
 bool CoordinatorWorker::init() {
 	Coordinator *coordinator = Coordinator::getInstance();
 
+	CoordinatorWorker::idGenerator = &coordinator->idGenerator;
 	CoordinatorWorker::eventQueue = &coordinator->eventQueue;
 
 	return true;
 }
 
-bool CoordinatorWorker::init( GlobalConfig &config, WorkerRole role ) {
+bool CoordinatorWorker::init( GlobalConfig &config, WorkerRole role, uint32_t workerId ) {
 	this->protocol.init(
 		Protocol::getSuggestedBufferSize(
 			config.size.key,
@@ -285,6 +288,7 @@ bool CoordinatorWorker::init( GlobalConfig &config, WorkerRole role ) {
 		)
 	);
 	this->role = role;
+	this->workerId = workerId;
 	return role != WORKER_ROLE_UNDEFINED;
 }
 

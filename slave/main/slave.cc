@@ -8,6 +8,8 @@ Slave::Slave() {
 }
 
 void Slave::free() {
+	/* ID generator */
+	this->idGenerator.free();
 	/* Event queue */
 	this->eventQueue.free();
 	/* Coding */
@@ -147,8 +149,9 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 			);
 		}
 	}
-	/* Workers, packet pool and event queues */
+	/* Workers, ID generator, packet pool and event queues */
 	if ( this->config.slave.workers.type == WORKER_TYPE_MIXED ) {
+		this->idGenerator.init( this->config.slave.workers.number.mixed );
 		this->packetPool.init(
 			this->config.slave.workers.number.mixed * this->config.global.coding.params.getChunkCount(),
 			Protocol::getSuggestedBufferSize(
@@ -168,10 +171,12 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 			this->workers[ i ].init(
 				this->config.global,
 				this->config.slave,
-				WORKER_ROLE_MIXED
+				WORKER_ROLE_MIXED,
+				i // worker ID
 			);
 		}
 	} else {
+		this->idGenerator.init( this->config.slave.workers.number.separated.total );
 		this->packetPool.init(
 			this->config.slave.workers.number.separated.total * this->config.global.coding.params.getChunkCount(),
 			Protocol::getSuggestedBufferSize(
@@ -198,7 +203,8 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 			this->workers[ index ].init( \
 				this->config.global, \
 				this->config.slave, \
-				_CONSTANT_ \
+				_CONSTANT_, \
+				index \
 			); \
 		}
 

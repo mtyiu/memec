@@ -133,7 +133,7 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 						socket->done( fd ); // The socket is valid
 
 						MasterEvent event;
-						event.resRegister( masterSocket );
+						event.resRegister( masterSocket, header.id );
 						coordinator->eventQueue.insert( event );
 					} else if ( header.from == PROTO_MAGIC_FROM_SLAVE ) {
 						SlaveSocket *slaveSocket = new SlaveSocket();
@@ -145,7 +145,7 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 						socket->done( fd ); // The socket is valid
 
 						SlaveEvent event;
-						event.resRegister( slaveSocket );
+						event.resRegister( slaveSocket, header.id );
 						coordinator->eventQueue.insert( event );
 
 						event.announceSlaveConnected( slaveSocket );
