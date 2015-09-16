@@ -278,7 +278,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 			this->load.elapsedTime += get_elapsed_time( t );
 		}
 		while ( buffer.size > 0 ) {
-			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "SlaveWorker" );
+			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "SlaveWorker (master)" );
 
 			buffer.data += PROTO_HEADER_SIZE;
 			buffer.size -= PROTO_HEADER_SIZE;
@@ -449,7 +449,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 			this->load.elapsedTime += get_elapsed_time( t );
 		}
 		while ( buffer.size > 0 ) {
-			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "SlaveWorker" );
+			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "SlaveWorker (slave peer)" );
 
 			buffer.data += PROTO_HEADER_SIZE;
 			buffer.size -= PROTO_HEADER_SIZE;
@@ -791,7 +791,6 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 		);
 
 		if ( SlaveWorker::parityChunkCount == 0 ) {
-			// TODO: Send UPDATE response to master immediately
 			event.resUpdate( event.socket, key, header.valueUpdateOffset, header.valueUpdateSize, true, false );
 			this->dispatch( event );
 			return true;
@@ -828,7 +827,6 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 			pthread_mutex_lock( &SlaveWorker::pending->slavePeers.updateLock );
 			SlaveWorker::pending->slavePeers.updateChunk.insert( chunkUpdate );
 			pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.updateLock );
-			// Slave::getInstance()->printPending();
 
 			// Prepare UPDATE_CHUNK request
 			size_t size;
@@ -1177,10 +1175,9 @@ bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success,
 
 	chunkUpdate.set(
 		header.listId, header.stripeId, header.updatingChunkId, // header.chunkId,
-		header.offset, header.length
+		header.offset, header.length, ( void * ) event.socket
 	);
 	chunkUpdate.setKeyValueUpdate( 0, 0, 0 );
-	chunkUpdate.ptr = ( void * ) event.socket;
 
 	pthread_mutex_lock( &SlaveWorker::pending->slavePeers.updateLock );
 	it = SlaveWorker::pending->slavePeers.updateChunk.lower_bound( chunkUpdate );
@@ -1193,9 +1190,12 @@ bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success,
 	SlaveWorker::pending->slavePeers.updateChunk.erase( it );
 
 	// Check pending slave UPDATE_CHUNK requests
+	chunkUpdate.chunkId = 0;
 	chunkUpdate.ptr = 0;
 	it = SlaveWorker::pending->slavePeers.updateChunk.lower_bound( chunkUpdate );
-	for ( pending = 0; it != SlaveWorker::pending->slavePeers.updateChunk.end() && chunkUpdate.equal( *it ); pending++, it++ );
+	for ( pending = 0; it != SlaveWorker::pending->slavePeers.updateChunk.end() && chunkUpdate.matchStripe( *it ); pending++, it++ ) {
+		fprintf( stderr, "[%d] Pending: Metadata = (%u, %u, %u); offset = %u; length = %u vs. Metadata = (%u, %u, %u); offset = %u; length = %u\n", pending, it->listId, it->stripeId, it->chunkId, it->offset, it->length, header.listId, header.stripeId, header.updatingChunkId, header.offset, header.length );
+	}
 	pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.updateLock );
 
 	__DEBUG__( BLUE, "SlaveWorker", "handleUpdateChunkResponse", "Pending slave UPDATE_CHUNK requests = %d (%s).", pending, success ? "success" : "fail" );

@@ -611,6 +611,7 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 	pthread_mutex_unlock( &MasterWorker::pending->applications.updateLock );
 
 	keyValueUpdate.ptr = ( void * ) socket;
+
 	pthread_mutex_lock( &MasterWorker::pending->slaves.updateLock );
 	MasterWorker::pending->slaves.update.insert( keyValueUpdate );
 	pthread_mutex_unlock( &MasterWorker::pending->slaves.updateLock );

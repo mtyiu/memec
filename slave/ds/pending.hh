@@ -81,6 +81,18 @@ public:
 			this->length == c.length
 		);
 	}
+
+	bool matchStripe( const ChunkUpdate &c ) const {
+		return (
+			this->listId == c.listId &&
+			this->stripeId == c.stripeId &&
+			this->offset == c.offset &&
+			this->length == c.length &&
+			this->valueUpdateOffset == c.valueUpdateOffset &&
+			this->keySize == c.keySize &&
+			strncmp( this->key, c.key, this->keySize ) == 0
+		);
+	}
 };
 
 class ChunkRequest : public Metadata {
