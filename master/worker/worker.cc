@@ -239,6 +239,8 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 							case PROTO_MAGIC_RESPONSE_FAILURE:
 								__ERROR__( "MasterWorker", "dispatch", "Failed to register with coordinator." );
 								break;
+							case PROTO_MAGIC_LOADING_STATS:
+								break;
 							default:
 								__ERROR__( "MasterWorker", "dispatch", "Invalid magic code from coordinator." );
 								break;
@@ -859,7 +861,7 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 			// insert the latency to the set
 			// TODO use time when Response came, i.e. event created for latency cal.
 			struct timespec currentTime;
-			clock_settime( CLOCK_REALTIME, &currentTime);
+			clock_gettime( CLOCK_REALTIME, &currentTime);
 			double elapseTime = currentTime.tv_sec - lit->second.sttime.tv_sec + ( currentTime.tv_nsec - lit->second.sttime.tv_nsec ) / GIGA  ;
 			Latency latency = Latency ( ( double ) elapseTime );
 			if ( index == -1 )
