@@ -42,6 +42,14 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 			buffer.data = this->protocol.resRegisterMaster( buffer.size, false );
 			isSend = true;
 			break;
+		case MASTER_EVENT_TYPE_PUSH_LOADING_STATS:
+			buffer.data = this->protocol.reqPushLoadStats ( 
+				buffer.size, 
+				event.message.slaveLoading.slaveGetLatency, 
+				event.message.slaveLoading.slaveSetLatency
+			);
+			isSend = true;
+			break;
 		case MASTER_EVENT_TYPE_PENDING:
 			isSend = false;
 			break;
@@ -70,13 +78,46 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 			struct LoadStatsHeader loadStatsHeader;
 			ArrayMap< ServerAddr, Latency > getLatency;
 			ArrayMap< ServerAddr, Latency > setLatency;
+			Coordinator *coordinator = Coordinator::getInstance();
+			ServerAddr masterAddr ( NULL, event.socket->getAddr().sin_addr.s_addr, event.socket->getAddr().sin_port, 0);
+			ArrayMap<ServerAddr, Latency> *latencyPool = NULL;
+			int index = 0;
 
 			switch ( header.magic ) {
 				case PROTO_MAGIC_LOADING_STATS:
 					this->protocol.parseLoadStatsHeader( loadStatsHeader, buffer.data, buffer.size );
+					buffer.data += PROTO_LOAD_STATS_SIZE;
+					buffer.size -= PROTO_LOAD_STATS_SIZE;
 					if ( ! this->protocol.parseLoadingStats( loadStatsHeader, getLatency, setLatency, buffer.data, buffer.size ) )
 						__ERROR__( "CoordinatorWorker", "dispatch", "Invalid amount of data received from master." );
 					//fprintf( stderr, "get stats GET %d SET %d\n", loadStatsHeader.slaveGetCount, loadStatsHeader.slaveSetCount );
+					// TODO set the latest loading stats
+					fprintf( stderr, "fd %d IP %u:%hu\n", event.socket->getSocket(), ntohl( event.socket->getAddr().sin_addr.s_addr ), ntohs( event.socket->getAddr().sin_port ) );
+#define SET_SLAVE_LATENCY_FOR_MASTER( _MASTER_ADDR_, _SRC_, _DST_ ) \
+	for ( uint32_t i = 0; i < _SRC_.size(); i++ ) { \
+		coordinator->slaveLoading._DST_.get( _SRC_.keys[ i ], &index ); \
+		if ( index == -1 ) { \
+			coordinator->slaveLoading._DST_.set( _SRC_.keys[ i ], new ArrayMap<ServerAddr, Latency> () ); \
+			index = coordinator->slaveLoading._DST_.size() - 1; \
+			coordinator->slaveLoading._DST_.values[ index ]->set( _MASTER_ADDR_, _SRC_.values[ i ] ); \
+		} else { \
+			latencyPool = coordinator->slaveLoading._DST_.values[ index ]; \
+			latencyPool->get( _MASTER_ADDR_, &index ); \
+			if ( index == -1 ) { \
+				latencyPool->set( _MASTER_ADDR_, _SRC_.values[ i ] ); \
+			} else { \
+				delete latencyPool->values[ index ]; \
+				latencyPool->values[ index ] = _SRC_.values[ i ]; \
+			} \
+		} \
+	} \
+
+					pthread_mutex_lock ( &coordinator->slaveLoading.loadingLock );
+					SET_SLAVE_LATENCY_FOR_MASTER( masterAddr, getLatency, latestGet );
+					SET_SLAVE_LATENCY_FOR_MASTER( masterAddr, setLatency, latestSet );
+					pthread_mutex_unlock ( &coordinator->slaveLoading.loadingLock ); 
+					buffer.data -= PROTO_LOAD_STATS_SIZE;
+					buffer.size += PROTO_LOAD_STATS_SIZE;
 					break;
 				case PROTO_MAGIC_REQUEST:
 					goto quit_1;
@@ -85,6 +126,7 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 					goto quit_1;
 			}
 
+//#undef SET_SLAVE_LATENCY_FOR_MASTER
 quit_1:
 			buffer.data += header.length;
 			buffer.size -= header.length;

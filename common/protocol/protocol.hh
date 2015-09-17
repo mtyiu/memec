@@ -183,7 +183,7 @@ protected:
 	size_t generateChunkDataHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t chunkSize, char *chunkData );
 	size_t generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t opcode, struct HeartbeatHeader &header, std::map<Key, OpMetadata> &ops, size_t &count );
 	size_t generateAddressHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t addr, uint16_t port );
-	size_t generateLoadStatsHeader( uint8_t magic, uint8_t to, uint32_t slaveGetCount, uint32_t slaveSetCount );
+	size_t generateLoadStatsHeader( uint8_t magic, uint8_t to, uint32_t slaveGetCount, uint32_t slaveSetCount, uint32_t recordSize );
 
 	bool parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t &opcode, uint32_t &length, char *buf, size_t size );
 	bool parseKeyHeader( size_t offset, uint8_t &keySize, char *&key, char *buf, size_t size );

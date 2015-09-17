@@ -2,6 +2,8 @@
 #include <ctype.h>
 #include "coordinator.hh"
 
+#define MILLION		( 1000 * 1000 )
+
 Coordinator::Coordinator() {
 	this->isRunning = false;
 }
@@ -10,10 +12,66 @@ void Coordinator::free() {
 	this->eventQueue.free();
 }
 
+void Coordinator::updateAverageSlaveLoading( ArrayMap<ServerAddr, Latency> *slaveGetLatency, 
+		ArrayMap<ServerAddr, Latency> *slaveSetLatency ) {
+
+	pthread_mutex_lock( &this->slaveLoading.loadingLock );
+	ArrayMap< ServerAddr, ArrayMap< ServerAddr, Latency > > *latest = NULL;
+	double avgSec = 0.0, avgUsec = 0.0;
+	// TODO calculate the average from existing stat from masters
+#define SET_AVG_SLAVE_LATENCY( _TYPE_ ) \
+	avgSec = 0.0; \
+	avgUsec = 0.0; \
+	latest = &this->slaveLoading.latest##_TYPE_; \
+	for ( uint32_t i = 0; i < latest->size(); i++ ) { \
+		uint32_t masterCount = latest->values[ i ]->size(); \
+		for ( uint32_t j = 0; j < masterCount; j++ ) { \
+			avgSec += latest->values[ i ]->values[ j ]->sec / masterCount; \
+			avgUsec += latest->values[ i ]->values[ j ]->usec / masterCount; \
+		} \
+		fprintf( stderr, "avg %u %u %u %u\n", latest->keys[ i ].addr, latest->keys[ i ].port, \
+				( uint32_t )avgSec,( uint32_t )avgUsec ); \
+		slave##_TYPE_##Latency->set( latest->keys[ i ], new Latency( avgSec + avgUsec / MILLION ) ); \
+	}
+
+	SET_AVG_SLAVE_LATENCY( Get );
+	SET_AVG_SLAVE_LATENCY( Set );
+
+#undef SET_AVG_SLAVE_LATENCY
+		
+	// TODO clean up the current stats
+	// TODO release the arrayMaps
+	this->slaveLoading.latestGet.clear();
+	this->slaveLoading.latestSet.clear();
+	pthread_mutex_unlock( &this->slaveLoading.loadingLock );
+}
+
 void Coordinator::signalHandler( int signal ) {
-	Signal::setHandler();
-	Coordinator::getInstance()->stop();
-	fclose( stdin );
+	Coordinator *coordinator = Coordinator::getInstance();
+	ArrayMap<int, MasterSocket> &sockets = coordinator->sockets.masters;
+	ArrayMap<ServerAddr, Latency> *slaveGetLatency = new ArrayMap<ServerAddr, Latency>();
+	ArrayMap<ServerAddr, Latency> *slaveSetLatency = new ArrayMap<ServerAddr, Latency>();
+	switch ( signal ) {
+		case SIGALRM:
+			coordinator->updateAverageSlaveLoading( slaveGetLatency, slaveSetLatency );
+			// TODO push the stats back to masters
+			pthread_mutex_lock( &sockets.lock );
+			fprintf( stderr, "queuing events get %lu set %lu\n", slaveGetLatency->size(), slaveSetLatency->size() );
+			if ( slaveGetLatency->size() > 0 || slaveSetLatency->size() > 0 ) {
+				MasterEvent event;
+				for ( uint32_t i = 0; i < sockets.size(); i++ ) {
+					event.reqPushLoadStats( sockets.values[ i ], slaveGetLatency, slaveSetLatency);
+					coordinator->eventQueue.insert( event );
+				}
+			}
+			pthread_mutex_unlock( &sockets.lock );
+			// set timer for next push
+			alarm( coordinator->config.coordinator.loadingStats.updateInterval );
+			break;
+		default:
+			Coordinator::getInstance()->stop();
+			fclose( stdin );
+	}
 }
 
 bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
@@ -41,6 +99,7 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 		__ERROR__( "Coordinator", "init", "Cannot initialize socket." );
 		return false;
 	}
+
 	/* Vectors and other sockets */
 	Socket::init( &this->sockets.epoll );
 	MasterSocket::setArrayMap( &this->sockets.masters );
@@ -96,6 +155,9 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 		remapMsgHandler.init( this->config.global.spreadd.addr.addr, this->config.global.spreadd.addr.port, coordName );
 	}
 
+	/* Slave Loading stats */
+	pthread_mutex_init( &this->slaveLoading.loadingLock, NULL );
+
 	// Set signal handlers //
 	Signal::setHandler( Coordinator::signalHandler );
 
@@ -132,6 +194,9 @@ bool Coordinator::start() {
 
 	this->startTime = start_timer();
 	this->isRunning = true;
+
+	/* Slave loading stats */
+	alarm( this->config.coordinator.loadingStats.updateInterval );
 
 	return true;
 }

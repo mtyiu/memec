@@ -2,6 +2,7 @@
 #define __COORDINATOR_MAIN_COORDINATOR_HH__
 
 #include <cstdio>
+#include <pthread.h>
 #include "../config/coordinator_config.hh"
 #include "../event/event_queue.hh"
 #include "../remap/remap_msg_handler.hh"
@@ -31,6 +32,8 @@ private:
 	void operator=( Coordinator const& );
 
 	void free();
+	void updateAverageSlaveLoading( ArrayMap<ServerAddr, Latency> *slaveGetLatency, 
+			ArrayMap<ServerAddr, Latency> *slaveSetLatency );
 	// Commands
 	void help();
 
@@ -46,6 +49,12 @@ public:
 		ArrayMap<int, SlaveSocket> slaves;
 	} sockets;
 	CoordinatorEventQueue eventQueue;
+	struct {
+		// ( slaveAddr, ( mastserAddr, Latency ) )
+		ArrayMap< ServerAddr, ArrayMap< ServerAddr, Latency > > latestGet;
+		ArrayMap< ServerAddr, ArrayMap< ServerAddr, Latency > > latestSet;
+		pthread_mutex_t loadingLock;
+	} slaveLoading;
 	
 	static Coordinator *getInstance() {
 		static Coordinator coordinator;

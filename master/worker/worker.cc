@@ -459,16 +459,17 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 	pthread_mutex_unlock( &MasterWorker::pending->slaves.getLock );
 
 	// Mark the time when request is sent
-	sockaddr_in socketAddr = socket->getAddr();
-	ServerAddr slaveAddr;
-	slaveAddr.addr = socketAddr.sin_addr.s_addr;
-	slaveAddr.port= socketAddr.sin_port;
+#define ADD_PENDING_LATENCY_ITEM( _TYPE_ , _ADDR_ ) \
+	ServerAddr slaveAddr ( NULL, _ADDR_.sin_addr.s_addr, _ADDR_.sin_port, 0 ); \
+	\
+	KeyLatencyStartTime klst = { slaveAddr }; \
+	clock_gettime( CLOCK_REALTIME, &klst.sttime ); \
+	pthread_mutex_lock( &MasterWorker::pending->stats._TYPE_##Lock );\
+	MasterWorker::pending->stats._TYPE_.insert( std::make_pair( key, klst ) ); \
+	pthread_mutex_unlock( &MasterWorker::pending->stats._TYPE_##Lock );
 
-	KeyLatencyStartTime klst = { slaveAddr };
-	clock_gettime( CLOCK_REALTIME, &klst.sttime );
-	pthread_mutex_lock( &MasterWorker::pending->stats.getLock );
-	MasterWorker::pending->stats.get.insert( std::make_pair( key, klst ) );
-	pthread_mutex_unlock( &MasterWorker::pending->stats.getLock );
+	sockaddr_in socketAddr = socket->getAddr(); 
+	ADD_PENDING_LATENCY_ITEM( get, socketAddr );
 
 	// Send GET request
 	sentBytes = socket->send( buffer.data, buffer.size, connected );
@@ -550,14 +551,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
 			// Mark the time when request is sent
 			sockaddr_in socketAddr = this->paritySlaveSockets[ i ]->getAddr();
-			ServerAddr slaveAddr;
-			slaveAddr.addr = socketAddr.sin_addr.s_addr;
-			slaveAddr.port= socketAddr.sin_port;
-
-			KeyLatencyStartTime klst = { slaveAddr, time ( NULL ) };
-			pthread_mutex_lock( &MasterWorker::pending->stats.setLock );
-			MasterWorker::pending->stats.set.insert( std::make_pair( key, klst ) );
-			pthread_mutex_unlock( &MasterWorker::pending->stats.setLock );
+			ADD_PENDING_LATENCY_ITEM( set, socketAddr );
 
 #ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
 			SlaveEvent slaveEvent;
@@ -575,6 +569,10 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 			}
 		}
 
+		// Mark the time when request is sent
+		sockaddr_in socketAddr = socket->getAddr();
+		ADD_PENDING_LATENCY_ITEM( set, socketAddr );
+
 		sentBytes = socket->send( buffer.data, buffer.size, connected );
 		if ( sentBytes != ( ssize_t ) buffer.size ) {
 			__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
@@ -582,6 +580,10 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		}
 #endif
 	} else {
+		// Mark the time when request is sent
+		sockaddr_in socketAddr = socket->getAddr();
+		ADD_PENDING_LATENCY_ITEM( set, socketAddr );
+
 		sentBytes = socket->send( buffer.data, buffer.size, connected );
 		if ( sentBytes != ( ssize_t ) buffer.size ) {
 			__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
@@ -589,17 +591,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		}
 	}
 
-	// Mark the time when request is sent
-	sockaddr_in socketAddr = socket->getAddr();
-	ServerAddr slaveAddr;
-	slaveAddr.addr = socketAddr.sin_addr.s_addr;
-	slaveAddr.port = socketAddr.sin_port;
-
-	KeyLatencyStartTime klst = { slaveAddr };
-
-	pthread_mutex_lock( &MasterWorker::pending->stats.setLock );
-	MasterWorker::pending->stats.set.insert( std::make_pair( key, klst ) );
-	pthread_mutex_unlock( &MasterWorker::pending->stats.setLock );
+#undef ADD_PENDING_LATENCY_ITEM
 
 	return true;
 }

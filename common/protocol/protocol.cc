@@ -199,9 +199,9 @@ size_t Protocol::generateAddressHeader( uint8_t magic, uint8_t to, uint8_t opcod
 	return bytes;
 }
 
-size_t Protocol::generateLoadStatsHeader( uint8_t magic, uint8_t to, uint32_t slaveGetCount, uint32_t slaveSetCount ) {
+size_t Protocol::generateLoadStatsHeader( uint8_t magic, uint8_t to, uint32_t slaveGetCount, uint32_t slaveSetCount, uint32_t recordSize ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to , 0, PROTO_LOAD_STATS_SIZE );
+	size_t bytes = this->generateHeader( magic, to , 0, PROTO_LOAD_STATS_SIZE + ( slaveGetCount + slaveSetCount ) * recordSize );
 	
 	*( ( uint32_t * )( buf ) ) = htonl( slaveGetCount );
 	*( ( uint32_t * )( buf + sizeof( uint32_t ) ) ) = htonl( slaveSetCount );
