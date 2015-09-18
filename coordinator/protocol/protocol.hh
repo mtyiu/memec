@@ -18,8 +18,13 @@ public:
 	char *resRegisterMaster( size_t &size, uint32_t id, bool success );
 	// char *resRegisterMaster( size_t &size, GlobalConfig &globalConfig, MasterConfig *masterConfig = 0 );
 	// Load statistics
-	bool parseLoadingStats(
-		const LoadStatsHeader& loadStatsHeader,
+	char *reqPushLoadStats( 
+		size_t &size, uint32_t id,
+		ArrayMap< ServerAddr, Latency > *slaveGetLatency, 
+		ArrayMap< ServerAddr, Latency > *slaveSetLatency 
+	);
+	bool parseLoadingStats( 
+		const LoadStatsHeader& loadStatsHeader, 
 		ArrayMap< ServerAddr, Latency >& slaveGetLatency,
 		ArrayMap< ServerAddr, Latency >& slaveSetLatency,
 		char* buffer, uint32_t size

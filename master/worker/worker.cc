@@ -256,6 +256,8 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 							case PROTO_MAGIC_RESPONSE_FAILURE:
 								__ERROR__( "MasterWorker", "dispatch", "Failed to register with coordinator." );
 								break;
+							case PROTO_MAGIC_LOADING_STATS:
+								break;
 							default:
 								__ERROR__( "MasterWorker", "dispatch", "Invalid magic code from coordinator." );
 								break;
