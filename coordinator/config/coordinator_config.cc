@@ -72,6 +72,11 @@ bool CoordinatorConfig::set( const char *section, const char *name, const char *
 			this->eventQueue.size.separated.slave = atoi( value );
 		else
 			return false;
+	} else if ( match( section, "loadingStats" ) ) {
+		if ( match( name, "updateInterval" ) )
+			this->loadingStats.updateInterval = atoi( value );
+		else 
+			return false;
 	} else {
 		return false;
 	}

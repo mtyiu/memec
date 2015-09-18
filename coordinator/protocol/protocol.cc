@@ -50,14 +50,71 @@ char *CoordinatorProtocol::resRegisterMaster( size_t &size, GlobalConfig &global
 }
 */
 
+// TODO pull into common/ as this is same as  MasterProtocol::reqPushLoadStats
+char *CoordinatorProtocol::reqPushLoadStats( 
+		size_t &size, uint32_t id,
+		ArrayMap< ServerAddr, Latency > *slaveGetLatency, 
+		ArrayMap< ServerAddr, Latency > *slaveSetLatency ) 
+{
+
+	size = this->generateLoadStatsHeader(
+		PROTO_MAGIC_LOADING_STATS,
+		PROTO_MAGIC_TO_MASTER,
+		id, // id
+		slaveGetLatency->size(),
+		slaveSetLatency->size(),
+		14
+	);
+
+	// TODO only send stats of most heavily loaded slave in case buffer overflows
+
+	uint32_t addr, sec, usec;
+	uint16_t port;
+
+#define SET_FIELDS_VAR( _SRC_ ) \
+	addr = _SRC_->keys[ idx ].addr; \
+	port = _SRC_->keys[ idx ].port; \
+	sec = _SRC_->values[ idx ]->sec; \
+	usec = _SRC_->values[ idx ]->sec; \
+
+	for ( uint32_t i = 0; i < slaveGetLatency->size() + slaveSetLatency->size(); i++ ) {
+		uint32_t idx = i;
+		// serialize the loading stats
+		if ( i < slaveGetLatency->size() ) {
+			SET_FIELDS_VAR( slaveGetLatency );
+		} else {
+			idx = i - slaveGetLatency->size();
+			SET_FIELDS_VAR( slaveSetLatency );
+		}
+
+		fprintf ( stderr, " stats send %d IP %u:%u time %us %usec\n", i, addr, port, sec, usec );
+		*( ( uint32_t * )( this->buffer.send + size ) ) = htonl( addr );
+		size += sizeof( addr );
+		*( ( uint16_t * )( this->buffer.send + size ) ) = htons( port );
+		size += sizeof( port );
+		*( ( uint32_t * )( this->buffer.send + size ) ) = htonl( sec );
+		size += sizeof( sec );
+		*( ( uint32_t * )( this->buffer.send + size ) ) = htonl( usec );
+		size += sizeof( usec );
+	}
+
+#undef SET_FIELDS_VAR
+
+	if ( size > PROTO_BUF_MIN_SIZE ) {
+		__DEBUG__( CYAN, "CoordinatorProtocol" , "Warning: Load stats exceeds minimum buffer size!\n" );
+	}
+
+	return this->buffer.send;
+}
+
 bool CoordinatorProtocol::parseLoadingStats(
 		const LoadStatsHeader& loadStatsHeader,
 		ArrayMap< ServerAddr, Latency >& slaveGetLatency,
 		ArrayMap< ServerAddr, Latency >& slaveSetLatency,
 		char* buffer, uint32_t size )
 {
-	ServerAddr addr;
-	Latency *tempLatency;
+	ServerAddr addr; 
+	Latency *tempLatency = NULL;
 
 	uint32_t recordSize = sizeof( uint32_t ) * 3 + sizeof( uint16_t );
 
@@ -72,6 +129,7 @@ bool CoordinatorProtocol::parseLoadingStats(
 		tempLatency->sec = ntohl( *( uint32_t * )( buffer + sizeof( uint32_t ) + sizeof( uint16_t ) ) );
 		tempLatency->usec = ntohl( *( uint32_t * )( buffer + sizeof( uint32_t ) * 2 + sizeof( uint16_t ) ) );
 
+		fprintf( stderr, " stats for %u IP %u:%hu with %us %uusec\n", i, addr.addr, addr.port, tempLatency->sec, tempLatency->usec );
 		if ( i < loadStatsHeader.slaveGetCount )
 			slaveGetLatency.set( addr, tempLatency );
 		else

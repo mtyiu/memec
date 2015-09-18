@@ -12,7 +12,10 @@ ServerAddr::ServerAddr() {
 
 ServerAddr::ServerAddr( const char *name, uint32_t addr, uint16_t port, int type ) {
 	this->initialized = true;
-	strncpy( this->name, name, SERVER_NAME_MAX_LEN );
+	if ( name != NULL ) 
+		strncpy( this->name, name, SERVER_NAME_MAX_LEN );
+	else
+		this->name[ 0 ] = 0;
 	this->addr = addr;
 	this->port = port;
 	this->type = type;

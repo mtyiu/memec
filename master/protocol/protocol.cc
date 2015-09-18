@@ -33,7 +33,8 @@ char *MasterProtocol::reqPushLoadStats(
 		PROTO_MAGIC_TO_COORDINATOR,
 		id,
 		slaveGetLatency->size(),
-		slaveSetLatency->size()
+		slaveSetLatency->size(),
+		14
 	);
 
 	// TODO only send stats of most heavily loaded slave in case buffer overflows
@@ -57,6 +58,7 @@ char *MasterProtocol::reqPushLoadStats(
 			SET_FIELDS_VAR( slaveSetLatency );
 		}
 
+		fprintf ( stderr, " stats send %d IP %u:%u time %us %usec\n", i, addr, port, sec, usec );
 		*( ( uint32_t * )( this->buffer.send + size ) ) = addr; // htonl( addr );
 		size += sizeof( addr );
 		*( ( uint16_t * )( this->buffer.send + size ) ) = port; // htons( port );
