@@ -47,7 +47,7 @@ char *CoordinatorProtocol::resRegisterMaster( size_t &size, GlobalConfig &global
 	return this->buffer.send;
 }
 
-// TODO pull into common/ as this is same as  MasterProtocol::reqPushLoadStats
+// TODO put into common/ as this is same as  MasterProtocol::reqPushLoadStats
 char *CoordinatorProtocol::reqPushLoadStats( 
 		size_t &size, 
 		ArrayMap< ServerAddr, Latency > *slaveGetLatency, 
@@ -83,7 +83,6 @@ char *CoordinatorProtocol::reqPushLoadStats(
 			SET_FIELDS_VAR( slaveSetLatency );
 		}
 
-		fprintf ( stderr, " stats send %d IP %u:%u time %us %usec\n", i, addr, port, sec, usec );
 		*( ( uint32_t * )( this->buffer.send + size ) ) = htonl( addr );
 		size += sizeof( addr );
 		*( ( uint16_t * )( this->buffer.send + size ) ) = htons( port );
@@ -103,6 +102,7 @@ char *CoordinatorProtocol::reqPushLoadStats(
 	return this->buffer.send;
 }
 
+// TODO put into common/ as this is same as  MasterProtocol::parseLoadingStats
 bool CoordinatorProtocol::parseLoadingStats( 
 		const LoadStatsHeader& loadStatsHeader, 
 		ArrayMap< ServerAddr, Latency >& slaveGetLatency,
@@ -125,7 +125,6 @@ bool CoordinatorProtocol::parseLoadingStats(
 		tempLatency->sec = ntohl( *( uint32_t * )( buffer + sizeof( uint32_t ) + sizeof( uint16_t ) ) );
 		tempLatency->usec = ntohl( *( uint32_t * )( buffer + sizeof( uint32_t ) * 2 + sizeof( uint16_t ) ) );
 
-		fprintf( stderr, " stats for %u IP %u:%hu with %us %uusec\n", i, addr.addr, addr.port, tempLatency->sec, tempLatency->usec );
 		if ( i < loadStatsHeader.slaveGetCount )
 			slaveGetLatency.set( addr, tempLatency );
 		else

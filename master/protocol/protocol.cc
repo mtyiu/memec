@@ -56,7 +56,7 @@ char *MasterProtocol::reqPushLoadStats(
 			SET_FIELDS_VAR( slaveSetLatency );
 		}
 
-		fprintf ( stderr, " stats send %d IP %u:%u time %us %usec\n", i, addr, port, sec, usec );
+		//fprintf ( stderr, " stats send %d IP %u:%u time %us %usec\n", i, addr, port, sec, usec );
 		*( ( uint32_t * )( this->buffer.send + size ) ) = htonl( addr );
 		size += sizeof( addr );
 		*( ( uint16_t * )( this->buffer.send + size ) ) = htons( port );
@@ -75,6 +75,40 @@ char *MasterProtocol::reqPushLoadStats(
 
 	return this->buffer.send;
 }
+
+bool MasterProtocol::parseLoadingStats( 
+		const LoadStatsHeader& loadStatsHeader, 
+		ArrayMap< ServerAddr, Latency >& slaveGetLatency,
+		ArrayMap< ServerAddr, Latency >& slaveSetLatency,
+		char* buffer, uint32_t size )
+{
+	ServerAddr addr; 
+	Latency *tempLatency = NULL;
+
+	uint32_t recordSize = sizeof( uint32_t ) * 3 + sizeof( uint16_t );
+
+	// check if the all stats are received properly
+	if ( size < ( loadStatsHeader.slaveGetCount + loadStatsHeader.slaveSetCount ) * recordSize )
+		return false;
+
+	for ( uint32_t i = 0; i < loadStatsHeader.slaveGetCount + loadStatsHeader.slaveSetCount; i++ ) {
+		addr.addr = ntohl( *( uint32_t * )( buffer ) );
+		addr.port = ntohs( *( uint16_t * )( buffer + sizeof( uint32_t ) ) );
+		tempLatency = new Latency();
+		tempLatency->sec = ntohl( *( uint32_t * )( buffer + sizeof( uint32_t ) + sizeof( uint16_t ) ) );
+		tempLatency->usec = ntohl( *( uint32_t * )( buffer + sizeof( uint32_t ) * 2 + sizeof( uint16_t ) ) );
+
+		if ( i < loadStatsHeader.slaveGetCount )
+			slaveGetLatency.set( addr, tempLatency );
+		else
+			slaveSetLatency.set( addr, tempLatency );
+		
+		buffer += recordSize;
+	}
+
+	return true;
+}
+
 
 char *MasterProtocol::reqRegisterSlave( size_t &size, uint32_t addr, uint16_t port ) {
 	size = this->generateAddressHeader(

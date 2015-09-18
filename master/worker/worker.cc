@@ -221,6 +221,10 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 	} else {
 		ProtocolHeader header;
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();
+		ArrayMap<ServerAddr, Latency> getLatency, setLatency;
+		struct LoadStatsHeader loadStatsHeader;
+		Master *master = Master::getInstance();
+
 		while ( buffer.size > 0 ) {
 			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "MasterWorker" );
 
@@ -240,6 +244,13 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 								__ERROR__( "MasterWorker", "dispatch", "Failed to register with coordinator." );
 								break;
 							case PROTO_MAGIC_LOADING_STATS:
+								this->protocol.parseLoadStatsHeader( loadStatsHeader, buffer.data, buffer.size );
+								buffer.data += PROTO_LOAD_STATS_SIZE;
+								buffer.size -= PROTO_LOAD_STATS_SIZE;
+								this->protocol.parseLoadingStats( loadStatsHeader, getLatency, setLatency, buffer.data, buffer.size );
+								master->mergeSlaveCumulativeLoading( &getLatency, &setLatency );
+								buffer.data -= PROTO_LOAD_STATS_SIZE;
+								buffer.size += PROTO_LOAD_STATS_SIZE;
 								break;
 							default:
 								__ERROR__( "MasterWorker", "dispatch", "Invalid magic code from coordinator." );

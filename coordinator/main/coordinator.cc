@@ -26,11 +26,9 @@ void Coordinator::updateAverageSlaveLoading( ArrayMap<ServerAddr, Latency> *slav
 	for ( uint32_t i = 0; i < latest->size(); i++ ) { \
 		uint32_t masterCount = latest->values[ i ]->size(); \
 		for ( uint32_t j = 0; j < masterCount; j++ ) { \
-			avgSec += latest->values[ i ]->values[ j ]->sec / masterCount; \
-			avgUsec += latest->values[ i ]->values[ j ]->usec / masterCount; \
+			avgSec += ( double ) latest->values[ i ]->values[ j ]->sec / masterCount; \
+			avgUsec += ( double ) latest->values[ i ]->values[ j ]->usec / masterCount; \
 		} \
-		fprintf( stderr, "avg %u %u %u %u\n", latest->keys[ i ].addr, latest->keys[ i ].port, \
-				( uint32_t )avgSec,( uint32_t )avgUsec ); \
 		slave##_TYPE_##Latency->set( latest->keys[ i ], new Latency( avgSec + avgUsec / MILLION ) ); \
 	}
 
@@ -39,8 +37,8 @@ void Coordinator::updateAverageSlaveLoading( ArrayMap<ServerAddr, Latency> *slav
 
 #undef SET_AVG_SLAVE_LATENCY
 		
-	// TODO clean up the current stats
-	// TODO release the arrayMaps
+	// clean up the current stats
+	// TODO release the arrayMaps??
 	this->slaveLoading.latestGet.clear();
 	this->slaveLoading.latestSet.clear();
 	pthread_mutex_unlock( &this->slaveLoading.loadingLock );
@@ -54,9 +52,10 @@ void Coordinator::signalHandler( int signal ) {
 	switch ( signal ) {
 		case SIGALRM:
 			coordinator->updateAverageSlaveLoading( slaveGetLatency, slaveSetLatency );
-			// TODO push the stats back to masters
+			// push the stats back to masters
+			// leave the free of ArrayMaps to workers after constructing the data buffer
 			pthread_mutex_lock( &sockets.lock );
-			fprintf( stderr, "queuing events get %lu set %lu\n", slaveGetLatency->size(), slaveSetLatency->size() );
+			//fprintf( stderr, "queuing events get %lu set %lu\n", slaveGetLatency->size(), slaveSetLatency->size() );
 			if ( slaveGetLatency->size() > 0 || slaveSetLatency->size() > 0 ) {
 				MasterEvent event;
 				for ( uint32_t i = 0; i < sockets.size(); i++ ) {

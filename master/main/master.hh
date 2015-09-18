@@ -97,6 +97,9 @@ public:
 	void time();
 	double getElapsedTime();
 	void interactive();
+
+	// helper function to update slave stats
+	void mergeSlaveCumulativeLoading ( ArrayMap< ServerAddr, Latency > *getLatency, ArrayMap< ServerAddr, Latency> *setLatency );
 };
 
 #endif

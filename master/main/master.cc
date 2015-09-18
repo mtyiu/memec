@@ -78,6 +78,35 @@ void Master::updateSlavesCumulativeLoading () {
 	pthread_mutex_unlock( &this->slaveLoading.loadLock );
 }
 
+void Master::mergeSlaveCumulativeLoading ( ArrayMap< ServerAddr, Latency > *getLatency, ArrayMap< ServerAddr, Latency> *setLatency ) {
+	
+	pthread_mutex_lock( &this->slaveLoading.loadLock );
+
+	int index = -1;
+	// check if the slave addr already exists in currentMap
+	// if not, update the cumulativeMap directly
+	// otherwise, ignore it
+#define MERGE_AND_UPDATE_LATENCY( _SRC_, _MERGE_DST_, _CHECK_EXIST_ ) \
+	for ( uint32_t i = 0; i < _SRC_->size(); i++ ) { \
+		_CHECK_EXIST_.get( _SRC_->keys[ i ], &index ); \
+		if ( index != -1 ) \
+			continue; \
+		_MERGE_DST_.get( _SRC_->keys[ i ], &index ); \
+		if ( index == -1 ) { \
+			_MERGE_DST_.set( _SRC_->keys[ i ], _SRC_->values[ i ] ); \
+		} else { \
+			_MERGE_DST_.values[ index ]->aggregate( _SRC_->values[ i ] ); \
+			delete _SRC_->values[ i ]; \
+		} \
+	} 
+	MERGE_AND_UPDATE_LATENCY( getLatency, this->slaveLoading.cumulative.get, this->slaveLoading.current.get );
+	MERGE_AND_UPDATE_LATENCY( setLatency, this->slaveLoading.cumulative.set, this->slaveLoading.current.set );
+
+#undef MERGE_AND_UPDATE_LATENCY
+	
+	pthread_mutex_unlock( &this->slaveLoading.loadLock );
+}
+
 void Master::free() {
 	this->eventQueue.free();
 	delete this->stripeList;

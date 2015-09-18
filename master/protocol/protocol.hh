@@ -20,7 +20,8 @@ public:
 	char *reqRegisterCoordinator( size_t &size, uint32_t addr, uint16_t port );
 	// Loading statistics
 	char *reqPushLoadStats( size_t &size, ArrayMap< ServerAddr, Latency > *slaveGetLatency, ArrayMap< ServerAddr, Latency > *slaveSetLatency );
-
+	bool parseLoadingStats( const LoadStatsHeader& loadStatsHeader, ArrayMap< ServerAddr, Latency >& slaveGetLatency, ArrayMap< ServerAddr, Latency >& slaveSetLatency,
+		char* buffer, uint32_t size );
 	/* Slave */
 	// Register
 	char *reqRegisterSlave( size_t &size, uint32_t addr, uint16_t port );

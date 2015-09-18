@@ -48,6 +48,9 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 				event.message.slaveLoading.slaveGetLatency, 
 				event.message.slaveLoading.slaveSetLatency
 			);
+			// release the ArrayMaps
+			delete event.message.slaveLoading.slaveGetLatency;
+			delete event.message.slaveLoading.slaveSetLatency;
 			isSend = true;
 			break;
 		case MASTER_EVENT_TYPE_PENDING:
@@ -91,8 +94,9 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 					if ( ! this->protocol.parseLoadingStats( loadStatsHeader, getLatency, setLatency, buffer.data, buffer.size ) )
 						__ERROR__( "CoordinatorWorker", "dispatch", "Invalid amount of data received from master." );
 					//fprintf( stderr, "get stats GET %d SET %d\n", loadStatsHeader.slaveGetCount, loadStatsHeader.slaveSetCount );
-					// TODO set the latest loading stats
-					fprintf( stderr, "fd %d IP %u:%hu\n", event.socket->getSocket(), ntohl( event.socket->getAddr().sin_addr.s_addr ), ntohs( event.socket->getAddr().sin_port ) );
+					// set the latest loading stats
+					//fprintf( stderr, "fd %d IP %u:%hu\n", event.socket->getSocket(), ntohl( event.socket->getAddr().sin_addr.s_addr ), ntohs( event.socket->getAddr().sin_port ) );
+
 #define SET_SLAVE_LATENCY_FOR_MASTER( _MASTER_ADDR_, _SRC_, _DST_ ) \
 	for ( uint32_t i = 0; i < _SRC_.size(); i++ ) { \
 		coordinator->slaveLoading._DST_.get( _SRC_.keys[ i ], &index ); \
@@ -116,6 +120,7 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 					SET_SLAVE_LATENCY_FOR_MASTER( masterAddr, getLatency, latestGet );
 					SET_SLAVE_LATENCY_FOR_MASTER( masterAddr, setLatency, latestSet );
 					pthread_mutex_unlock ( &coordinator->slaveLoading.loadingLock ); 
+
 					buffer.data -= PROTO_LOAD_STATS_SIZE;
 					buffer.size += PROTO_LOAD_STATS_SIZE;
 					break;
@@ -126,7 +131,7 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 					goto quit_1;
 			}
 
-//#undef SET_SLAVE_LATENCY_FOR_MASTER
+#undef SET_SLAVE_LATENCY_FOR_MASTER
 quit_1:
 			buffer.data += header.length;
 			buffer.size -= header.length;
