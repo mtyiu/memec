@@ -6,6 +6,7 @@ BIN=$(PLIO_SRC_ROOT)/bin/master
 
 OBJS= \
 	config/master_config.o \
+	ds/pending.o \
 	event/application_event.o \
 	event/coordinator_event.o \
 	event/master_event.o \
