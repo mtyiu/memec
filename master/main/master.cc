@@ -78,7 +78,7 @@ void Master::updateSlavesCumulativeLoading () {
 	pthread_mutex_unlock( &this->slaveLoading.loadLock );
 }
 
-void Master::mergeSlaveCumulativeLoading ( ArrayMap< ServerAddr, Latency > *getLatency, ArrayMap< ServerAddr, Latency> *setLatency ) {
+void Master::mergeSlaveCumulativeLoading ( ArrayMap< struct sockaddr_in, Latency > *getLatency, ArrayMap< struct sockaddr_in, Latency> *setLatency ) {
 	
 	pthread_mutex_lock( &this->slaveLoading.loadLock );
 

@@ -1,8 +1,9 @@
 #include <cstring>
 #include <ctype.h>
 #include "coordinator.hh"
+#include "../../common/ds/sockaddr_in.hh"
 
-#define MILLION		( 1000 * 1000 )
+#define GIGA ( 1000 * 1000 * 1000 )
 
 Coordinator::Coordinator() {
 	this->isRunning = false;
@@ -13,24 +14,24 @@ void Coordinator::free() {
 	this->eventQueue.free();
 }
 
-void Coordinator::updateAverageSlaveLoading( ArrayMap<ServerAddr, Latency> *slaveGetLatency, 
-		ArrayMap<ServerAddr, Latency> *slaveSetLatency ) {
+void Coordinator::updateAverageSlaveLoading( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency, 
+		ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency ) {
 
 	pthread_mutex_lock( &this->slaveLoading.loadingLock );
-	ArrayMap< ServerAddr, ArrayMap< ServerAddr, Latency > > *latest = NULL;
-	double avgSec = 0.0, avgUsec = 0.0;
+	ArrayMap< struct sockaddr_in, ArrayMap< struct sockaddr_in, Latency > > *latest = NULL;
+	double avgSec = 0.0, avgNsec = 0.0;
 	// TODO calculate the average from existing stat from masters
 #define SET_AVG_SLAVE_LATENCY( _TYPE_ ) \
 	avgSec = 0.0; \
-	avgUsec = 0.0; \
+	avgNsec = 0.0; \
 	latest = &this->slaveLoading.latest##_TYPE_; \
 	for ( uint32_t i = 0; i < latest->size(); i++ ) { \
 		uint32_t masterCount = latest->values[ i ]->size(); \
 		for ( uint32_t j = 0; j < masterCount; j++ ) { \
 			avgSec += ( double ) latest->values[ i ]->values[ j ]->sec / masterCount; \
-			avgUsec += ( double ) latest->values[ i ]->values[ j ]->usec / masterCount; \
+			avgNsec += ( double ) latest->values[ i ]->values[ j ]->nsec / masterCount; \
 		} \
-		slave##_TYPE_##Latency->set( latest->keys[ i ], new Latency( avgSec + avgUsec / MILLION ) ); \
+		slave##_TYPE_##Latency->set( latest->keys[ i ], new Latency( avgSec, avgNsec ) ); \
 	}
 
 	SET_AVG_SLAVE_LATENCY( Get );
@@ -48,8 +49,8 @@ void Coordinator::updateAverageSlaveLoading( ArrayMap<ServerAddr, Latency> *slav
 void Coordinator::signalHandler( int signal ) {
 	Coordinator *coordinator = Coordinator::getInstance();
 	ArrayMap<int, MasterSocket> &sockets = coordinator->sockets.masters;
-	ArrayMap<ServerAddr, Latency> *slaveGetLatency = new ArrayMap<ServerAddr, Latency>();
-	ArrayMap<ServerAddr, Latency> *slaveSetLatency = new ArrayMap<ServerAddr, Latency>();
+	ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency = new ArrayMap<struct sockaddr_in, Latency>();
+	ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency = new ArrayMap<struct sockaddr_in, Latency>();
 	switch ( signal ) {
 		case SIGALRM:
 			coordinator->updateAverageSlaveLoading( slaveGetLatency, slaveSetLatency );

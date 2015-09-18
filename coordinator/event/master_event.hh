@@ -20,14 +20,14 @@ public:
 	MasterSocket *socket;
 	union {
 		struct {
-			ArrayMap<ServerAddr, Latency> *slaveGetLatency;
-			ArrayMap<ServerAddr, Latency> *slaveSetLatency;
+			ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency;
+			ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency;
 		} slaveLoading;
 	} message;
 
 	void resRegister( MasterSocket *socket, uint32_t id, bool success = true );
-	void reqPushLoadStats ( MasterSocket *socket, ArrayMap<ServerAddr, Latency> *slaveGetLatency, 
-			ArrayMap<ServerAddr, Latency> *slaveSetLatency );
+	void reqPushLoadStats ( MasterSocket *socket, ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency, 
+			ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency );
 	void pending( MasterSocket *socket );
 };
 

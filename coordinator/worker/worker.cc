@@ -1,6 +1,7 @@
 #include "worker.hh"
 #include "../main/coordinator.hh"
 #include "../../common/util/debug.hh"
+#include "../../common/ds/sockaddr_in.hh"
 
 #define WORKER_COLOR	YELLOW
 
@@ -68,6 +69,14 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 	} else {
 		ProtocolHeader header;
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();
+
+		struct LoadStatsHeader loadStatsHeader;
+		ArrayMap< struct sockaddr_in, Latency > getLatency;
+		ArrayMap< struct sockaddr_in, Latency > setLatency;
+		Coordinator *coordinator = Coordinator::getInstance();
+		ArrayMap< struct sockaddr_in, Latency> *latencyPool = NULL;
+		struct sockaddr_in masterAddr;
+
 		while( buffer.size > 0 ) {
 			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "CoordinatorWorker" );
 
@@ -79,12 +88,6 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 				__ERROR__( "CoordinatorWorker", "dispatch", "Invalid message source from master." );
 			}
 
-			struct LoadStatsHeader loadStatsHeader;
-			ArrayMap< ServerAddr, Latency > getLatency;
-			ArrayMap< ServerAddr, Latency > setLatency;
-			Coordinator *coordinator = Coordinator::getInstance();
-			ServerAddr masterAddr ( NULL, event.socket->getAddr().sin_addr.s_addr, event.socket->getAddr().sin_port, 0);
-			ArrayMap<ServerAddr, Latency> *latencyPool = NULL;
 			int index = 0;
 
 			switch ( header.magic ) {
@@ -102,7 +105,7 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 	for ( uint32_t i = 0; i < _SRC_.size(); i++ ) { \
 		coordinator->slaveLoading._DST_.get( _SRC_.keys[ i ], &index ); \
 		if ( index == -1 ) { \
-			coordinator->slaveLoading._DST_.set( _SRC_.keys[ i ], new ArrayMap<ServerAddr, Latency> () ); \
+			coordinator->slaveLoading._DST_.set( _SRC_.keys[ i ], new ArrayMap<struct sockaddr_in, Latency> () ); \
 			index = coordinator->slaveLoading._DST_.size() - 1; \
 			coordinator->slaveLoading._DST_.values[ index ]->set( _MASTER_ADDR_, _SRC_.values[ i ] ); \
 		} else { \
@@ -117,6 +120,7 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 		} \
 	} \
 
+					masterAddr = event.socket->getAddr();
 					pthread_mutex_lock ( &coordinator->slaveLoading.loadingLock );
 					SET_SLAVE_LATENCY_FOR_MASTER( masterAddr, getLatency, latestGet );
 					SET_SLAVE_LATENCY_FOR_MASTER( masterAddr, setLatency, latestSet );

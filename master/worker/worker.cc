@@ -238,7 +238,7 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 	} else {
 		ProtocolHeader header;
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();
-		ArrayMap<ServerAddr, Latency> getLatency, setLatency;
+		ArrayMap<struct sockaddr_in, Latency> getLatency, setLatency;
 		struct LoadStatsHeader loadStatsHeader;
 		Master *master = Master::getInstance();
 
@@ -790,7 +790,7 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, char *buf,
 	// Mark the elapse time as latency
 	Master* master = Master::getInstance();
 	if ( master->config.master.loadingStats.updateInterval > 0 ) {
-		double elapsedTime;
+		struct timespec elapsedTime;
 		RequestStartTime rst;
 
 		if ( ! MasterWorker::pending->eraseRequestStartTime( PT_SLAVE_GET, pid.id, ( void * ) event.socket, elapsedTime, 0, &rst ) ) {
@@ -804,7 +804,7 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, char *buf,
 			}
 			// insert the latency to the set
 			// TODO use time when Response came, i.e. event created for latency cal.
-			Latency latency = Latency ( ( double ) elapsedTime );
+			Latency latency = Latency ( elapsedTime );
 			if ( index == -1 )
 				latencyPool = master->slaveLoading.past.get.get( rst.addr );
 			latencyPool->insert( latency );
@@ -857,7 +857,7 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 	// Mark the elapse time as latency
 	Master* master = Master::getInstance();
 	if ( master->config.master.loadingStats.updateInterval > 0 ) {
-		double elapsedTime;
+		struct timespec elapsedTime;
 		RequestStartTime rst;
 
 		if ( ! MasterWorker::pending->eraseRequestStartTime( PT_SLAVE_SET, pid.id, ( void * ) event.socket, elapsedTime, 0, &rst ) ) {
@@ -871,7 +871,7 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 			}
 			// insert the latency to the set
 			// TODO use time when Response came, i.e. event created for latency cal.
-			Latency latency = Latency ( ( double ) elapsedTime );
+			Latency latency = Latency ( elapsedTime );
 			if ( index == -1 )
 				latencyPool = master->slaveLoading.past.set.get( rst.addr );
 			latencyPool->insert( latency );

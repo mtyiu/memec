@@ -102,7 +102,7 @@ public:
 	void interactive();
 
 	// helper function to update slave stats
-	void mergeSlaveCumulativeLoading ( ArrayMap< ServerAddr, Latency > *getLatency, ArrayMap< ServerAddr, Latency> *setLatency );
+	void mergeSlaveCumulativeLoading ( ArrayMap< struct sockaddr_in, Latency > *getLatency, ArrayMap< struct sockaddr_in, Latency> *setLatency );
 };
 
 #endif

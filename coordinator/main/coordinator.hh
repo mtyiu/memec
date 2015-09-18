@@ -33,8 +33,8 @@ private:
 	void operator=( Coordinator const& );
 
 	void free();
-	void updateAverageSlaveLoading( ArrayMap<ServerAddr, Latency> *slaveGetLatency, 
-			ArrayMap<ServerAddr, Latency> *slaveSetLatency );
+	void updateAverageSlaveLoading( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency, 
+			ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency );
 	// Commands
 	void help();
 
@@ -54,8 +54,8 @@ public:
 
 	struct {
 		// ( slaveAddr, ( mastserAddr, Latency ) )
-		ArrayMap< ServerAddr, ArrayMap< ServerAddr, Latency > > latestGet;
-		ArrayMap< ServerAddr, ArrayMap< ServerAddr, Latency > > latestSet;
+		ArrayMap< struct sockaddr_in, ArrayMap< struct sockaddr_in, Latency > > latestGet;
+		ArrayMap< struct sockaddr_in, ArrayMap< struct sockaddr_in, Latency > > latestSet;
 		pthread_mutex_t loadingLock;
 	} slaveLoading;
 	

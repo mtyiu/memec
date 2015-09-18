@@ -4,31 +4,34 @@
 
 #include <stdint.h>
 #include <set>
+#include <ctime>
 
 class Latency {
 public:
 	
 	uint32_t sec;
-	uint32_t usec;
+	uint32_t nsec;
 
 	Latency();
-	Latency( double latency ) {
+	Latency( double sec ) {
+		this->set( sec );
+	}
+	Latency( double sec, double nsec ) {
+		this->set( sec, nsec );
+	}
+	Latency( struct timespec latency ) {
 		this->set( latency );
 	}
 	~Latency() {} ;
 
-	void set ( double latency );
+	void set ( double sec );
+	void set ( double sec, double nsec );
+	void set ( struct timespec latency );
 	void set ( Latency latency );
 	void set ( std::set< Latency > latencies );
 	double get();
 	void aggregate ( Latency *l );
 	void aggregate ( Latency l );
-
-
-	static void set ( Latency& target, double latency ) {
-		target.sec = ( uint32_t ) latency;
-		target.usec = ( uint32_t ) ( latency - target.sec ) * 1000000;
-	}
 
 	bool operator< ( const Latency &l ) const {
 		if ( this->sec > l.sec ) {
@@ -36,7 +39,7 @@ public:
 		} else if ( this->sec < l.sec ) {
 			return false;
 		}
-		if ( this->usec < l.usec ) {
+		if ( this->nsec < l.nsec ) {
 			return false;
 		}
 		return true;

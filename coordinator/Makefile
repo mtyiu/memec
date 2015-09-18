@@ -24,6 +24,7 @@ EXTERNAL_LIB= \
 	$(PLIO_SRC_ROOT)/common/config/server_addr.o \
 	$(PLIO_SRC_ROOT)/common/ds/latency.o \
 	$(PLIO_SRC_ROOT)/common/ds/load.o \
+	$(PLIO_SRC_ROOT)/common/ds/sockaddr_in.o \
 	$(PLIO_SRC_ROOT)/common/protocol/protocol.o \
 	$(PLIO_SRC_ROOT)/common/remap/remap_msg_handler.o \
 	$(PLIO_SRC_ROOT)/common/socket/socket.o \
