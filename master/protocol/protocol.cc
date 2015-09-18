@@ -24,8 +24,8 @@ char *MasterProtocol::reqRegisterCoordinator( size_t &size, uint32_t id, uint32_
 
 char *MasterProtocol::reqPushLoadStats(
 		size_t &size, uint32_t id,
-		ArrayMap< ServerAddr, Latency > *slaveGetLatency,
-		ArrayMap< ServerAddr, Latency > *slaveSetLatency )
+		ArrayMap< struct sockaddr_in, Latency > *slaveGetLatency,
+		ArrayMap< struct sockaddr_in, Latency > *slaveSetLatency )
 {
 
 	size = this->generateLoadStatsHeader(
@@ -42,8 +42,8 @@ char *MasterProtocol::reqPushLoadStats(
 	uint16_t port;
 
 #define SET_FIELDS_VAR( _SRC_ ) \
-	addr = _SRC_->keys[ idx ].addr; \
-	port = _SRC_->keys[ idx ].port; \
+	addr = _SRC_->keys[ idx ].sin_addr.s_addr; \
+	port = _SRC_->keys[ idx ].sin_port; \
 	sec = _SRC_->values[ idx ]->sec; \
 	usec = _SRC_->values[ idx ]->sec; \
 
@@ -57,9 +57,9 @@ char *MasterProtocol::reqPushLoadStats(
 			SET_FIELDS_VAR( slaveSetLatency );
 		}
 
-		*( ( uint32_t * )( this->buffer.send + size ) ) = htonl( addr );
+		*( ( uint32_t * )( this->buffer.send + size ) ) = addr; // htonl( addr );
 		size += sizeof( addr );
-		*( ( uint16_t * )( this->buffer.send + size ) ) = htons( port );
+		*( ( uint16_t * )( this->buffer.send + size ) ) = port; // htons( port );
 		size += sizeof( port );
 		*( ( uint32_t * )( this->buffer.send + size ) ) = htonl( sec );
 		size += sizeof( sec );

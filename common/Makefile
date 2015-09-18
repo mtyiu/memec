@@ -1,7 +1,7 @@
 CC=g++
 CFLAGS=-Wall -O2 -g
 PLIO_SRC_ROOT=..
-LIBS=-pthread 
+LIBS=-pthread
 EXTERNAL_LIBS=-ltspread
 
 OBJS= \
@@ -13,6 +13,7 @@ OBJS= \
 	ds/key_value.o \
 	ds/latency.o \
 	ds/load.o \
+	ds/sockaddr_in.o \
 	protocol/protocol.o \
 	remap/remap_msg_handler.o \
 	socket/socket.o \
@@ -22,7 +23,7 @@ all: $(OBJS)
 	$(MAKE) -C coding
 
 %.o: %.cc %.hh
-	$(CC) $(CFLAGS) $(INCLUDE) $(LIBS) -c -o $@ $< $(EXTERNAL_LIBS) 
+	$(CC) $(CFLAGS) $(INCLUDE) $(LIBS) -c -o $@ $< $(EXTERNAL_LIBS)
 
 clean:
 	rm -f $(OBJS)

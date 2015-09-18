@@ -20,6 +20,7 @@
 #include "../../common/ds/key_value.hh"
 #include "../../common/ds/packet_pool.hh"
 #include "../../common/ds/latency.hh"
+#include "../../common/ds/sockaddr_in.hh"
 #include "../../common/stripe_list/stripe_list.hh"
 #include "../../common/socket/epoll.hh"
 #include "../../common/signal/signal.hh"
@@ -69,16 +70,16 @@ public:
 
 	struct {
 		struct {
-			ArrayMap< ServerAddr, std::set< Latency > > get;
-			ArrayMap< ServerAddr, std::set< Latency > > set;
+			ArrayMap< struct sockaddr_in, std::set< Latency > > get;
+			ArrayMap< struct sockaddr_in, std::set< Latency > > set;
 		} past;
 		struct {
-			ArrayMap< ServerAddr, Latency > get;
-			ArrayMap< ServerAddr, Latency > set;
+			ArrayMap< struct sockaddr_in, Latency > get;
+			ArrayMap< struct sockaddr_in, Latency > set;
 		} current;
 		struct {
-			ArrayMap< ServerAddr, Latency > get;
-			ArrayMap< ServerAddr, Latency > set;
+			ArrayMap< struct sockaddr_in, Latency > get;
+			ArrayMap< struct sockaddr_in, Latency > set;
 		} cumulative;
 		pthread_mutex_t loadLock;
 	} slaveLoading;

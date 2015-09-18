@@ -5,6 +5,7 @@
 #include "../../common/ds/array_map.hh"
 #include "../../common/ds/bitmask_array.hh"
 #include "../../common/ds/latency.hh"
+#include "../../common/ds/sockaddr_in.hh"
 #include "../../common/protocol/protocol.hh"
 
 class MasterProtocol : public Protocol {
@@ -19,7 +20,7 @@ public:
 	// Register
 	char *reqRegisterCoordinator( size_t &size, uint32_t id, uint32_t addr, uint16_t port );
 	// Loading statistics
-	char *reqPushLoadStats( size_t &size, uint32_t id, ArrayMap< ServerAddr, Latency > *slaveGetLatency, ArrayMap< ServerAddr, Latency > *slaveSetLatency );
+	char *reqPushLoadStats( size_t &size, uint32_t id, ArrayMap< struct sockaddr_in, Latency > *slaveGetLatency, ArrayMap< struct sockaddr_in, Latency > *slaveSetLatency );
 
 	/* Slave */
 	// Register

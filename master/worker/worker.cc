@@ -6,9 +6,6 @@
 #include "../../common/util/debug.hh"
 
 #define WORKER_COLOR	YELLOW
-#define GIGA			( 1000 * 1000 * 1000 )
-
-#define TODO_ID	0xFFFFFFFF
 
 uint32_t MasterWorker::dataChunkCount;
 uint32_t MasterWorker::parityChunkCount;
@@ -348,6 +345,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 						goto quit_1;
 				}
 
+				event.id = header.id;
 				switch( header.opcode ) {
 					case PROTO_OPCODE_REGISTER:
 						if ( success ) {
@@ -478,27 +476,17 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
 
-	pthread_mutex_lock( &MasterWorker::pending->applications.getLock );
-	MasterWorker::pending->applications.get.insert( key );
-	pthread_mutex_unlock( &MasterWorker::pending->applications.getLock );
+	if ( ! MasterWorker::pending->insert( PT_APPLICATION_GET, event.id, ( void * ) event.socket, key ) ) {
+		__ERROR__( "MasterWorker", "handleGetRequest", "Cannot insert into application GET pending map." );
+	}
 
 	key.ptr = ( void * ) socket;
-
-	pthread_mutex_lock( &MasterWorker::pending->slaves.getLock );
-	MasterWorker::pending->slaves.get.insert( key );
-	pthread_mutex_unlock( &MasterWorker::pending->slaves.getLock );
+	if ( ! MasterWorker::pending->insert( PT_SLAVE_GET, requestId, event.id, ( void * ) socket, key ) ) {
+		__ERROR__( "MasterWorker", "handleGetRequest", "Cannot insert into slave GET pending map." );
+	}
 
 	// Mark the time when request is sent
-	sockaddr_in socketAddr = socket->getAddr();
-	ServerAddr slaveAddr;
-	slaveAddr.addr = socketAddr.sin_addr.s_addr;
-	slaveAddr.port= socketAddr.sin_port;
-
-	KeyLatencyStartTime klst = { slaveAddr };
-	clock_gettime( CLOCK_REALTIME, &klst.sttime );
-	pthread_mutex_lock( &MasterWorker::pending->stats.getLock );
-	MasterWorker::pending->stats.get.insert( std::make_pair( key, klst ) );
-	pthread_mutex_unlock( &MasterWorker::pending->stats.getLock );
+	MasterWorker::pending->recordRequestStartTime( PT_SLAVE_GET, requestId, event.id, ( void * ) socket, socket->getAddr() );
 
 	// Send GET request
 	sentBytes = socket->send( buffer.data, buffer.size, connected );
@@ -565,30 +553,30 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
 
-	pthread_mutex_lock( &MasterWorker::pending->applications.setLock );
-	MasterWorker::pending->applications.set.insert( key );
-	pthread_mutex_unlock( &MasterWorker::pending->applications.setLock );
+	if ( ! MasterWorker::pending->insert( PT_APPLICATION_SET, event.id, ( void * ) event.socket, key ) ) {
+		__ERROR__( "MasterWorker", "handleSetRequest", "Cannot insert into application SET pending map." );
+	}
 
-	pthread_mutex_lock( &MasterWorker::pending->slaves.setLock );
 	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount + 1; i++ ) {
 		key.ptr = ( void * )( i == 0 ? socket : this->paritySlaveSockets[ i - 1 ] );
-		MasterWorker::pending->slaves.set.insert( key );
+		if ( ! MasterWorker::pending->insert(
+			PT_SLAVE_SET, requestId, event.id,
+			( void * )( i == 0 ? socket : this->paritySlaveSockets[ i - 1 ] ),
+			key
+		) ) {
+			__ERROR__( "MasterWorker", "handleSetRequest", "Cannot insert into slave SET pending map." );
+		}
 	}
-	pthread_mutex_unlock( &MasterWorker::pending->slaves.setLock );
 
 	// Send SET requests
 	if ( MasterWorker::parityChunkCount ) {
 		for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
 			// Mark the time when request is sent
-			sockaddr_in socketAddr = this->paritySlaveSockets[ i ]->getAddr();
-			ServerAddr slaveAddr;
-			slaveAddr.addr = socketAddr.sin_addr.s_addr;
-			slaveAddr.port= socketAddr.sin_port;
-
-			KeyLatencyStartTime klst = { slaveAddr, time ( NULL ) };
-			pthread_mutex_lock( &MasterWorker::pending->stats.setLock );
-			MasterWorker::pending->stats.set.insert( std::make_pair( key, klst ) );
-			pthread_mutex_unlock( &MasterWorker::pending->stats.setLock );
+			MasterWorker::pending->recordRequestStartTime(
+				PT_SLAVE_SET, requestId, event.id,
+				( void * ) this->paritySlaveSockets[ i ],
+				this->paritySlaveSockets[ i ]->getAddr()
+			);
 
 #ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
 			SlaveEvent slaveEvent;
@@ -596,6 +584,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 			MasterWorker::eventQueue->prioritizedInsert( slaveEvent );
 		}
 
+		MasterWorker::pending->recordRequestStartTime( PT_SLAVE_SET, requestId, event.id, ( void * ) socket, socket->getAddr() );
 		SlaveEvent slaveEvent;
 		slaveEvent.send( socket, packet );
 		this->dispatch( slaveEvent );
@@ -606,6 +595,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 			}
 		}
 
+		MasterWorker::pending->recordRequestStartTime( PT_SLAVE_SET, requestId, event.id, ( void * ) socket, socket->getAddr() );
 		sentBytes = socket->send( buffer.data, buffer.size, connected );
 		if ( sentBytes != ( ssize_t ) buffer.size ) {
 			__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
@@ -613,24 +603,13 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		}
 #endif
 	} else {
+		MasterWorker::pending->recordRequestStartTime( PT_SLAVE_SET, requestId, event.id, ( void * ) socket, socket->getAddr() );
 		sentBytes = socket->send( buffer.data, buffer.size, connected );
 		if ( sentBytes != ( ssize_t ) buffer.size ) {
 			__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 			return false;
 		}
 	}
-
-	// Mark the time when request is sent
-	sockaddr_in socketAddr = socket->getAddr();
-	ServerAddr slaveAddr;
-	slaveAddr.addr = socketAddr.sin_addr.s_addr;
-	slaveAddr.port = socketAddr.sin_port;
-
-	KeyLatencyStartTime klst = { slaveAddr };
-
-	pthread_mutex_lock( &MasterWorker::pending->stats.setLock );
-	MasterWorker::pending->stats.set.insert( std::make_pair( key, klst ) );
-	pthread_mutex_unlock( &MasterWorker::pending->stats.setLock );
 
 	return true;
 }
@@ -685,15 +664,14 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 	keyValueUpdate.offset = header.valueUpdateOffset;
 	keyValueUpdate.length = header.valueUpdateSize;
 
-	pthread_mutex_lock( &MasterWorker::pending->applications.updateLock );
-	MasterWorker::pending->applications.update.insert( keyValueUpdate );
-	pthread_mutex_unlock( &MasterWorker::pending->applications.updateLock );
+	if ( ! MasterWorker::pending->insert( PT_APPLICATION_UPDATE, event.id, ( void * ) event.socket, keyValueUpdate ) ) {
+		__ERROR__( "MasterWorker", "handleUpdateRequest", "Cannot insert into application UPDATE pending map." );
+	}
 
 	keyValueUpdate.ptr = ( void * ) socket;
-
-	pthread_mutex_lock( &MasterWorker::pending->slaves.updateLock );
-	MasterWorker::pending->slaves.update.insert( keyValueUpdate );
-	pthread_mutex_unlock( &MasterWorker::pending->slaves.updateLock );
+	if ( ! MasterWorker::pending->insert( PT_SLAVE_UPDATE, requestId, event.id, ( void * ) socket, keyValueUpdate ) ) {
+		__ERROR__( "MasterWorker", "handleUpdateRequest", "Cannot insert into slave UPDATE pending map." );
+	}
 
 	// Send UPDATE request
 	sentBytes = socket->send( buffer.data, buffer.size, connected );
@@ -745,14 +723,14 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 	buffer.data = this->protocol.reqDelete( buffer.size, requestId, header.key, header.keySize );
 
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
-	pthread_mutex_lock( &MasterWorker::pending->applications.delLock );
-	MasterWorker::pending->applications.del.insert( key );
-	pthread_mutex_unlock( &MasterWorker::pending->applications.delLock );
+	if ( ! MasterWorker::pending->insert( PT_APPLICATION_DEL, event.id, ( void * ) event.socket, key ) ) {
+		__ERROR__( "MasterWorker", "handleDeleteRequest", "Cannot insert into application DELETE pending map." );
+	}
 
 	key.ptr = ( void * ) socket;
-	pthread_mutex_lock( &MasterWorker::pending->slaves.delLock );
-	MasterWorker::pending->slaves.del.insert( key );
-	pthread_mutex_unlock( &MasterWorker::pending->slaves.delLock );
+	if ( ! MasterWorker::pending->insert( PT_SLAVE_DEL, requestId, event.id, ( void * ) socket, key ) ) {
+		__ERROR__( "MasterWorker", "handleDeleteRequest", "Cannot insert into slave DELETE pending map." );
+	}
 
 	// Send DELETE requests
 	sentBytes = socket->send( buffer.data, buffer.size, connected );
@@ -788,63 +766,50 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, char *buf,
 
 	std::set<Key>::iterator it;
 	ApplicationEvent applicationEvent;
+	PendingIdentifier pid;
 
-	pthread_mutex_lock( &MasterWorker::pending->slaves.getLock );
-	it = MasterWorker::pending->slaves.get.find( key );
-	if ( it == MasterWorker::pending->slaves.get.end() ) {
-		pthread_mutex_unlock( &MasterWorker::pending->slaves.getLock );
+	if ( ! MasterWorker::pending->eraseKey( PT_SLAVE_GET, event.id, event.socket, &pid, &key ) ) {
 		__ERROR__( "MasterWorker", "handleGetResponse", "Cannot find a pending slave GET request that matches the response. This message will be discarded (key = %.*s).", key.size, key.data );
 		if ( success ) keyValue.free();
 		return false;
 	}
-	MasterWorker::pending->slaves.get.erase( it );
-	pthread_mutex_unlock( &MasterWorker::pending->slaves.getLock );
 
 	// Mark the elapse time as latency
 	Master* master = Master::getInstance();
 	if ( master->config.master.loadingStats.updateInterval > 0 ) {
-		pthread_mutex_lock( &MasterWorker::pending->stats.getLock );
-		std::map<Key, KeyLatencyStartTime>::iterator lit = MasterWorker::pending->stats.get.find( key );
-		if ( lit == MasterWorker::pending->stats.get.end() ) {
-			__DEBUG__( "MasterWorker", "handleGetResponse", "Cannot find a pending stats GET request that matches the response." );
+		double elapsedTime;
+		RequestStartTime rst;
+
+		if ( ! MasterWorker::pending->eraseRequestStartTime( PT_SLAVE_GET, pid.id, ( void * ) event.socket, elapsedTime, 0, &rst ) ) {
+			__ERROR__( "MasterWorker", "handleGetResponse", "Cannot find a pending stats GET request that matches the response." );
 		} else {
 			int index = -1;
-			std::set<Latency> *latencyPool = master->slaveLoading.past.get.get( lit->second.addr, &index );
+			std::set<Latency> *latencyPool = master->slaveLoading.past.get.get( rst.addr, &index );
 			// init. the set if it is not there
 			if ( index == -1 ) {
-				master->slaveLoading.past.get.set( lit->second.addr, new std::set<Latency>() );
+				master->slaveLoading.past.get.set( rst.addr, new std::set<Latency>() );
 			}
 			// insert the latency to the set
 			// TODO use time when Response came, i.e. event created for latency cal.
-			struct timespec currentTime;
-			clock_gettime( CLOCK_REALTIME, &currentTime );
-			double elapseTime = currentTime.tv_sec - lit->second.sttime.tv_sec + ( currentTime.tv_nsec - lit->second.sttime.tv_nsec ) / GIGA  ;
-			Latency latency = Latency ( ( double ) elapseTime );
+			Latency latency = Latency ( ( double ) elapsedTime );
 			if ( index == -1 )
-				latencyPool = master->slaveLoading.past.get.get( lit->second.addr );
+				latencyPool = master->slaveLoading.past.get.get( rst.addr );
 			latencyPool->insert( latency );
 		}
-		pthread_mutex_unlock( &MasterWorker::pending->stats.getLock );
 	}
 
 	key.ptr = 0;
-	pthread_mutex_lock( &MasterWorker::pending->applications.getLock );
-	it = MasterWorker::pending->applications.get.lower_bound( key );
-	if ( it == MasterWorker::pending->applications.get.end() || ! key.equal( *it ) ) {
-		pthread_mutex_unlock( &MasterWorker::pending->applications.getLock );
-		__ERROR__( "MasterWorker", "handleGetResponse", "Cannot find a pending application GET request that matches the response. This message will be discarded." );
+	if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_GET, pid.parentId, 0, &pid, &key ) ) {
+		__ERROR__( "MasterWorker", "handleGetResponse", "Cannot find a pending application GET request that matches the response. This message will be discarded (key = %.*s).", key.size, key.data );
 		if ( success ) keyValue.free();
 		return false;
 	}
-	key = *it;
-	MasterWorker::pending->applications.get.erase( it );
-	pthread_mutex_unlock( &MasterWorker::pending->applications.getLock );
 
 	if ( success ) {
 		key.free();
-		applicationEvent.resGet( ( ApplicationSocket * ) key.ptr, TODO_ID, keyValue );
+		applicationEvent.resGet( ( ApplicationSocket * ) key.ptr, pid.id, keyValue );
 	} else {
-		applicationEvent.resGet( ( ApplicationSocket * ) key.ptr, TODO_ID, key );
+		applicationEvent.resGet( ( ApplicationSocket * ) key.ptr, pid.id, key );
 	}
 	MasterWorker::eventQueue->insert( applicationEvent );
 	return true;
@@ -865,80 +830,51 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 	int pending;
 	std::set<Key>::iterator it;
 	ApplicationEvent applicationEvent;
+	PendingIdentifier pid;
 	Key key;
 
-	key.set( header.keySize, header.key, ( void * ) event.socket );
-
-	pthread_mutex_lock( &MasterWorker::pending->slaves.setLock );
-	it = MasterWorker::pending->slaves.set.find( key );
-	if ( it == MasterWorker::pending->slaves.set.end() ) {
+	if ( ! MasterWorker::pending->eraseKey( PT_SLAVE_SET, event.id, event.socket, &pid, &key, true, false ) ) {
 		pthread_mutex_unlock( &MasterWorker::pending->slaves.setLock );
-		__ERROR__( "MasterWorker", "handleSetResponse", "Cannot find a pending slave SET request that matches the response. This message will be discarded." );
-		__ERROR__(
-			"MasterWorker", "handleSetResponse",
-			"[SET] Key: %.*s (key size = %u)",
-			( int ) header.keySize, header.key, header.keySize
-		);
+		__ERROR__( "MasterWorker", "handleSetResponse", "Cannot find a pending slave SET request that matches the response. This message will be discarded. (ID: %u)", event.id );
 		return false;
 	}
-	key = *it;
-	MasterWorker::pending->slaves.set.erase( it );
+	// Check pending slave SET requests
+	pending = MasterWorker::pending->count( PT_SLAVE_SET, pid.id, false, true );
 
 	// Mark the elapse time as latency
 	Master* master = Master::getInstance();
 	if ( master->config.master.loadingStats.updateInterval > 0 ) {
-		pthread_mutex_lock( &MasterWorker::pending->stats.setLock );
-		std::map<Key, KeyLatencyStartTime>::iterator lit = MasterWorker::pending->stats.set.find( key );
-		if ( lit == MasterWorker::pending->stats.set.end() ) {
-			__DEBUG__( "MasterWorker", "handleGetResponse", "Cannot find a pending stats GET request that matches the response." );
+		double elapsedTime;
+		RequestStartTime rst;
+
+		if ( ! MasterWorker::pending->eraseRequestStartTime( PT_SLAVE_SET, pid.id, ( void * ) event.socket, elapsedTime, 0, &rst ) ) {
+			__ERROR__( "MasterWorker", "handleSetResponse", "Cannot find a pending stats SET request that matches the response." );
 		} else {
 			int index = -1;
-			std::set< Latency > *latencyPool = master->slaveLoading.past.set.get( lit->second.addr, &index );
+			std::set<Latency> *latencyPool = master->slaveLoading.past.set.get( rst.addr, &index );
 			// init. the set if it is not there
 			if ( index == -1 ) {
-				master->slaveLoading.past.set.set( lit->second.addr, new std::set<Latency>() );
+				master->slaveLoading.past.set.set( rst.addr, new std::set<Latency>() );
 			}
 			// insert the latency to the set
 			// TODO use time when Response came, i.e. event created for latency cal.
-			struct timespec currentTime;
-			clock_settime( CLOCK_REALTIME, &currentTime);
-			double elapseTime = currentTime.tv_sec - lit->second.sttime.tv_sec + ( currentTime.tv_nsec - lit->second.sttime.tv_nsec ) / GIGA  ;
-			Latency latency = Latency ( ( double ) elapseTime );
+			Latency latency = Latency ( ( double ) elapsedTime );
 			if ( index == -1 )
-				latencyPool = master->slaveLoading.past.set.get( lit->second.addr );
+				latencyPool = master->slaveLoading.past.set.get( rst.addr );
 			latencyPool->insert( latency );
 		}
-		pthread_mutex_unlock( &MasterWorker::pending->stats.setLock );
 	}
-
-	// Check pending slave SET requests
-	key.ptr = 0;
-	it = MasterWorker::pending->slaves.set.lower_bound( key );
-	for ( pending = 0; it != MasterWorker::pending->slaves.set.end() && key.equal( *it ); pending++, it++ );
-	pthread_mutex_unlock( &MasterWorker::pending->slaves.setLock );
 
 	// __ERROR__( "MasterWorker", "handleSetResponse", "Pending slave SET requests = %d.", pending );
 
 	if ( pending == 0 ) {
 		// Only send application SET response when the number of pending slave SET requests equal 0
-		key.ptr = 0;
-		pthread_mutex_lock( &MasterWorker::pending->applications.setLock );
-		it = MasterWorker::pending->applications.set.lower_bound( key );
-		if ( it == MasterWorker::pending->applications.set.end() || ! key.equal( *it ) ) {
-			pthread_mutex_unlock( &MasterWorker::pending->applications.setLock );
+		if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_SET, pid.parentId, 0, &pid, &key ) ) {
 			__ERROR__( "MasterWorker", "handleSetResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded." );
-			__ERROR__(
-				"MasterWorker", "handleSetResponse",
-				"[SET] Key: %.*s (key size = %u)",
-				( int ) header.keySize, header.key, header.keySize
-			);
 			return false;
 		}
-		key = *it;
-		MasterWorker::pending->applications.set.erase( it );
-		pthread_mutex_unlock( &MasterWorker::pending->applications.setLock );
 
-		applicationEvent.resSet( ( ApplicationSocket * ) key.ptr, TODO_ID, key, success );
+		applicationEvent.resSet( ( ApplicationSocket * ) key.ptr, pid.id, key, success );
 		MasterWorker::eventQueue->insert( applicationEvent );
 	}
 	return true;
@@ -961,35 +897,20 @@ bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, char *b
 	std::set<KeyValueUpdate>::iterator it;
 	KeyValueUpdate keyValueUpdate;
 	ApplicationEvent applicationEvent;
+	PendingIdentifier pid;
 
 	// Find the cooresponding request
-	keyValueUpdate.set( header.keySize, header.key, ( void * ) event.socket );
-	keyValueUpdate.offset = header.valueUpdateOffset;
-	keyValueUpdate.length = header.valueUpdateSize;
-
-	pthread_mutex_lock( &MasterWorker::pending->slaves.updateLock );
-	it = MasterWorker::pending->slaves.update.find( keyValueUpdate );
-	if ( it == MasterWorker::pending->slaves.update.end() ) {
-		pthread_mutex_unlock( &MasterWorker::pending->slaves.updateLock );
+	if ( ! MasterWorker::pending->eraseKeyValueUpdate( PT_SLAVE_UPDATE, event.id, ( void * ) event.socket, &pid, &keyValueUpdate ) ) {
 		__ERROR__( "MasterWorker", "handleUpdateResponse", "Cannot find a pending slave UPDATE request that matches the response. This message will be discarded." );
 		return false;
 	}
-	MasterWorker::pending->slaves.update.erase( it );
-	pthread_mutex_unlock( &MasterWorker::pending->slaves.updateLock );
 
-	keyValueUpdate.ptr = 0;
-	pthread_mutex_lock( &MasterWorker::pending->applications.updateLock );
-	it = MasterWorker::pending->applications.update.lower_bound( keyValueUpdate );
-	if ( it == MasterWorker::pending->applications.update.end() || ! keyValueUpdate.equal( *it ) ) {
-		pthread_mutex_unlock( &MasterWorker::pending->applications.updateLock );
+	if ( ! MasterWorker::pending->eraseKeyValueUpdate( PT_APPLICATION_UPDATE, pid.parentId, 0, &pid, &keyValueUpdate ) ) {
 		__ERROR__( "MasterWorker", "handleUpdateResponse", "Cannot find a pending application UPDATE request that matches the response. This message will be discarded." );
 		return false;
 	}
-	keyValueUpdate = *it;
-	MasterWorker::pending->applications.update.erase( it );
-	pthread_mutex_unlock( &MasterWorker::pending->applications.updateLock );
 
-	applicationEvent.resUpdate( ( ApplicationSocket * ) keyValueUpdate.ptr, TODO_ID, keyValueUpdate, success );
+	applicationEvent.resUpdate( ( ApplicationSocket * ) keyValueUpdate.ptr, pid.id, keyValueUpdate, success );
 	MasterWorker::eventQueue->insert( applicationEvent );
 
 	return true;
@@ -1003,34 +924,21 @@ bool MasterWorker::handleDeleteResponse( SlaveEvent event, bool success, char *b
 	}
 
 	ApplicationEvent applicationEvent;
+	PendingIdentifier pid;
 	std::set<Key>::iterator it;
 	Key key;
 
-	key.set( header.keySize, header.key, ( void * ) event.socket );
-
-	pthread_mutex_lock( &MasterWorker::pending->slaves.delLock );
-	it = MasterWorker::pending->slaves.del.find( key );
-	if ( it == MasterWorker::pending->slaves.del.end() ) {
-		pthread_mutex_unlock( &MasterWorker::pending->slaves.delLock );
+	if ( ! MasterWorker::pending->eraseKey( PT_SLAVE_DEL, event.id, ( void * ) event.socket, &pid, &key ) ) {
 		__ERROR__( "MasterWorker", "handleDeleteResponse", "Cannot find a pending slave DELETE request that matches the response. This message will be discarded." );
 		return false;
 	}
-	MasterWorker::pending->slaves.del.erase( it );
-	pthread_mutex_unlock( &MasterWorker::pending->slaves.delLock );
 
-	key.ptr = 0;
-	pthread_mutex_lock( &MasterWorker::pending->applications.delLock );
-	it = MasterWorker::pending->applications.del.lower_bound( key );
-	if ( it == MasterWorker::pending->applications.del.end() || ! key.equal( *it ) ) {
-		pthread_mutex_unlock( &MasterWorker::pending->applications.delLock );
+	if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_DEL, pid.parentId, 0, &pid, &key ) ) {
 		__ERROR__( "MasterWorker", "handleDeleteResponse", "Cannot find a pending application DELETE request that matches the response. This message will be discarded." );
 		return false;
 	}
-	key = *it;
-	MasterWorker::pending->applications.del.erase( it );
-	pthread_mutex_unlock( &MasterWorker::pending->applications.delLock );
 
-	applicationEvent.resDelete( ( ApplicationSocket * ) key.ptr, TODO_ID, key, success );
+	applicationEvent.resDelete( ( ApplicationSocket * ) key.ptr, pid.id, key, success );
 	MasterWorker::eventQueue->insert( applicationEvent );
 
 	return true;

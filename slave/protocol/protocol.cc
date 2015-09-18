@@ -125,7 +125,6 @@ char *SlaveProtocol::resRegisterSlavePeer( size_t &size, uint32_t id, bool succe
 		0, // length
 		id
 	);
-	printf( "resRegisterSlavePeer: size = %lu\n", size );
 	return this->buffer.send;
 }
 

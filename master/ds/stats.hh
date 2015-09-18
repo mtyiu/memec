@@ -5,8 +5,8 @@
 #include "../../common/config/server_addr.hh"
 
 typedef struct {
-	ServerAddr addr;
+	struct sockaddr_in addr;
 	struct timespec sttime;
-} KeyLatencyStartTime;
+} RequestStartTime;
 
 #endif
