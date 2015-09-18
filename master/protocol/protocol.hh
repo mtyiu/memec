@@ -5,6 +5,7 @@
 #include "../../common/ds/array_map.hh"
 #include "../../common/ds/bitmask_array.hh"
 #include "../../common/ds/latency.hh"
+#include "../../common/ds/sockaddr_in.hh"
 #include "../../common/protocol/protocol.hh"
 
 class MasterProtocol : public Protocol {
@@ -17,34 +18,35 @@ public:
 
 	/* Coordinator */
 	// Register
-	char *reqRegisterCoordinator( size_t &size, uint32_t addr, uint16_t port );
+	char *reqRegisterCoordinator( size_t &size, uint32_t id, uint32_t addr, uint16_t port );
 	// Loading statistics
-	char *reqPushLoadStats( size_t &size, ArrayMap< ServerAddr, Latency > *slaveGetLatency, ArrayMap< ServerAddr, Latency > *slaveSetLatency );
-	bool parseLoadingStats( const LoadStatsHeader& loadStatsHeader, ArrayMap< ServerAddr, Latency >& slaveGetLatency, ArrayMap< ServerAddr, Latency >& slaveSetLatency,
+	char *reqPushLoadStats( size_t &size, uint32_t id, ArrayMap< struct sockaddr_in, Latency > *slaveGetLatency, ArrayMap< struct sockaddr_in, Latency > *slaveSetLatency );
+	bool parseLoadingStats( const LoadStatsHeader& loadStatsHeader, ArrayMap< struct sockaddr_in, Latency >& slaveGetLatency, ArrayMap< struct sockaddr_in, Latency >& slaveSetLatency,
 		char* buffer, uint32_t size );
+
 	/* Slave */
 	// Register
-	char *reqRegisterSlave( size_t &size, uint32_t addr, uint16_t port );
+	char *reqRegisterSlave( size_t &size, uint32_t id, uint32_t addr, uint16_t port );
 	// SET
-	char *reqSet( size_t &size, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf = 0 );
+	char *reqSet( size_t &size, uint32_t id, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf = 0 );
 	// GET
-	char *reqGet( size_t &size, char *key, uint8_t keySize );
+	char *reqGet( size_t &size, uint32_t id, char *key, uint8_t keySize );
 	// UPDATE
-	char *reqUpdate( size_t &size, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize );
+	char *reqUpdate( size_t &size, uint32_t id, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize );
 	// DELETE
-	char *reqDelete( size_t &size, char *key, uint8_t keySize );
+	char *reqDelete( size_t &size, uint32_t id, char *key, uint8_t keySize );
 
 	/* Application */
 	// Register
-	char *resRegisterApplication( size_t &size, bool success );
+	char *resRegisterApplication( size_t &size, uint32_t id, bool success );
 	// SET
-	char *resSet( size_t &size, bool success, uint8_t keySize, char *key );
+	char *resSet( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key );
 	// GET
-	char *resGet( size_t &size, bool success, uint8_t keySize, char *key, uint32_t valueSize = 0, char *value = 0 );
+	char *resGet( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key, uint32_t valueSize = 0, char *value = 0 );
 	// UPDATE
-	char *resUpdate( size_t &size, bool success, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize );
+	char *resUpdate( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize );
 	// DELETE
-	char *resDelete( size_t &size, bool success, uint8_t keySize, char *key );
+	char *resDelete( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key );
 };
 
 #endif

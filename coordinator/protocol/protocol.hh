@@ -15,11 +15,11 @@ public:
 
 	/* Master */
 	// Register
-	char *resRegisterMaster( size_t &size, bool success );
-	char *resRegisterMaster( size_t &size, GlobalConfig &globalConfig, MasterConfig *masterConfig = 0 );
+	char *resRegisterMaster( size_t &size, uint32_t id, bool success );
+	// char *resRegisterMaster( size_t &size, GlobalConfig &globalConfig, MasterConfig *masterConfig = 0 );
 	// Load statistics
 	char *reqPushLoadStats( 
-		size_t &size, 
+		size_t &size, uint32_t id,
 		ArrayMap< ServerAddr, Latency > *slaveGetLatency, 
 		ArrayMap< ServerAddr, Latency > *slaveSetLatency 
 	);
@@ -32,9 +32,9 @@ public:
 
 	/* Slave */
 	// Register
-	char *resRegisterSlave( size_t &size, bool success );
-	char *resRegisterSlave( size_t &size, GlobalConfig &globalConfig, SlaveConfig *slaveConfig = 0 );
-	char *announceSlaveConnected( size_t &size, SlaveSocket *socket );
+	char *resRegisterSlave( size_t &size, uint32_t id, bool success );
+	// char *resRegisterSlave( size_t &size, GlobalConfig &globalConfig, SlaveConfig *slaveConfig = 0 );
+	char *announceSlaveConnected( size_t &size, uint32_t id, SlaveSocket *socket );
 };
 
 #endif

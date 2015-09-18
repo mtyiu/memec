@@ -15,7 +15,7 @@ void Master::updateSlavesCurrentLoading() {
 
 #define UPDATE_LATENCY( _SRC_, _DST_, _SRC_VAL_TYPE_, _DST_OP_, _CHECK_EXIST_ ) \
 	for ( uint32_t i = 0; i < _SRC_.size(); i++ ) { \
-		ServerAddr &slaveAddr = _SRC_.keys[ i ]; \
+		struct sockaddr_in &slaveAddr = _SRC_.keys[ i ]; \
 		_SRC_VAL_TYPE_ *srcLatency = _SRC_.values[ i ]; \
 		Latency *dstLatency = NULL; \
 		if ( _CHECK_EXIST_ ) { \
@@ -32,10 +32,10 @@ void Master::updateSlavesCurrentLoading() {
 		} \
 	}
 
-	ArrayMap< ServerAddr, std::set< Latency > > &pastGet = this->slaveLoading.past.get;
-	ArrayMap< ServerAddr, Latency > &currentGet = this->slaveLoading.current.get;
-	ArrayMap< ServerAddr, std::set< Latency > > &pastSet = this->slaveLoading.past.set;
-	ArrayMap< ServerAddr, Latency > &currentSet = this->slaveLoading.current.set;
+	ArrayMap< struct sockaddr_in, std::set< Latency > > &pastGet = this->slaveLoading.past.get;
+	ArrayMap< struct sockaddr_in, Latency > &currentGet = this->slaveLoading.current.get;
+	ArrayMap< struct sockaddr_in, std::set< Latency > > &pastSet = this->slaveLoading.past.set;
+	ArrayMap< struct sockaddr_in, Latency > &currentSet = this->slaveLoading.current.set;
 	//fprintf( stderr, "past %lu %lu current %lu %lu\n", pastGet.size(), pastSet.size(), currentGet.size(), currentSet.size() );
 
 	// reset the current stats before update
@@ -61,10 +61,10 @@ void Master::updateSlavesCumulativeLoading () {
 
 	pthread_mutex_lock( &this->slaveLoading.loadLock );
 
-	ArrayMap< ServerAddr, Latency > &currentGet = this->slaveLoading.current.get;
-	ArrayMap< ServerAddr, Latency > &cumulativeGet = this->slaveLoading.cumulative.get;
-	ArrayMap< ServerAddr, Latency > &currentSet = this->slaveLoading.current.set;
-	ArrayMap< ServerAddr, Latency > &cumulativeSet = this->slaveLoading.cumulative.set;
+	ArrayMap< struct sockaddr_in, Latency > &currentGet = this->slaveLoading.current.get;
+	ArrayMap< struct sockaddr_in, Latency > &cumulativeGet = this->slaveLoading.cumulative.get;
+	ArrayMap< struct sockaddr_in, Latency > &currentSet = this->slaveLoading.current.set;
+	ArrayMap< struct sockaddr_in, Latency > &cumulativeSet = this->slaveLoading.cumulative.set;
 	//fprintf( stderr, "cumulative %lu %lu current %lu %lu\n", cumulativeGet.size(), cumulativeSet.size(), currentGet.size(), currentSet.size() );
 
 	// GET
@@ -108,6 +108,7 @@ void Master::mergeSlaveCumulativeLoading ( ArrayMap< ServerAddr, Latency > *getL
 }
 
 void Master::free() {
+	this->idGenerator.free();
 	this->eventQueue.free();
 	delete this->stripeList;
 }
@@ -201,8 +202,9 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 		this->config.global.stripeList.count,
 		this->sockets.slaves.values
 	);
-	/* Workers, packet pool and event queues */
+	/* Workers, ID generator, packet pool and event queues */
 	if ( this->config.master.workers.type == WORKER_TYPE_MIXED ) {
+		this->idGenerator.init( this->config.master.workers.number.mixed );
 		this->packetPool.init(
 			this->config.master.workers.number.mixed,
 			Protocol::getSuggestedBufferSize(
@@ -221,10 +223,12 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 			this->workers.push_back( MasterWorker() );
 			this->workers[ i ].init(
 				this->config.global,
-				WORKER_ROLE_MIXED
+				WORKER_ROLE_MIXED,
+				i // worker ID
 			);
 		}
 	} else {
+		this->idGenerator.init( this->config.master.workers.number.separated.total );
 		this->packetPool.init(
 			this->config.master.workers.number.separated.total,
 			Protocol::getSuggestedBufferSize(
@@ -247,7 +251,8 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 			this->workers.push_back( MasterWorker() ); \
 			this->workers[ index ].init( \
 				this->config.global, \
-				_CONSTANT_ \
+				_CONSTANT_, \
+				index \
 			); \
 		}
 
@@ -502,8 +507,8 @@ void Master::interactive() {
 
 void Master::printPending( FILE *f ) {
 	size_t i;
-	std::set<Key>::iterator it;
-	std::set<KeyValueUpdate>::iterator keyValueUpdateIt;
+	std::map<PendingIdentifier, Key>::iterator it;
+	std::map<PendingIdentifier, KeyValueUpdate>::iterator keyValueUpdateIt;
 
 	pthread_mutex_lock( &this->pending.applications.setLock );
 	fprintf(
@@ -519,8 +524,8 @@ void Master::printPending( FILE *f ) {
 		it != this->pending.applications.set.end();
 		it++, i++
 	) {
-		const Key &key = *it;
-		fprintf( f, "%lu. Key: %.*s (size = %u); source: ", i, key.size, key.data, key.size );
+		const Key &key = it->second;
+		fprintf( f, "%lu. ID: %u; Key: %.*s (size = %u); source: ", i, it->first.id, key.size, key.data, key.size );
 		( ( Socket * ) key.ptr )->printAddress( f );
 
 		for ( uint8_t i = 0; i < key.size; i++ ) {
@@ -545,8 +550,8 @@ void Master::printPending( FILE *f ) {
 		it != this->pending.applications.get.end();
 		it++, i++
 	) {
-		const Key &key = *it;
-		fprintf( f, "%lu. Key: %.*s (size = %u); source: ", i, key.size, key.data, key.size );
+		const Key &key = it->second;
+		fprintf( f, "%lu. ID: %u; Key: %.*s (size = %u); source: ", i, it->first.id, key.size, key.data, key.size );
 		if ( key.ptr )
 			( ( Socket * ) key.ptr )->printAddress( f );
 		else
@@ -567,10 +572,10 @@ void Master::printPending( FILE *f ) {
 		keyValueUpdateIt != this->pending.applications.update.end();
 		keyValueUpdateIt++, i++
 	) {
-		const KeyValueUpdate &keyValueUpdate = *keyValueUpdateIt;
+		const KeyValueUpdate &keyValueUpdate = keyValueUpdateIt->second;
 		fprintf(
-			f, "%lu. Key: %.*s (size = %u, offset = %u, length = %u); source: ",
-			i, keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
+			f, "%lu. ID: %u; Key: %.*s (size = %u, offset = %u, length = %u); source: ",
+			i, it->first.id, keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
 			keyValueUpdate.offset, keyValueUpdate.length
 		);
 		if ( keyValueUpdate.ptr )
@@ -593,8 +598,8 @@ void Master::printPending( FILE *f ) {
 		it != this->pending.applications.del.end();
 		it++, i++
 	) {
-		const Key &key = *it;
-		fprintf( f, "%lu. Key: %.*s (size = %u); source: ", i, key.size, key.data, key.size );
+		const Key &key = it->second;
+		fprintf( f, "%lu. ID: %u; Key: %.*s (size = %u); source: ", i, it->first.id, key.size, key.data, key.size );
 		if ( key.ptr )
 			( ( Socket * ) key.ptr )->printAddress( f );
 		else
@@ -618,8 +623,8 @@ void Master::printPending( FILE *f ) {
 		it != this->pending.slaves.set.end();
 		it++, i++
 	) {
-		const Key &key = *it;
-		fprintf( f, "%lu. Key: %.*s (size = %u); target: ", i, key.size, key.data, key.size );
+		const Key &key = it->second;
+		fprintf( f, "%lu. ID: %u, parent ID: %u; Key: %.*s (size = %u); target: ", i, it->first.id, it->first.parentId, key.size, key.data, key.size );
 		( ( Socket * ) key.ptr )->printAddress( f );
 		fprintf( f, "\n" );
 	}
@@ -637,8 +642,8 @@ void Master::printPending( FILE *f ) {
 		it != this->pending.slaves.get.end();
 		it++, i++
 	) {
-		const Key &key = *it;
-		fprintf( f, "%lu. Key: %.*s (size = %u); target: ", i, key.size, key.data, key.size );
+		const Key &key = it->second;
+		fprintf( f, "%lu. ID: %u, parent ID: %u; Key: %.*s (size = %u); target: ", i, it->first.id, it->first.parentId, key.size, key.data, key.size );
 		( ( Socket * ) key.ptr )->printAddress( f );
 		fprintf( f, "\n" );
 	}
@@ -656,10 +661,10 @@ void Master::printPending( FILE *f ) {
 		keyValueUpdateIt != this->pending.slaves.update.end();
 		keyValueUpdateIt++, i++
 	) {
-		const KeyValueUpdate &keyValueUpdate = *keyValueUpdateIt;
+		const KeyValueUpdate &keyValueUpdate = keyValueUpdateIt->second;
 		fprintf(
-			f, "%lu. Key: %.*s (size = %u, offset = %u, length = %u); target: ",
-			i, keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
+			f, "%lu. ID: %u, parent ID: %u; Key: %.*s (size = %u, offset = %u, length = %u); target: ",
+			i, it->first.id, it->first.parentId, keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
 			keyValueUpdate.offset, keyValueUpdate.length
 		);
 		if ( keyValueUpdate.ptr )
@@ -682,8 +687,8 @@ void Master::printPending( FILE *f ) {
 		it != this->pending.slaves.del.end();
 		it++, i++
 	) {
-		const Key &key = *it;
-		fprintf( f, "%lu. Key: %.*s (size = %u); target: ", i, key.size, key.data, key.size );
+		const Key &key = it->second;
+		fprintf( f, "%lu. ID: %u, parent ID: %u; Key: %.*s (size = %u); target: ", i, it->first.id, it->first.parentId, key.size, key.data, key.size );
 		( ( Socket * ) key.ptr )->printAddress( f );
 		fprintf( f, "\n" );
 	}

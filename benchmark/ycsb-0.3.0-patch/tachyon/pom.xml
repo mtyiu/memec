@@ -3,8 +3,9 @@
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>com.yahoo.ycsb</groupId>
-    <artifactId>root</artifactId>
-    <version>0.1.4</version>
+    <artifactId>binding-parent</artifactId>
+    <version>0.3.0</version>
+    <relativePath>../binding-parent</relativePath>
   </parent>
 
   <artifactId>tachyon-binding</artifactId>
@@ -13,11 +14,8 @@
   <dependencies>
     <dependency>
       <groupId>org.tachyonproject</groupId>
-      <artifactId>tachyon</artifactId>
-      <version>${tachyon.version}</version>
-      <classifier>jar-with-dependencies</classifier>
-      <scope>system</scope>
-      <systemPath>${basedir}/../libs/tachyon-0.6.0-SNAPSHOT-jar-with-dependencies.jar</systemPath>
+      <artifactId>tachyon-client</artifactId>
+      <version>0.7.1</version>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>

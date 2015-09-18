@@ -5,8 +5,9 @@ void SlaveEvent::pending( SlaveSocket *socket ) {
 	this->socket = socket;
 }
 
-void SlaveEvent::resRegister( SlaveSocket *socket, bool success ) {
+void SlaveEvent::resRegister( SlaveSocket *socket, uint32_t id, bool success ) {
 	this->type = success ? SLAVE_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS : SLAVE_EVENT_TYPE_REGISTER_RESPONSE_FAILURE;
+	this->id = id;
 	this->socket = socket;
 }
 

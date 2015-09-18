@@ -11,6 +11,7 @@ Application::Application() {
 }
 
 void Application::free() {
+	this->idGenerator.free();
 	this->eventQueue.free();
 }
 
@@ -74,8 +75,9 @@ bool Application::init( char *path, OptionList &options, bool verbose ) {
 		fd = socket->getSocket();
 		this->sockets.masters.set( fd, socket );
 	}
-	/* Workers and event queues */
+	/* Workers, ID generator and event queues */
 	if ( this->config.application.workers.type == WORKER_TYPE_MIXED ) {
+		this->idGenerator.init( this->config.application.eventQueue.size.mixed );
 		this->eventQueue.init(
 			this->config.application.eventQueue.block,
 			this->config.application.eventQueue.size.mixed
@@ -86,10 +88,12 @@ bool Application::init( char *path, OptionList &options, bool verbose ) {
 			this->workers.push_back( ApplicationWorker() );
 			this->workers[ i ].init(
 				this->config.application,
-				WORKER_ROLE_MIXED
+				WORKER_ROLE_MIXED,
+				i // worker ID
 			);
 		}
 	} else {
+		this->idGenerator.init( this->config.application.workers.number.separated.total );
 		this->workers.reserve( this->config.application.workers.number.separated.total );
 		this->eventQueue.init(
 			this->config.application.eventQueue.block,
@@ -104,7 +108,8 @@ bool Application::init( char *path, OptionList &options, bool verbose ) {
 			this->workers.push_back( ApplicationWorker() ); \
 			this->workers[ index ].init( \
 				this->config.application, \
-				_CONSTANT_ \
+				_CONSTANT_, \
+				index \
 			); \
 		}
 

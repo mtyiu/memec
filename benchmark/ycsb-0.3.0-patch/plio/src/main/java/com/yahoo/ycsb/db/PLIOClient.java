@@ -17,15 +17,15 @@ import edu.cuhk.cse.plio.PLIO;
 import edu.cuhk.cse.plio.Protocol;
 
 public class PLIOClient extends DB {
-   // Properties
+	// Properties
 	public static final String HOST_PROPERTY = "plio.host";
 	public static final String PORT_PROPERTY = "plio.port";
 	public static final String KEY_SIZE_PROPERTY = "plio.key_size";
 	public static final String CHUNK_SIZE_PROPERTY = "plio.chunk_size";
-   // Return values
-   public static final int OK = 0;
-   public static final int ERROR = -1;
-   public static final int NOT_FOUND = -2;
+	// Return values
+	public static final int OK = 0;
+	public static final int ERROR = -1;
+	public static final int NOT_FOUND = -2;
 
 	private PLIO plio;
 
@@ -45,7 +45,7 @@ public class PLIOClient extends DB {
 		s = props.getProperty( CHUNK_SIZE_PROPERTY );
 		chunkSize = s != null ? Integer.parseInt( s ) : PLIO.DEFAULT_CHUNK_SIZE;
 
-		plio = new PLIO( keySize, chunkSize, host, port );
+		plio = new PLIO( keySize, chunkSize, host, port, ( int ) ( Math.random() * Integer.MAX_VALUE ) );
 
 		if ( ! plio.connect() )
 			throw new DBException();

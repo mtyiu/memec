@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- 
+<!--
 Copyright (c) 2012 - 2015 YCSB contributors. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License"); you
@@ -81,7 +81,6 @@ LICENSE file.
     <mongodb.async.version>2.0.1</mongodb.async.version>
     <orientdb.version>1.0.1</orientdb.version>
     <redis.version>2.0.0</redis.version>
-    <tachyon.version>0.6.0-SNAPSHOT</tachyon.version>
     <voldemort.version>0.81</voldemort.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <thrift.version>0.8.0</thrift.version>
@@ -114,7 +113,8 @@ LICENSE file.
     <!--module>nosqldb</module-->
     <module>orientdb</module>
     <module>plio</module>
-	<module>redis</module>
+    <module>dummy</module>
+    <module>redis</module>
     <module>tarantool</module>
     <module>tachyon</module>
     <!--<module>voldemort</module>-->

@@ -30,6 +30,7 @@ enum MasterEventType {
 class MasterEvent : public Event {
 public:
 	MasterEventType type;
+	uint32_t id;
 	bool needsFree;
 	MasterSocket *socket;
 	union {
@@ -44,16 +45,16 @@ public:
 	} message;
 
 	// Register
-	void resRegister( MasterSocket *socket, bool success = true );
+	void resRegister( MasterSocket *socket, uint32_t id, bool success = true );
 	// GET
-	void resGet( MasterSocket *socket, KeyValue &keyValue );
-	void resGet( MasterSocket *socket, Key &key );
+	void resGet( MasterSocket *socket, uint32_t id, KeyValue &keyValue );
+	void resGet( MasterSocket *socket, uint32_t id, Key &key );
 	// SET
-	void resSet( MasterSocket *socket, Key &key, bool success );
+	void resSet( MasterSocket *socket, uint32_t id, Key &key, bool success );
 	// UPDATE
-	void resUpdate( MasterSocket *socket, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool success, bool needsFree = true );
+	void resUpdate( MasterSocket *socket, uint32_t id, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool success, bool needsFree = true );
 	// DELETE
-	void resDelete( MasterSocket *socket, Key &key, bool success, bool needsFree = true );
+	void resDelete( MasterSocket *socket, uint32_t id, Key &key, bool success, bool needsFree = true );
 	// Pending
 	void pending( MasterSocket *socket );
 };

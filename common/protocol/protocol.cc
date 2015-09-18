@@ -1,28 +1,31 @@
 #include <cstdlib>
+#include <sys/types.h>
+#include <signal.h>
 #include "protocol.hh"
 #include "../util/debug.hh"
 
 #define PROTO_KEY_VALUE_SIZE	4 // 1 byte for key size, 3 bytes for value size
 
-size_t Protocol::generateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t length, char *sendBuf ) {
+size_t Protocol::generateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t length, uint32_t id, char *sendBuf ) {
 	size_t bytes = 0;
 	if ( ! sendBuf ) sendBuf = this->buffer.send;
 
 	sendBuf[ 0 ] = ( ( magic & 0x07 ) | ( this->from & 0x18 ) | ( to & 0x60 ) );
 	sendBuf[ 1 ] = opcode & 0xFF;
-	sendBuf[ 2 ] = 0;
-	sendBuf[ 3 ] = 0;
-	bytes += 4;
+	bytes = 2;
 
 	*( ( uint32_t * )( sendBuf + bytes ) ) = htonl( length );
+	bytes += 4;
+
+	*( ( uint32_t * )( sendBuf + bytes ) ) = htonl( id );
 	bytes += 4;
 
 	return bytes;
 }
 
-size_t Protocol::generateKeyHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint8_t keySize, char *key ) {
+size_t Protocol::generateKeyHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint8_t keySize, char *key ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_KEY_SIZE + keySize );
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_KEY_SIZE + keySize, id );
 
 	buf[ 0 ] = keySize;
 
@@ -34,10 +37,10 @@ size_t Protocol::generateKeyHeader( uint8_t magic, uint8_t to, uint8_t opcode, u
 	return bytes;
 }
 
-size_t Protocol::generateKeyValueHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint8_t keySize, char *key, uint32_t valueSize, char *value, char *sendBuf ) {
+size_t Protocol::generateKeyValueHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint8_t keySize, char *key, uint32_t valueSize, char *value, char *sendBuf ) {
 	if ( ! sendBuf ) sendBuf = this->buffer.send;
 	char *buf = sendBuf + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_KEY_VALUE_SIZE + keySize + valueSize, sendBuf );
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_KEY_VALUE_SIZE + keySize + valueSize, id, sendBuf );
 
 	buf[ 0 ] = keySize;
 
@@ -58,9 +61,9 @@ size_t Protocol::generateKeyValueHeader( uint8_t magic, uint8_t to, uint8_t opco
 	return bytes;
 }
 
-size_t Protocol::generateKeyValueUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate ) {
+size_t Protocol::generateKeyValueUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_KEY_VALUE_UPDATE_SIZE + keySize + ( valueUpdate ? valueUpdateSize : 0 ) );
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_KEY_VALUE_UPDATE_SIZE + keySize + ( valueUpdate ? valueUpdateSize : 0 ), id );
 
 	buf[ 0 ] = keySize;
 
@@ -91,10 +94,10 @@ size_t Protocol::generateKeyValueUpdateHeader( uint8_t magic, uint8_t to, uint8_
 	return bytes;
 }
 
-size_t Protocol::generateChunkUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta, char *sendBuf ) {
+size_t Protocol::generateChunkUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta, char *sendBuf ) {
 	if ( ! sendBuf ) sendBuf = this->buffer.send;
 	char *buf = sendBuf + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, delta ? PROTO_CHUNK_UPDATE_SIZE + length : PROTO_CHUNK_UPDATE_SIZE, sendBuf );
+	size_t bytes = this->generateHeader( magic, to, opcode, delta ? PROTO_CHUNK_UPDATE_SIZE + length : PROTO_CHUNK_UPDATE_SIZE, id, sendBuf );
 
 	*( ( uint32_t * )( buf      ) ) = htonl( listId );
 	*( ( uint32_t * )( buf +  4 ) ) = htonl( stripeId );
@@ -115,9 +118,9 @@ size_t Protocol::generateChunkUpdateHeader( uint8_t magic, uint8_t to, uint8_t o
 	return bytes;
 }
 
-size_t Protocol::generateChunkHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) {
+size_t Protocol::generateChunkHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_CHUNK_SIZE );
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_CHUNK_SIZE, id );
 
 	*( ( uint32_t * )( buf      ) ) = htonl( listId );
 	*( ( uint32_t * )( buf +  4 ) ) = htonl( stripeId );
@@ -128,9 +131,9 @@ size_t Protocol::generateChunkHeader( uint8_t magic, uint8_t to, uint8_t opcode,
 	return bytes;
 }
 
-size_t Protocol::generateChunkDataHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t chunkSize, char *chunkData ) {
+size_t Protocol::generateChunkDataHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t chunkSize, char *chunkData ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_CHUNK_DATA_SIZE + chunkSize );
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_CHUNK_DATA_SIZE + chunkSize, id );
 
 	*( ( uint32_t * )( buf      ) ) = htonl( listId );
 	*( ( uint32_t * )( buf +  4 ) ) = htonl( stripeId );
@@ -145,7 +148,7 @@ size_t Protocol::generateChunkDataHeader( uint8_t magic, uint8_t to, uint8_t opc
 	return bytes;
 }
 
-size_t Protocol::generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t opcode, struct HeartbeatHeader &header, std::map<Key, OpMetadata> &ops, size_t &count ) {
+size_t Protocol::generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, struct HeartbeatHeader &header, std::map<Key, OpMetadata> &ops, size_t &count ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	std::map<Key, OpMetadata>::iterator it;
 	size_t bytes = PROTO_HEADER_SIZE;
@@ -181,14 +184,14 @@ size_t Protocol::generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t op
 	// Clear sent metadata
 	ops.erase( ops.begin(), it );
 
-	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE );
+	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, id );
 
 	return bytes;
 }
 
-size_t Protocol::generateAddressHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t addr, uint16_t port ) {
+size_t Protocol::generateAddressHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t addr, uint16_t port ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_ADDRESS_SIZE );
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_ADDRESS_SIZE, id );
 
 	// Already in network-byte order
 	*( ( uint32_t * )( buf     ) ) = addr;
@@ -199,10 +202,10 @@ size_t Protocol::generateAddressHeader( uint8_t magic, uint8_t to, uint8_t opcod
 	return bytes;
 }
 
-size_t Protocol::generateLoadStatsHeader( uint8_t magic, uint8_t to, uint32_t slaveGetCount, uint32_t slaveSetCount, uint32_t recordSize ) {
+size_t Protocol::generateLoadStatsHeader( uint8_t magic, uint8_t to, uint32_t id, uint32_t slaveGetCount, uint32_t slaveSetCount, uint32_t recordSize ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to , 0, PROTO_LOAD_STATS_SIZE + ( slaveGetCount + slaveSetCount ) * recordSize );
-	
+	size_t bytes = this->generateHeader( magic, to, 0, PROTO_LOAD_STATS_SIZE + ( slaveGetCount + slaveSetCount ) * recordSize, id );
+
 	*( ( uint32_t * )( buf ) ) = htonl( slaveGetCount );
 	*( ( uint32_t * )( buf + sizeof( uint32_t ) ) ) = htonl( slaveSetCount );
 
@@ -211,15 +214,16 @@ size_t Protocol::generateLoadStatsHeader( uint8_t magic, uint8_t to, uint32_t sl
 	return bytes;
 }
 
-bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t &opcode, uint32_t &length, char *buf, size_t size ) {
-	if ( size < 8 )
+bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t &opcode, uint32_t &length, uint32_t &id, char *buf, size_t size ) {
+	if ( size < PROTO_HEADER_SIZE )
 		return false;
 
 	magic = buf[ 0 ] & 0x07;
 	from = buf[ 0 ] & 0x18;
 	to = buf[ 0 ] & 0x60;
 	opcode = buf[ 1 ] & 0xFF;
-	length = ntohl( *( ( uint32_t * )( buf + 4 ) ) );
+	length = ntohl( *( ( uint32_t * )( buf + 2 ) ) );
+	id = ntohl( *( ( uint32_t * )( buf + 6 ) ) );
 
 	switch( magic ) {
 		case PROTO_MAGIC_HEARTBEAT:
@@ -230,6 +234,7 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_MAGIC_LOADING_STATS:
 			break;
 		default:
+			fprintf( stderr, "Error #1\n" );
 			return false;
 	}
 
@@ -240,11 +245,14 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_MAGIC_FROM_SLAVE:
 			break;
 		default:
+			fprintf( stderr, "Error #2\n" );
 			return false;
 	}
 
-	if ( to != this->to )
+	if ( to != this->to ) {
+		fprintf( stderr, "Error #3\n" );
 		return false;
+	}
 
 	switch( opcode ) {
 		case PROTO_OPCODE_REGISTER:
@@ -263,6 +271,7 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_OPCODE_COORDINATOR_PUSH_STATS:
 			break;
 		default:
+			fprintf( stderr, "Error #4\n" );
 			return false;
 	}
 
@@ -477,7 +486,7 @@ bool Protocol::parseAddressHeader( size_t offset, uint32_t &addr, uint16_t &port
 bool Protocol::parseLoadStatsHeader( size_t offset, uint32_t &slaveGetCount, uint32_t &slaveSetCount, char *buf, size_t size ) {
 	if ( size < PROTO_LOAD_STATS_SIZE )
 		return false;
-	
+
 	slaveGetCount = ntohl( *( ( uint32_t * )( buf + offset ) ) );
 	slaveSetCount = ntohl( *( ( uint32_t * )( buf + offset + sizeof( uint32_t ) ) ) );
 
@@ -547,6 +556,7 @@ bool Protocol::parseHeader( struct ProtocolHeader &header, char *buf, size_t siz
 		header.to,
 		header.opcode,
 		header.length,
+		header.id,
 		buf, size
 	);
 }

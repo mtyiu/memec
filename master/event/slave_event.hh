@@ -16,6 +16,7 @@ enum SlaveEventType {
 class SlaveEvent : public Event {
 public:
 	SlaveEventType type;
+	uint32_t id;
 	SlaveSocket *socket;
 	union {
 		struct {

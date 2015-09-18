@@ -10,12 +10,15 @@
 #include "../../common/worker/worker.hh"
 #include "../../common/config/global_config.hh"
 #include "../../common/stripe_list/stripe_list.hh"
+#include "../../common/ds/id_generator.hh"
 #include "../../common/ds/packet_pool.hh"
+#include "../../common/ds/sockaddr_in.hh"
 
 #define MASTER_WORKER_SEND_REPLICAS_PARALLEL
 
 class MasterWorker : public Worker {
 private:
+	uint32_t workerId;
 	WorkerRole role;
 	MasterProtocol protocol;
 	// Temporary variables
@@ -23,6 +26,7 @@ private:
 	SlaveSocket **paritySlaveSockets;
 	static uint32_t dataChunkCount;
 	static uint32_t parityChunkCount;
+	static IDGenerator *idGenerator;
 	static Pending *pending;
 	static MasterEventQueue *eventQueue;
 	static StripeList<SlaveSocket> *stripeList;
@@ -52,7 +56,7 @@ private:
 
 public:
 	static bool init();
-	bool init( GlobalConfig &config, WorkerRole role );
+	bool init( GlobalConfig &config, WorkerRole role, uint32_t workerId );
 	bool start();
 	void stop();
 	void print( FILE *f = stdout );

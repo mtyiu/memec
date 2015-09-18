@@ -9,6 +9,7 @@ Coordinator::Coordinator() {
 }
 
 void Coordinator::free() {
+	this->idGenerator.free();
 	this->eventQueue.free();
 }
 
@@ -105,8 +106,9 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 	SlaveSocket::setArrayMap( &this->sockets.slaves );
 	this->sockets.masters.reserve( this->config.global.slaves.size() );
 	this->sockets.slaves.reserve( this->config.global.slaves.size() );
-	/* Workers and event queues */
+	/* Workers, ID generator and event queues */
 	if ( this->config.coordinator.workers.type == WORKER_TYPE_MIXED ) {
+		this->idGenerator.init( this->config.coordinator.workers.number.mixed );
 		this->eventQueue.init(
 			this->config.coordinator.eventQueue.block,
 			this->config.coordinator.eventQueue.size.mixed
@@ -117,10 +119,12 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 			this->workers.push_back( CoordinatorWorker() );
 			this->workers[ i ].init(
 				this->config.global,
-				WORKER_ROLE_MIXED
+				WORKER_ROLE_MIXED,
+				i // worker ID
 			);
 		}
 	} else {
+		this->idGenerator.init( this->config.coordinator.workers.number.separated.total );
 		this->workers.reserve( this->config.coordinator.workers.number.separated.total );
 		this->eventQueue.init(
 			this->config.coordinator.eventQueue.block,
@@ -136,7 +140,8 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 			this->workers.push_back( CoordinatorWorker() ); \
 			this->workers[ index ].init( \
 				this->config.global, \
-				_CONSTANT_ \
+				_CONSTANT_, \
+				index \
 			); \
 		}
 

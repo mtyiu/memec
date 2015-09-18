@@ -11,25 +11,27 @@ void MasterProtocol::free() {
 	Protocol::free();
 }
 
-char *MasterProtocol::reqRegisterCoordinator( size_t &size, uint32_t addr, uint16_t port ) {
+char *MasterProtocol::reqRegisterCoordinator( size_t &size, uint32_t id, uint32_t addr, uint16_t port ) {
 	size = this->generateAddressHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_COORDINATOR,
 		PROTO_OPCODE_REGISTER,
+		id,
 		addr, port
 	);
 	return this->buffer.send;
 }
 
-char *MasterProtocol::reqPushLoadStats( 
-		size_t &size, 
-		ArrayMap< ServerAddr, Latency > *slaveGetLatency, 
-		ArrayMap< ServerAddr, Latency > *slaveSetLatency ) 
+char *MasterProtocol::reqPushLoadStats(
+		size_t &size, uint32_t id,
+		ArrayMap< struct sockaddr_in, Latency > *slaveGetLatency,
+		ArrayMap< struct sockaddr_in, Latency > *slaveSetLatency )
 {
 
 	size = this->generateLoadStatsHeader(
 		PROTO_MAGIC_LOADING_STATS,
 		PROTO_MAGIC_TO_COORDINATOR,
+		id,
 		slaveGetLatency->size(),
 		slaveSetLatency->size(),
 		14
@@ -41,8 +43,8 @@ char *MasterProtocol::reqPushLoadStats(
 	uint16_t port;
 
 #define SET_FIELDS_VAR( _SRC_ ) \
-	addr = _SRC_->keys[ idx ].addr; \
-	port = _SRC_->keys[ idx ].port; \
+	addr = _SRC_->keys[ idx ].sin_addr.s_addr; \
+	port = _SRC_->keys[ idx ].sin_port; \
 	sec = _SRC_->values[ idx ]->sec; \
 	usec = _SRC_->values[ idx ]->sec; \
 
@@ -56,10 +58,10 @@ char *MasterProtocol::reqPushLoadStats(
 			SET_FIELDS_VAR( slaveSetLatency );
 		}
 
-		//fprintf ( stderr, " stats send %d IP %u:%u time %us %usec\n", i, addr, port, sec, usec );
-		*( ( uint32_t * )( this->buffer.send + size ) ) = htonl( addr );
+		fprintf ( stderr, " stats send %d IP %u:%u time %us %usec\n", i, addr, port, sec, usec );
+		*( ( uint32_t * )( this->buffer.send + size ) ) = addr; // htonl( addr );
 		size += sizeof( addr );
-		*( ( uint16_t * )( this->buffer.send + size ) ) = htons( port );
+		*( ( uint16_t * )( this->buffer.send + size ) ) = port; // htons( port );
 		size += sizeof( port );
 		*( ( uint32_t * )( this->buffer.send + size ) ) = htonl( sec );
 		size += sizeof( sec );
@@ -78,11 +80,11 @@ char *MasterProtocol::reqPushLoadStats(
 
 bool MasterProtocol::parseLoadingStats( 
 		const LoadStatsHeader& loadStatsHeader, 
-		ArrayMap< ServerAddr, Latency >& slaveGetLatency,
-		ArrayMap< ServerAddr, Latency >& slaveSetLatency,
+		ArrayMap< struct sockaddr_in, Latency >& slaveGetLatency,
+		ArrayMap< struct sockaddr_in, Latency >& slaveSetLatency,
 		char* buffer, uint32_t size )
 {
-	ServerAddr addr; 
+	sockaddr_in addr;
 	Latency *tempLatency = NULL;
 
 	uint32_t recordSize = sizeof( uint32_t ) * 3 + sizeof( uint16_t );
@@ -92,8 +94,8 @@ bool MasterProtocol::parseLoadingStats(
 		return false;
 
 	for ( uint32_t i = 0; i < loadStatsHeader.slaveGetCount + loadStatsHeader.slaveSetCount; i++ ) {
-		addr.addr = ntohl( *( uint32_t * )( buffer ) );
-		addr.port = ntohs( *( uint16_t * )( buffer + sizeof( uint32_t ) ) );
+		addr.sin_addr.s_addr = ntohl( *( uint32_t * )( buffer ) );
+		addr.sin_port = ntohs( *( uint16_t * )( buffer + sizeof( uint32_t ) ) );
 		tempLatency = new Latency();
 		tempLatency->sec = ntohl( *( uint32_t * )( buffer + sizeof( uint32_t ) + sizeof( uint16_t ) ) );
 		tempLatency->usec = ntohl( *( uint32_t * )( buffer + sizeof( uint32_t ) * 2 + sizeof( uint16_t ) ) );
@@ -109,23 +111,25 @@ bool MasterProtocol::parseLoadingStats(
 	return true;
 }
 
-
-char *MasterProtocol::reqRegisterSlave( size_t &size, uint32_t addr, uint16_t port ) {
+char *MasterProtocol::reqRegisterSlave( size_t &size, uint32_t id, uint32_t addr, uint16_t port ) {
 	size = this->generateAddressHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_REGISTER,
-		addr, port
+		id,
+		addr,
+		port
 	);
 	return this->buffer.send;
 }
 
-char *MasterProtocol::reqSet( size_t &size, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf ) {
+char *MasterProtocol::reqSet( size_t &size, uint32_t id, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf ) {
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateKeyValueHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_SET,
+		id,
 		keySize,
 		key,
 		valueSize,
@@ -135,22 +139,24 @@ char *MasterProtocol::reqSet( size_t &size, char *key, uint8_t keySize, char *va
 	return buf;
 }
 
-char *MasterProtocol::reqGet( size_t &size, char *key, uint8_t keySize ) {
+char *MasterProtocol::reqGet( size_t &size, uint32_t id, char *key, uint8_t keySize ) {
 	size = this->generateKeyHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_GET,
+		id,
 		keySize,
 		key
 	);
 	return this->buffer.send;
 }
 
-char *MasterProtocol::reqUpdate( size_t &size, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize ) {
+char *MasterProtocol::reqUpdate( size_t &size, uint32_t id, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize ) {
 	size = this->generateKeyValueUpdateHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_UPDATE,
+		id,
 		keySize,
 		key,
 		valueUpdateOffset,
@@ -160,44 +166,48 @@ char *MasterProtocol::reqUpdate( size_t &size, char *key, uint8_t keySize, char 
 	return this->buffer.send;
 }
 
-char *MasterProtocol::reqDelete( size_t &size, char *key, uint8_t keySize ) {
+char *MasterProtocol::reqDelete( size_t &size, uint32_t id, char *key, uint8_t keySize ) {
 	size = this->generateKeyHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_DELETE,
+		id,
 		keySize,
 		key
 	);
 	return this->buffer.send;
 }
 
-char *MasterProtocol::resRegisterApplication( size_t &size, bool success ) {
+char *MasterProtocol::resRegisterApplication( size_t &size, uint32_t id, bool success ) {
 	size = this->generateHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_APPLICATION,
 		PROTO_OPCODE_REGISTER,
-		0
+		0, // length
+		id
 	);
 	return this->buffer.send;
 }
 
-char *MasterProtocol::resSet( size_t &size, bool success, uint8_t keySize, char *key ) {
+char *MasterProtocol::resSet( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key ) {
 	size = this->generateKeyHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_APPLICATION,
 		PROTO_OPCODE_SET,
+		id,
 		keySize,
 		key
 	);
 	return this->buffer.send;
 }
 
-char *MasterProtocol::resGet( size_t &size, bool success, uint8_t keySize, char *key, uint32_t valueSize, char *value ) {
+char *MasterProtocol::resGet( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key, uint32_t valueSize, char *value ) {
 	if ( success ) {
 		size = this->generateKeyValueHeader(
 			PROTO_MAGIC_RESPONSE_SUCCESS,
 			PROTO_MAGIC_TO_APPLICATION,
 			PROTO_OPCODE_GET,
+			id,
 			keySize,
 			key,
 			valueSize,
@@ -208,6 +218,7 @@ char *MasterProtocol::resGet( size_t &size, bool success, uint8_t keySize, char 
 			PROTO_MAGIC_RESPONSE_FAILURE,
 			PROTO_MAGIC_TO_APPLICATION,
 			PROTO_OPCODE_GET,
+			id,
 			keySize,
 			key
 		);
@@ -215,22 +226,24 @@ char *MasterProtocol::resGet( size_t &size, bool success, uint8_t keySize, char 
 	return this->buffer.send;
 }
 
-char *MasterProtocol::resUpdate( size_t &size, bool success, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize ) {
+char *MasterProtocol::resUpdate( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize ) {
 	size = this->generateKeyValueUpdateHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_APPLICATION,
 		PROTO_OPCODE_UPDATE,
+		id,
 		keySize, key,
 		valueUpdateOffset, valueUpdateSize, 0
 	);
 	return this->buffer.send;
 }
 
-char *MasterProtocol::resDelete( size_t &size, bool success, uint8_t keySize, char *key ) {
+char *MasterProtocol::resDelete( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key ) {
 	size = this->generateKeyHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_APPLICATION,
 		PROTO_OPCODE_DELETE,
+		id,
 		keySize,
 		key
 	);

@@ -9,7 +9,7 @@ SlaveSocket::SlaveSocket() {
 	this->isRunning = false;
 	this->tid = 0;
 	this->epoll = 0;
-	this->buffer.size = PROTO_HEADER_SIZE + 4 + 2;
+	this->buffer.size = PROTO_HEADER_SIZE + PROTO_ADDRESS_SIZE;
 	this->identifier = 0;
 	this->sockets.needsDelete = true;
 }
@@ -139,7 +139,7 @@ bool SlaveSocket::handler( int fd, uint32_t events, void *data ) {
 						socket->done( fd ); // The socket is valid
 
 						MasterEvent event;
-						event.resRegister( masterSocket );
+						event.resRegister( masterSocket, header.id );
 						slave->eventQueue.insert( event );
 					} else if ( header.from == PROTO_MAGIC_FROM_SLAVE ) {
 						SlavePeerSocket *s = 0;
@@ -159,7 +159,7 @@ bool SlaveSocket::handler( int fd, uint32_t events, void *data ) {
 
 						if ( s ) {
 							SlavePeerEvent event;
-							event.resRegister( s, true );
+							event.resRegister( s, true, header.id );
 							slave->eventQueue.insert( event );
 						} else {
 							__ERROR__( "SlaveSocket", "handler", "Unexpected registration from slave." );

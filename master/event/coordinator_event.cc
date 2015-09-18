@@ -7,10 +7,10 @@ void CoordinatorEvent::reqRegister( CoordinatorSocket *socket, uint32_t addr, ui
 	this->message.address.port = port;
 }
 
-void CoordinatorEvent::reqSendLoadStats( 
-		CoordinatorSocket *socket, 
-		ArrayMap< ServerAddr, Latency > *slaveGetLatency,
-		ArrayMap< ServerAddr, Latency > *slaveSetLatency ) 
+void CoordinatorEvent::reqSendLoadStats(
+		CoordinatorSocket *socket,
+		ArrayMap< struct sockaddr_in, Latency > *slaveGetLatency,
+		ArrayMap< struct sockaddr_in, Latency > *slaveSetLatency ) 
 {
 	this->type = COORDINATOR_EVENT_TYPE_PUSH_LOAD_STATS;
 	this->socket = socket;

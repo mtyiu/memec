@@ -8,15 +8,18 @@
 #include "../event/event_queue.hh"
 #include "../protocol/protocol.hh"
 #include "../../common/worker/worker.hh"
+#include "../../common/ds/id_generator.hh"
 
 class ApplicationWorker : public Worker {
 private:
+	uint32_t workerId;
 	WorkerRole role;
 	ApplicationProtocol protocol;
 	struct {
 		char *value;
 		uint32_t valueSize;
 	} buffer;
+	static IDGenerator *idGenerator;
 	static ApplicationEventQueue *eventQueue;
 	static Pending *pending;
 
@@ -28,7 +31,7 @@ private:
 
 public:
 	static bool init();
-	bool init( ApplicationConfig &config, WorkerRole role );
+	bool init( ApplicationConfig &config, WorkerRole role, uint32_t workerId );
 	bool start();
 	void stop();
 	void print( FILE *f = stdout );

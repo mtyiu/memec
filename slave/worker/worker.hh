@@ -15,6 +15,7 @@
 #include "../../common/coding/coding.hh"
 #include "../../common/config/global_config.hh"
 #include "../../common/ds/chunk.hh"
+#include "../../common/ds/id_generator.hh"
 #include "../../common/ds/key.hh"
 #include "../../common/ds/memory_pool.hh"
 #include "../../common/ds/packet_pool.hh"
@@ -25,6 +26,7 @@
 
 class SlaveWorker : public Worker {
 private:
+	uint32_t workerId;
 	WorkerRole role;
 	SlaveProtocol protocol;
 	Storage *storage;
@@ -38,6 +40,7 @@ private:
 	static uint32_t dataChunkCount;
 	static uint32_t parityChunkCount;
 	static uint32_t chunkCount;
+	static IDGenerator *idGenerator;
 	static ArrayMap<int, SlavePeerSocket> *slavePeers;
 	static Pending *pending;
 	static ServerAddr *slaveServerAddr;
@@ -90,7 +93,7 @@ public:
 	SlaveLoad load;
 
 	static bool init();
-	bool init( GlobalConfig &globalConfig, SlaveConfig &slaveConfig, WorkerRole role );
+	bool init( GlobalConfig &globalConfig, SlaveConfig &slaveConfig, WorkerRole role, uint32_t workerId );
 	bool start();
 	void stop();
 	void print( FILE *f = stdout );

@@ -16,6 +16,7 @@ enum MasterEventType {
 class MasterEvent : public Event {
 public:
 	MasterEventType type;
+	uint32_t id;
 	MasterSocket *socket;
 	union {
 		struct {
@@ -24,7 +25,7 @@ public:
 		} slaveLoading;
 	} message;
 
-	void resRegister( MasterSocket *socket, bool success = true );
+	void resRegister( MasterSocket *socket, uint32_t id, bool success = true );
 	void reqPushLoadStats ( MasterSocket *socket, ArrayMap<ServerAddr, Latency> *slaveGetLatency, 
 			ArrayMap<ServerAddr, Latency> *slaveSetLatency );
 	void pending( MasterSocket *socket );

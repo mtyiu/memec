@@ -25,6 +25,7 @@ enum ApplicationEventType {
 class ApplicationEvent : public Event {
 public:
 	ApplicationEventType type;
+	uint32_t id;
 	ApplicationSocket *socket;
 	bool needsFree;
 	union {
@@ -33,12 +34,12 @@ public:
 		KeyValueUpdate keyValueUpdate;
 	} message;
 
-	void resRegister( ApplicationSocket *socket, bool success = true );
-	void resGet( ApplicationSocket *socket, KeyValue &keyValue, bool needsFree = true );
-	void resGet( ApplicationSocket *socket, Key &key, bool needsFree = true );
-	void resSet( ApplicationSocket *socket, Key &key, bool success, bool needsFree = true );
-	void resUpdate( ApplicationSocket *socket, KeyValueUpdate &keyValueUpdate, bool success, bool needsFree = true );
-	void resDelete( ApplicationSocket *socket, Key &key, bool success, bool needsFree = true );
+	void resRegister( ApplicationSocket *socket, uint32_t id, bool success = true );
+	void resGet( ApplicationSocket *socket, uint32_t id, KeyValue &keyValue, bool needsFree = true );
+	void resGet( ApplicationSocket *socket, uint32_t id, Key &key, bool needsFree = true );
+	void resSet( ApplicationSocket *socket, uint32_t id, Key &key, bool success, bool needsFree = true );
+	void resUpdate( ApplicationSocket *socket, uint32_t id, KeyValueUpdate &keyValueUpdate, bool success, bool needsFree = true );
+	void resDelete( ApplicationSocket *socket, uint32_t id, Key &key, bool success, bool needsFree = true );
 	void pending( ApplicationSocket *socket );
 };
 
