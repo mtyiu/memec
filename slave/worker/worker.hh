@@ -84,7 +84,7 @@ private:
 	bool handleGetChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleSetChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 
-	bool performDegradedRead( uint32_t listId, uint32_t stripeId, uint32_t lostChunkId, uint8_t opcode, Key *key, KeyValueUpdate *keyValueUpdate = 0 );
+	bool performDegradedRead( uint32_t listId, uint32_t stripeId, uint32_t lostChunkId, uint8_t opcode, uint32_t parentId, Key *key, KeyValueUpdate *keyValueUpdate = 0 );
 
 	void free();
 	static void *run( void *argv );

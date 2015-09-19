@@ -489,12 +489,12 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
 
-	if ( ! MasterWorker::pending->insert( PT_APPLICATION_GET, event.id, ( void * ) event.socket, key ) ) {
+	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_GET, event.id, ( void * ) event.socket, key ) ) {
 		__ERROR__( "MasterWorker", "handleGetRequest", "Cannot insert into application GET pending map." );
 	}
 
 	key.ptr = ( void * ) socket;
-	if ( ! MasterWorker::pending->insert( PT_SLAVE_GET, requestId, event.id, ( void * ) socket, key ) ) {
+	if ( ! MasterWorker::pending->insertKey( PT_SLAVE_GET, requestId, event.id, ( void * ) socket, key ) ) {
 		__ERROR__( "MasterWorker", "handleGetRequest", "Cannot insert into slave GET pending map." );
 	}
 
@@ -566,13 +566,13 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
 
-	if ( ! MasterWorker::pending->insert( PT_APPLICATION_SET, event.id, ( void * ) event.socket, key ) ) {
+	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_SET, event.id, ( void * ) event.socket, key ) ) {
 		__ERROR__( "MasterWorker", "handleSetRequest", "Cannot insert into application SET pending map." );
 	}
 
 	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount + 1; i++ ) {
 		key.ptr = ( void * )( i == 0 ? socket : this->paritySlaveSockets[ i - 1 ] );
-		if ( ! MasterWorker::pending->insert(
+		if ( ! MasterWorker::pending->insertKey(
 			PT_SLAVE_SET, requestId, event.id,
 			( void * )( i == 0 ? socket : this->paritySlaveSockets[ i - 1 ] ),
 			key
@@ -677,12 +677,12 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 	keyValueUpdate.offset = header.valueUpdateOffset;
 	keyValueUpdate.length = header.valueUpdateSize;
 
-	if ( ! MasterWorker::pending->insert( PT_APPLICATION_UPDATE, event.id, ( void * ) event.socket, keyValueUpdate ) ) {
+	if ( ! MasterWorker::pending->insertKeyValueUpdate( PT_APPLICATION_UPDATE, event.id, ( void * ) event.socket, keyValueUpdate ) ) {
 		__ERROR__( "MasterWorker", "handleUpdateRequest", "Cannot insert into application UPDATE pending map." );
 	}
 
 	keyValueUpdate.ptr = ( void * ) socket;
-	if ( ! MasterWorker::pending->insert( PT_SLAVE_UPDATE, requestId, event.id, ( void * ) socket, keyValueUpdate ) ) {
+	if ( ! MasterWorker::pending->insertKeyValueUpdate( PT_SLAVE_UPDATE, requestId, event.id, ( void * ) socket, keyValueUpdate ) ) {
 		__ERROR__( "MasterWorker", "handleUpdateRequest", "Cannot insert into slave UPDATE pending map." );
 	}
 
@@ -736,12 +736,12 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 	buffer.data = this->protocol.reqDelete( buffer.size, requestId, header.key, header.keySize );
 
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
-	if ( ! MasterWorker::pending->insert( PT_APPLICATION_DEL, event.id, ( void * ) event.socket, key ) ) {
+	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_DEL, event.id, ( void * ) event.socket, key ) ) {
 		__ERROR__( "MasterWorker", "handleDeleteRequest", "Cannot insert into application DELETE pending map." );
 	}
 
 	key.ptr = ( void * ) socket;
-	if ( ! MasterWorker::pending->insert( PT_SLAVE_DEL, requestId, event.id, ( void * ) socket, key ) ) {
+	if ( ! MasterWorker::pending->insertKey( PT_SLAVE_DEL, requestId, event.id, ( void * ) socket, key ) ) {
 		__ERROR__( "MasterWorker", "handleDeleteRequest", "Cannot insert into slave DELETE pending map." );
 	}
 
@@ -914,7 +914,7 @@ bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, char *b
 
 	// Find the cooresponding request
 	if ( ! MasterWorker::pending->eraseKeyValueUpdate( PT_SLAVE_UPDATE, event.id, ( void * ) event.socket, &pid, &keyValueUpdate ) ) {
-		__ERROR__( "MasterWorker", "handleUpdateResponse", "Cannot find a pending slave UPDATE request that matches the response. This message will be discarded." );
+		__ERROR__( "MasterWorker", "handleUpdateResponse", "Cannot find a pending slave UPDATE request that matches the response. This message will be discarded. (ID: %u)", event.id );
 		return false;
 	}
 

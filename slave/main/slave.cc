@@ -470,10 +470,10 @@ void Slave::interactive() {
 
 void Slave::printPending( FILE *f ) {
 	size_t i;
-	std::set<Key>::iterator it;
-	std::set<KeyValueUpdate>::iterator keyValueUpdateIt;
-	std::set<ChunkUpdate>::iterator chunkUpdateIt;
-	std::set<ChunkRequest>::iterator chunkRequestIt;
+	std::map<PendingIdentifier, Key>::iterator it;
+	std::map<PendingIdentifier, KeyValueUpdate>::iterator keyValueUpdateIt;
+	std::map<PendingIdentifier, ChunkUpdate>::iterator chunkUpdateIt;
+	std::map<PendingIdentifier, ChunkRequest>::iterator chunkRequestIt;
 	fprintf(
 		f,
 		"Pending requests for masters\n"
@@ -487,8 +487,8 @@ void Slave::printPending( FILE *f ) {
 		it != this->pending.masters.get.end();
 		it++, i++
 	) {
-		const Key &key = *it;
-		fprintf( f, "%lu. Key: %.*s (size = %u); source: ", i, key.size, key.data, key.size );
+		const Key &key = it->second;
+		fprintf( f, "%lu. ID: %u; Key: %.*s (size = %u); source: ", i, it->first.id, key.size, key.data, key.size );
 		if ( key.ptr )
 			( ( Socket * ) key.ptr )->printAddress( f );
 		else
@@ -507,10 +507,10 @@ void Slave::printPending( FILE *f ) {
 		keyValueUpdateIt != this->pending.masters.update.end();
 		keyValueUpdateIt++, i++
 	) {
-		const KeyValueUpdate &keyValueUpdate = *keyValueUpdateIt;
+		const KeyValueUpdate &keyValueUpdate = keyValueUpdateIt->second;
 		fprintf(
-			f, "%lu. Key: %.*s (size = %u, offset = %u, length = %u); source: ",
-			i, keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
+			f, "%lu. ID: %u; Key: %.*s (size = %u, offset = %u, length = %u); source: ",
+			i, it->first.id, keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
 			keyValueUpdate.offset, keyValueUpdate.length
 		);
 		if ( keyValueUpdate.ptr )
@@ -531,8 +531,8 @@ void Slave::printPending( FILE *f ) {
 		it != this->pending.masters.del.end();
 		it++, i++
 	) {
-		const Key &key = *it;
-		fprintf( f, "%lu. Key: %.*s (size = %u); source: ", i, key.size, key.data, key.size );
+		const Key &key = it->second;
+		fprintf( f, "%lu. ID: %u; Key: %.*s (size = %u); source: ", i, it->first.id, key.size, key.data, key.size );
 		if ( key.ptr )
 			( ( Socket * ) key.ptr )->printAddress( f );
 		else
@@ -554,10 +554,10 @@ void Slave::printPending( FILE *f ) {
 		chunkUpdateIt != this->pending.slavePeers.updateChunk.end();
 		chunkUpdateIt++, i++
 	) {
-		const ChunkUpdate &chunkUpdate = *chunkUpdateIt;
+		const ChunkUpdate &chunkUpdate = chunkUpdateIt->second;
 		fprintf(
-			f, "%lu. List ID: %u, stripe ID: %u, chunk ID: %u; Key: %.*s (key size = %u, offset = %u, length = %u, value update offset = %u); target: ",
-			i, chunkUpdate.listId, chunkUpdate.stripeId, chunkUpdate.chunkId,
+			f, "%lu. ID: %u; List ID: %u, stripe ID: %u, chunk ID: %u; Key: %.*s (key size = %u, offset = %u, length = %u, value update offset = %u); target: ",
+			i, it->first.id, chunkUpdate.listId, chunkUpdate.stripeId, chunkUpdate.chunkId,
 			chunkUpdate.keySize, chunkUpdate.key, chunkUpdate.keySize,
 			chunkUpdate.offset, chunkUpdate.length, chunkUpdate.valueUpdateOffset
 		);
@@ -579,10 +579,10 @@ void Slave::printPending( FILE *f ) {
 		chunkUpdateIt != this->pending.slavePeers.deleteChunk.end();
 		chunkUpdateIt++, i++
 	) {
-		const ChunkUpdate &chunkUpdate = *chunkUpdateIt;
+		const ChunkUpdate &chunkUpdate = chunkUpdateIt->second;
 		fprintf(
-			f, "%lu. List ID: %u, stripe ID: %u, chunk ID: %u; Key: %.*s (key size = %u, offset = %u, length = %u); target: ",
-			i, chunkUpdate.listId, chunkUpdate.stripeId, chunkUpdate.chunkId,
+			f, "%lu. ID: %u; List ID: %u, stripe ID: %u, chunk ID: %u; Key: %.*s (key size = %u, offset = %u, length = %u); target: ",
+			i, it->first.id, chunkUpdate.listId, chunkUpdate.stripeId, chunkUpdate.chunkId,
 			chunkUpdate.keySize, chunkUpdate.key, chunkUpdate.keySize,
 			chunkUpdate.offset, chunkUpdate.length
 		);
@@ -604,10 +604,10 @@ void Slave::printPending( FILE *f ) {
 		chunkRequestIt != this->pending.slavePeers.getChunk.end();
 		chunkRequestIt++, i++
 	) {
-		const ChunkRequest &chunkRequest = *chunkRequestIt;
+		const ChunkRequest &chunkRequest = chunkRequestIt->second;
 		fprintf(
-			f, "%lu. List ID: %u, stripe ID: %u, chunk ID: %u; target: ",
-			i, chunkRequest.listId, chunkRequest.stripeId, chunkRequest.chunkId
+			f, "%lu. ID: %u; List ID: %u, stripe ID: %u, chunk ID: %u; target: ",
+			i, it->first.id, chunkRequest.listId, chunkRequest.stripeId, chunkRequest.chunkId
 		);
 		if ( chunkRequest.socket )
 			chunkRequest.socket->printAddress( f );
@@ -627,10 +627,10 @@ void Slave::printPending( FILE *f ) {
 		chunkRequestIt != this->pending.slavePeers.setChunk.end();
 		chunkRequestIt++, i++
 	) {
-		const ChunkRequest &chunkRequest = *chunkRequestIt;
+		const ChunkRequest &chunkRequest = chunkRequestIt->second;
 		fprintf(
-			f, "%lu. List ID: %u, stripe ID: %u, chunk ID: %u; target: ",
-			i, chunkRequest.listId, chunkRequest.stripeId, chunkRequest.chunkId
+			f, "%lu. ID: %u; List ID: %u, stripe ID: %u, chunk ID: %u; target: ",
+			i, it->first.id, chunkRequest.listId, chunkRequest.stripeId, chunkRequest.chunkId
 		);
 		if ( chunkRequest.socket )
 			chunkRequest.socket->printAddress( f );

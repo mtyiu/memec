@@ -2,8 +2,10 @@
 #define __SLAVE_DS_PENDING_HH__
 
 #include "../socket/slave_peer_socket.hh"
+#include "../../common/ds/chunk.hh"
 #include "../../common/ds/metadata.hh"
 #include "../../common/ds/pending.hh"
+#include "../../common/protocol/protocol.hh"
 
 class ChunkUpdate : public Metadata {
 public:
@@ -198,22 +200,40 @@ public:
 	}
 };
 
+enum PendingType {
+	PT_MASTER_GET,
+	PT_MASTER_UPDATE,
+	PT_MASTER_DEL,
+	PT_SLAVE_PEER_DEGRADED_OPS,
+	PT_SLAVE_PEER_GET_CHUNK,
+	PT_SLAVE_PEER_SET_CHUNK,
+	PT_SLAVE_PEER_UPDATE_CHUNK,
+	PT_SLAVE_PEER_DEL_CHUNK
+};
+
 class Pending {
+private:
+	bool get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIdentifier, Key> *&map );
+	bool get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIdentifier, KeyValueUpdate> *&map );
+	bool get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIdentifier, DegradedOp> *&map );
+	bool get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIdentifier, ChunkRequest> *&map );
+	bool get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIdentifier, ChunkUpdate> *&map );
+
 public:
 	struct {
-		std::multiset<Key> get;
-		std::multiset<KeyValueUpdate> update;
-		std::set<Key> del;
+		std::map<PendingIdentifier, Key> get;
+		std::map<PendingIdentifier, KeyValueUpdate> update;
+		std::map<PendingIdentifier, Key> del;
 		pthread_mutex_t getLock;
 		pthread_mutex_t updateLock;
 		pthread_mutex_t delLock;
 	} masters;
    struct {
-		std::set<DegradedOp> degradedOps;
-		std::set<ChunkRequest> getChunk;
-		std::set<ChunkRequest> setChunk;
-		std::multiset<ChunkUpdate> updateChunk;
-		std::multiset<ChunkUpdate> deleteChunk;
+		std::map<PendingIdentifier, DegradedOp> degradedOps;
+		std::map<PendingIdentifier, ChunkRequest> getChunk;
+		std::map<PendingIdentifier, ChunkRequest> setChunk;
+		std::map<PendingIdentifier, ChunkUpdate> updateChunk;
+		std::map<PendingIdentifier, ChunkUpdate> deleteChunk;
 		pthread_mutex_t degradedOpsLock;
 		pthread_mutex_t getLock;
 		pthread_mutex_t setLock;
@@ -231,6 +251,22 @@ public:
 		pthread_mutex_init( &this->slavePeers.updateLock, 0 );
 		pthread_mutex_init( &this->slavePeers.delLock, 0 );
 	}
+
+	bool insertKey( PendingType type, uint32_t id, void *ptr, Key &key, bool needsLock = true, bool needsUnlock = true );
+	bool insertKeyValueUpdate( PendingType type, uint32_t id, void *ptr, KeyValueUpdate &keyValueUpdate, bool needsLock = true, bool needsUnlock = true );
+	bool insertDegradedOp( PendingType type, uint32_t id, uint32_t parentId, void *ptr, DegradedOp &degradedOp, bool needsLock = true, bool needsUnlock = true );
+	bool insertChunkRequest( PendingType type, uint32_t id, uint32_t parentId, void *ptr, ChunkRequest &chunkRequest, bool needsLock = true, bool needsUnlock = true );
+	bool insertChunkUpdate( PendingType type, uint32_t id, uint32_t parentId, void *ptr, ChunkUpdate &chunkUpdate, bool needsLock = true, bool needsUnlock = true );
+
+	bool eraseKey( PendingType type, uint32_t id, void *ptr = 0, PendingIdentifier *pidPtr = 0, Key *keyPtr = 0, bool needsLock = true, bool needsUnlock = true );
+	bool eraseKeyValueUpdate( PendingType type, uint32_t id, void *ptr = 0, PendingIdentifier *pidPtr = 0, KeyValueUpdate *keyValueUpdatePtr = 0, bool needsLock = true, bool needsUnlock = true );
+	bool eraseDegradedOp( PendingType type, uint32_t id, void *ptr = 0, PendingIdentifier *pidPtr = 0, DegradedOp *degradedOpPtr = 0, bool needsLock = true, bool needsUnlock = true );
+	bool eraseChunkRequest( PendingType type, uint32_t id, void *ptr = 0, PendingIdentifier *pidPtr = 0, ChunkRequest *chunkRequestPtr = 0, bool needsLock = true, bool needsUnlock = true );
+	bool eraseChunkUpdate( PendingType type, uint32_t id, void *ptr = 0, PendingIdentifier *pidPtr = 0, ChunkUpdate *chunkUpdatePtr = 0, bool needsLock = true, bool needsUnlock = true );
+
+	bool findChunkRequest( PendingType type, uint32_t id, void *ptr, std::map<PendingIdentifier, ChunkRequest>::iterator &it, bool needsLock = true, bool needsUnlock = true );
+
+	uint32_t count( PendingType type, uint32_t id, bool needsLock = true, bool needsUnlock = true );
 };
 
 #endif
