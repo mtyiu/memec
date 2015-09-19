@@ -860,62 +860,60 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 		chunkUpdate.setKeyValueUpdate( keyValueUpdate.size, keyValueUpdate.data, header.valueUpdateOffset );
 
 		// Send UPDATE_CHUNK requests to parity slaves
-		if ( SlaveWorker::parityChunkCount ) {
-			uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
-			for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
-				chunkUpdate.chunkId = SlaveWorker::dataChunkCount + i; // updatingChunkId
-				chunkUpdate.ptr = ( void * ) this->paritySlaveSockets[ i ];
+		uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
+		for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
+			chunkUpdate.chunkId = SlaveWorker::dataChunkCount + i; // updatingChunkId
+			chunkUpdate.ptr = ( void * ) this->paritySlaveSockets[ i ];
 
-				// Insert into pending set
-				if ( ! SlaveWorker::pending->insertChunkUpdate(
-					PT_SLAVE_PEER_UPDATE_CHUNK, requestId, event.id,
-					( void * ) this->paritySlaveSockets[ i ],
-					chunkUpdate
-				) ) {
-					__ERROR__( "SlaveWorker", "handleUpdateRequest", "Cannot insert into slave UPDATE_CHUNK pending map." );
-				}
+			// Insert into pending set
+			if ( ! SlaveWorker::pending->insertChunkUpdate(
+				PT_SLAVE_PEER_UPDATE_CHUNK, requestId, event.id,
+				( void * ) this->paritySlaveSockets[ i ],
+				chunkUpdate
+			) ) {
+				__ERROR__( "SlaveWorker", "handleUpdateRequest", "Cannot insert into slave UPDATE_CHUNK pending map." );
+			}
 
-				// Prepare UPDATE_CHUNK request
-				size_t size;
-				Packet *packet = SlaveWorker::packetPool->malloc();
-				packet->setReferenceCount( 1 );
-				this->protocol.reqUpdateChunk(
-					size,
-					requestId,
-					metadata.listId,
-					metadata.stripeId,
-					metadata.chunkId,
-					offset,
-					header.valueUpdateSize, // length
-					SlaveWorker::dataChunkCount + i, // updatingChunkId
-					header.valueUpdate,
-					packet->data
-				);
-				packet->size = ( uint32_t ) size;
+			// Prepare UPDATE_CHUNK request
+			size_t size;
+			Packet *packet = SlaveWorker::packetPool->malloc();
+			packet->setReferenceCount( 1 );
+			this->protocol.reqUpdateChunk(
+				size,
+				requestId,
+				metadata.listId,
+				metadata.stripeId,
+				metadata.chunkId,
+				offset,
+				header.valueUpdateSize, // length
+				SlaveWorker::dataChunkCount + i, // updatingChunkId
+				header.valueUpdate,
+				packet->data
+			);
+			packet->size = ( uint32_t ) size;
 
-				// Insert into event queue
-				SlavePeerEvent slavePeerEvent;
-				slavePeerEvent.send( this->paritySlaveSockets[ i ], packet );
+			// Insert into event queue
+			SlavePeerEvent slavePeerEvent;
+			slavePeerEvent.send( this->paritySlaveSockets[ i ], packet );
 
 #ifdef SLAVE_WORKER_SEND_REPLICAS_PARALLEL
-				if ( i == SlaveWorker::parityChunkCount - 1 )
-					this->dispatch( slavePeerEvent );
-				else
-					SlaveWorker::eventQueue->prioritizedInsert( slavePeerEvent );
-#else
+			if ( i == SlaveWorker::parityChunkCount - 1 )
 				this->dispatch( slavePeerEvent );
+			else
+				SlaveWorker::eventQueue->prioritizedInsert( slavePeerEvent );
+#else
+			this->dispatch( slavePeerEvent );
 #endif
-			}
 		}
 
 		ret = true;
 	} else {
 		event.resUpdate( event.socket, event.id, key, header.valueUpdateOffset, header.valueUpdateSize, false );
+		this->dispatch( event );
 		ret = false;
 	}
 
 	this->load.update();
-	this->dispatch( event );
 
 	return ret;
 }

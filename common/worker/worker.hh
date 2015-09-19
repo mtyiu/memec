@@ -28,7 +28,7 @@
 	} \
 	if ( ! connected || ! buffer.size ) break; \
 	if ( ! this->protocol.parseHeader( header, buffer.data, buffer.size ) ) { \
-		__ERROR__( worker_name, "dispatch", "Undefined message (remaining bytes = %lu).", buffer.size ); \
+		__ERROR__( worker_name, "dispatch", "Undefined message (remaining bytes = %lu). First byte = %u.", buffer.size, buffer.data[ 0 ] ); \
 		break; \
 	} \
 	if ( buffer.size < PROTO_HEADER_SIZE + header.length ) { \

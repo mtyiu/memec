@@ -63,11 +63,11 @@ Pending::Pending() {
 	pthread_mutex_init( &this->slaves.delLock, 0 );
 }
 
-bool Pending::insert( PendingType type, uint32_t id, void *ptr, Key &key, bool needsLock, bool needsUnlock ) {
-	return this->insert( type, id, id, ptr, key, needsLock, needsUnlock );
+bool Pending::insertKey( PendingType type, uint32_t id, void *ptr, Key &key, bool needsLock, bool needsUnlock ) {
+	return this->insertKey( type, id, id, ptr, key, needsLock, needsUnlock );
 }
 
-bool Pending::insert( PendingType type, uint32_t id, uint32_t parentId, void *ptr, Key &key, bool needsLock, bool needsUnlock ) {
+bool Pending::insertKey( PendingType type, uint32_t id, uint32_t parentId, void *ptr, Key &key, bool needsLock, bool needsUnlock ) {
 	PendingIdentifier pid( id, parentId, ptr );
 	std::pair<PendingIdentifier, Key> p( pid, key );
 	std::pair<std::map<PendingIdentifier, Key>::iterator, bool> ret;
@@ -84,11 +84,11 @@ bool Pending::insert( PendingType type, uint32_t id, uint32_t parentId, void *pt
 	return ret.second;
 }
 
-bool Pending::insert( PendingType type, uint32_t id, void *ptr, KeyValueUpdate &keyValueUpdate, bool needsLock, bool needsUnlock ) {
-	return this->insert( type, id, id, ptr, keyValueUpdate, needsLock, needsUnlock );
+bool Pending::insertKeyValueUpdate( PendingType type, uint32_t id, void *ptr, KeyValueUpdate &keyValueUpdate, bool needsLock, bool needsUnlock ) {
+	return this->insertKeyValueUpdate( type, id, id, ptr, keyValueUpdate, needsLock, needsUnlock );
 }
 
-bool Pending::insert( PendingType type, uint32_t id, uint32_t parentId, void *ptr, KeyValueUpdate &keyValueUpdate, bool needsLock, bool needsUnlock ) {
+bool Pending::insertKeyValueUpdate( PendingType type, uint32_t id, uint32_t parentId, void *ptr, KeyValueUpdate &keyValueUpdate, bool needsLock, bool needsUnlock ) {
 	PendingIdentifier pid( id, parentId, ptr );
 	std::pair<PendingIdentifier, KeyValueUpdate> p( pid, keyValueUpdate );
 	std::pair<std::map<PendingIdentifier, KeyValueUpdate>::iterator, bool> ret;

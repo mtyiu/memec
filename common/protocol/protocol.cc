@@ -91,6 +91,15 @@ size_t Protocol::generateKeyValueUpdateHeader( uint8_t magic, uint8_t to, uint8_
 		bytes += PROTO_KEY_VALUE_UPDATE_SIZE + keySize;
 	}
 
+	if ( bytes - PROTO_HEADER_SIZE != ( PROTO_KEY_VALUE_UPDATE_SIZE + keySize + ( valueUpdate ? valueUpdateSize : 0 ) ) ) {
+		fprintf(
+			stderr,
+			"%lu vs. %lu\n",
+			bytes,
+			PROTO_KEY_VALUE_UPDATE_SIZE + keySize + ( valueUpdate ? valueUpdateSize : 0 )
+		);
+	}
+
 	return bytes;
 }
 
@@ -234,7 +243,7 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_MAGIC_LOADING_STATS:
 			break;
 		default:
-			fprintf( stderr, "Error #1\n" );
+			fprintf( stderr, "Error #1: (magic, from, to, opcode, length, id) = (%x, %x, %x, %x, %u, %u)\n", magic, from, to, opcode, length, id );
 			return false;
 	}
 
@@ -245,12 +254,12 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_MAGIC_FROM_SLAVE:
 			break;
 		default:
-			fprintf( stderr, "Error #2\n" );
+			fprintf( stderr, "Error #2: (magic, from, to, opcode, length, id) = (%x, %x, %x, %x, %u, %u)\n", magic, from, to, opcode, length, id );
 			return false;
 	}
 
 	if ( to != this->to ) {
-		fprintf( stderr, "Error #3\n" );
+		fprintf( stderr, "Error #3: (magic, from, to, opcode, length, id) = (%x, %x, %x, %x, %u, %u)\n", magic, from, to, opcode, length, id );
 		return false;
 	}
 

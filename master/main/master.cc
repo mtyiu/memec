@@ -546,7 +546,7 @@ void Master::printPending( FILE *f ) {
 		const KeyValueUpdate &keyValueUpdate = keyValueUpdateIt->second;
 		fprintf(
 			f, "%lu. ID: %u; Key: %.*s (size = %u, offset = %u, length = %u); source: ",
-			i, it->first.id, keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
+			i, keyValueUpdateIt->first.id, keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
 			keyValueUpdate.offset, keyValueUpdate.length
 		);
 		if ( keyValueUpdate.ptr )
@@ -635,7 +635,7 @@ void Master::printPending( FILE *f ) {
 		const KeyValueUpdate &keyValueUpdate = keyValueUpdateIt->second;
 		fprintf(
 			f, "%lu. ID: %u, parent ID: %u; Key: %.*s (size = %u, offset = %u, length = %u); target: ",
-			i, it->first.id, it->first.parentId, keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
+			i, keyValueUpdateIt->first.id, keyValueUpdateIt->first.parentId, keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
 			keyValueUpdate.offset, keyValueUpdate.length
 		);
 		if ( keyValueUpdate.ptr )
