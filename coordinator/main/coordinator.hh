@@ -25,16 +25,20 @@ private:
 	struct timespec startTime;
 	std::vector<CoordinatorWorker> workers;
 
-	CoordinatorRemapMsgHandler remapMsgHandler;
-
 	Coordinator();
 	// Do not implement
 	Coordinator( Coordinator const& );
 	void operator=( Coordinator const& );
 
 	void free();
+
+	// Helper functions to determine slave loading
 	void updateAverageSlaveLoading( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency, 
 			ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency );
+	void updateOverloadedSlaveSet( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency, 
+			ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency );
+	bool switchPhase();
+
 	// Commands
 	void help();
 
@@ -52,12 +56,19 @@ public:
 	IDGenerator idGenerator;
 	CoordinatorEventQueue eventQueue;
 
+	CoordinatorRemapMsgHandler remapMsgHandler;
+
 	struct {
 		// ( slaveAddr, ( mastserAddr, Latency ) )
 		ArrayMap< struct sockaddr_in, ArrayMap< struct sockaddr_in, Latency > > latestGet;
 		ArrayMap< struct sockaddr_in, ArrayMap< struct sockaddr_in, Latency > > latestSet;
-		pthread_mutex_t loadingLock;
+		pthread_mutex_t lock;
 	} slaveLoading;
+
+	struct {
+		std::set< struct sockaddr_in > slaveSet;
+		pthread_mutex_t lock;
+	} overloadedSlaves;
 	
 	static Coordinator *getInstance() {
 		static Coordinator coordinator;

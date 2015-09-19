@@ -28,12 +28,13 @@ void CoordinatorWorker::dispatch( CoordinatorEvent event ) {
 }
 
 void CoordinatorWorker::dispatch( MasterEvent event ) {
-	bool connected, isSend;
+	bool connected = false, isSend;
 	ssize_t ret;
 	struct {
 		size_t size;
 		char *data;
 	} buffer;
+	Coordinator *coordinator = Coordinator::getInstance();
 
 	switch( event.type ) {
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
@@ -55,6 +56,15 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 			delete event.message.slaveLoading.slaveSetLatency;
 			isSend = true;
 			break;
+		case MASTER_EVENT_TYPE_SWITCH_PHASE:
+			// just trigger / stop the remap phase, no message need to be handled
+			if ( event.message.remap.toRemap ) {
+				coordinator->remapMsgHandler.startRemap();
+			} else {
+				coordinator->remapMsgHandler.stopRemap();
+			}
+			isSend = false;
+			break;
 		case MASTER_EVENT_TYPE_PENDING:
 			isSend = false;
 			break;
@@ -66,6 +76,9 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+	} else if ( event.type == MASTER_EVENT_TYPE_SWITCH_PHASE ) {
+		// just to avoid error message
+		connected = true;
 	} else {
 		ProtocolHeader header;
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();
@@ -121,10 +134,10 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 	} \
 
 					masterAddr = event.socket->getAddr();
-					pthread_mutex_lock ( &coordinator->slaveLoading.loadingLock );
+					pthread_mutex_lock ( &coordinator->slaveLoading.lock );
 					SET_SLAVE_LATENCY_FOR_MASTER( masterAddr, getLatency, latestGet );
 					SET_SLAVE_LATENCY_FOR_MASTER( masterAddr, setLatency, latestSet );
-					pthread_mutex_unlock ( &coordinator->slaveLoading.loadingLock ); 
+					pthread_mutex_unlock ( &coordinator->slaveLoading.lock ); 
 
 					buffer.data -= PROTO_LOAD_STATS_SIZE;
 					buffer.size += PROTO_LOAD_STATS_SIZE;

@@ -3,7 +3,10 @@
 #include "coordinator.hh"
 #include "../../common/ds/sockaddr_in.hh"
 
-#define GIGA ( 1000 * 1000 * 1000 )
+#define GIGA 				( 1000 * 1000 * 1000 )
+#define FLOAT_THRESHOLD		( ( float ) 0.00001 )
+#define A_EQUAL_B( _A_, _B_ ) \
+	( _A_ - _B_ >= -1 * FLOAT_THRESHOLD && _A_ - _B_ <= FLOAT_THRESHOLD ) 
 
 Coordinator::Coordinator() {
 	this->isRunning = false;
@@ -14,13 +17,69 @@ void Coordinator::free() {
 	this->eventQueue.free();
 }
 
+bool Coordinator::switchPhase() {
+	// skip if remap feature is disabled
+	bool switched = false;
+	if ( ! this->config.global.remap.enabled ) 
+		return switched;
+
+	MasterEvent event;
+	pthread_mutex_lock( &this->overloadedSlaves.lock );
+	if ( this->remapMsgHandler.isRemapStopped() &&
+			this->overloadedSlaves.slaveSet.size() > this->sockets.slaves.size() * this->config.global.remap.startThreshold ) {
+		// start remapping phase in the background
+		event.switchPhase( true );
+	} else if ( this->remapMsgHandler.isRemapStarted() && 
+			this->overloadedSlaves.slaveSet.size() < this->sockets.slaves.size() * this->config.global.remap.stopThreshold ) {
+		// stop remapping phase in the background
+		event.switchPhase( false );
+	} else {
+		goto quit;
+	}
+	this->eventQueue.insert( event );
+quit:
+	pthread_mutex_unlock( &this->overloadedSlaves.lock );
+	return switched;
+}
+
+void Coordinator::updateOverloadedSlaveSet( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency, 
+		ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency ) {
+	double avgSec = 0.0, avgNsec = 0.0;
+	pthread_mutex_lock( &this->overloadedSlaves.lock );
+
+	// what has past is left in the past
+	this->overloadedSlaves.slaveSet.clear();
+	double threshold = this->config.global.remap.overloadThreshold;
+
+	// compare each slave latency with the avg multipled by threshold 
+#define GET_OVERLOADED_SLAVES( _TYPE_ ) { \
+	uint32_t slaveCount = slave##_TYPE_##Latency->size(); \
+	for ( uint32_t i = 0; i < slaveCount; i++ ) { \
+		avgSec += ( double ) slave##_TYPE_##Latency->values[ i ]->sec / slaveCount; \
+		avgNsec += ( double ) slave##_TYPE_##Latency->values[ i ]->nsec / slaveCount; \
+	} \
+	for ( uint32_t i = 0; i < slaveCount; i++ ) { \
+		if ( slave##_TYPE_##Latency->values[ i ]->sec > avgSec * threshold - FLOAT_THRESHOLD || \
+				( ( A_EQUAL_B ( slave##_TYPE_##Latency->values[ i ]->sec, avgSec * threshold ) && \
+					slave##_TYPE_##Latency->values[ i ]->nsec >= avgNsec * threshold - FLOAT_THRESHOLD ) ) ) \
+			this->overloadedSlaves.slaveSet.insert( slave##_TYPE_##Latency->keys[ i ] ); \
+	} \
+}
+
+	GET_OVERLOADED_SLAVES( Get );
+	GET_OVERLOADED_SLAVES( Set );
+#undef GET_OVERLOADED_SLAVES
+	pthread_mutex_unlock( &this->overloadedSlaves.lock );
+}
+
 void Coordinator::updateAverageSlaveLoading( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency, 
 		ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency ) {
 
-	pthread_mutex_lock( &this->slaveLoading.loadingLock );
+	pthread_mutex_lock( &this->slaveLoading.lock );
 	ArrayMap< struct sockaddr_in, ArrayMap< struct sockaddr_in, Latency > > *latest = NULL;
 	double avgSec = 0.0, avgNsec = 0.0;
-	// TODO calculate the average from existing stat from masters
+
+	// calculate the average from existing stat from masters
 #define SET_AVG_SLAVE_LATENCY( _TYPE_ ) \
 	avgSec = 0.0; \
 	avgNsec = 0.0; \
@@ -36,14 +95,13 @@ void Coordinator::updateAverageSlaveLoading( ArrayMap<struct sockaddr_in, Latenc
 
 	SET_AVG_SLAVE_LATENCY( Get );
 	SET_AVG_SLAVE_LATENCY( Set );
-
 #undef SET_AVG_SLAVE_LATENCY
 		
 	// clean up the current stats
 	// TODO release the arrayMaps??
 	this->slaveLoading.latestGet.clear();
 	this->slaveLoading.latestSet.clear();
-	pthread_mutex_unlock( &this->slaveLoading.loadingLock );
+	pthread_mutex_unlock( &this->slaveLoading.lock );
 }
 
 void Coordinator::signalHandler( int signal ) {
@@ -54,6 +112,9 @@ void Coordinator::signalHandler( int signal ) {
 	switch ( signal ) {
 		case SIGALRM:
 			coordinator->updateAverageSlaveLoading( slaveGetLatency, slaveSetLatency );
+			coordinator->updateOverloadedSlaveSet( slaveGetLatency, slaveSetLatency );
+			coordinator->switchPhase();
+			// TODO start / stop remapping according to criteria
 			// push the stats back to masters
 			// leave the free of ArrayMaps to workers after constructing the data buffer
 			pthread_mutex_lock( &sockets.lock );
@@ -153,15 +214,15 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 	}
 
 	/* Remapping message handler */
-	if ( this->config.global.spreadd.enabled ) {
+	if ( this->config.global.remap.enabled ) {
 		char coordName[ 11 ];
 		memset( coordName, 0, 11 );
 		sprintf( coordName, "%s%03d", COORD_PREFIX, this->config.coordinator.coordinator.addr.port % 1000 );
-		remapMsgHandler.init( this->config.global.spreadd.addr.addr, this->config.global.spreadd.addr.port, coordName );
+		remapMsgHandler.init( this->config.global.remap.spreaddAddr.addr, this->config.global.remap.spreaddAddr.port, coordName );
 	}
 
 	/* Slave Loading stats */
-	pthread_mutex_init( &this->slaveLoading.loadingLock, NULL );
+	pthread_mutex_init( &this->slaveLoading.lock, NULL );
 
 	// Set signal handlers //
 	Signal::setHandler( Coordinator::signalHandler );
@@ -192,7 +253,7 @@ bool Coordinator::start() {
 	}
 
 	/* Remapping message handler */
-	if ( this->config.global.spreadd.enabled && ! this->remapMsgHandler.start() ) {
+	if ( this->config.global.remap.enabled && ! this->remapMsgHandler.start() ) {
 		__ERROR__( "Coordinator", "start", "Cannot start remapping message handler." );
 		return false;
 	}
@@ -237,7 +298,7 @@ bool Coordinator::stop() {
 	this->sockets.slaves.clear();
 
 	/* Remapping message handler */
-	if ( this->config.global.spreadd.enabled ) {
+	if ( this->config.global.remap.enabled ) {
 		this->remapMsgHandler.stop();
 		this->remapMsgHandler.quit();
 	}

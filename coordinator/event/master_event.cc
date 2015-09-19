@@ -14,6 +14,11 @@ void MasterEvent::reqPushLoadStats( MasterSocket *socket, ArrayMap<struct sockad
 	this->message.slaveLoading.slaveSetLatency = slaveSetLatency;
 }
 
+void MasterEvent::switchPhase( bool toRemap ) {
+	this->type = MASTER_EVENT_TYPE_SWITCH_PHASE;
+	this->message.remap.toRemap = toRemap;
+}
+
 void MasterEvent::pending( MasterSocket *socket ) {
 	this->type = MASTER_EVENT_TYPE_PENDING;
 	this->socket = socket;

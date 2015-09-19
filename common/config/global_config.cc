@@ -42,16 +42,25 @@ bool GlobalConfig::set( const char *section, const char *name, const char *value
 			this->slaves.push_back( addr );
 		else
 			return false;
-	} else if ( match( section, "spreadd" ) ) {
+	} else if ( match( section, "remap" ) ) {
 		if ( match( name, "enabled" ) ) {
-			this->spreadd.enabled = ( atoi( value ) >= 1 );
-		} else {
+			this->remap.enabled = ( atoi( value ) >= 1 );
+		} else if ( match( name, "spreadd" ) ) {
 			ServerAddr addr;
 			if ( addr.parse( name, value ) )
-				this->spreadd.addr = addr;
+				this->remap.spreaddAddr = addr;
 			else
 				return false;
-		}
+		} else if ( match( name, "startThreshold" ) ) {
+			this->remap.startThreshold = atoi( value ) / 100.0;
+		} else if ( match( name, "stopThreshold" ) ) {
+			this->remap.stopThreshold = atoi( value ) / 100.0;
+		} else if ( match( name, "overloadThreshold" ) ) {
+			this->remap.overloadThreshold = atoi( value ) / 100.0;
+			if ( this->remap.overloadThreshold <= 1 )
+				return false;
+		} else
+			return false;
 	} else if ( match( section, "buffer" ) ) {
 		if ( match( name, "chunks_per_list" ) )
 			this->buffer.chunksPerList = atoi( value );

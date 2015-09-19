@@ -265,11 +265,11 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 	}
 
 	/* Remapping message handler */
-	if ( this->config.global.spreadd.enabled ) {
+	if ( this->config.global.remap.enabled ) {
 		char masterName[ 11 ];
 		memset( masterName, 0, 11 );
 		sprintf( masterName, "%s%03d", MASTER_PREFIX, this->config.master.master.addr.port % 1000 );
-		remapMsgHandler.init( this->config.global.spreadd.addr.addr, this->config.global.spreadd.addr.port, masterName );
+		remapMsgHandler.init( this->config.global.remap.spreaddAddr.addr, this->config.global.remap.spreaddAddr.port, masterName );
 	}
 
 	/* Loading statistics update */
@@ -324,7 +324,7 @@ bool Master::start() {
 	}
 
 	/* Remapping message handler */
-	if ( this->config.global.spreadd.enabled && ! this->remapMsgHandler.start() ) {
+	if ( this->config.global.remap.enabled && ! this->remapMsgHandler.start() ) {
 		__ERROR__( "Master", "start", "Cannot start remapping message handler." );
 		ret = false;
 	}
@@ -377,7 +377,7 @@ bool Master::stop() {
 	this->sockets.slaves.clear();
 
 	 /* Remapping message handler */
-	if ( this->config.global.spreadd.enabled ) {
+	if ( this->config.global.remap.enabled ) {
 		this->remapMsgHandler.stop();
 		this->remapMsgHandler.quit();
 	}
