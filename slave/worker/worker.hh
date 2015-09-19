@@ -22,7 +22,7 @@
 #include "../../common/stripe_list/stripe_list.hh"
 #include "../../common/worker/worker.hh"
 
-// #define SLAVE_WORKER_SEND_REPLICAS_PARALLEL
+#define SLAVE_WORKER_SEND_REPLICAS_PARALLEL
 
 class SlaveWorker : public Worker {
 private:
