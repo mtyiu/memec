@@ -13,48 +13,51 @@
  *  Magic byte (1 byte) *
  ************************/
 // (Bit: 0-2) //
-#define PROTO_MAGIC_HEARTBEAT		  0x00 // -----000
-#define PROTO_MAGIC_REQUEST			0x01 // -----001
-#define PROTO_MAGIC_RESPONSE_SUCCESS   0x02 // -----010
-#define PROTO_MAGIC_RESPONSE_FAILURE   0x03 // -----011
-#define PROTO_MAGIC_ANNOUNCEMENT	   0x04 // -----100
-#define PROTO_MAGIC_LOADING_STATS 	   0x05 // -----101
-#define PROTO_MAGIC_RESERVED_3		 0x06 // -----110
-#define PROTO_MAGIC_RESERVED_4		 0x07 // -----111
+#define PROTO_MAGIC_HEARTBEAT                     0x00 // -----000
+#define PROTO_MAGIC_REQUEST                       0x01 // -----001
+#define PROTO_MAGIC_RESPONSE_SUCCESS              0x02 // -----010
+#define PROTO_MAGIC_RESPONSE_FAILURE              0x03 // -----011
+#define PROTO_MAGIC_ANNOUNCEMENT                  0x04 // -----100
+#define PROTO_MAGIC_LOADING_STATS                 0x05 // -----101
+#define PROTO_MAGIC_RESERVED_3                    0x06 // -----110
+#define PROTO_MAGIC_RESERVED_4                    0x07 // -----111
 // (Bit: 3-4) //
-#define PROTO_MAGIC_FROM_APPLICATION   0x00 // ---00---
-#define PROTO_MAGIC_FROM_COORDINATOR   0x08 // ---01---
-#define PROTO_MAGIC_FROM_MASTER		0x10 // ---10---
-#define PROTO_MAGIC_FROM_SLAVE		 0x18 // ---11---
+#define PROTO_MAGIC_FROM_APPLICATION              0x00 // ---00---
+#define PROTO_MAGIC_FROM_COORDINATOR              0x08 // ---01---
+#define PROTO_MAGIC_FROM_MASTER                   0x10 // ---10---
+#define PROTO_MAGIC_FROM_SLAVE                    0x18 // ---11---
  // (Bit: 5-6) //
-#define PROTO_MAGIC_TO_APPLICATION	 0x00 // -00-----
-#define PROTO_MAGIC_TO_COORDINATOR	 0x20 // -01-----
-#define PROTO_MAGIC_TO_MASTER		  0x40 // -10-----
-#define PROTO_MAGIC_TO_SLAVE		   0x60 // -11-----
+#define PROTO_MAGIC_TO_APPLICATION                0x00 // -00-----
+#define PROTO_MAGIC_TO_COORDINATOR                0x20 // -01-----
+#define PROTO_MAGIC_TO_MASTER                     0x40 // -10-----
+#define PROTO_MAGIC_TO_SLAVE                      0x60 // -11-----
 // (Bit: 7): Reserved //
 
 /*******************
  * Opcode (1 byte) *
  *******************/
 // Coordinator-specific opcodes //
-#define PROTO_OPCODE_REGISTER		  0x00
-#define PROTO_OPCODE_GET_CONFIG		0x09
-#define PROTO_OPCODE_SYNC			  0x10
-#define PROTO_OPCODE_SLAVE_CONNECTED   0x11
-#define PROTO_OPCODE_MASTER_PUSH_STATS		0x12
-#define PROTO_OPCODE_COORDINATOR_PUSH_STATS		0x13
+#define PROTO_OPCODE_REGISTER                     0x30
+#define PROTO_OPCODE_SYNC                         0x31
+#define PROTO_OPCODE_SLAVE_CONNECTED              0x32
+#define PROTO_OPCODE_MASTER_PUSH_STATS            0x33
+#define PROTO_OPCODE_COORDINATOR_PUSH_STATS       0x34
 
 // Application <-> Master or Master <-> Slave //
-#define PROTO_OPCODE_GET			   0x01
-#define PROTO_OPCODE_SET			   0x02
-#define PROTO_OPCODE_UPDATE			0x03
-#define PROTO_OPCODE_DELETE			0x04
+#define PROTO_OPCODE_GET                          0x01
+#define PROTO_OPCODE_SET                          0x02
+#define PROTO_OPCODE_UPDATE                       0x03
+#define PROTO_OPCODE_DELETE                       0x04
+
+// Master <-> Slave //
+#define PROTO_OPCODE_REMAPPING_LOCK               0x10
+#define PROTO_OPCODE_REMAPPING_SET                0x11
 
 // Slave <-> Slave //
-#define PROTO_OPCODE_UPDATE_CHUNK	  0x05
-#define PROTO_OPCODE_DELETE_CHUNK	  0x06
-#define PROTO_OPCODE_GET_CHUNK		 0x07
-#define PROTO_OPCODE_SET_CHUNK		 0x08
+#define PROTO_OPCODE_UPDATE_CHUNK                 0x20
+#define PROTO_OPCODE_DELETE_CHUNK                 0x21
+#define PROTO_OPCODE_GET_CHUNK                    0x22
+#define PROTO_OPCODE_SET_CHUNK                    0x23
 
 /*********************
  * Key size (1 byte) *
@@ -128,6 +131,27 @@ struct KeyValueUpdateHeader {
 	char *valueUpdate;
 }; // UPDATE request and UPDATE (fail) response
 
+// vvvvvvvvvv For remapping vvvvvvvvvv //
+#define PROTO_REMAPPING_LOCK_SIZE 9
+struct RemappingLockHeader {
+	uint32_t listId;
+	uint32_t chunkId;
+	uint8_t keySize;
+	char *key;
+};
+
+#define PROTO_REMAPPING_SET_SIZE 13
+struct RemappingSetHeader {
+	uint32_t listId;
+	uint32_t chunkId;
+	bool needsForwarding;
+	uint8_t keySize;
+	uint32_t valueSize; // 3 bytes
+	char *key;
+	char *value;
+};
+// ^^^^^^^^^^ For remapping ^^^^^^^^^^ //
+
 #define PROTO_CHUNK_UPDATE_SIZE 24
 struct ChunkUpdateHeader {
 	uint32_t listId;
@@ -179,6 +203,8 @@ protected:
 	size_t generateKeyHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint8_t keySize, char *key );
 	size_t generateKeyValueHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint8_t keySize, char *key, uint32_t valueSize, char *value, char *sendBuf = 0 );
 	size_t generateKeyValueUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate = 0 );
+	size_t generateRemappingLockHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key );
+	size_t generateRemappingSetHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t chunkId, bool needsForwarding, uint8_t keySize, char *key, uint32_t valueSize, char *value, char *sendBuf = 0 );
 	size_t generateChunkUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta = 0, char *sendBuf = 0 );
 	size_t generateChunkHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId );
 	size_t generateChunkDataHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t chunkSize, char *chunkData );
@@ -192,6 +218,8 @@ protected:
 	bool parseKeyValueHeader( size_t offset, uint8_t &keySize, char *&key, uint32_t &valueSize, char *&value, char *buf, size_t size );
 	bool parseKeyValueUpdateHeader( size_t offset, uint8_t &keySize, char *&key, uint32_t &valueUpdateOffset, uint32_t &valueUpdateSize, char *buf, size_t size );
 	bool parseKeyValueUpdateHeader( size_t offset, uint8_t &keySize, char *&key, uint32_t &valueUpdateOffset, uint32_t &valueUpdateSize, char *&valueUpdate, char *buf, size_t size );
+	bool parseRemappingLockHeader( size_t offset, uint32_t &listId, uint32_t &chunkId, uint8_t &keySize, char *&key, char *buf, size_t size );
+	bool parseRemappingSetHeader( size_t offset, uint32_t &listId, uint32_t &chunkId, bool &needsForwarding, uint8_t &keySize, char *&key, uint32_t &valueSize, char *&value, char *buf, size_t size );
 	bool parseChunkUpdateHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &updateOffset, uint32_t &updateLength, uint32_t &updatingChunkId, char *buf, size_t size );
 	bool parseChunkUpdateHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &updateOffset, uint32_t &updateLength, uint32_t &updatingChunkId, char *&delta, char *buf, size_t size );
 	bool parseChunkHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, char *buf, size_t size );
@@ -215,6 +243,8 @@ public:
 	bool parseKeyHeader( struct KeyHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
 	bool parseKeyValueHeader( struct KeyValueHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
 	bool parseKeyValueUpdateHeader( struct KeyValueUpdateHeader &header, bool withValueUpdate, char *buf = 0, size_t size = 0, size_t offset = 0 );
+	bool parseRemappingLockHeader( struct RemappingLockHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
+	bool parseRemappingSetHeader( struct RemappingSetHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
 	bool parseChunkUpdateHeader( struct ChunkUpdateHeader &header, bool withDelta, char *buf = 0, size_t size = 0, size_t offset = 0 );
 	bool parseChunkHeader( struct ChunkHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
 	bool parseChunkDataHeader( struct ChunkDataHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );

@@ -91,14 +91,55 @@ size_t Protocol::generateKeyValueUpdateHeader( uint8_t magic, uint8_t to, uint8_
 		bytes += PROTO_KEY_VALUE_UPDATE_SIZE + keySize;
 	}
 
-	if ( bytes - PROTO_HEADER_SIZE != ( PROTO_KEY_VALUE_UPDATE_SIZE + keySize + ( valueUpdate ? valueUpdateSize : 0 ) ) ) {
-		fprintf(
-			stderr,
-			"%lu vs. %lu\n",
-			bytes,
-			PROTO_KEY_VALUE_UPDATE_SIZE + keySize + ( valueUpdate ? valueUpdateSize : 0 )
-		);
-	}
+	return bytes;
+}
+
+size_t Protocol::generateRemappingLockHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key ) {
+	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_REMAPPING_LOCK_SIZE + keySize, id );
+
+	*( ( uint32_t * )( buf     ) ) = htonl( listId );
+	*( ( uint32_t * )( buf + 4 ) ) = htonl( chunkId );
+	bytes += 8;
+	buf += 8;
+
+	buf[ 0 ] = keySize;
+	bytes++;
+	buf++;
+
+	memmove( buf, key, keySize );
+	bytes += keySize;
+
+	return bytes;
+}
+
+size_t Protocol::generateRemappingSetHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t chunkId, bool needsForwarding, uint8_t keySize, char *key, uint32_t valueSize, char *value, char *sendBuf ) {
+	if ( ! sendBuf ) sendBuf = this->buffer.send;
+	char *buf = sendBuf + PROTO_HEADER_SIZE;
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_REMAPPING_SET_SIZE + keySize + valueSize, id );
+
+	*( ( uint32_t * )( buf     ) ) = htonl( listId );
+	*( ( uint32_t * )( buf + 4 ) ) = htonl( chunkId );
+	bytes += 8;
+	buf += 8;
+
+	unsigned char *tmp;
+	valueSize = htonl( valueSize );
+	tmp = ( unsigned char * ) &valueSize;
+	buf[ 0 ] = needsForwarding;
+	buf[ 1 ] = keySize;
+	buf[ 2 ] = tmp[ 1 ];
+	buf[ 3 ] = tmp[ 2 ];
+	buf[ 4 ] = tmp[ 3 ];
+	bytes += 5;
+	buf += 5;
+
+	memmove( buf, key, keySize );
+	bytes += keySize;
+	buf += keySize;
+
+	memmove( buf, value, valueSize );
+	bytes += valueSize;
 
 	return bytes;
 }
@@ -265,22 +306,23 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 
 	switch( opcode ) {
 		case PROTO_OPCODE_REGISTER:
-		case PROTO_OPCODE_GET_CONFIG:
 		case PROTO_OPCODE_SYNC:
 		case PROTO_OPCODE_SLAVE_CONNECTED:
+		case PROTO_OPCODE_MASTER_PUSH_STATS:
+		case PROTO_OPCODE_COORDINATOR_PUSH_STATS:
 		case PROTO_OPCODE_GET:
 		case PROTO_OPCODE_SET:
 		case PROTO_OPCODE_UPDATE:
 		case PROTO_OPCODE_DELETE:
+		case PROTO_OPCODE_REMAPPING_LOCK:
+		case PROTO_OPCODE_REMAPPING_SET:
 		case PROTO_OPCODE_UPDATE_CHUNK:
 		case PROTO_OPCODE_DELETE_CHUNK:
 		case PROTO_OPCODE_GET_CHUNK:
 		case PROTO_OPCODE_SET_CHUNK:
-		case PROTO_OPCODE_MASTER_PUSH_STATS:
-		case PROTO_OPCODE_COORDINATOR_PUSH_STATS:
 			break;
 		default:
-			fprintf( stderr, "Error #4\n" );
+			fprintf( stderr, "Error #4: (magic, from, to, opcode, length, id) = (%x, %x, %x, %x, %u, %u)\n", magic, from, to, opcode, length, id );
 			return false;
 	}
 
@@ -379,6 +421,52 @@ bool Protocol::parseKeyValueUpdateHeader( size_t offset, uint8_t &keySize, char 
 
 	key = ptr + PROTO_KEY_VALUE_UPDATE_SIZE;
 	valueUpdate = valueUpdateSize ? key + keySize : 0;
+
+	return true;
+}
+
+bool Protocol::parseRemappingLockHeader( size_t offset, uint32_t &listId, uint32_t &chunkId, uint8_t &keySize, char *&key, char *buf, size_t size ) {
+	if ( size < PROTO_REMAPPING_LOCK_SIZE )
+		return false;
+
+	char *ptr = buf + offset;
+	listId  = ntohl( *( ( uint32_t * )( ptr      ) ) );
+	chunkId = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
+	keySize = *( ptr + 8 );
+
+	if ( size < ( size_t ) PROTO_REMAPPING_LOCK_SIZE + keySize )
+		return false;
+
+	key = ptr + 9;
+
+	return true;
+}
+
+bool Protocol::parseRemappingSetHeader( size_t offset, uint32_t &listId, uint32_t &chunkId, bool &needsForwarding, uint8_t &keySize, char *&key, uint32_t &valueSize, char *&value, char *buf, size_t size ) {
+	if ( size < PROTO_REMAPPING_SET_SIZE )
+		return false;
+
+	char *ptr = buf + offset;
+	unsigned char *tmp;
+	listId  = ntohl( *( ( uint32_t * )( ptr      ) ) );
+	chunkId = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
+	needsForwarding = *( ptr + 8 );
+	keySize = *( ptr + 9 );
+	ptr += 10;
+
+	valueSize = 0;
+	tmp = ( unsigned char * ) &valueSize;
+	tmp[ 1 ] = ptr[ 0 ];
+	tmp[ 2 ] = ptr[ 1 ];
+	tmp[ 3 ] = ptr[ 2 ];
+	valueSize = ntohl( valueSize );
+	ptr += 3;
+
+	if ( size < PROTO_REMAPPING_SET_SIZE + keySize + valueSize )
+		return false;
+
+	key = ptr;
+	value = ptr + keySize;
 
 	return true;
 }
@@ -626,6 +714,39 @@ bool Protocol::parseKeyValueUpdateHeader( struct KeyValueUpdateHeader &header, b
 	}
 }
 
+bool Protocol::parseRemappingLockHeader( struct RemappingLockHeader &header, char *buf, size_t size, size_t offset ) {
+	if ( ! buf || ! size ) {
+		buf = this->buffer.recv;
+		size = this->buffer.size;
+	}
+	return this->parseRemappingLockHeader(
+		offset,
+		header.listId,
+		header.chunkId,
+		header.keySize,
+		header.key,
+		buf, size
+	);
+}
+
+bool Protocol::parseRemappingSetHeader( struct RemappingSetHeader &header, char *buf, size_t size, size_t offset ) {
+	if ( ! buf || ! size ) {
+		buf = this->buffer.recv;
+		size = this->buffer.size;
+	}
+	return this->parseRemappingSetHeader(
+		offset,
+		header.listId,
+		header.chunkId,
+		header.needsForwarding,
+		header.keySize,
+		header.key,
+		header.valueSize,
+		header.value,
+		buf, size
+	);
+}
+
 bool Protocol::parseChunkUpdateHeader( struct ChunkUpdateHeader &header, bool withDelta, char *buf, size_t size, size_t offset ) {
 	if ( ! buf || ! size ) {
 		buf = this->buffer.recv;
@@ -656,7 +777,6 @@ bool Protocol::parseChunkUpdateHeader( struct ChunkUpdateHeader &header, bool wi
 			buf, size
 		);
 	}
-
 }
 
 bool Protocol::parseChunkHeader( struct ChunkHeader &header, char *buf, size_t size, size_t offset ) {
