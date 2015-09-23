@@ -1283,7 +1283,6 @@ bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success,
 	);
 
 	int pending;
-	std::set<ChunkUpdate>::iterator it;
 	ChunkUpdate chunkUpdate;
 	PendingIdentifier pid;
 
@@ -1331,7 +1330,6 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 	);
 
 	int pending;
-	std::set<ChunkUpdate>::iterator it;
 	ChunkUpdate chunkUpdate;
 	PendingIdentifier pid;
 
@@ -1354,7 +1352,6 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 	if ( pending == 0 ) {
 		// Only send application DELETE response when the number of pending slave DELETE_CHUNK requests equal 0
 		MasterEvent masterEvent;
-		std::set<Key>::iterator it;
 		Key key;
 
 		if ( ! SlaveWorker::pending->eraseKey( PT_MASTER_DEL, pid.parentId, 0, &pid, &key ) ) {
@@ -1561,7 +1558,6 @@ bool SlaveWorker::handleSetChunkResponse( SlavePeerEvent event, bool success, ch
 		header.listId, header.stripeId, header.chunkId
 	);
 
-	std::set<ChunkRequest>::iterator it;
 	ChunkRequest chunkRequest;
 
 	chunkRequest.set(

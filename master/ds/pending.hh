@@ -69,6 +69,8 @@ public:
 	bool insertKeyValueUpdate( PendingType type, uint32_t id, uint32_t parentId, void *ptr, KeyValueUpdate &keyValueUpdate, bool needsLock = true, bool needsUnlock = true );
 	bool recordRequestStartTime( PendingType type, uint32_t id, uint32_t parentId, void *ptr, struct sockaddr_in addr );
 
+	bool findKey( PendingType type, uint32_t id, void *ptr, Key *keyPtr );
+
 	bool eraseKey( PendingType type, uint32_t id, void *ptr = 0, PendingIdentifier *pidPtr = 0, Key *keyPtr = 0, bool needsLock = true, bool needsUnlock = true );
 	bool eraseRemappingRecord( PendingType type, uint32_t id, void *ptr = 0, PendingIdentifier *pidPtr = 0, RemappingRecord *remappingRecordPtr = 0, bool needsLock = true, bool needsUnlock = true );
 	bool eraseKeyValueUpdate( PendingType type, uint32_t id, void *ptr = 0, PendingIdentifier *pidPtr = 0, KeyValueUpdate *keyValueUpdatePtr = 0, bool needsLock = true, bool needsUnlock = true );

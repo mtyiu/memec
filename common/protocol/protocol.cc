@@ -116,7 +116,7 @@ size_t Protocol::generateRemappingLockHeader( uint8_t magic, uint8_t to, uint8_t
 size_t Protocol::generateRemappingSetHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t chunkId, bool needsForwarding, uint8_t keySize, char *key, uint32_t valueSize, char *value, char *sendBuf ) {
 	if ( ! sendBuf ) sendBuf = this->buffer.send;
 	char *buf = sendBuf + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_REMAPPING_SET_SIZE + keySize + valueSize, id );
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_REMAPPING_SET_SIZE + keySize + valueSize, id, sendBuf );
 
 	*( ( uint32_t * )( buf     ) ) = htonl( listId );
 	*( ( uint32_t * )( buf + 4 ) ) = htonl( chunkId );

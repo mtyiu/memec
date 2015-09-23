@@ -51,10 +51,10 @@ char *CoordinatorProtocol::resRegisterMaster( size_t &size, GlobalConfig &global
 */
 
 // TODO pull into common/ as this is same as  MasterProtocol::reqPushLoadStats
-char *CoordinatorProtocol::reqPushLoadStats( 
+char *CoordinatorProtocol::reqPushLoadStats(
 		size_t &size, uint32_t id,
-		ArrayMap< ServerAddr, Latency > *slaveGetLatency, 
-		ArrayMap< ServerAddr, Latency > *slaveSetLatency ) 
+		ArrayMap< ServerAddr, Latency > *slaveGetLatency,
+		ArrayMap< ServerAddr, Latency > *slaveSetLatency )
 {
 
 	size = this->generateLoadStatsHeader(
@@ -101,7 +101,7 @@ char *CoordinatorProtocol::reqPushLoadStats(
 #undef SET_FIELDS_VAR
 
 	if ( size > PROTO_BUF_MIN_SIZE ) {
-		__DEBUG__( CYAN, "CoordinatorProtocol" , "Warning: Load stats exceeds minimum buffer size!\n" );
+		__DEBUG__( CYAN, "CoordinatorProtocol", "reqPushLoadStats", "Warning: Load stats exceeds minimum buffer size!\n" );
 	}
 
 	return this->buffer.send;
@@ -113,7 +113,7 @@ bool CoordinatorProtocol::parseLoadingStats(
 		ArrayMap< ServerAddr, Latency >& slaveSetLatency,
 		char* buffer, uint32_t size )
 {
-	ServerAddr addr; 
+	ServerAddr addr;
 	Latency *tempLatency = NULL;
 
 	uint32_t recordSize = sizeof( uint32_t ) * 3 + sizeof( uint16_t );

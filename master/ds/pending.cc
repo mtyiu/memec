@@ -159,6 +159,32 @@ bool Pending::recordRequestStartTime( PendingType type, uint32_t id, uint32_t pa
 	return ret.second;
 }
 
+bool Pending::findKey( PendingType type, uint32_t id, void *ptr, Key *keyPtr ) {
+	PendingIdentifier pid( id, 0, ptr );
+	pthread_mutex_t *lock;
+	bool ret;
+
+	std::map<PendingIdentifier, Key> *map;
+	std::map<PendingIdentifier, Key>::iterator it;
+	if ( ! this->get( type, lock, map ) )
+		return false;
+
+	pthread_mutex_lock( lock );
+	if ( ptr ) {
+		it = map->find( pid );
+		ret = ( it != map->end() );
+	} else {
+		it = map->lower_bound( pid );
+		ret = ( it != map->end() && it->first.id == id ); // Match request ID
+	}
+	if ( ret ) {
+		if ( keyPtr ) *keyPtr = it->second;
+	}
+	pthread_mutex_unlock( lock );
+
+	return ret;
+}
+
 bool Pending::eraseKey( PendingType type, uint32_t id, void *ptr, PendingIdentifier *pidPtr, Key *keyPtr, bool needsLock, bool needsUnlock ) {
 	PendingIdentifier pid( id, 0, ptr );
 	pthread_mutex_t *lock;
@@ -209,6 +235,10 @@ bool Pending::eraseRemappingRecord( PendingType type, uint32_t id, void *ptr, Pe
 		if ( pidPtr ) *pidPtr = it->first;
 		if ( remappingRecordPtr ) *remappingRecordPtr = it->second;
 		map->erase( it );
+	} else {
+		for ( it = map->begin(); it != map->end(); it++ ) {
+			printf( "(%u, %u, %p) vs. (%u, %u, %p)\n", it->first.id, it->first.parentId, it->first.ptr, pid.id, pid.parentId, pid.ptr );
+		}
 	}
 	if ( needsUnlock ) pthread_mutex_unlock( lock );
 
