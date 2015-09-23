@@ -139,6 +139,39 @@ char *MasterProtocol::reqSet( size_t &size, uint32_t id, char *key, uint8_t keyS
 	return buf;
 }
 
+char *MasterProtocol::reqRemappingSetLock( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, char *key, uint8_t keySize ) {
+	size = this->generateRemappingLockHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_REMAPPING_LOCK,
+		id,
+		listId,
+		chunkId,
+		keySize,
+		key
+	);
+	return this->buffer.send;
+}
+
+char *MasterProtocol::reqRemappingSet( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, bool needsForwarding, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf ) {
+	if ( ! buf ) buf = this->buffer.send;
+	size = this->generateRemappingSetHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_REMAPPING_SET,
+		id,
+		listId,
+		chunkId,
+		needsForwarding,
+		keySize,
+		key,
+		valueSize,
+		value,
+		buf
+	);
+	return buf;
+}
+
 char *MasterProtocol::reqGet( size_t &size, uint32_t id, char *key, uint8_t keySize ) {
 	size = this->generateKeyHeader(
 		PROTO_MAGIC_REQUEST,

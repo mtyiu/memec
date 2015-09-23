@@ -641,41 +641,7 @@ void Slave::printPending( FILE *f ) {
 }
 
 void Slave::dump() {
-	/*
-	fprintf( stdout, "List of key-value pairs:\n------------------------\n" );
-	if ( ! this->map.keys.size() ) {
-		fprintf( stdout, "(None)\n" );
-	} else {
-		for ( std::map<Key, KeyMetadata>::iterator it = this->map.keys.begin(); it != this->map.keys.end(); it++ ) {
-			fprintf(
-				stdout, "%.*s --> (list ID: %u, stripe ID: %u, chunk ID: %u, offset: %u, length: %u)\n",
-				it->first.size, it->first.data,
-				it->second.listId, it->second.stripeId, it->second.chunkId,
-				it->second.offset, it->second.length
-			);
-		}
-	}
-	fprintf( stdout, "\n" );
-	*/
-	fprintf( stdout, "Number of key-value pairs: %lu\n\n", this->map.keys.size() );
-
-	fprintf( stdout, "List of chunks in the cache:\n----------------------------\n" );
-	if ( ! this->map.cache.size() ) {
-		fprintf( stdout, "(None)\n" );
-	} else {
-		for ( std::map<Metadata, Chunk *>::iterator it = this->map.cache.begin(); it != this->map.cache.end(); it++ ) {
-			fprintf(
-				stdout, "(list ID: %u, stripe ID: %u, chunk ID: %u) --> %p (type: %s chunk, status: %s, count: %u, size: %u)\n",
-				it->first.listId, it->first.stripeId, it->first.chunkId,
-				it->second, it->second->isParity ? "parity" : "data",
-				( it->second->status == CHUNK_STATUS_EMPTY ? "empty" :
-					( it->second->status == CHUNK_STATUS_DIRTY ? "dirty" : "cached" )
-				),
-				it->second->count, it->second->size
-			);
-		}
-	}
-	fprintf( stdout, "\n" );
+	this->map.dump();
 }
 
 void Slave::help() {

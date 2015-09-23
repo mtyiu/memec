@@ -23,6 +23,8 @@ public:
 	char *resRegisterMaster( size_t &size, uint32_t id, bool success );
 	// SET
 	char *resSet( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key );
+	// Remapping SET
+	char *resRemappingSetLock( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key );
 	// GET
 	char *resGet( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key, uint32_t valueSize = 0, char *value = 0 );
 	// UPDATE

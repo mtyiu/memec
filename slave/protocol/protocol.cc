@@ -57,6 +57,20 @@ char *SlaveProtocol::resSet( size_t &size, uint32_t id, bool success, uint8_t ke
 	return this->buffer.send;
 }
 
+char *SlaveProtocol::resRemappingSetLock( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key ) {
+	size = this->generateRemappingLockHeader(
+		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+		PROTO_MAGIC_TO_MASTER,
+		PROTO_OPCODE_REMAPPING_LOCK,
+		id,
+		listId,
+		chunkId,
+		keySize,
+		key
+	);
+	return this->buffer.send;
+}
+
 char *SlaveProtocol::resGet( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key, uint32_t valueSize, char *value ) {
 	if ( success ) {
 		size = this->generateKeyValueHeader(

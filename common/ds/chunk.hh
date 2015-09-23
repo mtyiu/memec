@@ -3,6 +3,7 @@
 
 #include <map>
 #include <stdint.h>
+#include <pthread.h>
 #include <arpa/inet.h>
 #include "metadata.hh"
 #include "key.hh"
@@ -46,7 +47,7 @@ public:
 	// Compute delta
 	void computeDelta( char *delta, char *newData, uint32_t offset, uint32_t length, bool update = true );
 	// Delete key
-	uint32_t deleteKeyValue( Key target, std::map<Key, KeyMetadata> *keys, char *delta, size_t deltaBufSize );
+	uint32_t deleteKeyValue( Key target, std::map<Key, KeyMetadata> *keys, pthread_mutex_t *lock, char *delta, size_t deltaBufSize );
 	// Get key-value pair
 	KeyValue getKeyValue( uint32_t offset );
 	// Reset internal status
