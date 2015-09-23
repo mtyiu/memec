@@ -173,6 +173,8 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 		this->config.global.stripeList.count,
 		this->sockets.slaves.values
 	);
+	/* Remap flag */
+	this->remapFlag.set( this->config.master.remap.forceEnabled );
 	/* Workers, ID generator, packet pool and event queues */
 	if ( this->config.master.workers.type == WORKER_TYPE_MIXED ) {
 		this->idGenerator.init( this->config.master.workers.number.mixed );

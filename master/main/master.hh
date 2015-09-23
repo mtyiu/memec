@@ -7,6 +7,7 @@
 #include "../config/master_config.hh"
 #include "../ds/counter.hh"
 #include "../ds/pending.hh"
+#include "../ds/remap_flag.hh"
 #include "../event/event_queue.hh"
 #include "../remap/remap_msg_handler.hh"
 #include "../socket/application_socket.hh"
@@ -69,6 +70,7 @@ public:
 	PacketPool packetPool;
 	StripeList<SlaveSocket> *stripeList;
 	Counter counter;
+	RemapFlag remapFlag;
 	struct {
 		struct {
 			ArrayMap< struct sockaddr_in, std::set< Latency > > get;

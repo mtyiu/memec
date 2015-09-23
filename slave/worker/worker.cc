@@ -186,6 +186,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_GET_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_SET_RESPONSE_SUCCESS:
+		case MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS:
 			success = true;
@@ -193,6 +194,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
 		case MASTER_EVENT_TYPE_GET_RESPONSE_FAILURE:
 		case MASTER_EVENT_TYPE_SET_RESPONSE_FAILURE:
+		case MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_FAILURE:
 		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
 		case MASTER_EVENT_TYPE_DELETE_RESPONSE_FAILURE:
 			success = false;
@@ -242,6 +244,19 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 				success,
 				event.message.key.size,
 				event.message.key.data
+			);
+			break;
+		// Remapping SET
+		case MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_SUCCESS:
+		case MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resRemappingSetLock(
+				buffer.size,
+				event.id,
+				success,
+				event.message.remap.listId,
+				event.message.remap.chunkId,
+				event.message.remap.key.size,
+				event.message.remap.key.data
 			);
 			break;
 		// UPDATE
@@ -314,6 +329,13 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 						break;
 					case PROTO_OPCODE_SET:
 						this->handleSetRequest( event, buffer.data, buffer.size );
+						break;
+					case PROTO_OPCODE_REMAPPING_LOCK:
+						this->handleRemappingSetLockRequest( event, buffer.data, buffer.size );
+						break;
+					case PROTO_OPCODE_REMAPPING_SET:
+						// this->handleRemappingSetRequest( event, buffer.data, buffer.size );
+						printf( "remapping set\n" );
 						break;
 					case PROTO_OPCODE_UPDATE:
 						this->handleUpdateRequest( event, buffer.data, buffer.size );
@@ -787,6 +809,42 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size ) 
 	key.set( header.keySize, header.key );
 	event.resSet( event.socket, event.id, key, true );
 	this->load.set();
+	this->dispatch( event );
+
+	return true;
+}
+
+bool SlaveWorker::handleRemappingSetLockRequest( MasterEvent event, char *buf, size_t size ) {
+	struct RemappingLockHeader header;
+	if ( ! this->protocol.parseRemappingLockHeader( header, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleRemappingSetLockRequest", "Invalid REMAPPING_SET_LOCK request (size = %lu).", size );
+		return false;
+	}
+	// __DEBUG__(
+	__ERROR__(
+		// BLUE,
+		"SlaveWorker", "handleRemappingSetLockRequest",
+		"[REMAPPING_SET_LOCK] Key: %.*s (key size = %u); remapped list ID: %u, remapped chunk ID: %u",
+		( int ) header.keySize, header.key, header.keySize, header.listId, header.chunkId
+	);
+
+	// Detect degraded REMAPPING_SET_LOCK
+	bool isParity;
+	uint32_t listId, chunkId;
+	if ( this->isRedirectedRequest( header.key, header.keySize, &isParity, &listId, &chunkId ) && ! isParity ) {
+		__ERROR__( "SlaveWorker", "handleRemappingSetLockRequest", "!!! Degraded REMAPPING_SET_LOCK request [not yet implemented] !!!" );
+		// TODO
+	}
+
+	Key key;
+	key.set( header.keySize, header.key );
+
+	RemappingRecord remappingRecord( header.listId, header.chunkId );
+	if ( SlaveWorker::map->insertRemappingRecord( key, remappingRecord ) ) {
+		event.resRemappingSetLock( event.socket, event.id, key, remappingRecord, true );
+	} else {
+		event.resRemappingSetLock( event.socket, event.id, key, remappingRecord, false );
+	}
 	this->dispatch( event );
 
 	return true;

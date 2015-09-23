@@ -4,6 +4,7 @@
 #include "../socket/master_socket.hh"
 #include "../../common/ds/key.hh"
 #include "../../common/ds/key_value.hh"
+#include "../../common/ds/metadata.hh"
 #include "../../common/event/event.hh"
 
 enum MasterEventType {
@@ -17,6 +18,9 @@ enum MasterEventType {
 	// SET
 	MASTER_EVENT_TYPE_SET_RESPONSE_SUCCESS,
 	MASTER_EVENT_TYPE_SET_RESPONSE_FAILURE,
+	// Remapping SET
+	MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_SUCCESS,
+	MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_FAILURE,
 	// UPDATE
 	MASTER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS,
 	MASTER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE,
@@ -42,6 +46,10 @@ public:
 			uint32_t valueUpdateOffset;
 			uint32_t valueUpdateSize;
 		} keyValueUpdate;
+		struct {
+			Key key;
+			uint32_t listId, chunkId;
+		} remap;
 	} message;
 
 	// Register
@@ -51,6 +59,8 @@ public:
 	void resGet( MasterSocket *socket, uint32_t id, Key &key );
 	// SET
 	void resSet( MasterSocket *socket, uint32_t id, Key &key, bool success );
+	// Remapping SET
+	void resRemappingSetLock( MasterSocket *socket, uint32_t id, Key &key, RemappingRecord &remappingRecord, bool success );
 	// UPDATE
 	void resUpdate( MasterSocket *socket, uint32_t id, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool success, bool needsFree = true );
 	// DELETE

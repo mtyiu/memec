@@ -133,6 +133,7 @@ size_t Protocol::generateRemappingSetHeader( uint8_t magic, uint8_t to, uint8_t 
 	buf[ 4 ] = tmp[ 3 ];
 	bytes += 5;
 	buf += 5;
+	valueSize = ntohl( valueSize );
 
 	memmove( buf, key, keySize );
 	bytes += keySize;

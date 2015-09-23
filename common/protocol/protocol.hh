@@ -37,7 +37,7 @@
  * Opcode (1 byte) *
  *******************/
 // Coordinator-specific opcodes //
-#define PROTO_OPCODE_REGISTER                     0x30
+#define PROTO_OPCODE_REGISTER                     0x00
 #define PROTO_OPCODE_SYNC                         0x31
 #define PROTO_OPCODE_SLAVE_CONNECTED              0x32
 #define PROTO_OPCODE_MASTER_PUSH_STATS            0x33

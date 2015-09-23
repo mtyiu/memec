@@ -15,6 +15,7 @@ MasterEventQueue *MasterWorker::eventQueue;
 StripeList<SlaveSocket> *MasterWorker::stripeList;
 PacketPool *MasterWorker::packetPool;
 Counter *MasterWorker::counter;
+RemapFlag *MasterWorker::remapFlag;
 
 void MasterWorker::dispatch( MixedEvent event ) {
 	switch( event.type ) {
@@ -168,7 +169,11 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 						this->handleGetRequest( event, buffer.data, buffer.size );
 						break;
 					case PROTO_OPCODE_SET:
-						this->handleSetRequest( event, buffer.data, buffer.size );
+						if ( MasterWorker::remapFlag->get() ) {
+							this->handleRemappingSetRequest( event, buffer.data, buffer.size );
+						} else {
+							this->handleSetRequest( event, buffer.data, buffer.size );
+						}
 						break;
 					case PROTO_OPCODE_UPDATE:
 						this->handleUpdateRequest( event, buffer.data, buffer.size );
@@ -363,6 +368,9 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 					case PROTO_OPCODE_SET:
 						this->handleSetResponse( event, success, buffer.data, buffer.size );
 						break;
+					case PROTO_OPCODE_REMAPPING_LOCK:
+						this->handleRemappingSetLockResponse( event, success, buffer.data, buffer.size );
+						break;
 					case PROTO_OPCODE_UPDATE:
 						this->handleUpdateResponse( event, success, buffer.data, buffer.size );
 						break;
@@ -412,6 +420,45 @@ SlaveSocket *MasterWorker::getSlave( char *data, uint8_t size, uint32_t &listId,
 	}
 
 	return 0;
+}
+
+SlaveSocket *MasterWorker::getSlave( char *data, uint8_t size, uint32_t &originalListId, uint32_t &originalChunkId, uint32_t &remappedListId, uint32_t &remappedChunkId, bool allowDegraded, bool *isDegraded ) {
+	SlaveSocket *ret;
+
+	// Determine original data slave
+	originalListId = MasterWorker::stripeList->get(
+		data, ( size_t ) size,
+		this->dataSlaveSockets,
+		0, &originalChunkId, false
+	);
+
+	ret = *this->dataSlaveSockets;
+
+	if ( isDegraded )
+		*isDegraded = ( ! ret->ready() && allowDegraded );
+
+	if ( ret->ready() )
+		goto get_remap;
+
+	if ( allowDegraded ) {
+		for ( uint32_t i = 0; i < MasterWorker::dataChunkCount + MasterWorker::parityChunkCount; i++ ) {
+			ret = MasterWorker::stripeList->get( originalListId, originalChunkId, i );
+			if ( ret->ready() )
+				goto get_remap;
+		}
+		__ERROR__( "MasterWorker", "getSlave", "Cannot find a slave for performing degraded operation." );
+		return 0;
+	}
+
+	return 0;
+
+get_remap:
+	// Determine remapped data slave
+	// TODO: Change the hardcoded values!
+	remappedListId = 1;
+	remappedChunkId = 0;
+
+	return ret;
 }
 
 SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded, bool *isDegraded ) {
@@ -625,24 +672,28 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf, size_t size ) {
 	struct KeyValueHeader header;
 	if ( ! this->protocol.parseKeyValueHeader( header, buf, size ) ) {
-		__ERROR__( "MasterWorker", "handleSetRequest", "Invalid SET request." );
+		__ERROR__( "MasterWorker", "handleRemappingSetRequest", "Invalid SET request." );
 		return false;
 	}
-	__DEBUG__(
-		BLUE, "MasterWorker", "handleSetRequest",
+	// __DEBUG__(
+	__ERROR__(
+		// BLUE,
+		"MasterWorker", "handleRemappingSetRequest",
 		"[SET] Key: %.*s (key size = %u); Value: (value size = %u)",
 		( int ) header.keySize, header.key, header.keySize, header.valueSize
 	);
 	MasterWorker::counter->increaseRemapping();
 
-	uint32_t listId, chunkId;
+	uint32_t originalListId, originalChunkId, remappedListId, remappedChunkId;
 	bool isDegraded, connected;
 	ssize_t sentBytes;
 	SlaveSocket *socket;
 
-	socket = this->getSlaves(
+	socket = this->getSlave(
 		header.key, header.keySize,
-		listId, chunkId, /* allowDegraded */ false, &isDegraded
+		originalListId, originalChunkId,
+		remappedListId, remappedChunkId,
+		 /* allowDegraded */ false, &isDegraded
 	);
 
 	if ( ! socket ) {
@@ -662,84 +713,62 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 	Key key;
 	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
 
-#ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
-	Packet *packet = 0;
-	if ( MasterWorker::parityChunkCount ) {
-		packet = MasterWorker::packetPool->malloc();
-		packet->setReferenceCount( 1 + MasterWorker::parityChunkCount );
-		buffer.data = packet->data;
-		this->protocol.reqSet( buffer.size, requestId, header.key, header.keySize, header.value, header.valueSize, buffer.data );
-		packet->size = buffer.size;
-	} else {
-		buffer.data = this->protocol.reqSet( buffer.size, requestId, header.key, header.keySize, header.value, header.valueSize );
-	}
-#else
-	buffer.data = this->protocol.reqSet( buffer.size, requestId, header.key, header.keySize, header.value, header.valueSize );
-#endif
-
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
 
+	// Insert the key into application SET pending map
 	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_SET, event.id, ( void * ) event.socket, key ) ) {
-		__ERROR__( "MasterWorker", "handleSetRequest", "Cannot insert into application SET pending map." );
+		__ERROR__( "MasterWorker", "handleRemappingSetRequest", "Cannot insert into application SET pending map." );
 	}
 
-	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount + 1; i++ ) {
-		key.ptr = ( void * )( i == 0 ? socket : this->paritySlaveSockets[ i - 1 ] );
-		if ( ! MasterWorker::pending->insertKey(
-			PT_SLAVE_SET, requestId, event.id,
-			( void * )( i == 0 ? socket : this->paritySlaveSockets[ i - 1 ] ),
-			key
-		) ) {
-			__ERROR__( "MasterWorker", "handleSetRequest", "Cannot insert into slave SET pending map." );
+	// Check whether the lock should be acquired first
+	if ( originalListId == remappedListId && originalChunkId == remappedChunkId ) {
+		// Send directly to the data slave and let it forward to the parity slaves
+		buffer.data = this->protocol.reqRemappingSet(
+			buffer.size, requestId,
+			originalListId, originalChunkId, true,
+			header.key, header.keySize,
+			header.value, header.valueSize
+		);
+
+		if ( ! MasterWorker::pending->insertKey( PT_SLAVE_SET, requestId, event.id, ( void * ) event.socket, key ) ) {
+			__ERROR__( "MasterWorker", "handleRemappingSetRequest", "Cannot insert into slave SET pending map." );
 		}
-	}
-
-	// Send SET requests
-	if ( MasterWorker::parityChunkCount ) {
-		for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
-			// Mark the time when request is sent
-			MasterWorker::pending->recordRequestStartTime(
-				PT_SLAVE_SET, requestId, event.id,
-				( void * ) this->paritySlaveSockets[ i ],
-				this->paritySlaveSockets[ i ]->getAddr()
-			);
-
-#ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
-			SlaveEvent slaveEvent;
-			slaveEvent.send( this->paritySlaveSockets[ i ], packet );
-			MasterWorker::eventQueue->prioritizedInsert( slaveEvent );
-		}
-
 		MasterWorker::pending->recordRequestStartTime( PT_SLAVE_SET, requestId, event.id, ( void * ) socket, socket->getAddr() );
-		SlaveEvent slaveEvent;
-		slaveEvent.send( socket, packet );
-		this->dispatch( slaveEvent );
-#else
-			sentBytes = this->paritySlaveSockets[ i ]->send( buffer.data, buffer.size, connected );
-			if ( sentBytes != ( ssize_t ) buffer.size ) {
-				__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
-			}
-		}
-
-		MasterWorker::pending->recordRequestStartTime( PT_SLAVE_SET, requestId, event.id, ( void * ) socket, socket->getAddr() );
+		// Send SET request
 		sentBytes = socket->send( buffer.data, buffer.size, connected );
 		if ( sentBytes != ( ssize_t ) buffer.size ) {
-			__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
-			MasterWorker::counter->decreaseRemapping();
+			__ERROR__( "MasterWorker", "handleRemappingSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 			return false;
 		}
-#endif
 	} else {
-		MasterWorker::pending->recordRequestStartTime( PT_SLAVE_SET, requestId, event.id, ( void * ) socket, socket->getAddr() );
+		// Need to buffer the key-value pair in a packet
+		Packet *packet = MasterWorker::packetPool->malloc();
+		packet->setReferenceCount( 1 + MasterWorker::parityChunkCount );
+		buffer.data = packet->data;
+		this->protocol.reqRemappingSet( buffer.size, requestId, remappedListId, remappedChunkId, false, header.key, header.keySize, header.value, header.valueSize, buffer.data );
+		packet->size = buffer.size;
+
+		// Insert the remapping record into master REMAPPING_SET pending map
+		RemappingRecord remappingRecord( remappedListId, remappedChunkId, packet );
+		if ( ! MasterWorker::pending->insertRemappingRecord( PT_SLAVE_REMAPPING_SET, requestId, event.id, ( void * ) event.socket, remappingRecord ) ) {
+			__ERROR__( "MasterWorker", "handleRemappingSetRequest", "Cannot insert into slave REMAPPING_SET pending map." );
+		}
+
+		// Acquire remapping lock
+		buffer.data = this->protocol.reqRemappingSetLock(
+			buffer.size, requestId,
+			remappedListId, remappedChunkId,
+			header.key, header.keySize
+		);
+
 		sentBytes = socket->send( buffer.data, buffer.size, connected );
 		if ( sentBytes != ( ssize_t ) buffer.size ) {
-			__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
+			__ERROR__( "MasterWorker", "handleRemappingSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 			MasterWorker::counter->decreaseRemapping();
 			return false;
 		}
 	}
 
-	MasterWorker::counter->decreaseRemapping();
 	return true;
 }
 
@@ -1009,6 +1038,10 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 	return true;
 }
 
+bool MasterWorker::handleRemappingSetLockResponse( SlaveEvent event, bool success, char *buf, size_t size ) {
+	return false;
+}
+
 bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, char *buf, size_t size ) {
 	struct KeyValueUpdateHeader header;
 	if ( ! this->protocol.parseKeyValueUpdateHeader( header, false, buf, size ) ) {
@@ -1152,6 +1185,7 @@ bool MasterWorker::init() {
 	MasterWorker::eventQueue = &master->eventQueue;
 	MasterWorker::stripeList = master->stripeList;
 	MasterWorker::counter = &master->counter;
+	MasterWorker::remapFlag = &master->remapFlag;
 	MasterWorker::packetPool = &master->packetPool;
 	return true;
 }

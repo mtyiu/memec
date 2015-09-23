@@ -52,6 +52,18 @@ bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIde
 	return true;
 }
 
+bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIdentifier, RemappingRecord> *&map ) {
+	if ( type == PT_SLAVE_REMAPPING_SET ) {
+		lock = &this->slaves.remappingSetLock;
+		map = &this->slaves.remappingSet;
+		return true;
+	} else {
+		lock = 0;
+		map = 0;
+		return false;
+	}
+}
+
 Pending::Pending() {
 	pthread_mutex_init( &this->applications.getLock, 0 );
 	pthread_mutex_init( &this->applications.setLock, 0 );
@@ -74,6 +86,23 @@ bool Pending::insertKey( PendingType type, uint32_t id, uint32_t parentId, void 
 
 	pthread_mutex_t *lock;
 	std::map<PendingIdentifier, Key> *map;
+	if ( ! this->get( type, lock, map ) )
+		return false;
+
+	if ( needsLock ) pthread_mutex_lock( lock );
+	ret = map->insert( p );
+	if ( needsUnlock ) pthread_mutex_unlock( lock );
+
+	return ret.second;
+}
+
+bool Pending::insertRemappingRecord( PendingType type, uint32_t id, uint32_t parentId, void *ptr, RemappingRecord &remappingRecord, bool needsLock, bool needsUnlock ) {
+	PendingIdentifier pid( id, parentId, ptr );
+	std::pair<PendingIdentifier, RemappingRecord> p( pid, remappingRecord );
+	std::pair<std::map<PendingIdentifier, RemappingRecord>::iterator, bool> ret;
+
+	pthread_mutex_t *lock;
+	std::map<PendingIdentifier, RemappingRecord> *map;
 	if ( ! this->get( type, lock, map ) )
 		return false;
 
@@ -151,6 +180,34 @@ bool Pending::eraseKey( PendingType type, uint32_t id, void *ptr, PendingIdentif
 	if ( ret ) {
 		if ( pidPtr ) *pidPtr = it->first;
 		if ( keyPtr ) *keyPtr = it->second;
+		map->erase( it );
+	}
+	if ( needsUnlock ) pthread_mutex_unlock( lock );
+
+	return ret;
+}
+
+bool Pending::eraseRemappingRecord( PendingType type, uint32_t id, void *ptr, PendingIdentifier *pidPtr, RemappingRecord *remappingRecordPtr, bool needsLock, bool needsUnlock ) {
+	PendingIdentifier pid( id, 0, ptr );
+	pthread_mutex_t *lock;
+	bool ret;
+
+	std::map<PendingIdentifier, RemappingRecord> *map;
+	std::map<PendingIdentifier, RemappingRecord>::iterator it;
+	if ( ! this->get( type, lock, map ) )
+		return false;
+
+	if ( needsLock ) pthread_mutex_lock( lock );
+	if ( ptr ) {
+		it = map->find( pid );
+		ret = ( it != map->end() );
+	} else {
+		it = map->lower_bound( pid );
+		ret = ( it != map->end() && it->first.id == id ); // Match request ID
+	}
+	if ( ret ) {
+		if ( pidPtr ) *pidPtr = it->first;
+		if ( remappingRecordPtr ) *remappingRecordPtr = it->second;
 		map->erase( it );
 	}
 	if ( needsUnlock ) pthread_mutex_unlock( lock );

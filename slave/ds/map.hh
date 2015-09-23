@@ -34,6 +34,14 @@ public:
 	 * Key |-> (list ID, stripe ID, chunk ID, opcode)
 	 */
 	std::map<Key, OpMetadata> ops;
+	pthread_mutex_t opsLock;
+
+	Map() {
+		pthread_mutex_init( &this->keysLock, 0 );
+		pthread_mutex_init( &this->remapLock, 0 );
+		pthread_mutex_init( &this->cacheLock, 0 );
+		pthread_mutex_init( &this->opsLock, 0 );
+	}
 
 	bool findRemappingRecordByKey( char *data, uint8_t size, RemappingRecord *remappingRecordPtr = 0, Key *keyPtr = 0 ) {
 		std::map<Key, RemappingRecord>::iterator it;
@@ -98,32 +106,80 @@ public:
 		metadata.set( listId, stripeId, chunkId );
 		if ( metadataPtr ) *metadataPtr = metadata;
 
+		pthread_mutex_lock( &this->cacheLock );
 		it = this->cache.find( metadata );
-		if ( it == this->cache.end() )
+		if ( it == this->cache.end() ) {
+			pthread_mutex_unlock( &this->cacheLock );
 			return 0;
+		}
+		pthread_mutex_unlock( &this->cacheLock );
 		return it->second;
 	}
 
-	void insertKey( Key &key, uint8_t opcode, KeyMetadata &keyMetadata ) {
+	bool insertKey( Key &key, uint8_t opcode, KeyMetadata &keyMetadata ) {
 		key.dup( key.size, key.data );
-		this->keys[ key ] = keyMetadata;
+
+		std::pair<Key, KeyMetadata> p( key, keyMetadata );
+		std::pair<std::map<Key, KeyMetadata>::iterator, bool> ret;
+
+		pthread_mutex_lock( &this->keysLock );
+		ret = this->keys.insert( p );
+		if ( ! ret.second ) {
+			pthread_mutex_unlock( &this->keysLock );
+			return false;
+		}
+		pthread_mutex_unlock( &this->keysLock );
 
 		OpMetadata opMetadata;
 		opMetadata.clone( keyMetadata );
 		opMetadata.opcode = opcode;
+		pthread_mutex_lock( &this->opsLock );
 		this->ops[ key ] = opMetadata;
+		pthread_mutex_unlock( &this->opsLock );
+
+		return true;
+	}
+
+	bool insertRemappingRecord( Key &key, RemappingRecord &remappingRecord ) {
+		key.dup( key.size, key.data );
+
+		std::pair<Key, RemappingRecord> p( key, remappingRecord );
+		std::pair<std::map<Key, RemappingRecord>::iterator, bool> ret;
+
+		pthread_mutex_lock( &this->remapLock );
+		ret = this->remap.insert( p );
+		if ( ! ret.second ) {
+			pthread_mutex_unlock( &this->remapLock );
+			return false;
+		}
+		pthread_mutex_unlock( &this->remapLock );
+
+		OpMetadata opMetadata;
+		opMetadata.listId = remappingRecord.listId;
+		opMetadata.chunkId = remappingRecord.chunkId;
+		opMetadata.opcode = PROTO_OPCODE_REMAPPING_LOCK;
+		pthread_mutex_lock( &this->opsLock );
+		this->ops[ key ] = opMetadata;
+		pthread_mutex_unlock( &this->opsLock );
+
+		return true;
 	}
 
 	void setChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, Chunk *chunk, bool isParity = false ) {
 		Metadata metadata;
 		metadata.set( listId, stripeId, chunkId );
+
+		pthread_mutex_lock( &this->cacheLock );
 		this->cache[ metadata ] = chunk;
+		pthread_mutex_unlock( &this->cacheLock );
+
 		if ( ! isParity ) {
 			char *ptr = chunk->data;
 			char *keyPtr, *valuePtr;
 			uint8_t keySize;
 			uint32_t valueSize, offset = 0, size;
 
+			pthread_mutex_lock( &this->keysLock );
 			while( ptr < chunk->data + Chunk::capacity ) {
 				KeyValue::deserialize( ptr, keyPtr, keySize, valuePtr, valueSize );
 				if ( keySize == 0 && valueSize == 0 )
@@ -145,6 +201,7 @@ public:
 
 				ptr += size;
 			}
+			pthread_mutex_unlock( &this->keysLock );
 		}
 	}
 
