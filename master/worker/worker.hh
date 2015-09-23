@@ -3,6 +3,7 @@
 
 #include <cstdio>
 #include "worker_role.hh"
+#include "../ds/counter.hh"
 #include "../ds/pending.hh"
 #include "../event/event_queue.hh"
 #include "../protocol/protocol.hh"
@@ -30,6 +31,7 @@ private:
 	static Pending *pending;
 	static MasterEventQueue *eventQueue;
 	static StripeList<SlaveSocket> *stripeList;
+	static Counter *counter;
 	static PacketPool *packetPool;
 
 	void dispatch( MixedEvent event );
@@ -43,6 +45,7 @@ private:
 
 	bool handleGetRequest( ApplicationEvent event, char *buf, size_t size );
 	bool handleSetRequest( ApplicationEvent event, char *buf, size_t size );
+	bool handleRemappingSetRequest( ApplicationEvent event, char *buf, size_t size );
 	bool handleUpdateRequest( ApplicationEvent event, char *buf, size_t size );
 	bool handleDeleteRequest( ApplicationEvent event, char *buf, size_t size );
 

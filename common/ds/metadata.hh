@@ -67,4 +67,8 @@ public:
 	uint8_t opcode;
 };
 
+class RemappingRecord {
+	uint32_t listId, chunkId;
+};
+
 #endif

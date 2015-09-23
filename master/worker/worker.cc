@@ -14,6 +14,7 @@ Pending *MasterWorker::pending;
 MasterEventQueue *MasterWorker::eventQueue;
 StripeList<SlaveSocket> *MasterWorker::stripeList;
 PacketPool *MasterWorker::packetPool;
+Counter *MasterWorker::counter;
 
 void MasterWorker::dispatch( MixedEvent event ) {
 	switch( event.type ) {
@@ -511,6 +512,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		"[SET] Key: %.*s (key size = %u); Value: (value size = %u)",
 		( int ) header.keySize, header.key, header.keySize, header.valueSize
 	);
+	MasterWorker::counter->increaseNormal();
 
 	uint32_t listId, chunkId;
 	bool isDegraded, connected;
@@ -528,6 +530,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		key.set( header.keySize, header.key );
 		event.resSet( event.socket, event.id, key, false, false );
 		this->dispatch( event );
+		MasterWorker::counter->decreaseNormal();
 		return false;
 	}
 
@@ -601,6 +604,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		sentBytes = socket->send( buffer.data, buffer.size, connected );
 		if ( sentBytes != ( ssize_t ) buffer.size ) {
 			__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
+			MasterWorker::counter->decreaseNormal();
 			return false;
 		}
 #endif
@@ -609,10 +613,133 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		sentBytes = socket->send( buffer.data, buffer.size, connected );
 		if ( sentBytes != ( ssize_t ) buffer.size ) {
 			__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
+			MasterWorker::counter->decreaseNormal();
 			return false;
 		}
 	}
 
+	MasterWorker::counter->decreaseNormal();
+	return true;
+}
+
+bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf, size_t size ) {
+	struct KeyValueHeader header;
+	if ( ! this->protocol.parseKeyValueHeader( header, buf, size ) ) {
+		__ERROR__( "MasterWorker", "handleSetRequest", "Invalid SET request." );
+		return false;
+	}
+	__DEBUG__(
+		BLUE, "MasterWorker", "handleSetRequest",
+		"[SET] Key: %.*s (key size = %u); Value: (value size = %u)",
+		( int ) header.keySize, header.key, header.keySize, header.valueSize
+	);
+	MasterWorker::counter->increaseRemapping();
+
+	uint32_t listId, chunkId;
+	bool isDegraded, connected;
+	ssize_t sentBytes;
+	SlaveSocket *socket;
+
+	socket = this->getSlaves(
+		header.key, header.keySize,
+		listId, chunkId, /* allowDegraded */ false, &isDegraded
+	);
+
+	if ( ! socket ) {
+		// TODO
+		Key key;
+		key.set( header.keySize, header.key );
+		event.resSet( event.socket, event.id, key, false, false );
+		this->dispatch( event );
+		MasterWorker::counter->decreaseRemapping();
+		return false;
+	}
+
+	struct {
+		size_t size;
+		char *data;
+	} buffer;
+	Key key;
+	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
+
+#ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
+	Packet *packet = 0;
+	if ( MasterWorker::parityChunkCount ) {
+		packet = MasterWorker::packetPool->malloc();
+		packet->setReferenceCount( 1 + MasterWorker::parityChunkCount );
+		buffer.data = packet->data;
+		this->protocol.reqSet( buffer.size, requestId, header.key, header.keySize, header.value, header.valueSize, buffer.data );
+		packet->size = buffer.size;
+	} else {
+		buffer.data = this->protocol.reqSet( buffer.size, requestId, header.key, header.keySize, header.value, header.valueSize );
+	}
+#else
+	buffer.data = this->protocol.reqSet( buffer.size, requestId, header.key, header.keySize, header.value, header.valueSize );
+#endif
+
+	key.dup( header.keySize, header.key, ( void * ) event.socket );
+
+	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_SET, event.id, ( void * ) event.socket, key ) ) {
+		__ERROR__( "MasterWorker", "handleSetRequest", "Cannot insert into application SET pending map." );
+	}
+
+	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount + 1; i++ ) {
+		key.ptr = ( void * )( i == 0 ? socket : this->paritySlaveSockets[ i - 1 ] );
+		if ( ! MasterWorker::pending->insertKey(
+			PT_SLAVE_SET, requestId, event.id,
+			( void * )( i == 0 ? socket : this->paritySlaveSockets[ i - 1 ] ),
+			key
+		) ) {
+			__ERROR__( "MasterWorker", "handleSetRequest", "Cannot insert into slave SET pending map." );
+		}
+	}
+
+	// Send SET requests
+	if ( MasterWorker::parityChunkCount ) {
+		for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
+			// Mark the time when request is sent
+			MasterWorker::pending->recordRequestStartTime(
+				PT_SLAVE_SET, requestId, event.id,
+				( void * ) this->paritySlaveSockets[ i ],
+				this->paritySlaveSockets[ i ]->getAddr()
+			);
+
+#ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
+			SlaveEvent slaveEvent;
+			slaveEvent.send( this->paritySlaveSockets[ i ], packet );
+			MasterWorker::eventQueue->prioritizedInsert( slaveEvent );
+		}
+
+		MasterWorker::pending->recordRequestStartTime( PT_SLAVE_SET, requestId, event.id, ( void * ) socket, socket->getAddr() );
+		SlaveEvent slaveEvent;
+		slaveEvent.send( socket, packet );
+		this->dispatch( slaveEvent );
+#else
+			sentBytes = this->paritySlaveSockets[ i ]->send( buffer.data, buffer.size, connected );
+			if ( sentBytes != ( ssize_t ) buffer.size ) {
+				__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
+			}
+		}
+
+		MasterWorker::pending->recordRequestStartTime( PT_SLAVE_SET, requestId, event.id, ( void * ) socket, socket->getAddr() );
+		sentBytes = socket->send( buffer.data, buffer.size, connected );
+		if ( sentBytes != ( ssize_t ) buffer.size ) {
+			__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
+			MasterWorker::counter->decreaseRemapping();
+			return false;
+		}
+#endif
+	} else {
+		MasterWorker::pending->recordRequestStartTime( PT_SLAVE_SET, requestId, event.id, ( void * ) socket, socket->getAddr() );
+		sentBytes = socket->send( buffer.data, buffer.size, connected );
+		if ( sentBytes != ( ssize_t ) buffer.size ) {
+			__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
+			MasterWorker::counter->decreaseRemapping();
+			return false;
+		}
+	}
+
+	MasterWorker::counter->decreaseRemapping();
 	return true;
 }
 
@@ -1024,6 +1151,7 @@ bool MasterWorker::init() {
 	MasterWorker::pending = &master->pending;
 	MasterWorker::eventQueue = &master->eventQueue;
 	MasterWorker::stripeList = master->stripeList;
+	MasterWorker::counter = &master->counter;
 	MasterWorker::packetPool = &master->packetPool;
 	return true;
 }

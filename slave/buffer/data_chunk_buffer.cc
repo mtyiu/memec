@@ -16,7 +16,8 @@ DataChunkBuffer::DataChunkBuffer( uint32_t count, uint32_t listId, uint32_t stri
 		metadata.listId = this->listId;
 		metadata.stripeId = this->stripeId;
 		metadata.chunkId = this->chunkId;
-		ChunkBuffer::map->cache[ metadata ] = this->chunks[ i ];
+		// ChunkBuffer::map->cache[ metadata ] = this->chunks[ i ];
+		ChunkBuffer::map->setChunk( this->listId, this->stripeId, this->chunkId, this->chunks[ i ], false );
 
 		this->sizes[ i ] = 0;
 
@@ -129,7 +130,8 @@ Chunk *DataChunkBuffer::flush( int index, bool lock ) {
 	newChunk->metadata.stripeId = this->stripeId;
 	newChunk->metadata.chunkId = this->chunkId;
 	newChunk->isParity = false;
-	ChunkBuffer::map->cache[ newChunk->metadata ] = newChunk;
+	// ChunkBuffer::map->cache[ newChunk->metadata ] = newChunk;
+	ChunkBuffer::map->setChunk( this->listId, this->stripeId, this->chunkId, newChunk, false );
 	this->chunks[ index ] = newChunk;
 	this->stripeId++;
 

@@ -115,7 +115,9 @@ void Chunk::computeDelta( char *delta, char *newData, uint32_t offset, uint32_t 
 	}
 }
 
-uint32_t Chunk::deleteKeyValue( Key target, std::map<Key, KeyMetadata> *keys, char *delta, size_t deltaBufSize ) {
+uint32_t Chunk::deleteKeyValue( Key target, std::map<Key, KeyMetadata> *keys, pthread_mutex_t *lock, char *delta, size_t deltaBufSize ) {
+	pthread_mutex_lock( lock );
+
 	uint32_t deltaSize, bytes;
 	char *startPtr, *src, *dst;
 	std::map<Key, KeyMetadata>::iterator it = keys->find( target );
@@ -133,6 +135,7 @@ uint32_t Chunk::deleteKeyValue( Key target, std::map<Key, KeyMetadata> *keys, ch
 	deltaSize = this->size - metadata.offset;
 	if ( deltaSize > deltaBufSize ) {
 		__ERROR__( "Chunk", "deleteKeyValue", "The buffer size is smaller than the modified chunk size." );
+		pthread_mutex_unlock( lock );
 		return 0;
 	}
 	// Backup the original data
@@ -169,6 +172,8 @@ uint32_t Chunk::deleteKeyValue( Key target, std::map<Key, KeyMetadata> *keys, ch
 	this->size -= metadata.length;
 
 	this->status = CHUNK_STATUS_DIRTY;
+
+	pthread_mutex_unlock( lock );
 
 	// Compute data delta
 	Coding::bitwiseXOR( delta, delta, startPtr, deltaSize );

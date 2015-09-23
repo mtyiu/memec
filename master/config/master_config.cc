@@ -1,6 +1,18 @@
 #include <cstdlib>
 #include "master_config.hh"
 
+MasterConfig::MasterConfig() {
+	this->epoll.maxEvents = 64;
+	this->epoll.timeout = -1;
+	this->workers.type = WORKER_TYPE_MIXED;
+	this->workers.number.mixed = 8;
+	this->eventQueue.block = true;
+	this->eventQueue.size.mixed = 1048576;
+	this->eventQueue.size.pMixed = 1024;
+	this->loadingStats.updateInterval = 30;
+	this->remap.forceEnabled = false;
+}
+
 bool MasterConfig::merge( GlobalConfig &globalConfig ) {
 	this->epoll.maxEvents = globalConfig.epoll.maxEvents;
 	this->epoll.timeout = globalConfig.epoll.timeout;
@@ -82,7 +94,12 @@ bool MasterConfig::set( const char *section, const char *name, const char *value
 	} else if ( match( section, "loadingStats" ) ) {
 		if ( match ( name, "updateInterval" ) )
 			this->loadingStats.updateInterval = atoi( value );
-		else 
+		else
+			return false;
+	} else if ( match( section, "remap" ) ) {
+		if ( match ( name, "force_enabled" ) )
+			this->remap.forceEnabled = ! match( value, "false" );
+		else
 			return false;
 	} else {
 		return false;

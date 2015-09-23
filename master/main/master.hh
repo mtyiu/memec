@@ -5,6 +5,7 @@
 #include <set>
 #include <cstdio>
 #include "../config/master_config.hh"
+#include "../ds/counter.hh"
 #include "../ds/pending.hh"
 #include "../event/event_queue.hh"
 #include "../remap/remap_msg_handler.hh"
@@ -67,7 +68,7 @@ public:
 	MasterEventQueue eventQueue;
 	PacketPool packetPool;
 	StripeList<SlaveSocket> *stripeList;
-
+	Counter counter;
 	struct {
 		struct {
 			ArrayMap< struct sockaddr_in, std::set< Latency > > get;

@@ -961,8 +961,11 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 		// Update data chunk and map
 		delta = this->protocol.buffer.recv + PROTO_KEY_SIZE + key.size;
 		key.ptr = 0;
+		pthread_mutex_t *lock;
+		std::map<Key, KeyMetadata> *keys;
+		SlaveWorker::map->getKeysMap( keys, lock );
 		deltaSize = chunk->deleteKeyValue(
-			key, &map->keys, delta,
+			key, keys, lock, delta,
 			this->protocol.buffer.size - PROTO_KEY_SIZE - key.size
 		);
 

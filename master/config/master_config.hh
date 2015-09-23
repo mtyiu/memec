@@ -47,7 +47,11 @@ public:
 	struct {
 		uint32_t updateInterval;
 	} loadingStats;
+	struct {
+		bool forceEnabled;
+	} remap;
 
+	MasterConfig();
 	bool merge( GlobalConfig &globalConfig );
 	bool parse( const char *path );
 	bool override( OptionList &options );
