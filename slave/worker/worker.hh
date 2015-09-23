@@ -72,6 +72,7 @@ private:
 	bool handleGetRequest( MasterEvent event, char *buf, size_t size );
 	bool handleSetRequest( MasterEvent event, char *buf, size_t size );
 	bool handleRemappingSetLockRequest( MasterEvent event, char *buf, size_t size );
+	bool handleRemappingSetRequest( MasterEvent event, char *buf, size_t size );
 	bool handleUpdateRequest( MasterEvent event, char *buf, size_t size );
 	bool handleDeleteRequest( MasterEvent event, char *buf, size_t size );
 

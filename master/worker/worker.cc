@@ -369,6 +369,10 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 					case PROTO_OPCODE_REMAPPING_LOCK:
 						this->handleRemappingSetLockResponse( event, success, buffer.data, buffer.size );
 						break;
+					case PROTO_OPCODE_REMAPPING_SET:
+						printf( "PROTO_OPCODE_REMAPPING_SET\n" );
+						// this->handleRemappingSetLockResponse( event, success, buffer.data, buffer.size );
+						break;
 					case PROTO_OPCODE_UPDATE:
 						this->handleUpdateResponse( event, success, buffer.data, buffer.size );
 						break;
@@ -487,8 +491,7 @@ SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId
 SlaveSocket *MasterWorker::getSlaves( uint32_t listId, uint32_t chunkId, bool allowDegraded, bool *isDegraded ) {
 	SlaveSocket *ret;
 	MasterWorker::stripeList->get( listId, this->paritySlaveSockets, this->dataSlaveSockets );
-	this->dataSlaveSockets[ 0 ] = this->dataSlaveSockets[ chunkId ];
-	ret = *this->dataSlaveSockets;
+	ret = this->dataSlaveSockets[ chunkId ];
 
 	if ( isDegraded )
 		*isDegraded = ( ! ret->ready() && allowDegraded );
@@ -1076,6 +1079,12 @@ bool MasterWorker::handleRemappingSetLockResponse( SlaveEvent event, bool succes
 
 	if ( ! MasterWorker::pending->eraseRemappingRecord( PT_SLAVE_REMAPPING_SET, event.id, event.socket, &pid, &remappingRecord ) ) {
 		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Cannot find a pending slave REMAPPING_SET_LOCK request that matches the response. This message will be discarded. (ID: %u)", event.id );
+		return false;
+	}
+
+	if ( ! success ) {
+		// TODO
+		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "TODO: Handle the case when the lock cannot be aquired." );
 		return false;
 	}
 
