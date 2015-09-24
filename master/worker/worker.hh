@@ -45,6 +45,7 @@ private:
 	SlaveSocket *getSlave( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded = false, bool *isDegraded = 0 );
 	SlaveSocket *getSlave( char *data, uint8_t size, uint32_t &originalListId, uint32_t &originalChunkId, uint32_t &remappedListId, uint32_t &remappedChunkId, bool allowDegraded = false, bool *isDegraded = 0 ); // for remapping
 	SlaveSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded = false, bool *isDegraded = 0 );
+	SlaveSocket *getSlaves( uint32_t listId, uint32_t chunkId, bool allowDegraded, bool *isDegraded );
 
 	bool handleGetRequest( ApplicationEvent event, char *buf, size_t size );
 	bool handleSetRequest( ApplicationEvent event, char *buf, size_t size );
@@ -55,6 +56,7 @@ private:
 	bool handleGetResponse( SlaveEvent event, bool success, char *buf, size_t size );
 	bool handleSetResponse( SlaveEvent event, bool success, char *buf, size_t size );
 	bool handleRemappingSetLockResponse( SlaveEvent event, bool success, char *buf, size_t size );
+	bool handleRemappingSetResponse( SlaveEvent event, bool success, char *buf, size_t size );
 	bool handleUpdateResponse( SlaveEvent event, bool success, char *buf, size_t size );
 	bool handleDeleteResponse( SlaveEvent event, bool success, char *buf, size_t size );
 

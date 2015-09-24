@@ -61,8 +61,7 @@ protected:
 		if ( generated )
 			return;
 
-		uint32_t index;
-		uint32_t i, j;
+		uint32_t i, j, index, count;
 
 		for ( i = 0; i < this->numLists; i++ ) {
 			T **list = this->lists[ i ];
@@ -71,17 +70,27 @@ protected:
 				this->parity.set( i, index );
 				this->weight[ index ] += this->k;
 				this->cost[ index ] += 1;
-
-				list[ this->k + j ] = this->slaves->at( index );
 			}
 			for ( j = 0; j < this->k; j++ ) {
 				index = pickMin( i );
 				this->data.set( i, index );
 				this->weight[ index ] += 1;
 				this->cost[ index ] += 1;
-
-				list[ j ] = this->slaves->at( index );
 			}
+
+			// Implicitly sort the item
+			count = 0;
+			for ( j = 0; j < this->numSlaves; j++ ) {
+				if ( this->data.check( i, j ) ) {
+					list[ count++ ] = this->slaves->at( j );
+				}
+			}
+			for ( j = 0; j < this->numSlaves; j++ ) {
+				if ( this->parity.check( i, j ) ) {
+					list[ count++ ] = this->slaves->at( j );
+				}
+			}
+
 			this->listRing.add( i );
 		}
 

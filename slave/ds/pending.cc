@@ -1,5 +1,23 @@
 #include "pending.hh"
 
+bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIdentifier, RemappingRecordKey> *&map ) {
+	switch( type ) {
+		case PT_MASTER_REMAPPING_SET:
+			lock = &this->masters.remappingSetLock;
+			map = &this->masters.remappingSet;
+			break;
+		case PT_SLAVE_PEER_REMAPPING_SET:
+			lock = &this->slavePeers.remappingSetLock;
+			map = &this->slavePeers.remappingSet;
+			break;
+		default:
+			lock = 0;
+			map = 0;
+			return false;
+	}
+	return true;
+}
+
 bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIdentifier, Key> *&map ) {
 	switch( type ) {
 		case PT_MASTER_GET:
@@ -49,11 +67,11 @@ bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIde
 bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIdentifier, ChunkRequest> *&map ) {
 	switch( type ) {
 		case PT_SLAVE_PEER_GET_CHUNK:
-			lock = &this->slavePeers.getLock;
+			lock = &this->slavePeers.getChunkLock;
 			map = &this->slavePeers.getChunk;
 			break;
 		case PT_SLAVE_PEER_SET_CHUNK:
-			lock = &this->slavePeers.setLock;
+			lock = &this->slavePeers.setChunkLock;
 			map = &this->slavePeers.setChunk;
 			break;
 		default:
@@ -67,11 +85,11 @@ bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIde
 bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIdentifier, ChunkUpdate> *&map ) {
 	switch( type ) {
 		case PT_SLAVE_PEER_UPDATE_CHUNK:
-			lock = &this->slavePeers.updateLock;
+			lock = &this->slavePeers.updateChunkLock;
 			map = &this->slavePeers.updateChunk;
 			break;
 		case PT_SLAVE_PEER_DEL_CHUNK:
-			lock = &this->slavePeers.delLock;
+			lock = &this->slavePeers.delChunkLock;
 			map = &this->slavePeers.deleteChunk;
 			break;
 		default:
@@ -147,9 +165,11 @@ bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIde
 		return ret; \
 	}
 
+DEFINE_PENDING_MASTER_INSERT_METHOD( insertRemappingRecordKey, RemappingRecordKey, remappingRecordKey )
 DEFINE_PENDING_MASTER_INSERT_METHOD( insertKey, Key, key )
 DEFINE_PENDING_MASTER_INSERT_METHOD( insertKeyValueUpdate, KeyValueUpdate, keyValueUpdate )
 
+DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( insertRemappingRecordKey, RemappingRecordKey, remappingRecordKey )
 DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( insertDegradedOp, DegradedOp, degradedOp )
 DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( insertChunkRequest, ChunkRequest, chunkRequest )
 DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( insertChunkUpdate, ChunkUpdate, chunkUpdate )

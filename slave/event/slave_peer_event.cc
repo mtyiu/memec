@@ -11,6 +11,15 @@ void SlavePeerEvent::resRegister( SlavePeerSocket *socket, uint32_t id, bool suc
 	this->socket = socket;
 }
 
+void SlavePeerEvent::resRemappingSet( SlavePeerSocket *socket, uint32_t id, Key &key, uint32_t listId, uint32_t chunkId, bool success ) {
+	this->type = success ? SLAVE_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE;
+	this->id = id;
+	this->socket = socket;
+	this->message.remap.key = key;
+	this->message.remap.listId = listId;
+	this->message.remap.chunkId = chunkId;
+}
+
 void SlavePeerEvent::resUpdateChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, bool success ) {
 	this->type = success ? SLAVE_PEER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_FAILURE;
 	this->id = id;

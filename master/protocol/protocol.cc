@@ -72,7 +72,7 @@ char *MasterProtocol::reqPushLoadStats(
 #undef SET_FIELDS_VAR
 
 	if ( size > PROTO_BUF_MIN_SIZE ) {
-		__DEBUG__( CYAN, "MasterProtocol" , "Warning: Load stats exceeds minimum buffer size!\n" );
+		__DEBUG__( CYAN, "MasterProtocol", "reqPushLoadStats", "Warning: Load stats exceeds minimum buffer size!\n" );
 	}
 
 	return this->buffer.send;

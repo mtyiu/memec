@@ -71,6 +71,20 @@ char *SlaveProtocol::resRemappingSetLock( size_t &size, uint32_t id, bool succes
 	return this->buffer.send;
 }
 
+char *SlaveProtocol::resRemappingSet( size_t &size, bool toMaster, uint32_t id, bool success, uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key ) {
+	size = this->generateRemappingLockHeader(
+		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+		toMaster ? PROTO_MAGIC_TO_MASTER : PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_REMAPPING_SET,
+		id,
+		listId,
+		chunkId,
+		keySize,
+		key
+	);
+	return this->buffer.send;
+}
+
 char *SlaveProtocol::resGet( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key, uint32_t valueSize, char *value ) {
 	if ( success ) {
 		size = this->generateKeyValueHeader(
@@ -140,6 +154,25 @@ char *SlaveProtocol::resRegisterSlavePeer( size_t &size, uint32_t id, bool succe
 		id
 	);
 	return this->buffer.send;
+}
+
+char *SlaveProtocol::reqRemappingSet( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, bool needsForwarding, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf ) {
+	if ( ! buf ) buf = this->buffer.send;
+	size = this->generateRemappingSetHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_REMAPPING_SET,
+		id,
+		listId,
+		chunkId,
+		needsForwarding,
+		keySize,
+		key,
+		valueSize,
+		value,
+		buf
+	);
+	return buf;
 }
 
 char *SlaveProtocol::reqUpdateChunk( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta, char *buf ) {

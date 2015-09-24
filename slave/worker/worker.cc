@@ -187,6 +187,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		case MASTER_EVENT_TYPE_GET_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_SET_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_SUCCESS:
+		case MASTER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS:
 			success = true;
@@ -195,6 +196,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		case MASTER_EVENT_TYPE_GET_RESPONSE_FAILURE:
 		case MASTER_EVENT_TYPE_SET_RESPONSE_FAILURE:
 		case MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_FAILURE:
+		case MASTER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE:
 		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
 		case MASTER_EVENT_TYPE_DELETE_RESPONSE_FAILURE:
 			success = false;
@@ -246,11 +248,25 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 				event.message.key.data
 			);
 			break;
-		// Remapping SET
+		// REMAPPING_SET_LOCK
 		case MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resRemappingSetLock(
 				buffer.size,
+				event.id,
+				success,
+				event.message.remap.listId,
+				event.message.remap.chunkId,
+				event.message.remap.key.size,
+				event.message.remap.key.data
+			);
+			break;
+		// REMAPPING_SET_LOCK
+		case MASTER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS:
+		case MASTER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resRemappingSet(
+				buffer.size,
+				true,
 				event.id,
 				success,
 				event.message.remap.listId,
@@ -334,8 +350,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 						this->handleRemappingSetLockRequest( event, buffer.data, buffer.size );
 						break;
 					case PROTO_OPCODE_REMAPPING_SET:
-						// this->handleRemappingSetRequest( event, buffer.data, buffer.size );
-						printf( "remapping set\n" );
+						this->handleRemappingSetRequest( event, buffer.data, buffer.size );
 						break;
 					case PROTO_OPCODE_UPDATE:
 						this->handleUpdateRequest( event, buffer.data, buffer.size );
@@ -413,6 +428,20 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				buffer.size,
 				event.id,
 				success
+			);
+			break;
+		case SLAVE_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS:
+			success = true; // default is false
+		case SLAVE_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resRemappingSet(
+				buffer.size,
+				false, // toMaster
+				event.id,
+				success,
+				event.message.remap.listId,
+				event.message.remap.chunkId,
+				event.message.remap.key.size,
+				event.message.remap.key.data
 			);
 			break;
 		// UPDATE_CHUNK
@@ -686,12 +715,12 @@ SlavePeerSocket *SlaveWorker::getSlaves( char *data, uint8_t size, uint32_t &lis
 				return 0;
 			if ( isDegraded ) *isDegraded = true;
 
-			for ( uint32_t i = 0; i < SlaveWorker::chunkCount; i++ ) {
-				SlavePeerSocket *s = SlaveWorker::stripeList->get( listId, chunkId, i );
+			for ( uint32_t j = 0; j < SlaveWorker::chunkCount; j++ ) {
+				SlavePeerSocket *s = SlaveWorker::stripeList->get( listId, chunkId, j );
 				if ( s->ready() ) {
 					this->paritySlaveSockets[ i ] = s;
 					break;
-				} else if ( i == SlaveWorker::chunkCount - 1 ) {
+				} else if ( j == SlaveWorker::chunkCount - 1 ) {
 					__ERROR__( "SlaveWorker", "getSlave", "Cannot find a slave for performing degraded operation." );
 					return 0;
 				}
@@ -699,6 +728,31 @@ SlavePeerSocket *SlaveWorker::getSlaves( char *data, uint8_t size, uint32_t &lis
 		}
 	}
 	return ret;
+}
+
+bool SlaveWorker::getSlaves( uint32_t listId, bool allowDegraded, bool *isDegraded ) {
+	SlaveWorker::stripeList->get( listId, this->paritySlaveSockets );
+
+	if ( isDegraded ) *isDegraded = false;
+	for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
+		if ( ! this->paritySlaveSockets[ i ]->ready() ) {
+			if ( ! allowDegraded )
+				return false;
+			if ( isDegraded ) *isDegraded = true;
+
+			for ( uint32_t j = 0; j < SlaveWorker::chunkCount; j++ ) {
+				SlavePeerSocket *s = SlaveWorker::stripeList->get( listId, SlaveWorker::dataChunkCount + i, j );
+				if ( s->ready() ) {
+					this->paritySlaveSockets[ i ] = s;
+					break;
+				} else if ( j == SlaveWorker::chunkCount - 1 ) {
+					__ERROR__( "SlaveWorker", "getSlaves", "Cannot find a slave for performing degraded operation." );
+					return false;
+				}
+			}
+		}
+	}
+	return true;
 }
 
 bool SlaveWorker::handleSlaveConnectedMsg( CoordinatorEvent event, char *buf, size_t size ) {
@@ -820,9 +874,8 @@ bool SlaveWorker::handleRemappingSetLockRequest( MasterEvent event, char *buf, s
 		__ERROR__( "SlaveWorker", "handleRemappingSetLockRequest", "Invalid REMAPPING_SET_LOCK request (size = %lu).", size );
 		return false;
 	}
-	// __DEBUG__(
-	__ERROR__(
-		// BLUE,
+	__DEBUG__(
+		BLUE,
 		"SlaveWorker", "handleRemappingSetLockRequest",
 		"[REMAPPING_SET_LOCK] Key: %.*s (key size = %u); remapped list ID: %u, remapped chunk ID: %u",
 		( int ) header.keySize, header.key, header.keySize, header.listId, header.chunkId
@@ -845,6 +898,116 @@ bool SlaveWorker::handleRemappingSetLockRequest( MasterEvent event, char *buf, s
 	} else {
 		event.resRemappingSetLock( event.socket, event.id, key, remappingRecord, false );
 	}
+	this->dispatch( event );
+
+	return true;
+}
+
+bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_t size ) {
+	struct RemappingSetHeader header;
+	if ( ! this->protocol.parseRemappingSetHeader( header, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleRemappingSetRequest", "Invalid REMAPPING_SET request (size = %lu).", size );
+		return false;
+	}
+	__DEBUG__(
+		BLUE, "SlaveWorker", "handleRemappingSetRequest",
+		"[SET] Key: %.*s (key size = %u); Value: (value size = %u); list ID = %u, chunk ID = %u; needs forwarding? %s",
+		( int ) header.keySize, header.key, header.keySize, header.valueSize,
+		header.listId, header.chunkId, header.needsForwarding ? "true" : "false"
+	);
+
+	SlaveWorker::chunkBuffer->at( header.listId )->set(
+		header.key, header.keySize, header.value, header.valueSize, PROTO_OPCODE_REMAPPING_SET, header.chunkId,
+		this->chunks, this->dataChunk, this->parityChunk
+	);
+
+	if ( header.needsForwarding && SlaveWorker::parityChunkCount > 0 ) {
+		__ERROR__( "SlaveWorker", "handleRemappingSetRequest", "TODO: Implement forwarding." );
+		uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
+
+		// Insert into master REMAPPING_SET pending set
+		struct RemappingRecordKey record;
+		record.remap.set( header.listId, header.chunkId );
+		record.key.dup( header.keySize, header.key );
+
+		if ( ! SlaveWorker::pending->insertRemappingRecordKey( PT_MASTER_REMAPPING_SET, event.id, ( void * ) event.socket, record ) ) {
+			__ERROR__( "SlaveWorker", "handleRemappingSetRequest", "Cannot insert into master REMAPPING_SET pending map (ID: %u).", event.id );
+			return false;
+		}
+
+		// Get parity slaves
+		bool isDegraded;
+		if ( ! this->getSlaves( header.listId, /* allowDegraded */ false, &isDegraded ) ) {
+			__ERROR__( "SlaveWorker", "handleRemappingSetRequest", "Cannot find a slave for performing degraded operation." );
+		}
+
+		// Prepare a packet buffer
+		Packet *packet = SlaveWorker::packetPool->malloc();
+		packet->setReferenceCount( SlaveWorker::parityChunkCount );
+
+		size_t size;
+		this->protocol.reqRemappingSet(
+			size, requestId,
+			header.listId, header.chunkId, false,
+			header.key, header.keySize,
+			header.value, header.valueSize,
+			packet->data
+		);
+		packet->size = ( uint32_t ) size;
+
+		// Forward the whole packet to the parity slaves
+		for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
+			// Insert into slave SET pending set
+			if ( ! SlaveWorker::pending->insertRemappingRecordKey( PT_SLAVE_PEER_REMAPPING_SET, requestId, event.id, this->paritySlaveSockets[ i ], record ) ) {
+				__ERROR__( "SlaveWorker", "handleRemappingSetRequest", "Cannot insert into slave SET pending map (ID: %u).", event.id );
+			}
+
+			// Insert into event queue
+			SlavePeerEvent slavePeerEvent;
+			slavePeerEvent.send( this->paritySlaveSockets[ i ], packet );
+
+#ifdef SLAVE_WORKER_SEND_REPLICAS_PARALLEL
+			if ( i == SlaveWorker::parityChunkCount - 1 )
+				this->dispatch( slavePeerEvent );
+			else
+				SlaveWorker::eventQueue->prioritizedInsert( slavePeerEvent );
+#else
+			this->dispatch( slavePeerEvent );
+#endif
+		}
+	} else {
+		Key key;
+		key.set( header.keySize, header.key );
+		event.resRemappingSet( event.socket, event.id, key, header.listId, header.chunkId, true );
+		this->load.set();
+		this->dispatch( event );
+	}
+
+	return true;
+}
+
+bool SlaveWorker::handleRemappingSetRequest( SlavePeerEvent event, char *buf, size_t size ) {
+	struct RemappingSetHeader header;
+	if ( ! this->protocol.parseRemappingSetHeader( header, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleRemappingSetRequest", "Invalid REMAPPING_SET request (size = %lu).", size );
+		return false;
+	}
+	__DEBUG__(
+		BLUE, "SlaveWorker", "handleRemappingSetRequest",
+		"[SET] Key: %.*s (key size = %u); Value: (value size = %u); list ID = %u, chunk ID = %u; needs forwarding? %s",
+		( int ) header.keySize, header.key, header.keySize, header.valueSize,
+		header.listId, header.chunkId, header.needsForwarding ? "true" : "false"
+	);
+
+	SlaveWorker::chunkBuffer->at( header.listId )->set(
+		header.key, header.keySize, header.value, header.valueSize, PROTO_OPCODE_REMAPPING_SET, header.chunkId,
+		this->chunks, this->dataChunk, this->parityChunk
+	);
+
+	Key key;
+	key.set( header.keySize, header.key );
+	event.resRemappingSet( event.socket, event.id, key, header.listId, header.chunkId, true );
+	this->load.set();
 	this->dispatch( event );
 
 	return true;
@@ -1283,12 +1446,11 @@ bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success,
 	);
 
 	int pending;
-	std::set<ChunkUpdate>::iterator it;
 	ChunkUpdate chunkUpdate;
 	PendingIdentifier pid;
 
 	if ( ! SlaveWorker::pending->eraseChunkUpdate( PT_SLAVE_PEER_UPDATE_CHUNK, event.id, event.socket, &pid, &chunkUpdate, true, false ) ) {
-		pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.updateLock );
+		pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.updateChunkLock );
 		__ERROR__( "SlaveWorker", "handleUpdateChunkResponse", "Cannot find a pending slave UPDATE_CHUNK request that matches the response. This message will be discarded. (ID: %u)", event.id );
 		return false;
 	}
@@ -1331,7 +1493,6 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 	);
 
 	int pending;
-	std::set<ChunkUpdate>::iterator it;
 	ChunkUpdate chunkUpdate;
 	PendingIdentifier pid;
 
@@ -1343,7 +1504,7 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 	chunkUpdate.ptr = ( void * ) event.socket;
 
 	if ( ! SlaveWorker::pending->eraseChunkUpdate( PT_SLAVE_PEER_DEL_CHUNK, event.id, event.socket, &pid, &chunkUpdate, true, false ) ) {
-		pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.delLock );
+		pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.delChunkLock );
 		__ERROR__( "SlaveWorker", "handleDeleteChunkResponse", "Cannot find a pending slave DELETE_CHUNK request that matches the response. This message will be discarded. (ID: %u)", event.id );
 		return false;
 	}
@@ -1354,7 +1515,6 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 	if ( pending == 0 ) {
 		// Only send application DELETE response when the number of pending slave DELETE_CHUNK requests equal 0
 		MasterEvent masterEvent;
-		std::set<Key>::iterator it;
 		Key key;
 
 		if ( ! SlaveWorker::pending->eraseKey( PT_MASTER_DEL, pid.parentId, 0, &pid, &key ) ) {
@@ -1388,7 +1548,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 
 		// Find the corresponding GET_CHUNK request from the pending set
 		if ( ! SlaveWorker::pending->findChunkRequest( PT_SLAVE_PEER_GET_CHUNK, event.id, event.socket, it, true, false ) ) {
-			pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.getLock );
+			pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.getChunkLock );
 			__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot find a pending slave GET_CHUNK request that matches the response. This message will be discarded." );
 			return false;
 		}
@@ -1423,7 +1583,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 		// __ERROR__( "SlaveWorker", "handleGetChunkResponse", "Pending slave GET_CHUNK requests = %d (%s).", pending, success ? "success" : "fail" );
 		if ( pending == 0 )
 			SlaveWorker::pending->slavePeers.getChunk.erase( it, tmp );
-		pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.getLock );
+		pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.getChunkLock );
 
 		if ( pending == 0 ) {
 			// Set up chunk buffer for storing reconstructed chunks
@@ -1561,7 +1721,6 @@ bool SlaveWorker::handleSetChunkResponse( SlavePeerEvent event, bool success, ch
 		header.listId, header.stripeId, header.chunkId
 	);
 
-	std::set<ChunkRequest>::iterator it;
 	ChunkRequest chunkRequest;
 
 	chunkRequest.set(

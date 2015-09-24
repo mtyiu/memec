@@ -102,7 +102,7 @@ char *CoordinatorProtocol::reqPushLoadStats(
 #undef SET_FIELDS_VAR
 
 	if ( size > PROTO_BUF_MIN_SIZE ) {
-		__DEBUG__( CYAN, "CoordinatorProtocol" , "Warning: Load stats exceeds minimum buffer size!\n" );
+		__DEBUG__( CYAN, "CoordinatorProtocol", "reqPushLoadStats", "Warning: Load stats exceeds minimum buffer size!\n" );
 	}
 
 	return this->buffer.send;

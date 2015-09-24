@@ -23,8 +23,10 @@ public:
 	char *resRegisterMaster( size_t &size, uint32_t id, bool success );
 	// SET
 	char *resSet( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key );
-	// Remapping SET
+	// REMAPPING_SET_LOCK
 	char *resRemappingSetLock( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key );
+	// REMAPPING_SET
+	char *resRemappingSet( size_t &size, bool toMaster, uint32_t id, bool success, uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key );
 	// GET
 	char *resGet( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key, uint32_t valueSize = 0, char *value = 0 );
 	// UPDATE
@@ -36,6 +38,8 @@ public:
 	// Register
 	char *reqRegisterSlavePeer( size_t &size, uint32_t id, ServerAddr *addr );
 	char *resRegisterSlavePeer( size_t &size, uint32_t id, bool success );
+	// REMAPPING_SET
+	char *reqRemappingSet( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, bool needsForwarding, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf = 0 );
 	// UPDATE_CHUNK
 	char *reqUpdateChunk( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta, char *buf = 0 );
 	char *resUpdateChunk( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId );
