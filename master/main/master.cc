@@ -482,6 +482,7 @@ void Master::printPending( FILE *f ) {
 	size_t i;
 	std::map<PendingIdentifier, Key>::iterator it;
 	std::map<PendingIdentifier, KeyValueUpdate>::iterator keyValueUpdateIt;
+	std::map<PendingIdentifier, RemappingRecord>::iterator remappingRecordIt;
 
 	pthread_mutex_lock( &this->pending.applications.setLock );
 	fprintf(
@@ -602,6 +603,26 @@ void Master::printPending( FILE *f ) {
 		fprintf( f, "\n" );
 	}
 	pthread_mutex_unlock( &this->pending.slaves.setLock );
+
+	pthread_mutex_lock( &this->pending.slaves.remappingSetLock );
+	fprintf(
+		f,
+		"\n[REMAPPING_SET] Pending: %lu\n",
+		this->pending.slaves.remappingSet.size()
+	);
+
+	i = 1;
+	for (
+		remappingRecordIt = this->pending.slaves.remappingSet.begin();
+		remappingRecordIt != this->pending.slaves.remappingSet.end();
+		remappingRecordIt++, i++
+	) {
+		const RemappingRecord &record = remappingRecordIt->second;
+		fprintf( f, "%lu. ID: %u, parent ID: %u; list ID: %u, chunk ID: %u; target: ", i, remappingRecordIt->first.id, remappingRecordIt->first.parentId, record.listId, record.chunkId );
+		( ( Socket * ) remappingRecordIt->first.ptr )->printAddress( f );
+		fprintf( f, "\n" );
+	}
+	pthread_mutex_unlock( &this->pending.slaves.remappingSetLock );
 
 	pthread_mutex_lock( &this->pending.slaves.getLock );
 	fprintf(

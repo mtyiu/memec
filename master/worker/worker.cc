@@ -456,8 +456,8 @@ SlaveSocket *MasterWorker::getSlave( char *data, uint8_t size, uint32_t &origina
 get_remap:
 	// Determine remapped data slave
 	// TODO: Change the hardcoded values!
-	remappedListId = 1;
-	remappedChunkId = 0;
+	remappedListId = 3; // originalListId;
+	remappedChunkId = 0; // originalChunkId;
 
 	return ret;
 }
@@ -747,7 +747,8 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 		// Send directly to the data slave and let it forward to the parity slaves
 		buffer.data = this->protocol.reqRemappingSet(
 			buffer.size, requestId,
-			originalListId, originalChunkId, MasterWorker::parityChunkCount > 0 /* needsForwarding */,
+			originalListId, originalChunkId,
+			MasterWorker::parityChunkCount > 0, /* needsForwarding */
 			header.key, header.keySize,
 			header.value, header.valueSize
 		);
@@ -767,7 +768,13 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 		Packet *packet = MasterWorker::packetPool->malloc();
 		packet->setReferenceCount( 1 + MasterWorker::parityChunkCount );
 		buffer.data = packet->data;
-		this->protocol.reqRemappingSet( buffer.size, requestId, remappedListId, remappedChunkId, false, header.key, header.keySize, header.value, header.valueSize, buffer.data );
+		this->protocol.reqRemappingSet(
+			buffer.size, requestId,
+			remappedListId, remappedChunkId, false,
+			header.key, header.keySize,
+			header.value, header.valueSize,
+			buffer.data
+		);
 		packet->size = buffer.size;
 
 		// Insert the remapping record into master REMAPPING_SET pending map
@@ -1162,8 +1169,17 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 	Key key;
 
 	// Find the cooresponding request
-	if ( ! MasterWorker::pending->eraseKey( PT_SLAVE_SET, event.id, ( void * ) event.socket, &pid, &key ) ) {
+	if ( ! MasterWorker::pending->eraseKey( PT_SLAVE_SET, event.id, ( void * ) event.socket, &pid, &key, true, false ) ) {
 		__ERROR__( "MasterWorker", "handleRemappingSetResponse", "Cannot find a pending slave SET request that matches the response. This message will be discarded. (ID: %u)", event.id );
+		event.socket->printAddress();
+		__ERROR__(
+			"MasterWorker", "handleRemappingSetResponse",
+			"[REMAPPING_SET (%s)] Key: %.*s (key size = %u); list ID: %u, chunk ID: %u.",
+			success ? "Success" : "Fail",
+			( int ) header.keySize, header.key, header.keySize,
+			header.listId, header.chunkId
+		);
+		printf( "\n" );
 
 		// std::map<PendingIdentifier, Key>::iterator it = MasterWorker::pending->slaves.set.begin();
 		// for ( ; it != MasterWorker::pending->slaves.set.end(); it++ ) {

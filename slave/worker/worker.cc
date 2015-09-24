@@ -911,9 +911,12 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 	}
 	__DEBUG__(
 		BLUE, "SlaveWorker", "handleRemappingSetRequest",
-		"[SET] Key: %.*s (key size = %u); Value: (value size = %u); list ID = %u, chunk ID = %u; needs forwarding? %s",
+	// __ERROR__(
+	// 	"SlaveWorker", "handleRemappingSetRequest",
+		"[SET] Key: %.*s (key size = %u); Value: (value size = %u); list ID = %u, chunk ID = %u; needs forwarding? %s (ID: %u)",
 		( int ) header.keySize, header.key, header.keySize, header.valueSize,
-		header.listId, header.chunkId, header.needsForwarding ? "true" : "false"
+		header.listId, header.chunkId, header.needsForwarding ? "true" : "false",
+		event.id
 	);
 
 	SlaveWorker::chunkBuffer->at( header.listId )->set(
