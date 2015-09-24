@@ -22,7 +22,8 @@ public:
     bool start();
     bool stop();
 
-    bool ackRemap();
+	bool useRemapFlow();
+    bool ackRemap( uint32_t normal = 0, uint32_t remapping = 0 );
 };
 
 #endif

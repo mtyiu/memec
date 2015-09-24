@@ -36,8 +36,6 @@ private:
 	struct timespec startTime;
 	std::vector<MasterWorker> workers;
 
-	MasterRemapMsgHandler remapMsgHandler;
-
 	Master();
 	// Do not implement
 	Master( Master const& );
@@ -71,6 +69,7 @@ public:
 	StripeList<SlaveSocket> *stripeList;
 	Counter counter;
 	RemapFlag remapFlag;
+	MasterRemapMsgHandler remapMsgHandler;
 	struct {
 		struct {
 			ArrayMap< struct sockaddr_in, std::set< Latency > > get;
@@ -86,6 +85,7 @@ public:
 		} cumulative;
 		pthread_mutex_t loadLock;
 	} slaveLoading;
+
 
 	static Master *getInstance() {
 		static Master master;

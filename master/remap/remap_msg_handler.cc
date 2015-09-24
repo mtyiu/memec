@@ -3,6 +3,7 @@
 #include <pthread.h>
 #include <string.h>
 #include "../../common/remap/remap_group.hh"
+#include "../main/master.hh"
 #include "remap_msg_handler.hh"
 
 MasterRemapMsgHandler::MasterRemapMsgHandler() : 
@@ -59,34 +60,6 @@ bool MasterRemapMsgHandler::stop() {
 
     return ( ret == 0 );
 }
-
-bool MasterRemapMsgHandler::ackRemap() {
-    char buf[ MAX_MESSLEN ];
-    int len = 0, ret = -1;
-    RemapStatus signal = REMAP_UNDEFINED;
-
-    pthread_rwlock_wrlock( &this->stlock );
-    switch ( this->status ) {
-        case REMAP_PREPARE_START:
-            signal = REMAP_WAIT_START;
-            break;
-        case REMAP_PREPARE_END:
-            signal = REMAP_WAIT_END;
-            break;
-        default:
-            pthread_rwlock_unlock( &this->stlock );
-            return false;
-    }
-    len = sprintf( buf, "%d\n", signal );
-    ret = SP_multicast( this->mbox, MSG_TYPE, COORD_GROUP, 0, len, buf );
-    if ( ret == len ) {
-        this->status = signal;
-    }
-    pthread_rwlock_unlock( &this->stlock );
-
-    return true;
-}
-
 void *MasterRemapMsgHandler::readMessages( void *argv ) {
     MasterRemapMsgHandler *myself = ( MasterRemapMsgHandler* ) argv;
     int ret = 0;
@@ -130,4 +103,54 @@ void MasterRemapMsgHandler::setStatus( char* msg , int len ) {
     pthread_rwlock_wrlock( &this->stlock );
     this->status = signal;
     pthread_rwlock_unlock( &this->stlock );
+	if ( signal == REMAP_PREPARE_START || signal == REMAP_PREPARE_END )
+		this->ackRemap( Master::getInstance()->counter.getNormal(), Master::getInstance()->counter.getRemapping() );
 }
+
+bool MasterRemapMsgHandler::useRemapFlow() {
+	switch ( this->status ) {
+		case REMAP_PREPARE_START:
+		case REMAP_WAIT_START:
+		case REMAP_START:
+			return true;
+		default:
+			break;
+	}
+	return false;
+}
+
+bool MasterRemapMsgHandler::ackRemap( uint32_t normal, uint32_t remapping ) {
+    char buf[ MAX_MESSLEN ];
+    int len = 0, ret = -1;
+    RemapStatus signal = REMAP_UNDEFINED;
+
+    pthread_rwlock_wrlock( &this->stlock );
+	if ( ( this->status == REMAP_PREPARE_START && normal > 0 ) ||
+			( this->status == REMAP_PREPARE_END && remapping > 0 ) ||
+			( this->status != REMAP_PREPARE_START && this->status != REMAP_PREPARE_END ) ) {
+		pthread_rwlock_unlock( &this->stlock );
+		return false;
+	}
+		
+    switch ( this->status ) {
+        case REMAP_PREPARE_START:
+            signal = REMAP_WAIT_START;
+            break;
+        case REMAP_PREPARE_END:
+            signal = REMAP_WAIT_END;
+            break;
+        default:
+            pthread_rwlock_unlock( &this->stlock );
+            return false;
+    }
+
+    len = sprintf( buf, "%d\n", signal );
+    ret = SP_multicast( this->mbox, MSG_TYPE, COORD_GROUP, 0, len, buf );
+    if ( ret == len ) {
+        this->status = signal;
+    }
+    pthread_rwlock_unlock( &this->stlock );
+
+    return true;
+}
+
