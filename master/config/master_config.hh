@@ -45,6 +45,9 @@ public:
 		} size;
 	} eventQueue;
 	struct {
+		uint32_t packets;
+	} pool;
+	struct {
 		uint32_t updateInterval;
 	} loadingStats;
 	struct {

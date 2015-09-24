@@ -286,21 +286,17 @@ void MasterWorker::dispatch( MasterEvent event ) {
 
 void MasterWorker::dispatch( SlaveEvent event ) {
 	bool connected, isSend;
-	uint32_t requestId;
 	ssize_t ret;
 	struct {
 		size_t size;
 		char *data;
 	} buffer;
 
-	if ( event.type != SLAVE_EVENT_TYPE_PENDING )
-		requestId = MasterWorker::idGenerator->nextVal( this->workerId );
-
 	switch( event.type ) {
 		case SLAVE_EVENT_TYPE_REGISTER_REQUEST:
 			buffer.data = this->protocol.reqRegisterSlave(
 				buffer.size,
-				requestId,
+				MasterWorker::idGenerator->nextVal( this->workerId ),
 				event.message.address.addr,
 				event.message.address.port
 			);
@@ -324,6 +320,8 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 
 		if ( event.type == SLAVE_EVENT_TYPE_SEND ) {
 			MasterWorker::packetPool->free( event.message.send.packet );
+			// fprintf( stderr, "- After free(): " );
+			// MasterWorker::packetPool->print( stderr );
 		}
 	} else {
 		// Parse responses from slaves
@@ -456,7 +454,7 @@ SlaveSocket *MasterWorker::getSlave( char *data, uint8_t size, uint32_t &origina
 get_remap:
 	// Determine remapped data slave
 	// TODO: Change the hardcoded values!
-	remappedListId = 3; // originalListId;
+	remappedListId = ( originalListId + 1 ) % 8; // originalListId;
 	remappedChunkId = 0; // originalChunkId;
 
 	return ret;
@@ -765,20 +763,11 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 		}
 	} else {
 		// Need to buffer the key-value pair in a packet
-		Packet *packet = MasterWorker::packetPool->malloc();
-		packet->setReferenceCount( 1 + MasterWorker::parityChunkCount );
-		buffer.data = packet->data;
-		this->protocol.reqRemappingSet(
-			buffer.size, requestId,
-			remappedListId, remappedChunkId, false,
-			header.key, header.keySize,
-			header.value, header.valueSize,
-			buffer.data
-		);
-		packet->size = buffer.size;
+		Key *value = new Key(); // Note: Use an Key object to store the value
+		value->dup( header.valueSize, header.value );
 
 		// Insert the remapping record into master REMAPPING_SET pending map
-		RemappingRecord remappingRecord( remappedListId, remappedChunkId, packet );
+		RemappingRecord remappingRecord( remappedListId, remappedChunkId, value );
 		if ( ! MasterWorker::pending->insertRemappingRecord( PT_SLAVE_REMAPPING_SET, requestId, event.id, ( void * ) socket, remappingRecord ) ) {
 			__ERROR__( "MasterWorker", "handleRemappingSetRequest", "Cannot insert into slave REMAPPING_SET pending map." );
 		}
@@ -1088,14 +1077,14 @@ bool MasterWorker::handleRemappingSetLockResponse( SlaveEvent event, bool succes
 
 	if ( ! success ) {
 		// TODO
-		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "TODO: Handle the case when the lock cannot be aquired." );
+		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "TODO: Handle the case when the lock cannot be acquired." );
 		return false;
 	}
 
 	bool isDegraded;
 	SlaveSocket *socket;
 	Key key;
-	Packet *packet = ( Packet * ) remappingRecord.ptr;
+	Key *value = ( Key * ) remappingRecord.ptr;
 
 	socket = this->getSlaves( remappingRecord.listId, remappingRecord.chunkId, /* allowDegraded */ false, &isDegraded );
 
@@ -1121,27 +1110,41 @@ bool MasterWorker::handleRemappingSetLockResponse( SlaveEvent event, bool succes
 		}
 	}
 
-	// Send SET requests
-	if ( MasterWorker::parityChunkCount ) {
-		for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
-			// Mark the time when request is sent
-			MasterWorker::pending->recordRequestStartTime(
-				PT_SLAVE_SET, pid.id, pid.parentId,
-				( void * ) this->paritySlaveSockets[ i ],
-				this->paritySlaveSockets[ i ]->getAddr()
-			);
+	// Prepare a packet buffer
+	Packet *packet = MasterWorker::packetPool->malloc();
+	size_t s;
+	packet->setReferenceCount( 1 + MasterWorker::parityChunkCount );
+	this->protocol.reqRemappingSet(
+		s, pid.id,
+		remappingRecord.listId, remappingRecord.chunkId, false,
+		key.data, key.size,
+		value->data, value->size,
+		packet->data
+	);
+	packet->size = s;
+	delete value;
+	value = 0;
 
-			SlaveEvent slaveEvent;
-			slaveEvent.send( this->paritySlaveSockets[ i ], packet );
+	// Send SET requests
+	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
+		// Mark the time when request is sent
+		MasterWorker::pending->recordRequestStartTime(
+			PT_SLAVE_SET, pid.id, pid.parentId,
+			( void * ) this->paritySlaveSockets[ i ],
+			this->paritySlaveSockets[ i ]->getAddr()
+		);
+
+		SlaveEvent slaveEvent;
+		slaveEvent.send( this->paritySlaveSockets[ i ], packet );
 #ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
-			MasterWorker::eventQueue->prioritizedInsert( slaveEvent );
+		MasterWorker::eventQueue->prioritizedInsert( slaveEvent );
 #else
-			this->dispatch( slaveEvent );
+		this->dispatch( slaveEvent );
 #endif
-		}
 	}
 
 	MasterWorker::pending->recordRequestStartTime( PT_SLAVE_SET, pid.id, pid.parentId, ( void * ) socket, socket->getAddr() );
+
 	SlaveEvent slaveEvent;
 	slaveEvent.send( socket, packet );
 	this->dispatch( slaveEvent );
@@ -1170,8 +1173,8 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 
 	// Find the cooresponding request
 	if ( ! MasterWorker::pending->eraseKey( PT_SLAVE_SET, event.id, ( void * ) event.socket, &pid, &key, true, false ) ) {
+		pthread_mutex_unlock( &MasterWorker::pending->slaves.setLock );
 		__ERROR__( "MasterWorker", "handleRemappingSetResponse", "Cannot find a pending slave SET request that matches the response. This message will be discarded. (ID: %u)", event.id );
-		event.socket->printAddress();
 		__ERROR__(
 			"MasterWorker", "handleRemappingSetResponse",
 			"[REMAPPING_SET (%s)] Key: %.*s (key size = %u); list ID: %u, chunk ID: %u.",
@@ -1179,12 +1182,6 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 			( int ) header.keySize, header.key, header.keySize,
 			header.listId, header.chunkId
 		);
-		printf( "\n" );
-
-		// std::map<PendingIdentifier, Key>::iterator it = MasterWorker::pending->slaves.set.begin();
-		// for ( ; it != MasterWorker::pending->slaves.set.end(); it++ ) {
-		// 	printf( "%u --> %p\n", it->first.id, it->first.ptr );
-		// }
 		return false;
 	}
 	// Check pending slave SET requests

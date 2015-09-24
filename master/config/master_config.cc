@@ -9,6 +9,7 @@ MasterConfig::MasterConfig() {
 	this->eventQueue.block = true;
 	this->eventQueue.size.mixed = 1048576;
 	this->eventQueue.size.pMixed = 1024;
+	this->pool.packets = 128;
 	this->loadingStats.updateInterval = 30;
 	this->remap.forceEnabled = false;
 }
@@ -91,6 +92,11 @@ bool MasterConfig::set( const char *section, const char *name, const char *value
 			this->eventQueue.size.separated.slave = atoi( value );
 		else
 			return false;
+	} else if ( match( section, "pool" ) ) {
+		if ( match ( name, "packets" ) )
+			this->pool.packets = atoi( value );
+		else
+			return false;
 	} else if ( match( section, "loadingStats" ) ) {
 		if ( match ( name, "updateInterval" ) )
 			this->loadingStats.updateInterval = atoi( value );
@@ -116,6 +122,9 @@ bool MasterConfig::validate() {
 
 	if ( this->epoll.timeout < -1 )
 		CFG_PARSE_ERROR( "MasterConfig", "The timeout value of epoll should be either -1 (infinite blocking), 0 (non-blocking) or a positive value (representing the number of milliseconds to block)." );
+
+	if ( this->pool.packets < this->workers.number.mixed )
+		CFG_PARSE_ERROR( "MasterConfig", "The packet pool should be at least the number of workers." );
 
 	switch( this->workers.type ) {
 		case WORKER_TYPE_MIXED:
@@ -211,9 +220,15 @@ void MasterConfig::print( FILE *f ) {
 	}
 	fprintf(
 		f,
-		"Loading statistics\n"
-		"\t- %-*s : %u\n",
-		width, "Update interval (seconds)", this->loadingStats.updateInterval
+		"- Pool\n"
+		"\t- %-*s : %u\n"
+		"- Loading statistics\n"
+		"\t- %-*s : %u\n"
+		"- Remapping\n"
+		"\t- %-*s : %s\n",
+		width, "Packets", this->pool.packets,
+		width, "Update interval (seconds)", this->loadingStats.updateInterval,
+		width, "Force enabled?", this->remap.forceEnabled ? "true" : "false"
 	);
 
 	fprintf( f, "\n" );

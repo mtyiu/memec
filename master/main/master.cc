@@ -179,7 +179,7 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 	if ( this->config.master.workers.type == WORKER_TYPE_MIXED ) {
 		this->idGenerator.init( this->config.master.workers.number.mixed );
 		this->packetPool.init(
-			this->config.master.workers.number.mixed,
+			this->config.master.pool.packets,
 			Protocol::getSuggestedBufferSize(
 				this->config.global.size.key,
 				this->config.global.size.chunk
@@ -203,7 +203,7 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 	} else {
 		this->idGenerator.init( this->config.master.workers.number.separated.total );
 		this->packetPool.init(
-			this->config.master.workers.number.separated.total,
+			this->config.master.pool.packets,
 			Protocol::getSuggestedBufferSize(
 				this->config.global.size.key,
 				this->config.global.size.chunk

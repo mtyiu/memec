@@ -71,8 +71,11 @@ Pending::Pending() {
 	pthread_mutex_init( &this->applications.delLock, 0 );
 	pthread_mutex_init( &this->slaves.getLock, 0 );
 	pthread_mutex_init( &this->slaves.setLock, 0 );
+	pthread_mutex_init( &this->slaves.remappingSetLock, 0 );
 	pthread_mutex_init( &this->slaves.updateLock, 0 );
 	pthread_mutex_init( &this->slaves.delLock, 0 );
+	pthread_mutex_init( &this->stats.getLock, 0 );
+	pthread_mutex_init( &this->stats.setLock, 0 );
 }
 
 bool Pending::insertKey( PendingType type, uint32_t id, void *ptr, Key &key, bool needsLock, bool needsUnlock ) {
@@ -235,10 +238,6 @@ bool Pending::eraseRemappingRecord( PendingType type, uint32_t id, void *ptr, Pe
 		if ( pidPtr ) *pidPtr = it->first;
 		if ( remappingRecordPtr ) *remappingRecordPtr = it->second;
 		map->erase( it );
-	} else {
-		for ( it = map->begin(); it != map->end(); it++ ) {
-			printf( "(%u, %u, %p) vs. (%u, %u, %p)\n", it->first.id, it->first.parentId, it->first.ptr, pid.id, pid.parentId, pid.ptr );
-		}
 	}
 	if ( needsUnlock ) pthread_mutex_unlock( lock );
 
@@ -324,6 +323,16 @@ uint32_t Pending::count( PendingType type, uint32_t id, bool needsLock, bool nee
 	if ( type == PT_APPLICATION_UPDATE || type == PT_SLAVE_UPDATE ) {
 		std::map<PendingIdentifier, KeyValueUpdate> *map;
 		std::map<PendingIdentifier, KeyValueUpdate>::iterator it;
+
+		if ( ! this->get( type, lock, map ) ) return 0;
+
+		if ( needsLock ) pthread_mutex_lock( lock );
+		it = map->lower_bound( pid );
+		for ( ret = 0; it != map->end() && it->first.id == id; ret++, it++ );
+		if ( needsUnlock ) pthread_mutex_unlock( lock );
+	} else if ( type == PT_SLAVE_REMAPPING_SET ) {
+		std::map<PendingIdentifier, RemappingRecord> *map;
+		std::map<PendingIdentifier, RemappingRecord>::iterator it;
 
 		if ( ! this->get( type, lock, map ) ) return 0;
 

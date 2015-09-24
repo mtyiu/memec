@@ -82,7 +82,7 @@ public:
 		}
 	}
 
-	T *malloc( T **buffer = 0, uint64_t count = 0 ) {
+	T *malloc( T **buffer = 0, uint64_t count = 1 ) {
 		T *ret = 0;
 
 		pthread_mutex_lock( &this->mAccess );
