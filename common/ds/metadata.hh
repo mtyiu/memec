@@ -79,6 +79,10 @@ public:
 	}
 
 	RemappingRecord( uint32_t listId, uint32_t chunkId, void *ptr = 0 ) {
+		this->set( listId, chunkId, ptr );
+	}
+
+	void set( uint32_t listId, uint32_t chunkId, void *ptr = 0 ) {
 		this->listId = listId;
 		this->chunkId = chunkId;
 		this->ptr = ptr;

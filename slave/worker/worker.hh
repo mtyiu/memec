@@ -66,6 +66,7 @@ private:
 
 	SlavePeerSocket *getSlave( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded = false, bool *isDegraded = 0 );
 	SlavePeerSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded = false, bool *isDegraded = 0 );
+	bool getSlaves( uint32_t listId, bool allowDegraded = false, bool *isDegraded = 0 );
 
 	bool handleSlaveConnectedMsg( CoordinatorEvent event, char *buf, size_t size );
 
@@ -77,6 +78,7 @@ private:
 	bool handleDeleteRequest( MasterEvent event, char *buf, size_t size );
 
 	bool handleSlavePeerRegisterRequest( SlavePeerSocket *socket, char *buf, size_t size );
+	bool handleRemappingSetRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleUpdateChunkRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleDeleteChunkRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleGetChunkRequest( SlavePeerEvent event, char *buf, size_t size );

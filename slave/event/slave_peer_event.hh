@@ -14,6 +14,9 @@ enum SlavePeerEventType {
 	SLAVE_PEER_EVENT_TYPE_REGISTER_REQUEST,
 	SLAVE_PEER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS,
 	SLAVE_PEER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE,
+	// REMAPPING_SET
+	SLAVE_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS,
+	SLAVE_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE,
 	// UPDATE_CHUNK
 	SLAVE_PEER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_SUCCESS,
 	SLAVE_PEER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_FAILURE,
@@ -54,11 +57,17 @@ public:
 		struct {
 			Packet *packet;
 		} send;
+		struct {
+			Key key;
+			uint32_t listId, chunkId;
+		} remap;
 	} message;
 
 	// Register
 	void reqRegister( SlavePeerSocket *socket );
 	void resRegister( SlavePeerSocket *socket, uint32_t id, bool success = true );
+	// REMAPPING_SET
+	void resRemappingSet( SlavePeerSocket *socket, uint32_t id, Key &key, uint32_t listId, uint32_t chunkId, bool success );
 	// UPDATE_CHUNK
 	void resUpdateChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, bool success );
 	// DELETE_CHUNK
