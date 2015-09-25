@@ -59,10 +59,12 @@ void Coordinator::updateOverloadedSlaveSet( ArrayMap<struct sockaddr_in, Latency
 		avgNsec += ( double ) slave##_TYPE_##Latency->values[ i ]->nsec / slaveCount; \
 	} \
 	for ( uint32_t i = 0; i < slaveCount; i++ ) { \
-		if ( slave##_TYPE_##Latency->values[ i ]->sec > avgSec * threshold - FLOAT_THRESHOLD || \
+		if ( ( double ) slave##_TYPE_##Latency->values[ i ]->sec > avgSec * threshold || \
 				( ( A_EQUAL_B ( slave##_TYPE_##Latency->values[ i ]->sec, avgSec * threshold ) && \
-					slave##_TYPE_##Latency->values[ i ]->nsec >= avgNsec * threshold - FLOAT_THRESHOLD ) ) ) \
+					(double) slave##_TYPE_##Latency->values[ i ]->nsec >= avgNsec * threshold ) ) ) {\
 			this->overloadedSlaves.slaveSet.insert( slave##_TYPE_##Latency->keys[ i ] ); \
+		} \
+		this->overloadedSlaves.slaveSet.insert( slave##_TYPE_##Latency->keys[ i ] ); \
 	} \
 }
 
