@@ -82,14 +82,18 @@ void Coordinator::updateAverageSlaveLoading( ArrayMap<struct sockaddr_in, Latenc
 
 	// calculate the average from existing stat from masters
 #define SET_AVG_SLAVE_LATENCY( _TYPE_ ) \
-	avgSec = 0.0; \
-	avgNsec = 0.0; \
 	latest = &this->slaveLoading.latest##_TYPE_; \
 	for ( uint32_t i = 0; i < latest->size(); i++ ) { \
+		avgSec = 0.0; \
+		avgNsec = 0.0; \
 		uint32_t masterCount = latest->values[ i ]->size(); \
 		for ( uint32_t j = 0; j < masterCount; j++ ) { \
 			avgSec += ( double ) latest->values[ i ]->values[ j ]->sec / masterCount; \
 			avgNsec += ( double ) latest->values[ i ]->values[ j ]->nsec / masterCount; \
+			if ( avgNsec >= GIGA ) { \
+				avgNsec -= GIGA; \
+				avgSec += 1; \
+			} \
 		} \
 		slave##_TYPE_##Latency->set( latest->keys[ i ], new Latency( avgSec, avgNsec ) ); \
 	}
