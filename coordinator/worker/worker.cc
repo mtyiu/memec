@@ -1,6 +1,7 @@
 #include "worker.hh"
 #include "../main/coordinator.hh"
 #include "../../common/util/debug.hh"
+#include "../../common/ds/sockaddr_in.hh"
 
 #define WORKER_COLOR	YELLOW
 
@@ -27,12 +28,13 @@ void CoordinatorWorker::dispatch( CoordinatorEvent event ) {
 }
 
 void CoordinatorWorker::dispatch( MasterEvent event ) {
-	bool connected, isSend;
+	bool connected = false, isSend;
 	ssize_t ret;
 	struct {
 		size_t size;
 		char *data;
 	} buffer;
+	Coordinator *coordinator = Coordinator::getInstance();
 
 	switch( event.type ) {
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
@@ -49,7 +51,19 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 				event.message.slaveLoading.slaveGetLatency, 
 				event.message.slaveLoading.slaveSetLatency
 			);
+			// release the ArrayMaps
+			delete event.message.slaveLoading.slaveGetLatency;
+			delete event.message.slaveLoading.slaveSetLatency;
 			isSend = true;
+			break;
+		case MASTER_EVENT_TYPE_SWITCH_PHASE:
+			// just trigger / stop the remap phase, no message need to be handled
+			if ( event.message.remap.toRemap ) {
+				coordinator->remapMsgHandler.startRemap();
+			} else {
+				coordinator->remapMsgHandler.stopRemap();
+			}
+			isSend = false;
 			break;
 		case MASTER_EVENT_TYPE_PENDING:
 			isSend = false;
@@ -62,9 +76,20 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+	} else if ( event.type == MASTER_EVENT_TYPE_SWITCH_PHASE ) {
+		// just to avoid error message
+		connected = true;
 	} else {
 		ProtocolHeader header;
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();
+
+		struct LoadStatsHeader loadStatsHeader;
+		ArrayMap< struct sockaddr_in, Latency > getLatency;
+		ArrayMap< struct sockaddr_in, Latency > setLatency;
+		Coordinator *coordinator = Coordinator::getInstance();
+		ArrayMap< struct sockaddr_in, Latency> *latencyPool = NULL;
+		struct sockaddr_in masterAddr;
+
 		while( buffer.size > 0 ) {
 			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "CoordinatorWorker" );
 
@@ -76,12 +101,6 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 				__ERROR__( "CoordinatorWorker", "dispatch", "Invalid message source from master." );
 			}
 
-			struct LoadStatsHeader loadStatsHeader;
-			ArrayMap< ServerAddr, Latency > getLatency;
-			ArrayMap< ServerAddr, Latency > setLatency;
-			Coordinator *coordinator = Coordinator::getInstance();
-			ServerAddr masterAddr ( NULL, event.socket->getAddr().sin_addr.s_addr, event.socket->getAddr().sin_port, 0);
-			ArrayMap<ServerAddr, Latency> *latencyPool = NULL;
 			int index = 0;
 
 			switch ( header.magic ) {
@@ -92,13 +111,14 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 					if ( ! this->protocol.parseLoadingStats( loadStatsHeader, getLatency, setLatency, buffer.data, buffer.size ) )
 						__ERROR__( "CoordinatorWorker", "dispatch", "Invalid amount of data received from master." );
 					//fprintf( stderr, "get stats GET %d SET %d\n", loadStatsHeader.slaveGetCount, loadStatsHeader.slaveSetCount );
-					// TODO set the latest loading stats
-					fprintf( stderr, "fd %d IP %u:%hu\n", event.socket->getSocket(), ntohl( event.socket->getAddr().sin_addr.s_addr ), ntohs( event.socket->getAddr().sin_port ) );
+					// set the latest loading stats
+					//fprintf( stderr, "fd %d IP %u:%hu\n", event.socket->getSocket(), ntohl( event.socket->getAddr().sin_addr.s_addr ), ntohs( event.socket->getAddr().sin_port ) );
+
 #define SET_SLAVE_LATENCY_FOR_MASTER( _MASTER_ADDR_, _SRC_, _DST_ ) \
 	for ( uint32_t i = 0; i < _SRC_.size(); i++ ) { \
 		coordinator->slaveLoading._DST_.get( _SRC_.keys[ i ], &index ); \
 		if ( index == -1 ) { \
-			coordinator->slaveLoading._DST_.set( _SRC_.keys[ i ], new ArrayMap<ServerAddr, Latency> () ); \
+			coordinator->slaveLoading._DST_.set( _SRC_.keys[ i ], new ArrayMap<struct sockaddr_in, Latency> () ); \
 			index = coordinator->slaveLoading._DST_.size() - 1; \
 			coordinator->slaveLoading._DST_.values[ index ]->set( _MASTER_ADDR_, _SRC_.values[ i ] ); \
 		} else { \
@@ -113,10 +133,12 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 		} \
 	} \
 
-					pthread_mutex_lock ( &coordinator->slaveLoading.loadingLock );
+					masterAddr = event.socket->getAddr();
+					pthread_mutex_lock ( &coordinator->slaveLoading.lock );
 					SET_SLAVE_LATENCY_FOR_MASTER( masterAddr, getLatency, latestGet );
 					SET_SLAVE_LATENCY_FOR_MASTER( masterAddr, setLatency, latestSet );
-					pthread_mutex_unlock ( &coordinator->slaveLoading.loadingLock ); 
+					pthread_mutex_unlock ( &coordinator->slaveLoading.lock ); 
+
 					buffer.data -= PROTO_LOAD_STATS_SIZE;
 					buffer.size += PROTO_LOAD_STATS_SIZE;
 					break;
@@ -127,7 +149,7 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 					goto quit_1;
 			}
 
-//#undef SET_SLAVE_LATENCY_FOR_MASTER
+#undef SET_SLAVE_LATENCY_FOR_MASTER
 quit_1:
 			buffer.data += header.length;
 			buffer.size -= header.length;

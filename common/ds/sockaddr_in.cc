@@ -6,3 +6,10 @@ bool operator==( const struct sockaddr_in &lhs, const struct sockaddr_in &rhs ) 
 		lhs.sin_addr.s_addr == rhs.sin_addr.s_addr
 	);
 }
+
+bool operator<( const struct sockaddr_in &lhs, const struct sockaddr_in &rhs ) {
+	return (
+		lhs.sin_addr.s_addr > rhs.sin_addr.s_addr ||
+		lhs.sin_port > rhs.sin_port 
+	);
+}

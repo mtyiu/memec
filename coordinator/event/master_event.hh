@@ -10,6 +10,7 @@ enum MasterEventType {
 	MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS,
 	MASTER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE,
 	MASTER_EVENT_TYPE_PUSH_LOADING_STATS,
+	MASTER_EVENT_TYPE_SWITCH_PHASE,
 	MASTER_EVENT_TYPE_PENDING
 };
 
@@ -20,14 +21,18 @@ public:
 	MasterSocket *socket;
 	union {
 		struct {
-			ArrayMap<ServerAddr, Latency> *slaveGetLatency;
-			ArrayMap<ServerAddr, Latency> *slaveSetLatency;
+			ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency;
+			ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency;
 		} slaveLoading;
+		struct {
+			bool toRemap;
+		} remap;
 	} message;
 
 	void resRegister( MasterSocket *socket, uint32_t id, bool success = true );
-	void reqPushLoadStats ( MasterSocket *socket, ArrayMap<ServerAddr, Latency> *slaveGetLatency, 
-			ArrayMap<ServerAddr, Latency> *slaveSetLatency );
+	void reqPushLoadStats ( MasterSocket *socket, ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency, 
+			ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency );
+	void switchPhase( bool toRemap );
 	void pending( MasterSocket *socket );
 };
 

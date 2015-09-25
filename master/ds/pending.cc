@@ -272,7 +272,7 @@ bool Pending::eraseKeyValueUpdate( PendingType type, uint32_t id, void *ptr, Pen
 	return ret;
 }
 
-bool Pending::eraseRequestStartTime( PendingType type, uint32_t id, void *ptr, double &elapsedTime, PendingIdentifier *pidPtr, RequestStartTime *rstPtr ) {
+bool Pending::eraseRequestStartTime( PendingType type, uint32_t id, void *ptr, struct timespec &elapsedTime, PendingIdentifier *pidPtr, RequestStartTime *rstPtr ) {
 	PendingIdentifier pid( id, 0, ptr );
 	std::map<PendingIdentifier, RequestStartTime>::iterator it;
 	RequestStartTime rst;
@@ -309,9 +309,17 @@ bool Pending::eraseRequestStartTime( PendingType type, uint32_t id, void *ptr, d
 	if ( ret ) {
 		struct timespec currentTime;
 		clock_gettime( CLOCK_REALTIME, &currentTime );
-		elapsedTime = currentTime.tv_sec - rst.sttime.tv_sec + ( currentTime.tv_nsec - rst.sttime.tv_nsec ) / GIGA;
+		elapsedTime.tv_sec = currentTime.tv_sec - rst.sttime.tv_sec;
+		//fprintf( stderr, "from %lu.%lu to %lu.%lu\n", rst.sttime.tv_sec, rst.sttime.tv_nsec, currentTime.tv_sec, currentTime.tv_nsec );
+		if ( ( long long )currentTime.tv_nsec - rst.sttime.tv_nsec < 0 ) {
+			elapsedTime.tv_sec -= 1;
+			elapsedTime.tv_nsec = GIGA - rst.sttime.tv_nsec + currentTime.tv_nsec;
+		} else {
+			elapsedTime.tv_nsec = currentTime.tv_nsec- rst.sttime.tv_nsec;
+		}
 	} else {
-		elapsedTime = 0.0;
+		elapsedTime.tv_sec = 0;
+		elapsedTime.tv_nsec = 0;
 	}
 	return ret;
 }

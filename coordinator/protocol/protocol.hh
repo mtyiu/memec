@@ -20,13 +20,13 @@ public:
 	// Load statistics
 	char *reqPushLoadStats( 
 		size_t &size, uint32_t id,
-		ArrayMap< ServerAddr, Latency > *slaveGetLatency, 
-		ArrayMap< ServerAddr, Latency > *slaveSetLatency 
+		ArrayMap< struct sockaddr_in, Latency > *slaveGetLatency, 
+		ArrayMap< struct sockaddr_in, Latency > *slaveSetLatency 
 	);
 	bool parseLoadingStats( 
 		const LoadStatsHeader& loadStatsHeader, 
-		ArrayMap< ServerAddr, Latency >& slaveGetLatency,
-		ArrayMap< ServerAddr, Latency >& slaveSetLatency,
+		ArrayMap< struct sockaddr_in, Latency >& slaveGetLatency,
+		ArrayMap< struct sockaddr_in, Latency >& slaveSetLatency,
 		char* buffer, uint32_t size
 	);
 

@@ -74,7 +74,7 @@ public:
 	bool eraseKey( PendingType type, uint32_t id, void *ptr = 0, PendingIdentifier *pidPtr = 0, Key *keyPtr = 0, bool needsLock = true, bool needsUnlock = true );
 	bool eraseRemappingRecord( PendingType type, uint32_t id, void *ptr = 0, PendingIdentifier *pidPtr = 0, RemappingRecord *remappingRecordPtr = 0, bool needsLock = true, bool needsUnlock = true );
 	bool eraseKeyValueUpdate( PendingType type, uint32_t id, void *ptr = 0, PendingIdentifier *pidPtr = 0, KeyValueUpdate *keyValueUpdatePtr = 0, bool needsLock = true, bool needsUnlock = true );
-	bool eraseRequestStartTime( PendingType type, uint32_t id, void *ptr, double &elapsedTime, PendingIdentifier *pidPtr = 0, RequestStartTime *rstPtr = 0 );
+	bool eraseRequestStartTime( PendingType type, uint32_t id, void *ptr, struct timespec &elapsedTime, PendingIdentifier *pidPtr = 0, RequestStartTime *rstPtr = 0 );
 
 	uint32_t count( PendingType type, uint32_t id, bool needsLock = true, bool needsUnlock = true );
 };

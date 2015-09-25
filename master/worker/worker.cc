@@ -167,7 +167,8 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 						this->handleGetRequest( event, buffer.data, buffer.size );
 						break;
 					case PROTO_OPCODE_SET:
-						if ( MasterWorker::remapFlag->get() ) {
+						//if ( MasterWorker::remapFlag->get() ) {
+						if ( Master::getInstance()->remapMsgHandler.useRemapFlow() ) {
 							this->handleRemappingSetRequest( event, buffer.data, buffer.size );
 						} else {
 							this->handleSetRequest( event, buffer.data, buffer.size );
@@ -242,6 +243,10 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 	} else {
 		ProtocolHeader header;
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();
+		ArrayMap<struct sockaddr_in, Latency> getLatency, setLatency;
+		struct LoadStatsHeader loadStatsHeader;
+		Master *master = Master::getInstance();
+
 		while ( buffer.size > 0 ) {
 			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "MasterWorker" );
 
@@ -261,6 +266,13 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 								__ERROR__( "MasterWorker", "dispatch", "Failed to register with coordinator." );
 								break;
 							case PROTO_MAGIC_LOADING_STATS:
+								this->protocol.parseLoadStatsHeader( loadStatsHeader, buffer.data, buffer.size );
+								buffer.data += PROTO_LOAD_STATS_SIZE;
+								buffer.size -= PROTO_LOAD_STATS_SIZE;
+								this->protocol.parseLoadingStats( loadStatsHeader, getLatency, setLatency, buffer.data, buffer.size );
+								master->mergeSlaveCumulativeLoading( &getLatency, &setLatency );
+								buffer.data -= PROTO_LOAD_STATS_SIZE;
+								buffer.size += PROTO_LOAD_STATS_SIZE;
 								break;
 							default:
 								__ERROR__( "MasterWorker", "dispatch", "Invalid magic code from coordinator." );
@@ -600,6 +612,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		event.resSet( event.socket, event.id, key, false, false );
 		this->dispatch( event );
 		MasterWorker::counter->decreaseNormal();
+		Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
 		return false;
 	}
 
@@ -674,6 +687,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		if ( sentBytes != ( ssize_t ) buffer.size ) {
 			__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 			MasterWorker::counter->decreaseNormal();
+			Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
 			return false;
 		}
 #endif
@@ -683,11 +697,13 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		if ( sentBytes != ( ssize_t ) buffer.size ) {
 			__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 			MasterWorker::counter->decreaseNormal();
+			Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
 			return false;
 		}
 	}
 
 	MasterWorker::counter->decreaseNormal();
+	Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
 	return true;
 }
 
@@ -723,6 +739,7 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 		event.resSet( event.socket, event.id, key, false, false );
 		this->dispatch( event );
 		MasterWorker::counter->decreaseRemapping();
+		Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
 		return false;
 	}
 
@@ -783,9 +800,12 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 		if ( sentBytes != ( ssize_t ) buffer.size ) {
 			__ERROR__( "MasterWorker", "handleRemappingSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 			MasterWorker::counter->decreaseRemapping();
+			Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
 			return false;
 		}
 	}
+
+	Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
 
 	return true;
 }
@@ -952,7 +972,7 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, char *buf,
 	// Mark the elapse time as latency
 	Master* master = Master::getInstance();
 	if ( master->config.master.loadingStats.updateInterval > 0 ) {
-		double elapsedTime;
+		struct timespec elapsedTime;
 		RequestStartTime rst;
 
 		if ( ! MasterWorker::pending->eraseRequestStartTime( PT_SLAVE_GET, pid.id, ( void * ) event.socket, elapsedTime, 0, &rst ) ) {
@@ -966,7 +986,7 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, char *buf,
 			}
 			// insert the latency to the set
 			// TODO use time when Response came, i.e. event created for latency cal.
-			Latency latency = Latency ( ( double ) elapsedTime );
+			Latency latency = Latency ( elapsedTime );
 			if ( index == -1 )
 				latencyPool = master->slaveLoading.past.get.get( rst.addr );
 			latencyPool->insert( latency );
@@ -1018,7 +1038,7 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 	// Mark the elapse time as latency
 	Master* master = Master::getInstance();
 	if ( master->config.master.loadingStats.updateInterval > 0 ) {
-		double elapsedTime;
+		struct timespec elapsedTime;
 		RequestStartTime rst;
 
 		if ( ! MasterWorker::pending->eraseRequestStartTime( PT_SLAVE_SET, pid.id, ( void * ) event.socket, elapsedTime, 0, &rst ) ) {
@@ -1032,7 +1052,7 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 			}
 			// insert the latency to the set
 			// TODO use time when Response came, i.e. event created for latency cal.
-			Latency latency = Latency ( ( double ) elapsedTime );
+			Latency latency = Latency ( elapsedTime );
 			if ( index == -1 )
 				latencyPool = master->slaveLoading.past.set.get( rst.addr );
 			latencyPool->insert( latency );
@@ -1190,7 +1210,7 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 	// Mark the elapse time as latency
 	Master* master = Master::getInstance();
 	if ( master->config.master.loadingStats.updateInterval > 0 ) {
-		double elapsedTime;
+		timespec elapsedTime;
 		RequestStartTime rst;
 
 		if ( ! MasterWorker::pending->eraseRequestStartTime( PT_SLAVE_SET, pid.id, ( void * ) event.socket, elapsedTime, 0, &rst ) ) {
@@ -1204,7 +1224,7 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 			}
 			// insert the latency to the set
 			// TODO use time when Response came, i.e. event created for latency cal.
-			Latency latency = Latency ( ( double ) elapsedTime );
+			Latency latency = Latency ( elapsedTime );
 			if ( index == -1 )
 				latencyPool = master->slaveLoading.past.set.get( rst.addr );
 			latencyPool->insert( latency );

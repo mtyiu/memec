@@ -46,6 +46,28 @@ public:
 
     bool startRemap();
     bool stopRemap();
+	bool isRemapStarted() {
+		switch ( this->status ) {
+			case REMAP_PREPARE_START:
+			case REMAP_START:
+			case REMAP_PREPARE_END:
+				return true;
+			default:
+				return false;
+		} 
+		return false;
+	}
+	bool isRemapStopped() {
+		switch ( this->status ) {
+			case REMAP_NONE:
+			case REMAP_END:
+			case REMAP_UNDEFINED:
+				return true;
+			default:
+				return false;
+		}
+		return true;
+	}
 };
 
 #endif

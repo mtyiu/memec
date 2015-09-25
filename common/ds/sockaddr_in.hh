@@ -4,5 +4,6 @@
 #include <netinet/in.h>
 
 bool operator==( const struct sockaddr_in &lhs, const struct sockaddr_in &rhs );
+bool operator<( const struct sockaddr_in &lhs, const struct sockaddr_in &rhs );
 
 #endif

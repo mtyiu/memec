@@ -78,6 +78,35 @@ void Master::updateSlavesCumulativeLoading () {
 	pthread_mutex_unlock( &this->slaveLoading.loadLock );
 }
 
+void Master::mergeSlaveCumulativeLoading ( ArrayMap< struct sockaddr_in, Latency > *getLatency, ArrayMap< struct sockaddr_in, Latency> *setLatency ) {
+	
+	pthread_mutex_lock( &this->slaveLoading.loadLock );
+
+	int index = -1;
+	// check if the slave addr already exists in currentMap
+	// if not, update the cumulativeMap directly
+	// otherwise, ignore it
+#define MERGE_AND_UPDATE_LATENCY( _SRC_, _MERGE_DST_, _CHECK_EXIST_ ) \
+	for ( uint32_t i = 0; i < _SRC_->size(); i++ ) { \
+		_CHECK_EXIST_.get( _SRC_->keys[ i ], &index ); \
+		if ( index != -1 ) \
+			continue; \
+		_MERGE_DST_.get( _SRC_->keys[ i ], &index ); \
+		if ( index == -1 ) { \
+			_MERGE_DST_.set( _SRC_->keys[ i ], _SRC_->values[ i ] ); \
+		} else { \
+			_MERGE_DST_.values[ index ]->aggregate( _SRC_->values[ i ] ); \
+			delete _SRC_->values[ i ]; \
+		} \
+	} 
+	MERGE_AND_UPDATE_LATENCY( getLatency, this->slaveLoading.cumulative.get, this->slaveLoading.current.get );
+	MERGE_AND_UPDATE_LATENCY( setLatency, this->slaveLoading.cumulative.set, this->slaveLoading.current.set );
+
+#undef MERGE_AND_UPDATE_LATENCY
+	
+	pthread_mutex_unlock( &this->slaveLoading.loadLock );
+}
+
 void Master::free() {
 	this->idGenerator.free();
 	this->eventQueue.free();
@@ -238,11 +267,11 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 	}
 
 	/* Remapping message handler */
-	if ( this->config.global.spreadd.enabled ) {
+	if ( this->config.global.remap.enabled ) {
 		char masterName[ 11 ];
 		memset( masterName, 0, 11 );
 		sprintf( masterName, "%s%03d", MASTER_PREFIX, this->config.master.master.addr.port % 1000 );
-		remapMsgHandler.init( this->config.global.spreadd.addr.addr, this->config.global.spreadd.addr.port, masterName );
+		remapMsgHandler.init( this->config.global.remap.spreaddAddr.addr, this->config.global.remap.spreaddAddr.port, masterName );
 	}
 
 	/* Loading statistics update */
@@ -297,7 +326,7 @@ bool Master::start() {
 	}
 
 	/* Remapping message handler */
-	if ( this->config.global.spreadd.enabled && ! this->remapMsgHandler.start() ) {
+	if ( this->config.global.remap.enabled && ! this->remapMsgHandler.start() ) {
 		__ERROR__( "Master", "start", "Cannot start remapping message handler." );
 		ret = false;
 	}
@@ -350,7 +379,7 @@ bool Master::stop() {
 	this->sockets.slaves.clear();
 
 	 /* Remapping message handler */
-	if ( this->config.global.spreadd.enabled ) {
+	if ( this->config.global.remap.enabled ) {
 		this->remapMsgHandler.stop();
 		this->remapMsgHandler.quit();
 	}

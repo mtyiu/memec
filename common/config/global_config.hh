@@ -29,8 +29,11 @@ public:
 	std::vector<ServerAddr> slaves;
     struct {
 		bool enabled;
-		ServerAddr addr;
-	} spreadd;
+		ServerAddr spreaddAddr;
+		float startThreshold;
+		float stopThreshold;
+		float overloadThreshold;
+	} remap;
 	struct {
 		uint16_t chunksPerList;
 	} buffer;
