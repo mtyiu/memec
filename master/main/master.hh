@@ -8,6 +8,7 @@
 #include "../ds/counter.hh"
 #include "../ds/pending.hh"
 #include "../ds/remap_flag.hh"
+#include "../ds/stats.hh"
 #include "../event/event_queue.hh"
 #include "../remap/remap_msg_handler.hh"
 #include "../socket/application_socket.hh"
@@ -70,22 +71,8 @@ public:
 	Counter counter;
 	RemapFlag remapFlag;
 	MasterRemapMsgHandler remapMsgHandler;
-	struct {
-		struct {
-			ArrayMap< struct sockaddr_in, std::set< Latency > > get;
-			ArrayMap< struct sockaddr_in, std::set< Latency > > set;
-		} past;
-		struct {
-			ArrayMap< struct sockaddr_in, Latency > get;
-			ArrayMap< struct sockaddr_in, Latency > set;
-		} current;
-		struct {
-			ArrayMap< struct sockaddr_in, Latency > get;
-			ArrayMap< struct sockaddr_in, Latency > set;
-		} cumulative;
-		pthread_mutex_t loadLock;
-	} slaveLoading;
-
+	SlaveLoading slaveLoading;
+	OverloadedSlave overloadedSlave;
 
 	static Master *getInstance() {
 		static Master master;

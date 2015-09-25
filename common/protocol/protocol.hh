@@ -185,10 +185,11 @@ struct AddressHeader {
 	uint16_t port;
 };
 
-#define PROTO_LOAD_STATS_SIZE 8
+#define PROTO_LOAD_STATS_SIZE 12
 struct LoadStatsHeader {
 	uint32_t slaveGetCount;
 	uint32_t slaveSetCount;
+	uint32_t slaveOverloadCount;
 };
 
 #define PROTO_BUF_MIN_SIZE		65536
@@ -210,7 +211,7 @@ protected:
 	size_t generateChunkDataHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t chunkSize, char *chunkData );
 	size_t generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, struct HeartbeatHeader &header, std::map<Key, OpMetadata> &ops, size_t &count );
 	size_t generateAddressHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t addr, uint16_t port );
-	size_t generateLoadStatsHeader( uint8_t magic, uint8_t to, uint32_t id, uint32_t slaveGetCount, uint32_t slaveSetCount, uint32_t recordSize );
+	size_t generateLoadStatsHeader( uint8_t magic, uint8_t to, uint32_t id, uint32_t slaveGetCount, uint32_t slaveSetCount, uint32_t slaveOverloadCount, uint32_t recordSize, uint32_t slaveAddrSize );
 
 	bool parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t &opcode, uint32_t &length, uint32_t &id, char *buf, size_t size );
 
@@ -227,7 +228,7 @@ protected:
 	bool parseHeartbeatHeader( size_t offset, uint32_t &get, uint32_t &set, uint32_t &update, uint32_t &del, char *buf, size_t size );
 	bool parseSlaveSyncHeader( size_t offset, uint8_t &keySize, uint8_t &opcode, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, char *&key, char *buf, size_t size );
 	bool parseAddressHeader( size_t offset, uint32_t &addr, uint16_t &port, char *buf, size_t size );
-	bool parseLoadStatsHeader( size_t offset, uint32_t &slaveGetCount, uint32_t &slaveSetCount, char *buf, size_t size );
+	bool parseLoadStatsHeader( size_t offset, uint32_t &slaveGetCount, uint32_t &slaveSetCount, uint32_t &slaveOverloadCount, char *buf, size_t size );
 
 public:
 	struct {

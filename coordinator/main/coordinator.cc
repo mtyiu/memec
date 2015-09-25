@@ -43,7 +43,7 @@ quit:
 }
 
 void Coordinator::updateOverloadedSlaveSet( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
-		ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency ) {
+		ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency, std::set<struct sockaddr_in> *slaveSet ) {
 	double avgSec = 0.0, avgNsec = 0.0;
 	pthread_mutex_lock( &this->overloadedSlaves.lock );
 
@@ -65,6 +65,7 @@ void Coordinator::updateOverloadedSlaveSet( ArrayMap<struct sockaddr_in, Latency
 				( ( A_EQUAL_B ( slave##_TYPE_##Latency->values[ i ]->sec, avgSec * threshold ) && \
 					(double) slave##_TYPE_##Latency->values[ i ]->nsec >= avgNsec * threshold ) ) ) {\
 			this->overloadedSlaves.slaveSet.insert( slave##_TYPE_##Latency->keys[ i ] ); \
+			slaveSet->insert( slave##_TYPE_##Latency->keys[ i ] ); \
 			printf( "Slave #%u overloaded!!!!\n", i ); \
 		} \
 	} \
@@ -117,10 +118,11 @@ void Coordinator::signalHandler( int signal ) {
 	ArrayMap<int, MasterSocket> &sockets = coordinator->sockets.masters;
 	ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency = new ArrayMap<struct sockaddr_in, Latency>();
 	ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency = new ArrayMap<struct sockaddr_in, Latency>();
+	std::set<struct sockaddr_in> *overloadedSlaveSet = new std::set<struct sockaddr_in>();
 	switch ( signal ) {
 		case SIGALRM:
 			coordinator->updateAverageSlaveLoading( slaveGetLatency, slaveSetLatency );
-			coordinator->updateOverloadedSlaveSet( slaveGetLatency, slaveSetLatency );
+			coordinator->updateOverloadedSlaveSet( slaveGetLatency, slaveSetLatency, overloadedSlaveSet );
 			coordinator->switchPhase();
 			// TODO start / stop remapping according to criteria
 			// push the stats back to masters
@@ -130,7 +132,7 @@ void Coordinator::signalHandler( int signal ) {
 			if ( slaveGetLatency->size() > 0 || slaveSetLatency->size() > 0 ) {
 				MasterEvent event;
 				for ( uint32_t i = 0; i < sockets.size(); i++ ) {
-					event.reqPushLoadStats( sockets.values[ i ], slaveGetLatency, slaveSetLatency);
+					event.reqPushLoadStats( sockets.values[ i ], slaveGetLatency, slaveSetLatency, overloadedSlaveSet );
 					coordinator->eventQueue.insert( event );
 				}
 			}

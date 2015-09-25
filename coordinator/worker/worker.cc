@@ -49,11 +49,13 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 			buffer.data = this->protocol.reqPushLoadStats ( 
 				buffer.size, 0, // id 
 				event.message.slaveLoading.slaveGetLatency, 
-				event.message.slaveLoading.slaveSetLatency
+				event.message.slaveLoading.slaveSetLatency,
+				event.message.slaveLoading.overloadedSlaveSet
 			);
 			// release the ArrayMaps
 			delete event.message.slaveLoading.slaveGetLatency;
 			delete event.message.slaveLoading.slaveSetLatency;
+			delete event.message.slaveLoading.overloadedSlaveSet;
 			isSend = true;
 			break;
 		case MASTER_EVENT_TYPE_SWITCH_PHASE:

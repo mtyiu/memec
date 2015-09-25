@@ -34,7 +34,9 @@ char *MasterProtocol::reqPushLoadStats(
 		id,
 		slaveGetLatency->size(),
 		slaveSetLatency->size(),
-		14
+		0,
+		sizeof( uint32_t ) * 3 + sizeof( uint16_t ),
+		sizeof( uint32_t ) + sizeof( uint16_t )
 	);
 
 	// TODO only send stats of most heavily loaded slave in case buffer overflows
@@ -80,17 +82,20 @@ char *MasterProtocol::reqPushLoadStats(
 
 bool MasterProtocol::parseLoadingStats( 
 		const LoadStatsHeader& loadStatsHeader, 
-		ArrayMap< struct sockaddr_in, Latency >& slaveGetLatency,
-		ArrayMap< struct sockaddr_in, Latency >& slaveSetLatency,
+		ArrayMap< struct sockaddr_in, Latency > &slaveGetLatency,
+		ArrayMap< struct sockaddr_in, Latency > &slaveSetLatency,
+		std::set< struct sockaddr_in > &overloadedSlaveSet, 
 		char* buffer, uint32_t size )
 {
 	sockaddr_in addr;
 	Latency *tempLatency = NULL;
 
 	uint32_t recordSize = sizeof( uint32_t ) * 3 + sizeof( uint16_t );
+	uint32_t slaveAddrSize = sizeof( uint32_t ) + sizeof ( uint16_t );
 
 	// check if the all stats are received properly
-	if ( size < ( loadStatsHeader.slaveGetCount + loadStatsHeader.slaveSetCount ) * recordSize )
+	if ( size < ( loadStatsHeader.slaveGetCount + loadStatsHeader.slaveSetCount ) * recordSize + 
+			loadStatsHeader.slaveOverloadCount * slaveAddrSize )
 		return false;
 
 	for ( uint32_t i = 0; i < loadStatsHeader.slaveGetCount + loadStatsHeader.slaveSetCount; i++ ) {
@@ -107,6 +112,15 @@ bool MasterProtocol::parseLoadingStats(
 		
 		buffer += recordSize;
 	}
+
+	for  ( uint32_t i = 0; i < loadStatsHeader.slaveOverloadCount; i++ ) {
+		addr.sin_addr.s_addr = *( uint32_t * )( buffer );
+		addr.sin_port = *( uint16_t * )( buffer + sizeof( uint32_t ) );
+
+		overloadedSlaveSet.insert( addr );
+
+		buffer += slaveAddrSize;
+	}    
 
 	return true;
 }

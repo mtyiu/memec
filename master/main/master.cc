@@ -1,6 +1,7 @@
 #include <cstring>
 #include <ctype.h>
 #include "master.hh"
+#include "../remap/basic_remap_scheme.hh"
 
 Master::Master() {
 	this->isRunning = false;
@@ -11,7 +12,7 @@ void Master::updateSlavesCurrentLoading() {
 	int index = -1;
 	Latency *tempLatency = NULL;
 
-	pthread_mutex_lock( &this->slaveLoading.loadLock );
+	pthread_mutex_lock( &this->slaveLoading.lock );
 
 #define UPDATE_LATENCY( _SRC_, _DST_, _SRC_VAL_TYPE_, _DST_OP_, _CHECK_EXIST_ ) \
 	for ( uint32_t i = 0; i < _SRC_.size(); i++ ) { \
@@ -52,14 +53,14 @@ void Master::updateSlavesCurrentLoading() {
 	pastGet.clear();
 	pastSet.clear();
 
-	pthread_mutex_unlock( &this->slaveLoading.loadLock );
+	pthread_mutex_unlock( &this->slaveLoading.lock );
 }
 
 void Master::updateSlavesCumulativeLoading () {
 	int index = -1;
 	Latency *tempLatency = NULL;
 
-	pthread_mutex_lock( &this->slaveLoading.loadLock );
+	pthread_mutex_lock( &this->slaveLoading.lock );
 
 	ArrayMap< struct sockaddr_in, Latency > &currentGet = this->slaveLoading.current.get;
 	ArrayMap< struct sockaddr_in, Latency > &cumulativeGet = this->slaveLoading.cumulative.get;
@@ -75,12 +76,12 @@ void Master::updateSlavesCumulativeLoading () {
 
 #undef UPDATE_LATENCY
 
-	pthread_mutex_unlock( &this->slaveLoading.loadLock );
+	pthread_mutex_unlock( &this->slaveLoading.lock );
 }
 
 void Master::mergeSlaveCumulativeLoading ( ArrayMap< struct sockaddr_in, Latency > *getLatency, ArrayMap< struct sockaddr_in, Latency> *setLatency ) {
 
-	pthread_mutex_lock( &this->slaveLoading.loadLock );
+	pthread_mutex_lock( &this->slaveLoading.lock );
 
 	int index = -1;
 	// check if the slave addr already exists in currentMap
@@ -104,7 +105,7 @@ void Master::mergeSlaveCumulativeLoading ( ArrayMap< struct sockaddr_in, Latency
 
 #undef MERGE_AND_UPDATE_LATENCY
 
-	pthread_mutex_unlock( &this->slaveLoading.loadLock );
+	pthread_mutex_unlock( &this->slaveLoading.lock );
 }
 
 void Master::free() {
@@ -124,7 +125,7 @@ void Master::signalHandler( int signal ) {
 			master->updateSlavesCumulativeLoading();
 
 			// ask workers to send the loading stats to coordinators
-			pthread_mutex_lock( &master->slaveLoading.loadLock );
+			pthread_mutex_lock( &master->slaveLoading.lock );
 			CoordinatorEvent event;
 			pthread_mutex_lock( &sockets.lock );
 			for ( uint32_t i = 0; i < sockets.size(); i++ ) {
@@ -136,7 +137,7 @@ void Master::signalHandler( int signal ) {
 				master->eventQueue.insert( event );
 			}
 			pthread_mutex_unlock( &sockets.lock );
-			pthread_mutex_unlock( &master->slaveLoading.loadLock );
+			pthread_mutex_unlock( &master->slaveLoading.lock );
 
 			// set next update alarm
 			alarm ( master->config.master.loadingStats.updateInterval );
@@ -266,17 +267,20 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 #undef WORKER_INIT_LOOP
 	}
 
-	/* Remapping message handler */
+	/* Remapping message handler; Remapping scheme */
 	if ( this->config.global.remap.enabled ) {
 		char masterName[ 11 ];
 		memset( masterName, 0, 11 );
 		sprintf( masterName, "%s%03d", MASTER_PREFIX, this->config.master.master.addr.port % 1000 );
 		remapMsgHandler.init( this->config.global.remap.spreaddAddr.addr, this->config.global.remap.spreaddAddr.port, masterName );
+		BasicRemappingScheme::slaveLoading = &this->slaveLoading;
+		BasicRemappingScheme::overloadedSlave = &this->overloadedSlave;
+		BasicRemappingScheme::stripeList = this->stripeList;
 	}
 
 	/* Loading statistics update */
 	if ( this->config.master.loadingStats.updateInterval > 0 ) {
-		pthread_mutex_init ( &this->slaveLoading.loadLock, NULL );
+		pthread_mutex_init ( &this->slaveLoading.lock, NULL );
 		this->slaveLoading.past.get.clear();
 		this->slaveLoading.past.set.clear();
 		this->slaveLoading.current.get.clear();

@@ -3,6 +3,7 @@
 
 #include <cstdio>
 #include <pthread.h>
+#include <set>
 #include "../config/coordinator_config.hh"
 #include "../event/event_queue.hh"
 #include "../remap/remap_msg_handler.hh"
@@ -36,7 +37,8 @@ private:
 	void updateAverageSlaveLoading( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency, 
 			ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency );
 	void updateOverloadedSlaveSet( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency, 
-			ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency );
+			ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency, 
+			std::set<struct sockaddr_in> *slaveSet );
 	bool switchPhase();
 
 	// Commands

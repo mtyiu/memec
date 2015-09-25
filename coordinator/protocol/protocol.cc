@@ -55,16 +55,19 @@ char *CoordinatorProtocol::resRegisterMaster( size_t &size, GlobalConfig &global
 char *CoordinatorProtocol::reqPushLoadStats( 
 		size_t &size, uint32_t id,
 		ArrayMap< struct sockaddr_in, Latency > *slaveGetLatency, 
-		ArrayMap< struct sockaddr_in, Latency > *slaveSetLatency ) 
+		ArrayMap< struct sockaddr_in, Latency > *slaveSetLatency,
+		std::set< struct sockaddr_in > *overloadedSlaveSet ) 
 {
 
 	size = this->generateLoadStatsHeader(
 		PROTO_MAGIC_LOADING_STATS,
 		PROTO_MAGIC_TO_MASTER,
-		id, // id
+		id, 
 		slaveGetLatency->size(),
 		slaveSetLatency->size(),
-		14
+		overloadedSlaveSet->size(),
+		sizeof( uint32_t ) * 3 + sizeof( uint16_t ),
+		sizeof( uint32_t ) + sizeof( uint16_t )
 	);
 
 	// TODO only send stats of most heavily loaded slave in case buffer overflows
@@ -100,6 +103,15 @@ char *CoordinatorProtocol::reqPushLoadStats(
 	}
 
 #undef SET_FIELDS_VAR
+
+	for ( std::set<struct sockaddr_in>::iterator it = overloadedSlaveSet->begin(); it != overloadedSlaveSet->end(); it++ ) {
+		addr = (*it).sin_addr.s_addr;
+		port = (*it).sin_port;
+		*( ( uint32_t * )( this->buffer.send + size ) ) = addr; // htonl( addr );
+		size += sizeof( addr );
+		*( ( uint16_t * )( this->buffer.send + size ) ) = port; //htons( port );
+		size += sizeof( port );
+	}
 
 	if ( size > PROTO_BUF_MIN_SIZE ) {
 		__DEBUG__( CYAN, "CoordinatorProtocol", "reqPushLoadStats", "Warning: Load stats exceeds minimum buffer size!\n" );

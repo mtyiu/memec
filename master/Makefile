@@ -12,6 +12,7 @@ OBJS= \
 	event/master_event.o \
 	event/slave_event.o \
 	protocol/protocol.o \
+	remap/basic_remap_scheme.o \
 	remap/remap_msg_handler.o \
 	socket/application_socket.o \
 	socket/coordinator_socket.o \

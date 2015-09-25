@@ -21,7 +21,8 @@ public:
 	char *reqPushLoadStats( 
 		size_t &size, uint32_t id,
 		ArrayMap< struct sockaddr_in, Latency > *slaveGetLatency, 
-		ArrayMap< struct sockaddr_in, Latency > *slaveSetLatency 
+		ArrayMap< struct sockaddr_in, Latency > *slaveSetLatency,
+		std::set< struct sockaddr_in > *overloadedSlaveSet
 	);
 	bool parseLoadingStats( 
 		const LoadStatsHeader& loadStatsHeader, 

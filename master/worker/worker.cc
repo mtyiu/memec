@@ -3,6 +3,7 @@
 #include <utility>
 #include "worker.hh"
 #include "../main/master.hh"
+#include "../remap/basic_remap_scheme.hh"
 #include "../../common/util/debug.hh"
 
 #define WORKER_COLOR	YELLOW
@@ -269,8 +270,14 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 								this->protocol.parseLoadStatsHeader( loadStatsHeader, buffer.data, buffer.size );
 								buffer.data += PROTO_LOAD_STATS_SIZE;
 								buffer.size -= PROTO_LOAD_STATS_SIZE;
-								this->protocol.parseLoadingStats( loadStatsHeader, getLatency, setLatency, buffer.data, buffer.size );
+
+								// parse the loading stats and merge with existing stats
+								pthread_mutex_lock( &master->overloadedSlave.lock );
+								master->overloadedSlave.slaveSet.clear();
+								this->protocol.parseLoadingStats( loadStatsHeader, getLatency, setLatency, master->overloadedSlave.slaveSet, buffer.data, buffer.size );
+								pthread_mutex_unlock( &master->overloadedSlave.lock );
 								master->mergeSlaveCumulativeLoading( &getLatency, &setLatency );
+
 								buffer.data -= PROTO_LOAD_STATS_SIZE;
 								buffer.size += PROTO_LOAD_STATS_SIZE;
 								break;
@@ -466,6 +473,7 @@ SlaveSocket *MasterWorker::getSlave( char *data, uint8_t size, uint32_t &origina
 get_remap:
 	// Determine remapped data slave
 	// TODO: Change the hardcoded values!
+	//BasicRemappingScheme::getRemapTarget( originalListId, originalChunkId, remappedListId, remappedChunkId, MasterWorker::dataChunkCount, MasterWorker::parityChunkCount ); 
 	remappedListId = ( originalListId + 1 ) % 8; // originalListId;
 	remappedChunkId = 0; // originalChunkId;
 
