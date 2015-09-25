@@ -104,10 +104,12 @@ public:
 	}
 
 	void clear() {
-		for ( int i = 0, len = this->keys.size(); i < len; i++ )
-			delete this->values[ i ];
+		pthread_mutex_lock( &this->lock );
 		this->keys.clear();
 		this->values.clear();
+		for ( int i = 0, len = this->keys.size(); i < len; i++ )
+			delete this->values[ i ];
+		pthread_mutex_unlock( &this->lock );
 	}
 };
 

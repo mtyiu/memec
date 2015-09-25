@@ -79,7 +79,7 @@ void Master::updateSlavesCumulativeLoading () {
 }
 
 void Master::mergeSlaveCumulativeLoading ( ArrayMap< struct sockaddr_in, Latency > *getLatency, ArrayMap< struct sockaddr_in, Latency> *setLatency ) {
-	
+
 	pthread_mutex_lock( &this->slaveLoading.loadLock );
 
 	int index = -1;
@@ -98,12 +98,12 @@ void Master::mergeSlaveCumulativeLoading ( ArrayMap< struct sockaddr_in, Latency
 			_MERGE_DST_.values[ index ]->aggregate( _SRC_->values[ i ] ); \
 			delete _SRC_->values[ i ]; \
 		} \
-	} 
+	}
 	MERGE_AND_UPDATE_LATENCY( getLatency, this->slaveLoading.cumulative.get, this->slaveLoading.current.get );
 	MERGE_AND_UPDATE_LATENCY( setLatency, this->slaveLoading.cumulative.set, this->slaveLoading.current.set );
 
 #undef MERGE_AND_UPDATE_LATENCY
-	
+
 	pthread_mutex_unlock( &this->slaveLoading.loadLock );
 }
 
@@ -716,6 +716,15 @@ void Master::printPending( FILE *f ) {
 		fprintf( f, "\n" );
 	}
 	pthread_mutex_unlock( &this->pending.slaves.delLock );
+
+	fprintf(
+		f,
+		"\n\nCounters\n"
+		"--------\n"
+		"\n[REMAP] Normal: %u; Remapping: %u\n",
+		this->counter.getNormal(),
+		this->counter.getRemapping()
+	);
 }
 
 void Master::help() {
