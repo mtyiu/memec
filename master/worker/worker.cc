@@ -1078,6 +1078,7 @@ bool MasterWorker::handleRemappingSetLockResponse( SlaveEvent event, bool succes
 	struct RemappingLockHeader header;
 	if ( ! this->protocol.parseRemappingLockHeader( header, buf, size ) ) {
 		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Invalid REMAPPING_SET_LOCK Response." );
+		MasterWorker::counter->decreaseRemapping();
 		return false;
 	}
 	__DEBUG__(
@@ -1092,12 +1093,14 @@ bool MasterWorker::handleRemappingSetLockResponse( SlaveEvent event, bool succes
 
 	if ( ! MasterWorker::pending->eraseRemappingRecord( PT_SLAVE_REMAPPING_SET, event.id, event.socket, &pid, &remappingRecord ) ) {
 		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Cannot find a pending slave REMAPPING_SET_LOCK request that matches the response. This message will be discarded. (ID: %u)", event.id );
+		MasterWorker::counter->decreaseRemapping();
 		return false;
 	}
 
 	if ( ! success ) {
 		// TODO
 		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "TODO: Handle the case when the lock cannot be acquired." );
+		MasterWorker::counter->decreaseRemapping();
 		return false;
 	}
 
@@ -1111,11 +1114,13 @@ bool MasterWorker::handleRemappingSetLockResponse( SlaveEvent event, bool succes
 	if ( ! socket ) {
 		// TODO
 		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Not yet implemented!" );
+		MasterWorker::counter->decreaseRemapping();
 		return false;
 	}
 
 	if ( ! MasterWorker::pending->findKey( PT_APPLICATION_SET, pid.parentId, 0, &key ) ) {
 		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded. (ID: %u)", event.id );
+		MasterWorker::counter->decreaseRemapping();
 		return false;
 	}
 
@@ -1168,6 +1173,7 @@ bool MasterWorker::handleRemappingSetLockResponse( SlaveEvent event, bool succes
 	SlaveEvent slaveEvent;
 	slaveEvent.send( socket, packet );
 	this->dispatch( slaveEvent );
+	MasterWorker::counter->decreaseRemapping();
 
 	return true;
 }

@@ -6,7 +6,7 @@
 #define GIGA 				( 1000 * 1000 * 1000 )
 #define FLOAT_THRESHOLD		( ( float ) 0.00001 )
 #define A_EQUAL_B( _A_, _B_ ) \
-	( _A_ - _B_ >= -1 * FLOAT_THRESHOLD && _A_ - _B_ <= FLOAT_THRESHOLD ) 
+	( _A_ - _B_ >= -1 * FLOAT_THRESHOLD && _A_ - _B_ <= FLOAT_THRESHOLD )
 
 Coordinator::Coordinator() {
 	this->isRunning = false;
@@ -20,7 +20,7 @@ void Coordinator::free() {
 bool Coordinator::switchPhase() {
 	// skip if remap feature is disabled
 	bool switched = false;
-	if ( ! this->config.global.remap.enabled ) 
+	if ( ! this->config.global.remap.enabled )
 		return switched;
 
 	MasterEvent event;
@@ -29,7 +29,7 @@ bool Coordinator::switchPhase() {
 			this->overloadedSlaves.slaveSet.size() > this->sockets.slaves.size() * this->config.global.remap.startThreshold ) {
 		// start remapping phase in the background
 		event.switchPhase( true );
-	} else if ( this->remapMsgHandler.isRemapStarted() && 
+	} else if ( this->remapMsgHandler.isRemapStarted() &&
 			this->overloadedSlaves.slaveSet.size() < this->sockets.slaves.size() * this->config.global.remap.stopThreshold ) {
 		// stop remapping phase in the background
 		event.switchPhase( false );
@@ -42,7 +42,7 @@ quit:
 	return switched;
 }
 
-void Coordinator::updateOverloadedSlaveSet( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency, 
+void Coordinator::updateOverloadedSlaveSet( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
 		ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency ) {
 	double avgSec = 0.0, avgNsec = 0.0;
 	pthread_mutex_lock( &this->overloadedSlaves.lock );
@@ -51,18 +51,22 @@ void Coordinator::updateOverloadedSlaveSet( ArrayMap<struct sockaddr_in, Latency
 	this->overloadedSlaves.slaveSet.clear();
 	double threshold = this->config.global.remap.overloadThreshold;
 
-	// compare each slave latency with the avg multipled by threshold 
+	// compare each slave latency with the avg multipled by threshold
 #define GET_OVERLOADED_SLAVES( _TYPE_ ) { \
 	uint32_t slaveCount = slave##_TYPE_##Latency->size(); \
 	for ( uint32_t i = 0; i < slaveCount; i++ ) { \
 		avgSec += ( double ) slave##_TYPE_##Latency->values[ i ]->sec / slaveCount; \
 		avgNsec += ( double ) slave##_TYPE_##Latency->values[ i ]->nsec / slaveCount; \
+		printf( "Slave #%u: sec = %lf, nsec = %lf\n", i, avgSec, avgNsec ); \
 	} \
+	printf( "\n" ); \
 	for ( uint32_t i = 0; i < slaveCount; i++ ) { \
 		if ( slave##_TYPE_##Latency->values[ i ]->sec > avgSec * threshold - FLOAT_THRESHOLD || \
 				( ( A_EQUAL_B ( slave##_TYPE_##Latency->values[ i ]->sec, avgSec * threshold ) && \
-					slave##_TYPE_##Latency->values[ i ]->nsec >= avgNsec * threshold - FLOAT_THRESHOLD ) ) ) \
+					slave##_TYPE_##Latency->values[ i ]->nsec >= avgNsec * threshold - FLOAT_THRESHOLD ) ) ) { \
 			this->overloadedSlaves.slaveSet.insert( slave##_TYPE_##Latency->keys[ i ] ); \
+			printf( "Slave #%u overloaded!!!!\n", i ); \
+		} \
 	} \
 }
 
@@ -72,7 +76,7 @@ void Coordinator::updateOverloadedSlaveSet( ArrayMap<struct sockaddr_in, Latency
 	pthread_mutex_unlock( &this->overloadedSlaves.lock );
 }
 
-void Coordinator::updateAverageSlaveLoading( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency, 
+void Coordinator::updateAverageSlaveLoading( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
 		ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency ) {
 
 	pthread_mutex_lock( &this->slaveLoading.lock );
@@ -96,7 +100,7 @@ void Coordinator::updateAverageSlaveLoading( ArrayMap<struct sockaddr_in, Latenc
 	SET_AVG_SLAVE_LATENCY( Get );
 	SET_AVG_SLAVE_LATENCY( Set );
 #undef SET_AVG_SLAVE_LATENCY
-		
+
 	// clean up the current stats
 	// TODO release the arrayMaps??
 	this->slaveLoading.latestGet.clear();

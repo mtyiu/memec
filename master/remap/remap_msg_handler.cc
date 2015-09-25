@@ -6,7 +6,7 @@
 #include "../main/master.hh"
 #include "remap_msg_handler.hh"
 
-MasterRemapMsgHandler::MasterRemapMsgHandler() : 
+MasterRemapMsgHandler::MasterRemapMsgHandler() :
         RemapMsgHandler() {
     this->group = ( char* )MASTER_GROUP;
 }
@@ -14,7 +14,7 @@ MasterRemapMsgHandler::MasterRemapMsgHandler() :
 MasterRemapMsgHandler::~MasterRemapMsgHandler() {
 }
 
-bool MasterRemapMsgHandler::init( const int ip, const int port, const char *user ) { 
+bool MasterRemapMsgHandler::init( const int ip, const int port, const char *user ) {
     char addrbuf[ 32 ], ipstr[ INET_ADDRSTRLEN ];
     struct in_addr addr;
     memset( addrbuf, 0, 32 );
@@ -32,10 +32,10 @@ void MasterRemapMsgHandler::quit() {
     pthread_join( this->reader, NULL );
     this->isListening = true;
     this->reader = -1;
-} 
+}
 
 bool MasterRemapMsgHandler::start() {
-    if ( ! this->isConnected ) 
+    if ( ! this->isConnected )
         return false;
 
     // read message using a background thread
@@ -50,10 +50,10 @@ bool MasterRemapMsgHandler::start() {
 
 bool MasterRemapMsgHandler::stop() {
     int ret = 0;
-    if ( ! this->isConnected || ! this->isListening ) 
+    if ( ! this->isConnected || ! this->isListening )
         return false;
 
-    // stop reading messages 
+    // stop reading messages
     this->isListening = false;
     // avoid blocking call from blocking the stop action
     ret = pthread_cancel( this->reader );
@@ -90,21 +90,28 @@ void MasterRemapMsgHandler::setStatus( char* msg , int len ) {
 
     switch ( signal ) {
         case REMAP_PREPARE_START:
+            printf( "REMAP_PREPARE_START\n" );
+            break;
         case REMAP_START:
+            printf( "REMAP_START\n" );
+            break;
         case REMAP_PREPARE_END:
+            printf( "REMAP_PREPARE_END\n" );
             break;
         case REMAP_END:
+            printf( "REMAP_END\n" );
             signal = REMAP_NONE;
             break;
         default:
-            return;   
+            printf( "REMAP_%d\n", signal );
+            return;
     }
 
     pthread_rwlock_wrlock( &this->stlock );
     this->status = signal;
     pthread_rwlock_unlock( &this->stlock );
-	if ( signal == REMAP_PREPARE_START || signal == REMAP_PREPARE_END )
-		this->ackRemap( Master::getInstance()->counter.getNormal(), Master::getInstance()->counter.getRemapping() );
+    if ( signal == REMAP_PREPARE_START || signal == REMAP_PREPARE_END )
+        this->ackRemap( Master::getInstance()->counter.getNormal(), Master::getInstance()->counter.getRemapping() );
 }
 
 bool MasterRemapMsgHandler::useRemapFlow() {
@@ -131,7 +138,7 @@ bool MasterRemapMsgHandler::ackRemap( uint32_t normal, uint32_t remapping ) {
 		pthread_rwlock_unlock( &this->stlock );
 		return false;
 	}
-		
+
     switch ( this->status ) {
         case REMAP_PREPARE_START:
             signal = REMAP_WAIT_START;
@@ -153,4 +160,3 @@ bool MasterRemapMsgHandler::ackRemap( uint32_t normal, uint32_t remapping ) {
 
     return true;
 }
-
