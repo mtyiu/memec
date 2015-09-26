@@ -114,21 +114,10 @@ void MasterRemapMsgHandler::setStatus( char* msg , int len ) {
         this->ackRemap( Master::getInstance()->counter.getNormal(), Master::getInstance()->counter.getRemapping() );
 }
 
-bool MasterRemapMsgHandler::useRemappingFlow() {
+bool MasterRemapMsgHandler::useRemapFlow() {
 	switch ( this->status ) {
 		case REMAP_PREPARE_START:
 		case REMAP_WAIT_START:
-		case REMAP_START:
-		case REMAP_PREPARE_END:
-			return true;
-		default:
-			break;
-	}
-	return false;
-}
-
-bool MasterRemapMsgHandler::allowRemapping() {
-	switch ( this->status ) {
 		case REMAP_START:
 			return true;
 		default:
