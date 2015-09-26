@@ -784,8 +784,6 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 		sentBytes = socket->send( buffer.data, buffer.size, connected );
 		if ( sentBytes != ( ssize_t ) buffer.size ) {
 			__ERROR__( "MasterWorker", "handleRemappingSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
-			MasterWorker::counter->decreaseRemapping();
-			Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
 			return false;
 		}
 	} else {
@@ -815,7 +813,6 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 		}
 	}
 
-	MasterWorker::counter->decreaseRemapping();
 	Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
 
 	return true;
