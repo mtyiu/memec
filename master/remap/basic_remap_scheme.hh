@@ -3,7 +3,7 @@
 
 #include "../socket/slave_socket.hh"
 #include "../ds/stats.hh"
-#include "../..//common/stripe_list/stripe_list.hh"
+#include "../../common/stripe_list/stripe_list.hh"
 
 class BasicRemappingScheme {
 public:

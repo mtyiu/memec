@@ -199,6 +199,10 @@ public:
 		return ret;
 	}
 
+	uint32_t getNumList() {
+		return this->numLists;
+	}
+
 	void print( FILE *f = stdout ) {
 		uint32_t i, j;
 		bool first;
