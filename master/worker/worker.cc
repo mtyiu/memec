@@ -473,9 +473,9 @@ SlaveSocket *MasterWorker::getSlave( char *data, uint8_t size, uint32_t &origina
 get_remap:
 	// Determine remapped data slave
 	// TODO: Change the hardcoded values!
-	//BasicRemappingScheme::getRemapTarget( originalListId, originalChunkId, remappedListId, remappedChunkId, MasterWorker::dataChunkCount, MasterWorker::parityChunkCount ); 
-	remappedListId = ( originalListId + 1 ) % 8; // originalListId;
-	remappedChunkId = 0; // originalChunkId;
+	BasicRemappingScheme::getRemapTarget( originalListId, originalChunkId, remappedListId, remappedChunkId, MasterWorker::dataChunkCount, MasterWorker::parityChunkCount ); 
+	//remappedListId = ( originalListId + 1 ) % 8; // originalListId;
+	//remappedChunkId = 0; // originalChunkId;
 
 	return ret;
 }

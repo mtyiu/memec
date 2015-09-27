@@ -276,6 +276,7 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 		BasicRemappingScheme::slaveLoading = &this->slaveLoading;
 		BasicRemappingScheme::overloadedSlave = &this->overloadedSlave;
 		BasicRemappingScheme::stripeList = this->stripeList;
+		BasicRemappingScheme::remapMsgHandler = &this->remapMsgHandler;
 	}
 
 	/* Loading statistics update */
