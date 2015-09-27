@@ -68,3 +68,26 @@ void Latency::aggregate( Latency *l ) {
 void Latency::aggregate( Latency l ) {
 	this->aggregate( &l );
 }
+
+bool Latency::operator< ( const Latency &l ) const {
+	if ( this->sec < l.sec ) {
+		return true;
+	} else if ( this->sec > l.sec ) {
+		return false;
+	}
+	if ( this->nsec > l.nsec ) {
+		return false;
+	}
+	return true;
+}
+
+Latency Latency::operator+ ( const Latency &l ) const {
+	Latency ret;
+	ret.sec = this->sec + l.sec;
+	ret.nsec = this->nsec + l.nsec;
+	if ( ret.nsec >= GIGA ) {
+		ret.sec += 1;
+		ret.nsec -= GIGA;
+	}
+	return ret;
+}

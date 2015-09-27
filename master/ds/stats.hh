@@ -25,6 +25,10 @@ typedef struct {
 		ArrayMap< struct sockaddr_in, Latency > get;
 		ArrayMap< struct sockaddr_in, Latency > set;
 	} cumulative;
+	struct {
+		ArrayMap< struct sockaddr_in, Latency > get;
+		ArrayMap< struct sockaddr_in, Latency > set;
+	} cumulativeMirror;
 	pthread_mutex_t lock;
 } SlaveLoading;
 

@@ -22,6 +22,9 @@ public:
 	Latency( struct timespec latency ) {
 		this->set( latency );
 	}
+	Latency( const Latency *latency ) {
+		this->set( *latency );
+	}
 	~Latency() {} ;
 
 	void set ( double sec );
@@ -33,18 +36,8 @@ public:
 	void aggregate ( Latency *l );
 	void aggregate ( Latency l );
 
-	bool operator< ( const Latency &l ) const {
-		if ( this->sec < l.sec ) {
-			return true;
-		} else if ( this->sec > l.sec ) {
-			return false;
-		}
-		if ( this->nsec > l.nsec ) {
-			return false;
-		}
-		return true;
-	}
-	
+	bool operator< ( const Latency &l ) const;
+	Latency operator+ ( const Latency &l ) const;
 };
 
 #endif

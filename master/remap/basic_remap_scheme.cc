@@ -6,6 +6,8 @@ OverloadedSlave *BasicRemappingScheme::overloadedSlave = NULL;
 StripeList<SlaveSocket> *BasicRemappingScheme::stripeList = NULL;
 MasterRemapMsgHandler *BasicRemappingScheme::remapMsgHandler = NULL;
 
+Latency BasicRemappingScheme::increment ( 0, 10 );
+
 void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t originalChunkId, uint32_t &remappedListId, uint32_t &remappedChunkId, uint32_t dataCount, uint32_t parityCount ) {
 	int index = -1, leastOverloadedId = -1;
 	struct sockaddr_in slaveAddr;
@@ -41,7 +43,7 @@ void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t ori
 	pthread_mutex_lock( &slaveLoading->lock );
 	pthread_mutex_lock( &overloadedSlave->lock );
 
-	targetLatency = slaveLoading->cumulative.set.get( slaveAddr, &index );
+	targetLatency = slaveLoading->cumulativeMirror.set.get( slaveAddr, &index );
 	overloadLatency = targetLatency;
 	// cannot determine whether remap is necessary??
 	if ( index == -1 ) 
@@ -54,7 +56,7 @@ void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t ori
 		for ( uint32_t listIndex = 0; listIndex < stripeList->getNumList(); listIndex++ ) {
 			parity = stripeList->get( listIndex, parity, data );
 			slaveAddr = data[ 0 ]->getAddr();
-			nodeLatency = slaveLoading->cumulative.set.get( slaveAddr , &index );
+			nodeLatency = slaveLoading->cumulativeMirror.set.get( slaveAddr , &index );
 
 			// TODO if this node had not been accessed, should we take the risk and try?
 			if ( index == -1 ) 
@@ -72,6 +74,7 @@ void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t ori
 		}
 		if ( remappedListId == originalListId )
 			remappedListId = leastOverloadedId;
+		*targetLatency = *targetLatency + increment;
 		
 	} else {
 		// search the least-loaded node with the stripe list
@@ -81,7 +84,7 @@ void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t ori
 			if ( chunkIndex == originalChunkId )
 				continue;
 			slaveAddr = data[ chunkIndex ]->getAddr();
-			nodeLatency = slaveLoading->cumulative.set.get( slaveAddr, &index );
+			nodeLatency = slaveLoading->cumulativeMirror.set.get( slaveAddr, &index );
 
 			// TODO if this node had not been accessed, should we take the risk and try?
 			if ( index == -1 ) 
@@ -99,6 +102,7 @@ void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t ori
 		}
 		if ( remappedChunkId == originalChunkId )
 			remappedChunkId = leastOverloadedId;
+		*targetLatency = *targetLatency + increment;
 	}
 
 exit:
@@ -106,7 +110,8 @@ exit:
 	pthread_mutex_unlock( &overloadedSlave->lock );
 	pthread_mutex_unlock( &slaveLoading->lock );
 #define NO_REMAPPING ( remappedChunkId == originalChunkId && remappedListId == originalListId )
-	fprintf( stderr, "remapping += %d locking += %d\n", !NO_REMAPPING, NO_REMAPPING );
+	if ( ! NO_REMAPPING ) 
+		fprintf( stderr, "remap from %u to %u\n", originalListId, remappedListId );
 #undef NO_REMAPPING
 
 	delete data;

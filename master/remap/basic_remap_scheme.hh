@@ -14,6 +14,7 @@ public:
 	static OverloadedSlave *overloadedSlave;
 	static StripeList<SlaveSocket> *stripeList;
 	static MasterRemapMsgHandler *remapMsgHandler;
+	static Latency increment;
 
 };
 

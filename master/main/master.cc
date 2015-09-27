@@ -14,7 +14,7 @@ void Master::updateSlavesCurrentLoading() {
 
 	pthread_mutex_lock( &this->slaveLoading.lock );
 
-#define UPDATE_LATENCY( _SRC_, _DST_, _SRC_VAL_TYPE_, _DST_OP_, _CHECK_EXIST_ ) \
+#define UPDATE_LATENCY( _SRC_, _DST_, _SRC_VAL_TYPE_, _DST_OP_, _CHECK_EXIST_, _MIRROR_DST_ ) \
 	for ( uint32_t i = 0; i < _SRC_.size(); i++ ) { \
 		struct sockaddr_in &slaveAddr = _SRC_.keys[ i ]; \
 		_SRC_VAL_TYPE_ *srcLatency = _SRC_.values[ i ]; \
@@ -28,8 +28,12 @@ void Master::updateSlavesCurrentLoading() {
 			tempLatency = new Latency(); \
 			tempLatency->set( *srcLatency ); \
 			_DST_.set( slaveAddr, tempLatency ); \
+			if ( _MIRROR_DST_ ) \
+				_MIRROR_DST_->set( slaveAddr, new Latency( tempLatency ) ); \
 		} else { \
 			dstLatency->_DST_OP_( *srcLatency ); \
+			if ( _MIRROR_DST_ ) \
+				_MIRROR_DST_->values[ index ]->set( *dstLatency ); \
 		} \
 	}
 
@@ -37,6 +41,7 @@ void Master::updateSlavesCurrentLoading() {
 	ArrayMap< struct sockaddr_in, Latency > &currentGet = this->slaveLoading.current.get;
 	ArrayMap< struct sockaddr_in, std::set< Latency > > &pastSet = this->slaveLoading.past.set;
 	ArrayMap< struct sockaddr_in, Latency > &currentSet = this->slaveLoading.current.set;
+	ArrayMap< struct sockaddr_in, Latency > *tmp = NULL;
 	//fprintf( stderr, "past %lu %lu current %lu %lu\n", pastGet.size(), pastSet.size(), currentGet.size(), currentSet.size() );
 
 	// reset the current stats before update
@@ -44,10 +49,10 @@ void Master::updateSlavesCurrentLoading() {
 	currentSet.clear();
 
 	// GET
-	UPDATE_LATENCY( pastGet, currentGet, std::set<Latency>, set, false );
+	UPDATE_LATENCY( pastGet, currentGet, std::set<Latency>, set, false, tmp );
 
 	// SET
-	UPDATE_LATENCY( pastSet, currentSet, std::set<Latency>, set, false );
+	UPDATE_LATENCY( pastSet, currentSet, std::set<Latency>, set, false, tmp );
 
 	// reset past stats
 	pastGet.clear();
@@ -64,15 +69,17 @@ void Master::updateSlavesCumulativeLoading () {
 
 	ArrayMap< struct sockaddr_in, Latency > &currentGet = this->slaveLoading.current.get;
 	ArrayMap< struct sockaddr_in, Latency > &cumulativeGet = this->slaveLoading.cumulative.get;
+	ArrayMap< struct sockaddr_in, Latency > *cumulativeMirrorGet = &this->slaveLoading.cumulativeMirror.get;
 	ArrayMap< struct sockaddr_in, Latency > &currentSet = this->slaveLoading.current.set;
 	ArrayMap< struct sockaddr_in, Latency > &cumulativeSet = this->slaveLoading.cumulative.set;
+	ArrayMap< struct sockaddr_in, Latency > *cumulativeMirrorSet = &this->slaveLoading.cumulativeMirror.set;
 	//fprintf( stderr, "cumulative %lu %lu current %lu %lu\n", cumulativeGet.size(), cumulativeSet.size(), currentGet.size(), currentSet.size() );
 
 	// GET
-	UPDATE_LATENCY( currentGet, cumulativeGet, Latency, aggregate, true );
+	UPDATE_LATENCY( currentGet, cumulativeGet, Latency, aggregate, true, cumulativeMirrorGet );
 
 	// SET
-	UPDATE_LATENCY( currentSet, cumulativeSet, Latency, aggregate, true );
+	UPDATE_LATENCY( currentSet, cumulativeSet, Latency, aggregate, true, cumulativeMirrorSet );
 
 #undef UPDATE_LATENCY
 
@@ -87,7 +94,7 @@ void Master::mergeSlaveCumulativeLoading ( ArrayMap< struct sockaddr_in, Latency
 	// check if the slave addr already exists in currentMap
 	// if not, update the cumulativeMap directly
 	// otherwise, ignore it
-#define MERGE_AND_UPDATE_LATENCY( _SRC_, _MERGE_DST_, _CHECK_EXIST_ ) \
+#define MERGE_AND_UPDATE_LATENCY( _SRC_, _MERGE_DST_, _CHECK_EXIST_, _MIRROR_DST_ ) \
 	for ( uint32_t i = 0; i < _SRC_->size(); i++ ) { \
 		_CHECK_EXIST_.get( _SRC_->keys[ i ], &index ); \
 		if ( index != -1 ) \
@@ -95,13 +102,15 @@ void Master::mergeSlaveCumulativeLoading ( ArrayMap< struct sockaddr_in, Latency
 		_MERGE_DST_.get( _SRC_->keys[ i ], &index ); \
 		if ( index == -1 ) { \
 			_MERGE_DST_.set( _SRC_->keys[ i ], _SRC_->values[ i ] ); \
+			_MIRROR_DST_.set( _SRC_->keys[ i ], new Latency( _SRC_->values[ i ] ) ); \
 		} else { \
 			_MERGE_DST_.values[ index ]->aggregate( _SRC_->values[ i ] ); \
+			_MIRROR_DST_.values[ index ]->set( _MERGE_DST_.values[ index ] ); \
 			delete _SRC_->values[ i ]; \
 		} \
 	}
-	MERGE_AND_UPDATE_LATENCY( getLatency, this->slaveLoading.cumulative.get, this->slaveLoading.current.get );
-	MERGE_AND_UPDATE_LATENCY( setLatency, this->slaveLoading.cumulative.set, this->slaveLoading.current.set );
+	MERGE_AND_UPDATE_LATENCY( getLatency, this->slaveLoading.cumulative.get, this->slaveLoading.current.get, this->slaveLoading.cumulativeMirror.get );
+	MERGE_AND_UPDATE_LATENCY( setLatency, this->slaveLoading.cumulative.set, this->slaveLoading.current.set, this->slaveLoading.cumulativeMirror.set );
 
 #undef MERGE_AND_UPDATE_LATENCY
 
