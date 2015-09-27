@@ -1,6 +1,7 @@
 #ifndef __MASTER_REMAP_BASIC_REMAP_SCHEME_HH__
 #define __MASTER_REMAP_BASIC_REMAP_SCHEME_HH__
 
+#include "remap_msg_handler.hh"
 #include "../socket/slave_socket.hh"
 #include "../ds/stats.hh"
 #include "../../common/stripe_list/stripe_list.hh"
@@ -12,6 +13,7 @@ public:
 	static SlaveLoading *slaveLoading;
 	static OverloadedSlave *overloadedSlave;
 	static StripeList<SlaveSocket> *stripeList;
+	static MasterRemapMsgHandler *remapMsgHandler;
 
 };
 

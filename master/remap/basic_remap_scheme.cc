@@ -4,6 +4,7 @@
 SlaveLoading *BasicRemappingScheme::slaveLoading = NULL;
 OverloadedSlave *BasicRemappingScheme::overloadedSlave = NULL;
 StripeList<SlaveSocket> *BasicRemappingScheme::stripeList = NULL;
+MasterRemapMsgHandler *BasicRemappingScheme::remapMsgHandler = NULL;
 
 void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t originalChunkId, uint32_t &remappedListId, uint32_t &remappedChunkId, uint32_t dataCount, uint32_t parityCount ) {
 	int index = -1, leastOverloadedId = -1;
@@ -16,10 +17,14 @@ void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t ori
 	remappedListId = originalListId;
 	leastOverloadedId = originalChunkId;
 
-	if ( slaveLoading == NULL || overloadedSlave == NULL || stripeList == NULL ) {
+	if ( slaveLoading == NULL || overloadedSlave == NULL || stripeList == NULL || remapMsgHandler == NULL ) {
 		fprintf( stderr, "The scheme is not yet initialized!! Abort remapping!!\n" );
 		return;
 	}
+
+	// check if remamping is allowed
+	if ( ! remapMsgHandler->allowRemapping() ) 
+		return;
 
 	// get the original mapped stripe list 
 	data = new SlaveSocket*[ dataCount ];
@@ -95,6 +100,9 @@ exit:
 
 	pthread_mutex_unlock( &overloadedSlave->lock );
 	pthread_mutex_unlock( &slaveLoading->lock );
+#define NO_REMAPPING ( remappedChunkId == originalChunkId && remappedListId == originalListId )
+	fprintf( stderr, "remapping += %d locking += %d\n", !NO_REMAPPING, NO_REMAPPING );
+#undef NO_REMAPPING
 
 	delete data;
 	delete parity;

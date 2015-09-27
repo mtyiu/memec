@@ -725,8 +725,9 @@ void Master::printPending( FILE *f ) {
 		f,
 		"\n\nCounters\n"
 		"--------\n"
-		"\n[REMAP] Normal: %u; Remapping: %u\n",
+		"\n[REMAP] Normal: %u; Locking only: %u; Remapping: %u\n",
 		this->counter.getNormal(),
+		this->counter.getLockOnly(),
 		this->counter.getRemapping()
 	);
 }
