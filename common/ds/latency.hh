@@ -34,12 +34,12 @@ public:
 	void aggregate ( Latency l );
 
 	bool operator< ( const Latency &l ) const {
-		if ( this->sec > l.sec ) {
+		if ( this->sec < l.sec ) {
 			return true;
-		} else if ( this->sec < l.sec ) {
+		} else if ( this->sec > l.sec ) {
 			return false;
 		}
-		if ( this->nsec < l.nsec ) {
+		if ( this->nsec > l.nsec ) {
 			return false;
 		}
 		return true;

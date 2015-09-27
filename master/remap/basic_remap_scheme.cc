@@ -31,11 +31,16 @@ void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t ori
 	parity = new SlaveSocket*[ parityCount ];
 	parity = stripeList->get( originalListId, parity, data );
 
+	slaveAddr = data[ originalChunkId ]->getAddr();
+
+	// skip remap if not overloaded
+	if ( overloadedSlave->slaveSet.count( slaveAddr ) < 1 )
+		return;
+
 	// TODO avoid locking?
 	pthread_mutex_lock( &slaveLoading->lock );
 	pthread_mutex_lock( &overloadedSlave->lock );
 
-	slaveAddr = data[ originalChunkId ]->getAddr();
 	targetLatency = slaveLoading->cumulative.set.get( slaveAddr, &index );
 	overloadLatency = targetLatency;
 	// cannot determine whether remap is necessary??
