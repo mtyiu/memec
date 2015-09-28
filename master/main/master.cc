@@ -740,6 +740,12 @@ void Master::printPending( FILE *f ) {
 		this->counter.getLockOnly(),
 		this->counter.getRemapping()
 	);
+
+	fprintf(
+		f,
+		"\n\nRemapped SET Ops: %d\n",
+		BasicRemappingScheme::remapped
+	);
 }
 
 void Master::help() {

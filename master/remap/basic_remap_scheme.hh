@@ -16,6 +16,8 @@ public:
 	static MasterRemapMsgHandler *remapMsgHandler;
 	static Latency increment;
 
+	static uint32_t remapped;
+
 };
 
 #endif

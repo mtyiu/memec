@@ -6,7 +6,8 @@ OverloadedSlave *BasicRemappingScheme::overloadedSlave = NULL;
 StripeList<SlaveSocket> *BasicRemappingScheme::stripeList = NULL;
 MasterRemapMsgHandler *BasicRemappingScheme::remapMsgHandler = NULL;
 
-Latency BasicRemappingScheme::increment ( 0, 10 );
+Latency BasicRemappingScheme::increment ( 0, 100 );
+uint32_t BasicRemappingScheme::remapped = 0;
 
 void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t originalChunkId, uint32_t &remappedListId, uint32_t &remappedChunkId, uint32_t dataCount, uint32_t parityCount ) {
 	int index = -1, leastOverloadedId = -1;
@@ -110,8 +111,10 @@ exit:
 	pthread_mutex_unlock( &overloadedSlave->lock );
 	pthread_mutex_unlock( &slaveLoading->lock );
 #define NO_REMAPPING ( remappedChunkId == originalChunkId && remappedListId == originalListId )
-	if ( ! NO_REMAPPING ) 
-		fprintf( stderr, "remap from %u to %u\n", originalListId, remappedListId );
+	if ( ! NO_REMAPPING ) {
+		//fprintf( stderr, "remap from %u to %u\n", originalListId, remappedListId );
+		remapped++;
+	}
 #undef NO_REMAPPING
 
 	delete data;
