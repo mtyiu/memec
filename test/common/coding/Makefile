@@ -6,6 +6,7 @@ INCLUDE=-I$(PLIO_SRC_ROOT)/lib/jerasure/include -I$(PLIO_SRC_ROOT)/lib/gf_comple
 FLAGS=-DTEST_DELTA
 
 TARGETS= \
+	checker \
 	coding \
 	basic_op_performance \
 	performance
