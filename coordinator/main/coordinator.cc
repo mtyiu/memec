@@ -227,7 +227,7 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 	if ( this->config.global.remap.enabled ) {
 		char coordName[ 11 ];
 		memset( coordName, 0, 11 );
-		sprintf( coordName, "%s%4d", COORD_PREFIX, this->config.coordinator.coordinator.addr.id );
+		sprintf( coordName, "%s%04d", COORD_PREFIX, this->config.coordinator.coordinator.addr.id );
 		remapMsgHandler.init( this->config.global.remap.spreaddAddr.addr, this->config.global.remap.spreaddAddr.port, coordName );
 	}
 

@@ -280,7 +280,7 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 	if ( this->config.global.remap.enabled ) {
 		char masterName[ 11 ];
 		memset( masterName, 0, 11 );
-		sprintf( masterName, "%s%4d", MASTER_PREFIX, this->config.master.master.addr.id );
+		sprintf( masterName, "%s%04d", MASTER_PREFIX, this->config.master.master.addr.id );
 		remapMsgHandler.init( this->config.global.remap.spreaddAddr.addr, this->config.global.remap.spreaddAddr.port, masterName );
 		BasicRemappingScheme::slaveLoading = &this->slaveLoading;
 		BasicRemappingScheme::overloadedSlave = &this->overloadedSlave;
