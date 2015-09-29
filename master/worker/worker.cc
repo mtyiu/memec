@@ -472,10 +472,7 @@ SlaveSocket *MasterWorker::getSlave( char *data, uint8_t size, uint32_t &origina
 
 get_remap:
 	// Determine remapped data slave
-	// TODO: Change the hardcoded values!
-	BasicRemappingScheme::getRemapTarget( originalListId, originalChunkId, remappedListId, remappedChunkId, MasterWorker::dataChunkCount, MasterWorker::parityChunkCount ); 
-	//remappedListId = ( originalListId + 1 ) % 8; // originalListId;
-	//remappedChunkId = 0; // originalChunkId;
+	BasicRemappingScheme::getRemapTarget( originalListId, originalChunkId, remappedListId, remappedChunkId, MasterWorker::dataChunkCount, MasterWorker::parityChunkCount );
 
 	return ret;
 }
@@ -614,7 +611,6 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 	);
 
 	if ( ! socket ) {
-		// TODO
 		Key key;
 		key.set( header.keySize, header.key );
 		event.resSet( event.socket, event.id, key, false, false );
@@ -738,7 +734,7 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 		remappedListId, remappedChunkId,
 		 /* allowDegraded */ false, &isDegraded
 	);
-	
+
 #define NO_REMAPPING ( originalListId == remappedListId && originalChunkId == remappedChunkId )
 	if ( NO_REMAPPING )
 		MasterWorker::counter->increaseLockOnly();
@@ -746,7 +742,6 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 		MasterWorker::counter->increaseRemapping();
 
 	if ( ! socket ) {
-		// TODO
 		Key key;
 		key.set( header.keySize, header.key );
 		event.resSet( event.socket, event.id, key, false, false );
@@ -1099,7 +1094,7 @@ bool MasterWorker::handleRemappingSetLockResponse( SlaveEvent event, bool succes
 	struct RemappingLockHeader header;
 	if ( ! this->protocol.parseRemappingLockHeader( header, buf, size ) ) {
 		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Invalid REMAPPING_SET_LOCK Response." );
-		// TODO is it possible to determine which counter to decrement? .. 
+		// TODO is it possible to determine which counter to decrement? ..
 		MasterWorker::counter->decreaseLockOnly();
 		MasterWorker::counter->decreaseRemapping();
 		Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
@@ -1128,7 +1123,7 @@ bool MasterWorker::handleRemappingSetLockResponse( SlaveEvent event, bool succes
 		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Cannot find a pending slave REMAPPING_SET_LOCK request that matches the response. This message will be discarded. (ID: %u)", event.id );
 		if ( NO_REMAPPING )
 			MasterWorker::counter->decreaseLockOnly();
-		else 
+		else
 			MasterWorker::counter->decreaseRemapping();
 		Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
 		return false;
@@ -1247,7 +1242,7 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 		header.key, ( size_t ) header.keySize,
 		0, 0, &originalChunkId, false
 	);
-	
+
 #define NO_REMAPPING ( originalListId == header.listId && originalChunkId == header.chunkId )
 
 	// reampping SET ended
