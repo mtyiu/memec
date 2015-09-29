@@ -44,6 +44,7 @@ public class Main implements Runnable {
 		} catch( NumberFormatException e ) {
 			System.err.println( "Both parameters: [Key Size], [Chunk Size] & [Port Number] should be integers." );
 			System.exit( 1 );
+			return;
 		}
 		fixedSize = ! args[ 7 ].equals( "true" );
 
