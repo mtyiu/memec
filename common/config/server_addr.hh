@@ -13,6 +13,7 @@ private:
 
 public:
 	char name[ SERVER_NAME_MAX_LEN + 1 ];
+	uint32_t id;
 	uint32_t addr;
 	uint16_t port;
 	int type;

@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctype.h>
 #include <arpa/inet.h>
 #include "server_addr.hh"
 
@@ -26,7 +27,7 @@ bool ServerAddr::isInitialized() {
 }
 
 bool ServerAddr::parse( const char *name, const char *addr ) {
-	char *s, ip[ 16 ];
+	char *s, ip[ 16 ], *cur;
 	struct in_addr inAddr;
 
 	// Read protocol
@@ -55,6 +56,17 @@ bool ServerAddr::parse( const char *name, const char *addr ) {
 	this->addr = inAddr.s_addr;
 
 	strncpy( this->name, name, SERVER_NAME_MAX_LEN );
+
+	id = 0;
+	cur = this->name;
+	while ( *cur ) {
+		if ( isdigit( *cur ) ) {
+			id = atoi( cur );
+			break;
+		}
+		cur++;
+	}
+
 	this->initialized = true;
 	return true;
 }
