@@ -141,6 +141,9 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 					SET_SLAVE_LATENCY_FOR_MASTER( masterAddr, setLatency, latestSet );
 					pthread_mutex_unlock ( &coordinator->slaveLoading.lock ); 
 
+					getLatency.clear();
+					setLatency.clear();
+
 					buffer.data -= PROTO_LOAD_STATS_SIZE;
 					buffer.size += PROTO_LOAD_STATS_SIZE;
 					break;
