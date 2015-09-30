@@ -280,6 +280,12 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 
 								buffer.data -= PROTO_LOAD_STATS_SIZE;
 								buffer.size += PROTO_LOAD_STATS_SIZE;
+
+								getLatency.needsDelete = false;
+								setLatency.needsDelete = false;
+								getLatency.clear(); 
+								setLatency.clear();
+
 								break;
 							default:
 								__ERROR__( "MasterWorker", "dispatch", "Invalid magic code from coordinator." );
@@ -294,6 +300,7 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 			buffer.data += header.length;
 			buffer.size -= header.length;
 		}
+
 		if ( connected ) event.socket->done();
 	}
 	if ( ! connected )

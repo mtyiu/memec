@@ -88,10 +88,8 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();
 
 		struct LoadStatsHeader loadStatsHeader;
-		ArrayMap< struct sockaddr_in, Latency > getLatency;
-		ArrayMap< struct sockaddr_in, Latency > setLatency;
+		ArrayMap< struct sockaddr_in, Latency > getLatency, setLatency, *latencyPool = NULL;
 		Coordinator *coordinator = Coordinator::getInstance();
-		ArrayMap< struct sockaddr_in, Latency> *latencyPool = NULL;
 		struct sockaddr_in masterAddr;
 
 		while( buffer.size > 0 ) {
@@ -143,6 +141,8 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 					SET_SLAVE_LATENCY_FOR_MASTER( masterAddr, setLatency, latestSet );
 					pthread_mutex_unlock ( &coordinator->slaveLoading.lock ); 
 
+					getLatency.needsDelete = false;
+					setLatency.needsDelete = false;
 					getLatency.clear();
 					setLatency.clear();
 

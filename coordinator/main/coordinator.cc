@@ -106,8 +106,17 @@ void Coordinator::updateAverageSlaveLoading( ArrayMap<struct sockaddr_in, Latenc
 
 	// clean up the current stats
 	// TODO release the arrayMaps??
-	this->slaveLoading.latestGet.clear();
-	this->slaveLoading.latestSet.clear();
+#define CLEAN_2D_ARRAY_MAP( _DST_ ) \
+	for ( uint32_t i = 0; i < _DST_.size();  i++ ) { \
+		_DST_.values.clear(); \
+	} \
+	_DST_.clear();
+
+	CLEAN_2D_ARRAY_MAP( this->slaveLoading.latestGet );
+	CLEAN_2D_ARRAY_MAP( this->slaveLoading.latestSet );
+#undef CLEAN_2D_ARRAY_MAP
+	//this->slaveLoading.latestGet.clear();
+	//this->slaveLoading.latestSet.clear();
 	pthread_mutex_unlock( &this->slaveLoading.lock );
 }
 
