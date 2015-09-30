@@ -31,6 +31,14 @@ public:
 		this->needsDelete = true;
 	}
 
+	ArrayMap( ArrayMap const& arrayMap ) {
+		size_t i;
+		for ( i = 0; i < arrayMap.size(); i++ ) {
+			this->keys.push_back( arrayMap.keys[ i ] );
+			this->values.push_back( new ValueType( arrayMap.values[ i ] ) );
+		}
+	}
+
 	void reserve( int n ) {
 		this->keys.reserve( n );
 		this->values.reserve( n );
@@ -60,7 +68,7 @@ public:
 		return index != -1;
 	}
 
-	size_t size() {
+	size_t size() const {
 		return this->values.size();
 	}
 
@@ -105,10 +113,10 @@ public:
 
 	void clear() {
 		pthread_mutex_lock( &this->lock );
+		for ( int i = 0, len = this->keys.size(); i < len && needsDelete ; i++ )
+			delete this->values[ i ];
 		this->keys.clear();
 		this->values.clear();
-		for ( int i = 0, len = this->keys.size(); i < len; i++ )
-			delete this->values[ i ];
 		pthread_mutex_unlock( &this->lock );
 	}
 };

@@ -130,7 +130,12 @@ void Coordinator::signalHandler( int signal ) {
 			if ( slaveGetLatency->size() > 0 || slaveSetLatency->size() > 0 ) {
 				MasterEvent event;
 				for ( uint32_t i = 0; i < sockets.size(); i++ ) {
-					event.reqPushLoadStats( sockets.values[ i ], slaveGetLatency, slaveSetLatency, overloadedSlaveSet );
+					event.reqPushLoadStats( 
+						sockets.values[ i ], 
+						new ArrayMap<struct sockaddr_in, Latency>( *slaveGetLatency ), 
+						new ArrayMap<struct sockaddr_in, Latency>( *slaveSetLatency ),
+						new std::set<struct sockaddr_in>( *overloadedSlaveSet ) 
+					);
 					coordinator->eventQueue.insert( event );
 				}
 			}
@@ -142,6 +147,11 @@ void Coordinator::signalHandler( int signal ) {
 			Coordinator::getInstance()->stop();
 			fclose( stdin );
 	}
+	slaveGetLatency->clear();
+	slaveSetLatency->clear();
+	delete slaveGetLatency;
+	delete slaveSetLatency;
+	delete overloadedSlaveSet;
 }
 
 bool Coordinator::init( char *path, OptionList &options, bool verbose ) {

@@ -53,6 +53,8 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 				event.message.slaveLoading.overloadedSlaveSet
 			);
 			// release the ArrayMaps
+			event.message.slaveLoading.slaveGetLatency->clear();
+			event.message.slaveLoading.slaveSetLatency->clear();
 			delete event.message.slaveLoading.slaveGetLatency;
 			delete event.message.slaveLoading.slaveSetLatency;
 			delete event.message.slaveLoading.overloadedSlaveSet;
