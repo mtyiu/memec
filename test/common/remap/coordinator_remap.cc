@@ -7,34 +7,34 @@
 #define JOIN_TIME_OUT 10
 
 int main () {
-    CoordinatorRemapMsgHandler *ch = new CoordinatorRemapMsgHandler();
-    
-    fprintf( stderr, "START testing coordinator remapping message handler\n" );
+	CoordinatorRemapMsgHandler *ch = new CoordinatorRemapMsgHandler();
 
-    struct in_addr addr;
-    inet_pton( AF_INET, "127.0.0.1", &addr );
+	fprintf( stderr, "START testing coordinator remapping message handler\n" );
 
-    ch->init( addr.s_addr, htons( 4803 ), COORD_PREFIX );
+	struct in_addr addr;
+	inet_pton( AF_INET, "127.0.0.1", &addr );
 
-    if ( ! ch->start() ) {
-        fprintf( stderr, "!! Cannot start reading message with message handler !!\n" );
-    } else {
-        fprintf( stderr, ".. wait for masters to join in %d seconds\n", JOIN_TIME_OUT );
-        sleep( JOIN_TIME_OUT );
-        fprintf( stderr, ".. Start remapping phase\n" );
-        ch->startRemap();
-        while( ch->getStatus() != REMAP_START ) 
-            sleep( TIME_OUT );
-        fprintf( stderr, ".. Stop remapping phase\n" );
-        ch->stopRemap();
-        while( ch->getStatus() != REMAP_NONE ) 
-            sleep( TIME_OUT );
-        ch->stop();
-    }
-    ch->quit();
-    delete ch;
+	ch->init( addr.s_addr, htons( 4803 ), COORD_PREFIX );
 
-    fprintf( stderr, "END testing coordinator remapping message handler\n" );
+	if ( ! ch->start() ) {
+		fprintf( stderr, "!! Cannot start reading message with message handler !!\n" );
+	} else {
+		fprintf( stderr, ".. wait for masters to join in %d seconds\n", JOIN_TIME_OUT );
+		sleep( JOIN_TIME_OUT );
+		fprintf( stderr, ".. Start remapping phase\n" );
+		ch->startRemap();
+		while( ch->getStatus() != REMAP_START )
+			sleep( TIME_OUT );
+		fprintf( stderr, ".. Stop remapping phase\n" );
+		ch->stopRemap();
+		while( ch->getStatus() != REMAP_NONE )
+			sleep( TIME_OUT );
+		ch->stop();
+	}
+	ch->quit();
+	delete ch;
 
-    return 0;
+	fprintf( stderr, "END testing coordinator remapping message handler\n" );
+
+	return 0;
 }
