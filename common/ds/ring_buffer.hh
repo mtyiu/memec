@@ -4,11 +4,11 @@
 #include <pthread.h>
 
 template <class T> class RingBuffer {
-    typedef struct {
-        int len;
-        T data;        
-    } /* __attribute((packed)) */ Buffer_t; 
-    Buffer_t* buffer; 
+	typedef struct {
+		int len;
+		T data;
+	} /* __attribute((packed)) */ Buffer_t;
+	Buffer_t* buffer;
 	volatile int readIndex;
 	volatile int writeIndex;
 	volatile int count;				// current number of occupied elements
@@ -20,12 +20,12 @@ template <class T> class RingBuffer {
 	pthread_cond_t cvFull;
 
 public:
-   
+
 	RingBuffer(int size, bool block=true) {
 		if (size < 2) size = 2; // shouldn't allow value less than 2.
 		buffer = new Buffer_t[size];
-        //buffer = (Buffer_t*)malloc(sizeof(Buffer_t)*size);
-		readIndex = 0; 
+		//buffer = (Buffer_t*)malloc(sizeof(Buffer_t)*size);
+		readIndex = 0;
 		writeIndex = 0;
 		count = 0;
 		max = size;
@@ -48,7 +48,7 @@ public:
 		while (count == max) {
 			pthread_cond_wait(&cvFull, &mAccess);
 		}
-        buffer[writeIndex].len = len;
+		buffer[writeIndex].len = len;
 		memcpy(&(buffer[writeIndex].data), data, len);
 		writeIndex = nextVal(writeIndex);
 		count++;
@@ -89,4 +89,4 @@ public:
 	}
 };
 
-#endif 
+#endif

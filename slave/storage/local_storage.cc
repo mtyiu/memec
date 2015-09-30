@@ -62,7 +62,7 @@ bool LocalStorage::read( Chunk *chunk, uint32_t listId, uint32_t stripeId, uint3
 			return false;
 		}
 	}
-	ret = ::read( fd, chunk->data + offset, length );
+	ret = ::read( fd, chunk->getData() + offset, length );
 	if ( ret == -1 ) {
 		__ERROR__( "LocalStorage", "read", "read(): %s", strerror( errno ) );
 	} else if ( ret < ( ssize_t ) length ) {
@@ -101,10 +101,10 @@ ssize_t LocalStorage::write( Chunk *chunk, bool sync, long offset, size_t length
 
 	// Determine the number of bytes to be written
 	offset = offset > 0 ? offset : 0;
-	size = chunk->size;
-	chunk->size = Chunk::capacity; // Force the file size to be one complete chunk
-	length = length == 0 ? chunk->size : ( chunk->size - offset < ( off_t ) length ? chunk->size - offset : length );
-	chunk->size = size;
+	size = chunk->getSize();
+	chunk->setSize( Chunk::capacity ); // Force the file size to be one complete chunk
+	length = length == 0 ? chunk->getSize() : ( chunk->getSize() - offset < ( off_t ) length ? chunk->getSize() - offset : length );
+	chunk->setSize( size );
 
 	fd = ::open( this->path, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR );
 	if ( fd == -1 ) {
@@ -119,7 +119,7 @@ ssize_t LocalStorage::write( Chunk *chunk, bool sync, long offset, size_t length
 			return -1;
 		}
 	}
-	ret = ::write( fd, chunk->data + offset, length );
+	ret = ::write( fd, chunk->getData() + offset, length );
 	if ( ret == -1 ) {
 		__ERROR__( "LocalStorage", "write", "write(): %s", strerror( errno ) );
 	} else {

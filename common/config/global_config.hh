@@ -27,7 +27,7 @@ public:
 	} sync;
 	std::vector<ServerAddr> coordinators;
 	std::vector<ServerAddr> slaves;
-    struct {
+	struct {
 		bool enabled;
 		ServerAddr spreaddAddr;
 		float startThreshold;

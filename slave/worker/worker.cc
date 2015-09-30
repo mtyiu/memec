@@ -413,8 +413,8 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				event.message.chunk.metadata.listId,
 				event.message.chunk.metadata.stripeId,
 				event.message.chunk.metadata.chunkId,
-				event.message.chunk.chunk->size,
-				event.message.chunk.chunk->data
+				event.message.chunk.chunk->getSize(),
+				event.message.chunk.chunk->getData()
 			);
 			break;
 		///////////////
@@ -487,8 +487,8 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				event.message.chunk.metadata.listId,
 				event.message.chunk.metadata.stripeId,
 				event.message.chunk.metadata.chunkId,
-				event.message.chunk.chunk->size,
-				event.message.chunk.chunk->data
+				event.message.chunk.chunk->getSize(),
+				event.message.chunk.chunk->getData()
 			);
 			break;
 		// SET_CHUNK
@@ -1623,7 +1623,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 			for ( uint32_t i = 0; i < SlaveWorker::dataChunkCount; i++ ) {
 				chunkSize = this->chunks[ i ]->status == CHUNK_STATUS_RECONSTRUCTED ?
 				            this->chunks[ i ]->updateData() :
-				            this->chunks[ i ]->size;
+				            this->chunks[ i ]->getSize();
 				if ( chunkSize > maxChunkSize )
 					maxChunkSize = chunkSize;
 			}
@@ -1631,9 +1631,9 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 			for ( uint32_t i = SlaveWorker::dataChunkCount; i < SlaveWorker::chunkCount; i++ ) {
 				if ( this->chunks[ i ]->status == CHUNK_STATUS_RECONSTRUCTED ) {
 					this->chunks[ i ]->isParity = true;
-					this->chunks[ i ]->size = maxChunkSize;
-				} else if ( this->chunks[ i ]->size != maxChunkSize ) {
-					__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Parity chunk size mismatch (chunk ID = %u): %u vs. %u.", i, this->chunks[ i ]->size, maxChunkSize );
+					this->chunks[ i ]->setSize( maxChunkSize );
+				} else if ( this->chunks[ i ]->getSize() != maxChunkSize ) {
+					__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Parity chunk size mismatch (chunk ID = %u): %u vs. %u.", i, this->chunks[ i ]->getSize(), maxChunkSize );
 				}
 			}
 

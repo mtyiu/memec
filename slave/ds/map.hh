@@ -174,13 +174,13 @@ public:
 		pthread_mutex_unlock( &this->cacheLock );
 
 		if ( ! isParity ) {
-			char *ptr = chunk->data;
+			char *ptr = chunk->getData();
 			char *keyPtr, *valuePtr;
 			uint8_t keySize;
 			uint32_t valueSize, offset = 0, size;
 
 			pthread_mutex_lock( &this->keysLock );
-			while( ptr < chunk->data + Chunk::capacity ) {
+			while( ptr < chunk->getData() + Chunk::capacity ) {
 				KeyValue::deserialize( ptr, keyPtr, keySize, valuePtr, valueSize );
 				if ( keySize == 0 && valueSize == 0 )
 					break;
@@ -241,7 +241,7 @@ public:
 					( it->second->status == CHUNK_STATUS_EMPTY ? "empty" :
 						( it->second->status == CHUNK_STATUS_DIRTY ? "dirty" : "cached" )
 					),
-					it->second->count, it->second->size
+					it->second->count, it->second->getSize()
 				);
 			}
 		}

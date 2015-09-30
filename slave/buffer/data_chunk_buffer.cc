@@ -39,14 +39,14 @@ KeyMetadata DataChunkBuffer::set( char *key, uint8_t keySize, char *value, uint3
 			if ( tmp > max ) {
 				max = tmp;
 				index = i;
-			} else if ( tmp == max ) {
+			} else if ( tmp == max && index != -1 ) {
 				if ( this->chunks[ i ]->metadata.stripeId < this->chunks[ index ]->metadata.stripeId )
 					index = i;
 			}
 		}
 	}
 	if ( index == -1 )
-		index = this->flush( false );
+		index = this->flush( false, true );
 
 	// Allocate memory in the selected chunk
 	pthread_mutex_lock( this->locks + index );
@@ -59,6 +59,7 @@ KeyMetadata DataChunkBuffer::set( char *key, uint8_t keySize, char *value, uint3
 	keyMetadata.length = size;
 
 	// Allocate memory from chunk
+	assert( this->sizes[ index ] == this->chunks[ index ]->getSize() );
 	ptr = this->chunks[ index ]->alloc( size, keyMetadata.offset );
 	this->sizes[ index ] += size;
 
@@ -67,7 +68,8 @@ KeyMetadata DataChunkBuffer::set( char *key, uint8_t keySize, char *value, uint3
 
 	// Flush if the current buffer is full
 	if ( this->sizes[ index ] + 4 + CHUNK_BUFFER_FLUSH_THRESHOLD >= ChunkBuffer::capacity )
-		this->flush( index, false );
+		this->flushAt( index, false );
+
 	pthread_mutex_unlock( this->locks + index );
 	pthread_mutex_unlock( &this->lock );
 
@@ -79,7 +81,7 @@ KeyMetadata DataChunkBuffer::set( char *key, uint8_t keySize, char *value, uint3
 	return keyMetadata;
 }
 
-uint32_t DataChunkBuffer::flush( bool lock ) {
+uint32_t DataChunkBuffer::flush( bool lock, bool lockAtIndex ) {
 	if ( lock )
 		pthread_mutex_lock( &this->lock );
 
@@ -88,7 +90,7 @@ uint32_t DataChunkBuffer::flush( bool lock ) {
 
 	for ( uint32_t i = 1; i < this->count; i++ ) {
 		if ( this->sizes[ i ] > max ) {
-			this->sizes[ i ] = max;
+			max = this->sizes[ i ];
 			index = i;
 		} else if ( this->sizes[ i ] == max ) {
 			if ( this->chunks[ i ]->metadata.stripeId < this->chunks[ index ]->metadata.stripeId )
@@ -96,20 +98,21 @@ uint32_t DataChunkBuffer::flush( bool lock ) {
 		}
 	}
 
-	if ( lock )
+	if ( lock || lockAtIndex )
 		pthread_mutex_lock( this->locks + index );
 
-	this->flush( index, false );
+	this->flushAt( index, false );
 
-	if ( lock ) {
+	if ( lock || lockAtIndex )
 		pthread_mutex_unlock( this->locks + index );
+
+	if ( lock )
 		pthread_mutex_unlock( &this->lock );
-	}
 
 	return index;
 }
 
-Chunk *DataChunkBuffer::flush( int index, bool lock ) {
+Chunk *DataChunkBuffer::flushAt( int index, bool lock ) {
 	if ( lock ) {
 		pthread_mutex_lock( &this->lock );
 		pthread_mutex_lock( this->locks + index );

@@ -13,8 +13,8 @@ private:
 public:
 	DataChunkBuffer( uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId );
 	KeyMetadata set( char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode );
-	uint32_t flush( bool lock = true );
-	Chunk *flush( int index, bool lock = true );
+	uint32_t flush( bool lock = true, bool lockAtIndex = false );
+	Chunk *flushAt( int index, bool lock = true );
 	void print( FILE *f = stdout );
 	void stop();
 	~DataChunkBuffer();

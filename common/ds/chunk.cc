@@ -104,6 +104,7 @@ void Chunk::computeDelta( char *delta, char *newData, uint32_t offset, uint32_t 
 		newData,             // new data
 		length
 	);
+
 	if ( update ) {
 		this->status = CHUNK_STATUS_DIRTY;
 		Coding::bitwiseXOR(

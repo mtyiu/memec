@@ -15,24 +15,24 @@ Coding *Coding::instantiate( CodingScheme scheme, CodingParams &params, uint32_t
 	switch( scheme ) {
 		case CS_RAID0:
 		{
-            RAID0Coding *coding;
-            coding = new RAID0Coding();
-            coding->init( params.getN() );
+			RAID0Coding *coding;
+			coding = new RAID0Coding();
+			coding->init( params.getN() );
 			return coding;
 		}
 		case CS_RAID1:
 		{
-            RAID1Coding *coding;
-            coding = new RAID1Coding();
-            coding->init( params.getN() );
+			RAID1Coding *coding;
+			coding = new RAID1Coding();
+			coding->init( params.getN() );
 			return coding;
 		}
 		case CS_RAID5:
 		{
-            RAID5Coding *coding;
-            coding = new RAID5Coding();
-            coding->init( params.getN() );
-            return coding;
+			RAID5Coding *coding;
+			coding = new RAID5Coding();
+			coding->init( params.getN() );
+			return coding;
 		}
 		case CS_RS:
 			return new RSCoding( params.getK(), params.getM(), chunkSize );
@@ -110,11 +110,11 @@ char *Coding::bitwiseXOR( char *dst, char *srcA, char *srcB, uint32_t len ) {
 
 Chunk *Coding::bitwiseXOR( Chunk *dst, Chunk *srcA, Chunk *srcB, uint32_t size ) {
 	Coding::bitwiseXOR(
-		dst->data,
-		srcA->data,
-		srcB->data,
+		dst->getData(),
+		srcA->getData(),
+		srcB->getData(),
 		size
 	);
-	dst->size = size > dst->size ? size : dst->size;
+	dst->setSize( size > dst->getSize() ? size : dst->getSize() );
 	return dst;
 }

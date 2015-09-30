@@ -7,7 +7,7 @@ bool RAID5Coding::init( uint32_t n ) {
 
 void RAID5Coding::encode( Chunk **data, Chunk *parity, uint32_t index, uint32_t startOff, uint32_t endOff ) {
 	for ( uint32_t i = 0; i < this->n - 1; i++ )
-		this->bitwiseXOR( parity, parity, data[ i ], data[ i ]->size );
+		this->bitwiseXOR( parity, parity, data[ i ], data[ i ]->getSize() );
 }
 
 bool RAID5Coding::decode( Chunk **chunks, BitmaskArray *bitmap ) {
@@ -31,7 +31,7 @@ bool RAID5Coding::decode( Chunk **chunks, BitmaskArray *bitmap ) {
 	for ( uint32_t i = 0; i < this->n; i++ ) {
 		if ( i == lostIndex )
 			continue;
-		this->bitwiseXOR( lostChunk, lostChunk, chunks[ i ], chunks[ i ]->size );
+		this->bitwiseXOR( lostChunk, lostChunk, chunks[ i ], chunks[ i ]->getSize() );
 	}
 
 	return true;

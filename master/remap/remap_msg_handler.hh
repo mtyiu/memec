@@ -6,25 +6,25 @@
 
 class MasterRemapMsgHandler : public RemapMsgHandler {
 private:
-    bool isListening;
+	bool isListening;
 
-    void setStatus( char* msg, int len );
-    static void *readMessages( void *argv );
+	void setStatus( char* msg, int len );
+	static void *readMessages( void *argv );
 
 public:
 
-    MasterRemapMsgHandler();
-    ~MasterRemapMsgHandler();
+	MasterRemapMsgHandler();
+	~MasterRemapMsgHandler();
 
-    bool init( const int ip, const int port, const char *user = NULL );
-    void quit();
+	bool init( const int ip, const int port, const char *user = NULL );
+	void quit();
 
-    bool start();
-    bool stop();
+	bool start();
+	bool stop();
 
 	bool useRemappingFlow();
 	bool allowRemapping();
-    bool ackRemap( uint32_t normal = 0, uint32_t remapping = 0 );
+	bool ackRemap( uint32_t normal = 0, uint32_t remapping = 0 );
 };
 
 #endif

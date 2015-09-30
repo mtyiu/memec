@@ -25,14 +25,16 @@ enum ChunkStatus {
 };
 
 class Chunk {
+private:
+	char *data;                 // Buffer
+	uint32_t size;              // Occupied data
+
 public:
 	static uint32_t capacity;   // Chunk size
 	ChunkStatus status;         // Current status of the chunk
 	uint32_t count;             // Number of key-value pair
-	uint32_t size;              // Occupied data
 	Metadata metadata;          // Metadata (list ID, stripe ID, chunk ID)
 	bool isParity;              // Indicate whether the chunk is a parity chunk
-	char *data;                 // Buffer
 
 	// Initialization
 	Chunk();
@@ -41,6 +43,11 @@ public:
 	char *alloc( uint32_t size, uint32_t &offset );
 	void loadFromGetChunkRequest( uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isParity, char *data, uint32_t size );
 	void swap( Chunk *c );
+	// Setters and getters
+	inline char *getData() { return this->data; }
+	inline uint32_t getSize() { return this->size; }
+	inline void setData( char *data ) { this->data = data; }
+	inline void setSize( uint32_t size ) { this->size = size; }
 	// Update internal counters for data and parity chunks
 	uint32_t updateData();
 	uint32_t updateParity( uint32_t offset = 0, uint32_t length = 0 );

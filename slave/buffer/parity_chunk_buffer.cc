@@ -44,8 +44,8 @@ void ParityChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t v
 	// Prepare data delta
 	dataChunk->clear();
 	parityChunk->clear();
-	dataChunk->size = offset + size;
-	KeyValue::serialize( dataChunk->data + offset, key, keySize, value, valueSize );
+	dataChunk->setSize( offset + size );
+	KeyValue::serialize( dataChunk->getData() + offset, key, keySize, value, valueSize );
 
 	// Prepare the stripe
 	for ( uint32_t i = 0; i < ChunkBuffer::dataChunkCount; i++ )
@@ -57,13 +57,13 @@ void ParityChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t v
 
 	pthread_mutex_lock( &wrapper.lock );
 	wrapper.chunk->status = CHUNK_STATUS_DIRTY;
-	if ( offset + size > wrapper.chunk->size )
-		wrapper.chunk->size = offset + size;
+	if ( offset + size > wrapper.chunk->getSize() )
+		wrapper.chunk->setSize( offset + size );
 	// Update the parity chunk
 	Coding::bitwiseXOR(
-		wrapper.chunk->data,
-		wrapper.chunk->data,
-		parityChunk->data,
+		wrapper.chunk->getData(),
+		wrapper.chunk->getData(),
+		parityChunk->getData(),
 		ChunkBuffer::capacity
 	);
 	pthread_mutex_unlock( &wrapper.lock );
@@ -75,8 +75,8 @@ void ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t of
 	// Prepare data delta
 	dataChunk->clear();
 	parityChunk->clear();
-	dataChunk->size = offset + size;
-	memcpy( dataChunk->data + offset, dataDelta, size );
+	dataChunk->setSize( offset + size );
+	memcpy( dataChunk->getData() + offset, dataDelta, size );
 
 	// Prepare the stripe
 	for ( uint32_t i = 0; i < ChunkBuffer::dataChunkCount; i++ )
@@ -88,13 +88,13 @@ void ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t of
 
 	pthread_mutex_lock( &wrapper.lock );
 	wrapper.chunk->status = CHUNK_STATUS_DIRTY;
-	if ( offset + size > wrapper.chunk->size )
-		wrapper.chunk->size = offset + size;
+	if ( offset + size > wrapper.chunk->getSize() )
+		wrapper.chunk->setSize( offset + size );
 	// Update the parity chunk
 	Coding::bitwiseXOR(
-		wrapper.chunk->data,
-		wrapper.chunk->data,
-		parityChunk->data,
+		wrapper.chunk->getData(),
+		wrapper.chunk->getData(),
+		parityChunk->getData(),
 		ChunkBuffer::capacity
 	);
 	pthread_mutex_unlock( &wrapper.lock );
@@ -129,11 +129,11 @@ void ParityChunkBuffer::print( FILE *f ) {
 		ParityChunkWrapper &wrapper = it->second;
 		if ( wrapper.pending ) {
 			numPending++;
-			occupied = ( double ) wrapper.chunk->size / ChunkBuffer::capacity * 100.0;
+			occupied = ( double ) wrapper.chunk->getSize() / ChunkBuffer::capacity * 100.0;
 			fprintf(
 				f,
 				"\t%u. [#%u] %u / %u (%5.2lf%%) (pending: %u)\n",
-				numPending, wrapper.chunk->metadata.stripeId, wrapper.chunk->size, ChunkBuffer::capacity, occupied,
+				numPending, wrapper.chunk->metadata.stripeId, wrapper.chunk->getSize(), ChunkBuffer::capacity, occupied,
 				wrapper.pending
 			);
 			// The pending number does not necessarily equal to the number of data chunks in the dummy data chunk buffer as they may not have been allocated!

@@ -1,3 +1,3 @@
 #!/bin/bash
 
-killall application coordinator master slave
+killall -9 application coordinator master slave
