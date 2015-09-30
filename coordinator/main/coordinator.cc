@@ -57,9 +57,7 @@ void Coordinator::updateOverloadedSlaveSet( ArrayMap<struct sockaddr_in, Latency
 	for ( uint32_t i = 0; i < slaveCount; i++ ) { \
 		avgSec += ( double ) slave##_TYPE_##Latency->values[ i ]->sec / slaveCount; \
 		avgNsec += ( double ) slave##_TYPE_##Latency->values[ i ]->nsec / slaveCount; \
-		printf( "Slave #%u: sec = %lf, nsec = %lf\n", i, avgSec, avgNsec ); \
 	} \
-	printf( "\n" ); \
 	for ( uint32_t i = 0; i < slaveCount; i++ ) { \
 		if ( ( double ) slave##_TYPE_##Latency->values[ i ]->sec > avgSec * threshold || \
 				( ( A_EQUAL_B ( slave##_TYPE_##Latency->values[ i ]->sec, avgSec * threshold ) && \
@@ -138,7 +136,7 @@ void Coordinator::signalHandler( int signal ) {
 			}
 			pthread_mutex_unlock( &sockets.lock );
 			// set timer for next push
-			alarm( coordinator->config.coordinator.loadingStats.updateInterval );
+			//alarm( coordinator->config.coordinator.loadingStats.updateInterval );
 			break;
 		default:
 			Coordinator::getInstance()->stop();
@@ -233,6 +231,16 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 
 	/* Slave Loading stats */
 	pthread_mutex_init( &this->slaveLoading.lock, NULL );
+	uint32_t sec, msec;
+	if ( this->config.coordinator.loadingStats.updateInterval > 0 ) {
+		sec = this->config.coordinator.loadingStats.updateInterval / 1000;
+		msec = this->config.coordinator.loadingStats.updateInterval % 1000;
+	} else {
+		sec = 0;
+		msec = 0;
+	}
+	statsTimer.setInterval( sec, msec );
+	
 
 	// Set signal handlers //
 	Signal::setHandler( Coordinator::signalHandler );
@@ -272,8 +280,9 @@ bool Coordinator::start() {
 	this->isRunning = true;
 
 	/* Slave loading stats */
-	alarm( this->config.coordinator.loadingStats.updateInterval );
-
+	//alarm( this->config.coordinator.loadingStats.updateInterval );
+	statsTimer.start();
+	
 	return true;
 }
 
@@ -312,6 +321,9 @@ bool Coordinator::stop() {
 		this->remapMsgHandler.stop();
 		this->remapMsgHandler.quit();
 	}
+
+	/* Loading stats */
+	statsTimer.stop();
 
 	this->free();
 	this->isRunning = false;
