@@ -149,7 +149,7 @@ void Master::signalHandler( int signal ) {
 			pthread_mutex_unlock( &master->slaveLoading.lock );
 
 			// set next update alarm
-			alarm ( master->config.master.loadingStats.updateInterval );
+			//alarm ( master->config.master.loadingStats.updateInterval );
 			break;
 		default:
 			master->stop();
@@ -280,7 +280,7 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 	if ( this->config.global.remap.enabled ) {
 		char masterName[ 11 ];
 		memset( masterName, 0, 11 );
-		sprintf( masterName, "%s%03d", MASTER_PREFIX, this->config.master.master.addr.port % 1000 );
+		sprintf( masterName, "%s%04d", MASTER_PREFIX, this->config.master.master.addr.id );
 		remapMsgHandler.init( this->config.global.remap.spreaddAddr.addr, this->config.global.remap.spreaddAddr.port, masterName );
 		BasicRemappingScheme::slaveLoading = &this->slaveLoading;
 		BasicRemappingScheme::overloadedSlave = &this->overloadedSlave;
@@ -289,6 +289,7 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 	}
 
 	/* Loading statistics update */
+	uint32_t sec, msec;
 	if ( this->config.master.loadingStats.updateInterval > 0 ) {
 		pthread_mutex_init ( &this->slaveLoading.lock, NULL );
 		this->slaveLoading.past.get.clear();
@@ -297,7 +298,13 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 		this->slaveLoading.current.set.clear();
 		this->slaveLoading.cumulative.get.clear();
 		this->slaveLoading.cumulative.set.clear();
+		sec = this->config.master.loadingStats.updateInterval / 1000;
+		msec = this->config.master.loadingStats.updateInterval % 1000;
+	} else {
+		sec = 0;
+		msec = 0;
 	}
+	this->statsTimer.setInterval( sec, msec );
 
 	// Set signal handlers //
 	Signal::setHandler( Master::signalHandler );
@@ -350,7 +357,8 @@ bool Master::start() {
 
 	/* Loading statistics update */
 	//fprintf( stderr, "Update loading stats every %d seconds\n", this->config.master.loadingStats.updateInterval );
-	alarm ( this->config.master.loadingStats.updateInterval );
+	//alarm ( this->config.master.loadingStats.updateInterval );
+	this->statsTimer.start();
 
 	return ret;
 }
@@ -399,7 +407,8 @@ bool Master::stop() {
 	}
 
 	/* Loading statistics update */
-	alarm ( 0 );
+	//alarm ( 0 );
+	statsTimer.stop();
 
 	this->free();
 	this->isRunning = false;

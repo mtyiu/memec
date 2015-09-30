@@ -66,12 +66,12 @@ public:
 		ArrayMap< struct sockaddr_in, ArrayMap< struct sockaddr_in, Latency > > latestSet;
 		pthread_mutex_t lock;
 	} slaveLoading;
-
 	struct {
 		std::set< struct sockaddr_in > slaveSet;
 		pthread_mutex_t lock;
 	} overloadedSlaves;
-	
+	Timer statsTimer;
+
 	static Coordinator *getInstance() {
 		static Coordinator coordinator;
 		return &coordinator;

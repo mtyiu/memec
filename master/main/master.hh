@@ -73,6 +73,7 @@ public:
 	MasterRemapMsgHandler remapMsgHandler;
 	SlaveLoading slaveLoading;
 	OverloadedSlave overloadedSlave;
+	Timer statsTimer;
 
 	static Master *getInstance() {
 		static Master master;
