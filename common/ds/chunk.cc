@@ -175,7 +175,7 @@ uint32_t Chunk::deleteKeyValue( Key target, std::map<Key, KeyMetadata> *keys, ch
 
 	// Backup the metadata and then remove the entry from map
 	target = it->first;
-	KeyMetadata &metadata = it->second;
+	KeyMetadata metadata = it->second;
 	keys->erase( it );
 	target.free();
 

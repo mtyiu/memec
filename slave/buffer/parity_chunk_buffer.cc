@@ -59,6 +59,7 @@ void ParityChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t v
 	wrapper.chunk->status = CHUNK_STATUS_DIRTY;
 	if ( offset + size > wrapper.chunk->getSize() )
 		wrapper.chunk->setSize( offset + size );
+
 	// Update the parity chunk
 	Coding::bitwiseXOR(
 		wrapper.chunk->getData(),
