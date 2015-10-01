@@ -210,6 +210,11 @@ public:
 		lock = &this->keysLock;
 	}
 
+	void getCacheMap( std::map<Metadata, Chunk *> *&cache, pthread_mutex_t *&lock ) {
+		cache = &this->cache;
+		lock = &this->cacheLock;
+	}
+
 	void dump() {
 		/*
 		fprintf( stdout, "List of key-value pairs:\n------------------------\n" );

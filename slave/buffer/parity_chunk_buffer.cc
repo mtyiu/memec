@@ -53,12 +53,13 @@ void ParityChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t v
 	dataChunks[ chunkId ] = dataChunk;
 
 	// Compute parity delta
-	ChunkBuffer::coding->encode( dataChunks, parityChunk, this->chunkId, offset, offset + size );
+	ChunkBuffer::coding->encode( dataChunks, parityChunk, this->chunkId - ChunkBuffer::dataChunkCount + 1, offset, offset + size );
 
 	pthread_mutex_lock( &wrapper.lock );
 	wrapper.chunk->status = CHUNK_STATUS_DIRTY;
 	if ( offset + size > wrapper.chunk->getSize() )
 		wrapper.chunk->setSize( offset + size );
+
 	// Update the parity chunk
 	Coding::bitwiseXOR(
 		wrapper.chunk->getData(),
@@ -84,7 +85,7 @@ void ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t of
 	dataChunks[ chunkId ] = dataChunk;
 
 	// Compute parity delta
-	ChunkBuffer::coding->encode( dataChunks, parityChunk, this->chunkId, offset, offset + size );
+	ChunkBuffer::coding->encode( dataChunks, parityChunk, this->chunkId - ChunkBuffer::dataChunkCount + 1, offset, offset + size );
 
 	pthread_mutex_lock( &wrapper.lock );
 	wrapper.chunk->status = CHUNK_STATUS_DIRTY;

@@ -9,6 +9,8 @@
 #include "key.hh"
 #include "key_value.hh"
 
+// #define USE_CHUNK_MUTEX_LOCK
+
 enum ChunkStatus {
 	// Clean chunk (used in chunk buffer)
 	CHUNK_STATUS_EMPTY,
@@ -28,6 +30,9 @@ class Chunk {
 private:
 	char *data;                 // Buffer
 	uint32_t size;              // Occupied data
+#ifdef USE_CHUNK_MUTEX_LOCK
+	pthread_mutex_t lock;       // Lock
+#endif
 
 public:
 	static uint32_t capacity;   // Chunk size
@@ -48,13 +53,17 @@ public:
 	inline uint32_t getSize() { return this->size; }
 	inline void setData( char *data ) { this->data = data; }
 	inline void setSize( uint32_t size ) { this->size = size; }
+#ifdef USE_CHUNK_MUTEX_LOCK
+	inline void setLock() { pthread_mutex_lock( &this->lock ); }
+	inline void setUnlock() { pthread_mutex_unlock( &this->lock ); }
+#endif
 	// Update internal counters for data and parity chunks
 	uint32_t updateData();
 	uint32_t updateParity( uint32_t offset = 0, uint32_t length = 0 );
 	// Compute delta
 	void computeDelta( char *delta, char *newData, uint32_t offset, uint32_t length, bool update = true );
 	// Delete key
-	uint32_t deleteKeyValue( Key target, std::map<Key, KeyMetadata> *keys, pthread_mutex_t *lock, char *delta, size_t deltaBufSize );
+	uint32_t deleteKeyValue( Key target, std::map<Key, KeyMetadata> *keys, char *delta = 0, size_t deltaBufSize = 0 );
 	// Get key-value pair
 	KeyValue getKeyValue( uint32_t offset );
 	// Reset internal status
