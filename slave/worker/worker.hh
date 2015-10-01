@@ -31,6 +31,10 @@ private:
 	SlaveProtocol protocol;
 	Storage *storage;
 	// Temporary variables
+	struct { // Buffer for storing data delta
+		char *data;
+		uint32_t size;
+	} buffer;
 	BitmaskArray *chunkStatus;
 	Chunk *dataChunk, *parityChunk;
 	Chunk **chunks;

@@ -16,6 +16,8 @@ public class Main implements Runnable {
 	/* States */
 	public static Main[] mainObjs;
 	public static Thread[] threads;
+	public static int completedOps;
+	public static Object lock;
 	/* Constants */
 	private static final String characters = "01234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz~!@#$%^&*()_+`=[]\\;',./<>?:{}|\"";
 	private static final int charactersLength = characters.length();
@@ -40,6 +42,17 @@ public class Main implements Runnable {
 			sb.append( Main.characters.charAt( this.random.nextInt( Main.charactersLength ) ) );
 		}
 		return sb.toString();
+	}
+
+	private int incrementCounter() {
+		int ret;
+		synchronized( Main.lock ) {
+			this.completedOps++;
+			ret = this.completedOps;
+			if ( this.completedOps % ( Main.numOps / 10 ) == 0 )
+				System.out.printf( "Completed operations: %d (%.2f%%)\r", this.completedOps, ( double ) this.completedOps / Main.numOps * 100.0 );
+		}
+		return ret;
 	}
 
 	public void run() {
@@ -80,6 +93,7 @@ public class Main implements Runnable {
 
 					this.completed[ 0 ]++;
 					if ( ret ) this.succeeded[ 0 ]++;
+					this.incrementCounter();
 					i++;
 				}
 			} else if ( size > 0 ) {
@@ -103,6 +117,7 @@ public class Main implements Runnable {
 
 					this.completed[ 1 ]++;
 					if ( ret ) this.succeeded[ 1 ]++;
+					this.incrementCounter();
 					i++;
 				} else if ( rand == 2 ) {
 					// UPDATE
@@ -129,6 +144,7 @@ public class Main implements Runnable {
 
 					this.completed[ 2 ]++;
 					if ( ret ) this.succeeded[ 2 ]++;
+					this.incrementCounter();
 					i++;
 				} else if ( rand == 3 ) {
 					// DELETE
@@ -136,8 +152,13 @@ public class Main implements Runnable {
 
 					if ( ret ) this.map.remove( key );
 
+					// Test whether the key is still available
+					if ( plio.get( key ) != null )
+						ret = false;
+
 					this.completed[ 3 ]++;
 					if ( ret ) this.succeeded[ 3 ]++;
+					this.incrementCounter();
 					i++;
 				}
 			}
@@ -168,6 +189,7 @@ public class Main implements Runnable {
 		/* Initialization */
 		Main.mainObjs = new Main[ Main.numThreads ];
 		Main.threads = new Thread[ Main.numThreads ];
+		Main.lock = new Object();
 		for ( int i = 0; i < Main.numThreads; i++ ) {
 			int startId = Integer.MAX_VALUE / Main.numThreads * i;
 			Main.mainObjs[ i ] = new Main( startId );
@@ -194,6 +216,7 @@ public class Main implements Runnable {
 		}
 
 		System.out.printf(
+			"\n" +
 			"Number of SET operations    : %d / %d\n" +
 			"Number of GET operations    : %d / %d\n" +
 			"Number of UPDATE operations : %d / %d\n" +

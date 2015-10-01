@@ -80,11 +80,11 @@ char *MasterProtocol::reqPushLoadStats(
 	return this->buffer.send;
 }
 
-bool MasterProtocol::parseLoadingStats( 
-		const LoadStatsHeader& loadStatsHeader, 
+bool MasterProtocol::parseLoadingStats(
+		const LoadStatsHeader& loadStatsHeader,
 		ArrayMap< struct sockaddr_in, Latency > &slaveGetLatency,
 		ArrayMap< struct sockaddr_in, Latency > &slaveSetLatency,
-		std::set< struct sockaddr_in > &overloadedSlaveSet, 
+		std::set< struct sockaddr_in > &overloadedSlaveSet,
 		char* buffer, uint32_t size )
 {
 	sockaddr_in addr;
@@ -94,7 +94,7 @@ bool MasterProtocol::parseLoadingStats(
 	uint32_t slaveAddrSize = sizeof( uint32_t ) + sizeof ( uint16_t );
 
 	// check if the all stats are received properly
-	if ( size < ( loadStatsHeader.slaveGetCount + loadStatsHeader.slaveSetCount ) * recordSize + 
+	if ( size < ( loadStatsHeader.slaveGetCount + loadStatsHeader.slaveSetCount ) * recordSize +
 			loadStatsHeader.slaveOverloadCount * slaveAddrSize )
 		return false;
 
@@ -109,7 +109,7 @@ bool MasterProtocol::parseLoadingStats(
 			slaveGetLatency.set( addr, tempLatency );
 		else
 			slaveSetLatency.set( addr, tempLatency );
-		
+
 		buffer += recordSize;
 	}
 
@@ -120,7 +120,7 @@ bool MasterProtocol::parseLoadingStats(
 		overloadedSlaveSet.insert( addr );
 
 		buffer += slaveAddrSize;
-	}    
+	}
 
 	return true;
 }

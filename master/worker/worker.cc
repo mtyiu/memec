@@ -932,7 +932,10 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 	ssize_t sentBytes;
 	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
 
-	buffer.data = this->protocol.reqDelete( buffer.size, requestId, header.key, header.keySize );
+	buffer.data = this->protocol.reqDelete(
+		buffer.size, requestId,
+		header.key, header.keySize
+	);
 
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
 	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_DEL, event.id, ( void * ) event.socket, key ) ) {
@@ -946,6 +949,7 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 
 	// Send DELETE requests
 	sentBytes = socket->send( buffer.data, buffer.size, connected );
+	assert( sentBytes == 42 );
 	if ( sentBytes != ( ssize_t ) buffer.size ) {
 		__ERROR__( "MasterWorker", "handleDeleteRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 		return false;

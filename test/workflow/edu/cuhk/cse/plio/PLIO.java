@@ -187,7 +187,7 @@ public class PLIO {
 			} else {
 				this.protocol.parseKeyHeader( bytes, 0 );
 				// this.debug( this.protocol.keyHeader.toString() );
-				System.err.println( "PLIO.get(): [Error] Key not found." );
+				// System.err.println( "PLIO.get(): [Error] Key not found." );
 			}
 		} else {
 			System.err.println( "PLIO.get(): [Error] Header length mismatch: " + bytes + " vs. " + this.protocol.header.length + "." );

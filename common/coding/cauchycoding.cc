@@ -58,8 +58,7 @@ void CauchyCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t inde
 	}
 
 	// encode
-	jerasure_schedule_encode( k, m, w, schedule, data, code, chunkSize,
-			chunkSize / w );
+	jerasure_schedule_encode( k, m, w, schedule, data, code, chunkSize, chunkSize / w );
 
 	delete [] data;
 	delete [] code;

@@ -81,6 +81,30 @@ KeyMetadata DataChunkBuffer::set( char *key, uint8_t keySize, char *value, uint3
 	return keyMetadata;
 }
 
+int DataChunkBuffer::lockChunk( Chunk *chunk ) {
+	int index = -1;
+	pthread_mutex_lock( &this->lock );
+	for ( uint32_t i = 0; i < this->count; i++ ) {
+		if ( this->chunks[ i ] == chunk ) {
+			index = i;
+			break;
+		}
+	}
+	if ( index != -1 ) {
+		// Found
+		pthread_mutex_lock( this->locks + index );
+	} else {
+		pthread_mutex_unlock( &this->lock );
+	}
+	return index;
+}
+
+void DataChunkBuffer::updateAndUnlockChunk( int index ) {
+	this->sizes[ index ] = this->chunks[ index ]->getSize();
+	pthread_mutex_unlock( this->locks + index );
+	pthread_mutex_unlock( &this->lock );
+}
+
 uint32_t DataChunkBuffer::flush( bool lock, bool lockAtIndex ) {
 	if ( lock )
 		pthread_mutex_lock( &this->lock );

@@ -98,7 +98,7 @@ uint32_t DummyDataChunkBuffer::flush( bool lock ) {
 
 	for ( uint32_t i = 1; i < this->count; i++ ) {
 		if ( this->sizes[ i ] > max ) {
-			this->sizes[ i ] = max;
+			max = this->sizes[ i ];
 			index = i;
 		} else if ( this->sizes[ i ] == max ) {
 			if ( this->chunks[ i ]->metadata.stripeId < this->chunks[ index ]->metadata.stripeId )
