@@ -1,6 +1,6 @@
 #!/bin/bash
 
-COORDINATOR_NAME=coordinator # $(hostname)
+COORDINATOR_NAME=coord1 # $(hostname)
 COORDINATOR_IP=$(hostname -I | xargs)
 COORDINATOR_PORT=9110
 CONFIG_PATH=bin/config/ncs
@@ -20,4 +20,3 @@ else
 		-p ${CONFIG_PATH} \
 		-o coordinator ${COORDINATOR_NAME} tcp://${COORDINATOR_IP}:${COORDINATOR_PORT}/
 fi
-

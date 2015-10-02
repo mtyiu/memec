@@ -8,40 +8,6 @@
 class KeyValueUpdate : public Key {
 public:
 	uint32_t offset, length;
-
-	bool operator<( const KeyValueUpdate &k ) const {
-		int ret;
-		if ( this->size < k.size )
-			return true;
-		if ( this->size > k.size )
-			return false;
-
-		ret = strncmp( this->data, k.data, this->size );
-		if ( ret < 0 )
-			return true;
-		if ( ret > 0 )
-			return false;
-
-		if ( this->ptr < k.ptr )
-			return true;
-		if ( this->ptr > k.ptr )
-			return false;
-
-		if ( this->offset < k.offset )
-			return true;
-		if ( this->offset > k.offset )
-			return false;
-
-		return this->length < k.length;
-	}
-
-	bool equal( const KeyValueUpdate &k ) const {
-		return (
-			Key::equal( k ) &&
-			this->offset == k.offset &&
-			this->length == k.length
-		);
-	}
 };
 
 class Pending {

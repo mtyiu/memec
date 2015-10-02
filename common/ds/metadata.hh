@@ -27,21 +27,6 @@ public:
 		this->chunkId = m.chunkId;
 	}
 
-	bool equal( const Metadata &m ) const {
-		return (
-			this->listId == m.listId &&
-			this->stripeId == m.stripeId &&
-			this->chunkId == m.chunkId
-		);
-	}
-
-	bool matchStripe( const Metadata &m ) const {
-		return (
-			this->listId == m.listId &&
-			this->stripeId == m.stripeId
-		);
-	}
-
 	bool operator<( const Metadata &m ) const {
 		if ( this->listId < m.listId )
 			return true;

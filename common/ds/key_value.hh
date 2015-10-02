@@ -26,9 +26,6 @@ public:
 
 	char *deserialize( char *&key, uint8_t &keySize, char *&value, uint32_t &valueSize ) const;
 	static char *deserialize( char *data, char *&key, uint8_t &keySize, char *&value, uint32_t &valueSize );
-
-	bool operator<( const KeyValue &kv ) const;
-	static bool compare( const KeyValue *v1, const KeyValue *v2 );
 };
 
 #endif

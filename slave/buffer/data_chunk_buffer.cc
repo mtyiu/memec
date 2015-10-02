@@ -145,9 +145,11 @@ Chunk *DataChunkBuffer::flushAt( int index, bool lock ) {
 	Chunk *chunk = this->chunks[ index ];
 
 	// Append a flush event to the event queue
+	/*
 	IOEvent ioEvent;
 	ioEvent.flush( chunk );
 	ChunkBuffer::eventQueue->insert( ioEvent );
+	*/
 
 	// Get a new chunk
 	this->sizes[ index ] = 0;

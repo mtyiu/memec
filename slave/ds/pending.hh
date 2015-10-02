@@ -28,73 +28,6 @@ public:
 		this->key = key;
 		this->valueUpdateOffset = valueUpdateOffset;
 	}
-
-	bool operator<( const ChunkUpdate &m ) const {
-		int ret;
-		if ( this->listId < m.listId )
-			return true;
-		if ( this->listId > m.listId )
-			return false;
-
-		if ( this->stripeId < m.stripeId )
-			return true;
-		if ( this->stripeId > m.stripeId )
-			return false;
-
-		if ( this->chunkId < m.chunkId )
-			return true;
-		if ( this->chunkId > m.chunkId )
-			return false;
-
-		if ( this->offset < m.offset )
-			return true;
-		if ( this->offset > m.offset )
-			return false;
-
-		if ( this->length < m.length )
-			return true;
-		if ( this->length > m.length )
-			return false;
-
-		if ( this->ptr < m.ptr )
-			return true;
-		if ( this->ptr > m.ptr )
-			return false;
-
-		if ( this->valueUpdateOffset < m.valueUpdateOffset )
-			return true;
-		if ( this->valueUpdateOffset > m.valueUpdateOffset )
-			return false;
-
-		if ( this->keySize < m.keySize )
-			return true;
-		if ( this->keySize > m.keySize )
-			return false;
-
-		ret = strncmp( this->key, m.key, this->keySize );
-
-		return ret < 0;
-	}
-
-	bool equal( const ChunkUpdate &c ) const {
-		return (
-			Metadata::equal( c ) &&
-			this->offset == c.offset &&
-			this->length == c.length
-		);
-	}
-
-	bool matchStripe( const ChunkUpdate &c ) const {
-		return (
-			this->listId == c.listId &&
-			this->stripeId == c.stripeId &&
-			this->offset == c.offset &&
-			this->length == c.length &&
-			this->valueUpdateOffset == c.valueUpdateOffset &&
-			this->keySize == c.keySize &&
-			strncmp( this->key, c.key, this->keySize ) == 0
-		);
-	}
 };
 
 class ChunkRequest : public Metadata {
@@ -108,41 +41,6 @@ public:
 		this->chunkId = chunkId;
 		this->socket = socket;
 		this->chunk = chunk;
-	}
-
-	bool operator<( const ChunkRequest &m ) const {
-		if ( this->listId < m.listId )
-			return true;
-		if ( this->listId > m.listId )
-			return false;
-
-		if ( this->stripeId < m.stripeId )
-			return true;
-		if ( this->stripeId > m.stripeId )
-			return false;
-
-		if ( this->chunkId < m.chunkId )
-			return true;
-		if ( this->chunkId > m.chunkId )
-			return false;
-
-		// Do not compare the chunk pointer
-		return ( this->socket < m.socket );
-	}
-
-	bool equal( const ChunkRequest &c ) const {
-		return (
-			Metadata::equal( c ) &&
-			this->socket == c.socket &&
-			this->chunk == c.chunk
-		);
-	}
-
-	bool matchStripe( const ChunkRequest &c ) const {
-		return (
-			this->listId == c.listId &&
-			this->stripeId == c.stripeId
-		);
 	}
 };
 
@@ -159,44 +57,6 @@ public:
 		this->stripeId = stripeId;
 		this->chunkId = chunkId;
 		this->opcode = opcode;
-	}
-
-	bool operator<( const DegradedOp &m ) const {
-		if ( this->listId < m.listId )
-			return true;
-		if ( this->listId > m.listId )
-			return false;
-
-		if ( this->stripeId < m.stripeId )
-			return true;
-		if ( this->stripeId > m.stripeId )
-			return false;
-
-		if ( this->chunkId < m.chunkId )
-			return true;
-		if ( this->chunkId > m.chunkId )
-			return false;
-
-		if ( this->opcode < m.opcode )
-			return true;
-		if ( this->opcode > m.opcode )
-			return false;
-
-		switch( this->opcode ) {
-			case PROTO_OPCODE_GET:
-			case PROTO_OPCODE_DELETE:
-				return ( this->data.key < m.data.key );
-			case PROTO_OPCODE_UPDATE:
-				return ( this->data.keyValueUpdate < m.data.keyValueUpdate );
-		}
-		return false;
-	}
-
-	bool matchStripe( const DegradedOp &d ) const {
-		return (
-			this->listId == d.listId &&
-			this->stripeId == d.stripeId
-		);
 	}
 };
 

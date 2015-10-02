@@ -79,12 +79,16 @@ public:
 	bool init( char *path, OptionList &options, bool verbose );
 	bool start();
 	bool stop();
+	void flush();
+
 	void info( FILE *f = stdout );
 	void debug( FILE *f = stdout );
 	void dump();
 	void printPending( FILE *f = stdout );
 	void time();
+
 	void alarm();
+
 	Load &aggregateLoad( FILE *f = 0 );
 	double getElapsedTime();
 	void interactive();

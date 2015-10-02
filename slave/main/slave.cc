@@ -308,6 +308,26 @@ bool Slave::stop() {
 	return true;
 }
 
+void Slave::flush() {
+	IOEvent ioEvent;
+	std::map<Metadata, Chunk *>::iterator it;
+	std::map<Metadata, Chunk *> *cache;
+	pthread_mutex_t *lock;
+	Chunk *chunk;
+
+	this->map.getCacheMap( cache, lock );
+
+	pthread_mutex_lock( lock );
+	for ( it = cache->begin(); it != cache->end(); it++ ) {
+		chunk = it->second;
+		if ( chunk->status == CHUNK_STATUS_DIRTY ) {
+			ioEvent.flush( chunk );
+			this->eventQueue.insert( ioEvent );
+		}
+	}
+	pthread_mutex_unlock( lock );
+}
+
 double Slave::getElapsedTime() {
 	return get_elapsed_time( this->startTime );
 }
@@ -375,12 +395,6 @@ void Slave::debug( FILE *f ) {
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
 
-	fprintf( f, "\nSlave event queue\n-----------------\n" );
-	this->eventQueue.print( f );
-
-	fprintf( f, "\nPacket pool\n-----------\n" );
-	this->packetPool.print( f );
-
 	fprintf( f, "\nWorkers\n-------\n" );
 	for ( i = 0, len = this->workers.size(); i < len; i++ ) {
 		fprintf( f, "%d. ", i + 1 );
@@ -398,6 +412,12 @@ void Slave::debug( FILE *f ) {
 		this->sockets.slavePeers[ i ]->print( f );
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
+
+	fprintf( f, "\nPacket pool\n-----------\n" );
+	this->packetPool.print( f );
+
+	fprintf( f, "\nSlave event queue\n-----------------\n" );
+	this->eventQueue.print( f );
 }
 
 void Slave::interactive() {
@@ -446,6 +466,9 @@ void Slave::interactive() {
 		} else if ( strcmp( command, "dump" ) == 0 ) {
 			valid = true;
 			this->dump();
+		} else if ( strcmp( command, "flush" ) == 0 ) {
+			valid = true;
+			this->flush();
 		} else if ( strcmp( command, "pending" ) == 0 ) {
 			valid = true;
 			this->printPending();
@@ -652,6 +675,7 @@ void Slave::help() {
 		"- info: Show configuration\n"
 		"- debug: Show debug messages\n"
 		"- dump: Dump all key-value pairs\n"
+		"- flush: Flush all dirty chunks to disk\n"
 		"- sync: Synchronize with coordinator\n"
 		"- load: Show the load of each worker\n"
 		"- time: Show elapsed time\n"
