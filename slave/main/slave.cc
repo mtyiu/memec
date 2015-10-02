@@ -24,12 +24,12 @@ void Slave::free() {
 }
 
 void Slave::sync() {
-	// CoordinatorEvent event;
-	// for ( int i = 0, len = this->config.global.coordinators.size(); i < len; i++ ) {
-	// 	// Can only sync with one coordinator
-	// 	event.sync( this->sockets.coordinators[ i ] );
-	// 	this->eventQueue.insert( event );
-	// }
+	CoordinatorEvent event;
+	for ( int i = 0, len = this->config.global.coordinators.size(); i < len; i++ ) {
+		// Can only sync with one coordinator
+		event.sync( this->sockets.coordinators[ i ] );
+		this->eventQueue.insert( event );
+	}
 }
 
 void Slave::signalHandler( int signal ) {

@@ -144,12 +144,10 @@ Chunk *DataChunkBuffer::flushAt( int index, bool lock ) {
 
 	Chunk *chunk = this->chunks[ index ];
 
-	// Append a flush event to the event queue
-	/*
-	IOEvent ioEvent;
-	ioEvent.flush( chunk );
-	ChunkBuffer::eventQueue->insert( ioEvent );
-	*/
+	// Notify the parity slaves to seal the chunk
+	SlavePeerEvent slavePeerEvent;
+	slavePeerEvent.reqSealChunk( chunk );
+	ChunkBuffer::eventQueue->insert( slavePeerEvent );
 
 	// Get a new chunk
 	this->sizes[ index ] = 0;

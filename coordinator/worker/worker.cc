@@ -46,9 +46,9 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 			isSend = true;
 			break;
 		case MASTER_EVENT_TYPE_PUSH_LOADING_STATS:
-			buffer.data = this->protocol.reqPushLoadStats ( 
-				buffer.size, 0, // id 
-				event.message.slaveLoading.slaveGetLatency, 
+			buffer.data = this->protocol.reqPushLoadStats (
+				buffer.size, 0, // id
+				event.message.slaveLoading.slaveGetLatency,
 				event.message.slaveLoading.slaveSetLatency,
 				event.message.slaveLoading.overloadedSlaveSet
 			);
@@ -139,7 +139,7 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 					pthread_mutex_lock ( &coordinator->slaveLoading.lock );
 					SET_SLAVE_LATENCY_FOR_MASTER( masterAddr, getLatency, latestGet );
 					SET_SLAVE_LATENCY_FOR_MASTER( masterAddr, setLatency, latestSet );
-					pthread_mutex_unlock ( &coordinator->slaveLoading.lock ); 
+					pthread_mutex_unlock ( &coordinator->slaveLoading.lock );
 
 					getLatency.needsDelete = false;
 					setLatency.needsDelete = false;

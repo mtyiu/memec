@@ -21,7 +21,7 @@ char *SlaveProtocol::reqRegisterCoordinator( size_t &size, uint32_t id, uint32_t
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::sendHeartbeat( size_t &size, uint32_t id, struct HeartbeatHeader &header, std::map<Key, OpMetadata> &opMetadataMap, size_t &count ) {
+char *SlaveProtocol::sendHeartbeat( size_t &size, uint32_t id, struct HeartbeatHeader &header, std::map<Key, OpMetadata> &opMetadataMap, pthread_mutex_t *lock, size_t &count ) {
 	size = this->generateHeartbeatMessage(
 		PROTO_MAGIC_HEARTBEAT,
 		PROTO_MAGIC_TO_COORDINATOR,
@@ -29,6 +29,7 @@ char *SlaveProtocol::sendHeartbeat( size_t &size, uint32_t id, struct HeartbeatH
 		id,
 		header,
 		opMetadataMap,
+		lock,
 		count
 	);
 	return this->buffer.send;

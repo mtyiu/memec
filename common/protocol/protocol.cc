@@ -1,6 +1,7 @@
 #include <cstdlib>
 #include <sys/types.h>
 #include <signal.h>
+#include <pthread.h>
 #include "protocol.hh"
 #include "../util/debug.hh"
 
@@ -199,7 +200,7 @@ size_t Protocol::generateChunkDataHeader( uint8_t magic, uint8_t to, uint8_t opc
 	return bytes;
 }
 
-size_t Protocol::generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, struct HeartbeatHeader &header, std::map<Key, OpMetadata> &ops, size_t &count ) {
+size_t Protocol::generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, struct HeartbeatHeader &header, std::map<Key, OpMetadata> &ops, pthread_mutex_t *lock, size_t &count ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	std::map<Key, OpMetadata>::iterator it;
 	size_t bytes = PROTO_HEADER_SIZE;
@@ -212,6 +213,7 @@ size_t Protocol::generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t op
 	buf += PROTO_HEARTBEAT_SIZE;
 	bytes += PROTO_HEARTBEAT_SIZE;
 
+	pthread_mutex_lock( lock );
 	for ( it = ops.begin(); it != ops.end(); it++ ) {
 		const Key &key = it->first;
 		const OpMetadata &opMetadata = it->second;
@@ -234,6 +236,7 @@ size_t Protocol::generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t op
 	}
 	// Clear sent metadata
 	ops.erase( ops.begin(), it );
+	pthread_mutex_unlock( lock );
 
 	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, id );
 

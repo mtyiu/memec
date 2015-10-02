@@ -86,6 +86,7 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 				requestId,
 				Slave::getInstance()->aggregateLoad().ops,
 				SlaveWorker::map->ops,
+				&SlaveWorker::map->opsLock,
 				count
 			);
 			isSend = true;
@@ -414,6 +415,10 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				event.message.chunk.chunk->getData()
 			);
 			break;
+		case SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_REQUEST:
+			printf( "TODO: SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_REQUEST\n" );
+			return;
+			break;
 		///////////////
 		// Responses //
 		///////////////
@@ -500,6 +505,21 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				event.message.chunk.metadata.stripeId,
 				event.message.chunk.metadata.chunkId
 			);
+			break;
+		// SEAL_CHUNK
+		case SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_RESPONSE_SUCCESS:
+			success = true; // default is false
+		case SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_RESPONSE_FAILURE:
+			/* buffer.data = this->protocol.resSetChunk(
+				buffer.size,
+				event.id,
+				success,
+				event.message.chunk.metadata.listId,
+				event.message.chunk.metadata.stripeId,
+				event.message.chunk.metadata.chunkId
+			); */
+			printf( "TODO: SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_RESPONSE_SUCCESS & SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_RESPONSE_FAILURE\n" );
+			return;
 			break;
 		//////////
 		// Send //
