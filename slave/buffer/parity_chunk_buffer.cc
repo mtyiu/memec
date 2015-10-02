@@ -53,7 +53,11 @@ void ParityChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t v
 	dataChunks[ chunkId ] = dataChunk;
 
 	// Compute parity delta
-	ChunkBuffer::coding->encode( dataChunks, parityChunk, this->chunkId - ChunkBuffer::dataChunkCount + 1, offset, offset + size );
+	ChunkBuffer::coding->encode(
+		dataChunks, parityChunk, this->chunkId - ChunkBuffer::dataChunkCount + 1,
+		offset + chunkId * ChunkBuffer::capacity,
+		offset + chunkId * ChunkBuffer::capacity + size
+	);
 
 	pthread_mutex_lock( &wrapper.lock );
 	wrapper.chunk->status = CHUNK_STATUS_DIRTY;
@@ -61,6 +65,7 @@ void ParityChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t v
 		wrapper.chunk->setSize( offset + size );
 
 	// Update the parity chunk
+	// KeyValue::serialize( wrapper.chunk->getData() + offset, key, keySize, value, valueSize );
 	Coding::bitwiseXOR(
 		wrapper.chunk->getData(),
 		wrapper.chunk->getData(),
@@ -85,7 +90,11 @@ void ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t of
 	dataChunks[ chunkId ] = dataChunk;
 
 	// Compute parity delta
-	ChunkBuffer::coding->encode( dataChunks, parityChunk, this->chunkId - ChunkBuffer::dataChunkCount + 1, offset, offset + size );
+	ChunkBuffer::coding->encode(
+		dataChunks, parityChunk, this->chunkId - ChunkBuffer::dataChunkCount + 1,
+		offset + chunkId * ChunkBuffer::capacity,
+		offset + chunkId * ChunkBuffer::capacity + size
+	);
 
 	pthread_mutex_lock( &wrapper.lock );
 	wrapper.chunk->status = CHUNK_STATUS_DIRTY;
@@ -103,9 +112,11 @@ void ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t of
 
 void ParityChunkBuffer::flush( uint32_t stripeId, Chunk *chunk ) {
 	// Append a flush event to the event queue
+	/*
 	IOEvent ioEvent;
 	ioEvent.flush( chunk );
 	ChunkBuffer::eventQueue->insert( ioEvent );
+	*/
 }
 
 void ParityChunkBuffer::print( FILE *f ) {

@@ -160,8 +160,6 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 }
 
 void SlaveWorker::dispatch( IOEvent event ) {
-	// TODO: Only flush the chunk to disk when idle / periodically
-	/*
 	switch( event.type ) {
 		case IO_EVENT_TYPE_FLUSH_CHUNK:
 			this->storage->write(
@@ -170,7 +168,6 @@ void SlaveWorker::dispatch( IOEvent event ) {
 			);
 			break;
 	}
-	*/
 }
 
 void SlaveWorker::dispatch( MasterEvent event ) {

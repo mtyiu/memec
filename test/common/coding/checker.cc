@@ -142,9 +142,9 @@ int main( int argc, char** argv ) {
 	fprintf( stdout, "Verify chunks\n");
 	if ( verify_chunks() ) {
 		fprintf( stdout, "Passed verification!\n" );
+		return 0;
 	} else {
 		fprintf( stdout, "Failed verification...\n" );
+		return 1;
 	}
-
-	return 0;
 }
