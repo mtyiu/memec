@@ -416,7 +416,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 			);
 			break;
 		case SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_REQUEST:
-			printf( "TODO: SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_REQUEST\n" );
+			// printf( "TODO: SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_REQUEST\n" );
 			return;
 			break;
 		///////////////
@@ -518,7 +518,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				event.message.chunk.metadata.stripeId,
 				event.message.chunk.metadata.chunkId
 			); */
-			printf( "TODO: SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_RESPONSE_SUCCESS & SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_RESPONSE_FAILURE\n" );
+			// printf( "TODO: SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_RESPONSE_SUCCESS & SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_RESPONSE_FAILURE\n" );
 			return;
 			break;
 		//////////
