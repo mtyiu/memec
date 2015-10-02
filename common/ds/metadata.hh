@@ -54,16 +54,19 @@ public:
 
 class RemappingRecord {
 public:
+	bool sent;
 	uint32_t listId, chunkId;
 	void *ptr;
 
 	RemappingRecord() {
+		this->sent = false;
 		this->listId = 0;
 		this->chunkId = 0;
 		this->ptr = 0;
 	}
 
 	RemappingRecord( uint32_t listId, uint32_t chunkId, void *ptr = 0 ) {
+		this->sent = false;
 		this->set( listId, chunkId, ptr );
 	}
 
@@ -72,6 +75,7 @@ public:
 		this->chunkId = chunkId;
 		this->ptr = ptr;
 	}
+
 };
 
 #endif

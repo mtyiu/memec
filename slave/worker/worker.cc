@@ -60,12 +60,13 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 	bool connected, isSend;
 	uint32_t requestId;
 	ssize_t ret;
-	size_t count;
+	size_t count, remapCount;
 	struct {
 		size_t size;
 		char *data;
 	} buffer;
 	struct timespec t = start_timer();
+	std::map<Key, RemappingRecord>::iterator it, safeNextIt;
 
 	if ( event.type != COORDINATOR_EVENT_TYPE_PENDING )
 		requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
@@ -86,9 +87,31 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 				requestId,
 				Slave::getInstance()->aggregateLoad().ops,
 				SlaveWorker::map->ops,
+				SlaveWorker::map->remap,
 				&SlaveWorker::map->opsLock,
-				count
+				&SlaveWorker::map->remapLock,
+				count,
+				remapCount
 			);
+			// move the remapping record sent to another set to avoid looping through all records over and over ..
+			pthread_mutex_lock ( &SlaveWorker::map->remapLock );
+			if ( remapCount == SlaveWorker::map->remap.size() ) {
+				SlaveWorker::map->remapSent.insert( 
+					SlaveWorker::map->remap.begin(),
+					SlaveWorker::map->remap.end()
+				);
+				SlaveWorker::map->remap.clear();
+			} else {
+				for ( it = SlaveWorker::map->remap.begin(); it != SlaveWorker::map->remap.end(); it = safeNextIt ) {
+					safeNextIt = it;
+					safeNextIt++;
+					if ( it->second.sent ) {
+						SlaveWorker::map->remapSent[ it->first ] = it->second;
+						SlaveWorker::map->remap.erase( it );
+					}
+				}
+			}
+			pthread_mutex_unlock ( &SlaveWorker::map->remapLock );
 			isSend = true;
 			break;
 		case COORDINATOR_EVENT_TYPE_PENDING:
