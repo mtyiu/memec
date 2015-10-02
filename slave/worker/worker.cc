@@ -1120,20 +1120,6 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 				);
 				packet->size = ( uint32_t ) size;
 
-				{
-					struct ChunkUpdateHeader h;
-					if ( ! this->protocol.parseChunkUpdateHeader( h, true, packet->data + PROTO_HEADER_SIZE, packet->size - PROTO_HEADER_SIZE ) ) {
-						printf( "error 1\n" );
-					} else {
-						char *r = ( char * ) memmem( packet->data, packet->size, header.valueUpdate, header.valueUpdateSize );
-						if ( r ) {
-							if ( memcmp( header.valueUpdate, h.delta, header.valueUpdateSize ) != 0 )
-								printf( "memmem(): %d. %p vs %p\n", r - packet->data, r, h.delta );
-						} else
-							printf( "not found\n" );
-					}
-				}
-
 				// Insert into event queue
 				SlavePeerEvent slavePeerEvent;
 				slavePeerEvent.send( this->paritySlaveSockets[ i ], packet );
