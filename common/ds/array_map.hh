@@ -33,6 +33,9 @@ public:
 
 	ArrayMap( ArrayMap const& arrayMap ) {
 		size_t i;
+		pthread_mutex_init( &this->lock, 0 );
+		this->needsDelete = true;
+		this->clear();
 		for ( i = 0; i < arrayMap.size(); i++ ) {
 			this->keys.push_back( arrayMap.keys[ i ] );
 			this->values.push_back( new ValueType( arrayMap.values[ i ] ) );
