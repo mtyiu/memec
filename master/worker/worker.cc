@@ -1006,6 +1006,7 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, char *buf,
 			__ERROR__( "MasterWorker", "handleGetResponse", "Cannot find a pending stats GET request that matches the response." );
 		} else {
 			int index = -1;
+			pthread_mutex_lock( &master->slaveLoading.lock );
 			std::set<Latency> *latencyPool = master->slaveLoading.past.get.get( rst.addr, &index );
 			// init. the set if it is not there
 			if ( index == -1 ) {
@@ -1017,6 +1018,7 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, char *buf,
 			if ( index == -1 )
 				latencyPool = master->slaveLoading.past.get.get( rst.addr );
 			latencyPool->insert( latency );
+			pthread_mutex_unlock( &master->slaveLoading.lock );
 		}
 	}
 
@@ -1072,6 +1074,7 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 			__ERROR__( "MasterWorker", "handleSetResponse", "Cannot find a pending stats SET request that matches the response." );
 		} else {
 			int index = -1;
+			pthread_mutex_lock( &master->slaveLoading.lock );
 			std::set<Latency> *latencyPool = master->slaveLoading.past.set.get( rst.addr, &index );
 			// init. the set if it is not there
 			if ( index == -1 ) {
@@ -1083,6 +1086,7 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 			if ( index == -1 )
 				latencyPool = master->slaveLoading.past.set.get( rst.addr );
 			latencyPool->insert( latency );
+			pthread_mutex_unlock( &master->slaveLoading.lock );
 		}
 	}
 
@@ -1296,6 +1300,7 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 			__ERROR__( "MasterWorker", "handleRemappingSetResponse", "Cannot find a pending stats SET request that matches the response." );
 		} else {
 			int index = -1;
+			pthread_mutex_lock( &master->slaveLoading.lock );
 			std::set<Latency> *latencyPool = master->slaveLoading.past.set.get( rst.addr, &index );
 			// init. the set if it is not there
 			if ( index == -1 ) {
@@ -1307,6 +1312,7 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 			if ( index == -1 )
 				latencyPool = master->slaveLoading.past.set.get( rst.addr );
 			latencyPool->insert( latency );
+			pthread_mutex_unlock( &master->slaveLoading.lock );
 		}
 	}
 
