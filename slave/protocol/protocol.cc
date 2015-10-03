@@ -176,6 +176,22 @@ char *SlaveProtocol::reqRemappingSet( size_t &size, uint32_t id, uint32_t listId
 	return buf;
 }
 
+char *SlaveProtocol::reqSealChunk( size_t &size, uint32_t id, Chunk *chunk, char *buf ) {
+	if ( ! buf ) buf = this->buffer.send;
+	size = this->generateChunkSealHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_SEAL_CHUNK,
+		id,
+		chunk->metadata.listId,
+		chunk->metadata.stripeId,
+		chunk->metadata.chunkId,
+		chunk,
+		buf
+	);
+	return buf;
+}
+
 char *SlaveProtocol::reqUpdateChunk( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta, char *buf ) {
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateChunkUpdateHeader(

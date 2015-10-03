@@ -64,23 +64,25 @@ private:
 	void dispatch( MasterEvent event );
 	void dispatch( SlaveEvent event );
 	void dispatch( SlavePeerEvent event );
-
+	// Detect redirected requests
 	bool isRedirectedRequest( char *key, uint8_t size, bool *isParity = 0, uint32_t *listIdPtr = 0, uint32_t *chunkIdPtr = 0 );
 	bool isRedirectedRequest( uint32_t listId, uint32_t updatingChunkId );
-
+	// Perform consistent hashing
 	SlavePeerSocket *getSlave( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded = false, bool *isDegraded = 0 );
 	SlavePeerSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded = false, bool *isDegraded = 0 );
 	bool getSlaves( uint32_t listId, bool allowDegraded = false, bool *isDegraded = 0 );
-
+	// Issue seal chunk requests
+	bool issueSealChunkRequest( Chunk *chunk );
+	// Request handler for coordinator
 	bool handleSlaveConnectedMsg( CoordinatorEvent event, char *buf, size_t size );
-
+	// Request handler for master
 	bool handleGetRequest( MasterEvent event, char *buf, size_t size );
 	bool handleSetRequest( MasterEvent event, char *buf, size_t size );
 	bool handleRemappingSetLockRequest( MasterEvent event, char *buf, size_t size );
 	bool handleRemappingSetRequest( MasterEvent event, char *buf, size_t size );
 	bool handleUpdateRequest( MasterEvent event, char *buf, size_t size );
 	bool handleDeleteRequest( MasterEvent event, char *buf, size_t size );
-
+	// Request handler for slave peers
 	bool handleSlavePeerRegisterRequest( SlavePeerSocket *socket, char *buf, size_t size );
 	bool handleRemappingSetRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleUpdateChunkRequest( SlavePeerEvent event, char *buf, size_t size );

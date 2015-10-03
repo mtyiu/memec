@@ -416,9 +416,8 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 			);
 			break;
 		case SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_REQUEST:
-			printf( "TODO: SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_REQUEST\n" );
+			this->issueSealChunkRequest( event.message.chunk.chunk );
 			return;
-			break;
 		///////////////
 		// Responses //
 		///////////////
@@ -583,6 +582,9 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
 							break;
 					}
+					break;
+				case PROTO_OPCODE_SEAL_CHUNK:
+					printf( "Received PROTO_OPCODE_SEAL_CHUNK request.\n" );
 					break;
 				case PROTO_OPCODE_UPDATE_CHUNK:
 					switch( header.magic ) {
@@ -767,6 +769,33 @@ bool SlaveWorker::getSlaves( uint32_t listId, bool allowDegraded, bool *isDegrad
 					return false;
 				}
 			}
+		}
+	}
+	return true;
+}
+
+bool SlaveWorker::issueSealChunkRequest( Chunk *chunk ) {
+	if ( SlaveWorker::parityChunkCount ) {
+		size_t size;
+		uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
+		Packet *packet = SlaveWorker::packetPool->malloc();
+		packet->setReferenceCount( SlaveWorker::parityChunkCount );
+
+		this->protocol.reqSealChunk( size, requestId, chunk, packet->data );
+		packet->size = ( uint32_t ) size;
+
+		for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
+			SlavePeerEvent slavePeerEvent;
+			slavePeerEvent.send( this->paritySlaveSockets[ i ], packet );
+
+#ifdef SLAVE_WORKER_SEND_REPLICAS_PARALLEL
+			if ( i == SlaveWorker::parityChunkCount - 1 )
+				this->dispatch( slavePeerEvent );
+			else
+				SlaveWorker::eventQueue->prioritizedInsert( slavePeerEvent );
+#else
+			this->dispatch( slavePeerEvent );
+#endif
 		}
 	}
 	return true;
