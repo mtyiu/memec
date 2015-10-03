@@ -146,45 +146,17 @@ size_t Protocol::generateRemappingSetHeader( uint8_t magic, uint8_t to, uint8_t 
 	return bytes;
 }
 
-size_t Protocol::generateChunkSealHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t count, Chunk *chunk, char *sendBuf ) {
+size_t Protocol::generateChunkSealHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t count, uint32_t dataLength, char *sendBuf ) {
 	if ( ! sendBuf ) sendBuf = this->buffer.send;
-	char *buf = sendBuf + PROTO_HEADER_SIZE, *countPtr;
-	size_t bytes = 0;
+	char *buf = sendBuf + PROTO_HEADER_SIZE;
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_CHUNK_SEAL_SIZE + dataLength, id, sendBuf );
 
 	*( ( uint32_t * )( buf      ) ) = htonl( listId );
 	*( ( uint32_t * )( buf +  4 ) ) = htonl( stripeId );
 	*( ( uint32_t * )( buf +  8 ) ) = htonl( chunkId );
-	countPtr = buf + 12;
-	bytes += PROTO_CHUNK_SEAL_SIZE;
-	buf += PROTO_CHUNK_SEAL_SIZE;
+	*( ( uint32_t * )( buf + 12 ) ) = htonl( count );
 
-#ifdef USE_CHUNK_MUTEX_LOCK
-	chunk->setLock();
-#endif
-	int currentOffset = 0, nextOffset = 0;
-	uint32_t count = 0;
-	char *key;
-	uint8_t keySize;
-	while ( ( nextOffset = chunk->next( currentOffset, key, keySize ) ) != -1 ) {
-		buf[ 0 ] = keySize;
-		*( ( uint32_t * )( buf + 1 ) ) = htonl( currentOffset );
-		memmove( buf + 5, key, keySize );
-
-		count++;
-		bytes += PROTO_CHUNK_SEAL_DATA_SIZE + keySize;
-		buf += PROTO_CHUNK_SEAL_DATA_SIZE + keySize;
-
-		currentOffset = nextOffset;
-	}
-#ifdef USE_CHUNK_MUTEX_LOCK
-	chunk->setUnlock();
-#endif
-
-	*( ( uint32_t * )( countPtr ) ) = htonl( count );
-	bytes += this->generateHeader( magic, to, opcode, bytes, id, sendBuf );
-
-	// The seal request should not exceed the size of the send buffer
-	assert( bytes <= this->buffer.size );
+	bytes += PROTO_CHUNK_SEAL_SIZE + dataLength;
 
 	return bytes;
 }
@@ -364,6 +336,7 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_OPCODE_DELETE:
 		case PROTO_OPCODE_REMAPPING_LOCK:
 		case PROTO_OPCODE_REMAPPING_SET:
+		case PROTO_OPCODE_SEAL_CHUNK:
 		case PROTO_OPCODE_UPDATE_CHUNK:
 		case PROTO_OPCODE_DELETE_CHUNK:
 		case PROTO_OPCODE_GET_CHUNK:
@@ -540,7 +513,7 @@ bool Protocol::parseChunkSealHeaderData( size_t offset, uint8_t &keySize, uint32
 	keySize = ptr[ 0 ];
 	offset  = ntohl( *( ( uint32_t * )( ptr + 1 ) ) );
 
-	if ( size < PROTO_CHUNK_SEAL_DATA_SIZE + keySize )
+	if ( size < ( size_t ) PROTO_CHUNK_SEAL_DATA_SIZE + keySize )
 		key = ptr + PROTO_CHUNK_SEAL_DATA_SIZE;
 
 	return true;
@@ -846,7 +819,7 @@ bool Protocol::parseChunkSealHeaderData( struct ChunkSealHeaderData &header, cha
 	return this->parseChunkSealHeaderData(
 		offset,
 		header.keySize,
-		header.keyOffset,
+		header.offset,
 		header.key,
 		buf, size
 	);

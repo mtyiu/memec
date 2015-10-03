@@ -778,9 +778,14 @@ bool SlaveWorker::issueSealChunkRequest( Chunk *chunk ) {
 	if ( SlaveWorker::parityChunkCount ) {
 		size_t size;
 		uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
+		bool isDegraded;
 		Packet *packet = SlaveWorker::packetPool->malloc();
 		packet->setReferenceCount( SlaveWorker::parityChunkCount );
 
+		// Find parity slaves
+		this->getSlaves( chunk->metadata.listId, false /* allowDegraded */, &isDegraded );
+
+		// Prepare seal chunk request
 		this->protocol.reqSealChunk( size, requestId, chunk, packet->data );
 		packet->size = ( uint32_t ) size;
 

@@ -3,6 +3,7 @@
 
 #include "../../common/protocol/protocol.hh"
 #include "../../common/config/server_addr.hh"
+#include "../../common/ds/chunk.hh"
 
 class SlaveProtocol : public Protocol {
 public:
