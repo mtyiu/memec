@@ -146,6 +146,21 @@ size_t Protocol::generateRemappingSetHeader( uint8_t magic, uint8_t to, uint8_t 
 	return bytes;
 }
 
+size_t Protocol::generateChunkSealHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t count, uint32_t dataLength, char *sendBuf ) {
+	if ( ! sendBuf ) sendBuf = this->buffer.send;
+	char *buf = sendBuf + PROTO_HEADER_SIZE;
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_CHUNK_SEAL_SIZE + dataLength, id, sendBuf );
+
+	*( ( uint32_t * )( buf      ) ) = htonl( listId );
+	*( ( uint32_t * )( buf +  4 ) ) = htonl( stripeId );
+	*( ( uint32_t * )( buf +  8 ) ) = htonl( chunkId );
+	*( ( uint32_t * )( buf + 12 ) ) = htonl( count );
+
+	bytes += PROTO_CHUNK_SEAL_SIZE + dataLength;
+
+	return bytes;
+}
+
 size_t Protocol::generateChunkUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta, char *sendBuf ) {
 	if ( ! sendBuf ) sendBuf = this->buffer.send;
 	char *buf = sendBuf + PROTO_HEADER_SIZE;
@@ -315,12 +330,15 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_OPCODE_SLAVE_CONNECTED:
 		case PROTO_OPCODE_MASTER_PUSH_STATS:
 		case PROTO_OPCODE_COORDINATOR_PUSH_STATS:
+		case PROTO_OPCODE_SEAL_CHUNKS:
+		case PROTO_OPCODE_FLUSH_CHUNKS:
 		case PROTO_OPCODE_GET:
 		case PROTO_OPCODE_SET:
 		case PROTO_OPCODE_UPDATE:
 		case PROTO_OPCODE_DELETE:
 		case PROTO_OPCODE_REMAPPING_LOCK:
 		case PROTO_OPCODE_REMAPPING_SET:
+		case PROTO_OPCODE_SEAL_CHUNK:
 		case PROTO_OPCODE_UPDATE_CHUNK:
 		case PROTO_OPCODE_DELETE_CHUNK:
 		case PROTO_OPCODE_GET_CHUNK:
@@ -472,6 +490,36 @@ bool Protocol::parseRemappingSetHeader( size_t offset, uint32_t &listId, uint32_
 
 	key = ptr;
 	value = ptr + keySize;
+
+	return true;
+}
+
+bool Protocol::parseChunkSealHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &count, char *buf, size_t size ) {
+	if ( size < PROTO_CHUNK_SEAL_SIZE )
+		return false;
+
+	char *ptr = buf + offset;
+	listId   = ntohl( *( ( uint32_t * )( ptr      ) ) );
+	stripeId = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
+	chunkId  = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
+	count    = ntohl( *( ( uint32_t * )( ptr + 12 ) ) );
+
+	return true;
+}
+
+bool Protocol::parseChunkSealHeaderData( size_t offset, uint8_t &keySize, uint32_t &keyOffset, char *&key, char *buf, size_t size ) {
+	// Note: Also implemented in slave/buffer/parity_chunk_buffer.cc
+	if ( size < PROTO_CHUNK_SEAL_DATA_SIZE )
+		return false;
+
+	char *ptr = buf + offset;
+	keySize = ptr[ 0 ];
+	offset  = ntohl( *( ( uint32_t * )( ptr + 1 ) ) );
+
+	if ( size < ( size_t ) PROTO_CHUNK_SEAL_DATA_SIZE + keySize )
+		return false;
+
+	key = ptr + PROTO_CHUNK_SEAL_DATA_SIZE;
 
 	return true;
 }
@@ -749,6 +797,35 @@ bool Protocol::parseRemappingSetHeader( struct RemappingSetHeader &header, char 
 		header.key,
 		header.valueSize,
 		header.value,
+		buf, size
+	);
+}
+
+bool Protocol::parseChunkSealHeader( struct ChunkSealHeader &header, char *buf, size_t size, size_t offset ) {
+	if ( ! buf || ! size ) {
+		buf = this->buffer.recv;
+		size = this->buffer.size;
+	}
+	return this->parseChunkSealHeader(
+		offset,
+		header.listId,
+		header.stripeId,
+		header.chunkId,
+		header.count,
+		buf, size
+	);
+}
+
+bool Protocol::parseChunkSealHeaderData( struct ChunkSealHeaderData &header, char *buf, size_t size, size_t offset ) {
+	if ( ! buf || ! size ) {
+		buf = this->buffer.recv;
+		size = this->buffer.size;
+	}
+	return this->parseChunkSealHeaderData(
+		offset,
+		header.keySize,
+		header.offset,
+		header.key,
 		buf, size
 	);
 }

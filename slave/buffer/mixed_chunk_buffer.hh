@@ -20,7 +20,14 @@ public:
 
 	MixedChunkBuffer( DataChunkBuffer *dataChunkBuffer );
 	MixedChunkBuffer( ParityChunkBuffer *parityChunkBuffer );
-	void set( char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode, uint32_t chunkId, Chunk **chunks = 0, Chunk *dataChunk = 0, Chunk *parityChunk = 0 );
+
+	bool set( char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode, uint32_t chunkId, Chunk **chunks = 0, Chunk *dataChunk = 0, Chunk *parityChunk = 0 );
+
+	// For DataChunkBuffer only
+	size_t seal();
+	// For ParityChunkBuffer only
+	bool seal( uint32_t stripeId, uint32_t chunkId, uint32_t count, char *sealData, size_t sealDataSize, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk );
+
 	int lockChunk( Chunk *chunk );
 	void updateAndUnlockChunk( int index );
 	void update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, char *dataDelta, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk );

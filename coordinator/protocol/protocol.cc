@@ -52,17 +52,17 @@ char *CoordinatorProtocol::resRegisterMaster( size_t &size, GlobalConfig &global
 */
 
 // TODO put into common/ as this is same as  MasterProtocol::reqPushLoadStats
-char *CoordinatorProtocol::reqPushLoadStats( 
+char *CoordinatorProtocol::reqPushLoadStats(
 		size_t &size, uint32_t id,
-		ArrayMap< struct sockaddr_in, Latency > *slaveGetLatency, 
+		ArrayMap< struct sockaddr_in, Latency > *slaveGetLatency,
 		ArrayMap< struct sockaddr_in, Latency > *slaveSetLatency,
-		std::set< struct sockaddr_in > *overloadedSlaveSet ) 
+		std::set< struct sockaddr_in > *overloadedSlaveSet )
 {
 
 	size = this->generateLoadStatsHeader(
 		PROTO_MAGIC_LOADING_STATS,
 		PROTO_MAGIC_TO_MASTER,
-		id, 
+		id,
 		slaveGetLatency->size(),
 		slaveSetLatency->size(),
 		overloadedSlaveSet->size(),
@@ -121,13 +121,13 @@ char *CoordinatorProtocol::reqPushLoadStats(
 }
 
 // TODO put into common/ as this is same as  MasterProtocol::parseLoadingStats
-bool CoordinatorProtocol::parseLoadingStats( 
-		const LoadStatsHeader& loadStatsHeader, 
+bool CoordinatorProtocol::parseLoadingStats(
+		const LoadStatsHeader& loadStatsHeader,
 		ArrayMap< struct sockaddr_in, Latency >& slaveGetLatency,
 		ArrayMap< struct sockaddr_in, Latency >& slaveSetLatency,
 		char* buffer, uint32_t size )
 {
-	struct sockaddr_in addr; 
+	struct sockaddr_in addr;
 	Latency *tempLatency = NULL;
 
 	uint32_t recordSize = sizeof( uint32_t ) * 3 + sizeof( uint16_t );
@@ -212,6 +212,28 @@ char *CoordinatorProtocol::announceSlaveConnected( size_t &size, uint32_t id, Sl
 		id,
 		socket->listenAddr.addr,
 		socket->listenAddr.port
+	);
+	return this->buffer.send;
+}
+
+char *CoordinatorProtocol::reqSealChunks( size_t &size, uint32_t id ) {
+	size = this->generateHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_SEAL_CHUNKS,
+		0, // length
+		id
+	);
+	return this->buffer.send;
+}
+
+char *CoordinatorProtocol::reqFlushChunks( size_t &size, uint32_t id ) {
+	size = this->generateHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_FLUSH_CHUNKS,
+		0, // length
+		id
 	);
 	return this->buffer.send;
 }

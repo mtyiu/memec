@@ -9,7 +9,7 @@
 #include "key.hh"
 #include "key_value.hh"
 
-// #define USE_CHUNK_MUTEX_LOCK
+#define USE_CHUNK_MUTEX_LOCK
 
 enum ChunkStatus {
 	// Clean chunk (used in chunk buffer)
@@ -45,9 +45,15 @@ public:
 	Chunk();
 	static void init( uint32_t capacity );
 	void init();
-	char *alloc( uint32_t size, uint32_t &offset );
-	void loadFromGetChunkRequest( uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isParity, char *data, uint32_t size );
 	void swap( Chunk *c );
+	void loadFromGetChunkRequest( uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isParity, char *data, uint32_t size );
+	// Access data inside the chunk
+	char *alloc( uint32_t size, uint32_t &offset );
+#ifdef USE_CHUNK_MUTEX_LOCK
+	int next( int offset, char *&key, uint8_t &keySize, bool needsLock = false, bool needsUnlock = false );
+#else
+	int next( int offset, char *&key, uint8_t &keySize );
+#endif
 	// Setters and getters
 	inline char *getData() { return this->data; }
 	inline uint32_t getSize() { return this->size; }

@@ -3,6 +3,7 @@
 #include "chunk.hh"
 #include "key_value.hh"
 #include "../coding/coding.hh"
+#include "../protocol/protocol.hh"
 #include "../util/debug.hh"
 
 uint32_t Chunk::capacity;
@@ -25,23 +26,6 @@ void Chunk::init( uint32_t capacity ) {
 void Chunk::init() {
 	this->data = new char[ Chunk::capacity ];
 	this->clear();
-}
-
-char *Chunk::alloc( uint32_t size, uint32_t &offset ) {
-#ifdef USE_CHUNK_MUTEX_LOCK
-	pthread_mutex_lock( &this->lock );
-#endif
-	char *ret = this->data + this->size;
-	offset = this->size;
-
-	this->status = CHUNK_STATUS_DIRTY;
-	this->count++;
-	this->size += size;
-#ifdef USE_CHUNK_MUTEX_LOCK
-	pthread_mutex_unlock( &this->lock );
-#endif
-
-	return ret;
 }
 
 void Chunk::loadFromGetChunkRequest( uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isParity, char *data, uint32_t size ) {
@@ -93,6 +77,49 @@ void Chunk::swap( Chunk *c ) {
 #ifdef USE_CHUNK_MUTEX_LOCK
 	pthread_mutex_unlock( &this->lock );
 #endif
+}
+
+char *Chunk::alloc( uint32_t size, uint32_t &offset ) {
+#ifdef USE_CHUNK_MUTEX_LOCK
+	pthread_mutex_lock( &this->lock );
+#endif
+	char *ret = this->data + this->size;
+	offset = this->size;
+
+	this->status = CHUNK_STATUS_DIRTY;
+	this->count++;
+	this->size += size;
+#ifdef USE_CHUNK_MUTEX_LOCK
+	pthread_mutex_unlock( &this->lock );
+#endif
+
+	return ret;
+}
+
+#ifdef USE_CHUNK_MUTEX_LOCK
+int Chunk::next( int offset, char *&key, uint8_t &keySize, bool needsLock, bool needsUnlock )
+#else
+int Chunk::next( int offset, char *&key, uint8_t &keySize )
+#endif
+{
+#ifdef USE_CHUNK_MUTEX_LOCK
+	if ( needsLock ) pthread_mutex_lock( &this->lock );
+#endif
+	char *ptr = this->data + offset, *value;
+	int ret = -1;
+	uint32_t valueSize;
+
+	if ( ptr < this->data + Chunk::capacity ) {
+		KeyValue::deserialize( ptr, key, keySize, value, valueSize );
+		if ( keySize )
+			ret = offset + PROTO_KEY_VALUE_SIZE + keySize + valueSize;
+		else
+			key = 0;
+	}
+#ifdef USE_CHUNK_MUTEX_LOCK
+	if ( needsUnlock ) pthread_mutex_unlock( &this->lock );
+#endif
+	return ret;
 }
 
 uint32_t Chunk::updateData() {

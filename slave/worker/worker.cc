@@ -145,6 +145,12 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 					case PROTO_OPCODE_SLAVE_CONNECTED:
 						this->handleSlaveConnectedMsg( event, buffer.data, buffer.size );
 						break;
+					case PROTO_OPCODE_SEAL_CHUNKS:
+						Slave::getInstance()->seal();
+						break;
+					case PROTO_OPCODE_FLUSH_CHUNKS:
+						Slave::getInstance()->flush();
+						break;
 					default:
 						__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from coordinator." );
 						break;
@@ -416,9 +422,8 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 			);
 			break;
 		case SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_REQUEST:
-			// printf( "TODO: SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_REQUEST\n" );
+			this->issueSealChunkRequest( event.message.chunk.chunk );
 			return;
-			break;
 		///////////////
 		// Responses //
 		///////////////
@@ -578,6 +583,22 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 							break;
 						case PROTO_MAGIC_RESPONSE_FAILURE:
 							__ERROR__( "SlaveWorker", "dispatch", "Failed to register with slave." );
+							break;
+						default:
+							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
+							break;
+					}
+					break;
+				case PROTO_OPCODE_SEAL_CHUNK:
+					switch( header.magic ) {
+						case PROTO_MAGIC_REQUEST:
+							this->handleSealChunkRequest( event, buffer.data, header.length );
+							break;
+						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							this->handleSealChunkResponse( event, true, buffer.data, buffer.size );
+							break;
+						case PROTO_MAGIC_RESPONSE_FAILURE:
+							this->handleSealChunkResponse( event, false, buffer.data, buffer.size );
 							break;
 						default:
 							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
@@ -772,6 +793,38 @@ bool SlaveWorker::getSlaves( uint32_t listId, bool allowDegraded, bool *isDegrad
 	return true;
 }
 
+bool SlaveWorker::issueSealChunkRequest( Chunk *chunk ) {
+	if ( SlaveWorker::parityChunkCount ) {
+		size_t size;
+		uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
+		bool isDegraded;
+		Packet *packet = SlaveWorker::packetPool->malloc();
+		packet->setReferenceCount( SlaveWorker::parityChunkCount );
+
+		// Find parity slaves
+		this->getSlaves( chunk->metadata.listId, false /* allowDegraded */, &isDegraded );
+
+		// Prepare seal chunk request
+		this->protocol.reqSealChunk( size, requestId, chunk, packet->data );
+		packet->size = ( uint32_t ) size;
+
+		for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
+			SlavePeerEvent slavePeerEvent;
+			slavePeerEvent.send( this->paritySlaveSockets[ i ], packet );
+
+#ifdef SLAVE_WORKER_SEND_REPLICAS_PARALLEL
+			if ( i == SlaveWorker::parityChunkCount - 1 )
+				this->dispatch( slavePeerEvent );
+			else
+				SlaveWorker::eventQueue->prioritizedInsert( slavePeerEvent );
+#else
+			this->dispatch( slavePeerEvent );
+#endif
+		}
+	}
+	return true;
+}
+
 bool SlaveWorker::handleSlaveConnectedMsg( CoordinatorEvent event, char *buf, size_t size ) {
 	struct AddressHeader header;
 	if ( ! this->protocol.parseAddressHeader( header, buf, size ) ) {
@@ -872,7 +925,9 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size ) 
 	}
 
 	SlaveWorker::chunkBuffer->at( listId )->set(
-		header.key, header.keySize, header.value, header.valueSize, PROTO_OPCODE_SET, chunkId,
+		header.key, header.keySize,
+		header.value, header.valueSize,
+		PROTO_OPCODE_SET, chunkId,
 		this->chunks, this->dataChunk, this->parityChunk
 	);
 
@@ -936,17 +991,10 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 		event.id
 	);
 
-	if ( ! SlaveWorker::chunkBuffer->at( header.listId ) ) {
-		__ERROR__(
-			"SlaveWorker", "handleRemappingSetRequest",
-			"[SET] Key: %.*s (key size = %u); Value: (value size = %u); list ID = %u, chunk ID = %u; needs forwarding? %s (ID: %u)",
-			( int ) header.keySize, header.key, header.keySize, header.valueSize,
-			header.listId, header.chunkId, header.needsForwarding ? "true" : "false",
-			event.id
-		);
-	}
 	SlaveWorker::chunkBuffer->at( header.listId )->set(
-		header.key, header.keySize, header.value, header.valueSize, PROTO_OPCODE_REMAPPING_SET, header.chunkId,
+		header.key, header.keySize,
+		header.value, header.valueSize,
+		PROTO_OPCODE_REMAPPING_SET, header.chunkId,
 		this->chunks, this->dataChunk, this->parityChunk
 	);
 
@@ -1029,7 +1077,9 @@ bool SlaveWorker::handleRemappingSetRequest( SlavePeerEvent event, char *buf, si
 	);
 
 	SlaveWorker::chunkBuffer->at( header.listId )->set(
-		header.key, header.keySize, header.value, header.valueSize, PROTO_OPCODE_REMAPPING_SET, header.chunkId,
+		header.key, header.keySize,
+		header.value, header.valueSize,
+		PROTO_OPCODE_REMAPPING_SET, header.chunkId,
 		this->chunks, this->dataChunk, this->parityChunk
 	);
 
@@ -1341,6 +1391,33 @@ bool SlaveWorker::handleSlavePeerRegisterRequest( SlavePeerSocket *socket, char 
 	return true;
 }
 
+bool SlaveWorker::handleSealChunkRequest( SlavePeerEvent event, char *buf, size_t size ) {
+	struct ChunkSealHeader header;
+	bool ret;
+	if ( ! this->protocol.parseChunkSealHeader( header, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleSealChunkRequest", "Invalid SEAL_CHUNK request." );
+		return false;
+	}
+	__DEBUG__(
+		BLUE, "SlaveWorker", "handleSealChunkRequest",
+		"SlaveWorker", "handleSealChunkRequest",
+		"[SEAL_CHUNK] List ID: %u, stripe ID: %u, chunk ID: %u; count = %u.",
+		header.listId, header.stripeId, header.chunkId, header.count
+	);
+
+	ret = SlaveWorker::chunkBuffer->at( header.listId )->seal(
+		header.stripeId, header.chunkId, header.count,
+		buf + PROTO_CHUNK_SEAL_SIZE,
+		size - PROTO_CHUNK_SEAL_SIZE,
+		this->chunks, this->dataChunk, this->parityChunk
+	);
+
+	if ( ! ret )
+		__ERROR__( "SlaveWorker", "handleSealChunkRequest", "Cannot update parity chunk." );
+
+	return true;
+}
+
 bool SlaveWorker::handleUpdateChunkRequest( SlavePeerEvent event, char *buf, size_t size ) {
 	struct ChunkUpdateHeader header;
 	bool ret;
@@ -1477,6 +1554,10 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, char *buf, size_t
 	this->dispatch( event );
 
 	return ret;
+}
+
+bool SlaveWorker::handleSealChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
+	return true;
 }
 
 bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {

@@ -3,6 +3,7 @@
 
 #include "../../common/protocol/protocol.hh"
 #include "../../common/config/server_addr.hh"
+#include "../../common/ds/chunk.hh"
 
 class SlaveProtocol : public Protocol {
 public:
@@ -40,6 +41,8 @@ public:
 	char *resRegisterSlavePeer( size_t &size, uint32_t id, bool success );
 	// REMAPPING_SET
 	char *reqRemappingSet( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, bool needsForwarding, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf = 0 );
+	// SEAL_CHUNK
+	char *reqSealChunk( size_t &size, uint32_t id, Chunk *chunk, char *buf = 0 );
 	// UPDATE_CHUNK
 	char *reqUpdateChunk( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta, char *buf = 0 );
 	char *resUpdateChunk( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId );

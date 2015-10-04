@@ -34,10 +34,10 @@ private:
 	void free();
 
 	// Helper functions to determine slave loading
-	void updateAverageSlaveLoading( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency, 
+	void updateAverageSlaveLoading( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
 			ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency );
-	void updateOverloadedSlaveSet( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency, 
-			ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency, 
+	void updateOverloadedSlaveSet( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
+			ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency,
 			std::set<struct sockaddr_in> *slaveSet );
 	bool switchPhase();
 
@@ -86,6 +86,8 @@ public:
 	void debug( FILE *f = stdout );
 	void dump();
 	void time();
+	void seal();
+	void flush();
 	double getElapsedTime();
 	void interactive();
 };

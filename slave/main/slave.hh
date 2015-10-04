@@ -79,6 +79,8 @@ public:
 	bool init( char *path, OptionList &options, bool verbose );
 	bool start();
 	bool stop();
+
+	void seal();
 	void flush();
 
 	void info( FILE *f = stdout );

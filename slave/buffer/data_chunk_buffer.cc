@@ -27,7 +27,7 @@ DataChunkBuffer::DataChunkBuffer( uint32_t count, uint32_t listId, uint32_t stri
 
 KeyMetadata DataChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode ) {
 	KeyMetadata keyMetadata;
-	uint32_t size = 4 + keySize + valueSize, max = 0, tmp;
+	uint32_t size = PROTO_KEY_VALUE_SIZE + keySize + valueSize, max = 0, tmp;
 	int index = -1;
 	char *ptr;
 
@@ -67,7 +67,7 @@ KeyMetadata DataChunkBuffer::set( char *key, uint8_t keySize, char *value, uint3
 	KeyValue::serialize( ptr, key, keySize, value, valueSize );
 
 	// Flush if the current buffer is full
-	if ( this->sizes[ index ] + 4 + CHUNK_BUFFER_FLUSH_THRESHOLD >= ChunkBuffer::capacity )
+	if ( this->sizes[ index ] + PROTO_KEY_VALUE_SIZE + CHUNK_BUFFER_FLUSH_THRESHOLD >= ChunkBuffer::capacity )
 		this->flushAt( index, false );
 
 	pthread_mutex_unlock( this->locks + index );
@@ -79,6 +79,15 @@ KeyMetadata DataChunkBuffer::set( char *key, uint8_t keySize, char *value, uint3
 	ChunkBuffer::map->insertKey( keyObj, opcode, keyMetadata );
 
 	return keyMetadata;
+}
+
+size_t DataChunkBuffer::seal() {
+	pthread_mutex_lock( &this->lock );
+	for ( uint32_t i = 0; i < this->count; i++ ) {
+		this->flushAt( i, false );
+	}
+	pthread_mutex_unlock( &this->lock );
+	return this->count;
 }
 
 int DataChunkBuffer::lockChunk( Chunk *chunk ) {
