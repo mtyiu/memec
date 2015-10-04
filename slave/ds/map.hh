@@ -16,12 +16,6 @@ private:
 	std::map<Key, KeyMetadata> keys;
 	pthread_mutex_t keysLock;
 	/**
-	 * Store the remapping records
-	 * Key |-> (list ID, chunk ID)
-	 */
-	std::map<Key, RemappingRecord> remap;
-	pthread_mutex_t remapLock;
-	/**
 	 * Store the cached chunks
 	 * (list ID, stripe ID, chunk ID) |-> Chunk *
 	 */
@@ -35,6 +29,17 @@ public:
 	 */
 	std::map<Key, OpMetadata> ops;
 	pthread_mutex_t opsLock;
+	/**
+	 * Store the pending-to-send remapping records
+	 * Key |-> (list ID, chunk ID)
+	 */
+	std::map<Key, RemappingRecord> remap;
+	/**
+	 * Store the alread-sent remapping records
+	 * Key |-> (list ID, chunk ID)
+	 */
+	std::map<Key, RemappingRecord> remapSent;
+	pthread_mutex_t remapLock;
 
 	Map() {
 		pthread_mutex_init( &this->keysLock, 0 );
