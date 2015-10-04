@@ -42,6 +42,8 @@
 #define PROTO_OPCODE_SLAVE_CONNECTED              0x32
 #define PROTO_OPCODE_MASTER_PUSH_STATS            0x33
 #define PROTO_OPCODE_COORDINATOR_PUSH_STATS       0x34
+#define PROTO_OPCODE_SEAL_CHUNKS                  0x35
+#define PROTO_OPCODE_FLUSH_CHUNKS                 0x36
 
 // Application <-> Master or Master <-> Slave //
 #define PROTO_OPCODE_GET                          0x01

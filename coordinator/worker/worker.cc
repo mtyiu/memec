@@ -177,6 +177,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 		size_t size;
 		char *data;
 	} buffer;
+	uint32_t requestId;
 
 	switch( event.type ) {
 		case SLAVE_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
@@ -185,6 +186,16 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			break;
 		case SLAVE_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resRegisterSlave( buffer.size, event.id, false );
+			isSend = true;
+			break;
+		case SLAVE_EVENT_TYPE_REQUEST_SEAL_CHUNKS:
+			requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
+			buffer.data = this->protocol.reqSealChunks( buffer.size, requestId );
+			isSend = true;
+			break;
+		case SLAVE_EVENT_TYPE_REQUEST_FLUSH_CHUNKS:
+			requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
+			buffer.data = this->protocol.reqFlushChunks( buffer.size, requestId );
 			isSend = true;
 			break;
 		case SLAVE_EVENT_TYPE_PENDING:

@@ -9,7 +9,7 @@
 #include "key.hh"
 #include "key_value.hh"
 
-// #define USE_CHUNK_MUTEX_LOCK
+#define USE_CHUNK_MUTEX_LOCK
 
 enum ChunkStatus {
 	// Clean chunk (used in chunk buffer)

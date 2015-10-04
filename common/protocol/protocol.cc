@@ -330,6 +330,8 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_OPCODE_SLAVE_CONNECTED:
 		case PROTO_OPCODE_MASTER_PUSH_STATS:
 		case PROTO_OPCODE_COORDINATOR_PUSH_STATS:
+		case PROTO_OPCODE_SEAL_CHUNKS:
+		case PROTO_OPCODE_FLUSH_CHUNKS:
 		case PROTO_OPCODE_GET:
 		case PROTO_OPCODE_SET:
 		case PROTO_OPCODE_UPDATE:
@@ -506,6 +508,7 @@ bool Protocol::parseChunkSealHeader( size_t offset, uint32_t &listId, uint32_t &
 }
 
 bool Protocol::parseChunkSealHeaderData( size_t offset, uint8_t &keySize, uint32_t &keyOffset, char *&key, char *buf, size_t size ) {
+	// Note: Also implemented in slave/buffer/parity_chunk_buffer.cc
 	if ( size < PROTO_CHUNK_SEAL_DATA_SIZE )
 		return false;
 
@@ -514,7 +517,9 @@ bool Protocol::parseChunkSealHeaderData( size_t offset, uint8_t &keySize, uint32
 	offset  = ntohl( *( ( uint32_t * )( ptr + 1 ) ) );
 
 	if ( size < ( size_t ) PROTO_CHUNK_SEAL_DATA_SIZE + keySize )
-		key = ptr + PROTO_CHUNK_SEAL_DATA_SIZE;
+		return false;
+
+	key = ptr + PROTO_CHUNK_SEAL_DATA_SIZE;
 
 	return true;
 }

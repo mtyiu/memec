@@ -18,14 +18,14 @@ public:
 	char *resRegisterMaster( size_t &size, uint32_t id, bool success );
 	// char *resRegisterMaster( size_t &size, GlobalConfig &globalConfig, MasterConfig *masterConfig = 0 );
 	// Load statistics
-	char *reqPushLoadStats( 
+	char *reqPushLoadStats(
 		size_t &size, uint32_t id,
-		ArrayMap< struct sockaddr_in, Latency > *slaveGetLatency, 
+		ArrayMap< struct sockaddr_in, Latency > *slaveGetLatency,
 		ArrayMap< struct sockaddr_in, Latency > *slaveSetLatency,
 		std::set< struct sockaddr_in > *overloadedSlaveSet
 	);
-	bool parseLoadingStats( 
-		const LoadStatsHeader& loadStatsHeader, 
+	bool parseLoadingStats(
+		const LoadStatsHeader& loadStatsHeader,
 		ArrayMap< struct sockaddr_in, Latency >& slaveGetLatency,
 		ArrayMap< struct sockaddr_in, Latency >& slaveSetLatency,
 		char* buffer, uint32_t size
@@ -36,6 +36,8 @@ public:
 	char *resRegisterSlave( size_t &size, uint32_t id, bool success );
 	// char *resRegisterSlave( size_t &size, GlobalConfig &globalConfig, SlaveConfig *slaveConfig = 0 );
 	char *announceSlaveConnected( size_t &size, uint32_t id, SlaveSocket *socket );
+	char *reqSealChunks( size_t &size, uint32_t id );
+	char *reqFlushChunks( size_t &size, uint32_t id );
 };
 
 #endif
