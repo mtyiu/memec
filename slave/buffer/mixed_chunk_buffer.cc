@@ -73,6 +73,15 @@ void MixedChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t off
 	}
 }
 
+bool MixedChunkBuffer::deleteKey( char *keyStr, uint8_t keySize ) {
+	switch( this->role ) {
+		case CBR_PARITY:
+			return this->buffer.parity->deleteKey( keyStr, keySize );
+		default:
+			return false;
+	}
+}
+
 void MixedChunkBuffer::stop() {
 	switch( this->role ) {
 		case CBR_DATA:

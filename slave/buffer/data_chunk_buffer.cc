@@ -1,5 +1,4 @@
 #include "data_chunk_buffer.hh"
-#include "../event/io_event.hh"
 #include "../main/slave.hh"
 
 DataChunkBuffer::DataChunkBuffer( uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) : ChunkBuffer( listId, stripeId, chunkId ) {

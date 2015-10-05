@@ -248,6 +248,8 @@ uint32_t Chunk::deleteKeyValue( Key target, std::map<Key, KeyMetadata> *keys, ch
 		dst += m.length;
 		src += m.length;
 	}
+	// Set the data after the last key-value pair as zeros
+	memset( dst, 0, metadata.length );
 
 	// Update internal counters
 	this->count--;

@@ -119,6 +119,15 @@ struct KeyHeader {
 	char *key;
 };
 
+#define PROTO_KEY_STRIPE_SIZE 13
+struct KeyStripeHeader {
+	uint32_t listId;
+	uint32_t stripeId;
+	uint32_t chunkId;
+	uint8_t keySize;
+	char *key;
+};
+
 #define PROTO_KEY_VALUE_SIZE 4
 struct KeyValueHeader {
 	uint8_t keySize;
@@ -220,7 +229,8 @@ protected:
 	uint8_t from, to;
 
 	size_t generateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t length, uint32_t id, char *sendBuf = 0 );
-	size_t generateKeyHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint8_t keySize, char *key );
+	size_t generateKeyHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint8_t keySize, char *key, char *sendBuf = 0 );
+	size_t generateKeyStripeHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint8_t keySize, char *key, char *sendBuf = 0 );
 	size_t generateKeyValueHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint8_t keySize, char *key, uint32_t valueSize, char *value, char *sendBuf = 0 );
 	size_t generateKeyValueUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate = 0 );
 	size_t generateRemappingLockHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key );
@@ -234,8 +244,8 @@ protected:
 	size_t generateLoadStatsHeader( uint8_t magic, uint8_t to, uint32_t id, uint32_t slaveGetCount, uint32_t slaveSetCount, uint32_t slaveOverloadCount, uint32_t recordSize, uint32_t slaveAddrSize );
 
 	bool parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t &opcode, uint32_t &length, uint32_t &id, char *buf, size_t size );
-
 	bool parseKeyHeader( size_t offset, uint8_t &keySize, char *&key, char *buf, size_t size );
+	bool parseKeyStripeHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint8_t &keySize, char *&key, char *buf, size_t size );
 	bool parseKeyValueHeader( size_t offset, uint8_t &keySize, char *&key, uint32_t &valueSize, char *&value, char *buf, size_t size );
 	bool parseKeyValueUpdateHeader( size_t offset, uint8_t &keySize, char *&key, uint32_t &valueUpdateOffset, uint32_t &valueUpdateSize, char *buf, size_t size );
 	bool parseKeyValueUpdateHeader( size_t offset, uint8_t &keySize, char *&key, uint32_t &valueUpdateOffset, uint32_t &valueUpdateSize, char *&valueUpdate, char *buf, size_t size );
@@ -264,6 +274,7 @@ public:
 	void free();
 	bool parseHeader( struct ProtocolHeader &header, char *buf = 0, size_t size = 0 );
 	bool parseKeyHeader( struct KeyHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
+	bool parseKeyStripeHeader( struct KeyStripeHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
 	bool parseKeyValueHeader( struct KeyValueHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
 	bool parseKeyValueUpdateHeader( struct KeyValueUpdateHeader &header, bool withValueUpdate, char *buf = 0, size_t size = 0, size_t offset = 0 );
 	bool parseRemappingLockHeader( struct RemappingLockHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );

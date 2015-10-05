@@ -40,6 +40,16 @@ void SlavePeerEvent::resDeleteChunk( SlavePeerSocket *socket, uint32_t id, Metad
 	this->message.chunkUpdate.updatingChunkId = updatingChunkId;
 }
 
+void SlavePeerEvent::resDelete( SlavePeerSocket *socket, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key, bool success ) {
+	this->type = success ? SLAVE_PEER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_DELETE_RESPONSE_FAILURE;
+	this->id = id;
+	this->socket = socket;
+	this->message.del.listId = listId;
+	this->message.del.stripeId = stripeId;
+	this->message.del.chunkId = chunkId;
+	this->message.del.key = key;
+}
+
 void SlavePeerEvent::reqGetChunk( SlavePeerSocket *socket, Metadata &metadata ) {
 	this->type = SLAVE_PEER_EVENT_TYPE_GET_CHUNK_REQUEST;
 	this->socket = socket;

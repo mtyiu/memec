@@ -35,6 +35,9 @@ enum SlavePeerEventType {
 	SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_REQUEST,
 	SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_RESPONSE_SUCCESS,
 	SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_RESPONSE_FAILURE,
+	// DELETE_CHUNK
+	SLAVE_PEER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS,
+	SLAVE_PEER_EVENT_TYPE_DELETE_RESPONSE_FAILURE,
 	// Send
 	SLAVE_PEER_EVENT_TYPE_SEND,
 	// Pending
@@ -47,6 +50,7 @@ public:
 	uint32_t id;
 	SlavePeerSocket *socket;
 	struct {
+		Key key;
 		struct {
 			Metadata metadata;
 			uint32_t offset;
@@ -64,6 +68,10 @@ public:
 			Key key;
 			uint32_t listId, chunkId;
 		} remap;
+		struct {
+			uint32_t listId, stripeId, chunkId;
+			Key key;
+		} del;
 	} message;
 
 	// Register
@@ -75,6 +83,8 @@ public:
 	void resUpdateChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, bool success );
 	// DELETE_CHUNK
 	void resDeleteChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, bool success );
+	// DELETE
+	void resDelete( SlavePeerSocket *socket, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key, bool success );
 	// GET_CHUNK
 	void reqGetChunk( SlavePeerSocket *socket, Metadata &metadata );
 	void resGetChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, bool success, Chunk *chunk = 0 );

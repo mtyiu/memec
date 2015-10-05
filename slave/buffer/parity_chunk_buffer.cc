@@ -153,6 +153,28 @@ bool ParityChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t coun
 	return true;
 }
 
+bool ParityChunkBuffer::deleteKey( char *keyStr, uint8_t keySize ) {
+	std::map<Key, KeyValue>::iterator it;
+	Key key;
+
+	key.set( keySize, keyStr );
+
+	pthread_mutex_lock( &this->lock );
+
+	it = this->keys.find( key );
+	if ( it == this->keys.end() ) {
+		pthread_mutex_unlock( &this->lock );
+		return false;
+	} else {
+		KeyValue keyValue = it->second;
+		this->keys.erase( it );
+		keyValue.free();
+	}
+
+	pthread_mutex_unlock( &this->lock );
+	return true;
+}
+
 void ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, bool needsLock, bool needsUnlock ) {
 	// Prepare the stripe
 	for ( uint32_t i = 0; i < ChunkBuffer::dataChunkCount; i++ )
@@ -194,15 +216,6 @@ void ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t of
 	dataChunk->setSize( offset + size );
 	memcpy( dataChunk->getData() + offset, dataDelta, size );
 	this->update( stripeId, chunkId, offset, size, dataChunks, dataChunk, parityChunk, true, true );
-}
-
-void ParityChunkBuffer::flush( uint32_t stripeId, Chunk *chunk ) {
-	// Append a flush event to the event queue
-	/*
-	IOEvent ioEvent;
-	ioEvent.flush( chunk );
-	ChunkBuffer::eventQueue->insert( ioEvent );
-	*/
 }
 
 void ParityChunkBuffer::print( FILE *f ) {
