@@ -96,7 +96,7 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 			// move the remapping record sent to another set to avoid looping through all records over and over ..
 			pthread_mutex_lock ( &SlaveWorker::map->remapLock );
 			if ( remapCount == SlaveWorker::map->remap.size() ) {
-				SlaveWorker::map->remapSent.insert( 
+				SlaveWorker::map->remapSent.insert(
 					SlaveWorker::map->remap.begin(),
 					SlaveWorker::map->remap.end()
 				);
@@ -1206,7 +1206,7 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 					metadata.stripeId,
 					metadata.chunkId,
 					offset,
-					header.valueUpdateSize, // length
+					header.valueUpdateSize,          // length
 					SlaveWorker::dataChunkCount + i, // updatingChunkId
 					header.valueUpdate,
 					packet->data
@@ -1324,53 +1324,51 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 				true, &isDegraded
 			);
 
-			if ( SlaveWorker::parityChunkCount ) {
-				uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
-				for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
-					chunkUpdate.chunkId = SlaveWorker::dataChunkCount + i; // updatingChunkId
-					chunkUpdate.ptr = ( void * ) this->paritySlaveSockets[ i ];
-					if ( ! SlaveWorker::pending->insertChunkUpdate(
-						PT_SLAVE_PEER_DEL_CHUNK, requestId, event.id,
-						( void * ) this->paritySlaveSockets[ i ],
-						chunkUpdate
-					) ) {
-						__ERROR__( "SlaveWorker", "handleDeleteRequest", "Cannot insert into slave DELETE_CHUNK pending map." );
-					}
+			uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
+			for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
+				chunkUpdate.chunkId = SlaveWorker::dataChunkCount + i; // updatingChunkId
+				chunkUpdate.ptr = ( void * ) this->paritySlaveSockets[ i ];
+				if ( ! SlaveWorker::pending->insertChunkUpdate(
+					PT_SLAVE_PEER_DEL_CHUNK, requestId, event.id,
+					( void * ) this->paritySlaveSockets[ i ],
+					chunkUpdate
+				) ) {
+					__ERROR__( "SlaveWorker", "handleDeleteRequest", "Cannot insert into slave DELETE_CHUNK pending map." );
 				}
+			}
 
-				// Start sending packets only after all the insertion to the slave peer DELETE_CHUNK pending set is completed
-				for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
-					// Prepare DELETE_CHUNK request
-					size_t size;
-					Packet *packet = SlaveWorker::packetPool->malloc();
-					packet->setReferenceCount( 1 );
-					this->protocol.reqDeleteChunk(
-						size,
-						requestId,
-						metadata.listId,
-						metadata.stripeId,
-						metadata.chunkId,
-						keyMetadata.offset,
-						deltaSize,
-						SlaveWorker::dataChunkCount + i,
-						delta,
-						packet->data
-					);
-					packet->size = ( uint32_t ) size;
+			// Start sending packets only after all the insertion to the slave peer DELETE_CHUNK pending set is completed
+			for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
+				// Prepare DELETE_CHUNK request
+				size_t size;
+				Packet *packet = SlaveWorker::packetPool->malloc();
+				packet->setReferenceCount( 1 );
+				this->protocol.reqDeleteChunk(
+					size,
+					requestId,
+					metadata.listId,
+					metadata.stripeId,
+					metadata.chunkId,
+					keyMetadata.offset,
+					deltaSize,                       // length
+					SlaveWorker::dataChunkCount + i, // updatingChunkId
+					delta,
+					packet->data
+				);
+				packet->size = ( uint32_t ) size;
 
-					// Insert into event queue
-					SlavePeerEvent slavePeerEvent;
-					slavePeerEvent.send( this->paritySlaveSockets[ i ], packet );
+				// Insert into event queue
+				SlavePeerEvent slavePeerEvent;
+				slavePeerEvent.send( this->paritySlaveSockets[ i ], packet );
 
 #ifdef SLAVE_WORKER_SEND_REPLICAS_PARALLEL
-					if ( i == SlaveWorker::parityChunkCount - 1 )
-						this->dispatch( slavePeerEvent );
-					else
-						SlaveWorker::eventQueue->prioritizedInsert( slavePeerEvent );
-#else
+				if ( i == SlaveWorker::parityChunkCount - 1 )
 					this->dispatch( slavePeerEvent );
+				else
+					SlaveWorker::eventQueue->prioritizedInsert( slavePeerEvent );
+#else
+				this->dispatch( slavePeerEvent );
 #endif
-				}
 			}
 		} else {
 			event.resDelete( event.socket, event.id, key, true, false );

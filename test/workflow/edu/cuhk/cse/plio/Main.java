@@ -19,7 +19,7 @@ public class Main implements Runnable {
 	public static int completedOps;
 	public static Object lock;
 	/* Constants */
-	private static final String characters = "01234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz~!@#$%^&*()_+`=[]\\;',./<>?:{}|\"";
+	private static final String characters = "01234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 	private static final int charactersLength = characters.length();
 
 	/* Instance variables */
