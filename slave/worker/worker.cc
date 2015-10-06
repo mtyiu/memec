@@ -87,10 +87,17 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 				requestId,
 				Slave::getInstance()->aggregateLoad().ops,
 				SlaveWorker::map->ops,
-				SlaveWorker::map->remap,
 				&SlaveWorker::map->opsLock,
+				count
+			);
+			isSend = true;
+			break;
+		case COORDINATOR_EVENT_TYPE_REMAP_SYNC:
+			buffer.data = this->protocol.sendRemappingRecords(
+				buffer.size,
+				requestId,
+				SlaveWorker::map->remap,
 				&SlaveWorker::map->remapLock,
-				count,
 				remapCount
 			);
 			// move the remapping record sent to another set to avoid looping through all records over and over ..
@@ -133,6 +140,8 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 
 		if ( event.type == COORDINATOR_EVENT_TYPE_SYNC && SlaveWorker::map->ops.size() ) {
 			// Some metadata is not sent yet, continue to send
+			SlaveWorker::eventQueue->insert( event );
+		} else if ( event.type == COORDINATOR_EVENT_TYPE_REMAP_SYNC && SlaveWorker::map->remap.size() ) {
 			SlaveWorker::eventQueue->insert( event );
 		}
 	} else {

@@ -7,6 +7,7 @@
 
 IDGenerator *CoordinatorWorker::idGenerator;
 CoordinatorEventQueue *CoordinatorWorker::eventQueue;
+RemappingRecordMap *CoordinatorWorker::remappingRecords = &Coordinator::getInstance()->remappingRecords;
 
 void CoordinatorWorker::dispatch( MixedEvent event ) {
 	switch( event.type ) {
@@ -227,6 +228,8 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 		while( buffer.size > 0 ) {
 			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "CoordinatorWorker" );
 
+			// avvoid declaring variables after jump statements
+			size_t bytes, offset, count = 0;
 			buffer.data += PROTO_HEADER_SIZE;
 			buffer.size -= PROTO_HEADER_SIZE;
 			// Validate message
@@ -235,13 +238,12 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 				goto quit_1;
 			}
 
-			if ( header.opcode == PROTO_OPCODE_SYNC ) {
-				if ( header.magic != PROTO_MAGIC_HEARTBEAT ) {
-					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );
-					goto quit_1;
-				}
+			if ( header.opcode != PROTO_OPCODE_SYNC ) {
+				__ERROR__( "CoordinatorWorker", "dispatch", "Invalid opcode from slave." );
+				goto quit_1;
+			}
 
-				size_t bytes, offset, count = 0;
+			if ( header.magic == PROTO_MAGIC_HEARTBEAT ) {
 				struct HeartbeatHeader heartbeatHeader;
 				struct SlaveSyncHeader slaveSyncHeader;
 
@@ -252,6 +254,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 					event.socket->load.ops.del = heartbeatHeader.del;
 
 					offset = PROTO_HEADER_SIZE + PROTO_HEARTBEAT_SIZE;
+					// TODO ret?
 					while ( offset < ( size_t ) ret ) {
 						if ( ! this->protocol.parseSlaveSyncHeader( slaveSyncHeader, bytes, buffer.data, buffer.size, offset ) )
 							break;
@@ -275,8 +278,35 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 				} else {
 					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid heartbeat protocol header." );
 				}
+			} else if ( header.magic == PROTO_MAGIC_REMAPPING ) {
+				struct RemappingRecordHeader remappingRecordHeader;
+				struct SlaveSyncRemapHeader slaveSyncRemapHeader;
+				if ( ! this->protocol.parseRemappingRecordHeader( remappingRecordHeader, buffer.data, buffer.size ) ) {
+					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid heartbeat protocol header." );
+					goto quit_1;
+				}
+				// start parsing the remapping records
+				offset = PROTO_HEADER_SIZE + PROTO_HEARTBEAT_SIZE;
+				for ( offset = 0, count = 0; offset < ( size_t ) buffer.size; offset += bytes ) {
+					if ( ! this->protocol.parseSlaveSyncRemapHeader( slaveSyncRemapHeader, bytes, buffer.data, buffer.size, offset ) ) 
+						break;
+					count++;
+
+					Key key;
+					key.set ( slaveSyncRemapHeader.keySize, slaveSyncRemapHeader.key );
+
+					RemappingRecord remappingRecord;
+					remappingRecord.set( slaveSyncRemapHeader.listId, slaveSyncRemapHeader.chunkId, 0 );
+
+					RemappingRecordMap *map = CoordinatorWorker::remappingRecords;
+					if ( slaveSyncRemapHeader.opcode == 0 ) { // remove record
+						map->erase( key, remappingRecord );
+					} else if ( slaveSyncRemapHeader.opcode == 1 ) { // add record
+						map->insert( key, remappingRecord );
+					}
+				}
 			} else {
-				__ERROR__( "CoordinatorWorker", "dispatch", "Invalid opcode from slave." );
+				__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );
 			}
 quit_1:
 			buffer.data += header.length;

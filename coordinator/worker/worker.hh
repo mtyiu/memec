@@ -3,6 +3,7 @@
 
 #include <cstdio>
 #include "worker_role.hh"
+#include "../ds/remapping_record_map.hh"
 #include "../event/event_queue.hh"
 #include "../protocol/protocol.hh"
 #include "../../common/worker/worker.hh"
@@ -25,6 +26,8 @@ private:
 	static void *run( void *argv );
 
 public:
+	static RemappingRecordMap *remappingRecords;
+
 	static bool init();
 	bool init( GlobalConfig &config, WorkerRole role, uint32_t workerId );
 	bool start();

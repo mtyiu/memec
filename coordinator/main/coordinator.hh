@@ -5,6 +5,7 @@
 #include <pthread.h>
 #include <set>
 #include "../config/coordinator_config.hh"
+#include "../ds/remapping_record_map.hh"
 #include "../event/event_queue.hh"
 #include "../remap/remap_msg_handler.hh"
 #include "../socket/coordinator_socket.hh"
@@ -59,6 +60,7 @@ public:
 	CoordinatorEventQueue eventQueue;
 
 	CoordinatorRemapMsgHandler remapMsgHandler;
+	RemappingRecordMap remappingRecords;
 
 	struct {
 		// ( slaveAddr, ( mastserAddr, Latency ) )
