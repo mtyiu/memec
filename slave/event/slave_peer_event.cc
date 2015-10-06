@@ -20,6 +20,28 @@ void SlavePeerEvent::resRemappingSet( SlavePeerSocket *socket, uint32_t id, Key 
 	this->message.remap.chunkId = chunkId;
 }
 
+void SlavePeerEvent::resUpdate( SlavePeerSocket *socket, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key, uint32_t offset, uint32_t length, bool success ) {
+	this->type = success ? SLAVE_PEER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE;
+	this->id = id;
+	this->socket = socket;
+	this->message.update.listId = listId;
+	this->message.update.stripeId = stripeId;
+	this->message.update.chunkId = chunkId;
+	this->message.update.offset = offset;
+	this->message.update.length = length;
+	this->message.update.key = key;
+}
+
+void SlavePeerEvent::resDelete( SlavePeerSocket *socket, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key, bool success ) {
+	this->type = success ? SLAVE_PEER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_DELETE_RESPONSE_FAILURE;
+	this->id = id;
+	this->socket = socket;
+	this->message.del.listId = listId;
+	this->message.del.stripeId = stripeId;
+	this->message.del.chunkId = chunkId;
+	this->message.del.key = key;
+}
+
 void SlavePeerEvent::resUpdateChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, bool success ) {
 	this->type = success ? SLAVE_PEER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_FAILURE;
 	this->id = id;
@@ -38,16 +60,6 @@ void SlavePeerEvent::resDeleteChunk( SlavePeerSocket *socket, uint32_t id, Metad
 	this->message.chunkUpdate.offset = offset;
 	this->message.chunkUpdate.length = length;
 	this->message.chunkUpdate.updatingChunkId = updatingChunkId;
-}
-
-void SlavePeerEvent::resDelete( SlavePeerSocket *socket, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key, bool success ) {
-	this->type = success ? SLAVE_PEER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_DELETE_RESPONSE_FAILURE;
-	this->id = id;
-	this->socket = socket;
-	this->message.del.listId = listId;
-	this->message.del.stripeId = stripeId;
-	this->message.del.chunkId = chunkId;
-	this->message.del.key = key;
 }
 
 void SlavePeerEvent::reqGetChunk( SlavePeerSocket *socket, Metadata &metadata ) {

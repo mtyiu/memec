@@ -30,8 +30,9 @@ public:
 
 	int lockChunk( Chunk *chunk );
 	void updateAndUnlockChunk( int index );
-	void update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, char *dataDelta, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk );
 	bool deleteKey( char *keyStr, uint8_t keySize );
+	bool updateKeyValue( char *keyStr, uint8_t keySize, uint32_t offset, uint32_t length, char *valueUpdate );
+	void update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, char *dataDelta, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk );
 	void print( FILE *f = stdout );
 	void stop();
 	~MixedChunkBuffer();

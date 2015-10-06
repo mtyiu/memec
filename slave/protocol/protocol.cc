@@ -226,6 +226,45 @@ char *SlaveProtocol::reqSealChunk( size_t &size, uint32_t id, Chunk *chunk, char
 	return buf;
 }
 
+char *SlaveProtocol::reqUpdate( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *buf ) {
+	if ( ! buf ) buf = this->buffer.send;
+	size = this->generateChunkKeyValueUpdateHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_UPDATE,
+		id,
+		listId,
+		stripeId,
+		chunkId,
+		keySize,
+		key,
+		valueUpdateOffset,
+		valueUpdateSize,
+		valueUpdate,
+		buf
+	);
+	return buf;
+}
+
+char *SlaveProtocol::resUpdate( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *buf ) {
+	if ( ! buf ) buf = this->buffer.send;
+	size = this->generateChunkKeyValueUpdateHeader(
+		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_UPDATE,
+		id,
+		listId,
+		stripeId,
+		chunkId,
+		keySize,
+		key,
+		valueUpdateOffset,
+		valueUpdateSize,
+		buf
+	);
+	return buf;
+}
+
 char *SlaveProtocol::reqUpdateChunk( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta, char *buf ) {
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateChunkUpdateHeader(
@@ -255,7 +294,7 @@ char *SlaveProtocol::resUpdateChunk( size_t &size, uint32_t id, bool success, ui
 
 char *SlaveProtocol::reqDelete( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, char *buf ) {
 	if ( ! buf ) buf = this->buffer.send;
-	size = this->generateKeyStripeHeader(
+	size = this->generateChunkKeyHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_DELETE,
@@ -272,7 +311,7 @@ char *SlaveProtocol::reqDelete( size_t &size, uint32_t id, uint32_t listId, uint
 
 char *SlaveProtocol::resDelete( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, char *buf ) {
 	if ( ! buf ) buf = this->buffer.send;
-	size = this->generateKeyStripeHeader(
+	size = this->generateChunkKeyHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_DELETE,

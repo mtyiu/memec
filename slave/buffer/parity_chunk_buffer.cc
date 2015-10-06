@@ -175,6 +175,29 @@ bool ParityChunkBuffer::deleteKey( char *keyStr, uint8_t keySize ) {
 	return true;
 }
 
+bool ParityChunkBuffer::updateKeyValue( char *keyStr, uint8_t keySize, uint32_t offset, uint32_t length, char *valueUpdate ) {
+	std::map<Key, KeyValue>::iterator it;
+	Key key;
+
+	key.set( keySize, keyStr );
+
+	pthread_mutex_lock( &this->lock );
+	it = this->keys.find( key );
+	if ( it == this->keys.end() ) {
+		pthread_mutex_unlock( &this->lock );
+		return false;
+	} else {
+		KeyValue keyValue = it->second;
+		memcpy(
+			keyValue.data + PROTO_KEY_VALUE_SIZE + keySize + offset,
+			valueUpdate,
+			length
+		);
+	}
+	pthread_mutex_unlock( &this->lock );
+	return true;
+}
+
 void ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, bool needsLock, bool needsUnlock ) {
 	// Prepare the stripe
 	for ( uint32_t i = 0; i < ChunkBuffer::dataChunkCount; i++ )

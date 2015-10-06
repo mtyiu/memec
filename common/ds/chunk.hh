@@ -68,6 +68,7 @@ public:
 	uint32_t updateParity( uint32_t offset = 0, uint32_t length = 0 );
 	// Compute delta
 	void computeDelta( char *delta, char *newData, uint32_t offset, uint32_t length, bool update = true );
+	void update( char *newData, uint32_t offset, uint32_t length );
 	// Delete key
 	uint32_t deleteKeyValue( Key target, std::map<Key, KeyMetadata> *keys, char *delta = 0, size_t deltaBufSize = 0 );
 	// Get key-value pair

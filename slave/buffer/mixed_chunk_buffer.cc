@@ -63,6 +63,24 @@ void MixedChunkBuffer::updateAndUnlockChunk( int index ) {
 	}
 }
 
+bool MixedChunkBuffer::deleteKey( char *keyStr, uint8_t keySize ) {
+	switch( this->role ) {
+		case CBR_PARITY:
+			return this->buffer.parity->deleteKey( keyStr, keySize );
+		default:
+			return false;
+	}
+}
+
+bool MixedChunkBuffer::updateKeyValue( char *keyStr, uint8_t keySize, uint32_t offset, uint32_t length, char *valueUpdate ) {
+	switch( this->role ) {
+		case CBR_PARITY:
+			return this->buffer.parity->updateKeyValue( keyStr, keySize, offset, length, valueUpdate );
+		default:
+			return false;
+	}
+}
+
 void MixedChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, char *dataDelta, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk ) {
 	switch( this->role ) {
 		case CBR_PARITY:
@@ -70,15 +88,6 @@ void MixedChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t off
 			break;
 		default:
 			return;
-	}
-}
-
-bool MixedChunkBuffer::deleteKey( char *keyStr, uint8_t keySize ) {
-	switch( this->role ) {
-		case CBR_PARITY:
-			return this->buffer.parity->deleteKey( keyStr, keySize );
-		default:
-			return false;
 	}
 }
 
