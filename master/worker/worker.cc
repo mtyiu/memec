@@ -322,7 +322,7 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 									map->insert( key, remappingRecord );
 								}
 							}
-							map->print();
+							//map->print();
 						} else {
 							__ERROR__( "MasterWorker", "dispatch", "Invalid magic code from coordinator." );
 						}
