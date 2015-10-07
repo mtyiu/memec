@@ -573,6 +573,12 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		case SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_RESPONSE_FAILURE:
 			// TODO: Is a response message for SEAL_CHUNK request required?
 			return;
+		/////////////////////////////////////
+		// Seal chunks in the chunk buffer //
+		/////////////////////////////////////
+		case SLAVE_PEER_EVENT_TYPE_SEAL_CHUNKS:
+			printf( "\tSealing %lu chunks...\n", event.message.chunkBuffer->seal( this ) );
+			return;
 		//////////
 		// Send //
 		//////////

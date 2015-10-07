@@ -315,9 +315,10 @@ void Slave::seal() {
 		if ( this->chunkBuffer[ i ] ) {
 			event.reqSealChunks( this->chunkBuffer[ i ] );
 			this->eventQueue.insert( event );
+			count++;
 		}
 	}
-	printf( "Sealing %lu chunk buffer...\n", count );
+	printf( "\nSealing %lu chunk buffer:\n", count );
 }
 
 void Slave::flush() {
