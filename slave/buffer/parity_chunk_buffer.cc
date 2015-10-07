@@ -123,7 +123,7 @@ bool ParityChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t coun
 
 		prtIt = this->pending.find( key );
 		if ( prtIt != this->pending.end() ) {
-			printf( "prtIt != this->pending.end()\n" );
+			printf( "prtIt != this->pending.end(); (%u, %u) vs. (%u, %u)\n", stripeId, offset, prtIt->second.req.seal.stripeId, prtIt->second.req.seal.offset );
 		}
 
 		if ( it == this->keys.end() ) {

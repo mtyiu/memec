@@ -221,6 +221,7 @@ public:
 	}
 
 	void dump() {
+		/*
 		fprintf( stdout, "List of key-value pairs:\n------------------------\n" );
 		if ( ! this->keys.size() ) {
 			fprintf( stdout, "(None)\n" );
@@ -235,6 +236,7 @@ public:
 			}
 		}
 		fprintf( stdout, "\n" );
+		*/
 
 		fprintf( stdout, "Number of key-value pairs: %lu\n\n", this->keys.size() );
 

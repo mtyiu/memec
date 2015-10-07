@@ -186,9 +186,6 @@ char *SlaveProtocol::reqSealChunk( size_t &size, uint32_t id, Chunk *chunk, char
 	char *ptr = buf + PROTO_HEADER_SIZE + PROTO_CHUNK_SEAL_SIZE;
 	size_t bytes = 0; // data length only
 
-#ifdef USE_CHUNK_MUTEX_LOCK
-	chunk->setLock();
-#endif
 	int currentOffset = 0, nextOffset = 0;
 	uint32_t count = 0;
 	char *key;
@@ -204,9 +201,6 @@ char *SlaveProtocol::reqSealChunk( size_t &size, uint32_t id, Chunk *chunk, char
 
 		currentOffset = nextOffset;
 	}
-#ifdef USE_CHUNK_MUTEX_LOCK
-	chunk->setUnlock();
-#endif
 
 	// The seal request should not exceed the size of the send buffer
 	assert( bytes <= this->buffer.size );

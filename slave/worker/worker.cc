@@ -873,6 +873,7 @@ bool SlaveWorker::getSlaves( uint32_t listId, bool allowDegraded, bool *isDegrad
 }
 
 bool SlaveWorker::issueSealChunkRequest( Chunk *chunk ) {
+	// The chunk is locked when this function is called
 	if ( SlaveWorker::parityChunkCount ) {
 		size_t size;
 		uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
@@ -900,6 +901,14 @@ bool SlaveWorker::issueSealChunkRequest( Chunk *chunk ) {
 			this->dispatch( slavePeerEvent );
 #endif
 		}
+
+		// __ERROR__(
+		// 	"SlaveWorker", "issueSealChunkRequest",
+		// 	"[SEAL_CHUNK] List ID: %u; stripe ID: %u; chunk ID: %u.",
+		// 	chunk->metadata.listId,
+		// 	chunk->metadata.stripeId,
+		// 	chunk->metadata.chunkId
+		// );
 	}
 	return true;
 }
@@ -1004,6 +1013,7 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size ) 
 	}
 
 	SlaveWorker::chunkBuffer->at( listId )->set(
+		this,
 		header.key, header.keySize,
 		header.value, header.valueSize,
 		PROTO_OPCODE_SET, chunkId,
@@ -1071,6 +1081,7 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 	);
 
 	SlaveWorker::chunkBuffer->at( header.listId )->set(
+		this,
 		header.key, header.keySize,
 		header.value, header.valueSize,
 		PROTO_OPCODE_REMAPPING_SET, header.chunkId,
@@ -1156,6 +1167,7 @@ bool SlaveWorker::handleRemappingSetRequest( SlavePeerEvent event, char *buf, si
 	);
 
 	SlaveWorker::chunkBuffer->at( header.listId )->set(
+		this,
 		header.key, header.keySize,
 		header.value, header.valueSize,
 		PROTO_OPCODE_REMAPPING_SET, header.chunkId,
@@ -1568,13 +1580,12 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 #endif
 				}
 			}
-
-			if ( chunkBufferIndex != -1 )
-				chunkBuffer->updateAndUnlockChunk( chunkBufferIndex );
 		} else {
 			event.resDelete( event.socket, event.id, key, true, false );
 			this->dispatch( event );
 		}
+		if ( chunkBufferIndex != -1 )
+			chunkBuffer->updateAndUnlockChunk( chunkBufferIndex );
 		ret = true;
 	} else {
 		key.set( header.keySize, header.key, ( void * ) event.socket );
@@ -1621,13 +1632,11 @@ bool SlaveWorker::handleSealChunkRequest( SlavePeerEvent event, char *buf, size_
 		__ERROR__( "SlaveWorker", "handleSealChunkRequest", "Invalid SEAL_CHUNK request." );
 		return false;
 	}
-	// __DEBUG__(
-	// 	BLUE, "SlaveWorker", "handleSealChunkRequest",
-	// fprintf(
-	// 	stderr,
-	// 	"[SEAL_CHUNK] List ID: %u, stripe ID: %u, chunk ID: %u; count = %u.\n",
-	// 	header.listId, header.stripeId, header.chunkId, header.count
-	// );
+	__DEBUG__(
+		BLUE, "SlaveWorker", "handleSealChunkRequest",
+		"[SEAL_CHUNK] List ID: %u, stripe ID: %u, chunk ID: %u; count = %u.\n",
+		header.listId, header.stripeId, header.chunkId, header.count
+	);
 
 	ret = SlaveWorker::chunkBuffer->at( header.listId )->seal(
 		header.stripeId, header.chunkId, header.count,
@@ -1695,7 +1704,7 @@ bool SlaveWorker::handleDeleteChunkRequest( SlavePeerEvent event, char *buf, siz
 	}
 	__DEBUG__(
 		BLUE, "SlaveWorker", "handleDeleteChunkRequest",
-		"[DELETE_CHUNK] List ID: %u; stripe ID: %u; chunk ID: %u; offset: %u; length: %u; updating chunk ID: %u.",
+		"[DELETE_CHUNK] List ID: %u, stripe ID: %u, chunk ID: %u; offset: %u; length: %u; updating chunk ID: %u.",
 		header.listId, header.stripeId, header.chunkId,
 		header.offset, header.length, header.updatingChunkId
 	);
@@ -1776,6 +1785,8 @@ bool SlaveWorker::handleDeleteRequest( SlavePeerEvent event, char *buf, size_t s
 	}
 	__DEBUG__(
 		BLUE, "SlaveWorker", "handleDeleteRequest",
+	// __ERROR__(
+	// 	"SlaveWorker", "handleDeleteRequest",
 		"[DELETE] Key: %.*s (key size = %u); list ID = %u, stripe ID = %u, chunk Id = %u.",
 		( int ) header.keySize, header.key, header.keySize,
 		header.listId, header.stripeId, header.chunkId
@@ -1789,16 +1800,6 @@ bool SlaveWorker::handleDeleteRequest( SlavePeerEvent event, char *buf, size_t s
 	key.set( header.keySize, header.key );
 	event.resDelete( event.socket, event.id, header.listId, header.stripeId, header.chunkId, key, ret );
 	this->dispatch( event );
-
-	if ( ret ) {
-		__ERROR__(
-			"SlaveWorker", "handleDeleteRequest",
-			"[DELETE] Key: %.*s (key size = %u); list ID = %u, stripe ID = %u, chunk Id = %u.",
-			( int ) header.keySize, header.key, header.keySize,
-			header.listId, header.stripeId, header.chunkId
-		);
-		// TODO
-	}
 
 	return ret;
 }

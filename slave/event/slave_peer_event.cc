@@ -1,4 +1,5 @@
 #include "slave_peer_event.hh"
+#include "../buffer/mixed_chunk_buffer.hh"
 
 void SlavePeerEvent::reqRegister( SlavePeerSocket *socket ) {
 	this->type = SLAVE_PEER_EVENT_TYPE_REGISTER_REQUEST;
@@ -96,6 +97,11 @@ void SlavePeerEvent::resSetChunk( SlavePeerSocket *socket, uint32_t id, Metadata
 void SlavePeerEvent::reqSealChunk( Chunk *chunk ) {
 	this->type = SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_REQUEST;
 	this->message.chunk.chunk = chunk;
+}
+
+void SlavePeerEvent::reqSealChunks( MixedChunkBuffer *chunkBuffer ) {
+	this->type = SLAVE_PEER_EVENT_TYPE_SEAL_CHUNKS;
+	this->message.chunkBuffer = chunkBuffer;
 }
 
 void SlavePeerEvent::resSealChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, bool success ) {

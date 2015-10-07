@@ -1,5 +1,6 @@
 #include "data_chunk_buffer.hh"
 #include "../main/slave.hh"
+#include "../worker/worker.hh"
 
 DataChunkBuffer::DataChunkBuffer( uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) : ChunkBuffer( listId, stripeId, chunkId ) {
 	this->count = count;
@@ -24,7 +25,7 @@ DataChunkBuffer::DataChunkBuffer( uint32_t count, uint32_t listId, uint32_t stri
 	}
 }
 
-KeyMetadata DataChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode ) {
+KeyMetadata DataChunkBuffer::set( SlaveWorker *worker, char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode ) {
 	KeyMetadata keyMetadata;
 	uint32_t size = PROTO_KEY_VALUE_SIZE + keySize + valueSize, max = 0, tmp;
 	int index = -1;
@@ -45,7 +46,7 @@ KeyMetadata DataChunkBuffer::set( char *key, uint8_t keySize, char *value, uint3
 		}
 	}
 	if ( index == -1 )
-		index = this->flush( false, true );
+		index = this->flush( worker, false, true );
 
 	// Allocate memory in the selected chunk
 	pthread_mutex_lock( this->locks + index );
@@ -67,7 +68,7 @@ KeyMetadata DataChunkBuffer::set( char *key, uint8_t keySize, char *value, uint3
 
 	// Flush if the current buffer is full
 	if ( this->sizes[ index ] + PROTO_KEY_VALUE_SIZE + CHUNK_BUFFER_FLUSH_THRESHOLD >= ChunkBuffer::capacity )
-		this->flushAt( index, false );
+		this->flushAt( worker, index, false );
 
 	pthread_mutex_unlock( this->locks + index );
 	pthread_mutex_unlock( &this->lock );
@@ -80,10 +81,10 @@ KeyMetadata DataChunkBuffer::set( char *key, uint8_t keySize, char *value, uint3
 	return keyMetadata;
 }
 
-size_t DataChunkBuffer::seal() {
+size_t DataChunkBuffer::seal( SlaveWorker *worker ) {
 	pthread_mutex_lock( &this->lock );
 	for ( uint32_t i = 0; i < this->count; i++ ) {
-		this->flushAt( i, false );
+		this->flushAt( worker, i, false );
 	}
 	pthread_mutex_unlock( &this->lock );
 	return this->count;
@@ -113,7 +114,7 @@ void DataChunkBuffer::updateAndUnlockChunk( int index ) {
 	pthread_mutex_unlock( &this->lock );
 }
 
-uint32_t DataChunkBuffer::flush( bool lock, bool lockAtIndex ) {
+uint32_t DataChunkBuffer::flush( SlaveWorker *worker, bool lock, bool lockAtIndex ) {
 	if ( lock )
 		pthread_mutex_lock( &this->lock );
 
@@ -133,7 +134,7 @@ uint32_t DataChunkBuffer::flush( bool lock, bool lockAtIndex ) {
 	if ( lock || lockAtIndex )
 		pthread_mutex_lock( this->locks + index );
 
-	this->flushAt( index, false );
+	this->flushAt( worker, index, false );
 
 	if ( lock || lockAtIndex )
 		pthread_mutex_unlock( this->locks + index );
@@ -144,7 +145,7 @@ uint32_t DataChunkBuffer::flush( bool lock, bool lockAtIndex ) {
 	return index;
 }
 
-Chunk *DataChunkBuffer::flushAt( int index, bool lock ) {
+Chunk *DataChunkBuffer::flushAt( SlaveWorker *worker, int index, bool lock ) {
 	if ( lock ) {
 		pthread_mutex_lock( &this->lock );
 		pthread_mutex_lock( this->locks + index );
@@ -165,15 +166,13 @@ Chunk *DataChunkBuffer::flushAt( int index, bool lock ) {
 	this->chunks[ index ] = newChunk;
 	this->stripeId++;
 
+	// Notify the parity slaves to seal the chunk
+	worker->issueSealChunkRequest( chunk );
+
 	if ( lock ) {
 		pthread_mutex_unlock( this->locks + index );
 		pthread_mutex_unlock( &this->lock );
 	}
-
-	// Notify the parity slaves to seal the chunk
-	SlavePeerEvent slavePeerEvent;
-	slavePeerEvent.reqSealChunk( chunk );
-	ChunkBuffer::eventQueue->insert( slavePeerEvent );
 
 	return chunk;
 }

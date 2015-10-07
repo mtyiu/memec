@@ -8,6 +8,8 @@
 #include "../../common/ds/packet_pool.hh"
 #include "../../common/event/event.hh"
 
+class MixedChunkBuffer;
+
 enum SlavePeerEventType {
 	SLAVE_PEER_EVENT_TYPE_UNDEFINED,
 	// Register
@@ -41,6 +43,8 @@ enum SlavePeerEventType {
 	SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_REQUEST,
 	SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_RESPONSE_SUCCESS,
 	SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_RESPONSE_FAILURE,
+	// Seal chunk buffer
+	SLAVE_PEER_EVENT_TYPE_SEAL_CHUNKS,
 	// Send
 	SLAVE_PEER_EVENT_TYPE_SEND,
 	// Pending
@@ -72,6 +76,7 @@ public:
 			Metadata metadata;
 			Chunk *chunk;
 		} chunk;
+		MixedChunkBuffer *chunkBuffer;
 		struct {
 			Packet *packet;
 		} send;
@@ -103,6 +108,8 @@ public:
 	// SEAL_CHUNK
 	void reqSealChunk( Chunk *chunk );
 	void resSealChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, bool success );
+	// Seal chunk buffer
+	void reqSealChunks( MixedChunkBuffer *chunkBuffer );
 	// Send
 	void send( SlavePeerSocket *socket, Packet *packet );
 	// Pending
