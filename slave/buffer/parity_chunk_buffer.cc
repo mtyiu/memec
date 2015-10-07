@@ -33,7 +33,7 @@ ParityChunkWrapper &ParityChunkBuffer::getWrapper( uint32_t stripeId, bool needs
 
 bool ParityChunkBuffer::set( char *keyStr, uint8_t keySize, char *valueStr, uint32_t valueSize, uint32_t chunkId, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk ) {
 	Key key;
-	std::map<Key, KeyValueOffset>::iterator it;
+	std::map<Key, PendingRequest>::iterator it;
 
 	key.set( keySize, keyStr );
 
@@ -65,22 +65,33 @@ bool ParityChunkBuffer::set( char *keyStr, uint8_t keySize, char *valueStr, uint
 		dataChunk->clear();
 
 		key = it->first;
-		KeyValueOffset keyValueOffset = it->second;
+		PendingRequest pendingRequest = it->second;
 
 		this->pending.erase( it );
 		key.free();
 
-		KeyValue::serialize( data + keyValueOffset.offset, keyStr, keySize, valueStr, valueSize );
-		dataChunk->setSize( keyValueOffset.offset + KEY_VALUE_METADATA_SIZE + keySize + valueSize );
+		switch ( pendingRequest.type ) {
+			case PRT_SEAL:
+				// fprintf( stderr, "--- PRT_SEAL: Key = %.*s ---\n", keySize, keyStr );
+				KeyValue::serialize( data + pendingRequest.req.seal.offset, keyStr, keySize, valueStr, valueSize );
+				dataChunk->setSize( pendingRequest.req.seal.offset + KEY_VALUE_METADATA_SIZE + keySize + valueSize );
 
-		// Update parity chunk
-		this->update(
-			keyValueOffset.stripeId, chunkId,
-			keyValueOffset.offset,
-			KEY_VALUE_METADATA_SIZE + keySize + valueSize,
-			dataChunks, dataChunk, parityChunk,
-			false, false
-		);
+				// Update parity chunk
+				this->update(
+					pendingRequest.req.seal.stripeId, chunkId,
+					pendingRequest.req.seal.offset,
+					KEY_VALUE_METADATA_SIZE + keySize + valueSize,
+					dataChunks, dataChunk, parityChunk,
+					false, false
+				);
+				break;
+			case PRT_UPDATE:
+				fprintf( stderr, "--- TODO: PRT_UPDATE: Key = %.*s ---\n", keySize, keyStr );
+				break;
+			case PRT_DELETE:
+				fprintf( stderr, "--- TODO: PRT_DELETE: Key = %.*s ---\n", keySize, keyStr );
+				break;
+		}
 	}
 	pthread_mutex_unlock( &this->lock );
 
@@ -97,6 +108,7 @@ bool ParityChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t coun
 	Key key;
 	KeyValue keyValue;
 	std::map<Key, KeyValue>::iterator it;
+	std::map<Key, PendingRequest>::iterator prtIt;
 
 	pthread_mutex_lock( &this->lock );
 	while ( sealDataSize ) {
@@ -108,22 +120,25 @@ bool ParityChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t coun
 		// Find the key-value pair from the temporary buffer
 		key.set( keySize, keyStr );
 		it = this->keys.find( key );
+
+		prtIt = this->pending.find( key );
+		if ( prtIt != this->pending.end() ) {
+			printf( "prtIt != this->pending.end()\n" );
+		}
+
 		if ( it == this->keys.end() ) {
 			// Defer the processing of this key
 			key.dup();
-			KeyValueOffset keyValueOffset;
-			keyValueOffset.stripeId = stripeId;
-			keyValueOffset.offset = offset;
+			PendingRequest pendingRequest;
+			pendingRequest.seal( stripeId, offset );
 
-			std::pair<Key, KeyValueOffset> p( key, keyValueOffset );
-			std::pair<std::map<Key, KeyValueOffset>::iterator, bool> ret;
+			std::pair<Key, PendingRequest> p( key, pendingRequest );
+			std::pair<std::map<Key, PendingRequest>::iterator, bool> ret;
 
 			ret = this->pending.insert( p );
 			if ( ! ret.second ) {
 				__ERROR__( "ParityChunkBuffer", "seal", "Key: %.*s (size = %u) cannot be inserted into pending keys map.\n", keySize, keyStr, keySize );
-			} /* else {
-				__ERROR__( "ParityChunkBuffer", "seal", "Key: %.*s (size = %u) at offset %u is not yet received (list ID = %u, stripe ID = %u, chunk ID = %u).\n", keySize, keyStr, keySize, offset, this->listId, stripeId, chunkId );
-			} */
+			}
 		} else {
 			keyValue = it->second;
 
@@ -163,6 +178,18 @@ bool ParityChunkBuffer::deleteKey( char *keyStr, uint8_t keySize ) {
 
 	it = this->keys.find( key );
 	if ( it == this->keys.end() ) {
+		PendingRequest pendingRequest;
+		pendingRequest.del();
+
+		key.dup();
+
+		std::pair<Key, PendingRequest> p( key, pendingRequest );
+		std::pair<std::map<Key, PendingRequest>::iterator, bool> ret;
+
+		ret = this->pending.insert( p );
+		if ( ! ret.second ) {
+			__ERROR__( "ParityChunkBuffer", "deleteKey", "Key: %.*s (size = %u) cannot be inserted into pending keys map.\n", keySize, keyStr, keySize );
+		}
 		pthread_mutex_unlock( &this->lock );
 		return false;
 	} else {
@@ -184,12 +211,26 @@ bool ParityChunkBuffer::updateKeyValue( char *keyStr, uint8_t keySize, uint32_t 
 	pthread_mutex_lock( &this->lock );
 	it = this->keys.find( key );
 	if ( it == this->keys.end() ) {
+		PendingRequest pendingRequest;
+		pendingRequest.update( offset, length, valueUpdate );
+
+		key.dup();
+
+		std::pair<Key, PendingRequest> p( key, pendingRequest );
+		std::pair<std::map<Key, PendingRequest>::iterator, bool> ret;
+
+		ret = this->pending.insert( p );
+		if ( ! ret.second ) {
+			__ERROR__( "ParityChunkBuffer", "updateKeyValue", "Key: %.*s (size = %u) cannot be inserted into pending keys map.\n", keySize, keyStr, keySize );
+		}
 		pthread_mutex_unlock( &this->lock );
 		return false;
 	} else {
 		KeyValue keyValue = it->second;
-		memcpy(
-			keyValue.data + PROTO_KEY_VALUE_SIZE + keySize + offset,
+		char *dst = keyValue.data + PROTO_KEY_VALUE_SIZE + keySize + offset;
+		Coding::bitwiseXOR(
+			dst,
+			dst,
 			valueUpdate,
 			length
 		);

@@ -61,7 +61,7 @@ public:
 			uint32_t updatingChunkId;
 		} chunkUpdate;
 		struct {
-			uint32_t listId, stripeId, chunkId, offset, length;
+			uint32_t listId, stripeId, chunkId, valueUpdateOffset, chunkUpdateOffset, length;
 			Key key;
 		} update;
 		struct {
@@ -87,7 +87,7 @@ public:
 	// REMAPPING_SET
 	void resRemappingSet( SlavePeerSocket *socket, uint32_t id, Key &key, uint32_t listId, uint32_t chunkId, bool success );
 	// UPDATE
-	void resUpdate( SlavePeerSocket *socket, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key, uint32_t offset, uint32_t length, bool success );
+	void resUpdate( SlavePeerSocket *socket, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key, uint32_t valueUpdateOffset, uint32_t length, uint32_t chunkUpdateOffset, bool success );
 	// DELETE
 	void resDelete( SlavePeerSocket *socket, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key, bool success );
 	// UPDATE_CHUNK

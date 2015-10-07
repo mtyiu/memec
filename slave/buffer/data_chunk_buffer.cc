@@ -152,11 +152,6 @@ Chunk *DataChunkBuffer::flushAt( int index, bool lock ) {
 
 	Chunk *chunk = this->chunks[ index ];
 
-	// Notify the parity slaves to seal the chunk
-	SlavePeerEvent slavePeerEvent;
-	slavePeerEvent.reqSealChunk( chunk );
-	ChunkBuffer::eventQueue->insert( slavePeerEvent );
-
 	// Get a new chunk
 	this->sizes[ index ] = 0;
 	Chunk *newChunk = ChunkBuffer::chunkPool->malloc();
@@ -174,6 +169,11 @@ Chunk *DataChunkBuffer::flushAt( int index, bool lock ) {
 		pthread_mutex_unlock( this->locks + index );
 		pthread_mutex_unlock( &this->lock );
 	}
+
+	// Notify the parity slaves to seal the chunk
+	SlavePeerEvent slavePeerEvent;
+	slavePeerEvent.reqSealChunk( chunk );
+	ChunkBuffer::eventQueue->insert( slavePeerEvent );
 
 	return chunk;
 }

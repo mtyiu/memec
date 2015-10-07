@@ -226,7 +226,7 @@ char *SlaveProtocol::reqSealChunk( size_t &size, uint32_t id, Chunk *chunk, char
 	return buf;
 }
 
-char *SlaveProtocol::reqUpdate( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *buf ) {
+char *SlaveProtocol::reqUpdate( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t chunkUpdateOffset, char *buf ) {
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateChunkKeyValueUpdateHeader(
 		PROTO_MAGIC_REQUEST,
@@ -240,13 +240,14 @@ char *SlaveProtocol::reqUpdate( size_t &size, uint32_t id, uint32_t listId, uint
 		key,
 		valueUpdateOffset,
 		valueUpdateSize,
+		chunkUpdateOffset,
 		valueUpdate,
 		buf
 	);
 	return buf;
 }
 
-char *SlaveProtocol::resUpdate( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *buf ) {
+char *SlaveProtocol::resUpdate( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t chunkUpdateOffset, char *buf ) {
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateChunkKeyValueUpdateHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
@@ -260,6 +261,7 @@ char *SlaveProtocol::resUpdate( size_t &size, uint32_t id, bool success, uint32_
 		key,
 		valueUpdateOffset,
 		valueUpdateSize,
+		chunkUpdateOffset,
 		buf
 	);
 	return buf;

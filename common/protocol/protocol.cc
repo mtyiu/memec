@@ -57,7 +57,7 @@ size_t Protocol::generateChunkKeyHeader( uint8_t magic, uint8_t to, uint8_t opco
 	return bytes;
 }
 
-size_t Protocol::generateChunkKeyValueUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate, char *sendBuf ) {
+size_t Protocol::generateChunkKeyValueUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t chunkUpdateOffset, char *valueUpdate, char *sendBuf ) {
 	if ( ! sendBuf ) sendBuf = this->buffer.send;
 	char *buf = sendBuf + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_CHUNK_KEY_VALUE_UPDATE_SIZE + keySize + ( valueUpdate ? valueUpdateSize : 0 ), id, sendBuf );
@@ -72,6 +72,7 @@ size_t Protocol::generateChunkKeyValueUpdateHeader( uint8_t magic, uint8_t to, u
 	unsigned char *tmp;
 	valueUpdateSize = htonl( valueUpdateSize );
 	valueUpdateOffset = htonl( valueUpdateOffset );
+	chunkUpdateOffset = htonl( chunkUpdateOffset );
 	tmp = ( unsigned char * ) &valueUpdateSize;
 	buf[ 1 ] = tmp[ 1 ];
 	buf[ 2 ] = tmp[ 2 ];
@@ -80,10 +81,15 @@ size_t Protocol::generateChunkKeyValueUpdateHeader( uint8_t magic, uint8_t to, u
 	buf[ 4 ] = tmp[ 1 ];
 	buf[ 5 ] = tmp[ 2 ];
 	buf[ 6 ] = tmp[ 3 ];
+	tmp = ( unsigned char * ) &chunkUpdateOffset;
+	buf[ 7 ] = tmp[ 1 ];
+	buf[ 8 ] = tmp[ 2 ];
+	buf[ 9 ] = tmp[ 3 ];
 	valueUpdateSize = ntohl( valueUpdateSize );
 	valueUpdateOffset = ntohl( valueUpdateOffset );
+	chunkUpdateOffset = ntohl( chunkUpdateOffset );
 
-	buf += 7;
+	buf += 10;
 	memmove( buf, key, keySize );
 	buf += keySize;
 	if ( valueUpdateSize && valueUpdate ) {
@@ -469,7 +475,7 @@ bool Protocol::parseChunkKeyHeader( size_t offset, uint32_t &listId, uint32_t &s
 	return true;
 }
 
-bool Protocol::parseChunkKeyValueUpdateHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint8_t &keySize, char *&key, uint32_t &valueUpdateOffset, uint32_t &valueUpdateSize, char *buf, size_t size ) {
+bool Protocol::parseChunkKeyValueUpdateHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint8_t &keySize, char *&key, uint32_t &valueUpdateOffset, uint32_t &valueUpdateSize, uint32_t &chunkUpdateOffset, char *buf, size_t size ) {
 	if ( size < PROTO_CHUNK_KEY_VALUE_UPDATE_SIZE )
 		return false;
 
@@ -497,12 +503,19 @@ bool Protocol::parseChunkKeyValueUpdateHeader( size_t offset, uint32_t &listId, 
 	tmp[ 3 ] = ptr[ 6 ];
 	valueUpdateOffset = ntohl( valueUpdateOffset );
 
-	key = ptr + 7;
+	chunkUpdateOffset = 0;
+	tmp = ( unsigned char * ) &chunkUpdateOffset;
+	tmp[ 1 ] = ptr[ 7 ];
+	tmp[ 2 ] = ptr[ 8 ];
+	tmp[ 3 ] = ptr[ 9 ];
+	chunkUpdateOffset = ntohl( chunkUpdateOffset );
+
+	key = ptr + 10;
 
 	return true;
 }
 
-bool Protocol::parseChunkKeyValueUpdateHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint8_t &keySize, char *&key, uint32_t &valueUpdateOffset, uint32_t &valueUpdateSize, char *&valueUpdate, char *buf, size_t size ) {
+bool Protocol::parseChunkKeyValueUpdateHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint8_t &keySize, char *&key, uint32_t &valueUpdateOffset, uint32_t &valueUpdateSize, uint32_t &chunkUpdateOffset, char *&valueUpdate, char *buf, size_t size ) {
 	if ( size < PROTO_CHUNK_KEY_VALUE_UPDATE_SIZE )
 		return false;
 
@@ -530,10 +543,17 @@ bool Protocol::parseChunkKeyValueUpdateHeader( size_t offset, uint32_t &listId, 
 	tmp[ 3 ] = ptr[ 6 ];
 	valueUpdateOffset = ntohl( valueUpdateOffset );
 
+	chunkUpdateOffset = 0;
+	tmp = ( unsigned char * ) &chunkUpdateOffset;
+	tmp[ 1 ] = ptr[ 7 ];
+	tmp[ 2 ] = ptr[ 8 ];
+	tmp[ 3 ] = ptr[ 9 ];
+	chunkUpdateOffset = ntohl( chunkUpdateOffset );
+
 	if ( size < PROTO_CHUNK_KEY_VALUE_UPDATE_SIZE + keySize + valueUpdateSize )
 		return false;
 
-	key = ptr + 7;
+	key = ptr + 10;
 	valueUpdate = valueUpdateSize ? key + keySize : 0;
 
 	return true;
@@ -929,6 +949,7 @@ bool Protocol::parseChunkKeyValueUpdateHeader( struct ChunkKeyValueUpdateHeader 
 			header.key,
 			header.valueUpdateOffset,
 			header.valueUpdateSize,
+			header.chunkUpdateOffset,
 			header.valueUpdate,
 			buf, size
 		);
@@ -943,6 +964,7 @@ bool Protocol::parseChunkKeyValueUpdateHeader( struct ChunkKeyValueUpdateHeader 
 			header.key,
 			header.valueUpdateOffset,
 			header.valueUpdateSize,
+			header.chunkUpdateOffset,
 			buf, size
 		);
 	}
