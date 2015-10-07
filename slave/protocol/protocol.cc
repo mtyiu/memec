@@ -1,3 +1,4 @@
+#include <cassert>
 #include "protocol.hh"
 
 bool SlaveProtocol::init( size_t size, uint32_t dataChunkCount ) {
@@ -184,6 +185,52 @@ char *SlaveProtocol::reqRemappingSet( size_t &size, uint32_t id, uint32_t listId
 		key,
 		valueSize,
 		value,
+		buf
+	);
+	return buf;
+}
+
+char *SlaveProtocol::reqSealChunk( size_t &size, uint32_t id, Chunk *chunk, char *buf ) {
+	if ( ! buf ) buf = this->buffer.send;
+
+	char *ptr = buf + PROTO_HEADER_SIZE + PROTO_CHUNK_SEAL_SIZE;
+	size_t bytes = 0; // data length only
+
+#ifdef USE_CHUNK_MUTEX_LOCK
+	chunk->setLock();
+#endif
+	int currentOffset = 0, nextOffset = 0;
+	uint32_t count = 0;
+	char *key;
+	uint8_t keySize;
+	while ( ( nextOffset = chunk->next( currentOffset, key, keySize ) ) != -1 ) {
+		ptr[ 0 ] = keySize;
+		*( ( uint32_t * )( ptr + 1 ) ) = htonl( currentOffset );
+		memmove( ptr + 5, key, keySize );
+
+		count++;
+		bytes += PROTO_CHUNK_SEAL_DATA_SIZE + keySize;
+		ptr += PROTO_CHUNK_SEAL_DATA_SIZE + keySize;
+
+		currentOffset = nextOffset;
+	}
+#ifdef USE_CHUNK_MUTEX_LOCK
+	chunk->setUnlock();
+#endif
+
+	// The seal request should not exceed the size of the send buffer
+	assert( bytes <= this->buffer.size );
+
+	size = this->generateChunkSealHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_SEAL_CHUNK,
+		id,
+		chunk->metadata.listId,
+		chunk->metadata.stripeId,
+		chunk->metadata.chunkId,
+		count,
+		bytes,
 		buf
 	);
 	return buf;

@@ -7,7 +7,6 @@ BIN=$(PLIO_SRC_ROOT)/bin/slave
 OBJS= \
 	buffer/chunk_buffer.o \
 	buffer/data_chunk_buffer.o \
-	buffer/dummy_data_chunk_buffer.o \
 	buffer/parity_chunk_buffer.o \
 	buffer/mixed_chunk_buffer.o \
 	config/slave_config.o \
@@ -43,14 +42,16 @@ EXTERNAL_LIB= \
 	$(PLIO_SRC_ROOT)/common/socket/socket.o \
 	$(PLIO_SRC_ROOT)/common/socket/epoll.o \
 	$(PLIO_SRC_ROOT)/lib/death_handler/death_handler.o \
-	$(PLIO_SRC_ROOT)/lib/inih/ini.o \
+	$(PLIO_SRC_ROOT)/lib/inih/ini.o
+
+LD_LIB= \
 	-lrt \
 	-ldl
 
 .PHONY: clean
 
 $(BIN): $(OBJS) $(EXTERNAL_LIB)
-	$(CC) $(CFLAGS) $(LIBS) -o $(BIN) $(OBJS) $(EXTERNAL_LIB)
+	$(CC) $(CFLAGS) $(LIBS) -o $(BIN) $(OBJS) $(EXTERNAL_LIB) $(LD_LIB)
 
 %.o: %.cc %.hh
 	$(CC) $(CFLAGS) $(INCLUDE) $(LIBS) -c -o $@ $<

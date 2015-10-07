@@ -313,12 +313,22 @@ bool Slave::stop() {
 	return true;
 }
 
+void Slave::seal() {
+	size_t count = 0;
+	for ( int i = 0, size = this->chunkBuffer.size(); i < size; i++ ) {
+		if ( this->chunkBuffer[ i ] )
+			count += this->chunkBuffer[ i ]->seal();
+	}
+	printf( "Sealing %lu chunks...\n", count );
+}
+
 void Slave::flush() {
 	IOEvent ioEvent;
 	std::map<Metadata, Chunk *>::iterator it;
 	std::map<Metadata, Chunk *> *cache;
 	pthread_mutex_t *lock;
 	Chunk *chunk;
+	size_t count = 0;
 
 	this->map.getCacheMap( cache, lock );
 
@@ -328,9 +338,12 @@ void Slave::flush() {
 		if ( chunk->status == CHUNK_STATUS_DIRTY ) {
 			ioEvent.flush( chunk );
 			this->eventQueue.insert( ioEvent );
+			count++;
 		}
 	}
 	pthread_mutex_unlock( lock );
+
+	printf( "Flushing %lu chunks...\n", count );
 }
 
 double Slave::getElapsedTime() {
@@ -471,6 +484,9 @@ void Slave::interactive() {
 		} else if ( strcmp( command, "dump" ) == 0 ) {
 			valid = true;
 			this->dump();
+		} else if ( strcmp( command, "seal" ) == 0 ) {
+			valid = true;
+			this->seal();
 		} else if ( strcmp( command, "flush" ) == 0 ) {
 			valid = true;
 			this->flush();
@@ -680,6 +696,7 @@ void Slave::help() {
 		"- info: Show configuration\n"
 		"- debug: Show debug messages\n"
 		"- dump: Dump all key-value pairs\n"
+		"- seal: Seal all chunks in the chunk buffer\n"
 		"- flush: Flush all dirty chunks to disk\n"
 		"- sync: Synchronize with coordinator\n"
 		"- load: Show the load of each worker\n"

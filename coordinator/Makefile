@@ -30,7 +30,9 @@ EXTERNAL_LIB= \
 	$(PLIO_SRC_ROOT)/common/socket/socket.o \
 	$(PLIO_SRC_ROOT)/common/socket/epoll.o \
 	$(PLIO_SRC_ROOT)/lib/death_handler/death_handler.o \
-	$(PLIO_SRC_ROOT)/lib/inih/ini.o \
+	$(PLIO_SRC_ROOT)/lib/inih/ini.o
+
+LD_LIB= \
 	-lrt \
 	-ldl \
 	-ltspread
@@ -38,7 +40,7 @@ EXTERNAL_LIB= \
 .PHONY: clean
 
 $(BIN): $(OBJS) $(EXTERNAL_LIB)
-	$(CC) $(CFLAGS) $(LIBS) -o $(BIN) $(OBJS) $(EXTERNAL_LIB)
+	$(CC) $(CFLAGS) $(LIBS) -o $(BIN) $(OBJS) $(EXTERNAL_LIB) $(LD_LIB)
 
 %.o: %.cc %.hh
 	$(CC) $(CFLAGS) $(INCLUDE) $(LIBS) -c -o $@ $<

@@ -15,3 +15,13 @@ void SlaveEvent::announceSlaveConnected( SlaveSocket *socket ) {
 	this->type = SLAVE_EVENT_TYPE_ANNOUNCE_SLAVE_CONNECTED;
 	this->socket = socket;
 }
+
+void SlaveEvent::reqSealChunks( SlaveSocket *socket ) {
+	this->type = SLAVE_EVENT_TYPE_REQUEST_SEAL_CHUNKS;
+	this->socket = socket;
+}
+
+void SlaveEvent::reqFlushChunks( SlaveSocket *socket ) {
+	this->type = SLAVE_EVENT_TYPE_REQUEST_FLUSH_CHUNKS;
+	this->socket = socket;
+}

@@ -12,7 +12,11 @@ private:
 
 public:
 	DataChunkBuffer( uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId );
+
 	KeyMetadata set( char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode );
+
+	size_t seal();
+
 	int lockChunk( Chunk *chunk );
 	void updateAndUnlockChunk( int index );
 	uint32_t flush( bool lock = true, bool lockAtIndex = false );

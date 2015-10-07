@@ -139,11 +139,11 @@ void Coordinator::signalHandler( int signal ) {
 			if ( slaveGetLatency->size() > 0 || slaveSetLatency->size() > 0 ) {
 				MasterEvent event;
 				for ( uint32_t i = 0; i < sockets.size(); i++ ) {
-					event.reqPushLoadStats( 
-						sockets.values[ i ], 
-						new ArrayMap<struct sockaddr_in, Latency>( *slaveGetLatency ), 
+					event.reqPushLoadStats(
+						sockets.values[ i ],
+						new ArrayMap<struct sockaddr_in, Latency>( *slaveGetLatency ),
 						new ArrayMap<struct sockaddr_in, Latency>( *slaveSetLatency ),
-						new std::set<struct sockaddr_in>( *overloadedSlaveSet ) 
+						new std::set<struct sockaddr_in>( *overloadedSlaveSet )
 					);
 					coordinator->eventQueue.insert( event );
 				}
@@ -259,7 +259,7 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 		msec = 0;
 	}
 	statsTimer.setInterval( sec, msec );
-	
+
 
 	// Set signal handlers //
 	Signal::setHandler( Coordinator::signalHandler );
@@ -301,7 +301,7 @@ bool Coordinator::start() {
 	/* Slave loading stats */
 	//alarm( this->config.coordinator.loadingStats.updateInterval );
 	statsTimer.start();
-	
+
 	return true;
 }
 
@@ -446,6 +446,12 @@ void Coordinator::interactive() {
 		} else if ( strcmp( command, "time" ) == 0 ) {
 			valid = true;
 			this->time();
+		} else if ( strcmp( command, "seal" ) == 0 ) {
+			valid = true;
+			this->seal();
+		} else if ( strcmp( command, "flush" ) == 0 ) {
+			valid = true;
+			this->flush();
 		} else {
 			valid = false;
 		}
@@ -498,6 +504,8 @@ void Coordinator::help() {
 		"- info: Show configuration\n"
 		"- debug: Show debug messages\n"
 		"- time: Show elapsed time\n"
+		"- seal: Force all slaves to seal all its chunks\n"
+		"- flush: Force all slaves to flush all its chunks\n"
 		"- exit: Terminate this client\n"
 	);
 	fflush( stdout );
@@ -506,4 +514,30 @@ void Coordinator::help() {
 void Coordinator::time() {
 	fprintf( stdout, "Elapsed time: %12.6lf s\n", this->getElapsedTime() );
 	fflush( stdout );
+}
+
+void Coordinator::seal() {
+	SlaveEvent event;
+	size_t count = 0;
+	for ( size_t i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
+		if ( this->sockets.slaves[ i ]->ready() ) {
+			event.reqSealChunks( this->sockets.slaves[ i ] );
+			this->eventQueue.insert( event );
+			count++;
+		}
+	}
+	printf( "Sending seal requests to %lu slaves...\n", count );
+}
+
+void Coordinator::flush() {
+	SlaveEvent event;
+	size_t count = 0;
+	for ( size_t i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
+		if ( this->sockets.slaves[ i ]->ready() ) {
+			event.reqFlushChunks( this->sockets.slaves[ i ] );
+			this->eventQueue.insert( event );
+			count++;
+		}
+	}
+	printf( "Sending flush requests to %lu slaves...\n", count );
 }
