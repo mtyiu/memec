@@ -61,6 +61,12 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 			delete event.message.slaveLoading.overloadedSlaveSet;
 			isSend = true;
 			break;
+		case MASTER_EVENT_TYPE_FORWARD_REMAPPING_RECORDS:
+			buffer.size = event.message.forward.prevSize;
+			buffer.data = this->protocol.forwardRemappingRecords ( buffer.size, 0, event.message.forward.data );
+			delete [] event.message.forward.data;
+			isSend = true;
+			break;
 		case MASTER_EVENT_TYPE_SWITCH_PHASE:
 			// just trigger / stop the remap phase, no message need to be handled
 			if ( event.message.remap.toRemap ) {
@@ -225,6 +231,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 		// Parse requests from slaves
 		ProtocolHeader header;
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();
+		ArrayMap<int, MasterSocket> &masters = Coordinator::getInstance()->sockets.masters;
 		while( buffer.size > 0 ) {
 			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "CoordinatorWorker" );
 
@@ -282,13 +289,14 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 				struct RemappingRecordHeader remappingRecordHeader;
 				struct SlaveSyncRemapHeader slaveSyncRemapHeader;
 				if ( ! this->protocol.parseRemappingRecordHeader( remappingRecordHeader, buffer.data, buffer.size ) ) {
-					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid heartbeat protocol header." );
+					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid remapping record protocol header." );
 					goto quit_1;
 				}
 				// start parsing the remapping records
-				offset = PROTO_HEADER_SIZE + PROTO_HEARTBEAT_SIZE;
-				for ( offset = 0, count = 0; offset < ( size_t ) buffer.size; offset += bytes ) {
-					if ( ! this->protocol.parseSlaveSyncRemapHeader( slaveSyncRemapHeader, bytes, buffer.data, buffer.size, offset ) ) 
+				offset = PROTO_REMAPPING_RECORD_SIZE;
+				RemappingRecordMap *map = CoordinatorWorker::remappingRecords;
+				for ( count = 0; offset < ( size_t ) buffer.size; offset += bytes ) {
+					if ( ! this->protocol.parseSlaveSyncRemapHeader( slaveSyncRemapHeader, bytes, buffer.data, buffer.size - offset, offset ) ) 
 						break;
 					count++;
 
@@ -298,12 +306,24 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 					RemappingRecord remappingRecord;
 					remappingRecord.set( slaveSyncRemapHeader.listId, slaveSyncRemapHeader.chunkId, 0 );
 
-					RemappingRecordMap *map = CoordinatorWorker::remappingRecords;
 					if ( slaveSyncRemapHeader.opcode == 0 ) { // remove record
 						map->erase( key, remappingRecord );
 					} else if ( slaveSyncRemapHeader.opcode == 1 ) { // add record
 						map->insert( key, remappingRecord );
 					}
+				}
+				//map->print();
+				//fprintf ( stderr, "Remapping Records no.=%lu upto=%lu size=%lu\n", count, offset, buffer.size );
+				
+				// forward the copies of message to masters
+				MasterEvent masterEvent;
+				masterEvent.type = MASTER_EVENT_TYPE_FORWARD_REMAPPING_RECORDS;
+				masterEvent.message.forward.prevSize = buffer.size;
+				for ( uint32_t i = 0; i < masters.size() ; i++ ) {
+					masterEvent.socket = masters.values[ i ];
+					masterEvent.message.forward.data = new char[ buffer.size ];
+					memcpy( masterEvent.message.forward.data, buffer.data, buffer.size );
+					CoordinatorWorker::eventQueue->insert( masterEvent );
 				}
 			} else {
 				__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );

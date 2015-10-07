@@ -5,7 +5,6 @@
 #include <pthread.h>
 #include <set>
 #include "../config/coordinator_config.hh"
-#include "../ds/remapping_record_map.hh"
 #include "../event/event_queue.hh"
 #include "../remap/remap_msg_handler.hh"
 #include "../socket/coordinator_socket.hh"
@@ -15,6 +14,7 @@
 #include "../../common/config/global_config.hh"
 #include "../../common/ds/array_map.hh"
 #include "../../common/ds/id_generator.hh"
+#include "../../common/ds/remapping_record_map.hh"
 #include "../../common/socket/epoll.hh"
 #include "../../common/signal/signal.hh"
 #include "../../common/util/option.hh"
@@ -58,10 +58,10 @@ public:
 	} sockets;
 	IDGenerator idGenerator;
 	CoordinatorEventQueue eventQueue;
-
+	/* Remapping */
 	CoordinatorRemapMsgHandler remapMsgHandler;
 	RemappingRecordMap remappingRecords;
-
+	/* Loading statistics */
 	struct {
 		// ( slaveAddr, ( mastserAddr, Latency ) )
 		ArrayMap< struct sockaddr_in, ArrayMap< struct sockaddr_in, Latency > > latestGet;

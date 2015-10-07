@@ -14,6 +14,7 @@
 #include "../../common/stripe_list/stripe_list.hh"
 #include "../../common/ds/id_generator.hh"
 #include "../../common/ds/packet_pool.hh"
+#include "../../common/ds/remapping_record_map.hh"
 #include "../../common/ds/sockaddr_in.hh"
 
 #define MASTER_WORKER_SEND_REPLICAS_PARALLEL
@@ -35,6 +36,7 @@ private:
 	static Counter *counter;
 	static RemapFlag *remapFlag;
 	static PacketPool *packetPool;
+	static RemappingRecordMap *remappingRecords;
 
 	void dispatch( MixedEvent event );
 	void dispatch( ApplicationEvent event );

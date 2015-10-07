@@ -3,7 +3,7 @@
 
 #include <cstdio>
 #include "worker_role.hh"
-#include "../ds/remapping_record_map.hh"
+#include "../../common/ds/remapping_record_map.hh"
 #include "../event/event_queue.hh"
 #include "../protocol/protocol.hh"
 #include "../../common/worker/worker.hh"

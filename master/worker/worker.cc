@@ -17,6 +17,7 @@ StripeList<SlaveSocket> *MasterWorker::stripeList;
 PacketPool *MasterWorker::packetPool;
 Counter *MasterWorker::counter;
 RemapFlag *MasterWorker::remapFlag;
+RemappingRecordMap *MasterWorker::remappingRecords = &Master::getInstance()->remappingRecords;
 
 void MasterWorker::dispatch( MixedEvent event ) {
 	switch( event.type ) {
@@ -246,6 +247,9 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();
 		ArrayMap<struct sockaddr_in, Latency> getLatency, setLatency;
 		struct LoadStatsHeader loadStatsHeader;
+		struct RemappingRecordHeader remappingRecordHeader;
+		struct SlaveSyncRemapHeader slaveSyncRemapHeader;
+		size_t offset, count, bytes;
 		Master *master = Master::getInstance();
 
 		while ( buffer.size > 0 ) {
@@ -292,11 +296,43 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 								break;
 						}
 						break;
+					case PROTO_OPCODE_SYNC:
+						if ( header.magic == PROTO_MAGIC_REMAPPING ) {
+							if ( ! this->protocol.parseRemappingRecordHeader( remappingRecordHeader, buffer.data, buffer.size ) ) {
+								__ERROR__( "CoordinatorWorker", "dispatch", "Invalid remapping record protocol header." );
+								goto quit_1;
+							}
+							// start parsing the remapping records
+							offset = PROTO_REMAPPING_RECORD_SIZE;
+							RemappingRecordMap *map = MasterWorker::remappingRecords;
+							for ( count = 0; offset < ( size_t ) buffer.size; offset += bytes ) {
+								if ( ! this->protocol.parseSlaveSyncRemapHeader( slaveSyncRemapHeader, bytes, buffer.data, buffer.size - offset, offset ) ) 
+									break;
+								count++;
+
+								Key key;
+								key.set ( slaveSyncRemapHeader.keySize, slaveSyncRemapHeader.key );
+
+								RemappingRecord remappingRecord;
+								remappingRecord.set( slaveSyncRemapHeader.listId, slaveSyncRemapHeader.chunkId, 0 );
+
+								if ( slaveSyncRemapHeader.opcode == 0 ) { // remove record
+									map->erase( key, remappingRecord );
+								} else if ( slaveSyncRemapHeader.opcode == 1 ) { // add record
+									map->insert( key, remappingRecord );
+								}
+							}
+							map->print();
+						} else {
+							__ERROR__( "MasterWorker", "dispatch", "Invalid magic code from coordinator." );
+						}
+						break;
 					default:
 						__ERROR__( "MasterWorker", "dispatch", "Invalid opcode from coordinator." );
 						break;
 				}
 			}
+quit_1:
 			buffer.data += header.length;
 			buffer.size -= header.length;
 		}
