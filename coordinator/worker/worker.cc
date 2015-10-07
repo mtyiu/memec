@@ -293,9 +293,10 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 					goto quit_1;
 				}
 				// start parsing the remapping records
+				// TODO buffer.size >> total size of remapping records?
 				offset = PROTO_REMAPPING_RECORD_SIZE;
 				RemappingRecordMap *map = CoordinatorWorker::remappingRecords;
-				for ( count = 0; offset < ( size_t ) buffer.size; offset += bytes ) {
+				for ( count = 0; offset < ( size_t ) buffer.size && count < remappingRecordHeader.remap; offset += bytes ) {
 					if ( ! this->protocol.parseSlaveSyncRemapHeader( slaveSyncRemapHeader, bytes, buffer.data, buffer.size - offset, offset ) ) 
 						break;
 					count++;
@@ -313,7 +314,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 					}
 				}
 				//map->print();
-				//fprintf ( stderr, "Remapping Records no.=%lu upto=%lu size=%lu\n", count, offset, buffer.size );
+				//fprintf ( stderr, "Remapping Records no.=%lu (%u) upto=%lu size=%lu\n", count, remappingRecordHeader.remap, offset, buffer.size );
 				
 				// forward the copies of message to masters
 				MasterEvent masterEvent;

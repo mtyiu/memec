@@ -517,6 +517,9 @@ void Master::interactive() {
 		} else if ( strcmp( command, "pending" ) == 0 ) {
 			valid = true;
 			this->printPending();
+		} else if ( strcmp( command, "remapping" ) == 0 ) {
+			valid = true;
+			this->printRemapping();
 		} else if ( strcmp( command, "time" ) == 0 ) {
 			valid = true;
 			this->time();
@@ -750,6 +753,16 @@ void Master::printPending( FILE *f ) {
 		this->counter.getRemapping()
 	);
 
+}
+
+void Master::printRemapping( FILE *f ) {
+	fprintf(
+		f,
+		"\nRemapping Record Mapping\n"
+		"--------\n"
+	);
+	this->remappingRecords.print( f, true );
+
 	fprintf(
 		f,
 		"\n\nRemapped SET Ops: %d\n",
@@ -765,6 +778,7 @@ void Master::help() {
 		"- info: Show configuration\n"
 		"- debug: Show debug messages\n"
 		"- pending: Show all pending requests\n"
+		"- remapping: Show remapping info\n"
 		"- time: Show elapsed time\n"
 		"- exit: Terminate this client\n"
 	);

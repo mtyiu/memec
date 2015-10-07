@@ -302,10 +302,11 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 								__ERROR__( "CoordinatorWorker", "dispatch", "Invalid remapping record protocol header." );
 								goto quit_1;
 							}
+							fprintf( stderr, "remapping records come !!\n" );
 							// start parsing the remapping records
 							offset = PROTO_REMAPPING_RECORD_SIZE;
 							RemappingRecordMap *map = MasterWorker::remappingRecords;
-							for ( count = 0; offset < ( size_t ) buffer.size; offset += bytes ) {
+							for ( count = 0; offset < ( size_t ) buffer.size && count < remappingRecordHeader.remap; offset += bytes ) {
 								if ( ! this->protocol.parseSlaveSyncRemapHeader( slaveSyncRemapHeader, bytes, buffer.data, buffer.size - offset, offset ) ) 
 									break;
 								count++;
@@ -322,6 +323,7 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 									map->insert( key, remappingRecord );
 								}
 							}
+							fprintf( stderr, "remapping records end !!\n" );
 							//map->print();
 						} else {
 							__ERROR__( "MasterWorker", "dispatch", "Invalid magic code from coordinator." );
@@ -455,12 +457,30 @@ quit_1:
 
 SlaveSocket *MasterWorker::getSlave( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded, bool *isDegraded ) {
 	SlaveSocket *ret;
-	listId = MasterWorker::stripeList->get(
-		data, ( size_t ) size,
-		this->dataSlaveSockets,
-		this->paritySlaveSockets,
-		&chunkId, false
-	);
+
+	// Search to see if this key is remapped
+	Key key;
+	key.set( size, data );
+	RemappingRecord record = MasterWorker::remappingRecords->find( key );
+	if ( record.valid ) { // remapped keys
+		fprintf( stderr, "Redirect request from list=%u chunk=%u to list=%u chunk=%u\n", 
+			listId, chunkId, record.listId, record.chunkId
+		);
+		listId = record.listId;
+		chunkId = record.chunkId;
+		this->paritySlaveSockets = MasterWorker::stripeList->get(
+			listId, 
+			this->paritySlaveSockets, 
+			this->dataSlaveSockets
+		);
+	} else { // non-remapped keys
+		listId = MasterWorker::stripeList->get(
+			data, ( size_t ) size,
+			this->dataSlaveSockets,
+			this->paritySlaveSockets,
+			&chunkId, false
+		);
+	}
 
 	ret = *this->dataSlaveSockets;
 
@@ -1303,7 +1323,6 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 		MasterWorker::counter->decreaseRemapping();
 	Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
 
-#undef NO_REMAPPING
 
 	int pending;
 	ApplicationEvent applicationEvent;
@@ -1364,6 +1383,14 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 		applicationEvent.resSet( ( ApplicationSocket * ) key.ptr, pid.id, key, success );
 		MasterWorker::eventQueue->insert( applicationEvent );
 	}
+
+	// add a remaping record
+	if ( ! NO_REMAPPING ) {
+		key.set( header.keySize, header.key );
+		RemappingRecord record ( header.listId, header.chunkId );
+		MasterWorker::remappingRecords->insert( key, record );
+	}
+#undef NO_REMAPPING
 	return true;
 }
 
@@ -1425,6 +1452,8 @@ bool MasterWorker::handleDeleteResponse( SlaveEvent event, bool success, char *b
 
 	applicationEvent.resDelete( ( ApplicationSocket * ) key.ptr, pid.id, key, success );
 	MasterWorker::eventQueue->insert( applicationEvent );
+
+	// TODO remove remapping records
 
 	return true;
 }

@@ -50,14 +50,26 @@ public:
 		return true;
 	}
 
-	void print() {
+	RemappingRecord find( Key key ) {
+		RemappingRecord ret;
+		pthread_mutex_lock( &this->lock );
+		std::map<Key, RemappingRecord>::iterator it = map.find( key );
+		if ( it != map.end() ) {
+			ret = it->second;
+			ret.valid = true;
+		}
+		pthread_mutex_unlock( &this->lock );
+		return ret;
+	}
+
+	void print( FILE *f = stderr, bool listAll = false ) {
 		std::map<Key, RemappingRecord>::iterator it;
 		unsigned long count = 0;
-		fprintf( stderr, "%lu remppaing records\n", map.size() );
-		for ( it = map.begin(); it != map.end(); it++, count++ ) {
+		fprintf( f, "%lu remppaing records\n", map.size() );
+		for ( it = map.begin(); it != map.end() && listAll; it++, count++ ) {
 			fprintf( 
-				stderr, "%lu: [%s] to list %u chunk %u\n", 
-				count, it->first.data, 
+				f , "%lu: [%s](%d) to list %u chunk %u\n", 
+				count, it->first.data, it->first.size,
 				it->second.listId, it->second.chunkId 
 			);
 		}
