@@ -82,7 +82,7 @@ public:
 
 	void seal();
 	void flush();
-	void memory();
+	void memory( FILE *f = stdout );
 
 	void info( FILE *f = stdout );
 	void debug( FILE *f = stdout );
