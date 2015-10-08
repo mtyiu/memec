@@ -1445,7 +1445,7 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 		pthread_mutex_lock( keysLock );
 		pthread_mutex_lock( cacheLock );
 		// Delete the chunk and perform key-value compaction
-		if ( SlaveWorker::parityChunkCount && chunkBufferIndex == -1 ) {
+		if ( chunkBufferIndex == -1 ) {
 			// Only compute data delta if the chunk is not yet sealed
 			if ( ! chunkBuffer->reInsert( chunk, keyMetadata.length, false, false ) ) {
 				// The chunk is compacted before. Need to seal the chunk first
@@ -1455,17 +1455,16 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 					this->issueSealChunkRequest( chunk, chunk->lastDelPos );
 				}
 			}
-			deltaSize = chunk->deleteKeyValue( key, keys, delta, this->buffer.size );
-			// Release the locks
-			pthread_mutex_unlock( cacheLock );
-			pthread_mutex_unlock( keysLock );
-			chunkBuffer->unlock();
-		} else {
-			deltaSize = chunk->deleteKeyValue( key, keys );
-			// Release the locks
-			pthread_mutex_unlock( cacheLock );
-			pthread_mutex_unlock( keysLock );
 		}
+		if ( SlaveWorker::parityChunkCount )
+			deltaSize = chunk->deleteKeyValue( key, keys, delta, this->buffer.size );
+		else
+			deltaSize = chunk->deleteKeyValue( key, keys );
+		// Release the locks
+		pthread_mutex_unlock( cacheLock );
+		pthread_mutex_unlock( keysLock );
+		if ( chunkBufferIndex == -1 )
+			chunkBuffer->unlock();
 
 		if ( SlaveWorker::parityChunkCount ) {
 			uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
