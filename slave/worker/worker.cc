@@ -1447,7 +1447,7 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 		// Delete the chunk and perform key-value compaction
 		if ( chunkBufferIndex == -1 ) {
 			// Only compute data delta if the chunk is not yet sealed
-			if ( ! chunkBuffer->reInsert( chunk, keyMetadata.length, false, false ) ) {
+			if ( ! chunkBuffer->reInsert( this, chunk, keyMetadata.length, false, false ) ) {
 				// The chunk is compacted before. Need to seal the chunk first
 				// Seal from chunk->lastDelPos
 				if ( chunk->lastDelPos < chunk->getSize() ) {

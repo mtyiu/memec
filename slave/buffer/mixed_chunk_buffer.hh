@@ -25,7 +25,7 @@ public:
 
 	// For DataChunkBuffer only
 	size_t seal( SlaveWorker *worker );
-	bool reInsert( Chunk *chunk, uint32_t sizeToBeFreed, bool needsLock, bool needsUnlock );
+	bool reInsert( SlaveWorker *worker, Chunk *chunk, uint32_t sizeToBeFreed, bool needsLock, bool needsUnlock );
 	// For ParityChunkBuffer only
 	bool seal( uint32_t stripeId, uint32_t chunkId, uint32_t count, char *sealData, size_t sealDataSize, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk );
 

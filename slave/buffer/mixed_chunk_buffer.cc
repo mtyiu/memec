@@ -33,10 +33,10 @@ size_t MixedChunkBuffer::seal( SlaveWorker *worker ) {
 	}
 }
 
-bool MixedChunkBuffer::reInsert( Chunk *chunk, uint32_t sizeToBeFreed, bool needsLock, bool needsUnlock ) {
+bool MixedChunkBuffer::reInsert( SlaveWorker *worker, Chunk *chunk, uint32_t sizeToBeFreed, bool needsLock, bool needsUnlock ) {
 	switch( this->role ) {
 		case CBR_DATA:
-			return this->buffer.data->reInsert( chunk, sizeToBeFreed, needsLock, needsUnlock );
+			return this->buffer.data->reInsert( worker, chunk, sizeToBeFreed, needsLock, needsUnlock );
 		case CBR_PARITY:
 		default:
 			return false;
