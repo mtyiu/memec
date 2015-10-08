@@ -25,11 +25,13 @@ public:
 
 	// For DataChunkBuffer only
 	size_t seal( SlaveWorker *worker );
+	bool reInsert( Chunk *chunk, uint32_t sizeToBeFreed, bool needsLock, bool needsUnlock );
 	// For ParityChunkBuffer only
 	bool seal( uint32_t stripeId, uint32_t chunkId, uint32_t count, char *sealData, size_t sealDataSize, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk );
 
-	int lockChunk( Chunk *chunk );
+	int lockChunk( Chunk *chunk, bool keepGlobalLock = false );
 	void updateAndUnlockChunk( int index );
+	void unlock();
 	bool deleteKey( char *keyStr, uint8_t keySize );
 	bool updateKeyValue( char *keyStr, uint8_t keySize, uint32_t offset, uint32_t length, char *valueUpdate );
 	void update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, char *dataDelta, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk );

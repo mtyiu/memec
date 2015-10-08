@@ -864,9 +864,10 @@ bool SlaveWorker::getSlaves( uint32_t listId, bool allowDegraded, bool *isDegrad
 	return true;
 }
 
-bool SlaveWorker::issueSealChunkRequest( Chunk *chunk ) {
+bool SlaveWorker::issueSealChunkRequest( Chunk *chunk, uint32_t startPos ) {
 	// The chunk is locked when this function is called
-	if ( SlaveWorker::parityChunkCount ) {
+	// Only issue seal chunk request when new key-value pairs are received
+	if ( SlaveWorker::parityChunkCount && startPos < chunk->getSize() ) {
 		size_t size;
 		uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
 		bool isDegraded;
@@ -877,8 +878,14 @@ bool SlaveWorker::issueSealChunkRequest( Chunk *chunk ) {
 		this->getSlaves( chunk->metadata.listId, false /* allowDegraded */, &isDegraded );
 
 		// Prepare seal chunk request
-		this->protocol.reqSealChunk( size, requestId, chunk, packet->data );
+		this->protocol.reqSealChunk( size, requestId, chunk, startPos, packet->data );
 		packet->size = ( uint32_t ) size;
+
+		if ( size == PROTO_HEADER_SIZE + PROTO_CHUNK_SEAL_SIZE ) {
+			packet->setReferenceCount( 1 );
+			SlaveWorker::packetPool->free( packet );
+			return true;
+		}
 
 		for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
 			SlavePeerEvent slavePeerEvent;
@@ -893,14 +900,6 @@ bool SlaveWorker::issueSealChunkRequest( Chunk *chunk ) {
 			this->dispatch( slavePeerEvent );
 #endif
 		}
-
-		// __ERROR__(
-		// 	"SlaveWorker", "issueSealChunkRequest",
-		// 	"[SEAL_CHUNK] List ID: %u; stripe ID: %u; chunk ID: %u.",
-		// 	chunk->metadata.listId,
-		// 	chunk->metadata.stripeId,
-		// 	chunk->metadata.chunkId
-		// );
 	}
 	return true;
 }
@@ -1441,19 +1440,32 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 		SlaveWorker::map->getCacheMap( cache, cacheLock );
 		// Lock the data chunk buffer
 		MixedChunkBuffer *chunkBuffer = SlaveWorker::chunkBuffer->at( metadata.listId );
-		int chunkBufferIndex = chunkBuffer->lockChunk( chunk );
+		int chunkBufferIndex = chunkBuffer->lockChunk( chunk, true );
 		// Lock the keys and cache map
 		pthread_mutex_lock( keysLock );
 		pthread_mutex_lock( cacheLock );
 		// Delete the chunk and perform key-value compaction
-		if ( SlaveWorker::parityChunkCount && chunkBufferIndex == -1 )
+		if ( SlaveWorker::parityChunkCount && chunkBufferIndex == -1 ) {
 			// Only compute data delta if the chunk is not yet sealed
+			if ( ! chunkBuffer->reInsert( chunk, keyMetadata.length, false, false ) ) {
+				// The chunk is compacted before. Need to seal the chunk first
+				// Seal from chunk->lastDelPos
+				if ( chunk->lastDelPos < chunk->getSize() ) {
+					// Only issue seal chunk request when new key-value pairs are received
+					this->issueSealChunkRequest( chunk, chunk->lastDelPos );
+				}
+			}
 			deltaSize = chunk->deleteKeyValue( key, keys, delta, this->buffer.size );
-		else
+			// Release the locks
+			pthread_mutex_unlock( cacheLock );
+			pthread_mutex_unlock( keysLock );
+			chunkBuffer->unlock();
+		} else {
 			deltaSize = chunk->deleteKeyValue( key, keys );
-		// Release the locks
-		pthread_mutex_unlock( cacheLock );
-		pthread_mutex_unlock( keysLock );
+			// Release the locks
+			pthread_mutex_unlock( cacheLock );
+			pthread_mutex_unlock( keysLock );
+		}
 
 		if ( SlaveWorker::parityChunkCount ) {
 			uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
@@ -1618,7 +1630,7 @@ bool SlaveWorker::handleSealChunkRequest( SlavePeerEvent event, char *buf, size_
 	}
 	__DEBUG__(
 		BLUE, "SlaveWorker", "handleSealChunkRequest",
-		"[SEAL_CHUNK] List ID: %u, stripe ID: %u, chunk ID: %u; count = %u.\n",
+		"[SEAL_CHUNK] List ID: %u, stripe ID: %u, chunk ID: %u; count = %u.",
 		header.listId, header.stripeId, header.chunkId, header.count
 	);
 

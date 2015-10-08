@@ -13,6 +13,7 @@ Chunk::Chunk() {
 	this->size = 0;
 	this->status = CHUNK_STATUS_EMPTY;
 	this->count = 0;
+	this->lastDelPos = 0;
 	this->isParity = false;
 #ifdef USE_CHUNK_MUTEX_LOCK
 	pthread_mutex_init( &this->lock, 0 );
@@ -264,10 +265,11 @@ uint32_t Chunk::deleteKeyValue( Key target, std::map<Key, KeyMetadata> *keys, ch
 	// Update internal counters
 	this->count--;
 	this->size -= metadata.length;
-
 	this->status = CHUNK_STATUS_DIRTY;
 
 	if ( delta ) {
+		// Update counter if the chunk is sealed before
+		this->lastDelPos = this->size;
 		// Compute data delta
 		Coding::bitwiseXOR( delta, delta, startPtr, deltaSize );
 	}

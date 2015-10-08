@@ -113,7 +113,7 @@ public:
 	void stop();
 	void print( FILE *f = stdout );
 	// Issue seal chunk requests
-	bool issueSealChunkRequest( Chunk *chunk );
+	bool issueSealChunkRequest( Chunk *chunk, uint32_t startPos = 0 );
 
 	inline WorkerRole getRole() {
 		return this->role;

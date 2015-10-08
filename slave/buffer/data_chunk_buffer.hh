@@ -1,6 +1,7 @@
 #ifndef __SLAVE_BUFFER_DATA_CHUNK_BUFFER_HH__
 #define __SLAVE_BUFFER_DATA_CHUNK_BUFFER_HH__
 
+#include <set>
 #include "chunk_buffer.hh"
 
 class SlaveWorker;
@@ -11,6 +12,8 @@ private:
 	pthread_mutex_t *locks;                // Lock for each chunk
 	Chunk **chunks;                        // Allocated chunk buffer
 	uint32_t *sizes;                       // Occupied space for each chunk
+	std::set<Chunk *> reInsertedChunks;    // Chunks that have free space after deletion
+	uint32_t reInsertedChunkMaxSpace;      // Maximum space avaiable in the re-inserted chunks
 
 public:
 	DataChunkBuffer( uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId );
@@ -19,8 +22,12 @@ public:
 
 	size_t seal( SlaveWorker *worker );
 
-	int lockChunk( Chunk *chunk );
+	// Re-insert into the buffer after a DELETE operation
+	bool reInsert( Chunk *chunk, uint32_t sizeToBeFreed, bool needsLock, bool needsUnlock );
+
+	int lockChunk( Chunk *chunk, bool keepGlobalLock );
 	void updateAndUnlockChunk( int index );
+	void unlock();
 	uint32_t flush( SlaveWorker *worker, bool lock = true, bool lockAtIndex = false );
 	Chunk *flushAt( SlaveWorker *worker, int index, bool lock = true );
 	void print( FILE *f = stdout );

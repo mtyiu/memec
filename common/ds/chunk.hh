@@ -39,6 +39,7 @@ public:
 	ChunkStatus status;         // Current status of the chunk
 	uint32_t count;             // Number of key-value pair
 	Metadata metadata;          // Metadata (list ID, stripe ID, chunk ID)
+	uint32_t lastDelPos;        // Record the position where the last key-value compaction ends after deletion
 	bool isParity;              // Indicate whether the chunk is a parity chunk
 
 	// Initialization
