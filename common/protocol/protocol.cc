@@ -279,18 +279,13 @@ size_t Protocol::generateChunkDataHeader( uint8_t magic, uint8_t to, uint8_t opc
 	return bytes;
 }
 
-size_t Protocol::generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, struct HeartbeatHeader &header, std::map<Key, OpMetadata> &ops, std::map<Key, RemappingRecord> &remapRecords, pthread_mutex_t *lock, pthread_mutex_t *rlock, size_t &count, size_t &remapCount ) {
+size_t Protocol::generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, std::map<Key, OpMetadata> &ops, std::map<Key, RemappingRecord> &remapRecords, pthread_mutex_t *lock, pthread_mutex_t *rlock, size_t &count, size_t &remapCount ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	std::map<Key, OpMetadata>::iterator it;
 	std::map<Key, RemappingRecord>::iterator rit;
 	size_t bytes = PROTO_HEADER_SIZE;
 	count = 0;
 
-	*( ( uint32_t * )( buf      ) ) = htonl( header.get );
-	*( ( uint32_t * )( buf +  4 ) ) = htonl( header.set );
-	*( ( uint32_t * )( buf +  8 ) ) = htonl( header.update );
-	*( ( uint32_t * )( buf + 12 ) ) = htonl( header.del );
-	*( ( uint32_t * )( buf + 16 ) ) = htonl( header.remap );
 	buf += PROTO_HEARTBEAT_SIZE;
 	bytes += PROTO_HEARTBEAT_SIZE;
 
@@ -341,6 +336,8 @@ size_t Protocol::generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t op
 		}
 	}
 	pthread_mutex_unlock( rlock );
+
+	*( ( uint32_t * ) this->buffer.send + PROTO_HEADER_SIZE ) = htonl( remapCount );
 
 	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, id );
 
@@ -782,16 +779,12 @@ bool Protocol::parseChunkDataHeader( size_t offset, uint32_t &listId, uint32_t &
 }
 
 
-bool Protocol::parseHeartbeatHeader( size_t offset, uint32_t &get, uint32_t &set, uint32_t &update, uint32_t &del, uint32_t &remap, char *buf, size_t size ) {
+bool Protocol::parseHeartbeatHeader( size_t offset, uint32_t &remap, char *buf, size_t size ) {
 	if ( size < PROTO_HEARTBEAT_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
-	get    = ntohl( *( ( uint32_t * )( ptr      ) ) );
-	set    = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
-	update = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
-	del    = ntohl( *( ( uint32_t * )( ptr + 12 ) ) );
-	remap  = ntohl( *( ( uint32_t * )( ptr + 16 ) ) );
+	remap  = ntohl( *( ( uint32_t * )( ptr ) ) );
 
 	return true;
 }
@@ -1144,10 +1137,6 @@ bool Protocol::parseHeartbeatHeader( struct HeartbeatHeader &header, char *buf, 
 	}
 	return this->parseHeartbeatHeader(
 		offset,
-		header.get,
-		header.set,
-		header.update,
-		header.del,
 		header.remap,
 		buf, size
 	);

@@ -465,9 +465,6 @@ void Coordinator::dump() {
 		this->sockets.slaves[ i ]->printAddress( f );
 		fprintf( f, "\n----------------------------------------\n" );
 
-		fprintf( f, "[Load]\n" );
-		this->sockets.slaves[ i ]->load.print( f );
-
 		fprintf( f, "\n[List of metadata]\n" );
 		if ( ! map.size() ) {
 			fprintf( f, "(None)\n" );

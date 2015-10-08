@@ -17,7 +17,7 @@ public:
 	// Register
 	char *reqRegisterCoordinator( size_t &size, uint32_t id, uint32_t addr, uint16_t port );
 	// Heartbeat
-	char *sendHeartbeat( size_t &size, uint32_t id, struct HeartbeatHeader &header, std::map<Key, OpMetadata> &opMetadataMap, std::map<Key, RemappingRecord> &remapRecord, pthread_mutex_t *lock, pthread_mutex_t *rlock, size_t &count, size_t &remapCount );
+	char *sendHeartbeat( size_t &size, uint32_t id, std::map<Key, OpMetadata> &opMetadataMap, std::map<Key, RemappingRecord> &remapRecord, pthread_mutex_t *lock, pthread_mutex_t *rlock, size_t &count, size_t &remapCount );
 
 	/* Master */
 	// Register

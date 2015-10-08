@@ -257,11 +257,6 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 				struct SlaveSyncHeader slaveSyncHeader;
 
 				if ( this->protocol.parseHeartbeatHeader( heartbeatHeader, buffer.data, buffer.size ) ) {
-					event.socket->load.ops.get = heartbeatHeader.get;
-					event.socket->load.ops.set = heartbeatHeader.set;
-					event.socket->load.ops.update = heartbeatHeader.update;
-					event.socket->load.ops.del = heartbeatHeader.del;
-
 					offset = PROTO_HEADER_SIZE + PROTO_HEARTBEAT_SIZE;
 					while ( offset < ( size_t ) ret ) {
 						if ( ! this->protocol.parseSlaveSyncHeader( slaveSyncHeader, bytes, buffer.data, buffer.size, offset ) )

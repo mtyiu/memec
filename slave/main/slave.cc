@@ -345,6 +345,10 @@ void Slave::flush() {
 	printf( "Flushing %lu chunks...\n", count );
 }
 
+void Slave::memory() {
+
+}
+
 double Slave::getElapsedTime() {
 	return get_elapsed_time( this->startTime );
 }
@@ -489,6 +493,9 @@ void Slave::interactive() {
 		} else if ( strcmp( command, "flush" ) == 0 ) {
 			valid = true;
 			this->flush();
+		} else if ( strcmp( command, "memory" ) == 0 ) {
+			valid = true;
+			this->memory();
 		} else if ( strcmp( command, "pending" ) == 0 ) {
 			valid = true;
 			this->printPending();
@@ -697,6 +704,7 @@ void Slave::help() {
 		"- dump: Dump all key-value pairs\n"
 		"- seal: Seal all chunks in the chunk buffer\n"
 		"- flush: Flush all dirty chunks to disk\n"
+		"- memory: Print memory usage\n"
 		"- sync: Synchronize with coordinator\n"
 		"- load: Show the load of each worker\n"
 		"- time: Show elapsed time\n"
@@ -714,7 +722,7 @@ void Slave::alarm() {
 	::alarm( this->config.global.sync.timeout );
 }
 
-Load &Slave::aggregateLoad( FILE *f ) {
+SlaveLoad &Slave::aggregateLoad( FILE *f ) {
 	this->load.reset();
 	for ( int i = 0, len = this->workers.size(); i < len; i++ ) {
 		SlaveLoad &load = this->workers[ i ].load;

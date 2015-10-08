@@ -60,12 +60,11 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 	bool connected, isSend;
 	uint32_t requestId;
 	ssize_t ret;
-	size_t count, remapCount;
+	size_t count, remapCount = 0;
 	struct {
 		size_t size;
 		char *data;
 	} buffer;
-	struct timespec t = start_timer();
 	std::map<Key, RemappingRecord>::iterator it, safeNextIt;
 
 	if ( event.type != COORDINATOR_EVENT_TYPE_PENDING )
@@ -85,7 +84,6 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 			buffer.data = this->protocol.sendHeartbeat(
 				buffer.size,
 				requestId,
-				Slave::getInstance()->aggregateLoad().ops,
 				SlaveWorker::map->ops,
 				SlaveWorker::map->remap,
 				&SlaveWorker::map->opsLock,
@@ -126,11 +124,6 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "SlaveWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 
-		if ( ret > 0 ) {
-			this->load.sentBytes += ret;
-			this->load.elapsedTime += get_elapsed_time( t );
-		}
-
 		if ( event.type == COORDINATOR_EVENT_TYPE_SYNC && SlaveWorker::map->ops.size() ) {
 			// Some metadata is not sent yet, continue to send
 			SlaveWorker::eventQueue->insert( event );
@@ -138,10 +131,6 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 	} else {
 		ProtocolHeader header;
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();
-		if ( ret > 0 ) {
-			this->load.recvBytes += ret;
-			this->load.elapsedTime += get_elapsed_time( t );
-		}
 		while ( buffer.size > 0 ) {
 			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "SlaveWorker" );
 
@@ -207,7 +196,6 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		size_t size;
 		char *data;
 	} buffer;
-	struct timespec t = start_timer();
 
 	switch( event.type ) {
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
@@ -344,18 +332,14 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "SlaveWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 
-		if ( ret > 0 ) {
-			this->load.sentBytes += ret;
-			this->load.elapsedTime += get_elapsed_time( t );
-		}
+		if ( ret > 0 )
+			this->load.sentBytes( ret );
 	} else {
 		// Parse requests from masters
 		ProtocolHeader header;
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();
-		if ( ret > 0 ) {
-			this->load.recvBytes += ret;
-			this->load.elapsedTime += get_elapsed_time( t );
-		}
+		if ( ret > 0 )
+			this->load.recvBytes( ret );
 		while ( buffer.size > 0 ) {
 			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "SlaveWorker (master)" );
 
@@ -369,21 +353,26 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 				switch( header.opcode ) {
 					case PROTO_OPCODE_GET:
 						this->handleGetRequest( event, buffer.data, buffer.size );
+						this->load.get();
 						break;
 					case PROTO_OPCODE_SET:
 						this->handleSetRequest( event, buffer.data, buffer.size );
+						this->load.set();
 						break;
 					case PROTO_OPCODE_REMAPPING_LOCK:
 						this->handleRemappingSetLockRequest( event, buffer.data, buffer.size );
 						break;
 					case PROTO_OPCODE_REMAPPING_SET:
 						this->handleRemappingSetRequest( event, buffer.data, buffer.size );
+						this->load.set();
 						break;
 					case PROTO_OPCODE_UPDATE:
 						this->handleUpdateRequest( event, buffer.data, buffer.size );
+						this->load.update();
 						break;
 					case PROTO_OPCODE_DELETE:
 						this->handleDeleteRequest( event, buffer.data, buffer.size );
+						this->load.del();
 						break;
 					default:
 						__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from master." );
@@ -409,7 +398,6 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		size_t size;
 		char *data;
 	} buffer;
-	struct timespec t = start_timer();
 
 	isSend = ( event.type != SLAVE_PEER_EVENT_TYPE_PENDING );
 	success = false;
@@ -599,21 +587,12 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "SlaveWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 
-		if ( ret > 0 ) {
-			this->load.sentBytes += ret;
-			this->load.elapsedTime += get_elapsed_time( t );
-		}
-
 		if ( event.type == SLAVE_PEER_EVENT_TYPE_SEND ) {
 			SlaveWorker::packetPool->free( event.message.send.packet );
 		}
 	} else {
 		ProtocolHeader header;
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();
-		if ( ret > 0 ) {
-			this->load.recvBytes += ret;
-			this->load.elapsedTime += get_elapsed_time( t );
-		}
 		while ( buffer.size > 0 ) {
 			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "SlaveWorker (slave peer)" );
 
@@ -646,6 +625,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
 							this->handleSealChunkRequest( event, buffer.data, header.length );
+							this->load.sealChunk();
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
 							this->handleSealChunkResponse( event, true, buffer.data, buffer.size );
@@ -662,6 +642,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
 							this->handleUpdateRequest( event, buffer.data, buffer.size );
+							this->load.update();
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
 							this->handleUpdateResponse( event, true, buffer.data, buffer.size );
@@ -678,6 +659,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
 							this->handleDeleteRequest( event, buffer.data, buffer.size );
+							this->load.del();
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
 							this->handleDeleteResponse( event, true, buffer.data, buffer.size );
@@ -694,6 +676,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
 							this->handleUpdateChunkRequest( event, buffer.data, buffer.size );
+							this->load.updateChunk();
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
 							this->handleUpdateChunkResponse( event, true, buffer.data, buffer.size );
@@ -710,6 +693,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
 							this->handleDeleteChunkRequest( event, buffer.data, buffer.size );
+							this->load.delChunk();
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
 							this->handleDeleteChunkResponse( event, true, buffer.data, buffer.size );
@@ -726,6 +710,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
 							this->handleGetChunkRequest( event, buffer.data, buffer.size );
+							this->load.getChunk();
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
 							this->handleGetChunkResponse( event, true, buffer.data, buffer.size );
@@ -742,6 +727,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
 							this->handleSetChunkRequest( event, buffer.data, buffer.size );
+							this->load.setChunk();
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
 							this->handleSetChunkResponse( event, true, buffer.data, buffer.size );
@@ -994,7 +980,6 @@ bool SlaveWorker::handleGetRequest( MasterEvent event, char *buf, size_t size ) 
 			this->dispatch( event );
 		}
 	}
-	this->load.get();
 	return ret;
 }
 
@@ -1029,7 +1014,6 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size ) 
 	Key key;
 	key.set( header.keySize, header.key );
 	event.resSet( event.socket, event.id, key, true );
-	this->load.set();
 	this->dispatch( event );
 
 	return true;
@@ -1152,7 +1136,6 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 		Key key;
 		key.set( header.keySize, header.key );
 		event.resRemappingSet( event.socket, event.id, key, header.listId, header.chunkId, true );
-		this->load.set();
 		this->dispatch( event );
 	}
 
@@ -1183,7 +1166,6 @@ bool SlaveWorker::handleRemappingSetRequest( SlavePeerEvent event, char *buf, si
 	Key key;
 	key.set( header.keySize, header.key );
 	event.resRemappingSet( event.socket, event.id, key, header.listId, header.chunkId, true );
-	this->load.set();
 	this->dispatch( event );
 
 	return true;
@@ -1406,8 +1388,6 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 		ret = false;
 	}
 
-	this->load.update();
-
 	return ret;
 }
 
@@ -1600,8 +1580,6 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 		ret = false;
 	}
 
-	this->load.del();
-
 	return ret;
 }
 
@@ -1694,8 +1672,6 @@ bool SlaveWorker::handleUpdateChunkRequest( SlavePeerEvent event, char *buf, siz
 		header.offset, header.length,
 		header.updatingChunkId, ret
 	);
-
-	this->load.updateChunk();
 	this->dispatch( event );
 
 	return ret;
@@ -1738,7 +1714,6 @@ bool SlaveWorker::handleDeleteChunkRequest( SlavePeerEvent event, char *buf, siz
 		header.updatingChunkId, ret
 	);
 
-	this->load.delChunk();
 	this->dispatch( event );
 
 	return ret;
@@ -1828,7 +1803,6 @@ bool SlaveWorker::handleGetChunkRequest( SlavePeerEvent event, char *buf, size_t
 	ret = chunk;
 
 	event.resGetChunk( event.socket, event.id, metadata, ret, chunk );
-	this->load.getChunk();
 	this->dispatch( event );
 
 	return ret;
@@ -1855,7 +1829,6 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, char *buf, size_t
 	ret = false;
 
 	event.resSetChunk( event.socket, event.id, metadata, ret );
-	this->load.setChunk();
 	this->dispatch( event );
 
 	return ret;

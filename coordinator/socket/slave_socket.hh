@@ -13,7 +13,6 @@ private:
 	static ArrayMap<int, SlaveSocket> *slaves;
 
 public:
-	Load load;
 	// All stored keys
 	std::map<Key, OpMetadata> keys;
 	struct {

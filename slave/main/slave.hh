@@ -82,6 +82,7 @@ public:
 
 	void seal();
 	void flush();
+	void memory();
 
 	void info( FILE *f = stdout );
 	void debug( FILE *f = stdout );
@@ -91,7 +92,7 @@ public:
 
 	void alarm();
 
-	Load &aggregateLoad( FILE *f = 0 );
+	SlaveLoad &aggregateLoad( FILE *f = 0 );
 	double getElapsedTime();
 	void interactive();
 };

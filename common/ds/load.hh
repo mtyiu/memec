@@ -4,20 +4,22 @@
 #include <cstdio>
 #include "../../common/protocol/protocol.hh"
 
-typedef struct HeartbeatHeader OpLoad;
-
 class Load {
 public:
-	OpLoad ops;
+	uint32_t _get;
+	uint32_t _set;
+	uint32_t _update;
+	uint32_t _del;
 
 	Load();
 	virtual void reset();
 	virtual void aggregate( Load &l );
 	virtual void print( FILE *f = stdout );
-	inline void get() { this->ops.get++; }
-	inline void set() { this->ops.set++; }
-	inline void update() { this->ops.update++; }
-	inline void del() { this->ops.del++; }
+
+	inline void get() { this->_get++; }
+	inline void set() { this->_set++; }
+	inline void update() { this->_update++; }
+	inline void del() { this->_del++; }
 };
 
 #endif

@@ -5,17 +5,17 @@ Load::Load() {
 }
 
 void Load::reset() {
-	this->ops.get = 0;
-	this->ops.set = 0;
-	this->ops.update = 0;
-	this->ops.del = 0;
+	this->_get = 0;
+	this->_set = 0;
+	this->_update = 0;
+	this->_del = 0;
 }
 
 void Load::aggregate( Load &l ) {
-	this->ops.get += l.ops.get;
-	this->ops.set += l.ops.set;
-	this->ops.update += l.ops.update;
-	this->ops.del += l.ops.del;
+	this->_get += l._get;
+	this->_set += l._set;
+	this->_update += l._update;
+	this->_del += l._del;
 }
 
 void Load::print( FILE *f ) {
@@ -25,9 +25,9 @@ void Load::print( FILE *f ) {
 		"%-*s : %u\n"
 		"%-*s : %u\n"
 		"%-*s : %u\n",
-		width, "Number of GET operations", this->ops.get,
-		width, "Number of SET operations", this->ops.set,
-		width, "Number of UPDATE operations", this->ops.update,
-		width, "Number of DELETE operations", this->ops.del
+		width, "Number of GET operations", this->_get,
+		width, "Number of SET operations", this->_set,
+		width, "Number of UPDATE operations", this->_update,
+		width, "Number of DELETE operations", this->_del
 	);
 }
