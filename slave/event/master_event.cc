@@ -63,6 +63,15 @@ void MasterEvent::resDelete( MasterSocket *socket, uint32_t id, Key &key, bool s
 	this->needsFree = needsFree;
 }
 
+void MasterEvent::resRedirect( MasterSocket *socket, uint32_t id, uint8_t opcode, Key &key, RemappingRecord record ) {
+	this->type = MASTER_EVENT_TYPE_REDIRECT_RESPONSE;
+	this->id = id;
+	this->message.key = key;
+	this->message.remap.opcode = opcode;
+	this->message.remap.listId = record.listId;
+	this->message.remap.chunkId = record.chunkId;
+}
+
 void MasterEvent::pending( MasterSocket *socket ) {
 	this->type = MASTER_EVENT_TYPE_PENDING;
 	this->socket = socket;

@@ -50,13 +50,13 @@ public:
 		return true;
 	}
 
-	RemappingRecord find( Key key ) {
-		RemappingRecord ret;
+	bool find( Key key, RemappingRecord *record = NULL ) {
+		bool ret = false;
 		pthread_mutex_lock( &this->lock );
 		std::map<Key, RemappingRecord>::iterator it = map.find( key );
 		if ( it != map.end() ) {
-			ret = it->second;
-			ret.valid = true;
+			if ( record ) *record = it->second;
+			ret = true;
 		}
 		pthread_mutex_unlock( &this->lock );
 		return ret;

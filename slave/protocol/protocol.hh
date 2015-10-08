@@ -36,6 +36,8 @@ public:
 	char *resUpdate( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize );
 	// DELETE
 	char *resDelete( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key );
+	// Redirect
+	char *resRedirect( size_t &size, uint32_t id, uint8_t opcode, uint8_t keySize, char *key, uint32_t remappedListId, uint32_t remappedChunkId );
 
 	/* Slave */
 	// Register

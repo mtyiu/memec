@@ -302,7 +302,6 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 								__ERROR__( "CoordinatorWorker", "dispatch", "Invalid remapping record protocol header." );
 								goto quit_1;
 							}
-							fprintf( stderr, "remapping records come !!\n" );
 							// start parsing the remapping records
 							offset = PROTO_REMAPPING_RECORD_SIZE;
 							RemappingRecordMap *map = MasterWorker::remappingRecords;
@@ -323,7 +322,6 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 									map->insert( key, remappingRecord );
 								}
 							}
-							fprintf( stderr, "remapping records end !!\n" );
 							//map->print();
 						} else {
 							__ERROR__( "MasterWorker", "dispatch", "Invalid magic code from coordinator." );
@@ -440,6 +438,9 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 					case PROTO_OPCODE_DELETE:
 						this->handleDeleteResponse( event, success, buffer.data, buffer.size );
 						break;
+					case PROTO_OPCODE_REDIRECT_GET:
+						this->handleRedirectedGetRequest( event, buffer.data, buffer.size );
+						break;
 					default:
 						__ERROR__( "MasterWorker", "dispatch", "Invalid opcode from slave." );
 						goto quit_1;
@@ -455,17 +456,23 @@ quit_1:
 		__ERROR__( "MasterWorker", "dispatch", "The slave is disconnected." );
 }
 
-SlaveSocket *MasterWorker::getSlave( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded, bool *isDegraded ) {
+SlaveSocket *MasterWorker::getSlave( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded, bool *isDegraded, bool isRedirected ) {
 	SlaveSocket *ret;
 
 	// Search to see if this key is remapped
 	Key key;
 	key.set( size, data );
-	RemappingRecord record = MasterWorker::remappingRecords->find( key );
-	if ( record.valid ) { // remapped keys
-		fprintf( stderr, "Redirect request from list=%u chunk=%u to list=%u chunk=%u\n", 
-			listId, chunkId, record.listId, record.chunkId
+	RemappingRecord record;
+	bool found = MasterWorker::remappingRecords->find( key, &record );
+	found = ( found && ! Master::getInstance()->config.master.remap.forceNoCacheRecords );
+	if ( isRedirected ) {
+		this->paritySlaveSockets = MasterWorker::stripeList->get(
+			listId,
+			this->paritySlaveSockets,
+			this->dataSlaveSockets
 		);
+	} else if ( found ) { // remapped keys
+		//fprintf( stderr, "Redirect request from list=%u chunk=%u to list=%u chunk=%u\n", listId, chunkId, record.listId, record.chunkId);
 		listId = record.listId;
 		chunkId = record.chunkId;
 		this->paritySlaveSockets = MasterWorker::stripeList->get(
@@ -1015,6 +1022,82 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 	assert( sentBytes == 42 );
 	if ( sentBytes != ( ssize_t ) buffer.size ) {
 		__ERROR__( "MasterWorker", "handleDeleteRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
+		return false;
+	}
+
+	return true;
+}
+
+bool MasterWorker::handleRedirectedGetRequest( SlaveEvent event, char *buf, size_t size ) {
+	struct RedirectHeader header;
+	if ( ! this->protocol.parseRedirectHeader( header, buf, size ) ) {
+		__ERROR__( "MasterWorker", "handleRedirectedGetRequest", "Invalid Redirected GET request." );
+		return false;
+	}
+	__DEBUG__(
+		BLUE, "MasterWorker", "handleRedirectedGetRequest",
+		"[GET] Key: %.*s (key size = %u). Redirect to list=%u chunk=%u. ",
+		( int ) header.keySize, header.key, header.keySize,
+		header.listId, header.chunkId
+	);
+
+	uint32_t listId = header.listId, chunkId = header.chunkId;
+	uint32_t requestId = event.id;
+	bool isDegraded, connected;
+	SlaveSocket *socket;
+
+	struct {
+		size_t size;
+		char *data;
+	} buffer;
+	Key key;
+	ssize_t sentBytes;
+
+	ApplicationEvent applicationEvent;
+	PendingIdentifier pid;
+
+	struct timespec elapsedTime;
+
+	// purge pending records on previous slave
+	if ( ! MasterWorker::pending->eraseKey( PT_SLAVE_GET, event.id, event.socket, &pid, &key ) ) {
+		__ERROR__( "MasterWorker", "handleRedirectedGetRequest", "Cannot find a pending slave GET request that matches the response. This message will be discarded (key = %.*s).", key.size, key.data );
+		return false;
+	}
+	MasterWorker::pending->eraseRequestStartTime( PT_SLAVE_GET, pid.id, ( void * ) event.socket, elapsedTime );
+
+	// abort request if no application is pending for result
+	if ( ! MasterWorker::pending->findKey( PT_APPLICATION_GET, pid.parentId, 0, &key ) ) {
+		__ERROR__( "MasterWorker", "handleRedirectedGetRequest", "Cannot find a pending application GET request that matches the response. This message will be discarded (key = %.*s).", key.size, key.data );
+		return false;
+	}
+
+	socket = this->getSlave(
+		key.data, key.size,
+		listId, chunkId, true, &isDegraded, true
+	);
+
+	if ( ! socket ) {
+		ApplicationSocket *applicationSocket = ( ApplicationSocket * ) key.ptr;
+		key.set( header.keySize, header.key );
+		applicationEvent.resGet( applicationSocket, event.id, key, false );
+		this->dispatch( applicationEvent );
+		return false;
+	}
+
+	buffer.data = this->protocol.reqGet( buffer.size, requestId, header.key, header.keySize );
+
+	// add pending records on redirected slave
+	if ( ! MasterWorker::pending->insertKey( PT_SLAVE_GET, requestId, pid.parentId , ( void * ) socket, key ) ) {
+		__ERROR__( "MasterWorker", "handleRedirectedGetRequest", "Cannot insert into slave GET pending map." );
+	}
+
+	// Mark the time when request is sent
+	MasterWorker::pending->recordRequestStartTime( PT_SLAVE_GET, requestId, event.id, ( void * ) socket, socket->getAddr() );
+
+	// Send GET request
+	sentBytes = socket->send( buffer.data, buffer.size, connected );
+	if ( sentBytes != ( ssize_t ) buffer.size ) {
+		__ERROR__( "MasterWorker", "handleRedirectedGetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 		return false;
 	}
 

@@ -30,6 +30,8 @@ enum MasterEventType {
 	// DELETE
 	MASTER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS,
 	MASTER_EVENT_TYPE_DELETE_RESPONSE_FAILURE,
+	// REDIRECT
+	MASTER_EVENT_TYPE_REDIRECT_RESPONSE,
 	// Pending
 	MASTER_EVENT_TYPE_PENDING
 };
@@ -51,6 +53,7 @@ public:
 		} keyValueUpdate;
 		struct {
 			Key key;
+			uint8_t opcode;
 			uint32_t listId, chunkId;
 		} remap;
 	} message;
@@ -70,6 +73,8 @@ public:
 	void resUpdate( MasterSocket *socket, uint32_t id, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool success, bool needsFree = true );
 	// DELETE
 	void resDelete( MasterSocket *socket, uint32_t id, Key &key, bool success, bool needsFree = true );
+	// Redirect
+	void resRedirect ( MasterSocket *socket, uint32_t id, uint8_t opcode, Key &key, RemappingRecord record );
 	// Pending
 	void pending( MasterSocket *socket );
 };

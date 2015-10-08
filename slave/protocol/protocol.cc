@@ -149,6 +149,22 @@ char *SlaveProtocol::resDelete( size_t &size, uint32_t id, bool success, uint8_t
 	return this->buffer.send;
 }
 
+char* SlaveProtocol::resRedirect( size_t &size, uint32_t id, uint8_t opcode, uint8_t keySize, char* key, uint32_t remappedListId, uint32_t remappedChunkId ) {
+	size = this->generateRedirectHeader( 
+		PROTO_MAGIC_RESPONSE_FAILURE,
+		PROTO_MAGIC_TO_MASTER,
+		opcode == PROTO_OPCODE_GET ? PROTO_OPCODE_REDIRECT_GET : 
+			opcode == PROTO_OPCODE_UPDATE ? PROTO_OPCODE_REDIRECT_UPDATE : 
+			PROTO_OPCODE_REDIRECT_DELETE,
+		id,
+		keySize,
+		key,
+		remappedListId,
+		remappedChunkId
+	);
+	return this->buffer.send;
+}
+
 char *SlaveProtocol::reqRegisterSlavePeer( size_t &size, uint32_t id, ServerAddr *addr ) {
 	size = this->generateAddressHeader(
 		PROTO_MAGIC_REQUEST,

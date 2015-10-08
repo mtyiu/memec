@@ -328,6 +328,20 @@ size_t Protocol::generateLoadStatsHeader( uint8_t magic, uint8_t to, uint32_t id
 	return bytes;
 }
 
+size_t Protocol::generateRedirectHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint8_t keySize, char *key, uint32_t remappedListId, uint32_t remappedChunkId ) {
+	size_t bytes = this->generateKeyHeader( magic, to, opcode, id, keySize, key );
+	char *buf = this->buffer.send + bytes;
+
+	*( ( uint32_t * )( buf ) ) = htonl( remappedListId );
+	*( ( uint32_t * )( buf + sizeof( uint32_t ) ) ) = htonl( remappedChunkId );
+
+	bytes += PROTO_REDIRECT_SIZE;
+
+	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, id );
+
+	return bytes;
+}
+
 bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t &opcode, uint32_t &length, uint32_t &id, char *buf, size_t size ) {
 	if ( size < PROTO_HEADER_SIZE )
 		return false;
@@ -381,6 +395,9 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_OPCODE_SET:
 		case PROTO_OPCODE_UPDATE:
 		case PROTO_OPCODE_DELETE:
+		case PROTO_OPCODE_REDIRECT_GET:
+		case PROTO_OPCODE_REDIRECT_UPDATE:
+		case PROTO_OPCODE_REDIRECT_DELETE:
 		case PROTO_OPCODE_REMAPPING_LOCK:
 		case PROTO_OPCODE_REMAPPING_SET:
 		case PROTO_OPCODE_SEAL_CHUNK:
@@ -714,6 +731,18 @@ bool Protocol::parseLoadStatsHeader( size_t offset, uint32_t &slaveGetCount, uin
 	slaveSetCount = ntohl( *( ( uint32_t * )( buf + offset + sizeof( uint32_t ) ) ) );
 	slaveOverloadCount = ntohl( *( ( uint32_t * )( buf + offset + sizeof( uint32_t ) * 2 ) ) );
 
+	return true;
+}
+
+bool Protocol::parseRedirectHeader( size_t offset, uint8_t &keySize, char *&key, uint32_t &remappedListId, uint32_t &remappedChunkId, char *buf, size_t size ) {
+	if ( ( ! this->parseKeyHeader( offset, keySize, key, buf, size ) ) || ( size < ( size_t ) PROTO_KEY_SIZE + keySize + PROTO_REDIRECT_SIZE ) ) 
+		return false;
+
+	offset += PROTO_KEY_SIZE + keySize;
+	char *ptr = buf + offset;
+	remappedListId = ntohl( *( ( uint32_t * )( ptr ) ) );
+	remappedChunkId = ntohl( *( ( uint32_t * )( ptr + sizeof( uint32_t ) ) ) );
+	
 	return true;
 }
 
@@ -1052,6 +1081,21 @@ bool Protocol::parseLoadStatsHeader( struct LoadStatsHeader &header, char *buf, 
 		header.slaveGetCount,
 		header.slaveSetCount,
 		header.slaveOverloadCount,
+		buf, size
+	);
+}
+
+bool Protocol::parseRedirectHeader( struct RedirectHeader &header, char *buf, size_t size, size_t offset ) {
+	if ( ! buf || ! size ) {
+		buf = this->buffer.recv;
+		size = this->buffer.size;
+	}
+	return this->parseRedirectHeader(
+		offset,
+		header.keySize,
+		header.key,
+		header.listId,
+		header.chunkId,
 		buf, size
 	);
 }
