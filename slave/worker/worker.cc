@@ -60,12 +60,11 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 	bool connected, isSend;
 	uint32_t requestId;
 	ssize_t ret;
-	size_t count, remapCount;
+	size_t count, remapCount = 0;
 	struct {
 		size_t size;
 		char *data;
 	} buffer;
-	struct timespec t = start_timer();
 	std::map<Key, RemappingRecord>::iterator it, safeNextIt;
 
 	if ( event.type != COORDINATOR_EVENT_TYPE_PENDING )
@@ -85,7 +84,6 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 			buffer.data = this->protocol.sendHeartbeat(
 				buffer.size,
 				requestId,
-				Slave::getInstance()->aggregateLoad().ops,
 				SlaveWorker::map->ops,
 				&SlaveWorker::map->opsLock,
 				count
@@ -133,11 +131,6 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "SlaveWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 
-		if ( ret > 0 ) {
-			this->load.sentBytes += ret;
-			this->load.elapsedTime += get_elapsed_time( t );
-		}
-
 		if ( event.type == COORDINATOR_EVENT_TYPE_SYNC && SlaveWorker::map->ops.size() ) {
 			// Some metadata is not sent yet, continue to send
 			SlaveWorker::eventQueue->insert( event );
@@ -147,10 +140,6 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 	} else {
 		ProtocolHeader header;
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();
-		if ( ret > 0 ) {
-			this->load.recvBytes += ret;
-			this->load.elapsedTime += get_elapsed_time( t );
-		}
 		while ( buffer.size > 0 ) {
 			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "SlaveWorker" );
 
@@ -203,7 +192,7 @@ void SlaveWorker::dispatch( IOEvent event ) {
 		case IO_EVENT_TYPE_FLUSH_CHUNK:
 			this->storage->write(
 				event.message.chunk,
-				true
+				false
 			);
 			break;
 	}
@@ -216,7 +205,6 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		size_t size;
 		char *data;
 	} buffer;
-	struct timespec t = start_timer();
 
 	switch( event.type ) {
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
@@ -367,18 +355,14 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "SlaveWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 
-		if ( ret > 0 ) {
-			this->load.sentBytes += ret;
-			this->load.elapsedTime += get_elapsed_time( t );
-		}
+		if ( ret > 0 )
+			this->load.sentBytes( ret );
 	} else {
 		// Parse requests from masters
 		ProtocolHeader header;
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();
-		if ( ret > 0 ) {
-			this->load.recvBytes += ret;
-			this->load.elapsedTime += get_elapsed_time( t );
-		}
+		if ( ret > 0 )
+			this->load.recvBytes( ret );
 		while ( buffer.size > 0 ) {
 			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "SlaveWorker (master)" );
 
@@ -392,21 +376,26 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 				switch( header.opcode ) {
 					case PROTO_OPCODE_GET:
 						this->handleGetRequest( event, buffer.data, buffer.size );
+						this->load.get();
 						break;
 					case PROTO_OPCODE_SET:
 						this->handleSetRequest( event, buffer.data, buffer.size );
+						this->load.set();
 						break;
 					case PROTO_OPCODE_REMAPPING_LOCK:
 						this->handleRemappingSetLockRequest( event, buffer.data, buffer.size );
 						break;
 					case PROTO_OPCODE_REMAPPING_SET:
 						this->handleRemappingSetRequest( event, buffer.data, buffer.size );
+						this->load.set();
 						break;
 					case PROTO_OPCODE_UPDATE:
 						this->handleUpdateRequest( event, buffer.data, buffer.size );
+						this->load.update();
 						break;
 					case PROTO_OPCODE_DELETE:
 						this->handleDeleteRequest( event, buffer.data, buffer.size );
+						this->load.del();
 						break;
 					default:
 						__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from master." );
@@ -432,7 +421,6 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		size_t size;
 		char *data;
 	} buffer;
-	struct timespec t = start_timer();
 
 	isSend = ( event.type != SLAVE_PEER_EVENT_TYPE_PENDING );
 	success = false;
@@ -513,6 +501,39 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				event.message.chunkUpdate.updatingChunkId
 			);
 			break;
+		// UPDATE
+		case SLAVE_PEER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
+			success = true; // default is false
+		case SLAVE_PEER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resUpdate(
+				buffer.size,
+				event.id,
+				success,
+				event.message.update.listId,
+				event.message.update.stripeId,
+				event.message.update.chunkId,
+				event.message.update.key.data,
+				event.message.update.key.size,
+				event.message.update.valueUpdateOffset,
+				event.message.update.length,
+				event.message.update.chunkUpdateOffset
+			);
+			break;
+		// DELETE
+		case SLAVE_PEER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS:
+			success = true; // default is false
+		case SLAVE_PEER_EVENT_TYPE_DELETE_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resDelete(
+				buffer.size,
+				event.id,
+				success,
+				event.message.del.listId,
+				event.message.del.stripeId,
+				event.message.del.chunkId,
+				event.message.del.key.data,
+				event.message.del.key.size
+			);
+			break;
 		// DELETE_CHUNK
 		case SLAVE_PEER_EVENT_TYPE_DELETE_CHUNK_RESPONSE_SUCCESS:
 			success = true; // default is false
@@ -561,17 +582,14 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		case SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_RESPONSE_SUCCESS:
 			success = true; // default is false
 		case SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_RESPONSE_FAILURE:
-			/* buffer.data = this->protocol.resSetChunk(
-				buffer.size,
-				event.id,
-				success,
-				event.message.chunk.metadata.listId,
-				event.message.chunk.metadata.stripeId,
-				event.message.chunk.metadata.chunkId
-			); */
-			// printf( "TODO: SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_RESPONSE_SUCCESS & SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_RESPONSE_FAILURE\n" );
+			// TODO: Is a response message for SEAL_CHUNK request required?
 			return;
-			break;
+		/////////////////////////////////////
+		// Seal chunks in the chunk buffer //
+		/////////////////////////////////////
+		case SLAVE_PEER_EVENT_TYPE_SEAL_CHUNKS:
+			printf( "\tSealing %lu chunks...\n", event.message.chunkBuffer->seal( this ) );
+			return;
 		//////////
 		// Send //
 		//////////
@@ -592,21 +610,12 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "SlaveWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 
-		if ( ret > 0 ) {
-			this->load.sentBytes += ret;
-			this->load.elapsedTime += get_elapsed_time( t );
-		}
-
 		if ( event.type == SLAVE_PEER_EVENT_TYPE_SEND ) {
 			SlaveWorker::packetPool->free( event.message.send.packet );
 		}
 	} else {
 		ProtocolHeader header;
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();
-		if ( ret > 0 ) {
-			this->load.recvBytes += ret;
-			this->load.elapsedTime += get_elapsed_time( t );
-		}
 		while ( buffer.size > 0 ) {
 			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "SlaveWorker (slave peer)" );
 
@@ -639,6 +648,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
 							this->handleSealChunkRequest( event, buffer.data, header.length );
+							this->load.sealChunk();
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
 							this->handleSealChunkResponse( event, true, buffer.data, buffer.size );
@@ -651,10 +661,45 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 							break;
 					}
 					break;
+				case PROTO_OPCODE_UPDATE:
+					switch( header.magic ) {
+						case PROTO_MAGIC_REQUEST:
+							this->handleUpdateRequest( event, buffer.data, buffer.size );
+							this->load.update();
+							break;
+						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							this->handleUpdateResponse( event, true, buffer.data, buffer.size );
+							break;
+						case PROTO_MAGIC_RESPONSE_FAILURE:
+							this->handleUpdateResponse( event, false, buffer.data, buffer.size );
+							break;
+						default:
+							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
+							break;
+					}
+					break;
+				case PROTO_OPCODE_DELETE:
+					switch( header.magic ) {
+						case PROTO_MAGIC_REQUEST:
+							this->handleDeleteRequest( event, buffer.data, buffer.size );
+							this->load.del();
+							break;
+						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							this->handleDeleteResponse( event, true, buffer.data, buffer.size );
+							break;
+						case PROTO_MAGIC_RESPONSE_FAILURE:
+							this->handleDeleteResponse( event, false, buffer.data, buffer.size );
+							break;
+						default:
+							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
+							break;
+					}
+					break;
 				case PROTO_OPCODE_UPDATE_CHUNK:
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
 							this->handleUpdateChunkRequest( event, buffer.data, buffer.size );
+							this->load.updateChunk();
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
 							this->handleUpdateChunkResponse( event, true, buffer.data, buffer.size );
@@ -671,6 +716,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
 							this->handleDeleteChunkRequest( event, buffer.data, buffer.size );
+							this->load.delChunk();
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
 							this->handleDeleteChunkResponse( event, true, buffer.data, buffer.size );
@@ -687,6 +733,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
 							this->handleGetChunkRequest( event, buffer.data, buffer.size );
+							this->load.getChunk();
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
 							this->handleGetChunkResponse( event, true, buffer.data, buffer.size );
@@ -703,6 +750,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
 							this->handleSetChunkRequest( event, buffer.data, buffer.size );
+							this->load.setChunk();
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
 							this->handleSetChunkResponse( event, true, buffer.data, buffer.size );
@@ -839,8 +887,10 @@ bool SlaveWorker::getSlaves( uint32_t listId, bool allowDegraded, bool *isDegrad
 	return true;
 }
 
-bool SlaveWorker::issueSealChunkRequest( Chunk *chunk ) {
-	if ( SlaveWorker::parityChunkCount ) {
+bool SlaveWorker::issueSealChunkRequest( Chunk *chunk, uint32_t startPos ) {
+	// The chunk is locked when this function is called
+	// Only issue seal chunk request when new key-value pairs are received
+	if ( SlaveWorker::parityChunkCount && startPos < chunk->getSize() ) {
 		size_t size;
 		uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
 		bool isDegraded;
@@ -851,8 +901,14 @@ bool SlaveWorker::issueSealChunkRequest( Chunk *chunk ) {
 		this->getSlaves( chunk->metadata.listId, false /* allowDegraded */, &isDegraded );
 
 		// Prepare seal chunk request
-		this->protocol.reqSealChunk( size, requestId, chunk, packet->data );
+		this->protocol.reqSealChunk( size, requestId, chunk, startPos, packet->data );
 		packet->size = ( uint32_t ) size;
+
+		if ( size == PROTO_HEADER_SIZE + PROTO_CHUNK_SEAL_SIZE ) {
+			packet->setReferenceCount( 1 );
+			SlaveWorker::packetPool->free( packet );
+			return true;
+		}
 
 		for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
 			SlavePeerEvent slavePeerEvent;
@@ -952,7 +1008,6 @@ bool SlaveWorker::handleGetRequest( MasterEvent event, char *buf, size_t size ) 
 			this->dispatch( event );
 		}
 	}
-	this->load.get();
 	return ret;
 }
 
@@ -977,6 +1032,7 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size ) 
 	}
 
 	SlaveWorker::chunkBuffer->at( listId )->set(
+		this,
 		header.key, header.keySize,
 		header.value, header.valueSize,
 		PROTO_OPCODE_SET, chunkId,
@@ -986,7 +1042,6 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size ) 
 	Key key;
 	key.set( header.keySize, header.key );
 	event.resSet( event.socket, event.id, key, true );
-	this->load.set();
 	this->dispatch( event );
 
 	return true;
@@ -1044,6 +1099,7 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 	);
 
 	SlaveWorker::chunkBuffer->at( header.listId )->set(
+		this,
 		header.key, header.keySize,
 		header.value, header.valueSize,
 		PROTO_OPCODE_REMAPPING_SET, header.chunkId,
@@ -1108,7 +1164,6 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 		Key key;
 		key.set( header.keySize, header.key );
 		event.resRemappingSet( event.socket, event.id, key, header.listId, header.chunkId, true );
-		this->load.set();
 		this->dispatch( event );
 	}
 
@@ -1129,6 +1184,7 @@ bool SlaveWorker::handleRemappingSetRequest( SlavePeerEvent event, char *buf, si
 	);
 
 	SlaveWorker::chunkBuffer->at( header.listId )->set(
+		this,
 		header.key, header.keySize,
 		header.value, header.valueSize,
 		PROTO_OPCODE_REMAPPING_SET, header.chunkId,
@@ -1138,7 +1194,6 @@ bool SlaveWorker::handleRemappingSetRequest( SlavePeerEvent event, char *buf, si
 	Key key;
 	key.set( header.keySize, header.key );
 	event.resRemappingSet( event.socket, event.id, key, header.listId, header.chunkId, true );
-	this->load.set();
 	this->dispatch( event );
 
 	return true;
@@ -1171,94 +1226,188 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 	Chunk *chunk;
 	RemappingRecord remappingRecord;
 	if ( map->findValueByKey( header.key, header.keySize, &keyValue, &key, &keyMetadata, &metadata, &chunk ) ) {
+		uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
 		uint32_t offset = keyMetadata.offset + PROTO_KEY_VALUE_SIZE + header.keySize + header.valueUpdateOffset;
 		bool isDegraded;
-		KeyValueUpdate keyValueUpdate;
-		ChunkUpdate chunkUpdate;
 
-		// Compute delta and perform update
-		chunk->computeDelta(
-			header.valueUpdate, // delta
-			header.valueUpdate, // new data
-			offset, header.valueUpdateSize,
-			true // perform update
-		);
+		pthread_mutex_t *keysLock;
+		std::map<Key, KeyMetadata> *keys;
+		SlaveWorker::map->getKeysMap( keys, keysLock );
+		// Lock the data chunk buffer
+		MixedChunkBuffer *chunkBuffer = SlaveWorker::chunkBuffer->at( metadata.listId );
+		int chunkBufferIndex;
 
 		if ( SlaveWorker::parityChunkCount ) {
-			// Add the current request to the pending set
-			keyValueUpdate.dup( header.keySize, header.key, ( void * ) event.socket );
-			keyValueUpdate.offset = header.valueUpdateOffset;
-			keyValueUpdate.length = header.valueUpdateSize;
-
-			if ( ! SlaveWorker::pending->insertKeyValueUpdate( PT_MASTER_UPDATE, event.id, ( void * ) event.socket, keyValueUpdate ) ) {
-				__ERROR__( "SlaveWorker", "handleUpdateRequest", "Cannot insert into master UPDATE pending map (ID = %u).", event.id );
-			}
-
 			// Find parity slaves
 			this->getSlaves(
 				header.key, header.keySize,
 				metadata.listId, metadata.chunkId,
 				true, &isDegraded
 			);
+		}
 
-			chunkUpdate.set(
-				metadata.listId, metadata.stripeId, metadata.chunkId,
-				offset, header.valueUpdateSize
-			);
-			chunkUpdate.setKeyValueUpdate( keyValueUpdate.size, keyValueUpdate.data, header.valueUpdateOffset );
+		chunkBufferIndex = chunkBuffer->lockChunk( chunk );
+		if ( chunkBufferIndex == -1 ) {
+			pthread_mutex_lock( keysLock );
+			if ( SlaveWorker::parityChunkCount ) {
+				KeyValueUpdate keyValueUpdate;
+				ChunkUpdate chunkUpdate;
 
-			// Send UPDATE_CHUNK requests to parity slaves
-			uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
-			for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
-				chunkUpdate.chunkId = SlaveWorker::dataChunkCount + i; // updatingChunkId
-				chunkUpdate.ptr = ( void * ) this->paritySlaveSockets[ i ];
+				// Compute delta and perform update
+				chunk->computeDelta(
+					header.valueUpdate, // delta
+					header.valueUpdate, // new data
+					offset, header.valueUpdateSize,
+					true // perform update
+				);
+				pthread_mutex_unlock( keysLock );
 
-				// Insert into pending set
-				if ( ! SlaveWorker::pending->insertChunkUpdate(
-					PT_SLAVE_PEER_UPDATE_CHUNK, requestId, event.id,
-					( void * ) this->paritySlaveSockets[ i ],
-					chunkUpdate
-				) ) {
-					__ERROR__( "SlaveWorker", "handleUpdateRequest", "Cannot insert into slave UPDATE_CHUNK pending map." );
+				// Add the current request to the pending set
+				keyValueUpdate.dup( header.keySize, header.key, ( void * ) event.socket );
+				keyValueUpdate.offset = header.valueUpdateOffset;
+				keyValueUpdate.length = header.valueUpdateSize;
+
+				if ( ! SlaveWorker::pending->insertKeyValueUpdate( PT_MASTER_UPDATE, event.id, ( void * ) event.socket, keyValueUpdate ) ) {
+					__ERROR__( "SlaveWorker", "handleUpdateRequest", "Cannot insert into master UPDATE pending map (ID = %u).", event.id );
 				}
-			}
 
-			// Start sending packets only after all the insertion to the slave peer UPDATE_CHUNK pending set is completed
-			for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
-				// Prepare UPDATE_CHUNK request
+				chunkUpdate.set(
+					metadata.listId, metadata.stripeId, metadata.chunkId,
+					offset, header.valueUpdateSize
+				);
+				chunkUpdate.setKeyValueUpdate( keyValueUpdate.size, keyValueUpdate.data, header.valueUpdateOffset );
+
+				// Send UPDATE_CHUNK requests to parity slaves
+				for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
+					chunkUpdate.chunkId = SlaveWorker::dataChunkCount + i; // updatingChunkId
+					chunkUpdate.ptr = ( void * ) this->paritySlaveSockets[ i ];
+
+					// Insert into pending set
+					if ( ! SlaveWorker::pending->insertChunkUpdate(
+						PT_SLAVE_PEER_UPDATE_CHUNK, requestId, event.id,
+						( void * ) this->paritySlaveSockets[ i ],
+						chunkUpdate
+					) ) {
+						__ERROR__( "SlaveWorker", "handleUpdateRequest", "Cannot insert into slave UPDATE_CHUNK pending map." );
+					}
+				}
+
+				// Start sending packets only after all the insertion to the slave peer UPDATE_CHUNK pending set is completed
+				for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
+					// Prepare UPDATE_CHUNK request
+					size_t size;
+					Packet *packet = SlaveWorker::packetPool->malloc();
+					packet->setReferenceCount( 1 );
+					this->protocol.reqUpdateChunk(
+						size,
+						requestId,
+						metadata.listId,
+						metadata.stripeId,
+						metadata.chunkId,
+						offset,
+						header.valueUpdateSize,          // length
+						SlaveWorker::dataChunkCount + i, // updatingChunkId
+						header.valueUpdate,
+						packet->data
+					);
+					packet->size = ( uint32_t ) size;
+
+					// Insert into event queue
+					SlavePeerEvent slavePeerEvent;
+					slavePeerEvent.send( this->paritySlaveSockets[ i ], packet );
+
+#ifdef SLAVE_WORKER_SEND_REPLICAS_PARALLEL
+					if ( i == SlaveWorker::parityChunkCount - 1 )
+						this->dispatch( slavePeerEvent );
+					else
+						SlaveWorker::eventQueue->prioritizedInsert( slavePeerEvent );
+#else
+					this->dispatch( slavePeerEvent );
+#endif
+				}
+			} else {
+				chunk->update( header.valueUpdate, offset, header.valueUpdateSize );
+				pthread_mutex_unlock( keysLock );
+
+				event.resUpdate( event.socket, event.id, key, header.valueUpdateOffset, header.valueUpdateSize, true, false );
+				this->dispatch( event );
+			}
+		} else {
+			pthread_mutex_lock( keysLock );
+			// The chunk is not yet sealed
+			// chunk->update( header.valueUpdate, offset, header.valueUpdateSize );
+			// Compute delta and perform update
+			chunk->computeDelta(
+				header.valueUpdate, // delta
+				header.valueUpdate, // new data
+				offset, header.valueUpdateSize,
+				true // perform update
+			);
+			pthread_mutex_unlock( keysLock );
+
+			if ( SlaveWorker::parityChunkCount ) {
+				// Add the current request to the pending set
+				KeyValueUpdate keyValueUpdate;
+				keyValueUpdate.dup( header.keySize, header.key, ( void * ) event.socket );
+				keyValueUpdate.offset = header.valueUpdateOffset;
+				keyValueUpdate.length = header.valueUpdateSize;
+
+				if ( ! SlaveWorker::pending->insertKeyValueUpdate( PT_MASTER_UPDATE, event.id, ( void * ) event.socket, keyValueUpdate ) ) {
+					__ERROR__( "SlaveWorker", "handleUpdateRequest", "Cannot insert into master UPDATE pending map (ID = %u).", event.id );
+				}
+
+				// Prepare UPDATE request
 				size_t size;
 				Packet *packet = SlaveWorker::packetPool->malloc();
-				packet->setReferenceCount( 1 );
-				this->protocol.reqUpdateChunk(
+				packet->setReferenceCount( SlaveWorker::parityChunkCount );
+				this->protocol.reqUpdate(
 					size,
 					requestId,
 					metadata.listId,
 					metadata.stripeId,
 					metadata.chunkId,
-					offset,
-					header.valueUpdateSize,          // length
-					SlaveWorker::dataChunkCount + i, // updatingChunkId
+					header.key,
+					header.keySize,
 					header.valueUpdate,
+					header.valueUpdateOffset,
+					header.valueUpdateSize,
+					offset, // Chunk update offset
 					packet->data
 				);
 				packet->size = ( uint32_t ) size;
 
-				// Insert into event queue
-				SlavePeerEvent slavePeerEvent;
-				slavePeerEvent.send( this->paritySlaveSockets[ i ], packet );
+				for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
+					key.ptr = ( void * ) this->paritySlaveSockets[ i ];
+					if ( ! SlaveWorker::pending->insertKeyValueUpdate(
+						PT_SLAVE_PEER_UPDATE, requestId, event.id,
+						( void * ) this->paritySlaveSockets[ i ],
+						keyValueUpdate
+					) ) {
+						__ERROR__( "SlaveWorker", "handleUpdateRequest", "Cannot insert into slave UPDATE pending map." );
+					}
+				}
+
+				// Start sending packets only after all the insertion to the slave peer UPDATE pending set is completed
+				for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
+					// Insert into event queue
+					SlavePeerEvent slavePeerEvent;
+					slavePeerEvent.send( this->paritySlaveSockets[ i ], packet );
 
 #ifdef SLAVE_WORKER_SEND_REPLICAS_PARALLEL
-				if ( i == SlaveWorker::parityChunkCount - 1 )
-					this->dispatch( slavePeerEvent );
-				else
-					SlaveWorker::eventQueue->prioritizedInsert( slavePeerEvent );
+					if ( i == SlaveWorker::parityChunkCount - 1 )
+						this->dispatch( slavePeerEvent );
+					else
+						SlaveWorker::eventQueue->prioritizedInsert( slavePeerEvent );
 #else
-				this->dispatch( slavePeerEvent );
+					this->dispatch( slavePeerEvent );
 #endif
+				}
+			} else {
+				event.resUpdate( event.socket, event.id, key, header.valueUpdateOffset, header.valueUpdateSize, true, false );
+				this->dispatch( event );
 			}
-		} else {
-			event.resUpdate( event.socket, event.id, key, header.valueUpdateOffset, header.valueUpdateSize, true, false );
-			this->dispatch( event );
+			// Only unlock chunk when all requests are sent
+			chunkBuffer->updateAndUnlockChunk( chunkBufferIndex );
 		}
 
 		ret = true;
@@ -1272,8 +1421,6 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 		this->dispatch( event );
 		ret = false;
 	}
-
-	this->load.update();
 
 	return ret;
 }
@@ -1307,7 +1454,6 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 		uint32_t deltaSize;
 		char *delta;
 		bool isDegraded;
-		ChunkUpdate chunkUpdate;
 
 		// Add the current request to the pending set
 		if ( SlaveWorker::parityChunkCount ) {
@@ -1330,11 +1476,22 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 		SlaveWorker::map->getCacheMap( cache, cacheLock );
 		// Lock the data chunk buffer
 		MixedChunkBuffer *chunkBuffer = SlaveWorker::chunkBuffer->at( metadata.listId );
-		int chunkBufferIndex = chunkBuffer->lockChunk( chunk );
+		int chunkBufferIndex = chunkBuffer->lockChunk( chunk, true );
 		// Lock the keys and cache map
 		pthread_mutex_lock( keysLock );
 		pthread_mutex_lock( cacheLock );
 		// Delete the chunk and perform key-value compaction
+		if ( chunkBufferIndex == -1 ) {
+			// Only compute data delta if the chunk is not yet sealed
+			if ( ! chunkBuffer->reInsert( this, chunk, keyMetadata.length, false, false ) ) {
+				// The chunk is compacted before. Need to seal the chunk first
+				// Seal from chunk->lastDelPos
+				if ( chunk->lastDelPos < chunk->getSize() ) {
+					// Only issue seal chunk request when new key-value pairs are received
+					this->issueSealChunkRequest( chunk, chunk->lastDelPos );
+				}
+			}
+		}
 		if ( SlaveWorker::parityChunkCount )
 			deltaSize = chunk->deleteKeyValue( key, keys, delta, this->buffer.size );
 		else
@@ -1342,74 +1499,126 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 		// Release the locks
 		pthread_mutex_unlock( cacheLock );
 		pthread_mutex_unlock( keysLock );
-		if ( chunkBufferIndex != -1 )
-			chunkBuffer->updateAndUnlockChunk( chunkBufferIndex );
+		if ( chunkBufferIndex == -1 )
+			chunkBuffer->unlock();
 
 		if ( SlaveWorker::parityChunkCount ) {
-			// Send DELETE_CHUNK requests to parity slaves
-			chunkUpdate.set(
-				metadata.listId, metadata.stripeId, metadata.chunkId,
-				keyMetadata.offset, deltaSize
-			);
-			chunkUpdate.setKeyValueUpdate( key.size, key.data, keyMetadata.offset );
-
+			uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
 			// Find parity slaves
 			this->getSlaves(
 				header.key, header.keySize,
 				metadata.listId, metadata.chunkId,
 				true, &isDegraded
 			);
+			if ( chunkBufferIndex == -1 ) {
+				// Send DELETE_CHUNK requests to parity slaves if the chunk is sealed
+				ChunkUpdate chunkUpdate;
+				chunkUpdate.set(
+					metadata.listId, metadata.stripeId, metadata.chunkId,
+					keyMetadata.offset, deltaSize
+				);
+				chunkUpdate.setKeyValueUpdate( key.size, key.data, keyMetadata.offset );
 
-			uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
-			for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
-				chunkUpdate.chunkId = SlaveWorker::dataChunkCount + i; // updatingChunkId
-				chunkUpdate.ptr = ( void * ) this->paritySlaveSockets[ i ];
-				if ( ! SlaveWorker::pending->insertChunkUpdate(
-					PT_SLAVE_PEER_DEL_CHUNK, requestId, event.id,
-					( void * ) this->paritySlaveSockets[ i ],
-					chunkUpdate
-				) ) {
-					__ERROR__( "SlaveWorker", "handleDeleteRequest", "Cannot insert into slave DELETE_CHUNK pending map." );
+				for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
+					chunkUpdate.chunkId = SlaveWorker::dataChunkCount + i; // updatingChunkId
+					chunkUpdate.ptr = ( void * ) this->paritySlaveSockets[ i ];
+					if ( ! SlaveWorker::pending->insertChunkUpdate(
+						PT_SLAVE_PEER_DEL_CHUNK, requestId, event.id,
+						( void * ) this->paritySlaveSockets[ i ],
+						chunkUpdate
+					) ) {
+						__ERROR__( "SlaveWorker", "handleDeleteRequest", "Cannot insert into slave DELETE_CHUNK pending map." );
+					}
 				}
-			}
 
-			// Start sending packets only after all the insertion to the slave peer DELETE_CHUNK pending set is completed
-			for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
-				// Prepare DELETE_CHUNK request
+				// Start sending packets only after all the insertion to the slave peer DELETE_CHUNK pending set is completed
+				for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
+					// Prepare DELETE_CHUNK request
+					size_t size;
+					Packet *packet = SlaveWorker::packetPool->malloc();
+					packet->setReferenceCount( 1 );
+					this->protocol.reqDeleteChunk(
+						size,
+						requestId,
+						metadata.listId,
+						metadata.stripeId,
+						metadata.chunkId,
+						keyMetadata.offset,
+						deltaSize,                       // length
+						SlaveWorker::dataChunkCount + i, // updatingChunkId
+						delta,
+						packet->data
+					);
+					packet->size = ( uint32_t ) size;
+
+					// Insert into event queue
+					SlavePeerEvent slavePeerEvent;
+					slavePeerEvent.send( this->paritySlaveSockets[ i ], packet );
+
+#ifdef SLAVE_WORKER_SEND_REPLICAS_PARALLEL
+					if ( i == SlaveWorker::parityChunkCount - 1 )
+						this->dispatch( slavePeerEvent );
+					else
+						SlaveWorker::eventQueue->prioritizedInsert( slavePeerEvent );
+#else
+					this->dispatch( slavePeerEvent );
+#endif
+				}
+			} else {
+				// Send DELETE request if the chunk is not yet sealed
+				// TODO: Handle remapped keys
+				Key key;
+				key.dup( header.keySize, header.key );
+
+				// Prepare DELETE request
 				size_t size;
 				Packet *packet = SlaveWorker::packetPool->malloc();
-				packet->setReferenceCount( 1 );
-				this->protocol.reqDeleteChunk(
+				packet->setReferenceCount( SlaveWorker::parityChunkCount );
+				this->protocol.reqDelete(
 					size,
 					requestId,
 					metadata.listId,
 					metadata.stripeId,
 					metadata.chunkId,
-					keyMetadata.offset,
-					deltaSize,                       // length
-					SlaveWorker::dataChunkCount + i, // updatingChunkId
-					delta,
+					header.key,
+					header.keySize,
 					packet->data
 				);
 				packet->size = ( uint32_t ) size;
 
-				// Insert into event queue
-				SlavePeerEvent slavePeerEvent;
-				slavePeerEvent.send( this->paritySlaveSockets[ i ], packet );
+				for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
+					key.ptr = ( void * ) this->paritySlaveSockets[ i ];
+					if ( ! SlaveWorker::pending->insertKey(
+						PT_SLAVE_PEER_DEL, requestId, event.id,
+						( void * ) this->paritySlaveSockets[ i ],
+						key
+					) ) {
+						__ERROR__( "SlaveWorker", "handleDeleteRequest", "Cannot insert into slave DELETE pending map." );
+					}
+				}
+
+				// Start sending packets only after all the insertion to the slave peer DELETE pending set is completed
+				for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
+					// Insert into event queue
+					SlavePeerEvent slavePeerEvent;
+					slavePeerEvent.send( this->paritySlaveSockets[ i ], packet );
 
 #ifdef SLAVE_WORKER_SEND_REPLICAS_PARALLEL
-				if ( i == SlaveWorker::parityChunkCount - 1 )
-					this->dispatch( slavePeerEvent );
-				else
-					SlaveWorker::eventQueue->prioritizedInsert( slavePeerEvent );
+					if ( i == SlaveWorker::parityChunkCount - 1 )
+						this->dispatch( slavePeerEvent );
+					else
+						SlaveWorker::eventQueue->prioritizedInsert( slavePeerEvent );
 #else
-				this->dispatch( slavePeerEvent );
+					this->dispatch( slavePeerEvent );
 #endif
+				}
 			}
 		} else {
 			event.resDelete( event.socket, event.id, key, true, false );
 			this->dispatch( event );
 		}
+		if ( chunkBufferIndex != -1 )
+			chunkBuffer->updateAndUnlockChunk( chunkBufferIndex );
 		ret = true;
 	} else if ( map->findRemappingRecordByKey( header.key, header.keySize, &remappingRecord, &key ) ) {
 		// Redirect request to remapped slave
@@ -1417,12 +1626,11 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 		ret = false;
 		this->dispatch( event );
 	} else {
+		key.set( header.keySize, header.key, ( void * ) event.socket );
 		event.resDelete( event.socket, event.id, key, false );
 		this->dispatch( event );
 		ret = false;
 	}
-
-	this->load.del();
 
 	return ret;
 }
@@ -1462,7 +1670,6 @@ bool SlaveWorker::handleSealChunkRequest( SlavePeerEvent event, char *buf, size_
 	}
 	__DEBUG__(
 		BLUE, "SlaveWorker", "handleSealChunkRequest",
-		"SlaveWorker", "handleSealChunkRequest",
 		"[SEAL_CHUNK] List ID: %u, stripe ID: %u, chunk ID: %u; count = %u.",
 		header.listId, header.stripeId, header.chunkId, header.count
 	);
@@ -1517,8 +1724,6 @@ bool SlaveWorker::handleUpdateChunkRequest( SlavePeerEvent event, char *buf, siz
 		header.offset, header.length,
 		header.updatingChunkId, ret
 	);
-
-	this->load.updateChunk();
 	this->dispatch( event );
 
 	return ret;
@@ -1533,7 +1738,7 @@ bool SlaveWorker::handleDeleteChunkRequest( SlavePeerEvent event, char *buf, siz
 	}
 	__DEBUG__(
 		BLUE, "SlaveWorker", "handleDeleteChunkRequest",
-		"[DELETE_CHUNK] List ID: %u; stripe ID: %u; chunk ID: %u; offset: %u; length: %u; updating chunk ID: %u.",
+		"[DELETE_CHUNK] List ID: %u, stripe ID: %u, chunk ID: %u; offset: %u; length: %u; updating chunk ID: %u.",
 		header.listId, header.stripeId, header.chunkId,
 		header.offset, header.length, header.updatingChunkId
 	);
@@ -1561,7 +1766,72 @@ bool SlaveWorker::handleDeleteChunkRequest( SlavePeerEvent event, char *buf, siz
 		header.updatingChunkId, ret
 	);
 
-	this->load.delChunk();
+	this->dispatch( event );
+
+	return ret;
+}
+
+bool SlaveWorker::handleUpdateRequest( SlavePeerEvent event, char *buf, size_t size ) {
+	struct ChunkKeyValueUpdateHeader header;
+	if ( ! this->protocol.parseChunkKeyValueUpdateHeader( header, true, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleUpdateRequest", "Invalid UPDATE request." );
+		return false;
+	}
+	__DEBUG__(
+		BLUE, "SlaveWorker", "handleUpdateRequest",
+		"[UPDATE] Key: %.*s (key size = %u); Value: (update size = %u, offset = %u); list ID = %u, stripe ID = %u, chunk Id = %u, chunk update offset = %u.",
+		( int ) header.keySize, header.key, header.keySize,
+		header.valueUpdateSize, header.valueUpdateOffset,
+		header.listId, header.stripeId, header.chunkId,
+		header.chunkUpdateOffset
+	);
+
+	// TODO: Detect degraded UPDATE
+
+	Key key;
+	bool ret = SlaveWorker::chunkBuffer->at( header.listId )->updateKeyValue(
+		header.key, header.keySize,
+		header.valueUpdateOffset, header.valueUpdateSize, header.valueUpdate
+	);
+	if ( ! ret ) {
+		// Use the chunkUpdateOffset
+		SlaveWorker::chunkBuffer->at( header.listId )->update(
+			header.stripeId, header.chunkId,
+			header.chunkUpdateOffset, header.valueUpdateSize, header.valueUpdate,
+			this->chunks, this->dataChunk, this->parityChunk
+		);
+		ret = true;
+	}
+
+	key.set( header.keySize, header.key );
+	event.resUpdate( event.socket, event.id, header.listId, header.stripeId, header.chunkId, key, header.valueUpdateOffset, header.valueUpdateSize, header.chunkUpdateOffset, ret );
+	this->dispatch( event );
+
+	return ret;
+}
+
+bool SlaveWorker::handleDeleteRequest( SlavePeerEvent event, char *buf, size_t size ) {
+	struct ChunkKeyHeader header;
+	if ( ! this->protocol.parseChunkKeyHeader( header, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleDeleteRequest", "Invalid DELETE request." );
+		return false;
+	}
+	__DEBUG__(
+		BLUE, "SlaveWorker", "handleDeleteRequest",
+	// __ERROR__(
+	// 	"SlaveWorker", "handleDeleteRequest",
+		"[DELETE] Key: %.*s (key size = %u); list ID = %u, stripe ID = %u, chunk Id = %u.",
+		( int ) header.keySize, header.key, header.keySize,
+		header.listId, header.stripeId, header.chunkId
+	);
+
+	// TODO: Detect degraded DELETE
+
+	Key key;
+	bool ret = SlaveWorker::chunkBuffer->at( header.listId )->deleteKey( header.key, header.keySize );
+
+	key.set( header.keySize, header.key );
+	event.resDelete( event.socket, event.id, header.listId, header.stripeId, header.chunkId, key, ret );
 	this->dispatch( event );
 
 	return ret;
@@ -1585,7 +1855,6 @@ bool SlaveWorker::handleGetChunkRequest( SlavePeerEvent event, char *buf, size_t
 	ret = chunk;
 
 	event.resGetChunk( event.socket, event.id, metadata, ret, chunk );
-	this->load.getChunk();
 	this->dispatch( event );
 
 	return ret;
@@ -1612,7 +1881,6 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, char *buf, size_t
 	ret = false;
 
 	event.resSetChunk( event.socket, event.id, metadata, ret );
-	this->load.setChunk();
 	this->dispatch( event );
 
 	return ret;
@@ -1703,12 +1971,96 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 
 	// __ERROR__( "SlaveWorker", "handleDeleteChunkResponse", "Pending slave DELETE_CHUNK requests = %d.", pending );
 	if ( pending == 0 ) {
-		// Only send application DELETE response when the number of pending slave DELETE_CHUNK requests equal 0
+		// Only send master DELETE response when the number of pending slave DELETE_CHUNK requests equal 0
 		MasterEvent masterEvent;
 		Key key;
 
 		if ( ! SlaveWorker::pending->eraseKey( PT_MASTER_DEL, pid.parentId, 0, &pid, &key ) ) {
 			__ERROR__( "SlaveWorker", "handleDeleteChunkResponse", "Cannot find a pending master DELETE request that matches the response. This message will be discarded." );
+			return false;
+		}
+
+		masterEvent.resDelete( ( MasterSocket * ) key.ptr, pid.id, key, success );
+		SlaveWorker::eventQueue->insert( masterEvent );
+	}
+	return true;
+}
+
+bool SlaveWorker::handleUpdateResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
+	struct ChunkKeyValueUpdateHeader header;
+	if ( ! this->protocol.parseChunkKeyValueUpdateHeader( header, false, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleUpdateResponse", "Invalid UPDATE response." );
+		return false;
+	}
+	__DEBUG__(
+		BLUE, "SlaveWorker", "handleUpdateResponse",
+		"[UPDATE] Key: %.*s (key size = %u); ; update value size = %u at offset: %u; list ID = %u, stripe ID = %u, chunk Id = %u.",
+		( int ) header.keySize, header.key, header.keySize,
+		header.valueUpdateSize, header.valueUpdateOffset,
+		header.listId, header.stripeId, header.chunkId
+	);
+
+	int pending;
+	KeyValueUpdate keyValueUpdate;
+	PendingIdentifier pid;
+
+	if ( ! SlaveWorker::pending->eraseKeyValueUpdate( PT_SLAVE_PEER_UPDATE, event.id, event.socket, &pid, &keyValueUpdate, true, false ) ) {
+		pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.updateLock );
+		__ERROR__( "SlaveWorker", "handleUpdateResponse", "Cannot find a pending slave UPDATE request that matches the response. This message will be discarded. (ID: %u)", event.id );
+		return false;
+	}
+	// Check pending slave UPDATE requests
+	pending = SlaveWorker::pending->count( PT_SLAVE_PEER_UPDATE, pid.id, false, true );
+
+	__DEBUG__( BLUE, "SlaveWorker", "handleUpdateResponse", "Pending slave UPDATE requests = %d (%s).", pending, success ? "success" : "fail" );
+	if ( pending == 0 ) {
+		// Only send master DELETE response when the number of pending slave DELETE requests equal 0
+		MasterEvent masterEvent;
+
+		if ( ! SlaveWorker::pending->eraseKeyValueUpdate( PT_MASTER_UPDATE, pid.parentId, 0, &pid, &keyValueUpdate ) ) {
+			__ERROR__( "SlaveWorker", "handleUpdateResponse", "Cannot find a pending master UPDATE request that matches the response. This message will be discarded." );
+			return false;
+		}
+
+		masterEvent.resUpdate( ( MasterSocket * ) keyValueUpdate.ptr, pid.id, keyValueUpdate, header.valueUpdateOffset, header.valueUpdateSize, success, true );
+		SlaveWorker::eventQueue->insert( masterEvent );
+	}
+	return true;
+}
+
+bool SlaveWorker::handleDeleteResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
+	struct ChunkKeyHeader header;
+	if ( ! this->protocol.parseChunkKeyHeader( header, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleDeleteRequest", "Invalid DELETE response." );
+		return false;
+	}
+	__DEBUG__(
+		BLUE, "SlaveWorker", "handleDeleteRequest",
+		"[DELETE] Key: %.*s (key size = %u); list ID = %u, stripe ID = %u, chunk Id = %u.",
+		( int ) header.keySize, header.key, header.keySize,
+		header.listId, header.stripeId, header.chunkId
+	);
+
+	int pending;
+	Key key;
+	PendingIdentifier pid;
+
+	if ( ! SlaveWorker::pending->eraseKey( PT_SLAVE_PEER_DEL, event.id, event.socket, &pid, &key, true, false ) ) {
+		pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.delLock );
+		__ERROR__( "SlaveWorker", "handleDeleteResponse", "Cannot find a pending slave DELETE request that matches the response. This message will be discarded. (ID: %u)", event.id );
+		return false;
+	}
+	// Check pending slave UPDATE requests
+	pending = SlaveWorker::pending->count( PT_SLAVE_PEER_DEL, pid.id, false, true );
+
+	__DEBUG__( BLUE, "SlaveWorker", "handleDeleteResponse", "Pending slave DELETE requests = %d (%s).", pending, success ? "success" : "fail" );
+	if ( pending == 0 ) {
+		// Only send master DELETE response when the number of pending slave DELETE requests equal 0
+		MasterEvent masterEvent;
+		Key key;
+
+		if ( ! SlaveWorker::pending->eraseKey( PT_MASTER_DEL, pid.parentId, 0, &pid, &key ) ) {
+			__ERROR__( "SlaveWorker", "handleDeleteResponse", "Cannot find a pending master DELETE request that matches the response. This message will be discarded." );
 			return false;
 		}
 

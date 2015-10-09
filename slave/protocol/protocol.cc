@@ -22,13 +22,12 @@ char *SlaveProtocol::reqRegisterCoordinator( size_t &size, uint32_t id, uint32_t
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::sendHeartbeat( size_t &size, uint32_t id, struct HeartbeatHeader &header, std::map<Key, OpMetadata> &opMetadataMap, pthread_mutex_t *lock, size_t &count ) {
+char *SlaveProtocol::sendHeartbeat( size_t &size, uint32_t id, std::map<Key, OpMetadata> &opMetadataMap, pthread_mutex_t *lock, size_t &count ) {
 	size = this->generateHeartbeatMessage(
 		PROTO_MAGIC_HEARTBEAT,
 		PROTO_MAGIC_TO_COORDINATOR,
 		PROTO_OPCODE_SYNC,
 		id,
-		header,
 		opMetadataMap,
 		lock,
 		count
@@ -137,10 +136,10 @@ char *SlaveProtocol::resUpdate( size_t &size, uint32_t id, bool success, uint8_t
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::resDelete( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key ) {
+char *SlaveProtocol::resDelete( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key, bool toMaster ) {
 	size = this->generateKeyHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
-		PROTO_MAGIC_TO_MASTER,
+		toMaster ? PROTO_MAGIC_TO_MASTER : PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_DELETE,
 		id,
 		keySize,
@@ -206,16 +205,13 @@ char *SlaveProtocol::reqRemappingSet( size_t &size, uint32_t id, uint32_t listId
 	return buf;
 }
 
-char *SlaveProtocol::reqSealChunk( size_t &size, uint32_t id, Chunk *chunk, char *buf ) {
+char *SlaveProtocol::reqSealChunk( size_t &size, uint32_t id, Chunk *chunk, uint32_t startPos, char *buf ) {
 	if ( ! buf ) buf = this->buffer.send;
 
 	char *ptr = buf + PROTO_HEADER_SIZE + PROTO_CHUNK_SEAL_SIZE;
 	size_t bytes = 0; // data length only
 
-#ifdef USE_CHUNK_MUTEX_LOCK
-	chunk->setLock();
-#endif
-	int currentOffset = 0, nextOffset = 0;
+	int currentOffset = startPos, nextOffset = 0;
 	uint32_t count = 0;
 	char *key;
 	uint8_t keySize;
@@ -230,9 +226,6 @@ char *SlaveProtocol::reqSealChunk( size_t &size, uint32_t id, Chunk *chunk, char
 
 		currentOffset = nextOffset;
 	}
-#ifdef USE_CHUNK_MUTEX_LOCK
-	chunk->setUnlock();
-#endif
 
 	// The seal request should not exceed the size of the send buffer
 	assert( bytes <= this->buffer.size );
@@ -247,6 +240,47 @@ char *SlaveProtocol::reqSealChunk( size_t &size, uint32_t id, Chunk *chunk, char
 		chunk->metadata.chunkId,
 		count,
 		bytes,
+		buf
+	);
+	return buf;
+}
+
+char *SlaveProtocol::reqUpdate( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t chunkUpdateOffset, char *buf ) {
+	if ( ! buf ) buf = this->buffer.send;
+	size = this->generateChunkKeyValueUpdateHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_UPDATE,
+		id,
+		listId,
+		stripeId,
+		chunkId,
+		keySize,
+		key,
+		valueUpdateOffset,
+		valueUpdateSize,
+		chunkUpdateOffset,
+		valueUpdate,
+		buf
+	);
+	return buf;
+}
+
+char *SlaveProtocol::resUpdate( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t chunkUpdateOffset, char *buf ) {
+	if ( ! buf ) buf = this->buffer.send;
+	size = this->generateChunkKeyValueUpdateHeader(
+		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_UPDATE,
+		id,
+		listId,
+		stripeId,
+		chunkId,
+		keySize,
+		key,
+		valueUpdateOffset,
+		valueUpdateSize,
+		chunkUpdateOffset,
 		buf
 	);
 	return buf;
@@ -277,6 +311,40 @@ char *SlaveProtocol::resUpdateChunk( size_t &size, uint32_t id, bool success, ui
 		offset, length, updatingChunkId
 	);
 	return this->buffer.send;
+}
+
+char *SlaveProtocol::reqDelete( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, char *buf ) {
+	if ( ! buf ) buf = this->buffer.send;
+	size = this->generateChunkKeyHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_DELETE,
+		id,
+		listId,
+		stripeId,
+		chunkId,
+		keySize,
+		key,
+		buf
+	);
+	return buf;
+}
+
+char *SlaveProtocol::resDelete( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, char *buf ) {
+	if ( ! buf ) buf = this->buffer.send;
+	size = this->generateChunkKeyHeader(
+		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_DELETE,
+		id,
+		listId,
+		stripeId,
+		chunkId,
+		keySize,
+		key,
+		buf
+	);
+	return buf;
 }
 
 char *SlaveProtocol::reqDeleteChunk( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta, char *buf ) {

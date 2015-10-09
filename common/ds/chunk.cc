@@ -13,6 +13,7 @@ Chunk::Chunk() {
 	this->size = 0;
 	this->status = CHUNK_STATUS_EMPTY;
 	this->count = 0;
+	this->lastDelPos = 0;
 	this->isParity = false;
 #ifdef USE_CHUNK_MUTEX_LOCK
 	pthread_mutex_init( &this->lock, 0 );
@@ -190,6 +191,16 @@ void Chunk::computeDelta( char *delta, char *newData, uint32_t offset, uint32_t 
 #endif
 }
 
+void Chunk::update( char *newData, uint32_t offset, uint32_t length ) {
+#ifdef USE_CHUNK_MUTEX_LOCK
+	pthread_mutex_lock( &this->lock );
+#endif
+	memcpy( this->data + offset, newData, length );
+#ifdef USE_CHUNK_MUTEX_LOCK
+	pthread_mutex_unlock( &this->lock );
+#endif
+}
+
 uint32_t Chunk::deleteKeyValue( Key target, std::map<Key, KeyMetadata> *keys, char *delta, size_t deltaBufSize ) {
 #ifdef USE_CHUNK_MUTEX_LOCK
 	pthread_mutex_lock( &this->lock );
@@ -248,21 +259,24 @@ uint32_t Chunk::deleteKeyValue( Key target, std::map<Key, KeyMetadata> *keys, ch
 		dst += m.length;
 		src += m.length;
 	}
+	// Set the data after the last key-value pair as zeros
+	memset( dst, 0, metadata.length );
 
 	// Update internal counters
 	this->count--;
 	this->size -= metadata.length;
-
 	this->status = CHUNK_STATUS_DIRTY;
+
+	if ( delta ) {
+		// Update counter if the chunk is sealed before
+		this->lastDelPos = this->size;
+		// Compute data delta
+		Coding::bitwiseXOR( delta, delta, startPtr, deltaSize );
+	}
 
 #ifdef USE_CHUNK_MUTEX_LOCK
 	pthread_mutex_unlock( &this->lock );
 #endif
-
-	if ( delta ) {
-		// Compute data delta
-		Coding::bitwiseXOR( delta, delta, startPtr, deltaSize );
-	}
 	return deltaSize;
 }
 

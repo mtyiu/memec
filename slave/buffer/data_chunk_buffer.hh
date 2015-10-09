@@ -3,24 +3,32 @@
 
 #include "chunk_buffer.hh"
 
+class SlaveWorker;
+
 class DataChunkBuffer : public ChunkBuffer {
 private:
 	uint32_t count;                        // Number of chunks
 	pthread_mutex_t *locks;                // Lock for each chunk
 	Chunk **chunks;                        // Allocated chunk buffer
+	Chunk **reInsertedChunks;              // Chunks that have free space after deletion
 	uint32_t *sizes;                       // Occupied space for each chunk
+	uint32_t reInsertedChunkMaxSpace;      // Maximum space avaiable in the re-inserted chunks
 
 public:
 	DataChunkBuffer( uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId );
 
-	KeyMetadata set( char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode );
+	KeyMetadata set( SlaveWorker *worker, char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode );
 
-	size_t seal();
+	size_t seal( SlaveWorker *worker );
 
-	int lockChunk( Chunk *chunk );
+	// Re-insert into the buffer after a DELETE operation
+	bool reInsert( SlaveWorker *worker, Chunk *chunk, uint32_t sizeToBeFreed, bool needsLock, bool needsUnlock );
+
+	int lockChunk( Chunk *chunk, bool keepGlobalLock );
 	void updateAndUnlockChunk( int index );
-	uint32_t flush( bool lock = true, bool lockAtIndex = false );
-	Chunk *flushAt( int index, bool lock = true );
+	void unlock();
+	uint32_t flush( SlaveWorker *worker, bool lock = true, bool lockAtIndex = false );
+	Chunk *flushAt( SlaveWorker *worker, int index, bool lock = true );
 	void print( FILE *f = stdout );
 	void stop();
 	~DataChunkBuffer();

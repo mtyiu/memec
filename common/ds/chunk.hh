@@ -39,6 +39,7 @@ public:
 	ChunkStatus status;         // Current status of the chunk
 	uint32_t count;             // Number of key-value pair
 	Metadata metadata;          // Metadata (list ID, stripe ID, chunk ID)
+	uint32_t lastDelPos;        // Record the position where the last key-value compaction ends after deletion
 	bool isParity;              // Indicate whether the chunk is a parity chunk
 
 	// Initialization
@@ -68,6 +69,7 @@ public:
 	uint32_t updateParity( uint32_t offset = 0, uint32_t length = 0 );
 	// Compute delta
 	void computeDelta( char *delta, char *newData, uint32_t offset, uint32_t length, bool update = true );
+	void update( char *newData, uint32_t offset, uint32_t length );
 	// Delete key
 	uint32_t deleteKeyValue( Key target, std::map<Key, KeyMetadata> *keys, char *delta = 0, size_t deltaBufSize = 0 );
 	// Get key-value pair

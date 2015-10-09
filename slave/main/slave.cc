@@ -315,11 +315,15 @@ bool Slave::stop() {
 
 void Slave::seal() {
 	size_t count = 0;
+	SlavePeerEvent event;
 	for ( int i = 0, size = this->chunkBuffer.size(); i < size; i++ ) {
-		if ( this->chunkBuffer[ i ] )
-			count += this->chunkBuffer[ i ]->seal();
+		if ( this->chunkBuffer[ i ] ) {
+			event.reqSealChunks( this->chunkBuffer[ i ] );
+			this->eventQueue.insert( event );
+			count++;
+		}
 	}
-	printf( "Sealing %lu chunks...\n", count );
+	printf( "\nSealing %lu chunk buffer:\n", count );
 }
 
 void Slave::flush() {
@@ -344,6 +348,53 @@ void Slave::flush() {
 	pthread_mutex_unlock( lock );
 
 	printf( "Flushing %lu chunks...\n", count );
+}
+
+void Slave::memory( FILE *f ) {
+	std::map<Metadata, Chunk *> *cache;
+	std::map<Metadata, Chunk *>::iterator it;
+	pthread_mutex_t *lock;
+	uint32_t numDataChunks = 0, numParityChunks = 0, numKeyValues = 0;
+	uint64_t occupied = 0, allocated = 0, bytesParity = 0;
+
+	this->map.getCacheMap( cache, lock );
+
+	pthread_mutex_lock( lock );
+	for ( it = cache->begin(); it != cache->end(); it++ ) {
+		Chunk *chunk = it->second;
+		if ( chunk->isParity ) {
+			numParityChunks++;
+			bytesParity += chunk->capacity;
+		} else {
+			numDataChunks++;
+			numKeyValues += chunk->count;
+			occupied += chunk->getSize();
+			allocated += chunk->capacity;
+		}
+	}
+	pthread_mutex_unlock( lock );
+
+	int width = 25;
+	fprintf(
+		f,
+		"Parity chunks\n"
+		"\t- %-*s : %u\n"
+		"\t- %-*s : %lu\n"
+		"Data chunks\n"
+		"\t- %-*s : %u\n"
+		"\t- %-*s : %u\n"
+		"\t- %-*s : %lu\n"
+		"\t- %-*s : %lu\n"
+		"\t- %-*s : %6.4lf%%\n",
+		width, "Number of parity chunks", numParityChunks,
+		width, "Total size (bytes)", bytesParity,
+
+		width, "Number of data chunks", numDataChunks,
+		width, "Number of key-value pairs", numKeyValues,
+		width, "Occupied size (bytes)", occupied,
+		width, "Total size (bytes)", allocated,
+		width, "Utilization", ( double ) occupied / allocated * 100.0
+	);
 }
 
 double Slave::getElapsedTime() {
@@ -490,6 +541,9 @@ void Slave::interactive() {
 		} else if ( strcmp( command, "flush" ) == 0 ) {
 			valid = true;
 			this->flush();
+		} else if ( strcmp( command, "memory" ) == 0 ) {
+			valid = true;
+			this->memory();
 		} else if ( strcmp( command, "pending" ) == 0 ) {
 			valid = true;
 			this->printPending();
@@ -698,6 +752,7 @@ void Slave::help() {
 		"- dump: Dump all key-value pairs\n"
 		"- seal: Seal all chunks in the chunk buffer\n"
 		"- flush: Flush all dirty chunks to disk\n"
+		"- memory: Print memory usage\n"
 		"- sync: Synchronize with coordinator\n"
 		"- load: Show the load of each worker\n"
 		"- time: Show elapsed time\n"
@@ -715,7 +770,7 @@ void Slave::alarm() {
 	::alarm( this->config.global.sync.timeout );
 }
 
-Load &Slave::aggregateLoad( FILE *f ) {
+SlaveLoad &Slave::aggregateLoad( FILE *f ) {
 	this->load.reset();
 	for ( int i = 0, len = this->workers.size(); i < len; i++ ) {
 		SlaveLoad &load = this->workers[ i ].load;

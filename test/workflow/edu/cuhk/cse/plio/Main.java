@@ -19,7 +19,7 @@ public class Main implements Runnable {
 	public static int completedOps;
 	public static Object lock;
 	/* Constants */
-	private static final String characters = "01234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+	private static final String characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 	private static final int charactersLength = characters.length();
 
 	/* Instance variables */
@@ -36,12 +36,13 @@ public class Main implements Runnable {
 		this.random = new Random();
 	}
 
-	private String generate( int size ) {
+	private String generate( int size, boolean toLower ) {
 		StringBuilder sb = new StringBuilder( size );
 		for ( int i = 0; i < size; i++ ) {
 			sb.append( Main.characters.charAt( this.random.nextInt( Main.charactersLength ) ) );
 		}
-		return sb.toString();
+		String ret = sb.toString();
+		return toLower ? ret.toLowerCase() : ret;
 	}
 
 	private int incrementCounter() {
@@ -82,9 +83,9 @@ public class Main implements Runnable {
 
 					// Store it in the HashMap
 					do {
-						key = this.generate( keySize );
+						key = this.generate( keySize, false );
 					} while ( this.map.containsKey( key ) );
-					value = this.generate( valueSize );
+					value = this.generate( valueSize, true );
 
 					// Issue the request
 					ret = plio.set( key, value );
@@ -128,7 +129,7 @@ public class Main implements Runnable {
 						offset = this.random.nextInt( length );
 						length = this.random.nextInt( length - offset );
 					} while ( length <= 0 );
-					String valueUpdate = this.generate( length );
+					String valueUpdate = this.generate( length, true );
 					ret = plio.update( key, valueUpdate, offset );
 
 					if ( ret ) {

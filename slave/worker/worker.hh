@@ -71,8 +71,6 @@ private:
 	SlavePeerSocket *getSlave( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded = false, bool *isDegraded = 0 );
 	SlavePeerSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded = false, bool *isDegraded = 0 );
 	bool getSlaves( uint32_t listId, bool allowDegraded = false, bool *isDegraded = 0 );
-	// Issue seal chunk requests
-	bool issueSealChunkRequest( Chunk *chunk );
 	// Request handler for coordinator
 	bool handleSlaveConnectedMsg( CoordinatorEvent event, char *buf, size_t size );
 	// Request handler for master
@@ -86,11 +84,16 @@ private:
 	bool handleSlavePeerRegisterRequest( SlavePeerSocket *socket, char *buf, size_t size );
 	bool handleRemappingSetRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleSealChunkRequest( SlavePeerEvent event, char *buf, size_t size );
+	bool handleUpdateRequest( SlavePeerEvent event, char *buf, size_t size );
+	bool handleDeleteRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleUpdateChunkRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleDeleteChunkRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleGetChunkRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleSetChunkRequest( SlavePeerEvent event, char *buf, size_t size );
+	// Response handler for slave peers
 	bool handleSealChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
+	bool handleUpdateResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
+	bool handleDeleteResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleUpdateChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleDeleteChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleGetChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
@@ -109,6 +112,8 @@ public:
 	bool start();
 	void stop();
 	void print( FILE *f = stdout );
+	// Issue seal chunk requests
+	bool issueSealChunkRequest( Chunk *chunk, uint32_t startPos = 0 );
 
 	inline WorkerRole getRole() {
 		return this->role;

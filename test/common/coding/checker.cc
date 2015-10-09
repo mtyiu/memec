@@ -15,7 +15,7 @@ CodingParams params;
 CodingScheme scheme;
 
 void usage( char* command ) {
-	fprintf( stderr, "%s [n] [k] [chunk size] [raid5|cauchy|rdp|rs|evenodd] [k data files] [(n-k) parity files]\n", command );
+	fprintf( stderr, "%s [n] [k] [chunk size] [raid1|raid5|cauchy|rdp|rs|evenodd] [k data files] [(n-k) parity files]\n", command );
 }
 
 bool parse_args( int argc, char** argv ) {
@@ -26,7 +26,10 @@ bool parse_args( int argc, char** argv ) {
 	k = atoi( argv[2] );
 	csize = atoi( argv[3] );
 
-	if ( strcmp ( argv[4], "raid5" ) == 0 ) {
+	if ( strcmp ( argv[4], "raid1" ) == 0 ) {
+		params.setScheme ( CS_RAID1 );
+		scheme  = CS_RAID1;
+	} else if ( strcmp ( argv[4], "raid5" ) == 0 ) {
 		params.setScheme ( CS_RAID5 );
 		scheme  = CS_RAID5;
 	} else if ( strcmp ( argv[4], "cauchy" ) == 0 ) {
@@ -69,6 +72,21 @@ void print_chunk( Chunk *chunk, uint32_t id = 0 ) {
 	printf("\t\t[%02x] from %8d to %8d\n", *prev, prevPos, csize - 1);
 }
 
+void print_chunks( Chunk *c1, Chunk *c2, uint32_t id = 0 ) {
+	char *d1 = c1->getData(), *d2 = c2->getData();
+	int count = 0;
+	if (id != 0) {
+		printf("chunk %d:\n", id);
+	}
+	for (uint32_t i = 0; i < csize; i++) {
+		if ( d1[i] != d2[i] ) {
+			printf("\t\t[%4d] input: %02x vs. expected %02x\n", i, ( unsigned char ) d1[i], ( unsigned char ) d2[i]);
+			count++;
+		}
+	}
+	printf("\t\tNumber of mismatch: %d / %d bytes; correct %%: %4.2lf%%\n", count, csize, ( double ) ( csize - count ) / csize * 100.0);
+}
+
 bool read_chunks( char** argv ) {
 	uint32_t i;
 	FILE *infile = NULL;
@@ -107,10 +125,13 @@ bool verify_chunks() {
 			c.setSize( csize );
 			c.setData( buf + ( i + k ) * csize );
 			fprintf( stdout, "\tchunk %d [PARITY] wrong..\n", i + k );
+			/*
 			fprintf( stdout, "\tinput " );
 			print_chunk( &c, i + k );
 			fprintf( stdout, "\texpected " );
 			print_chunk( chunks[ i + k ], i + k );
+			*/
+			print_chunks( &c, chunks[ i + k ], i + k );
 		}
 	}
 

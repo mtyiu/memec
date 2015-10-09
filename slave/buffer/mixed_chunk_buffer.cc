@@ -1,4 +1,5 @@
 #include "mixed_chunk_buffer.hh"
+#include "../worker/worker.hh"
 
 MixedChunkBuffer::MixedChunkBuffer( DataChunkBuffer *dataChunkBuffer ) {
 	this->role = CBR_DATA;
@@ -10,10 +11,10 @@ MixedChunkBuffer::MixedChunkBuffer( ParityChunkBuffer *parityChunkBuffer ) {
 	this->buffer.parity = parityChunkBuffer;
 }
 
-bool MixedChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode, uint32_t chunkId, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk ) {
+bool MixedChunkBuffer::set( SlaveWorker *worker, char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode, uint32_t chunkId, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk ) {
 	switch( this->role ) {
 		case CBR_DATA:
-			this->buffer.data->set( key, keySize, value, valueSize, opcode );
+			this->buffer.data->set( worker, key, keySize, value, valueSize, opcode );
 			return true;
 		case CBR_PARITY:
 			return this->buffer.parity->set( key, keySize, value, valueSize, chunkId, dataChunks, dataChunk, parityChunk );
@@ -22,10 +23,20 @@ bool MixedChunkBuffer::set( char *key, uint8_t keySize, char *value, uint32_t va
 	}
 }
 
-size_t MixedChunkBuffer::seal() {
+size_t MixedChunkBuffer::seal( SlaveWorker *worker ) {
 	switch( this->role ) {
 		case CBR_DATA:
-			return this->buffer.data->seal();
+			return this->buffer.data->seal( worker );
+		case CBR_PARITY:
+		default:
+			return false;
+	}
+}
+
+bool MixedChunkBuffer::reInsert( SlaveWorker *worker, Chunk *chunk, uint32_t sizeToBeFreed, bool needsLock, bool needsUnlock ) {
+	switch( this->role ) {
+		case CBR_DATA:
+			return this->buffer.data->reInsert( worker, chunk, sizeToBeFreed, needsLock, needsUnlock );
 		case CBR_PARITY:
 		default:
 			return false;
@@ -42,10 +53,10 @@ bool MixedChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t count
 	}
 }
 
-int MixedChunkBuffer::lockChunk( Chunk *chunk ) {
+int MixedChunkBuffer::lockChunk( Chunk *chunk, bool keepGlobalLock ) {
 	switch( this->role ) {
 		case CBR_DATA:
-			return this->buffer.data->lockChunk( chunk );
+			return this->buffer.data->lockChunk( chunk, keepGlobalLock );
 		case CBR_PARITY:
 		default:
 			return -1;
@@ -60,6 +71,35 @@ void MixedChunkBuffer::updateAndUnlockChunk( int index ) {
 		case CBR_PARITY:
 		default:
 			break;
+	}
+}
+
+void MixedChunkBuffer::unlock() {
+	switch( this->role ) {
+		case CBR_DATA:
+			this->buffer.data->unlock();
+			break;
+		case CBR_PARITY:
+		default:
+			break;
+	}
+}
+
+bool MixedChunkBuffer::deleteKey( char *keyStr, uint8_t keySize ) {
+	switch( this->role ) {
+		case CBR_PARITY:
+			return this->buffer.parity->deleteKey( keyStr, keySize );
+		default:
+			return false;
+	}
+}
+
+bool MixedChunkBuffer::updateKeyValue( char *keyStr, uint8_t keySize, uint32_t offset, uint32_t length, char *valueUpdate ) {
+	switch( this->role ) {
+		case CBR_PARITY:
+			return this->buffer.parity->updateKeyValue( keyStr, keySize, offset, length, valueUpdate );
+		default:
+			return false;
 	}
 }
 

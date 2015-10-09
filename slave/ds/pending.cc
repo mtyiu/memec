@@ -28,6 +28,10 @@ bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIde
 			lock = &this->masters.delLock;
 			map = &this->masters.del;
 			break;
+		case PT_SLAVE_PEER_DEL:
+			lock = &this->slavePeers.delLock;
+			map = &this->slavePeers.del;
+			break;
 		default:
 			lock = 0;
 			map = 0;
@@ -41,6 +45,10 @@ bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIde
 		case PT_MASTER_UPDATE:
 			lock = &this->masters.updateLock;
 			map = &this->masters.update;
+			break;
+		case PT_SLAVE_PEER_UPDATE:
+			lock = &this->slavePeers.updateLock;
+			map = &this->slavePeers.update;
 			break;
 		default:
 			lock = 0;
@@ -170,6 +178,8 @@ DEFINE_PENDING_MASTER_INSERT_METHOD( insertKey, Key, key )
 DEFINE_PENDING_MASTER_INSERT_METHOD( insertKeyValueUpdate, KeyValueUpdate, keyValueUpdate )
 
 DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( insertRemappingRecordKey, RemappingRecordKey, remappingRecordKey )
+DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( insertKey, Key, key )
+DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( insertKeyValueUpdate, KeyValueUpdate, keyValueUpdate )
 DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( insertDegradedOp, DegradedOp, degradedOp )
 DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( insertChunkRequest, ChunkRequest, chunkRequest )
 DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( insertChunkUpdate, ChunkUpdate, chunkUpdate )
@@ -213,6 +223,26 @@ uint32_t Pending::count( PendingType type, uint32_t id, bool needsLock, bool nee
 	if ( type == PT_SLAVE_PEER_DEGRADED_OPS ) {
 		std::map<PendingIdentifier, DegradedOp> *map;
 		std::map<PendingIdentifier, DegradedOp>::iterator it;
+
+		if ( ! this->get( type, lock, map ) ) return 0;
+
+		if ( needsLock ) pthread_mutex_lock( lock );
+		it = map->lower_bound( pid );
+		for ( ret = 0; it != map->end() && it->first.id == id; ret++, it++ );
+		if ( needsUnlock ) pthread_mutex_unlock( lock );
+	} else if ( type == PT_SLAVE_PEER_UPDATE ) {
+		std::map<PendingIdentifier, KeyValueUpdate> *map;
+		std::map<PendingIdentifier, KeyValueUpdate>::iterator it;
+
+		if ( ! this->get( type, lock, map ) ) return 0;
+
+		if ( needsLock ) pthread_mutex_lock( lock );
+		it = map->lower_bound( pid );
+		for ( ret = 0; it != map->end() && it->first.id == id; ret++, it++ );
+		if ( needsUnlock ) pthread_mutex_unlock( lock );
+	} else if ( type == PT_SLAVE_PEER_DEL ) {
+		std::map<PendingIdentifier, Key> *map;
+		std::map<PendingIdentifier, Key>::iterator it;
 
 		if ( ! this->get( type, lock, map ) ) return 0;
 

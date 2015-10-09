@@ -73,6 +73,8 @@ enum PendingType {
 	PT_MASTER_DEL,
 	PT_SLAVE_PEER_DEGRADED_OPS,
 	PT_SLAVE_PEER_REMAPPING_SET,
+	PT_SLAVE_PEER_UPDATE,
+	PT_SLAVE_PEER_DEL,
 	PT_SLAVE_PEER_GET_CHUNK,
 	PT_SLAVE_PEER_SET_CHUNK,
 	PT_SLAVE_PEER_UPDATE_CHUNK,
@@ -102,12 +104,16 @@ public:
    struct {
 		std::map<PendingIdentifier, DegradedOp> degradedOps;
 		std::map<PendingIdentifier, RemappingRecordKey> remappingSet;
+		std::map<PendingIdentifier, KeyValueUpdate> update;
+		std::map<PendingIdentifier, Key> del;
 		std::map<PendingIdentifier, ChunkRequest> getChunk;
 		std::map<PendingIdentifier, ChunkRequest> setChunk;
 		std::map<PendingIdentifier, ChunkUpdate> updateChunk;
 		std::map<PendingIdentifier, ChunkUpdate> deleteChunk;
 		pthread_mutex_t degradedOpsLock;
 		pthread_mutex_t remappingSetLock;
+		pthread_mutex_t updateLock;
+		pthread_mutex_t delLock;
 		pthread_mutex_t getChunkLock;
 		pthread_mutex_t setChunkLock;
 		pthread_mutex_t updateChunkLock;
@@ -121,6 +127,8 @@ public:
 		pthread_mutex_init( &this->masters.delLock, 0 );
 		pthread_mutex_init( &this->slavePeers.degradedOpsLock, 0 );
 		pthread_mutex_init( &this->slavePeers.remappingSetLock, 0 );
+		pthread_mutex_init( &this->slavePeers.updateLock, 0 );
+		pthread_mutex_init( &this->slavePeers.delLock, 0 );
 		pthread_mutex_init( &this->slavePeers.getChunkLock, 0 );
 		pthread_mutex_init( &this->slavePeers.setChunkLock, 0 );
 		pthread_mutex_init( &this->slavePeers.updateChunkLock, 0 );
@@ -130,7 +138,9 @@ public:
 	bool insertRemappingRecordKey( PendingType type, uint32_t id, void *ptr, RemappingRecordKey &remappingRecordKey, bool needsLock = true, bool needsUnlock = true );
 	bool insertRemappingRecordKey( PendingType type, uint32_t id, uint32_t parentId, void *ptr, RemappingRecordKey &remappingRecordKey, bool needsLock = true, bool needsUnlock = true );
 	bool insertKey( PendingType type, uint32_t id, void *ptr, Key &key, bool needsLock = true, bool needsUnlock = true );
+	bool insertKey( PendingType type, uint32_t id, uint32_t parentId, void *ptr, Key &key, bool needsLock = true, bool needsUnlock = true );
 	bool insertKeyValueUpdate( PendingType type, uint32_t id, void *ptr, KeyValueUpdate &keyValueUpdate, bool needsLock = true, bool needsUnlock = true );
+	bool insertKeyValueUpdate( PendingType type, uint32_t id, uint32_t parentId, void *ptr, KeyValueUpdate &keyValueUpdate, bool needsLock = true, bool needsUnlock = true );
 	bool insertDegradedOp( PendingType type, uint32_t id, uint32_t parentId, void *ptr, DegradedOp &degradedOp, bool needsLock = true, bool needsUnlock = true );
 	bool insertChunkRequest( PendingType type, uint32_t id, uint32_t parentId, void *ptr, ChunkRequest &chunkRequest, bool needsLock = true, bool needsUnlock = true );
 	bool insertChunkUpdate( PendingType type, uint32_t id, uint32_t parentId, void *ptr, ChunkUpdate &chunkUpdate, bool needsLock = true, bool needsUnlock = true );
