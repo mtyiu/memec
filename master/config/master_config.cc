@@ -106,7 +106,7 @@ bool MasterConfig::set( const char *section, const char *name, const char *value
 	} else if ( match( section, "remap" ) ) {
 		if ( match ( name, "force_enabled" ) )
 			this->remap.forceEnabled = ! match( value, "false" );
-		else if ( match ( name, "force_enabled" ) )
+		else if ( match ( name, "force_no_record_cache_search" ) )
 			this->remap.forceNoCacheRecords = ! match( value, "false" );
 		else
 			return false;

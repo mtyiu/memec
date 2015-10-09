@@ -54,7 +54,7 @@ private:
 	bool handleRemappingSetRequest( ApplicationEvent event, char *buf, size_t size );
 	bool handleUpdateRequest( ApplicationEvent event, char *buf, size_t size );
 	bool handleDeleteRequest( ApplicationEvent event, char *buf, size_t size );
-	bool handleRedirectedGetRequest ( SlaveEvent event, char *buf, size_t size );
+	bool handleRedirectedRequest ( SlaveEvent event, char *buf, size_t size, uint8_t opcode );
 
 	bool handleGetResponse( SlaveEvent event, bool success, char *buf, size_t size );
 	bool handleSetResponse( SlaveEvent event, bool success, char *buf, size_t size );

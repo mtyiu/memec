@@ -439,7 +439,9 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 						this->handleDeleteResponse( event, success, buffer.data, buffer.size );
 						break;
 					case PROTO_OPCODE_REDIRECT_GET:
-						this->handleRedirectedGetRequest( event, buffer.data, buffer.size );
+					case PROTO_OPCODE_REDIRECT_UPDATE:
+					case PROTO_OPCODE_REDIRECT_DELETE:
+						this->handleRedirectedRequest( event, buffer.data, buffer.size, header.opcode );
 						break;
 					default:
 						__ERROR__( "MasterWorker", "dispatch", "Invalid opcode from slave." );
@@ -942,7 +944,9 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 		header.valueUpdate, header.valueUpdateOffset, header.valueUpdateSize
 	);
 
-	keyValueUpdate.dup( header.keySize, header.key, ( void * ) event.socket );
+	char* valueUpdate = new char [ header.valueUpdateSize ];
+	memcpy( valueUpdate, header.valueUpdate, header.valueUpdateSize );
+	keyValueUpdate.dup( header.keySize, header.key, valueUpdate );
 	keyValueUpdate.offset = header.valueUpdateOffset;
 	keyValueUpdate.length = header.valueUpdateSize;
 
@@ -1028,15 +1032,18 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 	return true;
 }
 
-bool MasterWorker::handleRedirectedGetRequest( SlaveEvent event, char *buf, size_t size ) {
+bool MasterWorker::handleRedirectedRequest( SlaveEvent event, char *buf, size_t size, uint8_t opcode ) {
 	struct RedirectHeader header;
 	if ( ! this->protocol.parseRedirectHeader( header, buf, size ) ) {
-		__ERROR__( "MasterWorker", "handleRedirectedGetRequest", "Invalid Redirected GET request." );
+		__ERROR__( "MasterWorker", "handleRedirectedRequest", "Invalid redirected request header." );
 		return false;
 	}
 	__DEBUG__(
-		BLUE, "MasterWorker", "handleRedirectedGetRequest",
-		"[GET] Key: %.*s (key size = %u). Redirect to list=%u chunk=%u. ",
+		BLUE, "MasterWorker", "handleRedirectedRequest",
+		"[%s] Key: %.*s (key size = %u). Redirect to list=%u chunk=%u. ",
+		opcode == PROTO_OPCODE_REDIRECT_UPDATE ? "UPDATE" :
+		opcode == PROTO_OPCODE_REDIRECT_DELELE ? "DELETE" :
+		opcode == PROTO_OPCODE_REDIRECT_GET ? "GET" : "UNKNOWN",
 		( int ) header.keySize, header.key, header.keySize,
 		header.listId, header.chunkId
 	);
@@ -1051,6 +1058,7 @@ bool MasterWorker::handleRedirectedGetRequest( SlaveEvent event, char *buf, size
 		char *data;
 	} buffer;
 	Key key;
+	KeyValueUpdate keyValueUpdate;
 	ssize_t sentBytes;
 
 	ApplicationEvent applicationEvent;
@@ -1058,16 +1066,48 @@ bool MasterWorker::handleRedirectedGetRequest( SlaveEvent event, char *buf, size
 
 	struct timespec elapsedTime;
 
-	// purge pending records on previous slave
-	if ( ! MasterWorker::pending->eraseKey( PT_SLAVE_GET, event.id, event.socket, &pid, &key ) ) {
-		__ERROR__( "MasterWorker", "handleRedirectedGetRequest", "Cannot find a pending slave GET request that matches the response. This message will be discarded (key = %.*s).", key.size, key.data );
+	// identify the code for each type of requests
+	PendingType applicationPT = PT_APPLICATION_GET;
+	PendingType slavePT = PT_SLAVE_GET;
+	const char *opName = "GET";
+	if ( opcode == PROTO_OPCODE_REDIRECT_UPDATE ) {
+		applicationPT = PT_APPLICATION_UPDATE;
+		slavePT = PT_SLAVE_UPDATE;
+		opName = "UPDATE";
+	} else if ( opcode == PROTO_OPCODE_REDIRECT_DELETE ) {
+		applicationPT = PT_APPLICATION_DEL;
+		slavePT = PT_SLAVE_DEL;
+		opName = "DELETE";
+	} else if ( opcode != PROTO_OPCODE_REDIRECT_GET ) {
+		__ERROR__( "MasterWorker", "handleRedirectedRequest", "Invalid type of redirect request." );
 		return false;
 	}
-	MasterWorker::pending->eraseRequestStartTime( PT_SLAVE_GET, pid.id, ( void * ) event.socket, elapsedTime );
+	//fprintf( stderr, "handle redirected %s request on key [%s](%u)\n", opName, header.key, header.keySize );
+
+	bool ret = false;
+
+	// purge pending records on previous slave
+	if ( slavePT == PT_SLAVE_GET || slavePT == PT_SLAVE_DEL ) {
+		ret = MasterWorker::pending->eraseKey( slavePT, event.id, event.socket, &pid, &key );
+	} else {
+		ret = MasterWorker::pending->eraseKeyValueUpdate( slavePT, event.id, event.socket, &pid, &keyValueUpdate );
+	}
+	if ( ! ret ) {
+		__ERROR__( "MasterWorker", "handleRedirectedRequest", "Cannot find a pending slave %s request that matches the response. This message will be discarded (key = %.*s).", opName, key.size, key.data );
+		return false;
+	}
+ 
+	if ( slavePT == PT_SLAVE_GET )
+		MasterWorker::pending->eraseRequestStartTime( slavePT, pid.id, ( void * ) event.socket, elapsedTime );
 
 	// abort request if no application is pending for result
-	if ( ! MasterWorker::pending->findKey( PT_APPLICATION_GET, pid.parentId, 0, &key ) ) {
-		__ERROR__( "MasterWorker", "handleRedirectedGetRequest", "Cannot find a pending application GET request that matches the response. This message will be discarded (key = %.*s).", key.size, key.data );
+	if ( slavePT == PT_SLAVE_GET || slavePT == PT_SLAVE_DEL ) {
+		ret = MasterWorker::pending->findKey( applicationPT, pid.parentId, 0, &key );
+	} else {
+		ret = MasterWorker::pending->findKeyValueUpdate( applicationPT, pid.parentId, 0, &keyValueUpdate );
+	}
+	if ( ! ret ) {
+		__ERROR__( "MasterWorker", "handleRedirectedRequest", "Cannot find a pending application %s request that matches the response. This message will be discarded (key = %.*s).", opName, key.size, key.data );
 		return false;
 	}
 
@@ -1084,15 +1124,28 @@ bool MasterWorker::handleRedirectedGetRequest( SlaveEvent event, char *buf, size
 		return false;
 	}
 
-	buffer.data = this->protocol.reqGet( buffer.size, requestId, header.key, header.keySize );
+	if ( slavePT == PT_SLAVE_GET ) {
+		buffer.data = this->protocol.reqGet( buffer.size, requestId, header.key, header.keySize );
+	} else if ( slavePT == PT_SLAVE_UPDATE ) {
+		buffer.data = this->protocol.reqUpdate( buffer.size, requestId, header.key, header.keySize, ( char * ) keyValueUpdate.ptr, keyValueUpdate.offset, keyValueUpdate.length );
+	} else if ( slavePT == PT_SLAVE_DEL ) {
+		buffer.data = this->protocol.reqDelete( buffer.size, requestId, header.key, header.keySize );
+	}
 
 	// add pending records on redirected slave
-	if ( ! MasterWorker::pending->insertKey( PT_SLAVE_GET, requestId, pid.parentId , ( void * ) socket, key ) ) {
-		__ERROR__( "MasterWorker", "handleRedirectedGetRequest", "Cannot insert into slave GET pending map." );
+	if ( slavePT == PT_SLAVE_GET || slavePT == PT_SLAVE_DEL ) {
+		ret = MasterWorker::pending->insertKey( slavePT, requestId, pid.parentId , ( void * ) socket, key );
+	} else {
+		ret = MasterWorker::pending->insertKeyValueUpdate( slavePT, requestId, pid.parentId, ( void * ) socket, keyValueUpdate );
+	}
+	if ( ! ret ) {
+		__ERROR__( "MasterWorker", "handleRedirectedequest", "Cannot insert into slave %s pending map.", opName );
+		return false;
 	}
 
 	// Mark the time when request is sent
-	MasterWorker::pending->recordRequestStartTime( PT_SLAVE_GET, requestId, event.id, ( void * ) socket, socket->getAddr() );
+	if ( slavePT == PT_SLAVE_GET )
+		MasterWorker::pending->recordRequestStartTime( slavePT, requestId, event.id, ( void * ) socket, socket->getAddr() );
 
 	// Send GET request
 	sentBytes = socket->send( buffer.data, buffer.size, connected );
@@ -1100,6 +1153,11 @@ bool MasterWorker::handleRedirectedGetRequest( SlaveEvent event, char *buf, size
 		__ERROR__( "MasterWorker", "handleRedirectedGetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 		return false;
 	}
+
+	// add the remapping record to cache
+	key.set( header.keySize, header.key );
+	RemappingRecord record ( listId, chunkId );
+	MasterWorker::remappingRecords->insert( key, record );
 
 	return true;
 }
@@ -1506,7 +1564,10 @@ bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, char *b
 		return false;
 	}
 
-	applicationEvent.resUpdate( ( ApplicationSocket * ) keyValueUpdate.ptr, pid.id, keyValueUpdate, success );
+	// free the updated value
+	delete [] ( ( char* )( keyValueUpdate.ptr) );
+
+	applicationEvent.resUpdate( ( ApplicationSocket * ) pid.ptr, pid.id, keyValueUpdate, success );
 	MasterWorker::eventQueue->insert( applicationEvent );
 
 	return true;

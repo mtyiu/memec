@@ -1169,6 +1169,7 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 	KeyMetadata keyMetadata;
 	Metadata metadata;
 	Chunk *chunk;
+	RemappingRecord remappingRecord;
 	if ( map->findValueByKey( header.key, header.keySize, &keyValue, &key, &keyMetadata, &metadata, &chunk ) ) {
 		uint32_t offset = keyMetadata.offset + PROTO_KEY_VALUE_SIZE + header.keySize + header.valueUpdateOffset;
 		bool isDegraded;
@@ -1256,12 +1257,16 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 #endif
 			}
 		} else {
-			// TODO redirect requests on remapped keys
 			event.resUpdate( event.socket, event.id, key, header.valueUpdateOffset, header.valueUpdateSize, true, false );
 			this->dispatch( event );
 		}
 
 		ret = true;
+	} else if ( map->findRemappingRecordByKey( header.key, header.keySize, &remappingRecord, &key ) ) {
+		// Redirect request to remapped slave
+		event.resRedirect( event.socket, event.id, PROTO_OPCODE_UPDATE, key, remappingRecord );
+		ret = false;
+		this->dispatch( event );
 	} else {
 		event.resUpdate( event.socket, event.id, key, header.valueUpdateOffset, header.valueUpdateSize, false );
 		this->dispatch( event );
@@ -1297,6 +1302,7 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 	KeyMetadata keyMetadata;
 	Metadata metadata;
 	Chunk *chunk;
+	RemappingRecord remappingRecord;
 	if ( map->findValueByKey( header.key, header.keySize, &keyValue, 0, &keyMetadata, &metadata, &chunk ) ) {
 		uint32_t deltaSize;
 		char *delta;
@@ -1401,11 +1407,15 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 #endif
 			}
 		} else {
-			// TODO handle requests on remapped keys
 			event.resDelete( event.socket, event.id, key, true, false );
 			this->dispatch( event );
 		}
 		ret = true;
+	} else if ( map->findRemappingRecordByKey( header.key, header.keySize, &remappingRecord, &key ) ) {
+		// Redirect request to remapped slave
+		event.resRedirect( event.socket, event.id, PROTO_OPCODE_DELETE, key, remappingRecord );
+		ret = false;
+		this->dispatch( event );
 	} else {
 		event.resDelete( event.socket, event.id, key, false );
 		this->dispatch( event );
