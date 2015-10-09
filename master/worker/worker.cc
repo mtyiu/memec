@@ -283,7 +283,7 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 
 								getLatency.needsDelete = false;
 								setLatency.needsDelete = false;
-								getLatency.clear(); 
+								getLatency.clear();
 								setLatency.clear();
 
 								break;
@@ -956,7 +956,6 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 
 	// Send DELETE requests
 	sentBytes = socket->send( buffer.data, buffer.size, connected );
-	assert( sentBytes == 42 );
 	if ( sentBytes != ( ssize_t ) buffer.size ) {
 		__ERROR__( "MasterWorker", "handleDeleteRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 		return false;
