@@ -6,7 +6,9 @@ DataChunkBuffer::DataChunkBuffer( uint32_t count, uint32_t listId, uint32_t stri
 	this->count = count;
 	this->locks = new pthread_mutex_t[ count ];
 	this->chunks = new Chunk*[ count ];
+#ifndef REINSERTED_CHUNKS_IS_SET
 	this->reInsertedChunks = new Chunk*[ count ];
+#endif
 	this->sizes = new uint32_t[ count ];
 
 	ChunkBuffer::chunkPool->malloc( this->chunks, this->count );
@@ -24,7 +26,9 @@ DataChunkBuffer::DataChunkBuffer( uint32_t count, uint32_t listId, uint32_t stri
 
 		this->stripeId++;
 
+#ifndef REINSERTED_CHUNKS_IS_SET
 		this->reInsertedChunks[ i ] = 0;
+#endif
 	}
 }
 
@@ -41,6 +45,17 @@ KeyMetadata DataChunkBuffer::set( SlaveWorker *worker, char *key, uint8_t keySiz
 		uint32_t space, min = ChunkBuffer::capacity;
 		Chunk *c;
 		// Choose one from the re-inserted chunks
+#ifdef REINSERTED_CHUNKS_IS_SET
+		std::set<Chunk *>::iterator it;
+		for ( it = this->reInsertedChunks.begin(); it != this->reInsertedChunks.end(); it++ ) {
+			c = *it;
+			space = ChunkBuffer::capacity - c->getSize();
+			if ( space >= size && space < min ) {
+				min = space;
+				reInsertedChunk = c;
+			}
+		}
+#else
 		for ( uint32_t i = 0; i < this->count; i++ ) {
 			if ( ( c = this->reInsertedChunks[ i ] ) ) {
 				space = ChunkBuffer::capacity - c->getSize();
@@ -50,17 +65,28 @@ KeyMetadata DataChunkBuffer::set( SlaveWorker *worker, char *key, uint8_t keySiz
 				}
 			}
 		}
+#endif
 		if ( reInsertedChunk ) {
 			// Update reInsertedChunkMaxSpace if the chunk with reInsertedChunkMaxSpace is chosen
 			if ( ChunkBuffer::capacity - reInsertedChunk->getSize() == this->reInsertedChunkMaxSpace ) {
 				this->reInsertedChunkMaxSpace = 0;
+
+#ifdef REINSERTED_CHUNKS_IS_SET
+				for ( it = this->reInsertedChunks.begin(); it != this->reInsertedChunks.end(); it++ ) {
+					c = *it;
+					space = ChunkBuffer::capacity - c->getSize();
+					if ( space > this->reInsertedChunkMaxSpace )
+						this->reInsertedChunkMaxSpace = space;
+				}
+#else
 				for ( uint32_t i = 0; i < this->count; i++ ) {
 					if ( ( c = this->reInsertedChunks[ i ] ) ) {
 						space = ChunkBuffer::capacity - c->getSize();
 						if ( space > this->reInsertedChunkMaxSpace )
-							space = this->reInsertedChunkMaxSpace;
+							this->reInsertedChunkMaxSpace = space;
 					}
 				}
+#endif
 			}
 		}
 	}
@@ -110,13 +136,16 @@ KeyMetadata DataChunkBuffer::set( SlaveWorker *worker, char *key, uint8_t keySiz
 			this->flushAt( worker, index, false );
 		} else {
 			worker->issueSealChunkRequest( chunk, chunk->lastDelPos );
-
+#ifdef REINSERTED_CHUNKS_IS_SET
+			this->reInsertedChunks.erase( chunk );
+#else
 			for ( uint32_t i = 0; i < this->count; i++ ) {
 				if ( this->reInsertedChunks[ i ] == chunk ) {
 					this->reInsertedChunks[ i ] = 0;
 					break;
 				}
 			}
+#endif
 		}
 	}
 
@@ -140,24 +169,44 @@ size_t DataChunkBuffer::seal( SlaveWorker *worker ) {
 		this->flushAt( worker, i, false );
 		count++;
 	}
+#ifdef REINSERTED_CHUNKS_IS_SET
+	for (
+		std::set<Chunk *>::iterator it = this->reInsertedChunks.begin();
+		it != this->reInsertedChunks.end();
+		it++
+	) {
+		c = *it;
+		worker->issueSealChunkRequest( c, c->lastDelPos );
+		count++;
+	}
+#else
 	for ( uint32_t i = 0; i < this->count; i++ ) {
 		if ( ( c = this->reInsertedChunks[ i ] ) ) {
 			worker->issueSealChunkRequest( c, c->lastDelPos );
 			count++;
 		}
 	}
+#endif
 	pthread_mutex_unlock( &this->lock );
 	return count;
 }
 
 bool DataChunkBuffer::reInsert( SlaveWorker *worker, Chunk *chunk, uint32_t sizeToBeFreed, bool needsLock, bool needsUnlock ) {
+#ifdef REINSERTED_CHUNKS_IS_SET
+	std::set<Chunk *>::iterator it;
+	std::pair<std::set<Chunk *>::iterator, bool> ret;
+#else
 	bool ret = true;
+#endif
 	uint32_t space;
 
 	if ( needsLock ) pthread_mutex_lock( &this->lock );
 
 	space = ChunkBuffer::capacity - chunk->getSize() + sizeToBeFreed;
 
+#ifdef REINSERTED_CHUNKS_IS_SET
+	ret = this->reInsertedChunks.insert( chunk );
+#else
 	// Limit the number of re-inserted chunks to be this->count
 	Chunk *c;
 	uint32_t i, j = this->count, min = space, index = this->count;
@@ -193,12 +242,17 @@ bool DataChunkBuffer::reInsert( SlaveWorker *worker, Chunk *chunk, uint32_t size
 	}
 
 reInsertExit:
+#endif
 	if ( space > reInsertedChunkMaxSpace )
 		reInsertedChunkMaxSpace = space;
 
 	if ( needsUnlock ) pthread_mutex_unlock( &this->lock );
 
+#ifdef REINSERTED_CHUNKS_IS_SET
+	return ret.second;
+#else
 	return ret;
+#endif
 }
 
 int DataChunkBuffer::lockChunk( Chunk *chunk, bool keepGlobalLock ) {
