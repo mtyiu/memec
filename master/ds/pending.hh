@@ -1,8 +1,6 @@
 #ifndef __MASTER_DS_PENDING_HH__
 #define __MASTER_DS_PENDING_HH__
 
-#include <map>
-#include <set>
 #include <cstring>
 #include <pthread.h>
 #include <netinet/in.h>

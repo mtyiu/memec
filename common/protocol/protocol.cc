@@ -279,10 +279,10 @@ size_t Protocol::generateChunkDataHeader( uint8_t magic, uint8_t to, uint8_t opc
 	return bytes;
 }
 
-size_t Protocol::generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, std::map<Key, OpMetadata> &ops, std::map<Key, RemappingRecord> &remapRecords, pthread_mutex_t *lock, pthread_mutex_t *rlock, size_t &count, size_t &remapCount ) {
+size_t Protocol::generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, std::unordered_map<Key, OpMetadata> &ops, std::unordered_map<Key, RemappingRecord> &remapRecords, pthread_mutex_t *lock, pthread_mutex_t *rlock, size_t &count, size_t &remapCount ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
-	std::map<Key, OpMetadata>::iterator it;
-	std::map<Key, RemappingRecord>::iterator rit;
+	std::unordered_map<Key, OpMetadata>::iterator it;
+	std::unordered_map<Key, RemappingRecord>::iterator rit;
 	size_t bytes = PROTO_HEADER_SIZE;
 	count = 0;
 

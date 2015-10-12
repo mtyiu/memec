@@ -1,7 +1,7 @@
 #ifndef __COMMON_DS_PENDING_HH__
 #define __COMMON_DS_PENDING_HH__
 
-#include <set>
+#include <map>
 #include <cstring>
 #include "../../common/ds/key.hh"
 

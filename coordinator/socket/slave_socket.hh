@@ -1,7 +1,7 @@
 #ifndef __COORDINATOR_SOCKET_SLAVE_SOCKET_HH__
 #define __COORDINATOR_SOCKET_SLAVE_SOCKET_HH__
 
-#include <map>
+#include <unordered_map>
 #include "../../common/ds/array_map.hh"
 #include "../../common/ds/key.hh"
 #include "../../common/ds/load.hh"
@@ -14,7 +14,7 @@ private:
 
 public:
 	// All stored keys
-	std::map<Key, OpMetadata> keys;
+	std::unordered_map<Key, OpMetadata> keys;
 	struct {
 		uint32_t addr;
 		uint16_t port;

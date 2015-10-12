@@ -13,7 +13,7 @@ ParityChunkBuffer::ParityChunkBuffer( uint32_t count, uint32_t listId, uint32_t 
 
 ParityChunkWrapper &ParityChunkBuffer::getWrapper( uint32_t stripeId, bool needsLock, bool needsUnlock ) {
 	if ( needsLock ) pthread_mutex_lock( &this->lock );
-	std::map<uint32_t, ParityChunkWrapper>::iterator it = this->chunks.find( stripeId );
+	std::unordered_map<uint32_t, ParityChunkWrapper>::iterator it = this->chunks.find( stripeId );
 	if ( it == this->chunks.end() ) {
 		ParityChunkWrapper wrapper;
 		wrapper.chunk = ChunkBuffer::chunkPool->malloc();
@@ -33,7 +33,7 @@ ParityChunkWrapper &ParityChunkBuffer::getWrapper( uint32_t stripeId, bool needs
 
 bool ParityChunkBuffer::set( char *keyStr, uint8_t keySize, char *valueStr, uint32_t valueSize, uint32_t chunkId, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk ) {
 	Key key;
-	std::map<Key, PendingRequest>::iterator it;
+	std::unordered_map<Key, PendingRequest>::iterator it;
 
 	key.set( keySize, keyStr );
 
@@ -44,7 +44,7 @@ bool ParityChunkBuffer::set( char *keyStr, uint8_t keySize, char *valueStr, uint
 	if ( it == this->pending.end() ) {
 		// Store the key-value pair in a temporary buffer
 		KeyValue keyValue;
-		std::pair<std::map<Key, KeyValue>::iterator, bool> ret;
+		std::pair<std::unordered_map<Key, KeyValue>::iterator, bool> ret;
 
 		keyValue.dup( keyStr, keySize, valueStr, valueSize );
 		keyValue.deserialize( keyStr, keySize, valueStr, valueSize );
@@ -107,8 +107,8 @@ bool ParityChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t coun
 	char *keyStr, *valueStr;
 	Key key;
 	KeyValue keyValue;
-	std::map<Key, KeyValue>::iterator it;
-	std::map<Key, PendingRequest>::iterator prtIt;
+	std::unordered_map<Key, KeyValue>::iterator it;
+	std::unordered_map<Key, PendingRequest>::iterator prtIt;
 
 	pthread_mutex_lock( &this->lock );
 	while ( sealDataSize ) {
@@ -133,7 +133,7 @@ bool ParityChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t coun
 			pendingRequest.seal( stripeId, offset );
 
 			std::pair<Key, PendingRequest> p( key, pendingRequest );
-			std::pair<std::map<Key, PendingRequest>::iterator, bool> ret;
+			std::pair<std::unordered_map<Key, PendingRequest>::iterator, bool> ret;
 
 			ret = this->pending.insert( p );
 			if ( ! ret.second ) {
@@ -169,7 +169,7 @@ bool ParityChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t coun
 }
 
 bool ParityChunkBuffer::deleteKey( char *keyStr, uint8_t keySize ) {
-	std::map<Key, KeyValue>::iterator it;
+	std::unordered_map<Key, KeyValue>::iterator it;
 	Key key;
 
 	key.set( keySize, keyStr );
@@ -184,7 +184,7 @@ bool ParityChunkBuffer::deleteKey( char *keyStr, uint8_t keySize ) {
 		key.dup();
 
 		std::pair<Key, PendingRequest> p( key, pendingRequest );
-		std::pair<std::map<Key, PendingRequest>::iterator, bool> ret;
+		std::pair<std::unordered_map<Key, PendingRequest>::iterator, bool> ret;
 
 		ret = this->pending.insert( p );
 		if ( ! ret.second ) {
@@ -203,7 +203,7 @@ bool ParityChunkBuffer::deleteKey( char *keyStr, uint8_t keySize ) {
 }
 
 bool ParityChunkBuffer::updateKeyValue( char *keyStr, uint8_t keySize, uint32_t offset, uint32_t length, char *valueUpdate ) {
-	std::map<Key, KeyValue>::iterator it;
+	std::unordered_map<Key, KeyValue>::iterator it;
 	Key key;
 
 	key.set( keySize, keyStr );
@@ -217,7 +217,7 @@ bool ParityChunkBuffer::updateKeyValue( char *keyStr, uint8_t keySize, uint32_t 
 		key.dup();
 
 		std::pair<Key, PendingRequest> p( key, pendingRequest );
-		std::pair<std::map<Key, PendingRequest>::iterator, bool> ret;
+		std::pair<std::unordered_map<Key, PendingRequest>::iterator, bool> ret;
 
 		ret = this->pending.insert( p );
 		if ( ! ret.second ) {
@@ -297,7 +297,7 @@ void ParityChunkBuffer::print( FILE *f ) {
 		width, "Statistics (occupied / total)"
 	);
 	for (
-		std::map<uint32_t, ParityChunkWrapper>::iterator it = this->chunks.begin();
+		std::unordered_map<uint32_t, ParityChunkWrapper>::iterator it = this->chunks.begin();
 		it != this->chunks.end();
 		it++
 	) {

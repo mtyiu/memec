@@ -20,7 +20,7 @@ private:
 	 * Store the cached chunks
 	 * (list ID, stripe ID, chunk ID) |-> Chunk *
 	 */
-	std::map<Metadata, Chunk *> cache;
+	std::unordered_map<Metadata, Chunk *> cache;
 	pthread_mutex_t cacheLock;
 
 public:
@@ -28,18 +28,18 @@ public:
 	 * Store the keys to be synchronized with coordinator
 	 * Key |-> (list ID, stripe ID, chunk ID, opcode)
 	 */
-	std::map<Key, OpMetadata> ops;
+	std::unordered_map<Key, OpMetadata> ops;
 	pthread_mutex_t opsLock;
 	/**
 	 * Store the pending-to-send remapping records
 	 * Key |-> (list ID, chunk ID)
 	 */
-	std::map<Key, RemappingRecord> remap;
+	std::unordered_map<Key, RemappingRecord> remap;
 	/**
 	 * Store the alread-sent remapping records
 	 * Key |-> (list ID, chunk ID)
 	 */
-	std::map<Key, RemappingRecord> remapSent;
+	std::unordered_map<Key, RemappingRecord> remapSent;
 	pthread_mutex_t remapLock;
 
 	Map() {
@@ -50,7 +50,7 @@ public:
 	}
 
 	bool findRemappingRecordByKey( char *data, uint8_t size, RemappingRecord *remappingRecordPtr = 0, Key *keyPtr = 0 ) {
-		std::map<Key, RemappingRecord>::iterator it;
+		std::unordered_map<Key, RemappingRecord>::iterator it;
 		Key key;
 
 		key.set( size, data );
@@ -71,7 +71,7 @@ public:
 
 	bool findValueByKey( char *data, uint8_t size, KeyValue *keyValue, Key *keyPtr = 0, KeyMetadata *keyMetadataPtr = 0, Metadata *metadataPtr = 0, Chunk **chunkPtr = 0 ) {
 		std::unordered_map<Key, KeyMetadata>::iterator keysIt;
-		std::map<Metadata, Chunk *>::iterator cacheIt;
+		std::unordered_map<Metadata, Chunk *>::iterator cacheIt;
 		Key key;
 
 		keyValue->clear();
@@ -106,7 +106,7 @@ public:
 	}
 
 	Chunk *findChunkById( uint32_t listId, uint32_t stripeId, uint32_t chunkId, Metadata *metadataPtr = 0 ) {
-		std::map<Metadata, Chunk *>::iterator it;
+		std::unordered_map<Metadata, Chunk *>::iterator it;
 		Metadata metadata;
 
 		metadata.set( listId, stripeId, chunkId );
@@ -150,7 +150,7 @@ public:
 		key.dup( key.size, key.data );
 
 		std::pair<Key, RemappingRecord> p( key, remappingRecord );
-		std::pair<std::map<Key, RemappingRecord>::iterator, bool> ret;
+		std::pair<std::unordered_map<Key, RemappingRecord>::iterator, bool> ret;
 
 		pthread_mutex_lock( &this->remapLock );
 		ret = this->remap.insert( p );
@@ -216,7 +216,7 @@ public:
 		lock = &this->keysLock;
 	}
 
-	void getCacheMap( std::map<Metadata, Chunk *> *&cache, pthread_mutex_t *&lock ) {
+	void getCacheMap( std::unordered_map<Metadata, Chunk *> *&cache, pthread_mutex_t *&lock ) {
 		cache = &this->cache;
 		lock = &this->cacheLock;
 	}
@@ -245,7 +245,7 @@ public:
 		if ( ! this->cache.size() ) {
 			fprintf( stdout, "(None)\n" );
 		} else {
-			for ( std::map<Metadata, Chunk *>::iterator it = this->cache.begin(); it != this->cache.end(); it++ ) {
+			for ( std::unordered_map<Metadata, Chunk *>::iterator it = this->cache.begin(); it != this->cache.end(); it++ ) {
 				fprintf(
 					stdout, "(list ID: %u, stripe ID: %u, chunk ID: %u) --> %p (type: %s chunk, status: %s, count: %u, size: %u)\n",
 					it->first.listId, it->first.stripeId, it->first.chunkId,

@@ -323,8 +323,8 @@ void Slave::seal() {
 
 void Slave::flush() {
 	IOEvent ioEvent;
-	std::map<Metadata, Chunk *>::iterator it;
-	std::map<Metadata, Chunk *> *cache;
+	std::unordered_map<Metadata, Chunk *>::iterator it;
+	std::unordered_map<Metadata, Chunk *> *cache;
 	pthread_mutex_t *lock;
 	Chunk *chunk;
 	size_t count = 0;
@@ -346,8 +346,8 @@ void Slave::flush() {
 }
 
 void Slave::memory( FILE *f ) {
-	std::map<Metadata, Chunk *> *cache;
-	std::map<Metadata, Chunk *>::iterator it;
+	std::unordered_map<Metadata, Chunk *> *cache;
+	std::unordered_map<Metadata, Chunk *>::iterator it;
 	pthread_mutex_t *lock;
 	uint32_t numDataChunks = 0, numParityChunks = 0, numKeyValues = 0;
 	uint64_t occupied = 0, allocated = 0, bytesParity = 0;

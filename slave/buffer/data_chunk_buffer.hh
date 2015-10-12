@@ -4,7 +4,7 @@
 #define REINSERTED_CHUNKS_IS_SET
 
 #ifdef REINSERTED_CHUNKS_IS_SET
-#include <set>
+#include <unordered_set>
 #endif
 
 #include "chunk_buffer.hh"
@@ -17,7 +17,7 @@ private:
 	pthread_mutex_t *locks;                // Lock for each chunk
 	Chunk **chunks;                        // Allocated chunk buffer
 #ifdef REINSERTED_CHUNKS_IS_SET
-	std::set<Chunk *> reInsertedChunks;    // Chunks that have free space after deletion
+	std::unordered_set<Chunk *> reInsertedChunks;    // Chunks that have free space after deletion
 #else
 	Chunk **reInsertedChunks;              // Chunks that have free space after deletion
 #endif

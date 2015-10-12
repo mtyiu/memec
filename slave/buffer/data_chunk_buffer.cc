@@ -46,7 +46,7 @@ KeyMetadata DataChunkBuffer::set( SlaveWorker *worker, char *key, uint8_t keySiz
 		Chunk *c;
 		// Choose one from the re-inserted chunks
 #ifdef REINSERTED_CHUNKS_IS_SET
-		std::set<Chunk *>::iterator it;
+		std::unordered_set<Chunk *>::iterator it;
 		for ( it = this->reInsertedChunks.begin(); it != this->reInsertedChunks.end(); it++ ) {
 			c = *it;
 			space = ChunkBuffer::capacity - c->getSize();
@@ -171,7 +171,7 @@ size_t DataChunkBuffer::seal( SlaveWorker *worker ) {
 	}
 #ifdef REINSERTED_CHUNKS_IS_SET
 	for (
-		std::set<Chunk *>::iterator it = this->reInsertedChunks.begin();
+		std::unordered_set<Chunk *>::iterator it = this->reInsertedChunks.begin();
 		it != this->reInsertedChunks.end();
 		it++
 	) {
@@ -193,8 +193,8 @@ size_t DataChunkBuffer::seal( SlaveWorker *worker ) {
 
 bool DataChunkBuffer::reInsert( SlaveWorker *worker, Chunk *chunk, uint32_t sizeToBeFreed, bool needsLock, bool needsUnlock ) {
 #ifdef REINSERTED_CHUNKS_IS_SET
-	std::set<Chunk *>::iterator it;
-	std::pair<std::set<Chunk *>::iterator, bool> ret;
+	std::unordered_set<Chunk *>::iterator it;
+	std::pair<std::unordered_set<Chunk *>::iterator, bool> ret;
 #else
 	bool ret = true;
 #endif

@@ -1,7 +1,7 @@
 #ifndef __SLAVE_BUFFER_PARITY_CHUNK_BUFFER_HH__
 #define __SLAVE_BUFFER_PARITY_CHUNK_BUFFER_HH__
 
-#include <set>
+#include <unordered_map>
 #include "chunk_buffer.hh"
 #include "../../common/ds/bitmask_array.hh"
 
@@ -60,11 +60,11 @@ public:
 class ParityChunkBuffer : public ChunkBuffer {
 private:
 	// Map stripe ID to ParityChunk objects
-	std::map<uint32_t, ParityChunkWrapper> chunks;
+	std::unordered_map<uint32_t, ParityChunkWrapper> chunks;
 	// Temporary map that stores the not-yet-sealed key-value pairs
-	std::map<Key, KeyValue> keys;
+	std::unordered_map<Key, KeyValue> keys;
 	// Store the request that update the not-yet-received keys
-	std::map<Key, PendingRequest> pending;
+	std::unordered_map<Key, PendingRequest> pending;
 
 	void update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, bool needsLock = true, bool needsUnlock = true );
 

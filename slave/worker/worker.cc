@@ -65,7 +65,7 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 		size_t size;
 		char *data;
 	} buffer;
-	std::map<Key, RemappingRecord>::iterator it, safeNextIt;
+	std::unordered_map<Key, RemappingRecord>::iterator it, safeNextIt;
 
 	if ( event.type != COORDINATOR_EVENT_TYPE_PENDING )
 		requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
@@ -1435,7 +1435,7 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 		key.ptr = 0;
 		pthread_mutex_t *keysLock, *cacheLock;
 		std::unordered_map<Key, KeyMetadata> *keys;
-		std::map<Metadata, Chunk *> *cache;
+		std::unordered_map<Metadata, Chunk *> *cache;
 		SlaveWorker::map->getKeysMap( keys, keysLock );
 		SlaveWorker::map->getCacheMap( cache, cacheLock );
 		// Lock the data chunk buffer
