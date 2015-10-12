@@ -532,9 +532,9 @@ void Master::interactive() {
 
 void Master::printPending( FILE *f ) {
 	size_t i;
-	std::map<PendingIdentifier, Key>::iterator it;
-	std::map<PendingIdentifier, KeyValueUpdate>::iterator keyValueUpdateIt;
-	std::map<PendingIdentifier, RemappingRecord>::iterator remappingRecordIt;
+	std::unordered_multimap<PendingIdentifier, Key>::iterator it;
+	std::unordered_multimap<PendingIdentifier, KeyValueUpdate>::iterator keyValueUpdateIt;
+	std::unordered_multimap<PendingIdentifier, RemappingRecord>::iterator remappingRecordIt;
 
 	pthread_mutex_lock( &this->pending.applications.setLock );
 	fprintf(
