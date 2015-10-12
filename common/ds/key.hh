@@ -1,6 +1,7 @@
 #ifndef __COMMON_DS_KEY_HH__
 #define __COMMON_DS_KEY_HH__
 
+#include <unordered_map>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -70,12 +71,11 @@ public:
 };
 
 namespace std {
-	template<> class hash<Key> {
-	public:
+	template<> struct hash<Key> {
 		size_t operator()( const Key &key ) const {
 			return HashFunc::hash( key.data, key.size );
 		}
 	};
-};
+}
 
 #endif
