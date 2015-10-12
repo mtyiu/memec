@@ -2031,7 +2031,7 @@ bool SlaveWorker::handleDeleteResponse( SlavePeerEvent event, bool success, char
 
 bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
 	int pending;
-	std::map<PendingIdentifier, ChunkRequest>::iterator it, tmp, end;
+	std::unordered_multimap<PendingIdentifier, ChunkRequest>::iterator it, tmp, end;
 	ChunkRequest chunkRequest;
 
 	if ( success ) {

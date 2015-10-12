@@ -563,10 +563,10 @@ void Slave::interactive() {
 
 void Slave::printPending( FILE *f ) {
 	size_t i;
-	std::map<PendingIdentifier, Key>::iterator it;
-	std::map<PendingIdentifier, KeyValueUpdate>::iterator keyValueUpdateIt;
-	std::map<PendingIdentifier, ChunkUpdate>::iterator chunkUpdateIt;
-	std::map<PendingIdentifier, ChunkRequest>::iterator chunkRequestIt;
+	std::unordered_multimap<PendingIdentifier, Key>::iterator it;
+	std::unordered_multimap<PendingIdentifier, KeyValueUpdate>::iterator keyValueUpdateIt;
+	std::unordered_multimap<PendingIdentifier, ChunkUpdate>::iterator chunkUpdateIt;
+	std::unordered_multimap<PendingIdentifier, ChunkRequest>::iterator chunkRequestIt;
 	fprintf(
 		f,
 		"Pending requests for masters\n"

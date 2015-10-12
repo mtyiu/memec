@@ -1,6 +1,6 @@
 #include "pending.hh"
 
-bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIdentifier, RemappingRecordKey> *&map ) {
+bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::unordered_multimap<PendingIdentifier, RemappingRecordKey> *&map ) {
 	switch( type ) {
 		case PT_MASTER_REMAPPING_SET:
 			lock = &this->masters.remappingSetLock;
@@ -18,7 +18,7 @@ bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIde
 	return true;
 }
 
-bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIdentifier, Key> *&map ) {
+bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::unordered_multimap<PendingIdentifier, Key> *&map ) {
 	switch( type ) {
 		case PT_MASTER_GET:
 			lock = &this->masters.getLock;
@@ -40,7 +40,7 @@ bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIde
 	return true;
 }
 
-bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIdentifier, KeyValueUpdate> *&map ) {
+bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *&map ) {
 	switch( type ) {
 		case PT_MASTER_UPDATE:
 			lock = &this->masters.updateLock;
@@ -58,7 +58,7 @@ bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIde
 	return true;
 }
 
-bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIdentifier, DegradedOp> *&map ) {
+bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::unordered_multimap<PendingIdentifier, DegradedOp> *&map ) {
 	switch( type ) {
 		case PT_SLAVE_PEER_DEGRADED_OPS:
 			lock = &this->slavePeers.degradedOpsLock;
@@ -72,7 +72,7 @@ bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIde
 	return true;
 }
 
-bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIdentifier, ChunkRequest> *&map ) {
+bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::unordered_multimap<PendingIdentifier, ChunkRequest> *&map ) {
 	switch( type ) {
 		case PT_SLAVE_PEER_GET_CHUNK:
 			lock = &this->slavePeers.getChunkLock;
@@ -90,7 +90,7 @@ bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIde
 	return true;
 }
 
-bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIdentifier, ChunkUpdate> *&map ) {
+bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::unordered_multimap<PendingIdentifier, ChunkUpdate> *&map ) {
 	switch( type ) {
 		case PT_SLAVE_PEER_UPDATE_CHUNK:
 			lock = &this->slavePeers.updateChunkLock;
@@ -112,10 +112,10 @@ bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIde
 	bool Pending::METHOD_NAME( PendingType type, uint32_t id, void *ptr, VALUE_TYPE &VALUE_VAR, bool needsLock, bool needsUnlock ) { \
 		PendingIdentifier pid( id, id, ptr ); \
 		std::pair<PendingIdentifier, VALUE_TYPE> p( pid, VALUE_VAR ); \
-		std::pair<std::map<PendingIdentifier, VALUE_TYPE>::iterator, bool> ret; \
+		std::unordered_multimap<PendingIdentifier, VALUE_TYPE>::iterator ret; \
  		\
 		pthread_mutex_t *lock; \
-		std::map<PendingIdentifier, VALUE_TYPE> *map; \
+		std::unordered_multimap<PendingIdentifier, VALUE_TYPE> *map; \
 		if ( ! this->get( type, lock, map ) ) \
 			return false; \
  		\
@@ -123,17 +123,17 @@ bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIde
 		ret = map->insert( p ); \
 		if ( needsUnlock ) pthread_mutex_unlock( lock ); \
  		\
-		return ret.second; \
+		return true; /* ret.second; */ \
 	}
 
 #define DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( METHOD_NAME, VALUE_TYPE, VALUE_VAR ) \
 	bool Pending::METHOD_NAME( PendingType type, uint32_t id, uint32_t parentId, void *ptr, VALUE_TYPE &VALUE_VAR, bool needsLock, bool needsUnlock ) { \
 		PendingIdentifier pid( id, parentId, ptr ); \
 		std::pair<PendingIdentifier, VALUE_TYPE> p( pid, VALUE_VAR ); \
-		std::pair<std::map<PendingIdentifier, VALUE_TYPE>::iterator, bool> ret; \
+		std::unordered_multimap<PendingIdentifier, VALUE_TYPE>::iterator ret; \
  		\
 		pthread_mutex_t *lock; \
-		std::map<PendingIdentifier, VALUE_TYPE> *map; \
+		std::unordered_multimap<PendingIdentifier, VALUE_TYPE> *map; \
 		if ( ! this->get( type, lock, map ) ) \
 			return false; \
  		\
@@ -141,7 +141,7 @@ bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIde
 		ret = map->insert( p ); \
 		if ( needsUnlock ) pthread_mutex_unlock( lock ); \
  		\
-		return ret.second; \
+		return true; /* ret.second; */ \
 	}
 
 #define DEFINE_PENDING_ERASE_METHOD( METHOD_NAME, VALUE_TYPE, VALUE_PTR_VAR ) \
@@ -150,8 +150,8 @@ bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIde
 		pthread_mutex_t *lock; \
 		bool ret; \
 		\
-		std::map<PendingIdentifier, VALUE_TYPE> *map; \
-		std::map<PendingIdentifier, VALUE_TYPE>::iterator it; \
+		std::unordered_multimap<PendingIdentifier, VALUE_TYPE> *map; \
+		std::unordered_multimap<PendingIdentifier, VALUE_TYPE>::iterator it; \
 		if ( ! this->get( type, lock, map ) ) \
 			return false; \
 		\
@@ -160,7 +160,7 @@ bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIde
 			it = map->find( pid ); \
 			ret = ( it != map->end() ); \
 		} else { \
-			it = map->lower_bound( pid ); \
+			it = map->find( pid ); \
 			ret = ( it != map->end() && it->first.id == id ); \
 		} \
 		if ( ret ) { \
@@ -194,12 +194,12 @@ DEFINE_PENDING_ERASE_METHOD( eraseChunkUpdate, ChunkUpdate, chunkUpdatePtr )
 #undef DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD
 #undef DEFINE_PENDING_ERASE_METHOD
 
-bool Pending::findChunkRequest( PendingType type, uint32_t id, void *ptr, std::map<PendingIdentifier, ChunkRequest>::iterator &it, bool needsLock, bool needsUnlock ) {
+bool Pending::findChunkRequest( PendingType type, uint32_t id, void *ptr, std::unordered_multimap<PendingIdentifier, ChunkRequest>::iterator &it, bool needsLock, bool needsUnlock ) {
 	PendingIdentifier pid( id, 0, ptr );
 	pthread_mutex_t *lock;
 	bool ret;
 
-	std::map<PendingIdentifier, ChunkRequest> *map;
+	std::unordered_multimap<PendingIdentifier, ChunkRequest> *map;
 	if ( ! this->get( type, lock, map ) )
 		return false;
 
@@ -208,7 +208,7 @@ bool Pending::findChunkRequest( PendingType type, uint32_t id, void *ptr, std::m
 		it = map->find( pid );
 		ret = ( it != map->end() );
 	} else {
-		it = map->lower_bound( pid );
+		it = map->find( pid );
 		ret = ( it != map->end() && it->first.id == id );
 	}
 	if ( needsUnlock ) pthread_mutex_unlock( lock );
@@ -221,54 +221,59 @@ uint32_t Pending::count( PendingType type, uint32_t id, bool needsLock, bool nee
 	pthread_mutex_t *lock;
 	uint32_t ret = 0;
 	if ( type == PT_SLAVE_PEER_DEGRADED_OPS ) {
-		std::map<PendingIdentifier, DegradedOp> *map;
-		std::map<PendingIdentifier, DegradedOp>::iterator it;
+		std::unordered_multimap<PendingIdentifier, DegradedOp> *map;
+		std::unordered_multimap<PendingIdentifier, DegradedOp>::iterator it;
 
 		if ( ! this->get( type, lock, map ) ) return 0;
 
 		if ( needsLock ) pthread_mutex_lock( lock );
-		it = map->lower_bound( pid );
-		for ( ret = 0; it != map->end() && it->first.id == id; ret++, it++ );
+		ret = map->count( pid );
+		// it = map->count( pid );
+		// for ( ret = 0; it != map->end() && it->first.id == id; ret++, it++ );
 		if ( needsUnlock ) pthread_mutex_unlock( lock );
 	} else if ( type == PT_SLAVE_PEER_UPDATE ) {
-		std::map<PendingIdentifier, KeyValueUpdate> *map;
-		std::map<PendingIdentifier, KeyValueUpdate>::iterator it;
+		std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *map;
+		std::unordered_multimap<PendingIdentifier, KeyValueUpdate>::iterator it;
 
 		if ( ! this->get( type, lock, map ) ) return 0;
 
 		if ( needsLock ) pthread_mutex_lock( lock );
-		it = map->lower_bound( pid );
-		for ( ret = 0; it != map->end() && it->first.id == id; ret++, it++ );
+		ret = map->count( pid );
+		// it = map->count( pid );
+		// for ( ret = 0; it != map->end() && it->first.id == id; ret++, it++ );
 		if ( needsUnlock ) pthread_mutex_unlock( lock );
 	} else if ( type == PT_SLAVE_PEER_DEL ) {
-		std::map<PendingIdentifier, Key> *map;
-		std::map<PendingIdentifier, Key>::iterator it;
+		std::unordered_multimap<PendingIdentifier, Key> *map;
+		std::unordered_multimap<PendingIdentifier, Key>::iterator it;
 
 		if ( ! this->get( type, lock, map ) ) return 0;
 
 		if ( needsLock ) pthread_mutex_lock( lock );
-		it = map->lower_bound( pid );
-		for ( ret = 0; it != map->end() && it->first.id == id; ret++, it++ );
+		ret = map->count( pid );
+		// it = map->count( pid );
+		// for ( ret = 0; it != map->end() && it->first.id == id; ret++, it++ );
 		if ( needsUnlock ) pthread_mutex_unlock( lock );
 	} else if ( type == PT_SLAVE_PEER_GET_CHUNK || type == PT_SLAVE_PEER_SET_CHUNK ) {
-		std::map<PendingIdentifier, ChunkRequest> *map;
-		std::map<PendingIdentifier, ChunkRequest>::iterator it;
+		std::unordered_multimap<PendingIdentifier, ChunkRequest> *map;
+		std::unordered_multimap<PendingIdentifier, ChunkRequest>::iterator it;
 
 		if ( ! this->get( type, lock, map ) ) return 0;
 
 		if ( needsLock ) pthread_mutex_lock( lock );
-		it = map->lower_bound( pid );
-		for ( ret = 0; it != map->end() && it->first.id == id; ret++, it++ );
+		ret = map->count( pid );
+		// it = map->count( pid );
+		// for ( ret = 0; it != map->end() && it->first.id == id; ret++, it++ );
 		if ( needsUnlock ) pthread_mutex_unlock( lock );
 	} else if ( type == PT_SLAVE_PEER_UPDATE_CHUNK || type == PT_SLAVE_PEER_DEL_CHUNK ) {
-		std::map<PendingIdentifier, ChunkUpdate> *map;
-		std::map<PendingIdentifier, ChunkUpdate>::iterator it;
+		std::unordered_multimap<PendingIdentifier, ChunkUpdate> *map;
+		std::unordered_multimap<PendingIdentifier, ChunkUpdate>::iterator it;
 
 		if ( ! this->get( type, lock, map ) ) return 0;
 
 		if ( needsLock ) pthread_mutex_lock( lock );
-		it = map->lower_bound( pid );
-		for ( ret = 0; it != map->end() && it->first.id == id; ret++, it++ );
+		ret = map->count( pid );
+		// it = map->lower_bound( pid );
+		// for ( ret = 0; it != map->end() && it->first.id == id; ret++, it++ );
 		if ( needsUnlock ) pthread_mutex_unlock( lock );
 	}
 

@@ -83,33 +83,33 @@ enum PendingType {
 
 class Pending {
 private:
-	bool get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIdentifier, Key> *&map );
-	bool get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIdentifier, RemappingRecordKey> *&map );
-	bool get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIdentifier, KeyValueUpdate> *&map );
-	bool get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIdentifier, DegradedOp> *&map );
-	bool get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIdentifier, ChunkRequest> *&map );
-	bool get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIdentifier, ChunkUpdate> *&map );
+	bool get( PendingType type, pthread_mutex_t *&lock, std::unordered_multimap<PendingIdentifier, Key> *&map );
+	bool get( PendingType type, pthread_mutex_t *&lock, std::unordered_multimap<PendingIdentifier, RemappingRecordKey> *&map );
+	bool get( PendingType type, pthread_mutex_t *&lock, std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *&map );
+	bool get( PendingType type, pthread_mutex_t *&lock, std::unordered_multimap<PendingIdentifier, DegradedOp> *&map );
+	bool get( PendingType type, pthread_mutex_t *&lock, std::unordered_multimap<PendingIdentifier, ChunkRequest> *&map );
+	bool get( PendingType type, pthread_mutex_t *&lock, std::unordered_multimap<PendingIdentifier, ChunkUpdate> *&map );
 
 public:
 	struct {
-		std::map<PendingIdentifier, RemappingRecordKey> remappingSet;
-		std::map<PendingIdentifier, Key> get;
-		std::map<PendingIdentifier, KeyValueUpdate> update;
-		std::map<PendingIdentifier, Key> del;
+		std::unordered_multimap<PendingIdentifier, RemappingRecordKey> remappingSet;
+		std::unordered_multimap<PendingIdentifier, Key> get;
+		std::unordered_multimap<PendingIdentifier, KeyValueUpdate> update;
+		std::unordered_multimap<PendingIdentifier, Key> del;
 		pthread_mutex_t remappingSetLock;
 		pthread_mutex_t getLock;
 		pthread_mutex_t updateLock;
 		pthread_mutex_t delLock;
 	} masters;
    struct {
-		std::map<PendingIdentifier, DegradedOp> degradedOps;
-		std::map<PendingIdentifier, RemappingRecordKey> remappingSet;
-		std::map<PendingIdentifier, KeyValueUpdate> update;
-		std::map<PendingIdentifier, Key> del;
-		std::map<PendingIdentifier, ChunkRequest> getChunk;
-		std::map<PendingIdentifier, ChunkRequest> setChunk;
-		std::map<PendingIdentifier, ChunkUpdate> updateChunk;
-		std::map<PendingIdentifier, ChunkUpdate> deleteChunk;
+		std::unordered_multimap<PendingIdentifier, DegradedOp> degradedOps;
+		std::unordered_multimap<PendingIdentifier, RemappingRecordKey> remappingSet;
+		std::unordered_multimap<PendingIdentifier, KeyValueUpdate> update;
+		std::unordered_multimap<PendingIdentifier, Key> del;
+		std::unordered_multimap<PendingIdentifier, ChunkRequest> getChunk;
+		std::unordered_multimap<PendingIdentifier, ChunkRequest> setChunk;
+		std::unordered_multimap<PendingIdentifier, ChunkUpdate> updateChunk;
+		std::unordered_multimap<PendingIdentifier, ChunkUpdate> deleteChunk;
 		pthread_mutex_t degradedOpsLock;
 		pthread_mutex_t remappingSetLock;
 		pthread_mutex_t updateLock;
@@ -152,7 +152,7 @@ public:
 	bool eraseChunkRequest( PendingType type, uint32_t id, void *ptr = 0, PendingIdentifier *pidPtr = 0, ChunkRequest *chunkRequestPtr = 0, bool needsLock = true, bool needsUnlock = true );
 	bool eraseChunkUpdate( PendingType type, uint32_t id, void *ptr = 0, PendingIdentifier *pidPtr = 0, ChunkUpdate *chunkUpdatePtr = 0, bool needsLock = true, bool needsUnlock = true );
 
-	bool findChunkRequest( PendingType type, uint32_t id, void *ptr, std::map<PendingIdentifier, ChunkRequest>::iterator &it, bool needsLock = true, bool needsUnlock = true );
+	bool findChunkRequest( PendingType type, uint32_t id, void *ptr, std::unordered_multimap<PendingIdentifier, ChunkRequest>::iterator &it, bool needsLock = true, bool needsUnlock = true );
 
 	uint32_t count( PendingType type, uint32_t id, bool needsLock = true, bool needsUnlock = true );
 };
