@@ -15,13 +15,13 @@ private:
 	 * Key |-> (list ID, stripe ID, chunk ID, offset, length)
 	 */
 	std::unordered_map<Key, KeyMetadata> keys;
-	pthread_mutex_t keysLock;
+	pthread_spinlock_t keysLock;
 	/**
 	 * Store the cached chunks
 	 * (list ID, stripe ID, chunk ID) |-> Chunk *
 	 */
 	std::unordered_map<Metadata, Chunk *> cache;
-	pthread_mutex_t cacheLock;
+	pthread_spinlock_t cacheLock;
 
 public:
 	/**
@@ -43,9 +43,9 @@ public:
 	pthread_mutex_t remapLock;
 
 	Map() {
-		pthread_mutex_init( &this->keysLock, 0 );
+		pthread_spin_init( &this->keysLock, 0 );
 		pthread_mutex_init( &this->remapLock, 0 );
-		pthread_mutex_init( &this->cacheLock, 0 );
+		pthread_spin_init( &this->cacheLock, 0 );
 		pthread_mutex_init( &this->opsLock, 0 );
 	}
 
@@ -77,22 +77,22 @@ public:
 		keyValue->clear();
 		key.set( size, data );
 
-		pthread_mutex_lock( &this->keysLock );
+		pthread_spin_lock( &this->keysLock );
 		keysIt = this->keys.find( key );
 		if ( keysIt == this->keys.end() ) {
 			if ( keyPtr ) *keyPtr = key;
-			pthread_mutex_unlock( &this->keysLock );
+			pthread_spin_unlock( &this->keysLock );
 			return false;
 		}
 
 		if ( keyPtr ) *keyPtr = keysIt->first;
 		if ( keyMetadataPtr ) *keyMetadataPtr = keysIt->second;
-		pthread_mutex_unlock( &this->keysLock );
+		pthread_spin_unlock( &this->keysLock );
 
-		pthread_mutex_lock( &this->cacheLock );
+		pthread_spin_lock( &this->cacheLock );
 		cacheIt = this->cache.find( keysIt->second );
 		if ( cacheIt == this->cache.end() ) {
-			pthread_mutex_unlock( &this->cacheLock );
+			pthread_spin_unlock( &this->cacheLock );
 			return false;
 		}
 
@@ -101,7 +101,7 @@ public:
 
 		Chunk *chunk = cacheIt->second;
 		*keyValue = chunk->getKeyValue( keysIt->second.offset );
-		pthread_mutex_unlock( &this->cacheLock );
+		pthread_spin_unlock( &this->cacheLock );
 		return true;
 	}
 
@@ -112,13 +112,13 @@ public:
 		metadata.set( listId, stripeId, chunkId );
 		if ( metadataPtr ) *metadataPtr = metadata;
 
-		pthread_mutex_lock( &this->cacheLock );
+		pthread_spin_lock( &this->cacheLock );
 		it = this->cache.find( metadata );
 		if ( it == this->cache.end() ) {
-			pthread_mutex_unlock( &this->cacheLock );
+			pthread_spin_unlock( &this->cacheLock );
 			return 0;
 		}
-		pthread_mutex_unlock( &this->cacheLock );
+		pthread_spin_unlock( &this->cacheLock );
 		return it->second;
 	}
 
@@ -128,13 +128,13 @@ public:
 		std::pair<Key, KeyMetadata> p( key, keyMetadata );
 		std::pair<std::unordered_map<Key, KeyMetadata>::iterator, bool> ret;
 
-		pthread_mutex_lock( &this->keysLock );
+		pthread_spin_lock( &this->keysLock );
 		ret = this->keys.insert( p );
 		if ( ! ret.second ) {
-			pthread_mutex_unlock( &this->keysLock );
+			pthread_spin_unlock( &this->keysLock );
 			return false;
 		}
-		pthread_mutex_unlock( &this->keysLock );
+		pthread_spin_unlock( &this->keysLock );
 
 		OpMetadata opMetadata;
 		opMetadata.clone( keyMetadata );
@@ -175,9 +175,9 @@ public:
 		Metadata metadata;
 		metadata.set( listId, stripeId, chunkId );
 
-		pthread_mutex_lock( &this->cacheLock );
+		pthread_spin_lock( &this->cacheLock );
 		this->cache[ metadata ] = chunk;
-		pthread_mutex_unlock( &this->cacheLock );
+		pthread_spin_unlock( &this->cacheLock );
 
 		if ( ! isParity ) {
 			char *ptr = chunk->getData();
@@ -185,7 +185,7 @@ public:
 			uint8_t keySize;
 			uint32_t valueSize, offset = 0, size;
 
-			pthread_mutex_lock( &this->keysLock );
+			pthread_spin_lock( &this->keysLock );
 			while( ptr < chunk->getData() + Chunk::capacity ) {
 				KeyValue::deserialize( ptr, keyPtr, keySize, valuePtr, valueSize );
 				if ( keySize == 0 && valueSize == 0 )
@@ -207,16 +207,16 @@ public:
 
 				ptr += size;
 			}
-			pthread_mutex_unlock( &this->keysLock );
+			pthread_spin_unlock( &this->keysLock );
 		}
 	}
 
-	void getKeysMap( std::unordered_map<Key, KeyMetadata> *&keys, pthread_mutex_t *&lock ) {
+	void getKeysMap( std::unordered_map<Key, KeyMetadata> *&keys, pthread_spinlock_t *&lock ) {
 		keys = &this->keys;
 		lock = &this->keysLock;
 	}
 
-	void getCacheMap( std::unordered_map<Metadata, Chunk *> *&cache, pthread_mutex_t *&lock ) {
+	void getCacheMap( std::unordered_map<Metadata, Chunk *> *&cache, pthread_spinlock_t *&lock ) {
 		cache = &this->cache;
 		lock = &this->cacheLock;
 	}

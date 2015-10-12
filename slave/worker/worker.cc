@@ -1200,7 +1200,7 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 		uint32_t offset = keyMetadata.offset + PROTO_KEY_VALUE_SIZE + header.keySize + header.valueUpdateOffset;
 		bool isDegraded;
 
-		pthread_mutex_t *keysLock;
+		pthread_spinlock_t *keysLock;
 		std::unordered_map<Key, KeyMetadata> *keys;
 		SlaveWorker::map->getKeysMap( keys, keysLock );
 		// Lock the data chunk buffer
@@ -1218,7 +1218,7 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 
 		chunkBufferIndex = chunkBuffer->lockChunk( chunk );
 		if ( chunkBufferIndex == -1 ) {
-			pthread_mutex_lock( keysLock );
+			pthread_spin_lock( keysLock );
 			if ( SlaveWorker::parityChunkCount ) {
 				KeyValueUpdate keyValueUpdate;
 				ChunkUpdate chunkUpdate;
@@ -1230,7 +1230,7 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 					offset, header.valueUpdateSize,
 					true // perform update
 				);
-				pthread_mutex_unlock( keysLock );
+				pthread_spin_unlock( keysLock );
 
 				// Add the current request to the pending set
 				keyValueUpdate.dup( header.keySize, header.key, ( void * ) event.socket );
@@ -1297,13 +1297,13 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 				}
 			} else {
 				chunk->update( header.valueUpdate, offset, header.valueUpdateSize );
-				pthread_mutex_unlock( keysLock );
+				pthread_spin_unlock( keysLock );
 
 				event.resUpdate( event.socket, event.id, key, header.valueUpdateOffset, header.valueUpdateSize, true, false );
 				this->dispatch( event );
 			}
 		} else {
-			pthread_mutex_lock( keysLock );
+			pthread_spin_lock( keysLock );
 			// The chunk is not yet sealed
 			// chunk->update( header.valueUpdate, offset, header.valueUpdateSize );
 			// Compute delta and perform update
@@ -1313,7 +1313,7 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 				offset, header.valueUpdateSize,
 				true // perform update
 			);
-			pthread_mutex_unlock( keysLock );
+			pthread_spin_unlock( keysLock );
 
 			if ( SlaveWorker::parityChunkCount ) {
 				// Add the current request to the pending set
@@ -1433,7 +1433,7 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 
 		// Update data chunk and map
 		key.ptr = 0;
-		pthread_mutex_t *keysLock, *cacheLock;
+		pthread_spinlock_t *keysLock, *cacheLock;
 		std::unordered_map<Key, KeyMetadata> *keys;
 		std::unordered_map<Metadata, Chunk *> *cache;
 		SlaveWorker::map->getKeysMap( keys, keysLock );
@@ -1442,8 +1442,8 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 		MixedChunkBuffer *chunkBuffer = SlaveWorker::chunkBuffer->at( metadata.listId );
 		int chunkBufferIndex = chunkBuffer->lockChunk( chunk, true );
 		// Lock the keys and cache map
-		pthread_mutex_lock( keysLock );
-		pthread_mutex_lock( cacheLock );
+		pthread_spin_lock( keysLock );
+		pthread_spin_lock( cacheLock );
 		// Delete the chunk and perform key-value compaction
 		if ( chunkBufferIndex == -1 ) {
 			// Only compute data delta if the chunk is not yet sealed
@@ -1461,8 +1461,8 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 		else
 			deltaSize = chunk->deleteKeyValue( key, keys );
 		// Release the locks
-		pthread_mutex_unlock( cacheLock );
-		pthread_mutex_unlock( keysLock );
+		pthread_spin_unlock( cacheLock );
+		pthread_spin_unlock( keysLock );
 		if ( chunkBufferIndex == -1 )
 			chunkBuffer->unlock();
 
@@ -2031,7 +2031,7 @@ bool SlaveWorker::handleDeleteResponse( SlavePeerEvent event, bool success, char
 
 bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
 	int pending;
-	std::unordered_multimap<PendingIdentifier, ChunkRequest>::iterator it, tmp, end;
+	std::unordered_map<PendingIdentifier, ChunkRequest>::iterator it, tmp, end;
 	ChunkRequest chunkRequest;
 
 	if ( success ) {
