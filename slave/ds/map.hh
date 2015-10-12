@@ -2,6 +2,7 @@
 #define __SLAVE_MAP_MAP_HH__
 
 #include <map>
+#include <unordered_map>
 #include "../../common/ds/chunk.hh"
 #include "../../common/ds/key.hh"
 #include "../../common/ds/metadata.hh"
@@ -13,7 +14,7 @@ private:
 	 * Store the mapping between keys and chunks
 	 * Key |-> (list ID, stripe ID, chunk ID, offset, length)
 	 */
-	std::map<Key, KeyMetadata> keys;
+	std::unordered_map<Key, KeyMetadata> keys;
 	pthread_mutex_t keysLock;
 	/**
 	 * Store the cached chunks
@@ -69,7 +70,7 @@ public:
 	}
 
 	bool findValueByKey( char *data, uint8_t size, KeyValue *keyValue, Key *keyPtr = 0, KeyMetadata *keyMetadataPtr = 0, Metadata *metadataPtr = 0, Chunk **chunkPtr = 0 ) {
-		std::map<Key, KeyMetadata>::iterator keysIt;
+		std::unordered_map<Key, KeyMetadata>::iterator keysIt;
 		std::map<Metadata, Chunk *>::iterator cacheIt;
 		Key key;
 
@@ -125,7 +126,7 @@ public:
 		key.dup( key.size, key.data );
 
 		std::pair<Key, KeyMetadata> p( key, keyMetadata );
-		std::pair<std::map<Key, KeyMetadata>::iterator, bool> ret;
+		std::pair<std::unordered_map<Key, KeyMetadata>::iterator, bool> ret;
 
 		pthread_mutex_lock( &this->keysLock );
 		ret = this->keys.insert( p );
@@ -210,7 +211,7 @@ public:
 		}
 	}
 
-	void getKeysMap( std::map<Key, KeyMetadata> *&keys, pthread_mutex_t *&lock ) {
+	void getKeysMap( std::unordered_map<Key, KeyMetadata> *&keys, pthread_mutex_t *&lock ) {
 		keys = &this->keys;
 		lock = &this->keysLock;
 	}
@@ -226,7 +227,7 @@ public:
 		if ( ! this->keys.size() ) {
 			fprintf( stdout, "(None)\n" );
 		} else {
-			for ( std::map<Key, KeyMetadata>::iterator it = this->keys.begin(); it != this->keys.end(); it++ ) {
+			for ( std::unordered_map<Key, KeyMetadata>::iterator it = this->keys.begin(); it != this->keys.end(); it++ ) {
 				fprintf(
 					stdout, "%.*s --> (list ID: %u, stripe ID: %u, chunk ID: %u, offset: %u, length: %u)\n",
 					it->first.size, it->first.data,

@@ -6,6 +6,7 @@
 #include <cstring>
 #include <ctype.h>
 #include <stdint.h>
+#include "../hash/hash_func.hh"
 
 class Key {
 public:
@@ -44,6 +45,13 @@ public:
 		);
 	}
 
+	bool operator==( const Key &k ) const {
+		return (
+			this->size == k.size &&
+			strncmp( this->data, k.data, this->size ) == 0
+		);
+	}
+
 	bool operator<( const Key &k ) const {
 		int ret;
 		if ( this->size < k.size )
@@ -59,6 +67,15 @@ public:
 
 		return this->ptr < k.ptr;
 	}
+};
+
+namespace std {
+	template<> class hash<Key> {
+	public:
+		size_t operator()( const Key &key ) const {
+			return HashFunc::hash( key.data, key.size );
+		}
+	};
 };
 
 #endif

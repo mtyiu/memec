@@ -9,7 +9,7 @@ if [ $# -gt 0 ]; then
 	echo "*** Warning: Debug mode is enabled. ***"
 fi
 
-ssh hpc9 "screen -S coordinator -p 0 -X stuff \"$(printf '\r\r')${BOOTSTRAP_SCRIPT_PATH}/start-plio-coordinator.sh ${1}$(printf '\r\r')\""
+ssh hpc15 "screen -S coordinator -p 0 -X stuff \"$(printf '\r\r')${BOOTSTRAP_SCRIPT_PATH}/start-plio-coordinator.sh ${1}$(printf '\r\r')\""
 
 sleep ${SLEEP_TIME}
 
@@ -46,7 +46,7 @@ for i in {1..6}; do
 done
 ssh hpc15 "screen -S master -p 0 -X stuff \"${TERM_COMMAND}\"" &
 ssh hpc15 "screen -S ycsb -p 0 -X stuff \"${TERM_COMMAND}\"" &
-ssh hpc9 "screen -S coordinator -p 0 -X stuff \"${TERM_COMMAND}\"" &
+ssh hpc15 "screen -S coordinator -p 0 -X stuff \"${TERM_COMMAND}\"" &
 
 sleep ${SLEEP_TIME}
 

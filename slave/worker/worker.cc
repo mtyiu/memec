@@ -1201,7 +1201,7 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 		bool isDegraded;
 
 		pthread_mutex_t *keysLock;
-		std::map<Key, KeyMetadata> *keys;
+		std::unordered_map<Key, KeyMetadata> *keys;
 		SlaveWorker::map->getKeysMap( keys, keysLock );
 		// Lock the data chunk buffer
 		MixedChunkBuffer *chunkBuffer = SlaveWorker::chunkBuffer->at( metadata.listId );
@@ -1434,7 +1434,7 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 		// Update data chunk and map
 		key.ptr = 0;
 		pthread_mutex_t *keysLock, *cacheLock;
-		std::map<Key, KeyMetadata> *keys;
+		std::unordered_map<Key, KeyMetadata> *keys;
 		std::map<Metadata, Chunk *> *cache;
 		SlaveWorker::map->getKeysMap( keys, keysLock );
 		SlaveWorker::map->getCacheMap( cache, cacheLock );

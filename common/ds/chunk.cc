@@ -201,14 +201,14 @@ void Chunk::update( char *newData, uint32_t offset, uint32_t length ) {
 #endif
 }
 
-uint32_t Chunk::deleteKeyValue( Key target, std::map<Key, KeyMetadata> *keys, char *delta, size_t deltaBufSize ) {
+uint32_t Chunk::deleteKeyValue( Key target, std::unordered_map<Key, KeyMetadata> *keys, char *delta, size_t deltaBufSize ) {
 #ifdef USE_CHUNK_MUTEX_LOCK
 	pthread_mutex_lock( &this->lock );
 #endif
 
 	uint32_t deltaSize, bytes;
 	char *startPtr, *src, *dst;
-	std::map<Key, KeyMetadata>::iterator it = keys->find( target );
+	std::unordered_map<Key, KeyMetadata>::iterator it = keys->find( target );
 	assert( it != keys->end() );
 
 	// Backup the metadata and then remove the entry from map
