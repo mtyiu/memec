@@ -89,6 +89,7 @@ public:
 	void time();
 	void seal();
 	void flush();
+	void metadata();
 	double getElapsedTime();
 	void interactive();
 };

@@ -204,6 +204,9 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 		case SLAVE_EVENT_TYPE_ANNOUNCE_SLAVE_CONNECTED:
 			isSend = false;
 			break;
+		case SLAVE_EVENT_TYPE_DISCONNECT:
+			isSend = false;
+			break;
 		default:
 			return;
 	}
@@ -213,8 +216,6 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 		uint32_t requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
 
 		buffer.data = this->protocol.announceSlaveConnected( buffer.size, requestId, event.socket );
-
-		connected = true;
 
 		LOCK( &slaves.lock );
 		for ( uint32_t i = 0; i < slaves.size(); i++ ) {
@@ -227,10 +228,14 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 				__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 		}
 		UNLOCK( &slaves.lock );
+	} else if ( event.type == SLAVE_EVENT_TYPE_DISCONNECT ) {
+		printf( "Slave disconnected!\n" );
 	} else if ( isSend ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+		if ( ! connected )
+			__ERROR__( "CoordinatorWorker", "dispatch", "The slave is disconnected." );
 	} else {
 		// Parse requests from slaves
 		ProtocolHeader header;
@@ -256,27 +261,24 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 				struct HeartbeatHeader heartbeatHeader;
 				struct SlaveSyncHeader slaveSyncHeader;
 
-				if ( this->protocol.parseHeartbeatHeader( heartbeatHeader, buffer.data, buffer.size ) ) {
-					offset = PROTO_HEADER_SIZE + PROTO_HEARTBEAT_SIZE;
-					while ( offset < ( size_t ) ret ) {
-						if ( ! this->protocol.parseSlaveSyncHeader( slaveSyncHeader, bytes, buffer.data, buffer.size, offset ) )
+				if ( this->protocol.parseHeartbeatHeader( heartbeatHeader, buffer.data, header.length ) ) {
+					offset = PROTO_HEARTBEAT_SIZE;
+					while ( offset < header.length ) {
+						if ( ! this->protocol.parseSlaveSyncHeader( slaveSyncHeader, bytes, buffer.data, header.length, offset ) )
 							break;
+
 						offset += bytes;
 						count++;
 
 						// Update metadata map
-						Key key;
-						key.set( slaveSyncHeader.keySize, slaveSyncHeader.key, 0 );
-
-						OpMetadata opMetadata;
-						opMetadata.opcode = slaveSyncHeader.opcode;
-						opMetadata.listId = slaveSyncHeader.listId;
-						opMetadata.stripeId = slaveSyncHeader.stripeId;
-						opMetadata.chunkId = slaveSyncHeader.chunkId;
-
-						if ( event.socket->keys.find( key ) == event.socket->keys.end() )
-							key.dup();
-						event.socket->keys[ key ] = opMetadata;
+						event.socket->map.setKey(
+							slaveSyncHeader.key,
+							slaveSyncHeader.keySize,
+							slaveSyncHeader.listId,
+							slaveSyncHeader.stripeId,
+							slaveSyncHeader.chunkId,
+							slaveSyncHeader.opcode
+						);
 					}
 				} else {
 					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid heartbeat protocol header." );
@@ -288,11 +290,11 @@ quit_1:
 			buffer.data += header.length;
 			buffer.size -= header.length;
 		}
-		if ( connected ) event.socket->done();
+		if ( connected )
+			event.socket->done();
+		else
+			__ERROR__( "CoordinatorWorker", "dispatch", "The slave is disconnected." );
 	}
-
-	if ( ! connected )
-		__ERROR__( "CoordinatorWorker", "dispatch", "The slave is disconnected." );
 }
 
 void CoordinatorWorker::free() {

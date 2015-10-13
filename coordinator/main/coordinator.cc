@@ -443,6 +443,9 @@ void Coordinator::interactive() {
 		} else if ( strcmp( command, "seal" ) == 0 ) {
 			valid = true;
 			this->seal();
+		} else if ( strcmp( command, "metadata" ) == 0 ) {
+			valid = true;
+			this->metadata();
 		} else if ( strcmp( command, "flush" ) == 0 ) {
 			valid = true;
 			this->flush();
@@ -459,26 +462,25 @@ void Coordinator::interactive() {
 void Coordinator::dump() {
 	FILE *f = stdout;
 	for ( size_t i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
-		std::unordered_map<Key, OpMetadata> &map = this->sockets.slaves[ i ]->keys;
-
 		fprintf( f, "Slave #%lu: ", i + 1 );
 		this->sockets.slaves[ i ]->printAddress( f );
 		fprintf( f, "\n----------------------------------------\n" );
 
-		fprintf( f, "\n[List of metadata]\n" );
-		if ( ! map.size() ) {
-			fprintf( f, "(None)\n" );
-		} else {
-			for ( std::unordered_map<Key, OpMetadata>::iterator it = map.begin(); it != map.end(); it++ ) {
-				fprintf(
-					f, "%.*s --> (list: %u, stripe: %u, chunk: %u)\n",
-					it->first.size, it->first.data,
-					it->second.listId, it->second.stripeId, it->second.chunkId
-				);
-			}
-		}
-		fprintf( f, "\n" );
+		this->sockets.slaves[ i ]->map.dump();
 	}
+}
+
+void Coordinator::metadata() {
+	FILE *f = fopen( "coordinator.meta", "w+" );
+	if ( ! f ) {
+		__ERROR__( "Slave", "metadata", "Cannot write to the file \"coordinator.meta\"." );
+	}
+
+	for ( size_t i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
+		this->sockets.slaves[ i ]->map.persist( f );
+	}
+
+	fclose( f );
 }
 
 void Coordinator::help() {
@@ -491,6 +493,7 @@ void Coordinator::help() {
 		"- time: Show elapsed time\n"
 		"- seal: Force all slaves to seal all its chunks\n"
 		"- flush: Force all slaves to flush all its chunks\n"
+		"- metadata: Write metadata to disk\n"
 		"- exit: Terminate this client\n"
 	);
 	fflush( stdout );

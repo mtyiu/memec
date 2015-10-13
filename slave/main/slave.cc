@@ -345,6 +345,33 @@ void Slave::flush() {
 	printf( "Flushing %lu chunks...\n", count );
 }
 
+void Slave::metadata() {
+	std::unordered_map<Key, KeyMetadata>::iterator it;
+	std::unordered_map<Key, KeyMetadata> *keys;
+	LOCK_T *lock;
+	FILE *f;
+	char filename[ 64 ];
+
+	this->map.getKeysMap( keys, lock );
+
+	snprintf( filename, sizeof( filename ), "%s.meta", this->config.slave.slave.addr.name );
+	f = fopen( filename, "w+" );
+	if ( ! f ) {
+		__ERROR__( "Slave", "metadata", "Cannot write to the file \"%s\".", filename );
+	}
+
+	LOCK( lock );
+	for ( it = keys->begin(); it != keys->end(); it++ ) {
+		Key key = it->first;
+		KeyMetadata keyMetadata = it->second;
+
+		fprintf( f, "%.*s\t%u\t%u\t%u\n", key.size, key.data, keyMetadata.listId, keyMetadata.stripeId, keyMetadata.chunkId );
+	}
+	UNLOCK( lock );
+
+	fclose( f );
+}
+
 void Slave::memory( FILE *f ) {
 	std::unordered_map<Metadata, Chunk *> *cache;
 	std::unordered_map<Metadata, Chunk *>::iterator it;
@@ -539,6 +566,9 @@ void Slave::interactive() {
 		} else if ( strcmp( command, "memory" ) == 0 ) {
 			valid = true;
 			this->memory();
+		} else if ( strcmp( command, "metadata" ) == 0 ) {
+			valid = true;
+			this->metadata();
 		} else if ( strcmp( command, "pending" ) == 0 ) {
 			valid = true;
 			this->printPending();
@@ -748,6 +778,7 @@ void Slave::help() {
 		"- seal: Seal all chunks in the chunk buffer\n"
 		"- flush: Flush all dirty chunks to disk\n"
 		"- memory: Print memory usage\n"
+		"- metadata: Write metadata to disk\n"
 		"- sync: Synchronize with coordinator\n"
 		"- load: Show the load of each worker\n"
 		"- time: Show elapsed time\n"

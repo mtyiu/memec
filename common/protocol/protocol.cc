@@ -337,7 +337,7 @@ size_t Protocol::generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t op
 	}
 	UNLOCK( rlock );
 
-	*( ( uint32_t * ) this->buffer.send + PROTO_HEADER_SIZE ) = htonl( remapCount );
+	*( ( uint32_t * )( this->buffer.send + PROTO_HEADER_SIZE ) ) = htonl( remapCount );
 
 	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, id );
 

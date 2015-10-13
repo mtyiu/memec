@@ -222,33 +222,31 @@ public:
 		lock = &this->cacheLock;
 	}
 
-	void dump() {
-		/*
-		fprintf( stdout, "List of key-value pairs:\n------------------------\n" );
+	void dump( FILE *f = stdout ) {
+		fprintf( f, "List of key-value pairs:\n------------------------\n" );
 		if ( ! this->keys.size() ) {
-			fprintf( stdout, "(None)\n" );
+			fprintf( f, "(None)\n" );
 		} else {
 			for ( std::unordered_map<Key, KeyMetadata>::iterator it = this->keys.begin(); it != this->keys.end(); it++ ) {
 				fprintf(
-					stdout, "%.*s --> (list ID: %u, stripe ID: %u, chunk ID: %u, offset: %u, length: %u)\n",
+					f, "%.*s --> (list ID: %u, stripe ID: %u, chunk ID: %u, offset: %u, length: %u)\n",
 					it->first.size, it->first.data,
 					it->second.listId, it->second.stripeId, it->second.chunkId,
 					it->second.offset, it->second.length
 				);
 			}
 		}
-		fprintf( stdout, "\n" );
-		*/
+		fprintf( f, "\n" );
 
-		fprintf( stdout, "Number of key-value pairs: %lu\n\n", this->keys.size() );
+		fprintf( f, "Number of key-value pairs: %lu\n\n", this->keys.size() );
 
-		fprintf( stdout, "List of chunks in the cache:\n----------------------------\n" );
+		fprintf( f, "List of chunks in the cache:\n----------------------------\n" );
 		if ( ! this->cache.size() ) {
-			fprintf( stdout, "(None)\n" );
+			fprintf( f, "(None)\n" );
 		} else {
 			for ( std::unordered_map<Metadata, Chunk *>::iterator it = this->cache.begin(); it != this->cache.end(); it++ ) {
 				fprintf(
-					stdout, "(list ID: %u, stripe ID: %u, chunk ID: %u) --> %p (type: %s chunk, status: %s, count: %u, size: %u)\n",
+					f, "(list ID: %u, stripe ID: %u, chunk ID: %u) --> %p (type: %s chunk, status: %s, count: %u, size: %u)\n",
 					it->first.listId, it->first.stripeId, it->first.chunkId,
 					it->second, it->second->isParity ? "parity" : "data",
 					( it->second->status == CHUNK_STATUS_EMPTY ? "empty" :
@@ -258,7 +256,7 @@ public:
 				);
 			}
 		}
-		fprintf( stdout, "\n" );
+		fprintf( f, "\n" );
 	}
 };
 

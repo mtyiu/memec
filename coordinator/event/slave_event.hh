@@ -11,7 +11,8 @@ enum SlaveEventType {
 	SLAVE_EVENT_TYPE_ANNOUNCE_SLAVE_CONNECTED,
 	SLAVE_EVENT_TYPE_PENDING,
 	SLAVE_EVENT_TYPE_REQUEST_SEAL_CHUNKS,
-	SLAVE_EVENT_TYPE_REQUEST_FLUSH_CHUNKS
+	SLAVE_EVENT_TYPE_REQUEST_FLUSH_CHUNKS,
+	SLAVE_EVENT_TYPE_DISCONNECT
 };
 
 class SlaveEvent : public Event {
@@ -25,6 +26,7 @@ public:
 	void announceSlaveConnected( SlaveSocket *socket );
 	void reqSealChunks( SlaveSocket *socket );
 	void reqFlushChunks( SlaveSocket *socket );
+	void disconnect( SlaveSocket *socket );
 };
 
 #endif
