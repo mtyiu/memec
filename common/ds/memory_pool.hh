@@ -4,7 +4,6 @@
 #include <cstdlib>
 #include <cassert>
 #include <pthread.h>
-#include "../lock/lock.hh"
 #include "../util/debug.hh"
 
 // Implemented the singleton pattern
@@ -15,7 +14,7 @@ private:
 	MemoryPool( MemoryPool<T> const& );
 	void operator=( MemoryPool<T> const& );
 	~MemoryPool() {
-		LOCK( &this->mAccess );
+		pthread_mutex_lock( &this->mAccess );
 		// while( this->count != 0 ) {
 		// 	// Wait until all memory is returned
 		// 	pthread_cond_wait( &this->cvEmpty, &this->mAccess );
@@ -25,7 +24,7 @@ private:
 		}
 		delete[] pool;
 		delete[] poolBackup;
-		UNLOCK( &this->mAccess );
+		pthread_mutex_unlock( &this->mAccess );
 	}
 
 	volatile uint64_t readIndex;
@@ -33,7 +32,7 @@ private:
 	volatile uint64_t count; // current number of occupied elements
 	volatile uint64_t capacity;
 
-	LOCK_T mAccess;
+	pthread_mutex_t mAccess;
 	pthread_cond_t cvEmpty;
 	T **pool;
 	T **poolBackup;
@@ -60,7 +59,7 @@ public:
 		this->count = 0;
 		this->capacity = capacity;
 
-		LOCK_INIT( &this->mAccess, NULL );
+		pthread_mutex_init( &this->mAccess, NULL );
 		pthread_cond_init( &this->cvEmpty, NULL );
 
 		this->pool = new T*[ capacity ];
@@ -86,7 +85,7 @@ public:
 	T *malloc( T **buffer = 0, uint64_t count = 1 ) {
 		T *ret = 0;
 
-		LOCK( &this->mAccess );
+		pthread_mutex_lock( &this->mAccess );
 		while( this->count + count > this->capacity ) {
 			// Check whether the pool can provide the requested number of T
 			// Doing this outside the loop to avoid deadlock!
@@ -105,26 +104,26 @@ public:
 			this->readIndex = nextVal( this->readIndex );
 			this->count++;
 		}
-		UNLOCK( &this->mAccess );
+		pthread_mutex_unlock( &this->mAccess );
 
 		return ret;
 	}
 
 	uint64_t free( T *buffer ) {
-		LOCK( &this->mAccess );
+		pthread_mutex_lock( &this->mAccess );
 		assert( this->count != 0 );
 		this->pool[ this->writeIndex ] = buffer;
 		this->writeIndex = nextVal( this->writeIndex );
 		this->count--;
 		pthread_cond_signal( &this->cvEmpty );
-		UNLOCK( &this->mAccess );
+		pthread_mutex_unlock( &this->mAccess );
 		return 1;
 	}
 
 	uint64_t free( T **buffer, uint64_t count ) {
 		uint64_t ret = 0;
 
-		LOCK( &this->mAccess );
+		pthread_mutex_lock( &this->mAccess );
 		for ( uint64_t i = 0; i < count; i++ ) {
 			assert( this->count != 0 );
 			this->pool[ this->writeIndex ] = buffer[ i ];
@@ -133,7 +132,7 @@ public:
 			ret++;
 		}
 		pthread_cond_signal( &this->cvEmpty );
-		UNLOCK( &this->mAccess );
+		pthread_mutex_unlock( &this->mAccess );
 
 		return ret;
 	}

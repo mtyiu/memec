@@ -20,7 +20,7 @@
 #endif
 
 #define LOCK_T               pthread_mutex_t
-#define LOCK_INIT( l, attr ) pthread_mutex_init( l, attr )
+#define LOCK_INIT( l )       pthread_mutex_init( l, 0 )
 #define LOCK( l )            pthread_mutex_lock( l )
 #define UNLOCK( l )          pthread_mutex_unlock( l )
 

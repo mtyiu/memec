@@ -122,18 +122,18 @@ public:
 	} slavePeers;
 
 	Pending() {
-		LOCK_INIT( &this->masters.remappingSetLock, 0 );
-		LOCK_INIT( &this->masters.getLock, 0 );
-		LOCK_INIT( &this->masters.updateLock, 0 );
-		LOCK_INIT( &this->masters.delLock, 0 );
-		LOCK_INIT( &this->slavePeers.degradedOpsLock, 0 );
-		LOCK_INIT( &this->slavePeers.remappingSetLock, 0 );
-		LOCK_INIT( &this->slavePeers.updateLock, 0 );
-		LOCK_INIT( &this->slavePeers.delLock, 0 );
-		LOCK_INIT( &this->slavePeers.getChunkLock, 0 );
-		LOCK_INIT( &this->slavePeers.setChunkLock, 0 );
-		LOCK_INIT( &this->slavePeers.updateChunkLock, 0 );
-		LOCK_INIT( &this->slavePeers.delChunkLock, 0 );
+		LOCK_INIT( &this->masters.remappingSetLock );
+		LOCK_INIT( &this->masters.getLock );
+		LOCK_INIT( &this->masters.updateLock );
+		LOCK_INIT( &this->masters.delLock );
+		LOCK_INIT( &this->slavePeers.degradedOpsLock );
+		LOCK_INIT( &this->slavePeers.remappingSetLock );
+		LOCK_INIT( &this->slavePeers.updateLock );
+		LOCK_INIT( &this->slavePeers.delLock );
+		LOCK_INIT( &this->slavePeers.getChunkLock );
+		LOCK_INIT( &this->slavePeers.setChunkLock );
+		LOCK_INIT( &this->slavePeers.updateChunkLock );
+		LOCK_INIT( &this->slavePeers.delChunkLock );
 	}
 
 	bool insertRemappingRecordKey( PendingType type, uint32_t id, void *ptr, RemappingRecordKey &remappingRecordKey, bool needsLock = true, bool needsUnlock = true );

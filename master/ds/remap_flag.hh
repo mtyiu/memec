@@ -10,7 +10,7 @@ private:
 
 public:
 	RemapFlag() {
-		LOCK_INIT( &this->lock, 0 );
+		LOCK_INIT( &this->lock );
 		this->isRemapping = false;
 	}
 

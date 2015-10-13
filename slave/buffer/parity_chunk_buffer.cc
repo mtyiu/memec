@@ -3,7 +3,7 @@
 
 ParityChunkWrapper::ParityChunkWrapper() {
 	this->pending = ChunkBuffer::dataChunkCount;
-	LOCK_INIT( &this->lock, 0 );
+	LOCK_INIT( &this->lock );
 	this->chunk = 0;
 }
 

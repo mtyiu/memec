@@ -27,13 +27,13 @@ public:
 	LOCK_T lock;
 
 	ArrayMap() {
-		LOCK_INIT( &this->lock, 0 );
+		LOCK_INIT( &this->lock );
 		this->needsDelete = true;
 	}
 
 	ArrayMap( ArrayMap const& arrayMap ) {
 		size_t i;
-		LOCK_INIT( &this->lock, 0 );
+		LOCK_INIT( &this->lock );
 		this->needsDelete = true;
 		this->clear();
 		for ( i = 0; i < arrayMap.size(); i++ ) {

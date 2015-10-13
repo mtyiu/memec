@@ -291,7 +291,7 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 	/* Loading statistics update */
 	uint32_t sec, msec;
 	if ( this->config.master.loadingStats.updateInterval > 0 ) {
-		LOCK_INIT ( &this->slaveLoading.lock, NULL );
+		LOCK_INIT ( &this->slaveLoading.lock );
 		this->slaveLoading.past.get.clear();
 		this->slaveLoading.past.set.clear();
 		this->slaveLoading.current.get.clear();

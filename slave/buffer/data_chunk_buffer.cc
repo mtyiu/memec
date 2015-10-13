@@ -13,7 +13,7 @@ DataChunkBuffer::DataChunkBuffer( uint32_t count, uint32_t listId, uint32_t stri
 
 	ChunkBuffer::chunkPool->malloc( this->chunks, this->count );
 	for ( uint32_t i = 0; i < count; i++ ) {
-		LOCK_INIT( this->locks + i, 0 );
+		LOCK_INIT( this->locks + i );
 
 		Metadata &metadata = this->chunks[ i ]->metadata;
 		metadata.listId = this->listId;

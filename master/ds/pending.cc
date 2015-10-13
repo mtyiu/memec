@@ -65,17 +65,17 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 }
 
 Pending::Pending() {
-	LOCK_INIT( &this->applications.getLock, 0 );
-	LOCK_INIT( &this->applications.setLock, 0 );
-	LOCK_INIT( &this->applications.updateLock, 0 );
-	LOCK_INIT( &this->applications.delLock, 0 );
-	LOCK_INIT( &this->slaves.getLock, 0 );
-	LOCK_INIT( &this->slaves.setLock, 0 );
-	LOCK_INIT( &this->slaves.remappingSetLock, 0 );
-	LOCK_INIT( &this->slaves.updateLock, 0 );
-	LOCK_INIT( &this->slaves.delLock, 0 );
-	LOCK_INIT( &this->stats.getLock, 0 );
-	LOCK_INIT( &this->stats.setLock, 0 );
+	LOCK_INIT( &this->applications.getLock );
+	LOCK_INIT( &this->applications.setLock );
+	LOCK_INIT( &this->applications.updateLock );
+	LOCK_INIT( &this->applications.delLock );
+	LOCK_INIT( &this->slaves.getLock );
+	LOCK_INIT( &this->slaves.setLock );
+	LOCK_INIT( &this->slaves.remappingSetLock );
+	LOCK_INIT( &this->slaves.updateLock );
+	LOCK_INIT( &this->slaves.delLock );
+	LOCK_INIT( &this->stats.getLock );
+	LOCK_INIT( &this->stats.setLock );
 }
 
 bool Pending::insertKey( PendingType type, uint32_t id, void *ptr, Key &key, bool needsLock, bool needsUnlock ) {

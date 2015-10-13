@@ -44,7 +44,7 @@ public:
 		this->mixed = new EventQueue<MixedEvent>( mixed, block );
 		this->priority.mixed = new EventQueue<MixedEvent>( pMixed, false );
 		this->priority.capacity = pMixed;
-		LOCK_INIT( &this->priority.lock, 0 );
+		LOCK_INIT( &this->priority.lock );
 	}
 
 	void init( bool block, uint32_t application, uint32_t coordinator, uint32_t master, uint32_t slave ) {

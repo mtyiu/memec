@@ -184,8 +184,8 @@ void Socket::init( EPoll *epoll ) {
 }
 
 Socket::Socket() {
-	LOCK_INIT( &this->readLock, 0 );
-	LOCK_INIT( &this->writeLock, 0 );
+	LOCK_INIT( &this->readLock );
+	LOCK_INIT( &this->writeLock );
 }
 
 bool Socket::init( int type, uint32_t addr, uint16_t port, bool block ) {

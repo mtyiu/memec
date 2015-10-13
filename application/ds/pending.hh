@@ -34,14 +34,14 @@ public:
 	} masters;
 
 	Pending() {
-		LOCK_INIT( &this->application.getLock, 0 );
-		LOCK_INIT( &this->application.setLock, 0 );
-		LOCK_INIT( &this->application.updateLock, 0 );
-		LOCK_INIT( &this->application.delLock, 0 );
-		LOCK_INIT( &this->masters.getLock, 0 );
-		LOCK_INIT( &this->masters.setLock, 0 );
-		LOCK_INIT( &this->masters.updateLock, 0 );
-		LOCK_INIT( &this->masters.delLock, 0 );
+		LOCK_INIT( &this->application.getLock );
+		LOCK_INIT( &this->application.setLock );
+		LOCK_INIT( &this->application.updateLock );
+		LOCK_INIT( &this->application.delLock );
+		LOCK_INIT( &this->masters.getLock );
+		LOCK_INIT( &this->masters.setLock );
+		LOCK_INIT( &this->masters.updateLock );
+		LOCK_INIT( &this->masters.delLock );
 	}
 };
 

@@ -44,10 +44,10 @@ public:
 	LOCK_T remapLock;
 
 	Map() {
-		LOCK_INIT( &this->keysLock, 0 );
-		LOCK_INIT( &this->remapLock, 0 );
-		LOCK_INIT( &this->cacheLock, 0 );
-		LOCK_INIT( &this->opsLock, 0 );
+		LOCK_INIT( &this->keysLock );
+		LOCK_INIT( &this->remapLock );
+		LOCK_INIT( &this->cacheLock );
+		LOCK_INIT( &this->opsLock );
 	}
 
 	bool findRemappingRecordByKey( char *data, uint8_t size, RemappingRecord *remappingRecordPtr = 0, Key *keyPtr = 0 ) {

@@ -9,7 +9,7 @@
 #include "key_value.hh"
 #include "../lock/lock.hh"
 
-#define USE_CHUNK_MUTEX_LOCK
+#define USE_CHUNK_LOCK
 
 enum ChunkStatus {
 	// Clean chunk (used in chunk buffer)
@@ -30,7 +30,7 @@ class Chunk {
 private:
 	char *data;                 // Buffer
 	uint32_t size;              // Occupied data
-#ifdef USE_CHUNK_MUTEX_LOCK
+#ifdef USE_CHUNK_LOCK
 	LOCK_T lock;       // Lock
 #endif
 
@@ -50,7 +50,7 @@ public:
 	void loadFromGetChunkRequest( uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isParity, char *data, uint32_t size );
 	// Access data inside the chunk
 	char *alloc( uint32_t size, uint32_t &offset );
-#ifdef USE_CHUNK_MUTEX_LOCK
+#ifdef USE_CHUNK_LOCK
 	int next( int offset, char *&key, uint8_t &keySize, bool needsLock = false, bool needsUnlock = false );
 #else
 	int next( int offset, char *&key, uint8_t &keySize );
@@ -60,7 +60,7 @@ public:
 	inline uint32_t getSize() { return this->size; }
 	inline void setData( char *data ) { this->data = data; }
 	inline void setSize( uint32_t size ) { this->size = size; }
-#ifdef USE_CHUNK_MUTEX_LOCK
+#ifdef USE_CHUNK_LOCK
 	inline void setLock() { LOCK( &this->lock ); }
 	inline void setUnlock() { UNLOCK( &this->lock ); }
 #endif

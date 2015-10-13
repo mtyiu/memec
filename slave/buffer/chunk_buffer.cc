@@ -22,7 +22,7 @@ ChunkBuffer::ChunkBuffer( uint32_t listId, uint32_t stripeId, uint32_t chunkId )
 	this->listId = listId;
 	this->stripeId = stripeId;
 	this->chunkId = chunkId;
-	LOCK_INIT( &this->lock, 0 );
+	LOCK_INIT( &this->lock );
 }
 
 ChunkBuffer::~ChunkBuffer() {}

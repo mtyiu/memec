@@ -13,7 +13,7 @@ private:
 
 public:
 	Counter() {
-		LOCK_INIT( &this->lock, 0 );
+		LOCK_INIT( &this->lock );
 		this->remapping = 0;
 		this->normal = 0;
 		this->lockOnly = 0;

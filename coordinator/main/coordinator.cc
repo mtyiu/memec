@@ -249,7 +249,7 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 	}
 
 	/* Slave Loading stats */
-	LOCK_INIT( &this->slaveLoading.lock, NULL );
+	LOCK_INIT( &this->slaveLoading.lock );
 	uint32_t sec, msec;
 	if ( this->config.coordinator.loadingStats.updateInterval > 0 ) {
 		sec = this->config.coordinator.loadingStats.updateInterval / 1000;

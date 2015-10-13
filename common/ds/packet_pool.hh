@@ -18,7 +18,7 @@ public:
 		this->referenceCount = 0;
 		this->capacity = 0;
 		this->size = 0;
-		LOCK_INIT( &this->lock, 0 );
+		LOCK_INIT( &this->lock );
 		this->data = 0;
 	}
 
