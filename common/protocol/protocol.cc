@@ -279,7 +279,7 @@ size_t Protocol::generateChunkDataHeader( uint8_t magic, uint8_t to, uint8_t opc
 	return bytes;
 }
 
-size_t Protocol::generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, std::unordered_map<Key, OpMetadata> &ops, std::unordered_map<Key, RemappingRecord> &remapRecords, pthread_mutex_t *lock, pthread_mutex_t *rlock, size_t &count, size_t &remapCount ) {
+size_t Protocol::generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, std::unordered_map<Key, OpMetadata> &ops, std::unordered_map<Key, RemappingRecord> &remapRecords, LOCK_T *lock, LOCK_T *rlock, size_t &count, size_t &remapCount ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	std::unordered_map<Key, OpMetadata>::iterator it;
 	std::unordered_map<Key, RemappingRecord>::iterator rit;
@@ -289,7 +289,7 @@ size_t Protocol::generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t op
 	buf += PROTO_HEARTBEAT_SIZE;
 	bytes += PROTO_HEARTBEAT_SIZE;
 
-	pthread_mutex_lock( lock );
+	LOCK( lock );
 	for ( it = ops.begin(); it != ops.end(); it++ ) {
 		const Key &key = it->first;
 		const OpMetadata &opMetadata = it->second;
@@ -313,10 +313,10 @@ size_t Protocol::generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t op
 	}
 	// Clear sent metadata
 	ops.erase( ops.begin(), it );
-	pthread_mutex_unlock( lock );
+	UNLOCK( lock );
 
 	// append remapping record
-	pthread_mutex_lock( rlock );
+	LOCK( rlock );
 	for ( rit = remapRecords.begin(); rit != remapRecords.end(); rit++ ) {
 		const Key &key = rit->first;
 		if ( this->buffer.size >= bytes + PROTO_SLAVE_SYNC_REMAP_PER_SIZE + key.size ) {
@@ -335,7 +335,7 @@ size_t Protocol::generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t op
 			break;
 		}
 	}
-	pthread_mutex_unlock( rlock );
+	UNLOCK( rlock );
 
 	*( ( uint32_t * ) this->buffer.send + PROTO_HEADER_SIZE ) = htonl( remapCount );
 

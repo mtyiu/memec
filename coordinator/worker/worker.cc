@@ -136,10 +136,10 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 	} \
 
 					masterAddr = event.socket->getAddr();
-					pthread_mutex_lock ( &coordinator->slaveLoading.lock );
+					LOCK ( &coordinator->slaveLoading.lock );
 					SET_SLAVE_LATENCY_FOR_MASTER( masterAddr, getLatency, latestGet );
 					SET_SLAVE_LATENCY_FOR_MASTER( masterAddr, setLatency, latestSet );
-					pthread_mutex_unlock ( &coordinator->slaveLoading.lock );
+					UNLOCK ( &coordinator->slaveLoading.lock );
 
 					getLatency.needsDelete = false;
 					setLatency.needsDelete = false;
@@ -216,7 +216,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 
 		connected = true;
 
-		pthread_mutex_lock( &slaves.lock );
+		LOCK( &slaves.lock );
 		for ( uint32_t i = 0; i < slaves.size(); i++ ) {
 			SlaveSocket *slave = slaves.values[ i ];
 			if ( event.socket->equal( slave ) )
@@ -226,7 +226,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			if ( ret != ( ssize_t ) buffer.size )
 				__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 		}
-		pthread_mutex_unlock( &slaves.lock );
+		UNLOCK( &slaves.lock );
 	} else if ( isSend ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
 		if ( ret != ( ssize_t ) buffer.size )

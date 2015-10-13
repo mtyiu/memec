@@ -41,8 +41,8 @@ void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t ori
 		return;
 
 	// TODO avoid locking?
-	pthread_mutex_lock( &slaveLoading->lock );
-	pthread_mutex_lock( &overloadedSlave->lock );
+	LOCK( &slaveLoading->lock );
+	LOCK( &overloadedSlave->lock );
 
 	targetLatency = slaveLoading->cumulativeMirror.set.get( slaveAddr, &index );
 	overloadLatency = targetLatency;
@@ -108,8 +108,8 @@ void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t ori
 
 exit:
 
-	pthread_mutex_unlock( &overloadedSlave->lock );
-	pthread_mutex_unlock( &slaveLoading->lock );
+	UNLOCK( &overloadedSlave->lock );
+	UNLOCK( &slaveLoading->lock );
 #define NO_REMAPPING ( remappedChunkId == originalChunkId && remappedListId == originalListId )
 	if ( ! NO_REMAPPING ) {
 		//fprintf( stderr, "remap from %u to %u\n", originalListId, remappedListId );

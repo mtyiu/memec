@@ -8,7 +8,7 @@ class Packet {
 private:
 	uint32_t referenceCount;
 	uint32_t capacity;
-	pthread_mutex_t lock;
+	LOCK_T lock;
 
 public:
 	uint32_t size;
@@ -18,7 +18,7 @@ public:
 		this->referenceCount = 0;
 		this->capacity = 0;
 		this->size = 0;
-		pthread_mutex_init( &this->lock, 0 );
+		LOCK_INIT( &this->lock, 0 );
 		this->data = 0;
 	}
 
@@ -64,10 +64,10 @@ public:
 	bool decrement() {
 		bool ret;
 
-		pthread_mutex_lock( &this->lock );
+		LOCK( &this->lock );
 		this->referenceCount--;
 		ret = this->referenceCount == 0;
-		pthread_mutex_unlock( &this->lock );
+		UNLOCK( &this->lock );
 
 		return ret;
 	}

@@ -30,12 +30,12 @@ typedef struct {
 		ArrayMap< struct sockaddr_in, Latency > get;
 		ArrayMap< struct sockaddr_in, Latency > set;
 	} cumulativeMirror;
-	pthread_mutex_t lock;
+	LOCK_T lock;
 } SlaveLoading;
 
 typedef struct {
 	std::set< struct sockaddr_in > slaveSet;
-	pthread_mutex_t lock;
+	LOCK_T lock;
 } OverloadedSlave;
 
 #endif

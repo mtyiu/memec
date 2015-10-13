@@ -31,7 +31,7 @@ private:
 	char *data;                 // Buffer
 	uint32_t size;              // Occupied data
 #ifdef USE_CHUNK_MUTEX_LOCK
-	pthread_mutex_t lock;       // Lock
+	LOCK_T lock;       // Lock
 #endif
 
 public:
@@ -61,8 +61,8 @@ public:
 	inline void setData( char *data ) { this->data = data; }
 	inline void setSize( uint32_t size ) { this->size = size; }
 #ifdef USE_CHUNK_MUTEX_LOCK
-	inline void setLock() { pthread_mutex_lock( &this->lock ); }
-	inline void setUnlock() { pthread_mutex_unlock( &this->lock ); }
+	inline void setLock() { LOCK( &this->lock ); }
+	inline void setUnlock() { UNLOCK( &this->lock ); }
 #endif
 	// Update internal counters for data and parity chunks
 	uint32_t updateData();

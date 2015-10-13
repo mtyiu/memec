@@ -1,6 +1,6 @@
 #include "pending.hh"
 
-bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::unordered_multimap<PendingIdentifier, Key> *&map ) {
+bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, Key> *&map ) {
 	switch( type ) {
 		case PT_APPLICATION_GET:
 			lock = &this->applications.getLock;
@@ -34,7 +34,7 @@ bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::unordered_mult
 	return true;
 }
 
-bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *&map ) {
+bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *&map ) {
 	switch( type ) {
 		case PT_APPLICATION_UPDATE:
 			lock = &this->applications.updateLock;
@@ -52,7 +52,7 @@ bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::unordered_mult
 	return true;
 }
 
-bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::unordered_multimap<PendingIdentifier, RemappingRecord> *&map ) {
+bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, RemappingRecord> *&map ) {
 	if ( type == PT_SLAVE_REMAPPING_SET ) {
 		lock = &this->slaves.remappingSetLock;
 		map = &this->slaves.remappingSet;
@@ -65,17 +65,17 @@ bool Pending::get( PendingType type, pthread_mutex_t *&lock, std::unordered_mult
 }
 
 Pending::Pending() {
-	pthread_mutex_init( &this->applications.getLock, 0 );
-	pthread_mutex_init( &this->applications.setLock, 0 );
-	pthread_mutex_init( &this->applications.updateLock, 0 );
-	pthread_mutex_init( &this->applications.delLock, 0 );
-	pthread_mutex_init( &this->slaves.getLock, 0 );
-	pthread_mutex_init( &this->slaves.setLock, 0 );
-	pthread_mutex_init( &this->slaves.remappingSetLock, 0 );
-	pthread_mutex_init( &this->slaves.updateLock, 0 );
-	pthread_mutex_init( &this->slaves.delLock, 0 );
-	pthread_mutex_init( &this->stats.getLock, 0 );
-	pthread_mutex_init( &this->stats.setLock, 0 );
+	LOCK_INIT( &this->applications.getLock, 0 );
+	LOCK_INIT( &this->applications.setLock, 0 );
+	LOCK_INIT( &this->applications.updateLock, 0 );
+	LOCK_INIT( &this->applications.delLock, 0 );
+	LOCK_INIT( &this->slaves.getLock, 0 );
+	LOCK_INIT( &this->slaves.setLock, 0 );
+	LOCK_INIT( &this->slaves.remappingSetLock, 0 );
+	LOCK_INIT( &this->slaves.updateLock, 0 );
+	LOCK_INIT( &this->slaves.delLock, 0 );
+	LOCK_INIT( &this->stats.getLock, 0 );
+	LOCK_INIT( &this->stats.setLock, 0 );
 }
 
 bool Pending::insertKey( PendingType type, uint32_t id, void *ptr, Key &key, bool needsLock, bool needsUnlock ) {
@@ -87,14 +87,14 @@ bool Pending::insertKey( PendingType type, uint32_t id, uint32_t parentId, void 
 	std::pair<PendingIdentifier, Key> p( pid, key );
 	std::unordered_multimap<PendingIdentifier, Key>::iterator ret;
 
-	pthread_mutex_t *lock;
+	LOCK_T *lock;
 	std::unordered_multimap<PendingIdentifier, Key> *map;
 	if ( ! this->get( type, lock, map ) )
 		return false;
 
-	if ( needsLock ) pthread_mutex_lock( lock );
+	if ( needsLock ) LOCK( lock );
 	ret = map->insert( p );
-	if ( needsUnlock ) pthread_mutex_unlock( lock );
+	if ( needsUnlock ) UNLOCK( lock );
 
 	return true; // ret.second;
 }
@@ -104,14 +104,14 @@ bool Pending::insertRemappingRecord( PendingType type, uint32_t id, uint32_t par
 	std::pair<PendingIdentifier, RemappingRecord> p( pid, remappingRecord );
 	std::unordered_multimap<PendingIdentifier, RemappingRecord>::iterator ret;
 
-	pthread_mutex_t *lock;
+	LOCK_T *lock;
 	std::unordered_multimap<PendingIdentifier, RemappingRecord> *map;
 	if ( ! this->get( type, lock, map ) )
 		return false;
 
-	if ( needsLock ) pthread_mutex_lock( lock );
+	if ( needsLock ) LOCK( lock );
 	ret = map->insert( p );
-	if ( needsUnlock ) pthread_mutex_unlock( lock );
+	if ( needsUnlock ) UNLOCK( lock );
 
 	return true; // ret.second;
 }
@@ -125,14 +125,14 @@ bool Pending::insertKeyValueUpdate( PendingType type, uint32_t id, uint32_t pare
 	std::pair<PendingIdentifier, KeyValueUpdate> p( pid, keyValueUpdate );
 	std::unordered_multimap<PendingIdentifier, KeyValueUpdate>::iterator ret;
 
-	pthread_mutex_t *lock;
+	LOCK_T *lock;
 	std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *map;
 	if ( ! this->get( type, lock, map ) )
 		return false;
 
-	if ( needsLock ) pthread_mutex_lock( lock );
+	if ( needsLock ) LOCK( lock );
 	ret = map->insert( p );
-	if ( needsUnlock ) pthread_mutex_unlock( lock );
+	if ( needsUnlock ) UNLOCK( lock );
 
 	return true; // ret.second;
 }
@@ -148,13 +148,13 @@ bool Pending::recordRequestStartTime( PendingType type, uint32_t id, uint32_t pa
 	std::unordered_multimap<PendingIdentifier, RequestStartTime>::iterator ret;
 
 	if ( type == PT_SLAVE_GET ) {
-		pthread_mutex_lock( &this->stats.getLock );
+		LOCK( &this->stats.getLock );
 		ret = this->stats.get.insert( p );
-		pthread_mutex_unlock( &this->stats.getLock );
+		UNLOCK( &this->stats.getLock );
 	} else if ( type == PT_SLAVE_SET ) {
-		pthread_mutex_lock( &this->stats.setLock );
+		LOCK( &this->stats.setLock );
 		ret = this->stats.set.insert( p );
-		pthread_mutex_unlock( &this->stats.setLock );
+		UNLOCK( &this->stats.setLock );
 	} else {
 		return false;
 	}
@@ -164,7 +164,7 @@ bool Pending::recordRequestStartTime( PendingType type, uint32_t id, uint32_t pa
 
 bool Pending::findKey( PendingType type, uint32_t id, void *ptr, Key *keyPtr ) {
 	PendingIdentifier pid( id, 0, ptr );
-	pthread_mutex_t *lock;
+	LOCK_T *lock;
 	bool ret;
 
 	std::unordered_multimap<PendingIdentifier, Key> *map;
@@ -172,7 +172,7 @@ bool Pending::findKey( PendingType type, uint32_t id, void *ptr, Key *keyPtr ) {
 	if ( ! this->get( type, lock, map ) )
 		return false;
 
-	pthread_mutex_lock( lock );
+	LOCK( lock );
 	if ( ptr ) {
 		it = map->find( pid );
 		ret = ( it != map->end() );
@@ -183,14 +183,14 @@ bool Pending::findKey( PendingType type, uint32_t id, void *ptr, Key *keyPtr ) {
 	if ( ret ) {
 		if ( keyPtr ) *keyPtr = it->second;
 	}
-	pthread_mutex_unlock( lock );
+	UNLOCK( lock );
 
 	return ret;
 }
 
 bool Pending::eraseKey( PendingType type, uint32_t id, void *ptr, PendingIdentifier *pidPtr, Key *keyPtr, bool needsLock, bool needsUnlock ) {
 	PendingIdentifier pid( id, 0, ptr );
-	pthread_mutex_t *lock;
+	LOCK_T *lock;
 	bool ret;
 
 	std::unordered_multimap<PendingIdentifier, Key> *map;
@@ -198,7 +198,7 @@ bool Pending::eraseKey( PendingType type, uint32_t id, void *ptr, PendingIdentif
 	if ( ! this->get( type, lock, map ) )
 		return false;
 
-	if ( needsLock ) pthread_mutex_lock( lock );
+	if ( needsLock ) LOCK( lock );
 	if ( ptr ) {
 		it = map->find( pid );
 		ret = ( it != map->end() );
@@ -211,14 +211,14 @@ bool Pending::eraseKey( PendingType type, uint32_t id, void *ptr, PendingIdentif
 		if ( keyPtr ) *keyPtr = it->second;
 		map->erase( it );
 	}
-	if ( needsUnlock ) pthread_mutex_unlock( lock );
+	if ( needsUnlock ) UNLOCK( lock );
 
 	return ret;
 }
 
 bool Pending::eraseRemappingRecord( PendingType type, uint32_t id, void *ptr, PendingIdentifier *pidPtr, RemappingRecord *remappingRecordPtr, bool needsLock, bool needsUnlock ) {
 	PendingIdentifier pid( id, 0, ptr );
-	pthread_mutex_t *lock;
+	LOCK_T *lock;
 	bool ret;
 
 	std::unordered_multimap<PendingIdentifier, RemappingRecord> *map;
@@ -226,7 +226,7 @@ bool Pending::eraseRemappingRecord( PendingType type, uint32_t id, void *ptr, Pe
 	if ( ! this->get( type, lock, map ) )
 		return false;
 
-	if ( needsLock ) pthread_mutex_lock( lock );
+	if ( needsLock ) LOCK( lock );
 	if ( ptr ) {
 		it = map->find( pid );
 		ret = ( it != map->end() );
@@ -239,14 +239,14 @@ bool Pending::eraseRemappingRecord( PendingType type, uint32_t id, void *ptr, Pe
 		if ( remappingRecordPtr ) *remappingRecordPtr = it->second;
 		map->erase( it );
 	}
-	if ( needsUnlock ) pthread_mutex_unlock( lock );
+	if ( needsUnlock ) UNLOCK( lock );
 
 	return ret;
 }
 
 bool Pending::eraseKeyValueUpdate( PendingType type, uint32_t id, void *ptr, PendingIdentifier *pidPtr, KeyValueUpdate *keyValueUpdatePtr, bool needsLock, bool needsUnlock ) {
 	PendingIdentifier pid( id, 0, ptr );
-	pthread_mutex_t *lock;
+	LOCK_T *lock;
 	bool ret;
 
 	std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *map;
@@ -254,7 +254,7 @@ bool Pending::eraseKeyValueUpdate( PendingType type, uint32_t id, void *ptr, Pen
 	if ( ! this->get( type, lock, map ) )
 		return false;
 
-	if ( needsLock ) pthread_mutex_lock( lock );
+	if ( needsLock ) LOCK( lock );
 	if ( ptr ) {
 		it = map->find( pid );
 		ret = ( it != map->end() );
@@ -267,7 +267,7 @@ bool Pending::eraseKeyValueUpdate( PendingType type, uint32_t id, void *ptr, Pen
 		if ( keyValueUpdatePtr ) *keyValueUpdatePtr = it->second;
 		map->erase( it );
 	}
-	if ( needsUnlock ) pthread_mutex_unlock( lock );
+	if ( needsUnlock ) UNLOCK( lock );
 
 	return ret;
 }
@@ -279,7 +279,7 @@ bool Pending::eraseRequestStartTime( PendingType type, uint32_t id, void *ptr, s
 	bool ret;
 
 	if ( type == PT_SLAVE_GET ) {
-		pthread_mutex_lock( &this->stats.getLock );
+		LOCK( &this->stats.getLock );
 		it = this->stats.get.find( pid );
 		ret = ( it != this->stats.get.end() );
 		if ( ret ) {
@@ -289,9 +289,9 @@ bool Pending::eraseRequestStartTime( PendingType type, uint32_t id, void *ptr, s
 			if ( rstPtr ) *rstPtr = rst;
 			this->stats.get.erase( it );
 		}
-		pthread_mutex_unlock( &this->stats.getLock );
+		UNLOCK( &this->stats.getLock );
 	} else if ( type == PT_SLAVE_SET ) {
-		pthread_mutex_lock( &this->stats.setLock );
+		LOCK( &this->stats.setLock );
 		it = this->stats.set.find( pid );
 		ret = ( it != this->stats.set.end() );
 		if ( ret ) {
@@ -301,7 +301,7 @@ bool Pending::eraseRequestStartTime( PendingType type, uint32_t id, void *ptr, s
 			if ( rstPtr ) *rstPtr = rst;
 			this->stats.set.erase( it );
 		}
-		pthread_mutex_unlock( &this->stats.setLock );
+		UNLOCK( &this->stats.setLock );
 	} else {
 		return false;
 	}
@@ -326,7 +326,7 @@ bool Pending::eraseRequestStartTime( PendingType type, uint32_t id, void *ptr, s
 
 uint32_t Pending::count( PendingType type, uint32_t id, bool needsLock, bool needsUnlock ) {
 	PendingIdentifier pid( id, 0, 0 );
-	pthread_mutex_t *lock;
+	LOCK_T *lock;
 	uint32_t ret = 0;
 	if ( type == PT_APPLICATION_UPDATE || type == PT_SLAVE_UPDATE ) {
 		std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *map;
@@ -334,33 +334,33 @@ uint32_t Pending::count( PendingType type, uint32_t id, bool needsLock, bool nee
 
 		if ( ! this->get( type, lock, map ) ) return 0;
 
-		if ( needsLock ) pthread_mutex_lock( lock );
+		if ( needsLock ) LOCK( lock );
 		ret = map->count( pid );
 		// it = map->lower_bound( pid );
 		// for ( ret = 0; it != map->end() && it->first.id == id; ret++, it++ );
-		if ( needsUnlock ) pthread_mutex_unlock( lock );
+		if ( needsUnlock ) UNLOCK( lock );
 	} else if ( type == PT_SLAVE_REMAPPING_SET ) {
 		std::unordered_multimap<PendingIdentifier, RemappingRecord> *map;
 		std::unordered_multimap<PendingIdentifier, RemappingRecord>::iterator it;
 
 		if ( ! this->get( type, lock, map ) ) return 0;
 
-		if ( needsLock ) pthread_mutex_lock( lock );
+		if ( needsLock ) LOCK( lock );
 		ret = map->count( pid );
 		// it = map->lower_bound( pid );
 		// for ( ret = 0; it != map->end() && it->first.id == id; ret++, it++ );
-		if ( needsUnlock ) pthread_mutex_unlock( lock );
+		if ( needsUnlock ) UNLOCK( lock );
 	} else {
 		std::unordered_multimap<PendingIdentifier, Key> *map;
 		std::unordered_multimap<PendingIdentifier, Key>::iterator it;
 
 		if ( ! this->get( type, lock, map ) ) return 0;
 
-		if ( needsLock ) pthread_mutex_lock( lock );
+		if ( needsLock ) LOCK( lock );
 		ret = map->count( pid );
 		// it = map->lower_bound( pid );
 		// for ( ret = 0; it != map->end() && it->first.id == id; ret++, it++ );
-		if ( needsUnlock ) pthread_mutex_unlock( lock );
+		if ( needsUnlock ) UNLOCK( lock );
 	}
 
 	return ret;

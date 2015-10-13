@@ -65,11 +65,11 @@ public:
 		// ( slaveAddr, ( mastserAddr, Latency ) )
 		ArrayMap< struct sockaddr_in, ArrayMap< struct sockaddr_in, Latency > > latestGet;
 		ArrayMap< struct sockaddr_in, ArrayMap< struct sockaddr_in, Latency > > latestSet;
-		pthread_mutex_t lock;
+		LOCK_T lock;
 	} slaveLoading;
 	struct {
 		std::set< struct sockaddr_in > slaveSet;
-		pthread_mutex_t lock;
+		LOCK_T lock;
 	} overloadedSlaves;
 	Timer statsTimer;
 

@@ -16,13 +16,13 @@ private:
 	 * Key |-> (list ID, stripe ID, chunk ID, offset, length)
 	 */
 	std::unordered_map<Key, KeyMetadata> keys;
-	pthread_spinlock_t keysLock;
+	LOCK_T keysLock;
 	/**
 	 * Store the cached chunks
 	 * (list ID, stripe ID, chunk ID) |-> Chunk *
 	 */
 	std::unordered_map<Metadata, Chunk *> cache;
-	pthread_spinlock_t cacheLock;
+	LOCK_T cacheLock;
 
 public:
 	/**
@@ -30,7 +30,7 @@ public:
 	 * Key |-> (list ID, stripe ID, chunk ID, opcode)
 	 */
 	std::unordered_map<Key, OpMetadata> ops;
-	pthread_mutex_t opsLock;
+	LOCK_T opsLock;
 	/**
 	 * Store the pending-to-send remapping records
 	 * Key |-> (list ID, chunk ID)
@@ -41,13 +41,13 @@ public:
 	 * Key |-> (list ID, chunk ID)
 	 */
 	std::unordered_map<Key, RemappingRecord> remapSent;
-	pthread_mutex_t remapLock;
+	LOCK_T remapLock;
 
 	Map() {
-		pthread_spin_init( &this->keysLock, 0 );
-		pthread_mutex_init( &this->remapLock, 0 );
-		pthread_spin_init( &this->cacheLock, 0 );
-		pthread_mutex_init( &this->opsLock, 0 );
+		LOCK_INIT( &this->keysLock, 0 );
+		LOCK_INIT( &this->remapLock, 0 );
+		LOCK_INIT( &this->cacheLock, 0 );
+		LOCK_INIT( &this->opsLock, 0 );
 	}
 
 	bool findRemappingRecordByKey( char *data, uint8_t size, RemappingRecord *remappingRecordPtr = 0, Key *keyPtr = 0 ) {
@@ -56,17 +56,17 @@ public:
 
 		key.set( size, data );
 
-		pthread_mutex_lock( &this->remapLock );
+		LOCK( &this->remapLock );
 		it = this->remap.find( key );
 		if ( it == this->remap.end() ) {
 			if ( keyPtr ) *keyPtr = key;
-			pthread_mutex_unlock( &this->remapLock );
+			UNLOCK( &this->remapLock );
 			return false;
 		}
 
 		if ( keyPtr ) *keyPtr = it->first;
 		if ( remappingRecordPtr ) *remappingRecordPtr = it->second;
-		pthread_mutex_unlock( &this->remapLock );
+		UNLOCK( &this->remapLock );
 		return true;
 	}
 
@@ -78,22 +78,22 @@ public:
 		keyValue->clear();
 		key.set( size, data );
 
-		pthread_spin_lock( &this->keysLock );
+		LOCK( &this->keysLock );
 		keysIt = this->keys.find( key );
 		if ( keysIt == this->keys.end() ) {
 			if ( keyPtr ) *keyPtr = key;
-			pthread_spin_unlock( &this->keysLock );
+			UNLOCK( &this->keysLock );
 			return false;
 		}
 
 		if ( keyPtr ) *keyPtr = keysIt->first;
 		if ( keyMetadataPtr ) *keyMetadataPtr = keysIt->second;
-		pthread_spin_unlock( &this->keysLock );
+		UNLOCK( &this->keysLock );
 
-		pthread_spin_lock( &this->cacheLock );
+		LOCK( &this->cacheLock );
 		cacheIt = this->cache.find( keysIt->second );
 		if ( cacheIt == this->cache.end() ) {
-			pthread_spin_unlock( &this->cacheLock );
+			UNLOCK( &this->cacheLock );
 			return false;
 		}
 
@@ -102,7 +102,7 @@ public:
 
 		Chunk *chunk = cacheIt->second;
 		*keyValue = chunk->getKeyValue( keysIt->second.offset );
-		pthread_spin_unlock( &this->cacheLock );
+		UNLOCK( &this->cacheLock );
 		return true;
 	}
 
@@ -113,13 +113,13 @@ public:
 		metadata.set( listId, stripeId, chunkId );
 		if ( metadataPtr ) *metadataPtr = metadata;
 
-		pthread_spin_lock( &this->cacheLock );
+		LOCK( &this->cacheLock );
 		it = this->cache.find( metadata );
 		if ( it == this->cache.end() ) {
-			pthread_spin_unlock( &this->cacheLock );
+			UNLOCK( &this->cacheLock );
 			return 0;
 		}
-		pthread_spin_unlock( &this->cacheLock );
+		UNLOCK( &this->cacheLock );
 		return it->second;
 	}
 
@@ -129,20 +129,20 @@ public:
 		std::pair<Key, KeyMetadata> p( key, keyMetadata );
 		std::pair<std::unordered_map<Key, KeyMetadata>::iterator, bool> ret;
 
-		pthread_spin_lock( &this->keysLock );
+		LOCK( &this->keysLock );
 		ret = this->keys.insert( p );
 		if ( ! ret.second ) {
-			pthread_spin_unlock( &this->keysLock );
+			UNLOCK( &this->keysLock );
 			return false;
 		}
-		pthread_spin_unlock( &this->keysLock );
+		UNLOCK( &this->keysLock );
 
 		OpMetadata opMetadata;
 		opMetadata.clone( keyMetadata );
 		opMetadata.opcode = opcode;
-		pthread_mutex_lock( &this->opsLock );
+		LOCK( &this->opsLock );
 		this->ops[ key ] = opMetadata;
-		pthread_mutex_unlock( &this->opsLock );
+		UNLOCK( &this->opsLock );
 
 		return true;
 	}
@@ -153,21 +153,21 @@ public:
 		std::pair<Key, RemappingRecord> p( key, remappingRecord );
 		std::pair<std::unordered_map<Key, RemappingRecord>::iterator, bool> ret;
 
-		pthread_mutex_lock( &this->remapLock );
+		LOCK( &this->remapLock );
 		ret = this->remap.insert( p );
 		if ( ! ret.second ) {
-			pthread_mutex_unlock( &this->remapLock );
+			UNLOCK( &this->remapLock );
 			return false;
 		}
-		pthread_mutex_unlock( &this->remapLock );
+		UNLOCK( &this->remapLock );
 
 		OpMetadata opMetadata;
 		opMetadata.listId = remappingRecord.listId;
 		opMetadata.chunkId = remappingRecord.chunkId;
 		opMetadata.opcode = PROTO_OPCODE_REMAPPING_LOCK;
-		pthread_mutex_lock( &this->opsLock );
+		LOCK( &this->opsLock );
 		this->ops[ key ] = opMetadata;
-		pthread_mutex_unlock( &this->opsLock );
+		UNLOCK( &this->opsLock );
 
 		return true;
 	}
@@ -176,9 +176,9 @@ public:
 		Metadata metadata;
 		metadata.set( listId, stripeId, chunkId );
 
-		pthread_spin_lock( &this->cacheLock );
+		LOCK( &this->cacheLock );
 		this->cache[ metadata ] = chunk;
-		pthread_spin_unlock( &this->cacheLock );
+		UNLOCK( &this->cacheLock );
 
 		if ( ! isParity ) {
 			char *ptr = chunk->getData();
@@ -186,7 +186,7 @@ public:
 			uint8_t keySize;
 			uint32_t valueSize, offset = 0, size;
 
-			pthread_spin_lock( &this->keysLock );
+			LOCK( &this->keysLock );
 			while( ptr < chunk->getData() + Chunk::capacity ) {
 				KeyValue::deserialize( ptr, keyPtr, keySize, valuePtr, valueSize );
 				if ( keySize == 0 && valueSize == 0 )
@@ -208,16 +208,16 @@ public:
 
 				ptr += size;
 			}
-			pthread_spin_unlock( &this->keysLock );
+			UNLOCK( &this->keysLock );
 		}
 	}
 
-	void getKeysMap( std::unordered_map<Key, KeyMetadata> *&keys, pthread_spinlock_t *&lock ) {
+	void getKeysMap( std::unordered_map<Key, KeyMetadata> *&keys, LOCK_T *&lock ) {
 		keys = &this->keys;
 		lock = &this->keysLock;
 	}
 
-	void getCacheMap( std::unordered_map<Metadata, Chunk *> *&cache, pthread_spinlock_t *&lock ) {
+	void getCacheMap( std::unordered_map<Metadata, Chunk *> *&cache, LOCK_T *&lock ) {
 		cache = &this->cache;
 		lock = &this->cacheLock;
 	}

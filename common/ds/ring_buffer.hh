@@ -15,7 +15,7 @@ template <class T> class RingBuffer {
 	volatile int max;				// capacity of the buffer
 	volatile int run;
 	volatile int blockOnEmpty;
-	pthread_mutex_t mAccess;
+	LOCK_T mAccess;
 	pthread_cond_t cvEmpty;
 	pthread_cond_t cvFull;
 
@@ -31,7 +31,7 @@ public:
 		max = size;
 		run = true;
 		blockOnEmpty = block;
-		pthread_mutex_init(&mAccess, NULL);
+		LOCK_INIT(&mAccess, NULL);
 		pthread_cond_init(&cvEmpty, NULL);
 		pthread_cond_init(&cvFull, NULL);
 	}
@@ -44,7 +44,7 @@ public:
 	// inline int nextVal(int x) { return (x+1)%max; }
 
 	int Insert(T* data, int len) {
-		pthread_mutex_lock(&mAccess);
+		LOCK(&mAccess);
 		while (count == max) {
 			pthread_cond_wait(&cvFull, &mAccess);
 		}
@@ -53,15 +53,15 @@ public:
 		writeIndex = nextVal(writeIndex);
 		count++;
 		pthread_cond_signal(&cvEmpty);
-		pthread_mutex_unlock(&mAccess);
+		UNLOCK(&mAccess);
 		return 0;
 	}
 
 	int Extract(T* data) {
-		pthread_mutex_lock(&mAccess);
+		LOCK(&mAccess);
 		while (count == 0) {
 			if (!blockOnEmpty || !run) {
-				pthread_mutex_unlock(&mAccess);
+				UNLOCK(&mAccess);
 				return -1;
 			}
 			pthread_cond_wait(&cvEmpty, &mAccess);
@@ -70,7 +70,7 @@ public:
 		readIndex = nextVal(readIndex);
 		count--;
 		pthread_cond_signal(&cvFull);
-		pthread_mutex_unlock(&mAccess);
+		UNLOCK(&mAccess);
 		return 0;
 	}
 
@@ -79,12 +79,12 @@ public:
 	}
 
 	void Stop() {
-		pthread_mutex_lock(&mAccess);
+		LOCK(&mAccess);
 		run = false;
 		while (count > 0) {
 			pthread_cond_wait(&cvFull, &mAccess);
 		}
-		pthread_mutex_unlock(&mAccess);
+		UNLOCK(&mAccess);
 		pthread_cond_broadcast(&cvEmpty);
 	}
 };

@@ -3,7 +3,7 @@
 
 ParityChunkWrapper::ParityChunkWrapper() {
 	this->pending = ChunkBuffer::dataChunkCount;
-	pthread_mutex_init( &this->lock, 0 );
+	LOCK_INIT( &this->lock, 0 );
 	this->chunk = 0;
 }
 
@@ -12,7 +12,7 @@ ParityChunkWrapper::ParityChunkWrapper() {
 ParityChunkBuffer::ParityChunkBuffer( uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) : ChunkBuffer( listId, stripeId, chunkId ) {}
 
 ParityChunkWrapper &ParityChunkBuffer::getWrapper( uint32_t stripeId, bool needsLock, bool needsUnlock ) {
-	if ( needsLock ) pthread_mutex_lock( &this->lock );
+	if ( needsLock ) LOCK( &this->lock );
 	std::unordered_map<uint32_t, ParityChunkWrapper>::iterator it = this->chunks.find( stripeId );
 	if ( it == this->chunks.end() ) {
 		ParityChunkWrapper wrapper;
@@ -27,7 +27,7 @@ ParityChunkWrapper &ParityChunkBuffer::getWrapper( uint32_t stripeId, bool needs
 		it = this->chunks.find( stripeId );
 	}
 	ParityChunkWrapper &wrapper = it->second;
-	if ( needsUnlock ) pthread_mutex_unlock( &this->lock );
+	if ( needsUnlock ) UNLOCK( &this->lock );
 	return wrapper;
 }
 
@@ -37,7 +37,7 @@ bool ParityChunkBuffer::set( char *keyStr, uint8_t keySize, char *valueStr, uint
 
 	key.set( keySize, keyStr );
 
-	pthread_mutex_lock( &this->lock );
+	LOCK( &this->lock );
 
 	// Check whether the key is in a sealed chunk
 	it = this->pending.find( key );
@@ -55,7 +55,7 @@ bool ParityChunkBuffer::set( char *keyStr, uint8_t keySize, char *valueStr, uint
 
 		ret = this->keys.insert( p );
 		if ( ! ret.second ) {
-			pthread_mutex_unlock( &this->lock );
+			UNLOCK( &this->lock );
 			keyValue.free();
 			return false;
 		}
@@ -93,7 +93,7 @@ bool ParityChunkBuffer::set( char *keyStr, uint8_t keySize, char *valueStr, uint
 				break;
 		}
 	}
-	pthread_mutex_unlock( &this->lock );
+	UNLOCK( &this->lock );
 
 	return true;
 }
@@ -110,7 +110,7 @@ bool ParityChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t coun
 	std::unordered_map<Key, KeyValue>::iterator it;
 	std::unordered_map<Key, PendingRequest>::iterator prtIt;
 
-	pthread_mutex_lock( &this->lock );
+	LOCK( &this->lock );
 	while ( sealDataSize ) {
 		// Parse the (key, offset) record
 		keySize = sealData[ 0 ];
@@ -163,7 +163,7 @@ bool ParityChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t coun
 	assert( numOfKeys == count );
 	dataChunk->setSize( curPos );
 	this->update( stripeId, chunkId, 0, curPos, dataChunks, dataChunk, parityChunk, false, false );
-	pthread_mutex_unlock( &this->lock );
+	UNLOCK( &this->lock );
 
 	return true;
 }
@@ -174,7 +174,7 @@ bool ParityChunkBuffer::deleteKey( char *keyStr, uint8_t keySize ) {
 
 	key.set( keySize, keyStr );
 
-	pthread_mutex_lock( &this->lock );
+	LOCK( &this->lock );
 
 	it = this->keys.find( key );
 	if ( it == this->keys.end() ) {
@@ -190,7 +190,7 @@ bool ParityChunkBuffer::deleteKey( char *keyStr, uint8_t keySize ) {
 		if ( ! ret.second ) {
 			__ERROR__( "ParityChunkBuffer", "deleteKey", "Key: %.*s (size = %u) cannot be inserted into pending keys map.\n", keySize, keyStr, keySize );
 		}
-		pthread_mutex_unlock( &this->lock );
+		UNLOCK( &this->lock );
 		return false;
 	} else {
 		KeyValue keyValue = it->second;
@@ -198,7 +198,7 @@ bool ParityChunkBuffer::deleteKey( char *keyStr, uint8_t keySize ) {
 		keyValue.free();
 	}
 
-	pthread_mutex_unlock( &this->lock );
+	UNLOCK( &this->lock );
 	return true;
 }
 
@@ -208,7 +208,7 @@ bool ParityChunkBuffer::updateKeyValue( char *keyStr, uint8_t keySize, uint32_t 
 
 	key.set( keySize, keyStr );
 
-	pthread_mutex_lock( &this->lock );
+	LOCK( &this->lock );
 	it = this->keys.find( key );
 	if ( it == this->keys.end() ) {
 		PendingRequest pendingRequest;
@@ -223,7 +223,7 @@ bool ParityChunkBuffer::updateKeyValue( char *keyStr, uint8_t keySize, uint32_t 
 		if ( ! ret.second ) {
 			__ERROR__( "ParityChunkBuffer", "updateKeyValue", "Key: %.*s (size = %u) cannot be inserted into pending keys map.\n", keySize, keyStr, keySize );
 		}
-		pthread_mutex_unlock( &this->lock );
+		UNLOCK( &this->lock );
 		return false;
 	} else {
 		KeyValue keyValue = it->second;
@@ -235,7 +235,7 @@ bool ParityChunkBuffer::updateKeyValue( char *keyStr, uint8_t keySize, uint32_t 
 			length
 		);
 	}
-	pthread_mutex_unlock( &this->lock );
+	UNLOCK( &this->lock );
 	return true;
 }
 
@@ -254,10 +254,10 @@ void ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t of
 		offset + chunkId * ChunkBuffer::capacity + size
 	);
 
-	if ( needsLock ) pthread_mutex_lock( &this->lock );
+	if ( needsLock ) LOCK( &this->lock );
 	ParityChunkWrapper &wrapper = this->getWrapper( stripeId, false, false );
 
-	pthread_mutex_lock( &wrapper.lock );
+	LOCK( &wrapper.lock );
 	wrapper.chunk->status = CHUNK_STATUS_DIRTY;
 	if ( offset + size > wrapper.chunk->getSize() ) {
 		wrapper.chunk->setSize( offset + size );
@@ -270,8 +270,8 @@ void ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t of
 		parityChunk->getData(),
 		ChunkBuffer::capacity
 	);
-	pthread_mutex_unlock( &wrapper.lock );
-	if ( needsUnlock ) pthread_mutex_unlock( &this->lock );
+	UNLOCK( &wrapper.lock );
+	if ( needsUnlock ) UNLOCK( &this->lock );
 }
 
 void ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, char *dataDelta, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk ) {

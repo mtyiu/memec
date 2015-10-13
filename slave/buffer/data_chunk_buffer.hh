@@ -14,7 +14,7 @@ class SlaveWorker;
 class DataChunkBuffer : public ChunkBuffer {
 private:
 	uint32_t count;                        // Number of chunks
-	pthread_mutex_t *locks;                // Lock for each chunk
+	LOCK_T *locks;                // Lock for each chunk
 	Chunk **chunks;                        // Allocated chunk buffer
 #ifdef REINSERTED_CHUNKS_IS_SET
 	std::unordered_set<Chunk *> reInsertedChunks;    // Chunks that have free space after deletion

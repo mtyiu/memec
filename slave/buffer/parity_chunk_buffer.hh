@@ -8,7 +8,7 @@
 class ParityChunkWrapper {
 public:
 	uint32_t pending;
-	pthread_mutex_t lock;
+	LOCK_T lock;
 	Chunk *chunk;
 
 	ParityChunkWrapper();

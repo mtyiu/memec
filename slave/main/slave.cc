@@ -325,13 +325,13 @@ void Slave::flush() {
 	IOEvent ioEvent;
 	std::unordered_map<Metadata, Chunk *>::iterator it;
 	std::unordered_map<Metadata, Chunk *> *cache;
-	pthread_spinlock_t *lock;
+	LOCK_T *lock;
 	Chunk *chunk;
 	size_t count = 0;
 
 	this->map.getCacheMap( cache, lock );
 
-	pthread_spin_lock( lock );
+	LOCK( lock );
 	for ( it = cache->begin(); it != cache->end(); it++ ) {
 		chunk = it->second;
 		if ( chunk->status == CHUNK_STATUS_DIRTY ) {
@@ -340,7 +340,7 @@ void Slave::flush() {
 			count++;
 		}
 	}
-	pthread_spin_unlock( lock );
+	UNLOCK( lock );
 
 	printf( "Flushing %lu chunks...\n", count );
 }
@@ -348,13 +348,13 @@ void Slave::flush() {
 void Slave::memory( FILE *f ) {
 	std::unordered_map<Metadata, Chunk *> *cache;
 	std::unordered_map<Metadata, Chunk *>::iterator it;
-	pthread_spinlock_t *lock;
+	LOCK_T *lock;
 	uint32_t numDataChunks = 0, numParityChunks = 0, numKeyValues = 0;
 	uint64_t occupied = 0, allocated = 0, bytesParity = 0;
 
 	this->map.getCacheMap( cache, lock );
 
-	pthread_spin_lock( lock );
+	LOCK( lock );
 	for ( it = cache->begin(); it != cache->end(); it++ ) {
 		Chunk *chunk = it->second;
 		if ( chunk->isParity ) {
@@ -367,7 +367,7 @@ void Slave::memory( FILE *f ) {
 			allocated += chunk->capacity;
 		}
 	}
-	pthread_spin_unlock( lock );
+	UNLOCK( lock );
 
 	int width = 25;
 	fprintf(

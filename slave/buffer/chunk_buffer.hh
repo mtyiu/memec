@@ -17,7 +17,7 @@ protected:
 	uint32_t listId;                       // List ID of this buffer
 	uint32_t stripeId;                     // Current stripe ID
 	uint32_t chunkId;                      // Chunk ID of this buffer
-	pthread_mutex_t lock;                  // Lock for the whole buffer
+	LOCK_T lock;                  // Lock for the whole buffer
 
 	static Coding *coding;                 // Coding module
 	static MemoryPool<Chunk> *chunkPool;   // Memory pool for chunks

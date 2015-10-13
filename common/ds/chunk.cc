@@ -16,7 +16,7 @@ Chunk::Chunk() {
 	this->lastDelPos = 0;
 	this->isParity = false;
 #ifdef USE_CHUNK_MUTEX_LOCK
-	pthread_mutex_init( &this->lock, 0 );
+	LOCK_INIT( &this->lock, 0 );
 #endif
 }
 
@@ -31,7 +31,7 @@ void Chunk::init() {
 
 void Chunk::loadFromGetChunkRequest( uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isParity, char *data, uint32_t size ) {
 #ifdef USE_CHUNK_MUTEX_LOCK
-	pthread_mutex_lock( &this->lock );
+	LOCK( &this->lock );
 #endif
 	this->status = CHUNK_STATUS_FROM_GET_CHUNK;
 	this->size = size;
@@ -39,7 +39,7 @@ void Chunk::loadFromGetChunkRequest( uint32_t listId, uint32_t stripeId, uint32_
 	this->isParity = isParity;
 	memcpy( this->data, data, size );
 #ifdef USE_CHUNK_MUTEX_LOCK
-	pthread_mutex_unlock( &this->lock );
+	UNLOCK( &this->lock );
 #endif
 }
 
@@ -54,7 +54,7 @@ void Chunk::swap( Chunk *c ) {
 	tmp.data = c->data;
 
 #ifdef USE_CHUNK_MUTEX_LOCK
-	pthread_mutex_lock( &c->lock );
+	LOCK( &c->lock );
 #endif
 	c->status = this->status;
 	c->count = this->count;
@@ -63,11 +63,11 @@ void Chunk::swap( Chunk *c ) {
 	c->isParity = this->isParity;
 	c->data = this->data;
 #ifdef USE_CHUNK_MUTEX_LOCK
-	pthread_mutex_unlock( &c->lock );
+	UNLOCK( &c->lock );
 #endif
 
 #ifdef USE_CHUNK_MUTEX_LOCK
-	pthread_mutex_lock( &this->lock );
+	LOCK( &this->lock );
 #endif
 	this->status = tmp.status;
 	this->count = tmp.count;
@@ -76,13 +76,13 @@ void Chunk::swap( Chunk *c ) {
 	this->isParity = tmp.isParity;
 	this->data = tmp.data;
 #ifdef USE_CHUNK_MUTEX_LOCK
-	pthread_mutex_unlock( &this->lock );
+	UNLOCK( &this->lock );
 #endif
 }
 
 char *Chunk::alloc( uint32_t size, uint32_t &offset ) {
 #ifdef USE_CHUNK_MUTEX_LOCK
-	pthread_mutex_lock( &this->lock );
+	LOCK( &this->lock );
 #endif
 	char *ret = this->data + this->size;
 	offset = this->size;
@@ -91,7 +91,7 @@ char *Chunk::alloc( uint32_t size, uint32_t &offset ) {
 	this->count++;
 	this->size += size;
 #ifdef USE_CHUNK_MUTEX_LOCK
-	pthread_mutex_unlock( &this->lock );
+	UNLOCK( &this->lock );
 #endif
 
 	return ret;
@@ -104,7 +104,7 @@ int Chunk::next( int offset, char *&key, uint8_t &keySize )
 #endif
 {
 #ifdef USE_CHUNK_MUTEX_LOCK
-	if ( needsLock ) pthread_mutex_lock( &this->lock );
+	if ( needsLock ) LOCK( &this->lock );
 #endif
 	char *ptr = this->data + offset, *value;
 	int ret = -1;
@@ -118,7 +118,7 @@ int Chunk::next( int offset, char *&key, uint8_t &keySize )
 			key = 0;
 	}
 #ifdef USE_CHUNK_MUTEX_LOCK
-	if ( needsUnlock ) pthread_mutex_unlock( &this->lock );
+	if ( needsUnlock ) UNLOCK( &this->lock );
 #endif
 	return ret;
 }
@@ -129,7 +129,7 @@ uint32_t Chunk::updateData() {
 	char *key, *value, *ptr = this->data;
 
 #ifdef USE_CHUNK_MUTEX_LOCK
-	pthread_mutex_lock( &this->lock );
+	LOCK( &this->lock );
 #endif
 	this->isParity = false;
 	while ( ptr < this->data + Chunk::capacity ) {
@@ -146,14 +146,14 @@ uint32_t Chunk::updateData() {
 	}
 	tmp = this->size;
 #ifdef USE_CHUNK_MUTEX_LOCK
-	pthread_mutex_unlock( &this->lock );
+	UNLOCK( &this->lock );
 #endif
 	return tmp;
 }
 
 uint32_t Chunk::updateParity( uint32_t offset, uint32_t length ) {
 #ifdef USE_CHUNK_MUTEX_LOCK
-	pthread_mutex_lock( &this->lock );
+	LOCK( &this->lock );
 #endif
 	uint32_t size = offset + length;
 	this->isParity = true;
@@ -161,14 +161,14 @@ uint32_t Chunk::updateParity( uint32_t offset, uint32_t length ) {
 		this->size = size;
 	size = this->size;
 #ifdef USE_CHUNK_MUTEX_LOCK
-	pthread_mutex_unlock( &this->lock );
+	UNLOCK( &this->lock );
 #endif
 	return size;
 }
 
 void Chunk::computeDelta( char *delta, char *newData, uint32_t offset, uint32_t length, bool update ) {
 #ifdef USE_CHUNK_MUTEX_LOCK
-	pthread_mutex_lock( &this->lock );
+	LOCK( &this->lock );
 #endif
 	Coding::bitwiseXOR(
 		delta,
@@ -187,23 +187,23 @@ void Chunk::computeDelta( char *delta, char *newData, uint32_t offset, uint32_t 
 		);
 	}
 #ifdef USE_CHUNK_MUTEX_LOCK
-	pthread_mutex_unlock( &this->lock );
+	UNLOCK( &this->lock );
 #endif
 }
 
 void Chunk::update( char *newData, uint32_t offset, uint32_t length ) {
 #ifdef USE_CHUNK_MUTEX_LOCK
-	pthread_mutex_lock( &this->lock );
+	LOCK( &this->lock );
 #endif
 	memcpy( this->data + offset, newData, length );
 #ifdef USE_CHUNK_MUTEX_LOCK
-	pthread_mutex_unlock( &this->lock );
+	UNLOCK( &this->lock );
 #endif
 }
 
 uint32_t Chunk::deleteKeyValue( Key target, std::unordered_map<Key, KeyMetadata> *keys, char *delta, size_t deltaBufSize ) {
 #ifdef USE_CHUNK_MUTEX_LOCK
-	pthread_mutex_lock( &this->lock );
+	LOCK( &this->lock );
 #endif
 
 	uint32_t deltaSize, bytes;
@@ -225,7 +225,7 @@ uint32_t Chunk::deleteKeyValue( Key target, std::unordered_map<Key, KeyMetadata>
 		if ( deltaSize > deltaBufSize ) {
 			__ERROR__( "Chunk", "deleteKeyValue", "The buffer size (%lu) is smaller than the modified chunk size (%u).", deltaBufSize, deltaSize );
 #ifdef USE_CHUNK_MUTEX_LOCK
-			pthread_mutex_unlock( &this->lock );
+			UNLOCK( &this->lock );
 #endif
 			return 0;
 		}
@@ -275,7 +275,7 @@ uint32_t Chunk::deleteKeyValue( Key target, std::unordered_map<Key, KeyMetadata>
 	}
 
 #ifdef USE_CHUNK_MUTEX_LOCK
-	pthread_mutex_unlock( &this->lock );
+	UNLOCK( &this->lock );
 #endif
 	return deltaSize;
 }
@@ -283,31 +283,31 @@ uint32_t Chunk::deleteKeyValue( Key target, std::unordered_map<Key, KeyMetadata>
 KeyValue Chunk::getKeyValue( uint32_t offset ) {
 	KeyValue ret;
 #ifdef USE_CHUNK_MUTEX_LOCK
-	pthread_mutex_lock( &this->lock );
+	LOCK( &this->lock );
 #endif
 	ret.data = this->data + offset;
 #ifdef USE_CHUNK_MUTEX_LOCK
-	pthread_mutex_unlock( &this->lock );
+	UNLOCK( &this->lock );
 #endif
 	return ret;
 }
 
 void Chunk::clear() {
 #ifdef USE_CHUNK_MUTEX_LOCK
-	pthread_mutex_lock( &this->lock );
+	LOCK( &this->lock );
 #endif
 	this->status = CHUNK_STATUS_EMPTY;
 	this->count = 0;
 	this->size = 0;
 	memset( this->data, 0, Chunk::capacity );
 #ifdef USE_CHUNK_MUTEX_LOCK
-	pthread_mutex_unlock( &this->lock );
+	UNLOCK( &this->lock );
 #endif
 }
 
 void Chunk::setReconstructed( uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isParity ) {
 #ifdef USE_CHUNK_MUTEX_LOCK
-	pthread_mutex_lock( &this->lock );
+	LOCK( &this->lock );
 #endif
 	this->status = CHUNK_STATUS_RECONSTRUCTED;
 	this->count = 0;
@@ -318,18 +318,18 @@ void Chunk::setReconstructed( uint32_t listId, uint32_t stripeId, uint32_t chunk
 	this->isParity = isParity;
 	memset( this->data, 0, Chunk::capacity );
 #ifdef USE_CHUNK_MUTEX_LOCK
-	pthread_mutex_unlock( &this->lock );
+	UNLOCK( &this->lock );
 #endif
 }
 
 void Chunk::free() {
 #ifdef USE_CHUNK_MUTEX_LOCK
-	pthread_mutex_lock( &this->lock );
+	LOCK( &this->lock );
 #endif
 	delete this->data;
 	this->data = 0;
 #ifdef USE_CHUNK_MUTEX_LOCK
-	pthread_mutex_unlock( &this->lock );
+	UNLOCK( &this->lock );
 #endif
 }
 

@@ -26,7 +26,7 @@ protected:
 	int sockfd;
 	int type;
 	struct sockaddr_in addr;
-	pthread_mutex_t readLock, writeLock;
+	LOCK_T readLock, writeLock;
 
 	static EPoll *epoll;
 

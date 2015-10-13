@@ -12,7 +12,7 @@ void Master::updateSlavesCurrentLoading() {
 	int index = -1;
 	Latency *tempLatency = NULL;
 
-	pthread_mutex_lock( &this->slaveLoading.lock );
+	LOCK( &this->slaveLoading.lock );
 
 #define UPDATE_LATENCY( _SRC_, _DST_, _SRC_VAL_TYPE_, _DST_OP_, _CHECK_EXIST_, _MIRROR_DST_ ) \
 	for ( uint32_t i = 0; i < _SRC_.size(); i++ ) { \
@@ -58,14 +58,14 @@ void Master::updateSlavesCurrentLoading() {
 	pastGet.clear();
 	pastSet.clear();
 
-	pthread_mutex_unlock( &this->slaveLoading.lock );
+	UNLOCK( &this->slaveLoading.lock );
 }
 
 void Master::updateSlavesCumulativeLoading () {
 	int index = -1;
 	Latency *tempLatency = NULL;
 
-	pthread_mutex_lock( &this->slaveLoading.lock );
+	LOCK( &this->slaveLoading.lock );
 
 	ArrayMap< struct sockaddr_in, Latency > &currentGet = this->slaveLoading.current.get;
 	ArrayMap< struct sockaddr_in, Latency > &cumulativeGet = this->slaveLoading.cumulative.get;
@@ -83,12 +83,12 @@ void Master::updateSlavesCumulativeLoading () {
 
 #undef UPDATE_LATENCY
 
-	pthread_mutex_unlock( &this->slaveLoading.lock );
+	UNLOCK( &this->slaveLoading.lock );
 }
 
 void Master::mergeSlaveCumulativeLoading ( ArrayMap< struct sockaddr_in, Latency > *getLatency, ArrayMap< struct sockaddr_in, Latency> *setLatency ) {
 
-	pthread_mutex_lock( &this->slaveLoading.lock );
+	LOCK( &this->slaveLoading.lock );
 
 	int index = -1;
 	// check if the slave addr already exists in currentMap
@@ -114,7 +114,7 @@ void Master::mergeSlaveCumulativeLoading ( ArrayMap< struct sockaddr_in, Latency
 
 #undef MERGE_AND_UPDATE_LATENCY
 
-	pthread_mutex_unlock( &this->slaveLoading.lock );
+	UNLOCK( &this->slaveLoading.lock );
 }
 
 void Master::free() {
@@ -134,9 +134,9 @@ void Master::signalHandler( int signal ) {
 			master->updateSlavesCumulativeLoading();
 
 			// ask workers to send the loading stats to coordinators
-			pthread_mutex_lock( &master->slaveLoading.lock );
+			LOCK( &master->slaveLoading.lock );
 			CoordinatorEvent event;
-			pthread_mutex_lock( &sockets.lock );
+			LOCK( &sockets.lock );
 			for ( uint32_t i = 0; i < sockets.size(); i++ ) {
 				event.reqSendLoadStats(
 					sockets.values[ i ],
@@ -145,8 +145,8 @@ void Master::signalHandler( int signal ) {
 				);
 				master->eventQueue.insert( event );
 			}
-			pthread_mutex_unlock( &sockets.lock );
-			pthread_mutex_unlock( &master->slaveLoading.lock );
+			UNLOCK( &sockets.lock );
+			UNLOCK( &master->slaveLoading.lock );
 
 			// set next update alarm
 			//alarm ( master->config.master.loadingStats.updateInterval );
@@ -291,7 +291,7 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 	/* Loading statistics update */
 	uint32_t sec, msec;
 	if ( this->config.master.loadingStats.updateInterval > 0 ) {
-		pthread_mutex_init ( &this->slaveLoading.lock, NULL );
+		LOCK_INIT ( &this->slaveLoading.lock, NULL );
 		this->slaveLoading.past.get.clear();
 		this->slaveLoading.past.set.clear();
 		this->slaveLoading.current.get.clear();
@@ -536,7 +536,7 @@ void Master::printPending( FILE *f ) {
 	std::unordered_multimap<PendingIdentifier, KeyValueUpdate>::iterator keyValueUpdateIt;
 	std::unordered_multimap<PendingIdentifier, RemappingRecord>::iterator remappingRecordIt;
 
-	pthread_mutex_lock( &this->pending.applications.setLock );
+	LOCK( &this->pending.applications.setLock );
 	fprintf(
 		f,
 		"Pending requests for applications\n"
@@ -562,9 +562,9 @@ void Master::printPending( FILE *f ) {
 
 		fprintf( f, "\n" );
 	}
-	pthread_mutex_unlock( &this->pending.applications.setLock );
+	UNLOCK( &this->pending.applications.setLock );
 
-	pthread_mutex_lock( &this->pending.applications.getLock );
+	LOCK( &this->pending.applications.getLock );
 	fprintf(
 		f,
 		"\n[GET] Pending: %lu\n",
@@ -584,9 +584,9 @@ void Master::printPending( FILE *f ) {
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
 	}
-	pthread_mutex_unlock( &this->pending.applications.getLock );
+	UNLOCK( &this->pending.applications.getLock );
 
-	pthread_mutex_lock( &this->pending.applications.updateLock );
+	LOCK( &this->pending.applications.updateLock );
 	fprintf(
 		f,
 		"\n[UPDATE] Pending: %lu\n",
@@ -610,9 +610,9 @@ void Master::printPending( FILE *f ) {
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
 	}
-	pthread_mutex_unlock( &this->pending.applications.updateLock );
+	UNLOCK( &this->pending.applications.updateLock );
 
-	pthread_mutex_lock( &this->pending.applications.delLock );
+	LOCK( &this->pending.applications.delLock );
 	fprintf(
 		f,
 		"\n[DELETE] Pending: %lu\n",
@@ -632,9 +632,9 @@ void Master::printPending( FILE *f ) {
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
 	}
-	pthread_mutex_unlock( &this->pending.applications.delLock );
+	UNLOCK( &this->pending.applications.delLock );
 
-	pthread_mutex_lock( &this->pending.slaves.setLock );
+	LOCK( &this->pending.slaves.setLock );
 	fprintf(
 		f,
 		"\n\nPending requests for slaves\n"
@@ -654,9 +654,9 @@ void Master::printPending( FILE *f ) {
 		( ( Socket * ) key.ptr )->printAddress( f );
 		fprintf( f, "\n" );
 	}
-	pthread_mutex_unlock( &this->pending.slaves.setLock );
+	UNLOCK( &this->pending.slaves.setLock );
 
-	pthread_mutex_lock( &this->pending.slaves.remappingSetLock );
+	LOCK( &this->pending.slaves.remappingSetLock );
 	fprintf(
 		f,
 		"\n[REMAPPING_SET] Pending: %lu\n",
@@ -674,9 +674,9 @@ void Master::printPending( FILE *f ) {
 		( ( Socket * ) remappingRecordIt->first.ptr )->printAddress( f );
 		fprintf( f, "\n" );
 	}
-	pthread_mutex_unlock( &this->pending.slaves.remappingSetLock );
+	UNLOCK( &this->pending.slaves.remappingSetLock );
 
-	pthread_mutex_lock( &this->pending.slaves.getLock );
+	LOCK( &this->pending.slaves.getLock );
 	fprintf(
 		f,
 		"\n[GET] Pending: %lu\n",
@@ -693,9 +693,9 @@ void Master::printPending( FILE *f ) {
 		( ( Socket * ) key.ptr )->printAddress( f );
 		fprintf( f, "\n" );
 	}
-	pthread_mutex_unlock( &this->pending.slaves.getLock );
+	UNLOCK( &this->pending.slaves.getLock );
 
-	pthread_mutex_lock( &this->pending.slaves.updateLock );
+	LOCK( &this->pending.slaves.updateLock );
 	fprintf(
 		f,
 		"\n[UPDATE] Pending: %lu\n",
@@ -719,9 +719,9 @@ void Master::printPending( FILE *f ) {
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
 	}
-	pthread_mutex_unlock( &this->pending.slaves.updateLock );
+	UNLOCK( &this->pending.slaves.updateLock );
 
-	pthread_mutex_lock( &this->pending.slaves.delLock );
+	LOCK( &this->pending.slaves.delLock );
 	fprintf(
 		f,
 		"\n[DELETE] Pending: %lu\n",
@@ -738,7 +738,7 @@ void Master::printPending( FILE *f ) {
 		( ( Socket * ) key.ptr )->printAddress( f );
 		fprintf( f, "\n" );
 	}
-	pthread_mutex_unlock( &this->pending.slaves.delLock );
+	UNLOCK( &this->pending.slaves.delLock );
 
 	fprintf(
 		f,

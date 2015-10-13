@@ -272,10 +272,10 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 								buffer.size -= PROTO_LOAD_STATS_SIZE;
 
 								// parse the loading stats and merge with existing stats
-								pthread_mutex_lock( &master->overloadedSlave.lock );
+								LOCK( &master->overloadedSlave.lock );
 								master->overloadedSlave.slaveSet.clear();
 								this->protocol.parseLoadingStats( loadStatsHeader, getLatency, setLatency, master->overloadedSlave.slaveSet, buffer.data, buffer.size );
-								pthread_mutex_unlock( &master->overloadedSlave.lock );
+								UNLOCK( &master->overloadedSlave.lock );
 								master->mergeSlaveCumulativeLoading( &getLatency, &setLatency );
 
 								buffer.data -= PROTO_LOAD_STATS_SIZE;
@@ -1005,7 +1005,7 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, char *buf,
 			__ERROR__( "MasterWorker", "handleGetResponse", "Cannot find a pending stats GET request that matches the response." );
 		} else {
 			int index = -1;
-			pthread_mutex_lock( &master->slaveLoading.lock );
+			LOCK( &master->slaveLoading.lock );
 			std::set<Latency> *latencyPool = master->slaveLoading.past.get.get( rst.addr, &index );
 			// init. the set if it is not there
 			if ( index == -1 ) {
@@ -1017,7 +1017,7 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, char *buf,
 			if ( index == -1 )
 				latencyPool = master->slaveLoading.past.get.get( rst.addr );
 			latencyPool->insert( latency );
-			pthread_mutex_unlock( &master->slaveLoading.lock );
+			UNLOCK( &master->slaveLoading.lock );
 		}
 	}
 
@@ -1056,7 +1056,7 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 	Key key;
 
 	if ( ! MasterWorker::pending->eraseKey( PT_SLAVE_SET, event.id, event.socket, &pid, &key, true, false ) ) {
-		pthread_mutex_unlock( &MasterWorker::pending->slaves.setLock );
+		UNLOCK( &MasterWorker::pending->slaves.setLock );
 		__ERROR__( "MasterWorker", "handleSetResponse", "Cannot find a pending slave SET request that matches the response. This message will be discarded. (ID: %u)", event.id );
 		return false;
 	}
@@ -1073,7 +1073,7 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 			__ERROR__( "MasterWorker", "handleSetResponse", "Cannot find a pending stats SET request that matches the response." );
 		} else {
 			int index = -1;
-			pthread_mutex_lock( &master->slaveLoading.lock );
+			LOCK( &master->slaveLoading.lock );
 			std::set<Latency> *latencyPool = master->slaveLoading.past.set.get( rst.addr, &index );
 			// init. the set if it is not there
 			if ( index == -1 ) {
@@ -1085,7 +1085,7 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 			if ( index == -1 )
 				latencyPool = master->slaveLoading.past.set.get( rst.addr );
 			latencyPool->insert( latency );
-			pthread_mutex_unlock( &master->slaveLoading.lock );
+			UNLOCK( &master->slaveLoading.lock );
 		}
 	}
 
@@ -1275,7 +1275,7 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 
 	// Find the cooresponding request
 	if ( ! MasterWorker::pending->eraseKey( PT_SLAVE_SET, event.id, ( void * ) event.socket, &pid, &key, true, false ) ) {
-		pthread_mutex_unlock( &MasterWorker::pending->slaves.setLock );
+		UNLOCK( &MasterWorker::pending->slaves.setLock );
 		__ERROR__( "MasterWorker", "handleRemappingSetResponse", "Cannot find a pending slave SET request that matches the response. This message will be discarded. (ID: %u)", event.id );
 		__ERROR__(
 			"MasterWorker", "handleRemappingSetResponse",
@@ -1299,7 +1299,7 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 			__ERROR__( "MasterWorker", "handleRemappingSetResponse", "Cannot find a pending stats SET request that matches the response." );
 		} else {
 			int index = -1;
-			pthread_mutex_lock( &master->slaveLoading.lock );
+			LOCK( &master->slaveLoading.lock );
 			std::set<Latency> *latencyPool = master->slaveLoading.past.set.get( rst.addr, &index );
 			// init. the set if it is not there
 			if ( index == -1 ) {
@@ -1311,7 +1311,7 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 			if ( index == -1 )
 				latencyPool = master->slaveLoading.past.set.get( rst.addr );
 			latencyPool->insert( latency );
-			pthread_mutex_unlock( &master->slaveLoading.lock );
+			UNLOCK( &master->slaveLoading.lock );
 		}
 	}
 

@@ -19,7 +19,7 @@ public:
 	struct {
 		 // High priority
 		EventQueue<MixedEvent> *mixed;
-		pthread_mutex_t lock;
+		LOCK_T lock;
 		uint32_t capacity;
 		uint32_t count;
 	} priority;
@@ -50,7 +50,7 @@ public:
 		this->mixed = new EventQueue<MixedEvent>( mixed, block );
 		this->priority.mixed = new EventQueue<MixedEvent>( pMixed, false );
 		this->priority.capacity = pMixed;
-		pthread_mutex_init( &this->priority.lock, 0 );
+		LOCK_INIT( &this->priority.lock, 0 );
 	}
 
 	void init( bool block, uint32_t coding, uint32_t coordinator, uint32_t io, uint32_t master, uint32_t slave, uint32_t slavePeer ) {
@@ -150,15 +150,15 @@ public:
 		if ( this->isMixed ) {
 			MixedEvent mixedEvent;
 			mixedEvent.set( event );
-			if ( pthread_mutex_lock( &this->priority.lock ) == 0 ) {
+			if ( LOCK( &this->priority.lock ) == 0 ) {
 				// Locked
 				if ( this->priority.count < this->priority.capacity ) {
 					this->priority.count++;
 					bool ret = this->priority.mixed->insert( mixedEvent );
-					pthread_mutex_unlock( &this->priority.lock );
+					UNLOCK( &this->priority.lock );
 					return ret;
 				} else {
-					pthread_mutex_unlock( &this->priority.lock );
+					UNLOCK( &this->priority.lock );
 					return this->mixed->insert( mixedEvent );
 				}
 			} else {
@@ -171,9 +171,9 @@ public:
 
 	bool extractMixed( MixedEvent &event ) {
 		if ( this->priority.mixed->extract( event ) ) {
-			pthread_mutex_lock( &this->priority.lock );
+			LOCK( &this->priority.lock );
 			this->priority.count--;
-			pthread_mutex_unlock( &this->priority.lock );
+			UNLOCK( &this->priority.lock );
 			return true;
 		} else {
 			return this->mixed->extract( event );

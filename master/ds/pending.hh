@@ -25,9 +25,9 @@ enum PendingType {
 
 class Pending {
 private:
-	bool get( PendingType type, pthread_mutex_t *&lock, std::unordered_multimap<PendingIdentifier, Key> *&map );
-	bool get( PendingType type, pthread_mutex_t *&lock, std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *&map );
-	bool get( PendingType type, pthread_mutex_t *&lock, std::unordered_multimap<PendingIdentifier, RemappingRecord> *&map );
+	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, Key> *&map );
+	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *&map );
+	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, RemappingRecord> *&map );
 
 public:
 	struct {
@@ -35,10 +35,10 @@ public:
 		std::unordered_multimap<PendingIdentifier, Key> set;
 		std::unordered_multimap<PendingIdentifier, KeyValueUpdate> update;
 		std::unordered_multimap<PendingIdentifier, Key> del;
-		pthread_mutex_t getLock;
-		pthread_mutex_t setLock;
-		pthread_mutex_t updateLock;
-		pthread_mutex_t delLock;
+		LOCK_T getLock;
+		LOCK_T setLock;
+		LOCK_T updateLock;
+		LOCK_T delLock;
 	} applications;
 	struct {
 		std::unordered_multimap<PendingIdentifier, Key> get;
@@ -46,17 +46,17 @@ public:
 		std::unordered_multimap<PendingIdentifier, RemappingRecord> remappingSet;
 		std::unordered_multimap<PendingIdentifier, KeyValueUpdate> update;
 		std::unordered_multimap<PendingIdentifier, Key> del;
-		pthread_mutex_t getLock;
-		pthread_mutex_t setLock;
-		pthread_mutex_t remappingSetLock;
-		pthread_mutex_t updateLock;
-		pthread_mutex_t delLock;
+		LOCK_T getLock;
+		LOCK_T setLock;
+		LOCK_T remappingSetLock;
+		LOCK_T updateLock;
+		LOCK_T delLock;
 	} slaves;
 	struct {
 		std::unordered_multimap<PendingIdentifier, RequestStartTime> get;
 		std::unordered_multimap<PendingIdentifier, RequestStartTime> set;
-		pthread_mutex_t getLock;
-		pthread_mutex_t setLock;
+		LOCK_T getLock;
+		LOCK_T setLock;
 	} stats;
 
 	Pending();

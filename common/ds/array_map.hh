@@ -24,16 +24,16 @@ public:
 	std::vector<KeyType> keys;
 	std::vector<ValueType *> values;
 	bool needsDelete;
-	pthread_mutex_t lock;
+	LOCK_T lock;
 
 	ArrayMap() {
-		pthread_mutex_init( &this->lock, 0 );
+		LOCK_INIT( &this->lock, 0 );
 		this->needsDelete = true;
 	}
 
 	ArrayMap( ArrayMap const& arrayMap ) {
 		size_t i;
-		pthread_mutex_init( &this->lock, 0 );
+		LOCK_INIT( &this->lock, 0 );
 		this->needsDelete = true;
 		this->clear();
 		for ( i = 0; i < arrayMap.size(); i++ ) {
@@ -49,12 +49,12 @@ public:
 
 	ValueType *get( KeyType &key, int *indexPtr = 0 ) {
 		ValueType *ret;
-		pthread_mutex_lock( &this->lock );
+		LOCK( &this->lock );
 		int index = this->indexOf( key );
 		if ( indexPtr )
 			*indexPtr = index;
 		ret = index == -1 ? 0 : this->values[ index ];
-		pthread_mutex_unlock( &this->lock );
+		UNLOCK( &this->lock );
 		return ret;
 	}
 
@@ -63,11 +63,11 @@ public:
 	}
 
 	bool replaceKey( KeyType &oldKey, KeyType &newKey ) {
-		pthread_mutex_lock( &this->lock );
+		LOCK( &this->lock );
 		int index = this->indexOf( oldKey );
 		if ( index != -1 )
 			this->keys[ index ] = newKey;
-		pthread_mutex_unlock( &this->lock );
+		UNLOCK( &this->lock );
 		return index != -1;
 	}
 
@@ -76,51 +76,51 @@ public:
 	}
 
 	bool set( KeyType &key, ValueType *value, bool check = false ) {
-		pthread_mutex_lock( &this->lock );
+		LOCK( &this->lock );
 		if ( check && this->indexOf( key ) != -1 ) {
-			pthread_mutex_unlock( &this->lock );
+			UNLOCK( &this->lock );
 			return false;
 		}
 		this->keys.push_back( key );
 		this->values.push_back( value );
-		pthread_mutex_unlock( &this->lock );
+		UNLOCK( &this->lock );
 		return true;
 	}
 
 	bool remove( KeyType &key ) {
 		ValueType *val;
-		pthread_mutex_lock( &this->lock );
+		LOCK( &this->lock );
 		int index = this->indexOf( key );
 		if ( index == -1 ) {
-			pthread_mutex_unlock( &this->lock );
+			UNLOCK( &this->lock );
 			return false;
 		}
 		val = this->values[ index ];
 		this->keys.erase( this->keys.begin() + index );
 		this->values.erase( this->values.begin() + index );
-		pthread_mutex_unlock( &this->lock );
+		UNLOCK( &this->lock );
 		if ( needsDelete ) delete val;
 		return true;
 	}
 
 	bool removeAt( int index ) {
 		ValueType *val;
-		pthread_mutex_lock( &this->lock );
+		LOCK( &this->lock );
 		val = this->values[ index ];
 		this->keys.erase( this->keys.begin() + index );
 		this->values.erase( this->values.begin() + index );
-		pthread_mutex_unlock( &this->lock );
+		UNLOCK( &this->lock );
 		if ( needsDelete ) delete val;
 		return true;
 	}
 
 	void clear() {
-		pthread_mutex_lock( &this->lock );
+		LOCK( &this->lock );
 		for ( int i = 0, len = this->keys.size(); i < len && needsDelete ; i++ )
 			delete this->values[ i ];
 		this->keys.clear();
 		this->values.clear();
-		pthread_mutex_unlock( &this->lock );
+		UNLOCK( &this->lock );
 	}
 };
 

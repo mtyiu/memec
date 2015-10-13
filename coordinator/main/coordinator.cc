@@ -24,7 +24,7 @@ bool Coordinator::switchPhase() {
 		return switched;
 
 	MasterEvent event;
-	pthread_mutex_lock( &this->overloadedSlaves.lock );
+	LOCK( &this->overloadedSlaves.lock );
 	if ( this->remapMsgHandler.isRemapStopped() &&
 			this->overloadedSlaves.slaveSet.size() > this->sockets.slaves.size() * this->config.global.remap.startThreshold ) {
 		// start remapping phase in the background
@@ -38,14 +38,14 @@ bool Coordinator::switchPhase() {
 	}
 	this->eventQueue.insert( event );
 quit:
-	pthread_mutex_unlock( &this->overloadedSlaves.lock );
+	UNLOCK( &this->overloadedSlaves.lock );
 	return switched;
 }
 
 void Coordinator::updateOverloadedSlaveSet( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
 		ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency, std::set<struct sockaddr_in> *slaveSet ) {
 	double avgSec = 0.0, avgNsec = 0.0;
-	pthread_mutex_lock( &this->overloadedSlaves.lock );
+	LOCK( &this->overloadedSlaves.lock );
 
 	// what has past is left in the past
 	this->overloadedSlaves.slaveSet.clear();
@@ -72,13 +72,13 @@ void Coordinator::updateOverloadedSlaveSet( ArrayMap<struct sockaddr_in, Latency
 	GET_OVERLOADED_SLAVES( Get );
 	GET_OVERLOADED_SLAVES( Set );
 #undef GET_OVERLOADED_SLAVES
-	pthread_mutex_unlock( &this->overloadedSlaves.lock );
+	UNLOCK( &this->overloadedSlaves.lock );
 }
 
 void Coordinator::updateAverageSlaveLoading( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
 		ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency ) {
 
-	pthread_mutex_lock( &this->slaveLoading.lock );
+	LOCK( &this->slaveLoading.lock );
 	ArrayMap< struct sockaddr_in, ArrayMap< struct sockaddr_in, Latency > > *latest = NULL;
 	double avgSec = 0.0, avgNsec = 0.0;
 
@@ -117,7 +117,7 @@ void Coordinator::updateAverageSlaveLoading( ArrayMap<struct sockaddr_in, Latenc
 #undef CLEAN_2D_ARRAY_MAP
 	//this->slaveLoading.latestGet.clear();
 	//this->slaveLoading.latestSet.clear();
-	pthread_mutex_unlock( &this->slaveLoading.lock );
+	UNLOCK( &this->slaveLoading.lock );
 }
 
 void Coordinator::signalHandler( int signal ) {
@@ -134,7 +134,7 @@ void Coordinator::signalHandler( int signal ) {
 			// TODO start / stop remapping according to criteria
 			// push the stats back to masters
 			// leave the free of ArrayMaps to workers after constructing the data buffer
-			pthread_mutex_lock( &sockets.lock );
+			LOCK( &sockets.lock );
 			//fprintf( stderr, "queuing events get %lu set %lu\n", slaveGetLatency->size(), slaveSetLatency->size() );
 			if ( slaveGetLatency->size() > 0 || slaveSetLatency->size() > 0 ) {
 				MasterEvent event;
@@ -148,7 +148,7 @@ void Coordinator::signalHandler( int signal ) {
 					coordinator->eventQueue.insert( event );
 				}
 			}
-			pthread_mutex_unlock( &sockets.lock );
+			UNLOCK( &sockets.lock );
 			// set timer for next push
 			//alarm( coordinator->config.coordinator.loadingStats.updateInterval );
 			break;
@@ -249,7 +249,7 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 	}
 
 	/* Slave Loading stats */
-	pthread_mutex_init( &this->slaveLoading.lock, NULL );
+	LOCK_INIT( &this->slaveLoading.lock, NULL );
 	uint32_t sec, msec;
 	if ( this->config.coordinator.loadingStats.updateInterval > 0 ) {
 		sec = this->config.coordinator.loadingStats.updateInterval / 1000;
