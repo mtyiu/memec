@@ -291,7 +291,7 @@ size_t Protocol::generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t op
 
 	LOCK( lock );
 	for ( it = ops.begin(); it != ops.end(); it++ ) {
-		const Key &key = it->first;
+		Key key = it->first;
 		const OpMetadata &opMetadata = it->second;
 		if ( this->buffer.size >= bytes + PROTO_SLAVE_SYNC_PER_SIZE + key.size ) {
 			// Send buffer still has enough space for holding the current metadata
@@ -306,6 +306,8 @@ size_t Protocol::generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t op
 			buf += key.size;
 			bytes += PROTO_SLAVE_SYNC_PER_SIZE + key.size;
 			count++;
+
+			key.free();
 		} else {
 			// TODO handle overflow
 			break;

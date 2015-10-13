@@ -71,7 +71,7 @@ public:
 	void computeDelta( char *delta, char *newData, uint32_t offset, uint32_t length, bool update = true );
 	void update( char *newData, uint32_t offset, uint32_t length );
 	// Delete key
-	uint32_t deleteKeyValue( Key target, std::unordered_map<Key, KeyMetadata> *keys, char *delta = 0, size_t deltaBufSize = 0 );
+	uint32_t deleteKeyValue( std::unordered_map<Key, KeyMetadata> *keys, KeyMetadata metadata, char *delta = 0, size_t deltaBufSize = 0 );
 	// Get key-value pair
 	KeyValue getKeyValue( uint32_t offset );
 	// Reset internal status

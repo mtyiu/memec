@@ -1436,6 +1436,8 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 		LOCK_T *keysLock, *cacheLock;
 		std::unordered_map<Key, KeyMetadata> *keys;
 		std::unordered_map<Metadata, Chunk *> *cache;
+		KeyMetadata keyMetadata;
+
 		SlaveWorker::map->getKeysMap( keys, keysLock );
 		SlaveWorker::map->getCacheMap( cache, cacheLock );
 		// Lock the data chunk buffer
@@ -1456,10 +1458,11 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 				}
 			}
 		}
+		SlaveWorker::map->deleteKey( key, PROTO_OPCODE_DELETE, keyMetadata, false, false );
 		if ( SlaveWorker::parityChunkCount )
-			deltaSize = chunk->deleteKeyValue( key, keys, delta, this->buffer.size );
+			deltaSize = chunk->deleteKeyValue( keys, keyMetadata, delta, this->buffer.size );
 		else
-			deltaSize = chunk->deleteKeyValue( key, keys );
+			deltaSize = chunk->deleteKeyValue( keys, keyMetadata );
 		// Release the locks
 		UNLOCK( cacheLock );
 		UNLOCK( keysLock );

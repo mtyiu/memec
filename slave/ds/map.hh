@@ -123,31 +123,86 @@ public:
 		return it->second;
 	}
 
-	bool insertKey( Key &key, uint8_t opcode, KeyMetadata &keyMetadata ) {
-		key.dup( key.size, key.data );
+	bool insertKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata ) {
+		OpMetadata opMetadata;
+		opMetadata.clone( keyMetadata );
+		opMetadata.opcode = opcode;
 
-		std::pair<Key, KeyMetadata> p( key, keyMetadata );
-		std::pair<std::unordered_map<Key, KeyMetadata>::iterator, bool> ret;
+		Key k1, k2;
+
+		k1.dup( key.size, key.data );
+		std::pair<Key, KeyMetadata> keyPair( k1, keyMetadata );
+		std::pair<std::unordered_map<Key, KeyMetadata>::iterator, bool> keyRet;
+
+		k2.dup( key.size, key.data );
+		std::pair<Key, OpMetadata> opPair( k2, opMetadata );
+		std::pair<std::unordered_map<Key, OpMetadata>::iterator, bool> opRet;
 
 		LOCK( &this->keysLock );
-		ret = this->keys.insert( p );
-		if ( ! ret.second ) {
+		keyRet = this->keys.insert( keyPair );
+		if ( ! keyRet.second ) {
 			UNLOCK( &this->keysLock );
 			return false;
 		}
 		UNLOCK( &this->keysLock );
 
-		OpMetadata opMetadata;
-		opMetadata.clone( keyMetadata );
-		opMetadata.opcode = opcode;
 		LOCK( &this->opsLock );
-		this->ops[ key ] = opMetadata;
+		opRet = this->ops.insert( opPair );
+		if ( ! opRet.second ) {
+			UNLOCK( &this->opsLock );
+			return false;
+		}
 		UNLOCK( &this->opsLock );
 
 		return true;
 	}
 
-	bool insertRemappingRecord( Key &key, RemappingRecord &remappingRecord ) {
+	bool deleteKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata, bool needsLock, bool needsUnlock ) {
+		Key k;
+		std::unordered_map<Key, KeyMetadata>::iterator keysIt;
+		std::unordered_map<Key, OpMetadata>::iterator opsIt;
+
+		if ( needsLock ) LOCK( &this->keysLock );
+		keysIt = this->keys.find( key );
+		if ( keysIt == this->keys.end() ) {
+			if ( needsUnlock ) UNLOCK( &this->keysLock );
+			return false;
+		} else {
+			k = keysIt->first;
+			keyMetadata = keysIt->second;
+			this->keys.erase( keysIt );
+			k.free();
+		}
+		if ( needsUnlock ) UNLOCK( &this->keysLock );
+
+		if ( needsLock ) LOCK( &this->opsLock );
+		opsIt = this->ops.find( key );
+		if ( opsIt == this->ops.end() ) {
+			OpMetadata opMetadata;
+			opMetadata.clone( keyMetadata );
+			opMetadata.opcode = opcode;
+
+			key.dup();
+
+			std::pair<Key, OpMetadata> opsPair( key, opMetadata );
+			std::pair<std::unordered_map<Key, OpMetadata>::iterator, bool> opsRet;
+
+			opsRet = this->ops.insert( opsPair );
+			if ( ! opsRet.second ) {
+				if ( needsUnlock ) UNLOCK( &this->opsLock );
+				return false;
+			}
+		} else {
+			k = opsIt->first;
+			this->ops.erase( opsIt );
+			k.free();
+		}
+		if ( needsUnlock ) UNLOCK( &this->opsLock );
+
+		return true;
+	}
+
+	bool insertRemappingRecord( Key key, RemappingRecord &remappingRecord ) {
 		key.dup( key.size, key.data );
 
 		std::pair<Key, RemappingRecord> p( key, remappingRecord );
