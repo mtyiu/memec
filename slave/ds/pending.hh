@@ -5,6 +5,7 @@
 #include "../../common/ds/chunk.hh"
 #include "../../common/ds/metadata.hh"
 #include "../../common/ds/pending.hh"
+#include "../../common/lock/lock.hh"
 #include "../../common/protocol/protocol.hh"
 
 class ChunkUpdate : public Metadata {

@@ -1,8 +1,8 @@
 #ifndef __MASTER_DS_COUNTER_HH__
 #define __MASTER_DS_COUNTER_HH__
 
-#include <pthread.h>
 #include <stdint.h>
+#include "../../common/lock/lock.hh"
 
 class Counter {
 private:

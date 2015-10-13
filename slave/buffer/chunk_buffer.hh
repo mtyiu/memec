@@ -8,6 +8,7 @@
 #include "../../common/coding/coding.hh"
 #include "../../common/ds/chunk.hh"
 #include "../../common/ds/memory_pool.hh"
+#include "../../common/lock/lock.hh"
 
 #define CHUNK_BUFFER_FLUSH_THRESHOLD	4 // excluding metadata (4 bytes)
 

@@ -1,7 +1,7 @@
 #ifndef __COMMON_DS_RING_BUFFER_HH__
 #define __COMMON_DS_RING_BUFFER_HH__
 
-#include <pthread.h>
+#include "../lock/lock.hh"
 
 template <class T> class RingBuffer {
 	typedef struct {

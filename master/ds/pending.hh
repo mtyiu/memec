@@ -7,6 +7,7 @@
 #include "stats.hh"
 #include "../../common/ds/metadata.hh"
 #include "../../common/ds/pending.hh"
+#include "../../common/lock/lock.hh"
 
 #define GIGA ( 1000 * 1000 * 1000 )
 

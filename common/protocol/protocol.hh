@@ -74,8 +74,9 @@
 #include <unordered_map>
 #include <stdint.h>
 #include <arpa/inet.h>
-#include "../../common/ds/key.hh"
-#include "../../common/ds/metadata.hh"
+#include "../ds/key.hh"
+#include "../ds/metadata.hh"
+#include "../lock/lock.hh"
 
 enum Role {
 	ROLE_APPLICATION,

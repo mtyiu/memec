@@ -3,7 +3,7 @@
 
 #include <vector>
 #include <cstdio>
-#include <pthread.h>
+#include "../lock/lock.hh"
 
 template<typename KeyType, typename ValueType> class ArrayMap {
 private:

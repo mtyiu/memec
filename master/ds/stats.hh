@@ -6,6 +6,7 @@
 #include "../../common/config/server_addr.hh"
 #include "../../common/ds/array_map.hh"
 #include "../../common/ds/latency.hh"
+#include "../../common/lock/lock.hh"
 
 typedef struct {
 	struct sockaddr_in addr;

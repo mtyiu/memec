@@ -1,7 +1,7 @@
 #ifndef __MASTER_DS_REMAP_FLAG_HH__
 #define __MASTER_DS_REMAP_FLAG_HH__
 
-#include <pthread.h>
+#include "../../common/lock/lock.hh"
 
 class RemapFlag {
 private:

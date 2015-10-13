@@ -3,11 +3,11 @@
 
 #include <unordered_map>
 #include <stdint.h>
-#include <pthread.h>
 #include <arpa/inet.h>
 #include "metadata.hh"
 #include "key.hh"
 #include "key_value.hh"
+#include "../lock/lock.hh"
 
 #define USE_CHUNK_MUTEX_LOCK
 

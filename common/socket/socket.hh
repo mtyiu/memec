@@ -6,12 +6,12 @@
 #endif
 
 #include <cstdio>
-#include <pthread.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include "epoll.hh"
 #include "../config/server_addr.hh"
+#include "../lock/lock.hh"
 
 enum SocketMode {
 	SOCKET_MODE_UNDEFINED,

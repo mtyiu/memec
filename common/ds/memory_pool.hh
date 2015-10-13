@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <cassert>
 #include <pthread.h>
+#include "../lock/lock.hh"
 #include "../util/debug.hh"
 
 // Implemented the singleton pattern

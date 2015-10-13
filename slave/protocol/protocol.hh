@@ -1,9 +1,10 @@
 #ifndef __SLAVE_PROTOCOL_PROTOCOL_HH__
 #define __SLAVE_PROTOCOL_PROTOCOL_HH__
 
-#include "../../common/protocol/protocol.hh"
 #include "../../common/config/server_addr.hh"
 #include "../../common/ds/chunk.hh"
+#include "../../common/lock/lock.hh"
+#include "../../common/protocol/protocol.hh"
 
 class SlaveProtocol : public Protocol {
 public:

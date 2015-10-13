@@ -2,6 +2,7 @@
 #define __PACKET_POOL_HH__
 
 #include "memory_pool.hh"
+#include "../lock/lock.hh"
 
 class Packet {
 private:

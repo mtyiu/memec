@@ -14,6 +14,7 @@
 #include "../../common/config/global_config.hh"
 #include "../../common/ds/array_map.hh"
 #include "../../common/ds/id_generator.hh"
+#include "../../common/lock/lock.hh"
 #include "../../common/socket/epoll.hh"
 #include "../../common/signal/signal.hh"
 #include "../../common/util/option.hh"

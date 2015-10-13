@@ -2,8 +2,8 @@
 #define __APPLICATION_DS_PENDING_HH__
 
 #include <set>
-#include <pthread.h>
 #include "../../common/ds/key.hh"
+#include "../../common/lock/lock.hh"
 
 class KeyValueUpdate : public Key {
 public:

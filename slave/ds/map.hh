@@ -6,6 +6,7 @@
 #include "../../common/ds/chunk.hh"
 #include "../../common/ds/key.hh"
 #include "../../common/ds/metadata.hh"
+#include "../../common/lock/lock.hh"
 #include "../../common/protocol/protocol.hh"
 
 class Map {

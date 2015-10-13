@@ -8,6 +8,7 @@
 #include "master_event.hh"
 #include "slave_event.hh"
 #include "../../common/event/event_queue.hh"
+#include "../../common/lock/lock.hh"
 
 class MasterEventQueue {
 public:
