@@ -42,7 +42,7 @@ import redis.clients.jedis.HostAndPort;
 
 public class RedisClusterClient extends DB {
 
-	private JedisCluster jedis;
+    private JedisCluster jedis;
 
     public static final String HOST_PROPERTY = "redis.host";
     public static final String PORT_PROPERTY = "redis.port";
@@ -53,44 +53,44 @@ public class RedisClusterClient extends DB {
     public void init() throws DBException {
         Properties props = getProperties();
         int port, serverCount;
-		HashSet<HostAndPort> servers = new HashSet<HostAndPort>();
+        HashSet<HostAndPort> servers = new HashSet<HostAndPort>();
 
-		String serverCountString = props.getProperty(SERVER_COUNT);
-		if (serverCountString != null ) {
-			serverCount = Integer.parseInt(serverCountString);
-		} else {
-			serverCount = 1;
-		}
+        String serverCountString = props.getProperty(SERVER_COUNT);
+        if (serverCountString != null ) {
+            serverCount = Integer.parseInt(serverCountString);
+        } else {
+            serverCount = 1;
+        }
 
-		// connect to servers
-		for (int i = 0, count = 0; count < serverCount; i++) {
-			String portString = props.getProperty(PORT_PROPERTY.concat(Integer.toString(count)));
-			if (portString != null) {
-				port = Integer.parseInt(portString);
-			} else {
-				port = Protocol.DEFAULT_PORT;
-			}
+        // connect to servers
+        for (int i = 0, count = 0; count < serverCount; i++) {
+            String portString = props.getProperty(PORT_PROPERTY.concat(Integer.toString(count)));
+            if (portString != null) {
+                port = Integer.parseInt(portString);
+            } else {
+                port = Protocol.DEFAULT_PORT;
+            }
 
-			String host = props.getProperty(HOST_PROPERTY.concat(Integer.toString(count)));
-			if (host == null && serverCount > 1) {
-				if ( i > serverCount * 10 ) {
-					throw new DBException("Not encough server info provided / server naming is too sparse!\n");
-				}
-				continue;
-			}
-	
-			servers.add(new HostAndPort(host, port));
-			//System.out.format("Added server %d at %s:%d\n", count, host, port );
+            String host = props.getProperty(HOST_PROPERTY.concat(Integer.toString(count)));
+            if (host == null && serverCount > 1) {
+                if ( i > serverCount * 10 ) {
+                    throw new DBException("Not encough server info provided / server naming is too sparse!\n");
+                }
+                continue;
+            }
+    
+            servers.add(new HostAndPort(host, port));
+            //System.out.format("Added server %d at %s:%d\n", count, host, port );
 
-			// TODO support password-protected cluster
-			count++;
-		}
+            // TODO support password-protected cluster
+            count++;
+        }
 
-		jedis = new JedisCluster(servers);
+        jedis = new JedisCluster(servers);
     }
 
     public void cleanup() throws DBException {
-		jedis.close();
+        jedis.close();
     }
 
     /* Calculate a hash for a key to store it in an index.  The actual return
@@ -101,7 +101,7 @@ public class RedisClusterClient extends DB {
     private int hash(String key) {
         return key.hashCode();
     }
-	
+    
     //XXX jedis.select(int index) to switch to `table`
 
     @Override
@@ -119,7 +119,7 @@ public class RedisClusterClient extends DB {
 
             while (fieldIterator.hasNext() && valueIterator.hasNext()) {
                 result.put(fieldIterator.next(),
-			   new StringByteIterator(valueIterator.next()));
+                new StringByteIterator(valueIterator.next()));
             }
             assert !fieldIterator.hasNext() && !valueIterator.hasNext();
         }
@@ -128,7 +128,7 @@ public class RedisClusterClient extends DB {
 
     @Override
     public int insert(String table, String key, HashMap<String, ByteIterator> values) {
-		//System.out.format("key %s hash to server %d\n", key, hashSlot(key));
+        //System.out.format("key %s hash to server %d\n", key, hashSlot(key));
         if (jedis.hmset(key, StringByteIterator.getStringMap(values)).equals("OK")) {
             jedis.zadd(INDEX_KEY, hash(key), key);
             return 0;

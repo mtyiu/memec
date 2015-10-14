@@ -48,11 +48,11 @@ public class MemcachedCluster extends com.yahoo.ycsb.DB
     String serverCountString = props.getProperty(MEMCACHED_COUNT);
     if (serverCountString == null) {
       serverCount = 1;
-	} else {
+    } else {
       serverCount = Integer.parseInt(serverCountString);
-	}
+    }
 
-	// construct the list of servers
+    // construct the list of servers
     for (int i = 0, count = 0; count < serverCount; i++ ) {
       String server = props.getProperty(MEMCACHED_SERVER.concat(Integer.toString(count)));
       int port = 11211;
@@ -67,9 +67,9 @@ public class MemcachedCluster extends com.yahoo.ycsb.DB
       catch (Exception e) {}
       servers.add(new InetSocketAddress(server, port));
       count++;
-	}
+  }
 
-	// init client using MD5 as the hashing function
+  // init client using MD5 as the hashing function
     try {
       client = new MemcachedClient(new KetamaConnectionFactory(), servers);
     } catch (IOException e) { throw new DBException(e); }
