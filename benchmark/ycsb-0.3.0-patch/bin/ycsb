@@ -70,6 +70,7 @@ DATABASES = {
     "plio"         : "com.yahoo.ycsb.db.PLIOClient",
     "dummy"        : "com.yahoo.ycsb.db.DummyClient",
     "redis"        : "com.yahoo.ycsb.db.RedisClient",
+    "redis-cluster": "com.yahoo.ycsb.db.RedisClusterClient",
     "tarantool"    : "com.yahoo.ycsb.db.TarantoolClient",
     "tachyon"      : "com.yahoo.ycsb.db.TachyonClient",
     "voldemort"    : "com.yahoo.ycsb.db.VoldemortClient"
