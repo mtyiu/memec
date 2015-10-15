@@ -60,7 +60,6 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 	bool connected, isSend;
 	uint32_t requestId;
 	ssize_t ret;
-	size_t count, remapCount = 0;
 	struct {
 		size_t size;
 		char *data;
@@ -81,16 +80,22 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 			isSend = true;
 			break;
 		case COORDINATOR_EVENT_TYPE_SYNC:
+		{
+			uint32_t sealedCount, opsCount, remapCount;
+			bool isCompleted;
+
 			buffer.data = this->protocol.sendHeartbeat(
 				buffer.size,
 				requestId,
-				SlaveWorker::map->ops,
-				SlaveWorker::map->remap,
-				&SlaveWorker::map->opsLock,
-				&SlaveWorker::map->remapLock,
-				count,
-				remapCount
+				&SlaveWorker::map->sealedLock, SlaveWorker::map->sealed, sealedCount,
+				&SlaveWorker::map->opsLock, SlaveWorker::map->ops, opsCount,
+				&SlaveWorker::map->remapLock, SlaveWorker::map->remap, remapCount,
+				isCompleted
 			);
+
+			if ( ! isCompleted )
+				SlaveWorker::eventQueue->insert( event );
+
 			// move the remapping record sent to another set to avoid looping through all records over and over ..
 			LOCK ( &SlaveWorker::map->remapLock );
 			if ( remapCount == SlaveWorker::map->remap.size() ) {
@@ -111,6 +116,7 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 			}
 			UNLOCK ( &SlaveWorker::map->remapLock );
 			isSend = true;
+		}
 			break;
 		case COORDINATOR_EVENT_TYPE_PENDING:
 			isSend = false;
@@ -123,11 +129,6 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "SlaveWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
-
-		if ( event.type == COORDINATOR_EVENT_TYPE_SYNC && SlaveWorker::map->ops.size() ) {
-			// Some metadata is not sent yet, continue to send
-			SlaveWorker::eventQueue->insert( event );
-		}
 	} else {
 		ProtocolHeader header;
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();

@@ -2,13 +2,20 @@
 #define __SLAVE_MAP_MAP_HH__
 
 #include <unordered_map>
+#include <unordered_set>
 #include "../../common/ds/key.hh"
 #include "../../common/ds/metadata.hh"
 #include "../../common/lock/lock.hh"
 #include "../../common/protocol/protocol.hh"
 
 class Map {
-private:
+public:
+	/**
+	 * Store the set of sealed chunks
+	 * (list ID, stripe ID, chunk ID)
+	 */
+	std::unordered_set<Metadata> chunks;
+	LOCK_T chunksLock;
 	/**
 	 * Store the mapping between keys and chunks
 	 * Key |-> (list ID, stripe ID, chunk ID)
@@ -22,14 +29,26 @@ private:
 	std::unordered_map<Key, RemappingRecord> remap;
 	LOCK_T remapLock;
 
-public:
-
 	Map() {
+		LOCK_INIT( &this->chunksLock );
 		LOCK_INIT( &this->keysLock );
 		LOCK_INIT( &this->remapLock );
 	}
 
-	bool setKey( char *keyStr, uint8_t keySize, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint8_t opcode ) {
+	bool seal( uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool needsLock = true, bool needsUnlock = true ) {
+		Metadata metadata;
+		metadata.set( listId, stripeId, chunkId );
+
+		std::pair<std::unordered_set<Metadata>::iterator, bool> ret;
+
+		if ( needsLock ) LOCK( &this->chunksLock );
+		ret = this->chunks.insert( metadata );
+		if ( needsUnlock ) UNLOCK( &this->chunksLock );
+
+		return ret.second;
+	}
+
+	bool setKey( char *keyStr, uint8_t keySize, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint8_t opcode, bool needsLock = true, bool needsUnlock = true ) {
 		Key key;
 		key.dup( keySize, keyStr );
 
@@ -40,7 +59,7 @@ public:
 		std::pair<Key, Metadata> p( key, metadata );
 		bool ret = true;
 
-		LOCK( &this->keysLock );
+		if ( needsLock ) LOCK( &this->keysLock );
 		it = this->keys.find( key );
 		if ( it == this->keys.end() && opcode == PROTO_OPCODE_SET ) {
 			std::pair<std::unordered_map<Key, Metadata>::iterator, bool> r;
@@ -51,24 +70,27 @@ public:
 		} else {
 			ret = false;
 		}
-		UNLOCK( &this->keysLock );
+		if ( needsUnlock ) UNLOCK( &this->keysLock );
 
 		return ret;
 	}
 
-	bool insertRemappingRecord( Key &key, RemappingRecord &remappingRecord ) {
-		key.dup( key.size, key.data );
+	bool insertRemappingRecord( char *keyStr, uint8_t keySize, uint32_t listId, uint32_t chunkId, bool needsLock = true, bool needsUnlock = true ) {
+		Key key;
+		key.dup( keySize, keyStr );
+
+		RemappingRecord remappingRecord( listId, chunkId );
 
 		std::pair<Key, RemappingRecord> p( key, remappingRecord );
 		std::pair<std::unordered_map<Key, RemappingRecord>::iterator, bool> ret;
 
-		LOCK( &this->remapLock );
+		if ( needsLock ) LOCK( &this->remapLock );
 		ret = this->remap.insert( p );
 		if ( ! ret.second ) {
 			UNLOCK( &this->remapLock );
 			return false;
 		}
-		UNLOCK( &this->remapLock );
+		if ( needsUnlock ) UNLOCK( &this->remapLock );
 
 		return true;
 	}

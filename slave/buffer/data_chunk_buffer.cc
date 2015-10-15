@@ -338,6 +338,11 @@ Chunk *DataChunkBuffer::flushAt( SlaveWorker *worker, int index, bool lock ) {
 
 	// Notify the parity slaves to seal the chunk
 	worker->issueSealChunkRequest( chunk );
+	ChunkBuffer::map->seal(
+		chunk->metadata.listId,
+		chunk->metadata.stripeId,
+		chunk->metadata.chunkId
+	);
 
 	if ( lock ) {
 		UNLOCK( this->locks + index );

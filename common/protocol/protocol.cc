@@ -279,67 +279,104 @@ size_t Protocol::generateChunkDataHeader( uint8_t magic, uint8_t to, uint8_t opc
 	return bytes;
 }
 
-size_t Protocol::generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, std::unordered_map<Key, OpMetadata> &ops, std::unordered_map<Key, RemappingRecord> &remapRecords, LOCK_T *lock, LOCK_T *rlock, size_t &count, size_t &remapCount ) {
+size_t Protocol::generateHeartbeatMessage(
+	uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+	LOCK_T *sealedLock, std::unordered_set<Metadata> &sealed, uint32_t &sealedCount,
+	LOCK_T *opsLock, std::unordered_map<Key, OpMetadata> &ops, uint32_t &opsCount,
+	LOCK_T *remapLock, std::unordered_map<Key, RemappingRecord> &remapRecords, uint32_t &remapCount,
+	bool &isCompleted
+) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
-	std::unordered_map<Key, OpMetadata>::iterator it;
-	std::unordered_map<Key, RemappingRecord>::iterator rit;
 	size_t bytes = PROTO_HEADER_SIZE;
-	count = 0;
+	uint32_t *sealedPtr, *opsPtr, *remapRecordsPtr;
+	std::unordered_set<Metadata>::iterator sealedIt;
+	std::unordered_map<Key, OpMetadata>::iterator opsIt;
+	std::unordered_map<Key, RemappingRecord>::iterator remapIt;
+
+	sealedCount = 0;
+	opsCount = 0;
+	remapCount = 0;
+	isCompleted = true;
+
+	sealedPtr       = ( uint32_t * )( buf     );
+	opsPtr          = ( uint32_t * )( buf + 4 );
+	remapRecordsPtr = ( uint32_t * )( buf + 8 );
 
 	buf += PROTO_HEARTBEAT_SIZE;
 	bytes += PROTO_HEARTBEAT_SIZE;
 
-	LOCK( lock );
-	for ( it = ops.begin(); it != ops.end(); it++ ) {
-		Key key = it->first;
-		const OpMetadata &opMetadata = it->second;
-		if ( this->buffer.size >= bytes + PROTO_SLAVE_SYNC_PER_SIZE + key.size ) {
-			// Send buffer still has enough space for holding the current metadata
+	/**** Sealed chunks *****/
+	LOCK( sealedLock );
+	for ( sealedIt = sealed.begin(); sealedIt != sealed.end(); sealedIt++ ) {
+		const Metadata &metadata = *sealedIt;
+		if ( this->buffer.size >= bytes + PROTO_METADATA_SIZE ) {
+			*( ( uint32_t * )( buf     ) ) = htonl( metadata.listId );
+			*( ( uint32_t * )( buf + 4 ) ) = htonl( metadata.stripeId );
+			*( ( uint32_t * )( buf + 8 ) ) = htonl( metadata.chunkId );
+			buf   += PROTO_METADATA_SIZE;
+			bytes += PROTO_METADATA_SIZE;
+			sealedCount++;
+		} else {
+			isCompleted = false;
+			break;
+		}
+	}
+	sealed.erase( sealed.begin(), sealedIt );
+	UNLOCK( sealedLock );
+
+	/***** Keys in SET and DELETE requests *****/
+	LOCK( opsLock );
+	for ( opsIt = ops.begin(); opsIt != ops.end(); opsIt++ ) {
+		Key key = opsIt->first;
+		const OpMetadata &opMetadata = opsIt->second;
+		if ( this->buffer.size >= bytes + PROTO_KEY_OP_METADATA_SIZE + key.size ) {
 			buf[ 0 ] = key.size;
 			buf[ 1 ] = opMetadata.opcode;
 			*( ( uint32_t * )( buf + 2 ) ) = htonl( opMetadata.listId );
 			*( ( uint32_t * )( buf + 6 ) ) = htonl( opMetadata.stripeId );
 			*( ( uint32_t * )( buf + 10 ) ) = htonl( opMetadata.chunkId );
 
-			buf += PROTO_SLAVE_SYNC_PER_SIZE;
+			buf += PROTO_KEY_OP_METADATA_SIZE;
 			memcpy( buf, key.data, key.size );
 			buf += key.size;
-			bytes += PROTO_SLAVE_SYNC_PER_SIZE + key.size;
-			count++;
-
+			bytes += PROTO_KEY_OP_METADATA_SIZE + key.size;
+			opsCount++;
 			key.free();
 		} else {
-			// TODO handle overflow
+			isCompleted = false;
 			break;
 		}
 	}
-	// Clear sent metadata
-	ops.erase( ops.begin(), it );
-	UNLOCK( lock );
+	ops.erase( ops.begin(), opsIt );
+	UNLOCK( opsLock );
 
-	// append remapping record
-	LOCK( rlock );
-	for ( rit = remapRecords.begin(); rit != remapRecords.end(); rit++ ) {
-		const Key &key = rit->first;
-		if ( this->buffer.size >= bytes + PROTO_SLAVE_SYNC_REMAP_PER_SIZE + key.size ) {
+	/***** Remapping records *****/
+	LOCK( remapLock );
+	for ( remapIt = remapRecords.begin(); remapIt != remapRecords.end(); remapIt++ ) {
+		const Key &key = remapIt->first;
+		if ( this->buffer.size >= bytes + PROTO_REMAPPING_RECORD_SIZE + key.size ) {
 			buf[ 0 ] = key.size;
-			*( ( uint32_t * )( buf + 1 ) ) = htonl( rit->second.listId );
-			*( ( uint32_t * )( buf + 5 ) ) = htonl( rit->second.chunkId );
+			*( ( uint32_t * )( buf + 1 ) ) = htonl( remapIt->second.listId );
+			*( ( uint32_t * )( buf + 5 ) ) = htonl( remapIt->second.chunkId );
 
-			buf += PROTO_SLAVE_SYNC_REMAP_PER_SIZE;
+			buf += PROTO_REMAPPING_RECORD_SIZE;
 			memcpy( buf, key.data, key.size );
 			buf += key.size;
-			bytes += PROTO_SLAVE_SYNC_REMAP_PER_SIZE + key.size;
-			rit->second.sent = true;
+			bytes += PROTO_REMAPPING_RECORD_SIZE + key.size;
+			remapIt->second.sent = true;
 			remapCount++;
 		} else {
-			// TODO handle overflow
+			isCompleted = false;
 			break;
 		}
 	}
-	UNLOCK( rlock );
+	UNLOCK( remapLock );
 
-	*( ( uint32_t * )( this->buffer.send + PROTO_HEADER_SIZE ) ) = htonl( remapCount );
+	*sealedPtr = htonl( sealedCount );
+	*opsPtr = htonl( opsCount );
+	*remapRecordsPtr = htonl( remapCount );
+
+	printf( "%u %u %u\n", sealedCount, opsCount, remapCount );
 
 	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, id );
 
@@ -781,31 +818,62 @@ bool Protocol::parseChunkDataHeader( size_t offset, uint32_t &listId, uint32_t &
 }
 
 
-bool Protocol::parseHeartbeatHeader( size_t offset, uint32_t &remap, char *buf, size_t size ) {
+bool Protocol::parseHeartbeatHeader( size_t offset, uint32_t &sealed, uint32_t &keys, uint32_t &remap, char *buf, size_t size ) {
 	if ( size < PROTO_HEARTBEAT_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
-	remap  = ntohl( *( ( uint32_t * )( ptr ) ) );
+	sealed = ntohl( *( ( uint32_t * )( ptr     ) ) );
+	keys   = ntohl( *( ( uint32_t * )( ptr + 4 ) ) );
+	remap  = ntohl( *( ( uint32_t * )( ptr + 8 ) ) );
 
 	return true;
 }
 
-bool Protocol::parseSlaveSyncHeader( size_t offset, uint8_t &keySize, uint8_t &opcode, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, char *&key, char *buf, size_t size ) {
-	if ( size < PROTO_SLAVE_SYNC_PER_SIZE )
+bool Protocol::parseMetadataHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, char *buf, size_t size ) {
+	if ( size - offset < PROTO_METADATA_SIZE )
+		return false;
+
+	char *ptr = buf + offset;
+	listId   = ntohl( *( ( uint32_t * )( ptr     ) ) );
+	stripeId = ntohl( *( ( uint32_t * )( ptr + 4 ) ) );
+	chunkId  = ntohl( *( ( uint32_t * )( ptr + 8 ) ) );
+
+	return true;
+}
+
+bool Protocol::parseKeyOpMetadataHeader( size_t offset, uint8_t &keySize, uint8_t &opcode, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, char *&key, char *buf, size_t size ) {
+	if ( size - offset < PROTO_KEY_OP_METADATA_SIZE )
+		return false;
+
+	char *ptr = buf + offset;
+	keySize  = ( uint8_t ) ptr[ 0 ];
+	opcode   = ( uint8_t ) ptr[ 1 ];
+	listId   = ntohl( *( ( uint32_t * )( ptr +  2 ) ) );
+	stripeId = ntohl( *( ( uint32_t * )( ptr +  6 ) ) );
+	chunkId  = ntohl( *( ( uint32_t * )( ptr + 10 ) ) );
+
+	if ( size < PROTO_KEY_OP_METADATA_SIZE + ( size_t ) keySize )
+		return false;
+
+	key = ptr + PROTO_KEY_OP_METADATA_SIZE;
+
+	return true;
+}
+
+bool Protocol::parseRemappingRecordHeader( size_t offset, uint8_t &keySize, uint32_t &listId, uint32_t &chunkId, char *&key, char *buf, size_t size ) {
+	if ( size - offset < PROTO_REMAPPING_RECORD_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
 	keySize = ( uint8_t ) ptr[ 0 ];
-	opcode = ( uint8_t ) ptr[ 1 ];
-	listId = ntohl( *( ( uint32_t * )( ptr + 2 ) ) );
-	stripeId = ntohl( *( ( uint32_t * )( ptr + 6 ) ) );
-	chunkId = ntohl( *( ( uint32_t * )( ptr + 10 ) ) );
+	listId  = ntohl( *( ( uint32_t * )( ptr + 1 ) ) );
+	chunkId = ntohl( *( ( uint32_t * )( ptr + 5 ) ) );
 
-	if ( size < PROTO_SLAVE_SYNC_PER_SIZE + ( size_t ) keySize )
+	if ( size < PROTO_REMAPPING_RECORD_SIZE + ( size_t ) keySize )
 		return false;
 
-	key = ptr + PROTO_SLAVE_SYNC_PER_SIZE;
+	key = ptr + PROTO_REMAPPING_RECORD_SIZE;
 
 	return true;
 }
@@ -1139,17 +1207,35 @@ bool Protocol::parseHeartbeatHeader( struct HeartbeatHeader &header, char *buf, 
 	}
 	return this->parseHeartbeatHeader(
 		offset,
+		header.sealed,
+		header.keys,
 		header.remap,
 		buf, size
 	);
 }
 
-bool Protocol::parseSlaveSyncHeader( struct SlaveSyncHeader &header, size_t &bytes, char *buf, size_t size, size_t offset ) {
+bool Protocol::parseMetadataHeader( struct MetadataHeader &header, size_t &bytes, char *buf, size_t size, size_t offset ) {
 	if ( ! buf || ! size ) {
 		buf = this->buffer.recv;
 		size = this->buffer.size;
 	}
-	bool ret = this->parseSlaveSyncHeader(
+	bool ret = this->parseMetadataHeader(
+		offset,
+		header.listId,
+		header.stripeId,
+		header.chunkId,
+		buf, size
+	);
+	bytes = PROTO_METADATA_SIZE;
+	return ret;
+}
+
+bool Protocol::parseKeyOpMetadataHeader( struct KeyOpMetadataHeader &header, size_t &bytes, char *buf, size_t size, size_t offset ) {
+	if ( ! buf || ! size ) {
+		buf = this->buffer.recv;
+		size = this->buffer.size;
+	}
+	bool ret = this->parseKeyOpMetadataHeader(
 		offset,
 		header.keySize,
 		header.opcode,
@@ -1159,7 +1245,24 @@ bool Protocol::parseSlaveSyncHeader( struct SlaveSyncHeader &header, size_t &byt
 		header.key,
 		buf, size
 	);
-	bytes = PROTO_SLAVE_SYNC_PER_SIZE + header.keySize;
+	bytes = PROTO_KEY_OP_METADATA_SIZE + header.keySize;
+	return ret;
+}
+
+bool Protocol::parseRemappingRecordHeader( struct RemappingRecordHeader &header, size_t &bytes, char *buf, size_t size, size_t offset ) {
+	if ( ! buf || ! size ) {
+		buf = this->buffer.recv;
+		size = this->buffer.size;
+	}
+	bool ret = this->parseRemappingRecordHeader(
+		offset,
+		header.keySize,
+		header.listId,
+		header.chunkId,
+		header.key,
+		buf, size
+	);
+	bytes = PROTO_REMAPPING_RECORD_SIZE + header.keySize;
 	return ret;
 }
 

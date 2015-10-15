@@ -72,6 +72,7 @@
  #define MAXIMUM_VALUE_SIZE 16777215
 
 #include <unordered_map>
+#include <unordered_set>
 #include <stdint.h>
 #include <arpa/inet.h>
 #include "../ds/key.hh"
@@ -94,14 +95,23 @@ struct ProtocolHeader {
 	uint32_t id;
 };
 
-#define PROTO_HEARTBEAT_SIZE 4
+// vvvvvvvvvv Heartbeat vvvvvvvvvv
+#define PROTO_HEARTBEAT_SIZE 12
 struct HeartbeatHeader {
+    uint32_t sealed;
+    uint32_t keys;
 	uint32_t remap;
 };
 
-#define PROTO_SLAVE_SYNC_PER_SIZE 14
-#define PROTO_SLAVE_SYNC_REMAP_PER_SIZE 9
-struct SlaveSyncHeader {
+#define PROTO_METADATA_SIZE 12
+struct MetadataHeader {
+	uint32_t listId;
+	uint32_t stripeId;
+	uint32_t chunkId;
+};
+
+#define PROTO_KEY_OP_METADATA_SIZE 14
+struct KeyOpMetadataHeader {
 	uint8_t keySize;
 	uint8_t opcode;
 	uint32_t listId;
@@ -109,6 +119,16 @@ struct SlaveSyncHeader {
 	uint32_t chunkId;
 	char *key;
 };
+
+#define PROTO_REMAPPING_RECORD_SIZE 9
+struct RemappingRecordHeader {
+    uint8_t keySize;
+	uint32_t listId;
+	uint32_t chunkId;
+	char *key;
+};
+
+// ^^^^^^^^^^ Heartbeat ^^^^^^^^^^
 
 #define PROTO_KEY_SIZE 1
 struct KeyHeader {
@@ -250,7 +270,7 @@ protected:
 	size_t generateChunkUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta = 0, char *sendBuf = 0 );
 	size_t generateChunkHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId );
 	size_t generateChunkDataHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t chunkSize, char *chunkData );
-	size_t generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, std::unordered_map<Key, OpMetadata> &ops, std::unordered_map<Key, RemappingRecord> &remapRecords, LOCK_T *lock, LOCK_T *rlock, size_t &count, size_t &remapCount );
+	size_t generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, LOCK_T *sealedLock, std::unordered_set<Metadata> &sealed, uint32_t &sealedCount, LOCK_T *opsLock, std::unordered_map<Key, OpMetadata> &ops, uint32_t &opsCount, LOCK_T *remapLock, std::unordered_map<Key, RemappingRecord> &remapRecords, uint32_t &remapCount, bool &isCompleted );
 	size_t generateAddressHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t addr, uint16_t port );
 	size_t generateLoadStatsHeader( uint8_t magic, uint8_t to, uint32_t id, uint32_t slaveGetCount, uint32_t slaveSetCount, uint32_t slaveOverloadCount, uint32_t recordSize, uint32_t slaveAddrSize );
 
@@ -270,8 +290,10 @@ protected:
 	bool parseChunkUpdateHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &updateOffset, uint32_t &updateLength, uint32_t &updatingChunkId, char *&delta, char *buf, size_t size );
 	bool parseChunkHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, char *buf, size_t size );
 	bool parseChunkDataHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &chunkSize, char *&chunkData, char *buf, size_t size );
-	bool parseHeartbeatHeader( size_t offset, uint32_t &remap, char *buf, size_t size );
-	bool parseSlaveSyncHeader( size_t offset, uint8_t &keySize, uint8_t &opcode, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, char *&key, char *buf, size_t size );
+	bool parseHeartbeatHeader( size_t offset, uint32_t &sealed, uint32_t &keys, uint32_t &remap, char *buf, size_t size );
+	bool parseMetadataHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, char *buf, size_t size );
+	bool parseKeyOpMetadataHeader( size_t offset, uint8_t &keySize, uint8_t &opcode, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, char *&key, char *buf, size_t size );
+	bool parseRemappingRecordHeader( size_t offset, uint8_t &keySize, uint32_t &listId, uint32_t &chunkId, char *&key, char *buf, size_t size );
 	bool parseAddressHeader( size_t offset, uint32_t &addr, uint16_t &port, char *buf, size_t size );
 	bool parseLoadStatsHeader( size_t offset, uint32_t &slaveGetCount, uint32_t &slaveSetCount, uint32_t &slaveOverloadCount, char *buf, size_t size );
 
@@ -299,7 +321,9 @@ public:
 	bool parseChunkHeader( struct ChunkHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
 	bool parseChunkDataHeader( struct ChunkDataHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
 	bool parseHeartbeatHeader( struct HeartbeatHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
-	bool parseSlaveSyncHeader( struct SlaveSyncHeader &header, size_t &bytes, char *buf = 0, size_t size = 0, size_t offset = PROTO_HEADER_SIZE + PROTO_HEARTBEAT_SIZE );
+	bool parseMetadataHeader( struct MetadataHeader &header, size_t &bytes, char *buf = 0, size_t size = 0, size_t offset = 0 );
+	bool parseKeyOpMetadataHeader( struct KeyOpMetadataHeader &header, size_t &bytes, char *buf = 0, size_t size = 0, size_t offset = 0 );
+	bool parseRemappingRecordHeader( struct RemappingRecordHeader &header, size_t &bytes, char *buf = 0, size_t size = 0, size_t offset = 0 );
 	bool parseAddressHeader( struct AddressHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
 	bool parseLoadStatsHeader( struct LoadStatsHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
 

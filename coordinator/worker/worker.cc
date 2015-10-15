@@ -256,33 +256,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );
 					goto quit_1;
 				}
-
-				size_t bytes, offset, count = 0;
-				struct HeartbeatHeader heartbeatHeader;
-				struct SlaveSyncHeader slaveSyncHeader;
-
-				if ( this->protocol.parseHeartbeatHeader( heartbeatHeader, buffer.data, header.length ) ) {
-					offset = PROTO_HEARTBEAT_SIZE;
-					while ( offset < header.length ) {
-						if ( ! this->protocol.parseSlaveSyncHeader( slaveSyncHeader, bytes, buffer.data, header.length, offset ) )
-							break;
-
-						offset += bytes;
-						count++;
-
-						// Update metadata map
-						event.socket->map.setKey(
-							slaveSyncHeader.key,
-							slaveSyncHeader.keySize,
-							slaveSyncHeader.listId,
-							slaveSyncHeader.stripeId,
-							slaveSyncHeader.chunkId,
-							slaveSyncHeader.opcode
-						);
-					}
-				} else {
-					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid heartbeat protocol header." );
-				}
+				this->processHeartbeat( event, buffer.data, header.length );
 			} else {
 				__ERROR__( "CoordinatorWorker", "dispatch", "Invalid opcode from slave." );
 			}
@@ -348,6 +322,85 @@ void *CoordinatorWorker::run( void *argv ) {
 	worker->free();
 	pthread_exit( 0 );
 	return 0;
+}
+
+bool CoordinatorWorker::processHeartbeat( SlaveEvent event, char *buf, size_t size ) {
+	uint32_t count;
+	size_t processed, offset, failed = 0;
+	struct HeartbeatHeader heartbeat;
+	union {
+		struct MetadataHeader metadata;
+		struct KeyOpMetadataHeader op;
+		struct RemappingRecordHeader remap;
+	} header;
+
+	offset = 0;
+	if ( ! this->protocol.parseHeartbeatHeader( heartbeat, buf, size ) ) {
+		__ERROR__( "CoordinatorWorker", "dispatch", "Invalid heartbeat protocol header." );
+		return false;
+	}
+
+	offset += PROTO_HEARTBEAT_SIZE;
+
+	LOCK( &event.socket->map.chunksLock );
+	for ( count = 0; count < heartbeat.sealed; count++ ) {
+		if ( this->protocol.parseMetadataHeader( header.metadata, processed, buf, size, offset ) ) {
+			event.socket->map.seal(
+				header.metadata.listId,
+				header.metadata.stripeId,
+				header.metadata.chunkId,
+				false, false
+			);
+		} else {
+			failed++;
+		}
+		offset += processed;
+	}
+	UNLOCK( &event.socket->map.chunksLock );
+
+	LOCK( &event.socket->map.keysLock );
+	for ( count = 0; count < heartbeat.keys; count++ ) {
+		if ( this->protocol.parseKeyOpMetadataHeader( header.op, processed, buf, size, offset ) ) {
+			event.socket->map.setKey(
+				header.op.key,
+				header.op.keySize,
+				header.op.listId,
+				header.op.stripeId,
+				header.op.chunkId,
+				header.op.opcode,
+				false, false
+			);
+		} else {
+			failed++;
+		}
+		offset += processed;
+	}
+	UNLOCK( &event.socket->map.keysLock );
+
+	LOCK( &event.socket->map.remapLock );
+	for ( count = 0; count < heartbeat.remap; count++ ) {
+		if ( this->protocol.parseRemappingRecordHeader( header.remap, processed, buf, size, offset ) ) {
+			event.socket->map.insertRemappingRecord(
+				header.remap.key,
+				header.remap.keySize,
+				header.remap.listId,
+				header.remap.chunkId,
+				false, false
+			);
+		} else {
+			failed++;
+		}
+		offset += processed;
+	}
+	UNLOCK( &event.socket->map.remapLock );
+
+	if ( failed ) {
+		__ERROR__( "CoordinatorWorker", "processHeartbeat", "Number of failed objects = %lu", failed );
+	// } else {
+	// 	__ERROR__( "CoordinatorWorker", "processHeartbeat", "(sealed, keys, remap) = (%u, %u, %u)", heartbeat.sealed, heartbeat.keys, heartbeat.remap );
+	}
+
+	return failed == 0;
 }
 
 bool CoordinatorWorker::init() {

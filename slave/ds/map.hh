@@ -1,8 +1,8 @@
 #ifndef __SLAVE_MAP_MAP_HH__
 #define __SLAVE_MAP_MAP_HH__
 
-#include <map>
 #include <unordered_map>
+#include <unordered_set>
 #include "../../common/ds/chunk.hh"
 #include "../../common/ds/key.hh"
 #include "../../common/ds/metadata.hh"
@@ -32,6 +32,12 @@ public:
 	std::unordered_map<Key, OpMetadata> ops;
 	LOCK_T opsLock;
 	/**
+	 * Store the metadata of the sealed chunks to be synchronized with coordinator
+	 * (list ID, stripe ID, chunk ID)
+	 */
+	std::unordered_set<Metadata> sealed;
+	LOCK_T sealedLock;
+	/**
 	 * Store the pending-to-send remapping records
 	 * Key |-> (list ID, chunk ID)
 	 */
@@ -48,6 +54,7 @@ public:
 		LOCK_INIT( &this->remapLock );
 		LOCK_INIT( &this->cacheLock );
 		LOCK_INIT( &this->opsLock );
+		LOCK_INIT( &this->sealedLock );
 	}
 
 	bool findRemappingRecordByKey( char *data, uint8_t size, RemappingRecord *remappingRecordPtr = 0, Key *keyPtr = 0 ) {
@@ -200,6 +207,19 @@ public:
 		UNLOCK( &this->opsLock );
 
 		return true;
+	}
+
+	bool seal( uint32_t listId, uint32_t stripeId, uint32_t chunkId ) {
+		Metadata metadata;
+		metadata.set( listId, stripeId, chunkId );
+
+		std::pair<std::unordered_set<Metadata>::iterator, bool> ret;
+
+		LOCK( &this->sealedLock );
+		ret = this->sealed.insert( metadata );
+		UNLOCK( &this->sealedLock );
+
+		return ret.second;
 	}
 
 	bool insertRemappingRecord( Key key, RemappingRecord &remappingRecord ) {

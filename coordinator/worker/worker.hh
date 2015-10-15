@@ -25,6 +25,8 @@ private:
 	static void *run( void *argv );
 
 public:
+	bool processHeartbeat( SlaveEvent event, char *buf, size_t size );
+
 	static bool init();
 	bool init( GlobalConfig &config, WorkerRole role, uint32_t workerId );
 	bool start();
