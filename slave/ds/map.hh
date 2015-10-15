@@ -175,7 +175,7 @@ public:
 		}
 		if ( needsUnlock ) UNLOCK( &this->keysLock );
 
-		if ( needsLock ) LOCK( &this->opsLock );
+		LOCK( &this->opsLock );
 		opsIt = this->ops.find( key );
 		if ( opsIt == this->ops.end() ) {
 			OpMetadata opMetadata;
@@ -197,7 +197,7 @@ public:
 			this->ops.erase( opsIt );
 			k.free();
 		}
-		if ( needsUnlock ) UNLOCK( &this->opsLock );
+		UNLOCK( &this->opsLock );
 
 		return true;
 	}
