@@ -70,6 +70,7 @@ public:
 	bool recordRequestStartTime( PendingType type, uint32_t id, uint32_t parentId, void *ptr, struct sockaddr_in addr );
 
 	bool findKey( PendingType type, uint32_t id, void *ptr, Key *keyPtr );
+	bool findKeyValueUpdate( PendingType type, uint32_t id, void *ptr, KeyValueUpdate *keyValuePtr );
 
 	bool eraseKey( PendingType type, uint32_t id, void *ptr = 0, PendingIdentifier *pidPtr = 0, Key *keyPtr = 0, bool needsLock = true, bool needsUnlock = true );
 	bool eraseRemappingRecord( PendingType type, uint32_t id, void *ptr = 0, PendingIdentifier *pidPtr = 0, RemappingRecord *remappingRecordPtr = 0, bool needsLock = true, bool needsUnlock = true );

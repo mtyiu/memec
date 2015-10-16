@@ -188,6 +188,32 @@ bool Pending::findKey( PendingType type, uint32_t id, void *ptr, Key *keyPtr ) {
 	return ret;
 }
 
+bool Pending::findKeyValueUpdate( PendingType type, uint32_t id, void *ptr, KeyValueUpdate *keyValuePtr ) {
+	PendingIdentifier pid( id, 0, ptr );
+	pthread_mutex_t *lock;
+	bool ret;
+
+	std::map<PendingIdentifier, KeyValueUpdate> *map;
+	std::map<PendingIdentifier, KeyValueUpdate>::iterator it;
+	if ( ! this->get( type, lock, map ) )
+		return false;
+
+	pthread_mutex_lock( lock );
+	if ( ptr ) {
+		it = map->find( pid );
+		ret = ( it != map->end() );
+	} else {
+		it = map->lower_bound( pid );
+		ret = ( it != map->end() && it->first.id == id ); // Match request ID
+	}
+	if ( ret ) {
+		if ( keyValuePtr ) *keyValuePtr = it->second;
+	}
+	pthread_mutex_unlock( lock );
+
+	return ret;
+}
+
 bool Pending::eraseKey( PendingType type, uint32_t id, void *ptr, PendingIdentifier *pidPtr, Key *keyPtr, bool needsLock, bool needsUnlock ) {
 	PendingIdentifier pid( id, 0, ptr );
 	pthread_mutex_t *lock;

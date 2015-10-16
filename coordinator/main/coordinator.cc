@@ -64,7 +64,7 @@ void Coordinator::updateOverloadedSlaveSet( ArrayMap<struct sockaddr_in, Latency
 					(double) slave##_TYPE_##Latency->values[ i ]->nsec >= avgNsec * threshold ) ) ) {\
 			this->overloadedSlaves.slaveSet.insert( slave##_TYPE_##Latency->keys[ i ] ); \
 			slaveSet->insert( slave##_TYPE_##Latency->keys[ i ] ); \
-			printf( "Slave #%u overloaded!!!!\n", i ); \
+			/* printf( "Slave #%u overloaded!!!!\n", i ); */ \
 		} \
 	} \
 }
@@ -440,6 +440,12 @@ void Coordinator::interactive() {
 		} else if ( strcmp( command, "dump" ) == 0 ) {
 			valid = true;
 			this->dump();
+		} else if ( strcmp( command, "remapping" ) == 0 ) {
+			valid = true;
+			this->printRemapping();
+		} else if ( strcmp( command, "time" ) == 0 ) {
+			valid = true;
+			this->time();
 		} else if ( strcmp( command, "seal" ) == 0 ) {
 			valid = true;
 			this->seal();
@@ -479,6 +485,12 @@ void Coordinator::dump() {
 		}
 		fprintf( f, "\n" );
 	}
+}
+
+void Coordinator::printRemapping( FILE *f ) {
+	fprintf( f, "\nRemapping Records\n" );
+	fprintf( f, "----------------------------------------\n" );
+	this->remappingRecords.print( f );
 }
 
 void Coordinator::help() {

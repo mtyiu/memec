@@ -85,10 +85,17 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 				buffer.size,
 				requestId,
 				SlaveWorker::map->ops,
-				SlaveWorker::map->remap,
 				&SlaveWorker::map->opsLock,
+				count
+			);
+			isSend = true;
+			break;
+		case COORDINATOR_EVENT_TYPE_REMAP_SYNC:
+			buffer.data = this->protocol.sendRemappingRecords(
+				buffer.size,
+				requestId,
+				SlaveWorker::map->remap,
 				&SlaveWorker::map->remapLock,
-				count,
 				remapCount
 			);
 			// move the remapping record sent to another set to avoid looping through all records over and over ..
@@ -126,6 +133,8 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 
 		if ( event.type == COORDINATOR_EVENT_TYPE_SYNC && SlaveWorker::map->ops.size() ) {
 			// Some metadata is not sent yet, continue to send
+			SlaveWorker::eventQueue->insert( event );
+		} else if ( event.type == COORDINATOR_EVENT_TYPE_REMAP_SYNC && SlaveWorker::map->remap.size() ) {
 			SlaveWorker::eventQueue->insert( event );
 		}
 	} else {
@@ -214,6 +223,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		case MASTER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE:
 		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
 		case MASTER_EVENT_TYPE_DELETE_RESPONSE_FAILURE:
+		case MASTER_EVENT_TYPE_REDIRECT_RESPONSE:
 			success = false;
 			break;
 		default:
@@ -320,6 +330,18 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 			if ( event.needsFree )
 				event.message.key.free();
 			break;
+		// Redirect
+		case MASTER_EVENT_TYPE_REDIRECT_RESPONSE:
+			buffer.data = this->protocol.resRedirect(
+				buffer.size,
+				event.id,
+				event.message.remap.opcode,
+				event.message.key.size,
+				event.message.key.data,
+				event.message.remap.listId,
+				event.message.remap.chunkId
+			);
+			break;
 		// Pending
 		case MASTER_EVENT_TYPE_PENDING:
 			break;
@@ -329,6 +351,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 
 	if ( isSend ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
+		if ( event.type == MASTER_EVENT_TYPE_REDIRECT_RESPONSE ) fprintf( stderr, "redirect %u\n", event.id );
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "SlaveWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 
@@ -954,9 +977,15 @@ bool SlaveWorker::handleGetRequest( MasterEvent event, char *buf, size_t size ) 
 
 	Key key;
 	KeyValue keyValue;
+	RemappingRecord remappingRecord;
 	if ( map->findValueByKey( header.key, header.keySize, &keyValue, &key ) ) {
 		event.resGet( event.socket, event.id, keyValue );
 		ret = true;
+		this->dispatch( event );
+	} else if ( map->findRemappingRecordByKey( header.key, header.keySize, &remappingRecord, &key ) ) {
+		// Redirect request to remapped slave
+		event.resRedirect( event.socket, event.id, PROTO_OPCODE_GET, key, remappingRecord );
+		ret = false;
 		this->dispatch( event );
 	} else {
 		// Detect degraded GET
@@ -1195,6 +1224,7 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 	KeyMetadata keyMetadata;
 	Metadata metadata;
 	Chunk *chunk;
+	RemappingRecord remappingRecord;
 	if ( map->findValueByKey( header.key, header.keySize, &keyValue, &key, &keyMetadata, &metadata, &chunk ) ) {
 		uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
 		uint32_t offset = keyMetadata.offset + PROTO_KEY_VALUE_SIZE + header.keySize + header.valueUpdateOffset;
@@ -1381,6 +1411,11 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 		}
 
 		ret = true;
+	} else if ( map->findRemappingRecordByKey( header.key, header.keySize, &remappingRecord, &key ) ) {
+		// Redirect request to remapped slave
+		event.resRedirect( event.socket, event.id, PROTO_OPCODE_UPDATE, key, remappingRecord );
+		ret = false;
+		this->dispatch( event );
 	} else {
 		event.resUpdate( event.socket, event.id, key, header.valueUpdateOffset, header.valueUpdateSize, false );
 		this->dispatch( event );
@@ -1414,6 +1449,7 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 	KeyMetadata keyMetadata;
 	Metadata metadata;
 	Chunk *chunk;
+	RemappingRecord remappingRecord;
 	if ( map->findValueByKey( header.key, header.keySize, &keyValue, 0, &keyMetadata, &metadata, &chunk ) ) {
 		uint32_t deltaSize;
 		char *delta;
@@ -1584,6 +1620,11 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 		if ( chunkBufferIndex != -1 )
 			chunkBuffer->updateAndUnlockChunk( chunkBufferIndex );
 		ret = true;
+	} else if ( map->findRemappingRecordByKey( header.key, header.keySize, &remappingRecord, &key ) ) {
+		// Redirect request to remapped slave
+		event.resRedirect( event.socket, event.id, PROTO_OPCODE_DELETE, key, remappingRecord );
+		ret = false;
+		this->dispatch( event );
 	} else {
 		key.set( header.keySize, header.key, ( void * ) event.socket );
 		event.resDelete( event.socket, event.id, key, false );

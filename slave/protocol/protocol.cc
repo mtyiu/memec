@@ -22,17 +22,27 @@ char *SlaveProtocol::reqRegisterCoordinator( size_t &size, uint32_t id, uint32_t
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::sendHeartbeat( size_t &size, uint32_t id, std::map<Key, OpMetadata> &opMetadataMap, std::map<Key, RemappingRecord> &remapMetadataMap, pthread_mutex_t *lock, pthread_mutex_t *rlock, size_t &count, size_t &remapCount ) {
+char *SlaveProtocol::sendHeartbeat( size_t &size, uint32_t id, std::map<Key, OpMetadata> &opMetadataMap, pthread_mutex_t *lock, size_t &count ) {
 	size = this->generateHeartbeatMessage(
 		PROTO_MAGIC_HEARTBEAT,
 		PROTO_MAGIC_TO_COORDINATOR,
 		PROTO_OPCODE_SYNC,
 		id,
 		opMetadataMap,
-		remapMetadataMap,
 		lock,
-		rlock,
-		count,
+		count
+	);
+	return this->buffer.send;
+}
+
+char *SlaveProtocol::sendRemappingRecords( size_t &size, uint32_t id, std::map<Key, RemappingRecord> &remapRecord, pthread_mutex_t *lock, size_t &remapCount ) {
+	size = this->generateRemappingRecordMessage(
+		PROTO_MAGIC_REMAPPING,
+		PROTO_MAGIC_TO_COORDINATOR,
+		PROTO_OPCODE_SYNC,
+		id,
+		remapRecord,
+		lock, 
 		remapCount
 	);
 	return this->buffer.send;
@@ -134,6 +144,22 @@ char *SlaveProtocol::resDelete( size_t &size, uint32_t id, bool success, uint8_t
 		id,
 		keySize,
 		key
+	);
+	return this->buffer.send;
+}
+
+char* SlaveProtocol::resRedirect( size_t &size, uint32_t id, uint8_t opcode, uint8_t keySize, char* key, uint32_t remappedListId, uint32_t remappedChunkId ) {
+	size = this->generateRedirectHeader( 
+		PROTO_MAGIC_RESPONSE_FAILURE,
+		PROTO_MAGIC_TO_MASTER,
+		opcode == PROTO_OPCODE_GET ? PROTO_OPCODE_REDIRECT_GET : 
+			opcode == PROTO_OPCODE_UPDATE ? PROTO_OPCODE_REDIRECT_UPDATE : 
+			PROTO_OPCODE_REDIRECT_DELETE,
+		id,
+		keySize,
+		key,
+		remappedListId,
+		remappedChunkId
 	);
 	return this->buffer.send;
 }

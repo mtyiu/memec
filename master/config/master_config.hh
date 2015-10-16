@@ -52,6 +52,7 @@ public:
 	} loadingStats;
 	struct {
 		bool forceEnabled;
+		bool forceNoCacheRecords;
 	} remap;
 
 	MasterConfig();

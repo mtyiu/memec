@@ -53,16 +53,20 @@ public:
 		Key key;
 
 		key.set( size, data );
+		if ( keyPtr ) *keyPtr = key;
 
 		pthread_mutex_lock( &this->remapLock );
-		it = this->remap.find( key );
-		if ( it == this->remap.end() ) {
-			if ( keyPtr ) *keyPtr = key;
-			pthread_mutex_unlock( &this->remapLock );
-			return false;
+		// check the sent records
+		it = this->remapSent.find( key );
+		if ( it == this->remapSent.end() ) {
+			// check the unsent records
+			it = this->remap.find( key );
+			if ( it == this->remap.find( key ) ) {
+				pthread_mutex_unlock( &this->remapLock );
+				return false;
+			}
 		}
 
-		if ( keyPtr ) *keyPtr = it->first;
 		if ( remappingRecordPtr ) *remappingRecordPtr = it->second;
 		pthread_mutex_unlock( &this->remapLock );
 		return true;

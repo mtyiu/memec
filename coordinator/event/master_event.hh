@@ -11,6 +11,7 @@ enum MasterEventType {
 	MASTER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE,
 	MASTER_EVENT_TYPE_PUSH_LOADING_STATS,
 	MASTER_EVENT_TYPE_SWITCH_PHASE,
+	MASTER_EVENT_TYPE_FORWARD_REMAPPING_RECORDS,
 	MASTER_EVENT_TYPE_PENDING
 };
 
@@ -28,6 +29,10 @@ public:
 		struct {
 			bool toRemap;
 		} remap;
+		struct {
+			size_t prevSize;
+			char *data;
+		} forward;
 	} message;
 
 	void resRegister( MasterSocket *socket, uint32_t id, bool success = true );

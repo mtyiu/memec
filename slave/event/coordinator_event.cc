@@ -12,6 +12,11 @@ void CoordinatorEvent::sync( CoordinatorSocket *socket ) {
 	this->socket = socket;
 }
 
+void CoordinatorEvent::syncRemap( CoordinatorSocket *socket ) {
+	this->type = COORDINATOR_EVENT_TYPE_REMAP_SYNC;
+	this->socket = socket;
+}
+
 void CoordinatorEvent::pending( CoordinatorSocket *socket ) {
 	this->type = COORDINATOR_EVENT_TYPE_PENDING;
 	this->socket = socket;

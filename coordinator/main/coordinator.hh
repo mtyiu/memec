@@ -14,6 +14,7 @@
 #include "../../common/config/global_config.hh"
 #include "../../common/ds/array_map.hh"
 #include "../../common/ds/id_generator.hh"
+#include "../../common/ds/remapping_record_map.hh"
 #include "../../common/socket/epoll.hh"
 #include "../../common/signal/signal.hh"
 #include "../../common/util/option.hh"
@@ -57,9 +58,10 @@ public:
 	} sockets;
 	IDGenerator idGenerator;
 	CoordinatorEventQueue eventQueue;
-
+	/* Remapping */
 	CoordinatorRemapMsgHandler remapMsgHandler;
-
+	RemappingRecordMap remappingRecords;
+	/* Loading statistics */
 	struct {
 		// ( slaveAddr, ( mastserAddr, Latency ) )
 		ArrayMap< struct sockaddr_in, ArrayMap< struct sockaddr_in, Latency > > latestGet;
@@ -85,6 +87,7 @@ public:
 	void info( FILE *f = stdout );
 	void debug( FILE *f = stdout );
 	void dump();
+	void printRemapping( FILE *f = stdout );
 	void time();
 	void seal();
 	void flush();

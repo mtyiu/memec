@@ -12,6 +12,7 @@ MasterConfig::MasterConfig() {
 	this->pool.packets = 128;
 	this->loadingStats.updateInterval = 30;
 	this->remap.forceEnabled = false;
+	this->remap.forceNoCacheRecords = false;
 }
 
 bool MasterConfig::merge( GlobalConfig &globalConfig ) {
@@ -105,6 +106,8 @@ bool MasterConfig::set( const char *section, const char *name, const char *value
 	} else if ( match( section, "remap" ) ) {
 		if ( match ( name, "force_enabled" ) )
 			this->remap.forceEnabled = ! match( value, "false" );
+		else if ( match ( name, "force_no_record_cache_search" ) )
+			this->remap.forceNoCacheRecords = ! match( value, "false" );
 		else
 			return false;
 	} else {
@@ -225,10 +228,12 @@ void MasterConfig::print( FILE *f ) {
 		"- Loading statistics\n"
 		"\t- %-*s : %u\n"
 		"- Remapping\n"
+		"\t- %-*s : %s\n"
 		"\t- %-*s : %s\n",
 		width, "Packets", this->pool.packets,
-		width, "Update interval (seconds)", this->loadingStats.updateInterval,
-		width, "Force enabled?", this->remap.forceEnabled ? "true" : "false"
+		width, "Update interval (ms)", this->loadingStats.updateInterval,
+		width, "Force enabled?", this->remap.forceEnabled ? "true" : "false",
+		width, "No search on cached records?", this->remap.forceNoCacheRecords ? "true" : "false"
 	);
 
 	fprintf( f, "\n" );

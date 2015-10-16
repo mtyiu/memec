@@ -154,6 +154,19 @@ bool CoordinatorProtocol::parseLoadingStats(
 	return true;
 }
 
+char *CoordinatorProtocol::forwardRemappingRecords( size_t &size, uint32_t id, char* message ) {
+	size_t headerSize = this->generateHeader(
+		PROTO_MAGIC_REMAPPING,
+		PROTO_MAGIC_TO_MASTER,
+		PROTO_OPCODE_SYNC,
+		size,
+		id
+	);
+	memcpy( this->buffer.send + headerSize, message, size );
+	size += headerSize;
+	return this->buffer.send;
+}
+
 char *CoordinatorProtocol::resRegisterSlave( size_t &size, uint32_t id, bool success ) {
 	size = this->generateHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,

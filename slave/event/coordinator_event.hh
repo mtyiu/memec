@@ -7,6 +7,7 @@
 enum CoordinatorEventType {
 	COORDINATOR_EVENT_TYPE_REGISTER_REQUEST,
 	COORDINATOR_EVENT_TYPE_SYNC,
+	COORDINATOR_EVENT_TYPE_REMAP_SYNC,
 	COORDINATOR_EVENT_TYPE_PENDING
 };
 
@@ -23,6 +24,7 @@ public:
 
 	void reqRegister( CoordinatorSocket *socket, uint32_t addr, uint16_t port );
 	void sync( CoordinatorSocket *socket );
+	void syncRemap( CoordinatorSocket *socket );
 	void pending( CoordinatorSocket *socket );
 };
 

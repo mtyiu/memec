@@ -21,8 +21,9 @@
 #include "../../common/ds/id_generator.hh"
 #include "../../common/ds/key.hh"
 #include "../../common/ds/key_value.hh"
-#include "../../common/ds/packet_pool.hh"
 #include "../../common/ds/latency.hh"
+#include "../../common/ds/packet_pool.hh"
+#include "../../common/ds/remapping_record_map.hh"
 #include "../../common/ds/sockaddr_in.hh"
 #include "../../common/stripe_list/stripe_list.hh"
 #include "../../common/socket/epoll.hh"
@@ -69,8 +70,11 @@ public:
 	PacketPool packetPool;
 	StripeList<SlaveSocket> *stripeList;
 	Counter counter;
+	/* Remapping */
 	RemapFlag remapFlag;
 	MasterRemapMsgHandler remapMsgHandler;
+	RemappingRecordMap remappingRecords;
+	/* Loading statistics */
 	SlaveLoading slaveLoading;
 	OverloadedSlave overloadedSlave;
 	Timer statsTimer;
@@ -88,6 +92,7 @@ public:
 	void info( FILE *f = stdout );
 	void debug( FILE *f = stdout );
 	void printPending( FILE *f = stdout );
+	void printRemapping( FILE *f = stdout );
 	void time();
 	double getElapsedTime();
 	void interactive();

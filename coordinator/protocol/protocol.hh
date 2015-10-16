@@ -30,6 +30,8 @@ public:
 		ArrayMap< struct sockaddr_in, Latency >& slaveSetLatency,
 		char* buffer, uint32_t size
 	);
+	// Forward the whole remapping record message passed in (with the protocol header excluded) pfrom slave to masters
+	char *forwardRemappingRecords( size_t &size, uint32_t id, char *message );
 
 	/* Slave */
 	// Register

@@ -14,6 +14,7 @@
 #include "../../common/stripe_list/stripe_list.hh"
 #include "../../common/ds/id_generator.hh"
 #include "../../common/ds/packet_pool.hh"
+#include "../../common/ds/remapping_record_map.hh"
 #include "../../common/ds/sockaddr_in.hh"
 
 #define MASTER_WORKER_SEND_REPLICAS_PARALLEL
@@ -35,6 +36,7 @@ private:
 	static Counter *counter;
 	static RemapFlag *remapFlag;
 	static PacketPool *packetPool;
+	static RemappingRecordMap *remappingRecords;
 
 	void dispatch( MixedEvent event );
 	void dispatch( ApplicationEvent event );
@@ -42,7 +44,7 @@ private:
 	void dispatch( MasterEvent event );
 	void dispatch( SlaveEvent event );
 
-	SlaveSocket *getSlave( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded = false, bool *isDegraded = 0 );
+	SlaveSocket *getSlave( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded = false, bool *isDegraded = 0, bool isRedirected = false );
 	SlaveSocket *getSlave( char *data, uint8_t size, uint32_t &originalListId, uint32_t &originalChunkId, uint32_t &remappedListId, uint32_t &remappedChunkId, bool allowDegraded = false, bool *isDegraded = 0 ); // for remapping
 	SlaveSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded = false, bool *isDegraded = 0 );
 	SlaveSocket *getSlaves( uint32_t listId, uint32_t chunkId, bool allowDegraded, bool *isDegraded );
@@ -52,6 +54,7 @@ private:
 	bool handleRemappingSetRequest( ApplicationEvent event, char *buf, size_t size );
 	bool handleUpdateRequest( ApplicationEvent event, char *buf, size_t size );
 	bool handleDeleteRequest( ApplicationEvent event, char *buf, size_t size );
+	bool handleRedirectedRequest ( SlaveEvent event, char *buf, size_t size, uint8_t opcode );
 
 	bool handleGetResponse( SlaveEvent event, bool success, char *buf, size_t size );
 	bool handleSetResponse( SlaveEvent event, bool success, char *buf, size_t size );
