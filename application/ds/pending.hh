@@ -2,8 +2,8 @@
 #define __APPLICATION_DS_PENDING_HH__
 
 #include <set>
-#include <pthread.h>
 #include "../../common/ds/key.hh"
+#include "../../common/lock/lock.hh"
 
 class KeyValueUpdate : public Key {
 public:
@@ -17,31 +17,31 @@ public:
 		std::set<Key> set;
 		std::set<KeyValueUpdate> update;
 		std::set<Key> del;
-		pthread_mutex_t getLock;
-		pthread_mutex_t setLock;
-		pthread_mutex_t updateLock;
-		pthread_mutex_t delLock;
+		LOCK_T getLock;
+		LOCK_T setLock;
+		LOCK_T updateLock;
+		LOCK_T delLock;
 	} application;
 	struct {
 		std::set<Key> get;
 		std::set<Key> set;
 		std::set<KeyValueUpdate> update;
 		std::set<Key> del;
-		pthread_mutex_t getLock;
-		pthread_mutex_t setLock;
-		pthread_mutex_t updateLock;
-		pthread_mutex_t delLock;
+		LOCK_T getLock;
+		LOCK_T setLock;
+		LOCK_T updateLock;
+		LOCK_T delLock;
 	} masters;
 
 	Pending() {
-		pthread_mutex_init( &this->application.getLock, 0 );
-		pthread_mutex_init( &this->application.setLock, 0 );
-		pthread_mutex_init( &this->application.updateLock, 0 );
-		pthread_mutex_init( &this->application.delLock, 0 );
-		pthread_mutex_init( &this->masters.getLock, 0 );
-		pthread_mutex_init( &this->masters.setLock, 0 );
-		pthread_mutex_init( &this->masters.updateLock, 0 );
-		pthread_mutex_init( &this->masters.delLock, 0 );
+		LOCK_INIT( &this->application.getLock );
+		LOCK_INIT( &this->application.setLock );
+		LOCK_INIT( &this->application.updateLock );
+		LOCK_INIT( &this->application.delLock );
+		LOCK_INIT( &this->masters.getLock );
+		LOCK_INIT( &this->masters.setLock );
+		LOCK_INIT( &this->masters.updateLock );
+		LOCK_INIT( &this->masters.delLock );
 	}
 };
 

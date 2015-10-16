@@ -1,30 +1,30 @@
 #ifndef __MASTER_DS_REMAP_FLAG_HH__
 #define __MASTER_DS_REMAP_FLAG_HH__
 
-#include <pthread.h>
+#include "../../common/lock/lock.hh"
 
 class RemapFlag {
 private:
-	pthread_mutex_t lock;
+	LOCK_T lock;
 	bool isRemapping;
 
 public:
 	RemapFlag() {
-		pthread_mutex_init( &this->lock, 0 );
+		LOCK_INIT( &this->lock );
 		this->isRemapping = false;
 	}
 
 	void set( bool isRemapping ) {
-		pthread_mutex_lock( &this->lock );
+		LOCK( &this->lock );
 		this->isRemapping = isRemapping;
-		pthread_mutex_unlock( &this->lock );
+		UNLOCK( &this->lock );
 	}
 
 	bool get() {
 		bool ret;
-		pthread_mutex_lock( &this->lock );
+		LOCK( &this->lock );
 		ret = this->isRemapping;
-		pthread_mutex_unlock( &this->lock );
+		UNLOCK( &this->lock );
 		return ret;
 	}
 };

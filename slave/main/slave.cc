@@ -328,15 +328,15 @@ void Slave::seal() {
 
 void Slave::flush() {
 	IOEvent ioEvent;
-	std::map<Metadata, Chunk *>::iterator it;
-	std::map<Metadata, Chunk *> *cache;
-	pthread_mutex_t *lock;
+	std::unordered_map<Metadata, Chunk *>::iterator it;
+	std::unordered_map<Metadata, Chunk *> *cache;
+	LOCK_T *lock;
 	Chunk *chunk;
 	size_t count = 0;
 
 	this->map.getCacheMap( cache, lock );
 
-	pthread_mutex_lock( lock );
+	LOCK( lock );
 	for ( it = cache->begin(); it != cache->end(); it++ ) {
 		chunk = it->second;
 		if ( chunk->status == CHUNK_STATUS_DIRTY ) {
@@ -345,21 +345,48 @@ void Slave::flush() {
 			count++;
 		}
 	}
-	pthread_mutex_unlock( lock );
+	UNLOCK( lock );
 
 	printf( "Flushing %lu chunks...\n", count );
 }
 
+void Slave::metadata() {
+	std::unordered_map<Key, KeyMetadata>::iterator it;
+	std::unordered_map<Key, KeyMetadata> *keys;
+	LOCK_T *lock;
+	FILE *f;
+	char filename[ 64 ];
+
+	this->map.getKeysMap( keys, lock );
+
+	snprintf( filename, sizeof( filename ), "%s.meta", this->config.slave.slave.addr.name );
+	f = fopen( filename, "w+" );
+	if ( ! f ) {
+		__ERROR__( "Slave", "metadata", "Cannot write to the file \"%s\".", filename );
+	}
+
+	LOCK( lock );
+	for ( it = keys->begin(); it != keys->end(); it++ ) {
+		Key key = it->first;
+		KeyMetadata keyMetadata = it->second;
+
+		fprintf( f, "%.*s\t%u\t%u\t%u\n", key.size, key.data, keyMetadata.listId, keyMetadata.stripeId, keyMetadata.chunkId );
+	}
+	UNLOCK( lock );
+
+	fclose( f );
+}
+
 void Slave::memory( FILE *f ) {
-	std::map<Metadata, Chunk *> *cache;
-	std::map<Metadata, Chunk *>::iterator it;
-	pthread_mutex_t *lock;
+	std::unordered_map<Metadata, Chunk *> *cache;
+	std::unordered_map<Metadata, Chunk *>::iterator it;
+	LOCK_T *lock;
 	uint32_t numDataChunks = 0, numParityChunks = 0, numKeyValues = 0;
 	uint64_t occupied = 0, allocated = 0, bytesParity = 0;
 
 	this->map.getCacheMap( cache, lock );
 
-	pthread_mutex_lock( lock );
+	LOCK( lock );
 	for ( it = cache->begin(); it != cache->end(); it++ ) {
 		Chunk *chunk = it->second;
 		if ( chunk->isParity ) {
@@ -372,7 +399,7 @@ void Slave::memory( FILE *f ) {
 			allocated += chunk->capacity;
 		}
 	}
-	pthread_mutex_unlock( lock );
+	UNLOCK( lock );
 
 	int width = 25;
 	fprintf(
@@ -544,6 +571,9 @@ void Slave::interactive() {
 		} else if ( strcmp( command, "memory" ) == 0 ) {
 			valid = true;
 			this->memory();
+		} else if ( strcmp( command, "metadata" ) == 0 ) {
+			valid = true;
+			this->metadata();
 		} else if ( strcmp( command, "pending" ) == 0 ) {
 			valid = true;
 			this->printPending();
@@ -568,10 +598,10 @@ void Slave::interactive() {
 
 void Slave::printPending( FILE *f ) {
 	size_t i;
-	std::map<PendingIdentifier, Key>::iterator it;
-	std::map<PendingIdentifier, KeyValueUpdate>::iterator keyValueUpdateIt;
-	std::map<PendingIdentifier, ChunkUpdate>::iterator chunkUpdateIt;
-	std::map<PendingIdentifier, ChunkRequest>::iterator chunkRequestIt;
+	std::unordered_multimap<PendingIdentifier, Key>::iterator it;
+	std::unordered_multimap<PendingIdentifier, KeyValueUpdate>::iterator keyValueUpdateIt;
+	std::unordered_multimap<PendingIdentifier, ChunkUpdate>::iterator chunkUpdateIt;
+	std::unordered_multimap<PendingIdentifier, ChunkRequest>::iterator chunkRequestIt;
 	fprintf(
 		f,
 		"Pending requests for masters\n"
@@ -753,6 +783,7 @@ void Slave::help() {
 		"- seal: Seal all chunks in the chunk buffer\n"
 		"- flush: Flush all dirty chunks to disk\n"
 		"- memory: Print memory usage\n"
+		"- metadata: Write metadata to disk\n"
 		"- sync: Synchronize with coordinator\n"
 		"- load: Show the load of each worker\n"
 		"- time: Show elapsed time\n"

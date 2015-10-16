@@ -1,5 +1,5 @@
 CC=g++
-CFLAGS=-Wall -O2 -g
+CFLAGS=-std=c++11 -Wall -O2 -g
 PLIO_SRC_ROOT=../../..
 LIBS=-pthread
 
@@ -23,7 +23,7 @@ OBJS= \
 	$(PLIO_SRC_ROOT)/master/worker/worker.o \
 	$(PLIO_SRC_ROOT)/master/main/master.o \
 	$(PLIO_SRC_ROOT)/master/main/main.o
-	$(PLIO_SRC_ROOT)/coordinator/remap/remap_msg_handler.o 
+	$(PLIO_SRC_ROOT)/coordinator/remap/remap_msg_handler.o
 
 EXTERNAL_LIBS = \
 	$(PLIO_SRC_ROOT)/common/config/config.o \
@@ -44,13 +44,13 @@ EXTERNAL_LIBS = \
 	-lrt \
 	-ltspread
 
-all: $(OBJS) $(TARGETS) 
+all: $(OBJS) $(TARGETS)
 
 $(TARGETS): % : %.cc $(OBJS)
 	$(CC) $(CFLAGS) $(INCLUDE) $(LIBS) -o $@ $< $(OBJS) $(EXTERNAL_LIBS)
 
-$(OBJS): %.o: %.cc 
+$(OBJS): %.o: %.cc
 	$(CC) $(CFLAGS) $(INCLUDE) $(LIBS) -c -o $@ $<
 
-clean: 
+clean:
 	rm -f $(TARGETS)

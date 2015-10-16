@@ -1,9 +1,10 @@
 #ifndef __SLAVE_PROTOCOL_PROTOCOL_HH__
 #define __SLAVE_PROTOCOL_PROTOCOL_HH__
 
-#include "../../common/protocol/protocol.hh"
 #include "../../common/config/server_addr.hh"
 #include "../../common/ds/chunk.hh"
+#include "../../common/lock/lock.hh"
+#include "../../common/protocol/protocol.hh"
 
 class SlaveProtocol : public Protocol {
 public:
@@ -17,9 +18,9 @@ public:
 	// Register
 	char *reqRegisterCoordinator( size_t &size, uint32_t id, uint32_t addr, uint16_t port );
 	// Heartbeat
-	char *sendHeartbeat( size_t &size, uint32_t id, std::map<Key, OpMetadata> &opMetadataMap, pthread_mutex_t *lock, size_t &count );
+	char *sendHeartbeat( size_t &size, uint32_t id, LOCK_T *sealedLock, std::unordered_set<Metadata> &sealed, uint32_t &sealedCount, LOCK_T *opsLock, std::unordered_map<Key, OpMetadata> &ops, uint32_t &opsCount, LOCK_T *remapLock, std::unordered_map<Key, RemappingRecord> &remapRecords, uint32_t &remapCount, bool &isCompleted );
 	// Remapping Records
-	char *sendRemappingRecords( size_t &size, uint32_t id, std::map<Key, RemappingRecord> &remapRecord, pthread_mutex_t *lock, size_t &remapCount );
+	char *sendRemappingRecords( size_t &size, uint32_t id, std::unordered_map<Key, RemappingRecord> &remapRecord, pthread_mutex_t *lock, size_t &remapCount );
 
 	/* Master */
 	// Register

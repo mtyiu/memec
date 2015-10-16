@@ -1,11 +1,13 @@
 #ifndef __COORDINATOR_SOCKET_SLAVE_SOCKET_HH__
 #define __COORDINATOR_SOCKET_SLAVE_SOCKET_HH__
 
-#include <map>
+#include <unordered_map>
+#include "../ds/map.hh"
 #include "../../common/ds/array_map.hh"
 #include "../../common/ds/key.hh"
 #include "../../common/ds/load.hh"
 #include "../../common/ds/metadata.hh"
+#include "../../common/lock/lock.hh"
 #include "../../common/socket/socket.hh"
 
 class SlaveSocket : public Socket {
@@ -13,8 +15,7 @@ private:
 	static ArrayMap<int, SlaveSocket> *slaves;
 
 public:
-	// All stored keys
-	std::map<Key, OpMetadata> keys;
+	Map map;
 	struct {
 		uint32_t addr;
 		uint16_t port;

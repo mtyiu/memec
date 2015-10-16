@@ -1,15 +1,15 @@
 #ifndef __COMMON_DS_CHUNK_HH__
 #define __COMMON_DS_CHUNK_HH__
 
-#include <map>
+#include <unordered_map>
 #include <stdint.h>
-#include <pthread.h>
 #include <arpa/inet.h>
 #include "metadata.hh"
 #include "key.hh"
 #include "key_value.hh"
+#include "../lock/lock.hh"
 
-#define USE_CHUNK_MUTEX_LOCK
+#define USE_CHUNK_LOCK
 
 enum ChunkStatus {
 	// Clean chunk (used in chunk buffer)
@@ -30,8 +30,8 @@ class Chunk {
 private:
 	char *data;                 // Buffer
 	uint32_t size;              // Occupied data
-#ifdef USE_CHUNK_MUTEX_LOCK
-	pthread_mutex_t lock;       // Lock
+#ifdef USE_CHUNK_LOCK
+	LOCK_T lock;       // Lock
 #endif
 
 public:
@@ -50,7 +50,7 @@ public:
 	void loadFromGetChunkRequest( uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isParity, char *data, uint32_t size );
 	// Access data inside the chunk
 	char *alloc( uint32_t size, uint32_t &offset );
-#ifdef USE_CHUNK_MUTEX_LOCK
+#ifdef USE_CHUNK_LOCK
 	int next( int offset, char *&key, uint8_t &keySize, bool needsLock = false, bool needsUnlock = false );
 #else
 	int next( int offset, char *&key, uint8_t &keySize );
@@ -60,9 +60,9 @@ public:
 	inline uint32_t getSize() { return this->size; }
 	inline void setData( char *data ) { this->data = data; }
 	inline void setSize( uint32_t size ) { this->size = size; }
-#ifdef USE_CHUNK_MUTEX_LOCK
-	inline void setLock() { pthread_mutex_lock( &this->lock ); }
-	inline void setUnlock() { pthread_mutex_unlock( &this->lock ); }
+#ifdef USE_CHUNK_LOCK
+	inline void setLock() { LOCK( &this->lock ); }
+	inline void setUnlock() { UNLOCK( &this->lock ); }
 #endif
 	// Update internal counters for data and parity chunks
 	uint32_t updateData();
@@ -71,7 +71,7 @@ public:
 	void computeDelta( char *delta, char *newData, uint32_t offset, uint32_t length, bool update = true );
 	void update( char *newData, uint32_t offset, uint32_t length );
 	// Delete key
-	uint32_t deleteKeyValue( Key target, std::map<Key, KeyMetadata> *keys, char *delta = 0, size_t deltaBufSize = 0 );
+	uint32_t deleteKeyValue( std::unordered_map<Key, KeyMetadata> *keys, KeyMetadata metadata, char *delta = 0, size_t deltaBufSize = 0 );
 	// Get key-value pair
 	KeyValue getKeyValue( uint32_t offset );
 	// Reset internal status

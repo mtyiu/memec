@@ -24,7 +24,7 @@ bool Coordinator::switchPhase() {
 		return switched;
 
 	MasterEvent event;
-	pthread_mutex_lock( &this->overloadedSlaves.lock );
+	LOCK( &this->overloadedSlaves.lock );
 	if ( this->remapMsgHandler.isRemapStopped() &&
 			this->overloadedSlaves.slaveSet.size() > this->sockets.slaves.size() * this->config.global.remap.startThreshold ) {
 		// start remapping phase in the background
@@ -38,14 +38,14 @@ bool Coordinator::switchPhase() {
 	}
 	this->eventQueue.insert( event );
 quit:
-	pthread_mutex_unlock( &this->overloadedSlaves.lock );
+	UNLOCK( &this->overloadedSlaves.lock );
 	return switched;
 }
 
 void Coordinator::updateOverloadedSlaveSet( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
 		ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency, std::set<struct sockaddr_in> *slaveSet ) {
 	double avgSec = 0.0, avgNsec = 0.0;
-	pthread_mutex_lock( &this->overloadedSlaves.lock );
+	LOCK( &this->overloadedSlaves.lock );
 
 	// what has past is left in the past
 	this->overloadedSlaves.slaveSet.clear();
@@ -72,13 +72,13 @@ void Coordinator::updateOverloadedSlaveSet( ArrayMap<struct sockaddr_in, Latency
 	GET_OVERLOADED_SLAVES( Get );
 	GET_OVERLOADED_SLAVES( Set );
 #undef GET_OVERLOADED_SLAVES
-	pthread_mutex_unlock( &this->overloadedSlaves.lock );
+	UNLOCK( &this->overloadedSlaves.lock );
 }
 
 void Coordinator::updateAverageSlaveLoading( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
 		ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency ) {
 
-	pthread_mutex_lock( &this->slaveLoading.lock );
+	LOCK( &this->slaveLoading.lock );
 	ArrayMap< struct sockaddr_in, ArrayMap< struct sockaddr_in, Latency > > *latest = NULL;
 	double avgSec = 0.0, avgNsec = 0.0;
 
@@ -117,7 +117,7 @@ void Coordinator::updateAverageSlaveLoading( ArrayMap<struct sockaddr_in, Latenc
 #undef CLEAN_2D_ARRAY_MAP
 	//this->slaveLoading.latestGet.clear();
 	//this->slaveLoading.latestSet.clear();
-	pthread_mutex_unlock( &this->slaveLoading.lock );
+	UNLOCK( &this->slaveLoading.lock );
 }
 
 void Coordinator::signalHandler( int signal ) {
@@ -134,7 +134,7 @@ void Coordinator::signalHandler( int signal ) {
 			// TODO start / stop remapping according to criteria
 			// push the stats back to masters
 			// leave the free of ArrayMaps to workers after constructing the data buffer
-			pthread_mutex_lock( &sockets.lock );
+			LOCK( &sockets.lock );
 			//fprintf( stderr, "queuing events get %lu set %lu\n", slaveGetLatency->size(), slaveSetLatency->size() );
 			if ( slaveGetLatency->size() > 0 || slaveSetLatency->size() > 0 ) {
 				MasterEvent event;
@@ -148,7 +148,7 @@ void Coordinator::signalHandler( int signal ) {
 					coordinator->eventQueue.insert( event );
 				}
 			}
-			pthread_mutex_unlock( &sockets.lock );
+			UNLOCK( &sockets.lock );
 			// set timer for next push
 			//alarm( coordinator->config.coordinator.loadingStats.updateInterval );
 			break;
@@ -249,7 +249,7 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 	}
 
 	/* Slave Loading stats */
-	pthread_mutex_init( &this->slaveLoading.lock, NULL );
+	LOCK_INIT( &this->slaveLoading.lock );
 	uint32_t sec, msec;
 	if ( this->config.coordinator.loadingStats.updateInterval > 0 ) {
 		sec = this->config.coordinator.loadingStats.updateInterval / 1000;
@@ -449,6 +449,9 @@ void Coordinator::interactive() {
 		} else if ( strcmp( command, "seal" ) == 0 ) {
 			valid = true;
 			this->seal();
+		} else if ( strcmp( command, "metadata" ) == 0 ) {
+			valid = true;
+			this->metadata();
 		} else if ( strcmp( command, "flush" ) == 0 ) {
 			valid = true;
 			this->flush();
@@ -465,26 +468,25 @@ void Coordinator::interactive() {
 void Coordinator::dump() {
 	FILE *f = stdout;
 	for ( size_t i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
-		std::map<Key, OpMetadata> &map = this->sockets.slaves[ i ]->keys;
-
 		fprintf( f, "Slave #%lu: ", i + 1 );
 		this->sockets.slaves[ i ]->printAddress( f );
 		fprintf( f, "\n----------------------------------------\n" );
 
-		fprintf( f, "\n[List of metadata]\n" );
-		if ( ! map.size() ) {
-			fprintf( f, "(None)\n" );
-		} else {
-			for ( std::map<Key, OpMetadata>::iterator it = map.begin(); it != map.end(); it++ ) {
-				fprintf(
-					f, "%.*s --> (list: %u, stripe: %u, chunk: %u)\n",
-					it->first.size, it->first.data,
-					it->second.listId, it->second.stripeId, it->second.chunkId
-				);
-			}
-		}
-		fprintf( f, "\n" );
+		this->sockets.slaves[ i ]->map.dump();
 	}
+}
+
+void Coordinator::metadata() {
+	FILE *f = fopen( "coordinator.meta", "w+" );
+	if ( ! f ) {
+		__ERROR__( "Slave", "metadata", "Cannot write to the file \"coordinator.meta\"." );
+	}
+
+	for ( size_t i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
+		this->sockets.slaves[ i ]->map.persist( f );
+	}
+
+	fclose( f );
 }
 
 void Coordinator::printRemapping( FILE *f ) {
@@ -503,6 +505,7 @@ void Coordinator::help() {
 		"- time: Show elapsed time\n"
 		"- seal: Force all slaves to seal all its chunks\n"
 		"- flush: Force all slaves to flush all its chunks\n"
+		"- metadata: Write metadata to disk\n"
 		"- exit: Terminate this client\n"
 	);
 	fflush( stdout );

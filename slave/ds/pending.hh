@@ -5,6 +5,7 @@
 #include "../../common/ds/chunk.hh"
 #include "../../common/ds/metadata.hh"
 #include "../../common/ds/pending.hh"
+#include "../../common/lock/lock.hh"
 #include "../../common/protocol/protocol.hh"
 
 class ChunkUpdate : public Metadata {
@@ -83,56 +84,56 @@ enum PendingType {
 
 class Pending {
 private:
-	bool get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIdentifier, Key> *&map );
-	bool get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIdentifier, RemappingRecordKey> *&map );
-	bool get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIdentifier, KeyValueUpdate> *&map );
-	bool get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIdentifier, DegradedOp> *&map );
-	bool get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIdentifier, ChunkRequest> *&map );
-	bool get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIdentifier, ChunkUpdate> *&map );
+	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, Key> *&map );
+	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, RemappingRecordKey> *&map );
+	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *&map );
+	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, DegradedOp> *&map );
+	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, ChunkRequest> *&map );
+	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, ChunkUpdate> *&map );
 
 public:
 	struct {
-		std::map<PendingIdentifier, RemappingRecordKey> remappingSet;
-		std::map<PendingIdentifier, Key> get;
-		std::map<PendingIdentifier, KeyValueUpdate> update;
-		std::map<PendingIdentifier, Key> del;
-		pthread_mutex_t remappingSetLock;
-		pthread_mutex_t getLock;
-		pthread_mutex_t updateLock;
-		pthread_mutex_t delLock;
+		std::unordered_multimap<PendingIdentifier, RemappingRecordKey> remappingSet;
+		std::unordered_multimap<PendingIdentifier, Key> get;
+		std::unordered_multimap<PendingIdentifier, KeyValueUpdate> update;
+		std::unordered_multimap<PendingIdentifier, Key> del;
+		LOCK_T remappingSetLock;
+		LOCK_T getLock;
+		LOCK_T updateLock;
+		LOCK_T delLock;
 	} masters;
    struct {
-		std::map<PendingIdentifier, DegradedOp> degradedOps;
-		std::map<PendingIdentifier, RemappingRecordKey> remappingSet;
-		std::map<PendingIdentifier, KeyValueUpdate> update;
-		std::map<PendingIdentifier, Key> del;
-		std::map<PendingIdentifier, ChunkRequest> getChunk;
-		std::map<PendingIdentifier, ChunkRequest> setChunk;
-		std::map<PendingIdentifier, ChunkUpdate> updateChunk;
-		std::map<PendingIdentifier, ChunkUpdate> deleteChunk;
-		pthread_mutex_t degradedOpsLock;
-		pthread_mutex_t remappingSetLock;
-		pthread_mutex_t updateLock;
-		pthread_mutex_t delLock;
-		pthread_mutex_t getChunkLock;
-		pthread_mutex_t setChunkLock;
-		pthread_mutex_t updateChunkLock;
-		pthread_mutex_t delChunkLock;
+		std::unordered_multimap<PendingIdentifier, DegradedOp> degradedOps;
+		std::unordered_multimap<PendingIdentifier, RemappingRecordKey> remappingSet;
+		std::unordered_multimap<PendingIdentifier, KeyValueUpdate> update;
+		std::unordered_multimap<PendingIdentifier, Key> del;
+		std::unordered_multimap<PendingIdentifier, ChunkRequest> getChunk;
+		std::unordered_multimap<PendingIdentifier, ChunkRequest> setChunk;
+		std::unordered_multimap<PendingIdentifier, ChunkUpdate> updateChunk;
+		std::unordered_multimap<PendingIdentifier, ChunkUpdate> deleteChunk;
+		LOCK_T degradedOpsLock;
+		LOCK_T remappingSetLock;
+		LOCK_T updateLock;
+		LOCK_T delLock;
+		LOCK_T getChunkLock;
+		LOCK_T setChunkLock;
+		LOCK_T updateChunkLock;
+		LOCK_T delChunkLock;
 	} slavePeers;
 
 	Pending() {
-		pthread_mutex_init( &this->masters.remappingSetLock, 0 );
-		pthread_mutex_init( &this->masters.getLock, 0 );
-		pthread_mutex_init( &this->masters.updateLock, 0 );
-		pthread_mutex_init( &this->masters.delLock, 0 );
-		pthread_mutex_init( &this->slavePeers.degradedOpsLock, 0 );
-		pthread_mutex_init( &this->slavePeers.remappingSetLock, 0 );
-		pthread_mutex_init( &this->slavePeers.updateLock, 0 );
-		pthread_mutex_init( &this->slavePeers.delLock, 0 );
-		pthread_mutex_init( &this->slavePeers.getChunkLock, 0 );
-		pthread_mutex_init( &this->slavePeers.setChunkLock, 0 );
-		pthread_mutex_init( &this->slavePeers.updateChunkLock, 0 );
-		pthread_mutex_init( &this->slavePeers.delChunkLock, 0 );
+		LOCK_INIT( &this->masters.remappingSetLock );
+		LOCK_INIT( &this->masters.getLock );
+		LOCK_INIT( &this->masters.updateLock );
+		LOCK_INIT( &this->masters.delLock );
+		LOCK_INIT( &this->slavePeers.degradedOpsLock );
+		LOCK_INIT( &this->slavePeers.remappingSetLock );
+		LOCK_INIT( &this->slavePeers.updateLock );
+		LOCK_INIT( &this->slavePeers.delLock );
+		LOCK_INIT( &this->slavePeers.getChunkLock );
+		LOCK_INIT( &this->slavePeers.setChunkLock );
+		LOCK_INIT( &this->slavePeers.updateChunkLock );
+		LOCK_INIT( &this->slavePeers.delChunkLock );
 	}
 
 	bool insertRemappingRecordKey( PendingType type, uint32_t id, void *ptr, RemappingRecordKey &remappingRecordKey, bool needsLock = true, bool needsUnlock = true );
@@ -152,7 +153,7 @@ public:
 	bool eraseChunkRequest( PendingType type, uint32_t id, void *ptr = 0, PendingIdentifier *pidPtr = 0, ChunkRequest *chunkRequestPtr = 0, bool needsLock = true, bool needsUnlock = true );
 	bool eraseChunkUpdate( PendingType type, uint32_t id, void *ptr = 0, PendingIdentifier *pidPtr = 0, ChunkUpdate *chunkUpdatePtr = 0, bool needsLock = true, bool needsUnlock = true );
 
-	bool findChunkRequest( PendingType type, uint32_t id, void *ptr, std::map<PendingIdentifier, ChunkRequest>::iterator &it, bool needsLock = true, bool needsUnlock = true );
+	bool findChunkRequest( PendingType type, uint32_t id, void *ptr, std::unordered_multimap<PendingIdentifier, ChunkRequest>::iterator &it, bool needsLock = true, bool needsUnlock = true );
 
 	uint32_t count( PendingType type, uint32_t id, bool needsLock = true, bool needsUnlock = true );
 };

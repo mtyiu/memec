@@ -1,9 +1,10 @@
 #ifndef __COMMON_DS_PENDING_HH__
 #define __COMMON_DS_PENDING_HH__
 
-#include <set>
+#include <map>
 #include <cstring>
 #include "../../common/ds/key.hh"
+#include "../../common/hash/hash_func.hh"
 
 class KeyValueUpdate : public Key {
 public:
@@ -37,6 +38,18 @@ public:
 
 		return this->ptr < p.ptr;
 	}
+
+	bool operator==( const PendingIdentifier &p ) const {
+		return ( this->id == p.id );
+	}
 };
+
+namespace std {
+	template<> struct hash<PendingIdentifier> {
+		size_t operator()( const PendingIdentifier &pid ) const {
+			return ( size_t ) pid.id;
+		}
+	};
+}
 
 #endif

@@ -60,12 +60,11 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 	bool connected, isSend;
 	uint32_t requestId;
 	ssize_t ret;
-	size_t count, remapCount = 0;
 	struct {
 		size_t size;
 		char *data;
 	} buffer;
-	std::map<Key, RemappingRecord>::iterator it, safeNextIt;
+	std::unordered_map<Key, RemappingRecord>::iterator it, safeNextIt;
 
 	if ( event.type != COORDINATOR_EVENT_TYPE_PENDING )
 		requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
@@ -81,16 +80,28 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 			isSend = true;
 			break;
 		case COORDINATOR_EVENT_TYPE_SYNC:
+		{
+			uint32_t sealedCount, opsCount, remapCount;
+			bool isCompleted;
+
 			buffer.data = this->protocol.sendHeartbeat(
 				buffer.size,
 				requestId,
-				SlaveWorker::map->ops,
-				&SlaveWorker::map->opsLock,
-				count
+				&SlaveWorker::map->sealedLock, SlaveWorker::map->sealed, sealedCount,
+				&SlaveWorker::map->opsLock, SlaveWorker::map->ops, opsCount,
+				&SlaveWorker::map->remapLock, SlaveWorker::map->remap, remapCount,
+				isCompleted
 			);
+
+			if ( ! isCompleted )
+				SlaveWorker::eventQueue->insert( event );
+
 			isSend = true;
+		}
 			break;
 		case COORDINATOR_EVENT_TYPE_REMAP_SYNC:
+		{
+			size_t remapCount;
 			buffer.data = this->protocol.sendRemappingRecords(
 				buffer.size,
 				requestId,
@@ -98,8 +109,9 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 				&SlaveWorker::map->remapLock,
 				remapCount
 			);
+
 			// move the remapping record sent to another set to avoid looping through all records over and over ..
-			pthread_mutex_lock ( &SlaveWorker::map->remapLock );
+			LOCK ( &SlaveWorker::map->remapLock );
 			if ( remapCount == SlaveWorker::map->remap.size() ) {
 				SlaveWorker::map->remapSent.insert(
 					SlaveWorker::map->remap.begin(),
@@ -116,8 +128,12 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 					}
 				}
 			}
-			pthread_mutex_unlock ( &SlaveWorker::map->remapLock );
+			UNLOCK ( &SlaveWorker::map->remapLock );
 			isSend = true;
+		
+			if ( SlaveWorker::map->remap.size() )
+				SlaveWorker::eventQueue->insert( event );
+		}
 			break;
 		case COORDINATOR_EVENT_TYPE_PENDING:
 			isSend = false;
@@ -130,13 +146,6 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "SlaveWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
-
-		if ( event.type == COORDINATOR_EVENT_TYPE_SYNC && SlaveWorker::map->ops.size() ) {
-			// Some metadata is not sent yet, continue to send
-			SlaveWorker::eventQueue->insert( event );
-		} else if ( event.type == COORDINATOR_EVENT_TYPE_REMAP_SYNC && SlaveWorker::map->remap.size() ) {
-			SlaveWorker::eventQueue->insert( event );
-		}
 	} else {
 		ProtocolHeader header;
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();
@@ -1230,8 +1239,8 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 		uint32_t offset = keyMetadata.offset + PROTO_KEY_VALUE_SIZE + header.keySize + header.valueUpdateOffset;
 		bool isDegraded;
 
-		pthread_mutex_t *keysLock;
-		std::map<Key, KeyMetadata> *keys;
+		LOCK_T *keysLock;
+		std::unordered_map<Key, KeyMetadata> *keys;
 		SlaveWorker::map->getKeysMap( keys, keysLock );
 		// Lock the data chunk buffer
 		MixedChunkBuffer *chunkBuffer = SlaveWorker::chunkBuffer->at( metadata.listId );
@@ -1248,7 +1257,7 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 
 		chunkBufferIndex = chunkBuffer->lockChunk( chunk );
 		if ( chunkBufferIndex == -1 ) {
-			pthread_mutex_lock( keysLock );
+			LOCK( keysLock );
 			if ( SlaveWorker::parityChunkCount ) {
 				KeyValueUpdate keyValueUpdate;
 				ChunkUpdate chunkUpdate;
@@ -1260,7 +1269,7 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 					offset, header.valueUpdateSize,
 					true // perform update
 				);
-				pthread_mutex_unlock( keysLock );
+				UNLOCK( keysLock );
 
 				// Add the current request to the pending set
 				keyValueUpdate.dup( header.keySize, header.key, ( void * ) event.socket );
@@ -1327,13 +1336,13 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 				}
 			} else {
 				chunk->update( header.valueUpdate, offset, header.valueUpdateSize );
-				pthread_mutex_unlock( keysLock );
+				UNLOCK( keysLock );
 
 				event.resUpdate( event.socket, event.id, key, header.valueUpdateOffset, header.valueUpdateSize, true, false );
 				this->dispatch( event );
 			}
 		} else {
-			pthread_mutex_lock( keysLock );
+			LOCK( keysLock );
 			// The chunk is not yet sealed
 			// chunk->update( header.valueUpdate, offset, header.valueUpdateSize );
 			// Compute delta and perform update
@@ -1343,7 +1352,7 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 				offset, header.valueUpdateSize,
 				true // perform update
 			);
-			pthread_mutex_unlock( keysLock );
+			UNLOCK( keysLock );
 
 			if ( SlaveWorker::parityChunkCount ) {
 				// Add the current request to the pending set
@@ -1469,17 +1478,19 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 
 		// Update data chunk and map
 		key.ptr = 0;
-		pthread_mutex_t *keysLock, *cacheLock;
-		std::map<Key, KeyMetadata> *keys;
-		std::map<Metadata, Chunk *> *cache;
+		LOCK_T *keysLock, *cacheLock;
+		std::unordered_map<Key, KeyMetadata> *keys;
+		std::unordered_map<Metadata, Chunk *> *cache;
+		KeyMetadata keyMetadata;
+
 		SlaveWorker::map->getKeysMap( keys, keysLock );
 		SlaveWorker::map->getCacheMap( cache, cacheLock );
 		// Lock the data chunk buffer
 		MixedChunkBuffer *chunkBuffer = SlaveWorker::chunkBuffer->at( metadata.listId );
 		int chunkBufferIndex = chunkBuffer->lockChunk( chunk, true );
 		// Lock the keys and cache map
-		pthread_mutex_lock( keysLock );
-		pthread_mutex_lock( cacheLock );
+		LOCK( keysLock );
+		LOCK( cacheLock );
 		// Delete the chunk and perform key-value compaction
 		if ( chunkBufferIndex == -1 ) {
 			// Only compute data delta if the chunk is not yet sealed
@@ -1492,13 +1503,14 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 				}
 			}
 		}
+		SlaveWorker::map->deleteKey( key, PROTO_OPCODE_DELETE, keyMetadata, false, false );
 		if ( SlaveWorker::parityChunkCount )
-			deltaSize = chunk->deleteKeyValue( key, keys, delta, this->buffer.size );
+			deltaSize = chunk->deleteKeyValue( keys, keyMetadata, delta, this->buffer.size );
 		else
-			deltaSize = chunk->deleteKeyValue( key, keys );
+			deltaSize = chunk->deleteKeyValue( keys, keyMetadata );
 		// Release the locks
-		pthread_mutex_unlock( cacheLock );
-		pthread_mutex_unlock( keysLock );
+		UNLOCK( cacheLock );
+		UNLOCK( keysLock );
 		if ( chunkBufferIndex == -1 )
 			chunkBuffer->unlock();
 
@@ -1908,7 +1920,7 @@ bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success,
 	PendingIdentifier pid;
 
 	if ( ! SlaveWorker::pending->eraseChunkUpdate( PT_SLAVE_PEER_UPDATE_CHUNK, event.id, event.socket, &pid, &chunkUpdate, true, false ) ) {
-		pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.updateChunkLock );
+		UNLOCK( &SlaveWorker::pending->slavePeers.updateChunkLock );
 		__ERROR__( "SlaveWorker", "handleUpdateChunkResponse", "Cannot find a pending slave UPDATE_CHUNK request that matches the response. This message will be discarded. (ID: %u)", event.id );
 		return false;
 	}
@@ -1962,7 +1974,7 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 	chunkUpdate.ptr = ( void * ) event.socket;
 
 	if ( ! SlaveWorker::pending->eraseChunkUpdate( PT_SLAVE_PEER_DEL_CHUNK, event.id, event.socket, &pid, &chunkUpdate, true, false ) ) {
-		pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.delChunkLock );
+		UNLOCK( &SlaveWorker::pending->slavePeers.delChunkLock );
 		__ERROR__( "SlaveWorker", "handleDeleteChunkResponse", "Cannot find a pending slave DELETE_CHUNK request that matches the response. This message will be discarded. (ID: %u)", event.id );
 		return false;
 	}
@@ -2005,7 +2017,7 @@ bool SlaveWorker::handleUpdateResponse( SlavePeerEvent event, bool success, char
 	PendingIdentifier pid;
 
 	if ( ! SlaveWorker::pending->eraseKeyValueUpdate( PT_SLAVE_PEER_UPDATE, event.id, event.socket, &pid, &keyValueUpdate, true, false ) ) {
-		pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.updateLock );
+		UNLOCK( &SlaveWorker::pending->slavePeers.updateLock );
 		__ERROR__( "SlaveWorker", "handleUpdateResponse", "Cannot find a pending slave UPDATE request that matches the response. This message will be discarded. (ID: %u)", event.id );
 		return false;
 	}
@@ -2046,7 +2058,7 @@ bool SlaveWorker::handleDeleteResponse( SlavePeerEvent event, bool success, char
 	PendingIdentifier pid;
 
 	if ( ! SlaveWorker::pending->eraseKey( PT_SLAVE_PEER_DEL, event.id, event.socket, &pid, &key, true, false ) ) {
-		pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.delLock );
+		UNLOCK( &SlaveWorker::pending->slavePeers.delLock );
 		__ERROR__( "SlaveWorker", "handleDeleteResponse", "Cannot find a pending slave DELETE request that matches the response. This message will be discarded. (ID: %u)", event.id );
 		return false;
 	}
@@ -2072,7 +2084,7 @@ bool SlaveWorker::handleDeleteResponse( SlavePeerEvent event, bool success, char
 
 bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
 	int pending;
-	std::map<PendingIdentifier, ChunkRequest>::iterator it, tmp, end;
+	std::unordered_map<PendingIdentifier, ChunkRequest>::iterator it, tmp, end;
 	ChunkRequest chunkRequest;
 
 	if ( success ) {
@@ -2090,7 +2102,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 
 		// Find the corresponding GET_CHUNK request from the pending set
 		if ( ! SlaveWorker::pending->findChunkRequest( PT_SLAVE_PEER_GET_CHUNK, event.id, event.socket, it, true, false ) ) {
-			pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.getChunkLock );
+			UNLOCK( &SlaveWorker::pending->slavePeers.getChunkLock );
 			__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot find a pending slave GET_CHUNK request that matches the response. This message will be discarded." );
 			return false;
 		}
@@ -2125,7 +2137,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 		// __ERROR__( "SlaveWorker", "handleGetChunkResponse", "Pending slave GET_CHUNK requests = %d (%s).", pending, success ? "success" : "fail" );
 		if ( pending == 0 )
 			SlaveWorker::pending->slavePeers.getChunk.erase( it, tmp );
-		pthread_mutex_unlock( &SlaveWorker::pending->slavePeers.getChunkLock );
+		UNLOCK( &SlaveWorker::pending->slavePeers.getChunkLock );
 
 		if ( pending == 0 ) {
 			// Set up chunk buffer for storing reconstructed chunks

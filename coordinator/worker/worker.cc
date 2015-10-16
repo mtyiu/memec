@@ -143,10 +143,10 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 	} \
 
 					masterAddr = event.socket->getAddr();
-					pthread_mutex_lock ( &coordinator->slaveLoading.lock );
+					LOCK ( &coordinator->slaveLoading.lock );
 					SET_SLAVE_LATENCY_FOR_MASTER( masterAddr, getLatency, latestGet );
 					SET_SLAVE_LATENCY_FOR_MASTER( masterAddr, setLatency, latestSet );
-					pthread_mutex_unlock ( &coordinator->slaveLoading.lock );
+					UNLOCK ( &coordinator->slaveLoading.lock );
 
 					getLatency.needsDelete = false;
 					setLatency.needsDelete = false;
@@ -211,6 +211,9 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 		case SLAVE_EVENT_TYPE_ANNOUNCE_SLAVE_CONNECTED:
 			isSend = false;
 			break;
+		case SLAVE_EVENT_TYPE_DISCONNECT:
+			isSend = false;
+			break;
 		default:
 			return;
 	}
@@ -221,9 +224,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 
 		buffer.data = this->protocol.announceSlaveConnected( buffer.size, requestId, event.socket );
 
-		connected = true;
-
-		pthread_mutex_lock( &slaves.lock );
+		LOCK( &slaves.lock );
 		for ( uint32_t i = 0; i < slaves.size(); i++ ) {
 			SlaveSocket *slave = slaves.values[ i ];
 			if ( event.socket->equal( slave ) )
@@ -233,11 +234,15 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			if ( ret != ( ssize_t ) buffer.size )
 				__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 		}
-		pthread_mutex_unlock( &slaves.lock );
+		UNLOCK( &slaves.lock );
+	} else if ( event.type == SLAVE_EVENT_TYPE_DISCONNECT ) {
+		printf( "Slave disconnected!\n" );
 	} else if ( isSend ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+		if ( ! connected )
+			__ERROR__( "CoordinatorWorker", "dispatch", "The slave is disconnected." );
 	} else {
 		// Parse requests from slaves
 		ProtocolHeader header;
@@ -262,35 +267,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			}
 
 			if ( header.magic == PROTO_MAGIC_HEARTBEAT ) {
-				struct HeartbeatHeader heartbeatHeader;
-				struct SlaveSyncHeader slaveSyncHeader;
-
-				if ( this->protocol.parseHeartbeatHeader( heartbeatHeader, buffer.data, buffer.size ) ) {
-					offset = PROTO_HEADER_SIZE + PROTO_HEARTBEAT_SIZE;
-					// TODO ret?
-					while ( offset < ( size_t ) ret ) {
-						if ( ! this->protocol.parseSlaveSyncHeader( slaveSyncHeader, bytes, buffer.data, buffer.size, offset ) )
-							break;
-						offset += bytes;
-						count++;
-
-						// Update metadata map
-						Key key;
-						key.set( slaveSyncHeader.keySize, slaveSyncHeader.key, 0 );
-
-						OpMetadata opMetadata;
-						opMetadata.opcode = slaveSyncHeader.opcode;
-						opMetadata.listId = slaveSyncHeader.listId;
-						opMetadata.stripeId = slaveSyncHeader.stripeId;
-						opMetadata.chunkId = slaveSyncHeader.chunkId;
-
-						if ( event.socket->keys.find( key ) == event.socket->keys.end() )
-							key.dup();
-						event.socket->keys[ key ] = opMetadata;
-					}
-				} else {
-					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid heartbeat protocol header." );
-				}
+				this->processHeartbeat( event, buffer.data, header.length );
 			} else if ( header.magic == PROTO_MAGIC_REMAPPING ) {
 				struct RemappingRecordHeader remappingRecordHeader;
 				struct SlaveSyncRemapHeader slaveSyncRemapHeader;
@@ -339,11 +316,11 @@ quit_1:
 			buffer.data += header.length;
 			buffer.size -= header.length;
 		}
-		if ( connected ) event.socket->done();
+		if ( connected )
+			event.socket->done();
+		else
+			__ERROR__( "CoordinatorWorker", "dispatch", "The slave is disconnected." );
 	}
-
-	if ( ! connected )
-		__ERROR__( "CoordinatorWorker", "dispatch", "The slave is disconnected." );
 }
 
 void CoordinatorWorker::free() {
@@ -397,6 +374,85 @@ void *CoordinatorWorker::run( void *argv ) {
 	worker->free();
 	pthread_exit( 0 );
 	return 0;
+}
+
+bool CoordinatorWorker::processHeartbeat( SlaveEvent event, char *buf, size_t size ) {
+	uint32_t count;
+	size_t processed, offset, failed = 0;
+	struct HeartbeatHeader heartbeat;
+	union {
+		struct MetadataHeader metadata;
+		struct KeyOpMetadataHeader op;
+		struct RemappingRecordHeader1 remap;
+	} header;
+
+	offset = 0;
+	if ( ! this->protocol.parseHeartbeatHeader( heartbeat, buf, size ) ) {
+		__ERROR__( "CoordinatorWorker", "dispatch", "Invalid heartbeat protocol header." );
+		return false;
+	}
+
+	offset += PROTO_HEARTBEAT_SIZE;
+
+	LOCK( &event.socket->map.chunksLock );
+	for ( count = 0; count < heartbeat.sealed; count++ ) {
+		if ( this->protocol.parseMetadataHeader( header.metadata, processed, buf, size, offset ) ) {
+			event.socket->map.seal(
+				header.metadata.listId,
+				header.metadata.stripeId,
+				header.metadata.chunkId,
+				false, false
+			);
+		} else {
+			failed++;
+		}
+		offset += processed;
+	}
+	UNLOCK( &event.socket->map.chunksLock );
+
+	LOCK( &event.socket->map.keysLock );
+	for ( count = 0; count < heartbeat.keys; count++ ) {
+		if ( this->protocol.parseKeyOpMetadataHeader( header.op, processed, buf, size, offset ) ) {
+			event.socket->map.setKey(
+				header.op.key,
+				header.op.keySize,
+				header.op.listId,
+				header.op.stripeId,
+				header.op.chunkId,
+				header.op.opcode,
+				false, false
+			);
+		} else {
+			failed++;
+		}
+		offset += processed;
+	}
+	UNLOCK( &event.socket->map.keysLock );
+
+	LOCK( &event.socket->map.remapLock );
+	for ( count = 0; count < heartbeat.remap; count++ ) {
+		if ( this->protocol.parseRemappingRecordHeader( header.remap, processed, buf, size, offset ) ) {
+			event.socket->map.insertRemappingRecord(
+				header.remap.key,
+				header.remap.keySize,
+				header.remap.listId,
+				header.remap.chunkId,
+				false, false
+			);
+		} else {
+			failed++;
+		}
+		offset += processed;
+	}
+	UNLOCK( &event.socket->map.remapLock );
+
+	if ( failed ) {
+		__ERROR__( "CoordinatorWorker", "processHeartbeat", "Number of failed objects = %lu", failed );
+	// } else {
+	// 	__ERROR__( "CoordinatorWorker", "processHeartbeat", "(sealed, keys, remap) = (%u, %u, %u)", heartbeat.sealed, heartbeat.keys, heartbeat.remap );
+	}
+
+	return failed == 0;
 }
 
 bool CoordinatorWorker::init() {

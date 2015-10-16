@@ -1,5 +1,5 @@
 CC=g++
-CFLAGS=-Wall -O2 -g
+CFLAGS=-std=c++11 -Wall -O2 -g
 PLIO_SRC_ROOT=../../..
 LIBS=
 INCLUDE=-I$(PLIO_SRC_ROOT)/lib/jerasure/include -I$(PLIO_SRC_ROOT)/lib/gf_complete/include

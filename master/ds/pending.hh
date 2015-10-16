@@ -1,14 +1,13 @@
 #ifndef __MASTER_DS_PENDING_HH__
 #define __MASTER_DS_PENDING_HH__
 
-#include <map>
-#include <set>
 #include <cstring>
 #include <pthread.h>
 #include <netinet/in.h>
 #include "stats.hh"
 #include "../../common/ds/metadata.hh"
 #include "../../common/ds/pending.hh"
+#include "../../common/lock/lock.hh"
 
 #define GIGA ( 1000 * 1000 * 1000 )
 
@@ -26,38 +25,38 @@ enum PendingType {
 
 class Pending {
 private:
-	bool get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIdentifier, Key> *&map );
-	bool get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIdentifier, KeyValueUpdate> *&map );
-	bool get( PendingType type, pthread_mutex_t *&lock, std::map<PendingIdentifier, RemappingRecord> *&map );
+	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, Key> *&map );
+	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *&map );
+	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, RemappingRecord> *&map );
 
 public:
 	struct {
-		std::map<PendingIdentifier, Key> get;
-		std::map<PendingIdentifier, Key> set;
-		std::map<PendingIdentifier, KeyValueUpdate> update;
-		std::map<PendingIdentifier, Key> del;
-		pthread_mutex_t getLock;
-		pthread_mutex_t setLock;
-		pthread_mutex_t updateLock;
-		pthread_mutex_t delLock;
+		std::unordered_multimap<PendingIdentifier, Key> get;
+		std::unordered_multimap<PendingIdentifier, Key> set;
+		std::unordered_multimap<PendingIdentifier, KeyValueUpdate> update;
+		std::unordered_multimap<PendingIdentifier, Key> del;
+		LOCK_T getLock;
+		LOCK_T setLock;
+		LOCK_T updateLock;
+		LOCK_T delLock;
 	} applications;
 	struct {
-		std::map<PendingIdentifier, Key> get;
-		std::map<PendingIdentifier, Key> set;
-		std::map<PendingIdentifier, RemappingRecord> remappingSet;
-		std::map<PendingIdentifier, KeyValueUpdate> update;
-		std::map<PendingIdentifier, Key> del;
-		pthread_mutex_t getLock;
-		pthread_mutex_t setLock;
-		pthread_mutex_t remappingSetLock;
-		pthread_mutex_t updateLock;
-		pthread_mutex_t delLock;
+		std::unordered_multimap<PendingIdentifier, Key> get;
+		std::unordered_multimap<PendingIdentifier, Key> set;
+		std::unordered_multimap<PendingIdentifier, RemappingRecord> remappingSet;
+		std::unordered_multimap<PendingIdentifier, KeyValueUpdate> update;
+		std::unordered_multimap<PendingIdentifier, Key> del;
+		LOCK_T getLock;
+		LOCK_T setLock;
+		LOCK_T remappingSetLock;
+		LOCK_T updateLock;
+		LOCK_T delLock;
 	} slaves;
 	struct {
-		std::map<PendingIdentifier, RequestStartTime> get;
-		std::map<PendingIdentifier, RequestStartTime> set;
-		pthread_mutex_t getLock;
-		pthread_mutex_t setLock;
+		std::unordered_multimap<PendingIdentifier, RequestStartTime> get;
+		std::unordered_multimap<PendingIdentifier, RequestStartTime> set;
+		LOCK_T getLock;
+		LOCK_T setLock;
 	} stats;
 
 	Pending();

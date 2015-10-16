@@ -118,15 +118,15 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 					( void * ) ( uint64_t ) event.message.set.fd
 				);
 
-				pthread_mutex_lock( &ApplicationWorker::pending->application.setLock );
+				LOCK( &ApplicationWorker::pending->application.setLock );
 				ApplicationWorker::pending->application.set.insert( key );
-				pthread_mutex_unlock( &ApplicationWorker::pending->application.setLock );
+				UNLOCK( &ApplicationWorker::pending->application.setLock );
 
 				key.ptr = ( void * ) event.socket;
 
-				pthread_mutex_lock( &ApplicationWorker::pending->masters.setLock );
+				LOCK( &ApplicationWorker::pending->masters.setLock );
 				ApplicationWorker::pending->masters.set.insert( key );
-				pthread_mutex_unlock( &ApplicationWorker::pending->masters.setLock );
+				UNLOCK( &ApplicationWorker::pending->masters.setLock );
 				break;
 			case MASTER_EVENT_TYPE_GET_REQUEST:
 				key.dup(
@@ -135,15 +135,15 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 					( void * ) ( uint64_t ) event.message.set.fd
 				);
 
-				pthread_mutex_lock( &ApplicationWorker::pending->application.getLock );
+				LOCK( &ApplicationWorker::pending->application.getLock );
 				ApplicationWorker::pending->application.get.insert( key );
-				pthread_mutex_unlock( &ApplicationWorker::pending->application.getLock );
+				UNLOCK( &ApplicationWorker::pending->application.getLock );
 
 				key.ptr = ( void * ) event.socket;
 
-				pthread_mutex_lock( &ApplicationWorker::pending->masters.getLock );
+				LOCK( &ApplicationWorker::pending->masters.getLock );
 				ApplicationWorker::pending->masters.get.insert( key );
-				pthread_mutex_unlock( &ApplicationWorker::pending->masters.getLock );
+				UNLOCK( &ApplicationWorker::pending->masters.getLock );
 				break;
 			case MASTER_EVENT_TYPE_UPDATE_REQUEST:
 				keyValueUpdate.dup(
@@ -154,28 +154,28 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 				keyValueUpdate.offset = event.message.update.offset;
 				keyValueUpdate.length = valueSize;
 
-				pthread_mutex_lock( &ApplicationWorker::pending->application.updateLock );
+				LOCK( &ApplicationWorker::pending->application.updateLock );
 				ApplicationWorker::pending->application.update.insert( keyValueUpdate );
-				pthread_mutex_unlock( &ApplicationWorker::pending->application.updateLock );
+				UNLOCK( &ApplicationWorker::pending->application.updateLock );
 
 				keyValueUpdate.ptr = ( void * ) event.socket;
 
-				pthread_mutex_lock( &ApplicationWorker::pending->masters.updateLock );
+				LOCK( &ApplicationWorker::pending->masters.updateLock );
 				ApplicationWorker::pending->masters.update.insert( keyValueUpdate );
-				pthread_mutex_unlock( &ApplicationWorker::pending->masters.updateLock );
+				UNLOCK( &ApplicationWorker::pending->masters.updateLock );
 				break;
 			case MASTER_EVENT_TYPE_DELETE_REQUEST:
 				key.dup( event.message.del.keySize, event.message.del.key, 0 );
 
-				pthread_mutex_lock( &ApplicationWorker::pending->application.delLock );
+				LOCK( &ApplicationWorker::pending->application.delLock );
 				ApplicationWorker::pending->application.del.insert( key );
-				pthread_mutex_unlock( &ApplicationWorker::pending->application.delLock );
+				UNLOCK( &ApplicationWorker::pending->application.delLock );
 
 				key.ptr = ( void * ) event.socket;
 
-				pthread_mutex_lock( &ApplicationWorker::pending->masters.delLock );
+				LOCK( &ApplicationWorker::pending->masters.delLock );
 				ApplicationWorker::pending->masters.del.insert( key );
-				pthread_mutex_unlock( &ApplicationWorker::pending->masters.delLock );
+				UNLOCK( &ApplicationWorker::pending->masters.delLock );
 				break;
 			default:
 				break;
@@ -226,18 +226,18 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 					key.data = keyHeader.key;
 					key.ptr = ( void * ) event.socket;
 
-					pthread_mutex_lock( &ApplicationWorker::pending->masters.setLock );
+					LOCK( &ApplicationWorker::pending->masters.setLock );
 					it = ApplicationWorker::pending->masters.set.find( key );
 					if ( it == ApplicationWorker::pending->masters.set.end() ) {
 						__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending master SET request that matches the response. This message will be discarded." );
 						goto quit_1;
 					}
 					ApplicationWorker::pending->masters.set.erase( it );
-					pthread_mutex_unlock( &ApplicationWorker::pending->masters.setLock );
+					UNLOCK( &ApplicationWorker::pending->masters.setLock );
 
 					key.ptr = 0;
 
-					pthread_mutex_lock( &ApplicationWorker::pending->application.setLock );
+					LOCK( &ApplicationWorker::pending->application.setLock );
 					it = ApplicationWorker::pending->application.set.lower_bound( key );
 					if ( it == ApplicationWorker::pending->application.set.end() || ! key.equal( *it ) ) {
 						__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending application SET request that matches the response. This message will be discarded." );
@@ -245,7 +245,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 					}
 					key = *it;
 					ApplicationWorker::pending->application.set.erase( it );
-					pthread_mutex_unlock( &ApplicationWorker::pending->application.setLock );
+					UNLOCK( &ApplicationWorker::pending->application.setLock );
 
 					// Report result
 					if ( success ) {
@@ -278,18 +278,18 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 						}
 					}
 
-					pthread_mutex_lock( &ApplicationWorker::pending->masters.getLock );
+					LOCK( &ApplicationWorker::pending->masters.getLock );
 					it = ApplicationWorker::pending->masters.get.find( key );
 					if ( it == ApplicationWorker::pending->masters.get.end() ) {
 						__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending master GET request that matches the response. This message will be discarded. (key = %.*s)", key.size, key.data );
 						goto quit_1;
 					}
 					ApplicationWorker::pending->masters.get.erase( it );
-					pthread_mutex_unlock( &ApplicationWorker::pending->masters.getLock );
+					UNLOCK( &ApplicationWorker::pending->masters.getLock );
 
 					key.ptr = 0;
 
-					pthread_mutex_lock( &ApplicationWorker::pending->application.getLock );
+					LOCK( &ApplicationWorker::pending->application.getLock );
 					it = ApplicationWorker::pending->application.get.lower_bound( key );
 					if ( it == ApplicationWorker::pending->application.get.end() || ! key.equal( *it ) ) {
 						__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending application GET request that matches the response. This message will be discarded." );
@@ -297,7 +297,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 					}
 					key = *it;
 					ApplicationWorker::pending->application.get.erase( it );
-					pthread_mutex_unlock( &ApplicationWorker::pending->application.getLock );
+					UNLOCK( &ApplicationWorker::pending->application.getLock );
 
 					fd = ( int )( uint64_t ) key.ptr;
 
@@ -323,18 +323,18 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 						keyValueUpdate.length = keyValueUpdateHeader.valueUpdateSize;
 						keyValueUpdate.ptr = ( void * ) event.socket;
 
-						pthread_mutex_lock( &ApplicationWorker::pending->masters.updateLock );
+						LOCK( &ApplicationWorker::pending->masters.updateLock );
 						keyValueUpdateIt = ApplicationWorker::pending->masters.update.find( keyValueUpdate );
 						if ( keyValueUpdateIt == ApplicationWorker::pending->masters.update.end() ) {
 							__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending master UPDATE request that matches the response. This message will be discarded. (key = %.*s)", keyValueUpdate.size, keyValueUpdate.data );
 							goto quit_1;
 						}
 						ApplicationWorker::pending->masters.update.erase( keyValueUpdateIt );
-						pthread_mutex_unlock( &ApplicationWorker::pending->masters.updateLock );
+						UNLOCK( &ApplicationWorker::pending->masters.updateLock );
 
 						keyValueUpdate.ptr = 0;
 
-						pthread_mutex_lock( &ApplicationWorker::pending->application.updateLock );
+						LOCK( &ApplicationWorker::pending->application.updateLock );
 						keyValueUpdateIt = ApplicationWorker::pending->application.update.lower_bound( keyValueUpdate );
 						if ( keyValueUpdateIt == ApplicationWorker::pending->application.update.end() || ! keyValueUpdate.equal( *keyValueUpdateIt ) ) {
 							__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending application UPDATE request that matches the response. This message will be discarded. (key = %.*s, size = %u)", keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size );
@@ -342,7 +342,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 						}
 						keyValueUpdate = *keyValueUpdateIt;
 						ApplicationWorker::pending->application.update.erase( keyValueUpdateIt );
-						pthread_mutex_unlock( &ApplicationWorker::pending->application.updateLock );
+						UNLOCK( &ApplicationWorker::pending->application.updateLock );
 
 						if ( success ) {
 							__ERROR__( "ApplicationWorker", "dispatch", "The key: %.*s is UPDATE successfully.", keyValueUpdate.size, keyValueUpdate.data );
@@ -360,18 +360,18 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 						key.data = keyHeader.key;
 						key.ptr = ( void * ) event.socket;
 
-						pthread_mutex_lock( &ApplicationWorker::pending->masters.delLock );
+						LOCK( &ApplicationWorker::pending->masters.delLock );
 						it = ApplicationWorker::pending->masters.del.find( key );
 						if ( it == ApplicationWorker::pending->masters.del.end() ) {
 							__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending master DELETE request that matches the response. This message will be discarded. (key = %.*s)", key.size, key.data );
 							goto quit_1;
 						}
 						ApplicationWorker::pending->masters.del.erase( it );
-						pthread_mutex_unlock( &ApplicationWorker::pending->masters.delLock );
+						UNLOCK( &ApplicationWorker::pending->masters.delLock );
 
 						key.ptr = 0;
 
-						pthread_mutex_lock( &ApplicationWorker::pending->application.delLock );
+						LOCK( &ApplicationWorker::pending->application.delLock );
 						it = ApplicationWorker::pending->application.del.lower_bound( key );
 						if ( it == ApplicationWorker::pending->application.del.end() || ! key.equal( *it ) ) {
 							__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending application DELETE request that matches the response. This message will be discarded." );
@@ -379,7 +379,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 						}
 						key = *it;
 						ApplicationWorker::pending->application.del.erase( it );
-						pthread_mutex_unlock( &ApplicationWorker::pending->application.delLock );
+						UNLOCK( &ApplicationWorker::pending->application.delLock );
 
 						if ( success ) {
 							__ERROR__( "ApplicationWorker", "dispatch", "The key: %.*s is DELETE successfully.", key.size, key.data );

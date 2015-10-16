@@ -4,7 +4,7 @@
 
 DataChunkBuffer::DataChunkBuffer( uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) : ChunkBuffer( listId, stripeId, chunkId ) {
 	this->count = count;
-	this->locks = new pthread_mutex_t[ count ];
+	this->locks = new LOCK_T[ count ];
 	this->chunks = new Chunk*[ count ];
 #ifndef REINSERTED_CHUNKS_IS_SET
 	this->reInsertedChunks = new Chunk*[ count ];
@@ -13,7 +13,7 @@ DataChunkBuffer::DataChunkBuffer( uint32_t count, uint32_t listId, uint32_t stri
 
 	ChunkBuffer::chunkPool->malloc( this->chunks, this->count );
 	for ( uint32_t i = 0; i < count; i++ ) {
-		pthread_mutex_init( this->locks + i, 0 );
+		LOCK_INIT( this->locks + i );
 
 		Metadata &metadata = this->chunks[ i ]->metadata;
 		metadata.listId = this->listId;
@@ -40,13 +40,13 @@ KeyMetadata DataChunkBuffer::set( SlaveWorker *worker, char *key, uint8_t keySiz
 	char *ptr;
 
 	// Choose one chunk buffer with minimum free space
-	pthread_mutex_lock( &this->lock );
+	LOCK( &this->lock );
 	if ( size <= this->reInsertedChunkMaxSpace ) {
 		uint32_t space, min = ChunkBuffer::capacity;
 		Chunk *c;
 		// Choose one from the re-inserted chunks
 #ifdef REINSERTED_CHUNKS_IS_SET
-		std::set<Chunk *>::iterator it;
+		std::unordered_set<Chunk *>::iterator it;
 		for ( it = this->reInsertedChunks.begin(); it != this->reInsertedChunks.end(); it++ ) {
 			c = *it;
 			space = ChunkBuffer::capacity - c->getSize();
@@ -112,7 +112,7 @@ KeyMetadata DataChunkBuffer::set( SlaveWorker *worker, char *key, uint8_t keySiz
 			index = this->flush( worker, false, true );
 
 		// Allocate memory in the selected chunk
-		pthread_mutex_lock( this->locks + index );
+		LOCK( this->locks + index );
 		chunk = this->chunks[ index ];
 	}
 
@@ -150,8 +150,8 @@ KeyMetadata DataChunkBuffer::set( SlaveWorker *worker, char *key, uint8_t keySiz
 	}
 
 	if ( index != -1 )
-		pthread_mutex_unlock( this->locks + index );
-	pthread_mutex_unlock( &this->lock );
+		UNLOCK( this->locks + index );
+	UNLOCK( &this->lock );
 
 	// Update key map
 	Key keyObj;
@@ -164,14 +164,14 @@ KeyMetadata DataChunkBuffer::set( SlaveWorker *worker, char *key, uint8_t keySiz
 size_t DataChunkBuffer::seal( SlaveWorker *worker ) {
 	uint32_t count = 0;
 	Chunk *c;
-	pthread_mutex_lock( &this->lock );
+	LOCK( &this->lock );
 	for ( uint32_t i = 0; i < this->count; i++ ) {
 		this->flushAt( worker, i, false );
 		count++;
 	}
 #ifdef REINSERTED_CHUNKS_IS_SET
 	for (
-		std::set<Chunk *>::iterator it = this->reInsertedChunks.begin();
+		std::unordered_set<Chunk *>::iterator it = this->reInsertedChunks.begin();
 		it != this->reInsertedChunks.end();
 		it++
 	) {
@@ -187,20 +187,20 @@ size_t DataChunkBuffer::seal( SlaveWorker *worker ) {
 		}
 	}
 #endif
-	pthread_mutex_unlock( &this->lock );
+	UNLOCK( &this->lock );
 	return count;
 }
 
 bool DataChunkBuffer::reInsert( SlaveWorker *worker, Chunk *chunk, uint32_t sizeToBeFreed, bool needsLock, bool needsUnlock ) {
 #ifdef REINSERTED_CHUNKS_IS_SET
-	std::set<Chunk *>::iterator it;
-	std::pair<std::set<Chunk *>::iterator, bool> ret;
+	std::unordered_set<Chunk *>::iterator it;
+	std::pair<std::unordered_set<Chunk *>::iterator, bool> ret;
 #else
 	bool ret = true;
 #endif
 	uint32_t space;
 
-	if ( needsLock ) pthread_mutex_lock( &this->lock );
+	if ( needsLock ) LOCK( &this->lock );
 
 	space = ChunkBuffer::capacity - chunk->getSize() + sizeToBeFreed;
 
@@ -234,7 +234,7 @@ bool DataChunkBuffer::reInsert( SlaveWorker *worker, Chunk *chunk, uint32_t size
 			this->reInsertedChunks[ index ] = chunk;
 		} else {
 			// Ignore the current chunk if it has least free space
-			if ( needsUnlock ) pthread_mutex_unlock( &this->lock );
+			if ( needsUnlock ) UNLOCK( &this->lock );
 			return true;
 		}
 	} else {
@@ -246,7 +246,7 @@ reInsertExit:
 	if ( space > reInsertedChunkMaxSpace )
 		reInsertedChunkMaxSpace = space;
 
-	if ( needsUnlock ) pthread_mutex_unlock( &this->lock );
+	if ( needsUnlock ) UNLOCK( &this->lock );
 
 #ifdef REINSERTED_CHUNKS_IS_SET
 	return ret.second;
@@ -257,7 +257,7 @@ reInsertExit:
 
 int DataChunkBuffer::lockChunk( Chunk *chunk, bool keepGlobalLock ) {
 	int index = -1;
-	pthread_mutex_lock( &this->lock );
+	LOCK( &this->lock );
 	for ( uint32_t i = 0; i < this->count; i++ ) {
 		if ( this->chunks[ i ] == chunk ) {
 			index = i;
@@ -266,27 +266,27 @@ int DataChunkBuffer::lockChunk( Chunk *chunk, bool keepGlobalLock ) {
 	}
 	if ( index != -1 ) {
 		// Found
-		pthread_mutex_lock( this->locks + index );
+		LOCK( this->locks + index );
 	} else {
 		if ( ! keepGlobalLock )
-			pthread_mutex_unlock( &this->lock );
+			UNLOCK( &this->lock );
 	}
 	return index;
 }
 
 void DataChunkBuffer::updateAndUnlockChunk( int index ) {
 	this->sizes[ index ] = this->chunks[ index ]->getSize();
-	pthread_mutex_unlock( this->locks + index );
-	pthread_mutex_unlock( &this->lock );
+	UNLOCK( this->locks + index );
+	UNLOCK( &this->lock );
 }
 
 void DataChunkBuffer::unlock() {
-	pthread_mutex_unlock( &this->lock );
+	UNLOCK( &this->lock );
 }
 
 uint32_t DataChunkBuffer::flush( SlaveWorker *worker, bool lock, bool lockAtIndex ) {
 	if ( lock )
-		pthread_mutex_lock( &this->lock );
+		LOCK( &this->lock );
 
 	uint32_t index = 0;
 	uint32_t max = this->sizes[ 0 ];
@@ -302,23 +302,23 @@ uint32_t DataChunkBuffer::flush( SlaveWorker *worker, bool lock, bool lockAtInde
 	}
 
 	if ( lock || lockAtIndex )
-		pthread_mutex_lock( this->locks + index );
+		LOCK( this->locks + index );
 
 	this->flushAt( worker, index, false );
 
 	if ( lock || lockAtIndex )
-		pthread_mutex_unlock( this->locks + index );
+		UNLOCK( this->locks + index );
 
 	if ( lock )
-		pthread_mutex_unlock( &this->lock );
+		UNLOCK( &this->lock );
 
 	return index;
 }
 
 Chunk *DataChunkBuffer::flushAt( SlaveWorker *worker, int index, bool lock ) {
 	if ( lock ) {
-		pthread_mutex_lock( &this->lock );
-		pthread_mutex_lock( this->locks + index );
+		LOCK( &this->lock );
+		LOCK( this->locks + index );
 	}
 
 	Chunk *chunk = this->chunks[ index ];
@@ -338,10 +338,15 @@ Chunk *DataChunkBuffer::flushAt( SlaveWorker *worker, int index, bool lock ) {
 
 	// Notify the parity slaves to seal the chunk
 	worker->issueSealChunkRequest( chunk );
+	ChunkBuffer::map->seal(
+		chunk->metadata.listId,
+		chunk->metadata.stripeId,
+		chunk->metadata.chunkId
+	);
 
 	if ( lock ) {
-		pthread_mutex_unlock( this->locks + index );
-		pthread_mutex_unlock( &this->lock );
+		UNLOCK( this->locks + index );
+		UNLOCK( &this->lock );
 	}
 
 	return chunk;

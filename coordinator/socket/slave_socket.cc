@@ -1,4 +1,6 @@
 #include "slave_socket.hh"
+#include "../main/coordinator.hh"
+#include "../event/slave_event.hh"
 
 ArrayMap<int, SlaveSocket> *SlaveSocket::slaves;
 
@@ -14,6 +16,10 @@ bool SlaveSocket::start() {
 void SlaveSocket::stop() {
 	SlaveSocket::slaves->remove( this->sockfd );
 	Socket::stop();
+
+	SlaveEvent event;
+	event.disconnect( this );
+	Coordinator::getInstance()->eventQueue.insert( event );
 	// TODO: Fix memory leakage!
 	// delete this;
 }

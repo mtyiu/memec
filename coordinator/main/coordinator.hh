@@ -15,6 +15,7 @@
 #include "../../common/ds/array_map.hh"
 #include "../../common/ds/id_generator.hh"
 #include "../../common/ds/remapping_record_map.hh"
+#include "../../common/lock/lock.hh"
 #include "../../common/socket/epoll.hh"
 #include "../../common/signal/signal.hh"
 #include "../../common/util/option.hh"
@@ -66,11 +67,11 @@ public:
 		// ( slaveAddr, ( mastserAddr, Latency ) )
 		ArrayMap< struct sockaddr_in, ArrayMap< struct sockaddr_in, Latency > > latestGet;
 		ArrayMap< struct sockaddr_in, ArrayMap< struct sockaddr_in, Latency > > latestSet;
-		pthread_mutex_t lock;
+		LOCK_T lock;
 	} slaveLoading;
 	struct {
 		std::set< struct sockaddr_in > slaveSet;
-		pthread_mutex_t lock;
+		LOCK_T lock;
 	} overloadedSlaves;
 	Timer statsTimer;
 
@@ -91,6 +92,7 @@ public:
 	void time();
 	void seal();
 	void flush();
+	void metadata();
 	double getElapsedTime();
 	void interactive();
 };

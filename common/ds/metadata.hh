@@ -1,6 +1,7 @@
 #ifndef __COMMON_DS_METADATA_HH__
 #define __COMMON_DS_METADATA_HH__
 
+#include <unordered_map>
 #include <stdint.h>
 
 class Metadata {
@@ -40,7 +41,36 @@ public:
 
 		return this->chunkId < m.chunkId;
 	}
+
+	bool operator==( const Metadata &m ) const {
+		return (
+			this->listId == m.listId &&
+			this->stripeId == m.stripeId &&
+			this->chunkId == m.chunkId
+		);
+	}
 };
+
+namespace std {
+	template<> struct hash<Metadata> {
+		size_t operator()( const Metadata &metadata ) const {
+			size_t ret = 0;
+			char *ptr = ( char * ) &ret, *tmp;
+			tmp = ( char * ) &metadata.stripeId;
+			ptr[ 0 ] = tmp[ 0 ];
+			ptr[ 1 ] = tmp[ 1 ];
+			ptr[ 2 ] = tmp[ 2 ];
+			ptr[ 3 ] = tmp[ 3 ];
+			tmp = ( char * ) &metadata.listId;
+			ptr[ 4 ] = tmp[ 0 ];
+			ptr[ 5 ] = tmp[ 1 ];
+			tmp = ( char * ) &metadata.chunkId;
+			ptr[ 6 ] = tmp[ 0 ];
+			ptr[ 7 ] = tmp[ 1 ];
+			return ret;
+		}
+	};
+}
 
 class KeyMetadata : public Metadata {
 public:

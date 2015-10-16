@@ -25,3 +25,8 @@ void SlaveEvent::reqFlushChunks( SlaveSocket *socket ) {
 	this->type = SLAVE_EVENT_TYPE_REQUEST_FLUSH_CHUNKS;
 	this->socket = socket;
 }
+
+void SlaveEvent::disconnect( SlaveSocket *socket ) {
+	this->type = SLAVE_EVENT_TYPE_DISCONNECT;
+	this->socket = socket;
+}
