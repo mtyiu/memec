@@ -26,7 +26,6 @@ char *SlaveProtocol::sendHeartbeat(
 	size_t &size, uint32_t id,
 	LOCK_T *sealedLock, std::unordered_set<Metadata> &sealed, uint32_t &sealedCount,
 	LOCK_T *opsLock, std::unordered_map<Key, OpMetadata> &ops, uint32_t &opsCount,
-	LOCK_T *remapLock, std::unordered_map<Key, RemappingRecord> &remapRecords, uint32_t &remapCount,
 	bool &isCompleted
 ) {
 	size = this->generateHeartbeatMessage(
@@ -36,7 +35,6 @@ char *SlaveProtocol::sendHeartbeat(
 		id,
 		sealedLock, sealed, sealedCount,
 		opsLock, ops, opsCount,
-		remapLock, remapRecords, remapCount,
 		isCompleted
 	);
 	return this->buffer.send;
@@ -49,7 +47,7 @@ char *SlaveProtocol::sendRemappingRecords( size_t &size, uint32_t id, std::unord
 		PROTO_OPCODE_SYNC,
 		id,
 		remapRecord,
-		lock, 
+		lock,
 		remapCount
 	);
 	return this->buffer.send;
@@ -156,11 +154,11 @@ char *SlaveProtocol::resDelete( size_t &size, uint32_t id, bool success, uint8_t
 }
 
 char* SlaveProtocol::resRedirect( size_t &size, uint32_t id, uint8_t opcode, uint8_t keySize, char* key, uint32_t remappedListId, uint32_t remappedChunkId ) {
-	size = this->generateRedirectHeader( 
+	size = this->generateRedirectHeader(
 		PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_MASTER,
-		opcode == PROTO_OPCODE_GET ? PROTO_OPCODE_REDIRECT_GET : 
-			opcode == PROTO_OPCODE_UPDATE ? PROTO_OPCODE_REDIRECT_UPDATE : 
+		opcode == PROTO_OPCODE_GET ? PROTO_OPCODE_REDIRECT_GET :
+			opcode == PROTO_OPCODE_UPDATE ? PROTO_OPCODE_REDIRECT_UPDATE :
 			PROTO_OPCODE_REDIRECT_DELETE,
 		id,
 		keySize,

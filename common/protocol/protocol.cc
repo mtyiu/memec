@@ -283,24 +283,20 @@ size_t Protocol::generateHeartbeatMessage(
 	uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
 	LOCK_T *sealedLock, std::unordered_set<Metadata> &sealed, uint32_t &sealedCount,
 	LOCK_T *opsLock, std::unordered_map<Key, OpMetadata> &ops, uint32_t &opsCount,
-	LOCK_T *remapLock, std::unordered_map<Key, RemappingRecord> &remapRecords, uint32_t &remapCount,
 	bool &isCompleted
 ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = PROTO_HEADER_SIZE;
-	uint32_t *sealedPtr, *opsPtr, *remapRecordsPtr;
+	uint32_t *sealedPtr, *opsPtr;
 	std::unordered_set<Metadata>::iterator sealedIt;
 	std::unordered_map<Key, OpMetadata>::iterator opsIt;
-	std::unordered_map<Key, RemappingRecord>::iterator remapIt;
 
 	sealedCount = 0;
 	opsCount = 0;
-	remapCount = 0;
 	isCompleted = true;
 
 	sealedPtr       = ( uint32_t * )( buf     );
 	opsPtr          = ( uint32_t * )( buf + 4 );
-	remapRecordsPtr = ( uint32_t * )( buf + 8 );
 
 	buf += PROTO_HEARTBEAT_SIZE;
 	bytes += PROTO_HEARTBEAT_SIZE;
@@ -350,33 +346,8 @@ size_t Protocol::generateHeartbeatMessage(
 	ops.erase( ops.begin(), opsIt );
 	UNLOCK( opsLock );
 
-	/***** Remapping records *****/
-	LOCK( remapLock );
-	for ( remapIt = remapRecords.begin(); remapIt != remapRecords.end(); remapIt++ ) {
-		const Key &key = remapIt->first;
-		if ( this->buffer.size >= bytes + PROTO_REMAPPING_RECORD_SIZE + key.size ) {
-			buf[ 0 ] = key.size;
-			*( ( uint32_t * )( buf + 1 ) ) = htonl( remapIt->second.listId );
-			*( ( uint32_t * )( buf + 5 ) ) = htonl( remapIt->second.chunkId );
-
-			buf += PROTO_REMAPPING_RECORD_SIZE;
-			memcpy( buf, key.data, key.size );
-			buf += key.size;
-			bytes += PROTO_REMAPPING_RECORD_SIZE + key.size;
-			remapIt->second.sent = true;
-			remapCount++;
-		} else {
-			// isCompleted = false;
-			break;
-		}
-	}
-	UNLOCK( remapLock );
-
 	*sealedPtr = htonl( sealedCount );
 	*opsPtr = htonl( opsCount );
-	*remapRecordsPtr = htonl( remapCount );
-
-	printf( "%u %u %u\n", sealedCount, opsCount, remapCount );
 
 	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, id );
 
@@ -882,14 +853,13 @@ bool Protocol::parseChunkDataHeader( size_t offset, uint32_t &listId, uint32_t &
 }
 
 
-bool Protocol::parseHeartbeatHeader( size_t offset, uint32_t &sealed, uint32_t &keys, uint32_t &remap, char *buf, size_t size ) {
+bool Protocol::parseHeartbeatHeader( size_t offset, uint32_t &sealed, uint32_t &keys, char *buf, size_t size ) {
 	if ( size < PROTO_HEARTBEAT_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
 	sealed = ntohl( *( ( uint32_t * )( ptr     ) ) );
 	keys   = ntohl( *( ( uint32_t * )( ptr + 4 ) ) );
-	remap  = ntohl( *( ( uint32_t * )( ptr + 8 ) ) );
 
 	return true;
 }
@@ -921,23 +891,6 @@ bool Protocol::parseKeyOpMetadataHeader( size_t offset, uint8_t &keySize, uint8_
 		return false;
 
 	key = ptr + PROTO_KEY_OP_METADATA_SIZE;
-
-	return true;
-}
-
-bool Protocol::parseRemappingRecordHeader( size_t offset, uint8_t &keySize, uint32_t &listId, uint32_t &chunkId, char *&key, char *buf, size_t size ) {
-	if ( size - offset < PROTO_REMAPPING_RECORD_SIZE )
-		return false;
-
-	char *ptr = buf + offset;
-	keySize = ( uint8_t ) ptr[ 0 ];
-	listId  = ntohl( *( ( uint32_t * )( ptr + 1 ) ) );
-	chunkId = ntohl( *( ( uint32_t * )( ptr + 5 ) ) );
-
-	if ( size < PROTO_REMAPPING_RECORD_SIZE + ( size_t ) keySize )
-		return false;
-
-	key = ptr + PROTO_REMAPPING_RECORD_SIZE;
 
 	return true;
 }
@@ -993,14 +946,14 @@ bool Protocol::parseLoadStatsHeader( size_t offset, uint32_t &slaveGetCount, uin
 }
 
 bool Protocol::parseRedirectHeader( size_t offset, uint8_t &keySize, char *&key, uint32_t &remappedListId, uint32_t &remappedChunkId, char *buf, size_t size ) {
-	if ( ( ! this->parseKeyHeader( offset, keySize, key, buf, size ) ) || ( size < ( size_t ) PROTO_KEY_SIZE + keySize + PROTO_REDIRECT_SIZE ) ) 
+	if ( ( ! this->parseKeyHeader( offset, keySize, key, buf, size ) ) || ( size < ( size_t ) PROTO_KEY_SIZE + keySize + PROTO_REDIRECT_SIZE ) )
 		return false;
 
 	offset += PROTO_KEY_SIZE + keySize;
 	char *ptr = buf + offset;
 	remappedListId = ntohl( *( ( uint32_t * )( ptr ) ) );
 	remappedChunkId = ntohl( *( ( uint32_t * )( ptr + sizeof( uint32_t ) ) ) );
-	
+
 	return true;
 }
 
@@ -1313,7 +1266,6 @@ bool Protocol::parseHeartbeatHeader( struct HeartbeatHeader &header, char *buf, 
 		offset,
 		header.sealed,
 		header.keys,
-		header.remap,
 		buf, size
 	);
 }
@@ -1350,23 +1302,6 @@ bool Protocol::parseKeyOpMetadataHeader( struct KeyOpMetadataHeader &header, siz
 		buf, size
 	);
 	bytes = PROTO_KEY_OP_METADATA_SIZE + header.keySize;
-	return ret;
-}
-
-bool Protocol::parseRemappingRecordHeader( struct RemappingRecordHeader1 &header, size_t &bytes, char *buf, size_t size, size_t offset ) {
-	if ( ! buf || ! size ) {
-		buf = this->buffer.recv;
-		size = this->buffer.size;
-	}
-	bool ret = this->parseRemappingRecordHeader(
-		offset,
-		header.keySize,
-		header.listId,
-		header.chunkId,
-		header.key,
-		buf, size
-	);
-	bytes = PROTO_REMAPPING_RECORD_SIZE + header.keySize;
 	return ret;
 }
 

@@ -81,7 +81,7 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 			break;
 		case COORDINATOR_EVENT_TYPE_SYNC:
 		{
-			uint32_t sealedCount, opsCount, remapCount;
+			uint32_t sealedCount, opsCount;
 			bool isCompleted;
 
 			buffer.data = this->protocol.sendHeartbeat(
@@ -89,7 +89,6 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 				requestId,
 				&SlaveWorker::map->sealedLock, SlaveWorker::map->sealed, sealedCount,
 				&SlaveWorker::map->opsLock, SlaveWorker::map->ops, opsCount,
-				&SlaveWorker::map->remapLock, SlaveWorker::map->remap, remapCount,
 				isCompleted
 			);
 
@@ -130,7 +129,7 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 			}
 			UNLOCK ( &SlaveWorker::map->remapLock );
 			isSend = true;
-		
+
 			if ( SlaveWorker::map->remap.size() )
 				SlaveWorker::eventQueue->insert( event );
 		}

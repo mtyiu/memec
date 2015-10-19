@@ -280,7 +280,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 				offset = PROTO_REMAPPING_RECORD_SIZE;
 				RemappingRecordMap *map = CoordinatorWorker::remappingRecords;
 				for ( count = 0; offset < ( size_t ) buffer.size && count < remappingRecordHeader.remap; offset += bytes ) {
-					if ( ! this->protocol.parseSlaveSyncRemapHeader( slaveSyncRemapHeader, bytes, buffer.data, buffer.size - offset, offset ) ) 
+					if ( ! this->protocol.parseSlaveSyncRemapHeader( slaveSyncRemapHeader, bytes, buffer.data, buffer.size - offset, offset ) )
 						break;
 					count++;
 
@@ -298,7 +298,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 				}
 				//map->print();
 				//fprintf ( stderr, "Remapping Records no.=%lu (%u) upto=%lu size=%lu\n", count, remappingRecordHeader.remap, offset, buffer.size );
-				
+
 				// forward the copies of message to masters
 				MasterEvent masterEvent;
 				masterEvent.type = MASTER_EVENT_TYPE_FORWARD_REMAPPING_RECORDS;
@@ -383,7 +383,6 @@ bool CoordinatorWorker::processHeartbeat( SlaveEvent event, char *buf, size_t si
 	union {
 		struct MetadataHeader metadata;
 		struct KeyOpMetadataHeader op;
-		struct RemappingRecordHeader1 remap;
 	} header;
 
 	offset = 0;
@@ -428,23 +427,6 @@ bool CoordinatorWorker::processHeartbeat( SlaveEvent event, char *buf, size_t si
 		offset += processed;
 	}
 	UNLOCK( &event.socket->map.keysLock );
-
-	LOCK( &event.socket->map.remapLock );
-	for ( count = 0; count < heartbeat.remap; count++ ) {
-		if ( this->protocol.parseRemappingRecordHeader( header.remap, processed, buf, size, offset ) ) {
-			event.socket->map.insertRemappingRecord(
-				header.remap.key,
-				header.remap.keySize,
-				header.remap.listId,
-				header.remap.chunkId,
-				false, false
-			);
-		} else {
-			failed++;
-		}
-		offset += processed;
-	}
-	UNLOCK( &event.socket->map.remapLock );
 
 	if ( failed ) {
 		__ERROR__( "CoordinatorWorker", "processHeartbeat", "Number of failed objects = %lu", failed );

@@ -22,17 +22,10 @@ public:
 	 */
 	std::unordered_map<Key, Metadata> keys;
 	LOCK_T keysLock;
-	/**
-	 * Store the pending-to-send remapping records
-	 * Key |-> (list ID, chunk ID)
-	 */
-	std::unordered_map<Key, RemappingRecord> remap;
-	LOCK_T remapLock;
 
 	Map() {
 		LOCK_INIT( &this->chunksLock );
 		LOCK_INIT( &this->keysLock );
-		LOCK_INIT( &this->remapLock );
 	}
 
 	bool seal( uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool needsLock = true, bool needsUnlock = true ) {
@@ -73,26 +66,6 @@ public:
 		if ( needsUnlock ) UNLOCK( &this->keysLock );
 
 		return ret;
-	}
-
-	bool insertRemappingRecord( char *keyStr, uint8_t keySize, uint32_t listId, uint32_t chunkId, bool needsLock = true, bool needsUnlock = true ) {
-		Key key;
-		key.dup( keySize, keyStr );
-
-		RemappingRecord remappingRecord( listId, chunkId );
-
-		std::pair<Key, RemappingRecord> p( key, remappingRecord );
-		std::pair<std::unordered_map<Key, RemappingRecord>::iterator, bool> ret;
-
-		if ( needsLock ) LOCK( &this->remapLock );
-		ret = this->remap.insert( p );
-		if ( ! ret.second ) {
-			UNLOCK( &this->remapLock );
-			return false;
-		}
-		if ( needsUnlock ) UNLOCK( &this->remapLock );
-
-		return true;
 	}
 
 	void dump( FILE *f = stdout ) {
