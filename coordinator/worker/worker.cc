@@ -7,7 +7,8 @@
 
 IDGenerator *CoordinatorWorker::idGenerator;
 CoordinatorEventQueue *CoordinatorWorker::eventQueue;
-RemappingRecordMap *CoordinatorWorker::remappingRecords = &Coordinator::getInstance()->remappingRecords;
+RemappingRecordMap *CoordinatorWorker::remappingRecords;
+StripeList<ServerAddr> *CoordinatorWorker::stripeList;
 
 void CoordinatorWorker::dispatch( MixedEvent event ) {
 	switch( event.type ) {
@@ -236,7 +237,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 		}
 		UNLOCK( &slaves.lock );
 	} else if ( event.type == SLAVE_EVENT_TYPE_DISCONNECT ) {
-		printf( "Slave disconnected!\n" );
+		this->triggerRecovery( event.socket );
 	} else if ( isSend ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
 		if ( ret != ( ssize_t ) buffer.size )
@@ -437,11 +438,69 @@ bool CoordinatorWorker::processHeartbeat( SlaveEvent event, char *buf, size_t si
 	return failed == 0;
 }
 
+bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
+	ServerAddr addr( 0, socket->listenAddr.addr, socket->listenAddr.port, 0 );
+	int index = CoordinatorWorker::stripeList->search( &addr, ServerAddr::match );
+	if ( index == -1 ) {
+		__ERROR__( "CoordinatorWorker", "triggerRecovery", "The disconnected server does not exist in the consistent hash ring.\n" );
+		return false;
+	}
+
+	std::unordered_set<Metadata> unsealedChunks;
+	std::unordered_set<Metadata>::iterator chunksIt;
+	std::unordered_map<Key, Metadata>::iterator keysIt;
+	uint32_t count = 0;
+	std::vector<StripeListIndex> lists = CoordinatorWorker::stripeList->list( ( uint32_t ) index );
+
+	LOCK( &Map::stripesLock );
+	printf( "Slave disconnected! index = %d. Appeared in:\n", index );
+	for ( uint32_t i = 0, size = lists.size(); i < size; i++ ) {
+		printf(
+			"(%u, %u, %s%u)\n",
+			lists[ i ].listId,
+			Map::stripes[ lists[ i ].listId ],
+			lists[ i ].isParity ? "p" : "",
+			lists[ i ].chunkId
+		);
+	}
+	UNLOCK( &Map::stripesLock );
+
+	LOCK( &socket->map.chunksLock );
+	LOCK( &socket->map.keysLock );
+
+	for ( chunksIt = socket->map.chunks.begin(); chunksIt != socket->map.chunks.end(); chunksIt++ ) {
+		const Metadata &metadata = *chunksIt;
+		// printf( "(%u, %u, %u)\n", metadata.listId, metadata.stripeId, metadata.chunkId );
+	}
+	count += socket->map.chunks.size();
+
+	for ( keysIt = socket->map.keys.begin(); keysIt != socket->map.keys.end(); keysIt++ ) {
+		const Metadata &metadata = keysIt->second;
+		if (
+			socket->map.chunks.find( metadata ) == socket->map.chunks.end() &&
+			unsealedChunks.find( metadata ) == unsealedChunks.end()
+		) {
+			unsealedChunks.insert( metadata );
+			// printf( "(%u, %u, %u)\n", metadata.listId, metadata.stripeId, metadata.chunkId );
+		}
+	}
+	count += unsealedChunks.size();
+
+	UNLOCK( &socket->map.keysLock );
+	UNLOCK( &socket->map.chunksLock );
+
+	printf( "Number of chunks that need to be recovered: %u\n", count );
+
+	return true;
+}
+
 bool CoordinatorWorker::init() {
 	Coordinator *coordinator = Coordinator::getInstance();
 
 	CoordinatorWorker::idGenerator = &coordinator->idGenerator;
 	CoordinatorWorker::eventQueue = &coordinator->eventQueue;
+	CoordinatorWorker::remappingRecords = &coordinator->remappingRecords;
+	CoordinatorWorker::stripeList = coordinator->stripeList;
 
 	return true;
 }

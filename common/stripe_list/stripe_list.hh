@@ -199,6 +199,14 @@ public:
 		return ret;
 	}
 
+	int32_t search( T *target, bool ( *match )( const T *t1, const T *t2 ) ) {
+		for ( uint32_t i = 0; i < this->numSlaves; i++ ) {
+			if ( match( target, this->slaves->at( i ) ) )
+				return i;
+		}
+		return -1;
+	}
+
 	uint32_t getNumList() {
 		return this->numLists;
 	}

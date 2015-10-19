@@ -1,6 +1,7 @@
 #include <cstring>
 #include <ctype.h>
 #include "coordinator.hh"
+#include "../ds/map.hh"
 #include "../../common/ds/sockaddr_in.hh"
 
 #define GIGA 				( 1000 * 1000 * 1000 )
@@ -15,6 +16,8 @@ Coordinator::Coordinator() {
 void Coordinator::free() {
 	this->idGenerator.free();
 	this->eventQueue.free();
+	delete this->stripeList;
+	Map::free();
 }
 
 bool Coordinator::switchPhase() {
@@ -195,6 +198,18 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 	SlaveSocket::setArrayMap( &this->sockets.slaves );
 	this->sockets.masters.reserve( this->config.global.slaves.size() );
 	this->sockets.slaves.reserve( this->config.global.slaves.size() );
+	Map::init( this->config.global.stripeList.count );
+	/* Stripe list */
+	this->addr.reserve( this->config.global.slaves.size() );
+	for ( uint32_t i = 0, size = this->config.global.slaves.size(); i < size; i++ ) {
+		this->addr.push_back( &this->config.global.slaves[ i ] );
+	}
+	this->stripeList = new StripeList<ServerAddr>(
+		this->config.global.coding.params.getChunkCount(),
+		this->config.global.coding.params.getDataChunkCount(),
+		this->config.global.stripeList.count,
+		this->addr
+	);
 	/* Workers, ID generator and event queues */
 	if ( this->config.coordinator.workers.type == WORKER_TYPE_MIXED ) {
 		this->idGenerator.init( this->config.coordinator.workers.number.mixed );
@@ -259,7 +274,6 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 		msec = 0;
 	}
 	statsTimer.setInterval( sec, msec );
-
 
 	// Set signal handlers //
 	Signal::setHandler( Coordinator::signalHandler );
@@ -357,6 +371,7 @@ double Coordinator::getElapsedTime() {
 void Coordinator::info( FILE *f ) {
 	this->config.global.print( f );
 	this->config.coordinator.print( f );
+	this->stripeList->print( f );
 }
 
 void Coordinator::debug( FILE *f ) {

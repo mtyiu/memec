@@ -9,6 +9,7 @@
 #include "../../common/worker/worker.hh"
 #include "../../common/config/global_config.hh"
 #include "../../common/ds/id_generator.hh"
+#include "../../common/stripe_list/stripe_list.hh"
 
 class CoordinatorWorker : public Worker {
 private:
@@ -17,6 +18,7 @@ private:
 	CoordinatorProtocol protocol;
 	static IDGenerator *idGenerator;
 	static CoordinatorEventQueue *eventQueue;
+	static StripeList<ServerAddr> *stripeList;
 
 	void dispatch( MixedEvent event );
 	void dispatch( CoordinatorEvent event );
@@ -28,6 +30,7 @@ private:
 public:
 	static RemappingRecordMap *remappingRecords;
 	bool processHeartbeat( SlaveEvent event, char *buf, size_t size );
+	bool triggerRecovery( SlaveSocket *socket );
 
 	static bool init();
 	bool init( GlobalConfig &config, WorkerRole role, uint32_t workerId );

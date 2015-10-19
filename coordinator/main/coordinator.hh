@@ -16,8 +16,9 @@
 #include "../../common/ds/id_generator.hh"
 #include "../../common/ds/remapping_record_map.hh"
 #include "../../common/lock/lock.hh"
-#include "../../common/socket/epoll.hh"
 #include "../../common/signal/signal.hh"
+#include "../../common/socket/epoll.hh"
+#include "../../common/stripe_list/stripe_list.hh"
 #include "../../common/util/option.hh"
 #include "../../common/util/time.hh"
 
@@ -59,6 +60,9 @@ public:
 	} sockets;
 	IDGenerator idGenerator;
 	CoordinatorEventQueue eventQueue;
+	/* Stripe list */
+	std::vector<ServerAddr *> addr;
+	StripeList<ServerAddr> *stripeList;
 	/* Remapping */
 	CoordinatorRemapMsgHandler remapMsgHandler;
 	RemappingRecordMap remappingRecords;

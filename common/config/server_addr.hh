@@ -26,6 +26,7 @@ public:
 	size_t deserialize( const char *message );
 	void print( FILE *f = stdout );
 	bool operator==( const ServerAddr &addr ) const;
+	static bool match( const ServerAddr *a1, const ServerAddr *a2 );
 };
 
 #endif

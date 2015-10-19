@@ -13,7 +13,7 @@ ServerAddr::ServerAddr() {
 
 ServerAddr::ServerAddr( const char *name, uint32_t addr, uint16_t port, int type ) {
 	this->initialized = true;
-	if ( name != NULL ) 
+	if ( name != NULL )
 		strncpy( this->name, name, SERVER_NAME_MAX_LEN );
 	else
 		this->name[ 0 ] = 0;
@@ -112,4 +112,11 @@ bool ServerAddr::operator==( const ServerAddr &addr ) const {
 		this->port == addr.port &&
 		this->type == addr.type
 	);
+}
+
+bool ServerAddr::match( const ServerAddr *a1, const ServerAddr *a2 ) {
+   return (
+	   a1->addr == a2->addr &&
+	   a1->port == a2->port
+   );
 }

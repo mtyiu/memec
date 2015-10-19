@@ -6,6 +6,7 @@ BIN=$(PLIO_SRC_ROOT)/bin/coordinator
 
 OBJS= \
 	config/coordinator_config.o \
+	ds/map.o \
 	event/coordinator_event.o \
 	event/master_event.o \
 	event/slave_event.o \
@@ -22,6 +23,7 @@ EXTERNAL_LIB= \
 	$(PLIO_SRC_ROOT)/common/config/config.o \
 	$(PLIO_SRC_ROOT)/common/config/global_config.o \
 	$(PLIO_SRC_ROOT)/common/config/server_addr.o \
+	$(PLIO_SRC_ROOT)/common/ds/bitmask_array.o \
 	$(PLIO_SRC_ROOT)/common/ds/latency.o \
 	$(PLIO_SRC_ROOT)/common/ds/load.o \
 	$(PLIO_SRC_ROOT)/common/ds/sockaddr_in.o \
