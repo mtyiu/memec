@@ -808,7 +808,7 @@ bool SlaveWorker::isRedirectedRequest( char *key, uint8_t size, bool *isParity, 
 }
 
 bool SlaveWorker::isRedirectedRequest( uint32_t listId, uint32_t updatingChunkId ) {
-	SlaveWorker::stripeList->getValues( listId, this->paritySlaveSockets );
+	SlaveWorker::stripeList->get( listId, this->paritySlaveSockets );
 	for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ )
 		if ( this->paritySlaveSockets[ i ]->self )
 			return updatingChunkId != i + SlaveWorker::dataChunkCount;
@@ -871,7 +871,7 @@ SlavePeerSocket *SlaveWorker::getSlaves( char *data, uint8_t size, uint32_t &lis
 }
 
 bool SlaveWorker::getSlaves( uint32_t listId, bool allowDegraded, bool *isDegraded ) {
-	SlaveWorker::stripeList->getValues( listId, this->paritySlaveSockets );
+	SlaveWorker::stripeList->get( listId, this->paritySlaveSockets );
 
 	if ( isDegraded ) *isDegraded = false;
 	for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
@@ -2291,7 +2291,7 @@ bool SlaveWorker::handleSetChunkResponse( SlavePeerEvent event, bool success, ch
 }
 
 bool SlaveWorker::performDegradedRead( uint32_t listId, uint32_t stripeId, uint32_t lostChunkId, uint8_t opcode, uint32_t parentId, Key *key, KeyValueUpdate *keyValueUpdate ) {
-	SlaveWorker::stripeList->getValues( listId, this->paritySlaveSockets, this->dataSlaveSockets );
+	SlaveWorker::stripeList->get( listId, this->paritySlaveSockets, this->dataSlaveSockets );
 
 	// Check whether the number of surviving nodes >= k
 	uint32_t selected = 0;

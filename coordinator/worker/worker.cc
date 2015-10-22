@@ -456,7 +456,7 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 	std::vector<StripeListIndex> lists = CoordinatorWorker::stripeList->list( ( uint32_t ) index );
 
 	// List ID |-> k SlaveSockets
-	std::unordered_map<uint32_t, SlaveSocket **> sockets;
+	std::unordered_map<uint32_t, ServerAddr **> addrs;
 
 	LOCK( &Map::stripesLock );
 	printf( "Slave disconnected! index = %d. Appeared in:\n", index );
@@ -470,11 +470,11 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 		);
 
 		if ( sockets.find( lists[ i ].listId ) == sockets.end() ) {
-			SlaveSocket **s = new SlaveSocket*[ CoordinatorWorker::chunkCount ];
-			CoordinatorWorker::stripeList->getValues(
-				lists[ i ].listId, s, s
+			ServerAddr **addr = new ServerAddr*[ CoordinatorWorker::chunkCount ];
+			CoordinatorWorker::stripeList->get(
+				lists[ i ].listId, addr + CoordinatorWorker::dataChunkCount, addr
 			);
-			sockets[ lists[ i ].listId ] = s;
+			sockets[ lists[ i ].listId ] = addr;
 		}
 	}
 	UNLOCK( &Map::stripesLock );

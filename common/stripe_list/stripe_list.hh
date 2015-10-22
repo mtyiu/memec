@@ -151,7 +151,7 @@ public:
 		return ret[ index ];
 	}
 
-	T **getValues( uint32_t listIndex, T **parity, T **data = 0 ) {
+	T **get( uint32_t listIndex, T **parity, T **data = 0 ) {
 		T **ret = this->lists[ listIndex ];
 		for ( uint32_t i = 0; i < this->n - this->k; i++ ) {
 			parity[ i ] = ret[ this->k + i ];

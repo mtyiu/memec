@@ -468,7 +468,7 @@ SlaveSocket *MasterWorker::getSlave( char *data, uint8_t size, uint32_t &listId,
 	bool found = MasterWorker::remappingRecords->find( key, &record );
 	found = ( found && ! Master::getInstance()->config.master.remap.forceNoCacheRecords );
 	if ( isRedirected ) {
-		this->paritySlaveSockets = MasterWorker::stripeList->getValues(
+		this->paritySlaveSockets = MasterWorker::stripeList->get(
 			listId,
 			this->paritySlaveSockets,
 			this->dataSlaveSockets
@@ -477,7 +477,7 @@ SlaveSocket *MasterWorker::getSlave( char *data, uint8_t size, uint32_t &listId,
 		//fprintf( stderr, "Redirect request from list=%u chunk=%u to list=%u chunk=%u\n", listId, chunkId, record.listId, record.chunkId);
 		listId = record.listId;
 		chunkId = record.chunkId;
-		this->paritySlaveSockets = MasterWorker::stripeList->getValues(
+		this->paritySlaveSockets = MasterWorker::stripeList->get(
 			listId, 
 			this->paritySlaveSockets, 
 			this->dataSlaveSockets
@@ -576,7 +576,7 @@ SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId
 
 SlaveSocket *MasterWorker::getSlaves( uint32_t listId, uint32_t chunkId, bool allowDegraded, bool *isDegraded ) {
 	SlaveSocket *ret;
-	MasterWorker::stripeList->getValues( listId, this->paritySlaveSockets, this->dataSlaveSockets );
+	MasterWorker::stripeList->get( listId, this->paritySlaveSockets, this->dataSlaveSockets );
 	ret = this->dataSlaveSockets[ chunkId ];
 
 	if ( isDegraded )
