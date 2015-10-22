@@ -32,7 +32,7 @@ void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t ori
 	// get the original mapped stripe list 
 	data = new SlaveSocket*[ dataCount ];
 	parity = new SlaveSocket*[ parityCount ];
-	parity = stripeList->get( originalListId, parity, data );
+	parity = stripeList->getValues( originalListId, parity, data );
 
 	slaveAddr = data[ originalChunkId ]->getAddr();
 
@@ -55,7 +55,7 @@ void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t ori
 		leastOverloadedId = originalListId;
 		// search all stripe lists 
 		for ( uint32_t listIndex = 0; listIndex < stripeList->getNumList(); listIndex++ ) {
-			parity = stripeList->get( listIndex, parity, data );
+			parity = stripeList->getValues( listIndex, parity, data );
 			slaveAddr = data[ 0 ]->getAddr();
 			nodeLatency = slaveLoading->cumulativeMirror.set.get( slaveAddr , &index );
 

@@ -5,6 +5,9 @@
 
 #define WORKER_COLOR	YELLOW
 
+uint32_t CoordinatorWorker::dataChunkCount;
+uint32_t CoordinatorWorker::parityChunkCount;
+uint32_t CoordinatorWorker::chunkCount;
 IDGenerator *CoordinatorWorker::idGenerator;
 CoordinatorEventQueue *CoordinatorWorker::eventQueue;
 RemappingRecordMap *CoordinatorWorker::remappingRecords;
@@ -452,6 +455,9 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 	uint32_t count = 0;
 	std::vector<StripeListIndex> lists = CoordinatorWorker::stripeList->list( ( uint32_t ) index );
 
+	// List ID |-> k SlaveSockets
+	std::unordered_map<uint32_t, SlaveSocket **> sockets;
+
 	LOCK( &Map::stripesLock );
 	printf( "Slave disconnected! index = %d. Appeared in:\n", index );
 	for ( uint32_t i = 0, size = lists.size(); i < size; i++ ) {
@@ -462,6 +468,14 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 			lists[ i ].isParity ? "p" : "",
 			lists[ i ].chunkId
 		);
+
+		if ( sockets.find( lists[ i ].listId ) == sockets.end() ) {
+			SlaveSocket **s = new SlaveSocket*[ CoordinatorWorker::chunkCount ];
+			CoordinatorWorker::stripeList->getValues(
+				lists[ i ].listId, s, s
+			);
+			sockets[ lists[ i ].listId ] = s;
+		}
 	}
 	UNLOCK( &Map::stripesLock );
 
@@ -497,6 +511,10 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 bool CoordinatorWorker::init() {
 	Coordinator *coordinator = Coordinator::getInstance();
 
+	CoordinatorWorker::dataChunkCount =
+	coordinator->config.global.coding.params.getDataChunkCount();
+	CoordinatorWorker::parityChunkCount = coordinator->config.global.coding.params.getParityChunkCount();
+	CoordinatorWorker::chunkCount = CoordinatorWorker::dataChunkCount + CoordinatorWorker::parityChunkCount;
 	CoordinatorWorker::idGenerator = &coordinator->idGenerator;
 	CoordinatorWorker::eventQueue = &coordinator->eventQueue;
 	CoordinatorWorker::remappingRecords = &coordinator->remappingRecords;

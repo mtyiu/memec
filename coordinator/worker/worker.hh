@@ -16,6 +16,9 @@ private:
 	uint32_t workerId;
 	WorkerRole role;
 	CoordinatorProtocol protocol;
+	static uint32_t dataChunkCount;
+	static uint32_t parityChunkCount;
+	static uint32_t chunkCount;
 	static IDGenerator *idGenerator;
 	static CoordinatorEventQueue *eventQueue;
 	static StripeList<ServerAddr> *stripeList;
