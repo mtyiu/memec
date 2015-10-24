@@ -4,12 +4,14 @@ import com.google.common.io.Closeables;
 import com.yahoo.ycsb.ByteIterator;
 import com.yahoo.ycsb.DB;
 import com.yahoo.ycsb.DBException;
+
 import tachyon.TachyonURI;
 import tachyon.client.ReadType;
 import tachyon.client.RemoteBlockInStreams;
 import tachyon.client.TachyonFS;
 import tachyon.client.TachyonFile;
 import tachyon.client.WriteType;
+import tachyon.conf.TachyonConf;
 import tachyon.org.apache.thrift.TException;
 
 import java.io.DataInputStream;
@@ -226,11 +228,10 @@ public final class TachyonClient extends DB {
     }
   }
 
-  private static InputStream createStream(final TachyonFile file, final ReadType readType)
+  private InputStream createStream(final TachyonFile file, final ReadType readType)
       throws IOException {
-    // need to avoid the local read path
-    // https://tachyon.atlassian.net/browse/TACHYON-53
-    return RemoteBlockInStreams.create(file, readType, 0, null);
+	// let tachyon client to choose between local and remote stream
+    return file.getInStream(readType);
   }
 
   private static void log(final String msg) {
