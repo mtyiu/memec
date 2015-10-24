@@ -58,6 +58,7 @@ public:
 	virtual void print( FILE *f = stdout );
 	void printAddress( FILE *f = stdout );
 	struct sockaddr_in getAddr();
+	ServerAddr getServerAddr();
 	bool equal( Socket *s );
 	bool equal( uint32_t addr, uint16_t port );
 	virtual ~Socket();

@@ -210,6 +210,43 @@ size_t Protocol::generateRemappingSetHeader( uint8_t magic, uint8_t to, uint8_t 
 	return bytes;
 }
 
+size_t Protocol::generateRecoveryHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeIdFrom, uint32_t stripeIdTo, uint32_t chunkId, std::unordered_set<Metadata> unsealedChunks, char *sendBuf ) {
+	if ( ! sendBuf ) sendBuf = this->buffer.send;
+	char *buf = sendBuf + PROTO_HEADER_SIZE;
+	size_t bytes;
+	uint32_t count = 0;
+
+	buf += PROTO_HEADER_SIZE;
+	bytes = PROTO_HEADER_SIZE;
+
+	*( ( uint32_t * )( buf      ) ) = htonl( listId );
+	*( ( uint32_t * )( buf +  4 ) ) = htonl( stripeIdFrom );
+	*( ( uint32_t * )( buf +  8 ) ) = htonl( stripeIdTo );
+	*( ( uint32_t * )( buf + 12 ) ) = htonl( chunkId );
+
+	buf += PROTO_RECOVERY_SIZE;
+	bytes += PROTO_RECOVERY_SIZE;
+
+	std::unordered_set<Metadata>::iterator it = unsealedChunks.begin();
+	while ( bytes + PROTO_CHUNK_SIZE <= this->buffer.size && it != unsealedChunks.end() ) {
+		*( ( uint32_t * )( buf      ) ) = htonl( it->listId );
+		*( ( uint32_t * )( buf +  4 ) ) = htonl( it->stripeId );
+		*( ( uint32_t * )( buf +  8 ) ) = htonl( it->chunkId );
+
+		buf += PROTO_CHUNK_SIZE;
+		bytes += PROTO_CHUNK_SIZE;
+
+		count++;
+		it++;
+	}
+	unsealedChunks.erase( unsealedChunks.begin(), it );
+
+	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, id, sendBuf );
+	*( ( uint32_t * )( sendBuf + PROTO_HEADER_SIZE + 16 ) ) = htonl( count );
+
+	return bytes;
+}
+
 size_t Protocol::generateChunkSealHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t count, uint32_t dataLength, char *sendBuf ) {
 	if ( ! sendBuf ) sendBuf = this->buffer.send;
 	char *buf = sendBuf + PROTO_HEADER_SIZE;
@@ -489,6 +526,7 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_OPCODE_COORDINATOR_PUSH_STATS:
 		case PROTO_OPCODE_SEAL_CHUNKS:
 		case PROTO_OPCODE_FLUSH_CHUNKS:
+		case PROTO_OPCODE_RECOVERY:
 		case PROTO_OPCODE_GET:
 		case PROTO_OPCODE_SET:
 		case PROTO_OPCODE_UPDATE:
@@ -753,6 +791,20 @@ bool Protocol::parseRemappingSetHeader( size_t offset, uint32_t &listId, uint32_
 
 	key = ptr;
 	value = ptr + keySize;
+
+	return true;
+}
+
+bool Protocol::parseRecoveryHeader( size_t offset, uint32_t &listId, uint32_t &stripeIdFrom, uint32_t &stripeIdTo, uint32_t &chunkId, uint32_t &unsealedChunkCount, char *buf, size_t size ) {
+	if ( size < PROTO_RECOVERY_SIZE )
+		return false;
+
+	char *ptr = buf + offset;
+	listId             = ntohl( *( ( uint32_t * )( ptr      ) ) );
+	stripeIdFrom       = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
+	stripeIdTo         = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
+	chunkId            = ntohl( *( ( uint32_t * )( ptr + 12 ) ) );
+	unsealedChunkCount = ntohl( *( ( uint32_t * )( ptr + 16 ) ) );
 
 	return true;
 }
@@ -1164,6 +1216,34 @@ bool Protocol::parseRemappingSetHeader( struct RemappingSetHeader &header, char 
 		header.value,
 		buf, size
 	);
+}
+
+bool Protocol::parseRecoveryHeader( struct RecoveryHeader &header, std::unordered_set<Metadata> &unsealedChunks, char *buf, size_t size, size_t offset ) {
+	if ( ! buf || ! size ) {
+		buf = this->buffer.recv;
+		size = this->buffer.size;
+	}
+	if ( this->parseRecoveryHeader( offset, header.listId, header.stripeIdFrom, header.stripeIdTo, header.chunkId, header.unsealedChunkCount, buf, size ) ) {
+		uint32_t count = 0;
+		offset += PROTO_RECOVERY_SIZE;
+
+		while ( count < header.unsealedChunkCount ) {
+			Metadata metadata;
+			if ( ! this->parseChunkHeader( offset, metadata.listId, metadata.stripeId, metadata.chunkId, buf, size ) )
+				return false;
+			count++;
+			offset += PROTO_CHUNK_SIZE;
+
+			unsealedChunks.insert( metadata );
+
+			if ( offset > size )
+				return false;
+		}
+
+		return true;
+	} else {
+		return false;
+	}
 }
 
 bool Protocol::parseChunkSealHeader( struct ChunkSealHeader &header, char *buf, size_t size, size_t offset ) {

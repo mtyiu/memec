@@ -44,6 +44,7 @@
 #define PROTO_OPCODE_COORDINATOR_PUSH_STATS       0x34
 #define PROTO_OPCODE_SEAL_CHUNKS                  0x35
 #define PROTO_OPCODE_FLUSH_CHUNKS                 0x36
+#define PROTO_OPCODE_RECOVERY                     0x37
 
 // Application <-> Master or Master <-> Slave //
 #define PROTO_OPCODE_GET                          0x01
@@ -168,7 +169,7 @@ struct KeyValueUpdateHeader {
 	char *valueUpdate;
 }; // UPDATE request and UPDATE (fail) response
 
-// vvvvvvvvvv For remapping vvvvvvvvvv //
+// vvvvvvvvvv Remapping vvvvvvvvvv //
 #define PROTO_REMAPPING_LOCK_SIZE 9
 struct RemappingLockHeader {
 	uint32_t listId;
@@ -201,7 +202,19 @@ struct SlaveSyncRemapHeader {
 	uint32_t chunkId;
 	char *key;
 };
-// ^^^^^^^^^^ For remapping ^^^^^^^^^^ //
+// ^^^^^^^^^^ Remapping ^^^^^^^^^^ //
+
+// vvvvvvvvvv Recovery vvvvvvvvvv //
+#define PROTO_RECOVERY_SIZE 20
+struct RecoveryHeader {
+	uint32_t listId;
+	uint32_t stripeIdFrom;
+	uint32_t stripeIdTo;
+	uint32_t chunkId;
+	uint32_t unsealedChunkCount;
+};
+// Use ChunkHeader to indicate the lost chunk and the surviving chunks
+// ^^^^^^^^^^ Recovery ^^^^^^^^^^ //
 
 #define PROTO_CHUNK_SEAL_SIZE 16
 #define PROTO_CHUNK_SEAL_DATA_SIZE 5
@@ -281,6 +294,7 @@ protected:
 	size_t generateKeyValueUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate = 0 );
 	size_t generateRemappingLockHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key );
 	size_t generateRemappingSetHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t chunkId, bool needsForwarding, uint8_t keySize, char *key, uint32_t valueSize, char *value, char *sendBuf = 0 );
+    size_t generateRecoveryHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeIdFrom, uint32_t stripeIdTo, uint32_t chunkId, std::unordered_set<Metadata> unsealedChunks, char *sendBuf = 0 );
 	size_t generateChunkSealHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t count, uint32_t dataLength, char *sendBuf = 0 );
 	size_t generateChunkUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta = 0, char *sendBuf = 0 );
 	size_t generateChunkHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId );
@@ -301,6 +315,7 @@ protected:
 	bool parseKeyValueUpdateHeader( size_t offset, uint8_t &keySize, char *&key, uint32_t &valueUpdateOffset, uint32_t &valueUpdateSize, char *&valueUpdate, char *buf, size_t size );
 	bool parseRemappingLockHeader( size_t offset, uint32_t &listId, uint32_t &chunkId, uint8_t &keySize, char *&key, char *buf, size_t size );
 	bool parseRemappingSetHeader( size_t offset, uint32_t &listId, uint32_t &chunkId, bool &needsForwarding, uint8_t &keySize, char *&key, uint32_t &valueSize, char *&value, char *buf, size_t size );
+	bool parseRecoveryHeader( size_t offset, uint32_t &listId, uint32_t &stripeIdFrom, uint32_t &stripeIdTo, uint32_t &chunkId, uint32_t &unsealedChunkCount, char *buf, size_t size );
 	bool parseChunkSealHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &count, char *buf, size_t size );
 	bool parseChunkSealHeaderData( size_t offset, uint8_t &keySize, uint32_t &keyOffset, char *&key, char *buf, size_t size );
 	bool parseChunkUpdateHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &updateOffset, uint32_t &updateLength, uint32_t &updatingChunkId, char *buf, size_t size );
@@ -334,6 +349,7 @@ public:
 	bool parseKeyValueUpdateHeader( struct KeyValueUpdateHeader &header, bool withValueUpdate, char *buf = 0, size_t size = 0, size_t offset = 0 );
 	bool parseRemappingLockHeader( struct RemappingLockHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
 	bool parseRemappingSetHeader( struct RemappingSetHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
+	bool parseRecoveryHeader( struct RecoveryHeader &header, std::unordered_set<Metadata> &unsealedChunks, char *buf = 0, size_t size = 0, size_t offset = 0 );
 	bool parseChunkSealHeader( struct ChunkSealHeader &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
 	bool parseChunkSealHeaderData( struct ChunkSealHeaderData &header, char *buf = 0, size_t size = 0, size_t offset = 0 );
 	bool parseChunkUpdateHeader( struct ChunkUpdateHeader &header, bool withDelta, char *buf = 0, size_t size = 0, size_t offset = 0 );

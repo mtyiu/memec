@@ -258,6 +258,10 @@ struct sockaddr_in Socket::getAddr() {
 	return this->addr;
 }
 
+ServerAddr Socket::getServerAddr() {
+	return ServerAddr( 0, this->addr.sin_addr.s_addr, this->addr.sin_port, 0 );
+}
+
 bool Socket::equal( Socket *s ) {
 	struct sockaddr_in saddr = s->getAddr();
 	return this->equal( saddr.sin_addr.s_addr, saddr.sin_port );

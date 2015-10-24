@@ -449,15 +449,17 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 		return false;
 	}
 
-	std::unordered_set<Metadata> unsealedChunks;
-	std::unordered_set<Metadata>::iterator chunksIt;
-	std::unordered_map<Key, Metadata>::iterator keysIt;
-	uint32_t count = 0;
+	uint32_t numLostChunks = 0;
+	std::set<Metadata> unsealedChunks;
+	std::unordered_map<uint32_t, SlaveSocket **> sockets;
 	std::vector<StripeListIndex> lists = CoordinatorWorker::stripeList->list( ( uint32_t ) index );
 
-	// List ID |-> k SlaveSockets
 	std::unordered_map<uint32_t, ServerAddr **> addrs;
+	ArrayMap<int, SlaveSocket> &map = Coordinator::getInstance()->sockets.slaves;
 
+	////////////////////////////////////////////////
+	// Get the ServerAddr of the surviving slaves //
+	////////////////////////////////////////////////
 	LOCK( &Map::stripesLock );
 	printf( "Slave disconnected! index = %d. Appeared in:\n", index );
 	for ( uint32_t i = 0, size = lists.size(); i < size; i++ ) {
@@ -469,26 +471,61 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 			lists[ i ].chunkId
 		);
 
-		if ( sockets.find( lists[ i ].listId ) == sockets.end() ) {
+		if ( addrs.find( lists[ i ].listId ) == addrs.end() ) {
 			ServerAddr **addr = new ServerAddr*[ CoordinatorWorker::chunkCount ];
+			SlaveSocket **s = new SlaveSocket*[ CoordinatorWorker::chunkCount ];
+
 			CoordinatorWorker::stripeList->get(
 				lists[ i ].listId, addr + CoordinatorWorker::dataChunkCount, addr
 			);
-			sockets[ lists[ i ].listId ] = addr;
+
+			addrs[ lists[ i ].listId ] = addr;
+			sockets[ lists[ i ].listId ] = s;
 		}
 	}
 	UNLOCK( &Map::stripesLock );
 
+	////////////////////////////////////////////
+	// Obtain the SlaveSocket from ServerAddr //
+	////////////////////////////////////////////
+	LOCK( &map.lock );
+	for (
+		std::unordered_map<uint32_t, ServerAddr **>::iterator it = addrs.begin();
+		it != addrs.end();
+		it++
+	) {
+		ServerAddr **target = it->second;
+		for ( uint32_t i = 0; i < CoordinatorWorker::chunkCount; i++ ) {
+			for ( uint32_t j = 0, size = map.values.size(); j < size; j++ ) {
+				ServerAddr tmp( 0, map.values[ j ]->listenAddr.addr, map.values[ j ]->listenAddr.port, 0 );
+				if ( ServerAddr::match( &tmp, target[ i ] ) ) {
+					sockets[ it->first ][ i ] = map.values[ j ];
+					break;
+				}
+			}
+		}
+		delete[] it->second;
+	}
+	UNLOCK( &map.lock );
+	addrs.clear();
+
 	LOCK( &socket->map.chunksLock );
 	LOCK( &socket->map.keysLock );
 
-	for ( chunksIt = socket->map.chunks.begin(); chunksIt != socket->map.chunks.end(); chunksIt++ ) {
+	/////////////////////////////////////////////////////////////////
+	// Distribute the reconstruction tasks to the surviving slaves //
+	/////////////////////////////////////////////////////////////////
+	for ( std::unordered_set<Metadata>::iterator chunksIt = socket->map.chunks.begin(); chunksIt != socket->map.chunks.end(); chunksIt++ ) {
 		const Metadata &metadata = *chunksIt;
 		// printf( "(%u, %u, %u)\n", metadata.listId, metadata.stripeId, metadata.chunkId );
 	}
-	count += socket->map.chunks.size();
+	numLostChunks += socket->map.chunks.size();
 
-	for ( keysIt = socket->map.keys.begin(); keysIt != socket->map.keys.end(); keysIt++ ) {
+	////////////////////////////
+	// Handle unsealed chunks //
+	////////////////////////////
+	// TODO
+	for ( std::unordered_map<Key, Metadata>::iterator keysIt = socket->map.keys.begin(); keysIt != socket->map.keys.end(); keysIt++ ) {
 		const Metadata &metadata = keysIt->second;
 		if (
 			socket->map.chunks.find( metadata ) == socket->map.chunks.end() &&
@@ -498,12 +535,12 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 			// printf( "(%u, %u, %u)\n", metadata.listId, metadata.stripeId, metadata.chunkId );
 		}
 	}
-	count += unsealedChunks.size();
+	numLostChunks += unsealedChunks.size();
 
 	UNLOCK( &socket->map.keysLock );
 	UNLOCK( &socket->map.chunksLock );
 
-	printf( "Number of chunks that need to be recovered: %u\n", count );
+	printf( "Number of chunks that need to be recovered: %u\n", numLostChunks );
 
 	return true;
 }
