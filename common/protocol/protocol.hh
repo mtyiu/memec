@@ -248,6 +248,19 @@ struct RedirectHeader {
 	uint32_t chunkId;
 };
 
+//////////////////////////
+// Degraded prefetching //
+//////////////////////////
+#define PROTO_DEGRADED_LOCK_SIZE 9
+struct DegradedLockHeader {
+	// Indicate where the reconstructed chunk should be stored
+	// using one of the stripe list that the server belongs to
+	uint32_t dstListId;
+	uint32_t dstChunkId;
+	uint8_t keySize;
+	char *key;
+};
+
 //////////////
 // Recovery //
 //////////////
@@ -499,6 +512,20 @@ protected:
 		char *buf, size_t size
 	);
 
+	//////////////////////////
+	// Degraded prefetching //
+	//////////////////////////
+	size_t generateDegradedLockHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint32_t dstListId, uint32_t dstChunkId,
+		uint8_t keySize, char *key
+	);
+	bool parseDegradedLockHeader(
+		size_t offset, uint32_t &dstListId, uint32_t &dstChunkId,
+		uint8_t &keySize, char *&key,
+		char *buf, size_t size
+	);
+
 	//////////////
 	// Recovery //
 	//////////////
@@ -514,6 +541,7 @@ protected:
 		uint32_t &unsealedChunkCount, uint32_t &addr, uint16_t &port,
 		char *buf, size_t size
 	);
+
 	//////////
 	// Seal //
 	//////////
@@ -650,6 +678,13 @@ public:
 	);
 	bool parseRedirectHeader(
 		struct RedirectHeader &header,
+		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
+	//////////////////////////
+	// Degraded prefetching //
+	//////////////////////////
+	bool parseDegradedLockHeader(
+		struct DegradedLockHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 	//////////////
