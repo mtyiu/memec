@@ -46,8 +46,8 @@ char *SlaveProtocol::sendRemappingRecords( size_t &size, uint32_t id, std::unord
 		PROTO_MAGIC_TO_COORDINATOR,
 		PROTO_OPCODE_SYNC,
 		id,
-		remapRecord,
 		lock,
+		remapRecord,
 		remapCount
 	);
 	return this->buffer.send;
