@@ -813,6 +813,9 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 	else
 		MasterWorker::counter->increaseRemapping();
 
+	if ( ! NO_REMAPPING )
+		fprintf( stderr, "Remapped from (%u, %u) to (%u, %u) for key %.*s...\n", originalListId, originalChunkId, remappedListId, remappedChunkId, header.keySize, header.key );
+
 	if ( ! socket ) {
 		Key key;
 		key.set( header.keySize, header.key );

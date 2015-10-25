@@ -1016,6 +1016,12 @@ bool SlaveWorker::handleGetRequest( MasterEvent event, char *buf, size_t size ) 
 		ret = false;
 		this->dispatch( event );
 	} else {
+		__ERROR__(
+			"SlaveWorker", "handleGetRequest",
+			"[GET] Key: %.*s (key size = %u).",
+			( int ) header.keySize, header.key, header.keySize
+		);
+		exit( 1 );
 		// Detect degraded GET
 		uint32_t listId, chunkId;
 		if ( this->isRedirectedRequest( header.key, header.keySize, 0, &listId, &chunkId ) ) {
@@ -1187,6 +1193,11 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 #endif
 		}
 	} else {
+		__ERROR__(
+			"SlaveWorker", "handleRemappingSetRequest",
+			"[REMAPPING_SET] Key: %.*s (key size = %u) (%u, %u).",
+			( int ) header.keySize, header.key, header.keySize, header.listId, header.chunkId
+		);
 		Key key;
 		key.set( header.keySize, header.key );
 		event.resRemappingSet( event.socket, event.id, key, header.listId, header.chunkId, true, false );
