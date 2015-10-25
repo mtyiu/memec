@@ -1,4 +1,5 @@
 #include "pending.hh"
+#include "../../common/util/debug.hh"
 
 bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, RemappingRecordKey> *&map ) {
 	switch( type ) {
@@ -184,6 +185,7 @@ DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( insertDegradedOp, DegradedOp, degradedO
 DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( insertChunkRequest, ChunkRequest, chunkRequest )
 DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( insertChunkUpdate, ChunkUpdate, chunkUpdate )
 
+DEFINE_PENDING_ERASE_METHOD( eraseRemappingRecordKey, RemappingRecordKey, remappingRecordKeyPtr )
 DEFINE_PENDING_ERASE_METHOD( eraseKey, Key, keyPtr )
 DEFINE_PENDING_ERASE_METHOD( eraseKeyValueUpdate, KeyValueUpdate, keyValueUpdatePtr )
 DEFINE_PENDING_ERASE_METHOD( eraseDegradedOp, DegradedOp, degradedOpPtr )
@@ -220,7 +222,18 @@ uint32_t Pending::count( PendingType type, uint32_t id, bool needsLock, bool nee
 	PendingIdentifier pid( id, 0, 0 );
 	LOCK_T *lock;
 	uint32_t ret = 0;
-	if ( type == PT_SLAVE_PEER_DEGRADED_OPS ) {
+	if ( type == PT_SLAVE_PEER_REMAPPING_SET ) {
+		std::unordered_multimap<PendingIdentifier, RemappingRecordKey> *map;
+		std::unordered_multimap<PendingIdentifier, RemappingRecordKey>::iterator it;
+
+		if ( ! this->get( type, lock, map ) ) return 0;
+
+		if ( needsLock ) LOCK( lock );
+		ret = map->count( pid );
+		// it = map->count( pid );
+		// for ( ret = 0; it != map->end() && it->first.id == id; ret++, it++ );
+		if ( needsUnlock ) UNLOCK( lock );
+	} else if ( type == PT_SLAVE_PEER_DEGRADED_OPS ) {
 		std::unordered_multimap<PendingIdentifier, DegradedOp> *map;
 		std::unordered_multimap<PendingIdentifier, DegradedOp>::iterator it;
 
@@ -275,6 +288,9 @@ uint32_t Pending::count( PendingType type, uint32_t id, bool needsLock, bool nee
 		// it = map->lower_bound( pid );
 		// for ( ret = 0; it != map->end() && it->first.id == id; ret++, it++ );
 		if ( needsUnlock ) UNLOCK( lock );
+	} else {
+		__ERROR__( "Pending", "count", "The count function is not implemented for this type." );
+		return 0;
 	}
 
 	return ret;

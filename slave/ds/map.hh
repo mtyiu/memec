@@ -23,6 +23,12 @@ private:
 	 */
 	std::unordered_map<Metadata, Chunk *> cache;
 	LOCK_T cacheLock;
+	/**
+	 * Store the chunks that are locked by degraded operations
+	 * (list ID, stripe ID, chunk ID) |-> (list ID, chunk ID)
+	 */
+	std::unordered_map<Metadata, Metadata> degraded;
+	LOCK_T degradedLock;
 
 public:
 	/**

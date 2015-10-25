@@ -92,6 +92,7 @@ private:
 	bool handleSetChunkRequest( SlavePeerEvent event, char *buf, size_t size );
 	// Response handler for slave peers
 	bool handleSealChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
+	bool handleRemappingSetResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleUpdateResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleDeleteResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleUpdateChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );

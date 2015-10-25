@@ -306,7 +306,7 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 							offset = PROTO_REMAPPING_RECORD_SIZE;
 							RemappingRecordMap *map = MasterWorker::remappingRecords;
 							for ( count = 0; offset < ( size_t ) buffer.size && count < remappingRecordHeader.remap; offset += bytes ) {
-								if ( ! this->protocol.parseSlaveSyncRemapHeader( slaveSyncRemapHeader, bytes, buffer.data, buffer.size - offset, offset ) ) 
+								if ( ! this->protocol.parseSlaveSyncRemapHeader( slaveSyncRemapHeader, bytes, buffer.data, buffer.size - offset, offset ) )
 									break;
 								count++;
 
@@ -478,8 +478,8 @@ SlaveSocket *MasterWorker::getSlave( char *data, uint8_t size, uint32_t &listId,
 		listId = record.listId;
 		chunkId = record.chunkId;
 		this->paritySlaveSockets = MasterWorker::stripeList->get(
-			listId, 
-			this->paritySlaveSockets, 
+			listId,
+			this->paritySlaveSockets,
 			this->dataSlaveSockets
 		);
 	} else { // non-remapped keys
@@ -1095,7 +1095,7 @@ bool MasterWorker::handleRedirectedRequest( SlaveEvent event, char *buf, size_t 
 		__ERROR__( "MasterWorker", "handleRedirectedRequest", "Cannot find a pending slave %s request that matches the response. This message will be discarded (key = %.*s).", opName, key.size, key.data );
 		return false;
 	}
- 
+
 	if ( slavePT == PT_SLAVE_GET )
 		MasterWorker::pending->eraseRequestStartTime( slavePT, pid.id, ( void * ) event.socket, elapsedTime );
 

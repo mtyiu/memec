@@ -307,6 +307,9 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 				event.message.remap.key.size,
 				event.message.remap.key.data
 			);
+
+			if ( event.needsFree )
+				event.message.keyValueUpdate.key.free();
 			break;
 		// UPDATE
 		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
@@ -669,6 +672,23 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 							break;
 					}
 					break;
+				case PROTO_OPCODE_REMAPPING_SET:
+					switch( header.magic ) {
+						case PROTO_MAGIC_REQUEST:
+							this->handleRemappingSetRequest( event, buffer.data, header.length );
+							this->load.set();
+							break;
+						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							this->handleRemappingSetResponse( event, true, buffer.data, header.length );
+							break;
+						case PROTO_MAGIC_RESPONSE_FAILURE:
+							this->handleRemappingSetResponse( event, false, buffer.data, header.length );
+							break;
+						default:
+							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
+							break;
+					}
+					break;
 				case PROTO_OPCODE_UPDATE:
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
@@ -772,7 +792,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 					}
 					break;
 				default:
-					__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from slave." );
+					__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from slave. opcode = %x", header.opcode );
 					goto quit_1;
 			}
 quit_1:
@@ -1062,8 +1082,7 @@ bool SlaveWorker::handleRemappingSetLockRequest( MasterEvent event, char *buf, s
 		return false;
 	}
 	__DEBUG__(
-		BLUE,
-		"SlaveWorker", "handleRemappingSetLockRequest",
+		BLUE, "SlaveWorker", "handleRemappingSetLockRequest",
 		"[REMAPPING_SET_LOCK] Key: %.*s (key size = %u); remapped list ID: %u, remapped chunk ID: %u",
 		( int ) header.keySize, header.key, header.keySize, header.listId, header.chunkId
 	);
@@ -1098,8 +1117,6 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 	}
 	__DEBUG__(
 		BLUE, "SlaveWorker", "handleRemappingSetRequest",
-	// __ERROR__(
-	// 	"SlaveWorker", "handleRemappingSetRequest",
 		"[SET] Key: %.*s (key size = %u); Value: (value size = %u); list ID = %u, chunk ID = %u; needs forwarding? %s (ID: %u)",
 		( int ) header.keySize, header.key, header.keySize, header.valueSize,
 		header.listId, header.chunkId, header.needsForwarding ? "true" : "false",
@@ -1115,7 +1132,6 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 	);
 
 	if ( header.needsForwarding && SlaveWorker::parityChunkCount > 0 ) {
-		__ERROR__( "SlaveWorker", "handleRemappingSetRequest", "TODO: Implement forwarding." );
 		uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
 
 		// Insert into master REMAPPING_SET pending set
@@ -1154,7 +1170,9 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 			if ( ! SlaveWorker::pending->insertRemappingRecordKey( PT_SLAVE_PEER_REMAPPING_SET, requestId, event.id, this->paritySlaveSockets[ i ], record ) ) {
 				__ERROR__( "SlaveWorker", "handleRemappingSetRequest", "Cannot insert into slave SET pending map (ID: %u).", event.id );
 			}
+		}
 
+		for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
 			// Insert into event queue
 			SlavePeerEvent slavePeerEvent;
 			slavePeerEvent.send( this->paritySlaveSockets[ i ], packet );
@@ -1171,7 +1189,7 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 	} else {
 		Key key;
 		key.set( header.keySize, header.key );
-		event.resRemappingSet( event.socket, event.id, key, header.listId, header.chunkId, true );
+		event.resRemappingSet( event.socket, event.id, key, header.listId, header.chunkId, true, false );
 		this->dispatch( event );
 	}
 
@@ -1203,6 +1221,50 @@ bool SlaveWorker::handleRemappingSetRequest( SlavePeerEvent event, char *buf, si
 	key.set( header.keySize, header.key );
 	event.resRemappingSet( event.socket, event.id, key, header.listId, header.chunkId, true );
 	this->dispatch( event );
+
+	return true;
+}
+
+bool SlaveWorker::handleRemappingSetResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
+	struct RemappingLockHeader header;
+	if ( ! this->protocol.parseRemappingLockHeader( header, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleRemappingSetResponse", "Invalid REMAPPING_SET response (size = %lu).", size );
+		return false;
+	}
+	__DEBUG__(
+		BLUE, "SlaveWorker", "handleRemappingSetResponse",
+		"[REMAPPING_SET] Key: %.*s (key size = %u); list ID: %u, chunk ID: %u",
+		( int ) header.keySize, header.key, header.keySize, header.listId, header.chunkId
+	);
+
+	int pending;
+	PendingIdentifier pid;
+	RemappingRecordKey record;
+
+	if ( ! SlaveWorker::pending->eraseRemappingRecordKey( PT_SLAVE_PEER_REMAPPING_SET, event.id, event.socket, &pid, &record, true, false ) ) {
+		UNLOCK( &SlaveWorker::pending->slavePeers.remappingSetLock );
+		__ERROR__( "SlaveWorker", "handleRemappingSetResponse", "Cannot find a pending slave REMAPPING_SET request that matches the response. This message will be discarded. (ID: %u)", event.id );
+		return false;
+	}
+	// Check pending slave UPDATE requests
+	pending = SlaveWorker::pending->count( PT_SLAVE_PEER_REMAPPING_SET, pid.id, false, true );
+
+	__DEBUG__( BLUE, "SlaveWorker", "handleRemappingSetResponse", "Pending slave REMAPPING_SET requests = %d (%s).", pending, success ? "success" : "fail" );
+	if ( pending == 0 ) {
+		// Only send master REMAPPING_SET response when the number of pending slave REMAPPING_SET requests equal 0
+		MasterEvent masterEvent;
+
+		if ( ! SlaveWorker::pending->eraseRemappingRecordKey( PT_MASTER_REMAPPING_SET, pid.parentId, 0, &pid, &record ) ) {
+			__ERROR__( "SlaveWorker", "handleRemappingSetResponse", "Cannot find a pending master REMAPPING_SET request that matches the response. This message will be discarded." );
+			return false;
+		}
+
+		masterEvent.resRemappingSet(
+			( MasterSocket * ) pid.ptr, pid.id, record.key,
+			record.remap.listId, record.remap.chunkId, success, true
+		);
+		SlaveWorker::eventQueue->insert( masterEvent );
+	}
 
 	return true;
 }
@@ -1827,10 +1889,8 @@ bool SlaveWorker::handleDeleteRequest( SlavePeerEvent event, char *buf, size_t s
 		__ERROR__( "SlaveWorker", "handleDeleteRequest", "Invalid DELETE request." );
 		return false;
 	}
-	__DEBUG__(
-		BLUE, "SlaveWorker", "handleDeleteRequest",
-	// __ERROR__(
-	// 	"SlaveWorker", "handleDeleteRequest",
+	__ERROR__(
+		"SlaveWorker", "handleDeleteRequest",
 		"[DELETE] Key: %.*s (key size = %u); list ID = %u, stripe ID = %u, chunk Id = %u.",
 		( int ) header.keySize, header.key, header.keySize,
 		header.listId, header.stripeId, header.chunkId

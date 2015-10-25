@@ -83,6 +83,7 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_OPCODE_REDIRECT_DELETE:
 		case PROTO_OPCODE_REMAPPING_LOCK:
 		case PROTO_OPCODE_REMAPPING_SET:
+		case PROTO_OPCODE_DEGRADED_OP:
 		case PROTO_OPCODE_SEAL_CHUNK:
 		case PROTO_OPCODE_UPDATE_CHUNK:
 		case PROTO_OPCODE_DELETE_CHUNK:

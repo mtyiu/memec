@@ -36,13 +36,14 @@ void MasterEvent::resRemappingSetLock( MasterSocket *socket, uint32_t id, Key &k
 	this->message.remap.chunkId = remappingRecord.chunkId;
 }
 
-void MasterEvent::resRemappingSet( MasterSocket *socket, uint32_t id, Key &key, uint32_t listId, uint32_t chunkId, bool success ) {
+void MasterEvent::resRemappingSet( MasterSocket *socket, uint32_t id, Key &key, uint32_t listId, uint32_t chunkId, bool success, bool needsFree ) {
 	this->type = success ? MASTER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS : MASTER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE;
 	this->id = id;
 	this->socket = socket;
 	this->message.remap.key = key;
 	this->message.remap.listId = listId;
 	this->message.remap.chunkId = chunkId;
+	this->needsFree = needsFree;
 }
 
 void MasterEvent::resUpdate( MasterSocket *socket, uint32_t id, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool success, bool needsFree ) {
