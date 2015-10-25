@@ -819,7 +819,7 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 		event.resSet( event.socket, event.id, key, false, false );
 		this->dispatch( event );
 		if ( NO_REMAPPING )
-			MasterWorker::counter->increaseLockOnly();
+			MasterWorker::counter->decreaseLockOnly();
 		else
 			MasterWorker::counter->decreaseRemapping();
 		Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
@@ -883,7 +883,7 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 		if ( sentBytes != ( ssize_t ) buffer.size ) {
 			__ERROR__( "MasterWorker", "handleRemappingSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 			if ( NO_REMAPPING )
-				MasterWorker::counter->increaseLockOnly();
+				MasterWorker::counter->decreaseLockOnly();
 			else
 				MasterWorker::counter->decreaseRemapping();
 			Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
@@ -1306,7 +1306,7 @@ bool MasterWorker::handleRemappingSetLockResponse( SlaveEvent event, bool succes
 	if ( ! this->protocol.parseRemappingLockHeader( header, buf, size ) ) {
 		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Invalid REMAPPING_SET_LOCK Response." );
 		// TODO is it possible to determine which counter to decrement? ..
-		MasterWorker::counter->decreaseLockOnly();
+		// MasterWorker::counter->decreaseLockOnly();
 		MasterWorker::counter->decreaseRemapping();
 		Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
 		return false;
@@ -1321,21 +1321,9 @@ bool MasterWorker::handleRemappingSetLockResponse( SlaveEvent event, bool succes
 	PendingIdentifier pid;
 	RemappingRecord remappingRecord;
 
-	// find the type of counter by comparing the remapped Ids to original Ids
-	uint32_t originalListId, originalChunkId;
-	originalListId = MasterWorker::stripeList->get(
-		header.key, ( size_t ) header.keySize,
-		0, 0, &originalChunkId, false
-	);
-
-#define NO_REMAPPING ( originalListId == header.listId && originalChunkId == header.chunkId )
-
 	if ( ! MasterWorker::pending->eraseRemappingRecord( PT_SLAVE_REMAPPING_SET, event.id, event.socket, &pid, &remappingRecord ) ) {
 		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Cannot find a pending slave REMAPPING_SET_LOCK request that matches the response. This message will be discarded. (ID: %u)", event.id );
-		if ( NO_REMAPPING )
-			MasterWorker::counter->decreaseLockOnly();
-		else
-			MasterWorker::counter->decreaseRemapping();
+		MasterWorker::counter->decreaseRemapping();
 		Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
 		return false;
 	}
@@ -1343,10 +1331,7 @@ bool MasterWorker::handleRemappingSetLockResponse( SlaveEvent event, bool succes
 	if ( ! success ) {
 		// TODO
 		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "TODO: Handle the case when the lock cannot be acquired." );
-		if ( NO_REMAPPING )
-			MasterWorker::counter->decreaseLockOnly();
-		else
-			MasterWorker::counter->decreaseRemapping();
+		MasterWorker::counter->decreaseRemapping();
 		Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
 		return false;
 	}
@@ -1361,20 +1346,14 @@ bool MasterWorker::handleRemappingSetLockResponse( SlaveEvent event, bool succes
 	if ( ! socket ) {
 		// TODO
 		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Not yet implemented!" );
-		if ( NO_REMAPPING )
-			MasterWorker::counter->decreaseLockOnly();
-		else
-			MasterWorker::counter->decreaseRemapping();
+		MasterWorker::counter->decreaseRemapping();
 		Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
 		return false;
 	}
 
 	if ( ! MasterWorker::pending->findKey( PT_APPLICATION_SET, pid.parentId, 0, &key ) ) {
 		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded. (ID: %u)", event.id );
-		if ( NO_REMAPPING )
-			MasterWorker::counter->decreaseLockOnly();
-		else
-			MasterWorker::counter->decreaseRemapping();
+		MasterWorker::counter->decreaseRemapping();
 		Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
 		return false;
 	}
