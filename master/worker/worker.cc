@@ -519,10 +519,11 @@ SlaveSocket *MasterWorker::getSlave( char *data, uint8_t size, uint32_t &origina
 	originalListId = MasterWorker::stripeList->get(
 		data, ( size_t ) size,
 		this->dataSlaveSockets,
-		0, &originalChunkId, false
+		this->paritySlaveSockets,
+		&originalChunkId, true
 	);
 
-	ret = *this->dataSlaveSockets;
+	ret = this->dataSlaveSockets[ originalChunkId ];
 
 	if ( isDegraded )
 		*isDegraded = ( ! ret->ready() && allowDegraded );
@@ -544,7 +545,15 @@ SlaveSocket *MasterWorker::getSlave( char *data, uint8_t size, uint32_t &origina
 
 get_remap:
 	// Determine remapped data slave
-	BasicRemappingScheme::getRemapTarget( originalListId, originalChunkId, remappedListId, remappedChunkId, MasterWorker::dataChunkCount, MasterWorker::parityChunkCount );
+	BasicRemappingScheme::getRemapTarget(
+		originalListId, originalChunkId,
+		remappedListId, remappedChunkId,
+		MasterWorker::dataChunkCount, MasterWorker::parityChunkCount,
+		this->dataSlaveSockets, this->paritySlaveSockets
+	);
+
+	this->getSlaves( originalListId, originalChunkId, false, 0 );
+	ret = this->dataSlaveSockets[ originalChunkId ];
 
 	return ret;
 }
@@ -810,11 +819,9 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 #define NO_REMAPPING ( originalListId == remappedListId && originalChunkId == remappedChunkId )
 	if ( NO_REMAPPING )
 		MasterWorker::counter->increaseLockOnly();
-	else
+	else {
 		MasterWorker::counter->increaseRemapping();
-
-	if ( ! NO_REMAPPING )
-		fprintf( stderr, "Remapped from (%u, %u) to (%u, %u) for key %.*s...\n", originalListId, originalChunkId, remappedListId, remappedChunkId, header.keySize, header.key );
+	}
 
 	if ( ! socket ) {
 		Key key;
@@ -920,7 +927,7 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 
 	socket = this->getSlave(
 		header.key, header.keySize,
-		listId, chunkId, true, &isDegraded
+		listId, chunkId, /* allowDegraded */ false, &isDegraded
 	);
 
 	if ( ! socket ) {
@@ -990,7 +997,7 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 
 	socket = this->getSlave(
 		header.key, header.keySize,
-		listId, chunkId, true, &isDegraded
+		listId, chunkId, /* allowDegraded */ false, &isDegraded
 	);
 
 	if ( ! socket ) {
@@ -1113,9 +1120,9 @@ bool MasterWorker::handleRedirectedRequest( SlaveEvent event, char *buf, size_t 
 		return false;
 	}
 
-	socket = this->getSlave(
-		key.data, key.size,
-		listId, chunkId, true, &isDegraded, true
+	socket = this->getSlaves(
+		listId, chunkId,
+		/* allowDegraded */ false, &isDegraded
 	);
 
 	if ( ! socket ) {
@@ -1503,7 +1510,7 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 
 		applicationEvent.resSet( ( ApplicationSocket * ) key.ptr, pid.id, key, success );
 		MasterWorker::eventQueue->insert( applicationEvent );
-		
+
 		// remapping SET ended
 		if ( NO_REMAPPING )
 			MasterWorker::counter->decreaseLockOnly();

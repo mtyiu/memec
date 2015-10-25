@@ -29,6 +29,8 @@ public:
 	// For ParityChunkBuffer only
 	bool seal( uint32_t stripeId, uint32_t chunkId, uint32_t count, char *sealData, size_t sealDataSize, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk );
 
+	inline uint32_t getChunkId() { return this->role == CBR_DATA ? this->buffer.data->getChunkId() : this->buffer.parity->getChunkId(); }
+
 	int lockChunk( Chunk *chunk, bool keepGlobalLock = false );
 	void updateAndUnlockChunk( int index );
 	void unlock();

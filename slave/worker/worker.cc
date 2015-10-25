@@ -362,7 +362,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 
 	if ( isSend ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
-		if ( event.type == MASTER_EVENT_TYPE_REDIRECT_RESPONSE ) fprintf( stderr, "redirect %u\n", event.id );
+		// if ( event.type == MASTER_EVENT_TYPE_REDIRECT_RESPONSE ) fprintf( stderr, "redirect %u\n", event.id );
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "SlaveWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 
@@ -1016,12 +1016,6 @@ bool SlaveWorker::handleGetRequest( MasterEvent event, char *buf, size_t size ) 
 		ret = false;
 		this->dispatch( event );
 	} else {
-		__ERROR__(
-			"SlaveWorker", "handleGetRequest",
-			"[GET] Key: %.*s (key size = %u).",
-			( int ) header.keySize, header.key, header.keySize
-		);
-		exit( 1 );
 		// Detect degraded GET
 		uint32_t listId, chunkId;
 		if ( this->isRedirectedRequest( header.key, header.keySize, 0, &listId, &chunkId ) ) {
@@ -1193,11 +1187,6 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 #endif
 		}
 	} else {
-		__ERROR__(
-			"SlaveWorker", "handleRemappingSetRequest",
-			"[REMAPPING_SET] Key: %.*s (key size = %u) (%u, %u).",
-			( int ) header.keySize, header.key, header.keySize, header.listId, header.chunkId
-		);
 		Key key;
 		key.set( header.keySize, header.key );
 		event.resRemappingSet( event.socket, event.id, key, header.listId, header.chunkId, true, false );
@@ -1224,7 +1213,8 @@ bool SlaveWorker::handleRemappingSetRequest( SlavePeerEvent event, char *buf, si
 		this,
 		header.key, header.keySize,
 		header.value, header.valueSize,
-		PROTO_OPCODE_REMAPPING_SET, header.chunkId,
+		PROTO_OPCODE_REMAPPING_SET,
+		SlaveWorker::chunkBuffer->at( header.listId )->getChunkId(),
 		this->chunks, this->dataChunk, this->parityChunk
 	);
 

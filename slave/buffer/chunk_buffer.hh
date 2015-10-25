@@ -30,6 +30,7 @@ public:
 
 	static void init();
 	ChunkBuffer( uint32_t listId, uint32_t stripeId, uint32_t chunkId );
+	inline uint32_t getChunkId() { return this->chunkId; }
 	virtual void print( FILE *f = stdout ) = 0;
 	virtual void stop() = 0;
 	virtual ~ChunkBuffer();

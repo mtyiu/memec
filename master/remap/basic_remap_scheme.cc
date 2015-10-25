@@ -9,11 +9,10 @@ MasterRemapMsgHandler *BasicRemappingScheme::remapMsgHandler = NULL;
 Latency BasicRemappingScheme::increment ( 0, 100 );
 uint32_t BasicRemappingScheme::remapped = 0;
 
-void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t originalChunkId, uint32_t &remappedListId, uint32_t &remappedChunkId, uint32_t dataCount, uint32_t parityCount ) {
+void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t originalChunkId, uint32_t &remappedListId, uint32_t &remappedChunkId, uint32_t dataCount, uint32_t parityCount, SlaveSocket **data, SlaveSocket **parity ) {
 	int index = -1, leastOverloadedId = -1;
 	struct sockaddr_in slaveAddr;
 	Latency *targetLatency, *nodeLatency, *overloadLatency;
-	SlaveSocket **data, **parity;
 
 	// baseline: no remapping
 	remappedChunkId = originalChunkId;
@@ -26,13 +25,8 @@ void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t ori
 	}
 
 	// check if remamping is allowed
-	if ( ! remapMsgHandler->allowRemapping() ) 
+	if ( ! remapMsgHandler->allowRemapping() )
 		return;
-
-	// get the original mapped stripe list 
-	data = new SlaveSocket*[ dataCount ];
-	parity = new SlaveSocket*[ parityCount ];
-	parity = stripeList->get( originalListId, parity, data );
 
 	slaveAddr = data[ originalChunkId ]->getAddr();
 
@@ -47,20 +41,20 @@ void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t ori
 	targetLatency = slaveLoading->cumulativeMirror.set.get( slaveAddr, &index );
 	overloadLatency = targetLatency;
 	// cannot determine whether remap is necessary??
-	if ( index == -1 ) 
+	if ( index == -1 )
 		goto exit;
 
 	if ( dataCount < 2 ) {
 		// need a new stripe list if the list only consist of one node
 		leastOverloadedId = originalListId;
-		// search all stripe lists 
+		// search all stripe lists
 		for ( uint32_t listIndex = 0; listIndex < stripeList->getNumList(); listIndex++ ) {
 			parity = stripeList->get( listIndex, parity, data );
 			slaveAddr = data[ 0 ]->getAddr();
 			nodeLatency = slaveLoading->cumulativeMirror.set.get( slaveAddr , &index );
 
 			// TODO if this node had not been accessed, should we take the risk and try?
-			if ( index == -1 ) 
+			if ( index == -1 )
 				continue;
 
 			if ( overloadedSlave->slaveSet.count( slaveAddr ) > 0 ) {
@@ -76,7 +70,7 @@ void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t ori
 		if ( remappedListId == originalListId )
 			remappedListId = leastOverloadedId;
 		*targetLatency = *targetLatency + increment;
-		
+
 	} else {
 		// search the least-loaded node with the stripe list
 		// TODO  move to more efficient and scalable data structure e.g. min-heap
@@ -88,7 +82,7 @@ void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t ori
 			nodeLatency = slaveLoading->cumulativeMirror.set.get( slaveAddr, &index );
 
 			// TODO if this node had not been accessed, should we take the risk and try?
-			if ( index == -1 ) 
+			if ( index == -1 )
 				continue;
 			if ( overloadedSlave->slaveSet.count( slaveAddr ) > 0 ) {
 				// scan for the least overloaded node, in case all nodes are overloaded
@@ -116,8 +110,4 @@ exit:
 		remapped++;
 	}
 #undef NO_REMAPPING
-
-	delete data;
-	delete parity;
 }
-

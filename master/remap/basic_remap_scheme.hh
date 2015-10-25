@@ -8,7 +8,7 @@
 
 class BasicRemappingScheme {
 public:
-	static void getRemapTarget( uint32_t originalListId, uint32_t originalChunkId, uint32_t &remappedListId, uint32_t &remappedChunkId, uint32_t dataCount, uint32_t parityCount );
+	static void getRemapTarget( uint32_t originalListId, uint32_t originalChunkId, uint32_t &remappedListId, uint32_t &remappedChunkId, uint32_t dataCount, uint32_t parityCount, SlaveSocket **data, SlaveSocket **parity );
 
 	static SlaveLoading *slaveLoading;
 	static OverloadedSlave *overloadedSlave;
