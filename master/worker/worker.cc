@@ -1435,14 +1435,6 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 
 #define NO_REMAPPING ( originalListId == header.listId && originalChunkId == header.chunkId )
 
-	// reampping SET ended
-	if ( NO_REMAPPING )
-		MasterWorker::counter->decreaseLockOnly();
-	else
-		MasterWorker::counter->decreaseRemapping();
-	Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
-
-
 	int pending;
 	ApplicationEvent applicationEvent;
 	PendingIdentifier pid;
@@ -1459,6 +1451,13 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 			( int ) header.keySize, header.key, header.keySize,
 			header.listId, header.chunkId
 		);
+		// remapping SET ended
+		if ( NO_REMAPPING )
+			MasterWorker::counter->decreaseLockOnly();
+		else
+			MasterWorker::counter->decreaseRemapping();
+		Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
+
 		return false;
 	}
 	// Check pending slave SET requests
@@ -1501,6 +1500,13 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 
 		applicationEvent.resSet( ( ApplicationSocket * ) key.ptr, pid.id, key, success );
 		MasterWorker::eventQueue->insert( applicationEvent );
+		
+		// remapping SET ended
+		if ( NO_REMAPPING )
+			MasterWorker::counter->decreaseLockOnly();
+		else
+			MasterWorker::counter->decreaseRemapping();
+		Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
 	}
 
 	// add a remaping record
