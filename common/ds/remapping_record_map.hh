@@ -3,6 +3,7 @@
 
 #include <map>
 #include <pthread.h>
+#include <assert.h>
 #include "key.hh"
 #include "metadata.hh"
 
@@ -62,15 +63,23 @@ public:
 		return ret;
 	}
 
+	size_t size() {
+		size_t ret;
+		pthread_mutex_lock( &this->lock );
+		ret = this->map.size();
+		pthread_mutex_unlock( &this->lock );
+		return ret;
+	}
+
 	void print( FILE *f = stderr, bool listAll = false ) {
 		std::map<Key, RemappingRecord>::iterator it;
 		unsigned long count = 0;
-		fprintf( f, "%lu remppaing records\n", map.size() );
+		fprintf( f, "%lu remapping records\n", map.size() );
 		for ( it = map.begin(); it != map.end() && listAll; it++, count++ ) {
-			fprintf( 
-				f , "%lu: [%s](%d) to list %u chunk %u\n", 
-				count, it->first.data, it->first.size,
-				it->second.listId, it->second.chunkId 
+			fprintf(
+				f , "%lu: [%.*s](%d) to list %u chunk %u\n",
+				count, it->first.size, it->first.data, it->first.size,
+				it->second.listId, it->second.chunkId
 			);
 		}
 	}

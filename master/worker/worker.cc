@@ -313,13 +313,20 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 								Key key;
 								key.set ( slaveSyncRemapHeader.keySize, slaveSyncRemapHeader.key );
 
+								for ( uint8_t i = 0; i < slaveSyncRemapHeader.keySize; i++ ) {
+									if ( ! ( slaveSyncRemapHeader.key[ i ] >= 'A' && slaveSyncRemapHeader.key[ i ] <= 'Z' ) ) {
+										printf( "Error: Key = %.*s\n", slaveSyncRemapHeader.keySize, slaveSyncRemapHeader.key );
+										break;
+									}
+								}
+
 								RemappingRecord remappingRecord;
 								remappingRecord.set( slaveSyncRemapHeader.listId, slaveSyncRemapHeader.chunkId, 0 );
 
 								if ( slaveSyncRemapHeader.opcode == 0 ) { // remove record
 									map->erase( key, remappingRecord );
 								} else if ( slaveSyncRemapHeader.opcode == 1 ) { // add record
-									map->insert( key, remappingRecord );
+									// map->insert( key, remappingRecord );
 								}
 							}
 							//map->print();
@@ -473,6 +480,7 @@ SlaveSocket *MasterWorker::getSlave( char *data, uint8_t size, uint32_t &listId,
 			this->paritySlaveSockets,
 			this->dataSlaveSockets
 		);
+		ret = this->dataSlaveSockets[ chunkId ];
 	} else if ( found ) { // remapped keys
 		//fprintf( stderr, "Redirect request from list=%u chunk=%u to list=%u chunk=%u\n", listId, chunkId, record.listId, record.chunkId);
 		listId = record.listId;
@@ -482,6 +490,7 @@ SlaveSocket *MasterWorker::getSlave( char *data, uint8_t size, uint32_t &listId,
 			this->paritySlaveSockets,
 			this->dataSlaveSockets
 		);
+		ret = this->dataSlaveSockets[ chunkId ];
 	} else { // non-remapped keys
 		listId = MasterWorker::stripeList->get(
 			data, ( size_t ) size,
@@ -489,9 +498,8 @@ SlaveSocket *MasterWorker::getSlave( char *data, uint8_t size, uint32_t &listId,
 			this->paritySlaveSockets,
 			&chunkId, false
 		);
+		ret = *this->dataSlaveSockets;
 	}
-
-	ret = *this->dataSlaveSockets;
 
 	if ( isDegraded )
 		*isDegraded = ( ! ret->ready() && allowDegraded );
@@ -820,6 +828,12 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 	if ( NO_REMAPPING )
 		MasterWorker::counter->increaseLockOnly();
 	else {
+		// fprintf(
+		// 	stderr, "remap from (%u, %u) to (%u, %u) for key: %.*s\n",
+		// 	originalListId, originalChunkId,
+		// 	remappedListId, remappedChunkId,
+		// 	header.keySize, header.key
+		// );
 		MasterWorker::counter->increaseRemapping();
 	}
 
@@ -1051,7 +1065,7 @@ bool MasterWorker::handleRedirectedRequest( SlaveEvent event, char *buf, size_t 
 		BLUE, "MasterWorker", "handleRedirectedRequest",
 		"[%s] Key: %.*s (key size = %u). Redirect to list=%u chunk=%u. ",
 		opcode == PROTO_OPCODE_REDIRECT_UPDATE ? "UPDATE" :
-		opcode == PROTO_OPCODE_REDIRECT_DELELE ? "DELETE" :
+		opcode == PROTO_OPCODE_REDIRECT_DELETE ? "DELETE" :
 		opcode == PROTO_OPCODE_REDIRECT_GET ? "GET" : "UNKNOWN",
 		( int ) header.keySize, header.key, header.keySize,
 		header.listId, header.chunkId
@@ -1191,6 +1205,7 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, char *buf,
 			__ERROR__( "MasterWorker", "handleGetResponse", "Invalid GET response." );
 			return false;
 		}
+		printf( "Failed GET request: key = %.*s.\n", header.keySize, header.key );
 	}
 
 	ApplicationEvent applicationEvent;
@@ -1499,7 +1514,9 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 		}
 	}
 
-	// __ERROR__( "MasterWorker", "handleSetResponse", "Pending slave SET requests = %d.", pending );
+	// if ( pending ) {
+	// 	__ERROR__( "MasterWorker", "handleRemappingSetResponse", "Pending slave REMAPPING_SET requests = %d (%sremapping).", pending, NO_REMAPPING ? "no " : "" );
+	// }
 
 	if ( pending == 0 ) {
 		// Only send application SET response when the number of pending slave SET requests equal 0
@@ -1514,17 +1531,18 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 		// remapping SET ended
 		if ( NO_REMAPPING )
 			MasterWorker::counter->decreaseLockOnly();
-		else
+		else {
 			MasterWorker::counter->decreaseRemapping();
+
+			// add a remaping record
+			key.set( header.keySize, header.key );
+			RemappingRecord record ( header.listId, header.chunkId );
+			MasterWorker::remappingRecords->insert( key, record );
+		}
+
 		Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
 	}
 
-	// add a remaping record
-	if ( ! NO_REMAPPING ) {
-		key.set( header.keySize, header.key );
-		RemappingRecord record ( header.listId, header.chunkId );
-		MasterWorker::remappingRecords->insert( key, record );
-	}
 #undef NO_REMAPPING
 	return true;
 }

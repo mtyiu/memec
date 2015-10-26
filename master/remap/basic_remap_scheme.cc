@@ -7,6 +7,7 @@ StripeList<SlaveSocket> *BasicRemappingScheme::stripeList = NULL;
 MasterRemapMsgHandler *BasicRemappingScheme::remapMsgHandler = NULL;
 
 Latency BasicRemappingScheme::increment ( 0, 100 );
+LOCK_T BasicRemappingScheme::lock = PTHREAD_MUTEX_INITIALIZER;
 uint32_t BasicRemappingScheme::remapped = 0;
 
 void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t originalChunkId, uint32_t &remappedListId, uint32_t &remappedChunkId, uint32_t dataCount, uint32_t parityCount, SlaveSocket **data, SlaveSocket **parity ) {
@@ -104,10 +105,10 @@ exit:
 
 	UNLOCK( &overloadedSlave->lock );
 	UNLOCK( &slaveLoading->lock );
-#define NO_REMAPPING ( remappedChunkId == originalChunkId && remappedListId == originalListId )
-	if ( ! NO_REMAPPING ) {
-		//fprintf( stderr, "remap from %u to %u\n", originalListId, remappedListId );
+
+	if ( ! ( remappedChunkId == originalChunkId && remappedListId == originalListId ) ) {
+		LOCK( &BasicRemappingScheme::lock );
 		remapped++;
+		UNLOCK( &BasicRemappingScheme::lock );
 	}
-#undef NO_REMAPPING
 }

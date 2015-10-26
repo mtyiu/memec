@@ -4,6 +4,7 @@
 #include "remap_msg_handler.hh"
 #include "../socket/slave_socket.hh"
 #include "../ds/stats.hh"
+#include "../../common/lock/lock.hh"
 #include "../../common/stripe_list/stripe_list.hh"
 
 class BasicRemappingScheme {
@@ -16,6 +17,7 @@ public:
 	static MasterRemapMsgHandler *remapMsgHandler;
 	static Latency increment;
 
+	static LOCK_T lock;
 	static uint32_t remapped;
 
 };

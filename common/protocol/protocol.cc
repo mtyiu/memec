@@ -347,6 +347,14 @@ size_t Protocol::generateRemappingRecordMessage( uint8_t magic, uint8_t to, uint
 
 			buf += PROTO_SLAVE_SYNC_REMAP_PER_SIZE;
 			memcpy( buf, key.data, key.size );
+
+			for ( uint8_t i = 0; i < key.size; i++ ) {
+				if ( ! ( buf[ i ] >= 'A' && buf[ i ] <= 'Z' ) ) {
+					printf( "~~~ Error: Key = %.*s ~~~\n", key.size, buf );
+					break;
+				}
+			}
+
 			buf += key.size;
 			bytes += PROTO_SLAVE_SYNC_REMAP_PER_SIZE + key.size;
 			rit->second.sent = true;
@@ -358,9 +366,6 @@ size_t Protocol::generateRemappingRecordMessage( uint8_t magic, uint8_t to, uint
 	pthread_mutex_unlock( lock );
 
 	// set the record count
-	buf = this->buffer.send + PROTO_HEADER_SIZE;
-	*( ( uint32_t * )( buf ) ) = htonl( remapCount );
-
 	*( ( uint32_t * ) this->buffer.send + PROTO_HEADER_SIZE ) = htonl( remapCount );
 
 	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, id );
@@ -423,6 +428,14 @@ bool Protocol::parseSlaveSyncRemapHeader( struct SlaveSyncRemapHeader &header, s
 		buf, size
 	);
 	bytes = PROTO_SLAVE_SYNC_REMAP_PER_SIZE + header.keySize;
+
+	for ( uint8_t i = 0; i < header.keySize; i++ ) {
+		if ( ! ( header.key[ i ] >= 'A' && header.key[ i ] <= 'Z' ) ) {
+			printf( "--- Error: Key = %.*s ---\n", header.keySize, header.key );
+			break;
+		}
+	}
+
 	return ret;
 }
 

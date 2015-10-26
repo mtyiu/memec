@@ -759,13 +759,13 @@ void Master::printRemapping( FILE *f ) {
 	fprintf(
 		f,
 		"\nRemapping Record Mapping\n"
-		"--------\n"
+		"------------------------\n"
 	);
-	this->remappingRecords.print( f, true );
+	this->remappingRecords.print( f );
 
 	fprintf(
 		f,
-		"\n\nRemapped SET Ops: %d\n",
+		"\nRemapped SET Ops: %d\n",
 		BasicRemappingScheme::remapped
 	);
 }
