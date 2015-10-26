@@ -1221,12 +1221,6 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 		header.valueUpdateSize, header.valueUpdateOffset
 	);
 
-	// Detect degraded UPDATE
-	if ( this->isRedirectedRequest( header.key, header.keySize ) ) {
-		__ERROR__( "SlaveWorker", "handleUpdateRequest", "!!! Degraded UPDATE request [not yet implemented] !!!" );
-		// TODO
-	}
-
 	Key key;
 	KeyValue keyValue;
 	KeyMetadata keyMetadata;
@@ -1425,9 +1419,17 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 		ret = false;
 		this->dispatch( event );
 	} else {
-		event.resUpdate( event.socket, event.id, key, header.valueUpdateOffset, header.valueUpdateSize, false );
-		this->dispatch( event );
-		ret = false;
+
+		// Detect degraded UPDATE
+		if ( this->isRedirectedRequest( header.key, header.keySize ) ) {
+			__ERROR__( "SlaveWorker", "handleUpdateRequest", "!!! Degraded UPDATE request [not yet implemented] !!!" );
+			// TODO
+			ret = false;
+		} else {
+			event.resUpdate( event.socket, event.id, key, header.valueUpdateOffset, header.valueUpdateSize, false );
+			this->dispatch( event );
+			ret = false;
+		}
 	}
 
 	return ret;

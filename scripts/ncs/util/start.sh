@@ -9,6 +9,8 @@ if [ $# -gt 0 ]; then
 	echo "*** Warning: Debug mode is enabled. ***"
 fi
 
+./set_config.sh
+
 ssh testbed-node10 "screen -S coordinator -p 0 -X stuff \"$(printf '\r\r')${BOOTSTRAP_SCRIPT_PATH}/start-plio-coordinator.sh ${1}$(printf '\r\r')\""
 
 sleep ${SLEEP_TIME}
@@ -23,6 +25,7 @@ ssh testbed-node9 "screen -S master -p 0 -X stuff \"$(printf '\r\r')${BOOTSTRAP_
 
 sleep ${SLEEP_TIME}
 
+echo 1 > RUNNING
 read -p "Press Enter to terminate all instances..."
 
 for i in {1..10}; do
@@ -46,5 +49,7 @@ ssh testbed-node9 "screen -S ycsb -p 0 -X stuff \"${TERM_COMMAND}\"" &
 ssh testbed-node10 "screen -S coordinator -p 0 -X stuff \"${TERM_COMMAND}\"" &
 
 sleep ${SLEEP_TIME}
+
+echo 0 > RUNNING
 
 clear

@@ -761,7 +761,7 @@ void Master::printRemapping( FILE *f ) {
 		"\nRemapping Record Mapping\n"
 		"--------\n"
 	);
-	this->remappingRecords.print( f, true );
+	this->remappingRecords.print( f );
 
 	fprintf(
 		f,
