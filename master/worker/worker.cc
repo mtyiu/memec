@@ -1205,7 +1205,6 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, char *buf,
 			__ERROR__( "MasterWorker", "handleGetResponse", "Invalid GET response." );
 			return false;
 		}
-		printf( "Failed GET request: key = %.*s.\n", header.keySize, header.key );
 	}
 
 	ApplicationEvent applicationEvent;

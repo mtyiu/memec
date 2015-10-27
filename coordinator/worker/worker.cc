@@ -289,14 +289,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 					count++;
 
 					Key key;
-					key.set ( slaveSyncRemapHeader.keySize, slaveSyncRemapHeader.key );
-
-					for ( uint8_t i = 0; i < slaveSyncRemapHeader.keySize; i++ ) {
-						if ( ! ( slaveSyncRemapHeader.key[ i ] >= 'A' && slaveSyncRemapHeader.key[ i ] <= 'Z' ) ) {
-							printf( "Error: Key = %.*s\n", slaveSyncRemapHeader.keySize, slaveSyncRemapHeader.key );
-							break;
-						}
-					}
+					key.set( slaveSyncRemapHeader.keySize, slaveSyncRemapHeader.key );
 
 					RemappingRecord remappingRecord;
 					remappingRecord.set( slaveSyncRemapHeader.listId, slaveSyncRemapHeader.chunkId, 0 );

@@ -1890,8 +1890,8 @@ bool SlaveWorker::handleDeleteRequest( SlavePeerEvent event, char *buf, size_t s
 		__ERROR__( "SlaveWorker", "handleDeleteRequest", "Invalid DELETE request." );
 		return false;
 	}
-	__ERROR__(
-		"SlaveWorker", "handleDeleteRequest",
+	__DEBUG__(
+		BLUE, "SlaveWorker", "handleDeleteRequest",
 		"[DELETE] Key: %.*s (key size = %u); list ID = %u, stripe ID = %u, chunk Id = %u.",
 		( int ) header.keySize, header.key, header.keySize,
 		header.listId, header.stripeId, header.chunkId
