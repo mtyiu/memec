@@ -113,8 +113,13 @@ public class Main implements Runnable {
 					String v = plio.get( key );
 					ret = ( v != null );
 
-					if ( ret )
+					if ( ret ) {
 						ret = v.equals( value );
+						if ( ! ret )
+							System.out.println( "Value mismatch: " + v.length() + " vs. " + value.length() );
+					} else {
+						System.out.println( "? " + key );
+					}
 
 					this.completed[ 1 ]++;
 					if ( ret ) this.succeeded[ 1 ]++;

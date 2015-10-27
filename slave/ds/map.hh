@@ -76,7 +76,7 @@ public:
 		if ( it == this->remapSent.end() ) {
 			// check the unsent records
 			it = this->remap.find( key );
-			if ( it == this->remap.find( key ) ) {
+			if ( it == this->remap.end() ) {
 				UNLOCK( &this->remapLock );
 				return false;
 			}

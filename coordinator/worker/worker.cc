@@ -516,7 +516,7 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 	// Distribute the reconstruction tasks to the surviving slaves //
 	/////////////////////////////////////////////////////////////////
 	for ( std::unordered_set<Metadata>::iterator chunksIt = socket->map.chunks.begin(); chunksIt != socket->map.chunks.end(); chunksIt++ ) {
-		const Metadata &metadata = *chunksIt;
+		// const Metadata &metadata = *chunksIt;
 		// printf( "(%u, %u, %u)\n", metadata.listId, metadata.stripeId, metadata.chunkId );
 	}
 	numLostChunks += socket->map.chunks.size();

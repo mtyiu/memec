@@ -5,6 +5,7 @@
 #include "../main/master.hh"
 #include "../remap/basic_remap_scheme.hh"
 #include "../../common/util/debug.hh"
+#include "../../common/ds/value.hh"
 
 #define WORKER_COLOR	YELLOW
 
@@ -313,20 +314,13 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 								Key key;
 								key.set ( slaveSyncRemapHeader.keySize, slaveSyncRemapHeader.key );
 
-								for ( uint8_t i = 0; i < slaveSyncRemapHeader.keySize; i++ ) {
-									if ( ! ( slaveSyncRemapHeader.key[ i ] >= 'A' && slaveSyncRemapHeader.key[ i ] <= 'Z' ) ) {
-										printf( "Error: Key = %.*s\n", slaveSyncRemapHeader.keySize, slaveSyncRemapHeader.key );
-										break;
-									}
-								}
-
 								RemappingRecord remappingRecord;
 								remappingRecord.set( slaveSyncRemapHeader.listId, slaveSyncRemapHeader.chunkId, 0 );
 
 								if ( slaveSyncRemapHeader.opcode == 0 ) { // remove record
 									map->erase( key, remappingRecord );
 								} else if ( slaveSyncRemapHeader.opcode == 1 ) { // add record
-									// map->insert( key, remappingRecord );
+									map->insert( key, remappingRecord );
 								}
 							}
 							//map->print();
@@ -887,7 +881,7 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 		}
 	} else {
 		// Need to buffer the key-value pair in a packet
-		Key *value = new Key(); // Note: Use an Key object to store the value
+		Value *value = new Value(); // Note: Use an Key object to store the value
 		value->dup( header.valueSize, header.value );
 
 		// Insert the remapping record into master REMAPPING_SET pending map
@@ -1363,7 +1357,7 @@ bool MasterWorker::handleRemappingSetLockResponse( SlaveEvent event, bool succes
 	bool isDegraded;
 	SlaveSocket *socket;
 	Key key;
-	Key *value = ( Key * ) remappingRecord.ptr;
+	Value *value = ( Value * ) remappingRecord.ptr;
 
 	socket = this->getSlaves( remappingRecord.listId, remappingRecord.chunkId, /* allowDegraded */ false, &isDegraded );
 

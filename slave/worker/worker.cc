@@ -362,7 +362,8 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 
 	if ( isSend ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
-		// if ( event.type == MASTER_EVENT_TYPE_REDIRECT_RESPONSE ) fprintf( stderr, "redirect %u\n", event.id );
+		// if ( event.type == MASTER_EVENT_TYPE_REDIRECT_RESPONSE )
+		// 	fprintf( stderr, "redirect %u\n", event.id );
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "SlaveWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 
@@ -805,36 +806,6 @@ quit_1:
 		__ERROR__( "SlaveWorker", "dispatch", "The slave is disconnected." );
 }
 
-bool SlaveWorker::isRedirectedRequest( char *key, uint8_t size, bool *isParity, uint32_t *listIdPtr, uint32_t *chunkIdPtr ) {
-	SlavePeerSocket *target;
-	uint32_t listId, chunkId;
-	listId = SlaveWorker::stripeList->get( key, size, &target, isParity ? this->paritySlaveSockets : 0, &chunkId );
-	if ( listIdPtr ) *listIdPtr = listId;
-	if ( chunkIdPtr ) *chunkIdPtr = chunkId;
-	if ( ! target->self ) {
-		if ( isParity ) {
-			for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
-				if ( this->paritySlaveSockets[ i ]->self ) {
-					*isParity = true;
-					return false;
-				}
-			}
-			*isParity = false;
-		}
-		return true;
-	}
-	if ( isParity ) *isParity = false;
-	return false;
-}
-
-bool SlaveWorker::isRedirectedRequest( uint32_t listId, uint32_t updatingChunkId ) {
-	SlaveWorker::stripeList->get( listId, this->paritySlaveSockets );
-	for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ )
-		if ( this->paritySlaveSockets[ i ]->self )
-			return updatingChunkId != i + SlaveWorker::dataChunkCount;
-	return true;
-}
-
 SlavePeerSocket *SlaveWorker::getSlave( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded, bool *isDegraded ) {
 	SlavePeerSocket *ret;
 	listId = SlaveWorker::stripeList->get(
@@ -1016,25 +987,9 @@ bool SlaveWorker::handleGetRequest( MasterEvent event, char *buf, size_t size ) 
 		ret = false;
 		this->dispatch( event );
 	} else {
-		// Detect degraded GET
-		uint32_t listId, chunkId;
-		if ( this->isRedirectedRequest( header.key, header.keySize, 0, &listId, &chunkId ) ) {
-			uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
-			Key key;
-			key.dup( header.keySize, header.key, ( void * ) event.socket );
-
-			if ( ! SlaveWorker::pending->insertKey( PT_MASTER_GET, event.id, ( void * ) event.socket, key ) ) {
-				__ERROR__( "SlaveWorker", "handleGetRequest", "Cannot insert into master GET pending map." );
-			}
-
-			// TODO: Need to know the stripe ID
-			this->performDegradedRead( listId, 0, chunkId, PROTO_OPCODE_GET, requestId, &key );
-			ret = false;
-		} else {
-			event.resGet( event.socket, event.id, key );
-			ret = false;
-			this->dispatch( event );
-		}
+		event.resGet( event.socket, event.id, key );
+		ret = false;
+		this->dispatch( event );
 	}
 	return ret;
 }
@@ -1052,12 +1007,8 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size ) 
 	);
 
 	// Detect degraded SET
-	bool isParity;
 	uint32_t listId, chunkId;
-	if ( this->isRedirectedRequest( header.key, header.keySize, &isParity, &listId, &chunkId ) && ! isParity ) {
-		__ERROR__( "SlaveWorker", "handleSetRequest", "!!! Degraded SET request [not yet implemented] !!!" );
-		// TODO
-	}
+	listId = SlaveWorker::stripeList->get( header.key, header.keySize, 0, 0, &chunkId );
 
 	SlaveWorker::chunkBuffer->at( listId )->set(
 		this,
@@ -1086,14 +1037,6 @@ bool SlaveWorker::handleRemappingSetLockRequest( MasterEvent event, char *buf, s
 		"[REMAPPING_SET_LOCK] Key: %.*s (key size = %u); remapped list ID: %u, remapped chunk ID: %u",
 		( int ) header.keySize, header.key, header.keySize, header.listId, header.chunkId
 	);
-
-	// Detect degraded REMAPPING_SET_LOCK
-	bool isParity;
-	uint32_t listId, chunkId;
-	if ( this->isRedirectedRequest( header.key, header.keySize, &isParity, &listId, &chunkId ) && ! isParity ) {
-		__ERROR__( "SlaveWorker", "handleRemappingSetLockRequest", "!!! Degraded REMAPPING_SET_LOCK request [not yet implemented] !!!" );
-		// TODO
-	}
 
 	Key key;
 	key.set( header.keySize, header.key );
@@ -1482,17 +1425,9 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 		ret = false;
 		this->dispatch( event );
 	} else {
-
-		// Detect degraded UPDATE
-		if ( this->isRedirectedRequest( header.key, header.keySize ) ) {
-			__ERROR__( "SlaveWorker", "handleUpdateRequest", "!!! Degraded UPDATE request [not yet implemented] !!!" );
-			// TODO
-			ret = false;
-		} else {
-			event.resUpdate( event.socket, event.id, key, header.valueUpdateOffset, header.valueUpdateSize, false );
-			this->dispatch( event );
-			ret = false;
-		}
+		event.resUpdate( event.socket, event.id, key, header.valueUpdateOffset, header.valueUpdateSize, false );
+		this->dispatch( event );
+		ret = false;
 	}
 
 	return ret;
@@ -1510,12 +1445,6 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 		"[DELETE] Key: %.*s (key size = %u).",
 		( int ) header.keySize, header.key, header.keySize
 	);
-
-	// Detect degraded DELETE
-	if ( this->isRedirectedRequest( header.key, header.keySize ) ) {
-		__ERROR__( "SlaveWorker", "handleDeleteRequest", "!!! Degraded DELETE request [not yet implemented] !!!" );
-		// TODO
-	}
 
 	Key key;
 	KeyValue keyValue;
@@ -1778,19 +1707,12 @@ bool SlaveWorker::handleUpdateChunkRequest( SlavePeerEvent event, char *buf, siz
 		header.updatingChunkId
 	);
 
-	// Detect degraded UPDATE_CHUNK
-	if ( this->isRedirectedRequest( header.listId, header.updatingChunkId ) ) {
-		__ERROR__( "SlaveWorker", "handleUpdateChunkRequest", "!!! Degraded UPDATE_CHUNK request [not yet implemented] !!!" );
-		// TODO
-		ret = false;
-	} else {
-		SlaveWorker::chunkBuffer->at( header.listId )->update(
-			header.stripeId, header.chunkId,
-			header.offset, header.length, header.delta,
-			this->chunks, this->dataChunk, this->parityChunk
-		);
-		ret = true;
-	}
+	SlaveWorker::chunkBuffer->at( header.listId )->update(
+		header.stripeId, header.chunkId,
+		header.offset, header.length, header.delta,
+		this->chunks, this->dataChunk, this->parityChunk
+	);
+	ret = true;
 
 	Metadata metadata;
 	metadata.set( header.listId, header.stripeId, header.chunkId );
@@ -1819,19 +1741,12 @@ bool SlaveWorker::handleDeleteChunkRequest( SlavePeerEvent event, char *buf, siz
 		header.offset, header.length, header.updatingChunkId
 	);
 
-	// Detect degraded UPDATE_CHUNK
-	if ( this->isRedirectedRequest( header.listId, header.updatingChunkId ) ) {
-		__ERROR__( "SlaveWorker", "handleDeleteChunkRequest", "!!! Degraded DELETE_CHUNK request [not yet implemented] !!!" );
-		// TODO
-		ret = false;
-	} else {
-		SlaveWorker::chunkBuffer->at( header.listId )->update(
-			header.stripeId, header.chunkId,
-			header.offset, header.length, header.delta,
-			this->chunks, this->dataChunk, this->parityChunk
-		);
-		ret = true;
-	}
+	SlaveWorker::chunkBuffer->at( header.listId )->update(
+		header.stripeId, header.chunkId,
+		header.offset, header.length, header.delta,
+		this->chunks, this->dataChunk, this->parityChunk
+	);
+	ret = true;
 
 	Metadata metadata;
 	metadata.set( header.listId, header.stripeId, header.chunkId );
@@ -1862,7 +1777,6 @@ bool SlaveWorker::handleUpdateRequest( SlavePeerEvent event, char *buf, size_t s
 		header.chunkUpdateOffset
 	);
 
-	// TODO: Detect degraded UPDATE
 
 	Key key;
 	bool ret = SlaveWorker::chunkBuffer->at( header.listId )->updateKeyValue(
@@ -1898,8 +1812,6 @@ bool SlaveWorker::handleDeleteRequest( SlavePeerEvent event, char *buf, size_t s
 		( int ) header.keySize, header.key, header.keySize,
 		header.listId, header.stripeId, header.chunkId
 	);
-
-	// TODO: Detect degraded DELETE
 
 	Key key;
 	bool ret = SlaveWorker::chunkBuffer->at( header.listId )->deleteKey( header.key, header.keySize );

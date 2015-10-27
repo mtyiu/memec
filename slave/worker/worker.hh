@@ -64,9 +64,6 @@ private:
 	void dispatch( MasterEvent event );
 	void dispatch( SlaveEvent event );
 	void dispatch( SlavePeerEvent event );
-	// Detect redirected requests
-	bool isRedirectedRequest( char *key, uint8_t size, bool *isParity = 0, uint32_t *listIdPtr = 0, uint32_t *chunkIdPtr = 0 );
-	bool isRedirectedRequest( uint32_t listId, uint32_t updatingChunkId );
 	// Perform consistent hashing
 	SlavePeerSocket *getSlave( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded = false, bool *isDegraded = 0 );
 	SlavePeerSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded = false, bool *isDegraded = 0 );
