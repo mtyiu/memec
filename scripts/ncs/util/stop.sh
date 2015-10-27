@@ -24,4 +24,6 @@ ssh testbed-node10 "screen -S coordinator -p 0 -X stuff \"${TERM_COMMAND}\"" &
 
 sleep ${SLEEP_TIME}
 
+echo 0 > RUNNING
+
 clear
