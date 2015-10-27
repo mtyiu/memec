@@ -1,5 +1,5 @@
 CC=g++
-CFLAGS=-Wall -O2 -g
+CFLAGS=-Wall -O2
 
 all: ini.o
 
