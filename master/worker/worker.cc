@@ -459,7 +459,7 @@ quit_1:
 		__ERROR__( "MasterWorker", "dispatch", "The slave is disconnected." );
 }
 
-SlaveSocket *MasterWorker::getSlave( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded, bool *isDegraded, bool isRedirected ) {
+SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId ) {
 	SlaveSocket *ret;
 
 	// Search to see if this key is remapped
@@ -468,14 +468,7 @@ SlaveSocket *MasterWorker::getSlave( char *data, uint8_t size, uint32_t &listId,
 	RemappingRecord record;
 	bool found = MasterWorker::remappingRecords->find( key, &record );
 	found = ( found && ! Master::getInstance()->config.master.remap.forceNoCacheRecords );
-	if ( isRedirected ) {
-		this->paritySlaveSockets = MasterWorker::stripeList->get(
-			listId,
-			this->paritySlaveSockets,
-			this->dataSlaveSockets
-		);
-		ret = this->dataSlaveSockets[ chunkId ];
-	} else if ( found ) { // remapped keys
+	if ( found ) { // remapped keys
 		//fprintf( stderr, "Redirect request from list=%u chunk=%u to list=%u chunk=%u\n", listId, chunkId, record.listId, record.chunkId);
 		listId = record.listId;
 		chunkId = record.chunkId;
@@ -495,26 +488,10 @@ SlaveSocket *MasterWorker::getSlave( char *data, uint8_t size, uint32_t &listId,
 		ret = *this->dataSlaveSockets;
 	}
 
-	if ( isDegraded )
-		*isDegraded = ( ! ret->ready() && allowDegraded );
-
-	if ( ret->ready() )
-		return ret;
-
-	if ( allowDegraded ) {
-		for ( uint32_t i = 0; i < MasterWorker::dataChunkCount + MasterWorker::parityChunkCount; i++ ) {
-			ret = MasterWorker::stripeList->get( listId, chunkId, i );
-			if ( ret->ready() )
-				return ret;
-		}
-		__ERROR__( "MasterWorker", "getSlave", "Cannot find a slave for performing degraded operation." );
-		return 0;
-	}
-
-	return 0;
+	return ret->ready() ? ret : 0;
 }
 
-SlaveSocket *MasterWorker::getSlave( char *data, uint8_t size, uint32_t &originalListId, uint32_t &originalChunkId, uint32_t &remappedListId, uint32_t &remappedChunkId, bool allowDegraded, bool *isDegraded ) {
+SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &originalListId, uint32_t &originalChunkId, uint32_t &remappedListId, uint32_t &remappedChunkId ) {
 	SlaveSocket *ret;
 
 	// Determine original data slave
@@ -527,25 +504,6 @@ SlaveSocket *MasterWorker::getSlave( char *data, uint8_t size, uint32_t &origina
 
 	ret = this->dataSlaveSockets[ originalChunkId ];
 
-	if ( isDegraded )
-		*isDegraded = ( ! ret->ready() && allowDegraded );
-
-	if ( ret->ready() )
-		goto get_remap;
-
-	if ( allowDegraded ) {
-		for ( uint32_t i = 0; i < MasterWorker::dataChunkCount + MasterWorker::parityChunkCount; i++ ) {
-			ret = MasterWorker::stripeList->get( originalListId, originalChunkId, i );
-			if ( ret->ready() )
-				goto get_remap;
-		}
-		__ERROR__( "MasterWorker", "getSlave", "Cannot find a slave for performing degraded operation." );
-		return 0;
-	}
-
-	return 0;
-
-get_remap:
 	// Determine remapped data slave
 	BasicRemappingScheme::getRemapTarget(
 		originalListId, originalChunkId,
@@ -554,58 +512,17 @@ get_remap:
 		this->dataSlaveSockets, this->paritySlaveSockets
 	);
 
-	this->getSlaves( originalListId, originalChunkId, false, 0 );
+	this->getSlaves( originalListId, originalChunkId );
 	ret = this->dataSlaveSockets[ originalChunkId ];
 
-	return ret;
+	return ret->ready() ? ret : 0;
 }
 
-SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded, bool *isDegraded ) {
-	SlaveSocket *ret = this->getSlave( data, size, listId, chunkId, allowDegraded, isDegraded );
-
-	if ( isDegraded ) *isDegraded = false;
-	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
-		if ( ! this->paritySlaveSockets[ i ]->ready() ) {
-			if ( ! allowDegraded )
-				return 0;
-			if ( isDegraded ) *isDegraded = true;
-
-			for ( uint32_t i = 0; i < MasterWorker::dataChunkCount + MasterWorker::parityChunkCount; i++ ) {
-				SlaveSocket *s = MasterWorker::stripeList->get( listId, chunkId, i );
-				if ( s->ready() ) {
-					this->paritySlaveSockets[ i ] = s;
-					break;
-				} else if ( i == MasterWorker::dataChunkCount + MasterWorker::parityChunkCount - 1 ) {
-					__ERROR__( "MasterWorker", "getSlave", "Cannot find a slave for performing degraded operation." );
-					return 0;
-				}
-			}
-		}
-	}
-	return ret;
-}
-
-SlaveSocket *MasterWorker::getSlaves( uint32_t listId, uint32_t chunkId, bool allowDegraded, bool *isDegraded ) {
+SlaveSocket *MasterWorker::getSlaves( uint32_t listId, uint32_t chunkId ) {
 	SlaveSocket *ret;
 	MasterWorker::stripeList->get( listId, this->paritySlaveSockets, this->dataSlaveSockets );
 	ret = this->dataSlaveSockets[ chunkId ];
-
-	if ( isDegraded )
-		*isDegraded = ( ! ret->ready() && allowDegraded );
-
-	if ( ret->ready() )
-		return ret;
-
-	if ( allowDegraded ) {
-		for ( uint32_t i = 0; i < MasterWorker::dataChunkCount + MasterWorker::parityChunkCount; i++ ) {
-			ret = MasterWorker::stripeList->get( listId, chunkId, i );
-			if ( ret->ready() )
-				return ret;
-		}
-		__ERROR__( "MasterWorker", "getSlave", "Cannot find a slave for performing degraded operation." );
-	}
-
-	return 0;
+	return ret->ready() ? ret : 0;
 }
 
 bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t size ) {
@@ -621,12 +538,12 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 	);
 
 	uint32_t listId, chunkId;
-	bool isDegraded, connected;
+	bool connected;
 	SlaveSocket *socket;
 
-	socket = this->getSlave(
+	socket = this->getSlaves(
 		header.key, header.keySize,
-		listId, chunkId, true, &isDegraded
+		listId, chunkId
 	);
 	if ( ! socket ) {
 		Key key;
@@ -684,13 +601,13 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 	MasterWorker::counter->increaseNormal();
 
 	uint32_t listId, chunkId;
-	bool isDegraded, connected;
+	bool connected;
 	ssize_t sentBytes;
 	SlaveSocket *socket;
 
 	socket = this->getSlaves(
 		header.key, header.keySize,
-		listId, chunkId, /* allowDegraded */ false, &isDegraded
+		listId, chunkId
 	);
 
 	if ( ! socket ) {
@@ -807,15 +724,14 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 	);
 
 	uint32_t originalListId, originalChunkId, remappedListId, remappedChunkId;
-	bool isDegraded, connected;
+	bool connected;
 	ssize_t sentBytes;
 	SlaveSocket *socket;
 
-	socket = this->getSlave(
+	socket = this->getSlaves(
 		header.key, header.keySize,
 		originalListId, originalChunkId,
-		remappedListId, remappedChunkId,
-		 /* allowDegraded */ false, &isDegraded
+		remappedListId, remappedChunkId
 	);
 
 #define NO_REMAPPING ( originalListId == remappedListId && originalChunkId == remappedChunkId )
@@ -930,12 +846,12 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 	);
 
 	uint32_t listId, chunkId;
-	bool isDegraded, connected;
+	bool connected;
 	SlaveSocket *socket;
 
-	socket = this->getSlave(
+	socket = this->getSlaves(
 		header.key, header.keySize,
-		listId, chunkId, /* allowDegraded */ false, &isDegraded
+		listId, chunkId
 	);
 
 	if ( ! socket ) {
@@ -1000,12 +916,12 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 	);
 
 	uint32_t listId, chunkId;
-	bool isDegraded, connected;
+	bool connected;
 	SlaveSocket *socket;
 
-	socket = this->getSlave(
+	socket = this->getSlaves(
 		header.key, header.keySize,
-		listId, chunkId, /* allowDegraded */ false, &isDegraded
+		listId, chunkId
 	);
 
 	if ( ! socket ) {
@@ -1067,7 +983,7 @@ bool MasterWorker::handleRedirectedRequest( SlaveEvent event, char *buf, size_t 
 
 	uint32_t listId = header.listId, chunkId = header.chunkId;
 	uint32_t requestId = event.id;
-	bool isDegraded, connected;
+	bool connected;
 	SlaveSocket *socket;
 
 	struct {
@@ -1128,10 +1044,7 @@ bool MasterWorker::handleRedirectedRequest( SlaveEvent event, char *buf, size_t 
 		return false;
 	}
 
-	socket = this->getSlaves(
-		listId, chunkId,
-		/* allowDegraded */ false, &isDegraded
-	);
+	socket = this->getSlaves( listId, chunkId );
 
 	if ( ! socket ) {
 		ApplicationSocket *applicationSocket = ( ApplicationSocket * ) key.ptr;
@@ -1354,12 +1267,11 @@ bool MasterWorker::handleRemappingSetLockResponse( SlaveEvent event, bool succes
 		return false;
 	}
 
-	bool isDegraded;
 	SlaveSocket *socket;
 	Key key;
 	Value *value = ( Value * ) remappingRecord.ptr;
 
-	socket = this->getSlaves( remappingRecord.listId, remappingRecord.chunkId, /* allowDegraded */ false, &isDegraded );
+	socket = this->getSlaves( remappingRecord.listId, remappingRecord.chunkId );
 
 	if ( ! socket ) {
 		// TODO

@@ -806,7 +806,7 @@ quit_1:
 		__ERROR__( "SlaveWorker", "dispatch", "The slave is disconnected." );
 }
 
-SlavePeerSocket *SlaveWorker::getSlave( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded, bool *isDegraded ) {
+SlavePeerSocket *SlaveWorker::getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId ) {
 	SlavePeerSocket *ret;
 	listId = SlaveWorker::stripeList->get(
 		data, ( size_t ) size,
@@ -817,72 +817,15 @@ SlavePeerSocket *SlaveWorker::getSlave( char *data, uint8_t size, uint32_t &list
 
 	ret = *this->dataSlaveSockets;
 
-	if ( isDegraded )
-		*isDegraded = ( ! ret->ready() && allowDegraded );
-
-	if ( ret->ready() )
-		return ret;
-
-	if ( allowDegraded ) {
-		for ( uint32_t i = 0; i < SlaveWorker::chunkCount; i++ ) {
-			ret = SlaveWorker::stripeList->get( listId, chunkId, i );
-			if ( ret->ready() )
-				return ret;
-		}
-		__ERROR__( "SlaveWorker", "getSlave", "Cannot find a slave for performing degraded operation." );
-		return 0;
-	}
-
-	return 0;
+	return ret->ready() ? ret : 0;
 }
 
-SlavePeerSocket *SlaveWorker::getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded, bool *isDegraded ) {
-	SlavePeerSocket *ret = this->getSlave( data, size, listId, chunkId, allowDegraded, isDegraded );
-
-	if ( isDegraded ) *isDegraded = false;
-	for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
-		if ( ! this->paritySlaveSockets[ i ]->ready() ) {
-			if ( ! allowDegraded )
-				return 0;
-			if ( isDegraded ) *isDegraded = true;
-
-			for ( uint32_t j = 0; j < SlaveWorker::chunkCount; j++ ) {
-				SlavePeerSocket *s = SlaveWorker::stripeList->get( listId, chunkId, j );
-				if ( s->ready() ) {
-					this->paritySlaveSockets[ i ] = s;
-					break;
-				} else if ( j == SlaveWorker::chunkCount - 1 ) {
-					__ERROR__( "SlaveWorker", "getSlave", "Cannot find a slave for performing degraded operation." );
-					return 0;
-				}
-			}
-		}
-	}
-	return ret;
-}
-
-bool SlaveWorker::getSlaves( uint32_t listId, bool allowDegraded, bool *isDegraded ) {
+bool SlaveWorker::getSlaves( uint32_t listId ) {
 	SlaveWorker::stripeList->get( listId, this->paritySlaveSockets );
 
-	if ( isDegraded ) *isDegraded = false;
-	for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
-		if ( ! this->paritySlaveSockets[ i ]->ready() ) {
-			if ( ! allowDegraded )
-				return false;
-			if ( isDegraded ) *isDegraded = true;
-
-			for ( uint32_t j = 0; j < SlaveWorker::chunkCount; j++ ) {
-				SlavePeerSocket *s = SlaveWorker::stripeList->get( listId, SlaveWorker::dataChunkCount + i, j );
-				if ( s->ready() ) {
-					this->paritySlaveSockets[ i ] = s;
-					break;
-				} else if ( j == SlaveWorker::chunkCount - 1 ) {
-					__ERROR__( "SlaveWorker", "getSlaves", "Cannot find a slave for performing degraded operation." );
-					return false;
-				}
-			}
-		}
-	}
+	for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ )
+		if ( ! this->paritySlaveSockets[ i ]->ready() )
+			return false;
 	return true;
 }
 
@@ -892,12 +835,11 @@ bool SlaveWorker::issueSealChunkRequest( Chunk *chunk, uint32_t startPos ) {
 	if ( SlaveWorker::parityChunkCount && startPos < chunk->getSize() ) {
 		size_t size;
 		uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
-		bool isDegraded;
 		Packet *packet = SlaveWorker::packetPool->malloc();
 		packet->setReferenceCount( SlaveWorker::parityChunkCount );
 
 		// Find parity slaves
-		this->getSlaves( chunk->metadata.listId, false /* allowDegraded */, &isDegraded );
+		this->getSlaves( chunk->metadata.listId );
 
 		// Prepare seal chunk request
 		this->protocol.reqSealChunk( size, requestId, chunk, startPos, packet->data );
@@ -1088,8 +1030,7 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 		}
 
 		// Get parity slaves
-		bool isDegraded;
-		if ( ! this->getSlaves( header.listId, /* allowDegraded */ false, &isDegraded ) ) {
+		if ( ! this->getSlaves( header.listId ) ) {
 			__ERROR__( "SlaveWorker", "handleRemappingSetRequest", "Cannot find a slave for performing degraded operation." );
 		}
 
@@ -1236,7 +1177,6 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 	if ( map->findValueByKey( header.key, header.keySize, &keyValue, &key, &keyMetadata, &metadata, &chunk ) ) {
 		uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
 		uint32_t offset = keyMetadata.offset + PROTO_KEY_VALUE_SIZE + header.keySize + header.valueUpdateOffset;
-		bool isDegraded;
 
 		LOCK_T *keysLock;
 		std::unordered_map<Key, KeyMetadata> *keys;
@@ -1249,8 +1189,7 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 			// Find parity slaves
 			this->getSlaves(
 				header.key, header.keySize,
-				metadata.listId, metadata.chunkId,
-				true, &isDegraded
+				metadata.listId, metadata.chunkId
 			);
 		}
 
@@ -1455,7 +1394,6 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 	if ( map->findValueByKey( header.key, header.keySize, &keyValue, 0, &keyMetadata, &metadata, &chunk ) ) {
 		uint32_t deltaSize;
 		char *delta;
-		bool isDegraded;
 
 		// Add the current request to the pending set
 		if ( SlaveWorker::parityChunkCount ) {
@@ -1512,8 +1450,7 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 			// Find parity slaves
 			this->getSlaves(
 				header.key, header.keySize,
-				metadata.listId, metadata.chunkId,
-				true, &isDegraded
+				metadata.listId, metadata.chunkId
 			);
 			if ( chunkBufferIndex == -1 ) {
 				// Send DELETE_CHUNK requests to parity slaves if the chunk is sealed

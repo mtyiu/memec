@@ -65,9 +65,8 @@ private:
 	void dispatch( SlaveEvent event );
 	void dispatch( SlavePeerEvent event );
 	// Perform consistent hashing
-	SlavePeerSocket *getSlave( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded = false, bool *isDegraded = 0 );
-	SlavePeerSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, bool allowDegraded = false, bool *isDegraded = 0 );
-	bool getSlaves( uint32_t listId, bool allowDegraded = false, bool *isDegraded = 0 );
+	SlavePeerSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId );
+	bool getSlaves( uint32_t listId );
 	// Request handler for coordinator
 	bool handleSlaveConnectedMsg( CoordinatorEvent event, char *buf, size_t size );
 	// Request handler for master
