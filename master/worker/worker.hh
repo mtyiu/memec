@@ -44,23 +44,31 @@ private:
 	void dispatch( MasterEvent event );
 	void dispatch( SlaveEvent event );
 
+	// For normal operations
 	SlaveSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId );
-	SlaveSocket *getSlaves( char *data, uint8_t size, uint32_t &originalListId, uint32_t &originalChunkId, uint32_t &remappedListId, uint32_t &remappedChunkId ); // for remapping
+	// For degraded oeprations
+	SlaveSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, uint32_t &newChunkId );
+	// For remapping
+	SlaveSocket *getSlaves( char *data, uint8_t size, uint32_t &originalListId, uint32_t &originalChunkId, uint32_t &remappedListId, uint32_t &remappedChunkId );
 	SlaveSocket *getSlaves( uint32_t listId, uint32_t chunkId );
 
 	bool handleGetRequest( ApplicationEvent event, char *buf, size_t size );
 	bool handleSetRequest( ApplicationEvent event, char *buf, size_t size );
-	bool handleRemappingSetRequest( ApplicationEvent event, char *buf, size_t size );
 	bool handleUpdateRequest( ApplicationEvent event, char *buf, size_t size );
 	bool handleDeleteRequest( ApplicationEvent event, char *buf, size_t size );
-	bool handleRedirectedRequest ( SlaveEvent event, char *buf, size_t size, uint8_t opcode );
+
+	bool handleRemappingSetRequest( ApplicationEvent event, char *buf, size_t size );
 
 	bool handleGetResponse( SlaveEvent event, bool success, char *buf, size_t size );
 	bool handleSetResponse( SlaveEvent event, bool success, char *buf, size_t size );
-	bool handleRemappingSetLockResponse( SlaveEvent event, bool success, char *buf, size_t size );
-	bool handleRemappingSetResponse( SlaveEvent event, bool success, char *buf, size_t size );
 	bool handleUpdateResponse( SlaveEvent event, bool success, char *buf, size_t size );
 	bool handleDeleteResponse( SlaveEvent event, bool success, char *buf, size_t size );
+
+	bool handleRedirectedResponse( SlaveEvent event, char *buf, size_t size, uint8_t opcode );
+
+	bool handleRemappingSetLockResponse( SlaveEvent event, bool success, char *buf, size_t size );
+	bool handleRemappingSetResponse( SlaveEvent event, bool success, char *buf, size_t size );
+	// bool handleDegradedLockResponse( SlaveEvent event, bool success, char *buf, size_t size );
 
 	void free();
 	static void *run( void *argv );

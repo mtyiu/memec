@@ -54,18 +54,23 @@
 #define PROTO_OPCODE_REDIRECT_GET                 0x05
 #define PROTO_OPCODE_REDIRECT_UPDATE              0x06
 #define PROTO_OPCODE_REDIRECT_DELETE              0x07
+#define PROTO_OPCODE_DEGRADED_GET                 0x08
+#define PROTO_OPCODE_DEGRADED_UPDATE              0x09
+#define PROTO_OPCODE_DEGRADED_DELETE              0x10
 
 // Master <-> Slave //
-#define PROTO_OPCODE_REMAPPING_LOCK               0x10
-#define PROTO_OPCODE_REMAPPING_SET                0x11
-#define PROTO_OPCODE_DEGRADED_OP                  0X12
+#define PROTO_OPCODE_REMAPPING_LOCK               0x11
+#define PROTO_OPCODE_REMAPPING_SET                0x12
+#define PROTO_OPCODE_DEGRADED_LOCK                0X13
+#define PROTO_OPCODE_DEGRADED_UNLOCK              0X14
 
 // Slave <-> Slave //
-#define PROTO_OPCODE_SEAL_CHUNK                   0x20
-#define PROTO_OPCODE_UPDATE_CHUNK                 0x21
-#define PROTO_OPCODE_DELETE_CHUNK                 0x22
-#define PROTO_OPCODE_GET_CHUNK                    0x23
-#define PROTO_OPCODE_SET_CHUNK                    0x24
+#define PROTO_OPCODE_REMAPPING_UNLOCK             0x20
+#define PROTO_OPCODE_SEAL_CHUNK                   0x21
+#define PROTO_OPCODE_UPDATE_CHUNK                 0x22
+#define PROTO_OPCODE_DELETE_CHUNK                 0x23
+#define PROTO_OPCODE_GET_CHUNK                    0x24
+#define PROTO_OPCODE_SET_CHUNK                    0x25
 
 /*********************
  * Key size (1 byte) *
