@@ -1235,6 +1235,102 @@ bool Protocol::parseDegradedLockReqHeader( struct DegradedLockReqHeader &header,
 	);
 }
 
+size_t Protocol::generateDegradedLockResHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, bool isLocked, uint8_t keySize, char *key, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) {
+	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
+	size_t bytes = this->generateHeader(
+		magic, to, opcode,
+		PROTO_DEGRADED_LOCK_RES_BASE_SIZE + PROTO_DEGRADED_LOCK_RES_METADATA_SIZE + keySize,
+		id
+	);
+
+	buf[ 0 ] = isLocked ? PROTO_DEGRADED_LOCK_RES_IS_LOCKED : PROTO_DEGRADED_LOCK_RES_WAS_LOCKED;
+	buf[ 1 ] = keySize;
+	*( ( uint32_t * )( buf     ) ) = htonl( listId );
+	*( ( uint32_t * )( buf + 4 ) ) = htonl( stripeId );
+	*( ( uint32_t * )( buf + 8 ) ) = htonl( chunkId );
+
+	buf += PROTO_DEGRADED_LOCK_RES_BASE_SIZE + PROTO_DEGRADED_LOCK_RES_METADATA_SIZE;
+	memmove( buf, key, keySize );
+
+	bytes += PROTO_DEGRADED_LOCK_RES_BASE_SIZE + PROTO_DEGRADED_LOCK_RES_METADATA_SIZE + keySize;
+
+	return bytes;
+}
+
+size_t Protocol::generateDegradedLockResHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint8_t keySize, char *key, uint32_t listId, uint32_t chunkId ) {
+	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
+	size_t bytes = this->generateHeader(
+		magic, to, opcode,
+		PROTO_DEGRADED_LOCK_RES_BASE_SIZE + PROTO_DEGRADED_LOCK_RES_REMAP_SIZE + keySize,
+		id
+	);
+
+	buf[ 0 ] = PROTO_DEGRADED_LOCK_RES_REMAPPED;
+	buf[ 1 ] = keySize;
+	*( ( uint32_t * )( buf     ) ) = htonl( listId );
+	*( ( uint32_t * )( buf + 4 ) ) = htonl( chunkId );
+
+	buf += PROTO_DEGRADED_LOCK_RES_BASE_SIZE + PROTO_DEGRADED_LOCK_RES_REMAP_SIZE;
+	memmove( buf, key, keySize );
+
+	bytes += PROTO_DEGRADED_LOCK_RES_BASE_SIZE + PROTO_DEGRADED_LOCK_RES_REMAP_SIZE + keySize;
+
+	return bytes;
+}
+
+size_t Protocol::generateDegradedLockResHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint8_t keySize, char *key ) {
+	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
+	size_t bytes = this->generateHeader(
+		magic, to, opcode,
+		PROTO_DEGRADED_LOCK_RES_BASE_SIZE + keySize,
+		id
+	);
+
+	buf[ 0 ] = PROTO_DEGRADED_LOCK_RES_NOT_EXIST;
+	buf[ 1 ] = keySize;
+
+	buf += PROTO_DEGRADED_LOCK_RES_BASE_SIZE;
+	memmove( buf, key, keySize );
+
+	bytes += PROTO_DEGRADED_LOCK_RES_BASE_SIZE + keySize;
+
+	return bytes;
+}
+
+/*
+bool Protocol::parseDegradedLockResHeader( size_t offset, uint32_t &dstListId, uint32_t &dstChunkId, uint8_t &keySize, char *&key, char *buf, size_t size ) {
+	if ( size - offset < PROTO_DEGRADED_LOCK_REQ_SIZE )
+		return false;
+
+	char *ptr = buf + offset;
+	dstListId  = ntohl( *( ( uint32_t * )( ptr     ) ) );
+	dstChunkId = ntohl( *( ( uint32_t * )( ptr + 4 ) ) );
+	keySize = ptr[ 8 ];
+
+	if ( size < PROTO_DEGRADED_LOCK_REQ_SIZE + ( size_t ) keySize )
+		return false;
+
+	key = ptr + PROTO_DEGRADED_LOCK_REQ_SIZE;
+
+	return true;
+}
+
+bool Protocol::parseDegradedLockResHeader( struct DegradedLockResHeader &header, char *buf, size_t size, size_t offset ) {
+	if ( ! buf || ! size ) {
+		buf = this->buffer.recv;
+		size = this->buffer.size;
+	}
+	return this->parseDegradedLockReqHeader(
+		offset,
+		header.dstListId,
+		header.dstChunkId,
+		header.keySize,
+		header.key,
+		buf, size
+	);
+}
+*/
+
 //////////////
 // Recovery //
 //////////////
