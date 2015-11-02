@@ -38,6 +38,8 @@ public:
 	char *reqUpdate( size_t &size, uint32_t id, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize );
 	// DELETE
 	char *reqDelete( size_t &size, uint32_t id, char *key, uint8_t keySize );
+	// Degraded lock
+	char *reqDegradedLock( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, char *key, uint8_t keySize );
 
 	/* Application */
 	// Register

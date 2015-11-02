@@ -495,8 +495,15 @@ SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId
 	newChunkId = chunkId;
 	if ( Master::getInstance()->remapMsgHandler.useRemappingFlow() ) {
 		// Perform degraded operation
-		newChunkId = chunkId;
+		BasicRemappingScheme::getDegradedOpTarget(
+			listId, chunkId, newChunkId,
+			MasterWorker::dataChunkCount,
+			MasterWorker::parityChunkCount,
+			this->dataSlaveSockets,
+			this->paritySlaveSockets
+		);
 	}
+	// Always return the original data slave socket
 	return ret;
 }
 
@@ -562,10 +569,6 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 		return false;
 	}
 
-	if ( chunkId != newChunkId ) {
-		printf( "[GET] Performing degraded operation on %u to %u...\n", chunkId, newChunkId );
-	}
-
 	struct {
 		size_t size;
 		char *data;
@@ -574,27 +577,49 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 	ssize_t sentBytes;
 	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
 
-	buffer.data = this->protocol.reqGet( buffer.size, requestId, header.key, header.keySize );
-
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
-
 	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_GET, event.id, ( void * ) event.socket, key ) ) {
 		__ERROR__( "MasterWorker", "handleGetRequest", "Cannot insert into application GET pending map." );
 	}
 
-	key.ptr = ( void * ) socket;
-	if ( ! MasterWorker::pending->insertKey( PT_SLAVE_GET, requestId, event.id, ( void * ) socket, key ) ) {
-		__ERROR__( "MasterWorker", "handleGetRequest", "Cannot insert into slave GET pending map." );
-	}
+	if ( chunkId != newChunkId ) {
+		////////// Degraded GET //////////
+		DegradedLock degradedLock;
 
-	// Mark the time when request is sent
-	MasterWorker::pending->recordRequestStartTime( PT_SLAVE_GET, requestId, event.id, ( void * ) socket, socket->getAddr() );
+		printf( "[GET] Performing degraded operation on %u to %u...\n", chunkId, newChunkId );
 
-	// Send GET request
-	sentBytes = socket->send( buffer.data, buffer.size, connected );
-	if ( sentBytes != ( ssize_t ) buffer.size ) {
-		__ERROR__( "MasterWorker", "handleGetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
-		return false;
+		buffer.data = this->protocol.reqDegradedLock( buffer.size, requestId, listId, newChunkId, header.key, header.keySize );
+
+		degradedLock.set( listId, newChunkId, key.size, key.data );
+
+		if ( ! MasterWorker::pending->insertDegradedLock( PT_SLAVE_DEGRADED_LOCK, requestId, event.id, ( void * ) socket, degradedLock ) ) {
+			__ERROR__( "MasterWorker", "handleGetRequest", "Cannot insert into slave degraded lock pending map." );
+		}
+
+		// Send degraded lock request
+		sentBytes = socket->send( buffer.data, buffer.size, connected );
+		if ( sentBytes != ( ssize_t ) buffer.size ) {
+			__ERROR__( "MasterWorker", "handleGetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
+			return false;
+		}
+	} else {
+		////////// Normal GET //////////
+		buffer.data = this->protocol.reqGet( buffer.size, requestId, header.key, header.keySize );
+
+		key.ptr = ( void * ) socket;
+		if ( ! MasterWorker::pending->insertKey( PT_SLAVE_GET, requestId, event.id, ( void * ) socket, key ) ) {
+			__ERROR__( "MasterWorker", "handleGetRequest", "Cannot insert into slave GET pending map." );
+		}
+
+		// Mark the time when request is sent
+		MasterWorker::pending->recordRequestStartTime( PT_SLAVE_GET, requestId, event.id, ( void * ) socket, socket->getAddr() );
+
+		// Send GET request
+		sentBytes = socket->send( buffer.data, buffer.size, connected );
+		if ( sentBytes != ( ssize_t ) buffer.size ) {
+			__ERROR__( "MasterWorker", "handleGetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
+			return false;
+		}
 	}
 
 	return true;
@@ -756,10 +781,6 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 		return false;
 	}
 
-	if ( chunkId != newChunkId ) {
-		printf( "[UPDATE] Performing degraded operation on %u to %u...\n", chunkId, newChunkId );
-	}
-
 	struct {
 		size_t size;
 		char *data;
@@ -768,32 +789,38 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 	ssize_t sentBytes;
 	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
 
-	buffer.data = this->protocol.reqUpdate(
-		buffer.size, requestId,
-		header.key, header.keySize,
-		header.valueUpdate, header.valueUpdateOffset, header.valueUpdateSize
-	);
+	if ( chunkId != newChunkId ) {
+		////////// Degraded UPDATE //////////
+		printf( "[UPDATE] Performing degraded operation on %u to %u...\n", chunkId, newChunkId );
+	} else {
+		////////// Normal UPDATE //////////
+		buffer.data = this->protocol.reqUpdate(
+			buffer.size, requestId,
+			header.key, header.keySize,
+			header.valueUpdate, header.valueUpdateOffset, header.valueUpdateSize
+		);
 
-	char* valueUpdate = new char [ header.valueUpdateSize ];
-	memcpy( valueUpdate, header.valueUpdate, header.valueUpdateSize );
-	keyValueUpdate.dup( header.keySize, header.key, valueUpdate );
-	keyValueUpdate.offset = header.valueUpdateOffset;
-	keyValueUpdate.length = header.valueUpdateSize;
+		char* valueUpdate = new char [ header.valueUpdateSize ];
+		memcpy( valueUpdate, header.valueUpdate, header.valueUpdateSize );
+		keyValueUpdate.dup( header.keySize, header.key, valueUpdate );
+		keyValueUpdate.offset = header.valueUpdateOffset;
+		keyValueUpdate.length = header.valueUpdateSize;
 
-	if ( ! MasterWorker::pending->insertKeyValueUpdate( PT_APPLICATION_UPDATE, event.id, ( void * ) event.socket, keyValueUpdate ) ) {
-		__ERROR__( "MasterWorker", "handleUpdateRequest", "Cannot insert into application UPDATE pending map." );
-	}
+		if ( ! MasterWorker::pending->insertKeyValueUpdate( PT_APPLICATION_UPDATE, event.id, ( void * ) event.socket, keyValueUpdate ) ) {
+			__ERROR__( "MasterWorker", "handleUpdateRequest", "Cannot insert into application UPDATE pending map." );
+		}
 
-	keyValueUpdate.ptr = ( void * ) socket;
-	if ( ! MasterWorker::pending->insertKeyValueUpdate( PT_SLAVE_UPDATE, requestId, event.id, ( void * ) socket, keyValueUpdate ) ) {
-		__ERROR__( "MasterWorker", "handleUpdateRequest", "Cannot insert into slave UPDATE pending map." );
-	}
+		keyValueUpdate.ptr = ( void * ) socket;
+		if ( ! MasterWorker::pending->insertKeyValueUpdate( PT_SLAVE_UPDATE, requestId, event.id, ( void * ) socket, keyValueUpdate ) ) {
+			__ERROR__( "MasterWorker", "handleUpdateRequest", "Cannot insert into slave UPDATE pending map." );
+		}
 
-	// Send UPDATE request
-	sentBytes = socket->send( buffer.data, buffer.size, connected );
-	if ( sentBytes != ( ssize_t ) buffer.size ) {
-		__ERROR__( "MasterWorker", "handleUpdateRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
-		return false;
+		// Send UPDATE request
+		sentBytes = socket->send( buffer.data, buffer.size, connected );
+		if ( sentBytes != ( ssize_t ) buffer.size ) {
+			__ERROR__( "MasterWorker", "handleUpdateRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
+			return false;
+		}
 	}
 
 	return true;
@@ -828,10 +855,6 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 		return false;
 	}
 
-	if ( chunkId != newChunkId ) {
-		printf( "[DELETE] Performing degraded operation on %u to %u...\n", chunkId, newChunkId );
-	}
-
 	struct {
 		size_t size;
 		char *data;
@@ -840,26 +863,32 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 	ssize_t sentBytes;
 	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
 
-	buffer.data = this->protocol.reqDelete(
-		buffer.size, requestId,
-		header.key, header.keySize
-	);
+	if ( chunkId != newChunkId ) {
+		////////// Degraded DELETE //////////
+		printf( "[DELETE] Performing degraded operation on %u to %u...\n", chunkId, newChunkId );
+	} else {
+		////////// Normal DELETE //////////
+		buffer.data = this->protocol.reqDelete(
+			buffer.size, requestId,
+			header.key, header.keySize
+		);
 
-	key.dup( header.keySize, header.key, ( void * ) event.socket );
-	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_DEL, event.id, ( void * ) event.socket, key ) ) {
-		__ERROR__( "MasterWorker", "handleDeleteRequest", "Cannot insert into application DELETE pending map." );
-	}
+		key.dup( header.keySize, header.key, ( void * ) event.socket );
+		if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_DEL, event.id, ( void * ) event.socket, key ) ) {
+			__ERROR__( "MasterWorker", "handleDeleteRequest", "Cannot insert into application DELETE pending map." );
+		}
 
-	key.ptr = ( void * ) socket;
-	if ( ! MasterWorker::pending->insertKey( PT_SLAVE_DEL, requestId, event.id, ( void * ) socket, key ) ) {
-		__ERROR__( "MasterWorker", "handleDeleteRequest", "Cannot insert into slave DELETE pending map." );
-	}
+		key.ptr = ( void * ) socket;
+		if ( ! MasterWorker::pending->insertKey( PT_SLAVE_DEL, requestId, event.id, ( void * ) socket, key ) ) {
+			__ERROR__( "MasterWorker", "handleDeleteRequest", "Cannot insert into slave DELETE pending map." );
+		}
 
-	// Send DELETE requests
-	sentBytes = socket->send( buffer.data, buffer.size, connected );
-	if ( sentBytes != ( ssize_t ) buffer.size ) {
-		__ERROR__( "MasterWorker", "handleDeleteRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
-		return false;
+		// Send DELETE requests
+		sentBytes = socket->send( buffer.data, buffer.size, connected );
+		if ( sentBytes != ( ssize_t ) buffer.size ) {
+			__ERROR__( "MasterWorker", "handleDeleteRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
+			return false;
+		}
 	}
 
 	return true;

@@ -409,6 +409,9 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 						this->handleDeleteRequest( event, buffer.data, buffer.size );
 						this->load.del();
 						break;
+					case PROTO_OPCODE_DEGRADED_LOCK:
+						this->handleDegradedLockRequest( event, buffer.data, buffer.size );
+						break;
 					default:
 						__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from master." );
 						break;
@@ -1575,6 +1578,40 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 	}
 
 	return ret;
+}
+
+bool SlaveWorker::handleDegradedLockRequest( MasterEvent event, char *buf, size_t size ) {
+	struct DegradedLockReqHeader header;
+	if ( ! this->protocol.parseDegradedLockReqHeader( header, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleDegradedLockRequest", "Invalid DEGRADED_LOCK request (size = %lu).", size );
+		return false;
+	}
+	__DEBUG__(
+		BLUE, "SlaveWorker", "handleDegradedLockRequest",
+		"[DEGRADED_LOCK] Key: %.*s (key size = %u); target list ID: %u, target chunk ID: %u",
+		( int ) header.keySize, header.key, header.keySize, header.dstListId, header.dstChunkId
+	);
+
+	Metadata metadata;
+	RemappingRecord remappingRecord;
+
+	if ( map->findValueByKey( header.key, header.keySize, 0, 0, 0, &metadata ) ) {
+		// Not remapped: Find the stripe which contains the key
+		Metadata target;
+		target.set( header.dstListId, metadata.stripeId, header.dstChunkId );
+
+		if ( SlaveWorker::map->insertDegradedLock( metadata, target ) ) {
+			// The degraded lock is attained
+		} else {
+			// Degraded operation is performed before
+		}
+	} else if ( map->findRemappingRecordByKey( header.key, header.keySize, &remappingRecord ) ) {
+		// Remapped: Reject the degraded operation
+	} else {
+		// Key not found
+	}
+
+	return true;
 }
 
 bool SlaveWorker::handleSlavePeerRegisterRequest( SlavePeerSocket *socket, char *buf, size_t size ) {

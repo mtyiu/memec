@@ -256,14 +256,40 @@ struct RedirectHeader {
 //////////////////////////
 // Degraded prefetching //
 //////////////////////////
-#define PROTO_DEGRADED_LOCK_SIZE 9
-struct DegradedLockHeader {
+#define PROTO_DEGRADED_LOCK_REQ_SIZE 9
+struct DegradedLockReqHeader {
 	// Indicate where the reconstructed chunk should be stored
 	// using one of the stripe list that the server belongs to
 	uint32_t dstListId;
 	uint32_t dstChunkId;
 	uint8_t keySize;
 	char *key;
+};
+
+// Size
+#define PROTO_DEGRADED_LOCK_RES_BASE_SIZE 2
+#define PROTO_DEGRADED_LOCK_RES_METADATA_SIZE 12
+#define PROTO_DEGRADED_LOCK_RES_REMAP_SIZE 8
+// Type
+#define PROTO_DEGRADED_LOCK_RES_IS_LOCKED  1   // Return metadata (lock successfully)
+#define PROTO_DEGRADED_LOCK_RES_WAS_LOCKED 2   // Return metadata (lock failed due to a previous degraded lock operation)
+#define PROTO_DEGRADED_LOCK_RES_REMAPPED   3   // Return remap
+#define PROTO_DEGRADED_LOCK_RES_NOT_EXIST  4   // Return nothing
+struct DegradedLockResHeader {
+    uint8_t type;
+    uint8_t keySize;
+    char *key;
+    union {
+        struct {
+            uint32_t listId;
+            uint32_t stripeId;
+            uint32_t chunkId;
+        } metadata;
+        struct {
+            uint32_t listId;
+            uint32_t chunkId;
+        } remap;
+    };
 };
 
 //////////////
@@ -520,12 +546,12 @@ protected:
 	//////////////////////////
 	// Degraded prefetching //
 	//////////////////////////
-	size_t generateDegradedLockHeader(
+	size_t generateDegradedLockReqHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
 		uint32_t dstListId, uint32_t dstChunkId,
 		uint8_t keySize, char *key
 	);
-	bool parseDegradedLockHeader(
+	bool parseDegradedLockReqHeader(
 		size_t offset, uint32_t &dstListId, uint32_t &dstChunkId,
 		uint8_t &keySize, char *&key,
 		char *buf, size_t size
@@ -688,8 +714,8 @@ public:
 	//////////////////////////
 	// Degraded prefetching //
 	//////////////////////////
-	bool parseDegradedLockHeader(
-		struct DegradedLockHeader &header,
+	bool parseDegradedLockReqHeader(
+		struct DegradedLockReqHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 	//////////////

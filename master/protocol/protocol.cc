@@ -225,6 +225,20 @@ char *MasterProtocol::reqDelete( size_t &size, uint32_t id, char *key, uint8_t k
 	return this->buffer.send;
 }
 
+char *MasterProtocol::reqDegradedLock( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, char *key, uint8_t keySize ) {
+	size = this->generateDegradedLockReqHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_DEGRADED_LOCK,
+		id,
+		listId,
+		chunkId,
+		keySize,
+		key
+	);
+	return this->buffer.send;
+}
+
 char *MasterProtocol::resRegisterApplication( size_t &size, uint32_t id, bool success ) {
 	size = this->generateHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,

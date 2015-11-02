@@ -64,6 +64,18 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 	}
 }
 
+bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, DegradedLock> *&map ) {
+	if ( type == PT_SLAVE_DEGRADED_LOCK ) {
+		lock = &this->slaves.degradedLockLock;
+		map = &this->slaves.degradedLock;
+		return true;
+	} else {
+		lock = 0;
+		map = 0;
+		return false;
+	}
+}
+
 Pending::Pending() {
 	LOCK_INIT( &this->applications.getLock );
 	LOCK_INIT( &this->applications.setLock );
@@ -74,6 +86,7 @@ Pending::Pending() {
 	LOCK_INIT( &this->slaves.remappingSetLock );
 	LOCK_INIT( &this->slaves.updateLock );
 	LOCK_INIT( &this->slaves.delLock );
+	LOCK_INIT( &this->slaves.degradedLockLock );
 	LOCK_INIT( &this->stats.getLock );
 	LOCK_INIT( &this->stats.setLock );
 }
@@ -127,6 +140,23 @@ bool Pending::insertKeyValueUpdate( PendingType type, uint32_t id, uint32_t pare
 
 	LOCK_T *lock;
 	std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *map;
+	if ( ! this->get( type, lock, map ) )
+		return false;
+
+	if ( needsLock ) LOCK( lock );
+	ret = map->insert( p );
+	if ( needsUnlock ) UNLOCK( lock );
+
+	return true; // ret.second;
+}
+
+bool Pending::insertDegradedLock( PendingType type, uint32_t id, uint32_t parentId, void *ptr, DegradedLock &degradedLock, bool needsLock, bool needsUnlock ) {
+	PendingIdentifier pid( id, parentId, ptr );
+	std::pair<PendingIdentifier, DegradedLock> p( pid, degradedLock );
+	std::unordered_multimap<PendingIdentifier, DegradedLock>::iterator ret;
+
+	LOCK_T *lock;
+	std::unordered_multimap<PendingIdentifier, DegradedLock> *map;
 	if ( ! this->get( type, lock, map ) )
 		return false;
 
@@ -291,6 +321,34 @@ bool Pending::eraseKeyValueUpdate( PendingType type, uint32_t id, void *ptr, Pen
 	if ( ret ) {
 		if ( pidPtr ) *pidPtr = it->first;
 		if ( keyValueUpdatePtr ) *keyValueUpdatePtr = it->second;
+		map->erase( it );
+	}
+	if ( needsUnlock ) UNLOCK( lock );
+
+	return ret;
+}
+
+bool Pending::eraseDegradedLock( PendingType type, uint32_t id, void *ptr, PendingIdentifier *pidPtr, DegradedLock *degradedLockPtr, bool needsLock, bool needsUnlock ) {
+	PendingIdentifier pid( id, 0, ptr );
+	LOCK_T *lock;
+	bool ret;
+
+	std::unordered_multimap<PendingIdentifier, DegradedLock> *map;
+	std::unordered_multimap<PendingIdentifier, DegradedLock>::iterator it;
+	if ( ! this->get( type, lock, map ) )
+		return false;
+
+	if ( needsLock ) LOCK( lock );
+	if ( ptr ) {
+		it = map->find( pid );
+		ret = ( it != map->end() );
+	} else {
+		it = map->find( pid );
+		ret = ( it != map->end() && it->first.id == id );
+	}
+	if ( ret ) {
+		if ( pidPtr ) *pidPtr = it->first;
+		if ( degradedLockPtr ) *degradedLockPtr = it->second;
 		map->erase( it );
 	}
 	if ( needsUnlock ) UNLOCK( lock );

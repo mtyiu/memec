@@ -1187,24 +1187,24 @@ bool Protocol::parseRedirectHeader( struct RedirectHeader &header, char *buf, si
 //////////////////////////
 // Degraded prefetching //
 //////////////////////////
-size_t Protocol::generateDegradedLockHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t dstListId, uint32_t dstChunkId, uint8_t keySize, char *key ) {
+size_t Protocol::generateDegradedLockReqHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t dstListId, uint32_t dstChunkId, uint8_t keySize, char *key ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_DEGRADED_LOCK_SIZE + keySize, id );
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_DEGRADED_LOCK_REQ_SIZE + keySize, id );
 
 	*( ( uint32_t * )( buf     ) ) = htonl( dstListId );
 	*( ( uint32_t * )( buf + 4 ) ) = htonl( dstChunkId );
 	buf[ 8 ] = keySize;
 
-	buf += PROTO_DEGRADED_LOCK_SIZE;
+	buf += PROTO_DEGRADED_LOCK_REQ_SIZE;
 	memmove( buf, key, keySize );
 
-	bytes += PROTO_DEGRADED_LOCK_SIZE + keySize;
+	bytes += PROTO_DEGRADED_LOCK_REQ_SIZE + keySize;
 
 	return bytes;
 }
 
-bool Protocol::parseDegradedLockHeader( size_t offset, uint32_t &dstListId, uint32_t &dstChunkId, uint8_t &keySize, char *&key, char *buf, size_t size ) {
-	if ( size - offset < PROTO_DEGRADED_LOCK_SIZE )
+bool Protocol::parseDegradedLockReqHeader( size_t offset, uint32_t &dstListId, uint32_t &dstChunkId, uint8_t &keySize, char *&key, char *buf, size_t size ) {
+	if ( size - offset < PROTO_DEGRADED_LOCK_REQ_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
@@ -1212,20 +1212,20 @@ bool Protocol::parseDegradedLockHeader( size_t offset, uint32_t &dstListId, uint
 	dstChunkId = ntohl( *( ( uint32_t * )( ptr + 4 ) ) );
 	keySize = ptr[ 8 ];
 
-	if ( size < PROTO_DEGRADED_LOCK_SIZE + ( size_t ) keySize )
+	if ( size < PROTO_DEGRADED_LOCK_REQ_SIZE + ( size_t ) keySize )
 		return false;
 
-	key = ptr + PROTO_DEGRADED_LOCK_SIZE;
+	key = ptr + PROTO_DEGRADED_LOCK_REQ_SIZE;
 
 	return true;
 }
 
-bool Protocol::parseDegradedLockHeader( struct DegradedLockHeader &header, char *buf, size_t size, size_t offset ) {
+bool Protocol::parseDegradedLockReqHeader( struct DegradedLockReqHeader &header, char *buf, size_t size, size_t offset ) {
 	if ( ! buf || ! size ) {
 		buf = this->buffer.recv;
 		size = this->buffer.size;
 	}
-	return this->parseDegradedLockHeader(
+	return this->parseDegradedLockReqHeader(
 		offset,
 		header.dstListId,
 		header.dstChunkId,

@@ -11,7 +11,7 @@ LOCK_T BasicRemappingScheme::lock = PTHREAD_MUTEX_INITIALIZER;
 uint32_t BasicRemappingScheme::remapped = 0;
 
 void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t originalChunkId, uint32_t &remappedListId, uint32_t &remappedChunkId, uint32_t dataCount, uint32_t parityCount, SlaveSocket **data, SlaveSocket **parity ) {
-	int index = -1, leastOverloadedId = -1;
+	int index = -1, leastOverloadedId;
 	struct sockaddr_in slaveAddr;
 	Latency *targetLatency, *nodeLatency, *overloadLatency;
 
@@ -25,7 +25,7 @@ void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t ori
 		return;
 	}
 
-	// check if remamping is allowed
+	// check if remapping is allowed
 	if ( ! remapMsgHandler->allowRemapping() )
 		return;
 
@@ -59,7 +59,7 @@ void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t ori
 				continue;
 
 			if ( overloadedSlave->slaveSet.count( slaveAddr ) > 0 ) {
-				if ( *overloadLatency < *nodeLatency ) {
+				if ( *nodeLatency < *overloadLatency ) {
 					overloadLatency = nodeLatency;
 					leastOverloadedId = listIndex;
 				}
@@ -87,7 +87,7 @@ void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t ori
 				continue;
 			if ( overloadedSlave->slaveSet.count( slaveAddr ) > 0 ) {
 				// scan for the least overloaded node, in case all nodes are overloaded
-				if ( *overloadLatency < *nodeLatency ) {
+				if ( *nodeLatency < *overloadLatency ) {
 					overloadLatency = nodeLatency;
 					leastOverloadedId = chunkIndex;
 				}
@@ -102,7 +102,6 @@ void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t ori
 	}
 
 exit:
-
 	UNLOCK( &overloadedSlave->lock );
 	UNLOCK( &slaveLoading->lock );
 
@@ -111,4 +110,75 @@ exit:
 		remapped++;
 		UNLOCK( &BasicRemappingScheme::lock );
 	}
+}
+
+// Enable degraded operation only if remapping is enabled
+void BasicRemappingScheme::getDegradedOpTarget( uint32_t listId, uint32_t originalChunkId, uint32_t &newChunkId, uint32_t dataCount, uint32_t parityCount, SlaveSocket **data, SlaveSocket **parity ) {
+	int index = -1, leastOverloadedId;
+	struct sockaddr_in slaveAddr;
+	Latency *targetLatency, *nodeLatency, *overloadLatency;
+
+	// Baseline
+	newChunkId = originalChunkId;
+	leastOverloadedId = originalChunkId;
+
+	if ( slaveLoading == NULL || overloadedSlave == NULL || stripeList == NULL || remapMsgHandler == NULL ) {
+		fprintf( stderr, "The scheme is not yet initialized!! Abort degraded operation!\n" );
+		return;
+	}
+
+	// check if remapping is allowed
+	if ( ! remapMsgHandler->allowRemapping() || parityCount == 0 )
+		return;
+
+	slaveAddr = data[ originalChunkId ]->getAddr();
+
+	// skip remap if not overloaded
+	if ( overloadedSlave->slaveSet.count( slaveAddr ) < 1 )
+		return;
+
+	// TODO avoid locking?
+	LOCK( &slaveLoading->lock );
+	LOCK( &overloadedSlave->lock );
+
+	targetLatency = slaveLoading->cumulativeMirror.set.get( slaveAddr, &index );
+	overloadLatency = targetLatency;
+	// cannot determine whether remap is necessary??
+	if ( index == -1 )
+		goto exit;
+
+
+	// search the least-loaded node with the stripe list
+	// TODO  move to more efficient and scalable data structure e.g. min-heap
+	for ( uint32_t chunkIndex = 0; chunkIndex < dataCount + parityCount; chunkIndex++ ) {
+		// skip the original node
+		if ( chunkIndex == originalChunkId )
+			continue;
+		if ( chunkIndex < dataCount )
+			slaveAddr = data[ chunkIndex ]->getAddr();
+		else
+			slaveAddr = parity[ chunkIndex - dataCount ]->getAddr();
+		nodeLatency = slaveLoading->cumulativeMirror.set.get( slaveAddr, &index );
+
+		// TODO if this node had not been accessed, should we take the risk and try?
+		if ( index == -1 )
+			continue;
+		if ( overloadedSlave->slaveSet.count( slaveAddr ) > 0 ) {
+			// scan for the least overloaded node, in case all nodes are overloaded
+			if ( *nodeLatency < *overloadLatency ) {
+				overloadLatency = nodeLatency;
+				leastOverloadedId = chunkIndex;
+			}
+		} else if ( *nodeLatency < *targetLatency ) {
+			targetLatency = nodeLatency;
+			newChunkId = chunkIndex;
+		}
+	}
+	if ( newChunkId == originalChunkId )
+		newChunkId = leastOverloadedId;
+	*targetLatency = *targetLatency + increment;
+
+exit:
+	UNLOCK( &overloadedSlave->lock );
+	UNLOCK( &slaveLoading->lock );
 }
