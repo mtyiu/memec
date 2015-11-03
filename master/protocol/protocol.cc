@@ -186,11 +186,11 @@ char *MasterProtocol::reqRemappingSet( size_t &size, uint32_t id, uint32_t listI
 	return buf;
 }
 
-char *MasterProtocol::reqGet( size_t &size, uint32_t id, char *key, uint8_t keySize ) {
+char *MasterProtocol::reqGet( size_t &size, uint32_t id, char *key, uint8_t keySize, bool isDegraded ) {
 	size = this->generateKeyHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
-		PROTO_OPCODE_GET,
+		isDegraded ? PROTO_OPCODE_DEGRADED_GET : PROTO_OPCODE_GET,
 		id,
 		keySize,
 		key
@@ -198,11 +198,11 @@ char *MasterProtocol::reqGet( size_t &size, uint32_t id, char *key, uint8_t keyS
 	return this->buffer.send;
 }
 
-char *MasterProtocol::reqUpdate( size_t &size, uint32_t id, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize ) {
+char *MasterProtocol::reqUpdate( size_t &size, uint32_t id, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool isDegraded ) {
 	size = this->generateKeyValueUpdateHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
-		PROTO_OPCODE_UPDATE,
+		isDegraded ? PROTO_OPCODE_DEGRADED_UPDATE : PROTO_OPCODE_UPDATE,
 		id,
 		keySize,
 		key,
@@ -213,26 +213,12 @@ char *MasterProtocol::reqUpdate( size_t &size, uint32_t id, char *key, uint8_t k
 	return this->buffer.send;
 }
 
-char *MasterProtocol::reqDelete( size_t &size, uint32_t id, char *key, uint8_t keySize ) {
+char *MasterProtocol::reqDelete( size_t &size, uint32_t id, char *key, uint8_t keySize, bool isDegraded ) {
 	size = this->generateKeyHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
-		PROTO_OPCODE_DELETE,
+		isDegraded ? PROTO_OPCODE_DEGRADED_DELETE : PROTO_OPCODE_DELETE,
 		id,
-		keySize,
-		key
-	);
-	return this->buffer.send;
-}
-
-char *MasterProtocol::reqDegradedLock( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, char *key, uint8_t keySize ) {
-	size = this->generateDegradedLockReqHeader(
-		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
-		PROTO_OPCODE_DEGRADED_LOCK,
-		id,
-		listId,
-		chunkId,
 		keySize,
 		key
 	);

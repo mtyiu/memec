@@ -33,13 +33,11 @@ public:
 	char *reqRemappingSetLock( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, char *key, uint8_t keySize );
 	char *reqRemappingSet( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, bool needsForwarding, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf = 0 );
 	// GET
-	char *reqGet( size_t &size, uint32_t id, char *key, uint8_t keySize );
+	char *reqGet( size_t &size, uint32_t id, char *key, uint8_t keySize, bool isDegraded = false );
 	// UPDATE
-	char *reqUpdate( size_t &size, uint32_t id, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize );
+	char *reqUpdate( size_t &size, uint32_t id, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool isDegraded = false );
 	// DELETE
-	char *reqDelete( size_t &size, uint32_t id, char *key, uint8_t keySize );
-	// Degraded lock
-	char *reqDegradedLock( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, char *key, uint8_t keySize );
+	char *reqDelete( size_t &size, uint32_t id, char *key, uint8_t keySize, bool isDegraded = false );
 
 	/* Application */
 	// Register

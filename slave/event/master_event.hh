@@ -32,11 +32,6 @@ enum MasterEventType {
 	MASTER_EVENT_TYPE_DELETE_RESPONSE_FAILURE,
 	// REDIRECT
 	MASTER_EVENT_TYPE_REDIRECT_RESPONSE,
-	// Degraded operation
-	MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED,
-	MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_WAS_LOCKED,
-	MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_REMAPPED,
-	MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_FOUND,
 	// Pending
 	MASTER_EVENT_TYPE_PENDING
 };
@@ -61,10 +56,6 @@ public:
 			uint8_t opcode;
 			uint32_t listId, chunkId;
 		} remap;
-		struct {
-			Key key;
-			uint32_t listId, stripeId, chunkId;
-		} degradedLock;
 	} message;
 
 	// Register
@@ -84,10 +75,6 @@ public:
 	void resDelete( MasterSocket *socket, uint32_t id, Key &key, bool success, bool needsFree = true );
 	// Redirect
 	void resRedirect( MasterSocket *socket, uint32_t id, uint8_t opcode, Key &key, RemappingRecord record );
-	// Degraded lock
-	void resDegradedLock( MasterSocket *socket, uint32_t id, Key &key, bool isLocked, uint32_t listId, uint32_t stripeId, uint32_t chunkId );
-	void resDegradedLock( MasterSocket *socket, uint32_t id, Key &key, uint32_t listId, uint32_t chunkId );
-	void resDegradedLock( MasterSocket *socket, uint32_t id, Key &key );
 	// Pending
 	void pending( MasterSocket *socket );
 };

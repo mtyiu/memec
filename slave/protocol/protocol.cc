@@ -169,10 +169,24 @@ char* SlaveProtocol::resRedirect( size_t &size, uint32_t id, uint8_t opcode, uin
 	return this->buffer.send;
 }
 
+char *SlaveProtocol::reqDegradedLock( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, char *key, uint8_t keySize ) {
+	size = this->generateDegradedLockReqHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_DEGRADED_LOCK,
+		id,
+		listId,
+		chunkId,
+		keySize,
+		key
+	);
+	return this->buffer.send;
+}
+
 char *SlaveProtocol::resDegradedLock( size_t &size, uint32_t id, uint8_t keySize, char *key, bool isLocked, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) {
 	size = this->generateDegradedLockResHeader(
 		isLocked ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
-		PROTO_MAGIC_TO_MASTER,
+		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_DEGRADED_LOCK,
 		id,
 		isLocked,
@@ -185,7 +199,7 @@ char *SlaveProtocol::resDegradedLock( size_t &size, uint32_t id, uint8_t keySize
 char *SlaveProtocol::resDegradedLock( size_t &size, uint32_t id, uint8_t keySize, char *key, uint32_t listId, uint32_t chunkId ) {
 	size = this->generateDegradedLockResHeader(
 		PROTO_MAGIC_RESPONSE_FAILURE,
-		PROTO_MAGIC_TO_MASTER,
+		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_DEGRADED_LOCK,
 		id,
 		keySize, key,
@@ -197,7 +211,7 @@ char *SlaveProtocol::resDegradedLock( size_t &size, uint32_t id, uint8_t keySize
 char *SlaveProtocol::resDegradedLock( size_t &size, uint32_t id, uint8_t keySize, char *key ) {
 	size = this->generateDegradedLockResHeader(
 		PROTO_MAGIC_RESPONSE_FAILURE,
-		PROTO_MAGIC_TO_MASTER,
+		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_DEGRADED_LOCK,
 		id,
 		keySize,
