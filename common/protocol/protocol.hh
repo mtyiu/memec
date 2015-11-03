@@ -119,8 +119,8 @@ struct AddressHeader {
 //////////////////////////////////////////
 #define PROTO_HEARTBEAT_SIZE 12
 struct HeartbeatHeader {
-    uint32_t sealed;
-    uint32_t keys;
+	uint32_t sealed;
+	uint32_t keys;
 };
 
 #define PROTO_METADATA_SIZE 12
@@ -276,20 +276,20 @@ struct DegradedLockReqHeader {
 #define PROTO_DEGRADED_LOCK_RES_REMAPPED   3   // Return remap
 #define PROTO_DEGRADED_LOCK_RES_NOT_EXIST  4   // Return nothing
 struct DegradedLockResHeader {
-    uint8_t type;
-    uint8_t keySize;
-    char *key;
-    union {
-        struct {
-            uint32_t listId;
-            uint32_t stripeId;
-            uint32_t chunkId;
-        } metadata;
-        struct {
-            uint32_t listId;
-            uint32_t chunkId;
-        } remap;
-    };
+	uint8_t type;
+	uint8_t keySize;
+	char *key;
+	union {
+		struct {
+			uint32_t listId;
+			uint32_t stripeId;
+			uint32_t chunkId;
+		} metadata;
+		struct {
+			uint32_t listId;
+			uint32_t chunkId;
+		} remap;
+	} data;
 };
 
 //////////////
@@ -556,6 +556,37 @@ protected:
 		uint8_t &keySize, char *&key,
 		char *buf, size_t size
 	);
+	size_t generateDegradedLockResHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t type, uint8_t keySize, char *key, char *&buf
+	);
+	size_t generateDegradedLockResHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		bool isLocked, uint8_t keySize, char *key,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId
+	);
+	size_t generateDegradedLockResHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t keySize, char *key,
+		uint32_t listId, uint32_t chunkId
+	);
+	size_t generateDegradedLockResHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t keySize, char *key
+	);
+	bool parseDegradedLockResHeader(
+		size_t offset, uint8_t &type,
+		uint8_t &keySize, char *&key,
+		char *buf, size_t size
+	);
+	bool parseDegradedLockResHeader(
+		size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
+		char *buf, size_t size
+	);
+	bool parseDegradedLockResHeader(
+		size_t offset, uint32_t &listId, uint32_t &chunkId,
+		char *buf, size_t size
+	);
 
 	//////////////
 	// Recovery //
@@ -716,6 +747,10 @@ public:
 	//////////////////////////
 	bool parseDegradedLockReqHeader(
 		struct DegradedLockReqHeader &header,
+		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
+	bool parseDegradedLockResHeader(
+		struct DegradedLockResHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 	//////////////
