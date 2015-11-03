@@ -186,7 +186,7 @@ public:
 		LOCK( &this->degradedLockLock );
 		it = this->degradedLock.find( original );
 
-		if ( it != this->degradedLock.end() ) {
+		if ( it == this->degradedLock.end() ) {
 			r = this->degradedLock.insert( p );
 			ret = r.second;
 		} else {

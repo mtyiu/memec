@@ -601,9 +601,10 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 
 	if ( chunkId != newChunkId ) {
 		////////// Degraded GET //////////
-		DegradedLock degradedLock;
-
 		printf( "[GET] Performing degraded operation on %u to %u...\n", chunkId, newChunkId );
+
+		/*
+		DegradedLock degradedLock;
 
 		buffer.data = this->protocol.reqDegradedLock( buffer.size, requestId, listId, newChunkId, header.key, header.keySize );
 
@@ -619,6 +620,7 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 			__ERROR__( "MasterWorker", "handleGetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 			return false;
 		}
+		*/
 	} else {
 		////////// Normal GET //////////
 		buffer.data = this->protocol.reqGet( buffer.size, requestId, header.key, header.keySize );
