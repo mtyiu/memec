@@ -14,6 +14,7 @@ MasterConfig::MasterConfig() {
 	this->remap.forceEnabled = false;
 	this->remap.forceNoCacheRecords = false;
 	this->degraded.isFixed = true;
+	this->degraded.disabled = false;
 }
 
 bool MasterConfig::merge( GlobalConfig &globalConfig ) {
@@ -114,6 +115,8 @@ bool MasterConfig::set( const char *section, const char *name, const char *value
 	} else if ( match( section, "degraded" ) ) {
 		if ( match ( name, "target" ) )
 			this->degraded.isFixed = ! match( value, "dynamic" );
+		else if ( match ( name, "disabled" ) )
+			this->degraded.disabled = match( value, "true" );
 		else
 			return false;
 	} else {
@@ -237,12 +240,14 @@ void MasterConfig::print( FILE *f ) {
 		"\t- %-*s : %s\n"
 		"\t- %-*s : %s\n"
 		"- Degraded operations\n"
+		"\t- %-*s : %s\n"
 		"\t- %-*s : %s\n",
 		width, "Packets", this->pool.packets,
 		width, "Update interval (ms)", this->loadingStats.updateInterval,
 		width, "Force enabled?", this->remap.forceEnabled ? "true" : "false",
 		width, "No search on cached records?", this->remap.forceNoCacheRecords ? "true" : "false",
-		width, "Target", this->degraded.isFixed ? "Fixed" : "Dynamic"
+		width, "Target", this->degraded.isFixed ? "Fixed" : "Dynamic",
+		width, "Disabled", this->degraded.disabled ? "true" : "false"
 	);
 
 	fprintf( f, "\n" );

@@ -103,10 +103,10 @@ bool MixedChunkBuffer::updateKeyValue( char *keyStr, uint8_t keySize, uint32_t o
 	}
 }
 
-void MixedChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, char *dataDelta, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk ) {
+void MixedChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, char *dataDelta, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, bool isDelete ) {
 	switch( this->role ) {
 		case CBR_PARITY:
-			this->buffer.parity->update( stripeId, chunkId, offset, size, dataDelta, dataChunks, dataChunk, parityChunk );
+			this->buffer.parity->update( stripeId, chunkId, offset, size, dataDelta, dataChunks, dataChunk, parityChunk, isDelete );
 			break;
 		default:
 			return;

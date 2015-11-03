@@ -12,6 +12,7 @@
 uint32_t MasterWorker::dataChunkCount;
 uint32_t MasterWorker::parityChunkCount;
 bool MasterWorker::degradedTargetIsFixed;
+bool MasterWorker::degradedIsDisabled;
 IDGenerator *MasterWorker::idGenerator;
 Pending *MasterWorker::pending;
 MasterEventQueue *MasterWorker::eventQueue;
@@ -494,7 +495,7 @@ SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId
 SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, uint32_t &newChunkId, SlaveSocket *&original ) {
 	original = this->getSlaves( data, size, listId, chunkId );
 	newChunkId = chunkId;
-	if ( MasterWorker::remapMsgHandler->useRemappingFlow() ) {
+	if ( MasterWorker::remapMsgHandler->useRemappingFlow() && ! MasterWorker::degradedIsDisabled ) {
 		// Perform degraded operation
 		if ( MasterWorker::degradedTargetIsFixed ) {
 			if ( ! BasicRemappingScheme::isOverloaded( original ) )
@@ -1648,6 +1649,7 @@ bool MasterWorker::init() {
 	MasterWorker::dataChunkCount = master->config.global.coding.params.getDataChunkCount();
 	MasterWorker::parityChunkCount = master->config.global.coding.params.getParityChunkCount();
 	MasterWorker::degradedTargetIsFixed = master->config.master.degraded.isFixed;
+	MasterWorker::degradedIsDisabled = master->config.master.degraded.disabled;
 	MasterWorker::pending = &master->pending;
 	MasterWorker::eventQueue = &master->eventQueue;
 	MasterWorker::stripeList = master->stripeList;

@@ -1730,7 +1730,8 @@ bool SlaveWorker::handleDeleteChunkRequest( SlavePeerEvent event, char *buf, siz
 	SlaveWorker::chunkBuffer->at( header.listId )->update(
 		header.stripeId, header.chunkId,
 		header.offset, header.length, header.delta,
-		this->chunks, this->dataChunk, this->parityChunk
+		this->chunks, this->dataChunk, this->parityChunk,
+		true /* isDelete */
 	);
 	ret = true;
 

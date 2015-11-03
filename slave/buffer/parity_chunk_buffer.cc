@@ -2,9 +2,24 @@
 #include "../../common/util/debug.hh"
 
 ParityChunkWrapper::ParityChunkWrapper() {
-	this->pending = ChunkBuffer::dataChunkCount;
+	this->pending = new bool[ ChunkBuffer::dataChunkCount ];
 	LOCK_INIT( &this->lock );
 	this->chunk = 0;
+
+	for ( uint32_t i = 0; i < ChunkBuffer::dataChunkCount; i++ )
+		this->pending[ i ] = true;
+}
+
+uint32_t ParityChunkWrapper::countPending() {
+	uint32_t ret = 0;
+	for ( uint32_t i = 0; i < ChunkBuffer::dataChunkCount; i++ )
+		if ( this->pending[ i ] )
+			ret++;
+	return ret;
+}
+
+void ParityChunkWrapper::free() {
+	delete[] this->pending;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -162,7 +177,7 @@ bool ParityChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t coun
 	}
 	assert( numOfKeys == count );
 	dataChunk->setSize( curPos );
-	this->update( stripeId, chunkId, 0, curPos, dataChunks, dataChunk, parityChunk, false, false );
+	this->update( stripeId, chunkId, 0, curPos, dataChunks, dataChunk, parityChunk, false, false, true );
 	UNLOCK( &this->lock );
 
 	return true;
@@ -239,7 +254,7 @@ bool ParityChunkBuffer::updateKeyValue( char *keyStr, uint8_t keySize, uint32_t 
 	return true;
 }
 
-void ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, bool needsLock, bool needsUnlock ) {
+void ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, bool needsLock, bool needsUnlock, bool isSeal, bool isDelete ) {
 	// Prepare the stripe
 	for ( uint32_t i = 0; i < ChunkBuffer::dataChunkCount; i++ )
 		dataChunks[ i ] = Coding::zeros;
@@ -270,16 +285,20 @@ void ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t of
 		parityChunk->getData(),
 		ChunkBuffer::capacity
 	);
+	if ( isSeal )
+		wrapper.pending[ chunkId ] = false;
+	else if ( isDelete )
+		wrapper.pending[ chunkId ] = true;
 	UNLOCK( &wrapper.lock );
 	if ( needsUnlock ) UNLOCK( &this->lock );
 }
 
-void ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, char *dataDelta, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk ) {
+void ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, char *dataDelta, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, bool isDelete ) {
 	// Prepare data delta
 	dataChunk->clear();
 	dataChunk->setSize( offset + size );
 	memcpy( dataChunk->getData() + offset, dataDelta, size );
-	this->update( stripeId, chunkId, offset, size, dataChunks, dataChunk, parityChunk, true, true );
+	this->update( stripeId, chunkId, offset, size, dataChunks, dataChunk, parityChunk, true, true, false, true );
 }
 
 void ParityChunkBuffer::print( FILE *f ) {
@@ -302,14 +321,15 @@ void ParityChunkBuffer::print( FILE *f ) {
 		it++
 	) {
 		ParityChunkWrapper &wrapper = it->second;
-		if ( wrapper.pending ) {
+		uint32_t pending = wrapper.countPending();
+		if ( pending ) {
 			numPending++;
 			occupied = ( double ) wrapper.chunk->getSize() / ChunkBuffer::capacity * 100.0;
 			fprintf(
 				f,
 				"\t%u. [#%u] %u / %u (%5.2lf%%) (pending: %u)\n",
 				numPending, wrapper.chunk->metadata.stripeId, wrapper.chunk->getSize(), ChunkBuffer::capacity, occupied,
-				wrapper.pending
+				pending
 			);
 			// The pending number does not necessarily equal to the number of data chunks in the dummy data chunk buffer as they may not have been allocated!
 		}

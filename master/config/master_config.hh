@@ -56,6 +56,7 @@ public:
 	} remap;
 	struct {
 		bool isFixed;
+		bool disabled;
 	} degraded;
 
 	MasterConfig();

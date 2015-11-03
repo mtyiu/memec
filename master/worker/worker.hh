@@ -31,6 +31,7 @@ private:
 	static uint32_t dataChunkCount;
 	static uint32_t parityChunkCount;
 	static bool degradedTargetIsFixed;
+	static bool degradedIsDisabled;
 	static IDGenerator *idGenerator;
 	static Pending *pending;
 	static MasterEventQueue *eventQueue;

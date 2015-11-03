@@ -7,11 +7,13 @@
 
 class ParityChunkWrapper {
 public:
-	uint32_t pending;
+	bool *pending;
 	LOCK_T lock;
 	Chunk *chunk;
 
 	ParityChunkWrapper();
+	uint32_t countPending();
+	void free();
 };
 
 enum PendingRequestType {
@@ -66,7 +68,7 @@ private:
 	// Store the request that update the not-yet-received keys
 	std::unordered_map<Key, PendingRequest> pending;
 
-	void update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, bool needsLock = true, bool needsUnlock = true );
+	void update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, bool needsLock = true, bool needsUnlock = true, bool isSeal = false, bool isDelete = false );
 
 public:
 	ParityChunkBuffer( uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId );
@@ -75,7 +77,7 @@ public:
 	bool seal( uint32_t stripeId, uint32_t chunkId, uint32_t count, char *sealData, size_t sealDataSize, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk );
 	bool deleteKey( char *keyStr, uint8_t keySize );
 	bool updateKeyValue( char *keyStr, uint8_t keySize, uint32_t offset, uint32_t length, char *valueUpdate );
-	void update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, char *dataDelta, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk );
+	void update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, char *dataDelta, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, bool isDelete = false );
 	void print( FILE *f = stdout );
 	void stop();
 };
