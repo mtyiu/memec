@@ -8,6 +8,7 @@
 #include "../ds/remap_flag.hh"
 #include "../event/event_queue.hh"
 #include "../protocol/protocol.hh"
+#include "../remap/remap_msg_handler.hh"
 #include "../socket/slave_socket.hh"
 #include "../../common/worker/worker.hh"
 #include "../../common/config/global_config.hh"
@@ -29,6 +30,7 @@ private:
 	SlaveSocket **paritySlaveSockets;
 	static uint32_t dataChunkCount;
 	static uint32_t parityChunkCount;
+	static bool degradedTargetIsFixed;
 	static IDGenerator *idGenerator;
 	static Pending *pending;
 	static MasterEventQueue *eventQueue;
@@ -36,6 +38,7 @@ private:
 	static Counter *counter;
 	static RemapFlag *remapFlag;
 	static PacketPool *packetPool;
+	static MasterRemapMsgHandler *remapMsgHandler;
 	static RemappingRecordMap *remappingRecords;
 
 	void dispatch( MixedEvent event );
@@ -47,7 +50,7 @@ private:
 	// For normal operations
 	SlaveSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId );
 	// For degraded oeprations
-	SlaveSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, uint32_t &newChunkId );
+	SlaveSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, uint32_t &newChunkId, SlaveSocket *&original );
 	// For remapping
 	SlaveSocket *getSlaves( char *data, uint8_t size, uint32_t &originalListId, uint32_t &originalChunkId, uint32_t &remappedListId, uint32_t &remappedChunkId );
 	SlaveSocket *getSlaves( uint32_t listId, uint32_t chunkId );

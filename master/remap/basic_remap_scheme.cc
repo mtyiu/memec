@@ -182,3 +182,20 @@ exit:
 	UNLOCK( &overloadedSlave->lock );
 	UNLOCK( &slaveLoading->lock );
 }
+
+bool BasicRemappingScheme::isOverloaded( SlaveSocket *socket ) {
+	struct sockaddr_in slaveAddr;
+
+	if ( slaveLoading == NULL || overloadedSlave == NULL || stripeList == NULL || remapMsgHandler == NULL ) {
+		fprintf( stderr, "The scheme is not yet initialized!! Abort degraded operation!\n" );
+		return false;
+	}
+
+	// check if remapping is allowed
+	if ( ! remapMsgHandler->allowRemapping() )
+		return false;
+
+	slaveAddr = socket->getAddr();
+
+	return ( overloadedSlave->slaveSet.count( slaveAddr ) >= 1 );
+}

@@ -54,6 +54,9 @@ public:
 		bool forceEnabled;
 		bool forceNoCacheRecords;
 	} remap;
+	struct {
+		bool isFixed;
+	} degraded;
 
 	MasterConfig();
 	bool merge( GlobalConfig &globalConfig );

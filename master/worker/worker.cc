@@ -11,6 +11,7 @@
 
 uint32_t MasterWorker::dataChunkCount;
 uint32_t MasterWorker::parityChunkCount;
+bool MasterWorker::degradedTargetIsFixed;
 IDGenerator *MasterWorker::idGenerator;
 Pending *MasterWorker::pending;
 MasterEventQueue *MasterWorker::eventQueue;
@@ -18,7 +19,8 @@ StripeList<SlaveSocket> *MasterWorker::stripeList;
 PacketPool *MasterWorker::packetPool;
 Counter *MasterWorker::counter;
 RemapFlag *MasterWorker::remapFlag;
-RemappingRecordMap *MasterWorker::remappingRecords = &Master::getInstance()->remappingRecords;
+RemappingRecordMap *MasterWorker::remappingRecords;
+MasterRemapMsgHandler *MasterWorker::remapMsgHandler;
 
 void MasterWorker::dispatch( MixedEvent event ) {
 	switch( event.type ) {
@@ -170,7 +172,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 						this->handleGetRequest( event, buffer.data, buffer.size );
 						break;
 					case PROTO_OPCODE_SET:
-						if ( Master::getInstance()->remapMsgHandler.useRemappingFlow() ) {
+						if ( MasterWorker::remapMsgHandler->useRemappingFlow() ) {
 							this->handleRemappingSetRequest( event, buffer.data, buffer.size );
 						} else {
 							this->handleSetRequest( event, buffer.data, buffer.size );
@@ -476,35 +478,50 @@ SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId
 			this->paritySlaveSockets,
 			this->dataSlaveSockets
 		);
-		ret = this->dataSlaveSockets[ chunkId ];
 	} else { // non-remapped keys
 		listId = MasterWorker::stripeList->get(
 			data, ( size_t ) size,
 			this->dataSlaveSockets,
 			this->paritySlaveSockets,
-			&chunkId, false
+			&chunkId, true
 		);
-		ret = *this->dataSlaveSockets;
 	}
+	ret = this->dataSlaveSockets[ chunkId ];
 
 	return ret->ready() ? ret : 0;
 }
 
-SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, uint32_t &newChunkId ) {
-	SlaveSocket *ret = this->getSlaves( data, size, listId, chunkId );
+SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, uint32_t &newChunkId, SlaveSocket *&original ) {
+	original = this->getSlaves( data, size, listId, chunkId );
 	newChunkId = chunkId;
-	if ( Master::getInstance()->remapMsgHandler.useRemappingFlow() ) {
+	if ( MasterWorker::remapMsgHandler->useRemappingFlow() ) {
 		// Perform degraded operation
-		BasicRemappingScheme::getDegradedOpTarget(
-			listId, chunkId, newChunkId,
-			MasterWorker::dataChunkCount,
-			MasterWorker::parityChunkCount,
-			this->dataSlaveSockets,
-			this->paritySlaveSockets
-		);
+		if ( MasterWorker::degradedTargetIsFixed ) {
+			if ( ! BasicRemappingScheme::isOverloaded( original ) )
+				return original; // not overloaded
+
+			// Pick a new server from the same stripe list to handle the request
+			for ( uint32_t jump = 0, chunkCount = MasterWorker::dataChunkCount + MasterWorker::parityChunkCount; jump < chunkCount; jump++ ) {
+				SlaveSocket *target = MasterWorker::stripeList->get( listId, chunkId, jump, &newChunkId );
+				if ( target->ready() )
+					return target;
+			}
+			__ERROR__( "MasterWorker", "getSlaves", "No slaves are available for degraded operations." );
+			return 0;
+		} else {
+			BasicRemappingScheme::getDegradedOpTarget(
+				listId, chunkId, newChunkId,
+				MasterWorker::dataChunkCount,
+				MasterWorker::parityChunkCount,
+				this->dataSlaveSockets,
+				this->paritySlaveSockets
+			);
+			if ( newChunkId < MasterWorker::dataChunkCount )
+				return this->dataSlaveSockets[ newChunkId ];
+			return this->paritySlaveSockets[ newChunkId - MasterWorker::dataChunkCount ];
+		}
 	}
-	// Always return the original data slave socket
-	return ret;
+	return original;
 }
 
 SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &originalListId, uint32_t &originalChunkId, uint32_t &remappedListId, uint32_t &remappedChunkId ) {
@@ -555,11 +572,11 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 
 	uint32_t listId, chunkId, newChunkId;
 	bool connected;
-	SlaveSocket *socket;
+	SlaveSocket *socket, *target;
 
 	socket = this->getSlaves(
 		header.key, header.keySize,
-		listId, chunkId, newChunkId
+		listId, chunkId, newChunkId, target
 	);
 	if ( ! socket ) {
 		Key key;
@@ -654,7 +671,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		event.resSet( event.socket, event.id, key, false, false );
 		this->dispatch( event );
 		MasterWorker::counter->decreaseNormal();
-		Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
+		MasterWorker::remapMsgHandler->ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
 		return false;
 	}
 
@@ -729,7 +746,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		if ( sentBytes != ( ssize_t ) buffer.size ) {
 			__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 			MasterWorker::counter->decreaseNormal();
-			Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
+			MasterWorker::remapMsgHandler->ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
 			return false;
 		}
 #endif
@@ -739,13 +756,13 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		if ( sentBytes != ( ssize_t ) buffer.size ) {
 			__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 			MasterWorker::counter->decreaseNormal();
-			Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
+			MasterWorker::remapMsgHandler->ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
 			return false;
 		}
 	}
 
 	MasterWorker::counter->decreaseNormal();
-	Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
+	MasterWorker::remapMsgHandler->ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
 	return true;
 }
 
@@ -764,11 +781,11 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 
 	uint32_t listId, chunkId, newChunkId;
 	bool connected;
-	SlaveSocket *socket;
+	SlaveSocket *socket, *target;
 
 	socket = this->getSlaves(
 		header.key, header.keySize,
-		listId, chunkId, newChunkId
+		listId, chunkId, newChunkId, target
 	);
 
 	if ( ! socket ) {
@@ -840,11 +857,11 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 
 	uint32_t listId, chunkId, newChunkId;
 	bool connected;
-	SlaveSocket *socket;
+	SlaveSocket *socket, *target;
 
 	socket = this->getSlaves(
 		header.key, header.keySize,
-		listId, chunkId, newChunkId
+		listId, chunkId, newChunkId, target
 	);
 
 	if ( ! socket ) {
@@ -939,7 +956,7 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 			MasterWorker::counter->decreaseLockOnly();
 		else
 			MasterWorker::counter->decreaseRemapping();
-		Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
+		MasterWorker::remapMsgHandler->ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
 		return false;
 	}
 
@@ -1003,14 +1020,14 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 				MasterWorker::counter->decreaseLockOnly();
 			else
 				MasterWorker::counter->decreaseRemapping();
-			Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
+			MasterWorker::remapMsgHandler->ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
 			return false;
 		}
 	}
 
 #undef NO_REMAPPING
 
-	Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
+	MasterWorker::remapMsgHandler->ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
 
 	return true;
 }
@@ -1356,7 +1373,7 @@ bool MasterWorker::handleRemappingSetLockResponse( SlaveEvent event, bool succes
 		// TODO is it possible to determine which counter to decrement? ..
 		// MasterWorker::counter->decreaseLockOnly();
 		MasterWorker::counter->decreaseRemapping();
-		Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
+		MasterWorker::remapMsgHandler->ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
 		return false;
 	}
 	__DEBUG__(
@@ -1372,7 +1389,7 @@ bool MasterWorker::handleRemappingSetLockResponse( SlaveEvent event, bool succes
 	if ( ! MasterWorker::pending->eraseRemappingRecord( PT_SLAVE_REMAPPING_SET, event.id, event.socket, &pid, &remappingRecord ) ) {
 		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Cannot find a pending slave REMAPPING_SET_LOCK request that matches the response. This message will be discarded. (ID: %u)", event.id );
 		MasterWorker::counter->decreaseRemapping();
-		Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
+		MasterWorker::remapMsgHandler->ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
 		return false;
 	}
 
@@ -1380,7 +1397,7 @@ bool MasterWorker::handleRemappingSetLockResponse( SlaveEvent event, bool succes
 		// TODO
 		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "TODO: Handle the case when the lock cannot be acquired." );
 		MasterWorker::counter->decreaseRemapping();
-		Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
+		MasterWorker::remapMsgHandler->ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
 		return false;
 	}
 
@@ -1394,14 +1411,14 @@ bool MasterWorker::handleRemappingSetLockResponse( SlaveEvent event, bool succes
 		// TODO
 		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Not yet implemented!" );
 		MasterWorker::counter->decreaseRemapping();
-		Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
+		MasterWorker::remapMsgHandler->ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
 		return false;
 	}
 
 	if ( ! MasterWorker::pending->findKey( PT_APPLICATION_SET, pid.parentId, 0, &key ) ) {
 		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded. (ID: %u)", event.id );
 		MasterWorker::counter->decreaseRemapping();
-		Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
+		MasterWorker::remapMsgHandler->ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
 		return false;
 	}
 
@@ -1503,7 +1520,7 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 			MasterWorker::counter->decreaseLockOnly();
 		else
 			MasterWorker::counter->decreaseRemapping();
-		Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
+		MasterWorker::remapMsgHandler->ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
 
 		return false;
 	}
@@ -1562,7 +1579,7 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 			MasterWorker::remappingRecords->insert( key, record );
 		}
 
-		Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
+		MasterWorker::remapMsgHandler->ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
 	}
 
 #undef NO_REMAPPING
@@ -1644,12 +1661,15 @@ bool MasterWorker::init() {
 	MasterWorker::idGenerator = &master->idGenerator;
 	MasterWorker::dataChunkCount = master->config.global.coding.params.getDataChunkCount();
 	MasterWorker::parityChunkCount = master->config.global.coding.params.getParityChunkCount();
+	MasterWorker::degradedTargetIsFixed = master->config.master.degraded.isFixed;
 	MasterWorker::pending = &master->pending;
 	MasterWorker::eventQueue = &master->eventQueue;
 	MasterWorker::stripeList = master->stripeList;
 	MasterWorker::counter = &master->counter;
 	MasterWorker::remapFlag = &master->remapFlag;
+	MasterWorker::remappingRecords = &master->remappingRecords;
 	MasterWorker::packetPool = &master->packetPool;
+	MasterWorker::remapMsgHandler = &master->remapMsgHandler;
 	return true;
 }
 

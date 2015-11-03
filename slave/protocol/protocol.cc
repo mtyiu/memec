@@ -169,6 +169,43 @@ char* SlaveProtocol::resRedirect( size_t &size, uint32_t id, uint8_t opcode, uin
 	return this->buffer.send;
 }
 
+char *SlaveProtocol::resDegradedLock( size_t &size, uint32_t id, uint8_t keySize, char *key, bool isLocked, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) {
+	size = this->generateDegradedLockResHeader(
+		isLocked ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+		PROTO_MAGIC_TO_MASTER,
+		PROTO_OPCODE_DEGRADED_LOCK,
+		id,
+		isLocked,
+		keySize, key,
+		listId, stripeId, chunkId
+	);
+	return this->buffer.send;
+}
+
+char *SlaveProtocol::resDegradedLock( size_t &size, uint32_t id, uint8_t keySize, char *key, uint32_t listId, uint32_t chunkId ) {
+	size = this->generateDegradedLockResHeader(
+		PROTO_MAGIC_RESPONSE_FAILURE,
+		PROTO_MAGIC_TO_MASTER,
+		PROTO_OPCODE_DEGRADED_LOCK,
+		id,
+		keySize, key,
+		listId, chunkId
+	);
+	return this->buffer.send;
+}
+
+char *SlaveProtocol::resDegradedLock( size_t &size, uint32_t id, uint8_t keySize, char *key ) {
+	size = this->generateDegradedLockResHeader(
+		PROTO_MAGIC_RESPONSE_FAILURE,
+		PROTO_MAGIC_TO_MASTER,
+		PROTO_OPCODE_DEGRADED_LOCK,
+		id,
+		keySize,
+		key
+	);
+	return this->buffer.send;
+}
+
 char *SlaveProtocol::reqRegisterSlavePeer( size_t &size, uint32_t id, ServerAddr *addr ) {
 	size = this->generateAddressHeader(
 		PROTO_MAGIC_REQUEST,

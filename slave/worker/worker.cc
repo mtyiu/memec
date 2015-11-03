@@ -222,6 +222,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		case MASTER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS:
+		case MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED:
 			success = true;
 			break;
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
@@ -232,6 +233,9 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
 		case MASTER_EVENT_TYPE_DELETE_RESPONSE_FAILURE:
 		case MASTER_EVENT_TYPE_REDIRECT_RESPONSE:
+		case MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_WAS_LOCKED:
+		case MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_REMAPPED:
+		case MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_FOUND:
 			success = false;
 			break;
 		default:
@@ -347,10 +351,42 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 				buffer.size,
 				event.id,
 				event.message.remap.opcode,
-				event.message.key.size,
-				event.message.key.data,
+				event.message.remap.key.size,
+				event.message.remap.key.data,
 				event.message.remap.listId,
 				event.message.remap.chunkId
+			);
+			break;
+		// Degraded operation
+		case MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED:
+		case MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_WAS_LOCKED:
+			buffer.data = this->protocol.resDegradedLock(
+				buffer.size,
+				event.id,
+				event.message.degradedLock.key.size,
+				event.message.degradedLock.key.data,
+				success,
+				event.message.degradedLock.listId,
+				event.message.degradedLock.stripeId,
+				event.message.degradedLock.chunkId
+			);
+			break;
+		case MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_REMAPPED:
+			buffer.data = this->protocol.resDegradedLock(
+				buffer.size,
+				event.id,
+				event.message.degradedLock.key.size,
+				event.message.degradedLock.key.data,
+				event.message.degradedLock.listId,
+				event.message.degradedLock.chunkId
+			);
+			break;
+		case MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_FOUND:
+			buffer.data = this->protocol.resDegradedLock(
+				buffer.size,
+				event.id,
+				event.message.degradedLock.key.size,
+				event.message.degradedLock.key.data
 			);
 			break;
 		// Pending
@@ -1594,22 +1630,28 @@ bool SlaveWorker::handleDegradedLockRequest( MasterEvent event, char *buf, size_
 
 	Metadata metadata;
 	RemappingRecord remappingRecord;
+	Key key;
+	key.set( header.keySize, header.key );
 
 	if ( map->findValueByKey( header.key, header.keySize, 0, 0, 0, &metadata ) ) {
 		// Not remapped: Find the stripe which contains the key
 		Metadata target;
 		target.set( header.dstListId, metadata.stripeId, header.dstChunkId );
 
-		if ( SlaveWorker::map->insertDegradedLock( metadata, target ) ) {
-			// The degraded lock is attained
-		} else {
-			// Degraded operation is performed before
-		}
+		bool ret = SlaveWorker::map->insertDegradedLock( metadata, target );
+		// ret is true if the degraded lock is attained
+		event.resDegradedLock(
+			event.socket, event.id, key, ret,
+			target.listId, target.stripeId, target.chunkId
+		);
 	} else if ( map->findRemappingRecordByKey( header.key, header.keySize, &remappingRecord ) ) {
 		// Remapped: Reject the degraded operation
+		event.resDegradedLock( event.socket, event.id, key, remappingRecord.listId, remappingRecord.chunkId );
 	} else {
 		// Key not found
+		event.resDegradedLock( event.socket, event.id, key );
 	}
+	this->dispatch( event );
 
 	return true;
 }
