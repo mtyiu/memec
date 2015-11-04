@@ -18,6 +18,8 @@ void MasterEvent::reqPushLoadStats( MasterSocket *socket, ArrayMap<struct sockad
 void MasterEvent::switchPhase( bool toRemap ) {
 	this->type = MASTER_EVENT_TYPE_SWITCH_PHASE;
 	this->message.remap.toRemap = toRemap;
+	// TODO specify the vector of slaves
+	this->message.remap.slaves = NULL;
 }
 
 void MasterEvent::pending( MasterSocket *socket ) {

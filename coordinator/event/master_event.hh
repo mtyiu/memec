@@ -28,6 +28,7 @@ public:
 		} slaveLoading;
 		struct {
 			bool toRemap;
+			std::vector<struct sockaddr_in> *slaves;
 		} remap;
 		struct {
 			size_t prevSize;

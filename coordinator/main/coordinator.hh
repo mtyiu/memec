@@ -64,7 +64,7 @@ public:
 	std::vector<ServerAddr *> addr;
 	StripeList<ServerAddr> *stripeList;
 	/* Remapping */
-	CoordinatorRemapMsgHandler remapMsgHandler;
+	CoordinatorRemapMsgHandler *remapMsgHandler;
 	RemappingRecordMap remappingRecords;
 	/* Loading statistics */
 	struct {

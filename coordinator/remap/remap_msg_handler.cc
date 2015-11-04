@@ -4,19 +4,27 @@
 #include <sp.h>
 #include <unistd.h>
 #include "remap_msg_handler.hh"
+#include "remap_worker.hh"
 #include "../../common/remap/remap_group.hh"
 
 using namespace std;
 
 #define POLL_ACK_TIME_INTVL	 1   // in seconds
+#define WORKER_NUM			 4
 
 CoordinatorRemapMsgHandler::CoordinatorRemapMsgHandler() :
 		RemapMsgHandler() {
 	this->group = ( char* ) COORD_GROUP;
-	pthread_rwlock_init( &this->mastersLock, NULL );
+	LOCK_INIT( &this->mastersLock );
+	LOCK_INIT( &this->mastersAckLock );
+	slavesStatusLock.clear();
+	this->eventQueue = new EventQueue<RemapStatusEvent>( WORKER_NUM * WORKER_NUM );
+	this->workers = new CoordinatorRemapWorker[ WORKER_NUM ];
 }
 
 CoordinatorRemapMsgHandler::~CoordinatorRemapMsgHandler() {
+	delete this->eventQueue;
+	delete [] this->workers;
 }
 
 bool CoordinatorRemapMsgHandler::init( const int ip, const int port, const char *user ) {
@@ -44,13 +52,18 @@ void CoordinatorRemapMsgHandler::quit() {
 bool CoordinatorRemapMsgHandler::start() {
 	if ( ! this->isConnected )
 		return false;
-
+	// start event queue processing
+	this->eventQueue->start();
 	// read messages using a background thread
 	if ( pthread_create( &this->reader, NULL, CoordinatorRemapMsgHandler::readMessages, this ) < 0 ) {
 		fprintf( stderr, "Coordinator FAILED to start reading messages" );
 		return false;
 	}
 	this->isListening = true;
+	// start all workers
+	for ( int i = 0; i < WORKER_NUM; i++ ) {
+		this->workers[i].start();
+	}
 	return true;
 }
 
@@ -58,79 +71,46 @@ bool CoordinatorRemapMsgHandler::stop() {
 	int ret = 0;
 	if ( ! this->isConnected || ! this->isListening )
 		return false;
+	// stop event queue processing
+	this->eventQueue->stop();
 	// no longer listen to incoming messages
 	this->isListening = false;
 	// avoid blocking call from blocking the stop action
 	ret = pthread_cancel( this->reader );
-
+	// stop all workers
+	for ( int i = 0; i < WORKER_NUM; i++ ) {
+		this->workers[i].stop();
+	}
 	return ( ret == 0 );
 }
 
-bool CoordinatorRemapMsgHandler::startRemap() {
-	pthread_rwlock_wrlock( &this->stlock );
-	if ( this->status != REMAP_NONE &&
-			this->status != REMAP_PREPARE_START ) {
-		pthread_rwlock_unlock( &this->stlock );
-		return false;
-	}
-
-	resetMasterAck();
-
-	// ask master to prepare for start
-	if ( this->sendMessageToMasters( REMAP_PREPARE_START ) == false ) {
-		pthread_rwlock_unlock( &this->stlock );
-		return false;
-	}
-	this->status = REMAP_PREPARE_START;
-	pthread_rwlock_unlock( &this->stlock );
-
-	// wait for ack (busy waiting)
-	while( isAllMasterAcked() == false )
-		sleep(POLL_ACK_TIME_INTVL);
-
-	// ask master to start remap
-	pthread_rwlock_wrlock( &this->stlock );
-	if ( this->sendMessageToMasters( REMAP_START ) == false ) {
-		pthread_rwlock_unlock( &this->stlock );
-		return false;
-	}
-	this->status = REMAP_START;
-	pthread_rwlock_unlock( &this->stlock );
-	return true;
+bool CoordinatorRemapMsgHandler::startRemap( std::vector<struct sockaddr_in> *slaves ) {
+	RemapStatusEvent event;
+	event.start = true;
+	return this->insertRepeatedEvents( event, slaves );
 }
 
-bool CoordinatorRemapMsgHandler::stopRemap() {
+bool CoordinatorRemapMsgHandler::stopRemap( std::vector<struct sockaddr_in> *slaves ) {
+	RemapStatusEvent event;
+	event.start = false;
+	return this->insertRepeatedEvents( event, slaves );
+}
 
-	pthread_rwlock_wrlock( &this->stlock );
-	if ( this->status != REMAP_START &&
-			this->status != REMAP_PREPARE_END ) {
-		pthread_rwlock_unlock( &this->stlock );
-		return false;
+bool CoordinatorRemapMsgHandler::insertRepeatedEvents( RemapStatusEvent event, std::vector<struct sockaddr_in> *slaves ) {
+	bool ret = true;
+	uint32_t i = 0;
+	for ( i = 0; i < slaves->size(); i++ ) {
+		event.slave = slaves->at(i);
+		ret = this->eventQueue->insert( event );
+		if ( ! ret ) 
+			break;
 	}
-
-	resetMasterAck();
-
-	// ask master to stop remapping
-	if ( this->sendMessageToMasters( REMAP_PREPARE_END ) == false ) {
-		pthread_rwlock_unlock( &this->stlock );
-		return false;
-	}
-	this->status = REMAP_PREPARE_END ;
-	pthread_rwlock_unlock( &this->stlock );
-
-	// TODO wait for ack.
-	while( isAllMasterAcked() == false )
-		sleep(1);
-
-	// ask master to use normal SET workflow
-	pthread_rwlock_wrlock( &this->stlock );
-	if ( this->sendMessageToMasters( REMAP_END ) == false ) {
-		pthread_rwlock_unlock( &this->stlock );
-		return false;
-	}
-	this->status = REMAP_NONE ;
-	pthread_rwlock_unlock( &this->stlock );
-	return true;
+	// notify the caller if any slave cannot start remapping
+	if ( ret )
+		slaves->clear();
+	else
+		slaves->erase( slaves->begin(), slaves->begin()+i );
+	return ret;
 }
 
 bool CoordinatorRemapMsgHandler::isMasterLeft( int service, char *msg, char *subject ) {
@@ -154,6 +134,7 @@ bool CoordinatorRemapMsgHandler::isMasterJoin( int service, char *msg, char *sub
 	return false;
 }
 
+// TODO !!! redefine protocol here
 bool CoordinatorRemapMsgHandler::sendMessageToMasters( RemapStatus to ) {
 	if ( to == REMAP_UNDEFINED ) {
 		to = this->status;
@@ -187,10 +168,10 @@ void *CoordinatorRemapMsgHandler::readMessages( void *argv ) {
 		if ( ! regular && fromMaster && myself->isMasterJoin( service , msg, subject ) ) {
 			// master joined ( masters group )
 			myself->addAliveMaster( subject );
-			pthread_rwlock_rdlock( &myself->stlock );
+			LOCK( &myself->stlock );
 			// notify the new master about the remapping status
 			myself->sendMessageToMasters();
-			pthread_rwlock_unlock( &myself->stlock );
+			LOCK( &myself->stlock );
 		} else if ( ! regular && myself->isMasterLeft( service , msg, subject ) ) {
 			// master left
 			myself->removeAliveMaster( subject );
@@ -207,6 +188,7 @@ void *CoordinatorRemapMsgHandler::readMessages( void *argv ) {
 	return ( void* ) &myself->msgCount;
 }
 
+// TODO !!! redefine protocol here
 bool CoordinatorRemapMsgHandler::updateStatus( char *subject, char *msg, int len ) {
 
 	RemapStatus reply = ( RemapStatus ) atoi ( msg );
@@ -216,47 +198,76 @@ bool CoordinatorRemapMsgHandler::updateStatus( char *subject, char *msg, int len
 		return false;
 	}
 
-	pthread_rwlock_rdlock( &this->stlock );
+	LOCK( &this->stlock );
 	if ( ( this->status == REMAP_PREPARE_START && reply == REMAP_WAIT_START ) ||
 			( this->status == REMAP_PREPARE_END && reply == REMAP_WAIT_END ) ) {
 		// ack to preparation for starting/ending the remapping phase
-		pthread_rwlock_wrlock( &this->mastersLock );
-		if ( aliveMasters.count( string( subject ) ) )
-			 ackMasters.insert( string( subject ) );
+		LOCK( &this->mastersLock );
+		//if ( aliveMasters.count( string( subject ) ) )
+		//	 ackMasters.insert( string( subject ) );
 		//else
 		//	fprintf( stderr, "master not found %s!!\n", subject );
-		pthread_rwlock_unlock( &this->mastersLock );
+		UNLOCK( &this->mastersLock );
 	}
-	pthread_rwlock_unlock( &this->stlock );
+	UNLOCK( &this->stlock );
 
 	return true;
 }
 
 void CoordinatorRemapMsgHandler::addAliveMaster( char *name ) {
-	pthread_rwlock_wrlock( &this->mastersLock );
+	LOCK( &this->mastersLock );
 	aliveMasters.insert( string( name ) );
-	pthread_rwlock_unlock( &this->mastersLock );
+	UNLOCK( &this->mastersLock );
 }
 
 void CoordinatorRemapMsgHandler::removeAliveMaster( char *name ) {
-	pthread_rwlock_wrlock( &this->mastersLock );
+	LOCK( &this->mastersLock );
 	aliveMasters.erase( string( name ) );
-	ackMasters.erase( string( name ) );
-	pthread_rwlock_unlock( &this->mastersLock );
+	UNLOCK( &this->mastersLock );
+
+	// remove the master from all alive slaves ack. pool
+	LOCK( &this->mastersAckLock );
+	for( auto it : ackMasters ) {
+		it.second->erase( name );
+	}
+	UNLOCK( &this->mastersAckLock );
 }
 
-bool CoordinatorRemapMsgHandler::resetMasterAck() {
-	pthread_rwlock_wrlock( &this->mastersLock );
-	ackMasters.clear();
-	pthread_rwlock_unlock( &this->mastersLock );
+void CoordinatorRemapMsgHandler::addAliveSlave( struct sockaddr_in slave ) {
+	LOCK( &this->mastersAckLock );
+	ackMasters[ slave ] = new std::set<std::string>();
+	UNLOCK( &this->mastersAckLock );
+}
+
+void CoordinatorRemapMsgHandler::removeAliveSlave( struct sockaddr_in slave ) {
+	LOCK( &this->mastersAckLock );
+	delete ackMasters[ slave ];
+	ackMasters.erase( slave );
+	UNLOCK( &this->mastersAckLock );
+}
+
+bool CoordinatorRemapMsgHandler::resetMasterAck( struct sockaddr_in slave ) {
+	LOCK( &this->mastersAckLock );
+	// slave does not exists
+	if ( ackMasters.count( slave ) == 0 ) {
+		UNLOCK( &this->mastersLock );
+		return false;
+	}
+	ackMasters[ slave ]->clear();
+	UNLOCK( &this->mastersAckLock );
 	return true;
 }
 
-bool CoordinatorRemapMsgHandler::isAllMasterAcked() {
+bool CoordinatorRemapMsgHandler::isAllMasterAcked( struct sockaddr_in slave ) {
 	bool allAcked = false;
-	pthread_rwlock_wrlock( &this->mastersLock );
-	allAcked = ( aliveMasters.size() == ackMasters.size() );
-	fprintf( stderr, "%lu of %lu masters acked\n", ackMasters.size(), aliveMasters.size() );
-	pthread_rwlock_unlock( &this->mastersLock );
+	LOCK( &this->mastersAckLock );
+	// TODO slave is no longer accessiable
+	if ( ackMasters.count( slave ) == 0 ) {
+		UNLOCK( &this->mastersLock );
+		return true;
+	}
+	allAcked = ( aliveMasters.size() == ackMasters[ slave ]->size() );
+	fprintf( stderr, "%lu of %lu masters acked\n", ackMasters[ slave ]->size(), aliveMasters.size() );
+	UNLOCK( &this->mastersLock );
 	return allAcked;
 }

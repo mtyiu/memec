@@ -6,7 +6,7 @@ RemapMsgHandler::RemapMsgHandler() {
 	this->isConnected = false;
 	this->msgCount = 0;
 	this->group = ( char* ) GROUP_NAME;
-	pthread_rwlock_init( &this->stlock, NULL );
+	LOCK_INIT( &this->stlock );
 }
 
 RemapMsgHandler::~RemapMsgHandler() {
@@ -23,9 +23,9 @@ bool RemapMsgHandler::init( const char *spread, const char *user ) {
 		memset( this->user + MAX_SPREAD_NAME - 1, 0, 1 );
 	}
 
-	pthread_rwlock_wrlock( &this->stlock );
+	LOCK( &this->stlock );
 	this->status = REMAP_NONE;
-	pthread_rwlock_unlock( &this->stlock );
+	UNLOCK( &this->stlock );
 	this->msgCount = 0;
 
 	// construct the spread name, username

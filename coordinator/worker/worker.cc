@@ -72,13 +72,17 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 			isSend = true;
 			break;
 		case MASTER_EVENT_TYPE_SWITCH_PHASE:
+			isSend = false;
+			if ( event.message.remap.slaves == NULL )
+				break;
 			// just trigger / stop the remap phase, no message need to be handled
 			if ( event.message.remap.toRemap ) {
-				coordinator->remapMsgHandler.startRemap();
+				coordinator->remapMsgHandler->startRemap( event.message.remap.slaves );
 			} else {
-				coordinator->remapMsgHandler.stopRemap();
+				coordinator->remapMsgHandler->stopRemap( event.message.remap.slaves );
 			}
-			isSend = false;
+			// free the vector of slaves?
+			delete event.message.remap.slaves;
 			break;
 		case MASTER_EVENT_TYPE_PENDING:
 			isSend = false;

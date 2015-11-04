@@ -7,6 +7,7 @@
 #include <pthread.h>
 #include <sp.h>
 #include "remap_status.hh"
+#include "../lock/lock.hh"
 
 #define MAX_MESSLEN	 1024
 #define MAX_SPREAD_NAME 1024
@@ -27,7 +28,7 @@ protected:
 
 	bool isConnected;
 
-	pthread_rwlock_t stlock;
+	LOCK_T stlock;
 	RemapStatus status;
 
 	inline void increMsgCount() {

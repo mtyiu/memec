@@ -107,9 +107,9 @@ void MasterRemapMsgHandler::setStatus( char* msg , int len ) {
 			return;
 	}
 
-	pthread_rwlock_wrlock( &this->stlock );
+	LOCK( &this->stlock );
 	this->status = signal;
-	pthread_rwlock_unlock( &this->stlock );
+	UNLOCK( &this->stlock );
 	if ( signal == REMAP_PREPARE_START || signal == REMAP_PREPARE_END )
 		this->ackRemap( Master::getInstance()->counter.getNormal(), Master::getInstance()->counter.getRemapping() );
 }
@@ -142,11 +142,11 @@ bool MasterRemapMsgHandler::ackRemap( uint32_t normal, uint32_t remapping ) {
 	int len = 0, ret = -1;
 	RemapStatus signal = REMAP_UNDEFINED;
 
-	pthread_rwlock_wrlock( &this->stlock );
+	LOCK( &this->stlock );
 	if ( ( this->status == REMAP_PREPARE_START && normal > 0 ) ||
 			( this->status == REMAP_PREPARE_END && remapping > 0 ) ||
 			( this->status != REMAP_PREPARE_START && this->status != REMAP_PREPARE_END ) ) {
-		pthread_rwlock_unlock( &this->stlock );
+		UNLOCK( &this->stlock );
 		return false;
 	}
 
@@ -158,7 +158,7 @@ bool MasterRemapMsgHandler::ackRemap( uint32_t normal, uint32_t remapping ) {
 			signal = REMAP_WAIT_END;
 			break;
 		default:
-			pthread_rwlock_unlock( &this->stlock );
+			UNLOCK( &this->stlock );
 			return false;
 	}
 
@@ -167,7 +167,7 @@ bool MasterRemapMsgHandler::ackRemap( uint32_t normal, uint32_t remapping ) {
 	if ( ret == len ) {
 		this->status = signal;
 	}
-	pthread_rwlock_unlock( &this->stlock );
+	UNLOCK( &this->stlock );
 
 	return true;
 }

@@ -28,11 +28,11 @@ bool Coordinator::switchPhase() {
 
 	MasterEvent event;
 	LOCK( &this->overloadedSlaves.lock );
-	if ( this->remapMsgHandler.isRemapStopped() &&
+	if ( this->remapMsgHandler->isRemapStopped() &&
 			this->overloadedSlaves.slaveSet.size() > this->sockets.slaves.size() * this->config.global.remap.startThreshold ) {
 		// start remapping phase in the background
 		event.switchPhase( true );
-	} else if ( this->remapMsgHandler.isRemapStarted() &&
+	} else if ( this->remapMsgHandler->isRemapStarted() &&
 			this->overloadedSlaves.slaveSet.size() < this->sockets.slaves.size() * this->config.global.remap.stopThreshold ) {
 		// stop remapping phase in the background
 		event.switchPhase( false );
@@ -260,7 +260,8 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 		char coordName[ 11 ];
 		memset( coordName, 0, 11 );
 		sprintf( coordName, "%s%04d", COORD_PREFIX, this->config.coordinator.coordinator.addr.id );
-		remapMsgHandler.init( this->config.global.remap.spreaddAddr.addr, this->config.global.remap.spreaddAddr.port, coordName );
+		remapMsgHandler->init( this->config.global.remap.spreaddAddr.addr, this->config.global.remap.spreaddAddr.port, coordName );
+		// TODO : add the slave addrs to remapMsgHandler
 	}
 
 	/* Slave Loading stats */
@@ -304,7 +305,7 @@ bool Coordinator::start() {
 	}
 
 	/* Remapping message handler */
-	if ( this->config.global.remap.enabled && ! this->remapMsgHandler.start() ) {
+	if ( this->config.global.remap.enabled && ! this->remapMsgHandler->start() ) {
 		__ERROR__( "Coordinator", "start", "Cannot start remapping message handler." );
 		return false;
 	}
@@ -351,8 +352,8 @@ bool Coordinator::stop() {
 
 	/* Remapping message handler */
 	if ( this->config.global.remap.enabled ) {
-		this->remapMsgHandler.stop();
-		this->remapMsgHandler.quit();
+		this->remapMsgHandler->stop();
+		this->remapMsgHandler->quit();
 	}
 
 	/* Loading stats */
