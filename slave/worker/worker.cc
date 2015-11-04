@@ -409,6 +409,15 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 						this->handleDeleteRequest( event, buffer.data, buffer.size );
 						this->load.del();
 						break;
+					case PROTO_OPCODE_DEGRADED_GET:
+						printf( "PROTO_OPCODE_DEGRADED_GET\n" );
+						break;
+					case PROTO_OPCODE_DEGRADED_UPDATE:
+						printf( "PROTO_OPCODE_DEGRADED_UPDATE\n" );
+						break;
+					case PROTO_OPCODE_DEGRADED_DELETE:
+						printf( "PROTO_OPCODE_DEGRADED_DELETE\n" );
+						break;
 					default:
 						__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from master." );
 						break;
@@ -870,10 +879,13 @@ SlavePeerSocket *SlaveWorker::getSlaves( char *data, uint8_t size, uint32_t &lis
 }
 
 bool SlaveWorker::getSlaves( uint32_t listId ) {
-	SlaveWorker::stripeList->get( listId, this->paritySlaveSockets );
+	SlaveWorker::stripeList->get( listId, this->paritySlaveSockets, this->dataSlaveSockets );
 
 	for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ )
 		if ( ! this->paritySlaveSockets[ i ]->ready() )
+			return false;
+	for ( uint32_t i = 0; i < SlaveWorker::dataChunkCount; i++ )
+		if ( ! this->dataSlaveSockets[ i ]->ready() )
 			return false;
 	return true;
 }
@@ -1624,6 +1636,121 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 	}
 
 	return ret;
+}
+
+bool SlaveWorker::handleDegradedRequest( MasterEvent event, uint8_t opcode, char *buf, size_t size ) {
+	Key key;
+	union {
+		struct KeyHeader key;
+		struct KeyValueUpdateHeader keyValueUpdate;
+	} header;
+
+	// Parse header
+	switch ( opcode ) {
+		case PROTO_OPCODE_DEGRADED_GET:
+			if ( ! this->protocol.parseKeyHeader( header.key, buf, size ) ) {
+				__ERROR__( "SlaveWorker", "handleDegradedRequest", "Invalid degraded GET request." );
+				return false;
+			}
+			__DEBUG__(
+				BLUE, "SlaveWorker", "handleDegradedRequest",
+				"[GET] Key: %.*s (key size = %u).",
+				( int ) header.key.keySize,
+				header.key.key,
+				header.key.keySize
+			);
+			key.set( header.key.keySize, header.key.key );
+			break;
+		case PROTO_OPCODE_DEGRADED_UPDATE:
+			if ( ! this->protocol.parseKeyValueUpdateHeader( header.keyValueUpdate, true, buf, size ) ) {
+				__ERROR__( "SlaveWorker", "handleDegradedRequest", "Invalid UPDATE request." );
+				return false;
+			}
+			__DEBUG__(
+				BLUE, "SlaveWorker", "handleDegradedRequest",
+				"[UPDATE] Key: %.*s (key size = %u); Value: (update size = %u, offset = %u).",
+				( int ) header.keyValueUpdate.keySize,
+				header.keyValueUpdate.key,
+				header.keyValueUpdate.keySize,
+				header.keyValueUpdate.valueUpdateSize,
+				header.keyValueUpdate.valueUpdateOffset
+			);
+			key.set( header.keyValueUpdate.keySize, header.keyValueUpdate.key );
+			break;
+		case PROTO_OPCODE_DEGRADED_DELETE:
+			if ( ! this->protocol.parseKeyHeader( header.key, buf, size ) ) {
+				__ERROR__( "SlaveWorker", "handleDegradedRequest", "Invalid degraded DELETE request." );
+				return false;
+			}
+			__DEBUG__(
+				BLUE, "SlaveWorker", "handleDegradedRequest",
+				"[DELETE] Key: %.*s (key size = %u).",
+				( int ) header.key.keySize,
+				header.key.key,
+				header.key.keySize
+			);
+			key.set( header.key.keySize, header.key.key );
+			break;
+		default:
+			__ERROR__( "SlaveWorker", "handleDegradedRequest", "Invalid opcode for degraded request." );
+			return false;
+	}
+
+	// Check if the key is already fetched
+
+	// Get the original server
+	RemappingRecord remappingRecord;
+	uint32_t listId, chunkId, newChunkId;
+	SlavePeerSocket *socket;
+
+	if ( map->findRemappingRecordByKey( key.data, key.size, &remappingRecord ) ) {
+		listId = remappingRecord.listId;
+		chunkId = remappingRecord.chunkId;
+
+		this->getSlaves( listId );
+		socket = this->dataSlaveSockets[ chunkId ];
+	} else {
+		socket = this->getSlaves( key.data, key.size, listId, chunkId );
+	}
+
+	// Get new chunk ID
+	newChunkId = SlaveWorker::chunkBuffer->at( listId )->getChunkId();
+
+	if ( ! socket ) {
+		// The original server fails
+		// event.resGet( event.socket, event.id, key, false );
+		// this->dispatch( event );
+		// TODO
+		__ERROR__( "SlaveWorker", "handleDegradedRequest", "The original server crashes." );
+		return false;
+	}
+
+	// Add the degraded lock request to the pending set
+	uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
+	DegradedLock degradedLock;
+	degradedLock.set( listId, newChunkId, key.size, key.data );
+	if ( ! SlaveWorker::pending->insertDegradedLock( PT_SLAVE_PEER_DEGRADED_LOCK, requestId, event.id, ( void * ) socket, degradedLock ) ) {
+		__ERROR__( "SlaveWorker", "handleDegradedRequest", "Cannot insert into slave degraded lock pending map." );
+	}
+
+	// Get degraded lock from the original server
+	struct {
+		size_t size;
+		char *data;
+	} buffer;
+	ssize_t sentBytes;
+	bool connected;
+
+	buffer.data = this->protocol.reqDegradedLock( buffer.size, requestId, listId, newChunkId, key.data, key.size );
+
+	// Send degraded lock request
+	sentBytes = socket->send( buffer.data, buffer.size, connected );
+	if ( sentBytes != ( ssize_t ) buffer.size ) {
+		__ERROR__( "SlaveWorker", "handleDegradedRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
+		return false;
+	}
+
+	return true;
 }
 
 bool SlaveWorker::handleSlavePeerRegisterRequest( SlavePeerSocket *socket, char *buf, size_t size ) {

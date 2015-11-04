@@ -73,6 +73,7 @@ enum PendingType {
 	PT_MASTER_UPDATE,
 	PT_MASTER_DEL,
 	PT_SLAVE_PEER_DEGRADED_OPS,
+	PT_SLAVE_PEER_DEGRADED_LOCK,
 	PT_SLAVE_PEER_REMAPPING_SET,
 	PT_SLAVE_PEER_UPDATE,
 	PT_SLAVE_PEER_DEL,
@@ -88,6 +89,7 @@ private:
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, RemappingRecordKey> *&map );
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *&map );
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, DegradedOp> *&map );
+	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, DegradedLock> *&map );
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, ChunkRequest> *&map );
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, ChunkUpdate> *&map );
 
@@ -104,6 +106,7 @@ public:
 	} masters;
    struct {
 		std::unordered_multimap<PendingIdentifier, DegradedOp> degradedOps;
+		std::unordered_multimap<PendingIdentifier, DegradedLock> degradedLock;
 		std::unordered_multimap<PendingIdentifier, RemappingRecordKey> remappingSet;
 		std::unordered_multimap<PendingIdentifier, KeyValueUpdate> update;
 		std::unordered_multimap<PendingIdentifier, Key> del;
@@ -112,6 +115,7 @@ public:
 		std::unordered_multimap<PendingIdentifier, ChunkUpdate> updateChunk;
 		std::unordered_multimap<PendingIdentifier, ChunkUpdate> deleteChunk;
 		LOCK_T degradedOpsLock;
+		LOCK_T degradedLockLock;
 		LOCK_T remappingSetLock;
 		LOCK_T updateLock;
 		LOCK_T delLock;
@@ -127,6 +131,7 @@ public:
 		LOCK_INIT( &this->masters.updateLock );
 		LOCK_INIT( &this->masters.delLock );
 		LOCK_INIT( &this->slavePeers.degradedOpsLock );
+		LOCK_INIT( &this->slavePeers.degradedLockLock );
 		LOCK_INIT( &this->slavePeers.remappingSetLock );
 		LOCK_INIT( &this->slavePeers.updateLock );
 		LOCK_INIT( &this->slavePeers.delLock );
@@ -143,6 +148,7 @@ public:
 	bool insertKeyValueUpdate( PendingType type, uint32_t id, void *ptr, KeyValueUpdate &keyValueUpdate, bool needsLock = true, bool needsUnlock = true );
 	bool insertKeyValueUpdate( PendingType type, uint32_t id, uint32_t parentId, void *ptr, KeyValueUpdate &keyValueUpdate, bool needsLock = true, bool needsUnlock = true );
 	bool insertDegradedOp( PendingType type, uint32_t id, uint32_t parentId, void *ptr, DegradedOp &degradedOp, bool needsLock = true, bool needsUnlock = true );
+	bool insertDegradedLock( PendingType type, uint32_t id, uint32_t parentId, void *ptr, DegradedLock &degradedLock, bool needsLock = true, bool needsUnlock = true );
 	bool insertChunkRequest( PendingType type, uint32_t id, uint32_t parentId, void *ptr, ChunkRequest &chunkRequest, bool needsLock = true, bool needsUnlock = true );
 	bool insertChunkUpdate( PendingType type, uint32_t id, uint32_t parentId, void *ptr, ChunkUpdate &chunkUpdate, bool needsLock = true, bool needsUnlock = true );
 
@@ -150,6 +156,7 @@ public:
 	bool eraseKey( PendingType type, uint32_t id, void *ptr = 0, PendingIdentifier *pidPtr = 0, Key *keyPtr = 0, bool needsLock = true, bool needsUnlock = true );
 	bool eraseKeyValueUpdate( PendingType type, uint32_t id, void *ptr = 0, PendingIdentifier *pidPtr = 0, KeyValueUpdate *keyValueUpdatePtr = 0, bool needsLock = true, bool needsUnlock = true );
 	bool eraseDegradedOp( PendingType type, uint32_t id, void *ptr = 0, PendingIdentifier *pidPtr = 0, DegradedOp *degradedOpPtr = 0, bool needsLock = true, bool needsUnlock = true );
+	bool eraseDegradedLock( PendingType type, uint32_t id, void *ptr = 0, PendingIdentifier *pidPtr = 0, DegradedLock *degradedLockPtr = 0, bool needsLock = true, bool needsUnlock = true );
 	bool eraseChunkRequest( PendingType type, uint32_t id, void *ptr = 0, PendingIdentifier *pidPtr = 0, ChunkRequest *chunkRequestPtr = 0, bool needsLock = true, bool needsUnlock = true );
 	bool eraseChunkUpdate( PendingType type, uint32_t id, void *ptr = 0, PendingIdentifier *pidPtr = 0, ChunkUpdate *chunkUpdatePtr = 0, bool needsLock = true, bool needsUnlock = true );
 
