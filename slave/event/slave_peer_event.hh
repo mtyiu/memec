@@ -45,11 +45,6 @@ enum SlavePeerEventType {
 	SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_RESPONSE_FAILURE,
 	// Seal chunk buffer
 	SLAVE_PEER_EVENT_TYPE_SEAL_CHUNKS,
-	// Degraded operation
-	SLAVE_PEER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED,
-	SLAVE_PEER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_WAS_LOCKED,
-	SLAVE_PEER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_REMAPPED,
-	SLAVE_PEER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_FOUND,
 	// Send
 	SLAVE_PEER_EVENT_TYPE_SEND,
 	// Pending
@@ -119,10 +114,6 @@ public:
 	void resSealChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, bool success );
 	// Seal chunk buffer
 	void reqSealChunks( MixedChunkBuffer *chunkBuffer );
-	// Degraded lock
-	void resDegradedLock( SlavePeerSocket *socket, uint32_t id, Key &key, bool isLocked, uint32_t listId, uint32_t stripeId, uint32_t chunkId );
-	void resDegradedLock( SlavePeerSocket *socket, uint32_t id, Key &key, uint32_t listId, uint32_t chunkId );
-	void resDegradedLock( SlavePeerSocket *socket, uint32_t id, Key &key );
 	// Send
 	void send( SlavePeerSocket *socket, Packet *packet );
 	// Pending

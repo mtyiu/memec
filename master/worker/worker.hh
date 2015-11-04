@@ -63,6 +63,7 @@ private:
 	bool handleUpdateRequest( ApplicationEvent event, char *buf, size_t size );
 	bool handleDeleteRequest( ApplicationEvent event, char *buf, size_t size );
 	bool handleRemappingSetRequest( ApplicationEvent event, char *buf, size_t size );
+	bool handleDegradedLockRequest( ApplicationEvent event, bool success, char *buf, size_t size );
 
 	bool handleGetResponse( SlaveEvent event, bool success, char *buf, size_t size );
 	bool handleSetResponse( SlaveEvent event, bool success, char *buf, size_t size );

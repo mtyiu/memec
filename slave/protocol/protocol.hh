@@ -39,11 +39,6 @@ public:
 	char *resDelete( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key, bool toMaster = true );
 	// Redirect
 	char *resRedirect( size_t &size, uint32_t id, uint8_t opcode, uint8_t keySize, char *key, uint32_t remappedListId, uint32_t remappedChunkId );
-	// Degraded operation
-	char *reqDegradedLock( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, char *key, uint8_t keySize );
-	char *resDegradedLock( size_t &size, uint32_t id, uint8_t keySize, char *key, bool isLocked, uint32_t listId, uint32_t stripeId, uint32_t chunkId );
-	char *resDegradedLock( size_t &size, uint32_t id, uint8_t keySize, char *key, uint32_t listId, uint32_t chunkId );
-	char *resDegradedLock( size_t &size, uint32_t id, uint8_t keySize, char *key );
 
 	/* Slave */
 	// Register

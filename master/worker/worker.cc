@@ -1025,6 +1025,10 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 	return true;
 }
 
+bool MasterWorker::handleDegradedLockRequest( ApplicationEvent event, bool success, char *buf, size_t size ) {
+	return false;
+}
+
 bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, char *buf, size_t size ) {
 	Key key;
 	KeyValue keyValue;

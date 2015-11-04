@@ -167,6 +167,43 @@ char *CoordinatorProtocol::forwardRemappingRecords( size_t &size, uint32_t id, c
 	return this->buffer.send;
 }
 
+char *CoordinatorProtocol::resDegradedLock( size_t &size, uint32_t id, uint8_t keySize, char *key, bool isLocked, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) {
+	size = this->generateDegradedLockResHeader(
+		isLocked ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+		PROTO_MAGIC_TO_MASTER,
+		PROTO_OPCODE_DEGRADED_LOCK,
+		id,
+		isLocked,
+		keySize, key,
+		listId, stripeId, chunkId
+	);
+	return this->buffer.send;
+}
+
+char *CoordinatorProtocol::resDegradedLock( size_t &size, uint32_t id, uint8_t keySize, char *key, uint32_t listId, uint32_t chunkId ) {
+	size = this->generateDegradedLockResHeader(
+		PROTO_MAGIC_RESPONSE_FAILURE,
+		PROTO_MAGIC_TO_MASTER,
+		PROTO_OPCODE_DEGRADED_LOCK,
+		id,
+		keySize, key,
+		listId, chunkId
+	);
+	return this->buffer.send;
+}
+
+char *CoordinatorProtocol::resDegradedLock( size_t &size, uint32_t id, uint8_t keySize, char *key ) {
+	size = this->generateDegradedLockResHeader(
+		PROTO_MAGIC_RESPONSE_FAILURE,
+		PROTO_MAGIC_TO_MASTER,
+		PROTO_OPCODE_DEGRADED_LOCK,
+		id,
+		keySize,
+		key
+	);
+	return this->buffer.send;
+}
+
 char *CoordinatorProtocol::resRegisterSlave( size_t &size, uint32_t id, bool success ) {
 	size = this->generateHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,

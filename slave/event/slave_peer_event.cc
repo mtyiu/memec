@@ -112,32 +112,6 @@ void SlavePeerEvent::resSealChunk( SlavePeerSocket *socket, uint32_t id, Metadat
 	this->message.chunk.chunk = 0;
 }
 
-void SlavePeerEvent::resDegradedLock( SlavePeerSocket *socket, uint32_t id, Key &key, bool isLocked, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) {
-	this->type = isLocked ? SLAVE_PEER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED : SLAVE_PEER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_WAS_LOCKED;
-	this->id = id;
-	this->socket = socket;
-	this->message.degradedLock.key = key;
-	this->message.degradedLock.listId = listId;
-	this->message.degradedLock.stripeId = stripeId;
-	this->message.degradedLock.chunkId = chunkId;
-}
-
-void SlavePeerEvent::resDegradedLock( SlavePeerSocket *socket, uint32_t id, Key &key, uint32_t listId, uint32_t chunkId ) {
-	this->type = SLAVE_PEER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_REMAPPED;
-	this->id = id;
-	this->socket = socket;
-	this->message.degradedLock.key = key;
-	this->message.degradedLock.listId = listId;
-	this->message.degradedLock.chunkId = chunkId;
-}
-
-void SlavePeerEvent::resDegradedLock( SlavePeerSocket *socket, uint32_t id, Key &key ) {
-	this->type = SLAVE_PEER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_FOUND;
-	this->id = id;
-	this->socket = socket;
-	this->message.degradedLock.key = key;
-}
-
 void SlavePeerEvent::send( SlavePeerSocket *socket, Packet *packet ) {
 	this->type = SLAVE_PEER_EVENT_TYPE_SEND;
 	this->socket = socket;

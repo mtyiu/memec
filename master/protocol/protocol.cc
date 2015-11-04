@@ -125,6 +125,20 @@ bool MasterProtocol::parseLoadingStats(
 	return true;
 }
 
+char *MasterProtocol::reqDegradedLock( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, char *key, uint8_t keySize ) {
+	size = this->generateDegradedLockReqHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_COORDINATOR,
+		PROTO_OPCODE_DEGRADED_LOCK,
+		id,
+		listId,
+		chunkId,
+		keySize,
+		key
+	);
+	return this->buffer.send;
+}
+
 char *MasterProtocol::reqRegisterSlave( size_t &size, uint32_t id, uint32_t addr, uint16_t port ) {
 	size = this->generateAddressHeader(
 		PROTO_MAGIC_REQUEST,

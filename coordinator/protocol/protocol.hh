@@ -32,6 +32,21 @@ public:
 	);
 	// Forward the whole remapping record message passed in (with the protocol header excluded) pfrom slave to masters
 	char *forwardRemappingRecords( size_t &size, uint32_t id, char *message );
+	// Degraded operation
+	char *resDegradedLock(
+		size_t &size, uint32_t id,
+		uint8_t keySize, char *key, bool isLocked,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId
+	);
+	char *resDegradedLock(
+		size_t &size, uint32_t id,
+		uint8_t keySize, char *key,
+		uint32_t listId, uint32_t chunkId
+	);
+	char *resDegradedLock(
+		size_t &size, uint32_t id,
+		uint8_t keySize, char *key
+	);
 
 	/* Slave */
 	// Register

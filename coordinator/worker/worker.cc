@@ -83,6 +83,41 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 		case MASTER_EVENT_TYPE_PENDING:
 			isSend = false;
 			break;
+		// Degraded operation
+		case MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED:
+		case MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_WAS_LOCKED:
+			buffer.data = this->protocol.resDegradedLock(
+				buffer.size,
+				event.id,
+				event.message.degradedLock.key.size,
+				event.message.degradedLock.key.data,
+				event.type == MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED /* success */,
+				event.message.degradedLock.listId,
+				event.message.degradedLock.stripeId,
+				event.message.degradedLock.chunkId
+			);
+			isSend = true;
+			break;
+		case MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_REMAPPED:
+			buffer.data = this->protocol.resDegradedLock(
+				buffer.size,
+				event.id,
+				event.message.degradedLock.key.size,
+				event.message.degradedLock.key.data,
+				event.message.degradedLock.listId,
+				event.message.degradedLock.chunkId
+			);
+			isSend = true;
+			break;
+		case MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_FOUND:
+			buffer.data = this->protocol.resDegradedLock(
+				buffer.size,
+				event.id,
+				event.message.degradedLock.key.size,
+				event.message.degradedLock.key.data
+			);
+			isSend = true;
+			break;
 		default:
 			return;
 	}

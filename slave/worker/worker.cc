@@ -611,38 +611,6 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		case SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_RESPONSE_FAILURE:
 			// TODO: Is a response message for SEAL_CHUNK request required?
 			return;
-		// Degraded operation
-		case SLAVE_PEER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED:
-		case SLAVE_PEER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_WAS_LOCKED:
-			buffer.data = this->protocol.resDegradedLock(
-				buffer.size,
-				event.id,
-				event.message.degradedLock.key.size,
-				event.message.degradedLock.key.data,
-				success,
-				event.message.degradedLock.listId,
-				event.message.degradedLock.stripeId,
-				event.message.degradedLock.chunkId
-			);
-			break;
-		case SLAVE_PEER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_REMAPPED:
-			buffer.data = this->protocol.resDegradedLock(
-				buffer.size,
-				event.id,
-				event.message.degradedLock.key.size,
-				event.message.degradedLock.key.data,
-				event.message.degradedLock.listId,
-				event.message.degradedLock.chunkId
-			);
-			break;
-		case SLAVE_PEER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_FOUND:
-			buffer.data = this->protocol.resDegradedLock(
-				buffer.size,
-				event.id,
-				event.message.degradedLock.key.size,
-				event.message.degradedLock.key.data
-			);
-			break;
 		/////////////////////////////////////
 		// Seal chunks in the chunk buffer //
 		/////////////////////////////////////
