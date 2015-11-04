@@ -41,6 +41,7 @@ public:
 	MasterEventType type;
 	uint32_t id;
 	bool needsFree;
+	bool isDegraded;
 	MasterSocket *socket;
 	union {
 		Key key;
@@ -61,8 +62,8 @@ public:
 	// Register
 	void resRegister( MasterSocket *socket, uint32_t id, bool success = true );
 	// GET
-	void resGet( MasterSocket *socket, uint32_t id, KeyValue &keyValue );
-	void resGet( MasterSocket *socket, uint32_t id, Key &key );
+	void resGet( MasterSocket *socket, uint32_t id, KeyValue &keyValue, bool isDegraded );
+	void resGet( MasterSocket *socket, uint32_t id, Key &key, bool isDegraded );
 	// SET
 	void resSet( MasterSocket *socket, uint32_t id, Key &key, bool success );
 	// REMAPPING_SET_LOCK
@@ -70,9 +71,9 @@ public:
 	// REMAPPING_SET
 	void resRemappingSet( MasterSocket *socket, uint32_t id, Key &key, uint32_t listId, uint32_t chunkId, bool success, bool needsFree );
 	// UPDATE
-	void resUpdate( MasterSocket *socket, uint32_t id, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool success, bool needsFree = true );
+	void resUpdate( MasterSocket *socket, uint32_t id, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool success, bool needsFree, bool isDegraded );
 	// DELETE
-	void resDelete( MasterSocket *socket, uint32_t id, Key &key, bool success, bool needsFree = true );
+	void resDelete( MasterSocket *socket, uint32_t id, Key &key, bool success, bool needsFree, bool isDegraded );
 	// Redirect
 	void resRedirect( MasterSocket *socket, uint32_t id, uint8_t opcode, Key &key, RemappingRecord record );
 	// Pending

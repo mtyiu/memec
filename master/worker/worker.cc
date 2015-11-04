@@ -601,32 +601,38 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 	}
 
 	if ( chunkId != newChunkId ) {
-		// Degraded GET
-		printf( "[GET] Performing degraded operation on %u to %u...\n", chunkId, newChunkId );
+		// Acquire degraded lock from the coordinator
+		DegradedLockData degradedLockData;
+		degradedLockData.set( listId, newChunkId, key.size, key.data );
+		if ( ! MasterWorker::pending->insertDegradedLockData( PT_COORDINATOR_DEGRADED_LOCK_DATA, requestId, event.id, ( void * ) socket, degradedLockData ) ) {
+			__ERROR__( "MasterWorker", "handleGetRequest", "Cannot insert into coordinator DEGRADED_LOCK pending map." );
+			return false;
+		}
+		return true;
+	} else {
+		buffer.data = this->protocol.reqGet(
+			buffer.size, requestId,
+			header.key, header.keySize,
+			chunkId != newChunkId /* isDegraded */
+		);
+
+		key.ptr = ( void * ) socket;
+		if ( ! MasterWorker::pending->insertKey( PT_SLAVE_GET, requestId, event.id, ( void * ) socket, key ) ) {
+			__ERROR__( "MasterWorker", "handleGetRequest", "Cannot insert into slave GET pending map." );
+		}
+
+		// Mark the time when request is sent
+		MasterWorker::pending->recordRequestStartTime( PT_SLAVE_GET, requestId, event.id, ( void * ) socket, socket->getAddr() );
+
+		// Send GET request
+		sentBytes = socket->send( buffer.data, buffer.size, connected );
+		if ( sentBytes != ( ssize_t ) buffer.size ) {
+			__ERROR__( "MasterWorker", "handleGetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
+			return false;
+		}
+
+		return true;
 	}
-
-	buffer.data = this->protocol.reqGet(
-		buffer.size, requestId,
-		header.key, header.keySize,
-		chunkId != newChunkId /* isDegraded */
-	);
-
-	key.ptr = ( void * ) socket;
-	if ( ! MasterWorker::pending->insertKey( PT_SLAVE_GET, requestId, event.id, ( void * ) socket, key ) ) {
-		__ERROR__( "MasterWorker", "handleGetRequest", "Cannot insert into slave GET pending map." );
-	}
-
-	// Mark the time when request is sent
-	MasterWorker::pending->recordRequestStartTime( PT_SLAVE_GET, requestId, event.id, ( void * ) socket, socket->getAddr() );
-
-	// Send GET request
-	sentBytes = socket->send( buffer.data, buffer.size, connected );
-	if ( sentBytes != ( ssize_t ) buffer.size ) {
-		__ERROR__( "MasterWorker", "handleGetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
-		return false;
-	}
-
-	return true;
 }
 
 bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t size ) {

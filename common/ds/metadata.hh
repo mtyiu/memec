@@ -128,25 +128,21 @@ class DegradedLock {
 public:
 	uint32_t listId;
 	uint32_t chunkId;
-	uint8_t size;
-	char *data;
+	uint8_t keySize;
+	char *key;
 
 	DegradedLock() {
 		this->listId = 0;
 		this->chunkId = 0;
-		this->size = 0;
-		this->data = 0;
-	}
-
-	DegradedLock( uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key ) {
-		this->set( listId, chunkId, keySize, key );
+		this->keySize = 0;
+		this->key = 0;
 	}
 
 	void set( uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key ) {
 		this->listId = listId;
 		this->chunkId = chunkId;
-		this->size = keySize;
-		this->data = key;
+		this->keySize = keySize;
+		this->key = key;
 	}
 };
 

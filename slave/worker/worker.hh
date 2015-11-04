@@ -76,7 +76,7 @@ private:
 	bool handleRemappingSetRequest( MasterEvent event, char *buf, size_t size );
 	bool handleUpdateRequest( MasterEvent event, char *buf, size_t size );
 	bool handleDeleteRequest( MasterEvent event, char *buf, size_t size );
-	bool handleDegradedRequest( MasterEvent event, uint8_t opcode, char *buf, size_t size );
+	// bool handleDegradedRequest( MasterEvent event, uint8_t opcode, char *buf, size_t size );
 	// Request handler for slave peers
 	bool handleSlavePeerRegisterRequest( SlavePeerSocket *socket, char *buf, size_t size );
 	bool handleRemappingSetRequest( SlavePeerEvent event, char *buf, size_t size );
@@ -87,7 +87,6 @@ private:
 	bool handleDeleteChunkRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleGetChunkRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleSetChunkRequest( SlavePeerEvent event, char *buf, size_t size );
-	bool handleDegradedLockRequest( SlavePeerEvent event, char *buf, size_t size );
 	// Response handler for slave peers
 	bool handleSealChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleRemappingSetResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
@@ -97,7 +96,6 @@ private:
 	bool handleDeleteChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleGetChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleSetChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
-	bool handleDegradedLockResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 
 	bool performDegradedRead( uint32_t listId, uint32_t stripeId, uint32_t lostChunkId, uint8_t opcode, uint32_t parentId, Key *key, KeyValueUpdate *keyValueUpdate = 0 );
 

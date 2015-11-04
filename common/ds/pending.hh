@@ -12,6 +12,7 @@ public:
 };
 
 class PendingIdentifier {
+	// TODO: May have problem when there are multiple clients
 public:
 	uint32_t id, parentId;
 	void *ptr;

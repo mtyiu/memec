@@ -6,16 +6,18 @@ void MasterEvent::resRegister( MasterSocket *socket, uint32_t id, bool success )
 	this->socket = socket;
 }
 
-void MasterEvent::resGet( MasterSocket *socket, uint32_t id, KeyValue &keyValue ) {
+void MasterEvent::resGet( MasterSocket *socket, uint32_t id, KeyValue &keyValue, bool isDegraded ) {
 	this->type = MASTER_EVENT_TYPE_GET_RESPONSE_SUCCESS;
 	this->id = id;
+	this->isDegraded = isDegraded;
 	this->socket = socket;
 	this->message.keyValue = keyValue;
 }
 
-void MasterEvent::resGet( MasterSocket *socket, uint32_t id, Key &key ) {
+void MasterEvent::resGet( MasterSocket *socket, uint32_t id, Key &key, bool isDegraded ) {
 	this->type = MASTER_EVENT_TYPE_GET_RESPONSE_FAILURE;
 	this->id = id;
+	this->isDegraded = isDegraded;
 	this->socket = socket;
 	this->message.key = key;
 }
@@ -39,29 +41,31 @@ void MasterEvent::resRemappingSetLock( MasterSocket *socket, uint32_t id, Key &k
 void MasterEvent::resRemappingSet( MasterSocket *socket, uint32_t id, Key &key, uint32_t listId, uint32_t chunkId, bool success, bool needsFree ) {
 	this->type = success ? MASTER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS : MASTER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE;
 	this->id = id;
+	this->needsFree = needsFree;
 	this->socket = socket;
 	this->message.remap.key = key;
 	this->message.remap.listId = listId;
 	this->message.remap.chunkId = chunkId;
-	this->needsFree = needsFree;
 }
 
-void MasterEvent::resUpdate( MasterSocket *socket, uint32_t id, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool success, bool needsFree ) {
+void MasterEvent::resUpdate( MasterSocket *socket, uint32_t id, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool success, bool needsFree, bool isDegraded ) {
 	this->type = success ? MASTER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS : MASTER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE;
 	this->id = id;
+	this->needsFree = needsFree;
+	this->isDegraded = isDegraded;
 	this->socket = socket;
 	this->message.keyValueUpdate.key = key;
 	this->message.keyValueUpdate.valueUpdateOffset = valueUpdateOffset;
 	this->message.keyValueUpdate.valueUpdateSize = valueUpdateSize;
-	this->needsFree = needsFree;
 }
 
-void MasterEvent::resDelete( MasterSocket *socket, uint32_t id, Key &key, bool success, bool needsFree ) {
+void MasterEvent::resDelete( MasterSocket *socket, uint32_t id, Key &key, bool success, bool needsFree, bool isDegraded ) {
 	this->type = success ? MASTER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS : MASTER_EVENT_TYPE_DELETE_RESPONSE_FAILURE;
 	this->id = id;
+	this->needsFree = needsFree;
+	this->isDegraded = isDegraded;
 	this->socket = socket;
 	this->message.key = key;
-	this->needsFree = needsFree;
 }
 
 void MasterEvent::resRedirect( MasterSocket *socket, uint32_t id, uint8_t opcode, Key &key, RemappingRecord record ) {

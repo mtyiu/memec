@@ -35,6 +35,8 @@ public:
 	bool processHeartbeat( SlaveEvent event, char *buf, size_t size );
 	bool triggerRecovery( SlaveSocket *socket );
 
+	bool handleDegradedLockRequest( MasterEvent event, char *buf, size_t size );
+
 	static bool init();
 	bool init( GlobalConfig &config, WorkerRole role, uint32_t workerId );
 	bool start();

@@ -64,7 +64,20 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 	}
 }
 
+bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, DegradedLockData> *&map ) {
+	if ( type == PT_COORDINATOR_DEGRADED_LOCK_DATA ) {
+		lock = &this->coordinator.degradedLockDataLock;
+		map = &this->coordinator.degradedLockData;
+		return true;
+	} else {
+		lock = 0;
+		map = 0;
+		return false;
+	}
+}
+
 Pending::Pending() {
+	LOCK_INIT( &this->coordinator.degradedLockDataLock );
 	LOCK_INIT( &this->applications.getLock );
 	LOCK_INIT( &this->applications.setLock );
 	LOCK_INIT( &this->applications.updateLock );
@@ -78,64 +91,91 @@ Pending::Pending() {
 	LOCK_INIT( &this->stats.setLock );
 }
 
-bool Pending::insertKey( PendingType type, uint32_t id, void *ptr, Key &key, bool needsLock, bool needsUnlock ) {
-	return this->insertKey( type, id, id, ptr, key, needsLock, needsUnlock );
-}
+#define DEFINE_PENDING_APPLICATION_INSERT_METHOD( METHOD_NAME, VALUE_TYPE, VALUE_VAR ) \
+	bool Pending::METHOD_NAME( PendingType type, uint32_t id, void *ptr, VALUE_TYPE &VALUE_VAR, bool needsLock, bool needsUnlock ) { \
+		PendingIdentifier pid( id, id, ptr ); \
+		std::pair<PendingIdentifier, VALUE_TYPE> p( pid, VALUE_VAR ); \
+		std::unordered_multimap<PendingIdentifier, VALUE_TYPE>::iterator ret; \
+ 		\
+		LOCK_T *lock; \
+		std::unordered_multimap<PendingIdentifier, VALUE_TYPE> *map; \
+		if ( ! this->get( type, lock, map ) ) \
+			return false; \
+ 		\
+		if ( needsLock ) LOCK( lock ); \
+		ret = map->insert( p ); \
+		if ( needsUnlock ) UNLOCK( lock ); \
+ 		\
+		return true; /* ret.second; */ \
+	}
 
-bool Pending::insertKey( PendingType type, uint32_t id, uint32_t parentId, void *ptr, Key &key, bool needsLock, bool needsUnlock ) {
-	PendingIdentifier pid( id, parentId, ptr );
-	std::pair<PendingIdentifier, Key> p( pid, key );
-	std::unordered_multimap<PendingIdentifier, Key>::iterator ret;
+#define DEFINE_PENDING_SLAVE_INSERT_METHOD( METHOD_NAME, VALUE_TYPE, VALUE_VAR ) \
+	bool Pending::METHOD_NAME( PendingType type, uint32_t id, uint32_t parentId, void *ptr, VALUE_TYPE &VALUE_VAR, bool needsLock, bool needsUnlock ) { \
+		PendingIdentifier pid( id, parentId, ptr ); \
+		std::pair<PendingIdentifier, VALUE_TYPE> p( pid, VALUE_VAR ); \
+		std::unordered_multimap<PendingIdentifier, VALUE_TYPE>::iterator ret; \
+ 		\
+		LOCK_T *lock; \
+		std::unordered_multimap<PendingIdentifier, VALUE_TYPE> *map; \
+		if ( ! this->get( type, lock, map ) ) \
+			return false; \
+ 		\
+		if ( needsLock ) LOCK( lock ); \
+		ret = map->insert( p ); \
+		if ( needsUnlock ) UNLOCK( lock ); \
+ 		\
+		return true; /* ret.second; */ \
+	}
 
-	LOCK_T *lock;
-	std::unordered_multimap<PendingIdentifier, Key> *map;
-	if ( ! this->get( type, lock, map ) )
-		return false;
+#define DEFINE_PENDING_COORDINATOR_INSERT_METHOD DEFINE_PENDING_SLAVE_INSERT_METHOD
 
-	if ( needsLock ) LOCK( lock );
-	ret = map->insert( p );
-	if ( needsUnlock ) UNLOCK( lock );
+#define DEFINE_PENDING_ERASE_METHOD( METHOD_NAME, VALUE_TYPE, VALUE_PTR_VAR ) \
+	bool Pending::METHOD_NAME( PendingType type, uint32_t id, void *ptr, PendingIdentifier *pidPtr, VALUE_TYPE *VALUE_PTR_VAR, bool needsLock, bool needsUnlock ) { \
+		PendingIdentifier pid( id, 0, ptr ); \
+		LOCK_T *lock; \
+		bool ret; \
+		\
+		std::unordered_multimap<PendingIdentifier, VALUE_TYPE> *map; \
+		std::unordered_multimap<PendingIdentifier, VALUE_TYPE>::iterator it; \
+		if ( ! this->get( type, lock, map ) ) \
+			return false; \
+		\
+		if ( needsLock ) LOCK( lock ); \
+		if ( ptr ) { \
+			it = map->find( pid ); \
+			ret = ( it != map->end() ); \
+		} else { \
+			it = map->find( pid ); \
+			ret = ( it != map->end() && it->first.id == id ); \
+		} \
+		if ( ret ) { \
+			if ( pidPtr ) *pidPtr = it->first; \
+			if ( VALUE_PTR_VAR ) *VALUE_PTR_VAR = it->second; \
+			map->erase( it ); \
+		} \
+		if ( needsUnlock ) UNLOCK( lock ); \
+		\
+		return ret; \
+	}
 
-	return true; // ret.second;
-}
+DEFINE_PENDING_COORDINATOR_INSERT_METHOD( insertDegradedLockData, DegradedLockData, degradedLockData )
 
-bool Pending::insertRemappingRecord( PendingType type, uint32_t id, uint32_t parentId, void *ptr, RemappingRecord &remappingRecord, bool needsLock, bool needsUnlock ) {
-	PendingIdentifier pid( id, parentId, ptr );
-	std::pair<PendingIdentifier, RemappingRecord> p( pid, remappingRecord );
-	std::unordered_multimap<PendingIdentifier, RemappingRecord>::iterator ret;
+DEFINE_PENDING_APPLICATION_INSERT_METHOD( insertKey, Key, key )
+DEFINE_PENDING_APPLICATION_INSERT_METHOD( insertKeyValueUpdate, KeyValueUpdate, keyValueUpdate )
 
-	LOCK_T *lock;
-	std::unordered_multimap<PendingIdentifier, RemappingRecord> *map;
-	if ( ! this->get( type, lock, map ) )
-		return false;
+DEFINE_PENDING_SLAVE_INSERT_METHOD( insertKey, Key, key )
+DEFINE_PENDING_SLAVE_INSERT_METHOD( insertRemappingRecord, RemappingRecord, remappingRecord )
+DEFINE_PENDING_SLAVE_INSERT_METHOD( insertKeyValueUpdate, KeyValueUpdate, keyValueUpdate )
 
-	if ( needsLock ) LOCK( lock );
-	ret = map->insert( p );
-	if ( needsUnlock ) UNLOCK( lock );
+DEFINE_PENDING_ERASE_METHOD( eraseDegradedLockData, DegradedLockData, degradedLockDataPtr )
+DEFINE_PENDING_ERASE_METHOD( eraseKey, Key, keyPtr )
+DEFINE_PENDING_ERASE_METHOD( eraseRemappingRecord, RemappingRecord, remappingRecordPtr )
+DEFINE_PENDING_ERASE_METHOD( eraseKeyValueUpdate, KeyValueUpdate, KeyValueUpdatePtr )
 
-	return true; // ret.second;
-}
-
-bool Pending::insertKeyValueUpdate( PendingType type, uint32_t id, void *ptr, KeyValueUpdate &keyValueUpdate, bool needsLock, bool needsUnlock ) {
-	return this->insertKeyValueUpdate( type, id, id, ptr, keyValueUpdate, needsLock, needsUnlock );
-}
-
-bool Pending::insertKeyValueUpdate( PendingType type, uint32_t id, uint32_t parentId, void *ptr, KeyValueUpdate &keyValueUpdate, bool needsLock, bool needsUnlock ) {
-	PendingIdentifier pid( id, parentId, ptr );
-	std::pair<PendingIdentifier, KeyValueUpdate> p( pid, keyValueUpdate );
-	std::unordered_multimap<PendingIdentifier, KeyValueUpdate>::iterator ret;
-
-	LOCK_T *lock;
-	std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *map;
-	if ( ! this->get( type, lock, map ) )
-		return false;
-
-	if ( needsLock ) LOCK( lock );
-	ret = map->insert( p );
-	if ( needsUnlock ) UNLOCK( lock );
-
-	return true; // ret.second;
-}
+#undef DEFINE_PENDING_APPLICATION_INSERT_METHOD
+#undef DEFINE_PENDING_SLAVE_INSERT_METHOD
+#undef DEFINE_PENDING_COORDINATOR_INSERT_METHOD
+#undef DEFINE_PENDING_ERASE_METHOD
 
 bool Pending::recordRequestStartTime( PendingType type, uint32_t id, uint32_t parentId, void *ptr, struct sockaddr_in addr ) {
 	RequestStartTime rst;
@@ -160,142 +200,6 @@ bool Pending::recordRequestStartTime( PendingType type, uint32_t id, uint32_t pa
 	}
 
 	return true; // ret.second;
-}
-
-bool Pending::findKey( PendingType type, uint32_t id, void *ptr, Key *keyPtr ) {
-	PendingIdentifier pid( id, 0, ptr );
-	LOCK_T *lock;
-	bool ret;
-
-	std::unordered_multimap<PendingIdentifier, Key> *map;
-	std::unordered_multimap<PendingIdentifier, Key>::iterator it;
-	if ( ! this->get( type, lock, map ) )
-		return false;
-
-	LOCK( lock );
-	if ( ptr ) {
-		it = map->find( pid );
-		ret = ( it != map->end() );
-	} else {
-		it = map->find( pid );
-		ret = ( it != map->end() && it->first.id == id ); // Match request ID
-	}
-	if ( ret ) {
-		if ( keyPtr ) *keyPtr = it->second;
-	}
-	UNLOCK( lock );
-
-	return ret;
-}
-
-bool Pending::findKeyValueUpdate( PendingType type, uint32_t id, void *ptr, KeyValueUpdate *keyValuePtr ) {
-	PendingIdentifier pid( id, 0, ptr );
-	LOCK_T *lock;
-	bool ret;
-
-	std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *map;
-	std::unordered_multimap<PendingIdentifier, KeyValueUpdate>::iterator it;
-	if ( ! this->get( type, lock, map ) )
-		return false;
-
-	LOCK( lock );
-	if ( ptr ) {
-		it = map->find( pid );
-		ret = ( it != map->end() );
-	} else {
-		it = map->find( pid );
-		ret = ( it != map->end() && it->first.id == id ); // Match request ID
-	}
-	if ( ret ) {
-		if ( keyValuePtr ) *keyValuePtr = it->second;
-	}
-	UNLOCK( lock );
-
-	return ret;
-}
-
-bool Pending::eraseKey( PendingType type, uint32_t id, void *ptr, PendingIdentifier *pidPtr, Key *keyPtr, bool needsLock, bool needsUnlock ) {
-	PendingIdentifier pid( id, 0, ptr );
-	LOCK_T *lock;
-	bool ret;
-
-	std::unordered_multimap<PendingIdentifier, Key> *map;
-	std::unordered_multimap<PendingIdentifier, Key>::iterator it;
-	if ( ! this->get( type, lock, map ) )
-		return false;
-
-	if ( needsLock ) LOCK( lock );
-	if ( ptr ) {
-		it = map->find( pid );
-		ret = ( it != map->end() );
-	} else {
-		it = map->find( pid );
-		ret = ( it != map->end() && it->first.id == id ); // Match request ID
-	}
-	if ( ret ) {
-		if ( pidPtr ) *pidPtr = it->first;
-		if ( keyPtr ) *keyPtr = it->second;
-		map->erase( it );
-	}
-	if ( needsUnlock ) UNLOCK( lock );
-
-	return ret;
-}
-
-bool Pending::eraseRemappingRecord( PendingType type, uint32_t id, void *ptr, PendingIdentifier *pidPtr, RemappingRecord *remappingRecordPtr, bool needsLock, bool needsUnlock ) {
-	PendingIdentifier pid( id, 0, ptr );
-	LOCK_T *lock;
-	bool ret;
-
-	std::unordered_multimap<PendingIdentifier, RemappingRecord> *map;
-	std::unordered_multimap<PendingIdentifier, RemappingRecord>::iterator it;
-	if ( ! this->get( type, lock, map ) )
-		return false;
-
-	if ( needsLock ) LOCK( lock );
-	if ( ptr ) {
-		it = map->find( pid );
-		ret = ( it != map->end() );
-	} else {
-		it = map->find( pid );
-		ret = ( it != map->end() && it->first.id == id ); // Match request ID
-	}
-	if ( ret ) {
-		if ( pidPtr ) *pidPtr = it->first;
-		if ( remappingRecordPtr ) *remappingRecordPtr = it->second;
-		map->erase( it );
-	}
-	if ( needsUnlock ) UNLOCK( lock );
-
-	return ret;
-}
-
-bool Pending::eraseKeyValueUpdate( PendingType type, uint32_t id, void *ptr, PendingIdentifier *pidPtr, KeyValueUpdate *keyValueUpdatePtr, bool needsLock, bool needsUnlock ) {
-	PendingIdentifier pid( id, 0, ptr );
-	LOCK_T *lock;
-	bool ret;
-
-	std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *map;
-	std::unordered_multimap<PendingIdentifier, KeyValueUpdate>::iterator it;
-	if ( ! this->get( type, lock, map ) )
-		return false;
-
-	if ( needsLock ) LOCK( lock );
-	if ( ptr ) {
-		it = map->find( pid );
-		ret = ( it != map->end() );
-	} else {
-		it = map->find( pid );
-		ret = ( it != map->end() && it->first.id == id );
-	}
-	if ( ret ) {
-		if ( pidPtr ) *pidPtr = it->first;
-		if ( keyValueUpdatePtr ) *keyValueUpdatePtr = it->second;
-		map->erase( it );
-	}
-	if ( needsUnlock ) UNLOCK( lock );
-
-	return ret;
 }
 
 bool Pending::eraseRequestStartTime( PendingType type, uint32_t id, void *ptr, struct timespec &elapsedTime, PendingIdentifier *pidPtr, RequestStartTime *rstPtr ) {
@@ -347,6 +251,58 @@ bool Pending::eraseRequestStartTime( PendingType type, uint32_t id, void *ptr, s
 		elapsedTime.tv_sec = 0;
 		elapsedTime.tv_nsec = 0;
 	}
+	return ret;
+}
+
+bool Pending::findKey( PendingType type, uint32_t id, void *ptr, Key *keyPtr ) {
+	PendingIdentifier pid( id, 0, ptr );
+	LOCK_T *lock;
+	bool ret;
+
+	std::unordered_multimap<PendingIdentifier, Key> *map;
+	std::unordered_multimap<PendingIdentifier, Key>::iterator it;
+	if ( ! this->get( type, lock, map ) )
+		return false;
+
+	LOCK( lock );
+	if ( ptr ) {
+		it = map->find( pid );
+		ret = ( it != map->end() );
+	} else {
+		it = map->find( pid );
+		ret = ( it != map->end() && it->first.id == id ); // Match request ID
+	}
+	if ( ret ) {
+		if ( keyPtr ) *keyPtr = it->second;
+	}
+	UNLOCK( lock );
+
+	return ret;
+}
+
+bool Pending::findKeyValueUpdate( PendingType type, uint32_t id, void *ptr, KeyValueUpdate *keyValuePtr ) {
+	PendingIdentifier pid( id, 0, ptr );
+	LOCK_T *lock;
+	bool ret;
+
+	std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *map;
+	std::unordered_multimap<PendingIdentifier, KeyValueUpdate>::iterator it;
+	if ( ! this->get( type, lock, map ) )
+		return false;
+
+	LOCK( lock );
+	if ( ptr ) {
+		it = map->find( pid );
+		ret = ( it != map->end() );
+	} else {
+		it = map->find( pid );
+		ret = ( it != map->end() && it->first.id == id ); // Match request ID
+	}
+	if ( ret ) {
+		if ( keyValuePtr ) *keyValuePtr = it->second;
+	}
+	UNLOCK( lock );
+
 	return ret;
 }
 

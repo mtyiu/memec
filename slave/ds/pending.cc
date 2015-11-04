@@ -73,18 +73,6 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 	return true;
 }
 
-bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, DegradedLock> *&map ) {
-	if ( type == PT_SLAVE_PEER_DEGRADED_LOCK ) {
-		lock = &this->slavePeers.degradedLockLock;
-		map = &this->slavePeers.degradedLock;
-		return true;
-	} else {
-		lock = 0;
-		map = 0;
-		return false;
-	}
-}
-
 bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, ChunkRequest> *&map ) {
 	switch( type ) {
 		case PT_SLAVE_PEER_GET_CHUNK:
@@ -194,7 +182,6 @@ DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( insertRemappingRecordKey, RemappingReco
 DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( insertKey, Key, key )
 DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( insertKeyValueUpdate, KeyValueUpdate, keyValueUpdate )
 DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( insertDegradedOp, DegradedOp, degradedOp )
-DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( insertDegradedLock, DegradedLock, degradedLock )
 DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( insertChunkRequest, ChunkRequest, chunkRequest )
 DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( insertChunkUpdate, ChunkUpdate, chunkUpdate )
 
@@ -202,7 +189,6 @@ DEFINE_PENDING_ERASE_METHOD( eraseRemappingRecordKey, RemappingRecordKey, remapp
 DEFINE_PENDING_ERASE_METHOD( eraseKey, Key, keyPtr )
 DEFINE_PENDING_ERASE_METHOD( eraseKeyValueUpdate, KeyValueUpdate, keyValueUpdatePtr )
 DEFINE_PENDING_ERASE_METHOD( eraseDegradedOp, DegradedOp, degradedOpPtr )
-DEFINE_PENDING_ERASE_METHOD( eraseDegradedLock, DegradedLock, degradedLockPtr )
 DEFINE_PENDING_ERASE_METHOD( eraseChunkRequest, ChunkRequest, chunkRequestPtr )
 DEFINE_PENDING_ERASE_METHOD( eraseChunkUpdate, ChunkUpdate, chunkUpdatePtr )
 

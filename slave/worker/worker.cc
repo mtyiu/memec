@@ -411,12 +411,18 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 						break;
 					case PROTO_OPCODE_DEGRADED_GET:
 						printf( "PROTO_OPCODE_DEGRADED_GET\n" );
+						// this->handleDegradedRequest( event,buffer.data, buffer.size );
+						// this->load.get();
 						break;
 					case PROTO_OPCODE_DEGRADED_UPDATE:
 						printf( "PROTO_OPCODE_DEGRADED_UPDATE\n" );
+						// this->handleDegradedRequest( event,buffer.data, buffer.size );
+						// this->load.update();
 						break;
 					case PROTO_OPCODE_DEGRADED_DELETE:
 						printf( "PROTO_OPCODE_DEGRADED_DELETE\n" );
+						// this->handleDegradedRequest( event,buffer.data, buffer.size );
+						// this->load.del();
 						break;
 					default:
 						__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from master." );
@@ -833,23 +839,6 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 							break;
 					}
 					break;
-				case PROTO_OPCODE_DEGRADED_LOCK:
-					switch( header.magic ) {
-						case PROTO_MAGIC_REQUEST:
-							this->handleDegradedLockRequest( event, buffer.data, buffer.size );
-							break;
-						case PROTO_MAGIC_RESPONSE_SUCCESS:
-							this->handleDegradedLockResponse( event, true, buffer.data, buffer.size );
-							break;
-						case PROTO_MAGIC_RESPONSE_FAILURE:
-							this->handleDegradedLockResponse( event, false, buffer.data, buffer.size );
-							break;
-						default:
-							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave." );
-							break;
-					}
-
-					break;
 				default:
 					__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from slave. opcode = %x", header.opcode );
 					goto quit_1;
@@ -981,7 +970,7 @@ bool SlaveWorker::handleGetRequest( MasterEvent event, char *buf, size_t size ) 
 	KeyValue keyValue;
 	RemappingRecord remappingRecord;
 	if ( map->findValueByKey( header.key, header.keySize, &keyValue, &key ) ) {
-		event.resGet( event.socket, event.id, keyValue );
+		event.resGet( event.socket, event.id, keyValue, false );
 		ret = true;
 		this->dispatch( event );
 	} else if ( map->findRemappingRecordByKey( header.key, header.keySize, &remappingRecord, &key ) ) {
@@ -990,7 +979,7 @@ bool SlaveWorker::handleGetRequest( MasterEvent event, char *buf, size_t size ) 
 		ret = false;
 		this->dispatch( event );
 	} else {
-		event.resGet( event.socket, event.id, key );
+		event.resGet( event.socket, event.id, key, false );
 		ret = false;
 		this->dispatch( event );
 	}
@@ -1337,7 +1326,12 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 				chunk->update( header.valueUpdate, offset, header.valueUpdateSize );
 				UNLOCK( keysLock );
 
-				event.resUpdate( event.socket, event.id, key, header.valueUpdateOffset, header.valueUpdateSize, true, false );
+				event.resUpdate(
+					event.socket, event.id, key,
+					header.valueUpdateOffset,
+					header.valueUpdateSize,
+					true, false, false
+				);
 				this->dispatch( event );
 			}
 		} else {
@@ -1411,7 +1405,12 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 #endif
 				}
 			} else {
-				event.resUpdate( event.socket, event.id, key, header.valueUpdateOffset, header.valueUpdateSize, true, false );
+				event.resUpdate(
+					event.socket, event.id, key,
+					header.valueUpdateOffset,
+					header.valueUpdateSize,
+					true, false, false
+				);
 				this->dispatch( event );
 			}
 			// Only unlock chunk when all requests are sent
@@ -1425,7 +1424,11 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 		ret = false;
 		this->dispatch( event );
 	} else {
-		event.resUpdate( event.socket, event.id, key, header.valueUpdateOffset, header.valueUpdateSize, false );
+		event.resUpdate(
+			event.socket, event.id, key,
+			header.valueUpdateOffset, header.valueUpdateSize,
+			false, false, false
+		);
 		this->dispatch( event );
 		ret = false;
 	}
@@ -1617,7 +1620,7 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 				}
 			}
 		} else {
-			event.resDelete( event.socket, event.id, key, true, false );
+			event.resDelete( event.socket, event.id, key, true, false, false );
 			this->dispatch( event );
 		}
 		if ( chunkBufferIndex != -1 )
@@ -1630,7 +1633,7 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 		this->dispatch( event );
 	} else {
 		key.set( header.keySize, header.key, ( void * ) event.socket );
-		event.resDelete( event.socket, event.id, key, false );
+		event.resDelete( event.socket, event.id, key, false, false, false );
 		this->dispatch( event );
 		ret = false;
 	}
@@ -1638,6 +1641,7 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 	return ret;
 }
 
+/*
 bool SlaveWorker::handleDegradedRequest( MasterEvent event, uint8_t opcode, char *buf, size_t size ) {
 	Key key;
 	union {
@@ -1718,10 +1722,24 @@ bool SlaveWorker::handleDegradedRequest( MasterEvent event, uint8_t opcode, char
 
 	if ( ! socket ) {
 		// The original server fails
-		// event.resGet( event.socket, event.id, key, false );
-		// this->dispatch( event );
-		// TODO
+		switch ( opcode ) {
+			case PROTO_OPCODE_DEGRADED_GET:
+				event.resGet( event.socket, event.id, key, true );
+				break;
+			case PROTO_OPCODE_DEGRADED_UPDATE:
+				event.resUpdate(
+					event.socket, event.id, key, header.keyValueUpdate.valueUpdateOffset, header.keyValueUpdate.valueUpdateSize,
+					false, false, true
+				);
+				break;
+			case PROTO_OPCODE_DEGRADED_DELETE:
+				event.resDelete( event.socket, event.id, key, false, false, true );
+				break;
+			default:
+				break;
+		}
 		__ERROR__( "SlaveWorker", "handleDegradedRequest", "The original server crashes." );
+		this->dispatch( event );
 		return false;
 	}
 
@@ -1752,6 +1770,7 @@ bool SlaveWorker::handleDegradedRequest( MasterEvent event, uint8_t opcode, char
 
 	return true;
 }
+*/
 
 bool SlaveWorker::handleSlavePeerRegisterRequest( SlavePeerSocket *socket, char *buf, size_t size ) {
 	struct AddressHeader header;
@@ -1908,7 +1927,14 @@ bool SlaveWorker::handleUpdateRequest( SlavePeerEvent event, char *buf, size_t s
 	}
 
 	key.set( header.keySize, header.key );
-	event.resUpdate( event.socket, event.id, header.listId, header.stripeId, header.chunkId, key, header.valueUpdateOffset, header.valueUpdateSize, header.chunkUpdateOffset, ret );
+	event.resUpdate(
+		event.socket, event.id,
+		header.listId, header.stripeId, header.chunkId, key,
+		header.valueUpdateOffset,
+		header.valueUpdateSize,
+		header.chunkUpdateOffset,
+		ret
+	);
 	this->dispatch( event );
 
 	return ret;
@@ -1931,7 +1957,11 @@ bool SlaveWorker::handleDeleteRequest( SlavePeerEvent event, char *buf, size_t s
 	bool ret = SlaveWorker::chunkBuffer->at( header.listId )->deleteKey( header.key, header.keySize );
 
 	key.set( header.keySize, header.key );
-	event.resDelete( event.socket, event.id, header.listId, header.stripeId, header.chunkId, key, ret );
+	event.resDelete(
+		event.socket, event.id,
+		header.listId, header.stripeId, header.chunkId,
+		key, ret
+	);
 	this->dispatch( event );
 
 	return ret;
@@ -1986,46 +2016,6 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, char *buf, size_t
 	return ret;
 }
 
-bool SlaveWorker::handleDegradedLockRequest( SlavePeerEvent event, char *buf, size_t size ) {
-	struct DegradedLockReqHeader header;
-	if ( ! this->protocol.parseDegradedLockReqHeader( header, buf, size ) ) {
-		__ERROR__( "SlaveWorker", "handleDegradedLockRequest", "Invalid DEGRADED_LOCK request (size = %lu).", size );
-		return false;
-	}
-	__DEBUG__(
-		BLUE, "SlaveWorker", "handleDegradedLockRequest",
-		"[DEGRADED_LOCK] Key: %.*s (key size = %u); target list ID: %u, target chunk ID: %u",
-		( int ) header.keySize, header.key, header.keySize, header.dstListId, header.dstChunkId
-	);
-
-	Metadata metadata;
-	RemappingRecord remappingRecord;
-	Key key;
-	key.set( header.keySize, header.key );
-
-	if ( map->findValueByKey( header.key, header.keySize, 0, 0, 0, &metadata ) ) {
-		// Not remapped: Find the stripe which contains the key
-		Metadata target;
-		target.set( header.dstListId, metadata.stripeId, header.dstChunkId );
-
-		bool ret = SlaveWorker::map->insertDegradedLock( metadata, target );
-		// ret is true if the degraded lock is attained
-		event.resDegradedLock(
-			event.socket, event.id, key, ret,
-			target.listId, target.stripeId, target.chunkId
-		);
-	} else if ( map->findRemappingRecordByKey( header.key, header.keySize, &remappingRecord ) ) {
-		// Remapped: Reject the degraded operation
-		event.resDegradedLock( event.socket, event.id, key, remappingRecord.listId, remappingRecord.chunkId );
-	} else {
-		// Key not found
-		event.resDegradedLock( event.socket, event.id, key );
-	}
-	this->dispatch( event );
-
-	return true;
-}
-
 bool SlaveWorker::handleSealChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
 	return true;
 }
@@ -2070,7 +2060,8 @@ bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success,
 		key.set( keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.ptr );
 		masterEvent.resUpdate(
 			( MasterSocket * ) keyValueUpdate.ptr, pid.id, key,
-			keyValueUpdate.offset, keyValueUpdate.length, success
+			keyValueUpdate.offset, keyValueUpdate.length,
+			success, true, false
 		);
 		SlaveWorker::eventQueue->insert( masterEvent );
 	}
@@ -2120,7 +2111,7 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 			return false;
 		}
 
-		masterEvent.resDelete( ( MasterSocket * ) key.ptr, pid.id, key, success );
+		masterEvent.resDelete( ( MasterSocket * ) key.ptr, pid.id, key, success, true, false );
 		SlaveWorker::eventQueue->insert( masterEvent );
 	}
 	return true;
@@ -2162,7 +2153,13 @@ bool SlaveWorker::handleUpdateResponse( SlavePeerEvent event, bool success, char
 			return false;
 		}
 
-		masterEvent.resUpdate( ( MasterSocket * ) keyValueUpdate.ptr, pid.id, keyValueUpdate, header.valueUpdateOffset, header.valueUpdateSize, success, true );
+		masterEvent.resUpdate(
+			( MasterSocket * ) keyValueUpdate.ptr, pid.id,
+			keyValueUpdate,
+			header.valueUpdateOffset,
+			header.valueUpdateSize,
+			success, true, false
+		);
 		SlaveWorker::eventQueue->insert( masterEvent );
 	}
 	return true;
@@ -2204,7 +2201,7 @@ bool SlaveWorker::handleDeleteResponse( SlavePeerEvent event, bool success, char
 			return false;
 		}
 
-		masterEvent.resDelete( ( MasterSocket * ) key.ptr, pid.id, key, success );
+		masterEvent.resDelete( ( MasterSocket * ) key.ptr, pid.id, key, success, true, false );
 		SlaveWorker::eventQueue->insert( masterEvent );
 	}
 	return true;
@@ -2337,9 +2334,9 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 						KeyValue keyValue;
 
 						if ( SlaveWorker::map->findValueByKey( key.data, key.size, &keyValue ) )
-							event.resGet( ( MasterSocket * ) key.ptr, event.id, keyValue );
+							event.resGet( ( MasterSocket * ) key.ptr, event.id, keyValue, false );
 						else
-							event.resGet( ( MasterSocket * ) key.ptr, event.id, key );
+							event.resGet( ( MasterSocket * ) key.ptr, event.id, key, false );
 						this->dispatch( event );
 						key.free();
 					}
@@ -2417,10 +2414,6 @@ bool SlaveWorker::handleSetChunkResponse( SlavePeerEvent event, bool success, ch
 	// TODO: What should we do next?
 
 	return true;
-}
-
-bool SlaveWorker::handleDegradedLockResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
-	return false;
 }
 
 bool SlaveWorker::performDegradedRead( uint32_t listId, uint32_t stripeId, uint32_t lostChunkId, uint8_t opcode, uint32_t parentId, Key *key, KeyValueUpdate *keyValueUpdate ) {

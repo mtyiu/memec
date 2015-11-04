@@ -56,11 +56,12 @@ private:
 	SlaveSocket *getSlaves( char *data, uint8_t size, uint32_t &originalListId, uint32_t &originalChunkId, uint32_t &remappedListId, uint32_t &remappedChunkId );
 	SlaveSocket *getSlaves( uint32_t listId, uint32_t chunkId );
 
+	bool handleDegradedLockResponse( CoordinatorEvent event, bool success, char *buf, size_t size );
+
 	bool handleGetRequest( ApplicationEvent event, char *buf, size_t size );
 	bool handleSetRequest( ApplicationEvent event, char *buf, size_t size );
 	bool handleUpdateRequest( ApplicationEvent event, char *buf, size_t size );
 	bool handleDeleteRequest( ApplicationEvent event, char *buf, size_t size );
-
 	bool handleRemappingSetRequest( ApplicationEvent event, char *buf, size_t size );
 
 	bool handleGetResponse( SlaveEvent event, bool success, char *buf, size_t size );
@@ -72,7 +73,6 @@ private:
 
 	bool handleRemappingSetLockResponse( SlaveEvent event, bool success, char *buf, size_t size );
 	bool handleRemappingSetResponse( SlaveEvent event, bool success, char *buf, size_t size );
-	// bool handleDegradedLockResponse( SlaveEvent event, bool success, char *buf, size_t size );
 
 	void free();
 	static void *run( void *argv );
