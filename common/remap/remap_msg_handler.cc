@@ -6,10 +6,27 @@ RemapMsgHandler::RemapMsgHandler() {
 	this->isConnected = false;
 	this->msgCount = 0;
 	this->group = ( char* ) GROUP_NAME;
-	LOCK_INIT( &this->stlock );
 }
 
 RemapMsgHandler::~RemapMsgHandler() {
+}
+
+bool RemapMsgHandler::sendStatus( std::vector<struct sockaddr_in> slaves, const char *targetGroup ) {
+	char buf[ MAX_MESSLEN ];
+	int len = 0;
+	int recordSize = this->slaveStatusRecordSize;
+
+	buf[0] = ( uint8_t ) slaves.size();
+	len += 1;
+
+	for ( uint32_t i = 0; i < slaves.size(); i++ ) {
+		// slave info
+		buf[ len ] = htonl( slaves.at(i).sin_addr.s_addr );
+		buf[ len + sizeof( uint32_t ) ] = htons( slaves.at(i).sin_port );
+		buf[ len + sizeof( uint32_t ) + sizeof( uint16_t ) ] = ( uint8_t ) this->slavesStatus[ slaves.at(i) ];
+		len += recordSize;
+	}
+	return ( SP_multicast ( this->mbox, MSG_TYPE, targetGroup , 0, len, buf ) > 0 );
 }
 
 bool RemapMsgHandler::init( const char *spread, const char *user ) {
@@ -23,9 +40,6 @@ bool RemapMsgHandler::init( const char *spread, const char *user ) {
 		memset( this->user + MAX_SPREAD_NAME - 1, 0, 1 );
 	}
 
-	LOCK( &this->stlock );
-	this->status = REMAP_NONE;
-	UNLOCK( &this->stlock );
 	this->msgCount = 0;
 	slavesStatusLock.clear();
 

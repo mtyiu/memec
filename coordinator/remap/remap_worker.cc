@@ -21,7 +21,7 @@ bool CoordinatorRemapWorker::startRemap( RemapStatusEvent event ) {
 	// for multi-threaded environment, it is possible that other workers change 
 	// the status while this worker is waiting
 	// just abort and late comers to take over
-	if ( crmh->slaveStatus[ event.slave ] != REMAP_PREPARE_START ) {
+	if ( crmh->slavesStatus[ event.slave ] != REMAP_PREPARE_START ) {
 		UNLOCK( &crmh->slavesStatusLock[ event.slave ] );
 		return false;
 	}
@@ -34,7 +34,7 @@ bool CoordinatorRemapWorker::startRemap( RemapStatusEvent event ) {
 		return false;
 	}
 
-	crmh->slaveStatus[ event.slave ] = REMAP_START;
+	crmh->slavesStatus[ event.slave ] = REMAP_START;
 	UNLOCK( &crmh->slavesStatusLock[ event.slave ] );
 	return true;
 }
@@ -50,7 +50,7 @@ bool CoordinatorRemapWorker::stopRemap( RemapStatusEvent event ) {
 	// for multi-threaded environment, it is possible that other workers change 
 	// the tatus while this worker is waiting. 
 	// just abort and late comers to take over
-	if ( crmh->slaveStatus[ event.slave ] != REMAP_PREPARE_END ) {
+	if ( crmh->slavesStatus[ event.slave ] != REMAP_PREPARE_END ) {
 		UNLOCK( &crmh->slavesStatusLock[ event.slave ] );
 		return false;
 	}
@@ -62,7 +62,7 @@ bool CoordinatorRemapWorker::stopRemap( RemapStatusEvent event ) {
 		UNLOCK( &crmh->slavesStatusLock[ event.slave ] );
 		return false;
 	}
-	crmh->slaveStatus[ event.slave ] = REMAP_NONE ;
+	crmh->slavesStatus[ event.slave ] = REMAP_NONE ;
 	UNLOCK( &crmh->slavesStatusLock[ event.slave ] );
 	return false;
 }

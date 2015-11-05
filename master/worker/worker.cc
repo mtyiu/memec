@@ -170,8 +170,9 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 						this->handleGetRequest( event, buffer.data, buffer.size );
 						break;
 					case PROTO_OPCODE_SET:
-						//if ( MasterWorker::remapFlag->get() ) {
-						if ( Master::getInstance()->remapMsgHandler.useRemappingFlow() ) {
+						if ( MasterWorker::remapFlag->get() ) {
+						// TODO need to get slave address to determine the flow ...
+						//if ( Master::getInstance()->remapMsgHandler.useRemappingFlow( ) ) {
 							this->handleRemappingSetRequest( event, buffer.data, buffer.size );
 						} else {
 							this->handleSetRequest( event, buffer.data, buffer.size );
@@ -699,7 +700,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		event.resSet( event.socket, event.id, key, false, false );
 		this->dispatch( event );
 		MasterWorker::counter->decreaseNormal();
-		Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
+		Master::getInstance()->remapMsgHandler.ackRemap();
 		return false;
 	}
 
@@ -774,7 +775,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		if ( sentBytes != ( ssize_t ) buffer.size ) {
 			__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 			MasterWorker::counter->decreaseNormal();
-			Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
+			Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
 			return false;
 		}
 #endif
@@ -784,13 +785,13 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		if ( sentBytes != ( ssize_t ) buffer.size ) {
 			__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 			MasterWorker::counter->decreaseNormal();
-			Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
+			Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
 			return false;
 		}
 	}
 
 	MasterWorker::counter->decreaseNormal();
-	Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
+	Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
 	return true;
 }
 
@@ -840,7 +841,7 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 			MasterWorker::counter->decreaseLockOnly();
 		else
 			MasterWorker::counter->decreaseRemapping();
-		Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
+		Master::getInstance()->remapMsgHandler.ackRemap(); 
 		return false;
 	}
 
@@ -904,14 +905,14 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 				MasterWorker::counter->decreaseLockOnly();
 			else
 				MasterWorker::counter->decreaseRemapping();
-			Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
+			Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
 			return false;
 		}
 	}
 
 #undef NO_REMAPPING
 
-	Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
+	Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
 
 	return true;
 }
@@ -1326,7 +1327,7 @@ bool MasterWorker::handleRemappingSetLockResponse( SlaveEvent event, bool succes
 		// TODO is it possible to determine which counter to decrement? ..
 		// MasterWorker::counter->decreaseLockOnly();
 		MasterWorker::counter->decreaseRemapping();
-		Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
+		Master::getInstance()->remapMsgHandler.ackRemap();
 		return false;
 	}
 	__DEBUG__(
@@ -1342,7 +1343,7 @@ bool MasterWorker::handleRemappingSetLockResponse( SlaveEvent event, bool succes
 	if ( ! MasterWorker::pending->eraseRemappingRecord( PT_SLAVE_REMAPPING_SET, event.id, event.socket, &pid, &remappingRecord ) ) {
 		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Cannot find a pending slave REMAPPING_SET_LOCK request that matches the response. This message will be discarded. (ID: %u)", event.id );
 		MasterWorker::counter->decreaseRemapping();
-		Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
+		Master::getInstance()->remapMsgHandler.ackRemap();
 		return false;
 	}
 
@@ -1350,7 +1351,7 @@ bool MasterWorker::handleRemappingSetLockResponse( SlaveEvent event, bool succes
 		// TODO
 		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "TODO: Handle the case when the lock cannot be acquired." );
 		MasterWorker::counter->decreaseRemapping();
-		Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
+		Master::getInstance()->remapMsgHandler.ackRemap();
 		return false;
 	}
 
@@ -1365,14 +1366,14 @@ bool MasterWorker::handleRemappingSetLockResponse( SlaveEvent event, bool succes
 		// TODO
 		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Not yet implemented!" );
 		MasterWorker::counter->decreaseRemapping();
-		Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
+		Master::getInstance()->remapMsgHandler.ackRemap();
 		return false;
 	}
 
 	if ( ! MasterWorker::pending->findKey( PT_APPLICATION_SET, pid.parentId, 0, &key ) ) {
 		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded. (ID: %u)", event.id );
 		MasterWorker::counter->decreaseRemapping();
-		Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
+		Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
 		return false;
 	}
 
@@ -1474,7 +1475,7 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 			MasterWorker::counter->decreaseLockOnly();
 		else
 			MasterWorker::counter->decreaseRemapping();
-		Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
+		Master::getInstance()->remapMsgHandler.ackRemap( event.socket->getAddr() );
 
 		return false;
 	}
@@ -1533,7 +1534,7 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 			MasterWorker::remappingRecords->insert( key, record );
 		}
 
-		Master::getInstance()->remapMsgHandler.ackRemap( MasterWorker::counter->getNormal(), MasterWorker::counter->getRemapping() );
+		Master::getInstance()->remapMsgHandler.ackRemap( event.socket->getAddr() );
 	}
 
 #undef NO_REMAPPING

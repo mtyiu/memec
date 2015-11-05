@@ -25,11 +25,11 @@ void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t ori
 		return;
 	}
 
-	// check if remamping is allowed
-	if ( ! remapMsgHandler->allowRemapping() )
-		return;
-
 	slaveAddr = data[ originalChunkId ]->getAddr();
+
+	// check if remamping is allowed
+	if ( ! remapMsgHandler->allowRemapping( slaveAddr ) )
+		return;
 
 	// skip remap if not overloaded
 	if ( overloadedSlave->slaveSet.count( slaveAddr ) < 1 )

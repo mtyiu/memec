@@ -69,6 +69,7 @@ public:
 	MasterEventQueue eventQueue;
 	PacketPool packetPool;
 	StripeList<SlaveSocket> *stripeList;
+	// TODO use a separate counter for each slave
 	Counter counter;
 	/* Remapping */
 	RemapFlag remapFlag;

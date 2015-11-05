@@ -23,7 +23,6 @@ CoordinatorRemapMsgHandler::CoordinatorRemapMsgHandler() :
 	aliveSlaves.clear();
 	this->eventQueue = new EventQueue<RemapStatusEvent>( EVENT_QUEUE_LEN );
 	this->workers = new CoordinatorRemapWorker[ WORKER_NUM ];
-	this->slaveStatusRecordSize = 4 + 2 + 1; // sizeof( IP, port ) = 7
 }
 
 CoordinatorRemapMsgHandler::~CoordinatorRemapMsgHandler() {
@@ -96,12 +95,12 @@ bool CoordinatorRemapMsgHandler::stop() {
 		for ( uint32_t i = 0; i < _ALL_SLAVES_->size(); ) { \
 			LOCK( &this->slavesStatusLock[ _ALL_SLAVES_->at(i) ] ); \
 			/* no need to trigger remapping if is undefined / already entered / already exited remapping phase */ \
-			if ( this->slaveStatus.count( _ALL_SLAVES_->at(i) ) == 0 ) { \
+			if ( this->slavesStatus.count( _ALL_SLAVES_->at(i) ) == 0 ) { \
 				UNLOCK( &this->slavesStatusLock[ _ALL_SLAVES_->at(i) ] ); \
 				i++; \
 				continue; \
 			}  \
-			RemapStatus status = this->slaveStatus[ _ALL_SLAVES_->at(i) ]; \
+			RemapStatus status = this->slavesStatus[ _ALL_SLAVES_->at(i) ]; \
 			if ( ( start && ( status == REMAP_PREPARE_START || status == REMAP_START ) ) || \
 				( ( ! start ) && ( status == REMAP_PREPARE_END || status == REMAP_NONE ) ) ) \
 			{ \
@@ -110,7 +109,7 @@ bool CoordinatorRemapMsgHandler::stop() {
 				continue; \
 			}  \
 			/* set status for sync. and to avoid multiple start from others */ \
-			this->slaveStatus[ _ALL_SLAVES_->at(i) ] = ( start )? REMAP_PREPARE_START : REMAP_PREPARE_END ; \
+			this->slavesStatus[ _ALL_SLAVES_->at(i) ] = ( start )? REMAP_PREPARE_START : REMAP_PREPARE_END ; \
 			/* reset ack pool anyway */\
 			this->resetMasterAck( _ALL_SLAVES_->at(i) ); \
 			_CHECKED_SLAVES_.push_back( _ALL_SLAVES_->at(i) ); \
@@ -123,13 +122,13 @@ bool CoordinatorRemapMsgHandler::stop() {
 			for ( uint32_t i = 0; i < _CHECKED_SLAVES_.size() ; i++ ) { \
 				LOCK( &this->slavesStatusLock[ _ALL_SLAVES_->at(i) ] ); \
 				/* TODO is the previous status deterministic ?? */ \
-				if ( start && this->slaveStatus[ _ALL_SLAVES_->at(i) ] == REMAP_PREPARE_START ) { \
-					this->slaveStatus[ _ALL_SLAVES_->at(i) ] = REMAP_NONE; \
-				} else if ( ( ! start ) && this->slaveStatus[ _ALL_SLAVES_->at(i) ] == REMAP_PREPARE_END ) { \
-					this->slaveStatus[ _ALL_SLAVES_->at(i) ] = REMAP_START; \
+				if ( start && this->slavesStatus[ _ALL_SLAVES_->at(i) ] == REMAP_PREPARE_START ) { \
+					this->slavesStatus[ _ALL_SLAVES_->at(i) ] = REMAP_NONE; \
+				} else if ( ( ! start ) && this->slavesStatus[ _ALL_SLAVES_->at(i) ] == REMAP_PREPARE_END ) { \
+					this->slavesStatus[ _ALL_SLAVES_->at(i) ] = REMAP_START; \
 				} else { \
 					fprintf( stderr, "unexpected status of slave %u as %d\n",  \
-						_ALL_SLAVES_->at(i).sin_addr.s_addr, this->slaveStatus[ _ALL_SLAVES_->at(i) ]  \
+						_ALL_SLAVES_->at(i).sin_addr.s_addr, this->slavesStatus[ _ALL_SLAVES_->at(i) ]  \
 					); \
 				} \
 				UNLOCK( &this->slavesStatusLock[ _ALL_SLAVES_->at(i) ] ); \
@@ -217,8 +216,6 @@ bool CoordinatorRemapMsgHandler::isMasterJoin( int service, char *msg, char *sub
  * packet: [# of slaves](1) [ [ip addr](4) [port](2) [status](1) ](7) [..](7) [..](7) ...
  */
 bool CoordinatorRemapMsgHandler::sendStatusToMasters( std::vector<struct sockaddr_in> slaves ) {
-	char buf[ MAX_MESSLEN ];
-	int len = 0;
 	int recordSize = this->slaveStatusRecordSize;
 
 	if ( slaves.size() == 0 ) {
@@ -228,19 +225,7 @@ bool CoordinatorRemapMsgHandler::sendStatusToMasters( std::vector<struct sockadd
 		return false;
 	}
 
-	// new status and # of slave involved
-	buf[0] = ( uint8_t ) slaves.size();
-	len += 1;
-
-	for ( uint32_t i = 0; i < slaves.size(); i++ ) {
-		// slave info
-		buf[ len ] = htonl( slaves.at(i).sin_addr.s_addr );
-		buf[ len + sizeof( uint32_t ) ] = htons( slaves.at(i).sin_port );
-		buf[ len + sizeof( uint32_t ) + sizeof( uint16_t ) ] = ( uint8_t ) this->slaveStatus[ slaves.at(i) ];
-		len += recordSize;
-	}
-	return ( SP_multicast ( this->mbox, MSG_TYPE, MASTER_GROUP, 0, len, buf ) > 0 );
-
+	return sendStatus( slaves, MASTER_GROUP );
 }
 
 bool CoordinatorRemapMsgHandler::sendStatusToMasters( struct sockaddr_in slave ) {
@@ -272,10 +257,8 @@ void *CoordinatorRemapMsgHandler::readMessages( void *argv ) {
 		if ( ! regular && fromMaster && myself->isMasterJoin( service , msg, subject ) ) {
 			// master joined ( masters group )
 			myself->addAliveMaster( subject );
-			LOCK( &myself->stlock );
 			// notify the new master about the remapping status
 			myself->sendStatusToMasters();
-			LOCK( &myself->stlock );
 		} else if ( ! regular && myself->isMasterLeft( service , msg, subject ) ) {
 			// master left
 			myself->removeAliveMaster( subject );
@@ -310,21 +293,21 @@ bool CoordinatorRemapMsgHandler::updateStatus( char *subject, char *msg, int len
 	LOCK( &this->mastersAckLock );
 	// check slave by slave for changes
 	for ( uint8_t i = 0; i < slaveCount; i++ ) {
-		slave.sin_addr.s_addr = htonl( *( ( uint32_t * ) ( msg + ofs ) ) );
-		slave.sin_port = htons( *( ( uint16_t *) ( msg + ofs + 4 ) ) );
+		slave.sin_addr.s_addr = ntohl( *( ( uint32_t * ) ( msg + ofs ) ) );
+		slave.sin_port = ntohs( *( ( uint16_t *) ( msg + ofs + 4 ) ) );
 		status = msg[ ofs + 6 ];
 		ofs += recordSize;
 		// ignore changes for non-existing slaves or slaves in invalid status
 		// TODO sync status with master with invalid status of slaves
-		if ( this->slaveStatus.count( slave ) == 0 ||
-			( this->slaveStatus[ slave ] != REMAP_PREPARE_START &&
-			this->slaveStatus[ slave ] != REMAP_PREPARE_END )
+		if ( this->slavesStatus.count( slave ) == 0 ||
+			( this->slavesStatus[ slave ] != REMAP_PREPARE_START &&
+			this->slavesStatus[ slave ] != REMAP_PREPARE_END )
 		) {
 			continue;
 		}
 		// check if the ack is corresponding to a correct status
-		if ( ( this->slaveStatus[ slave ] == REMAP_PREPARE_START && status != REMAP_WAIT_START ) ||
-			( this->slaveStatus[ slave ] == REMAP_PREPARE_END && status != REMAP_WAIT_END ) ) {
+		if ( ( this->slavesStatus[ slave ] == REMAP_PREPARE_START && status != REMAP_WAIT_START ) ||
+			( this->slavesStatus[ slave ] == REMAP_PREPARE_END && status != REMAP_WAIT_END ) ) {
 			continue;
 		}
 

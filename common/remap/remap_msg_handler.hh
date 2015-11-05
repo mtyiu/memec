@@ -3,6 +3,7 @@
 
 #include <cstdio>
 #include <map>
+#include <vector>
 #include <stdint.h>
 #include <sys/types.h>
 #include <pthread.h>
@@ -30,9 +31,10 @@ protected:
 
 	bool isConnected;
 
-	// TODO remove  
-	LOCK_T stlock;
-	RemapStatus status;
+	const static uint32_t slaveStatusRecordSize = 4 + 2 + 1; // sizeof( IP, port, status ) = 7
+
+	// send a vector of slave status
+	bool sendStatus ( std::vector<struct sockaddr_in> slaves, const char *targetGroup );
 
 	inline void increMsgCount() {
 		this->msgCount++;
@@ -56,7 +58,7 @@ protected:
 	}
 
 public:
-	std::map<struct sockaddr_in, RemapStatus> slaveStatus;
+	std::map<struct sockaddr_in, RemapStatus> slavesStatus;
 	std::map<struct sockaddr_in, LOCK_T> slavesStatusLock;
 
 	RemapMsgHandler();
@@ -66,8 +68,11 @@ public:
 		return this->isConnected;
 	}
 
-	inline RemapStatus getStatus() {
-		return this->status;
+	inline RemapStatus getStatus( struct sockaddr_in slave ) {
+		RemapStatus status = REMAP_UNDEFINED;
+		if ( this->slavesStatus.count( slave ) )
+			status = this->slavesStatus[ slave ];
+		return status;
 	}
 
 	bool init( const char *spread = NULL, const char *user = NULL );
@@ -77,9 +82,9 @@ public:
 	virtual bool stop() = 0;
 
 	bool isRemapStarted( const struct sockaddr_in slave ) {
-		if ( this->slaveStatus.count( slave ) == 0 ) 
+		if ( this->slavesStatus.count( slave ) == 0 ) 
 			return false;
-		switch ( this->slaveStatus[ slave ] ) {
+		switch ( this->slavesStatus[ slave ] ) {
 			case REMAP_PREPARE_START:
 			case REMAP_START:
 			case REMAP_PREPARE_END:
@@ -90,9 +95,9 @@ public:
 		return false;
 	}
 	bool isRemapStopped( const struct sockaddr_in slave ) {
-		if ( this->slaveStatus.count( slave ) == 0 ) 
+		if ( this->slavesStatus.count( slave ) == 0 ) 
 			return false;
-		switch ( this->slaveStatus[ slave ] ) {
+		switch ( this->slavesStatus[ slave ] ) {
 			case REMAP_NONE:
 			case REMAP_END:
 			case REMAP_UNDEFINED:

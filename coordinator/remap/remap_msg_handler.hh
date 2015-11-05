@@ -38,8 +38,6 @@ private:
 	std::set<struct sockaddr_in> aliveSlaves;
 	LOCK_T aliveSlavesLock;
 
-	uint32_t slaveStatusRecordSize;
-
 	bool isMasterLeft( int service, char *msg, char *subject );
 	bool isMasterJoin( int service, char *msg, char *subject );
 
