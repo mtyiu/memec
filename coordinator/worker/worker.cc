@@ -153,16 +153,15 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 
 			int index = 0;
 
-			switch ( header.magic ) {
-				case PROTO_MAGIC_LOADING_STATS:
-					this->protocol.parseLoadStatsHeader( loadStatsHeader, buffer.data, buffer.size );
-					buffer.data += PROTO_LOAD_STATS_SIZE;
-					buffer.size -= PROTO_LOAD_STATS_SIZE;
-					if ( ! this->protocol.parseLoadingStats( loadStatsHeader, getLatency, setLatency, buffer.data, buffer.size ) )
-						__ERROR__( "CoordinatorWorker", "dispatch", "Invalid amount of data received from master." );
-					//fprintf( stderr, "get stats GET %d SET %d\n", loadStatsHeader.slaveGetCount, loadStatsHeader.slaveSetCount );
-					// set the latest loading stats
-					//fprintf( stderr, "fd %d IP %u:%hu\n", event.socket->getSocket(), ntohl( event.socket->getAddr().sin_addr.s_addr ), ntohs( event.socket->getAddr().sin_port ) );
+			if ( header.magic == PROTO_MAGIC_LOADING_STATS ) {
+				this->protocol.parseLoadStatsHeader( loadStatsHeader, buffer.data, buffer.size );
+				buffer.data += PROTO_LOAD_STATS_SIZE;
+				buffer.size -= PROTO_LOAD_STATS_SIZE;
+				if ( ! this->protocol.parseLoadingStats( loadStatsHeader, getLatency, setLatency, buffer.data, buffer.size ) )
+					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid amount of data received from master." );
+				//fprintf( stderr, "get stats GET %d SET %d\n", loadStatsHeader.slaveGetCount, loadStatsHeader.slaveSetCount );
+				// set the latest loading stats
+				//fprintf( stderr, "fd %d IP %u:%hu\n", event.socket->getSocket(), ntohl( event.socket->getAddr().sin_addr.s_addr ), ntohs( event.socket->getAddr().sin_port ) );
 
 #define SET_SLAVE_LATENCY_FOR_MASTER( _MASTER_ADDR_, _SRC_, _DST_ ) \
 	for ( uint32_t i = 0; i < _SRC_.size(); i++ ) { \
@@ -183,25 +182,30 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 		} \
 	} \
 
-					masterAddr = event.socket->getAddr();
-					LOCK ( &coordinator->slaveLoading.lock );
-					SET_SLAVE_LATENCY_FOR_MASTER( masterAddr, getLatency, latestGet );
-					SET_SLAVE_LATENCY_FOR_MASTER( masterAddr, setLatency, latestSet );
-					UNLOCK ( &coordinator->slaveLoading.lock );
+				masterAddr = event.socket->getAddr();
+				LOCK ( &coordinator->slaveLoading.lock );
+				SET_SLAVE_LATENCY_FOR_MASTER( masterAddr, getLatency, latestGet );
+				SET_SLAVE_LATENCY_FOR_MASTER( masterAddr, setLatency, latestSet );
+				UNLOCK ( &coordinator->slaveLoading.lock );
 
-					getLatency.needsDelete = false;
-					setLatency.needsDelete = false;
-					getLatency.clear();
-					setLatency.clear();
+				getLatency.needsDelete = false;
+				setLatency.needsDelete = false;
+				getLatency.clear();
+				setLatency.clear();
 
-					buffer.data -= PROTO_LOAD_STATS_SIZE;
-					buffer.size += PROTO_LOAD_STATS_SIZE;
-					break;
-				case PROTO_MAGIC_REQUEST:
-					goto quit_1;
-				default:
-					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from master." );
-					goto quit_1;
+				buffer.data -= PROTO_LOAD_STATS_SIZE;
+				buffer.size += PROTO_LOAD_STATS_SIZE;
+			} else if ( header.magic == PROTO_MAGIC_REQUEST ) {
+				switch( header.opcode ) {
+					case PROTO_OPCODE_DEGRADED_LOCK:
+						printf( "PROTO_OPCODE_DEGRADED_LOCK\n" );
+						break;
+					default:
+						goto quit_1;
+				}
+			} else {
+				__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from master." );
+				goto quit_1;
 			}
 
 #undef SET_SLAVE_LATENCY_FOR_MASTER

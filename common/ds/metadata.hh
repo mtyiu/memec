@@ -126,23 +126,26 @@ public:
 
 class DegradedLock {
 public:
-	uint32_t listId;
-	uint32_t chunkId;
-	uint8_t keySize;
-	char *key;
+	uint32_t srcListId;
+	uint32_t srcStripeId;
+	uint32_t srcChunkId;
+	uint32_t dstListId;
+	uint32_t dstChunkId;
 
 	DegradedLock() {
-		this->listId = 0;
-		this->chunkId = 0;
-		this->keySize = 0;
-		this->key = 0;
+		this->srcListId = 0;
+		this->srcStripeId = 0;
+		this->srcChunkId = 0;
+		this->dstListId = 0;
+		this->dstChunkId = 0;
 	}
 
-	void set( uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key ) {
-		this->listId = listId;
-		this->chunkId = chunkId;
-		this->keySize = keySize;
-		this->key = key;
+	void set( uint32_t srcListId, uint32_t srcStripeId, uint32_t srcChunkId, uint32_t dstListId, uint32_t dstChunkId ) {
+		this->srcListId = srcListId;
+		this->srcStripeId = srcStripeId;
+		this->srcChunkId = srcChunkId;
+		this->dstListId = dstListId;
+		this->dstChunkId = dstChunkId;
 	}
 };
 

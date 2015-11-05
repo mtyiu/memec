@@ -27,31 +27,33 @@ enum PendingType {
 class DegradedLockData : public DegradedLock {
 public:
 	uint8_t opcode;
+	uint8_t keySize;
+	char *key;
 	uint32_t valueUpdateSize;
 	uint32_t valueUpdateOffset;
 	char *valueUpdate;
 
 	DegradedLockData() : DegradedLock() {
 		this->opcode = 0;
+		this->keySize = 0;
+		this->key = 0;
 		this->valueUpdateSize = 0;
 		this->valueUpdateOffset = 0;
 		this->valueUpdate = 0;
 	}
 
-	void set( uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key ) {
-		DegradedLock::set( listId, chunkId, keySize, key );
+	void set( uint8_t opcode, uint32_t srcListId, uint32_t srcStripeId, uint32_t srcChunkId, uint32_t dstListId, uint32_t dstChunkId, uint8_t keySize = 0, char *key = 0 ) {
+		this->opcode = opcode;
+		DegradedLock::set( srcListId, srcStripeId, srcChunkId, dstListId, dstChunkId );
+		this->keySize = keySize;
+		this->key = key;
 	}
 
-	void set( uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key, uint32_t valueUpdateSize, uint32_t valueUpdateOffset, char *valueUpdate, bool dup ) {
-		this->set( listId, chunkId, keySize, key );
+	void dup( uint32_t valueUpdateSize, uint32_t valueUpdateOffset, char *valueUpdate ) {
 		this->valueUpdateSize = valueUpdateSize;
 		this->valueUpdateOffset = valueUpdateOffset;
-		if ( dup ) {
-			this->valueUpdate = ( char * ) malloc( valueUpdateSize );
-			memcpy( this->valueUpdate, valueUpdate, valueUpdateSize );
-		} else {
-			this->valueUpdate = valueUpdate;
-		}
+		this->valueUpdate = ( char * ) malloc( valueUpdateSize );
+		memcpy( this->valueUpdate, valueUpdate, valueUpdateSize );
 	}
 };
 

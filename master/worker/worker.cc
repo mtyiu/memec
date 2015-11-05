@@ -12,7 +12,6 @@
 uint32_t MasterWorker::dataChunkCount;
 uint32_t MasterWorker::parityChunkCount;
 bool MasterWorker::degradedTargetIsFixed;
-bool MasterWorker::degradedIsDisabled;
 IDGenerator *MasterWorker::idGenerator;
 Pending *MasterWorker::pending;
 MasterEventQueue *MasterWorker::eventQueue;
@@ -495,11 +494,13 @@ SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId
 SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, uint32_t &newChunkId, SlaveSocket *&original ) {
 	original = this->getSlaves( data, size, listId, chunkId );
 	newChunkId = chunkId;
-	if ( MasterWorker::remapMsgHandler->useRemappingFlow() && ! MasterWorker::degradedIsDisabled ) {
+	if ( Master::getInstance()->isDegraded( original ) ) {
 		// Perform degraded operation
 		if ( MasterWorker::degradedTargetIsFixed ) {
+			/*
 			if ( ! BasicRemappingScheme::isOverloaded( original ) )
 				return original; // not overloaded
+			*/
 
 			// Pick a new server from the same stripe list to handle the request
 			for ( uint32_t jump = 0, chunkCount = MasterWorker::dataChunkCount + MasterWorker::parityChunkCount; jump < chunkCount; jump++ ) {
@@ -573,11 +574,11 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 
 	uint32_t listId, chunkId, newChunkId;
 	bool connected;
-	SlaveSocket *socket, *target;
+	SlaveSocket *socket, *original;
 
 	socket = this->getSlaves(
 		header.key, header.keySize,
-		listId, chunkId, newChunkId, target
+		listId, chunkId, newChunkId, original
 	);
 	if ( ! socket ) {
 		Key key;
@@ -602,13 +603,11 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 
 	if ( chunkId != newChunkId ) {
 		// Acquire degraded lock from the coordinator
-		DegradedLockData degradedLockData;
-		degradedLockData.set( listId, newChunkId, key.size, key.data );
-		if ( ! MasterWorker::pending->insertDegradedLockData( PT_COORDINATOR_DEGRADED_LOCK_DATA, requestId, event.id, ( void * ) socket, degradedLockData ) ) {
-			__ERROR__( "MasterWorker", "handleGetRequest", "Cannot insert into coordinator DEGRADED_LOCK pending map." );
-			return false;
-		}
-		return true;
+		return this->sendDegradedLockRequest(
+			event.id, PROTO_OPCODE_GET,
+			listId, chunkId, newChunkId,
+			key.data, key.size
+		);
 	} else {
 		buffer.data = this->protocol.reqGet(
 			buffer.size, requestId,
@@ -1025,8 +1024,49 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 	return true;
 }
 
-bool MasterWorker::sendDegradedLockRequest( uint32_t listId, uint32_t chunkId, uint32_t newChunkId, char *key, uint8_t keySize ) {
-	return false;
+bool MasterWorker::sendDegradedLockRequest( uint32_t parentId, uint8_t opcode, uint32_t listId, uint32_t chunkId, uint32_t newChunkId, char *key, uint8_t keySize, uint32_t valueUpdateSize, uint32_t valueUpdateOffset, char *valueUpdate ) {
+	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
+	CoordinatorSocket *socket = Master::getInstance()->sockets.coordinators.values[ 0 ];
+
+	// Add the degraded lock request to the pending set
+	DegradedLockData degradedLockData;
+	degradedLockData.set(
+		opcode,
+		listId, 0 /* srcStripeId */, chunkId,
+		listId, newChunkId,
+		keySize, key
+	);
+	if ( valueUpdateSize != 0 && valueUpdate ) {
+		degradedLockData.dup( valueUpdateSize, valueUpdateOffset, valueUpdate );
+	}
+
+	if ( ! MasterWorker::pending->insertDegradedLockData( PT_COORDINATOR_DEGRADED_LOCK_DATA, requestId, parentId, ( void * ) socket, degradedLockData ) ) {
+		__ERROR__( "MasterWorker", "handleDegradedRequest", "Cannot insert into slave degraded lock pending map." );
+	}
+
+	// Get degraded lock from the coordinator
+	struct {
+		size_t size;
+		char *data;
+	} buffer;
+	ssize_t sentBytes;
+	bool connected;
+
+	buffer.data = this->protocol.reqDegradedLock(
+		buffer.size, requestId,
+		listId, chunkId,
+		listId, newChunkId,
+		key, keySize
+	);
+
+	// Send degraded lock request
+	sentBytes = socket->send( buffer.data, buffer.size, connected );
+	if ( sentBytes != ( ssize_t ) buffer.size ) {
+		__ERROR__( "MasterWorker", "handleDegradedRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
+		return false;
+	}
+
+	return true;
 }
 
 bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, char *buf, size_t size ) {
@@ -1659,7 +1699,6 @@ bool MasterWorker::init() {
 	MasterWorker::dataChunkCount = master->config.global.coding.params.getDataChunkCount();
 	MasterWorker::parityChunkCount = master->config.global.coding.params.getParityChunkCount();
 	MasterWorker::degradedTargetIsFixed = master->config.master.degraded.isFixed;
-	MasterWorker::degradedIsDisabled = master->config.master.degraded.disabled;
 	MasterWorker::pending = &master->pending;
 	MasterWorker::eventQueue = &master->eventQueue;
 	MasterWorker::stripeList = master->stripeList;

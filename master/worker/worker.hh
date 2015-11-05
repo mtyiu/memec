@@ -31,7 +31,6 @@ private:
 	static uint32_t dataChunkCount;
 	static uint32_t parityChunkCount;
 	static bool degradedTargetIsFixed;
-	static bool degradedIsDisabled;
 	static IDGenerator *idGenerator;
 	static Pending *pending;
 	static MasterEventQueue *eventQueue;
@@ -62,7 +61,12 @@ private:
 	bool handleDeleteRequest( ApplicationEvent event, char *buf, size_t size );
 	bool handleRemappingSetRequest( ApplicationEvent event, char *buf, size_t size );
 
-	bool sendDegradedLockRequest( uint32_t listId, uint32_t chunkId, uint32_t newChunkId, char *key, uint8_t keySize );
+	bool sendDegradedLockRequest(
+		uint32_t parentId, uint8_t opcode,
+		uint32_t listId, uint32_t chunkId, uint32_t newChunkId,
+		char *key, uint8_t keySize,
+		uint32_t valueUpdateSize = 0, uint32_t valueUpdateOffset = 0, char *valueUpdate = 0
+	);
 	bool handleDegradedLockResponse( CoordinatorEvent event, bool success, char *buf, size_t size );
 
 	bool handleGetResponse( SlaveEvent event, bool success, char *buf, size_t size );

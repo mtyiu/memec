@@ -571,6 +571,16 @@ bool Master::setDebugFlag( char *input ) {
 	return ret;
 }
 
+bool Master::isDegraded( SlaveSocket *socket ) {
+	return (
+		( this->debugFlags.isDegraded ) ||
+		(
+			// this->remapMsgHandler.useRemappingFlow() &&
+			! this->config.master.degraded.disabled
+		)
+	);
+}
+
 void Master::printPending( FILE *f ) {
 	size_t i;
 	std::unordered_multimap<PendingIdentifier, Key>::iterator it;
