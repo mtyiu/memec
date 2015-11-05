@@ -1,3 +1,4 @@
+#include <vector>
 #include "master_event.hh"
 
 void MasterEvent::resRegister( MasterSocket *socket, uint32_t id, bool success ) {
@@ -15,11 +16,10 @@ void MasterEvent::reqPushLoadStats( MasterSocket *socket, ArrayMap<struct sockad
 	this->message.slaveLoading.overloadedSlaveSet = overloadedSlaveSet;
 }
 
-void MasterEvent::switchPhase( bool toRemap ) {
+void MasterEvent::switchPhase( bool toRemap, std::set<struct sockaddr_in> slaves ) {
 	this->type = MASTER_EVENT_TYPE_SWITCH_PHASE;
 	this->message.remap.toRemap = toRemap;
-	// TODO specify the vector of slaves
-	this->message.remap.slaves = NULL;
+	this->message.remap.slaves = new std::vector<struct sockaddr_in>( slaves.begin(), slaves.end() );
 }
 
 void MasterEvent::pending( MasterSocket *socket ) {

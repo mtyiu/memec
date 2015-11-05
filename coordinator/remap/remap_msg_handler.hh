@@ -35,6 +35,10 @@ private:
 	bool isListening;
 
 	CoordinatorRemapWorker *workers;
+	std::set<struct sockaddr_in> aliveSlaves;
+	LOCK_T aliveSlavesLock;
+
+	uint32_t slaveStatusRecordSize;
 
 	bool isMasterLeft( int service, char *msg, char *subject );
 	bool isMasterJoin( int service, char *msg, char *subject );
@@ -53,9 +57,6 @@ private:
 public:
 	EventQueue<RemapStatusEvent> *eventQueue;
 
-	std::map<struct sockaddr_in, RemapStatus> slaveStatus;
-	std::map<struct sockaddr_in, LOCK_T> slavesStatusLock;
-
 	static CoordinatorRemapMsgHandler *getInstance() {
 		static CoordinatorRemapMsgHandler crmh;
 		return &crmh;
@@ -72,35 +73,16 @@ public:
 	// batch start and stop (to trigger individual remap)
 	bool startRemap( std::vector<struct sockaddr_in> *slaves );
 	bool stopRemap( std::vector<struct sockaddr_in> *slaves );
-	bool startRemap();
-	bool stopRemap();
+
+	bool startRemapEnd( const struct sockaddr_in &slave );
+	bool stopRemapEnd( const struct sockaddr_in &slave );
 
 	bool resetMasterAck( struct sockaddr_in slave );
 	bool isAllMasterAcked( struct sockaddr_in slave );
-	bool sendMessageToMasters( RemapStatus to = REMAP_UNDEFINED );
 
-	bool isRemapStarted() {
-		switch ( this->status ) {
-			case REMAP_PREPARE_START:
-			case REMAP_START:
-			case REMAP_PREPARE_END:
-				return true;
-			default:
-				return false;
-		}
-		return false;
-	}
-	bool isRemapStopped() {
-		switch ( this->status ) {
-			case REMAP_NONE:
-			case REMAP_END:
-			case REMAP_UNDEFINED:
-				return true;
-			default:
-				return false;
-		}
-		return true;
-	}
+	bool sendStatusToMasters( std::vector<struct sockaddr_in> slaves = std::vector <struct sockaddr_in>() );
+	bool sendStatusToMasters( struct sockaddr_in slave );
+
 };
 
 #endif

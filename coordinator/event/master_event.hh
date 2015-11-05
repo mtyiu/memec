@@ -1,6 +1,7 @@
 #ifndef __COORDINATOR_EVENT_MASTER_EVENT_HH__
 #define __COORDINATOR_EVENT_MASTER_EVENT_HH__
 
+#include <set>
 #include "../socket/master_socket.hh"
 #include "../../common/ds/latency.hh"
 #include "../../common/event/event.hh"
@@ -39,7 +40,7 @@ public:
 	void resRegister( MasterSocket *socket, uint32_t id, bool success = true );
 	void reqPushLoadStats ( MasterSocket *socket, ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency, 
 			ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency, std::set<struct sockaddr_in> *slaveSet );
-	void switchPhase( bool toRemap );
+	void switchPhase( bool toRemap, std::set<struct sockaddr_in> slaves );
 	void pending( MasterSocket *socket );
 };
 

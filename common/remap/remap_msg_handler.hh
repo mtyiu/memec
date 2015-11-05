@@ -2,14 +2,16 @@
 #define __COMMON_REMAP_REMAP_MSG_HANDLER_HH__
 
 #include <cstdio>
+#include <map>
 #include <stdint.h>
 #include <sys/types.h>
 #include <pthread.h>
 #include <sp.h>
 #include "remap_status.hh"
 #include "../lock/lock.hh"
+#include "../ds/sockaddr_in.hh"
 
-#define MAX_MESSLEN	 1024
+#define MAX_MESSLEN	 4096
 #define MAX_SPREAD_NAME 1024
 #define MAX_GROUP_NUM   10
 #define GROUP_NAME	  "plio"
@@ -28,6 +30,7 @@ protected:
 
 	bool isConnected;
 
+	// TODO remove  
 	LOCK_T stlock;
 	RemapStatus status;
 
@@ -53,6 +56,9 @@ protected:
 	}
 
 public:
+	std::map<struct sockaddr_in, RemapStatus> slaveStatus;
+	std::map<struct sockaddr_in, LOCK_T> slavesStatusLock;
+
 	RemapMsgHandler();
 	virtual ~RemapMsgHandler();
 
@@ -69,6 +75,34 @@ public:
 
 	virtual bool start() = 0;
 	virtual bool stop() = 0;
+
+	bool isRemapStarted( const struct sockaddr_in slave ) {
+		if ( this->slaveStatus.count( slave ) == 0 ) 
+			return false;
+		switch ( this->slaveStatus[ slave ] ) {
+			case REMAP_PREPARE_START:
+			case REMAP_START:
+			case REMAP_PREPARE_END:
+				return true;
+			default:
+				return false;
+		}
+		return false;
+	}
+	bool isRemapStopped( const struct sockaddr_in slave ) {
+		if ( this->slaveStatus.count( slave ) == 0 ) 
+			return false;
+		switch ( this->slaveStatus[ slave ] ) {
+			case REMAP_NONE:
+			case REMAP_END:
+			case REMAP_UNDEFINED:
+				return true;
+			default:
+				return false;
+		}
+		return true;
+	}
+
 };
 
 #endif

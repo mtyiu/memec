@@ -27,6 +27,7 @@ bool RemapMsgHandler::init( const char *spread, const char *user ) {
 	this->status = REMAP_NONE;
 	UNLOCK( &this->stlock );
 	this->msgCount = 0;
+	slavesStatusLock.clear();
 
 	// construct the spread name, username
 	// connect to spread daemon

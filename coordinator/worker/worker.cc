@@ -81,7 +81,7 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 			} else {
 				coordinator->remapMsgHandler->stopRemap( event.message.remap.slaves );
 			}
-			// free the vector of slaves?
+			// free the vector of slaves
 			delete event.message.remap.slaves;
 			break;
 		case MASTER_EVENT_TYPE_PENDING:

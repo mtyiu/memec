@@ -12,34 +12,28 @@ CoordinatorRemapWorker::~CoordinatorRemapWorker() {
 
 bool CoordinatorRemapWorker::startRemap( RemapStatusEvent event ) {
 	CoordinatorRemapMsgHandler *crmh = CoordinatorRemapMsgHandler::getInstance();
-	// check if there is a collision in status
-	LOCK( &crmh->slavesStatusLock[ event.slave ] );
-	if ( crmh->slaveStatus[ event.slave ] != REMAP_NONE &&
-			crmh->slaveStatus[ event.slave ] != REMAP_PREPARE_START ) {
-		UNLOCK( &crmh->slavesStatusLock[ event.slave ] );
-		return false;
-	}
-
-	crmh->resetMasterAck( event.slave );
-
-	// ask master to prepare for start
-	if ( crmh->sendMessageToMasters( REMAP_PREPARE_START ) == false ) {
-		UNLOCK( &crmh->slavesStatusLock[ event.slave ] );
-		return false;
-	}
-	crmh->slaveStatus[ event.slave ] = REMAP_PREPARE_START;
-	UNLOCK( &crmh->slavesStatusLock[ event.slave ] );
 
 	// wait for ack (busy waiting)
 	while( crmh->isAllMasterAcked( event.slave ) == false )
 		sleep( POLL_ACK_TIME_INTVL );
 
-	// ask master to start remap
 	LOCK( &crmh->slavesStatusLock[ event.slave ] );
-	if ( crmh->sendMessageToMasters( REMAP_START ) == false ) {
+	// for multi-threaded environment, it is possible that other workers change 
+	// the status while this worker is waiting
+	// just abort and late comers to take over
+	if ( crmh->slaveStatus[ event.slave ] != REMAP_PREPARE_START ) {
 		UNLOCK( &crmh->slavesStatusLock[ event.slave ] );
 		return false;
 	}
+	// any cleanup to be done
+	crmh->startRemapEnd( event.slave );
+
+	// ask master to start remap
+	if ( crmh->sendStatusToMasters( event.slave ) == false ) {
+		UNLOCK( &crmh->slavesStatusLock[ event.slave ] );
+		return false;
+	}
+
 	crmh->slaveStatus[ event.slave ] = REMAP_START;
 	UNLOCK( &crmh->slavesStatusLock[ event.slave ] );
 	return true;
@@ -48,30 +42,23 @@ bool CoordinatorRemapWorker::startRemap( RemapStatusEvent event ) {
 bool CoordinatorRemapWorker::stopRemap( RemapStatusEvent event ) {
 	CoordinatorRemapMsgHandler *crmh = CoordinatorRemapMsgHandler::getInstance();
 
-	LOCK( &crmh->slavesStatusLock[ event.slave ] );
-	if ( crmh->slaveStatus[ event.slave ] != REMAP_START &&
-			crmh->slaveStatus[ event.slave ] != REMAP_PREPARE_END ) {
-		UNLOCK( &crmh->slavesStatusLock[ event.slave ] );
-		return false;
-	}
-
-	crmh->resetMasterAck( event.slave );
-
-	// ask master to stop remapping
-	if ( crmh->sendMessageToMasters( REMAP_PREPARE_END ) == false ) {
-		UNLOCK( &crmh->slavesStatusLock[ event.slave ] );
-		return false;
-	}
-	crmh->slaveStatus[ event.slave ] = REMAP_PREPARE_END ;
-	UNLOCK( &crmh->slavesStatusLock[ event.slave ] );
-
-	// TODO wait for ack.
+	// wait for ack.
 	while( crmh->isAllMasterAcked( event.slave ) == false )
-		sleep(1);
+		sleep( POLL_ACK_TIME_INTVL );
+
+	LOCK( &crmh->slavesStatusLock[ event.slave ] );
+	// for multi-threaded environment, it is possible that other workers change 
+	// the tatus while this worker is waiting. 
+	// just abort and late comers to take over
+	if ( crmh->slaveStatus[ event.slave ] != REMAP_PREPARE_END ) {
+		UNLOCK( &crmh->slavesStatusLock[ event.slave ] );
+		return false;
+	}
+	// any cleanup to be done
+	crmh->stopRemapEnd( event.slave );
 
 	// ask master to use normal SET workflow
-	LOCK( &crmh->slavesStatusLock[ event.slave ] );
-	if ( crmh->sendMessageToMasters( REMAP_END ) == false ) {
+	if ( crmh->sendStatusToMasters( event.slave ) == false ) {
 		UNLOCK( &crmh->slavesStatusLock[ event.slave ] );
 		return false;
 	}

@@ -39,10 +39,13 @@ private:
 	// Helper functions to determine slave loading
 	void updateAverageSlaveLoading( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
 			ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency );
-	void updateOverloadedSlaveSet( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
+	// return previously overloaded slaves for per-slave phase change
+	std::set<struct sockaddr_in> updateOverloadedSlaveSet( 
+			ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
 			ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency,
-			std::set<struct sockaddr_in> *slaveSet );
-	bool switchPhase();
+			std::set<struct sockaddr_in> *slaveSet 
+	);
+	void switchPhase( std::set<struct sockaddr_in> prevOverloadedSlaves );
 
 	// Commands
 	void help();

@@ -10,16 +10,20 @@
 using namespace std;
 
 #define POLL_ACK_TIME_INTVL	 1   // in seconds
-#define WORKER_NUM			 4
+#define WORKER_NUM			 8
+#define EVENT_QUEUE_LEN		 256
 
 CoordinatorRemapMsgHandler::CoordinatorRemapMsgHandler() :
 		RemapMsgHandler() {
 	this->group = ( char* ) COORD_GROUP;
+
 	LOCK_INIT( &this->mastersLock );
 	LOCK_INIT( &this->mastersAckLock );
-	slavesStatusLock.clear();
-	this->eventQueue = new EventQueue<RemapStatusEvent>( WORKER_NUM * WORKER_NUM );
+	LOCK_INIT( &this->aliveSlavesLock );
+	aliveSlaves.clear();
+	this->eventQueue = new EventQueue<RemapStatusEvent>( EVENT_QUEUE_LEN );
 	this->workers = new CoordinatorRemapWorker[ WORKER_NUM ];
+	this->slaveStatusRecordSize = 4 + 2 + 1; // sizeof( IP, port ) = 7
 }
 
 CoordinatorRemapMsgHandler::~CoordinatorRemapMsgHandler() {
@@ -84,17 +88,93 @@ bool CoordinatorRemapMsgHandler::stop() {
 	return ( ret == 0 );
 }
 
+#define REMAP_PHASE_CHANGE_HANDLER( _ALL_SLAVES_, _CHECKED_SLAVES_, _EVENT_ ) \
+	do { \
+		_CHECKED_SLAVES_.clear(); \
+		\
+		bool start = _EVENT_.start; \
+		for ( uint32_t i = 0; i < _ALL_SLAVES_->size(); ) { \
+			LOCK( &this->slavesStatusLock[ _ALL_SLAVES_->at(i) ] ); \
+			/* no need to trigger remapping if is undefined / already entered / already exited remapping phase */ \
+			if ( this->slaveStatus.count( _ALL_SLAVES_->at(i) ) == 0 ) { \
+				UNLOCK( &this->slavesStatusLock[ _ALL_SLAVES_->at(i) ] ); \
+				i++; \
+				continue; \
+			}  \
+			RemapStatus status = this->slaveStatus[ _ALL_SLAVES_->at(i) ]; \
+			if ( ( start && ( status == REMAP_PREPARE_START || status == REMAP_START ) ) || \
+				( ( ! start ) && ( status == REMAP_PREPARE_END || status == REMAP_NONE ) ) ) \
+			{ \
+				UNLOCK( &this->slavesStatusLock[ _ALL_SLAVES_->at(i) ] ); \
+				i++; \
+				continue; \
+			}  \
+			/* set status for sync. and to avoid multiple start from others */ \
+			this->slaveStatus[ _ALL_SLAVES_->at(i) ] = ( start )? REMAP_PREPARE_START : REMAP_PREPARE_END ; \
+			/* reset ack pool anyway */\
+			this->resetMasterAck( _ALL_SLAVES_->at(i) ); \
+			_CHECKED_SLAVES_.push_back( _ALL_SLAVES_->at(i) ); \
+			_ALL_SLAVES_->erase( _ALL_SLAVES_->begin() + i ); \
+			UNLOCK( &this->slavesStatusLock[ _ALL_SLAVES_->at(i) ] ); \
+		} \
+		/* ask master to prepare for start */ \
+		if ( this->sendStatusToMasters( _CHECKED_SLAVES_ ) == false ) { \
+			/* revert the status if failed to start */ \
+			for ( uint32_t i = 0; i < _CHECKED_SLAVES_.size() ; i++ ) { \
+				LOCK( &this->slavesStatusLock[ _ALL_SLAVES_->at(i) ] ); \
+				/* TODO is the previous status deterministic ?? */ \
+				if ( start && this->slaveStatus[ _ALL_SLAVES_->at(i) ] == REMAP_PREPARE_START ) { \
+					this->slaveStatus[ _ALL_SLAVES_->at(i) ] = REMAP_NONE; \
+				} else if ( ( ! start ) && this->slaveStatus[ _ALL_SLAVES_->at(i) ] == REMAP_PREPARE_END ) { \
+					this->slaveStatus[ _ALL_SLAVES_->at(i) ] = REMAP_START; \
+				} else { \
+					fprintf( stderr, "unexpected status of slave %u as %d\n",  \
+						_ALL_SLAVES_->at(i).sin_addr.s_addr, this->slaveStatus[ _ALL_SLAVES_->at(i) ]  \
+					); \
+				} \
+				UNLOCK( &this->slavesStatusLock[ _ALL_SLAVES_->at(i) ] ); \
+			} \
+			/* let the caller know all slaves failed */ \
+			_ALL_SLAVES_->insert( _ALL_SLAVES_->end(), _CHECKED_SLAVES_.begin(), _CHECKED_SLAVES_.end() ); \
+			return false; \
+		} \
+		/* keep retrying until success */ \
+		/* TODO reset only failed ones instead */ \
+		while ( ! this->insertRepeatedEvents( _EVENT_, &_CHECKED_SLAVES_ ) ); \
+	} while (0) 
+
+
 bool CoordinatorRemapMsgHandler::startRemap( std::vector<struct sockaddr_in> *slaves ) {
 	RemapStatusEvent event;
 	event.start = true;
-	return this->insertRepeatedEvents( event, slaves );
+	vector<struct sockaddr_in> slavesToStart;
+	
+	REMAP_PHASE_CHANGE_HANDLER( slaves, slavesToStart, event );
+	
+	return true;
+}
+
+bool CoordinatorRemapMsgHandler::startRemapEnd( const struct sockaddr_in &slave ) {
+	// TODO all operation to slave get lock from coordinator, sync metadata before remapping
+	return false;
 }
 
 bool CoordinatorRemapMsgHandler::stopRemap( std::vector<struct sockaddr_in> *slaves ) {
 	RemapStatusEvent event;
 	event.start = false;
-	return this->insertRepeatedEvents( event, slaves );
+	vector<struct sockaddr_in> slavesToStop;
+
+	REMAP_PHASE_CHANGE_HANDLER( slaves, slavesToStop, event );
+
+	return true;
 }
+
+bool CoordinatorRemapMsgHandler::stopRemapEnd( const struct sockaddr_in &slave ) {
+	// TODO backward migration before getting back to normal 
+	return false;
+}
+
+#undef REMAP_PHASE_CHANGE_HANDLER
 
 bool CoordinatorRemapMsgHandler::insertRepeatedEvents( RemapStatusEvent event, std::vector<struct sockaddr_in> *slaves ) {
 	bool ret = true;
@@ -114,7 +194,7 @@ bool CoordinatorRemapMsgHandler::insertRepeatedEvents( RemapStatusEvent event, s
 }
 
 bool CoordinatorRemapMsgHandler::isMasterLeft( int service, char *msg, char *subject ) {
-	// assume masters name themselves "master[0-9]*"
+	// assume masters name themselves "[PREFIX][0-9]*"
 	if ( this->isMemberLeave( service ) ) {
 		if ( strncmp( subject + 1, MASTER_PREFIX , MASTER_PREFIX_LEN ) == 0 ) {
 			return true;
@@ -124,25 +204,49 @@ bool CoordinatorRemapMsgHandler::isMasterLeft( int service, char *msg, char *sub
 }
 
 bool CoordinatorRemapMsgHandler::isMasterJoin( int service, char *msg, char *subject ) {
-	// assume masters name themselves "master[0-9]*"
+	// assume masters name themselves "[PREFIX][0-9]*"
 	if ( this->isMemberJoin( service ) ) {
 		if ( strncmp( subject + 1, MASTER_PREFIX , MASTER_PREFIX_LEN ) == 0 ) {
 			return true;
-		} else {
 		}
 	}
 	return false;
 }
 
-// TODO !!! redefine protocol here
-bool CoordinatorRemapMsgHandler::sendMessageToMasters( RemapStatus to ) {
-	if ( to == REMAP_UNDEFINED ) {
-		to = this->status;
-	}
+/* 
+ * packet: [# of slaves](1) [ [ip addr](4) [port](2) [status](1) ](7) [..](7) [..](7) ...
+ */
+bool CoordinatorRemapMsgHandler::sendStatusToMasters( std::vector<struct sockaddr_in> slaves ) {
 	char buf[ MAX_MESSLEN ];
-	int len = sprintf( buf, "%d\n", to );
+	int len = 0;
+	int recordSize = this->slaveStatusRecordSize;
+
+	if ( slaves.size() == 0 ) {
+		slaves = std::vector<struct sockaddr_in>( this->aliveSlaves.begin(), this->aliveSlaves.end() );
+	} else if ( slaves.size() > 255 || slaves.size() * recordSize + 1 > MAX_MESSLEN ) {
+		fprintf( stderr, "Too much slaves to include in message" );
+		return false;
+	}
+
+	// new status and # of slave involved
+	buf[0] = ( uint8_t ) slaves.size();
+	len += 1;
+
+	for ( uint32_t i = 0; i < slaves.size(); i++ ) {
+		// slave info
+		buf[ len ] = htonl( slaves.at(i).sin_addr.s_addr );
+		buf[ len + sizeof( uint32_t ) ] = htons( slaves.at(i).sin_port );
+		buf[ len + sizeof( uint32_t ) + sizeof( uint16_t ) ] = ( uint8_t ) this->slaveStatus[ slaves.at(i) ];
+		len += recordSize;
+	}
 	return ( SP_multicast ( this->mbox, MSG_TYPE, MASTER_GROUP, 0, len, buf ) > 0 );
 
+}
+
+bool CoordinatorRemapMsgHandler::sendStatusToMasters( struct sockaddr_in slave ) {
+	std::vector<struct sockaddr_in> slaves;
+	slaves.push_back( slave );
+	return sendStatusToMasters( slaves );
 }
 
 void *CoordinatorRemapMsgHandler::readMessages( void *argv ) {
@@ -170,7 +274,7 @@ void *CoordinatorRemapMsgHandler::readMessages( void *argv ) {
 			myself->addAliveMaster( subject );
 			LOCK( &myself->stlock );
 			// notify the new master about the remapping status
-			myself->sendMessageToMasters();
+			myself->sendStatusToMasters();
 			LOCK( &myself->stlock );
 		} else if ( ! regular && myself->isMasterLeft( service , msg, subject ) ) {
 			// master left
@@ -188,28 +292,51 @@ void *CoordinatorRemapMsgHandler::readMessages( void *argv ) {
 	return ( void* ) &myself->msgCount;
 }
 
-// TODO !!! redefine protocol here
+/* 
+ * packet: [# of slaves](1) [ [ip addr](4) [port](2) [status](1) ](7) [..](7) [..](7) ...
+ */
 bool CoordinatorRemapMsgHandler::updateStatus( char *subject, char *msg, int len ) {
-
-	RemapStatus reply = ( RemapStatus ) atoi ( msg );
 
 	// ignore messages that not from masters
 	if ( strncmp( subject + 1, MASTER_PREFIX, MASTER_PREFIX_LEN ) != 0 ) {
 		return false;
 	}
 
-	LOCK( &this->stlock );
-	if ( ( this->status == REMAP_PREPARE_START && reply == REMAP_WAIT_START ) ||
-			( this->status == REMAP_PREPARE_END && reply == REMAP_WAIT_END ) ) {
-		// ack to preparation for starting/ending the remapping phase
-		LOCK( &this->mastersLock );
-		//if ( aliveMasters.count( string( subject ) ) )
-		//	 ackMasters.insert( string( subject ) );
-		//else
-		//	fprintf( stderr, "master not found %s!!\n", subject );
-		UNLOCK( &this->mastersLock );
+	uint8_t slaveCount = msg[0], status = 0;
+	struct sockaddr_in slave;
+	int ofs = 1;
+	int recordSize = this->slaveStatusRecordSize;
+
+	LOCK( &this->mastersAckLock );
+	// check slave by slave for changes
+	for ( uint8_t i = 0; i < slaveCount; i++ ) {
+		slave.sin_addr.s_addr = htonl( *( ( uint32_t * ) ( msg + ofs ) ) );
+		slave.sin_port = htons( *( ( uint16_t *) ( msg + ofs + 4 ) ) );
+		status = msg[ ofs + 6 ];
+		ofs += recordSize;
+		// ignore changes for non-existing slaves or slaves in invalid status
+		// TODO sync status with master with invalid status of slaves
+		if ( this->slaveStatus.count( slave ) == 0 ||
+			( this->slaveStatus[ slave ] != REMAP_PREPARE_START &&
+			this->slaveStatus[ slave ] != REMAP_PREPARE_END )
+		) {
+			continue;
+		}
+		// check if the ack is corresponding to a correct status
+		if ( ( this->slaveStatus[ slave ] == REMAP_PREPARE_START && status != REMAP_WAIT_START ) ||
+			( this->slaveStatus[ slave ] == REMAP_PREPARE_END && status != REMAP_WAIT_END ) ) {
+			continue;
+		}
+
+		if ( this->ackMasters.count( slave ) && aliveMasters.count( string( subject ) ) )
+			ackMasters[ slave ]->insert( string( subject ) );
+		else
+			fprintf( 
+				stderr, "master [%s] or slave [%u:%hu] not found !!", 
+				subject, slave.sin_addr.s_addr, slave.sin_port
+			);
 	}
-	UNLOCK( &this->stlock );
+	UNLOCK( &this->mastersAckLock );
 
 	return true;
 }
@@ -224,7 +351,6 @@ void CoordinatorRemapMsgHandler::removeAliveMaster( char *name ) {
 	LOCK( &this->mastersLock );
 	aliveMasters.erase( string( name ) );
 	UNLOCK( &this->mastersLock );
-
 	// remove the master from all alive slaves ack. pool
 	LOCK( &this->mastersAckLock );
 	for( auto it : ackMasters ) {
@@ -234,12 +360,22 @@ void CoordinatorRemapMsgHandler::removeAliveMaster( char *name ) {
 }
 
 void CoordinatorRemapMsgHandler::addAliveSlave( struct sockaddr_in slave ) {
+	// alive slaves list
+	LOCK( &this->aliveSlavesLock );
+	aliveSlaves.insert( slave );
+	UNLOCK( &this->aliveSlavesLock );
+	// master ack pool
 	LOCK( &this->mastersAckLock );
 	ackMasters[ slave ] = new std::set<std::string>();
 	UNLOCK( &this->mastersAckLock );
 }
 
 void CoordinatorRemapMsgHandler::removeAliveSlave( struct sockaddr_in slave ) {
+	// alive slaves list
+	LOCK( &this->aliveSlavesLock );
+	aliveSlaves.erase( slave );
+	UNLOCK( &this->aliveSlavesLock );
+	// master ack pool
 	LOCK( &this->mastersAckLock );
 	delete ackMasters[ slave ];
 	ackMasters.erase( slave );
@@ -248,7 +384,7 @@ void CoordinatorRemapMsgHandler::removeAliveSlave( struct sockaddr_in slave ) {
 
 bool CoordinatorRemapMsgHandler::resetMasterAck( struct sockaddr_in slave ) {
 	LOCK( &this->mastersAckLock );
-	// slave does not exists
+	// abort reset if slave does not exists
 	if ( ackMasters.count( slave ) == 0 ) {
 		UNLOCK( &this->mastersLock );
 		return false;
@@ -261,7 +397,7 @@ bool CoordinatorRemapMsgHandler::resetMasterAck( struct sockaddr_in slave ) {
 bool CoordinatorRemapMsgHandler::isAllMasterAcked( struct sockaddr_in slave ) {
 	bool allAcked = false;
 	LOCK( &this->mastersAckLock );
-	// TODO slave is no longer accessiable
+	// TODO abort checking if slave is no longer accessiable
 	if ( ackMasters.count( slave ) == 0 ) {
 		UNLOCK( &this->mastersLock );
 		return true;
