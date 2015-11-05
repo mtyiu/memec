@@ -1025,7 +1025,7 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 	return true;
 }
 
-bool MasterWorker::handleDegradedLockRequest( ApplicationEvent event, bool success, char *buf, size_t size ) {
+bool MasterWorker::sendDegradedLockRequest( uint32_t listId, uint32_t chunkId, uint32_t newChunkId, char *key, uint8_t keySize ) {
 	return false;
 }
 

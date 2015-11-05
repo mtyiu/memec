@@ -92,9 +92,11 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 				event.message.degradedLock.key.size,
 				event.message.degradedLock.key.data,
 				event.type == MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED /* success */,
-				event.message.degradedLock.listId,
-				event.message.degradedLock.stripeId,
-				event.message.degradedLock.chunkId
+				event.message.degradedLock.srcListId,
+				event.message.degradedLock.srcStripeId,
+				event.message.degradedLock.srcChunkId,
+				event.message.degradedLock.dstListId,
+				event.message.degradedLock.dstChunkId
 			);
 			isSend = true;
 			break;
@@ -104,8 +106,8 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 				event.id,
 				event.message.degradedLock.key.size,
 				event.message.degradedLock.key.data,
-				event.message.degradedLock.listId,
-				event.message.degradedLock.chunkId
+				event.message.degradedLock.srcListId,
+				event.message.degradedLock.srcChunkId
 			);
 			isSend = true;
 			break;

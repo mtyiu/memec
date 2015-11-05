@@ -125,14 +125,16 @@ bool MasterProtocol::parseLoadingStats(
 	return true;
 }
 
-char *MasterProtocol::reqDegradedLock( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, char *key, uint8_t keySize ) {
+char *MasterProtocol::reqDegradedLock( size_t &size, uint32_t id, uint32_t srcListId, uint32_t srcChunkId, uint32_t dstListId, uint32_t dstChunkId, char *key, uint8_t keySize ) {
 	size = this->generateDegradedLockReqHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_COORDINATOR,
 		PROTO_OPCODE_DEGRADED_LOCK,
 		id,
-		listId,
-		chunkId,
+		srcListId,
+		srcChunkId,
+		dstListId,
+		dstChunkId,
 		keySize,
 		key
 	);

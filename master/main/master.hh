@@ -78,6 +78,10 @@ public:
 	SlaveLoading slaveLoading;
 	OverloadedSlave overloadedSlave;
 	Timer statsTimer;
+	/* For debugging only */
+	struct {
+		bool isDegraded;
+	} debugFlags;
 
 	static Master *getInstance() {
 		static Master master;
@@ -96,6 +100,7 @@ public:
 	void time();
 	double getElapsedTime();
 	void interactive();
+	bool setDebugFlag( char *input );
 
 	// helper function to update slave stats
 	void mergeSlaveCumulativeLoading ( ArrayMap< struct sockaddr_in, Latency > *getLatency, ArrayMap< struct sockaddr_in, Latency> *setLatency );

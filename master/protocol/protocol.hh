@@ -23,7 +23,7 @@ public:
 	char *reqPushLoadStats( size_t &size, uint32_t id, ArrayMap< struct sockaddr_in, Latency > *slaveGetLatency, ArrayMap< struct sockaddr_in, Latency > *slaveSetLatency );
 	bool parseLoadingStats( const LoadStatsHeader& loadStatsHeader, ArrayMap< struct sockaddr_in, Latency > &slaveGetLatency, ArrayMap< struct sockaddr_in, Latency > &slaveSetLatency, std::set<struct sockaddr_in> &overloadedSlaveSet, char* buffer, uint32_t size );
 	// Degraded operation
-	char *reqDegradedLock( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, char *key, uint8_t keySize );
+	char *reqDegradedLock( size_t &size, uint32_t id, uint32_t srcListId, uint32_t srcChunkId, uint32_t dstListId, uint32_t dstChunkId, char *key, uint8_t keySize );
 
 	/* Slave */
 	// Register

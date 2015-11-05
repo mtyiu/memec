@@ -5,6 +5,8 @@
 
 Master::Master() {
 	this->isRunning = false;
+	/* Set debug flag */
+	this->debugFlags.isDegraded = false;
 }
 
 void Master::updateSlavesCurrentLoading() {
@@ -520,6 +522,8 @@ void Master::interactive() {
 		} else if ( strcmp( command, "remapping" ) == 0 ) {
 			valid = true;
 			this->printRemapping();
+		} else if ( strncmp( command, "set", 3 ) == 0 ) {
+			valid = this->setDebugFlag( command );
 		} else if ( strcmp( command, "time" ) == 0 ) {
 			valid = true;
 			this->time();
@@ -531,6 +535,40 @@ void Master::interactive() {
 			fprintf( stderr, "Invalid command!\n" );
 		}
 	}
+}
+
+bool Master::setDebugFlag( char *input ) {
+	bool ret = true;
+	char *token = 0, *key = 0, *value = 0;
+	int numOfTokens;
+
+	for ( numOfTokens = 0; numOfTokens < 3; numOfTokens++ ) {
+		token = strtok( ( token == NULL ? input : NULL ), " " );
+		if ( token ) {
+			if ( strlen( token ) == 0 )
+				continue;
+		} else {
+			return false;
+		}
+
+		switch( numOfTokens ) {
+			case 1:
+				key = token;
+				break;
+			case 2:
+				value = token;
+				break;
+			default:
+				break;
+		}
+	}
+
+	if ( strcmp( key, "degraded" ) == 0 ) {
+		this->debugFlags.isDegraded = ( strcmp( value, "true" ) == 0 );
+	} else {
+		ret = false;
+	}
+	return ret;
 }
 
 void Master::printPending( FILE *f ) {
@@ -779,6 +817,7 @@ void Master::help() {
 		"- debug: Show debug messages\n"
 		"- pending: Show all pending requests\n"
 		"- remapping: Show remapping info\n"
+		"- set: Set debug flag (degraded = [true|false])\n"
 		"- time: Show elapsed time\n"
 		"- exit: Terminate this client\n"
 	);

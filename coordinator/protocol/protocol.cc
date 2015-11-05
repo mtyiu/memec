@@ -167,7 +167,7 @@ char *CoordinatorProtocol::forwardRemappingRecords( size_t &size, uint32_t id, c
 	return this->buffer.send;
 }
 
-char *CoordinatorProtocol::resDegradedLock( size_t &size, uint32_t id, uint8_t keySize, char *key, bool isLocked, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) {
+char *CoordinatorProtocol::resDegradedLock( size_t &size, uint32_t id, uint8_t keySize, char *key, bool isLocked, uint32_t srcListId, uint32_t srcStripeId, uint32_t srcChunkId, uint32_t dstListId, uint32_t dstChunkId ) {
 	size = this->generateDegradedLockResHeader(
 		isLocked ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_MASTER,
@@ -175,7 +175,8 @@ char *CoordinatorProtocol::resDegradedLock( size_t &size, uint32_t id, uint8_t k
 		id,
 		isLocked,
 		keySize, key,
-		listId, stripeId, chunkId
+		srcListId, srcStripeId, srcChunkId,
+		dstListId, dstChunkId
 	);
 	return this->buffer.send;
 }
