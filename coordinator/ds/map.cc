@@ -143,6 +143,7 @@ void Map::dump( FILE *f ) {
 	if ( ! this->keys.size() ) {
 		fprintf( f, "(None)\n" );
 	} else {
+		/*
 		for ( std::unordered_map<Key, Metadata>::iterator it = this->keys.begin(); it != this->keys.end(); it++ ) {
 			fprintf(
 				f, "%.*s --> (list ID: %u, stripe ID: %u, chunk ID: %u)\n",
@@ -150,6 +151,7 @@ void Map::dump( FILE *f ) {
 				it->second.listId, it->second.stripeId, it->second.chunkId
 			);
 		}
+		*/
 		fprintf( f, "Count: %lu\n", this->keys.size() );
 	}
 	fprintf( f, "\n" );

@@ -21,7 +21,7 @@ private:
 	static uint32_t chunkCount;
 	static IDGenerator *idGenerator;
 	static CoordinatorEventQueue *eventQueue;
-	static StripeList<ServerAddr> *stripeList;
+	static StripeList<SlaveSocket> *stripeList;
 
 	void dispatch( MixedEvent event );
 	void dispatch( CoordinatorEvent event );

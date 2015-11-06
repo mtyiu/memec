@@ -573,11 +573,14 @@ bool Master::setDebugFlag( char *input ) {
 
 bool Master::isDegraded( SlaveSocket *socket ) {
 	return (
-		( this->debugFlags.isDegraded ) ||
+		( this->debugFlags.isDegraded )
+		/*
+		||
 		(
 			// this->remapMsgHandler.useRemappingFlow() &&
 			! this->config.master.degraded.disabled
 		)
+		*/
 	);
 }
 

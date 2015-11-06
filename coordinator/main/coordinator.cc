@@ -200,23 +200,17 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 	this->sockets.slaves.reserve( this->config.global.slaves.size() );
 	for ( int i = 0, len = this->config.global.slaves.size(); i < len; i++ ) {
 		SlaveSocket *socket = new SlaveSocket();
-		int fd;
-
-		socket->init( this->config.global.slaves[ i ], &this->sockets.epoll );
-		fd = socket->getSocket();
-		this->sockets.slaves.set( fd, socket );
+		int tmpfd = - ( i + 1 );
+		socket->init( tmpfd, this->config.global.slaves[ i ], &this->sockets.epoll );
+		this->sockets.slaves.set( tmpfd, socket );
 	}
 	Map::init( this->config.global.stripeList.count );
 	/* Stripe list */
-	this->addr.reserve( this->config.global.slaves.size() );
-	for ( uint32_t i = 0, size = this->config.global.slaves.size(); i < size; i++ ) {
-		this->addr.push_back( &this->config.global.slaves[ i ] );
-	}
-	this->stripeList = new StripeList<ServerAddr>(
+	this->stripeList = new StripeList<SlaveSocket>(
 		this->config.global.coding.params.getChunkCount(),
 		this->config.global.coding.params.getDataChunkCount(),
 		this->config.global.stripeList.count,
-		this->addr
+		this->sockets.slaves.values
 	);
 	/* Workers, ID generator and event queues */
 	if ( this->config.coordinator.workers.type == WORKER_TYPE_MIXED ) {

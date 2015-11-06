@@ -199,9 +199,9 @@ public:
 		return ret;
 	}
 
-	int32_t search( T *target, bool ( *match )( const T *t1, const T *t2 ) ) {
+	int32_t search( T *target ) {
 		for ( uint32_t i = 0; i < this->numSlaves; i++ ) {
-			if ( match( target, this->slaves->at( i ) ) )
+			if ( target == this->slaves->at( i ) )
 				return i;
 		}
 		return -1;

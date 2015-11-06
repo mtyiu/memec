@@ -11,7 +11,7 @@ uint32_t CoordinatorWorker::chunkCount;
 IDGenerator *CoordinatorWorker::idGenerator;
 CoordinatorEventQueue *CoordinatorWorker::eventQueue;
 RemappingRecordMap *CoordinatorWorker::remappingRecords;
-StripeList<ServerAddr> *CoordinatorWorker::stripeList;
+StripeList<SlaveSocket> *CoordinatorWorker::stripeList;
 
 void CoordinatorWorker::dispatch( MixedEvent event ) {
 	switch( event.type ) {
@@ -273,7 +273,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 		LOCK( &slaves.lock );
 		for ( uint32_t i = 0; i < slaves.size(); i++ ) {
 			SlaveSocket *slave = slaves.values[ i ];
-			if ( event.socket->equal( slave ) )
+			if ( event.socket->equal( slave ) || ! slave->ready() )
 				continue; // No need to tell the new socket
 
 			ret = slave->send( buffer.data, buffer.size, connected );
@@ -484,8 +484,7 @@ bool CoordinatorWorker::processHeartbeat( SlaveEvent event, char *buf, size_t si
 }
 
 bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
-	ServerAddr addr( 0, socket->listenAddr.addr, socket->listenAddr.port, 0 );
-	int index = CoordinatorWorker::stripeList->search( &addr, ServerAddr::match );
+	int index = CoordinatorWorker::stripeList->search( socket );
 	if ( index == -1 ) {
 		__ERROR__( "CoordinatorWorker", "triggerRecovery", "The disconnected server does not exist in the consistent hash ring.\n" );
 		return false;
@@ -496,13 +495,13 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 	std::unordered_map<uint32_t, SlaveSocket **> sockets;
 	std::vector<StripeListIndex> lists = CoordinatorWorker::stripeList->list( ( uint32_t ) index );
 
-	std::unordered_map<uint32_t, ServerAddr **> addrs;
 	ArrayMap<int, SlaveSocket> &map = Coordinator::getInstance()->sockets.slaves;
 
-	////////////////////////////////////////////////
-	// Get the ServerAddr of the surviving slaves //
-	////////////////////////////////////////////////
+	//////////////////////////////////////////////////
+	// Get the SlaveSockets of the surviving slaves //
+	//////////////////////////////////////////////////
 	LOCK( &Map::stripesLock );
+	LOCK( &map.lock );
 	printf( "Slave disconnected! index = %d. Appeared in:\n", index );
 	for ( uint32_t i = 0, size = lists.size(); i < size; i++ ) {
 		printf(
@@ -513,43 +512,18 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 			lists[ i ].chunkId
 		);
 
-		if ( addrs.find( lists[ i ].listId ) == addrs.end() ) {
-			ServerAddr **addr = new ServerAddr*[ CoordinatorWorker::chunkCount ];
+		if ( sockets.find( lists[ i ].listId ) == sockets.end() ) {
 			SlaveSocket **s = new SlaveSocket*[ CoordinatorWorker::chunkCount ];
 
 			CoordinatorWorker::stripeList->get(
-				lists[ i ].listId, addr + CoordinatorWorker::dataChunkCount, addr
+				lists[ i ].listId, s + CoordinatorWorker::dataChunkCount, s
 			);
 
-			addrs[ lists[ i ].listId ] = addr;
 			sockets[ lists[ i ].listId ] = s;
 		}
 	}
-	UNLOCK( &Map::stripesLock );
-
-	////////////////////////////////////////////
-	// Obtain the SlaveSocket from ServerAddr //
-	////////////////////////////////////////////
-	LOCK( &map.lock );
-	for (
-		std::unordered_map<uint32_t, ServerAddr **>::iterator it = addrs.begin();
-		it != addrs.end();
-		it++
-	) {
-		ServerAddr **target = it->second;
-		for ( uint32_t i = 0; i < CoordinatorWorker::chunkCount; i++ ) {
-			for ( uint32_t j = 0, size = map.values.size(); j < size; j++ ) {
-				ServerAddr tmp( 0, map.values[ j ]->listenAddr.addr, map.values[ j ]->listenAddr.port, 0 );
-				if ( ServerAddr::match( &tmp, target[ i ] ) ) {
-					sockets[ it->first ][ i ] = map.values[ j ];
-					break;
-				}
-			}
-		}
-		delete[] it->second;
-	}
 	UNLOCK( &map.lock );
-	addrs.clear();
+	UNLOCK( &Map::stripesLock );
 
 	LOCK( &socket->map.chunksLock );
 	LOCK( &socket->map.keysLock );
@@ -601,7 +575,7 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 		( int ) header.keySize, header.key, header.keySize, header.dstListId, header.dstChunkId
 	);
 
-	Metadata metadata;
+	// Metadata metadata;
 	RemappingRecord remappingRecord;
 	Key key;
 	key.set( header.keySize, header.key );

@@ -256,13 +256,14 @@ char *CoordinatorProtocol::resRegisterSlave( size_t &size, GlobalConfig &globalC
 */
 
 char *CoordinatorProtocol::announceSlaveConnected( size_t &size, uint32_t id, SlaveSocket *socket ) {
+	ServerAddr addr = socket->getServerAddr();
 	size = this->generateAddressHeader(
 		PROTO_MAGIC_ANNOUNCEMENT,
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_SLAVE_CONNECTED,
 		id,
-		socket->listenAddr.addr,
-		socket->listenAddr.port
+		addr.addr,
+		addr.port
 	);
 	return this->buffer.send;
 }

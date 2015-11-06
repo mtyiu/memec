@@ -61,8 +61,7 @@ public:
 	IDGenerator idGenerator;
 	CoordinatorEventQueue eventQueue;
 	/* Stripe list */
-	std::vector<ServerAddr *> addr;
-	StripeList<ServerAddr> *stripeList;
+	StripeList<SlaveSocket> *stripeList;
 	/* Remapping */
 	CoordinatorRemapMsgHandler remapMsgHandler;
 	RemappingRecordMap remappingRecords;

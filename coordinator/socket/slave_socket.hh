@@ -14,15 +14,13 @@ class SlaveSocket : public Socket {
 private:
 	static ArrayMap<int, SlaveSocket> *slaves;
 	struct sockaddr_in recvAddr;
+	char *identifier;
 
 public:
 	Map map;
-	struct {
-		uint32_t addr;
-		uint16_t port;
-	} listenAddr;
 
 	static void setArrayMap( ArrayMap<int, SlaveSocket> *slaves );
+	bool init( int tmpfd, ServerAddr &addr, EPoll *epoll );
 	bool start();
 	void stop();
 	bool setRecvFd( int fd, struct sockaddr_in *addr );

@@ -411,17 +411,17 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 						break;
 					case PROTO_OPCODE_DEGRADED_GET:
 						printf( "PROTO_OPCODE_DEGRADED_GET\n" );
-						// this->handleDegradedRequest( event,buffer.data, buffer.size );
+						// this->handleDegradedRequest( event, buffer.data, buffer.size );
 						// this->load.get();
 						break;
 					case PROTO_OPCODE_DEGRADED_UPDATE:
 						printf( "PROTO_OPCODE_DEGRADED_UPDATE\n" );
-						// this->handleDegradedRequest( event,buffer.data, buffer.size );
+						// this->handleDegradedRequest( event, buffer.data, buffer.size );
 						// this->load.update();
 						break;
 					case PROTO_OPCODE_DEGRADED_DELETE:
 						printf( "PROTO_OPCODE_DEGRADED_DELETE\n" );
-						// this->handleDegradedRequest( event,buffer.data, buffer.size );
+						// this->handleDegradedRequest( event, buffer.data, buffer.size );
 						// this->load.del();
 						break;
 					default:
