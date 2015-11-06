@@ -13,6 +13,7 @@
 class SlaveSocket : public Socket {
 private:
 	static ArrayMap<int, SlaveSocket> *slaves;
+	struct sockaddr_in recvAddr;
 
 public:
 	Map map;
@@ -24,7 +25,7 @@ public:
 	static void setArrayMap( ArrayMap<int, SlaveSocket> *slaves );
 	bool start();
 	void stop();
-	void setListenAddr( uint32_t addr, uint16_t port );
+	bool setRecvFd( int fd, struct sockaddr_in *addr );
 	ssize_t send( char *buf, size_t ulen, bool &connected );
 	ssize_t recv( char *buf, size_t ulen, bool &connected, bool wait );
 	ssize_t recvRem( char *buf, size_t expected, char *prevBuf, size_t prevSize, bool &connected );

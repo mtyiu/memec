@@ -9,6 +9,9 @@
 #include "../../common/protocol/protocol.hh"
 
 class Map {
+private:
+	bool updateMaxStripeId( uint32_t listId, uint32_t stripeId );
+
 public:
 	/**
 	 * Store the set of sealed chunks
@@ -22,7 +25,15 @@ public:
 	 */
 	std::unordered_map<Key, Metadata> keys;
 	LOCK_T keysLock;
-
+	/**
+	 * Store the degraded locks
+	 * (list ID, stripe ID, chunk ID) |-> (list ID, chunk ID)
+	 */
+	std::unordered_map<Metadata, Metadata> degradedLocks;
+	LOCK_T degradedLocksLock;
+	/**
+	 * Store the current stripe ID of each list.
+	 */
 	static uint32_t *stripes;
 	static LOCK_T stripesLock;
 
@@ -30,10 +41,27 @@ public:
 	static void free();
 
 	Map();
+	// Insertion //
+	bool insertChunk(
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		bool needsLock = true, bool needsUnlock = true
+	);
+	bool insertKey(
+		char *keyStr, uint8_t keySize,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		uint8_t opcode, bool needsLock = true, bool needsUnlock = true
+	);
+	bool insertDegradedLock(
+		uint32_t srcListId, uint32_t srcStripeId, uint32_t srcChunkId,
+		uint32_t &dstListId, uint32_t &dstChunkId,
+		bool needsLock = true, bool needsUnlock = true
+	);
 
-	bool updateMaxStripeId( uint32_t listId, uint32_t stripeId );
-	bool seal( uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool needsLock = true, bool needsUnlock = true );
-	bool setKey( char *keyStr, uint8_t keySize, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint8_t opcode, bool needsLock = true, bool needsUnlock = true );
+	// Find //
+	bool findMetadataByKey( char *keyStr, uint8_t keySize, Metadata &metadata );
+	bool findDegradedLock( uint32_t srcListId, uint32_t srcStripeId, uint32_t srcChunkId, Metadata &dstMetadata );
+
+	// Debug //
 	void dump( FILE *f = stdout );
 	void persist( FILE *f );
 };

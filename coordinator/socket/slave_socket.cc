@@ -24,9 +24,15 @@ void SlaveSocket::stop() {
 	// delete this;
 }
 
-void SlaveSocket::setListenAddr( uint32_t addr, uint16_t port ) {
-	this->listenAddr.addr = addr;
-	this->listenAddr.port = port;
+bool SlaveSocket::setRecvFd( int fd, struct sockaddr_in *addr ) {
+	bool ret = false;
+	this->recvAddr = *addr;
+
+	if ( fd != this->sockfd ) {
+		this->sockfd = fd;
+		ret = true;
+	}
+	return ret;
 }
 
 ssize_t SlaveSocket::send( char *buf, size_t ulen, bool &connected ) {

@@ -198,6 +198,14 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 	SlaveSocket::setArrayMap( &this->sockets.slaves );
 	this->sockets.masters.reserve( this->config.global.slaves.size() );
 	this->sockets.slaves.reserve( this->config.global.slaves.size() );
+	for ( int i = 0, len = this->config.global.slaves.size(); i < len; i++ ) {
+		SlaveSocket *socket = new SlaveSocket();
+		int fd;
+
+		socket->init( this->config.global.slaves[ i ], &this->sockets.epoll );
+		fd = socket->getSocket();
+		this->sockets.slaves.set( fd, socket );
+	}
 	Map::init( this->config.global.stripeList.count );
 	/* Stripe list */
 	this->addr.reserve( this->config.global.slaves.size() );

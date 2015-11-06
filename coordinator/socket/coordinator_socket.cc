@@ -136,20 +136,34 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 						event.resRegister( masterSocket, header.id );
 						coordinator->eventQueue.insert( event );
 					} else if ( header.from == PROTO_MAGIC_FROM_SLAVE ) {
-						SlaveSocket *slaveSocket = new SlaveSocket();
-						slaveSocket->init( fd, *addr );
-						slaveSocket->setListenAddr( addressHeader.addr, addressHeader.port );
-						coordinator->sockets.slaves.set( fd, slaveSocket );
-						socket->sockets.removeAt( index );
+						SlaveSocket *s = 0;
 
-						socket->done( fd ); // The socket is valid
+						for ( int i = 0, len = coordinator->sockets.slaves.size(); i < len; i++ ) {
+							if ( coordinator->sockets.slaves[ i ]->equal( addressHeader.addr, addressHeader.port ) ) {
+								s = coordinator->sockets.slaves[ i ];
+								int oldFd = s->getSocket();
+								coordinator->sockets.slaves.replaceKey( oldFd, fd );
+								s->setRecvFd( fd, addr );
+								socket->sockets.removeAt( index );
 
-						SlaveEvent event;
-						event.resRegister( slaveSocket, header.id );
-						coordinator->eventQueue.insert( event );
+								socket->done( fd ); // The socket is valid
+								break;
+							}
+						}
 
-						event.announceSlaveConnected( slaveSocket );
-						coordinator->eventQueue.insert( event );
+						if ( s ) {
+							SlaveEvent event;
+							event.resRegister( s, header.id );
+							coordinator->eventQueue.insert( event );
+
+							event.announceSlaveConnected( s );
+							coordinator->eventQueue.insert( event );
+						} else {
+							__ERROR__( "CoordinatorSocket", "handler", "Unexpected registration from slave." );
+							socket->sockets.removeAt( index );
+							::close( fd );
+							return false;
+						}
 					} else {
 						::close( fd );
 						socket->sockets.removeAt( index );

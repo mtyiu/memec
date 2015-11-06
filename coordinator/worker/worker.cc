@@ -196,9 +196,10 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 				buffer.data -= PROTO_LOAD_STATS_SIZE;
 				buffer.size += PROTO_LOAD_STATS_SIZE;
 			} else if ( header.magic == PROTO_MAGIC_REQUEST ) {
+				event.id = header.id;
 				switch( header.opcode ) {
 					case PROTO_OPCODE_DEGRADED_LOCK:
-						printf( "PROTO_OPCODE_DEGRADED_LOCK\n" );
+						this->handleDegradedLockRequest( event, buffer.data, buffer.size );
 						break;
 					default:
 						goto quit_1;
@@ -441,7 +442,7 @@ bool CoordinatorWorker::processHeartbeat( SlaveEvent event, char *buf, size_t si
 	LOCK( &event.socket->map.chunksLock );
 	for ( count = 0; count < heartbeat.sealed; count++ ) {
 		if ( this->protocol.parseMetadataHeader( header.metadata, processed, buf, size, offset ) ) {
-			event.socket->map.seal(
+			event.socket->map.insertChunk(
 				header.metadata.listId,
 				header.metadata.stripeId,
 				header.metadata.chunkId,
@@ -457,7 +458,7 @@ bool CoordinatorWorker::processHeartbeat( SlaveEvent event, char *buf, size_t si
 	LOCK( &event.socket->map.keysLock );
 	for ( count = 0; count < heartbeat.keys; count++ ) {
 		if ( this->protocol.parseKeyOpMetadataHeader( header.op, processed, buf, size, offset ) ) {
-			event.socket->map.setKey(
+			event.socket->map.insertKey(
 				header.op.key,
 				header.op.keySize,
 				header.op.listId,
@@ -592,8 +593,10 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 		__ERROR__( "CoordinatorWorker", "handleDegradedLockRequest", "Invalid DEGRADED_LOCK request (size = %lu).", size );
 		return false;
 	}
-	__DEBUG__(
-		BLUE, "CoordinatorWorker", "handleDegradedLockRequest",
+	// __DEBUG__(
+	// 	BLUE,
+	__ERROR__(
+		"CoordinatorWorker", "handleDegradedLockRequest",
 		"[DEGRADED_LOCK] Key: %.*s (key size = %u); target list ID: %u, target chunk ID: %u",
 		( int ) header.keySize, header.key, header.keySize, header.dstListId, header.dstChunkId
 	);
@@ -602,6 +605,12 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 	RemappingRecord remappingRecord;
 	Key key;
 	key.set( header.keySize, header.key );
+
+	if ( CoordinatorWorker::remappingRecords->find( key, &remappingRecord ) ) {
+		// Remapped: Reject the degraded operation
+	} else {
+
+	}
 
 	/*
 	if ( map->findValueByKey( header.key, header.keySize, 0, 0, 0, &metadata ) ) {
