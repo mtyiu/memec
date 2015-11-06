@@ -81,6 +81,9 @@ public:
 	virtual bool start() = 0;
 	virtual bool stop() = 0;
 
+	virtual bool addAliveSlave( struct sockaddr_in slave ) = 0;
+	virtual bool removeAliveSlave( struct sockaddr_in slave ) = 0;
+
 	bool isRemapStarted( const struct sockaddr_in slave ) {
 		if ( this->slavesStatus.count( slave ) == 0 ) 
 			return false;

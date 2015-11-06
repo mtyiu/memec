@@ -29,12 +29,12 @@ bool CoordinatorRemapWorker::startRemap( RemapStatusEvent event ) {
 	crmh->startRemapEnd( event.slave );
 
 	// ask master to start remap
+	crmh->slavesStatus[ event.slave ] = REMAP_START;
 	if ( crmh->sendStatusToMasters( event.slave ) == false ) {
 		UNLOCK( &crmh->slavesStatusLock[ event.slave ] );
 		return false;
 	}
 
-	crmh->slavesStatus[ event.slave ] = REMAP_START;
 	UNLOCK( &crmh->slavesStatusLock[ event.slave ] );
 	return true;
 }
@@ -58,13 +58,13 @@ bool CoordinatorRemapWorker::stopRemap( RemapStatusEvent event ) {
 	crmh->stopRemapEnd( event.slave );
 
 	// ask master to use normal SET workflow
+	crmh->slavesStatus[ event.slave ] = REMAP_NONE ;
 	if ( crmh->sendStatusToMasters( event.slave ) == false ) {
 		UNLOCK( &crmh->slavesStatusLock[ event.slave ] );
 		return false;
 	}
-	crmh->slavesStatus[ event.slave ] = REMAP_NONE ;
 	UNLOCK( &crmh->slavesStatusLock[ event.slave ] );
-	return false;
+	return true;
 }
 
 void *CoordinatorRemapWorker::run( void* argv ) {

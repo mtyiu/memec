@@ -113,13 +113,15 @@ void MasterRemapMsgHandler::setStatus( char* msg , int len ) {
 	uint32_t recordSize = this->slaveStatusRecordSize;
 
 	for ( uint8_t i = 0; i < slaveCount; i++ ) {
-		slave.sin_addr.s_addr = ntohl( *( ( uint32_t * )( msg + ofs ) ) );
-		slave.sin_port = ntohs( *( ( uint16_t * )( msg + ofs + 4 ) ) );
+		slave.sin_addr.s_addr = ( uint32_t ) ntohl( *( ( uint32_t * )( msg + ofs ) ) );
+		slave.sin_port = ( uint16_t ) ntohs( *( ( uint16_t * )( msg + ofs + 4 ) ) );
 		signal = ( RemapStatus ) msg[ ofs + 6 ];
 		ofs += recordSize;
 
-		if ( this->slavesStatus.count( slave ) == 0 )
+		if ( this->slavesStatus.count( slave ) == 0 ) {
+			__ERROR__( "MasterRemapMsgHandler", "setStatus" , "slave %u:%hu not found\n", slave.sin_addr.s_addr, slave.sin_port );
 			continue;
+		}
 
 		LOCK( &this->slavesStatusLock[ slave ] );
 		switch ( signal ) {
@@ -138,12 +140,12 @@ void MasterRemapMsgHandler::setStatus( char* msg , int len ) {
 				if ( this->slavesStatus[ slave ] == REMAP_WAIT_END )
 					signal = REMAP_WAIT_END ;
 				break;
-			case REMAP_END:
-				printf( "REMAP_END\n" );
-				signal = REMAP_NONE;
+			case REMAP_NONE:
+				printf( "REMAP_NONE = END\n" );
 				break;
 			default:
 				printf( "REMAP_%d\n", signal );
+				UNLOCK( &this->slavesStatusLock[ slave ] );
 				return;
 		}
 		this->slavesStatus[ slave ] = signal;
@@ -240,23 +242,24 @@ bool MasterRemapMsgHandler::ackRemap( struct sockaddr_in *slave ) {
 			UNLOCK( &this->aliveSlavesLock );
 			return false;
 		}
-		if ( this->ackRemapForSlave( *slave ) )
+		if ( this->checkAckRemapForSlave( *slave ) )
 			sendStatusToCoordinator( *slave );
 	} else {
 		// check all slaves
 		std::vector<struct sockaddr_in> slavesToAck;
 		for ( auto s : this->slavesStatus ) {
-			if ( this->ackRemapForSlave( s.first ) )
+			if ( this->checkAckRemapForSlave( s.first ) )
 				slavesToAck.push_back( s.first );
 		}
-		sendStatusToCoordinator( slavesToAck );
+		if ( ! slavesToAck.empty() ) 
+			sendStatusToCoordinator( slavesToAck );
 	}
 	UNLOCK( &this->aliveSlavesLock );
 
 	return true;
 }
 
-bool MasterRemapMsgHandler::ackRemapForSlave( struct sockaddr_in slave ) {
+bool MasterRemapMsgHandler::checkAckRemapForSlave( struct sockaddr_in slave ) {
 	uint32_t normal = 0, remap = 0;
 	normal = Master::getInstance()->counter.getNormal();
 	remap = Master::getInstance()->counter.getNormal();
@@ -281,7 +284,8 @@ bool MasterRemapMsgHandler::ackRemapForSlave( struct sockaddr_in slave ) {
 			UNLOCK( &this->slavesStatusLock[ slave ] );
 			return false;
 	}
-
+	this->slavesStatus[ slave ] = status;
 	UNLOCK( &this->slavesStatusLock[ slave ] );
+
 	return true;
 }

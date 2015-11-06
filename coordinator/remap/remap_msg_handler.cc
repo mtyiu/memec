@@ -113,8 +113,8 @@ bool CoordinatorRemapMsgHandler::stop() {
 			/* reset ack pool anyway */\
 			this->resetMasterAck( _ALL_SLAVES_->at(i) ); \
 			_CHECKED_SLAVES_.push_back( _ALL_SLAVES_->at(i) ); \
-			_ALL_SLAVES_->erase( _ALL_SLAVES_->begin() + i ); \
 			UNLOCK( &this->slavesStatusLock[ _ALL_SLAVES_->at(i) ] ); \
+			_ALL_SLAVES_->erase( _ALL_SLAVES_->begin() + i ); \
 		} \
 		/* ask master to prepare for start */ \
 		if ( this->sendStatusToMasters( _CHECKED_SLAVES_ ) == false ) { \
@@ -149,7 +149,7 @@ bool CoordinatorRemapMsgHandler::startRemap( std::vector<struct sockaddr_in> *sl
 	vector<struct sockaddr_in> slavesToStart;
 	
 	REMAP_PHASE_CHANGE_HANDLER( slaves, slavesToStart, event );
-	
+
 	return true;
 }
 
@@ -293,8 +293,8 @@ bool CoordinatorRemapMsgHandler::updateStatus( char *subject, char *msg, int len
 	LOCK( &this->mastersAckLock );
 	// check slave by slave for changes
 	for ( uint8_t i = 0; i < slaveCount; i++ ) {
-		slave.sin_addr.s_addr = ntohl( *( ( uint32_t * ) ( msg + ofs ) ) );
-		slave.sin_port = ntohs( *( ( uint16_t *) ( msg + ofs + 4 ) ) );
+		slave.sin_addr.s_addr = ( uint32_t ) ntohl( *( ( uint32_t * ) ( msg + ofs ) ) );
+		slave.sin_port = ( uint16_t ) ntohs( *( ( uint16_t *) ( msg + ofs + 4 ) ) );
 		status = msg[ ofs + 6 ];
 		ofs += recordSize;
 		// ignore changes for non-existing slaves or slaves in invalid status
@@ -342,27 +342,48 @@ void CoordinatorRemapMsgHandler::removeAliveMaster( char *name ) {
 	UNLOCK( &this->mastersAckLock );
 }
 
-void CoordinatorRemapMsgHandler::addAliveSlave( struct sockaddr_in slave ) {
+bool CoordinatorRemapMsgHandler::addAliveSlave( struct sockaddr_in slave ) {
 	// alive slaves list
 	LOCK( &this->aliveSlavesLock );
+	if ( this->aliveSlaves.count( slave ) > 0 ) {
+		UNLOCK( &this->aliveSlavesLock );
+		return false;
+	}
 	aliveSlaves.insert( slave );
 	UNLOCK( &this->aliveSlavesLock );
+	// add the status
+	LOCK_INIT( &this->slavesStatusLock[ slave ] );
+	LOCK( &this->slavesStatusLock[ slave ] );
+	slavesStatus[ slave ] = REMAP_NONE;
+	UNLOCK( &this->slavesStatusLock [ slave ] );
 	// master ack pool
 	LOCK( &this->mastersAckLock );
 	ackMasters[ slave ] = new std::set<std::string>();
 	UNLOCK( &this->mastersAckLock );
+	return true;
 }
 
-void CoordinatorRemapMsgHandler::removeAliveSlave( struct sockaddr_in slave ) {
+bool CoordinatorRemapMsgHandler::removeAliveSlave( struct sockaddr_in slave ) {
 	// alive slaves list
 	LOCK( &this->aliveSlavesLock );
+	if ( this->aliveSlaves.count( slave ) == 0 ) {
+		UNLOCK( &this->aliveSlavesLock );
+		return false;
+	}
 	aliveSlaves.erase( slave );
 	UNLOCK( &this->aliveSlavesLock );
+	// add the status
+	LOCK( &this->slavesStatusLock[ slave ] );
+	slavesStatus.erase( slave );
+	UNLOCK( &this->slavesStatusLock[ slave ] );
+	this->slavesStatusLock.erase( slave );
 	// master ack pool
 	LOCK( &this->mastersAckLock );
 	delete ackMasters[ slave ];
 	ackMasters.erase( slave );
 	UNLOCK( &this->mastersAckLock );
+
+	return true;
 }
 
 bool CoordinatorRemapMsgHandler::resetMasterAck( struct sockaddr_in slave ) {
@@ -382,11 +403,11 @@ bool CoordinatorRemapMsgHandler::isAllMasterAcked( struct sockaddr_in slave ) {
 	LOCK( &this->mastersAckLock );
 	// TODO abort checking if slave is no longer accessiable
 	if ( ackMasters.count( slave ) == 0 ) {
-		UNLOCK( &this->mastersLock );
+		UNLOCK( &this->mastersAckLock );
 		return true;
 	}
 	allAcked = ( aliveMasters.size() == ackMasters[ slave ]->size() );
-	fprintf( stderr, "%lu of %lu masters acked\n", ackMasters[ slave ]->size(), aliveMasters.size() );
-	UNLOCK( &this->mastersLock );
+	fprintf( stderr, "%lu of %lu masters acked slave %u:%hu\n", ackMasters[ slave ]->size(), aliveMasters.size(), slave.sin_addr.s_addr, slave.sin_port );
+	UNLOCK( &this->mastersAckLock );
 	return allAcked;
 }

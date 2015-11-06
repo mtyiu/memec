@@ -47,9 +47,6 @@ private:
 	void addAliveMaster( char *name );
 	void removeAliveMaster( char *name );
 
-	void addAliveSlave( struct sockaddr_in slave );
-	void removeAliveSlave( struct sockaddr_in slave );
-
 	bool insertRepeatedEvents ( RemapStatusEvent event, std::vector<struct sockaddr_in> *slaves );
 
 public:
@@ -80,6 +77,11 @@ public:
 
 	bool sendStatusToMasters( std::vector<struct sockaddr_in> slaves = std::vector <struct sockaddr_in>() );
 	bool sendStatusToMasters( struct sockaddr_in slave );
+
+	// keep trace of the alive slaves 
+	bool addAliveSlave( struct sockaddr_in slave );
+	bool removeAliveSlave( struct sockaddr_in slave );
+
 
 };
 

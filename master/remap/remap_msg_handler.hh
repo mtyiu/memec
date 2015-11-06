@@ -19,11 +19,8 @@ private:
 	static void *readMessages( void *argv );
 	static void *ackRemapLoop( void *argv );
 
-	bool addAliveSlave( struct sockaddr_in slave );
-	bool removeAliveSlave( struct sockaddr_in slave );
-
 	/* return if master need to ack coordinator for slave */
-	bool ackRemapForSlave( struct sockaddr_in slave ); 
+	bool checkAckRemapForSlave( struct sockaddr_in slave ); 
 
 	bool sendStatusToCoordinator( std::vector<struct sockaddr_in> slaves );
 	bool sendStatusToCoordinator( struct sockaddr_in slave );
@@ -38,6 +35,9 @@ public:
 
 	bool start();
 	bool stop();
+
+	bool addAliveSlave( struct sockaddr_in slave );
+	bool removeAliveSlave( struct sockaddr_in slave );
 
 	bool useRemappingFlow( struct sockaddr_in slave );
 	bool allowRemapping( struct sockaddr_in slave );
