@@ -1,5 +1,5 @@
 CC=g++
-CFLAGS=-std=c++11 -Wall -O2 -g
+CFLAGS=-std=c++11 -Wall -O2
 PLIO_SRC_ROOT=../../..
 LIBS=
 

@@ -1,5 +1,5 @@
 CC=g++
-CFLAGS=-Wall -Wno-unused-result -O2 -g
+CFLAGS=-Wall -Wno-unused-result -O2
 
 all: death_handler.o
 
