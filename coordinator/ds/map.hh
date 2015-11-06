@@ -52,8 +52,7 @@ public:
 		uint8_t opcode, bool needsLock = true, bool needsUnlock = true
 	);
 	bool insertDegradedLock(
-		uint32_t srcListId, uint32_t srcStripeId, uint32_t srcChunkId,
-		uint32_t &dstListId, uint32_t &dstChunkId,
+		Metadata srcMetadata, Metadata &dstMetadata,
 		bool needsLock = true, bool needsUnlock = true
 	);
 

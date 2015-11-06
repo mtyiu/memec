@@ -76,10 +76,8 @@ bool Map::insertKey( char *keyStr, uint8_t keySize, uint32_t listId, uint32_t st
 	return ret;
 }
 
-bool Map::insertDegradedLock( uint32_t srcListId, uint32_t srcStripeId, uint32_t srcChunkId, uint32_t &dstListId, uint32_t &dstChunkId, bool needsLock, bool needsUnlock ) {
-	Metadata srcMetadata, dstMetadata;
-	srcMetadata.set( srcListId, srcStripeId, srcChunkId );
-	dstMetadata.set( dstListId, -1, dstChunkId );
+bool Map::insertDegradedLock( Metadata srcMetadata, Metadata &dstMetadata, bool needsLock, bool needsUnlock ) {
+	dstMetadata.stripeId = -1; // This field is not used - indicate this using a special value
 
 	std::unordered_map<Metadata, Metadata>::iterator it;
 	std::pair<Metadata, Metadata> p( srcMetadata, dstMetadata );
@@ -93,8 +91,6 @@ bool Map::insertDegradedLock( uint32_t srcListId, uint32_t srcStripeId, uint32_t
 		ret = r.second;
 	} else {
 		dstMetadata = it->second;
-		dstListId = dstMetadata.listId;
-		dstChunkId = dstMetadata.chunkId;
 		ret = false;
 	}
 	if ( needsUnlock ) UNLOCK( &this->degradedLocksLock );
@@ -139,7 +135,27 @@ bool Map::findDegradedLock( uint32_t srcListId, uint32_t srcStripeId, uint32_t s
 }
 
 void Map::dump( FILE *f ) {
+	fprintf( f, "List of sealed chunks:\n----------------------\n" );
+	LOCK( &this->chunksLock );
+	if ( ! this->chunks.size() ) {
+		fprintf( f, "(None)\n" );
+	} else {
+		/*
+		for ( std::unordered_set<Metadata>::iterator it = this->chunks.begin(); it != this->chunks.end(); it++ ) {
+			const Metadata &m = *it;
+			fprintf(
+				f, "(%u, %u, %u)\n",
+				m.listId, m.stripeId, m.chunkId
+			);
+		}
+		*/
+		fprintf( f, "Count: %lu\n", this->chunks.size() );
+	}
+	UNLOCK( &this->chunksLock );
+	fprintf( f, "\n" );
+
 	fprintf( f, "List of key-value pairs:\n------------------------\n" );
+	LOCK( &this->keysLock );
 	if ( ! this->keys.size() ) {
 		fprintf( f, "(None)\n" );
 	} else {
@@ -154,6 +170,24 @@ void Map::dump( FILE *f ) {
 		*/
 		fprintf( f, "Count: %lu\n", this->keys.size() );
 	}
+	UNLOCK( &this->keysLock );
+	fprintf( f, "\n" );
+
+	fprintf( f, "List of degraded locks:\n-----------------------\n" );
+	LOCK( &this->degradedLocksLock );
+	if ( ! this->degradedLocks.size() ) {
+		fprintf( f, "(None)\n" );
+	} else {
+		for ( std::unordered_map<Metadata, Metadata>::iterator it = this->degradedLocks.begin(); it != this->degradedLocks.end(); it++ ) {
+			fprintf(
+				f, "(%u, %u, %u) |-> (%u, %u)\n",
+				it->first.listId, it->first.stripeId, it->first.chunkId,
+				it->second.listId, it->second.chunkId
+			);
+		}
+		fprintf( f, "Count: %lu\n", this->degradedLocks.size() );
+	}
+	UNLOCK( &this->degradedLocksLock );
 	fprintf( f, "\n" );
 }
 

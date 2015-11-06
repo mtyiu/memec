@@ -151,6 +151,11 @@ public:
 		return ret[ index ];
 	}
 
+	T *get( uint32_t listIndex, uint32_t chunkIndex ) {
+		T **ret = this->lists[ listIndex ];
+		return ret[ chunkIndex ];
+	}
+
 	T **get( uint32_t listIndex, T **parity, T **data = 0 ) {
 		T **ret = this->lists[ listIndex ];
 		for ( uint32_t i = 0; i < this->n - this->k; i++ ) {

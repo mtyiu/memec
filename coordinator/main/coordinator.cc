@@ -485,9 +485,9 @@ void Coordinator::interactive() {
 void Coordinator::dump() {
 	FILE *f = stdout;
 	for ( size_t i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
-		fprintf( f, "Slave #%lu: ", i + 1 );
+		fprintf( f, "##### Slave #%lu: ", i + 1 );
 		this->sockets.slaves[ i ]->printAddress( f );
-		fprintf( f, "\n----------------------------------------\n" );
+		fprintf( f, " #####\n" );
 
 		this->sockets.slaves[ i ]->map.dump();
 	}

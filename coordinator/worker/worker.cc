@@ -569,11 +569,11 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 	}
 	// __DEBUG__(
 	// 	BLUE,
-	__ERROR__(
-		"CoordinatorWorker", "handleDegradedLockRequest",
-		"[DEGRADED_LOCK] Key: %.*s (key size = %u); target list ID: %u, target chunk ID: %u",
-		( int ) header.keySize, header.key, header.keySize, header.dstListId, header.dstChunkId
-	);
+	// __ERROR__(
+	// 	"CoordinatorWorker", "handleDegradedLockRequest",
+	// 	"[DEGRADED_LOCK] Key: %.*s (key size = %u); target list ID: %u, target chunk ID: %u",
+	// 	( int ) header.keySize, header.key, header.keySize, header.dstListId, header.dstChunkId
+	// );
 
 	// Metadata metadata;
 	RemappingRecord remappingRecord;
@@ -581,34 +581,41 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 	key.set( header.keySize, header.key );
 
 	if ( CoordinatorWorker::remappingRecords->find( key, &remappingRecord ) ) {
-		// Remapped: Reject the degraded operation
-	} else {
-
+		// Remapped
+		if ( remappingRecord.listId != header.srcListId || remappingRecord.chunkId != header.srcChunkId ) {
+			// Reject the degraded operation
+			event.resDegradedLock(
+				event.socket, event.id, key,
+				remappingRecord.listId, remappingRecord.chunkId
+			);
+			this->dispatch( event );
+			return false;
+		}
 	}
 
-	/*
-	if ( map->findValueByKey( header.key, header.keySize, 0, 0, 0, &metadata ) ) {
-		// Not remapped: Find the stripe which contains the key
-		Metadata target;
-		target.set( header.dstListId, metadata.stripeId, header.dstChunkId );
+	// Find the SlaveSocket which stores the stripe with srcListId and srcChunkId
+	SlaveSocket *socket = CoordinatorWorker::stripeList->get( header.srcListId, header.srcChunkId );
+	Map *map = &socket->map;
+	Metadata srcMetadata, dstMetadata;
+	bool ret;
 
-		bool ret = CoordinatorWorker::map->insertDegradedLock( metadata, target );
+	dstMetadata.set( header.dstListId, 0, header.dstChunkId );
+
+	if ( ! map->findMetadataByKey( header.key, header.keySize, srcMetadata ) ) {
+		// Key not found
+		event.resDegradedLock( event.socket, event.id, key );
+		ret = false;
+	} else {
+		ret = map->insertDegradedLock( srcMetadata, dstMetadata );
 		// ret is true if the degraded lock is attained
 		event.resDegradedLock(
 			event.socket, event.id, key, ret,
-			target.listId, target.stripeId, target.chunkId
+			srcMetadata.listId, srcMetadata.stripeId, srcMetadata.chunkId,
+			dstMetadata.listId, dstMetadata.chunkId
 		);
-	} else if ( map->findRemappingRecordByKey( header.key, header.keySize, &remappingRecord ) ) {
-		// Remapped: Reject the degraded operation
-		event.resDegradedLock( event.socket, event.id, key, remappingRecord.listId, remappingRecord.chunkId );
-	} else {
-		// Key not found
-		event.resDegradedLock( event.socket, event.id, key );
 	}
 	this->dispatch( event );
-	*/
-
-	return true;
+	return ret;
 }
 
 bool CoordinatorWorker::init() {

@@ -1191,7 +1191,7 @@ size_t Protocol::generateDegradedLockReqHeader( uint8_t magic, uint8_t to, uint8
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_DEGRADED_LOCK_REQ_SIZE + keySize, id );
 
-	*( ( uint32_t * )( buf     ) ) = htonl( srcListId );
+	*( ( uint32_t * )( buf      ) ) = htonl( srcListId );
 	*( ( uint32_t * )( buf +  4 ) ) = htonl( srcChunkId );
 	*( ( uint32_t * )( buf +  8 ) ) = htonl( dstListId );
 	*( ( uint32_t * )( buf + 12 ) ) = htonl( dstChunkId );
