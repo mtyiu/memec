@@ -13,8 +13,11 @@ class SlaveWorker;
 
 class DataChunkBuffer : public ChunkBuffer {
 private:
+	uint32_t listId;                       // List ID of this buffer
+	uint32_t stripeId;                     // Current stripe ID
+	uint32_t chunkId;                      // Chunk ID of this buffer
 	uint32_t count;                        // Number of chunks
-	LOCK_T *locks;                // Lock for each chunk
+	LOCK_T *locks;                         // Lock for each chunk
 	Chunk **chunks;                        // Allocated chunk buffer
 #ifdef REINSERTED_CHUNKS_IS_SET
 	std::unordered_set<Chunk *> reInsertedChunks;    // Chunks that have free space after deletion
@@ -27,6 +30,8 @@ private:
 public:
 	DataChunkBuffer( uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId );
 
+	inline uint32_t getChunkId() { return this->chunkId; }
+
 	KeyMetadata set( SlaveWorker *worker, char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode );
 
 	size_t seal( SlaveWorker *worker );
@@ -37,10 +42,13 @@ public:
 	int lockChunk( Chunk *chunk, bool keepGlobalLock );
 	void updateAndUnlockChunk( int index );
 	void unlock();
+
 	uint32_t flush( SlaveWorker *worker, bool lock = true, bool lockAtIndex = false );
 	Chunk *flushAt( SlaveWorker *worker, int index, bool lock = true );
+
 	void print( FILE *f = stdout );
 	void stop();
+
 	~DataChunkBuffer();
 };
 

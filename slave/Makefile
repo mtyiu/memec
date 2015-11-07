@@ -1,5 +1,5 @@
 CC=g++
-CFLAGS=-std=c++11 -Wall -O2
+CFLAGS=-std=c++11 -Wall -O2 -g
 PLIO_SRC_ROOT=..
 LIBS=-pthread
 BIN=$(PLIO_SRC_ROOT)/bin/slave
@@ -7,6 +7,7 @@ BIN=$(PLIO_SRC_ROOT)/bin/slave
 OBJS= \
 	buffer/chunk_buffer.o \
 	buffer/data_chunk_buffer.o \
+	buffer/degraded_chunk_buffer.o \
 	buffer/parity_chunk_buffer.o \
 	buffer/mixed_chunk_buffer.o \
 	config/slave_config.o \

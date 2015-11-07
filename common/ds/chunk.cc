@@ -128,6 +128,8 @@ uint32_t Chunk::updateData() {
 	uint32_t valueSize, tmp;
 	char *key, *value, *ptr = this->data;
 
+	this->size = 0;
+
 #ifdef USE_CHUNK_LOCK
 	LOCK( &this->lock );
 #endif

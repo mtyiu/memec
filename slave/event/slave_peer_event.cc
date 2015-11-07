@@ -64,8 +64,9 @@ void SlavePeerEvent::resDeleteChunk( SlavePeerSocket *socket, uint32_t id, Metad
 	this->message.chunkUpdate.updatingChunkId = updatingChunkId;
 }
 
-void SlavePeerEvent::reqGetChunk( SlavePeerSocket *socket, Metadata &metadata ) {
+void SlavePeerEvent::reqGetChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata ) {
 	this->type = SLAVE_PEER_EVENT_TYPE_GET_CHUNK_REQUEST;
+	this->id = id;
 	this->socket = socket;
 	this->message.chunk.metadata = metadata;
 	this->message.chunk.chunk = 0;
@@ -79,8 +80,9 @@ void SlavePeerEvent::resGetChunk( SlavePeerSocket *socket, uint32_t id, Metadata
 	this->message.chunk.chunk = chunk;
 }
 
-void SlavePeerEvent::reqSetChunk( SlavePeerSocket *socket, Metadata &metadata, Chunk *chunk ) {
+void SlavePeerEvent::reqSetChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, Chunk *chunk ) {
 	this->type = SLAVE_PEER_EVENT_TYPE_SET_CHUNK_REQUEST;
+	this->id = id;
 	this->socket = socket;
 	this->message.chunk.metadata = metadata;
 	this->message.chunk.chunk = chunk;

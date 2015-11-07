@@ -24,7 +24,11 @@ void ParityChunkWrapper::free() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-ParityChunkBuffer::ParityChunkBuffer( uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) : ChunkBuffer( listId, stripeId, chunkId ) {}
+ParityChunkBuffer::ParityChunkBuffer( uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) : ChunkBuffer() {
+	this->listId = listId;
+	this->stripeId = stripeId;
+	this->chunkId = chunkId;
+}
 
 ParityChunkWrapper &ParityChunkBuffer::getWrapper( uint32_t stripeId, bool needsLock, bool needsUnlock ) {
 	if ( needsLock ) LOCK( &this->lock );

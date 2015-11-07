@@ -2,7 +2,10 @@
 #include "../main/slave.hh"
 #include "../worker/worker.hh"
 
-DataChunkBuffer::DataChunkBuffer( uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) : ChunkBuffer( listId, stripeId, chunkId ) {
+DataChunkBuffer::DataChunkBuffer( uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) : ChunkBuffer() {
+	this->listId = listId;
+	this->stripeId = stripeId;
+	this->chunkId = chunkId;
 	this->count = count;
 	this->locks = new LOCK_T[ count ];
 	this->chunks = new Chunk*[ count ];

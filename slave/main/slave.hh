@@ -5,6 +5,7 @@
 #include <vector>
 #include <cstdio>
 #include "../buffer/mixed_chunk_buffer.hh"
+#include "../buffer/degraded_chunk_buffer.hh"
 #include "../config/slave_config.hh"
 #include "../ds/map.hh"
 #include "../ds/pending.hh"
@@ -68,6 +69,7 @@ public:
 	std::vector<StripeListIndex> stripeListIndex;
 	MemoryPool<Chunk> *chunkPool;
 	std::vector<MixedChunkBuffer *> chunkBuffer;
+	DegradedChunkBuffer degradedChunkBuffer;
 
 	static Slave *getInstance() {
 		static Slave slave;

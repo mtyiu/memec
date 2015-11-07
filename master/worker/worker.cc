@@ -438,7 +438,8 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 						}
 						break;
 					case PROTO_OPCODE_GET:
-						this->handleGetResponse( event, success, buffer.data, buffer.size );
+					case PROTO_OPCODE_DEGRADED_GET:
+						this->handleGetResponse( event, success, header.opcode == PROTO_OPCODE_DEGRADED_GET, buffer.data, buffer.size );
 						break;
 					case PROTO_OPCODE_SET:
 						this->handleSetResponse( event, success, buffer.data, buffer.size );
@@ -450,10 +451,12 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 						this->handleRemappingSetResponse( event, success, buffer.data, buffer.size );
 						break;
 					case PROTO_OPCODE_UPDATE:
-						this->handleUpdateResponse( event, success, buffer.data, buffer.size );
+					case PROTO_OPCODE_DEGRADED_UPDATE:
+						this->handleUpdateResponse( event, success, header.opcode == PROTO_OPCODE_DEGRADED_UPDATE, buffer.data, buffer.size );
 						break;
 					case PROTO_OPCODE_DELETE:
-						this->handleDeleteResponse( event, success, buffer.data, buffer.size );
+					case PROTO_OPCODE_DEGRADED_DELETE:
+						this->handleDeleteResponse( event, success, header.opcode == PROTO_OPCODE_DEGRADED_DELETE, buffer.data, buffer.size );
 						break;
 					case PROTO_OPCODE_REDIRECT_GET:
 					case PROTO_OPCODE_REDIRECT_UPDATE:
@@ -1269,7 +1272,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 	return true;
 }
 
-bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, char *buf, size_t size ) {
+bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, bool isDegraded, char *buf, size_t size ) {
 	Key key;
 	KeyValue keyValue;
 	if ( success ) {
@@ -1302,7 +1305,7 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, char *buf,
 
 	// Mark the elapse time as latency
 	Master* master = Master::getInstance();
-	if ( master->config.master.loadingStats.updateInterval > 0 ) {
+	if ( ! isDegraded && master->config.master.loadingStats.updateInterval > 0 ) {
 		struct timespec elapsedTime;
 		RequestStartTime rst;
 
@@ -1409,7 +1412,7 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 	return true;
 }
 
-bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, char *buf, size_t size ) {
+bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, bool isDegraded, char *buf, size_t size ) {
 	struct KeyValueUpdateHeader header;
 	if ( ! this->protocol.parseKeyValueUpdateHeader( header, false, buf, size ) ) {
 		__ERROR__( "MasterWorker", "handleUpdateResponse", "Invalid UPDATE Response." );
@@ -1447,7 +1450,7 @@ bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, char *b
 	return true;
 }
 
-bool MasterWorker::handleDeleteResponse( SlaveEvent event, bool success, char *buf, size_t size ) {
+bool MasterWorker::handleDeleteResponse( SlaveEvent event, bool success, bool isDegraded, char *buf, size_t size ) {
 	struct KeyHeader header;
 	if ( ! this->protocol.parseKeyHeader( header, buf, size ) ) {
 		__ERROR__( "MasterWorker", "handleDeleteResponse", "Invalid DELETE Response." );

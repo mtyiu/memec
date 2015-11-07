@@ -84,10 +84,6 @@ public:
 			Key key;
 			uint32_t listId, chunkId;
 		} remap;
-		struct {
-			Key key;
-			uint32_t listId, stripeId, chunkId;
-		} degradedLock;
 	} message;
 
 	// Register
@@ -104,10 +100,10 @@ public:
 	// DELETE_CHUNK
 	void resDeleteChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, bool success );
 	// GET_CHUNK
-	void reqGetChunk( SlavePeerSocket *socket, Metadata &metadata );
+	void reqGetChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata );
 	void resGetChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, bool success, Chunk *chunk = 0 );
 	// SET_CHUNK
-	void reqSetChunk( SlavePeerSocket *socket, Metadata &metadata, Chunk *chunk );
+	void reqSetChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, Chunk *chunk );
 	void resSetChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, bool success );
 	// SEAL_CHUNK
 	void reqSealChunk( Chunk *chunk );

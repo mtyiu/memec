@@ -1501,8 +1501,8 @@ bool Protocol::parseDegradedReqHeader( struct DegradedReqHeader &header, uint8_t
 
 	offset += PROTO_DEGRADED_REQ_BASE_SIZE;
 	switch( opcode ) {
-		case PROTO_OPCODE_GET:
-		case PROTO_OPCODE_DELETE:
+		case PROTO_OPCODE_DEGRADED_GET:
+		case PROTO_OPCODE_DEGRADED_DELETE:
 			ret = this->parseKeyHeader(
 				offset,
 				header.data.key.keySize,
@@ -1510,7 +1510,7 @@ bool Protocol::parseDegradedReqHeader( struct DegradedReqHeader &header, uint8_t
 				buf, size
 			);
 			break;
-		case PROTO_OPCODE_UPDATE:
+		case PROTO_OPCODE_DEGRADED_UPDATE:
 			ret = this->parseKeyValueUpdateHeader(
 				offset,
 				header.data.keyValueUpdate.keySize,

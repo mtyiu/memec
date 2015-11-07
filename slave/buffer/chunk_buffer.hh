@@ -14,10 +14,7 @@
 
 class ChunkBuffer {
 protected:
-	uint32_t listId;                       // List ID of this buffer
-	uint32_t stripeId;                     // Current stripe ID
-	uint32_t chunkId;                      // Chunk ID of this buffer
-	LOCK_T lock;                  // Lock for the whole buffer
+	LOCK_T lock;                           // Lock for the whole buffer
 
 	static Coding *coding;                 // Coding module
 	static MemoryPool<Chunk> *chunkPool;   // Memory pool for chunks
@@ -29,8 +26,7 @@ public:
 	static uint32_t dataChunkCount;        // Number of data chunks per stripe
 
 	static void init();
-	ChunkBuffer( uint32_t listId, uint32_t stripeId, uint32_t chunkId );
-	inline uint32_t getChunkId() { return this->chunkId; }
+	ChunkBuffer();
 	virtual void print( FILE *f = stdout ) = 0;
 	virtual void stop() = 0;
 	virtual ~ChunkBuffer();

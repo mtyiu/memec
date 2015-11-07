@@ -1,15 +1,9 @@
-#ifndef __SLAVE_MAP_MAP_HH__
-#define __SLAVE_MAP_MAP_HH__
+#ifndef __SLAVE_BUFFER_DEGRADED_CHUNK_BUFFER_HH__
+#define __SLAVE_BUFFER_DEGRADED_CHUNK_BUFFER_HH__
 
-#include <unordered_map>
-#include <unordered_set>
-#include "../../common/ds/chunk.hh"
-#include "../../common/ds/key.hh"
-#include "../../common/ds/metadata.hh"
-#include "../../common/lock/lock.hh"
-#include "../../common/protocol/protocol.hh"
+#include "chunk_buffer.hh"
 
-class Map {
+class DegradedMap {
 private:
 	/**
 	 * Store the mapping between keys and chunks
@@ -25,36 +19,9 @@ private:
 	LOCK_T cacheLock;
 
 public:
-	/**
-	 * Store the keys to be synchronized with coordinator
-	 * Key |-> (list ID, stripe ID, chunk ID, opcode)
-	 */
-	std::unordered_map<Key, OpMetadata> ops;
-	LOCK_T opsLock;
-	/**
-	 * Store the metadata of the sealed chunks to be synchronized with coordinator
-	 * (list ID, stripe ID, chunk ID)
-	 */
-	std::unordered_set<Metadata> sealed;
-	LOCK_T sealedLock;
-	/**
-	 * Store the pending-to-send remapping records
-	 * Key |-> (list ID, chunk ID)
-	 */
-	std::unordered_map<Key, RemappingRecord> remap;
-	/**
-	 * Store the alread-sent remapping records
-	 * Key |-> (list ID, chunk ID)
-	 */
-	std::unordered_map<Key, RemappingRecord> remapSent;
-	LOCK_T remapLock;
-
-	Map() {
+	DegradedMap() {
 		LOCK_INIT( &this->keysLock );
 		LOCK_INIT( &this->cacheLock );
-		LOCK_INIT( &this->opsLock );
-		LOCK_INIT( &this->sealedLock );
-		LOCK_INIT( &this->remapLock );
 	}
 
 	bool findValueByKey( char *data, uint8_t size, KeyValue *keyValue, Key *keyPtr = 0, KeyMetadata *keyMetadataPtr = 0, Metadata *metadataPtr = 0, Chunk **chunkPtr = 0 ) {
@@ -112,44 +79,16 @@ public:
 		return it->second;
 	}
 
-	bool findRemappingRecordByKey( char *data, uint8_t size, RemappingRecord *remappingRecordPtr = 0, Key *keyPtr = 0 ) {
-		std::unordered_map<Key, RemappingRecord>::iterator it;
-		Key key;
-
-		key.set( size, data );
-		if ( keyPtr ) *keyPtr = key;
-
-		LOCK( &this->remapLock );
-		// check the sent records
-		it = this->remapSent.find( key );
-		if ( it == this->remapSent.end() ) {
-			// check the unsent records
-			it = this->remap.find( key );
-			if ( it == this->remap.end() ) {
-				UNLOCK( &this->remapLock );
-				return false;
-			}
-		}
-
-		if ( remappingRecordPtr ) *remappingRecordPtr = it->second;
-		UNLOCK( &this->remapLock );
-		return true;
-	}
-
 	bool insertKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata ) {
 		OpMetadata opMetadata;
 		opMetadata.clone( keyMetadata );
 		opMetadata.opcode = opcode;
 
-		Key k1, k2;
+		Key k1;
 
 		k1.dup( key.size, key.data );
 		std::pair<Key, KeyMetadata> keyPair( k1, keyMetadata );
 		std::pair<std::unordered_map<Key, KeyMetadata>::iterator, bool> keyRet;
-
-		k2.dup( key.size, key.data );
-		std::pair<Key, OpMetadata> opPair( k2, opMetadata );
-		std::pair<std::unordered_map<Key, OpMetadata>::iterator, bool> opRet;
 
 		LOCK( &this->keysLock );
 		keyRet = this->keys.insert( keyPair );
@@ -158,52 +97,6 @@ public:
 			return false;
 		}
 		UNLOCK( &this->keysLock );
-
-		LOCK( &this->opsLock );
-		opRet = this->ops.insert( opPair );
-		if ( ! opRet.second ) {
-			UNLOCK( &this->opsLock );
-			return false;
-		}
-		UNLOCK( &this->opsLock );
-
-		return true;
-	}
-
-	bool seal( uint32_t listId, uint32_t stripeId, uint32_t chunkId ) {
-		Metadata metadata;
-		metadata.set( listId, stripeId, chunkId );
-
-		std::pair<std::unordered_set<Metadata>::iterator, bool> ret;
-
-		LOCK( &this->sealedLock );
-		ret = this->sealed.insert( metadata );
-		UNLOCK( &this->sealedLock );
-
-		return ret.second;
-	}
-
-	bool insertRemappingRecord( Key key, RemappingRecord &remappingRecord ) {
-		key.dup( key.size, key.data );
-
-		std::pair<Key, RemappingRecord> p( key, remappingRecord );
-		std::pair<std::unordered_map<Key, RemappingRecord>::iterator, bool> ret;
-
-		LOCK( &this->remapLock );
-		ret = this->remap.insert( p );
-		if ( ! ret.second ) {
-			UNLOCK( &this->remapLock );
-			return false;
-		}
-		UNLOCK( &this->remapLock );
-
-		OpMetadata opMetadata;
-		opMetadata.listId = remappingRecord.listId;
-		opMetadata.chunkId = remappingRecord.chunkId;
-		opMetadata.opcode = PROTO_OPCODE_REMAPPING_LOCK;
-		LOCK( &this->opsLock );
-		this->ops[ key ] = opMetadata;
-		UNLOCK( &this->opsLock );
 
 		return true;
 	}
@@ -251,7 +144,6 @@ public:
 	bool deleteKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata, bool needsLock, bool needsUnlock ) {
 		Key k;
 		std::unordered_map<Key, KeyMetadata>::iterator keysIt;
-		std::unordered_map<Key, OpMetadata>::iterator opsIt;
 
 		if ( needsLock ) LOCK( &this->keysLock );
 		keysIt = this->keys.find( key );
@@ -265,30 +157,6 @@ public:
 			k.free();
 		}
 		if ( needsUnlock ) UNLOCK( &this->keysLock );
-
-		LOCK( &this->opsLock );
-		opsIt = this->ops.find( key );
-		if ( opsIt == this->ops.end() ) {
-			OpMetadata opMetadata;
-			opMetadata.clone( keyMetadata );
-			opMetadata.opcode = opcode;
-
-			key.dup();
-
-			std::pair<Key, OpMetadata> opsPair( key, opMetadata );
-			std::pair<std::unordered_map<Key, OpMetadata>::iterator, bool> opsRet;
-
-			opsRet = this->ops.insert( opsPair );
-			if ( ! opsRet.second ) {
-				if ( needsUnlock ) UNLOCK( &this->opsLock );
-				return false;
-			}
-		} else {
-			k = opsIt->first;
-			this->ops.erase( opsIt );
-			k.free();
-		}
-		UNLOCK( &this->opsLock );
 
 		return true;
 	}
@@ -339,6 +207,18 @@ public:
 		}
 		fprintf( f, "\n" );
 	}
+};
+
+class DegradedChunkBuffer : public ChunkBuffer {
+public:
+	DegradedMap map;
+
+	DegradedChunkBuffer();
+
+	void print( FILE *f = stdout );
+	void stop();
+
+	~DegradedChunkBuffer();
 };
 
 #endif

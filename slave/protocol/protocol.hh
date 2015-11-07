@@ -32,11 +32,11 @@ public:
 	// REMAPPING_SET
 	char *resRemappingSet( size_t &size, bool toMaster, uint32_t id, bool success, uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key );
 	// GET
-	char *resGet( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key, uint32_t valueSize = 0, char *value = 0 );
+	char *resGet( size_t &size, uint32_t id, bool success, bool isDegraded, uint8_t keySize, char *key, uint32_t valueSize = 0, char *value = 0 );
 	// UPDATE
-	char *resUpdate( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize );
+	char *resUpdate( size_t &size, uint32_t id, bool success, bool isDegraded, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize );
 	// DELETE
-	char *resDelete( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key, bool toMaster = true );
+	char *resDelete( size_t &size, uint32_t id, bool success, bool isDegraded, uint8_t keySize, char *key, bool toMaster = true );
 	// Redirect
 	char *resRedirect( size_t &size, uint32_t id, uint8_t opcode, uint8_t keySize, char *key, uint32_t remappedListId, uint32_t remappedChunkId );
 

@@ -18,10 +18,7 @@ void ChunkBuffer::init() {
 	ChunkBuffer::map = &slave->map;
 }
 
-ChunkBuffer::ChunkBuffer( uint32_t listId, uint32_t stripeId, uint32_t chunkId ) {
-	this->listId = listId;
-	this->stripeId = stripeId;
-	this->chunkId = chunkId;
+ChunkBuffer::ChunkBuffer() {
 	LOCK_INIT( &this->lock );
 }
 

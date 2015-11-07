@@ -5,6 +5,7 @@
 #include <cstdio>
 #include "worker_role.hh"
 #include "../buffer/mixed_chunk_buffer.hh"
+#include "../buffer/degraded_chunk_buffer.hh"
 #include "../config/slave_config.hh"
 #include "../event/event_queue.hh"
 #include "../ds/map.hh"
@@ -55,6 +56,7 @@ private:
 	static Map *map;
 	static MemoryPool<Chunk> *chunkPool;
 	static std::vector<MixedChunkBuffer *> *chunkBuffer;
+	static DegradedChunkBuffer *degradedChunkBuffer;
 	static PacketPool *packetPool;
 
 	void dispatch( MixedEvent event );
@@ -97,7 +99,7 @@ private:
 	bool handleGetChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleSetChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 
-	bool performDegradedRead( uint32_t listId, uint32_t stripeId, uint32_t lostChunkId, uint8_t opcode, uint32_t parentId, Key *key, KeyValueUpdate *keyValueUpdate = 0 );
+	bool performDegradedRead( MasterSocket *masterSocket, uint32_t listId, uint32_t stripeId, uint32_t lostChunkId, uint8_t opcode, uint32_t parentId, Key *key, KeyValueUpdate *keyValueUpdate = 0 );
 
 	void free();
 	static void *run( void *argv );

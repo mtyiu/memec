@@ -1,6 +1,7 @@
 #ifndef __SLAVE_DS_PENDING_HH__
 #define __SLAVE_DS_PENDING_HH__
 
+#include "../socket/master_socket.hh"
 #include "../socket/slave_peer_socket.hh"
 #include "../../common/ds/chunk.hh"
 #include "../../common/ds/metadata.hh"
@@ -48,16 +49,18 @@ public:
 class DegradedOp : public Metadata {
 public:
 	uint8_t opcode;
+	MasterSocket *socket;
 	union {
 		Key key;
 		KeyValueUpdate keyValueUpdate;
 	} data;
 
-	void set( uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint8_t opcode ) {
+	void set( uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint8_t opcode, MasterSocket *socket ) {
 		this->listId = listId;
 		this->stripeId = stripeId;
 		this->chunkId = chunkId;
 		this->opcode = opcode;
+		this->socket = socket;
 	}
 };
 

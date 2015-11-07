@@ -69,10 +69,10 @@ private:
 	);
 	bool handleDegradedLockResponse( CoordinatorEvent event, bool success, char *buf, size_t size );
 
-	bool handleGetResponse( SlaveEvent event, bool success, char *buf, size_t size );
+	bool handleGetResponse( SlaveEvent event, bool success, bool isDegraded, char *buf, size_t size );
 	bool handleSetResponse( SlaveEvent event, bool success, char *buf, size_t size );
-	bool handleUpdateResponse( SlaveEvent event, bool success, char *buf, size_t size );
-	bool handleDeleteResponse( SlaveEvent event, bool success, char *buf, size_t size );
+	bool handleUpdateResponse( SlaveEvent event, bool success, bool isDegraded, char *buf, size_t size );
+	bool handleDeleteResponse( SlaveEvent event, bool success, bool isDegraded, char *buf, size_t size );
 
 	bool handleRedirectedResponse( SlaveEvent event, char *buf, size_t size, uint8_t opcode );
 
