@@ -253,16 +253,16 @@ struct RedirectHeader {
 	uint32_t chunkId;
 };
 
-//////////////////////////
-// Degraded prefetching //
-//////////////////////////
+////////////////////////
+// Degraded operation //
+////////////////////////
 #define PROTO_DEGRADED_LOCK_REQ_SIZE 17
 struct DegradedLockReqHeader {
 	// Indicate where the reconstructed chunk should be stored
 	// using one of the stripe list that the server belongs to
-    uint32_t srcListId;
+	uint32_t srcListId;
 	uint32_t srcChunkId;
-    uint32_t dstListId;
+	uint32_t dstListId;
 	uint32_t dstChunkId;
 	uint8_t keySize;
 	char *key;
@@ -281,11 +281,22 @@ struct DegradedLockResHeader {
 	uint8_t type;
 	uint8_t keySize;
 	char *key;
-    uint32_t srcListId;
-    uint32_t srcStripeId;
-    uint32_t srcChunkId;
-    uint32_t dstListId;
-    uint32_t dstChunkId;
+	uint32_t srcListId;
+	uint32_t srcStripeId;
+	uint32_t srcChunkId;
+	uint32_t dstListId;
+	uint32_t dstChunkId;
+};
+
+#define PROTO_DEGRADED_REQ_BASE_SIZE 12
+struct DegradedReqHeader {
+	uint32_t listId;
+	uint32_t stripeId;
+	uint32_t chunkId;
+	union {
+		struct KeyHeader key;
+		struct KeyValueUpdateHeader keyValueUpdate;
+	} data;
 };
 
 //////////////
@@ -539,9 +550,9 @@ protected:
 		char *buf, size_t size
 	);
 
-	//////////////////////////
-	// Degraded prefetching //
-	//////////////////////////
+	////////////////////////
+	// Degraded operation //
+	////////////////////////
 	size_t generateDegradedLockReqHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
 		uint32_t srcListId, uint32_t srcChunkId,
@@ -550,11 +561,12 @@ protected:
 	);
 	bool parseDegradedLockReqHeader(
 		size_t offset,
-        uint32_t &srcListId, uint32_t &srcChunkId,
-        uint32_t &dstListId, uint32_t &dstChunkId,
+		uint32_t &srcListId, uint32_t &srcChunkId,
+		uint32_t &dstListId, uint32_t &dstChunkId,
 		uint8_t &keySize, char *&key,
 		char *buf, size_t size
 	);
+
 	size_t generateDegradedLockResHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
 		uint8_t type, uint8_t keySize, char *key, char *&buf
@@ -563,7 +575,7 @@ protected:
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
 		bool isLocked, uint8_t keySize, char *key,
 		uint32_t srcListId, uint32_t srcStripeId, uint32_t srcChunkId,
-        uint32_t dstListId, uint32_t dstChunkId
+		uint32_t dstListId, uint32_t dstChunkId
 	);
 	size_t generateDegradedLockResHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
@@ -581,13 +593,30 @@ protected:
 	);
 	bool parseDegradedLockResHeader(
 		size_t offset,
-        uint32_t &srcListId, uint32_t &srcStripeId, uint32_t &srcChunkId,
-        uint32_t &dstListId, uint32_t &dstChunkId,
-        char *buf, size_t size
+		uint32_t &srcListId, uint32_t &srcStripeId, uint32_t &srcChunkId,
+		uint32_t &dstListId, uint32_t &dstChunkId,
+		char *buf, size_t size
 	);
 	bool parseDegradedLockResHeader(
 		size_t offset,
-        uint32_t &listId, uint32_t &chunkId,
+		uint32_t &listId, uint32_t &chunkId,
+		char *buf, size_t size
+	);
+
+	size_t generateDegradedReqHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		uint8_t keySize, char *key
+	);
+	size_t generateDegradedReqHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		uint8_t keySize, char *key,
+		uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate
+	);
+	bool parseDegradedReqHeader(
+		size_t offset,
+		uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
 		char *buf, size_t size
 	);
 
@@ -745,15 +774,19 @@ public:
 		struct RedirectHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
-	//////////////////////////
-	// Degraded prefetching //
-	//////////////////////////
+	////////////////////////
+	// Degraded operation //
+	////////////////////////
 	bool parseDegradedLockReqHeader(
 		struct DegradedLockReqHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 	bool parseDegradedLockResHeader(
 		struct DegradedLockResHeader &header,
+		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
+	bool parseDegradedReqHeader(
+		struct DegradedReqHeader &header, uint8_t opcode,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 	//////////////

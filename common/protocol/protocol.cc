@@ -802,7 +802,11 @@ bool Protocol::parseKeyValueHeader( struct KeyValueHeader &header, char *buf, si
 
 size_t Protocol::generateKeyValueUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_KEY_VALUE_UPDATE_SIZE + keySize + ( valueUpdate ? valueUpdateSize : 0 ), id );
+	size_t bytes = this->generateHeader(
+		magic, to, opcode,
+		PROTO_KEY_VALUE_UPDATE_SIZE + keySize + ( valueUpdate ? valueUpdateSize : 0 ),
+		id
+	);
 
 	buf[ 0 ] = keySize;
 
@@ -1400,6 +1404,123 @@ bool Protocol::parseDegradedLockResHeader( struct DegradedLockResHeader &header,
 			break;
 		case PROTO_DEGRADED_LOCK_RES_NOT_EXIST:
 			return true;
+		default:
+			return false;
+	}
+	return ret;
+}
+
+size_t Protocol::generateDegradedReqHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint8_t keySize, char *key ) {
+	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
+	size_t bytes = this->generateHeader(
+		magic, to, opcode,
+		PROTO_DEGRADED_REQ_BASE_SIZE + PROTO_KEY_SIZE + keySize,
+		id
+	);
+
+	*( ( uint32_t * )( buf     ) ) = htonl( listId );
+	*( ( uint32_t * )( buf + 4 ) ) = htonl( stripeId );
+	*( ( uint32_t * )( buf + 8 ) ) = htonl( chunkId );
+	buf += PROTO_DEGRADED_REQ_BASE_SIZE;
+
+	buf[ 0 ] = keySize;
+
+	buf += PROTO_KEY_SIZE;
+	memmove( buf, key, keySize );
+
+	bytes += PROTO_DEGRADED_REQ_BASE_SIZE + PROTO_KEY_SIZE + keySize;
+
+	return bytes;
+}
+
+size_t Protocol::generateDegradedReqHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate ) {
+	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
+	size_t bytes = this->generateHeader(
+		magic, to, opcode,
+		PROTO_DEGRADED_REQ_BASE_SIZE + PROTO_KEY_VALUE_UPDATE_SIZE + keySize + valueUpdateSize,
+		id
+	);
+
+	*( ( uint32_t * )( buf     ) ) = htonl( listId );
+	*( ( uint32_t * )( buf + 4 ) ) = htonl( stripeId );
+	*( ( uint32_t * )( buf + 8 ) ) = htonl( chunkId );
+	buf += PROTO_DEGRADED_REQ_BASE_SIZE;
+
+	buf[ 0 ] = keySize;
+
+	unsigned char *tmp;
+	valueUpdateSize = htonl( valueUpdateSize );
+	valueUpdateOffset = htonl( valueUpdateOffset );
+	tmp = ( unsigned char * ) &valueUpdateSize;
+	buf[ 1 ] = tmp[ 1 ];
+	buf[ 2 ] = tmp[ 2 ];
+	buf[ 3 ] = tmp[ 3 ];
+	tmp = ( unsigned char * ) &valueUpdateOffset;
+	buf[ 4 ] = tmp[ 1 ];
+	buf[ 5 ] = tmp[ 2 ];
+	buf[ 6 ] = tmp[ 3 ];
+	valueUpdateSize = ntohl( valueUpdateSize );
+	valueUpdateOffset = ntohl( valueUpdateOffset );
+
+	buf += PROTO_KEY_VALUE_UPDATE_SIZE;
+	memmove( buf, key, keySize );
+	buf += keySize;
+	memmove( buf, valueUpdate, valueUpdateSize );
+
+	bytes += PROTO_DEGRADED_REQ_BASE_SIZE + PROTO_KEY_VALUE_UPDATE_SIZE + keySize + valueUpdateSize;
+
+	return bytes;
+}
+
+bool Protocol::parseDegradedReqHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, char *buf, size_t size ) {
+	if ( size - offset < PROTO_DEGRADED_REQ_BASE_SIZE )
+		return false;
+
+	char *ptr = buf + offset;
+	listId   = ntohl( *( ( uint32_t * )( ptr      ) ) );
+	stripeId = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
+	chunkId  = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
+
+	return true;
+}
+
+bool Protocol::parseDegradedReqHeader( struct DegradedReqHeader &header, uint8_t opcode, char *buf, size_t size, size_t offset ) {
+	if ( ! buf || ! size ) {
+		buf = this->buffer.recv;
+		size = this->buffer.size;
+	}
+	bool ret = this->parseDegradedReqHeader(
+		offset,
+		header.listId,
+		header.stripeId,
+		header.chunkId,
+		buf, size
+	);
+	if ( ! ret )
+		return false;
+
+	offset += PROTO_DEGRADED_REQ_BASE_SIZE;
+	switch( opcode ) {
+		case PROTO_OPCODE_GET:
+		case PROTO_OPCODE_DELETE:
+			ret = this->parseKeyHeader(
+				offset,
+				header.data.key.keySize,
+				header.data.key.key,
+				buf, size
+			);
+			break;
+		case PROTO_OPCODE_UPDATE:
+			ret = this->parseKeyValueUpdateHeader(
+				offset,
+				header.data.keyValueUpdate.keySize,
+				header.data.keyValueUpdate.key,
+				header.data.keyValueUpdate.valueUpdateOffset,
+				header.data.keyValueUpdate.valueUpdateSize,
+				header.data.keyValueUpdate.valueUpdate,
+				buf, size
+			);
+			break;
 		default:
 			return false;
 	}

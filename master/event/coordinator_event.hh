@@ -15,6 +15,7 @@ enum CoordinatorEventType {
 class CoordinatorEvent : public Event {
 public:
 	CoordinatorEventType type;
+	uint32_t id;
 	CoordinatorSocket *socket;
 	union {
 		struct {

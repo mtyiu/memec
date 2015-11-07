@@ -263,6 +263,18 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 			if ( header.from != PROTO_MAGIC_FROM_COORDINATOR ) {
 				__ERROR__( "MasterWorker", "dispatch", "Invalid message source from coordinator." );
 			} else {
+				bool success;
+				switch( header.magic ) {
+					case PROTO_MAGIC_RESPONSE_SUCCESS:
+						success = true;
+						break;
+					case PROTO_MAGIC_RESPONSE_FAILURE:
+					default:
+						success = false;
+						break;
+				}
+
+				event.id = header.id;
 				switch( header.opcode ) {
 					case PROTO_OPCODE_REGISTER:
 						switch( header.magic ) {
@@ -328,6 +340,9 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 						} else {
 							__ERROR__( "MasterWorker", "dispatch", "Invalid magic code from coordinator." );
 						}
+						break;
+					case PROTO_OPCODE_DEGRADED_LOCK:
+						this->handleDegradedLockResponse( event, success, buffer.data, buffer.size );
 						break;
 					default:
 						__ERROR__( "MasterWorker", "dispatch", "Invalid opcode from coordinator." );
@@ -1064,6 +1079,74 @@ bool MasterWorker::sendDegradedLockRequest( uint32_t parentId, uint8_t opcode, u
 	if ( sentBytes != ( ssize_t ) buffer.size ) {
 		__ERROR__( "MasterWorker", "handleDegradedRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 		return false;
+	}
+
+	return true;
+}
+
+bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool success, char *buf, size_t size ) {
+	struct DegradedLockResHeader header;
+	if ( ! this->protocol.parseDegradedLockResHeader( header, buf, size ) ) {
+		__ERROR__( "MasterWorker", "handleDegradedLockResponse", "Invalid DEGRADED_LOCK response." );
+		return false;
+	}
+	switch( header.type ) {
+		case PROTO_DEGRADED_LOCK_RES_IS_LOCKED:
+		case PROTO_DEGRADED_LOCK_RES_WAS_LOCKED:
+			__DEBUG__(
+				BLUE, "MasterWorker", "handleDegradedLockResponse",
+				"[%s Locked] Key: %.*s (key size = %u); (%u, %u, %u) |-> (%u, %u)",
+				header.type == PROTO_DEGRADED_LOCK_RES_IS_LOCKED ? "Is" : "Was",
+				( int ) header.keySize, header.key, header.keySize,
+				header.srcListId, header.srcStripeId, header.srcChunkId,
+				header.dstListId, header.dstChunkId
+			);
+			break;
+		case PROTO_DEGRADED_LOCK_RES_REMAPPED:
+			__DEBUG__(
+				BLUE, "MasterWorker", "handleDegradedLockResponse",
+				"[Remapped] Key: %.*s (key size = %u); (%u, %u)",
+				( int ) header.keySize, header.key, header.keySize,
+				header.srcListId, header.srcChunkId
+			);
+			break;
+		case PROTO_DEGRADED_LOCK_RES_NOT_EXIST:
+		default:
+			__DEBUG__(
+				BLUE, "MasterWorker", "handleDegradedLockResponse",
+				"[Not Fonud] Key: %.*s (key size = %u)",
+				( int ) header.keySize, header.key, header.keySize
+			);
+			break;
+	}
+
+	// Find the corresponding request
+	DegradedLockData degradedLockData;
+	PendingIdentifier pid;
+
+	if ( ! MasterWorker::pending->eraseDegradedLockData( PT_COORDINATOR_DEGRADED_LOCK_DATA, event.id, event.socket, &pid, &degradedLockData ) ) {
+		__ERROR__( "MasterWorker", "handleDegradedLockResponse", "Cannot find a pending coordinator DEGRADED_LOCK request that matches the response. This message will be discarded (key = %.*s).", header.keySize, header.key );
+		return false;
+	}
+
+	// Send the degraded request to the slave
+	struct {
+		size_t size;
+		char *data;
+	} buffer;
+	ssize_t sentBytes;
+	bool connected;
+
+	switch( degradedLockData.opcode ) {
+		case PROTO_OPCODE_GET:
+			break;
+		case PROTO_OPCODE_UPDATE:
+			break;
+		case PROTO_OPCODE_DELETE:
+			break;
+		default:
+			__ERROR__( "MasterWorker", "handleDegradedLockResponse", "Invalid opcode in DegradedLockData." );
+			return false;
 	}
 
 	return true;
