@@ -29,10 +29,11 @@ public:
 		this->currentValue = new uint32_t[ numberOfThreads ];
 		this->limits = new uint32_t[ numberOfThreads ];
 
-		this->rangeSize = ( UINT32_MAX - 1 ) / numberOfThreads;
+		// reserve id = 0 as special case
+		this->rangeSize = ( UINT32_MAX - 1 - 1 ) / numberOfThreads;
 		for ( uint32_t i = 0; i < numberOfThreads; i++ ) {
-			this->currentValue[ i ] = this->rangeSize * i;
-			this->limits[ i ] = this->rangeSize * i + ( this->rangeSize - 1 );
+			this->currentValue[ i ] = this->rangeSize * i + 1;
+			this->limits[ i ] = this->rangeSize * i + 1 + ( this->rangeSize - 1 );
 		}
 	}
 

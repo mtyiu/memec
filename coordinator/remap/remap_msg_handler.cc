@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include "remap_msg_handler.hh"
 #include "remap_worker.hh"
+#include "../main/coordinator.hh"
 #include "../../common/remap/remap_group.hh"
 
 using namespace std;
@@ -156,6 +157,12 @@ bool CoordinatorRemapMsgHandler::startRemap( std::vector<struct sockaddr_in> *sl
 
 bool CoordinatorRemapMsgHandler::startRemapEnd( const struct sockaddr_in &slave ) {
 	// TODO all operation to slave get lock from coordinator, sync metadata before remapping
+	bool sync = false;
+	Coordinator::getInstance()->syncSlaveMeta( slave, &sync );
+	// busy waiting for meta sync to complete
+	fprintf( stderr, "start waiting !!\n");
+	while ( sync == false );
+	fprintf( stderr, "end of waiting, yeah!!\n");
 	return false;
 }
 

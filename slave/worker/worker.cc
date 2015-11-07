@@ -66,7 +66,12 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 	} buffer;
 	std::unordered_map<Key, RemappingRecord>::iterator it, safeNextIt;
 
-	if ( event.type != COORDINATOR_EVENT_TYPE_PENDING )
+	if ( event.type == COORDINATOR_EVENT_TYPE_SYNC )
+		// esp. in response to request from coordinator
+		requestId = event.requestId;
+	else if ( event.type == COORDINATOR_EVENT_TYPE_PENDING )
+		requestId = 0;
+	else
 		requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
 
 	switch( event.type ) {
@@ -179,6 +184,9 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 						break;
 					case PROTO_OPCODE_FLUSH_CHUNKS:
 						Slave::getInstance()->flush();
+						break;
+					case PROTO_OPCODE_SYNC_META:
+						Slave::getInstance()->sync( header.id );
 						break;
 					default:
 						__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from coordinator." );

@@ -23,11 +23,11 @@ void Slave::free() {
 	}
 }
 
-void Slave::sync() {
+void Slave::sync( uint32_t requestId ) {
 	CoordinatorEvent event;
 	for ( int i = 0, len = this->config.global.coordinators.size(); i < len; i++ ) {
 		// Can only sync with one coordinator
-		event.sync( this->sockets.coordinators[ i ] );
+		event.sync( this->sockets.coordinators[ i ], requestId );
 		this->eventQueue.insert( event );
 		// Avoid empty messages 
 		if ( this->map.remap.size() > 0 ) {

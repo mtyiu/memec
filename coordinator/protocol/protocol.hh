@@ -40,6 +40,7 @@ public:
 	char *announceSlaveConnected( size_t &size, uint32_t id, SlaveSocket *socket );
 	char *reqSealChunks( size_t &size, uint32_t id );
 	char *reqFlushChunks( size_t &size, uint32_t id );
+	char *reqSyncMeta( size_t &size, uint32_t id );
 };
 
 #endif

@@ -5,6 +5,7 @@
 #include <pthread.h>
 #include <set>
 #include "../config/coordinator_config.hh"
+#include "../ds/pending.hh"
 #include "../event/event_queue.hh"
 #include "../remap/remap_msg_handler.hh"
 #include "../socket/coordinator_socket.hh"
@@ -81,6 +82,7 @@ public:
 		LOCK_T lock;
 	} overloadedSlaves;
 	Timer statsTimer;
+	Pending pending;
 
 	static Coordinator *getInstance() {
 		static Coordinator coordinator;
@@ -100,6 +102,7 @@ public:
 	void seal();
 	void flush();
 	void metadata();
+	void syncSlaveMeta( struct sockaddr_in slave, bool *sync );
 	double getElapsedTime();
 	void interactive();
 };

@@ -45,6 +45,7 @@
 #define PROTO_OPCODE_SEAL_CHUNKS                  0x35
 #define PROTO_OPCODE_FLUSH_CHUNKS                 0x36
 #define PROTO_OPCODE_RECOVERY                     0x37
+#define PROTO_OPCODE_SYNC_META                    0x38
 
 // Application <-> Master or Master <-> Slave //
 #define PROTO_OPCODE_GET                          0x01

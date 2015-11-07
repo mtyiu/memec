@@ -32,7 +32,7 @@ private:
 
 public:
 	static RemappingRecordMap *remappingRecords;
-	bool processHeartbeat( SlaveEvent event, char *buf, size_t size );
+	bool processHeartbeat( SlaveEvent event, char *buf, size_t size, uint32_t requestId = 0 );
 	bool triggerRecovery( SlaveSocket *socket );
 
 	static bool init();

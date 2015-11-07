@@ -213,6 +213,13 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			buffer.data = this->protocol.reqFlushChunks( buffer.size, requestId );
 			isSend = true;
 			break;
+		case SLAVE_EVENT_TYPE_REQUEST_SYNC_META:
+			requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
+			buffer.data = this->protocol.reqSyncMeta( buffer.size, requestId );
+			// add sync meta request to pending set
+			Coordinator::getInstance()->pending.addSyncMetaReq( requestId, event.sync );
+			isSend = true;
+			break;
 		case SLAVE_EVENT_TYPE_PENDING:
 			isSend = false;
 			break;
@@ -282,7 +289,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			}
 
 			if ( header.magic == PROTO_MAGIC_HEARTBEAT ) {
-				this->processHeartbeat( event, buffer.data, header.length );
+				this->processHeartbeat( event, buffer.data, header.length, header.id );
 			} else if ( header.magic == PROTO_MAGIC_REMAPPING ) {
 				struct RemappingRecordHeader remappingRecordHeader;
 				struct SlaveSyncRemapHeader slaveSyncRemapHeader;
@@ -391,7 +398,7 @@ void *CoordinatorWorker::run( void *argv ) {
 	return 0;
 }
 
-bool CoordinatorWorker::processHeartbeat( SlaveEvent event, char *buf, size_t size ) {
+bool CoordinatorWorker::processHeartbeat( SlaveEvent event, char *buf, size_t size, uint32_t requestId ) {
 	uint32_t count;
 	size_t processed, offset, failed = 0;
 	struct HeartbeatHeader heartbeat;
@@ -447,6 +454,14 @@ bool CoordinatorWorker::processHeartbeat( SlaveEvent event, char *buf, size_t si
 		__ERROR__( "CoordinatorWorker", "processHeartbeat", "Number of failed objects = %lu", failed );
 	// } else {
 	// 	__ERROR__( "CoordinatorWorker", "processHeartbeat", "(sealed, keys, remap) = (%u, %u, %u)", heartbeat.sealed, heartbeat.keys, heartbeat.remap );
+	}
+ 
+	// TODO check if this is the last packet for a sync operation
+	// remove pending meta sync requests
+	if ( requestId && ! failed ) {
+		bool *sync = Coordinator::getInstance()->pending.removeSyncMetaReq( requestId );
+		if ( sync )
+			*sync = true;
 	}
 
 	return failed == 0;

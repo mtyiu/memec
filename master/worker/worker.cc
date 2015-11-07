@@ -170,13 +170,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 						this->handleGetRequest( event, buffer.data, buffer.size );
 						break;
 					case PROTO_OPCODE_SET:
-						if ( MasterWorker::remapFlag->get() ) {
-						// TODO need to get slave address to determine the flow ...
-						//if ( Master::getInstance()->remapMsgHandler.useRemappingFlow( ) ) {
-							this->handleRemappingSetRequest( event, buffer.data, buffer.size );
-						} else {
-							this->handleSetRequest( event, buffer.data, buffer.size );
-						}
+						this->handleSetRequest( event, buffer.data, buffer.size );
 						break;
 					case PROTO_OPCODE_UPDATE:
 						this->handleUpdateRequest( event, buffer.data, buffer.size );
@@ -700,6 +694,10 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		event.resSet( event.socket, event.id, key, false, false );
 		this->dispatch( event );
 		return false;
+	}
+
+	if ( Master::getInstance()->remapMsgHandler.useRemappingFlow( socket->getAddr() ) ) {
+		return this->handleRemappingSetRequest( event, buf, size );
 	}
 
 	int sockfd = socket->getSocket();

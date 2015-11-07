@@ -21,9 +21,10 @@ public:
 			uint16_t port;
 		} address;
 	} message;
+	uint32_t requestId;
 
 	void reqRegister( CoordinatorSocket *socket, uint32_t addr, uint16_t port );
-	void sync( CoordinatorSocket *socket );
+	void sync( CoordinatorSocket *socket, uint32_t requestId = 0 );
 	void syncRemap( CoordinatorSocket *socket );
 	void pending( CoordinatorSocket *socket );
 };

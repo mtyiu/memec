@@ -395,6 +395,32 @@ bool Coordinator::stop() {
 	return true;
 }
 
+void Coordinator::syncSlaveMeta( struct sockaddr_in slave, bool *sync ) {
+	SlaveEvent event;
+	SlaveSocket *socket = NULL;
+	struct sockaddr_in addr;
+
+	// find the corresponding socket for slave by address
+	LOCK( &this->sockets.slaves.lock );
+	for( uint32_t i = 0; i < this->sockets.slaves.size(); i++ ) {
+		addr.sin_addr.s_addr = this->sockets.slaves.values[ i ]->listenAddr.addr;
+		addr.sin_port = this->sockets.slaves.values[ i ]->listenAddr.port;
+		if ( slave == addr ) {
+			socket = this->sockets.slaves.values[ i ];
+			break;
+		}
+	}
+	UNLOCK( &this->sockets.slaves.lock );
+	if ( socket == NULL ) {
+		__ERROR__( "Coordinator", "syncSlaveMeta", "Cannot find slave socket\n" );
+		*sync = true;
+		return;
+	}
+
+	event.reqSyncMeta( socket , sync );
+	this->eventQueue.insert( event );
+}
+
 double Coordinator::getElapsedTime() {
 	return get_elapsed_time( this->startTime );
 }

@@ -74,6 +74,7 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_OPCODE_SEAL_CHUNKS:
 		case PROTO_OPCODE_FLUSH_CHUNKS:
 		case PROTO_OPCODE_RECOVERY:
+		case PROTO_OPCODE_SYNC_META:
 		case PROTO_OPCODE_GET:
 		case PROTO_OPCODE_SET:
 		case PROTO_OPCODE_UPDATE:
@@ -226,6 +227,8 @@ size_t Protocol::generateHeartbeatMessage(
 
 	*sealedPtr = htonl( sealedCount );
 	*opsPtr = htonl( opsCount );
+
+	// TODO tell coordinator whether this is the last packet of records
 
 	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, id );
 

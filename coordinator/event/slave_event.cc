@@ -26,6 +26,12 @@ void SlaveEvent::reqFlushChunks( SlaveSocket *socket ) {
 	this->socket = socket;
 }
 
+void SlaveEvent::reqSyncMeta( SlaveSocket *socket, bool *sync ) {
+	this->type = SLAVE_EVENT_TYPE_REQUEST_SYNC_META;
+	this->sync = sync;
+	this->socket = socket;
+}
+
 void SlaveEvent::disconnect( SlaveSocket *socket ) {
 	this->type = SLAVE_EVENT_TYPE_DISCONNECT;
 	this->socket = socket;
