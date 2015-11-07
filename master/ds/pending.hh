@@ -49,7 +49,7 @@ public:
 		this->key = key;
 	}
 
-	void dup( uint32_t valueUpdateSize, uint32_t valueUpdateOffset, char *valueUpdate ) {
+	void set( uint32_t valueUpdateSize, uint32_t valueUpdateOffset, char *valueUpdate ) {
 		this->valueUpdateSize = valueUpdateSize;
 		this->valueUpdateOffset = valueUpdateOffset;
 		this->valueUpdate = ( char * ) malloc( valueUpdateSize );

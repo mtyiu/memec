@@ -202,11 +202,11 @@ char *MasterProtocol::reqRemappingSet( size_t &size, uint32_t id, uint32_t listI
 	return buf;
 }
 
-char *MasterProtocol::reqGet( size_t &size, uint32_t id, char *key, uint8_t keySize, bool isDegraded ) {
+char *MasterProtocol::reqGet( size_t &size, uint32_t id, char *key, uint8_t keySize ) {
 	size = this->generateKeyHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
-		isDegraded ? PROTO_OPCODE_DEGRADED_GET : PROTO_OPCODE_GET,
+		PROTO_OPCODE_GET,
 		id,
 		keySize,
 		key
@@ -214,11 +214,23 @@ char *MasterProtocol::reqGet( size_t &size, uint32_t id, char *key, uint8_t keyS
 	return this->buffer.send;
 }
 
-char *MasterProtocol::reqUpdate( size_t &size, uint32_t id, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool isDegraded ) {
+char *MasterProtocol::reqDegradedGet( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, bool isDegraded ) {
+	size = this->generateDegradedReqHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_DEGRADED_GET,
+		id,
+		listId, stripeId, chunkId,
+		keySize, key
+	);
+	return this->buffer.send;
+}
+
+char *MasterProtocol::reqUpdate( size_t &size, uint32_t id, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize ) {
 	size = this->generateKeyValueUpdateHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
-		isDegraded ? PROTO_OPCODE_DEGRADED_UPDATE : PROTO_OPCODE_UPDATE,
+		PROTO_OPCODE_UPDATE,
 		id,
 		keySize,
 		key,
@@ -229,14 +241,39 @@ char *MasterProtocol::reqUpdate( size_t &size, uint32_t id, char *key, uint8_t k
 	return this->buffer.send;
 }
 
-char *MasterProtocol::reqDelete( size_t &size, uint32_t id, char *key, uint8_t keySize, bool isDegraded ) {
+char *MasterProtocol::reqDegradedUpdate( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize ) {
+	size = this->generateKeyValueUpdateHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_DEGRADED_UPDATE,
+		id,
+		listId, stripeId, chunkId,
+		keySize, key,
+		valueUpdateOffset, valueUpdateSize, valueUpdate
+	);
+	return this->buffer.send;
+}
+
+char *MasterProtocol::reqDelete( size_t &size, uint32_t id, char *key, uint8_t keySize ) {
 	size = this->generateKeyHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
-		isDegraded ? PROTO_OPCODE_DEGRADED_DELETE : PROTO_OPCODE_DELETE,
+		PROTO_OPCODE_DELETE,
 		id,
 		keySize,
 		key
+	);
+	return this->buffer.send;
+}
+
+char *MasterProtocol::reqDegradedDelete( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize ) {
+	size = this->generateKeyHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_DEGRADED_DELETE,
+		id,
+		listId, stripeId, chunkId,
+		keySize, key
 	);
 	return this->buffer.send;
 }
