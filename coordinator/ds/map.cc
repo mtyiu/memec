@@ -134,6 +134,17 @@ bool Map::findDegradedLock( uint32_t srcListId, uint32_t srcStripeId, uint32_t s
 	return true;
 }
 
+bool Map::isSealed( Metadata metadata ) {
+	std::unordered_set<Metadata>::iterator it;
+	bool ret;
+
+	LOCK( &this->chunksLock );
+	it = this->chunks.find( metadata );
+	ret = ( it != this->chunks.end() );
+	UNLOCK( &this->chunksLock );
+	return ret;
+}
+
 void Map::dump( FILE *f ) {
 	fprintf( f, "List of sealed chunks:\n----------------------\n" );
 	LOCK( &this->chunksLock );

@@ -1720,7 +1720,7 @@ bool SlaveWorker::handleDegradedRequest( MasterEvent event, uint8_t opcode, char
 
 	if ( chunk ) {
 		this->dispatch( event );
-	} else if ( this->performDegradedRead( event.socket, header.listId, header.stripeId, header.chunkId, opcode, event.id, &key, &keyValueUpdate ) ) {
+	} else if ( this->performDegradedRead( event.socket, header.listId, header.stripeId, header.chunkId, header.isSealed, opcode, event.id, &key, &keyValueUpdate ) ) {
 		// __ERROR__( "SlaveWorker", "handleDegradedRequest", "Performing degraded read on (%u, %u)...", header.listId, header.stripeId );
 	} else {
 		__ERROR__( "SlaveWorker", "handleDegradedRequest", "Failed to perform degraded read on (%u, %u).", header.listId, header.stripeId );
@@ -2375,30 +2375,44 @@ bool SlaveWorker::handleSetChunkResponse( SlavePeerEvent event, bool success, ch
 	return true;
 }
 
-bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t listId, uint32_t stripeId, uint32_t lostChunkId, uint8_t opcode, uint32_t parentId, Key *key, KeyValueUpdate *keyValueUpdate ) {
+bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t listId, uint32_t stripeId, uint32_t lostChunkId, bool isSealed, uint8_t opcode, uint32_t parentId, Key *key, KeyValueUpdate *keyValueUpdate ) {
+	SlavePeerEvent event;
+	SlavePeerSocket *socket = 0;
+	uint32_t selected = 0;
+
 	SlaveWorker::stripeList->get( listId, this->paritySlaveSockets, this->dataSlaveSockets );
 
-	// Check whether the number of surviving nodes >= k
-	uint32_t selected = 0;
-	SlavePeerSocket *socket = 0;
-	for ( uint32_t i = 0; i < SlaveWorker::chunkCount; i++ ) {
-		// Never get from the overloaded slave (even if it is still "ready")
-		if ( i == lostChunkId )
-			continue;
-		socket = ( i < SlaveWorker::dataChunkCount ) ?
-		         ( this->dataSlaveSockets[ i ] ) :
-		         ( this->paritySlaveSockets[ i - SlaveWorker::dataChunkCount ] );
-		if ( socket->ready() ) selected++;
-	}
-	if ( selected < SlaveWorker::dataChunkCount ) {
-		__ERROR__( "SlaveWorker", "performDegradedRead", "The number of surviving nodes is less than k. The data cannot be recovered." );
-		return false;
+	if ( ! isSealed ) {
+		// Check whether there are surviving parity slaves
+		for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
+			socket = this->paritySlaveSockets[ ( parentId + i ) % SlaveWorker::parityChunkCount ];
+			if ( socket->ready() ) break;
+		}
+		if ( ! socket ) {
+			__ERROR__( "SlaveWorker", "performDegradedRead", "There are no surviving parity slaves. The data cannot be recovered." );
+			return false;
+		}
+	} else {
+		// Check whether the number of surviving nodes >= k
+		for ( uint32_t i = 0; i < SlaveWorker::chunkCount; i++ ) {
+			// Never get from the overloaded slave (even if it is still "ready")
+			if ( i == lostChunkId )
+				continue;
+			socket = ( i < SlaveWorker::dataChunkCount ) ?
+			         ( this->dataSlaveSockets[ i ] ) :
+			         ( this->paritySlaveSockets[ i - SlaveWorker::dataChunkCount ] );
+			if ( socket->ready() ) selected++;
+		}
+		if ( selected < SlaveWorker::dataChunkCount ) {
+			__ERROR__( "SlaveWorker", "performDegradedRead", "The number of surviving nodes is less than k. The data cannot be recovered." );
+			return false;
+		}
 	}
 
 	// Add to degraded operation pending set
 	uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
 	DegradedOp op;
-	op.set( listId, stripeId, lostChunkId, opcode, masterSocket );
+	op.set( listId, stripeId, lostChunkId, isSealed, opcode, masterSocket );
 	if ( opcode == PROTO_OPCODE_DEGRADED_UPDATE )
 		op.data.keyValueUpdate = *keyValueUpdate;
 	else
@@ -2407,51 +2421,57 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 		__ERROR__( "SlaveWorker", "performDegradedRead", "Cannot insert into slave DEGRADED_OPS pending map." );
 	}
 
-	// Send GET_CHUNK requests to surviving nodes
-	Metadata metadata;
-	SlavePeerEvent event;
-	metadata.set( listId, stripeId, 0 );
-	selected = 0;
-	for ( uint32_t i = 0; i < SlaveWorker::chunkCount; i++ ) {
-	// for ( uint32_t i = SlaveWorker::chunkCount - 1; i >= 0; i-- ) {
-		if ( selected >= SlaveWorker::dataChunkCount )
-			break;
-		if ( i == lostChunkId )
-			continue;
+	if ( isSealed ) {
+		// Send GET_CHUNK requests to surviving nodes
+		Metadata metadata;
+		metadata.set( listId, stripeId, 0 );
+		selected = 0;
+		for ( uint32_t i = 0; i < SlaveWorker::chunkCount; i++ ) {
+		// for ( uint32_t i = SlaveWorker::chunkCount - 1; i >= 0; i-- ) {
+			if ( selected >= SlaveWorker::dataChunkCount )
+				break;
+			if ( i == lostChunkId )
+				continue;
 
-		socket = ( i < SlaveWorker::dataChunkCount ) ?
-		         ( this->dataSlaveSockets[ i ] ) :
-		         ( this->paritySlaveSockets[ i - SlaveWorker::dataChunkCount ] );
+			socket = ( i < SlaveWorker::dataChunkCount ) ?
+			         ( this->dataSlaveSockets[ i ] ) :
+			         ( this->paritySlaveSockets[ i - SlaveWorker::dataChunkCount ] );
 
-		// Add to pending GET_CHUNK request set
-		if ( socket->self ) {
-			ChunkRequest chunkRequest;
-			chunkRequest.set( listId, stripeId, i, socket );
-			chunkRequest.chunk = SlaveWorker::map->findChunkById( listId,
-			 stripeId, i );
- 			// Add to pending GET_CHUNK request set
-			if ( ! SlaveWorker::pending->insertChunkRequest( PT_SLAVE_PEER_GET_CHUNK, requestId, parentId, socket, chunkRequest ) ) {
-				__ERROR__( "SlaveWorker", "performDegradedRead", "Cannot insert into slave CHUNK_REQUEST pending map." );
-			}
-		} else if ( socket->ready() ) {
-			ChunkRequest chunkRequest;
-			chunkRequest.set( listId, stripeId, i, socket );
-			chunkRequest.chunk = 0;
 			// Add to pending GET_CHUNK request set
-			if ( ! SlaveWorker::pending->insertChunkRequest( PT_SLAVE_PEER_GET_CHUNK, requestId, parentId, socket, chunkRequest ) ) {
-				__ERROR__( "SlaveWorker", "performDegradedRead", "Cannot insert into slave CHUNK_REQUEST pending map." );
+			ChunkRequest chunkRequest;
+			chunkRequest.set( listId, stripeId, i, socket );
+			if ( socket->self ) {
+				chunkRequest.chunk = SlaveWorker::map->findChunkById( listId,
+				 stripeId, i );
+
+				if ( ! SlaveWorker::pending->insertChunkRequest( PT_SLAVE_PEER_GET_CHUNK, requestId, parentId, socket, chunkRequest ) ) {
+					__ERROR__( "SlaveWorker", "performDegradedRead", "Cannot insert into slave CHUNK_REQUEST pending map." );
+				}
+			} else if ( socket->ready() ) {
+				chunkRequest.chunk = 0;
+
+				if ( ! SlaveWorker::pending->insertChunkRequest( PT_SLAVE_PEER_GET_CHUNK, requestId, parentId, socket, chunkRequest ) ) {
+					__ERROR__( "SlaveWorker", "performDegradedRead", "Cannot insert into slave CHUNK_REQUEST pending map." );
+				}
+
+				event.reqGetChunk( socket, requestId, metadata );
+				SlaveWorker::eventQueue->insert( event );
+			} else {
+				continue;
 			}
-
-			metadata.chunkId = i;
-			event.reqGetChunk( socket, requestId, metadata );
-			SlaveWorker::eventQueue->insert( event );
-		} else {
-			continue;
+			selected++;
 		}
-		selected++;
-	}
 
-	return ( selected >= SlaveWorker::dataChunkCount );
+		return ( selected >= SlaveWorker::dataChunkCount );
+	} else {
+		if ( ! SlaveWorker::pending->insertKey( PT_SLAVE_PEER_GET, requestId, parentId, socket, op.data.key ) ) {
+			__ERROR__( "SlaveWorker", "performDegradedRead", "Cannot insert into slave GET pending map." );
+		}
+		event.reqGet( socket, requestId, listId, lostChunkId, op.data.key );
+
+		printf( "TODO: Retrieve key-value pairs from unsealed chunks.\n" );
+		return false;
+	}
 }
 
 void SlaveWorker::free() {

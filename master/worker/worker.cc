@@ -1162,7 +1162,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 				case PROTO_DEGRADED_LOCK_RES_WAS_LOCKED:
 					buffer.data = this->protocol.reqDegradedGet(
 						buffer.size, requestId,
-						header.srcListId, header.srcStripeId, header.srcChunkId,
+						header.srcListId, header.srcStripeId, header.srcChunkId, header.isSealed,
 						degradedLockData.key, degradedLockData.keySize
 					);
 					break;
@@ -1194,7 +1194,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 				case PROTO_DEGRADED_LOCK_RES_WAS_LOCKED:
 					buffer.data = this->protocol.reqDegradedUpdate(
 						buffer.size, requestId,
-						header.srcListId, header.srcStripeId, header.srcChunkId,
+						header.srcListId, header.srcStripeId, header.srcChunkId, header.isSealed,
 						degradedLockData.key, degradedLockData.keySize,
 						degradedLockData.valueUpdate, degradedLockData.valueUpdateOffset, degradedLockData.valueUpdateSize
 					);
@@ -1231,7 +1231,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 				case PROTO_DEGRADED_LOCK_RES_WAS_LOCKED:
 					buffer.data = this->protocol.reqDegradedDelete(
 						buffer.size, requestId,
-						header.srcListId, header.srcStripeId, header.srcChunkId,
+						header.srcListId, header.srcStripeId, header.srcChunkId, header.isSealed,
 						degradedLockData.key, degradedLockData.keySize
 					);
 					break;

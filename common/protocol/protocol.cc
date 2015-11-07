@@ -1279,7 +1279,7 @@ size_t Protocol::generateDegradedLockResHeader( uint8_t magic, uint8_t to, uint8
 	return bytes;
 }
 
-size_t Protocol::generateDegradedLockResHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, bool isLocked, uint8_t keySize, char *key, uint32_t srcListId, uint32_t srcStripeId, uint32_t srcChunkId, uint32_t dstListId, uint32_t dstChunkId ) {
+size_t Protocol::generateDegradedLockResHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, bool isLocked, bool isSealed, uint8_t keySize, char *key, uint32_t srcListId, uint32_t srcStripeId, uint32_t srcChunkId, uint32_t dstListId, uint32_t dstChunkId ) {
 	char *buf;
 	size_t bytes = this->generateDegradedLockResHeader(
 		magic, to, opcode, id,
@@ -1292,6 +1292,7 @@ size_t Protocol::generateDegradedLockResHeader( uint8_t magic, uint8_t to, uint8
 	*( ( uint32_t * )( buf +  8 ) ) = htonl( srcChunkId );
 	*( ( uint32_t * )( buf + 12 ) ) = htonl( dstListId );
 	*( ( uint32_t * )( buf + 16 ) ) = htonl( dstChunkId );
+	buf[ 20 ] = isSealed;
 
 	bytes += PROTO_DEGRADED_LOCK_RES_LOCK_SIZE;
 
@@ -1340,7 +1341,7 @@ bool Protocol::parseDegradedLockResHeader( size_t offset, uint8_t &type, uint8_t
 	return true;
 }
 
-bool Protocol::parseDegradedLockResHeader( size_t offset, uint32_t &srcListId, uint32_t &srcStripeId, uint32_t &srcChunkId, uint32_t &dstListId, uint32_t &dstChunkId, char *buf, size_t size ) {
+bool Protocol::parseDegradedLockResHeader( size_t offset, uint32_t &srcListId, uint32_t &srcStripeId, uint32_t &srcChunkId, uint32_t &dstListId, uint32_t &dstChunkId, bool &isSealed, char *buf, size_t size ) {
 	if ( size - offset < PROTO_DEGRADED_LOCK_RES_LOCK_SIZE )
 		return false;
 
@@ -1350,6 +1351,7 @@ bool Protocol::parseDegradedLockResHeader( size_t offset, uint32_t &srcListId, u
 	srcChunkId  = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
 	dstListId   = ntohl( *( ( uint32_t * )( ptr + 12 ) ) );
 	dstChunkId  = ntohl( *( ( uint32_t * )( ptr + 16 ) ) );
+	isSealed = ptr[ 20 ];
 
 	return true;
 }
@@ -1391,6 +1393,7 @@ bool Protocol::parseDegradedLockResHeader( struct DegradedLockResHeader &header,
 				header.srcChunkId,
 				header.dstListId,
 				header.dstChunkId,
+				header.isSealed,
 				buf, size
 			);
 			break;
@@ -1410,7 +1413,7 @@ bool Protocol::parseDegradedLockResHeader( struct DegradedLockResHeader &header,
 	return ret;
 }
 
-size_t Protocol::generateDegradedReqHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint8_t keySize, char *key ) {
+size_t Protocol::generateDegradedReqHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isSealed, uint8_t keySize, char *key ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader(
 		magic, to, opcode,
@@ -1433,7 +1436,7 @@ size_t Protocol::generateDegradedReqHeader( uint8_t magic, uint8_t to, uint8_t o
 	return bytes;
 }
 
-size_t Protocol::generateDegradedReqHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate ) {
+size_t Protocol::generateDegradedReqHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isSealed, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader(
 		magic, to, opcode,
@@ -1444,6 +1447,7 @@ size_t Protocol::generateDegradedReqHeader( uint8_t magic, uint8_t to, uint8_t o
 	*( ( uint32_t * )( buf     ) ) = htonl( listId );
 	*( ( uint32_t * )( buf + 4 ) ) = htonl( stripeId );
 	*( ( uint32_t * )( buf + 8 ) ) = htonl( chunkId );
+	buf[ 12 ] = isSealed;
 	buf += PROTO_DEGRADED_REQ_BASE_SIZE;
 
 	buf[ 0 ] = keySize;
@@ -1472,7 +1476,7 @@ size_t Protocol::generateDegradedReqHeader( uint8_t magic, uint8_t to, uint8_t o
 	return bytes;
 }
 
-bool Protocol::parseDegradedReqHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, char *buf, size_t size ) {
+bool Protocol::parseDegradedReqHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, bool &isSealed, char *buf, size_t size ) {
 	if ( size - offset < PROTO_DEGRADED_REQ_BASE_SIZE )
 		return false;
 
@@ -1480,6 +1484,7 @@ bool Protocol::parseDegradedReqHeader( size_t offset, uint32_t &listId, uint32_t
 	listId   = ntohl( *( ( uint32_t * )( ptr      ) ) );
 	stripeId = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
 	chunkId  = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
+	isSealed = ptr[ 12 ];
 
 	return true;
 }
@@ -1494,6 +1499,7 @@ bool Protocol::parseDegradedReqHeader( struct DegradedReqHeader &header, uint8_t
 		header.listId,
 		header.stripeId,
 		header.chunkId,
+		header.isSealed,
 		buf, size
 	);
 	if ( ! ret )

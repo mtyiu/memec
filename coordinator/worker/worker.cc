@@ -92,6 +92,7 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 				event.message.degradedLock.key.size,
 				event.message.degradedLock.key.data,
 				event.type == MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED /* success */,
+				event.message.degradedLock.isSealed,
 				event.message.degradedLock.srcListId,
 				event.message.degradedLock.srcStripeId,
 				event.message.degradedLock.srcChunkId,
@@ -607,9 +608,11 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 		ret = false;
 	} else {
 		ret = map->insertDegradedLock( srcMetadata, dstMetadata );
-		// ret is true if the degraded lock is attained
+
 		event.resDegradedLock(
-			event.socket, event.id, key, ret,
+			event.socket, event.id, key,
+			ret,                          // the degraded lock is attained
+			map->isSealed( srcMetadata ), // the chunk is sealed
 			srcMetadata.listId, srcMetadata.stripeId, srcMetadata.chunkId,
 			dstMetadata.listId, dstMetadata.chunkId
 		);

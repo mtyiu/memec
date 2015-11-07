@@ -29,6 +29,10 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 			lock = &this->masters.delLock;
 			map = &this->masters.del;
 			break;
+		case PT_SLAVE_PEER_GET:
+			lock = &this->slavePeers.getLock;
+			map = &this->slavePeers.get;
+			break;
 		case PT_SLAVE_PEER_DEL:
 			lock = &this->slavePeers.delLock;
 			map = &this->slavePeers.del;

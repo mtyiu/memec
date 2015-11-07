@@ -49,16 +49,18 @@ public:
 class DegradedOp : public Metadata {
 public:
 	uint8_t opcode;
+	bool isSealed;
 	MasterSocket *socket;
 	union {
 		Key key;
 		KeyValueUpdate keyValueUpdate;
 	} data;
 
-	void set( uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint8_t opcode, MasterSocket *socket ) {
+	void set( uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isSealed, uint8_t opcode, MasterSocket *socket ) {
 		this->listId = listId;
 		this->stripeId = stripeId;
 		this->chunkId = chunkId;
+		this->isSealed = isSealed;
 		this->opcode = opcode;
 		this->socket = socket;
 	}
@@ -77,6 +79,7 @@ enum PendingType {
 	PT_MASTER_DEL,
 	PT_SLAVE_PEER_DEGRADED_OPS,
 	PT_SLAVE_PEER_REMAPPING_SET,
+	PT_SLAVE_PEER_GET,
 	PT_SLAVE_PEER_UPDATE,
 	PT_SLAVE_PEER_DEL,
 	PT_SLAVE_PEER_GET_CHUNK,
@@ -108,6 +111,7 @@ public:
    struct {
 		std::unordered_multimap<PendingIdentifier, DegradedOp> degradedOps;
 		std::unordered_multimap<PendingIdentifier, RemappingRecordKey> remappingSet;
+		std::unordered_multimap<PendingIdentifier, Key> get; // Degraded GET for unsealed chunks
 		std::unordered_multimap<PendingIdentifier, KeyValueUpdate> update;
 		std::unordered_multimap<PendingIdentifier, Key> del;
 		std::unordered_multimap<PendingIdentifier, ChunkRequest> getChunk;
@@ -116,6 +120,7 @@ public:
 		std::unordered_multimap<PendingIdentifier, ChunkUpdate> deleteChunk;
 		LOCK_T degradedOpsLock;
 		LOCK_T remappingSetLock;
+		LOCK_T getLock;
 		LOCK_T updateLock;
 		LOCK_T delLock;
 		LOCK_T getChunkLock;
@@ -131,6 +136,7 @@ public:
 		LOCK_INIT( &this->masters.delLock );
 		LOCK_INIT( &this->slavePeers.degradedOpsLock );
 		LOCK_INIT( &this->slavePeers.remappingSetLock );
+		LOCK_INIT( &this->slavePeers.getLock );
 		LOCK_INIT( &this->slavePeers.updateLock );
 		LOCK_INIT( &this->slavePeers.delLock );
 		LOCK_INIT( &this->slavePeers.getChunkLock );

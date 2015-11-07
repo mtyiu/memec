@@ -214,13 +214,13 @@ char *MasterProtocol::reqGet( size_t &size, uint32_t id, char *key, uint8_t keyS
 	return this->buffer.send;
 }
 
-char *MasterProtocol::reqDegradedGet( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize ) {
+char *MasterProtocol::reqDegradedGet( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isSealed, char *key, uint8_t keySize ) {
 	size = this->generateDegradedReqHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_DEGRADED_GET,
 		id,
-		listId, stripeId, chunkId,
+		listId, stripeId, chunkId, isSealed,
 		keySize, key
 	);
 	return this->buffer.send;
@@ -241,13 +241,13 @@ char *MasterProtocol::reqUpdate( size_t &size, uint32_t id, char *key, uint8_t k
 	return this->buffer.send;
 }
 
-char *MasterProtocol::reqDegradedUpdate( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize ) {
+char *MasterProtocol::reqDegradedUpdate( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isSealed, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize ) {
 	size = this->generateDegradedReqHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_DEGRADED_UPDATE,
 		id,
-		listId, stripeId, chunkId,
+		listId, stripeId, chunkId, isSealed,
 		keySize, key,
 		valueUpdateOffset, valueUpdateSize, valueUpdate
 	);
@@ -266,13 +266,13 @@ char *MasterProtocol::reqDelete( size_t &size, uint32_t id, char *key, uint8_t k
 	return this->buffer.send;
 }
 
-char *MasterProtocol::reqDegradedDelete( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize ) {
+char *MasterProtocol::reqDegradedDelete( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isSealed, char *key, uint8_t keySize ) {
 	size = this->generateDegradedReqHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_DEGRADED_DELETE,
 		id,
-		listId, stripeId, chunkId,
+		listId, stripeId, chunkId, isSealed,
 		keySize, key
 	);
 	return this->buffer.send;

@@ -21,6 +21,29 @@ void SlavePeerEvent::resRemappingSet( SlavePeerSocket *socket, uint32_t id, Key 
 	this->message.remap.chunkId = chunkId;
 }
 
+void SlavePeerEvent::reqGet( SlavePeerSocket *socket, uint32_t id, uint32_t listId, uint32_t chunkId, Key &key ) {
+	this->type = SLAVE_PEER_EVENT_TYPE_GET_REQUEST;
+	this->id = id;
+	this->socket = socket;
+	this->message.get.listId = listId;
+	this->message.get.chunkId = chunkId;
+	this->message.get.key = key;
+}
+
+void SlavePeerEvent::resGet( SlavePeerSocket *socket, uint32_t id, KeyValue &keyValue ) {
+	this->type = SLAVE_PEER_EVENT_TYPE_GET_RESPONSE_SUCCESS;
+	this->id = id;
+	this->socket = socket;
+	this->message.get.keyValue = keyValue;
+}
+
+void SlavePeerEvent::resGet( SlavePeerSocket *socket, uint32_t id, Key &key ) {
+	this->type = SLAVE_PEER_EVENT_TYPE_GET_RESPONSE_FAILURE;
+	this->id = id;
+	this->socket = socket;
+	this->message.get.key = key;
+}
+
 void SlavePeerEvent::resUpdate( SlavePeerSocket *socket, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key, uint32_t valueUpdateOffset, uint32_t length, uint32_t chunkUpdateOffset, bool success ) {
 	this->type = success ? SLAVE_PEER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE;
 	this->id = id;

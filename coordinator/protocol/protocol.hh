@@ -35,7 +35,7 @@ public:
 	// Degraded operation
 	char *resDegradedLock(
 		size_t &size, uint32_t id,
-		uint8_t keySize, char *key, bool isLocked,
+		uint8_t keySize, char *key, bool isLocked, bool isSealed,
 		uint32_t srcListId, uint32_t srcStripeId, uint32_t srcChunkId,
 		uint32_t dstListId, uint32_t dstChunkId
 	);

@@ -20,7 +20,7 @@ void MasterEvent::switchPhase( bool toRemap ) {
 	this->message.remap.toRemap = toRemap;
 }
 
-void MasterEvent::resDegradedLock( MasterSocket *socket, uint32_t id, Key &key, bool isLocked, uint32_t srcListId, uint32_t srcStripeId, uint32_t srcChunkId, uint32_t dstListId, uint32_t dstChunkId ) {
+void MasterEvent::resDegradedLock( MasterSocket *socket, uint32_t id, Key &key, bool isLocked, bool isSealed, uint32_t srcListId, uint32_t srcStripeId, uint32_t srcChunkId, uint32_t dstListId, uint32_t dstChunkId ) {
 	this->type = isLocked ? MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED : MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_WAS_LOCKED;
 	this->id = id;
 	this->socket = socket;
@@ -30,6 +30,7 @@ void MasterEvent::resDegradedLock( MasterSocket *socket, uint32_t id, Key &key, 
 	this->message.degradedLock.srcChunkId = srcChunkId;
 	this->message.degradedLock.dstListId = dstListId;
 	this->message.degradedLock.dstChunkId = dstChunkId;
+	this->message.degradedLock.isSealed = isSealed;
 }
 
 void MasterEvent::resDegradedLock( MasterSocket *socket, uint32_t id, Key &key, uint32_t listId, uint32_t chunkId ) {

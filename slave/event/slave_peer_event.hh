@@ -19,6 +19,10 @@ enum SlavePeerEventType {
 	// REMAPPING_SET
 	SLAVE_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS,
 	SLAVE_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE,
+	// GET
+	SLAVE_PEER_EVENT_TYPE_GET_REQUEST,
+	SLAVE_PEER_EVENT_TYPE_GET_RESPONSE_SUCCESS,
+	SLAVE_PEER_EVENT_TYPE_GET_RESPONSE_FAILURE,
 	// DELETE
 	SLAVE_PEER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS,
 	SLAVE_PEER_EVENT_TYPE_DELETE_RESPONSE_FAILURE,
@@ -57,13 +61,17 @@ public:
 	uint32_t id;
 	SlavePeerSocket *socket;
 	struct {
-		Key key;
 		struct {
 			Metadata metadata;
 			uint32_t offset;
 			uint32_t length;
 			uint32_t updatingChunkId;
 		} chunkUpdate;
+		struct {
+			uint32_t listId, chunkId;
+			Key key;
+			KeyValue keyValue;
+		} get;
 		struct {
 			uint32_t listId, stripeId, chunkId, valueUpdateOffset, chunkUpdateOffset, length;
 			Key key;
@@ -91,6 +99,10 @@ public:
 	void resRegister( SlavePeerSocket *socket, uint32_t id, bool success = true );
 	// REMAPPING_SET
 	void resRemappingSet( SlavePeerSocket *socket, uint32_t id, Key &key, uint32_t listId, uint32_t chunkId, bool success );
+	// GET
+	void reqGet( SlavePeerSocket *socket, uint32_t id, uint32_t listId, uint32_t chunkId, Key &key );
+	void resGet( SlavePeerSocket *socket, uint32_t id, KeyValue &keyValue );
+	void resGet( SlavePeerSocket *socket, uint32_t id, Key &key );
 	// UPDATE
 	void resUpdate( SlavePeerSocket *socket, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key, uint32_t valueUpdateOffset, uint32_t length, uint32_t chunkUpdateOffset, bool success );
 	// DELETE

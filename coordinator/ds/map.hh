@@ -59,6 +59,7 @@ public:
 	// Find //
 	bool findMetadataByKey( char *keyStr, uint8_t keySize, Metadata &metadata );
 	bool findDegradedLock( uint32_t srcListId, uint32_t srcStripeId, uint32_t srcChunkId, Metadata &dstMetadata );
+	bool isSealed( Metadata metadata );
 
 	// Debug //
 	void dump( FILE *f = stdout );
