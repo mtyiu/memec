@@ -283,8 +283,15 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 		char coordName[ 11 ];
 		memset( coordName, 0, 11 );
 		sprintf( coordName, "%s%04d", COORD_PREFIX, this->config.coordinator.coordinator.addr.id );
+		remapMsgHandler = CoordinatorRemapMsgHandler::getInstance();
 		remapMsgHandler->init( this->config.global.remap.spreaddAddr.addr, this->config.global.remap.spreaddAddr.port, coordName );
-		// TODO : add the slave addrs to remapMsgHandler
+		// add the slave addrs to remapMsgHandler
+		LOCK( &this->sockets.slaves.lock );
+		for ( uint32_t i = 0; i < this->sockets.slaves.size(); i++ ) {
+			remapMsgHandler->addAliveSlave( this->sockets.slaves.values[ i ]->getAddr() );
+		}
+		UNLOCK( &this->sockets.slaves.lock );
+		//remapMsgHandler->listAliveSlaves();
 	}
 
 	/* Slave Loading stats */
@@ -532,6 +539,9 @@ void Coordinator::printRemapping( FILE *f ) {
 	fprintf( f, "\nRemapping Records\n" );
 	fprintf( f, "----------------------------------------\n" );
 	this->remappingRecords.print( f );
+	fprintf( f, "\nList of Tracking Slaves\n" );
+	fprintf( f, "----------------------------------------\n" );
+	this->remapMsgHandler->listAliveSlaves();
 }
 
 void Coordinator::help() {
@@ -545,6 +555,7 @@ void Coordinator::help() {
 		"- seal: Force all slaves to seal all its chunks\n"
 		"- flush: Force all slaves to flush all its chunks\n"
 		"- metadata: Write metadata to disk\n"
+		"- remapping: Show remapping info\n"
 		"- exit: Terminate this client\n"
 	);
 	fflush( stdout );

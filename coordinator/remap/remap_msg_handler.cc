@@ -71,6 +71,7 @@ bool CoordinatorRemapMsgHandler::start() {
 }
 
 bool CoordinatorRemapMsgHandler::stop() {
+	fprintf( stderr, "Coordinator stop\n" );
 	int ret = 0;
 	if ( ! this->isConnected || ! this->isListening )
 		return false;
@@ -293,8 +294,8 @@ bool CoordinatorRemapMsgHandler::updateStatus( char *subject, char *msg, int len
 	LOCK( &this->mastersAckLock );
 	// check slave by slave for changes
 	for ( uint8_t i = 0; i < slaveCount; i++ ) {
-		slave.sin_addr.s_addr = ( uint32_t ) ntohl( *( ( uint32_t * ) ( msg + ofs ) ) );
-		slave.sin_port = ( uint16_t ) ntohs( *( ( uint16_t *) ( msg + ofs + 4 ) ) );
+		slave.sin_addr.s_addr = *( ( uint32_t * ) ( msg + ofs ) );
+		slave.sin_port = *( ( uint16_t *) ( msg + ofs + 4 ) );
 		status = msg[ ofs + 6 ];
 		ofs += recordSize;
 		// ignore changes for non-existing slaves or slaves in invalid status
@@ -313,11 +314,14 @@ bool CoordinatorRemapMsgHandler::updateStatus( char *subject, char *msg, int len
 
 		if ( this->ackMasters.count( slave ) && aliveMasters.count( string( subject ) ) )
 			ackMasters[ slave ]->insert( string( subject ) );
-		else
+		else {
+			char buf[ INET_ADDRSTRLEN ];
+			inet_ntop( AF_INET, &slave.sin_addr.s_addr, buf, INET_ADDRSTRLEN );
 			fprintf( 
-				stderr, "master [%s] or slave [%u:%hu] not found !!", 
-				subject, slave.sin_addr.s_addr, slave.sin_port
+				stderr, "master [%s] or slave [%s:%hu] not found !!", 
+				subject, buf , slave.sin_port
 			);
+		}
 	}
 	UNLOCK( &this->mastersAckLock );
 
@@ -400,6 +404,8 @@ bool CoordinatorRemapMsgHandler::resetMasterAck( struct sockaddr_in slave ) {
 
 bool CoordinatorRemapMsgHandler::isAllMasterAcked( struct sockaddr_in slave ) {
 	bool allAcked = false;
+	char buf[ INET_ADDRSTRLEN ];
+	inet_ntop( AF_INET, &slave.sin_addr.s_addr, buf, INET_ADDRSTRLEN );
 	LOCK( &this->mastersAckLock );
 	// TODO abort checking if slave is no longer accessiable
 	if ( ackMasters.count( slave ) == 0 ) {
@@ -407,7 +413,10 @@ bool CoordinatorRemapMsgHandler::isAllMasterAcked( struct sockaddr_in slave ) {
 		return true;
 	}
 	allAcked = ( aliveMasters.size() == ackMasters[ slave ]->size() );
-	fprintf( stderr, "%lu of %lu masters acked slave %u:%hu\n", ackMasters[ slave ]->size(), aliveMasters.size(), slave.sin_addr.s_addr, slave.sin_port );
+	if ( allAcked ) {
+		fprintf( stderr, "all masters acked slave %s:%hu on %d\n", buf, slave.sin_port, this->slavesStatus[ slave ] );
+	}
+	//fprintf( stderr, "%lu of %lu masters acked slave %s:%hu\n", ackMasters[ slave ]->size(), aliveMasters.size(), buf , slave.sin_port );
 	UNLOCK( &this->mastersAckLock );
 	return allAcked;
 }

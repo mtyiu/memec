@@ -113,13 +113,15 @@ void MasterRemapMsgHandler::setStatus( char* msg , int len ) {
 	uint32_t recordSize = this->slaveStatusRecordSize;
 
 	for ( uint8_t i = 0; i < slaveCount; i++ ) {
-		slave.sin_addr.s_addr = ( uint32_t ) ntohl( *( ( uint32_t * )( msg + ofs ) ) );
-		slave.sin_port = ( uint16_t ) ntohs( *( ( uint16_t * )( msg + ofs + 4 ) ) );
+		slave.sin_addr.s_addr = (*( ( uint32_t * )( msg + ofs ) ) );
+		slave.sin_port = *( ( uint16_t * )( msg + ofs + 4 ) );
 		signal = ( RemapStatus ) msg[ ofs + 6 ];
 		ofs += recordSize;
 
 		if ( this->slavesStatus.count( slave ) == 0 ) {
-			__ERROR__( "MasterRemapMsgHandler", "setStatus" , "slave %u:%hu not found\n", slave.sin_addr.s_addr, slave.sin_port );
+			char buf[ INET_ADDRSTRLEN ];
+			inet_ntop( AF_INET, &slave.sin_addr.s_addr, buf, INET_ADDRSTRLEN );
+			__ERROR__( "MasterRemapMsgHandler", "setStatus" , "slave %s:%hu not found\n", buf, slave.sin_port );
 			continue;
 		}
 
@@ -261,8 +263,11 @@ bool MasterRemapMsgHandler::ackRemap( struct sockaddr_in *slave ) {
 
 bool MasterRemapMsgHandler::checkAckRemapForSlave( struct sockaddr_in slave ) {
 	uint32_t normal = 0, remap = 0;
-	normal = Master::getInstance()->counter.getNormal();
-	remap = Master::getInstance()->counter.getNormal();
+	Counter* counter = Master::getInstance()->counters.slaves[ slave ];
+	if ( counter == NULL )
+		return false;
+	normal = counter->getNormal();
+	remap = counter->getRemapping();
 	LOCK( &this->slavesStatusLock[ slave ] );
 	RemapStatus status = this->slavesStatus[ slave ];
 

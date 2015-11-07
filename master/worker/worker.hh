@@ -33,7 +33,8 @@ private:
 	static Pending *pending;
 	static MasterEventQueue *eventQueue;
 	static StripeList<SlaveSocket> *stripeList;
-	static Counter *counter;
+	//static Counter *counter;
+	static ArrayMap<int, SlaveSocket> *slaveSockets;
 	static RemapFlag *remapFlag;
 	static PacketPool *packetPool;
 	static RemappingRecordMap *remappingRecords;

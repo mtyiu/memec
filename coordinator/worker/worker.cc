@@ -242,9 +242,16 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			if ( ret != ( ssize_t ) buffer.size )
 				__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 		}
+		// notify the remap message handler of the new slave
+		struct sockaddr_in slaveAddr; 
+		slaveAddr.sin_addr.s_addr = event.socket->listenAddr.addr;
+		slaveAddr.sin_port = event.socket->listenAddr.port;
+		Coordinator::getInstance()->remapMsgHandler->addAliveSlave( slaveAddr );
 		UNLOCK( &slaves.lock );
 	} else if ( event.type == SLAVE_EVENT_TYPE_DISCONNECT ) {
 		this->triggerRecovery( event.socket );
+		// notify the remap message handler of a "removed" slave
+		Coordinator::getInstance()->remapMsgHandler->removeAliveSlave( event.socket->getAddr() );
 	} else if ( isSend ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
 		if ( ret != ( ssize_t ) buffer.size )
