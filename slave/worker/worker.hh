@@ -76,7 +76,7 @@ private:
 	bool handleRemappingSetRequest( MasterEvent event, char *buf, size_t size );
 	bool handleUpdateRequest( MasterEvent event, char *buf, size_t size );
 	bool handleDeleteRequest( MasterEvent event, char *buf, size_t size );
-	// bool handleDegradedRequest( MasterEvent event, uint8_t opcode, char *buf, size_t size );
+	bool handleDegradedRequest( MasterEvent event, uint8_t opcode, char *buf, size_t size );
 	// Request handler for slave peers
 	bool handleSlavePeerRegisterRequest( SlavePeerSocket *socket, char *buf, size_t size );
 	bool handleRemappingSetRequest( SlavePeerEvent event, char *buf, size_t size );
