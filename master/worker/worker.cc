@@ -571,7 +571,7 @@ SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &origin
 SlaveSocket *MasterWorker::getSlaves( uint32_t listId, uint32_t chunkId ) {
 	SlaveSocket *ret;
 	MasterWorker::stripeList->get( listId, this->paritySlaveSockets, this->dataSlaveSockets );
-	ret = this->dataSlaveSockets[ chunkId ];
+	ret = chunkId < MasterWorker::dataChunkCount ? this->dataSlaveSockets[ chunkId ] : this->paritySlaveSockets[ chunkId - MasterWorker::dataChunkCount ];
 	return ret->ready() ? ret : 0;
 }
 
@@ -826,7 +826,7 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 		return this->sendDegradedLockRequest(
 			event.id, PROTO_OPCODE_UPDATE,
 			listId, chunkId, newChunkId,
-			key.data, key.size,
+			keyValueUpdate.data, keyValueUpdate.size,
 			keyValueUpdate.length,
 			keyValueUpdate.offset,
 			( char * ) keyValueUpdate.ptr
@@ -1092,7 +1092,7 @@ bool MasterWorker::sendDegradedLockRequest( uint32_t parentId, uint8_t opcode, u
 }
 
 bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool success, char *buf, size_t size ) {
-	SlaveSocket *socket;
+	SlaveSocket *socket = 0;
 	struct DegradedLockResHeader header;
 	if ( ! this->protocol.parseDegradedLockResHeader( header, buf, size ) ) {
 		__ERROR__( "MasterWorker", "handleDegradedLockResponse", "Invalid DEGRADED_LOCK response." );
