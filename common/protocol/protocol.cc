@@ -167,6 +167,7 @@ size_t Protocol::generateHeartbeatMessage(
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = PROTO_HEADER_SIZE;
 	uint32_t *sealedPtr, *opsPtr;
+	uint8_t *isLastPtr;
 	std::unordered_set<Metadata>::iterator sealedIt;
 	std::unordered_map<Key, OpMetadata>::iterator opsIt;
 
@@ -176,6 +177,7 @@ size_t Protocol::generateHeartbeatMessage(
 
 	sealedPtr       = ( uint32_t * )( buf     );
 	opsPtr          = ( uint32_t * )( buf + 4 );
+	isLastPtr       = ( uint8_t * )( buf + 8 );
 
 	buf += PROTO_HEARTBEAT_SIZE;
 	bytes += PROTO_HEARTBEAT_SIZE;
@@ -227,6 +229,7 @@ size_t Protocol::generateHeartbeatMessage(
 
 	*sealedPtr = htonl( sealedCount );
 	*opsPtr = htonl( opsCount );
+	*isLastPtr = isCompleted? 1 : 0;
 
 	// TODO tell coordinator whether this is the last packet of records
 
@@ -235,13 +238,14 @@ size_t Protocol::generateHeartbeatMessage(
 	return bytes;
 }
 
-bool Protocol::parseHeartbeatHeader( size_t offset, uint32_t &sealed, uint32_t &keys, char *buf, size_t size ) {
+bool Protocol::parseHeartbeatHeader( size_t offset, uint32_t &sealed, uint32_t &keys, bool isLast, char *buf, size_t size ) {
 	if ( size < PROTO_HEARTBEAT_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
 	sealed = ntohl( *( ( uint32_t * )( ptr     ) ) );
 	keys   = ntohl( *( ( uint32_t * )( ptr + 4 ) ) );
+	isLast = ( *( ( uint8_t * )( ptr + 8 ) ) == 0 )? false : true;
 
 	return true;
 }
@@ -255,6 +259,7 @@ bool Protocol::parseHeartbeatHeader( struct HeartbeatHeader &header, char *buf, 
 		offset,
 		header.sealed,
 		header.keys,
+		header.isLast,
 		buf, size
 	);
 }

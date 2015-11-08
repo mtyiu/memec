@@ -113,10 +113,11 @@ struct AddressHeader {
 //////////////////////////////////////////
 // Heartbeat & metadata synchronization //
 //////////////////////////////////////////
-#define PROTO_HEARTBEAT_SIZE 12
+#define PROTO_HEARTBEAT_SIZE 9
 struct HeartbeatHeader {
     uint32_t sealed;
     uint32_t keys;
+    bool isLast;
 };
 
 #define PROTO_METADATA_SIZE 12
@@ -353,7 +354,7 @@ protected:
 		bool &isCompleted
 	);
 	bool parseHeartbeatHeader(
-		size_t offset, uint32_t &sealed, uint32_t &keys,
+		size_t offset, uint32_t &sealed, uint32_t &keys, bool isLast, 
 		char *buf, size_t size
 	);
 	bool parseMetadataHeader(

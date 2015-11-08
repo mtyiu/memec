@@ -156,13 +156,13 @@ bool CoordinatorRemapMsgHandler::startRemap( std::vector<struct sockaddr_in> *sl
 }
 
 bool CoordinatorRemapMsgHandler::startRemapEnd( const struct sockaddr_in &slave ) {
-	// TODO all operation to slave get lock from coordinator, sync metadata before remapping
-	bool sync = false;
-	Coordinator::getInstance()->syncSlaveMeta( slave, &sync );
+	// all operation to slave get lock from coordinator, 
+	// sync metadata before remapping
+	// use volatile to avoid "improper" -O2 optmization 
+	volatile bool sync = false;
+	Coordinator::getInstance()->syncSlaveMeta( slave, ( bool * )&sync );
 	// busy waiting for meta sync to complete
-	fprintf( stderr, "start waiting !!\n");
 	while ( sync == false );
-	fprintf( stderr, "end of waiting, yeah!!\n");
 	return false;
 }
 

@@ -764,7 +764,7 @@ void Master::printPending( FILE *f ) {
 		inet_ntop( AF_INET, &addr.sin_addr, buf, INET_ADDRSTRLEN );
 		fprintf(
 			f,
-			"[REMAP] %s:%hu Normal: %d; Locking only: %d; Remapping: %d\n",
+			"[REMAP] %s:%hu Normal: %u; Locking only: %u; Remapping: %u\n",
 			buf, 
 			ntohs( this->sockets.slaves.values[ i ]->getAddr().sin_port ),
 			this->sockets.slaves.values[ i ]->counter.getNormal(),

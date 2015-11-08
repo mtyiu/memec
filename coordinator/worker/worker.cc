@@ -456,9 +456,9 @@ bool CoordinatorWorker::processHeartbeat( SlaveEvent event, char *buf, size_t si
 	// 	__ERROR__( "CoordinatorWorker", "processHeartbeat", "(sealed, keys, remap) = (%u, %u, %u)", heartbeat.sealed, heartbeat.keys, heartbeat.remap );
 	}
  
-	// TODO check if this is the last packet for a sync operation
+	// check if this is the last packet for a sync operation
 	// remove pending meta sync requests
-	if ( requestId && ! failed ) {
+	if ( requestId && heartbeat.isLast && ! failed ) {
 		bool *sync = Coordinator::getInstance()->pending.removeSyncMetaReq( requestId );
 		if ( sync )
 			*sync = true;
