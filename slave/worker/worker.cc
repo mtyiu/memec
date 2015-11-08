@@ -1718,9 +1718,9 @@ bool SlaveWorker::handleDegradedRequest( MasterEvent event, uint8_t opcode, char
 
 			if ( chunk ) {
 				if ( isKeyValueFound )
-					event.resGet( event.socket, event.id, keyValue, false );
+					event.resGet( event.socket, event.id, keyValue, true );
 				else
-					event.resGet( event.socket, event.id, key, false );
+					event.resGet( event.socket, event.id, key, true );
 			}
 			break;
 		case PROTO_OPCODE_DEGRADED_UPDATE:
@@ -2023,9 +2023,9 @@ bool SlaveWorker::handleGetChunkRequest( SlavePeerEvent event, char *buf, size_t
 	Chunk *chunk = map->findChunkById( header.listId, header.stripeId, header.chunkId, &metadata );
 	ret = chunk;
 
-	if ( ! chunk ) {
-		__ERROR__( "SlaveWorker", "handleGetChunkRequest", "The chunk (%u, %u, %u) does not exist.", header.listId, header.stripeId, header.chunkId );
-	}
+	// if ( ! chunk ) {
+	// 	__ERROR__( "SlaveWorker", "handleGetChunkRequest", "The chunk (%u, %u, %u) does not exist.", header.listId, header.stripeId, header.chunkId );
+	// }
 
 	event.resGetChunk( event.socket, event.id, metadata, ret, chunk );
 	this->dispatch( event );
@@ -2306,180 +2306,177 @@ bool SlaveWorker::handleDeleteResponse( SlavePeerEvent event, bool success, char
 
 bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
 	int pending;
+	uint32_t chunkId;
 	std::unordered_map<PendingIdentifier, ChunkRequest>::iterator it, tmp, end;
 	ChunkRequest chunkRequest;
+	union {
+		struct ChunkDataHeader chunkData;
+		struct ChunkHeader chunk;
+	} header;
 
 	if ( success ) {
-		struct ChunkDataHeader header;
 		// Parse header
-		if ( ! this->protocol.parseChunkDataHeader( header, buf, size ) ) {
+		if ( ! this->protocol.parseChunkDataHeader( header.chunkData, buf, size ) ) {
 			__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Invalid GET_CHUNK (success) response." );
 			return false;
 		}
 		__DEBUG__(
 			BLUE, "SlaveWorker", "handleGetChunkResponse",
 			"[GET_CHUNK (success)] List ID: %u, stripe ID: %u, chunk ID: %u; chunk size = %u.",
-			header.listId, header.stripeId, header.chunkId, header.size
+			header.chunkData.listId, header.chunkData.stripeId, header.chunkData.chunkId, header.chunkData.size
 		);
-
-		// Find the corresponding GET_CHUNK request from the pending set
-		if ( ! SlaveWorker::pending->findChunkRequest( PT_SLAVE_PEER_GET_CHUNK, event.id, event.socket, it, true, false ) ) {
-			UNLOCK( &SlaveWorker::pending->slavePeers.getChunkLock );
-			__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot find a pending slave GET_CHUNK request that matches the response. This message will be discarded." );
-			return false;
-		}
-
-		chunkRequest = it->second;
-
-		// Prepare stripe buffer
-		for ( uint32_t i = 0, total = SlaveWorker::chunkCount; i < total; i++ ) {
-			this->chunks[ i ] = 0;
-		}
-
-		// Check remaining slave GET_CHUNK requests in the pending set
-		pending = 0;
-		tmp = it;
-		end = SlaveWorker::pending->slavePeers.getChunk.end();
-		while( tmp != end && tmp->first.id == event.id ) {
-			if ( tmp->second.chunkId == header.chunkId ) {
-				// Store the chunk into the buffer
-				tmp->second.chunk = SlaveWorker::chunkPool->malloc();
-				tmp->second.chunk->loadFromGetChunkRequest(
-					header.listId, header.stripeId, header.chunkId,
-					header.chunkId >= SlaveWorker::dataChunkCount, // isParity
-					header.data, header.size
-				);
-				this->chunks[ header.chunkId ] = tmp->second.chunk;
-			} else if ( ! tmp->second.chunk ) {
-				// The chunk is not received yet
-				pending++;
-			} else {
-				this->chunks[ tmp->second.chunkId ] = tmp->second.chunk;
-			}
-			tmp++;
-		}
-		// __ERROR__( "SlaveWorker", "handleGetChunkResponse", "Pending slave GET_CHUNK requests = %d (%s).", pending, success ? "success" : "fail" );
-		if ( pending == 0 )
-			SlaveWorker::pending->slavePeers.getChunk.erase( it, tmp );
-		UNLOCK( &SlaveWorker::pending->slavePeers.getChunkLock );
-
-		if ( pending == 0 ) {
-			// Set up chunk buffer for storing reconstructed chunks
-			for ( uint32_t i = 0, j = 0; i < SlaveWorker::chunkCount; i++ ) {
-				if ( ! this->chunks[ i ] ) {
-					this->freeChunks[ j ].setReconstructed(
-						chunkRequest.listId, chunkRequest.stripeId, i,
-						i >= SlaveWorker::dataChunkCount
-					);
-					this->chunks[ i ] = this->freeChunks + j;
-					this->chunkStatus->unset( i );
-					j++;
-				} else {
-					this->chunkStatus->set( i );
-				}
-			}
-
-			// Decode to reconstruct the lost chunk
-			CodingEvent codingEvent;
-			codingEvent.decode( this->chunks, this->chunkStatus );
-			this->dispatch( codingEvent );
-
-			uint32_t maxChunkSize = 0, chunkSize;
-			for ( uint32_t i = 0; i < SlaveWorker::dataChunkCount; i++ ) {
-				chunkSize = this->chunks[ i ]->status == CHUNK_STATUS_RECONSTRUCTED ?
-				            this->chunks[ i ]->updateData() :
-				            this->chunks[ i ]->getSize();
-				if ( chunkSize > maxChunkSize )
-					maxChunkSize = chunkSize;
-			}
-
-			for ( uint32_t i = SlaveWorker::dataChunkCount; i < SlaveWorker::chunkCount; i++ ) {
-				if ( this->chunks[ i ]->status == CHUNK_STATUS_RECONSTRUCTED ) {
-					this->chunks[ i ]->isParity = true;
-					this->chunks[ i ]->setSize( maxChunkSize );
-				} else if ( this->chunks[ i ]->getSize() != maxChunkSize ) {
-					__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Parity chunk size mismatch (chunk ID = %u): %u vs. %u.", i, this->chunks[ i ]->getSize(), maxChunkSize );
-				}
-			}
-
-			PendingIdentifier pid;
-			DegradedOp op;
-
-			// Respond the original GET/UPDATE/DELETE operation using the reconstructed data
-			if ( ! SlaveWorker::pending->eraseDegradedOp( PT_SLAVE_PEER_DEGRADED_OPS, event.id, event.socket, &pid, &op ) ) {
-				__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot find a pending slave DEGRADED_OPS request that matches the response. This message will be discarded." );
-			} else {
-				//// TODO ----------------------------------------
-				// Find the chunk from the map
-				Chunk *chunk = SlaveWorker::map->findChunkById( op.listId, op.stripeId, op.chunkId );
-				if ( ! chunk ) {
-					this->chunks[ op.chunkId ]->status = CHUNK_STATUS_RECONSTRUCTED;
-
-					chunk = SlaveWorker::chunkPool->malloc();
-					chunk->swap( this->chunks[ op.chunkId ] );
-
-					SlaveWorker::map->setChunk(
-						op.listId, op.stripeId, op.chunkId, chunk,
-						op.chunkId >= SlaveWorker::dataChunkCount
-					);
-				}
-				// Send response
-				if ( op.opcode == PROTO_OPCODE_DEGRADED_GET ) {
-					MasterEvent event;
-					KeyValue keyValue;
-					Key &key = op.data.key;
-
-					if ( SlaveWorker::map->findValueByKey( key.data, key.size, &keyValue ) )
-						event.resGet( op.socket, pid.parentId, keyValue, true );
-					else
-						event.resGet( op.socket, pid.parentId, key, true );
-					this->dispatch( event );
-					key.free();
-				} else if ( op.opcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
-				} else if ( op.opcode == PROTO_OPCODE_DEGRADED_DELETE ) {
-				}
-			}
-
-			// Return chunks to chunk pool
-			for ( uint32_t i = 0; i < SlaveWorker::chunkCount; i++ ) {
-				switch( this->chunks[ i ]->status ) {
-					case CHUNK_STATUS_FROM_GET_CHUNK:
-						SlaveWorker::chunkPool->free( this->chunks[ i ] );
-						this->chunks[ i ] = 0;
-						break;
-					case CHUNK_STATUS_RECONSTRUCTED:
-						break;
-					default:
-						break;
-				}
-			}
-		}
-		return true;
+		chunkId = header.chunkData.chunkId;
 	} else {
-		struct ChunkHeader header;
-		if ( ! this->protocol.parseChunkHeader( header, buf, size ) ) {
+		if ( ! this->protocol.parseChunkHeader( header.chunk, buf, size ) ) {
 			__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Invalid GET_CHUNK (failure) response." );
 			return false;
 		}
 		__DEBUG__(
 			BLUE, "SlaveWorker", "handleGetChunkResponse",
 			"[GET_CHUNK (failure)] List ID: %u, stripe ID: %u, chunk ID: %u.",
-			header.listId, header.stripeId, header.chunkId
+			header.chunk.listId, header.chunk.stripeId, header.chunk.chunkId
 		);
-		chunkRequest.set(
-			header.listId, header.stripeId, header.chunkId,
-			event.socket, 0 // chunk
-		);
+		chunkId = header.chunk.chunkId;
+	}
 
-		PendingIdentifier pid;
-
-		// Find the corresponding GET_CHUNK request from the pending set
-		if ( ! SlaveWorker::pending->eraseChunkRequest( PT_SLAVE_PEER_GET_CHUNK, event.id, event.socket ) ) {
-			__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot find a pending slave GET_CHUNK request that matches the response. This message will be discarded." );
-		}
-
+	// Find the corresponding GET_CHUNK request from the pending set
+	if ( ! SlaveWorker::pending->findChunkRequest( PT_SLAVE_PEER_GET_CHUNK, event.id, event.socket, it, true, false ) ) {
+		UNLOCK( &SlaveWorker::pending->slavePeers.getChunkLock );
+		__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot find a pending slave GET_CHUNK request that matches the response. This message will be discarded." );
 		return false;
 	}
+
+	chunkRequest = it->second;
+
+	// Prepare stripe buffer
+	for ( uint32_t i = 0, total = SlaveWorker::chunkCount; i < total; i++ ) {
+		this->chunks[ i ] = 0;
+	}
+
+	// Check remaining slave GET_CHUNK requests in the pending set
+	pending = 0;
+	tmp = it;
+	end = SlaveWorker::pending->slavePeers.getChunk.end();
+	while( tmp != end && tmp->first.id == event.id ) {
+		if ( tmp->second.chunkId == chunkId ) {
+			// Store the chunk into the buffer
+			if ( success ) {
+				tmp->second.chunk = SlaveWorker::chunkPool->malloc();
+				tmp->second.chunk->loadFromGetChunkRequest(
+					header.chunkData.listId, header.chunkData.stripeId, header.chunkData.chunkId,
+					header.chunkData.chunkId >= SlaveWorker::dataChunkCount, // isParity
+					header.chunkData.data, header.chunkData.size
+				);
+			} else {
+				tmp->second.chunk = Coding::zeros;
+			}
+			this->chunks[ chunkId ] = tmp->second.chunk;
+		} else if ( ! tmp->second.chunk ) {
+			// The chunk is not received yet
+			pending++;
+		} else {
+			this->chunks[ tmp->second.chunkId ] = tmp->second.chunk;
+		}
+		tmp++;
+	}
+	// __ERROR__( "SlaveWorker", "handleGetChunkResponse", "Pending slave GET_CHUNK requests = %d (%s).", pending, success ? "success" : "fail" );
+	if ( pending == 0 )
+		SlaveWorker::pending->slavePeers.getChunk.erase( it, tmp );
+	UNLOCK( &SlaveWorker::pending->slavePeers.getChunkLock );
+
+	if ( pending == 0 ) {
+		// Set up chunk buffer for storing reconstructed chunks
+		for ( uint32_t i = 0, j = 0; i < SlaveWorker::chunkCount; i++ ) {
+			if ( ! this->chunks[ i ] ) {
+				this->freeChunks[ j ].setReconstructed(
+					chunkRequest.listId, chunkRequest.stripeId, i,
+					i >= SlaveWorker::dataChunkCount
+				);
+				this->chunks[ i ] = this->freeChunks + j;
+				this->chunkStatus->unset( i );
+				j++;
+			} else {
+				this->chunkStatus->set( i );
+			}
+		}
+
+		// Decode to reconstruct the lost chunk
+		CodingEvent codingEvent;
+		codingEvent.decode( this->chunks, this->chunkStatus );
+		this->dispatch( codingEvent );
+
+		uint32_t maxChunkSize = 0, chunkSize;
+		for ( uint32_t i = 0; i < SlaveWorker::dataChunkCount; i++ ) {
+			chunkSize = this->chunks[ i ]->status == CHUNK_STATUS_RECONSTRUCTED ?
+			            this->chunks[ i ]->updateData() :
+			            this->chunks[ i ]->getSize();
+			if ( chunkSize > maxChunkSize )
+				maxChunkSize = chunkSize;
+		}
+
+		for ( uint32_t i = SlaveWorker::dataChunkCount; i < SlaveWorker::chunkCount; i++ ) {
+			if ( this->chunks[ i ]->status == CHUNK_STATUS_RECONSTRUCTED ) {
+				this->chunks[ i ]->isParity = true;
+				this->chunks[ i ]->setSize( maxChunkSize );
+			} else if ( this->chunks[ i ]->getSize() != maxChunkSize ) {
+				__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Parity chunk size mismatch (chunk ID = %u): %u vs. %u.", i, this->chunks[ i ]->getSize(), maxChunkSize );
+			}
+		}
+
+		PendingIdentifier pid;
+		DegradedOp op;
+
+		// Respond the original GET/UPDATE/DELETE operation using the reconstructed data
+		if ( ! SlaveWorker::pending->eraseDegradedOp( PT_SLAVE_PEER_DEGRADED_OPS, event.id, event.socket, &pid, &op ) ) {
+			__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot find a pending slave DEGRADED_OPS request that matches the response. This message will be discarded." );
+		} else {
+			//// TODO ----------------------------------------
+			DegradedMap *dmap = &SlaveWorker::degradedChunkBuffer->map;
+			// Find the chunk from the map
+			Chunk *chunk = dmap->findChunkById( op.listId, op.stripeId, op.chunkId );
+			if ( ! chunk ) {
+				this->chunks[ op.chunkId ]->status = CHUNK_STATUS_RECONSTRUCTED;
+
+				chunk = SlaveWorker::chunkPool->malloc();
+				chunk->swap( this->chunks[ op.chunkId ] );
+
+				dmap->setChunk(
+					op.listId, op.stripeId, op.chunkId, chunk,
+					op.chunkId >= SlaveWorker::dataChunkCount
+				);
+			}
+			// Send response
+			if ( op.opcode == PROTO_OPCODE_DEGRADED_GET ) {
+				MasterEvent event;
+				KeyValue keyValue;
+				Key &key = op.data.key;
+
+				if ( dmap->findValueByKey( key.data, key.size, &keyValue ) )
+					event.resGet( op.socket, pid.parentId, keyValue, true );
+				else
+					event.resGet( op.socket, pid.parentId, key, true );
+				this->dispatch( event );
+				key.free();
+			} else if ( op.opcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
+			} else if ( op.opcode == PROTO_OPCODE_DEGRADED_DELETE ) {
+			}
+		}
+
+		// Return chunks to chunk pool
+		for ( uint32_t i = 0; i < SlaveWorker::chunkCount; i++ ) {
+			switch( this->chunks[ i ]->status ) {
+				case CHUNK_STATUS_FROM_GET_CHUNK:
+					SlaveWorker::chunkPool->free( this->chunks[ i ] );
+					this->chunks[ i ] = 0;
+					break;
+				case CHUNK_STATUS_RECONSTRUCTED:
+					break;
+				default:
+					break;
+			}
+		}
+	}
+	return true;
 }
 
 bool SlaveWorker::handleSetChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
@@ -2579,8 +2576,10 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 			ChunkRequest chunkRequest;
 			chunkRequest.set( listId, stripeId, i, socket );
 			if ( socket->self ) {
-				chunkRequest.chunk = SlaveWorker::map->findChunkById( listId,
-				 stripeId, i );
+				chunkRequest.chunk = SlaveWorker::map->findChunkById( listId, stripeId, i );
+				if ( ! chunkRequest.chunk ) {
+					chunkRequest.chunk = Coding::zeros;
+				}
 
 				if ( ! SlaveWorker::pending->insertChunkRequest( PT_SLAVE_PEER_GET_CHUNK, requestId, parentId, socket, chunkRequest ) ) {
 					__ERROR__( "SlaveWorker", "performDegradedRead", "Cannot insert into slave CHUNK_REQUEST pending map." );

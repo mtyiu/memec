@@ -29,7 +29,7 @@ void Slave::sync() {
 		// Can only sync with one coordinator
 		event.sync( this->sockets.coordinators[ i ] );
 		this->eventQueue.insert( event );
-		// Avoid empty messages 
+		// Avoid empty messages
 		if ( this->map.remap.size() > 0 ) {
 			event.syncRemap( this->sockets.coordinators[ i ] );
 			this->eventQueue.insert( event );
@@ -602,6 +602,8 @@ void Slave::printPending( FILE *f ) {
 	std::unordered_multimap<PendingIdentifier, KeyValueUpdate>::iterator keyValueUpdateIt;
 	std::unordered_multimap<PendingIdentifier, ChunkUpdate>::iterator chunkUpdateIt;
 	std::unordered_multimap<PendingIdentifier, ChunkRequest>::iterator chunkRequestIt;
+
+	LOCK( &this->pending.masters.getLock );
 	fprintf(
 		f,
 		"Pending requests for masters\n"
@@ -623,7 +625,9 @@ void Slave::printPending( FILE *f ) {
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
 	}
+	UNLOCK( &this->pending.masters.getLock );
 
+	LOCK( &this->pending.masters.updateLock );
 	fprintf(
 		f,
 		"\n[UPDATE] Pending: %lu\n",
@@ -638,7 +642,7 @@ void Slave::printPending( FILE *f ) {
 		const KeyValueUpdate &keyValueUpdate = keyValueUpdateIt->second;
 		fprintf(
 			f, "%lu. ID: %u; Key: %.*s (size = %u, offset = %u, length = %u); source: ",
-			i, it->first.id, keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
+			i, keyValueUpdateIt->first.id, keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
 			keyValueUpdate.offset, keyValueUpdate.length
 		);
 		if ( keyValueUpdate.ptr )
@@ -647,7 +651,9 @@ void Slave::printPending( FILE *f ) {
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
 	}
+	UNLOCK( &this->pending.masters.updateLock );
 
+	LOCK( &this->pending.masters.delLock );
 	fprintf(
 		f,
 		"\n[DELETE] Pending: %lu\n",
@@ -667,8 +673,9 @@ void Slave::printPending( FILE *f ) {
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
 	}
+	UNLOCK( &this->pending.masters.delLock );
 
-
+	LOCK( &this->pending.slavePeers.updateChunkLock );
 	fprintf(
 		f,
 		"\n\nPending requests for slave peers\n"
@@ -685,7 +692,7 @@ void Slave::printPending( FILE *f ) {
 		const ChunkUpdate &chunkUpdate = chunkUpdateIt->second;
 		fprintf(
 			f, "%lu. ID: %u; List ID: %u, stripe ID: %u, chunk ID: %u; Key: %.*s (key size = %u, offset = %u, length = %u, value update offset = %u); target: ",
-			i, it->first.id, chunkUpdate.listId, chunkUpdate.stripeId, chunkUpdate.chunkId,
+			i, chunkUpdateIt->first.id, chunkUpdate.listId, chunkUpdate.stripeId, chunkUpdate.chunkId,
 			chunkUpdate.keySize, chunkUpdate.key, chunkUpdate.keySize,
 			chunkUpdate.offset, chunkUpdate.length, chunkUpdate.valueUpdateOffset
 		);
@@ -695,7 +702,9 @@ void Slave::printPending( FILE *f ) {
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
 	}
+	UNLOCK( &this->pending.slavePeers.updateChunkLock );
 
+	LOCK( &this->pending.slavePeers.delChunkLock );
 	fprintf(
 		f,
 		"\n[DELETE_CHUNK] Pending: %lu\n",
@@ -710,7 +719,7 @@ void Slave::printPending( FILE *f ) {
 		const ChunkUpdate &chunkUpdate = chunkUpdateIt->second;
 		fprintf(
 			f, "%lu. ID: %u; List ID: %u, stripe ID: %u, chunk ID: %u; Key: %.*s (key size = %u, offset = %u, length = %u); target: ",
-			i, it->first.id, chunkUpdate.listId, chunkUpdate.stripeId, chunkUpdate.chunkId,
+			i, chunkUpdateIt->first.id, chunkUpdate.listId, chunkUpdate.stripeId, chunkUpdate.chunkId,
 			chunkUpdate.keySize, chunkUpdate.key, chunkUpdate.keySize,
 			chunkUpdate.offset, chunkUpdate.length
 		);
@@ -720,7 +729,9 @@ void Slave::printPending( FILE *f ) {
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
 	}
+	UNLOCK( &this->pending.slavePeers.delChunkLock );
 
+	LOCK( &this->pending.slavePeers.getChunkLock );
 	fprintf(
 		f,
 		"\n[GET_CHUNK] Pending: %lu\n",
@@ -734,8 +745,8 @@ void Slave::printPending( FILE *f ) {
 	) {
 		const ChunkRequest &chunkRequest = chunkRequestIt->second;
 		fprintf(
-			f, "%lu. ID: %u; List ID: %u, stripe ID: %u, chunk ID: %u; target: ",
-			i, it->first.id, chunkRequest.listId, chunkRequest.stripeId, chunkRequest.chunkId
+			f, "%lu. ID: %u; List ID: %u, stripe ID: %u, chunk ID: %u; chunk: %p; target: ",
+			i, chunkRequestIt->first.id, chunkRequest.listId, chunkRequest.stripeId, chunkRequest.chunkId, chunkRequest.chunk
 		);
 		if ( chunkRequest.socket )
 			chunkRequest.socket->printAddress( f );
@@ -743,7 +754,9 @@ void Slave::printPending( FILE *f ) {
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
 	}
+	UNLOCK( &this->pending.slavePeers.getChunkLock );
 
+	LOCK( &this->pending.slavePeers.setChunkLock );
 	fprintf(
 		f,
 		"\n[SET_CHUNK] Pending: %lu\n",
@@ -758,7 +771,7 @@ void Slave::printPending( FILE *f ) {
 		const ChunkRequest &chunkRequest = chunkRequestIt->second;
 		fprintf(
 			f, "%lu. ID: %u; List ID: %u, stripe ID: %u, chunk ID: %u; target: ",
-			i, it->first.id, chunkRequest.listId, chunkRequest.stripeId, chunkRequest.chunkId
+			i, chunkRequestIt->first.id, chunkRequest.listId, chunkRequest.stripeId, chunkRequest.chunkId
 		);
 		if ( chunkRequest.socket )
 			chunkRequest.socket->printAddress( f );
@@ -766,6 +779,7 @@ void Slave::printPending( FILE *f ) {
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
 	}
+	UNLOCK( &this->pending.slavePeers.setChunkLock );
 }
 
 void Slave::dump() {

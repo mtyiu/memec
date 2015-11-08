@@ -73,6 +73,21 @@ public class Main implements Runnable {
 			size = this.map.size();
 			ret = false;
 
+			if ( i == numRecords ) {
+				// Wait for 20 seconds
+				System.out.println( "Sleep for 10 seconds..." );
+				try {
+					Thread.sleep( 10000 );
+				} catch( InterruptedException e ) {}
+				System.out.println( "Done." );
+			}
+
+			if ( i < numRecords ) {
+				rand = 0;
+			} else {
+				rand = 1;
+			}
+
 			if ( rand == 0 ) {
 				// SET
 				if ( size < numRecords ) {
