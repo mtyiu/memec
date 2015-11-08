@@ -1743,10 +1743,16 @@ bool SlaveWorker::handleDegradedRequest( MasterEvent event, uint8_t opcode, char
 
 			printf( "Degraded UPDATE: TODO...\n" );
 			if ( chunk ) {
-				// if ( isKeyValueFound )
-				// 	event.resGet( event.socket, event.id, keyValue, false );
-				// else
-				// 	event.resGet( event.socket, event.id, key, false );
+				if ( isKeyValueFound ) {
+					// event.resUpdate( event.socket, event.id, keyValue, true );
+				} else {
+					event.resUpdate(
+						event.socket, event.id, keyValueUpdate,
+						keyValueUpdate.offset,
+						keyValueUpdate.length,
+						false, true, true
+					);
+				}
 			}
 			break;
 		case PROTO_OPCODE_DEGRADED_DELETE:
@@ -1758,14 +1764,18 @@ bool SlaveWorker::handleDegradedRequest( MasterEvent event, uint8_t opcode, char
 				header.data.key.key,
 				header.data.key.keySize
 			);
-			key.set( header.data.key.keySize, header.data.key.key );
+			key.dup( header.data.key.keySize, header.data.key.key );
 
 			printf( "Degraded DELETE: TODO...\n" );
 			if ( chunk ) {
-				// if ( isKeyValueFound )
-				// 	event.resGet( event.socket, event.id, keyValue, false );
-				// else
-				// 	event.resGet( event.socket, event.id, key, false );
+				if ( isKeyValueFound ) {
+					// event.resDelete( event.socket, event.id, keyValue, true );
+				} else {
+					event.resDelete(
+						event.socket, event.id, key,
+						false, true, true
+					);
+				}
 			}
 			break;
 		default:

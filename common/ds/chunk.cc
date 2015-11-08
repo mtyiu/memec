@@ -141,9 +141,9 @@ uint32_t Chunk::updateData() {
 
 		if ( valueSize > Chunk::capacity ) {
 			fprintf(
-				stderr, "[%s] Current position: %u; key size = %u, value size = %u\n",
-				ptr - this->data, keySize, valueSize,
-				this->status == CHUNK_STATUS_RECONSTRUCTED ? "Reconstructed" : "Normal"
+				stderr, "[%s] Current position: %lu; key size = %u, value size = %u\n",
+				this->status == CHUNK_STATUS_RECONSTRUCTED ? "Reconstructed" : "Normal",
+				ptr - this->data, keySize, valueSize
 			);
 		}
 

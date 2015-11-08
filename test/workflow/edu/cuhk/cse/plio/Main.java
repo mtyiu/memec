@@ -85,7 +85,7 @@ public class Main implements Runnable {
 			if ( i < numRecords ) {
 				rand = 0;
 			} else {
-				rand = 1;
+				rand = rand == 0 ? 1 : rand;
 			}
 
 			if ( rand == 0 ) {
