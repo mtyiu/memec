@@ -100,8 +100,16 @@ private:
 	bool handleDeleteChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleGetChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleSetChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
-
+	// Functions for performing degraded operations
 	bool performDegradedRead( MasterSocket *masterSocket, uint32_t listId, uint32_t stripeId, uint32_t lostChunkId, bool isSealed, uint8_t opcode, uint32_t parentId, Key *key, KeyValueUpdate *keyValueUpdate = 0 );
+	bool sendModifyChunkRequest(
+		uint32_t parentId, uint8_t keySize, char *keyStr,
+		Metadata &metadata, uint32_t offset,
+		uint32_t deltaSize, /* valueUpdateSize */
+		uint32_t valueUpdateOffset,
+		char *delta,        /* valueUpdate */
+		bool isSealed, bool isUpdate
+	);
 
 	void free();
 	static void *run( void *argv );

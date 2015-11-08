@@ -73,6 +73,7 @@ public class Main implements Runnable {
 			size = this.map.size();
 			ret = false;
 
+			/*
 			if ( i == numRecords ) {
 				// Wait for 20 seconds
 				System.out.println( "Sleep for 10 seconds..." );
@@ -85,8 +86,10 @@ public class Main implements Runnable {
 			if ( i < numRecords ) {
 				rand = 0;
 			} else {
-				rand = rand == 0 ? 1 : rand;
+				// rand = rand == 0 ? 1 : rand;
+				rand = 1;
 			}
+			*/
 
 			if ( rand == 0 ) {
 				// SET
@@ -236,14 +239,14 @@ public class Main implements Runnable {
 
 		System.out.printf(
 			"\n" +
-			"Number of SET operations    : %d / %d\n" +
-			"Number of GET operations    : %d / %d\n" +
-			"Number of UPDATE operations : %d / %d\n" +
-			"Number of DELETE operations : %d / %d\n",
-			succeeded[ 0 ], completed[ 0 ],
-			succeeded[ 1 ], completed[ 1 ],
-			succeeded[ 2 ], completed[ 2 ],
-			succeeded[ 3 ], completed[ 3 ]
+			"Number of SET operations    : %d / %d (failed: %d)\n" +
+			"Number of GET operations    : %d / %d (failed: %d)\n" +
+			"Number of UPDATE operations : %d / %d (failed: %d)\n" +
+			"Number of DELETE operations : %d / %d (failed: %d)\n",
+			succeeded[ 0 ], completed[ 0 ], completed[ 0 ] - succeeded[ 0 ],
+			succeeded[ 1 ], completed[ 1 ], completed[ 1 ] - succeeded[ 1 ],
+			succeeded[ 2 ], completed[ 2 ], completed[ 2 ] - succeeded[ 2 ],
+			succeeded[ 3 ], completed[ 3 ], completed[ 3 ] - succeeded[ 3 ]
 		);
 	}
 }
