@@ -2608,7 +2608,9 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 			         ( this->dataSlaveSockets[ i ] ) :
 			         ( this->paritySlaveSockets[ i - SlaveWorker::dataChunkCount ] );
 
-			if ( ! socket->self && socket->ready() ) {
+			if ( socket->self ) {
+				selected++;
+			} else if ( socket->ready() ) {
 				metadata.chunkId = i;
 				event.reqGetChunk( socket, requestId, metadata );
 				SlaveWorker::eventQueue->insert( event );

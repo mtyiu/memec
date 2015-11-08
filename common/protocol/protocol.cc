@@ -1424,6 +1424,7 @@ size_t Protocol::generateDegradedReqHeader( uint8_t magic, uint8_t to, uint8_t o
 	*( ( uint32_t * )( buf     ) ) = htonl( listId );
 	*( ( uint32_t * )( buf + 4 ) ) = htonl( stripeId );
 	*( ( uint32_t * )( buf + 8 ) ) = htonl( chunkId );
+	buf[ 12 ] = isSealed;
 	buf += PROTO_DEGRADED_REQ_BASE_SIZE;
 
 	buf[ 0 ] = keySize;

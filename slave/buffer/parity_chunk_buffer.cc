@@ -200,6 +200,7 @@ bool ParityChunkBuffer::findValueByKey( char *data, uint8_t size, KeyValue *keyV
 	if ( it == this->keys.end() ) {
 		UNLOCK( &this->lock );
 		if ( keyPtr ) *keyPtr = key;
+		// printf( "findValueByKey() failed: %.*s\n", size, data );
 		return false;
 	}
 

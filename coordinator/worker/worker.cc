@@ -568,13 +568,11 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 		__ERROR__( "CoordinatorWorker", "handleDegradedLockRequest", "Invalid DEGRADED_LOCK request (size = %lu).", size );
 		return false;
 	}
-	// __DEBUG__(
-	// 	BLUE,
-	// __ERROR__(
-	// 	"CoordinatorWorker", "handleDegradedLockRequest",
-	// 	"[DEGRADED_LOCK] Key: %.*s (key size = %u); target list ID: %u, target chunk ID: %u",
-	// 	( int ) header.keySize, header.key, header.keySize, header.dstListId, header.dstChunkId
-	// );
+	__DEBUG__(
+		BLUE, "CoordinatorWorker", "handleDegradedLockRequest",
+		"[DEGRADED_LOCK] Key: %.*s (key size = %u); target list ID: %u, target chunk ID: %u",
+		( int ) header.keySize, header.key, header.keySize, header.dstListId, header.dstChunkId
+	);
 
 	// Metadata metadata;
 	RemappingRecord remappingRecord;
