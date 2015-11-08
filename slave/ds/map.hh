@@ -69,8 +69,8 @@ public:
 		LOCK( &this->keysLock );
 		keysIt = this->keys.find( key );
 		if ( keysIt == this->keys.end() ) {
-			if ( keyPtr ) *keyPtr = key;
 			UNLOCK( &this->keysLock );
+			if ( keyPtr ) *keyPtr = key;
 			return false;
 		}
 

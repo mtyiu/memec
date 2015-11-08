@@ -83,6 +83,7 @@ private:
 	bool handleSlavePeerRegisterRequest( SlavePeerSocket *socket, char *buf, size_t size );
 	bool handleRemappingSetRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleSealChunkRequest( SlavePeerEvent event, char *buf, size_t size );
+	bool handleGetRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleUpdateRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleDeleteRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleUpdateChunkRequest( SlavePeerEvent event, char *buf, size_t size );
@@ -92,6 +93,7 @@ private:
 	// Response handler for slave peers
 	bool handleSealChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleRemappingSetResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
+	bool handleGetResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleUpdateResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleDeleteResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleUpdateChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );

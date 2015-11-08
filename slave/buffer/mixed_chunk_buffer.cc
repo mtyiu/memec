@@ -85,6 +85,15 @@ void MixedChunkBuffer::unlock() {
 	}
 }
 
+bool MixedChunkBuffer::findValueByKey( char *data, uint8_t size, KeyValue *keyValuePtr, Key *keyPtr ) {
+	switch( this->role ) {
+		case CBR_PARITY:
+			return this->buffer.parity->findValueByKey( data, size, keyValuePtr, keyPtr );
+		default:
+			return false;
+	}
+}
+
 bool MixedChunkBuffer::deleteKey( char *keyStr, uint8_t keySize ) {
 	switch( this->role ) {
 		case CBR_PARITY:

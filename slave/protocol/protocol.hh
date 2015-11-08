@@ -32,7 +32,7 @@ public:
 	// REMAPPING_SET
 	char *resRemappingSet( size_t &size, bool toMaster, uint32_t id, bool success, uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key );
 	// GET
-	char *resGet( size_t &size, uint32_t id, bool success, bool isDegraded, uint8_t keySize, char *key, uint32_t valueSize = 0, char *value = 0 );
+	char *resGet( size_t &size, uint32_t id, bool success, bool isDegraded, uint8_t keySize, char *key, uint32_t valueSize = 0, char *value = 0, bool toMaster = true );
 	// UPDATE
 	char *resUpdate( size_t &size, uint32_t id, bool success, bool isDegraded, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize );
 	// DELETE
@@ -48,6 +48,8 @@ public:
 	char *reqRemappingSet( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, bool needsForwarding, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf = 0 );
 	// SEAL_CHUNK
 	char *reqSealChunk( size_t &size, uint32_t id, Chunk *chunk, uint32_t startPos, char *buf = 0 );
+	// GET
+	char *reqGet( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key );
 	// UPDATE
 	char *reqUpdate( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t chunkUpdateOffset, char *buf = 0 );
 	char *resUpdate( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t chunkUpdateOffset, char *buf = 0 );

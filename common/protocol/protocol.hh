@@ -301,6 +301,15 @@ struct DegradedReqHeader {
 	} data;
 };
 
+// For retrieving key-value pair in unsealed chunks from parity slave
+#define PROTO_LIST_STRIPE_KEY_SIZE 9
+struct ListStripeKeyHeader {
+	uint32_t listId;
+	uint32_t chunkId;
+	uint8_t keySize;
+	char *key;
+};
+
 //////////////
 // Recovery //
 //////////////
@@ -622,6 +631,16 @@ protected:
 		char *buf, size_t size
 	);
 
+	size_t generateListStripeKeyHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key
+	);
+	bool parseListStripeKeyHeader(
+		size_t offset,
+		uint32_t &listId, uint32_t &chunkId, uint8_t &keySize, char *&key,
+		char *buf, size_t size
+	);
+
 	//////////////
 	// Recovery //
 	//////////////
@@ -789,6 +808,10 @@ public:
 	);
 	bool parseDegradedReqHeader(
 		struct DegradedReqHeader &header, uint8_t opcode,
+		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
+	bool parseListStripeKeyHeader(
+		struct ListStripeKeyHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 	//////////////

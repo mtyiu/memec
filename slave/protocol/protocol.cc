@@ -104,11 +104,11 @@ char *SlaveProtocol::resRemappingSet( size_t &size, bool toMaster, uint32_t id, 
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::resGet( size_t &size, uint32_t id, bool success, bool isDegraded, uint8_t keySize, char *key, uint32_t valueSize, char *value ) {
+char *SlaveProtocol::resGet( size_t &size, uint32_t id, bool success, bool isDegraded, uint8_t keySize, char *key, uint32_t valueSize, char *value, bool toMaster ) {
 	if ( success ) {
 		size = this->generateKeyValueHeader(
 			PROTO_MAGIC_RESPONSE_SUCCESS,
-			PROTO_MAGIC_TO_MASTER,
+			toMaster ? PROTO_MAGIC_TO_MASTER : PROTO_MAGIC_TO_SLAVE,
 			isDegraded ? PROTO_OPCODE_DEGRADED_GET : PROTO_OPCODE_GET,
 			id,
 			keySize,
@@ -119,7 +119,7 @@ char *SlaveProtocol::resGet( size_t &size, uint32_t id, bool success, bool isDeg
 	} else {
 		size = this->generateKeyHeader(
 			PROTO_MAGIC_RESPONSE_FAILURE,
-			PROTO_MAGIC_TO_MASTER,
+			toMaster ? PROTO_MAGIC_TO_MASTER : PROTO_MAGIC_TO_SLAVE,
 			isDegraded ? PROTO_OPCODE_DEGRADED_GET : PROTO_OPCODE_GET,
 			id,
 			keySize,
@@ -248,6 +248,20 @@ char *SlaveProtocol::reqSealChunk( size_t &size, uint32_t id, Chunk *chunk, uint
 		buf
 	);
 	return buf;
+}
+
+char *SlaveProtocol::reqGet( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key ) {
+	size = this->generateListStripeKeyHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_GET,
+		id,
+		listId,
+		chunkId,
+		keySize,
+		key
+	);
+	return this->buffer.send;
 }
 
 char *SlaveProtocol::reqUpdate( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t chunkUpdateOffset, char *buf ) {

@@ -139,7 +139,7 @@ size_t Protocol::generateAddressHeader( uint8_t magic, uint8_t to, uint8_t opcod
 }
 
 bool Protocol::parseAddressHeader( size_t offset, uint32_t &addr, uint16_t &port, char *buf, size_t size ) {
-	if ( size < PROTO_ADDRESS_SIZE )
+	if ( size - offset < PROTO_ADDRESS_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
@@ -241,7 +241,7 @@ size_t Protocol::generateHeartbeatMessage(
 }
 
 bool Protocol::parseHeartbeatHeader( size_t offset, uint32_t &sealed, uint32_t &keys, char *buf, size_t size ) {
-	if ( size < PROTO_HEARTBEAT_SIZE )
+	if ( size - offset < PROTO_HEARTBEAT_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
@@ -303,7 +303,7 @@ bool Protocol::parseKeyOpMetadataHeader( size_t offset, uint8_t &keySize, uint8_
 	stripeId = ntohl( *( ( uint32_t * )( ptr +  6 ) ) );
 	chunkId  = ntohl( *( ( uint32_t * )( ptr + 10 ) ) );
 
-	if ( size < PROTO_KEY_OP_METADATA_SIZE + ( size_t ) keySize )
+	if ( size - offset < PROTO_KEY_OP_METADATA_SIZE + ( size_t ) keySize )
 		return false;
 
 	key = ptr + PROTO_KEY_OP_METADATA_SIZE;
@@ -375,7 +375,7 @@ size_t Protocol::generateRemappingRecordMessage( uint8_t magic, uint8_t to, uint
 }
 
 bool Protocol::parseRemappingRecordHeader( size_t offset, uint32_t &remap, char* buf, size_t size ) {
-	if ( size < PROTO_REMAPPING_RECORD_SIZE )
+	if ( size - offset < PROTO_REMAPPING_RECORD_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
@@ -397,7 +397,7 @@ bool Protocol::parseRemappingRecordHeader( struct RemappingRecordHeader &header,
 }
 
 bool Protocol::parseSlaveSyncRemapHeader( size_t offset, uint8_t &keySize, uint8_t &opcode, uint32_t &listId, uint32_t &chunkId, char *&key, char *buf, size_t size ) {
-	if ( size < PROTO_SLAVE_SYNC_REMAP_PER_SIZE )
+	if ( size - offset < PROTO_SLAVE_SYNC_REMAP_PER_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
@@ -406,7 +406,7 @@ bool Protocol::parseSlaveSyncRemapHeader( size_t offset, uint8_t &keySize, uint8
 	listId = ntohl( *( ( uint32_t * )( ptr + 2 ) ) );
 	chunkId = ntohl( *( ( uint32_t * )( ptr + 6 ) ) );
 
-	if ( size < PROTO_SLAVE_SYNC_REMAP_PER_SIZE + ( size_t ) keySize )
+	if ( size - offset < PROTO_SLAVE_SYNC_REMAP_PER_SIZE + ( size_t ) keySize )
 		return false;
 
 	key = ptr + PROTO_SLAVE_SYNC_REMAP_PER_SIZE;
@@ -450,7 +450,7 @@ size_t Protocol::generateLoadStatsHeader( uint8_t magic, uint8_t to, uint32_t id
 }
 
 bool Protocol::parseLoadStatsHeader( size_t offset, uint32_t &slaveGetCount, uint32_t &slaveSetCount, uint32_t &slaveOverloadCount, char *buf, size_t size ) {
-	if ( size < PROTO_LOAD_STATS_SIZE )
+	if ( size - offset < PROTO_LOAD_STATS_SIZE )
 		return false;
 
 	slaveGetCount = ntohl( *( ( uint32_t * )( buf + offset ) ) );
@@ -493,13 +493,13 @@ size_t Protocol::generateKeyHeader( uint8_t magic, uint8_t to, uint8_t opcode, u
 }
 
 bool Protocol::parseKeyHeader( size_t offset, uint8_t &keySize, char *&key, char *buf, size_t size ) {
-	if ( size < PROTO_KEY_SIZE )
+	if ( size - offset < PROTO_KEY_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
 	keySize = ( uint8_t ) ptr[ 0 ];
 
-	if ( size < ( size_t ) PROTO_KEY_SIZE + keySize )
+	if ( size - offset < ( size_t ) PROTO_KEY_SIZE + keySize )
 		return false;
 
 	key = ptr + PROTO_KEY_SIZE;
@@ -539,7 +539,7 @@ size_t Protocol::generateChunkKeyHeader( uint8_t magic, uint8_t to, uint8_t opco
 }
 
 bool Protocol::parseChunkKeyHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint8_t &keySize, char *&key, char *buf, size_t size ) {
-	if ( size < PROTO_CHUNK_KEY_SIZE )
+	if ( size - offset < PROTO_CHUNK_KEY_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
@@ -549,7 +549,7 @@ bool Protocol::parseChunkKeyHeader( size_t offset, uint32_t &listId, uint32_t &s
 	chunkId  = ntohl( *( ( uint32_t * )( ptr + 8 ) ) );
 	keySize = ( uint8_t ) ptr[ 12 ];
 
-	if ( size < ( size_t ) PROTO_CHUNK_KEY_SIZE + keySize )
+	if ( size - offset < ( size_t ) PROTO_CHUNK_KEY_SIZE + keySize )
 		return false;
 
 	key = ptr + PROTO_CHUNK_KEY_SIZE;
@@ -619,7 +619,7 @@ size_t Protocol::generateChunkKeyValueUpdateHeader( uint8_t magic, uint8_t to, u
 }
 
 bool Protocol::parseChunkKeyValueUpdateHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint8_t &keySize, char *&key, uint32_t &valueUpdateOffset, uint32_t &valueUpdateSize, uint32_t &chunkUpdateOffset, char *buf, size_t size ) {
-	if ( size < PROTO_CHUNK_KEY_VALUE_UPDATE_SIZE )
+	if ( size - offset < PROTO_CHUNK_KEY_VALUE_UPDATE_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
@@ -659,7 +659,7 @@ bool Protocol::parseChunkKeyValueUpdateHeader( size_t offset, uint32_t &listId, 
 }
 
 bool Protocol::parseChunkKeyValueUpdateHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint8_t &keySize, char *&key, uint32_t &valueUpdateOffset, uint32_t &valueUpdateSize, uint32_t &chunkUpdateOffset, char *&valueUpdate, char *buf, size_t size ) {
-	if ( size < PROTO_CHUNK_KEY_VALUE_UPDATE_SIZE )
+	if ( size - offset < PROTO_CHUNK_KEY_VALUE_UPDATE_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
@@ -693,7 +693,7 @@ bool Protocol::parseChunkKeyValueUpdateHeader( size_t offset, uint32_t &listId, 
 	tmp[ 3 ] = ptr[ 9 ];
 	chunkUpdateOffset = ntohl( chunkUpdateOffset );
 
-	if ( size < PROTO_CHUNK_KEY_VALUE_UPDATE_SIZE + keySize + valueUpdateSize )
+	if ( size - offset < PROTO_CHUNK_KEY_VALUE_UPDATE_SIZE + keySize + valueUpdateSize )
 		return false;
 
 	key = ptr + 10;
@@ -763,7 +763,7 @@ size_t Protocol::generateKeyValueHeader( uint8_t magic, uint8_t to, uint8_t opco
 }
 
 bool Protocol::parseKeyValueHeader( size_t offset, uint8_t &keySize, char *&key, uint32_t &valueSize, char *&value, char *buf, size_t size ) {
-	if ( size < PROTO_KEY_VALUE_SIZE )
+	if ( size - offset < PROTO_KEY_VALUE_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
@@ -776,7 +776,7 @@ bool Protocol::parseKeyValueHeader( size_t offset, uint8_t &keySize, char *&key,
 	tmp[ 3 ] = ptr[ 3 ];
 	valueSize = ntohl( valueSize );
 
-	if ( size < PROTO_KEY_VALUE_SIZE + keySize + valueSize )
+	if ( size - offset < PROTO_KEY_VALUE_SIZE + keySize + valueSize )
 		return false;
 
 	key = ptr + PROTO_KEY_VALUE_SIZE;
@@ -838,7 +838,7 @@ size_t Protocol::generateKeyValueUpdateHeader( uint8_t magic, uint8_t to, uint8_
 }
 
 bool Protocol::parseKeyValueUpdateHeader( size_t offset, uint8_t &keySize, char *&key, uint32_t &valueUpdateOffset, uint32_t &valueUpdateSize, char *buf, size_t size ) {
-	if ( size < PROTO_KEY_VALUE_UPDATE_SIZE )
+	if ( size - offset < PROTO_KEY_VALUE_UPDATE_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
@@ -865,7 +865,7 @@ bool Protocol::parseKeyValueUpdateHeader( size_t offset, uint8_t &keySize, char 
 }
 
 bool Protocol::parseKeyValueUpdateHeader( size_t offset, uint8_t &keySize, char *&key, uint32_t &valueUpdateOffset, uint32_t &valueUpdateSize, char *&valueUpdate, char *buf, size_t size ) {
-	if ( size < PROTO_KEY_VALUE_UPDATE_SIZE )
+	if ( size - offset < PROTO_KEY_VALUE_UPDATE_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
@@ -886,7 +886,7 @@ bool Protocol::parseKeyValueUpdateHeader( size_t offset, uint8_t &keySize, char 
 	tmp[ 3 ] = ptr[ 6 ];
 	valueUpdateOffset = ntohl( valueUpdateOffset );
 
-	if ( size < PROTO_KEY_VALUE_UPDATE_SIZE + keySize + valueUpdateSize )
+	if ( size - offset < PROTO_KEY_VALUE_UPDATE_SIZE + keySize + valueUpdateSize )
 		return false;
 
 	key = ptr + PROTO_KEY_VALUE_UPDATE_SIZE;
@@ -948,7 +948,7 @@ size_t Protocol::generateChunkUpdateHeader( uint8_t magic, uint8_t to, uint8_t o
 }
 
 bool Protocol::parseChunkUpdateHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &updateOffset, uint32_t &updateLength, uint32_t &updatingChunkId, char *buf, size_t size ) {
-	if ( size < PROTO_CHUNK_UPDATE_SIZE )
+	if ( size - offset < PROTO_CHUNK_UPDATE_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
@@ -963,7 +963,7 @@ bool Protocol::parseChunkUpdateHeader( size_t offset, uint32_t &listId, uint32_t
 }
 
 bool Protocol::parseChunkUpdateHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &updateOffset, uint32_t &updateLength, uint32_t &updatingChunkId, char *&delta, char *buf, size_t size ) {
-	if ( size < PROTO_CHUNK_UPDATE_SIZE )
+	if ( size - offset < PROTO_CHUNK_UPDATE_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
@@ -974,7 +974,7 @@ bool Protocol::parseChunkUpdateHeader( size_t offset, uint32_t &listId, uint32_t
 	updateLength    = ntohl( *( ( uint32_t * )( ptr + 16 ) ) );
 	updatingChunkId = ntohl( *( ( uint32_t * )( ptr + 20 ) ) );
 
-	if ( size < PROTO_CHUNK_UPDATE_SIZE + updateLength )
+	if ( size - offset < PROTO_CHUNK_UPDATE_SIZE + updateLength )
 		return false;
 
 	delta = updateLength ? ptr + PROTO_CHUNK_UPDATE_SIZE : 0;
@@ -1037,7 +1037,7 @@ size_t Protocol::generateRemappingLockHeader( uint8_t magic, uint8_t to, uint8_t
 }
 
 bool Protocol::parseRemappingLockHeader( size_t offset, uint32_t &listId, uint32_t &chunkId, uint8_t &keySize, char *&key, char *buf, size_t size ) {
-	if ( size < PROTO_REMAPPING_LOCK_SIZE )
+	if ( size - offset < PROTO_REMAPPING_LOCK_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
@@ -1045,7 +1045,7 @@ bool Protocol::parseRemappingLockHeader( size_t offset, uint32_t &listId, uint32
 	chunkId = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
 	keySize = *( ptr + 8 );
 
-	if ( size < ( size_t ) PROTO_REMAPPING_LOCK_SIZE + keySize )
+	if ( size - offset < ( size_t ) PROTO_REMAPPING_LOCK_SIZE + keySize )
 		return false;
 
 	key = ptr + 9;
@@ -1101,7 +1101,7 @@ size_t Protocol::generateRemappingSetHeader( uint8_t magic, uint8_t to, uint8_t 
 }
 
 bool Protocol::parseRemappingSetHeader( size_t offset, uint32_t &listId, uint32_t &chunkId, bool &needsForwarding, uint8_t &keySize, char *&key, uint32_t &valueSize, char *&value, char *buf, size_t size ) {
-	if ( size < PROTO_REMAPPING_SET_SIZE )
+	if ( size - offset < PROTO_REMAPPING_SET_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
@@ -1120,7 +1120,7 @@ bool Protocol::parseRemappingSetHeader( size_t offset, uint32_t &listId, uint32_
 	valueSize = ntohl( valueSize );
 	ptr += 3;
 
-	if ( size < PROTO_REMAPPING_SET_SIZE + keySize + valueSize )
+	if ( size - offset < PROTO_REMAPPING_SET_SIZE + keySize + valueSize )
 		return false;
 
 	key = ptr;
@@ -1220,7 +1220,7 @@ bool Protocol::parseDegradedLockReqHeader( size_t offset, uint32_t &srcListId, u
 	dstChunkId = ntohl( *( ( uint32_t * )( ptr + 12 ) ) );
 	keySize = ptr[ 16 ];
 
-	if ( size < PROTO_DEGRADED_LOCK_REQ_SIZE + ( size_t ) keySize )
+	if ( size - offset < PROTO_DEGRADED_LOCK_REQ_SIZE + ( size_t ) keySize )
 		return false;
 
 	key = ptr + PROTO_DEGRADED_LOCK_REQ_SIZE;
@@ -1333,7 +1333,7 @@ bool Protocol::parseDegradedLockResHeader( size_t offset, uint8_t &type, uint8_t
 	type = ptr[ 0 ];
 	keySize = ptr[ 1 ];
 
-	if ( size < PROTO_DEGRADED_LOCK_RES_BASE_SIZE + ( size_t ) keySize )
+	if ( size - offset < PROTO_DEGRADED_LOCK_RES_BASE_SIZE + ( size_t ) keySize )
 		return false;
 
 	key = ptr + PROTO_DEGRADED_LOCK_RES_BASE_SIZE;
@@ -1533,6 +1533,54 @@ bool Protocol::parseDegradedReqHeader( struct DegradedReqHeader &header, uint8_t
 	return ret;
 }
 
+size_t Protocol::generateListStripeKeyHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key ) {
+	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_LIST_STRIPE_KEY_SIZE + keySize, id );
+
+	*( ( uint32_t * )( buf     ) ) = htonl( listId );
+	*( ( uint32_t * )( buf + 4 ) ) = htonl( chunkId );
+	buf[ 8 ] = keySize;
+
+	buf += PROTO_LIST_STRIPE_KEY_SIZE;
+	memmove( buf, key, keySize );
+
+	bytes += PROTO_LIST_STRIPE_KEY_SIZE + keySize;
+
+	return bytes;
+}
+
+bool Protocol::parseListStripeKeyHeader( size_t offset, uint32_t &listId, uint32_t &chunkId, uint8_t &keySize, char *&key, char *buf, size_t size ) {
+	if ( size - offset < PROTO_LIST_STRIPE_KEY_SIZE )
+		return false;
+
+	char *ptr = buf + offset;
+	listId  = ntohl( *( ( uint32_t * )( ptr     ) ) );
+	chunkId = ntohl( *( ( uint32_t * )( ptr + 4 ) ) );
+	keySize = ptr[ 8 ];
+
+	if ( size - offset < ( size_t ) PROTO_LIST_STRIPE_KEY_SIZE + keySize )
+		return false;
+
+	key = ptr + PROTO_LIST_STRIPE_KEY_SIZE;
+
+	return true;
+}
+
+bool Protocol::parseListStripeKeyHeader( struct ListStripeKeyHeader &header, char *buf, size_t size, size_t offset ) {
+	if ( ! buf || ! size ) {
+		buf = this->buffer.recv;
+		size = this->buffer.size;
+	}
+	return this->parseListStripeKeyHeader(
+		offset,
+		header.listId,
+		header.chunkId,
+		header.keySize,
+		header.key,
+		buf, size
+	);
+}
+
 //////////////
 // Recovery //
 //////////////
@@ -1576,7 +1624,7 @@ size_t Protocol::generateRecoveryHeader( uint8_t magic, uint8_t to, uint8_t opco
 }
 
 bool Protocol::parseRecoveryHeader( size_t offset, uint32_t &listId, uint32_t &stripeIdFrom, uint32_t &stripeIdTo, uint32_t &chunkId, uint32_t &unsealedChunkCount, uint32_t &addr, uint16_t &port, char *buf, size_t size ) {
-	if ( size < PROTO_RECOVERY_SIZE )
+	if ( size - offset < PROTO_RECOVERY_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
@@ -1638,7 +1686,7 @@ size_t Protocol::generateChunkSealHeader( uint8_t magic, uint8_t to, uint8_t opc
 }
 
 bool Protocol::parseChunkSealHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &count, char *buf, size_t size ) {
-	if ( size < PROTO_CHUNK_SEAL_SIZE )
+	if ( size - offset < PROTO_CHUNK_SEAL_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
@@ -1667,14 +1715,14 @@ bool Protocol::parseChunkSealHeader( struct ChunkSealHeader &header, char *buf, 
 
 bool Protocol::parseChunkSealHeaderData( size_t offset, uint8_t &keySize, uint32_t &keyOffset, char *&key, char *buf, size_t size ) {
 	// Note: Also implemented in slave/buffer/parity_chunk_buffer.cc
-	if ( size < PROTO_CHUNK_SEAL_DATA_SIZE )
+	if ( size - offset < PROTO_CHUNK_SEAL_DATA_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
 	keySize = ptr[ 0 ];
 	offset  = ntohl( *( ( uint32_t * )( ptr + 1 ) ) );
 
-	if ( size < ( size_t ) PROTO_CHUNK_SEAL_DATA_SIZE + keySize )
+	if ( size - offset < ( size_t ) PROTO_CHUNK_SEAL_DATA_SIZE + keySize )
 		return false;
 
 	key = ptr + PROTO_CHUNK_SEAL_DATA_SIZE;
@@ -1713,7 +1761,7 @@ size_t Protocol::generateChunkHeader( uint8_t magic, uint8_t to, uint8_t opcode,
 }
 
 bool Protocol::parseChunkHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, char *buf, size_t size ) {
-	if ( size < PROTO_CHUNK_SIZE )
+	if ( size - offset < PROTO_CHUNK_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
@@ -1756,7 +1804,7 @@ size_t Protocol::generateChunkDataHeader( uint8_t magic, uint8_t to, uint8_t opc
 }
 
 bool Protocol::parseChunkDataHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &chunkSize, char *&chunkData, char *buf, size_t size ) {
-	if ( size < PROTO_CHUNK_DATA_SIZE )
+	if ( size - offset < PROTO_CHUNK_DATA_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
@@ -1765,7 +1813,7 @@ bool Protocol::parseChunkDataHeader( size_t offset, uint32_t &listId, uint32_t &
 	chunkId   = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
 	chunkSize = ntohl( *( ( uint32_t * )( ptr + 12 ) ) );
 
-	if ( size < PROTO_CHUNK_DATA_SIZE + chunkSize )
+	if ( size - offset < PROTO_CHUNK_DATA_SIZE + chunkSize )
 		return false;
 
 	chunkData = chunkSize ? ptr + PROTO_CHUNK_DATA_SIZE : 0;

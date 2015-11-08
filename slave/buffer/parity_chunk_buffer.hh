@@ -84,6 +84,8 @@ public:
 
 	bool seal( uint32_t stripeId, uint32_t chunkId, uint32_t count, char *sealData, size_t sealDataSize, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk );
 
+	bool findValueByKey( char *data, uint8_t size, KeyValue *keyValuePtr, Key *keyPtr = 0 );
+
 	bool deleteKey( char *keyStr, uint8_t keySize );
 
 	bool updateKeyValue( char *keyStr, uint8_t keySize, uint32_t offset, uint32_t length, char *valueUpdate );

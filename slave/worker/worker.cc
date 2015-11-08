@@ -487,6 +487,16 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		case SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_REQUEST:
 			this->issueSealChunkRequest( event.message.chunk.chunk );
 			return;
+		case SLAVE_PEER_EVENT_TYPE_GET_REQUEST:
+			buffer.data = this->protocol.reqGet(
+				buffer.size,
+				event.id,
+				event.message.get.listId,
+				event.message.get.chunkId,
+				event.message.get.key.size,
+				event.message.get.key.data
+			);
+			break;
 		///////////////
 		// Responses //
 		///////////////
@@ -512,6 +522,36 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				event.message.remap.chunkId,
 				event.message.remap.key.size,
 				event.message.remap.key.data
+			);
+			break;
+		// GET
+		case SLAVE_PEER_EVENT_TYPE_GET_RESPONSE_SUCCESS:
+		{
+			char *key, *value;
+			uint8_t keySize;
+			uint32_t valueSize;
+			event.message.get.keyValue.deserialize( key, keySize, value, valueSize );
+			buffer.data = this->protocol.resGet(
+				buffer.size,
+				event.id,
+				true /* success */,
+				false /* isDegraded */,
+				keySize, key,
+				valueSize, value,
+				false /* toMaster */
+			);
+		}
+			break;
+		case SLAVE_PEER_EVENT_TYPE_GET_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resGet(
+				buffer.size,
+				event.id,
+				false /* success */,
+				false /* isDegraded */,
+				event.message.get.key.size,
+				event.message.get.key.data,
+				0, 0,
+				false /* toMaster */
 			);
 			break;
 		// UPDATE_CHUNK
@@ -709,6 +749,23 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 							break;
 						case PROTO_MAGIC_RESPONSE_FAILURE:
 							this->handleRemappingSetResponse( event, false, buffer.data, header.length );
+							break;
+						default:
+							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
+							break;
+					}
+					break;
+				case PROTO_OPCODE_GET:
+					switch( header.magic ) {
+						case PROTO_MAGIC_REQUEST:
+							this->handleGetRequest( event, buffer.data, buffer.size );
+							this->load.get();
+							break;
+						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							this->handleGetResponse( event, true, buffer.data, buffer.size );
+							break;
+						case PROTO_MAGIC_RESPONSE_FAILURE:
+							this->handleGetResponse( event, false, buffer.data, buffer.size );
 							break;
 						default:
 							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
@@ -950,17 +1007,15 @@ bool SlaveWorker::handleGetRequest( MasterEvent event, char *buf, size_t size ) 
 	if ( map->findValueByKey( header.key, header.keySize, &keyValue, &key ) ) {
 		event.resGet( event.socket, event.id, keyValue, false );
 		ret = true;
-		this->dispatch( event );
 	} else if ( map->findRemappingRecordByKey( header.key, header.keySize, &remappingRecord, &key ) ) {
 		// Redirect request to remapped slave
 		event.resRedirect( event.socket, event.id, PROTO_OPCODE_GET, key, remappingRecord );
 		ret = false;
-		this->dispatch( event );
 	} else {
 		event.resGet( event.socket, event.id, key, false );
 		ret = false;
-		this->dispatch( event );
 	}
+	this->dispatch( event );
 	return ret;
 }
 
@@ -1780,6 +1835,33 @@ bool SlaveWorker::handleSealChunkRequest( SlavePeerEvent event, char *buf, size_
 
 	return true;
 }
+bool SlaveWorker::handleGetRequest( SlavePeerEvent event, char *buf, size_t size ) {
+	struct ListStripeKeyHeader header;
+	bool ret;
+	if ( ! this->protocol.parseListStripeKeyHeader( header, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleGetRequest", "Invalid UNSEALED_GET request." );
+		return false;
+	}
+	__DEBUG__(
+		BLUE, "SlaveWorker", "handleGetRequest",
+		"[UNSEALED_GET] List ID: %u, chunk ID: %u; key: %.*s.",
+		header.listId, header.chunkId, header.keySize, header.key
+	);
+
+	Key key;
+	KeyValue keyValue;
+
+	ret = SlaveWorker::chunkBuffer->at( header.listId )->findValueByKey(
+		header.key, header.keySize, &keyValue, &key
+	);
+
+	if ( ret )
+		event.resGet( event.socket, event.id, keyValue );
+	else
+		event.resGet( event.socket, event.id, key );
+	this->dispatch( event );
+	return ret;
+}
 
 bool SlaveWorker::handleUpdateChunkRequest( SlavePeerEvent event, char *buf, size_t size ) {
 	struct ChunkUpdateHeader header;
@@ -1942,7 +2024,7 @@ bool SlaveWorker::handleGetChunkRequest( SlavePeerEvent event, char *buf, size_t
 	ret = chunk;
 
 	if ( ! chunk ) {
-		fprintf( stderr, "chunk == null\n" );
+		__ERROR__( "SlaveWorker", "handleGetChunkRequest", "The chunk (%u, %u, %u) does not exist.", header.listId, header.stripeId, header.chunkId );
 	}
 
 	event.resGetChunk( event.socket, event.id, metadata, ret, chunk );
@@ -2075,6 +2157,60 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 		masterEvent.resDelete( ( MasterSocket * ) key.ptr, pid.id, key, success, true, false );
 		SlaveWorker::eventQueue->insert( masterEvent );
 	}
+	return true;
+}
+
+bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
+	Key key;
+	KeyValue keyValue;
+	if ( success ) {
+		struct KeyValueHeader header;
+		if ( this->protocol.parseKeyValueHeader( header, buf, size ) ) {
+			key.set( header.keySize, header.key, ( void * ) event.socket );
+			keyValue.dup( header.key, header.keySize, header.value, header.valueSize );
+		} else {
+			__ERROR__( "SlaveWorker", "handleGetResponse", "Invalid GET response." );
+			return false;
+		}
+	} else {
+		struct KeyHeader header;
+		if ( this->protocol.parseKeyHeader( header, buf, size ) ) {
+			key.set( header.keySize, header.key, ( void * ) event.socket );
+		} else {
+			__ERROR__( "SlaveWorker", "handleGetResponse", "Invalid GET response." );
+			return false;
+		}
+	}
+
+	PendingIdentifier pid;
+	DegradedOp op;
+
+	if ( ! SlaveWorker::pending->eraseKey( PT_SLAVE_PEER_GET, event.id, event.socket, &pid ) ) {
+		__ERROR__( "SlaveWorker", "handleGetResponse", "Cannot find a pending slave UNSEALED_GET request that matches the response. This message will be discarded. (ID: %u)", event.id );
+		return false;
+	} else if ( ! SlaveWorker::pending->eraseDegradedOp( PT_SLAVE_PEER_DEGRADED_OPS, event.id, event.socket, &pid, &op ) ) {
+		__ERROR__( "SlaveWorker", "handleGetResponse", "Cannot find a pending slave DEGRADED_OPS request that matches the response. This message will be discarded." );
+		return false;
+	}
+
+	MasterEvent masterEvent;
+	switch( op.opcode ) {
+		case PROTO_OPCODE_DEGRADED_GET:
+			key = op.data.key;
+			if ( success ) {
+				masterEvent.resGet( op.socket, pid.parentId, keyValue, true );
+				key.free();
+			} else {
+				masterEvent.resGet( op.socket, pid.parentId, key, true );
+			}
+			SlaveWorker::eventQueue->insert( masterEvent );
+			break;
+		case PROTO_OPCODE_DEGRADED_UPDATE:
+			break;
+		case PROTO_OPCODE_DEGRADED_DELETE:
+			break;
+	}
+
 	return true;
 }
 
@@ -2417,8 +2553,11 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 		op.data.keyValueUpdate = *keyValueUpdate;
 	else
 		op.data.key = *key;
-	if ( ! SlaveWorker::pending->insertDegradedOp( PT_SLAVE_PEER_DEGRADED_OPS, requestId, parentId, 0, op ) ) {
-		__ERROR__( "SlaveWorker", "performDegradedRead", "Cannot insert into slave DEGRADED_OPS pending map." );
+
+	if ( isSealed || ! socket->self ) {
+		if ( ! SlaveWorker::pending->insertDegradedOp( PT_SLAVE_PEER_DEGRADED_OPS, requestId, parentId, 0, op ) ) {
+			__ERROR__( "SlaveWorker", "performDegradedRead", "Cannot insert into slave DEGRADED_OPS pending map." );
+		}
 	}
 
 	if ( isSealed ) {
@@ -2427,7 +2566,6 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 		metadata.set( listId, stripeId, 0 );
 		selected = 0;
 		for ( uint32_t i = 0; i < SlaveWorker::chunkCount; i++ ) {
-		// for ( uint32_t i = SlaveWorker::chunkCount - 1; i >= 0; i-- ) {
 			if ( selected >= SlaveWorker::dataChunkCount )
 				break;
 			if ( i == lostChunkId )
@@ -2453,24 +2591,67 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 				if ( ! SlaveWorker::pending->insertChunkRequest( PT_SLAVE_PEER_GET_CHUNK, requestId, parentId, socket, chunkRequest ) ) {
 					__ERROR__( "SlaveWorker", "performDegradedRead", "Cannot insert into slave CHUNK_REQUEST pending map." );
 				}
-
-				event.reqGetChunk( socket, requestId, metadata );
-				SlaveWorker::eventQueue->insert( event );
 			} else {
 				continue;
 			}
 			selected++;
 		}
 
+		selected = 0;
+		for ( uint32_t i = 0; i < SlaveWorker::chunkCount; i++ ) {
+			if ( selected >= SlaveWorker::dataChunkCount )
+				break;
+			if ( i == lostChunkId )
+				continue;
+
+			socket = ( i < SlaveWorker::dataChunkCount ) ?
+			         ( this->dataSlaveSockets[ i ] ) :
+			         ( this->paritySlaveSockets[ i - SlaveWorker::dataChunkCount ] );
+
+			if ( ! socket->self && socket->ready() ) {
+				metadata.chunkId = i;
+				event.reqGetChunk( socket, requestId, metadata );
+				SlaveWorker::eventQueue->insert( event );
+				selected++;
+			}
+		}
+
 		return ( selected >= SlaveWorker::dataChunkCount );
 	} else {
-		if ( ! SlaveWorker::pending->insertKey( PT_SLAVE_PEER_GET, requestId, parentId, socket, op.data.key ) ) {
-			__ERROR__( "SlaveWorker", "performDegradedRead", "Cannot insert into slave GET pending map." );
-		}
-		event.reqGet( socket, requestId, listId, lostChunkId, op.data.key );
+		if ( socket->self ) {
+			Key key;
+			KeyValue keyValue;
+			MasterEvent masterEvent;
 
-		printf( "TODO: Retrieve key-value pairs from unsealed chunks.\n" );
-		return false;
+			bool ret = SlaveWorker::chunkBuffer->at( listId )->findValueByKey(
+				op.data.key.data, op.data.key.size, &keyValue, &key
+			);
+
+			switch( opcode ) {
+				case PROTO_OPCODE_DEGRADED_GET:
+					if ( ret ) {
+						masterEvent.resGet( masterSocket, parentId, keyValue, true );
+					} else {
+						masterEvent.resGet( masterSocket, parentId, key, true );
+					}
+					break;
+				case PROTO_OPCODE_DEGRADED_UPDATE:
+					break;
+				case PROTO_OPCODE_DEGRADED_DELETE:
+					break;
+			}
+			this->dispatch( masterEvent );
+			op.data.key.free();
+
+			return ret;
+		} else {
+			if ( ! SlaveWorker::pending->insertKey( PT_SLAVE_PEER_GET, requestId, parentId, socket, op.data.key ) ) {
+				__ERROR__( "SlaveWorker", "performDegradedRead", "Cannot insert into slave GET pending map." );
+			}
+			event.reqGet( socket, requestId, listId, lostChunkId, op.data.key );
+			this->dispatch( event );
+			return true;
+		}
 	}
 }
 
