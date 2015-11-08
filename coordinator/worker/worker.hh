@@ -34,6 +34,7 @@ public:
 	static RemappingRecordMap *remappingRecords;
 	bool processHeartbeat( SlaveEvent event, char *buf, size_t size, uint32_t requestId = 0 );
 	bool triggerRecovery( SlaveSocket *socket );
+	bool handleRemappingSetLockRequest( MasterEvent event, char* buf, size_t size );
 
 	static bool init();
 	bool init( GlobalConfig &config, WorkerRole role, uint32_t workerId );

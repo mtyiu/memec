@@ -41,6 +41,7 @@ public:
 	char *reqSealChunks( size_t &size, uint32_t id );
 	char *reqFlushChunks( size_t &size, uint32_t id );
 	char *reqSyncMeta( size_t &size, uint32_t id );
+	char *resRemappingSetLock( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t chunkId, bool isRemapped, uint8_t keySize, char *key );
 };
 
 #endif

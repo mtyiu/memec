@@ -26,6 +26,7 @@ public:
 			ArrayMap< struct sockaddr_in, Latency >* slaveSetLatency;
 		} loading;
 	} message;
+	uint32_t id;
 
 	void reqRegister( CoordinatorSocket *socket, uint32_t addr, uint16_t port );
 	void reqSendLoadStats(

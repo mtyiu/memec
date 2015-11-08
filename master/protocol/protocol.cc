@@ -153,14 +153,15 @@ char *MasterProtocol::reqSet( size_t &size, uint32_t id, char *key, uint8_t keyS
 	return buf;
 }
 
-char *MasterProtocol::reqRemappingSetLock( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, char *key, uint8_t keySize ) {
+char *MasterProtocol::reqRemappingSetLock( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, bool isRemapped, char *key, uint8_t keySize ) {
 	size = this->generateRemappingLockHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_COORDINATOR,
 		PROTO_OPCODE_REMAPPING_LOCK,
 		id,
 		listId,
 		chunkId,
+		isRemapped,
 		keySize,
 		key
 	);

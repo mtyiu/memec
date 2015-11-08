@@ -33,7 +33,7 @@ void CoordinatorWorker::dispatch( CoordinatorEvent event ) {
 }
 
 void CoordinatorWorker::dispatch( MasterEvent event ) {
-	bool connected = false, isSend;
+	bool connected = false, isSend, success = false;
 	ssize_t ret;
 	struct {
 		size_t size;
@@ -69,6 +69,21 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 			buffer.size = event.message.forward.prevSize;
 			buffer.data = this->protocol.forwardRemappingRecords ( buffer.size, 0, event.message.forward.data );
 			delete [] event.message.forward.data;
+			isSend = true;
+			break;
+		case MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_SUCCESS:
+			success = true;
+		case MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resRemappingSetLock(
+				buffer.size,
+				event.id,
+				success,
+				event.message.remap.listId,
+				event.message.remap.chunkId,
+				event.message.remap.isRemapped,
+				event.message.remap.key.size,
+				event.message.remap.key.data
+			);
 			isSend = true;
 			break;
 		case MASTER_EVENT_TYPE_SWITCH_PHASE:
@@ -165,7 +180,11 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 					buffer.size += PROTO_LOAD_STATS_SIZE;
 					break;
 				case PROTO_MAGIC_REQUEST:
-					goto quit_1;
+					if ( header.opcode != PROTO_OPCODE_REMAPPING_LOCK )
+						goto quit_1;
+					event.id = header.id;
+					this->handleRemappingSetLockRequest( event, buffer.data, buffer.size );
+					break;
 				default:
 					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from master." );
 					goto quit_1;
@@ -570,6 +589,46 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 
 	return true;
 }
+
+bool CoordinatorWorker::handleRemappingSetLockRequest( MasterEvent event, char *buf, size_t size ) {
+	struct RemappingLockHeader header;
+	if ( ! this->protocol.parseRemappingLockHeader( header, buf, size ) ) {
+		__ERROR__( "CoordinatorWorker", "handleRemappingSetLockRequest", "Invalid REMAPPING_SET_LOCK request (size = %lu).", size );
+		return false;
+	}
+	__DEBUG__(
+		BLUE, "CoordinatorWorker", "handleRemappingSetLockRequest",
+		"[REMAPPING_SET_LOCK] Key: %.*s (key size = %u); remapped list ID: %u, remapped chunk ID: %u",
+		( int ) header.keySize, header.key, header.keySize, header.listId, header.chunkId
+	);
+
+	Key key;
+	key.set( header.keySize, header.key );
+
+	// if already exists, does not allow remap; otherwise insert the remapping record
+	RemappingRecord remappingRecord( header.listId, header.chunkId );
+	if ( Map::setKey( 
+		header.key, header.keySize, header.listId, 0, 
+		header.chunkId, PROTO_OPCODE_REMAPPING_LOCK, 
+		true, true) 
+	) {
+		if ( header.isRemapped ) {
+			if ( CoordinatorWorker::remappingRecords->insert( key, remappingRecord ) ) {
+				event.resRemappingSetLock( event.socket, event.id, header.isRemapped, key, remappingRecord, true );
+			} else {
+				event.resRemappingSetLock( event.socket, event.id, header.isRemapped, key, remappingRecord, false );
+			}
+		} else {
+			event.resRemappingSetLock( event.socket, event.id, header.isRemapped, key, remappingRecord, true );
+		}
+	} else {
+		event.resRemappingSetLock( event.socket, event.id, header.isRemapped, key, remappingRecord, false );
+	}
+	this->dispatch( event );
+
+	return true;
+}
+
 
 bool CoordinatorWorker::init() {
 	Coordinator *coordinator = Coordinator::getInstance();

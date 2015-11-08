@@ -59,7 +59,7 @@ private:
 
 	bool handleGetResponse( SlaveEvent event, bool success, char *buf, size_t size );
 	bool handleSetResponse( SlaveEvent event, bool success, char *buf, size_t size );
-	bool handleRemappingSetLockResponse( SlaveEvent event, bool success, char *buf, size_t size );
+	bool handleRemappingSetLockResponse( CoordinatorEvent event, bool success, char *buf, size_t size );
 	bool handleRemappingSetResponse( SlaveEvent event, bool success, char *buf, size_t size );
 	bool handleUpdateResponse( SlaveEvent event, bool success, char *buf, size_t size );
 	bool handleDeleteResponse( SlaveEvent event, bool success, char *buf, size_t size );

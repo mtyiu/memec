@@ -118,9 +118,9 @@ void MasterRemapMsgHandler::setStatus( char* msg , int len ) {
 		signal = ( RemapStatus ) msg[ ofs + 6 ];
 		ofs += recordSize;
 
+		char buf[ INET_ADDRSTRLEN ];
+		inet_ntop( AF_INET, &slave.sin_addr.s_addr, buf, INET_ADDRSTRLEN );
 		if ( this->slavesStatus.count( slave ) == 0 ) {
-			char buf[ INET_ADDRSTRLEN ];
-			inet_ntop( AF_INET, &slave.sin_addr.s_addr, buf, INET_ADDRSTRLEN );
 			__ERROR__( "MasterRemapMsgHandler", "setStatus" , "slave %s:%hu not found\n", buf, slave.sin_port );
 			continue;
 		}
@@ -128,25 +128,25 @@ void MasterRemapMsgHandler::setStatus( char* msg , int len ) {
 		LOCK( &this->slavesStatusLock[ slave ] );
 		switch ( signal ) {
 			case REMAP_PREPARE_START:
-				printf( "REMAP_PREPARE_START\n" );
+				printf( "REMAP_PREPARE_START %s:%hu\n", buf, slave.sin_port );
 				// waiting for other masters
 				if ( this->slavesStatus[ slave ] == REMAP_WAIT_START )
 					signal = REMAP_WAIT_START;
 				break;
 			case REMAP_START:
-				printf( "REMAP_START\n" );
+				printf( "REMAP_START %s:%hu\n", buf, slave.sin_port );
 				break;
 			case REMAP_PREPARE_END:
-				printf( "REMAP_PREPARE_END\n" );
+				printf( "REMAP_PREPARE_END %s:%hu\n", buf, slave.sin_port );
 				// waiting for other masters
 				if ( this->slavesStatus[ slave ] == REMAP_WAIT_END )
 					signal = REMAP_WAIT_END ;
 				break;
 			case REMAP_NONE:
-				printf( "REMAP_NONE = END\n" );
+				printf( "REMAP_NONE = END %s:%hu\n", buf, slave.sin_port );
 				break;
 			default:
-				printf( "REMAP_%d\n", signal );
+				printf( "REMAP_%d %s:%hu\n", signal, buf, slave.sin_port );
 				UNLOCK( &this->slavesStatusLock[ slave ] );
 				return;
 		}

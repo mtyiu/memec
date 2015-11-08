@@ -20,8 +20,12 @@ public:
 	 * Store the mapping between keys and chunks
 	 * Key |-> (list ID, stripe ID, chunk ID)
 	 */
-	std::unordered_map<Key, Metadata> keys;
-	LOCK_T keysLock;
+	static std::unordered_map<Key, Metadata> keys;
+	static LOCK_T keysLock;
+	/**
+	 * Store the set of keys with lock acquired 
+	 */
+	static std::unordered_set<Key> lockedKeys;
 
 	static uint32_t *stripes;
 	static LOCK_T stripesLock;
@@ -31,9 +35,9 @@ public:
 
 	Map();
 
-	bool updateMaxStripeId( uint32_t listId, uint32_t stripeId );
+	static bool updateMaxStripeId( uint32_t listId, uint32_t stripeId );
 	bool seal( uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool needsLock = true, bool needsUnlock = true );
-	bool setKey( char *keyStr, uint8_t keySize, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint8_t opcode, bool needsLock = true, bool needsUnlock = true );
+	static bool setKey( char *keyStr, uint8_t keySize, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint8_t opcode, bool needsLock = true, bool needsUnlock = true );
 	void dump( FILE *f = stdout );
 	void persist( FILE *f );
 };

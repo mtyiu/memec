@@ -57,9 +57,11 @@
 #define PROTO_OPCODE_REDIRECT_DELETE              0x07
 
 // Master <-> Slave //
-#define PROTO_OPCODE_REMAPPING_LOCK               0x10
-#define PROTO_OPCODE_REMAPPING_SET                0x11
-#define PROTO_OPCODE_DEGRADED_OP                  0X12
+#define PROTO_OPCODE_REMAPPING_SET                0x10
+#define PROTO_OPCODE_DEGRADED_OP                  0X11
+
+// Master <-> Coordinator //
+#define PROTO_OPCODE_REMAPPING_LOCK               0x40
 
 // Slave <-> Slave //
 #define PROTO_OPCODE_SEAL_CHUNK                   0x20
@@ -223,10 +225,11 @@ struct ChunkUpdateHeader {
 ///////////////
 // Remapping //
 ///////////////
-#define PROTO_REMAPPING_LOCK_SIZE 9
+#define PROTO_REMAPPING_LOCK_SIZE 10
 struct RemappingLockHeader {
 	uint32_t listId;
 	uint32_t chunkId;
+	uint8_t isRemapped;
 	uint8_t keySize;
 	char *key;
 };
@@ -481,12 +484,12 @@ protected:
 	///////////////
 	size_t generateRemappingLockHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
-		uint32_t listId, uint32_t chunkId,
+		uint32_t listId, uint32_t chunkId, bool isRemapped, 
 		uint8_t keySize, char *key
 	);
 	bool parseRemappingLockHeader(
 		size_t offset, uint32_t &listId, uint32_t &chunkId,
-		uint8_t &keySize, char *&key,
+		bool isRemapped, uint8_t &keySize, char *&key,
 		char *buf, size_t size
 	);
 

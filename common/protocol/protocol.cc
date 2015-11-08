@@ -1013,14 +1013,15 @@ bool Protocol::parseChunkUpdateHeader( struct ChunkUpdateHeader &header, bool wi
 ///////////////
 // Remapping //
 ///////////////
-size_t Protocol::generateRemappingLockHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key ) {
+size_t Protocol::generateRemappingLockHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t chunkId, bool isRemapped, uint8_t keySize, char *key ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_REMAPPING_LOCK_SIZE + keySize, id );
 
 	*( ( uint32_t * )( buf     ) ) = htonl( listId );
 	*( ( uint32_t * )( buf + 4 ) ) = htonl( chunkId );
-	bytes += 8;
-	buf += 8;
+	*( ( uint32_t * )( buf + 8 ) ) = htonl( isRemapped ? 1 : 0 );
+	bytes += 9;
+	buf += 9;
 
 	buf[ 0 ] = keySize;
 	bytes++;
@@ -1032,19 +1033,20 @@ size_t Protocol::generateRemappingLockHeader( uint8_t magic, uint8_t to, uint8_t
 	return bytes;
 }
 
-bool Protocol::parseRemappingLockHeader( size_t offset, uint32_t &listId, uint32_t &chunkId, uint8_t &keySize, char *&key, char *buf, size_t size ) {
+bool Protocol::parseRemappingLockHeader( size_t offset, uint32_t &listId, uint32_t &chunkId, bool isRemapped, uint8_t &keySize, char *&key, char *buf, size_t size ) {
 	if ( size < PROTO_REMAPPING_LOCK_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
 	listId  = ntohl( *( ( uint32_t * )( ptr      ) ) );
 	chunkId = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
-	keySize = *( ptr + 8 );
+	isRemapped = *( ( uint8_t * )( ptr + 8 ) ) == 0 ? false : true ;
+	keySize = *( ptr + 9 );
 
 	if ( size < ( size_t ) PROTO_REMAPPING_LOCK_SIZE + keySize )
 		return false;
 
-	key = ptr + 9;
+	key = ptr + PROTO_REMAPPING_LOCK_SIZE;
 
 	return true;
 }
@@ -1058,6 +1060,7 @@ bool Protocol::parseRemappingLockHeader( struct RemappingLockHeader &header, cha
 		offset,
 		header.listId,
 		header.chunkId,
+		header.isRemapped,
 		header.keySize,
 		header.key,
 		buf, size

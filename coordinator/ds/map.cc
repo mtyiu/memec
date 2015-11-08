@@ -2,12 +2,16 @@
 
 uint32_t *Map::stripes;
 LOCK_T Map::stripesLock;
+std::unordered_map<Key, Metadata> Map::keys;
+LOCK_T Map::keysLock;
+std::unordered_set<Key> Map::lockedKeys;
 
 void Map::init( uint32_t numStripeList ) {
 	Map::stripes = new uint32_t[ numStripeList ];
 	LOCK_INIT( &Map::stripesLock );
 	for ( uint32_t i = 0; i < numStripeList; i++ )
 		Map::stripes[ i ] = 0;
+	LOCK_INIT( &Map::keysLock );
 }
 
 void Map::free() {
@@ -16,7 +20,6 @@ void Map::free() {
 
 Map::Map() {
 	LOCK_INIT( &this->chunksLock );
-	LOCK_INIT( &this->keysLock );
 }
 
 bool Map::updateMaxStripeId( uint32_t listId, uint32_t stripeId ) {
@@ -57,18 +60,24 @@ bool Map::setKey( char *keyStr, uint8_t keySize, uint32_t listId, uint32_t strip
 	std::pair<Key, Metadata> p( key, metadata );
 	bool ret = true;
 
-	if ( needsLock ) LOCK( &this->keysLock );
-	it = this->keys.find( key );
-	if ( it == this->keys.end() && opcode == PROTO_OPCODE_SET ) {
+	if ( needsLock ) LOCK( &Map::keysLock );
+	it = Map::keys.find( key );
+	if ( it == Map::keys.end() && opcode == PROTO_OPCODE_SET ) {
 		std::pair<std::unordered_map<Key, Metadata>::iterator, bool> r;
-		r = this->keys.insert( p );
+		r = Map::keys.insert( p );
 		ret = r.second;
-	} else if ( it != this->keys.end() && opcode == PROTO_OPCODE_DELETE ) {
-		this->keys.erase( it );
+	} else if ( it != Map::keys.end() && opcode == PROTO_OPCODE_DELETE ) {
+		Map::keys.erase( it );
+	} else if ( it == Map::keys.end() && opcode == PROTO_OPCODE_REMAPPING_LOCK ) {
+		// check if lock is already acquired by others
+		if ( Map::lockedKeys.count( key ) )
+			ret = false;
+		else
+			Map::lockedKeys.insert( key );
 	} else {
 		ret = false;
 	}
-	if ( needsUnlock ) UNLOCK( &this->keysLock );
+	if ( needsUnlock ) UNLOCK( &Map::keysLock );
 
 	Map::updateMaxStripeId( listId, stripeId );
 
