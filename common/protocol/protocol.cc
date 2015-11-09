@@ -1019,7 +1019,7 @@ size_t Protocol::generateRemappingLockHeader( uint8_t magic, uint8_t to, uint8_t
 
 	*( ( uint32_t * )( buf     ) ) = htonl( listId );
 	*( ( uint32_t * )( buf + 4 ) ) = htonl( chunkId );
-	*( ( uint32_t * )( buf + 8 ) ) = htonl( isRemapped ? 1 : 0 );
+	buf[ 8 ] = isRemapped ? 1 : 0;
 	bytes += 9;
 	buf += 9;
 
@@ -1033,14 +1033,14 @@ size_t Protocol::generateRemappingLockHeader( uint8_t magic, uint8_t to, uint8_t
 	return bytes;
 }
 
-bool Protocol::parseRemappingLockHeader( size_t offset, uint32_t &listId, uint32_t &chunkId, bool isRemapped, uint8_t &keySize, char *&key, char *buf, size_t size ) {
+bool Protocol::parseRemappingLockHeader( size_t offset, uint32_t &listId, uint32_t &chunkId, bool &isRemapped, uint8_t &keySize, char *&key, char *buf, size_t size ) {
 	if ( size < PROTO_REMAPPING_LOCK_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
 	listId  = ntohl( *( ( uint32_t * )( ptr      ) ) );
 	chunkId = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
-	isRemapped = *( ( uint8_t * )( ptr + 8 ) ) == 0 ? false : true ;
+	isRemapped = ( ptr[ 8 ] != 0 );
 	keySize = *( ptr + 9 );
 
 	if ( size < ( size_t ) PROTO_REMAPPING_LOCK_SIZE + keySize )

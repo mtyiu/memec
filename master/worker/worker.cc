@@ -831,7 +831,9 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 		 /* allowDegraded */ false, &isDegraded
 	);
 
-	if ( ! socket ) {
+	remappedSocket = this->getSlaves( remappedListId, remappedChunkId, false, &isDegraded );
+
+	if ( ! socket || ! remappedSocket ) {
 		Key key;
 		key.set( header.keySize, header.key );
 		event.resSet( event.socket, event.id, key, false, false );
@@ -845,7 +847,6 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 	if ( NO_REMAPPING ) {
 		MasterWorker::slaveSockets->get( sockfd )->counter.increaseLockOnly();
 	} else {
-		remappedSocket = this->getSlaves( remappedListId, remappedChunkId, false, &isDegraded );
 		sockfd = remappedSocket->getSocket();
 		// fprintf(
 		// 	stderr, "remap from (%u, %u) to (%u, %u) for key: %.*s\n",
@@ -882,7 +883,7 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 	buffer.data = this->protocol.reqRemappingSetLock(
 		buffer.size, requestId,
 		remappedListId, remappedChunkId,
-		! NO_REMAPPING,
+		NO_REMAPPING ? false : true,
 		header.key, header.keySize
 	);
 
@@ -900,11 +901,13 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 		if ( sentBytes != ( ssize_t ) buffer.size ) {
 			__ERROR__( "MasterWorker", "handleRemappingSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 			if ( i == 0 ) {
-				if ( NO_REMAPPING ) 
+				if ( NO_REMAPPING ) {
 					MasterWorker::slaveSockets->get( sockfd )->counter.decreaseLockOnly();
-				else
+					Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
+				} else {
 					MasterWorker::slaveSockets->get( sockfd )->counter.decreaseRemapping();
-				Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
+					Master::getInstance()->remapMsgHandler.ackRemap( remappedSocket->getAddr() );
+				}
 				return false;
 			} else {
 				// TODO handle message failure for some coordinators
@@ -1515,7 +1518,7 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 
 	// Mark the elapse time as latency
 	Master* master = Master::getInstance();
-	if ( master->config.master.loadingStats.updateInterval > 0 ) {
+	if ( master->config.master.loadingStats.updateInterval > 0 && NO_REMAPPING ) {
 		timespec elapsedTime;
 		RequestStartTime rst;
 

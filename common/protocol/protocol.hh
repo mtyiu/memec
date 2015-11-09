@@ -229,7 +229,7 @@ struct ChunkUpdateHeader {
 struct RemappingLockHeader {
 	uint32_t listId;
 	uint32_t chunkId;
-	uint8_t isRemapped;
+	bool isRemapped;
 	uint8_t keySize;
 	char *key;
 };
@@ -489,7 +489,7 @@ protected:
 	);
 	bool parseRemappingLockHeader(
 		size_t offset, uint32_t &listId, uint32_t &chunkId,
-		bool isRemapped, uint8_t &keySize, char *&key,
+		bool &isRemapped, uint8_t &keySize, char *&key,
 		char *buf, size_t size
 	);
 

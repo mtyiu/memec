@@ -82,9 +82,9 @@ char *SlaveProtocol::resRemappingSet( size_t &size, bool toMaster, uint32_t id, 
 		toMaster ? PROTO_MAGIC_TO_MASTER : PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_REMAPPING_SET,
 		id,
-		true, // TODO whether this is a true remapped key
 		listId,
 		chunkId,
+		true, // TODO whether this is a true remapped key
 		keySize,
 		key
 	);

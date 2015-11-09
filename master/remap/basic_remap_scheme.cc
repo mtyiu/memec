@@ -9,6 +9,7 @@ MasterRemapMsgHandler *BasicRemappingScheme::remapMsgHandler = NULL;
 Latency BasicRemappingScheme::increment ( 0, 100 );
 LOCK_T BasicRemappingScheme::lock = PTHREAD_MUTEX_INITIALIZER;
 uint32_t BasicRemappingScheme::remapped = 0;
+uint32_t BasicRemappingScheme::lockonly= 0;
 
 void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t originalChunkId, uint32_t &remappedListId, uint32_t &remappedChunkId, uint32_t dataCount, uint32_t parityCount, SlaveSocket **data, SlaveSocket **parity ) {
 	int index = -1, leastOverloadedId = -1;
@@ -28,8 +29,10 @@ void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t ori
 	slaveAddr = data[ originalChunkId ]->getAddr();
 
 	// check if remamping is allowed
-	if ( ! remapMsgHandler->allowRemapping( slaveAddr ) )
+	if ( ! remapMsgHandler->allowRemapping( slaveAddr ) ) {
+		lockonly++;
 		return;
+	}
 
 	// skip remap if not overloaded
 	if ( overloadedSlave->slaveSet.count( slaveAddr ) < 1 )
@@ -100,6 +103,7 @@ void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t ori
 			remappedChunkId = leastOverloadedId;
 		*targetLatency = *targetLatency + increment;
 	}
+
 
 exit:
 

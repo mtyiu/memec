@@ -793,8 +793,10 @@ void Master::printRemapping( FILE *f ) {
 
 	fprintf(
 		f,
-		"\nRemapped SET Ops: %d\n",
-		BasicRemappingScheme::remapped
+		"\nRemapped SET Ops: %d\n"
+		"\nLockOnly SET Ops: %d\n",
+		BasicRemappingScheme::remapped,
+		BasicRemappingScheme::lockonly
 	);
 }
 
