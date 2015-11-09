@@ -2420,6 +2420,11 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 				if ( isKeyValueFound ) {
 					uint32_t chunkUpdateOffset = keyMetadata.offset + op.data.keyValueUpdate.offset;
 
+					// Insert into master UPDATE pending set
+					if ( ! SlaveWorker::pending->insertKeyValueUpdate( PT_MASTER_UPDATE, pid.parentId, op.socket, op.data.keyValueUpdate ) ) {
+						__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot insert into master UPDATE pending map." );
+					}
+
 					SlaveWorker::degradedChunkBuffer->updateKeyValue(
 						key.size, key.data,
 						op.data.keyValueUpdate.length,
@@ -2459,6 +2464,11 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 				char *delta = this->buffer.data;
 
 				if ( isKeyValueFound ) {
+					// Insert into master DELETE pending set
+					if ( ! SlaveWorker::pending->insertKey( PT_MASTER_DEL, pid.parentId, op.socket, op.data.key ) ) {
+						__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot insert into master DELETE pending map." );
+					}
+
 					SlaveWorker::degradedChunkBuffer->deleteKey(
 						PROTO_OPCODE_DELETE,
 						key.size, key.data, true /* isSealed */,
