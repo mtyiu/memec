@@ -137,19 +137,10 @@ public:
 	}
 
 	bool insertKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata ) {
-		OpMetadata opMetadata;
-		opMetadata.clone( keyMetadata );
-		opMetadata.opcode = opcode;
+		key.dup();
 
-		Key k1, k2;
-
-		k1.dup( key.size, key.data );
-		std::pair<Key, KeyMetadata> keyPair( k1, keyMetadata );
+		std::pair<Key, KeyMetadata> keyPair( key, keyMetadata );
 		std::pair<std::unordered_map<Key, KeyMetadata>::iterator, bool> keyRet;
-
-		k2.dup( key.size, key.data );
-		std::pair<Key, OpMetadata> opPair( k2, opMetadata );
-		std::pair<std::unordered_map<Key, OpMetadata>::iterator, bool> opRet;
 
 		LOCK( &this->keysLock );
 		keyRet = this->keys.insert( keyPair );
@@ -159,15 +150,39 @@ public:
 		}
 		UNLOCK( &this->keysLock );
 
+		return this->insertOpMetadata( opcode, key, keyMetadata );
+	}
+
+	bool insertOpMetadata( uint8_t opcode, Key key, KeyMetadata keyMetadata, bool dup = true ) {
+		bool ret;
+		std::unordered_map<Key, OpMetadata>::iterator opsIt;
+		std::pair<std::unordered_map<Key, OpMetadata>::iterator, bool> opRet;
+
 		LOCK( &this->opsLock );
-		opRet = this->ops.insert( opPair );
-		if ( ! opRet.second ) {
-			UNLOCK( &this->opsLock );
-			return false;
+		opsIt = this->ops.find( key );
+		if ( opsIt == this->ops.end() ) {
+			OpMetadata opMetadata;
+			opMetadata.clone( keyMetadata );
+			opMetadata.opcode = opcode;
+
+			if ( dup ) key.dup();
+
+			std::pair<Key, OpMetadata> opsPair( key, opMetadata );
+			std::pair<std::unordered_map<Key, OpMetadata>::iterator, bool> opsRet;
+
+			opsRet = this->ops.insert( opsPair );
+			ret = opsRet.second;
+		} else if ( opcode == PROTO_OPCODE_DELETE ) {
+			Key k = opsIt->first;
+			this->ops.erase( opsIt );
+			k.free();
+			ret = true;
+		} else {
+			ret = false;
 		}
 		UNLOCK( &this->opsLock );
 
-		return true;
+		return ret;
 	}
 
 	bool seal( uint32_t listId, uint32_t stripeId, uint32_t chunkId ) {
@@ -197,15 +212,12 @@ public:
 		}
 		UNLOCK( &this->remapLock );
 
-		OpMetadata opMetadata;
-		opMetadata.listId = remappingRecord.listId;
-		opMetadata.chunkId = remappingRecord.chunkId;
-		opMetadata.opcode = PROTO_OPCODE_REMAPPING_LOCK;
-		LOCK( &this->opsLock );
-		this->ops[ key ] = opMetadata;
-		UNLOCK( &this->opsLock );
+		KeyMetadata keyMetadata;
 
-		return true;
+		keyMetadata.listId = remappingRecord.listId;
+		keyMetadata.chunkId = remappingRecord.chunkId;
+
+		return this->insertOpMetadata( PROTO_OPCODE_REMAPPING_LOCK, key, keyMetadata, false );
 	}
 
 	void setChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, Chunk *chunk, bool isParity = false ) {
@@ -266,31 +278,7 @@ public:
 		}
 		if ( needsUnlock ) UNLOCK( &this->keysLock );
 
-		LOCK( &this->opsLock );
-		opsIt = this->ops.find( key );
-		if ( opsIt == this->ops.end() ) {
-			OpMetadata opMetadata;
-			opMetadata.clone( keyMetadata );
-			opMetadata.opcode = opcode;
-
-			key.dup();
-
-			std::pair<Key, OpMetadata> opsPair( key, opMetadata );
-			std::pair<std::unordered_map<Key, OpMetadata>::iterator, bool> opsRet;
-
-			opsRet = this->ops.insert( opsPair );
-			if ( ! opsRet.second ) {
-				if ( needsUnlock ) UNLOCK( &this->opsLock );
-				return false;
-			}
-		} else {
-			k = opsIt->first;
-			this->ops.erase( opsIt );
-			k.free();
-		}
-		UNLOCK( &this->opsLock );
-
-		return true;
+		return this->insertOpMetadata( opcode, key, keyMetadata );
 	}
 
 	void getKeysMap( std::unordered_map<Key, KeyMetadata> *&keys, LOCK_T *&lock ) {

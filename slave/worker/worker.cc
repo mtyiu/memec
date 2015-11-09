@@ -1446,6 +1446,7 @@ bool SlaveWorker::handleDegradedRequest( MasterEvent event, uint8_t opcode, char
 	Key key;
 	KeyValue keyValue;
 	KeyValueUpdate keyValueUpdate;
+	KeyMetadata keyMetadata;
 	DegradedMap *dmap = &SlaveWorker::degradedChunkBuffer->map;
 	char *valueUpdate;
 
@@ -1466,7 +1467,7 @@ bool SlaveWorker::handleDegradedRequest( MasterEvent event, uint8_t opcode, char
 		keyStr = header.data.key.key;
 		keySize = header.data.key.keySize;
 	}
-	isKeyValueFound = dmap->findValueByKey( keyStr, keySize, &keyValue, &key );
+	isKeyValueFound = dmap->findValueByKey( keyStr, keySize, &keyValue, &key, &keyMetadata );
 
 	switch ( opcode ) {
 		case PROTO_OPCODE_DEGRADED_GET:
@@ -1525,15 +1526,27 @@ bool SlaveWorker::handleDegradedRequest( MasterEvent event, uint8_t opcode, char
 			key.dup( keySize, keyStr );
 
 			printf( "Degraded DELETE: TODO...\n" );
-			if ( chunk ) {
-				if ( isKeyValueFound ) {
-					// event.resDelete( event.socket, event.id, keyValue, true );
+			if ( isKeyValueFound ) {
+				uint32_t deltaSize = this->buffer.size;
+				char *delta = this->buffer.data;
+
+				SlaveWorker::degradedChunkBuffer->deleteKey(
+					PROTO_OPCODE_DELETE,
+					keySize, keyStr, chunk, /* isSealed */
+					deltaSize, delta, chunk
+				);
+
+				if ( chunk ) {
+					assert( header.isSealed );
 				} else {
-					event.resDelete(
-						event.socket, event.id, key,
-						false, true, true
-					);
+
 				}
+			} else if ( chunk ) {
+				// Key not found
+				event.resDelete(
+					event.socket, event.id, key,
+					false, true, true
+				);
 			}
 			break;
 		default:
@@ -1959,27 +1972,40 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 
 	if ( ! SlaveWorker::pending->eraseKey( PT_SLAVE_PEER_GET, event.id, event.socket, &pid ) ) {
 		__ERROR__( "SlaveWorker", "handleGetResponse", "Cannot find a pending slave UNSEALED_GET request that matches the response. This message will be discarded. (ID: %u)", event.id );
+		if ( success ) keyValue.free();
 		return false;
 	} else if ( ! SlaveWorker::pending->eraseDegradedOp( PT_SLAVE_PEER_DEGRADED_OPS, event.id, event.socket, &pid, &op ) ) {
 		__ERROR__( "SlaveWorker", "handleGetResponse", "Cannot find a pending slave DEGRADED_OPS request that matches the response. This message will be discarded." );
+		if ( success ) keyValue.free();
 		return false;
+	} else if ( success ) {
+		if ( op.opcode == PROTO_OPCODE_DEGRADED_DELETE ) {
+			keyValue.free();
+			SlaveWorker::degradedChunkBuffer->map.deleteValue( key, PROTO_OPCODE_DELETE );
+
+			// TODO: Forward the DELETE request to the parity slaves
+		} else if ( ! SlaveWorker::degradedChunkBuffer->map.insertValue( keyValue ) ) {
+			__ERROR__( "SlaveWorker", "handleGetResponse", "Cannot insert into degraded chunk buffer values map." );
+			if ( success ) keyValue.free();
+			return false;
+		}
 	}
 
 	MasterEvent masterEvent;
 	switch( op.opcode ) {
 		case PROTO_OPCODE_DEGRADED_GET:
-			key = op.data.key;
 			if ( success ) {
+				op.data.key.free();
 				masterEvent.resGet( op.socket, pid.parentId, keyValue, true );
-				key.free();
 			} else {
 				masterEvent.resGet( op.socket, pid.parentId, key, true );
 			}
-			SlaveWorker::eventQueue->insert( masterEvent );
+			this->dispatch( masterEvent );
 			break;
 		case PROTO_OPCODE_DEGRADED_UPDATE:
 			break;
 		case PROTO_OPCODE_DEGRADED_DELETE:
+			// masterEvent.resDelete( op.socket, pid.parentId, key, success, false, true );
 			break;
 	}
 

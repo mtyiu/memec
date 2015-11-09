@@ -1,6 +1,7 @@
 #ifndef __SLAVE_BUFFER_DEGRADED_CHUNK_BUFFER_HH__
 #define __SLAVE_BUFFER_DEGRADED_CHUNK_BUFFER_HH__
 
+#include "../ds/map.hh"
 #include "chunk_buffer.hh"
 
 class DegradedMap {
@@ -12,6 +13,12 @@ private:
 	std::unordered_map<Key, KeyMetadata> keys;
 	LOCK_T keysLock;
 	/**
+	 * Store the key-value pairs from unsealed chunks
+	 * Key |-> KeyValue
+	 */
+	std::unordered_map<Key, KeyValue> values;
+	LOCK_T valuesLock;
+	/**
 	 * Store the cached chunks
 	 * (list ID, stripe ID, chunk ID) |-> Chunk *
 	 */
@@ -21,6 +28,7 @@ private:
 public:
 	DegradedMap() {
 		LOCK_INIT( &this->keysLock );
+		LOCK_INIT( &this->valuesLock );
 		LOCK_INIT( &this->cacheLock );
 	}
 
@@ -101,6 +109,18 @@ public:
 		return true;
 	}
 
+	bool insertValue( KeyValue &keyValue ) { // KeyValue's data is allocated by malloc()
+		Key key = keyValue.key();
+		std::pair<Key, KeyValue> p( key, keyValue );
+		std::pair<std::unordered_map<Key, KeyValue>::iterator, bool> ret;
+
+		LOCK( &this->valuesLock );
+		ret = this->values.insert( p );
+		UNLOCK( &this->valuesLock );
+
+		return ret.second;
+	}
+
 	void setChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, Chunk *chunk, bool isParity = false ) {
 		Metadata metadata;
 		metadata.set( listId, stripeId, chunkId );
@@ -158,6 +178,29 @@ public:
 		}
 		if ( needsUnlock ) UNLOCK( &this->keysLock );
 
+		// TODO: Add to opMap
+
+		return true;
+	}
+
+	bool deleteValue( Key key, uint8_t opcode ) {
+		std::unordered_map<Key, KeyValue>::iterator it;
+		KeyValue keyValue;
+
+		LOCK( &this->valuesLock );
+		it = this->values.find( key );
+		if ( it == this->values.end() ) {
+			UNLOCK( &this->valuesLock );
+			return false;
+		} else {
+			keyValue = it->second;
+			this->values.erase( it );
+			keyValue.free();
+		}
+		UNLOCK( &this->valuesLock );
+
+		// TODO: Add to opMap
+
 		return true;
 	}
 
@@ -212,11 +255,17 @@ public:
 class DegradedChunkBuffer : public ChunkBuffer {
 public:
 	DegradedMap map;
+	Map *slaveMap;
 
 	DegradedChunkBuffer();
 
+	void init( Map *slaveMap );
+
 	void print( FILE *f = stdout );
 	void stop();
+
+	bool updateKeyValue( uint8_t keySize, char *keyStr, uint32_t valueUpdateSize, uint32_t valueUpdateOffset, char *valueUpdate, bool isSealed );
+	bool deleteKey( uint8_t opcode, uint8_t keySize, char *keyStr, bool isSealed, uint32_t &deltaSize, char *delta, Chunk *chunk );
 
 	~DegradedChunkBuffer();
 };

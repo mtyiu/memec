@@ -154,6 +154,9 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 			);
 		}
 	}
+	// Map //
+	this->degradedChunkBuffer.init( &this->map );
+
 	/* Workers, ID generator, packet pool and event queues */
 	if ( this->config.slave.workers.type == WORKER_TYPE_MIXED ) {
 		this->idGenerator.init( this->config.slave.workers.number.mixed );
