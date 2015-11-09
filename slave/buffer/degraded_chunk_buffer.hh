@@ -24,12 +24,19 @@ private:
 	 */
 	std::unordered_map<Metadata, Chunk *> cache;
 	LOCK_T cacheLock;
+	/**
+	 * Store the set of reconstructed chunks
+	 * (list ID, stripe ID, chunk ID)
+	 */
+	std::unordered_set<Metadata> reconstructed;
+	LOCK_T reconstructedLock;
 
 public:
 	DegradedMap() {
 		LOCK_INIT( &this->keysLock );
 		LOCK_INIT( &this->valuesLock );
 		LOCK_INIT( &this->cacheLock );
+		LOCK_INIT( &this->reconstructedLock );
 	}
 
 	bool findValueByKey( char *data, uint8_t size, KeyValue *keyValue, Key *keyPtr = 0, KeyMetadata *keyMetadataPtr = 0, Metadata *metadataPtr = 0, Chunk **chunkPtr = 0 ) {
@@ -121,15 +128,31 @@ public:
 		return ret.second;
 	}
 
-	void setChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, Chunk *chunk, bool isParity = false ) {
+	bool insertReconstructedChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId ) {
 		Metadata metadata;
 		metadata.set( listId, stripeId, chunkId );
 
+		std::pair<std::unordered_set<Metadata>::iterator, bool> ret;
+
+		LOCK( &this->reconstructedLock );
+		ret = this->reconstructed.insert( metadata );
+		UNLOCK( &this->reconstructedLock );
+
+		return ret.second;
+	}
+
+	bool setChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, Chunk *chunk, bool isParity = false ) {
+		Metadata metadata;
+		metadata.set( listId, stripeId, chunkId );
+
+		std::pair<Metadata, Chunk *> p( metadata, chunk );
+		std::pair<std::unordered_map<Metadata, Chunk *>::iterator, bool> ret;
+
 		LOCK( &this->cacheLock );
-		this->cache[ metadata ] = chunk;
+		ret = this->cache.insert( p );
 		UNLOCK( &this->cacheLock );
 
-		if ( ! isParity ) {
+		if ( ret.second && ! isParity ) {
 			char *ptr = chunk->getData();
 			char *keyPtr, *valuePtr;
 			uint8_t keySize;
@@ -159,6 +182,8 @@ public:
 			}
 			UNLOCK( &this->keysLock );
 		}
+
+		return ret.second;
 	}
 
 	bool deleteKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata, bool needsLock, bool needsUnlock ) {
