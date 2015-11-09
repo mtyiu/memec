@@ -73,7 +73,7 @@ public class Main implements Runnable {
 			size = this.map.size();
 			ret = false;
 
-			/*
+			/* */
 			if ( i == numRecords ) {
 				// Wait for 20 seconds
 				System.out.println( "Sleep for 10 seconds..." );
@@ -87,9 +87,11 @@ public class Main implements Runnable {
 				rand = 0;
 			} else {
 				// rand = rand == 0 ? 1 : rand;
-				rand = 1;
+				// rand = 1;
+
+				rand = rand == 3 ? 1 : rand;
 			}
-			*/
+			/* */
 
 			if ( rand == 0 ) {
 				// SET

@@ -95,7 +95,7 @@ bool SlavePeerSocket::setRecvFd( int fd, struct sockaddr_in *addr ) {
 
 ssize_t SlavePeerSocket::send( char *buf, size_t ulen, bool &connected ) {
 	if ( this->self ) {
-		__ERROR__( "SlavePeerSocket", "send", "send() should not be called for self-socket (opcode = %u)!", buf[ 1 ] );
+		__ERROR__( "SlavePeerSocket", "send", "send() should not be called for self-socket (opcode = 0x%x)!", buf[ 1 ] );
 		return 0;
 	}
 	return Socket::send( this->sockfd, buf, ulen, connected );

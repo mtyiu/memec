@@ -12,14 +12,33 @@ void DegradedChunkBuffer::print( FILE *f ) {
 
 void DegradedChunkBuffer::stop() {}
 
-bool DegradedChunkBuffer::updateKeyValue( uint8_t keySize, char *keyStr, uint32_t valueUpdateSize, uint32_t valueUpdateOffset, char *valueUpdate, bool isSealed ) {
+bool DegradedChunkBuffer::updateKeyValue( uint8_t keySize, char *keyStr, uint32_t valueUpdateSize, uint32_t valueUpdateOffset, uint32_t chunkUpdateOffset, char *valueUpdate, Chunk *chunk, bool isSealed ) {
 	Key key;
-	key.set( keySize, keyStr );
-	if ( isSealed ) {
+	LOCK_T *keysLock, *cacheLock;
+	std::unordered_map<Key, KeyMetadata> *keys;
+	std::unordered_map<Metadata, Chunk *> *cache;
 
+	this->map.getKeysMap( keys, keysLock );
+	this->map.getCacheMap( cache, cacheLock );
+
+	key.set( keySize, keyStr );
+
+	LOCK( keysLock );
+	if ( isSealed ) {
+		LOCK( cacheLock );
+		chunk->computeDelta(
+			valueUpdate, // delta
+			valueUpdate, // new data
+			chunkUpdateOffset,
+			valueUpdateSize,
+			true // perform update
+		);
+		UNLOCK( cacheLock );
 	} else {
 
 	}
+	UNLOCK( keysLock );
+
 	return false;
 }
 
