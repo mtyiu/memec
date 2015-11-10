@@ -33,7 +33,7 @@ public:
 
 	int lockChunk( Chunk *chunk, bool keepGlobalLock = false );
 	void updateAndUnlockChunk( int index );
-	void unlock();
+	void unlock( int index = -1 );
 
 	bool findValueByKey( char *data, uint8_t size, KeyValue *keyValuePtr, Key *keyPtr = 0 );
 

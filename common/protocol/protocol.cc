@@ -1798,7 +1798,8 @@ size_t Protocol::generateChunkDataHeader( uint8_t magic, uint8_t to, uint8_t opc
 
 	buf += PROTO_CHUNK_DATA_SIZE;
 
-	memmove( buf, chunkData, chunkSize );
+	if ( chunkSize && chunkData )
+		memmove( buf, chunkData, chunkSize );
 	bytes += PROTO_CHUNK_DATA_SIZE + chunkSize;
 
 	return bytes;

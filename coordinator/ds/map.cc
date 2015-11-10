@@ -151,7 +151,6 @@ void Map::dump( FILE *f ) {
 	if ( ! this->chunks.size() ) {
 		fprintf( f, "(None)\n" );
 	} else {
-		/*
 		for ( std::unordered_set<Metadata>::iterator it = this->chunks.begin(); it != this->chunks.end(); it++ ) {
 			const Metadata &m = *it;
 			fprintf(
@@ -159,7 +158,6 @@ void Map::dump( FILE *f ) {
 				m.listId, m.stripeId, m.chunkId
 			);
 		}
-		*/
 		fprintf( f, "Count: %lu\n", this->chunks.size() );
 	}
 	UNLOCK( &this->chunksLock );

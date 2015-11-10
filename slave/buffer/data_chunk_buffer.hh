@@ -41,7 +41,7 @@ public:
 
 	int lockChunk( Chunk *chunk, bool keepGlobalLock );
 	void updateAndUnlockChunk( int index );
-	void unlock();
+	void unlock( int index = -1 );
 
 	uint32_t flush( SlaveWorker *worker, bool lock = true, bool lockAtIndex = false );
 	Chunk *flushAt( SlaveWorker *worker, int index, bool lock = true );

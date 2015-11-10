@@ -283,7 +283,9 @@ void DataChunkBuffer::updateAndUnlockChunk( int index ) {
 	UNLOCK( &this->lock );
 }
 
-void DataChunkBuffer::unlock() {
+void DataChunkBuffer::unlock( int index ) {
+	if ( index != -1 )
+		UNLOCK( this->locks + index );
 	UNLOCK( &this->lock );
 }
 

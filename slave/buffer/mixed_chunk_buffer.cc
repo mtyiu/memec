@@ -74,10 +74,10 @@ void MixedChunkBuffer::updateAndUnlockChunk( int index ) {
 	}
 }
 
-void MixedChunkBuffer::unlock() {
+void MixedChunkBuffer::unlock( int index ) {
 	switch( this->role ) {
 		case CBR_DATA:
-			this->buffer.data->unlock();
+			this->buffer.data->unlock( index );
 			break;
 		case CBR_PARITY:
 		default:

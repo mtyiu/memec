@@ -139,13 +139,13 @@ uint32_t Chunk::updateData() {
 		if ( keySize == 0 && valueSize == 0 )
 			break;
 
-		if ( valueSize > Chunk::capacity ) {
-			fprintf(
-				stderr, "[%s] Current position: %lu; key size = %u, value size = %u\n",
-				this->status == CHUNK_STATUS_RECONSTRUCTED ? "Reconstructed" : "Normal",
-				ptr - this->data, keySize, valueSize
-			);
-		}
+		// if ( valueSize > Chunk::capacity ) {
+		// 	fprintf(
+		// 		stderr, "[%s] Current position: %lu; key size = %u, value size = %u\n",
+		// 		this->status == CHUNK_STATUS_RECONSTRUCTED ? "Reconstructed" : "Normal",
+		// 		ptr - this->data, keySize, valueSize
+		// 	);
+		// }
 
 		tmp = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
 
