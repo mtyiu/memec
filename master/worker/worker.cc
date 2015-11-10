@@ -822,7 +822,7 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 	uint32_t originalListId, originalChunkId, remappedListId, remappedChunkId;
 	bool isDegraded, connected;
 	ssize_t sentBytes;
-	SlaveSocket *socket, *remappedSocket;
+	SlaveSocket *socket;
 
 	socket = this->getSlave(
 		header.key, header.keySize,
@@ -831,9 +831,7 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 		 /* allowDegraded */ false, &isDegraded
 	);
 
-	remappedSocket = this->getSlaves( remappedListId, remappedChunkId, false, &isDegraded );
-
-	if ( ! socket || ! remappedSocket ) {
+	if ( ! socket ) {
 		Key key;
 		key.set( header.keySize, header.key );
 		event.resSet( event.socket, event.id, key, false, false );
@@ -843,11 +841,11 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 
 
 #define NO_REMAPPING ( originalListId == remappedListId && originalChunkId == remappedChunkId )
+	// always increment the counter of the original slave
 	int sockfd = socket->getSocket();
 	if ( NO_REMAPPING ) {
 		MasterWorker::slaveSockets->get( sockfd )->counter.increaseLockOnly();
 	} else {
-		sockfd = remappedSocket->getSocket();
 		// fprintf(
 		// 	stderr, "remap from (%u, %u) to (%u, %u) for key: %.*s\n",
 		// 	originalListId, originalChunkId,
@@ -866,8 +864,10 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
 
+	if ( MasterWorker::pending->count( PT_APPLICATION_SET, event.id, true, true ) )
+		printf( "collision on %d\n", event.id );
 	// Insert the key into application SET pending map
-	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_SET, event.id, ( void * ) event.socket, key ) ) {
+	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_SET, event.id, ( void * ) event.socket, key, true, true ) ) {
 		__ERROR__( "MasterWorker", "handleRemappingSetRequest", "Cannot insert into application SET pending map." );
 	}
 
@@ -889,25 +889,29 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 
 	for( uint32_t i = 0; i < Master::getInstance()->sockets.coordinators.size(); i++ ) {
 		CoordinatorSocket *coordinator = Master::getInstance()->sockets.coordinators.values[ i ];
-		sentBytes = coordinator->send( buffer.data, buffer.size, connected );
 
 		// Insert the remapping record into master REMAPPING_SET pending map
 		// Note: the records point to the same copy of value
 		RemappingRecord remappingRecord( remappedListId, remappedChunkId, value );
-		if ( ! MasterWorker::pending->insertRemappingRecord( PT_SLAVE_REMAPPING_SET, requestId, event.id, coordinator, remappingRecord ) ) {
+		if ( ! MasterWorker::pending->insertRemappingRecord( PT_SLAVE_REMAPPING_SET, requestId, event.id, coordinator, remappingRecord, true, true ) ) {
 			__ERROR__( "MasterWorker", "handleRemappingSetRequest", "Cannot insert into slave REMAPPING_SET pending map." );
 		}
+
+		// send the message
+		sentBytes = coordinator->send( buffer.data, buffer.size, connected );
 
 		if ( sentBytes != ( ssize_t ) buffer.size ) {
 			__ERROR__( "MasterWorker", "handleRemappingSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 			if ( i == 0 ) {
+				// revert all changes made
+				MasterWorker::pending->eraseRemappingRecord( PT_SLAVE_REMAPPING_SET, requestId, coordinator, 0, 0, true, true );
+				delete value;
 				if ( NO_REMAPPING ) {
 					MasterWorker::slaveSockets->get( sockfd )->counter.decreaseLockOnly();
-					Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
 				} else {
 					MasterWorker::slaveSockets->get( sockfd )->counter.decreaseRemapping();
-					Master::getInstance()->remapMsgHandler.ackRemap( remappedSocket->getAddr() );
 				}
+				Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
 				return false;
 			} else {
 				// TODO handle message failure for some coordinators
@@ -1342,18 +1346,20 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 		( int ) header.keySize, header.key, header.keySize, header.listId, header.chunkId
 	);
 
+	uint32_t originalListId, originalChunkId;
+
+	this->getSlaves(
+		header.key, header.keySize,
+		originalListId, originalChunkId, /* allowDegraded */ false, 0
+	);
+
+
 	PendingIdentifier pid;
 	RemappingRecord remappingRecord;
 
-	uint32_t originalListId, originalChunkId;
-	originalListId = MasterWorker::stripeList->get(
-		header.key, ( size_t ) header.keySize,
-		0, 0, &originalChunkId, false
-	);
-
 #define NO_REMAPPING ( originalListId == header.listId && originalChunkId == header.chunkId )
-
-	if ( ! MasterWorker::pending->eraseRemappingRecord( PT_SLAVE_REMAPPING_SET, event.id, event.socket, &pid, &remappingRecord ) ) {
+	if ( ! MasterWorker::pending->eraseRemappingRecord( PT_SLAVE_REMAPPING_SET, event.id, 0, &pid, &remappingRecord, true, false ) ) {
+		UNLOCK( &MasterWorker::pending->slaves.remappingSetLock );
 		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Cannot find a pending slave REMAPPING_SET_LOCK request that matches the response. This message will be discarded. (ID: %u)", event.id );
 		// TODO no need to update counter?
 		//MasterWorker::slaveSockets->get( sockfd )->counter.decreaseRemapping();
@@ -1363,28 +1369,27 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 
 	bool isDegraded;
 	SlaveSocket *socket;
-	socket = this->getSlaves( remappingRecord.listId, remappingRecord.chunkId, /* allowDegraded */ false, &isDegraded );
-
 	int sockfd;
-	if ( socket )
-		sockfd = socket->getSocket();
+	socket = this->getSlaves( originalListId, originalChunkId, /* allowDegraded */ false, &isDegraded );
+
 
 	if ( ! success ) {
 		// TODO
 		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "TODO: Handle the case when the lock cannot be acquired." );
 		if ( socket ) {
+			sockfd = socket->getSocket();
 			if ( NO_REMAPPING )
 				MasterWorker::slaveSockets->get( sockfd )->counter.decreaseLockOnly();
 			else
 				MasterWorker::slaveSockets->get( sockfd )->counter.decreaseRemapping();
-			Master::getInstance()->remapMsgHandler.ackRemap();
+			Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
 		}
 		return false;
 	}
 
 	// wait until all coordinator response to the locking
 	// TODO handle failure response from some coordinators
-	int pending = MasterWorker::pending->count( PT_SLAVE_REMAPPING_SET, event.id, false, false );
+	int pending = MasterWorker::pending->count( PT_SLAVE_REMAPPING_SET, event.id, false, true );
 	if ( pending > 0 ) {
 		return true;
 	}
@@ -1402,8 +1407,8 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 
 	sockfd = socket->getSocket();
 
-	if ( ! MasterWorker::pending->findKey( PT_APPLICATION_SET, pid.parentId, 0, &key ) ) {
-		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded. (ID: %u)", event.id );
+	if ( ! MasterWorker::pending->findKey( PT_APPLICATION_SET, pid.parentId, 0, &key, true, header.key ) ) {
+		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded. (ID: %u)", pid.parentId );
 		if ( NO_REMAPPING )
 			MasterWorker::slaveSockets->get( sockfd )->counter.decreaseLockOnly();
 		else
@@ -1411,6 +1416,9 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 		Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
 		return false;
 	}
+
+	if ( strncmp( key.data, header.key, header.keySize ) != 0 )
+		fprintf( stderr, "key mismatched header %.*s key find %.*s\n", header.keySize, header.key, key.size, key.data );
 
 	// Add data and parity slaves into the pending set
 	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount + 1; i++ ) {
@@ -1439,7 +1447,7 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 	delete value;
 	value = 0;
 
-	// Send SET requests
+	// Send SET requests (parity)
 	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
 		// Mark the time when request is sent
 		MasterWorker::pending->recordRequestStartTime(
@@ -1459,6 +1467,7 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 
 	MasterWorker::pending->recordRequestStartTime( PT_SLAVE_SET, pid.id, pid.parentId, ( void * ) socket, socket->getAddr() );
 
+	// Send SET requests (data)
 	SlaveEvent slaveEvent;
 	slaveEvent.send( socket, packet );
 	this->dispatch( slaveEvent );
@@ -1481,9 +1490,10 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 
 	// find the type of counter by comparing the remapped Ids to original Ids
 	uint32_t originalListId, originalChunkId;
-	originalListId = MasterWorker::stripeList->get(
-		header.key, ( size_t ) header.keySize,
-		0, 0, &originalChunkId, false
+
+	this->getSlaves(
+		header.key, header.keySize,
+		originalListId, originalChunkId, /* allowDegraded */ false, 0
 	);
 
 #define NO_REMAPPING ( originalListId == header.listId && originalChunkId == header.chunkId )
@@ -1548,7 +1558,7 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 
 	if ( pending == 0 ) {
 		// Only send application SET response when the number of pending slave SET requests equal 0
-		if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_SET, pid.parentId, 0, &pid, &key ) ) {
+		if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_SET, pid.parentId, 0, &pid, &key, true, header.key ) ) {
 			__ERROR__( "MasterWorker", "handleRemappingSetResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded." );
 			return false;
 		}
@@ -1558,16 +1568,15 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 
 		// find the data slave socket (and the counter embedded)
 		bool isDegraded;
-		SlaveSocket* slaveSocket = this->getSlaves( header.listId, header.chunkId, false, &isDegraded );
+		SlaveSocket* slaveSocket = this->getSlaves( originalListId, originalChunkId, false, &isDegraded );
 		if ( slaveSocket ) {
 			int sockfd = slaveSocket->getSocket();
-
-			if ( NO_REMAPPING )
+			if ( NO_REMAPPING ) {
 				MasterWorker::slaveSockets->get( sockfd )->counter.decreaseLockOnly();
-			else {
+			} else {
 				MasterWorker::slaveSockets->get( sockfd )->counter.decreaseRemapping();
 			}
-			Master::getInstance()->remapMsgHandler.ackRemap( event.socket->getAddr() );
+			Master::getInstance()->remapMsgHandler.ackRemap( slaveSocket->getAddr() );
 		} else {
 			// TODO slave not found within a stripe list, is the stripe list deleted?
 		}

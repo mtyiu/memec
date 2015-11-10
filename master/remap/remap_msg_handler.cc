@@ -128,25 +128,25 @@ void MasterRemapMsgHandler::setStatus( char* msg , int len ) {
 		LOCK( &this->slavesStatusLock[ slave ] );
 		switch ( signal ) {
 			case REMAP_PREPARE_START:
-				printf( "REMAP_PREPARE_START %s:%hu\n", buf, slave.sin_port );
+				__DEBUG__( BLUE, "MasterRemapMsgHandler", "setStatus", "REMAP_PREPARE_START %s:%hu", buf, slave.sin_port );
 				// waiting for other masters
 				if ( this->slavesStatus[ slave ] == REMAP_WAIT_START )
 					signal = REMAP_WAIT_START;
 				break;
 			case REMAP_START:
-				printf( "REMAP_START %s:%hu\n", buf, slave.sin_port );
+				__DEBUG__( BLUE, "MasterRemapMsgHandler", "setStatus", "REMAP_START %s:%hu", buf, slave.sin_port );
 				break;
 			case REMAP_PREPARE_END:
-				printf( "REMAP_PREPARE_END %s:%hu\n", buf, slave.sin_port );
+				__DEBUG__( BLUE, "MasterRemapMsgHandler", "setStatus", "REMAP_PREPARE_END %s:%hu", buf, slave.sin_port );
 				// waiting for other masters
 				if ( this->slavesStatus[ slave ] == REMAP_WAIT_END )
 					signal = REMAP_WAIT_END ;
 				break;
 			case REMAP_NONE:
-				printf( "REMAP_NONE = END %s:%hu\n", buf, slave.sin_port );
+				__DEBUG__( BLUE, "MasterRemapMsgHandler", "setStatus", "REMAP_NONE = END %s:%hu", buf, slave.sin_port );
 				break;
 			default:
-				printf( "REMAP_%d %s:%hu\n", signal, buf, slave.sin_port );
+				__DEBUG__( BLUE, "MasterRemapMsgHandler", "setStatus", "REMAP_%d %s:%hu", signal, buf, slave.sin_port );
 				UNLOCK( &this->slavesStatusLock[ slave ] );
 				return;
 		}

@@ -162,7 +162,7 @@ bool Pending::recordRequestStartTime( PendingType type, uint32_t id, uint32_t pa
 	return true; // ret.second;
 }
 
-bool Pending::findKey( PendingType type, uint32_t id, void *ptr, Key *keyPtr ) {
+bool Pending::findKey( PendingType type, uint32_t id, void *ptr, Key *keyPtr, bool checkKey, char* checkKeyPtr ) {
 	PendingIdentifier pid( id, 0, ptr );
 	LOCK_T *lock;
 	bool ret;
@@ -175,9 +175,15 @@ bool Pending::findKey( PendingType type, uint32_t id, void *ptr, Key *keyPtr ) {
 	LOCK( lock );
 	if ( ptr ) {
 		it = map->find( pid );
-		ret = ( it != map->end() );
+		// prevent collision on id
+		while ( it != map->end() && it->first.id == id && checkKey && checkKeyPtr && strncmp( checkKeyPtr, it->second.data, it->second.size ) != 0 )
+			it++;
+		ret = ( it != map->end() && it->first.id == id );
 	} else {
 		it = map->find( pid );
+		// prevent collision on id
+		while ( it != map->end() && it->first.id == id && checkKey && checkKeyPtr && strncmp( checkKeyPtr, it->second.data, it->second.size ) != 0 )
+			it++;
 		ret = ( it != map->end() && it->first.id == id ); // Match request ID
 	}
 	if ( ret ) {
@@ -214,7 +220,7 @@ bool Pending::findKeyValueUpdate( PendingType type, uint32_t id, void *ptr, KeyV
 	return ret;
 }
 
-bool Pending::eraseKey( PendingType type, uint32_t id, void *ptr, PendingIdentifier *pidPtr, Key *keyPtr, bool needsLock, bool needsUnlock ) {
+bool Pending::eraseKey( PendingType type, uint32_t id, void *ptr, PendingIdentifier *pidPtr, Key *keyPtr, bool needsLock, bool needsUnlock, bool checkKey, char* checkKeyPtr ) {
 	PendingIdentifier pid( id, 0, ptr );
 	LOCK_T *lock;
 	bool ret;
@@ -227,9 +233,15 @@ bool Pending::eraseKey( PendingType type, uint32_t id, void *ptr, PendingIdentif
 	if ( needsLock ) LOCK( lock );
 	if ( ptr ) {
 		it = map->find( pid );
-		ret = ( it != map->end() );
+		// prevent collision on id
+		while ( it != map->end() && it->first.id == id && checkKey && checkKeyPtr && strncmp( checkKeyPtr, it->second.data, it->second.size ) != 0 )
+			it++;
+		ret = ( it != map->end() && it->first.id == id );
 	} else {
 		it = map->find( pid );
+		// prevent collision on id
+		while ( it != map->end() && it->first.id == id && checkKey && checkKeyPtr && strncmp( checkKeyPtr, it->second.data, it->second.size ) != 0 )
+			it++;
 		ret = ( it != map->end() && it->first.id == id ); // Match request ID
 	}
 	if ( ret ) {
