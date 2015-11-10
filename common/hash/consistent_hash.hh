@@ -44,6 +44,14 @@ public:
 		}
 	}
 
+	T get( unsigned int val ) {
+		typename std::map<unsigned int, T>::iterator it;
+		it = this->ring.lower_bound( val );
+		if ( it == this->ring.end() )
+			it = this->ring.begin();
+		return it->second;
+	}
+
 	T get( const char *data, size_t n = 0 ) {
 		typename std::map<unsigned int, T>::iterator it;
 		unsigned int val = HashFunc::hash( data, n ? n : strlen( data ) );

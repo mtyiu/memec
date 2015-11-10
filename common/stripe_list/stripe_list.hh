@@ -142,6 +142,31 @@ public:
 		return listIndex;
 	}
 
+	unsigned int getByHash( unsigned int hashValue, T **data = 0, T **parity = 0, uint32_t *dataIndexPtr = 0, bool full = false ) {
+		uint32_t dataIndex = hashValue % this->k;
+		uint32_t listIndex = this->listRing.get( hashValue );
+		T **ret = this->lists[ listIndex ];
+
+		if ( dataIndexPtr )
+			*dataIndexPtr = dataIndex;
+
+		if ( parity ) {
+			for ( uint32_t i = 0; i < this->n - this->k; i++ ) {
+				parity[ i ] = ret[ this->k + i ];
+			}
+		}
+		if ( data ) {
+			if ( full ) {
+				for ( uint32_t i = 0; i < this->k; i++ ) {
+					data[ i ] = ret[ i ];
+				}
+			} else {
+				*data = ret[ dataIndex ];
+			}
+		}
+		return listIndex;
+	}
+
 	T *get( uint32_t listIndex, uint32_t dataIndex, uint32_t jump, uint32_t *slaveIndex = 0 ) {
 		T **ret = this->lists[ listIndex ];
 		unsigned int index = HashFunc::hash( ( char * ) &dataIndex, sizeof( dataIndex ) );

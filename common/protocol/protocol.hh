@@ -310,6 +310,14 @@ struct ListStripeKeyHeader {
 	char *key;
 };
 
+// For asking slaves to send back the modified reconstructed chunks to the overloaded slave
+#define PROTO_DEGRADED_RELEASE_SIZE 9
+struct DegradedReleaseHeader {
+	uint32_t listId;
+	uint32_t stripeId;
+	uint32_t chunkId;
+};
+
 //////////////
 // Recovery //
 //////////////
