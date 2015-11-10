@@ -245,7 +245,7 @@ find_in_values:
 
 				size = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
 
-				key.set( keySize, keyPtr );
+				key.dup( keySize, keyPtr );
 				keyMetadata.set( listId, stripeId, chunkId );
 				keyMetadata.offset = offset;
 				keyMetadata.length = size;

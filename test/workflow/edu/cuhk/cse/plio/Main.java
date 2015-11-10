@@ -86,10 +86,12 @@ public class Main implements Runnable {
 			if ( i < numRecords ) {
 				rand = 0;
 			} else {
-				// rand = rand == 0 ? 1 : rand;
-				// rand = 1;
-
-				rand = rand == 3 ? 1 : rand;
+				// rand = rand == 2 ? 1 : rand;
+				// rand = rand == 3 ? 1 : rand;
+				rand = 3;
+				if ( i > numRecords + numRecords - 1 ) {
+					break;
+				}
 			}
 			/* */
 

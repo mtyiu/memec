@@ -2300,7 +2300,6 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 				}
 				break;
 			case PROTO_OPCODE_DEGRADED_DELETE:
-				__ERROR__( "SlaveWorker", "handleGetResponse", "TODO: PROTO_OPCODE_DEGRADED_DELETE not implemented." );
 				if ( success ) {
 					Metadata metadata;
 					metadata.set( op.listId, op.stripeId, op.chunkId );

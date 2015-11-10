@@ -252,7 +252,7 @@ uint32_t Chunk::deleteKeyValue( std::unordered_map<Key, KeyMetadata> *keys, KeyM
 
 		it = keys->find( tmp );
 		if ( it == keys->end() ) {
-			printf( "Chunk::deleteKeyValue(): Key not found (%.*s, size = %u)\n", keySize, key, keySize );
+			printf( "Chunk::deleteKeyValue(): Key not found (%.*s, size = %u); current position: %lu [%s, (%u, %u, %u)]\n", keySize, key, keySize, src - this->data, this->status == CHUNK_STATUS_RECONSTRUCTED ? "Reconstructed" : "Normal", this->metadata.listId, this->metadata.stripeId, this->metadata.chunkId );
 		}
 		assert( it != keys->end() );
 		KeyMetadata &m = it->second;

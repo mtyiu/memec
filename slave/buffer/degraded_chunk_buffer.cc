@@ -60,8 +60,7 @@ bool DegradedChunkBuffer::deleteKey( uint8_t opcode, uint8_t keySize, char *keyS
 		LOCK( cacheLock );
 		ret = this->map.deleteKey( key, opcode, keyMetadata, false, false );
 		if ( ret ) {
-			deltaSize = chunk->deleteKeyValue(
-				keys, keyMetadata, delta, deltaSize );
+			deltaSize = chunk->deleteKeyValue( keys, keyMetadata, delta, deltaSize );
 			ret = true;
 		}
 		UNLOCK( cacheLock );
