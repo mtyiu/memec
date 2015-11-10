@@ -520,10 +520,13 @@ SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId
 				return original; // not overloaded
 			*/
 
+			if ( chunkId != 0 )
+				return original;
+
 			// Pick a new server from the same stripe list to handle the request
 			for ( uint32_t jump = 0, chunkCount = MasterWorker::dataChunkCount + MasterWorker::parityChunkCount; jump < chunkCount; jump++ ) {
 				SlaveSocket *target = MasterWorker::stripeList->get( listId, chunkId, jump, &newChunkId );
-				if ( target->ready() )
+				if ( target && target->ready() )
 					return target;
 			}
 			__ERROR__( "MasterWorker", "getSlaves", "No slaves are available for degraded operations." );

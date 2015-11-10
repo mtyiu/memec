@@ -1554,7 +1554,11 @@ bool SlaveWorker::handleDegradedUpdateRequest( MasterEvent event, char *buf, siz
 
 		if ( chunk ) {
 			// Send UPDATE_CHUNK request to the parity slaves
-			uint32_t chunkUpdateOffset = keyMetadata.offset + keyValueUpdate.offset;
+			uint32_t chunkUpdateOffset = KeyValue::getChunkUpdateOffset(
+				keyMetadata.offset, // chunkOffset
+				keyValueUpdate.size, // keySize
+				keyValueUpdate.offset // valueUpdateOffset
+			);
 
 			SlaveWorker::degradedChunkBuffer->updateKeyValue(
 				keyValueUpdate.size,
@@ -2364,6 +2368,9 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 			            this->chunks[ i ]->getSize();
 			if ( chunkSize > maxChunkSize )
 				maxChunkSize = chunkSize;
+			if ( chunkSize > Chunk::capacity ) {
+				__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Invalid chunk size (%u, %u, %u): %u", chunkRequest.listId, chunkRequest.stripeId, i, this->chunks[ i ]->getSize(), maxChunkSize );
+			}
 		}
 
 		for ( uint32_t i = SlaveWorker::dataChunkCount; i < SlaveWorker::chunkCount; i++ ) {
@@ -2433,7 +2440,11 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 				op.data.key.free();
 			} else if ( op.opcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
 				if ( isKeyValueFound ) {
-					uint32_t chunkUpdateOffset = keyMetadata.offset + op.data.keyValueUpdate.offset;
+					uint32_t chunkUpdateOffset = KeyValue::getChunkUpdateOffset(
+						keyMetadata.offset, // chunkOffset
+						key.size, // keySize
+						op.data.keyValueUpdate.offset // valueUpdateOffset
+					);
 					char *valueUpdate = ( char * ) op.data.keyValueUpdate.ptr;
 					op.data.keyValueUpdate.ptr = op.socket;
 
@@ -2707,32 +2718,40 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 						Metadata metadata;
 						metadata.set( listId, stripeId, lostChunkId );
 
+						uint32_t dataUpdateOffset = KeyValue::getChunkUpdateOffset(
+							0,                     // chunkOffset
+							keyValueUpdate->size,  // keySize
+							keyValueUpdate->offset // valueUpdateOffset
+						);
+
 						char *valueUpdate = ( char * ) keyValueUpdate->ptr;
 
 						// Send UPDATE request to the parity slaves
+						/*
 						SlaveWorker::degradedChunkBuffer->updateKeyValue(
-							keyValueUpdate->size,
-							keyValueUpdate->data,
-							keyValueUpdate->length,
-							keyValueUpdate->offset,
-							0, /* chunkUpdateOffset */
-							valueUpdate,
-							0, /* chunk */
-							false /* isSealed */
+							keyValueUpdate->size,    // keySize
+							keyValueUpdate->data,    // keyStr
+							keyValueUpdate->length,  // valueUpdateSize
+							keyValueUpdate->offset,  // valueUpdateOffset
+							0,                       // chunkUpdateOffset
+							valueUpdate,             // valueUpdate
+							0,                       // chunk
+							false                    // isSealed
 						);
+						*/
 
 						// Compute data delta
 						Coding::bitwiseXOR(
 							valueUpdate,
-							keyValue.data + keyValueUpdate->offset, // original data
-							valueUpdate,                            // new data
+							keyValue.data + dataUpdateOffset, // original data
+							valueUpdate,                      // new data
 							keyValueUpdate->length
 						);
 						// Perform actual data update
 						Coding::bitwiseXOR(
-							keyValue.data + keyValueUpdate->offset,
-							keyValue.data + keyValueUpdate->offset, // original data
-							valueUpdate,                            // new data
+							keyValue.data + dataUpdateOffset,
+							keyValue.data + dataUpdateOffset, // original data
+							valueUpdate,                      // new data
 							keyValueUpdate->length
 						);
 

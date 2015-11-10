@@ -81,3 +81,7 @@ char *KeyValue::deserialize( char *data, char *&key, uint8_t &keySize, char *&va
 
 	return data;
 }
+
+uint32_t KeyValue::getChunkUpdateOffset( uint32_t chunkOffset, uint8_t keySize, uint32_t valueUpdateOffset ) {
+	return ( chunkOffset + KEY_VALUE_METADATA_SIZE + keySize + valueUpdateOffset );
+}
