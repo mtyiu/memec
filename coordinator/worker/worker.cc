@@ -459,7 +459,10 @@ bool CoordinatorWorker::processHeartbeat( SlaveEvent event, char *buf, size_t si
 	LOCK( &event.socket->map.keysLock );
 	for ( count = 0; count < heartbeat.keys; count++ ) {
 		if ( this->protocol.parseKeyOpMetadataHeader( header.op, processed, buf, size, offset ) ) {
-			event.socket->map.insertKey(
+			SlaveSocket *s = event.socket;
+			if ( header.op.opcode == PROTO_OPCODE_DELETE ) // Handle keys from degraded DELETE
+				s = CoordinatorWorker::stripeList->get( header.op.listId, header.op.chunkId );
+			s->map.insertKey(
 				header.op.key,
 				header.op.keySize,
 				header.op.listId,

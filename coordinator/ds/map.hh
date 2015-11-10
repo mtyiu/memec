@@ -62,7 +62,7 @@ public:
 	bool isSealed( Metadata metadata );
 
 	// Debug //
-	void dump( FILE *f = stdout );
+	size_t dump( FILE *f = stdout );
 	void persist( FILE *f );
 };
 

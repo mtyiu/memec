@@ -484,13 +484,16 @@ void Coordinator::interactive() {
 
 void Coordinator::dump() {
 	FILE *f = stdout;
+	size_t numKeys = 0;
 	for ( size_t i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
 		fprintf( f, "##### Slave #%lu: ", i + 1 );
 		this->sockets.slaves[ i ]->printAddress( f );
 		fprintf( f, " #####\n" );
 
-		this->sockets.slaves[ i ]->map.dump();
+		numKeys += this->sockets.slaves[ i ]->map.dump();
 	}
+
+	fprintf( f, "Total number of key-value pairs = %lu.\n", numKeys );
 }
 
 void Coordinator::metadata() {

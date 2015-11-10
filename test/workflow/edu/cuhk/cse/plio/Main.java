@@ -73,9 +73,9 @@ public class Main implements Runnable {
 			size = this.map.size();
 			ret = false;
 
-			/* */
+			// vvvvv For testing degraded operations (Start) vvvvv
 			if ( i == numRecords ) {
-				// Wait for 20 seconds
+				// Wait for 10 seconds
 				System.out.println( "Sleep for 10 seconds..." );
 				try {
 					Thread.sleep( 10000 );
@@ -86,14 +86,11 @@ public class Main implements Runnable {
 			if ( i < numRecords ) {
 				rand = 0;
 			} else {
-				// rand = rand == 2 ? 1 : rand;
-				// rand = rand == 3 ? 1 : rand;
-				rand = 3;
-				if ( i > numRecords + numRecords - 1 ) {
+				rand = rand == 0 ? 1 : rand;
+				if ( size == 0 )
 					break;
-				}
 			}
-			/* */
+			// ^^^^^ For testing degraded operations (End) ^^^^^
 
 			if ( rand == 0 ) {
 				// SET
@@ -179,8 +176,10 @@ public class Main implements Runnable {
 					if ( ret ) this.map.remove( key );
 
 					// Test whether the key is still available
-					if ( plio.get( key ) != null )
+					if ( plio.get( key ) != null ) {
+						System.err.println( "The deleted key (" + key + ") is still available." );
 						ret = false;
+					}
 
 					this.completed[ 3 ]++;
 					if ( ret ) this.succeeded[ 3 ]++;
@@ -189,6 +188,8 @@ public class Main implements Runnable {
 				}
 			}
 		}
+
+		System.out.println( "Final map size: " + this.map.size() );
 	}
 
 	public static void main( String[] args ) throws Exception {

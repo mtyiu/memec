@@ -48,25 +48,31 @@ bool Map::insertChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, boo
 
 bool Map::insertKey( char *keyStr, uint8_t keySize, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint8_t opcode, bool needsLock, bool needsUnlock ) {
 	Key key;
-	key.size = keySize;
-	key.dup( keySize, keyStr );
+	key.set( keySize, keyStr );
 
 	Metadata metadata;
 	metadata.set( listId, stripeId, chunkId );
 
 	std::unordered_map<Key, Metadata>::iterator it;
-	std::pair<Key, Metadata> p( key, metadata );
 	bool ret = true;
 
 	if ( needsLock ) LOCK( &this->keysLock );
 	it = this->keys.find( key );
 	if ( it == this->keys.end() && opcode == PROTO_OPCODE_SET ) {
+		key.dup();
+
+		std::pair<Key, Metadata> p( key, metadata );
 		std::pair<std::unordered_map<Key, Metadata>::iterator, bool> r;
+
 		r = this->keys.insert( p );
+
 		ret = r.second;
 	} else if ( it != this->keys.end() && opcode == PROTO_OPCODE_DELETE ) {
+		key = it->first;
+		key.free();
 		this->keys.erase( it );
 	} else {
+		printf( "Unknown key: %.*s.\n", keySize, keyStr );
 		ret = false;
 	}
 	if ( needsUnlock ) UNLOCK( &this->keysLock );
@@ -145,19 +151,21 @@ bool Map::isSealed( Metadata metadata ) {
 	return ret;
 }
 
-void Map::dump( FILE *f ) {
+size_t Map::dump( FILE *f ) {
+	size_t numKeys;
+
 	fprintf( f, "List of sealed chunks:\n----------------------\n" );
 	LOCK( &this->chunksLock );
 	if ( ! this->chunks.size() ) {
 		fprintf( f, "(None)\n" );
 	} else {
-		for ( std::unordered_set<Metadata>::iterator it = this->chunks.begin(); it != this->chunks.end(); it++ ) {
-			const Metadata &m = *it;
-			fprintf(
-				f, "(%u, %u, %u)\n",
-				m.listId, m.stripeId, m.chunkId
-			);
-		}
+		// for ( std::unordered_set<Metadata>::iterator it = this->chunks.begin(); it != this->chunks.end(); it++ ) {
+		// 	const Metadata &m = *it;
+		// 	fprintf(
+		// 		f, "(%u, %u, %u)\n",
+		// 		m.listId, m.stripeId, m.chunkId
+		// 	);
+		// }
 		fprintf( f, "Count: %lu\n", this->chunks.size() );
 	}
 	UNLOCK( &this->chunksLock );
@@ -179,6 +187,7 @@ void Map::dump( FILE *f ) {
 		*/
 		fprintf( f, "Count: %lu\n", this->keys.size() );
 	}
+	numKeys = this->keys.size();
 	UNLOCK( &this->keysLock );
 	fprintf( f, "\n" );
 
@@ -198,6 +207,8 @@ void Map::dump( FILE *f ) {
 	}
 	UNLOCK( &this->degradedLocksLock );
 	fprintf( f, "\n" );
+
+	return numKeys;
 }
 
 void Map::persist( FILE *f ) {

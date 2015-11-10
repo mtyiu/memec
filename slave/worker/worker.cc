@@ -1709,26 +1709,22 @@ bool SlaveWorker::handleDegradedDeleteRequest( MasterEvent event, char *buf, siz
 	metadata.set( header.listId, header.stripeId, header.chunkId );
 
 	if ( isKeyValueFound ) {
-		key.dup();
+		key.dup( 0, 0, ( void * ) event.socket );
 		if ( ! SlaveWorker::pending->insertKey( PT_MASTER_DEL, event.id, ( void * ) event.socket, key ) ) {
 			__ERROR__( "SlaveWorker", "handleDegradedDeleteRequest", "Cannot insert into master DELETE pending map." );
 		}
 
-		if ( chunk ) {
-			// Send DELETE_CHUNK request to the parity slaves
-			uint32_t deltaSize = this->buffer.size;
-			char *delta = this->buffer.data;
+		uint32_t deltaSize = this->buffer.size;
+		char *delta = this->buffer.data;
 
+		if ( chunk ) {
 			SlaveWorker::degradedChunkBuffer->deleteKey(
 				PROTO_OPCODE_DELETE,
-				key.size,
-				key.data,
-				true, /* isSealed */
-				deltaSize,
-				delta,
-				chunk
+				key.size, key.data, true, /* isSealed */
+				deltaSize, delta, chunk
 			);
 
+			// Send DELETE_CHUNK request to the parity slaves
 			this->sendModifyChunkRequest(
 				event.id,
 				key.size,
@@ -1742,8 +1738,24 @@ bool SlaveWorker::handleDegradedDeleteRequest( MasterEvent event, char *buf, siz
 				false /* isUpdate */
 			);
 		} else {
+			uint32_t tmp = 0;
+			SlaveWorker::degradedChunkBuffer->deleteKey(
+				PROTO_OPCODE_DELETE,
+				key.size, key.data, false,
+				tmp, 0, 0
+			);
+
 			// Send DELETE request to the parity slaves
-			__ERROR__( "SlaveWorker", "handleDegradedDeleteRequest", "TODO: Send DELETE request to the parity slaves..." );
+			this->sendModifyChunkRequest(
+				event.id,
+				key.size,
+				key.data,
+				metadata,
+				// not needed for deleting a key-value pair in an unsealed chunk:
+				0, 0, 0, 0,
+				false /* isSealed */,
+				false /* isUpdate */
+			);
 		}
 	} else if ( chunk ) {
 		// Key not found
@@ -2204,11 +2216,19 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 		if ( success ) {
 			if ( op.opcode == PROTO_OPCODE_DEGRADED_DELETE ) {
 				keyValue.free();
-				dmap->deleteValue( key, PROTO_OPCODE_DELETE );
-
-				// TODO: Forward the DELETE request to the parity slaves
+				if ( ! dmap->deleteValue( key, PROTO_OPCODE_DELETE ) ) {
+					// Insert into OpMetadata map
+					KeyMetadata keyMetadata;
+					keyMetadata.set( op.listId, op.stripeId, op.chunkId );
+					SlaveWorker::map->insertOpMetadata(
+						PROTO_OPCODE_DELETE,
+						key, keyMetadata
+					);
+				}
 			} else if ( ! isInserted ) {
-				isInserted = dmap->insertValue( keyValue );
+				Metadata metadata;
+				metadata.set( op.listId, op.stripeId, op.chunkId );
+				isInserted = dmap->insertValue( keyValue, metadata );
 				if ( ! isInserted ) {
 					__ERROR__( "SlaveWorker", "handleGetResponse", "Cannot insert into degraded chunk buffer values map (key: %.*s).", key.size, key.data );
 					keyValue.free();
@@ -2554,8 +2574,8 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 			if ( this->chunks[ i ]->status == CHUNK_STATUS_RECONSTRUCTED ) {
 				this->chunks[ i ]->isParity = true;
 				this->chunks[ i ]->setSize( maxChunkSize );
-			} else if ( this->chunks[ i ]->getSize() != maxChunkSize ) {
-				__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Parity chunk size mismatch (%u, %u, %u): %u vs. %u.", chunkRequest.listId, chunkRequest.stripeId, i, this->chunks[ i ]->getSize(), maxChunkSize );
+			// } else if ( this->chunks[ i ]->getSize() != maxChunkSize ) {
+			// 	__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Parity chunk size mismatch (%u, %u, %u): %u vs. %u.", chunkRequest.listId, chunkRequest.stripeId, i, this->chunks[ i ]->getSize(), maxChunkSize );
 			}
 		}
 
@@ -2606,8 +2626,8 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 					) ) {
 						__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot insert into degraded chunk buffer's chunk map." );
 					}
-				} else {
-					__ERROR__( "SlaveWorker", "handleGetChunkResponse", "The chunk already exist." );
+				// } else {
+					// __ERROR__( "SlaveWorker", "handleGetChunkResponse", "The chunk already exist." );
 				}
 
 				switch( op.opcode ) {
@@ -2913,11 +2933,14 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 				char *key, *value;
 				uint8_t keySize;
 				uint32_t valueSize;
+				Metadata metadata;
+
+				metadata.set( listId, stripeId, lostChunkId );
 
 				keyValue.deserialize( key, keySize, value, valueSize );
 				keyValue.dup( key, keySize, value, valueSize );
 
-				if ( ! SlaveWorker::degradedChunkBuffer->map.insertValue( keyValue ) ) {
+				if ( ! SlaveWorker::degradedChunkBuffer->map.insertValue( keyValue, metadata ) ) {
 					__ERROR__( "SlaveWorker", "performDegradedRead", "Cannot insert into degraded chunk buffer values map. (Key: %.*s)", keySize, key );
 					// keyValue.free();
 					// success = false;
@@ -3004,7 +3027,21 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 				case PROTO_OPCODE_DEGRADED_DELETE:
 					if ( success ) {
 						Metadata metadata;
+						KeyMetadata keyMetadata;
 						metadata.set( listId, stripeId, lostChunkId );
+						keyMetadata.set( listId, stripeId, lostChunkId );
+
+						SlaveWorker::map->insertOpMetadata(
+							PROTO_OPCODE_DELETE,
+							key, keyMetadata
+						);
+
+						uint32_t tmp = 0;
+						SlaveWorker::degradedChunkBuffer->deleteKey(
+							PROTO_OPCODE_DELETE,
+							key.size, key.data, true /* isSealed */,
+							tmp, 0, 0
+						);
 
 						this->sendModifyChunkRequest(
 							parentId, key.size, key.data,
