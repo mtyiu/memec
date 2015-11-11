@@ -247,7 +247,7 @@ quit_1:
 }
 
 void CoordinatorWorker::dispatch( SlaveEvent event ) {
-	bool connected, isSend;
+	bool connected, isSend, isCompleted;
 	ssize_t ret;
 	struct {
 		size_t size;
@@ -279,6 +279,21 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			buffer.data = this->protocol.reqSyncMeta( buffer.size, requestId );
 			// add sync meta request to pending set
 			Coordinator::getInstance()->pending.addSyncMetaReq( requestId, event.sync );
+			isSend = true;
+			break;
+		case SLAVE_EVENT_TYPE_REQUEST_RELEASE_DEGRADED_LOCK:
+			requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
+			buffer.data = this->protocol.reqReleaseDegradedLock(
+				buffer.size, requestId,
+				&event.socket->map.degradedLocksLock,
+				&event.socket->map.degradedLocks,
+				&event.socket->map.releasingDegradedLocks,
+				isCompleted
+			);
+			if ( buffer.size == PROTO_HEADER_SIZE ) {
+				__ERROR__( "CoordinatorWorker", "dispatch", "No chunks are locked on this slave." );
+				return;
+			}
 			isSend = true;
 			break;
 		case SLAVE_EVENT_TYPE_PENDING:
@@ -326,6 +341,11 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 		if ( ! connected )
 			__ERROR__( "CoordinatorWorker", "dispatch", "The slave is disconnected." );
+
+		if ( event.type == SLAVE_EVENT_TYPE_REQUEST_RELEASE_DEGRADED_LOCK && ! isCompleted ) {
+			event.reqReleaseDegradedLock( event.socket );
+			this->eventQueue->insert( event );
+		}
 	} else {
 		// Parse requests from slaves
 		ProtocolHeader header;

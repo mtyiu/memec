@@ -32,6 +32,11 @@ void SlaveEvent::reqSyncMeta( SlaveSocket *socket, bool *sync ) {
 	this->socket = socket;
 }
 
+void SlaveEvent::reqReleaseDegradedLock( SlaveSocket *socket ) {
+	this->type = SLAVE_EVENT_TYPE_REQUEST_RELEASE_DEGRADED_LOCK;
+	this->socket = socket;
+}
+
 void SlaveEvent::disconnect( SlaveSocket *socket ) {
 	this->type = SLAVE_EVENT_TYPE_DISCONNECT;
 	this->socket = socket;

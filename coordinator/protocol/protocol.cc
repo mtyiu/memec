@@ -302,6 +302,20 @@ char *CoordinatorProtocol::reqSyncMeta( size_t &size, uint32_t id ) {
 	return this->buffer.send;
 }
 
+char *CoordinatorProtocol::reqReleaseDegradedLock( size_t &size, uint32_t id, LOCK_T *degradedLocksLock, std::unordered_map<Metadata, Metadata> *degradedLocks, std::unordered_map<Metadata, Metadata> *releasingDegradedLocks, bool &isCompleted ) {
+	size = this->generateDegradedReleaseHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_RELEASE_DEGRADED_LOCKS,
+		id,
+		degradedLocksLock,
+		degradedLocks,
+		releasingDegradedLocks,
+		isCompleted
+	);
+	return this->buffer.send;
+}
+
 char *CoordinatorProtocol::resRemappingSetLock( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t chunkId, bool isRemapped, uint8_t keySize, char *key ) {
 	size = this->generateRemappingLockHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,

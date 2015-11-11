@@ -422,8 +422,32 @@ void Coordinator::syncSlaveMeta( struct sockaddr_in slave, bool *sync ) {
 	this->eventQueue.insert( event );
 }
 
-void Coordinator::releaseDegradedLock( uint32_t socketId ) {
+void Coordinator::releaseDegradedLock() {
+	uint32_t socketId;
+
+	printf( "Which socket? " );
+	fflush( stdout );
+	if ( scanf( "%u", &socketId ) != 1 ) {
+		fprintf( stderr, "Invalid socket ID.\n" );
+		return;
+	} else if ( socketId >= this->sockets.slaves.size() ) {
+		fprintf( stderr, "The specified socket ID exceeds the range [0-%lu].\n", this->sockets.slaves.size() );
+		return;
+	}
+
 	SlaveSocket *socket = this->sockets.slaves.values[ socketId ];
+	if ( ! socket ) {
+		fprintf( stderr, "Unknown socket ID!\n" );
+		return;
+	}
+
+	SlaveEvent event;
+	event.reqReleaseDegradedLock( socket );
+	this->eventQueue.insert( event );
+
+	printf( "Sending release degraded locks request to: (#%u) ", socketId );
+	socket->printAddress();
+	printf( "\n" );
 }
 
 double Coordinator::getElapsedTime() {
@@ -532,6 +556,9 @@ void Coordinator::interactive() {
 		} else if ( strcmp( command, "flush" ) == 0 ) {
 			valid = true;
 			this->flush();
+		} else if ( strcmp( command, "release" ) == 0 ) {
+			valid = true;
+			this->releaseDegradedLock();
 		} else {
 			valid = false;
 		}
@@ -590,6 +617,7 @@ void Coordinator::help() {
 		"- time: Show elapsed time\n"
 		"- seal: Force all slaves to seal all its chunks\n"
 		"- flush: Force all slaves to flush all its chunks\n"
+		"- release: Release degraded locks at the specified socket\n"
 		"- metadata: Write metadata to disk\n"
 		"- remapping: Show remapping info\n"
 		"- exit: Terminate this client\n"

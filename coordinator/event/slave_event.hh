@@ -13,6 +13,7 @@ enum SlaveEventType {
 	SLAVE_EVENT_TYPE_REQUEST_SEAL_CHUNKS,
 	SLAVE_EVENT_TYPE_REQUEST_FLUSH_CHUNKS,
 	SLAVE_EVENT_TYPE_REQUEST_SYNC_META,
+	SLAVE_EVENT_TYPE_REQUEST_RELEASE_DEGRADED_LOCK,
 	SLAVE_EVENT_TYPE_DISCONNECT
 };
 
@@ -29,6 +30,7 @@ public:
 	void reqSealChunks( SlaveSocket *socket );
 	void reqFlushChunks( SlaveSocket *socket );
 	void reqSyncMeta( SlaveSocket *socket, bool *sync );
+	void reqReleaseDegradedLock( SlaveSocket *socket );
 	void disconnect( SlaveSocket *socket );
 };
 

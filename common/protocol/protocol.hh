@@ -46,6 +46,7 @@
 #define PROTO_OPCODE_FLUSH_CHUNKS                 0x36
 #define PROTO_OPCODE_RECOVERY                     0x37
 #define PROTO_OPCODE_SYNC_META                    0x38
+#define PROTO_OPCODE_RELEASE_DEGRADED_LOCKS       0x39
 
 // Application <-> Master or Master <-> Slave (0-19) //
 #define PROTO_OPCODE_GET                          0x01
@@ -315,7 +316,7 @@ struct ListStripeKeyHeader {
 };
 
 // For asking slaves to send back the modified reconstructed chunks to the overloaded slave
-#define PROTO_DEGRADED_RELEASE_SIZE 9
+#define PROTO_DEGRADED_RELEASE_SIZE 12
 struct DegradedReleaseHeader {
 	uint32_t listId;
 	uint32_t stripeId;

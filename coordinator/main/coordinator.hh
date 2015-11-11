@@ -102,7 +102,7 @@ public:
 	void flush();
 	void metadata();
 	void syncSlaveMeta( struct sockaddr_in slave, bool *sync );
-	void releaseDegradedLock( uint32_t socketId );
+	void releaseDegradedLock();
 	double getElapsedTime();
 	void interactive();
 };

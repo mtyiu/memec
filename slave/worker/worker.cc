@@ -189,6 +189,9 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 					case PROTO_OPCODE_SYNC_META:
 						Slave::getInstance()->sync( header.id );
 						break;
+					case PROTO_OPCODE_RELEASE_DEGRADED_LOCKS:
+						this->handleReleaseDegradedLockRequest( event, buffer.data, header.length );
+						break;
 					default:
 						__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from coordinator." );
 						break;
@@ -988,6 +991,57 @@ bool SlaveWorker::handleSlaveConnectedMsg( CoordinatorEvent event, char *buf, si
 	// Connect to the slave peer
 	slavePeers->values[ index ]->start();
 
+	return true;
+}
+
+bool SlaveWorker::handleReleaseDegradedLockRequest( CoordinatorEvent event, char *buf, size_t size ) {
+	struct DegradedReleaseHeader header;
+	Metadata metadata;
+	Chunk *chunk;
+	uint32_t count = 0;
+
+	while( size ) {
+		if ( ! this->protocol.parseDegradedReleaseHeader( header, buf, size ) ) {
+			__ERROR__( "SlaveWorker", "handleReleaseDegradedLockRequest", "Invalid DEGRADED_RELEASE request." );
+			return false;
+		}
+		__DEBUG__(
+			BLUE, "SlaveWorker", "handleGetRequest",
+			"[DEGRADED_RELEASE] (%u, %u, %u) (remaining = %lu).",
+			header.listId, header.stripeId, header.chunkId, size
+		);
+		buf += PROTO_DEGRADED_RELEASE_SIZE;
+		size -= PROTO_DEGRADED_RELEASE_SIZE;
+
+		// Find the chunk from DegradedMap
+		chunk = SlaveWorker::map->findChunkById(
+			header.listId, header.stripeId, header.chunkId,
+			&metadata
+		);
+		if ( chunk ) {
+			SlavePeerSocket *socket;
+			uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
+
+			this->getSlaves( header.listId );
+			socket = header.chunkId < SlaveWorker::dataChunkCount ? this->dataSlaveSockets[ header.chunkId ] : this->paritySlaveSockets[ header.chunkId - SlaveWorker::dataChunkCount ];
+
+			if ( socket->self ) {
+				printf( "self-socket? (%u, %u, %u)\n", header.listId, header.stripeId, header.chunkId );
+				continue;
+			}
+
+			SlavePeerEvent slavePeerEvent;
+
+			slavePeerEvent.reqSetChunk(
+				socket, requestId, metadata, chunk
+			);
+			SlaveWorker::eventQueue->insert( slavePeerEvent );
+			count++;
+		} else {
+			printf( "Chunk: (%u, %u, %u) not fonud.", header.listId, header.stripeId, header.chunkId );
+		}
+	}
+	printf( "Sync-ed chunks: %u\n", count );
 	return true;
 }
 

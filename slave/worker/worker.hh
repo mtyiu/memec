@@ -71,6 +71,7 @@ private:
 	bool getSlaves( uint32_t listId );
 	// Request handler for coordinator
 	bool handleSlaveConnectedMsg( CoordinatorEvent event, char *buf, size_t size );
+	bool handleReleaseDegradedLockRequest( CoordinatorEvent event, char *buf, size_t size );
 	// Request handler for master
 	bool handleGetRequest( MasterEvent event, char *buf, size_t size );
 	bool handleSetRequest( MasterEvent event, char *buf, size_t size );

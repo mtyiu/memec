@@ -74,8 +74,9 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_OPCODE_SEAL_CHUNKS:
 		case PROTO_OPCODE_FLUSH_CHUNKS:
 		case PROTO_OPCODE_RECOVERY:
-
 		case PROTO_OPCODE_SYNC_META:
+		case PROTO_OPCODE_RELEASE_DEGRADED_LOCKS:
+
 		case PROTO_OPCODE_GET:
 		case PROTO_OPCODE_SET:
 		case PROTO_OPCODE_UPDATE:
@@ -87,10 +88,11 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_OPCODE_DEGRADED_UPDATE:
 		case PROTO_OPCODE_DEGRADED_DELETE:
 
-		case PROTO_OPCODE_REMAPPING_LOCK:
 		case PROTO_OPCODE_REMAPPING_SET:
 		case PROTO_OPCODE_DEGRADED_LOCK:
 		case PROTO_OPCODE_DEGRADED_UNLOCK:
+
+		case PROTO_OPCODE_REMAPPING_LOCK:
 
 		case PROTO_OPCODE_REMAPPING_UNLOCK:
 		case PROTO_OPCODE_SEAL_CHUNK:
