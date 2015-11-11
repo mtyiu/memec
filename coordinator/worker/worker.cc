@@ -88,7 +88,7 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 			break;
 		case MASTER_EVENT_TYPE_SWITCH_PHASE:
 			isSend = false;
-			if ( event.message.remap.slaves == NULL )
+			if ( event.message.remap.slaves == NULL || ! Coordinator::getInstance()->remapMsgHandler )
 				break;
 			// just trigger / stop the remap phase, no message need to be handled
 			if ( event.message.remap.toRemap ) {
@@ -312,12 +312,14 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 		}
 		// notify the remap message handler of the new slave
 		struct sockaddr_in slaveAddr = event.socket->getAddr();
-		Coordinator::getInstance()->remapMsgHandler->addAliveSlave( slaveAddr );
+		if ( Coordinator::getInstance()->remapMsgHandler )
+			Coordinator::getInstance()->remapMsgHandler->addAliveSlave( slaveAddr );
 		UNLOCK( &slaves.lock );
 	} else if ( event.type == SLAVE_EVENT_TYPE_DISCONNECT ) {
 		this->triggerRecovery( event.socket );
 		// notify the remap message handler of a "removed" slave
-		Coordinator::getInstance()->remapMsgHandler->removeAliveSlave( event.socket->getAddr() );
+		if ( Coordinator::getInstance()->remapMsgHandler )
+			Coordinator::getInstance()->remapMsgHandler->removeAliveSlave( event.socket->getAddr() );
 	} else if ( isSend ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
 		if ( ret != ( ssize_t ) buffer.size )

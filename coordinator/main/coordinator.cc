@@ -569,9 +569,11 @@ void Coordinator::printRemapping( FILE *f ) {
 	fprintf( f, "\nRemapping Records\n" );
 	fprintf( f, "----------------------------------------\n" );
 	this->remappingRecords.print( f );
-	fprintf( f, "\nList of Tracking Slaves\n" );
-	fprintf( f, "----------------------------------------\n" );
-	this->remapMsgHandler->listAliveSlaves();
+	if ( this->config.global.remap.enabled ) {
+		fprintf( f, "\nList of Tracking Slaves\n" );
+		fprintf( f, "----------------------------------------\n" );
+		this->remapMsgHandler->listAliveSlaves();
+	}
 }
 
 void Coordinator::help() {
