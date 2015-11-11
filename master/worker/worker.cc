@@ -495,7 +495,7 @@ SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId
 	bool found = MasterWorker::remappingRecords->find( key, &record );
 	found = ( found && ! Master::getInstance()->config.master.remap.forceNoCacheRecords );
 	if ( found ) { // remapped keys
-		fprintf( stderr, "Redirect request to list=%u chunk=%u\n", record.listId, record.chunkId);
+		//fprintf( stderr, "Redirect request to list=%u chunk=%u\n", record.listId, record.chunkId);
 		listId = record.listId;
 		chunkId = record.chunkId;
 		this->paritySlaveSockets = MasterWorker::stripeList->get(
@@ -723,7 +723,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
 
-	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_SET, event.id, ( void * ) event.socket, key, true, true ) ) {
+	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_SET, event.id, ( void * ) event.socket, key ) ) {
 		__ERROR__( "MasterWorker", "handleSetRequest", "Cannot insert into application SET pending map." );
 	}
 
@@ -1004,7 +1004,7 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
 
 	// Insert the key into application SET pending map
-	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_SET, event.id, ( void * ) event.socket, key, true, true ) ) {
+	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_SET, event.id, ( void * ) event.socket, key ) ) {
 		__ERROR__( "MasterWorker", "handleRemappingSetRequest", "Cannot insert into application SET pending map." );
 	}
 
@@ -1187,7 +1187,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 					);
 					break;
 				case PROTO_DEGRADED_LOCK_RES_NOT_EXIST:
-					if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_GET, pid.parentId, 0, &pid, &key ) ) {
+					if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_GET, pid.parentId, 0, &pid, &key, true, true, true, header.key ) ) {
 						__ERROR__( "MasterWorker", "handleDegradedLockResponse", "Cannot find a pending application GET request that matches the response. This message will be discarded (key = %.*s).", header.keySize, header.key );
 						return false;
 					}
@@ -1221,7 +1221,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 					);
 					break;
 				case PROTO_DEGRADED_LOCK_RES_NOT_EXIST:
-					if ( ! MasterWorker::pending->eraseKeyValueUpdate( PT_APPLICATION_UPDATE, pid.parentId, 0, &pid, &keyValueUpdate ) ) {
+					if ( ! MasterWorker::pending->eraseKeyValueUpdate( PT_APPLICATION_UPDATE, pid.parentId, 0, &pid, &keyValueUpdate, true, true, true, header.key ) ) {
 						__ERROR__( "MasterWorker", "handleDegradedLockResponse", "Cannot find a pending application UPDATE request that matches the response. This message will be discarded (key = %.*s).", header.keySize, header.key );
 						return false;
 					}
@@ -1256,7 +1256,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 					);
 					break;
 				case PROTO_DEGRADED_LOCK_RES_NOT_EXIST:
-					if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_DEL, pid.parentId, 0, &pid, &key ) ) {
+					if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_DEL, pid.parentId, 0, &pid, &key, true, true, true, header.key ) ) {
 						__ERROR__( "MasterWorker", "handleDegradedLockResponse", "Cannot find a pending application DELETE request that matches the response. This message will be discarded (key = %.*s).", header.keySize, header.key );
 						return false;
 					}
@@ -1311,7 +1311,7 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, bool isDeg
 	ApplicationEvent applicationEvent;
 	PendingIdentifier pid;
 
-	if ( ! MasterWorker::pending->eraseKey( PT_SLAVE_GET, event.id, event.socket, &pid, &key ) ) {
+	if ( ! MasterWorker::pending->eraseKey( PT_SLAVE_GET, event.id, event.socket, &pid, &key, true, true ) ) {
 		__ERROR__( "MasterWorker", "handleGetResponse", "Cannot find a pending slave GET request that matches the response. This message will be discarded (key = %.*s).", key.size, key.data );
 		if ( success ) keyValue.free();
 		return false;
@@ -1344,7 +1344,7 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, bool isDeg
 	}
 
 	key.ptr = 0;
-	if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_GET, pid.parentId, 0, &pid, &key ) ) {
+	if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_GET, pid.parentId, 0, &pid, &key, true, true, true, key.data ) ) {
 		__ERROR__( "MasterWorker", "handleGetResponse", "Cannot find a pending application GET request that matches the response. This message will be discarded (key = %.*s).", key.size, key.data );
 		if ( success ) keyValue.free();
 		return false;
@@ -1450,7 +1450,7 @@ bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, bool is
 		return false;
 	}
 
-	if ( ! MasterWorker::pending->eraseKeyValueUpdate( PT_APPLICATION_UPDATE, pid.parentId, 0, &pid, &keyValueUpdate ) ) {
+	if ( ! MasterWorker::pending->eraseKeyValueUpdate( PT_APPLICATION_UPDATE, pid.parentId, 0, &pid, &keyValueUpdate, true, true, true, header.key ) ) {
 		__ERROR__( "MasterWorker", "handleUpdateResponse", "Cannot find a pending application UPDATE request that matches the response. This message will be discarded." );
 		return false;
 	}
@@ -1480,7 +1480,7 @@ bool MasterWorker::handleDeleteResponse( SlaveEvent event, bool success, bool is
 		return false;
 	}
 
-	if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_DEL, pid.parentId, 0, &pid, &key ) ) {
+	if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_DEL, pid.parentId, 0, &pid, &key, true, true, true, header.key ) ) {
 		__ERROR__( "MasterWorker", "handleDeleteResponse", "Cannot find a pending application DELETE request that matches the response. This message will be discarded." );
 		return false;
 	}
@@ -1563,9 +1563,9 @@ bool MasterWorker::handleRedirectedResponse( SlaveEvent event, char *buf, size_t
 
 	// abort request if no application is pending for result
 	if ( slavePT == PT_SLAVE_GET || slavePT == PT_SLAVE_DEL ) {
-		ret = MasterWorker::pending->findKey( applicationPT, pid.parentId, 0, &key );
+		ret = MasterWorker::pending->findKey( applicationPT, pid.parentId, 0, &key, true, header.key );
 	} else {
-		ret = MasterWorker::pending->findKeyValueUpdate( applicationPT, pid.parentId, 0, &keyValueUpdate );
+		ret = MasterWorker::pending->findKeyValueUpdate( applicationPT, pid.parentId, 0, &keyValueUpdate, true, header.key );
 	}
 	if ( ! ret ) {
 		__ERROR__( "MasterWorker", "handleRedirectedRequest", "Cannot find a pending application %s request that matches the response. This message will be discarded (key = %.*s).", opName, key.size, key.data );
@@ -1690,7 +1690,6 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 		return false;
 	}
 
-
 	if ( ! MasterWorker::pending->findKey( PT_APPLICATION_SET, pid.parentId, 0, &key, true, header.key ) ) {
 		// set socket fd for counter
 		sockfd = socket->getSocket();
@@ -1704,8 +1703,8 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 	}
 
 
-	if ( strncmp( key.data, header.key, header.keySize ) != 0 )
-		fprintf( stderr, "key mismatched header %.*s key find %.*s\n", header.keySize, header.key, key.size, key.data );
+	// get the socket of remapped data slave
+	socket = this->getSlaves( remappingRecord.listId, remappingRecord.chunkId );
 
 	// Add data and parity slaves into the pending set
 	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount + 1; i++ ) {
@@ -1718,9 +1717,6 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 			__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Cannot insert into slave SET pending map." );
 		}
 	}
-
-	// get the socket of remapped data slave
-	socket = this->getSlaves( remappingRecord.listId, remappingRecord.chunkId );
 
 	// Prepare a packet buffer
 	Packet *packet = MasterWorker::packetPool->malloc();
