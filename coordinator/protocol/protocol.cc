@@ -290,3 +290,29 @@ char *CoordinatorProtocol::reqFlushChunks( size_t &size, uint32_t id ) {
 	);
 	return this->buffer.send;
 }
+
+char *CoordinatorProtocol::reqSyncMeta( size_t &size, uint32_t id ) {
+	size = this->generateHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_SYNC_META,
+		0, // length
+		id
+	);
+	return this->buffer.send;
+}
+
+char *CoordinatorProtocol::resRemappingSetLock( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t chunkId, bool isRemapped, uint8_t keySize, char *key ) {
+	size = this->generateRemappingLockHeader(
+		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+		PROTO_MAGIC_TO_MASTER,
+		PROTO_OPCODE_REMAPPING_LOCK,
+		id,
+		listId,
+		chunkId,
+		isRemapped,
+		keySize,
+		key
+	);
+	return this->buffer.send;
+}

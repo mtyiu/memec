@@ -5,6 +5,7 @@
 #include <pthread.h>
 #include <set>
 #include "../config/coordinator_config.hh"
+#include "../ds/pending.hh"
 #include "../event/event_queue.hh"
 #include "../remap/remap_msg_handler.hh"
 #include "../socket/coordinator_socket.hh"
@@ -39,10 +40,13 @@ private:
 	// Helper functions to determine slave loading
 	void updateAverageSlaveLoading( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
 			ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency );
-	void updateOverloadedSlaveSet( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
+	// return previously overloaded slaves for per-slave phase change
+	std::set<struct sockaddr_in> updateOverloadedSlaveSet( 
+			ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
 			ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency,
-			std::set<struct sockaddr_in> *slaveSet );
-	bool switchPhase();
+			std::set<struct sockaddr_in> *slaveSet 
+	);
+	void switchPhase( std::set<struct sockaddr_in> prevOverloadedSlaves );
 
 	// Commands
 	void help();
@@ -63,7 +67,7 @@ public:
 	/* Stripe list */
 	StripeList<SlaveSocket> *stripeList;
 	/* Remapping */
-	CoordinatorRemapMsgHandler remapMsgHandler;
+	CoordinatorRemapMsgHandler *remapMsgHandler;
 	RemappingRecordMap remappingRecords;
 	/* Loading statistics */
 	struct {
@@ -77,6 +81,7 @@ public:
 		LOCK_T lock;
 	} overloadedSlaves;
 	Timer statsTimer;
+	Pending pending;
 
 	static Coordinator *getInstance() {
 		static Coordinator coordinator;
@@ -96,6 +101,7 @@ public:
 	void seal();
 	void flush();
 	void metadata();
+	void syncSlaveMeta( struct sockaddr_in slave, bool *sync );
 	double getElapsedTime();
 	void interactive();
 };

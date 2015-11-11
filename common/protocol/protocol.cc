@@ -75,6 +75,7 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_OPCODE_FLUSH_CHUNKS:
 		case PROTO_OPCODE_RECOVERY:
 
+		case PROTO_OPCODE_SYNC_META:
 		case PROTO_OPCODE_GET:
 		case PROTO_OPCODE_SET:
 		case PROTO_OPCODE_UPDATE:
@@ -174,6 +175,7 @@ size_t Protocol::generateHeartbeatMessage(
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = PROTO_HEADER_SIZE;
 	uint32_t *sealedPtr, *opsPtr;
+	uint8_t *isLastPtr;
 	std::unordered_set<Metadata>::iterator sealedIt;
 	std::unordered_map<Key, OpMetadata>::iterator opsIt;
 
@@ -183,6 +185,7 @@ size_t Protocol::generateHeartbeatMessage(
 
 	sealedPtr       = ( uint32_t * )( buf     );
 	opsPtr          = ( uint32_t * )( buf + 4 );
+	isLastPtr       = ( uint8_t * )( buf + 8 );
 
 	buf += PROTO_HEARTBEAT_SIZE;
 	bytes += PROTO_HEARTBEAT_SIZE;
@@ -234,19 +237,23 @@ size_t Protocol::generateHeartbeatMessage(
 
 	*sealedPtr = htonl( sealedCount );
 	*opsPtr = htonl( opsCount );
+	*isLastPtr = isCompleted? 1 : 0;
+
+	// TODO tell coordinator whether this is the last packet of records
 
 	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, id );
 
 	return bytes;
 }
 
-bool Protocol::parseHeartbeatHeader( size_t offset, uint32_t &sealed, uint32_t &keys, char *buf, size_t size ) {
+bool Protocol::parseHeartbeatHeader( size_t offset, uint32_t &sealed, uint32_t &keys, bool isLast, char *buf, size_t size ) {
 	if ( size - offset < PROTO_HEARTBEAT_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
 	sealed = ntohl( *( ( uint32_t * )( ptr     ) ) );
 	keys   = ntohl( *( ( uint32_t * )( ptr + 4 ) ) );
+	isLast = ( *( ( uint8_t * )( ptr + 8 ) ) == 0 )? false : true;
 
 	return true;
 }
@@ -260,6 +267,7 @@ bool Protocol::parseHeartbeatHeader( struct HeartbeatHeader &header, char *buf, 
 		offset,
 		header.sealed,
 		header.keys,
+		header.isLast,
 		buf, size
 	);
 }
@@ -1017,14 +1025,15 @@ bool Protocol::parseChunkUpdateHeader( struct ChunkUpdateHeader &header, bool wi
 ///////////////
 // Remapping //
 ///////////////
-size_t Protocol::generateRemappingLockHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key ) {
+size_t Protocol::generateRemappingLockHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t chunkId, bool isRemapped, uint8_t keySize, char *key ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_REMAPPING_LOCK_SIZE + keySize, id );
 
 	*( ( uint32_t * )( buf     ) ) = htonl( listId );
 	*( ( uint32_t * )( buf + 4 ) ) = htonl( chunkId );
-	bytes += 8;
-	buf += 8;
+	buf[ 8 ] = isRemapped ? 1 : 0;
+	bytes += 9;
+	buf += 9;
 
 	buf[ 0 ] = keySize;
 	bytes++;
@@ -1036,19 +1045,20 @@ size_t Protocol::generateRemappingLockHeader( uint8_t magic, uint8_t to, uint8_t
 	return bytes;
 }
 
-bool Protocol::parseRemappingLockHeader( size_t offset, uint32_t &listId, uint32_t &chunkId, uint8_t &keySize, char *&key, char *buf, size_t size ) {
+bool Protocol::parseRemappingLockHeader( size_t offset, uint32_t &listId, uint32_t &chunkId, bool &isRemapped, uint8_t &keySize, char *&key, char *buf, size_t size ) {
 	if ( size - offset < PROTO_REMAPPING_LOCK_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
 	listId  = ntohl( *( ( uint32_t * )( ptr      ) ) );
 	chunkId = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
-	keySize = *( ptr + 8 );
+	isRemapped = ( ptr[ 8 ] != 0 );
+	keySize = *( ptr + 9 );
 
 	if ( size - offset < ( size_t ) PROTO_REMAPPING_LOCK_SIZE + keySize )
 		return false;
 
-	key = ptr + 9;
+	key = ptr + PROTO_REMAPPING_LOCK_SIZE;
 
 	return true;
 }
@@ -1062,6 +1072,7 @@ bool Protocol::parseRemappingLockHeader( struct RemappingLockHeader &header, cha
 		offset,
 		header.listId,
 		header.chunkId,
+		header.isRemapped,
 		header.keySize,
 		header.key,
 		buf, size

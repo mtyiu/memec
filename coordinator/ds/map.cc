@@ -71,6 +71,14 @@ bool Map::insertKey( char *keyStr, uint8_t keySize, uint32_t listId, uint32_t st
 		key = it->first;
 		key.free();
 		this->keys.erase( it );
+	} else if ( it == this->keys.end() && opcode == PROTO_OPCODE_REMAPPING_LOCK ) {
+		// check if lock is already acquired by others
+		if ( this->lockedKeys.count( key ) ) {
+			ret = false;
+		} else {
+			key.dup();
+			this->lockedKeys.insert( key );
+		}
 	} else {
 		printf( "Unknown key: %.*s.\n", keySize, keyStr );
 		ret = false;

@@ -20,35 +20,58 @@ void Coordinator::free() {
 	Map::free();
 }
 
-bool Coordinator::switchPhase() {
+void Coordinator::switchPhase( std::set<struct sockaddr_in> prevOverloadedSlaves ) {
 	// skip if remap feature is disabled
-	bool switched = false;
 	if ( ! this->config.global.remap.enabled )
-		return switched;
+		return;
 
 	MasterEvent event;
 	LOCK( &this->overloadedSlaves.lock );
-	if ( this->remapMsgHandler.isRemapStopped() &&
-			this->overloadedSlaves.slaveSet.size() > this->sockets.slaves.size() * this->config.global.remap.startThreshold ) {
-		// start remapping phase in the background
-		event.switchPhase( true );
-	} else if ( this->remapMsgHandler.isRemapStarted() &&
-			this->overloadedSlaves.slaveSet.size() < this->sockets.slaves.size() * this->config.global.remap.stopThreshold ) {
-		// stop remapping phase in the background
-		event.switchPhase( false );
-	} else {
-		goto quit;
+
+	uint32_t startThreshold = this->config.global.remap.startThreshold;
+	uint32_t stopThreshold = this->config.global.remap.stopThreshold;
+	uint32_t totalSlaveCount = this->sockets.slaves.size();
+	uint32_t curOverloadedSlaveCount = this->overloadedSlaves.slaveSet.size();
+	uint32_t prevOverloadedSlaveCount = prevOverloadedSlaves.size();
+
+	if ( curOverloadedSlaveCount > totalSlaveCount * startThreshold ) {
+		if ( prevOverloadedSlaveCount > totalSlaveCount * startThreshold ) {
+			std::set<struct sockaddr_in> newOverloadedSlaves = this->overloadedSlaves.slaveSet;
+			// already started remapping
+			// start recently overloaded slaves for remapping
+			for ( auto slave : prevOverloadedSlaves )
+				newOverloadedSlaves.erase( slave );
+			if ( newOverloadedSlaves.size() > 0 ) {
+				event.switchPhase( true, newOverloadedSlaves );
+				this->eventQueue.insert( event );
+			}
+			// stop non-overloaded slaves from remapping
+			for ( auto slave : this->overloadedSlaves.slaveSet )
+				prevOverloadedSlaves.erase( slave );
+			if ( prevOverloadedSlaves.size() > 0 ) {
+				event.switchPhase( false, prevOverloadedSlaves );
+				this->eventQueue.insert( event );
+			}
+		} else {
+			// start remapping phase for all in the background
+			event.switchPhase( true, this->overloadedSlaves.slaveSet );
+		}
+	} else if ( curOverloadedSlaveCount < totalSlaveCount * stopThreshold &&
+		prevOverloadedSlaveCount >= totalSlaveCount * stopThreshold
+	) {
+		// stop remapping phase for all in the background
+		event.switchPhase( false, prevOverloadedSlaves );
+		this->eventQueue.insert( event );
 	}
-	this->eventQueue.insert( event );
-quit:
 	UNLOCK( &this->overloadedSlaves.lock );
-	return switched;
 }
 
-void Coordinator::updateOverloadedSlaveSet( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
+std::set<struct sockaddr_in> Coordinator::updateOverloadedSlaveSet( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
 		ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency, std::set<struct sockaddr_in> *slaveSet ) {
 	double avgSec = 0.0, avgNsec = 0.0;
 	LOCK( &this->overloadedSlaves.lock );
+
+	std::set<struct sockaddr_in> prevOverloadedSlaves = this->overloadedSlaves.slaveSet;
 
 	// what has past is left in the past
 	this->overloadedSlaves.slaveSet.clear();
@@ -76,6 +99,7 @@ void Coordinator::updateOverloadedSlaveSet( ArrayMap<struct sockaddr_in, Latency
 	GET_OVERLOADED_SLAVES( Set );
 #undef GET_OVERLOADED_SLAVES
 	UNLOCK( &this->overloadedSlaves.lock );
+	return prevOverloadedSlaves;
 }
 
 void Coordinator::updateAverageSlaveLoading( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
@@ -132,8 +156,7 @@ void Coordinator::signalHandler( int signal ) {
 	switch ( signal ) {
 		case SIGALRM:
 			coordinator->updateAverageSlaveLoading( slaveGetLatency, slaveSetLatency );
-			coordinator->updateOverloadedSlaveSet( slaveGetLatency, slaveSetLatency, overloadedSlaveSet );
-			coordinator->switchPhase();
+			coordinator->switchPhase( coordinator->updateOverloadedSlaveSet( slaveGetLatency, slaveSetLatency, overloadedSlaveSet ) );
 			// TODO start / stop remapping according to criteria
 			// push the stats back to masters
 			// leave the free of ArrayMaps to workers after constructing the data buffer
@@ -262,7 +285,15 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 		char coordName[ 11 ];
 		memset( coordName, 0, 11 );
 		sprintf( coordName, "%s%04d", COORD_PREFIX, this->config.coordinator.coordinator.addr.id );
-		remapMsgHandler.init( this->config.global.remap.spreaddAddr.addr, this->config.global.remap.spreaddAddr.port, coordName );
+		remapMsgHandler = CoordinatorRemapMsgHandler::getInstance();
+		remapMsgHandler->init( this->config.global.remap.spreaddAddr.addr, this->config.global.remap.spreaddAddr.port, coordName );
+		// add the slave addrs to remapMsgHandler
+		LOCK( &this->sockets.slaves.lock );
+		for ( uint32_t i = 0; i < this->sockets.slaves.size(); i++ ) {
+			remapMsgHandler->addAliveSlave( this->sockets.slaves.values[ i ]->getAddr() );
+		}
+		UNLOCK( &this->sockets.slaves.lock );
+		//remapMsgHandler->listAliveSlaves();
 	}
 
 	/* Slave Loading stats */
@@ -306,7 +337,7 @@ bool Coordinator::start() {
 	}
 
 	/* Remapping message handler */
-	if ( this->config.global.remap.enabled && ! this->remapMsgHandler.start() ) {
+	if ( this->config.global.remap.enabled && ! this->remapMsgHandler->start() ) {
 		__ERROR__( "Coordinator", "start", "Cannot start remapping message handler." );
 		return false;
 	}
@@ -353,8 +384,8 @@ bool Coordinator::stop() {
 
 	/* Remapping message handler */
 	if ( this->config.global.remap.enabled ) {
-		this->remapMsgHandler.stop();
-		this->remapMsgHandler.quit();
+		this->remapMsgHandler->stop();
+		this->remapMsgHandler->quit();
 	}
 
 	/* Loading stats */
@@ -364,6 +395,31 @@ bool Coordinator::stop() {
 	this->isRunning = false;
 	printf( "\nBye.\n" );
 	return true;
+}
+
+void Coordinator::syncSlaveMeta( struct sockaddr_in slave, bool *sync ) {
+	SlaveEvent event;
+	SlaveSocket *socket = NULL;
+	struct sockaddr_in addr;
+
+	// find the corresponding socket for slave by address
+	LOCK( &this->sockets.slaves.lock );
+	for( uint32_t i = 0; i < this->sockets.slaves.size(); i++ ) {
+		addr = this->sockets.slaves.values[ i ]->getAddr();
+		if ( slave == addr ) {
+			socket = this->sockets.slaves.values[ i ];
+			break;
+		}
+	}
+	UNLOCK( &this->sockets.slaves.lock );
+	if ( socket == NULL ) {
+		__ERROR__( "Coordinator", "syncSlaveMeta", "Cannot find slave socket\n" );
+		*sync = true;
+		return;
+	}
+
+	event.reqSyncMeta( socket , sync );
+	this->eventQueue.insert( event );
 }
 
 double Coordinator::getElapsedTime() {
@@ -513,6 +569,9 @@ void Coordinator::printRemapping( FILE *f ) {
 	fprintf( f, "\nRemapping Records\n" );
 	fprintf( f, "----------------------------------------\n" );
 	this->remappingRecords.print( f );
+	fprintf( f, "\nList of Tracking Slaves\n" );
+	fprintf( f, "----------------------------------------\n" );
+	this->remapMsgHandler->listAliveSlaves();
 }
 
 void Coordinator::help() {
@@ -526,6 +585,7 @@ void Coordinator::help() {
 		"- seal: Force all slaves to seal all its chunks\n"
 		"- flush: Force all slaves to flush all its chunks\n"
 		"- metadata: Write metadata to disk\n"
+		"- remapping: Show remapping info\n"
 		"- exit: Terminate this client\n"
 	);
 	fflush( stdout );

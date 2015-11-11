@@ -1,13 +1,15 @@
+#include <vector>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include "common.hh"
 #include "../../../common/remap/remap_status.hh"
 #include "../../../coordinator/remap/remap_msg_handler.hh"
 
 #define TIME_OUT 2
-#define JOIN_TIME_OUT 10
+#define JOIN_TIME_OUT 4
 
 int main () {
-	CoordinatorRemapMsgHandler *ch = new CoordinatorRemapMsgHandler();
+	CoordinatorRemapMsgHandler *ch = CoordinatorRemapMsgHandler::getInstance();
 
 	fprintf( stderr, "START testing coordinator remapping message handler\n" );
 
@@ -21,18 +23,25 @@ int main () {
 	} else {
 		fprintf( stderr, ".. wait for masters to join in %d seconds\n", JOIN_TIME_OUT );
 		sleep( JOIN_TIME_OUT );
-		fprintf( stderr, ".. Start remapping phase\n" );
-		ch->startRemap();
-		while( ch->getStatus() != REMAP_START )
+		fprintf( stderr, " .. Add random slaves\n" );
+		std::vector<struct sockaddr_in> slaves = addSlaves( ch );
+		for ( int i = 0; i < ROUNDS; i++ ) {
 			sleep( TIME_OUT );
-		fprintf( stderr, ".. Stop remapping phase\n" );
-		ch->stopRemap();
-		while( ch->getStatus() != REMAP_NONE )
-			sleep( TIME_OUT );
+			fprintf( stderr, ".. Start remapping phase\n" );
+			startRemap( ch, slaves );
+			while( meetStatus( ch, slaves, REMAP_START ) == false )
+				sleep( TIME_OUT );
+			fprintf( stderr, ".. Stop remapping phase\n" );
+			for ( int i = 0; i < REMAP_COUNT; i++ ) {
+				stopRemap( ch, slaves );
+				sleep( TIME_OUT );
+			}
+			while( meetStatus( ch, slaves, REMAP_NONE ) == false )
+				sleep( TIME_OUT );
+		}
 		ch->stop();
 	}
 	ch->quit();
-	delete ch;
 
 	fprintf( stderr, "END testing coordinator remapping message handler\n" );
 

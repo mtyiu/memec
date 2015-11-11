@@ -35,7 +35,8 @@ private:
 	static Pending *pending;
 	static MasterEventQueue *eventQueue;
 	static StripeList<SlaveSocket> *stripeList;
-	static Counter *counter;
+	//static Counter *counter;
+	static ArrayMap<int, SlaveSocket> *slaveSockets;
 	static RemapFlag *remapFlag;
 	static PacketPool *packetPool;
 	static MasterRemapMsgHandler *remapMsgHandler;
@@ -68,6 +69,7 @@ private:
 		uint32_t valueUpdateSize = 0, uint32_t valueUpdateOffset = 0, char *valueUpdate = 0
 	);
 	bool handleDegradedLockResponse( CoordinatorEvent event, bool success, char *buf, size_t size );
+	bool handleRemappingSetLockResponse( CoordinatorEvent event, bool success, char *buf, size_t size );
 
 	bool handleGetResponse( SlaveEvent event, bool success, bool isDegraded, char *buf, size_t size );
 	bool handleSetResponse( SlaveEvent event, bool success, char *buf, size_t size );
@@ -75,8 +77,6 @@ private:
 	bool handleDeleteResponse( SlaveEvent event, bool success, bool isDegraded, char *buf, size_t size );
 
 	bool handleRedirectedResponse( SlaveEvent event, char *buf, size_t size, uint8_t opcode );
-
-	bool handleRemappingSetLockResponse( SlaveEvent event, bool success, char *buf, size_t size );
 	bool handleRemappingSetResponse( SlaveEvent event, bool success, char *buf, size_t size );
 
 	void free();

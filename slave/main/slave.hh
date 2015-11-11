@@ -43,7 +43,6 @@ private:
 
 	void free();
 	// Commands
-	void sync();
 	void help();
 
 public:
@@ -84,6 +83,7 @@ public:
 
 	void seal();
 	void flush();
+	void sync( uint32_t requestId = 0 );
 	void metadata();
 	void memory( FILE *f = stdout );
 

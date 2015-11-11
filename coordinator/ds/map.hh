@@ -19,18 +19,25 @@ public:
 	 */
 	std::unordered_set<Metadata> chunks;
 	LOCK_T chunksLock;
+
 	/**
 	 * Store the mapping between keys and chunks
 	 * Key |-> (list ID, stripe ID, chunk ID)
 	 */
 	std::unordered_map<Key, Metadata> keys;
+	/**
+	 * Store the set of keys with lock acquired
+	 */
+	std::unordered_set<Key> lockedKeys;
 	LOCK_T keysLock;
+
 	/**
 	 * Store the degraded locks
 	 * (list ID, stripe ID, chunk ID) |-> (list ID, chunk ID)
 	 */
 	std::unordered_map<Metadata, Metadata> degradedLocks;
 	LOCK_T degradedLocksLock;
+
 	/**
 	 * Store the current stripe ID of each list.
 	 */

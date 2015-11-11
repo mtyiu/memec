@@ -1,3 +1,4 @@
+#include <vector>
 #include "master_event.hh"
 
 void MasterEvent::resRegister( MasterSocket *socket, uint32_t id, bool success ) {
@@ -15,9 +16,20 @@ void MasterEvent::reqPushLoadStats( MasterSocket *socket, ArrayMap<struct sockad
 	this->message.slaveLoading.overloadedSlaveSet = overloadedSlaveSet;
 }
 
-void MasterEvent::switchPhase( bool toRemap ) {
+void MasterEvent::resRemappingSetLock( MasterSocket *socket, uint32_t id, bool isRemapped, Key &key, RemappingRecord &remappingRecord, bool success ) {
+	this->type = success ? MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_SUCCESS : MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_FAILURE;
+	this->id = id;
+	this->socket = socket;
+	this->message.remap.key = key;
+	this->message.remap.listId = remappingRecord.listId;
+	this->message.remap.chunkId = remappingRecord.chunkId;
+	this->message.remap.isRemapped = isRemapped;
+}
+
+void MasterEvent::switchPhase( bool toRemap, std::set<struct sockaddr_in> slaves ) {
 	this->type = MASTER_EVENT_TYPE_SWITCH_PHASE;
 	this->message.remap.toRemap = toRemap;
+	this->message.remap.slaves = new std::vector<struct sockaddr_in>( slaves.begin(), slaves.end() );
 }
 
 void MasterEvent::resDegradedLock( MasterSocket *socket, uint32_t id, Key &key, bool isLocked, bool isSealed, uint32_t srcListId, uint32_t srcStripeId, uint32_t srcChunkId, uint32_t dstListId, uint32_t dstChunkId ) {

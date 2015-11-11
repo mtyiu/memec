@@ -21,6 +21,7 @@ public:
 
 	static LOCK_T lock;
 	static uint32_t remapped;
+	static uint32_t lockonly;
 
 };
 

@@ -9,6 +9,7 @@ MasterRemapMsgHandler *BasicRemappingScheme::remapMsgHandler = NULL;
 Latency BasicRemappingScheme::increment ( 0, 100 );
 LOCK_T BasicRemappingScheme::lock = PTHREAD_MUTEX_INITIALIZER;
 uint32_t BasicRemappingScheme::remapped = 0;
+uint32_t BasicRemappingScheme::lockonly= 0;
 
 void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t originalChunkId, uint32_t &remappedListId, uint32_t &remappedChunkId, uint32_t dataCount, uint32_t parityCount, SlaveSocket **data, SlaveSocket **parity ) {
 	int index = -1, leastOverloadedId;
@@ -25,11 +26,13 @@ void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t ori
 		return;
 	}
 
-	// check if remapping is allowed
-	if ( ! remapMsgHandler->allowRemapping() )
-		return;
-
 	slaveAddr = data[ originalChunkId ]->getAddr();
+
+	// check if remamping is allowed
+	if ( ! remapMsgHandler->allowRemapping( slaveAddr ) ) {
+		lockonly++;
+		return;
+	}
 
 	// skip remap if not overloaded
 	if ( overloadedSlave->slaveSet.count( slaveAddr ) < 1 )
@@ -101,6 +104,7 @@ void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t ori
 		*targetLatency = *targetLatency + increment;
 	}
 
+
 exit:
 	UNLOCK( &overloadedSlave->lock );
 	UNLOCK( &slaveLoading->lock );
@@ -127,11 +131,11 @@ void BasicRemappingScheme::getDegradedOpTarget( uint32_t listId, uint32_t origin
 		return;
 	}
 
-	// check if remapping is allowed
-	if ( ! remapMsgHandler->allowRemapping() || parityCount == 0 )
-		return;
-
 	slaveAddr = data[ originalChunkId ]->getAddr();
+
+	// check if remapping is allowed
+	if ( ! remapMsgHandler->allowRemapping( slaveAddr ) || parityCount == 0 )
+		return;
 
 	// skip remap if not overloaded
 	if ( overloadedSlave->slaveSet.count( slaveAddr ) < 1 )
@@ -191,11 +195,11 @@ bool BasicRemappingScheme::isOverloaded( SlaveSocket *socket ) {
 		return false;
 	}
 
-	// check if remapping is allowed
-	if ( ! remapMsgHandler->allowRemapping() )
-		return false;
-
 	slaveAddr = socket->getAddr();
+
+	// check if remapping is allowed
+	if ( ! remapMsgHandler->allowRemapping( slaveAddr ) )
+		return false;
 
 	return ( overloadedSlave->slaveSet.count( slaveAddr ) >= 1 );
 }

@@ -146,7 +146,8 @@ public:
 	bool eraseKey(
 		PendingType type, uint32_t id, void *ptr = 0,
 		PendingIdentifier *pidPtr = 0, Key *keyPtr = 0,
-		bool needsLock = true, bool needsUnlock = true
+		bool needsLock = true, bool needsUnlock = true,
+		bool checkKey = false, char *checkKeyPtr = 0
 	);
 	bool eraseRemappingRecord(
 		PendingType type, uint32_t id, void *ptr = 0,
@@ -170,7 +171,8 @@ public:
 	// Find
 	bool findKey(
 		PendingType type, uint32_t id, void *ptr,
-		Key *keyPtr
+		Key *keyPtr,
+		bool checkKey = false, char *checkKeyPtr = 0
 	);
 	bool findKeyValueUpdate(
 		PendingType type, uint32_t id, void *ptr,

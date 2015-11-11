@@ -168,7 +168,6 @@ DEFINE_PENDING_SLAVE_INSERT_METHOD( insertRemappingRecord, RemappingRecord, rema
 DEFINE_PENDING_SLAVE_INSERT_METHOD( insertKeyValueUpdate, KeyValueUpdate, keyValueUpdate )
 
 DEFINE_PENDING_ERASE_METHOD( eraseDegradedLockData, DegradedLockData, degradedLockDataPtr )
-DEFINE_PENDING_ERASE_METHOD( eraseKey, Key, keyPtr )
 DEFINE_PENDING_ERASE_METHOD( eraseRemappingRecord, RemappingRecord, remappingRecordPtr )
 DEFINE_PENDING_ERASE_METHOD( eraseKeyValueUpdate, KeyValueUpdate, KeyValueUpdatePtr )
 
@@ -254,7 +253,41 @@ bool Pending::eraseRequestStartTime( PendingType type, uint32_t id, void *ptr, s
 	return ret;
 }
 
-bool Pending::findKey( PendingType type, uint32_t id, void *ptr, Key *keyPtr ) {
+bool Pending::eraseKey( PendingType type, uint32_t id, void *ptr, PendingIdentifier *pidPtr, Key *keyPtr, bool needsLock, bool needsUnlock, bool checkKey, char* checkKeyPtr ) {
+	PendingIdentifier pid( id, 0, ptr );
+	LOCK_T *lock;
+	bool ret;
+
+	std::unordered_multimap<PendingIdentifier, Key> *map;
+	std::unordered_multimap<PendingIdentifier, Key>::iterator it;
+	if ( ! this->get( type, lock, map ) )
+		return false;
+
+	if ( needsLock ) LOCK( lock );
+	if ( ptr ) {
+		it = map->find( pid );
+		// prevent collision on id
+		while ( it != map->end() && it->first.id == id && checkKey && checkKeyPtr && strncmp( checkKeyPtr, it->second.data, it->second.size ) != 0 )
+			it++;
+		ret = ( it != map->end() && it->first.id == id );
+	} else {
+		it = map->find( pid );
+		// prevent collision on id
+		while ( it != map->end() && it->first.id == id && checkKey && checkKeyPtr && strncmp( checkKeyPtr, it->second.data, it->second.size ) != 0 )
+			it++;
+		ret = ( it != map->end() && it->first.id == id ); // Match request ID
+	}
+	if ( ret ) {
+		if ( pidPtr ) *pidPtr = it->first;
+		if ( keyPtr ) *keyPtr = it->second;
+		map->erase( it );
+	}
+	if ( needsUnlock ) UNLOCK( lock );
+
+	return ret;
+}
+
+bool Pending::findKey( PendingType type, uint32_t id, void *ptr, Key *keyPtr, bool checkKey, char* checkKeyPtr ) {
 	PendingIdentifier pid( id, 0, ptr );
 	LOCK_T *lock;
 	bool ret;
@@ -267,9 +300,15 @@ bool Pending::findKey( PendingType type, uint32_t id, void *ptr, Key *keyPtr ) {
 	LOCK( lock );
 	if ( ptr ) {
 		it = map->find( pid );
-		ret = ( it != map->end() );
+		// prevent collision on id
+		while ( it != map->end() && it->first.id == id && checkKey && checkKeyPtr && strncmp( checkKeyPtr, it->second.data, it->second.size ) != 0 )
+			it++;
+		ret = ( it != map->end() && it->first.id == id );
 	} else {
 		it = map->find( pid );
+		// prevent collision on id
+		while ( it != map->end() && it->first.id == id && checkKey && checkKeyPtr && strncmp( checkKeyPtr, it->second.data, it->second.size ) != 0 )
+			it++;
 		ret = ( it != map->end() && it->first.id == id ); // Match request ID
 	}
 	if ( ret ) {

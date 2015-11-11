@@ -33,7 +33,7 @@ void CoordinatorWorker::dispatch( CoordinatorEvent event ) {
 }
 
 void CoordinatorWorker::dispatch( MasterEvent event ) {
-	bool connected = false, isSend;
+	bool connected = false, isSend, success = false;
 	ssize_t ret;
 	struct {
 		size_t size;
@@ -71,14 +71,33 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 			delete [] event.message.forward.data;
 			isSend = true;
 			break;
+		case MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_SUCCESS:
+			success = true;
+		case MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resRemappingSetLock(
+				buffer.size,
+				event.id,
+				success,
+				event.message.remap.listId,
+				event.message.remap.chunkId,
+				event.message.remap.isRemapped,
+				event.message.remap.key.size,
+				event.message.remap.key.data
+			);
+			isSend = true;
+			break;
 		case MASTER_EVENT_TYPE_SWITCH_PHASE:
+			isSend = false;
+			if ( event.message.remap.slaves == NULL )
+				break;
 			// just trigger / stop the remap phase, no message need to be handled
 			if ( event.message.remap.toRemap ) {
-				coordinator->remapMsgHandler.startRemap();
+				coordinator->remapMsgHandler->startRemap( event.message.remap.slaves );
 			} else {
-				coordinator->remapMsgHandler.stopRemap();
+				coordinator->remapMsgHandler->stopRemap( event.message.remap.slaves );
 			}
-			isSend = false;
+			// free the vector of slaves
+			delete event.message.remap.slaves;
 			break;
 		case MASTER_EVENT_TYPE_PENDING:
 			isSend = false;
@@ -199,6 +218,9 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 			} else if ( header.magic == PROTO_MAGIC_REQUEST ) {
 				event.id = header.id;
 				switch( header.opcode ) {
+					case PROTO_OPCODE_REMAPPING_LOCK:
+						this->handleRemappingSetLockRequest( event, buffer.data, buffer.size );
+						break;
 					case PROTO_OPCODE_DEGRADED_LOCK:
 						this->handleDegradedLockRequest( event, buffer.data, buffer.size );
 						break;
@@ -252,6 +274,13 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			buffer.data = this->protocol.reqFlushChunks( buffer.size, requestId );
 			isSend = true;
 			break;
+		case SLAVE_EVENT_TYPE_REQUEST_SYNC_META:
+			requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
+			buffer.data = this->protocol.reqSyncMeta( buffer.size, requestId );
+			// add sync meta request to pending set
+			Coordinator::getInstance()->pending.addSyncMetaReq( requestId, event.sync );
+			isSend = true;
+			break;
 		case SLAVE_EVENT_TYPE_PENDING:
 			isSend = false;
 			break;
@@ -281,9 +310,14 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			if ( ret != ( ssize_t ) buffer.size )
 				__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 		}
+		// notify the remap message handler of the new slave
+		struct sockaddr_in slaveAddr = event.socket->getAddr();
+		Coordinator::getInstance()->remapMsgHandler->addAliveSlave( slaveAddr );
 		UNLOCK( &slaves.lock );
 	} else if ( event.type == SLAVE_EVENT_TYPE_DISCONNECT ) {
 		this->triggerRecovery( event.socket );
+		// notify the remap message handler of a "removed" slave
+		Coordinator::getInstance()->remapMsgHandler->removeAliveSlave( event.socket->getAddr() );
 	} else if ( isSend ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
 		if ( ret != ( ssize_t ) buffer.size )
@@ -314,7 +348,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			}
 
 			if ( header.magic == PROTO_MAGIC_HEARTBEAT ) {
-				this->processHeartbeat( event, buffer.data, header.length );
+				this->processHeartbeat( event, buffer.data, header.length, header.id );
 			} else if ( header.magic == PROTO_MAGIC_REMAPPING ) {
 				struct RemappingRecordHeader remappingRecordHeader;
 				struct SlaveSyncRemapHeader slaveSyncRemapHeader;
@@ -423,7 +457,7 @@ void *CoordinatorWorker::run( void *argv ) {
 	return 0;
 }
 
-bool CoordinatorWorker::processHeartbeat( SlaveEvent event, char *buf, size_t size ) {
+bool CoordinatorWorker::processHeartbeat( SlaveEvent event, char *buf, size_t size, uint32_t requestId ) {
 	uint32_t count;
 	size_t processed, offset, failed = 0;
 	struct HeartbeatHeader heartbeat;
@@ -482,6 +516,14 @@ bool CoordinatorWorker::processHeartbeat( SlaveEvent event, char *buf, size_t si
 		__ERROR__( "CoordinatorWorker", "processHeartbeat", "Number of failed objects = %lu", failed );
 	// } else {
 	// 	__ERROR__( "CoordinatorWorker", "processHeartbeat", "(sealed, keys, remap) = (%u, %u, %u)", heartbeat.sealed, heartbeat.keys, heartbeat.remap );
+	}
+
+	// check if this is the last packet for a sync operation
+	// remove pending meta sync requests
+	if ( requestId && heartbeat.isLast && ! failed ) {
+		bool *sync = Coordinator::getInstance()->pending.removeSyncMetaReq( requestId );
+		if ( sync )
+			*sync = true;
 	}
 
 	return failed == 0;
@@ -620,6 +662,49 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 	}
 	this->dispatch( event );
 	return ret;
+}
+
+bool CoordinatorWorker::handleRemappingSetLockRequest( MasterEvent event, char *buf, size_t size ) {
+	struct RemappingLockHeader header;
+	if ( ! this->protocol.parseRemappingLockHeader( header, buf, size ) ) {
+		__ERROR__( "CoordinatorWorker", "handleRemappingSetLockRequest", "Invalid REMAPPING_SET_LOCK request (size = %lu).", size );
+		return false;
+	}
+	__DEBUG__(
+		BLUE, "CoordinatorWorker", "handleRemappingSetLockRequest",
+		"[REMAPPING_SET_LOCK] Key: %.*s (key size = %u); remapped list ID: %u, remapped chunk ID: %u",
+		( int ) header.keySize, header.key, header.keySize, header.listId, header.chunkId
+	);
+
+	Key key;
+	key.set( header.keySize, header.key );
+
+	// Find the SlaveSocket which stores the stripe with srcListId and srcChunkId
+	SlaveSocket *socket = CoordinatorWorker::stripeList->get( header.listId, header.chunkId );
+	Map *map = &socket->map;
+
+	// if already exists, does not allow remap; otherwise insert the remapping record
+	RemappingRecord remappingRecord( header.listId, header.chunkId );
+	if ( map->insertKey(
+		header.key, header.keySize, header.listId, 0,
+		header.chunkId, PROTO_OPCODE_REMAPPING_LOCK,
+		true, true)
+	) {
+		if ( header.isRemapped ) {
+			if ( CoordinatorWorker::remappingRecords->insert( key, remappingRecord ) ) {
+				event.resRemappingSetLock( event.socket, event.id, header.isRemapped, key, remappingRecord, true );
+			} else {
+				event.resRemappingSetLock( event.socket, event.id, header.isRemapped, key, remappingRecord, false );
+			}
+		} else {
+			event.resRemappingSetLock( event.socket, event.id, header.isRemapped, key, remappingRecord, true );
+		}
+	} else {
+		event.resRemappingSetLock( event.socket, event.id, header.isRemapped, key, remappingRecord, false );
+	}
+	this->dispatch( event );
+
+	return true;
 }
 
 bool CoordinatorWorker::init() {

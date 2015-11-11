@@ -36,7 +36,7 @@
 /*******************
  * Opcode (1 byte) *
  *******************/
-// Coordinator-specific opcodes //
+// Coordinator-specific opcodes (30-49) //
 #define PROTO_OPCODE_REGISTER                     0x00
 #define PROTO_OPCODE_SYNC                         0x31
 #define PROTO_OPCODE_SLAVE_CONNECTED              0x32
@@ -45,8 +45,9 @@
 #define PROTO_OPCODE_SEAL_CHUNKS                  0x35
 #define PROTO_OPCODE_FLUSH_CHUNKS                 0x36
 #define PROTO_OPCODE_RECOVERY                     0x37
+#define PROTO_OPCODE_SYNC_META                    0x38
 
-// Application <-> Master or Master <-> Slave //
+// Application <-> Master or Master <-> Slave (0-19) //
 #define PROTO_OPCODE_GET                          0x01
 #define PROTO_OPCODE_SET                          0x02
 #define PROTO_OPCODE_UPDATE                       0x03
@@ -57,20 +58,21 @@
 #define PROTO_OPCODE_DEGRADED_GET                 0x08
 #define PROTO_OPCODE_DEGRADED_UPDATE              0x09
 #define PROTO_OPCODE_DEGRADED_DELETE              0x10
-
 // Master <-> Slave //
-#define PROTO_OPCODE_REMAPPING_LOCK               0x11
 #define PROTO_OPCODE_REMAPPING_SET                0x12
 #define PROTO_OPCODE_DEGRADED_LOCK                0X13
 #define PROTO_OPCODE_DEGRADED_UNLOCK              0X14
 
-// Slave <-> Slave //
-#define PROTO_OPCODE_REMAPPING_UNLOCK             0x20
-#define PROTO_OPCODE_SEAL_CHUNK                   0x21
-#define PROTO_OPCODE_UPDATE_CHUNK                 0x22
-#define PROTO_OPCODE_DELETE_CHUNK                 0x23
-#define PROTO_OPCODE_GET_CHUNK                    0x24
-#define PROTO_OPCODE_SET_CHUNK                    0x25
+// Master <-> Coordinator (20-29) //
+#define PROTO_OPCODE_REMAPPING_LOCK               0x20
+
+// Slave <-> Slave (50-69) //
+#define PROTO_OPCODE_REMAPPING_UNLOCK             0x50
+#define PROTO_OPCODE_SEAL_CHUNK                   0x51
+#define PROTO_OPCODE_UPDATE_CHUNK                 0x52
+#define PROTO_OPCODE_DELETE_CHUNK                 0x53
+#define PROTO_OPCODE_GET_CHUNK                    0x54
+#define PROTO_OPCODE_SET_CHUNK                    0x55
 
 /*********************
  * Key size (1 byte) *
@@ -117,10 +119,11 @@ struct AddressHeader {
 //////////////////////////////////////////
 // Heartbeat & metadata synchronization //
 //////////////////////////////////////////
-#define PROTO_HEARTBEAT_SIZE 12
+#define PROTO_HEARTBEAT_SIZE 9
 struct HeartbeatHeader {
-	uint32_t sealed;
-	uint32_t keys;
+    uint32_t sealed;
+    uint32_t keys;
+    bool isLast;
 };
 
 #define PROTO_METADATA_SIZE 12
@@ -226,10 +229,11 @@ struct ChunkUpdateHeader {
 ///////////////
 // Remapping //
 ///////////////
-#define PROTO_REMAPPING_LOCK_SIZE 9
+#define PROTO_REMAPPING_LOCK_SIZE 10
 struct RemappingLockHeader {
 	uint32_t listId;
 	uint32_t chunkId;
+	bool isRemapped;
 	uint8_t keySize;
 	char *key;
 };
@@ -409,7 +413,7 @@ protected:
 		bool &isCompleted
 	);
 	bool parseHeartbeatHeader(
-		size_t offset, uint32_t &sealed, uint32_t &keys,
+		size_t offset, uint32_t &sealed, uint32_t &keys, bool isLast,
 		char *buf, size_t size
 	);
 	bool parseMetadataHeader(
@@ -536,12 +540,12 @@ protected:
 	///////////////
 	size_t generateRemappingLockHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
-		uint32_t listId, uint32_t chunkId,
+		uint32_t listId, uint32_t chunkId, bool isRemapped,
 		uint8_t keySize, char *key
 	);
 	bool parseRemappingLockHeader(
 		size_t offset, uint32_t &listId, uint32_t &chunkId,
-		uint8_t &keySize, char *&key,
+		bool &isRemapped, uint8_t &keySize, char *&key,
 		char *buf, size_t size
 	);
 

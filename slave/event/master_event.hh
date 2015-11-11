@@ -18,9 +18,6 @@ enum MasterEventType {
 	// SET
 	MASTER_EVENT_TYPE_SET_RESPONSE_SUCCESS,
 	MASTER_EVENT_TYPE_SET_RESPONSE_FAILURE,
-	// REMAPPING_SET_LOCK
-	MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_SUCCESS,
-	MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_FAILURE,
 	// REMAPPING_SET
 	MASTER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS,
 	MASTER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE,
@@ -66,8 +63,6 @@ public:
 	void resGet( MasterSocket *socket, uint32_t id, Key &key, bool isDegraded );
 	// SET
 	void resSet( MasterSocket *socket, uint32_t id, Key &key, bool success );
-	// REMAPPING_SET_LOCK
-	void resRemappingSetLock( MasterSocket *socket, uint32_t id, Key &key, RemappingRecord &remappingRecord, bool success );
 	// REMAPPING_SET
 	void resRemappingSet( MasterSocket *socket, uint32_t id, Key &key, uint32_t listId, uint32_t chunkId, bool success, bool needsFree );
 	// UPDATE

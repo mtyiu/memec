@@ -1,5 +1,7 @@
+#include <vector>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include "common.hh"
 #include "../../../common/remap/remap_status.hh"
 #include "../../../master/remap/remap_msg_handler.hh"
 
@@ -26,18 +28,22 @@ int main ( int argc, char **argv ) {
 	if ( ! mh->start() ) {
 		fprintf( stderr, "!! Cannot start reading message with message handler !!\n" );
 	} else {
+		fprintf( stderr, ".. Add random slaves\n" );
+		std::vector<struct sockaddr_in> slaves = addSlaves( mh );
 		// simulate the flow of start/end of remapping phase
-		while ( mh->getStatus() != REMAP_PREPARE_START )
-			sleep( TIME_OUT );
-		fprintf( stderr, ".. Acknowledge start of remapping phase\n" );
-		mh->ackRemap();
-		while ( mh->getStatus() != REMAP_PREPARE_END )
-			sleep( TIME_OUT );
-		fprintf( stderr, ".. Acknowledge end of remapping phase\n" );
-		mh->ackRemap();
-		while ( mh->getStatus() != REMAP_NONE )
-			sleep( TIME_OUT );
-		fprintf( stderr, "... Stop listening to incomming messages\n" );
+		for ( int i = 0; i < ROUNDS; i++ ) {
+			fprintf( stderr, ".. Waiting start of remapping phase\n" );
+			while ( meetStatus( mh, slaves, REMAP_PREPARE_START ) == false && 
+				meetStatus( mh, slaves, REMAP_START ) == false &&
+				meetStatus( mh, slaves, REMAP_PREPARE_END ) == false 
+			) 
+				sleep( TIME_OUT );
+			fprintf( stderr, ".. Waiting end of remapping phase\n" );
+			//mh->ackRemap();
+			while ( meetStatus( mh, slaves, REMAP_NONE ) == false )
+				sleep( TIME_OUT );
+			fprintf( stderr, "... Stop listening to incomming messages\n" );
+		}
 		mh->stop();
 	}
 	// stop listening and disconnect from spread daemon

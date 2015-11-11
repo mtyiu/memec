@@ -64,12 +64,14 @@ public:
 		ArrayMap<int, CoordinatorSocket> coordinators;
 		ArrayMap<int, SlaveSocket> slaves;
 	} sockets;
+	struct {
+		std::map<struct sockaddr_in, Counter*> slaves;
+	} counters;
 	IDGenerator idGenerator;
 	Pending pending;
 	MasterEventQueue eventQueue;
 	PacketPool packetPool;
 	StripeList<SlaveSocket> *stripeList;
-	Counter counter;
 	/* Remapping */
 	RemapFlag remapFlag;
 	MasterRemapMsgHandler remapMsgHandler;

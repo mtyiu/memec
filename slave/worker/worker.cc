@@ -67,7 +67,12 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 	} buffer;
 	std::unordered_map<Key, RemappingRecord>::iterator it, safeNextIt;
 
-	if ( event.type != COORDINATOR_EVENT_TYPE_PENDING )
+	if ( event.type == COORDINATOR_EVENT_TYPE_SYNC )
+		// esp. in response to request from coordinator
+		requestId = event.requestId;
+	else if ( event.type == COORDINATOR_EVENT_TYPE_PENDING )
+		requestId = 0;
+	else
 		requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
 
 	switch( event.type ) {
@@ -181,6 +186,9 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 					case PROTO_OPCODE_FLUSH_CHUNKS:
 						Slave::getInstance()->flush();
 						break;
+					case PROTO_OPCODE_SYNC_META:
+						Slave::getInstance()->sync( header.id );
+						break;
 					default:
 						__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from coordinator." );
 						break;
@@ -219,7 +227,6 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_GET_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_SET_RESPONSE_SUCCESS:
-		case MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS:
@@ -228,7 +235,6 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
 		case MASTER_EVENT_TYPE_GET_RESPONSE_FAILURE:
 		case MASTER_EVENT_TYPE_SET_RESPONSE_FAILURE:
-		case MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_FAILURE:
 		case MASTER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE:
 		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
 		case MASTER_EVENT_TYPE_DELETE_RESPONSE_FAILURE:
@@ -288,20 +294,6 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 				event.message.key.data
 			);
 			break;
-		// REMAPPING_SET_LOCK
-		case MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_SUCCESS:
-		case MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resRemappingSetLock(
-				buffer.size,
-				event.id,
-				success,
-				event.message.remap.listId,
-				event.message.remap.chunkId,
-				event.message.remap.key.size,
-				event.message.remap.key.data
-			);
-			break;
-		// REMAPPING_SET_LOCK
 		case MASTER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resRemappingSet(
@@ -402,9 +394,6 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 					case PROTO_OPCODE_SET:
 						this->handleSetRequest( event, buffer.data, buffer.size );
 						this->load.set();
-						break;
-					case PROTO_OPCODE_REMAPPING_LOCK:
-						this->handleRemappingSetLockRequest( event, buffer.data, buffer.size );
 						break;
 					case PROTO_OPCODE_REMAPPING_SET:
 						this->handleRemappingSetRequest( event, buffer.data, buffer.size );
@@ -1060,32 +1049,6 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size ) 
 	Key key;
 	key.set( header.keySize, header.key );
 	event.resSet( event.socket, event.id, key, true );
-	this->dispatch( event );
-
-	return true;
-}
-
-bool SlaveWorker::handleRemappingSetLockRequest( MasterEvent event, char *buf, size_t size ) {
-	struct RemappingLockHeader header;
-	if ( ! this->protocol.parseRemappingLockHeader( header, buf, size ) ) {
-		__ERROR__( "SlaveWorker", "handleRemappingSetLockRequest", "Invalid REMAPPING_SET_LOCK request (size = %lu).", size );
-		return false;
-	}
-	__DEBUG__(
-		BLUE, "SlaveWorker", "handleRemappingSetLockRequest",
-		"[REMAPPING_SET_LOCK] Key: %.*s (key size = %u); remapped list ID: %u, remapped chunk ID: %u",
-		( int ) header.keySize, header.key, header.keySize, header.listId, header.chunkId
-	);
-
-	Key key;
-	key.set( header.keySize, header.key );
-
-	RemappingRecord remappingRecord( header.listId, header.chunkId );
-	if ( SlaveWorker::map->insertRemappingRecord( key, remappingRecord ) ) {
-		event.resRemappingSetLock( event.socket, event.id, key, remappingRecord, true );
-	} else {
-		event.resRemappingSetLock( event.socket, event.id, key, remappingRecord, false );
-	}
 	this->dispatch( event );
 
 	return true;

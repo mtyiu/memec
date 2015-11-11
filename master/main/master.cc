@@ -206,6 +206,7 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 		socket->init( this->config.global.slaves[ i ], &this->sockets.epoll );
 		fd = socket->getSocket();
 		this->sockets.slaves.set( fd, socket );
+		this->counters.slaves[ socket->getAddr() ] = &( socket->counter );
 	}
 	/* Stripe list */
 	this->stripeList = new StripeList<SlaveSocket>(
@@ -288,6 +289,13 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 		BasicRemappingScheme::overloadedSlave = &this->overloadedSlave;
 		BasicRemappingScheme::stripeList = this->stripeList;
 		BasicRemappingScheme::remapMsgHandler = &this->remapMsgHandler;
+		// add the slave addrs to remapMsgHandler
+		LOCK( &this->sockets.slaves.lock );
+		for ( uint32_t i = 0; i < this->sockets.slaves.size(); i++ ) {
+			remapMsgHandler.addAliveSlave( this->sockets.slaves.values[ i ]->getAddr() );
+		}
+		UNLOCK( &this->sockets.slaves.lock );
+		//remapMsgHandler.listAliveSlaves();
 	}
 
 	/* Loading statistics update */
@@ -798,11 +806,24 @@ void Master::printPending( FILE *f ) {
 		f,
 		"\n\nCounters\n"
 		"--------\n"
-		"\n[REMAP] Normal: %u; Locking only: %u; Remapping: %u\n",
-		this->counter.getNormal(),
-		this->counter.getLockOnly(),
-		this->counter.getRemapping()
 	);
+	LOCK( &this->sockets.slaves.lock );
+	char buf[ INET_ADDRSTRLEN ];
+	struct sockaddr_in addr;
+	for ( uint32_t i = 0; i < this->sockets.slaves.size(); i++ ) {
+		addr = this->sockets.slaves.values[ i ]->getAddr();
+		inet_ntop( AF_INET, &addr.sin_addr, buf, INET_ADDRSTRLEN );
+		fprintf(
+			f,
+			"[REMAP] %s:%hu Normal: %u; Locking only: %u; Remapping: %u\n",
+			buf, 
+			ntohs( this->sockets.slaves.values[ i ]->getAddr().sin_port ),
+			this->sockets.slaves.values[ i ]->counter.getNormal(),
+			this->sockets.slaves.values[ i ]->counter.getLockOnly(),
+			this->sockets.slaves.values[ i ]->counter.getRemapping()
+		);
+	}
+	UNLOCK( &this->sockets.slaves.lock );
 
 }
 
@@ -816,8 +837,17 @@ void Master::printRemapping( FILE *f ) {
 
 	fprintf(
 		f,
-		"\nRemapped SET Ops: %d\n",
-		BasicRemappingScheme::remapped
+		"\nList of Tracking Slaves\n"
+		"------------------------\n"
+	);
+	this->remapMsgHandler.listAliveSlaves();
+
+	fprintf(
+		f,
+		"\nRemapped SET Ops: %d\n"
+		"\nLockOnly SET Ops: %d\n",
+		BasicRemappingScheme::remapped,
+		BasicRemappingScheme::lockonly
 	);
 }
 
