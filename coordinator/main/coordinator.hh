@@ -41,10 +41,10 @@ private:
 	void updateAverageSlaveLoading( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
 			ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency );
 	// return previously overloaded slaves for per-slave phase change
-	std::set<struct sockaddr_in> updateOverloadedSlaveSet( 
+	std::set<struct sockaddr_in> updateOverloadedSlaveSet(
 			ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
 			ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency,
-			std::set<struct sockaddr_in> *slaveSet 
+			std::set<struct sockaddr_in> *slaveSet
 	);
 	void switchPhase( std::set<struct sockaddr_in> prevOverloadedSlaves );
 
@@ -102,6 +102,7 @@ public:
 	void flush();
 	void metadata();
 	void syncSlaveMeta( struct sockaddr_in slave, bool *sync );
+	void releaseDegradedLock( uint32_t socketId );
 	double getElapsedTime();
 	void interactive();
 };

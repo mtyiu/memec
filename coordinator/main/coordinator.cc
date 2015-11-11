@@ -422,6 +422,10 @@ void Coordinator::syncSlaveMeta( struct sockaddr_in slave, bool *sync ) {
 	this->eventQueue.insert( event );
 }
 
+void Coordinator::releaseDegradedLock( uint32_t socketId ) {
+	SlaveSocket *socket = this->sockets.slaves.values[ socketId ];
+}
+
 double Coordinator::getElapsedTime() {
 	return get_elapsed_time( this->startTime );
 }

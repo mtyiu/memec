@@ -32,9 +32,9 @@ public class Main implements Runnable {
 	public long[] size;
 	public long[] count;
 
-	public Main( int id, int startId ) {
+	public Main( int id, int fromId, int toId ) {
 		this.id = id;
-		this.plio = new PLIO( Main.keySize, Main.chunkSize, Main.host, Main.port, startId );
+		this.plio = new PLIO( Main.keySize, Main.chunkSize, Main.host, Main.port, fromId, toId );
 		this.map = new HashMap<String, String>();
 		this.random = new Random();
 		this.size = new long[ 3 ];
@@ -293,8 +293,9 @@ public class Main implements Runnable {
 		Main.phase = 1;
 		Main.lock = new Object();
 		for ( int i = 0; i < Main.numThreads; i++ ) {
-			int startId = Integer.MAX_VALUE / Main.numThreads * i;
-			Main.mainObjs[ i ] = new Main( i, startId );
+			int fromId = Integer.MAX_VALUE / Main.numThreads * i;
+			int toId = Integer.MAX_VALUE / Main.numThreads * ( i + 1 );
+			Main.mainObjs[ i ] = new Main( i, fromId, toId );
 			Main.threads[ i ] = new Thread( Main.mainObjs[ i ] );
 			Main.completed[ i ] = false;
 		}

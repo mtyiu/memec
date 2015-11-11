@@ -653,6 +653,19 @@ protected:
 		char *buf, size_t size
 	);
 
+	size_t generateDegradedReleaseHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		LOCK_T *degradedLocksLock,
+		std::unordered_map<Metadata, Metadata> *degradedLocks,
+		std::unordered_map<Metadata, Metadata> *releasingDegradedLocks,
+		bool &isCompleted
+	);
+	bool parseDegradedReleaseHeader(
+		size_t offset,
+		uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
+		char *buf, size_t size
+	);
+
 	//////////////
 	// Recovery //
 	//////////////
@@ -824,6 +837,10 @@ public:
 	);
 	bool parseListStripeKeyHeader(
 		struct ListStripeKeyHeader &header,
+		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
+	bool parseDegradedReleaseHeader(
+		struct DegradedReleaseHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 	//////////////

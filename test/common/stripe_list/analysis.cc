@@ -96,17 +96,27 @@ double calculateFairness( int metricType, int fairnessType ) {
 
 	if ( fairnessType == FAIRNESS_MAX_MIN_AVG ) {
 		double max = 0, min = 0;
+		// uint32_t originalMax = 0, originalMin = 0;
 		for ( uint32_t i = 0; i < M; i++ ) {
 			metric = servers[ i ]->getMetric( metricType );
 			normalizedMetric = ( double ) metric / totalSum;
 			if ( i == 0 ) {
 				max = normalizedMetric;
 				min = normalizedMetric;
+
+				// originalMax = metric;
+				// originalMin = metric;
 			} else {
 				max = normalizedMetric > max ? normalizedMetric : max;
 				min = normalizedMetric < min ? normalizedMetric : min;
+
+				// originalMax = metric > originalMax ? metric : originalMax;
+				// originalMin = metric < originalMin ? metric : originalMin;
 			}
 		}
+		// if ( metricType == METRIC_LOAD ) {
+		// 	fprintf( stderr, "%lf %lf (%lf)\t%u %u (%u)\n", max, min, max - min, originalMax, originalMin, originalMax - originalMin );
+		// }
 		fairness = ( max - min ) / ( double ) M;
 	} else if ( fairnessType == FAIRNESS_STDEV ) {
 		double mean = 0;

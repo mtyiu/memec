@@ -12,6 +12,8 @@ public class PLIO {
 	private String host;
 	private int port;
 	private int id;
+	private int fromId;
+	private int toId;
 	private Socket socket;
 	private BufferedInputStream in;
 	private OutputStream out;
@@ -21,16 +23,18 @@ public class PLIO {
 	public static int DEFAULT_KEY_SIZE = 255;
 	public static int DEFAULT_CHUNK_SIZE = 4096;
 
-	public PLIO( int keySize, int chunkSize, String host, int port, int startId ) {
+	public PLIO( int keySize, int chunkSize, String host, int port, int fromId, int toId ) {
 		this.protocol = new Protocol( keySize, chunkSize );
 		this.host = host;
 		this.port = port;
-		this.id = startId;
+		this.id = fromId;
+		this.fromId = fromId;
+		this.toId = toId;
 	}
 
 	public int nextVal() {
-		if ( this.id == Integer.MAX_VALUE - 1 )
-			this.id = 0;
+		if ( this.id == this.toId - 1 )
+			this.id = this.fromId;
 		else
 			this.id++;
 		return this.id;

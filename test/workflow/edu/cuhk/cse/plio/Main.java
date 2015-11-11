@@ -28,8 +28,8 @@ public class Main implements Runnable {
 	private Random random;
 	public int[] completed, succeeded;
 
-	public Main( int startId ) {
-		this.plio = new PLIO( Main.keySize, Main.chunkSize, Main.host, Main.port, startId );
+	public Main( int fromId, int toId ) {
+		this.plio = new PLIO( Main.keySize, Main.chunkSize, Main.host, Main.port, fromId, toId );
 		this.map = new HashMap<String, String>( Main.numRecords / Main.numThreads );
 		this.completed = new int[ 4 ];
 		this.succeeded = new int[ 4 ];
@@ -189,7 +189,7 @@ public class Main implements Runnable {
 			}
 		}
 
-		System.out.println( "Final map size: " + this.map.size() );
+		// System.out.println( "Final map size: " + this.map.size() );
 	}
 
 	public static void main( String[] args ) throws Exception {
@@ -218,8 +218,9 @@ public class Main implements Runnable {
 		Main.threads = new Thread[ Main.numThreads ];
 		Main.lock = new Object();
 		for ( int i = 0; i < Main.numThreads; i++ ) {
-			int startId = Integer.MAX_VALUE / Main.numThreads * i;
-			Main.mainObjs[ i ] = new Main( startId );
+			int fromId = Integer.MAX_VALUE / Main.numThreads * i;
+			int toId = Integer.MAX_VALUE / Main.numThreads * ( i + 1 );
+			Main.mainObjs[ i ] = new Main( fromId, toId );
 			Main.threads[ i ] = new Thread( Main.mainObjs[ i ] );
 		}
 
