@@ -70,6 +70,10 @@ public:
 		return it->second;
 	}
 
+	std::map<unsigned int, T> getRing() {
+		return this->ring;
+	}
+
 	void print( FILE *f = stdout ) {
 		fprintf( f,
 			"Consistent Hash Ring\n"

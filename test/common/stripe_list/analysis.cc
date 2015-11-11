@@ -4,8 +4,15 @@
 #include <cassert>
 #include "../../../common/stripe_list/stripe_list.hh"
 
-#define USE_LOAD_AS_METRIC
-// #define USE_STORAGE_COST_AS_METRIC
+#define METRIC_LOAD         0
+#define METRIC_STORAGE_COST 1
+#define METRIC_NUM_KEYS     2
+#define METRIC_COUNT        3
+
+#define FAIRNESS_MAX_MIN_AVG 0
+#define FAIRNESS_STDEV       1
+#define FAIRNESS_JAINS       2
+#define FAIRNESS_COUNT       3
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -16,62 +23,62 @@ uint32_t n, k, M;
 class ServerNode {
 private:
 	uint32_t id;
-	uint32_t load, initLoad;
-	uint32_t numKeys;
+	uint32_t metric[ METRIC_COUNT ];
 
 public:
-	ServerNode( uint32_t id, uint32_t load = 0 ) {
+	ServerNode( uint32_t id ) {
 		this->id = id;
-		this->load = load;
-		this->initLoad = load;
-		this->numKeys = 0;
-	}
-
-	uint32_t incrementLoad( bool isParity ) {
-#ifdef USE_LOAD_AS_METRIC
-		this->load += isParity ? k : 1;
-#endif
-#ifdef USE_STORAGE_COST_AS_METRIC
-		this->load += 1;
-#endif
-		return this->load;
-	}
-
-	uint32_t incrementNumKeys( bool isParity = false ) {
-		if ( ! isParity )
-			this->numKeys++;
-		return this->numKeys;
-	}
-
-	uint32_t getLoad() {
-		return this->load;
-	}
-
-	uint32_t getNumKeys() {
-		return this->numKeys;
+		this->reset();
 	}
 
 	void reset() {
-		this->load = this->initLoad;
-		this->numKeys = 0;
+		for ( uint32_t i = 0; i < METRIC_COUNT; i++ )
+			this->metric[ i ] = 0;
+	}
+
+	void increment( int metricType, bool isParity ) {
+		switch( metricType ) {
+			case METRIC_LOAD:
+				this->metric[ metricType ] += isParity ? k : 1;
+				break;
+			case METRIC_STORAGE_COST:
+				this->metric[ metricType ] += 1;
+				break;
+			default:
+				return;
+		}
+	}
+
+	void increment( bool isParity ) {
+		for ( int metricType = 0; metricType < METRIC_COUNT; metricType++ ) {
+			if ( metricType == METRIC_NUM_KEYS )
+				continue;
+			this->increment( metricType, isParity );
+		}
+	}
+
+	void incrementNumKeys( uint32_t num, bool isParity ) {
+		this->metric[ METRIC_NUM_KEYS ] += num;
+	}
+
+	uint32_t getMetric( int metricType ) {
+		if ( metricType < 0 || metricType > METRIC_COUNT )
+			return 0;
+		return this->metric[ metricType ];
 	}
 
 	void print() {
-		printf( "#%u: %u; %u\n", this->id, this->load, this->numKeys );
+		printf( "#%u:", this->id );
+		for ( uint32_t metricType = 0; metricType < METRIC_COUNT; metricType++ )
+			printf( "\t%u", this->metric[ metricType ] );
+		printf( "\n" );
 	}
 };
 
+////////////////////////////////////////////////////////////////////////////////
+
 struct Fairness {
-	struct {
-		double maxMinAverage;
-		double stDev;
-		double jains;
-	} load;
-	struct {
-		double maxMinAverage;
-		double stDev;
-		double jains;
-	} keyRange;
+	double f[ FAIRNESS_COUNT ];
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -80,7 +87,51 @@ std::vector<ServerNode *> servers;
 
 ////////////////////////////////////////////////////////////////////////////////
 
-struct Fairness generateStripeLists( uint32_t c ) {
+double calculateFairness( int metricType, int fairnessType ) {
+	uint32_t metric;
+	double normalizedMetric, fairness = 0, totalSum = 0;
+
+	for ( uint32_t i = 0; i < M; i++ )
+		totalSum += servers[ i ]->getMetric( metricType );
+
+	if ( fairnessType == FAIRNESS_MAX_MIN_AVG ) {
+		double max = 0, min = 0;
+		for ( uint32_t i = 0; i < M; i++ ) {
+			metric = servers[ i ]->getMetric( metricType );
+			normalizedMetric = ( double ) metric / totalSum;
+			if ( i == 0 ) {
+				max = normalizedMetric;
+				min = normalizedMetric;
+			} else {
+				max = normalizedMetric > max ? normalizedMetric : max;
+				min = normalizedMetric < min ? normalizedMetric : min;
+			}
+		}
+		fairness = ( max - min ) / ( double ) M;
+	} else if ( fairnessType == FAIRNESS_STDEV ) {
+		double mean = 0;
+		mean = 1.0 / ( double ) M;
+		for ( uint32_t i = 0; i < M; i++ ) {
+			metric = servers[ i ]->getMetric( metricType );
+			normalizedMetric = ( double ) metric / totalSum;
+			fairness += ( normalizedMetric - mean ) * ( normalizedMetric - mean );
+		}
+		fairness = sqrt( fairness / ( double ) M );
+	} else if ( fairnessType == FAIRNESS_JAINS ) {
+		double sum = 0, sumsq = 0;
+		for ( uint32_t i = 0; i < M; i++ ) {
+			metric = servers[ i ]->getMetric( metricType );
+			normalizedMetric = ( double ) metric / totalSum;
+			sum += normalizedMetric;
+			sumsq += normalizedMetric * normalizedMetric;
+		}
+		fairness = ( double )( sum * sum ) / ( M * sumsq );
+	}
+
+	return fairness;
+}
+
+void generateStripeLists( uint32_t c, struct Fairness *fairnesses ) {
 	ServerNode *serverNode;
 	StripeList<ServerNode> stripeList( n, k, c, servers );
 
@@ -89,135 +140,77 @@ struct Fairness generateStripeLists( uint32_t c ) {
 		servers[ i ]->reset();
 	}
 
-	// Calculate metrics
+	// Calculate metrics (load and storage cost)
 	for ( uint32_t listId = 0; listId < c; listId++ ) {
 		for ( uint32_t chunkId = 0; chunkId < n; chunkId++ ) {
 			serverNode = stripeList.get( listId, chunkId );
-			serverNode->incrementLoad(
-				chunkId >= k // isParity
-			);
+			serverNode->increment( chunkId >= k /* isParity */ );
 		}
 	}
 
-	// Calculate laod fairness
-	struct Fairness fairness = { { 0, 0, 0 }, { 0, 0, 0 } };
-	uint32_t metric;
-
-	////////// Load //////////
-
-	/* Max-Min Average */
-	uint32_t max = 0, min = 0;
-	for ( uint32_t i = 0; i < M; i++ ) {
-		metric = servers[ i ]->getLoad();
-		if ( i == 0 ) {
-			max = metric;
-			min = metric;
-		} else {
-			max = metric > max ? metric : max;
-			min = metric < min ? metric : min;
-		}
-	}
-	fairness.load.maxMinAverage = ( ( double )( max - min ) ) / ( double ) M;
-
-	/* Standard Deviation */
-	double mean = 0;
-	for ( uint32_t i = 0; i < M; i++ )
-		mean += servers[ i ]->getLoad();
-	mean = mean / ( double ) M;
-	for ( uint32_t i = 0; i < M; i++ ) {
-		metric = servers[ i ]->getLoad();
-		fairness.load.stDev += ( metric - mean ) * ( metric - mean );
-	}
-	fairness.load.stDev = sqrt( fairness.load.stDev / ( double ) M );
-
-	/* Jain's Fairness */
-	uint32_t sum = 0, sumsq = 0;
-	for ( uint32_t i = 0; i < M; i++ ) {
-		metric = servers[ i ]->getLoad();
-		sum += metric;
-		sumsq += metric * metric;
-	}
-	fairness.load.jains = ( double )( sum * sum ) / ( M * sumsq );
-
-	////////// Key Range Distribution //////////
-
-	// Calculate key range distribution
+	// Calculate metrics (key range distribution)
 	ServerNode **dataServerNodes = new ServerNode*[ k ];
 	ServerNode **parityServerNodes = new ServerNode*[ n - k ];
-	for ( unsigned int val = 0; val < UINT32_MAX; val++ ) {
-		stripeList.getByHash( val, dataServerNodes, parityServerNodes, 0, true );
-		for ( uint32_t i = 0; i < k; i++ ) {
-			dataServerNodes[ i ]->incrementNumKeys( false );
-		}
-		/*
-		for ( uint32_t i = 0; i < n - k; i++ ) {
-			parityServerNodes[ i ]->incrementNumKeys( true );
-		}
-		*/
+	std::map<unsigned int, uint32_t> ring = stripeList.getRing();
+	std::map<unsigned int, uint32_t>::iterator it;
+	unsigned int from = 0, to = 0, num, rem;
+	for ( it = ring.begin(); it != ring.end(); it++ ) {
+		to = it->first;
+		num = ( to - from ) / k;
+		rem = ( to - from ) % k;
+		assert(
+			stripeList.getByHash( from, dataServerNodes, parityServerNodes ) == stripeList.getByHash( to, dataServerNodes, parityServerNodes )
+		);
+		for ( uint32_t i = 0; i < k; i++ )
+			dataServerNodes[ i ]->incrementNumKeys( num + ( ( rem <= i ) ? 1 : 0 ), false );
+		for ( uint32_t i = 0; i < n - k; i++ )
+			parityServerNodes[ i ]->incrementNumKeys( num + ( ( rem <= i ) ? 1 : 0 ), true );
+		from = to + 1;
+	}
+	// Handle wrap-around list
+	from = ring.rbegin()->first + 1;
+	to = UINT32_MAX;
+	num = ( to - from ) / k;
+	rem = ( to - from ) % k;
+	assert(
+		stripeList.getByHash( from, dataServerNodes, parityServerNodes ) == stripeList.getByHash( to, dataServerNodes, parityServerNodes )
+	);
+	for ( uint32_t i = 0; i < k; i++ ) {
+		dataServerNodes[ i ]->incrementNumKeys( num + ( ( rem <= i ) ? 1 : 0 ), false );
+		for ( uint32_t j = 0; j < n - k; j++ )
+			parityServerNodes[ j ]->incrementNumKeys( num + ( ( rem <= i ) ? 1 : 0 ), true );
 	}
 
-	/* Max-Min Average */
-	max = 0, min = 0;
-	for ( uint32_t i = 0; i < M; i++ ) {
-		metric = servers[ i ]->getNumKeys();
-		if ( i == 0 ) {
-			max = metric;
-			min = metric;
-		} else {
-			max = metric > max ? metric : max;
-			min = metric < min ? metric : min;
+	delete[] dataServerNodes;
+	delete[] parityServerNodes;
+
+	// Calculate fairness
+	for ( int metricType = 0; metricType < METRIC_COUNT; metricType++ ) {
+		for ( int fairnessType = 0; fairnessType < FAIRNESS_COUNT; fairnessType++ ) {
+			fairnesses[ metricType ].f[ fairnessType ] = calculateFairness( metricType, fairnessType );
 		}
 	}
-	fairness.keyRange.maxMinAverage = ( ( double )( max - min ) ) / ( double ) M;
-
-	/* Standard Deviation */
-	mean = 0;
-	for ( uint32_t i = 0; i < M; i++ )
-		mean += servers[ i ]->getNumKeys();
-	mean = mean / ( double ) M;
-	for ( uint32_t i = 0; i < M; i++ ) {
-		metric = servers[ i ]->getNumKeys();
-		fairness.keyRange.stDev += ( metric - mean ) * ( metric - mean );
-	}
-	fairness.keyRange.stDev = sqrt( fairness.keyRange.stDev / ( double ) M );
-
-	/* Jain's Fairness */
-	sum = 0, sumsq = 0;
-	for ( uint32_t i = 0; i < M; i++ ) {
-		metric = servers[ i ]->getNumKeys();
-		sum += metric;
-		sumsq += metric * metric;
-	}
-	fairness.keyRange.jains = ( double )( sum * sum ) / ( M * sumsq );
 
 	// Print each server node (for debugging only)
 	// for ( uint32_t i = 0; i < M; i++ ) {
 	// 	servers[ i ]->print();
 	// }
 	// stripeList.print();
-
-	delete[] dataServerNodes;
-	delete[] parityServerNodes;
-
-	return fairness;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
 void runExperiments( uint32_t from, uint32_t to ) {
-	struct Fairness fairness;
+	struct Fairness fairnesses[ METRIC_COUNT ];
 	for ( uint32_t c = from; c < to; c++ ) {
-		fairness = generateStripeLists( c );
-		printf(
-			"%u\t%6.4lf\t%6.4lf\t%6.4lf\t%6.4lf\t%6.4lf\t%6.4lf\n",
-			c,
-			fairness.load.maxMinAverage,
-			fairness.load.stDev,
-			fairness.load.jains,
-			fairness.keyRange.maxMinAverage,
-			fairness.keyRange.stDev,
-			fairness.keyRange.jains
-		);
+		generateStripeLists( c, fairnesses );
+		printf( "%u", c );
+		for ( int metricType = 0; metricType < METRIC_COUNT; metricType++ ) {
+			for ( int fairnessType = 0; fairnessType < FAIRNESS_COUNT; fairnessType++ ) {
+				printf( "\t%10.8lf", fairnesses[ metricType ].f[ fairnessType ] );
+			}
+		}
+		printf( "\n" );
 	}
 }
 

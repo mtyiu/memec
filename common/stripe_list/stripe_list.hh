@@ -142,28 +142,14 @@ public:
 		return listIndex;
 	}
 
-	unsigned int getByHash( unsigned int hashValue, T **data = 0, T **parity = 0, uint32_t *dataIndexPtr = 0, bool full = false ) {
-		uint32_t dataIndex = hashValue % this->k;
+	unsigned int getByHash( unsigned int hashValue, T **data, T **parity ) {
 		uint32_t listIndex = this->listRing.get( hashValue );
 		T **ret = this->lists[ listIndex ];
 
-		if ( dataIndexPtr )
-			*dataIndexPtr = dataIndex;
-
-		if ( parity ) {
-			for ( uint32_t i = 0; i < this->n - this->k; i++ ) {
-				parity[ i ] = ret[ this->k + i ];
-			}
-		}
-		if ( data ) {
-			if ( full ) {
-				for ( uint32_t i = 0; i < this->k; i++ ) {
-					data[ i ] = ret[ i ];
-				}
-			} else {
-				*data = ret[ dataIndex ];
-			}
-		}
+		for ( uint32_t i = 0; i < this->n - this->k; i++ )
+			parity[ i ] = ret[ this->k + i ];
+		for ( uint32_t i = 0; i < this->k; i++ )
+			data[ i ] = ret[ i ];
 		return listIndex;
 	}
 
@@ -239,6 +225,10 @@ public:
 
 	uint32_t getNumList() {
 		return this->numLists;
+	}
+
+	std::map<unsigned int, uint32_t> getRing() {
+		return this->listRing.getRing();
 	}
 
 	void print( FILE *f = stdout ) {
