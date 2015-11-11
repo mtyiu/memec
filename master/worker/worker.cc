@@ -723,7 +723,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
 
-	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_SET, event.id, ( void * ) event.socket, key ) ) {
+	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_SET, event.id, ( void * ) event.socket, key, true, true ) ) {
 		__ERROR__( "MasterWorker", "handleSetRequest", "Cannot insert into application SET pending map." );
 	}
 
@@ -1003,8 +1003,6 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
 
-	if ( MasterWorker::pending->count( PT_APPLICATION_SET, event.id, true, true ) )
-		printf( "collision on %d\n", event.id );
 	// Insert the key into application SET pending map
 	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_SET, event.id, ( void * ) event.socket, key, true, true ) ) {
 		__ERROR__( "MasterWorker", "handleRemappingSetRequest", "Cannot insert into application SET pending map." );
@@ -1417,7 +1415,7 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 
 	if ( pending == 0 ) {
 		// Only send application SET response when the number of pending slave SET requests equal 0
-		if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_SET, pid.parentId, 0, &pid, &key ) ) {
+		if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_SET, pid.parentId, 0, &pid, &key, true, true, true, header.key ) ) {
 			__ERROR__( "MasterWorker", "handleSetResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded." );
 			return false;
 		}
@@ -1846,7 +1844,7 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 
 	if ( pending == 0 ) {
 		// Only send application SET response when the number of pending slave SET requests equal 0
-		if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_SET, pid.parentId, 0, &pid, &key, true, header.key ) ) {
+		if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_SET, pid.parentId, 0, &pid, &key, true, true, true, header.key ) ) {
 			__ERROR__( "MasterWorker", "handleRemappingSetResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded." );
 			return false;
 		}
