@@ -58,13 +58,14 @@ bool Map::insertKey( char *keyStr, uint8_t keySize, uint32_t listId, uint32_t st
 
 	if ( needsLock ) LOCK( &this->keysLock );
 	it = this->keys.find( key );
-	if ( it == this->keys.end() && opcode == PROTO_OPCODE_SET ) {
+	if ( it == this->keys.end() && ( opcode == PROTO_OPCODE_SET || opcode == PROTO_OPCODE_REMAPPING_SET ) ) {
 		key.dup();
 
 		std::pair<Key, Metadata> p( key, metadata );
 		std::pair<std::unordered_map<Key, Metadata>::iterator, bool> r;
 
 		r = this->keys.insert( p );
+		this->lockedKeys.erase( key );
 
 		ret = r.second;
 	} else if ( it != this->keys.end() && opcode == PROTO_OPCODE_DELETE ) {
@@ -80,7 +81,7 @@ bool Map::insertKey( char *keyStr, uint8_t keySize, uint32_t listId, uint32_t st
 			this->lockedKeys.insert( key );
 		}
 	} else {
-		printf( "Unknown key: %.*s.\n", keySize, keyStr );
+		printf( "Unknown key: %.*s for opcode %d.\n", keySize, keyStr, opcode );
 		ret = false;
 	}
 	if ( needsUnlock ) UNLOCK( &this->keysLock );

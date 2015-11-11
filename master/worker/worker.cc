@@ -495,7 +495,7 @@ SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId
 	bool found = MasterWorker::remappingRecords->find( key, &record );
 	found = ( found && ! Master::getInstance()->config.master.remap.forceNoCacheRecords );
 	if ( found ) { // remapped keys
-		//fprintf( stderr, "Redirect request from list=%u chunk=%u to list=%u chunk=%u\n", listId, chunkId, record.listId, record.chunkId);
+		fprintf( stderr, "Redirect request to list=%u chunk=%u\n", record.listId, record.chunkId);
 		listId = record.listId;
 		chunkId = record.chunkId;
 		this->paritySlaveSockets = MasterWorker::stripeList->get(
@@ -1690,9 +1690,10 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 		return false;
 	}
 
-	sockfd = socket->getSocket();
 
 	if ( ! MasterWorker::pending->findKey( PT_APPLICATION_SET, pid.parentId, 0, &key, true, header.key ) ) {
+		// set socket fd for counter
+		sockfd = socket->getSocket();
 		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded. (ID: %u)", pid.parentId );
 		if ( NO_REMAPPING )
 			MasterWorker::slaveSockets->get( sockfd )->counter.decreaseLockOnly();
@@ -1701,6 +1702,7 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 		Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
 		return false;
 	}
+
 
 	if ( strncmp( key.data, header.key, header.keySize ) != 0 )
 		fprintf( stderr, "key mismatched header %.*s key find %.*s\n", header.keySize, header.key, key.size, key.data );
@@ -1716,6 +1718,9 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 			__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Cannot insert into slave SET pending map." );
 		}
 	}
+
+	// get the socket of remapped data slave
+	socket = this->getSlaves( remappingRecord.listId, remappingRecord.chunkId );
 
 	// Prepare a packet buffer
 	Packet *packet = MasterWorker::packetPool->malloc();
@@ -1752,7 +1757,7 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 
 	MasterWorker::pending->recordRequestStartTime( PT_SLAVE_SET, pid.id, pid.parentId, ( void * ) socket, socket->getAddr() );
 
-	// Send SET requests (data)
+	// Send SET request (data)
 	SlaveEvent slaveEvent;
 	slaveEvent.send( socket, packet );
 	this->dispatch( slaveEvent );
