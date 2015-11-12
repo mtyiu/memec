@@ -10,7 +10,7 @@ common/protocol/protocol
 common/remap/coordinator_remap
 common/remap/master_remap
 common/stripe_list/analysis
-common/stripe_list/*.png
-common/stripe_list/results.txt
+common/stripe_list/fairness
+common/stripe_list/results
 temp/permutation
 temp/stripe_list

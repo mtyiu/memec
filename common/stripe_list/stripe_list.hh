@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <stdint.h>
 #include "../ds/array_map.hh"
@@ -25,7 +26,7 @@ typedef struct {
 template <class T> class StripeList {
 protected:
 	uint32_t n, k, numLists, numSlaves;
-	bool generated;
+	bool generated, useAlgo;
 	BitmaskArray data, parity;
 	unsigned int *weight, *cost;
 	std::vector<T *> *slaves;
@@ -57,7 +58,26 @@ protected:
 		return ( uint32_t ) index;
 	}
 
-	void generate( bool verbose = false ) {
+	inline uint32_t pickRand( int listIndex ) {
+		int32_t index = -1;
+		uint32_t i;
+		 while( index == -1 ) {
+			i = rand() % this->numSlaves;
+			if (
+				! this->data.check( listIndex, i ) && // The slave should not be selected before
+				! this->parity.check( listIndex, i ) // The slave should not be selected before
+			) {
+				index = i;
+			}
+		}
+		if ( index == -1 ) {
+			fprintf( stderr, "Cannot assign a slave for stripe list #%d.", listIndex );
+			return 0;
+		}
+		return ( uint32_t ) index;
+	}
+
+	void generate( bool verbose = false, bool useAlgo = true ) {
 		if ( generated )
 			return;
 
@@ -66,13 +86,13 @@ protected:
 		for ( i = 0; i < this->numLists; i++ ) {
 			T **list = this->lists[ i ];
 			for ( j = 0; j < this->n - this->k; j++ ) {
-				index = pickMin( i );
+				index = useAlgo ? pickMin( i ) : pickRand( i );
 				this->parity.set( i, index );
 				this->weight[ index ] += this->k;
 				this->cost[ index ] += 1;
 			}
 			for ( j = 0; j < this->k; j++ ) {
-				index = pickMin( i );
+				index = useAlgo ? pickMin( i ) : pickRand( i );
 				this->data.set( i, index );
 				this->weight[ index ] += 1;
 				this->cost[ index ] += 1;
@@ -98,12 +118,13 @@ protected:
 	}
 
 public:
-	StripeList( uint32_t n, uint32_t k, uint32_t numLists, std::vector<T *> &slaves ) : data( slaves.size(), numLists ), parity( slaves.size(), numLists ) {
+	StripeList( uint32_t n, uint32_t k, uint32_t numLists, std::vector<T *> &slaves, bool useAlgo = true ) : data( slaves.size(), numLists ), parity( slaves.size(), numLists ) {
 		this->n = n;
 		this->k = k;
 		this->numLists = numLists;
 		this->numSlaves = slaves.size();
 		this->generated = false;
+		this->useAlgo = useAlgo;
 		this->weight = new unsigned int[ numSlaves ];
 		this->cost = new unsigned int[ numSlaves ];
 		this->slaves = &slaves;
@@ -114,7 +135,7 @@ public:
 		memset( this->weight, 0, sizeof( unsigned int ) * numSlaves );
 		memset( this->cost, 0, sizeof( unsigned int ) * numSlaves );
 
-		this->generate();
+		this->generate( false /* verbose */, useAlgo );
 	}
 
 	unsigned int get( const char *key, uint8_t keySize, T **data = 0, T **parity = 0, uint32_t *dataIndexPtr = 0, bool full = false ) {
@@ -235,10 +256,12 @@ public:
 		uint32_t i, j;
 		bool first;
 
-		if ( ! generated )
-			this->generate();
+		if ( ! generated ) {
+			fprintf( f, "The stripe lists are not generated yet.\n" );
+			return;
+		}
 
-		fprintf( f, "### Stripe List ###\n" );
+		fprintf( f, "### Stripe List (%s) ###\n", this->useAlgo ? "Load-aware" : "Random" );
 		for ( i = 0; i < this->numLists; i++ ) {
 			first = true;
 			fprintf( f, "#%u: ((", i );

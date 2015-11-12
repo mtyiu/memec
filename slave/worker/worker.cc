@@ -996,9 +996,12 @@ bool SlaveWorker::handleSlaveConnectedMsg( CoordinatorEvent event, char *buf, si
 
 bool SlaveWorker::handleReleaseDegradedLockRequest( CoordinatorEvent event, char *buf, size_t size ) {
 	struct DegradedReleaseHeader header;
-	Metadata metadata;
-	Chunk *chunk;
 	uint32_t count = 0;
+
+	// (dstListId, dstChunkId) |-> (srcListId, srcStripeId, srcChunkId)
+	std::unordered_map<Metadata, std::vector<Metadata>> chunks;
+	std::unordered_map<Metadata, std::vector<Metadata>>::iterator it;
+	Metadata src, dst;
 
 	while( size ) {
 		if ( ! this->protocol.parseDegradedReleaseHeader( header, buf, size ) ) {
@@ -1007,40 +1010,62 @@ bool SlaveWorker::handleReleaseDegradedLockRequest( CoordinatorEvent event, char
 		}
 		__DEBUG__(
 			BLUE, "SlaveWorker", "handleGetRequest",
-			"[DEGRADED_RELEASE] (%u, %u, %u) (remaining = %lu).",
-			header.listId, header.stripeId, header.chunkId, size
+			"[DEGRADED_RELEASE] (%u, %u, %u |-> %u, %u) (remaining = %lu).",
+			header.srcListId, header.srcStripeId, header.srcChunkId,
+			header.dstListId, header.dstChunkId, size
 		);
 		buf += PROTO_DEGRADED_RELEASE_SIZE;
 		size -= PROTO_DEGRADED_RELEASE_SIZE;
 
-		// Find the chunk from DegradedMap
-		chunk = SlaveWorker::map->findChunkById(
-			header.listId, header.stripeId, header.chunkId,
-			&metadata
-		);
-		if ( chunk ) {
-			SlavePeerSocket *socket;
-			uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
-
-			this->getSlaves( header.listId );
-			socket = header.chunkId < SlaveWorker::dataChunkCount ? this->dataSlaveSockets[ header.chunkId ] : this->paritySlaveSockets[ header.chunkId - SlaveWorker::dataChunkCount ];
-
-			if ( socket->self ) {
-				printf( "self-socket? (%u, %u, %u)\n", header.listId, header.stripeId, header.chunkId );
-				continue;
-			}
-
-			SlavePeerEvent slavePeerEvent;
-
-			slavePeerEvent.reqSetChunk(
-				socket, requestId, metadata, chunk
-			);
-			SlaveWorker::eventQueue->insert( slavePeerEvent );
-			count++;
+		dst.set( header.dstListId, 0, header.dstChunkId );
+		src.set( header.srcListId, header.srcStripeId, header.srcChunkId );
+		it = chunks.find( dst );
+		if ( it != chunks.end() ) {
+			std::vector<Metadata> &srcs = it->second;
+			srcs.push_back( src );
 		} else {
-			printf( "Chunk: (%u, %u, %u) not fonud.", header.listId, header.stripeId, header.chunkId );
+			std::vector<Metadata> srcs;
+			srcs.push_back( src );
+			chunks[ dst ] = srcs;
 		}
+
+		count++;
 	}
+
+	for ( it = chunks.begin(); it != chunks.end(); it++ ) {
+		std::vector<Metadata> &srcs = it->second;
+		printf( "dst: (%u, %u) |-> (", it->first.listId, it->first.chunkId );
+		for ( size_t i = 0, len = srcs.size(); i < len; i++ ) {
+			printf(
+				"%s(%u, %u, %u)",
+				i == 0 ? "" : ", ",
+				srcs[ i ].listId,
+				srcs[ i ].stripeId,
+				srcs[ i ].chunkId
+			);
+		}
+		printf( ")\n" );
+	}
+
+	/*
+	SlavePeerSocket *socket;
+	uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
+
+	this->getSlaves( header.dstListId );
+	socket = header.dstChunkId < SlaveWorker::dataChunkCount ? this->dataSlaveSockets[ header.dstChunkId ] : this->paritySlaveSockets[ header.dstChunkId - SlaveWorker::dataChunkCount ];
+
+	if ( socket->self ) {
+		printf( "self-socket? (%u, %u, %u)\n", header.dstListId, header.dstChunkId );
+		continue;
+	}
+	*/
+
+	// SlavePeerEvent slavePeerEvent;
+	// slavePeerEvent.reqSetChunk(
+	// 	socket, requestId, metadata, chunk
+	// );
+	// SlaveWorker::eventQueue->insert( slavePeerEvent );
+
 	printf( "Sync-ed chunks: %u\n", count );
 	return true;
 }

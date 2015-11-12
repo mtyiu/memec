@@ -247,7 +247,7 @@ quit_1:
 }
 
 void CoordinatorWorker::dispatch( SlaveEvent event ) {
-	bool connected, isSend, isCompleted;
+	bool connected, isSend;
 	ssize_t ret;
 	struct {
 		size_t size;
@@ -282,19 +282,8 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			isSend = true;
 			break;
 		case SLAVE_EVENT_TYPE_REQUEST_RELEASE_DEGRADED_LOCK:
-			requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
-			buffer.data = this->protocol.reqReleaseDegradedLock(
-				buffer.size, requestId,
-				&event.socket->map.degradedLocksLock,
-				&event.socket->map.degradedLocks,
-				&event.socket->map.releasingDegradedLocks,
-				isCompleted
-			);
-			if ( buffer.size == PROTO_HEADER_SIZE ) {
-				__ERROR__( "CoordinatorWorker", "dispatch", "No chunks are locked on this slave." );
-				return;
-			}
-			isSend = true;
+			this->handleReleaseDegradedLockRequest( event.socket );
+			isSend = false;
 			break;
 		case SLAVE_EVENT_TYPE_PENDING:
 			isSend = false;
@@ -341,11 +330,6 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 		if ( ! connected )
 			__ERROR__( "CoordinatorWorker", "dispatch", "The slave is disconnected." );
-
-		if ( event.type == SLAVE_EVENT_TYPE_REQUEST_RELEASE_DEGRADED_LOCK && ! isCompleted ) {
-			event.reqReleaseDegradedLock( event.socket );
-			this->eventQueue->insert( event );
-		}
 	} else {
 		// Parse requests from slaves
 		ProtocolHeader header;
@@ -625,6 +609,48 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 	UNLOCK( &socket->map.chunksLock );
 
 	printf( "Number of chunks that need to be recovered: %u\n", numLostChunks );
+
+	return true;
+}
+
+bool CoordinatorWorker::handleReleaseDegradedLockRequest( SlaveSocket *socket ) {
+	std::unordered_map<Metadata, Metadata>::iterator dlsIt;
+	Map &map = socket->map;
+	// (dstListId, dstChunkId) |-> (srcListId, srcStripeId, srcChunkId)
+	std::unordered_map<Metadata, std::vector<Metadata>> chunks;
+	std::unordered_map<Metadata, std::vector<Metadata>>::iterator chunksIt;
+
+	LOCK( &map.degradedLocksLock );
+	for ( dlsIt = map.degradedLocks.begin(); dlsIt != map.degradedLocks.end(); dlsIt++ ) {
+		const Metadata &src = dlsIt->first, &dst = dlsIt->second;
+		chunksIt = chunks.find( dst );
+		if ( chunksIt != chunks.end() ) {
+			std::vector<Metadata> &srcs = chunksIt->second;
+			srcs.push_back( src );
+		} else {
+			std::vector<Metadata> srcs;
+			srcs.push_back( src );
+			chunks[ dst ] = srcs;
+		}
+	}
+	map.degradedLocks.swap( map.releasingDegradedLocks );
+	UNLOCK( &map.degradedLocksLock );
+
+	for ( chunksIt = chunks.begin(); chunksIt != chunks.end(); chunksIt++ ) {
+		std::vector<Metadata> &srcs = chunksIt->second;
+		// printf( "dst: (%u, %u) |-> (", chunksIt->first.listId, chunksIt->first.chunkId );
+		// for ( size_t i = 0, len = srcs.size(); i < len; i++ ) {
+		// 	printf(
+		// 		"%s(%u, %u, %u)",
+		// 		i == 0 ? "" : ", ",
+		// 		srcs[ i ].listId,
+		// 		srcs[ i ].stripeId,
+		// 		srcs[ i ].chunkId
+		// 	);
+		// }
+		// printf( ")\n" );
+		printf( "dst: (%u, %u) |-> %lu\n", chunksIt->first.listId, chunksIt->first.chunkId, srcs.size() );
+	}
 
 	return true;
 }

@@ -1605,9 +1605,11 @@ size_t Protocol::generateDegradedReleaseHeader( uint8_t magic, uint8_t to, uint8
 	std::unordered_map<Metadata, Metadata>::iterator it;
 	for ( it = degradedLocks->begin(); it != degradedLocks->end(); it++ ) {
 		if ( this->buffer.size >= bytes + PROTO_DEGRADED_RELEASE_SIZE ) {
-			*( ( uint32_t * )( buf     ) ) = htonl( it->first.listId );
-			*( ( uint32_t * )( buf + 4 ) ) = htonl( it->first.stripeId );
-			*( ( uint32_t * )( buf + 8 ) ) = htonl( it->first.chunkId );
+			*( ( uint32_t * )( buf      ) ) = htonl( it->first.listId );
+			*( ( uint32_t * )( buf +  4 ) ) = htonl( it->first.stripeId );
+			*( ( uint32_t * )( buf +  8 ) ) = htonl( it->first.chunkId );
+			*( ( uint32_t * )( buf + 12 ) ) = htonl( it->second.listId );
+			*( ( uint32_t * )( buf + 16 ) ) = htonl( it->second.chunkId );
 		} else {
 			isCompleted = false;
 			break;
@@ -1625,14 +1627,16 @@ size_t Protocol::generateDegradedReleaseHeader( uint8_t magic, uint8_t to, uint8
 	return bytes;
 }
 
-bool Protocol::parseDegradedReleaseHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, char *buf, size_t size ) {
+bool Protocol::parseDegradedReleaseHeader( size_t offset, uint32_t &srcListId, uint32_t &srcStripeId, uint32_t &srcChunkId, uint32_t &dstListId, uint32_t &dstChunkId, char *buf, size_t size ) {
 	if ( size - offset < PROTO_DEGRADED_RELEASE_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
-	listId   = ntohl( *( ( uint32_t * )( ptr     ) ) );
-	stripeId = ntohl( *( ( uint32_t * )( ptr + 4 ) ) );
-	chunkId  = ntohl( *( ( uint32_t * )( ptr + 8 ) ) );
+	srcListId   = ntohl( *( ( uint32_t * )( ptr      ) ) );
+	srcStripeId = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
+	srcChunkId  = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
+	dstListId   = ntohl( *( ( uint32_t * )( ptr + 12 ) ) );
+	dstChunkId  = ntohl( *( ( uint32_t * )( ptr + 16 ) ) );
 
 	return true;
 }
@@ -1644,9 +1648,11 @@ bool Protocol::parseDegradedReleaseHeader( struct DegradedReleaseHeader &header,
 	}
 	return this->parseDegradedReleaseHeader(
 		offset,
-		header.listId,
-		header.stripeId,
-		header.chunkId,
+		header.srcListId,
+		header.srcStripeId,
+		header.srcChunkId,
+		header.dstListId,
+		header.dstChunkId,
 		buf, size
 	);
 }

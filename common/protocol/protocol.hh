@@ -316,11 +316,13 @@ struct ListStripeKeyHeader {
 };
 
 // For asking slaves to send back the modified reconstructed chunks to the overloaded slave
-#define PROTO_DEGRADED_RELEASE_SIZE 12
+#define PROTO_DEGRADED_RELEASE_SIZE 20
 struct DegradedReleaseHeader {
-	uint32_t listId;
-	uint32_t stripeId;
-	uint32_t chunkId;
+	uint32_t srcListId;
+	uint32_t srcStripeId;
+	uint32_t srcChunkId;
+	uint32_t dstListId;
+	uint32_t dstChunkId;
 };
 
 //////////////
@@ -663,7 +665,8 @@ protected:
 	);
 	bool parseDegradedReleaseHeader(
 		size_t offset,
-		uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
+        uint32_t &srcListId, uint32_t &srcStripeId, uint32_t &srcChunkId,
+		uint32_t &dstListId, uint32_t &dstChunkId,
 		char *buf, size_t size
 	);
 
