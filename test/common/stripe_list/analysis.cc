@@ -17,7 +17,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 uint32_t n, k, M, cFrom, cTo, iters;
-char *loadFilename, *rand25Filename, *rand50Filename, *rand75Filename;
+char *loadFilename, *rand10Filename, *rand50Filename, *rand90Filename;
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -25,16 +25,20 @@ class ServerNode {
 private:
 	uint32_t id;
 	uint32_t metric[ METRIC_COUNT ];
+	uint32_t _metric[ METRIC_COUNT ]; // backup
 
 public:
 	ServerNode( uint32_t id ) {
 		this->id = id;
-		this->reset();
+		for ( uint32_t i = 0; i < METRIC_COUNT; i++ ) {
+			this->_metric[ i ] = this->metric[ i ] = 0; // id < M / 8 ? ( i == 0 ? k : ( i == 1 ? 1 : 0 ) ) : 0;
+		}
 	}
 
 	void reset() {
-		for ( uint32_t i = 0; i < METRIC_COUNT; i++ )
-			this->metric[ i ] = 0;
+		for ( uint32_t i = 0; i < METRIC_COUNT; i++ ) {
+			this->metric[ i ] = this->_metric[ i ];
+		}
 	}
 
 	void increment( int metricType, bool isParity ) {
@@ -59,7 +63,7 @@ public:
 	}
 
 	void incrementNumKeys( uint32_t num, bool isParity ) {
-		this->metric[ METRIC_NUM_KEYS ] += num;
+		this->metric[ METRIC_NUM_KEYS ] += num; // isParity ? 0 : num;
 	}
 
 	uint32_t getMetric( int metricType ) {
@@ -84,19 +88,22 @@ struct Fairness {
 	static int compareByMaxMinAvg( const void *p1, const void *p2 ) {
 		const struct Fairness *f1 = ( struct Fairness * ) p1;
 		const struct Fairness *f2 = ( struct Fairness * ) p2;
-		return f1->f[ FAIRNESS_MAX_MIN_AVG ] > f2->f[ FAIRNESS_MAX_MIN_AVG ];
+		double diff = f1->f[ FAIRNESS_MAX_MIN_AVG ] - f2->f[ FAIRNESS_MAX_MIN_AVG ];
+		return ( diff < 0.0 ) ? -1 : ( ( diff > 0.0 ) ? 1 : 0 );
 	}
 
 	static int compareByStDev( const void *p1, const void *p2 ) {
 		const struct Fairness *f1 = ( struct Fairness * ) p1;
 		const struct Fairness *f2 = ( struct Fairness * ) p2;
-		return f1->f[ FAIRNESS_STDEV ] < f2->f[ FAIRNESS_STDEV ];
+		double diff = f1->f[ FAIRNESS_STDEV ] - f2->f[ FAIRNESS_STDEV ];
+		return ( diff < 0.0 ) ? -1 : ( ( diff > 0.0 ) ? 1 : 0 );
 	}
 
 	static int compareByJains( const void *p1, const void *p2 ) {
 		const struct Fairness *f1 = ( struct Fairness * ) p1;
 		const struct Fairness *f2 = ( struct Fairness * ) p2;
-		return f1->f[ FAIRNESS_JAINS ] < f2->f[ FAIRNESS_JAINS ];
+		double diff = f1->f[ FAIRNESS_JAINS ] - f2->f[ FAIRNESS_JAINS ];
+		return ( diff < 0.0 ) ? -1 : ( ( diff > 0.0 ) ? 1 : 0 );
 	}
 };
 
@@ -236,11 +243,16 @@ void runExperiments() {
 	struct Fairness **fairnesses, *tmp;
 	struct Fairness sortedFairness[ 3 ][ METRIC_COUNT ];
 	FILE *f[ 4 ];
+	int ( *compar[ FAIRNESS_COUNT ] )( const void *, const void * ) = {
+		Fairness::compareByMaxMinAvg,
+		Fairness::compareByStDev,
+		Fairness::compareByJains
+	};
 
 	f[ 0 ] = fopen( loadFilename, "w" );
-	f[ 1 ] = fopen( rand25Filename, "w" );
+	f[ 1 ] = fopen( rand10Filename, "w" );
 	f[ 2 ] = fopen( rand50Filename, "w" );
-	f[ 3 ] = fopen( rand75Filename, "w" );
+	f[ 3 ] = fopen( rand90Filename, "w" );
 
 	fairnesses = new struct Fairness*[ iters ];
 	for ( uint32_t iter = 0; iter < iters; iter++ )
@@ -257,75 +269,41 @@ void runExperiments() {
 	}
 
 	// Load-aware stripe list generation
+	printf( "Performing load-aware stripe list generation..." );
+	fflush( stdout );
 	for ( uint32_t c = cFrom; c < cTo; c++ ) {
 		generateStripeLists( c, fairnesses[ 0 ], true /* useAlgo */ );
 		printFairness( f[ 0 ], fairnesses[ 0 ], c );
 	}
 
 	// Random stripe list generatoin
-	srand( cFrom + cTo + iters ); // Select a random seed
+	printf( "Performing random stripe list generation (seed = %u)...\n", cFrom + cTo + iters );
+	fflush( stdout );
 	for ( uint32_t c = cFrom; c < cTo; c++ ) {
 		for ( uint32_t iter = 0; iter < iters; iter++ ) {
+			printf( "\r\tc = %u (%6d / %6d)", c, iter + 1, iters );
 			generateStripeLists( c, fairnesses[ iter ], false /* useAlgo */ );
-			fairnesses[ iter ][ 0 ].f[ 0 ] = iter;
-			fairnesses[ iter ][ 0 ].f[ 1 ] = 10 + iter;
-			fairnesses[ iter ][ 0 ].f[ 2 ] = 20 + iter;
 		}
-
-		for ( uint32_t metricType = 0; metricType < METRIC_COUNT; metricType++ ) {
-			printf( "Metric Type: %u\n", metricType );
-			// Before sorting
-			for ( uint32_t fairnessType = 0; fairnessType < FAIRNESS_COUNT; fairnessType++ ) {
-				for ( uint32_t iter = 0; iter < iters; iter++ ) {
-					printf( "%lf ", fairnesses[ iter ][ metricType ].f[ fairnessType ] );
-				}
-				printf( "\n" );
-			}
-
-			// Sort by different fairnesses
-			printf( "\nSort by max-min average:\n" );
-			for ( uint32_t iter = 0; iter < iters; iter++ ) {
-				printf( "%p\n", fairnesses[ iter ][ metricType ].f );
-				printf( "(%p)\n", tmp[ iter ].f );
-				tmp[ iter ] = fairnesses[ iter ][ metricType ];
-			}
-			for ( uint32_t iter = 0; iter < iters; iter++ )
-				printf( "%lf ", tmp[ iter ].f[ FAIRNESS_MAX_MIN_AVG ] );
-			printf( "\n\n" );
-
-			////////////////////////////////////////////////////////////////////
-
-			printf( "Sort by standard deviation:\n" );
-			for ( uint32_t iter = 0; iter < iters; iter++ ) {
-				printf( "%p\n", fairnesses[ iter ][ metricType ].f );
-				printf( "(%p)\n", tmp[ iter ].f );
-				tmp[ iter ] = fairnesses[ iter ][ metricType ];
-			}
-			qsort( fairnesses, iters, sizeof( struct Fairness ), Fairness::compareByStDev );
-			for ( uint32_t iter = 0; iter < iters; iter++ )
-				printf( "%lf ", tmp[ iter ].f[ FAIRNESS_STDEV ] );
-			printf( "\n\n" );
-			
-			////////////////////////////////////////////////////////////////////
-
-
-			printf( "Sort by Jain's fairness:\n" );
-			for ( uint32_t iter = 0; iter < iters; iter++ ) {
-				printf( "%p\n", fairnesses[ iter ][ metricType ].f );
-				printf( "(%p)\n", tmp[ iter ].f );
-				tmp[ iter ] = fairnesses[ iter ][ metricType ];
-			}
-			qsort( fairnesses, iters, sizeof( struct Fairness ), Fairness::compareByJains );
-			for ( uint32_t iter = 0; iter < iters; iter++ )
-				printf( "%lf ", tmp[ iter ].f[ FAIRNESS_JAINS ] );
-			printf( "\n\n" );
-		}
-
 		printf( "\n" );
 
-		// for ( int i = 0; i < 3; i++ )
-		// 	printFairness( f[ i + 1 ], sortedFairness[ i ], c );
+		for ( uint32_t metricType = 0; metricType < METRIC_COUNT; metricType++ ) {
+			// Sort by different fairnesses
+			for ( uint32_t fairnessType = 0; fairnessType < FAIRNESS_COUNT; fairnessType++ ) {
+				for ( uint32_t iter = 0; iter < iters; iter++ )
+					tmp[ iter ] = fairnesses[ iter ][ metricType ];
+				qsort( tmp, iters, sizeof( struct Fairness ), compar[ fairnessType ] );
+
+				// Take the 10th-percentile, 50th-percentile and 90th-percentile
+				sortedFairness[ 0 ][ metricType ].f[ fairnessType ] = tmp[ iters / 10 ].f[ fairnessType ];
+				sortedFairness[ 1 ][ metricType ].f[ fairnessType ] = tmp[ iters / 2 ].f[ fairnessType ];
+				sortedFairness[ 2 ][ metricType ].f[ fairnessType ] = tmp[ 9 * iters / 10 ].f[ fairnessType ];
+			}
+		}
+
+		for ( int i = 0; i < 3; i++ )
+			printFairness( f[ i + 1 ], sortedFairness[ i ], c );
 	}
+	printf( "Done.\n" );
 
 	for ( int i = 0; i < 4; i++ )
 		fclose( f[ i ] );
@@ -338,7 +316,7 @@ int main( int argc, char **argv ) {
 	if ( argc <= 10 ) {
 		fprintf(
 			stderr,
-			"Usage: %s [n] [k] [M] [c_from] [c_to] [iters] [laod_f] [rand25_f] [rand50_f] [rand75_f]\n\n"
+			"Usage: %s [n] [k] [M] [c_from] [c_to] [iters] [laod_f] [rand10_f] [rand50_f] [rand90_f]\n\n"
 			"n: Number of chunks\n"
 			"k: Number of data chunks\n"
 			"M: Number of servers\n"
@@ -346,9 +324,9 @@ int main( int argc, char **argv ) {
 			"c_to: Number of stripe lists (To)\n"
 			"iters: Number of iterations for random stripe list generation\n"
 			"load_f: Output file for load-aware stripe list generation algorithm\n"
-			"rand25_f: Output file for random stripe list generation (25th percentile)\n"
+			"rand10_f: Output file for random stripe list generation (10th percentile)\n"
 			"rand50_f: Output file for random stripe list generation (50th percentile)\n"
-			"rand75_f: Output file for random stripe list generation (75th percentile)\n",
+			"rand90_f: Output file for random stripe list generation (90th percentile)\n",
 			argv[ 0 ]
 		);
 		return 1;
@@ -361,9 +339,12 @@ int main( int argc, char **argv ) {
 	cTo = atoi( argv[ 5 ] );
 	iters = atoi( argv[ 6 ] );
 	loadFilename = argv[ 7 ];
-	rand25Filename = argv[ 8 ];
+	rand10Filename = argv[ 8 ];
 	rand50Filename = argv[ 9 ];
-	rand75Filename = argv[ 10 ];
+	rand90Filename = argv[ 10 ];
+
+	// Select a random seed
+	srand( cFrom + cTo + iters );
 
 	// Generate ServerNodes
 	for ( uint32_t i = 0; i < M; i++ ) {
