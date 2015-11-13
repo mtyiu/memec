@@ -1595,21 +1595,17 @@ bool Protocol::parseListStripeKeyHeader( struct ListStripeKeyHeader &header, cha
 	);
 }
 
-size_t Protocol::generateDegradedReleaseHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, LOCK_T *degradedLocksLock, std::unordered_map<Metadata, Metadata> *degradedLocks, std::unordered_map<Metadata, Metadata> *releasingDegradedLocks, bool &isCompleted ) {
+size_t Protocol::generateDegradedReleaseHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, std::vector<Metadata> &chunks, bool &isCompleted ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = 0;
 
 	isCompleted = true;
 
-	LOCK( degradedLocksLock );
-	std::unordered_map<Metadata, Metadata>::iterator it;
-	for ( it = degradedLocks->begin(); it != degradedLocks->end(); it++ ) {
+	for ( size_t i = 0, len = chunks.size(); i < len; i++ ) {
 		if ( this->buffer.size >= bytes + PROTO_DEGRADED_RELEASE_SIZE ) {
-			*( ( uint32_t * )( buf      ) ) = htonl( it->first.listId );
-			*( ( uint32_t * )( buf +  4 ) ) = htonl( it->first.stripeId );
-			*( ( uint32_t * )( buf +  8 ) ) = htonl( it->first.chunkId );
-			*( ( uint32_t * )( buf + 12 ) ) = htonl( it->second.listId );
-			*( ( uint32_t * )( buf + 16 ) ) = htonl( it->second.chunkId );
+			*( ( uint32_t * )( buf      ) ) = htonl( chunks[ i ].listId );
+			*( ( uint32_t * )( buf +  4 ) ) = htonl( chunks[ i ].stripeId );
+			*( ( uint32_t * )( buf +  8 ) ) = htonl( chunks[ i ].chunkId );
 		} else {
 			isCompleted = false;
 			break;
@@ -1618,43 +1614,10 @@ size_t Protocol::generateDegradedReleaseHeader( uint8_t magic, uint8_t to, uint8
 		buf += PROTO_DEGRADED_RELEASE_SIZE;
 		bytes += PROTO_DEGRADED_RELEASE_SIZE;
 	}
-	releasingDegradedLocks->insert( degradedLocks->begin(), it );
-	degradedLocks->erase( degradedLocks->begin(), it );
-	UNLOCK( degradedLocksLock );
 
 	bytes += this->generateHeader( magic, to, opcode, bytes, id );
 
 	return bytes;
-}
-
-bool Protocol::parseDegradedReleaseHeader( size_t offset, uint32_t &srcListId, uint32_t &srcStripeId, uint32_t &srcChunkId, uint32_t &dstListId, uint32_t &dstChunkId, char *buf, size_t size ) {
-	if ( size - offset < PROTO_DEGRADED_RELEASE_SIZE )
-		return false;
-
-	char *ptr = buf + offset;
-	srcListId   = ntohl( *( ( uint32_t * )( ptr      ) ) );
-	srcStripeId = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
-	srcChunkId  = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
-	dstListId   = ntohl( *( ( uint32_t * )( ptr + 12 ) ) );
-	dstChunkId  = ntohl( *( ( uint32_t * )( ptr + 16 ) ) );
-
-	return true;
-}
-
-bool Protocol::parseDegradedReleaseHeader( struct DegradedReleaseHeader &header, char *buf, size_t size, size_t offset ) {
-	if ( ! buf || ! size ) {
-		buf = this->buffer.recv;
-		size = this->buffer.size;
-	}
-	return this->parseDegradedReleaseHeader(
-		offset,
-		header.srcListId,
-		header.srcStripeId,
-		header.srcChunkId,
-		header.dstListId,
-		header.dstChunkId,
-		buf, size
-	);
 }
 
 //////////////

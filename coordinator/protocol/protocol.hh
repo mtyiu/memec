@@ -59,8 +59,7 @@ public:
 	char *reqSyncMeta( size_t &size, uint32_t id );
 	char *reqReleaseDegradedLock(
 		size_t &size, uint32_t id,
-		LOCK_T *degradedLocksLock,
-		std::unordered_map<Metadata, Metadata> *degradedLocks, std::unordered_map<Metadata, Metadata> *releasingDegradedLocks,
+		std::vector<Metadata> &chunks,
 		bool &isCompleted
 	);
 	char *resRemappingSetLock( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t chunkId, bool isRemapped, uint8_t keySize, char *key );

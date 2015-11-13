@@ -423,31 +423,40 @@ void Coordinator::syncSlaveMeta( struct sockaddr_in slave, bool *sync ) {
 }
 
 void Coordinator::releaseDegradedLock() {
-	uint32_t socketId;
+	uint32_t socketFromId, socketToId;
+	char tmp[ 16 ];
+	SlaveEvent event;
 
-	printf( "Which socket? " );
+	printf( "Which socket ([0-%lu] or all)? ", this->sockets.slaves.size() - 1 );
 	fflush( stdout );
-	if ( scanf( "%u", &socketId ) != 1 ) {
+	if ( ! fgets( tmp, sizeof( tmp ), stdin ) )
+		return;
+	if ( strncmp( tmp, "all", 3 ) == 0 ) {
+		socketFromId = 0;
+		socketToId = this->sockets.slaves.size();
+	} else if ( sscanf( tmp, "%u", &socketFromId ) != 1 ) {
 		fprintf( stderr, "Invalid socket ID.\n" );
 		return;
-	} else if ( socketId >= this->sockets.slaves.size() ) {
-		fprintf( stderr, "The specified socket ID exceeds the range [0-%lu].\n", this->sockets.slaves.size() );
+	} else if ( socketFromId >= this->sockets.slaves.size() ) {
+		fprintf( stderr, "The specified socket ID exceeds the range [0-%lu].\n", this->sockets.slaves.size() - 1 );
 		return;
+	} else {
+		socketToId = socketFromId + 1;
 	}
 
-	SlaveSocket *socket = this->sockets.slaves.values[ socketId ];
-	if ( ! socket ) {
-		fprintf( stderr, "Unknown socket ID!\n" );
-		return;
+	for ( uint32_t socketId = socketFromId; socketId < socketToId; socketId++ ) {
+		SlaveSocket *socket = this->sockets.slaves.values[ socketId ];
+		if ( ! socket ) {
+			fprintf( stderr, "Unknown socket ID!\n" );
+			return;
+		}
+		event.reqReleaseDegradedLock( socket );
+		this->eventQueue.insert( event );
+
+		printf( "Sending release degraded locks request to: (#%u) ", socketId );
+		socket->printAddress();
+		printf( "\n" );
 	}
-
-	SlaveEvent event;
-	event.reqReleaseDegradedLock( socket );
-	this->eventQueue.insert( event );
-
-	printf( "Sending release degraded locks request to: (#%u) ", socketId );
-	socket->printAddress();
-	printf( "\n" );
 }
 
 double Coordinator::getElapsedTime() {

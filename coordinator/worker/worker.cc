@@ -616,6 +616,15 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 bool CoordinatorWorker::handleReleaseDegradedLockRequest( SlaveSocket *socket ) {
 	std::unordered_map<Metadata, Metadata>::iterator dlsIt;
 	Map &map = socket->map;
+	Metadata dst;
+	SlaveSocket *dstSocket;
+	bool isCompleted, connected;
+	uint32_t requestId;
+	ssize_t ret;
+	struct {
+		size_t size;
+		char *data;
+	} buffer;
 	// (dstListId, dstChunkId) |-> (srcListId, srcStripeId, srcChunkId)
 	std::unordered_map<Metadata, std::vector<Metadata>> chunks;
 	std::unordered_map<Metadata, std::vector<Metadata>>::iterator chunksIt;
@@ -638,6 +647,19 @@ bool CoordinatorWorker::handleReleaseDegradedLockRequest( SlaveSocket *socket ) 
 
 	for ( chunksIt = chunks.begin(); chunksIt != chunks.end(); chunksIt++ ) {
 		std::vector<Metadata> &srcs = chunksIt->second;
+		dst = chunksIt->first;
+		dstSocket = CoordinatorWorker::stripeList->get( dst.listId, dst.chunkId );
+
+		do {
+			requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
+			buffer.data = this->protocol.reqReleaseDegradedLock(
+				buffer.size, requestId, srcs, isCompleted
+			);
+			ret = dstSocket->send( buffer.data, buffer.size, connected );
+			if ( ret != ( ssize_t ) buffer.size )
+				__ERROR__( "CoordinatorWorker", "handleReleaseDegradedLockRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+		} while ( ! isCompleted );
+
 		// printf( "dst: (%u, %u) |-> (", chunksIt->first.listId, chunksIt->first.chunkId );
 		// for ( size_t i = 0, len = srcs.size(); i < len; i++ ) {
 		// 	printf(
@@ -649,6 +671,7 @@ bool CoordinatorWorker::handleReleaseDegradedLockRequest( SlaveSocket *socket ) 
 		// 	);
 		// }
 		// printf( ")\n" );
+
 		printf( "dst: (%u, %u) |-> %lu\n", chunksIt->first.listId, chunksIt->first.chunkId, srcs.size() );
 	}
 

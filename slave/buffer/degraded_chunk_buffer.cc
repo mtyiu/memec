@@ -112,6 +112,27 @@ bool DegradedMap::insertKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata )
 	return true;
 }
 
+bool DegradedMap::deleteKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata, bool needsLock, bool needsUnlock ) {
+	Key k;
+	std::unordered_map<Key, KeyMetadata>::iterator keysIt;
+
+	if ( needsLock ) LOCK( &this->keysLock );
+	keysIt = this->keys.find( key );
+	if ( keysIt == this->keys.end() ) {
+		if ( needsUnlock ) UNLOCK( &this->keysLock );
+		printf( "deleteKey(): Key not found.\n" );
+		return false;
+	} else {
+		k = keysIt->first;
+		keyMetadata = keysIt->second;
+		this->keys.erase( keysIt );
+		k.free();
+	}
+	if ( needsUnlock ) UNLOCK( &this->keysLock );
+
+	return this->slaveMap->insertOpMetadata( opcode, key, keyMetadata );
+}
+
 bool DegradedMap::insertValue( KeyValue keyValue, Metadata metadata ) { // KeyValue's data is allocated by malloc()
 	Key key = keyValue.key();
 	std::pair<Key, KeyValue> p( key, keyValue );
@@ -124,6 +145,43 @@ bool DegradedMap::insertValue( KeyValue keyValue, Metadata metadata ) { // KeyVa
 	UNLOCK( &this->valuesLock );
 
 	return ret.second;
+}
+
+bool DegradedMap::deleteValue( Key key, uint8_t opcode ) {
+	std::unordered_map<Key, KeyValue>::iterator it;
+	KeyValue keyValue;
+
+	LOCK( &this->valuesLock );
+	it = this->values.find( key );
+	if ( it == this->values.end() ) {
+		UNLOCK( &this->valuesLock );
+		return false;
+	} else {
+		keyValue = it->second;
+		this->values.erase( it );
+	}
+
+	// TODO: Add to opMap
+	// Find metadata
+	std::unordered_map<Key, Metadata>::iterator metaIt;
+	Metadata metadata;
+
+	metaIt = this->valueMeta.find( key );
+	if ( metaIt == this->valueMeta.end() ) {
+		keyValue.free();
+		UNLOCK( &this->valuesLock );
+		return false;
+	}
+
+	metadata = metaIt->second;
+	keyValue.free();
+	this->valueMeta.erase( metaIt );
+	UNLOCK( &this->valuesLock );
+
+	KeyMetadata keyMetadata;
+	keyMetadata.set( metadata.listId, metadata.stripeId, metadata.chunkId );
+
+	return this->slaveMap->insertOpMetadata( opcode, key, keyMetadata );
 }
 
 bool DegradedMap::insertDegradedChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t pid ) {
@@ -156,6 +214,26 @@ bool DegradedMap::insertDegradedChunk( uint32_t listId, uint32_t stripeId, uint3
 	return ret;
 }
 
+bool DegradedMap::deleteDegradedChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, std::vector<uint32_t> &pids ) {
+	Metadata metadata;
+	std::unordered_map<Metadata, std::vector<uint32_t>>::iterator it;
+
+	metadata.set( listId, stripeId, chunkId );
+
+	LOCK( &this->degraded.chunksLock );
+	it = this->degraded.chunks.find( metadata );
+	if ( it == this->degraded.chunks.end() ) {
+		UNLOCK( &this->degraded.chunksLock );
+		return false;
+	} else {
+		pids = it->second;
+		this->degraded.chunks.erase( it );
+	}
+	UNLOCK( &this->degraded.chunksLock );
+
+	return true;
+}
+
 bool DegradedMap::insertDegradedKey( Key key, uint32_t pid ) {
 	std::unordered_map<Key, std::vector<uint32_t>>::iterator it;
 	bool ret = false;
@@ -183,7 +261,24 @@ bool DegradedMap::insertDegradedKey( Key key, uint32_t pid ) {
 	return ret;
 }
 
-bool DegradedMap::setChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, Chunk *chunk, bool isParity ) {
+bool DegradedMap::deleteDegradedKey( Key key, std::vector<uint32_t> &pids ) {
+	std::unordered_map<Key, std::vector<uint32_t>>::iterator it;
+
+	LOCK( &this->degraded.keysLock );
+	it = this->degraded.keys.find( key );
+	if ( it == this->degraded.keys.end() ) {
+		UNLOCK( &this->degraded.keysLock );
+		return false;
+	} else {
+		pids = it->second;
+		this->degraded.keys.erase( it );
+	}
+	UNLOCK( &this->degraded.keysLock );
+
+	return true;
+}
+
+bool DegradedMap::insertChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, Chunk *chunk, bool isParity ) {
 	Metadata metadata;
 	metadata.set( listId, stripeId, chunkId );
 
@@ -228,99 +323,24 @@ bool DegradedMap::setChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId
 	return ret.second;
 }
 
-bool DegradedMap::deleteKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata, bool needsLock, bool needsUnlock ) {
-	Key k;
-	std::unordered_map<Key, KeyMetadata>::iterator keysIt;
-
-	if ( needsLock ) LOCK( &this->keysLock );
-	keysIt = this->keys.find( key );
-	if ( keysIt == this->keys.end() ) {
-		if ( needsUnlock ) UNLOCK( &this->keysLock );
-		printf( "deleteKey(): Key not found.\n" );
-		return false;
-	} else {
-		k = keysIt->first;
-		keyMetadata = keysIt->second;
-		this->keys.erase( keysIt );
-		k.free();
-	}
-	if ( needsUnlock ) UNLOCK( &this->keysLock );
-
-	return this->slaveMap->insertOpMetadata( opcode, key, keyMetadata );
-}
-
-bool DegradedMap::deleteValue( Key key, uint8_t opcode ) {
-	std::unordered_map<Key, KeyValue>::iterator it;
-	KeyValue keyValue;
-
-	LOCK( &this->valuesLock );
-	it = this->values.find( key );
-	if ( it == this->values.end() ) {
-		UNLOCK( &this->valuesLock );
-		return false;
-	} else {
-		keyValue = it->second;
-		this->values.erase( it );
-	}
-
-	// TODO: Add to opMap
-	// Find metadata
-	std::unordered_map<Key, Metadata>::iterator metaIt;
+Chunk *DegradedMap::deleteChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, Metadata *metadataPtr ) {
 	Metadata metadata;
-
-	metaIt = this->valueMeta.find( key );
-	if ( metaIt == this->valueMeta.end() ) {
-		keyValue.free();
-		UNLOCK( &this->valuesLock );
-		return false;
-	}
-
-	metadata = metaIt->second;
-	keyValue.free();
-	this->valueMeta.erase( metaIt );
-	UNLOCK( &this->valuesLock );
-
-	KeyMetadata keyMetadata;
-	keyMetadata.set( metadata.listId, metadata.stripeId, metadata.chunkId );
-
-	return this->slaveMap->insertOpMetadata( opcode, key, keyMetadata );
-}
-
-bool DegradedMap::deleteDegradedChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, std::vector<uint32_t> &pids ) {
-	Metadata metadata;
-	std::unordered_map<Metadata, std::vector<uint32_t>>::iterator it;
+	Chunk *chunk = 0;
+	std::unordered_map<Metadata, Chunk *>::iterator it;
 
 	metadata.set( listId, stripeId, chunkId );
+	if ( metadataPtr ) *metadataPtr = metadata;
 
-	LOCK( &this->degraded.chunksLock );
-	it = this->degraded.chunks.find( metadata );
-	if ( it == this->degraded.chunks.end() ) {
-		UNLOCK( &this->degraded.chunksLock );
-		return false;
-	} else {
-		pids = it->second;
-		this->degraded.chunks.erase( it );
+	LOCK( &this->cacheLock );
+	it = this->cache.find( metadata );
+	if ( it != this->cache.end() ) {
+		// Chunk is found
+		chunk = it->second;
+		this->cache.erase( it );
 	}
-	UNLOCK( &this->degraded.chunksLock );
+	UNLOCK( &this->cacheLock );
 
-	return true;
-}
-
-bool DegradedMap::deleteDegradedKey( Key key, std::vector<uint32_t> &pids ) {
-	std::unordered_map<Key, std::vector<uint32_t>>::iterator it;
-
-	LOCK( &this->degraded.keysLock );
-	it = this->degraded.keys.find( key );
-	if ( it == this->degraded.keys.end() ) {
-		UNLOCK( &this->degraded.keysLock );
-		return false;
-	} else {
-		pids = it->second;
-		this->degraded.keys.erase( it );
-	}
-	UNLOCK( &this->degraded.keysLock );
-
-	return true;
+	return chunk;
 }
 
 void DegradedMap::getKeysMap( std::unordered_map<Key, KeyMetadata> *&keys, LOCK_T *&lock ) {

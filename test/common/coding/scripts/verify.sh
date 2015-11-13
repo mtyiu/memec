@@ -9,6 +9,16 @@ fi
 
 processed=0
 succeeded=0
+total=0
+
+for i in $(ls $5/*.0.chunk); do
+	prefix=$(sed 's/0\.chunk//g' <<< $i)
+	count=$(ls $prefix* | wc -l)
+	if [ $count == $1 ]; then
+		total=$(expr $total + 1)
+	fi
+done
+
 for i in $(ls $5/*.0.chunk); do
 	prefix=$(sed 's/0\.chunk//g' <<< $i)
 	count=$(ls $prefix* | wc -l)
@@ -24,6 +34,7 @@ for i in $(ls $5/*.0.chunk); do
 			succeeded=$(expr $succeeded + 1)
 		fi
 	fi
+	echo -n -e "\rProcessing...$processed / $total"
 done
 
-echo "Passed / Processed = $succeeded / $processed"
+echo -e "\nPassed / Processed = $succeeded / $processed"

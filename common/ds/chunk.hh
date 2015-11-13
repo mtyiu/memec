@@ -48,6 +48,7 @@ public:
 	void init();
 	void swap( Chunk *c );
 	void loadFromGetChunkRequest( uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isParity, char *data, uint32_t size );
+	void loadFromSetChunkRequest( char *data, uint32_t size );
 	// Access data inside the chunk
 	char *alloc( uint32_t size, uint32_t &offset );
 #ifdef USE_CHUNK_LOCK

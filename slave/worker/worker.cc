@@ -995,13 +995,15 @@ bool SlaveWorker::handleSlaveConnectedMsg( CoordinatorEvent event, char *buf, si
 }
 
 bool SlaveWorker::handleReleaseDegradedLockRequest( CoordinatorEvent event, char *buf, size_t size ) {
-	struct DegradedReleaseHeader header;
-	uint32_t count = 0;
+	struct ChunkHeader header;
+	uint32_t count = 0, requestId;
 
-	// (dstListId, dstChunkId) |-> (srcListId, srcStripeId, srcChunkId)
-	std::unordered_map<Metadata, std::vector<Metadata>> chunks;
-	std::unordered_map<Metadata, std::vector<Metadata>>::iterator it;
-	Metadata src, dst;
+	Metadata metadata;
+	ChunkRequest chunkRequest;
+	std::vector<Metadata> chunks;
+	SlavePeerEvent slavePeerEvent;
+	SlavePeerSocket *socket;
+	Chunk *chunk;
 
 	while( size ) {
 		if ( ! this->protocol.parseDegradedReleaseHeader( header, buf, size ) ) {
@@ -1010,61 +1012,50 @@ bool SlaveWorker::handleReleaseDegradedLockRequest( CoordinatorEvent event, char
 		}
 		__DEBUG__(
 			BLUE, "SlaveWorker", "handleGetRequest",
-			"[DEGRADED_RELEASE] (%u, %u, %u |-> %u, %u) (remaining = %lu).",
-			header.srcListId, header.srcStripeId, header.srcChunkId,
-			header.dstListId, header.dstChunkId, size
+			"[DEGRADED_RELEASE] (%u, %u, %u) (remaining = %lu).",
+			header.listId, header.stripeId, header.chunkId
 		);
 		buf += PROTO_DEGRADED_RELEASE_SIZE;
 		size -= PROTO_DEGRADED_RELEASE_SIZE;
 
-		dst.set( header.dstListId, 0, header.dstChunkId );
-		src.set( header.srcListId, header.srcStripeId, header.srcChunkId );
-		it = chunks.find( dst );
-		if ( it != chunks.end() ) {
-			std::vector<Metadata> &srcs = it->second;
-			srcs.push_back( src );
-		} else {
-			std::vector<Metadata> srcs;
-			srcs.push_back( src );
-			chunks[ dst ] = srcs;
-		}
+		metadata.set( header.listId, header.stripeId, header.chunkId );
+		chunks.push_back( metadata );
 
 		count++;
 	}
 
-	for ( it = chunks.begin(); it != chunks.end(); it++ ) {
-		std::vector<Metadata> &srcs = it->second;
-		printf( "dst: (%u, %u) |-> (", it->first.listId, it->first.chunkId );
-		for ( size_t i = 0, len = srcs.size(); i < len; i++ ) {
-			printf(
-				"%s(%u, %u, %u)",
-				i == 0 ? "" : ", ",
-				srcs[ i ].listId,
-				srcs[ i ].stripeId,
-				srcs[ i ].chunkId
-			);
+	for ( size_t i = 0, len = chunks.size(); i < len; i++ ) {
+		// Determine the src
+		if ( i == 0 ) {
+			// The target is the same for all chunks in this request
+			this->getSlaves( chunks[ i ].listId );
+			socket =   chunks[ i ].chunkId < SlaveWorker::dataChunkCount
+			         ? this->dataSlaveSockets[ chunks[ i ].chunkId ]
+			         : this->paritySlaveSockets[ chunks[ i ].chunkId - SlaveWorker::dataChunkCount ];
 		}
-		printf( ")\n" );
+
+		requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
+		chunk = SlaveWorker::degradedChunkBuffer->map.deleteChunk(
+			chunks[ i ].listId, chunks[ i ].stripeId, chunks[ i ].chunkId,
+			&metadata
+		);
+
+		if ( ! chunk ) {
+			__ERROR__( "SlaveWorker", "handleReleaseDegradedLockRequest", "Cannot find chunk (%u, %u, %u).", chunks[ i ].listId, chunks[ i ].stripeId, chunks[ i ].chunkId );
+			continue;
+		}
+
+		chunkRequest.set(
+			chunks[ i ].listId, chunks[ i ].stripeId, chunks[ i ].chunkId,
+			socket, chunk
+		);
+		if ( ! SlaveWorker::pending->insertChunkRequest( PT_SLAVE_PEER_SET_CHUNK, requestId, 0, socket, chunkRequest ) ) {
+			__ERROR__( "SlaveWorker", "performDegradedRead", "Cannot insert into slave CHUNK_REQUEST pending map." );
+		}
+
+		slavePeerEvent.reqSetChunk( socket, requestId, metadata, chunk );
+		SlaveWorker::eventQueue->insert( slavePeerEvent );
 	}
-
-	/*
-	SlavePeerSocket *socket;
-	uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
-
-	this->getSlaves( header.dstListId );
-	socket = header.dstChunkId < SlaveWorker::dataChunkCount ? this->dataSlaveSockets[ header.dstChunkId ] : this->paritySlaveSockets[ header.dstChunkId - SlaveWorker::dataChunkCount ];
-
-	if ( socket->self ) {
-		printf( "self-socket? (%u, %u, %u)\n", header.dstListId, header.dstChunkId );
-		continue;
-	}
-	*/
-
-	// SlavePeerEvent slavePeerEvent;
-	// slavePeerEvent.reqSetChunk(
-	// 	socket, requestId, metadata, chunk
-	// );
-	// SlaveWorker::eventQueue->insert( slavePeerEvent );
 
 	printf( "Sync-ed chunks: %u\n", count );
 	return true;
@@ -2093,11 +2084,21 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, char *buf, size_t
 	);
 
 	Metadata metadata;
-	metadata.listId = header.listId;
-	metadata.stripeId = header.stripeId;
-	metadata.chunkId = header.chunkId;
-	__ERROR__( "SlaveWorker", "handleSetChunkRequest", "TODO: SET_CHUNK not yet implemented!" );
-	ret = false;
+	Chunk *chunk;
+
+	chunk = SlaveWorker::map->findChunkById( header.listId, header.stripeId, header.chunkId, &metadata );
+
+	ret = chunk;
+	if ( ! chunk ) {
+		__ERROR__( "SlaveWorker", "handleSetChunkRequest", "The chunk (%u, %u, %u) does not exist.", header.listId, header.stripeId, header.chunkId );
+	} else {
+		// Update metadata map
+
+		// Replace chunk contents
+		chunk->loadFromSetChunkRequest( header.data, header.size );
+
+		// Update metadata map again
+	}
 
 	event.resSetChunk( event.socket, event.id, metadata, ret );
 	this->dispatch( event );
@@ -2662,7 +2663,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 					chunk = SlaveWorker::chunkPool->malloc();
 					chunk->swap( this->chunks[ op.chunkId ] );
 
-					if ( ! dmap->setChunk(
+					if ( ! dmap->insertChunk(
 						op.listId, op.stripeId, op.chunkId, chunk,
 						op.chunkId >= SlaveWorker::dataChunkCount
 					) ) {

@@ -63,28 +63,31 @@ public:
 	);
 
 	bool insertKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata );
-	bool insertValue( KeyValue keyValue, Metadata metadata );
-	bool insertDegradedChunk(
-		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
-		uint32_t pid
-	);
-	bool insertDegradedKey( Key key, uint32_t pid );
-
-	bool setChunk(
-		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
-		Chunk *chunk, bool isParity = false
-	);
-
 	bool deleteKey(
 		Key key, uint8_t opcode, KeyMetadata &keyMetadata,
 		bool needsLock, bool needsUnlock
 	);
+
+	bool insertValue( KeyValue keyValue, Metadata metadata );
 	bool deleteValue( Key key, uint8_t opcode );
+
+	bool insertDegradedChunk(
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		uint32_t pid
+	);
 	bool deleteDegradedChunk(
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		std::vector<uint32_t> &pids
 	);
+
+	bool insertDegradedKey( Key key, uint32_t pid );
 	bool deleteDegradedKey( Key key, std::vector<uint32_t> &pids );
+
+	bool insertChunk(
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		Chunk *chunk, bool isParity = false
+	);
+	Chunk *deleteChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, Metadata *metadataPtr = 0 );
 
 	void getKeysMap( std::unordered_map<Key, KeyMetadata> *&keys, LOCK_T *&lock );
 	void getCacheMap( std::unordered_map<Metadata, Chunk *> *&cache, LOCK_T *&lock );

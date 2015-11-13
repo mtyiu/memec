@@ -43,6 +43,19 @@ void Chunk::loadFromGetChunkRequest( uint32_t listId, uint32_t stripeId, uint32_
 #endif
 }
 
+void Chunk::loadFromSetChunkRequest( char *data, uint32_t size ) {
+#ifdef USE_CHUNK_LOCK
+	LOCK( &this->lock );
+#endif
+	this->size = size;
+	memcpy( this->data, data, size );
+	if ( Chunk::capacity > size )
+		memset( this->data + size, 0, Chunk::capacity - size );
+#ifdef USE_CHUNK_LOCK
+	UNLOCK( &this->lock );
+#endif
+}
+
 void Chunk::swap( Chunk *c ) {
 	Chunk tmp;
 

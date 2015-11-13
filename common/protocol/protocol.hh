@@ -84,6 +84,7 @@
  ***********************/
  #define MAXIMUM_VALUE_SIZE 16777215
 
+#include <vector>
 #include <unordered_map>
 #include <unordered_set>
 #include <stdint.h>
@@ -658,17 +659,10 @@ protected:
 
 	size_t generateDegradedReleaseHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
-		LOCK_T *degradedLocksLock,
-		std::unordered_map<Metadata, Metadata> *degradedLocks,
-		std::unordered_map<Metadata, Metadata> *releasingDegradedLocks,
+		std::vector<Metadata> &chunks,
 		bool &isCompleted
 	);
-	bool parseDegradedReleaseHeader(
-		size_t offset,
-        uint32_t &srcListId, uint32_t &srcStripeId, uint32_t &srcChunkId,
-		uint32_t &dstListId, uint32_t &dstChunkId,
-		char *buf, size_t size
-	);
+    #define parseDegradedReleaseHeader parseChunkHeader
 
 	//////////////
 	// Recovery //
