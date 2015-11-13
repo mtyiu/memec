@@ -44,6 +44,9 @@ public:
 	struct {
 		uint32_t updateInterval;
 	} loadingStats;
+	struct {
+		uint32_t packets;
+	} pool;
 
 	bool merge( GlobalConfig &globalConfig );
 	bool parse( const char *path );

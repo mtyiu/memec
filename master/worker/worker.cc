@@ -229,6 +229,13 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 			);
 			isSend = true;
 			break;
+		case COORDINATOR_EVENT_TYPE_RESPONSE_SYNC_REMAPPING_RECORDS:
+			buffer.data = this->protocol.resSyncRemappingRecords(
+				buffer.size,
+				event.id
+			);
+			isSend = true;
+			break;
 		case COORDINATOR_EVENT_TYPE_PENDING:
 			isSend = false;
 			break;
@@ -332,6 +339,8 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 									map->insert( key, remappingRecord );
 								}
 							}
+							event.resSyncRemappingRecords();
+							this->dispatch( event );
 							//map->print();
 						} else {
 							__ERROR__( "MasterWorker", "dispatch", "Invalid magic code from coordinator." );

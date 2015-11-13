@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <pthread.h>
 #include <set>
+#include <unordered_map>
 #include "../config/coordinator_config.hh"
 #include "../ds/pending.hh"
 #include "../event/event_queue.hh"
@@ -29,6 +30,8 @@ private:
 	bool isRunning;
 	struct timespec startTime;
 	std::vector<CoordinatorWorker> workers;
+
+	
 
 	Coordinator();
 	// Do not implement
@@ -69,6 +72,11 @@ public:
 	/* Remapping */
 	CoordinatorRemapMsgHandler *remapMsgHandler;
 	RemappingRecordMap remappingRecords;
+	struct {
+		std::unordered_map<Key, RemappingRecord> toSend; 
+		LOCK_T toSendLock;
+	} pendingRemappingRecords;
+	PacketPool packetPool;
 	/* Loading statistics */
 	struct {
 		// ( slaveAddr, ( mastserAddr, Latency ) )
@@ -97,11 +105,13 @@ public:
 	void debug( FILE *f = stdout );
 	void dump();
 	void printRemapping( FILE *f = stdout );
+	void printPending( FILE *f = stdout );
 	void time();
 	void seal();
 	void flush();
 	void metadata();
 	void syncSlaveMeta( struct sockaddr_in slave, bool *sync );
+	void syncRemappingRecords( LOCK_T *lock, std::map<struct sockaddr_in, uint32_t> *counter, bool *done );
 	double getElapsedTime();
 	void interactive();
 };

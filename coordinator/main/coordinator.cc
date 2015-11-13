@@ -2,7 +2,9 @@
 #include <ctype.h>
 #include "coordinator.hh"
 #include "../ds/map.hh"
+#include "../event/coordinator_event.hh"
 #include "../../common/ds/sockaddr_in.hh"
+#include "../../common/ds/packet_pool.hh"
 
 #define GIGA 				( 1000 * 1000 * 1000 )
 #define FLOAT_THRESHOLD		( ( float ) 0.00001 )
@@ -235,6 +237,14 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 		this->config.global.stripeList.count,
 		this->sockets.slaves.values
 	);
+	/* Packet Pool */
+	this->packetPool.init(
+		this->config.coordinator.pool.packets,
+		Protocol::getSuggestedBufferSize(
+			this->config.global.size.key,
+			this->config.global.size.chunk
+		)
+	);
 	/* Workers, ID generator and event queues */
 	if ( this->config.coordinator.workers.type == WORKER_TYPE_MIXED ) {
 		this->idGenerator.init( this->config.coordinator.workers.number.mixed );
@@ -422,6 +432,12 @@ void Coordinator::syncSlaveMeta( struct sockaddr_in slave, bool *sync ) {
 	this->eventQueue.insert( event );
 }
 
+void Coordinator::syncRemappingRecords( LOCK_T *lock, std::map<struct sockaddr_in, uint32_t> *counter, bool *done ) {
+	CoordinatorEvent event;
+	event.syncRemappingRecords( lock, counter, done );
+	this->eventQueue.insert( event );
+} 
+
 double Coordinator::getElapsedTime() {
 	return get_elapsed_time( this->startTime );
 }
@@ -516,6 +532,9 @@ void Coordinator::interactive() {
 		} else if ( strcmp( command, "remapping" ) == 0 ) {
 			valid = true;
 			this->printRemapping();
+		} else if ( strcmp( command, "pending" ) == 0 ) {
+			valid = true;
+			this->printPending();
 		} else if ( strcmp( command, "time" ) == 0 ) {
 			valid = true;
 			this->time();
@@ -574,6 +593,17 @@ void Coordinator::printRemapping( FILE *f ) {
 		fprintf( f, "----------------------------------------\n" );
 		this->remapMsgHandler->listAliveSlaves();
 	}
+}
+
+void Coordinator::printPending( FILE *f ) {
+	fprintf( f, "\nPending\n" );
+	fprintf( f, "----------------------------------------\n" );
+	fprintf( f, "\nList of Sync Metadata Requests\n" );
+	fprintf( f, "----------------------------------------\n" );
+	this->pending.printSyncMetaRequests( f );
+	fprintf( f, "\nList of Remapping Record Counters \n" );
+	fprintf( f, "----------------------------------------\n" );
+	this->pending.printSyncRemappingRecords( f );
 }
 
 void Coordinator::help() {

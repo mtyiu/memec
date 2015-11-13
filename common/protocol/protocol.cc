@@ -338,9 +338,11 @@ bool Protocol::parseKeyOpMetadataHeader( struct KeyOpMetadataHeader &header, siz
 	return ret;
 }
 
-size_t Protocol::generateRemappingRecordMessage( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, LOCK_T *lock, std::unordered_map<Key, RemappingRecord> &remapRecords, size_t &remapCount ) {
+size_t Protocol::generateRemappingRecordMessage( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, LOCK_T *lock, std::unordered_map<Key, RemappingRecord> &remapRecords, size_t &remapCount, char *buf ) {
+	if ( ! buf ) buf = this->buffer.send;
+	buf += PROTO_HEADER_SIZE;
+
 	uint32_t bytes = 0;
-	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	std::unordered_map<Key, RemappingRecord>::iterator rit;
 	bytes = PROTO_HEADER_SIZE;
 	remapCount = 0;
@@ -350,7 +352,7 @@ size_t Protocol::generateRemappingRecordMessage( uint8_t magic, uint8_t to, uint
 	bytes += PROTO_REMAPPING_RECORD_SIZE;
 
 	// append remapping record
-	pthread_mutex_lock( lock );
+	if ( lock ) LOCK( lock );
 	for ( rit = remapRecords.begin(); rit != remapRecords.end(); rit++ ) {
 		if ( rit->second.sent )
 			continue;
@@ -372,12 +374,12 @@ size_t Protocol::generateRemappingRecordMessage( uint8_t magic, uint8_t to, uint
 			break;
 		}
 	}
-	pthread_mutex_unlock( lock );
+	if ( lock ) UNLOCK( lock );
 
 	// set the record count
-	*( ( uint32_t * )( this->buffer.send + PROTO_HEADER_SIZE ) ) = htonl( remapCount );
+	*( ( uint32_t * )( buf - bytes + PROTO_HEADER_SIZE ) ) = htonl( remapCount );
 
-	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, id );
+	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, id, buf - bytes );
 
 	return bytes;
 }

@@ -428,7 +428,8 @@ protected:
 
 	size_t generateRemappingRecordMessage(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
-		LOCK_T *lock, std::unordered_map<Key, RemappingRecord> &remapRecords, size_t &remapCount
+		LOCK_T *lock, std::unordered_map<Key, RemappingRecord> &remapRecords, 
+		size_t &remapCount, char *buf = 0
 	);
 	bool parseRemappingRecordHeader(
 		size_t offset, uint32_t &remap,

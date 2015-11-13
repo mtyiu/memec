@@ -167,6 +167,24 @@ char *CoordinatorProtocol::forwardRemappingRecords( size_t &size, uint32_t id, c
 	return this->buffer.send;
 }
 
+char *CoordinatorProtocol::reqSyncRemappingRecord( size_t &size, uint32_t id, std::unordered_map<Key, RemappingRecord> &remappingRecords, LOCK_T* lock, bool &isLast, char* buffer ) {
+	size_t remapCount = 0;
+	if ( ! buffer ) buffer = this->buffer.send;
+	size = this->generateRemappingRecordMessage(
+		PROTO_MAGIC_REMAPPING,
+		PROTO_MAGIC_TO_MASTER,
+		PROTO_OPCODE_SYNC,
+		id,
+		lock,
+		remappingRecords,
+		remapCount,
+		buffer
+	);
+	isLast = ( remapCount == 0 );
+	
+	return buffer;
+}
+
 char *CoordinatorProtocol::resDegradedLock( size_t &size, uint32_t id, uint8_t keySize, char *key, bool isLocked, bool isSealed, uint32_t srcListId, uint32_t srcStripeId, uint32_t srcChunkId, uint32_t dstListId, uint32_t dstChunkId ) {
 	size = this->generateDegradedLockResHeader(
 		isLocked ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
