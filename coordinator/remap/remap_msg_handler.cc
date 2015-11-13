@@ -230,7 +230,7 @@ bool CoordinatorRemapMsgHandler::isMasterJoin( int service, char *msg, char *sub
 /* 
  * packet: [# of slaves](1) [ [ip addr](4) [port](2) [status](1) ](7) [..](7) [..](7) ...
  */
-bool CoordinatorRemapMsgHandler::sendStatusToMasters( std::vector<struct sockaddr_in> slaves ) {
+bool CoordinatorRemapMsgHandler::sendStatusToMasters( std::vector<struct sockaddr_in> &slaves ) {
 	int recordSize = this->slaveStatusRecordSize;
 
 	if ( slaves.size() == 0 ) {
@@ -273,7 +273,8 @@ void *CoordinatorRemapMsgHandler::readMessages( void *argv ) {
 			// master joined ( masters group )
 			myself->addAliveMaster( subject );
 			// notify the new master about the remapping status
-			myself->sendStatusToMasters();
+			std::vector<struct sockaddr_in> slaves;
+			myself->sendStatusToMasters( slaves );
 		} else if ( ! regular && myself->isMasterLeft( service , msg, subject ) ) {
 			// master left
 			myself->removeAliveMaster( subject );

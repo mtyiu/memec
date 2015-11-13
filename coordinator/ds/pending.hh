@@ -69,9 +69,9 @@ public:
 	}
 
 	// decrement the counter for a packet acked by a master
-	bool decrementRemappingRecords( uint32_t id, struct sockaddr_in addr ) {
+	bool decrementRemappingRecords( uint32_t id, struct sockaddr_in addr, bool lock = true, bool unlock = true ) {
 		bool ret = false;
-		LOCK( &this->syncRemappingRecordLock );
+		if ( lock ) LOCK( &this->syncRemappingRecordLock );
 		// check if the master needs to ack this packet
 		if ( this->syncRemappingRecordCounters.count( id ) > 0 && 
 			this->syncRemappingRecordCounters[ id ]->count( addr ) ) 
@@ -84,16 +84,16 @@ public:
 			}
 			ret = true;
 		}
-		UNLOCK( &this->syncRemappingRecordLock );
+		if ( unlock ) UNLOCK( &this->syncRemappingRecordLock );
 		return ret;
 	}
 
 	std::pair<std::map<struct sockaddr_in, uint32_t> *, bool*> 
-		checkAndRemoveRemappingRecords( uint32_t id, uint32_t target = 0 ) 
+		checkAndRemoveRemappingRecords( uint32_t id, uint32_t target = 0, bool lock = true, bool unlock = true ) 
 	{
 		std::map<struct sockaddr_in, uint32_t> *map = NULL;
 		bool *indicator = NULL;
-		LOCK( &this->syncRemappingRecordLock );
+		if ( lock ) LOCK( &this->syncRemappingRecordLock );
 		// check if the packet exists, and the counter has "target" number of master remains
 		if ( this->syncRemappingRecordCounters.count( id ) > 0 &&
 			this->syncRemappingRecordCounters[ id ]->size() == target ) 
@@ -110,7 +110,7 @@ public:
 			if ( indicator )
 				*indicator = ! *indicator;
 		}
-		UNLOCK( &this->syncRemappingRecordLock );
+		if ( unlock ) UNLOCK( &this->syncRemappingRecordLock );
 		return std::pair<std::map<struct sockaddr_in, uint32_t> *, bool *>( map, indicator );
 	}
 

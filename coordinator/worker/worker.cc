@@ -330,12 +330,8 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 				switch( header.opcode ) {
 					case PROTO_OPCODE_SYNC:
 					{
-						std::map<struct sockaddr_in, uint32_t> *map;
-						bool *done;
-						coordinator->pending.decrementRemappingRecords( header.id, event.socket->getAddr() );
-						tie( map, done ) = coordinator->pending.checkAndRemoveRemappingRecords( header.id );
-						if ( map )
-							map->clear();
+						coordinator->pending.decrementRemappingRecords( header.id, event.socket->getAddr(), true, false );
+						coordinator->pending.checkAndRemoveRemappingRecords( header.id, 0, false, true );
 					}
 						break;
 					default:
@@ -810,7 +806,9 @@ bool CoordinatorWorker::handleRemappingSetLockRequest( MasterEvent event, char *
 		if ( header.isRemapped ) {
 			if ( CoordinatorWorker::remappingRecords->insert( key, remappingRecord ) ) {
 				key.dup();
+				LOCK( &Coordinator::getInstance()->pendingRemappingRecords.toSendLock );
 				Coordinator::getInstance()->pendingRemappingRecords.toSend[ key ] = remappingRecord;
+				UNLOCK( &Coordinator::getInstance()->pendingRemappingRecords.toSendLock );
 				event.resRemappingSetLock( event.socket, event.id, header.isRemapped, key, remappingRecord, true );
 			} else {
 				event.resRemappingSetLock( event.socket, event.id, header.isRemapped, key, remappingRecord, false );

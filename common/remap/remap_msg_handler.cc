@@ -12,7 +12,7 @@ RemapMsgHandler::RemapMsgHandler() {
 RemapMsgHandler::~RemapMsgHandler() {
 }
 
-bool RemapMsgHandler::sendStatus( std::vector<struct sockaddr_in> slaves, const char *targetGroup ) {
+bool RemapMsgHandler::sendStatus( std::vector<struct sockaddr_in> &slaves, const char *targetGroup ) {
 	char buf[ MAX_MESSLEN ];
 	int len = 0;
 	int recordSize = this->slaveStatusRecordSize;
