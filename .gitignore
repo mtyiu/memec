@@ -1,6 +1,7 @@
 *.o
 *.dSYM
 *.swp
+*.bak
 bin/application
 bin/coordinator
 bin/master
