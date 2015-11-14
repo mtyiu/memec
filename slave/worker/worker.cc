@@ -2072,7 +2072,6 @@ bool SlaveWorker::handleGetChunkRequest( SlavePeerEvent event, char *buf, size_t
 
 bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, char *buf, size_t size ) {
 	struct ChunkDataHeader header;
-	bool ret;
 	if ( ! this->protocol.parseChunkDataHeader( header, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleSetChunkRequest", "Invalid SET_CHUNK request." );
 		return false;
@@ -2084,21 +2083,50 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, char *buf, size_t
 	);
 
 	Metadata metadata;
+	KeyValue keyValue;
+	bool ret;
+	uint8_t keySize;
+	uint32_t offset, chunkSize, valueSize, objSize;
+	char *keyStr, *valueStr;
 	Chunk *chunk;
+	LOCK_T *lock;
 
-	chunk = SlaveWorker::map->findChunkById( header.listId, header.stripeId, header.chunkId, &metadata );
-
+	chunk = SlaveWorker::map->findChunkById(
+		header.listId, header.stripeId, header.chunkId,
+		&metadata,
+		true, // needsLock
+		false, // needsUnlock
+		&lock
+	);
 	ret = chunk;
 	if ( ! chunk ) {
 		__ERROR__( "SlaveWorker", "handleSetChunkRequest", "The chunk (%u, %u, %u) does not exist.", header.listId, header.stripeId, header.chunkId );
 	} else {
 		// Update metadata map
+		if ( header.chunkId < SlaveWorker::dataChunkCount ) {
+			// Delete all keys in the chunk from the map
+			offset = 0;
+			chunkSize = chunk->getSize();
+			while ( offset < chunkSize ) {
+				keyValue = chunk->getKeyValue( offset );
+				keyValue.deserialize( keyStr, keySize, valueStr, valueSize );
+
+				printf( "Key: %.*s (%u & %u)\n", keySize, keyStr, keySize, valueSize );
+
+				objSize = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
+				offset += objSize;
+			}
+		}
 
 		// Replace chunk contents
 		chunk->loadFromSetChunkRequest( header.data, header.size );
 
 		// Update metadata map again
+		if ( header.chunkId < SlaveWorker::dataChunkCount ) {
+			// Add all keys in the new chunk to the map
+		}
 	}
+	UNLOCK( lock );
 
 	event.resSetChunk( event.socket, event.id, metadata, ret );
 	this->dispatch( event );

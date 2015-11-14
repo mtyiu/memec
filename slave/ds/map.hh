@@ -95,20 +95,21 @@ public:
 		return true;
 	}
 
-	Chunk *findChunkById( uint32_t listId, uint32_t stripeId, uint32_t chunkId, Metadata *metadataPtr = 0 ) {
+	Chunk *findChunkById( uint32_t listId, uint32_t stripeId, uint32_t chunkId, Metadata *metadataPtr = 0, bool needsLock = true, bool needsUnlock = true, LOCK_T **lock = 0 ) {
 		std::unordered_map<Metadata, Chunk *>::iterator it;
 		Metadata metadata;
 
 		metadata.set( listId, stripeId, chunkId );
 		if ( metadataPtr ) *metadataPtr = metadata;
+		if ( lock ) *lock = &this->cacheLock;
 
-		LOCK( &this->cacheLock );
+		if ( needsLock ) LOCK( &this->cacheLock );
 		it = this->cache.find( metadata );
 		if ( it == this->cache.end() ) {
 			UNLOCK( &this->cacheLock );
 			return 0;
 		}
-		UNLOCK( &this->cacheLock );
+		if ( needsUnlock ) UNLOCK( &this->cacheLock );
 		return it->second;
 	}
 
@@ -136,7 +137,7 @@ public:
 		return true;
 	}
 
-	bool insertKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata ) {
+	bool insertKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata, bool needsUpdateOpMetadata = true ) {
 		key.dup();
 
 		std::pair<Key, KeyMetadata> keyPair( key, keyMetadata );
@@ -150,7 +151,7 @@ public:
 		}
 		UNLOCK( &this->keysLock );
 
-		return this->insertOpMetadata( opcode, key, keyMetadata );
+		return needsUpdateOpMetadata ? this->insertOpMetadata( opcode, key, keyMetadata ) : true;
 	}
 
 	bool insertOpMetadata( uint8_t opcode, Key key, KeyMetadata keyMetadata, bool dup = true ) {
@@ -260,7 +261,7 @@ public:
 		}
 	}
 
-	bool deleteKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata, bool needsLock, bool needsUnlock ) {
+	bool deleteKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata, bool needsLock, bool needsUnlock, bool needsUpdateOpMetadata = true ) {
 		Key k;
 		std::unordered_map<Key, KeyMetadata>::iterator keysIt;
 		std::unordered_map<Key, OpMetadata>::iterator opsIt;
@@ -278,7 +279,7 @@ public:
 		}
 		if ( needsUnlock ) UNLOCK( &this->keysLock );
 
-		return this->insertOpMetadata( opcode, key, keyMetadata );
+		return needsUpdateOpMetadata ? this->insertOpMetadata( opcode, key, keyMetadata ) : true;
 	}
 
 	void getKeysMap( std::unordered_map<Key, KeyMetadata> *&keys, LOCK_T *&lock ) {
