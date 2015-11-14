@@ -152,7 +152,7 @@ bool DegradedMap::insertValue( KeyValue keyValue, Metadata metadata ) { // KeyVa
 	return ret1.second && ret2.second;
 }
 
-bool DegradedMap::deleteValue( Key key, uint8_t opcode ) {
+bool DegradedMap::deleteValue( Key key, Metadata metadata, uint8_t opcode ) {
 	std::unordered_map<Key, KeyValue>::iterator valuesIt;
 	std::unordered_map<Key, Metadata>::iterator metadataIt;
 	std::pair<
@@ -161,14 +161,12 @@ bool DegradedMap::deleteValue( Key key, uint8_t opcode ) {
 	> metadataRevIts;
 	std::unordered_multimap<Metadata, Key>::iterator metadataRevIt;
 	KeyValue keyValue;
-	Metadata metadata;
+	bool isFound = false;
 
 	LOCK( &this->unsealed.lock );
 	valuesIt = this->unsealed.values.find( key );
-	if ( valuesIt == this->unsealed.values.end() ) {
-		UNLOCK( &this->unsealed.lock );
-		return false;
-	}
+	if ( valuesIt == this->unsealed.values.end() )
+		goto re_insert;
 	keyValue = valuesIt->second;
 	this->unsealed.values.erase( valuesIt );
 
@@ -176,14 +174,12 @@ bool DegradedMap::deleteValue( Key key, uint8_t opcode ) {
 	metadataIt = this->unsealed.metadata.find( key );
 	if ( metadataIt == this->unsealed.metadata.end() ) {
 		keyValue.free();
-		UNLOCK( &this->unsealed.lock );
-		return false;
+		goto re_insert;
 	}
 	metadata = metadataIt->second;
 	this->unsealed.metadata.erase( metadataIt );
 
 	// Find from metadataRev
-	bool isFound = false;
 	metadataRevIts = this->unsealed.metadataRev.equal_range( metadata );
 	for ( metadataRevIt = metadataRevIts.first; metadataRevIt != metadataRevIts.second; metadataRevIt++ ) {
 		if ( metadataRevIt->second == key ) {
@@ -192,18 +188,22 @@ bool DegradedMap::deleteValue( Key key, uint8_t opcode ) {
 			break;
 		}
 	}
-	if ( ! isFound ) printf( "DegradedMap::deleteValue(): Key is NOT found!\n" );
-
-	// Insert into deleted set
-	key.dup();
-	this->unsealed.deleted.insert( key );
-
+	assert( isFound );
 	keyValue.free();
+
+re_insert:
+	// Re-insert for synchronizing the unsealed chunks
+	key.dup();
+	std::pair<Metadata, Key> p( metadata, key );
+	this->unsealed.metadataRev.insert( p );
+	this->unsealed.deleted.insert( key );
 
 	UNLOCK( &this->unsealed.lock );
 
 	KeyMetadata keyMetadata;
 	keyMetadata.set( metadata.listId, metadata.stripeId, metadata.chunkId );
+	if ( metadata.chunkId > 4 )
+		printf( "metadata.chunkId = %u\n", metadata.chunkId );
 
 	return this->slaveMap->insertOpMetadata( opcode, key, keyMetadata );
 }
@@ -454,7 +454,7 @@ bool DegradedChunkBuffer::updateKeyValue( uint8_t keySize, char *keyStr, uint32_
 	return false;
 }
 
-bool DegradedChunkBuffer::deleteKey( uint8_t opcode, uint8_t keySize, char *keyStr, bool isSealed, uint32_t &deltaSize, char *delta, Chunk *chunk ) {
+bool DegradedChunkBuffer::deleteKey( uint8_t opcode, uint8_t keySize, char *keyStr, Metadata metadata, bool isSealed, uint32_t &deltaSize, char *delta, Chunk *chunk ) {
 	Key key;
 	KeyMetadata keyMetadata;
 	bool ret;
@@ -477,7 +477,7 @@ bool DegradedChunkBuffer::deleteKey( uint8_t opcode, uint8_t keySize, char *keyS
 		}
 		UNLOCK( cacheLock );
 	} else {
-		ret = this->map.deleteValue( key, opcode );
+		ret = this->map.deleteValue( key, metadata, opcode );
 	}
 	UNLOCK( keysLock );
 

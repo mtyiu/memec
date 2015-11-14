@@ -82,6 +82,7 @@ public class Main implements Runnable {
 				System.out.println( "Done." );
 			}
 
+			/*
 			if ( i == numRecords * 3 ) {
 				System.out.println( "Sleep for 20 seconds..." );
 				try {
@@ -89,6 +90,7 @@ public class Main implements Runnable {
 				} catch( InterruptedException e ) {}
 				System.out.println( "Done." );
 			}
+			*/
 
 			if ( i < numRecords ) {
 				rand = 0;
@@ -96,6 +98,7 @@ public class Main implements Runnable {
 				rand = rand == 0 ? 1 : rand;
 				if ( size == 0 )
 					break;
+				rand = 3;
 			}
 			// ^^^^^ For testing degraded operations (End) ^^^^^
 

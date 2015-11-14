@@ -1753,7 +1753,9 @@ bool SlaveWorker::handleDegradedDeleteRequest( MasterEvent event, char *buf, siz
 		if ( chunk ) {
 			SlaveWorker::degradedChunkBuffer->deleteKey(
 				PROTO_OPCODE_DELETE,
-				key.size, key.data, true, /* isSealed */
+				key.size, key.data,
+				metadata,
+				true, /* isSealed */
 				deltaSize, delta, chunk
 			);
 
@@ -1774,7 +1776,9 @@ bool SlaveWorker::handleDegradedDeleteRequest( MasterEvent event, char *buf, siz
 			uint32_t tmp = 0;
 			SlaveWorker::degradedChunkBuffer->deleteKey(
 				PROTO_OPCODE_DELETE,
-				key.size, key.data, false,
+				key.size, key.data,
+				metadata,
+				false,
 				tmp, 0, 0
 			);
 
@@ -2129,7 +2133,7 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, char *buf, size_t
 
 			// Replace chunk contents
 			chunk->loadFromSetChunkRequest( header.data, header.size );
-    
+
 			// Add all keys in the new chunk to the map
 			offset = 0;
 			chunkSize = header.size;
@@ -2153,7 +2157,7 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, char *buf, size_t
 
 				offset += objSize;
 			}
-			
+
 			UNLOCK( keysLock );
 		} else {
 			// Replace chunk contents
@@ -2272,6 +2276,7 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
 	Key key;
 	KeyValue keyValue;
+	Metadata metadata;
 	DegradedMap *dmap = &SlaveWorker::degradedChunkBuffer->map;
 	if ( success ) {
 		struct KeyValueHeader header;
@@ -2320,16 +2325,9 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 
 		if ( success ) {
 			if ( op.opcode == PROTO_OPCODE_DEGRADED_DELETE ) {
+				metadata.set( op.listId, op.stripeId, op.chunkId );
+				dmap->deleteValue( key, metadata, PROTO_OPCODE_DELETE );
 				keyValue.free();
-				if ( ! dmap->deleteValue( key, PROTO_OPCODE_DELETE ) ) {
-					// Insert into OpMetadata map
-					KeyMetadata keyMetadata;
-					keyMetadata.set( op.listId, op.stripeId, op.chunkId );
-					SlaveWorker::map->insertOpMetadata(
-						PROTO_OPCODE_DELETE,
-						key, keyMetadata
-					);
-				}
 			} else if ( ! isInserted ) {
 				Metadata metadata;
 				metadata.set( op.listId, op.stripeId, op.chunkId );
@@ -2704,6 +2702,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 			if ( ! dmap->deleteDegradedChunk( op.listId, op.stripeId, op.chunkId, pids ) ) {
 				__ERROR__( "SlaveWorker", "handleGetChunkResponse", "dmap->deleteDegradedChunk() failed (%u, %u, %u).", op.listId, op.stripeId, op.chunkId );
 			}
+			metadata.set( op.listId, op.stripeId, op.chunkId );
 
 			for ( int pidsIndex = 0, len = pids.size(); pidsIndex < len; pidsIndex++ ) {
 				if ( pidsIndex == 0 ) {
@@ -2713,8 +2712,6 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 						__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot find a pending slave DEGRADED_OPS request that matches the response. This message will be discarded." );
 					}
 				}
-
-				metadata.set( op.listId, op.stripeId, op.chunkId );
 
 				// Find the chunk from the map
 				Chunk *chunk = dmap->findChunkById( op.listId, op.stripeId, op.chunkId );
@@ -2821,7 +2818,9 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 
 						SlaveWorker::degradedChunkBuffer->deleteKey(
 							PROTO_OPCODE_DELETE,
-							key.size, key.data, true /* isSealed */,
+							key.size, key.data,
+							metadata,
+							true /* isSealed */,
 							deltaSize, delta, chunk
 						);
 
@@ -3144,7 +3143,9 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 						uint32_t tmp = 0;
 						SlaveWorker::degradedChunkBuffer->deleteKey(
 							PROTO_OPCODE_DELETE,
-							key.size, key.data, true /* isSealed */,
+							key.size, key.data,
+							metadata,
+							true /* isSealed */,
 							tmp, 0, 0
 						);
 

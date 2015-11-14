@@ -45,7 +45,7 @@ void CoordinatorWorker::dispatch( CoordinatorEvent event ) {
 			bool empty = coordinator->pendingRemappingRecords.toSend.empty();
 			MasterEvent masterEvent;
 
-			// generate packets of remapping records 
+			// generate packets of remapping records
 			LOCK( &coordinator->pendingRemappingRecords.toSendLock );
 			// stop if there is no remapping record to sync
 			if ( empty ) {
@@ -61,7 +61,7 @@ void CoordinatorWorker::dispatch( CoordinatorEvent event ) {
 				packet = coordinator->packetPool.malloc();
 				buffer.data = packet->data;
 				this->protocol.reqSyncRemappingRecord(
-					buffer.size, id, 
+					buffer.size, id,
 					coordinator->pendingRemappingRecords.toSend, 0 /* no need to lock again */,
 					empty, buffer.data
 				);
@@ -81,7 +81,7 @@ void CoordinatorWorker::dispatch( CoordinatorEvent event ) {
 			} while ( ! empty );
 			UNLOCK( &coordinator->pendingRemappingRecords.toSendLock );
 
-			counter = packets.size(); 
+			counter = packets.size();
 
 			// prepare to send the packets to all masters
 			LOCK( &coordinator->sockets.masters.lock );
@@ -90,8 +90,8 @@ void CoordinatorWorker::dispatch( CoordinatorEvent event ) {
 				packets[ pcnt ]->setReferenceCount( coordinator->sockets.masters.size() );
 			}
 			for ( uint32_t i = 0; i < coordinator->sockets.masters.size(); i++ ) {
-				event.message.remap.counter->insert( 
-					std::pair<struct sockaddr_in, uint32_t> ( 
+				event.message.remap.counter->insert(
+					std::pair<struct sockaddr_in, uint32_t> (
 					coordinator->sockets.masters[ i ]->getAddr(), counter
 					)
 				);
@@ -611,8 +611,9 @@ bool CoordinatorWorker::processHeartbeat( SlaveEvent event, char *buf, size_t si
 	for ( count = 0; count < heartbeat.keys; count++ ) {
 		if ( this->protocol.parseKeyOpMetadataHeader( header.op, processed, buf, size, offset ) ) {
 			SlaveSocket *s = event.socket;
-			if ( header.op.opcode == PROTO_OPCODE_DELETE ) // Handle keys from degraded DELETE
+			if ( header.op.opcode == PROTO_OPCODE_DELETE ) { // Handle keys from degraded DELETE
 				s = CoordinatorWorker::stripeList->get( header.op.listId, header.op.chunkId );
+			}
 			s->map.insertKey(
 				header.op.key,
 				header.op.keySize,
