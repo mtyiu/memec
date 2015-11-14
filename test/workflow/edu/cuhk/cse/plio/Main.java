@@ -75,10 +75,17 @@ public class Main implements Runnable {
 
 			// vvvvv For testing degraded operations (Start) vvvvv
 			if ( i == numRecords ) {
-				// Wait for 10 seconds
 				System.out.println( "Sleep for 10 seconds..." );
 				try {
 					Thread.sleep( 10000 );
+				} catch( InterruptedException e ) {}
+				System.out.println( "Done." );
+			}
+
+			if ( i == numRecords * 3 ) {
+				System.out.println( "Sleep for 20 seconds..." );
+				try {
+					Thread.sleep( 20000 );
 				} catch( InterruptedException e ) {}
 				System.out.println( "Done." );
 			}

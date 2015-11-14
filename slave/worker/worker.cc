@@ -2083,13 +2083,15 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, char *buf, size_t
 	);
 
 	Metadata metadata;
+	Key key;
 	KeyValue keyValue;
+	KeyMetadata keyMetadata;
 	bool ret;
-	uint8_t keySize;
 	uint32_t offset, chunkSize, valueSize, objSize;
-	char *keyStr, *valueStr;
+	char *valueStr;
 	Chunk *chunk;
-	LOCK_T *lock;
+	LOCK_T *lock, *keysLock;
+	std::unordered_map<Key, KeyMetadata> *keys;
 
 	chunk = SlaveWorker::map->findChunkById(
 		header.listId, header.stripeId, header.chunkId,
@@ -2098,32 +2100,64 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, char *buf, size_t
 		false, // needsUnlock
 		&lock
 	);
+	SlaveWorker::map->getKeysMap( keys, keysLock );
 	ret = chunk;
 	if ( ! chunk ) {
 		__ERROR__( "SlaveWorker", "handleSetChunkRequest", "The chunk (%u, %u, %u) does not exist.", header.listId, header.stripeId, header.chunkId );
 	} else {
-		// Update metadata map
 		if ( header.chunkId < SlaveWorker::dataChunkCount ) {
+			LOCK( keysLock );
+
 			// Delete all keys in the chunk from the map
 			offset = 0;
 			chunkSize = chunk->getSize();
 			while ( offset < chunkSize ) {
 				keyValue = chunk->getKeyValue( offset );
-				keyValue.deserialize( keyStr, keySize, valueStr, valueSize );
+				keyValue.deserialize( key.data, key.size, valueStr, valueSize );
 
-				printf( "Key: %.*s (%u & %u)\n", keySize, keyStr, keySize, valueSize );
+				key.set( key.size, key.data );
+				SlaveWorker::map->deleteKey(
+					key, 0, keyMetadata,
+					false, // needsLock
+					false, // needsUnlock
+					false  // needsUpdateOpMetadata
+				);
 
-				objSize = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
+				objSize = KEY_VALUE_METADATA_SIZE + key.size + valueSize;
 				offset += objSize;
 			}
-		}
 
-		// Replace chunk contents
-		chunk->loadFromSetChunkRequest( header.data, header.size );
-
-		// Update metadata map again
-		if ( header.chunkId < SlaveWorker::dataChunkCount ) {
+			// Replace chunk contents
+			chunk->loadFromSetChunkRequest( header.data, header.size );
+    
 			// Add all keys in the new chunk to the map
+			offset = 0;
+			chunkSize = header.size;
+			while( offset < chunkSize ) {
+				keyValue = chunk->getKeyValue( offset );
+				keyValue.deserialize( key.data, key.size, valueStr, valueSize );
+				objSize = KEY_VALUE_METADATA_SIZE + key.size + valueSize;
+
+				key.set( key.size, key.data );
+
+				keyMetadata.set( header.listId, header.stripeId, header.chunkId );
+				keyMetadata.offset = offset;
+				keyMetadata.length = objSize;
+
+				SlaveWorker::map->insertKey(
+					key, 0, keyMetadata,
+					false, // needsLock
+					false, // needsUnlock
+					false  // needsUpdateOpMetadata
+				);
+
+				offset += objSize;
+			}
+			
+			UNLOCK( keysLock );
+		} else {
+			// Replace chunk contents
+			chunk->loadFromSetChunkRequest( header.data, header.size );
 		}
 	}
 	UNLOCK( lock );

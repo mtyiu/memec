@@ -137,19 +137,19 @@ public:
 		return true;
 	}
 
-	bool insertKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata, bool needsUpdateOpMetadata = true ) {
+	bool insertKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata, bool needsLock = true, bool needsUnlock = true, bool needsUpdateOpMetadata = true ) {
 		key.dup();
 
 		std::pair<Key, KeyMetadata> keyPair( key, keyMetadata );
 		std::pair<std::unordered_map<Key, KeyMetadata>::iterator, bool> keyRet;
 
-		LOCK( &this->keysLock );
+		if ( needsLock ) LOCK( &this->keysLock );
 		keyRet = this->keys.insert( keyPair );
 		if ( ! keyRet.second ) {
-			UNLOCK( &this->keysLock );
+			if ( needsUnlock ) UNLOCK( &this->keysLock );
 			return false;
 		}
-		UNLOCK( &this->keysLock );
+		if ( needsUnlock ) UNLOCK( &this->keysLock );
 
 		return needsUpdateOpMetadata ? this->insertOpMetadata( opcode, key, keyMetadata ) : true;
 	}
