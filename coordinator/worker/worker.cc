@@ -30,6 +30,82 @@ void CoordinatorWorker::dispatch( MixedEvent event ) {
 }
 
 void CoordinatorWorker::dispatch( CoordinatorEvent event ) {
+	Coordinator *coordinator = Coordinator::getInstance();
+	struct {
+		size_t size;
+		char *data;
+	} buffer;
+
+	switch( event.type ) {
+		case COORDINATOR_EVENT_TYPE_SYNC_REMAPPING_RECORDS:
+		{
+			Packet *packet;
+			std::vector<Packet*> packets;
+			uint32_t counter, id;
+			bool empty = coordinator->pendingRemappingRecords.toSend.empty();
+			MasterEvent masterEvent;
+
+			// generate packets of remapping records 
+			LOCK( &coordinator->pendingRemappingRecords.toSendLock );
+			// stop if there is no remapping record to sync
+			if ( empty ) {
+				UNLOCK( &coordinator->pendingRemappingRecords.toSendLock );
+				event.message.remap.counter->clear();
+				*event.message.remap.done = true;
+				break;
+			}
+			do {
+				id = coordinator->idGenerator.nextVal( this->workerId );
+				coordinator->pending.addRemappingRecords( id, event.message.remap.counter, event.message.remap.done );
+
+				packet = coordinator->packetPool.malloc();
+				buffer.data = packet->data;
+				this->protocol.reqSyncRemappingRecord(
+					buffer.size, id, 
+					coordinator->pendingRemappingRecords.toSend, 0 /* no need to lock again */,
+					empty, buffer.data
+				);
+				packet->size = buffer.size;
+				packets.push_back( packet );
+				// remove records sent
+				std::unordered_map<Key, RemappingRecord>::iterator it, safePtr;
+				for ( it = coordinator->pendingRemappingRecords.toSend.begin(); it != coordinator->pendingRemappingRecords.toSend.end(); it = safePtr ) {
+					safePtr = it;
+					safePtr++;
+					if ( it->second.sent ) {
+						coordinator->pendingRemappingRecords.toSend.erase( it );
+						delete it->first.data;
+					}
+				}
+				empty = coordinator->pendingRemappingRecords.toSend.empty();
+			} while ( ! empty );
+			UNLOCK( &coordinator->pendingRemappingRecords.toSendLock );
+
+			counter = packets.size(); 
+
+			// prepare to send the packets to all masters
+			LOCK( &coordinator->sockets.masters.lock );
+			// reference count
+			for ( uint32_t pcnt = 0; pcnt < packets.size(); pcnt++ ) {
+				packets[ pcnt ]->setReferenceCount( coordinator->sockets.masters.size() );
+			}
+			for ( uint32_t i = 0; i < coordinator->sockets.masters.size(); i++ ) {
+				event.message.remap.counter->insert( 
+					std::pair<struct sockaddr_in, uint32_t> ( 
+					coordinator->sockets.masters[ i ]->getAddr(), counter
+					)
+				);
+				// event for each master
+				masterEvent.syncRemappingRecords( coordinator->sockets.masters[ i ], new std::vector<Packet*>( packets ) );
+				coordinator->eventQueue.insert( masterEvent );
+			}
+			UNLOCK( &coordinator->sockets.masters.lock );
+		}
+			break;
+		default:
+			break;
+	}
+
 }
 
 void CoordinatorWorker::dispatch( MasterEvent event ) {
@@ -40,6 +116,7 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 		char *data;
 	} buffer;
 	Coordinator *coordinator = Coordinator::getInstance();
+	Packet *packet = NULL;
 
 	switch( event.type ) {
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
@@ -99,8 +176,24 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 			// free the vector of slaves
 			delete event.message.remap.slaves;
 			break;
-		case MASTER_EVENT_TYPE_PENDING:
-			isSend = false;
+		case MASTER_EVENT_TYPE_SYNC_REMAPPING_RECORDS:
+			// TODO directly send packets out
+		{
+			std::vector<Packet*> *packets = event.message.remap.syncPackets;
+
+			packet = packets->back();
+			buffer.data = packet->data;
+			buffer.size = packet->size;
+
+			packets->pop_back();
+
+			// check if this is the last packet to send
+			if ( packets->empty() )
+				delete packets;
+			else
+				coordinator->eventQueue.insert( event );
+		}
+			isSend = true;
 			break;
 		// Degraded operation
 		case MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED:
@@ -140,6 +233,10 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 			);
 			isSend = true;
 			break;
+		// Pending
+		case MASTER_EVENT_TYPE_PENDING:
+			isSend = false;
+			break;
 		default:
 			return;
 	}
@@ -148,6 +245,8 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+		if ( event.type == MASTER_EVENT_TYPE_SYNC_REMAPPING_RECORDS && packet )
+			coordinator->packetPool.free( packet );
 	} else if ( event.type == MASTER_EVENT_TYPE_SWITCH_PHASE ) {
 		// just to avoid error message
 		connected = true;
@@ -225,6 +324,18 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 						this->handleDegradedLockRequest( event, buffer.data, buffer.size );
 						break;
 					default:
+						goto quit_1;
+				}
+			} else if ( header.magic == PROTO_MAGIC_REMAPPING ) {
+				switch( header.opcode ) {
+					case PROTO_OPCODE_SYNC:
+					{
+						coordinator->pending.decrementRemappingRecords( header.id, event.socket->getAddr(), true, false );
+						coordinator->pending.checkAndRemoveRemappingRecords( header.id, 0, false, true );
+					}
+						break;
+					default:
+						__ERROR__( "CoordinatorWorker", "dispatch", "Invalid opcode from master." );
 						goto quit_1;
 				}
 			} else {
@@ -763,6 +874,10 @@ bool CoordinatorWorker::handleRemappingSetLockRequest( MasterEvent event, char *
 	) {
 		if ( header.isRemapped ) {
 			if ( CoordinatorWorker::remappingRecords->insert( key, remappingRecord ) ) {
+				key.dup();
+				LOCK( &Coordinator::getInstance()->pendingRemappingRecords.toSendLock );
+				Coordinator::getInstance()->pendingRemappingRecords.toSend[ key ] = remappingRecord;
+				UNLOCK( &Coordinator::getInstance()->pendingRemappingRecords.toSendLock );
 				event.resRemappingSetLock( event.socket, event.id, header.isRemapped, key, remappingRecord, true );
 			} else {
 				event.resRemappingSetLock( event.socket, event.id, header.isRemapped, key, remappingRecord, false );

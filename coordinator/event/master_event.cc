@@ -32,6 +32,12 @@ void MasterEvent::switchPhase( bool toRemap, std::set<struct sockaddr_in> slaves
 	this->message.remap.slaves = new std::vector<struct sockaddr_in>( slaves.begin(), slaves.end() );
 }
 
+void MasterEvent::syncRemappingRecords( MasterSocket *socket, std::vector<Packet*> *packets ) {
+	this->type = MASTER_EVENT_TYPE_SYNC_REMAPPING_RECORDS;
+	this->socket = socket;
+	this->message.remap.syncPackets = packets;
+}
+
 void MasterEvent::resDegradedLock( MasterSocket *socket, uint32_t id, Key &key, bool isLocked, bool isSealed, uint32_t srcListId, uint32_t srcStripeId, uint32_t srcChunkId, uint32_t dstListId, uint32_t dstChunkId ) {
 	this->type = isLocked ? MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED : MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_WAS_LOCKED;
 	this->id = id;

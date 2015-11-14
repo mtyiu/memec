@@ -75,7 +75,7 @@ public:
 	bool resetMasterAck( struct sockaddr_in slave );
 	bool isAllMasterAcked( struct sockaddr_in slave );
 
-	bool sendStatusToMasters( std::vector<struct sockaddr_in> slaves = std::vector <struct sockaddr_in>() );
+	bool sendStatusToMasters( std::vector<struct sockaddr_in> &slaves );
 	bool sendStatusToMasters( struct sockaddr_in slave );
 
 	// keep trace of the alive slaves 

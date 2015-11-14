@@ -9,6 +9,7 @@
 enum CoordinatorEventType {
 	COORDINATOR_EVENT_TYPE_REGISTER_REQUEST,
 	COORDINATOR_EVENT_TYPE_PUSH_LOAD_STATS,
+	COORDINATOR_EVENT_TYPE_RESPONSE_SYNC_REMAPPING_RECORDS,
 	COORDINATOR_EVENT_TYPE_PENDING
 };
 
@@ -34,6 +35,7 @@ public:
 		ArrayMap< struct sockaddr_in, Latency > *slaveGetLatency,
 		ArrayMap< struct sockaddr_in, Latency > *slaveSetLatency
 	);
+	void resSyncRemappingRecords( void );
 	void pending( CoordinatorSocket *socket );
 };
 

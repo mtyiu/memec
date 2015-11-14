@@ -7,6 +7,7 @@
 #include "../../common/ds/latency.hh"
 #include "../../common/ds/key.hh"
 #include "../../common/ds/metadata.hh"
+#include "../../common/ds/packet_pool.hh"
 #include "../../common/event/event.hh"
 
 enum MasterEventType {
@@ -20,6 +21,7 @@ enum MasterEventType {
 	MASTER_EVENT_TYPE_SWITCH_PHASE,
 	// REMAPPING_RECORDS
 	MASTER_EVENT_TYPE_FORWARD_REMAPPING_RECORDS,
+	MASTER_EVENT_TYPE_SYNC_REMAPPING_RECORDS,
 	// Degraded operation
 	MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED,
 	MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_WAS_LOCKED,
@@ -50,6 +52,7 @@ public:
 			uint32_t listId;
 			uint32_t chunkId;
 			uint32_t isRemapped;
+			std::vector<Packet*> *syncPackets;
 		} remap;
 		struct {
 			size_t prevSize;
@@ -64,6 +67,7 @@ public:
 	} message;
 
 	void resRegister( MasterSocket *socket, uint32_t id, bool success = true );
+
 	void reqPushLoadStats (
 		MasterSocket *socket,
 		ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
@@ -86,6 +90,10 @@ public:
 	void resRemappingSetLock(
 		MasterSocket *socket, uint32_t id, bool isRemapped,
 		Key &key, RemappingRecord &remappingRecord, bool success
+	);
+	// Remapping Records
+	void syncRemappingRecords( 
+		MasterSocket *socket, std::vector<Packet*> *packets
 	);
 	// Pending
 	void pending( MasterSocket *socket );

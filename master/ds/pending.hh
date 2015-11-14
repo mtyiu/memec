@@ -159,7 +159,8 @@ public:
 		PendingType type, uint32_t id, void *ptr = 0,
 		PendingIdentifier *pidPtr = 0,
 		KeyValueUpdate *keyValueUpdatePtr = 0,
-		bool needsLock = true, bool needsUnlock = true
+		bool needsLock = true, bool needsUnlock = true,
+		bool checkKey = false, char *checkKeyPtr = 0
 	);
 	bool eraseRequestStartTime(
 		PendingType type, uint32_t id, void *ptr,
@@ -176,7 +177,8 @@ public:
 	);
 	bool findKeyValueUpdate(
 		PendingType type, uint32_t id, void *ptr,
-		KeyValueUpdate *keyValuePtr
+		KeyValueUpdate *keyValuePtr,
+		bool checkKey = false, char *checkKeyPtr = 0
 	);
 
 	// Count

@@ -169,7 +169,6 @@ DEFINE_PENDING_SLAVE_INSERT_METHOD( insertKeyValueUpdate, KeyValueUpdate, keyVal
 
 DEFINE_PENDING_ERASE_METHOD( eraseDegradedLockData, DegradedLockData, degradedLockDataPtr )
 DEFINE_PENDING_ERASE_METHOD( eraseRemappingRecord, RemappingRecord, remappingRecordPtr )
-DEFINE_PENDING_ERASE_METHOD( eraseKeyValueUpdate, KeyValueUpdate, KeyValueUpdatePtr )
 
 #undef DEFINE_PENDING_APPLICATION_INSERT_METHOD
 #undef DEFINE_PENDING_SLAVE_INSERT_METHOD
@@ -253,34 +252,66 @@ bool Pending::eraseRequestStartTime( PendingType type, uint32_t id, void *ptr, s
 	return ret;
 }
 
+#define SEARCH_KEY_RANGE( _MAP_, _LEFT_, _RIGHT_, _PTR_, _CHECK_KEY_, _KEY_PTR_ , _RET_ ) \
+	do { \
+		/* prevent collision on id, use key and/or ptr as identifier as well */ \
+		if ( _PTR_ ) { \
+			while ( _LEFT_ != _RIGHT_ && ( _LEFT_->first.ptr != ptr || ( _CHECK_KEY_ && _KEY_PTR_ && strncmp( _KEY_PTR_, _LEFT_->second.data, _LEFT_->second.size ) != 0 ) ) ) \
+				_LEFT_++; \
+			/* match request id, ptr and/or key */ \
+			_RET_ = ( _LEFT_ != _RIGHT_ && _LEFT_->first.ptr == ptr && ( ! _CHECK_KEY_ || ! _KEY_PTR_ || strncmp( _KEY_PTR_, _LEFT_->second.data, _LEFT_->second.size ) == 0 ) ); \
+		} else { \
+			while ( _LEFT_ != _RIGHT_ && _CHECK_KEY_ && _KEY_PTR_ && strncmp( _KEY_PTR_, _LEFT_->second.data, _LEFT_->second.size ) != 0 ) \
+				_LEFT_++; \
+			/* match request and/or key */ \
+			_RET_ = ( _LEFT_ != _RIGHT_ && ( ! _CHECK_KEY_ || ! _KEY_PTR_ || strncmp( _KEY_PTR_, _LEFT_->second.data, _LEFT_->second.size ) == 0 ) ); \
+		} \
+	} while ( 0 )
+
 bool Pending::eraseKey( PendingType type, uint32_t id, void *ptr, PendingIdentifier *pidPtr, Key *keyPtr, bool needsLock, bool needsUnlock, bool checkKey, char* checkKeyPtr ) {
 	PendingIdentifier pid( id, 0, ptr );
 	LOCK_T *lock;
 	bool ret;
 
 	std::unordered_multimap<PendingIdentifier, Key> *map;
-	std::unordered_multimap<PendingIdentifier, Key>::iterator it;
+	std::unordered_multimap<PendingIdentifier, Key>::iterator lit, rit;
 	if ( ! this->get( type, lock, map ) )
 		return false;
 
 	if ( needsLock ) LOCK( lock );
-	if ( ptr ) {
-		it = map->find( pid );
-		// prevent collision on id
-		while ( it != map->end() && it->first.id == id && checkKey && checkKeyPtr && strncmp( checkKeyPtr, it->second.data, it->second.size ) != 0 )
-			it++;
-		ret = ( it != map->end() && it->first.id == id );
-	} else {
-		it = map->find( pid );
-		// prevent collision on id
-		while ( it != map->end() && it->first.id == id && checkKey && checkKeyPtr && strncmp( checkKeyPtr, it->second.data, it->second.size ) != 0 )
-			it++;
-		ret = ( it != map->end() && it->first.id == id ); // Match request ID
-	}
+	tie( lit, rit ) = map->equal_range( pid );
+	SEARCH_KEY_RANGE( map, lit, rit, ptr, checkKey, checkKeyPtr, ret );
+
 	if ( ret ) {
-		if ( pidPtr ) *pidPtr = it->first;
-		if ( keyPtr ) *keyPtr = it->second;
-		map->erase( it );
+		if ( pidPtr ) *pidPtr = lit->first;
+		if ( keyPtr ) *keyPtr = lit->second;
+		map->erase( lit );
+	}
+	if ( needsUnlock ) UNLOCK( lock );
+
+	return ret;
+}
+
+bool Pending::eraseKeyValueUpdate( PendingType type, uint32_t id, void *ptr, PendingIdentifier *pidPtr, KeyValueUpdate *keyValueUpdatePtr,
+	bool needsLock, bool needsUnlock, bool checkKey, char* checkKeyPtr
+) {
+	PendingIdentifier pid( id, 0, ptr );
+	LOCK_T *lock;
+	bool ret;
+
+	std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *map;
+	std::unordered_multimap<PendingIdentifier, KeyValueUpdate>::iterator lit, rit;
+	if ( ! this->get( type, lock, map ) )
+		return false;
+
+	if ( needsLock ) LOCK( lock );
+	tie( lit, rit ) = map->equal_range( pid );
+	SEARCH_KEY_RANGE( map, lit, rit, ptr, checkKey, checkKeyPtr, ret );
+
+	if ( ret ) {
+		if ( pidPtr ) *pidPtr = lit->first;
+		if ( keyValueUpdatePtr ) *keyValueUpdatePtr = lit->second;
+		map->erase( lit );
 	}
 	if ( needsUnlock ) UNLOCK( lock );
 
@@ -293,57 +324,45 @@ bool Pending::findKey( PendingType type, uint32_t id, void *ptr, Key *keyPtr, bo
 	bool ret;
 
 	std::unordered_multimap<PendingIdentifier, Key> *map;
-	std::unordered_multimap<PendingIdentifier, Key>::iterator it;
+	std::unordered_multimap<PendingIdentifier, Key>::iterator lit, rit;
 	if ( ! this->get( type, lock, map ) )
 		return false;
 
 	LOCK( lock );
-	if ( ptr ) {
-		it = map->find( pid );
-		// prevent collision on id
-		while ( it != map->end() && it->first.id == id && checkKey && checkKeyPtr && strncmp( checkKeyPtr, it->second.data, it->second.size ) != 0 )
-			it++;
-		ret = ( it != map->end() && it->first.id == id );
-	} else {
-		it = map->find( pid );
-		// prevent collision on id
-		while ( it != map->end() && it->first.id == id && checkKey && checkKeyPtr && strncmp( checkKeyPtr, it->second.data, it->second.size ) != 0 )
-			it++;
-		ret = ( it != map->end() && it->first.id == id ); // Match request ID
-	}
+	tie( lit, rit ) = map->equal_range( pid );
+	SEARCH_KEY_RANGE( map, lit, rit, ptr, checkKey, checkKeyPtr, ret );
+
 	if ( ret ) {
-		if ( keyPtr ) *keyPtr = it->second;
+		if ( keyPtr ) *keyPtr = lit->second;
 	}
 	UNLOCK( lock );
 
 	return ret;
 }
 
-bool Pending::findKeyValueUpdate( PendingType type, uint32_t id, void *ptr, KeyValueUpdate *keyValuePtr ) {
+bool Pending::findKeyValueUpdate( PendingType type, uint32_t id, void *ptr, KeyValueUpdate *keyValuePtr, bool checkKey, char *checkKeyPtr ) {
 	PendingIdentifier pid( id, 0, ptr );
 	LOCK_T *lock;
 	bool ret;
 
 	std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *map;
-	std::unordered_multimap<PendingIdentifier, KeyValueUpdate>::iterator it;
+	std::unordered_multimap<PendingIdentifier, KeyValueUpdate>::iterator lit, rit;
 	if ( ! this->get( type, lock, map ) )
 		return false;
 
 	LOCK( lock );
-	if ( ptr ) {
-		it = map->find( pid );
-		ret = ( it != map->end() );
-	} else {
-		it = map->find( pid );
-		ret = ( it != map->end() && it->first.id == id ); // Match request ID
-	}
+	tie( lit, rit ) = map->equal_range( pid );
+	SEARCH_KEY_RANGE( map, lit, rit, ptr, checkKey, checkKeyPtr, ret );
+
 	if ( ret ) {
-		if ( keyValuePtr ) *keyValuePtr = it->second;
+		if ( keyValuePtr ) *keyValuePtr = lit->second;
 	}
 	UNLOCK( lock );
 
 	return ret;
 }
+
+#undef SEARCH_KEY_RANGE
 
 uint32_t Pending::count( PendingType type, uint32_t id, bool needsLock, bool needsUnlock ) {
 	PendingIdentifier pid( id, 0, 0 );

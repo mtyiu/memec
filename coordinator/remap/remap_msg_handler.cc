@@ -1,6 +1,7 @@
 #include <cstring>
 #include <cstdlib>
 #include <arpa/inet.h>
+#include <pthread.h>
 #include <sp.h>
 #include <unistd.h>
 #include "remap_msg_handler.hh"
@@ -160,7 +161,7 @@ bool CoordinatorRemapMsgHandler::startRemapEnd( const struct sockaddr_in &slave 
 	// sync metadata before remapping
 	// use volatile to avoid "improper" -O2 optmization 
 	volatile bool sync = false;
-	Coordinator::getInstance()->syncSlaveMeta( slave, ( bool * )&sync );
+	Coordinator::getInstance()->syncSlaveMeta( slave, ( bool * ) &sync );
 	// busy waiting for meta sync to complete
 	while ( sync == false );
 	return false;
@@ -178,6 +179,12 @@ bool CoordinatorRemapMsgHandler::stopRemap( std::vector<struct sockaddr_in> *sla
 
 bool CoordinatorRemapMsgHandler::stopRemapEnd( const struct sockaddr_in &slave ) {
 	// TODO backward migration before getting back to normal 
+	// sync all remapping records back to masters
+	LOCK_T lock; 
+	std::map<struct sockaddr_in, uint32_t> count;
+	volatile bool done = false;
+	Coordinator::getInstance()->syncRemappingRecords( &lock, &count, ( bool * ) &done );
+	while ( done == false ); 
 	return false;
 }
 
@@ -223,7 +230,7 @@ bool CoordinatorRemapMsgHandler::isMasterJoin( int service, char *msg, char *sub
 /* 
  * packet: [# of slaves](1) [ [ip addr](4) [port](2) [status](1) ](7) [..](7) [..](7) ...
  */
-bool CoordinatorRemapMsgHandler::sendStatusToMasters( std::vector<struct sockaddr_in> slaves ) {
+bool CoordinatorRemapMsgHandler::sendStatusToMasters( std::vector<struct sockaddr_in> &slaves ) {
 	int recordSize = this->slaveStatusRecordSize;
 
 	if ( slaves.size() == 0 ) {
@@ -266,7 +273,8 @@ void *CoordinatorRemapMsgHandler::readMessages( void *argv ) {
 			// master joined ( masters group )
 			myself->addAliveMaster( subject );
 			// notify the new master about the remapping status
-			myself->sendStatusToMasters();
+			std::vector<struct sockaddr_in> slaves;
+			myself->sendStatusToMasters( slaves );
 		} else if ( ! regular && myself->isMasterLeft( service , msg, subject ) ) {
 			// master left
 			myself->removeAliveMaster( subject );

@@ -125,6 +125,17 @@ bool MasterProtocol::parseLoadingStats(
 	return true;
 }
 
+char *MasterProtocol::resSyncRemappingRecords( size_t &size, uint32_t id ) {
+	size = this->generateHeader(
+		PROTO_MAGIC_REMAPPING,
+		PROTO_MAGIC_TO_COORDINATOR,
+		PROTO_OPCODE_SYNC,
+		0,
+		id
+	);
+	return this->buffer.send;
+}
+
 char *MasterProtocol::reqDegradedLock( size_t &size, uint32_t id, uint32_t srcListId, uint32_t srcChunkId, uint32_t dstListId, uint32_t dstChunkId, char *key, uint8_t keySize ) {
 	size = this->generateDegradedLockReqHeader(
 		PROTO_MAGIC_REQUEST,

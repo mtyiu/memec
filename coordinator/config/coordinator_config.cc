@@ -59,6 +59,11 @@ bool CoordinatorConfig::set( const char *section, const char *name, const char *
 			this->workers.number.separated.slave = atoi( value );
 		else
 			return false;
+	} else if ( match( section, "pool" ) ) {
+		if ( match ( name, "packets" ) )
+			this->pool.packets = atoi( value );
+		else
+			return false;
 	} else if ( match( section, "event_queue" ) ) {
 		if ( match( name, "block" ) )
 			this->eventQueue.block = ! match( value, "false" );
