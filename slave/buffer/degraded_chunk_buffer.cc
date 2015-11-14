@@ -2,7 +2,7 @@
 
 DegradedMap::DegradedMap() {
 	LOCK_INIT( &this->keysLock );
-	LOCK_INIT( &this->valuesLock );
+	LOCK_INIT( &this->unsealed.lock );
 	LOCK_INIT( &this->cacheLock );
 	LOCK_INIT( &this->degraded.chunksLock );
 	LOCK_INIT( &this->degraded.keysLock );
@@ -59,16 +59,16 @@ find_in_values:
 
 	std::unordered_map<Key, KeyValue>::iterator it;
 
-	LOCK( &this->valuesLock );
-	it = this->values.find( key );
-	if ( it == this->values.end() ) {
-		UNLOCK( &this->valuesLock );
+	LOCK( &this->unsealed.lock );
+	it = this->unsealed.values.find( key );
+	if ( it == this->unsealed.values.end() ) {
+		UNLOCK( &this->unsealed.lock );
 		return false;
 	} else {
 		if ( keyPtr ) *keyPtr = it->first;
 		*keyValue = it->second;
 	}
-	UNLOCK( &this->valuesLock );
+	UNLOCK( &this->unsealed.lock );
 
 	return true;
 }
@@ -135,48 +135,72 @@ bool DegradedMap::deleteKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata, 
 
 bool DegradedMap::insertValue( KeyValue keyValue, Metadata metadata ) { // KeyValue's data is allocated by malloc()
 	Key key = keyValue.key();
-	std::pair<Key, KeyValue> p( key, keyValue );
-	std::pair<std::unordered_map<Key, KeyValue>::iterator, bool> ret;
+	std::pair<Key, KeyValue> p1( key, keyValue );
+	std::pair<Key, Metadata> p2( key, metadata );
+	std::pair<Metadata, Key> p3( metadata, key );
+	std::pair<std::unordered_map<Key, KeyValue>::iterator, bool> ret1;
+	std::pair<std::unordered_map<Key, Metadata>::iterator, bool> ret2;
 
-	LOCK( &this->valuesLock );
-	ret = this->values.insert( p );
-	if ( ret.second )
-		this->valueMeta[ key ] = metadata;
-	UNLOCK( &this->valuesLock );
+	LOCK( &this->unsealed.lock );
+	ret1 = this->unsealed.values.insert( p1 );
+	if ( ret1.second ) {
+		ret2 = this->unsealed.metadata.insert( p2 );
+		this->unsealed.metadataRev.insert( p3 );
+	}
+	UNLOCK( &this->unsealed.lock );
 
-	return ret.second;
+	return ret1.second && ret2.second;
 }
 
 bool DegradedMap::deleteValue( Key key, uint8_t opcode ) {
-	std::unordered_map<Key, KeyValue>::iterator it;
+	std::unordered_map<Key, KeyValue>::iterator valuesIt;
+	std::unordered_map<Key, Metadata>::iterator metadataIt;
+	std::pair<
+		std::unordered_multimap<Metadata, Key>::iterator,
+		std::unordered_multimap<Metadata, Key>::iterator
+	> metadataRevIts;
+	std::unordered_multimap<Metadata, Key>::iterator metadataRevIt;
 	KeyValue keyValue;
-
-	LOCK( &this->valuesLock );
-	it = this->values.find( key );
-	if ( it == this->values.end() ) {
-		UNLOCK( &this->valuesLock );
-		return false;
-	} else {
-		keyValue = it->second;
-		this->values.erase( it );
-	}
-
-	// TODO: Add to opMap
-	// Find metadata
-	std::unordered_map<Key, Metadata>::iterator metaIt;
 	Metadata metadata;
 
-	metaIt = this->valueMeta.find( key );
-	if ( metaIt == this->valueMeta.end() ) {
-		keyValue.free();
-		UNLOCK( &this->valuesLock );
+	LOCK( &this->unsealed.lock );
+	valuesIt = this->unsealed.values.find( key );
+	if ( valuesIt == this->unsealed.values.end() ) {
+		UNLOCK( &this->unsealed.lock );
 		return false;
 	}
+	keyValue = valuesIt->second;
+	this->unsealed.values.erase( valuesIt );
 
-	metadata = metaIt->second;
+	// Find metadata
+	metadataIt = this->unsealed.metadata.find( key );
+	if ( metadataIt == this->unsealed.metadata.end() ) {
+		keyValue.free();
+		UNLOCK( &this->unsealed.lock );
+		return false;
+	}
+	metadata = metadataIt->second;
+	this->unsealed.metadata.erase( metadataIt );
+
+	// Find from metadataRev
+	bool isFound = false;
+	metadataRevIts = this->unsealed.metadataRev.equal_range( metadata );
+	for ( metadataRevIt = metadataRevIts.first; metadataRevIt != metadataRevIts.second; metadataRevIt++ ) {
+		if ( metadataRevIt->second == key ) {
+			this->unsealed.metadataRev.erase( metadataRevIt );
+			isFound = true;
+			break;
+		}
+	}
+	if ( ! isFound ) printf( "DegradedMap::deleteValue(): Key is NOT found!\n" );
+
+	// Insert into deleted set
+	key.dup();
+	this->unsealed.deleted.insert( key );
+
 	keyValue.free();
-	this->valueMeta.erase( metaIt );
-	UNLOCK( &this->valuesLock );
+
+	UNLOCK( &this->unsealed.lock );
 
 	KeyMetadata keyMetadata;
 	keyMetadata.set( metadata.listId, metadata.stripeId, metadata.chunkId );

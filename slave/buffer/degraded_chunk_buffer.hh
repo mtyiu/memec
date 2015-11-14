@@ -16,9 +16,13 @@ private:
 	 * Store the key-value pairs from unsealed chunks
 	 * Key |-> KeyValue
 	 */
-	std::unordered_map<Key, KeyValue> values;
-	std::unordered_map<Key, Metadata> valueMeta;
-	LOCK_T valuesLock;
+	struct {
+		std::unordered_map<Key, KeyValue> values;
+		std::unordered_map<Key, Metadata> metadata;
+		std::unordered_multimap<Metadata, Key> metadataRev;
+		std::unordered_set<Key> deleted;
+		LOCK_T lock;
+	} unsealed;
 	/**
 	 * Store the cached chunks
 	 * (list ID, stripe ID, chunk ID) |-> Chunk *
