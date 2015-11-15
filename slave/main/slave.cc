@@ -57,10 +57,11 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 	if ( ( ! this->config.global.parse( path ) ) ||
 	     ( ! this->config.slave.merge( this->config.global ) ) ||
 	     ( ! this->config.slave.parse( path ) ) ||
-	     ( ! this->config.slave.override( options ) ) ||
-	     ( ( mySlaveIndex = this->config.slave.validate( this->config.global.slaves ) ) == -1 ) ) {
+	     ( ! this->config.slave.override( options ) )
+	) {
 		return false;
 	}
+	mySlaveIndex = this->config.slave.validate( this->config.global.slaves );
 
 	// Initialize modules //
 	/* Socket */
@@ -99,7 +100,7 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 			tmpfd,
 			this->config.global.slaves[ i ],
 			&this->sockets.epoll,
-			i == mySlaveIndex // indicate whether this is a self-socket
+			i == mySlaveIndex && mySlaveIndex != -1 // indicate whether this is a self-socket
 		);
 		this->sockets.slavePeers.set( tmpfd, socket );
 	}
@@ -117,7 +118,8 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 		this->sockets.slavePeers.values
 	);
 	/* Stripe list index */
-	this->stripeListIndex = this->stripeList->list( mySlaveIndex );
+	if ( mySlaveIndex != -1 )
+		this->stripeListIndex = this->stripeList->list( mySlaveIndex );
 	/* Chunk pool */
 	Chunk::init( this->config.global.size.chunk );
 	this->chunkPool = MemoryPool<Chunk>::getInstance();
@@ -134,24 +136,27 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 	this->chunkBuffer.reserve( this->config.global.stripeList.count );
 	for ( uint32_t i = 0; i < this->config.global.stripeList.count; i++ )
 		this->chunkBuffer.push_back( 0 );
-	for ( uint32_t i = 0, size = this->stripeListIndex.size(); i < size; i++ ) {
-		uint32_t listId = this->stripeListIndex[ i ].listId,
-		         stripeId = this->stripeListIndex[ i ].stripeId,
-		         chunkId = this->stripeListIndex[ i ].chunkId;
-		if ( this->stripeListIndex[ i ].isParity ) {
-			this->chunkBuffer[ listId ] = new MixedChunkBuffer(
-				new ParityChunkBuffer(
-					this->config.global.buffer.chunksPerList,
-					listId, stripeId, chunkId
-				)
-			);
-		} else {
-			this->chunkBuffer[ listId ] = new MixedChunkBuffer(
-				new DataChunkBuffer(
-					this->config.global.buffer.chunksPerList,
-					listId, stripeId, chunkId
-				)
-			);
+
+	if ( mySlaveIndex != -1 ) {
+		for ( uint32_t i = 0, size = this->stripeListIndex.size(); i < size; i++ ) {
+			uint32_t listId = this->stripeListIndex[ i ].listId,
+			         stripeId = this->stripeListIndex[ i ].stripeId,
+			         chunkId = this->stripeListIndex[ i ].chunkId;
+			if ( this->stripeListIndex[ i ].isParity ) {
+				this->chunkBuffer[ listId ] = new MixedChunkBuffer(
+					new ParityChunkBuffer(
+						this->config.global.buffer.chunksPerList,
+						listId, stripeId, chunkId
+					)
+				);
+			} else {
+				this->chunkBuffer[ listId ] = new MixedChunkBuffer(
+					new DataChunkBuffer(
+						this->config.global.buffer.chunksPerList,
+						listId, stripeId, chunkId
+					)
+				);
+			}
 		}
 	}
 	// Map //

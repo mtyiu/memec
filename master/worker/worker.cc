@@ -531,10 +531,8 @@ SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId
 	if ( Master::getInstance()->isDegraded( original ) ) {
 		// Perform degraded operation
 		if ( MasterWorker::degradedTargetIsFixed ) {
-			/*
 			if ( ! BasicRemappingScheme::isOverloaded( original ) )
 				return original; // not overloaded
-			*/
 
 			if ( chunkId != 0 )
 				return original;

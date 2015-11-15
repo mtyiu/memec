@@ -16,6 +16,12 @@ void SlaveEvent::announceSlaveConnected( SlaveSocket *socket ) {
 	this->socket = socket;
 }
 
+void SlaveEvent::announceSlaveReconstructed( SlaveSocket *srcSocket, SlaveSocket *dstSocket ) {
+	this->type = SLAVE_EVENT_TYPE_ANNOUNCE_SLAVE_RECONSTRUCTED;
+	this->reconstructed.src = srcSocket;
+	this->reconstructed.dst = dstSocket;
+}
+
 void SlaveEvent::reqSealChunks( SlaveSocket *socket ) {
 	this->type = SLAVE_EVENT_TYPE_REQUEST_SEAL_CHUNKS;
 	this->socket = socket;

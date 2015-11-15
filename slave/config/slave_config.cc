@@ -191,7 +191,7 @@ int SlaveConfig::validate( std::vector<ServerAddr> slaves ) {
 			if ( this->slave.addr == slaves[ i ] )
 				return i;
 		}
-		CFG_PARSE_ERROR( "SlaveConfig", "The assigned address does not match with the global slave list." );
+		__ERROR__( "SlaveConfig", "validate", "The assigned address does not match with the global slave list." );
 	}
 	return -1;
 }

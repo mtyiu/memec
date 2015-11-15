@@ -47,6 +47,7 @@
 #define PROTO_OPCODE_RECOVERY                     0x37
 #define PROTO_OPCODE_SYNC_META                    0x38
 #define PROTO_OPCODE_RELEASE_DEGRADED_LOCKS       0x39
+#define PROTO_OPCODE_SLAVE_RECONSTRUCTED          0x40
 
 // Application <-> Master or Master <-> Slave (0-19) //
 #define PROTO_OPCODE_GET                          0x01
@@ -419,6 +420,12 @@ protected:
 		char *buf, size_t size
 	);
 
+	size_t generateSrcDstAddressHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint32_t srcAddr, uint16_t srcPort,
+		uint32_t dstAddr, uint16_t dstPort
+	);
+
 	//////////////////////////////////////////
 	// Heartbeat & metadata synchronization //
 	//////////////////////////////////////////
@@ -771,6 +778,11 @@ public:
 	//////////////
 	bool parseAddressHeader(
 		struct AddressHeader &header,
+		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
+	bool parseSrcDstAddressHeader(
+		struct AddressHeader &srcHeader,
+		struct AddressHeader &dstHeader,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 	//////////////////////////////////////////

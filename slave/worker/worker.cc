@@ -180,6 +180,9 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 					case PROTO_OPCODE_SLAVE_CONNECTED:
 						this->handleSlaveConnectedMsg( event, buffer.data, buffer.size );
 						break;
+					case PROTO_OPCODE_SLAVE_RECONSTRUCTED:
+						this->handleSlaveReconstructedMsg( event, buffer.data, buffer.size );
+						break;
 					case PROTO_OPCODE_SEAL_CHUNKS:
 						Slave::getInstance()->seal();
 						break;
@@ -1017,6 +1020,60 @@ bool SlaveWorker::handleSlaveConnectedMsg( CoordinatorEvent event, char *buf, si
 
 	// Connect to the slave peer
 	slavePeers->values[ index ]->start();
+
+	return true;
+}
+
+bool SlaveWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *buf, size_t size ) {
+	struct AddressHeader srcHeader, dstHeader;
+	if ( ! this->protocol.parseSrcDstAddressHeader( srcHeader, dstHeader, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleSlaveReconstructedMsg", "Invalid address header." );
+		return false;
+	}
+
+	char srcTmp[ 22 ], dstTmp[ 22 ];
+	Socket::ntoh_ip( srcHeader.addr, srcTmp, 16 );
+	Socket::ntoh_port( srcHeader.port, srcTmp + 16, 6 );
+	Socket::ntoh_ip( dstHeader.addr, dstTmp, 16 );
+	Socket::ntoh_port( dstHeader.port, dstTmp + 16, 6 );
+	// __DEBUG__(
+	// 	YELLOW,
+	__ERROR__(
+		"SlaveWorker", "handleSlaveReconstructedMsg",
+		"Slave: %s:%s is reconstructed at %s:%s.",
+		srcTmp, srcTmp + 16, dstTmp, dstTmp + 16
+	);
+
+	// Find the slave peer socket in the array map
+	int index = -1, sockfd;
+	SlavePeerSocket *s;
+
+	for ( int i = 0, len = slavePeers->size(); i < len; i++ ) {
+		if ( slavePeers->values[ i ]->equal( srcHeader.addr, srcHeader.port ) ) {
+			index = i;
+			break;
+		}
+	}
+	if ( index == -1 ) {
+		__ERROR__( "SlaveWorker", "handleSlaveReconstructedMsg", "The slave is not in the list. Ignoring this slave..." );
+		return false;
+	}
+
+	ServerAddr serverAddr( slavePeers->values[ index ]->identifier, dstHeader.addr, dstHeader.port );
+
+	s = new SlavePeerSocket();
+	s->init(
+		sockfd, serverAddr,
+		&Slave::getInstance()->sockets.epoll,
+		false // self-socket
+	);
+
+	// Update sockfd in the array Map
+	sockfd = s->init();
+	slavePeers->set( sockfd, s );
+
+	// Connect to the slave peer
+	s->start();
 
 	return true;
 }

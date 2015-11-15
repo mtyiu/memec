@@ -181,7 +181,7 @@ char *CoordinatorProtocol::reqSyncRemappingRecord( size_t &size, uint32_t id, st
 		buffer
 	);
 	isLast = ( remapCount == 0 );
-	
+
 	return buffer;
 }
 
@@ -283,6 +283,21 @@ char *CoordinatorProtocol::announceSlaveConnected( size_t &size, uint32_t id, Sl
 		id,
 		addr.addr,
 		addr.port
+	);
+	return this->buffer.send;
+}
+
+char *CoordinatorProtocol::announceSlaveReconstructed( size_t &size, uint32_t id, SlaveSocket *srcSocket, SlaveSocket *dstSocket ) {
+	ServerAddr srcAddr = srcSocket->getServerAddr(), dstAddr = dstSocket->getServerAddr();
+	size = this->generateSrcDstAddressHeader(
+		PROTO_MAGIC_ANNOUNCEMENT,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_SLAVE_RECONSTRUCTED,
+		id,
+		srcAddr.addr,
+		srcAddr.port,
+		dstAddr.addr,
+		dstAddr.port
 	);
 	return this->buffer.send;
 }

@@ -62,6 +62,7 @@ public:
 		EPoll epoll;
 		ArrayMap<int, MasterSocket> masters;
 		ArrayMap<int, SlaveSocket> slaves;
+		ArrayMap<int, SlaveSocket> backupSlaves;
 	} sockets;
 	IDGenerator idGenerator;
 	CoordinatorEventQueue eventQueue;
@@ -71,7 +72,7 @@ public:
 	CoordinatorRemapMsgHandler *remapMsgHandler;
 	RemappingRecordMap remappingRecords;
 	struct {
-		std::unordered_map<Key, RemappingRecord> toSend; 
+		std::unordered_map<Key, RemappingRecord> toSend;
 		LOCK_T toSendLock;
 	} pendingRemappingRecords;
 	PacketPool packetPool;

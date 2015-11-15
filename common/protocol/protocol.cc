@@ -76,6 +76,7 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_OPCODE_RECOVERY:
 		case PROTO_OPCODE_SYNC_META:
 		case PROTO_OPCODE_RELEASE_DEGRADED_LOCKS:
+		case PROTO_OPCODE_SLAVE_RECONSTRUCTED:
 
 		case PROTO_OPCODE_GET:
 		case PROTO_OPCODE_SET:
@@ -164,6 +165,40 @@ bool Protocol::parseAddressHeader( struct AddressHeader &header, char *buf, size
 		header.port,
 		buf, size
 	);
+}
+
+size_t Protocol::generateSrcDstAddressHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t srcAddr, uint16_t srcPort, uint32_t dstAddr, uint16_t dstPort ) {
+	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_ADDRESS_SIZE * 2, id );
+
+	// Already in network-byte order
+	*( ( uint32_t * )( buf     ) ) = srcAddr;
+	*( ( uint16_t * )( buf + 4 ) ) = srcPort;
+	*( ( uint32_t * )( buf + 6 ) ) = dstAddr;
+	*( ( uint16_t * )( buf + 10 ) ) = dstPort;
+
+	bytes += PROTO_ADDRESS_SIZE * 2;
+
+	return bytes;
+}
+
+bool Protocol::parseSrcDstAddressHeader( struct AddressHeader &srcHeader, struct AddressHeader &dstHeader, char *buf, size_t size, size_t offset ) {
+	if ( ! buf || ! size ) {
+		buf = this->buffer.recv;
+		size = this->buffer.size;
+	}
+	bool ret = this->parseAddressHeader(
+		offset,
+		srcHeader.addr,
+		srcHeader.port,
+		buf, size
+	);
+	return ret ? this->parseAddressHeader(
+		offset + PROTO_ADDRESS_SIZE,
+		dstHeader.addr,
+		dstHeader.port,
+		buf, size
+	) : false;
 }
 
 //////////////////////////////////////////

@@ -9,6 +9,7 @@ enum SlaveEventType {
 	SLAVE_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS,
 	SLAVE_EVENT_TYPE_REGISTER_RESPONSE_FAILURE,
 	SLAVE_EVENT_TYPE_ANNOUNCE_SLAVE_CONNECTED,
+	SLAVE_EVENT_TYPE_ANNOUNCE_SLAVE_RECONSTRUCTED,
 	SLAVE_EVENT_TYPE_PENDING,
 	SLAVE_EVENT_TYPE_REQUEST_SEAL_CHUNKS,
 	SLAVE_EVENT_TYPE_REQUEST_FLUSH_CHUNKS,
@@ -22,11 +23,16 @@ public:
 	SlaveEventType type;
 	uint32_t id;
 	SlaveSocket *socket;
+	struct {
+		SlaveSocket *src;
+		SlaveSocket *dst;
+	} reconstructed;
 	bool *sync;
 
 	void pending( SlaveSocket *socket );
 	void resRegister( SlaveSocket *socket, uint32_t id, bool success = true );
 	void announceSlaveConnected( SlaveSocket *socket );
+	void announceSlaveReconstructed( SlaveSocket *srcSocket, SlaveSocket *dstSocket );
 	void reqSealChunks( SlaveSocket *socket );
 	void reqFlushChunks( SlaveSocket *socket );
 	void reqSyncMeta( SlaveSocket *socket, bool *sync );

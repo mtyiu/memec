@@ -183,7 +183,7 @@ bool MasterRemapMsgHandler::removeAliveSlave( struct sockaddr_in slave ) {
 }
 
 bool MasterRemapMsgHandler::useRemappingFlow( struct sockaddr_in slave ) {
-	if ( this->slavesStatus.count( slave ) == 0 ) 
+	if ( this->slavesStatus.count( slave ) == 0 )
 		return false;
 
 	switch ( this->slavesStatus[ slave ] ) {
@@ -199,7 +199,7 @@ bool MasterRemapMsgHandler::useRemappingFlow( struct sockaddr_in slave ) {
 }
 
 bool MasterRemapMsgHandler::allowRemapping( struct sockaddr_in slave ) {
-	if ( this->slavesStatus.count( slave ) == 0 ) 
+	if ( this->slavesStatus.count( slave ) == 0 )
 		return false;
 
 	switch ( this->slavesStatus[ slave ] ) {
@@ -253,7 +253,7 @@ bool MasterRemapMsgHandler::ackRemap( struct sockaddr_in *slave ) {
 			if ( this->checkAckRemapForSlave( s.first ) )
 				slavesToAck.push_back( s.first );
 		}
-		if ( ! slavesToAck.empty() ) 
+		if ( ! slavesToAck.empty() )
 			sendStatusToCoordinator( slavesToAck );
 	}
 	UNLOCK( &this->aliveSlavesLock );

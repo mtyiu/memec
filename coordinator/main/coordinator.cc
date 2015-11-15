@@ -473,7 +473,7 @@ void Coordinator::syncRemappingRecords( LOCK_T *lock, std::map<struct sockaddr_i
 	CoordinatorEvent event;
 	event.syncRemappingRecords( lock, counter, done );
 	this->eventQueue.insert( event );
-} 
+}
 
 double Coordinator::getElapsedTime() {
 	return get_elapsed_time( this->startTime );
@@ -502,6 +502,13 @@ void Coordinator::debug( FILE *f ) {
 	for ( i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
 		fprintf( f, "%d. ", i + 1 );
 		this->sockets.slaves[ i ]->print( f );
+	}
+	if ( len == 0 ) fprintf( f, "(None)\n" );
+
+	fprintf( f, "\nBackup slave sockets\n-------------\n" );
+	for ( i = 0, len = this->sockets.backupSlaves.size(); i < len; i++ ) {
+		fprintf( f, "%d. ", i + 1 );
+		this->sockets.backupSlaves[ i ]->print( f );
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
 

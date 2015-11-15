@@ -74,6 +74,7 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 		} else {
 			MasterSocket *masterSocket = coordinator->sockets.masters.get( fd );
 			SlaveSocket *slaveSocket = masterSocket ? 0 : coordinator->sockets.slaves.get( fd );
+			slaveSocket = slaveSocket ? slaveSocket : coordinator->sockets.backupSlaves.get( fd );
 			if ( masterSocket ) {
 				masterSocket->stop();
 			} else if ( slaveSocket ) {
@@ -159,10 +160,24 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 							event.announceSlaveConnected( s );
 							coordinator->eventQueue.insert( event );
 						} else {
-							__ERROR__( "CoordinatorSocket", "handler", "Unexpected registration from slave." );
+							// Treat it as backup slaves
+							ServerAddr serverAddr( "backup", addressHeader.addr, addressHeader.port );
+							s = new SlaveSocket();
+							s->init( fd, serverAddr, socket->epoll );
+							s->setRecvFd( fd, addr );
+							coordinator->sockets.backupSlaves.set( fd, s );
+
 							socket->sockets.removeAt( index );
-							::close( fd );
-							return false;
+							socket->done( fd );
+
+							SlaveEvent event;
+							event.resRegister( s, header.id );
+							coordinator->eventQueue.insert( event );
+
+							// __ERROR__( "CoordinatorSocket", "handler", "Unexpected registration from slave." );
+							// socket->sockets.removeAt( index );
+							// ::close( fd );
+							// return false;
 						}
 					} else {
 						::close( fd );
@@ -181,6 +196,7 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 		} else {
 			MasterSocket *masterSocket = coordinator->sockets.masters.get( fd );
 			SlaveSocket *slaveSocket = masterSocket ? 0 : coordinator->sockets.slaves.get( fd );
+			slaveSocket = slaveSocket ? slaveSocket : coordinator->sockets.backupSlaves.get( fd );
 			if ( masterSocket ) {
 				MasterEvent event;
 				event.pending( masterSocket );
@@ -190,7 +206,7 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 				event.pending( slaveSocket );
 				coordinator->eventQueue.insert( event );
 			} else {
-				__ERROR__( "CoordinatorSocket", "handler", "Unknown socket." );
+				__ERROR__( "CoordinatorSocket", "handler", "Unknown socket (fd = %d).", fd );
 				return false;
 			}
 		}

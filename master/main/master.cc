@@ -582,13 +582,11 @@ bool Master::setDebugFlag( char *input ) {
 bool Master::isDegraded( SlaveSocket *socket ) {
 	return (
 		( this->debugFlags.isDegraded )
-		/*
 		||
 		(
-			// this->remapMsgHandler.useRemappingFlow() &&
+			this->remapMsgHandler.useRemappingFlow( socket->getAddr() ) &&
 			! this->config.master.degraded.disabled
 		)
-		*/
 	);
 }
 
@@ -816,7 +814,7 @@ void Master::printPending( FILE *f ) {
 		fprintf(
 			f,
 			"[REMAP] %s:%hu Normal: %u; Locking only: %u; Remapping: %u\n",
-			buf, 
+			buf,
 			ntohs( this->sockets.slaves.values[ i ]->getAddr().sin_port ),
 			this->sockets.slaves.values[ i ]->counter.getNormal(),
 			this->sockets.slaves.values[ i ]->counter.getLockOnly(),

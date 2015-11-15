@@ -68,6 +68,17 @@ bool SlavePeerSocket::start() {
 	return false;
 }
 
+void SlavePeerSocket::replace( uint32_t addr, uint16_t port ) {
+	this->received = false;
+	this->self = false;
+
+	this->mode = SOCKET_MODE_UNDEFINED;
+	this->connected = false;
+
+	this->addr.sin_port = port;
+	this->addr.sin_addr.s_addr = addr;
+}
+
 bool SlavePeerSocket::ready() {
 	return this->self || ( Socket::ready() );
 }

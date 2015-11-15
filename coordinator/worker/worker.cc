@@ -400,6 +400,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			isSend = false;
 			break;
 		case SLAVE_EVENT_TYPE_ANNOUNCE_SLAVE_CONNECTED:
+		case SLAVE_EVENT_TYPE_ANNOUNCE_SLAVE_RECONSTRUCTED:
 			isSend = false;
 			break;
 		case SLAVE_EVENT_TYPE_DISCONNECT:
@@ -427,6 +428,27 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 		}
 		// notify the remap message handler of the new slave
 		struct sockaddr_in slaveAddr = event.socket->getAddr();
+		if ( Coordinator::getInstance()->remapMsgHandler )
+			Coordinator::getInstance()->remapMsgHandler->addAliveSlave( slaveAddr );
+		UNLOCK( &slaves.lock );
+	} else if ( event.type == SLAVE_EVENT_TYPE_ANNOUNCE_SLAVE_RECONSTRUCTED ) {
+		ArrayMap<int, SlaveSocket> &slaves = Coordinator::getInstance()->sockets.slaves;
+		uint32_t requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
+
+		buffer.data = this->protocol.announceSlaveReconstructed( buffer.size, requestId, event.reconstructed.src, event.reconstructed.dst );
+
+		LOCK( &slaves.lock );
+		for ( uint32_t i = 0; i < slaves.size(); i++ ) {
+			SlaveSocket *slave = slaves.values[ i ];
+			if ( event.socket->equal( slave ) || ! slave->ready() )
+				continue; // No need to tell the new socket
+
+			ret = slave->send( buffer.data, buffer.size, connected );
+			if ( ret != ( ssize_t ) buffer.size )
+				__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+		}
+		// notify the remap message handler of the new slave
+		struct sockaddr_in slaveAddr = event.reconstructed.dst->getAddr();
 		if ( Coordinator::getInstance()->remapMsgHandler )
 			Coordinator::getInstance()->remapMsgHandler->addAliveSlave( slaveAddr );
 		UNLOCK( &slaves.lock );
@@ -653,6 +675,22 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 		__ERROR__( "CoordinatorWorker", "triggerRecovery", "The disconnected server does not exist in the consistent hash ring.\n" );
 		return false;
 	}
+
+	// Choose a backup slave socket for reconstructing the failed node
+	ArrayMap<int, SlaveSocket> &backupSlaves = Coordinator::getInstance()->sockets.backupSlaves;
+	if ( backupSlaves.size() == 0 ) {
+		__ERROR__( "CoordinatorWorker", "triggerRecovery", "No backup node is available!" );
+		return false;
+	}
+	SlaveSocket *backupSlaveSocket = backupSlaves[ 0 ];
+	// backupSlaves.removeAt( 0 );
+
+	// Announce to the slaves
+	SlaveEvent slaveEvent;
+	slaveEvent.announceSlaveReconstructed( socket, backupSlaveSocket );
+	CoordinatorWorker::eventQueue->insert( slaveEvent );
+
+	return false;
 
 	uint32_t numLostChunks = 0;
 	std::set<Metadata> unsealedChunks;
