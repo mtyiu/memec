@@ -798,7 +798,6 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		}
 	}
 
-	MasterWorker::slaveSockets->get( sockfd )->counter.decreaseNormal();
 	Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
 
 	return true;
@@ -1432,6 +1431,8 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 		applicationEvent.resSet( ( ApplicationSocket * ) key.ptr, pid.id, key, success );
 		MasterWorker::eventQueue->insert( applicationEvent );
 	}
+	int sockfd = event.socket->getSocket();
+	MasterWorker::slaveSockets->get( sockfd )->counter.decreaseNormal();
 	return true;
 }
 

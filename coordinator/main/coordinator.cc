@@ -30,8 +30,8 @@ void Coordinator::switchPhase( std::set<struct sockaddr_in> prevOverloadedSlaves
 	MasterEvent event;
 	LOCK( &this->overloadedSlaves.lock );
 
-	uint32_t startThreshold = this->config.global.remap.startThreshold;
-	uint32_t stopThreshold = this->config.global.remap.stopThreshold;
+	double startThreshold = this->config.global.remap.startThreshold;
+	double stopThreshold = this->config.global.remap.stopThreshold;
 	uint32_t totalSlaveCount = this->sockets.slaves.size();
 	uint32_t curOverloadedSlaveCount = this->overloadedSlaves.slaveSet.size();
 	uint32_t prevOverloadedSlaveCount = prevOverloadedSlaves.size();
