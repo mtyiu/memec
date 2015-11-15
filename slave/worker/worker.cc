@@ -2162,9 +2162,10 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, bool isSealed, ch
 	} else {
 		if ( metadata.chunkId < SlaveWorker::dataChunkCount ) {
 			if ( isSealed ) {
+				uint32_t originalChunkSize;
 				// Delete all keys in the chunk from the map
 				offset = 0;
-				chunkSize = chunk->getSize();
+				originalChunkSize = chunkSize = chunk->getSize();
 				while ( offset < chunkSize ) {
 					keyValue = chunk->getKeyValue( offset );
 					keyValue.deserialize( key.data, key.size, valueStr, valueSize );
@@ -2207,6 +2208,17 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, bool isSealed, ch
 
 					offset += objSize;
 				}
+
+				// Re-insert into data chunk buffer
+				assert( chunkBufferIndex == -1 );
+				if ( ! chunkBuffer->reInsert( this, chunk, originalChunkSize - chunkSize, false, false ) ) {
+					// The chunk is compacted before. Need to seal the chunk first
+					// Seal from chunk->lastDelPos
+					if ( chunk->lastDelPos < chunk->getSize() ) {
+						// Only issue seal chunk request when new key-value pairs are received
+						this->issueSealChunkRequest( chunk, chunk->lastDelPos );
+					}
+				}
 			} else {
 				struct KeyHeader keyHeader;
 				struct KeyValueHeader keyValueHeader;
@@ -2218,12 +2230,14 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, bool isSealed, ch
 						__ERROR__( "SlaveWorker", "handleSetChunkRequest", "Invalid key in deleted key list." );
 						break;
 					}
-
-					printf( "Deleting %.*s...\n", keyHeader.keySize, keyHeader.key );
+					key.set( keyHeader.keySize, keyHeader.key );
 
 					// Update key map and chunk
-					// SlaveWorker::map->deleteKey( key, PROTO_OPCODE_DELETE, keyMetadata, false, false, false );
-					// chunk->deleteKeyValue( keys, keyMetadata );
+					if ( SlaveWorker::map->deleteKey( key, PROTO_OPCODE_DELETE, keyMetadata, false, false, false ) ) {
+						chunk->deleteKeyValue( keys, keyMetadata );
+					} else {
+						__ERROR__( "SlaveWorker", "handleSetChunkRequest", "The deleted key does not exist." );
+					}
 
 					offset += PROTO_KEY_SIZE + keyHeader.keySize;
 				}

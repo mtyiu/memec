@@ -218,7 +218,7 @@ bool DataChunkBuffer::reInsert( SlaveWorker *worker, Chunk *chunk, uint32_t size
 	for ( i = 0; i < this->count; i++ ) {
 		if ( ( c = this->reInsertedChunks[ i ] ) ) {
 			if ( c == chunk ) {
-				// No need to insert
+				// No need to insert as the chunk is already re-inserted
 				ret = false;
 				goto reInsertExit;
 			} else if ( ChunkBuffer::capacity - c->getSize() < min ) {

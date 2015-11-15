@@ -189,8 +189,6 @@ re_insert:
 
 	KeyMetadata keyMetadata;
 	keyMetadata.set( metadata.listId, metadata.stripeId, metadata.chunkId );
-	if ( metadata.chunkId > 4 )
-		printf( "metadata.chunkId = %u\n", metadata.chunkId );
 
 	return this->slaveMap->insertOpMetadata( opcode, key, keyMetadata );
 }

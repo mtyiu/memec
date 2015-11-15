@@ -47,6 +47,7 @@ void Chunk::loadFromSetChunkRequest( char *data, uint32_t size ) {
 #ifdef USE_CHUNK_LOCK
 	LOCK( &this->lock );
 #endif
+	this->count = 0;
 	this->size = size;
 	memcpy( this->data, data, size );
 	if ( Chunk::capacity > size )

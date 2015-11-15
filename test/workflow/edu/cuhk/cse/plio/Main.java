@@ -98,7 +98,6 @@ public class Main implements Runnable {
 				rand = rand == 0 ? 1 : rand;
 				if ( size == 0 )
 					break;
-				rand = rand == 3 ? 2 : rand;
 			}
 			// ^^^^^ For testing degraded operations (End) ^^^^^
 
