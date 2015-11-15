@@ -425,6 +425,19 @@ char *SlaveProtocol::reqSetChunk( size_t &size, uint32_t id, uint32_t listId, ui
 	return this->buffer.send;
 }
 
+char *SlaveProtocol::reqSetChunk( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, std::unordered_map<Key, KeyValue> *values, std::unordered_multimap<Metadata, Key> *metadataRev, std::unordered_set<Key> *deleted, LOCK_T *lock, bool &isCompleted ) {
+	size = this->generateChunkKeyValueHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_SET_CHUNK_UNSEALED,
+		id,
+		listId, stripeId, chunkId,
+		values, metadataRev, deleted, lock,
+		isCompleted
+	);
+	return this->buffer.send;
+}
+
 char *SlaveProtocol::resSetChunk( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) {
 	size = this->generateChunkHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,

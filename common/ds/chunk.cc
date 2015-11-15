@@ -229,9 +229,9 @@ uint32_t Chunk::deleteKeyValue( std::unordered_map<Key, KeyMetadata> *keys, KeyM
 	char *startPtr, *src, *dst;
 	std::unordered_map<Key, KeyMetadata>::iterator it;
 
-	#ifdef USE_CHUNK_LOCK
-		LOCK( &this->lock );
-	#endif
+#ifdef USE_CHUNK_LOCK
+	LOCK( &this->lock );
+#endif
 
 	startPtr = this->data + metadata.offset;
 

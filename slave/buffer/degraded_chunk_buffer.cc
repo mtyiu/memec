@@ -136,20 +136,16 @@ bool DegradedMap::deleteKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata, 
 bool DegradedMap::insertValue( KeyValue keyValue, Metadata metadata ) { // KeyValue's data is allocated by malloc()
 	Key key = keyValue.key();
 	std::pair<Key, KeyValue> p1( key, keyValue );
-	std::pair<Key, Metadata> p2( key, metadata );
-	std::pair<Metadata, Key> p3( metadata, key );
-	std::pair<std::unordered_map<Key, KeyValue>::iterator, bool> ret1;
-	std::pair<std::unordered_map<Key, Metadata>::iterator, bool> ret2;
+	std::pair<Metadata, Key> p2( metadata, key );
+	std::pair<std::unordered_map<Key, KeyValue>::iterator, bool> ret;
 
 	LOCK( &this->unsealed.lock );
-	ret1 = this->unsealed.values.insert( p1 );
-	if ( ret1.second ) {
-		ret2 = this->unsealed.metadata.insert( p2 );
-		this->unsealed.metadataRev.insert( p3 );
-	}
+	ret = this->unsealed.values.insert( p1 );
+	if ( ret.second )
+		this->unsealed.metadataRev.insert( p2 );
 	UNLOCK( &this->unsealed.lock );
 
-	return ret1.second && ret2.second;
+	return ret.second;
 }
 
 bool DegradedMap::deleteValue( Key key, Metadata metadata, uint8_t opcode ) {
@@ -169,15 +165,6 @@ bool DegradedMap::deleteValue( Key key, Metadata metadata, uint8_t opcode ) {
 		goto re_insert;
 	keyValue = valuesIt->second;
 	this->unsealed.values.erase( valuesIt );
-
-	// Find metadata
-	metadataIt = this->unsealed.metadata.find( key );
-	if ( metadataIt == this->unsealed.metadata.end() ) {
-		keyValue.free();
-		goto re_insert;
-	}
-	metadata = metadataIt->second;
-	this->unsealed.metadata.erase( metadataIt );
 
 	// Find from metadataRev
 	metadataRevIts = this->unsealed.metadataRev.equal_range( metadata );

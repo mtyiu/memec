@@ -74,6 +74,7 @@
 #define PROTO_OPCODE_DELETE_CHUNK                 0x53
 #define PROTO_OPCODE_GET_CHUNK                    0x54
 #define PROTO_OPCODE_SET_CHUNK                    0x55
+#define PROTO_OPCODE_SET_CHUNK_UNSEALED           0x56
 
 /*********************
  * Key size (1 byte) *
@@ -90,6 +91,7 @@
 #include <stdint.h>
 #include <arpa/inet.h>
 #include "../ds/key.hh"
+#include "../ds/key_value.hh"
 #include "../ds/metadata.hh"
 #include "../lock/lock.hh"
 
@@ -377,6 +379,16 @@ struct ChunkDataHeader {
 	char *data;
 };
 
+#define PROTO_CHUNK_KEY_VALUE_SIZE 21
+struct ChunkKeyValueHeader {
+	uint32_t listId;
+	uint32_t stripeId;
+	uint32_t chunkId;
+	uint32_t deleted;
+	uint32_t count;
+	bool isCompleted;
+};
+
 #define PROTO_BUF_MIN_SIZE		65536
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -432,7 +444,7 @@ protected:
 
 	size_t generateRemappingRecordMessage(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
-		LOCK_T *lock, std::unordered_map<Key, RemappingRecord> &remapRecords, 
+		LOCK_T *lock, std::unordered_map<Key, RemappingRecord> &remapRecords,
 		size_t &remapCount, char *buf = 0
 	);
 	bool parseRemappingRecordHeader(
@@ -721,6 +733,21 @@ protected:
 		char *buf, size_t size
 	);
 
+	size_t generateChunkKeyValueHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		std::unordered_map<Key, KeyValue> *values,
+		std::unordered_multimap<Metadata, Key> *metadataRev,
+		std::unordered_set<Key> *deleted,
+		LOCK_T *lock,
+		bool &isCompleted
+	);
+	bool parseChunkKeyValueHeader(
+		size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
+		uint32_t &deleted, uint32_t &count, bool &isCompleted, char *&dataPtr,
+		char *buf, size_t size
+	);
+
 public:
 	struct {
 		size_t size;
@@ -869,6 +896,10 @@ public:
 	);
 	bool parseChunkDataHeader(
 		struct ChunkDataHeader &header,
+		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
+	bool parseChunkKeyValueHeader(
+		struct ChunkKeyValueHeader &header, char *&ptr,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 };

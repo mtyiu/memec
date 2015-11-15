@@ -13,17 +13,6 @@ private:
 	std::unordered_map<Key, KeyMetadata> keys;
 	LOCK_T keysLock;
 	/**
-	 * Store the key-value pairs from unsealed chunks
-	 * Key |-> KeyValue
-	 */
-	struct {
-		std::unordered_map<Key, KeyValue> values;
-		std::unordered_map<Key, Metadata> metadata;
-		std::unordered_multimap<Metadata, Key> metadataRev;
-		std::unordered_set<Key> deleted;
-		LOCK_T lock;
-	} unsealed;
-	/**
 	 * Store the cached chunks
 	 * (list ID, stripe ID, chunk ID) |-> Chunk *
 	 */
@@ -47,6 +36,17 @@ private:
 	Map *slaveMap;
 
 public:
+	/**
+	 * Store the key-value pairs from unsealed chunks
+	 * Key |-> KeyValue
+	 */
+	struct {
+		std::unordered_map<Key, KeyValue> values;
+		std::unordered_multimap<Metadata, Key> metadataRev;
+		std::unordered_set<Key> deleted;
+		LOCK_T lock;
+	} unsealed;
+	
 	DegradedMap();
 
 	void init( Map *map );
