@@ -611,11 +611,11 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 
 	uint32_t listId, chunkId, newChunkId;
 	bool connected, useDegradedMode;
-	SlaveSocket *socket, *original;
+	SlaveSocket *socket, *target;
 
 	socket = this->getSlaves(
 		header.key, header.keySize,
-		listId, chunkId, newChunkId, useDegradedMode, original
+		listId, chunkId, newChunkId, useDegradedMode, target
 	);
 	if ( ! socket ) {
 		Key key;
@@ -632,7 +632,7 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 	Key key;
 	ssize_t sentBytes;
 	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
-	int sockfd = socket->getSocket();
+	int sockfd = target->getSocket();
 
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
 	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_GET, event.id, ( void * ) event.socket, key ) ) {
@@ -929,7 +929,7 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 	Key key;
 	ssize_t sentBytes;
 	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
-	int sockfd = socket->getSocket();
+	int sockfd = target->getSocket();
 
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
 	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_DEL, event.id, ( void * ) event.socket, key ) ) {
@@ -1129,7 +1129,7 @@ bool MasterWorker::sendDegradedLockRequest( uint32_t parentId, uint8_t opcode, u
 }
 
 bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool success, char *buf, size_t size ) {
-	SlaveSocket *socket = 0;
+	SlaveSocket *socket = 0, *original;
 	int sockfd;
 	struct DegradedLockResHeader header;
 	if ( ! this->protocol.parseDegradedLockResHeader( header, buf, size ) ) {
@@ -1147,19 +1147,36 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 				header.srcListId, header.srcStripeId, header.srcChunkId,
 				header.dstListId, header.dstChunkId
 			);
+			original = this->getSlaves( header.srcListId, header.srcChunkId );
 			socket = this->getSlaves( header.dstListId, header.dstChunkId );
 			break;
 		case PROTO_DEGRADED_LOCK_RES_NOT_LOCKED:
+			__DEBUG__(
+				BLUE, "MasterWorker", "handleDegradedLockResponse",
+				"[Not Locked] Key: %.*s (key size = %u); (%u, %u)",
+				( int ) header.keySize, header.key, header.keySize,
+				header.srcListId, header.srcChunkId
+			);
+			original = socket = this->getSlaves( header.srcListId, header.srcChunkId );
+			sockfd = socket->getSocket();
+			MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
+			MasterWorker::slaveSockets->get( sockfd )->counter.increaseNormal();
+			Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
+			break;
 		case PROTO_DEGRADED_LOCK_RES_REMAPPED:
 			__DEBUG__(
 				BLUE, "MasterWorker", "handleDegradedLockResponse",
-				"[Not Locked / Remapped] Key: %.*s (key size = %u); (%u, %u)",
+				"[Remapped] Key: %.*s (key size = %u); (%u, %u)",
 				( int ) header.keySize, header.key, header.keySize,
-				header.srcListId, header.srcChunkId
+				header.dstListId, header.dstChunkId
 			);
 			socket = this->getSlaves( header.srcListId, header.srcChunkId );
 			sockfd = socket->getSocket();
 			MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
+			Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
+
+			original = socket = this->getSlaves( header.dstListId, header.dstChunkId );
+			sockfd = socket->getSocket();
 			MasterWorker::slaveSockets->get( sockfd )->counter.increaseNormal();
 			Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
 			break;
@@ -1170,6 +1187,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 				"[Not Fonud] Key: %.*s (key size = %u)",
 				( int ) header.keySize, header.key, header.keySize
 			);
+			original = socket = this->getSlaves( header.srcListId, header.srcChunkId );
 			sockfd = socket->getSocket();
 			MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
 			Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
@@ -1228,7 +1246,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 			}
 
 			// Insert into slave GET pending map
-			key.set( degradedLockData.keySize, degradedLockData.key, ( void * ) socket );
+			key.set( degradedLockData.keySize, degradedLockData.key, ( void * ) original );
 			if ( ! MasterWorker::pending->insertKey( PT_SLAVE_GET, requestId, pid.parentId, ( void * ) socket, key ) ) {
 				__ERROR__( "MasterWorker", "handleDegradedLockResponse", "Cannot insert into slave GET pending map." );
 			}
@@ -1264,7 +1282,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 			}
 
 			// Insert into slave UPDATE pending map
-			keyValueUpdate.set( degradedLockData.keySize, degradedLockData.key, ( void * ) socket );
+			keyValueUpdate.set( degradedLockData.keySize, degradedLockData.key, ( void * ) original );
 			keyValueUpdate.offset = degradedLockData.valueUpdateOffset;
 			keyValueUpdate.length = degradedLockData.valueUpdateSize;
 			if ( ! MasterWorker::pending->insertKeyValueUpdate( PT_SLAVE_UPDATE, requestId, pid.parentId, ( void * ) socket, keyValueUpdate ) ) {
@@ -1299,7 +1317,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 			}
 
 			// Insert into slave DELETE pending map
-			key.set( degradedLockData.keySize, degradedLockData.key, ( void * ) socket );
+			key.set( degradedLockData.keySize, degradedLockData.key, ( void * ) original );
 			if ( ! MasterWorker::pending->insertKey( PT_SLAVE_DEL, requestId, pid.parentId, ( void * ) socket, key ) ) {
 				__ERROR__( "MasterWorker", "handleDegradedLockResponse", "Cannot insert into slave DELETE pending map." );
 			}
@@ -1343,12 +1361,15 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, bool isDeg
 
 	ApplicationEvent applicationEvent;
 	PendingIdentifier pid;
+	SlaveSocket *original;
+	int sockfd;
 
 	if ( ! MasterWorker::pending->eraseKey( PT_SLAVE_GET, event.id, event.socket, &pid, &key, true, true ) ) {
 		__ERROR__( "MasterWorker", "handleGetResponse", "Cannot find a pending slave GET request that matches the response. This message will be discarded (key = %.*s).", key.size, key.data );
 		if ( success ) keyValue.free();
 		return false;
 	}
+	original = ( SlaveSocket * ) key.ptr;
 
 	// Mark the elapse time as latency
 	Master* master = Master::getInstance();
@@ -1383,12 +1404,15 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, bool isDeg
 		return false;
 	}
 
-	int sockfd = event.socket->getSocket();
-	if ( isDegraded )
+	if ( isDegraded ) {
+		sockfd = original->getSocket();
 		MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
-	else
+		Master::getInstance()->remapMsgHandler.ackRemap( original->getAddr() );
+	} else {
+		sockfd = event.socket->getSocket();
 		MasterWorker::slaveSockets->get( sockfd )->counter.decreaseNormal();
-	Master::getInstance()->remapMsgHandler.ackRemap( event.socket->getAddr() );
+		Master::getInstance()->remapMsgHandler.ackRemap( event.socket->getAddr() );
+	}
 
 	if ( success ) {
 		key.free();
@@ -1483,12 +1507,15 @@ bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, bool is
 	KeyValueUpdate keyValueUpdate;
 	ApplicationEvent applicationEvent;
 	PendingIdentifier pid;
+	SlaveSocket *original;
+	int sockfd;
 
 	// Find the cooresponding request
 	if ( ! MasterWorker::pending->eraseKeyValueUpdate( PT_SLAVE_UPDATE, event.id, ( void * ) event.socket, &pid, &keyValueUpdate ) ) {
 		__ERROR__( "MasterWorker", "handleUpdateResponse", "Cannot find a pending slave UPDATE request that matches the response. This message will be discarded. (ID: %u)", event.id );
 		return false;
 	}
+	original = ( SlaveSocket * ) keyValueUpdate.ptr;
 
 	if ( ! MasterWorker::pending->eraseKeyValueUpdate( PT_APPLICATION_UPDATE, pid.parentId, 0, &pid, &keyValueUpdate, true, true, true, header.key ) ) {
 		__ERROR__( "MasterWorker", "handleUpdateResponse", "Cannot find a pending application UPDATE request that matches the response. This message will be discarded." );
@@ -1498,12 +1525,15 @@ bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, bool is
 	// free the updated value
 	delete[] ( ( char * )( keyValueUpdate.ptr ) );
 
-	int sockfd = event.socket->getSocket();
-	if ( isDegraded )
+	if ( isDegraded ) {
+		sockfd = original->getSocket();
 		MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
-	else
+		Master::getInstance()->remapMsgHandler.ackRemap( original->getAddr() );
+	} else {
+		sockfd = event.socket->getSocket();
 		MasterWorker::slaveSockets->get( sockfd )->counter.decreaseNormal();
-	Master::getInstance()->remapMsgHandler.ackRemap( event.socket->getAddr() );
+		Master::getInstance()->remapMsgHandler.ackRemap( event.socket->getAddr() );
+	}
 
 	applicationEvent.resUpdate( ( ApplicationSocket * ) pid.ptr, pid.id, keyValueUpdate, success );
 	MasterWorker::eventQueue->insert( applicationEvent );
@@ -1521,23 +1551,29 @@ bool MasterWorker::handleDeleteResponse( SlaveEvent event, bool success, bool is
 	ApplicationEvent applicationEvent;
 	PendingIdentifier pid;
 	Key key;
+	SlaveSocket *original;
+	int sockfd;
 
 	if ( ! MasterWorker::pending->eraseKey( PT_SLAVE_DEL, event.id, ( void * ) event.socket, &pid, &key ) ) {
 		__ERROR__( "MasterWorker", "handleDeleteResponse", "Cannot find a pending slave DELETE request that matches the response. This message will be discarded." );
 		return false;
 	}
+	original = ( SlaveSocket * ) key.ptr;
 
 	if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_DEL, pid.parentId, 0, &pid, &key, true, true, true, header.key ) ) {
 		__ERROR__( "MasterWorker", "handleDeleteResponse", "Cannot find a pending application DELETE request that matches the response. This message will be discarded." );
 		return false;
 	}
 
-	int sockfd = event.socket->getSocket();
-	if ( isDegraded )
+	if ( isDegraded ) {
+		sockfd = original->getSocket();
 		MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
-	else
+		Master::getInstance()->remapMsgHandler.ackRemap( original->getAddr() );
+	} else {
+		sockfd = event.socket->getSocket();
 		MasterWorker::slaveSockets->get( sockfd )->counter.decreaseNormal();
-	Master::getInstance()->remapMsgHandler.ackRemap( event.socket->getAddr() );
+		Master::getInstance()->remapMsgHandler.ackRemap( event.socket->getAddr() );
+	}
 
 	applicationEvent.resDelete( ( ApplicationSocket * ) key.ptr, pid.id, key, success );
 	MasterWorker::eventQueue->insert( applicationEvent );

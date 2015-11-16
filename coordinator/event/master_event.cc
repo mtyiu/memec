@@ -51,8 +51,8 @@ void MasterEvent::resDegradedLock( MasterSocket *socket, uint32_t id, Key &key, 
 	this->message.degradedLock.isSealed = isSealed;
 }
 
-void MasterEvent::resDegradedLock( MasterSocket *socket, uint32_t id, Key &key, bool isRemapped, uint32_t listId, uint32_t chunkId ) {
-	this->type = isRemapped ? MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_REMAPPED : MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_LOCKED;
+void MasterEvent::resDegradedLock( MasterSocket *socket, uint32_t id, Key &key, bool exist, uint32_t listId, uint32_t chunkId ) {
+	this->type = exist ? MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_LOCKED : MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_FOUND;
 	this->id = id;
 	this->socket = socket;
 	this->message.degradedLock.key = key;
@@ -60,11 +60,15 @@ void MasterEvent::resDegradedLock( MasterSocket *socket, uint32_t id, Key &key, 
 	this->message.degradedLock.srcChunkId = chunkId;
 }
 
-void MasterEvent::resDegradedLock( MasterSocket *socket, uint32_t id, Key &key ) {
-	this->type = MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_FOUND;
+void MasterEvent::resDegradedLock( MasterSocket *socket, uint32_t id, Key &key, uint32_t srcListId, uint32_t srcChunkId, uint32_t dstListId, uint32_t dstChunkId ) {
+	this->type = MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_REMAPPED;
 	this->id = id;
 	this->socket = socket;
 	this->message.degradedLock.key = key;
+	this->message.degradedLock.srcListId = srcListId;
+	this->message.degradedLock.srcChunkId = srcChunkId;
+	this->message.degradedLock.dstListId = dstListId;
+	this->message.degradedLock.dstChunkId = dstChunkId;
 }
 
 void MasterEvent::pending( MasterSocket *socket ) {

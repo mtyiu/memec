@@ -65,7 +65,7 @@ public:
 
 	inline void decreaseDegraded() {
 		LOCK( &this->lock );
-		this->degraded++;
+		this->degraded--;
 		UNLOCK( &this->lock );
 	}
 

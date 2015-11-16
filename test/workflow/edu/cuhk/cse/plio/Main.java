@@ -77,7 +77,7 @@ public class Main implements Runnable {
 			if ( i == numRecords ) {
 				System.out.println( "Sleep for 10 seconds..." );
 				try {
-					Thread.sleep( 10000 );
+					Thread.sleep( 2000 );
 				} catch( InterruptedException e ) {}
 				System.out.println( "Done." );
 			}

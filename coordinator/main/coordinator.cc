@@ -393,11 +393,15 @@ bool Coordinator::stop() {
 		this->sockets.slaves[ i ]->stop();
 	this->sockets.slaves.clear();
 
+	printf( "remapMsgHandler (start)\n" );
+
 	/* Remapping message handler */
 	if ( this->config.global.remap.enabled ) {
 		this->remapMsgHandler->stop();
 		this->remapMsgHandler->quit();
 	}
+
+	printf( "remapMsgHandler (end)\n" );
 
 	/* Loading stats */
 	statsTimer.stop();

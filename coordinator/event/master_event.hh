@@ -83,10 +83,14 @@ public:
 		uint32_t dstListId, uint32_t dstChunkId
 	);
 	void resDegradedLock(
-		MasterSocket *socket, uint32_t id, Key &key, bool isRemapped,
+		MasterSocket *socket, uint32_t id, Key &key, bool exist,
 		uint32_t listId, uint32_t chunkId
 	);
-	void resDegradedLock( MasterSocket *socket, uint32_t id, Key &key );
+	void resDegradedLock(
+		MasterSocket *socket, uint32_t id, Key &key,
+		uint32_t srcListId, uint32_t srcChunkId,
+		uint32_t dstListId, uint32_t dstChunkId
+	);
 	// REMAPPING_SET_LOCK
 	void resRemappingSetLock(
 		MasterSocket *socket, uint32_t id, bool isRemapped,

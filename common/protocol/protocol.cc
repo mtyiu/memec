@@ -1304,13 +1304,13 @@ size_t Protocol::generateDegradedLockResHeader( uint8_t magic, uint8_t to, uint8
 		case PROTO_DEGRADED_LOCK_RES_WAS_LOCKED:
 			length = PROTO_DEGRADED_LOCK_RES_LOCK_SIZE;
 			break;
-		case PROTO_DEGRADED_LOCK_RES_NOT_LOCKED:
 		case PROTO_DEGRADED_LOCK_RES_REMAPPED:
 			length = PROTO_DEGRADED_LOCK_RES_REMAP_SIZE;
 			break;
+		case PROTO_DEGRADED_LOCK_RES_NOT_LOCKED:
 		case PROTO_DEGRADED_LOCK_RES_NOT_EXIST:
 		default:
-			length = 0;
+			length = PROTO_DEGRADED_LOCK_RES_NOT_SIZE;
 			break;
 	}
 	size_t bytes = this->generateHeader(
@@ -1351,29 +1351,37 @@ size_t Protocol::generateDegradedLockResHeader( uint8_t magic, uint8_t to, uint8
 	return bytes;
 }
 
-size_t Protocol::generateDegradedLockResHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, bool isRemapped, uint8_t keySize, char *key, uint32_t listId, uint32_t chunkId ) {
+size_t Protocol::generateDegradedLockResHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, bool exist, uint8_t keySize, char *key, uint32_t listId, uint32_t chunkId ) {
 	char *buf;
 	size_t bytes = this->generateDegradedLockResHeader(
 		magic, to, opcode, id,
-		isRemapped ? PROTO_DEGRADED_LOCK_RES_REMAPPED : PROTO_DEGRADED_LOCK_RES_NOT_LOCKED,
+		exist ? PROTO_DEGRADED_LOCK_RES_NOT_LOCKED : PROTO_DEGRADED_LOCK_RES_NOT_EXIST,
 		keySize, key, buf
 	);
 
 	*( ( uint32_t * )( buf     ) ) = htonl( listId );
 	*( ( uint32_t * )( buf + 4 ) ) = htonl( chunkId );
 
-	bytes += PROTO_DEGRADED_LOCK_RES_REMAP_SIZE;
+	bytes += PROTO_DEGRADED_LOCK_RES_NOT_SIZE;
 
 	return bytes;
 }
 
-size_t Protocol::generateDegradedLockResHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint8_t keySize, char *key ) {
+size_t Protocol::generateDegradedLockResHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint8_t keySize, char *key, uint32_t srcListId, uint32_t srcChunkId, uint32_t dstListId, uint32_t dstChunkId ) {
 	char *buf;
 	size_t bytes = this->generateDegradedLockResHeader(
 		magic, to, opcode, id,
-		PROTO_DEGRADED_LOCK_RES_NOT_EXIST,
+		PROTO_DEGRADED_LOCK_RES_REMAPPED,
 		keySize, key, buf
 	);
+
+	*( ( uint32_t * )( buf      ) ) = htonl( srcListId );
+	*( ( uint32_t * )( buf +  4 ) ) = htonl( srcChunkId );
+	*( ( uint32_t * )( buf +  8 ) ) = htonl( dstListId );
+	*( ( uint32_t * )( buf + 12 ) ) = htonl( dstChunkId );
+
+	bytes += PROTO_DEGRADED_LOCK_RES_REMAP_SIZE;
+
 	return bytes;
 }
 
@@ -1409,12 +1417,25 @@ bool Protocol::parseDegradedLockResHeader( size_t offset, uint32_t &srcListId, u
 }
 
 bool Protocol::parseDegradedLockResHeader( size_t offset, uint32_t &listId, uint32_t &chunkId, char *buf, size_t size ) {
-	if ( size - offset < PROTO_DEGRADED_LOCK_RES_REMAP_SIZE )
+	if ( size - offset < PROTO_DEGRADED_LOCK_RES_NOT_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
 	listId   = ntohl( *( ( uint32_t * )( ptr     ) ) );
 	chunkId  = ntohl( *( ( uint32_t * )( ptr + 4 ) ) );
+
+	return true;
+}
+
+bool Protocol::parseDegradedLockResHeader( size_t offset, uint32_t &srcListId, uint32_t &srcChunkId, uint32_t &dstListId, uint32_t &dstChunkId, char *buf, size_t size ) {
+	if ( size - offset < PROTO_DEGRADED_LOCK_RES_REMAP_SIZE )
+		return false;
+
+	char *ptr = buf + offset;
+	srcListId   = ntohl( *( ( uint32_t * )( ptr      ) ) );
+	srcChunkId  = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
+	dstListId   = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
+	dstChunkId  = ntohl( *( ( uint32_t * )( ptr + 12 ) ) );
 
 	return true;
 }
@@ -1450,7 +1471,7 @@ bool Protocol::parseDegradedLockResHeader( struct DegradedLockResHeader &header,
 			);
 			break;
 		case PROTO_DEGRADED_LOCK_RES_NOT_LOCKED:
-		case PROTO_DEGRADED_LOCK_RES_REMAPPED:
+		case PROTO_DEGRADED_LOCK_RES_NOT_EXIST:
 			ret = this->parseDegradedLockResHeader(
 				offset,
 				header.srcListId,
@@ -1458,8 +1479,16 @@ bool Protocol::parseDegradedLockResHeader( struct DegradedLockResHeader &header,
 				buf, size
 			);
 			break;
-		case PROTO_DEGRADED_LOCK_RES_NOT_EXIST:
-			return true;
+		case PROTO_DEGRADED_LOCK_RES_REMAPPED:
+			ret = this->parseDegradedLockResHeader(
+				offset,
+				header.srcListId,
+				header.srcChunkId,
+				header.dstListId,
+				header.dstChunkId,
+				buf, size
+			);
+			break;
 		default:
 			return false;
 	}

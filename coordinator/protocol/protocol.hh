@@ -45,13 +45,15 @@ public:
 	);
 	char *resDegradedLock(
 		size_t &size, uint32_t id,
-		bool isRemapped,
 		uint8_t keySize, char *key,
-		uint32_t listId, uint32_t chunkId
+		uint32_t srcListId, uint32_t srcChunkId,
+		uint32_t dstListId, uint32_t dstChunkId
 	);
 	char *resDegradedLock(
 		size_t &size, uint32_t id,
-		uint8_t keySize, char *key
+		bool exist,
+		uint8_t keySize, char *key,
+		uint32_t listId, uint32_t chunkId
 	);
 
 	/* Slave */

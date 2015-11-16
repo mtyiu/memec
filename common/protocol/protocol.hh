@@ -280,13 +280,14 @@ struct DegradedLockReqHeader {
 // Size
 #define PROTO_DEGRADED_LOCK_RES_BASE_SIZE 2
 #define PROTO_DEGRADED_LOCK_RES_LOCK_SIZE 21
-#define PROTO_DEGRADED_LOCK_RES_REMAP_SIZE 8
+#define PROTO_DEGRADED_LOCK_RES_REMAP_SIZE 16
+#define PROTO_DEGRADED_LOCK_RES_NOT_SIZE 8
 // Type
 #define PROTO_DEGRADED_LOCK_RES_IS_LOCKED  1   // Return src* and dst* (same as the client request)
 #define PROTO_DEGRADED_LOCK_RES_WAS_LOCKED 2   // Return src* and dst* (different from the client request)
 #define PROTO_DEGRADED_LOCK_RES_NOT_LOCKED 3   // Return original srcListId and srcChunkId without dst*
-#define PROTO_DEGRADED_LOCK_RES_REMAPPED   4   // Return remapped srcListId and srcChunkId without dst*
-#define PROTO_DEGRADED_LOCK_RES_NOT_EXIST  5   // Return without src* and dst*
+#define PROTO_DEGRADED_LOCK_RES_REMAPPED   4   // Return original srcListId and srcChunkId and remapped dstListId and dstChunkId
+#define PROTO_DEGRADED_LOCK_RES_NOT_EXIST  5   // Return original srcListId and srcChunkId
 struct DegradedLockResHeader {
 	uint8_t type;
 	uint8_t keySize;
@@ -628,13 +629,15 @@ protected:
 	);
 	size_t generateDegradedLockResHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
-		bool isRemapped,
+		bool exist,
 		uint8_t keySize, char *key,
 		uint32_t listId, uint32_t chunkId
 	);
 	size_t generateDegradedLockResHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
-		uint8_t keySize, char *key
+		uint8_t keySize, char *key,
+		uint32_t srcListId, uint32_t srcChunkId,
+		uint32_t dstListId, uint32_t dstChunkId
 	);
 	bool parseDegradedLockResHeader(
 		size_t offset, uint8_t &type,
@@ -650,6 +653,12 @@ protected:
 	bool parseDegradedLockResHeader(
 		size_t offset,
 		uint32_t &listId, uint32_t &chunkId,
+		char *buf, size_t size
+	);
+	bool parseDegradedLockResHeader(
+		size_t offset,
+		uint32_t &srcListId, uint32_t &srcChunkId,
+		uint32_t &dstListId, uint32_t &dstChunkId,
 		char *buf, size_t size
 	);
 

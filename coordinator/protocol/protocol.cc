@@ -200,27 +200,28 @@ char *CoordinatorProtocol::resDegradedLock( size_t &size, uint32_t id, bool isLo
 	return this->buffer.send;
 }
 
-char *CoordinatorProtocol::resDegradedLock( size_t &size, uint32_t id, bool isRemapped, uint8_t keySize, char *key, uint32_t listId, uint32_t chunkId ) {
+char *CoordinatorProtocol::resDegradedLock( size_t &size, uint32_t id, uint8_t keySize, char *key, uint32_t srcListId, uint32_t srcChunkId, uint32_t dstListId, uint32_t dstChunkId ) {
 	size = this->generateDegradedLockResHeader(
 		PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_MASTER,
 		PROTO_OPCODE_DEGRADED_LOCK,
 		id,
-		isRemapped,
 		keySize, key,
-		listId, chunkId
+		srcListId, srcChunkId,
+		dstListId, dstChunkId
 	);
 	return this->buffer.send;
 }
 
-char *CoordinatorProtocol::resDegradedLock( size_t &size, uint32_t id, uint8_t keySize, char *key ) {
+char *CoordinatorProtocol::resDegradedLock( size_t &size, uint32_t id, bool exist, uint8_t keySize, char *key, uint32_t listId, uint32_t chunkId ) {
 	size = this->generateDegradedLockResHeader(
 		PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_MASTER,
 		PROTO_OPCODE_DEGRADED_LOCK,
 		id,
-		keySize,
-		key
+		exist,
+		keySize, key,
+		listId, chunkId
 	);
 	return this->buffer.send;
 }
