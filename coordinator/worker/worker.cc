@@ -202,10 +202,10 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 			buffer.data = this->protocol.resDegradedLock(
 				buffer.size,
 				event.id,
-				event.message.degradedLock.key.size,
-				event.message.degradedLock.key.data,
 				event.type == MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED /* success */,
 				event.message.degradedLock.isSealed,
+				event.message.degradedLock.key.size,
+				event.message.degradedLock.key.data,
 				event.message.degradedLock.srcListId,
 				event.message.degradedLock.srcStripeId,
 				event.message.degradedLock.srcChunkId,
@@ -214,10 +214,12 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 			);
 			isSend = true;
 			break;
+		case MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_LOCKED:
 		case MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_REMAPPED:
 			buffer.data = this->protocol.resDegradedLock(
 				buffer.size,
 				event.id,
+				event.type == MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_REMAPPED /* isRemapped */,
 				event.message.degradedLock.key.size,
 				event.message.degradedLock.key.data,
 				event.message.degradedLock.srcListId,
@@ -900,8 +902,6 @@ bool CoordinatorWorker::handleReleaseDegradedLockRequest( SlaveSocket *socket, b
 	map.degradedLocks.swap( map.releasingDegradedLocks );
 	UNLOCK( &map.degradedLocksLock );
 
-	requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
-
 	// Update pending map
 	CoordinatorWorker::pending->addReleaseDegradedLock( requestId, chunks.size(), done );
 
@@ -910,6 +910,7 @@ bool CoordinatorWorker::handleReleaseDegradedLockRequest( SlaveSocket *socket, b
 		dst = chunksIt->first;
 		dstSocket = CoordinatorWorker::stripeList->get( dst.listId, dst.chunkId );
 
+		requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
 		isCompleted = true;
 		do {
 			if ( ! isCompleted ) // When the loop is not at its first iteration
@@ -971,7 +972,7 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 		if ( remappingRecord.listId != header.srcListId || remappingRecord.chunkId != header.srcChunkId ) {
 			// Reject the degraded operation
 			event.resDegradedLock(
-				event.socket, event.id, key,
+				event.socket, event.id, key, true,
 				remappingRecord.listId, remappingRecord.chunkId
 			);
 			this->dispatch( event );
@@ -990,6 +991,13 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 	if ( ! map->findMetadataByKey( header.key, header.keySize, srcMetadata ) ) {
 		// Key not found
 		event.resDegradedLock( event.socket, event.id, key );
+		ret = false;
+	} else if ( header.srcListId == header.dstListId && header.srcChunkId == header.dstChunkId ) {
+		// No need to lock
+		event.resDegradedLock(
+			event.socket, event.id, key, false,
+			srcMetadata.listId, srcMetadata.chunkId
+		);
 		ret = false;
 	} else {
 		ret = map->insertDegradedLock( srcMetadata, dstMetadata );

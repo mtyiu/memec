@@ -1172,7 +1172,6 @@ bool SlaveWorker::handleReleaseDegradedLockRequest( CoordinatorEvent event, char
 		SlaveWorker::eventQueue->insert( slavePeerEvent );
 	}
 
-	printf( "Sync-ed chunks: %u\n", count );
 	return true;
 }
 
@@ -3232,14 +3231,14 @@ bool SlaveWorker::handleSetChunkResponse( SlavePeerEvent event, bool success, ch
 	if ( chunkRequest.isDegraded ) {
 		// Release degraded lock
 		uint32_t remaining, total;
-		if ( ! SlaveWorker::pending->eraseReleaseDegradedLock( pid.parentId, 1, remaining, total ) ) {
+		if ( ! SlaveWorker::pending->eraseReleaseDegradedLock( pid.parentId, 1, remaining, total, &pid ) ) {
 			__ERROR__( "SlaveWorker", "handleSetChunkResponse", "Cannot find a pending coordinator release degraded lock request that matches the response. The message will be discarded." );
 			return false;
 		}
 		if ( remaining == 0 ) {
 			// Tell the coordinator that all degraded lock is released
 			CoordinatorEvent coordinatorEvent;
-			coordinatorEvent.resReleaseDegradedLock( ( CoordinatorSocket * ) pid.ptr, pid.parentId, total );
+			coordinatorEvent.resReleaseDegradedLock( ( CoordinatorSocket * ) pid.ptr, pid.id, total );
 			SlaveWorker::eventQueue->insert( coordinatorEvent );
 		}
 	} else {
@@ -3251,6 +3250,7 @@ bool SlaveWorker::handleSetChunkResponse( SlavePeerEvent event, bool success, ch
 }
 
 bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t listId, uint32_t stripeId, uint32_t lostChunkId, bool isSealed, uint8_t opcode, uint32_t parentId, Key *key, KeyValueUpdate *keyValueUpdate ) {
+	Key mykey;
 	SlavePeerEvent event;
 	SlavePeerSocket *socket = 0;
 	uint32_t selected = 0;
@@ -3288,10 +3288,13 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 	uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
 	DegradedOp op;
 	op.set( listId, stripeId, lostChunkId, isSealed, opcode, masterSocket );
-	if ( opcode == PROTO_OPCODE_DEGRADED_UPDATE )
+	if ( opcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
 		op.data.keyValueUpdate = *keyValueUpdate;
-	else
+		mykey.set( keyValueUpdate->size, keyValueUpdate->data );
+	} else {
 		op.data.key = *key;
+		mykey.set( key->size, key->data );
+	}
 
 	if ( isSealed || ! socket->self ) {
 		if ( ! SlaveWorker::pending->insertDegradedOp( PT_SLAVE_PEER_DEGRADED_OPS, requestId, parentId, 0, op ) ) {
@@ -3389,11 +3392,10 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 	} else {
 		// Send GET request to surviving parity slave
 		if ( socket->self ) {
-			Key key;
 			KeyValue keyValue;
 			MasterEvent masterEvent;
 
-			bool success = SlaveWorker::chunkBuffer->at( listId )->findValueByKey( key.data, key.size, &keyValue, &key );
+			bool success = SlaveWorker::chunkBuffer->at( listId )->findValueByKey( mykey.data, mykey.size, &keyValue, &mykey );
 			if ( success && opcode != PROTO_OPCODE_DEGRADED_DELETE ) {
 				// Insert into degradedChunkBuffer
 				char *key, *value;
@@ -3419,10 +3421,10 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 						masterEvent.resGet( masterSocket, parentId, keyValue, true );
 					} else {
 						// Return failure to master
-						masterEvent.resGet( masterSocket, parentId, key, true );
+						masterEvent.resGet( masterSocket, parentId, mykey, true );
 					}
-					op.data.key.free();
 					this->dispatch( masterEvent );
+					op.data.key.free();
 					break;
 				case PROTO_OPCODE_DEGRADED_UPDATE:
 					if ( success ) {
@@ -3467,7 +3469,7 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 						);
 					} else {
 						masterEvent.resUpdate(
-							masterSocket, parentId, key,
+							masterSocket, parentId, mykey,
 							keyValueUpdate->offset,
 							keyValueUpdate->length,
 							false, false, true
@@ -3486,20 +3488,20 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 
 						SlaveWorker::map->insertOpMetadata(
 							PROTO_OPCODE_DELETE,
-							key, keyMetadata
+							mykey, keyMetadata
 						);
 
 						uint32_t tmp = 0;
 						SlaveWorker::degradedChunkBuffer->deleteKey(
 							PROTO_OPCODE_DELETE,
-							key.size, key.data,
+							mykey.size, mykey.data,
 							metadata,
 							true /* isSealed */,
 							tmp, 0, 0
 						);
 
 						this->sendModifyChunkRequest(
-							parentId, key.size, key.data,
+							parentId, mykey.size, mykey.data,
 							metadata,
 							// not needed for deleting a key-value pair in an unsealed chunk:
 							0, 0, 0, 0,
@@ -3507,7 +3509,7 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 							false /* isUpdate */
 						);
 					} else {
-						masterEvent.resDelete( masterSocket, parentId, key, false, false, true );
+						masterEvent.resDelete( masterSocket, parentId, mykey, false, false, true );
 						this->dispatch( masterEvent );
 					}
 					op.data.key.free();

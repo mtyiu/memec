@@ -51,8 +51,8 @@ void MasterEvent::resDegradedLock( MasterSocket *socket, uint32_t id, Key &key, 
 	this->message.degradedLock.isSealed = isSealed;
 }
 
-void MasterEvent::resDegradedLock( MasterSocket *socket, uint32_t id, Key &key, uint32_t listId, uint32_t chunkId ) {
-	this->type = MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_REMAPPED;
+void MasterEvent::resDegradedLock( MasterSocket *socket, uint32_t id, Key &key, bool isRemapped, uint32_t listId, uint32_t chunkId ) {
+	this->type = isRemapped ? MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_REMAPPED : MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_LOCKED;
 	this->id = id;
 	this->socket = socket;
 	this->message.degradedLock.key = key;

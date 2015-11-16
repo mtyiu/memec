@@ -628,6 +628,7 @@ protected:
 	);
 	size_t generateDegradedLockResHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		bool isRemapped,
 		uint8_t keySize, char *key,
 		uint32_t listId, uint32_t chunkId
 	);

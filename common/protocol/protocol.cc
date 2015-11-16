@@ -1304,6 +1304,7 @@ size_t Protocol::generateDegradedLockResHeader( uint8_t magic, uint8_t to, uint8
 		case PROTO_DEGRADED_LOCK_RES_WAS_LOCKED:
 			length = PROTO_DEGRADED_LOCK_RES_LOCK_SIZE;
 			break;
+		case PROTO_DEGRADED_LOCK_RES_NOT_LOCKED:
 		case PROTO_DEGRADED_LOCK_RES_REMAPPED:
 			length = PROTO_DEGRADED_LOCK_RES_REMAP_SIZE;
 			break;
@@ -1350,11 +1351,11 @@ size_t Protocol::generateDegradedLockResHeader( uint8_t magic, uint8_t to, uint8
 	return bytes;
 }
 
-size_t Protocol::generateDegradedLockResHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint8_t keySize, char *key, uint32_t listId, uint32_t chunkId ) {
+size_t Protocol::generateDegradedLockResHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, bool isRemapped, uint8_t keySize, char *key, uint32_t listId, uint32_t chunkId ) {
 	char *buf;
 	size_t bytes = this->generateDegradedLockResHeader(
 		magic, to, opcode, id,
-		PROTO_DEGRADED_LOCK_RES_REMAPPED,
+		isRemapped ? PROTO_DEGRADED_LOCK_RES_REMAPPED : PROTO_DEGRADED_LOCK_RES_NOT_LOCKED,
 		keySize, key, buf
 	);
 
@@ -1448,6 +1449,7 @@ bool Protocol::parseDegradedLockResHeader( struct DegradedLockResHeader &header,
 				buf, size
 			);
 			break;
+		case PROTO_DEGRADED_LOCK_RES_NOT_LOCKED:
 		case PROTO_DEGRADED_LOCK_RES_REMAPPED:
 			ret = this->parseDegradedLockResHeader(
 				offset,

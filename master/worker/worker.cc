@@ -846,7 +846,7 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 	KeyValueUpdate keyValueUpdate;
 	ssize_t sentBytes;
 	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
-	int sockfd = socket->getSocket();
+	int sockfd = target->getSocket();
 
 	char* valueUpdate = new char [ header.valueUpdateSize ];
 	memcpy( valueUpdate, header.valueUpdate, header.valueUpdateSize );
@@ -1160,6 +1160,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 			socket = this->getSlaves( header.srcListId, header.srcChunkId );
 			sockfd = socket->getSocket();
 			MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
+			MasterWorker::slaveSockets->get( sockfd )->counter.increaseNormal();
 			Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
 			break;
 		case PROTO_DEGRADED_LOCK_RES_NOT_EXIST:
@@ -1214,13 +1215,14 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 						buffer.size, requestId,
 						degradedLockData.key, degradedLockData.keySize
 					);
+					MasterWorker::pending->recordRequestStartTime( PT_SLAVE_GET, requestId, pid.parentId, ( void * ) socket, socket->getAddr() );
 					break;
 				case PROTO_DEGRADED_LOCK_RES_NOT_EXIST:
 					if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_GET, pid.parentId, 0, &pid, &key, true, true, true, header.key ) ) {
 						__ERROR__( "MasterWorker", "handleDegradedLockResponse", "Cannot find a pending application GET request that matches the response. This message will be discarded (key = %.*s).", header.keySize, header.key );
 						return false;
 					}
-					applicationEvent.resGet( ( ApplicationSocket * ) key.ptr, pid.id, key );
+					applicationEvent.resGet( ( ApplicationSocket * ) key.ptr, pid.parentId, key );
 					MasterWorker::eventQueue->insert( applicationEvent );
 					return true;
 			}
@@ -1256,7 +1258,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 						return false;
 					}
 					delete[] ( ( char * )( keyValueUpdate.ptr ) );
-					applicationEvent.resUpdate( ( ApplicationSocket * ) pid.ptr, pid.id, keyValueUpdate, false );
+					applicationEvent.resUpdate( ( ApplicationSocket * ) pid.ptr, pid.parentId, keyValueUpdate, false );
 					MasterWorker::eventQueue->insert( applicationEvent );
 					return true;
 			}
@@ -1291,7 +1293,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 						__ERROR__( "MasterWorker", "handleDegradedLockResponse", "Cannot find a pending application DELETE request that matches the response. This message will be discarded (key = %.*s).", header.keySize, header.key );
 						return false;
 					}
-					applicationEvent.resDelete( ( ApplicationSocket * ) key.ptr, pid.id, key, false );
+					applicationEvent.resDelete( ( ApplicationSocket * ) key.ptr, pid.parentId, key, false );
 					MasterWorker::eventQueue->insert( applicationEvent );
 					return true;
 			}

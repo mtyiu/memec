@@ -25,6 +25,7 @@ enum MasterEventType {
 	// Degraded operation
 	MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED,
 	MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_WAS_LOCKED,
+	MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_LOCKED,
 	MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_REMAPPED,
 	MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_FOUND,
 	// REMAPPING_SET_LOCK
@@ -82,7 +83,7 @@ public:
 		uint32_t dstListId, uint32_t dstChunkId
 	);
 	void resDegradedLock(
-		MasterSocket *socket, uint32_t id, Key &key,
+		MasterSocket *socket, uint32_t id, Key &key, bool isRemapped,
 		uint32_t listId, uint32_t chunkId
 	);
 	void resDegradedLock( MasterSocket *socket, uint32_t id, Key &key );
@@ -92,7 +93,7 @@ public:
 		Key &key, RemappingRecord &remappingRecord, bool success
 	);
 	// Remapping Records
-	void syncRemappingRecords( 
+	void syncRemappingRecords(
 		MasterSocket *socket, std::vector<Packet*> *packets
 	);
 	// Pending

@@ -239,7 +239,8 @@ public:
 	bool eraseReleaseDegradedLock(
 		uint32_t id, uint32_t count,
 		uint32_t &remaining,
-		uint32_t &total
+		uint32_t &total,
+		PendingIdentifier *pidPtr = 0
 	);
 	bool eraseRemappingRecordKey(
 		PendingType type, uint32_t id, void *ptr = 0,

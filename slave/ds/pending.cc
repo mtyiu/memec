@@ -233,7 +233,7 @@ bool Pending::insertRecovery( uint32_t id, SlavePeerSocket *target, uint32_t lis
 	return ret.second;
 }
 
-bool Pending::eraseReleaseDegradedLock( uint32_t id, uint32_t count, uint32_t &remaining, uint32_t &total ) {
+bool Pending::eraseReleaseDegradedLock( uint32_t id, uint32_t count, uint32_t &remaining, uint32_t &total, PendingIdentifier *pidPtr ) {
 	PendingIdentifier pid( id, id, 0 );
 	std::unordered_map<PendingIdentifier, PendingDegradedLock>::iterator it;
 
@@ -243,6 +243,7 @@ bool Pending::eraseReleaseDegradedLock( uint32_t id, uint32_t count, uint32_t &r
 		UNLOCK( &this->coordinators.releaseDegradedLockLock );
 		return false;
 	}
+	if ( pidPtr ) *pidPtr = it->first;
 	it->second.count -= count;
 	remaining = it->second.count;
 	total = it->second.total;
