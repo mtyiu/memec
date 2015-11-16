@@ -676,25 +676,53 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 		return false;
 	}
 
-	// Choose a backup slave socket for reconstructing the failed node
+	/////////////////////////////////////////////////////////////////////
+	// Choose a backup slave socket for reconstructing the failed node //
+	/////////////////////////////////////////////////////////////////////
+	ArrayMap<int, SlaveSocket> &slaves = Coordinator::getInstance()->sockets.slaves;
 	ArrayMap<int, SlaveSocket> &backupSlaves = Coordinator::getInstance()->sockets.backupSlaves;
+	int fd;
+	SlaveSocket *backupSlaveSocket;
+
+	///////////////////////////////////////////////////////
+	// Choose a backup slave to replace the failed slave //
+	///////////////////////////////////////////////////////
 	if ( backupSlaves.size() == 0 ) {
 		__ERROR__( "CoordinatorWorker", "triggerRecovery", "No backup node is available!" );
 		return false;
 	}
-	SlaveSocket *backupSlaveSocket = backupSlaves[ 0 ];
-	// backupSlaves.removeAt( 0 );
+	backupSlaveSocket = backupSlaves[ 0 ];
+	backupSlaves.removeAt( 0 );
 
-	// Announce to the slaves
+	////////////////////////////
+	// Update SlaveSocket map //
+	////////////////////////////
+	fd = backupSlaveSocket->getSocket();
+	backupSlaveSocket->failed = socket;
+	slaves.set( index, fd, backupSlaveSocket );
+
+	////////////////////////////
+	// Announce to the slaves //
+	////////////////////////////
 	SlaveEvent slaveEvent;
 	slaveEvent.announceSlaveReconstructed( socket, backupSlaveSocket );
 	CoordinatorWorker::eventQueue->insert( slaveEvent );
 
-	return false;
+	////////////////////////////////////////////////////////////////////////////
 
-	uint32_t numLostChunks = 0;
+	uint32_t numLostChunks = 0, listId, stripeId, chunkId, requestId, pos;
 	std::set<Metadata> unsealedChunks;
+	bool connected, isCompleted, isAllCompleted;
+	ssize_t ret;
+	struct {
+		size_t size;
+		char *data;
+	} buffer;
+
+	std::unordered_map<uint32_t, std::vector<uint32_t>> stripeIds;
+	std::unordered_map<uint32_t, std::vector<uint32_t>>::iterator stripeIdsIt;
 	std::unordered_map<uint32_t, SlaveSocket **> sockets;
+
 	std::vector<StripeListIndex> lists = CoordinatorWorker::stripeList->list( ( uint32_t ) index );
 
 	ArrayMap<int, SlaveSocket> &map = Coordinator::getInstance()->sockets.slaves;
@@ -702,30 +730,18 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 	//////////////////////////////////////////////////
 	// Get the SlaveSockets of the surviving slaves //
 	//////////////////////////////////////////////////
-	LOCK( &Map::stripesLock );
 	LOCK( &map.lock );
-	printf( "Slave disconnected! index = %d. Appeared in:\n", index );
 	for ( uint32_t i = 0, size = lists.size(); i < size; i++ ) {
-		printf(
-			"(%u, %u, %s%u)\n",
-			lists[ i ].listId,
-			Map::stripes[ lists[ i ].listId ],
-			lists[ i ].isParity ? "p" : "",
-			lists[ i ].chunkId
-		);
-
-		if ( sockets.find( lists[ i ].listId ) == sockets.end() ) {
+		listId = lists[ i ].listId;
+		if ( sockets.find( listId ) == sockets.end() ) {
 			SlaveSocket **s = new SlaveSocket*[ CoordinatorWorker::chunkCount ];
-
 			CoordinatorWorker::stripeList->get(
-				lists[ i ].listId, s + CoordinatorWorker::dataChunkCount, s
+				listId, s + CoordinatorWorker::dataChunkCount, s
 			);
-
-			sockets[ lists[ i ].listId ] = s;
+			sockets[ listId ] = s;
 		}
 	}
 	UNLOCK( &map.lock );
-	UNLOCK( &Map::stripesLock );
 
 	LOCK( &socket->map.chunksLock );
 	LOCK( &socket->map.keysLock );
@@ -734,26 +750,89 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 	// Distribute the reconstruction tasks to the surviving slaves //
 	/////////////////////////////////////////////////////////////////
 	for ( std::unordered_set<Metadata>::iterator chunksIt = socket->map.chunks.begin(); chunksIt != socket->map.chunks.end(); chunksIt++ ) {
-		// const Metadata &metadata = *chunksIt;
-		// printf( "(%u, %u, %u)\n", metadata.listId, metadata.stripeId, metadata.chunkId );
+		listId = chunksIt->listId;
+		stripeId = chunksIt->stripeId;
+
+		stripeIdsIt = stripeIds.find( listId );
+		if ( stripeIdsIt == stripeIds.end() ) {
+			std::vector<uint32_t> ids;
+			ids.push_back( stripeId );
+			stripeIds[ listId ] = ids;
+		} else {
+			stripeIdsIt->second.push_back( stripeId );
+		}
+		numLostChunks++;
 	}
-	numLostChunks += socket->map.chunks.size();
+	assert( numLostChunks == socket->map.chunks.size() );
+	// Distribute the reconstruction task among the slaves in the same stripe list
+	for ( uint32_t i = 0, size = lists.size(); i < size; i++ ) {
+		uint32_t numSurvivingSlaves = 0;
+		uint32_t numStripePerSlave;
+
+		listId = lists[ i ].listId;
+		chunkId = lists[ i ].chunkId;
+
+		if ( chunkId >= CoordinatorWorker::dataChunkCount ) {
+			LOCK( &Map::stripesLock );
+			// Update stripeIds for parity slave
+			stripeIdsIt = stripeIds.find( listId );
+			if ( stripeIdsIt == stripeIds.end() ) {
+				std::vector<uint32_t> ids;
+				for ( uint32_t j = 0; j < Map::stripes[ listId ]; j++ )
+					ids.push_back( j );
+				stripeIds[ listId ] = ids;
+			} else {
+				for ( uint32_t j = 0; j < Map::stripes[ listId ]; j++ )
+					stripeIdsIt->second.push_back( j );
+			}
+			UNLOCK( &Map::stripesLock );
+		}
+
+		for ( uint32_t j = 0; j < CoordinatorWorker::chunkCount; j++ ) {
+			SlaveSocket *s = sockets[ listId ][ j ];
+			if ( s->ready() && s != backupSlaveSocket )
+				numSurvivingSlaves++;
+		}
+
+		numStripePerSlave = stripeIds[ listId ].size() / numSurvivingSlaves;
+		if ( stripeIds[ listId ].size() % numSurvivingSlaves > 0 )
+			numStripePerSlave++;
+
+		// Distribute the task
+		pos = 0;
+		requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
+		isAllCompleted = true;
+		do {
+			for ( uint32_t j = 0; j < CoordinatorWorker::chunkCount; j++ ) {
+				SlaveSocket *s = sockets[ listId ][ j ];
+				if ( s->ready() && s != backupSlaveSocket ) {
+					buffer.data = this->protocol.reqRecovery(
+						buffer.size,
+						requestId,
+						listId,
+						chunkId,
+						stripeIds[ listId ],
+						pos,
+						numStripePerSlave,
+						isCompleted
+					);
+
+					ret = s->send( buffer.data, buffer.size, connected );
+					if ( ret != ( ssize_t ) buffer.size )
+						__ERROR__( "SlaveWorker", "triggerRecovery", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+
+					isAllCompleted &= isCompleted;
+				}
+			}
+		} while ( ! isAllCompleted );
+
+		printf( "(%u, %u): Number of surviving slaves: %u; number of stripes per slave: %u; total number of stripes: %lu\n", listId, chunkId, numSurvivingSlaves, numStripePerSlave, stripeIds[ listId ].size() );
+	}
 
 	////////////////////////////
 	// Handle unsealed chunks //
 	////////////////////////////
 	// TODO
-	for ( std::unordered_map<Key, Metadata>::iterator keysIt = socket->map.keys.begin(); keysIt != socket->map.keys.end(); keysIt++ ) {
-		const Metadata &metadata = keysIt->second;
-		if (
-			socket->map.chunks.find( metadata ) == socket->map.chunks.end() &&
-			unsealedChunks.find( metadata ) == unsealedChunks.end()
-		) {
-			unsealedChunks.insert( metadata );
-			// printf( "(%u, %u, %u)\n", metadata.listId, metadata.stripeId, metadata.chunkId );
-		}
-	}
-	numLostChunks += unsealedChunks.size();
 
 	UNLOCK( &socket->map.keysLock );
 	UNLOCK( &socket->map.chunksLock );

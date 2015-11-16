@@ -195,6 +195,9 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 					case PROTO_OPCODE_RELEASE_DEGRADED_LOCKS:
 						this->handleReleaseDegradedLockRequest( event, buffer.data, header.length );
 						break;
+					case PROTO_OPCODE_RECOVERY:
+						this->handleRecoveryRequest( event, buffer.data, header.length );
+						break;
 					default:
 						__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from coordinator." );
 						break;
@@ -1045,8 +1048,9 @@ bool SlaveWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *buf
 	);
 
 	// Find the slave peer socket in the array map
-	int index = -1, sockfd;
+	int index = -1, sockfd = -1;
 	SlavePeerSocket *original, *s;
+	bool self = false;
 
 	for ( int i = 0, len = slavePeers->size(); i < len; i++ ) {
 		if ( slavePeers->values[ i ]->equal( srcHeader.addr, srcHeader.port ) ) {
@@ -1062,20 +1066,30 @@ bool SlaveWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *buf
 	original->stop();
 
 	ServerAddr serverAddr( slavePeers->values[ index ]->identifier, dstHeader.addr, dstHeader.port );
+	ServerAddr &me = Slave::getInstance()->config.slave.slave.addr;
+
+	// Check if this is a self-socket
+	self = ( dstHeader.addr == me.addr && dstHeader.port == me.port );
+
 	s = new SlavePeerSocket();
 	s->init(
 		sockfd, serverAddr,
 		&Slave::getInstance()->sockets.epoll,
-		false // self-socket
+		self // self-socket
 	);
 
 	// Update sockfd in the array Map
-	sockfd = s->init();
+	if ( self ) {
+		sockfd = original->getSocket();
+	} else {
+		sockfd = s->init();
+	}
 	slavePeers->set( index, sockfd, s );
 	delete original;
 
 	// Connect to the slave peer
-	s->start();
+	if ( ! self )
+		s->start();
 
 	return true;
 }
@@ -1141,6 +1155,27 @@ bool SlaveWorker::handleReleaseDegradedLockRequest( CoordinatorEvent event, char
 
 	printf( "Sync-ed chunks: %u\n", count );
 	return true;
+}
+
+bool SlaveWorker::handleRecoveryRequest( CoordinatorEvent event, char *buf, size_t size ) {
+	struct RecoveryHeader header;
+	bool ret;
+	if ( ! this->protocol.parseRecoveryHeader( header, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleRecoveryRequest", "Invalid RECOVERY request." );
+		return false;
+	}
+	// __DEBUG__(
+	// 	BLUE,
+	__ERROR__(
+		"SlaveWorker", "handleRecoveryRequest",
+		"[RECOVERY] List ID: %u; chunk ID: %u; number of stripes: %u.",
+		header.listId, header.chunkId, header.numStripes
+	);
+	for ( uint32_t i = 0; i < header.numStripes; i++ ) {
+		// printf( "i (%u/%u): (%u, %u, %u)\n", i, header.numStripes, header.listId, header.stripeIds[ i ], header.chunkId );
+	}
+
+	return false;
 }
 
 bool SlaveWorker::handleGetRequest( MasterEvent event, char *buf, size_t size ) {

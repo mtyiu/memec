@@ -223,6 +223,7 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 	SlaveSocket::setArrayMap( &this->sockets.slaves );
 	this->sockets.masters.reserve( this->config.global.slaves.size() );
 	this->sockets.slaves.reserve( this->config.global.slaves.size() );
+	this->sockets.backupSlaves.needsDelete = false;
 	for ( int i = 0, len = this->config.global.slaves.size(); i < len; i++ ) {
 		SlaveSocket *socket = new SlaveSocket();
 		int tmpfd = - ( i + 1 );

@@ -332,17 +332,13 @@ struct DegradedReleaseHeader {
 //////////////
 // Recovery //
 //////////////
-#define PROTO_RECOVERY_SIZE 26
+#define PROTO_RECOVERY_SIZE 12
 struct RecoveryHeader {
 	uint32_t listId;
-	uint32_t stripeIdFrom;
-	uint32_t stripeIdTo;
 	uint32_t chunkId;
-	uint32_t unsealedChunkCount;
-	uint32_t addr;
-	uint16_t port;
+	uint32_t numStripes;
+	uint32_t *stripeIds;
 };
-// Use ChunkHeader to indicate the lost chunk and the surviving chunks
 
 //////////
 // Seal //
@@ -689,14 +685,16 @@ protected:
 	//////////////
 	size_t generateRecoveryHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
-		uint32_t listId, uint32_t stripeIdFrom, uint32_t stripeIdTo, uint32_t chunkId,
-		uint32_t addr, uint16_t port,
-		std::unordered_set<Metadata> unsealedChunks, char *sendBuf = 0
+		uint32_t listId, uint32_t chunkId,
+		std::vector<uint32_t> &stripeIds,
+		uint32_t &pos,
+		uint32_t numChunks,
+		bool &isCompleted
 	);
 	bool parseRecoveryHeader(
-		size_t offset, uint32_t &listId,
-		uint32_t &stripeIdFrom, uint32_t &stripeIdTo, uint32_t &chunkId,
-		uint32_t &unsealedChunkCount, uint32_t &addr, uint16_t &port,
+		size_t offset,
+		uint32_t &listId, uint32_t &chunkId, uint32_t &numStripes,
+		uint32_t *&stripeIds,
 		char *buf, size_t size
 	);
 
@@ -885,7 +883,7 @@ public:
 	// Recovery //
 	//////////////
 	bool parseRecoveryHeader(
-		struct RecoveryHeader &header, std::unordered_set<Metadata> &unsealedChunks,
+		struct RecoveryHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 	//////////

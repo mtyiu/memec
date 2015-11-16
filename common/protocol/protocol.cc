@@ -1661,87 +1661,76 @@ size_t Protocol::generateDegradedReleaseHeader( uint8_t magic, uint8_t to, uint8
 //////////////
 // Recovery //
 //////////////
-size_t Protocol::generateRecoveryHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeIdFrom, uint32_t stripeIdTo, uint32_t chunkId, uint32_t addr, uint16_t port, std::unordered_set<Metadata> unsealedChunks, char *sendBuf ) {
-	if ( ! sendBuf ) sendBuf = this->buffer.send;
-	char *buf = sendBuf + PROTO_HEADER_SIZE;
+size_t Protocol::generateRecoveryHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t chunkId, std::vector<uint32_t> &stripeIds, uint32_t &pos, uint32_t numChunks, bool &isCompleted ) {
+	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes;
-	uint32_t count = 0;
+	uint32_t count = 0, total = stripeIds.size();
+	uint32_t *tmp, *numStripes;
 
-	buf += PROTO_HEADER_SIZE;
+	isCompleted = true;
+
 	bytes = PROTO_HEADER_SIZE;
 
 	*( ( uint32_t * )( buf      ) ) = htonl( listId );
-	*( ( uint32_t * )( buf +  4 ) ) = htonl( stripeIdFrom );
-	*( ( uint32_t * )( buf +  8 ) ) = htonl( stripeIdTo );
-	*( ( uint32_t * )( buf + 12 ) ) = htonl( chunkId );
-	*( ( uint32_t * )( buf + 20 ) ) = htonl( addr );
-	*( ( uint32_t * )( buf + 24 ) ) = htons( port );
+	*( ( uint32_t * )( buf +  4 ) ) = htonl( chunkId );
+	numStripes = ( uint32_t * )( buf + 8 );
 
 	buf += PROTO_RECOVERY_SIZE;
 	bytes += PROTO_RECOVERY_SIZE;
 
-	std::unordered_set<Metadata>::iterator it = unsealedChunks.begin();
-	while ( bytes + PROTO_CHUNK_SIZE <= this->buffer.size && it != unsealedChunks.end() ) {
-		*( ( uint32_t * )( buf      ) ) = htonl( it->listId );
-		*( ( uint32_t * )( buf +  4 ) ) = htonl( it->stripeId );
-		*( ( uint32_t * )( buf +  8 ) ) = htonl( it->chunkId );
+	tmp = ( uint32_t * ) buf;
+	for ( count = 0; count < numChunks && pos < total; count++, pos++ ) {
+		if ( this->buffer.size >= bytes + 4 ) {
+			tmp[ count ] = htonl( stripeIds[ pos ] );
 
-		buf += PROTO_CHUNK_SIZE;
-		bytes += PROTO_CHUNK_SIZE;
-
-		count++;
-		it++;
+			// buf += 4 * count; (not used anymore)
+			bytes += 4;
+		} else {
+			isCompleted = false;
+			break;
+		}
 	}
-	unsealedChunks.erase( unsealedChunks.begin(), it );
 
-	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, id, sendBuf );
-	*( ( uint32_t * )( sendBuf + PROTO_HEADER_SIZE + 16 ) ) = htonl( count );
+	*numStripes = htonl( count );
+
+	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, id, this->buffer.send );
 
 	return bytes;
 }
 
-bool Protocol::parseRecoveryHeader( size_t offset, uint32_t &listId, uint32_t &stripeIdFrom, uint32_t &stripeIdTo, uint32_t &chunkId, uint32_t &unsealedChunkCount, uint32_t &addr, uint16_t &port, char *buf, size_t size ) {
+bool Protocol::parseRecoveryHeader( size_t offset, uint32_t &listId, uint32_t &chunkId, uint32_t &numStripes, uint32_t *&stripeIds, char *buf, size_t size ) {
 	if ( size - offset < PROTO_RECOVERY_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
-	listId             = ntohl( *( ( uint32_t * )( ptr      ) ) );
-	stripeIdFrom       = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
-	stripeIdTo         = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
-	chunkId            = ntohl( *( ( uint32_t * )( ptr + 12 ) ) );
-	unsealedChunkCount = ntohl( *( ( uint32_t * )( ptr + 16 ) ) );
-	addr               = ntohl( *( ( uint32_t * )( ptr + 20 ) ) );
-	port               = ntohs( *( ( uint32_t * )( ptr + 24 ) ) );
+	listId     = ntohl( *( ( uint32_t * )( ptr     ) ) );
+	chunkId    = ntohl( *( ( uint32_t * )( ptr + 4 ) ) );
+	numStripes = ntohl( *( ( uint32_t * )( ptr + 8 ) ) );
+	stripeIds = ( uint32_t * )( ptr + PROTO_RECOVERY_SIZE );
+
+	if ( size - offset < ( size_t ) PROTO_RECOVERY_SIZE + numStripes * 4 )
+		return false;
+
+	for ( uint32_t i = 0; i < numStripes; i++ ) {
+		stripeIds[ i ] = ntohl( stripeIds[ i ] );
+	}
 
 	return true;
 }
 
-bool Protocol::parseRecoveryHeader( struct RecoveryHeader &header, std::unordered_set<Metadata> &unsealedChunks, char *buf, size_t size, size_t offset ) {
+bool Protocol::parseRecoveryHeader( struct RecoveryHeader &header, char *buf, size_t size, size_t offset ) {
 	if ( ! buf || ! size ) {
 		buf = this->buffer.recv;
 		size = this->buffer.size;
 	}
-	if ( this->parseRecoveryHeader( offset, header.listId, header.stripeIdFrom, header.stripeIdTo, header.chunkId, header.unsealedChunkCount, header.addr, header.port, buf, size ) ) {
-		uint32_t count = 0;
-		offset += PROTO_RECOVERY_SIZE;
-
-		while ( count < header.unsealedChunkCount ) {
-			Metadata metadata;
-			if ( ! this->parseChunkHeader( offset, metadata.listId, metadata.stripeId, metadata.chunkId, buf, size ) )
-				return false;
-			count++;
-			offset += PROTO_CHUNK_SIZE;
-
-			unsealedChunks.insert( metadata );
-
-			if ( offset > size )
-				return false;
-		}
-
-		return true;
-	} else {
-		return false;
-	}
+	return this->parseRecoveryHeader(
+		offset,
+		header.listId,
+		header.chunkId,
+		header.numStripes,
+		header.stripeIds,
+		buf, size
+	);
 }
 
 //////////

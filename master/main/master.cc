@@ -6,7 +6,7 @@
 Master::Master() {
 	this->isRunning = false;
 	/* Set debug flag */
-	this->debugFlags.isDegraded = true;
+	this->debugFlags.isDegraded = false;
 }
 
 void Master::updateSlavesCurrentLoading() {
