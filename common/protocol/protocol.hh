@@ -321,13 +321,18 @@ struct ListStripeKeyHeader {
 };
 
 // For asking slaves to send back the modified reconstructed chunks to the overloaded slave
-#define PROTO_DEGRADED_RELEASE_SIZE 20
-struct DegradedReleaseHeader {
+#define PROTO_DEGRADED_RELEASE_REQ_SIZE 20
+struct DegradedReleaseReqHeader {
 	uint32_t srcListId;
 	uint32_t srcStripeId;
 	uint32_t srcChunkId;
 	uint32_t dstListId;
 	uint32_t dstChunkId;
+};
+
+#define PROTO_DEGRADED_RELEASE_RES_SIZE 4
+struct DegradedReleaseResHeader {
+	uint32_t count;
 };
 
 //////////////
@@ -674,12 +679,22 @@ protected:
 		char *buf, size_t size
 	);
 
-	size_t generateDegradedReleaseHeader(
+	size_t generateDegradedReleaseReqHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
 		std::vector<Metadata> &chunks,
 		bool &isCompleted
 	);
-    #define parseDegradedReleaseHeader parseChunkHeader
+    #define parseDegradedReleaseReqHeader parseChunkHeader
+
+	size_t generateDegradedReleaseResHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint32_t count
+	);
+	bool parseDegradedReleaseResHeader(
+		size_t offset,
+		uint32_t &count,
+		char *buf, size_t size
+	);
 
 	//////////////
 	// Recovery //
@@ -876,8 +891,12 @@ public:
 		struct ListStripeKeyHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
-	bool parseDegradedReleaseHeader(
-		struct DegradedReleaseHeader &header,
+	bool parseDegradedReleaseReqHeader(
+		struct DegradedReleaseReqHeader &header,
+		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
+	bool parseDegradedReleaseResHeader(
+		struct DegradedReleaseResHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 	//////////////

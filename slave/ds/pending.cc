@@ -1,20 +1,6 @@
 #include "pending.hh"
 #include "../../common/util/debug.hh"
 
-bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_map<PendingIdentifier, PendingRecovery> *&map ) {
-	switch( type ) {
-		case PT_COORDINATOR_RECOVERY:
-			lock = &this->coordinators.recoveryLock;
-			map = &this->coordinators.recovery;
-			break;
-		default:
-			lock = 0;
-			map = 0;
-			return false;
-	}
-	return true;
-}
-
 bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, RemappingRecordKey> *&map ) {
 	switch( type ) {
 		case PT_MASTER_REMAPPING_SET:
@@ -214,6 +200,21 @@ DEFINE_PENDING_ERASE_METHOD( eraseChunkUpdate, ChunkUpdate, chunkUpdatePtr )
 #undef DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD
 #undef DEFINE_PENDING_ERASE_METHOD
 
+bool Pending::insertReleaseDegradedLock( uint32_t id, CoordinatorSocket *socket, uint32_t count ) {
+	PendingIdentifier pid( id, id, socket );
+	PendingDegradedLock d;
+	d.count = count;
+	d.total = count;
+	std::pair<PendingIdentifier, PendingDegradedLock> p( pid, d );
+	std::pair<std::unordered_map<PendingIdentifier, PendingDegradedLock>::iterator, bool> ret;
+
+	LOCK( &this->coordinators.releaseDegradedLockLock );
+	ret = this->coordinators.releaseDegradedLock.insert( p );
+	UNLOCK( &this->coordinators.releaseDegradedLockLock );
+
+	return ret.second;
+}
+
 bool Pending::insertRecovery( uint32_t id, SlavePeerSocket *target, uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds ) {
 	PendingIdentifier pid( id, id, target );
 	PendingRecovery r;
@@ -221,43 +222,49 @@ bool Pending::insertRecovery( uint32_t id, SlavePeerSocket *target, uint32_t lis
 	std::pair<PendingIdentifier, PendingRecovery> p( pid, r );
 	std::pair<std::unordered_map<PendingIdentifier, PendingRecovery>::iterator, bool> ret;
 
-	LOCK_T *lock;
-	std::unordered_map<PendingIdentifier, PendingRecovery> *map;
-
 	printf( "insertRecovery(): " );
 	target->printAddress();
 	printf( "\n" );
 
-	if ( ! this->get( PT_COORDINATOR_RECOVERY, lock, map ) )
-		return false;
-
-	LOCK( lock );
-	ret = map->insert( p );
-	UNLOCK( lock );
+	LOCK( &this->coordinators.recoveryLock );
+	ret = this->coordinators.recovery.insert( p );
+	UNLOCK( &this->coordinators.recoveryLock );
 
 	return ret.second;
+}
+
+bool Pending::eraseReleaseDegradedLock( uint32_t id, uint32_t count, uint32_t &remaining, uint32_t &total ) {
+	PendingIdentifier pid( id, id, 0 );
+	std::unordered_map<PendingIdentifier, PendingDegradedLock>::iterator it;
+
+	LOCK( &this->coordinators.releaseDegradedLockLock );
+	it = this->coordinators.releaseDegradedLock.find( pid );
+	if ( it == this->coordinators.releaseDegradedLock.end() ) {
+		UNLOCK( &this->coordinators.releaseDegradedLockLock );
+		return false;
+	}
+	it->second.count -= count;
+	remaining = it->second.count;
+	total = it->second.total;
+	UNLOCK( &this->coordinators.releaseDegradedLockLock );
+
+	return true;
 }
 
 std::unordered_set<uint32_t> *Pending::findRecovery( uint32_t id, SlavePeerSocket *&target, uint32_t &listId, uint32_t &chunkId ) {
 	PendingIdentifier pid( id, id, 0 );
 	std::unordered_map<PendingIdentifier, PendingRecovery>::iterator it;
 
-	LOCK_T *lock;
-	std::unordered_map<PendingIdentifier, PendingRecovery> *map;
-
-	if ( ! this->get( PT_COORDINATOR_RECOVERY, lock, map ) )
-		return 0;
-
-	LOCK( lock );
-	it = map->find( pid );
-	if ( it == map->end() ) {
-		UNLOCK( lock );
+	LOCK( &this->coordinators.recoveryLock );
+	it = this->coordinators.recovery.find( pid );
+	if ( it == this->coordinators.recovery.end() ) {
+		UNLOCK( &this->coordinators.recoveryLock );
 		return 0;
 	}
 	target = ( SlavePeerSocket * ) it->first.ptr;
 	listId = it->second.listId;
 	chunkId = it->second.chunkId;
-	UNLOCK( lock );
+	UNLOCK( &this->coordinators.recoveryLock );
 
 	return &( it->second.stripeIds );
 }

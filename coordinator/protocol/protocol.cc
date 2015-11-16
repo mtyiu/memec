@@ -336,7 +336,7 @@ char *CoordinatorProtocol::reqSyncMeta( size_t &size, uint32_t id ) {
 }
 
 char *CoordinatorProtocol::reqReleaseDegradedLock( size_t &size, uint32_t id, std::vector<Metadata> &chunks, bool &isCompleted ) {
-	size = this->generateDegradedReleaseHeader(
+	size = this->generateDegradedReleaseReqHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_RELEASE_DEGRADED_LOCKS,

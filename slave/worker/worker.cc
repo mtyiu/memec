@@ -140,6 +140,14 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 				SlaveWorker::eventQueue->insert( event );
 		}
 			break;
+		case COORDINATOR_EVENT_TYPE_RELEASE_DEGRADED_LOCK:
+			buffer.data = this->protocol.resReleaseDegradedLock(
+				buffer.size,
+				event.id,
+				event.message.degraded.count
+			);
+			isSend = true;
+			break;
 		case COORDINATOR_EVENT_TYPE_PENDING:
 			isSend = false;
 			break;
@@ -1113,7 +1121,7 @@ bool SlaveWorker::handleReleaseDegradedLockRequest( CoordinatorEvent event, char
 	Chunk *chunk;
 
 	while( size ) {
-		if ( ! this->protocol.parseDegradedReleaseHeader( header, buf, size ) ) {
+		if ( ! this->protocol.parseDegradedReleaseReqHeader( header, buf, size ) ) {
 			__ERROR__( "SlaveWorker", "handleReleaseDegradedLockRequest", "Invalid DEGRADED_RELEASE request." );
 			return false;
 		}
@@ -1122,13 +1130,17 @@ bool SlaveWorker::handleReleaseDegradedLockRequest( CoordinatorEvent event, char
 			"[DEGRADED_RELEASE] (%u, %u, %u) (remaining = %lu).",
 			header.listId, header.stripeId, header.chunkId
 		);
-		buf += PROTO_DEGRADED_RELEASE_SIZE;
-		size -= PROTO_DEGRADED_RELEASE_SIZE;
+		buf += PROTO_DEGRADED_RELEASE_REQ_SIZE;
+		size -= PROTO_DEGRADED_RELEASE_REQ_SIZE;
 
 		metadata.set( header.listId, header.stripeId, header.chunkId );
 		chunks.push_back( metadata );
 
 		count++;
+	}
+
+	if ( ! SlaveWorker::pending->insertReleaseDegradedLock( event.id, event.socket, count ) ) {
+		__ERROR__( "SlaveWorker", "handleReleaseDegradedLockRequest", "Cannot insert into pending release degraded lock map." );
 	}
 
 	for ( size_t i = 0, len = chunks.size(); i < len; i++ ) {
@@ -3205,6 +3217,7 @@ bool SlaveWorker::handleSetChunkResponse( SlavePeerEvent event, bool success, ch
 		header.listId, header.stripeId, header.chunkId
 	);
 
+	PendingIdentifier pid;
 	ChunkRequest chunkRequest;
 
 	chunkRequest.set(
@@ -3212,11 +3225,27 @@ bool SlaveWorker::handleSetChunkResponse( SlavePeerEvent event, bool success, ch
 		event.socket, 0 // ptr
 	);
 
-	if ( ! SlaveWorker::pending->eraseChunkRequest( PT_SLAVE_PEER_SET_CHUNK, event.id, event.socket ) ) {
+	if ( ! SlaveWorker::pending->eraseChunkRequest( PT_SLAVE_PEER_SET_CHUNK, event.id, event.socket, &pid, &chunkRequest ) ) {
 		__ERROR__( "SlaveWorker", "handleSetChunkResponse", "Cannot find a pending slave SET_CHUNK request that matches the response. This message will be discarded." );
 	}
 
-	// TODO: What should we do next?
+	if ( chunkRequest.isDegraded ) {
+		// Release degraded lock
+		uint32_t remaining, total;
+		if ( ! SlaveWorker::pending->eraseReleaseDegradedLock( pid.parentId, 1, remaining, total ) ) {
+			__ERROR__( "SlaveWorker", "handleSetChunkResponse", "Cannot find a pending coordinator release degraded lock request that matches the response. The message will be discarded." );
+			return false;
+		}
+		if ( remaining == 0 ) {
+			// Tell the coordinator that all degraded lock is released
+			CoordinatorEvent coordinatorEvent;
+			coordinatorEvent.resReleaseDegradedLock( ( CoordinatorSocket * ) pid.ptr, pid.parentId, total );
+			SlaveWorker::eventQueue->insert( coordinatorEvent );
+		}
+	} else {
+		// Recovery
+		// TODO
+	}
 
 	return true;
 }

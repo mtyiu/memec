@@ -482,56 +482,74 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 				goto quit_1;
 			}
 
-			if ( header.opcode != PROTO_OPCODE_SYNC ) {
-				__ERROR__( "CoordinatorWorker", "dispatch", "Invalid opcode from slave." );
-				goto quit_1;
-			}
-
-			if ( header.magic == PROTO_MAGIC_HEARTBEAT ) {
-				this->processHeartbeat( event, buffer.data, header.length, header.id );
-			} else if ( header.magic == PROTO_MAGIC_REMAPPING ) {
-				struct RemappingRecordHeader remappingRecordHeader;
-				struct SlaveSyncRemapHeader slaveSyncRemapHeader;
-				if ( ! this->protocol.parseRemappingRecordHeader( remappingRecordHeader, buffer.data, buffer.size ) ) {
-					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid remapping record protocol header." );
-					goto quit_1;
-				}
-				// start parsing the remapping records
-				// TODO buffer.size >> total size of remapping records?
-				offset = PROTO_REMAPPING_RECORD_SIZE;
-				RemappingRecordMap *map = CoordinatorWorker::remappingRecords;
-				for ( count = 0; offset < ( size_t ) buffer.size && count < remappingRecordHeader.remap; offset += bytes ) {
-					if ( ! this->protocol.parseSlaveSyncRemapHeader( slaveSyncRemapHeader, bytes, buffer.data, buffer.size - offset, offset ) )
-						break;
-					count++;
-
-					Key key;
-					key.set( slaveSyncRemapHeader.keySize, slaveSyncRemapHeader.key );
-
-					RemappingRecord remappingRecord;
-					remappingRecord.set( slaveSyncRemapHeader.listId, slaveSyncRemapHeader.chunkId, 0 );
-
-					if ( slaveSyncRemapHeader.opcode == 0 ) { // remove record
-						map->erase( key, remappingRecord );
-					} else if ( slaveSyncRemapHeader.opcode == 1 ) { // add record
-						map->insert( key, remappingRecord );
+			event.id = header.id;
+			switch( header.opcode ) {
+				case PROTO_OPCODE_RELEASE_DEGRADED_LOCKS:
+					switch( header.magic ) {
+						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							this->handleReleaseDegradedLockResponse( event, buffer.data, header.length );
+							break;
+						default:
+							__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );
 					}
-				}
-				//map->print();
-				//fprintf ( stderr, "Remapping Records no.=%lu (%u) upto=%lu size=%lu\n", count, remappingRecordHeader.remap, offset, buffer.size );
+					break;
+				case PROTO_OPCODE_SYNC:
+					switch( header.magic ) {
+						case PROTO_MAGIC_HEARTBEAT:
+							this->processHeartbeat( event, buffer.data, header.length );
+							break;
+						case PROTO_MAGIC_REMAPPING:
+						{
+							struct RemappingRecordHeader remappingRecordHeader;
+							struct SlaveSyncRemapHeader slaveSyncRemapHeader;
+							if ( ! this->protocol.parseRemappingRecordHeader( remappingRecordHeader, buffer.data, buffer.size ) ) {
+								__ERROR__( "CoordinatorWorker", "dispatch", "Invalid remapping record protocol header." );
+								goto quit_1;
+							}
+							// start parsing the remapping records
+							// TODO buffer.size >> total size of remapping records?
+							offset = PROTO_REMAPPING_RECORD_SIZE;
+							RemappingRecordMap *map = CoordinatorWorker::remappingRecords;
+							for ( count = 0; offset < ( size_t ) buffer.size && count < remappingRecordHeader.remap; offset += bytes ) {
+								if ( ! this->protocol.parseSlaveSyncRemapHeader( slaveSyncRemapHeader, bytes, buffer.data, buffer.size - offset, offset ) )
+									break;
+								count++;
 
-				// forward the copies of message to masters
-				MasterEvent masterEvent;
-				masterEvent.type = MASTER_EVENT_TYPE_FORWARD_REMAPPING_RECORDS;
-				masterEvent.message.forward.prevSize = buffer.size;
-				for ( uint32_t i = 0; i < masters.size() ; i++ ) {
-					masterEvent.socket = masters.values[ i ];
-					masterEvent.message.forward.data = new char[ buffer.size ];
-					memcpy( masterEvent.message.forward.data, buffer.data, buffer.size );
-					CoordinatorWorker::eventQueue->insert( masterEvent );
-				}
-			} else {
-				__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );
+								Key key;
+								key.set( slaveSyncRemapHeader.keySize, slaveSyncRemapHeader.key );
+
+								RemappingRecord remappingRecord;
+								remappingRecord.set( slaveSyncRemapHeader.listId, slaveSyncRemapHeader.chunkId, 0 );
+
+								if ( slaveSyncRemapHeader.opcode == 0 ) { // remove record
+									map->erase( key, remappingRecord );
+								} else if ( slaveSyncRemapHeader.opcode == 1 ) { // add record
+									map->insert( key, remappingRecord );
+								}
+							}
+							//map->print();
+							//fprintf ( stderr, "Remapping Records no.=%lu (%u) upto=%lu size=%lu\n", count, remappingRecordHeader.remap, offset, buffer.size );
+
+							// forward the copies of message to masters
+							MasterEvent masterEvent;
+							masterEvent.type = MASTER_EVENT_TYPE_FORWARD_REMAPPING_RECORDS;
+							masterEvent.message.forward.prevSize = buffer.size;
+							for ( uint32_t i = 0; i < masters.size() ; i++ ) {
+								masterEvent.socket = masters.values[ i ];
+								masterEvent.message.forward.data = new char[ buffer.size ];
+								memcpy( masterEvent.message.forward.data, buffer.data, buffer.size );
+								CoordinatorWorker::eventQueue->insert( masterEvent );
+							}
+						}
+							break;
+						default:
+							__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );
+							break;
+					}
+					break;
+				default:
+					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid opcode from slave." );
+					goto quit_1;
 			}
 quit_1:
 			buffer.data += header.length;
@@ -597,8 +615,8 @@ void *CoordinatorWorker::run( void *argv ) {
 	return 0;
 }
 
-bool CoordinatorWorker::processHeartbeat( SlaveEvent event, char *buf, size_t size, uint32_t requestId ) {
-	uint32_t count;
+bool CoordinatorWorker::processHeartbeat( SlaveEvent event, char *buf, size_t size ) {
+	uint32_t count, requestId = event.id;
 	size_t processed, offset, failed = 0;
 	struct HeartbeatHeader heartbeat;
 	union {
@@ -908,6 +926,26 @@ bool CoordinatorWorker::handleReleaseDegradedLockRequest( SlaveSocket *socket, b
 		printf( "dst: (%u, %u) |-> %lu\n", chunksIt->first.listId, chunksIt->first.chunkId, srcs.size() );
 	}
 
+	return true;
+}
+
+bool CoordinatorWorker::handleReleaseDegradedLockResponse( SlaveEvent event, char *buf, size_t size ) {
+	struct DegradedReleaseResHeader header;
+	if ( ! this->protocol.parseDegradedReleaseResHeader( header, buf, size ) ) {
+		__ERROR__( "CoordinatorWorker", "handleReleaseDegradedLockResponse", "Invalid RELEASE_DEGRADED_LOCK request (size = %lu).", size );
+		return false;
+	}
+	__DEBUG__(
+		BLUE, "CoordinatorWorker", "handleReleaseDegradedLockResponse",
+		"[RELEASE_DEGRADED_LOCK] Count: %u",
+		header.count
+	);
+
+	bool *done = CoordinatorWorker::pending->removeReleaseDegradedLock( event.id, header.count );
+	if ( done ) {
+		*done = true;
+		printf( "handleReleaseDegradedLockResponse() is completed.\n" );
+	}
 	return true;
 }
 

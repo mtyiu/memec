@@ -1633,14 +1633,14 @@ bool Protocol::parseListStripeKeyHeader( struct ListStripeKeyHeader &header, cha
 	);
 }
 
-size_t Protocol::generateDegradedReleaseHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, std::vector<Metadata> &chunks, bool &isCompleted ) {
+size_t Protocol::generateDegradedReleaseReqHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, std::vector<Metadata> &chunks, bool &isCompleted ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = 0;
 
 	isCompleted = true;
 
 	for ( size_t i = 0, len = chunks.size(); i < len; i++ ) {
-		if ( this->buffer.size >= bytes + PROTO_DEGRADED_RELEASE_SIZE ) {
+		if ( this->buffer.size >= bytes + PROTO_DEGRADED_RELEASE_REQ_SIZE ) {
 			*( ( uint32_t * )( buf      ) ) = htonl( chunks[ i ].listId );
 			*( ( uint32_t * )( buf +  4 ) ) = htonl( chunks[ i ].stripeId );
 			*( ( uint32_t * )( buf +  8 ) ) = htonl( chunks[ i ].chunkId );
@@ -1649,13 +1649,46 @@ size_t Protocol::generateDegradedReleaseHeader( uint8_t magic, uint8_t to, uint8
 			break;
 		}
 
-		buf += PROTO_DEGRADED_RELEASE_SIZE;
-		bytes += PROTO_DEGRADED_RELEASE_SIZE;
+		buf += PROTO_DEGRADED_RELEASE_REQ_SIZE;
+		bytes += PROTO_DEGRADED_RELEASE_REQ_SIZE;
 	}
 
 	bytes += this->generateHeader( magic, to, opcode, bytes, id );
 
 	return bytes;
+}
+
+size_t Protocol::generateDegradedReleaseResHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t count ) {
+	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_DEGRADED_RELEASE_RES_SIZE, id );
+
+	*( ( uint32_t * )( buf ) ) = htonl( count );
+
+	bytes += PROTO_DEGRADED_RELEASE_RES_SIZE;
+
+	return bytes;
+}
+
+bool Protocol::parseDegradedReleaseResHeader( size_t offset, uint32_t &count, char* buf, size_t size ) {
+	if ( size - offset < PROTO_DEGRADED_RELEASE_RES_SIZE )
+		return false;
+
+	char *ptr = buf + offset;
+	count = ntohl( *( ( uint32_t * )( ptr ) ) );
+
+	return true;
+}
+
+bool Protocol::parseDegradedReleaseResHeader( struct DegradedReleaseResHeader &header, char *buf, size_t size, size_t offset ) {
+	if ( ! buf || ! size ) {
+		buf = this->buffer.recv;
+		size = this->buffer.size;
+	}
+	return this->parseDegradedReleaseResHeader(
+		offset,
+		header.count,
+		buf, size
+	);
 }
 
 //////////////

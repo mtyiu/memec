@@ -53,6 +53,17 @@ char *SlaveProtocol::sendRemappingRecords( size_t &size, uint32_t id, std::unord
 	return this->buffer.send;
 }
 
+char *SlaveProtocol::resReleaseDegradedLock( size_t &size, uint32_t id, uint32_t count ) {
+	size = this->generateDegradedReleaseResHeader(
+		PROTO_MAGIC_RESPONSE_SUCCESS,
+		PROTO_MAGIC_TO_COORDINATOR,
+		PROTO_OPCODE_RELEASE_DEGRADED_LOCKS,
+		id,
+		count
+	);
+	return this->buffer.send;
+}
+
 char *SlaveProtocol::resRegisterMaster( size_t &size, uint32_t id, bool success ) {
 	size = this->generateHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,

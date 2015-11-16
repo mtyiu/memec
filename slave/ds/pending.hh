@@ -1,6 +1,7 @@
 #ifndef __SLAVE_DS_PENDING_HH__
 #define __SLAVE_DS_PENDING_HH__
 
+#include "../socket/coordinator_socket.hh"
 #include "../socket/master_socket.hh"
 #include "../socket/slave_peer_socket.hh"
 #include "../../common/ds/chunk.hh"
@@ -74,6 +75,11 @@ public:
 	Key key;
 };
 
+struct PendingDegradedLock {
+	uint32_t count;
+	uint32_t total;
+};
+
 class PendingRecovery {
 public:
 	uint32_t listId;
@@ -110,7 +116,6 @@ enum PendingType {
 
 class Pending {
 private:
-	bool get( PendingType type, LOCK_T *&lock, std::unordered_map<PendingIdentifier, PendingRecovery> *&map );
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, Key> *&map );
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, RemappingRecordKey> *&map );
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *&map );
@@ -120,7 +125,9 @@ private:
 
 public:
 	struct {
+		std::unordered_map<PendingIdentifier, PendingDegradedLock> releaseDegradedLock;
 		std::unordered_map<PendingIdentifier, PendingRecovery> recovery;
+		LOCK_T releaseDegradedLockLock;
 		LOCK_T recoveryLock;
 	} coordinators;
 	struct {
@@ -155,6 +162,7 @@ public:
 	} slavePeers;
 
 	Pending() {
+		LOCK_INIT( &this->coordinators.releaseDegradedLockLock );
 		LOCK_INIT( &this->coordinators.recoveryLock );
 		LOCK_INIT( &this->masters.remappingSetLock );
 		LOCK_INIT( &this->masters.getLock );
@@ -172,6 +180,9 @@ public:
 	}
 
 	// Insert (Coordinator)
+	bool insertReleaseDegradedLock(
+		uint32_t id, CoordinatorSocket *socket, uint32_t count
+	);
 	bool insertRecovery(
 		uint32_t id, SlavePeerSocket *target, uint32_t listId, uint32_t chunkId,
 		std::unordered_set<uint32_t> &stripeIds
@@ -225,6 +236,11 @@ public:
 		bool needsLock = true, bool needsUnlock = true
 	);
 	// Erase
+	bool eraseReleaseDegradedLock(
+		uint32_t id, uint32_t count,
+		uint32_t &remaining,
+		uint32_t &total
+	);
 	bool eraseRemappingRecordKey(
 		PendingType type, uint32_t id, void *ptr = 0,
 		PendingIdentifier *pidPtr = 0,
