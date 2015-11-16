@@ -510,13 +510,6 @@ void Slave::debug( FILE *f ) {
 
 	fprintf( f, "\n" );
 
-	fprintf( f, "\nSlave peer sockets\n------------------\n" );
-	for ( i = 0, len = this->sockets.slavePeers.size(); i < len; i++ ) {
-		fprintf( f, "%d. ", i + 1 );
-		this->sockets.slavePeers[ i ]->print( f );
-	}
-	if ( len == 0 ) fprintf( f, "(None)\n" );
-
 	fprintf( f, "\nPacket pool\n-----------\n" );
 	this->packetPool.print( f );
 

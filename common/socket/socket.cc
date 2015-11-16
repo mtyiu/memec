@@ -232,9 +232,10 @@ bool Socket::init( int sockfd, struct sockaddr_in addr ) {
 }
 
 void Socket::stop() {
-	if ( this->sockfd == -1 ) return;
-	::close( this->sockfd );
-	this->sockfd = -1;
+	if ( this->sockfd >= 0 ) {
+		::close( this->sockfd );
+		this->sockfd = - this->sockfd;
+	}
 	this->connected = false;
 }
 

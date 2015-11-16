@@ -440,8 +440,8 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 		LOCK( &slaves.lock );
 		for ( uint32_t i = 0; i < slaves.size(); i++ ) {
 			SlaveSocket *slave = slaves.values[ i ];
-			if ( event.socket->equal( slave ) || ! slave->ready() )
-				continue; // No need to tell the new socket
+			if ( ! slave->ready() )
+				continue;
 
 			ret = slave->send( buffer.data, buffer.size, connected );
 			if ( ret != ( ssize_t ) buffer.size )

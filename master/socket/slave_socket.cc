@@ -21,6 +21,13 @@ bool SlaveSocket::start() {
 	return false;
 }
 
+void SlaveSocket::stop() {
+	int newFd = - this->sockfd;
+
+	SlaveSocket::slaves->replaceKey( this->sockfd, newFd );
+	Socket::stop();
+}
+
 ssize_t SlaveSocket::send( char *buf, size_t ulen, bool &connected ) {
 	return Socket::send( this->sockfd, buf, ulen, connected );
 }

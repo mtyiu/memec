@@ -1046,11 +1046,12 @@ bool SlaveWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *buf
 
 	// Find the slave peer socket in the array map
 	int index = -1, sockfd;
-	SlavePeerSocket *s;
+	SlavePeerSocket *original, *s;
 
 	for ( int i = 0, len = slavePeers->size(); i < len; i++ ) {
 		if ( slavePeers->values[ i ]->equal( srcHeader.addr, srcHeader.port ) ) {
 			index = i;
+			original = slavePeers->values[ i ];
 			break;
 		}
 	}
@@ -1058,9 +1059,9 @@ bool SlaveWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *buf
 		__ERROR__( "SlaveWorker", "handleSlaveReconstructedMsg", "The slave is not in the list. Ignoring this slave..." );
 		return false;
 	}
+	original->stop();
 
 	ServerAddr serverAddr( slavePeers->values[ index ]->identifier, dstHeader.addr, dstHeader.port );
-
 	s = new SlavePeerSocket();
 	s->init(
 		sockfd, serverAddr,
@@ -1070,7 +1071,8 @@ bool SlaveWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *buf
 
 	// Update sockfd in the array Map
 	sockfd = s->init();
-	slavePeers->set( sockfd, s );
+	slavePeers->set( index, sockfd, s );
+	delete original;
 
 	// Connect to the slave peer
 	s->start();
