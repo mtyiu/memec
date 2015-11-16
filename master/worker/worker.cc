@@ -1430,9 +1430,11 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 
 		applicationEvent.resSet( ( ApplicationSocket * ) key.ptr, pid.id, key, success );
 		MasterWorker::eventQueue->insert( applicationEvent );
+		uint32_t originalListId, originalChunkId;
+		SlaveSocket *original = this->getSlaves( header.key, header.keySize, originalListId, originalChunkId );
+		int sockfd = original->getSocket();
+		MasterWorker::slaveSockets->get( sockfd )->counter.decreaseNormal();
 	}
-	int sockfd = event.socket->getSocket();
-	MasterWorker::slaveSockets->get( sockfd )->counter.decreaseNormal();
 	return true;
 }
 
