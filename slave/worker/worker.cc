@@ -2097,6 +2097,7 @@ bool SlaveWorker::handleSealChunkRequest( SlavePeerEvent event, char *buf, size_
 
 	return true;
 }
+
 bool SlaveWorker::handleGetRequest( SlavePeerEvent event, char *buf, size_t size ) {
 	struct ListStripeKeyHeader header;
 	bool ret;

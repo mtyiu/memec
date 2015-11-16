@@ -906,6 +906,12 @@ bool CoordinatorWorker::handleReleaseDegradedLockRequest( SlaveSocket *socket, b
 	map.degradedLocks.swap( map.releasingDegradedLocks );
 	UNLOCK( &map.degradedLocksLock );
 
+	if ( chunks.size() == 0 ) {
+		// No chunks needed to be sync.
+		*done = true;
+		return true;
+	}
+
 	// Update pending map
 	CoordinatorWorker::pending->addReleaseDegradedLock( requestId, chunks.size(), done );
 
@@ -928,7 +934,7 @@ bool CoordinatorWorker::handleReleaseDegradedLockRequest( SlaveSocket *socket, b
 				__ERROR__( "CoordinatorWorker", "handleReleaseDegradedLockRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 		} while ( ! isCompleted );
 
-		printf( "dst: (%u, %u) |-> %lu\n", chunksIt->first.listId, chunksIt->first.chunkId, srcs.size() );
+		// printf( "dst: (%u, %u) |-> %lu\n", chunksIt->first.listId, chunksIt->first.chunkId, srcs.size() );
 	}
 
 	return true;
@@ -1010,15 +1016,37 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 		);
 		ret = true;
 	} else {
-		ret = map->insertDegradedLock( srcMetadata, dstMetadata );
+		// Check whether any chunk in the same stripe has been locked
+		bool exist = false;
+		Metadata tmpDst;
+		for ( uint32_t chunkId = 0; chunkId < CoordinatorWorker::chunkCount; chunkId++ ) {
+			if ( map->findDegradedLock( srcMetadata.listId, srcMetadata.stripeId, chunkId, tmpDst ) ) {
+				exist = true;
+				break;
+			}
+		}
 
-		event.resDegradedLock(
-			event.socket, event.id, key,
-			ret,                          // the degraded lock is attained
-			map->isSealed( srcMetadata ), // the chunk is sealed
-			srcMetadata.listId, srcMetadata.stripeId, srcMetadata.chunkId,
-			dstMetadata.listId, dstMetadata.chunkId
-		);
+		if ( exist ) {
+			// printf( "A chunk in the same stripe has been locked.\n" );
+
+			// Reject the lock request
+			event.resDegradedLock(
+				event.socket, event.id,
+				key, true,
+				srcMetadata.listId, srcMetadata.chunkId
+			);
+			ret = true;
+		} else {
+			ret = map->insertDegradedLock( srcMetadata, dstMetadata );
+
+			event.resDegradedLock(
+				event.socket, event.id, key,
+				ret,                          // the degraded lock is attained
+				map->isSealed( srcMetadata ), // the chunk is sealed
+				srcMetadata.listId, srcMetadata.stripeId, srcMetadata.chunkId,
+				dstMetadata.listId, dstMetadata.chunkId
+			);
+		}
 	}
 	this->dispatch( event );
 	return ret;
