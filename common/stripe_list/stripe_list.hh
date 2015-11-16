@@ -234,6 +234,28 @@ public:
 		return ret;
 	}
 
+	void update() {
+		if ( ! this->generated ) {
+			this->generate();
+			return;
+		}
+
+		uint32_t i, j, dataCount, parityCount;
+
+		for ( i = 0; i < this->numLists; i++ ) {
+			T **list = this->lists[ i ];
+			dataCount = 0;
+			parityCount = 0;
+			for ( j = 0; j < this->numSlaves; j++ ) {
+				if ( this->data.check( i, j ) ) {
+					list[ dataCount++ ] = this->slaves->at( j );
+				} else if ( this->parity.check( i, j ) ) {
+					list[ this->k + ( parityCount++ ) ] = this->slaves->at( j );
+				}
+			}
+		}
+	}
+
 	int32_t search( T *target ) {
 		for ( uint32_t i = 0; i < this->numSlaves; i++ ) {
 			if ( target == this->slaves->at( i ) )

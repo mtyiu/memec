@@ -1,6 +1,20 @@
 #include "pending.hh"
 #include "../../common/util/debug.hh"
 
+bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_map<PendingIdentifier, PendingRecovery> *&map ) {
+	switch( type ) {
+		case PT_COORDINATOR_RECOVERY:
+			lock = &this->coordinators.recoveryLock;
+			map = &this->coordinators.recovery;
+			break;
+		default:
+			lock = 0;
+			map = 0;
+			return false;
+	}
+	return true;
+}
+
 bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, RemappingRecordKey> *&map ) {
 	switch( type ) {
 		case PT_MASTER_REMAPPING_SET:
@@ -199,6 +213,54 @@ DEFINE_PENDING_ERASE_METHOD( eraseChunkUpdate, ChunkUpdate, chunkUpdatePtr )
 #undef DEFINE_PENDING_MASTER_INSERT_METHOD
 #undef DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD
 #undef DEFINE_PENDING_ERASE_METHOD
+
+bool Pending::insertRecovery( uint32_t id, SlavePeerSocket *target, uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds ) {
+	PendingIdentifier pid( id, id, target );
+	PendingRecovery r;
+	r.set( listId, chunkId, stripeIds );
+	std::pair<PendingIdentifier, PendingRecovery> p( pid, r );
+	std::pair<std::unordered_map<PendingIdentifier, PendingRecovery>::iterator, bool> ret;
+
+	LOCK_T *lock;
+	std::unordered_map<PendingIdentifier, PendingRecovery> *map;
+
+	printf( "insertRecovery(): " );
+	target->printAddress();
+	printf( "\n" );
+
+	if ( ! this->get( PT_COORDINATOR_RECOVERY, lock, map ) )
+		return false;
+
+	LOCK( lock );
+	ret = map->insert( p );
+	UNLOCK( lock );
+
+	return ret.second;
+}
+
+std::unordered_set<uint32_t> *Pending::findRecovery( uint32_t id, SlavePeerSocket *&target, uint32_t &listId, uint32_t &chunkId ) {
+	PendingIdentifier pid( id, id, 0 );
+	std::unordered_map<PendingIdentifier, PendingRecovery>::iterator it;
+
+	LOCK_T *lock;
+	std::unordered_map<PendingIdentifier, PendingRecovery> *map;
+
+	if ( ! this->get( PT_COORDINATOR_RECOVERY, lock, map ) )
+		return 0;
+
+	LOCK( lock );
+	it = map->find( pid );
+	if ( it == map->end() ) {
+		UNLOCK( lock );
+		return 0;
+	}
+	target = ( SlavePeerSocket * ) it->first.ptr;
+	listId = it->second.listId;
+	chunkId = it->second.chunkId;
+	UNLOCK( lock );
+
+	return &( it->second.stripeIds );
+}
 
 bool Pending::findChunkRequest( PendingType type, uint32_t id, void *ptr, std::unordered_multimap<PendingIdentifier, ChunkRequest>::iterator &it, bool needsLock, bool needsUnlock ) {
 	PendingIdentifier pid( id, 0, ptr );

@@ -12,6 +12,7 @@ IDGenerator *CoordinatorWorker::idGenerator;
 CoordinatorEventQueue *CoordinatorWorker::eventQueue;
 RemappingRecordMap *CoordinatorWorker::remappingRecords;
 StripeList<SlaveSocket> *CoordinatorWorker::stripeList;
+Pending *CoordinatorWorker::pending;
 
 void CoordinatorWorker::dispatch( MixedEvent event ) {
 	switch( event.type ) {
@@ -169,7 +170,7 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 				break;
 			// just trigger / stop the remap phase, no message need to be handled
 			if ( event.message.remap.toRemap ) {
-				coordinator->remapMsgHandler->startRemap( event.message.remap.slaves );
+				coordinator->remapMsgHandler->startRemap( event.message.remap.slaves ); // Phase 1 --> 2
 			} else {
 				coordinator->remapMsgHandler->stopRemap( event.message.remap.slaves );
 			}
@@ -710,7 +711,7 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 
 	////////////////////////////////////////////////////////////////////////////
 
-	uint32_t numLostChunks = 0, listId, stripeId, chunkId, requestId, pos;
+	uint32_t numLostChunks = 0, listId, stripeId, chunkId, requestId;
 	std::set<Metadata> unsealedChunks;
 	bool connected, isCompleted, isAllCompleted;
 	ssize_t ret;
@@ -719,8 +720,9 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 		char *data;
 	} buffer;
 
-	std::unordered_map<uint32_t, std::vector<uint32_t>> stripeIds;
-	std::unordered_map<uint32_t, std::vector<uint32_t>>::iterator stripeIdsIt;
+	std::unordered_map<uint32_t, std::unordered_set<uint32_t>> stripeIds;
+	std::unordered_map<uint32_t, std::unordered_set<uint32_t>>::iterator stripeIdsIt;
+	std::unordered_set<uint32_t>::iterator stripeIdSetIt;
 	std::unordered_map<uint32_t, SlaveSocket **> sockets;
 
 	std::vector<StripeListIndex> lists = CoordinatorWorker::stripeList->list( ( uint32_t ) index );
@@ -755,11 +757,11 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 
 		stripeIdsIt = stripeIds.find( listId );
 		if ( stripeIdsIt == stripeIds.end() ) {
-			std::vector<uint32_t> ids;
-			ids.push_back( stripeId );
+			std::unordered_set<uint32_t> ids;
+			ids.insert( stripeId );
 			stripeIds[ listId ] = ids;
 		} else {
-			stripeIdsIt->second.push_back( stripeId );
+			stripeIdsIt->second.insert( stripeId );
 		}
 		numLostChunks++;
 	}
@@ -777,13 +779,13 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 			// Update stripeIds for parity slave
 			stripeIdsIt = stripeIds.find( listId );
 			if ( stripeIdsIt == stripeIds.end() ) {
-				std::vector<uint32_t> ids;
+				std::unordered_set<uint32_t> ids;
 				for ( uint32_t j = 0; j < Map::stripes[ listId ]; j++ )
-					ids.push_back( j );
+					ids.insert( j );
 				stripeIds[ listId ] = ids;
 			} else {
 				for ( uint32_t j = 0; j < Map::stripes[ listId ]; j++ )
-					stripeIdsIt->second.push_back( j );
+					stripeIdsIt->second.insert( j );
 			}
 			UNLOCK( &Map::stripesLock );
 		}
@@ -799,9 +801,9 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 			numStripePerSlave++;
 
 		// Distribute the task
-		pos = 0;
 		requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
 		isAllCompleted = true;
+		stripeIdSetIt = stripeIds[ listId ].begin();
 		do {
 			for ( uint32_t j = 0; j < CoordinatorWorker::chunkCount; j++ ) {
 				SlaveSocket *s = sockets[ listId ][ j ];
@@ -812,7 +814,7 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 						listId,
 						chunkId,
 						stripeIds[ listId ],
-						pos,
+						stripeIdSetIt,
 						numStripePerSlave,
 						isCompleted
 					);
@@ -825,6 +827,12 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 				}
 			}
 		} while ( ! isAllCompleted );
+
+		// Insert into pending map
+		CoordinatorWorker::pending->insertRecovery(
+			requestId,
+			listId, chunkId, stripeIds[ listId ]
+		);
 
 		printf( "(%u, %u): Number of surviving slaves: %u; number of stripes per slave: %u; total number of stripes: %lu\n", listId, chunkId, numSurvivingSlaves, numStripePerSlave, stripeIds[ listId ].size() );
 	}
@@ -1022,6 +1030,7 @@ bool CoordinatorWorker::init() {
 	CoordinatorWorker::eventQueue = &coordinator->eventQueue;
 	CoordinatorWorker::remappingRecords = &coordinator->remappingRecords;
 	CoordinatorWorker::stripeList = coordinator->stripeList;
+	CoordinatorWorker::pending = &coordinator->pending;
 
 	return true;
 }

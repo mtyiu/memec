@@ -362,7 +362,7 @@ char *CoordinatorProtocol::resRemappingSetLock( size_t &size, uint32_t id, bool 
 	return this->buffer.send;
 }
 
-char *CoordinatorProtocol::reqRecovery( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, std::vector<uint32_t> &stripeIds, uint32_t &pos, uint32_t numChunks, bool &isCompleted ) {
+char *CoordinatorProtocol::reqRecovery( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds, std::unordered_set<uint32_t>::iterator &it, uint32_t numChunks, bool &isCompleted ) {
 	size = this->generateRecoveryHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
@@ -370,7 +370,7 @@ char *CoordinatorProtocol::reqRecovery( size_t &size, uint32_t id, uint32_t list
 		id,
 		listId, chunkId,
 		stripeIds,
-		pos,
+		it,
 		numChunks,
 		isCompleted
 	);

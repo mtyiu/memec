@@ -284,8 +284,9 @@ struct DegradedLockReqHeader {
 // Type
 #define PROTO_DEGRADED_LOCK_RES_IS_LOCKED  1   // Return src* and dst* (same as the client request)
 #define PROTO_DEGRADED_LOCK_RES_WAS_LOCKED 2   // Return src* and dst* (different from the client request)
-#define PROTO_DEGRADED_LOCK_RES_REMAPPED   3   // Return remapped srcListId and srcChunkId without dst*
-#define PROTO_DEGRADED_LOCK_RES_NOT_EXIST  4   // Return without src* and dst*
+#define PROTO_DEGRADED_LOCK_RES_NOT_LOCKED 3   // Return original srcListId and srcChunkId without dst*
+#define PROTO_DEGRADED_LOCK_RES_REMAPPED   4   // Return remapped srcListId and srcChunkId without dst*
+#define PROTO_DEGRADED_LOCK_RES_NOT_EXIST  5   // Return without src* and dst*
 struct DegradedLockResHeader {
 	uint8_t type;
 	uint8_t keySize;
@@ -686,8 +687,8 @@ protected:
 	size_t generateRecoveryHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
 		uint32_t listId, uint32_t chunkId,
-		std::vector<uint32_t> &stripeIds,
-		uint32_t &pos,
+		std::unordered_set<uint32_t> &stripeIds,
+		std::unordered_set<uint32_t>::iterator &it,
 		uint32_t numChunks,
 		bool &isCompleted
 	);

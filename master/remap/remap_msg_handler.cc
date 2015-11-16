@@ -262,17 +262,16 @@ bool MasterRemapMsgHandler::ackRemap( struct sockaddr_in *slave ) {
 }
 
 bool MasterRemapMsgHandler::checkAckRemapForSlave( struct sockaddr_in slave ) {
-	uint32_t normal = 0, remap = 0;
+	uint32_t normal = 0, remapping = 0, lockOnly, degraded;
 	Counter* counter = Master::getInstance()->counters.slaves[ slave ];
 	if ( counter == NULL )
 		return false;
-	normal = counter->getNormal();
-	remap = counter->getRemapping();
+	counter->getAll( remapping, normal, lockOnly, degraded );
 	LOCK( &this->slavesStatusLock[ slave ] );
 	RemapStatus status = this->slavesStatus[ slave ];
 
 	if ( ( status == REMAP_PREPARE_START && normal > 0 ) ||
-			( status == REMAP_PREPARE_END && remap > 0 ) ||
+			( status == REMAP_PREPARE_END && ( remapping > 0 || degraded > 0 ) ) ||
 			( status != REMAP_PREPARE_START && status != REMAP_PREPARE_END ) ) {
 		UNLOCK( &this->slavesStatusLock[ slave ] );
 		return false;

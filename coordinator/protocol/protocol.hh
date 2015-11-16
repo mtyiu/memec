@@ -69,7 +69,14 @@ public:
 	char *reqSyncRemappingRecord( size_t &size, uint32_t id, std::unordered_map<Key, RemappingRecord> &remappingRecords, LOCK_T* lock, bool &isLast, char *buffer = 0 );
 	char *resRemappingSetLock( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t chunkId, bool isRemapped, uint8_t keySize, char *key );
 	// Recovery
-	char *reqRecovery( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, std::vector<uint32_t> &stripeIds, uint32_t &pos, uint32_t numChunks, bool &isCompleted );
+	char *reqRecovery(
+		size_t &size, uint32_t id,
+		uint32_t listId, uint32_t chunkId,
+		std::unordered_set<uint32_t> &stripeIds,
+		std::unordered_set<uint32_t>::iterator &it,
+		uint32_t numChunks,
+		bool &isCompleted
+	);
 };
 
 #endif

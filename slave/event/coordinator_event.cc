@@ -7,10 +7,10 @@ void CoordinatorEvent::reqRegister( CoordinatorSocket *socket, uint32_t addr, ui
 	this->message.address.port = port;
 }
 
-void CoordinatorEvent::sync( CoordinatorSocket *socket, uint32_t requestId ) {
+void CoordinatorEvent::sync( CoordinatorSocket *socket, uint32_t id ) {
 	this->type = COORDINATOR_EVENT_TYPE_SYNC;
 	this->socket = socket;
-	this->requestId = requestId;
+	this->id = id;
 }
 
 void CoordinatorEvent::syncRemap( CoordinatorSocket *socket ) {

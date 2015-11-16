@@ -1661,10 +1661,10 @@ size_t Protocol::generateDegradedReleaseHeader( uint8_t magic, uint8_t to, uint8
 //////////////
 // Recovery //
 //////////////
-size_t Protocol::generateRecoveryHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t chunkId, std::vector<uint32_t> &stripeIds, uint32_t &pos, uint32_t numChunks, bool &isCompleted ) {
+size_t Protocol::generateRecoveryHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds, std::unordered_set<uint32_t>::iterator &it, uint32_t numChunks, bool &isCompleted ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes;
-	uint32_t count = 0, total = stripeIds.size();
+	uint32_t count = 0;
 	uint32_t *tmp, *numStripes;
 
 	isCompleted = true;
@@ -1679,9 +1679,9 @@ size_t Protocol::generateRecoveryHeader( uint8_t magic, uint8_t to, uint8_t opco
 	bytes += PROTO_RECOVERY_SIZE;
 
 	tmp = ( uint32_t * ) buf;
-	for ( count = 0; count < numChunks && pos < total; count++, pos++ ) {
+	for ( count = 0; count < numChunks && it != stripeIds.end(); count++, it++ ) {
 		if ( this->buffer.size >= bytes + 4 ) {
-			tmp[ count ] = htonl( stripeIds[ pos ] );
+			tmp[ count ] = htonl( *it );
 
 			// buf += 4 * count; (not used anymore)
 			bytes += 4;

@@ -525,11 +525,13 @@ SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId
 	return ret->ready() ? ret : 0;
 }
 
-SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, uint32_t &newChunkId, SlaveSocket *&original ) {
+SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, uint32_t &newChunkId, bool &useDegradedMode, SlaveSocket *&original ) {
+	useDegradedMode = false;
 	original = this->getSlaves( data, size, listId, chunkId );
 	newChunkId = chunkId;
 	if ( Master::getInstance()->isDegraded( original ) ) {
 		// Perform degraded operation
+		useDegradedMode = true;
 		if ( MasterWorker::degradedTargetIsFixed ) {
 			if ( ! BasicRemappingScheme::isOverloaded( original ) )
 				return original; // not overloaded
@@ -611,12 +613,12 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 	);
 
 	uint32_t listId, chunkId, newChunkId;
-	bool connected;
+	bool connected, useDegradedMode;
 	SlaveSocket *socket, *original;
 
 	socket = this->getSlaves(
 		header.key, header.keySize,
-		listId, chunkId, newChunkId, original
+		listId, chunkId, newChunkId, useDegradedMode, original
 	);
 	if ( ! socket ) {
 		Key key;
@@ -633,20 +635,24 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 	Key key;
 	ssize_t sentBytes;
 	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
+	int sockfd = socket->getSocket();
 
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
 	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_GET, event.id, ( void * ) event.socket, key ) ) {
 		__ERROR__( "MasterWorker", "handleGetRequest", "Cannot insert into application GET pending map." );
 	}
 
-	if ( chunkId != newChunkId ) {
+	if ( useDegradedMode ) {
 		// Acquire degraded lock from the coordinator
+		MasterWorker::slaveSockets->get( sockfd )->counter.increaseDegraded();
 		return this->sendDegradedLockRequest(
 			event.id, PROTO_OPCODE_GET,
 			listId, chunkId, newChunkId,
 			key.data, key.size
 		);
 	} else {
+		MasterWorker::slaveSockets->get( sockfd )->counter.increaseNormal();
+
 		buffer.data = this->protocol.reqGet(
 			buffer.size, requestId,
 			header.key, header.keySize
@@ -818,12 +824,12 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 	);
 
 	uint32_t listId, chunkId, newChunkId;
-	bool connected;
+	bool connected, useDegradedMode;
 	SlaveSocket *socket, *target;
 
 	socket = this->getSlaves(
 		header.key, header.keySize,
-		listId, chunkId, newChunkId, target
+		listId, chunkId, newChunkId, useDegradedMode, target
 	);
 
 	if ( ! socket ) {
@@ -843,6 +849,7 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 	KeyValueUpdate keyValueUpdate;
 	ssize_t sentBytes;
 	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
+	int sockfd = socket->getSocket();
 
 	char* valueUpdate = new char [ header.valueUpdateSize ];
 	memcpy( valueUpdate, header.valueUpdate, header.valueUpdateSize );
@@ -853,8 +860,9 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 		__ERROR__( "MasterWorker", "handleUpdateRequest", "Cannot insert into application UPDATE pending map." );
 	}
 
-	if ( chunkId != newChunkId ) {
+	if ( useDegradedMode ) {
 		// Acquire degraded lock from the coordinator
+		MasterWorker::slaveSockets->get( sockfd )->counter.increaseDegraded();
 		return this->sendDegradedLockRequest(
 			event.id, PROTO_OPCODE_UPDATE,
 			listId, chunkId, newChunkId,
@@ -864,6 +872,8 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 			( char * ) keyValueUpdate.ptr
 		);
 	} else {
+		MasterWorker::slaveSockets->get( sockfd )->counter.increaseNormal();
+
 		buffer.data = this->protocol.reqUpdate(
 			buffer.size, requestId,
 			header.key, header.keySize,
@@ -899,12 +909,12 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 	);
 
 	uint32_t listId, chunkId, newChunkId;
-	bool connected;
+	bool connected, useDegradedMode;
 	SlaveSocket *socket, *target;
 
 	socket = this->getSlaves(
 		header.key, header.keySize,
-		listId, chunkId, newChunkId, target
+		listId, chunkId, newChunkId, useDegradedMode, target
 	);
 
 	if ( ! socket ) {
@@ -922,20 +932,24 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 	Key key;
 	ssize_t sentBytes;
 	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
+	int sockfd = socket->getSocket();
 
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
 	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_DEL, event.id, ( void * ) event.socket, key ) ) {
 		__ERROR__( "MasterWorker", "handleDeleteRequest", "Cannot insert into application DELETE pending map." );
 	}
 
-	if ( chunkId != newChunkId ) {
+	if ( useDegradedMode ) {
 		// Acquire degraded lock from the coordinator
+		MasterWorker::slaveSockets->get( sockfd )->counter.increaseDegraded();
 		return this->sendDegradedLockRequest(
 			event.id, PROTO_OPCODE_DELETE,
 			listId, chunkId, newChunkId,
 			key.data, key.size
 		);
 	} else {
+		MasterWorker::slaveSockets->get( sockfd )->counter.increaseNormal();
+
 		buffer.data = this->protocol.reqDelete(
 			buffer.size, requestId,
 			header.key, header.keySize
@@ -1119,6 +1133,7 @@ bool MasterWorker::sendDegradedLockRequest( uint32_t parentId, uint8_t opcode, u
 
 bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool success, char *buf, size_t size ) {
 	SlaveSocket *socket = 0;
+	int sockfd;
 	struct DegradedLockResHeader header;
 	if ( ! this->protocol.parseDegradedLockResHeader( header, buf, size ) ) {
 		__ERROR__( "MasterWorker", "handleDegradedLockResponse", "Invalid DEGRADED_LOCK response." );
@@ -1137,14 +1152,18 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 			);
 			socket = this->getSlaves( header.dstListId, header.dstChunkId );
 			break;
+		case PROTO_DEGRADED_LOCK_RES_NOT_LOCKED:
 		case PROTO_DEGRADED_LOCK_RES_REMAPPED:
 			__DEBUG__(
 				BLUE, "MasterWorker", "handleDegradedLockResponse",
-				"[Remapped] Key: %.*s (key size = %u); (%u, %u)",
+				"[Not Locked / Remapped] Key: %.*s (key size = %u); (%u, %u)",
 				( int ) header.keySize, header.key, header.keySize,
 				header.srcListId, header.srcChunkId
 			);
 			socket = this->getSlaves( header.srcListId, header.srcChunkId );
+			sockfd = socket->getSocket();
+			MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
+			Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
 			break;
 		case PROTO_DEGRADED_LOCK_RES_NOT_EXIST:
 		default:
@@ -1153,6 +1172,9 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 				"[Not Fonud] Key: %.*s (key size = %u)",
 				( int ) header.keySize, header.key, header.keySize
 			);
+			sockfd = socket->getSocket();
+			MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
+			Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
 			break;
 	}
 
@@ -1189,6 +1211,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 						degradedLockData.key, degradedLockData.keySize
 					);
 					break;
+				case PROTO_DEGRADED_LOCK_RES_NOT_LOCKED:
 				case PROTO_DEGRADED_LOCK_RES_REMAPPED:
 					buffer.data = this->protocol.reqGet(
 						buffer.size, requestId,
@@ -1222,6 +1245,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 						degradedLockData.valueUpdate, degradedLockData.valueUpdateOffset, degradedLockData.valueUpdateSize
 					);
 					break;
+				case PROTO_DEGRADED_LOCK_RES_NOT_LOCKED:
 				case PROTO_DEGRADED_LOCK_RES_REMAPPED:
 					buffer.data = this->protocol.reqUpdate(
 						buffer.size, requestId,
@@ -1258,6 +1282,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 						degradedLockData.key, degradedLockData.keySize
 					);
 					break;
+				case PROTO_DEGRADED_LOCK_RES_NOT_LOCKED:
 				case PROTO_DEGRADED_LOCK_RES_REMAPPED:
 					buffer.data = this->protocol.reqDelete(
 						buffer.size, requestId,
@@ -1358,6 +1383,13 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, bool isDeg
 		if ( success ) keyValue.free();
 		return false;
 	}
+
+	int sockfd = event.socket->getSocket();
+	if ( isDegraded )
+		MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
+	else
+		MasterWorker::slaveSockets->get( sockfd )->counter.decreaseNormal();
+	Master::getInstance()->remapMsgHandler.ackRemap( event.socket->getAddr() );
 
 	if ( success ) {
 		key.free();
@@ -1467,6 +1499,13 @@ bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, bool is
 	// free the updated value
 	delete[] ( ( char * )( keyValueUpdate.ptr ) );
 
+	int sockfd = event.socket->getSocket();
+	if ( isDegraded )
+		MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
+	else
+		MasterWorker::slaveSockets->get( sockfd )->counter.decreaseNormal();
+	Master::getInstance()->remapMsgHandler.ackRemap( event.socket->getAddr() );
+
 	applicationEvent.resUpdate( ( ApplicationSocket * ) pid.ptr, pid.id, keyValueUpdate, success );
 	MasterWorker::eventQueue->insert( applicationEvent );
 
@@ -1493,6 +1532,13 @@ bool MasterWorker::handleDeleteResponse( SlaveEvent event, bool success, bool is
 		__ERROR__( "MasterWorker", "handleDeleteResponse", "Cannot find a pending application DELETE request that matches the response. This message will be discarded." );
 		return false;
 	}
+
+	int sockfd = event.socket->getSocket();
+	if ( isDegraded )
+		MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
+	else
+		MasterWorker::slaveSockets->get( sockfd )->counter.decreaseNormal();
+	Master::getInstance()->remapMsgHandler.ackRemap( event.socket->getAddr() );
 
 	applicationEvent.resDelete( ( ApplicationSocket * ) key.ptr, pid.id, key, success );
 	MasterWorker::eventQueue->insert( applicationEvent );

@@ -36,13 +36,15 @@ class ChunkRequest : public Metadata {
 public:
 	SlavePeerSocket *socket;
 	mutable Chunk *chunk;
+	bool isDegraded;
 
-	void set( uint32_t listId, uint32_t stripeId, uint32_t chunkId, SlavePeerSocket *socket, Chunk *chunk = 0 ) {
+	void set( uint32_t listId, uint32_t stripeId, uint32_t chunkId, SlavePeerSocket *socket, Chunk *chunk = 0, bool isDegraded = true ) {
 		this->listId = listId;
 		this->stripeId = stripeId;
 		this->chunkId = chunkId;
 		this->socket = socket;
 		this->chunk = chunk;
+		this->isDegraded = isDegraded;
 	}
 };
 
@@ -72,7 +74,25 @@ public:
 	Key key;
 };
 
+class PendingRecovery {
+public:
+	uint32_t listId;
+	uint32_t chunkId;
+	std::unordered_set<uint32_t> stripeIds;
+
+	void set( uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds ) {
+		this->listId = listId;
+		this->chunkId = chunkId;
+		this->stripeIds = stripeIds;
+	}
+
+	bool erase( uint32_t stripeId ) {
+		return this->stripeIds.erase( stripeId ) > 0;
+	}
+};
+
 enum PendingType {
+	PT_COORDINATOR_RECOVERY,
 	PT_MASTER_REMAPPING_SET,
 	PT_MASTER_GET,
 	PT_MASTER_UPDATE,
@@ -90,6 +110,7 @@ enum PendingType {
 
 class Pending {
 private:
+	bool get( PendingType type, LOCK_T *&lock, std::unordered_map<PendingIdentifier, PendingRecovery> *&map );
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, Key> *&map );
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, RemappingRecordKey> *&map );
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *&map );
@@ -98,6 +119,10 @@ private:
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, ChunkUpdate> *&map );
 
 public:
+	struct {
+		std::unordered_map<PendingIdentifier, PendingRecovery> recovery;
+		LOCK_T recoveryLock;
+	} coordinators;
 	struct {
 		std::unordered_multimap<PendingIdentifier, RemappingRecordKey> remappingSet;
 		std::unordered_multimap<PendingIdentifier, Key> get;
@@ -130,6 +155,7 @@ public:
 	} slavePeers;
 
 	Pending() {
+		LOCK_INIT( &this->coordinators.recoveryLock );
 		LOCK_INIT( &this->masters.remappingSetLock );
 		LOCK_INIT( &this->masters.getLock );
 		LOCK_INIT( &this->masters.updateLock );
@@ -144,6 +170,12 @@ public:
 		LOCK_INIT( &this->slavePeers.updateChunkLock );
 		LOCK_INIT( &this->slavePeers.delChunkLock );
 	}
+
+	// Insert (Coordinator)
+	bool insertRecovery(
+		uint32_t id, SlavePeerSocket *target, uint32_t listId, uint32_t chunkId,
+		std::unordered_set<uint32_t> &stripeIds
+	);
 
 	// Insert (Master)
 	bool insertRemappingRecordKey(
@@ -230,6 +262,10 @@ public:
 		bool needsLock = true, bool needsUnlock = true
 	);
 
+	std::unordered_set<uint32_t> *findRecovery(
+		uint32_t id, SlavePeerSocket *&socket,
+		uint32_t &listId, uint32_t &chunkId
+	);
 	bool findChunkRequest(
 		PendingType type, uint32_t id, void *ptr,
 		std::unordered_multimap<PendingIdentifier, ChunkRequest>::iterator &it,
