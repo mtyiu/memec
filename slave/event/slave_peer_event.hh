@@ -83,6 +83,7 @@ public:
 		struct {
 			Metadata metadata;
 			Chunk *chunk;
+			bool needsFree;
 		} chunk;
 		MixedChunkBuffer *chunkBuffer;
 		struct {
@@ -115,7 +116,7 @@ public:
 	void reqGetChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata );
 	void resGetChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, bool success, Chunk *chunk = 0 );
 	// SET_CHUNK
-	void reqSetChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, Chunk *chunk );
+	void reqSetChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, Chunk *chunk, bool needsFree );
 	void resSetChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, bool success );
 	// SEAL_CHUNK
 	void reqSealChunk( Chunk *chunk );

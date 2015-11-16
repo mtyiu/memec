@@ -533,11 +533,8 @@ SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId
 		// Perform degraded operation
 		useDegradedMode = true;
 		if ( MasterWorker::degradedTargetIsFixed ) {
-			if ( ! BasicRemappingScheme::isOverloaded( original ) )
+			if ( ! BasicRemappingScheme::isOverloaded( original ) || ! Master::getInstance()->remapMsgHandler.allowRemapping( original->getAddr() ) )
 				return original; // not overloaded
-
-			if ( chunkId != 0 )
-				return original;
 
 			// Pick a new server from the same stripe list to handle the request
 			for ( uint32_t jump = 0, chunkCount = MasterWorker::dataChunkCount + MasterWorker::parityChunkCount; jump < chunkCount; jump++ ) {

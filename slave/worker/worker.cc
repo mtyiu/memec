@@ -488,6 +488,10 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 					event.message.chunk.chunk->getSize(),
 					event.message.chunk.chunk->getData()
 				);
+
+				if ( event.message.chunk.needsFree ) {
+					SlaveWorker::chunkPool->free( event.message.chunk.chunk );
+				}
 			} else {
 				DegradedMap &map = SlaveWorker::degradedChunkBuffer->map;
 				buffer.data = this->protocol.reqSetChunk(
@@ -508,7 +512,8 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 						event.socket,
 						event.id,
 						event.message.chunk.metadata,
-						0 // unsealed chunk
+						0, // unsealed chunk
+						false
 					);
 				}
 			}
@@ -1151,7 +1156,7 @@ bool SlaveWorker::handleReleaseDegradedLockRequest( CoordinatorEvent event, char
 		}
 
 		// If chunk is NULL, then the unsealed version of SET_CHUNK will be used
-		slavePeerEvent.reqSetChunk( socket, requestId, metadata, chunk );
+		slavePeerEvent.reqSetChunk( socket, requestId, metadata, chunk, true );
 		SlaveWorker::eventQueue->insert( slavePeerEvent );
 	}
 
@@ -3166,7 +3171,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 
 			metadata.set( listId, stripeId, chunkId );
 
-			event.reqSetChunk( target, requestId, metadata, this->chunks[ chunkId ] );
+			event.reqSetChunk( target, requestId, metadata, this->chunks[ chunkId ], false );
 			this->dispatch( event );
 		}
 

@@ -103,12 +103,13 @@ void SlavePeerEvent::resGetChunk( SlavePeerSocket *socket, uint32_t id, Metadata
 	this->message.chunk.chunk = chunk;
 }
 
-void SlavePeerEvent::reqSetChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, Chunk *chunk ) {
+void SlavePeerEvent::reqSetChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, Chunk *chunk, bool needsFree ) {
 	this->type = SLAVE_PEER_EVENT_TYPE_SET_CHUNK_REQUEST;
 	this->id = id;
 	this->socket = socket;
 	this->message.chunk.metadata = metadata;
 	this->message.chunk.chunk = chunk;
+	this->message.chunk.needsFree = needsFree;
 }
 
 void SlavePeerEvent::resSetChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, bool success ) {

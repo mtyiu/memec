@@ -271,8 +271,8 @@ bool MasterRemapMsgHandler::checkAckRemapForSlave( struct sockaddr_in slave ) {
 	RemapStatus status = this->slavesStatus[ slave ];
 
 	if ( ( status == REMAP_PREPARE_START && normal > 0 ) ||
-			( status == REMAP_PREPARE_END && ( remapping > 0 || degraded > 0 ) ) ||
-			( status != REMAP_PREPARE_START && status != REMAP_PREPARE_END ) ) {
+	     ( status == REMAP_PREPARE_END && ( remapping > 0 || degraded > 0 ) ) ||
+	     ( status != REMAP_PREPARE_START && status != REMAP_PREPARE_END ) ) {
 		UNLOCK( &this->slavesStatusLock[ slave ] );
 		return false;
 	}

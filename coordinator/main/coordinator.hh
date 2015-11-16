@@ -111,6 +111,7 @@ public:
 	void metadata();
 	void syncSlaveMeta( struct sockaddr_in slave, bool *sync );
 	void releaseDegradedLock();
+	void releaseDegradedLock( struct sockaddr_in slave, bool *done );
 	void syncRemappingRecords( LOCK_T *lock, std::map<struct sockaddr_in, uint32_t> *counter, bool *done );
 	double getElapsedTime();
 	void interactive();

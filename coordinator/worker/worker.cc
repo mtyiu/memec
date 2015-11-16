@@ -129,7 +129,7 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 			isSend = true;
 			break;
 		case MASTER_EVENT_TYPE_PUSH_LOADING_STATS:
-			buffer.data = this->protocol.reqPushLoadStats (
+			buffer.data = this->protocol.reqPushLoadStats(
 				buffer.size, 0, // id
 				event.message.slaveLoading.slaveGetLatency,
 				event.message.slaveLoading.slaveSetLatency,
@@ -390,11 +390,11 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
 			buffer.data = this->protocol.reqSyncMeta( buffer.size, requestId );
 			// add sync meta request to pending set
-			Coordinator::getInstance()->pending.addSyncMetaReq( requestId, event.sync );
+			Coordinator::getInstance()->pending.addSyncMetaReq( requestId, event.message.sync );
 			isSend = true;
 			break;
 		case SLAVE_EVENT_TYPE_REQUEST_RELEASE_DEGRADED_LOCK:
-			this->handleReleaseDegradedLockRequest( event.socket );
+			this->handleReleaseDegradedLockRequest( event.socket, event.message.degraded.done );
 			isSend = false;
 			break;
 		case SLAVE_EVENT_TYPE_PENDING:
@@ -436,7 +436,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 		ArrayMap<int, SlaveSocket> &slaves = Coordinator::getInstance()->sockets.slaves;
 		uint32_t requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
 
-		buffer.data = this->protocol.announceSlaveReconstructed( buffer.size, requestId, event.reconstructed.src, event.reconstructed.dst );
+		buffer.data = this->protocol.announceSlaveReconstructed( buffer.size, requestId, event.message.reconstructed.src, event.message.reconstructed.dst );
 
 		LOCK( &slaves.lock );
 		for ( uint32_t i = 0; i < slaves.size(); i++ ) {
@@ -449,7 +449,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 				__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 		}
 		// notify the remap message handler of the new slave
-		struct sockaddr_in slaveAddr = event.reconstructed.dst->getAddr();
+		struct sockaddr_in slaveAddr = event.message.reconstructed.dst->getAddr();
 		if ( Coordinator::getInstance()->remapMsgHandler )
 			Coordinator::getInstance()->remapMsgHandler->addAliveSlave( slaveAddr );
 		UNLOCK( &slaves.lock );
@@ -850,7 +850,7 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 	return true;
 }
 
-bool CoordinatorWorker::handleReleaseDegradedLockRequest( SlaveSocket *socket ) {
+bool CoordinatorWorker::handleReleaseDegradedLockRequest( SlaveSocket *socket, bool *done ) {
 	std::unordered_map<Metadata, Metadata>::iterator dlsIt;
 	Map &map = socket->map;
 	Metadata dst;
@@ -882,13 +882,21 @@ bool CoordinatorWorker::handleReleaseDegradedLockRequest( SlaveSocket *socket ) 
 	map.degradedLocks.swap( map.releasingDegradedLocks );
 	UNLOCK( &map.degradedLocksLock );
 
+	requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
+
+	// Update pending map
+	CoordinatorWorker::pending->addReleaseDegradedLock( requestId, chunks.size(), done );
+
 	for ( chunksIt = chunks.begin(); chunksIt != chunks.end(); chunksIt++ ) {
 		std::vector<Metadata> &srcs = chunksIt->second;
 		dst = chunksIt->first;
 		dstSocket = CoordinatorWorker::stripeList->get( dst.listId, dst.chunkId );
 
+		isCompleted = true;
 		do {
-			requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
+			if ( ! isCompleted ) // When the loop is not at its first iteration
+				CoordinatorWorker::pending->addReleaseDegradedLock( requestId, 1, done );
+
 			buffer.data = this->protocol.reqReleaseDegradedLock(
 				buffer.size, requestId, srcs, isCompleted
 			);
@@ -896,18 +904,6 @@ bool CoordinatorWorker::handleReleaseDegradedLockRequest( SlaveSocket *socket ) 
 			if ( ret != ( ssize_t ) buffer.size )
 				__ERROR__( "CoordinatorWorker", "handleReleaseDegradedLockRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 		} while ( ! isCompleted );
-
-		// printf( "dst: (%u, %u) |-> (", chunksIt->first.listId, chunksIt->first.chunkId );
-		// for ( size_t i = 0, len = srcs.size(); i < len; i++ ) {
-		// 	printf(
-		// 		"%s(%u, %u, %u)",
-		// 		i == 0 ? "" : ", ",
-		// 		srcs[ i ].listId,
-		// 		srcs[ i ].stripeId,
-		// 		srcs[ i ].chunkId
-		// 	);
-		// }
-		// printf( ")\n" );
 
 		printf( "dst: (%u, %u) |-> %lu\n", chunksIt->first.listId, chunksIt->first.chunkId, srcs.size() );
 	}

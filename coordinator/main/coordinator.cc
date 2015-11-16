@@ -470,6 +470,36 @@ void Coordinator::releaseDegradedLock() {
 	}
 }
 
+void Coordinator::releaseDegradedLock( struct sockaddr_in slave, bool *done ) {
+	uint32_t index = 0;
+	SlaveSocket *socket;
+	for ( uint32_t i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
+		socket = this->sockets.slaves.values[ i ];
+		if ( ! socket )
+			continue;
+
+		if ( socket->equal( slave.sin_addr.s_addr, slave.sin_port ) ) {
+			index = i;
+			break;
+		} else {
+			socket = 0;
+		}
+	}
+
+	if ( ! socket ) {
+		__ERROR__( "Coordinator", "releaseDegradedLock", "Cannot find socket." );
+		return;
+	}
+
+	SlaveEvent event;
+	event.reqReleaseDegradedLock( socket, done );
+	this->eventQueue.insert( event );
+
+	printf( "Sending release degraded locks request to: (#%u) ", index );
+	socket->printAddress();
+	printf( "\n" );
+}
+
 void Coordinator::syncRemappingRecords( LOCK_T *lock, std::map<struct sockaddr_in, uint32_t> *counter, bool *done ) {
 	CoordinatorEvent event;
 	event.syncRemappingRecords( lock, counter, done );

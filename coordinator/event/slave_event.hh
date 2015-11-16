@@ -23,11 +23,16 @@ public:
 	SlaveEventType type;
 	uint32_t id;
 	SlaveSocket *socket;
-	struct {
-		SlaveSocket *src;
-		SlaveSocket *dst;
-	} reconstructed;
-	bool *sync;
+	union {
+		struct {
+			SlaveSocket *src;
+			SlaveSocket *dst;
+		} reconstructed;
+		struct {
+			bool *done;
+		} degraded;
+		bool *sync;
+	} message;
 
 	void pending( SlaveSocket *socket );
 	void resRegister( SlaveSocket *socket, uint32_t id, bool success = true );
@@ -36,7 +41,7 @@ public:
 	void reqSealChunks( SlaveSocket *socket );
 	void reqFlushChunks( SlaveSocket *socket );
 	void reqSyncMeta( SlaveSocket *socket, bool *sync );
-	void reqReleaseDegradedLock( SlaveSocket *socket );
+	void reqReleaseDegradedLock( SlaveSocket *socket, bool *done = 0 );
 	void disconnect( SlaveSocket *socket );
 };
 

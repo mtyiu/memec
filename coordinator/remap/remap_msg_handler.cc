@@ -183,8 +183,18 @@ bool CoordinatorRemapMsgHandler::stopRemapEnd( const struct sockaddr_in &slave )
 	LOCK_T lock;
 	std::map<struct sockaddr_in, uint32_t> count;
 	volatile bool done = false;
-	Coordinator::getInstance()->syncRemappingRecords( &lock, &count, ( bool * ) &done );
-	while ( done == false );
+
+	LOCK_INIT( &lock );
+
+	Coordinator *coordinator = Coordinator::getInstance();
+
+	coordinator->syncRemappingRecords( &lock, &count, ( bool * ) &done );
+	while ( ! done );
+
+	done = false;
+	coordinator->releaseDegradedLock( slave, ( bool * ) &done );
+	while( ! done );
+
 	return false;
 }
 

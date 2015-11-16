@@ -23,13 +23,21 @@ public:
 	}
 };
 
+struct PendingDegradedLock {
+	uint32_t count;
+	bool *done;
+};
+
 class Pending {
 private:
 	/*
 	 * syncMetaRequests: ( id, indicator whether sync is completed )
 	 */
-	std::unordered_map<uint32_t, bool*> syncMetaRequests;
+	std::unordered_map<uint32_t, bool *> syncMetaRequests;
 	LOCK_T syncMetaLock;
+
+	std::unordered_map<uint32_t, PendingDegradedLock> releaseDegradedLock;
+	LOCK_T releaseDegradedLockLock;
 
 	/*
 	 * syncRemappingRecordCounters: ( packet id, counter for a sync operation )
@@ -48,6 +56,7 @@ private:
 public:
 	Pending() {
 		LOCK_INIT( &this->syncMetaLock );
+		LOCK_INIT( &this->releaseDegradedLockLock );
 		LOCK_INIT( &this->syncRemappingRecordLock );
 		LOCK_INIT( &this->recoveryLock );
 	}
@@ -85,6 +94,41 @@ public:
 		UNLOCK( &this->recoveryLock );
 
 		return &( it->second.stripeIds );
+	}
+
+	void addReleaseDegradedLock( uint32_t id, uint32_t count, bool *done ) {
+		std::unordered_map<uint32_t, PendingDegradedLock>::iterator it;
+
+		LOCK( &this->releaseDegradedLockLock );
+		it = this->releaseDegradedLock.find( id );
+		if ( it == this->releaseDegradedLock.end() ) {
+			PendingDegradedLock v;
+			v.count = count;
+			v.done = done;
+
+			this->releaseDegradedLock[ id ] = v;
+		} else {
+			it->second.count += count;
+		}
+		UNLOCK( &this->releaseDegradedLockLock );
+	}
+
+	bool *removeReleaseDegradedLock( uint32_t id, uint32_t count ) {
+		std::unordered_map<uint32_t, PendingDegradedLock>::iterator it;
+
+		bool *done = 0;
+
+		LOCK( &this->releaseDegradedLockLock );
+		it = this->releaseDegradedLock.find( id );
+		if ( it != this->releaseDegradedLock.end() ) {
+			it->second.count -= count;
+			if ( it->second.count == 0 ) {
+				done = it->second.done;
+				this->releaseDegradedLock.erase( it );
+			}
+		}
+		UNLOCK( &this->releaseDegradedLockLock );
+		return done;
 	}
 
 	void addSyncMetaReq( uint32_t id, bool* sync ) {

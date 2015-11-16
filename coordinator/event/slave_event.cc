@@ -18,8 +18,8 @@ void SlaveEvent::announceSlaveConnected( SlaveSocket *socket ) {
 
 void SlaveEvent::announceSlaveReconstructed( SlaveSocket *srcSocket, SlaveSocket *dstSocket ) {
 	this->type = SLAVE_EVENT_TYPE_ANNOUNCE_SLAVE_RECONSTRUCTED;
-	this->reconstructed.src = srcSocket;
-	this->reconstructed.dst = dstSocket;
+	this->message.reconstructed.src = srcSocket;
+	this->message.reconstructed.dst = dstSocket;
 }
 
 void SlaveEvent::reqSealChunks( SlaveSocket *socket ) {
@@ -34,13 +34,14 @@ void SlaveEvent::reqFlushChunks( SlaveSocket *socket ) {
 
 void SlaveEvent::reqSyncMeta( SlaveSocket *socket, bool *sync ) {
 	this->type = SLAVE_EVENT_TYPE_REQUEST_SYNC_META;
-	this->sync = sync;
 	this->socket = socket;
+	this->message.sync = sync;
 }
 
-void SlaveEvent::reqReleaseDegradedLock( SlaveSocket *socket ) {
+void SlaveEvent::reqReleaseDegradedLock( SlaveSocket *socket, bool *done ) {
 	this->type = SLAVE_EVENT_TYPE_REQUEST_RELEASE_DEGRADED_LOCK;
 	this->socket = socket;
+	this->message.degraded.done = done;
 }
 
 void SlaveEvent::disconnect( SlaveSocket *socket ) {
