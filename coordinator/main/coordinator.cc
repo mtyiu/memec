@@ -37,6 +37,7 @@ void Coordinator::switchPhase( std::set<struct sockaddr_in> prevOverloadedSlaves
 	uint32_t prevOverloadedSlaveCount = prevOverloadedSlaves.size();
 
 	if ( curOverloadedSlaveCount > totalSlaveCount * startThreshold ) { // Phase 1 --> 2
+		// need to start remapping now
 		if ( prevOverloadedSlaveCount > totalSlaveCount * startThreshold ) {
 			std::set<struct sockaddr_in> newOverloadedSlaves = this->overloadedSlaves.slaveSet;
 			// already started remapping
@@ -59,8 +60,9 @@ void Coordinator::switchPhase( std::set<struct sockaddr_in> prevOverloadedSlaves
 			event.switchPhase( true, this->overloadedSlaves.slaveSet );
 		}
 	} else if ( curOverloadedSlaveCount < totalSlaveCount * stopThreshold &&
-		prevOverloadedSlaveCount >= totalSlaveCount * stopThreshold
+		prevOverloadedSlaveCount >= totalSlaveCount * startThreshold
 	) {
+		// no longer need remapping after remapping has started
 		// stop remapping phase for all in the background
 		event.switchPhase( false, prevOverloadedSlaves ); // Phase 4 --> 3
 		this->eventQueue.insert( event );
