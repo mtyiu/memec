@@ -1139,9 +1139,7 @@ bool SlaveWorker::handleReleaseDegradedLockRequest( CoordinatorEvent event, char
 		count++;
 	}
 
-	if ( ! SlaveWorker::pending->insertReleaseDegradedLock( event.id, event.socket, count ) ) {
-		__ERROR__( "SlaveWorker", "handleReleaseDegradedLockRequest", "Cannot insert into pending release degraded lock map." );
-	}
+	SlaveWorker::pending->insertReleaseDegradedLock( event.id, event.socket, count );
 
 	for ( size_t i = 0, len = chunks.size(); i < len; i++ ) {
 		// Determine the src
@@ -1161,7 +1159,7 @@ bool SlaveWorker::handleReleaseDegradedLockRequest( CoordinatorEvent event, char
 
 		chunkRequest.set(
 			chunks[ i ].listId, chunks[ i ].stripeId, chunks[ i ].chunkId,
-			socket, chunk, true
+			socket, chunk, true /* isDegraded */
 		);
 		if ( ! SlaveWorker::pending->insertChunkRequest( PT_SLAVE_PEER_SET_CHUNK, requestId, event.id, socket, chunkRequest ) ) {
 			__ERROR__( "SlaveWorker", "performDegradedRead", "Cannot insert into slave CHUNK_REQUEST pending map." );
@@ -3175,7 +3173,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 			uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
 			chunkRequest.set(
 				listId, stripeId, chunkId, target,
-				0 /* chunk */, false
+				0 /* chunk */, false /* isDegraded */
 			);
 			if ( ! SlaveWorker::pending->insertChunkRequest( PT_SLAVE_PEER_SET_CHUNK, requestId, pid.parentId, target, chunkRequest ) ) {
 				__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot insert into slave CHUNK_REQUEST pending map." );
@@ -3236,6 +3234,7 @@ bool SlaveWorker::handleSetChunkResponse( SlavePeerEvent event, bool success, ch
 			__ERROR__( "SlaveWorker", "handleSetChunkResponse", "Cannot find a pending coordinator release degraded lock request that matches the response. The message will be discarded." );
 			return false;
 		}
+
 		if ( remaining == 0 ) {
 			// Tell the coordinator that all degraded lock is released
 			CoordinatorEvent coordinatorEvent;

@@ -180,7 +180,7 @@ public:
 	}
 
 	// Insert (Coordinator)
-	bool insertReleaseDegradedLock(
+	void insertReleaseDegradedLock(
 		uint32_t id, CoordinatorSocket *socket, uint32_t count
 	);
 	bool insertRecovery(

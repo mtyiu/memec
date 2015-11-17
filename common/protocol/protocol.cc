@@ -1667,6 +1667,7 @@ bool Protocol::parseListStripeKeyHeader( struct ListStripeKeyHeader &header, cha
 size_t Protocol::generateDegradedReleaseReqHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, std::vector<Metadata> &chunks, bool &isCompleted ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = 0;
+	uint32_t count = 0;
 
 	isCompleted = true;
 
@@ -1675,6 +1676,8 @@ size_t Protocol::generateDegradedReleaseReqHeader( uint8_t magic, uint8_t to, ui
 			*( ( uint32_t * )( buf      ) ) = htonl( chunks[ i ].listId );
 			*( ( uint32_t * )( buf +  4 ) ) = htonl( chunks[ i ].stripeId );
 			*( ( uint32_t * )( buf +  8 ) ) = htonl( chunks[ i ].chunkId );
+
+			count++;
 		} else {
 			isCompleted = false;
 			break;

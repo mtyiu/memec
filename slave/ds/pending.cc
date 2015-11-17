@@ -200,19 +200,23 @@ DEFINE_PENDING_ERASE_METHOD( eraseChunkUpdate, ChunkUpdate, chunkUpdatePtr )
 #undef DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD
 #undef DEFINE_PENDING_ERASE_METHOD
 
-bool Pending::insertReleaseDegradedLock( uint32_t id, CoordinatorSocket *socket, uint32_t count ) {
+void Pending::insertReleaseDegradedLock( uint32_t id, CoordinatorSocket *socket, uint32_t count ) {
 	PendingIdentifier pid( id, id, socket );
-	PendingDegradedLock d;
-	d.count = count;
-	d.total = count;
-	std::pair<PendingIdentifier, PendingDegradedLock> p( pid, d );
-	std::pair<std::unordered_map<PendingIdentifier, PendingDegradedLock>::iterator, bool> ret;
+	std::unordered_map<PendingIdentifier, PendingDegradedLock>::iterator it;
 
 	LOCK( &this->coordinators.releaseDegradedLockLock );
-	ret = this->coordinators.releaseDegradedLock.insert( p );
-	UNLOCK( &this->coordinators.releaseDegradedLockLock );
+	it = this->coordinators.releaseDegradedLock.find( pid );
+	if ( it == this->coordinators.releaseDegradedLock.end() ) {
+		PendingDegradedLock d;
+		d.count = count;
+		d.total = count;
 
-	return ret.second;
+		this->coordinators.releaseDegradedLock[ pid ] = d;
+	} else {
+		it->second.count += count;
+		it->second.total += count;
+	}
+	UNLOCK( &this->coordinators.releaseDegradedLockLock );
 }
 
 bool Pending::insertRecovery( uint32_t id, SlavePeerSocket *target, uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds ) {

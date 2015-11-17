@@ -913,18 +913,17 @@ bool CoordinatorWorker::handleReleaseDegradedLockRequest( SlaveSocket *socket, b
 	}
 
 	// Update pending map
-	CoordinatorWorker::pending->addReleaseDegradedLock( requestId, chunks.size(), done );
+	requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
 
 	for ( chunksIt = chunks.begin(); chunksIt != chunks.end(); chunksIt++ ) {
 		std::vector<Metadata> &srcs = chunksIt->second;
 		dst = chunksIt->first;
 		dstSocket = CoordinatorWorker::stripeList->get( dst.listId, dst.chunkId );
 
-		requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
+		CoordinatorWorker::pending->addReleaseDegradedLock( requestId, srcs.size(), done );
+
 		isCompleted = true;
 		do {
-			if ( ! isCompleted ) // When the loop is not at its first iteration
-				CoordinatorWorker::pending->addReleaseDegradedLock( requestId, 1, done );
 
 			buffer.data = this->protocol.reqReleaseDegradedLock(
 				buffer.size, requestId, srcs, isCompleted
@@ -948,15 +947,13 @@ bool CoordinatorWorker::handleReleaseDegradedLockResponse( SlaveEvent event, cha
 	}
 	__DEBUG__(
 		BLUE, "CoordinatorWorker", "handleReleaseDegradedLockResponse",
-		"[RELEASE_DEGRADED_LOCK] Count: %u",
-		header.count
+		"[RELEASE_DEGRADED_LOCK] Request ID: %u; Count: %u",
+		event.id, header.count
 	);
 
 	bool *done = CoordinatorWorker::pending->removeReleaseDegradedLock( event.id, header.count );
-	if ( done ) {
+	if ( done )
 		*done = true;
-		printf( "handleReleaseDegradedLockResponse() is completed.\n" );
-	}
 	return true;
 }
 

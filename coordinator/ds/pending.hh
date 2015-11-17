@@ -126,6 +126,8 @@ public:
 				done = it->second.done;
 				this->releaseDegradedLock.erase( it );
 			}
+		} else {
+			__ERROR__( "Pending", "removeReleaseDegradedLock", "ID: %u Not found.\n", id );
 		}
 		UNLOCK( &this->releaseDegradedLockLock );
 		return done;
