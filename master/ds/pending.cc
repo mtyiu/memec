@@ -202,14 +202,15 @@ bool Pending::recordRequestStartTime( PendingType type, uint32_t id, uint32_t pa
 
 bool Pending::eraseRequestStartTime( PendingType type, uint32_t id, void *ptr, struct timespec &elapsedTime, PendingIdentifier *pidPtr, RequestStartTime *rstPtr ) {
 	PendingIdentifier pid( id, 0, ptr );
-	std::unordered_multimap<PendingIdentifier, RequestStartTime>::iterator it;
+	std::unordered_multimap<PendingIdentifier, RequestStartTime>::iterator it, rit;
 	RequestStartTime rst;
 	bool ret;
 
 	if ( type == PT_SLAVE_GET ) {
 		LOCK( &this->stats.getLock );
-		it = this->stats.get.find( pid );
-		ret = ( it != this->stats.get.end() );
+		tie( it, rit ) = this->stats.get.equal_range( pid );
+		while( it != rit && ptr && it->first.id == id && it->first.ptr != ptr ) it++;
+		ret = ( it != rit && it->first.id == id && ( ! ptr || it->first.ptr == ptr ) );
 		if ( ret ) {
 			pid = it->first;
 			rst = it->second;
@@ -220,8 +221,9 @@ bool Pending::eraseRequestStartTime( PendingType type, uint32_t id, void *ptr, s
 		UNLOCK( &this->stats.getLock );
 	} else if ( type == PT_SLAVE_SET ) {
 		LOCK( &this->stats.setLock );
-		it = this->stats.set.find( pid );
-		ret = ( it != this->stats.set.end() );
+		tie( it, rit ) = this->stats.set.equal_range( pid );
+		while( it != rit && ptr && it->first.id == id && it->first.ptr != ptr ) it++;
+		ret = ( it != rit && it->first.id == id && ( ! ptr || it->first.ptr == ptr ) );
 		if ( ret ) {
 			pid = it->first;
 			rst = it->second;
