@@ -239,6 +239,36 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 	return true;
 }
 
+bool Slave::init( int mySlaveIndex ) {
+	if ( mySlaveIndex == -1 )
+		return false;
+
+	this->stripeListIndex = this->stripeList->list( mySlaveIndex );
+
+	for ( uint32_t i = 0, size = this->stripeListIndex.size(); i < size; i++ ) {
+		uint32_t listId = this->stripeListIndex[ i ].listId,
+				 stripeId = this->stripeListIndex[ i ].stripeId,
+				 chunkId = this->stripeListIndex[ i ].chunkId;
+		if ( this->stripeListIndex[ i ].isParity ) {
+			this->chunkBuffer[ listId ] = new MixedChunkBuffer(
+				new ParityChunkBuffer(
+					this->config.global.buffer.chunksPerList,
+					listId, stripeId, chunkId
+				)
+			);
+		} else {
+			this->chunkBuffer[ listId ] = new MixedChunkBuffer(
+				new DataChunkBuffer(
+					this->config.global.buffer.chunksPerList,
+					listId, stripeId, chunkId
+				)
+			);
+		}
+	}
+
+	return true;
+}
+
 bool Slave::start() {
 	/* Workers and event queues */
 	this->eventQueue.start();

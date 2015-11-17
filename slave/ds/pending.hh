@@ -281,6 +281,7 @@ public:
 
 	std::unordered_set<uint32_t> *findRecovery(
 		uint32_t id, SlavePeerSocket *&socket,
+		uint32_t stripeId,
 		uint32_t &listId, uint32_t &chunkId
 	);
 	bool findChunkRequest(

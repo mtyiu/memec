@@ -66,6 +66,7 @@ public:
 	bool set( const char *section, const char *name, const char *value );
 	bool validate();
 	int validate( std::vector<ServerAddr> slaves );
+	int validate( std::vector<ServerAddr> slaves, ServerAddr &addr );
 	void print( FILE *f = stdout );
 };
 

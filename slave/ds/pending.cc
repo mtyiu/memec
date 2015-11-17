@@ -226,10 +226,6 @@ bool Pending::insertRecovery( uint32_t id, SlavePeerSocket *target, uint32_t lis
 	std::pair<PendingIdentifier, PendingRecovery> p( pid, r );
 	std::pair<std::unordered_map<PendingIdentifier, PendingRecovery>::iterator, bool> ret;
 
-	printf( "insertRecovery(): " );
-	target->printAddress();
-	printf( "\n" );
-
 	LOCK( &this->coordinators.recoveryLock );
 	ret = this->coordinators.recovery.insert( p );
 	UNLOCK( &this->coordinators.recoveryLock );
@@ -256,7 +252,7 @@ bool Pending::eraseReleaseDegradedLock( uint32_t id, uint32_t count, uint32_t &r
 	return true;
 }
 
-std::unordered_set<uint32_t> *Pending::findRecovery( uint32_t id, SlavePeerSocket *&target, uint32_t &listId, uint32_t &chunkId ) {
+std::unordered_set<uint32_t> *Pending::findRecovery( uint32_t id, SlavePeerSocket *&target, uint32_t stripeId, uint32_t &listId, uint32_t &chunkId ) {
 	PendingIdentifier pid( id, id, 0 );
 	std::unordered_map<PendingIdentifier, PendingRecovery>::iterator it;
 
@@ -269,6 +265,9 @@ std::unordered_set<uint32_t> *Pending::findRecovery( uint32_t id, SlavePeerSocke
 	target = ( SlavePeerSocket * ) it->first.ptr;
 	listId = it->second.listId;
 	chunkId = it->second.chunkId;
+
+	it->second.stripeIds.erase( stripeId );
+
 	UNLOCK( &this->coordinators.recoveryLock );
 
 	return &( it->second.stripeIds );

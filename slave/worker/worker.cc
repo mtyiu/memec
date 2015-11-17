@@ -1070,6 +1070,7 @@ bool SlaveWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *buf
 	// Find the slave peer socket in the array map
 	int index = -1, sockfd = -1;
 	SlavePeerSocket *original, *s;
+	Slave *slave = Slave::getInstance();
 	bool self = false;
 
 	for ( int i = 0, len = slavePeers->size(); i < len; i++ ) {
@@ -1086,10 +1087,24 @@ bool SlaveWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *buf
 	original->stop();
 
 	ServerAddr serverAddr( slavePeers->values[ index ]->identifier, dstHeader.addr, dstHeader.port );
-	ServerAddr &me = Slave::getInstance()->config.slave.slave.addr;
+	ServerAddr &me = slave->config.slave.slave.addr;
 
 	// Check if this is a self-socket
 	self = ( dstHeader.addr == me.addr && dstHeader.port == me.port );
+
+	if ( self ) {
+		ServerAddr src( 0, srcHeader.addr, srcHeader.port );
+		int mySlaveIndex = -1;
+
+		for ( int i = 0, len = slave->config.global.slaves.size(); i < len; i++ ) {
+			if ( ServerAddr::match( &slave->config.global.slaves[ i ], &src ) ) {
+				mySlaveIndex = i;
+				break;
+			}
+		}
+
+		slave->init( mySlaveIndex );
+	}
 
 	s = new SlavePeerSocket();
 	s->init(
@@ -1187,10 +1202,8 @@ bool SlaveWorker::handleRecoveryRequest( CoordinatorEvent event, char *buf, size
 		__ERROR__( "SlaveWorker", "handleRecoveryRequest", "Invalid RECOVERY request." );
 		return false;
 	}
-	// __DEBUG__(
-	// 	BLUE,
-	__ERROR__(
-		"SlaveWorker", "handleRecoveryRequest",
+	__DEBUG__(
+		BLUE, "SlaveWorker", "handleRecoveryRequest",
 		"[RECOVERY] List ID: %u; chunk ID: %u; number of stripes: %u.",
 		header.listId, header.chunkId, header.numStripes
 	);
@@ -1261,7 +1274,9 @@ bool SlaveWorker::handleRecoveryRequest( CoordinatorEvent event, char *buf, size
 					chunkCount++;
 				}
 			}
-			chunkId = ( chunkId + 1 ) % SlaveWorker::chunkCount;
+			chunkId++;
+			if ( chunkId >= SlaveWorker::chunkCount )
+				chunkId = 0;
 		}
 		// Use own chunk
 		chunk = SlaveWorker::map->findChunkById( metadata.listId, metadata.stripeId, myChunkId );
@@ -2955,6 +2970,8 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 	UNLOCK( &SlaveWorker::pending->slavePeers.getChunkLock );
 
 	if ( pending == 0 ) {
+		printf( "Reconstructing: %u, %u, {", chunkRequest.listId, chunkRequest.stripeId );
+
 		// Set up chunk buffer for storing reconstructed chunks
 		for ( uint32_t i = 0, j = 0; i < SlaveWorker::chunkCount; i++ ) {
 			if ( ! this->chunks[ i ] ) {
@@ -2966,9 +2983,12 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 				this->chunkStatus->unset( i );
 				j++;
 			} else {
+				printf( "%u ", i );
 				this->chunkStatus->set( i );
 			}
 		}
+		printf( "}\n" );
+		fflush( stdout );
 
 		// Decode to reconstruct the lost chunk
 		CodingEvent codingEvent;
@@ -3170,25 +3190,35 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 
 			std::unordered_set<uint32_t> *stripeIds = SlaveWorker::pending->findRecovery(
 				pid.parentId, target,
+				stripeId,
 				listId, chunkId
 			);
 
-			__ERROR__( "SlaveWorker", "handleGetChunkResponse", "TODO: Handle the case for recovery: (%u, %u, %u); target = %p.", listId, stripeId, chunkId, target );
+			SlaveWorker::stripeList->get( listId, this->paritySlaveSockets, this->dataSlaveSockets );
+			target = ( chunkId < SlaveWorker::dataChunkCount ) ?
+					 ( this->dataSlaveSockets[ chunkId ] ) :
+					 ( this->paritySlaveSockets[ chunkId - SlaveWorker::dataChunkCount ] );
 
-			// Send SET_CHUNK request
-			uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
-			chunkRequest.set(
-				listId, stripeId, chunkId, target,
-				0 /* chunk */, false /* isDegraded */
-			);
-			if ( ! SlaveWorker::pending->insertChunkRequest( PT_SLAVE_PEER_SET_CHUNK, requestId, pid.parentId, target, chunkRequest ) ) {
-				__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot insert into slave CHUNK_REQUEST pending map." );
+			// __ERROR__( "SlaveWorker", "handleGetChunkResponse", "TODO: Handle the case for recovery: (%u, %u, %u); target = %p.", listId, stripeId, chunkId, target );
+
+			if ( stripeIds ) {
+				// Send SET_CHUNK request
+				uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
+				chunkRequest.set(
+					listId, stripeId, chunkId, target,
+					0 /* chunk */, false /* isDegraded */
+				);
+				if ( ! SlaveWorker::pending->insertChunkRequest( PT_SLAVE_PEER_SET_CHUNK, requestId, pid.parentId, target, chunkRequest ) ) {
+					__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot insert into slave CHUNK_REQUEST pending map." );
+				}
+
+				metadata.set( listId, stripeId, chunkId );
+
+				event.reqSetChunk( target, requestId, metadata, this->chunks[ chunkId ], false );
+				this->dispatch( event );
+			} else {
+				__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot found a pending recovery request for (%u, %u, %u).\n", listId, stripeId, chunkId );
 			}
-
-			metadata.set( listId, stripeId, chunkId );
-
-			event.reqSetChunk( target, requestId, metadata, this->chunks[ chunkId ], false );
-			this->dispatch( event );
 		}
 
 		// Return chunks to chunk pool
