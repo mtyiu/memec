@@ -369,41 +369,179 @@ bool Coordinator::stop() {
 
 	int i, len;
 
-	/* Sockets */
+	/* Socket */
+	printf( "Stopping self-socket...\n" );
 	this->sockets.self.stop();
 
 	/* Workers */
+	printf( "Stopping workers...\n" );
 	len = this->workers.size();
 	for ( i = len - 1; i >= 0; i-- )
 		this->workers[ i ].stop();
 
 	/* Event queues */
+	printf( "Stopping event queues...\n" );
+
+	MixedEvent event;
+	int count = 0;
+	bool ret;
+	while( ( ret = this->eventQueue.mixed->extract( event ) ) ) {
+		char buf[ 4096 ];
+		ssize_t recvBytes;
+		bool connected;
+		if ( ret ) {
+			switch( event.type ) {
+				case EVENT_TYPE_COORDINATOR:
+					printf( "EVENT_TYPE_COORDINATOR\n" );
+					switch( event.event.coordinator.type ) {
+						case COORDINATOR_EVENT_TYPE_UNDEFINED:
+							printf( "\tCOORDINATOR_EVENT_TYPE_UNDEFINED\n" );
+							break;
+						case COORDINATOR_EVENT_TYPE_SYNC_REMAPPING_RECORDS:
+							printf( "\tCOORDINATOR_EVENT_TYPE_SYNC_REMAPPING_RECORDS\n" );
+							break;
+						case COORDINATOR_EVENT_TYPE_PENDING:
+							printf( "\tCOORDINATOR_EVENT_TYPE_PENDING\n" );
+							break;
+					}
+					break;
+				case EVENT_TYPE_MASTER:
+					printf( "EVENT_TYPE_MASTER\n" );
+					switch( event.event.master.type ) {
+						case MASTER_EVENT_TYPE_UNDEFINED:
+							printf( "\tMASTER_EVENT_TYPE_UNDEFINED\n" );
+							break;
+						case MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
+							printf( "\tMASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS\n" );
+							break;
+						case MASTER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
+							printf( "\tMASTER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE\n" );
+							break;
+						case MASTER_EVENT_TYPE_PUSH_LOADING_STATS:
+							printf( "\tMASTER_EVENT_TYPE_PUSH_LOADING_STATS\n" );
+							break;
+						case MASTER_EVENT_TYPE_SWITCH_PHASE:
+							printf( "\tMASTER_EVENT_TYPE_SWITCH_PHASE\n" );
+							break;
+						case MASTER_EVENT_TYPE_FORWARD_REMAPPING_RECORDS:
+							printf( "\tMASTER_EVENT_TYPE_FORWARD_REMAPPING_RECORDS\n" );
+							break;
+						case MASTER_EVENT_TYPE_SYNC_REMAPPING_RECORDS:
+							printf( "\tMASTER_EVENT_TYPE_SYNC_REMAPPING_RECORDS\n" );
+							break;
+						case MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED:
+							printf( "\tMASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED\n" );
+							break;
+						case MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_WAS_LOCKED:
+							printf( "\tMASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_WAS_LOCKED\n" );
+							break;
+						case MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_LOCKED:
+							printf( "\tMASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_LOCKED\n" );
+							break;
+						case MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_REMAPPED:
+							printf( "\tMASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_REMAPPED\n" );
+							break;
+						case MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_FOUND:
+							printf( "\tMASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_FOUND\n" );
+							break;
+						case MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_SUCCESS:
+							printf( "\tMASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_SUCCESS\n" );
+							break;
+						case MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_FAILURE:
+							printf( "\tMASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_FAILURE\n" );
+							break;
+						case MASTER_EVENT_TYPE_PENDING:
+							printf( "\tMASTER_EVENT_TYPE_PENDING\n" );
+							recvBytes = event.event.master.socket->recv( buf, sizeof( buf ), connected, false );
+							printf(
+								"(%lu) %x %x %x %x %x %x %x %x\n",
+								recvBytes,
+								buf[ 0 ], buf[ 1 ], buf[ 2 ], buf[ 3 ],
+								buf[ 4 ], buf[ 5 ], buf[ 6 ], buf[ 7 ]
+							);
+							break;
+					}
+					break;
+				case EVENT_TYPE_SLAVE:
+					printf( "EVENT_TYPE_SLAVE\n" );
+					switch( event.event.slave.type ) {
+						case SLAVE_EVENT_TYPE_UNDEFINED:
+							printf( "\tSLAVE_EVENT_TYPE_UNDEFINED\n" );
+							break;
+						case SLAVE_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
+							printf( "\tSLAVE_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS\n" );
+							break;
+						case SLAVE_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
+							printf( "\tSLAVE_EVENT_TYPE_REGISTER_RESPONSE_FAILURE\n" );
+							break;
+						case SLAVE_EVENT_TYPE_ANNOUNCE_SLAVE_CONNECTED:
+							printf( "\tSLAVE_EVENT_TYPE_ANNOUNCE_SLAVE_CONNECTED\n" );
+							break;
+						case SLAVE_EVENT_TYPE_ANNOUNCE_SLAVE_RECONSTRUCTED:
+							printf( "\tSLAVE_EVENT_TYPE_ANNOUNCE_SLAVE_RECONSTRUCTED\n" );
+							break;
+						case SLAVE_EVENT_TYPE_PENDING:
+							printf( "\tSLAVE_EVENT_TYPE_PENDING\n" );
+							recvBytes = event.event.slave.socket->recv( buf, sizeof( buf ), connected, false );
+							printf(
+								"(%lu) %x %x %x %x %x %x %x %x\n",
+								recvBytes,
+								buf[ 0 ], buf[ 1 ], buf[ 2 ], buf[ 3 ],
+								buf[ 4 ], buf[ 5 ], buf[ 6 ], buf[ 7 ]
+							);
+							break;
+						case SLAVE_EVENT_TYPE_REQUEST_SEAL_CHUNKS:
+							printf( "\tSLAVE_EVENT_TYPE_REQUEST_SEAL_CHUNKS\n" );
+							break;
+						case SLAVE_EVENT_TYPE_REQUEST_FLUSH_CHUNKS:
+							printf( "\tSLAVE_EVENT_TYPE_REQUEST_FLUSH_CHUNKS\n" );
+							break;
+						case SLAVE_EVENT_TYPE_REQUEST_SYNC_META:
+							printf( "\tSLAVE_EVENT_TYPE_REQUEST_SYNC_META\n" );
+							break;
+						case SLAVE_EVENT_TYPE_REQUEST_RELEASE_DEGRADED_LOCK:
+							printf( "\tSLAVE_EVENT_TYPE_REQUEST_RELEASE_DEGRADED_LOCK\n" );
+							break;
+						case SLAVE_EVENT_TYPE_DISCONNECT:
+							printf( "\tSLAVE_EVENT_TYPE_DISCONNECT\n" );
+							break;
+					}
+					break;
+				default:
+					printf( "Unknown.\n" );
+					break;
+			}
+			count++;
+		}
+	}
+
 	this->eventQueue.stop();
 
 	/* Workers */
+	printf( "Stopping workers...\n" );
 	for ( i = len - 1; i >= 0; i-- )
 		this->workers[ i ].join();
 
 	/* Sockets */
+	printf( "Stopping master sockets...\n" );
 	for ( i = 0, len = this->sockets.masters.size(); i < len; i++ )
 		this->sockets.masters[ i ]->stop();
 	this->sockets.masters.clear();
 
+	printf( "Stopping slave sockets...\n" );
 	for ( i = 0, len = this->sockets.slaves.size(); i < len; i++ )
 		this->sockets.slaves[ i ]->stop();
 	this->sockets.slaves.clear();
 
-	printf( "remapMsgHandler (start)\n" );
-
 	/* Remapping message handler */
+	printf( "Stopping remapping message handler...\n" );
 	if ( this->config.global.remap.enabled ) {
 		this->remapMsgHandler->stop();
 		this->remapMsgHandler->quit();
 	}
 
-	printf( "remapMsgHandler (end)\n" );
-
 	/* Loading stats */
+	printf( "Stopping loading stats...\n" );
 	statsTimer.stop();
 
 	this->free();
