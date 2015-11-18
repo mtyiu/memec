@@ -53,7 +53,7 @@ public class PLIOClient extends DB {
 			toId = tmp;
 		}
 
-		plio = new PLIO( keySize, chunkSize, host, port, fromId, toId ) );
+		plio = new PLIO( keySize, chunkSize, host, port, fromId, toId );
 
 		if ( ! plio.connect() )
 			throw new DBException();
