@@ -34,6 +34,7 @@ ${YCSB_PATH}/bin/ycsb \
 	-p insertstart=${INSERT_START} \
 	-p insertcount=${INSERT_COUNT} \
 	-p threadcount=$1 \
+	-p histogram.buckets=200000 \
 	-p plio.host=$(hostname -I | xargs) \
 	-p plio.port=9112 \
 	-p plio.key_size=255 \

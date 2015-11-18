@@ -34,6 +34,7 @@ ${YCSB_PATH}/bin/ycsb \
 	-p insertstart=${INSERT_START} \
 	-p insertcount=${INSERT_COUNT} \
 	-p threadcount=$1 \
+	-p histogram.buckets=200000 \
 	-p memcached.serverCount=16 \
 	-p memcached.server0=192.168.0.22 \
 	-p memcached.port0=11211 \

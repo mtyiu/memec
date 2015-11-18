@@ -22,6 +22,7 @@ ${YCSB_PATH}/bin/ycsb \
 	-p recordcount=${RECORD_COUNT} \
 	-p operationcount=${RECORD_COUNT} \
 	-p threadcount=$1 \
+	-p histogram.buckets=200000 \
 	-p memcached.serverCount=16 \
 	-p memcached.server0=192.168.0.22 \
 	-p memcached.port0=11211 \
