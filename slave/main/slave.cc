@@ -556,6 +556,7 @@ void Slave::interactive() {
 	char *command;
 	bool valid;
 	int i, len;
+	int count = 0;
 
 	this->help();
 	while( this->isRunning ) {
@@ -606,6 +607,12 @@ void Slave::interactive() {
 		} else if ( strcmp( command, "memory" ) == 0 ) {
 			valid = true;
 			this->memory();
+
+			char filename[ 32 ];
+			snprintf( filename, "memory_%c.log", count++ );
+			FILE *f = fopen( filename, "w" );
+			this->memory( f );
+			fclose( f );
 		} else if ( strcmp( command, "metadata" ) == 0 ) {
 			valid = true;
 			this->metadata();
