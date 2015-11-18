@@ -374,12 +374,13 @@ struct ChunkHeader {
 	uint32_t chunkId;
 };
 
-#define PROTO_CHUNK_DATA_SIZE 16
+#define PROTO_CHUNK_DATA_SIZE 20
 struct ChunkDataHeader {
 	uint32_t listId;
 	uint32_t stripeId;
 	uint32_t chunkId;
 	uint32_t size;
+	uint32_t offset;
 	char *data;
 };
 
@@ -756,11 +757,11 @@ protected:
 	size_t generateChunkDataHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
-		uint32_t chunkSize, char *chunkData
+		uint32_t chunkSize, uint32_t chunkOffset, char *chunkData
 	);
 	bool parseChunkDataHeader(
 		size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
-		uint32_t &chunkSize, char *&chunkData,
+		uint32_t &chunkSize, uint32_t &chunkOffset, char *&chunkData,
 		char *buf, size_t size
 	);
 

@@ -1919,7 +1919,7 @@ bool Protocol::parseChunkHeader( struct ChunkHeader &header, char *buf, size_t s
 	);
 }
 
-size_t Protocol::generateChunkDataHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t chunkSize, char *chunkData ) {
+size_t Protocol::generateChunkDataHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t chunkSize, uint32_t chunkOffset, char *chunkData ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_CHUNK_DATA_SIZE + chunkSize, id );
 
@@ -1927,6 +1927,7 @@ size_t Protocol::generateChunkDataHeader( uint8_t magic, uint8_t to, uint8_t opc
 	*( ( uint32_t * )( buf +  4 ) ) = htonl( stripeId );
 	*( ( uint32_t * )( buf +  8 ) ) = htonl( chunkId );
 	*( ( uint32_t * )( buf + 12 ) ) = htonl( chunkSize );
+	*( ( uint32_t * )( buf + 16 ) ) = htonl( chunkOffset );
 
 	buf += PROTO_CHUNK_DATA_SIZE;
 
@@ -1937,15 +1938,16 @@ size_t Protocol::generateChunkDataHeader( uint8_t magic, uint8_t to, uint8_t opc
 	return bytes;
 }
 
-bool Protocol::parseChunkDataHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &chunkSize, char *&chunkData, char *buf, size_t size ) {
+bool Protocol::parseChunkDataHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &chunkSize, uint32_t &chunkOffset, char *&chunkData, char *buf, size_t size ) {
 	if ( size - offset < PROTO_CHUNK_DATA_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
-	listId    = ntohl( *( ( uint32_t * )( ptr      ) ) );
-	stripeId  = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
-	chunkId   = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
-	chunkSize = ntohl( *( ( uint32_t * )( ptr + 12 ) ) );
+	listId      = ntohl( *( ( uint32_t * )( ptr      ) ) );
+	stripeId    = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
+	chunkId     = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
+	chunkSize   = ntohl( *( ( uint32_t * )( ptr + 12 ) ) );
+	chunkOffset = ntohl( *( ( uint32_t * )( ptr + 16 ) ) );
 
 	if ( size - offset < PROTO_CHUNK_DATA_SIZE + chunkSize )
 		return false;
@@ -1966,6 +1968,7 @@ bool Protocol::parseChunkDataHeader( struct ChunkDataHeader &header, char *buf, 
 		header.stripeId,
 		header.chunkId,
 		header.size,
+		header.offset,
 		header.data,
 		buf, size
 	);

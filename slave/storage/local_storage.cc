@@ -79,9 +79,7 @@ bool LocalStorage::read( Chunk *chunk, uint32_t listId, uint32_t stripeId, uint3
 	chunk->metadata.stripeId = stripeId;
 	chunk->metadata.chunkId = chunkId;
 	chunk->isParity = isParity;
-	if ( isParity )
-		chunk->updateParity( offset, length );
-	else
+	if ( ! isParity )
 		chunk->updateData();
 
 	return ret != -1;

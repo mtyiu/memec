@@ -608,6 +608,9 @@ void Slave::interactive() {
 		} else if ( strcmp( command, "pending" ) == 0 ) {
 			valid = true;
 			this->printPending();
+		} else if ( strcmp( command, "chunk" ) == 0 ) {
+			valid = true;
+			this->printChunk();
 		} else if ( strcmp( command, "sync" ) == 0 ) {
 			valid = true;
 			this->sync();
@@ -813,6 +816,22 @@ void Slave::printPending( FILE *f ) {
 	UNLOCK( &this->pending.slavePeers.setChunkLock );
 }
 
+void Slave::printChunk() {
+	uint32_t listId, stripeId, chunkId;
+	printf( "Which chunk (List ID, Stripe ID, Chunk ID)? " );
+	fflush( stdout );
+	if ( scanf( "%u %u %u", &listId, &stripeId, &chunkId ) == 3 ) {
+		Chunk *chunk = this->map.findChunkById( listId, stripeId, chunkId );
+		if ( chunk ) {
+			chunk->print();
+		} else {
+			printf( "Not found.\n" );
+		}
+	} else {
+		printf( "Invalid input.\n" );
+	}
+}
+
 void Slave::dump() {
 	this->map.dump();
 }
@@ -824,12 +843,14 @@ void Slave::help() {
 		"- help: Show this help message\n"
 		"- info: Show configuration\n"
 		"- debug: Show debug messages\n"
-		"- dump: Dump all key-value pairs\n"
 		"- seal: Seal all chunks in the chunk buffer\n"
 		"- flush: Flush all dirty chunks to disk\n"
-		"- memory: Print memory usage\n"
 		"- metadata: Write metadata to disk\n"
 		"- sync: Synchronize with coordinator\n"
+		"- chunk: Print the debug message for a chunk\n"
+		"- pending: Print all pending requests\n"
+		"- dump: Dump all key-value pairs\n"
+		"- memory: Print memory usage\n"
 		"- load: Show the load of each worker\n"
 		"- time: Show elapsed time\n"
 		"- exit: Terminate this client\n"

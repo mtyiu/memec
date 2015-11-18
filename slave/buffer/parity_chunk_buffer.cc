@@ -310,9 +310,6 @@ void ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t of
 
 	LOCK( &wrapper.lock );
 	wrapper.chunk->status = CHUNK_STATUS_DIRTY;
-	if ( offset + size > wrapper.chunk->getSize() ) {
-		wrapper.chunk->setSize( offset + size );
-	}
 	// Update the parity chunk
 	char *parity = wrapper.chunk->getData();
 	Coding::bitwiseXOR(

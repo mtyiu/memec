@@ -3,6 +3,7 @@
 #include "chunk.hh"
 #include "key_value.hh"
 #include "../coding/coding.hh"
+#include "../hash/hash_func.hh"
 #include "../protocol/protocol.hh"
 #include "../util/debug.hh"
 
@@ -29,32 +30,70 @@ void Chunk::init() {
 	this->clear();
 }
 
-void Chunk::loadFromGetChunkRequest( uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isParity, char *data, uint32_t size ) {
+void Chunk::loadFromGetChunkRequest( uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isParity, uint32_t size, uint32_t offset, char *data ) {
 #ifdef USE_CHUNK_LOCK
 	LOCK( &this->lock );
 #endif
 	this->status = CHUNK_STATUS_FROM_GET_CHUNK;
-	this->size = size;
+	this->size = isParity ? Chunk::capacity : size;
 	this->metadata.set( listId, stripeId, chunkId );
 	this->isParity = isParity;
-	memcpy( this->data, data, size );
+	if ( offset > 0 )
+		memset( this->data, 0, offset );
+	memcpy( this->data + offset, data, size );
+	if ( offset + size < Chunk::capacity )
+		memset( this->data + offset + size, 0, Chunk::capacity - offset - size );
 #ifdef USE_CHUNK_LOCK
 	UNLOCK( &this->lock );
 #endif
 }
 
-void Chunk::loadFromSetChunkRequest( char *data, uint32_t size ) {
+void Chunk::loadFromSetChunkRequest( char *data, uint32_t size, uint32_t offset, bool isParity ) {
 #ifdef USE_CHUNK_LOCK
 	LOCK( &this->lock );
 #endif
 	this->count = 0;
-	this->size = size;
-	memcpy( this->data, data, size );
-	if ( Chunk::capacity > size )
-		memset( this->data + size, 0, Chunk::capacity - size );
+	this->size = isParity ? Chunk::capacity : offset + size;
+
+	if ( offset > 0 )
+		memset( this->data, 0, offset );
+	memcpy( this->data + offset, data, size );
+	if ( offset + size < Chunk::capacity )
+		memset( this->data + offset + size, 0, Chunk::capacity - offset - size );
+
 #ifdef USE_CHUNK_LOCK
 	UNLOCK( &this->lock );
 #endif
+}
+
+char *Chunk::getData( uint32_t &offset, uint32_t &size ) {
+#ifdef USE_CHUNK_LOCK
+	LOCK( &this->lock );
+#endif
+	uint32_t chunkSize = isParity ? Chunk::capacity : this->size;
+
+	if ( chunkSize > 0 ) {
+		for ( offset = 0; offset < chunkSize; offset++ ) {
+			if ( this->data[ offset ] != 0 )
+				break;
+		}
+
+		for ( size = chunkSize - 1; size > offset; size-- ) {
+			if ( this->data[ size ] != 0 )
+				break;
+		}
+
+		size = size + 1 - offset;
+	} else {
+		offset = 0;
+		size = 0;
+	}
+
+#ifdef USE_CHUNK_LOCK
+	UNLOCK( &this->lock );
+#endif
+
+	return this->data + offset;
 }
 
 void Chunk::swap( Chunk *c ) {
@@ -168,26 +207,13 @@ uint32_t Chunk::updateData() {
 
 		ptr += tmp;
 	}
+	// if ( this->size > Chunk::capacity )
+	// 	this->size = Chunk::capacity;
 	tmp = this->size;
 #ifdef USE_CHUNK_LOCK
 	UNLOCK( &this->lock );
 #endif
 	return tmp;
-}
-
-uint32_t Chunk::updateParity( uint32_t offset, uint32_t length ) {
-#ifdef USE_CHUNK_LOCK
-	LOCK( &this->lock );
-#endif
-	uint32_t size = offset + length;
-	this->isParity = true;
-	if ( size > this->size )
-		this->size = size;
-	size = this->size;
-#ifdef USE_CHUNK_LOCK
-	UNLOCK( &this->lock );
-#endif
-	return size;
 }
 
 void Chunk::computeDelta( char *delta, char *newData, uint32_t offset, uint32_t length, bool update ) {
@@ -331,7 +357,7 @@ void Chunk::setReconstructed( uint32_t listId, uint32_t stripeId, uint32_t chunk
 #endif
 	this->status = CHUNK_STATUS_RECONSTRUCTED;
 	this->count = 0;
-	this->size = 0;
+	this->size = isParity ? Chunk::capacity : 0;
 	this->metadata.listId = listId;
 	this->metadata.stripeId = stripeId;
 	this->metadata.chunkId = chunkId;
@@ -351,6 +377,64 @@ void Chunk::free() {
 #ifdef USE_CHUNK_LOCK
 	UNLOCK( &this->lock );
 #endif
+}
+
+void Chunk::print( FILE *f ) {
+	int width = 21, index;
+	unsigned int hash = HashFunc::hash( this->data, Chunk::capacity );
+	const char *statusStrs[] = {
+		"CHUNK_STATUS_EMPTY",
+		"CHUNK_STATUS_DIRTY",
+		"CHUNK_STATUS_CACHED",
+		"CHUNK_STATUS_FROM_GET_CHUNK",
+		"CHUNK_STATUS_RECONSTRUCTED",
+		"CHUNK_STATUS_TEMPORARY"
+	};
+
+	switch( this->status ) {
+		case CHUNK_STATUS_EMPTY:
+			index = 0;
+			break;
+		case CHUNK_STATUS_DIRTY:
+			index = 1;
+			break;
+		case CHUNK_STATUS_CACHED:
+			index = 2;
+			break;
+		case CHUNK_STATUS_FROM_GET_CHUNK:
+			index = 3;
+			break;
+		case CHUNK_STATUS_RECONSTRUCTED:
+			index = 4;
+			break;
+		case CHUNK_STATUS_TEMPORARY:
+		default:
+			index = 5;
+			break;
+	}
+
+	fprintf(
+		f,
+		"---------- %s Chunk (%u, %u, %u) ----------\n"
+		"%-*s : %u\n"
+		"%-*s : %u\n"
+		"%-*s : %s\n"
+		"%-*s : %u\n"
+		"%-*s : %u\n",
+		this->isParity ? "Parity" : "Data",
+		this->metadata.listId,
+		this->metadata.stripeId,
+		this->metadata.chunkId,
+		width, "Data (Hash)", hash,
+		width, "Size", this->size,
+		width, "Status", statusStrs[ index ],
+		width, "Count", this->count,
+		width, "Last Deleted Position", this->lastDelPos
+	);
+}
+
+unsigned int Chunk::hash() {
+	return HashFunc::hash( this->data, Chunk::capacity );
 }
 
 bool Chunk::initFn( Chunk *chunk, void *argv ) {

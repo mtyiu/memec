@@ -69,6 +69,7 @@ public:
 	MemoryPool<Chunk> *chunkPool;
 	std::vector<MixedChunkBuffer *> chunkBuffer;
 	DegradedChunkBuffer degradedChunkBuffer;
+	LOCK_T lock;
 
 	static Slave *getInstance() {
 		static Slave slave;
@@ -92,6 +93,7 @@ public:
 	void debug( FILE *f = stdout );
 	void dump();
 	void printPending( FILE *f = stdout );
+	void printChunk();
 	void time();
 
 	void alarm();
