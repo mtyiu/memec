@@ -21,6 +21,10 @@ for w in {1..8}; do
 
 	echo "Done"
 
+	for i in {11..23} {37..39}; do
+		ssh testbed-node$i "screen -S slave -p 0 -X stuff \"$(printf '\r\r')memory ${1}$(printf '\r\r')\""
+	done
+
 	screen -S manage -p 0 -X stuff "$(printf '\r\r')"
 	sleep 10
 

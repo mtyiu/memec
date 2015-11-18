@@ -556,7 +556,6 @@ void Slave::interactive() {
 	char *command;
 	bool valid;
 	int i, len;
-	int count = 0;
 
 	this->help();
 	while( this->isRunning ) {
