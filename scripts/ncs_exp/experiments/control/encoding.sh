@@ -6,10 +6,6 @@ PLIO_PATH=${BASE_PATH}/plio
 coding='raid0 raid1 raid5 rdp cauchy rs evenodd'
 threads='64'
 
-for n in 3 4 8 9; do
-	ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/master/encoding.sh $1$(printf '\r')\"" &
-done
-
 for c in $coding; do
 	echo "Preparing for the experiments with coding scheme = $c..."
 
@@ -18,10 +14,10 @@ for c in $coding; do
 	for t in $threads; do
 		echo "Running experiment with coding scheme = $c and thread count = $t..."
 		screen -S manage -p 0 -X stuff "${BASE_PATH}/scripts/util/start.sh $1$(printf '\r')"
-		sleep 10
+		sleep 30
 
 		for n in 3 4 8 9; do
-			ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"$(printf '\r')\"" &
+			ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/master/encoding.sh $c $t$(printf '\r')\"" &
 		done
 
 		pending=0
@@ -33,6 +29,7 @@ for c in $coding; do
 		echo "Finished experiment with coding scheme = $c and thread count = $t..."
 
 		screen -S manage -p 0 -X stuff "$(printf '\r\r')"
+		sleep 10
 
 		for n in 3 4 8 9; do
 			scp testbed-node$n:${BASE_PATH}/results/encoding/$c ${BASE_PATH}/results/encoding/$c/node$n
