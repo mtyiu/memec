@@ -17,7 +17,7 @@ echo "Running experiment with coding scheme = $c and thread count = $t..."
 if [ $w == "load" ]; then
 	echo "-------------------- Load (workloada) --------------------"
 	${BASE_PATH}/scripts/ycsb/plio/load.sh $t 2>&1 | tee ${BASE_PATH}/results/workloads/$c/$t/load.txt
-else; then
+else
 	echo "-------------------- Run ($w) --------------------"
 	${BASE_PATH}/scripts/ycsb/plio/run.sh $t $w 2>&1 | tee ${BASE_PATH}/results/workloads/$c/$t/$w.txt
 fi

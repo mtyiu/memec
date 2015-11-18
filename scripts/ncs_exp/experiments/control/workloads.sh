@@ -28,7 +28,7 @@ for c in $coding; do
 		for w in $workloads; do
 			if [ $w == "load" ]; then
 				echo "-------------------- Load --------------------"
-			else; then
+			else
 				echo "-------------------- Run ($w) --------------------"
 			fi
 
