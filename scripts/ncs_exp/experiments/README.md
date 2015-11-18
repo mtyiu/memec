@@ -1,0 +1,2 @@
+- `control`: For executing YCSB clients on each of the client nodes
+- `master`: For executing one YCSB client locally

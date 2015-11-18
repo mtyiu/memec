@@ -991,10 +991,8 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 	// Find the SlaveSocket which stores the stripe with srcListId and srcChunkId
 	SlaveSocket *socket = CoordinatorWorker::stripeList->get( header.srcListId, header.srcChunkId );
 	Map *map = &socket->map;
-	Metadata srcMetadata, dstMetadata;
-	bool ret;
-
-	dstMetadata.set( header.dstListId, 0, header.dstChunkId );
+	Metadata srcMetadata /* set via findMetadataByKey() */, dstMetadata;
+	bool ret = true;
 
 	if ( ! map->findMetadataByKey( header.key, header.keySize, srcMetadata ) ) {
 		// Key not found
@@ -1004,6 +1002,15 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 			header.srcListId, header.srcChunkId
 		);
 		ret = false;
+	} else if ( map->findDegradedLock( srcMetadata.listId, srcMetadata.stripeId, srcMetadata.chunkId, dstMetadata ) ) {
+		// The chunk is already locked
+		event.resDegradedLock(
+			event.socket, event.id, key,
+			dstMetadata.listId == header.dstListId && dstMetadata.chunkId == header.dstChunkId, // the degraded lock is attained
+			map->isSealed( srcMetadata ), // the chunk is sealed
+			srcMetadata.listId, srcMetadata.stripeId, srcMetadata.chunkId,
+			dstMetadata.listId, dstMetadata.chunkId
+		);
 	} else if ( header.srcListId == header.dstListId && header.srcChunkId == header.dstChunkId ) {
 		// No need to lock
 		event.resDegradedLock(
@@ -1011,34 +1018,37 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 			key, true,
 			srcMetadata.listId, srcMetadata.chunkId
 		);
-		ret = true;
 	} else {
 		// Check whether any chunk in the same stripe has been locked
 		bool exist = false;
 		Metadata tmpDst;
 		for ( uint32_t chunkId = 0; chunkId < CoordinatorWorker::chunkCount; chunkId++ ) {
-			if ( map->findDegradedLock( srcMetadata.listId, srcMetadata.stripeId, chunkId, tmpDst ) ) {
+			if ( chunkId != srcMetadata.chunkId && map->findDegradedLock( srcMetadata.listId, srcMetadata.stripeId, chunkId, tmpDst ) ) {
+				printf(
+					"Chunk (%u, %u, %u) in the same stripe has been locked (destination: %u, %u). Rejecting degraded lock request to (%u, %u).\n",
+					srcMetadata.listId, srcMetadata.stripeId, chunkId,
+					tmpDst.listId, tmpDst.chunkId,
+					header.dstListId, header.dstChunkId
+				);
 				exist = true;
 				break;
 			}
 		}
 
 		if ( exist ) {
-			// printf( "A chunk in the same stripe has been locked.\n" );
-
 			// Reject the lock request
 			event.resDegradedLock(
 				event.socket, event.id,
 				key, true,
 				srcMetadata.listId, srcMetadata.chunkId
 			);
-			ret = true;
 		} else {
+			dstMetadata.set( header.dstListId, 0, header.dstChunkId );
 			ret = map->insertDegradedLock( srcMetadata, dstMetadata );
 
 			event.resDegradedLock(
 				event.socket, event.id, key,
-				ret,                          // the degraded lock is attained
+				true,                         // the degraded lock is attained
 				map->isSealed( srcMetadata ), // the chunk is sealed
 				srcMetadata.listId, srcMetadata.stripeId, srcMetadata.chunkId,
 				dstMetadata.listId, dstMetadata.chunkId

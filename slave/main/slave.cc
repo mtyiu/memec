@@ -146,14 +146,14 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 				this->chunkBuffer[ listId ] = new MixedChunkBuffer(
 					new ParityChunkBuffer(
 						this->config.global.buffer.chunksPerList,
-						listId, stripeId, chunkId
+						listId, stripeId, chunkId, true
 					)
 				);
 			} else {
 				this->chunkBuffer[ listId ] = new MixedChunkBuffer(
 					new DataChunkBuffer(
 						this->config.global.buffer.chunksPerList,
-						listId, stripeId, chunkId
+						listId, stripeId, chunkId, true
 					)
 				);
 			}
@@ -247,20 +247,24 @@ bool Slave::init( int mySlaveIndex ) {
 
 	for ( uint32_t i = 0, size = this->stripeListIndex.size(); i < size; i++ ) {
 		uint32_t listId = this->stripeListIndex[ i ].listId,
-				 stripeId = this->stripeListIndex[ i ].stripeId,
 				 chunkId = this->stripeListIndex[ i ].chunkId;
+		uint32_t stripeId = 0;
 		if ( this->stripeListIndex[ i ].isParity ) {
+			// The stripe ID is not used
 			this->chunkBuffer[ listId ] = new MixedChunkBuffer(
 				new ParityChunkBuffer(
 					this->config.global.buffer.chunksPerList,
-					listId, stripeId, chunkId
+					listId, stripeId, chunkId, false
 				)
 			);
 		} else {
+			// Get minimum stripe ID
+			stripeId = 0;
+
 			this->chunkBuffer[ listId ] = new MixedChunkBuffer(
 				new DataChunkBuffer(
 					this->config.global.buffer.chunksPerList,
-					listId, stripeId, chunkId
+					listId, stripeId, chunkId, false
 				)
 			);
 		}
