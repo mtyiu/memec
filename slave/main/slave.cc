@@ -609,7 +609,7 @@ void Slave::interactive() {
 			this->memory();
 
 			char filename[ 32 ];
-			snprintf( filename, "memory_%c.log", count++ );
+			snprintf( filename, "memory_%d.log", count++ );
 			FILE *f = fopen( filename, "w" );
 			this->memory( f );
 			fclose( f );
