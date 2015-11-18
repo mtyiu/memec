@@ -7,7 +7,7 @@ if [ $# != 2 ]; then
 	exit 1
 fi
 
-RECORD_COUNT=100000000
+RECORD_COUNT=10000000
 
 ${YCSB_PATH}/bin/ycsb \
 	run plio \
@@ -17,7 +17,8 @@ ${YCSB_PATH}/bin/ycsb \
 	-p readallfields=false \
 	-p scanproportion=0 \
 	-p table=u \
-	-p fieldlength=100 \
+	-p fieldlength=200 \
+	-p requestdistribution=zipfian \
 	-p recordcount=${RECORD_COUNT} \
 	-p operationcount=${RECORD_COUNT} \
 	-p threadcount=$1 \

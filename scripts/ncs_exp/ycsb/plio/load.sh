@@ -8,7 +8,7 @@ if [ $# != 1 ]; then
 fi
 
 ID=$(hostname | sed 's/testbed-node//g')
-RECORD_COUNT=100000000
+RECORD_COUNT=10000000
 INSERT_COUNT=$(expr ${RECORD_COUNT} \/ 4)
 if [ $ID == 3 ]; then
 	INSERT_START=0
@@ -28,7 +28,8 @@ ${YCSB_PATH}/bin/ycsb \
 	-p readallfields=false \
 	-p scanproportion=0 \
 	-p table=u \
-	-p fieldlength=100 \
+	-p fieldlength=200 \
+	-p requestdistribution=zipfian \
 	-p recordcount=${RECORD_COUNT} \
 	-p insertstart=${INSERT_START} \
 	-p insertcount=${INSERT_COUNT} \
