@@ -23,6 +23,6 @@ else; then
 fi
 
 # Tell the control node that this iteration is finished
-ssh testbed-node10 "screen -S control -p 0 -X stuff \"$(printf '\r')\""
+ssh testbed-node10 "screen -S experiment -p 0 -X stuff \"$(printf '\r')\""
 
 echo "Finished experiment with coding scheme = $c and thread count = $t..."

@@ -13,6 +13,6 @@ echo "Running experiment with coding scheme = $c and thread count = $t..."
 ${BASE_PATH}/scripts/ycsb/plio/load.sh $t 2>&1 | tee ${BASE_PATH}/results/encoding/$c/$t.txt
 
 # Tell the control node that this iteration is finished
-ssh testbed-node10 "screen -S control -p 0 -X stuff \"$(printf '\r')\""
+ssh testbed-node10 "screen -S experiment -p 0 -X stuff \"$(printf '\r')\""
 
 echo "Finished experiment with coding scheme = $c and thread count = $t..."
