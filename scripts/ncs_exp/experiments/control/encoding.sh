@@ -9,6 +9,9 @@ threads='64'
 for c in $coding; do
 	echo "Preparing for the experiments with coding scheme = $c..."
 
+	sed -i "s/^scheme=.*$/scheme=$c/g" ${PLIO_PATH}/bin/config/ncs_exp/global.ini
+	${BASE_PATH}/scripts/util/rsync.sh
+
 	mkdir -p ${BASE_PATH}/results/encoding/$c
 
 	for t in $threads; do
@@ -38,5 +41,4 @@ for c in $coding; do
 done
 
 sed -i "s/^scheme=.*$/scheme=raid0/g" ${PLIO_PATH}/bin/config/ncs_exp/global.ini
-
 ${BASE_PATH}/scripts/util/rsync.sh
