@@ -8,6 +8,10 @@ coding='raid0 raid1 raid5 rdp cauchy rs evenodd'
 threads=64 # '16 32 64 128 256 512 1000'
 workloads='workloada workloadb workloadc workloadf workloadd'
 
+for n in 3 4 8 9; do
+	ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/ncs_exp/experiments/master/workloads.sh $1$(printf '\r')\"" &
+done
+
 for c in $coding; do
 	echo "Preparing for the experiments with coding scheme = $c..."
 
