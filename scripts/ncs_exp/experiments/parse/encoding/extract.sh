@@ -10,7 +10,8 @@ coding='raid0 raid1 raid5 rs rdp evenodd cauchy'
 output=""
 
 for c in $coding; do
-	output="$output $(head -n $(grep -n "\[INSERT\], Return=" evenodd/64.txt | sed 's/:.*$//g') $1/$c/*.txt | tail -n 5 | sed 's/^.*, //g')"
+	file=$1/$c/*.txt
+	output="$output $(head -n $(grep -n "\[INSERT\], Return=" $file | sed 's/:.*$//g') $file | tail -n 5 | sed 's/^.*, //g')"
 done
 
 echo $output | python convert.py
