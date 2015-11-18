@@ -32,7 +32,7 @@ for c in $coding; do
 		sleep 10
 
 		for n in 3 4 8 9; do
-			scp testbed-node$n:${BASE_PATH}/results/encoding/$c ${BASE_PATH}/results/encoding/$c/node$n
+			scp -r testbed-node$n:${BASE_PATH}/results/encoding/$c ${BASE_PATH}/results/encoding/$c/node$n
 		done
 	done
 done

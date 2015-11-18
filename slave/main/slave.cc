@@ -608,9 +608,7 @@ void Slave::interactive() {
 			valid = true;
 			this->memory();
 
-			char filename[ 32 ];
-			snprintf( filename, sizeof( filename ), "memory_%d.log", count++ );
-			FILE *f = fopen( filename, "w" );
+			FILE *f = fopen( "memory.log", "w" );
 			this->memory( f );
 			fclose( f );
 		} else if ( strcmp( command, "metadata" ) == 0 ) {
