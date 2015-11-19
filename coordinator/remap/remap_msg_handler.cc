@@ -40,6 +40,7 @@ bool CoordinatorRemapMsgHandler::init( const int ip, const int port, const char 
 	inet_ntop( AF_INET, &addr, ipstr, INET_ADDRSTRLEN );
 	sprintf( addrbuf, "%u@%s", ntohs( port ), ipstr );
 	RemapMsgHandler::init( addrbuf , user );
+	LOCK_INIT( &this->ackSignalLock );
 
 	this->isListening = false;
 	return ( SP_join( this->mbox, MASTER_GROUP ) == 0 );
@@ -337,6 +338,10 @@ bool CoordinatorRemapMsgHandler::updateStatus( char *subject, char *msg, int len
 				subject, buf , slave.sin_port
 			);
 		}
+		// check if all master acked
+		UNLOCK( &this->mastersAckLock );
+		this->isAllMasterAcked( slave );
+		LOCK( &this->mastersAckLock );
 	}
 	UNLOCK( &this->mastersAckLock );
 
@@ -379,6 +384,8 @@ bool CoordinatorRemapMsgHandler::addAliveSlave( struct sockaddr_in slave ) {
 	LOCK( &this->mastersAckLock );
 	ackMasters[ slave ] = new std::set<std::string>();
 	UNLOCK( &this->mastersAckLock );
+	// waiting slave 
+	pthread_cond_init( &this->ackSignal[ slave ], NULL );
 	return true;
 }
 
@@ -401,7 +408,8 @@ bool CoordinatorRemapMsgHandler::removeAliveSlave( struct sockaddr_in slave ) {
 	delete ackMasters[ slave ];
 	ackMasters.erase( slave );
 	UNLOCK( &this->mastersAckLock );
-
+	// waiting slave
+	pthread_cond_broadcast( &this->ackSignal[ slave ] );
 	return true;
 }
 
@@ -428,10 +436,14 @@ bool CoordinatorRemapMsgHandler::isAllMasterAcked( struct sockaddr_in slave ) {
 		return true;
 	}
 	allAcked = ( aliveMasters.size() == ackMasters[ slave ]->size() );
-	if ( allAcked ) {
-		fprintf( stderr, "all masters acked slave %s:%hu on %d\n", buf, slave.sin_port, this->slavesStatus[ slave ] );
-	}
+	//if ( allAcked ) {
+	//	fprintf( stderr, "all masters acked slave %s:%hu on %d\n", buf, slave.sin_port, this->slavesStatus[ slave ] );
+	//}
 	//fprintf( stderr, "%lu of %lu masters acked slave %s:%hu\n", ackMasters[ slave ]->size(), aliveMasters.size(), buf , slave.sin_port );
+	if ( allAcked ) {
+		printf( " ACKED slave %s:%hu\n", buf, slave.sin_port );
+		pthread_cond_broadcast( &this->ackSignal[ slave ] );
+	}
 	UNLOCK( &this->mastersAckLock );
 	return allAcked;
 }
