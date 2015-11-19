@@ -206,9 +206,9 @@ bool Pending::eraseRequestStartTime( PendingType type, uint32_t id, void *ptr, s
 	RequestStartTime rst;
 	bool ret;
 
-#define DO_SEARCH_FOR_ID \
+#define DO_SEARCH_FOR_ID( _TYPE_ ) \
 	do { \
-		tie( it, rit ) = this->stats.get.equal_range( pid ); \
+		tie( it, rit ) = this->stats._TYPE_.equal_range( pid ); \
 		while( it != rit && ptr && it->first.id == id && it->first.ptr != ptr ) it++; \
 		ret = ( it != rit && it->first.id == id && ( ! ptr || it->first.ptr == ptr ) ); \
 		if ( ret ) { \
@@ -216,17 +216,17 @@ bool Pending::eraseRequestStartTime( PendingType type, uint32_t id, void *ptr, s
 			rst = it->second; \
 			if ( pidPtr ) *pidPtr = pid; \
 			if ( rstPtr ) *rstPtr = rst; \
-			this->stats.get.erase( it ); \
+			this->stats._TYPE_.erase( it ); \
 		} \
 	} while (0)
 
 	if ( type == PT_SLAVE_GET ) {
 		LOCK( &this->stats.getLock );
-		DO_SEARCH_FOR_ID;
+		DO_SEARCH_FOR_ID( get );
 		UNLOCK( &this->stats.getLock );
 	} else if ( type == PT_SLAVE_SET ) {
 		LOCK( &this->stats.setLock );
-		DO_SEARCH_FOR_ID;
+		DO_SEARCH_FOR_ID( set );
 		UNLOCK( &this->stats.setLock );
 	} else {
 		return false;
