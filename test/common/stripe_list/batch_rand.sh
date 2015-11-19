@@ -1,7 +1,7 @@
 #!/bin/bash
 
-N=6
-K=4
+N=10
+K=8
 M=16
 C_FROM=1
 C_TO=100

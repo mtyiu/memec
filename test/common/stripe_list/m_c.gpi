@@ -1,0 +1,10 @@
+#!/usr/bin/gnuplot
+
+set terminal postscript enhanced portrait 'Times-Roman' 36 size 10,7 solid
+set output "./eps/chart.eps"
+set size 1.5, 1.5
+
+set xlabel "Number of servers (M)" offset 0, 0.3
+set ylabel "Number of stripe lists (c)" offset 2.0, 0
+
+plot 'data/m_c.txt'   using 1:2 title '' with linespoints lw 4 lc rgb "black"
