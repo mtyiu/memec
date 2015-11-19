@@ -28,9 +28,10 @@ ${YCSB_PATH}/bin/ycsb \
 	-p readallfields=false \
 	-p scanproportion=0 \
 	-p table=u \
-	-p fieldlength=100 \
+	-p fieldlength=200 \
+	-p requestdistribution=zipfian \
 	-p recordcount=${RECORD_COUNT} \
 	-p insertstart=${INSERT_START} \
 	-p insertcount=${INSERT_COUNT} \
 	-p threadcount=$1 \
-	-p uri=tachyon://192.168.0.11:19999
+	-p uri=tachyon://192.168.0.11:19998
