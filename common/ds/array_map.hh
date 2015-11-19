@@ -87,6 +87,16 @@ public:
 		return true;
 	}
 
+	ValueType *set( int index, KeyType &key, ValueType *value ) {
+		ValueType *ret;
+		LOCK( &this->lock );
+		this->keys[ index ] = key;
+		ret = this->values[ index ];
+		this->values[ index ] = value;
+		UNLOCK( &this->lock );
+		return ret;
+	}
+
 	bool remove( KeyType &key ) {
 		ValueType *val;
 		LOCK( &this->lock );

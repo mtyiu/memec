@@ -57,7 +57,7 @@ public:
 		LOCK_INIT( &this->remapLock );
 	}
 
-	bool findValueByKey( char *data, uint8_t size, KeyValue *keyValue, Key *keyPtr = 0, KeyMetadata *keyMetadataPtr = 0, Metadata *metadataPtr = 0, Chunk **chunkPtr = 0 ) {
+	bool findValueByKey( char *data, uint8_t size, KeyValue *keyValue, Key *keyPtr = 0, KeyMetadata *keyMetadataPtr = 0, Metadata *metadataPtr = 0, Chunk **chunkPtr = 0, bool needsLock = true, bool needsUnlock = true ) {
 		std::unordered_map<Key, KeyMetadata>::iterator keysIt;
 		std::unordered_map<Metadata, Chunk *>::iterator cacheIt;
 		Key key;
@@ -66,22 +66,22 @@ public:
 			keyValue->clear();
 		key.set( size, data );
 
-		LOCK( &this->keysLock );
+		if ( needsLock ) LOCK( &this->keysLock );
 		keysIt = this->keys.find( key );
 		if ( keysIt == this->keys.end() ) {
-			UNLOCK( &this->keysLock );
+			if ( needsUnlock ) UNLOCK( &this->keysLock );
 			if ( keyPtr ) *keyPtr = key;
 			return false;
 		}
 
 		if ( keyPtr ) *keyPtr = keysIt->first;
 		if ( keyMetadataPtr ) *keyMetadataPtr = keysIt->second;
-		UNLOCK( &this->keysLock );
+		if ( needsUnlock ) UNLOCK( &this->keysLock );
 
-		LOCK( &this->cacheLock );
+		if ( needsLock ) LOCK( &this->cacheLock );
 		cacheIt = this->cache.find( keysIt->second );
 		if ( cacheIt == this->cache.end() ) {
-			UNLOCK( &this->cacheLock );
+			if ( needsUnlock ) UNLOCK( &this->cacheLock );
 			return false;
 		}
 
@@ -91,24 +91,25 @@ public:
 		Chunk *chunk = cacheIt->second;
 		if ( keyValue )
 			*keyValue = chunk->getKeyValue( keysIt->second.offset );
-		UNLOCK( &this->cacheLock );
+		if ( needsUnlock ) UNLOCK( &this->cacheLock );
 		return true;
 	}
 
-	Chunk *findChunkById( uint32_t listId, uint32_t stripeId, uint32_t chunkId, Metadata *metadataPtr = 0 ) {
+	Chunk *findChunkById( uint32_t listId, uint32_t stripeId, uint32_t chunkId, Metadata *metadataPtr = 0, bool needsLock = true, bool needsUnlock = true, LOCK_T **lock = 0 ) {
 		std::unordered_map<Metadata, Chunk *>::iterator it;
 		Metadata metadata;
 
 		metadata.set( listId, stripeId, chunkId );
 		if ( metadataPtr ) *metadataPtr = metadata;
+		if ( lock ) *lock = &this->cacheLock;
 
-		LOCK( &this->cacheLock );
+		if ( needsLock ) LOCK( &this->cacheLock );
 		it = this->cache.find( metadata );
 		if ( it == this->cache.end() ) {
 			UNLOCK( &this->cacheLock );
 			return 0;
 		}
-		UNLOCK( &this->cacheLock );
+		if ( needsUnlock ) UNLOCK( &this->cacheLock );
 		return it->second;
 	}
 
@@ -136,21 +137,21 @@ public:
 		return true;
 	}
 
-	bool insertKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata ) {
+	bool insertKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata, bool needsLock = true, bool needsUnlock = true, bool needsUpdateOpMetadata = true ) {
 		key.dup();
 
 		std::pair<Key, KeyMetadata> keyPair( key, keyMetadata );
 		std::pair<std::unordered_map<Key, KeyMetadata>::iterator, bool> keyRet;
 
-		LOCK( &this->keysLock );
+		if ( needsLock ) LOCK( &this->keysLock );
 		keyRet = this->keys.insert( keyPair );
 		if ( ! keyRet.second ) {
-			UNLOCK( &this->keysLock );
+			if ( needsUnlock ) UNLOCK( &this->keysLock );
 			return false;
 		}
-		UNLOCK( &this->keysLock );
+		if ( needsUnlock ) UNLOCK( &this->keysLock );
 
-		return this->insertOpMetadata( opcode, key, keyMetadata );
+		return needsUpdateOpMetadata ? this->insertOpMetadata( opcode, key, keyMetadata ) : true;
 	}
 
 	bool insertOpMetadata( uint8_t opcode, Key key, KeyMetadata keyMetadata, bool dup = true ) {
@@ -260,7 +261,7 @@ public:
 		}
 	}
 
-	bool deleteKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata, bool needsLock, bool needsUnlock ) {
+	bool deleteKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata, bool needsLock, bool needsUnlock, bool needsUpdateOpMetadata = true ) {
 		Key k;
 		std::unordered_map<Key, KeyMetadata>::iterator keysIt;
 		std::unordered_map<Key, OpMetadata>::iterator opsIt;
@@ -278,7 +279,7 @@ public:
 		}
 		if ( needsUnlock ) UNLOCK( &this->keysLock );
 
-		return this->insertOpMetadata( opcode, key, keyMetadata );
+		return needsUpdateOpMetadata ? this->insertOpMetadata( opcode, key, keyMetadata ) : true;
 	}
 
 	void getKeysMap( std::unordered_map<Key, KeyMetadata> *&keys, LOCK_T *&lock ) {

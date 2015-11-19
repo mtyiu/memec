@@ -6,7 +6,7 @@
 Master::Master() {
 	this->isRunning = false;
 	/* Set debug flag */
-	this->debugFlags.isDegraded = true;
+	this->debugFlags.isDegraded = false;
 }
 
 void Master::updateSlavesCurrentLoading() {
@@ -582,13 +582,11 @@ bool Master::setDebugFlag( char *input ) {
 bool Master::isDegraded( SlaveSocket *socket ) {
 	return (
 		( this->debugFlags.isDegraded )
-		/*
 		||
 		(
-			// this->remapMsgHandler.useRemappingFlow() &&
+			this->remapMsgHandler.useRemappingFlow( socket->getAddr() ) &&
 			! this->config.master.degraded.disabled
 		)
-		*/
 	);
 }
 
@@ -810,17 +808,17 @@ void Master::printPending( FILE *f ) {
 	LOCK( &this->sockets.slaves.lock );
 	char buf[ INET_ADDRSTRLEN ];
 	struct sockaddr_in addr;
+	uint32_t remapping, normal, lockOnly, degraded;
 	for ( uint32_t i = 0; i < this->sockets.slaves.size(); i++ ) {
 		addr = this->sockets.slaves.values[ i ]->getAddr();
 		inet_ntop( AF_INET, &addr.sin_addr, buf, INET_ADDRSTRLEN );
+		this->sockets.slaves.values[ i ]->counter.getAll( remapping, normal, lockOnly, degraded );
 		fprintf(
 			f,
-			"[REMAP] %s:%hu Normal: %u; Locking only: %u; Remapping: %u\n",
-			buf, 
+			"[REMAP] %s:%hu Normal: %u; Locking only: %u; Remapping: %u; Degraded: %u\n",
+			buf,
 			ntohs( this->sockets.slaves.values[ i ]->getAddr().sin_port ),
-			this->sockets.slaves.values[ i ]->counter.getNormal(),
-			this->sockets.slaves.values[ i ]->counter.getLockOnly(),
-			this->sockets.slaves.values[ i ]->counter.getRemapping()
+			normal, lockOnly, remapping, degraded
 		);
 	}
 	UNLOCK( &this->sockets.slaves.lock );

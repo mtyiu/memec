@@ -1,11 +1,14 @@
 #include <vector>
 #include <arpa/inet.h>
 #include <unistd.h>
-#include "common.hh"
 #include "../../../common/remap/remap_status.hh"
 #include "../../../master/remap/remap_msg_handler.hh"
 
 #define TIME_OUT 1
+
+#define MASTER_REMAP_UNIT_TEST
+#include "common.hh"
+#undef MASTER_REMAP_UNIT_TEST
 
 int main ( int argc, char **argv ) {
 
@@ -39,7 +42,7 @@ int main ( int argc, char **argv ) {
 			) 
 				sleep( TIME_OUT );
 			fprintf( stderr, ".. Waiting end of remapping phase\n" );
-			//mh->ackRemap();
+			mh->ackRemap();
 			while ( meetStatus( mh, slaves, REMAP_NONE ) == false )
 				sleep( TIME_OUT );
 			fprintf( stderr, "... Stop listening to incomming messages\n" );

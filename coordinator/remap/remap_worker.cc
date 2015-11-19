@@ -24,20 +24,23 @@ bool CoordinatorRemapWorker::startRemap( RemapStatusEvent event ) {
 	UNLOCK( &crmh->ackSignalLock );
 
 	LOCK( &crmh->slavesStatusLock[ event.slave ] );
-	// for multi-threaded environment, it is possible that other workers change 
+	// for multi-threaded environment, it is possible that other workers change
 	// the status while this worker is waiting
 	// just abort and late comers to take over
 	if ( crmh->slavesStatus[ event.slave ] != REMAP_PREPARE_START ) {
 		UNLOCK( &crmh->slavesStatusLock[ event.slave ] );
 		return false;
 	}
-	// any cleanup to be done
+	// any cleanup to be done (request for metadata sync.)
 	crmh->startRemapEnd( event.slave );
 
 	// ask master to start remap
-	crmh->slavesStatus[ event.slave ] = REMAP_START;
+	crmh->slavesStatus[ event.slave ] = REMAP_START; // Phase 4
 	if ( crmh->sendStatusToMasters( event.slave ) == false ) {
-		__ERROR__( "CoordinatorRemapWorker", "startRemap", "Failed to broadcast status changes!" );
+		__ERROR__( "CoordinatorRemapWorker", "stopRemap", 
+			"Failed to broadcast status changes on salve %s:%u!", 
+			buf, event.slave.sin_port 
+		);
 		UNLOCK( &crmh->slavesStatusLock[ event.slave ] );
 		return false;
 	}
@@ -46,7 +49,7 @@ bool CoordinatorRemapWorker::startRemap( RemapStatusEvent event ) {
 	return true;
 }
 
-bool CoordinatorRemapWorker::stopRemap( RemapStatusEvent event ) {
+bool CoordinatorRemapWorker::stopRemap( RemapStatusEvent event ) { // Phase 4 --> 3
 	CoordinatorRemapMsgHandler *crmh = CoordinatorRemapMsgHandler::getInstance();
 
 	pthread_mutex_t lock;
@@ -59,20 +62,23 @@ bool CoordinatorRemapWorker::stopRemap( RemapStatusEvent event ) {
 	UNLOCK( &crmh->ackSignalLock );
 
 	LOCK( &crmh->slavesStatusLock[ event.slave ] );
-	// for multi-threaded environment, it is possible that other workers change 
-	// the tatus while this worker is waiting. 
+	// for multi-threaded environment, it is possible that other workers change
+	// the tatus while this worker is waiting.
 	// just abort and late comers to take over
 	if ( crmh->slavesStatus[ event.slave ] != REMAP_PREPARE_END ) {
 		UNLOCK( &crmh->slavesStatusLock[ event.slave ] );
 		return false;
 	}
 	// any cleanup to be done
-	crmh->stopRemapEnd( event.slave );
+	crmh->stopRemapEnd( event.slave ); // Prepare for switching to Phase 1 from Phase 3
 
 	// ask master to use normal SET workflow
 	crmh->slavesStatus[ event.slave ] = REMAP_NONE ;
 	if ( crmh->sendStatusToMasters( event.slave ) == false ) {
-		__ERROR__( "CoordinatorRemapWorker", "stopRemap", "Failed to broadcast status changes!" );
+		__ERROR__( "CoordinatorRemapWorker", "stopRemap", 
+			"Failed to broadcast status changes on salve %s:%u!", 
+			buf, event.slave.sin_port 
+		);
 		UNLOCK( &crmh->slavesStatusLock[ event.slave ] );
 		return false;
 	}

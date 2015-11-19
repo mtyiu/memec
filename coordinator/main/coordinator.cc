@@ -36,7 +36,7 @@ void Coordinator::switchPhase( std::set<struct sockaddr_in> prevOverloadedSlaves
 	uint32_t curOverloadedSlaveCount = this->overloadedSlaves.slaveSet.size();
 	uint32_t prevOverloadedSlaveCount = prevOverloadedSlaves.size();
 
-	if ( curOverloadedSlaveCount > totalSlaveCount * startThreshold ) {
+	if ( curOverloadedSlaveCount > totalSlaveCount * startThreshold ) { // Phase 1 --> 2
 		// need to start remapping now
 		if ( prevOverloadedSlaveCount > totalSlaveCount * startThreshold ) {
 			std::set<struct sockaddr_in> newOverloadedSlaves = this->overloadedSlaves.slaveSet;
@@ -52,7 +52,7 @@ void Coordinator::switchPhase( std::set<struct sockaddr_in> prevOverloadedSlaves
 			for ( auto slave : this->overloadedSlaves.slaveSet )
 				prevOverloadedSlaves.erase( slave );
 			if ( prevOverloadedSlaves.size() > 0 ) {
-				event.switchPhase( false, prevOverloadedSlaves );
+				event.switchPhase( false, prevOverloadedSlaves ); // Phase 4 --> 3
 				this->eventQueue.insert( event );
 			}
 		} else {
@@ -65,7 +65,7 @@ void Coordinator::switchPhase( std::set<struct sockaddr_in> prevOverloadedSlaves
 	) {
 		// no longer need remapping after remapping has started
 		// stop remapping phase for all in the background
-		event.switchPhase( false, prevOverloadedSlaves );
+		event.switchPhase( false, prevOverloadedSlaves ); // Phase 4 --> 3
 		this->eventQueue.insert( event );
 	}
 	UNLOCK( &this->overloadedSlaves.lock );
@@ -226,6 +226,7 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 	SlaveSocket::setArrayMap( &this->sockets.slaves );
 	this->sockets.masters.reserve( this->config.global.slaves.size() );
 	this->sockets.slaves.reserve( this->config.global.slaves.size() );
+	this->sockets.backupSlaves.needsDelete = false;
 	for ( int i = 0, len = this->config.global.slaves.size(); i < len; i++ ) {
 		SlaveSocket *socket = new SlaveSocket();
 		int tmpfd = - ( i + 1 );
@@ -371,37 +372,45 @@ bool Coordinator::stop() {
 
 	int i, len;
 
-	/* Sockets */
+	/* Socket */
+	printf( "Stopping self-socket...\n" );
 	this->sockets.self.stop();
 
 	/* Workers */
+	printf( "Stopping workers...\n" );
 	len = this->workers.size();
 	for ( i = len - 1; i >= 0; i-- )
 		this->workers[ i ].stop();
 
 	/* Event queues */
+	printf( "Stopping event queues...\n" );
 	this->eventQueue.stop();
 
 	/* Workers */
+	printf( "Stopping workers...\n" );
 	for ( i = len - 1; i >= 0; i-- )
 		this->workers[ i ].join();
 
 	/* Sockets */
+	printf( "Stopping master sockets...\n" );
 	for ( i = 0, len = this->sockets.masters.size(); i < len; i++ )
 		this->sockets.masters[ i ]->stop();
 	this->sockets.masters.clear();
 
+	printf( "Stopping slave sockets...\n" );
 	for ( i = 0, len = this->sockets.slaves.size(); i < len; i++ )
 		this->sockets.slaves[ i ]->stop();
 	this->sockets.slaves.clear();
 
 	/* Remapping message handler */
+	printf( "Stopping remapping message handler...\n" );
 	if ( this->config.global.remap.enabled ) {
 		this->remapMsgHandler->stop();
 		this->remapMsgHandler->quit();
 	}
 
 	/* Loading stats */
+	printf( "Stopping loading stats...\n" );
 	statsTimer.stop();
 
 	this->free();
@@ -435,11 +444,78 @@ void Coordinator::syncSlaveMeta( struct sockaddr_in slave, bool *sync ) {
 	this->eventQueue.insert( event );
 }
 
+void Coordinator::releaseDegradedLock() {
+	uint32_t socketFromId, socketToId;
+	char tmp[ 16 ];
+	SlaveEvent event;
+
+	printf( "Which socket ([0-%lu] or all)? ", this->sockets.slaves.size() - 1 );
+	fflush( stdout );
+	if ( ! fgets( tmp, sizeof( tmp ), stdin ) )
+		return;
+	if ( strncmp( tmp, "all", 3 ) == 0 ) {
+		socketFromId = 0;
+		socketToId = this->sockets.slaves.size();
+	} else if ( sscanf( tmp, "%u", &socketFromId ) != 1 ) {
+		fprintf( stderr, "Invalid socket ID.\n" );
+		return;
+	} else if ( socketFromId >= this->sockets.slaves.size() ) {
+		fprintf( stderr, "The specified socket ID exceeds the range [0-%lu].\n", this->sockets.slaves.size() - 1 );
+		return;
+	} else {
+		socketToId = socketFromId + 1;
+	}
+
+	for ( uint32_t socketId = socketFromId; socketId < socketToId; socketId++ ) {
+		SlaveSocket *socket = this->sockets.slaves.values[ socketId ];
+		if ( ! socket ) {
+			fprintf( stderr, "Unknown socket ID!\n" );
+			return;
+		}
+		event.reqReleaseDegradedLock( socket );
+		this->eventQueue.insert( event );
+
+		printf( "Sending release degraded locks request to: (#%u) ", socketId );
+		socket->printAddress();
+		printf( "\n" );
+	}
+}
+
+void Coordinator::releaseDegradedLock( struct sockaddr_in slave, bool *done ) {
+	uint32_t index = 0;
+	SlaveSocket *socket;
+	for ( uint32_t i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
+		socket = this->sockets.slaves.values[ i ];
+		if ( ! socket )
+			continue;
+
+		if ( socket->equal( slave.sin_addr.s_addr, slave.sin_port ) ) {
+			index = i;
+			break;
+		} else {
+			socket = 0;
+		}
+	}
+
+	if ( ! socket ) {
+		__ERROR__( "Coordinator", "releaseDegradedLock", "Cannot find socket." );
+		return;
+	}
+
+	SlaveEvent event;
+	event.reqReleaseDegradedLock( socket, done );
+	this->eventQueue.insert( event );
+
+	printf( "Sending release degraded locks request to: (#%u) ", index );
+	socket->printAddress();
+	printf( "\n" );
+}
+
 void Coordinator::syncRemappingRecords( LOCK_T *lock, std::map<struct sockaddr_in, uint32_t> *counter, bool *done ) {
 	CoordinatorEvent event;
 	event.syncRemappingRecords( lock, counter, done );
 	this->eventQueue.insert( event );
-} 
+}
 
 double Coordinator::getElapsedTime() {
 	return get_elapsed_time( this->startTime );
@@ -468,6 +544,13 @@ void Coordinator::debug( FILE *f ) {
 	for ( i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
 		fprintf( f, "%d. ", i + 1 );
 		this->sockets.slaves[ i ]->print( f );
+	}
+	if ( len == 0 ) fprintf( f, "(None)\n" );
+
+	fprintf( f, "\nBackup slave sockets\n-------------\n" );
+	for ( i = 0, len = this->sockets.backupSlaves.size(); i < len; i++ ) {
+		fprintf( f, "%d. ", i + 1 );
+		this->sockets.backupSlaves[ i ]->print( f );
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
 
@@ -555,6 +638,9 @@ void Coordinator::interactive() {
 		} else if ( strcmp( command, "flush" ) == 0 ) {
 			valid = true;
 			this->flush();
+		} else if ( strcmp( command, "release" ) == 0 ) {
+			valid = true;
+			this->releaseDegradedLock();
 		} else {
 			valid = false;
 		}
@@ -624,6 +710,7 @@ void Coordinator::help() {
 		"- time: Show elapsed time\n"
 		"- seal: Force all slaves to seal all its chunks\n"
 		"- flush: Force all slaves to flush all its chunks\n"
+		"- release: Release degraded locks at the specified socket\n"
 		"- metadata: Write metadata to disk\n"
 		"- remapping: Show remapping info\n"
 		"- exit: Terminate this client\n"

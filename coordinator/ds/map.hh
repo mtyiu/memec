@@ -36,6 +36,11 @@ public:
 	 * (list ID, stripe ID, chunk ID) |-> (list ID, chunk ID)
 	 */
 	std::unordered_map<Metadata, Metadata> degradedLocks;
+	/**
+	 * Store the to-be-released degraded locks
+	 * (list ID, stripe ID, chunk ID) |-> (list ID, chunk ID)
+	 */
+	std::unordered_map<Metadata, Metadata> releasingDegradedLocks;
 	LOCK_T degradedLocksLock;
 
 	/**

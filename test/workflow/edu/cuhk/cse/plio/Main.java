@@ -28,8 +28,8 @@ public class Main implements Runnable {
 	private Random random;
 	public int[] completed, succeeded;
 
-	public Main( int startId ) {
-		this.plio = new PLIO( Main.keySize, Main.chunkSize, Main.host, Main.port, startId );
+	public Main( int fromId, int toId ) {
+		this.plio = new PLIO( Main.keySize, Main.chunkSize, Main.host, Main.port, fromId, toId );
 		this.map = new HashMap<String, String>( Main.numRecords / Main.numThreads );
 		this.completed = new int[ 4 ];
 		this.succeeded = new int[ 4 ];
@@ -75,13 +75,22 @@ public class Main implements Runnable {
 
 			// vvvvv For testing degraded operations (Start) vvvvv
 			if ( i == numRecords ) {
-				// Wait for 10 seconds
 				System.out.println( "Sleep for 10 seconds..." );
 				try {
-					Thread.sleep( 10000 );
+					Thread.sleep( 2000 );
 				} catch( InterruptedException e ) {}
 				System.out.println( "Done." );
 			}
+
+			/*
+			if ( i == numRecords * 3 ) {
+				System.out.println( "Sleep for 20 seconds..." );
+				try {
+					Thread.sleep( 20000 );
+				} catch( InterruptedException e ) {}
+				System.out.println( "Done." );
+			}
+			*/
 
 			if ( i < numRecords ) {
 				rand = 0;
@@ -89,6 +98,7 @@ public class Main implements Runnable {
 				rand = rand == 0 ? 1 : rand;
 				if ( size == 0 )
 					break;
+				rand = rand == 3 ? 1 : rand;
 			}
 			// ^^^^^ For testing degraded operations (End) ^^^^^
 
@@ -189,7 +199,7 @@ public class Main implements Runnable {
 			}
 		}
 
-		System.out.println( "Final map size: " + this.map.size() );
+		// System.out.println( "Final map size: " + this.map.size() );
 	}
 
 	public static void main( String[] args ) throws Exception {
@@ -218,8 +228,9 @@ public class Main implements Runnable {
 		Main.threads = new Thread[ Main.numThreads ];
 		Main.lock = new Object();
 		for ( int i = 0; i < Main.numThreads; i++ ) {
-			int startId = Integer.MAX_VALUE / Main.numThreads * i;
-			Main.mainObjs[ i ] = new Main( startId );
+			int fromId = Integer.MAX_VALUE / Main.numThreads * i;
+			int toId = Integer.MAX_VALUE / Main.numThreads * ( i + 1 );
+			Main.mainObjs[ i ] = new Main( fromId, toId );
 			Main.threads[ i ] = new Thread( Main.mainObjs[ i ] );
 		}
 

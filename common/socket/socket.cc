@@ -232,9 +232,10 @@ bool Socket::init( int sockfd, struct sockaddr_in addr ) {
 }
 
 void Socket::stop() {
-	if ( this->sockfd == -1 ) return;
-	::close( this->sockfd );
-	this->sockfd = -1;
+	if ( this->sockfd >= 0 ) {
+		::close( this->sockfd );
+		this->sockfd = - this->sockfd;
+	}
 	this->connected = false;
 }
 
@@ -259,7 +260,7 @@ struct sockaddr_in Socket::getAddr() {
 }
 
 ServerAddr Socket::getServerAddr() {
-	return ServerAddr( 0, this->addr.sin_addr.s_addr, this->addr.sin_port, 0 );
+	return ServerAddr( 0, this->addr.sin_addr.s_addr, this->addr.sin_port, this->type );
 }
 
 bool Socket::equal( Socket *s ) {

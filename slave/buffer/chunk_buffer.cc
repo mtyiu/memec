@@ -18,8 +18,9 @@ void ChunkBuffer::init() {
 	ChunkBuffer::map = &slave->map;
 }
 
-ChunkBuffer::ChunkBuffer() {
+ChunkBuffer::ChunkBuffer( bool isReady ) {
 	LOCK_INIT( &this->lock );
+	this->isReady = isReady;
 }
 
 ChunkBuffer::~ChunkBuffer() {}

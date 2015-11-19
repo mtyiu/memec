@@ -27,12 +27,15 @@ bool SlaveSocket::start() {
 }
 
 void SlaveSocket::stop() {
-	// SlaveSocket::slaves->remove( this->sockfd );
+	int newFd = - this->sockfd;
+
+	SlaveSocket::slaves->replaceKey( this->sockfd, newFd );
 	Socket::stop();
 
 	SlaveEvent event;
 	event.disconnect( this );
 	Coordinator::getInstance()->eventQueue.insert( event );
+
 	// TODO: Fix memory leakage!
 	// delete this;
 }

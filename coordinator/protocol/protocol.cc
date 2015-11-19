@@ -181,11 +181,11 @@ char *CoordinatorProtocol::reqSyncRemappingRecord( size_t &size, uint32_t id, st
 		buffer
 	);
 	isLast = ( remapCount == 0 );
-	
+
 	return buffer;
 }
 
-char *CoordinatorProtocol::resDegradedLock( size_t &size, uint32_t id, uint8_t keySize, char *key, bool isLocked, bool isSealed, uint32_t srcListId, uint32_t srcStripeId, uint32_t srcChunkId, uint32_t dstListId, uint32_t dstChunkId ) {
+char *CoordinatorProtocol::resDegradedLock( size_t &size, uint32_t id, bool isLocked, bool isSealed, uint8_t keySize, char *key, uint32_t srcListId, uint32_t srcStripeId, uint32_t srcChunkId, uint32_t dstListId, uint32_t dstChunkId ) {
 	size = this->generateDegradedLockResHeader(
 		isLocked ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_MASTER,
@@ -200,26 +200,28 @@ char *CoordinatorProtocol::resDegradedLock( size_t &size, uint32_t id, uint8_t k
 	return this->buffer.send;
 }
 
-char *CoordinatorProtocol::resDegradedLock( size_t &size, uint32_t id, uint8_t keySize, char *key, uint32_t listId, uint32_t chunkId ) {
+char *CoordinatorProtocol::resDegradedLock( size_t &size, uint32_t id, uint8_t keySize, char *key, uint32_t srcListId, uint32_t srcChunkId, uint32_t dstListId, uint32_t dstChunkId ) {
 	size = this->generateDegradedLockResHeader(
 		PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_MASTER,
 		PROTO_OPCODE_DEGRADED_LOCK,
 		id,
 		keySize, key,
-		listId, chunkId
+		srcListId, srcChunkId,
+		dstListId, dstChunkId
 	);
 	return this->buffer.send;
 }
 
-char *CoordinatorProtocol::resDegradedLock( size_t &size, uint32_t id, uint8_t keySize, char *key ) {
+char *CoordinatorProtocol::resDegradedLock( size_t &size, uint32_t id, bool exist, uint8_t keySize, char *key, uint32_t listId, uint32_t chunkId ) {
 	size = this->generateDegradedLockResHeader(
 		PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_MASTER,
 		PROTO_OPCODE_DEGRADED_LOCK,
 		id,
-		keySize,
-		key
+		exist,
+		keySize, key,
+		listId, chunkId
 	);
 	return this->buffer.send;
 }
@@ -287,6 +289,21 @@ char *CoordinatorProtocol::announceSlaveConnected( size_t &size, uint32_t id, Sl
 	return this->buffer.send;
 }
 
+char *CoordinatorProtocol::announceSlaveReconstructed( size_t &size, uint32_t id, SlaveSocket *srcSocket, SlaveSocket *dstSocket ) {
+	ServerAddr srcAddr = srcSocket->getServerAddr(), dstAddr = dstSocket->getServerAddr();
+	size = this->generateSrcDstAddressHeader(
+		PROTO_MAGIC_ANNOUNCEMENT,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_SLAVE_RECONSTRUCTED,
+		id,
+		srcAddr.addr,
+		srcAddr.port,
+		dstAddr.addr,
+		dstAddr.port
+	);
+	return this->buffer.send;
+}
+
 char *CoordinatorProtocol::reqSealChunks( size_t &size, uint32_t id ) {
 	size = this->generateHeader(
 		PROTO_MAGIC_REQUEST,
@@ -320,6 +337,18 @@ char *CoordinatorProtocol::reqSyncMeta( size_t &size, uint32_t id ) {
 	return this->buffer.send;
 }
 
+char *CoordinatorProtocol::reqReleaseDegradedLock( size_t &size, uint32_t id, std::vector<Metadata> &chunks, bool &isCompleted ) {
+	size = this->generateDegradedReleaseReqHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_RELEASE_DEGRADED_LOCKS,
+		id,
+		chunks,
+		isCompleted
+	);
+	return this->buffer.send;
+}
+
 char *CoordinatorProtocol::resRemappingSetLock( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t chunkId, bool isRemapped, uint8_t keySize, char *key ) {
 	size = this->generateRemappingLockHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
@@ -331,6 +360,22 @@ char *CoordinatorProtocol::resRemappingSetLock( size_t &size, uint32_t id, bool 
 		isRemapped,
 		keySize,
 		key
+	);
+	return this->buffer.send;
+}
+
+char *CoordinatorProtocol::reqRecovery( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds, std::unordered_set<uint32_t>::iterator &it, uint32_t numChunks, bool &isCompleted ) {
+	size = this->generateRecoveryHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_RECOVERY,
+		id,
+		listId,
+		chunkId,
+		stripeIds,
+		it,
+		numChunks,
+		isCompleted
 	);
 	return this->buffer.send;
 }

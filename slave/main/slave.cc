@@ -57,10 +57,11 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 	if ( ( ! this->config.global.parse( path ) ) ||
 	     ( ! this->config.slave.merge( this->config.global ) ) ||
 	     ( ! this->config.slave.parse( path ) ) ||
-	     ( ! this->config.slave.override( options ) ) ||
-	     ( ( mySlaveIndex = this->config.slave.validate( this->config.global.slaves ) ) == -1 ) ) {
+	     ( ! this->config.slave.override( options ) )
+	) {
 		return false;
 	}
+	mySlaveIndex = this->config.slave.validate( this->config.global.slaves );
 
 	// Initialize modules //
 	/* Socket */
@@ -99,7 +100,7 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 			tmpfd,
 			this->config.global.slaves[ i ],
 			&this->sockets.epoll,
-			i == mySlaveIndex // indicate whether this is a self-socket
+			i == mySlaveIndex && mySlaveIndex != -1 // indicate whether this is a self-socket
 		);
 		this->sockets.slavePeers.set( tmpfd, socket );
 	}
@@ -117,7 +118,8 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 		this->sockets.slavePeers.values
 	);
 	/* Stripe list index */
-	this->stripeListIndex = this->stripeList->list( mySlaveIndex );
+	if ( mySlaveIndex != -1 )
+		this->stripeListIndex = this->stripeList->list( mySlaveIndex );
 	/* Chunk pool */
 	Chunk::init( this->config.global.size.chunk );
 	this->chunkPool = MemoryPool<Chunk>::getInstance();
@@ -134,24 +136,27 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 	this->chunkBuffer.reserve( this->config.global.stripeList.count );
 	for ( uint32_t i = 0; i < this->config.global.stripeList.count; i++ )
 		this->chunkBuffer.push_back( 0 );
-	for ( uint32_t i = 0, size = this->stripeListIndex.size(); i < size; i++ ) {
-		uint32_t listId = this->stripeListIndex[ i ].listId,
-		         stripeId = this->stripeListIndex[ i ].stripeId,
-		         chunkId = this->stripeListIndex[ i ].chunkId;
-		if ( this->stripeListIndex[ i ].isParity ) {
-			this->chunkBuffer[ listId ] = new MixedChunkBuffer(
-				new ParityChunkBuffer(
-					this->config.global.buffer.chunksPerList,
-					listId, stripeId, chunkId
-				)
-			);
-		} else {
-			this->chunkBuffer[ listId ] = new MixedChunkBuffer(
-				new DataChunkBuffer(
-					this->config.global.buffer.chunksPerList,
-					listId, stripeId, chunkId
-				)
-			);
+
+	if ( mySlaveIndex != -1 ) {
+		for ( uint32_t i = 0, size = this->stripeListIndex.size(); i < size; i++ ) {
+			uint32_t listId = this->stripeListIndex[ i ].listId,
+			         stripeId = this->stripeListIndex[ i ].stripeId,
+			         chunkId = this->stripeListIndex[ i ].chunkId;
+			if ( this->stripeListIndex[ i ].isParity ) {
+				this->chunkBuffer[ listId ] = new MixedChunkBuffer(
+					new ParityChunkBuffer(
+						this->config.global.buffer.chunksPerList,
+						listId, stripeId, chunkId, true
+					)
+				);
+			} else {
+				this->chunkBuffer[ listId ] = new MixedChunkBuffer(
+					new DataChunkBuffer(
+						this->config.global.buffer.chunksPerList,
+						listId, stripeId, chunkId, true
+					)
+				);
+			}
 		}
 	}
 	// Map //
@@ -231,6 +236,40 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 	// Show configuration //
 	if ( verbose )
 		this->info();
+	return true;
+}
+
+bool Slave::init( int mySlaveIndex ) {
+	if ( mySlaveIndex == -1 )
+		return false;
+
+	this->stripeListIndex = this->stripeList->list( mySlaveIndex );
+
+	for ( uint32_t i = 0, size = this->stripeListIndex.size(); i < size; i++ ) {
+		uint32_t listId = this->stripeListIndex[ i ].listId,
+				 chunkId = this->stripeListIndex[ i ].chunkId;
+		uint32_t stripeId = 0;
+		if ( this->stripeListIndex[ i ].isParity ) {
+			// The stripe ID is not used
+			this->chunkBuffer[ listId ] = new MixedChunkBuffer(
+				new ParityChunkBuffer(
+					this->config.global.buffer.chunksPerList,
+					listId, stripeId, chunkId, false
+				)
+			);
+		} else {
+			// Get minimum stripe ID
+			stripeId = 0;
+
+			this->chunkBuffer[ listId ] = new MixedChunkBuffer(
+				new DataChunkBuffer(
+					this->config.global.buffer.chunksPerList,
+					listId, stripeId, chunkId, false
+				)
+			);
+		}
+	}
+
 	return true;
 }
 
@@ -505,13 +544,6 @@ void Slave::debug( FILE *f ) {
 
 	fprintf( f, "\n" );
 
-	fprintf( f, "\nSlave peer sockets\n------------------\n" );
-	for ( i = 0, len = this->sockets.slavePeers.size(); i < len; i++ ) {
-		fprintf( f, "%d. ", i + 1 );
-		this->sockets.slavePeers[ i ]->print( f );
-	}
-	if ( len == 0 ) fprintf( f, "(None)\n" );
-
 	fprintf( f, "\nPacket pool\n-----------\n" );
 	this->packetPool.print( f );
 
@@ -574,12 +606,19 @@ void Slave::interactive() {
 		} else if ( strcmp( command, "memory" ) == 0 ) {
 			valid = true;
 			this->memory();
+
+			FILE *f = fopen( "memory.log", "w" );
+			this->memory( f );
+			fclose( f );
 		} else if ( strcmp( command, "metadata" ) == 0 ) {
 			valid = true;
 			this->metadata();
 		} else if ( strcmp( command, "pending" ) == 0 ) {
 			valid = true;
 			this->printPending();
+		} else if ( strcmp( command, "chunk" ) == 0 ) {
+			valid = true;
+			this->printChunk();
 		} else if ( strcmp( command, "sync" ) == 0 ) {
 			valid = true;
 			this->sync();
@@ -785,6 +824,22 @@ void Slave::printPending( FILE *f ) {
 	UNLOCK( &this->pending.slavePeers.setChunkLock );
 }
 
+void Slave::printChunk() {
+	uint32_t listId, stripeId, chunkId;
+	printf( "Which chunk (List ID, Stripe ID, Chunk ID)? " );
+	fflush( stdout );
+	if ( scanf( "%u %u %u", &listId, &stripeId, &chunkId ) == 3 ) {
+		Chunk *chunk = this->map.findChunkById( listId, stripeId, chunkId );
+		if ( chunk ) {
+			chunk->print();
+		} else {
+			printf( "Not found.\n" );
+		}
+	} else {
+		printf( "Invalid input.\n" );
+	}
+}
+
 void Slave::dump() {
 	this->map.dump();
 }
@@ -796,12 +851,14 @@ void Slave::help() {
 		"- help: Show this help message\n"
 		"- info: Show configuration\n"
 		"- debug: Show debug messages\n"
-		"- dump: Dump all key-value pairs\n"
 		"- seal: Seal all chunks in the chunk buffer\n"
 		"- flush: Flush all dirty chunks to disk\n"
-		"- memory: Print memory usage\n"
 		"- metadata: Write metadata to disk\n"
 		"- sync: Synchronize with coordinator\n"
+		"- chunk: Print the debug message for a chunk\n"
+		"- pending: Print all pending requests\n"
+		"- dump: Dump all key-value pairs\n"
+		"- memory: Print memory usage\n"
 		"- load: Show the load of each worker\n"
 		"- time: Show elapsed time\n"
 		"- exit: Terminate this client\n"

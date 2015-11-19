@@ -9,5 +9,8 @@ common/ds/id_generator
 common/protocol/protocol
 common/remap/coordinator_remap
 common/remap/master_remap
+common/stripe_list/analysis
+common/stripe_list/fairness
+common/stripe_list/results
 temp/permutation
 temp/stripe_list

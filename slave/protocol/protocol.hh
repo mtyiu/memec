@@ -21,6 +21,8 @@ public:
 	char *sendHeartbeat( size_t &size, uint32_t id, LOCK_T *sealedLock, std::unordered_set<Metadata> &sealed, uint32_t &sealedCount, LOCK_T *opsLock, std::unordered_map<Key, OpMetadata> &ops, uint32_t &opsCount, bool &isCompleted );
 	// Remapping Records
 	char *sendRemappingRecords( size_t &size, uint32_t id, std::unordered_map<Key, RemappingRecord> &remapRecord, pthread_mutex_t *lock, size_t &remapCount );
+	// Degraded operations
+	char *resReleaseDegradedLock( size_t &size, uint32_t id, uint32_t count );
 
 	/* Master */
 	// Register
@@ -62,9 +64,10 @@ public:
 	char *resDeleteChunk( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId );
 	// GET_CHUNK
 	char *reqGetChunk( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId );
-	char *resGetChunk( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t chunkSize = 0, char *chunkData = 0 );
+	char *resGetChunk( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t chunkSize = 0, uint32_t chunkOffset = 0, char *chunkData = 0 );
 	// SET_CHUNK
-	char *reqSetChunk( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t chunkSize, char *chunkData );
+	char *reqSetChunk( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t chunkSize, uint32_t chunkOffset, char *chunkData );
+	char *reqSetChunk( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, std::unordered_map<Key, KeyValue> *values, std::unordered_multimap<Metadata, Key> *metadataRev, std::unordered_set<Key> *deleted, LOCK_T *lock, bool &isCompleted );
 	char *resSetChunk( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId );
 };
 #endif

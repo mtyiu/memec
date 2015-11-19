@@ -75,7 +75,8 @@ private:
 	void update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, bool needsLock = true, bool needsUnlock = true, bool isSeal = false, bool isDelete = false );
 
 public:
-	ParityChunkBuffer( uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId );
+	ParityChunkBuffer( uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isReady );
+	void init( uint32_t listId, uint32_t stripeId, uint32_t chunkId );
 	ParityChunkWrapper &getWrapper( uint32_t stripeId, bool needsLock = true, bool needsUnlock = true );
 
 	inline uint32_t getChunkId() { return this->chunkId; }

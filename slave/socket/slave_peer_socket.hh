@@ -10,13 +10,13 @@ private:
 
 	bool received;
 	struct sockaddr_in recvAddr;
-	char *identifier;
 	EPoll *epoll;
 
 	void registerTo();
 
 public:
 	volatile bool registered;
+	char *identifier;
 	bool self;
 
 	SlavePeerSocket();
@@ -24,6 +24,7 @@ public:
 	bool init( int tmpfd, ServerAddr &addr, EPoll *epoll, bool self );
 	int init();
 	bool start();
+	void stop();
 	bool ready();
 	void free();
 	bool setRecvFd( int fd, struct sockaddr_in *addr );

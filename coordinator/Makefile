@@ -25,6 +25,7 @@ EXTERNAL_LIB= \
 	$(PLIO_SRC_ROOT)/common/config/global_config.o \
 	$(PLIO_SRC_ROOT)/common/config/server_addr.o \
 	$(PLIO_SRC_ROOT)/common/ds/bitmask_array.o \
+	$(PLIO_SRC_ROOT)/common/ds/key_value.o \
 	$(PLIO_SRC_ROOT)/common/ds/latency.o \
 	$(PLIO_SRC_ROOT)/common/ds/load.o \
 	$(PLIO_SRC_ROOT)/common/ds/sockaddr_in.o \

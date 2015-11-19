@@ -47,7 +47,8 @@ public:
 	static void init( uint32_t capacity );
 	void init();
 	void swap( Chunk *c );
-	void loadFromGetChunkRequest( uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isParity, char *data, uint32_t size );
+	void loadFromGetChunkRequest( uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isParity, uint32_t size, uint32_t offset, char *data );
+	void loadFromSetChunkRequest( char *data, uint32_t size, uint32_t offset, bool isParity );
 	// Access data inside the chunk
 	char *alloc( uint32_t size, uint32_t &offset );
 #ifdef USE_CHUNK_LOCK
@@ -57,16 +58,19 @@ public:
 #endif
 	// Setters and getters
 	inline char *getData() { return this->data; }
-	inline uint32_t getSize() { return this->size; }
+	inline uint32_t getSize() { return this->isParity ? Chunk::capacity : this->size; }
 	inline void setData( char *data ) { this->data = data; }
-	inline void setSize( uint32_t size ) { this->size = size; }
+	inline void setSize( uint32_t size ) {
+		if ( ! this->isParity )
+			this->size = size;
+	}
+	char *getData( uint32_t &offset, uint32_t &size );
 #ifdef USE_CHUNK_LOCK
 	inline void setLock() { LOCK( &this->lock ); }
 	inline void setUnlock() { UNLOCK( &this->lock ); }
 #endif
 	// Update internal counters for data and parity chunks
 	uint32_t updateData();
-	uint32_t updateParity( uint32_t offset = 0, uint32_t length = 0 );
 	// Compute delta
 	void computeDelta( char *delta, char *newData, uint32_t offset, uint32_t length, bool update = true );
 	void update( char *newData, uint32_t offset, uint32_t length );
@@ -78,6 +82,9 @@ public:
 	void clear();
 	void setReconstructed( uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isParity );
 	void free();
+
+	void print( FILE *f = stdout );
+	unsigned int hash();
 
 	static bool initFn( Chunk *chunk, void *argv );
 };

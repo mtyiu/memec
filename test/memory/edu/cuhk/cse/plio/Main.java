@@ -27,15 +27,15 @@ public class Main implements Runnable {
 	/* Instance variables */
 	private int id;
 	private PLIO plio;
-	private HashMap<String, String> map;
+	private HashMap<String, Integer> map;
 	private Random random;
 	public long[] size;
 	public long[] count;
 
-	public Main( int id, int startId ) {
+	public Main( int id, int fromId, int toId ) {
 		this.id = id;
-		this.plio = new PLIO( Main.keySize, Main.chunkSize, Main.host, Main.port, startId );
-		this.map = new HashMap<String, String>();
+		this.plio = new PLIO( Main.keySize, Main.chunkSize, Main.host, Main.port, fromId, toId );
+		this.map = new HashMap<String, Integer>();
 		this.random = new Random();
 		this.size = new long[ 3 ];
 		this.count = new long[ 3 ];
@@ -104,7 +104,7 @@ public class Main implements Runnable {
 
 					if ( ret ) {
 						// Update internal key-value map
-						this.map.put( key, value );
+						this.map.put( key, valueSize );
 
 						// Update counter
 						this.size[ 0 ] += keySize + valueSize;
@@ -117,7 +117,7 @@ public class Main implements Runnable {
 				int index;
 				int removeTarget;
 				Object[] entries;
-				Map.Entry<String, String> entry;
+				Map.Entry<String, Integer> entry;
 
 				switch( Main.workload ) {
 					case 1:
@@ -144,9 +144,9 @@ public class Main implements Runnable {
 					// Select a key to delete
 					index = this.random.nextInt( this.map.size() );
 					entries = this.map.entrySet().toArray();
-					entry = ( Map.Entry<String, String> ) entries[ index ];
+					entry = ( Map.Entry<String, Integer> ) entries[ index ];
 					key = entry.getKey();
-					value = entry.getValue();
+					valueSize = entry.getValue();
 
 					// Perform DELETE operation
 					ret = plio.delete( key );
@@ -156,7 +156,7 @@ public class Main implements Runnable {
 						this.map.remove( key );
 
 						// Update counter
-						this.size[ 1 ] += key.length() + value.length();
+						this.size[ 1 ] += key.length() + valueSize;
 						this.count[ 1 ]++;
 					}
 					entries = null;
@@ -201,7 +201,7 @@ public class Main implements Runnable {
 
 					if ( ret ) {
 						// Update internal key-value map
-						this.map.put( key, value );
+						this.map.put( key, valueSize );
 
 						// Update counter
 						this.size[ 2 ] += keySize + valueSize;
@@ -293,8 +293,9 @@ public class Main implements Runnable {
 		Main.phase = 1;
 		Main.lock = new Object();
 		for ( int i = 0; i < Main.numThreads; i++ ) {
-			int startId = Integer.MAX_VALUE / Main.numThreads * i;
-			Main.mainObjs[ i ] = new Main( i, startId );
+			int fromId = Integer.MAX_VALUE / Main.numThreads * i;
+			int toId = Integer.MAX_VALUE / Main.numThreads * ( i + 1 );
+			Main.mainObjs[ i ] = new Main( i, fromId, toId );
 			Main.threads[ i ] = new Thread( Main.mainObjs[ i ] );
 			Main.completed[ i ] = false;
 		}

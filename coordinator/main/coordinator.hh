@@ -31,8 +31,6 @@ private:
 	struct timespec startTime;
 	std::vector<CoordinatorWorker> workers;
 
-	
-
 	Coordinator();
 	// Do not implement
 	Coordinator( Coordinator const& );
@@ -44,10 +42,10 @@ private:
 	void updateAverageSlaveLoading( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
 			ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency );
 	// return previously overloaded slaves for per-slave phase change
-	std::set<struct sockaddr_in> updateOverloadedSlaveSet( 
+	std::set<struct sockaddr_in> updateOverloadedSlaveSet(
 			ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
 			ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency,
-			std::set<struct sockaddr_in> *slaveSet 
+			std::set<struct sockaddr_in> *slaveSet
 	);
 	void switchPhase( std::set<struct sockaddr_in> prevOverloadedSlaves );
 
@@ -64,6 +62,7 @@ public:
 		EPoll epoll;
 		ArrayMap<int, MasterSocket> masters;
 		ArrayMap<int, SlaveSocket> slaves;
+		ArrayMap<int, SlaveSocket> backupSlaves;
 	} sockets;
 	IDGenerator idGenerator;
 	CoordinatorEventQueue eventQueue;
@@ -73,7 +72,7 @@ public:
 	CoordinatorRemapMsgHandler *remapMsgHandler;
 	RemappingRecordMap remappingRecords;
 	struct {
-		std::unordered_map<Key, RemappingRecord> toSend; 
+		std::unordered_map<Key, RemappingRecord> toSend;
 		LOCK_T toSendLock;
 	} pendingRemappingRecords;
 	PacketPool packetPool;
@@ -111,6 +110,8 @@ public:
 	void flush();
 	void metadata();
 	void syncSlaveMeta( struct sockaddr_in slave, bool *sync );
+	void releaseDegradedLock();
+	void releaseDegradedLock( struct sockaddr_in slave, bool *done );
 	void syncRemappingRecords( LOCK_T *lock, std::map<struct sockaddr_in, uint32_t> *counter, bool *done );
 	double getElapsedTime();
 	void interactive();

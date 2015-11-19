@@ -69,7 +69,7 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 
 	if ( event.type == COORDINATOR_EVENT_TYPE_SYNC )
 		// esp. in response to request from coordinator
-		requestId = event.requestId;
+		requestId = event.id;
 	else if ( event.type == COORDINATOR_EVENT_TYPE_PENDING )
 		requestId = 0;
 	else
@@ -140,6 +140,14 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 				SlaveWorker::eventQueue->insert( event );
 		}
 			break;
+		case COORDINATOR_EVENT_TYPE_RELEASE_DEGRADED_LOCK:
+			buffer.data = this->protocol.resReleaseDegradedLock(
+				buffer.size,
+				event.id,
+				event.message.degraded.count
+			);
+			isSend = true;
+			break;
 		case COORDINATOR_EVENT_TYPE_PENDING:
 			isSend = false;
 			break;
@@ -163,6 +171,7 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 			if ( header.from != PROTO_MAGIC_FROM_COORDINATOR ) {
 				__ERROR__( "SlaveWorker", "dispatch", "Invalid message source from coordinator." );
 			} else {
+				event.id = header.id;
 				switch( header.opcode ) {
 					case PROTO_OPCODE_REGISTER:
 						switch( header.magic ) {
@@ -180,6 +189,9 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 					case PROTO_OPCODE_SLAVE_CONNECTED:
 						this->handleSlaveConnectedMsg( event, buffer.data, buffer.size );
 						break;
+					case PROTO_OPCODE_SLAVE_RECONSTRUCTED:
+						this->handleSlaveReconstructedMsg( event, buffer.data, buffer.size );
+						break;
 					case PROTO_OPCODE_SEAL_CHUNKS:
 						Slave::getInstance()->seal();
 						break;
@@ -188,6 +200,12 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 						break;
 					case PROTO_OPCODE_SYNC_META:
 						Slave::getInstance()->sync( header.id );
+						break;
+					case PROTO_OPCODE_RELEASE_DEGRADED_LOCKS:
+						this->handleReleaseDegradedLockRequest( event, buffer.data, header.length );
+						break;
+					case PROTO_OPCODE_RECOVERY:
+						this->handleRecoveryRequest( event, buffer.data, header.length );
 						break;
 					default:
 						__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from coordinator." );
@@ -437,7 +455,7 @@ void SlaveWorker::dispatch( SlaveEvent event ) {
 }
 
 void SlaveWorker::dispatch( SlavePeerEvent event ) {
-	bool success, connected, isSend;
+	bool success, connected, isSend, isCompleted = true;
 	ssize_t ret;
 	struct {
 		size_t size;
@@ -467,15 +485,49 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 			);
 			break;
 		case SLAVE_PEER_EVENT_TYPE_SET_CHUNK_REQUEST:
-			buffer.data = this->protocol.reqSetChunk(
-				buffer.size,
-				event.id,
-				event.message.chunk.metadata.listId,
-				event.message.chunk.metadata.stripeId,
-				event.message.chunk.metadata.chunkId,
-				event.message.chunk.chunk->getSize(),
-				event.message.chunk.chunk->getData()
-			);
+			if ( event.message.chunk.chunk ) {
+				uint32_t offset, size;
+				char *data;
+
+				data = event.message.chunk.chunk->getData( offset, size );
+				// The chunk is sealed
+				buffer.data = this->protocol.reqSetChunk(
+					buffer.size,
+					event.id,
+					event.message.chunk.metadata.listId,
+					event.message.chunk.metadata.stripeId,
+					event.message.chunk.metadata.chunkId,
+					size, offset, data
+				);
+
+				if ( event.message.chunk.needsFree ) {
+					SlaveWorker::chunkPool->free( event.message.chunk.chunk );
+				}
+			} else {
+				DegradedMap &map = SlaveWorker::degradedChunkBuffer->map;
+				buffer.data = this->protocol.reqSetChunk(
+					buffer.size,
+					event.id,
+					event.message.chunk.metadata.listId,
+					event.message.chunk.metadata.stripeId,
+					event.message.chunk.metadata.chunkId,
+					&map.unsealed.values,
+					&map.unsealed.metadataRev,
+					&map.unsealed.deleted,
+					&map.unsealed.lock,
+					isCompleted
+				);
+				if ( ! isCompleted ) {
+					SlavePeerEvent newEvent;
+					newEvent.reqSetChunk(
+						event.socket,
+						event.id,
+						event.message.chunk.metadata,
+						0, // unsealed chunk
+						false
+					);
+				}
+			}
 			break;
 		case SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_REQUEST:
 			this->issueSealChunkRequest( event.message.chunk.chunk );
@@ -615,13 +667,11 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		// GET_CHUNK
 		case SLAVE_PEER_EVENT_TYPE_GET_CHUNK_RESPONSE_SUCCESS:
 		{
-			char *chunkData = 0;
-			uint32_t chunkSize = 0;
+			char *data = 0;
+			uint32_t size = 0, offset = 0;
 
-			if ( event.message.chunk.chunk ) {
-				chunkData = event.message.chunk.chunk->getData();
-				chunkSize = event.message.chunk.chunk->getSize();
-			}
+			if ( event.message.chunk.chunk )
+				data = event.message.chunk.chunk->getData( offset, size );
 
 			buffer.data = this->protocol.resGetChunk(
 				buffer.size,
@@ -630,8 +680,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				event.message.chunk.metadata.listId,
 				event.message.chunk.metadata.stripeId,
 				event.message.chunk.metadata.chunkId,
-				chunkSize,
-				chunkData
+				size, offset, data
 			);
 		}
 			break;
@@ -861,9 +910,10 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 					}
 					break;
 				case PROTO_OPCODE_SET_CHUNK:
+				case PROTO_OPCODE_SET_CHUNK_UNSEALED:
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
-							this->handleSetChunkRequest( event, buffer.data, buffer.size );
+							this->handleSetChunkRequest( event, header.opcode == PROTO_OPCODE_SET_CHUNK, buffer.data, buffer.size );
 							this->load.setChunk();
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
@@ -918,6 +968,12 @@ bool SlaveWorker::getSlaves( uint32_t listId ) {
 }
 
 bool SlaveWorker::issueSealChunkRequest( Chunk *chunk, uint32_t startPos ) {
+	// printf(
+	// 	"issueSealChunkRequest(): (%u, %u, %u)\n",
+	// 	chunk->metadata.listId,
+	// 	chunk->metadata.stripeId,
+	// 	chunk->metadata.chunkId
+	// );
 	// The chunk is locked when this function is called
 	// Only issue seal chunk request when new key-value pairs are received
 	if ( SlaveWorker::parityChunkCount && startPos < chunk->getSize() ) {
@@ -989,6 +1045,268 @@ bool SlaveWorker::handleSlaveConnectedMsg( CoordinatorEvent event, char *buf, si
 	slavePeers->values[ index ]->start();
 
 	return true;
+}
+
+bool SlaveWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *buf, size_t size ) {
+	struct AddressHeader srcHeader, dstHeader;
+	if ( ! this->protocol.parseSrcDstAddressHeader( srcHeader, dstHeader, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleSlaveReconstructedMsg", "Invalid address header." );
+		return false;
+	}
+
+	char srcTmp[ 22 ], dstTmp[ 22 ];
+	Socket::ntoh_ip( srcHeader.addr, srcTmp, 16 );
+	Socket::ntoh_port( srcHeader.port, srcTmp + 16, 6 );
+	Socket::ntoh_ip( dstHeader.addr, dstTmp, 16 );
+	Socket::ntoh_port( dstHeader.port, dstTmp + 16, 6 );
+	// __DEBUG__(
+	// 	YELLOW,
+	__ERROR__(
+		"SlaveWorker", "handleSlaveReconstructedMsg",
+		"Slave: %s:%s is reconstructed at %s:%s.",
+		srcTmp, srcTmp + 16, dstTmp, dstTmp + 16
+	);
+
+	// Find the slave peer socket in the array map
+	int index = -1, sockfd = -1;
+	SlavePeerSocket *original, *s;
+	Slave *slave = Slave::getInstance();
+	bool self = false;
+
+	for ( int i = 0, len = slavePeers->size(); i < len; i++ ) {
+		if ( slavePeers->values[ i ]->equal( srcHeader.addr, srcHeader.port ) ) {
+			index = i;
+			original = slavePeers->values[ i ];
+			break;
+		}
+	}
+	if ( index == -1 ) {
+		__ERROR__( "SlaveWorker", "handleSlaveReconstructedMsg", "The slave is not in the list. Ignoring this slave..." );
+		return false;
+	}
+	original->stop();
+
+	ServerAddr serverAddr( slavePeers->values[ index ]->identifier, dstHeader.addr, dstHeader.port );
+	ServerAddr &me = slave->config.slave.slave.addr;
+
+	// Check if this is a self-socket
+	self = ( dstHeader.addr == me.addr && dstHeader.port == me.port );
+
+	if ( self ) {
+		ServerAddr src( 0, srcHeader.addr, srcHeader.port );
+		int mySlaveIndex = -1;
+
+		for ( int i = 0, len = slave->config.global.slaves.size(); i < len; i++ ) {
+			if ( ServerAddr::match( &slave->config.global.slaves[ i ], &src ) ) {
+				mySlaveIndex = i;
+				break;
+			}
+		}
+
+		slave->init( mySlaveIndex );
+	}
+
+	s = new SlavePeerSocket();
+	s->init(
+		sockfd, serverAddr,
+		&Slave::getInstance()->sockets.epoll,
+		self // self-socket
+	);
+
+	// Update sockfd in the array Map
+	if ( self ) {
+		sockfd = original->getSocket();
+	} else {
+		sockfd = s->init();
+	}
+	slavePeers->set( index, sockfd, s );
+	SlaveWorker::stripeList->update();
+	delete original;
+
+	// Connect to the slave peer
+	if ( ! self )
+		s->start();
+
+	return true;
+}
+
+bool SlaveWorker::handleReleaseDegradedLockRequest( CoordinatorEvent event, char *buf, size_t size ) {
+	struct ChunkHeader header;
+	uint32_t count = 0, requestId;
+
+	Metadata metadata;
+	ChunkRequest chunkRequest;
+	std::vector<Metadata> chunks;
+	SlavePeerEvent slavePeerEvent;
+	SlavePeerSocket *socket;
+	Chunk *chunk;
+
+	while( size ) {
+		if ( ! this->protocol.parseDegradedReleaseReqHeader( header, buf, size ) ) {
+			__ERROR__( "SlaveWorker", "handleReleaseDegradedLockRequest", "Invalid DEGRADED_RELEASE request." );
+			return false;
+		}
+		__DEBUG__(
+			BLUE, "SlaveWorker", "handleGetRequest",
+			"[DEGRADED_RELEASE] (%u, %u, %u) (remaining = %lu).",
+			header.listId, header.stripeId, header.chunkId
+		);
+		buf += PROTO_DEGRADED_RELEASE_REQ_SIZE;
+		size -= PROTO_DEGRADED_RELEASE_REQ_SIZE;
+
+		metadata.set( header.listId, header.stripeId, header.chunkId );
+		chunks.push_back( metadata );
+
+		count++;
+	}
+
+	SlaveWorker::pending->insertReleaseDegradedLock( event.id, event.socket, count );
+
+	for ( size_t i = 0, len = chunks.size(); i < len; i++ ) {
+		// Determine the src
+		if ( i == 0 ) {
+			// The target is the same for all chunks in this request
+			this->getSlaves( chunks[ i ].listId );
+			socket =   chunks[ i ].chunkId < SlaveWorker::dataChunkCount
+			         ? this->dataSlaveSockets[ chunks[ i ].chunkId ]
+			         : this->paritySlaveSockets[ chunks[ i ].chunkId - SlaveWorker::dataChunkCount ];
+		}
+
+		requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
+		chunk = SlaveWorker::degradedChunkBuffer->map.deleteChunk(
+			chunks[ i ].listId, chunks[ i ].stripeId, chunks[ i ].chunkId,
+			&metadata
+		);
+
+		chunkRequest.set(
+			chunks[ i ].listId, chunks[ i ].stripeId, chunks[ i ].chunkId,
+			socket, chunk, true /* isDegraded */
+		);
+		if ( ! SlaveWorker::pending->insertChunkRequest( PT_SLAVE_PEER_SET_CHUNK, requestId, event.id, socket, chunkRequest ) ) {
+			__ERROR__( "SlaveWorker", "performDegradedRead", "Cannot insert into slave CHUNK_REQUEST pending map." );
+		}
+
+		// If chunk is NULL, then the unsealed version of SET_CHUNK will be used
+		slavePeerEvent.reqSetChunk( socket, requestId, metadata, chunk, true );
+		SlaveWorker::eventQueue->insert( slavePeerEvent );
+	}
+
+	return true;
+}
+
+bool SlaveWorker::handleRecoveryRequest( CoordinatorEvent event, char *buf, size_t size ) {
+	struct RecoveryHeader header;
+	std::unordered_set<uint32_t> stripeIds;
+	std::unordered_set<uint32_t>::iterator it;
+	if ( ! this->protocol.parseRecoveryHeader( header, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleRecoveryRequest", "Invalid RECOVERY request." );
+		return false;
+	}
+	__DEBUG__(
+		BLUE, "SlaveWorker", "handleRecoveryRequest",
+		"[RECOVERY] List ID: %u; chunk ID: %u; number of stripes: %u.",
+		header.listId, header.chunkId, header.numStripes
+	);
+
+	uint32_t chunkId, myChunkId = SlaveWorker::chunkCount, chunkCount, requestId;
+	ChunkRequest chunkRequest;
+	Metadata metadata;
+	SlavePeerEvent *events;
+	Chunk *chunk;
+	SlavePeerSocket *socket = 0;
+
+	// Check whether the number of surviving nodes >= k
+	SlaveWorker::stripeList->get( header.listId, this->paritySlaveSockets, this->dataSlaveSockets );
+	chunkCount = 0;
+	for ( uint32_t i = 0; i < SlaveWorker::chunkCount; i++ ) {
+		if ( i == header.chunkId )
+			continue;
+		socket = ( i < SlaveWorker::dataChunkCount ) ?
+				 ( this->dataSlaveSockets[ i ] ) :
+				 ( this->paritySlaveSockets[ i - SlaveWorker::dataChunkCount ] );
+		if ( socket->ready() ) chunkCount++;
+		if ( socket->self ) myChunkId = i;
+	}
+	assert( myChunkId < SlaveWorker::chunkCount );
+	if ( chunkCount < SlaveWorker::dataChunkCount ) {
+		__ERROR__( "SlaveWorker", "handleRecoveryRequest", "The number of surviving nodes is less than k. The data cannot be recovered." );
+		// TODO
+		return false;
+	}
+
+	// Insert into pending set
+	for ( uint32_t i = 0; i < header.numStripes; i++ )
+		stripeIds.insert( header.stripeIds[ i ] );
+	if ( ! SlaveWorker::pending->insertRecovery(
+		event.id,
+		header.chunkId < SlaveWorker::dataChunkCount ? this->dataSlaveSockets[ header.chunkId ] : this->paritySlaveSockets[ header.chunkId - SlaveWorker::dataChunkCount ],
+		header.listId,
+		header.chunkId,
+		stripeIds
+	) ) {
+		__ERROR__( "SlaveWorker", "handleRecoveryRequest", "Cannot insert into coordinator RECOVERY pending map." );
+	}
+
+	// Send GET_CHUNK requests to surviving nodes
+	events = new SlavePeerEvent[ SlaveWorker::dataChunkCount - 1 ];
+	chunkId = 0;
+	for ( it = stripeIds.begin(); it != stripeIds.end(); it++ ) {
+		// printf( "Processing (%u, %u, %u)...\n", header.listId, *it, header.chunkId );
+		chunkCount = 0;
+		requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
+		metadata.listId = header.listId;
+		metadata.stripeId = *it;
+		while( chunkCount < SlaveWorker::dataChunkCount - 1 ) {
+			if ( chunkId != header.chunkId ) { // skip the chunk to be reconstructed
+				socket = ( chunkId < SlaveWorker::dataChunkCount ) ?
+						 ( this->dataSlaveSockets[ chunkId ] ) :
+						 ( this->paritySlaveSockets[ chunkId - SlaveWorker::dataChunkCount ] );
+				if ( socket->ready() && ! socket->self ) { // use this slave
+					metadata.chunkId = chunkId;
+					chunkRequest.set(
+						metadata.listId, metadata.stripeId, metadata.chunkId,
+						socket, 0, false
+					);
+					if ( ! SlaveWorker::pending->insertChunkRequest( PT_SLAVE_PEER_GET_CHUNK, requestId, event.id, socket, chunkRequest ) ) {
+						__ERROR__( "SlaveWorker", "handleRecoveryRequest", "Cannot insert into slave CHUNK_REQUEST pending map." );
+					} else {
+						events[ chunkCount ].reqGetChunk( socket, requestId, metadata );
+						chunkCount++;
+					}
+				}
+			}
+			chunkId++;
+			if ( chunkId >= SlaveWorker::chunkCount )
+				chunkId = 0;
+		}
+		// Use own chunk
+		chunk = SlaveWorker::map->findChunkById( metadata.listId, metadata.stripeId, myChunkId );
+		if ( ! chunk ) {
+			chunk = Coding::zeros;
+		} else {
+			// Check whether the chunk is sealed or not
+			MixedChunkBuffer *chunkBuffer = SlaveWorker::chunkBuffer->at( metadata.listId );
+			int chunkBufferIndex = chunkBuffer->lockChunk( chunk, true );
+			bool isSealed = ( chunkBufferIndex == -1 );
+			if ( ! isSealed )
+				chunk = Coding::zeros;
+			chunkBuffer->unlock( chunkBufferIndex );
+		}
+		chunkRequest.set(
+			metadata.listId, metadata.stripeId, myChunkId,
+			0, chunk, false
+		);
+		if ( ! SlaveWorker::pending->insertChunkRequest( PT_SLAVE_PEER_GET_CHUNK, requestId, event.id, 0, chunkRequest ) ) {
+			__ERROR__( "SlaveWorker", "performDegradedRead", "Cannot insert into slave CHUNK_REQUEST pending map." );
+		}
+		// Send GET_CHUNK requests now
+		for ( uint32_t i = 0; i < SlaveWorker::dataChunkCount - 1; i++ ) {
+			SlaveWorker::eventQueue->insert( events[ i ] );
+		}
+	}
+	delete[] events;
+
+	return false;
 }
 
 bool SlaveWorker::handleGetRequest( MasterEvent event, char *buf, size_t size ) {
@@ -1683,7 +2001,9 @@ bool SlaveWorker::handleDegradedDeleteRequest( MasterEvent event, char *buf, siz
 		if ( chunk ) {
 			SlaveWorker::degradedChunkBuffer->deleteKey(
 				PROTO_OPCODE_DELETE,
-				key.size, key.data, true, /* isSealed */
+				key.size, key.data,
+				metadata,
+				true, /* isSealed */
 				deltaSize, delta, chunk
 			);
 
@@ -1704,7 +2024,9 @@ bool SlaveWorker::handleDegradedDeleteRequest( MasterEvent event, char *buf, siz
 			uint32_t tmp = 0;
 			SlaveWorker::degradedChunkBuffer->deleteKey(
 				PROTO_OPCODE_DELETE,
-				key.size, key.data, false,
+				key.size, key.data,
+				metadata,
+				false,
 				tmp, 0, 0
 			);
 
@@ -1795,6 +2117,7 @@ bool SlaveWorker::handleSealChunkRequest( SlavePeerEvent event, char *buf, size_
 
 	return true;
 }
+
 bool SlaveWorker::handleGetRequest( SlavePeerEvent event, char *buf, size_t size ) {
 	struct ListStripeKeyHeader header;
 	bool ret;
@@ -2000,28 +2323,195 @@ bool SlaveWorker::handleGetChunkRequest( SlavePeerEvent event, char *buf, size_t
 	return ret;
 }
 
-bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, char *buf, size_t size ) {
-	struct ChunkDataHeader header;
-	bool ret;
-	if ( ! this->protocol.parseChunkDataHeader( header, buf, size ) ) {
-		__ERROR__( "SlaveWorker", "handleSetChunkRequest", "Invalid SET_CHUNK request." );
-		return false;
-	}
-	__DEBUG__(
-		BLUE, "SlaveWorker", "handleSetChunkRequest",
-		"[SET_CHUNK] List ID: %u; stripe ID: %u; chunk ID: %u; chunk size = %u.",
-		header.listId, header.stripeId, header.chunkId, header.size
-	);
-
+bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, bool isSealed, char *buf, size_t size ) {
+	union {
+		struct ChunkDataHeader chunkData;
+		struct ChunkKeyValueHeader chunkKeyValue;
+	} header;
 	Metadata metadata;
-	metadata.listId = header.listId;
-	metadata.stripeId = header.stripeId;
-	metadata.chunkId = header.chunkId;
-	__ERROR__( "SlaveWorker", "handleSetChunkRequest", "TODO: SET_CHUNK not yet implemented!" );
-	ret = false;
+	char *ptr = 0;
 
-	event.resSetChunk( event.socket, event.id, metadata, ret );
-	this->dispatch( event );
+	if ( isSealed ) {
+		if ( ! this->protocol.parseChunkDataHeader( header.chunkData, buf, size ) ) {
+			__ERROR__( "SlaveWorker", "handleSetChunkRequest", "Invalid SET_CHUNK request." );
+			return false;
+		}
+		metadata.set( header.chunkData.listId, header.chunkData.stripeId, header.chunkData.chunkId );
+		__DEBUG__(
+			BLUE, "SlaveWorker", "handleSetChunkRequest",
+			"[SET_CHUNK] List ID: %u; stripe ID: %u; chunk ID: %u; chunk size = %u.",
+			header.chunkData.listId, header.chunkData.stripeId, header.chunkData.chunkId, header.chunkData.size
+		);
+	} else {
+		if ( ! this->protocol.parseChunkKeyValueHeader( header.chunkKeyValue, ptr, buf, size ) ) {
+			__ERROR__( "SlaveWorker", "handleSetChunkRequest", "Invalid SET_CHUNK request." );
+			return false;
+		}
+		metadata.set( header.chunkKeyValue.listId, header.chunkKeyValue.stripeId, header.chunkKeyValue.chunkId );
+		__DEBUG__(
+			BLUE, "SlaveWorker", "handleSetChunkRequest",
+			"[SET_CHUNK] List ID: %u; stripe ID: %u; chunk ID: %u; deleted = %u; count = %u.",
+			header.chunkKeyValue.listId, header.chunkKeyValue.stripeId, header.chunkKeyValue.chunkId,
+			header.chunkKeyValue.deleted, header.chunkKeyValue.count
+		);
+	}
+
+	Key key;
+	KeyValue keyValue;
+	KeyMetadata keyMetadata;
+	bool ret;
+	uint32_t offset, chunkSize, valueSize, objSize;
+	char *valueStr;
+	Chunk *chunk;
+	LOCK_T *keysLock, *cacheLock;
+	std::unordered_map<Key, KeyMetadata> *keys;
+	std::unordered_map<Metadata, Chunk *> *cache;
+
+	SlaveWorker::map->getKeysMap( keys, keysLock );
+	SlaveWorker::map->getCacheMap( cache, cacheLock );
+
+	LOCK( keysLock );
+	LOCK( cacheLock );
+
+	chunk = SlaveWorker::map->findChunkById(
+		metadata.listId, metadata.stripeId, metadata.chunkId, 0,
+		false, // needsLock
+		false // needsUnlock
+	);
+	// Lock the data chunk buffer
+	MixedChunkBuffer *chunkBuffer = SlaveWorker::chunkBuffer->at( metadata.listId );
+	int chunkBufferIndex = chunkBuffer->lockChunk( chunk, false );
+
+	ret = chunk;
+	if ( ! chunk ) {
+		__ERROR__( "SlaveWorker", "handleSetChunkRequest", "The chunk (%u, %u, %u) does not exist.", metadata.listId, metadata.stripeId, metadata.chunkId );
+	} else {
+		if ( metadata.chunkId < SlaveWorker::dataChunkCount ) {
+			if ( isSealed ) {
+				uint32_t originalChunkSize;
+				// Delete all keys in the chunk from the map
+				offset = 0;
+				originalChunkSize = chunkSize = chunk->getSize();
+				while ( offset < chunkSize ) {
+					keyValue = chunk->getKeyValue( offset );
+					keyValue.deserialize( key.data, key.size, valueStr, valueSize );
+
+					key.set( key.size, key.data );
+					SlaveWorker::map->deleteKey(
+						key, 0, keyMetadata,
+						false, // needsLock
+						false, // needsUnlock
+						false  // needsUpdateOpMetadata
+					);
+
+					objSize = KEY_VALUE_METADATA_SIZE + key.size + valueSize;
+					offset += objSize;
+				}
+
+				// Replace chunk contents
+				chunk->loadFromSetChunkRequest(
+					header.chunkData.data,
+					header.chunkData.size,
+					header.chunkData.offset,
+					header.chunkData.chunkId >= SlaveWorker::dataChunkCount
+				);
+
+				// Add all keys in the new chunk to the map
+				offset = 0;
+				chunkSize = header.chunkData.size;
+				while( offset < chunkSize ) {
+					keyValue = chunk->getKeyValue( offset );
+					keyValue.deserialize( key.data, key.size, valueStr, valueSize );
+					objSize = KEY_VALUE_METADATA_SIZE + key.size + valueSize;
+
+					key.set( key.size, key.data );
+
+					keyMetadata.set( metadata.listId, metadata.stripeId, metadata.chunkId );
+					keyMetadata.offset = offset;
+					keyMetadata.length = objSize;
+
+					SlaveWorker::map->insertKey(
+						key, 0, keyMetadata,
+						false, // needsLock
+						false, // needsUnlock
+						false  // needsUpdateOpMetadata
+					);
+
+					offset += objSize;
+				}
+
+				// Re-insert into data chunk buffer
+				assert( chunkBufferIndex == -1 );
+				if ( ! chunkBuffer->reInsert( this, chunk, originalChunkSize - chunkSize, false, false ) ) {
+					// The chunk is compacted before. Need to seal the chunk first
+					// Seal from chunk->lastDelPos
+					if ( chunk->lastDelPos < chunk->getSize() ) {
+						// Only issue seal chunk request when new key-value pairs are received
+						this->issueSealChunkRequest( chunk, chunk->lastDelPos );
+					}
+				}
+			} else {
+				struct KeyHeader keyHeader;
+				struct KeyValueHeader keyValueHeader;
+				uint32_t offset = ptr - buf;
+
+				// Handle removed keys in DEGRADED_DELETE
+				for ( uint32_t i = 0; i < header.chunkKeyValue.deleted; i++ ) {
+					if ( ! this->protocol.parseKeyHeader( keyHeader, buf, size, offset ) ) {
+						__ERROR__( "SlaveWorker", "handleSetChunkRequest", "Invalid key in deleted key list." );
+						break;
+					}
+					key.set( keyHeader.keySize, keyHeader.key );
+
+					// Update key map and chunk
+					if ( SlaveWorker::map->deleteKey( key, PROTO_OPCODE_DELETE, keyMetadata, false, false, false ) ) {
+						chunk->deleteKeyValue( keys, keyMetadata );
+					} else {
+						__ERROR__( "SlaveWorker", "handleSetChunkRequest", "The deleted key does not exist." );
+					}
+
+					offset += PROTO_KEY_SIZE + keyHeader.keySize;
+				}
+
+				// Update key-value pairs
+				for ( uint32_t i = 0; i < header.chunkKeyValue.count; i++ ) {
+					if ( ! this->protocol.parseKeyValueHeader( keyValueHeader, buf, size, offset ) ) {
+						__ERROR__( "SlaveWorker", "handleSetChunkRequest", "Invalid key-value pair in updated value list." );
+						break;
+					}
+
+					// Update the key-value pair
+					if ( map->findValueByKey( keyValueHeader.key, keyValueHeader.keySize, &keyValue, 0, 0, 0, 0, false, false ) ) {
+						keyValue.deserialize( key.data, key.size, valueStr, valueSize );
+						assert( valueSize == keyValueHeader.valueSize );
+						memcpy( valueStr, keyValueHeader.value, valueSize );
+					} else {
+						__ERROR__( "SlaveWorker", "handleSetChunkRequest", "The updated key-value pair does not exist." );
+					}
+
+					offset += PROTO_KEY_VALUE_SIZE + keyValueHeader.keySize + keyValueHeader.valueSize;
+				}
+			}
+		} else {
+			// Replace chunk contents
+			chunk->loadFromSetChunkRequest(
+				header.chunkData.data,
+				header.chunkData.size,
+				header.chunkData.offset,
+				header.chunkData.chunkId >= SlaveWorker::dataChunkCount
+			);
+		}
+	}
+
+	UNLOCK( cacheLock );
+	UNLOCK( keysLock );
+	if ( chunkBufferIndex != -1 )
+		chunkBuffer->updateAndUnlockChunk( chunkBufferIndex );
+
+	if ( isSealed || header.chunkKeyValue.isCompleted ) {
+		event.resSetChunk( event.socket, event.id, metadata, ret );
+		this->dispatch( event );
+	}
 
 	return ret;
 }
@@ -2130,6 +2620,7 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
 	Key key;
 	KeyValue keyValue;
+	Metadata metadata;
 	DegradedMap *dmap = &SlaveWorker::degradedChunkBuffer->map;
 	if ( success ) {
 		struct KeyValueHeader header;
@@ -2178,16 +2669,9 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 
 		if ( success ) {
 			if ( op.opcode == PROTO_OPCODE_DEGRADED_DELETE ) {
+				metadata.set( op.listId, op.stripeId, op.chunkId );
+				dmap->deleteValue( key, metadata, PROTO_OPCODE_DELETE );
 				keyValue.free();
-				if ( ! dmap->deleteValue( key, PROTO_OPCODE_DELETE ) ) {
-					// Insert into OpMetadata map
-					KeyMetadata keyMetadata;
-					keyMetadata.set( op.listId, op.stripeId, op.chunkId );
-					SlaveWorker::map->insertOpMetadata(
-						PROTO_OPCODE_DELETE,
-						key, keyMetadata
-					);
-				}
 			} else if ( ! isInserted ) {
 				Metadata metadata;
 				metadata.set( op.listId, op.stripeId, op.chunkId );
@@ -2407,9 +2891,10 @@ bool SlaveWorker::handleDeleteResponse( SlavePeerEvent event, bool success, char
 
 bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
 	int pending;
-	uint32_t chunkId;
+	uint32_t listId, stripeId, chunkId;
 	std::unordered_map<PendingIdentifier, ChunkRequest>::iterator it, tmp, end;
 	ChunkRequest chunkRequest;
+	PendingIdentifier pid;
 	union {
 		struct ChunkDataHeader chunkData;
 		struct ChunkHeader chunk;
@@ -2426,6 +2911,8 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 			"[GET_CHUNK (success)] List ID: %u, stripe ID: %u, chunk ID: %u; chunk size = %u.",
 			header.chunkData.listId, header.chunkData.stripeId, header.chunkData.chunkId, header.chunkData.size
 		);
+		listId = header.chunkData.listId;
+		stripeId = header.chunkData.stripeId;
 		chunkId = header.chunkData.chunkId;
 	} else {
 		if ( ! this->protocol.parseChunkHeader( header.chunk, buf, size ) ) {
@@ -2437,6 +2924,8 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 			"[GET_CHUNK (failure)] List ID: %u, stripe ID: %u, chunk ID: %u.",
 			header.chunk.listId, header.chunk.stripeId, header.chunk.chunkId
 		);
+		listId = header.chunk.listId;
+		stripeId = header.chunk.stripeId;
 		chunkId = header.chunk.chunkId;
 	}
 
@@ -2447,6 +2936,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 		return false;
 	}
 
+	pid = it->first;
 	chunkRequest = it->second;
 
 	// Prepare stripe buffer
@@ -2466,9 +2956,13 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 					// The requested chunk is sealed
 					tmp->second.chunk = SlaveWorker::chunkPool->malloc();
 					tmp->second.chunk->loadFromGetChunkRequest(
-						header.chunkData.listId, header.chunkData.stripeId, header.chunkData.chunkId,
+						header.chunkData.listId,
+						header.chunkData.stripeId,
+						header.chunkData.chunkId,
 						header.chunkData.chunkId >= SlaveWorker::dataChunkCount, // isParity
-						header.chunkData.data, header.chunkData.size
+						header.chunkData.size,
+						header.chunkData.offset,
+						header.chunkData.data
 					);
 				} else {
 					// The requested chunk is not yet sealed
@@ -2493,6 +2987,8 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 	UNLOCK( &SlaveWorker::pending->slavePeers.getChunkLock );
 
 	if ( pending == 0 ) {
+		// printf( "Reconstructing: %u, %u, { ", listId, stripeId );
+
 		// Set up chunk buffer for storing reconstructed chunks
 		for ( uint32_t i = 0, j = 0; i < SlaveWorker::chunkCount; i++ ) {
 			if ( ! this->chunks[ i ] ) {
@@ -2504,9 +3000,12 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 				this->chunkStatus->unset( i );
 				j++;
 			} else {
+				// printf( "%u ", i );
 				this->chunkStatus->set( i );
 			}
 		}
+		// printf( "}\n" );
+		// fflush( stdout );
 
 		// Decode to reconstruct the lost chunk
 		CodingEvent codingEvent;
@@ -2542,161 +3041,202 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 			}
 		}
 
-		PendingIdentifier pid;
-		DegradedOp op;
+		if ( chunkRequest.isDegraded ) {
+			// Respond the original GET/UPDATE/DELETE operation using the reconstructed data
+			PendingIdentifier pid;
+			DegradedOp op;
 
-		// Respond the original GET/UPDATE/DELETE operation using the reconstructed data
-		if ( ! SlaveWorker::pending->eraseDegradedOp( PT_SLAVE_PEER_DEGRADED_OPS, event.id, event.socket, &pid, &op ) ) {
-			__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot find a pending slave DEGRADED_OPS request that matches the response. This message will be discarded." );
-		} else {
-			DegradedMap *dmap = &SlaveWorker::degradedChunkBuffer->map;
-			bool isKeyValueFound, isSealed;
-			Key key;
-			KeyValue keyValue;
-			KeyMetadata keyMetadata;
-			Metadata metadata;
-			std::vector<uint32_t> pids;
+			if ( ! SlaveWorker::pending->eraseDegradedOp( PT_SLAVE_PEER_DEGRADED_OPS, event.id, event.socket, &pid, &op ) ) {
+				__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot find a pending slave DEGRADED_OPS request that matches the response. This message will be discarded." );
+			} else {
+				DegradedMap *dmap = &SlaveWorker::degradedChunkBuffer->map;
+				bool isKeyValueFound, isSealed;
+				Key key;
+				KeyValue keyValue;
+				KeyMetadata keyMetadata;
+				Metadata metadata;
+				std::vector<uint32_t> pids;
 
-			keyMetadata.offset = 0;
+				keyMetadata.offset = 0;
 
-			if ( ! dmap->deleteDegradedChunk( op.listId, op.stripeId, op.chunkId, pids ) ) {
-				__ERROR__( "SlaveWorker", "handleGetChunkResponse", "dmap->deleteDegradedChunk() failed (%u, %u, %u).", op.listId, op.stripeId, op.chunkId );
-			}
-
-			for ( int pidsIndex = 0, len = pids.size(); pidsIndex < len; pidsIndex++ ) {
-				if ( pidsIndex == 0 ) {
-					assert( pids[ pidsIndex ] == pid.id );
-				} else {
-					if ( ! SlaveWorker::pending->eraseDegradedOp( PT_SLAVE_PEER_DEGRADED_OPS, pids[ pidsIndex ], 0, &pid, &op ) ) {
-						__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot find a pending slave DEGRADED_OPS request that matches the response. This message will be discarded." );
-					}
+				if ( ! dmap->deleteDegradedChunk( op.listId, op.stripeId, op.chunkId, pids ) ) {
+					__ERROR__( "SlaveWorker", "handleGetChunkResponse", "dmap->deleteDegradedChunk() failed (%u, %u, %u).", op.listId, op.stripeId, op.chunkId );
 				}
-
 				metadata.set( op.listId, op.stripeId, op.chunkId );
 
-				// Find the chunk from the map
-				Chunk *chunk = dmap->findChunkById( op.listId, op.stripeId, op.chunkId );
-
-				if ( ! chunk ) {
-					this->chunks[ op.chunkId ]->status = CHUNK_STATUS_RECONSTRUCTED;
-
-					chunk = SlaveWorker::chunkPool->malloc();
-					chunk->swap( this->chunks[ op.chunkId ] );
-
-					if ( ! dmap->setChunk(
-						op.listId, op.stripeId, op.chunkId, chunk,
-						op.chunkId >= SlaveWorker::dataChunkCount
-					) ) {
-						__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot insert into degraded chunk buffer's chunk map." );
-					}
-				// } else {
-					// __ERROR__( "SlaveWorker", "handleGetChunkResponse", "The chunk already exist." );
-				}
-
-				switch( op.opcode ) {
-					case PROTO_OPCODE_DEGRADED_UPDATE:
-						key.set( op.data.keyValueUpdate.size, op.data.keyValueUpdate.data );
-						break;
-					case PROTO_OPCODE_DEGRADED_GET:
-					case PROTO_OPCODE_DEGRADED_DELETE:
-					default:
-						key.set( op.data.key.size, op.data.key.data );
-						break;
-				}
-
-				isKeyValueFound = dmap->findValueByKey( key.data, key.size, isSealed, &keyValue, &key, &keyMetadata );
-				// Send response
-				if ( op.opcode == PROTO_OPCODE_DEGRADED_GET ) {
-					MasterEvent event;
-
-					if ( isKeyValueFound )
-						event.resGet( op.socket, pid.parentId, keyValue, true );
-					else
-						event.resGet( op.socket, pid.parentId, key, true );
-					this->dispatch( event );
-					op.data.key.free();
-				} else if ( op.opcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
-					if ( isKeyValueFound ) {
-						uint32_t chunkUpdateOffset = KeyValue::getChunkUpdateOffset(
-							keyMetadata.offset, // chunkOffset
-							key.size, // keySize
-							op.data.keyValueUpdate.offset // valueUpdateOffset
-						);
-						char *valueUpdate = ( char * ) op.data.keyValueUpdate.ptr;
-
-						op.data.keyValueUpdate.ptr = op.socket;
-						// Insert into master UPDATE pending set
-						if ( ! SlaveWorker::pending->insertKeyValueUpdate( PT_MASTER_UPDATE, pid.parentId, op.socket, op.data.keyValueUpdate ) ) {
-							__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot insert into master UPDATE pending map." );
-						}
-
-						SlaveWorker::degradedChunkBuffer->updateKeyValue(
-							key.size, key.data,
-							op.data.keyValueUpdate.length,
-							op.data.keyValueUpdate.offset,
-							chunkUpdateOffset,
-							valueUpdate,
-							chunk,
-							true /* isSealed */
-						);
-
-						this->sendModifyChunkRequest(
-							pid.parentId,
-							key.size, key.data,
-							metadata,
-							chunkUpdateOffset,
-							op.data.keyValueUpdate.length /* deltaSize */,
-							op.data.keyValueUpdate.offset,
-							valueUpdate,
-							true /* isSealed */,
-							true /* isUpdate */
-						);
-
-						delete[] valueUpdate;
+				for ( int pidsIndex = 0, len = pids.size(); pidsIndex < len; pidsIndex++ ) {
+					if ( pidsIndex == 0 ) {
+						assert( pids[ pidsIndex ] == pid.id );
 					} else {
+						if ( ! SlaveWorker::pending->eraseDegradedOp( PT_SLAVE_PEER_DEGRADED_OPS, pids[ pidsIndex ], 0, &pid, &op ) ) {
+							__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot find a pending slave DEGRADED_OPS request that matches the response. This message will be discarded." );
+						}
+					}
+
+					// Find the chunk from the map
+					Chunk *chunk = dmap->findChunkById( op.listId, op.stripeId, op.chunkId );
+
+					if ( ! chunk ) {
+						this->chunks[ op.chunkId ]->status = CHUNK_STATUS_RECONSTRUCTED;
+
+						chunk = SlaveWorker::chunkPool->malloc();
+						chunk->swap( this->chunks[ op.chunkId ] );
+
+						if ( ! dmap->insertChunk(
+							op.listId, op.stripeId, op.chunkId, chunk,
+							op.chunkId >= SlaveWorker::dataChunkCount
+						) ) {
+							__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot insert into degraded chunk buffer's chunk map." );
+						}
+					// } else {
+						// __ERROR__( "SlaveWorker", "handleGetChunkResponse", "The chunk already exist." );
+					}
+
+					switch( op.opcode ) {
+						case PROTO_OPCODE_DEGRADED_UPDATE:
+							key.set( op.data.keyValueUpdate.size, op.data.keyValueUpdate.data );
+							break;
+						case PROTO_OPCODE_DEGRADED_GET:
+						case PROTO_OPCODE_DEGRADED_DELETE:
+						default:
+							key.set( op.data.key.size, op.data.key.data );
+							break;
+					}
+
+					isKeyValueFound = dmap->findValueByKey( key.data, key.size, isSealed, &keyValue, &key, &keyMetadata );
+					// Send response
+					if ( op.opcode == PROTO_OPCODE_DEGRADED_GET ) {
 						MasterEvent event;
 
-						event.resUpdate(
-							op.socket, pid.parentId, key,
-							op.data.keyValueUpdate.offset,
-							op.data.keyValueUpdate.length,
-							false, false, true
-						);
-						this->dispatch( event );
-						op.data.keyValueUpdate.free();
-						delete[] ( ( char * ) op.data.keyValueUpdate.ptr );
-					}
-				} else if ( op.opcode == PROTO_OPCODE_DEGRADED_DELETE ) {
-					uint32_t deltaSize = this->buffer.size;
-					char *delta = this->buffer.data;
-
-					if ( isKeyValueFound ) {
-						// Insert into master DELETE pending set
-						op.data.key.ptr = op.socket;
-						if ( ! SlaveWorker::pending->insertKey( PT_MASTER_DEL, pid.parentId, op.socket, op.data.key ) ) {
-							__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot insert into master DELETE pending map." );
-						}
-
-						SlaveWorker::degradedChunkBuffer->deleteKey(
-							PROTO_OPCODE_DELETE,
-							key.size, key.data, true /* isSealed */,
-							deltaSize, delta, chunk
-						);
-
-						this->sendModifyChunkRequest(
-							pid.parentId, key.size, key.data,
-							metadata, keyMetadata.offset, deltaSize, 0, delta,
-							true /* isSealed */,
-							false /* isUpdate */
-						);
-					} else {
-						MasterEvent event;
-
-						event.resDelete( op.socket, pid.parentId, key, false, false, true );
+						if ( isKeyValueFound )
+							event.resGet( op.socket, pid.parentId, keyValue, true );
+						else
+							event.resGet( op.socket, pid.parentId, key, true );
 						this->dispatch( event );
 						op.data.key.free();
+					} else if ( op.opcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
+						if ( isKeyValueFound ) {
+							uint32_t chunkUpdateOffset = KeyValue::getChunkUpdateOffset(
+								keyMetadata.offset, // chunkOffset
+								key.size, // keySize
+								op.data.keyValueUpdate.offset // valueUpdateOffset
+							);
+							char *valueUpdate = ( char * ) op.data.keyValueUpdate.ptr;
+
+							op.data.keyValueUpdate.ptr = op.socket;
+							// Insert into master UPDATE pending set
+							if ( ! SlaveWorker::pending->insertKeyValueUpdate( PT_MASTER_UPDATE, pid.parentId, op.socket, op.data.keyValueUpdate ) ) {
+								__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot insert into master UPDATE pending map." );
+							}
+
+							SlaveWorker::degradedChunkBuffer->updateKeyValue(
+								key.size, key.data,
+								op.data.keyValueUpdate.length,
+								op.data.keyValueUpdate.offset,
+								chunkUpdateOffset,
+								valueUpdate,
+								chunk,
+								true /* isSealed */
+							);
+
+							this->sendModifyChunkRequest(
+								pid.parentId,
+								key.size, key.data,
+								metadata,
+								chunkUpdateOffset,
+								op.data.keyValueUpdate.length /* deltaSize */,
+								op.data.keyValueUpdate.offset,
+								valueUpdate,
+								true /* isSealed */,
+								true /* isUpdate */
+							);
+
+							delete[] valueUpdate;
+						} else {
+							MasterEvent event;
+
+							event.resUpdate(
+								op.socket, pid.parentId, key,
+								op.data.keyValueUpdate.offset,
+								op.data.keyValueUpdate.length,
+								false, false, true
+							);
+							this->dispatch( event );
+							op.data.keyValueUpdate.free();
+							delete[] ( ( char * ) op.data.keyValueUpdate.ptr );
+						}
+					} else if ( op.opcode == PROTO_OPCODE_DEGRADED_DELETE ) {
+						uint32_t deltaSize = this->buffer.size;
+						char *delta = this->buffer.data;
+
+						if ( isKeyValueFound ) {
+							// Insert into master DELETE pending set
+							op.data.key.ptr = op.socket;
+							if ( ! SlaveWorker::pending->insertKey( PT_MASTER_DEL, pid.parentId, op.socket, op.data.key ) ) {
+								__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot insert into master DELETE pending map." );
+							}
+
+							SlaveWorker::degradedChunkBuffer->deleteKey(
+								PROTO_OPCODE_DELETE,
+								key.size, key.data,
+								metadata,
+								true /* isSealed */,
+								deltaSize, delta, chunk
+							);
+
+							this->sendModifyChunkRequest(
+								pid.parentId, key.size, key.data,
+								metadata, keyMetadata.offset, deltaSize, 0, delta,
+								true /* isSealed */,
+								false /* isUpdate */
+							);
+						} else {
+							MasterEvent event;
+
+							event.resDelete( op.socket, pid.parentId, key, false, false, true );
+							this->dispatch( event );
+							op.data.key.free();
+						}
 					}
 				}
+			}
+		} else {
+			SlavePeerSocket *target;
+			Metadata metadata;
+
+			std::unordered_set<uint32_t> *stripeIds = SlaveWorker::pending->findRecovery(
+				pid.parentId, target,
+				stripeId,
+				listId, chunkId
+			);
+
+			// printf( "%u\n", chunkId );
+			// fflush( stdout );
+
+			SlaveWorker::stripeList->get( listId, this->paritySlaveSockets, this->dataSlaveSockets );
+			target = ( chunkId < SlaveWorker::dataChunkCount ) ?
+					 ( this->dataSlaveSockets[ chunkId ] ) :
+					 ( this->paritySlaveSockets[ chunkId - SlaveWorker::dataChunkCount ] );
+
+			// __ERROR__( "SlaveWorker", "handleGetChunkResponse", "TODO: Handle the case for recovery: (%u, %u, %u); target = %p.", listId, stripeId, chunkId, target );
+
+			if ( stripeIds ) {
+				// Send SET_CHUNK request
+				uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
+				chunkRequest.set(
+					listId, stripeId, chunkId, target,
+					0 /* chunk */, false /* isDegraded */
+				);
+				if ( ! SlaveWorker::pending->insertChunkRequest( PT_SLAVE_PEER_SET_CHUNK, requestId, pid.parentId, target, chunkRequest ) ) {
+					__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot insert into slave CHUNK_REQUEST pending map." );
+				}
+
+				metadata.set( listId, stripeId, chunkId );
+
+				event.reqSetChunk( target, requestId, metadata, this->chunks[ chunkId ], false );
+				this->dispatch( event );
+			} else {
+				__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot found a pending recovery request for (%u, %u).\n", listId, stripeId );
 			}
 		}
 
@@ -2730,6 +3270,7 @@ bool SlaveWorker::handleSetChunkResponse( SlavePeerEvent event, bool success, ch
 		header.listId, header.stripeId, header.chunkId
 	);
 
+	PendingIdentifier pid;
 	ChunkRequest chunkRequest;
 
 	chunkRequest.set(
@@ -2737,16 +3278,34 @@ bool SlaveWorker::handleSetChunkResponse( SlavePeerEvent event, bool success, ch
 		event.socket, 0 // ptr
 	);
 
-	if ( ! SlaveWorker::pending->eraseChunkRequest( PT_SLAVE_PEER_SET_CHUNK, event.id, event.socket ) ) {
+	if ( ! SlaveWorker::pending->eraseChunkRequest( PT_SLAVE_PEER_SET_CHUNK, event.id, event.socket, &pid, &chunkRequest ) ) {
 		__ERROR__( "SlaveWorker", "handleSetChunkResponse", "Cannot find a pending slave SET_CHUNK request that matches the response. This message will be discarded." );
 	}
 
-	// TODO: What should we do next?
+	if ( chunkRequest.isDegraded ) {
+		// Release degraded lock
+		uint32_t remaining, total;
+		if ( ! SlaveWorker::pending->eraseReleaseDegradedLock( pid.parentId, 1, remaining, total, &pid ) ) {
+			__ERROR__( "SlaveWorker", "handleSetChunkResponse", "Cannot find a pending coordinator release degraded lock request that matches the response. The message will be discarded." );
+			return false;
+		}
+
+		if ( remaining == 0 ) {
+			// Tell the coordinator that all degraded lock is released
+			CoordinatorEvent coordinatorEvent;
+			coordinatorEvent.resReleaseDegradedLock( ( CoordinatorSocket * ) pid.ptr, pid.id, total );
+			SlaveWorker::eventQueue->insert( coordinatorEvent );
+		}
+	} else {
+		// Recovery
+		// TODO
+	}
 
 	return true;
 }
 
 bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t listId, uint32_t stripeId, uint32_t lostChunkId, bool isSealed, uint8_t opcode, uint32_t parentId, Key *key, KeyValueUpdate *keyValueUpdate ) {
+	Key mykey;
 	SlavePeerEvent event;
 	SlavePeerSocket *socket = 0;
 	uint32_t selected = 0;
@@ -2784,10 +3343,13 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 	uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
 	DegradedOp op;
 	op.set( listId, stripeId, lostChunkId, isSealed, opcode, masterSocket );
-	if ( opcode == PROTO_OPCODE_DEGRADED_UPDATE )
+	if ( opcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
 		op.data.keyValueUpdate = *keyValueUpdate;
-	else
+		mykey.set( keyValueUpdate->size, keyValueUpdate->data );
+	} else {
 		op.data.key = *key;
+		mykey.set( key->size, key->data );
+	}
 
 	if ( isSealed || ! socket->self ) {
 		if ( ! SlaveWorker::pending->insertDegradedOp( PT_SLAVE_PEER_DEGRADED_OPS, requestId, parentId, 0, op ) ) {
@@ -2830,9 +3392,8 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 
 			// Add to pending GET_CHUNK request set
 			ChunkRequest chunkRequest;
-			chunkRequest.set( listId, stripeId, i, socket );
+			chunkRequest.set( listId, stripeId, i, socket, 0, true );
 			if ( socket->self ) {
-				// Check whether the chunk is sealed or not
 				chunkRequest.chunk = SlaveWorker::map->findChunkById( listId, stripeId, i );
 				// Check whether the chunk is sealed or not
 				if ( ! chunkRequest.chunk ) {
@@ -2886,11 +3447,10 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 	} else {
 		// Send GET request to surviving parity slave
 		if ( socket->self ) {
-			Key key;
 			KeyValue keyValue;
 			MasterEvent masterEvent;
 
-			bool success = SlaveWorker::chunkBuffer->at( listId )->findValueByKey( key.data, key.size, &keyValue, &key );
+			bool success = SlaveWorker::chunkBuffer->at( listId )->findValueByKey( mykey.data, mykey.size, &keyValue, &mykey );
 			if ( success && opcode != PROTO_OPCODE_DEGRADED_DELETE ) {
 				// Insert into degradedChunkBuffer
 				char *key, *value;
@@ -2916,10 +3476,10 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 						masterEvent.resGet( masterSocket, parentId, keyValue, true );
 					} else {
 						// Return failure to master
-						masterEvent.resGet( masterSocket, parentId, key, true );
+						masterEvent.resGet( masterSocket, parentId, mykey, true );
 					}
-					op.data.key.free();
 					this->dispatch( masterEvent );
+					op.data.key.free();
 					break;
 				case PROTO_OPCODE_DEGRADED_UPDATE:
 					if ( success ) {
@@ -2933,19 +3493,6 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 						);
 
 						char *valueUpdate = ( char * ) keyValueUpdate->ptr;
-
-						/*
-						SlaveWorker::degradedChunkBuffer->updateKeyValue(
-							keyValueUpdate->size,    // keySize
-							keyValueUpdate->data,    // keyStr
-							keyValueUpdate->length,  // valueUpdateSize
-							keyValueUpdate->offset,  // valueUpdateOffset
-							0,                       // chunkUpdateOffset
-							valueUpdate,             // valueUpdate
-							0,                       // chunk
-							false                    // isSealed
-						);
-						*/
 
 						// Compute data delta
 						Coding::bitwiseXOR(
@@ -2977,7 +3524,7 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 						);
 					} else {
 						masterEvent.resUpdate(
-							masterSocket, parentId, key,
+							masterSocket, parentId, mykey,
 							keyValueUpdate->offset,
 							keyValueUpdate->length,
 							false, false, true
@@ -2996,18 +3543,20 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 
 						SlaveWorker::map->insertOpMetadata(
 							PROTO_OPCODE_DELETE,
-							key, keyMetadata
+							mykey, keyMetadata
 						);
 
 						uint32_t tmp = 0;
 						SlaveWorker::degradedChunkBuffer->deleteKey(
 							PROTO_OPCODE_DELETE,
-							key.size, key.data, true /* isSealed */,
+							mykey.size, mykey.data,
+							metadata,
+							true /* isSealed */,
 							tmp, 0, 0
 						);
 
 						this->sendModifyChunkRequest(
-							parentId, key.size, key.data,
+							parentId, mykey.size, mykey.data,
 							metadata,
 							// not needed for deleting a key-value pair in an unsealed chunk:
 							0, 0, 0, 0,
@@ -3015,7 +3564,7 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 							false /* isUpdate */
 						);
 					} else {
-						masterEvent.resDelete( masterSocket, parentId, key, false, false, true );
+						masterEvent.resDelete( masterSocket, parentId, mykey, false, false, true );
 						this->dispatch( masterEvent );
 					}
 					op.data.key.free();

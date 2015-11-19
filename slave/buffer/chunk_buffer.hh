@@ -15,6 +15,7 @@
 class ChunkBuffer {
 protected:
 	LOCK_T lock;                           // Lock for the whole buffer
+	bool isReady;
 
 	static Coding *coding;                 // Coding module
 	static MemoryPool<Chunk> *chunkPool;   // Memory pool for chunks
@@ -26,7 +27,7 @@ public:
 	static uint32_t dataChunkCount;        // Number of data chunks per stripe
 
 	static void init();
-	ChunkBuffer();
+	ChunkBuffer( bool isReady = true );
 	virtual void print( FILE *f = stdout ) = 0;
 	virtual void stop() = 0;
 	virtual ~ChunkBuffer();

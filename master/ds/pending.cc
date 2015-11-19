@@ -206,31 +206,27 @@ bool Pending::eraseRequestStartTime( PendingType type, uint32_t id, void *ptr, s
 	RequestStartTime rst;
 	bool ret;
 
+#define DO_SEARCH_FOR_ID \
+	do { \
+		tie( it, rit ) = this->stats.get.equal_range( pid ); \
+		while( it != rit && ptr && it->first.id == id && it->first.ptr != ptr ) it++; \
+		ret = ( it != rit && it->first.id == id && ( ! ptr || it->first.ptr == ptr ) ); \
+		if ( ret ) { \
+			pid = it->first; \
+			rst = it->second; \
+			if ( pidPtr ) *pidPtr = pid; \
+			if ( rstPtr ) *rstPtr = rst; \
+			this->stats.get.erase( it ); \
+		} \
+	} while (0)
+
 	if ( type == PT_SLAVE_GET ) {
 		LOCK( &this->stats.getLock );
-		tie( it, rit ) = this->stats.get.equal_range( pid );
-		while( it != rit && ptr && it->first.id == id && it->first.ptr != ptr ) it++;
-		ret = ( it != rit && it->first.id == id && ( ! ptr || it->first.ptr == ptr ) );
-		if ( ret ) {
-			pid = it->first;
-			rst = it->second;
-			if ( pidPtr ) *pidPtr = pid;
-			if ( rstPtr ) *rstPtr = rst;
-			this->stats.get.erase( it );
-		}
+		DO_SEARCH_FOR_ID;
 		UNLOCK( &this->stats.getLock );
 	} else if ( type == PT_SLAVE_SET ) {
 		LOCK( &this->stats.setLock );
-		tie( it, rit ) = this->stats.set.equal_range( pid );
-		while( it != rit && ptr && it->first.id == id && it->first.ptr != ptr ) it++;
-		ret = ( it != rit && it->first.id == id && ( ! ptr || it->first.ptr == ptr ) );
-		if ( ret ) {
-			pid = it->first;
-			rst = it->second;
-			if ( pidPtr ) *pidPtr = pid;
-			if ( rstPtr ) *rstPtr = rst;
-			this->stats.set.erase( it );
-		}
+		DO_SEARCH_FOR_ID;
 		UNLOCK( &this->stats.setLock );
 	} else {
 		return false;

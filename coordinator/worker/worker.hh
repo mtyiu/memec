@@ -3,9 +3,10 @@
 
 #include <cstdio>
 #include "worker_role.hh"
-#include "../../common/ds/remapping_record_map.hh"
+#include "../ds/pending.hh"
 #include "../event/event_queue.hh"
 #include "../protocol/protocol.hh"
+#include "../../common/ds/remapping_record_map.hh"
 #include "../../common/worker/worker.hh"
 #include "../../common/config/global_config.hh"
 #include "../../common/ds/id_generator.hh"
@@ -22,6 +23,7 @@ private:
 	static IDGenerator *idGenerator;
 	static CoordinatorEventQueue *eventQueue;
 	static StripeList<SlaveSocket> *stripeList;
+	static Pending *pending;
 
 	void dispatch( MixedEvent event );
 	void dispatch( CoordinatorEvent event );
@@ -32,10 +34,13 @@ private:
 
 public:
 	static RemappingRecordMap *remappingRecords;
-	bool processHeartbeat( SlaveEvent event, char *buf, size_t size, uint32_t requestId = 0 );
-	bool triggerRecovery( SlaveSocket *socket );
-	bool handleRemappingSetLockRequest( MasterEvent event, char* buf, size_t size );
 
+	bool processHeartbeat( SlaveEvent event, char *buf, size_t size );
+	bool triggerRecovery( SlaveSocket *socket );
+	bool handleReleaseDegradedLockRequest( SlaveSocket *socket, bool *done = 0 );
+	bool handleReleaseDegradedLockResponse( SlaveEvent event, char *buf, size_t size );
+
+	bool handleRemappingSetLockRequest( MasterEvent event, char* buf, size_t size );
 	bool handleDegradedLockRequest( MasterEvent event, char *buf, size_t size );
 
 	static bool init();

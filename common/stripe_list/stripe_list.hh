@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <stdint.h>
 #include "../ds/array_map.hh"
@@ -25,28 +26,28 @@ typedef struct {
 template <class T> class StripeList {
 protected:
 	uint32_t n, k, numLists, numSlaves;
-	bool generated;
+	bool generated, useAlgo;
 	BitmaskArray data, parity;
-	unsigned int *weight, *cost;
+	unsigned int *load, *count;
 	std::vector<T *> *slaves;
 	ConsistentHash<uint32_t> listRing;
 	std::vector<T **> lists;
 
 	inline uint32_t pickMin( int listIndex ) {
 		int32_t index = -1;
-		uint32_t minWeight = UINT32_MAX;
-		uint32_t minCost = UINT32_MAX;
+		uint32_t minLoad = UINT32_MAX;
+		uint32_t minCount = UINT32_MAX;
 		for ( uint32_t i = 0; i < this->numSlaves; i++ ) {
 			if (
 				(
-					( this->weight[ i ] < minWeight ) ||
-					( this->weight[ i ] == minWeight && this->cost[ i ] < minCost )
+					( this->load[ i ] < minLoad ) ||
+					( this->load[ i ] == minLoad && this->count[ i ] < minCount )
 				) &&
 				! this->data.check( listIndex, i ) && // The slave should not be selected before
 				! this->parity.check( listIndex, i ) // The slave should not be selected before
 			) {
-				minWeight = this->weight[ i ];
-				minCost = this->cost[ i ];
+				minLoad = this->load[ i ];
+				minCount = this->count[ i ];
 				index = i;
 			}
 		}
@@ -57,37 +58,54 @@ protected:
 		return ( uint32_t ) index;
 	}
 
-	void generate( bool verbose = false ) {
+	inline uint32_t pickRand( int listIndex ) {
+		int32_t index = -1;
+		uint32_t i;
+		 while( index == -1 ) {
+			i = rand() % this->numSlaves;
+			if (
+				! this->data.check( listIndex, i ) && // The slave should not be selected before
+				! this->parity.check( listIndex, i ) // The slave should not be selected before
+			) {
+				index = i;
+			}
+		}
+		if ( index == -1 ) {
+			fprintf( stderr, "Cannot assign a slave for stripe list #%d.", listIndex );
+			return 0;
+		}
+		return ( uint32_t ) index;
+	}
+
+	void generate( bool verbose = false, bool useAlgo = true ) {
 		if ( generated )
 			return;
 
-		uint32_t i, j, index, count;
+		uint32_t i, j, index, dataCount, parityCount;
 
 		for ( i = 0; i < this->numLists; i++ ) {
 			T **list = this->lists[ i ];
 			for ( j = 0; j < this->n - this->k; j++ ) {
-				index = pickMin( i );
+				index = useAlgo ? pickMin( i ) : pickRand( i );
 				this->parity.set( i, index );
-				this->weight[ index ] += this->k;
-				this->cost[ index ] += 1;
 			}
 			for ( j = 0; j < this->k; j++ ) {
-				index = pickMin( i );
+				index = useAlgo ? pickMin( i ) : pickRand( i );
 				this->data.set( i, index );
-				this->weight[ index ] += 1;
-				this->cost[ index ] += 1;
 			}
 
 			// Implicitly sort the item
-			count = 0;
+			dataCount = 0;
+			parityCount = 0;
 			for ( j = 0; j < this->numSlaves; j++ ) {
 				if ( this->data.check( i, j ) ) {
-					list[ count++ ] = this->slaves->at( j );
-				}
-			}
-			for ( j = 0; j < this->numSlaves; j++ ) {
-				if ( this->parity.check( i, j ) ) {
-					list[ count++ ] = this->slaves->at( j );
+					list[ dataCount++ ] = this->slaves->at( j );
+					this->load[ j ] += 1;
+					this->count[ j ]++;
+				} else if ( this->parity.check( i, j ) ) {
+					list[ this->k + ( parityCount++ ) ] = this->slaves->at( j );
+					this->load[ j ] += this->k;
+					this->count[ j ]++;
 				}
 			}
 
@@ -98,23 +116,24 @@ protected:
 	}
 
 public:
-	StripeList( uint32_t n, uint32_t k, uint32_t numLists, std::vector<T *> &slaves ) : data( slaves.size(), numLists ), parity( slaves.size(), numLists ) {
+	StripeList( uint32_t n, uint32_t k, uint32_t numLists, std::vector<T *> &slaves, bool useAlgo = true ) : data( slaves.size(), numLists ), parity( slaves.size(), numLists ) {
 		this->n = n;
 		this->k = k;
 		this->numLists = numLists;
 		this->numSlaves = slaves.size();
 		this->generated = false;
-		this->weight = new unsigned int[ numSlaves ];
-		this->cost = new unsigned int[ numSlaves ];
+		this->useAlgo = useAlgo;
+		this->load = new unsigned int[ numSlaves ];
+		this->count = new unsigned int[ numSlaves ];
 		this->slaves = &slaves;
 		this->lists.reserve( numLists );
 		for ( uint32_t i = 0; i < numLists; i++ )
 			this->lists.push_back( new T*[ n ] );
 
-		memset( this->weight, 0, sizeof( unsigned int ) * numSlaves );
-		memset( this->cost, 0, sizeof( unsigned int ) * numSlaves );
+		memset( this->load, 0, sizeof( unsigned int ) * numSlaves );
+		memset( this->count, 0, sizeof( unsigned int ) * numSlaves );
 
-		this->generate();
+		this->generate( false /* verbose */, useAlgo );
 	}
 
 	unsigned int get( const char *key, uint8_t keySize, T **data = 0, T **parity = 0, uint32_t *dataIndexPtr = 0, bool full = false ) {
@@ -142,28 +161,14 @@ public:
 		return listIndex;
 	}
 
-	unsigned int getByHash( unsigned int hashValue, T **data = 0, T **parity = 0, uint32_t *dataIndexPtr = 0, bool full = false ) {
-		uint32_t dataIndex = hashValue % this->k;
+	unsigned int getByHash( unsigned int hashValue, T **data, T **parity ) {
 		uint32_t listIndex = this->listRing.get( hashValue );
 		T **ret = this->lists[ listIndex ];
 
-		if ( dataIndexPtr )
-			*dataIndexPtr = dataIndex;
-
-		if ( parity ) {
-			for ( uint32_t i = 0; i < this->n - this->k; i++ ) {
-				parity[ i ] = ret[ this->k + i ];
-			}
-		}
-		if ( data ) {
-			if ( full ) {
-				for ( uint32_t i = 0; i < this->k; i++ ) {
-					data[ i ] = ret[ i ];
-				}
-			} else {
-				*data = ret[ dataIndex ];
-			}
-		}
+		for ( uint32_t i = 0; i < this->n - this->k; i++ )
+			parity[ i ] = ret[ this->k + i ];
+		for ( uint32_t i = 0; i < this->k; i++ )
+			data[ i ] = ret[ i ];
 		return listIndex;
 	}
 
@@ -229,6 +234,28 @@ public:
 		return ret;
 	}
 
+	void update() {
+		if ( ! this->generated ) {
+			this->generate();
+			return;
+		}
+
+		uint32_t i, j, dataCount, parityCount;
+
+		for ( i = 0; i < this->numLists; i++ ) {
+			T **list = this->lists[ i ];
+			dataCount = 0;
+			parityCount = 0;
+			for ( j = 0; j < this->numSlaves; j++ ) {
+				if ( this->data.check( i, j ) ) {
+					list[ dataCount++ ] = this->slaves->at( j );
+				} else if ( this->parity.check( i, j ) ) {
+					list[ this->k + ( parityCount++ ) ] = this->slaves->at( j );
+				}
+			}
+		}
+	}
+
 	int32_t search( T *target ) {
 		for ( uint32_t i = 0; i < this->numSlaves; i++ ) {
 			if ( target == this->slaves->at( i ) )
@@ -241,14 +268,20 @@ public:
 		return this->numLists;
 	}
 
+	std::map<unsigned int, uint32_t> getRing() {
+		return this->listRing.getRing();
+	}
+
 	void print( FILE *f = stdout ) {
 		uint32_t i, j;
 		bool first;
 
-		if ( ! generated )
-			this->generate();
+		if ( ! generated ) {
+			fprintf( f, "The stripe lists are not generated yet.\n" );
+			return;
+		}
 
-		fprintf( f, "### Stripe List ###\n" );
+		fprintf( f, "### Stripe List (%s) ###\n", this->useAlgo ? "Load-aware" : "Random" );
 		for ( i = 0; i < this->numLists; i++ ) {
 			first = true;
 			fprintf( f, "#%u: ((", i );
@@ -271,10 +304,10 @@ public:
 
 		fprintf( f, "\n- Weight vector :" );
 		for ( uint32_t i = 0; i < this->numSlaves; i++ )
-			fprintf( f, " %d", this->weight[ i ] );
+			fprintf( f, " %d", this->load[ i ] );
 		fprintf( f, "\n- Cost vector   :" );
 		for ( uint32_t i = 0; i < this->numSlaves; i++ )
-			fprintf( f, " %d", this->cost[ i ] );
+			fprintf( f, " %d", this->count[ i ] );
 
 		fprintf( f, "\n\n" );
 
@@ -284,8 +317,8 @@ public:
 	}
 
 	~StripeList() {
-		delete[] this->weight;
-		delete[] this->cost;
+		delete[] this->load;
+		delete[] this->count;
 		for ( uint32_t i = 0; i < this->numLists; i++ )
 			delete[] this->lists[ i ];
 	}

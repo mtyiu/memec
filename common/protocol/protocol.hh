@@ -46,6 +46,8 @@
 #define PROTO_OPCODE_FLUSH_CHUNKS                 0x36
 #define PROTO_OPCODE_RECOVERY                     0x37
 #define PROTO_OPCODE_SYNC_META                    0x38
+#define PROTO_OPCODE_RELEASE_DEGRADED_LOCKS       0x39
+#define PROTO_OPCODE_SLAVE_RECONSTRUCTED          0x40
 
 // Application <-> Master or Master <-> Slave (0-19) //
 #define PROTO_OPCODE_GET                          0x01
@@ -73,6 +75,7 @@
 #define PROTO_OPCODE_DELETE_CHUNK                 0x53
 #define PROTO_OPCODE_GET_CHUNK                    0x54
 #define PROTO_OPCODE_SET_CHUNK                    0x55
+#define PROTO_OPCODE_SET_CHUNK_UNSEALED           0x56
 
 /*********************
  * Key size (1 byte) *
@@ -83,11 +86,13 @@
  ***********************/
  #define MAXIMUM_VALUE_SIZE 16777215
 
+#include <vector>
 #include <unordered_map>
 #include <unordered_set>
 #include <stdint.h>
 #include <arpa/inet.h>
 #include "../ds/key.hh"
+#include "../ds/key_value.hh"
 #include "../ds/metadata.hh"
 #include "../lock/lock.hh"
 
@@ -275,12 +280,14 @@ struct DegradedLockReqHeader {
 // Size
 #define PROTO_DEGRADED_LOCK_RES_BASE_SIZE 2
 #define PROTO_DEGRADED_LOCK_RES_LOCK_SIZE 21
-#define PROTO_DEGRADED_LOCK_RES_REMAP_SIZE 8
+#define PROTO_DEGRADED_LOCK_RES_REMAP_SIZE 16
+#define PROTO_DEGRADED_LOCK_RES_NOT_SIZE 8
 // Type
 #define PROTO_DEGRADED_LOCK_RES_IS_LOCKED  1   // Return src* and dst* (same as the client request)
 #define PROTO_DEGRADED_LOCK_RES_WAS_LOCKED 2   // Return src* and dst* (different from the client request)
-#define PROTO_DEGRADED_LOCK_RES_REMAPPED   3   // Return remapped srcListId and srcChunkId without dst*
-#define PROTO_DEGRADED_LOCK_RES_NOT_EXIST  4   // Return without src* and dst*
+#define PROTO_DEGRADED_LOCK_RES_NOT_LOCKED 3   // Return original srcListId and srcChunkId without dst*
+#define PROTO_DEGRADED_LOCK_RES_REMAPPED   4   // Return original srcListId and srcChunkId and remapped dstListId and dstChunkId
+#define PROTO_DEGRADED_LOCK_RES_NOT_EXIST  5   // Return original srcListId and srcChunkId
 struct DegradedLockResHeader {
 	uint8_t type;
 	uint8_t keySize;
@@ -315,27 +322,30 @@ struct ListStripeKeyHeader {
 };
 
 // For asking slaves to send back the modified reconstructed chunks to the overloaded slave
-#define PROTO_DEGRADED_RELEASE_SIZE 9
-struct DegradedReleaseHeader {
-	uint32_t listId;
-	uint32_t stripeId;
-	uint32_t chunkId;
+#define PROTO_DEGRADED_RELEASE_REQ_SIZE 20
+struct DegradedReleaseReqHeader {
+	uint32_t srcListId;
+	uint32_t srcStripeId;
+	uint32_t srcChunkId;
+	uint32_t dstListId;
+	uint32_t dstChunkId;
+};
+
+#define PROTO_DEGRADED_RELEASE_RES_SIZE 4
+struct DegradedReleaseResHeader {
+	uint32_t count;
 };
 
 //////////////
 // Recovery //
 //////////////
-#define PROTO_RECOVERY_SIZE 26
+#define PROTO_RECOVERY_SIZE 12
 struct RecoveryHeader {
 	uint32_t listId;
-	uint32_t stripeIdFrom;
-	uint32_t stripeIdTo;
 	uint32_t chunkId;
-	uint32_t unsealedChunkCount;
-	uint32_t addr;
-	uint16_t port;
+	uint32_t numStripes;
+	uint32_t *stripeIds;
 };
-// Use ChunkHeader to indicate the lost chunk and the surviving chunks
 
 //////////
 // Seal //
@@ -364,13 +374,24 @@ struct ChunkHeader {
 	uint32_t chunkId;
 };
 
-#define PROTO_CHUNK_DATA_SIZE 16
+#define PROTO_CHUNK_DATA_SIZE 20
 struct ChunkDataHeader {
 	uint32_t listId;
 	uint32_t stripeId;
 	uint32_t chunkId;
 	uint32_t size;
+	uint32_t offset;
 	char *data;
+};
+
+#define PROTO_CHUNK_KEY_VALUE_SIZE 21
+struct ChunkKeyValueHeader {
+	uint32_t listId;
+	uint32_t stripeId;
+	uint32_t chunkId;
+	uint32_t deleted;
+	uint32_t count;
+	bool isCompleted;
 };
 
 #define PROTO_BUF_MIN_SIZE		65536
@@ -403,6 +424,12 @@ protected:
 		char *buf, size_t size
 	);
 
+	size_t generateSrcDstAddressHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint32_t srcAddr, uint16_t srcPort,
+		uint32_t dstAddr, uint16_t dstPort
+	);
+
 	//////////////////////////////////////////
 	// Heartbeat & metadata synchronization //
 	//////////////////////////////////////////
@@ -428,7 +455,7 @@ protected:
 
 	size_t generateRemappingRecordMessage(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
-		LOCK_T *lock, std::unordered_map<Key, RemappingRecord> &remapRecords, 
+		LOCK_T *lock, std::unordered_map<Key, RemappingRecord> &remapRecords,
 		size_t &remapCount, char *buf = 0
 	);
 	bool parseRemappingRecordHeader(
@@ -603,12 +630,15 @@ protected:
 	);
 	size_t generateDegradedLockResHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		bool exist,
 		uint8_t keySize, char *key,
 		uint32_t listId, uint32_t chunkId
 	);
 	size_t generateDegradedLockResHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
-		uint8_t keySize, char *key
+		uint8_t keySize, char *key,
+		uint32_t srcListId, uint32_t srcChunkId,
+		uint32_t dstListId, uint32_t dstChunkId
 	);
 	bool parseDegradedLockResHeader(
 		size_t offset, uint8_t &type,
@@ -624,6 +654,12 @@ protected:
 	bool parseDegradedLockResHeader(
 		size_t offset,
 		uint32_t &listId, uint32_t &chunkId,
+		char *buf, size_t size
+	);
+	bool parseDegradedLockResHeader(
+		size_t offset,
+		uint32_t &srcListId, uint32_t &srcChunkId,
+		uint32_t &dstListId, uint32_t &dstChunkId,
 		char *buf, size_t size
 	);
 
@@ -654,19 +690,38 @@ protected:
 		char *buf, size_t size
 	);
 
+	size_t generateDegradedReleaseReqHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		std::vector<Metadata> &chunks,
+		bool &isCompleted
+	);
+    #define parseDegradedReleaseReqHeader parseChunkHeader
+
+	size_t generateDegradedReleaseResHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint32_t count
+	);
+	bool parseDegradedReleaseResHeader(
+		size_t offset,
+		uint32_t &count,
+		char *buf, size_t size
+	);
+
 	//////////////
 	// Recovery //
 	//////////////
 	size_t generateRecoveryHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
-		uint32_t listId, uint32_t stripeIdFrom, uint32_t stripeIdTo, uint32_t chunkId,
-		uint32_t addr, uint16_t port,
-		std::unordered_set<Metadata> unsealedChunks, char *sendBuf = 0
+		uint32_t listId, uint32_t chunkId,
+		std::unordered_set<uint32_t> &stripeIds,
+		std::unordered_set<uint32_t>::iterator &it,
+		uint32_t numChunks,
+		bool &isCompleted
 	);
 	bool parseRecoveryHeader(
-		size_t offset, uint32_t &listId,
-		uint32_t &stripeIdFrom, uint32_t &stripeIdTo, uint32_t &chunkId,
-		uint32_t &unsealedChunkCount, uint32_t &addr, uint16_t &port,
+		size_t offset,
+		uint32_t &listId, uint32_t &chunkId, uint32_t &numStripes,
+		uint32_t *&stripeIds,
 		char *buf, size_t size
 	);
 
@@ -702,11 +757,26 @@ protected:
 	size_t generateChunkDataHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
-		uint32_t chunkSize, char *chunkData
+		uint32_t chunkSize, uint32_t chunkOffset, char *chunkData
 	);
 	bool parseChunkDataHeader(
 		size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
-		uint32_t &chunkSize, char *&chunkData,
+		uint32_t &chunkSize, uint32_t &chunkOffset, char *&chunkData,
+		char *buf, size_t size
+	);
+
+	size_t generateChunkKeyValueHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		std::unordered_map<Key, KeyValue> *values,
+		std::unordered_multimap<Metadata, Key> *metadataRev,
+		std::unordered_set<Key> *deleted,
+		LOCK_T *lock,
+		bool &isCompleted
+	);
+	bool parseChunkKeyValueHeader(
+		size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
+		uint32_t &deleted, uint32_t &count, bool &isCompleted, char *&dataPtr,
 		char *buf, size_t size
 	);
 
@@ -733,6 +803,11 @@ public:
 	//////////////
 	bool parseAddressHeader(
 		struct AddressHeader &header,
+		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
+	bool parseSrcDstAddressHeader(
+		struct AddressHeader &srcHeader,
+		struct AddressHeader &dstHeader,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 	//////////////////////////////////////////
@@ -827,11 +902,19 @@ public:
 		struct ListStripeKeyHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
+	bool parseDegradedReleaseReqHeader(
+		struct DegradedReleaseReqHeader &header,
+		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
+	bool parseDegradedReleaseResHeader(
+		struct DegradedReleaseResHeader &header,
+		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
 	//////////////
 	// Recovery //
 	//////////////
 	bool parseRecoveryHeader(
-		struct RecoveryHeader &header, std::unordered_set<Metadata> &unsealedChunks,
+		struct RecoveryHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 	//////////
@@ -854,6 +937,10 @@ public:
 	);
 	bool parseChunkDataHeader(
 		struct ChunkDataHeader &header,
+		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
+	bool parseChunkKeyValueHeader(
+		struct ChunkKeyValueHeader &header, char *&ptr,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 };

@@ -3,18 +3,41 @@
 
 #include <map>
 #include <set>
+#include <unordered_set>
 #include <unordered_map>
 #include "../../common/lock/lock.hh"
 #include "../../common/ds/sockaddr_in.hh"
+#include "../../common/ds/pending.hh"
 #include "../../common/util/debug.hh"
+
+class PendingRecovery {
+public:
+	uint32_t listId;
+	uint32_t chunkId;
+	std::unordered_set<uint32_t> stripeIds;
+
+	void set( uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds ) {
+		this->listId = listId;
+		this->chunkId = chunkId;
+		this->stripeIds = stripeIds;
+	}
+};
+
+struct PendingDegradedLock {
+	uint32_t count;
+	bool *done;
+};
 
 class Pending {
 private:
 	/*
 	 * syncMetaRequests: ( id, indicator whether sync is completed )
 	 */
-	std::unordered_map<uint32_t, bool*> syncMetaRequests;
+	std::unordered_map<uint32_t, bool *> syncMetaRequests;
 	LOCK_T syncMetaLock;
+
+	std::unordered_map<uint32_t, PendingDegradedLock> releaseDegradedLock;
+	LOCK_T releaseDegradedLockLock;
 
 	/*
 	 * syncRemappingRecordCounters: ( packet id, counter for a sync operation )
@@ -26,14 +49,90 @@ private:
 	std::map<std::map<struct sockaddr_in, uint32_t>*, std::set<uint32_t> > syncRemappingRecordCountersReverse;
 	std::map<std::map<struct sockaddr_in, uint32_t>*, bool*> syncRemappingRecordIndicators;
 	LOCK_T syncRemappingRecordLock;
+
+	std::unordered_map<PendingIdentifier, PendingRecovery> recovery;
+	LOCK_T recoveryLock;
+
 public:
 	Pending() {
 		LOCK_INIT( &this->syncMetaLock );
+		LOCK_INIT( &this->releaseDegradedLockLock );
 		LOCK_INIT( &this->syncRemappingRecordLock );
+		LOCK_INIT( &this->recoveryLock );
 	}
+
 	~Pending() {}
 
-	
+	bool insertRecovery( uint32_t id, uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds ) {
+		PendingIdentifier pid( id, id, 0 );
+		PendingRecovery r;
+
+		r.set( listId, chunkId, stripeIds );
+
+		std::pair<PendingIdentifier, PendingRecovery> p( pid, r );
+		std::pair<std::unordered_map<PendingIdentifier, PendingRecovery>::iterator, bool> ret;
+
+		LOCK( &this->recoveryLock );
+		ret = this->recovery.insert( p );
+		UNLOCK( &this->recoveryLock );
+
+		return ret.second;
+	}
+
+	std::unordered_set<uint32_t> *findRecovery( uint32_t id, uint32_t &listId, uint32_t &chunkId ) {
+		PendingIdentifier pid( id, id, 0 );
+		std::unordered_map<PendingIdentifier, PendingRecovery>::iterator it;
+
+		LOCK( &this->recoveryLock );
+		it = this->recovery.find( pid );
+		if ( it == this->recovery.end() ) {
+			UNLOCK( &this->recoveryLock );
+			return 0;
+		}
+		listId = it->second.listId;
+		chunkId = it->second.chunkId;
+		UNLOCK( &this->recoveryLock );
+
+		return &( it->second.stripeIds );
+	}
+
+	void addReleaseDegradedLock( uint32_t id, uint32_t count, bool *done ) {
+		std::unordered_map<uint32_t, PendingDegradedLock>::iterator it;
+
+		LOCK( &this->releaseDegradedLockLock );
+		it = this->releaseDegradedLock.find( id );
+		if ( it == this->releaseDegradedLock.end() ) {
+			PendingDegradedLock v;
+			v.count = count;
+			v.done = done;
+
+			this->releaseDegradedLock[ id ] = v;
+		} else {
+			it->second.count += count;
+		}
+		UNLOCK( &this->releaseDegradedLockLock );
+	}
+
+	bool *removeReleaseDegradedLock( uint32_t id, uint32_t count ) {
+		std::unordered_map<uint32_t, PendingDegradedLock>::iterator it;
+
+		bool *done = 0;
+
+		LOCK( &this->releaseDegradedLockLock );
+		it = this->releaseDegradedLock.find( id );
+		if ( it != this->releaseDegradedLock.end() ) {
+			it->second.count -= count;
+			if ( it->second.count == 0 ) {
+				done = it->second.done;
+				this->releaseDegradedLock.erase( it );
+			}
+		} else {
+			__ERROR__( "Pending", "removeReleaseDegradedLock", "ID: %u Not found.\n", id );
+		}
+		UNLOCK( &this->releaseDegradedLockLock );
+		return done;
+	}
+
 	void addSyncMetaReq( uint32_t id, bool* sync ) {
 		LOCK( &this->syncMetaLock );
 		syncMetaRequests[ id ] = sync;
@@ -73,8 +172,8 @@ public:
 		bool ret = false;
 		if ( lock ) LOCK( &this->syncRemappingRecordLock );
 		// check if the master needs to ack this packet
-		if ( this->syncRemappingRecordCounters.count( id ) > 0 && 
-			this->syncRemappingRecordCounters[ id ]->count( addr ) ) 
+		if ( this->syncRemappingRecordCounters.count( id ) > 0 &&
+			this->syncRemappingRecordCounters[ id ]->count( addr ) )
 		{
 			uint32_t &count = this->syncRemappingRecordCounters[ id ]->at( addr );
 			count--;
@@ -88,15 +187,15 @@ public:
 		return ret;
 	}
 
-	std::pair<std::map<struct sockaddr_in, uint32_t> *, bool*> 
-		checkAndRemoveRemappingRecords( uint32_t id, uint32_t target = 0, bool lock = true, bool unlock = true ) 
+	std::pair<std::map<struct sockaddr_in, uint32_t> *, bool*>
+		checkAndRemoveRemappingRecords( uint32_t id, uint32_t target = 0, bool lock = true, bool unlock = true )
 	{
 		std::map<struct sockaddr_in, uint32_t> *map = NULL;
 		bool *indicator = NULL;
 		if ( lock ) LOCK( &this->syncRemappingRecordLock );
 		// check if the packet exists, and the counter has "target" number of master remains
 		if ( this->syncRemappingRecordCounters.count( id ) > 0 &&
-			this->syncRemappingRecordCounters[ id ]->size() == target ) 
+			this->syncRemappingRecordCounters[ id ]->size() == target )
 		{
 			map = this->syncRemappingRecordCounters[ id ];
 			indicator = this->syncRemappingRecordIndicators[ map ];
@@ -147,4 +246,4 @@ public:
 	}
 };
 
-#endif 
+#endif

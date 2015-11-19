@@ -144,23 +144,23 @@ bool CoordinatorRemapMsgHandler::stop() {
 		/* keep retrying until success */ \
 		/* TODO reset only failed ones instead */ \
 		while ( ! this->insertRepeatedEvents( _EVENT_, &_CHECKED_SLAVES_ ) ); \
-	} while (0) 
+	} while (0)
 
 
 bool CoordinatorRemapMsgHandler::startRemap( std::vector<struct sockaddr_in> *slaves ) {
 	RemapStatusEvent event;
 	event.start = true;
 	vector<struct sockaddr_in> slavesToStart;
-	
+
 	REMAP_PHASE_CHANGE_HANDLER( slaves, slavesToStart, event );
 
 	return true;
 }
 
 bool CoordinatorRemapMsgHandler::startRemapEnd( const struct sockaddr_in &slave ) {
-	// all operation to slave get lock from coordinator, 
+	// all operation to slave get lock from coordinator,
 	// sync metadata before remapping
-	// use volatile to avoid "improper" -O2 optmization 
+	// use volatile to avoid "improper" -O2 optmization
 	volatile bool sync = false;
 	Coordinator::getInstance()->syncSlaveMeta( slave, ( bool * ) &sync );
 	// busy waiting for meta sync to complete
@@ -179,13 +179,23 @@ bool CoordinatorRemapMsgHandler::stopRemap( std::vector<struct sockaddr_in> *sla
 }
 
 bool CoordinatorRemapMsgHandler::stopRemapEnd( const struct sockaddr_in &slave ) {
-	// TODO backward migration before getting back to normal 
+	// TODO backward migration before getting back to normal
 	// sync all remapping records back to masters
-	LOCK_T lock; 
+	LOCK_T lock;
 	std::map<struct sockaddr_in, uint32_t> count;
 	volatile bool done = false;
-	Coordinator::getInstance()->syncRemappingRecords( &lock, &count, ( bool * ) &done );
-	while ( done == false ); 
+
+	LOCK_INIT( &lock );
+
+	Coordinator *coordinator = Coordinator::getInstance();
+
+	coordinator->syncRemappingRecords( &lock, &count, ( bool * ) &done );
+	while ( ! done );
+
+	done = false;
+	coordinator->releaseDegradedLock( slave, ( bool * ) &done );
+	while( ! done );
+
 	return false;
 }
 
@@ -197,7 +207,7 @@ bool CoordinatorRemapMsgHandler::insertRepeatedEvents( RemapStatusEvent event, s
 	for ( i = 0; i < slaves->size(); i++ ) {
 		event.slave = slaves->at(i);
 		ret = this->eventQueue->insert( event );
-		if ( ! ret ) 
+		if ( ! ret )
 			break;
 	}
 	// notify the caller if any slave cannot start remapping
@@ -228,7 +238,7 @@ bool CoordinatorRemapMsgHandler::isMasterJoin( int service, char *msg, char *sub
 	return false;
 }
 
-/* 
+/*
  * packet: [# of slaves](1) [ [ip addr](4) [port](2) [status](1) ](7) [..](7) [..](7) ...
  */
 bool CoordinatorRemapMsgHandler::sendStatusToMasters( std::vector<struct sockaddr_in> &slaves ) {
@@ -292,7 +302,7 @@ void *CoordinatorRemapMsgHandler::readMessages( void *argv ) {
 	return ( void* ) &myself->msgCount;
 }
 
-/* 
+/*
  * packet: [# of slaves](1) [ [ip addr](4) [port](2) [status](1) ](7) [..](7) [..](7) ...
  */
 bool CoordinatorRemapMsgHandler::updateStatus( char *subject, char *msg, int len ) {
@@ -333,8 +343,8 @@ bool CoordinatorRemapMsgHandler::updateStatus( char *subject, char *msg, int len
 		else {
 			char buf[ INET_ADDRSTRLEN ];
 			inet_ntop( AF_INET, &slave.sin_addr.s_addr, buf, INET_ADDRSTRLEN );
-			fprintf( 
-				stderr, "master [%s] or slave [%s:%hu] not found !!", 
+			fprintf(
+				stderr, "master [%s] or slave [%s:%hu] not found !!",
 				subject, buf , slave.sin_port
 			);
 		}

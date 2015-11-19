@@ -24,7 +24,7 @@ bool RemapMsgHandler::sendStatus( std::vector<struct sockaddr_in> &slaves, const
 		// slave info
 		*( ( uint32_t * )( buf + len ) ) = slaves.at(i).sin_addr.s_addr;
 		*( ( uint32_t * )( buf + len + sizeof( uint32_t ) ) ) = slaves.at(i).sin_port;
-		*( ( uint32_t * )( buf +  len + sizeof( uint32_t ) + sizeof( uint16_t ) ) ) = ( uint8_t ) this->slavesStatus[ slaves.at(i) ];
+		*( ( uint32_t * )( buf + len + sizeof( uint32_t ) + sizeof( uint16_t ) ) ) = ( uint8_t ) this->slavesStatus[ slaves.at(i) ];
 		len += recordSize;
 	}
 	return ( SP_multicast ( this->mbox, MSG_TYPE, targetGroup , 0, len, buf ) > 0 );

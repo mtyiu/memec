@@ -28,7 +28,7 @@ void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t ori
 
 	slaveAddr = data[ originalChunkId ]->getAddr();
 
-	// check if remamping is allowed
+	// check if remapping is allowed
 	if ( ! remapMsgHandler->allowRemapping( slaveAddr ) ) {
 		lockonly++;
 		return;

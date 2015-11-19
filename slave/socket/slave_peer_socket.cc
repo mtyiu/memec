@@ -68,6 +68,14 @@ bool SlavePeerSocket::start() {
 	return false;
 }
 
+void SlavePeerSocket::stop() {
+	if ( ! this->self ) {
+		int newFd = - this->sockfd;
+		SlavePeerSocket::slavePeers->replaceKey( this->sockfd, newFd );
+	}
+	Socket::stop();
+}
+
 bool SlavePeerSocket::ready() {
 	return this->self || ( Socket::ready() );
 }

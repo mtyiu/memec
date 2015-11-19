@@ -24,7 +24,12 @@ void ParityChunkWrapper::free() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-ParityChunkBuffer::ParityChunkBuffer( uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) : ChunkBuffer() {
+ParityChunkBuffer::ParityChunkBuffer( uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isReady ) : ChunkBuffer( isReady ) {
+	if ( isReady )
+		this->init( listId, stripeId, chunkId );
+}
+
+void ParityChunkBuffer::init( uint32_t listId, uint32_t stripeId, uint32_t chunkId ) {
 	this->listId = listId;
 	this->stripeId = stripeId;
 	this->chunkId = chunkId;
@@ -142,7 +147,15 @@ bool ParityChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t coun
 
 		prtIt = this->pending.find( key );
 		if ( prtIt != this->pending.end() ) {
-			printf( "prtIt != this->pending.end(); (%u, %u) vs. (%u, %u)\n", stripeId, offset, prtIt->second.req.seal.stripeId, prtIt->second.req.seal.offset );
+			printf(
+				"prtIt != this->pending.end(); (%u, %u, %u, %u) vs. (%u, %u)\n",
+				this->listId,
+				stripeId,
+				chunkId,
+				offset,
+				prtIt->second.req.seal.stripeId,
+				prtIt->second.req.seal.offset
+			);
 		}
 
 		if ( it == this->keys.end() ) {
@@ -302,9 +315,6 @@ void ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t of
 
 	LOCK( &wrapper.lock );
 	wrapper.chunk->status = CHUNK_STATUS_DIRTY;
-	if ( offset + size > wrapper.chunk->getSize() ) {
-		wrapper.chunk->setSize( offset + size );
-	}
 	// Update the parity chunk
 	char *parity = wrapper.chunk->getData();
 	Coding::bitwiseXOR(

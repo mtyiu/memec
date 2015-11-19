@@ -18,6 +18,7 @@ private:
 
 public:
 	Map map;
+	SlaveSocket *failed;
 
 	static void setArrayMap( ArrayMap<int, SlaveSocket> *slaves );
 	bool init( int tmpfd, ServerAddr &addr, EPoll *epoll );

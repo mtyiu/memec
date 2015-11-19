@@ -2,10 +2,7 @@
 #include "../main/slave.hh"
 #include "../worker/worker.hh"
 
-DataChunkBuffer::DataChunkBuffer( uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) : ChunkBuffer() {
-	this->listId = listId;
-	this->stripeId = stripeId;
-	this->chunkId = chunkId;
+DataChunkBuffer::DataChunkBuffer( uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isReady ) : ChunkBuffer( isReady ) {
 	this->count = count;
 	this->locks = new LOCK_T[ count ];
 	this->chunks = new Chunk*[ count ];
@@ -17,21 +14,29 @@ DataChunkBuffer::DataChunkBuffer( uint32_t count, uint32_t listId, uint32_t stri
 	ChunkBuffer::chunkPool->malloc( this->chunks, this->count );
 	for ( uint32_t i = 0; i < count; i++ ) {
 		LOCK_INIT( this->locks + i );
+		this->sizes[ i ] = 0;
+#ifndef REINSERTED_CHUNKS_IS_SET
+		this->reInsertedChunks[ i ] = 0;
+#endif
+	}
 
+	if ( isReady )
+		this->init( listId, stripeId, chunkId );
+}
+
+void DataChunkBuffer::init( uint32_t listId, uint32_t stripeId, uint32_t chunkId ) {
+	this->listId = listId;
+	this->stripeId = stripeId;
+	this->chunkId = chunkId;
+
+	for ( uint32_t i = 0; i < this->count; i++ ) {
 		Metadata &metadata = this->chunks[ i ]->metadata;
 		metadata.listId = this->listId;
 		metadata.stripeId = this->stripeId;
 		metadata.chunkId = this->chunkId;
-		// ChunkBuffer::map->cache[ metadata ] = this->chunks[ i ];
 		ChunkBuffer::map->setChunk( this->listId, this->stripeId, this->chunkId, this->chunks[ i ], false );
 
-		this->sizes[ i ] = 0;
-
 		this->stripeId++;
-
-#ifndef REINSERTED_CHUNKS_IS_SET
-		this->reInsertedChunks[ i ] = 0;
-#endif
 	}
 }
 
@@ -218,7 +223,7 @@ bool DataChunkBuffer::reInsert( SlaveWorker *worker, Chunk *chunk, uint32_t size
 	for ( i = 0; i < this->count; i++ ) {
 		if ( ( c = this->reInsertedChunks[ i ] ) ) {
 			if ( c == chunk ) {
-				// No need to insert
+				// No need to insert as the chunk is already re-inserted
 				ret = false;
 				goto reInsertExit;
 			} else if ( ChunkBuffer::capacity - c->getSize() < min ) {

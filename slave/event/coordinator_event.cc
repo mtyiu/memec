@@ -7,15 +7,22 @@ void CoordinatorEvent::reqRegister( CoordinatorSocket *socket, uint32_t addr, ui
 	this->message.address.port = port;
 }
 
-void CoordinatorEvent::sync( CoordinatorSocket *socket, uint32_t requestId ) {
+void CoordinatorEvent::sync( CoordinatorSocket *socket, uint32_t id ) {
 	this->type = COORDINATOR_EVENT_TYPE_SYNC;
 	this->socket = socket;
-	this->requestId = requestId;
+	this->id = id;
 }
 
 void CoordinatorEvent::syncRemap( CoordinatorSocket *socket ) {
 	this->type = COORDINATOR_EVENT_TYPE_REMAP_SYNC;
 	this->socket = socket;
+}
+
+void CoordinatorEvent::resReleaseDegradedLock( CoordinatorSocket *socket, uint32_t id, uint32_t count ) {
+	this->type = COORDINATOR_EVENT_TYPE_RELEASE_DEGRADED_LOCK;
+	this->socket = socket;
+	this->id = id;
+	this->message.degraded.count = count;
 }
 
 void CoordinatorEvent::pending( CoordinatorSocket *socket ) {

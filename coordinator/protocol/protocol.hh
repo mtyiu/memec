@@ -38,18 +38,22 @@ public:
 	// Degraded operation
 	char *resDegradedLock(
 		size_t &size, uint32_t id,
-		uint8_t keySize, char *key, bool isLocked, bool isSealed,
+		bool isLocked, bool isSealed,
+		uint8_t keySize, char *key,
 		uint32_t srcListId, uint32_t srcStripeId, uint32_t srcChunkId,
 		uint32_t dstListId, uint32_t dstChunkId
 	);
 	char *resDegradedLock(
 		size_t &size, uint32_t id,
 		uint8_t keySize, char *key,
-		uint32_t listId, uint32_t chunkId
+		uint32_t srcListId, uint32_t srcChunkId,
+		uint32_t dstListId, uint32_t dstChunkId
 	);
 	char *resDegradedLock(
 		size_t &size, uint32_t id,
-		uint8_t keySize, char *key
+		bool exist,
+		uint8_t keySize, char *key,
+		uint32_t listId, uint32_t chunkId
 	);
 
 	/* Slave */
@@ -57,11 +61,26 @@ public:
 	char *resRegisterSlave( size_t &size, uint32_t id, bool success );
 	// char *resRegisterSlave( size_t &size, GlobalConfig &globalConfig, SlaveConfig *slaveConfig = 0 );
 	char *announceSlaveConnected( size_t &size, uint32_t id, SlaveSocket *socket );
+	char *announceSlaveReconstructed( size_t &size, uint32_t id, SlaveSocket *srcSocket, SlaveSocket *dstSocket );
 	char *reqSealChunks( size_t &size, uint32_t id );
 	char *reqFlushChunks( size_t &size, uint32_t id );
 	char *reqSyncMeta( size_t &size, uint32_t id );
+	char *reqReleaseDegradedLock(
+		size_t &size, uint32_t id,
+		std::vector<Metadata> &chunks,
+		bool &isCompleted
+	);
 	char *reqSyncRemappingRecord( size_t &size, uint32_t id, std::unordered_map<Key, RemappingRecord> &remappingRecords, LOCK_T* lock, bool &isLast, char *buffer = 0 );
 	char *resRemappingSetLock( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t chunkId, bool isRemapped, uint8_t keySize, char *key );
+	// Recovery
+	char *reqRecovery(
+		size_t &size, uint32_t id,
+		uint32_t listId, uint32_t chunkId,
+		std::unordered_set<uint32_t> &stripeIds,
+		std::unordered_set<uint32_t>::iterator &it,
+		uint32_t numChunks,
+		bool &isCompleted
+	);
 };
 
 #endif

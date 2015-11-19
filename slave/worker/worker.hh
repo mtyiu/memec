@@ -71,6 +71,9 @@ private:
 	bool getSlaves( uint32_t listId );
 	// Request handler for coordinator
 	bool handleSlaveConnectedMsg( CoordinatorEvent event, char *buf, size_t size );
+	bool handleSlaveReconstructedMsg( CoordinatorEvent event, char *buf, size_t size );
+	bool handleReleaseDegradedLockRequest( CoordinatorEvent event, char *buf, size_t size );
+	bool handleRecoveryRequest( CoordinatorEvent event, char *buf, size_t size );
 	// Request handler for master
 	bool handleGetRequest( MasterEvent event, char *buf, size_t size );
 	bool handleSetRequest( MasterEvent event, char *buf, size_t size );
@@ -91,7 +94,7 @@ private:
 	bool handleUpdateChunkRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleDeleteChunkRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleGetChunkRequest( SlavePeerEvent event, char *buf, size_t size );
-	bool handleSetChunkRequest( SlavePeerEvent event, char *buf, size_t size );
+	bool handleSetChunkRequest( SlavePeerEvent event, bool isSealed, char *buf, size_t size );
 	// Response handler for slave peers
 	bool handleSealChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleRemappingSetResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
