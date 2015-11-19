@@ -10,7 +10,7 @@ fi
 RECORD_COUNT=10000000
 
 ${YCSB_PATH}/bin/ycsb \
-	load redis-cluster \
+	run redis-cluster \
 	-s \
 	-P ${YCSB_PATH}/workloads/$2 \
 	-p fieldcount=1 \
