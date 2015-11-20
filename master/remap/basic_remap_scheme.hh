@@ -19,7 +19,7 @@ public:
 	static MasterRemapMsgHandler *remapMsgHandler;
 	static Latency increment;
 
-	static LOCK_T lock;
+	static pthread_mutex_t lock;
 	static uint32_t remapped;
 	static uint32_t lockonly;
 

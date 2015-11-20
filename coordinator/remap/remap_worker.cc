@@ -21,7 +21,7 @@ bool CoordinatorRemapWorker::startRemap( RemapStatusEvent event ) {
 	// wait for ack, release lock once acquired
 	if ( crmh->isAllMasterAcked( event.slave ) == false )
 		pthread_cond_wait( &crmh->ackSignal[ event.slave ], &crmh->ackSignalLock );
-	UNLOCK( &crmh->ackSignalLock );
+	pthread_mutex_unlock( &crmh->ackSignalLock );
 
 	LOCK( &crmh->slavesStatusLock[ event.slave ] );
 	// for multi-threaded environment, it is possible that other workers change
@@ -59,7 +59,7 @@ bool CoordinatorRemapWorker::stopRemap( RemapStatusEvent event ) { // Phase 4 --
 	// wait for ack, release lock once acquired
 	if ( crmh->isAllMasterAcked( event.slave ) == false )
 		pthread_cond_wait( &crmh->ackSignal[ event.slave ], &crmh->ackSignalLock );
-	UNLOCK( &crmh->ackSignalLock );
+	pthread_mutex_unlock( &crmh->ackSignalLock );
 
 	LOCK( &crmh->slavesStatusLock[ event.slave ] );
 	// for multi-threaded environment, it is possible that other workers change

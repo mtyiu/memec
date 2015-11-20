@@ -7,7 +7,7 @@ StripeList<SlaveSocket> *BasicRemappingScheme::stripeList = NULL;
 MasterRemapMsgHandler *BasicRemappingScheme::remapMsgHandler = NULL;
 
 Latency BasicRemappingScheme::increment ( 0, 100 );
-LOCK_T BasicRemappingScheme::lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t BasicRemappingScheme::lock = PTHREAD_MUTEX_INITIALIZER;
 uint32_t BasicRemappingScheme::remapped = 0;
 uint32_t BasicRemappingScheme::lockonly= 0;
 
@@ -110,9 +110,9 @@ exit:
 	UNLOCK( &slaveLoading->lock );
 
 	if ( ! ( remappedChunkId == originalChunkId && remappedListId == originalListId ) ) {
-		LOCK( &BasicRemappingScheme::lock );
+		pthread_mutex_lock( &BasicRemappingScheme::lock );
 		remapped++;
-		UNLOCK( &BasicRemappingScheme::lock );
+		pthread_mutex_unlock( &BasicRemappingScheme::lock );
 	}
 }
 

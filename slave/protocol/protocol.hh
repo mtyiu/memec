@@ -20,7 +20,7 @@ public:
 	// Heartbeat
 	char *sendHeartbeat( size_t &size, uint32_t id, LOCK_T *sealedLock, std::unordered_set<Metadata> &sealed, uint32_t &sealedCount, LOCK_T *opsLock, std::unordered_map<Key, OpMetadata> &ops, uint32_t &opsCount, bool &isCompleted );
 	// Remapping Records
-	char *sendRemappingRecords( size_t &size, uint32_t id, std::unordered_map<Key, RemappingRecord> &remapRecord, pthread_mutex_t *lock, size_t &remapCount );
+	char *sendRemappingRecords( size_t &size, uint32_t id, std::unordered_map<Key, RemappingRecord> &remapRecord, LOCK_T *lock, size_t &remapCount );
 	// Degraded operations
 	char *resReleaseDegradedLock( size_t &size, uint32_t id, uint32_t count );
 

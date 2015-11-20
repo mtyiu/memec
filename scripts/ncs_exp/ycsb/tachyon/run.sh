@@ -8,6 +8,7 @@ if [ $# != 2 ]; then
 fi
 
 RECORD_COUNT=100000000
+OPERATION_COUNT=$(expr ${RECORD_COUNT} \/ 4)
 
 ${YCSB_PATH}/bin/ycsb \
 	load tachyon \
@@ -20,6 +21,6 @@ ${YCSB_PATH}/bin/ycsb \
 	-p fieldlength=200 \
 	-p requestdistribution=zipfian \
 	-p recordcount=${RECORD_COUNT} \
-	-p operationcount=${RECORD_COUNT} \
+	-p operationcount=${OPERATION_COUNT} \
 	-p threadcount=$1 \
 	-p uri=tachyon://192.168.0.11:19998

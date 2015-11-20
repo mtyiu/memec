@@ -40,7 +40,7 @@ bool CoordinatorRemapMsgHandler::init( const int ip, const int port, const char 
 	inet_ntop( AF_INET, &addr, ipstr, INET_ADDRSTRLEN );
 	sprintf( addrbuf, "%u@%s", ntohs( port ), ipstr );
 	RemapMsgHandler::init( addrbuf , user );
-	LOCK_INIT( &this->ackSignalLock );
+	pthread_mutex_init( &this->ackSignalLock, 0 );
 
 	this->isListening = false;
 	return ( SP_join( this->mbox, MASTER_GROUP ) == 0 );

@@ -40,7 +40,7 @@ char *SlaveProtocol::sendHeartbeat(
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::sendRemappingRecords( size_t &size, uint32_t id, std::unordered_map<Key, RemappingRecord> &remapRecord, pthread_mutex_t *lock, size_t &remapCount ) {
+char *SlaveProtocol::sendRemappingRecords( size_t &size, uint32_t id, std::unordered_map<Key, RemappingRecord> &remapRecord, LOCK_T *lock, size_t &remapCount ) {
 	size = this->generateRemappingRecordMessage(
 		PROTO_MAGIC_REMAPPING,
 		PROTO_MAGIC_TO_COORDINATOR,
