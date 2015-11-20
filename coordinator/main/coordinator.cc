@@ -58,6 +58,7 @@ void Coordinator::switchPhase( std::set<struct sockaddr_in> prevOverloadedSlaves
 		} else {
 			// start remapping phase for all in the background
 			event.switchPhase( true, this->overloadedSlaves.slaveSet );
+			this->eventQueue.insert( event );
 		}
 	} else if ( curOverloadedSlaveCount < totalSlaveCount * stopThreshold &&
 		prevOverloadedSlaveCount >= totalSlaveCount * startThreshold
@@ -564,6 +565,11 @@ void Coordinator::debug( FILE *f ) {
 
 	fprintf( f, "\nOther threads\n--------------\n" );
 	this->sockets.self.printThread();
+
+	if ( this->config.global.remap.enabled ) {
+		fprintf( f, "\nRemapping handler event queue\n------------------\n" );
+		this->remapMsgHandler->eventQueue->print();
+	}
 
 	fprintf( f, "\n" );
 }

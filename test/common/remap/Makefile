@@ -22,8 +22,6 @@ MSTR_OBJS= \
 	$(PLIO_SRC_ROOT)/master/socket/master_socket.o \
 	$(PLIO_SRC_ROOT)/master/socket/slave_socket.o \
 	$(PLIO_SRC_ROOT)/master/worker/worker.o \
-	$(PLIO_SRC_ROOT)/coordinator/remap/remap_worker.o \
-	$(PLIO_SRC_ROOT)/coordinator/remap/remap_msg_handler.o \
 	$(PLIO_SRC_ROOT)/master/main/master.o 
 
 COOR_OBJS= \

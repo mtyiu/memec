@@ -1,12 +1,15 @@
 #include <vector>
 #include <arpa/inet.h>
 #include <unistd.h>
-#include "common.hh"
 #include "../../../common/remap/remap_status.hh"
 #include "../../../coordinator/remap/remap_msg_handler.hh"
 
 #define TIME_OUT 2
 #define JOIN_TIME_OUT 4
+
+#define COORDINATOR_REMAP_UNIT_TEST
+#include "common.hh"
+#undef COORDINATOR_REMAP_UNIT_TEST
 
 int main () {
 	CoordinatorRemapMsgHandler *ch = CoordinatorRemapMsgHandler::getInstance();

@@ -1,6 +1,7 @@
 #include "remap_msg_handler.hh"
 #include "remap_worker.hh"
 #include "../../common/util/debug.hh"
+#include "arpa/inet.h"
 
 #define POLL_ACK_TIME_INTVL	 1   // in seconds
 
@@ -13,9 +14,14 @@ CoordinatorRemapWorker::~CoordinatorRemapWorker() {
 bool CoordinatorRemapWorker::startRemap( RemapStatusEvent event ) {
 	CoordinatorRemapMsgHandler *crmh = CoordinatorRemapMsgHandler::getInstance();
 
-	// wait for ack (busy waiting)
-	while( crmh->isAllMasterAcked( event.slave ) == false )
-		sleep( POLL_ACK_TIME_INTVL ); // Phase 3 (no need to broadcast)
+	pthread_mutex_t lock;
+	pthread_mutex_init( &lock, NULL );
+	char buf[ INET_ADDRSTRLEN ];
+	inet_ntop( AF_INET, &event.slave.sin_addr.s_addr, buf, INET_ADDRSTRLEN );
+	// wait for ack, release lock once acquired
+	if ( crmh->isAllMasterAcked( event.slave ) == false )
+		pthread_cond_wait( &crmh->ackSignal[ event.slave ], &crmh->ackSignalLock );
+	UNLOCK( &crmh->ackSignalLock );
 
 	LOCK( &crmh->slavesStatusLock[ event.slave ] );
 	// for multi-threaded environment, it is possible that other workers change
@@ -31,6 +37,10 @@ bool CoordinatorRemapWorker::startRemap( RemapStatusEvent event ) {
 	// ask master to start remap
 	crmh->slavesStatus[ event.slave ] = REMAP_START; // Phase 4
 	if ( crmh->sendStatusToMasters( event.slave ) == false ) {
+		__ERROR__( "CoordinatorRemapWorker", "stopRemap", 
+			"Failed to broadcast status changes on salve %s:%u!", 
+			buf, event.slave.sin_port 
+		);
 		UNLOCK( &crmh->slavesStatusLock[ event.slave ] );
 		return false;
 	}
@@ -42,9 +52,14 @@ bool CoordinatorRemapWorker::startRemap( RemapStatusEvent event ) {
 bool CoordinatorRemapWorker::stopRemap( RemapStatusEvent event ) { // Phase 4 --> 3
 	CoordinatorRemapMsgHandler *crmh = CoordinatorRemapMsgHandler::getInstance();
 
-	// wait for ack.
-	while( crmh->isAllMasterAcked( event.slave ) == false ) // wait for all remapping SET in the masters to finish
-		sleep( POLL_ACK_TIME_INTVL );
+	pthread_mutex_t lock;
+	pthread_mutex_init( &lock, NULL );
+	char buf[ INET_ADDRSTRLEN ];
+	inet_ntop( AF_INET, &event.slave.sin_addr.s_addr, buf, INET_ADDRSTRLEN );
+	// wait for ack, release lock once acquired
+	if ( crmh->isAllMasterAcked( event.slave ) == false )
+		pthread_cond_wait( &crmh->ackSignal[ event.slave ], &crmh->ackSignalLock );
+	UNLOCK( &crmh->ackSignalLock );
 
 	LOCK( &crmh->slavesStatusLock[ event.slave ] );
 	// for multi-threaded environment, it is possible that other workers change
@@ -60,6 +75,10 @@ bool CoordinatorRemapWorker::stopRemap( RemapStatusEvent event ) { // Phase 4 --
 	// ask master to use normal SET workflow
 	crmh->slavesStatus[ event.slave ] = REMAP_NONE ;
 	if ( crmh->sendStatusToMasters( event.slave ) == false ) {
+		__ERROR__( "CoordinatorRemapWorker", "stopRemap", 
+			"Failed to broadcast status changes on salve %s:%u!", 
+			buf, event.slave.sin_port 
+		);
 		UNLOCK( &crmh->slavesStatusLock[ event.slave ] );
 		return false;
 	}
@@ -71,16 +90,23 @@ void *CoordinatorRemapWorker::run( void* argv ) {
 	CoordinatorRemapMsgHandler *crmh = CoordinatorRemapMsgHandler::getInstance();
 	CoordinatorRemapWorker *worker = ( CoordinatorRemapWorker *) argv;
 	RemapStatusEvent event;
-
-	while ( worker->getIsRunning()) {
-		if ( ! crmh->eventQueue->extract( event ) )
-			break;
+	bool ret;
+	
+	while ( true ) {
+		ret = crmh->eventQueue->extract( event );
+		if ( ! ret ) {
+			if ( ! worker->getIsRunning() ) {
+				break;
+			}
+			continue;
+		}
 		if ( event.start )
 			worker->startRemap( event );
 		else
 			worker->stopRemap( event );
 	}
 
+	__DEBUG__( BLUE, "CoordinatorRemapWorker", "run" "Worker thread stop running." );
 	worker->free();
 	pthread_exit( 0 );
 	return 0;

@@ -10,8 +10,6 @@
 #define SEED			7654321
 #define ROUNDS 2
 
-static int count = 1;
-
 // random a set of slaves for testing
 std::vector<struct sockaddr_in> addSlaves( RemapMsgHandler *handler ) {
 	srand( SEED );
@@ -26,6 +24,10 @@ std::vector<struct sockaddr_in> addSlaves( RemapMsgHandler *handler ) {
 	}
 	return slaves;
 }
+
+#ifdef COORDINATOR_REMAP_UNIT_TEST
+
+static int count = 1;
 
 // randomly select a set of slaves to start remapping
 void startRemap( CoordinatorRemapMsgHandler *handler, const std::vector<struct sockaddr_in> &slaves ) {
@@ -50,6 +52,8 @@ void stopRemap( CoordinatorRemapMsgHandler *handler, const std::vector<struct so
 	handler->stopRemap( &slavesToStop );
 	count++;
 }
+
+#endif
 
 // check for status change completion
 bool meetStatus( RemapMsgHandler *handler, const std::vector<struct sockaddr_in> &slaves, RemapStatus target ) {

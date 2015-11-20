@@ -51,6 +51,8 @@ private:
 
 public:
 	EventQueue<RemapStatusEvent> *eventQueue;
+	std::map<struct sockaddr_in, pthread_cond_t> ackSignal;
+	LOCK_T ackSignalLock; // dummy lock for pthread_cond_wait()
 
 	static CoordinatorRemapMsgHandler *getInstance() {
 		static CoordinatorRemapMsgHandler crmh;
