@@ -42,10 +42,6 @@ for c in $coding; do
 				read -p "Pending: ${pending} / 4"
 				pending=$(expr $pending + 1)
 			done
-
-			for n in 3 4 8 9; do
-				scp testbed-node$n:${BASE_PATH}/results/workloads/$c/$t/$w.txt ${BASE_PATH}/results/workloads/$c/$t/node$n/$w.txt
-			done
 		done
 
 		# screen -S manage -p 0 -X stuff "$(printf '\r\r')"

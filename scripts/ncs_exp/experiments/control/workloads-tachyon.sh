@@ -43,10 +43,6 @@ for c in $coding; do
 				read -p "Pending: ${pending} / 4"
 				pending=$(expr $pending + 1)
 			done
-
-			for n in 3 4 8 9; do
-				scp testbed-node$n:${BASE_PATH}/results/workloads/$c/$t/$w.txt ${BASE_PATH}/results/workloads/$c/$t/node$n/$w.txt
-			done
 		done
 
 		ssh testbed-node1 "screen -S coordinator -p 0 -X stuff \"${HOME}/hwchan/tachyon/bin/tachyon-stop.sh$(printf '\r')\""
