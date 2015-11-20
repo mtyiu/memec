@@ -1373,8 +1373,8 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, bool isDeg
 	original = ( SlaveSocket * ) key.ptr;
 
 	// Mark the elapse time as latency
-	Master* master = Master::getInstance();
 	if ( ! isDegraded && MasterWorker::updateInterval ) {
+		Master* master = Master::getInstance();
 		struct timespec elapsedTime;
 		RequestStartTime rst;
 
@@ -1415,7 +1415,6 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, bool isDeg
 	}
 
 	if ( success ) {
-		key.free();
 		applicationEvent.resGet(
 			( ApplicationSocket * ) key.ptr,
 			pid.id,
@@ -1426,10 +1425,11 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, bool isDeg
 			false
 		);
 	} else {
-		applicationEvent.resGet( ( ApplicationSocket * ) key.ptr, pid.id, key, true );
+		applicationEvent.resGet( ( ApplicationSocket * ) key.ptr, pid.id, key, false );
 	}
 	// MasterWorker::eventQueue->insert( applicationEvent );
 	this->dispatch( applicationEvent );
+	key.free();
 	return true;
 }
 
