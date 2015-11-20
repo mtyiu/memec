@@ -6,11 +6,14 @@ void ApplicationEvent::resRegister( ApplicationSocket *socket, uint32_t id, bool
 	this->socket = socket;
 }
 
-void ApplicationEvent::resGet( ApplicationSocket *socket, uint32_t id, KeyValue &keyValue, bool needsFree ) {
+void ApplicationEvent::resGet( ApplicationSocket *socket, uint32_t id, uint8_t keySize, uint32_t valueSize, char *keyStr, char *valueStr, bool needsFree ) {
 	this->type = APPLICATION_EVENT_TYPE_GET_RESPONSE_SUCCESS;
 	this->id = id;
 	this->socket = socket;
-	this->message.keyValue = keyValue;
+	this->message.keyValue.keySize = keySize;
+	this->message.keyValue.valueSize = valueSize;
+	this->message.keyValue.keyStr = keyStr;
+	this->message.keyValue.valueStr = valueStr;
 	this->needsFree = needsFree;
 }
 

@@ -45,9 +45,6 @@ void MasterWorker::dispatch( MixedEvent event ) {
 void MasterWorker::dispatch( ApplicationEvent event ) {
 	bool success = true, connected, isSend;
 	ssize_t ret;
-	uint32_t valueSize;
-	Key key;
-	char *value;
 	struct {
 		size_t size;
 		char *data;
@@ -82,19 +79,15 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 			buffer.data = this->protocol.resRegisterApplication( buffer.size, event.id, success );
 			break;
 		case APPLICATION_EVENT_TYPE_GET_RESPONSE_SUCCESS:
-			event.message.keyValue.deserialize(
-				key.data, key.size,
-				value, valueSize
-			);
 			buffer.data = this->protocol.resGet(
 				buffer.size,
 				event.id,
 				success,
-				key.size, key.data,
-				valueSize, value
+				event.message.keyValue.keySize,
+				event.message.keyValue.keyStr,
+				event.message.keyValue.valueSize,
+				event.message.keyValue.valueStr
 			);
-			if ( event.needsFree )
-				event.message.keyValue.free();
 			break;
 		case APPLICATION_EVENT_TYPE_GET_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resGet(
@@ -1346,12 +1339,14 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 
 bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, bool isDegraded, char *buf, size_t size ) {
 	Key key;
-	KeyValue keyValue;
+	uint32_t valueSize = 0;
+	char *valueStr = 0;
 	if ( success ) {
 		struct KeyValueHeader header;
 		if ( this->protocol.parseKeyValueHeader( header, buf, size ) ) {
 			key.set( header.keySize, header.key, ( void * ) event.socket );
-			keyValue.dup( header.key, header.keySize, header.value, header.valueSize );
+			valueSize = header.valueSize;
+			valueStr = header.value;
 		} else {
 			__ERROR__( "MasterWorker", "handleGetResponse", "Invalid GET response." );
 			return false;
@@ -1373,7 +1368,6 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, bool isDeg
 
 	if ( ! MasterWorker::pending->eraseKey( PT_SLAVE_GET, event.id, event.socket, &pid, &key, true, true ) ) {
 		__ERROR__( "MasterWorker", "handleGetResponse", "Cannot find a pending slave GET request that matches the response. This message will be discarded (key = %.*s).", key.size, key.data );
-		if ( success ) keyValue.free();
 		return false;
 	}
 	original = ( SlaveSocket * ) key.ptr;
@@ -1407,7 +1401,6 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, bool isDeg
 	key.ptr = 0;
 	if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_GET, pid.parentId, 0, &pid, &key, true, true, true, key.data ) ) {
 		__ERROR__( "MasterWorker", "handleGetResponse", "Cannot find a pending application GET request that matches the response. This message will be discarded (key = %.*s).", key.size, key.data );
-		if ( success ) keyValue.free();
 		return false;
 	}
 
@@ -1423,11 +1416,20 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, bool isDeg
 
 	if ( success ) {
 		key.free();
-		applicationEvent.resGet( ( ApplicationSocket * ) key.ptr, pid.id, keyValue );
+		applicationEvent.resGet(
+			( ApplicationSocket * ) key.ptr,
+			pid.id,
+			key.size,
+			valueSize,
+			key.data,
+			valueStr,
+			false
+		);
 	} else {
-		applicationEvent.resGet( ( ApplicationSocket * ) key.ptr, pid.id, key );
+		applicationEvent.resGet( ( ApplicationSocket * ) key.ptr, pid.id, key, true );
 	}
-	MasterWorker::eventQueue->insert( applicationEvent );
+	// MasterWorker::eventQueue->insert( applicationEvent );
+	this->dispatch( applicationEvent );
 	return true;
 }
 
