@@ -30,6 +30,7 @@ private:
 	SlaveSocket **paritySlaveSockets;
 	static uint32_t dataChunkCount;
 	static uint32_t parityChunkCount;
+	static uint32_t updateInterval;
 	static bool degradedTargetIsFixed;
 	static IDGenerator *idGenerator;
 	static Pending *pending;

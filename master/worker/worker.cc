@@ -11,6 +11,7 @@
 
 uint32_t MasterWorker::dataChunkCount;
 uint32_t MasterWorker::parityChunkCount;
+uint32_t MasterWorker::updateInterval;
 bool MasterWorker::degradedTargetIsFixed;
 IDGenerator *MasterWorker::idGenerator;
 Pending *MasterWorker::pending;
@@ -660,8 +661,10 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 			__ERROR__( "MasterWorker", "handleGetRequest", "Cannot insert into slave GET pending map." );
 		}
 
-		// Mark the time when request is sent
-		MasterWorker::pending->recordRequestStartTime( PT_SLAVE_GET, requestId, event.id, ( void * ) socket, socket->getAddr() );
+		if ( MasterWorker::updateInterval ) {
+			// Mark the time when request is sent
+			MasterWorker::pending->recordRequestStartTime( PT_SLAVE_GET, requestId, event.id, ( void * ) socket, socket->getAddr() );
+		}
 
 		// Send GET request
 		sentBytes = socket->send( buffer.data, buffer.size, connected );
@@ -753,12 +756,14 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 	// Send SET requests
 	if ( MasterWorker::parityChunkCount ) {
 		for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
-			// Mark the time when request is sent
-			MasterWorker::pending->recordRequestStartTime(
-				PT_SLAVE_SET, requestId, event.id,
-				( void * ) this->paritySlaveSockets[ i ],
-				this->paritySlaveSockets[ i ]->getAddr()
-			);
+			if ( MasterWorker::updateInterval ) {
+				// Mark the time when request is sent
+				MasterWorker::pending->recordRequestStartTime(
+					PT_SLAVE_SET, requestId, event.id,
+					( void * ) this->paritySlaveSockets[ i ],
+					this->paritySlaveSockets[ i ]->getAddr()
+				);
+			}
 
 #ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
 			SlaveEvent slaveEvent;
@@ -766,7 +771,8 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 			MasterWorker::eventQueue->prioritizedInsert( slaveEvent );
 		}
 
-		MasterWorker::pending->recordRequestStartTime( PT_SLAVE_SET, requestId, event.id, ( void * ) socket, socket->getAddr() );
+		if ( MasterWorker::updateInterval )
+			MasterWorker::pending->recordRequestStartTime( PT_SLAVE_SET, requestId, event.id, ( void * ) socket, socket->getAddr() );
 		SlaveEvent slaveEvent;
 		slaveEvent.send( socket, packet );
 		this->dispatch( slaveEvent );
@@ -777,7 +783,8 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 			}
 		}
 
-		MasterWorker::pending->recordRequestStartTime( PT_SLAVE_SET, requestId, event.id, ( void * ) socket, socket->getAddr() );
+		if ( MasterWorker::updateInterval )
+			MasterWorker::pending->recordRequestStartTime( PT_SLAVE_SET, requestId, event.id, ( void * ) socket, socket->getAddr() );
 		sentBytes = socket->send( buffer.data, buffer.size, connected );
 		if ( sentBytes != ( ssize_t ) buffer.size ) {
 			__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
@@ -789,7 +796,8 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		}
 #endif
 	} else {
-		MasterWorker::pending->recordRequestStartTime( PT_SLAVE_SET, requestId, event.id, ( void * ) socket, socket->getAddr() );
+		if ( MasterWorker::updateInterval )
+			MasterWorker::pending->recordRequestStartTime( PT_SLAVE_SET, requestId, event.id, ( void * ) socket, socket->getAddr() );
 		sentBytes = socket->send( buffer.data, buffer.size, connected );
 		if ( sentBytes != ( ssize_t ) buffer.size ) {
 			__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
@@ -1027,9 +1035,8 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 		__ERROR__( "MasterWorker", "handleRemappingSetRequest", "Cannot insert into application SET pending map." );
 	}
 
-	if ( NO_REMAPPING ) {
+	if ( MasterWorker::updateInterval && NO_REMAPPING )
 		MasterWorker::pending->recordRequestStartTime( PT_SLAVE_SET, requestId, event.id, ( void * ) socket, socket->getAddr() );
-	}
 
 	// always add a remapping record ( to buffer the value )
 	Value *value = new Value(); // Note: Use an Key object to store the value
@@ -1232,7 +1239,8 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 						buffer.size, requestId,
 						degradedLockData.key, degradedLockData.keySize
 					);
-					MasterWorker::pending->recordRequestStartTime( PT_SLAVE_GET, requestId, pid.parentId, ( void * ) socket, socket->getAddr() );
+					if ( MasterWorker::updateInterval )
+						MasterWorker::pending->recordRequestStartTime( PT_SLAVE_GET, requestId, pid.parentId, ( void * ) socket, socket->getAddr() );
 					break;
 				case PROTO_DEGRADED_LOCK_RES_NOT_EXIST:
 					if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_GET, pid.parentId, 0, &pid, &key, true, true, true, header.key ) ) {
@@ -1372,7 +1380,7 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, bool isDeg
 
 	// Mark the elapse time as latency
 	Master* master = Master::getInstance();
-	if ( ! isDegraded && master->config.master.loadingStats.updateInterval > 0 ) {
+	if ( ! isDegraded && MasterWorker::updateInterval ) {
 		struct timespec elapsedTime;
 		RequestStartTime rst;
 
@@ -1450,7 +1458,7 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 
 	// Mark the elapse time as latency
 	Master* master = Master::getInstance();
-	if ( master->config.master.loadingStats.updateInterval > 0 ) {
+	if ( MasterWorker::updateInterval ) {
 		struct timespec elapsedTime;
 		RequestStartTime rst;
 
@@ -1651,7 +1659,7 @@ bool MasterWorker::handleRedirectedResponse( SlaveEvent event, char *buf, size_t
 		return false;
 	}
 
-	if ( slavePT == PT_SLAVE_GET )
+	if ( slavePT == PT_SLAVE_GET && MasterWorker::updateInterval )
 		MasterWorker::pending->eraseRequestStartTime( slavePT, pid.id, ( void * ) event.socket, elapsedTime );
 
 	// abort request if no application is pending for result
@@ -1695,7 +1703,7 @@ bool MasterWorker::handleRedirectedResponse( SlaveEvent event, char *buf, size_t
 	}
 
 	// Mark the time when request is sent
-	if ( slavePT == PT_SLAVE_GET )
+	if ( MasterWorker::updateInterval && slavePT == PT_SLAVE_GET )
 		MasterWorker::pending->recordRequestStartTime( slavePT, requestId, event.id, ( void * ) socket, socket->getAddr() );
 
 	// Send GET request
@@ -1828,12 +1836,14 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 
 	// Send SET requests (parity)
 	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
-		// Mark the time when request is sent
-		MasterWorker::pending->recordRequestStartTime(
-			PT_SLAVE_SET, pid.id, pid.parentId,
-			( void * ) this->paritySlaveSockets[ i ],
-			this->paritySlaveSockets[ i ]->getAddr()
-		);
+		if ( MasterWorker::updateInterval ) {
+			// Mark the time when request is sent
+			MasterWorker::pending->recordRequestStartTime(
+				PT_SLAVE_SET, pid.id, pid.parentId,
+				( void * ) this->paritySlaveSockets[ i ],
+				this->paritySlaveSockets[ i ]->getAddr()
+			);
+		}
 
 		SlaveEvent slaveEvent;
 		slaveEvent.send( this->paritySlaveSockets[ i ], packet );
@@ -1844,7 +1854,8 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 #endif
 	}
 
-	MasterWorker::pending->recordRequestStartTime( PT_SLAVE_SET, pid.id, pid.parentId, ( void * ) socket, socket->getAddr() );
+	if ( MasterWorker::updateInterval )
+		MasterWorker::pending->recordRequestStartTime( PT_SLAVE_SET, pid.id, pid.parentId, ( void * ) socket, socket->getAddr() );
 
 	// Send SET request (data)
 	SlaveEvent slaveEvent;
@@ -1908,7 +1919,7 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 
 	// Mark the elapse time as latency
 	Master* master = Master::getInstance();
-	if ( master->config.master.loadingStats.updateInterval > 0 && NO_REMAPPING ) {
+	if ( MasterWorker::updateInterval && NO_REMAPPING ) {
 		timespec elapsedTime;
 		RequestStartTime rst;
 
@@ -2047,6 +2058,7 @@ bool MasterWorker::init() {
 	MasterWorker::idGenerator = &master->idGenerator;
 	MasterWorker::dataChunkCount = master->config.global.coding.params.getDataChunkCount();
 	MasterWorker::parityChunkCount = master->config.global.coding.params.getParityChunkCount();
+	MasterWorker::updateInterval = master->config.master.loadingStats.updateInterval;
 	MasterWorker::degradedTargetIsFixed = master->config.master.degraded.isFixed;
 	MasterWorker::pending = &master->pending;
 	MasterWorker::eventQueue = &master->eventQueue;
