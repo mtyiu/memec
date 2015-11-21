@@ -74,11 +74,11 @@ public class RedisClusterClient extends DB {
             String host = props.getProperty(HOST_PROPERTY.concat(Integer.toString(count)));
             if (host == null && serverCount > 1) {
                 if ( i > serverCount * 10 ) {
-                    throw new DBException("Not encough server info provided / server naming is too sparse!\n");
+                    throw new DBException("Not enough server info provided / server naming is too sparse!\n");
                 }
                 continue;
             }
-    
+
             servers.add(new HostAndPort(host, port));
             //System.out.format("Added server %d at %s:%d\n", count, host, port );
 
@@ -101,7 +101,7 @@ public class RedisClusterClient extends DB {
     private int hash(String key) {
         return key.hashCode();
     }
-    
+
     //XXX jedis.select(int index) to switch to `table`
 
     @Override

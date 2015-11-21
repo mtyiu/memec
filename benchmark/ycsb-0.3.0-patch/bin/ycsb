@@ -69,6 +69,7 @@ DATABASES = {
     "nosqldb"      : "com.yahoo.ycsb.db.NoSqlDbClient",
     "orientdb"     : "com.yahoo.ycsb.db.OrientDBClient",
     "plio"         : "com.yahoo.ycsb.db.PLIOClient",
+    "plio_direct"  : "com.yahoo.ycsb.db.PLIODirectClient",
     "dummy"        : "com.yahoo.ycsb.db.DummyClient",
     "redis"        : "com.yahoo.ycsb.db.RedisClient",
     "redis-cluster": "com.yahoo.ycsb.db.RedisClusterClient",

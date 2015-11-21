@@ -113,6 +113,7 @@ LICENSE file.
     <!--module>nosqldb</module-->
     <module>orientdb</module>
     <module>plio</module>
+    <module>plio_direct</module>
     <module>dummy</module>
     <module>redis</module>
     <module>tarantool</module>

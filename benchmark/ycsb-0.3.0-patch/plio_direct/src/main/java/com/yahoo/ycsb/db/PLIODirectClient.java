@@ -13,36 +13,50 @@ import com.yahoo.ycsb.DBException;
 import com.yahoo.ycsb.ByteIterator;
 import com.yahoo.ycsb.StringByteIterator;
 
-import edu.cuhk.cse.plio.PLIO;
+import edu.cuhk.cse.plio.PLIODirect;
 
-public class PLIOClient extends DB {
+public class PLIODirectClient extends DB {
 	// Properties
 	public static final String HOST_PROPERTY = "plio.host";
 	public static final String PORT_PROPERTY = "plio.port";
 	public static final String KEY_SIZE_PROPERTY = "plio.key_size";
 	public static final String CHUNK_SIZE_PROPERTY = "plio.chunk_size";
+	public static final String SERVER_COUNT_PROPERTY = "plio.server_count";
 	// Return values
 	public static final int OK = 0;
 	public static final int ERROR = -1;
 	public static final int NOT_FOUND = -2;
 
-	private PLIO plio;
+	private PLIODirect plio;
 
 	public void init() throws DBException {
 		Properties props = getProperties();
-		String host, s;
-		int port, keySize, chunkSize;
+		String s;
+		int keySize, chunkSize, serverCount;
+		String[] hosts;
+		int[] ports;
 
-		host = props.getProperty( HOST_PROPERTY );
+		s = props.getProperty( SERVER_COUNT_PROPERTY );
+		serverCount = s != null ? Integer.parseInt( s ) : 1;
 
-		s = props.getProperty( PORT_PROPERTY );
-		port = s != null ? Integer.parseInt( s ) : PLIO.DEFAULT_PORT;
+		hosts = new String[ serverCount ];
+		ports = new int[ serverCount ];
+
+		for ( int i = 0; i < serverCount; i++ ) {
+			hosts[ i ] = props.getProperty( HOST_PROPERTY.concat( Integer.toString( i ) ) );
+
+			s = props.getProperty( PORT_PROPERTY.concat( Integer.toString( i ) ) );
+			ports[ i ] = s != null ? Integer.parseInt( s ) : PLIODirect.DEFAULT_PORT;
+
+			if ( hosts[ i ] == null )
+				throw new DBException( "Invalid host name for server #" + i + "." );
+		}
 
 		s = props.getProperty( KEY_SIZE_PROPERTY );
-		keySize = s != null ? Integer.parseInt( s ) : PLIO.DEFAULT_KEY_SIZE;
+		keySize = s != null ? Integer.parseInt( s ) : PLIODirect.DEFAULT_KEY_SIZE;
 
 		s = props.getProperty( CHUNK_SIZE_PROPERTY );
-		chunkSize = s != null ? Integer.parseInt( s ) : PLIO.DEFAULT_CHUNK_SIZE;
+		chunkSize = s != null ? Integer.parseInt( s ) : PLIODirect.DEFAULT_CHUNK_SIZE;
 
 		int fromId = ( int ) ( Math.random() * Integer.MAX_VALUE );
 		int toId = ( int ) ( Math.random() * Integer.MAX_VALUE );
@@ -52,7 +66,7 @@ public class PLIOClient extends DB {
 			toId = tmp;
 		}
 
-		plio = new PLIO( keySize, chunkSize, host, port, fromId, toId );
+		plio = new PLIODirect( keySize, chunkSize, hosts, ports, fromId, toId );
 
 		if ( ! plio.connect() )
 			throw new DBException();

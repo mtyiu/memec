@@ -4,14 +4,18 @@ PLIO_SRC_ROOT=../../..
 LIBS=
 
 OBJS= \
-	protocol
+	hash \
+	Hash.class
 
 EXTERNAL_LIB=
 
 all: $(OBJS) $(EXTERNAL_LIB)
 
-protocol: protocol.cc $(PLIO_SRC_ROOT)/common/protocol/protocol.o
+hash: hash.cc
 	$(CC) $(CFLAGS) $(LIBS) -o $@ $^
+
+Hash.class: Hash.java
+	javac Hash.java
 
 clean:
 	rm -f $(OBJS)
