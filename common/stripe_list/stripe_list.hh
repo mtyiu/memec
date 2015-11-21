@@ -11,6 +11,8 @@
 #include "../hash/consistent_hash.hh"
 #include "../hash/hash_func.hh"
 
+// #define USE_CONSISTENT_HASHING
+
 #ifndef UINT32_MAX
 #define UINT32_MAX 0xFFFFFFFF
 #endif
@@ -30,7 +32,9 @@ protected:
 	BitmaskArray data, parity;
 	unsigned int *load, *count;
 	std::vector<T *> *slaves;
+#ifdef USE_CONSISTENT_HASHING
 	ConsistentHash<uint32_t> listRing;
+#endif
 	std::vector<T **> lists;
 
 	inline uint32_t pickMin( int listIndex ) {
@@ -109,7 +113,9 @@ protected:
 				}
 			}
 
+#ifdef USE_CONSISTENT_HASHING
 			this->listRing.add( i );
+#endif
 		}
 
 		this->generated = true;
@@ -137,8 +143,13 @@ public:
 	}
 
 	unsigned int get( const char *key, uint8_t keySize, T **data = 0, T **parity = 0, uint32_t *dataIndexPtr = 0, bool full = false ) {
-		uint32_t dataIndex = HashFunc::hash( key, keySize ) % this->k;
+		unsigned int hashValue = HashFunc::hash( key, keySize );
+		uint32_t dataIndex = hashValue % this->k;
+#ifdef USE_CONSISTENT_HASHING
 		uint32_t listIndex = this->listRing.get( key, keySize );
+#else
+		uint32_t listIndex = HashFunc::hash( ( char * ) &hashValue, sizeof( hashValue ) ) % this->numLists;
+#endif
 		T **ret = this->lists[ listIndex ];
 
 		if ( dataIndexPtr )
@@ -162,7 +173,11 @@ public:
 	}
 
 	unsigned int getByHash( unsigned int hashValue, T **data, T **parity ) {
+#ifdef USE_CONSISTENT_HASHING
 		uint32_t listIndex = this->listRing.get( hashValue );
+#else
+		uint32_t listIndex = HashFunc::hash( ( char * ) &hashValue, sizeof( hashValue ) ) % this->numLists;
+#endif
 		T **ret = this->lists[ listIndex ];
 
 		for ( uint32_t i = 0; i < this->n - this->k; i++ )
@@ -268,10 +283,6 @@ public:
 		return this->numLists;
 	}
 
-	std::map<unsigned int, uint32_t> getRing() {
-		return this->listRing.getRing();
-	}
-
 	void print( FILE *f = stdout ) {
 		uint32_t i, j;
 		bool first;
@@ -311,9 +322,11 @@ public:
 
 		fprintf( f, "\n\n" );
 
+#ifdef USE_CONSISTENT_HASHING
 		this->listRing.print( f );
 
 		fprintf( f, "\n" );
+#endif
 	}
 
 	~StripeList() {
