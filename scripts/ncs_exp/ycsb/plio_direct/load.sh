@@ -21,7 +21,7 @@ elif [ $ID == 9 ]; then
 fi
 
 ${YCSB_PATH}/bin/ycsb \
-	load plioplio_direct \
+	load plio_direct \
 	-s \
 	-P ${YCSB_PATH}/workloads/workloada \
 	-p fieldcount=1 \
