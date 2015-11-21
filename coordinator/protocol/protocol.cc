@@ -349,7 +349,7 @@ char *CoordinatorProtocol::reqReleaseDegradedLock( size_t &size, uint32_t id, st
 	return this->buffer.send;
 }
 
-char *CoordinatorProtocol::resRemappingSetLock( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t chunkId, bool isRemapped, uint8_t keySize, char *key ) {
+char *CoordinatorProtocol::resRemappingSetLock( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t chunkId, bool isRemapped, uint8_t keySize, char *key, uint32_t sockfd ) {
 	size = this->generateRemappingLockHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_MASTER,
@@ -359,7 +359,8 @@ char *CoordinatorProtocol::resRemappingSetLock( size_t &size, uint32_t id, bool 
 		chunkId,
 		isRemapped,
 		keySize,
-		key
+		key,
+		sockfd
 	);
 	return this->buffer.send;
 }
