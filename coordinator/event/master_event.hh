@@ -1,6 +1,7 @@
 #ifndef __COORDINATOR_EVENT_MASTER_EVENT_HH__
 #define __COORDINATOR_EVENT_MASTER_EVENT_HH__
 
+#include <climits>
 #include <set>
 #include "../socket/master_socket.hh"
 #include "../../common/ds/key.hh"
@@ -53,6 +54,7 @@ public:
 			uint32_t listId;
 			uint32_t chunkId;
 			uint32_t isRemapped;
+			uint32_t sockfd;
 			std::vector<Packet*> *syncPackets;
 		} remap;
 		struct {
@@ -94,7 +96,8 @@ public:
 	// REMAPPING_SET_LOCK
 	void resRemappingSetLock(
 		MasterSocket *socket, uint32_t id, bool isRemapped,
-		Key &key, RemappingRecord &remappingRecord, bool success
+		Key &key, RemappingRecord &remappingRecord, bool success,
+		uint32_t sockfd = UINT_MAX
 	);
 	// Remapping Records
 	void syncRemappingRecords(

@@ -16,7 +16,7 @@ void MasterEvent::reqPushLoadStats( MasterSocket *socket, ArrayMap<struct sockad
 	this->message.slaveLoading.overloadedSlaveSet = overloadedSlaveSet;
 }
 
-void MasterEvent::resRemappingSetLock( MasterSocket *socket, uint32_t id, bool isRemapped, Key &key, RemappingRecord &remappingRecord, bool success ) {
+void MasterEvent::resRemappingSetLock( MasterSocket *socket, uint32_t id, bool isRemapped, Key &key, RemappingRecord &remappingRecord, bool success, uint32_t sockfd ) {
 	this->type = success ? MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_SUCCESS : MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_FAILURE;
 	this->id = id;
 	this->socket = socket;
@@ -24,6 +24,7 @@ void MasterEvent::resRemappingSetLock( MasterSocket *socket, uint32_t id, bool i
 	this->message.remap.listId = remappingRecord.listId;
 	this->message.remap.chunkId = remappingRecord.chunkId;
 	this->message.remap.isRemapped = isRemapped;
+	this->message.remap.sockfd = sockfd;
 }
 
 void MasterEvent::switchPhase( bool toRemap, std::set<struct sockaddr_in> slaves ) {

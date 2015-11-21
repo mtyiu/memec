@@ -87,7 +87,7 @@ char *SlaveProtocol::resSet( size_t &size, uint32_t id, bool success, uint8_t ke
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::resRemappingSet( size_t &size, bool toMaster, uint32_t id, bool success, uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key ) {
+char *SlaveProtocol::resRemappingSet( size_t &size, bool toMaster, uint32_t id, bool success, uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key, uint32_t sockfd, bool remapped ) {
 	size = this->generateRemappingLockHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 		toMaster ? PROTO_MAGIC_TO_MASTER : PROTO_MAGIC_TO_SLAVE,
@@ -95,9 +95,10 @@ char *SlaveProtocol::resRemappingSet( size_t &size, bool toMaster, uint32_t id, 
 		id,
 		listId,
 		chunkId,
-		true, // TODO whether this is a true remapped key
+		remapped, // TODO whether this is a true remapped key
 		keySize,
-		key
+		key,
+		sockfd
 	);
 	return this->buffer.send;
 }

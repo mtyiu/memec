@@ -30,7 +30,7 @@ public:
 	// SET
 	char *resSet( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key );
 	// REMAPPING_SET
-	char *resRemappingSet( size_t &size, bool toMaster, uint32_t id, bool success, uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key );
+	char *resRemappingSet( size_t &size, bool toMaster, uint32_t id, bool success, uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key, uint32_t sockfd = UINT_MAX, bool remapped = false );
 	// GET
 	char *resGet( size_t &size, uint32_t id, bool success, bool isDegraded, uint8_t keySize, char *key, uint32_t valueSize = 0, char *value = 0, bool toMaster = true );
 	// UPDATE

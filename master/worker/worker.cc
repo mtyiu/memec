@@ -1040,7 +1040,8 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 		buffer.size, requestId,
 		remappedListId, remappedChunkId,
 		NO_REMAPPING ? false : true,
-		header.key, header.keySize
+		header.key, header.keySize,
+		sockfd
 	);
 
 	for( uint32_t i = 0; i < Master::getInstance()->sockets.coordinators.size(); i++ ) {
@@ -1820,7 +1821,8 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 		remappingRecord.listId, remappingRecord.chunkId, false,
 		key.data, key.size,
 		value->data, value->size,
-		packet->data
+		packet->data,
+		header.sockfd, header.isRemapped
 	);
 	packet->size = s;
 	delete value;
@@ -1949,13 +1951,19 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 		// find the data slave socket (and the counter embedded)
 		SlaveSocket* slaveSocket = this->getSlaves( originalListId, originalChunkId );
 		if ( slaveSocket ) {
-			int sockfd = slaveSocket->getSocket();
-			if ( NO_REMAPPING ) {
-				MasterWorker::slaveSockets->get( sockfd )->counter.decreaseLockOnly();
-			} else {
+			int sockfd = header.sockfd;
+			if ( header.isRemapped ) {
 				MasterWorker::slaveSockets->get( sockfd )->counter.decreaseRemapping();
+			} else {
+				MasterWorker::slaveSockets->get( sockfd )->counter.decreaseLockOnly();
 			}
-			Master::getInstance()->remapMsgHandler.ackRemap( slaveSocket->getAddr() );
+			//int sockfd = slaveSocket->getSocket();
+			//if ( NO_REMAPPING ) {
+			//	MasterWorker::slaveSockets->get( sockfd )->counter.decreaseLockOnly();
+			//} else {
+			//	MasterWorker::slaveSockets->get( sockfd )->counter.decreaseRemapping();
+			//}
+			//Master::getInstance()->remapMsgHandler.ackRemap( slaveSocket->getAddr() );
 		} else {
 			// TODO slave not found within a stripe list, is the stripe list deleted?
 		}
