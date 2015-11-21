@@ -52,7 +52,10 @@ public:
 		struct {
 			Key key;
 			uint8_t opcode;
-			uint32_t listId, chunkId;
+			uint32_t listId;
+			uint32_t chunkId;
+			uint32_t sockfd;
+			bool isRemapped;
 		} remap;
 	} message;
 
@@ -64,7 +67,7 @@ public:
 	// SET
 	void resSet( MasterSocket *socket, uint32_t id, Key &key, bool success );
 	// REMAPPING_SET
-	void resRemappingSet( MasterSocket *socket, uint32_t id, Key &key, uint32_t listId, uint32_t chunkId, bool success, bool needsFree );
+	void resRemappingSet( MasterSocket *socket, uint32_t id, Key &key, uint32_t listId, uint32_t chunkId, bool success, bool needsFree, uint32_t sockfd, bool remapped );
 	// UPDATE
 	void resUpdate( MasterSocket *socket, uint32_t id, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool success, bool needsFree, bool isDegraded );
 	// DELETE

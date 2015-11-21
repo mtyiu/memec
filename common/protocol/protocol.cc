@@ -1065,15 +1065,16 @@ bool Protocol::parseChunkUpdateHeader( struct ChunkUpdateHeader &header, bool wi
 ///////////////
 // Remapping //
 ///////////////
-size_t Protocol::generateRemappingLockHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t chunkId, bool isRemapped, uint8_t keySize, char *key ) {
+size_t Protocol::generateRemappingLockHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t chunkId, bool isRemapped, uint8_t keySize, char *key, uint32_t sockfd ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_REMAPPING_LOCK_SIZE + keySize, id );
 
 	*( ( uint32_t * )( buf     ) ) = htonl( listId );
 	*( ( uint32_t * )( buf + 4 ) ) = htonl( chunkId );
-	buf[ 8 ] = isRemapped ? 1 : 0;
-	bytes += 9;
-	buf += 9;
+	*( ( uint32_t * )( buf + 8 ) ) = htonl( sockfd );
+	buf[ 12 ] = isRemapped ? 1 : 0;
+	bytes += 13;
+	buf += 13;
 
 	buf[ 0 ] = keySize;
 	bytes++;
@@ -1085,15 +1086,16 @@ size_t Protocol::generateRemappingLockHeader( uint8_t magic, uint8_t to, uint8_t
 	return bytes;
 }
 
-bool Protocol::parseRemappingLockHeader( size_t offset, uint32_t &listId, uint32_t &chunkId, bool &isRemapped, uint8_t &keySize, char *&key, char *buf, size_t size ) {
+bool Protocol::parseRemappingLockHeader( size_t offset, uint32_t &listId, uint32_t &chunkId, bool &isRemapped, uint8_t &keySize, char *&key, char *buf, size_t size, uint32_t &sockfd ) {
 	if ( size - offset < PROTO_REMAPPING_LOCK_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
 	listId  = ntohl( *( ( uint32_t * )( ptr      ) ) );
 	chunkId = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
-	isRemapped = ( ptr[ 8 ] != 0 );
-	keySize = *( ptr + 9 );
+	sockfd = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
+	isRemapped = ( ptr[ 12 ] != 0 );
+	keySize = *( ptr + 13 );
 
 	if ( size - offset < ( size_t ) PROTO_REMAPPING_LOCK_SIZE + keySize )
 		return false;
@@ -1115,19 +1117,22 @@ bool Protocol::parseRemappingLockHeader( struct RemappingLockHeader &header, cha
 		header.isRemapped,
 		header.keySize,
 		header.key,
-		buf, size
+		buf, size,
+		header.sockfd
 	);
 }
 
-size_t Protocol::generateRemappingSetHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t chunkId, bool needsForwarding, uint8_t keySize, char *key, uint32_t valueSize, char *value, char *sendBuf ) {
+size_t Protocol::generateRemappingSetHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t chunkId, bool needsForwarding, uint8_t keySize, char *key, uint32_t valueSize, char *value, char *sendBuf, uint32_t sockfd, bool remapped ) {
 	if ( ! sendBuf ) sendBuf = this->buffer.send;
 	char *buf = sendBuf + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_REMAPPING_SET_SIZE + keySize + valueSize, id, sendBuf );
 
 	*( ( uint32_t * )( buf     ) ) = htonl( listId );
 	*( ( uint32_t * )( buf + 4 ) ) = htonl( chunkId );
-	bytes += 8;
-	buf += 8;
+	*( ( uint32_t * )( buf + 8 ) ) = htonl( sockfd );
+	buf[ 12 ] = remapped;
+	bytes += 13;
+	buf += 13;
 
 	unsigned char *tmp;
 	valueSize = htonl( valueSize );
@@ -1151,7 +1156,7 @@ size_t Protocol::generateRemappingSetHeader( uint8_t magic, uint8_t to, uint8_t 
 	return bytes;
 }
 
-bool Protocol::parseRemappingSetHeader( size_t offset, uint32_t &listId, uint32_t &chunkId, bool &needsForwarding, uint8_t &keySize, char *&key, uint32_t &valueSize, char *&value, char *buf, size_t size ) {
+bool Protocol::parseRemappingSetHeader( size_t offset, uint32_t &listId, uint32_t &chunkId, bool &needsForwarding, uint8_t &keySize, char *&key, uint32_t &valueSize, char *&value, char *buf, size_t size, uint32_t &sockfd, bool &remapped ) {
 	if ( size - offset < PROTO_REMAPPING_SET_SIZE )
 		return false;
 
@@ -1159,9 +1164,11 @@ bool Protocol::parseRemappingSetHeader( size_t offset, uint32_t &listId, uint32_
 	unsigned char *tmp;
 	listId  = ntohl( *( ( uint32_t * )( ptr      ) ) );
 	chunkId = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
-	needsForwarding = *( ptr + 8 );
-	keySize = *( ptr + 9 );
-	ptr += 10;
+	sockfd = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
+	remapped = *( ptr + 12 );
+	needsForwarding = *( ptr + 13 );
+	keySize = *( ptr + 14 );
+	ptr += 15;
 
 	valueSize = 0;
 	tmp = ( unsigned char * ) &valueSize;
@@ -1194,7 +1201,9 @@ bool Protocol::parseRemappingSetHeader( struct RemappingSetHeader &header, char 
 		header.key,
 		header.valueSize,
 		header.value,
-		buf, size
+		buf, size,
+		header.sockfd,
+		header.remapped
 	);
 }
 

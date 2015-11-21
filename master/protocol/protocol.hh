@@ -33,8 +33,8 @@ public:
 	// SET
 	char *reqSet( size_t &size, uint32_t id, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf = 0 );
 	// Remapping SET
-	char *reqRemappingSetLock( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, bool isRemapped, char *key, uint8_t keySize );
-	char *reqRemappingSet( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, bool needsForwarding, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf = 0 );
+	char *reqRemappingSetLock( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, bool isRemapped, char *key, uint8_t keySize, uint32_t sockfd = UINT_MAX );
+	char *reqRemappingSet( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, bool needsForwarding, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf = 0, uint32_t sockfd = UINT_MAX, bool remapped = false );
 	// GET
 	char *reqGet( size_t &size, uint32_t id, char *key, uint8_t keySize );
 	char *reqDegradedGet( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isSealed, char *key, uint8_t keySize );

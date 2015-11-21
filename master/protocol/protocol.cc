@@ -180,7 +180,7 @@ char *MasterProtocol::reqSet( size_t &size, uint32_t id, char *key, uint8_t keyS
 	return buf;
 }
 
-char *MasterProtocol::reqRemappingSetLock( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, bool isRemapped, char *key, uint8_t keySize ) {
+char *MasterProtocol::reqRemappingSetLock( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, bool isRemapped, char *key, uint8_t keySize, uint32_t sockfd ) {
 	size = this->generateRemappingLockHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_COORDINATOR,
@@ -190,12 +190,13 @@ char *MasterProtocol::reqRemappingSetLock( size_t &size, uint32_t id, uint32_t l
 		chunkId,
 		isRemapped,
 		keySize,
-		key
+		key,
+		sockfd
 	);
 	return this->buffer.send;
 }
 
-char *MasterProtocol::reqRemappingSet( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, bool needsForwarding, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf ) {
+char *MasterProtocol::reqRemappingSet( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, bool needsForwarding, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf, uint32_t sockfd, bool remapped ) {
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateRemappingSetHeader(
 		PROTO_MAGIC_REQUEST,
@@ -209,7 +210,9 @@ char *MasterProtocol::reqRemappingSet( size_t &size, uint32_t id, uint32_t listI
 		key,
 		valueSize,
 		value,
-		buf
+		buf,
+		sockfd,
+		remapped
 	);
 	return buf;
 }

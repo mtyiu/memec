@@ -86,6 +86,7 @@
  ***********************/
  #define MAXIMUM_VALUE_SIZE 16777215
 
+#include <climits>
 #include <vector>
 #include <unordered_map>
 #include <unordered_set>
@@ -234,19 +235,22 @@ struct ChunkUpdateHeader {
 ///////////////
 // Remapping //
 ///////////////
-#define PROTO_REMAPPING_LOCK_SIZE 10
+#define PROTO_REMAPPING_LOCK_SIZE 14
 struct RemappingLockHeader {
 	uint32_t listId;
 	uint32_t chunkId;
+	uint32_t sockfd;
 	bool isRemapped;
 	uint8_t keySize;
 	char *key;
 };
 
-#define PROTO_REMAPPING_SET_SIZE 13
+#define PROTO_REMAPPING_SET_SIZE 18
 struct RemappingSetHeader {
 	uint32_t listId;
 	uint32_t chunkId;
+	uint32_t sockfd;
+	bool remapped;
 	bool needsForwarding;
 	uint8_t keySize;
 	uint32_t valueSize; // 3 bytes
@@ -569,25 +573,27 @@ protected:
 	size_t generateRemappingLockHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
 		uint32_t listId, uint32_t chunkId, bool isRemapped,
-		uint8_t keySize, char *key
+		uint8_t keySize, char *key, uint32_t sockfd = UINT_MAX
 	);
 	bool parseRemappingLockHeader(
 		size_t offset, uint32_t &listId, uint32_t &chunkId,
 		bool &isRemapped, uint8_t &keySize, char *&key,
-		char *buf, size_t size
+		char *buf, size_t size, uint32_t &sockfd
 	);
 
 	size_t generateRemappingSetHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
 		uint32_t listId, uint32_t chunkId, bool needsForwarding,
 		uint8_t keySize, char *key,
-		uint32_t valueSize, char *value, char *sendBuf = 0
+		uint32_t valueSize, char *value, char *sendBuf = 0,
+		uint32_t sockfd = UINT_MAX, bool remapped = false
 	);
 	bool parseRemappingSetHeader(
 		size_t offset, uint32_t &listId, uint32_t &chunkId,
 		bool &needsForwarding, uint8_t &keySize, char *&key,
 		uint32_t &valueSize, char *&value,
-		char *buf, size_t size
+		char *buf, size_t size,
+		uint32_t &sockfd, bool &remapped
 	);
 
 	size_t generateRedirectHeader(

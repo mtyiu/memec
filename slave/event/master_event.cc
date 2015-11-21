@@ -29,7 +29,7 @@ void MasterEvent::resSet( MasterSocket *socket, uint32_t id, Key &key, bool succ
 	this->message.key = key;
 }
 
-void MasterEvent::resRemappingSet( MasterSocket *socket, uint32_t id, Key &key, uint32_t listId, uint32_t chunkId, bool success, bool needsFree ) {
+void MasterEvent::resRemappingSet( MasterSocket *socket, uint32_t id, Key &key, uint32_t listId, uint32_t chunkId, bool success, bool needsFree, uint32_t sockfd, bool remapped ) {
 	this->type = success ? MASTER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS : MASTER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE;
 	this->id = id;
 	this->needsFree = needsFree;
@@ -37,6 +37,8 @@ void MasterEvent::resRemappingSet( MasterSocket *socket, uint32_t id, Key &key, 
 	this->message.remap.key = key;
 	this->message.remap.listId = listId;
 	this->message.remap.chunkId = chunkId;
+	this->message.remap.sockfd = sockfd;
+	this->message.remap.isRemapped = remapped;
 }
 
 void MasterEvent::resUpdate( MasterSocket *socket, uint32_t id, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool success, bool needsFree, bool isDegraded ) {

@@ -322,7 +322,9 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 				event.message.remap.listId,
 				event.message.remap.chunkId,
 				event.message.remap.key.size,
-				event.message.remap.key.data
+				event.message.remap.key.data,
+				event.message.remap.sockfd,
+				event.message.remap.isRemapped
 			);
 
 			if ( event.needsFree )
@@ -1138,7 +1140,7 @@ bool SlaveWorker::handleReleaseDegradedLockRequest( CoordinatorEvent event, char
 	ChunkRequest chunkRequest;
 	std::vector<Metadata> chunks;
 	SlavePeerEvent slavePeerEvent;
-	SlavePeerSocket *socket;
+	SlavePeerSocket *socket = NULL;
 	Chunk *chunk;
 
 	while( size ) {
@@ -1416,6 +1418,7 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 		Packet *packet = SlaveWorker::packetPool->malloc();
 		packet->setReferenceCount( SlaveWorker::parityChunkCount );
 
+		// TODO : add (sockfd, isRemapped) to forwarded SET requests
 		size_t size;
 		this->protocol.reqRemappingSet(
 			size, requestId,
@@ -1451,7 +1454,7 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 	} else {
 		Key key;
 		key.set( header.keySize, header.key );
-		event.resRemappingSet( event.socket, event.id, key, header.listId, header.chunkId, true, false );
+		event.resRemappingSet( event.socket, event.id, key, header.listId, header.chunkId, true, false, header.sockfd, header.remapped );
 		this->dispatch( event );
 	}
 
@@ -1524,7 +1527,8 @@ bool SlaveWorker::handleRemappingSetResponse( SlavePeerEvent event, bool success
 
 		masterEvent.resRemappingSet(
 			( MasterSocket * ) pid.ptr, pid.id, record.key,
-			record.remap.listId, record.remap.chunkId, success, true
+			record.remap.listId, record.remap.chunkId, success, true,
+			header.sockfd, header.isRemapped
 		);
 		SlaveWorker::eventQueue->insert( masterEvent );
 	}
