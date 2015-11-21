@@ -17,11 +17,11 @@ echo "Running experiment with coding scheme = $c and thread count = $t..."
 if [ $w == "load" ]; then
 	echo "-------------------- Load (workloada) --------------------"
 	# ${BASE_PATH}/scripts/ycsb/plio/load.sh $t 2>&1 | tee ${BASE_PATH}/results/workloads/$c/$t/load.txt
-	${BASE_PATH}/scripts/ycsb/tachyon/load.sh $t 2>&1 | tee ${BASE_PATH}/results/workloads/$c/$t/load.txt
+	${BASE_PATH}/scripts/ycsb/tachyon/load.sh $t ${BASE_PATH}/results/workloads/$c/$t/load.csv 2>&1 | tee ${BASE_PATH}/results/workloads/$c/$t/load.txt
 else
 	echo "-------------------- Run ($w) --------------------"
 	# ${BASE_PATH}/scripts/ycsb/plio/run.sh $t $w 2>&1 | tee ${BASE_PATH}/results/workloads/$c/$t/$w.txt
-	${BASE_PATH}/scripts/ycsb/tachyon/run.sh $t $w 2>&1 | tee ${BASE_PATH}/results/workloads/$c/$t/$w.txt
+	${BASE_PATH}/scripts/ycsb/tachyon/run.sh $t $w ${BASE_PATH}/results/workloads/$c/$t/$w.csv 2>&1 | tee ${BASE_PATH}/results/workloads/$c/$t/$w.txt
 fi
 
 # Tell the control node that this iteration is finished

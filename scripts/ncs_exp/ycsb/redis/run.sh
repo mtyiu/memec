@@ -3,7 +3,7 @@
 YCSB_PATH=~/mtyiu/ycsb/0.3.0
 
 if [ $# != 2 ]; then
-	echo "Usage: $0 [Number of threads] [Workload]"
+	echo "Usage: $0 [Number of threads] [Workload] [Output file of raw datapoints]"
 	exit 1
 fi
 
@@ -23,6 +23,8 @@ ${YCSB_PATH}/bin/ycsb \
 	-p recordcount=${RECORD_COUNT} \
 	-p operationcount=${OPERATION_COUNT} \
 	-p threadcount=$1 \
+	-p measurementtype=raw \
+	-p measurement.raw.output_file = $3 \
 	-p histogram.buckets=200000 \
 	-p redis.serverCount=16 \
 	-p redis.host0=192.168.0.22 \
