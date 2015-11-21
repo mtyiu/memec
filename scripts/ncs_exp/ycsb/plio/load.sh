@@ -2,7 +2,7 @@
 
 YCSB_PATH=~/mtyiu/ycsb/0.3.0
 
-if [ $# != 2 ]; then
+if [ $# != 1 ]; then
 	echo "Usage: $0 [Number of threads] [Output file of raw datapoints]"
 	exit 1
 fi
@@ -34,8 +34,6 @@ ${YCSB_PATH}/bin/ycsb \
 	-p insertstart=${INSERT_START} \
 	-p insertcount=${INSERT_COUNT} \
 	-p threadcount=$1 \
-	-p measurementtype=raw \
-	-p measurement.raw.output_file=$2 \
 	-p histogram.buckets=200000 \
 	-p plio.host=$(hostname -I | xargs) \
 	-p plio.port=9112 \
