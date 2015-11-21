@@ -35,5 +35,5 @@ ${YCSB_PATH}/bin/ycsb \
 	-p insertcount=${INSERT_COUNT} \
 	-p threadcount=$1 \
 	-p measurementtype=raw \
-	-p measurement.raw.output_file = $2 \
+	-p measurement.raw.output_file=$2 \
 	-p uri=tachyon://192.168.0.11:19998

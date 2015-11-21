@@ -35,7 +35,7 @@ ${YCSB_PATH}/bin/ycsb \
 	-p insertcount=${INSERT_COUNT} \
 	-p threadcount=$1 \
 	-p measurementtype=raw \
-	-p measurement.raw.output_file = $2 \
+	-p measurement.raw.output_file=$2 \
 	-p histogram.buckets=200000 \
 	-p redis.serverCount=16 \
 	-p redis.host0=192.168.0.22 \

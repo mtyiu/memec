@@ -24,7 +24,7 @@ ${YCSB_PATH}/bin/ycsb \
 	-p operationcount=${OPERATION_COUNT} \
 	-p threadcount=$1 \
 	-p measurementtype=raw \
-	-p measurement.raw.output_file = $3 \
+	-p measurement.raw.output_file=$3 \
 	-p histogram.buckets=200000 \
 	-p plio.host=$(hostname -I | xargs) \
 	-p plio.port=9112 \

@@ -24,7 +24,7 @@ ${YCSB_PATH}/bin/ycsb \
 	-p operationcount=${OPERATION_COUNT} \
 	-p threadcount=$1 \
 	-p measurementtype=raw \
-	-p measurement.raw.output_file = $3 \
+	-p measurement.raw.output_file=$3 \
 	-p histogram.buckets=200000 \
 	-p redis.serverCount=16 \
 	-p redis.host0=192.168.0.22 \
