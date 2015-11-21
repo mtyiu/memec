@@ -57,7 +57,33 @@ public:
 		LOCK_INIT( &this->remapLock );
 	}
 
-	bool findValueByKey( char *data, uint8_t size, KeyValue *keyValue, Key *keyPtr = 0, KeyMetadata *keyMetadataPtr = 0, Metadata *metadataPtr = 0, Chunk **chunkPtr = 0, bool needsLock = true, bool needsUnlock = true ) {
+	bool findValueByKey( char *data, uint8_t size, KeyValue *keyValue, Key *keyPtr ) {
+		std::unordered_map<Key, KeyMetadata>::iterator keysIt;
+		std::unordered_map<Metadata, Chunk *>::iterator cacheIt;
+		Key key;
+
+		if ( keyValue )
+			keyValue->clear();
+		key.set( size, data );
+
+		if ( needsLock ) LOCK( &this->keysLock );
+		keysIt = this->keys.find( key );
+		if ( keysIt == this->keys.end() ) {
+			if ( needsUnlock ) UNLOCK( &this->keysLock );
+			if ( keyPtr ) *keyPtr = key;
+			return false;
+		}
+
+		if ( keyPtr ) *keyPtr = keysIt->first;
+		if ( needsUnlock ) UNLOCK( &this->keysLock );
+
+		Chunk *chunk = ( char * ) keysIt->second.ptr;
+		if ( keyValue )
+			*keyValue = chunk->getKeyValue( keysIt->second.offset );
+		return true;
+	}
+
+	bool findValueByKey( char *data, uint8_t size, KeyValue *keyValue, Key *keyPtr, KeyMetadata *keyMetadataPtr, Metadata *metadataPtr, Chunk **chunkPtr, bool needsLock = true, bool needsUnlock = true ) {
 		std::unordered_map<Key, KeyMetadata>::iterator keysIt;
 		std::unordered_map<Metadata, Chunk *>::iterator cacheIt;
 		Key key;

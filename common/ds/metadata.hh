@@ -75,6 +75,7 @@ namespace std {
 class KeyMetadata : public Metadata {
 public:
 	uint32_t offset, length;
+	char *ptr;
 };
 
 class OpMetadata : public Metadata {
