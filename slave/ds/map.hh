@@ -66,18 +66,18 @@ public:
 			keyValue->clear();
 		key.set( size, data );
 
-		if ( needsLock ) LOCK( &this->keysLock );
+		LOCK( &this->keysLock );
 		keysIt = this->keys.find( key );
 		if ( keysIt == this->keys.end() ) {
-			if ( needsUnlock ) UNLOCK( &this->keysLock );
+			UNLOCK( &this->keysLock );
 			if ( keyPtr ) *keyPtr = key;
 			return false;
 		}
 
 		if ( keyPtr ) *keyPtr = keysIt->first;
-		if ( needsUnlock ) UNLOCK( &this->keysLock );
+		UNLOCK( &this->keysLock );
 
-		Chunk *chunk = ( char * ) keysIt->second.ptr;
+		Chunk *chunk = ( Chunk * ) keysIt->second.ptr;
 		if ( keyValue )
 			*keyValue = chunk->getKeyValue( keysIt->second.offset );
 		return true;
