@@ -1,10 +1,7 @@
 package edu.cuhk.cse.plio;
 
-import java.util.Scanner;
-import java.util.TreeMap;
+import java.util.HashMap;
 import java.util.Random;
-import java.util.Map;
-import java.util.Set;
 
 public class Main implements Runnable {
 	/* Configuration */
@@ -27,7 +24,8 @@ public class Main implements Runnable {
 	/* Instance variables */
 	private int id;
 	private PLIO plio;
-	private TreeMap<String, Integer> map;
+	private String[] keys;
+	private HashMap<String, Integer> map;
 	private Random random;
 	public long[] size;
 	public long[] count;
@@ -35,7 +33,7 @@ public class Main implements Runnable {
 	public Main( int id, int fromId, int toId ) {
 		this.id = id;
 		this.plio = new PLIO( Main.keySize, Main.chunkSize, Main.host, Main.port, fromId, toId );
-		this.map = new TreeMap<String, Integer>();
+		this.map = new HashMap<String, Integer>();
 		this.random = new Random();
 		this.size = new long[ 3 ];
 		this.count = new long[ 3 ];
@@ -111,13 +109,18 @@ public class Main implements Runnable {
 						this.count[ 0 ]++;
 					}
 				}
+
+				i = 0;
+				this.keys = new String[ this.map.size() ];
+				for ( String k : this.map.keySet() ) {
+					this.keys[ i++ ] = k;
+				}
+
 				Main.complete( this.id );
 				phase = 2;
 			} else if ( phase == 2 ) {
 				int index;
 				int removeTarget;
-				Object[] entries;
-				Map.Entry<String, Integer> entry;
 
 				switch( Main.workload ) {
 					case 1:
@@ -142,7 +145,10 @@ public class Main implements Runnable {
 
 				while ( this.count[ 1 ] < removeTarget ) {
 					// Select a key to delete
-					key = this.map.firstKey();
+					do {
+						index = this.random.nextInt( this.keys.length );
+						key = this.keys[ index ];
+					} while ( key == null );
 					valueSize = this.map.get( key );
 
 					// Perform DELETE operation
@@ -150,15 +156,16 @@ public class Main implements Runnable {
 
 					if ( ret ) {
 						// Update internal key-value map
+						this.keys[ index ] = null;
 						this.map.remove( key );
 
 						// Update counter
 						this.size[ 1 ] += key.length() + valueSize;
 						this.count[ 1 ]++;
 					}
-					entries = null;
-					entry = null;
 				}
+
+				this.keys = null;
 				Main.complete( this.id );
 				phase = 3;
 			} else if ( phase == 3 ) {
