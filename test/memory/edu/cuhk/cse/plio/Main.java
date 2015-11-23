@@ -1,7 +1,7 @@
 package edu.cuhk.cse.plio;
 
 import java.util.Scanner;
-import java.util.HashMap;
+import java.util.TreeMap;
 import java.util.Random;
 import java.util.Map;
 import java.util.Set;
@@ -27,7 +27,7 @@ public class Main implements Runnable {
 	/* Instance variables */
 	private int id;
 	private PLIO plio;
-	private HashMap<String, Integer> map;
+	private TreeMap<String, Integer> map;
 	private Random random;
 	public long[] size;
 	public long[] count;
@@ -35,7 +35,7 @@ public class Main implements Runnable {
 	public Main( int id, int fromId, int toId ) {
 		this.id = id;
 		this.plio = new PLIO( Main.keySize, Main.chunkSize, Main.host, Main.port, fromId, toId );
-		this.map = new HashMap<String, Integer>();
+		this.map = new TreeMap<String, Integer>();
 		this.random = new Random();
 		this.size = new long[ 3 ];
 		this.count = new long[ 3 ];
@@ -142,11 +142,8 @@ public class Main implements Runnable {
 
 				while ( this.count[ 1 ] < removeTarget ) {
 					// Select a key to delete
-					index = this.random.nextInt( this.map.size() );
-					entries = this.map.entrySet().toArray();
-					entry = ( Map.Entry<String, Integer> ) entries[ index ];
-					key = entry.getKey();
-					valueSize = entry.getValue();
+					key = this.map.firstKey();
+					valueSize = this.map.get( key );
 
 					// Perform DELETE operation
 					ret = plio.delete( key );
