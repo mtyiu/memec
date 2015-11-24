@@ -298,6 +298,9 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 		//remapMsgHandler.listAliveSlaves();
 	}
 
+	/* Smoothing factor */
+	Latency::smoothingFactor = this->config.global.remap.smoothingFactor;
+
 	/* Loading statistics update */
 	uint32_t sec, msec;
 	if ( this->config.master.loadingStats.updateInterval > 0 ) {

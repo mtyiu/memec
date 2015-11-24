@@ -8,7 +8,8 @@
 
 class Latency {
 public:
-	
+	static double smoothingFactor;
+
 	uint32_t sec;
 	uint32_t nsec;
 

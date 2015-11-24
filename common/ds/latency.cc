@@ -6,7 +6,7 @@
 #define GIGA		( ( double ) 1000 * 1000 * 1000 )
 #define PRECENTILE	( ( double ) 0.9 )
 
-#define SMOOTHING_FACTOR		( ( double ) 0.2 )
+double Latency::smoothingFactor = 0.2;
 
 Latency::Latency() {
 	this->sec = 0;
@@ -24,7 +24,7 @@ void Latency::set( double sec, double nsec ) {
 	if ( this->nsec > GIGA ) {
 		this->sec += 1;
 		this->nsec -= GIGA;
-	} 
+	}
 }
 
 void Latency::set( struct timespec latency ) {
@@ -42,7 +42,7 @@ void Latency::set( std::set< Latency > latencies ) {
 	uint32_t setSize = latencies.size();
 	uint32_t precentileIndex = ( uint32_t ) setSize * PRECENTILE;
 	std::set< Latency >::iterator it = latencies.begin();
-	for ( uint32_t i = 0; i < precentileIndex; i++ ) 
+	for ( uint32_t i = 0; i < precentileIndex; i++ )
 		it++;
 	this->set( *it );
 }
@@ -57,8 +57,9 @@ void Latency::aggregate( Latency *l ) {
 		this->set ( *l );
 
 	// EWMA
-	this->sec = this->sec * ( 1 - SMOOTHING_FACTOR ) + l->sec * ( SMOOTHING_FACTOR );
-	this->nsec = this->nsec * ( 1 - SMOOTHING_FACTOR ) + l->nsec * ( SMOOTHING_FACTOR );
+	printf( "smoothingFactor = %f\n", Latency::smoothingFactor );
+	this->sec = this->sec * ( 1 - Latency::smoothingFactor ) + l->sec * ( Latency::smoothingFactor );
+	this->nsec = this->nsec * ( 1 - Latency::smoothingFactor ) + l->nsec * ( Latency::smoothingFactor );
 	if ( this->nsec > GIGA ) {
 		this->sec += 1;
 		this->nsec -= GIGA;

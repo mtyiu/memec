@@ -59,6 +59,8 @@ bool GlobalConfig::set( const char *section, const char *name, const char *value
 			this->remap.overloadThreshold = atoi( value ) / 100.0;
 			if ( this->remap.overloadThreshold <= 1 )
 				return false;
+		} else if ( match( name, "smoothingFactor" ) ) {
+			this->remap.smoothingFactor = atof( value );
 		} else
 			return false;
 	} else if ( match( section, "buffer" ) ) {

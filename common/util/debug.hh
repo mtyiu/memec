@@ -17,11 +17,7 @@
 
 #define DEBUG_STR_BUF_SIZE	4096
 
-// #define PRINT_DEBUG_MESSAGE
-
-#ifdef PRINT_DEBUG_MESSAGE
-
-#define __DEBUG__(color, class_name, func, ...) do { \
+#define __INFO__(color, class_name, func, ...) do { \
 		int _len; \
 		char _buf[ DEBUG_STR_BUF_SIZE ]; \
 		_len = snprintf( _buf, DEBUG_STR_BUF_SIZE, "%s[%s::%s()] ", color, \
@@ -34,11 +30,6 @@
 			fprintf( stderr, "Cannot write debug message.\n" ); \
 		} \
 	} while( 0 )
-
-#define __ERROR__(class_name, func, ...) \
-	__DEBUG__(RED, class_name, func, __VA_ARGS__)
-
-#else
 
 #define __DEBUG__(color, class_name, func, ...)
 
@@ -55,7 +46,5 @@
 			fprintf( stderr, "Cannot write debug message.\n" ); \
 		} \
 	} while( 0 )
-
-#endif
 
 #endif

@@ -37,6 +37,8 @@ void Coordinator::switchPhase( std::set<struct sockaddr_in> prevOverloadedSlaves
 	uint32_t prevOverloadedSlaveCount = prevOverloadedSlaves.size();
 
 	if ( curOverloadedSlaveCount > totalSlaveCount * startThreshold ) { // Phase 1 --> 2
+		__INFO__( "YELLOW", "Coordinator", "switchPhase", "Overload detected at %lf s.", this->getElapsedTime() );
+
 		// need to start remapping now
 		if ( prevOverloadedSlaveCount > totalSlaveCount * startThreshold ) {
 			std::set<struct sockaddr_in> newOverloadedSlaves = this->overloadedSlaves.slaveSet;
@@ -309,6 +311,9 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 		UNLOCK( &this->sockets.slaves.lock );
 		//remapMsgHandler->listAliveSlaves();
 	}
+
+	/* Smoothing factor */
+	Latency::smoothingFactor = this->config.global.remap.smoothingFactor;
 
 	/* Slave Loading stats */
 	LOCK_INIT( &this->slaveLoading.lock );

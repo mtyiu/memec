@@ -33,6 +33,7 @@ public:
 		float startThreshold;
 		float stopThreshold;
 		float overloadThreshold;
+		float smoothingFactor;
 	} remap;
 	struct {
 		uint16_t chunksPerList;
