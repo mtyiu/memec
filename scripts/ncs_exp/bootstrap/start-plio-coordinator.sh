@@ -16,7 +16,7 @@ if [ $# -gt 0 ]; then
 		-p ${CONFIG_PATH} \
 		-o coordinator ${COORDINATOR_NAME} tcp://${COORDINATOR_IP}:${COORDINATOR_PORT}/"
 else
-	bin/coordinator -v \
+	bin/coordinator \
 		-p ${CONFIG_PATH} \
 		-o coordinator ${COORDINATOR_NAME} tcp://${COORDINATOR_IP}:${COORDINATOR_PORT}/
 fi
