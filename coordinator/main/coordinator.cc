@@ -37,7 +37,7 @@ void Coordinator::switchPhase( std::set<struct sockaddr_in> prevOverloadedSlaves
 	uint32_t prevOverloadedSlaveCount = prevOverloadedSlaves.size();
 
 	if ( curOverloadedSlaveCount > totalSlaveCount * startThreshold ) { // Phase 1 --> 2
-		__INFO__( "YELLOW", "Coordinator", "switchPhase", "Overload detected at %lf s.", this->getElapsedTime() );
+		__INFO__( YELLOW, "Coordinator", "switchPhase", "Overload detected at %lf s (overloaded slave = %u).", this->getElapsedTime(), curOverloadedSlaveCount );
 
 		// need to start remapping now
 		if ( prevOverloadedSlaveCount > totalSlaveCount * startThreshold ) {

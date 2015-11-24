@@ -24,9 +24,9 @@ function restore_overload {
 }
 
 function set_config {
-	sed -i "s/^smoothingFactor=.*$/smoothingFactor=$2/g" ${PLIO_PATH}/bin/config/ncs_exp/global.ini
-	sed -i "s/^updateInterval=.*$/updateInterval=$1/g" ${PLIO_PATH}/bin/config/ncs_exp/coordinator.ini
-	sed -i "s/^updateInterval=.*$/updateInterval=$1/g" ${PLIO_PATH}/bin/config/ncs_exp/master.ini
+	sed -i "s/^smoothingFactor=.*$/smoothingFactor=$1/g" ${PLIO_PATH}/bin/config/ncs_exp/global.ini
+	sed -i "s/^updateInterval=.*$/updateInterval=$2/g" ${PLIO_PATH}/bin/config/ncs_exp/coordinator.ini
+	sed -i "s/^updateInterval=.*$/updateInterval=$2/g" ${PLIO_PATH}/bin/config/ncs_exp/master.ini
 }
 
 set_overload
@@ -49,7 +49,7 @@ for smoothing_factor in 0.1 0.2 0.3 0.4 0.5; do
 			read -p "Press Enter when completed..."
 
 			for n in 3 4 8 9; do
-				ssh testbed-node$n "killall -9 ycsb"
+				ssh testbed-node$n "killall -9 python"
 			done
 
 			echo "Done"

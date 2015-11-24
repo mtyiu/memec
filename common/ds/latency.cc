@@ -57,7 +57,6 @@ void Latency::aggregate( Latency *l ) {
 		this->set ( *l );
 
 	// EWMA
-	printf( "smoothingFactor = %f\n", Latency::smoothingFactor );
 	this->sec = this->sec * ( 1 - Latency::smoothingFactor ) + l->sec * ( Latency::smoothingFactor );
 	this->nsec = this->nsec * ( 1 - Latency::smoothingFactor ) + l->nsec * ( Latency::smoothingFactor );
 	if ( this->nsec > GIGA ) {
