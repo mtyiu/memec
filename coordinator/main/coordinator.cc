@@ -327,6 +327,9 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 	}
 	statsTimer.setInterval( sec, msec );
 
+	/* Pending Remapping Record */
+	LOCK_INIT( &this->pendingRemappingRecords.toSendLock );
+
 	// Set signal handlers //
 	Signal::setHandler( Coordinator::signalHandler );
 
