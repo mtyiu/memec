@@ -39,7 +39,11 @@ for iter in {1..30}; do
 
 				pending=0
 				for n in 3 4 8 9; do
-					read -p "Pending: ${pending} / 4"
+					if [ $n == 3 ]; then
+						read -p "Pending: ${pending} / 4" -t 300
+					else
+						read -p "Pending: ${pending} / 4" -t 60
+					fi
 					pending=$(expr $pending + 1)
 				done
 			done
