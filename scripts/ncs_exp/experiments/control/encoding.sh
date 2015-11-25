@@ -5,6 +5,7 @@ PLIO_PATH=${BASE_PATH}/plio
 
 coding='raid0 raid5 rdp cauchy rs evenodd'
 threads='64'
+workloads='load workloada workloadb workloadc workloadf workloadd'
 
 for iter in {1..30}; do
 	for c in $coding; do
@@ -20,14 +21,26 @@ for iter in {1..30}; do
 			screen -S manage -p 0 -X stuff "${BASE_PATH}/scripts/util/start.sh $1$(printf '\r')"
 			sleep 30
 
-			for n in 3 4 8 9; do
-				ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/master/encoding.sh $c $t$(printf '\r')\"" &
-			done
+			for w in $workloads; do
+				if [ $w == "load" ]; then
+					echo "-------------------- Load --------------------"
+				else
+					echo "-------------------- Run ($w) --------------------"
+				fi
 
-			pending=0
-			for n in 3 4 8 9; do
-				read -p "Pending: ${pending} / 4"
-				pending=$(expr $pending + 1)
+				for n in 3 4 8 9; do
+					ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/master/encoding.sh $c $t $w $(printf '\r')\"" &
+				done
+
+				pending=0
+				echo "Start waiting at: $(date)..."
+				for n in 3 4 8 9; do
+					read -p "Pending: ${pending} / 4"
+					pending=$(expr $pending + 1)
+				done
+				echo "Done at: $(date)."
+
+				sleep 30
 			done
 
 			echo "Finished experiment with coding scheme = $c and thread count = $t..."
@@ -36,8 +49,9 @@ for iter in {1..30}; do
 			sleep 10
 
 			for n in 3 4 8 9; do
-				scp -r testbed-node$n:${BASE_PATH}/results/encoding/$c ${BASE_PATH}/results/encoding/$iter/$c/node$n
-				ssh testbed-node$n "rm -rf ${BASE_PATH}/results/encoding/$c"
+				mkdir -p ${BASE_PATH}/results/encoding/$c/$t/$iter/node$n
+				scp testbed-node$n:${BASE_PATH}/results/encoding/$c/$t/$w.txt ${BASE_PATH}/results/encoding/$c/$t/$iter/node$n
+				ssh testbed-node$n 'rm -rf ${BASE_PATH}/results/*'
 			done
 		done
 	done

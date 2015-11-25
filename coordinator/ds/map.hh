@@ -44,6 +44,13 @@ public:
 	LOCK_T degradedLocksLock;
 
 	/**
+	 * Store the set of to-be-reconstructed chunks
+	 * (list ID, stripe ID, chunk ID)
+	 */
+	std::unordered_set<Metadata> reconstructingChunks;
+ 	LOCK_T reconstructingChunksLock;
+
+	/**
 	 * Store the current stripe ID of each list.
 	 */
 	static uint32_t *stripes;
