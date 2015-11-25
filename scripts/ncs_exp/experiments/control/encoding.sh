@@ -14,8 +14,6 @@ for iter in {1..30}; do
 		sed -i "s/^scheme=.*$/scheme=$c/g" ${PLIO_PATH}/bin/config/ncs_exp/global.ini
 		${BASE_PATH}/scripts/util/rsync.sh
 
-		mkdir -p ${BASE_PATH}/results/encoding/$iter/$c
-
 		for t in $threads; do
 			echo "Running experiment with coding scheme = $c and thread count = $t..."
 			screen -S manage -p 0 -X stuff "${BASE_PATH}/scripts/util/start.sh $1$(printf '\r')"
