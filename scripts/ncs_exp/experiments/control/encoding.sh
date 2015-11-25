@@ -3,17 +3,17 @@
 BASE_PATH=${HOME}/mtyiu
 PLIO_PATH=${BASE_PATH}/plio
 
-coding='raid0 raid5 rdp cauchy rs evenodd'
+coding='raid5 rdp cauchy rs evenodd'
 threads='64'
 workloads='load workloada workloadb workloadc workloadf workloadd'
 
-for iter in {1..30}; do
-	for c in $coding; do
-		echo "Preparing for the experiments with coding scheme = $c..."
+for c in $coding; do
+	echo "Preparing for the experiments with coding scheme = $c..."
 
-		sed -i "s/^scheme=.*$/scheme=$c/g" ${PLIO_PATH}/bin/config/ncs_exp/global.ini
-		${BASE_PATH}/scripts/util/rsync.sh
+	sed -i "s/^scheme=.*$/scheme=$c/g" ${PLIO_PATH}/bin/config/ncs_exp/global.ini
+	${BASE_PATH}/scripts/util/rsync.sh
 
+	for iter in {1..30}; do
 		for t in $threads; do
 			echo "Running experiment with coding scheme = $c and thread count = $t..."
 			screen -S manage -p 0 -X stuff "${BASE_PATH}/scripts/util/start.sh $1$(printf '\r')"

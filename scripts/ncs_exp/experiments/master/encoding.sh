@@ -8,7 +8,7 @@ c=$1 # coding
 t=$2 # threads
 w=$3 # workload
 
-mkdir -p ${BASE_PATH}/results/encoding/$c
+mkdir -p ${BASE_PATH}/results/encoding/$c/$t
 
 echo "Running experiment with coding scheme = $c and thread count = $t..."
 
