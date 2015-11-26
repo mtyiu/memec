@@ -702,6 +702,8 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 		return false;
 	}
 
+	struct timespec startTime = start_timer();
+
 	/////////////////////////////////////////////////////////////////////
 	// Choose a backup slave socket for reconstructing the failed node //
 	/////////////////////////////////////////////////////////////////////
@@ -859,7 +861,7 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 			listId, chunkId, stripeIds[ listId ]
 		);
 
-		printf( "(%u, %u): Number of surviving slaves: %u; number of stripes per slave: %u; total number of stripes: %lu\n", listId, chunkId, numSurvivingSlaves, numStripePerSlave, stripeIds[ listId ].size() );
+		// __INFO__( YELLOW, "CoordinatorWorker", "triggerRecovery", "(%u, %u): Number of surviving slaves: %u; number of stripes per slave: %u; total number of stripes: %lu\n", listId, chunkId, numSurvivingSlaves, numStripePerSlave, stripeIds[ listId ].size() );
 	}
 
 	////////////////////////////
