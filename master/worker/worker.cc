@@ -317,8 +317,10 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 							offset = PROTO_REMAPPING_RECORD_SIZE;
 							RemappingRecordMap *map = MasterWorker::remappingRecords;
 							for ( count = 0; offset < ( size_t ) buffer.size && count < remappingRecordHeader.remap; offset += bytes ) {
-								if ( ! this->protocol.parseSlaveSyncRemapHeader( slaveSyncRemapHeader, bytes, buffer.data, buffer.size - offset, offset ) )
+								if ( ! this->protocol.parseSlaveSyncRemapHeader( slaveSyncRemapHeader, bytes, buffer.data, buffer.size, offset ) ) {
+									__ERROR__( "CoordinatorWorker", "dispatch", "Failed to parse remapping record message. reading buffer of size %lu at %lu", buffer.size, offset );
 									break;
+								}
 								count++;
 
 								Key key;

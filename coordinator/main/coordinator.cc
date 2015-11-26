@@ -37,7 +37,7 @@ void Coordinator::switchPhase( std::set<struct sockaddr_in> prevOverloadedSlaves
 	uint32_t prevOverloadedSlaveCount = prevOverloadedSlaves.size();
 
 	if ( curOverloadedSlaveCount > totalSlaveCount * startThreshold ) { // Phase 1 --> 2
-		__INFO__( YELLOW, "Coordinator", "switchPhase", "%lf: Overload detected (overloaded slave = %u).", this->getElapsedTime(), curOverloadedSlaveCount );
+		//__INFO__( YELLOW, "Coordinator", "switchPhase", "%lf: Overload detected (overloaded slave = %u).", this->getElapsedTime(), curOverloadedSlaveCount );
 
 		// need to start remapping now
 		if ( prevOverloadedSlaveCount > totalSlaveCount * startThreshold ) {
@@ -649,6 +649,13 @@ void Coordinator::interactive() {
 		} else if ( strcmp( command, "release" ) == 0 ) {
 			valid = true;
 			this->releaseDegradedLock();
+		} else if ( strcmp( command, "remapsync" ) == 0 ) {
+			LOCK_T lock;
+			std::map<struct sockaddr_in, uint32_t> counter; 
+			volatile bool done;
+			this->syncRemappingRecords( &lock, &counter, ( bool * ) &done );
+			while( ! done );
+			valid = true;
 		} else {
 			valid = false;
 		}
@@ -721,6 +728,7 @@ void Coordinator::help() {
 		"- release: Release degraded locks at the specified socket\n"
 		"- metadata: Write metadata to disk\n"
 		"- remapping: Show remapping info\n"
+		"- remapsync: Force all remapping records to masters\n"
 		"- exit: Terminate this client\n"
 	);
 	fflush( stdout );
