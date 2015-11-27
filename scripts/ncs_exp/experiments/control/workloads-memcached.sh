@@ -47,7 +47,6 @@ for iter in {1..30}; do
 			for n in 3 4 8 9; do
 				mkdir -p ${BASE_PATH}/results/workloads/memcached/$iter/node$n
 				scp testbed-node$n:${BASE_PATH}/results/workloads/$c/$t/*.txt ${BASE_PATH}/results/workloads/memcached/$iter/node$n
-				scp testbed-node$n:${BASE_PATH}/results/workloads/$c/$t/*.csv ${BASE_PATH}/results/workloads/memcached/$iter/node$n
 				ssh testbed-node$n 'rm -rf ${BASE_PATH}/results/*'
 			done
 

@@ -5,7 +5,7 @@ PLIO_PATH=${BASE_PATH}/plio
 
 coding='raid5 rdp cauchy rs evenodd'
 threads='64'
-workloads='load workloada workloadb workloadc workloadf workloadd'
+workloads='load workloada workloadc'
 
 for c in $coding; do
 	echo "Preparing for the experiments with coding scheme = $c..."
@@ -13,7 +13,7 @@ for c in $coding; do
 	sed -i "s/^scheme=.*$/scheme=$c/g" ${PLIO_PATH}/bin/config/ncs_exp/global.ini
 	${BASE_PATH}/scripts/util/rsync.sh
 
-	for iter in {1..30}; do
+	for iter in {1..10}; do
 		for t in $threads; do
 			echo "Running experiment with coding scheme = $c and thread count = $t..."
 			screen -S manage -p 0 -X stuff "${BASE_PATH}/scripts/util/start.sh $1$(printf '\r')"
@@ -52,7 +52,7 @@ for c in $coding; do
 
 			for n in 3 4 8 9; do
 				mkdir -p ${BASE_PATH}/results/encoding/$c/$t/$iter/node$n
-				scp testbed-node$n:${BASE_PATH}/results/encoding/$c/$t/$w.txt ${BASE_PATH}/results/encoding/$c/$t/$iter/node$n
+				scp testbed-node$n:${BASE_PATH}/results/encoding/$c/$t/*.txt ${BASE_PATH}/results/encoding/$c/$t/$iter/node$n
 				ssh testbed-node$n 'rm -rf ${BASE_PATH}/results/*'
 			done
 		done
