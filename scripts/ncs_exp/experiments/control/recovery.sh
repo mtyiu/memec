@@ -4,9 +4,10 @@ BASE_PATH=${HOME}/mtyiu
 PLIO_PATH=${BASE_PATH}/plio
 
 sizes='1000000000 2000000000 4000000000 8000000000 16000000000 32000000000'
+sizes=1000000000
 
 for s in $sizes; do
-	for iter in {1..10}; do
+	for iter in {1..1}; do
 		mkdir -p ${BASE_PATH}/results/recovery/$s/$iter
 
 		echo "Preparing for the experiments for size = $s..."
@@ -15,7 +16,8 @@ for s in $sizes; do
 		for i in 2 5 6 7; do
 			ssh testbed-node$i "screen -S slave -p 0 -X stuff \"$(printf '\r\r')${BASE_PATH}/scripts/bootstrap/start-plio-backup-slave.sh ${1}$(printf '\r\r')\""
 		done
-		sleep 30
+		read -p "Press Enter when ready..." -t 30
+		# sleep 30
 
 		echo "Writing $s bytes of data to the system..."
 		size=$(expr $s \/ 4)
@@ -35,21 +37,22 @@ for s in $sizes; do
 		done
 		echo "Done at: $(date)."
 
-		ssh testbed-node1 "screen -S coordinator -p 0 -X stuff \"$(printf '\r\r')seal ${1}$(printf '\r\r')\""
+		ssh testbed-node1 "screen -S coordinator -p 0 -X stuff \"$(printf '\r\r')seal$(printf '\r\r')\""
 		sleep 10
 
 		n=$(expr $RANDOM % 13 + 11)
 		echo "Killing node $n..."
 
-		ssh testbed-node$n "screen -S slave -p 0 -X stuff \"$(printf '\r\r')sync ${1}$(printf '\r\r')\""
+		ssh testbed-node$n "screen -S slave -p 0 -X stuff \"$(printf '\r\r')sync$(printf '\r\r')\""
 		sleep 5
-		ssh testbed-node$n "screen -S slave -p 0 -X stuff \"$(printf '\r\r')memory ${1}$(printf '\r\r')\""
+		ssh testbed-node$n "screen -S slave -p 0 -X stuff \"$(printf '\r\r')memory$(printf '\r\r')\""
 		sleep 1
-		ssh testbed-node$n "screen -S slave -p 0 -X stuff \"$(printf '\r\r')exit ${1}$(printf '\r\r')\""
+		ssh testbed-node$n "screen -S slave -p 0 -X stuff \"$(printf '\r\r')exit$(printf '\r\r')\""
 
-		sleep 20
+		# sleep 20
+		read -p "Press Enter after recovery..."
 
-		ssh testbed-node1 "screen -S coordinator -p 0 -X stuff \"$(printf '\r\r')log ${1}$(printf '\r\r')\""
+		ssh testbed-node1 "screen -S coordinator -p 0 -X stuff \"$(printf '\r\r')log$(printf '\r\r')\""
 
 		screen -S manage -p 0 -X stuff "$(printf '\r\r')"
 		sleep 10

@@ -8,12 +8,13 @@ import java.util.Set;
 
 public class Main implements Runnable {
 	/* Configuration */
-	public static int keySize, chunkSize, port;
+	public static int maxKeySize, chunkSize, port;
 	public static String host;
 	/* Test parameters */
 	public static int numThreads;
 	public static long totalSize;
-	public static boolean fixedSize = true;
+	public static int keySize;
+	public static int valueSize;
 	/* States */
 	public static Main[] mainObjs;
 	public static Thread[] threads;
@@ -29,28 +30,27 @@ public class Main implements Runnable {
 	public int completed, succeeded;
 
 	public Main( int fromId, int toId ) {
-		this.plio = new PLIO( Main.keySize, Main.chunkSize, Main.host, Main.port, fromId, toId );
+		this.plio = new PLIO( Main.maxKeySize, Main.chunkSize, Main.host, Main.port, fromId, toId );
 		this.completed = 0;
 		this.succeeded = 0;
 		this.random = new Random();
 	}
 
-	private String generate( int size, boolean toLower ) {
-		StringBuilder sb = new StringBuilder( size );
+	private void generate( byte[] buf, int size, boolean toLower ) {
 		for ( int i = 0; i < size; i++ ) {
-			sb.append( Main.characters.charAt( this.random.nextInt( Main.charactersLength ) ) );
+			buf[ i ] = ( byte ) Main.characters.charAt( this.random.nextInt( Main.charactersLength ) );
+
+			if ( toLower )
+				buf[ i ] = ( byte ) Character.toLowerCase( buf[ i ] );
 		}
-		String ret = sb.toString();
-		return toLower ? ret.toLowerCase() : ret;
 	}
 
-	private long increment( int bytes ) {
+	private long increment( long bytes ) {
 		long ret;
 		synchronized( Main.lock ) {
 			Main.bytes += bytes;
 			ret = Main.bytes;
 		}
-		System.out.printf( "Written bytes: %d / %d\r", ret, Main.totalSize );
 		return ret;
 	}
 
@@ -60,53 +60,52 @@ public class Main implements Runnable {
 
 		int rand, size;
 
-		int i = 0, keySize, valueSize, index;
+		int i = 0, index;
 		long numBytes = Main.totalSize / Main.numThreads, bytes = 0;
-		String key, value;
+		byte[] key = new byte[ Main.keySize ];
+		byte[] value = new byte[ Main.valueSize ];
 		boolean ret;
 
 		while( bytes < numBytes ) {
 			ret = false;
 
-			// Construct new key-value pair
-			keySize = Main.keySize >> 3;
-			valueSize = Main.fixedSize ? ( Main.chunkSize >> 5 ) : this.random.nextInt( Main.chunkSize >> 3 );
-			if ( valueSize < 4 ) valueSize = 4;
-
 			// Store it in the HashMap
-			key = this.generate( keySize, false );
-			value = this.generate( valueSize, true );
+			this.generate( key, Main.keySize, false );
+			this.generate( value, Main.valueSize, true );
 
 			// Issue the request
-			ret = plio.set( key, value );
+			ret = plio.set( key, Main.keySize, value, Main.valueSize );
 
 			this.completed++;
 			if ( ret ) this.succeeded++;
-			this.increment( keySize + valueSize );
+
 			bytes += keySize + valueSize;
 			i++;
 		}
+
+		this.increment( bytes );
 	}
 
 	public static void main( String[] args ) throws Exception {
-		if ( args.length < 6 ) {
-			System.err.println( "Required parameters: [Maximum Key Size] [Chunk Size] [Hostname] [Port Number] [Total Size] [Number of threads] [Fixed size? (true/false)]" );
+		if ( args.length < 8 ) {
+			System.err.println( "Required parameters: [Maximum Key Size] [Chunk Size] [Hostname] [Port Number] [Total Size] [Key Size] [Value Size] [Number of threads]" );
 			System.exit( 1 );
 		}
 
 		try {
-			Main.keySize = Integer.parseInt( args[ 0 ] );
+			Main.maxKeySize = Integer.parseInt( args[ 0 ] );
 			Main.chunkSize = Integer.parseInt( args[ 1 ] );
 			Main.host = args[ 2 ];
 			Main.port = Integer.parseInt( args[ 3 ] );
 			Main.totalSize = Long.parseLong( args[ 4 ] );
-			Main.numThreads = Integer.parseInt( args[ 5 ] );
+			Main.keySize = Integer.parseInt( args[ 5 ] );
+			Main.valueSize = Integer.parseInt( args[ 6 ] );
+			Main.numThreads = Integer.parseInt( args[ 7 ] );
 		} catch( NumberFormatException e ) {
 			System.err.println( "Parameters: [Maximum Key Size], [Chunk Size], [Port Number], [Total Size] and [Number of threads] should be integers." );
 			System.exit( 1 );
 			return;
 		}
-		fixedSize = args[ 6 ].equals( "true" );
 
 		/* Initialization */
 		Main.mainObjs = new Main[ Main.numThreads ];

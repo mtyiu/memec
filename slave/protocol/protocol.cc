@@ -414,13 +414,14 @@ char *SlaveProtocol::resDeleteChunk( size_t &size, uint32_t id, bool success, ui
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::reqGetChunk( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) {
+char *SlaveProtocol::reqGetChunk( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *buf ) {
 	size = this->generateChunkHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_GET_CHUNK,
 		id,
-		listId, stripeId, chunkId
+		listId, stripeId, chunkId,
+		buf
 	);
 	return this->buffer.send;
 }

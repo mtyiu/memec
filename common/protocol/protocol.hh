@@ -75,8 +75,9 @@
 #define PROTO_OPCODE_UPDATE_CHUNK                 0x52
 #define PROTO_OPCODE_DELETE_CHUNK                 0x53
 #define PROTO_OPCODE_GET_CHUNK                    0x54
-#define PROTO_OPCODE_SET_CHUNK                    0x55
-#define PROTO_OPCODE_SET_CHUNK_UNSEALED           0x56
+#define PROTO_OPCODE_GET_CHUNKS                   0x55
+#define PROTO_OPCODE_SET_CHUNK                    0x56
+#define PROTO_OPCODE_SET_CHUNK_UNSEALED           0x57
 
 /*********************
  * Key size (1 byte) *
@@ -388,6 +389,14 @@ struct ChunkHeader {
 	uint32_t listId;
 	uint32_t stripeId;
 	uint32_t chunkId;
+};
+
+#define PROTO_CHUNKS_SIZE 12
+struct ChunksHeader {
+	uint32_t listId;
+	uint32_t chunkId;
+	uint32_t numStripes;
+	uint32_t *stripeIds;
 };
 
 #define PROTO_CHUNK_DATA_SIZE 20
@@ -799,10 +808,21 @@ protected:
 	//////////////////////
 	size_t generateChunkHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
-		uint32_t listId, uint32_t stripeId, uint32_t chunkId
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *sendBuf = 0
 	);
 	bool parseChunkHeader(
 		size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
+		char *buf, size_t size
+	);
+
+	size_t generateChunksHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint32_t listId, uint32_t chunkId, std::vector<uint32_t> &stripeIds,
+		uint32_t &count
+	);
+	bool parseChunksHeader(
+		size_t offset, uint32_t &listId, uint32_t &chunkId,
+		uint32_t &numStripes, uint32_t *&stripeIds,
 		char *buf, size_t size
 	);
 
@@ -992,6 +1012,10 @@ public:
 	//////////////////////
 	bool parseChunkHeader(
 		struct ChunkHeader &header,
+		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
+	bool parseChunksHeader(
+		struct ChunksHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 	bool parseChunkDataHeader(

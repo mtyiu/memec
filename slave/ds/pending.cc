@@ -233,6 +233,8 @@ bool Pending::insertReconstruction( uint32_t id, CoordinatorSocket *socket, uint
 		std::pair<std::unordered_map<PendingIdentifier, PendingReconstruction>::iterator, bool> r;
 		r = this->coordinators.reconstruction.insert( p );
 		ret = r.second;
+
+		printf( "(%u, %u): Number of pending chunks = %lu\n", listId, chunkId, stripeIds.size() );
 	} else {
 		PendingReconstruction &reconstruction = it->second;
 		if ( reconstruction.listId == listId && reconstruction.chunkId == chunkId ) {
@@ -241,6 +243,8 @@ bool Pending::insertReconstruction( uint32_t id, CoordinatorSocket *socket, uint
 		} else {
 			ret = false;
 		}
+
+		printf( "(%u, %u): Number of pending chunks = %lu\n", listId, chunkId, reconstruction.stripeIds.size() );
 	}
 	UNLOCK( &this->coordinators.reconstructionLock );
 

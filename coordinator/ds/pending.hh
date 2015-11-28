@@ -19,6 +19,13 @@ public:
 	uint32_t remaining;
 	uint32_t total;
 	std::unordered_set<uint32_t> stripeIds;
+	pthread_mutex_t lock;
+	pthread_cond_t cond;
+
+	PendingReconstruction() {
+		pthread_mutex_init( &this->lock, 0 );
+		pthread_cond_init( &this->cond, 0 );
+	}
 
 	void set( uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds ) {
 		this->listId = listId;
@@ -92,7 +99,7 @@ public:
 
 	~Pending() {}
 
-	bool insertReconstruction( uint32_t id, uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds ) {
+	bool insertReconstruction( uint32_t id, uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds, pthread_mutex_t *&lock, pthread_cond_t *&cond ) {
 		PendingIdentifier pid( id, id, 0 );
 		PendingReconstruction r;
 
@@ -103,6 +110,8 @@ public:
 
 		LOCK( &this->reconstructionLock );
 		ret = this->reconstruction.insert( p );
+		lock = &( ret.first )->second.lock;
+		cond = &( ret.first )->second.cond;
 		UNLOCK( &this->reconstructionLock );
 
 		return ret.second;
@@ -138,6 +147,7 @@ public:
 		}
 		ret = ( listId == it->second.listId && chunkId == it->second.chunkId && it->second.remaining >= numStripes );
 		if ( ret ) {
+			pthread_cond_signal( &it->second.cond );
 			it->second.remaining -= numStripes;
 			remaining = it->second.remaining;
 			if ( it->second.remaining == 0 )

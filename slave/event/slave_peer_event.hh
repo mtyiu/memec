@@ -39,6 +39,8 @@ enum SlavePeerEventType {
 	SLAVE_PEER_EVENT_TYPE_GET_CHUNK_REQUEST,
 	SLAVE_PEER_EVENT_TYPE_GET_CHUNK_RESPONSE_SUCCESS,
 	SLAVE_PEER_EVENT_TYPE_GET_CHUNK_RESPONSE_FAILURE,
+	// Batch GET_CHUNK
+	SLAVE_PEER_EVENT_TYPE_BATCH_GET_CHUNKS,
 	// SET_CHUNK
 	SLAVE_PEER_EVENT_TYPE_SET_CHUNK_REQUEST,
 	SLAVE_PEER_EVENT_TYPE_SET_CHUNK_RESPONSE_SUCCESS,
@@ -90,6 +92,10 @@ public:
 			Packet *packet;
 		} send;
 		struct {
+			std::vector<uint32_t> *requestIds;
+			std::vector<Metadata> *metadata;
+		} batchGetChunks;
+		struct {
 			Key key;
 			uint32_t listId, chunkId;
 		} remap;
@@ -115,6 +121,8 @@ public:
 	// GET_CHUNK
 	void reqGetChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata );
 	void resGetChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, bool success, Chunk *chunk = 0 );
+	// Batch GET_CHUNK
+	void batchGetChunks( SlavePeerSocket *socket, std::vector<uint32_t> *requestIds, std::vector<Metadata> *metadata );
 	// SET_CHUNK
 	void reqSetChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, Chunk *chunk, bool needsFree );
 	void resSetChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, bool success );

@@ -882,8 +882,19 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 		if ( stripeIds[ listId ].size() % numSurvivingSlaves > 0 )
 			numStripePerSlave++;
 
-		// Distribute the task
+		// Insert into pending map
+		pthread_mutex_t *lock;
+		pthread_cond_t *cond;
+
 		requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
+
+		CoordinatorWorker::pending->insertReconstruction(
+			requestId,
+			listId, chunkId, stripeIds[ listId ],
+			lock, cond
+		);
+
+		// Distribute the task
 		isAllCompleted = true;
 		stripeIdSetIt = stripeIds[ listId ].begin();
 		do {
@@ -905,16 +916,14 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 					if ( ret != ( ssize_t ) buffer.size )
 						__ERROR__( "CoordinatorWorker", "handleReconstructionRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 
+					pthread_mutex_lock( lock );
+					pthread_cond_wait( cond, lock );
+					pthread_mutex_unlock( lock );
+
 					isAllCompleted &= isCompleted;
 				}
 			}
 		} while ( ! isAllCompleted );
-
-		// Insert into pending map
-		CoordinatorWorker::pending->insertReconstruction(
-			requestId,
-			listId, chunkId, stripeIds[ listId ]
-		);
 
 		__INFO__( YELLOW, "CoordinatorWorker", "handleReconstructionRequest", "[%u] (%u, %u): Number of surviving slaves: %u; number of stripes per slave: %u; total number of stripes: %lu", requestId, listId, chunkId, numSurvivingSlaves, numStripePerSlave, stripeIds[ listId ].size() );
 	}

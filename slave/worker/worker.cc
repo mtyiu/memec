@@ -745,6 +745,47 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		case SLAVE_PEER_EVENT_TYPE_SEND:
 			event.message.send.packet->read( buffer.data, buffer.size );
 			break;
+		///////////
+		// Batch //
+		///////////
+		case SLAVE_PEER_EVENT_TYPE_BATCH_GET_CHUNKS:
+		{
+			uint32_t offset = 0;
+			size_t tmpSize, current, len;
+
+			buffer.data = this->protocol.buffer.send;
+			buffer.size = 0;
+			std::vector<uint32_t> *requestIds = event.message.batchGetChunks.requestIds;
+			std::vector<Metadata> *metadata = event.message.batchGetChunks.metadata;
+
+			for ( current = 0, len = metadata->size(); current < len; current++ ) {
+				if ( buffer.size + PROTO_CHUNK_SIZE > this->protocol.buffer.size )
+					break;
+
+				this->protocol.reqGetChunk(
+					tmpSize,
+					requestIds->at( current ),
+					metadata->at( current ).listId,
+					metadata->at( current ).stripeId,
+					metadata->at( current ).chunkId,
+					buffer.data + offset
+				);
+
+				offset += tmpSize;
+				buffer.size += tmpSize;
+			}
+			if ( current == len ) {
+				// All sent
+				delete requestIds;
+				delete metadata;
+			} else {
+				requestIds->erase( requestIds->begin(), requestIds->begin() + current );
+				metadata->erase( metadata->begin(), metadata->begin() + current );
+				event.batchGetChunks( event.socket, requestIds, metadata );
+				this->dispatch( event );
+			}
+		}
+			break;
 		/////////////
 		// Pending //
 		/////////////
@@ -1302,7 +1343,6 @@ bool SlaveWorker::handleReconstructionRequest( CoordinatorEvent event, char *buf
 	uint32_t chunkId, myChunkId = SlaveWorker::chunkCount, chunkCount, requestId;
 	ChunkRequest chunkRequest;
 	Metadata metadata;
-	SlavePeerEvent *events;
 	Chunk *chunk;
 	SlavePeerSocket *socket = 0;
 
@@ -1339,7 +1379,13 @@ bool SlaveWorker::handleReconstructionRequest( CoordinatorEvent event, char *buf
 	}
 
 	// Send GET_CHUNK requests to surviving nodes
-	events = new SlavePeerEvent[ SlaveWorker::dataChunkCount - 1 ];
+	SlavePeerEvent slavePeerEvent;
+	std::vector<uint32_t> **requestIds = new std::vector<uint32_t> *[ SlaveWorker::chunkCount ];
+	std::vector<Metadata> **metadataList = new std::vector<Metadata> *[ SlaveWorker::chunkCount ];
+	for ( uint32_t i = 0; i < SlaveWorker::chunkCount; i++ ) {
+		requestIds[ i ] = new std::vector<uint32_t>();
+		metadataList[ i ] = new std::vector<Metadata>();
+	}
 	chunkId = 0;
 	for ( it = stripeIds.begin(); it != stripeIds.end(); it++ ) {
 		// printf( "Processing (%u, %u, %u)...\n", header.listId, *it, header.chunkId );
@@ -1361,7 +1407,8 @@ bool SlaveWorker::handleReconstructionRequest( CoordinatorEvent event, char *buf
 					if ( ! SlaveWorker::pending->insertChunkRequest( PT_SLAVE_PEER_GET_CHUNK, requestId, event.id, socket, chunkRequest ) ) {
 						__ERROR__( "SlaveWorker", "handleReconstructionRequest", "Cannot insert into slave CHUNK_REQUEST pending map." );
 					} else {
-						events[ chunkCount ].reqGetChunk( socket, requestId, metadata );
+						requestIds[ chunkId ]->push_back( requestId );
+						metadataList[ chunkId ]->push_back( metadata );
 						chunkCount++;
 					}
 				}
@@ -1390,12 +1437,24 @@ bool SlaveWorker::handleReconstructionRequest( CoordinatorEvent event, char *buf
 		if ( ! SlaveWorker::pending->insertChunkRequest( PT_SLAVE_PEER_GET_CHUNK, requestId, event.id, 0, chunkRequest ) ) {
 			__ERROR__( "SlaveWorker", "performDegradedRead", "Cannot insert into slave CHUNK_REQUEST pending map." );
 		}
-		// Send GET_CHUNK requests now
-		for ( uint32_t i = 0; i < SlaveWorker::dataChunkCount - 1; i++ ) {
-			SlaveWorker::eventQueue->insert( events[ i ] );
+	}
+	// Send GET_CHUNK requests now
+	for ( uint32_t i = 0; i < SlaveWorker::chunkCount; i++ ) {
+		if ( metadataList[ i ]->size() > 0 ) {
+			socket = ( i < SlaveWorker::dataChunkCount ) ?
+					 ( this->dataSlaveSockets[ i ] ) :
+					 ( this->paritySlaveSockets[ i - SlaveWorker::dataChunkCount ] );
+
+			slavePeerEvent.batchGetChunks( socket, requestIds[ i ], metadataList[ i ] );
+			// SlaveWorker::eventQueue->insert( slavePeerEvent );
+			this->dispatch( slavePeerEvent );
+		} else {
+			delete requestIds[ i ];
+			delete metadataList[ i ];
 		}
 	}
-	delete[] events;
+	delete[] requestIds;
+	delete[] metadataList;
 
 	return false;
 }
@@ -2485,7 +2544,7 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, bool isSealed, ch
 		chunk->metadata.listId = metadata.listId;
 		chunk->metadata.stripeId = metadata.stripeId;
 		chunk->metadata.chunkId = metadata.chunkId;
-		chunk->isParity = metadata.chunkId < SlaveWorker::dataChunkCount;
+		chunk->isParity = metadata.chunkId >= SlaveWorker::dataChunkCount;
 		SlaveWorker::map->setChunk(
 			metadata.listId, metadata.stripeId, metadata.chunkId,
 			chunk, chunk->isParity,
