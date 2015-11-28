@@ -18,6 +18,8 @@ enum ChunkStatus {
 	CHUNK_STATUS_DIRTY,
 	// The chunk contains data that is already flushed to disk
 	CHUNK_STATUS_CACHED,
+	// The chunk needs to load data from disk
+	CHUNK_STATUS_NEEDS_LOAD_FROM_DISK,
 	// The chunk is retrieved from surviving node using GET_CHUNK
 	CHUNK_STATUS_FROM_GET_CHUNK,
 	// Reconstructed using k other chunks

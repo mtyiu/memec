@@ -84,7 +84,7 @@ public:
 	bool stop();
 
 	void seal();
-	void flush();
+	void flush( bool parityOnly = false );
 	void sync( uint32_t requestId = 0 );
 	void metadata();
 	void memory( FILE *f = stdout );

@@ -11,11 +11,10 @@ enum IOEventType {
 class IOEvent : public Event {
 public:
 	IOEventType type;
-	union {
-		Chunk *chunk;
-	} message;
+	Chunk *chunk;
+	bool clear;
 
-	void flush( Chunk *chunk );
+	void flush( Chunk *chunk, bool clear = false );
 };
 
 #endif

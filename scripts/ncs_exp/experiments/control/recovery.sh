@@ -38,7 +38,13 @@ for s in $sizes; do
 		echo "Done at: $(date)."
 
 		ssh testbed-node1 "screen -S coordinator -p 0 -X stuff \"$(printf '\r\r')seal$(printf '\r\r')\""
-		sleep 10
+		sleep 4
+
+		# Flush parity chunks to disk
+		# for n in {11..23} {37..39}; do
+		# 	ssh testbed-node$n "screen -S slave -p 0 -X stuff \"$(printf '\r\r')p2disk$(printf '\r\r')\"" &
+		# done
+		# sleep 10
 
 		n=$(expr $RANDOM % 13 + 11)
 		echo "Killing node $n..."

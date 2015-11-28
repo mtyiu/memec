@@ -368,7 +368,7 @@ void Slave::seal() {
 	printf( "\nSealing %lu chunk buffer:\n", count );
 }
 
-void Slave::flush() {
+void Slave::flush( bool parityOnly ) {
 	IOEvent ioEvent;
 	std::unordered_map<Metadata, Chunk *>::iterator it;
 	std::unordered_map<Metadata, Chunk *> *cache;
@@ -382,6 +382,8 @@ void Slave::flush() {
 	for ( it = cache->begin(); it != cache->end(); it++ ) {
 		chunk = it->second;
 		if ( chunk->status == CHUNK_STATUS_DIRTY ) {
+			if ( parityOnly && ! chunk->isParity )
+				continue;
 			ioEvent.flush( chunk );
 			this->eventQueue.insert( ioEvent );
 			count++;
@@ -603,6 +605,9 @@ void Slave::interactive() {
 		} else if ( strcmp( command, "flush" ) == 0 ) {
 			valid = true;
 			this->flush();
+		} else if ( strcmp( command, "p2disk" ) == 0 ) {
+			valid = true;
+			this->flush( true );
 		} else if ( strcmp( command, "memory" ) == 0 ) {
 			valid = true;
 			this->memory();

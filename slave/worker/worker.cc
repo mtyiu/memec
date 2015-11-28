@@ -244,9 +244,11 @@ void SlaveWorker::dispatch( IOEvent event ) {
 	switch( event.type ) {
 		case IO_EVENT_TYPE_FLUSH_CHUNK:
 			this->storage->write(
-				event.message.chunk,
+				event.chunk,
 				false
 			);
+			if ( event.clear )
+				event.chunk->status = CHUNK_STATUS_NEEDS_LOAD_FROM_DISK;
 			break;
 	}
 }
@@ -1360,8 +1362,7 @@ bool SlaveWorker::handleReconstructionRequest( CoordinatorEvent event, char *buf
 	}
 	assert( myChunkId < SlaveWorker::chunkCount );
 	if ( chunkCount < SlaveWorker::dataChunkCount ) {
-		__ERROR__( "SlaveWorker", "handleReconstructionRequest", "The number of surviving nodes is less than k. The data cannot be recovered." );
-		// TODO
+		__ERROR__( "SlaveWorker", "handleReconstructionRequest", "The number of surviving nodes (%u) is less than k (%u). The data cannot be recovered.", chunkCount, SlaveWorker::dataChunkCount );
 		return false;
 	}
 
@@ -2466,6 +2467,17 @@ bool SlaveWorker::handleGetChunkRequest( SlavePeerEvent event, char *buf, size_t
 	// if ( ! chunk ) {
 	// 	__ERROR__( "SlaveWorker", "handleGetChunkRequest", "The chunk (%u, %u, %u) does not exist.", header.listId, header.stripeId, header.chunkId );
 	// }
+
+	if ( chunk->status == CHUNK_STATUS_NEEDS_LOAD_FROM_DISK ) {
+		printf( "Loading chunk: (%u, %u, %u) from disk.\n", header.listId, header.stripeId, header.chunkId );
+		this->storage->read(
+			chunk,
+			chunk->metadata.listId,
+			chunk->metadata.stripeId,
+			chunk->metadata.chunkId,
+			chunk->isParity
+		);
+	}
 
 	event.resGetChunk( event.socket, event.id, metadata, ret, isSealed ? chunk : 0 );
 	this->dispatch( event );
