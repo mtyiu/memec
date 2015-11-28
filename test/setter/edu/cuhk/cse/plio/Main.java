@@ -50,7 +50,7 @@ public class Main implements Runnable {
 			Main.bytes += bytes;
 			ret = Main.bytes;
 		}
-		System.out.printf( "Written bytes: %ld / %ld\r", ret, Main.totalSize );
+		System.out.printf( "Written bytes: %d / %d\r", ret, Main.totalSize );
 		return ret;
 	}
 

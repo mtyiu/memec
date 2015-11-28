@@ -3,7 +3,7 @@
 BASE_PATH=${HOME}/mtyiu
 PLIO_PATH=${BASE_PATH}/plio
 
-sizes=1000000000 2000000000 4000000000 8000000000 16000000000 32000000000
+sizes='1000000000 2000000000 4000000000 8000000000 16000000000 32000000000'
 
 for s in $sizes; do
 	for iter in {1..10}; do
@@ -38,9 +38,9 @@ for s in $sizes; do
 		n=$(expr $RANDOM % 13 + 11)
 		echo "Killing node $n..."
 
-		ssh testbed-node$n "screen -S coordinator -p 0 -X stuff \"$(printf '\r\r')memory ${1}$(printf '\r\r')\""
+		ssh testbed-node$n "screen -S slave -p 0 -X stuff \"$(printf '\r\r')memory ${1}$(printf '\r\r')\""
 		sleep 1
-		ssh testbed-node$n "screen -S coordinator -p 0 -X stuff \"$(printf '\r\r')exit ${1}$(printf '\r\r')\""
+		ssh testbed-node$n "screen -S slave -p 0 -X stuff \"$(printf '\r\r')exit ${1}$(printf '\r\r')\""
 
 		sleep 20
 
