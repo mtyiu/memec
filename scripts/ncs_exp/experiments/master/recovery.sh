@@ -3,16 +3,14 @@
 BASE_PATH=${HOME}/mtyiu
 PLIO_PATH=${BASE_PATH}/plio
 
-cd ${PLIO_PATH}/test/memory
+cd ${PLIO_PATH}/test/setter
 
-w=$1
+size=$1
 
-mkdir -p ${BASE_PATH}/results/memory
-
-echo "Running experiment for Workload #$w..."
-time java -cp . edu.cuhk.cse.plio.Main 255 4096 $(hostname -I | xargs) 9112 $w 64 500000000 2>&1 | tee ${BASE_PATH}/results/memory/$w.out
+echo "Running load phase for size = $size..."
+time java -cp . edu.cuhk.cse.plio.Main 255 4096 $(hostname -I | xargs) 9112 $size 64 true
 
 # Tell the control node that this iteration is finished
 ssh testbed-node10 "screen -S experiment -p 0 -X stuff \"$(printf '\r')\""
 
-echo "Finished experiment for Workload #$w..."
+echo "Finished load phase for size = $s..."
