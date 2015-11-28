@@ -1,4 +1,5 @@
 #include "worker.hh"
+#include "../ds/log.hh"
 #include "../main/coordinator.hh"
 #include "../../common/util/debug.hh"
 #include "../../common/ds/sockaddr_in.hh"
@@ -1059,6 +1060,15 @@ bool CoordinatorWorker::handlePromoteBackupSlaveResponse( SlaveEvent event, char
 
 	if ( remaining == 0 ) {
 		__INFO__( CYAN, "CoordinatorWorker", "handlePromoteBackupSlaveResponse", "Recovery is completed. Number of chunks reconstructed = %u; elapsed time = %lf s.\n", total, elapsedTime );
+
+		Log log;
+		log.setRecovery(
+			header.addr,
+			header.port,
+			header.count,
+			elapsedTime
+		);
+		Coordinator::getInstance()->appendLog( log );
 	}
 
 	return true;

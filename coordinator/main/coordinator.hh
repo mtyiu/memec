@@ -6,6 +6,7 @@
 #include <set>
 #include <unordered_map>
 #include "../config/coordinator_config.hh"
+#include "../ds/log.hh"
 #include "../ds/pending.hh"
 #include "../event/event_queue.hh"
 #include "../remap/remap_msg_handler.hh"
@@ -87,6 +88,10 @@ public:
 		std::set< struct sockaddr_in > slaveSet;
 		LOCK_T lock;
 	} overloadedSlaves;
+	struct {
+		std::vector<Log> items;
+		LOCK_T lock;
+	} log;
 	Timer statsTimer;
 	Pending pending;
 
@@ -109,11 +114,13 @@ public:
 	void seal();
 	void flush();
 	void metadata();
+	void printLog();
 	void syncSlaveMeta( struct sockaddr_in slave, bool *sync );
 	void releaseDegradedLock();
 	void releaseDegradedLock( struct sockaddr_in slave, bool *done );
 	void syncRemappingRecords( LOCK_T *lock, std::map<struct sockaddr_in, uint32_t> *counter, bool *done );
 	double getElapsedTime();
+	void appendLog( Log log );
 	void interactive();
 };
 

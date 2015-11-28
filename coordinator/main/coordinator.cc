@@ -330,6 +330,9 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 	/* Pending Remapping Record */
 	LOCK_INIT( &this->pendingRemappingRecords.toSendLock );
 
+	/* Log */
+	LOCK_INIT( &this->log.lock );
+
 	// Set signal handlers //
 	Signal::setHandler( Coordinator::signalHandler );
 
@@ -646,12 +649,15 @@ void Coordinator::interactive() {
 		} else if ( strcmp( command, "flush" ) == 0 ) {
 			valid = true;
 			this->flush();
+		} else if ( strcmp( command, "log" ) == 0 ) {
+			valid = true;
+			this->printLog();
 		} else if ( strcmp( command, "release" ) == 0 ) {
 			valid = true;
 			this->releaseDegradedLock();
 		} else if ( strcmp( command, "remapsync" ) == 0 ) {
 			LOCK_T lock;
-			std::map<struct sockaddr_in, uint32_t> counter; 
+			std::map<struct sockaddr_in, uint32_t> counter;
 			volatile bool done;
 			this->syncRemappingRecords( &lock, &counter, ( bool * ) &done );
 			while( ! done );
@@ -686,11 +692,13 @@ void Coordinator::metadata() {
 		__ERROR__( "Slave", "metadata", "Cannot write to the file \"coordinator.meta\"." );
 	}
 
+	printf( "Writing log to coordinator.log..." );
+	fflush( stdout );
 	for ( size_t i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
 		this->sockets.slaves[ i ]->map.persist( f );
 	}
-
 	fclose( f );
+	printf( "Done.\n" );
 }
 
 void Coordinator::printRemapping( FILE *f ) {
@@ -725,6 +733,7 @@ void Coordinator::help() {
 		"- time: Show elapsed time\n"
 		"- seal: Force all slaves to seal all its chunks\n"
 		"- flush: Force all slaves to flush all its chunks\n"
+		"- log: Write the log to coordinator.log\n"
 		"- release: Release degraded locks at the specified socket\n"
 		"- metadata: Write metadata to disk\n"
 		"- remapping: Show remapping info\n"
@@ -737,6 +746,29 @@ void Coordinator::help() {
 void Coordinator::time() {
 	fprintf( stdout, "Elapsed time (s): %12.6lf\n", this->getElapsedTime() );
 	fflush( stdout );
+}
+
+void Coordinator::appendLog( Log log ) {
+	log.setTimestamp( this->getElapsedTime() );
+	LOCK( &this->log.lock );
+	this->log.items.push_back( log );
+	UNLOCK( &this->log.lock );
+}
+
+void Coordinator::printLog() {
+	FILE *f = fopen( "coordinator.log", "w" );
+	if ( ! f ) {
+		fprintf( stderr, "Cannot write to coordinator.log.\n" );
+		return;
+	}
+
+	LOCK( &this->log.lock );
+	for ( size_t i = 0, len = this->log.items.size(); i < len; i++ ) {
+		this->log.items[ i ].print( f );
+	}
+	UNLOCK( &this->log.lock );
+
+	fclose( f );
 }
 
 void Coordinator::seal() {
