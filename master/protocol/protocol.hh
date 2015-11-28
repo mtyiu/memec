@@ -33,8 +33,8 @@ public:
 	// SET
 	char *reqSet( size_t &size, uint32_t id, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf = 0 );
 	// Remapping SET
-	char *reqRemappingSetLock( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, bool isRemapped, char *key, uint8_t keySize, uint32_t sockfd = UINT_MAX );
-	char *reqRemappingSet( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, bool needsForwarding, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf = 0, uint32_t sockfd = UINT_MAX, bool remapped = false );
+	char *reqRemappingSetLock( size_t &size, uint32_t id, uint32_t listId, std::vector<uint32_t> chunkId, uint32_t reqRemapState, char *key, uint8_t keySize, uint32_t sockfd = UINT_MAX );
+	char *reqRemappingSet( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, bool needsForwarding, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf = 0, uint32_t sockfd = UINT_MAX, bool isParity = false, struct sockaddr_in *target = 0 );
 	// GET
 	char *reqGet( size_t &size, uint32_t id, char *key, uint8_t keySize );
 	char *reqDegradedGet( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isSealed, char *key, uint8_t keySize );

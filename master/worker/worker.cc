@@ -558,8 +558,9 @@ SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId
 	return original;
 }
 
-SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &originalListId, uint32_t &originalChunkId, uint32_t &remappedListId, uint32_t &remappedChunkId ) {
+SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &originalListId, uint32_t &originalChunkId, uint32_t &remappedListId, std::vector<uint32_t> &remappedChunkId ) {
 	SlaveSocket *ret;
+	
 
 	// Determine original data slave
 	originalListId = MasterWorker::stripeList->get(
@@ -702,7 +703,17 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		return false;
 	}
 
-	if ( Master::getInstance()->remapMsgHandler.useRemappingFlow( socket->getAddr() ) ) {
+	// decide whether any of the data / parity slave needs to use remapping flow
+	bool remapped = false;
+	for ( uint32_t i = 0; i < 1 + MasterWorker::parityChunkCount; i++ ) {
+		Master *master = Master::getInstance();
+		if ( i == 0 ) 
+			remapped |= master->remapMsgHandler.useRemappingFlow( socket->getAddr() );
+		else {
+			remapped |= master->remapMsgHandler.useRemappingFlow( this->paritySlaveSockets[ i - 1 ]->getAddr() );
+		}
+	}
+	if ( remapped ) {
 		return this->handleRemappingSetRequest( event, buf, size );
 	}
 
@@ -982,7 +993,8 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 		( int ) header.keySize, header.key, header.keySize, header.valueSize
 	);
 
-	uint32_t originalListId, originalChunkId, remappedListId, remappedChunkId;
+	uint32_t originalListId, originalChunkId, remappedListId;
+	std::vector<uint32_t> remappedChunkId; // data + parities ( 1 + m )
 	bool connected;
 	ssize_t sentBytes;
 	SlaveSocket *socket;
@@ -1001,20 +1013,46 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 		return false;
 	}
 
-#define NO_REMAPPING ( originalListId == remappedListId && originalChunkId == remappedChunkId )
-	// always increment the counter of the original slave
-	int sockfd = socket->getSocket();
-	if ( NO_REMAPPING ) {
-		MasterWorker::slaveSockets->get( sockfd )->counter.increaseLockOnly();
-	} else {
-		// fprintf(
-		// 	stderr, "remap from (%u, %u) to (%u, %u) for key: %.*s\n",
-		// 	originalListId, originalChunkId,
-		// 	remappedListId, remappedChunkId,
-		// 	header.keySize, header.key
-		// );
-		MasterWorker::slaveSockets->get( sockfd )->counter.increaseRemapping();
+	std::unordered_set<uint32_t>  remappedIndex;
+	RequestRemapState reqRemapState = NO_REMAP;
+	// determine whether data / parity is remapped
+	for ( uint32_t i = 0; i < 1 + MasterWorker::parityChunkCount; i++ ) {
+		if ( i == 0 ) {
+			// data is remapped
+			if ( ( MasterWorker::dataChunkCount < 2 && remappedListId != originalListId ) || 
+				( MasterWorker::dataChunkCount > 1 && remappedChunkId[ i ] != originalChunkId ) 
+			) {
+				reqRemapState = DATA_REMAP;
+			}
+		} else if ( remappedChunkId[ i ] != i - 1 + MasterWorker::dataChunkCount ) {
+			// parity is remapped
+			if ( reqRemapState == DATA_REMAP ) {
+				reqRemapState = MIXED_REMAP;
+				break;
+			} else if ( reqRemapState == NO_REMAP ) {
+				reqRemapState = PARITY_REMAP;
+				break;
+			}
+		}
 	}
+
+#define NO_DATA_REMAPPING ( reqRemapState == NO_REMAP || reqRemapState == PARITY_REMAP )
+#define NO_PARITY_REMAPPING ( reqRemapState == NO_REMAP || reqRemapState == DATA_REMAP )
+	int32_t sockfd = UINT_MAX;
+	// always increment the counter of the original slave
+	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
+		// only increase the counter for remapped parity slaves
+		if ( remappedChunkId[ i + 1 ] != i + MasterWorker::dataChunkCount ) {
+			sockfd = this->paritySlaveSockets[ i ]->getSocket();
+			MasterWorker::slaveSockets->get( sockfd )->counter.increaseRemapping();
+		}
+	}
+	// data slave counter
+	sockfd = socket->getSocket();
+	if ( NO_DATA_REMAPPING )
+		MasterWorker::slaveSockets->get( sockfd )->counter.increaseLockOnly();
+	else 
+		MasterWorker::slaveSockets->get( sockfd )->counter.increaseRemapping();
 
 	struct {
 		size_t size;
@@ -1030,8 +1068,9 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 		__ERROR__( "MasterWorker", "handleRemappingSetRequest", "Cannot insert into application SET pending map." );
 	}
 
-	if ( MasterWorker::updateInterval && NO_REMAPPING )
-		MasterWorker::pending->recordRequestStartTime( PT_SLAVE_SET, requestId, event.id, ( void * ) socket, socket->getAddr() );
+	// Not needed???
+	//if ( MasterWorker::updateInterval && NO_DATA_REMAPPING )
+	//	MasterWorker::pending->recordRequestStartTime( PT_SLAVE_SET, requestId, event.id, ( void * ) socket, socket->getAddr() );
 
 	// always add a remapping record ( to buffer the value )
 	Value *value = new Value(); // Note: Use an Key object to store the value
@@ -1041,17 +1080,20 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 	buffer.data = this->protocol.reqRemappingSetLock(
 		buffer.size, requestId,
 		remappedListId, remappedChunkId,
-		NO_REMAPPING ? false : true,
+		( uint32_t ) reqRemapState,
 		header.key, header.keySize,
 		sockfd
 	);
+
+	// insert the list of remapped slaves into pending map
+	MasterWorker::pending->insertRemapList( PT_KEY_REMAP_LIST, requestId, event.id, ( void * ) socket, remappedChunkId );
 
 	for( uint32_t i = 0; i < Master::getInstance()->sockets.coordinators.size(); i++ ) {
 		CoordinatorSocket *coordinator = Master::getInstance()->sockets.coordinators.values[ i ];
 
 		// Insert the remapping record into master REMAPPING_SET pending map
 		// Note: the records point to the same copy of value
-		RemappingRecord remappingRecord( remappedListId, remappedChunkId, value );
+		RemappingRecord remappingRecord( remappedListId, remappedChunkId[ 0 ], value );
 		if ( ! MasterWorker::pending->insertRemappingRecord( PT_SLAVE_REMAPPING_SET, requestId, event.id, coordinator, remappingRecord, true, true ) ) {
 			__ERROR__( "MasterWorker", "handleRemappingSetRequest", "Cannot insert into slave REMAPPING_SET pending map." );
 		}
@@ -1066,12 +1108,19 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 				// revert all changes made
 				MasterWorker::pending->eraseRemappingRecord( PT_SLAVE_REMAPPING_SET, requestId, coordinator, 0, 0, true, true );
 				delete value;
-				if ( NO_REMAPPING ) {
+				if ( NO_DATA_REMAPPING )
 					MasterWorker::slaveSockets->get( sockfd )->counter.decreaseLockOnly();
-				} else {
+				else 
 					MasterWorker::slaveSockets->get( sockfd )->counter.decreaseRemapping();
-				}
 				Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
+				for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
+					// only decrease the counter for remapped parity slaves
+					if ( remappedChunkId[ i + 1 ] != i + MasterWorker::dataChunkCount ) {
+						sockfd = this->paritySlaveSockets[ i ]->getSocket();
+						MasterWorker::slaveSockets->get( sockfd )->counter.decreaseRemapping();
+						Master::getInstance()->remapMsgHandler.ackRemap( this->paritySlaveSockets[ i ]->getAddr() );
+					}
+				}
 				return false;
 			} else {
 				// TODO handle message failure for some coordinators
@@ -1080,7 +1129,8 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 		}
 	}
 
-#undef NO_REMAPPING
+#undef NO_DATA_REMAPPING
+#undef NO_PARITY_REMAPPING
 
 	return true;
 }
@@ -1750,7 +1800,6 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 	PendingIdentifier pid;
 	RemappingRecord remappingRecord;
 
-#define NO_REMAPPING ( originalListId == header.listId && originalChunkId == header.chunkId )
 	if ( ! MasterWorker::pending->eraseRemappingRecord( PT_SLAVE_REMAPPING_SET, event.id, 0, &pid, &remappingRecord, true, false ) ) {
 		UNLOCK( &MasterWorker::pending->slaves.remappingSetLock );
 		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Cannot find a pending slave REMAPPING_SET_LOCK request that matches the response. This message will be discarded. (ID: %u)", event.id );
@@ -1764,16 +1813,52 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 	int sockfd;
 	socket = this->getSlaves( originalListId, originalChunkId );
 
+	// get the list of remapped slaves back
+	std::vector<uint32_t> remapList;
+	MasterWorker::pending->findRemapList( PT_KEY_REMAP_LIST, event.id, 0, &remapList );
+	if ( remapList.empty() ) {
+		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "List of remap slave not found, going to discard response." );
+		success = false;
+	}
+	RequestRemapState reqRemapState = NO_REMAP;
+	if ( originalListId != header.listId || originalChunkId != header.chunkId )
+		reqRemapState = DATA_REMAP;
+	for ( uint32_t i = 1; i < 1 + MasterWorker::parityChunkCount; i++ ) {
+		if ( originalListId == header.listId && remapList[ i ] == i - 1 + MasterWorker::dataChunkCount ) {
+			continue;
+		}
+		reqRemapState = ( reqRemapState == DATA_REMAP )? MIXED_REMAP : PARITY_REMAP;
+		break;
+	}
+
+#define NO_DATA_REMAPPING ( reqRemapState == NO_REMAP || reqRemapState == PARITY_REMAP ) 
+#define NO_PARITY_REMAPPING ( reqRemapState == NO_REMAP || reqRemapState == DATA_REMAP )
+#define DECREMENT_COUNTER_ON_FAILURE() \
+	do { \
+		sockfd = socket->getSocket(); \
+		/* data slave count */ \
+		if ( NO_DATA_REMAPPING ) \
+			MasterWorker::slaveSockets->get( sockfd )->counter.decreaseLockOnly(); \
+		else \
+			MasterWorker::slaveSockets->get( sockfd )->counter.decreaseRemapping(); \
+		Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() ); \
+		/* parity slave count */ \
+		for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) { \
+			sockfd = this->paritySlaveSockets[ i ]->getSocket(); \
+			if ( originalListId != header.listId || remapList[ i + 1 ] != i + MasterWorker::dataChunkCount ) { \
+				MasterWorker::slaveSockets->get( sockfd )->counter.decreaseRemapping(); \
+			} \
+			Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() ); \
+		} \
+	} while( 0 )
+
 	if ( ! success ) {
 		// TODO
 		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "TODO: Handle the case when the lock cannot be acquired." );
+		// if lock fails report to application directly ..
+		MasterWorker::pending->eraseRemapList( PT_KEY_REMAP_LIST, event.id, 0, &pid, &remapList );
 		if ( socket ) {
-			sockfd = socket->getSocket();
-			if ( NO_REMAPPING )
-				MasterWorker::slaveSockets->get( sockfd )->counter.decreaseLockOnly();
-			else
-				MasterWorker::slaveSockets->get( sockfd )->counter.decreaseRemapping();
-			Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
+			DECREMENT_COUNTER_ON_FAILURE();
 		}
 		return false;
 	}
@@ -1797,14 +1882,9 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 	}
 
 	if ( ! MasterWorker::pending->findKey( PT_APPLICATION_SET, pid.parentId, 0, &key, true, header.key ) ) {
-		// set socket fd for counter
-		sockfd = socket->getSocket();
 		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded. (ID: %u)", pid.parentId );
-		if ( NO_REMAPPING )
-			MasterWorker::slaveSockets->get( sockfd )->counter.decreaseLockOnly();
-		else
-			MasterWorker::slaveSockets->get( sockfd )->counter.decreaseRemapping();
-		Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
+		// set socket fd for counter
+		DECREMENT_COUNTER_ON_FAILURE();
 		return false;
 	}
 
@@ -1814,10 +1894,14 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 
 	// Add data and parity slaves into the pending set
 	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount + 1; i++ ) {
-		key.ptr = ( void * )( i == 0 ? socket : this->paritySlaveSockets[ i - 1 ] );
+		key.ptr = ( void * )( i == 0 ? socket : 
+			remapList[ i ] > MasterWorker::dataChunkCount - 1? 
+			this->paritySlaveSockets[ remapList[ i ] - MasterWorker::dataChunkCount ] :
+			this->dataSlaveSockets[ remapList[ i ] ]
+		);
 		if ( ! MasterWorker::pending->insertKey(
 			PT_SLAVE_SET, pid.id, pid.parentId,
-			( void * )( i == 0 ? socket : this->paritySlaveSockets[ i - 1 ] ),
+			( void * ) key.ptr,
 			key
 		) ) {
 			__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Cannot insert into slave SET pending map." );
@@ -1825,34 +1909,40 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 	}
 
 	// Prepare a packet buffer
-	Packet *packet = MasterWorker::packetPool->malloc();
+	Packet *packet = 0;
 	size_t s;
-	packet->setReferenceCount( 1 + MasterWorker::parityChunkCount );
-	this->protocol.reqRemappingSet(
-		s, pid.id,
-		remappingRecord.listId, remappingRecord.chunkId, false,
-		key.data, key.size,
-		value->data, value->size,
-		packet->data,
-		header.sockfd, header.isRemapped
-	);
-	packet->size = s;
-	delete value;
-	value = 0;
 
 	// Send SET requests (parity)
 	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
+		SlaveSocket *paritySocket = 0;
+		struct sockaddr_in originalParityAddr = this->paritySlaveSockets[ i ]->getAddr();
+		if ( remapList[ i + 1 ] > MasterWorker::dataChunkCount - 1 )
+			paritySocket = this->paritySlaveSockets[ remapList[ i + 1 ] - MasterWorker::dataChunkCount ];
+		else
+			paritySocket = this->dataSlaveSockets[ remapList[ i + 1 ] ];
+		packet = MasterWorker::packetPool->malloc();
+		// for parity slaves
+		packet->setReferenceCount( 1 );
+		this->protocol.reqRemappingSet(
+			s, pid.id,
+			remappingRecord.listId, remappingRecord.chunkId, false,
+			key.data, key.size,
+			value->data, value->size,
+			packet->data,
+			this->paritySlaveSockets[ i ]->getSocket(), true /* isParity */,
+			&originalParityAddr
+		);
+		packet->size = s;
 		if ( MasterWorker::updateInterval ) {
 			// Mark the time when request is sent
 			MasterWorker::pending->recordRequestStartTime(
 				PT_SLAVE_SET, pid.id, pid.parentId,
-				( void * ) this->paritySlaveSockets[ i ],
-				this->paritySlaveSockets[ i ]->getAddr()
+				( void * ) paritySocket, paritySocket->getAddr()
 			);
 		}
 
 		SlaveEvent slaveEvent;
-		slaveEvent.send( this->paritySlaveSockets[ i ], packet );
+		slaveEvent.send( paritySocket, packet );
 #ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
 		MasterWorker::eventQueue->prioritizedInsert( slaveEvent );
 #else
@@ -1863,11 +1953,31 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 	if ( MasterWorker::updateInterval )
 		MasterWorker::pending->recordRequestStartTime( PT_SLAVE_SET, pid.id, pid.parentId, ( void * ) socket, socket->getAddr() );
 
+	packet = MasterWorker::packetPool->malloc();
+	packet->setReferenceCount( 1 );
+	this->protocol.reqRemappingSet(
+		s, pid.id,
+		remappingRecord.listId, remappingRecord.chunkId, false,
+		key.data, key.size,
+		value->data, value->size,
+		packet->data,
+		header.sockfd, false /* ! isParity */
+	);
+	packet->size = s;
+
+	// release value buffer
+	delete value;
+	value = 0;
+
 	// Send SET request (data)
 	SlaveEvent slaveEvent;
 	slaveEvent.send( socket, packet );
 	this->dispatch( slaveEvent );
 	return true;
+
+#undef NO_DATA_REMAPPING
+#undef NO_PARITY_REMAPPING
+#undef DECREMENT_COUNTER_ON_FAILURE
 }
 
 bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, char *buf, size_t size ) {
@@ -1925,7 +2035,7 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 
 	// Mark the elapse time as latency
 	Master* master = Master::getInstance();
-	if ( MasterWorker::updateInterval && NO_REMAPPING ) {
+	if ( MasterWorker::updateInterval ) {
 		timespec elapsedTime;
 		RequestStartTime rst;
 
@@ -1949,6 +2059,15 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 		}
 	}
 
+	int32_t sockfd = header.sockfd;
+	// Determine if parity slave is involved in remapping
+	if ( header.sockfd != ( uint32_t ) event.socket->getSocket() ) {
+		// remapping always counts
+		MasterWorker::slaveSockets->get( sockfd )->counter.decreaseRemapping();
+	} else if ( ! header.isRemapped /* Not isParity */ ) {
+		MasterWorker::slaveSockets->get( sockfd )->counter.decreaseLockOnly();
+	}
+
 	// if ( pending ) {
 	// 	__ERROR__( "MasterWorker", "handleRemappingSetResponse", "Pending slave REMAPPING_SET requests = %d (%sremapping).", pending, NO_REMAPPING ? "no " : "" );
 	// }
@@ -1962,26 +2081,6 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 
 		applicationEvent.resSet( ( ApplicationSocket * ) key.ptr, pid.id, key, success );
 		MasterWorker::eventQueue->insert( applicationEvent );
-
-		// find the data slave socket (and the counter embedded)
-		SlaveSocket* slaveSocket = this->getSlaves( originalListId, originalChunkId );
-		if ( slaveSocket ) {
-			int sockfd = header.sockfd;
-			if ( header.isRemapped ) {
-				MasterWorker::slaveSockets->get( sockfd )->counter.decreaseRemapping();
-			} else {
-				MasterWorker::slaveSockets->get( sockfd )->counter.decreaseLockOnly();
-			}
-			//int sockfd = slaveSocket->getSocket();
-			//if ( NO_REMAPPING ) {
-			//	MasterWorker::slaveSockets->get( sockfd )->counter.decreaseLockOnly();
-			//} else {
-			//	MasterWorker::slaveSockets->get( sockfd )->counter.decreaseRemapping();
-			//}
-			//Master::getInstance()->remapMsgHandler.ackRemap( slaveSocket->getAddr() );
-		} else {
-			// TODO slave not found within a stripe list, is the stripe list deleted?
-		}
 
 		// add a remaping record
 		if ( ! NO_REMAPPING ) {

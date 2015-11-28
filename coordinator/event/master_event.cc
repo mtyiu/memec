@@ -39,6 +39,12 @@ void MasterEvent::syncRemappingRecords( MasterSocket *socket, std::vector<Packet
 	this->message.remap.syncPackets = packets;
 }
 
+void MasterEvent::syncRemappedParity( MasterSocket *socket, Packet *packet ) {
+	this->type = MASTER_EVENT_TYPE_PARITY_MIGRATE;
+	this->socket = socket;
+	this->message.parity.packet = packet;
+}
+
 void MasterEvent::resDegradedLock( MasterSocket *socket, uint32_t id, Key &key, bool isLocked, bool isSealed, uint32_t srcListId, uint32_t srcStripeId, uint32_t srcChunkId, uint32_t dstListId, uint32_t dstChunkId ) {
 	this->type = isLocked ? MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED : MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_WAS_LOCKED;
 	this->id = id;

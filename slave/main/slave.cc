@@ -822,6 +822,32 @@ void Slave::printPending( FILE *f ) {
 		fprintf( f, "\n" );
 	}
 	UNLOCK( &this->pending.slavePeers.setChunkLock );
+
+	// pending remapped data
+	LOCK( &this->pending.slavePeers.remappedDataLock );
+	fprintf(
+		f,
+		"\n[REMAP_DATA] Pending: %lu slaves\n",
+		this->pending.slavePeers.remappedData.size()
+	);
+	for ( 
+		auto slave = this->pending.slavePeers.remappedData.begin();
+		slave != this->pending.slavePeers.remappedData.end();
+		slave++
+	) {
+		char addrstr[ INET_ADDRSTRLEN ];
+		Socket::ntoh_ip( slave->first.sin_addr.s_addr, addrstr, INET_ADDRSTRLEN );
+		fprintf( f, "\tSlave %s:%hu\n", addrstr, ntohs( slave->first.sin_port ) );
+		for ( auto record : *slave->second ) {
+			fprintf( 
+				f, 
+				"\t\t List ID: %u Chunk Id: %u Key: %.*s\n",
+				record.listId, record.chunkId, 
+				record.key.size, record.key.data
+			);
+		}
+	}
+	UNLOCK( &this->pending.slavePeers.remappedDataLock );
 }
 
 void Slave::printChunk() {

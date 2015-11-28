@@ -525,6 +525,21 @@ void Coordinator::syncRemappingRecords( LOCK_T *lock, std::map<struct sockaddr_i
 	this->eventQueue.insert( event );
 }
 
+void Coordinator::syncRemappedParity( struct sockaddr_in slaveAddr ) {
+	CoordinatorEvent event;
+	LOCK_T lock;
+	LOCK_INIT( &lock );
+	pthread_cond_t allAcked;
+	pthread_cond_init( &allAcked, NULL );
+	std::set<struct sockaddr_in> ackedSlaves;
+	// let worker send the sync requests
+	event.syncRemappedParity( &lock, &ackedSlaves, &allAcked, slaveAddr );
+	this->eventQueue.insert( event );
+	// wait for sync to complete
+	pthread_cond_wait( &allAcked, &lock );
+	UNLOCK( &lock );
+}
+
 double Coordinator::getElapsedTime() {
 	return get_elapsed_time( this->startTime );
 }
@@ -656,6 +671,12 @@ void Coordinator::interactive() {
 			this->syncRemappingRecords( &lock, &counter, ( bool * ) &done );
 			while( ! done );
 			valid = true;
+		} else if ( strcmp( command, "paritysync" ) == 0 ) {
+			LOCK( &this->sockets.slaves.lock );
+			for ( uint32_t i = 0; i < this->sockets.slaves.size(); i++ ){
+				this->syncRemappedParity( this->sockets.slaves[ i ]->getAddr() );
+			}
+			UNLOCK( &this->sockets.slaves.lock );
 		} else {
 			valid = false;
 		}
@@ -729,6 +750,7 @@ void Coordinator::help() {
 		"- metadata: Write metadata to disk\n"
 		"- remapping: Show remapping info\n"
 		"- remapsync: Force all remapping records to masters\n"
+		"- paritysync: Force all remapped parity to migrate\n"
 		"- exit: Terminate this client\n"
 	);
 	fflush( stdout );

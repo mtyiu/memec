@@ -49,6 +49,8 @@ private:
 	std::map<std::map<struct sockaddr_in, uint32_t>*, std::set<uint32_t> > syncRemappingRecordCountersReverse;
 	std::map<std::map<struct sockaddr_in, uint32_t>*, bool*> syncRemappingRecordIndicators;
 	LOCK_T syncRemappingRecordLock;
+	std::map<struct sockaddr_in, Key> syncRemappedParity;
+	LOCK_T syncRemappedParityLock;
 
 	std::unordered_map<PendingIdentifier, PendingRecovery> recovery;
 	LOCK_T recoveryLock;
@@ -59,6 +61,7 @@ public:
 		LOCK_INIT( &this->releaseDegradedLockLock );
 		LOCK_INIT( &this->syncRemappingRecordLock );
 		LOCK_INIT( &this->recoveryLock );
+		LOCK_INIT( &this->syncRemappedParityLock );
 	}
 
 	~Pending() {}

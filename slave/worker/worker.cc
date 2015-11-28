@@ -1,5 +1,6 @@
 #include "worker.hh"
 #include "../main/slave.hh"
+#include "../../common/ds/sockaddr_in.hh"
 #include "../../common/util/debug.hh"
 #include "../../common/util/time.hh"
 
@@ -1376,7 +1377,9 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size ) 
 
 bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_t size ) {
 	struct RemappingSetHeader header;
-	if ( ! this->protocol.parseRemappingSetHeader( header, buf, size ) ) {
+	struct sockaddr_in targetAddr;
+	targetAddr.sin_addr.s_addr = 0;
+	if ( ! this->protocol.parseRemappingSetHeader( header, buf, size, 0, &targetAddr ) ) {
 		__ERROR__( "SlaveWorker", "handleRemappingSetRequest", "Invalid REMAPPING_SET request (size = %lu).", size );
 		return false;
 	}
@@ -1388,13 +1391,33 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 		event.id
 	);
 
-	SlaveWorker::chunkBuffer->at( header.listId )->set(
-		this,
-		header.key, header.keySize,
-		header.value, header.valueSize,
-		PROTO_OPCODE_REMAPPING_SET, header.chunkId,
-		this->chunks, this->dataChunk, this->parityChunk
-	);
+	uint32_t originalListId, originalChunkId;
+	SlavePeerSocket *dataSlaveSocket = this->getSlaves( header.key, header.keySize, originalListId, originalChunkId );
+	struct sockaddr_in selfAddr = Slave::getInstance()->sockets.self.getAddr();
+	bool bufferRemapData = true;
+	if ( ! header.remapped /* data rempped ?*/ ) {
+		if ( selfAddr == dataSlaveSocket->getAddr() ) {
+			bufferRemapData = false;
+		}
+	} else if ( targetAddr.sin_addr.s_addr == 0 || targetAddr == selfAddr ) {/* parity remapped ?*/
+		bufferRemapData = false;
+	}
+
+	if ( header.remapped ) { // only buffer remapped parity for the time being
+		Key key;
+		key.set( header.keySize, header.key );
+		Value value;
+		value.set( header.valueSize, header.value );
+		SlaveWorker::pending->insertRemapData( targetAddr, header.listId, header.chunkId, key, value );
+	} else {
+		SlaveWorker::chunkBuffer->at( header.listId )->set(
+			this,
+			header.key, header.keySize,
+			header.value, header.valueSize,
+			PROTO_OPCODE_REMAPPING_SET, header.chunkId,
+			this->chunks, this->dataChunk, this->parityChunk
+		);
+	}
 
 	if ( header.needsForwarding && SlaveWorker::parityChunkCount > 0 ) {
 		uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );

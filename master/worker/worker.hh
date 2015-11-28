@@ -54,7 +54,7 @@ private:
 	// For degraded oeprations
 	SlaveSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, uint32_t &newChunkId, bool &useDegradedMode, SlaveSocket *&original );
 	// For remapping
-	SlaveSocket *getSlaves( char *data, uint8_t size, uint32_t &originalListId, uint32_t &originalChunkId, uint32_t &remappedListId, uint32_t &remappedChunkId );
+	SlaveSocket *getSlaves( char *data, uint8_t size, uint32_t &originalListId, uint32_t &originalChunkId, uint32_t &remappedListId, std::vector<uint32_t> &remappedChunkId );
 	SlaveSocket *getSlaves( uint32_t listId, uint32_t chunkId );
 
 	bool handleGetRequest( ApplicationEvent event, char *buf, size_t size );

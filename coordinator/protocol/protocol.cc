@@ -154,6 +154,17 @@ bool CoordinatorProtocol::parseLoadingStats(
 	return true;
 }
 
+bool CoordinatorProtocol::parseRemappingLockHeader( struct RemappingLockHeader &header, char *buf, size_t size, std::vector<uint32_t> *remapList, size_t offset ) {
+	bool ret = Protocol::parseRemappingLockHeader( header, buf, size, offset );
+	char *payload = buf + offset + PROTO_REMAPPING_LOCK_SIZE + header.keySize;
+	uint32_t listCount = payload[ 0 ];
+	payload += 1;
+	for ( uint32_t i = 0; i < listCount; i++, payload += 4 ) {
+		remapList->push_back( ntohl( *( ( uint32_t * )( payload ) ) ) );
+	}
+	return ret;
+}
+
 char *CoordinatorProtocol::forwardRemappingRecords( size_t &size, uint32_t id, char* message ) {
 	size_t headerSize = this->generateHeader(
 		PROTO_MAGIC_REMAPPING,
@@ -182,6 +193,20 @@ char *CoordinatorProtocol::reqSyncRemappingRecord( size_t &size, uint32_t id, st
 	);
 	isLast = ( remapCount == 0 );
 
+	return buffer;
+}
+
+char *CoordinatorProtocol::reqSyncRemappedParity( size_t &size, uint32_t id, struct sockaddr_in target, char* buffer ) {
+	if ( ! buffer ) buffer = this->buffer.send;
+	size = this->generateAddressHeader(
+		PROTO_MAGIC_REMAPPING,
+		PROTO_MAGIC_TO_MASTER,
+		PROTO_OPCODE_PARITY_MIGRATE,
+		id,
+		target.sin_addr.s_addr, 
+		target.sin_port,
+		buffer
+	);
 	return buffer;
 }
 

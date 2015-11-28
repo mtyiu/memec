@@ -113,6 +113,7 @@ public:
 	void releaseDegradedLock();
 	void releaseDegradedLock( struct sockaddr_in slave, bool *done );
 	void syncRemappingRecords( LOCK_T *lock, std::map<struct sockaddr_in, uint32_t> *counter, bool *done );
+	void syncRemappedParity( struct sockaddr_in target );
 	double getElapsedTime();
 	void interactive();
 };

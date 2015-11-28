@@ -180,23 +180,32 @@ char *MasterProtocol::reqSet( size_t &size, uint32_t id, char *key, uint8_t keyS
 	return buf;
 }
 
-char *MasterProtocol::reqRemappingSetLock( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, bool isRemapped, char *key, uint8_t keySize, uint32_t sockfd ) {
+char *MasterProtocol::reqRemappingSetLock( size_t &size, uint32_t id, uint32_t listId, std::vector<uint32_t> chunkId, uint32_t reqRemapState , char *key, uint8_t keySize, uint32_t sockfd ) {
 	size = this->generateRemappingLockHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_COORDINATOR,
 		PROTO_OPCODE_REMAPPING_LOCK,
 		id,
 		listId,
-		chunkId,
-		isRemapped,
+		chunkId[ 0 ],
+		reqRemapState,
 		keySize,
 		key,
-		sockfd
+		sockfd,
+		( chunkId.size() - 1 ) * 4 + 1
 	);
+
+	// append the list of parity slave ( may be remapped )
+	*( this->buffer.send + size ) = ( uint8_t ) chunkId.size() - 1;
+	size += 1;
+	for ( uint32_t i = 1; i < chunkId.size(); i++, size += 4 ) {
+		*( ( uint32_t * )( this->buffer.send + size ) ) = htonl( chunkId[ i ] );
+	}
+
 	return this->buffer.send;
 }
 
-char *MasterProtocol::reqRemappingSet( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, bool needsForwarding, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf, uint32_t sockfd, bool remapped ) {
+char *MasterProtocol::reqRemappingSet( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, bool needsForwarding, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf, uint32_t sockfd, bool isParity, struct sockaddr_in *target ) {
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateRemappingSetHeader(
 		PROTO_MAGIC_REQUEST,
@@ -212,7 +221,8 @@ char *MasterProtocol::reqRemappingSet( size_t &size, uint32_t id, uint32_t listI
 		value,
 		buf,
 		sockfd,
-		remapped
+		isParity,
+		target
 	);
 	return buf;
 }

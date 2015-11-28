@@ -1,3 +1,4 @@
+#include <unordered_set>
 #include "basic_remap_scheme.hh"
 #include "../../common/ds/sockaddr_in.hh"
 
@@ -11,13 +12,16 @@ pthread_mutex_t BasicRemappingScheme::lock = PTHREAD_MUTEX_INITIALIZER;
 uint32_t BasicRemappingScheme::remapped = 0;
 uint32_t BasicRemappingScheme::lockonly= 0;
 
-void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t originalChunkId, uint32_t &remappedListId, uint32_t &remappedChunkId, uint32_t dataCount, uint32_t parityCount, SlaveSocket **data, SlaveSocket **parity ) {
+void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t originalChunkId, uint32_t &remappedListId, std::vector<uint32_t> &remappedChunkId, uint32_t dataCount, uint32_t parityCount, SlaveSocket **data, SlaveSocket **parity ) {
 	int index = -1, leastOverloadedId;
 	struct sockaddr_in slaveAddr;
 	Latency *targetLatency, *nodeLatency, *overloadLatency;
 
 	// baseline: no remapping
-	remappedChunkId = originalChunkId;
+	remappedChunkId.clear();
+	remappedChunkId.push_back( originalChunkId );
+	for ( uint32_t i = 0; i < parityCount; i++ )
+		remappedChunkId.push_back( dataCount + i );
 	remappedListId = originalListId;
 	leastOverloadedId = originalChunkId;
 
@@ -28,88 +32,121 @@ void BasicRemappingScheme::getRemapTarget( uint32_t originalListId, uint32_t ori
 
 	slaveAddr = data[ originalChunkId ]->getAddr();
 
-	// check if remapping is allowed
-	if ( ! remapMsgHandler->allowRemapping( slaveAddr ) ) {
+	// check if remapping is allowed, and mark the slaves to be remapped
+	// allow remapping && is overload
+	bool allowRemapping = false;
+	std::vector<uint32_t> remapIndex; // 0: data, idx > 0: idx-1 th parity
+	for ( uint32_t i = 0; i < 1 + parityCount; i++ ) {
+		if ( i == 0 ) {
+			allowRemapping = remapMsgHandler->allowRemapping( slaveAddr );
+			allowRemapping &= overloadedSlave->slaveSet.count( slaveAddr );
+		} else {
+			allowRemapping = remapMsgHandler->allowRemapping( parity[ i - 1 ]->getAddr() );
+			allowRemapping &= overloadedSlave->slaveSet.count( parity[ i - 1 ]->getAddr() );
+		}
+		if ( allowRemapping ) remapIndex.push_back( i );
+	}
+	if ( remapIndex.empty() ) {
 		lockonly++;
 		return;
 	}
 
-	// skip remap if not overloaded
-	if ( overloadedSlave->slaveSet.count( slaveAddr ) < 1 )
-		return;
-
-	// TODO avoid locking?
 	LOCK( &slaveLoading->lock );
 	LOCK( &overloadedSlave->lock );
 
-	targetLatency = slaveLoading->cumulativeMirror.set.get( slaveAddr, &index );
-	overloadLatency = targetLatency;
-	// cannot determine whether remap is necessary??
-	if ( index == -1 )
-		goto exit;
-
-	if ( dataCount < 2 ) {
-		// need a new stripe list if the list only consist of one node
-		leastOverloadedId = originalListId;
-		// search all stripe lists
-		for ( uint32_t listIndex = 0; listIndex < stripeList->getNumList(); listIndex++ ) {
-			parity = stripeList->get( listIndex, parity, data );
-			slaveAddr = data[ 0 ]->getAddr();
-			nodeLatency = slaveLoading->cumulativeMirror.set.get( slaveAddr , &index );
-
-			// TODO if this node had not been accessed, should we take the risk and try?
-			if ( index == -1 )
-				continue;
-
-			if ( overloadedSlave->slaveSet.count( slaveAddr ) > 0 ) {
-				if ( *nodeLatency < *overloadLatency ) {
-					overloadLatency = nodeLatency;
-					leastOverloadedId = listIndex;
-				}
-			} else if ( *nodeLatency < *targetLatency ) {
-				targetLatency = nodeLatency;
-				remappedListId = listIndex;
-			}
+	std::unordered_set<uint32_t> selectedSlaves;
+	bool hasRemapped = false;
+	for ( uint32_t i = 0; i < remapIndex.size(); i++ ) {
+		if ( remapIndex[ i ] != 0 )
+			slaveAddr = parity[ remapIndex[ i ] - 1 ]->getAddr();
+		if ( remapIndex[ i ] == 0 ) {
+			leastOverloadedId = originalChunkId;
+		} else {
+			leastOverloadedId = remapIndex[ i ] - 1 + dataCount;
 		}
-		if ( remappedListId == originalListId )
-			remappedListId = leastOverloadedId;
-		*targetLatency = *targetLatency + increment;
-
-	} else {
-		// search the least-loaded node with the stripe list
-		// TODO  move to more efficient and scalable data structure e.g. min-heap
-		for ( uint32_t chunkIndex = 0; chunkIndex < dataCount; chunkIndex++ ) {
-			// skip the original node
-			if ( chunkIndex == originalChunkId )
-				continue;
-			slaveAddr = data[ chunkIndex ]->getAddr();
-			nodeLatency = slaveLoading->cumulativeMirror.set.get( slaveAddr, &index );
-
-			// TODO if this node had not been accessed, should we take the risk and try?
-			if ( index == -1 )
-				continue;
-			if ( overloadedSlave->slaveSet.count( slaveAddr ) > 0 ) {
-				// scan for the least overloaded node, in case all nodes are overloaded
-				if ( *nodeLatency < *overloadLatency ) {
-					overloadLatency = nodeLatency;
-					leastOverloadedId = chunkIndex;
-				}
-			} else if ( *nodeLatency < *targetLatency ) {
-				targetLatency = nodeLatency;
-				remappedChunkId = chunkIndex;
-			}
+		targetLatency = slaveLoading->cumulativeMirror.set.get( slaveAddr, &index );
+		overloadLatency = targetLatency;
+		// cannot determine whether remap is necessary??
+		if ( index == -1 ) {
+			selectedSlaves.insert( remappedChunkId[ remapIndex [ i ] ] );
+			continue;
 		}
-		if ( remappedChunkId == originalChunkId )
-			remappedChunkId = leastOverloadedId;
-		*targetLatency = *targetLatency + increment;
+
+		if ( dataCount < 2 && remapIndex[ i ] == 0 ) {
+			// need a new stripe list if the list only consist of one node
+			leastOverloadedId = originalListId;
+			// search all stripe lists
+			for ( uint32_t listIndex = 0; listIndex < stripeList->getNumList(); listIndex++ ) {
+				parity = stripeList->get( listIndex, parity, data );
+				slaveAddr = data[ 0 ]->getAddr();
+				nodeLatency = slaveLoading->cumulativeMirror.set.get( slaveAddr , &index );
+
+				// TODO if this node had not been accessed, should we take the risk and try?
+				if ( index == -1 )
+					continue;
+
+				if ( overloadedSlave->slaveSet.count( slaveAddr ) > 0 ) {
+					if ( *nodeLatency < *overloadLatency ) {
+						overloadLatency = nodeLatency;
+						leastOverloadedId = listIndex;
+					}
+				} else if ( *nodeLatency < *targetLatency ) {
+					targetLatency = nodeLatency;
+					remappedListId = listIndex;
+				}
+			}
+			if ( remappedListId == originalListId )
+				remappedListId = leastOverloadedId;
+			*targetLatency = *targetLatency + increment;
+
+			hasRemapped |= ( remappedListId != originalListId );
+
+		} else if ( dataCount < 2 ) {
+			// TODO handle parity remap?
+		} else {
+			// search the least-loaded node with the stripe list
+			// TODO  move to more efficient and scalable data structure e.g. min-heap
+			for ( uint32_t chunkIndex = 0; chunkIndex < dataCount; chunkIndex++ ) {
+				// skip the original node
+				if ( chunkIndex == originalChunkId && remapIndex[ i ] == 0 )
+					continue;
+				nodeLatency = slaveLoading->cumulativeMirror.set.get( slaveAddr, &index );
+
+				// TODO if this node had not been accessed, should we take the risk and try?
+				if ( index == -1 )
+					continue;
+				if ( overloadedSlave->slaveSet.count( slaveAddr ) > 0 ) {
+					// scan for the least overloaded node, in case all nodes are overloaded
+					if ( *nodeLatency < *overloadLatency && selectedSlaves.count( chunkIndex ) == 0 ) {
+						overloadLatency = nodeLatency;
+						leastOverloadedId = chunkIndex;
+					}
+				} else if ( *nodeLatency < *targetLatency && selectedSlaves.count( chunkIndex ) == 0 ) {
+					targetLatency = nodeLatency;
+					remappedChunkId[ remapIndex[ i ] ] = chunkIndex;
+				}
+			}
+			if ( ( remapIndex[ i ] == 0 && remappedChunkId[ remapIndex[ i ] ] == originalChunkId ) ||
+				( remapIndex[ i ] > 0 && remappedChunkId[ remapIndex[ i ] ] == remapIndex[ i ] - 1 + dataCount ) ) 
+			{
+				remappedChunkId[ remapIndex[ i ] ] = leastOverloadedId;
+				*targetLatency = *targetLatency + increment;
+			}
+			selectedSlaves.insert( remappedChunkId[ remapIndex[ i ] ] );
+			// just for debug ( count and printing )
+			if ( remapIndex[ i ] == 0 )
+				hasRemapped |= ( remappedChunkId[ remapIndex[ i ] ] != originalChunkId );
+			else
+				hasRemapped |= ( remappedChunkId[ remapIndex[ i ] ] != dataCount + remapIndex[ i ] - 1 );
+		}
 	}
 
-
-exit:
 	UNLOCK( &overloadedSlave->lock );
 	UNLOCK( &slaveLoading->lock );
 
-	if ( ! ( remappedChunkId == originalChunkId && remappedListId == originalListId ) ) {
+	if ( hasRemapped ) {
+		//for ( uint32_t i = 0; i < remappedChunkId.size(); i++ )
+		//	printf( "remap[%u] %u to %u\n", i, (i == 0)? originalChunkId:i-1+dataCount, remappedChunkId[ i ] );
 		pthread_mutex_lock( &BasicRemappingScheme::lock );
 		remapped++;
 		pthread_mutex_unlock( &BasicRemappingScheme::lock );

@@ -103,6 +103,34 @@ void CoordinatorWorker::dispatch( CoordinatorEvent event ) {
 			UNLOCK( &coordinator->sockets.masters.lock );
 		}
 			break;
+		case COORDINATOR_EVENT_TYPE_SYNC_REMAPPED_PARITY:
+		{
+			uint32_t id = coordinator->idGenerator.nextVal( this->workerId );
+			MasterEvent masterEvent;
+			
+			// prepare the request for all master
+			Packet *packet = coordinator->packetPool.malloc();
+			buffer.data = packet->data;
+			this->protocol.reqSyncRemappedParity(
+				buffer.size, id, 
+				event.message.parity.target, buffer.data
+			);
+			packet->size = buffer.size;
+
+			//coordinator->pendingRemapParity->insert( id, event.message.parity.counter, event.message.parity.allAcked );
+	
+			LOCK( &coordinator->sockets.masters.lock );
+			packet->setReferenceCount( coordinator->sockets.masters.size() );
+			for ( uint32_t i = 0; i < coordinator->sockets.masters.size(); i++ ) {
+				MasterSocket *socket = coordinator->sockets.masters[ i ];
+				event.message.parity.counter->insert( socket->getAddr() );
+				masterEvent.syncRemappedParity( socket , packet );
+				coordinator->eventQueue.insert( masterEvent );
+			}
+			UNLOCK( &coordinator->sockets.masters.lock );
+		
+		}
+			break;
 		default:
 			break;
 	}
@@ -1064,10 +1092,19 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 
 bool CoordinatorWorker::handleRemappingSetLockRequest( MasterEvent event, char *buf, size_t size ) {
 	struct RemappingLockHeader header;
-	if ( ! this->protocol.parseRemappingLockHeader( header, buf, size ) ) {
+	std::vector<uint32_t> remapList;
+	if ( ! this->protocol.parseRemappingLockHeader( header, buf, size, &remapList ) ) {
 		__ERROR__( "CoordinatorWorker", "handleRemappingSetLockRequest", "Invalid REMAPPING_SET_LOCK request (size = %lu).", size );
 		return false;
 	}
+	
+	for ( uint32_t i = 1; i < remapList.size(); i++ ) {
+		if ( remapList[ i ] != CoordinatorWorker::dataChunkCount + i - 1 ) {
+			// TODO record the remapped parity locations
+			 //printf("remap parity: remapList[ %d ] = %u\n", i, remapList[ i ] );
+		}
+	}
+
 	__DEBUG__(
 		BLUE, "CoordinatorWorker", "handleRemappingSetLockRequest",
 		"[REMAPPING_SET_LOCK] Key: %.*s (key size = %u); remapped list ID: %u, remapped chunk ID: %u",

@@ -451,7 +451,7 @@ bool CoordinatorRemapMsgHandler::isAllMasterAcked( struct sockaddr_in slave ) {
 	//}
 	//fprintf( stderr, "%lu of %lu masters acked slave %s:%hu\n", ackMasters[ slave ]->size(), aliveMasters.size(), buf , slave.sin_port );
 	if ( allAcked ) {
-		printf( " ACKED slave %s:%hu\n", buf, slave.sin_port );
+		printf( " ACKED slave %s:%hu on state %d\n", buf, ntohs( slave.sin_port ), this->slavesStatus[ slave ] );
 		pthread_cond_broadcast( &this->ackSignal[ slave ] );
 	}
 	UNLOCK( &this->mastersAckLock );

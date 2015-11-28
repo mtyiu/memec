@@ -48,6 +48,7 @@
 #define PROTO_OPCODE_SYNC_META                    0x38
 #define PROTO_OPCODE_RELEASE_DEGRADED_LOCKS       0x39
 #define PROTO_OPCODE_SLAVE_RECONSTRUCTED          0x40
+#define PROTO_OPCODE_PARITY_MIGRATE               0x41
 
 // Application <-> Master or Master <-> Slave (0-19) //
 #define PROTO_OPCODE_GET                          0x01
@@ -162,6 +163,8 @@ struct SlaveSyncRemapHeader {
 	uint32_t chunkId;
 	char *key;
 };
+
+#define PROTO_SLAVE_REMAPPED_PARITY_SIZE PROTO_ADDRESS_SIZE
 
 //////////////////////////
 // Load synchronization //
@@ -421,7 +424,7 @@ protected:
 	//////////////
 	size_t generateAddressHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
-		uint32_t addr, uint16_t port
+		uint32_t addr, uint16_t port, char* buf = 0
 	);
 	bool parseAddressHeader(
 		size_t offset, uint32_t &addr, uint16_t &port,
@@ -573,7 +576,8 @@ protected:
 	size_t generateRemappingLockHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
 		uint32_t listId, uint32_t chunkId, bool isRemapped,
-		uint8_t keySize, char *key, uint32_t sockfd = UINT_MAX
+		uint8_t keySize, char *key, uint32_t sockfd = UINT_MAX,
+		uint32_t payload = 0
 	);
 	bool parseRemappingLockHeader(
 		size_t offset, uint32_t &listId, uint32_t &chunkId,
@@ -586,14 +590,16 @@ protected:
 		uint32_t listId, uint32_t chunkId, bool needsForwarding,
 		uint8_t keySize, char *key,
 		uint32_t valueSize, char *value, char *sendBuf = 0,
-		uint32_t sockfd = UINT_MAX, bool remapped = false
+		uint32_t sockfd = UINT_MAX, bool isParity = false,
+		struct sockaddr_in *target = 0
 	);
 	bool parseRemappingSetHeader(
 		size_t offset, uint32_t &listId, uint32_t &chunkId,
 		bool &needsForwarding, uint8_t &keySize, char *&key,
 		uint32_t &valueSize, char *&value,
 		char *buf, size_t size,
-		uint32_t &sockfd, bool &remapped
+		uint32_t &sockfd, bool &isParity,
+		struct sockaddr_in *target = 0
 	);
 
 	size_t generateRedirectHeader(
@@ -883,7 +889,8 @@ public:
 	);
 	bool parseRemappingSetHeader(
 		struct RemappingSetHeader &header,
-		char *buf = 0, size_t size = 0, size_t offset = 0
+		char *buf = 0, size_t size = 0, size_t offset = 0,
+		struct sockaddr_in *target = 0
 	);
 	bool parseRedirectHeader(
 		struct RedirectHeader &header,
