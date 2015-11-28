@@ -12,6 +12,9 @@ for s in $sizes; do
 		echo "Preparing for the experiments for size = $s..."
 
 		screen -S manage -p 0 -X stuff "${BASE_PATH}/scripts/util/start.sh $1$(printf '\r')"
+		for i in 2 5 6 7; do
+			ssh testbed-node$i "screen -S slave -p 0 -X stuff \"$(printf '\r\r')${BASE_PATH}/scripts/bootstrap/start-plio-backup-slave.sh ${1}$(printf '\r\r')\""
+		done
 		sleep 30
 
 		echo "Writing $s bytes of data to the system..."
