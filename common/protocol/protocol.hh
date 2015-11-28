@@ -44,10 +44,11 @@
 #define PROTO_OPCODE_COORDINATOR_PUSH_STATS       0x34
 #define PROTO_OPCODE_SEAL_CHUNKS                  0x35
 #define PROTO_OPCODE_FLUSH_CHUNKS                 0x36
-#define PROTO_OPCODE_RECOVERY                     0x37
+#define PROTO_OPCODE_RECONSTRUCTION               0x37
 #define PROTO_OPCODE_SYNC_META                    0x38
 #define PROTO_OPCODE_RELEASE_DEGRADED_LOCKS       0x39
 #define PROTO_OPCODE_SLAVE_RECONSTRUCTED          0x40
+#define PROTO_OPCODE_BACKUP_SLAVE_PROMOTED        0x41
 
 // Application <-> Master or Master <-> Slave (0-19) //
 #define PROTO_OPCODE_GET                          0x01
@@ -120,6 +121,17 @@ struct ProtocolHeader {
 struct AddressHeader {
 	uint32_t addr;
 	uint16_t port;
+};
+
+//////////////
+// Recovery //
+//////////////
+#define PROTO_PROMOTE_BACKUP_SLAVE_SIZE 10
+struct PromoteBackupSlaveHeader {
+	uint32_t addr;
+	uint16_t port;
+	uint32_t count;
+	uint32_t *metadata;
 };
 
 //////////////////////////////////////////
@@ -340,11 +352,11 @@ struct DegradedReleaseResHeader {
 	uint32_t count;
 };
 
-//////////////
-// Recovery //
-//////////////
-#define PROTO_RECOVERY_SIZE 12
-struct RecoveryHeader {
+////////////////////
+// Reconstruction //
+////////////////////
+#define PROTO_RECONSTRUCTION_SIZE 12
+struct ReconstructionHeader {
 	uint32_t listId;
 	uint32_t chunkId;
 	uint32_t numStripes;
@@ -428,10 +440,34 @@ protected:
 		char *buf, size_t size
 	);
 
+	//////////////
+	// Reconstruction //
+	//////////////
 	size_t generateSrcDstAddressHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
 		uint32_t srcAddr, uint16_t srcPort,
 		uint32_t dstAddr, uint16_t dstPort
+	);
+
+	size_t generatePromoteBackupSlaveHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint32_t addr, uint16_t port,
+		std::unordered_set<Metadata> &chunks,
+		std::unordered_set<Metadata>::iterator &it,
+		bool &isCompleted
+	);
+	size_t generatePromoteBackupSlaveHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint32_t addr, uint16_t port, uint32_t numReconstructed
+	);
+	bool parsePromoteBackupSlaveHeader(
+		size_t offset, uint32_t &addr, uint16_t &port, uint32_t &count,
+		uint32_t *&metadata,
+		char *buf, size_t size
+	);
+	bool parsePromoteBackupSlaveHeader(
+		size_t offset, uint32_t &addr, uint16_t &port, uint32_t &numReconstructed,
+		char *buf, size_t size
 	);
 
 	//////////////////////////////////////////
@@ -713,10 +749,10 @@ protected:
 		char *buf, size_t size
 	);
 
-	//////////////
-	// Recovery //
-	//////////////
-	size_t generateRecoveryHeader(
+	////////////////////
+	// Reconstruction //
+	////////////////////
+	size_t generateReconstructionHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
 		uint32_t listId, uint32_t chunkId,
 		std::unordered_set<uint32_t> &stripeIds,
@@ -724,10 +760,20 @@ protected:
 		uint32_t numChunks,
 		bool &isCompleted
 	);
-	bool parseRecoveryHeader(
+	size_t generateReconstructionHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint32_t listId, uint32_t chunkId,
+		uint32_t numChunks
+	);
+	bool parseReconstructionHeader(
 		size_t offset,
 		uint32_t &listId, uint32_t &chunkId, uint32_t &numStripes,
 		uint32_t *&stripeIds,
+		char *buf, size_t size
+	);
+	bool parseReconstructionHeader(
+		size_t offset,
+		uint32_t &listId, uint32_t &chunkId, uint32_t &numStripes,
 		char *buf, size_t size
 	);
 
@@ -814,6 +860,13 @@ public:
 	bool parseSrcDstAddressHeader(
 		struct AddressHeader &srcHeader,
 		struct AddressHeader &dstHeader,
+		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
+	//////////////
+	// Reconstruction //
+	//////////////
+	bool parsePromoteBackupSlaveHeader(
+		struct PromoteBackupSlaveHeader &header, bool isRequest,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 	//////////////////////////////////////////
@@ -917,10 +970,10 @@ public:
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 	//////////////
-	// Recovery //
+	// Reconstruction //
 	//////////////
-	bool parseRecoveryHeader(
-		struct RecoveryHeader &header,
+	bool parseReconstructionHeader(
+		struct ReconstructionHeader &header, bool isRequest,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 	//////////

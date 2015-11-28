@@ -200,7 +200,7 @@ bool SlaveSocket::handler( int fd, uint32_t events, void *data ) {
 				event.pending( slavePeerSocket );
 				slave->eventQueue.insert( event );
 			} else {
-				__ERROR__( "SlaveSocket", "handler", "Unknown socket: fd = %d.", fd );
+				// __ERROR__( "SlaveSocket", "handler", "Unknown socket: fd = %d.", fd );
 				return false;
 			}
 		}

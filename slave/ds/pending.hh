@@ -80,16 +80,26 @@ struct PendingDegradedLock {
 	uint32_t total;
 };
 
-class PendingRecovery {
+class PendingReconstruction {
 public:
 	uint32_t listId;
 	uint32_t chunkId;
+	uint32_t total;
 	std::unordered_set<uint32_t> stripeIds;
 
 	void set( uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds ) {
 		this->listId = listId;
 		this->chunkId = chunkId;
 		this->stripeIds = stripeIds;
+		this->total = ( uint32_t ) this->stripeIds.size();
+	}
+
+	void merge( std::unordered_set<uint32_t> &stripeIds ) {
+		this->total += stripeIds.size();
+		this->stripeIds.insert(
+			stripeIds.begin(),
+			stripeIds.end()
+		);
 	}
 
 	bool erase( uint32_t stripeId ) {
@@ -97,8 +107,35 @@ public:
 	}
 };
 
+class PendingRecovery {
+public:
+	uint32_t addr;
+	uint16_t port;
+	uint32_t total;
+	std::unordered_set<Metadata> chunks;
+
+	PendingRecovery( uint32_t addr, uint16_t port ) {
+		this->addr = addr;
+		this->port = port;
+		this->total = 0;
+	}
+
+	void insert( uint32_t count, uint32_t *buf ) {
+		Metadata metadata;
+		this->total += count;
+		for ( uint32_t i = 0; i < count; i++ ) {
+			metadata.set(
+				buf[ i * 3     ],
+				buf[ i * 3 + 1 ],
+				buf[ i * 3 + 2 ]
+			);
+			this->chunks.insert( metadata );
+		}
+	}
+};
+
 enum PendingType {
-	PT_COORDINATOR_RECOVERY,
+	PT_COORDINATOR_RECONSTRUCTION,
 	PT_MASTER_REMAPPING_SET,
 	PT_MASTER_GET,
 	PT_MASTER_UPDATE,
@@ -126,8 +163,10 @@ private:
 public:
 	struct {
 		std::unordered_map<PendingIdentifier, PendingDegradedLock> releaseDegradedLock;
+		std::unordered_map<PendingIdentifier, PendingReconstruction> reconstruction;
 		std::unordered_map<PendingIdentifier, PendingRecovery> recovery;
 		LOCK_T releaseDegradedLockLock;
+		LOCK_T reconstructionLock;
 		LOCK_T recoveryLock;
 	} coordinators;
 	struct {
@@ -163,6 +202,7 @@ public:
 
 	Pending() {
 		LOCK_INIT( &this->coordinators.releaseDegradedLockLock );
+		LOCK_INIT( &this->coordinators.reconstructionLock );
 		LOCK_INIT( &this->coordinators.recoveryLock );
 		LOCK_INIT( &this->masters.remappingSetLock );
 		LOCK_INIT( &this->masters.getLock );
@@ -183,9 +223,15 @@ public:
 	void insertReleaseDegradedLock(
 		uint32_t id, CoordinatorSocket *socket, uint32_t count
 	);
-	bool insertRecovery(
-		uint32_t id, SlavePeerSocket *target, uint32_t listId, uint32_t chunkId,
+	bool insertReconstruction(
+		uint32_t id, CoordinatorSocket *socket, uint32_t listId, uint32_t chunkId,
 		std::unordered_set<uint32_t> &stripeIds
+	);
+	bool insertRecovery(
+		uint32_t id, CoordinatorSocket *socket,
+		uint32_t addr, uint16_t port,
+		uint32_t count,
+		uint32_t *buf
 	);
 
 	// Insert (Master)
@@ -242,6 +288,17 @@ public:
 		uint32_t &total,
 		PendingIdentifier *pidPtr = 0
 	);
+	bool eraseReconstruction(
+		uint32_t id, CoordinatorSocket *&socket,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		uint32_t &remaining, uint32_t &total,
+		PendingIdentifier *pidPtr = 0
+	);
+	bool eraseRecovery(
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		uint32_t &id, CoordinatorSocket *&socket,
+		uint32_t &addr, uint16_t &port, uint32_t &remaining, uint32_t &total
+	);
 	bool eraseRemappingRecordKey(
 		PendingType type, uint32_t id, void *ptr = 0,
 		PendingIdentifier *pidPtr = 0,
@@ -279,8 +336,8 @@ public:
 		bool needsLock = true, bool needsUnlock = true
 	);
 
-	std::unordered_set<uint32_t> *findRecovery(
-		uint32_t id, SlavePeerSocket *&socket,
+	bool findReconstruction(
+		uint32_t id,
 		uint32_t stripeId,
 		uint32_t &listId, uint32_t &chunkId
 	);

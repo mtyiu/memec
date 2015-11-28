@@ -219,18 +219,57 @@ void Pending::insertReleaseDegradedLock( uint32_t id, CoordinatorSocket *socket,
 	UNLOCK( &this->coordinators.releaseDegradedLockLock );
 }
 
-bool Pending::insertRecovery( uint32_t id, SlavePeerSocket *target, uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds ) {
-	PendingIdentifier pid( id, id, target );
-	PendingRecovery r;
+bool Pending::insertReconstruction( uint32_t id, CoordinatorSocket *socket, uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds ) {
+	PendingIdentifier pid( id, id, socket );
+	PendingReconstruction r;
 	r.set( listId, chunkId, stripeIds );
-	std::pair<PendingIdentifier, PendingRecovery> p( pid, r );
-	std::pair<std::unordered_map<PendingIdentifier, PendingRecovery>::iterator, bool> ret;
+	std::unordered_map<PendingIdentifier, PendingReconstruction>::iterator it;
+	bool ret;
+
+	LOCK( &this->coordinators.reconstructionLock );
+	it = this->coordinators.reconstruction.find( pid );
+	if ( it == this->coordinators.reconstruction.end() ) {
+		std::pair<PendingIdentifier, PendingReconstruction> p( pid, r );
+		std::pair<std::unordered_map<PendingIdentifier, PendingReconstruction>::iterator, bool> r;
+		r = this->coordinators.reconstruction.insert( p );
+		ret = r.second;
+	} else {
+		PendingReconstruction &reconstruction = it->second;
+		if ( reconstruction.listId == listId && reconstruction.chunkId == chunkId ) {
+			reconstruction.merge( stripeIds );
+			ret = true;
+		} else {
+			ret = false;
+		}
+	}
+	UNLOCK( &this->coordinators.reconstructionLock );
+
+	return ret;
+}
+
+bool Pending::insertRecovery( uint32_t id, CoordinatorSocket *socket, uint32_t addr, uint16_t port, uint32_t count, uint32_t *buf ) {
+	PendingIdentifier pid( id, id, socket );
+	PendingRecovery r( addr, port );
+
+	std::unordered_map<PendingIdentifier, PendingRecovery>::iterator it;
+	bool ret;
 
 	LOCK( &this->coordinators.recoveryLock );
-	ret = this->coordinators.recovery.insert( p );
+	it = this->coordinators.recovery.find( pid );
+	if ( it == this->coordinators.recovery.end() ) {
+		r.insert( count, buf );
+
+		std::pair<PendingIdentifier, PendingRecovery> p( pid, r );
+		std::pair<std::unordered_map<PendingIdentifier, PendingRecovery>::iterator, bool> r;
+		r = this->coordinators.recovery.insert( p );
+		ret = r.second;
+	} else {
+		it->second.insert( count, buf );
+		ret = true;
+	}
 	UNLOCK( &this->coordinators.recoveryLock );
 
-	return ret.second;
+	return ret;
 }
 
 bool Pending::eraseReleaseDegradedLock( uint32_t id, uint32_t count, uint32_t &remaining, uint32_t &total, PendingIdentifier *pidPtr ) {
@@ -252,25 +291,87 @@ bool Pending::eraseReleaseDegradedLock( uint32_t id, uint32_t count, uint32_t &r
 	return true;
 }
 
-std::unordered_set<uint32_t> *Pending::findRecovery( uint32_t id, SlavePeerSocket *&target, uint32_t stripeId, uint32_t &listId, uint32_t &chunkId ) {
+bool Pending::eraseReconstruction( uint32_t id, CoordinatorSocket *&socket, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t &remaining, uint32_t &total, PendingIdentifier *pidPtr ) {
 	PendingIdentifier pid( id, id, 0 );
+	std::unordered_map<PendingIdentifier, PendingReconstruction>::iterator it;
+	bool ret;
+
+	LOCK( &this->coordinators.reconstructionLock );
+	it = this->coordinators.reconstruction.find( pid );
+	if ( it == this->coordinators.reconstruction.end() ) {
+		UNLOCK( &this->coordinators.reconstructionLock );
+		return false;
+	}
+	// Check whether the list ID and chunk ID match
+	if ( listId == it->second.listId && chunkId == it->second.chunkId ) {
+		size_t count;
+		if ( pidPtr ) *pidPtr = it->first;
+		socket = ( CoordinatorSocket * ) it->first.ptr;
+		count = it->second.stripeIds.erase( stripeId );
+		ret = count > 0;
+		remaining = it->second.stripeIds.size();
+		total = it->second.total;
+
+		if ( remaining == 0 )
+			this->coordinators.reconstruction.erase( it );
+	} else {
+		socket = 0;
+		ret = false;
+	}
+	UNLOCK( &this->coordinators.reconstructionLock );
+
+	return ret;
+}
+
+bool Pending::eraseRecovery( uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t &id, CoordinatorSocket *&socket, uint32_t &addr, uint16_t &port, uint32_t &remaining, uint32_t &total ) {
 	std::unordered_map<PendingIdentifier, PendingRecovery>::iterator it;
+	Metadata metadata;
+	bool ret = false;
+
+	metadata.set( listId, stripeId, chunkId );
 
 	LOCK( &this->coordinators.recoveryLock );
-	it = this->coordinators.recovery.find( pid );
-	if ( it == this->coordinators.recovery.end() ) {
-		UNLOCK( &this->coordinators.recoveryLock );
-		return 0;
+	for ( it = this->coordinators.recovery.begin(); it != this->coordinators.recovery.end(); it++ ) {
+		const PendingIdentifier &pid = it->first;
+		PendingRecovery &recovery = it->second;
+
+		if ( recovery.chunks.erase( metadata ) > 0 ) {
+			id = pid.id;
+			socket = ( CoordinatorSocket * ) pid.ptr;
+			addr = recovery.addr;
+			port = recovery.port;
+			remaining = recovery.chunks.size();
+			total = recovery.total;
+
+			if ( remaining == 0 )
+				this->coordinators.recovery.erase( it );
+
+			ret = true;
+			break;
+		}
 	}
-	target = ( SlavePeerSocket * ) it->first.ptr;
-	listId = it->second.listId;
-	chunkId = it->second.chunkId;
-
-	it->second.stripeIds.erase( stripeId );
-
 	UNLOCK( &this->coordinators.recoveryLock );
 
-	return &( it->second.stripeIds );
+	return ret;
+}
+
+bool Pending::findReconstruction( uint32_t id, uint32_t stripeId, uint32_t &listId, uint32_t &chunkId ) {
+	PendingIdentifier pid( id, id, 0 );
+	std::unordered_map<PendingIdentifier, PendingReconstruction>::iterator it;
+	size_t count;
+
+	LOCK( &this->coordinators.reconstructionLock );
+	it = this->coordinators.reconstruction.find( pid );
+	if ( it == this->coordinators.reconstruction.end() ) {
+		UNLOCK( &this->coordinators.reconstructionLock );
+		return 0;
+	}
+	listId = it->second.listId;
+	chunkId = it->second.chunkId;
+	count = it->second.stripeIds.count( stripeId );
+	UNLOCK( &this->coordinators.reconstructionLock );
+
+	return count > 0;
 }
 
 bool Pending::findChunkRequest( PendingType type, uint32_t id, void *ptr, std::unordered_multimap<PendingIdentifier, ChunkRequest>::iterator &it, bool needsLock, bool needsUnlock ) {

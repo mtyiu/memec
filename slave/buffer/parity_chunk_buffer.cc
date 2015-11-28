@@ -46,6 +46,8 @@ ParityChunkWrapper &ParityChunkBuffer::getWrapper( uint32_t stripeId, bool needs
 		wrapper.chunk->metadata.set( this->listId, stripeId, this->chunkId );
 
 		ChunkBuffer::map->setChunk( this->listId, stripeId, this->chunkId, wrapper.chunk, true );
+		// Insert into the sealed map such that the coordinator knows the existence of the new parity chunk
+		ChunkBuffer::map->seal( this->listId, stripeId, this->chunkId );
 
 		this->chunks[ stripeId ] = wrapper;
 		it = this->chunks.find( stripeId );

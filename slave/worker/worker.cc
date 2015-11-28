@@ -67,16 +67,11 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 	} buffer;
 	std::unordered_map<Key, RemappingRecord>::iterator it, safeNextIt;
 
-	if ( event.type == COORDINATOR_EVENT_TYPE_SYNC )
-		// esp. in response to request from coordinator
-		requestId = event.id;
-	else if ( event.type == COORDINATOR_EVENT_TYPE_PENDING )
-		requestId = 0;
-	else
-		requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
+	requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
 
 	switch( event.type ) {
 		case COORDINATOR_EVENT_TYPE_REGISTER_REQUEST:
+			requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
 			buffer.data = this->protocol.reqRegisterCoordinator(
 				buffer.size,
 				requestId,
@@ -92,7 +87,7 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 
 			buffer.data = this->protocol.sendHeartbeat(
 				buffer.size,
-				requestId,
+				event.id,
 				&SlaveWorker::map->sealedLock, SlaveWorker::map->sealed, sealedCount,
 				&SlaveWorker::map->opsLock, SlaveWorker::map->ops, opsCount,
 				isCompleted
@@ -140,11 +135,31 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 				SlaveWorker::eventQueue->insert( event );
 		}
 			break;
-		case COORDINATOR_EVENT_TYPE_RELEASE_DEGRADED_LOCK:
+		case COORDINATOR_EVENT_TYPE_RELEASE_DEGRADED_LOCK_RESPONSE_SUCCESS:
 			buffer.data = this->protocol.resReleaseDegradedLock(
 				buffer.size,
 				event.id,
 				event.message.degraded.count
+			);
+			isSend = true;
+			break;
+		case COORDINATOR_EVENT_TYPE_RECONSTRUCTION_RESPONSE_SUCCESS:
+			buffer.data = this->protocol.resReconstruction(
+				buffer.size,
+				event.id,
+				event.message.reconstruction.listId,
+				event.message.reconstruction.chunkId,
+				event.message.reconstruction.numStripes
+			);
+			isSend = true;
+			break;
+		case COORDINATOR_EVENT_TYPE_PROMOTE_BACKUP_SERVER_RESPONSE_SUCCESS:
+			buffer.data = this->protocol.resPromoteBackupSlave(
+				buffer.size,
+				event.id,
+				event.message.promote.addr,
+				event.message.promote.port,
+				event.message.promote.count
 			);
 			isSend = true;
 			break;
@@ -192,6 +207,9 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 					case PROTO_OPCODE_SLAVE_RECONSTRUCTED:
 						this->handleSlaveReconstructedMsg( event, buffer.data, buffer.size );
 						break;
+					case PROTO_OPCODE_BACKUP_SLAVE_PROMOTED:
+						this->handleBackupSlavePromotedMsg( event, buffer.data, buffer.size );
+						break;
 					case PROTO_OPCODE_SEAL_CHUNKS:
 						Slave::getInstance()->seal();
 						break;
@@ -204,8 +222,8 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 					case PROTO_OPCODE_RELEASE_DEGRADED_LOCKS:
 						this->handleReleaseDegradedLockRequest( event, buffer.data, header.length );
 						break;
-					case PROTO_OPCODE_RECOVERY:
-						this->handleRecoveryRequest( event, buffer.data, header.length );
+					case PROTO_OPCODE_RECONSTRUCTION:
+						this->handleReconstructionRequest( event, buffer.data, header.length );
 						break;
 					default:
 						__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from coordinator." );
@@ -1132,6 +1150,77 @@ bool SlaveWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *buf
 	return true;
 }
 
+bool SlaveWorker::handleBackupSlavePromotedMsg( CoordinatorEvent event, char *buf, size_t size ) {
+	struct PromoteBackupSlaveHeader header;
+	if ( ! this->protocol.parsePromoteBackupSlaveHeader( header, true /* isRequest */, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleBackupSlavePromotedMsg", "Invalid promote backup slave header." );
+		return false;
+	}
+
+	char tmp[ 22 ];
+	Socket::ntoh_ip( header.addr, tmp, 16 );
+	Socket::ntoh_port( header.port, tmp + 16, 6 );
+	// __DEBUG__(
+	// 	YELLOW,
+	__ERROR__(
+		"SlaveWorker", "handleBackupSlavePromotedMsg",
+		"This slave is promoted to replace %s:%s (chunk count = %u).",
+		tmp, tmp + 16, header.count
+	);
+
+	// Find the slave peer socket in the array map
+	int index = -1, sockfd = -1;
+	SlavePeerSocket *original, *s;
+	Slave *slave = Slave::getInstance();
+	bool self = false;
+
+	for ( int i = 0, len = slavePeers->size(); i < len; i++ ) {
+		if ( slavePeers->values[ i ]->equal( header.addr, header.port ) ) {
+			index = i;
+			original = slavePeers->values[ i ];
+			break;
+		}
+	}
+	if ( index == -1 ) {
+		__ERROR__( "SlaveWorker", "handleBackupSlavePromotedMsg", "The slave is not in the list. Ignoring this slave..." );
+		return false;
+	}
+	original->stop();
+
+	// Initialize
+	ServerAddr addr( 0, header.addr, header.port );
+	slave->init( index );
+
+	s = new SlavePeerSocket();
+	s->init(
+		sockfd, addr,
+		&Slave::getInstance()->sockets.epoll,
+		true
+	);
+
+	// Update sockfd in the array Map
+	if ( self ) {
+		sockfd = original->getSocket();
+	} else {
+		sockfd = s->init();
+	}
+	slavePeers->set( index, sockfd, s );
+	SlaveWorker::stripeList->update();
+	delete original;
+
+	// Insert the metadata into pending recovery map
+	SlaveWorker::pending->insertRecovery(
+		event.id,
+		event.socket,
+		header.addr,
+		header.port,
+		header.count,
+		header.metadata
+	);
+
+	return true;
+}
+
 bool SlaveWorker::handleReleaseDegradedLockRequest( CoordinatorEvent event, char *buf, size_t size ) {
 	struct ChunkHeader header;
 	uint32_t count = 0, requestId;
@@ -1196,17 +1285,17 @@ bool SlaveWorker::handleReleaseDegradedLockRequest( CoordinatorEvent event, char
 	return true;
 }
 
-bool SlaveWorker::handleRecoveryRequest( CoordinatorEvent event, char *buf, size_t size ) {
-	struct RecoveryHeader header;
+bool SlaveWorker::handleReconstructionRequest( CoordinatorEvent event, char *buf, size_t size ) {
+	struct ReconstructionHeader header;
 	std::unordered_set<uint32_t> stripeIds;
 	std::unordered_set<uint32_t>::iterator it;
-	if ( ! this->protocol.parseRecoveryHeader( header, buf, size ) ) {
-		__ERROR__( "SlaveWorker", "handleRecoveryRequest", "Invalid RECOVERY request." );
+	if ( ! this->protocol.parseReconstructionHeader( header, true, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleReconstructionRequest", "Invalid RECONSTRUCTION request." );
 		return false;
 	}
 	__DEBUG__(
-		BLUE, "SlaveWorker", "handleRecoveryRequest",
-		"[RECOVERY] List ID: %u; chunk ID: %u; number of stripes: %u.",
+		BLUE, "SlaveWorker", "handleReconstructionRequest",
+		"[RECONSTRUCTION] List ID: %u; chunk ID: %u; number of stripes: %u.",
 		header.listId, header.chunkId, header.numStripes
 	);
 
@@ -1231,7 +1320,7 @@ bool SlaveWorker::handleRecoveryRequest( CoordinatorEvent event, char *buf, size
 	}
 	assert( myChunkId < SlaveWorker::chunkCount );
 	if ( chunkCount < SlaveWorker::dataChunkCount ) {
-		__ERROR__( "SlaveWorker", "handleRecoveryRequest", "The number of surviving nodes is less than k. The data cannot be recovered." );
+		__ERROR__( "SlaveWorker", "handleReconstructionRequest", "The number of surviving nodes is less than k. The data cannot be recovered." );
 		// TODO
 		return false;
 	}
@@ -1239,14 +1328,14 @@ bool SlaveWorker::handleRecoveryRequest( CoordinatorEvent event, char *buf, size
 	// Insert into pending set
 	for ( uint32_t i = 0; i < header.numStripes; i++ )
 		stripeIds.insert( header.stripeIds[ i ] );
-	if ( ! SlaveWorker::pending->insertRecovery(
+	if ( ! SlaveWorker::pending->insertReconstruction(
 		event.id,
-		header.chunkId < SlaveWorker::dataChunkCount ? this->dataSlaveSockets[ header.chunkId ] : this->paritySlaveSockets[ header.chunkId - SlaveWorker::dataChunkCount ],
+		event.socket,
 		header.listId,
 		header.chunkId,
 		stripeIds
 	) ) {
-		__ERROR__( "SlaveWorker", "handleRecoveryRequest", "Cannot insert into coordinator RECOVERY pending map." );
+		__ERROR__( "SlaveWorker", "handleReconstructionRequest", "Cannot insert into coordinator RECONSTRUCTION pending map." );
 	}
 
 	// Send GET_CHUNK requests to surviving nodes
@@ -1270,7 +1359,7 @@ bool SlaveWorker::handleRecoveryRequest( CoordinatorEvent event, char *buf, size
 						socket, 0, false
 					);
 					if ( ! SlaveWorker::pending->insertChunkRequest( PT_SLAVE_PEER_GET_CHUNK, requestId, event.id, socket, chunkRequest ) ) {
-						__ERROR__( "SlaveWorker", "handleRecoveryRequest", "Cannot insert into slave CHUNK_REQUEST pending map." );
+						__ERROR__( "SlaveWorker", "handleReconstructionRequest", "Cannot insert into slave CHUNK_REQUEST pending map." );
 					} else {
 						events[ chunkCount ].reqGetChunk( socket, requestId, metadata );
 						chunkCount++;
@@ -2370,6 +2459,8 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, bool isSealed, ch
 	LOCK_T *keysLock, *cacheLock;
 	std::unordered_map<Key, KeyMetadata> *keys;
 	std::unordered_map<Metadata, Chunk *> *cache;
+	bool notifyCoordinator = false;
+	CoordinatorEvent coordinatorEvent;
 
 	SlaveWorker::map->getKeysMap( keys, keysLock );
 	SlaveWorker::map->getCacheMap( cache, cacheLock );
@@ -2388,115 +2479,57 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, bool isSealed, ch
 
 	ret = chunk;
 	if ( ! chunk ) {
-		__ERROR__( "SlaveWorker", "handleSetChunkRequest", "The chunk (%u, %u, %u) does not exist.", metadata.listId, metadata.stripeId, metadata.chunkId );
-	} else {
-		if ( metadata.chunkId < SlaveWorker::dataChunkCount ) {
-			if ( isSealed ) {
-				uint32_t originalChunkSize;
-				// Delete all keys in the chunk from the map
-				offset = 0;
-				originalChunkSize = chunkSize = chunk->getSize();
-				while ( offset < chunkSize ) {
-					keyValue = chunk->getKeyValue( offset );
-					keyValue.deserialize( key.data, key.size, valueStr, valueSize );
+		// Allocate memory for this chunk
+		chunk = SlaveWorker::chunkPool->malloc();
+		chunk->clear();
+		chunk->metadata.listId = metadata.listId;
+		chunk->metadata.stripeId = metadata.stripeId;
+		chunk->metadata.chunkId = metadata.chunkId;
+		chunk->isParity = metadata.chunkId < SlaveWorker::dataChunkCount;
+		SlaveWorker::map->setChunk(
+			metadata.listId, metadata.stripeId, metadata.chunkId,
+			chunk, chunk->isParity,
+			false, false
+		);
 
-					key.set( key.size, key.data );
-					SlaveWorker::map->deleteKey(
-						key, 0, keyMetadata,
-						false, // needsLock
-						false, // needsUnlock
-						false  // needsUpdateOpMetadata
-					);
+		// Remove the chunk from pending chunk set
+		uint32_t requestId, addr, remaining, total;
+		uint16_t port;
+		CoordinatorSocket *coordinatorSocket;
+		if ( SlaveWorker::pending->eraseRecovery( metadata.listId, metadata.stripeId, metadata.chunkId, requestId, coordinatorSocket, addr, port, remaining, total ) ) {
+			printf( "Received (%u, %u, %u). Number of remaining pending chunks = %u / %u.\n", metadata.listId, metadata.stripeId, metadata.chunkId, remaining, total );
 
-					objSize = KEY_VALUE_METADATA_SIZE + key.size + valueSize;
-					offset += objSize;
-				}
-
-				// Replace chunk contents
-				chunk->loadFromSetChunkRequest(
-					header.chunkData.data,
-					header.chunkData.size,
-					header.chunkData.offset,
-					header.chunkData.chunkId >= SlaveWorker::dataChunkCount
-				);
-
-				// Add all keys in the new chunk to the map
-				offset = 0;
-				chunkSize = header.chunkData.size;
-				while( offset < chunkSize ) {
-					keyValue = chunk->getKeyValue( offset );
-					keyValue.deserialize( key.data, key.size, valueStr, valueSize );
-					objSize = KEY_VALUE_METADATA_SIZE + key.size + valueSize;
-
-					key.set( key.size, key.data );
-
-					keyMetadata.set( metadata.listId, metadata.stripeId, metadata.chunkId );
-					keyMetadata.offset = offset;
-					keyMetadata.length = objSize;
-
-					SlaveWorker::map->insertKey(
-						key, 0, keyMetadata,
-						false, // needsLock
-						false, // needsUnlock
-						false  // needsUpdateOpMetadata
-					);
-
-					offset += objSize;
-				}
-
-				// Re-insert into data chunk buffer
-				assert( chunkBufferIndex == -1 );
-				if ( ! chunkBuffer->reInsert( this, chunk, originalChunkSize - chunkSize, false, false ) ) {
-					// The chunk is compacted before. Need to seal the chunk first
-					// Seal from chunk->lastDelPos
-					if ( chunk->lastDelPos < chunk->getSize() ) {
-						// Only issue seal chunk request when new key-value pairs are received
-						this->issueSealChunkRequest( chunk, chunk->lastDelPos );
-					}
-				}
-			} else {
-				struct KeyHeader keyHeader;
-				struct KeyValueHeader keyValueHeader;
-				uint32_t offset = ptr - buf;
-
-				// Handle removed keys in DEGRADED_DELETE
-				for ( uint32_t i = 0; i < header.chunkKeyValue.deleted; i++ ) {
-					if ( ! this->protocol.parseKeyHeader( keyHeader, buf, size, offset ) ) {
-						__ERROR__( "SlaveWorker", "handleSetChunkRequest", "Invalid key in deleted key list." );
-						break;
-					}
-					key.set( keyHeader.keySize, keyHeader.key );
-
-					// Update key map and chunk
-					if ( SlaveWorker::map->deleteKey( key, PROTO_OPCODE_DELETE, keyMetadata, false, false, false ) ) {
-						chunk->deleteKeyValue( keys, keyMetadata );
-					} else {
-						__ERROR__( "SlaveWorker", "handleSetChunkRequest", "The deleted key does not exist." );
-					}
-
-					offset += PROTO_KEY_SIZE + keyHeader.keySize;
-				}
-
-				// Update key-value pairs
-				for ( uint32_t i = 0; i < header.chunkKeyValue.count; i++ ) {
-					if ( ! this->protocol.parseKeyValueHeader( keyValueHeader, buf, size, offset ) ) {
-						__ERROR__( "SlaveWorker", "handleSetChunkRequest", "Invalid key-value pair in updated value list." );
-						break;
-					}
-
-					// Update the key-value pair
-					if ( map->findValueByKey( keyValueHeader.key, keyValueHeader.keySize, &keyValue, 0, 0, 0, 0, false, false ) ) {
-						keyValue.deserialize( key.data, key.size, valueStr, valueSize );
-						assert( valueSize == keyValueHeader.valueSize );
-						memcpy( valueStr, keyValueHeader.value, valueSize );
-					} else {
-						__ERROR__( "SlaveWorker", "handleSetChunkRequest", "The updated key-value pair does not exist." );
-					}
-
-					offset += PROTO_KEY_VALUE_SIZE + keyValueHeader.keySize + keyValueHeader.valueSize;
-				}
+			if ( remaining == 0 ) {
+				notifyCoordinator = true;
+				coordinatorEvent.resPromoteBackupSlave( coordinatorSocket, requestId, addr, port, total );
 			}
 		} else {
+			__ERROR__( "SlaveWorker", "handleSetChunkRequest", "Cannot find the chunk (%u, %u, %u) from pending chunk set.", metadata.listId, metadata.stripeId, metadata.chunkId );
+		}
+	}
+
+	if ( metadata.chunkId < SlaveWorker::dataChunkCount ) {
+		if ( isSealed ) {
+			uint32_t originalChunkSize;
+			// Delete all keys in the chunk from the map
+			offset = 0;
+			originalChunkSize = chunkSize = chunk->getSize();
+			while ( offset < chunkSize ) {
+				keyValue = chunk->getKeyValue( offset );
+				keyValue.deserialize( key.data, key.size, valueStr, valueSize );
+
+				key.set( key.size, key.data );
+				SlaveWorker::map->deleteKey(
+					key, 0, keyMetadata,
+					false, // needsLock
+					false, // needsUnlock
+					false  // needsUpdateOpMetadata
+				);
+
+				objSize = KEY_VALUE_METADATA_SIZE + key.size + valueSize;
+				offset += objSize;
+			}
+
 			// Replace chunk contents
 			chunk->loadFromSetChunkRequest(
 				header.chunkData.data,
@@ -2504,13 +2537,101 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, bool isSealed, ch
 				header.chunkData.offset,
 				header.chunkData.chunkId >= SlaveWorker::dataChunkCount
 			);
+
+			// Add all keys in the new chunk to the map
+			offset = 0;
+			chunkSize = header.chunkData.size;
+			while( offset < chunkSize ) {
+				keyValue = chunk->getKeyValue( offset );
+				keyValue.deserialize( key.data, key.size, valueStr, valueSize );
+				objSize = KEY_VALUE_METADATA_SIZE + key.size + valueSize;
+
+				key.set( key.size, key.data );
+
+				keyMetadata.set( metadata.listId, metadata.stripeId, metadata.chunkId );
+				keyMetadata.offset = offset;
+				keyMetadata.length = objSize;
+
+				SlaveWorker::map->insertKey(
+					key, 0, keyMetadata,
+					false, // needsLock
+					false, // needsUnlock
+					false  // needsUpdateOpMetadata
+				);
+
+				offset += objSize;
+			}
+
+			// Re-insert into data chunk buffer
+			assert( chunkBufferIndex == -1 );
+			if ( ! chunkBuffer->reInsert( this, chunk, originalChunkSize - chunkSize, false, false ) ) {
+				// The chunk is compacted before. Need to seal the chunk first
+				// Seal from chunk->lastDelPos
+				if ( chunk->lastDelPos < chunk->getSize() ) {
+					// Only issue seal chunk request when new key-value pairs are received
+					this->issueSealChunkRequest( chunk, chunk->lastDelPos );
+				}
+			}
+		} else {
+			struct KeyHeader keyHeader;
+			struct KeyValueHeader keyValueHeader;
+			uint32_t offset = ptr - buf;
+
+			// Handle removed keys in DEGRADED_DELETE
+			for ( uint32_t i = 0; i < header.chunkKeyValue.deleted; i++ ) {
+				if ( ! this->protocol.parseKeyHeader( keyHeader, buf, size, offset ) ) {
+					__ERROR__( "SlaveWorker", "handleSetChunkRequest", "Invalid key in deleted key list." );
+					break;
+				}
+				key.set( keyHeader.keySize, keyHeader.key );
+
+				// Update key map and chunk
+				if ( SlaveWorker::map->deleteKey( key, PROTO_OPCODE_DELETE, keyMetadata, false, false, false ) ) {
+					chunk->deleteKeyValue( keys, keyMetadata );
+				} else {
+					__ERROR__( "SlaveWorker", "handleSetChunkRequest", "The deleted key does not exist." );
+				}
+
+				offset += PROTO_KEY_SIZE + keyHeader.keySize;
+			}
+
+			// Update key-value pairs
+			for ( uint32_t i = 0; i < header.chunkKeyValue.count; i++ ) {
+				if ( ! this->protocol.parseKeyValueHeader( keyValueHeader, buf, size, offset ) ) {
+					__ERROR__( "SlaveWorker", "handleSetChunkRequest", "Invalid key-value pair in updated value list." );
+					break;
+				}
+
+				// Update the key-value pair
+				if ( map->findValueByKey( keyValueHeader.key, keyValueHeader.keySize, &keyValue, 0, 0, 0, 0, false, false ) ) {
+					keyValue.deserialize( key.data, key.size, valueStr, valueSize );
+					assert( valueSize == keyValueHeader.valueSize );
+					memcpy( valueStr, keyValueHeader.value, valueSize );
+				} else {
+					__ERROR__( "SlaveWorker", "handleSetChunkRequest", "The updated key-value pair does not exist." );
+				}
+
+				offset += PROTO_KEY_VALUE_SIZE + keyValueHeader.keySize + keyValueHeader.valueSize;
+			}
 		}
+	} else {
+		// Replace chunk contents
+		chunk->loadFromSetChunkRequest(
+			header.chunkData.data,
+			header.chunkData.size,
+			header.chunkData.offset,
+			header.chunkData.chunkId >= SlaveWorker::dataChunkCount
+		);
 	}
 
 	UNLOCK( cacheLock );
 	UNLOCK( keysLock );
 	if ( chunkBufferIndex != -1 )
 		chunkBuffer->updateAndUnlockChunk( chunkBufferIndex );
+
+	if ( notifyCoordinator ) {
+		SlaveWorker::eventQueue->insert( coordinatorEvent );
+	}
 
 	if ( isSealed || header.chunkKeyValue.isCompleted ) {
 		event.resSetChunk( event.socket, event.id, metadata, ret );
@@ -3205,26 +3326,21 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 				}
 			}
 		} else {
-			SlavePeerSocket *target;
 			Metadata metadata;
 
-			std::unordered_set<uint32_t> *stripeIds = SlaveWorker::pending->findRecovery(
-				pid.parentId, target,
-				stripeId,
-				listId, chunkId
-			);
+			bool hasStripe = SlaveWorker::pending->findReconstruction( pid.parentId, stripeId, listId, chunkId );
 
 			// printf( "%u\n", chunkId );
 			// fflush( stdout );
 
 			SlaveWorker::stripeList->get( listId, this->paritySlaveSockets, this->dataSlaveSockets );
-			target = ( chunkId < SlaveWorker::dataChunkCount ) ?
-					 ( this->dataSlaveSockets[ chunkId ] ) :
-					 ( this->paritySlaveSockets[ chunkId - SlaveWorker::dataChunkCount ] );
+			SlavePeerSocket *target = ( chunkId < SlaveWorker::dataChunkCount ) ?
+				( this->dataSlaveSockets[ chunkId ] ) :
+				( this->paritySlaveSockets[ chunkId - SlaveWorker::dataChunkCount ] );
 
-			// __ERROR__( "SlaveWorker", "handleGetChunkResponse", "TODO: Handle the case for recovery: (%u, %u, %u); target = %p.", listId, stripeId, chunkId, target );
+			// __ERROR__( "SlaveWorker", "handleGetChunkResponse", "TODO: Handle the case for reconstruction: (%u, %u, %u); target = %p.", listId, stripeId, chunkId, target );
 
-			if ( stripeIds ) {
+			if ( hasStripe ) {
 				// Send SET_CHUNK request
 				uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
 				chunkRequest.set(
@@ -3240,7 +3356,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 				event.reqSetChunk( target, requestId, metadata, this->chunks[ chunkId ], false );
 				this->dispatch( event );
 			} else {
-				__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot found a pending recovery request for (%u, %u).\n", listId, stripeId );
+				__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot found a pending reconstruction request for (%u, %u).\n", listId, stripeId );
 			}
 		}
 
@@ -3301,8 +3417,23 @@ bool SlaveWorker::handleSetChunkResponse( SlavePeerEvent event, bool success, ch
 			SlaveWorker::eventQueue->insert( coordinatorEvent );
 		}
 	} else {
-		// Recovery
-		// TODO
+		// Reconstruction
+		uint32_t remaining, total;
+		CoordinatorSocket *socket;
+		if ( ! SlaveWorker::pending->eraseReconstruction( pid.parentId, socket, header.listId, header.stripeId, header.chunkId, remaining, total, &pid ) ) {
+			__ERROR__( "SlaveWorker", "handleSetChunkResponse", "Cannot find a pending coordinator RECONSTRUCTION request that matches the response. The message will be discarded." );
+			return false;
+		}
+
+		if ( remaining == 0 ) {
+			// Tell the coordinator that the reconstruction task is completed
+			CoordinatorEvent coordinatorEvent;
+			coordinatorEvent.resReconstruction(
+				socket, pid.id,
+				header.listId, header.chunkId, total /* numStripes */
+			);
+			SlaveWorker::eventQueue->insert( coordinatorEvent );
+		}
 	}
 
 	return true;

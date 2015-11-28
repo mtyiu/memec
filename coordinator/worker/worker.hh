@@ -36,9 +36,11 @@ public:
 	static RemappingRecordMap *remappingRecords;
 
 	bool processHeartbeat( SlaveEvent event, char *buf, size_t size );
-	bool triggerRecovery( SlaveSocket *socket );
+	bool handleReconstructionRequest( SlaveSocket *socket );
+	bool handleReconstructionResponse( SlaveEvent event, char *buf, size_t size );
 	bool handleReleaseDegradedLockRequest( SlaveSocket *socket, bool *done = 0 );
 	bool handleReleaseDegradedLockResponse( SlaveEvent event, char *buf, size_t size );
+	bool handlePromoteBackupSlaveResponse( SlaveEvent event, char *buf, size_t size );
 
 	bool handleRemappingSetLockRequest( MasterEvent event, char* buf, size_t size );
 	bool handleDegradedLockRequest( MasterEvent event, char *buf, size_t size );

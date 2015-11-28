@@ -448,8 +448,8 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 		LOCK( &slaves.lock );
 		for ( uint32_t i = 0; i < slaves.size(); i++ ) {
 			SlaveSocket *slave = slaves.values[ i ];
-			if ( ! slave->ready() )
-				continue;
+			if ( slave->equal( event.message.reconstructed.dst ) || ! slave->ready() )
+				continue; // No need to tell the backup server
 
 			ret = slave->send( buffer.data, buffer.size, connected );
 			if ( ret != ( ssize_t ) buffer.size )
@@ -461,7 +461,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			Coordinator::getInstance()->remapMsgHandler->addAliveSlave( slaveAddr );
 		UNLOCK( &slaves.lock );
 	} else if ( event.type == SLAVE_EVENT_TYPE_DISCONNECT ) {
-		this->triggerRecovery( event.socket );
+		this->handleReconstructionRequest( event.socket );
 		// notify the remap message handler of a "removed" slave
 		if ( Coordinator::getInstance()->remapMsgHandler )
 			Coordinator::getInstance()->remapMsgHandler->removeAliveSlave( event.socket->getAddr() );
@@ -495,6 +495,24 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 					switch( header.magic ) {
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
 							this->handleReleaseDegradedLockResponse( event, buffer.data, header.length );
+							break;
+						default:
+							__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );
+					}
+					break;
+				case PROTO_OPCODE_RECONSTRUCTION:
+					switch( header.magic ) {
+						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							this->handleReconstructionResponse( event, buffer.data, header.length );
+							break;
+						default:
+							__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );
+					}
+					break;
+				case PROTO_OPCODE_BACKUP_SLAVE_PROMOTED:
+					switch( header.magic ) {
+						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							this->handlePromoteBackupSlaveResponse( event, buffer.data, header.length );
 							break;
 						default:
 							__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );
@@ -695,10 +713,10 @@ bool CoordinatorWorker::processHeartbeat( SlaveEvent event, char *buf, size_t si
 	return failed == 0;
 }
 
-bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
+bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 	int index = CoordinatorWorker::stripeList->search( socket );
 	if ( index == -1 ) {
-		__ERROR__( "CoordinatorWorker", "triggerRecovery", "The disconnected server does not exist in the consistent hash ring.\n" );
+		__ERROR__( "CoordinatorWorker", "handleReconstructionRequest", "The disconnected server does not exist in the consistent hash ring.\n" );
 		return false;
 	}
 
@@ -716,7 +734,7 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 	// Choose a backup slave to replace the failed slave //
 	///////////////////////////////////////////////////////
 	if ( backupSlaves.size() == 0 ) {
-		__ERROR__( "CoordinatorWorker", "triggerRecovery", "No backup node is available!" );
+		__ERROR__( "CoordinatorWorker", "handleReconstructionRequest", "No backup node is available!" );
 		return false;
 	}
 	backupSlaveSocket = backupSlaves[ 0 ];
@@ -747,6 +765,7 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 		char *data;
 	} buffer;
 
+	std::unordered_set<Metadata>::iterator chunksIt;
 	std::unordered_map<uint32_t, std::unordered_set<uint32_t>> stripeIds;
 	std::unordered_map<uint32_t, std::unordered_set<uint32_t>>::iterator stripeIdsIt;
 	std::unordered_set<uint32_t>::iterator stripeIdSetIt;
@@ -775,10 +794,45 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 	LOCK( &socket->map.chunksLock );
 	LOCK( &socket->map.keysLock );
 
+	//////////////////////////////
+	// Promote the backup slave //
+	//////////////////////////////
+	requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
+	chunksIt = socket->map.chunks.begin();
+	do {
+		buffer.data = this->protocol.promoteBackupSlave(
+			buffer.size,
+			requestId,
+			socket,
+			socket->map.chunks,
+			chunksIt,
+			isCompleted
+		);
+
+		ret = backupSlaveSocket->send( buffer.data, buffer.size, connected );
+		if ( ret != ( ssize_t ) buffer.size ) {
+			__ERROR__( "CoordinatorWorker", "handleReconstructionRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+			break;
+		}
+	} while ( ! isCompleted );
+
+	// Insert into pending recovery map
+	ServerAddr srcAddr = socket->getServerAddr();
+	if ( ! CoordinatorWorker::pending->insertRecovery(
+		requestId,
+		srcAddr.addr,
+		srcAddr.port,
+		socket->map.chunks.size(),
+		startTime,
+		backupSlaveSocket
+	) ) {
+		__ERROR__( "CoordinatorWorker", "handleReconstructionRequest", "Cannot insert into pending recovery map." );
+	}
+
 	/////////////////////////////////////////////////////////////////
 	// Distribute the reconstruction tasks to the surviving slaves //
 	/////////////////////////////////////////////////////////////////
-	for ( std::unordered_set<Metadata>::iterator chunksIt = socket->map.chunks.begin(); chunksIt != socket->map.chunks.end(); chunksIt++ ) {
+	for ( chunksIt = socket->map.chunks.begin(); chunksIt != socket->map.chunks.end(); chunksIt++ ) {
 		listId = chunksIt->listId;
 		stripeId = chunksIt->stripeId;
 
@@ -835,7 +889,7 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 			for ( uint32_t j = 0; j < CoordinatorWorker::chunkCount; j++ ) {
 				SlaveSocket *s = sockets[ listId ][ j ];
 				if ( s->ready() && s != backupSlaveSocket ) {
-					buffer.data = this->protocol.reqRecovery(
+					buffer.data = this->protocol.reqReconstruction(
 						buffer.size,
 						requestId,
 						listId,
@@ -848,7 +902,7 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 
 					ret = s->send( buffer.data, buffer.size, connected );
 					if ( ret != ( ssize_t ) buffer.size )
-						__ERROR__( "SlaveWorker", "triggerRecovery", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+						__ERROR__( "CoordinatorWorker", "handleReconstructionRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 
 					isAllCompleted &= isCompleted;
 				}
@@ -856,12 +910,12 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 		} while ( ! isAllCompleted );
 
 		// Insert into pending map
-		CoordinatorWorker::pending->insertRecovery(
+		CoordinatorWorker::pending->insertReconstruction(
 			requestId,
 			listId, chunkId, stripeIds[ listId ]
 		);
 
-		// __INFO__( YELLOW, "CoordinatorWorker", "triggerRecovery", "(%u, %u): Number of surviving slaves: %u; number of stripes per slave: %u; total number of stripes: %lu\n", listId, chunkId, numSurvivingSlaves, numStripePerSlave, stripeIds[ listId ].size() );
+		__INFO__( YELLOW, "CoordinatorWorker", "handleReconstructionRequest", "[%u] (%u, %u): Number of surviving slaves: %u; number of stripes per slave: %u; total number of stripes: %lu", requestId, listId, chunkId, numSurvivingSlaves, numStripePerSlave, stripeIds[ listId ].size() );
 	}
 
 	////////////////////////////
@@ -873,6 +927,29 @@ bool CoordinatorWorker::triggerRecovery( SlaveSocket *socket ) {
 	UNLOCK( &socket->map.chunksLock );
 
 	printf( "Number of chunks that need to be recovered: %u\n", numLostChunks );
+
+	return true;
+}
+
+bool CoordinatorWorker::handleReconstructionResponse( SlaveEvent event, char *buf, size_t size ) {
+	struct ReconstructionHeader header;
+	if ( ! this->protocol.parseReconstructionHeader( header, false /* isRequest */, buf, size ) ) {
+		__ERROR__( "CoordinatorWorker", "handleReconstructionResponse", "Invalid RECONSTRUCTION response (size = %lu).", size );
+		return false;
+	}
+
+	uint32_t remaining;
+	if ( ! CoordinatorWorker::pending->eraseReconstruction( event.id, header.listId, header.chunkId, header.numStripes, remaining ) ) {
+		__ERROR__( "CoordinatorWorker", "handleReconstructionResponse", "The response does not match with the request!" );
+		return false;
+	}
+
+	__DEBUG__(
+		BLUE, "CoordinatorWorker", "handleReconstructionResponse",
+		"[RECONSTRUCTION] Request ID: %u; list ID: %u, chunk Id: %u, number of stripes: %u (%s)",
+		event.id, header.listId, header.chunkId, header.numStripes,
+		remaining == 0 ? "Done" : "In progress"
+	);
 
 	return true;
 }
@@ -957,6 +1034,33 @@ bool CoordinatorWorker::handleReleaseDegradedLockResponse( SlaveEvent event, cha
 	bool *done = CoordinatorWorker::pending->removeReleaseDegradedLock( event.id, header.count );
 	if ( done )
 		*done = true;
+	return true;
+}
+
+bool CoordinatorWorker::handlePromoteBackupSlaveResponse( SlaveEvent event, char *buf, size_t size ) {
+	struct PromoteBackupSlaveHeader header;
+	if ( ! this->protocol.parsePromoteBackupSlaveHeader( header, false /* isRequest */, buf, size ) ) {
+		__ERROR__( "CoordinatorWorker", "handlePromoteBackupSlaveResponse", "Invalid PROMOTE_BACKUP_SLAVE response (size = %lu).", size );
+		return false;
+	}
+	__DEBUG__(
+		BLUE, "CoordinatorWorker", "handlePromoteBackupSlaveResponse",
+		"[PROMOTE_BACKUP_SLAVE] Request ID: %u; Count: %u (%u:%u)",
+		event.id, header.count, header.addr, header.port
+	);
+
+	uint32_t remaining, total;
+	double elapsedTime;
+
+	if ( ! CoordinatorWorker::pending->eraseRecovery( event.id, header.addr, header.port, header.count, event.socket, remaining, total, elapsedTime ) ) {
+		__ERROR__( "SlaveWorker", "handlePromoteBackupSlaveResponse", "Cannot find a pending RECOVERY request that matches the response. This message will be discarded. (ID: %u)", event.id );
+		return false;
+	}
+
+	if ( remaining == 0 ) {
+		__INFO__( CYAN, "CoordinatorWorker", "handlePromoteBackupSlaveResponse", "Recovery is completed. Number of chunks reconstructed = %u; elapsed time = %lf s.\n", total, elapsedTime );
+	}
+
 	return true;
 }
 

@@ -5,21 +5,46 @@
 #include <set>
 #include <unordered_set>
 #include <unordered_map>
+#include "../socket/slave_socket.hh"
 #include "../../common/lock/lock.hh"
 #include "../../common/ds/sockaddr_in.hh"
 #include "../../common/ds/pending.hh"
 #include "../../common/util/debug.hh"
+#include "../../common/util/time.hh"
 
-class PendingRecovery {
+class PendingReconstruction {
 public:
 	uint32_t listId;
 	uint32_t chunkId;
+	uint32_t remaining;
+	uint32_t total;
 	std::unordered_set<uint32_t> stripeIds;
 
 	void set( uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds ) {
 		this->listId = listId;
 		this->chunkId = chunkId;
 		this->stripeIds = stripeIds;
+		this->total = ( uint32_t ) this->stripeIds.size();
+		this->remaining = this->total;
+	}
+};
+
+class PendingRecovery {
+public:
+	uint32_t addr;
+	uint16_t port;
+	uint32_t remaining;
+	uint32_t total;
+	struct timespec startTime;
+	SlaveSocket *socket;
+
+	PendingRecovery( uint32_t addr, uint16_t port, uint32_t total, struct timespec startTime, SlaveSocket *socket ) {
+		this->addr = addr;
+		this->port = port;
+		this->remaining = total;
+		this->total = total;
+		this->startTime = startTime;
+		this->socket = socket;
 	}
 };
 
@@ -50,6 +75,9 @@ private:
 	std::map<std::map<struct sockaddr_in, uint32_t>*, bool*> syncRemappingRecordIndicators;
 	LOCK_T syncRemappingRecordLock;
 
+	std::unordered_map<PendingIdentifier, PendingReconstruction> reconstruction;
+	LOCK_T reconstructionLock;
+
 	std::unordered_map<PendingIdentifier, PendingRecovery> recovery;
 	LOCK_T recoveryLock;
 
@@ -58,16 +86,77 @@ public:
 		LOCK_INIT( &this->syncMetaLock );
 		LOCK_INIT( &this->releaseDegradedLockLock );
 		LOCK_INIT( &this->syncRemappingRecordLock );
+		LOCK_INIT( &this->reconstructionLock );
 		LOCK_INIT( &this->recoveryLock );
 	}
 
 	~Pending() {}
 
-	bool insertRecovery( uint32_t id, uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds ) {
+	bool insertReconstruction( uint32_t id, uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds ) {
 		PendingIdentifier pid( id, id, 0 );
-		PendingRecovery r;
+		PendingReconstruction r;
 
 		r.set( listId, chunkId, stripeIds );
+
+		std::pair<PendingIdentifier, PendingReconstruction> p( pid, r );
+		std::pair<std::unordered_map<PendingIdentifier, PendingReconstruction>::iterator, bool> ret;
+
+		LOCK( &this->reconstructionLock );
+		ret = this->reconstruction.insert( p );
+		UNLOCK( &this->reconstructionLock );
+
+		return ret.second;
+	}
+
+	std::unordered_set<uint32_t> *findReconstruction( uint32_t id, uint32_t &listId, uint32_t &chunkId ) {
+		PendingIdentifier pid( id, id, 0 );
+		std::unordered_map<PendingIdentifier, PendingReconstruction>::iterator it;
+
+		LOCK( &this->reconstructionLock );
+		it = this->reconstruction.find( pid );
+		if ( it == this->reconstruction.end() ) {
+			UNLOCK( &this->reconstructionLock );
+			return 0;
+		}
+		listId = it->second.listId;
+		chunkId = it->second.chunkId;
+		UNLOCK( &this->reconstructionLock );
+
+		return &( it->second.stripeIds );
+	}
+
+	bool eraseReconstruction( uint32_t id, uint32_t listId, uint32_t chunkId, uint32_t numStripes, uint32_t &remaining ) {
+		PendingIdentifier pid( id, id, 0 );
+		std::unordered_map<PendingIdentifier, PendingReconstruction>::iterator it;
+		bool ret;
+
+		LOCK( &this->reconstructionLock );
+		it = this->reconstruction.find( pid );
+		if ( it == this->reconstruction.end() ) {
+			UNLOCK( &this->reconstructionLock );
+			return false;
+		}
+		ret = ( listId == it->second.listId && chunkId == it->second.chunkId && it->second.remaining >= numStripes );
+		if ( ret ) {
+			it->second.remaining -= numStripes;
+			remaining = it->second.remaining;
+			if ( it->second.remaining == 0 )
+				this->reconstruction.erase( it );
+		} else {
+			printf(
+				"(%u, %u, %u) vs. (%u, %u, %u)\n",
+				listId, chunkId, numStripes,
+				it->second.listId, it->second.chunkId, it->second.remaining
+			);
+		}
+		UNLOCK( &this->reconstructionLock );
+
+		return ret;
+	}
+
+	bool insertRecovery( uint32_t id, uint32_t addr, uint16_t port, uint32_t total, struct timespec startTime, SlaveSocket *socket ) {
+		PendingIdentifier pid( id, id, socket );
+		PendingRecovery r( addr, port, total, startTime, socket );
 
 		std::pair<PendingIdentifier, PendingRecovery> p( pid, r );
 		std::pair<std::unordered_map<PendingIdentifier, PendingRecovery>::iterator, bool> ret;
@@ -79,21 +168,38 @@ public:
 		return ret.second;
 	}
 
-	std::unordered_set<uint32_t> *findRecovery( uint32_t id, uint32_t &listId, uint32_t &chunkId ) {
-		PendingIdentifier pid( id, id, 0 );
+	bool eraseRecovery( uint32_t id, uint32_t addr, uint16_t port, uint32_t numReconstructed, SlaveSocket *socket, uint32_t &remaining, uint32_t &total, double &elapsedTime ) {
+		PendingIdentifier pid( id, id, socket );
 		std::unordered_map<PendingIdentifier, PendingRecovery>::iterator it;
+		bool ret;
 
 		LOCK( &this->recoveryLock );
 		it = this->recovery.find( pid );
 		if ( it == this->recovery.end() ) {
 			UNLOCK( &this->recoveryLock );
-			return 0;
+			return false;
 		}
-		listId = it->second.listId;
-		chunkId = it->second.chunkId;
+		ret = ( addr == it->second.addr && port == it->second.port && it->second.remaining >= numReconstructed && socket == it->second.socket );
+		if ( ret ) {
+			it->second.remaining -= numReconstructed;
+			remaining = it->second.remaining;
+			total = it->second.total;
+			elapsedTime = get_elapsed_time( it->second.startTime );
+			if ( it->second.remaining == 0 )
+				this->recovery.erase( it );
+		} else {
+			printf(
+				"(%u, %u, %u, %p) vs. (%u, %u, %u, %p)\n",
+				addr, port, numReconstructed, socket,
+				it->second.addr,
+				it->second.port,
+				it->second.remaining,
+				it->second.socket
+			);
+		}
 		UNLOCK( &this->recoveryLock );
 
-		return &( it->second.stripeIds );
+		return ret;
 	}
 
 	void addReleaseDegradedLock( uint32_t id, uint32_t count, bool *done ) {

@@ -23,6 +23,9 @@ public:
 	char *sendRemappingRecords( size_t &size, uint32_t id, std::unordered_map<Key, RemappingRecord> &remapRecord, LOCK_T *lock, size_t &remapCount );
 	// Degraded operations
 	char *resReleaseDegradedLock( size_t &size, uint32_t id, uint32_t count );
+	// Reconstruction
+	char *resReconstruction( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, uint32_t numStripes );
+	char *resPromoteBackupSlave( size_t &size, uint32_t id, uint32_t addr, uint16_t port, uint32_t numStripes );
 
 	/* Master */
 	// Register

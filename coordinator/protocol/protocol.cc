@@ -304,6 +304,20 @@ char *CoordinatorProtocol::announceSlaveReconstructed( size_t &size, uint32_t id
 	return this->buffer.send;
 }
 
+char *CoordinatorProtocol::promoteBackupSlave( size_t &size, uint32_t id, SlaveSocket *srcSocket, std::unordered_set<Metadata> &chunks, std::unordered_set<Metadata>::iterator &it, bool &isCompleted ) {
+	ServerAddr srcAddr = srcSocket->getServerAddr();
+	size = this->generatePromoteBackupSlaveHeader(
+		PROTO_MAGIC_ANNOUNCEMENT,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_BACKUP_SLAVE_PROMOTED,
+		id,
+		srcAddr.addr,
+		srcAddr.port,
+		chunks, it, isCompleted
+	);
+	return this->buffer.send;
+}
+
 char *CoordinatorProtocol::reqSealChunks( size_t &size, uint32_t id ) {
 	size = this->generateHeader(
 		PROTO_MAGIC_REQUEST,
@@ -365,11 +379,11 @@ char *CoordinatorProtocol::resRemappingSetLock( size_t &size, uint32_t id, bool 
 	return this->buffer.send;
 }
 
-char *CoordinatorProtocol::reqRecovery( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds, std::unordered_set<uint32_t>::iterator &it, uint32_t numChunks, bool &isCompleted ) {
-	size = this->generateRecoveryHeader(
+char *CoordinatorProtocol::reqReconstruction( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds, std::unordered_set<uint32_t>::iterator &it, uint32_t numChunks, bool &isCompleted ) {
+	size = this->generateReconstructionHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
-		PROTO_OPCODE_RECOVERY,
+		PROTO_OPCODE_RECONSTRUCTION,
 		id,
 		listId,
 		chunkId,

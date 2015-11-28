@@ -247,13 +247,13 @@ public:
 		return this->insertOpMetadata( PROTO_OPCODE_REMAPPING_LOCK, key, keyMetadata, false );
 	}
 
-	void setChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, Chunk *chunk, bool isParity = false ) {
+	void setChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, Chunk *chunk, bool isParity = false, bool needsLock = true, bool needsUnlock = true ) {
 		Metadata metadata;
 		metadata.set( listId, stripeId, chunkId );
 
-		LOCK( &this->cacheLock );
+		if ( needsLock ) LOCK( &this->cacheLock );
 		this->cache[ metadata ] = chunk;
-		UNLOCK( &this->cacheLock );
+		if ( needsUnlock ) UNLOCK( &this->cacheLock );
 
 		if ( ! isParity ) {
 			char *ptr = chunk->getData();
@@ -261,7 +261,7 @@ public:
 			uint8_t keySize;
 			uint32_t valueSize, offset = 0, size;
 
-			LOCK( &this->keysLock );
+			if ( needsLock ) LOCK( &this->keysLock );
 			while( ptr < chunk->getData() + Chunk::capacity ) {
 				KeyValue::deserialize( ptr, keyPtr, keySize, valuePtr, valueSize );
 				if ( keySize == 0 && valueSize == 0 )
@@ -283,7 +283,7 @@ public:
 
 				ptr += size;
 			}
-			UNLOCK( &this->keysLock );
+			if ( needsUnlock ) UNLOCK( &this->keysLock );
 		}
 	}
 
