@@ -41,6 +41,8 @@ for s in $sizes; do
 		n=$(expr $RANDOM % 13 + 11)
 		echo "Killing node $n..."
 
+		ssh testbed-node$n "screen -S slave -p 0 -X stuff \"$(printf '\r\r')sync ${1}$(printf '\r\r')\""
+		sleep 5
 		ssh testbed-node$n "screen -S slave -p 0 -X stuff \"$(printf '\r\r')memory ${1}$(printf '\r\r')\""
 		sleep 1
 		ssh testbed-node$n "screen -S slave -p 0 -X stuff \"$(printf '\r\r')exit ${1}$(printf '\r\r')\""
