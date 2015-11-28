@@ -3,11 +3,12 @@
 BASE_PATH=${HOME}/mtyiu
 PLIO_PATH=${BASE_PATH}/plio
 
-sizes='1000000000 2000000000 4000000000 8000000000 16000000000'
+sizes='1000000000 2000000000 4000000000 8000000000 16000000000 32000000000'
+sizes=1000000000
 
 for s in $sizes; do
-	for iter in {1..10}; do
-		mkdir -p ${BASE_PATH}/results/recovery/$s/$iter
+	for iter in {1..1}; do
+		mkdir -p ${BASE_PATH}/results/recovery-disk/$s/$iter
 
 		echo "Preparing for the experiments for size = $s..."
 
@@ -30,7 +31,7 @@ for s in $sizes; do
 			if [ $n == 3 ]; then
 				read -p "Pending: ${pending} / 4" -t $(expr $s \/ 25000000)
 			else
-				read -p "Pending: ${pending} / 4" -t 10
+				read -p "Pending: ${pending} / 4" -t 60
 			fi
 			pending=$(expr $pending + 1)
 		done
@@ -38,6 +39,17 @@ for s in $sizes; do
 
 		ssh testbed-node1 "screen -S coordinator -p 0 -X stuff \"$(printf '\r\r')seal$(printf '\r\r')\""
 		sleep 4
+
+		# Flush parity chunks to disk
+		for n in {11..23} {37..39}; do
+			ssh testbed-node$n "screen -S slave -p 0 -X stuff \"$(printf '\r\r')p2disk$(printf '\r\r')\"" &
+		done
+		sleep 10
+
+		# Clear kernel buffer cache
+		for n in {11..23} {37..39}; do
+			ssh testbed-node$n "sudo sh -c 'echo 3 >/proc/sys/vm/drop_caches'"
+		done
 
 		n=$(expr $RANDOM % 13 + 11)
 		echo "Killing node $n..."
@@ -56,9 +68,7 @@ for s in $sizes; do
 		screen -S manage -p 0 -X stuff "$(printf '\r\r')"
 		sleep 10
 
-		scp testbed-node$n:${PLIO_PATH}/memory.log ${BASE_PATH}/results/recovery/$s/$iter/
-		scp testbed-node1:${PLIO_PATH}/coordinator.log ${BASE_PATH}/results/recovery/$s/$iter/
+		scp testbed-node$n:${PLIO_PATH}/memory.log ${BASE_PATH}/results/recovery-disk/$s/$iter/
+		scp testbed-node1:${PLIO_PATH}/coordinator.log ${BASE_PATH}/results/recovery-disk/$s/$iter/
 	done
 done
-
-./recovery-disk.sh

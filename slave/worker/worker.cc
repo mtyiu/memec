@@ -2468,8 +2468,8 @@ bool SlaveWorker::handleGetChunkRequest( SlavePeerEvent event, char *buf, size_t
 	// 	__ERROR__( "SlaveWorker", "handleGetChunkRequest", "The chunk (%u, %u, %u) does not exist.", header.listId, header.stripeId, header.chunkId );
 	// }
 
-	if ( chunk->status == CHUNK_STATUS_NEEDS_LOAD_FROM_DISK ) {
-		printf( "Loading chunk: (%u, %u, %u) from disk.\n", header.listId, header.stripeId, header.chunkId );
+	if ( chunk && chunk->status == CHUNK_STATUS_NEEDS_LOAD_FROM_DISK ) {
+		// printf( "Loading chunk: (%u, %u, %u) from disk.\n", header.listId, header.stripeId, header.chunkId );
 		this->storage->read(
 			chunk,
 			chunk->metadata.listId,
@@ -2568,14 +2568,14 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, bool isSealed, ch
 		uint16_t port;
 		CoordinatorSocket *coordinatorSocket;
 		if ( SlaveWorker::pending->eraseRecovery( metadata.listId, metadata.stripeId, metadata.chunkId, requestId, coordinatorSocket, addr, port, remaining, total ) ) {
-			printf( "Received (%u, %u, %u). Number of remaining pending chunks = %u / %u.\n", metadata.listId, metadata.stripeId, metadata.chunkId, remaining, total );
+			// printf( "Received (%u, %u, %u). Number of remaining pending chunks = %u / %u.\n", metadata.listId, metadata.stripeId, metadata.chunkId, remaining, total );
 
 			if ( remaining == 0 ) {
 				notifyCoordinator = true;
 				coordinatorEvent.resPromoteBackupSlave( coordinatorSocket, requestId, addr, port, total );
 			}
 		} else {
-			__ERROR__( "SlaveWorker", "handleSetChunkRequest", "Cannot find the chunk (%u, %u, %u) from pending chunk set.", metadata.listId, metadata.stripeId, metadata.chunkId );
+			// __ERROR__( "SlaveWorker", "handleSetChunkRequest", "Cannot find the chunk (%u, %u, %u) from pending chunk set.", metadata.listId, metadata.stripeId, metadata.chunkId );
 		}
 	}
 
@@ -2632,6 +2632,7 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, bool isSealed, ch
 
 				offset += objSize;
 			}
+			chunk->updateData();
 
 			// Re-insert into data chunk buffer
 			assert( chunkBufferIndex == -1 );
@@ -2686,7 +2687,7 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, bool isSealed, ch
 			}
 		}
 	} else {
-		// Replace chunk contents
+		// Replace chunk contents for parity chunks
 		chunk->loadFromSetChunkRequest(
 			header.chunkData.data,
 			header.chunkData.size,

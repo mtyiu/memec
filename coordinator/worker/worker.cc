@@ -1078,6 +1078,8 @@ bool CoordinatorWorker::handlePromoteBackupSlaveResponse( SlaveEvent event, char
 			elapsedTime
 		);
 		Coordinator::getInstance()->appendLog( log );
+
+		// system( "ssh testbed-node10 'screen -S experiment -p 0 -X stuff \"$(printf '\r')\"'" );
 	}
 
 	return true;

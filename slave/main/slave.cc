@@ -384,7 +384,7 @@ void Slave::flush( bool parityOnly ) {
 		if ( chunk->status == CHUNK_STATUS_DIRTY ) {
 			if ( parityOnly && ! chunk->isParity )
 				continue;
-			ioEvent.flush( chunk );
+			ioEvent.flush( chunk, parityOnly );
 			this->eventQueue.insert( ioEvent );
 			count++;
 		}
