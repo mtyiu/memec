@@ -672,11 +672,10 @@ void Coordinator::interactive() {
 			while( ! done );
 			valid = true;
 		} else if ( strcmp( command, "paritysync" ) == 0 ) {
-			LOCK( &this->sockets.slaves.lock );
 			for ( uint32_t i = 0; i < this->sockets.slaves.size(); i++ ){
 				this->syncRemappedParity( this->sockets.slaves[ i ]->getAddr() );
 			}
-			UNLOCK( &this->sockets.slaves.lock );
+			valid = true;
 		} else {
 			valid = false;
 		}
