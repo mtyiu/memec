@@ -12,6 +12,7 @@
 uint32_t MasterWorker::dataChunkCount;
 uint32_t MasterWorker::parityChunkCount;
 uint32_t MasterWorker::updateInterval;
+bool MasterWorker::disableRemappingSet;
 bool MasterWorker::degradedTargetIsFixed;
 IDGenerator *MasterWorker::idGenerator;
 Pending *MasterWorker::pending;
@@ -19,7 +20,6 @@ MasterEventQueue *MasterWorker::eventQueue;
 StripeList<SlaveSocket> *MasterWorker::stripeList;
 PacketPool *MasterWorker::packetPool;
 ArrayMap<int, SlaveSocket> *MasterWorker::slaveSockets;
-RemapFlag *MasterWorker::remapFlag;
 RemappingRecordMap *MasterWorker::remappingRecords;
 MasterRemapMsgHandler *MasterWorker::remapMsgHandler;
 
@@ -558,6 +558,67 @@ SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId
 	return original;
 }
 
+SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &dataChunkId, uint32_t &newDataChunkId, uint32_t &parityChunkId, uint32_t &newParityChunkId, bool &useDegradedMode ) {
+	SlaveSocket *socket;
+	bool found = false;
+
+	useDegradedMode = false;
+	this->getSlaves( data, size, listId, dataChunkId );
+	newDataChunkId = dataChunkId;
+	parityChunkId = newParityChunkId = 0; // baseline: no need to redirect parity servers
+
+	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount + 1; i++ ) {
+		// Already redirect a data or parity slave
+		if ( useDegradedMode )
+			break;
+
+		socket = i == 0 ? this->dataSlaveSockets[ dataChunkId ] : this->paritySlaveSockets[ i - 1 ];
+		if ( Master::getInstance()->isDegraded( socket ) ) {
+			// Perform degraded operation
+			useDegradedMode = true;
+
+			uint32_t &chunkId = i == 0 ? dataChunkId : parityChunkId;
+			uint32_t &newChunkId = i == 0 ? newDataChunkId : newParityChunkId;
+
+			if ( i != 0 )
+				chunkId = ( MasterWorker::dataChunkCount + i - 1 ); // set parity chunk ID
+
+			if ( MasterWorker::degradedTargetIsFixed ) {
+				if ( ! BasicRemappingScheme::isOverloaded( socket ) || ! Master::getInstance()->remapMsgHandler.allowRemapping( socket->getAddr() ) ) {
+					useDegradedMode = false;
+					continue;
+				}
+
+				// Pick a new server from the same stripe list to handle the request
+				for ( uint32_t jump = 0, chunkCount = MasterWorker::dataChunkCount + MasterWorker::parityChunkCount; jump < chunkCount; jump++ ) {
+					SlaveSocket *target = MasterWorker::stripeList->get( listId, chunkId, jump, &newChunkId );
+					if ( chunkId == newChunkId )
+						continue;
+					if ( target && target->ready() ) {
+						found = true;
+						break;
+					}
+				}
+
+				if ( ! found )
+					__ERROR__( "MasterWorker", "getSlaves", "No slaves are available for degraded operations." );
+				break;
+			} else {
+				BasicRemappingScheme::getDegradedOpTarget(
+					listId, chunkId, newChunkId,
+					MasterWorker::dataChunkCount,
+					MasterWorker::parityChunkCount,
+					this->dataSlaveSockets,
+					this->paritySlaveSockets
+				);
+			}
+		}
+	}
+
+	socket = this->dataSlaveSockets[ newDataChunkId ];
+	return socket->ready() ? socket : 0;
+}
+
 SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &originalListId, uint32_t &originalChunkId, uint32_t &remappedListId, uint32_t &remappedChunkId ) {
 	SlaveSocket *ret;
 
@@ -640,7 +701,9 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 		MasterWorker::slaveSockets->get( sockfd )->counter.increaseDegraded();
 		return this->sendDegradedLockRequest(
 			event.id, PROTO_OPCODE_GET,
-			listId, chunkId, newChunkId,
+			listId,
+			chunkId, newChunkId,
+			0, 0, // parity chunk (not needed)
 			key.data, key.size
 		);
 	} else {
@@ -702,7 +765,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		return false;
 	}
 
-	if ( Master::getInstance()->remapMsgHandler.useRemappingFlow( socket->getAddr() ) ) {
+	if ( Master::getInstance()->remapMsgHandler.useRemappingFlow( socket->getAddr() ) && ! MasterWorker::disableRemappingSet ) {
 		return this->handleRemappingSetRequest( event, buf, size );
 	}
 
@@ -822,13 +885,16 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 		header.valueUpdateOffset, header.valueUpdateSize
 	);
 
-	uint32_t listId, chunkId, newChunkId;
+	uint32_t listId, dataChunkId, newDataChunkId, parityChunkId, newParityChunkId;
 	bool connected, useDegradedMode;
 	SlaveSocket *socket, *target;
 
 	socket = this->getSlaves(
 		header.key, header.keySize,
-		listId, chunkId, newChunkId, useDegradedMode, target
+		listId,
+		dataChunkId, newDataChunkId,
+		parityChunkId, newParityChunkId,
+		useDegradedMode
 	);
 
 	if ( ! socket ) {
@@ -848,7 +914,7 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 	KeyValueUpdate keyValueUpdate;
 	ssize_t sentBytes;
 	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
-	int sockfd = target->getSocket();
+	int sockfd;
 
 	char* valueUpdate = new char [ header.valueUpdateSize ];
 	memcpy( valueUpdate, header.valueUpdate, header.valueUpdateSize );
@@ -860,17 +926,30 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 	}
 
 	if ( useDegradedMode ) {
+		if ( parityChunkId == 0 ) {
+			// Redirecting data server
+			__INFO__( CYAN, "Master", "handleUpdateRequest", "Redirecting UPDATE request for data server at list %u: (%u --> %u).", listId, dataChunkId, newDataChunkId );
+			target = newDataChunkId < MasterWorker::dataChunkCount ? this->dataSlaveSockets[ newDataChunkId ] : this->paritySlaveSockets[ newDataChunkId - MasterWorker::dataChunkCount ];
+		} else {
+			__INFO__( CYAN, "Master", "handleUpdateRequest", "Redirecting UPDATE request for parity server at list %u: (%u --> %u).", listId, parityChunkId, newParityChunkId );
+			target = newParityChunkId < MasterWorker::dataChunkCount ? this->dataSlaveSockets[ newParityChunkId ] : this->paritySlaveSockets[ newParityChunkId - MasterWorker::dataChunkCount ];
+		}
+
 		// Acquire degraded lock from the coordinator
+		sockfd = target->getSocket();
 		MasterWorker::slaveSockets->get( sockfd )->counter.increaseDegraded();
 		return this->sendDegradedLockRequest(
 			event.id, PROTO_OPCODE_UPDATE,
-			listId, chunkId, newChunkId,
+			listId,
+			dataChunkId, newDataChunkId,
+			parityChunkId, newParityChunkId,
 			keyValueUpdate.data, keyValueUpdate.size,
 			keyValueUpdate.length,
 			keyValueUpdate.offset,
 			( char * ) keyValueUpdate.ptr
 		);
 	} else {
+		sockfd = socket->getSocket();
 		MasterWorker::slaveSockets->get( sockfd )->counter.increaseNormal();
 
 		buffer.data = this->protocol.reqUpdate(
@@ -907,13 +986,16 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 		( int ) header.keySize, header.key, header.keySize
 	);
 
-	uint32_t listId, chunkId, newChunkId;
+	uint32_t listId, dataChunkId, newDataChunkId, parityChunkId, newParityChunkId;
 	bool connected, useDegradedMode;
 	SlaveSocket *socket, *target;
 
 	socket = this->getSlaves(
 		header.key, header.keySize,
-		listId, chunkId, newChunkId, useDegradedMode, target
+		listId,
+		dataChunkId, newDataChunkId,
+		parityChunkId, newParityChunkId,
+		useDegradedMode
 	);
 
 	if ( ! socket ) {
@@ -931,7 +1013,7 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 	Key key;
 	ssize_t sentBytes;
 	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
-	int sockfd = target->getSocket();
+	int sockfd = socket->getSocket();
 
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
 	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_DEL, event.id, ( void * ) event.socket, key ) ) {
@@ -939,11 +1021,23 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 	}
 
 	if ( useDegradedMode ) {
+		if ( parityChunkId == 0 ) {
+			// Redirecting data server
+			__INFO__( CYAN, "Master", "handleDeleteRequest", "Redirecting DELETE request for data server at list %u: (%u --> %u).", listId, dataChunkId, newDataChunkId );
+			target = newDataChunkId < MasterWorker::dataChunkCount ? this->dataSlaveSockets[ newDataChunkId ] : this->paritySlaveSockets[ newDataChunkId - MasterWorker::dataChunkCount ];
+		} else {
+			__INFO__( CYAN, "Master", "handleDeleteRequest", "Redirecting DELETE request for parity server at list %u: (%u --> %u).", listId, parityChunkId, newParityChunkId );
+			target = newParityChunkId < MasterWorker::dataChunkCount ? this->dataSlaveSockets[ newParityChunkId ] : this->paritySlaveSockets[ newParityChunkId - MasterWorker::dataChunkCount ];
+		}
+
 		// Acquire degraded lock from the coordinator
+		sockfd = target->getSocket();
 		MasterWorker::slaveSockets->get( sockfd )->counter.increaseDegraded();
 		return this->sendDegradedLockRequest(
 			event.id, PROTO_OPCODE_DELETE,
-			listId, chunkId, newChunkId,
+			listId,
+			dataChunkId, newDataChunkId,
+			parityChunkId, newParityChunkId,
 			key.data, key.size
 		);
 	} else {
@@ -1085,18 +1179,28 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 	return true;
 }
 
-bool MasterWorker::sendDegradedLockRequest( uint32_t parentId, uint8_t opcode, uint32_t listId, uint32_t chunkId, uint32_t newChunkId, char *key, uint8_t keySize, uint32_t valueUpdateSize, uint32_t valueUpdateOffset, char *valueUpdate ) {
+bool MasterWorker::sendDegradedLockRequest( uint32_t parentId, uint8_t opcode, uint32_t listId, uint32_t dataChunkId, uint32_t newDataChunkId, uint32_t parityChunkId, uint32_t newParityChunkId, char *key, uint8_t keySize, uint32_t valueUpdateSize, uint32_t valueUpdateOffset, char *valueUpdate ) {
 	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
 	CoordinatorSocket *socket = Master::getInstance()->sockets.coordinators.values[ 0 ];
 
 	// Add the degraded lock request to the pending set
 	DegradedLockData degradedLockData;
-	degradedLockData.set(
-		opcode,
-		listId, 0 /* srcStripeId */, chunkId,
-		listId, newChunkId,
-		keySize, key
-	);
+
+	if ( dataChunkId != newDataChunkId ) {
+		degradedLockData.set(
+			opcode,
+			listId, 0 /* srcStripeId */, dataChunkId,
+			listId, newDataChunkId,
+			keySize, key
+		);
+	} else {
+		degradedLockData.set(
+			opcode,
+			listId, 0 /* srcStripeId */, parityChunkId,
+			listId, newParityChunkId,
+			keySize, key
+		);
+	}
 	if ( valueUpdateSize != 0 && valueUpdate ) {
 		degradedLockData.set( valueUpdateSize, valueUpdateOffset, valueUpdate );
 	}
@@ -1115,8 +1219,9 @@ bool MasterWorker::sendDegradedLockRequest( uint32_t parentId, uint8_t opcode, u
 
 	buffer.data = this->protocol.reqDegradedLock(
 		buffer.size, requestId,
-		listId, chunkId,
-		listId, newChunkId,
+		listId,
+		dataChunkId, newDataChunkId,
+		parityChunkId, newParityChunkId,
 		key, keySize
 	);
 
@@ -1131,7 +1236,7 @@ bool MasterWorker::sendDegradedLockRequest( uint32_t parentId, uint8_t opcode, u
 }
 
 bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool success, char *buf, size_t size ) {
-	SlaveSocket *socket = 0, *original;
+	SlaveSocket *socket = 0, *original = 0;
 	int sockfd;
 	struct DegradedLockResHeader header;
 	if ( ! this->protocol.parseDegradedLockResHeader( header, buf, size ) ) {
@@ -1143,27 +1248,56 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 		case PROTO_DEGRADED_LOCK_RES_WAS_LOCKED:
 			__DEBUG__(
 				BLUE, "MasterWorker", "handleDegradedLockResponse",
-				"[%s Locked] Key: %.*s (key size = %u); (%u, %u, %u) |-> (%u, %u)",
+				"[%s Locked] Key: %.*s (key size = %u); list ID: %u, stripe ID: %u, data: (%u --> %u), parity: (%u --> %u). Is sealed? %s",
 				header.type == PROTO_DEGRADED_LOCK_RES_IS_LOCKED ? "Is" : "Was",
 				( int ) header.keySize, header.key, header.keySize,
-				header.srcListId, header.srcStripeId, header.srcChunkId,
-				header.dstListId, header.dstChunkId
+				header.listId,
+				header.stripeId,
+				header.srcDataChunkId, header.dstDataChunkId,
+				header.srcParityChunkId, header.dstParityChunkId,
+				header.isSealed ? "true" : "false"
 			);
-			original = this->getSlaves( header.srcListId, header.srcChunkId );
-			socket = this->getSlaves( header.dstListId, header.dstChunkId );
+
+			if ( header.srcParityChunkId == 0 ) {
+				// Data server is redirected
+				original = this->getSlaves( header.listId, header.srcDataChunkId );
+				socket = this->getSlaves( header.listId, header.dstDataChunkId );
+			} else {
+				// Parity server is redirected; use the original data server
+				original = socket = this->getSlaves( header.listId, header.srcDataChunkId );
+			}
 			break;
 		case PROTO_DEGRADED_LOCK_RES_NOT_LOCKED:
 			__DEBUG__(
 				BLUE, "MasterWorker", "handleDegradedLockResponse",
 				"[Not Locked] Key: %.*s (key size = %u); (%u, %u)",
 				( int ) header.keySize, header.key, header.keySize,
-				header.srcListId, header.srcChunkId
+				header.listId, header.srcDataChunkId
 			);
-			original = socket = this->getSlaves( header.srcListId, header.srcChunkId );
-			sockfd = socket->getSocket();
-			MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
-			MasterWorker::slaveSockets->get( sockfd )->counter.increaseNormal();
-			Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
+
+			if ( header.srcParityChunkId == 0 ) {
+				original = socket = this->getSlaves( header.listId, header.srcDataChunkId );
+				sockfd = socket->getSocket();
+				MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
+				MasterWorker::slaveSockets->get( sockfd )->counter.increaseNormal();
+				Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
+			} else {
+				original = this->getSlaves( header.listId, header.srcDataChunkId );
+
+				// Decrease degraded counter for the parity server
+				socket = this->getSlaves( header.listId, header.srcParityChunkId );
+				sockfd = socket->getSocket();
+				MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
+				Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
+
+				// Increase normal counter for the data server
+				sockfd = original->getSocket();
+				MasterWorker::slaveSockets->get( sockfd )->counter.increaseNormal();
+				Master::getInstance()->remapMsgHandler.ackRemap( original->getAddr() );
+
+				socket = original;
+			}
+
 			break;
 		case PROTO_DEGRADED_LOCK_RES_REMAPPED:
 			__DEBUG__(
@@ -1172,15 +1306,33 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 				( int ) header.keySize, header.key, header.keySize,
 				header.dstListId, header.dstChunkId
 			);
-			socket = this->getSlaves( header.srcListId, header.srcChunkId );
-			sockfd = socket->getSocket();
-			MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
-			Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
 
-			original = socket = this->getSlaves( header.dstListId, header.dstChunkId );
-			sockfd = socket->getSocket();
-			MasterWorker::slaveSockets->get( sockfd )->counter.increaseNormal();
-			Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
+			if ( header.srcParityChunkId == 0 ) {
+				// data server is remapped
+				socket = this->getSlaves( header.listId, header.srcDataChunkId );
+				sockfd = socket->getSocket();
+				MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
+
+				original = socket = this->getSlaves( header.listId, header.dstDataChunkId );
+				MasterWorker::slaveSockets->get( sockfd )->counter.increaseNormal();
+				Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
+			} else {
+				// parity server is remapped
+				original = this->getSlaves( header.listId, header.srcDataChunkId );
+
+				// Decrease degraded counter for the parity server
+				socket = this->getSlaves( header.listId, header.srcParityChunkId );
+				sockfd = socket->getSocket();
+				MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
+				Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
+
+				// Increase normal counter for the data server
+				sockfd = original->getSocket();
+				MasterWorker::slaveSockets->get( sockfd )->counter.increaseNormal();
+				Master::getInstance()->remapMsgHandler.ackRemap( original->getAddr() );
+
+				socket = original;
+			}
 			break;
 		case PROTO_DEGRADED_LOCK_RES_NOT_EXIST:
 		default:
@@ -1189,10 +1341,23 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 				"[Not Fonud] Key: %.*s (key size = %u)",
 				( int ) header.keySize, header.key, header.keySize
 			);
-			original = socket = this->getSlaves( header.srcListId, header.srcChunkId );
-			sockfd = socket->getSocket();
-			MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
-			Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
+
+			if ( header.srcParityChunkId == 0 ) {
+				socket = this->getSlaves( header.listId, header.srcDataChunkId );
+				sockfd = socket->getSocket();
+				MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
+				Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
+			} else {
+				original = this->getSlaves( header.listId, header.srcDataChunkId );
+
+				// Decrease degraded counter for the parity server
+				socket = this->getSlaves( header.listId, header.srcParityChunkId );
+				sockfd = socket->getSocket();
+				MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
+				Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
+
+				socket = original;
+			}
 			break;
 	}
 
@@ -1225,7 +1390,10 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 				case PROTO_DEGRADED_LOCK_RES_WAS_LOCKED:
 					buffer.data = this->protocol.reqDegradedGet(
 						buffer.size, requestId,
-						header.srcListId, header.srcStripeId, header.srcChunkId, header.isSealed,
+						header.listId, header.stripeId,
+						header.srcDataChunkId, header.dstDataChunkId,
+						header.dstParityChunkId, header.dstParityChunkId,
+						header.isSealed,
 						degradedLockData.key, degradedLockData.keySize
 					);
 					break;
@@ -1260,7 +1428,10 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 				case PROTO_DEGRADED_LOCK_RES_WAS_LOCKED:
 					buffer.data = this->protocol.reqDegradedUpdate(
 						buffer.size, requestId,
-						header.srcListId, header.srcStripeId, header.srcChunkId, header.isSealed,
+						header.listId, header.stripeId,
+						header.srcDataChunkId, header.dstDataChunkId,
+						header.dstParityChunkId, header.dstParityChunkId,
+						header.isSealed,
 						degradedLockData.key, degradedLockData.keySize,
 						degradedLockData.valueUpdate, degradedLockData.valueUpdateOffset, degradedLockData.valueUpdateSize
 					);
@@ -1298,7 +1469,10 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 				case PROTO_DEGRADED_LOCK_RES_WAS_LOCKED:
 					buffer.data = this->protocol.reqDegradedDelete(
 						buffer.size, requestId,
-						header.srcListId, header.srcStripeId, header.srcChunkId, header.isSealed,
+						header.listId, header.stripeId,
+						header.srcDataChunkId, header.dstDataChunkId,
+						header.dstParityChunkId, header.dstParityChunkId,
+						header.isSealed,
 						degradedLockData.key, degradedLockData.keySize
 					);
 					break;
@@ -2071,12 +2245,12 @@ bool MasterWorker::init() {
 	MasterWorker::dataChunkCount = master->config.global.coding.params.getDataChunkCount();
 	MasterWorker::parityChunkCount = master->config.global.coding.params.getParityChunkCount();
 	MasterWorker::updateInterval = master->config.master.loadingStats.updateInterval;
+	MasterWorker::disableRemappingSet = master->config.master.remap.disableRemappingSet;
 	MasterWorker::degradedTargetIsFixed = master->config.master.degraded.isFixed;
 	MasterWorker::pending = &master->pending;
 	MasterWorker::eventQueue = &master->eventQueue;
 	MasterWorker::stripeList = master->stripeList;
 	MasterWorker::slaveSockets = &master->sockets.slaves;
-	MasterWorker::remapFlag = &master->remapFlag;
 	MasterWorker::remappingRecords = &master->remappingRecords;
 	MasterWorker::packetPool = &master->packetPool;
 	MasterWorker::remapMsgHandler = &master->remapMsgHandler;

@@ -4,10 +4,9 @@ BASE_PATH=${HOME}/mtyiu
 PLIO_PATH=${BASE_PATH}/plio
 
 sizes='1000000000 2000000000 4000000000 8000000000 16000000000 32000000000'
-sizes=1000000000
 
 for s in $sizes; do
-	for iter in {1..1}; do
+	for iter in {1..10}; do
 		mkdir -p ${BASE_PATH}/results/recovery-disk/$s/$iter
 
 		echo "Preparing for the experiments for size = $s..."

@@ -208,11 +208,12 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 				event.message.degradedLock.isSealed,
 				event.message.degradedLock.key.size,
 				event.message.degradedLock.key.data,
-				event.message.degradedLock.srcListId,
-				event.message.degradedLock.srcStripeId,
-				event.message.degradedLock.srcChunkId,
-				event.message.degradedLock.dstListId,
-				event.message.degradedLock.dstChunkId
+				event.message.degradedLock.listId,
+				event.message.degradedLock.stripeId,
+				event.message.degradedLock.srcDataChunkId,
+				event.message.degradedLock.dstDataChunkId,
+				event.message.degradedLock.srcParityChunkId,
+				event.message.degradedLock.dstParityChunkId
 			);
 			isSend = true;
 			break;
@@ -224,8 +225,9 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 				event.type == MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_LOCKED /* exist */,
 				event.message.degradedLock.key.size,
 				event.message.degradedLock.key.data,
-				event.message.degradedLock.srcListId,
-				event.message.degradedLock.srcChunkId
+				event.message.degradedLock.listId,
+				event.message.degradedLock.srcDataChunkId,
+				event.message.degradedLock.srcParityChunkId
 			);
 			isSend = true;
 			break;
@@ -235,10 +237,11 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 				event.id,
 				event.message.degradedLock.key.size,
 				event.message.degradedLock.key.data,
-				event.message.degradedLock.srcListId,
-				event.message.degradedLock.srcChunkId,
-				event.message.degradedLock.dstListId,
-				event.message.degradedLock.dstChunkId
+				event.message.degradedLock.listId,
+				event.message.degradedLock.srcDataChunkId,
+				event.message.degradedLock.dstDataChunkId,
+				event.message.degradedLock.srcParityChunkId,
+				event.message.degradedLock.dstParityChunkId
 			);
 			isSend = true;
 			break;
@@ -1093,8 +1096,11 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 	}
 	__DEBUG__(
 		BLUE, "CoordinatorWorker", "handleDegradedLockRequest",
-		"[DEGRADED_LOCK] Key: %.*s (key size = %u); target list ID: %u, target chunk ID: %u",
-		( int ) header.keySize, header.key, header.keySize, header.dstListId, header.dstChunkId
+		"[DEGRADED_LOCK] Key: %.*s (key size = %u); List ID: %u; Data: (%u --> %u); Parity: (%u --> %u).",
+		( int ) header.keySize, header.key, header.keySize,
+		header.listId,
+		header.srcDataChunkId, header.dstDataChunkId,
+		header.srcParityChunkId, header.dstParityChunkId
 	);
 
 	// Metadata metadata;
@@ -1104,20 +1110,21 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 
 	if ( CoordinatorWorker::remappingRecords->find( key, &remappingRecord ) ) {
 		// Remapped
-		if ( remappingRecord.listId != header.srcListId || remappingRecord.chunkId != header.srcChunkId ) {
-			// Reject the degraded operation
+		if ( remappingRecord.listId != header.listId || remappingRecord.chunkId != header.srcDataChunkId ) {
+			// Reject the degraded operation if the data chunk ID does not match
 			event.resDegradedLock(
 				event.socket, event.id, key,
-				header.srcListId, header.srcChunkId,
-				remappingRecord.listId, remappingRecord.chunkId
+				header.listId,
+				header.srcDataChunkId, remappingRecord.chunkId,
+				header.srcParityChunkId, header.srcParityChunkId
 			);
 			this->dispatch( event );
 			return false;
 		}
 	}
 
-	// Find the SlaveSocket which stores the stripe with srcListId and srcChunkId
-	SlaveSocket *socket = CoordinatorWorker::stripeList->get( header.srcListId, header.srcChunkId );
+	// Find the SlaveSocket which stores the stripe with listId and srcDataChunkId
+	SlaveSocket *socket = CoordinatorWorker::stripeList->get( header.listId, header.srcDataChunkId );
 	Map *map = &socket->map;
 	Metadata srcMetadata /* set via findMetadataByKey() */, dstMetadata;
 	bool ret = true;
@@ -1127,24 +1134,37 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 		event.resDegradedLock(
 			event.socket, event.id,
 			key, false,
-			header.srcListId, header.srcChunkId
+			header.listId, header.srcDataChunkId, header.srcParityChunkId
 		);
 		ret = false;
-	} else if ( map->findDegradedLock( srcMetadata.listId, srcMetadata.stripeId, srcMetadata.chunkId, dstMetadata ) ) {
+	} else if ( header.srcDataChunkId != header.dstDataChunkId && map->findDegradedLock( srcMetadata.listId, srcMetadata.stripeId, header.srcDataChunkId, dstMetadata ) ) {
 		// The chunk is already locked
 		event.resDegradedLock(
 			event.socket, event.id, key,
-			dstMetadata.listId == header.dstListId && dstMetadata.chunkId == header.dstChunkId, // the degraded lock is attained
+			dstMetadata.listId == header.listId && dstMetadata.chunkId == header.dstDataChunkId, // the degraded lock is attained
 			map->isSealed( srcMetadata ), // the chunk is sealed
-			srcMetadata.listId, srcMetadata.stripeId, srcMetadata.chunkId,
-			dstMetadata.listId, dstMetadata.chunkId
+			srcMetadata.listId, srcMetadata.stripeId,
+			srcMetadata.chunkId, dstMetadata.chunkId,
+			header.srcParityChunkId, header.srcParityChunkId // Ignore parity server redirection
 		);
-	} else if ( header.srcListId == header.dstListId && header.srcChunkId == header.dstChunkId ) {
+	} else if ( header.srcParityChunkId != header.dstParityChunkId && map->findDegradedLock( srcMetadata.listId, srcMetadata.stripeId, header.srcParityChunkId, dstMetadata ) ) {
+		// The chunk is already locked
+		event.resDegradedLock(
+			event.socket, event.id, key,
+			dstMetadata.listId == header.listId && dstMetadata.chunkId == header.dstParityChunkId, // the degraded lock is attained
+			map->isSealed( srcMetadata ), // the chunk is sealed
+			srcMetadata.listId, srcMetadata.stripeId,
+			srcMetadata.chunkId, srcMetadata.chunkId, // Ignore data server redirection
+			header.srcParityChunkId, dstMetadata.chunkId
+		);
+	} else if ( header.srcDataChunkId == header.dstDataChunkId && header.srcParityChunkId == header.dstParityChunkId ) {
 		// No need to lock
 		event.resDegradedLock(
 			event.socket, event.id,
 			key, true,
-			srcMetadata.listId, srcMetadata.chunkId
+			srcMetadata.listId,
+			header.srcDataChunkId,
+			header.srcParityChunkId
 		);
 	} else {
 		// Check whether any chunk in the same stripe has been locked
@@ -1153,10 +1173,11 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 		for ( uint32_t chunkId = 0; chunkId < CoordinatorWorker::chunkCount; chunkId++ ) {
 			if ( chunkId != srcMetadata.chunkId && map->findDegradedLock( srcMetadata.listId, srcMetadata.stripeId, chunkId, tmpDst ) ) {
 				printf(
-					"Chunk (%u, %u, %u) in the same stripe has been locked (destination: %u, %u). Rejecting degraded lock request to (%u, %u).\n",
-					srcMetadata.listId, srcMetadata.stripeId, chunkId,
-					tmpDst.listId, tmpDst.chunkId,
-					header.dstListId, header.dstChunkId
+					"Chunk (%u, %u, %u) in the same stripe has been locked (destination chunk ID: %u). Rejecting degraded lock request: (data: %u --> %u; parity: %u --> %u).\n",
+					srcMetadata.listId, srcMetadata.stripeId,
+					chunkId, tmpDst.chunkId,
+					header.srcDataChunkId, header.dstDataChunkId,
+					header.srcParityChunkId, header.dstParityChunkId
 				);
 				exist = true;
 				break;
@@ -1168,18 +1189,29 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 			event.resDegradedLock(
 				event.socket, event.id,
 				key, true,
-				srcMetadata.listId, srcMetadata.chunkId
+				srcMetadata.listId,
+				header.srcDataChunkId,
+				header.srcParityChunkId
 			);
 		} else {
-			dstMetadata.set( header.dstListId, 0, header.dstChunkId );
-			ret = map->insertDegradedLock( srcMetadata, dstMetadata );
+			if ( header.srcDataChunkId != header.dstDataChunkId ) {
+				dstMetadata.set( header.listId, 0, header.dstDataChunkId );
+				ret = map->insertDegradedLock( srcMetadata, dstMetadata );
+			} else {
+				Metadata tmp;
+				tmp.set( srcMetadata.listId, srcMetadata.stripeId, header.srcParityChunkId );
+
+				dstMetadata.set( header.listId, 0, header.dstParityChunkId );
+				ret = map->insertDegradedLock( tmp, dstMetadata );
+			}
 
 			event.resDegradedLock(
 				event.socket, event.id, key,
 				true,                         // the degraded lock is attained
 				map->isSealed( srcMetadata ), // the chunk is sealed
-				srcMetadata.listId, srcMetadata.stripeId, srcMetadata.chunkId,
-				dstMetadata.listId, dstMetadata.chunkId
+				srcMetadata.listId, srcMetadata.stripeId,
+				srcMetadata.chunkId, header.dstDataChunkId,
+				header.srcParityChunkId, header.dstParityChunkId
 			);
 		}
 	}

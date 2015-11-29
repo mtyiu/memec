@@ -5,7 +5,6 @@
 #include "worker_role.hh"
 #include "../ds/counter.hh"
 #include "../ds/pending.hh"
-#include "../ds/remap_flag.hh"
 #include "../event/event_queue.hh"
 #include "../protocol/protocol.hh"
 #include "../remap/remap_msg_handler.hh"
@@ -31,6 +30,7 @@ private:
 	static uint32_t dataChunkCount;
 	static uint32_t parityChunkCount;
 	static uint32_t updateInterval;
+	static bool disableRemappingSet;
 	static bool degradedTargetIsFixed;
 	static IDGenerator *idGenerator;
 	static Pending *pending;
@@ -38,7 +38,6 @@ private:
 	static StripeList<SlaveSocket> *stripeList;
 	//static Counter *counter;
 	static ArrayMap<int, SlaveSocket> *slaveSockets;
-	static RemapFlag *remapFlag;
 	static PacketPool *packetPool;
 	static MasterRemapMsgHandler *remapMsgHandler;
 	static RemappingRecordMap *remappingRecords;
@@ -51,8 +50,11 @@ private:
 
 	// For normal operations
 	SlaveSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId );
-	// For degraded oeprations
+	// For degraded GET
 	SlaveSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, uint32_t &newChunkId, bool &useDegradedMode, SlaveSocket *&original );
+	// For degraded UPDATE / DELETE (which may involve failed parity slaves)
+	// Return the data server for handling the request
+	SlaveSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &dataChunkId, uint32_t &newDataChunkId, uint32_t &parityChunkId, uint32_t &newParityChunkId, bool &useDegradedMode );
 	// For remapping
 	SlaveSocket *getSlaves( char *data, uint8_t size, uint32_t &originalListId, uint32_t &originalChunkId, uint32_t &remappedListId, uint32_t &remappedChunkId );
 	SlaveSocket *getSlaves( uint32_t listId, uint32_t chunkId );
@@ -65,7 +67,9 @@ private:
 
 	bool sendDegradedLockRequest(
 		uint32_t parentId, uint8_t opcode,
-		uint32_t listId, uint32_t chunkId, uint32_t newChunkId,
+		uint32_t listId,
+		uint32_t dataChunkId, uint32_t newDataChunkId,
+		uint32_t parityChunkId, uint32_t newParityChunkId,
 		char *key, uint8_t keySize,
 		uint32_t valueUpdateSize = 0, uint32_t valueUpdateOffset = 0, char *valueUpdate = 0
 	);

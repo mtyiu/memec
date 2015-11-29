@@ -468,6 +468,18 @@ void Slave::memory( FILE *f ) {
 	);
 }
 
+void Slave::setDelay() {
+	unsigned int delay;
+
+	printf( "How much delay (in usec)? " );
+	fflush( stdout );
+	if ( scanf( "%u", &delay ) == 1 )  {
+		SlaveWorker::delay = delay;
+	} else {
+		printf( "Invalid input.\n" );
+	}
+}
+
 double Slave::getElapsedTime() {
 	return get_elapsed_time( this->startTime );
 }
@@ -615,6 +627,9 @@ void Slave::interactive() {
 			FILE *f = fopen( "memory.log", "w" );
 			this->memory( f );
 			fclose( f );
+		} else if ( strcmp( command, "delay" ) == 0 ) {
+			valid = true;
+			this->setDelay();
 		} else if ( strcmp( command, "metadata" ) == 0 ) {
 			valid = true;
 			this->metadata();
@@ -859,6 +874,7 @@ void Slave::help() {
 		"- seal: Seal all chunks in the chunk buffer\n"
 		"- flush: Flush all dirty chunks to disk\n"
 		"- metadata: Write metadata to disk\n"
+		"- delay: Add constant delay to each client response\n"
 		"- sync: Synchronize with coordinator\n"
 		"- chunk: Print the debug message for a chunk\n"
 		"- pending: Print all pending requests\n"

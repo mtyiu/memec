@@ -63,8 +63,9 @@ public:
 		} forward;
 		struct {
 			Key key;
-			uint32_t srcListId, srcStripeId, srcChunkId;
-			uint32_t dstListId, dstChunkId;
+			uint32_t listId, stripeId;
+			uint32_t srcDataChunkId, dstDataChunkId;
+			uint32_t srcParityChunkId, dstParityChunkId;
 			bool isSealed;
 		} degradedLock;
 	} message;
@@ -81,17 +82,19 @@ public:
 	// Degraded lock
 	void resDegradedLock(
 		MasterSocket *socket, uint32_t id, Key &key, bool isLocked, bool isSealed,
-		uint32_t srcListId, uint32_t srcStripeId, uint32_t srcChunkId,
-		uint32_t dstListId, uint32_t dstChunkId
+		uint32_t listId, uint32_t stripeId,
+		uint32_t srcDataChunkId, uint32_t dstDataChunkId,
+		uint32_t srcParityChunkId, uint32_t dstParityChunkId
 	);
 	void resDegradedLock(
 		MasterSocket *socket, uint32_t id, Key &key, bool exist,
-		uint32_t listId, uint32_t chunkId
+		uint32_t listId, uint32_t srcDataChunkId, uint32_t srcParityChunkId
 	);
 	void resDegradedLock(
 		MasterSocket *socket, uint32_t id, Key &key,
-		uint32_t srcListId, uint32_t srcChunkId,
-		uint32_t dstListId, uint32_t dstChunkId
+		uint32_t listId,
+		uint32_t srcDataChunkId, uint32_t dstDataChunkId,
+		uint32_t srcParityChunkId, uint32_t dstParityChunkId
 	);
 	// REMAPPING_SET_LOCK
 	void resRemappingSetLock(

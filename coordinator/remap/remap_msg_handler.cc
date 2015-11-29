@@ -394,7 +394,7 @@ bool CoordinatorRemapMsgHandler::addAliveSlave( struct sockaddr_in slave ) {
 	LOCK( &this->mastersAckLock );
 	ackMasters[ slave ] = new std::set<std::string>();
 	UNLOCK( &this->mastersAckLock );
-	// waiting slave 
+	// waiting slave
 	pthread_cond_init( &this->ackSignal[ slave ], NULL );
 	return true;
 }
@@ -451,7 +451,33 @@ bool CoordinatorRemapMsgHandler::isAllMasterAcked( struct sockaddr_in slave ) {
 	//}
 	//fprintf( stderr, "%lu of %lu masters acked slave %s:%hu\n", ackMasters[ slave ]->size(), aliveMasters.size(), buf , slave.sin_port );
 	if ( allAcked ) {
-		printf( " ACKED slave %s:%hu\n", buf, slave.sin_port );
+		printf( "Slave %s:%hu changes its state to: ", buf, slave.sin_port );
+		switch( this->slavesStatus[ slave ] ) {
+			case REMAP_UNDEFINED:
+				printf( "[REMAP_UNDEFINED] - 0, undefined\n" );
+				break;
+			case REMAP_NONE:
+				printf( "[REMAP_NONE] - no remapping (phase 0)\n" );
+				break;
+			case REMAP_PREPARE_START:
+				printf( "[REMAP_PREPARE_START] - start get locks (phase 1)\n" );
+				break;
+			case REMAP_WAIT_START:
+				printf( "[REMAP_WAIT_START] - all ops get locks (can enter phase 2)\n" );
+				break;
+			case REMAP_START:
+				printf( "[REMAP_START] - all ops get locks, meta sync (phase 3)\n" );
+				break;
+			case REMAP_PREPARE_END:
+				printf( "[REMAP_PREPARE_END] - 5, no more remap (back to phase 2)\n" );
+				break;
+			case REMAP_WAIT_END:
+				printf( "[REMAP_WAIT_END] - not remapping (back to phase 1)\n" );
+				break;
+			case REMAP_END:
+				printf( "[REMAP_END] - signal to go back to no remapping (phase 0)\n" );
+				break;
+		}
 		pthread_cond_broadcast( &this->ackSignal[ slave ] );
 	}
 	UNLOCK( &this->mastersAckLock );

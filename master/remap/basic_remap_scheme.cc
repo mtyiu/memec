@@ -131,7 +131,7 @@ void BasicRemappingScheme::getDegradedOpTarget( uint32_t listId, uint32_t origin
 		return;
 	}
 
-	slaveAddr = data[ originalChunkId ]->getAddr();
+	slaveAddr = originalChunkId < dataCount ? data[ originalChunkId ]->getAddr() : parity[ originalChunkId - dataCount ]->getAddr();
 
 	// check if remapping is allowed
 	if ( ! remapMsgHandler->allowRemapping( slaveAddr ) || parityCount == 0 )

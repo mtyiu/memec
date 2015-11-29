@@ -1362,18 +1362,19 @@ bool Protocol::parseRedirectHeader( struct RedirectHeader &header, char *buf, si
 	);
 }
 
-//////////////////////////
-// Degraded prefetching //
-//////////////////////////
-size_t Protocol::generateDegradedLockReqHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t srcListId, uint32_t srcChunkId, uint32_t dstListId, uint32_t dstChunkId, uint8_t keySize, char *key ) {
+////////////////////////
+// Degraded operation //
+////////////////////////
+size_t Protocol::generateDegradedLockReqHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t srcDataChunkId, uint32_t dstDataChunkId, uint32_t srcParityChunkId, uint32_t dstParityChunkId, uint8_t keySize, char *key ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_DEGRADED_LOCK_REQ_SIZE + keySize, id );
 
-	*( ( uint32_t * )( buf      ) ) = htonl( srcListId );
-	*( ( uint32_t * )( buf +  4 ) ) = htonl( srcChunkId );
-	*( ( uint32_t * )( buf +  8 ) ) = htonl( dstListId );
-	*( ( uint32_t * )( buf + 12 ) ) = htonl( dstChunkId );
-	buf[ 16 ] = keySize;
+	*( ( uint32_t * )( buf      ) ) = htonl( listId );
+	*( ( uint32_t * )( buf +  4 ) ) = htonl( srcDataChunkId );
+	*( ( uint32_t * )( buf +  8 ) ) = htonl( dstDataChunkId );
+	*( ( uint32_t * )( buf + 12 ) ) = htonl( srcParityChunkId );
+	*( ( uint32_t * )( buf + 16 ) ) = htonl( dstParityChunkId );
+	buf[ 20 ] = keySize;
 
 	buf += PROTO_DEGRADED_LOCK_REQ_SIZE;
 	memmove( buf, key, keySize );
@@ -1383,16 +1384,17 @@ size_t Protocol::generateDegradedLockReqHeader( uint8_t magic, uint8_t to, uint8
 	return bytes;
 }
 
-bool Protocol::parseDegradedLockReqHeader( size_t offset, uint32_t &srcListId, uint32_t &srcChunkId, uint32_t &dstListId, uint32_t &dstChunkId, uint8_t &keySize, char *&key, char *buf, size_t size ) {
+bool Protocol::parseDegradedLockReqHeader( size_t offset, uint32_t &listId, uint32_t &srcDataChunkId, uint32_t &dstDataChunkId, uint32_t &srcParityChunkId, uint32_t &dstParityChunkId, uint8_t &keySize, char *&key, char *buf, size_t size ) {
 	if ( size - offset < PROTO_DEGRADED_LOCK_REQ_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
-	srcListId  = ntohl( *( ( uint32_t * )( ptr      ) ) );
-	srcChunkId = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
-	dstListId  = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
-	dstChunkId = ntohl( *( ( uint32_t * )( ptr + 12 ) ) );
-	keySize = ptr[ 16 ];
+	listId           = ntohl( *( ( uint32_t * )( ptr      ) ) );
+	srcDataChunkId   = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
+	dstDataChunkId   = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
+	srcParityChunkId = ntohl( *( ( uint32_t * )( ptr + 12 ) ) );
+	dstParityChunkId = ntohl( *( ( uint32_t * )( ptr + 16 ) ) );
+	keySize = ptr[ 20 ];
 
 	if ( size - offset < PROTO_DEGRADED_LOCK_REQ_SIZE + ( size_t ) keySize )
 		return false;
@@ -1409,10 +1411,11 @@ bool Protocol::parseDegradedLockReqHeader( struct DegradedLockReqHeader &header,
 	}
 	return this->parseDegradedLockReqHeader(
 		offset,
-		header.srcListId,
-		header.srcChunkId,
-		header.dstListId,
-		header.dstChunkId,
+		header.listId,
+		header.srcDataChunkId,
+		header.dstDataChunkId,
+		header.srcParityChunkId,
+		header.dstParityChunkId,
 		header.keySize,
 		header.key,
 		buf, size
@@ -1454,7 +1457,7 @@ size_t Protocol::generateDegradedLockResHeader( uint8_t magic, uint8_t to, uint8
 	return bytes;
 }
 
-size_t Protocol::generateDegradedLockResHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, bool isLocked, bool isSealed, uint8_t keySize, char *key, uint32_t srcListId, uint32_t srcStripeId, uint32_t srcChunkId, uint32_t dstListId, uint32_t dstChunkId ) {
+size_t Protocol::generateDegradedLockResHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, bool isLocked, bool isSealed, uint8_t keySize, char *key, uint32_t listId, uint32_t stripeId, uint32_t srcDataChunkId, uint32_t dstDataChunkId, uint32_t srcParityChunkId, uint32_t dstParityChunkId ) {
 	char *buf;
 	size_t bytes = this->generateDegradedLockResHeader(
 		magic, to, opcode, id,
@@ -1462,19 +1465,20 @@ size_t Protocol::generateDegradedLockResHeader( uint8_t magic, uint8_t to, uint8
 		keySize, key, buf
 	);
 
-	*( ( uint32_t * )( buf      ) ) = htonl( srcListId );
-	*( ( uint32_t * )( buf +  4 ) ) = htonl( srcStripeId );
-	*( ( uint32_t * )( buf +  8 ) ) = htonl( srcChunkId );
-	*( ( uint32_t * )( buf + 12 ) ) = htonl( dstListId );
-	*( ( uint32_t * )( buf + 16 ) ) = htonl( dstChunkId );
-	buf[ 20 ] = isSealed;
+	*( ( uint32_t * )( buf      ) ) = htonl( listId );
+	*( ( uint32_t * )( buf +  4 ) ) = htonl( stripeId );
+	*( ( uint32_t * )( buf +  8 ) ) = htonl( srcDataChunkId );
+	*( ( uint32_t * )( buf + 12 ) ) = htonl( dstDataChunkId );
+	*( ( uint32_t * )( buf + 16 ) ) = htonl( srcParityChunkId );
+	*( ( uint32_t * )( buf + 20 ) ) = htonl( dstParityChunkId );
+	buf[ 24 ] = isSealed;
 
 	bytes += PROTO_DEGRADED_LOCK_RES_LOCK_SIZE;
 
 	return bytes;
 }
 
-size_t Protocol::generateDegradedLockResHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, bool exist, uint8_t keySize, char *key, uint32_t listId, uint32_t chunkId ) {
+size_t Protocol::generateDegradedLockResHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, bool exist, uint8_t keySize, char *key, uint32_t listId, uint32_t srcDataChunkId, uint32_t srcParityChunkId ) {
 	char *buf;
 	size_t bytes = this->generateDegradedLockResHeader(
 		magic, to, opcode, id,
@@ -1483,14 +1487,15 @@ size_t Protocol::generateDegradedLockResHeader( uint8_t magic, uint8_t to, uint8
 	);
 
 	*( ( uint32_t * )( buf     ) ) = htonl( listId );
-	*( ( uint32_t * )( buf + 4 ) ) = htonl( chunkId );
+	*( ( uint32_t * )( buf + 4 ) ) = htonl( srcDataChunkId );
+	*( ( uint32_t * )( buf + 8 ) ) = htonl( srcParityChunkId );
 
 	bytes += PROTO_DEGRADED_LOCK_RES_NOT_SIZE;
 
 	return bytes;
 }
 
-size_t Protocol::generateDegradedLockResHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint8_t keySize, char *key, uint32_t srcListId, uint32_t srcChunkId, uint32_t dstListId, uint32_t dstChunkId ) {
+size_t Protocol::generateDegradedLockResHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint8_t keySize, char *key, uint32_t listId, uint32_t srcDataChunkId, uint32_t dstDataChunkId, uint32_t srcParityChunkId, uint32_t dstParityChunkId ) {
 	char *buf;
 	size_t bytes = this->generateDegradedLockResHeader(
 		magic, to, opcode, id,
@@ -1498,10 +1503,11 @@ size_t Protocol::generateDegradedLockResHeader( uint8_t magic, uint8_t to, uint8
 		keySize, key, buf
 	);
 
-	*( ( uint32_t * )( buf      ) ) = htonl( srcListId );
-	*( ( uint32_t * )( buf +  4 ) ) = htonl( srcChunkId );
-	*( ( uint32_t * )( buf +  8 ) ) = htonl( dstListId );
-	*( ( uint32_t * )( buf + 12 ) ) = htonl( dstChunkId );
+	*( ( uint32_t * )( buf      ) ) = htonl( listId );
+	*( ( uint32_t * )( buf +  4 ) ) = htonl( srcDataChunkId );
+	*( ( uint32_t * )( buf +  8 ) ) = htonl( dstDataChunkId );
+	*( ( uint32_t * )( buf + 12 ) ) = htonl( srcParityChunkId );
+	*( ( uint32_t * )( buf + 16 ) ) = htonl( dstParityChunkId );
 
 	bytes += PROTO_DEGRADED_LOCK_RES_REMAP_SIZE;
 
@@ -1524,41 +1530,44 @@ bool Protocol::parseDegradedLockResHeader( size_t offset, uint8_t &type, uint8_t
 	return true;
 }
 
-bool Protocol::parseDegradedLockResHeader( size_t offset, uint32_t &srcListId, uint32_t &srcStripeId, uint32_t &srcChunkId, uint32_t &dstListId, uint32_t &dstChunkId, bool &isSealed, char *buf, size_t size ) {
+bool Protocol::parseDegradedLockResHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &srcDataChunkId, uint32_t &dstDataChunkId, uint32_t &srcParityChunkId, uint32_t &dstParityChunkId, bool &isSealed, char *buf, size_t size ) {
 	if ( size - offset < PROTO_DEGRADED_LOCK_RES_LOCK_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
-	srcListId   = ntohl( *( ( uint32_t * )( ptr      ) ) );
-	srcStripeId = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
-	srcChunkId  = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
-	dstListId   = ntohl( *( ( uint32_t * )( ptr + 12 ) ) );
-	dstChunkId  = ntohl( *( ( uint32_t * )( ptr + 16 ) ) );
-	isSealed = ptr[ 20 ];
+	listId           = ntohl( *( ( uint32_t * )( ptr      ) ) );
+	stripeId         = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
+	srcDataChunkId   = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
+	dstDataChunkId   = ntohl( *( ( uint32_t * )( ptr + 12 ) ) );
+	srcParityChunkId = ntohl( *( ( uint32_t * )( ptr + 16 ) ) );
+	dstParityChunkId = ntohl( *( ( uint32_t * )( ptr + 20 ) ) );
+	isSealed = ptr[ 24 ];
 
 	return true;
 }
 
-bool Protocol::parseDegradedLockResHeader( size_t offset, uint32_t &listId, uint32_t &chunkId, char *buf, size_t size ) {
+bool Protocol::parseDegradedLockResHeader( size_t offset, uint32_t &listId, uint32_t &srcDataChunkId, uint32_t &srcParityChunkId, char *buf, size_t size ) {
 	if ( size - offset < PROTO_DEGRADED_LOCK_RES_NOT_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
-	listId   = ntohl( *( ( uint32_t * )( ptr     ) ) );
-	chunkId  = ntohl( *( ( uint32_t * )( ptr + 4 ) ) );
+	listId           = ntohl( *( ( uint32_t * )( ptr     ) ) );
+	srcDataChunkId   = ntohl( *( ( uint32_t * )( ptr + 4 ) ) );
+	srcParityChunkId = ntohl( *( ( uint32_t * )( ptr + 8 ) ) );
 
 	return true;
 }
 
-bool Protocol::parseDegradedLockResHeader( size_t offset, uint32_t &srcListId, uint32_t &srcChunkId, uint32_t &dstListId, uint32_t &dstChunkId, char *buf, size_t size ) {
+bool Protocol::parseDegradedLockResHeader( size_t offset, uint32_t &listId, uint32_t &srcDataChunkId, uint32_t &dstDataChunkId, uint32_t &srcParityChunkId, uint32_t &dstParityChunkId, char *buf, size_t size ) {
 	if ( size - offset < PROTO_DEGRADED_LOCK_RES_REMAP_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
-	srcListId   = ntohl( *( ( uint32_t * )( ptr      ) ) );
-	srcChunkId  = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
-	dstListId   = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
-	dstChunkId  = ntohl( *( ( uint32_t * )( ptr + 12 ) ) );
+	listId           = ntohl( *( ( uint32_t * )( ptr      ) ) );
+	srcDataChunkId   = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
+	dstDataChunkId   = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
+	srcParityChunkId = ntohl( *( ( uint32_t * )( ptr + 12 ) ) );
+	dstParityChunkId = ntohl( *( ( uint32_t * )( ptr + 16 ) ) );
 
 	return true;
 }
@@ -1584,11 +1593,12 @@ bool Protocol::parseDegradedLockResHeader( struct DegradedLockResHeader &header,
 		case PROTO_DEGRADED_LOCK_RES_WAS_LOCKED:
 			ret = this->parseDegradedLockResHeader(
 				offset,
-				header.srcListId,
-				header.srcStripeId,
-				header.srcChunkId,
-				header.dstListId,
-				header.dstChunkId,
+				header.listId,
+				header.stripeId,
+				header.srcDataChunkId,
+				header.dstDataChunkId,
+				header.srcParityChunkId,
+				header.dstParityChunkId,
 				header.isSealed,
 				buf, size
 			);
@@ -1597,18 +1607,20 @@ bool Protocol::parseDegradedLockResHeader( struct DegradedLockResHeader &header,
 		case PROTO_DEGRADED_LOCK_RES_NOT_EXIST:
 			ret = this->parseDegradedLockResHeader(
 				offset,
-				header.srcListId,
-				header.srcChunkId,
+				header.listId,
+				header.srcDataChunkId,
+				header.srcParityChunkId,
 				buf, size
 			);
 			break;
 		case PROTO_DEGRADED_LOCK_RES_REMAPPED:
 			ret = this->parseDegradedLockResHeader(
 				offset,
-				header.srcListId,
-				header.srcChunkId,
-				header.dstListId,
-				header.dstChunkId,
+				header.listId,
+				header.srcDataChunkId,
+				header.dstDataChunkId,
+				header.srcParityChunkId,
+				header.dstParityChunkId,
 				buf, size
 			);
 			break;
@@ -1618,7 +1630,7 @@ bool Protocol::parseDegradedLockResHeader( struct DegradedLockResHeader &header,
 	return ret;
 }
 
-size_t Protocol::generateDegradedReqHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isSealed, uint8_t keySize, char *key ) {
+size_t Protocol::generateDegradedReqHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t srcDataChunkId, uint32_t dstDataChunkId, uint32_t srcParityChunkId, uint32_t dstParityChunkId, bool isSealed, uint8_t keySize, char *key ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader(
 		magic, to, opcode,
@@ -1626,10 +1638,13 @@ size_t Protocol::generateDegradedReqHeader( uint8_t magic, uint8_t to, uint8_t o
 		id
 	);
 
-	*( ( uint32_t * )( buf     ) ) = htonl( listId );
-	*( ( uint32_t * )( buf + 4 ) ) = htonl( stripeId );
-	*( ( uint32_t * )( buf + 8 ) ) = htonl( chunkId );
-	buf[ 12 ] = isSealed;
+	*( ( uint32_t * )( buf      ) ) = htonl( listId );
+	*( ( uint32_t * )( buf +  4 ) ) = htonl( stripeId );
+	*( ( uint32_t * )( buf +  8 ) ) = htonl( srcDataChunkId );
+	*( ( uint32_t * )( buf + 12 ) ) = htonl( dstDataChunkId );
+	*( ( uint32_t * )( buf + 16 ) ) = htonl( srcParityChunkId );
+	*( ( uint32_t * )( buf + 20 ) ) = htonl( dstParityChunkId );
+	buf[ 24 ] = isSealed;
 	buf += PROTO_DEGRADED_REQ_BASE_SIZE;
 
 	buf[ 0 ] = keySize;
@@ -1642,7 +1657,7 @@ size_t Protocol::generateDegradedReqHeader( uint8_t magic, uint8_t to, uint8_t o
 	return bytes;
 }
 
-size_t Protocol::generateDegradedReqHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isSealed, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate ) {
+size_t Protocol::generateDegradedReqHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t srcDataChunkId, uint32_t dstDataChunkId, uint32_t srcParityChunkId, uint32_t dstParityChunkId, bool isSealed, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader(
 		magic, to, opcode,
@@ -1650,10 +1665,13 @@ size_t Protocol::generateDegradedReqHeader( uint8_t magic, uint8_t to, uint8_t o
 		id
 	);
 
-	*( ( uint32_t * )( buf     ) ) = htonl( listId );
-	*( ( uint32_t * )( buf + 4 ) ) = htonl( stripeId );
-	*( ( uint32_t * )( buf + 8 ) ) = htonl( chunkId );
-	buf[ 12 ] = isSealed;
+	*( ( uint32_t * )( buf      ) ) = htonl( listId );
+	*( ( uint32_t * )( buf +  4 ) ) = htonl( stripeId );
+	*( ( uint32_t * )( buf +  8 ) ) = htonl( srcDataChunkId );
+	*( ( uint32_t * )( buf + 12 ) ) = htonl( dstDataChunkId );
+	*( ( uint32_t * )( buf + 16 ) ) = htonl( srcParityChunkId );
+	*( ( uint32_t * )( buf + 20 ) ) = htonl( dstParityChunkId );
+	buf[ 24 ] = isSealed;
 	buf += PROTO_DEGRADED_REQ_BASE_SIZE;
 
 	buf[ 0 ] = keySize;
@@ -1682,15 +1700,18 @@ size_t Protocol::generateDegradedReqHeader( uint8_t magic, uint8_t to, uint8_t o
 	return bytes;
 }
 
-bool Protocol::parseDegradedReqHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, bool &isSealed, char *buf, size_t size ) {
+bool Protocol::parseDegradedReqHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &srcDataChunkId, uint32_t &dstDataChunkId, uint32_t &srcParityChunkId, uint32_t &dstParityChunkId, bool &isSealed, char *buf, size_t size ) {
 	if ( size - offset < PROTO_DEGRADED_REQ_BASE_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
-	listId   = ntohl( *( ( uint32_t * )( ptr      ) ) );
-	stripeId = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
-	chunkId  = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
-	isSealed = ptr[ 12 ];
+	listId           = ntohl( *( ( uint32_t * )( ptr      ) ) );
+	stripeId         = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
+	srcDataChunkId   = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
+	dstDataChunkId   = ntohl( *( ( uint32_t * )( ptr + 12 ) ) );
+	srcParityChunkId = ntohl( *( ( uint32_t * )( ptr + 16 ) ) );
+	dstParityChunkId = ntohl( *( ( uint32_t * )( ptr + 20 ) ) );
+	isSealed = ptr[ 24 ];
 
 	return true;
 }
@@ -1704,7 +1725,10 @@ bool Protocol::parseDegradedReqHeader( struct DegradedReqHeader &header, uint8_t
 		offset,
 		header.listId,
 		header.stripeId,
-		header.chunkId,
+		header.srcDataChunkId,
+		header.dstDataChunkId,
+		header.srcParityChunkId,
+		header.dstParityChunkId,
 		header.isSealed,
 		buf, size
 	);
@@ -1870,10 +1894,8 @@ size_t Protocol::generateReconstructionHeader( uint8_t magic, uint8_t to, uint8_
 
 	tmp = ( uint32_t * ) buf;
 	for ( count = 0; count < numChunks && it != stripeIds.end(); count++, it++ ) {
-		if ( this->buffer.size >= bytes + 4 ) {
+		if ( this->buffer.size >= bytes + 4 && count < 3000 ) {
 			tmp[ count ] = htonl( *it );
-
-			// buf += 4 * count; (not used anymore)
 			bytes += 4;
 		} else {
 			isCompleted = false;

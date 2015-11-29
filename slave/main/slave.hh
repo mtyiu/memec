@@ -4,6 +4,7 @@
 #include <map>
 #include <vector>
 #include <cstdio>
+#include <unistd.h>
 #include "../buffer/mixed_chunk_buffer.hh"
 #include "../buffer/degraded_chunk_buffer.hh"
 #include "../config/slave_config.hh"
@@ -88,6 +89,7 @@ public:
 	void sync( uint32_t requestId = 0 );
 	void metadata();
 	void memory( FILE *f = stdout );
+	void setDelay();
 
 	void info( FILE *f = stdout );
 	void debug( FILE *f = stdout );

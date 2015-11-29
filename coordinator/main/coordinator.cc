@@ -87,6 +87,8 @@ std::set<struct sockaddr_in> Coordinator::updateOverloadedSlaveSet( ArrayMap<str
 	// compare each slave latency with the avg multipled by threshold
 #define GET_OVERLOADED_SLAVES( _TYPE_ ) { \
 	uint32_t slaveCount = slave##_TYPE_##Latency->size(); \
+	avgSec = 0.0; \
+	avgNsec = 0.0; \
 	for ( uint32_t i = 0; i < slaveCount; i++ ) { \
 		avgSec += ( double ) slave##_TYPE_##Latency->values[ i ]->sec / slaveCount; \
 		avgNsec += ( double ) slave##_TYPE_##Latency->values[ i ]->nsec / slaveCount; \

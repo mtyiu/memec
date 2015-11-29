@@ -282,46 +282,51 @@ struct RedirectHeader {
 ////////////////////////
 // Degraded operation //
 ////////////////////////
-#define PROTO_DEGRADED_LOCK_REQ_SIZE 17
+#define PROTO_DEGRADED_LOCK_REQ_SIZE 21
 struct DegradedLockReqHeader {
 	// Indicate where the reconstructed chunk should be stored
 	// using one of the stripe list that the server belongs to
-	uint32_t srcListId;
-	uint32_t srcChunkId;
-	uint32_t dstListId;
-	uint32_t dstChunkId;
+	uint32_t listId;
+	uint32_t srcDataChunkId;
+	uint32_t dstDataChunkId;
+	uint32_t srcParityChunkId;
+	uint32_t dstParityChunkId;
 	uint8_t keySize;
 	char *key;
 };
 
 // Size
 #define PROTO_DEGRADED_LOCK_RES_BASE_SIZE 2
-#define PROTO_DEGRADED_LOCK_RES_LOCK_SIZE 21
-#define PROTO_DEGRADED_LOCK_RES_REMAP_SIZE 16
-#define PROTO_DEGRADED_LOCK_RES_NOT_SIZE 8
+#define PROTO_DEGRADED_LOCK_RES_LOCK_SIZE 25
+#define PROTO_DEGRADED_LOCK_RES_REMAP_SIZE 20
+#define PROTO_DEGRADED_LOCK_RES_NOT_SIZE 12
 // Type
 #define PROTO_DEGRADED_LOCK_RES_IS_LOCKED  1   // Return src* and dst* (same as the client request)
 #define PROTO_DEGRADED_LOCK_RES_WAS_LOCKED 2   // Return src* and dst* (different from the client request)
-#define PROTO_DEGRADED_LOCK_RES_NOT_LOCKED 3   // Return original srcListId and srcChunkId without dst*
-#define PROTO_DEGRADED_LOCK_RES_REMAPPED   4   // Return original srcListId and srcChunkId and remapped dstListId and dstChunkId
-#define PROTO_DEGRADED_LOCK_RES_NOT_EXIST  5   // Return original srcListId and srcChunkId
+#define PROTO_DEGRADED_LOCK_RES_NOT_LOCKED 3   // Return original listId, srcDataChunkId, srcParityChunkId (without dst*)
+#define PROTO_DEGRADED_LOCK_RES_REMAPPED   4   // Return original listId, srcDataChunkId, srcParityChunkId, remapped dstDataChunkId and dstParityChunkId
+#define PROTO_DEGRADED_LOCK_RES_NOT_EXIST  5   // Return original listId, srcDataChunkId and srcParityChunkId (without dst*)
 struct DegradedLockResHeader {
 	uint8_t type;
 	uint8_t keySize;
 	char *key;
-	uint32_t srcListId;
-	uint32_t srcStripeId;
-	uint32_t srcChunkId;
-	uint32_t dstListId;
-	uint32_t dstChunkId;
+	uint32_t listId;
+	uint32_t stripeId;
+	uint32_t srcDataChunkId;
+	uint32_t dstDataChunkId;
+	uint32_t srcParityChunkId;
+	uint32_t dstParityChunkId;
 	bool isSealed;
 };
 
-#define PROTO_DEGRADED_REQ_BASE_SIZE 13
+#define PROTO_DEGRADED_REQ_BASE_SIZE 25
 struct DegradedReqHeader {
 	uint32_t listId;
 	uint32_t stripeId;
-	uint32_t chunkId;
+	uint32_t srcDataChunkId;
+	uint32_t dstDataChunkId;
+	uint32_t srcParityChunkId;
+	uint32_t dstParityChunkId;
 	bool isSealed;
 	union {
 		struct KeyHeader key;
@@ -657,14 +662,16 @@ protected:
 	////////////////////////
 	size_t generateDegradedLockReqHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
-		uint32_t srcListId, uint32_t srcChunkId,
-		uint32_t dstListId, uint32_t dstChunkId,
+		uint32_t listId,
+		uint32_t srcDataChunkId, uint32_t dstDataChunkId,
+		uint32_t srcParityChunkId, uint32_t dstParityChunkId,
 		uint8_t keySize, char *key
 	);
 	bool parseDegradedLockReqHeader(
 		size_t offset,
-		uint32_t &srcListId, uint32_t &srcChunkId,
-		uint32_t &dstListId, uint32_t &dstChunkId,
+		uint32_t &listId,
+		uint32_t &srcDataChunkId, uint32_t &dstDataChunkId,
+		uint32_t &srcParityChunkId, uint32_t &dstParityChunkId,
 		uint8_t &keySize, char *&key,
 		char *buf, size_t size
 	);
@@ -676,20 +683,22 @@ protected:
 	size_t generateDegradedLockResHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
 		bool isLocked, bool isSealed, uint8_t keySize, char *key,
-		uint32_t srcListId, uint32_t srcStripeId, uint32_t srcChunkId,
-		uint32_t dstListId, uint32_t dstChunkId
+		uint32_t listId, uint32_t stripeId,
+		uint32_t srcDataChunkId, uint32_t dstDataChunkId,
+		uint32_t srcParityChunkId, uint32_t dstParityChunkId
 	);
 	size_t generateDegradedLockResHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
 		bool exist,
 		uint8_t keySize, char *key,
-		uint32_t listId, uint32_t chunkId
+		uint32_t listId, uint32_t srcDataChunkId, uint32_t srcParityChunkId
 	);
 	size_t generateDegradedLockResHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
 		uint8_t keySize, char *key,
-		uint32_t srcListId, uint32_t srcChunkId,
-		uint32_t dstListId, uint32_t dstChunkId
+		uint32_t listId,
+		uint32_t srcDataChunkId, uint32_t dstDataChunkId,
+		uint32_t srcParityChunkId, uint32_t dstParityChunkId
 	);
 	bool parseDegradedLockResHeader(
 		size_t offset, uint8_t &type,
@@ -697,37 +706,47 @@ protected:
 		char *buf, size_t size
 	);
 	bool parseDegradedLockResHeader(
-		size_t offset,
-		uint32_t &srcListId, uint32_t &srcStripeId, uint32_t &srcChunkId,
-		uint32_t &dstListId, uint32_t &dstChunkId, bool &isSealed,
+		size_t offset, uint32_t &listId, uint32_t &stripeId,
+		uint32_t &srcDataChunkId, uint32_t &dstDataChunkId,
+		uint32_t &srcParityChunkId, uint32_t &dstParityChunkId,
+		bool &isSealed,
 		char *buf, size_t size
 	);
 	bool parseDegradedLockResHeader(
 		size_t offset,
-		uint32_t &listId, uint32_t &chunkId,
+		uint32_t &listId, uint32_t &srcDataChunkId, uint32_t &srcParityChunkId,
 		char *buf, size_t size
 	);
 	bool parseDegradedLockResHeader(
-		size_t offset,
-		uint32_t &srcListId, uint32_t &srcChunkId,
-		uint32_t &dstListId, uint32_t &dstChunkId,
+		size_t offset, uint32_t &listId,
+		uint32_t &srcDataChunkId, uint32_t &dstDataChunkId,
+		uint32_t &srcParityChunkId, uint32_t &dstParityChunkId,
 		char *buf, size_t size
 	);
 
 	size_t generateDegradedReqHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
-		uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isSealed,
+		uint32_t listId, uint32_t stripeId,
+		uint32_t srcDataChunkId, uint32_t dstDataChunkId,
+		uint32_t srcParityChunkId, uint32_t dstParityChunkId,
+		bool isSealed,
 		uint8_t keySize, char *key
 	);
 	size_t generateDegradedReqHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
-		uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isSealed,
+		uint32_t listId, uint32_t stripeId,
+		uint32_t srcDataChunkId, uint32_t dstDataChunkId,
+		uint32_t srcParityChunkId, uint32_t dstParityChunkId,
+		bool isSealed,
 		uint8_t keySize, char *key,
 		uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate
 	);
 	bool parseDegradedReqHeader(
 		size_t offset,
-		uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, bool &isSealed,
+		uint32_t &listId, uint32_t &stripeId,
+		uint32_t &srcDataChunkId, uint32_t &dstDataChunkId,
+		uint32_t &srcParityChunkId, uint32_t &dstParityChunkId,
+		bool &isSealed,
 		char *buf, size_t size
 	);
 

@@ -7,7 +7,6 @@
 #include "../config/master_config.hh"
 #include "../ds/counter.hh"
 #include "../ds/pending.hh"
-#include "../ds/remap_flag.hh"
 #include "../ds/stats.hh"
 #include "../event/event_queue.hh"
 #include "../remap/remap_msg_handler.hh"
@@ -73,7 +72,6 @@ public:
 	PacketPool packetPool;
 	StripeList<SlaveSocket> *stripeList;
 	/* Remapping */
-	RemapFlag remapFlag;
 	MasterRemapMsgHandler remapMsgHandler;
 	RemappingRecordMap remappingRecords;
 	/* Loading statistics */

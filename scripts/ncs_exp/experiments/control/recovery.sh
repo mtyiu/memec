@@ -60,5 +60,3 @@ for s in $sizes; do
 		scp testbed-node1:${PLIO_PATH}/coordinator.log ${BASE_PATH}/results/recovery/$s/$iter/
 	done
 done
-
-./recovery-disk.sh

@@ -121,6 +121,7 @@ private:
 	static void *run( void *argv );
 
 public:
+	static unsigned int delay;
 	SlaveLoad load;
 
 	static bool init();

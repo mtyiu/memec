@@ -51,7 +51,7 @@ public:
 		uint32_t updateInterval;
 	} loadingStats;
 	struct {
-		bool forceEnabled;
+		bool disableRemappingSet;
 		bool forceNoCacheRecords;
 	} remap;
 	struct {
