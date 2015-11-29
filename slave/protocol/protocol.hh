@@ -23,12 +23,14 @@ public:
 	char *sendRemappingRecords( size_t &size, uint32_t id, std::unordered_map<Key, RemappingRecord> &remapRecord, LOCK_T *lock, size_t &remapCount );
 	// Degraded operations
 	char *resReleaseDegradedLock( size_t &size, uint32_t id, uint32_t count );
+	// Remapped parity
+	char *resRemapParity( size_t &size, uint32_t id );
 
 	/* Master */
 	// Register
 	char *resRegisterMaster( size_t &size, uint32_t id, bool success );
 	// SET
-	char *resSet( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key );
+	char *resSet( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key, bool toMaster = true );
 	// REMAPPING_SET
 	char *resRemappingSet( size_t &size, bool toMaster, uint32_t id, bool success, uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key, uint32_t sockfd = UINT_MAX, bool remapped = false );
 	// GET
@@ -48,6 +50,8 @@ public:
 	char *reqRemappingSet( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, bool needsForwarding, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf = 0 );
 	// SEAL_CHUNK
 	char *reqSealChunk( size_t &size, uint32_t id, Chunk *chunk, uint32_t startPos, char *buf = 0 );
+	// SET
+	char *reqSet( size_t &size, uint32_t id, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf = 0 );
 	// GET
 	char *reqGet( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key );
 	// UPDATE

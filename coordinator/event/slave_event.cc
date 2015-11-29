@@ -38,6 +38,12 @@ void SlaveEvent::reqSyncMeta( SlaveSocket *socket, bool *sync ) {
 	this->message.sync = sync;
 }
 
+void SlaveEvent::syncRemappedParity( SlaveSocket *socket, Packet *packet ) {
+	this->type = SLAVE_EVENT_TYPE_PARITY_MIGRATE;
+	this->socket = socket;
+	this->message.parity.packet = packet;
+}
+
 void SlaveEvent::reqReleaseDegradedLock( SlaveSocket *socket, bool *done ) {
 	this->type = SLAVE_EVENT_TYPE_REQUEST_RELEASE_DEGRADED_LOCK;
 	this->socket = socket;

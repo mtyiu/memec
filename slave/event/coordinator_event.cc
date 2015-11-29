@@ -18,6 +18,12 @@ void CoordinatorEvent::syncRemap( CoordinatorSocket *socket ) {
 	this->socket = socket;
 }
 
+void CoordinatorEvent::resRemappedParity( CoordinatorSocket *socket, uint32_t *id ) {
+	this->type = COORDINATOR_EVENT_TYPE_RESPONSE_PARITY_MIGRATE;
+	if ( socket ) this->socket = socket;
+	if ( id ) this->id = *id;
+}
+
 void CoordinatorEvent::resReleaseDegradedLock( CoordinatorSocket *socket, uint32_t id, uint32_t count ) {
 	this->type = COORDINATOR_EVENT_TYPE_RELEASE_DEGRADED_LOCK;
 	this->socket = socket;

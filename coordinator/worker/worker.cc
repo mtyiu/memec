@@ -106,7 +106,7 @@ void CoordinatorWorker::dispatch( CoordinatorEvent event ) {
 		case COORDINATOR_EVENT_TYPE_SYNC_REMAPPED_PARITY:
 		{
 			uint32_t id = coordinator->idGenerator.nextVal( this->workerId );
-			MasterEvent masterEvent;
+			SlaveEvent slaveEvent;
 			
 			// prepare the request for all master
 			Packet *packet = coordinator->packetPool.malloc();
@@ -117,17 +117,17 @@ void CoordinatorWorker::dispatch( CoordinatorEvent event ) {
 			);
 			packet->size = buffer.size;
 
-			//coordinator->pendingRemapParity->insert( id, event.message.parity.counter, event.message.parity.allAcked );
+			coordinator->pending.insertRemappedParityRequest( id, event.message.parity.counter, event.message.parity.allAcked );
 	
-			LOCK( &coordinator->sockets.masters.lock );
-			packet->setReferenceCount( coordinator->sockets.masters.size() );
-			for ( uint32_t i = 0; i < coordinator->sockets.masters.size(); i++ ) {
-				MasterSocket *socket = coordinator->sockets.masters[ i ];
+			LOCK( &coordinator->sockets.slaves.lock );
+			packet->setReferenceCount( coordinator->sockets.slaves.size() );
+			for ( uint32_t i = 0; i < coordinator->sockets.slaves.size(); i++ ) {
+				SlaveSocket *socket = coordinator->sockets.slaves[ i ];
 				event.message.parity.counter->insert( socket->getAddr() );
-				masterEvent.syncRemappedParity( socket , packet );
-				coordinator->eventQueue.insert( masterEvent );
+				slaveEvent.syncRemappedParity( socket , packet );
+				coordinator->eventQueue.insert( slaveEvent );
 			}
-			UNLOCK( &coordinator->sockets.masters.lock );
+			UNLOCK( &coordinator->sockets.slaves.lock );
 		
 		}
 			break;
@@ -428,6 +428,12 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			Coordinator::getInstance()->pending.addSyncMetaReq( requestId, event.message.sync );
 			isSend = true;
 			break;
+		// reampped parity migration
+		case SLAVE_EVENT_TYPE_PARITY_MIGRATE:
+			buffer.data = event.message.parity.packet->data;
+			buffer.size = event.message.parity.packet->size;
+			isSend = true;
+			break;
 		case SLAVE_EVENT_TYPE_REQUEST_RELEASE_DEGRADED_LOCK:
 			this->handleReleaseDegradedLockRequest( event.socket, event.message.degraded.done );
 			isSend = false;
@@ -499,6 +505,8 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 		if ( ! connected )
 			__ERROR__( "CoordinatorWorker", "dispatch", "The slave is disconnected." );
+		if ( event.type == SLAVE_EVENT_TYPE_PARITY_MIGRATE )
+			Coordinator::getInstance()->packetPool.free( event.message.parity.packet );
 	} else {
 		// Parse requests from slaves
 		ProtocolHeader header;
@@ -581,6 +589,18 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 							__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );
 							break;
 					}
+					break;
+				case PROTO_OPCODE_PARITY_MIGRATE:
+				{
+					std::set<struct sockaddr_in> *counter;
+					pthread_cond_t *allAcked;
+					bool found = this->pending->decrementRemappedParityRequest( event.id, event.socket->getAddr(), &counter, &allAcked );
+					if ( found && counter == 0 ) {
+						pthread_cond_broadcast( allAcked );
+					} else if ( ! found ) {
+						__ERROR__( "CoordinatorWorker", "dispatch", "Invalid id reply to parity migrate request." );
+					}
+				}
 					break;
 				default:
 					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid opcode from slave." );

@@ -1200,8 +1200,8 @@ bool Protocol::parseRemappingSetHeader( size_t offset, uint32_t &listId, uint32_
 	ptr += keySize + valueSize;
 
 	if ( size - offset >= PROTO_REMAPPING_SET_SIZE + keySize + valueSize + 6 && target != 0 ) {
-		target->sin_addr.s_addr = *( uint32_t * ) ptr;
-		target->sin_port = *( uint16_t * ) ptr + 4;
+		target->sin_addr.s_addr = *( uint32_t * )( ptr );
+		target->sin_port = *( uint16_t * )( ptr + 4 );
 	}
 	return true;
 }

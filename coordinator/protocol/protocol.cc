@@ -200,7 +200,7 @@ char *CoordinatorProtocol::reqSyncRemappedParity( size_t &size, uint32_t id, str
 	if ( ! buffer ) buffer = this->buffer.send;
 	size = this->generateAddressHeader(
 		PROTO_MAGIC_REMAPPING,
-		PROTO_MAGIC_TO_MASTER,
+		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_PARITY_MIGRATE,
 		id,
 		target.sin_addr.s_addr, 

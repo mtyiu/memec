@@ -74,9 +74,10 @@ private:
 	bool handleSlaveReconstructedMsg( CoordinatorEvent event, char *buf, size_t size );
 	bool handleReleaseDegradedLockRequest( CoordinatorEvent event, char *buf, size_t size );
 	bool handleRecoveryRequest( CoordinatorEvent event, char *buf, size_t size );
+	bool handleRemappedParity( CoordinatorEvent event, char *buf, size_t size );
 	// Request handler for master
 	bool handleGetRequest( MasterEvent event, char *buf, size_t size );
-	bool handleSetRequest( MasterEvent event, char *buf, size_t size );
+	bool handleSetRequest( MasterEvent event, char *buf, size_t size, bool needResSet = true );
 	bool handleRemappingSetLockRequest( MasterEvent event, char *buf, size_t size );
 	bool handleRemappingSetRequest( MasterEvent event, char *buf, size_t size );
 	bool handleUpdateRequest( MasterEvent event, char *buf, size_t size );
@@ -88,6 +89,8 @@ private:
 	bool handleSlavePeerRegisterRequest( SlavePeerSocket *socket, char *buf, size_t size );
 	bool handleRemappingSetRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleSealChunkRequest( SlavePeerEvent event, char *buf, size_t size );
+	bool handleSetRequest( SlavePeerEvent event, char *buf, size_t size );
+	bool handleSetResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleGetRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleUpdateRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleDeleteRequest( SlavePeerEvent event, char *buf, size_t size );

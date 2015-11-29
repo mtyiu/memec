@@ -2,6 +2,7 @@
 #define __COORDINATOR_EVENT_SLAVE_EVENT_HH__
 
 #include "../socket/slave_socket.hh"
+#include "../../common/ds/packet_pool.hh"
 #include "../../common/event/event.hh"
 
 enum SlaveEventType {
@@ -14,6 +15,7 @@ enum SlaveEventType {
 	SLAVE_EVENT_TYPE_REQUEST_SEAL_CHUNKS,
 	SLAVE_EVENT_TYPE_REQUEST_FLUSH_CHUNKS,
 	SLAVE_EVENT_TYPE_REQUEST_SYNC_META,
+	SLAVE_EVENT_TYPE_PARITY_MIGRATE,
 	SLAVE_EVENT_TYPE_REQUEST_RELEASE_DEGRADED_LOCK,
 	SLAVE_EVENT_TYPE_DISCONNECT
 };
@@ -31,6 +33,9 @@ public:
 		struct {
 			bool *done;
 		} degraded;
+		struct {
+			Packet *packet;
+		} parity;
 		bool *sync;
 	} message;
 
@@ -42,6 +47,7 @@ public:
 	void reqFlushChunks( SlaveSocket *socket );
 	void reqSyncMeta( SlaveSocket *socket, bool *sync );
 	void reqReleaseDegradedLock( SlaveSocket *socket, bool *done = 0 );
+	void syncRemappedParity( SlaveSocket *socket, Packet *packet );
 	void disconnect( SlaveSocket *socket );
 };
 

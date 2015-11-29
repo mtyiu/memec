@@ -259,6 +259,18 @@ bool Pending::insertRemapData( struct sockaddr_in target, uint32_t listId, uint3
 	return true;
 }
 
+bool Pending::insertRemapDataRequest( uint32_t id, uint32_t parentId, uint32_t requestCount, SlavePeerSocket *target ) {
+	bool ret = false;
+	PendingIdentifier pid( id, parentId, target );
+	LOCK( &this->slavePeers.remappedDataRequestLock );
+	if ( this->slavePeers.remappedDataRequest.count( pid ) == 0 ){
+		ret = true;
+		this->slavePeers.remappedDataRequest[ pid ] = requestCount;
+	}
+	UNLOCK( &this->slavePeers.remappedDataRequestLock );
+	return ret;
+}
+
 bool Pending::eraseReleaseDegradedLock( uint32_t id, uint32_t count, uint32_t &remaining, uint32_t &total, PendingIdentifier *pidPtr ) {
 	PendingIdentifier pid( id, id, 0 );
 	std::unordered_map<PendingIdentifier, PendingDegradedLock>::iterator it;
@@ -290,6 +302,25 @@ bool Pending::eraseRemapData( struct sockaddr_in target, std::set<PendingData> *
 	}
 	UNLOCK( &this->slavePeers.remappedDataLock );
 	return found;
+}
+
+bool Pending::decrementRemapDataRequest( uint32_t id, PendingIdentifier *pidPtr, uint32_t *requestCount ) {
+	PendingIdentifier pid( id, 0, 0 );
+
+	LOCK( &this->slavePeers.remappedDataRequestLock );
+	auto it  = this->slavePeers.remappedDataRequest.find( pid );
+	bool ret = ( it != this->slavePeers.remappedDataRequest.end() );
+	// decrement remaining request count, remove counter if it reaches 0
+	it->second--;
+	if ( requestCount ) *requestCount = it->second;
+	if ( it->second == 0 ) this->slavePeers.remappedDataRequest.erase( pid );
+	UNLOCK( &this->slavePeers.remappedDataRequestLock );
+
+	if ( ret ) {
+		if ( pidPtr ) *pidPtr = it->first;
+	}
+
+	return ret;
 }
 
 std::unordered_set<uint32_t> *Pending::findRecovery( uint32_t id, SlavePeerSocket *&target, uint32_t stripeId, uint32_t &listId, uint32_t &chunkId ) {

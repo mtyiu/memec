@@ -49,8 +49,12 @@ private:
 	std::map<std::map<struct sockaddr_in, uint32_t>*, std::set<uint32_t> > syncRemappingRecordCountersReverse;
 	std::map<std::map<struct sockaddr_in, uint32_t>*, bool*> syncRemappingRecordIndicators;
 	LOCK_T syncRemappingRecordLock;
+
 	std::map<struct sockaddr_in, Key> syncRemappedParity;
 	LOCK_T syncRemappedParityLock;
+
+	std::unordered_map<uint32_t, std::pair< std::set<struct sockaddr_in>*, pthread_cond_t* > > syncRemappedParityRequest;
+	LOCK_T syncRemappedParityRequestLock;
 
 	std::unordered_map<PendingIdentifier, PendingRecovery> recovery;
 	LOCK_T recoveryLock;
@@ -62,6 +66,7 @@ public:
 		LOCK_INIT( &this->syncRemappingRecordLock );
 		LOCK_INIT( &this->recoveryLock );
 		LOCK_INIT( &this->syncRemappedParityLock );
+		LOCK_INIT( &this->syncRemappedParityRequestLock );
 	}
 
 	~Pending() {}
@@ -225,6 +230,38 @@ public:
 		}
 		UNLOCK( &this->syncRemappingRecordLock );
 		return map;
+	}
+
+	bool insertRemappedParityRequest( uint32_t id, std::set<struct sockaddr_in> *counter, pthread_cond_t *cond ) {
+		bool ret = false;
+		LOCK( &this->syncRemappedParityRequestLock );
+		if ( this->syncRemappedParityRequest.count( id ) == 0 ) {
+			this->syncRemappedParityRequest[ id ].first = counter;
+			this->syncRemappedParityRequest[ id ].second = cond;
+			ret = true;
+		}
+		UNLOCK( &this->syncRemappedParityRequestLock );
+		return ret;
+	}
+	
+	bool decrementRemappedParityRequest( uint32_t id, struct sockaddr_in target, std::set<struct sockaddr_in> **counter, pthread_cond_t **cond ) {
+		LOCK( &this->syncRemappedParityRequestLock );
+		auto it = this->syncRemappedParityRequest.find( id );
+		bool ret = ( it != this->syncRemappedParityRequest.end() );
+		if ( ret ) {
+			it->second.first->erase( target );
+			if ( cond ) *cond = it->second.second;
+			if ( counter ) { 
+				if ( ! it->second.first->empty() ) {
+					*counter = it->second.first;
+				} else {
+					*counter = 0;
+					this->syncRemappedParityRequest.erase( id );
+				}
+			}
+		}
+		UNLOCK( &this->syncRemappedParityRequestLock );
+		return ret;
 	}
 
 	void printSyncMetaRequests( FILE *f = stderr, bool list = false ) {

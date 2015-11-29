@@ -149,6 +149,13 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 			);
 			isSend = true;
 			break;
+		case COORDINATOR_EVENT_TYPE_RESPONSE_PARITY_MIGRATE:
+			buffer.data = this->protocol.resRemapParity(
+				buffer.size,
+				event.id
+			);
+			isSend = true;
+			break;
 		case COORDINATOR_EVENT_TYPE_PENDING:
 			isSend = false;
 			break;
@@ -207,6 +214,9 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 						break;
 					case PROTO_OPCODE_RECOVERY:
 						this->handleRecoveryRequest( event, buffer.data, header.length );
+						break;
+					case PROTO_OPCODE_PARITY_MIGRATE:
+						this->handleRemappedParity( event, buffer.data, buffer.size );
 						break;
 					default:
 						__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from coordinator." );
@@ -532,6 +542,28 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				}
 			}
 			break;
+		case SLAVE_PEER_EVENT_TYPE_SET_REQUEST:
+			buffer.data = this->protocol.reqSet(
+				buffer.size,
+				event.id,
+				event.message.parity.key.data,
+				event.message.parity.key.size,
+				event.message.parity.value.data,
+				event.message.parity.value.size
+			);
+			break;
+		case SLAVE_PEER_EVENT_TYPE_SET_RESPONSE_SUCCESS:
+			success = true;
+		case SLAVE_PEER_EVENT_TYPE_SET_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resSet(
+				buffer.size,
+				event.id,
+				success, /* success */
+				event.message.parity.key.size,
+				event.message.parity.key.data,
+				false /* to master */
+			);
+			break;
 		case SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_REQUEST:
 			this->issueSealChunkRequest( event.message.chunk.chunk );
 			return;
@@ -807,6 +839,23 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 							break;
 						default:
 							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
+							break;
+					}
+					break;
+				case PROTO_OPCODE_SET:
+					switch ( header.magic ) {
+						case PROTO_MAGIC_REQUEST:
+							this->handleSetRequest( event, buffer.data, buffer.size );
+							this->load.set();
+							break;
+						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							this->handleSetResponse( event, true, buffer.data, buffer.size );
+							break;
+						case PROTO_MAGIC_RESPONSE_FAILURE:
+							this->handleSetResponse( event, false, buffer.data, buffer.size );
+							break;
+						default:
+							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x for SET.", header.magic );
 							break;
 					}
 					break;
@@ -1312,6 +1361,51 @@ bool SlaveWorker::handleRecoveryRequest( CoordinatorEvent event, char *buf, size
 	return false;
 }
 
+bool SlaveWorker::handleRemappedParity( CoordinatorEvent event, char *buf, size_t size ) {
+	struct AddressHeader header;
+	if ( ! this->protocol.parseAddressHeader( header, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleRemappedParity", "Invalid Remapped Parity Sync request." );
+		return false;
+	}
+
+	SlavePeerEvent slavePeerEvent;
+	Slave *slave = Slave::getInstance();
+
+	struct sockaddr_in target;
+	target.sin_addr.s_addr = header.addr;
+	target.sin_port = header.port;
+	SlavePeerSocket *socket = 0;
+	for ( uint32_t i = 0; i < slave->sockets.slavePeers.size(); i++ ) {
+		if ( slave->sockets.slavePeers.values[ i ]->getAddr() == target ) {
+			socket = slave->sockets.slavePeers.values[ i ];
+			break;
+		}
+	}
+	if ( socket == 0 )
+		__ERROR__( "SlaveWorker", "handleRemappedparity", "Cannot find slave sccket to send remapped parity back." );
+
+	std::set<PendingData> *remappedParity;
+	bool found = SlaveWorker::pending->eraseRemapData( target, &remappedParity );
+
+	if ( found && socket ) {
+		uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
+		// TODO insert into pending set to wait for acknowledgement 
+		SlaveWorker::pending->insertRemapDataRequest( requestId, event.id, remappedParity->size(), socket );
+		// dispatch one event for each key 
+		for ( PendingData pendingData : *remappedParity ) {
+			slavePeerEvent.reqSet( socket, requestId, pendingData.listId, pendingData.chunkId, pendingData.key, pendingData.value );
+			slave->eventQueue.insert( slavePeerEvent );
+		}
+		delete remappedParity;
+	} else {
+		event.resRemappedParity();
+		this->dispatch( event );
+		// slave not found, but remapped parity found.. discard the parity
+		if ( found ) delete remappedParity;
+	}
+	return false;
+}
+
 bool SlaveWorker::handleGetRequest( MasterEvent event, char *buf, size_t size ) {
 	struct KeyHeader header;
 	bool ret;
@@ -1343,7 +1437,7 @@ bool SlaveWorker::handleGetRequest( MasterEvent event, char *buf, size_t size ) 
 	return ret;
 }
 
-bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size ) {
+bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size, bool needResSet ) {
 	struct KeyValueHeader header;
 	if ( ! this->protocol.parseKeyValueHeader( header, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleSetRequest", "Invalid SET request (size = %lu).", size );
@@ -1367,10 +1461,12 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size ) 
 		this->chunks, this->dataChunk, this->parityChunk
 	);
 
-	Key key;
-	key.set( header.keySize, header.key );
-	event.resSet( event.socket, event.id, key, true );
-	this->dispatch( event );
+	if ( needResSet ) {
+		Key key;
+		key.set( header.keySize, header.key );
+		event.resSet( event.socket, event.id, key, true );
+		this->dispatch( event );
+	}
 
 	return true;
 }
@@ -1399,11 +1495,11 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 		if ( selfAddr == dataSlaveSocket->getAddr() ) {
 			bufferRemapData = false;
 		}
-	} else if ( targetAddr.sin_addr.s_addr == 0 || targetAddr == selfAddr ) {/* parity remapped ?*/
+	} else if ( targetAddr.sin_addr.s_addr == 0 || targetAddr == selfAddr ) { /* parity remapped ?*/
 		bufferRemapData = false;
 	}
 
-	if ( header.remapped ) { // only buffer remapped parity for the time being
+	if ( header.remapped && bufferRemapData ) { // only buffer remapped parity for the time being
 		Key key;
 		key.set( header.keySize, header.key );
 		Value value;
@@ -1557,6 +1653,48 @@ bool SlaveWorker::handleRemappingSetResponse( SlavePeerEvent event, bool success
 	}
 
 	return true;
+}
+
+bool SlaveWorker::handleSetRequest( SlavePeerEvent event, char *buf, size_t size ) {
+	struct KeyValueHeader header;
+	if ( ! this->protocol.parseKeyValueHeader( header, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleSetRequest (SlavePeer)", "Invalid SET request (size = %lu).", size );
+		return false;
+	}
+	__DEBUG__(
+		BLUE, "SlaveWorker", "handleSetRequest (SlavePeer) ",
+		"[SET] Key: %.*s (key size = %u); Value: (value size = %u)",
+		( int ) header.keySize, header.key, header.keySize, header.valueSize
+	);
+	// same flow as set from masters
+	MasterEvent masterEvent;
+	bool success = this->handleSetRequest( masterEvent, buf, size, false );
+
+	uint32_t listId, chunkId;
+	listId = SlaveWorker::stripeList->get( header.key, header.keySize, 0, 0, &chunkId );
+
+	Key key;
+	key.set( header.keySize, header.key );
+	event.resSet( event.socket, event.id, listId, chunkId, key, success );
+	this->dispatch( event );
+
+	return success;
+}
+
+bool SlaveWorker::handleSetResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
+	PendingIdentifier pid;
+	uint32_t requestCount;
+	bool found = SlaveWorker::pending->decrementRemapDataRequest( event.id, &pid, &requestCount );
+	if ( found && requestCount == 0 ){
+		CoordinatorEvent coordinatorEvent;
+		Slave *slave = Slave::getInstance();
+		for ( uint32_t i = 0; i < slave->sockets.coordinators.size(); i++ ) {
+			CoordinatorSocket *socket = slave->sockets.coordinators.values[ i ];
+			coordinatorEvent.resRemappedParity( socket, &pid.parentId );
+			this->dispatch( coordinatorEvent );
+		}
+	}
+	return found;
 }
 
 bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size ) {

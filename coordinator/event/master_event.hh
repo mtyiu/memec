@@ -23,8 +23,6 @@ enum MasterEventType {
 	// REMAPPING_RECORDS
 	MASTER_EVENT_TYPE_FORWARD_REMAPPING_RECORDS,
 	MASTER_EVENT_TYPE_SYNC_REMAPPING_RECORDS,
-	// Parity Migration
-	MASTER_EVENT_TYPE_PARITY_MIGRATE,
 	// Degraded operation
 	MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED,
 	MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_WAS_LOCKED,
@@ -59,9 +57,6 @@ public:
 			uint32_t sockfd;
 			std::vector<Packet*> *syncPackets;
 		} remap;
-		struct {
-			Packet *packet;
-		} parity;
 		struct {
 			size_t prevSize;
 			char *data;
@@ -107,10 +102,6 @@ public:
 	// Remapping Records
 	void syncRemappingRecords(
 		MasterSocket *socket, std::vector<Packet*> *packets
-	);
-	// Parity Migration
-	void syncRemappedParity(
-		MasterSocket *socket, Packet *packet
 	);
 	// Pending
 	void pending( MasterSocket *socket );

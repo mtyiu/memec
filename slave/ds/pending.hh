@@ -182,6 +182,7 @@ public:
 		std::unordered_multimap<PendingIdentifier, ChunkUpdate> updateChunk;
 		std::unordered_multimap<PendingIdentifier, ChunkUpdate> deleteChunk;
 		std::map<struct sockaddr_in, std::set<PendingData>* > remappedData;
+		std::unordered_map<PendingIdentifier, uint32_t> remappedDataRequest;
 		LOCK_T degradedOpsLock;
 		LOCK_T remappingSetLock;
 		LOCK_T getLock;
@@ -192,6 +193,7 @@ public:
 		LOCK_T updateChunkLock;
 		LOCK_T delChunkLock;
 		LOCK_T remappedDataLock;
+		LOCK_T remappedDataRequestLock;
 	} slavePeers;
 
 	Pending() {
@@ -210,6 +212,8 @@ public:
 		LOCK_INIT( &this->slavePeers.setChunkLock );
 		LOCK_INIT( &this->slavePeers.updateChunkLock );
 		LOCK_INIT( &this->slavePeers.delChunkLock );
+		LOCK_INIT( &this->slavePeers.remappedDataLock );
+		LOCK_INIT( &this->slavePeers.remappedDataRequestLock );
 	}
 
 	// Insert (Coordinator)
@@ -272,6 +276,10 @@ public:
 		struct sockaddr_in target, uint32_t listId, uint32_t chunkId,
 		Key key, Value value
 	);
+	bool insertRemapDataRequest(
+		uint32_t id, uint32_t parentId, uint32_t requestCount,
+		SlavePeerSocket *target
+	);
 	// Erase
 	bool eraseReleaseDegradedLock(
 		uint32_t id, uint32_t count,
@@ -317,7 +325,12 @@ public:
 	);
 	bool eraseRemapData( 
 		struct sockaddr_in target, 
-		std::set<PendingData> **pendingData);
+		std::set<PendingData> **pendingData
+	);
+	bool decrementRemapDataRequest( 
+		uint32_t id, PendingIdentifier *pidPtr = 0,
+		uint32_t *requestCount = 0
+	);
 
 	std::unordered_set<uint32_t> *findRecovery(
 		uint32_t id, SlavePeerSocket *&socket,
