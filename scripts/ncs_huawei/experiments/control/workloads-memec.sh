@@ -37,11 +37,11 @@ for iter in {1..10}; do
 				done
 
 				pending=0
-				for n in {2..9}; do
+				for n in {2..9} {11..18}; do
 					if [ $n == 3 ]; then
-						read -p "Pending: ${pending} / 4" -t 300
+						read -p "Pending: ${pending} / 16" -t 300
 					else
-						read -p "Pending: ${pending} / 4" -t 60
+						read -p "Pending: ${pending} / 16" -t 60
 					fi
 					pending=$(expr $pending + 1)
 				done
@@ -52,7 +52,7 @@ for iter in {1..10}; do
 			screen -S manage -p 0 -X stuff "$(printf '\r\r')"
 			sleep 10
 
-			for n in {2..9}; do
+			for n in {2..9} {11..18}; do
 				mkdir -p ${BASE_PATH}/results/workloads/memec/$iter/node$n
 				scp testbed-node$n:${BASE_PATH}/results/workloads/$c/$t/*.txt ${BASE_PATH}/results/workloads/memec/$iter/node$n
 				ssh testbed-node$n 'rm -rf ${BASE_PATH}/results/*'

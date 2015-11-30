@@ -15,13 +15,13 @@ ssh testbed-node1 "screen -S coordinator -p 0 -X stuff \"$(printf '\r\r')${BOOTS
 
 sleep ${SLEEP_TIME}
 
-for i in {11..23} {37..39}; do
+for i in {19..23} {37..39}; do
 	ssh testbed-node$i "screen -S slave -p 0 -X stuff \"$(printf '\r\r')${BOOTSTRAP_SCRIPT_PATH}/start-plio-slave.sh ${1}$(printf '\r\r')\""
 done
 
 sleep ${SLEEP_TIME}
 
-for i in {2..9}; do
+for i in {2..9} {11..18}; do
 	ssh testbed-node$i "screen -S master -p 0 -X stuff \"$(printf '\r\r')${BOOTSTRAP_SCRIPT_PATH}/start-plio-master.sh ${1}$(printf '\r\r')\""
 done
 
@@ -43,10 +43,10 @@ else
 	TERM_COMMAND="$(printf '\r\r')clear$(printf '\r')"
 fi
 
-for i in {11..23} {37..39}; do
+for i in {19..23} {37..39}; do
 	ssh testbed-node$i "screen -S slave -p 0 -X stuff \"${TERM_COMMAND}\"" &
 done
-for i in {2..9}; do
+for i in {2..9} {11..18}; do
 	ssh testbed-node$i "screen -S master -p 0 -X stuff \"${TERM_COMMAND}\"" &
 	ssh testbed-node$i "screen -S ycsb -p 0 -X stuff \"${TERM_COMMAND}\"" &
 done
