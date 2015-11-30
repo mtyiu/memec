@@ -32,12 +32,12 @@ for iter in {1..10}; do
 					echo "-------------------- Run ($w) --------------------"
 				fi
 
-				for n in 3 4 8 9; do
+				for n in {2..9}; do
 					ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts_huawei/experiments/master/workloads-memec.sh $c $t $w $(printf '\r')\"" &
 				done
 
 				pending=0
-				for n in 3 4 8 9; do
+				for n in {2..9}; do
 					if [ $n == 3 ]; then
 						read -p "Pending: ${pending} / 4" -t 300
 					else
@@ -52,7 +52,7 @@ for iter in {1..10}; do
 			screen -S manage -p 0 -X stuff "$(printf '\r\r')"
 			sleep 10
 
-			for n in 3 4 8 9; do
+			for n in {2..9}; do
 				mkdir -p ${BASE_PATH}/results/workloads/memec/$iter/node$n
 				scp testbed-node$n:${BASE_PATH}/results/workloads/$c/$t/*.txt ${BASE_PATH}/results/workloads/memec/$iter/node$n
 				ssh testbed-node$n 'rm -rf ${BASE_PATH}/results/*'
