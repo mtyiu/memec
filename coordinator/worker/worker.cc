@@ -898,10 +898,13 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 		);
 
 		// Distribute the task
-		isAllCompleted = true;
 		stripeIdSetIt = stripeIds[ listId ].begin();
 		do {
+			isAllCompleted = true;
 			for ( uint32_t j = 0; j < CoordinatorWorker::chunkCount; j++ ) {
+				if ( stripeIdSetIt == stripeIds[ listId ].end() )
+					break;
+
 				SlaveSocket *s = sockets[ listId ][ j ];
 				if ( s->ready() && s != backupSlaveSocket ) {
 					buffer.data = this->protocol.reqReconstruction(

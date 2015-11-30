@@ -698,6 +698,12 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 
 	if ( useDegradedMode ) {
 		// Acquire degraded lock from the coordinator
+		// __INFO__(
+		// 	BLUE, "MasterWorker", "handleGetRequest",
+		// 	"[GET] Key: %.*s (key size = %u): acquiring lock.",
+		// 	( int ) header.keySize, header.key, header.keySize
+		// );
+
 		MasterWorker::slaveSockets->get( sockfd )->counter.increaseDegraded();
 		return this->sendDegradedLockRequest(
 			event.id, PROTO_OPCODE_GET,
@@ -1186,7 +1192,7 @@ bool MasterWorker::sendDegradedLockRequest( uint32_t parentId, uint8_t opcode, u
 	// Add the degraded lock request to the pending set
 	DegradedLockData degradedLockData;
 
-	if ( dataChunkId != newDataChunkId ) {
+	if ( parityChunkId == 0 ) {
 		degradedLockData.set(
 			opcode,
 			listId, 0 /* srcStripeId */, dataChunkId,

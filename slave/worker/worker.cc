@@ -1856,7 +1856,7 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 			if ( ! chunkBuffer->reInsert( this, chunk, keyMetadata.length, false, false ) ) {
 				// The chunk is compacted before. Need to seal the chunk first
 				// Seal from chunk->lastDelPos
-				if ( chunk->lastDelPos < chunk->getSize() ) {
+				if ( chunk->lastDelPos > 0 && chunk->lastDelPos < chunk->getSize() ) {
 					// Only issue seal chunk request when new key-value pairs are received
 					this->issueSealChunkRequest( chunk, chunk->lastDelPos );
 				}
@@ -1910,13 +1910,14 @@ bool SlaveWorker::handleDegradedGetRequest( MasterEvent event, char *buf, size_t
 	}
 	__DEBUG__(
 		BLUE, "SlaveWorker", "handleDegradedGetRequest",
-		"[GET (%u, %u, %u --> %u / %u --> %u)] Key: %.*s (key size = %u).",
+		"[GET (%u, %u, %u --> %u / %u --> %u)] Key: %.*s (key size = %u); is sealed? %s.",
 		header.listId, header.stripeId,
 		header.srcDataChunkId, header.dstDataChunkId,
 		header.srcParityChunkId, header.dstParityChunkId, // will be ignored
 		( int ) header.data.key.keySize,
 		header.data.key.key,
-		header.data.key.keySize
+		header.data.key.keySize,
+		header.isSealed ? "true" : "false"
 	);
 
 	if ( header.srcDataChunkId == header.dstDataChunkId )
@@ -2667,7 +2668,7 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, bool isSealed, ch
 			if ( ! chunkBuffer->reInsert( this, chunk, originalChunkSize - chunkSize, false, false ) ) {
 				// The chunk is compacted before. Need to seal the chunk first
 				// Seal from chunk->lastDelPos
-				if ( chunk->lastDelPos < chunk->getSize() ) {
+				if ( chunk->lastDelPos > 0 && chunk->lastDelPos < chunk->getSize() ) {
 					printf( "chunk->lastDelPos = %u; chunk->getSize() = %u\n", chunk->lastDelPos, chunk->getSize() );
 					// Only issue seal chunk request when new key-value pairs are received
 					this->issueSealChunkRequest( chunk, chunk->lastDelPos );

@@ -57,7 +57,7 @@ for s in $sizes; do
 		sleep 5
 		ssh testbed-node$n "screen -S slave -p 0 -X stuff \"$(printf '\r\r')memory$(printf '\r\r')\""
 		sleep 1
-		ssh testbed-node$n "screen -S slave -p 0 -X stuff \"$(printf '\r\r')exit$(printf '\r\r')\""
+		ssh testbed-node$n "killall -9 slave; screen -S slave -p 0 -X stuff \"$(printf '\r\r')\""
 
 		# sleep 20
 		read -p "Press Enter after recovery..." -t $(expr $s \/ 100000000)
