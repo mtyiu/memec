@@ -5,6 +5,8 @@
 #include "../../common/util/time.hh"
 
 #define WORKER_COLOR	YELLOW
+#define BATCH_THRESHOLD		20
+static struct timespec BATCH_INTVL = { 0, 500000 };
 
 uint32_t SlaveWorker::dataChunkCount;
 uint32_t SlaveWorker::parityChunkCount;
@@ -1392,9 +1394,15 @@ bool SlaveWorker::handleRemappedParity( CoordinatorEvent event, char *buf, size_
 		// TODO insert into pending set to wait for acknowledgement 
 		SlaveWorker::pending->insertRemapDataRequest( requestId, event.id, remappedParity->size(), socket );
 		// dispatch one event for each key 
+		uint32_t requestSent = 0;
 		for ( PendingData pendingData : *remappedParity ) {
 			slavePeerEvent.reqSet( socket, requestId, pendingData.listId, pendingData.chunkId, pendingData.key, pendingData.value );
 			slave->eventQueue.insert( slavePeerEvent );
+			requestSent++;
+			if ( requestSent % BATCH_THRESHOLD == 0 ) {
+				nanosleep( &BATCH_INTVL, 0 );
+				requestSent = 0;
+			}
 		}
 		delete remappedParity;
 	} else {

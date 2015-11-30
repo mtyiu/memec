@@ -311,9 +311,11 @@ bool Pending::decrementRemapDataRequest( uint32_t id, PendingIdentifier *pidPtr,
 	auto it  = this->slavePeers.remappedDataRequest.find( pid );
 	bool ret = ( it != this->slavePeers.remappedDataRequest.end() );
 	// decrement remaining request count, remove counter if it reaches 0
-	it->second--;
-	if ( requestCount ) *requestCount = it->second;
-	if ( it->second == 0 ) this->slavePeers.remappedDataRequest.erase( pid );
+	if ( ret ) {
+		it->second--;
+		if ( requestCount ) *requestCount = it->second;
+		if ( it->second == 0 ) this->slavePeers.remappedDataRequest.erase( pid );
+	}
 	UNLOCK( &this->slavePeers.remappedDataRequestLock );
 
 	if ( ret ) {
