@@ -10,7 +10,7 @@ fi
 ID=$(hostname | sed 's/testbed-node//g')
 RECORD_COUNT=10000000
 INSERT_COUNT=$(expr ${RECORD_COUNT} \/ 8)
-INSERT_START=$(expr ${INSERT_COUNT} \* \( ${ID} - 2 \) )
+INSERT_START=$(expr ${INSERT_COUNT} \* \( ${ID} - 11 \) )
 
 ${YCSB_PATH}/bin/ycsb \
 	load plio \

@@ -8,21 +8,18 @@ coding='raid0' # raid1 raid5 rdp cauchy rs evenodd'
 threads=64 # '16 32 64 128 256 512 1000'
 workloads='load workloada workloadb workloadc workloadf workloadd'
 
-for iter in {1..1}; do
-	mkdir -p ${BASE_PATH}/results/workloads/memec/$iter
+for iter in {1..30}; do
+	mkdir -p ${BASE_PATH}/results/workloads/memcached/$iter
 
 	for c in $coding; do
 		echo "Preparing for the experiments with coding scheme = $c..."
-
-		sed -i "s/^scheme=.*$/scheme=$c/g" ${PLIO_PATH}/bin/config/ncs_huawei/global.ini
-
-		${BASE_PATH}/scripts_huawei/util/rsync.sh
 
 		for t in $threads; do
 			echo "Running experiment with coding scheme = $c and thread count = $t..."
 
 			# Run workload A, B, C, F, D first
-			screen -S manage -p 0 -X stuff "${BASE_PATH}/scripts_huawei/util/start.sh $1$(printf '\r')"
+			# screen -S manage -p 0 -X stuff "${BASE_PATH}/scripts_huawei/util/start.sh $1$(printf '\r')"
+			screen -S manage -p 0 -X stuff "${HOME}/hwchan/util/memcached/start-distributed-8 start$(printf '\r')"
 			sleep 30
 
 			for w in $workloads; do
@@ -33,7 +30,7 @@ for iter in {1..1}; do
 				fi
 
 				for n in {11..18}; do
-					ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts_huawei/experiments/master/workloads-memec.sh $c $t $w $(printf '\r')\"" &
+					ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts_huawei/experiments/master/workloads-memcached.sh $c $t $w $(printf '\r')\"" &
 				done
 
 				pending=0
@@ -45,16 +42,15 @@ for iter in {1..1}; do
 					fi
 					pending=$(expr $pending + 1)
 				done
-
-				sleep 30
 			done
 
-			screen -S manage -p 0 -X stuff "$(printf '\r\r')"
+			# screen -S manage -p 0 -X stuff "$(printf '\r\r')"
+			screen -S manage -p 0 -X stuff "${HOME}/hwchan/util/memcached/start-distributed-8 stop$(printf '\r')"
 			sleep 10
 
 			for n in {11..18}; do
-				mkdir -p ${BASE_PATH}/results/workloads/memec/$iter/node$n
-				scp testbed-node$n:${BASE_PATH}/results/workloads/$c/$t/*.txt ${BASE_PATH}/results/workloads/memec/$iter/node$n
+				mkdir -p ${BASE_PATH}/results/workloads/memcached/$iter/node$n
+				scp testbed-node$n:${BASE_PATH}/results/workloads/$c/$t/*.txt ${BASE_PATH}/results/workloads/memcached/$iter/node$n
 				ssh testbed-node$n 'rm -rf ${BASE_PATH}/results/*'
 			done
 
@@ -62,7 +58,3 @@ for iter in {1..1}; do
 		done
 	done
 done
-
-sed -i "s/^scheme=.*$/scheme=raid0/g" ${PLIO_PATH}/bin/config/ncs_huawei/global.ini
-
-${BASE_PATH}/scripts_huawei/util/rsync.sh
