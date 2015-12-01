@@ -18,7 +18,7 @@ fi
 for i in {19..23} {37..39}; do
 	ssh testbed-node$i "screen -S slave -p 0 -X stuff \"${TERM_COMMAND}\"" &
 done
-for i in {2..9} {11..18}; do
+for i in {11..18}; do
 	ssh testbed-node$i "screen -S master -p 0 -X stuff \"${TERM_COMMAND}\"" &
 	ssh testbed-node$i "screen -S ycsb -p 0 -X stuff \"${TERM_COMMAND}\"" &
 done
