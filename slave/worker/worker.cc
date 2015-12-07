@@ -100,42 +100,6 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 			isSend = true;
 		}
 			break;
-		case COORDINATOR_EVENT_TYPE_REMAP_SYNC:
-		{
-			size_t remapCount;
-			buffer.data = this->protocol.sendRemappingRecords(
-				buffer.size,
-				requestId,
-				SlaveWorker::map->remap,
-				&SlaveWorker::map->remapLock,
-				remapCount
-			);
-
-			// move the remapping record sent to another set to avoid looping through all records over and over ..
-			LOCK ( &SlaveWorker::map->remapLock );
-			if ( remapCount == SlaveWorker::map->remap.size() ) {
-				SlaveWorker::map->remapSent.insert(
-					SlaveWorker::map->remap.begin(),
-					SlaveWorker::map->remap.end()
-				);
-				SlaveWorker::map->remap.clear();
-			} else {
-				for ( it = SlaveWorker::map->remap.begin(); it != SlaveWorker::map->remap.end(); it = safeNextIt ) {
-					safeNextIt = it;
-					safeNextIt++;
-					if ( it->second.sent ) {
-						SlaveWorker::map->remapSent[ it->first ] = it->second;
-						SlaveWorker::map->remap.erase( it );
-					}
-				}
-			}
-			UNLOCK ( &SlaveWorker::map->remapLock );
-			isSend = true;
-
-			if ( SlaveWorker::map->remap.size() )
-				SlaveWorker::eventQueue->insert( event );
-		}
-			break;
 		case COORDINATOR_EVENT_TYPE_RELEASE_DEGRADED_LOCK_RESPONSE_SUCCESS:
 			buffer.data = this->protocol.resReleaseDegradedLock(
 				buffer.size,
@@ -268,7 +232,8 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 	switch( event.type ) {
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_GET_RESPONSE_SUCCESS:
-		case MASTER_EVENT_TYPE_SET_RESPONSE_SUCCESS:
+		case MASTER_EVENT_TYPE_SET_RESPONSE_SUCCESS_DATA:
+		case MASTER_EVENT_TYPE_SET_RESPONSE_SUCCESS_PARITY:
 		case MASTER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS:
@@ -280,7 +245,6 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		case MASTER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE:
 		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
 		case MASTER_EVENT_TYPE_DELETE_RESPONSE_FAILURE:
-		case MASTER_EVENT_TYPE_REDIRECT_RESPONSE:
 			success = false;
 			break;
 		default:
@@ -326,14 +290,25 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 			);
 			break;
 		// SET
-		case MASTER_EVENT_TYPE_SET_RESPONSE_SUCCESS:
+		case MASTER_EVENT_TYPE_SET_RESPONSE_SUCCESS_DATA:
+			buffer.data = this->protocol.resSet(
+				buffer.size,
+				event.id,
+				event.message.set.listId,
+				event.message.set.stripeId,
+				event.message.set.chunkId,
+				event.message.set.key.size,
+				event.message.set.key.data
+			);
+			break;
+		case MASTER_EVENT_TYPE_SET_RESPONSE_SUCCESS_PARITY:
 		case MASTER_EVENT_TYPE_SET_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resSet(
 				buffer.size,
 				event.id,
 				success,
-				event.message.key.size,
-				event.message.key.data
+				event.message.set.key.size,
+				event.message.set.key.data
 			);
 			break;
 		case MASTER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS:
@@ -386,18 +361,6 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 			if ( event.needsFree )
 				event.message.key.free();
 			break;
-		// Redirect
-		case MASTER_EVENT_TYPE_REDIRECT_RESPONSE:
-			buffer.data = this->protocol.resRedirect(
-				buffer.size,
-				event.id,
-				event.message.remap.opcode,
-				event.message.remap.key.size,
-				event.message.remap.key.data,
-				event.message.remap.listId,
-				event.message.remap.chunkId
-			);
-			break;
 		// Pending
 		case MASTER_EVENT_TYPE_PENDING:
 			break;
@@ -407,8 +370,6 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 
 	if ( isSend ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
-		// if ( event.type == MASTER_EVENT_TYPE_REDIRECT_RESPONSE )
-		// 	fprintf( stderr, "redirect %u\n", event.id );
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "SlaveWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 
@@ -1492,10 +1453,6 @@ bool SlaveWorker::handleGetRequest( MasterEvent event, char *buf, size_t size ) 
 	if ( map->findValueByKey( header.key, header.keySize, &keyValue, &key ) ) {
 		event.resGet( event.socket, event.id, keyValue, false );
 		ret = true;
-	} else if ( map->findRemappingRecordByKey( header.key, header.keySize, &remappingRecord, &key ) ) {
-		// Redirect request to remapped slave
-		event.resRedirect( event.socket, event.id, PROTO_OPCODE_GET, key, remappingRecord );
-		ret = false;
 	} else {
 		event.resGet( event.socket, event.id, key, false );
 		ret = false;
@@ -1516,8 +1473,7 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size ) 
 		( int ) header.keySize, header.key, header.keySize, header.valueSize
 	);
 
-	// Detect degraded SET
-	uint32_t listId, chunkId;
+	uint32_t listId, stripeId, chunkId;
 	listId = SlaveWorker::stripeList->get( header.key, header.keySize, 0, 0, &chunkId );
 
 	SlaveWorker::chunkBuffer->at( listId )->set(
@@ -1530,7 +1486,20 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size ) 
 
 	Key key;
 	key.set( header.keySize, header.key );
-	event.resSet( event.socket, event.id, key, true );
+	if ( chunkId >= SlaveWorker::dataChunkCount ) {
+		event.resSet(
+			event.socket, event.id,
+			key, true
+		);
+	} else {
+		// Data server responds with metadata
+		stripeId = -1; // TODO
+		event.resSet(
+			event.socket, event.id,
+			listId, stripeId, chunkId,
+			key
+		);
+	}
 	this->dispatch( event );
 
 	return true;
@@ -1558,67 +1527,10 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 		this->chunks, this->dataChunk, this->parityChunk
 	);
 
-	if ( header.needsForwarding && SlaveWorker::parityChunkCount > 0 ) {
-		uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
-
-		// Insert into master REMAPPING_SET pending set
-		struct RemappingRecordKey record;
-		record.remap.set( header.listId, header.chunkId );
-		record.key.dup( header.keySize, header.key );
-
-		if ( ! SlaveWorker::pending->insertRemappingRecordKey( PT_MASTER_REMAPPING_SET, event.id, ( void * ) event.socket, record ) ) {
-			__ERROR__( "SlaveWorker", "handleRemappingSetRequest", "Cannot insert into master REMAPPING_SET pending map (ID: %u).", event.id );
-			return false;
-		}
-
-		// Get parity slaves
-		if ( ! this->getSlaves( header.listId ) ) {
-			__ERROR__( "SlaveWorker", "handleRemappingSetRequest", "Cannot find a slave for performing degraded operation." );
-		}
-
-		// Prepare a packet buffer
-		Packet *packet = SlaveWorker::packetPool->malloc();
-		packet->setReferenceCount( SlaveWorker::parityChunkCount );
-
-		// TODO : add (sockfd, isRemapped) to forwarded SET requests
-		size_t size;
-		this->protocol.reqRemappingSet(
-			size, requestId,
-			header.listId, header.chunkId, false,
-			header.key, header.keySize,
-			header.value, header.valueSize,
-			packet->data
-		);
-		packet->size = ( uint32_t ) size;
-
-		// Forward the whole packet to the parity slaves
-		for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
-			// Insert into slave SET pending set
-			if ( ! SlaveWorker::pending->insertRemappingRecordKey( PT_SLAVE_PEER_REMAPPING_SET, requestId, event.id, this->paritySlaveSockets[ i ], record ) ) {
-				__ERROR__( "SlaveWorker", "handleRemappingSetRequest", "Cannot insert into slave SET pending map (ID: %u).", event.id );
-			}
-		}
-
-		for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
-			// Insert into event queue
-			SlavePeerEvent slavePeerEvent;
-			slavePeerEvent.send( this->paritySlaveSockets[ i ], packet );
-
-#ifdef SLAVE_WORKER_SEND_REPLICAS_PARALLEL
-			if ( i == SlaveWorker::parityChunkCount - 1 )
-				this->dispatch( slavePeerEvent );
-			else
-				SlaveWorker::eventQueue->prioritizedInsert( slavePeerEvent );
-#else
-			this->dispatch( slavePeerEvent );
-#endif
-		}
-	} else {
-		Key key;
-		key.set( header.keySize, header.key );
-		event.resRemappingSet( event.socket, event.id, key, header.listId, header.chunkId, true, false, header.sockfd, header.remapped );
-		this->dispatch( event );
-	}
+	Key key;
+	key.set( header.keySize, header.key );
+	event.resRemappingSet( event.socket, event.id, key, header.listId, header.chunkId, true, false, header.sockfd, header.remapped );
+	this->dispatch( event );
 
 	return true;
 }
@@ -1782,11 +1694,6 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 		}
 		if ( chunkBufferIndex != -1 )
 			chunkBuffer->updateAndUnlockChunk( chunkBufferIndex );
-	} else if ( map->findRemappingRecordByKey( header.key, header.keySize, &remappingRecord, &key ) ) {
-		// Redirect request to remapped slave
-		event.resRedirect( event.socket, event.id, PROTO_OPCODE_UPDATE, key, remappingRecord );
-		ret = false;
-		this->dispatch( event );
 	} else {
 		event.resUpdate(
 			event.socket, event.id, key,
@@ -1887,11 +1794,6 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 		}
 		if ( chunkBufferIndex != -1 )
 			chunkBuffer->updateAndUnlockChunk( chunkBufferIndex );
-	} else if ( map->findRemappingRecordByKey( header.key, header.keySize, &remappingRecord, &key ) ) {
-		// Redirect request to remapped slave
-		event.resRedirect( event.socket, event.id, PROTO_OPCODE_DELETE, key, remappingRecord );
-		ret = false;
-		this->dispatch( event );
 	} else {
 		key.set( header.keySize, header.key, ( void * ) event.socket );
 		event.resDelete( event.socket, event.id, key, false, false, false );

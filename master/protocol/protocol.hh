@@ -22,6 +22,8 @@ public:
 	// Loading statistics
 	char *reqPushLoadStats( size_t &size, uint32_t id, ArrayMap< struct sockaddr_in, Latency > *slaveGetLatency, ArrayMap< struct sockaddr_in, Latency > *slaveSetLatency );
 	bool parseLoadingStats( const LoadStatsHeader& loadStatsHeader, ArrayMap< struct sockaddr_in, Latency > &slaveGetLatency, ArrayMap< struct sockaddr_in, Latency > &slaveSetLatency, std::set<struct sockaddr_in> &overloadedSlaveSet, char* buffer, uint32_t size );
+	// Remapping SET
+	char *reqRemappingSetLock( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, bool isRemapped, char *key, uint8_t keySize, uint32_t sockfd = UINT_MAX );
 	// Degraded operation
 	char *reqDegradedLock( size_t &size, uint32_t id, uint32_t listId, uint32_t srcDataChunkId, uint32_t dstDataChunkId, uint32_t srcParityChunkId, uint32_t dstParityChunkId, char *key, uint8_t keySize );
 	// Remapping Records
@@ -32,9 +34,7 @@ public:
 	char *reqRegisterSlave( size_t &size, uint32_t id, uint32_t addr, uint16_t port );
 	// SET
 	char *reqSet( size_t &size, uint32_t id, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf = 0 );
-	// Remapping SET
-	char *reqRemappingSetLock( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, bool isRemapped, char *key, uint8_t keySize, uint32_t sockfd = UINT_MAX );
-	char *reqRemappingSet( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, bool needsForwarding, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf = 0, uint32_t sockfd = UINT_MAX, bool remapped = false );
+	char *reqRemappingSet( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf = 0, uint32_t sockfd = UINT_MAX, bool remapped = false );
 	// GET
 	char *reqGet( size_t &size, uint32_t id, char *key, uint8_t keySize );
 	char *reqDegradedGet( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t srcDataChunkId, uint32_t dstDataChunkId, uint32_t srcParityChunkId, uint32_t dstParityChunkId, bool isSealed, char *key, uint8_t keySize );

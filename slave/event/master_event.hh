@@ -16,7 +16,8 @@ enum MasterEventType {
 	MASTER_EVENT_TYPE_GET_RESPONSE_SUCCESS,
 	MASTER_EVENT_TYPE_GET_RESPONSE_FAILURE,
 	// SET
-	MASTER_EVENT_TYPE_SET_RESPONSE_SUCCESS,
+	MASTER_EVENT_TYPE_SET_RESPONSE_SUCCESS_DATA,
+	MASTER_EVENT_TYPE_SET_RESPONSE_SUCCESS_PARITY,
 	MASTER_EVENT_TYPE_SET_RESPONSE_FAILURE,
 	// REMAPPING_SET
 	MASTER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS,
@@ -27,8 +28,6 @@ enum MasterEventType {
 	// DELETE
 	MASTER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS,
 	MASTER_EVENT_TYPE_DELETE_RESPONSE_FAILURE,
-	// REDIRECT
-	MASTER_EVENT_TYPE_REDIRECT_RESPONSE,
 	// Pending
 	MASTER_EVENT_TYPE_PENDING
 };
@@ -43,6 +42,12 @@ public:
 	union {
 		Key key;
 		KeyValue keyValue;
+		struct {
+			uint32_t listId;
+			uint32_t stripeId;
+			uint32_t chunkId;
+			Key key;
+		} set;
 		struct {
 			// key-value update
 			Key key;
@@ -65,6 +70,7 @@ public:
 	void resGet( MasterSocket *socket, uint32_t id, KeyValue &keyValue, bool isDegraded );
 	void resGet( MasterSocket *socket, uint32_t id, Key &key, bool isDegraded );
 	// SET
+	void resSet( MasterSocket *socket, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key );
 	void resSet( MasterSocket *socket, uint32_t id, Key &key, bool success );
 	// REMAPPING_SET
 	void resRemappingSet( MasterSocket *socket, uint32_t id, Key &key, uint32_t listId, uint32_t chunkId, bool success, bool needsFree, uint32_t sockfd, bool remapped );
@@ -72,8 +78,6 @@ public:
 	void resUpdate( MasterSocket *socket, uint32_t id, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool success, bool needsFree, bool isDegraded );
 	// DELETE
 	void resDelete( MasterSocket *socket, uint32_t id, Key &key, bool success, bool needsFree, bool isDegraded );
-	// Redirect
-	void resRedirect( MasterSocket *socket, uint32_t id, uint8_t opcode, Key &key, RemappingRecord record );
 	// Pending
 	void pending( MasterSocket *socket );
 };

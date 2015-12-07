@@ -136,6 +136,22 @@ char *MasterProtocol::resSyncRemappingRecords( size_t &size, uint32_t id ) {
 	return this->buffer.send;
 }
 
+char *MasterProtocol::reqRemappingSetLock( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, bool isRemapped, char *key, uint8_t keySize, uint32_t sockfd ) {
+	size = this->generateRemappingLockHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_COORDINATOR,
+		PROTO_OPCODE_REMAPPING_LOCK,
+		id,
+		listId,
+		chunkId,
+		isRemapped,
+		keySize,
+		key,
+		sockfd
+	);
+	return this->buffer.send;
+}
+
 char *MasterProtocol::reqDegradedLock( size_t &size, uint32_t id, uint32_t listId, uint32_t srcDataChunkId, uint32_t dstDataChunkId, uint32_t srcParityChunkId, uint32_t dstParityChunkId, char *key, uint8_t keySize ) {
 	size = this->generateDegradedLockReqHeader(
 		PROTO_MAGIC_REQUEST,
@@ -181,23 +197,7 @@ char *MasterProtocol::reqSet( size_t &size, uint32_t id, char *key, uint8_t keyS
 	return buf;
 }
 
-char *MasterProtocol::reqRemappingSetLock( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, bool isRemapped, char *key, uint8_t keySize, uint32_t sockfd ) {
-	size = this->generateRemappingLockHeader(
-		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_COORDINATOR,
-		PROTO_OPCODE_REMAPPING_LOCK,
-		id,
-		listId,
-		chunkId,
-		isRemapped,
-		keySize,
-		key,
-		sockfd
-	);
-	return this->buffer.send;
-}
-
-char *MasterProtocol::reqRemappingSet( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, bool needsForwarding, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf, uint32_t sockfd, bool remapped ) {
+char *MasterProtocol::reqRemappingSet( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf, uint32_t sockfd, bool remapped ) {
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateRemappingSetHeader(
 		PROTO_MAGIC_REQUEST,
@@ -206,7 +206,6 @@ char *MasterProtocol::reqRemappingSet( size_t &size, uint32_t id, uint32_t listI
 		id,
 		listId,
 		chunkId,
-		needsForwarding,
 		keySize,
 		key,
 		valueSize,

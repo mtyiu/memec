@@ -23,10 +23,20 @@ void MasterEvent::resGet( MasterSocket *socket, uint32_t id, Key &key, bool isDe
 }
 
 void MasterEvent::resSet( MasterSocket *socket, uint32_t id, Key &key, bool success ) {
-	this->type = success ? MASTER_EVENT_TYPE_SET_RESPONSE_SUCCESS : MASTER_EVENT_TYPE_SET_RESPONSE_FAILURE;
+	this->type = success ? MASTER_EVENT_TYPE_SET_RESPONSE_SUCCESS_PARITY : MASTER_EVENT_TYPE_SET_RESPONSE_FAILURE;
 	this->id = id;
 	this->socket = socket;
-	this->message.key = key;
+	this->message.set.key = key;
+}
+
+void MasterEvent::resSet( MasterSocket *socket, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key ) {
+	this->type = MASTER_EVENT_TYPE_SET_RESPONSE_SUCCESS_DATA;
+	this->id = id;
+	this->socket = socket;
+	this->message.set.key = key;
+	this->message.set.listId = listId;
+	this->message.set.stripeId = stripeId;
+	this->message.set.chunkId = chunkId;
 }
 
 void MasterEvent::resRemappingSet( MasterSocket *socket, uint32_t id, Key &key, uint32_t listId, uint32_t chunkId, bool success, bool needsFree, uint32_t sockfd, bool remapped ) {
@@ -59,17 +69,6 @@ void MasterEvent::resDelete( MasterSocket *socket, uint32_t id, Key &key, bool s
 	this->isDegraded = isDegraded;
 	this->socket = socket;
 	this->message.key = key;
-}
-
-void MasterEvent::resRedirect( MasterSocket *socket, uint32_t id, uint8_t opcode, Key &key, RemappingRecord record ) {
-	this->type = MASTER_EVENT_TYPE_REDIRECT_RESPONSE;
-	this->id = id;
-	this->needsFree = false;
-	this->socket = socket;
-	this->message.remap.key = key;
-	this->message.remap.opcode = opcode;
-	this->message.remap.listId = record.listId;
-	this->message.remap.chunkId = record.chunkId;
 }
 
 void MasterEvent::pending( MasterSocket *socket ) {

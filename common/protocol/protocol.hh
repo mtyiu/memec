@@ -258,13 +258,12 @@ struct RemappingLockHeader {
 	char *key;
 };
 
-#define PROTO_REMAPPING_SET_SIZE 18
+#define PROTO_REMAPPING_SET_SIZE 17
 struct RemappingSetHeader {
 	uint32_t listId;
 	uint32_t chunkId;
 	uint32_t sockfd;
 	bool remapped;
-	bool needsForwarding;
 	uint8_t keySize;
 	uint32_t valueSize; // 3 bytes
 	char *key;
@@ -633,14 +632,14 @@ protected:
 
 	size_t generateRemappingSetHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
-		uint32_t listId, uint32_t chunkId, bool needsForwarding,
+		uint32_t listId, uint32_t chunkId,
 		uint8_t keySize, char *key,
 		uint32_t valueSize, char *value, char *sendBuf = 0,
 		uint32_t sockfd = UINT_MAX, bool remapped = false
 	);
 	bool parseRemappingSetHeader(
 		size_t offset, uint32_t &listId, uint32_t &chunkId,
-		bool &needsForwarding, uint8_t &keySize, char *&key,
+		uint8_t &keySize, char *&key,
 		uint32_t &valueSize, char *&value,
 		char *buf, size_t size,
 		uint32_t &sockfd, bool &remapped

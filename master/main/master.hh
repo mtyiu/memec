@@ -106,7 +106,10 @@ public:
 	bool isDegraded( SlaveSocket *socket );
 
 	// Helper function to update slave stats
-	void mergeSlaveCumulativeLoading ( ArrayMap< struct sockaddr_in, Latency > *getLatency, ArrayMap< struct sockaddr_in, Latency> *setLatency );
+	void mergeSlaveCumulativeLoading(
+		ArrayMap<struct sockaddr_in, Latency> *getLatency,
+		ArrayMap<struct sockaddr_in, Latency> *setLatency
+	);
 };
 
 #endif

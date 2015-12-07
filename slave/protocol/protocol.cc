@@ -40,19 +40,6 @@ char *SlaveProtocol::sendHeartbeat(
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::sendRemappingRecords( size_t &size, uint32_t id, std::unordered_map<Key, RemappingRecord> &remapRecord, LOCK_T *lock, size_t &remapCount ) {
-	size = this->generateRemappingRecordMessage(
-		PROTO_MAGIC_REMAPPING,
-		PROTO_MAGIC_TO_COORDINATOR,
-		PROTO_OPCODE_SYNC,
-		id,
-		lock,
-		remapRecord,
-		remapCount
-	);
-	return this->buffer.send;
-}
-
 char *SlaveProtocol::resReleaseDegradedLock( size_t &size, uint32_t id, uint32_t count ) {
 	size = this->generateDegradedReleaseResHeader(
 		PROTO_MAGIC_RESPONSE_SUCCESS,
@@ -93,6 +80,21 @@ char *SlaveProtocol::resRegisterMaster( size_t &size, uint32_t id, bool success 
 		PROTO_OPCODE_REGISTER,
 		0, // length
 		id
+	);
+	return this->buffer.send;
+}
+
+char *SlaveProtocol::resSet( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint8_t keySize, char *key ) {
+	size = this->generateChunkKeyHeader(
+		PROTO_MAGIC_RESPONSE_SUCCESS,
+		PROTO_MAGIC_TO_MASTER,
+		PROTO_OPCODE_SET,
+		id,
+		listId,
+		stripeId,
+		chunkId,
+		keySize,
+		key
 	);
 	return this->buffer.send;
 }
@@ -174,22 +176,6 @@ char *SlaveProtocol::resDelete( size_t &size, uint32_t id, bool success, bool is
 	return this->buffer.send;
 }
 
-char* SlaveProtocol::resRedirect( size_t &size, uint32_t id, uint8_t opcode, uint8_t keySize, char* key, uint32_t remappedListId, uint32_t remappedChunkId ) {
-	size = this->generateRedirectHeader(
-		PROTO_MAGIC_RESPONSE_FAILURE,
-		PROTO_MAGIC_TO_MASTER,
-		opcode == PROTO_OPCODE_GET ? PROTO_OPCODE_REDIRECT_GET :
-			opcode == PROTO_OPCODE_UPDATE ? PROTO_OPCODE_REDIRECT_UPDATE :
-			PROTO_OPCODE_REDIRECT_DELETE,
-		id,
-		keySize,
-		key,
-		remappedListId,
-		remappedChunkId
-	);
-	return this->buffer.send;
-}
-
 char *SlaveProtocol::reqRegisterSlavePeer( size_t &size, uint32_t id, ServerAddr *addr ) {
 	size = this->generateAddressHeader(
 		PROTO_MAGIC_REQUEST,
@@ -210,25 +196,6 @@ char *SlaveProtocol::resRegisterSlavePeer( size_t &size, uint32_t id, bool succe
 		id
 	);
 	return this->buffer.send;
-}
-
-char *SlaveProtocol::reqRemappingSet( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, bool needsForwarding, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf ) {
-	if ( ! buf ) buf = this->buffer.send;
-	size = this->generateRemappingSetHeader(
-		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
-		PROTO_OPCODE_REMAPPING_SET,
-		id,
-		listId,
-		chunkId,
-		needsForwarding,
-		keySize,
-		key,
-		valueSize,
-		value,
-		buf
-	);
-	return buf;
 }
 
 char *SlaveProtocol::reqSealChunk( size_t &size, uint32_t id, Chunk *chunk, uint32_t startPos, char *buf ) {

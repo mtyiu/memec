@@ -470,11 +470,6 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 					case PROTO_OPCODE_DEGRADED_DELETE:
 						this->handleDeleteResponse( event, success, header.opcode == PROTO_OPCODE_DEGRADED_DELETE, buffer.data, buffer.size );
 						break;
-					case PROTO_OPCODE_REDIRECT_GET:
-					case PROTO_OPCODE_REDIRECT_UPDATE:
-					case PROTO_OPCODE_REDIRECT_DELETE:
-						this->handleRedirectedResponse( event, buffer.data, buffer.size, header.opcode );
-						break;
 					default:
 						__ERROR__( "MasterWorker", "dispatch", "Invalid opcode from slave." );
 						goto quit_1;
@@ -1779,133 +1774,6 @@ bool MasterWorker::handleDeleteResponse( SlaveEvent event, bool success, bool is
 	return true;
 }
 
-bool MasterWorker::handleRedirectedResponse( SlaveEvent event, char *buf, size_t size, uint8_t opcode ) {
-	struct RedirectHeader header;
-	if ( ! this->protocol.parseRedirectHeader( header, buf, size ) ) {
-		__ERROR__( "MasterWorker", "handleRedirectedRequest", "Invalid redirected request header." );
-		return false;
-	}
-	__DEBUG__(
-		BLUE, "MasterWorker", "handleRedirectedRequest",
-		"[%s] Key: %.*s (key size = %u). Redirect to list=%u chunk=%u. ",
-		opcode == PROTO_OPCODE_REDIRECT_UPDATE ? "UPDATE" :
-		opcode == PROTO_OPCODE_REDIRECT_DELETE ? "DELETE" :
-		opcode == PROTO_OPCODE_REDIRECT_GET ? "GET" : "UNKNOWN",
-		( int ) header.keySize, header.key, header.keySize,
-		header.listId, header.chunkId
-	);
-
-	uint32_t listId = header.listId, chunkId = header.chunkId;
-	uint32_t requestId = event.id;
-	bool connected;
-	SlaveSocket *socket;
-
-	struct {
-		size_t size;
-		char *data;
-	} buffer;
-	Key key;
-	KeyValueUpdate keyValueUpdate;
-	ssize_t sentBytes;
-
-	ApplicationEvent applicationEvent;
-	PendingIdentifier pid;
-
-	struct timespec elapsedTime;
-
-	// identify the code for each type of requests
-	PendingType applicationPT = PT_APPLICATION_GET;
-	PendingType slavePT = PT_SLAVE_GET;
-	const char *opName = "GET";
-	if ( opcode == PROTO_OPCODE_REDIRECT_UPDATE ) {
-		applicationPT = PT_APPLICATION_UPDATE;
-		slavePT = PT_SLAVE_UPDATE;
-		opName = "UPDATE";
-	} else if ( opcode == PROTO_OPCODE_REDIRECT_DELETE ) {
-		applicationPT = PT_APPLICATION_DEL;
-		slavePT = PT_SLAVE_DEL;
-		opName = "DELETE";
-	} else if ( opcode != PROTO_OPCODE_REDIRECT_GET ) {
-		__ERROR__( "MasterWorker", "handleRedirectedRequest", "Invalid type of redirect request." );
-		return false;
-	}
-	//fprintf( stderr, "handle redirected %s request on key [%s](%u)\n", opName, header.key, header.keySize );
-
-	bool ret = false;
-
-	// purge pending records on previous slave
-	if ( slavePT == PT_SLAVE_GET || slavePT == PT_SLAVE_DEL ) {
-		ret = MasterWorker::pending->eraseKey( slavePT, event.id, event.socket, &pid, &key );
-	} else {
-		ret = MasterWorker::pending->eraseKeyValueUpdate( slavePT, event.id, event.socket, &pid, &keyValueUpdate );
-	}
-	if ( ! ret ) {
-		__ERROR__( "MasterWorker", "handleRedirectedRequest", "Cannot find a pending slave %s request that matches the response. This message will be discarded (key = %.*s).", opName, key.size, key.data );
-		return false;
-	}
-
-	if ( slavePT == PT_SLAVE_GET && MasterWorker::updateInterval )
-		MasterWorker::pending->eraseRequestStartTime( slavePT, pid.id, ( void * ) event.socket, elapsedTime );
-
-	// abort request if no application is pending for result
-	if ( slavePT == PT_SLAVE_GET || slavePT == PT_SLAVE_DEL ) {
-		ret = MasterWorker::pending->findKey( applicationPT, pid.parentId, 0, &key, true, header.key );
-	} else {
-		ret = MasterWorker::pending->findKeyValueUpdate( applicationPT, pid.parentId, 0, &keyValueUpdate, true, header.key );
-	}
-	if ( ! ret ) {
-		__ERROR__( "MasterWorker", "handleRedirectedRequest", "Cannot find a pending application %s request that matches the response. This message will be discarded (key = %.*s).", opName, key.size, key.data );
-		return false;
-	}
-
-	socket = this->getSlaves( listId, chunkId );
-
-	if ( ! socket ) {
-		ApplicationSocket *applicationSocket = ( ApplicationSocket * ) key.ptr;
-		key.set( header.keySize, header.key );
-		applicationEvent.resGet( applicationSocket, event.id, key, false );
-		this->dispatch( applicationEvent );
-		return false;
-	}
-
-	if ( slavePT == PT_SLAVE_GET ) {
-		buffer.data = this->protocol.reqGet( buffer.size, requestId, header.key, header.keySize );
-	} else if ( slavePT == PT_SLAVE_UPDATE ) {
-		buffer.data = this->protocol.reqUpdate( buffer.size, requestId, header.key, header.keySize, ( char * ) keyValueUpdate.ptr, keyValueUpdate.offset, keyValueUpdate.length );
-	} else if ( slavePT == PT_SLAVE_DEL ) {
-		buffer.data = this->protocol.reqDelete( buffer.size, requestId, header.key, header.keySize );
-	}
-
-	// add pending records on redirected slave
-	if ( slavePT == PT_SLAVE_GET || slavePT == PT_SLAVE_DEL ) {
-		ret = MasterWorker::pending->insertKey( slavePT, requestId, pid.parentId , ( void * ) socket, key );
-	} else {
-		ret = MasterWorker::pending->insertKeyValueUpdate( slavePT, requestId, pid.parentId, ( void * ) socket, keyValueUpdate );
-	}
-	if ( ! ret ) {
-		__ERROR__( "MasterWorker", "handleRedirectedequest", "Cannot insert into slave %s pending map.", opName );
-		return false;
-	}
-
-	// Mark the time when request is sent
-	if ( MasterWorker::updateInterval && slavePT == PT_SLAVE_GET )
-		MasterWorker::pending->recordRequestStartTime( slavePT, requestId, event.id, ( void * ) socket, socket->getAddr() );
-
-	// Send GET request
-	sentBytes = socket->send( buffer.data, buffer.size, connected );
-	if ( sentBytes != ( ssize_t ) buffer.size ) {
-		__ERROR__( "MasterWorker", "handleRedirectedGetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
-		return false;
-	}
-
-	// add the remapping record to cache
-	key.set( header.keySize, header.key );
-	RemappingRecord record ( listId, chunkId );
-	MasterWorker::remappingRecords->insert( key, record );
-
-	return true;
-}
-
 bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool success, char *buf, size_t size ) {
 	struct RemappingLockHeader header;
 	if ( ! this->protocol.parseRemappingLockHeader( header, buf, size ) ) {
@@ -2010,7 +1878,7 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 	packet->setReferenceCount( 1 + MasterWorker::parityChunkCount );
 	this->protocol.reqRemappingSet(
 		s, pid.id,
-		remappingRecord.listId, remappingRecord.chunkId, false,
+		remappingRecord.listId, remappingRecord.chunkId,
 		key.data, key.size,
 		value->data, value->size,
 		packet->data,

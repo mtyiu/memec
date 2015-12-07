@@ -81,7 +81,6 @@ private:
 	bool handleUpdateResponse( SlaveEvent event, bool success, bool isDegraded, char *buf, size_t size );
 	bool handleDeleteResponse( SlaveEvent event, bool success, bool isDegraded, char *buf, size_t size );
 
-	bool handleRedirectedResponse( SlaveEvent event, char *buf, size_t size, uint8_t opcode );
 	bool handleRemappingSetResponse( SlaveEvent event, bool success, char *buf, size_t size );
 
 	void free();

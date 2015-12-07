@@ -561,12 +561,14 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 
 							// forward the copies of message to masters
 							MasterEvent masterEvent;
-							masterEvent.type = MASTER_EVENT_TYPE_FORWARD_REMAPPING_RECORDS;
-							masterEvent.message.forward.prevSize = buffer.size;
 							for ( uint32_t i = 0; i < masters.size() ; i++ ) {
-								masterEvent.socket = masters.values[ i ];
-								masterEvent.message.forward.data = new char[ buffer.size ];
-								memcpy( masterEvent.message.forward.data, buffer.data, buffer.size );
+								char *data = new char[ buffer.size ];
+								memcpy( data, buffer.data, buffer.size );
+								masterEvent.forwardRemappingRecords(
+									masters.values[ i ], // socket
+									buffer.size, // prevSize
+									data
+								);
 								CoordinatorWorker::eventQueue->insert( masterEvent );
 							}
 						}

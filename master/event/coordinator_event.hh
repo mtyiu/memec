@@ -35,7 +35,7 @@ public:
 		ArrayMap< struct sockaddr_in, Latency > *slaveGetLatency,
 		ArrayMap< struct sockaddr_in, Latency > *slaveSetLatency
 	);
-	void resSyncRemappingRecords( void );
+	void resSyncRemappingRecords();
 	void pending( CoordinatorSocket *socket );
 };
 

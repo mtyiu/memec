@@ -19,8 +19,6 @@ public:
 	char *reqRegisterCoordinator( size_t &size, uint32_t id, uint32_t addr, uint16_t port );
 	// Heartbeat
 	char *sendHeartbeat( size_t &size, uint32_t id, LOCK_T *sealedLock, std::unordered_set<Metadata> &sealed, uint32_t &sealedCount, LOCK_T *opsLock, std::unordered_map<Key, OpMetadata> &ops, uint32_t &opsCount, bool &isCompleted );
-	// Remapping Records
-	char *sendRemappingRecords( size_t &size, uint32_t id, std::unordered_map<Key, RemappingRecord> &remapRecord, LOCK_T *lock, size_t &remapCount );
 	// Degraded operations
 	char *resReleaseDegradedLock( size_t &size, uint32_t id, uint32_t count );
 	// Reconstruction
@@ -31,6 +29,7 @@ public:
 	// Register
 	char *resRegisterMaster( size_t &size, uint32_t id, bool success );
 	// SET
+	char *resSet( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint8_t keySize, char *key );
 	char *resSet( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key );
 	// REMAPPING_SET
 	char *resRemappingSet( size_t &size, bool toMaster, uint32_t id, bool success, uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key, uint32_t sockfd = UINT_MAX, bool remapped = false );
@@ -40,15 +39,11 @@ public:
 	char *resUpdate( size_t &size, uint32_t id, bool success, bool isDegraded, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize );
 	// DELETE
 	char *resDelete( size_t &size, uint32_t id, bool success, bool isDegraded, uint8_t keySize, char *key, bool toMaster = true );
-	// Redirect
-	char *resRedirect( size_t &size, uint32_t id, uint8_t opcode, uint8_t keySize, char *key, uint32_t remappedListId, uint32_t remappedChunkId );
 
 	/* Slave */
 	// Register
 	char *reqRegisterSlavePeer( size_t &size, uint32_t id, ServerAddr *addr );
 	char *resRegisterSlavePeer( size_t &size, uint32_t id, bool success );
-	// REMAPPING_SET
-	char *reqRemappingSet( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, bool needsForwarding, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf = 0 );
 	// SEAL_CHUNK
 	char *reqSealChunk( size_t &size, uint32_t id, Chunk *chunk, uint32_t startPos, char *buf = 0 );
 	// GET

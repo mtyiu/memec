@@ -19,7 +19,6 @@ public:
 	/* Master */
 	// Register
 	char *resRegisterMaster( size_t &size, uint32_t id, bool success );
-	// char *resRegisterMaster( size_t &size, GlobalConfig &globalConfig, MasterConfig *masterConfig = 0 );
 	// Load statistics
 	char *reqPushLoadStats(
 		size_t &size, uint32_t id,
@@ -35,6 +34,20 @@ public:
 	);
 	// Forward the whole remapping record message passed in (with the protocol header excluded) pfrom slave to masters
 	char *forwardRemappingRecords( size_t &size, uint32_t id, char *message );
+	// Remapping
+	char *reqSyncRemappingRecord(
+		size_t &size, uint32_t id,
+		std::unordered_map<Key, RemappingRecord> &remappingRecords,
+		LOCK_T* lock,
+		bool &isLast,
+		char *buffer = 0
+	);
+	char *resRemappingSetLock(
+		size_t &size, uint32_t id, bool success,
+		uint32_t listId, uint32_t chunkId,
+		bool isRemapped, uint8_t keySize, char *key,
+		uint32_t sockfd = UINT_MAX
+	);
 	// Degraded operation
 	char *resDegradedLock(
 		size_t &size, uint32_t id,
@@ -61,7 +74,6 @@ public:
 	/* Slave */
 	// Register
 	char *resRegisterSlave( size_t &size, uint32_t id, bool success );
-	// char *resRegisterSlave( size_t &size, GlobalConfig &globalConfig, SlaveConfig *slaveConfig = 0 );
 	char *announceSlaveConnected( size_t &size, uint32_t id, SlaveSocket *socket );
 	char *announceSlaveReconstructed( size_t &size, uint32_t id, SlaveSocket *srcSocket, SlaveSocket *dstSocket );
 	char *promoteBackupSlave(
@@ -79,8 +91,6 @@ public:
 		std::vector<Metadata> &chunks,
 		bool &isCompleted
 	);
-	char *reqSyncRemappingRecord( size_t &size, uint32_t id, std::unordered_map<Key, RemappingRecord> &remappingRecords, LOCK_T* lock, bool &isLast, char *buffer = 0 );
-	char *resRemappingSetLock( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t chunkId, bool isRemapped, uint8_t keySize, char *key, uint32_t sockfd = UINT_MAX );
 	// Reconstruction
 	char *reqReconstruction(
 		size_t &size, uint32_t id,

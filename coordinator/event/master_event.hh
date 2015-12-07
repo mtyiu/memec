@@ -103,6 +103,7 @@ public:
 		uint32_t sockfd = UINT_MAX
 	);
 	// Remapping Records
+	void forwardRemappingRecords( MasterSocket *socket, size_t prevSize, char *data );
 	void syncRemappingRecords(
 		MasterSocket *socket, std::vector<Packet*> *packets
 	);
