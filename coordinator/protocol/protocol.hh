@@ -16,10 +16,17 @@ class CoordinatorProtocol : public Protocol {
 public:
 	CoordinatorProtocol() : Protocol( ROLE_COORDINATOR ) {}
 
-	/* Master */
-	// Register
+	// ---------- protocol.cc ----------
+	char *reqSyncMeta( size_t &size, uint32_t id );
+	char *reqSealChunks( size_t &size, uint32_t id );
+	char *reqFlushChunks( size_t &size, uint32_t id );
+
+	// ---------- register_protocol.cc ----------
 	char *resRegisterMaster( size_t &size, uint32_t id, bool success );
-	// Load statistics
+	char *resRegisterSlave( size_t &size, uint32_t id, bool success );
+	char *announceSlaveConnected( size_t &size, uint32_t id, SlaveSocket *socket );
+
+	// ---------- load_protocol.cc ----------
 	char *reqPushLoadStats(
 		size_t &size, uint32_t id,
 		ArrayMap< struct sockaddr_in, Latency > *slaveGetLatency,
@@ -32,30 +39,8 @@ public:
 		ArrayMap< struct sockaddr_in, Latency >& slaveSetLatency,
 		char* buffer, uint32_t size
 	);
-	// RemapList
-	bool parseRemappingLockHeader(
-		struct RemappingLockHeader &header,
-		char *buf, size_t size,
-		std::vector<uint32_t> *remapList = 0,
-		size_t offset = 0
-	);
-	// Forward the whole remapping record message passed in (with the protocol header excluded) pfrom slave to masters
-	char *forwardRemappingRecords( size_t &size, uint32_t id, char *message );
-	// Remapping
-	char *reqSyncRemappingRecord(
-		size_t &size, uint32_t id,
-		std::unordered_map<Key, RemappingRecord> &remappingRecords,
-		LOCK_T* lock,
-		bool &isLast,
-		char *buffer = 0
-	);
-	char *resRemappingSetLock(
-		size_t &size, uint32_t id, bool success,
-		uint32_t listId, uint32_t chunkId,
-		bool isRemapped, uint8_t keySize, char *key,
-		uint32_t sockfd = UINT_MAX
-	);
-	// Degraded operation
+
+	// ---------- degraded_protocol.cc ----------
 	char *resDegradedLock(
 		size_t &size, uint32_t id,
 		bool isLocked, bool isSealed,
@@ -77,11 +62,39 @@ public:
 		uint8_t keySize, char *key,
 		uint32_t listId, uint32_t srcDataChunkId, uint32_t srcParityChunkId
 	);
+	char *reqReleaseDegradedLock(
+		size_t &size, uint32_t id,
+		std::vector<Metadata> &chunks,
+		bool &isCompleted
+	);
 
-	/* Slave */
-	// Register
-	char *resRegisterSlave( size_t &size, uint32_t id, bool success );
-	char *announceSlaveConnected( size_t &size, uint32_t id, SlaveSocket *socket );
+	// ---------- remap_protocol.cc ----------
+	// RemapList
+	bool parseRemappingLockHeader(
+		struct RemappingLockHeader &header,
+		char *buf, size_t size,
+		std::vector<uint32_t> *remapList = 0,
+		size_t offset = 0
+	);
+	char *resRemappingSetLock(
+		size_t &size, uint32_t id, bool success,
+		uint32_t listId, uint32_t chunkId,
+		bool isRemapped, uint8_t keySize, char *key,
+		uint32_t sockfd = UINT_MAX
+	);
+	// Forward the whole remapping record message passed in (with the protocol header excluded) pfrom slave to masters
+	char *forwardRemappingRecords( size_t &size, uint32_t id, char *message );
+	// Remapping
+	char *reqSyncRemappingRecord(
+		size_t &size, uint32_t id,
+		std::unordered_map<Key, RemappingRecord> &remappingRecords,
+		LOCK_T* lock,
+		bool &isLast,
+		char *buffer = 0
+	);
+	char *reqSyncRemappedParity( size_t &size, uint32_t id, struct sockaddr_in target, char* buffer = 0 );
+
+	// ---------- recovery_protocol.cc ----------
 	char *announceSlaveReconstructed( size_t &size, uint32_t id, SlaveSocket *srcSocket, SlaveSocket *dstSocket );
 	char *promoteBackupSlave(
 		size_t &size, uint32_t id,
@@ -90,16 +103,6 @@ public:
 		std::unordered_set<Metadata>::iterator &it,
 		bool &isCompleted
 	);
-	char *reqSealChunks( size_t &size, uint32_t id );
-	char *reqFlushChunks( size_t &size, uint32_t id );
-	char *reqSyncMeta( size_t &size, uint32_t id );
-	char *reqReleaseDegradedLock(
-		size_t &size, uint32_t id,
-		std::vector<Metadata> &chunks,
-		bool &isCompleted
-	);
-	char *reqSyncRemappedParity( size_t &size, uint32_t id, struct sockaddr_in target, char* buffer = 0 );
-	// Recovery
 	char *reqReconstruction(
 		size_t &size, uint32_t id,
 		uint32_t listId, uint32_t chunkId,
@@ -108,6 +111,7 @@ public:
 		uint32_t numChunks,
 		bool &isCompleted
 	);
+
 };
 
 #endif

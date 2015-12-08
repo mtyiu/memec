@@ -20,6 +20,14 @@ OBJS= \
 	event/slave_event.o \
 	event/slave_peer_event.o \
 	protocol/protocol.o \
+	protocol/degraded_protocol.o \
+	protocol/heartbeat_protocol.o \
+	protocol/normal_master_protocol.o \
+	protocol/normal_slave_protocol.o \
+	protocol/recovery_protocol.o \
+	protocol/register_protocol.o \
+	protocol/remap_protocol.o \
+	protocol/seal_protocol.o \
 	socket/coordinator_socket.o \
 	socket/master_socket.o \
 	socket/slave_socket.o \
