@@ -119,7 +119,12 @@ private:
 	bool handleDegradedGetRequest( MasterEvent event, char *buf, size_t size );
 	bool handleDegradedUpdateRequest( MasterEvent event, char *buf, size_t size );
 	bool handleDegradedDeleteRequest( MasterEvent event, char *buf, size_t size );
-	bool performDegradedRead( MasterSocket *masterSocket, uint32_t listId, uint32_t stripeId, uint32_t lostChunkId, bool isSealed, uint8_t opcode, uint32_t parentId, Key *key, KeyValueUpdate *keyValueUpdate = 0 );
+	bool performDegradedRead(
+		MasterSocket *masterSocket,
+		uint32_t listId, uint32_t stripeId, uint32_t lostChunkId,
+		bool isSealed, uint8_t opcode, uint32_t parentId,
+		Key *key, KeyValueUpdate *keyValueUpdate = 0
+	);
 	bool sendModifyChunkRequest(
 		uint32_t parentId, uint8_t keySize, char *keyStr,
 		Metadata &metadata, uint32_t offset,

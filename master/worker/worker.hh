@@ -48,12 +48,24 @@ private:
 	// For normal operations
 	SlaveSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId );
 	// For degraded GET
-	SlaveSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, uint32_t &newChunkId, bool &useDegradedMode, SlaveSocket *&original );
+	SlaveSocket *getSlaves(
+		char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, uint32_t &newChunkId,
+		bool &useDegradedMode, SlaveSocket *&original
+	);
 	// For degraded UPDATE / DELETE (which may involve failed parity slaves)
 	// Return the data server for handling the request
-	SlaveSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &dataChunkId, uint32_t &newDataChunkId, uint32_t &parityChunkId, uint32_t &newParityChunkId, bool &useDegradedMode );
+	SlaveSocket *getSlaves(
+		char *data, uint8_t size, uint32_t &listId,
+		uint32_t &dataChunkId, uint32_t &newDataChunkId,
+		uint32_t &parityChunkId, uint32_t &newParityChunkId,
+		bool &useDegradedMode
+	);
 	// For remapping
-	SlaveSocket *getSlaves( char *data, uint8_t size, uint32_t &originalListId, uint32_t &originalChunkId, uint32_t &remappedListId, std::vector<uint32_t> &remappedChunkId );
+	SlaveSocket *getSlaves(
+		char *data, uint8_t size,
+		uint32_t &originalListId, uint32_t &originalChunkId,
+		uint32_t &remappedListId, std::vector<uint32_t> &remappedChunkId
+	);
 	SlaveSocket *getSlaves( uint32_t listId, uint32_t chunkId );
 	void free();
 	static void *run( void *argv );

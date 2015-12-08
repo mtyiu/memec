@@ -49,6 +49,14 @@ EXTERNAL_LIB= \
 	$(PLIO_SRC_ROOT)/common/ds/load.o \
 	$(PLIO_SRC_ROOT)/common/ds/sockaddr_in.o \
 	$(PLIO_SRC_ROOT)/common/protocol/protocol.o \
+	$(PLIO_SRC_ROOT)/common/protocol/address_protocol.o \
+	$(PLIO_SRC_ROOT)/common/protocol/chunk_protocol.o \
+	$(PLIO_SRC_ROOT)/common/protocol/degraded_protocol.o \
+	$(PLIO_SRC_ROOT)/common/protocol/heartbeat_protocol.o \
+	$(PLIO_SRC_ROOT)/common/protocol/normal_protocol.o \
+	$(PLIO_SRC_ROOT)/common/protocol/recovery_protocol.o \
+	$(PLIO_SRC_ROOT)/common/protocol/remap_protocol.o \
+	$(PLIO_SRC_ROOT)/common/protocol/seal_protocol.o \
 	$(PLIO_SRC_ROOT)/common/socket/socket.o \
 	$(PLIO_SRC_ROOT)/common/socket/epoll.o \
 	$(PLIO_SRC_ROOT)/lib/death_handler/death_handler.o \

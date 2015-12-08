@@ -141,9 +141,9 @@ struct PromoteBackupSlaveHeader {
 //////////////////////////////////////////
 #define PROTO_HEARTBEAT_SIZE 9
 struct HeartbeatHeader {
-    uint32_t sealed;
-    uint32_t keys;
-    bool isLast;
+	uint32_t sealed;
+	uint32_t keys;
+	bool isLast;
 };
 
 #define PROTO_METADATA_SIZE 12
@@ -271,14 +271,6 @@ struct RemappingSetHeader {
 	uint32_t valueSize; // 3 bytes
 	char *key;
 	char *value;
-};
-
-#define PROTO_REDIRECT_SIZE 8 /* first 2 fields embedded as KeyHeader */
-struct RedirectHeader {
-	uint8_t keySize;
-	char* key;
-	uint32_t listId;
-	uint32_t chunkId;
 };
 
 ////////////////////////
@@ -433,7 +425,7 @@ struct ChunkKeyValueHeader {
 class Protocol {
 protected:
 	uint8_t from, to;
-
+	// ---------- protocol.cc ----------
 	size_t generateHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode,
 		uint32_t length, uint32_t id,
@@ -447,6 +439,7 @@ protected:
 	//////////////
 	// Register //
 	//////////////
+	// ---------- address_protocol.cc ----------
 	size_t generateAddressHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
 		uint32_t addr, uint16_t port, char* buf = 0
@@ -456,15 +449,16 @@ protected:
 		char *buf, size_t size
 	);
 
-	//////////////
+	////////////////////
 	// Reconstruction //
-	//////////////
+	////////////////////
+	// ---------- address_protocol.cc ----------
 	size_t generateSrcDstAddressHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
 		uint32_t srcAddr, uint16_t srcPort,
 		uint32_t dstAddr, uint16_t dstPort
 	);
-
+	// ---------- recovery_protocol.cc ----------
 	size_t generatePromoteBackupSlaveHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
 		uint32_t addr, uint16_t port,
@@ -489,6 +483,7 @@ protected:
 	//////////////////////////////////////////
 	// Heartbeat & metadata synchronization //
 	//////////////////////////////////////////
+	// ---------- heartbeat_protocol.cc ----------
 	size_t generateHeartbeatMessage(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
 		LOCK_T *sealedLock, std::unordered_set<Metadata> &sealed, uint32_t &sealedCount,
@@ -509,6 +504,7 @@ protected:
 		char *&key, char *buf, size_t size
 	);
 
+	// ---------- remap_protocol.cc ----------
 	size_t generateRemappingRecordMessage(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
 		LOCK_T *lock, std::unordered_map<Key, RemappingRecord> &remapRecords,
@@ -518,6 +514,8 @@ protected:
 		size_t offset, uint32_t &remap,
 		char *buf, size_t size
 	);
+
+	// ---------- slave_sync_remap_protocol.cc ----------
 	bool parseSlaveSyncRemapHeader(
 		size_t offset, uint8_t &keySize, uint8_t &opcode,
 		uint32_t &listId, uint32_t &chunkId, char *&key,
@@ -527,6 +525,7 @@ protected:
 	//////////////////////////
 	// Load synchronization //
 	//////////////////////////
+	// ---------- load_protocol.cc ----------
 	size_t generateLoadStatsHeader(
 		uint8_t magic, uint8_t to, uint32_t id,
 		uint32_t slaveGetCount, uint32_t slaveSetCount, uint32_t slaveOverloadCount,
@@ -540,6 +539,7 @@ protected:
 	///////////////////////
 	// Normal operations //
 	///////////////////////
+	// ---------- normal_protocol.cc ----------
 	size_t generateKeyHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
 		uint8_t keySize, char *key, char *sendBuf = 0
@@ -622,6 +622,7 @@ protected:
 	///////////////
 	// Remapping //
 	///////////////
+	// ---------- remap_protocol.cc ----------
 	size_t generateRemappingLockHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
 		uint32_t listId, uint32_t chunkId, bool isRemapped,
@@ -651,20 +652,10 @@ protected:
 		struct sockaddr_in *target = 0
 	);
 
-	size_t generateRedirectHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
-		uint8_t keySize, char *key,
-		uint32_t remappedListId, uint32_t remappedChunkId
-	);
-	bool parseRedirectHeader(
-		size_t offset, uint8_t &keySize, char *&key,
-		uint32_t &remappedListId, uint32_t &remappedChunkId,
-		char *buf, size_t size
-	);
-
 	////////////////////////
 	// Degraded operation //
 	////////////////////////
+	// ---------- degraded_protocol.cc ----------
 	size_t generateDegradedLockReqHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
 		uint32_t listId,
@@ -785,6 +776,7 @@ protected:
 	////////////////////
 	// Reconstruction //
 	////////////////////
+	// ---------- recovery_protocol.cc ----------
 	size_t generateReconstructionHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
 		uint32_t listId, uint32_t chunkId,
@@ -813,6 +805,7 @@ protected:
 	//////////
 	// Seal //
 	//////////
+	// ---------- seal_protocol.cc ----------
 	size_t generateChunkSealHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
@@ -830,6 +823,7 @@ protected:
 	//////////////////////
 	// Chunk operations //
 	//////////////////////
+	// ---------- chunk_protocol.cc ----------
 	size_t generateChunkHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *sendBuf = 0
@@ -883,20 +877,17 @@ public:
 		char *recv;
 	} buffer;
 
-	static size_t getSuggestedBufferSize( uint32_t keySize, uint32_t chunkSize );
-
+	// ---------- protocol.cc ----------
 	Protocol( Role role );
 	bool init( size_t size = 0 );
 	void free();
-
-	bool parseHeader(
-		struct ProtocolHeader &header,
-		char *buf = 0, size_t size = 0
-	);
+	bool parseHeader( struct ProtocolHeader &header, char *buf = 0, size_t size = 0 );
+	static size_t getSuggestedBufferSize( uint32_t keySize, uint32_t chunkSize );
 
 	//////////////
 	// Register //
 	//////////////
+	// ---------- address_protocol.cc ----------
 	bool parseAddressHeader(
 		struct AddressHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
@@ -906,9 +897,10 @@ public:
 		struct AddressHeader &dstHeader,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
-	//////////////
+	////////////////////
 	// Reconstruction //
-	//////////////
+	////////////////////
+	// ---------- recovery_protocol.cc ----------
 	bool parsePromoteBackupSlaveHeader(
 		struct PromoteBackupSlaveHeader &header, bool isRequest,
 		char *buf = 0, size_t size = 0, size_t offset = 0
@@ -916,6 +908,7 @@ public:
 	//////////////////////////////////////////
 	// Heartbeat & metadata synchronization //
 	//////////////////////////////////////////
+	// ---------- heartbeat_protocol.cc ----------
 	bool parseHeartbeatHeader(
 		struct HeartbeatHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
@@ -928,10 +921,12 @@ public:
 		struct KeyOpMetadataHeader &header, size_t &bytes,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
+	// ---------- remap_protocol.cc ----------
 	bool parseRemappingRecordHeader(
 		struct RemappingRecordHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
+	// ---------- slave_sync_remap_protocol.cc ----------
 	bool parseSlaveSyncRemapHeader(
 		struct SlaveSyncRemapHeader &header,
 		size_t &bytes, char *buf = 0, size_t size = 0,
@@ -940,6 +935,7 @@ public:
 	//////////////////////////
 	// Load synchronization //
 	//////////////////////////
+	// ---------- load_protocol.cc ----------
 	bool parseLoadStatsHeader(
 		struct LoadStatsHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
@@ -947,6 +943,7 @@ public:
 	///////////////////////
 	// Normal operations //
 	///////////////////////
+	// ---------- normal_protocol.cc ----------
 	bool parseKeyHeader(
 		struct KeyHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
@@ -974,6 +971,7 @@ public:
 	///////////////
 	// Remapping //
 	///////////////
+	// ---------- remap_protocol.cc ----------
 	bool parseRemappingLockHeader(
 		struct RemappingLockHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
@@ -983,13 +981,10 @@ public:
 		char *buf = 0, size_t size = 0, size_t offset = 0,
 		struct sockaddr_in *target = 0
 	);
-	bool parseRedirectHeader(
-		struct RedirectHeader &header,
-		char *buf = 0, size_t size = 0, size_t offset = 0
-	);
 	////////////////////////
 	// Degraded operation //
 	////////////////////////
+	// ---------- degraded_protocol.cc ----------
 	bool parseDegradedLockReqHeader(
 		struct DegradedLockReqHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
@@ -1014,9 +1009,10 @@ public:
 		struct DegradedReleaseResHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
-	//////////////
+	////////////////////
 	// Reconstruction //
-	//////////////
+	////////////////////
+	// ---------- recovery_protocol.cc ----------
 	bool parseReconstructionHeader(
 		struct ReconstructionHeader &header, bool isRequest,
 		char *buf = 0, size_t size = 0, size_t offset = 0
@@ -1024,6 +1020,7 @@ public:
 	//////////
 	// Seal //
 	//////////
+	// ---------- seal_protocol.cc ----------
 	bool parseChunkSealHeader(
 		struct ChunkSealHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
@@ -1035,6 +1032,7 @@ public:
 	//////////////////////
 	// Chunk operations //
 	//////////////////////
+	// ---------- chunk_protocol.cc ----------
 	bool parseChunkHeader(
 		struct ChunkHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0

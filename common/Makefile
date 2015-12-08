@@ -15,6 +15,16 @@ OBJS= \
 	ds/load.o \
 	ds/sockaddr_in.o \
 	protocol/protocol.o \
+	protocol/address_protocol.o \
+	protocol/chunk_protocol.o \
+	protocol/degraded_protocol.o \
+	protocol/heartbeat_protocol.o \
+	protocol/load_protocol.o \
+	protocol/normal_protocol.o \
+	protocol/recovery_protocol.o \
+	protocol/remap_protocol.o \
+	protocol/seal_protocol.o \
+	protocol/slave_sync_remap_protocol.o \
 	remap/remap_msg_handler.o \
 	socket/socket.o \
 	socket/epoll.o
@@ -23,6 +33,9 @@ all: $(OBJS)
 	$(MAKE) -C coding
 
 %.o: %.cc %.hh
+	$(CC) $(CFLAGS) $(INCLUDE) $(LIBS) -c -o $@ $< $(EXTERNAL_LIBS)
+
+%.o: %.cc
 	$(CC) $(CFLAGS) $(INCLUDE) $(LIBS) -c -o $@ $< $(EXTERNAL_LIBS)
 
 clean:
