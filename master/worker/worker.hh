@@ -56,7 +56,7 @@ private:
 	// Return the data server for handling the request
 	SlaveSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &dataChunkId, uint32_t &newDataChunkId, uint32_t &parityChunkId, uint32_t &newParityChunkId, bool &useDegradedMode );
 	// For remapping
-	SlaveSocket *getSlaves( char *data, uint8_t size, uint32_t &originalListId, uint32_t &originalChunkId, uint32_t &remappedListId, uint32_t &remappedChunkId );
+	SlaveSocket *getSlaves( char *data, uint8_t size, uint32_t &originalListId, uint32_t &originalChunkId, uint32_t &remappedListId, std::vector<uint32_t> &remappedChunkId );
 	SlaveSocket *getSlaves( uint32_t listId, uint32_t chunkId );
 
 	bool handleGetRequest( ApplicationEvent event, char *buf, size_t size );

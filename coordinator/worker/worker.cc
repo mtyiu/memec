@@ -104,6 +104,34 @@ void CoordinatorWorker::dispatch( CoordinatorEvent event ) {
 			UNLOCK( &coordinator->sockets.masters.lock );
 		}
 			break;
+		case COORDINATOR_EVENT_TYPE_SYNC_REMAPPED_PARITY:
+		{
+			uint32_t id = coordinator->idGenerator.nextVal( this->workerId );
+			SlaveEvent slaveEvent;
+			
+			// prepare the request for all master
+			Packet *packet = coordinator->packetPool.malloc();
+			buffer.data = packet->data;
+			this->protocol.reqSyncRemappedParity(
+				buffer.size, id, 
+				event.message.parity.target, buffer.data
+			);
+			packet->size = buffer.size;
+
+			coordinator->pending.insertRemappedParityRequest( id, event.message.parity.counter, event.message.parity.allAcked );
+	
+			LOCK( &coordinator->sockets.slaves.lock );
+			packet->setReferenceCount( coordinator->sockets.slaves.size() );
+			for ( uint32_t i = 0; i < coordinator->sockets.slaves.size(); i++ ) {
+				SlaveSocket *socket = coordinator->sockets.slaves[ i ];
+				event.message.parity.counter->insert( socket->getAddr() );
+				slaveEvent.syncRemappedParity( socket , packet );
+				coordinator->eventQueue.insert( slaveEvent );
+			}
+			UNLOCK( &coordinator->sockets.slaves.lock );
+		
+		}
+			break;
 		default:
 			break;
 	}
@@ -404,6 +432,12 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			Coordinator::getInstance()->pending.addSyncMetaReq( requestId, event.message.sync );
 			isSend = true;
 			break;
+		// reampped parity migration
+		case SLAVE_EVENT_TYPE_PARITY_MIGRATE:
+			buffer.data = event.message.parity.packet->data;
+			buffer.size = event.message.parity.packet->size;
+			isSend = true;
+			break;
 		case SLAVE_EVENT_TYPE_REQUEST_RELEASE_DEGRADED_LOCK:
 			this->handleReleaseDegradedLockRequest( event.socket, event.message.degraded.done );
 			isSend = false;
@@ -475,6 +509,8 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 		if ( ! connected )
 			__ERROR__( "CoordinatorWorker", "dispatch", "The slave is disconnected." );
+		if ( event.type == SLAVE_EVENT_TYPE_PARITY_MIGRATE )
+			Coordinator::getInstance()->packetPool.free( event.message.parity.packet );
 	} else {
 		// Parse requests from slaves
 		ProtocolHeader header;
@@ -577,6 +613,18 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 							__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );
 							break;
 					}
+					break;
+				case PROTO_OPCODE_PARITY_MIGRATE:
+				{
+					std::set<struct sockaddr_in> *counter;
+					pthread_cond_t *allAcked;
+					bool found = this->pending->decrementRemappedParityRequest( event.id, event.socket->getAddr(), &counter, &allAcked );
+					if ( found && counter == 0 ) {
+						pthread_cond_broadcast( allAcked );
+					} else if ( ! found ) {
+						__ERROR__( "CoordinatorWorker", "dispatch", "Invalid id reply to parity migrate request." );
+					}
+				}
 					break;
 				default:
 					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid opcode from slave." );
@@ -1226,10 +1274,19 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 
 bool CoordinatorWorker::handleRemappingSetLockRequest( MasterEvent event, char *buf, size_t size ) {
 	struct RemappingLockHeader header;
-	if ( ! this->protocol.parseRemappingLockHeader( header, buf, size ) ) {
+	std::vector<uint32_t> remapList;
+	if ( ! this->protocol.parseRemappingLockHeader( header, buf, size, &remapList ) ) {
 		__ERROR__( "CoordinatorWorker", "handleRemappingSetLockRequest", "Invalid REMAPPING_SET_LOCK request (size = %lu).", size );
 		return false;
 	}
+	
+	for ( uint32_t i = 1; i < remapList.size(); i++ ) {
+		if ( remapList[ i ] != CoordinatorWorker::dataChunkCount + i - 1 ) {
+			// TODO record the remapped parity locations
+			 //printf("remap parity: remapList[ %d ] = %u\n", i, remapList[ i ] );
+		}
+	}
+
 	__DEBUG__(
 		BLUE, "CoordinatorWorker", "handleRemappingSetLockRequest",
 		"[REMAPPING_SET_LOCK] Key: %.*s (key size = %u); remapped list ID: %u, remapped chunk ID: %u",

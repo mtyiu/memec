@@ -11,8 +11,8 @@ OBJS= \
 	buffer/parity_chunk_buffer.o \
 	buffer/mixed_chunk_buffer.o \
 	config/slave_config.o \
-	ds/slave_load.o \
 	ds/pending.o \
+	ds/slave_load.o \
 	event/coding_event.o \
 	event/coordinator_event.o \
 	event/io_event.o \
@@ -39,6 +39,7 @@ EXTERNAL_LIB= \
 	$(PLIO_SRC_ROOT)/common/ds/chunk.o \
 	$(PLIO_SRC_ROOT)/common/ds/key_value.o \
 	$(PLIO_SRC_ROOT)/common/ds/load.o \
+	$(PLIO_SRC_ROOT)/common/ds/sockaddr_in.o \
 	$(PLIO_SRC_ROOT)/common/protocol/protocol.o \
 	$(PLIO_SRC_ROOT)/common/socket/socket.o \
 	$(PLIO_SRC_ROOT)/common/socket/epoll.o \

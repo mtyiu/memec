@@ -12,4 +12,11 @@ enum RemapStatus {
 	REMAP_END						// signal to go back to no remapping (phase 0)
 };
 
+enum RequestRemapState{
+	NO_REMAP,
+	DATA_REMAP,
+	PARITY_REMAP,
+	MIXED_REMAP
+};
+
 #endif

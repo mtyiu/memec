@@ -89,17 +89,23 @@ std::set<struct sockaddr_in> Coordinator::updateOverloadedSlaveSet( ArrayMap<str
 	uint32_t slaveCount = slave##_TYPE_##Latency->size(); \
 	avgSec = 0.0; \
 	avgNsec = 0.0; \
+	/* get the average of slaves */ \
 	for ( uint32_t i = 0; i < slaveCount; i++ ) { \
 		avgSec += ( double ) slave##_TYPE_##Latency->values[ i ]->sec / slaveCount; \
 		avgNsec += ( double ) slave##_TYPE_##Latency->values[ i ]->nsec / slaveCount; \
 	} \
-	for ( uint32_t i = 0; i < slaveCount; i++ ) { \
-		if ( ( double ) slave##_TYPE_##Latency->values[ i ]->sec > avgSec * threshold || \
-				( ( A_EQUAL_B ( slave##_TYPE_##Latency->values[ i ]->sec, avgSec * threshold ) && \
-					(double) slave##_TYPE_##Latency->values[ i ]->nsec >= avgNsec * threshold ) ) ) {\
-			this->overloadedSlaves.slaveSet.insert( slave##_TYPE_##Latency->keys[ i ] ); \
-			slaveSet->insert( slave##_TYPE_##Latency->keys[ i ] ); \
-			/* printf( "Slave #%u overloaded!!!!\n", i ); */ \
+	/* if the average is too small ( esp. there is no data ), skip overload set update */ \
+	if ( avgSec > FLOAT_THRESHOLD || avgNsec > FLOAT_THRESHOLD ) { \
+		/* printf( " AVG %.3lf %.3lf vs THS %.3lf %.3lf\n", avgSec, avgNsec, avgSec * threshold, avgNsec * threshold ); */ \
+		for ( uint32_t i = 0; i < slaveCount; i++ ) { \
+			/* if (1) sec > avgSec or (2) sec == avgSec && nsec > avgNsec */ \
+			if ( ( double ) slave##_TYPE_##Latency->values[ i ]->sec > avgSec * threshold || \
+					( ( A_EQUAL_B ( slave##_TYPE_##Latency->values[ i ]->sec, avgSec * threshold ) && \
+						(double) slave##_TYPE_##Latency->values[ i ]->nsec >= avgNsec * threshold ) ) ) {\
+				this->overloadedSlaves.slaveSet.insert( slave##_TYPE_##Latency->keys[ i ] ); \
+				slaveSet->insert( slave##_TYPE_##Latency->keys[ i ] ); \
+				/* printf( "Slave #%u overloaded %u %u !!!!\n", i, slave##_TYPE_##Latency->values[ i ]->sec, slave##_TYPE_##Latency->values[ i ]->nsec ); */ \
+			} \
 		} \
 	} \
 }
@@ -125,6 +131,7 @@ void Coordinator::updateAverageSlaveLoading( ArrayMap<struct sockaddr_in, Latenc
 		avgSec = 0.0; \
 		avgNsec = 0.0; \
 		uint32_t masterCount = latest->values[ i ]->size(); \
+		/* calculate the average over masters with latency measurement for this slave */ \
 		for ( uint32_t j = 0; j < masterCount; j++ ) { \
 			avgSec += ( double ) latest->values[ i ]->values[ j ]->sec / masterCount; \
 			avgNsec += ( double ) latest->values[ i ]->values[ j ]->nsec / masterCount; \
@@ -133,7 +140,17 @@ void Coordinator::updateAverageSlaveLoading( ArrayMap<struct sockaddr_in, Latenc
 				avgSec += 1; \
 			} \
 		} \
-		slave##_TYPE_##Latency->set( latest->keys[ i ], new Latency( avgSec, avgNsec ) ); \
+		/* again, if too small or no data, skip the update, i.e. use old ones */ \
+		if ( avgSec > FLOAT_THRESHOLD || avgNsec > FLOAT_THRESHOLD ) { \
+			int idx = 0; \
+			/* directly insert latency if not exists, otherwise, replace */ \
+			Latency *oldLatency = slave##_TYPE_##Latency->get( latest->keys[ i ], &idx ); \
+			if ( idx == -1 ) \
+				slave##_TYPE_##Latency->set( latest->keys[ i ], new Latency( avgSec, avgNsec ) ); \
+			else { \
+				oldLatency->set( avgSec, avgNsec ); \
+			} \
+		} \
 	}
 
 	SET_AVG_SLAVE_LATENCY( Get );
@@ -530,6 +547,21 @@ void Coordinator::syncRemappingRecords( LOCK_T *lock, std::map<struct sockaddr_i
 	this->eventQueue.insert( event );
 }
 
+void Coordinator::syncRemappedParity( struct sockaddr_in slaveAddr ) {
+	CoordinatorEvent event;
+	LOCK_T lock;
+	LOCK_INIT( &lock );
+	pthread_cond_t allAcked;
+	pthread_cond_init( &allAcked, NULL );
+	std::set<struct sockaddr_in> ackedSlaves;
+	// let worker send the sync requests
+	event.syncRemappedParity( &lock, &ackedSlaves, &allAcked, slaveAddr );
+	this->eventQueue.insert( event );
+	// wait for sync to complete
+	pthread_cond_wait( &allAcked, &lock );
+	UNLOCK( &lock );
+}
+
 double Coordinator::getElapsedTime() {
 	return get_elapsed_time( this->startTime );
 }
@@ -664,6 +696,11 @@ void Coordinator::interactive() {
 			this->syncRemappingRecords( &lock, &counter, ( bool * ) &done );
 			while( ! done );
 			valid = true;
+		} else if ( strcmp( command, "paritysync" ) == 0 ) {
+			for ( uint32_t i = 0; i < this->sockets.slaves.size(); i++ ){
+				this->syncRemappedParity( this->sockets.slaves[ i ]->getAddr() );
+			}
+			valid = true;
 		} else {
 			valid = false;
 		}
@@ -740,6 +777,7 @@ void Coordinator::help() {
 		"- metadata: Write metadata to disk\n"
 		"- remapping: Show remapping info\n"
 		"- remapsync: Force all remapping records to masters\n"
+		"- paritysync: Force all remapped parity to migrate\n"
 		"- exit: Terminate this client\n"
 	);
 	fflush( stdout );

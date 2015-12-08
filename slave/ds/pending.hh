@@ -1,12 +1,15 @@
 #ifndef __SLAVE_DS_PENDING_HH__
 #define __SLAVE_DS_PENDING_HH__
 
+#include <set>
 #include "../socket/coordinator_socket.hh"
 #include "../socket/master_socket.hh"
 #include "../socket/slave_peer_socket.hh"
 #include "../../common/ds/chunk.hh"
 #include "../../common/ds/metadata.hh"
 #include "../../common/ds/pending.hh"
+#include "../../common/ds/sockaddr_in.hh"
+#include "../../common/ds/value.hh"
 #include "../../common/lock/lock.hh"
 #include "../../common/protocol/protocol.hh"
 
@@ -134,6 +137,32 @@ public:
 	}
 };
 
+class PendingData {
+public:
+	uint32_t listId;
+	uint32_t chunkId;
+	Key key;
+	Value value;
+
+	void set( uint32_t listId, uint32_t chunkId, Key key, Value value ) {
+		this->listId = listId;
+		this->chunkId = chunkId;
+		this->key.dup( key.size, key.data );
+		this->value.dup( value.size, value.data );
+	}
+
+	void free() {
+		this->key.free();
+		this->value.free();
+	}
+
+	bool operator< ( const PendingData &p ) const {
+		return ( this->listId < p.listId || this->chunkId < p.chunkId ||
+			this->key < p.key || this->value.size < p.value.size
+		);
+	}
+};
+
 enum PendingType {
 	PT_COORDINATOR_RECONSTRUCTION,
 	PT_MASTER_REMAPPING_SET,
@@ -148,7 +177,8 @@ enum PendingType {
 	PT_SLAVE_PEER_GET_CHUNK,
 	PT_SLAVE_PEER_SET_CHUNK,
 	PT_SLAVE_PEER_UPDATE_CHUNK,
-	PT_SLAVE_PEER_DEL_CHUNK
+	PT_SLAVE_PEER_DEL_CHUNK,
+	PT_SLAVE_PEER_PARITY
 };
 
 class Pending {
@@ -159,6 +189,7 @@ private:
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, DegradedOp> *&map );
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, ChunkRequest> *&map );
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, ChunkUpdate> *&map );
+	bool get( PendingType type, LOCK_T *&lock, std::map<struct sockaddr_in, std::set<PendingData>* > *&map );
 
 public:
 	struct {
@@ -189,6 +220,8 @@ public:
 		std::unordered_multimap<PendingIdentifier, ChunkRequest> setChunk;
 		std::unordered_multimap<PendingIdentifier, ChunkUpdate> updateChunk;
 		std::unordered_multimap<PendingIdentifier, ChunkUpdate> deleteChunk;
+		std::map<struct sockaddr_in, std::set<PendingData>* > remappedData;
+		std::unordered_map<PendingIdentifier, uint32_t> remappedDataRequest;
 		LOCK_T degradedOpsLock;
 		LOCK_T remappingSetLock;
 		LOCK_T getLock;
@@ -198,6 +231,8 @@ public:
 		LOCK_T setChunkLock;
 		LOCK_T updateChunkLock;
 		LOCK_T delChunkLock;
+		LOCK_T remappedDataLock;
+		LOCK_T remappedDataRequestLock;
 	} slavePeers;
 
 	Pending() {
@@ -217,6 +252,8 @@ public:
 		LOCK_INIT( &this->slavePeers.setChunkLock );
 		LOCK_INIT( &this->slavePeers.updateChunkLock );
 		LOCK_INIT( &this->slavePeers.delChunkLock );
+		LOCK_INIT( &this->slavePeers.remappedDataLock );
+		LOCK_INIT( &this->slavePeers.remappedDataRequestLock );
 	}
 
 	// Insert (Coordinator)
@@ -281,6 +318,14 @@ public:
 		ChunkUpdate &chunkUpdate,
 		bool needsLock = true, bool needsUnlock = true
 	);
+	bool insertRemapData(
+		struct sockaddr_in target, uint32_t listId, uint32_t chunkId,
+		Key key, Value value
+	);
+	bool insertRemapDataRequest(
+		uint32_t id, uint32_t parentId, uint32_t requestCount,
+		SlavePeerSocket *target
+	);
 	// Erase
 	bool eraseReleaseDegradedLock(
 		uint32_t id, uint32_t count,
@@ -334,6 +379,14 @@ public:
 		PendingIdentifier *pidPtr = 0,
 		ChunkUpdate *chunkUpdatePtr = 0,
 		bool needsLock = true, bool needsUnlock = true
+	);
+	bool eraseRemapData(
+		struct sockaddr_in target,
+		std::set<PendingData> **pendingData
+	);
+	bool decrementRemapDataRequest(
+		uint32_t id, PendingIdentifier *pidPtr = 0,
+		uint32_t *requestCount = 0
 	);
 
 	bool findReconstruction(

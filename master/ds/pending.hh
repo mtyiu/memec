@@ -21,7 +21,8 @@ enum PendingType {
 	PT_SLAVE_SET,
 	PT_SLAVE_REMAPPING_SET,
 	PT_SLAVE_UPDATE,
-	PT_SLAVE_DEL
+	PT_SLAVE_DEL,
+	PT_KEY_REMAP_LIST
 };
 
 class DegradedLockData : public DegradedLock {
@@ -63,6 +64,7 @@ private:
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *&map );
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, RemappingRecord> *&map );
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, DegradedLockData> *&map );
+	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, std::vector<uint32_t> > *&map );
 
 public:
 	struct {
@@ -91,6 +93,10 @@ public:
 		LOCK_T updateLock;
 		LOCK_T delLock;
 	} slaves;
+	struct {
+		std::unordered_multimap<PendingIdentifier, std::vector<uint32_t> > remapList;
+		LOCK_T remapListLock;
+	} requests;
 	struct {
 		std::unordered_multimap<PendingIdentifier, RequestStartTime> get;
 		std::unordered_multimap<PendingIdentifier, RequestStartTime> set;
@@ -135,6 +141,12 @@ public:
 		PendingType type, uint32_t id, uint32_t parentId, void *ptr,
 		struct sockaddr_in addr
 	);
+	// Insert (Request)
+	bool insertRemapList(
+		PendingType type, uint32_t id, uint32_t parentId, void *ptr,
+		std::vector<uint32_t> &remapList,
+		bool needsLock = true, bool needsUnlock = true
+	);
 
 	// Erase
 	bool eraseDegradedLockData(
@@ -168,6 +180,12 @@ public:
 		PendingIdentifier *pidPtr = 0,
 		RequestStartTime *rstPtr = 0
 	);
+	bool eraseRemapList(
+		PendingType type, uint32_t id, void *ptr = 0,
+		PendingIdentifier *pidPtr = 0,
+		std::vector<uint32_t> *remapList = 0,
+		bool needsLock = true, bool needsUnlock = true
+	);
 
 	// Find
 	bool findKey(
@@ -179,6 +197,10 @@ public:
 		PendingType type, uint32_t id, void *ptr,
 		KeyValueUpdate *keyValuePtr,
 		bool checkKey = false, char *checkKeyPtr = 0
+	);
+	bool findRemapList(
+		PendingType type, uint32_t id, void *ptr,
+		std::vector<uint32_t> *remapList
 	);
 
 	// Count

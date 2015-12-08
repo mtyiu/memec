@@ -21,6 +21,25 @@ void SlavePeerEvent::resRemappingSet( SlavePeerSocket *socket, uint32_t id, Key 
 	this->message.remap.chunkId = chunkId;
 }
 
+void SlavePeerEvent::reqSet( SlavePeerSocket *socket, uint32_t id, uint32_t listId, uint32_t chunkId, Key key, Value value ) {
+	this->type = SLAVE_PEER_EVENT_TYPE_SET_REQUEST;
+	this->id = id;
+	this->socket = socket;
+	this->message.parity.key = key;
+	this->message.parity.value = value;
+	this->message.parity.listId = listId;
+	this->message.parity.chunkId = chunkId;
+}
+
+void SlavePeerEvent::resSet( SlavePeerSocket *socket, uint32_t id, uint32_t listId, uint32_t chunkId, Key key, bool success ) {
+	this->type = success ? SLAVE_PEER_EVENT_TYPE_SET_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_SET_RESPONSE_FAILURE;
+	this->id = id;
+	this->socket = socket;
+	this->message.parity.key = key;
+	this->message.parity.listId = listId;
+	this->message.parity.chunkId = chunkId;
+}
+
 void SlavePeerEvent::reqGet( SlavePeerSocket *socket, uint32_t id, uint32_t listId, uint32_t chunkId, Key &key ) {
 	this->type = SLAVE_PEER_EVENT_TYPE_GET_REQUEST;
 	this->id = id;

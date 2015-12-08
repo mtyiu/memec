@@ -6,6 +6,7 @@
 #include "../../common/ds/metadata.hh"
 #include "../../common/ds/chunk.hh"
 #include "../../common/ds/packet_pool.hh"
+#include "../../common/ds/value.hh"
 #include "../../common/event/event.hh"
 
 class MixedChunkBuffer;
@@ -19,6 +20,10 @@ enum SlavePeerEventType {
 	// REMAPPING_SET
 	SLAVE_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS,
 	SLAVE_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE,
+	// SET
+	SLAVE_PEER_EVENT_TYPE_SET_REQUEST,
+	SLAVE_PEER_EVENT_TYPE_SET_RESPONSE_SUCCESS,
+	SLAVE_PEER_EVENT_TYPE_SET_RESPONSE_FAILURE,
 	// GET
 	SLAVE_PEER_EVENT_TYPE_GET_REQUEST,
 	SLAVE_PEER_EVENT_TYPE_GET_RESPONSE_SUCCESS,
@@ -99,6 +104,11 @@ public:
 			Key key;
 			uint32_t listId, chunkId;
 		} remap;
+		struct {
+			Key key;
+			Value value;
+			uint32_t listId, chunkId;
+		} parity;
 	} message;
 
 	// Register
@@ -106,6 +116,9 @@ public:
 	void resRegister( SlavePeerSocket *socket, uint32_t id, bool success = true );
 	// REMAPPING_SET
 	void resRemappingSet( SlavePeerSocket *socket, uint32_t id, Key &key, uint32_t listId, uint32_t chunkId, bool success );
+	// SET
+	void reqSet( SlavePeerSocket *socket, uint32_t id, uint32_t listId, uint32_t chunkId, Key key, Value value );
+	void resSet( SlavePeerSocket *socket, uint32_t id, uint32_t listId, uint32_t chunkId, Key key, bool success );
 	// GET
 	void reqGet( SlavePeerSocket *socket, uint32_t id, uint32_t listId, uint32_t chunkId, Key &key );
 	void resGet( SlavePeerSocket *socket, uint32_t id, KeyValue &keyValue );

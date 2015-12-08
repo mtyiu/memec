@@ -99,10 +99,10 @@ char *SlaveProtocol::resSet( size_t &size, uint32_t id, uint32_t listId, uint32_
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::resSet( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key ) {
+char *SlaveProtocol::resSet( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key, bool toMaster ) {
 	size = this->generateKeyHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
-		PROTO_MAGIC_TO_MASTER,
+		toMaster ? PROTO_MAGIC_TO_MASTER : PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_SET,
 		id,
 		keySize,
@@ -196,6 +196,22 @@ char *SlaveProtocol::resRegisterSlavePeer( size_t &size, uint32_t id, bool succe
 		id
 	);
 	return this->buffer.send;
+}
+
+char *SlaveProtocol::reqSet( size_t &size, uint32_t id, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf ) {
+	if ( ! buf ) buf = this->buffer.send;
+	size = this->generateKeyValueHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_SET,
+		id,
+		keySize,
+		key,
+		valueSize,
+		value,
+		buf
+	);
+	return buf;
 }
 
 char *SlaveProtocol::reqSealChunk( size_t &size, uint32_t id, Chunk *chunk, uint32_t startPos, char *buf ) {
@@ -450,3 +466,14 @@ char *SlaveProtocol::resSetChunk( size_t &size, uint32_t id, bool success, uint3
 	);
 	return this->buffer.send;
 }
+
+char *SlaveProtocol::resRemapParity( size_t &size, uint32_t id ) {
+	size = this->generateHeader(
+		PROTO_MAGIC_RESPONSE_SUCCESS,
+		PROTO_MAGIC_TO_COORDINATOR,
+		PROTO_OPCODE_PARITY_MIGRATE,
+		0,
+		id
+	);
+	return this->buffer.send;
+};

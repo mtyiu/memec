@@ -32,6 +32,13 @@ public:
 		ArrayMap< struct sockaddr_in, Latency >& slaveSetLatency,
 		char* buffer, uint32_t size
 	);
+	// RemapList
+	bool parseRemappingLockHeader(
+		struct RemappingLockHeader &header,
+		char *buf, size_t size,
+		std::vector<uint32_t> *remapList = 0,
+		size_t offset = 0
+	);
 	// Forward the whole remapping record message passed in (with the protocol header excluded) pfrom slave to masters
 	char *forwardRemappingRecords( size_t &size, uint32_t id, char *message );
 	// Remapping
@@ -91,7 +98,10 @@ public:
 		std::vector<Metadata> &chunks,
 		bool &isCompleted
 	);
-	// Reconstruction
+	char *reqSyncRemappingRecord( size_t &size, uint32_t id, std::unordered_map<Key, RemappingRecord> &remappingRecords, LOCK_T* lock, bool &isLast, char *buffer = 0 );
+	char *reqSyncRemappedParity( size_t &size, uint32_t id, struct sockaddr_in target, char* buffer = 0 );
+	char *resRemappingSetLock( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t chunkId, bool isRemapped, uint8_t keySize, char *key, uint32_t sockfd = UINT_MAX );
+	// Recovery
 	char *reqReconstruction(
 		size_t &size, uint32_t id,
 		uint32_t listId, uint32_t chunkId,

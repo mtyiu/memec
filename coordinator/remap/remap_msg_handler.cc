@@ -451,7 +451,7 @@ bool CoordinatorRemapMsgHandler::isAllMasterAcked( struct sockaddr_in slave ) {
 	//}
 	//fprintf( stderr, "%lu of %lu masters acked slave %s:%hu\n", ackMasters[ slave ]->size(), aliveMasters.size(), buf , slave.sin_port );
 	if ( allAcked ) {
-		printf( "Slave %s:%hu changes its state to: ", buf, slave.sin_port );
+		printf( "Slave %s:%hu changes its state to: ", buf, ntohs( slave.sin_port ) );
 		switch( this->slavesStatus[ slave ] ) {
 			case REMAP_UNDEFINED:
 				printf( "[REMAP_UNDEFINED] - 0, undefined\n" );
