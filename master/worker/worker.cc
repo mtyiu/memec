@@ -297,8 +297,7 @@ bool MasterWorker::init( GlobalConfig &config, WorkerRole role, uint32_t workerI
 		Protocol::getSuggestedBufferSize(
 			config.size.key,
 			config.size.chunk
-		),
-		MasterWorker::parityChunkCount
+		)
 	);
 	this->dataSlaveSockets = new SlaveSocket*[ MasterWorker::dataChunkCount ];
 	this->paritySlaveSockets = new SlaveSocket*[ MasterWorker::parityChunkCount ];

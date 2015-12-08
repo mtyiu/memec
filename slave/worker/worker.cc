@@ -219,8 +219,7 @@ bool SlaveWorker::init( GlobalConfig &globalConfig, SlaveConfig &slaveConfig, Wo
 		Protocol::getSuggestedBufferSize(
 			globalConfig.size.key,
 			globalConfig.size.chunk
-		),
-		SlaveWorker::dataChunkCount
+		)
 	);
 	this->role = role;
 	this->workerId = workerId;

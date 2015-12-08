@@ -19,7 +19,6 @@ OBJS= \
 	event/master_event.o \
 	event/slave_event.o \
 	event/slave_peer_event.o \
-	protocol/protocol.o \
 	protocol/degraded_protocol.o \
 	protocol/heartbeat_protocol.o \
 	protocol/normal_master_protocol.o \

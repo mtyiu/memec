@@ -11,7 +11,6 @@ OBJS= \
 	event/coordinator_event.o \
 	event/master_event.o \
 	event/slave_event.o \
-	protocol/protocol.o \
 	protocol/degraded_protocol.o \
 	protocol/load_protocol.o \
 	protocol/normal_protocol.o \
