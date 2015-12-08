@@ -98,9 +98,7 @@ public:
 		std::vector<Metadata> &chunks,
 		bool &isCompleted
 	);
-	char *reqSyncRemappingRecord( size_t &size, uint32_t id, std::unordered_map<Key, RemappingRecord> &remappingRecords, LOCK_T* lock, bool &isLast, char *buffer = 0 );
 	char *reqSyncRemappedParity( size_t &size, uint32_t id, struct sockaddr_in target, char* buffer = 0 );
-	char *resRemappingSetLock( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t chunkId, bool isRemapped, uint8_t keySize, char *key, uint32_t sockfd = UINT_MAX );
 	// Recovery
 	char *reqReconstruction(
 		size_t &size, uint32_t id,

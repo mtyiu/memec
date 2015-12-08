@@ -1,4 +1,4 @@
-m#include "protocol.hh"
+#include "protocol.hh"
 #include "../../common/util/debug.hh"
 
 bool MasterProtocol::init( size_t size, uint32_t parityChunkCount ) {

@@ -1973,7 +1973,7 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 		packet->setReferenceCount( 1 );
 		this->protocol.reqRemappingSet(
 			s, pid.id,
-			remappingRecord.listId, remappingRecord.chunkId, false,
+			remappingRecord.listId, remappingRecord.chunkId,
 			key.data, key.size,
 			value->data, value->size,
 			packet->data,
@@ -2005,7 +2005,7 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 	packet->setReferenceCount( 1 );
 	this->protocol.reqRemappingSet(
 		s, pid.id,
-		remappingRecord.listId, remappingRecord.chunkId, false,
+		remappingRecord.listId, remappingRecord.chunkId,
 		key.data, key.size,
 		value->data, value->size,
 		packet->data,
