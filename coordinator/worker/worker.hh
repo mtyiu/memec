@@ -25,35 +25,42 @@ private:
 	static StripeList<SlaveSocket> *stripeList;
 	static Pending *pending;
 
+	// ---------- worker.cc ----------
 	void dispatch( MixedEvent event );
 	void dispatch( CoordinatorEvent event );
-	void dispatch( MasterEvent event );
-	void dispatch( SlaveEvent event );
 	void free();
 	static void *run( void *argv );
+
+	// ---------- master_worker.cc ----------
+	void dispatch( MasterEvent event );
+
+	// ---------- slave_worker.cc ----------
+	void dispatch( SlaveEvent event );
+	bool processHeartbeat( SlaveEvent event, char *buf, size_t size );
+
+	// ---------- remap_worker.cc ----------
+	bool handleRemappingSetLockRequest( MasterEvent event, char* buf, size_t size );
+
+	// ---------- degraded_worker.cc ----------
+	bool handleDegradedLockRequest( MasterEvent event, char *buf, size_t size );
+	bool handleReleaseDegradedLockRequest( SlaveSocket *socket, bool *done = 0 );
+	bool handleReleaseDegradedLockResponse( SlaveEvent event, char *buf, size_t size );
+
+	// ---------- recovery_worker.cc ----------
+	bool handlePromoteBackupSlaveResponse( SlaveEvent event, char *buf, size_t size );
+	bool handleReconstructionRequest( SlaveSocket *socket );
+	bool handleReconstructionResponse( SlaveEvent event, char *buf, size_t size );
 
 public:
 	static RemappingRecordMap *remappingRecords;
 
-	bool processHeartbeat( SlaveEvent event, char *buf, size_t size );
-	bool handleReconstructionRequest( SlaveSocket *socket );
-	bool handleReconstructionResponse( SlaveEvent event, char *buf, size_t size );
-	bool handleReleaseDegradedLockRequest( SlaveSocket *socket, bool *done = 0 );
-	bool handleReleaseDegradedLockResponse( SlaveEvent event, char *buf, size_t size );
-	bool handlePromoteBackupSlaveResponse( SlaveEvent event, char *buf, size_t size );
-
-	bool handleRemappingSetLockRequest( MasterEvent event, char* buf, size_t size );
-	bool handleDegradedLockRequest( MasterEvent event, char *buf, size_t size );
-
+	// ---------- worker.cc ----------
 	static bool init();
 	bool init( GlobalConfig &config, WorkerRole role, uint32_t workerId );
 	bool start();
 	void stop();
 	void print( FILE *f = stdout );
-
-	inline WorkerRole getRole() {
-		return this->role;
-	}
+	inline WorkerRole getRole() { return this->role; }
 };
 
 #endif

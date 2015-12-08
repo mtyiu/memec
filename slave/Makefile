@@ -27,6 +27,14 @@ OBJS= \
 	storage/storage.o \
 	storage/local_storage.o \
 	worker/worker.o \
+	worker/coordinator_worker.o \
+	worker/degraded_worker.o \
+	worker/master_worker.o \
+	worker/recovery_worker.o \
+	worker/remap_worker.o \
+	worker/slave_peer_req_worker.o \
+	worker/slave_peer_res_worker.o \
+	worker/slave_peer_worker.o \
 	main/slave.o \
 	main/main.o
 

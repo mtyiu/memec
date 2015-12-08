@@ -42,12 +42,9 @@ private:
 	static MasterRemapMsgHandler *remapMsgHandler;
 	static RemappingRecordMap *remappingRecords;
 
+	// ---------- worker.cc ----------
 	void dispatch( MixedEvent event );
-	void dispatch( ApplicationEvent event );
-	void dispatch( CoordinatorEvent event );
 	void dispatch( MasterEvent event );
-	void dispatch( SlaveEvent event );
-
 	// For normal operations
 	SlaveSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId );
 	// For degraded GET
@@ -58,13 +55,27 @@ private:
 	// For remapping
 	SlaveSocket *getSlaves( char *data, uint8_t size, uint32_t &originalListId, uint32_t &originalChunkId, uint32_t &remappedListId, std::vector<uint32_t> &remappedChunkId );
 	SlaveSocket *getSlaves( uint32_t listId, uint32_t chunkId );
+	void free();
+	static void *run( void *argv );
 
-	bool handleGetRequest( ApplicationEvent event, char *buf, size_t size );
+	// ---------- coordinator_worker.cc ----------
+	void dispatch( CoordinatorEvent event );
+
+	// ---------- application_worker.cc ----------
+	void dispatch( ApplicationEvent event );
 	bool handleSetRequest( ApplicationEvent event, char *buf, size_t size );
+	bool handleGetRequest( ApplicationEvent event, char *buf, size_t size );
 	bool handleUpdateRequest( ApplicationEvent event, char *buf, size_t size );
 	bool handleDeleteRequest( ApplicationEvent event, char *buf, size_t size );
-	bool handleRemappingSetRequest( ApplicationEvent event, char *buf, size_t size );
 
+	// ---------- slave_worker.cc ----------
+	void dispatch( SlaveEvent event );
+	bool handleSetResponse( SlaveEvent event, bool success, char *buf, size_t size );
+	bool handleGetResponse( SlaveEvent event, bool success, bool isDegraded, char *buf, size_t size );
+	bool handleUpdateResponse( SlaveEvent event, bool success, bool isDegraded, char *buf, size_t size );
+	bool handleDeleteResponse( SlaveEvent event, bool success, bool isDegraded, char *buf, size_t size );
+
+	// ---------- degraded_worker.cc ----------
 	bool sendDegradedLockRequest(
 		uint32_t parentId, uint8_t opcode,
 		uint32_t listId,
@@ -74,28 +85,20 @@ private:
 		uint32_t valueUpdateSize = 0, uint32_t valueUpdateOffset = 0, char *valueUpdate = 0
 	);
 	bool handleDegradedLockResponse( CoordinatorEvent event, bool success, char *buf, size_t size );
+
+	// ---------- remap_worker.cc ----------
+	bool handleRemappingSetRequest( ApplicationEvent event, char *buf, size_t size );
 	bool handleRemappingSetLockResponse( CoordinatorEvent event, bool success, char *buf, size_t size );
-
-	bool handleGetResponse( SlaveEvent event, bool success, bool isDegraded, char *buf, size_t size );
-	bool handleSetResponse( SlaveEvent event, bool success, char *buf, size_t size );
-	bool handleUpdateResponse( SlaveEvent event, bool success, bool isDegraded, char *buf, size_t size );
-	bool handleDeleteResponse( SlaveEvent event, bool success, bool isDegraded, char *buf, size_t size );
-
 	bool handleRemappingSetResponse( SlaveEvent event, bool success, char *buf, size_t size );
 
-	void free();
-	static void *run( void *argv );
-
 public:
+	// ---------- worker.cc ----------
 	static bool init();
 	bool init( GlobalConfig &config, WorkerRole role, uint32_t workerId );
 	bool start();
 	void stop();
 	void print( FILE *f = stdout );
-
-	inline WorkerRole getRole() {
-		return this->role;
-	}
+	inline WorkerRole getRole() { return this->role; }
 };
 
 #endif

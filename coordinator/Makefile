@@ -17,6 +17,11 @@ OBJS= \
 	socket/master_socket.o \
 	socket/slave_socket.o \
 	worker/worker.o \
+	worker/degraded_worker.o \
+	worker/master_worker.o \
+	worker/recovery_worker.o \
+	worker/remap_worker.o \
+	worker/slave_worker.o \
 	main/coordinator.o \
 	main/main.o
 
