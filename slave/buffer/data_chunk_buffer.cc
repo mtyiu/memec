@@ -40,7 +40,7 @@ void DataChunkBuffer::init( uint32_t listId, uint32_t stripeId, uint32_t chunkId
 	}
 }
 
-KeyMetadata DataChunkBuffer::set( SlaveWorker *worker, char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode ) {
+KeyMetadata DataChunkBuffer::set( SlaveWorker *worker, char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode, uint32_t &stripeId ) {
 	KeyMetadata keyMetadata;
 	uint32_t size = PROTO_KEY_VALUE_SIZE + keySize + valueSize, max = 0, tmp;
 	int index = -1;
@@ -166,6 +166,7 @@ KeyMetadata DataChunkBuffer::set( SlaveWorker *worker, char *key, uint8_t keySiz
 	Key keyObj;
 	keyObj.set( keySize, key );
 	ChunkBuffer::map->insertKey( keyObj, opcode, keyMetadata );
+	stripeId = keyMetadata.stripeId;
 
 	return keyMetadata;
 }

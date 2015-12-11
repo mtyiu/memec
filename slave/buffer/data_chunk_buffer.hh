@@ -33,7 +33,7 @@ public:
 
 	inline uint32_t getChunkId() { return this->chunkId; }
 
-	KeyMetadata set( SlaveWorker *worker, char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode );
+	KeyMetadata set( SlaveWorker *worker, char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode, uint32_t &stripeId );
 
 	size_t seal( SlaveWorker *worker );
 

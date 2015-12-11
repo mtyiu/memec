@@ -21,7 +21,7 @@ public:
 	MixedChunkBuffer( DataChunkBuffer *dataChunkBuffer );
 	MixedChunkBuffer( ParityChunkBuffer *parityChunkBuffer );
 
-	bool set( SlaveWorker *worker, char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode, uint32_t chunkId, Chunk **chunks = 0, Chunk *dataChunk = 0, Chunk *parityChunk = 0 );
+	bool set( SlaveWorker *worker, char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode, uint32_t &stripeId, uint32_t chunkId, Chunk **chunks = 0, Chunk *dataChunk = 0, Chunk *parityChunk = 0 );
 
 	// For DataChunkBuffer only
 	size_t seal( SlaveWorker *worker );

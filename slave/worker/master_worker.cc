@@ -267,7 +267,7 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size, b
 		this,
 		header.key, header.keySize,
 		header.value, header.valueSize,
-		PROTO_OPCODE_SET, chunkId,
+		PROTO_OPCODE_SET, stripeId, chunkId,
 		this->chunks, this->dataChunk, this->parityChunk
 	);
 
@@ -283,7 +283,6 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size, b
 		);
 	} else {
 		// Data server responds with metadata
-		stripeId = -1; // TODO
 		event.resSet(
 			event.socket, event.id,
 			listId, stripeId, chunkId,

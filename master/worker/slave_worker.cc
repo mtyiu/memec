@@ -109,16 +109,35 @@ quit_1:
 }
 
 bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf, size_t size ) {
-	struct KeyHeader header;
-	if ( ! this->protocol.parseKeyHeader( header, buf, size ) ) {
-		__ERROR__( "MasterWorker", "handleSetResponse", "Invalid SET response." );
-		return false;
+	char *keyStr;
+	if ( success ) {
+		struct ChunkKeyHeader header;
+		if ( ! this->protocol.parseChunkKeyHeader( header, buf, size ) ) {
+			__ERROR__( "MasterWorker", "handleSetResponse", "Invalid SET response." );
+			return false;
+		}
+		__DEBUG__(
+			BLUE, "MasterWorker", "handleSetResponse",
+			"[SET] Key: %.*s (key size = %u) at (%u, %u, %u)",
+			( int ) header.keySize, header.key, header.keySize,
+			header.listId, header.stripeId, header.chunkId
+		);
+
+		keyStr = header.key;
+	} else {
+		struct KeyHeader header;
+		if ( ! this->protocol.parseKeyHeader( header, buf, size ) ) {
+			__ERROR__( "MasterWorker", "handleSetResponse", "Invalid SET response." );
+			return false;
+		}
+		__DEBUG__(
+			BLUE, "MasterWorker", "handleSetResponse",
+			"[SET] Key: %.*s (key size = %u)",
+			( int ) header.keySize, header.key, header.keySize
+		);
+
+		keyStr = header.key;
 	}
-	__DEBUG__(
-		BLUE, "MasterWorker", "handleSetResponse",
-		"[SET] Key: %.*s (key size = %u)",
-		( int ) header.keySize, header.key, header.keySize
-	);
 
 	int pending;
 	ApplicationEvent applicationEvent;
@@ -163,15 +182,15 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 
 	if ( pending == 0 ) {
 		// Only send application SET response when the number of pending slave SET requests equal 0
-		if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_SET, pid.parentId, 0, &pid, &key, true, true, true, header.key ) ) {
-			__ERROR__( "MasterWorker", "handleSetResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded." );
+		if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_SET, pid.parentId, 0, &pid, &key, true, true, true, keyStr ) ) {
+			__ERROR__( "MasterWorker", "handleSetResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded. (Key = %.*s, ID = %u)", key.size, key.data, pid.parentId );
 			return false;
 		}
 
 		applicationEvent.resSet( ( ApplicationSocket * ) key.ptr, pid.id, key, success );
 		MasterWorker::eventQueue->insert( applicationEvent );
 		uint32_t originalListId, originalChunkId;
-		SlaveSocket *original = this->getSlaves( header.key, header.keySize, originalListId, originalChunkId );
+		SlaveSocket *original = this->getSlaves( key.data, key.size, originalListId, originalChunkId );
 		int sockfd = original->getSocket();
 		MasterWorker::slaveSockets->get( sockfd )->counter.decreaseNormal();
 	}
