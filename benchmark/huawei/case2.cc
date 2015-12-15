@@ -100,7 +100,7 @@ int main( int argc, char **argv ) {
 	config.dataSize = atoi( argv[ 4 ] );
 	config.totalSize = ( uint64_t ) atol( argv[ 5 ] );
 	memset( &addr, 0, sizeof( addr ) );
-	inet_pton( AF_INET, argv[ 6 ], &addr );
+	inet_pton( AF_INET, argv[ 6 ], &( addr.sin_addr ) );
 	config.addr = addr.sin_addr.s_addr;
 	config.port = htons( atoi( argv[ 7 ] ) );
 	config.clientId = ( uint32_t ) atol( argv[ 8 ] );

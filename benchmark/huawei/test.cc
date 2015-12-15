@@ -242,7 +242,7 @@ int main( int argc, char **argv ) {
 	config.chunkSize = atoi( argv[ 2 ] );
 	config.batchSize = atoi( argv[ 3 ] );
 	memset( &addr, 0, sizeof( addr ) );
-	inet_pton( AF_INET, argv[ 4 ], &addr );
+	inet_pton( AF_INET, argv[ 4 ], &( addr.sin_addr ) );
 	config.addr = addr.sin_addr.s_addr;
 	config.port = htons( atoi( argv[ 5 ] ) );
 	config.fromId = ( uint32_t ) atol( argv[ 6 ] );
