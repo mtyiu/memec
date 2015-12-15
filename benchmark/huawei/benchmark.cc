@@ -19,10 +19,13 @@ struct {
 	uint32_t clientId;
 	uint32_t numClients;
 	uint32_t numThreads;
+	uint32_t numItems;
+	bool testDownload;
 	// States
 	uint64_t totalSizePerThread;
 	uint32_t waiting;
 	uint64_t sentBytes;
+	uint64_t recvBytes;
 	struct timespec ts;
 	pthread_mutex_t lock;
 	pthread_cond_t waitCond, startCond;
@@ -42,14 +45,26 @@ char *getRandomLong( char *buf ) {
 	return buf;
 }
 
-void runExperiment( MemEC *memec ) {
+void *upload( void *argv ) {
+	MemEC *memec = ( MemEC * ) argv;
+
 	uint8_t keySize = 8;
 	uint32_t valueSize = config.dataSize - keySize;
-	char *key, *value;
+	char **keys, *key = 0, *value;
 	uint64_t totalSize = 0;
+	uint32_t i;
 
-	key = ( char * ) malloc( sizeof( char ) * keySize );
-	value = ( char * ) malloc( sizeof( char ) * valueSize );
+	if ( config.testDownload ) {
+		keys = new char *[ config.numItems ];
+		for ( i = 0; i < config.numItems; i++ ) {
+			keys[ i ] = new char[ keySize ];
+			getRandomLong( keys[ i ] );
+		}
+	} else {
+		keys = 0;
+		key = new char[ keySize ];
+	}
+	value = new char[ valueSize ];
 	getRandomString( valueSize, value );
 
 	pthread_mutex_lock( &config.lock );
@@ -58,8 +73,13 @@ void runExperiment( MemEC *memec ) {
 	pthread_cond_wait( &config.startCond, &config.lock );
 	pthread_mutex_unlock( &config.lock );
 
+	i = 0;
 	while ( totalSize < config.totalSizePerThread ) {
-		getRandomLong( key );
+		if ( config.testDownload ) {
+			key = keys[ i++ ];
+		} else {
+			getRandomLong( key );
+		}
 		memec->set( key, keySize, value, valueSize );
 		totalSize += keySize + valueSize;
 	}
@@ -69,13 +89,47 @@ void runExperiment( MemEC *memec ) {
 	config.sentBytes += totalSize;
 	pthread_mutex_unlock( &config.lock );
 
-	free( key );
-	free( value );
+	if ( ! config.testDownload )
+		delete key;
+	delete value;
+
+	pthread_exit( ( void * ) keys );
+	return ( ( void * ) keys );
 }
 
-void *run( void *argv ) {
-	MemEC *memec = ( MemEC * ) argv;
-	runExperiment( memec );
+void *download( void *argv ) {
+	void **argvArray = ( void ** ) argv;
+	MemEC *memec = ( MemEC * ) argvArray[ 0 ];
+	char **keys = ( char ** ) argvArray[ 1 ];
+	free( argvArray );
+
+	uint8_t keySize = 8;
+	uint32_t valueSize = config.dataSize - keySize;
+	char *value;
+	uint64_t totalSize = 0;
+	int i;
+
+	value = new char[ valueSize ];
+
+	pthread_mutex_lock( &config.lock );
+	config.waiting++;
+	pthread_cond_signal( &config.waitCond );
+	pthread_cond_wait( &config.startCond, &config.lock );
+	pthread_mutex_unlock( &config.lock );
+
+	i = 0;
+	while ( totalSize < config.totalSizePerThread ) {
+		memec->get( keys[ i++ ], keySize, value, valueSize );
+		totalSize += keySize + valueSize;
+	}
+	memec->flush();
+
+	pthread_mutex_lock( &config.lock );
+	config.recvBytes += totalSize;
+	pthread_mutex_unlock( &config.lock );
+
+	delete[] value;
+
 	pthread_exit( 0 );
 	return 0;
 }
@@ -88,8 +142,8 @@ void *stop( void *argv ) {
 }
 
 int main( int argc, char **argv ) {
-	if ( argc <= 10 ) {
-		fprintf( stderr, "Usage: %s [Key size] [Chunk size] [Batch size] [Data size] [Total size] [Master IP] [Master port] [Client ID] [Total number of clients]\n", argv[ 0 ] );
+	if ( argc <= 11 ) {
+		fprintf( stderr, "Usage: %s [Key size] [Chunk size] [Batch size] [Data size] [Total size] [Master IP] [Master port] [Client ID] [Total number of clients] [Test download (true|false)?]\n", argv[ 0 ] );
 		return 1;
 	}
 	struct sockaddr_in addr;
@@ -106,9 +160,14 @@ int main( int argc, char **argv ) {
 	config.clientId = ( uint32_t ) atol( argv[ 8 ] );
 	config.numClients = ( uint32_t ) atol( argv[ 9 ] );
 	config.numThreads = atoi( argv[ 10 ] );
+	config.testDownload = ( strcmp( argv[ 11 ], "true" ) == 0 );
 	config.totalSizePerThread = config.totalSize / config.numThreads;
 	config.waiting = 0;
 	config.sentBytes = 0;
+	config.recvBytes = 0;
+	config.numItems = config.totalSizePerThread / config.dataSize;
+	if ( ( config.totalSizePerThread % config.dataSize ) > 0 )
+		config.numItems++;
 	pthread_mutex_init( &config.lock, 0 );
 	pthread_cond_init( &config.waitCond, 0 );
 	pthread_cond_init( &config.startCond, 0 );
@@ -116,7 +175,7 @@ int main( int argc, char **argv ) {
 
 	int width = 20;
 	char ipStr[ 16 ];
-	inet_ntop( AF_INET, &addr, ipStr, sizeof( ipStr ) );
+	inet_ntop( AF_INET, &( addr.sin_addr ), ipStr, sizeof( ipStr ) );
 	printf(
 		"---------- Configuration ----------\n"
 		"%-*s : %u\n"
@@ -125,16 +184,20 @@ int main( int argc, char **argv ) {
 		"%-*s : %u\n"
 		"%-*s : %lu\n"
 		"%-*s : %s:%u\n"
-		"%-*s : %u / %u\n"
-		"%-*s : %u\n",
+		"%-*s : %u\n"
+		"%-*s : %u\n"
+		"%-*s : %u\n"
+		"%-*s : %s\n",
 		width, "Key Size", config.keySize,
 		width, "Chunk Size", config.chunkSize,
 		width, "Batch Size", config.batchSize,
 		width, "Data Size", config.dataSize,
 		width, "Total Size", config.totalSize,
 		width, "Master", ipStr, ntohs( config.port ),
-		width, "Client ID", config.clientId, config.numClients,
-		width, "Number of threads", config.numThreads
+		width, "Client ID", config.clientId,
+		width, "Number of clients", config.numClients,
+		width, "Number of threads", config.numThreads,
+		width, "Test download?", config.testDownload ? "true" : "false"
 	);
 
 	uint32_t fromId, toId;
@@ -143,8 +206,10 @@ int main( int argc, char **argv ) {
 
 	MemEC **memecs = new MemEC *[ config.numThreads ];
 	pthread_t *tids = new pthread_t[ config.numThreads ];
+	char ***keysArray = config.testDownload ? new char **[ config.numThreads ] : 0;
 	double elapsedTime;
 
+	// -------------------- Upload --------------------
 	for ( uint32_t i = 0; i < config.numThreads; i++ ) {
 		memecs[ i ] = new MemEC(
 			config.keySize, config.chunkSize, config.batchSize,
@@ -153,7 +218,7 @@ int main( int argc, char **argv ) {
 			fromId + ( ( toId - fromId ) / config.numThreads * ( i + 1 ) - 1 )
 		);
 		memecs[ i ]->connect();
-		pthread_create( tids + i, 0, run, ( void * ) memecs[ i ] );
+		pthread_create( tids + i, 0, upload, ( void * ) memecs[ i ] );
 	}
 
 	pthread_mutex_lock( &config.lock );
@@ -164,13 +229,13 @@ int main( int argc, char **argv ) {
 	pthread_mutex_unlock( &config.lock );
 
 	for ( uint32_t i = 0; i < config.numThreads; i++ ) {
-		pthread_join( tids[ i ], 0 );
+		pthread_join( tids[ i ], config.testDownload ? ( ( void ** ) keysArray + i ) : 0 );
 	}
 	elapsedTime = get_elapsed_time( config.ts );
 
 	width = 20;
 	printf(
-		"\n---------- Statistics ----------\n"
+		"\n---------- Statistics (upload) ----------\n"
 		"%-*s : %8.3lf\n"
 		"%-*s : %lu\n"
 		"%-*s : %8.3lf\n"
@@ -190,6 +255,65 @@ int main( int argc, char **argv ) {
 		pthread_join( tids[ i ], 0 );
 		delete memecs[ i ];
 	}
+
+	if ( config.testDownload ) {
+		config.waiting = 0;
+		// -------------------- Download --------------------
+		for ( uint32_t i = 0; i < config.numThreads; i++ ) {
+			memecs[ i ] = new MemEC(
+				config.keySize, config.chunkSize, config.batchSize,
+				config.addr, config.port,
+				fromId + ( ( toId - fromId ) / config.numThreads * i ),
+				fromId + ( ( toId - fromId ) / config.numThreads * ( i + 1 ) - 1 )
+			);
+			memecs[ i ]->connect();
+			void **dlArgv = ( void ** ) malloc( sizeof( void * ) * 2 );
+			dlArgv[ 0 ] = ( void * ) memecs[ i ];
+			dlArgv[ 1 ] = ( void * ) keysArray[ i ];
+			pthread_create( tids + i, 0, download, ( void * ) dlArgv );
+		}
+
+		pthread_mutex_lock( &config.lock );
+		while ( config.waiting != config.numThreads )
+			pthread_cond_wait( &config.waitCond, &config.lock );
+		pthread_cond_broadcast( &config.startCond );
+		config.ts = start_timer();
+		pthread_mutex_unlock( &config.lock );
+
+		for ( uint32_t i = 0; i < config.numThreads; i++ ) {
+			pthread_join( tids[ i ], 0 );
+		}
+		elapsedTime = get_elapsed_time( config.ts );
+
+		width = 20;
+		printf(
+			"\n---------- Statistics (download) ----------\n"
+			"%-*s : %8.3lf\n"
+			"%-*s : %lu\n"
+			"%-*s : %8.3lf\n"
+			"%-*s : %8.3lf\n",
+			width, "Elapsed time", elapsedTime,
+			width, "Received bytes", config.recvBytes,
+			width, "Throughput (IOps)", ( double ) config.recvBytes / config.dataSize / elapsedTime,
+			width, "Throughput (MBps)", ( double ) config.recvBytes / ( 1024 * 1024 ) / elapsedTime
+		);
+
+		printf( "\nCleaning up...\n" );
+		for ( uint32_t i = 0; i < config.numThreads; i++ ) {
+			pthread_create( tids + i, 0, stop, ( void * ) memecs[ i ] );
+		}
+
+		for ( uint32_t i = 0; i < config.numThreads; i++ ) {
+			pthread_join( tids[ i ], 0 );
+			delete memecs[ i ];
+
+			for ( uint32_t j = 0; j < config.numItems; j++ )
+				delete[] keysArray[ i ][ j ];
+			delete[] keysArray[ i ];
+		}
+		delete[] keysArray;
+	}
+
 	delete[] memecs;
 	delete[] tids;
 

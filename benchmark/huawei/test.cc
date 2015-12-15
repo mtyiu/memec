@@ -250,7 +250,7 @@ int main( int argc, char **argv ) {
 
 	int width = 10;
 	char ipStr[ 16 ];
-	inet_ntop( AF_INET, &addr, ipStr, sizeof( ipStr ) );
+	inet_ntop( AF_INET, &( addr.sin_addr ), ipStr, sizeof( ipStr ) );
 	printf(
 		"---------- Configuration ----------\n"
 		"%*s : %u\n"

@@ -12,10 +12,13 @@ LD_LIB= \
 
 .PHONY: clean
 
-all: bin/case2 bin/test
+all: bin/benchmark bin/window bin/test
 
-bin/case2: $(OBJS) case2.cc
-	$(CC) $(CFLAGS) $(LIBS) -o $@ case2.cc $(OBJS) $(LD_LIB)
+bin/benchmark: $(OBJS) benchmark.cc
+	$(CC) $(CFLAGS) $(LIBS) -o $@ benchmark.cc $(OBJS) $(LD_LIB)
+
+bin/window: $(OBJS) window.cc
+	$(CC) $(CFLAGS) $(LIBS) -o $@ window.cc $(OBJS) $(LD_LIB)
 
 bin/test: $(OBJS) test.cc
 	$(CC) $(CFLAGS) $(LIBS) -o $@ test.cc $(OBJS) $(LD_LIB)
