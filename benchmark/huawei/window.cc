@@ -138,7 +138,6 @@ void *upload( void *argv ) {
 	delete value;
 
 #ifdef WAIT_ACKS
-	printf( "Waiting for ACKs...\n" );
 	memec->disconnect();
 #endif
 
