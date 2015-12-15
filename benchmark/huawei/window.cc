@@ -8,7 +8,7 @@
 #include "memec.hh"
 #include "time.hh"
 
-// #define WAIT_ACKS
+#define WAIT_ACKS
 
 struct {
 	// Configuration
