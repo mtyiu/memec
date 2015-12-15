@@ -40,7 +40,7 @@ size_t MemEC::write() {
 			len - sentBytes,
 			0
 		);
-		printf( "Sent %ld bytes.\n", ret );
+		// printf( "Sent %ld bytes.\n", ret );
 		if ( ret == -1 ) {
 			if ( errno == EWOULDBLOCK )
 				continue;
@@ -158,6 +158,29 @@ bool MemEC::connect() {
 }
 
 bool MemEC::disconnect() {
+	size_t pending;
+
+	do {
+		pthread_mutex_lock( &this->pending.setLock );
+		pthread_mutex_lock( &this->pending.getLock );
+		pthread_mutex_lock( &this->pending.updateLock );
+		pthread_mutex_lock( &this->pending.delLock );
+
+		pending = this->pending.set.size() +
+		          this->pending.get.size() +
+		          this->pending.update.size() +
+		          this->pending.del.size();
+
+		pthread_mutex_unlock( &this->pending.delLock );
+		pthread_mutex_unlock( &this->pending.updateLock );
+		pthread_mutex_unlock( &this->pending.getLock );
+		pthread_mutex_unlock( &this->pending.setLock );
+
+		// if ( pending > 0 )
+		// 	this->printPending();
+
+		sleep( 1 );
+	} while ( pending > 0 );
 	return ( ! ::close( this->sockfd ) );
 }
 
@@ -180,12 +203,15 @@ bool MemEC::get( char *key, uint8_t keySize, char *&value, uint32_t &valueSize )
 	// Add to pending map for GET
 	pthread_mutex_t lock;
 	pthread_cond_t cond;
+	bool completed = false;
 	pthread_mutex_init( &lock, 0 );
 	pthread_cond_init( &cond, 0 );
 	value = 0;
 	valueSize = 0;
 	struct GetResponse getResponse = {
+		.lock = &lock,
 		.cond = &cond,
+		.completed = &completed,
 		.valuePtr = &value,
 		.valueSizePtr = &valueSize
 	};
@@ -197,11 +223,13 @@ bool MemEC::get( char *key, uint8_t keySize, char *&value, uint32_t &valueSize )
 
 	// Wait for the response
 	pthread_mutex_lock( &lock );
-	pthread_cond_wait( &cond, &lock );
+	while ( ! completed )
+		pthread_cond_wait( &cond, &lock );
+	pthread_mutex_unlock( &lock );
+
 	pthread_mutex_lock( &this->pending.getLock );
 	this->pending.get.erase( id );
 	pthread_mutex_unlock( &this->pending.getLock );
-	pthread_mutex_unlock( &lock );
 
 	return ( value != 0 && valueSize != 0 );
 }
@@ -359,16 +387,21 @@ void MemEC::recvThread() {
 						it = this->pending.get.find( common.id );
 						if ( it == this->pending.get.end() ) {
 							fprintf( stderr, "MemEC::recvThread(): Cannot find a pending GET request that matches the response. The message will be discarded.\n" );
+							pthread_mutex_unlock( &this->pending.getLock );
 						} else {
+							pthread_mutex_unlock( &this->pending.getLock );
+
 							struct GetResponse getResponse = it->second;
+							pthread_mutex_lock( getResponse.lock );
+							*getResponse.completed = true;
 							if ( common.magic == PROTO_MAGIC_RESPONSE_SUCCESS ) {
 								*getResponse.valuePtr = ( char * ) malloc( sizeof( char ) * header.keyValue.valueSize );
 								memcpy( *getResponse.valuePtr, header.keyValue.value, header.keyValue.valueSize );
 								*getResponse.valueSizePtr = header.keyValue.valueSize;
 							}
 							pthread_cond_signal( getResponse.cond );
+							pthread_mutex_unlock( getResponse.lock );
 						}
-						pthread_mutex_unlock( &this->pending.getLock );
 					}
 						break;
 					case PROTO_OPCODE_SET:

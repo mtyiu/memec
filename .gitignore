@@ -7,5 +7,6 @@ bin/coordinator
 bin/master
 bin/slave
 benchmark/huawei/bin/benchmark
+benchmark/huawei/bin/test
 .remote-sync.json
 .sync-config.cson

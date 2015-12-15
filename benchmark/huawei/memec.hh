@@ -34,7 +34,9 @@ public:
 };
 
 struct GetResponse {
+	pthread_mutex_t *lock;
 	pthread_cond_t *cond;
+	bool *completed;
 	char **valuePtr;
 	uint32_t *valueSizePtr;
 };

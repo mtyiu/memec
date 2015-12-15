@@ -136,6 +136,101 @@ void batch( MemEC &memec, size_t count, uint8_t keySize = 12, uint32_t valueSize
 	memec.flush();
 }
 
+void randomWorkload( MemEC &memec, size_t count, uint8_t keySize = 12, uint32_t valueSize = 500 ) {
+	std::vector<char *> keys;
+	std::vector<char *> values;
+	char *key, *value, *valueUpdate;
+	uint32_t valueUpdateSize, valueUpdateOffset, tmpValueSize;
+	uint32_t stat[ 2 ][ 4 ] = { { 0, 0, 0, 0 }, { 0, 0, 0, 0 } };
+	int action, index;
+
+	for ( size_t i = 0; i < count; i++ ) {
+		action = keys.size() == 0 ? 0 : rand() % 4;
+		switch( action ) {
+			case 0:
+				key = getRandomString( keySize );
+				value = getRandomString( valueSize );
+				keys.push_back( key );
+				values.push_back( value );
+				memec.set( key, keySize, value, valueSize );
+				stat[ 0 ][ 0 ]++;
+				stat[ 1 ][ 0 ]++;
+				break;
+			case 1:
+				index = rand() % keys.size();
+				key = keys[ index ];
+				memec.get( key, keySize, value, tmpValueSize );
+				if ( tmpValueSize != valueSize || strncmp( value, values[ index ], valueSize ) != 0 )
+					fprintf( stderr, "[GET] Value mismatch: %.*s vs. %.*s\n", tmpValueSize, value, valueSize, values[ index ] );
+				else
+					stat[ 1 ][ 1 ]++;
+
+				stat[ 0 ][ 1 ]++;
+				break;
+			case 2:
+				index = rand() % keys.size();
+				key = keys[ index ];
+				valueUpdateSize = rand() % valueSize;
+				valueUpdateOffset = valueSize == valueUpdateSize ? 0 : rand() % ( valueSize - valueUpdateSize );
+				valueUpdate = getRandomString( valueUpdateSize );
+				memec.update( key, keySize, valueUpdate, valueUpdateSize, valueUpdateOffset );
+				memcpy( values[ index ] + valueUpdateOffset, valueUpdate, valueUpdateSize );
+				free( valueUpdate );
+
+				// Verify that the update is successful
+				memec.get( key, keySize, value, tmpValueSize );
+				if ( tmpValueSize != valueSize || strncmp( value, values[ index ], valueSize ) != 0 )
+					fprintf( stderr, "[UPDATE] Value mismatch: %.*s vs. %.*s\n", valueSize, value, valueSize, values[ index ] );
+				else
+					stat[ 1 ][ 2 ]++;
+
+				stat[ 0 ][ 2 ]++;
+				break;
+			case 3:
+				index = rand() % keys.size();
+				key = keys[ index ];
+				memec.del( key, keySize );
+
+				// Verify that the delete is successful
+				memec.get( key, keySize, value, tmpValueSize );
+				if ( tmpValueSize != 0 )
+					fprintf( stderr, "[DELETE] The key %.*s cannot be deleted.\n", keySize, key );
+				else
+					stat[ 1 ][ 3 ]++;
+
+				free( keys[ index ] );
+				free( values[ index ] );
+				keys.erase( keys.begin() + index );
+				values.erase( values.begin() + index );
+
+				stat[ 0 ][ 3 ]++;
+				break;
+			default:
+				break;
+		}
+	}
+	memec.flush();
+
+	// Release allocated memory
+	for ( size_t i = 0, len = keys.size(); i < len; i++ ) {
+		free( keys[ i ] );
+		free( values[ i ] );
+	}
+
+	int width = 25;
+	printf(
+		"---------- Report ----------\n"
+		"%*s : %u / %u\n"
+		"%*s : %u / %u\n"
+		"%*s : %u / %u\n"
+		"%*s : %u / %u\n",
+		width, "Number of SET requests", stat[ 0 ][ 0 ], stat[ 1 ][ 0 ],
+		width, "Number of GET requests", stat[ 0 ][ 1 ], stat[ 1 ][ 1 ],
+		width, "Number of UPDATE requests", stat[ 0 ][ 2 ], stat[ 1 ][ 2 ],
+		width, "Number of DELETE requests", stat[ 0 ][ 3 ], stat[ 1 ][ 3 ]
+	);
+}
+
 int main( int argc, char **argv ) {
 	if ( argc <= 7 ) {
 		fprintf( stderr, "Usage: %s [Key size] [Chunk size] [Batch size] [Master IP] [Master port] [From ID] [To ID]\n", argv[ 0 ] );
@@ -180,7 +275,8 @@ int main( int argc, char **argv ) {
 		printf( "Connected.\n" );
 
 	srand( time( 0 ) );
-	batch( memec, 50000 );
+	// batch( memec, 500000 );
+	// randomWorkload( memec, 50000 );
 	interactive( memec );
 
 	memec.disconnect();

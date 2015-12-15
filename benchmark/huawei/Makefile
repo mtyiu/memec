@@ -1,21 +1,24 @@
 CC=g++
-CFLAGS=-std=c++11 -Wall -O2
-PLIO_SRC_ROOT=.
+CFLAGS=-std=c++11 -Wall -O2 -g
 LIBS=-pthread
-BIN=$(PLIO_SRC_ROOT)/bin/benchmark
+BIN=bin/benchmark bin/test
 
 OBJS= \
 	protocol.o \
-	memec.o \
-	benchmark.o
+	memec.o
 
 LD_LIB= \
 	-lrt
 
 .PHONY: clean
 
-$(BIN): $(OBJS)
-	$(CC) $(CFLAGS) $(LIBS) -o $(BIN) $(OBJS) $(LD_LIB)
+all: bin/case2 bin/test
+
+bin/case2: $(OBJS) case2.cc
+	$(CC) $(CFLAGS) $(LIBS) -o $@ case2.cc $(OBJS) $(LD_LIB)
+
+bin/test: $(OBJS) test.cc
+	$(CC) $(CFLAGS) $(LIBS) -o $@ test.cc $(OBJS) $(LD_LIB)
 
 %.o: %.cc %.hh
 	$(CC) $(CFLAGS) $(INCLUDE) $(LIBS) -c -o $@ $<
