@@ -4,6 +4,7 @@
 #include <cstring>
 #include <arpa/inet.h>
 #include <pthread.h>
+#include <unistd.h>
 #include "memec.hh"
 #include "time.hh"
 
@@ -78,12 +79,17 @@ void *upload( void *argv ) {
 	i = 0;
 	while ( totalSize < config.totalSizePerThread ) {
 		if ( config.testDownload ) {
-			key = keys[ i++ ];
+			key = keys[ i ];
 		} else {
 			getRandomLong( key );
 		}
+		i++;
 		memec->set( key, keySize, value, valueSize );
 		totalSize += keySize + valueSize;
+
+		if ( i % ( 1000 / config.numThreads ) == 0 ) {
+			usleep( 20000 );
+		}
 	}
 	memec->flush();
 

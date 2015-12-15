@@ -14,8 +14,11 @@ LD_LIB= \
 
 all: bin/benchmark bin/window bin/test
 
+# bin/benchmark: $(OBJS) memec_sync.o benchmark.cc
+# 	$(CC) $(CFLAGS) $(LIBS) -o $@ benchmark.cc protocol.o memec_sync.o $(LD_LIB)
+
 bin/benchmark: $(OBJS) benchmark.cc
-	$(CC) $(CFLAGS) $(LIBS) -o $@ benchmark.cc $(OBJS) $(LD_LIB)
+		$(CC) $(CFLAGS) $(LIBS) -o $@ benchmark.cc $(OBJS) $(LD_LIB)
 
 bin/window: $(OBJS) window.cc
 	$(CC) $(CFLAGS) $(LIBS) -o $@ window.cc $(OBJS) $(LD_LIB)
