@@ -179,7 +179,7 @@ bool MemEC::disconnect() {
 		// if ( pending > 0 )
 		// 	this->printPending();
 
-		sleep( 1 );
+		// sleep( 1 );
 	} while ( pending > 0 );
 	return ( ! ::close( this->sockfd ) );
 }

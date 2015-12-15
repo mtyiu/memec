@@ -7,6 +7,8 @@
 #include "memec.hh"
 #include "time.hh"
 
+#define WAIT_ACKS
+
 struct {
 	// Configuration
 	uint8_t keySize;
@@ -130,16 +132,22 @@ void *download( void *argv ) {
 
 	delete[] value;
 
+#ifdef WAIT_ACKS
+	memec->disconnect();
+#endif
+
 	pthread_exit( 0 );
 	return 0;
 }
 
+#ifndef WAIT_ACKS
 void *stop( void *argv ) {
 	MemEC *memec = ( MemEC * ) argv;
 	memec->disconnect();
 	pthread_exit( 0 );
 	return 0;
 }
+#endif
 
 int main( int argc, char **argv ) {
 	if ( argc <= 11 ) {
@@ -236,11 +244,11 @@ int main( int argc, char **argv ) {
 	width = 20;
 	printf(
 		"\n---------- Statistics (upload) ----------\n"
-		"%-*s : %8.3lf\n"
+		"%-*s : %.3lf\n"
 		"%-*s : %lu\n"
-		"%-*s : %8.3lf\n"
-		"%-*s : %8.3lf\n",
-		width, "Elapsed time", elapsedTime,
+		"%-*s : %.3lf\n"
+		"%-*s : %.3lf\n",
+		width, "Elapsed time (s)", elapsedTime,
 		width, "Sent bytes", config.sentBytes,
 		width, "Throughput (IOps)", ( double ) config.sentBytes / config.dataSize / elapsedTime,
 		width, "Throughput (MBps)", ( double ) config.sentBytes / ( 1024 * 1024 ) / elapsedTime
@@ -248,11 +256,13 @@ int main( int argc, char **argv ) {
 
 	printf( "\nCleaning up...\n" );
 	for ( uint32_t i = 0; i < config.numThreads; i++ ) {
+#ifndef WAIT_ACKS
 		pthread_create( tids + i, 0, stop, ( void * ) memecs[ i ] );
 	}
 
 	for ( uint32_t i = 0; i < config.numThreads; i++ ) {
 		pthread_join( tids[ i ], 0 );
+#endif
 		delete memecs[ i ];
 	}
 
@@ -288,11 +298,11 @@ int main( int argc, char **argv ) {
 		width = 20;
 		printf(
 			"\n---------- Statistics (download) ----------\n"
-			"%-*s : %8.3lf\n"
+			"%-*s : %.3lf\n"
 			"%-*s : %lu\n"
-			"%-*s : %8.3lf\n"
-			"%-*s : %8.3lf\n",
-			width, "Elapsed time", elapsedTime,
+			"%-*s : %.3lf\n"
+			"%-*s : %.3lf\n",
+			width, "Elapsed time (s)", elapsedTime,
 			width, "Received bytes", config.recvBytes,
 			width, "Throughput (IOps)", ( double ) config.recvBytes / config.dataSize / elapsedTime,
 			width, "Throughput (MBps)", ( double ) config.recvBytes / ( 1024 * 1024 ) / elapsedTime
@@ -300,11 +310,13 @@ int main( int argc, char **argv ) {
 
 		printf( "\nCleaning up...\n" );
 		for ( uint32_t i = 0; i < config.numThreads; i++ ) {
+#ifndef WAIT_ACKS
 			pthread_create( tids + i, 0, stop, ( void * ) memecs[ i ] );
 		}
 
 		for ( uint32_t i = 0; i < config.numThreads; i++ ) {
 			pthread_join( tids[ i ], 0 );
+#endif
 			delete memecs[ i ];
 
 			for ( uint32_t j = 0; j < config.numItems; j++ )

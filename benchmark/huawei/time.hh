@@ -42,6 +42,13 @@ static inline int clock_gettime( int clk_id, struct timespec *tp ) {
 	elapsed_time; \
 } )
 
+#define get_elapsed_time_in_us(start_time) ( { \
+	struct timespec end_time = get_timer(); \
+	double elapsed_time = ( end_time.tv_sec - start_time.tv_sec ) * 1e6; \
+	elapsed_time += 1.0e-3 * ( end_time.tv_nsec - start_time.tv_nsec ); \
+	elapsed_time; \
+} )
+
 class Timer {
 private:
 	struct itimerspec timer;
