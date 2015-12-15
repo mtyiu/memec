@@ -92,8 +92,12 @@ void *upload( void *argv ) {
 	pthread_mutex_unlock( &config.lock );
 
 	if ( ! config.testDownload )
-		delete key;
-	delete value;
+		delete[] key;
+	delete[] value;
+
+#ifdef WAIT_ACKS
+	memec->disconnect();
+#endif
 
 	pthread_exit( ( void * ) keys );
 	return ( ( void * ) keys );

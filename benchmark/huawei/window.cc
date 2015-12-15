@@ -134,8 +134,8 @@ void *upload( void *argv ) {
 	config.sentBytes += totalSize;
 	pthread_mutex_unlock( &config.lock );
 
-	delete key;
-	delete value;
+	delete[] key;
+	delete[] value;
 
 #ifdef WAIT_ACKS
 	memec->disconnect();
