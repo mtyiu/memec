@@ -88,9 +88,9 @@ void *upload( void *argv ) {
 		memec->set( key, keySize, value, valueSize );
 		totalSize += keySize + valueSize;
 
-		if ( i % ( 1000 / config.numThreads ) == 0 ) {
-			usleep( 20000 );
-		}
+		// if ( i % ( 1000 / config.numThreads ) == 0 ) {
+		// 	usleep( 20000 );
+		// }
 	}
 	memec->flush();
 
