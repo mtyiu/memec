@@ -53,10 +53,6 @@ public:
 		return ret;
 	}
 
-	void interrupt() {
-		this->queue->Interrupt();
-	}
-
 	int count() {
 		return this->queue->GetCount();
 	}

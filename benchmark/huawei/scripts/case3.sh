@@ -1,12 +1,12 @@
 #!/bin/bash
 
 if [ $# != 3 ]; then
-	echo "Usage: $0 [Data size (bytes)] [Total size (GB)] [Number of threads]"
+	echo "Usage: $0 [Data size (bytes)] [Total size (GB)] [Number of clients]"
 	exit 1
 fi
 
 KEY_SIZE=255
-CHUNK_SIZE=4096
+CHUNK_SIZE=40960
 BATCH_SIZE=0
 DATA_SIZE=$1 # in GB
 TOTAL_SIZE=$(expr $2 \* 1073741824) # 250 MB
@@ -14,7 +14,7 @@ CLIENT_ID=0
 NUM_CLIENTS=1
 NUM_THREADS=$3
 MASTER_IP=$(head -n1 scripts/master.conf)
-MASTER_PORT=$(tail -n +2 scripts/master.conf)
+MASTER_PORTS=$(tail -n +2 scripts/master.conf)
 
 echo "Test case #3 Specification:"
 echo "---------------------------"

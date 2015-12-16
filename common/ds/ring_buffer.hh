@@ -57,20 +57,14 @@ public:
 		return 0;
 	}
 
-	void Interrupt() {
-		pthread_cond_signal(&cvEmpty);
-	}
-
 	int Extract(T* data) {
 		pthread_mutex_lock(&mAccess);
-		if ( count == 0 ) {
+		while (count == 0) {
 			if (!blockOnEmpty || !run) {
 				pthread_mutex_unlock(&mAccess);
 				return -1;
 			}
 			pthread_cond_wait(&cvEmpty, &mAccess);
-			if ( count == 0 || ! run )
-				return -1;
 		}
 		memcpy(data, &(buffer[readIndex].data), buffer[readIndex].len);
 		readIndex = nextVal(readIndex);

@@ -218,6 +218,7 @@ int main( int argc, char **argv ) {
 		printf( "%s%u", i == 0 ? "" : "|", ntohs( config.ports[ i ] ) );
 	}
 	printf(
+		"]\n"
 		"%-*s : %u\n"
 		"%-*s : %u\n"
 		"%-*s : %u\n"
@@ -249,6 +250,7 @@ int main( int argc, char **argv ) {
 		pthread_create( tids + i, 0, upload, ( void * ) memecs[ i ] );
 	}
 
+	printf( "Start uploading...\n" );
 	pthread_mutex_lock( &config.lock );
 	while ( config.waiting != config.numThreads )
 		pthread_cond_wait( &config.waitCond, &config.lock );
@@ -303,6 +305,7 @@ int main( int argc, char **argv ) {
 			pthread_create( tids + i, 0, download, ( void * ) dlArgv );
 		}
 
+		printf( "Start downloading...\n" );
 		pthread_mutex_lock( &config.lock );
 		while ( config.waiting != config.numThreads )
 			pthread_cond_wait( &config.waitCond, &config.lock );

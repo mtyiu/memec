@@ -132,13 +132,12 @@ public:
 		if ( this->isMixed ) {
 			MixedEvent mixedEvent;
 			mixedEvent.set( event );
-			if ( this->mixed.count() && LOCK( &this->priority.lock ) == 0 ) {
+			if ( this->mixed->count() && LOCK( &this->priority.lock ) == 0 ) {
 				// Locked
-				if ( ! && this->priority.count < this->priority.capacity ) {
+				if ( this->priority.count < this->priority.capacity ) {
 					this->priority.count++;
 					ret = this->priority.mixed->insert( mixedEvent );
 					UNLOCK( &this->priority.lock );
-					// this->mixed->interrupt();
 					return ret;
 				}
 				UNLOCK( &this->priority.lock );

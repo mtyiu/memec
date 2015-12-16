@@ -164,13 +164,13 @@ bool MemEC::connect() {
 
 bool MemEC::disconnect() {
 	size_t pending;
+	int retryCount = 2;
 
 	do {
 		pending = 0;
 
 		pthread_mutex_lock( &this->pending.setLock );
 		while ( this->pending.set.size() ) {
-			printf( "--- set: %lu ---\n", this->pending.set.size() );
 			pthread_cond_wait( &this->pending.setCond, &this->pending.setLock );
 		}
 		pending += this->pending.set.size();
@@ -178,7 +178,6 @@ bool MemEC::disconnect() {
 
 		pthread_mutex_lock( &this->pending.getLock );
 		while ( this->pending.get.size() ) {
-			printf( "--- get: %lu ---\n", this->pending.get.size() );
 			pthread_cond_wait( &this->pending.getCond, &this->pending.getLock );
 		}
 		pending += this->pending.get.size();
@@ -186,7 +185,6 @@ bool MemEC::disconnect() {
 
 		pthread_mutex_lock( &this->pending.updateLock );
 		while ( this->pending.update.size() ) {
-			printf( "--- update: %lu ---\n", this->pending.update.size() );
 			pthread_cond_wait( &this->pending.updateCond, &this->pending.updateLock
 			);
 		}
@@ -195,15 +193,14 @@ bool MemEC::disconnect() {
 
 		pthread_mutex_lock( &this->pending.delLock );
 		while ( this->pending.del.size() ) {
-			printf( "--- del: %lu ---\n", this->pending.del.size() );
 			pthread_cond_wait( &this->pending.delCond, &this->pending.delLock );
 		}
 		pending += this->pending.del.size();
 		pthread_mutex_unlock( &this->pending.delLock );
 
-		// if ( pending > 0 )
-		// 	this->printPending();
-	} while ( pending > 0 );
+		retryCount--;
+		// this->printPending();
+	} while ( retryCount != 0 || pending > 0 );
 	return ( ! ::close( this->sockfd ) );
 }
 
