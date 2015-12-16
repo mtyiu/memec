@@ -52,6 +52,14 @@ public:
 		ret = this->queue->Extract( &event ) == 0;
 		return ret;
 	}
+
+	void interrupt() {
+		this->queue->Interrupt();
+	}
+
+	int count() {
+		return this->queue->GetCount();
+	}
 };
 
 #endif

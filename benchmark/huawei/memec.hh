@@ -63,6 +63,10 @@ private:
 		pthread_mutex_t getLock;
 		pthread_mutex_t updateLock;
 		pthread_mutex_t delLock;
+		pthread_cond_t setCond;
+		pthread_cond_t getCond;
+		pthread_cond_t updateCond;
+		pthread_cond_t delCond;
 	} pending;
 
 	Protocol protocol;

@@ -10,11 +10,11 @@ CHUNK_SIZE=4096
 BATCH_SIZE=0
 DATA_SIZE=$1
 TOTAL_SIZE=26214400 # 250 MB
-MASTER_IP=$(head -n1 scripts/master.conf)
-MASTER_PORT=$(tail -n1 scripts/master.conf)
 CLIENT_ID=$2
 NUM_CLIENTS=$3
 NUM_THREADS=$4
+MASTER_IP=$(head -n1 scripts/master.conf)
+MASTER_PORT=$(tail -n +2 scripts/master.conf)
 
 if [ ${CLIENT_ID} -ge ${NUM_CLIENTS} ]; then
 	echo "The specified client ID is invalid. It should ranges from [0..$(expr ${NUM_CLIENTS} - 1)]"
@@ -37,9 +37,9 @@ bin/benchmark \
 	${BATCH_SIZE} \
 	${DATA_SIZE} \
 	${TOTAL_SIZE} \
-	${MASTER_IP} \
-	${MASTER_PORT} \
 	${CLIENT_ID} \
 	${NUM_CLIENTS} \
 	${NUM_THREADS} \
-	false
+	false \
+	${MASTER_IP} \
+	${MASTER_PORTS}

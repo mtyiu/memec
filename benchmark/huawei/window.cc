@@ -19,11 +19,12 @@ struct {
 	uint32_t numWindows;
 	uint32_t windowRate;
 	uint32_t itemsPerWindow;
-	uint32_t addr;
-	uint16_t port;
 	uint32_t clientId;
 	uint32_t numClients;
 	uint32_t numThreads;
+	uint32_t addr;
+	uint16_t *ports;
+	int numPorts;
 	// States for upload threads
 	uint32_t numRunning;
 	uint32_t waiting;
@@ -70,13 +71,7 @@ void *window( void *argv ) {
 		config.remaining++;
 		pthread_cond_broadcast( &config.hasItemsCond );
 		pthread_mutex_unlock( &config.lock );
-
-		// if ( i % config.windowRate == 0 ) {
-		// 	printf( "\r[%lf] %u / %u", get_elapsed_time( ts ), i, config.itemsPerWindow );
-		// 	fflush( stdout );
-		// }
 	}
-	// printf( "\r[%lf] %u / %u\n", get_elapsed_time( ts ), config.itemsPerWindow, config.itemsPerWindow );
 	fflush( stdout );
 
 	pthread_mutex_lock( &config.lock );
@@ -156,7 +151,7 @@ void *stop( void *argv ) {
 
 int main( int argc, char **argv ) {
 	if ( argc <= 12 ) {
-		fprintf( stderr, "Usage: %s [Key size] [Chunk size] [Batch size] [Data size] [Number of windows] [Window rate] [Items per window] [Master IP] [Master port] [Client ID] [Total number of clients] [Number of threads]\n", argv[ 0 ] );
+		fprintf( stderr, "Usage: %s [Key size] [Chunk size] [Batch size] [Data size] [Number of windows] [Window rate] [Items per window] [Client ID] [Total number of clients] [Number of threads] [Master IP] [Master port(s)]\n", argv[ 0 ] );
 		return 1;
 	}
 	struct sockaddr_in addr;
@@ -168,13 +163,17 @@ int main( int argc, char **argv ) {
 	config.numWindows = atoi( argv[ 5 ] );
 	config.windowRate = atoi( argv[ 6 ] );
 	config.itemsPerWindow = atoi( argv[ 7 ] );
+	config.clientId = ( uint32_t ) atol( argv[ 8 ] );
+	config.numClients = ( uint32_t ) atol( argv[ 9 ] );
+	config.numThreads = atoi( argv[ 10 ] );
 	memset( &addr, 0, sizeof( addr ) );
-	inet_pton( AF_INET, argv[ 8 ], &( addr.sin_addr ) );
+	inet_pton( AF_INET, argv[ 11 ], &( addr.sin_addr ) );
 	config.addr = addr.sin_addr.s_addr;
-	config.port = htons( atoi( argv[ 9 ] ) );
-	config.clientId = ( uint32_t ) atol( argv[ 10 ] );
-	config.numClients = ( uint32_t ) atol( argv[ 11 ] );
-	config.numThreads = atoi( argv[ 12 ] );
+	config.numPorts = argc - 12;
+	config.ports = new uint16_t[ config.numPorts ];
+	for ( int i = 0; i < config.numPorts; i++ )
+		config.ports[ i ] = htons( atoi( argv[ i + 12 ] ) );
+
 	config.numRunning = config.numWindows;
 	config.waiting = 0;
 	config.sentBytes = 0;
@@ -196,10 +195,7 @@ int main( int argc, char **argv ) {
 		"%-*s : %u\n"
 		"%-*s : %u\n"
 		"%-*s : %u\n"
-		"%-*s : %s:%u\n"
-		"%-*s : %u\n"
-		"%-*s : %u\n"
-		"%-*s : %u\n",
+		"%-*s : %s:[",
 		width, "Key Size", config.keySize,
 		width, "Chunk Size", config.chunkSize,
 		width, "Batch Size", config.batchSize,
@@ -207,7 +203,16 @@ int main( int argc, char **argv ) {
 		width, "Number of windows", config.numWindows,
 		width, "Window rate", config.windowRate,
 		width, "Items per window", config.itemsPerWindow,
-		width, "Master", ipStr, ntohs( config.port ),
+		width, "Master", ipStr
+	);
+	for ( int i = 0; i < config.numPorts; i++ ) {
+		printf( "%s%u", i == 0 ? "" : "|", ntohs( config.ports[ i ] ) );
+	}
+	printf(
+		"]\n"
+		"%-*s : %u\n"
+		"%-*s : %u\n"
+		"%-*s : %u\n",
 		width, "Client ID", config.clientId,
 		width, "Number of clients", config.numClients,
 		width, "Number of threads", config.numThreads
@@ -229,7 +234,7 @@ int main( int argc, char **argv ) {
 	for ( uint32_t i = 0; i < config.numThreads; i++ ) {
 		memecs[ i ] = new MemEC(
 			config.keySize, config.chunkSize, config.batchSize,
-			config.addr, config.port,
+			config.addr, config.ports[ i % config.numPorts ],
 			fromId + ( ( toId - fromId ) / config.numThreads * i ),
 			fromId + ( ( toId - fromId ) / config.numThreads * ( i + 1 ) - 1 )
 		);
@@ -245,7 +250,10 @@ int main( int argc, char **argv ) {
 	pthread_mutex_unlock( &config.lock );
 
 	for ( uint32_t i = 0; i < config.numThreads + config.numWindows; i++ ) {
+		printf( "Joining #%u...", i );
+		fflush( stdout );
 		pthread_join( tids[ i ], 0 );
+		printf( "Done.\n" );
 	}
 	elapsedTime = get_elapsed_time( config.ts );
 
@@ -274,6 +282,7 @@ int main( int argc, char **argv ) {
 		delete memecs[ i ];
 	}
 
+	delete[] config.ports;
 	delete[] memecs;
 	delete[] tids;
 

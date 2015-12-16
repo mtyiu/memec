@@ -233,7 +233,7 @@ void randomWorkload( MemEC &memec, size_t count, uint8_t keySize = 12, uint32_t 
 
 int main( int argc, char **argv ) {
 	if ( argc <= 7 ) {
-		fprintf( stderr, "Usage: %s [Key size] [Chunk size] [Batch size] [Master IP] [Master port] [From ID] [To ID]\n", argv[ 0 ] );
+		fprintf( stderr, "Usage: %s [Key size] [Chunk size] [Batch size] [From ID] [To ID] [Master IP] [Master port]\n", argv[ 0 ] );
 		return 1;
 	}
 	struct sockaddr_in addr;
@@ -241,12 +241,12 @@ int main( int argc, char **argv ) {
 	config.keySize = atoi( argv[ 1 ] );
 	config.chunkSize = atoi( argv[ 2 ] );
 	config.batchSize = atoi( argv[ 3 ] );
+	config.fromId = ( uint32_t ) atol( argv[ 4 ] );
+	config.toId = ( uint32_t ) atol( argv[ 5 ] );
 	memset( &addr, 0, sizeof( addr ) );
-	inet_pton( AF_INET, argv[ 4 ], &( addr.sin_addr ) );
+	inet_pton( AF_INET, argv[ 6 ], &( addr.sin_addr ) );
 	config.addr = addr.sin_addr.s_addr;
-	config.port = htons( atoi( argv[ 5 ] ) );
-	config.fromId = ( uint32_t ) atol( argv[ 6 ] );
-	config.toId = ( uint32_t ) atol( argv[ 7 ] );
+	config.port = htons( atoi( argv[ 7 ] ) );
 
 	int width = 10;
 	char ipStr[ 16 ];

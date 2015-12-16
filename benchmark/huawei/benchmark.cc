@@ -17,13 +17,14 @@ struct {
 	uint32_t batchSize;
 	uint32_t dataSize;
 	uint64_t totalSize;
-	uint32_t addr;
-	uint16_t port;
 	uint32_t clientId;
 	uint32_t numClients;
 	uint32_t numThreads;
 	uint32_t numItems;
 	bool testDownload;
+	uint32_t addr;
+	uint16_t *ports;
+	int numPorts;
 	// States
 	uint64_t totalSizePerThread;
 	uint32_t waiting;
@@ -161,7 +162,7 @@ void *stop( void *argv ) {
 
 int main( int argc, char **argv ) {
 	if ( argc <= 11 ) {
-		fprintf( stderr, "Usage: %s [Key size] [Chunk size] [Batch size] [Data size] [Total size] [Master IP] [Master port] [Client ID] [Total number of clients] [Test download (true|false)?]\n", argv[ 0 ] );
+		fprintf( stderr, "Usage: %s [Key size] [Chunk size] [Batch size] [Data size] [Total size] [Client ID] [Total number of clients] [Number of threads] [Test download (true|false)?] [Master IP] [Master port(s)]\n", argv[ 0 ] );
 		return 1;
 	}
 	struct sockaddr_in addr;
@@ -171,14 +172,18 @@ int main( int argc, char **argv ) {
 	config.batchSize = atoi( argv[ 3 ] );
 	config.dataSize = atoi( argv[ 4 ] );
 	config.totalSize = ( uint64_t ) atol( argv[ 5 ] );
+	config.clientId = ( uint32_t ) atol( argv[ 6 ] );
+	config.numClients = ( uint32_t ) atol( argv[ 7 ] );
+	config.numThreads = atoi( argv[ 8 ] );
+	config.testDownload = ( strcmp( argv[ 9 ], "true" ) == 0 );
 	memset( &addr, 0, sizeof( addr ) );
-	inet_pton( AF_INET, argv[ 6 ], &( addr.sin_addr ) );
+	inet_pton( AF_INET, argv[ 10 ], &( addr.sin_addr ) );
 	config.addr = addr.sin_addr.s_addr;
-	config.port = htons( atoi( argv[ 7 ] ) );
-	config.clientId = ( uint32_t ) atol( argv[ 8 ] );
-	config.numClients = ( uint32_t ) atol( argv[ 9 ] );
-	config.numThreads = atoi( argv[ 10 ] );
-	config.testDownload = ( strcmp( argv[ 11 ], "true" ) == 0 );
+	config.numPorts = argc - 11;
+	config.ports = new uint16_t[ config.numPorts ];
+	for ( int i = 0; i < config.numPorts; i++ )
+		config.ports[ i ] = htons( atoi( argv[ i + 11 ] ) );
+
 	config.totalSizePerThread = config.totalSize / config.numThreads;
 	config.waiting = 0;
 	config.sentBytes = 0;
@@ -201,17 +206,22 @@ int main( int argc, char **argv ) {
 		"%-*s : %u\n"
 		"%-*s : %u\n"
 		"%-*s : %lu\n"
-		"%-*s : %s:%u\n"
-		"%-*s : %u\n"
-		"%-*s : %u\n"
-		"%-*s : %u\n"
-		"%-*s : %s\n",
+		"%-*s : %s:[",
 		width, "Key Size", config.keySize,
 		width, "Chunk Size", config.chunkSize,
 		width, "Batch Size", config.batchSize,
 		width, "Data Size", config.dataSize,
 		width, "Total Size", config.totalSize,
-		width, "Master", ipStr, ntohs( config.port ),
+		width, "Master", ipStr
+	);
+	for ( int i = 0; i < config.numPorts; i++ ) {
+		printf( "%s%u", i == 0 ? "" : "|", ntohs( config.ports[ i ] ) );
+	}
+	printf(
+		"%-*s : %u\n"
+		"%-*s : %u\n"
+		"%-*s : %u\n"
+		"%-*s : %s\n",
 		width, "Client ID", config.clientId,
 		width, "Number of clients", config.numClients,
 		width, "Number of threads", config.numThreads,
@@ -231,7 +241,7 @@ int main( int argc, char **argv ) {
 	for ( uint32_t i = 0; i < config.numThreads; i++ ) {
 		memecs[ i ] = new MemEC(
 			config.keySize, config.chunkSize, config.batchSize,
-			config.addr, config.port,
+			config.addr, config.ports[ i % config.numPorts ],
 			fromId + ( ( toId - fromId ) / config.numThreads * i ),
 			fromId + ( ( toId - fromId ) / config.numThreads * ( i + 1 ) - 1 )
 		);
@@ -282,7 +292,7 @@ int main( int argc, char **argv ) {
 		for ( uint32_t i = 0; i < config.numThreads; i++ ) {
 			memecs[ i ] = new MemEC(
 				config.keySize, config.chunkSize, config.batchSize,
-				config.addr, config.port,
+				config.addr, config.ports[ i % config.numPorts ],
 				fromId + ( ( toId - fromId ) / config.numThreads * i ),
 				fromId + ( ( toId - fromId ) / config.numThreads * ( i + 1 ) - 1 )
 			);

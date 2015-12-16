@@ -114,7 +114,8 @@ public:
 		if ( this->isMixed ) { \
 			MixedEvent mixedEvent; \
 			mixedEvent.set( event ); \
-			return this->mixed->insert( mixedEvent ); \
+			bool ret = this->mixed->insert( mixedEvent ); \
+			return ret; \
 		} else { \
 			return this->separated._EVENT_QUEUE_->insert( event ); \
 		} \
@@ -127,22 +128,25 @@ public:
 #undef MASTER_EVENT_QUEUE_INSERT
 
 	bool prioritizedInsert( SlaveEvent &event ) {
+		bool ret;
 		if ( this->isMixed ) {
 			MixedEvent mixedEvent;
 			mixedEvent.set( event );
-			if ( LOCK( &this->priority.lock ) == 0 ) {
+			if ( this->mixed.count() && LOCK( &this->priority.lock ) == 0 ) {
 				// Locked
-				if ( this->priority.count < this->priority.capacity ) {
+				if ( ! && this->priority.count < this->priority.capacity ) {
 					this->priority.count++;
-					bool ret = this->priority.mixed->insert( mixedEvent );
+					ret = this->priority.mixed->insert( mixedEvent );
 					UNLOCK( &this->priority.lock );
+					// this->mixed->interrupt();
 					return ret;
-				} else {
-					UNLOCK( &this->priority.lock );
-					return this->mixed->insert( mixedEvent );
 				}
+				UNLOCK( &this->priority.lock );
+				ret = this->mixed->insert( mixedEvent );
+				return ret;
 			} else {
-				return this->mixed->insert( mixedEvent );
+				ret = this->mixed->insert( mixedEvent );
+				return ret;
 			}
 		} else {
 			return this->separated.slave->insert( event );

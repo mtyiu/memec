@@ -12,11 +12,11 @@ DATA_SIZE=512
 NUM_WINDOWS=$2
 WINDOW_RATE=$3
 ITEMS_PER_WINDOW=$4
-MASTER_IP=$(head -n1 scripts/master.conf)
-MASTER_PORT=$(tail -n1 scripts/master.conf)
 CLIENT_ID=0
 NUM_CLIENTS=1
 NUM_THREADS=$5
+MASTER_IP=$(head -n1 scripts/master.conf)
+MASTER_PORTS=$(tail -n +2 scripts/master.conf)
 
 if [ ${CLIENT_ID} -ge ${NUM_CLIENTS} ]; then
 	echo "The specified client ID is invalid. It should ranges from [0..$(expr ${NUM_CLIENTS} - 1)]"
@@ -41,8 +41,8 @@ bin/window \
 	${NUM_WINDOWS} \
 	${WINDOW_RATE} \
 	${ITEMS_PER_WINDOW} \
-	${MASTER_IP} \
-	${MASTER_PORT} \
 	${CLIENT_ID} \
 	${NUM_CLIENTS} \
-	${NUM_THREADS}
+	${NUM_THREADS} \
+	${MASTER_IP} \
+	${MASTER_PORTS}

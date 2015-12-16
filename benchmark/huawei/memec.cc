@@ -107,6 +107,11 @@ MemEC::MemEC( uint8_t keySize, uint32_t chunkSize, uint32_t batchSize, uint32_t 
 	pthread_mutex_init( &this->pending.getLock, 0 );
 	pthread_mutex_init( &this->pending.updateLock, 0 );
 	pthread_mutex_init( &this->pending.delLock, 0 );
+	// Initialize condition
+	pthread_cond_init( &this->pending.setCond, 0 );
+	pthread_cond_init( &this->pending.getCond, 0 );
+	pthread_cond_init( &this->pending.updateCond, 0 );
+	pthread_cond_init( &this->pending.delCond, 0 );
 }
 
 MemEC::~MemEC() {
@@ -161,25 +166,43 @@ bool MemEC::disconnect() {
 	size_t pending;
 
 	do {
+		pending = 0;
+
 		pthread_mutex_lock( &this->pending.setLock );
-		pthread_mutex_lock( &this->pending.getLock );
-		pthread_mutex_lock( &this->pending.updateLock );
-		pthread_mutex_lock( &this->pending.delLock );
-
-		pending = this->pending.set.size() +
-		          this->pending.get.size() +
-		          this->pending.update.size() +
-		          this->pending.del.size();
-
-		pthread_mutex_unlock( &this->pending.delLock );
-		pthread_mutex_unlock( &this->pending.updateLock );
-		pthread_mutex_unlock( &this->pending.getLock );
+		while ( this->pending.set.size() ) {
+			printf( "--- set: %lu ---\n", this->pending.set.size() );
+			pthread_cond_wait( &this->pending.setCond, &this->pending.setLock );
+		}
+		pending += this->pending.set.size();
 		pthread_mutex_unlock( &this->pending.setLock );
+
+		pthread_mutex_lock( &this->pending.getLock );
+		while ( this->pending.get.size() ) {
+			printf( "--- get: %lu ---\n", this->pending.get.size() );
+			pthread_cond_wait( &this->pending.getCond, &this->pending.getLock );
+		}
+		pending += this->pending.get.size();
+		pthread_mutex_unlock( &this->pending.getLock );
+
+		pthread_mutex_lock( &this->pending.updateLock );
+		while ( this->pending.update.size() ) {
+			printf( "--- update: %lu ---\n", this->pending.update.size() );
+			pthread_cond_wait( &this->pending.updateCond, &this->pending.updateLock
+			);
+		}
+		pending += this->pending.update.size();
+		pthread_mutex_unlock( &this->pending.updateLock );
+
+		pthread_mutex_lock( &this->pending.delLock );
+		while ( this->pending.del.size() ) {
+			printf( "--- del: %lu ---\n", this->pending.del.size() );
+			pthread_cond_wait( &this->pending.delCond, &this->pending.delLock );
+		}
+		pending += this->pending.del.size();
+		pthread_mutex_unlock( &this->pending.delLock );
 
 		// if ( pending > 0 )
 		// 	this->printPending();
-
-		// sleep( 1 );
 	} while ( pending > 0 );
 	return ( ! ::close( this->sockfd ) );
 }
@@ -229,6 +252,8 @@ bool MemEC::get( char *key, uint8_t keySize, char *&value, uint32_t &valueSize )
 
 	pthread_mutex_lock( &this->pending.getLock );
 	this->pending.get.erase( id );
+	if ( this->pending.get.size() == 0 )
+		pthread_cond_signal( &this->pending.getCond );
 	pthread_mutex_unlock( &this->pending.getLock );
 
 	return ( value != 0 && valueSize != 0 );
@@ -420,6 +445,8 @@ void MemEC::recvThread() {
 							fprintf( stderr, "MemEC::recvThread(): Cannot find a pending SET request that matches the response. The message will be discarded.\n" );
 						} else {
 							this->pending.set.erase( it );
+							if ( this->pending.set.size() == 0 )
+								pthread_cond_signal( &this->pending.setCond );
 						}
 						pthread_mutex_unlock( &this->pending.setLock );
 					}
@@ -440,6 +467,8 @@ void MemEC::recvThread() {
 							fprintf( stderr, "MemEC::recvThread(): Cannot find a pending SET request that matches the response. The message will be discarded.\n" );
 						} else {
 							this->pending.update.erase( it );
+							if ( this->pending.update.size() == 0 )
+								pthread_cond_signal( &this->pending.updateCond );
 						}
 						pthread_mutex_unlock( &this->pending.updateLock );
 					}
@@ -460,6 +489,8 @@ void MemEC::recvThread() {
 							fprintf( stderr, "MemEC::recvThread(): Cannot find a pending SET request that matches the response. The message will be discarded.\n" );
 						} else {
 							this->pending.del.erase( it );
+							if ( this->pending.del.size() == 0 )
+								pthread_cond_signal( &this->pending.delCond );
 						}
 						pthread_mutex_unlock( &this->pending.delLock );
 					}

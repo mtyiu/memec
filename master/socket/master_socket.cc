@@ -162,7 +162,7 @@ bool MasterSocket::handler( int fd, uint32_t events, void *data ) {
 			} else if ( slaveSocket ) {
 				SlaveEvent event;
 				event.pending( slaveSocket );
-				master->eventQueue.insert( event );
+				master->eventQueue.prioritizedInsert( event );
 			} else {
 				__ERROR__( "MasterSocket", "handler", "Unknown socket." );
 				return false;
