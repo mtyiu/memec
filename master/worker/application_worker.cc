@@ -185,9 +185,9 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 	for ( uint32_t i = 0; i < 1 + MasterWorker::parityChunkCount; i++ ) {
 		Master *master = Master::getInstance();
 		if ( i == 0 )
-			remapped |= master->remapMsgHandler.useRemappingFlow( socket->getAddr() );
+			remapped |= master->remapMsgHandler.useCoordinatedFlow( socket->getAddr() );
 		else {
-			remapped |= master->remapMsgHandler.useRemappingFlow( this->paritySlaveSockets[ i - 1 ]->getAddr() );
+			remapped |= master->remapMsgHandler.useCoordinatedFlow( this->paritySlaveSockets[ i - 1 ]->getAddr() );
 		}
 	}
 	remapped &= ( ! MasterWorker::disableRemappingSet );

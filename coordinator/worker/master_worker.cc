@@ -61,11 +61,11 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 			isSend = false;
 			if ( event.message.remap.slaves == NULL || ! Coordinator::getInstance()->remapMsgHandler )
 				break;
-			// just trigger / stop the remap phase, no message need to be handled
+			// just trigger the handling of transition, no message need to be handled
 			if ( event.message.remap.toRemap ) {
-				coordinator->remapMsgHandler->startRemap( event.message.remap.slaves ); // Phase 1 --> 2
+				coordinator->remapMsgHandler->transitToDegraded( event.message.remap.slaves ); // Phase 1a --> 2
 			} else {
-				coordinator->remapMsgHandler->stopRemap( event.message.remap.slaves );
+				coordinator->remapMsgHandler->transitToNormal( event.message.remap.slaves ); // Phase 1b --> 0
 			}
 			// free the vector of slaves
 			delete event.message.remap.slaves;

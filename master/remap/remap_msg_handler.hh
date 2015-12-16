@@ -13,17 +13,19 @@ private:
 	pthread_t acker;
 	LOCK_T aliveSlavesLock;
 
-	void setStatus( char* msg, int len );
+	uint32_t bgAckInterval;
+
+	void setState( char* msg, int len );
 
 	// threaded background process
 	static void *readMessages( void *argv );
 	static void *ackRemapLoop( void *argv );
 
 	/* return if master need to ack coordinator for slave */
-	bool checkAckRemapForSlave( struct sockaddr_in slave ); 
+	bool checkAckForSlave( struct sockaddr_in slave ); 
 
-	bool sendStatusToCoordinator( std::vector<struct sockaddr_in> slaves );
-	bool sendStatusToCoordinator( struct sockaddr_in slave );
+	bool sendStateToCoordinator( std::vector<struct sockaddr_in> slaves );
+	bool sendStateToCoordinator( struct sockaddr_in slave );
 	
 public:
 
@@ -39,7 +41,7 @@ public:
 	bool addAliveSlave( struct sockaddr_in slave );
 	bool removeAliveSlave( struct sockaddr_in slave );
 
-	bool useRemappingFlow( struct sockaddr_in slave );
+	bool useCoordinatedFlow( struct sockaddr_in slave );
 	bool allowRemapping( struct sockaddr_in slave );
 
 	// ack specific slave if necessary, 

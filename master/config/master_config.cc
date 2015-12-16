@@ -13,6 +13,7 @@ MasterConfig::MasterConfig() {
 	this->loadingStats.updateInterval = 30;
 	this->remap.disableRemappingSet = false;
 	this->remap.forceNoCacheRecords = false;
+	this->remap.backgroundAck = 0;
 	this->degraded.isFixed = true;
 	this->degraded.disabled = false;
 }
@@ -110,6 +111,8 @@ bool MasterConfig::set( const char *section, const char *name, const char *value
 			this->remap.disableRemappingSet = ! match( value, "false" );
 		else if ( match ( name, "force_no_record_cache_search" ) )
 			this->remap.forceNoCacheRecords = ! match( value, "false" );
+		else if ( match ( name, "background_ack" ) )
+			this->remap.backgroundAck= atoi( value );
 		else
 			return false;
 	} else if ( match( section, "degraded" ) ) {

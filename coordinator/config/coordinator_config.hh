@@ -47,6 +47,10 @@ public:
 	struct {
 		uint32_t packets;
 	} pool;
+	struct {
+		uint8_t worker;
+		uint16_t queue;
+	} remap;
 
 	bool merge( GlobalConfig &globalConfig );
 	bool parse( const char *path );

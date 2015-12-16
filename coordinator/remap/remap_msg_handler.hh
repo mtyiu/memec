@@ -7,13 +7,13 @@
 #include <map>
 #include <vector>
 #include "remap_worker.hh"
-#include "../event/remap_status_event.hh"
+#include "../event/remap_state_event.hh"
 #include "../../common/ds/sockaddr_in.hh"
 #include "../../common/event/event_queue.hh"
 #include "../../common/event/event_type.hh"
 #include "../../common/lock/lock.hh"
 #include "../../common/remap/remap_msg_handler.hh"
-#include "../../common/remap/remap_status.hh"
+#include "../../common/remap/remap_state.hh"
 #include "../../common/remap/remap_group.hh"
 
 class CoordinatorRemapMsgHandler : public RemapMsgHandler {
@@ -42,15 +42,15 @@ private:
 	bool isMasterJoin( int service, char *msg, char *subject );
 
 	static void *readMessages( void *argv );
-	bool updateStatus( char *subject, char *msg, int len );
+	bool updateState( char *subject, char *msg, int len );
 
 	void addAliveMaster( char *name );
 	void removeAliveMaster( char *name );
 
-	bool insertRepeatedEvents ( RemapStatusEvent event, std::vector<struct sockaddr_in> *slaves );
+	bool insertRepeatedEvents ( RemapStateEvent event, std::vector<struct sockaddr_in> *slaves );
 
 public:
-	EventQueue<RemapStatusEvent> *eventQueue;
+	EventQueue<RemapStateEvent> *eventQueue;
 	std::map<struct sockaddr_in, pthread_cond_t> ackSignal;
 	pthread_mutex_t ackSignalLock; // dummy lock for pthread_cond_wait()
 
@@ -68,17 +68,17 @@ public:
 	void* read( void * );
 
 	// batch start and stop (to trigger individual remap)
-	bool startRemap( std::vector<struct sockaddr_in> *slaves );
-	bool stopRemap( std::vector<struct sockaddr_in> *slaves );
+	bool transitToDegraded( std::vector<struct sockaddr_in> *slaves );
+	bool transitToNormal( std::vector<struct sockaddr_in> *slaves );
 
-	bool startRemapEnd( const struct sockaddr_in &slave );
-	bool stopRemapEnd( const struct sockaddr_in &slave );
+	bool transitToDegradedEnd( const struct sockaddr_in &slave );
+	bool transitToNormalEnd( const struct sockaddr_in &slave );
 
 	bool resetMasterAck( struct sockaddr_in slave );
 	bool isAllMasterAcked( struct sockaddr_in slave );
 
-	bool sendStatusToMasters( std::vector<struct sockaddr_in> &slaves );
-	bool sendStatusToMasters( struct sockaddr_in slave );
+	bool sendStateToMasters( std::vector<struct sockaddr_in> &slaves );
+	bool sendStateToMasters( struct sockaddr_in slave );
 
 	// keep trace of the alive slaves 
 	bool addAliveSlave( struct sockaddr_in slave );

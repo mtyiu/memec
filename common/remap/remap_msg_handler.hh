@@ -8,7 +8,7 @@
 #include <sys/types.h>
 #include <pthread.h>
 #include <sp.h>
-#include "remap_status.hh"
+#include "remap_state.hh"
 #include "../lock/lock.hh"
 #include "../ds/sockaddr_in.hh"
 
@@ -31,10 +31,10 @@ protected:
 
 	bool isConnected;
 
-	const static uint32_t slaveStatusRecordSize = 4 + 2 + 1; // sizeof( IP, port, status ) = 7
+	const static uint32_t slaveStateRecordSize = 4 + 2 + 1; // sizeof( IP, port, state ) = 7
 
-	// send a vector of slave status
-	bool sendStatus ( std::vector<struct sockaddr_in> &slaves, const char *targetGroup );
+	// send a vector of slave state
+	bool sendState ( std::vector<struct sockaddr_in> &slaves, const char *targetGroup );
 
 	inline void increMsgCount() {
 		this->msgCount++;
@@ -58,8 +58,8 @@ protected:
 	}
 
 public:
-	std::map<struct sockaddr_in, RemapStatus> slavesStatus;
-	std::map<struct sockaddr_in, LOCK_T> slavesStatusLock;
+	std::map<struct sockaddr_in, RemapState> slavesState;
+	std::map<struct sockaddr_in, LOCK_T> slavesStateLock;
 
 	RemapMsgHandler();
 	virtual ~RemapMsgHandler();
@@ -68,11 +68,11 @@ public:
 		return this->isConnected;
 	}
 
-	inline RemapStatus getStatus( struct sockaddr_in slave ) {
-		RemapStatus status = REMAP_UNDEFINED;
-		if ( this->slavesStatus.count( slave ) )
-			status = this->slavesStatus[ slave ];
-		return status;
+	inline RemapState getState( struct sockaddr_in slave ) {
+		RemapState state = REMAP_UNDEFINED;
+		if ( this->slavesState.count( slave ) )
+			state = this->slavesState[ slave ];
+		return state;
 	}
 
 	bool init( const char *spread = NULL, const char *user = NULL );
@@ -87,24 +87,24 @@ public:
 	virtual bool removeAliveSlave( struct sockaddr_in slave ) = 0;
 
 	bool isRemapStarted( const struct sockaddr_in slave ) {
-		if ( this->slavesStatus.count( slave ) == 0 ) 
+		if ( this->slavesState.count( slave ) == 0 ) 
 			return false;
-		switch ( this->slavesStatus[ slave ] ) {
-			case REMAP_PREPARE_START:
-			case REMAP_START:
-			case REMAP_PREPARE_END:
+		switch ( this->slavesState[ slave ] ) {
+			case REMAP_INTERMEDIATE:
+			case REMAP_COORDINATED:
+			case REMAP_DEGRADED:
 				return true;
 			default:
 				return false;
 		}
 		return false;
 	}
+
 	bool isRemapStopped( const struct sockaddr_in slave ) {
-		if ( this->slavesStatus.count( slave ) == 0 ) 
+		if ( this->slavesState.count( slave ) == 0 ) 
 			return false;
-		switch ( this->slavesStatus[ slave ] ) {
-			case REMAP_NONE:
-			case REMAP_END:
+		switch ( this->slavesState[ slave ] ) {
+			case REMAP_NORMAL:
 			case REMAP_UNDEFINED:
 				return true;
 			default:
