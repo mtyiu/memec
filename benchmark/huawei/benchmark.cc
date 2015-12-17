@@ -137,9 +137,11 @@ void *download( void *argv ) {
 	}
 	memec->flush();
 
+#ifdef WAIT_GET_RESPONSE
 	pthread_mutex_lock( &config.lock );
 	config.recvBytes += totalSize;
 	pthread_mutex_unlock( &config.lock );
+#endif
 
 	delete[] value;
 
@@ -298,6 +300,7 @@ int main( int argc, char **argv ) {
 				fromId + ( ( toId - fromId ) / config.numThreads * i ),
 				fromId + ( ( toId - fromId ) / config.numThreads * ( i + 1 ) - 1 )
 			);
+			memecs[ i ]->setRecvBytesVar( &config.lock, &config.recvBytes );
 			memecs[ i ]->connect();
 			void **dlArgv = ( void ** ) malloc( sizeof( void * ) * 2 );
 			dlArgv[ 0 ] = ( void * ) memecs[ i ];

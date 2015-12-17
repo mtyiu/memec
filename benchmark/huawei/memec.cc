@@ -3,7 +3,8 @@
 #include <cerrno>
 #include <cstring>
 #include <unistd.h>
-
+#include <sys/syscall.h>
+#include <sys/types.h>
 #include "memec.hh"
 
 size_t MemEC::read( size_t len, bool &connected ) {
@@ -221,6 +222,7 @@ bool MemEC::get( char *key, uint8_t keySize, char *&value, uint32_t &valueSize )
 	this->buffer.send.len += size;
 
 	// Add to pending map for GET
+#ifdef WAIT_GET_RESPONSE
 	pthread_mutex_t lock;
 	pthread_cond_t cond;
 	bool completed = false;
@@ -228,6 +230,7 @@ bool MemEC::get( char *key, uint8_t keySize, char *&value, uint32_t &valueSize )
 	pthread_cond_init( &cond, 0 );
 	value = 0;
 	valueSize = 0;
+
 	struct GetResponse getResponse = {
 		.lock = &lock,
 		.cond = &cond,
@@ -254,6 +257,13 @@ bool MemEC::get( char *key, uint8_t keySize, char *&value, uint32_t &valueSize )
 	pthread_mutex_unlock( &this->pending.getLock );
 
 	return ( value != 0 && valueSize != 0 );
+#else
+	pthread_mutex_lock( &this->pending.getLock );
+	this->pending.get.insert( id );
+	pthread_mutex_unlock( &this->pending.getLock );
+
+	return this->batchSize > 0 ? true : this->write() >= 0;
+#endif
 }
 
 bool MemEC::set( char *key, uint8_t keySize, char *value, uint32_t valueSize ) {
@@ -345,8 +355,6 @@ void MemEC::recvThread() {
 			break;
 
 		recvBytes = this->buffer.recv.len;
-
-		common.opcode = 0;
 		ptr = 0;
 		while ( recvBytes - ptr > 0 ) {
 			if ( common.opcode == 0 ) {
@@ -357,6 +365,8 @@ void MemEC::recvThread() {
 						recvBytes - ptr
 					);
 					this->buffer.recv.len = recvBytes - ptr;
+					ptr = 0;
+					common.opcode = 0;
 					break;
 				}
 
@@ -365,8 +375,10 @@ void MemEC::recvThread() {
 					this->buffer.recv.data + ptr,
 					recvBytes - ptr
 				);
-				if ( ! ret )
+				if ( ! ret ) {
 					fprintf( stderr, "MemEC::recvThread(): Protocol::parseHeader() failed.\n" );
+					exit( 1 );
+				}
 
 				ptr += PROTO_HEADER_SIZE;
 			} else {
@@ -379,13 +391,16 @@ void MemEC::recvThread() {
 						recvBytes - ptr
 					);
 					this->buffer.recv.len = recvBytes - ptr;
+					ptr = 0;
 					break;
 				}
 
 				switch( common.opcode ) {
 					case PROTO_OPCODE_GET:
 					{
+#ifdef WAIT_GET_RESPONSE
 						std::unordered_map<uint32_t, struct GetResponse>::iterator it;
+#endif
 
 						if ( common.magic == PROTO_MAGIC_RESPONSE_SUCCESS ) {
 							ret = this->protocol.parseKeyValueHeader(
@@ -393,8 +408,10 @@ void MemEC::recvThread() {
 								this->buffer.recv.data + ptr,
 								common.length
 							);
-							if ( ! ret )
+							if ( ! ret ) {
 								fprintf( stderr, "MemEC::recvThread(): Protocol::parseKeyValueHeader() failed.\n" );
+								exit( 1 );
+							}
 						} else {
 							ret = this->protocol.parseKeyHeader(
 								header.key,
@@ -411,8 +428,8 @@ void MemEC::recvThread() {
 							fprintf( stderr, "MemEC::recvThread(): Cannot find a pending GET request that matches the response. The message will be discarded.\n" );
 							pthread_mutex_unlock( &this->pending.getLock );
 						} else {
+#ifdef WAIT_GET_RESPONSE
 							pthread_mutex_unlock( &this->pending.getLock );
-
 							struct GetResponse getResponse = it->second;
 							pthread_mutex_lock( getResponse.lock );
 							*getResponse.completed = true;
@@ -423,6 +440,18 @@ void MemEC::recvThread() {
 							}
 							pthread_cond_signal( getResponse.cond );
 							pthread_mutex_unlock( getResponse.lock );
+#else
+							this->pending.get.erase( it );
+
+							pthread_mutex_lock( this->pending.recvBytesLock );
+							*this->pending.recvBytes += header.keyValue.keySize + header.keyValue.valueSize;
+							pthread_mutex_unlock( this->pending.recvBytesLock );
+
+							if ( this->pending.get.size() == 0 )
+								pthread_cond_signal( &this->pending.getCond );
+
+							pthread_mutex_unlock( &this->pending.getLock );
+#endif
 						}
 					}
 						break;
@@ -501,7 +530,7 @@ void MemEC::recvThread() {
 			}
 		}
 
-		if ( this->buffer.recv.len > ptr ) {
+		if ( ptr > 0 && this->buffer.recv.len > ptr ) {
 			memmove(
 				this->buffer.recv.data,
 				this->buffer.recv.data + ptr,
@@ -534,6 +563,11 @@ void MemEC::printPending( FILE *f ) {
 		width, "Number of UPDATE requests", this->pending.update.size(),
 		width, "Number of DELETE requests", this->pending.del.size()
 	);
+}
+
+void MemEC::setRecvBytesVar( pthread_mutex_t *recvBytesLock, uint64_t *recvBytes ) {
+	this->pending.recvBytesLock = recvBytesLock;
+	this->pending.recvBytes = recvBytes;
 }
 
 void *MemEC::recvThread( void *argv ) {

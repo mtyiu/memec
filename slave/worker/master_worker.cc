@@ -48,10 +48,6 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 			uint8_t keySize;
 			uint32_t valueSize;
 			event.message.keyValue.deserialize( key, keySize, value, valueSize );
-			if ( valueSize > 4096 ) {
-				printf( "keySize = %u; valueSize = %u\n", keySize, valueSize );
-				assert( valueSize <= 4096 );
-			}
 			buffer.data = this->protocol.resGet(
 				buffer.size,
 				event.id,
