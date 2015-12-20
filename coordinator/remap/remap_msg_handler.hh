@@ -25,28 +25,32 @@ private:
 
 	~CoordinatorRemapMsgHandler();
 
+	/* set of alive masters connected */
 	std::set<std::string> aliveMasters;
 	LOCK_T mastersLock;
 
-	std::map<struct sockaddr_in, std::set<std::string>* > ackMasters; // slave, set of acked masters
+	/* ack map for each slave, identify by slave addr, and contains the set of acked masters */
+	std::map<struct sockaddr_in, std::set<std::string>* > ackMasters;
 	LOCK_T mastersAckLock;
 	
-	pthread_t reader;
 	bool isListening;
 
 	CoordinatorRemapWorker *workers;
 	std::set<struct sockaddr_in> aliveSlaves;
 	LOCK_T aliveSlavesLock;
 
+	/* handle master join or leave */
 	bool isMasterLeft( int service, char *msg, char *subject );
 	bool isMasterJoin( int service, char *msg, char *subject );
 
 	static void *readMessages( void *argv );
 	bool updateState( char *subject, char *msg, int len );
 
+	/* manage the set of alive masters connected */
 	void addAliveMaster( char *name );
 	void removeAliveMaster( char *name );
 
+	/* insert the same event for one or more slaves */
 	bool insertRepeatedEvents ( RemapStateEvent event, std::vector<struct sockaddr_in> *slaves );
 
 public:
@@ -65,22 +69,22 @@ public:
 	bool start();
 	bool stop();
 
-	void* read( void * );
-
-	// batch start and stop (to trigger individual remap)
+	// batch transit (start)
 	bool transitToDegraded( std::vector<struct sockaddr_in> *slaves );
 	bool transitToNormal( std::vector<struct sockaddr_in> *slaves );
-
+	// clean up before transition ends
 	bool transitToDegradedEnd( const struct sockaddr_in &slave );
 	bool transitToNormalEnd( const struct sockaddr_in &slave );
 
+	// manage master ack
 	bool resetMasterAck( struct sockaddr_in slave );
 	bool isAllMasterAcked( struct sockaddr_in slave );
 
+	// notify master of slaves' state
 	bool sendStateToMasters( std::vector<struct sockaddr_in> &slaves );
 	bool sendStateToMasters( struct sockaddr_in slave );
 
-	// keep trace of the alive slaves 
+	// keep track of the alive slaves 
 	bool addAliveSlave( struct sockaddr_in slave );
 	bool removeAliveSlave( struct sockaddr_in slave );
 

@@ -274,7 +274,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 			__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 
 			MasterWorker::slaveSockets->get( sockfd )->counter.decreaseNormal();
-			Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
+			Master::getInstance()->remapMsgHandler.ackTransit( socket->getAddr() );
 
 			return false;
 		}
@@ -287,13 +287,13 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 			__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 
 			MasterWorker::slaveSockets->get( sockfd )->counter.decreaseNormal();
-			Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
+			Master::getInstance()->remapMsgHandler.ackTransit( socket->getAddr() );
 
 			return false;
 		}
 	}
 
-	Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
+	Master::getInstance()->remapMsgHandler.ackTransit( socket->getAddr() );
 
 	return true;
 }

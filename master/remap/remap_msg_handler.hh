@@ -10,20 +10,24 @@ class MasterRemapMsgHandler : public RemapMsgHandler {
 private:
 	bool isListening;
 
+	/* background thread to check ack condition regularly */
 	pthread_t acker;
-	LOCK_T aliveSlavesLock;
-
 	uint32_t bgAckInterval;
 
+	/* lock on the list of alive slaves connected */
+	LOCK_T aliveSlavesLock;
+
+	/* parse a message and set state of slaves accordingly */
 	void setState( char* msg, int len );
 
 	// threaded background process
 	static void *readMessages( void *argv );
-	static void *ackRemapLoop( void *argv );
+	static void *ackTransitThread( void *argv );
 
 	/* return if master need to ack coordinator for slave */
 	bool checkAckForSlave( struct sockaddr_in slave ); 
 
+	/* send a list of states of slaves */
 	bool sendStateToCoordinator( std::vector<struct sockaddr_in> slaves );
 	bool sendStateToCoordinator( struct sockaddr_in slave );
 	
@@ -46,8 +50,8 @@ public:
 
 	// ack specific slave if necessary, 
 	// empty slave will trigger full search on possible slaves to ack
-	bool ackRemap( struct sockaddr_in *slave = NULL );
-	bool ackRemap( struct sockaddr_in slave );
+	bool ackTransit( struct sockaddr_in *slave = NULL );
+	bool ackTransit( struct sockaddr_in slave );
 };
 
 #endif

@@ -47,7 +47,7 @@ bool MasterRemapMsgHandler::start() {
 		return false;
 	}
 	this->bgAckInterval = Master::getInstance()->config.master.remap.backgroundAck;
-	if ( this->bgAckInterval > 0 && pthread_create( &this->acker, NULL, MasterRemapMsgHandler::ackRemapLoop, this ) < 0 ){
+	if ( this->bgAckInterval > 0 && pthread_create( &this->acker, NULL, MasterRemapMsgHandler::ackTransitThread, this ) < 0 ){
 		__ERROR__( "MasterRemapMsgHandler", "start", "Master FAILED to start background ack. service.\n" );
 	}
 
@@ -92,13 +92,13 @@ void *MasterRemapMsgHandler::readMessages( void *argv ) {
 	return ( void* ) &myself->msgCount;
 }
 
-void *MasterRemapMsgHandler::ackRemapLoop( void *argv ) {
+void *MasterRemapMsgHandler::ackTransitThread( void *argv ) {
 
 	MasterRemapMsgHandler *myself = ( MasterRemapMsgHandler* ) argv;
 	
 	while ( myself->bgAckInterval > 0 && myself->isListening ) {
 		sleep( myself->bgAckInterval );
-		myself->ackRemap();
+		myself->ackTransit();
 	}
 
 	pthread_exit(0);
@@ -154,7 +154,7 @@ void MasterRemapMsgHandler::setState( char* msg , int len ) {
 
 		// check if the change can be immediately acked
 		if ( signal == REMAP_INTERMEDIATE || signal == REMAP_COORDINATED )
-			this->ackRemap( &slave );
+			this->ackTransit( &slave );
 	}
 
 }
@@ -231,11 +231,11 @@ bool MasterRemapMsgHandler::sendStateToCoordinator( struct sockaddr_in slave ) {
 	return sendStateToCoordinator( slaves );
 }
 
-bool MasterRemapMsgHandler::ackRemap( struct sockaddr_in slave ) {
-	return ackRemap( &slave );
+bool MasterRemapMsgHandler::ackTransit( struct sockaddr_in slave ) {
+	return ackTransit( &slave );
 }
 
-bool MasterRemapMsgHandler::ackRemap( struct sockaddr_in *slave ) {
+bool MasterRemapMsgHandler::ackTransit( struct sockaddr_in *slave ) {
 	LOCK( &this->aliveSlavesLock );
 	if ( slave ) {
 		// specific slave
@@ -270,8 +270,9 @@ bool MasterRemapMsgHandler::checkAckForSlave( struct sockaddr_in slave ) {
 	RemapState state = this->slavesState[ slave ];
 
 	if ( ( state == REMAP_NORMAL ) || 
-	     ( state == REMAP_INTERMEDIATE && true /* yet sync all meta */ ) ||
-	     ( state == REMAP_COORDINATED && true /* yet replay all requests */ ) ) {
+	     ( state == REMAP_INTERMEDIATE && normal > 0 /* yet all request go through coordinator */ 
+			&& true /* yet sync all meta */ && true /* yet undo all parity */ ) ||
+	     ( state == REMAP_COORDINATED && true /* yet replay all requests? */ ) ) {
 		UNLOCK( &this->slavesStateLock[ slave ] );
 		return false;
 	}

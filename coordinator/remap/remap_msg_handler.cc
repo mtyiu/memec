@@ -164,13 +164,7 @@ bool CoordinatorRemapMsgHandler::transitToDegraded( std::vector<struct sockaddr_
 
 bool CoordinatorRemapMsgHandler::transitToDegradedEnd( const struct sockaddr_in &slave ) {
 	// all operation to slave get lock from coordinator,
-	// sync metadata before remapping
-	// use volatile to avoid "improper" -O2 optmization
-	volatile bool sync = false;
-	Coordinator::getInstance()->syncSlaveMeta( slave, ( bool * ) &sync );
-	// busy waiting for meta sync to complete
-	while ( sync == false );
-	return false;
+	return true;
 }
 
 bool CoordinatorRemapMsgHandler::transitToNormal( std::vector<struct sockaddr_in> *slaves ) {
@@ -185,23 +179,14 @@ bool CoordinatorRemapMsgHandler::transitToNormal( std::vector<struct sockaddr_in
 
 bool CoordinatorRemapMsgHandler::transitToNormalEnd( const struct sockaddr_in &slave ) {
 	// TODO backward migration before getting back to normal
-	// sync all remapping records back to masters
-	LOCK_T lock;
-	std::map<struct sockaddr_in, uint32_t> count;
-	volatile bool done = false;
-
-	LOCK_INIT( &lock );
-
 	Coordinator *coordinator = Coordinator::getInstance();
-
-	coordinator->syncRemappingRecords( &lock, &count, ( bool * ) &done );
-	while ( ! done );
-
-	done = false;
+	
+	// TO REMOVE?
+	bool done = false;
 	coordinator->releaseDegradedLock( slave, ( bool * ) &done );
 	while( ! done );
 
-	return false;
+	return true;
 }
 
 #undef REMAP_PHASE_CHANGE_HANDLER
