@@ -5,6 +5,7 @@ LIBS=-pthread
 BIN=$(PLIO_SRC_ROOT)/bin/master
 
 OBJS= \
+	backup/backup.o \
 	config/master_config.o \
 	ds/pending.o \
 	event/application_event.o \

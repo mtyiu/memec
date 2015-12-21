@@ -390,7 +390,6 @@ bool SlaveWorker::handleDegradedDeleteRequest( MasterEvent event, char *buf, siz
 		// Key not found
 		event.resDelete(
 			event.socket, event.id, key,
-			false, /* success */
 			false, /* needsFree */
 			true   /* isDegraded */
 		);
@@ -670,7 +669,13 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 							false /* isUpdate */
 						);
 					} else {
-						masterEvent.resDelete( masterSocket, parentId, mykey, false, false, true );
+						masterEvent.resDelete(
+							masterSocket,
+							parentId,
+							mykey,
+							false, // needsFree
+							true   // isDegraded
+						);
 						this->dispatch( masterEvent );
 					}
 					op.data.key.free();

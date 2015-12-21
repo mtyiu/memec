@@ -18,6 +18,7 @@ MemoryPool<Chunk> *SlaveWorker::chunkPool;
 std::vector<MixedChunkBuffer *> *SlaveWorker::chunkBuffer;
 DegradedChunkBuffer *SlaveWorker::degradedChunkBuffer;
 PacketPool *SlaveWorker::packetPool;
+Timestamp *SlaveWorker::timestamp;
 
 void SlaveWorker::dispatch( MixedEvent event ) {
 	switch( event.type ) {
@@ -211,6 +212,7 @@ bool SlaveWorker::init() {
 	SlaveWorker::chunkBuffer = &slave->chunkBuffer;
 	SlaveWorker::degradedChunkBuffer = &slave->degradedChunkBuffer;
 	SlaveWorker::packetPool = &slave->packetPool;
+	SlaveWorker::timestamp = &slave->timestamp;
 	return true;
 }
 

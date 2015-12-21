@@ -21,6 +21,7 @@
 #include "../../common/ds/memory_pool.hh"
 #include "../../common/ds/packet_pool.hh"
 #include "../../common/stripe_list/stripe_list.hh"
+#include "../../common/timestamp/timestamp.hh"
 #include "../../common/worker/worker.hh"
 
 #define SLAVE_WORKER_SEND_REPLICAS_PARALLEL
@@ -59,6 +60,7 @@ private:
 	static std::vector<MixedChunkBuffer *> *chunkBuffer;
 	static DegradedChunkBuffer *degradedChunkBuffer;
 	static PacketPool *packetPool;
+	static Timestamp *timestamp;
 
 	// ---------- worker.cc ----------
 	void dispatch( MixedEvent event );
