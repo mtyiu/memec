@@ -335,13 +335,15 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 
 	packet = MasterWorker::packetPool->malloc();
 	packet->setReferenceCount( 1 );
+	struct sockaddr_in originalDataAddr = this->dataSlaveSockets[ originalChunkId ]->getAddr();
 	this->protocol.reqRemappingSet(
 		s, pid.id,
 		remappingRecord.listId, remappingRecord.chunkId,
 		key.data, key.size,
 		value->data, value->size,
 		packet->data,
-		header.sockfd, false /* ! isParity */
+		header.sockfd, false, /* ! isParity */
+		&originalDataAddr
 	);
 	packet->size = s;
 

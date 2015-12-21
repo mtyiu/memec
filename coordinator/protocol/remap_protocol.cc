@@ -61,7 +61,7 @@ char *CoordinatorProtocol::reqSyncRemappingRecord( size_t &size, uint32_t id, st
 	return buffer;
 }
 
-char *CoordinatorProtocol::reqSyncRemappedParity( size_t &size, uint32_t id, struct sockaddr_in target, char* buffer ) {
+char *CoordinatorProtocol::reqSyncRemappedData( size_t &size, uint32_t id, struct sockaddr_in target, char* buffer ) {
 	// -- common/protocol/address_protocol.cc --
 	if ( ! buffer ) buffer = this->buffer.send;
 	size = this->generateAddressHeader(

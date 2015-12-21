@@ -109,7 +109,7 @@ private:
 	bool handleSealChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 
 	// ---------- remap_worker.cc ----------
-	bool handleRemappedParity( CoordinatorEvent event, char *buf, size_t size );
+	bool handleRemappedData( CoordinatorEvent event, char *buf, size_t size );
 	bool handleRemappingSetRequest( MasterEvent event, char *buf, size_t size );
 	bool handleRemappingSetRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleRemappingSetResponse( SlavePeerEvent event, bool success, char *buf, size_t size );

@@ -47,7 +47,7 @@ public:
 	void reqFlushChunks( SlaveSocket *socket );
 	void reqSyncMeta( SlaveSocket *socket, bool *sync );
 	void reqReleaseDegradedLock( SlaveSocket *socket, bool *done = 0 );
-	void syncRemappedParity( SlaveSocket *socket, Packet *packet );
+	void syncRemappedData( SlaveSocket *socket, Packet *packet );
 	void disconnect( SlaveSocket *socket );
 };
 

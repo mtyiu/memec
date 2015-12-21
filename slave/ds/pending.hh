@@ -189,7 +189,7 @@ private:
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, DegradedOp> *&map );
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, ChunkRequest> *&map );
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, ChunkUpdate> *&map );
-	bool get( PendingType type, LOCK_T *&lock, std::map<struct sockaddr_in, std::set<PendingData>* > *&map );
+	bool get( PendingType type, LOCK_T *&lock, std::unordered_map<struct sockaddr_in, std::set<PendingData>* > *&map );
 
 public:
 	struct {
@@ -220,7 +220,7 @@ public:
 		std::unordered_multimap<PendingIdentifier, ChunkRequest> setChunk;
 		std::unordered_multimap<PendingIdentifier, ChunkUpdate> updateChunk;
 		std::unordered_multimap<PendingIdentifier, ChunkUpdate> deleteChunk;
-		std::map<struct sockaddr_in, std::set<PendingData>* > remappedData;
+		std::unordered_map<struct sockaddr_in, std::set<PendingData>* > remappedData;
 		std::unordered_map<PendingIdentifier, uint32_t> remappedDataRequest;
 		LOCK_T degradedOpsLock;
 		LOCK_T remappingSetLock;

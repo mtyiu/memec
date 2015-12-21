@@ -178,13 +178,18 @@ bool CoordinatorRemapMsgHandler::transitToNormal( std::vector<struct sockaddr_in
 }
 
 bool CoordinatorRemapMsgHandler::transitToNormalEnd( const struct sockaddr_in &slave ) {
-	// TODO backward migration before getting back to normal
+	// backward migration before getting back to normal
 	Coordinator *coordinator = Coordinator::getInstance();
 	
+	// REMAP SET
+	coordinator->syncRemappedData( slave );
+
+	// TODO DEGRADED
+
 	// TO REMOVE?
-	bool done = false;
-	coordinator->releaseDegradedLock( slave, ( bool * ) &done );
-	while( ! done );
+	//bool done = false;
+	//coordinator->releaseDegradedLock( slave, ( bool * ) &done );
+	//while( ! done );
 
 	return true;
 }

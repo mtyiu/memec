@@ -10,7 +10,7 @@ bool SlaveWorker::handleSetResponse( SlavePeerEvent event, bool success, char *b
 		Slave *slave = Slave::getInstance();
 		for ( uint32_t i = 0; i < slave->sockets.coordinators.size(); i++ ) {
 			CoordinatorSocket *socket = slave->sockets.coordinators.values[ i ];
-			coordinatorEvent.resRemappedParity( socket, &pid.parentId );
+			coordinatorEvent.resRemappedData( socket, &pid.parentId );
 			this->dispatch( coordinatorEvent );
 		}
 	}

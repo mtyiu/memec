@@ -113,7 +113,7 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 	return true;
 }
 
-bool Pending::get( PendingType type, LOCK_T *&lock, std::map<struct sockaddr_in, std::set<PendingData>* > *&map ) {
+bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_map<struct sockaddr_in, std::set<PendingData>* > *&map ) {
 	switch( type ) {
 		case PT_SLAVE_PEER_PARITY:
 			lock = &this->slavePeers.remappedDataLock;

@@ -222,7 +222,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 				{
 					std::set<struct sockaddr_in> *counter;
 					pthread_cond_t *allAcked;
-					bool found = this->pending->decrementRemappedParityRequest( event.id, event.socket->getAddr(), &counter, &allAcked );
+					bool found = this->pending->decrementRemappedDataRequest( event.id, event.socket->getAddr(), &counter, &allAcked );
 					if ( found && counter == 0 ) {
 						pthread_cond_broadcast( allAcked );
 					} else if ( ! found ) {

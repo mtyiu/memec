@@ -141,7 +141,7 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 						this->handleReconstructionRequest( event, buffer.data, header.length );
 						break;
 					case PROTO_OPCODE_PARITY_MIGRATE:
-						this->handleRemappedParity( event, buffer.data, buffer.size );
+						this->handleRemappedData( event, buffer.data, buffer.size );
 						break;
 					default:
 						__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from coordinator." );
