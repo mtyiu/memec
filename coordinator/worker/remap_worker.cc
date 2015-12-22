@@ -37,7 +37,10 @@ bool CoordinatorWorker::handleRemappingSetLockRequest( MasterEvent event, char *
 		true, true)
 	) {
 		if ( header.isRemapped ) {
-			if ( CoordinatorWorker::remappingRecords->insert( key, remappingRecord ) ) {
+			uint32_t originalChunkId;
+			SlaveSocket* dataSlaveSockets[ dataChunkCount ];
+			this->stripeList->get( key.data, key.size, dataSlaveSockets, 0, &originalChunkId );
+			if ( CoordinatorWorker::remappingRecords->insert( key, remappingRecord, dataSlaveSockets[ originalChunkId ]->getAddr() ) ) {
 				key.dup();
 				LOCK( &Coordinator::getInstance()->pendingRemappingRecords.toSendLock );
 				Coordinator::getInstance()->pendingRemappingRecords.toSend[ key ] = remappingRecord;

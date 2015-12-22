@@ -468,7 +468,7 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 		if ( ! NO_REMAPPING ) {
 			key.set( header.keySize, header.key );
 			RemappingRecord record ( header.listId, header.chunkId );
-			MasterWorker::remappingRecords->insert( key, record );
+			MasterWorker::remappingRecords->insert( key, record, this->dataSlaveSockets[ originalChunkId ]->getAddr() );
 		}
 	}
 

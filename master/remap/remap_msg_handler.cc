@@ -130,6 +130,9 @@ void MasterRemapMsgHandler::setState( char* msg , int len ) {
 		switch ( signal ) {
 			case REMAP_NORMAL:
 				__DEBUG__( BLUE, "MasterRemapMsgHandler", "setState", "REMAP_NORMAL %s:%hu", buf, slave.sin_port );
+				Master::getInstance()->remappingRecords.print();
+				Master::getInstance()->remappingRecords.erase( slave );
+				Master::getInstance()->remappingRecords.print();
 				break;
 			case REMAP_INTERMEDIATE:
 				__DEBUG__( BLUE, "MasterRemapMsgHandler", "setState", "REMAP_INTERMEDIATE %s:%hu", buf, slave.sin_port );
@@ -270,9 +273,8 @@ bool MasterRemapMsgHandler::checkAckForSlave( struct sockaddr_in slave ) {
 	RemapState state = this->slavesState[ slave ];
 
 	if ( ( state == REMAP_NORMAL ) || 
-	     ( state == REMAP_INTERMEDIATE && normal > 0 /* yet all request go through coordinator */ 
-			&& true /* yet sync all meta */ && true /* yet undo all parity */ ) ||
-	     ( state == REMAP_COORDINATED && true /* yet replay all requests? */ ) ) {
+	     ( state == REMAP_INTERMEDIATE && false /* yet sync all meta */ && false /* yet undo all parity */ ) ||
+	     ( state == REMAP_COORDINATED && false /* yet replay all requests? */ ) ) {
 		UNLOCK( &this->slavesStateLock[ slave ] );
 		return false;
 	}

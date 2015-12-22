@@ -183,6 +183,7 @@ bool CoordinatorRemapMsgHandler::transitToNormalEnd( const struct sockaddr_in &s
 	
 	// REMAP SET
 	coordinator->syncRemappedData( slave );
+	coordinator->remappingRecords.erase( slave );
 
 	// TODO DEGRADED
 
