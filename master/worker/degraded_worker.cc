@@ -233,7 +233,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 						__ERROR__( "MasterWorker", "handleDegradedLockResponse", "Cannot find a pending application GET request that matches the response. This message will be discarded (key = %.*s).", header.keySize, header.key );
 						return false;
 					}
-					applicationEvent.resGet( ( ApplicationSocket * ) key.ptr, pid.parentId, key );
+					applicationEvent.resGet( ( ApplicationSocket * ) pid.ptr, pid.parentId, key );
 					MasterWorker::eventQueue->insert( applicationEvent );
 					return true;
 			}
@@ -310,7 +310,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 						__ERROR__( "MasterWorker", "handleDegradedLockResponse", "Cannot find a pending application DELETE request that matches the response. This message will be discarded (key = %.*s).", header.keySize, header.key );
 						return false;
 					}
-					applicationEvent.resDelete( ( ApplicationSocket * ) key.ptr, pid.parentId, key, false );
+					applicationEvent.resDelete( ( ApplicationSocket * ) pid.ptr, pid.parentId, key, false );
 					MasterWorker::eventQueue->insert( applicationEvent );
 					return true;
 			}

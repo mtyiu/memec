@@ -6,48 +6,46 @@ Backup::Backup() {
 	LOCK_INIT( &this->lock );
 }
 
-void Backup::insert( uint8_t keySize, char *keyStr, uint8_t opcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) {
+void Backup::insert( uint8_t keySize, char *keyStr, uint8_t opcode, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) {
 	Key key;
-	std::unordered_map<Key, OpMetadata>::iterator it;
+	MetadataBackup metadataBackup;
+	std::unordered_multimap<Key, MetadataBackup>::iterator it;
 
-	key.set( keySize, keyStr );
+	key.dup( keySize, keyStr );
+
+	metadataBackup.opcode = opcode;
+	metadataBackup.timestamp = timestamp;
+	metadataBackup.set( listId, stripeId, chunkId );
+
+	std::pair<Key, MetadataBackup> p( key, metadataBackup );
 
 	LOCK( &this->lock );
-	it = this->ops.find( key );
-	if ( it == this->ops.end() ) {
-		OpMetadata opMetadata;
-		opMetadata.opcode = opcode;
-		opMetadata.set( listId, stripeId, chunkId );
-		key.dup();
-		this->ops[ key ] = opMetadata;
-	} else {
-		OpMetadata &opMetadata = it->second;
-		switch( opcode ) {
-			case PROTO_OPCODE_SET:
-				if ( listId   == opMetadata.listId &&
-				     stripeId == opMetadata.stripeId &&
-				     chunkId  == opMetadata.chunkId ) {
-					// Nothing to do
-				} else {
-					__ERROR__( "Backup", "insert", "[SET] Metadata mismatch: (%u, %u, %u) vs. (%u, %u, %u).", listId, stripeId, chunkId, opMetadata.listId, opMetadata.stripeId, opMetadata.chunkId );
-				}
-				break;
-			case PROTO_OPCODE_DELETE:
-				if ( listId   == opMetadata.listId &&
-				     stripeId == opMetadata.stripeId &&
-				     chunkId  == opMetadata.chunkId ) {
-					// Remove this entry
-				} else {
-					__ERROR__( "Backup", "insert", "[DELETE] Metadata mismatch: (%u, %u, %u) vs. (%u, %u, %u).", listId, stripeId, chunkId, opMetadata.listId, opMetadata.stripeId, opMetadata.chunkId );
-				}
-				break;
-		}
-	}
+	this->ops.insert( p );
 	UNLOCK( &this->lock );
 }
 
+void Backup::print( FILE *f ) {
+	std::unordered_multimap<Key, MetadataBackup>::iterator it;
+	fprintf( f, "--------------------\n" );
+	for ( it = this->ops.begin(); it != this->ops.end(); it++ ) {
+		const Key &key = it->first;
+		MetadataBackup &metadataBackup = it->second;
+
+		fprintf(
+			f, "%.*s: [%10u: %s] (%u, %u, %u)\n",
+			key.size, key.data,
+			metadataBackup.timestamp,
+			metadataBackup.opcode == PROTO_OPCODE_SET ? "SET" : "DELETE",
+			metadataBackup.listId,
+			metadataBackup.stripeId,
+			metadataBackup.chunkId
+		);
+	}
+	fprintf( f, "--------------------\n" );
+}
+
 Backup::~Backup() {
-	std::unordered_map<Key, OpMetadata>::iterator it;
+	std::unordered_multimap<Key, MetadataBackup>::iterator it;
 	Key key;
 
 	it = this->ops.begin();

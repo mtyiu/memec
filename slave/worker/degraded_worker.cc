@@ -834,7 +834,6 @@ bool SlaveWorker::sendModifyChunkRequest( uint32_t parentId, uint8_t keySize, ch
 				continue;
 
 			if ( isUpdate ) {
-				keyValueUpdate.ptr = ( void * ) this->paritySlaveSockets[ i ];
 				if ( ! SlaveWorker::pending->insertKeyValueUpdate(
 					PT_SLAVE_PEER_UPDATE, requestId, parentId,
 					( void * ) this->paritySlaveSockets[ i ],
@@ -843,7 +842,6 @@ bool SlaveWorker::sendModifyChunkRequest( uint32_t parentId, uint8_t keySize, ch
 					__ERROR__( "SlaveWorker", "handleUpdateRequest", "Cannot insert into slave UPDATE pending map." );
 				}
 			} else {
-				key.ptr = ( void * ) this->paritySlaveSockets[ i ];
 				if ( ! SlaveWorker::pending->insertKey(
 					PT_SLAVE_PEER_DEL, requestId, parentId,
 					( void * ) this->paritySlaveSockets[ i ],

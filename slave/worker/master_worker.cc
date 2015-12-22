@@ -73,6 +73,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 			buffer.data = this->protocol.resSet(
 				buffer.size,
 				event.id,
+				event.message.set.timestamp,
 				event.message.set.listId,
 				event.message.set.stripeId,
 				event.message.set.chunkId,
@@ -131,8 +132,11 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 			buffer.data = this->protocol.resDelete(
 				buffer.size,
 				event.id,
-				success,
 				event.isDegraded,
+				event.message.del.timestamp,
+				event.message.del.listId,
+				event.message.del.stripeId,
+				event.message.del.chunkId,
 				event.message.del.key.size,
 				event.message.del.key.data
 			);
@@ -144,7 +148,6 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 			buffer.data = this->protocol.resDelete(
 				buffer.size,
 				event.id,
-				success,
 				event.isDegraded,
 				event.message.del.key.size,
 				event.message.del.key.data
@@ -437,7 +440,6 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 		}
 
 		// Update data chunk and map
-		key.ptr = 0;
 		LOCK_T *keysLock, *cacheLock;
 		std::unordered_map<Key, KeyMetadata> *keys;
 		std::unordered_map<Metadata, Chunk *> *cache;

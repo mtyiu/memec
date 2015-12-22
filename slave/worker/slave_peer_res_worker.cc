@@ -238,7 +238,7 @@ bool SlaveWorker::handleUpdateResponse( SlavePeerEvent event, bool success, char
 		}
 
 		masterEvent.resUpdate(
-			( MasterSocket * ) keyValueUpdate.ptr, pid.id,
+			( MasterSocket * ) pid.ptr, pid.id,
 			keyValueUpdate,
 			header.valueUpdateOffset,
 			header.valueUpdateSize,
@@ -289,7 +289,7 @@ bool SlaveWorker::handleDeleteResponse( SlavePeerEvent event, bool success, char
 			printf( "TODO: slave/worker/slave_peer_res_worker.cc - Line 289: Include the timestamp and metadata in the response.\n" );
 			uint32_t timestamp = SlaveWorker::timestamp->nextVal();
 			masterEvent.resDelete(
-				( MasterSocket * ) key.ptr,
+				( MasterSocket * ) pid.ptr,
 				pid.id,
 				key,
 				true, // needsFree
@@ -297,7 +297,7 @@ bool SlaveWorker::handleDeleteResponse( SlavePeerEvent event, bool success, char
 			);
 		} else {
 			masterEvent.resDelete(
-				( MasterSocket * ) key.ptr,
+				( MasterSocket * ) pid.ptr,
 				pid.id,
 				key,
 				true, // needsFree
@@ -773,7 +773,7 @@ bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success,
 
 		key.set( keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.ptr );
 		masterEvent.resUpdate(
-			( MasterSocket * ) keyValueUpdate.ptr, pid.id, key,
+			( MasterSocket * ) pid.ptr, pid.id, key,
 			keyValueUpdate.offset, keyValueUpdate.length,
 			success, true, false
 		);

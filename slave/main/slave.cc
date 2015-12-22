@@ -674,10 +674,11 @@ void Slave::printPending( FILE *f ) {
 		it != this->pending.masters.get.end();
 		it++, i++
 	) {
+		const PendingIdentifier &pid = it->first;
 		const Key &key = it->second;
 		fprintf( f, "%lu. ID: %u; Key: %.*s (size = %u); source: ", i, it->first.id, key.size, key.data, key.size );
-		if ( key.ptr )
-			( ( Socket * ) key.ptr )->printAddress( f );
+		if ( pid.ptr )
+			( ( Socket * ) pid.ptr )->printAddress( f );
 		else
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
@@ -696,14 +697,15 @@ void Slave::printPending( FILE *f ) {
 		keyValueUpdateIt != this->pending.masters.update.end();
 		keyValueUpdateIt++, i++
 	) {
+		const PendingIdentifier &pid = keyValueUpdateIt->first;
 		const KeyValueUpdate &keyValueUpdate = keyValueUpdateIt->second;
 		fprintf(
 			f, "%lu. ID: %u; Key: %.*s (size = %u, offset = %u, length = %u); source: ",
 			i, keyValueUpdateIt->first.id, keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
 			keyValueUpdate.offset, keyValueUpdate.length
 		);
-		if ( keyValueUpdate.ptr )
-			( ( Socket * ) keyValueUpdate.ptr )->printAddress( f );
+		if ( pid.ptr )
+			( ( Socket * ) pid.ptr )->printAddress( f );
 		else
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
@@ -722,10 +724,11 @@ void Slave::printPending( FILE *f ) {
 		it != this->pending.masters.del.end();
 		it++, i++
 	) {
+		const PendingIdentifier &pid = it->first;
 		const Key &key = it->second;
 		fprintf( f, "%lu. ID: %u; Key: %.*s (size = %u); source: ", i, it->first.id, key.size, key.data, key.size );
-		if ( key.ptr )
-			( ( Socket * ) key.ptr )->printAddress( f );
+		if ( pid.ptr )
+			( ( Socket * ) pid.ptr )->printAddress( f );
 		else
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
@@ -845,7 +848,7 @@ void Slave::printPending( FILE *f ) {
 		"\n[REMAP_DATA] Pending: %lu slaves\n",
 		this->pending.slavePeers.remappedData.size()
 	);
-	for ( 
+	for (
 		auto slave = this->pending.slavePeers.remappedData.begin();
 		slave != this->pending.slavePeers.remappedData.end();
 		slave++
@@ -854,10 +857,10 @@ void Slave::printPending( FILE *f ) {
 		Socket::ntoh_ip( slave->first.sin_addr.s_addr, addrstr, INET_ADDRSTRLEN );
 		fprintf( f, "\tSlave %s:%hu\n", addrstr, ntohs( slave->first.sin_port ) );
 		for ( auto record : *slave->second ) {
-			fprintf( 
-				f, 
+			fprintf(
+				f,
 				"\t\t List ID: %u Chunk Id: %u Key: %.*s\n",
-				record.listId, record.chunkId, 
+				record.listId, record.chunkId,
 				record.key.size, record.key.data
 			);
 		}

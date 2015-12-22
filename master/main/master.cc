@@ -611,9 +611,10 @@ void Master::printPending( FILE *f ) {
 		it != this->pending.applications.set.end();
 		it++, i++
 	) {
+		const PendingIdentifier &pid = it->first;
 		const Key &key = it->second;
 		fprintf( f, "%lu. ID: %u; Key: %.*s (size = %u); source: ", i, it->first.id, key.size, key.data, key.size );
-		( ( Socket * ) key.ptr )->printAddress( f );
+		( ( Socket * ) pid.ptr )->printAddress( f );
 
 		for ( uint8_t i = 0; i < key.size; i++ ) {
 			if ( ! isprint( key.data[ i ] ) ) {
@@ -637,10 +638,11 @@ void Master::printPending( FILE *f ) {
 		it != this->pending.applications.get.end();
 		it++, i++
 	) {
+		const PendingIdentifier &pid = it->first;
 		const Key &key = it->second;
 		fprintf( f, "%lu. ID: %u; Key: %.*s (size = %u); source: ", i, it->first.id, key.size, key.data, key.size );
-		if ( key.ptr )
-			( ( Socket * ) key.ptr )->printAddress( f );
+		if ( pid.ptr )
+			( ( Socket * ) pid.ptr )->printAddress( f );
 		else
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
@@ -659,14 +661,15 @@ void Master::printPending( FILE *f ) {
 		keyValueUpdateIt != this->pending.applications.update.end();
 		keyValueUpdateIt++, i++
 	) {
+		const PendingIdentifier &pid = it->first;
 		const KeyValueUpdate &keyValueUpdate = keyValueUpdateIt->second;
 		fprintf(
 			f, "%lu. ID: %u; Key: %.*s (size = %u, offset = %u, length = %u); source: ",
 			i, keyValueUpdateIt->first.id, keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
 			keyValueUpdate.offset, keyValueUpdate.length
 		);
-		if ( keyValueUpdate.ptr )
-			( ( Socket * ) keyValueUpdate.ptr )->printAddress( f );
+		if ( pid.ptr )
+			( ( Socket * ) pid.ptr )->printAddress( f );
 		else
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
@@ -685,10 +688,11 @@ void Master::printPending( FILE *f ) {
 		it != this->pending.applications.del.end();
 		it++, i++
 	) {
+		const PendingIdentifier &pid = it->first;
 		const Key &key = it->second;
 		fprintf( f, "%lu. ID: %u; Key: %.*s (size = %u); source: ", i, it->first.id, key.size, key.data, key.size );
-		if ( key.ptr )
-			( ( Socket * ) key.ptr )->printAddress( f );
+		if ( pid.ptr )
+			( ( Socket * ) pid.ptr )->printAddress( f );
 		else
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
@@ -710,9 +714,10 @@ void Master::printPending( FILE *f ) {
 		it != this->pending.slaves.set.end();
 		it++, i++
 	) {
+		const PendingIdentifier &pid = it->first;
 		const Key &key = it->second;
 		fprintf( f, "%lu. ID: %u, parent ID: %u; Key: %.*s (size = %u); target: ", i, it->first.id, it->first.parentId, key.size, key.data, key.size );
-		( ( Socket * ) key.ptr )->printAddress( f );
+		( ( Socket * ) pid.ptr )->printAddress( f );
 		fprintf( f, "\n" );
 	}
 	UNLOCK( &this->pending.slaves.setLock );
@@ -749,9 +754,10 @@ void Master::printPending( FILE *f ) {
 		it != this->pending.slaves.get.end();
 		it++, i++
 	) {
+		const PendingIdentifier &pid = it->first;
 		const Key &key = it->second;
 		fprintf( f, "%lu. ID: %u, parent ID: %u; Key: %.*s (size = %u); target: ", i, it->first.id, it->first.parentId, key.size, key.data, key.size );
-		( ( Socket * ) key.ptr )->printAddress( f );
+		( ( Socket * ) pid.ptr )->printAddress( f );
 		fprintf( f, "\n" );
 	}
 	UNLOCK( &this->pending.slaves.getLock );
@@ -768,14 +774,15 @@ void Master::printPending( FILE *f ) {
 		keyValueUpdateIt != this->pending.slaves.update.end();
 		keyValueUpdateIt++, i++
 	) {
+		const PendingIdentifier &pid = it->first;
 		const KeyValueUpdate &keyValueUpdate = keyValueUpdateIt->second;
 		fprintf(
 			f, "%lu. ID: %u, parent ID: %u; Key: %.*s (size = %u, offset = %u, length = %u); target: ",
 			i, keyValueUpdateIt->first.id, keyValueUpdateIt->first.parentId, keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
 			keyValueUpdate.offset, keyValueUpdate.length
 		);
-		if ( keyValueUpdate.ptr )
-			( ( Socket * ) keyValueUpdate.ptr )->printAddress( f );
+		if ( pid.ptr )
+			( ( Socket * ) pid.ptr )->printAddress( f );
 		else
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
@@ -794,9 +801,10 @@ void Master::printPending( FILE *f ) {
 		it != this->pending.slaves.del.end();
 		it++, i++
 	) {
+		const PendingIdentifier &pid = it->first;
 		const Key &key = it->second;
 		fprintf( f, "%lu. ID: %u, parent ID: %u; Key: %.*s (size = %u); target: ", i, it->first.id, it->first.parentId, key.size, key.data, key.size );
-		( ( Socket * ) key.ptr )->printAddress( f );
+		( ( Socket * ) pid.ptr )->printAddress( f );
 		fprintf( f, "\n" );
 	}
 	UNLOCK( &this->pending.slaves.delLock );

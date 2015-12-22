@@ -3,6 +3,7 @@
 
 #include "../../common/ds/array_map.hh"
 #include "../../common/socket/socket.hh"
+#include "../backup/backup.hh"
 #include "../ds/counter.hh"
 
 class SlaveSocket : public Socket {
@@ -12,6 +13,7 @@ private:
 public:
 	bool registered;
 	Counter counter;
+	Backup backup;
 
 	static void setArrayMap( ArrayMap<int, SlaveSocket> *slaves );
 	bool start();

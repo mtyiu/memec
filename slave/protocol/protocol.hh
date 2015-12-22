@@ -27,7 +27,7 @@ public:
 	// ---------- normal_master_protocol.cc ----------
 	char *resSet(
 		size_t &size, uint32_t id,
-		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		uint8_t keySize, char *key
 	);
 	char *resSet(
@@ -45,7 +45,13 @@ public:
 		uint32_t valueUpdateOffset, uint32_t valueUpdateSize
 	);
 	char *resDelete(
-		size_t &size, uint32_t id, bool success, bool isDegraded,
+		size_t &size, uint32_t id, bool isDegraded,
+		uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		uint8_t keySize, char *key,
+		bool toMaster = true
+	);
+	char *resDelete(
+		size_t &size, uint32_t id, bool isDegraded,
 		uint8_t keySize, char *key,
 		bool toMaster = true
 	);
