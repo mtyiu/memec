@@ -36,8 +36,6 @@ public:
 			}
 		}
 		UNLOCK( &this->lock );
-		if ( ret )
-			printf( "PendingAck::erase(): (%u, %u]\n", from, to );
 		return ret;
 	}
 };
