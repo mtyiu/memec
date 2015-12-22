@@ -6,10 +6,6 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 			lock = &this->applications.getLock;
 			map = &this->applications.get;
 			break;
-		case PT_APPLICATION_SET:
-			lock = &this->applications.setLock;
-			map = &this->applications.set;
-			break;
 		case PT_APPLICATION_DEL:
 			lock = &this->applications.delLock;
 			map = &this->applications.del;
@@ -25,6 +21,20 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 		case PT_SLAVE_DEL:
 			lock = &this->slaves.delLock;
 			map = &this->slaves.del;
+			break;
+		default:
+			lock = 0;
+			map = 0;
+			return false;
+	}
+	return true;
+}
+
+bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, KeyValue> *&map ) {
+	switch( type ) {
+		case PT_APPLICATION_SET:
+			lock = &this->applications.setLock;
+			map = &this->applications.set;
 			break;
 		default:
 			lock = 0;
@@ -175,6 +185,7 @@ DEFINE_PENDING_COORDINATOR_INSERT_METHOD( insertDegradedLockData, DegradedLockDa
 DEFINE_PENDING_COORDINATOR_INSERT_METHOD( insertRemapList, std::vector<uint32_t>, remapList );
 
 DEFINE_PENDING_APPLICATION_INSERT_METHOD( insertKey, Key, key )
+DEFINE_PENDING_APPLICATION_INSERT_METHOD( insertKeyValue, KeyValue, keyValue )
 DEFINE_PENDING_APPLICATION_INSERT_METHOD( insertKeyValueUpdate, KeyValueUpdate, keyValueUpdate )
 
 DEFINE_PENDING_SLAVE_INSERT_METHOD( insertKey, Key, key )
@@ -298,6 +309,75 @@ bool Pending::eraseKey( PendingType type, uint32_t id, void *ptr, PendingIdentif
 	if ( ret ) {
 		if ( pidPtr ) *pidPtr = lit->first;
 		if ( keyPtr ) *keyPtr = lit->second;
+		map->erase( lit );
+	}
+	if ( needsUnlock ) UNLOCK( lock );
+
+	return ret;
+}
+
+bool Pending::eraseKeyValue( PendingType type, uint32_t id, void *ptr, PendingIdentifier *pidPtr, KeyValue *keyValuePtr, bool needsLock, bool needsUnlock, bool checkKey, char* checkKeyPtr ) {
+	PendingIdentifier pid( id, 0, ptr );
+	LOCK_T *lock;
+	bool ret;
+
+	std::unordered_multimap<PendingIdentifier, KeyValue> *map;
+	std::unordered_multimap<PendingIdentifier, KeyValue>::iterator lit, rit;
+	if ( ! this->get( type, lock, map ) )
+		return false;
+
+	if ( needsLock ) LOCK( lock );
+	tie( lit, rit ) = map->equal_range( pid );
+	Key key;
+	/* prevent collision on id, use key and/or ptr as identifier as well */
+	if ( ptr ) {
+		while ( lit != rit ) {
+			if ( lit->first.ptr == ptr ) {
+				if ( ! checkKey || ! checkKeyPtr )
+					break;
+				key = lit->second.key();
+				if ( strncmp( checkKeyPtr, key.data, key.size ) == 0 )
+					break;
+			}
+			lit++;
+		}
+		/* match request id, ptr and/or key */
+		ret = false;
+		if ( lit != rit && lit->first.ptr == ptr ) {
+			if ( ! checkKey || ! checkKeyPtr )
+				ret = true;
+			else {
+				key = lit->second.key();
+				if ( strncmp( checkKeyPtr, key.data, key.size ) == 0 )
+					ret = true;
+			}
+		}
+	} else {
+		while ( lit != rit ) {
+			if ( ! checkKey || ! checkKeyPtr )
+				break;
+			key = lit->second.key();
+			if ( strncmp( checkKeyPtr, key.data, key.size ) == 0 )
+				break;
+
+			lit++;
+		}
+		/* match request and/or key */
+		ret = false;
+		if ( lit != rit ) {
+			if ( ! checkKey || ! checkKeyPtr )
+				ret = true;
+			else {
+				key = lit->second.key();
+				if ( strncmp( checkKeyPtr, key.data, key.size ) == 0 )
+					ret = true;
+			}
+		}
+	}
+
+	if ( ret ) {
+		if ( pidPtr ) *pidPtr = lit->first;
+		if ( keyValuePtr ) *keyValuePtr = lit->second;
 		map->erase( lit );
 	}
 	if ( needsUnlock ) UNLOCK( lock );

@@ -172,6 +172,7 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 	ApplicationEvent applicationEvent;
 	PendingIdentifier pid;
 	Key key;
+	KeyValue keyValue;
 
 	if ( ! MasterWorker::pending->eraseKey( PT_SLAVE_SET, event.id, event.socket, &pid, &key, true, false ) ) {
 		UNLOCK( &MasterWorker::pending->slaves.setLock );
@@ -211,15 +212,15 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 
 	if ( pending == 0 ) {
 		// Only send application SET response when the number of pending slave SET requests equal 0
-		if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_SET, pid.parentId, 0, &pid, &key, true, true, true, keyStr ) ) {
+		if ( ! MasterWorker::pending->eraseKeyValue( PT_APPLICATION_SET, pid.parentId, 0, &pid, &keyValue, true, true, true, keyStr ) ) {
 			__ERROR__( "MasterWorker", "handleSetResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded. (Key = %.*s, ID = %u)", key.size, key.data, pid.parentId );
 			return false;
 		}
 
-		applicationEvent.resSet( ( ApplicationSocket * ) pid.ptr, pid.id, key, success );
+		applicationEvent.resSet( ( ApplicationSocket * ) pid.ptr, pid.id, keyValue, success );
 		MasterWorker::eventQueue->insert( applicationEvent );
 		uint32_t originalListId, originalChunkId;
-		SlaveSocket *original = this->getSlaves( key.data, key.size, originalListId, originalChunkId );
+		SlaveSocket *original = this->getSlaves( keyStr, keySize, originalListId, originalChunkId );
 		int sockfd = original->getSocket();
 		MasterWorker::slaveSockets->get( sockfd )->counter.decreaseNormal();
 	}
@@ -444,7 +445,7 @@ bool MasterWorker::handleAcknowledgement( SlaveEvent event, uint8_t opcode, char
 		return false;
 	}
 
-	__INFO__( YELLOW, "MasterWorker", "handleAcknowledgement", "Timestamp = (%u, %u).", header.fromTimestamp, header.toTimestamp );
+	// __INFO__( YELLOW, "MasterWorker", "handleAcknowledgement", "Timestamp = (%u, %u).", header.fromTimestamp, header.toTimestamp );
 
 	event.socket->backup.erase( header.fromTimestamp, header.toTimestamp );
 

@@ -597,6 +597,7 @@ bool Master::isDegraded( SlaveSocket *socket ) {
 void Master::printPending( FILE *f ) {
 	size_t i;
 	std::unordered_multimap<PendingIdentifier, Key>::iterator it;
+	std::unordered_multimap<PendingIdentifier, KeyValue>::iterator keyValueIt;
 	std::unordered_multimap<PendingIdentifier, KeyValueUpdate>::iterator keyValueUpdateIt;
 	std::unordered_multimap<PendingIdentifier, RemappingRecord>::iterator remappingRecordIt;
 
@@ -610,13 +611,14 @@ void Master::printPending( FILE *f ) {
 	);
 	i = 1;
 	for (
-		it = this->pending.applications.set.begin();
-		it != this->pending.applications.set.end();
-		it++, i++
+		keyValueIt = this->pending.applications.set.begin();
+		keyValueIt != this->pending.applications.set.end();
+		keyValueIt++, i++
 	) {
-		const PendingIdentifier &pid = it->first;
-		const Key &key = it->second;
-		fprintf( f, "%lu. ID: %u; Key: %.*s (size = %u); source: ", i, it->first.id, key.size, key.data, key.size );
+		const PendingIdentifier &pid = keyValueIt->first;
+		KeyValue &keyValue = keyValueIt->second;
+		Key key = keyValue.key();
+		fprintf( f, "%lu. ID: %u; Key: %.*s (size = %u); source: ", i, keyValueIt->first.id, key.size, key.data, key.size );
 		( ( Socket * ) pid.ptr )->printAddress( f );
 
 		for ( uint8_t i = 0; i < key.size; i++ ) {

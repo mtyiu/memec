@@ -5,6 +5,7 @@
 #include <pthread.h>
 #include <netinet/in.h>
 #include "stats.hh"
+#include "../../common/ds/key_value.hh"
 #include "../../common/ds/metadata.hh"
 #include "../../common/ds/pending.hh"
 #include "../../common/lock/lock.hh"
@@ -61,6 +62,7 @@ public:
 class Pending {
 private:
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, Key> *&map );
+	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, KeyValue> *&map );
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *&map );
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, RemappingRecord> *&map );
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, DegradedLockData> *&map );
@@ -73,7 +75,7 @@ public:
 	} coordinator;
 	struct {
 		std::unordered_multimap<PendingIdentifier, Key> get;
-		std::unordered_multimap<PendingIdentifier, Key> set;
+		std::unordered_multimap<PendingIdentifier, KeyValue> set;
 		std::unordered_multimap<PendingIdentifier, KeyValueUpdate> update;
 		std::unordered_multimap<PendingIdentifier, Key> del;
 		LOCK_T getLock;
@@ -117,6 +119,10 @@ public:
 		PendingType type, uint32_t id, void *ptr,
 		Key &key, bool needsLock = true, bool needsUnlock = true
 	);
+	bool insertKeyValue(
+		PendingType type, uint32_t id, void *ptr,
+		KeyValue &keyValue, bool needsLock = true, bool needsUnlock = true
+	);
 	bool insertKeyValueUpdate(
 		PendingType type, uint32_t id, void *ptr,
 		KeyValueUpdate &keyValueUpdate,
@@ -158,6 +164,12 @@ public:
 	bool eraseKey(
 		PendingType type, uint32_t id, void *ptr = 0,
 		PendingIdentifier *pidPtr = 0, Key *keyPtr = 0,
+		bool needsLock = true, bool needsUnlock = true,
+		bool checkKey = false, char *checkKeyPtr = 0
+	);
+	bool eraseKeyValue(
+		PendingType type, uint32_t id, void *ptr = 0,
+		PendingIdentifier *pidPtr = 0, KeyValue *keyValuePtr = 0,
 		bool needsLock = true, bool needsUnlock = true,
 		bool checkKey = false, char *checkKeyPtr = 0
 	);

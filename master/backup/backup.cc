@@ -53,7 +53,7 @@ size_t Backup::erase( uint32_t fromTimestamp, uint32_t toTimestamp ) {
 			it++;
 		}
 	}
-	printf( "Number of metadata backup: (released) %lu; (remaining) %lu\n", ret, this->ops.size() );
+	// printf( "Number of metadata backup: (released) %lu; (remaining) %lu\n", ret, this->ops.size() );
 	UNLOCK( &this->lock );
 
 	return ret;

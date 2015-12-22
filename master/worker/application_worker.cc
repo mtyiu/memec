@@ -42,10 +42,10 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 				buffer.size,
 				event.id,
 				success,
-				event.message.keyValue.keySize,
-				event.message.keyValue.keyStr,
-				event.message.keyValue.valueSize,
-				event.message.keyValue.valueStr
+				event.message.get.keySize,
+				event.message.get.keyStr,
+				event.message.get.valueSize,
+				event.message.get.valueStr
 			);
 			break;
 		case APPLICATION_EVENT_TYPE_GET_RESPONSE_FAILURE:
@@ -61,15 +61,29 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 			break;
 		case APPLICATION_EVENT_TYPE_SET_RESPONSE_SUCCESS:
 		case APPLICATION_EVENT_TYPE_SET_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resSet(
-				buffer.size,
-				event.id,
-				success,
-				event.message.key.size,
-				event.message.key.data
-			);
-			if ( event.needsFree )
-				event.message.key.free();
+			if ( event.message.set.isKeyValue ){
+				Key key = event.message.set.data.keyValue.key();
+				buffer.data = this->protocol.resSet(
+					buffer.size,
+					event.id,
+					success,
+					key.size,
+					key.data
+				);
+				if ( event.needsFree )
+					event.message.set.data.keyValue.free();
+			} else {
+				Key &key = event.message.set.data.key;
+				buffer.data = this->protocol.resSet(
+					buffer.size,
+					event.id,
+					success,
+					key.size,
+					key.data
+				);
+				if ( event.needsFree )
+					key.free();
+			}
 			break;
 		case APPLICATION_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
 		case APPLICATION_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
@@ -203,6 +217,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		char *data;
 	} buffer;
 	Key key;
+	KeyValue keyValue;
 	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
 
 #ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
@@ -220,11 +235,14 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 	buffer.data = this->protocol.reqSet( buffer.size, requestId, header.key, header.keySize, header.value, header.valueSize );
 #endif
 
-	key.dup( header.keySize, header.key );
+	keyValue.dup( header.key, header.keySize, header.value, header.valueSize );
+	key = keyValue.key();
 
-	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_SET, event.id, ( void * ) event.socket, key ) ) {
+	if ( ! MasterWorker::pending->insertKeyValue( PT_APPLICATION_SET, event.id, ( void * ) event.socket, keyValue ) ) {
 		__ERROR__( "MasterWorker", "handleSetRequest", "Cannot insert into application SET pending map." );
 	}
+
+	// key.dup( header.keySize, header.key );
 
 	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount + 1; i++ ) {
 		if ( ! MasterWorker::pending->insertKey(
