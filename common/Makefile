@@ -15,6 +15,7 @@ OBJS= \
 	ds/load.o \
 	ds/sockaddr_in.o \
 	protocol/protocol.o \
+	protocol/ack_protocol.o \
 	protocol/address_protocol.o \
 	protocol/chunk_protocol.o \
 	protocol/degraded_protocol.o \

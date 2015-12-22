@@ -43,6 +43,7 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_MAGIC_ANNOUNCEMENT:
 		case PROTO_MAGIC_LOADING_STATS:
 		case PROTO_MAGIC_REMAPPING:
+		case PROTO_MAGIC_ACKNOWLEDGEMENT:
 			break;
 		default:
 			fprintf( stderr, "Error #1: (magic, from, to, opcode, length, id) = (%x, %x, %x, %x, %u, %u)\n", magic, from, to, opcode, length, id );
@@ -94,6 +95,9 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_OPCODE_REMAPPING_SET:
 		case PROTO_OPCODE_DEGRADED_LOCK:
 		case PROTO_OPCODE_DEGRADED_UNLOCK:
+
+		case PROTO_OPCODE_ACK_METADATA:
+		case PROTO_OPCODE_ACK_REQUEST:
 
 		case PROTO_OPCODE_REMAPPING_LOCK:
 

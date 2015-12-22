@@ -8,6 +8,7 @@ unsigned int SlaveWorker::delay;
 IDGenerator *SlaveWorker::idGenerator;
 ArrayMap<int, SlavePeerSocket> *SlaveWorker::slavePeers;
 Pending *SlaveWorker::pending;
+PendingAck *SlaveWorker::pendingAck;
 ServerAddr *SlaveWorker::slaveServerAddr;
 Coding *SlaveWorker::coding;
 SlaveEventQueue *SlaveWorker::eventQueue;
@@ -202,6 +203,7 @@ bool SlaveWorker::init() {
 	SlaveWorker::delay = 0;
 	SlaveWorker::slavePeers = &slave->sockets.slavePeers;
 	SlaveWorker::pending = &slave->pending;
+	SlaveWorker::pendingAck = &slave->pendingAck;
 	SlaveWorker::slaveServerAddr = &slave->config.slave.slave.addr;
 	SlaveWorker::coding = slave->coding;
 	SlaveWorker::eventQueue = &slave->eventQueue;

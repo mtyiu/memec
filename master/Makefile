@@ -42,6 +42,7 @@ EXTERNAL_LIB= \
 	$(PLIO_SRC_ROOT)/common/ds/load.o \
 	$(PLIO_SRC_ROOT)/common/ds/sockaddr_in.o \
 	$(PLIO_SRC_ROOT)/common/protocol/protocol.o \
+	$(PLIO_SRC_ROOT)/common/protocol/ack_protocol.o \
 	$(PLIO_SRC_ROOT)/common/protocol/address_protocol.o \
 	$(PLIO_SRC_ROOT)/common/protocol/load_protocol.o \
 	$(PLIO_SRC_ROOT)/common/protocol/normal_protocol.o \

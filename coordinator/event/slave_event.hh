@@ -17,6 +17,7 @@ enum SlaveEventType {
 	SLAVE_EVENT_TYPE_REQUEST_SYNC_META,
 	SLAVE_EVENT_TYPE_PARITY_MIGRATE,
 	SLAVE_EVENT_TYPE_REQUEST_RELEASE_DEGRADED_LOCK,
+	SLAVE_EVENT_TYPE_RESPONSE_HEARTBEAT,
 	SLAVE_EVENT_TYPE_DISCONNECT
 };
 
@@ -37,6 +38,12 @@ public:
 			Packet *packet;
 		} parity;
 		bool *sync;
+		struct {
+			uint32_t timestamp;
+			uint32_t sealed;
+			uint32_t keys;
+			bool isLast;
+		} heartbeat;
 	} message;
 
 	void pending( SlaveSocket *socket );
@@ -48,6 +55,7 @@ public:
 	void reqSyncMeta( SlaveSocket *socket, bool *sync );
 	void reqReleaseDegradedLock( SlaveSocket *socket, bool *done = 0 );
 	void syncRemappedParity( SlaveSocket *socket, Packet *packet );
+	void resHeartbeat( SlaveSocket *socket, uint32_t timestamp, uint32_t sealed, uint32_t keys, bool isLast );
 	void disconnect( SlaveSocket *socket );
 };
 

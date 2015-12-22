@@ -24,9 +24,45 @@ void Backup::insert( uint8_t keySize, char *keyStr, uint8_t opcode, uint32_t tim
 	UNLOCK( &this->lock );
 }
 
+size_t Backup::erase( uint32_t fromTimestamp, uint32_t toTimestamp ) {
+	std::unordered_multimap<Key, MetadataBackup>::iterator it;
+	bool isWrappedAround, selected;
+	size_t ret = 0;
+
+	LOCK( &this->lock );
+	isWrappedAround = fromTimestamp > toTimestamp;
+	for ( it = this->ops.begin(); it != this->ops.end();  ) {
+		const MetadataBackup &metadataBackup = it->second;
+		if ( isWrappedAround ) {
+			selected = (
+				metadataBackup.timestamp > fromTimestamp ||
+				metadataBackup.timestamp < toTimestamp
+			);
+		} else {
+			selected = (
+				metadataBackup.timestamp > fromTimestamp &&
+				metadataBackup.timestamp < toTimestamp
+			);
+		}
+		if ( selected ) {
+			Key key = it->first;
+			it = this->ops.erase( it );
+			key.free();
+			ret++;
+		} else {
+			it++;
+		}
+	}
+	printf( "Number of metadata backup: (released) %lu; (remaining) %lu\n", ret, this->ops.size() );
+	UNLOCK( &this->lock );
+
+	return ret;
+}
+
 void Backup::print( FILE *f ) {
 	std::unordered_multimap<Key, MetadataBackup>::iterator it;
 	fprintf( f, "--------------------\n" );
+	fprintf( f, "Number of metadata backup: %lu\n", this->ops.size() );
 	for ( it = this->ops.begin(); it != this->ops.end(); it++ ) {
 		const Key &key = it->first;
 		MetadataBackup &metadataBackup = it->second;

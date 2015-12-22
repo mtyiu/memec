@@ -85,6 +85,14 @@ void MasterEvent::resDelete( MasterSocket *socket, uint32_t id, Key &key, bool n
 	this->message.del.key = key;
 }
 
+void MasterEvent::ackMetadata( MasterSocket	*socket, uint32_t id, uint32_t fromTimestamp, uint32_t toTimestamp ) {
+	this->type = MASTER_EVENT_TYPE_ACK_METADATA;
+	this->id = id;
+	this->socket = socket;
+	this->message.ack.fromTimestamp = fromTimestamp;
+	this->message.ack.toTimestamp = toTimestamp;
+}
+
 void MasterEvent::pending( MasterSocket *socket ) {
 	this->type = MASTER_EVENT_TYPE_PENDING;
 	this->socket = socket;

@@ -531,6 +531,9 @@ void Master::interactive() {
 		} else if ( strcmp( command, "remapping" ) == 0 ) {
 			valid = true;
 			this->printRemapping();
+		} else if ( strcmp( command, "backup" ) == 0 ) {
+			valid = true;
+			this->printBackup();
 		} else if ( strncmp( command, "set", 3 ) == 0 ) {
 			valid = this->setDebugFlag( command );
 		} else if ( strcmp( command, "time" ) == 0 ) {
@@ -858,6 +861,20 @@ void Master::printRemapping( FILE *f ) {
 	);
 }
 
+void Master::printBackup( FILE *f ) {
+	SlaveSocket *s;
+	LOCK( &this->sockets.slaves.lock );
+	std::vector<SlaveSocket *> &sockets = this->sockets.slaves.values;
+	for ( size_t i = 0, size = sockets.size(); i < size; i++ ) {
+		s = sockets[ i ];
+		s->printAddress();
+		printf( ":\n" );
+		s->backup.print( f );
+		printf( "\n" );
+	}
+	UNLOCK( &this->sockets.slaves.lock );
+}
+
 void Master::help() {
 	fprintf(
 		stdout,
@@ -867,6 +884,7 @@ void Master::help() {
 		"- debug: Show debug messages\n"
 		"- pending: Show all pending requests\n"
 		"- remapping: Show remapping info\n"
+		"- backup: Show backup info\n"
 		"- set: Set debug flag (degraded = [true|false])\n"
 		"- time: Show elapsed time\n"
 		"- exit: Terminate this client\n"

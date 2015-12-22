@@ -4,6 +4,7 @@
 #include <vector>
 #include <cstdio>
 #include "worker_role.hh"
+#include "../ack/pending_ack.hh"
 #include "../buffer/mixed_chunk_buffer.hh"
 #include "../buffer/degraded_chunk_buffer.hh"
 #include "../config/slave_config.hh"
@@ -50,6 +51,7 @@ private:
 	static IDGenerator *idGenerator;
 	static ArrayMap<int, SlavePeerSocket> *slavePeers;
 	static Pending *pending;
+	static PendingAck *pendingAck;
 	static ServerAddr *slaveServerAddr;
 	static Coding *coding;
 	static SlaveEventQueue *eventQueue;
@@ -75,6 +77,7 @@ private:
 	// ---------- coordinator_worker.cc ----------
 	void dispatch( CoordinatorEvent event );
 	bool handleSlaveConnectedMsg( CoordinatorEvent event, char *buf, size_t size );
+	bool handleHeartbeatAck( CoordinatorEvent event, char *buf, size_t size );
 
 	// ---------- master_worker.cc ----------
 	void dispatch( MasterEvent event );

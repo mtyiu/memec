@@ -287,7 +287,7 @@ bool SlaveWorker::handleDeleteResponse( SlavePeerEvent event, bool success, char
 
 		if ( success ) {
 			printf( "TODO: slave/worker/slave_peer_res_worker.cc - Line 289: Include the timestamp and metadata in the response.\n" );
-			uint32_t timestamp = SlaveWorker::timestamp->nextVal();
+			// uint32_t timestamp = SlaveWorker::timestamp->nextVal();
 			masterEvent.resDelete(
 				( MasterSocket * ) pid.ptr,
 				pid.id,

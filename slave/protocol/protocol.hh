@@ -18,7 +18,7 @@ public:
 
 	// ---------- heartbeat_protocol.cc ----------
 	char *sendHeartbeat(
-		size_t &size, uint32_t id,
+		size_t &size, uint32_t id, uint32_t timestamp,
 		LOCK_T *sealedLock, std::unordered_set<Metadata> &sealed, uint32_t &sealedCount,
 		LOCK_T *opsLock, std::unordered_map<Key, OpMetadata> &ops, uint32_t &opsCount,
 		bool &isCompleted
@@ -167,5 +167,7 @@ public:
 		uint32_t offset, uint32_t length, uint32_t updatingChunkId
 	);
 
+	// ---------- ack_protocol.cc ----------
+	char *ackMetadata( size_t &size, uint32_t id, uint32_t fromTimestamp, uint32_t toTimestamp );
 };
 #endif

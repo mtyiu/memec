@@ -112,6 +112,14 @@ public:
 		bool &isCompleted
 	);
 
+	// ---------- heartbeat_protocol.cc ----------
+	char *resHeartbeat(
+		size_t &size, uint32_t id,
+		uint32_t timestamp,
+		uint32_t sealed,
+		uint32_t keys,
+		bool isLast
+	);
 };
 
 #endif

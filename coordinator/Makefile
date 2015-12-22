@@ -13,6 +13,7 @@ OBJS= \
 	protocol/protocol.o \
 	protocol/degraded_protocol.o \
 	protocol/load_protocol.o \
+	protocol/heartbeat_protocol.o \
 	protocol/recovery_protocol.o \
 	protocol/register_protocol.o \
 	protocol/remap_protocol.o \

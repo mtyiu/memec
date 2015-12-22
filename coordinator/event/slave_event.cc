@@ -50,6 +50,15 @@ void SlaveEvent::reqReleaseDegradedLock( SlaveSocket *socket, bool *done ) {
 	this->message.degraded.done = done;
 }
 
+void SlaveEvent::resHeartbeat( SlaveSocket *socket, uint32_t timestamp, uint32_t sealed, uint32_t keys, bool isLast ) {
+	this->type = SLAVE_EVENT_TYPE_RESPONSE_HEARTBEAT;
+	this->socket = socket;
+	this->message.heartbeat.timestamp = timestamp;
+	this->message.heartbeat.sealed = sealed;
+	this->message.heartbeat.keys = keys;
+	this->message.heartbeat.isLast = isLast;
+}
+
 void SlaveEvent::disconnect( SlaveSocket *socket ) {
 	this->type = SLAVE_EVENT_TYPE_DISCONNECT;
 	this->socket = socket;

@@ -19,6 +19,7 @@ private:
 public:
 	Backup();
 	void insert( uint8_t keySize, char *keyStr, uint8_t opcode, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId );
+	size_t erase( uint32_t fromTimestamp, uint32_t toTimestamp );
 	void print( FILE *f = stdout );
 	~Backup();
 };

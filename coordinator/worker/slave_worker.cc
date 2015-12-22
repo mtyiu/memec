@@ -53,6 +53,17 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 		case SLAVE_EVENT_TYPE_ANNOUNCE_SLAVE_RECONSTRUCTED:
 			isSend = false;
 			break;
+		case SLAVE_EVENT_TYPE_RESPONSE_HEARTBEAT:
+			requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
+			buffer.data = this->protocol.resHeartbeat(
+				buffer.size, requestId,
+				event.message.heartbeat.timestamp,
+				event.message.heartbeat.sealed,
+				event.message.heartbeat.keys,
+				event.message.heartbeat.isLast
+			);
+			isSend = true;
+			break;
 		case SLAVE_EVENT_TYPE_DISCONNECT:
 			isSend = false;
 			break;
@@ -303,8 +314,12 @@ bool CoordinatorWorker::processHeartbeat( SlaveEvent event, char *buf, size_t si
 
 	if ( failed ) {
 		__ERROR__( "CoordinatorWorker", "processHeartbeat", "Number of failed objects = %lu", failed );
-	// } else {
-	// 	__ERROR__( "CoordinatorWorker", "processHeartbeat", "(sealed, keys, remap) = (%u, %u, %u)", heartbeat.sealed, heartbeat.keys, heartbeat.remap );
+	} else {
+		// __ERROR__( "CoordinatorWorker", "processHeartbeat", "(sealed, keys, remap) = (%u, %u, %u)", heartbeat.sealed, heartbeat.keys, heartbeat.remap );
+
+		// Send ACK message
+		event.resHeartbeat( event.socket, heartbeat.timestamp, heartbeat.sealed, heartbeat.keys, heartbeat.isLast );
+		this->dispatch( event );
 	}
 
 	// check if this is the last packet for a sync operation

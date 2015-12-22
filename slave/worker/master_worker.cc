@@ -20,6 +20,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		case MASTER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS:
+		case MASTER_EVENT_TYPE_ACK_METADATA:
 			success = true;
 			break;
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
@@ -155,6 +156,15 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 
 			if ( event.needsFree )
 				event.message.del.key.free();
+			break;
+		// ACK
+		case MASTER_EVENT_TYPE_ACK_METADATA:
+			buffer.data = this->protocol.ackMetadata(
+				buffer.size,
+				event.id,
+				event.message.ack.fromTimestamp,
+				event.message.ack.toTimestamp
+			);
 			break;
 		// Pending
 		case MASTER_EVENT_TYPE_PENDING:

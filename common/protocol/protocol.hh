@@ -64,8 +64,10 @@
 #define PROTO_OPCODE_DEGRADED_DELETE              0x10
 // Master <-> Slave //
 #define PROTO_OPCODE_REMAPPING_SET                0x12
-#define PROTO_OPCODE_DEGRADED_LOCK                0X13
-#define PROTO_OPCODE_DEGRADED_UNLOCK              0X14
+#define PROTO_OPCODE_DEGRADED_LOCK                0x13
+#define PROTO_OPCODE_DEGRADED_UNLOCK              0x14
+#define PROTO_OPCODE_ACK_METADATA                 0x15
+#define PROTO_OPCODE_ACK_REQUEST                  0x16
 
 // Master <-> Coordinator (20-29) //
 #define PROTO_OPCODE_REMAPPING_LOCK               0x20
@@ -139,8 +141,9 @@ struct PromoteBackupSlaveHeader {
 //////////////////////////////////////////
 // Heartbeat & metadata synchronization //
 //////////////////////////////////////////
-#define PROTO_HEARTBEAT_SIZE 9
+#define PROTO_HEARTBEAT_SIZE 13
 struct HeartbeatHeader {
+    uint32_t timestamp;
 	uint32_t sealed;
 	uint32_t keys;
 	bool isLast;
@@ -438,6 +441,15 @@ struct ChunkKeyValueHeader {
 
 #define PROTO_BUF_MIN_SIZE		65536
 
+/////////////////////
+// Acknowledgement //
+/////////////////////
+#define PROTO_ACK_BASE_SIZE 8
+struct AcknowledgementHeader {
+    uint32_t fromTimestamp;
+    uint32_t toTimestamp;
+};
+
 ///////////////////////////////////////////////////////////////////////////////
 
 class Protocol {
@@ -503,13 +515,20 @@ protected:
 	//////////////////////////////////////////
 	// ---------- heartbeat_protocol.cc ----------
 	size_t generateHeartbeatMessage(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t timestamp,
 		LOCK_T *sealedLock, std::unordered_set<Metadata> &sealed, uint32_t &sealedCount,
 		LOCK_T *opsLock, std::unordered_map<Key, OpMetadata> &ops, uint32_t &opsCount,
 		bool &isCompleted
 	);
+	size_t generateHeartbeatMessage(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+        uint32_t timestamp,
+        uint32_t sealed,
+        uint32_t keys,
+        bool isLast
+	);
 	bool parseHeartbeatHeader(
-		size_t offset, uint32_t &sealed, uint32_t &keys, bool isLast,
+		size_t offset, uint32_t &timestamp, uint32_t &sealed, uint32_t &keys, bool isLast,
 		char *buf, size_t size
 	);
 	bool parseMetadataHeader(
@@ -905,6 +924,19 @@ protected:
 		char *buf, size_t size
 	);
 
+	/////////////////////
+	// Acknowledgement //
+	/////////////////////
+	// ---------- ack_protocol.cc ----------
+	size_t generateAcknowledgementHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint32_t fromTimestamp, uint32_t toTimestamp, char* buf = 0
+	);
+	bool parseAcknowledgementHeader(
+		size_t offset, uint32_t &fromTimestamp, uint32_t &toTimestamp,
+		char *buf, size_t size
+	);
+
 public:
 	struct {
 		size_t size;
@@ -1086,6 +1118,14 @@ public:
 	);
 	bool parseChunkKeyValueHeader(
 		struct ChunkKeyValueHeader &header, char *&ptr,
+		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
+	/////////////////////
+	// Acknowledgement //
+	/////////////////////
+	// ---------- ack_protocol.cc ----------
+	bool parseAcknowledgementHeader(
+		struct AcknowledgementHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 };

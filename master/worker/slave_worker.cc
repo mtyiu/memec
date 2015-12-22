@@ -56,6 +56,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 				bool success;
 				switch( header.magic ) {
 					case PROTO_MAGIC_RESPONSE_SUCCESS:
+					case PROTO_MAGIC_ACKNOWLEDGEMENT:
 						success = true;
 						break;
 					case PROTO_MAGIC_RESPONSE_FAILURE:
@@ -77,21 +78,25 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 						break;
 					case PROTO_OPCODE_GET:
 					case PROTO_OPCODE_DEGRADED_GET:
-						this->handleGetResponse( event, success, header.opcode == PROTO_OPCODE_DEGRADED_GET, buffer.data, buffer.size );
+						this->handleGetResponse( event, success, header.opcode == PROTO_OPCODE_DEGRADED_GET, buffer.data, header.length );
 						break;
 					case PROTO_OPCODE_SET:
-						this->handleSetResponse( event, success, buffer.data, buffer.size );
+						this->handleSetResponse( event, success, buffer.data, header.length );
 						break;
 					case PROTO_OPCODE_REMAPPING_SET:
-						this->handleRemappingSetResponse( event, success, buffer.data, buffer.size );
+						this->handleRemappingSetResponse( event, success, buffer.data, header.length );
 						break;
 					case PROTO_OPCODE_UPDATE:
 					case PROTO_OPCODE_DEGRADED_UPDATE:
-						this->handleUpdateResponse( event, success, header.opcode == PROTO_OPCODE_DEGRADED_UPDATE, buffer.data, buffer.size );
+						this->handleUpdateResponse( event, success, header.opcode == PROTO_OPCODE_DEGRADED_UPDATE, buffer.data, header.length );
 						break;
 					case PROTO_OPCODE_DELETE:
 					case PROTO_OPCODE_DEGRADED_DELETE:
-						this->handleDeleteResponse( event, success, header.opcode == PROTO_OPCODE_DEGRADED_DELETE, buffer.data, buffer.size );
+						this->handleDeleteResponse( event, success, header.opcode == PROTO_OPCODE_DEGRADED_DELETE, buffer.data, header.length );
+						break;
+					case PROTO_OPCODE_ACK_METADATA:
+					case PROTO_OPCODE_ACK_REQUEST:
+						this->handleAcknowledgement( event, header.opcode, buffer.data, header.length );
 						break;
 					default:
 						__ERROR__( "MasterWorker", "dispatch", "Invalid opcode from slave." );
@@ -428,6 +433,20 @@ bool MasterWorker::handleDeleteResponse( SlaveEvent event, bool success, bool is
 	MasterWorker::eventQueue->insert( applicationEvent );
 
 	// TODO remove remapping records
+
+	return true;
+}
+
+bool MasterWorker::handleAcknowledgement( SlaveEvent event, uint8_t opcode, char *buf, size_t size ) {
+	struct AcknowledgementHeader header;
+	if ( ! this->protocol.parseAcknowledgementHeader( header, buf, size ) ) {
+		__ERROR__( "MasterWorker", "handleAcknowledgement", "Invalid ACK." );
+		return false;
+	}
+
+	__INFO__( YELLOW, "MasterWorker", "handleAcknowledgement", "Timestamp = (%u, %u).", header.fromTimestamp, header.toTimestamp );
+
+	event.socket->backup.erase( header.fromTimestamp, header.toTimestamp );
 
 	return true;
 }

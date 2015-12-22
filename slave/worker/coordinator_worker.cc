@@ -29,13 +29,19 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 			uint32_t sealedCount, opsCount;
 			bool isCompleted;
 
+			uint32_t timestamp = SlaveWorker::timestamp->nextVal();
+
 			buffer.data = this->protocol.sendHeartbeat(
 				buffer.size,
 				event.id,
+				timestamp,
 				&SlaveWorker::map->sealedLock, SlaveWorker::map->sealed, sealedCount,
 				&SlaveWorker::map->opsLock, SlaveWorker::map->ops, opsCount,
 				isCompleted
 			);
+
+			if ( opsCount )
+				SlaveWorker::pendingAck->insert( timestamp );
 
 			if ( ! isCompleted )
 				SlaveWorker::eventQueue->insert( event );
@@ -117,13 +123,13 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 						}
 						break;
 					case PROTO_OPCODE_SLAVE_CONNECTED:
-						this->handleSlaveConnectedMsg( event, buffer.data, buffer.size );
+						this->handleSlaveConnectedMsg( event, buffer.data, header.length );
 						break;
 					case PROTO_OPCODE_SLAVE_RECONSTRUCTED:
-						this->handleSlaveReconstructedMsg( event, buffer.data, buffer.size );
+						this->handleSlaveReconstructedMsg( event, buffer.data, header.length );
 						break;
 					case PROTO_OPCODE_BACKUP_SLAVE_PROMOTED:
-						this->handleBackupSlavePromotedMsg( event, buffer.data, buffer.size );
+						this->handleBackupSlavePromotedMsg( event, buffer.data, header.length );
 						break;
 					case PROTO_OPCODE_SEAL_CHUNKS:
 						Slave::getInstance()->seal();
@@ -141,7 +147,10 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 						this->handleReconstructionRequest( event, buffer.data, header.length );
 						break;
 					case PROTO_OPCODE_PARITY_MIGRATE:
-						this->handleRemappedParity( event, buffer.data, buffer.size );
+						this->handleRemappedParity( event, buffer.data, header.length );
+						break;
+					case PROTO_OPCODE_SYNC:
+						this->handleHeartbeatAck( event, buffer.data, header.length );
 						break;
 					default:
 						__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from coordinator." );
@@ -190,5 +199,34 @@ bool SlaveWorker::handleSlaveConnectedMsg( CoordinatorEvent event, char *buf, si
 	// Connect to the slave peer
 	slavePeers->values[ index ]->start();
 
+	return true;
+}
+
+bool SlaveWorker::handleHeartbeatAck( CoordinatorEvent event, char *buf, size_t size ) {
+	struct HeartbeatHeader header;
+	if ( ! this->protocol.parseHeartbeatHeader( header, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleHeartbeatAck", "Invalid acknowledgement header." );
+		return false;
+	}
+
+	uint32_t fromTimestamp;
+	if ( SlaveWorker::pendingAck->erase( header.timestamp, fromTimestamp ) ) {
+		// Send ACK to masters
+		MasterEvent masterEvent;
+		uint32_t id = SlaveWorker::idGenerator->nextVal( this->workerId );
+
+		Slave *slave = Slave::getInstance();
+		LOCK_T *lock = &slave->sockets.masters.lock;
+		std::vector<MasterSocket *> &sockets = slave->sockets.masters.values;
+
+		LOCK( lock );
+		for ( size_t i = 0, size = sockets.size(); i < size; i++ ) {
+			masterEvent.ackMetadata( sockets[ i ], id, fromTimestamp, header.timestamp );
+			SlaveWorker::eventQueue->insert( masterEvent );
+		}
+		UNLOCK( lock );
+	} else {
+		__DEBUG__( YELLOW, "SlaveWorker", "handleAcknowledgement", "Timestamp: %u.", header.timestamp );
+	}
 	return true;
 }

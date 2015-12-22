@@ -28,6 +28,8 @@ enum MasterEventType {
 	// DELETE
 	MASTER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS,
 	MASTER_EVENT_TYPE_DELETE_RESPONSE_FAILURE,
+	// ACK
+	MASTER_EVENT_TYPE_ACK_METADATA,
 	// Pending
 	MASTER_EVENT_TYPE_PENDING
 };
@@ -70,6 +72,10 @@ public:
 			uint32_t sockfd;
 			bool isRemapped;
 		} remap;
+		struct {
+			uint32_t fromTimestamp;
+			uint32_t toTimestamp;
+		} ack;
 	} message;
 
 	// Register
@@ -87,6 +93,8 @@ public:
 	// DELETE
 	void resDelete( MasterSocket *socket, uint32_t id, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key, bool needsFree, bool isDegraded );
 	void resDelete( MasterSocket *socket, uint32_t id, Key &key, bool needsFree, bool isDegraded );
+	// ACK
+	void ackMetadata( MasterSocket *socket, uint32_t id, uint32_t fromTimestamp, uint32_t toTimestamp );
 	// Pending
 	void pending( MasterSocket *socket );
 };

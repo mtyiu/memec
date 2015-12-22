@@ -97,6 +97,7 @@ public:
 	void debug( FILE *f = stdout );
 	void printPending( FILE *f = stdout );
 	void printRemapping( FILE *f = stdout );
+	void printBackup( FILE *f = stdout );
 	void time();
 	double getElapsedTime();
 	void interactive();
