@@ -85,11 +85,11 @@ private:
 	std::unordered_map<PendingIdentifier, PendingReconstruction> reconstruction;
 	LOCK_T reconstructionLock;
 
-	std::map<struct sockaddr_in, Key> syncRemappedParity;
-	LOCK_T syncRemappedParityLock;
+	std::map<struct sockaddr_in, Key> syncRemappedData;
+	LOCK_T syncRemappedDataLock;
 
-	std::unordered_map<uint32_t, std::pair< std::set<struct sockaddr_in>*, pthread_cond_t* > > syncRemappedParityRequest;
-	LOCK_T syncRemappedParityRequestLock;
+	std::unordered_map<uint32_t, std::pair< std::set<struct sockaddr_in>*, pthread_cond_t* > > syncRemappedDataRequest;
+	LOCK_T syncRemappedDataRequestLock;
 
 	std::unordered_map<PendingIdentifier, PendingRecovery> recovery;
 	LOCK_T recoveryLock;
@@ -101,8 +101,8 @@ public:
 		LOCK_INIT( &this->syncRemappingRecordLock );
 		LOCK_INIT( &this->reconstructionLock );
 		LOCK_INIT( &this->recoveryLock );
-		LOCK_INIT( &this->syncRemappedParityLock );
-		LOCK_INIT( &this->syncRemappedParityRequestLock );
+		LOCK_INIT( &this->syncRemappedDataLock );
+		LOCK_INIT( &this->syncRemappedDataRequestLock );
 	}
 
 	~Pending() {}
@@ -348,22 +348,22 @@ public:
 		return map;
 	}
 
-	bool insertRemappedParityRequest( uint32_t id, std::set<struct sockaddr_in> *counter, pthread_cond_t *cond ) {
+	bool insertRemappedDataRequest( uint32_t id, std::set<struct sockaddr_in> *counter, pthread_cond_t *cond ) {
 		bool ret = false;
-		LOCK( &this->syncRemappedParityRequestLock );
-		if ( this->syncRemappedParityRequest.count( id ) == 0 ) {
-			this->syncRemappedParityRequest[ id ].first = counter;
-			this->syncRemappedParityRequest[ id ].second = cond;
+		LOCK( &this->syncRemappedDataRequestLock );
+		if ( this->syncRemappedDataRequest.count( id ) == 0 ) {
+			this->syncRemappedDataRequest[ id ].first = counter;
+			this->syncRemappedDataRequest[ id ].second = cond;
 			ret = true;
 		}
-		UNLOCK( &this->syncRemappedParityRequestLock );
+		UNLOCK( &this->syncRemappedDataRequestLock );
 		return ret;
 	}
 
-	bool decrementRemappedParityRequest( uint32_t id, struct sockaddr_in target, std::set<struct sockaddr_in> **counter, pthread_cond_t **cond ) {
-		LOCK( &this->syncRemappedParityRequestLock );
-		auto it = this->syncRemappedParityRequest.find( id );
-		bool ret = ( it != this->syncRemappedParityRequest.end() );
+	bool decrementRemappedDataRequest( uint32_t id, struct sockaddr_in target, std::set<struct sockaddr_in> **counter, pthread_cond_t **cond ) {
+		LOCK( &this->syncRemappedDataRequestLock );
+		auto it = this->syncRemappedDataRequest.find( id );
+		bool ret = ( it != this->syncRemappedDataRequest.end() );
 		if ( ret ) {
 			it->second.first->erase( target );
 			if ( cond ) *cond = it->second.second;
@@ -372,11 +372,11 @@ public:
 					*counter = it->second.first;
 				} else {
 					*counter = 0;
-					this->syncRemappedParityRequest.erase( id );
+					this->syncRemappedDataRequest.erase( id );
 				}
 			}
 		}
-		UNLOCK( &this->syncRemappedParityRequestLock );
+		UNLOCK( &this->syncRemappedDataRequestLock );
 		return ret;
 	}
 

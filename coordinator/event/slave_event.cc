@@ -38,7 +38,7 @@ void SlaveEvent::reqSyncMeta( SlaveSocket *socket, bool *sync ) {
 	this->message.sync = sync;
 }
 
-void SlaveEvent::syncRemappedParity( SlaveSocket *socket, Packet *packet ) {
+void SlaveEvent::syncRemappedData( SlaveSocket *socket, Packet *packet ) {
 	this->type = SLAVE_EVENT_TYPE_PARITY_MIGRATE;
 	this->socket = socket;
 	this->message.parity.packet = packet;

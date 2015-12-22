@@ -82,6 +82,13 @@ bool CoordinatorConfig::set( const char *section, const char *name, const char *
 			this->loadingStats.updateInterval = atoi( value );
 		else 
 			return false;
+	} else if ( match( section, "remap" ) ) {
+		if ( match( name, "concurrent" ) )
+			this->remap.worker = atoi( value );
+		else if ( match( name, "queue_len" ) ) 
+			this->remap.queue = atoi( value );
+		else
+			return false;
 	} else {
 		return false;
 	}

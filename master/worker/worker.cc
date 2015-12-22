@@ -43,12 +43,24 @@ void MasterWorker::dispatch( MasterEvent event ) {}
 SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId ) {
 	SlaveSocket *ret;
 
-	// Search to see if this key is remapped
+	// use hashing to get original slave
 	Key key;
 	key.set( size, data );
+	listId = MasterWorker::stripeList->get(
+		data, ( size_t ) size,
+		this->dataSlaveSockets,
+		this->paritySlaveSockets,
+		&chunkId, true
+	);
+
 	RemappingRecord record;
-	bool found = MasterWorker::remappingRecords->find( key, &record );
-	found = ( found && ! Master::getInstance()->config.master.remap.forceNoCacheRecords );
+	bool found = false;
+	// if original slave is not in Normal state, search to see if this key is remapped
+	if ( ! Master::getInstance()->config.master.remap.forceNoCacheRecords && 
+		Master::getInstance()->remapMsgHandler.useCoordinatedFlow( this->dataSlaveSockets[ chunkId ]->getAddr() ) )
+	{
+		found = MasterWorker::remappingRecords->find( key, &record );
+	}
 	if ( found ) { // remapped keys
 		//fprintf( stderr, "Redirect request to list=%u chunk=%u\n", record.listId, record.chunkId);
 		listId = record.listId;
@@ -57,13 +69,6 @@ SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId
 			listId,
 			this->paritySlaveSockets,
 			this->dataSlaveSockets
-		);
-	} else { // non-remapped keys
-		listId = MasterWorker::stripeList->get(
-			data, ( size_t ) size,
-			this->dataSlaveSockets,
-			this->paritySlaveSockets,
-			&chunkId, true
 		);
 	}
 	ret = this->dataSlaveSockets[ chunkId ];

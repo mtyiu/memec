@@ -147,7 +147,7 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 						this->handleReconstructionRequest( event, buffer.data, header.length );
 						break;
 					case PROTO_OPCODE_PARITY_MIGRATE:
-						this->handleRemappedParity( event, buffer.data, header.length );
+						this->handleRemappedData( event, buffer.data, buffer.size );
 						break;
 					case PROTO_OPCODE_SYNC:
 						this->handleHeartbeatAck( event, buffer.data, header.length );

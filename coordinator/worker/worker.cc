@@ -109,20 +109,20 @@ void CoordinatorWorker::dispatch( CoordinatorEvent event ) {
 			// prepare the request for all master
 			Packet *packet = coordinator->packetPool.malloc();
 			buffer.data = packet->data;
-			this->protocol.reqSyncRemappedParity(
+			this->protocol.reqSyncRemappedData(
 				buffer.size, id,
 				event.message.parity.target, buffer.data
 			);
 			packet->size = buffer.size;
 
-			coordinator->pending.insertRemappedParityRequest( id, event.message.parity.counter, event.message.parity.allAcked );
+			coordinator->pending.insertRemappedDataRequest( id, event.message.parity.counter, event.message.parity.allAcked );
 
 			LOCK( &coordinator->sockets.slaves.lock );
 			packet->setReferenceCount( coordinator->sockets.slaves.size() );
 			for ( uint32_t i = 0; i < coordinator->sockets.slaves.size(); i++ ) {
 				SlaveSocket *socket = coordinator->sockets.slaves[ i ];
 				event.message.parity.counter->insert( socket->getAddr() );
-				slaveEvent.syncRemappedParity( socket , packet );
+				slaveEvent.syncRemappedData( socket , packet );
 				coordinator->eventQueue.insert( slaveEvent );
 			}
 			UNLOCK( &coordinator->sockets.slaves.lock );

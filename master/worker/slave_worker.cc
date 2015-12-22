@@ -296,11 +296,11 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, bool isDeg
 	if ( isDegraded ) {
 		sockfd = original->getSocket();
 		MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
-		Master::getInstance()->remapMsgHandler.ackRemap( original->getAddr() );
+		Master::getInstance()->remapMsgHandler.ackTransit( original->getAddr() );
 	} else {
 		sockfd = event.socket->getSocket();
 		MasterWorker::slaveSockets->get( sockfd )->counter.decreaseNormal();
-		Master::getInstance()->remapMsgHandler.ackRemap( event.socket->getAddr() );
+		Master::getInstance()->remapMsgHandler.ackTransit( event.socket->getAddr() );
 	}
 
 	if ( success ) {
@@ -360,11 +360,11 @@ bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, bool is
 	if ( isDegraded ) {
 		sockfd = original->getSocket();
 		MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
-		Master::getInstance()->remapMsgHandler.ackRemap( original->getAddr() );
+		Master::getInstance()->remapMsgHandler.ackTransit( original->getAddr() );
 	} else {
 		sockfd = event.socket->getSocket();
 		MasterWorker::slaveSockets->get( sockfd )->counter.decreaseNormal();
-		Master::getInstance()->remapMsgHandler.ackRemap( event.socket->getAddr() );
+		Master::getInstance()->remapMsgHandler.ackTransit( event.socket->getAddr() );
 	}
 
 	applicationEvent.resUpdate( ( ApplicationSocket * ) pid.ptr, pid.id, keyValueUpdate, success );
@@ -423,11 +423,11 @@ bool MasterWorker::handleDeleteResponse( SlaveEvent event, bool success, bool is
 	if ( isDegraded ) {
 		sockfd = original->getSocket();
 		MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
-		Master::getInstance()->remapMsgHandler.ackRemap( original->getAddr() );
+		Master::getInstance()->remapMsgHandler.ackTransit( original->getAddr() );
 	} else {
 		sockfd = event.socket->getSocket();
 		MasterWorker::slaveSockets->get( sockfd )->counter.decreaseNormal();
-		Master::getInstance()->remapMsgHandler.ackRemap( event.socket->getAddr() );
+		Master::getInstance()->remapMsgHandler.ackTransit( event.socket->getAddr() );
 	}
 
 	applicationEvent.resDelete( ( ApplicationSocket * ) pid.ptr, pid.id, key, success );

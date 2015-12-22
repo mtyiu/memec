@@ -37,24 +37,12 @@ public:
 	 */
 	std::unordered_set<Metadata> sealed;
 	LOCK_T sealedLock;
-	/**
-	 * Store the pending-to-send remapping records
-	 * Key |-> (list ID, chunk ID)
-	 */
-	std::unordered_map<Key, RemappingRecord> remap;
-	/**
-	 * Store the alread-sent remapping records
-	 * Key |-> (list ID, chunk ID)
-	 */
-	std::unordered_map<Key, RemappingRecord> remapSent;
-	LOCK_T remapLock;
 
 	Map() {
 		LOCK_INIT( &this->keysLock );
 		LOCK_INIT( &this->cacheLock );
 		LOCK_INIT( &this->opsLock );
 		LOCK_INIT( &this->sealedLock );
-		LOCK_INIT( &this->remapLock );
 	}
 
 	bool findValueByKey( char *data, uint8_t size, KeyValue *keyValue, Key *keyPtr ) {
@@ -139,30 +127,6 @@ public:
 		return it->second;
 	}
 
-	bool findRemappingRecordByKey( char *data, uint8_t size, RemappingRecord *remappingRecordPtr = 0, Key *keyPtr = 0 ) {
-		std::unordered_map<Key, RemappingRecord>::iterator it;
-		Key key;
-
-		key.set( size, data );
-		if ( keyPtr ) *keyPtr = key;
-
-		LOCK( &this->remapLock );
-		// check the sent records
-		it = this->remapSent.find( key );
-		if ( it == this->remapSent.end() ) {
-			// check the unsent records
-			it = this->remap.find( key );
-			if ( it == this->remap.end() ) {
-				UNLOCK( &this->remapLock );
-				return false;
-			}
-		}
-
-		if ( remappingRecordPtr ) *remappingRecordPtr = it->second;
-		UNLOCK( &this->remapLock );
-		return true;
-	}
-
 	bool insertKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata, bool needsLock = true, bool needsUnlock = true, bool needsUpdateOpMetadata = true ) {
 		key.dup();
 
@@ -223,28 +187,6 @@ public:
 		UNLOCK( &this->sealedLock );
 
 		return ret.second;
-	}
-
-	bool insertRemappingRecord( Key key, RemappingRecord &remappingRecord ) {
-		key.dup( key.size, key.data );
-
-		std::pair<Key, RemappingRecord> p( key, remappingRecord );
-		std::pair<std::unordered_map<Key, RemappingRecord>::iterator, bool> ret;
-
-		LOCK( &this->remapLock );
-		ret = this->remap.insert( p );
-		if ( ! ret.second ) {
-			UNLOCK( &this->remapLock );
-			return false;
-		}
-		UNLOCK( &this->remapLock );
-
-		KeyMetadata keyMetadata;
-
-		keyMetadata.listId = remappingRecord.listId;
-		keyMetadata.chunkId = remappingRecord.chunkId;
-
-		return this->insertOpMetadata( PROTO_OPCODE_REMAPPING_LOCK, key, keyMetadata, false );
 	}
 
 	void setChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, Chunk *chunk, bool isParity = false, bool needsLock = true, bool needsUnlock = true ) {

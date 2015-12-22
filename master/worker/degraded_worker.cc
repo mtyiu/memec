@@ -102,7 +102,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 				sockfd = socket->getSocket();
 				MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
 				MasterWorker::slaveSockets->get( sockfd )->counter.increaseNormal();
-				Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
+				Master::getInstance()->remapMsgHandler.ackTransit( socket->getAddr() );
 			} else {
 				original = this->getSlaves( header.listId, header.srcDataChunkId );
 
@@ -110,12 +110,12 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 				socket = this->getSlaves( header.listId, header.srcParityChunkId );
 				sockfd = socket->getSocket();
 				MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
-				Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
+				Master::getInstance()->remapMsgHandler.ackTransit( socket->getAddr() );
 
 				// Increase normal counter for the data server
 				sockfd = original->getSocket();
 				MasterWorker::slaveSockets->get( sockfd )->counter.increaseNormal();
-				Master::getInstance()->remapMsgHandler.ackRemap( original->getAddr() );
+				Master::getInstance()->remapMsgHandler.ackTransit( original->getAddr() );
 
 				socket = original;
 			}
@@ -137,7 +137,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 
 				original = socket = this->getSlaves( header.listId, header.dstDataChunkId );
 				MasterWorker::slaveSockets->get( sockfd )->counter.increaseNormal();
-				Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
+				Master::getInstance()->remapMsgHandler.ackTransit( socket->getAddr() );
 			} else {
 				// parity server is remapped
 				original = this->getSlaves( header.listId, header.srcDataChunkId );
@@ -146,12 +146,12 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 				socket = this->getSlaves( header.listId, header.srcParityChunkId );
 				sockfd = socket->getSocket();
 				MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
-				Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
+				Master::getInstance()->remapMsgHandler.ackTransit( socket->getAddr() );
 
 				// Increase normal counter for the data server
 				sockfd = original->getSocket();
 				MasterWorker::slaveSockets->get( sockfd )->counter.increaseNormal();
-				Master::getInstance()->remapMsgHandler.ackRemap( original->getAddr() );
+				Master::getInstance()->remapMsgHandler.ackTransit( original->getAddr() );
 
 				socket = original;
 			}
@@ -168,7 +168,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 				socket = this->getSlaves( header.listId, header.srcDataChunkId );
 				sockfd = socket->getSocket();
 				MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
-				Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
+				Master::getInstance()->remapMsgHandler.ackTransit( socket->getAddr() );
 			} else {
 				original = this->getSlaves( header.listId, header.srcDataChunkId );
 
@@ -176,7 +176,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 				socket = this->getSlaves( header.listId, header.srcParityChunkId );
 				sockfd = socket->getSocket();
 				MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
-				Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
+				Master::getInstance()->remapMsgHandler.ackTransit( socket->getAddr() );
 
 				socket = original;
 			}

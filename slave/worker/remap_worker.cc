@@ -4,10 +4,10 @@
 #define BATCH_THRESHOLD		20
 static struct timespec BATCH_INTVL = { 0, 500000 };
 
-bool SlaveWorker::handleRemappedParity( CoordinatorEvent event, char *buf, size_t size ) {
+bool SlaveWorker::handleRemappedData( CoordinatorEvent event, char *buf, size_t size ) {
 	struct AddressHeader header;
 	if ( ! this->protocol.parseAddressHeader( header, buf, size ) ) {
-		__ERROR__( "SlaveWorker", "handleRemappedParity", "Invalid Remapped Parity Sync request." );
+		__ERROR__( "SlaveWorker", "handleRemappedData", "Invalid Remapped Data Sync request." );
 		return false;
 	}
 
@@ -25,18 +25,19 @@ bool SlaveWorker::handleRemappedParity( CoordinatorEvent event, char *buf, size_
 		}
 	}
 	if ( socket == 0 )
-		__ERROR__( "SlaveWorker", "handleRemappedparity", "Cannot find slave sccket to send remapped parity back." );
+		__ERROR__( "SlaveWorker", "handleRemappedData", "Cannot find slave sccket to send remapped data back." );
 
-	std::set<PendingData> *remappedParity;
-	bool found = SlaveWorker::pending->eraseRemapData( target, &remappedParity );
+	std::set<PendingData> *remappedData;
+	bool found = SlaveWorker::pending->eraseRemapData( target, &remappedData );
 
 	if ( found && socket ) {
 		uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
-		// TODO insert into pending set to wait for acknowledgement
-		SlaveWorker::pending->insertRemapDataRequest( requestId, event.id, remappedParity->size(), socket );
+		// insert into pending set to wait for acknowledgement
+		SlaveWorker::pending->insertRemapDataRequest( requestId, event.id, remappedData->size(), socket );
 		// dispatch one event for each key
+		// TODO : batched SET
 		uint32_t requestSent = 0;
-		for ( PendingData pendingData : *remappedParity ) {
+		for ( PendingData pendingData : *remappedData) {
 			slavePeerEvent.reqSet( socket, requestId, pendingData.listId, pendingData.chunkId, pendingData.key, pendingData.value );
 			slave->eventQueue.insert( slavePeerEvent );
 			requestSent++;
@@ -45,12 +46,12 @@ bool SlaveWorker::handleRemappedParity( CoordinatorEvent event, char *buf, size_
 				requestSent = 0;
 			}
 		}
-		delete remappedParity;
+		delete remappedData;
 	} else {
-		event.resRemappedParity();
+		event.resRemappedData();
 		this->dispatch( event );
-		// slave not found, but remapped parity found.. discard the parity
-		if ( found ) delete remappedParity;
+		// slave not found, but remapped data found.. discard the data
+		if ( found ) delete remappedData;
 	}
 	return false;
 }
@@ -75,15 +76,13 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 	SlavePeerSocket *dataSlaveSocket = this->getSlaves( header.key, header.keySize, originalListId, originalChunkId );
 	struct sockaddr_in selfAddr = Slave::getInstance()->sockets.self.getAddr();
 	bool bufferRemapData = true;
-	if ( ! header.remapped /* data rempped ?*/ ) {
-		if ( selfAddr == dataSlaveSocket->getAddr() ) {
-			bufferRemapData = false;
-		}
-	} else if ( targetAddr.sin_addr.s_addr == 0 || targetAddr == selfAddr ) { /* parity remapped ?*/
+	// no need to buffer if (1) this is the target, or (2) remapped but target not specified
+	if ( selfAddr == dataSlaveSocket->getAddr() || 
+		( header.remapped && ( targetAddr.sin_addr.s_addr == 0 || targetAddr == selfAddr ) ) ) {
 		bufferRemapData = false;
 	}
 
-	if ( header.remapped && bufferRemapData ) { // only buffer remapped parity for the time being
+	if ( header.remapped && bufferRemapData ) { // buffer both parity and data
 		Key key;
 		key.set( header.keySize, header.key );
 		Value value;

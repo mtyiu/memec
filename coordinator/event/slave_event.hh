@@ -54,7 +54,7 @@ public:
 	void reqFlushChunks( SlaveSocket *socket );
 	void reqSyncMeta( SlaveSocket *socket, bool *sync );
 	void reqReleaseDegradedLock( SlaveSocket *socket, bool *done = 0 );
-	void syncRemappedParity( SlaveSocket *socket, Packet *packet );
+	void syncRemappedData( SlaveSocket *socket, Packet *packet );
 	void resHeartbeat( SlaveSocket *socket, uint32_t timestamp, uint32_t sealed, uint32_t keys, bool isLast );
 	void disconnect( SlaveSocket *socket );
 };

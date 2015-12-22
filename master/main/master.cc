@@ -588,7 +588,7 @@ bool Master::isDegraded( SlaveSocket *socket ) {
 		( this->debugFlags.isDegraded )
 		||
 		(
-			this->remapMsgHandler.useRemappingFlow( socket->getAddr() ) &&
+			this->remapMsgHandler.useCoordinatedFlow( socket->getAddr() ) &&
 			! this->config.master.degraded.disabled
 		)
 	);

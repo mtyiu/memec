@@ -199,9 +199,9 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 	for ( uint32_t i = 0; i < 1 + MasterWorker::parityChunkCount; i++ ) {
 		Master *master = Master::getInstance();
 		if ( i == 0 )
-			remapped |= master->remapMsgHandler.useRemappingFlow( socket->getAddr() );
+			remapped |= master->remapMsgHandler.useCoordinatedFlow( socket->getAddr() );
 		else {
-			remapped |= master->remapMsgHandler.useRemappingFlow( this->paritySlaveSockets[ i - 1 ]->getAddr() );
+			remapped |= master->remapMsgHandler.useCoordinatedFlow( this->paritySlaveSockets[ i - 1 ]->getAddr() );
 		}
 	}
 	remapped &= ( ! MasterWorker::disableRemappingSet );
@@ -291,7 +291,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 			__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 
 			MasterWorker::slaveSockets->get( sockfd )->counter.decreaseNormal();
-			Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
+			Master::getInstance()->remapMsgHandler.ackTransit( socket->getAddr() );
 
 			return false;
 		}
@@ -304,13 +304,13 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 			__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 
 			MasterWorker::slaveSockets->get( sockfd )->counter.decreaseNormal();
-			Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
+			Master::getInstance()->remapMsgHandler.ackTransit( socket->getAddr() );
 
 			return false;
 		}
 	}
 
-	Master::getInstance()->remapMsgHandler.ackRemap( socket->getAddr() );
+	Master::getInstance()->remapMsgHandler.ackTransit( socket->getAddr() );
 
 	return true;
 }

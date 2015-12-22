@@ -53,6 +53,7 @@ public:
 	struct {
 		bool disableRemappingSet;
 		bool forceNoCacheRecords;
+		uint32_t backgroundAck;
 	} remap;
 	struct {
 		bool isFixed;

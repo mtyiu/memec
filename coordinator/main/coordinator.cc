@@ -547,7 +547,7 @@ void Coordinator::syncRemappingRecords( LOCK_T *lock, std::map<struct sockaddr_i
 	this->eventQueue.insert( event );
 }
 
-void Coordinator::syncRemappedParity( struct sockaddr_in slaveAddr ) {
+void Coordinator::syncRemappedData( struct sockaddr_in slaveAddr ) {
 	CoordinatorEvent event;
 	LOCK_T lock;
 	LOCK_INIT( &lock );
@@ -555,7 +555,7 @@ void Coordinator::syncRemappedParity( struct sockaddr_in slaveAddr ) {
 	pthread_cond_init( &allAcked, NULL );
 	std::set<struct sockaddr_in> ackedSlaves;
 	// let worker send the sync requests
-	event.syncRemappedParity( &lock, &ackedSlaves, &allAcked, slaveAddr );
+	event.syncRemappedData( &lock, &ackedSlaves, &allAcked, slaveAddr );
 	this->eventQueue.insert( event );
 	// wait for sync to complete
 	pthread_cond_wait( &allAcked, &lock );
@@ -689,16 +689,16 @@ void Coordinator::interactive() {
 		} else if ( strcmp( command, "release" ) == 0 ) {
 			valid = true;
 			this->releaseDegradedLock();
-		} else if ( strcmp( command, "remapsync" ) == 0 ) {
+		} else if ( strcmp( command, "remapRecordSync" ) == 0 ) {
 			LOCK_T lock;
 			std::map<struct sockaddr_in, uint32_t> counter;
 			volatile bool done;
 			this->syncRemappingRecords( &lock, &counter, ( bool * ) &done );
 			while( ! done );
 			valid = true;
-		} else if ( strcmp( command, "paritysync" ) == 0 ) {
+		} else if ( strcmp( command, "remapMigrate" ) == 0 ) {
 			for ( uint32_t i = 0; i < this->sockets.slaves.size(); i++ ){
-				this->syncRemappedParity( this->sockets.slaves[ i ]->getAddr() );
+				this->syncRemappedData( this->sockets.slaves[ i ]->getAddr() );
 			}
 			valid = true;
 		} else {
@@ -776,8 +776,8 @@ void Coordinator::help() {
 		"- release: Release degraded locks at the specified socket\n"
 		"- metadata: Write metadata to disk\n"
 		"- remapping: Show remapping info\n"
-		"- remapsync: Force all remapping records to masters\n"
-		"- paritysync: Force all remapped parity to migrate\n"
+		"- remapRecordSync: Force all remapping records to masters\n"
+		"- remapMigrate: Force all remapped kv to migrate\n"
 		"- exit: Terminate this client\n"
 	);
 	fflush( stdout );

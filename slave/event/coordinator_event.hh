@@ -41,7 +41,7 @@ public:
 
 	void reqRegister( CoordinatorSocket *socket, uint32_t addr, uint16_t port );
 	void sync( CoordinatorSocket *socket, uint32_t id = 0 );
-	void resRemappedParity( CoordinatorSocket *socket = 0, uint32_t *id = 0 );
+	void resRemappedData( CoordinatorSocket *socket = 0, uint32_t *id = 0 );
 	void resReleaseDegradedLock( CoordinatorSocket *socket, uint32_t id, uint32_t count );
 	void resReconstruction( CoordinatorSocket *socket, uint32_t id, uint32_t listId, uint32_t chunkId, uint32_t numStripes );
 	void resPromoteBackupSlave( CoordinatorSocket *socket, uint32_t id, uint32_t addr, uint16_t port, uint32_t count );

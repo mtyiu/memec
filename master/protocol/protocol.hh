@@ -87,7 +87,7 @@ public:
 		char *buf = 0,
 		uint32_t sockfd = UINT_MAX,
 		bool isParity = false,
-		struct sockaddr_in *target = 0
+		struct sockaddr_in *target = 0 // embed original data/parity target
 	);
 	char *resSyncRemappingRecords( size_t &size, uint32_t id );
 

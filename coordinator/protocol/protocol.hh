@@ -92,7 +92,7 @@ public:
 		bool &isLast,
 		char *buffer = 0
 	);
-	char *reqSyncRemappedParity( size_t &size, uint32_t id, struct sockaddr_in target, char* buffer = 0 );
+	char *reqSyncRemappedData( size_t &size, uint32_t id, struct sockaddr_in target, char* buffer = 0 );
 
 	// ---------- recovery_protocol.cc ----------
 	char *announceSlaveReconstructed( size_t &size, uint32_t id, SlaveSocket *srcSocket, SlaveSocket *dstSocket );
