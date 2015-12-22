@@ -109,21 +109,44 @@ quit_1:
 }
 
 bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf, size_t size ) {
+	uint8_t keySize;
 	char *keyStr;
 	if ( success ) {
-		struct ChunkKeyHeader header;
-		if ( ! this->protocol.parseChunkKeyHeader( header, buf, size ) ) {
+		struct KeyBackupHeader header;
+		if ( ! this->protocol.parseKeyBackupHeader( header, buf, size ) ) {
 			__ERROR__( "MasterWorker", "handleSetResponse", "Invalid SET response." );
 			return false;
 		}
-		__DEBUG__(
-			BLUE, "MasterWorker", "handleSetResponse",
-			"[SET] Key: %.*s (key size = %u) at (%u, %u, %u)",
-			( int ) header.keySize, header.key, header.keySize,
-			header.listId, header.stripeId, header.chunkId
-		);
+		if ( header.isParity ) {
+			__DEBUG__(
+				BLUE, "MasterWorker", "handleSetResponse",
+				"[SET] Key: %.*s (key size = %u)",
+				( int ) header.keySize, header.key, header.keySize
+			);
 
-		keyStr = header.key;
+			keySize = header.keySize;
+			keyStr = header.key;
+		} else {
+			__DEBUG__(
+				BLUE, "MasterWorker", "handleSetResponse",
+				"[SET] [%u] Key: %.*s (key size = %u) at (%u, %u, %u)",
+				header.timestamp,
+				( int ) header.keySize, header.key, header.keySize,
+				header.listId, header.stripeId, header.chunkId
+			);
+
+			keySize = header.keySize;
+			keyStr = header.key;
+
+			event.socket->backup.insert(
+				keySize, keyStr,
+				PROTO_OPCODE_SET,
+				header.timestamp,
+				header.listId,
+				header.stripeId,
+				header.chunkId
+			);
+		}
 	} else {
 		struct KeyHeader header;
 		if ( ! this->protocol.parseKeyHeader( header, buf, size ) ) {
@@ -136,6 +159,7 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 			( int ) header.keySize, header.key, header.keySize
 		);
 
+		keySize = header.keySize;
 		keyStr = header.key;
 	}
 
@@ -187,7 +211,7 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 			return false;
 		}
 
-		applicationEvent.resSet( ( ApplicationSocket * ) key.ptr, pid.id, key, success );
+		applicationEvent.resSet( ( ApplicationSocket * ) pid.ptr, pid.id, key, success );
 		MasterWorker::eventQueue->insert( applicationEvent );
 		uint32_t originalListId, originalChunkId;
 		SlaveSocket *original = this->getSlaves( key.data, key.size, originalListId, originalChunkId );
@@ -230,7 +254,7 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, bool isDeg
 		__ERROR__( "MasterWorker", "handleGetResponse", "Cannot find a pending slave GET request that matches the response. This message will be discarded (key = %.*s).", key.size, key.data );
 		return false;
 	}
-	original = ( SlaveSocket * ) key.ptr;
+	original = ( SlaveSocket * ) pid.ptr;
 
 	// Mark the elapse time as latency
 	if ( ! isDegraded && MasterWorker::updateInterval ) {
@@ -258,7 +282,6 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, bool isDeg
 		}
 	}
 
-	key.ptr = 0;
 	if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_GET, pid.parentId, 0, &pid, &key, true, true, true, key.data ) ) {
 		__ERROR__( "MasterWorker", "handleGetResponse", "Cannot find a pending application GET request that matches the response. This message will be discarded (key = %.*s).", key.size, key.data );
 		return false;
@@ -276,7 +299,7 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, bool isDeg
 
 	if ( success ) {
 		applicationEvent.resGet(
-			( ApplicationSocket * ) key.ptr,
+			( ApplicationSocket * ) pid.ptr,
 			pid.id,
 			key.size,
 			valueSize,
@@ -285,7 +308,7 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, bool isDeg
 			false
 		);
 	} else {
-		applicationEvent.resGet( ( ApplicationSocket * ) key.ptr, pid.id, key, false );
+		applicationEvent.resGet( ( ApplicationSocket * ) pid.ptr, pid.id, key, false );
 	}
 	// MasterWorker::eventQueue->insert( applicationEvent );
 	this->dispatch( applicationEvent );
@@ -318,7 +341,7 @@ bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, bool is
 		__ERROR__( "MasterWorker", "handleUpdateResponse", "Cannot find a pending slave UPDATE request that matches the response. This message will be discarded. (ID: %u)", event.id );
 		return false;
 	}
-	original = ( SlaveSocket * ) keyValueUpdate.ptr;
+	original = ( SlaveSocket * ) pid.ptr;
 
 	if ( ! MasterWorker::pending->eraseKeyValueUpdate( PT_APPLICATION_UPDATE, pid.parentId, 0, &pid, &keyValueUpdate, true, true, true, header.key ) ) {
 		__ERROR__( "MasterWorker", "handleUpdateResponse", "Cannot find a pending application UPDATE request that matches the response. This message will be discarded." );
@@ -345,10 +368,33 @@ bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, bool is
 }
 
 bool MasterWorker::handleDeleteResponse( SlaveEvent event, bool success, bool isDegraded, char *buf, size_t size ) {
-	struct KeyHeader header;
-	if ( ! this->protocol.parseKeyHeader( header, buf, size ) ) {
-		__ERROR__( "MasterWorker", "handleDeleteResponse", "Invalid DELETE Response." );
-		return false;
+	char *keyStr;
+	uint8_t keySize;
+	if ( success ) {
+		struct KeyBackupHeader header;
+		if ( ! this->protocol.parseKeyBackupHeader( header, buf, size ) ) {
+			__ERROR__( "MasterWorker", "handleDeleteResponse", "Invalid DELETE Response." );
+			return false;
+		}
+		keyStr = header.key;
+		keySize = header.keySize;
+
+		event.socket->backup.insert(
+			keySize, keyStr,
+			PROTO_OPCODE_DELETE,
+			header.timestamp,
+			header.listId,
+			header.stripeId,
+			header.chunkId
+		);
+	} else {
+		struct KeyHeader header;
+		if ( ! this->protocol.parseKeyHeader( header, buf, size ) ) {
+			__ERROR__( "MasterWorker", "handleDeleteResponse", "Invalid DELETE Response." );
+			return false;
+		}
+		keyStr = header.key;
+		keySize = header.keySize;
 	}
 
 	ApplicationEvent applicationEvent;
@@ -361,9 +407,9 @@ bool MasterWorker::handleDeleteResponse( SlaveEvent event, bool success, bool is
 		__ERROR__( "MasterWorker", "handleDeleteResponse", "Cannot find a pending slave DELETE request that matches the response. This message will be discarded." );
 		return false;
 	}
-	original = ( SlaveSocket * ) key.ptr;
+	original = ( SlaveSocket * ) pid.ptr;
 
-	if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_DEL, pid.parentId, 0, &pid, &key, true, true, true, header.key ) ) {
+	if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_DEL, pid.parentId, 0, &pid, &key, true, true, true, keyStr ) ) {
 		__ERROR__( "MasterWorker", "handleDeleteResponse", "Cannot find a pending application DELETE request that matches the response. This message will be discarded." );
 		return false;
 	}
@@ -378,7 +424,7 @@ bool MasterWorker::handleDeleteResponse( SlaveEvent event, bool success, bool is
 		Master::getInstance()->remapMsgHandler.ackTransit( event.socket->getAddr() );
 	}
 
-	applicationEvent.resDelete( ( ApplicationSocket * ) key.ptr, pid.id, key, success );
+	applicationEvent.resDelete( ( ApplicationSocket * ) pid.ptr, pid.id, key, success );
 	MasterWorker::eventQueue->insert( applicationEvent );
 
 	// TODO remove remapping records

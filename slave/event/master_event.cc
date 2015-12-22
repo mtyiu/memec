@@ -29,11 +29,12 @@ void MasterEvent::resSet( MasterSocket *socket, uint32_t id, Key &key, bool succ
 	this->message.set.key = key;
 }
 
-void MasterEvent::resSet( MasterSocket *socket, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key ) {
+void MasterEvent::resSet( MasterSocket *socket, uint32_t id, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key ) {
 	this->type = MASTER_EVENT_TYPE_SET_RESPONSE_SUCCESS_DATA;
 	this->id = id;
 	this->socket = socket;
 	this->message.set.key = key;
+	this->message.set.timestamp = timestamp;
 	this->message.set.listId = listId;
 	this->message.set.stripeId = stripeId;
 	this->message.set.chunkId = chunkId;
@@ -62,13 +63,26 @@ void MasterEvent::resUpdate( MasterSocket *socket, uint32_t id, Key &key, uint32
 	this->message.keyValueUpdate.valueUpdateSize = valueUpdateSize;
 }
 
-void MasterEvent::resDelete( MasterSocket *socket, uint32_t id, Key &key, bool success, bool needsFree, bool isDegraded ) {
-	this->type = success ? MASTER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS : MASTER_EVENT_TYPE_DELETE_RESPONSE_FAILURE;
+void MasterEvent::resDelete( MasterSocket *socket, uint32_t id, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key, bool needsFree, bool isDegraded ) {
+	this->type = MASTER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS;
 	this->id = id;
 	this->needsFree = needsFree;
 	this->isDegraded = isDegraded;
 	this->socket = socket;
-	this->message.key = key;
+	this->message.del.key = key;
+	this->message.del.timestamp = timestamp;
+	this->message.del.listId = listId;
+	this->message.del.stripeId = stripeId;
+	this->message.del.chunkId = chunkId;
+}
+
+void MasterEvent::resDelete( MasterSocket *socket, uint32_t id, Key &key, bool needsFree, bool isDegraded ) {
+	this->type =  MASTER_EVENT_TYPE_DELETE_RESPONSE_FAILURE;
+	this->id = id;
+	this->needsFree = needsFree;
+	this->isDegraded = isDegraded;
+	this->socket = socket;
+	this->message.del.key = key;
 }
 
 void MasterEvent::pending( MasterSocket *socket ) {

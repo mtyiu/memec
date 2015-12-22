@@ -6,6 +6,8 @@
 #include <pthread.h>
 #include "protocol.hh"
 
+// #define WAIT_GET_RESPONSE
+
 class Buffer {
 public:
 	char *data;
@@ -33,6 +35,7 @@ public:
 	}
 };
 
+#ifdef WAIT_GET_RESPONSE
 struct GetResponse {
 	pthread_mutex_t *lock;
 	pthread_cond_t *cond;
@@ -40,6 +43,7 @@ struct GetResponse {
 	char **valuePtr;
 	uint32_t *valueSizePtr;
 };
+#endif
 
 class MemEC {
 private:
@@ -58,7 +62,13 @@ private:
 
 	struct {
 		std::unordered_set<uint32_t> set, update, del;
+#ifdef WAIT_GET_RESPONSE
 		std::unordered_map<uint32_t, struct GetResponse> get;
+#else
+		std::unordered_set<uint32_t> get;
+		pthread_mutex_t *recvBytesLock;
+		uint64_t *recvBytes;
+#endif
 		pthread_mutex_t setLock;
 		pthread_mutex_t getLock;
 		pthread_mutex_t updateLock;
@@ -94,6 +104,7 @@ public:
 	bool del( char *key, uint8_t keySize );
 	bool flush();
 	void printPending( FILE *f = stdout );
+	void setRecvBytesVar( pthread_mutex_t *recvBytesLock, uint64_t *recvBytes );
 
 	void recvThread();
 	static void *recvThread( void *argv );

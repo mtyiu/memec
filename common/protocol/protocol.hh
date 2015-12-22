@@ -20,7 +20,7 @@
 #define PROTO_MAGIC_ANNOUNCEMENT                  0x04 // -----100
 #define PROTO_MAGIC_LOADING_STATS                 0x05 // -----101
 #define PROTO_MAGIC_REMAPPING                     0x06 // -----110
-#define PROTO_MAGIC_RESERVED_4                    0x07 // -----111
+#define PROTO_MAGIC_ACKNOWLEDGEMENT               0x07 // -----111
 // (Bit: 3-4) //
 #define PROTO_MAGIC_FROM_APPLICATION              0x00 // ---00---
 #define PROTO_MAGIC_FROM_COORDINATOR              0x08 // ---01---
@@ -196,6 +196,24 @@ struct LoadStatsHeader {
 struct KeyHeader {
 	uint8_t keySize;
 	char *key;
+};
+
+#define PROTO_KEY_SLAVE_SIZE 17
+struct KeySlaveHeader {
+    uint8_t keySize;
+    char *key;
+};
+
+#define PROTO_KEY_BACKUP_FOR_DATA_SIZE 18
+#define PROTO_KEY_BACKUP_FOR_PARITY_SIZE 2
+struct KeyBackupHeader {
+    bool isParity;
+    uint32_t timestamp; // Only for data servers
+    uint32_t listId;    // Only for data servers
+    uint32_t stripeId;  // Only for data servers
+    uint32_t chunkId;   // Only for data servers
+    uint8_t keySize;
+    char *key;
 };
 
 #define PROTO_CHUNK_KEY_SIZE 13
@@ -545,6 +563,23 @@ protected:
 		uint8_t keySize, char *key, char *sendBuf = 0
 	);
 	bool parseKeyHeader( size_t offset, uint8_t &keySize, char *&key, char *buf, size_t size );
+
+	size_t generateKeyBackupHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+        uint32_t timestamp,
+        uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		uint8_t keySize, char *key, char *sendBuf = 0
+	);
+    size_t generateKeyBackupHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t keySize, char *key, char *sendBuf = 0
+	);
+	bool parseKeyBackupHeader(
+        size_t offset, bool &isParity,
+        uint32_t &timestamp, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
+        uint8_t &keySize, char *&key,
+        char *buf, size_t size
+    );
 
 	size_t generateChunkKeyHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
@@ -946,6 +981,10 @@ public:
 	// ---------- normal_protocol.cc ----------
 	bool parseKeyHeader(
 		struct KeyHeader &header,
+		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
+	bool parseKeyBackupHeader(
+		struct KeyBackupHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 	bool parseChunkKeyHeader(

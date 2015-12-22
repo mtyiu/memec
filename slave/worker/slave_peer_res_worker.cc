@@ -186,8 +186,10 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 					);
 				} else {
 					masterEvent.resDelete(
-						op.socket, pid.parentId, key,
-						false, false, true
+						op.socket, pid.parentId,
+						key,
+						false, // needsFree
+						true   // isDegraded
 					);
 					this->dispatch( masterEvent );
 				}
@@ -236,7 +238,7 @@ bool SlaveWorker::handleUpdateResponse( SlavePeerEvent event, bool success, char
 		}
 
 		masterEvent.resUpdate(
-			( MasterSocket * ) keyValueUpdate.ptr, pid.id,
+			( MasterSocket * ) pid.ptr, pid.id,
 			keyValueUpdate,
 			header.valueUpdateOffset,
 			header.valueUpdateSize,
@@ -283,7 +285,25 @@ bool SlaveWorker::handleDeleteResponse( SlavePeerEvent event, bool success, char
 			return false;
 		}
 
-		masterEvent.resDelete( ( MasterSocket * ) key.ptr, pid.id, key, success, true, false );
+		if ( success ) {
+			printf( "TODO: slave/worker/slave_peer_res_worker.cc - Line 289: Include the timestamp and metadata in the response.\n" );
+			uint32_t timestamp = SlaveWorker::timestamp->nextVal();
+			masterEvent.resDelete(
+				( MasterSocket * ) pid.ptr,
+				pid.id,
+				key,
+				true, // needsFree
+				false // isDegraded
+			);
+		} else {
+			masterEvent.resDelete(
+				( MasterSocket * ) pid.ptr,
+				pid.id,
+				key,
+				true, // needsFree
+				false // isDegraded
+			);
+		}
 		SlaveWorker::eventQueue->insert( masterEvent );
 	}
 	return true;
@@ -593,7 +613,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 						} else {
 							MasterEvent event;
 
-							event.resDelete( op.socket, pid.parentId, key, false, false, true );
+							event.resDelete( op.socket, pid.parentId, key, false, true );
 							this->dispatch( event );
 							op.data.key.free();
 						}
@@ -753,7 +773,7 @@ bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success,
 
 		key.set( keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.ptr );
 		masterEvent.resUpdate(
-			( MasterSocket * ) keyValueUpdate.ptr, pid.id, key,
+			( MasterSocket * ) pid.ptr, pid.id, key,
 			keyValueUpdate.offset, keyValueUpdate.length,
 			success, true, false
 		);
@@ -805,7 +825,25 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 			return false;
 		}
 
-		masterEvent.resDelete( ( MasterSocket * ) pid.ptr, pid.id, key, success, true, false );
+		// TODO: Include the timestamp and metadata in the response
+		if ( success ) {
+			uint32_t timestamp = SlaveWorker::timestamp->nextVal();
+			masterEvent.resDelete(
+				( MasterSocket * ) pid.ptr, pid.id,
+				timestamp,
+				header.listId, header.stripeId, header.chunkId,
+				key,
+				true, // needsFree
+				false // isDegraded
+			);
+		} else {
+			masterEvent.resDelete(
+				( MasterSocket * ) pid.ptr, pid.id,
+				key,
+				true, // needsFree
+				false // isDegraded
+			);
+		}
 		SlaveWorker::eventQueue->insert( masterEvent );
 	}
 	return true;

@@ -1,12 +1,13 @@
 #include "protocol.hh"
 
-char *SlaveProtocol::resSet( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint8_t keySize, char *key ) {
+char *SlaveProtocol::resSet( size_t &size, uint32_t id, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint8_t keySize, char *key ) {
 	// -- common/protocol/normal_protocol.cc --
-	size = this->generateChunkKeyHeader(
+	size = this->generateKeyBackupHeader(
 		PROTO_MAGIC_RESPONSE_SUCCESS,
 		PROTO_MAGIC_TO_MASTER,
 		PROTO_OPCODE_SET,
 		id,
+		timestamp,
 		listId,
 		stripeId,
 		chunkId,
@@ -18,7 +19,7 @@ char *SlaveProtocol::resSet( size_t &size, uint32_t id, uint32_t listId, uint32_
 
 char *SlaveProtocol::resSet( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key, bool toMaster ) {
 	// -- common/protocol/normal_protocol.cc --
-	size = this->generateKeyHeader(
+	size = this->generateKeyBackupHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 		toMaster ? PROTO_MAGIC_TO_MASTER : PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_SET,
@@ -68,10 +69,27 @@ char *SlaveProtocol::resUpdate( size_t &size, uint32_t id, bool success, bool is
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::resDelete( size_t &size, uint32_t id, bool success, bool isDegraded, uint8_t keySize, char *key, bool toMaster ) {
+char *SlaveProtocol::resDelete( size_t &size, uint32_t id, bool isDegraded, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint8_t keySize, char *key, bool toMaster ) {
 	// -- common/protocol/normal_protocol.cc --
-	size = this->generateKeyHeader(
-		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+	size = this->generateKeyBackupHeader(
+		PROTO_MAGIC_RESPONSE_SUCCESS,
+		toMaster ? PROTO_MAGIC_TO_MASTER : PROTO_MAGIC_TO_SLAVE,
+		isDegraded ? PROTO_OPCODE_DEGRADED_DELETE : PROTO_OPCODE_DELETE,
+		id,
+		timestamp,
+		listId,
+		stripeId,
+		chunkId,
+		keySize,
+		key
+	);
+	return this->buffer.send;
+}
+
+char *SlaveProtocol::resDelete( size_t &size, uint32_t id, bool isDegraded, uint8_t keySize, char *key, bool toMaster ) {
+	// -- common/protocol/normal_protocol.cc --
+	size = this->generateKeyBackupHeader(
+		PROTO_MAGIC_RESPONSE_FAILURE,
 		toMaster ? PROTO_MAGIC_TO_MASTER : PROTO_MAGIC_TO_SLAVE,
 		isDegraded ? PROTO_OPCODE_DEGRADED_DELETE : PROTO_OPCODE_DELETE,
 		id,

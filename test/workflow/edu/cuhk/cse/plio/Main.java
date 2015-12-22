@@ -73,35 +73,6 @@ public class Main implements Runnable {
 			size = this.map.size();
 			ret = false;
 
-			// vvvvv For testing degraded operations (Start) vvvvv
-			if ( i == numRecords ) {
-				System.out.println( "Sleep for 10 seconds..." );
-				try {
-					Thread.sleep( 2000 );
-				} catch( InterruptedException e ) {}
-				System.out.println( "Done." );
-			}
-
-			/*
-			if ( i == numRecords * 3 ) {
-				System.out.println( "Sleep for 20 seconds..." );
-				try {
-					Thread.sleep( 20000 );
-				} catch( InterruptedException e ) {}
-				System.out.println( "Done." );
-			}
-			*/
-
-			if ( i < numRecords ) {
-				rand = 0;
-			} else {
-				rand = rand == 0 ? 1 : rand;
-				if ( size == 0 )
-					break;
-				rand = rand == 3 ? 1 : rand;
-			}
-			// ^^^^^ For testing degraded operations (End) ^^^^^
-
 			if ( rand == 0 ) {
 				// SET
 				if ( size < numRecords ) {
@@ -198,8 +169,6 @@ public class Main implements Runnable {
 				}
 			}
 		}
-
-		// System.out.println( "Final map size: " + this.map.size() );
 	}
 
 	public static void main( String[] args ) throws Exception {

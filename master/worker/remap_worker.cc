@@ -219,14 +219,17 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 
 	// Add data and parity slaves into the pending set
 	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount + 1; i++ ) {
-		key.ptr = ( void * )( i == 0 ? socket :
-			remapList[ i ] > MasterWorker::dataChunkCount - 1?
-			this->paritySlaveSockets[ remapList[ i ] - MasterWorker::dataChunkCount ] :
-			this->dataSlaveSockets[ remapList[ i ] ]
-		);
+		SlaveSocket *target;
+		if ( i == 0 ) {
+			target = socket;
+		} else if ( remapList[ i ] > MasterWorker::dataChunkCount - 1 ) {
+			target = this->paritySlaveSockets[ remapList[ i ] - MasterWorker::dataChunkCount ];
+		} else {
+			target = this->dataSlaveSockets[ remapList[ i ] ];
+		}
 		if ( ! MasterWorker::pending->insertKey(
 			PT_SLAVE_SET, pid.id, pid.parentId,
-			( void * ) key.ptr,
+			target,
 			key
 		) ) {
 			__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Cannot insert into slave SET pending map." );
@@ -390,7 +393,7 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 			return false;
 		}
 
-		applicationEvent.resSet( ( ApplicationSocket * ) key.ptr, pid.id, key, success );
+		applicationEvent.resSet( ( ApplicationSocket * ) pid.ptr, pid.id, key, success );
 		MasterWorker::eventQueue->insert( applicationEvent );
 
 		// add a remaping record

@@ -48,10 +48,6 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 			uint8_t keySize;
 			uint32_t valueSize;
 			event.message.keyValue.deserialize( key, keySize, value, valueSize );
-			if ( valueSize > 4096 ) {
-				printf( "keySize = %u; valueSize = %u\n", keySize, valueSize );
-				assert( valueSize <= 4096 );
-			}
 			buffer.data = this->protocol.resGet(
 				buffer.size,
 				event.id,
@@ -77,6 +73,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 			buffer.data = this->protocol.resSet(
 				buffer.size,
 				event.id,
+				event.message.set.timestamp,
 				event.message.set.listId,
 				event.message.set.stripeId,
 				event.message.set.chunkId,
@@ -131,18 +128,33 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 			break;
 		// DELETE
 		case MASTER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS:
+			// TODO: Include the timestamp and metadata
+			buffer.data = this->protocol.resDelete(
+				buffer.size,
+				event.id,
+				event.isDegraded,
+				event.message.del.timestamp,
+				event.message.del.listId,
+				event.message.del.stripeId,
+				event.message.del.chunkId,
+				event.message.del.key.size,
+				event.message.del.key.data
+			);
+
+			if ( event.needsFree )
+				event.message.del.key.free();
+			break;
 		case MASTER_EVENT_TYPE_DELETE_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resDelete(
 				buffer.size,
 				event.id,
-				success,
 				event.isDegraded,
-				event.message.key.size,
-				event.message.key.data
+				event.message.del.key.size,
+				event.message.del.key.data
 			);
 
 			if ( event.needsFree )
-				event.message.key.free();
+				event.message.del.key.free();
 			break;
 		// Pending
 		case MASTER_EVENT_TYPE_PENDING:
@@ -283,9 +295,10 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size, b
 		);
 	} else {
 		// Data server responds with metadata
+		uint32_t timestamp = SlaveWorker::timestamp->nextVal();
 		event.resSet(
 			event.socket, event.id,
-			listId, stripeId, chunkId,
+			timestamp, listId, stripeId, chunkId,
 			key
 		);
 	}
@@ -427,7 +440,6 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 		}
 
 		// Update data chunk and map
-		key.ptr = 0;
 		LOCK_T *keysLock, *cacheLock;
 		std::unordered_map<Key, KeyMetadata> *keys;
 		std::unordered_map<Metadata, Chunk *> *cache;
@@ -472,7 +484,18 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 				false /* isUpdate */
 			);
 		} else {
-			event.resDelete( event.socket, event.id, key, true, false, false );
+			uint32_t timestamp = SlaveWorker::timestamp->nextVal();
+			event.resDelete(
+				event.socket,
+				event.id,
+				timestamp,
+				metadata.listId,
+				metadata.stripeId,
+				metadata.chunkId,
+				key,
+				false, // needsFree
+				false  // isDegraded
+			);
 			this->dispatch( event );
 			ret = true;
 		}
@@ -480,7 +503,13 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 			chunkBuffer->updateAndUnlockChunk( chunkBufferIndex );
 	} else {
 		key.set( header.keySize, header.key, ( void * ) event.socket );
-		event.resDelete( event.socket, event.id, key, false, false, false );
+		event.resDelete(
+			event.socket,
+			event.id,
+			key,
+			false, // needsFree
+			false  // isDegraded
+		);
 		this->dispatch( event );
 		ret = false;
 	}

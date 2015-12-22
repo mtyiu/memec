@@ -220,14 +220,13 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 	buffer.data = this->protocol.reqSet( buffer.size, requestId, header.key, header.keySize, header.value, header.valueSize );
 #endif
 
-	key.dup( header.keySize, header.key, ( void * ) event.socket );
+	key.dup( header.keySize, header.key );
 
 	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_SET, event.id, ( void * ) event.socket, key ) ) {
 		__ERROR__( "MasterWorker", "handleSetRequest", "Cannot insert into application SET pending map." );
 	}
 
 	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount + 1; i++ ) {
-		key.ptr = ( void * )( i == 0 ? socket : this->paritySlaveSockets[ i - 1 ] );
 		if ( ! MasterWorker::pending->insertKey(
 			PT_SLAVE_SET, requestId, event.id,
 			( void * )( i == 0 ? socket : this->paritySlaveSockets[ i - 1 ] ),
@@ -364,7 +363,6 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 			header.key, header.keySize
 		);
 
-		key.ptr = ( void * ) socket;
 		if ( ! MasterWorker::pending->insertKey( PT_SLAVE_GET, requestId, event.id, ( void * ) socket, key ) ) {
 			__ERROR__( "MasterWorker", "handleGetRequest", "Cannot insert into slave GET pending map." );
 		}
@@ -471,7 +469,6 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 			header.valueUpdate, header.valueUpdateOffset, header.valueUpdateSize
 		);
 
-		keyValueUpdate.ptr = ( void * ) socket;
 		if ( ! MasterWorker::pending->insertKeyValueUpdate( PT_SLAVE_UPDATE, requestId, event.id, ( void * ) socket, keyValueUpdate ) ) {
 			__ERROR__( "MasterWorker", "handleUpdateRequest", "Cannot insert into slave UPDATE pending map." );
 		}
@@ -561,7 +558,6 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 			header.key, header.keySize
 		);
 
-		key.ptr = ( void * ) socket;
 		if ( ! MasterWorker::pending->insertKey( PT_SLAVE_DEL, requestId, event.id, ( void * ) socket, key ) ) {
 			__ERROR__( "MasterWorker", "handleDeleteRequest", "Cannot insert into slave DELETE pending map." );
 		}

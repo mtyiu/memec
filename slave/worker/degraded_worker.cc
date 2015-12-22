@@ -390,7 +390,6 @@ bool SlaveWorker::handleDegradedDeleteRequest( MasterEvent event, char *buf, siz
 		// Key not found
 		event.resDelete(
 			event.socket, event.id, key,
-			false, /* success */
 			false, /* needsFree */
 			true   /* isDegraded */
 		);
@@ -670,7 +669,13 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 							false /* isUpdate */
 						);
 					} else {
-						masterEvent.resDelete( masterSocket, parentId, mykey, false, false, true );
+						masterEvent.resDelete(
+							masterSocket,
+							parentId,
+							mykey,
+							false, // needsFree
+							true   // isDegraded
+						);
 						this->dispatch( masterEvent );
 					}
 					op.data.key.free();
@@ -829,7 +834,6 @@ bool SlaveWorker::sendModifyChunkRequest( uint32_t parentId, uint8_t keySize, ch
 				continue;
 
 			if ( isUpdate ) {
-				keyValueUpdate.ptr = ( void * ) this->paritySlaveSockets[ i ];
 				if ( ! SlaveWorker::pending->insertKeyValueUpdate(
 					PT_SLAVE_PEER_UPDATE, requestId, parentId,
 					( void * ) this->paritySlaveSockets[ i ],
@@ -838,7 +842,6 @@ bool SlaveWorker::sendModifyChunkRequest( uint32_t parentId, uint8_t keySize, ch
 					__ERROR__( "SlaveWorker", "handleUpdateRequest", "Cannot insert into slave UPDATE pending map." );
 				}
 			} else {
-				key.ptr = ( void * ) this->paritySlaveSockets[ i ];
 				if ( ! SlaveWorker::pending->insertKey(
 					PT_SLAVE_PEER_DEL, requestId, parentId,
 					( void * ) this->paritySlaveSockets[ i ],

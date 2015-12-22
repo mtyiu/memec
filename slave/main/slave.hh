@@ -27,6 +27,7 @@
 #include "../../common/signal/signal.hh"
 #include "../../common/socket/epoll.hh"
 #include "../../common/stripe_list/stripe_list.hh"
+#include "../../common/timestamp/timestamp.hh"
 #include "../../common/util/option.hh"
 #include "../../common/util/time.hh"
 
@@ -70,6 +71,7 @@ public:
 	MemoryPool<Chunk> *chunkPool;
 	std::vector<MixedChunkBuffer *> chunkBuffer;
 	DegradedChunkBuffer degradedChunkBuffer;
+	Timestamp timestamp;
 	LOCK_T lock;
 
 	static Slave *getInstance() {
