@@ -13,6 +13,7 @@ OBJS= \
 	event/master_event.o \
 	event/slave_event.o \
 	protocol/degraded_protocol.o \
+	protocol/fault_protocol.o \
 	protocol/load_protocol.o \
 	protocol/normal_protocol.o \
 	protocol/register_protocol.o \
@@ -44,9 +45,10 @@ EXTERNAL_LIB= \
 	$(PLIO_SRC_ROOT)/common/protocol/protocol.o \
 	$(PLIO_SRC_ROOT)/common/protocol/ack_protocol.o \
 	$(PLIO_SRC_ROOT)/common/protocol/address_protocol.o \
+	$(PLIO_SRC_ROOT)/common/protocol/degraded_protocol.o \
+	$(PLIO_SRC_ROOT)/common/protocol/fault_protocol.o \
 	$(PLIO_SRC_ROOT)/common/protocol/load_protocol.o \
 	$(PLIO_SRC_ROOT)/common/protocol/normal_protocol.o \
-	$(PLIO_SRC_ROOT)/common/protocol/degraded_protocol.o \
 	$(PLIO_SRC_ROOT)/common/protocol/remap_protocol.o \
 	$(PLIO_SRC_ROOT)/common/protocol/slave_sync_remap_protocol.o \
 	$(PLIO_SRC_ROOT)/common/remap/remap_msg_handler.o \

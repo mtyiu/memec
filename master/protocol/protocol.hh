@@ -121,6 +121,14 @@ public:
 		uint32_t srcParityChunkId, uint32_t dstParityChunkId,
 		bool isSealed, char *key, uint8_t keySize
 	);
+
+	// ---------- fault_protocol.cc ----------
+	char *syncMetadataBackup(
+		size_t &size, uint32_t id, LOCK_T *lock,
+		std::unordered_multimap<uint32_t, Metadata> &sealed, uint32_t &sealedCount,
+		std::unordered_map<Key, MetadataBackup> &ops, uint32_t &opsCount,
+		bool &isCompleted
+	);
 };
 
 #endif

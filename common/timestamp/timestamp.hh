@@ -11,7 +11,7 @@ private:
 public:
 	Timestamp() {
 		LOCK_INIT( &this->lock );
-		this->value = 4294960000; // 4294967196;
+		this->value = 0;
 	}
 
 	inline uint32_t nextVal() {

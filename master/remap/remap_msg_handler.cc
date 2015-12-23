@@ -95,7 +95,7 @@ void *MasterRemapMsgHandler::readMessages( void *argv ) {
 void *MasterRemapMsgHandler::ackTransitThread( void *argv ) {
 
 	MasterRemapMsgHandler *myself = ( MasterRemapMsgHandler* ) argv;
-	
+
 	while ( myself->bgAckInterval > 0 && myself->isListening ) {
 		sleep( myself->bgAckInterval );
 		myself->ackTransit();
@@ -136,12 +136,15 @@ void MasterRemapMsgHandler::setState( char* msg , int len ) {
 				break;
 			case REMAP_INTERMEDIATE:
 				__DEBUG__( BLUE, "MasterRemapMsgHandler", "setState", "REMAP_INTERMEDIATE %s:%hu", buf, slave.sin_port );
-				if ( state == REMAP_WAIT_DEGRADED ) 
+				if ( state == REMAP_WAIT_DEGRADED )
 					signal = state;
+				else {
+					// Insert a new event
+				}
 				break;
 			case REMAP_COORDINATED:
 				__DEBUG__( BLUE, "MasterRemapMsgHandler", "setState", "REMAP_COORDINATED %s:%hu", buf, slave.sin_port );
-				if ( state == REMAP_WAIT_NORMAL ) 
+				if ( state == REMAP_WAIT_NORMAL )
 					signal = state;
 				break;
 			case REMAP_DEGRADED:
@@ -238,6 +241,7 @@ bool MasterRemapMsgHandler::ackTransit( struct sockaddr_in slave ) {
 	return ackTransit( &slave );
 }
 
+// Call after all metadata is synchonized
 bool MasterRemapMsgHandler::ackTransit( struct sockaddr_in *slave ) {
 	LOCK( &this->aliveSlavesLock );
 	if ( slave ) {
@@ -272,7 +276,7 @@ bool MasterRemapMsgHandler::checkAckForSlave( struct sockaddr_in slave ) {
 	LOCK( &this->slavesStateLock[ slave ] );
 	RemapState state = this->slavesState[ slave ];
 
-	if ( ( state == REMAP_NORMAL ) || 
+	if ( ( state == REMAP_NORMAL ) ||
 	     ( state == REMAP_INTERMEDIATE && false /* yet sync all meta */ && false /* yet undo all parity */ ) ||
 	     ( state == REMAP_COORDINATED && false /* yet replay all requests? */ ) ) {
 		UNLOCK( &this->slavesStateLock[ slave ] );

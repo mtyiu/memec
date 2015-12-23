@@ -545,6 +545,14 @@ protected:
 		uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
 		char *&key, char *buf, size_t size
 	);
+	// ---------- fault_protocol.cc ----------
+	size_t generateHeartbeatMessage(
+		uint8_t magic, uint8_t to, uint8_t opcode,
+		uint32_t id, LOCK_T *lock,
+		std::unordered_multimap<uint32_t, Metadata> &sealed, uint32_t &sealedCount,
+		std::unordered_map<Key, MetadataBackup> &ops, uint32_t &opsCount,
+		bool &isCompleted
+	);
 
 	// ---------- remap_protocol.cc ----------
 	size_t generateRemappingRecordMessage(

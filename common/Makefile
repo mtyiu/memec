@@ -19,6 +19,7 @@ OBJS= \
 	protocol/address_protocol.o \
 	protocol/chunk_protocol.o \
 	protocol/degraded_protocol.o \
+	protocol/fault_protocol.o \
 	protocol/heartbeat_protocol.o \
 	protocol/load_protocol.o \
 	protocol/normal_protocol.o \

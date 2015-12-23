@@ -9,6 +9,7 @@ Backup::Backup() {
 void Backup::insert( uint8_t keySize, char *keyStr, uint8_t opcode, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) {
 	Key key;
 	MetadataBackup metadataBackup;
+	std::unordered_map<Key, MetadataBackup>::iterator it;
 
 	key.dup( keySize, keyStr );
 
@@ -19,7 +20,30 @@ void Backup::insert( uint8_t keySize, char *keyStr, uint8_t opcode, uint32_t tim
 	std::pair<Key, MetadataBackup> p( key, metadataBackup );
 
 	LOCK( &this->lock );
-	this->ops.insert( p );
+	it = this->ops.find( key );
+	if ( it == this->ops.end() ) {
+		this->ops.insert( p );
+	} else {
+		key.free();
+
+		if ( opcode == PROTO_OPCODE_SET ) {
+			if ( timestamp > it->second.timestamp ) {
+				// Replace with the current entry
+				it->second = metadataBackup;
+			} else {
+				// TODO: Handle wrap around case
+			}
+		} else if ( opcode == PROTO_OPCODE_DELETE ) {
+			if ( timestamp > it->second.timestamp ) {
+				// Remove the previous entry
+				key = it->first;
+				this->ops.erase( it );
+				key.free();
+			} else {
+				// TODO: Handle wrap around case
+			}
+		}
+	}
 	UNLOCK( &this->lock );
 }
 
@@ -27,6 +51,7 @@ void Backup::insert( uint8_t keySize, char *keyStr, uint8_t opcode, uint32_t tim
 	Key key;
 	MetadataBackup metadataBackup;
 	Metadata metadata;
+	std::unordered_map<Key, MetadataBackup>::iterator opsIt;
 
 	key.dup( keySize, keyStr );
 	metadataBackup.opcode = opcode;
@@ -39,13 +64,37 @@ void Backup::insert( uint8_t keySize, char *keyStr, uint8_t opcode, uint32_t tim
 	std::pair<uint32_t, Metadata> p2( timestamp, metadata );
 
 	LOCK( &this->lock );
-	this->ops.insert( p1 );
+
+	opsIt = this->ops.find( key );
+	if ( opsIt == this->ops.end() ) {
+		this->ops.insert( p1 );
+	} else {
+		key.free();
+
+		if ( opcode == PROTO_OPCODE_SET ) {
+			if ( timestamp > opsIt->second.timestamp ) {
+				// Replace with the current entry
+				opsIt->second = metadataBackup;
+			} else {
+				// TODO: Handle wrap around case
+			}
+		} else if ( opcode == PROTO_OPCODE_DELETE ) {
+			if ( timestamp > opsIt->second.timestamp ) {
+				// Remove the previous entry
+				key = opsIt->first;
+				this->ops.erase( opsIt );
+				key.free();
+			} else {
+				// TODO: Handle wrap around case
+			}
+		}
+	}
 	this->sealed.insert( p2 );
 	UNLOCK( &this->lock );
 }
 
 size_t Backup::erase( uint32_t fromTimestamp, uint32_t toTimestamp ) {
-	std::unordered_multimap<Key, MetadataBackup>::iterator opsIt;
+	std::unordered_map<Key, MetadataBackup>::iterator opsIt;
 	std::unordered_multimap<uint32_t, Metadata>::iterator sealedIt;
 	bool isWrappedAround, selected;
 	size_t opsCount = 0, sealedCount = 0;
@@ -106,7 +155,7 @@ size_t Backup::erase( uint32_t fromTimestamp, uint32_t toTimestamp ) {
 }
 
 void Backup::print( FILE *f ) {
-	std::unordered_multimap<Key, MetadataBackup>::iterator opsIt;
+	std::unordered_map<Key, MetadataBackup>::iterator opsIt;
 	std::unordered_multimap<uint32_t, Metadata>::iterator sealedIt;
 	fprintf( f, "--------------------\n" );
 	fprintf( f, "Number of metadata backup: %lu\n", this->ops.size() );
@@ -142,7 +191,7 @@ void Backup::print( FILE *f ) {
 }
 
 Backup::~Backup() {
-	std::unordered_multimap<Key, MetadataBackup>::iterator it;
+	std::unordered_map<Key, MetadataBackup>::iterator it;
 	Key key;
 
 	it = this->ops.begin();

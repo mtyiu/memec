@@ -6,19 +6,13 @@
 #include "../../common/ds/metadata.hh"
 #include "../../common/lock/lock.hh"
 
-class MetadataBackup : public OpMetadata {
-public:
-	uint32_t timestamp;
-};
-
 class Backup {
-private:
+public:
 	LOCK_T lock;
-	std::unordered_multimap<Key, MetadataBackup> ops;
+	std::unordered_map<Key, MetadataBackup> ops;
 	// Timestamp |--> Metadata
 	std::unordered_multimap<uint32_t, Metadata> sealed;
 
-public:
 	Backup();
 	void insert(
 		uint8_t keySize, char *keyStr,

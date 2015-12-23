@@ -24,8 +24,21 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 			isSend = true;
 			break;
 		case SLAVE_EVENT_TYPE_SYNC_METADATA:
+		{
+			uint32_t sealedCount, opsCount;
+			bool isCompleted;
+
 			printf( "SLAVE_EVENT_TYPE_SYNC_METADATA\n" );
+			buffer.data = this->protocol.syncMetadataBackup(
+				buffer.size,
+				MasterWorker::idGenerator->nextVal( this->workerId ),
+				&event.socket->backup.lock,
+				event.socket->backup.sealed, sealedCount,
+				event.socket->backup.ops, opsCount,
+				isCompleted
+			);
 			isSend = true;
+		}
 			break;
 		case SLAVE_EVENT_TYPE_PENDING:
 			isSend = false;
