@@ -77,7 +77,7 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 	struct sockaddr_in selfAddr = Slave::getInstance()->sockets.self.getAddr();
 	bool bufferRemapData = true;
 	// no need to buffer if (1) this is the target, or (2) remapped but target not specified
-	if ( selfAddr == dataSlaveSocket->getAddr() || 
+	if ( selfAddr == dataSlaveSocket->getAddr() ||
 		( header.remapped && ( targetAddr.sin_addr.s_addr == 0 || targetAddr == selfAddr ) ) ) {
 		bufferRemapData = false;
 	}
@@ -90,11 +90,14 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 		SlaveWorker::pending->insertRemapData( targetAddr, header.listId, header.chunkId, key, value );
 	} else {
 		uint32_t stripeId;
+		bool isSealed;
+		Metadata sealed;
 		SlaveWorker::chunkBuffer->at( header.listId )->set(
 			this,
 			header.key, header.keySize,
 			header.value, header.valueSize,
 			PROTO_OPCODE_REMAPPING_SET, stripeId, header.chunkId,
+			&isSealed, &sealed,
 			this->chunks, this->dataChunk, this->parityChunk
 		);
 	}
@@ -120,6 +123,8 @@ bool SlaveWorker::handleRemappingSetRequest( SlavePeerEvent event, char *buf, si
 		header.listId, header.chunkId, header.needsForwarding ? "true" : "false"
 	);
 
+	bool isSealed;
+	Metadata sealed;
 	uint32_t stripeId;
 	SlaveWorker::chunkBuffer->at( header.listId )->set(
 		this,
@@ -128,6 +133,7 @@ bool SlaveWorker::handleRemappingSetRequest( SlavePeerEvent event, char *buf, si
 		PROTO_OPCODE_REMAPPING_SET,
 		stripeId,
 		SlaveWorker::chunkBuffer->at( header.listId )->getChunkId(),
+		&isSealed, &sealed,
 		this->chunks, this->dataChunk, this->parityChunk
 	);
 

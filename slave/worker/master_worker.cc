@@ -78,6 +78,10 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 				event.message.set.listId,
 				event.message.set.stripeId,
 				event.message.set.chunkId,
+				event.message.set.isSealed,
+				event.message.set.sealedListId,
+				event.message.set.sealedStripeId,
+				event.message.set.sealedChunkId,
 				event.message.set.key.size,
 				event.message.set.key.data
 			);
@@ -282,6 +286,8 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size, b
 		( int ) header.keySize, header.key, header.keySize, header.valueSize
 	);
 
+	bool isSealed;
+	Metadata sealed;
 	uint32_t listId, stripeId, chunkId;
 	listId = SlaveWorker::stripeList->get( header.key, header.keySize, 0, 0, &chunkId );
 
@@ -290,6 +296,7 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size, b
 		header.key, header.keySize,
 		header.value, header.valueSize,
 		PROTO_OPCODE_SET, stripeId, chunkId,
+		&isSealed, &sealed,
 		this->chunks, this->dataChunk, this->parityChunk
 	);
 
@@ -309,6 +316,7 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size, b
 		event.resSet(
 			event.socket, event.id,
 			timestamp, listId, stripeId, chunkId,
+			isSealed, sealed.listId, sealed.stripeId, sealed.chunkId,
 			key
 		);
 	}

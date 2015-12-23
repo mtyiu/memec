@@ -207,15 +207,20 @@ struct KeySlaveHeader {
     char *key;
 };
 
-#define PROTO_KEY_BACKUP_FOR_DATA_SIZE 18
-#define PROTO_KEY_BACKUP_FOR_PARITY_SIZE 2
+#define PROTO_KEY_BACKUP_BASE_SIZE       2
+#define PROTO_KEY_BACKUP_FOR_DATA_SIZE   17
+#define PROTO_KEY_BACKUP_SEALED_SIZE     12
 struct KeyBackupHeader {
     bool isParity;
-    uint32_t timestamp; // Only for data servers
-    uint32_t listId;    // Only for data servers
-    uint32_t stripeId;  // Only for data servers
-    uint32_t chunkId;   // Only for data servers
-    uint8_t keySize;
+	uint8_t keySize;
+    uint32_t timestamp;      // Only for data servers
+    uint32_t listId;         // Only for data servers
+    uint32_t stripeId;       // Only for data servers
+    uint32_t chunkId;        // Only for data servers
+	bool isSealed;           // Only for data servers
+	uint32_t sealedListId;   // Only for data servers && isSealed
+	uint32_t sealedStripeId; // Only for data servers && isSealed
+	uint32_t sealedChunkId;  // Only for data servers && isSealed
     char *key;
 };
 
@@ -585,6 +590,13 @@ protected:
 
 	size_t generateKeyBackupHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint32_t timestamp,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		uint32_t sealedListId, uint32_t sealedStripeId, uint32_t sealedChunkId,
+		uint8_t keySize, char *key, char *sendBuf = 0
+	);
+	size_t generateKeyBackupHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
         uint32_t timestamp,
         uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		uint8_t keySize, char *key, char *sendBuf = 0
@@ -594,9 +606,10 @@ protected:
 		uint8_t keySize, char *key, char *sendBuf = 0
 	);
 	bool parseKeyBackupHeader(
-        size_t offset, bool &isParity,
+        size_t offset, bool &isParity, uint8_t &keySize,
         uint32_t &timestamp, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
-        uint8_t &keySize, char *&key,
+		bool &isSealed, uint32_t &sealedListId, uint32_t &sealedStripeId, uint32_t &sealedChunkId,
+        char *&key,
         char *buf, size_t size
     );
 

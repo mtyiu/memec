@@ -534,6 +534,9 @@ void Master::interactive() {
 		} else if ( strcmp( command, "backup" ) == 0 ) {
 			valid = true;
 			this->printBackup();
+		} else if ( strcmp( command, "metadata" ) == 0 ) {
+			valid = true;
+			this->syncMetadata();
 		} else if ( strncmp( command, "set", 3 ) == 0 ) {
 			valid = this->setDebugFlag( command );
 		} else if ( strcmp( command, "time" ) == 0 ) {
@@ -877,6 +880,44 @@ void Master::printBackup( FILE *f ) {
 	UNLOCK( &this->sockets.slaves.lock );
 }
 
+void Master::syncMetadata() {
+	uint32_t socketFromId, socketToId;
+	char tmp[ 16 ];
+	SlaveEvent event;
+
+	printf( "Which socket ([0-%lu] or all)? ", this->sockets.slaves.size() - 1 );
+	fflush( stdout );
+	if ( ! fgets( tmp, sizeof( tmp ), stdin ) )
+		return;
+	if ( strncmp( tmp, "all", 3 ) == 0 ) {
+		socketFromId = 0;
+		socketToId = this->sockets.slaves.size();
+	} else if ( sscanf( tmp, "%u", &socketFromId ) != 1 ) {
+		fprintf( stderr, "Invalid socket ID.\n" );
+		return;
+	} else if ( socketFromId >= this->sockets.slaves.size() ) {
+		fprintf( stderr, "The specified socket ID exceeds the range [0-%lu].\n", this->sockets.slaves.size() - 1 );
+		return;
+	} else {
+		socketToId = socketFromId + 1;
+	}
+
+	for ( uint32_t socketId = socketFromId; socketId < socketToId; socketId++ ) {
+		SlaveSocket *socket = this->sockets.slaves.values[ socketId ];
+		if ( ! socket ) {
+			fprintf( stderr, "Unknown socket ID!\n" );
+			return;
+		}
+
+		event.syncMetadata( socket );
+		this->eventQueue.insert( event );
+
+		printf( "Synchronize metadata backup for the slave: (#%u) ", socketId );
+		socket->printAddress();
+		printf( "\n" );
+	}
+}
+
 void Master::help() {
 	fprintf(
 		stdout,
@@ -887,6 +928,7 @@ void Master::help() {
 		"- pending: Show all pending requests\n"
 		"- remapping: Show remapping info\n"
 		"- backup: Show backup info\n"
+		"- metadata: Synchronize metadata backup for a particular slave\n"
 		"- set: Set debug flag (degraded = [true|false])\n"
 		"- time: Show elapsed time\n"
 		"- exit: Terminate this client\n"

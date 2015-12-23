@@ -43,22 +43,64 @@ bool Protocol::parseKeyHeader( struct KeyHeader &header, char *buf, size_t size,
 	);
 }
 
+size_t Protocol::generateKeyBackupHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t sealedListId, uint32_t sealedStripeId, uint32_t sealedChunkId, uint8_t keySize, char *key, char *sendBuf ) {
+	if ( ! sendBuf ) sendBuf = this->buffer.send;
+	char *buf = sendBuf + PROTO_HEADER_SIZE;
+	size_t bytes = this->generateHeader(
+		magic, to, opcode,
+		PROTO_KEY_BACKUP_BASE_SIZE + PROTO_KEY_BACKUP_FOR_DATA_SIZE + PROTO_KEY_BACKUP_SEALED_SIZE + keySize,
+		id, sendBuf
+	);
+
+	buf[ 0 ] = false; // isParity
+	buf[ 1 ] = keySize;
+	buf += PROTO_KEY_BACKUP_BASE_SIZE;
+	bytes += PROTO_KEY_BACKUP_BASE_SIZE;
+
+	*( ( uint32_t * )( buf      ) ) = htonl( timestamp );
+	*( ( uint32_t * )( buf +  4 ) ) = htonl( listId );
+	*( ( uint32_t * )( buf +  8 ) ) = htonl( stripeId );
+	*( ( uint32_t * )( buf + 12 ) ) = htonl( chunkId );
+	buf[ 16 ] = true; // isSealed
+	buf += PROTO_KEY_BACKUP_FOR_DATA_SIZE;
+	bytes += PROTO_KEY_BACKUP_FOR_DATA_SIZE;
+
+	*( ( uint32_t * )( buf      ) ) = htonl( sealedListId );
+	*( ( uint32_t * )( buf +  4 ) ) = htonl( sealedStripeId );
+	*( ( uint32_t * )( buf +  8 ) ) = htonl( sealedChunkId );
+	buf += PROTO_KEY_BACKUP_SEALED_SIZE;
+	bytes += PROTO_KEY_BACKUP_SEALED_SIZE;
+
+	memmove( buf, key, keySize );
+	bytes += keySize;
+
+	return bytes;
+}
+
 size_t Protocol::generateKeyBackupHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint8_t keySize, char *key, char *sendBuf ) {
 	if ( ! sendBuf ) sendBuf = this->buffer.send;
 	char *buf = sendBuf + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_KEY_BACKUP_FOR_DATA_SIZE + keySize, id, sendBuf );
+	size_t bytes = this->generateHeader(
+		magic, to, opcode,
+		PROTO_KEY_BACKUP_BASE_SIZE + PROTO_KEY_BACKUP_FOR_DATA_SIZE + keySize,
+		id, sendBuf
+	);
 
 	buf[ 0 ] = false; // isParity
-	*( ( uint32_t * )( buf +  1 ) ) = htonl( timestamp );
-	*( ( uint32_t * )( buf +  5 ) ) = htonl( listId );
-	*( ( uint32_t * )( buf +  9 ) ) = htonl( stripeId );
-	*( ( uint32_t * )( buf + 13 ) ) = htonl( chunkId );
-	buf[ 17 ] = keySize;
+	buf[ 1 ] = keySize;
+	buf += PROTO_KEY_BACKUP_BASE_SIZE;
+	bytes += PROTO_KEY_BACKUP_BASE_SIZE;
 
+	*( ( uint32_t * )( buf      ) ) = htonl( timestamp );
+	*( ( uint32_t * )( buf +  4 ) ) = htonl( listId );
+	*( ( uint32_t * )( buf +  8 ) ) = htonl( stripeId );
+	*( ( uint32_t * )( buf + 12 ) ) = htonl( chunkId );
+	buf[ 16 ] = false; // isSealed
 	buf += PROTO_KEY_BACKUP_FOR_DATA_SIZE;
-	memmove( buf, key, keySize );
+	bytes += PROTO_KEY_BACKUP_FOR_DATA_SIZE;
 
-	bytes += PROTO_KEY_BACKUP_FOR_DATA_SIZE + keySize;
+	memmove( buf, key, keySize );
+	bytes += keySize;
 
 	return bytes;
 }
@@ -66,46 +108,55 @@ size_t Protocol::generateKeyBackupHeader( uint8_t magic, uint8_t to, uint8_t opc
 size_t Protocol::generateKeyBackupHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint8_t keySize, char *key, char *sendBuf ) {
 	if ( ! sendBuf ) sendBuf = this->buffer.send;
 	char *buf = sendBuf + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_KEY_BACKUP_FOR_PARITY_SIZE + keySize, id, sendBuf );
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_KEY_BACKUP_BASE_SIZE + keySize, id, sendBuf );
 
 	buf[ 0 ] = true; // isParity
 	buf[ 1 ] = keySize;
 
-	buf += PROTO_KEY_BACKUP_FOR_PARITY_SIZE;
+	buf += PROTO_KEY_BACKUP_BASE_SIZE;
 	memmove( buf, key, keySize );
 
-	bytes += PROTO_KEY_BACKUP_FOR_PARITY_SIZE + keySize;
+	bytes += PROTO_KEY_BACKUP_BASE_SIZE + keySize;
 
 	return bytes;
 }
 
-bool Protocol::parseKeyBackupHeader( size_t offset, bool &isParity, uint32_t &timestamp, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint8_t &keySize, char *&key, char *buf, size_t size ) {
-	if ( size - offset < PROTO_KEY_BACKUP_FOR_PARITY_SIZE )
+bool Protocol::parseKeyBackupHeader( size_t offset, bool &isParity, uint8_t &keySize, uint32_t &timestamp, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, bool &isSealed, uint32_t &sealedListId, uint32_t &sealedStripeId, uint32_t &sealedChunkId, char *&key, char *buf, size_t size ) {
+	if ( size - offset < PROTO_KEY_BACKUP_BASE_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
-	isParity  = ptr[ 0 ];
+	isParity = ptr[ 0 ];
+	keySize  = ptr[ 1 ];
+	ptr += PROTO_KEY_BACKUP_BASE_SIZE;
+
 	if ( isParity ) {
-		keySize = ptr[ 1 ];
-
-		if ( size - offset < ( size_t ) PROTO_KEY_BACKUP_FOR_PARITY_SIZE + keySize )
+		if ( size - offset < ( size_t ) PROTO_KEY_BACKUP_BASE_SIZE + keySize )
 			return false;
-
-		key = ptr + PROTO_KEY_BACKUP_FOR_PARITY_SIZE;
 	} else {
-		if ( size - offset < PROTO_KEY_BACKUP_FOR_DATA_SIZE )
+		if ( size - offset < ( size_t ) PROTO_KEY_BACKUP_BASE_SIZE + PROTO_KEY_BACKUP_FOR_DATA_SIZE + keySize )
 			return false;
 
-		timestamp = ntohl( *( ( uint32_t * )( ptr +  1 ) ) );
-		listId    = ntohl( *( ( uint32_t * )( ptr +  5 ) ) );
-		stripeId  = ntohl( *( ( uint32_t * )( ptr +  9 ) ) );
-		chunkId   = ntohl( *( ( uint32_t * )( ptr + 13 ) ) );
-		keySize   = ( uint8_t ) ptr[ 17 ];
+		timestamp = ntohl( *( ( uint32_t * )( ptr      ) ) );
+		listId    = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
+		stripeId  = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
+		chunkId   = ntohl( *( ( uint32_t * )( ptr + 12 ) ) );
+		isSealed  = ptr[ 16 ];
 
-		if ( size - offset < ( size_t ) PROTO_KEY_BACKUP_FOR_DATA_SIZE + keySize )
-			return false;
+		ptr += PROTO_KEY_BACKUP_FOR_DATA_SIZE;
 
-		key = ptr + PROTO_KEY_BACKUP_FOR_DATA_SIZE;
+		if ( isSealed ) {
+			sealedListId   = ntohl( *( ( uint32_t * )( ptr      ) ) );
+			sealedStripeId = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
+			sealedChunkId  = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
+
+			if ( size - offset < ( size_t ) PROTO_KEY_BACKUP_BASE_SIZE + PROTO_KEY_BACKUP_FOR_DATA_SIZE + PROTO_KEY_BACKUP_SEALED_SIZE + keySize )
+				return false;
+
+			ptr += PROTO_KEY_BACKUP_SEALED_SIZE;
+		}
+
+		key = ptr;
 	}
 
 	return true;
@@ -119,11 +170,15 @@ bool Protocol::parseKeyBackupHeader( struct KeyBackupHeader &header, char *buf, 
 	return this->parseKeyBackupHeader(
 		offset,
 		header.isParity,
+		header.keySize,
 		header.timestamp,
 		header.listId,
 		header.stripeId,
 		header.chunkId,
-		header.keySize,
+		header.isSealed,
+		header.sealedListId,
+		header.sealedStripeId,
+		header.sealedChunkId,
 		header.key,
 		buf, size
 	);

@@ -1,19 +1,37 @@
 #include "protocol.hh"
 
-char *SlaveProtocol::resSet( size_t &size, uint32_t id, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint8_t keySize, char *key ) {
+char *SlaveProtocol::resSet( size_t &size, uint32_t id, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isSealed, uint32_t sealedListId, uint32_t sealedStripeId, uint32_t sealedChunkId, uint8_t keySize, char *key ) {
 	// -- common/protocol/normal_protocol.cc --
-	size = this->generateKeyBackupHeader(
-		PROTO_MAGIC_RESPONSE_SUCCESS,
-		PROTO_MAGIC_TO_MASTER,
-		PROTO_OPCODE_SET,
-		id,
-		timestamp,
-		listId,
-		stripeId,
-		chunkId,
-		keySize,
-		key
-	);
+	if ( isSealed ) {
+		size = this->generateKeyBackupHeader(
+			PROTO_MAGIC_RESPONSE_SUCCESS,
+			PROTO_MAGIC_TO_MASTER,
+			PROTO_OPCODE_SET,
+			id,
+			timestamp,
+			listId,
+			stripeId,
+			chunkId,
+			sealedListId,
+			sealedStripeId,
+			sealedChunkId,
+			keySize,
+			key
+		);
+	} else {
+		size = this->generateKeyBackupHeader(
+			PROTO_MAGIC_RESPONSE_SUCCESS,
+			PROTO_MAGIC_TO_MASTER,
+			PROTO_OPCODE_SET,
+			id,
+			timestamp,
+			listId,
+			stripeId,
+			chunkId,
+			keySize,
+			key
+		);
+	}
 	return this->buffer.send;
 }
 

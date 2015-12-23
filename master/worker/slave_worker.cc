@@ -23,6 +23,10 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 			event.message.send.packet->read( buffer.data, buffer.size );
 			isSend = true;
 			break;
+		case SLAVE_EVENT_TYPE_SYNC_METADATA:
+			printf( "SLAVE_EVENT_TYPE_SYNC_METADATA\n" );
+			isSend = true;
+			break;
 		case SLAVE_EVENT_TYPE_PENDING:
 			isSend = false;
 			break;
@@ -143,14 +147,28 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 			keySize = header.keySize;
 			keyStr = header.key;
 
-			event.socket->backup.insert(
-				keySize, keyStr,
-				PROTO_OPCODE_SET,
-				header.timestamp,
-				header.listId,
-				header.stripeId,
-				header.chunkId
-			);
+			if ( header.isSealed ) {
+				event.socket->backup.insert(
+					keySize, keyStr,
+					PROTO_OPCODE_SET,
+					header.timestamp,
+					header.listId,
+					header.stripeId,
+					header.chunkId,
+					header.sealedListId,
+					header.sealedStripeId,
+					header.sealedChunkId
+				);
+			} else {
+				event.socket->backup.insert(
+					keySize, keyStr,
+					PROTO_OPCODE_SET,
+					header.timestamp,
+					header.listId,
+					header.stripeId,
+					header.chunkId
+				);
+			}
 		}
 	} else {
 		struct KeyHeader header;
@@ -385,14 +403,28 @@ bool MasterWorker::handleDeleteResponse( SlaveEvent event, bool success, bool is
 		keyStr = header.key;
 		keySize = header.keySize;
 
-		event.socket->backup.insert(
-			keySize, keyStr,
-			PROTO_OPCODE_DELETE,
-			header.timestamp,
-			header.listId,
-			header.stripeId,
-			header.chunkId
-		);
+		if ( header.isSealed ) {
+			event.socket->backup.insert(
+				keySize, keyStr,
+				PROTO_OPCODE_DELETE,
+				header.timestamp,
+				header.listId,
+				header.stripeId,
+				header.chunkId,
+				header.sealedListId,
+				header.sealedStripeId,
+				header.sealedChunkId
+			);
+		} else {
+			event.socket->backup.insert(
+				keySize, keyStr,
+				PROTO_OPCODE_DELETE,
+				header.timestamp,
+				header.listId,
+				header.stripeId,
+				header.chunkId
+			);
+		}
 	} else {
 		struct KeyHeader header;
 		if ( ! this->protocol.parseKeyHeader( header, buf, size ) ) {

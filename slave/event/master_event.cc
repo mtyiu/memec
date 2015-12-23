@@ -29,7 +29,7 @@ void MasterEvent::resSet( MasterSocket *socket, uint32_t id, Key &key, bool succ
 	this->message.set.key = key;
 }
 
-void MasterEvent::resSet( MasterSocket *socket, uint32_t id, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key ) {
+void MasterEvent::resSet( MasterSocket *socket, uint32_t id, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isSealed, uint32_t sealedListId, uint32_t sealedStripeId, uint32_t sealedChunkId, Key &key ) {
 	this->type = MASTER_EVENT_TYPE_SET_RESPONSE_SUCCESS_DATA;
 	this->id = id;
 	this->socket = socket;
@@ -38,6 +38,10 @@ void MasterEvent::resSet( MasterSocket *socket, uint32_t id, uint32_t timestamp,
 	this->message.set.listId = listId;
 	this->message.set.stripeId = stripeId;
 	this->message.set.chunkId = chunkId;
+	this->message.set.isSealed = isSealed;
+	this->message.set.sealedListId = sealedListId;
+	this->message.set.sealedStripeId = sealedStripeId;
+	this->message.set.sealedChunkId = sealedChunkId;
 }
 
 void MasterEvent::resRemappingSet( MasterSocket *socket, uint32_t id, Key &key, uint32_t listId, uint32_t chunkId, bool success, bool needsFree, uint32_t sockfd, bool remapped ) {

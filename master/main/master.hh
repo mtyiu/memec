@@ -98,6 +98,7 @@ public:
 	void printPending( FILE *f = stdout );
 	void printRemapping( FILE *f = stdout );
 	void printBackup( FILE *f = stdout );
+	void syncMetadata();
 	void time();
 	double getElapsedTime();
 	void interactive();

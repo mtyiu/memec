@@ -49,6 +49,10 @@ public:
 			uint32_t listId;
 			uint32_t stripeId;
 			uint32_t chunkId;
+			bool isSealed;
+			uint32_t sealedListId;
+			uint32_t sealedStripeId;
+			uint32_t sealedChunkId;
 			Key key;
 		} set;
 		struct {
@@ -84,7 +88,7 @@ public:
 	void resGet( MasterSocket *socket, uint32_t id, KeyValue &keyValue, bool isDegraded );
 	void resGet( MasterSocket *socket, uint32_t id, Key &key, bool isDegraded );
 	// SET
-	void resSet( MasterSocket *socket, uint32_t id, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key );
+	void resSet( MasterSocket *socket, uint32_t id, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isSealed, uint32_t sealedListId, uint32_t sealedStripeId, uint32_t sealedChunkId, Key &key );
 	void resSet( MasterSocket *socket, uint32_t id, Key &key, bool success );
 	// REMAPPING_SET
 	void resRemappingSet( MasterSocket *socket, uint32_t id, Key &key, uint32_t listId, uint32_t chunkId, bool success, bool needsFree, uint32_t sockfd, bool remapped );

@@ -10,6 +10,7 @@ enum SlaveEventType {
 	SLAVE_EVENT_TYPE_UNDEFINED,
 	SLAVE_EVENT_TYPE_REGISTER_REQUEST,
 	SLAVE_EVENT_TYPE_SEND,
+	SLAVE_EVENT_TYPE_SYNC_METADATA,
 	SLAVE_EVENT_TYPE_PENDING
 };
 
@@ -30,6 +31,7 @@ public:
 
 	void reqRegister( SlaveSocket *socket, uint32_t addr, uint16_t port );
 	void send( SlaveSocket *socket, Packet *packet );
+	void syncMetadata( SlaveSocket *socket );
 	void pending( SlaveSocket *socket );
 };
 
