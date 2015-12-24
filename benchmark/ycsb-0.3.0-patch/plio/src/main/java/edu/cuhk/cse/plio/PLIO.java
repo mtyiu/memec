@@ -11,10 +11,10 @@ public class PLIO {
 	private Protocol protocol;
 	private String host;
 	private int port;
+	private int instanceId;
 	private int id;
 	private int fromId;
 	private int toId;
-	private int instanceId;
 	private Socket socket;
 	private BufferedInputStream in;
 	private OutputStream out;
@@ -28,8 +28,8 @@ public class PLIO {
 		this.protocol = new Protocol( keySize, chunkSize );
 		this.host = host;
 		this.port = port;
-		this.id = fromId;
 		this.instanceId = 0;
+		this.id = fromId;
 		this.fromId = fromId;
 		this.toId = toId;
 	}
@@ -87,7 +87,8 @@ public class PLIO {
 			Protocol.PROTO_MAGIC_REQUEST,
 			Protocol.PROTO_MAGIC_TO_MASTER,
 			Protocol.PROTO_OPCODE_REGISTER,
-			0, 0,
+			0,
+			0,
 			id
 		);
 		try {
@@ -194,7 +195,7 @@ public class PLIO {
 			} else {
 				this.protocol.parseKeyHeader( bytes, 0 );
 				// this.debug( this.protocol.keyHeader.toString() );
-				System.err.println( "PLIO.get(): [Error] Key not found." );
+				// System.err.println( "PLIO.get(): [Error] Key not found." );
 			}
 		} else {
 			System.err.println( "PLIO.get(): [Error] Header length mismatch: " + bytes + " vs. " + this.protocol.header.length + "." );

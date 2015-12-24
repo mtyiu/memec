@@ -680,7 +680,7 @@ void Master::printPending( FILE *f ) {
 		keyValueUpdateIt != this->pending.applications.update.end();
 		keyValueUpdateIt++, i++
 	) {
-		const PendingIdentifier &pid = it->first;
+		const PendingIdentifier &pid = keyValueUpdateIt->first;
 		const KeyValueUpdate &keyValueUpdate = keyValueUpdateIt->second;
 		fprintf(
 			f, "%lu. ID: (%u, %u); Key: %.*s (size = %u, offset = %u, length = %u); source: ",
@@ -813,7 +813,7 @@ void Master::printPending( FILE *f ) {
 		keyValueUpdateIt != this->pending.slaves.update.end();
 		keyValueUpdateIt++, i++
 	) {
-		const PendingIdentifier &pid = it->first;
+		const PendingIdentifier &pid = keyValueUpdateIt->first;
 		const KeyValueUpdate &keyValueUpdate = keyValueUpdateIt->second;
 		fprintf(
 			f, "%lu. ID: (%u, %u), parent ID: (%u, %u); Key: %.*s (size = %u, offset = %u, length = %u); target: ",
