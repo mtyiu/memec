@@ -31,14 +31,15 @@ bool SlaveWorker::handleRemappedData( CoordinatorEvent event, char *buf, size_t 
 	bool found = SlaveWorker::pending->eraseRemapData( target, &remappedData );
 
 	if ( found && socket ) {
+		uint16_t instanceId = Slave::instanceId;
 		uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
 		// insert into pending set to wait for acknowledgement
-		SlaveWorker::pending->insertRemapDataRequest( requestId, event.id, remappedData->size(), socket );
+		SlaveWorker::pending->insertRemapDataRequest( instanceId, event.instanceId, requestId, event.requestId, remappedData->size(), socket );
 		// dispatch one event for each key
 		// TODO : batched SET
 		uint32_t requestSent = 0;
 		for ( PendingData pendingData : *remappedData) {
-			slavePeerEvent.reqSet( socket, requestId, pendingData.listId, pendingData.chunkId, pendingData.key, pendingData.value );
+			slavePeerEvent.reqSet( socket, instanceId, requestId, pendingData.listId, pendingData.chunkId, pendingData.key, pendingData.value );
 			slave->eventQueue.insert( slavePeerEvent );
 			requestSent++;
 			if ( requestSent % BATCH_THRESHOLD == 0 ) {
@@ -66,10 +67,10 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 	}
 	__DEBUG__(
 		BLUE, "SlaveWorker", "handleRemappingSetRequest",
-		"[SET] Key: %.*s (key size = %u); Value: (value size = %u); list ID = %u, chunk ID = %u; needs forwarding? %s (ID: %u)",
+		"[SET] Key: %.*s (key size = %u); Value: (value size = %u); list ID = %u, chunk ID = %u; needs forwarding? %s (ID: (%u, %u))",
 		( int ) header.keySize, header.key, header.keySize, header.valueSize,
 		header.listId, header.chunkId, header.needsForwarding ? "true" : "false",
-		event.id
+		event.instanceId, event.requestId
 	);
 
 	uint32_t originalListId, originalChunkId;
@@ -104,7 +105,7 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 
 	Key key;
 	key.set( header.keySize, header.key );
-	event.resRemappingSet( event.socket, event.id, key, header.listId, header.chunkId, true, false, header.sockfd, header.remapped );
+	event.resRemappingSet( event.socket, event.instanceId, event.requestId, key, header.listId, header.chunkId, true, false, header.sockfd, header.remapped );
 	this->dispatch( event );
 
 	return true;
@@ -139,7 +140,7 @@ bool SlaveWorker::handleRemappingSetRequest( SlavePeerEvent event, char *buf, si
 
 	Key key;
 	key.set( header.keySize, header.key );
-	event.resRemappingSet( event.socket, event.id, key, header.listId, header.chunkId, true );
+	event.resRemappingSet( event.socket, event.instanceId, event.requestId, key, header.listId, header.chunkId, true );
 	this->dispatch( event );
 
 	return true;
@@ -161,26 +162,26 @@ bool SlaveWorker::handleRemappingSetResponse( SlavePeerEvent event, bool success
 	PendingIdentifier pid;
 	RemappingRecordKey record;
 
-	if ( ! SlaveWorker::pending->eraseRemappingRecordKey( PT_SLAVE_PEER_REMAPPING_SET, event.id, event.socket, &pid, &record, true, false ) ) {
+	if ( ! SlaveWorker::pending->eraseRemappingRecordKey( PT_SLAVE_PEER_REMAPPING_SET, event.instanceId, event.requestId, event.socket, &pid, &record, true, false ) ) {
 		UNLOCK( &SlaveWorker::pending->slavePeers.remappingSetLock );
-		__ERROR__( "SlaveWorker", "handleRemappingSetResponse", "Cannot find a pending slave REMAPPING_SET request that matches the response. This message will be discarded. (ID: %u)", event.id );
+		__ERROR__( "SlaveWorker", "handleRemappingSetResponse", "Cannot find a pending slave REMAPPING_SET request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		return false;
 	}
 	// Check pending slave UPDATE requests
-	pending = SlaveWorker::pending->count( PT_SLAVE_PEER_REMAPPING_SET, pid.id, false, true );
+	pending = SlaveWorker::pending->count( PT_SLAVE_PEER_REMAPPING_SET, pid.instanceId, pid.requestId, false, true );
 
 	__DEBUG__( BLUE, "SlaveWorker", "handleRemappingSetResponse", "Pending slave REMAPPING_SET requests = %d (%s).", pending, success ? "success" : "fail" );
 	if ( pending == 0 ) {
 		// Only send master REMAPPING_SET response when the number of pending slave REMAPPING_SET requests equal 0
 		MasterEvent masterEvent;
 
-		if ( ! SlaveWorker::pending->eraseRemappingRecordKey( PT_MASTER_REMAPPING_SET, pid.parentId, 0, &pid, &record ) ) {
+		if ( ! SlaveWorker::pending->eraseRemappingRecordKey( PT_MASTER_REMAPPING_SET, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &record ) ) {
 			__ERROR__( "SlaveWorker", "handleRemappingSetResponse", "Cannot find a pending master REMAPPING_SET request that matches the response. This message will be discarded." );
 			return false;
 		}
 
 		masterEvent.resRemappingSet(
-			( MasterSocket * ) pid.ptr, pid.id, record.key,
+			( MasterSocket * ) pid.ptr, pid.instanceId, pid.requestId, record.key,
 			record.remap.listId, record.remap.chunkId, success, true,
 			header.sockfd, header.isRemapped
 		);

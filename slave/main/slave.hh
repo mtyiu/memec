@@ -75,6 +75,8 @@ public:
 	DegradedChunkBuffer degradedChunkBuffer;
 	Timestamp timestamp;
 	LOCK_T lock;
+	/* Instance ID (assigned by coordinator) */
+	static uint16_t instanceId;
 
 	static Slave *getInstance() {
 		static Slave slave;

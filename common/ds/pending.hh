@@ -14,41 +14,52 @@ public:
 class PendingIdentifier {
 	// TODO: May have problem when there are multiple clients
 public:
-	uint32_t id, parentId;
+	uint16_t instanceId, parentInstanceId;
+	uint32_t requestId, parentRequestId;
 	void *ptr;
 
 	PendingIdentifier() {
-		this->set( 0, 0, 0 );
+		this->set( 0, 0, 0, 0, 0 );
 	}
 
-	PendingIdentifier( uint32_t id, uint32_t parentId, void *ptr ) {
-		this->set( id, parentId, ptr );
+	PendingIdentifier( uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr ) {
+		this->set( instanceId, parentInstanceId, requestId, parentRequestId, ptr );
 	}
 
-	void set( uint32_t id, uint32_t parentId, void *ptr ) {
-		this->id = id;
-		this->parentId = parentId;
+	void set( uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr ) {
+		this->instanceId = instanceId;
+		this->parentInstanceId = parentInstanceId;
+		this->requestId = requestId;
+		this->parentRequestId = parentRequestId;
 		this->ptr = ptr;
 	}
 
 	bool operator<( const PendingIdentifier &p ) const {
-		if ( this->id < p.id )
+		if ( this->instanceId < p.instanceId )
 			return true;
-		if ( this->id > p.id )
+		if ( this->instanceId > p.instanceId )
+			return false;
+
+		if ( this->requestId < p.requestId )
+			return true;
+		if ( this->requestId > p.requestId )
 			return false;
 
 		return this->ptr < p.ptr;
 	}
 
 	bool operator==( const PendingIdentifier &p ) const {
-		return ( this->id == p.id );
+		return ( this->instanceId == p.instanceId && this->requestId == p.requestId );
 	}
 };
 
 namespace std {
 	template<> struct hash<PendingIdentifier> {
 		size_t operator()( const PendingIdentifier &pid ) const {
-			return ( size_t ) pid.id;
+			size_t ret = 0;
+			ret |= ( size_t ) pid.requestId;
+			ret |= ( ( ( size_t ) pid.instanceId ) << 32 );
+			return ret;
 		}
 	};
 }

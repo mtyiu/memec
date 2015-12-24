@@ -37,11 +37,12 @@
  ***********************/
 #define MAXIMUM_VALUE_SIZE 16777215
 
-#define PROTO_HEADER_SIZE 10
+#define PROTO_HEADER_SIZE 12
 struct ProtocolHeader {
 	uint8_t magic, from, to, opcode;
 	uint32_t length; // Content length
-	uint32_t id;
+	uint16_t instanceId;
+	uint32_t requestId;
 };
 
  ///////////////////////
@@ -76,7 +77,7 @@ class Protocol {
 protected:
 	bool parseHeader(
 		uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t &opcode,
-		uint32_t &length, uint32_t &id,
+		uint32_t &length, uint16_t &instanceId, uint32_t &requestId,
 		char *buf, size_t size
 	);
 	bool parseKeyHeader(
@@ -98,21 +99,21 @@ protected:
 public:
 	size_t generateHeader(
 		uint8_t magic, uint8_t opcode,
-		uint32_t length, uint32_t id,
+		uint32_t length, uint16_t instanceId, uint32_t requestId,
 		char *buf
 	);
 	size_t generateKeyHeader(
-		uint8_t magic, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint8_t keySize, char *key,
 		char *buf
 	);
 	size_t generateKeyValueHeader(
-		uint8_t magic, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint8_t keySize, char *key, uint32_t valueSize, char *value,
 		char *buf
 	);
 	size_t generateKeyValueUpdateHeader(
-		uint8_t magic, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint8_t keySize, char *key,
 		uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate,
 		char *buf

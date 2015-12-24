@@ -24,7 +24,8 @@ enum SlaveEventType {
 class SlaveEvent : public Event {
 public:
 	SlaveEventType type;
-	uint32_t id;
+	uint16_t instanceId;
+	uint32_t requestId;
 	SlaveSocket *socket;
 	union {
 		struct {
@@ -47,7 +48,7 @@ public:
 	} message;
 
 	void pending( SlaveSocket *socket );
-	void resRegister( SlaveSocket *socket, uint32_t id, bool success = true );
+	void resRegister( SlaveSocket *socket, uint16_t instanceId, uint32_t requestId, bool success = true );
 	void announceSlaveConnected( SlaveSocket *socket );
 	void announceSlaveReconstructed( SlaveSocket *srcSocket, SlaveSocket *dstSocket );
 	void reqSealChunks( SlaveSocket *socket );

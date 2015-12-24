@@ -1,12 +1,12 @@
 #include "protocol.hh"
 
-char *MasterProtocol::reqDegradedLock( size_t &size, uint32_t id, uint32_t listId, uint32_t srcDataChunkId, uint32_t dstDataChunkId, uint32_t srcParityChunkId, uint32_t dstParityChunkId, char *key, uint8_t keySize ) {
+char *MasterProtocol::reqDegradedLock( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t srcDataChunkId, uint32_t dstDataChunkId, uint32_t srcParityChunkId, uint32_t dstParityChunkId, char *key, uint8_t keySize ) {
 	// -- common/protocol/degraded_protocol.cc --
 	size = this->generateDegradedLockReqHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_COORDINATOR,
 		PROTO_OPCODE_DEGRADED_LOCK,
-		id,
+		instanceId, requestId,
 		listId,
 		srcDataChunkId,
 		dstDataChunkId,
@@ -18,13 +18,13 @@ char *MasterProtocol::reqDegradedLock( size_t &size, uint32_t id, uint32_t listI
 	return this->buffer.send;
 }
 
-char *MasterProtocol::reqDegradedGet( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t srcDataChunkId, uint32_t dstDataChunkId, uint32_t srcParityChunkId, uint32_t dstParityChunkId, bool isSealed, char *key, uint8_t keySize ) {
+char *MasterProtocol::reqDegradedGet( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t srcDataChunkId, uint32_t dstDataChunkId, uint32_t srcParityChunkId, uint32_t dstParityChunkId, bool isSealed, char *key, uint8_t keySize ) {
 	// -- common/protocol/degraded_protocol.cc --
 	size = this->generateDegradedReqHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_DEGRADED_GET,
-		id,
+		instanceId, requestId,
 		listId, stripeId,
 		srcDataChunkId, dstDataChunkId,
 		srcParityChunkId, dstParityChunkId,
@@ -34,13 +34,13 @@ char *MasterProtocol::reqDegradedGet( size_t &size, uint32_t id, uint32_t listId
 	return this->buffer.send;
 }
 
-char *MasterProtocol::reqDegradedUpdate( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t srcDataChunkId, uint32_t dstDataChunkId, uint32_t srcParityChunkId, uint32_t dstParityChunkId, bool isSealed, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize ) {
+char *MasterProtocol::reqDegradedUpdate( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t srcDataChunkId, uint32_t dstDataChunkId, uint32_t srcParityChunkId, uint32_t dstParityChunkId, bool isSealed, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize ) {
 	// -- common/protocol/degraded_protocol.cc --
 	size = this->generateDegradedReqHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_DEGRADED_UPDATE,
-		id,
+		instanceId, requestId,
 		listId, stripeId,
 		srcDataChunkId, dstDataChunkId,
 		srcParityChunkId, dstParityChunkId,
@@ -51,13 +51,13 @@ char *MasterProtocol::reqDegradedUpdate( size_t &size, uint32_t id, uint32_t lis
 	return this->buffer.send;
 }
 
-char *MasterProtocol::reqDegradedDelete( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t srcDataChunkId, uint32_t dstDataChunkId, uint32_t srcParityChunkId, uint32_t dstParityChunkId, bool isSealed, char *key, uint8_t keySize ) {
+char *MasterProtocol::reqDegradedDelete( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t srcDataChunkId, uint32_t dstDataChunkId, uint32_t srcParityChunkId, uint32_t dstParityChunkId, bool isSealed, char *key, uint8_t keySize ) {
 	// -- common/protocol/degraded_protocol.cc --
 	size = this->generateDegradedReqHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_DEGRADED_DELETE,
-		id,
+		instanceId, requestId,
 		listId, stripeId,
 		srcDataChunkId, dstDataChunkId,
 		srcParityChunkId, dstParityChunkId,

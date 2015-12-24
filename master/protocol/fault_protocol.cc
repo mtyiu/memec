@@ -1,7 +1,7 @@
 #include "protocol.hh"
 
 char *MasterProtocol::syncMetadataBackup(
-	size_t &size, uint32_t id, LOCK_T *lock,
+	size_t &size, uint16_t instanceId, uint32_t requestId, LOCK_T *lock,
 	std::unordered_multimap<uint32_t, Metadata> &sealed, uint32_t &sealedCount,
 	std::unordered_map<Key, MetadataBackup> &ops, uint32_t &opsCount,
 	bool &isCompleted
@@ -11,7 +11,7 @@ char *MasterProtocol::syncMetadataBackup(
 		PROTO_MAGIC_HEARTBEAT,
 		PROTO_MAGIC_TO_COORDINATOR,
 		PROTO_OPCODE_SYNC,
-		id, lock,
+		instanceId, requestId, lock,
 		sealed, sealedCount,
 		ops, opsCount,
 		isCompleted

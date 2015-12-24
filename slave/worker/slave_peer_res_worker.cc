@@ -4,13 +4,13 @@
 bool SlaveWorker::handleSetResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
 	PendingIdentifier pid;
 	uint32_t requestCount;
-	bool found = SlaveWorker::pending->decrementRemapDataRequest( event.id, &pid, &requestCount );
+	bool found = SlaveWorker::pending->decrementRemapDataRequest( event.instanceId, event.requestId, &pid, &requestCount );
 	if ( found && requestCount == 0 ){
 		CoordinatorEvent coordinatorEvent;
 		Slave *slave = Slave::getInstance();
 		for ( uint32_t i = 0; i < slave->sockets.coordinators.size(); i++ ) {
 			CoordinatorSocket *socket = slave->sockets.coordinators.values[ i ];
-			coordinatorEvent.resRemappedData( socket, &pid.parentId );
+			coordinatorEvent.resRemappedData( socket, pid.parentInstanceId, pid.parentRequestId );
 			this->dispatch( coordinatorEvent );
 		}
 	}
@@ -43,11 +43,11 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 
 	PendingIdentifier pid;
 	DegradedOp op;
-	std::vector<uint32_t> pids;
+	std::vector<struct pid_s> pids;
 	bool isInserted = false;
 
-	if ( ! SlaveWorker::pending->eraseKey( PT_SLAVE_PEER_GET, event.id, event.socket, &pid ) ) {
-		__ERROR__( "SlaveWorker", "handleGetResponse", "Cannot find a pending slave UNSEALED_GET request that matches the response. This message will be discarded. (ID: %u)", event.id );
+	if ( ! SlaveWorker::pending->eraseKey( PT_SLAVE_PEER_GET, event.instanceId, event.requestId, event.socket, &pid ) ) {
+		__ERROR__( "SlaveWorker", "handleGetResponse", "Cannot find a pending slave UNSEALED_GET request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		if ( success ) keyValue.free();
 		return false;
 	}
@@ -58,10 +58,10 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 
 	for ( int pidsIndex = 0, len = pids.size(); pidsIndex < len; pidsIndex++ ) {
 		if ( pidsIndex == 0 ) {
-			assert( pids[ pidsIndex ] == pid.id );
+			assert( pids[ pidsIndex ].instanceId == pid.instanceId && pids[ pidsIndex ].requestId == pid.requestId );
 		}
 
-		if ( ! SlaveWorker::pending->eraseDegradedOp( PT_SLAVE_PEER_DEGRADED_OPS, pids[ pidsIndex ], 0, &pid, &op ) ) {
+		if ( ! SlaveWorker::pending->eraseDegradedOp( PT_SLAVE_PEER_DEGRADED_OPS, pids[ pidsIndex ].instanceId, pids[ pidsIndex ].requestId, 0, &pid, &op ) ) {
 			__ERROR__( "SlaveWorker", "handleGetResponse", "Cannot find a pending slave DEGRADED_OPS request that matches the response. This message will be discarded." );
 			if ( success ) keyValue.free();
 			continue;
@@ -99,9 +99,9 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 		switch( op.opcode ) {
 			case PROTO_OPCODE_DEGRADED_GET:
 				if ( success ) {
-					masterEvent.resGet( op.socket, pid.parentId, keyValue, true );
+					masterEvent.resGet( op.socket, pid.parentInstanceId, pid.parentRequestId, keyValue, true );
 				} else {
-					masterEvent.resGet( op.socket, pid.parentId, key, true );
+					masterEvent.resGet( op.socket, pid.parentInstanceId, pid.parentRequestId, key, true );
 				}
 				op.data.key.free();
 				this->dispatch( masterEvent );
@@ -119,7 +119,7 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 
 					// Insert into master UPDATE pending set
 					op.data.keyValueUpdate.ptr = op.socket;
-					if ( ! SlaveWorker::pending->insertKeyValueUpdate( PT_MASTER_UPDATE, pid.parentId, op.socket, op.data.keyValueUpdate ) ) {
+					if ( ! SlaveWorker::pending->insertKeyValueUpdate( PT_MASTER_UPDATE, pid.parentInstanceId, pid.parentRequestId, op.socket, op.data.keyValueUpdate ) ) {
 						__ERROR__( "SlaveWorker", "handleGetResponse", "Cannot insert into master UPDATE pending map." );
 					}
 
@@ -140,7 +140,7 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 
 					// Send UPDATE request to the parity slaves
 					this->sendModifyChunkRequest(
-						pid.parentId,
+						pid.parentInstanceId, pid.parentRequestId,
 						op.data.keyValueUpdate.size,
 						op.data.keyValueUpdate.data,
 						metadata,
@@ -155,7 +155,7 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 					delete[] valueUpdate;
 				} else {
 					masterEvent.resUpdate(
-						op.socket, pid.parentId, key,
+						op.socket, pid.parentInstanceId, pid.parentRequestId, key,
 						op.data.keyValueUpdate.offset,
 						op.data.keyValueUpdate.length,
 						false, false, true
@@ -172,12 +172,12 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 					metadata.set( op.listId, op.stripeId, op.chunkId );
 					// Insert into master DELETE pending set
 					op.data.key.ptr = op.socket;
-					if ( ! SlaveWorker::pending->insertKey( PT_MASTER_DEL, pid.parentId, op.socket, op.data.key ) ) {
+					if ( ! SlaveWorker::pending->insertKey( PT_MASTER_DEL, pid.parentInstanceId, pid.parentRequestId, op.socket, op.data.key ) ) {
 						__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot insert into master DELETE pending map." );
 					}
 
 					this->sendModifyChunkRequest(
-						pid.parentId, key.size, key.data,
+						pid.parentInstanceId, pid.parentRequestId, key.size, key.data,
 						metadata,
 						// not needed for deleting a key-value pair in an unsealed chunk:
 						0, 0, 0, 0,
@@ -186,7 +186,7 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 					);
 				} else {
 					masterEvent.resDelete(
-						op.socket, pid.parentId,
+						op.socket, pid.parentInstanceId, pid.parentRequestId,
 						key,
 						false, // needsFree
 						true   // isDegraded
@@ -219,26 +219,26 @@ bool SlaveWorker::handleUpdateResponse( SlavePeerEvent event, bool success, char
 	KeyValueUpdate keyValueUpdate;
 	PendingIdentifier pid;
 
-	if ( ! SlaveWorker::pending->eraseKeyValueUpdate( PT_SLAVE_PEER_UPDATE, event.id, event.socket, &pid, &keyValueUpdate, true, false ) ) {
+	if ( ! SlaveWorker::pending->eraseKeyValueUpdate( PT_SLAVE_PEER_UPDATE, event.instanceId, event.requestId, event.socket, &pid, &keyValueUpdate, true, false ) ) {
 		UNLOCK( &SlaveWorker::pending->slavePeers.updateLock );
-		__ERROR__( "SlaveWorker", "handleUpdateResponse", "Cannot find a pending slave UPDATE request that matches the response. This message will be discarded. (ID: %u)", event.id );
+		__ERROR__( "SlaveWorker", "handleUpdateResponse", "Cannot find a pending slave UPDATE request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		return false;
 	}
 	// Check pending slave UPDATE requests
-	pending = SlaveWorker::pending->count( PT_SLAVE_PEER_UPDATE, pid.id, false, true );
+	pending = SlaveWorker::pending->count( PT_SLAVE_PEER_UPDATE, pid.instanceId, pid.requestId, false, true );
 
 	__DEBUG__( BLUE, "SlaveWorker", "handleUpdateResponse", "Pending slave UPDATE requests = %d (%s).", pending, success ? "success" : "fail" );
 	if ( pending == 0 ) {
 		// Only send master DELETE response when the number of pending slave DELETE requests equal 0
 		MasterEvent masterEvent;
 
-		if ( ! SlaveWorker::pending->eraseKeyValueUpdate( PT_MASTER_UPDATE, pid.parentId, 0, &pid, &keyValueUpdate ) ) {
+		if ( ! SlaveWorker::pending->eraseKeyValueUpdate( PT_MASTER_UPDATE, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &keyValueUpdate ) ) {
 			__ERROR__( "SlaveWorker", "handleUpdateResponse", "Cannot find a pending master UPDATE request that matches the response. This message will be discarded." );
 			return false;
 		}
 
 		masterEvent.resUpdate(
-			( MasterSocket * ) pid.ptr, pid.id,
+			( MasterSocket * ) pid.ptr, pid.instanceId, pid.requestId,
 			keyValueUpdate,
 			header.valueUpdateOffset,
 			header.valueUpdateSize,
@@ -266,13 +266,13 @@ bool SlaveWorker::handleDeleteResponse( SlavePeerEvent event, bool success, char
 	Key key;
 	PendingIdentifier pid;
 
-	if ( ! SlaveWorker::pending->eraseKey( PT_SLAVE_PEER_DEL, event.id, event.socket, &pid, &key, true, false ) ) {
+	if ( ! SlaveWorker::pending->eraseKey( PT_SLAVE_PEER_DEL, event.instanceId, event.requestId, event.socket, &pid, &key, true, false ) ) {
 		UNLOCK( &SlaveWorker::pending->slavePeers.delLock );
-		__ERROR__( "SlaveWorker", "handleDeleteResponse", "Cannot find a pending slave DELETE request that matches the response. This message will be discarded. (ID: %u)", event.id );
+		__ERROR__( "SlaveWorker", "handleDeleteResponse", "Cannot find a pending slave DELETE request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		return false;
 	}
 	// Check pending slave UPDATE requests
-	pending = SlaveWorker::pending->count( PT_SLAVE_PEER_DEL, pid.id, false, true );
+	pending = SlaveWorker::pending->count( PT_SLAVE_PEER_DEL, pid.instanceId, pid.requestId, false, true );
 
 	__DEBUG__( BLUE, "SlaveWorker", "handleDeleteResponse", "Pending slave DELETE requests = %d (%s).", pending, success ? "success" : "fail" );
 	if ( pending == 0 ) {
@@ -280,7 +280,7 @@ bool SlaveWorker::handleDeleteResponse( SlavePeerEvent event, bool success, char
 		MasterEvent masterEvent;
 		Key key;
 
-		if ( ! SlaveWorker::pending->eraseKey( PT_MASTER_DEL, pid.parentId, 0, &pid, &key ) ) {
+		if ( ! SlaveWorker::pending->eraseKey( PT_MASTER_DEL, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &key ) ) {
 			__ERROR__( "SlaveWorker", "handleDeleteResponse", "Cannot find a pending master DELETE request that matches the response. This message will be discarded." );
 			return false;
 		}
@@ -290,7 +290,7 @@ bool SlaveWorker::handleDeleteResponse( SlavePeerEvent event, bool success, char
 			// uint32_t timestamp = SlaveWorker::timestamp->nextVal();
 			masterEvent.resDelete(
 				( MasterSocket * ) pid.ptr,
-				pid.id,
+				pid.instanceId, pid.requestId,
 				key,
 				true, // needsFree
 				false // isDegraded
@@ -298,7 +298,7 @@ bool SlaveWorker::handleDeleteResponse( SlavePeerEvent event, bool success, char
 		} else {
 			masterEvent.resDelete(
 				( MasterSocket * ) pid.ptr,
-				pid.id,
+				pid.instanceId, pid.requestId,
 				key,
 				true, // needsFree
 				false // isDegraded
@@ -350,7 +350,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 	}
 
 	// Find the corresponding GET_CHUNK request from the pending set
-	if ( ! SlaveWorker::pending->findChunkRequest( PT_SLAVE_PEER_GET_CHUNK, event.id, event.socket, it, true, false ) ) {
+	if ( ! SlaveWorker::pending->findChunkRequest( PT_SLAVE_PEER_GET_CHUNK, event.instanceId, event.requestId, event.socket, it, true, false ) ) {
 		UNLOCK( &SlaveWorker::pending->slavePeers.getChunkLock );
 		__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot find a pending slave GET_CHUNK request that matches the response. This message will be discarded." );
 		return false;
@@ -368,7 +368,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 	pending = 0;
 	tmp = it;
 	end = SlaveWorker::pending->slavePeers.getChunk.end();
-	while( tmp != end && tmp->first.id == event.id ) {
+	while( tmp != end && tmp->first.instanceId == event.instanceId && tmp->first.requestId == event.requestId ) {
 		if ( tmp->second.chunkId == chunkId ) {
 			// Store the chunk into the buffer
 			if ( success ) {
@@ -466,7 +466,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 			PendingIdentifier pid;
 			DegradedOp op;
 
-			if ( ! SlaveWorker::pending->eraseDegradedOp( PT_SLAVE_PEER_DEGRADED_OPS, event.id, event.socket, &pid, &op ) ) {
+			if ( ! SlaveWorker::pending->eraseDegradedOp( PT_SLAVE_PEER_DEGRADED_OPS, event.instanceId, event.requestId, event.socket, &pid, &op ) ) {
 				__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot find a pending slave DEGRADED_OPS request that matches the response. This message will be discarded." );
 			} else {
 				DegradedMap *dmap = &SlaveWorker::degradedChunkBuffer->map;
@@ -475,7 +475,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 				KeyValue keyValue;
 				KeyMetadata keyMetadata;
 				Metadata metadata;
-				std::vector<uint32_t> pids;
+				std::vector<struct pid_s> pids;
 
 				keyMetadata.offset = 0;
 
@@ -486,9 +486,9 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 
 				for ( int pidsIndex = 0, len = pids.size(); pidsIndex < len; pidsIndex++ ) {
 					if ( pidsIndex == 0 ) {
-						assert( pids[ pidsIndex ] == pid.id );
+						assert( pids[ pidsIndex ].instanceId == pid.instanceId && pids[ pidsIndex ].requestId == pid.requestId );
 					} else {
-						if ( ! SlaveWorker::pending->eraseDegradedOp( PT_SLAVE_PEER_DEGRADED_OPS, pids[ pidsIndex ], 0, &pid, &op ) ) {
+						if ( ! SlaveWorker::pending->eraseDegradedOp( PT_SLAVE_PEER_DEGRADED_OPS, pids[ pidsIndex ].instanceId, pids[ pidsIndex ].requestId, 0, &pid, &op ) ) {
 							__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot find a pending slave DEGRADED_OPS request that matches the response. This message will be discarded." );
 						}
 					}
@@ -529,9 +529,9 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 						MasterEvent event;
 
 						if ( isKeyValueFound )
-							event.resGet( op.socket, pid.parentId, keyValue, true );
+							event.resGet( op.socket, pid.parentInstanceId, pid.parentRequestId, keyValue, true );
 						else
-							event.resGet( op.socket, pid.parentId, key, true );
+							event.resGet( op.socket, pid.parentInstanceId, pid.parentRequestId, key, true );
 						this->dispatch( event );
 						op.data.key.free();
 					} else if ( op.opcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
@@ -545,7 +545,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 
 							op.data.keyValueUpdate.ptr = op.socket;
 							// Insert into master UPDATE pending set
-							if ( ! SlaveWorker::pending->insertKeyValueUpdate( PT_MASTER_UPDATE, pid.parentId, op.socket, op.data.keyValueUpdate ) ) {
+							if ( ! SlaveWorker::pending->insertKeyValueUpdate( PT_MASTER_UPDATE, pid.parentInstanceId, pid.parentRequestId, op.socket, op.data.keyValueUpdate ) ) {
 								__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot insert into master UPDATE pending map." );
 							}
 
@@ -560,7 +560,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 							);
 
 							this->sendModifyChunkRequest(
-								pid.parentId,
+								pid.parentInstanceId, pid.parentRequestId,
 								key.size, key.data,
 								metadata,
 								chunkUpdateOffset,
@@ -576,7 +576,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 							MasterEvent event;
 
 							event.resUpdate(
-								op.socket, pid.parentId, key,
+								op.socket, pid.parentInstanceId, pid.parentRequestId, key,
 								op.data.keyValueUpdate.offset,
 								op.data.keyValueUpdate.length,
 								false, false, true
@@ -592,7 +592,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 						if ( isKeyValueFound ) {
 							// Insert into master DELETE pending set
 							op.data.key.ptr = op.socket;
-							if ( ! SlaveWorker::pending->insertKey( PT_MASTER_DEL, pid.parentId, op.socket, op.data.key ) ) {
+							if ( ! SlaveWorker::pending->insertKey( PT_MASTER_DEL, pid.parentInstanceId, pid.parentRequestId, op.socket, op.data.key ) ) {
 								__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot insert into master DELETE pending map." );
 							}
 
@@ -605,7 +605,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 							);
 
 							this->sendModifyChunkRequest(
-								pid.parentId, key.size, key.data,
+								pid.parentInstanceId, pid.parentRequestId, key.size, key.data,
 								metadata, keyMetadata.offset, deltaSize, 0, delta,
 								true /* isSealed */,
 								false /* isUpdate */
@@ -613,7 +613,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 						} else {
 							MasterEvent event;
 
-							event.resDelete( op.socket, pid.parentId, key, false, true );
+							event.resDelete( op.socket, pid.parentInstanceId, pid.parentRequestId, key, false, true );
 							this->dispatch( event );
 							op.data.key.free();
 						}
@@ -623,7 +623,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 		} else {
 			Metadata metadata;
 
-			bool hasStripe = SlaveWorker::pending->findReconstruction( pid.parentId, stripeId, listId, chunkId );
+			bool hasStripe = SlaveWorker::pending->findReconstruction( pid.parentInstanceId, pid.parentRequestId, stripeId, listId, chunkId );
 
 			// printf( "%u\n", chunkId );
 			// fflush( stdout );
@@ -637,18 +637,19 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 
 			if ( hasStripe ) {
 				// Send SET_CHUNK request
+				uint16_t instanceId = Slave::instanceId;
 				uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
 				chunkRequest.set(
 					listId, stripeId, chunkId, target,
 					0 /* chunk */, false /* isDegraded */
 				);
-				if ( ! SlaveWorker::pending->insertChunkRequest( PT_SLAVE_PEER_SET_CHUNK, requestId, pid.parentId, target, chunkRequest ) ) {
+				if ( ! SlaveWorker::pending->insertChunkRequest( PT_SLAVE_PEER_SET_CHUNK, instanceId, pid.parentInstanceId, requestId, pid.parentRequestId, target, chunkRequest ) ) {
 					__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot insert into slave CHUNK_REQUEST pending map." );
 				}
 
 				metadata.set( listId, stripeId, chunkId );
 
-				event.reqSetChunk( target, requestId, metadata, this->chunks[ chunkId ], false );
+				event.reqSetChunk( target, instanceId, requestId, metadata, this->chunks[ chunkId ], false );
 				this->dispatch( event );
 			} else {
 				__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot found a pending reconstruction request for (%u, %u).\n", listId, stripeId );
@@ -693,14 +694,14 @@ bool SlaveWorker::handleSetChunkResponse( SlavePeerEvent event, bool success, ch
 		event.socket, 0 // ptr
 	);
 
-	if ( ! SlaveWorker::pending->eraseChunkRequest( PT_SLAVE_PEER_SET_CHUNK, event.id, event.socket, &pid, &chunkRequest ) ) {
+	if ( ! SlaveWorker::pending->eraseChunkRequest( PT_SLAVE_PEER_SET_CHUNK, event.instanceId, event.requestId, event.socket, &pid, &chunkRequest ) ) {
 		__ERROR__( "SlaveWorker", "handleSetChunkResponse", "Cannot find a pending slave SET_CHUNK request that matches the response. This message will be discarded." );
 	}
 
 	if ( chunkRequest.isDegraded ) {
 		// Release degraded lock
 		uint32_t remaining, total;
-		if ( ! SlaveWorker::pending->eraseReleaseDegradedLock( pid.parentId, 1, remaining, total, &pid ) ) {
+		if ( ! SlaveWorker::pending->eraseReleaseDegradedLock( pid.parentInstanceId, pid.parentRequestId, 1, remaining, total, &pid ) ) {
 			__ERROR__( "SlaveWorker", "handleSetChunkResponse", "Cannot find a pending coordinator release degraded lock request that matches the response. The message will be discarded." );
 			return false;
 		}
@@ -708,14 +709,14 @@ bool SlaveWorker::handleSetChunkResponse( SlavePeerEvent event, bool success, ch
 		if ( remaining == 0 ) {
 			// Tell the coordinator that all degraded lock is released
 			CoordinatorEvent coordinatorEvent;
-			coordinatorEvent.resReleaseDegradedLock( ( CoordinatorSocket * ) pid.ptr, pid.id, total );
+			coordinatorEvent.resReleaseDegradedLock( ( CoordinatorSocket * ) pid.ptr, pid.instanceId, pid.requestId, total );
 			SlaveWorker::eventQueue->insert( coordinatorEvent );
 		}
 	} else {
 		// Reconstruction
 		uint32_t remaining, total;
 		CoordinatorSocket *socket;
-		if ( ! SlaveWorker::pending->eraseReconstruction( pid.parentId, socket, header.listId, header.stripeId, header.chunkId, remaining, total, &pid ) ) {
+		if ( ! SlaveWorker::pending->eraseReconstruction( pid.parentInstanceId, pid.parentRequestId, socket, header.listId, header.stripeId, header.chunkId, remaining, total, &pid ) ) {
 			__ERROR__( "SlaveWorker", "handleSetChunkResponse", "Cannot find a pending coordinator RECONSTRUCTION request that matches the response. The message will be discarded." );
 			return false;
 		}
@@ -724,7 +725,7 @@ bool SlaveWorker::handleSetChunkResponse( SlavePeerEvent event, bool success, ch
 			// Tell the coordinator that the reconstruction task is completed
 			CoordinatorEvent coordinatorEvent;
 			coordinatorEvent.resReconstruction(
-				socket, pid.id,
+				socket, pid.instanceId, pid.requestId,
 				header.listId, header.chunkId, total /* numStripes */
 			);
 			SlaveWorker::eventQueue->insert( coordinatorEvent );
@@ -751,13 +752,13 @@ bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success,
 	ChunkUpdate chunkUpdate;
 	PendingIdentifier pid;
 
-	if ( ! SlaveWorker::pending->eraseChunkUpdate( PT_SLAVE_PEER_UPDATE_CHUNK, event.id, event.socket, &pid, &chunkUpdate, true, false ) ) {
+	if ( ! SlaveWorker::pending->eraseChunkUpdate( PT_SLAVE_PEER_UPDATE_CHUNK, event.instanceId, event.requestId, event.socket, &pid, &chunkUpdate, true, false ) ) {
 		UNLOCK( &SlaveWorker::pending->slavePeers.updateChunkLock );
-		__ERROR__( "SlaveWorker", "handleUpdateChunkResponse", "Cannot find a pending slave UPDATE_CHUNK request that matches the response. This message will be discarded. (ID: %u)", event.id );
+		__ERROR__( "SlaveWorker", "handleUpdateChunkResponse", "Cannot find a pending slave UPDATE_CHUNK request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		return false;
 	}
 	// Check pending slave UPDATE requests
-	pending = SlaveWorker::pending->count( PT_SLAVE_PEER_UPDATE_CHUNK, pid.id, false, true );
+	pending = SlaveWorker::pending->count( PT_SLAVE_PEER_UPDATE_CHUNK, pid.instanceId, pid.requestId, false, true );
 
 	__DEBUG__( BLUE, "SlaveWorker", "handleUpdateChunkResponse", "Pending slave UPDATE_CHUNK requests = %d (%s).", pending, success ? "success" : "fail" );
 	if ( pending == 0 ) {
@@ -766,14 +767,14 @@ bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success,
 		KeyValueUpdate keyValueUpdate;
 		MasterEvent masterEvent;
 
-		if ( ! SlaveWorker::pending->eraseKeyValueUpdate( PT_MASTER_UPDATE, pid.parentId, 0, &pid, &keyValueUpdate ) ) {
+		if ( ! SlaveWorker::pending->eraseKeyValueUpdate( PT_MASTER_UPDATE, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &keyValueUpdate ) ) {
 			__ERROR__( "SlaveWorker", "handleUpdateChunkResponse", "Cannot find a pending master UPDATE request that matches the response. This message will be discarded." );
 			return false;
 		}
 
 		key.set( keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.ptr );
 		masterEvent.resUpdate(
-			( MasterSocket * ) pid.ptr, pid.id, key,
+			( MasterSocket * ) pid.ptr, pid.instanceId, pid.requestId, key,
 			keyValueUpdate.offset, keyValueUpdate.length,
 			success, true, false
 		);
@@ -806,13 +807,13 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 	chunkUpdate.setKeyValueUpdate( 0, 0, 0 );
 	chunkUpdate.ptr = ( void * ) event.socket;
 
-	if ( ! SlaveWorker::pending->eraseChunkUpdate( PT_SLAVE_PEER_DEL_CHUNK, event.id, event.socket, &pid, &chunkUpdate, true, false ) ) {
+	if ( ! SlaveWorker::pending->eraseChunkUpdate( PT_SLAVE_PEER_DEL_CHUNK, event.instanceId, event.requestId, event.socket, &pid, &chunkUpdate, true, false ) ) {
 		UNLOCK( &SlaveWorker::pending->slavePeers.delChunkLock );
-		__ERROR__( "SlaveWorker", "handleDeleteChunkResponse", "Cannot find a pending slave DELETE_CHUNK request that matches the response. This message will be discarded. (ID: %u)", event.id );
+		__ERROR__( "SlaveWorker", "handleDeleteChunkResponse", "Cannot find a pending slave DELETE_CHUNK request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		return false;
 	}
 	// Check pending slave UPDATE requests
-	pending = SlaveWorker::pending->count( PT_SLAVE_PEER_DEL_CHUNK, pid.id, false, true );
+	pending = SlaveWorker::pending->count( PT_SLAVE_PEER_DEL_CHUNK, pid.instanceId, pid.requestId, false, true );
 
 	// __ERROR__( "SlaveWorker", "handleDeleteChunkResponse", "Pending slave DELETE_CHUNK requests = %d.", pending );
 	if ( pending == 0 ) {
@@ -820,7 +821,7 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 		MasterEvent masterEvent;
 		Key key;
 
-		if ( ! SlaveWorker::pending->eraseKey( PT_MASTER_DEL, pid.parentId, 0, &pid, &key ) ) {
+		if ( ! SlaveWorker::pending->eraseKey( PT_MASTER_DEL, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &key ) ) {
 			__ERROR__( "SlaveWorker", "handleDeleteChunkResponse", "Cannot find a pending master DELETE request that matches the response. This message will be discarded." );
 			return false;
 		}
@@ -829,7 +830,7 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 		if ( success ) {
 			uint32_t timestamp = SlaveWorker::timestamp->nextVal();
 			masterEvent.resDelete(
-				( MasterSocket * ) pid.ptr, pid.id,
+				( MasterSocket * ) pid.ptr, pid.instanceId, pid.requestId,
 				timestamp,
 				header.listId, header.stripeId, header.chunkId,
 				key,
@@ -838,7 +839,7 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 			);
 		} else {
 			masterEvent.resDelete(
-				( MasterSocket * ) pid.ptr, pid.id,
+				( MasterSocket * ) pid.ptr, pid.instanceId, pid.requestId,
 				key,
 				true, // needsFree
 				false // isDegraded

@@ -90,7 +90,7 @@ private:
 	void dispatch( SlavePeerEvent event );
 
 	// ---------- slave_peer_req_worker.cc ----------
-	bool handleSlavePeerRegisterRequest( SlavePeerSocket *socket, char *buf, size_t size );
+	bool handleSlavePeerRegisterRequest( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, char *buf, size_t size );
 	bool handleSetRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleGetRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleUpdateRequest( SlavePeerEvent event, char *buf, size_t size );
@@ -127,11 +127,12 @@ private:
 	bool performDegradedRead(
 		MasterSocket *masterSocket,
 		uint32_t listId, uint32_t stripeId, uint32_t lostChunkId,
-		bool isSealed, uint8_t opcode, uint32_t parentId,
+		bool isSealed, uint8_t opcode, uint16_t parentInstanceId, uint32_t parentRequestId,
 		Key *key, KeyValueUpdate *keyValueUpdate = 0
 	);
 	bool sendModifyChunkRequest(
-		uint32_t parentId, uint8_t keySize, char *keyStr,
+		uint16_t parentInstanceId, uint32_t parentRequestId,
+		uint8_t keySize, char *keyStr,
 		Metadata &metadata, uint32_t offset,
 		uint32_t deltaSize, /* valueUpdateSize */
 		uint32_t valueUpdateOffset,

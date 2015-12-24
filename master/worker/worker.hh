@@ -90,7 +90,7 @@ private:
 
 	// ---------- degraded_worker.cc ----------
 	bool sendDegradedLockRequest(
-		uint32_t parentId, uint8_t opcode,
+		uint16_t parentInstanceId, uint32_t parentRequestId, uint8_t opcode,
 		uint32_t listId,
 		uint32_t dataChunkId, uint32_t newDataChunkId,
 		uint32_t parityChunkId, uint32_t newParityChunkId,

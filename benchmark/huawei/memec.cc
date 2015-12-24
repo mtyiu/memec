@@ -83,6 +83,7 @@ MemEC::MemEC( uint8_t keySize, uint32_t chunkSize, uint32_t batchSize, uint32_t 
 	this->id = fromId;
 	this->fromId = fromId;
 	this->toId = toId;
+	this->instanceId = 0;
 	// Set addr
 	memset( &this->addr, 0, sizeof( this->addr ) );
 	this->addr.sin_family = AF_INET;
@@ -131,7 +132,7 @@ bool MemEC::connect() {
 	size_t size = this->protocol.generateHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_OPCODE_REGISTER,
-		0, id, this->buffer.send.data
+		0, 0, id, this->buffer.send.data
 	);
 	bool connected;
 	this->buffer.send.len = size;
@@ -148,7 +149,8 @@ bool MemEC::connect() {
 		fprintf( stderr, "MemEC::connect(): Cannot parse register response message from the master.\n" );
 		return false;
 	}
-	if ( header.id != id ) {
+	this->instanceId = header.instanceId;
+	if ( header.requestId != id ) {
 		fprintf( stderr, "MemEC::connect(): The response does not match the request ID.\n" );
 		return false;
 	}
@@ -216,7 +218,7 @@ bool MemEC::get( char *key, uint8_t keySize, char *&value, uint32_t &valueSize )
 	size_t size = this->protocol.generateKeyHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_OPCODE_GET,
-		id, keySize, key,
+		this->instanceId, id, keySize, key,
 		this->buffer.send.data + this->buffer.send.len
 	);
 	this->buffer.send.len += size;
@@ -277,7 +279,7 @@ bool MemEC::set( char *key, uint8_t keySize, char *value, uint32_t valueSize ) {
 	size_t size = this->protocol.generateKeyValueHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_OPCODE_SET,
-		id, keySize, key,
+		this->instanceId, id, keySize, key,
 		valueSize, value,
 		this->buffer.send.data + this->buffer.send.len
 	);
@@ -302,7 +304,7 @@ bool MemEC::update( char *key, uint8_t keySize, char *valueUpdate, uint32_t valu
 	size_t size = this->protocol.generateKeyValueUpdateHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_OPCODE_UPDATE,
-		id, keySize, key,
+		this->instanceId, id, keySize, key,
 		valueUpdateOffset, valueUpdateSize, valueUpdate,
 		this->buffer.send.data + this->buffer.send.len
 	);
@@ -327,7 +329,7 @@ bool MemEC::del( char *key, uint8_t keySize ) {
 	size_t size = this->protocol.generateKeyHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_OPCODE_DELETE,
-		id, keySize, key,
+		this->instanceId, id, keySize, key,
 		this->buffer.send.data + this->buffer.send.len
 	);
 	this->buffer.send.len += size;
@@ -423,7 +425,7 @@ void MemEC::recvThread() {
 						}
 
 						pthread_mutex_lock( &this->pending.getLock );
-						it = this->pending.get.find( common.id );
+						it = this->pending.get.find( common.requestId );
 						if ( it == this->pending.get.end() ) {
 							fprintf( stderr, "MemEC::recvThread(): Cannot find a pending GET request that matches the response. The message will be discarded.\n" );
 							pthread_mutex_unlock( &this->pending.getLock );
@@ -466,7 +468,7 @@ void MemEC::recvThread() {
 							fprintf( stderr, "MemEC::recvThread(): Protocol::parseKeyHeader() failed.\n" );
 
 						pthread_mutex_lock( &this->pending.setLock );
-						it = this->pending.set.find( common.id );
+						it = this->pending.set.find( common.requestId );
 						if ( it == this->pending.set.end() ) {
 							fprintf( stderr, "MemEC::recvThread(): Cannot find a pending SET request that matches the response. The message will be discarded.\n" );
 						} else {
@@ -488,7 +490,7 @@ void MemEC::recvThread() {
 							fprintf( stderr, "MemEC::recvThread(): Protocol::parseKeyValueUpdateHeader() failed.\n" );
 
 						pthread_mutex_lock( &this->pending.updateLock );
-						it = this->pending.update.find( common.id );
+						it = this->pending.update.find( common.requestId );
 						if ( it == this->pending.update.end() ) {
 							fprintf( stderr, "MemEC::recvThread(): Cannot find a pending SET request that matches the response. The message will be discarded.\n" );
 						} else {
@@ -510,7 +512,7 @@ void MemEC::recvThread() {
 							fprintf( stderr, "MemEC::recvThread(): Protocol::parseKeyHeader() failed.\n" );
 
 						pthread_mutex_lock( &this->pending.delLock );
-						it = this->pending.del.find( common.id );
+						it = this->pending.del.find( common.requestId );
 						if ( it == this->pending.del.end() ) {
 							fprintf( stderr, "MemEC::recvThread(): Cannot find a pending SET request that matches the response. The message will be discarded.\n" );
 						} else {

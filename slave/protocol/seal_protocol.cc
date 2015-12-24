@@ -1,7 +1,7 @@
 #include <cassert>
 #include "protocol.hh"
 
-char *SlaveProtocol::reqSealChunk( size_t &size, uint32_t id, Chunk *chunk, uint32_t startPos, char *buf ) {
+char *SlaveProtocol::reqSealChunk( size_t &size, uint16_t instanceId, uint32_t requestId, Chunk *chunk, uint32_t startPos, char *buf ) {
 	// -- common/protocol/seal_protocol.cc --
 	if ( ! buf ) buf = this->buffer.send;
 
@@ -31,7 +31,7 @@ char *SlaveProtocol::reqSealChunk( size_t &size, uint32_t id, Chunk *chunk, uint
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_SEAL_CHUNK,
-		id,
+		instanceId, requestId,
 		chunk->metadata.listId,
 		chunk->metadata.stripeId,
 		chunk->metadata.chunkId,

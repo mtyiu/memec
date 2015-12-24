@@ -36,6 +36,7 @@ EXTERNAL_LIB= \
 	$(PLIO_SRC_ROOT)/common/config/global_config.o \
 	$(PLIO_SRC_ROOT)/common/config/server_addr.o \
 	$(PLIO_SRC_ROOT)/common/ds/bitmask_array.o \
+	$(PLIO_SRC_ROOT)/common/ds/instance_id_generator.o \
 	$(PLIO_SRC_ROOT)/common/ds/key_value.o \
 	$(PLIO_SRC_ROOT)/common/ds/latency.o \
 	$(PLIO_SRC_ROOT)/common/ds/load.o \

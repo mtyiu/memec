@@ -11,13 +11,13 @@ bool CoordinatorProtocol::parseRemappingLockHeader( struct RemappingLockHeader &
 	return ret;
 }
 
-char *CoordinatorProtocol::resRemappingSetLock( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t chunkId, bool isRemapped, uint8_t keySize, char *key, uint32_t sockfd ) {
+char *CoordinatorProtocol::resRemappingSetLock( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, uint32_t listId, uint32_t chunkId, bool isRemapped, uint8_t keySize, char *key, uint32_t sockfd ) {
 	// -- common/protocol/remap_protocol.cc --
 	size = this->generateRemappingLockHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_MASTER,
 		PROTO_OPCODE_REMAPPING_LOCK,
-		id,
+		instanceId, requestId,
 		listId,
 		chunkId,
 		isRemapped,
@@ -28,21 +28,21 @@ char *CoordinatorProtocol::resRemappingSetLock( size_t &size, uint32_t id, bool 
 	return this->buffer.send;
 }
 
-char *CoordinatorProtocol::forwardRemappingRecords( size_t &size, uint32_t id, char* message ) {
+char *CoordinatorProtocol::forwardRemappingRecords( size_t &size, uint16_t instanceId, uint32_t requestId, char* message ) {
 	// -- common/protocol/protocol.cc --
 	size_t headerSize = this->generateHeader(
 		PROTO_MAGIC_REMAPPING,
 		PROTO_MAGIC_TO_MASTER,
 		PROTO_OPCODE_SYNC,
 		size,
-		id
+		instanceId, requestId
 	);
 	memcpy( this->buffer.send + headerSize, message, size );
 	size += headerSize;
 	return this->buffer.send;
 }
 
-char *CoordinatorProtocol::reqSyncRemappingRecord( size_t &size, uint32_t id, std::unordered_map<Key, RemappingRecord> &remappingRecords, LOCK_T* lock, bool &isLast, char* buffer ) {
+char *CoordinatorProtocol::reqSyncRemappingRecord( size_t &size, uint16_t instanceId, uint32_t requestId, std::unordered_map<Key, RemappingRecord> &remappingRecords, LOCK_T* lock, bool &isLast, char* buffer ) {
 	// -- common/protocol/remap_protocol.cc --
 	size_t remapCount = 0;
 	if ( ! buffer ) buffer = this->buffer.send;
@@ -50,7 +50,7 @@ char *CoordinatorProtocol::reqSyncRemappingRecord( size_t &size, uint32_t id, st
 		PROTO_MAGIC_REMAPPING,
 		PROTO_MAGIC_TO_MASTER,
 		PROTO_OPCODE_SYNC,
-		id,
+		instanceId, requestId,
 		lock,
 		remappingRecords,
 		remapCount,
@@ -61,14 +61,14 @@ char *CoordinatorProtocol::reqSyncRemappingRecord( size_t &size, uint32_t id, st
 	return buffer;
 }
 
-char *CoordinatorProtocol::reqSyncRemappedData( size_t &size, uint32_t id, struct sockaddr_in target, char* buffer ) {
+char *CoordinatorProtocol::reqSyncRemappedData( size_t &size, uint16_t instanceId, uint32_t requestId, struct sockaddr_in target, char* buffer ) {
 	// -- common/protocol/address_protocol.cc --
 	if ( ! buffer ) buffer = this->buffer.send;
 	size = this->generateAddressHeader(
 		PROTO_MAGIC_REMAPPING,
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_PARITY_MIGRATE,
-		id,
+		instanceId, requestId,
 		target.sin_addr.s_addr,
 		target.sin_port,
 		buffer

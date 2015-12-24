@@ -1,6 +1,7 @@
 #include <cerrno>
 #include "coordinator_socket.hh"
 #include "../main/coordinator.hh"
+#include "../../common/ds/instance_id_generator.hh"
 #include "../../common/util/debug.hh"
 
 #define SOCKET_COLOR YELLOW
@@ -63,6 +64,7 @@ void *CoordinatorSocket::run( void *argv ) {
 bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 	CoordinatorSocket *socket = ( CoordinatorSocket * ) data;
 	static Coordinator *coordinator = Coordinator::getInstance();
+	static InstanceIdGenerator *generator = InstanceIdGenerator::getInstance();
 
 	///////////////////////////////////////////////////////////////////////////
 	if ( ! ( events & EPOLLIN ) && ( ( events & EPOLLERR ) || ( events & EPOLLHUP ) || ( events & EPOLLRDHUP ) ) ) {
@@ -107,6 +109,8 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 	} else {
 		int index;
 		struct sockaddr_in *addr;
+		uint16_t instanceId;
+
 		if ( ( addr = socket->sockets.get( fd, &index ) ) ) {
 			// Read message immediately and add to appropriate socket list such that all "add" operations originate from the epoll thread
 			// Only master or slave register message is expected
@@ -134,7 +138,8 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 						socket->done( fd ); // The socket is valid
 
 						MasterEvent event;
-						event.resRegister( masterSocket, header.id );
+						instanceId = generator->generate( masterSocket );
+						event.resRegister( masterSocket, instanceId, header.requestId );
 						coordinator->eventQueue.insert( event );
 					} else if ( header.from == PROTO_MAGIC_FROM_SLAVE ) {
 						SlaveSocket *s = 0;
@@ -154,7 +159,8 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 
 						if ( s ) {
 							SlaveEvent event;
-							event.resRegister( s, header.id );
+							instanceId = generator->generate( s );
+							event.resRegister( s, instanceId, header.requestId );
 							coordinator->eventQueue.insert( event );
 
 							event.announceSlaveConnected( s );
@@ -171,7 +177,8 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 							socket->done( fd );
 
 							SlaveEvent event;
-							event.resRegister( s, header.id );
+							instanceId = generator->generate( s );
+							event.resRegister( s, instanceId, header.requestId );
 							coordinator->eventQueue.insert( event );
 
 							// __ERROR__( "CoordinatorSocket", "handler", "Unexpected registration from slave." );

@@ -3,16 +3,20 @@
 #include "coordinator.hh"
 #include "../ds/map.hh"
 #include "../event/coordinator_event.hh"
-#include "../../common/ds/sockaddr_in.hh"
+#include "../../common/ds/instance_id_generator.hh"
 #include "../../common/ds/packet_pool.hh"
+#include "../../common/ds/sockaddr_in.hh"
 
 #define GIGA 				( 1000 * 1000 * 1000 )
 #define FLOAT_THRESHOLD		( ( float ) 0.00001 )
 #define A_EQUAL_B( _A_, _B_ ) \
 	( _A_ - _B_ >= -1 * FLOAT_THRESHOLD && _A_ - _B_ <= FLOAT_THRESHOLD )
 
+uint16_t Coordinator::instanceId;
+
 Coordinator::Coordinator() {
 	this->isRunning = false;
+	Coordinator::instanceId = InstanceIdGenerator::getInstance()->generate( 0 );
 }
 
 void Coordinator::free() {

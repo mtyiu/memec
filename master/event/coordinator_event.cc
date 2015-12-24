@@ -10,7 +10,7 @@ void CoordinatorEvent::reqRegister( CoordinatorSocket *socket, uint32_t addr, ui
 void CoordinatorEvent::reqSendLoadStats(
 		CoordinatorSocket *socket,
 		ArrayMap< struct sockaddr_in, Latency > *slaveGetLatency,
-		ArrayMap< struct sockaddr_in, Latency > *slaveSetLatency ) 
+		ArrayMap< struct sockaddr_in, Latency > *slaveSetLatency )
 {
 	this->type = COORDINATOR_EVENT_TYPE_PUSH_LOAD_STATS;
 	this->socket = socket;
@@ -18,8 +18,10 @@ void CoordinatorEvent::reqSendLoadStats(
 	this->message.loading.slaveSetLatency = slaveSetLatency;
 }
 
-void CoordinatorEvent::resSyncRemappingRecords() {
+void CoordinatorEvent::resSyncRemappingRecords( uint16_t instanceId, uint32_t requestId ) {
 	this->type = COORDINATOR_EVENT_TYPE_RESPONSE_SYNC_REMAPPING_RECORDS;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
 }
 
 void CoordinatorEvent::pending( CoordinatorSocket *socket ) {

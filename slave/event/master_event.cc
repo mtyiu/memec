@@ -1,37 +1,42 @@
 #include "master_event.hh"
 
-void MasterEvent::resRegister( MasterSocket *socket, uint32_t id, bool success ) {
+void MasterEvent::resRegister( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, bool success ) {
 	this->type = success ? MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS : MASTER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE;
-	this->id = id;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
 	this->socket = socket;
 }
 
-void MasterEvent::resGet( MasterSocket *socket, uint32_t id, KeyValue &keyValue, bool isDegraded ) {
+void MasterEvent::resGet( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, KeyValue &keyValue, bool isDegraded ) {
 	this->type = MASTER_EVENT_TYPE_GET_RESPONSE_SUCCESS;
-	this->id = id;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
 	this->isDegraded = isDegraded;
 	this->socket = socket;
 	this->message.keyValue = keyValue;
 }
 
-void MasterEvent::resGet( MasterSocket *socket, uint32_t id, Key &key, bool isDegraded ) {
+void MasterEvent::resGet( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool isDegraded ) {
 	this->type = MASTER_EVENT_TYPE_GET_RESPONSE_FAILURE;
-	this->id = id;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
 	this->isDegraded = isDegraded;
 	this->socket = socket;
 	this->message.key = key;
 }
 
-void MasterEvent::resSet( MasterSocket *socket, uint32_t id, Key &key, bool success ) {
+void MasterEvent::resSet( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool success ) {
 	this->type = success ? MASTER_EVENT_TYPE_SET_RESPONSE_SUCCESS_PARITY : MASTER_EVENT_TYPE_SET_RESPONSE_FAILURE;
-	this->id = id;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
 	this->socket = socket;
 	this->message.set.key = key;
 }
 
-void MasterEvent::resSet( MasterSocket *socket, uint32_t id, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isSealed, uint32_t sealedListId, uint32_t sealedStripeId, uint32_t sealedChunkId, Key &key ) {
+void MasterEvent::resSet( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isSealed, uint32_t sealedListId, uint32_t sealedStripeId, uint32_t sealedChunkId, Key &key ) {
 	this->type = MASTER_EVENT_TYPE_SET_RESPONSE_SUCCESS_DATA;
-	this->id = id;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
 	this->socket = socket;
 	this->message.set.key = key;
 	this->message.set.timestamp = timestamp;
@@ -44,9 +49,10 @@ void MasterEvent::resSet( MasterSocket *socket, uint32_t id, uint32_t timestamp,
 	this->message.set.sealedChunkId = sealedChunkId;
 }
 
-void MasterEvent::resRemappingSet( MasterSocket *socket, uint32_t id, Key &key, uint32_t listId, uint32_t chunkId, bool success, bool needsFree, uint32_t sockfd, bool remapped ) {
+void MasterEvent::resRemappingSet( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, uint32_t listId, uint32_t chunkId, bool success, bool needsFree, uint32_t sockfd, bool remapped ) {
 	this->type = success ? MASTER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS : MASTER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE;
-	this->id = id;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
 	this->needsFree = needsFree;
 	this->socket = socket;
 	this->message.remap.key = key;
@@ -56,9 +62,10 @@ void MasterEvent::resRemappingSet( MasterSocket *socket, uint32_t id, Key &key, 
 	this->message.remap.isRemapped = remapped;
 }
 
-void MasterEvent::resUpdate( MasterSocket *socket, uint32_t id, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool success, bool needsFree, bool isDegraded ) {
+void MasterEvent::resUpdate( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool success, bool needsFree, bool isDegraded ) {
 	this->type = success ? MASTER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS : MASTER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE;
-	this->id = id;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
 	this->needsFree = needsFree;
 	this->isDegraded = isDegraded;
 	this->socket = socket;
@@ -67,9 +74,10 @@ void MasterEvent::resUpdate( MasterSocket *socket, uint32_t id, Key &key, uint32
 	this->message.keyValueUpdate.valueUpdateSize = valueUpdateSize;
 }
 
-void MasterEvent::resDelete( MasterSocket *socket, uint32_t id, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key, bool needsFree, bool isDegraded ) {
+void MasterEvent::resDelete( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key, bool needsFree, bool isDegraded ) {
 	this->type = MASTER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS;
-	this->id = id;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
 	this->needsFree = needsFree;
 	this->isDegraded = isDegraded;
 	this->socket = socket;
@@ -80,18 +88,20 @@ void MasterEvent::resDelete( MasterSocket *socket, uint32_t id, uint32_t timesta
 	this->message.del.chunkId = chunkId;
 }
 
-void MasterEvent::resDelete( MasterSocket *socket, uint32_t id, Key &key, bool needsFree, bool isDegraded ) {
+void MasterEvent::resDelete( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool needsFree, bool isDegraded ) {
 	this->type =  MASTER_EVENT_TYPE_DELETE_RESPONSE_FAILURE;
-	this->id = id;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
 	this->needsFree = needsFree;
 	this->isDegraded = isDegraded;
 	this->socket = socket;
 	this->message.del.key = key;
 }
 
-void MasterEvent::ackMetadata( MasterSocket	*socket, uint32_t id, uint32_t fromTimestamp, uint32_t toTimestamp ) {
+void MasterEvent::ackMetadata( MasterSocket	*socket, uint16_t instanceId, uint32_t requestId, uint32_t fromTimestamp, uint32_t toTimestamp ) {
 	this->type = MASTER_EVENT_TYPE_ACK_METADATA;
-	this->id = id;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
 	this->socket = socket;
 	this->message.ack.fromTimestamp = fromTimestamp;
 	this->message.ack.toTimestamp = toTimestamp;

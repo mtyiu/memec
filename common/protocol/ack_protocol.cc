@@ -1,9 +1,9 @@
 #include "protocol.hh"
 
-size_t Protocol::generateAcknowledgementHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t fromTimestamp, uint32_t toTimestamp, char *sendBuf ) {
+size_t Protocol::generateAcknowledgementHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t fromTimestamp, uint32_t toTimestamp, char *sendBuf ) {
 	if ( ! sendBuf ) sendBuf = this->buffer.send;
 	char *buf = sendBuf + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_ACK_BASE_SIZE, id, sendBuf );
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_ACK_BASE_SIZE, instanceId, requestId, sendBuf );
 
 	*( ( uint32_t * )( buf     ) ) = htonl( fromTimestamp );
 	*( ( uint32_t * )( buf + 4 ) ) = htonl( toTimestamp );

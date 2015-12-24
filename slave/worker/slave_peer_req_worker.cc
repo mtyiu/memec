@@ -1,7 +1,7 @@
 #include "worker.hh"
 #include "../main/slave.hh"
 
-bool SlaveWorker::handleSlavePeerRegisterRequest( SlavePeerSocket *socket, char *buf, size_t size ) {
+bool SlaveWorker::handleSlavePeerRegisterRequest( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, char *buf, size_t size ) {
 	struct AddressHeader header;
 	if ( ! this->protocol.parseAddressHeader( header, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleSlavePeerRegisterRequest", "Invalid address header." );
@@ -22,7 +22,7 @@ bool SlaveWorker::handleSlavePeerRegisterRequest( SlavePeerSocket *socket, char 
 	}
 
 	SlavePeerEvent event;
-	event.resRegister( slavePeers->values[ index ], true );
+	event.resRegister( slavePeers->values[ index ], instanceId, requestId, true );
 	SlaveWorker::eventQueue->insert( event );
 	return true;
 }
@@ -49,7 +49,7 @@ bool SlaveWorker::handleSetRequest( SlavePeerEvent event, char *buf, size_t size
 
 	Key key;
 	key.set( header.keySize, header.key );
-	event.resSet( event.socket, event.id, listId, chunkId, key, success );
+	event.resSet( event.socket, event.instanceId, event.requestId, listId, chunkId, key, success );
 	this->dispatch( event );
 
 	return success;
@@ -76,9 +76,9 @@ bool SlaveWorker::handleGetRequest( SlavePeerEvent event, char *buf, size_t size
 	);
 
 	if ( ret )
-		event.resGet( event.socket, event.id, keyValue );
+		event.resGet( event.socket, event.instanceId, event.requestId, keyValue );
 	else
-		event.resGet( event.socket, event.id, key );
+		event.resGet( event.socket, event.instanceId, event.requestId, key );
 	this->dispatch( event );
 	return ret;
 }
@@ -116,7 +116,7 @@ bool SlaveWorker::handleUpdateRequest( SlavePeerEvent event, char *buf, size_t s
 
 	key.set( header.keySize, header.key );
 	event.resUpdate(
-		event.socket, event.id,
+		event.socket, event.instanceId, event.requestId,
 		header.listId, header.stripeId, header.chunkId, key,
 		header.valueUpdateOffset,
 		header.valueUpdateSize,
@@ -146,7 +146,7 @@ bool SlaveWorker::handleDeleteRequest( SlavePeerEvent event, char *buf, size_t s
 
 	key.set( header.keySize, header.key );
 	event.resDelete(
-		event.socket, event.id,
+		event.socket, event.instanceId, event.requestId,
 		header.listId, header.stripeId, header.chunkId,
 		key, ret
 	);
@@ -194,7 +194,7 @@ bool SlaveWorker::handleGetChunkRequest( SlavePeerEvent event, char *buf, size_t
 		);
 	}
 
-	event.resGetChunk( event.socket, event.id, metadata, ret, isSealed ? chunk : 0 );
+	event.resGetChunk( event.socket, event.instanceId, event.requestId, metadata, ret, isSealed ? chunk : 0 );
 	this->dispatch( event );
 
 	chunkBuffer->unlock( chunkBufferIndex );
@@ -279,15 +279,16 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, bool isSealed, ch
 		);
 
 		// Remove the chunk from pending chunk set
+		uint16_t instanceId;
 		uint32_t requestId, addr, remaining, total;
 		uint16_t port;
 		CoordinatorSocket *coordinatorSocket;
-		if ( SlaveWorker::pending->eraseRecovery( metadata.listId, metadata.stripeId, metadata.chunkId, requestId, coordinatorSocket, addr, port, remaining, total ) ) {
+		if ( SlaveWorker::pending->eraseRecovery( metadata.listId, metadata.stripeId, metadata.chunkId, instanceId, requestId, coordinatorSocket, addr, port, remaining, total ) ) {
 			// printf( "Received (%u, %u, %u). Number of remaining pending chunks = %u / %u.\n", metadata.listId, metadata.stripeId, metadata.chunkId, remaining, total );
 
 			if ( remaining == 0 ) {
 				notifyCoordinator = true;
-				coordinatorEvent.resPromoteBackupSlave( coordinatorSocket, requestId, addr, port, total );
+				coordinatorEvent.resPromoteBackupSlave( coordinatorSocket, instanceId, requestId, addr, port, total );
 			}
 		} else {
 			// __ERROR__( "SlaveWorker", "handleSetChunkRequest", "Cannot find the chunk (%u, %u, %u) from pending chunk set.", metadata.listId, metadata.stripeId, metadata.chunkId );
@@ -422,7 +423,7 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, bool isSealed, ch
 	}
 
 	if ( isSealed || header.chunkKeyValue.isCompleted ) {
-		event.resSetChunk( event.socket, event.id, metadata, ret );
+		event.resSetChunk( event.socket, event.instanceId, event.requestId, metadata, ret );
 		this->dispatch( event );
 	}
 
@@ -456,7 +457,7 @@ bool SlaveWorker::handleUpdateChunkRequest( SlavePeerEvent event, char *buf, siz
 	metadata.set( header.listId, header.stripeId, header.chunkId );
 
 	event.resUpdateChunk(
-		event.socket, event.id, metadata,
+		event.socket, event.instanceId, event.requestId, metadata,
 		header.offset, header.length,
 		header.updatingChunkId, ret
 	);
@@ -491,7 +492,7 @@ bool SlaveWorker::handleDeleteChunkRequest( SlavePeerEvent event, char *buf, siz
 	metadata.set( header.listId, header.stripeId, header.chunkId );
 
 	event.resDeleteChunk(
-		event.socket, event.id, metadata,
+		event.socket, event.instanceId, event.requestId, metadata,
 		header.offset, header.length,
 		header.updatingChunkId, ret
 	);
@@ -540,6 +541,7 @@ bool SlaveWorker::issueSealChunkRequest( Chunk *chunk, uint32_t startPos ) {
 	// Only issue seal chunk request when new key-value pairs are received
 	if ( SlaveWorker::parityChunkCount && startPos < chunk->getSize() ) {
 		size_t size;
+		uint16_t instanceId = Slave::instanceId;
 		uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
 		Packet *packet = SlaveWorker::packetPool->malloc();
 		packet->setReferenceCount( SlaveWorker::parityChunkCount );
@@ -548,7 +550,7 @@ bool SlaveWorker::issueSealChunkRequest( Chunk *chunk, uint32_t startPos ) {
 		this->getSlaves( chunk->metadata.listId );
 
 		// Prepare seal chunk request
-		this->protocol.reqSealChunk( size, requestId, chunk, startPos, packet->data );
+		this->protocol.reqSealChunk( size, instanceId, requestId, chunk, startPos, packet->data );
 		packet->size = ( uint32_t ) size;
 
 		if ( size == PROTO_HEADER_SIZE + PROTO_CHUNK_SEAL_SIZE ) {

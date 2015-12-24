@@ -11,7 +11,8 @@ void Backup::insert( uint8_t keySize, char *keyStr, uint8_t opcode, uint32_t tim
 	MetadataBackup metadataBackup;
 	std::unordered_map<Key, MetadataBackup>::iterator it;
 
-	key.dup( keySize, keyStr );
+	key.set( keySize, keyStr );
+	key.dup();
 
 	metadataBackup.opcode = opcode;
 	metadataBackup.timestamp = timestamp;
@@ -53,7 +54,8 @@ void Backup::insert( uint8_t keySize, char *keyStr, uint8_t opcode, uint32_t tim
 	Metadata metadata;
 	std::unordered_map<Key, MetadataBackup>::iterator opsIt;
 
-	key.dup( keySize, keyStr );
+	key.set( keySize, keyStr );
+	key.dup();
 	metadataBackup.opcode = opcode;
 	metadataBackup.timestamp = timestamp;
 	metadataBackup.set( listId, stripeId, chunkId );

@@ -1,7 +1,7 @@
 #include "protocol.hh"
 
 size_t Protocol::generateHeartbeatMessage(
-	uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t timestamp,
+	uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t timestamp,
 	LOCK_T *sealedLock, std::unordered_set<Metadata> &sealed, uint32_t &sealedCount,
 	LOCK_T *opsLock, std::unordered_map<Key, OpMetadata> &ops, uint32_t &opsCount,
 	bool &isCompleted
@@ -76,14 +76,14 @@ size_t Protocol::generateHeartbeatMessage(
 
 	// TODO tell coordinator whether this is the last packet of records
 
-	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, id );
+	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, instanceId, requestId );
 
 	return bytes;
 }
 
-size_t Protocol::generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t timestamp, uint32_t sealed, uint32_t keys, bool isLast ) {
+size_t Protocol::generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t timestamp, uint32_t sealed, uint32_t keys, bool isLast ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_HEARTBEAT_SIZE, id );
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_HEARTBEAT_SIZE, instanceId, requestId );
 
 	*( ( uint32_t * )( buf      ) ) = htonl( timestamp );
 	*( ( uint32_t * )( buf +  4 ) ) = htonl( sealed );

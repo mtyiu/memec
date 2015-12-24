@@ -110,90 +110,90 @@ public:
 
 	// Insert (Coordinator)
 	bool insertDegradedLockData(
-		PendingType type, uint32_t id, uint32_t parentId, void *ptr,
+		PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
 		DegradedLockData &degradedLockData,
 		bool needsLock = true, bool needsUnlock = true
 	);
 	// Insert (Applications)
 	bool insertKey(
-		PendingType type, uint32_t id, void *ptr,
+		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr,
 		Key &key, bool needsLock = true, bool needsUnlock = true
 	);
 	bool insertKeyValue(
-		PendingType type, uint32_t id, void *ptr,
+		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr,
 		KeyValue &keyValue, bool needsLock = true, bool needsUnlock = true
 	);
 	bool insertKeyValueUpdate(
-		PendingType type, uint32_t id, void *ptr,
+		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr,
 		KeyValueUpdate &keyValueUpdate,
 		bool needsLock = true, bool needsUnlock = true
 	);
 	// Insert (Slaves)
 	bool insertKey(
-		PendingType type, uint32_t id, uint32_t parentId, void *ptr,
+		PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
 		Key &key, bool needsLock = true, bool needsUnlock = true
 	);
 	bool insertRemappingRecord(
-		PendingType type, uint32_t id, uint32_t parentId, void *ptr,
+		PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
 		RemappingRecord &remappingRecord,
 		bool needsLock = true, bool needsUnlock = true
 	);
 	bool insertKeyValueUpdate(
-		PendingType type, uint32_t id, uint32_t parentId, void *ptr,
+		PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
 		KeyValueUpdate &keyValueUpdate,
 		bool needsLock = true, bool needsUnlock = true
 	);
 	bool recordRequestStartTime(
-		PendingType type, uint32_t id, uint32_t parentId, void *ptr,
+		PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
 		struct sockaddr_in addr
 	);
 	// Insert (Request)
 	bool insertRemapList(
-		PendingType type, uint32_t id, uint32_t parentId, void *ptr,
+		PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
 		std::vector<uint32_t> &remapList,
 		bool needsLock = true, bool needsUnlock = true
 	);
 
 	// Erase
 	bool eraseDegradedLockData(
-		PendingType type, uint32_t id, void *ptr = 0,
+		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr = 0,
 		PendingIdentifier *pidPtr = 0,
 		DegradedLockData *degradedLockDataPtr = 0,
 		bool needsLock = true, bool needsUnlock = true
 	);
 	bool eraseKey(
-		PendingType type, uint32_t id, void *ptr = 0,
+		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr = 0,
 		PendingIdentifier *pidPtr = 0, Key *keyPtr = 0,
 		bool needsLock = true, bool needsUnlock = true,
 		bool checkKey = false, char *checkKeyPtr = 0
 	);
 	bool eraseKeyValue(
-		PendingType type, uint32_t id, void *ptr = 0,
+		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr = 0,
 		PendingIdentifier *pidPtr = 0, KeyValue *keyValuePtr = 0,
 		bool needsLock = true, bool needsUnlock = true,
 		bool checkKey = false, char *checkKeyPtr = 0
 	);
 	bool eraseRemappingRecord(
-		PendingType type, uint32_t id, void *ptr = 0,
+		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr = 0,
 		PendingIdentifier *pidPtr = 0,
 		RemappingRecord *remappingRecordPtr = 0,
 		bool needsLock = true, bool needsUnlock = true
 	);
 	bool eraseKeyValueUpdate(
-		PendingType type, uint32_t id, void *ptr = 0,
+		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr = 0,
 		PendingIdentifier *pidPtr = 0,
 		KeyValueUpdate *keyValueUpdatePtr = 0,
 		bool needsLock = true, bool needsUnlock = true,
 		bool checkKey = false, char *checkKeyPtr = 0
 	);
 	bool eraseRequestStartTime(
-		PendingType type, uint32_t id, void *ptr,
+		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr,
 		struct timespec &elapsedTime,
 		PendingIdentifier *pidPtr = 0,
 		RequestStartTime *rstPtr = 0
 	);
 	bool eraseRemapList(
-		PendingType type, uint32_t id, void *ptr = 0,
+		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr = 0,
 		PendingIdentifier *pidPtr = 0,
 		std::vector<uint32_t> *remapList = 0,
 		bool needsLock = true, bool needsUnlock = true
@@ -201,22 +201,22 @@ public:
 
 	// Find
 	bool findKey(
-		PendingType type, uint32_t id, void *ptr,
+		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr,
 		Key *keyPtr,
 		bool checkKey = false, char *checkKeyPtr = 0
 	);
 	bool findKeyValueUpdate(
-		PendingType type, uint32_t id, void *ptr,
+		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr,
 		KeyValueUpdate *keyValuePtr,
 		bool checkKey = false, char *checkKeyPtr = 0
 	);
 	bool findRemapList(
-		PendingType type, uint32_t id, void *ptr,
+		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr,
 		std::vector<uint32_t> *remapList
 	);
 
 	// Count
-	uint32_t count( PendingType type, uint32_t id, bool needsLock = true, bool needsUnlock = true );
+	uint32_t count( PendingType type, uint16_t instanceId, uint32_t requestId, bool needsLock = true, bool needsUnlock = true );
 };
 
 #endif

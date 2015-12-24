@@ -39,7 +39,8 @@ enum MasterEventType {
 class MasterEvent : public Event {
 public:
 	MasterEventType type;
-	uint32_t id;
+	uint16_t instanceId;
+	uint32_t requestId;
 	MasterSocket *socket;
 	union {
 		struct {
@@ -70,7 +71,7 @@ public:
 		} degradedLock;
 	} message;
 
-	void resRegister( MasterSocket *socket, uint32_t id, bool success = true );
+	void resRegister( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, bool success = true );
 
 	void reqPushLoadStats (
 		MasterSocket *socket,
@@ -81,24 +82,24 @@ public:
 	void switchPhase( bool toRemap, std::set<struct sockaddr_in> slaves );
 	// Degraded lock
 	void resDegradedLock(
-		MasterSocket *socket, uint32_t id, Key &key, bool isLocked, bool isSealed,
+		MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool isLocked, bool isSealed,
 		uint32_t listId, uint32_t stripeId,
 		uint32_t srcDataChunkId, uint32_t dstDataChunkId,
 		uint32_t srcParityChunkId, uint32_t dstParityChunkId
 	);
 	void resDegradedLock(
-		MasterSocket *socket, uint32_t id, Key &key, bool exist,
+		MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool exist,
 		uint32_t listId, uint32_t srcDataChunkId, uint32_t srcParityChunkId
 	);
 	void resDegradedLock(
-		MasterSocket *socket, uint32_t id, Key &key,
+		MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key,
 		uint32_t listId,
 		uint32_t srcDataChunkId, uint32_t dstDataChunkId,
 		uint32_t srcParityChunkId, uint32_t dstParityChunkId
 	);
 	// REMAPPING_SET_LOCK
 	void resRemappingSetLock(
-		MasterSocket *socket, uint32_t id, bool isRemapped,
+		MasterSocket *socket, uint16_t instanceId, uint32_t requestId, bool isRemapped,
 		Key &key, RemappingRecord &remappingRecord, bool success,
 		uint32_t sockfd = UINT_MAX
 	);

@@ -8,7 +8,7 @@
 
 #define PROTO_KEY_VALUE_SIZE	4 // 1 byte for key size, 3 bytes for value size
 
-size_t Protocol::generateHeader( uint8_t magic, uint8_t opcode, uint32_t length, uint32_t id, char *buf ) {
+size_t Protocol::generateHeader( uint8_t magic, uint8_t opcode, uint32_t length, uint16_t instanceId, uint32_t requestId, char *buf ) {
 	size_t bytes = 0;
 
 	buf[ 0 ] = ( ( magic & 0x07 ) | ( PROTO_MAGIC_FROM_APPLICATION & 0x18 ) | ( PROTO_MAGIC_TO_MASTER & 0x60 ) );
@@ -18,13 +18,16 @@ size_t Protocol::generateHeader( uint8_t magic, uint8_t opcode, uint32_t length,
 	*( ( uint32_t * )( buf + bytes ) ) = htonl( length );
 	bytes += 4;
 
-	*( ( uint32_t * )( buf + bytes ) ) = htonl( id );
+	*( ( uint16_t * )( buf + bytes ) ) = htons( instanceId );
+	bytes += 2;
+
+	*( ( uint32_t * )( buf + bytes ) ) = htonl( requestId );
 	bytes += 4;
 
 	return bytes;
 }
 
-bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t &opcode, uint32_t &length, uint32_t &id, char *buf, size_t size ) {
+bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t &opcode, uint32_t &length, uint16_t &instanceId, uint32_t &requestId, char *buf, size_t size ) {
 	if ( size < PROTO_HEADER_SIZE )
 		return false;
 
@@ -33,7 +36,8 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 	to = buf[ 0 ] & 0x60;
 	opcode = buf[ 1 ] & 0xFF;
 	length = ntohl( *( ( uint32_t * )( buf + 2 ) ) );
-	id = ntohl( *( ( uint32_t * )( buf + 6 ) ) );
+	instanceId = ntohs( *( ( uint16_t * )( buf + 6 ) ) );
+	requestId = ntohl( *( ( uint32_t * )( buf + 8 ) ) );
 
 	switch( magic ) {
 		case PROTO_MAGIC_REQUEST:
@@ -41,17 +45,17 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_MAGIC_RESPONSE_FAILURE:
 			break;
 		default:
-			fprintf( stderr, "Error #1: (magic, from, to, opcode, length, id) = (%x, %x, %x, %x, %u, %u)\n", magic, from, to, opcode, length, id );
+			fprintf( stderr, "Error #1: (magic, from, to, opcode, length, instanceId, requestId) = (%x, %x, %x, %x, %u, %u, %u)\n", magic, from, to, opcode, length, instanceId, requestId );
 			return false;
 	}
 
 	if ( from != PROTO_MAGIC_FROM_MASTER ) {
-		fprintf( stderr, "Error #2: (magic, from, to, opcode, length, id) = (%x, %x, %x, %x, %u, %u)\n", magic, from, to, opcode, length, id );
+		fprintf( stderr, "Error #2: (magic, from, to, opcode, length, instanceId, requestId) = (%x, %x, %x, %x, %u, %u, %u)\n", magic, from, to, opcode, length, instanceId, requestId );
 		return false;
 	}
 
 	if ( to != PROTO_MAGIC_TO_APPLICATION ) {
-		fprintf( stderr, "Error #3: (magic, from, to, opcode, length, id) = (%x, %x, %x, %x, %u, %u)\n", magic, from, to, opcode, length, id );
+		fprintf( stderr, "Error #3: (magic, from, to, opcode, length, instanceId, requestId) = (%x, %x, %x, %x, %u, %u, %u)\n", magic, from, to, opcode, length, instanceId, requestId );
 		return false;
 	}
 
@@ -63,7 +67,7 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_OPCODE_DELETE:
 			break;
 		default:
-			fprintf( stderr, "Error #4: (magic, from, to, opcode, length, id) = (%x, %x, %x, %x, %u, %u)\n", magic, from, to, opcode, length, id );
+			fprintf( stderr, "Error #4: (magic, from, to, opcode, length, instanceId, requestId) = (%x, %x, %x, %x, %u, %u, %u)\n", magic, from, to, opcode, length, instanceId, requestId );
 			return false;
 	}
 
@@ -77,13 +81,14 @@ bool Protocol::parseHeader( struct ProtocolHeader &header, char *buf, size_t siz
 		header.to,
 		header.opcode,
 		header.length,
-		header.id,
+		header.instanceId,
+		header.requestId,
 		buf, size
 	);
 }
 
-size_t Protocol::generateKeyHeader( uint8_t magic, uint8_t opcode, uint32_t id, uint8_t keySize, char *key, char *buf ) {
-	size_t bytes = this->generateHeader( magic, opcode, PROTO_KEY_SIZE + keySize, id, buf );
+size_t Protocol::generateKeyHeader( uint8_t magic, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint8_t keySize, char *key, char *buf ) {
+	size_t bytes = this->generateHeader( magic, opcode, PROTO_KEY_SIZE + keySize, instanceId, requestId, buf );
 	buf += PROTO_HEADER_SIZE;
 
 	buf[ 0 ] = keySize;
@@ -120,8 +125,8 @@ bool Protocol::parseKeyHeader( struct KeyHeader &header, char *buf, size_t size,
 	);
 }
 
-size_t Protocol::generateKeyValueHeader( uint8_t magic, uint8_t opcode, uint32_t id, uint8_t keySize, char *key, uint32_t valueSize, char *value, char *buf ) {
-	size_t bytes = this->generateHeader( magic, opcode, PROTO_KEY_VALUE_SIZE + keySize + valueSize, id, buf );
+size_t Protocol::generateKeyValueHeader( uint8_t magic, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint8_t keySize, char *key, uint32_t valueSize, char *value, char *buf ) {
+	size_t bytes = this->generateHeader( magic, opcode, PROTO_KEY_VALUE_SIZE + keySize + valueSize, instanceId, requestId, buf );
 	buf += PROTO_HEADER_SIZE;
 
 	buf[ 0 ] = keySize;
@@ -177,11 +182,11 @@ bool Protocol::parseKeyValueHeader( struct KeyValueHeader &header, char *buf, si
 	);
 }
 
-size_t Protocol::generateKeyValueUpdateHeader( uint8_t magic, uint8_t opcode, uint32_t id, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate, char *buf ) {
+size_t Protocol::generateKeyValueUpdateHeader( uint8_t magic, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate, char *buf ) {
 	size_t bytes = this->generateHeader(
 		magic, opcode,
 		PROTO_KEY_VALUE_UPDATE_SIZE + keySize + ( valueUpdate ? valueUpdateSize : 0 ),
-		id, buf
+		instanceId, requestId, buf
 	);
 	buf += PROTO_HEADER_SIZE;
 

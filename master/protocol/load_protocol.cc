@@ -2,7 +2,7 @@
 #include "../../common/util/debug.hh"
 
 char *MasterProtocol::reqPushLoadStats(
-		size_t &size, uint32_t id,
+		size_t &size, uint16_t instanceId, uint32_t requestId,
 		ArrayMap< struct sockaddr_in, Latency > *slaveGetLatency,
 		ArrayMap< struct sockaddr_in, Latency > *slaveSetLatency )
 {
@@ -10,7 +10,7 @@ char *MasterProtocol::reqPushLoadStats(
 	size = this->generateLoadStatsHeader(
 		PROTO_MAGIC_LOADING_STATS,
 		PROTO_MAGIC_TO_COORDINATOR,
-		id,
+		instanceId, requestId,
 		slaveGetLatency->size(),
 		slaveSetLatency->size(),
 		0,

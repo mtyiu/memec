@@ -13,16 +13,18 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 
 	switch( event.type ) {
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
-			buffer.data = this->protocol.resRegisterMaster( buffer.size, event.id, true );
+			buffer.data = this->protocol.resRegisterMaster( buffer.size, event.instanceId, event.requestId, true );
 			isSend = true;
 			break;
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resRegisterMaster( buffer.size, event.id, false );
+			buffer.data = this->protocol.resRegisterMaster( buffer.size, event.instanceId, event.requestId, false );
 			isSend = true;
 			break;
 		case MASTER_EVENT_TYPE_PUSH_LOADING_STATS:
 			buffer.data = this->protocol.reqPushLoadStats(
-				buffer.size, 0, // id
+				buffer.size,
+				Coordinator::instanceId,
+				CoordinatorWorker::idGenerator->nextVal( this->workerId ),
 				event.message.slaveLoading.slaveGetLatency,
 				event.message.slaveLoading.slaveSetLatency,
 				event.message.slaveLoading.overloadedSlaveSet
@@ -37,7 +39,12 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 			break;
 		case MASTER_EVENT_TYPE_FORWARD_REMAPPING_RECORDS:
 			buffer.size = event.message.forward.prevSize;
-			buffer.data = this->protocol.forwardRemappingRecords ( buffer.size, 0, event.message.forward.data );
+			buffer.data = this->protocol.forwardRemappingRecords(
+				buffer.size,
+				Coordinator::instanceId,
+				CoordinatorWorker::idGenerator->nextVal( this->workerId ),
+				event.message.forward.data
+			);
 			delete [] event.message.forward.data;
 			isSend = true;
 			break;
@@ -46,7 +53,7 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 		case MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resRemappingSetLock(
 				buffer.size,
-				event.id,
+				event.instanceId, event.requestId,
 				success,
 				event.message.remap.listId,
 				event.message.remap.chunkId,
@@ -94,7 +101,7 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 		case MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_WAS_LOCKED:
 			buffer.data = this->protocol.resDegradedLock(
 				buffer.size,
-				event.id,
+				event.instanceId, event.requestId,
 				event.type == MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED /* success */,
 				event.message.degradedLock.isSealed,
 				event.message.degradedLock.key.size,
@@ -112,7 +119,7 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 		case MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_FOUND:
 			buffer.data = this->protocol.resDegradedLock(
 				buffer.size,
-				event.id,
+				event.instanceId, event.requestId,
 				event.type == MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_LOCKED /* exist */,
 				event.message.degradedLock.key.size,
 				event.message.degradedLock.key.data,
@@ -125,7 +132,7 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 		case MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_REMAPPED:
 			buffer.data = this->protocol.resDegradedLock(
 				buffer.size,
-				event.id,
+				event.instanceId, event.requestId,
 				event.message.degradedLock.key.size,
 				event.message.degradedLock.key.data,
 				event.message.degradedLock.listId,
@@ -218,13 +225,14 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 				buffer.data -= PROTO_LOAD_STATS_SIZE;
 				buffer.size += PROTO_LOAD_STATS_SIZE;
 			} else if ( header.magic == PROTO_MAGIC_REQUEST ) {
-				event.id = header.id;
+				event.instanceId = header.instanceId;
+				event.requestId = header.requestId;
 				switch( header.opcode ) {
 					case PROTO_OPCODE_REMAPPING_LOCK:
-						this->handleRemappingSetLockRequest( event, buffer.data, buffer.size );
+						this->handleRemappingSetLockRequest( event, buffer.data, header.length );
 						break;
 					case PROTO_OPCODE_DEGRADED_LOCK:
-						this->handleDegradedLockRequest( event, buffer.data, buffer.size );
+						this->handleDegradedLockRequest( event, buffer.data, header.length );
 						break;
 					default:
 						goto quit_1;
@@ -233,14 +241,17 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 				switch( header.opcode ) {
 					case PROTO_OPCODE_SYNC:
 					{
-						coordinator->pending.decrementRemappingRecords( header.id, event.socket->getAddr(), true, false );
-						coordinator->pending.checkAndRemoveRemappingRecords( header.id, 0, false, true );
+						coordinator->pending.decrementRemappingRecords( header.requestId, event.socket->getAddr(), true, false );
+						coordinator->pending.checkAndRemoveRemappingRecords( header.requestId, 0, false, true );
 					}
 						break;
 					default:
 						__ERROR__( "CoordinatorWorker", "dispatch", "Invalid opcode from master." );
 						goto quit_1;
 				}
+			} else if ( header.magic == PROTO_MAGIC_HEARTBEAT && header.opcode == PROTO_OPCODE_SYNC ) {
+				printf( "PROTO_OPCODE_SYNC\n" );
+				this->handleSyncMetadata( event, buffer.data, header.length );
 			} else {
 				__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from master." );
 				goto quit_1;
@@ -258,4 +269,84 @@ quit_1:
 
 	if ( ! connected )
 		__ERROR__( "CoordinatorWorker", "dispatch", "The master is disconnected." );
+}
+
+bool CoordinatorWorker::handleSyncMetadata( MasterEvent event, char *buf, size_t size ) {
+	/*
+	uint32_t count, requestId = event.instanceId, event.requestId;
+	size_t processed, offset, failed = 0;
+	struct HeartbeatHeader heartbeat;
+	union {
+		struct MetadataHeader metadata;
+		struct KeyOpMetadataHeader op;
+	} header;
+
+	offset = 0;
+	if ( ! this->protocol.parseHeartbeatHeader( heartbeat, buf, size ) ) {
+		__ERROR__( "CoordinatorWorker", "dispatch", "Invalid heartbeat protocol header." );
+		return false;
+	}
+
+	offset += PROTO_HEARTBEAT_SIZE;
+
+	LOCK( &event.socket->map.chunksLock );
+	for ( count = 0; count < heartbeat.sealed; count++ ) {
+		if ( this->protocol.parseMetadataHeader( header.metadata, processed, buf, size, offset ) ) {
+			event.socket->map.insertChunk(
+				header.metadata.listId,
+				header.metadata.stripeId,
+				header.metadata.chunkId,
+				false, false
+			);
+		} else {
+			failed++;
+		}
+		offset += processed;
+	}
+	UNLOCK( &event.socket->map.chunksLock );
+
+	LOCK( &event.socket->map.keysLock );
+	for ( count = 0; count < heartbeat.keys; count++ ) {
+		if ( this->protocol.parseKeyOpMetadataHeader( header.op, processed, buf, size, offset ) ) {
+			SlaveSocket *s = event.socket;
+			if ( header.op.opcode == PROTO_OPCODE_DELETE ) { // Handle keys from degraded DELETE
+				s = CoordinatorWorker::stripeList->get( header.op.listId, header.op.chunkId );
+			}
+			s->map.insertKey(
+				header.op.key,
+				header.op.keySize,
+				header.op.listId,
+				header.op.stripeId,
+				header.op.chunkId,
+				header.op.opcode,
+				false, false
+			);
+		} else {
+			failed++;
+		}
+		offset += processed;
+	}
+	UNLOCK( &event.socket->map.keysLock );
+
+	if ( failed ) {
+		__ERROR__( "CoordinatorWorker", "processHeartbeat", "Number of failed objects = %lu", failed );
+	} else {
+		__ERROR__( "CoordinatorWorker", "processHeartbeat", "(sealed, keys) = (%u, %u)", heartbeat.sealed, heartbeat.keys );
+
+		// Send ACK message
+		event.resHeartbeat( event.socket, heartbeat.timestamp, heartbeat.sealed, heartbeat.keys, heartbeat.isLast );
+		this->dispatch( event );
+	}
+
+	// check if this is the last packet for a sync operation
+	// remove pending meta sync requests
+	if ( requestId && heartbeat.isLast && ! failed ) {
+		bool *sync = Coordinator::getInstance()->pending.removeSyncMetaReq( requestId );
+		if ( sync )
+			*sync = true;
+	}
+
+	return failed == 0;
+	*/
+	return true;
 }

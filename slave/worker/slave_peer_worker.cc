@@ -18,6 +18,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		case SLAVE_PEER_EVENT_TYPE_REGISTER_REQUEST:
 			buffer.data = this->protocol.reqRegisterSlavePeer(
 				buffer.size,
+				Slave::instanceId,
 				SlaveWorker::idGenerator->nextVal( this->workerId ),
 				SlaveWorker::slaveServerAddr
 			);
@@ -25,7 +26,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		case SLAVE_PEER_EVENT_TYPE_GET_CHUNK_REQUEST:
 			buffer.data = this->protocol.reqGetChunk(
 				buffer.size,
-				event.id,
+				event.instanceId, event.requestId,
 				event.message.chunk.metadata.listId,
 				event.message.chunk.metadata.stripeId,
 				event.message.chunk.metadata.chunkId
@@ -40,7 +41,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				// The chunk is sealed
 				buffer.data = this->protocol.reqSetChunk(
 					buffer.size,
-					event.id,
+					event.instanceId, event.requestId,
 					event.message.chunk.metadata.listId,
 					event.message.chunk.metadata.stripeId,
 					event.message.chunk.metadata.chunkId,
@@ -54,7 +55,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				DegradedMap &map = SlaveWorker::degradedChunkBuffer->map;
 				buffer.data = this->protocol.reqSetChunk(
 					buffer.size,
-					event.id,
+					event.instanceId, event.requestId,
 					event.message.chunk.metadata.listId,
 					event.message.chunk.metadata.stripeId,
 					event.message.chunk.metadata.chunkId,
@@ -68,7 +69,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 					SlavePeerEvent newEvent;
 					newEvent.reqSetChunk(
 						event.socket,
-						event.id,
+						event.instanceId, event.requestId,
 						event.message.chunk.metadata,
 						0, // unsealed chunk
 						false
@@ -79,7 +80,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		case SLAVE_PEER_EVENT_TYPE_SET_REQUEST:
 			buffer.data = this->protocol.reqSet(
 				buffer.size,
-				event.id,
+				event.instanceId, event.requestId,
 				event.message.parity.key.data,
 				event.message.parity.key.size,
 				event.message.parity.value.data,
@@ -91,7 +92,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		case SLAVE_PEER_EVENT_TYPE_SET_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resSet(
 				buffer.size,
-				event.id,
+				event.instanceId, event.requestId,
 				success, /* success */
 				event.message.parity.key.size,
 				event.message.parity.key.data,
@@ -104,7 +105,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		case SLAVE_PEER_EVENT_TYPE_GET_REQUEST:
 			buffer.data = this->protocol.reqGet(
 				buffer.size,
-				event.id,
+				event.instanceId, event.requestId,
 				event.message.get.listId,
 				event.message.get.chunkId,
 				event.message.get.key.size,
@@ -120,7 +121,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		case SLAVE_PEER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resRegisterSlavePeer(
 				buffer.size,
-				event.id,
+				event.instanceId, event.requestId,
 				success
 			);
 			break;
@@ -130,7 +131,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 			buffer.data = this->protocol.resRemappingSet(
 				buffer.size,
 				false, // toMaster
-				event.id,
+				event.instanceId, event.requestId,
 				success,
 				event.message.remap.listId,
 				event.message.remap.chunkId,
@@ -147,7 +148,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 			event.message.get.keyValue.deserialize( key, keySize, value, valueSize );
 			buffer.data = this->protocol.resGet(
 				buffer.size,
-				event.id,
+				event.instanceId, event.requestId,
 				true /* success */,
 				false /* isDegraded */,
 				keySize, key,
@@ -159,7 +160,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		case SLAVE_PEER_EVENT_TYPE_GET_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resGet(
 				buffer.size,
-				event.id,
+				event.instanceId, event.requestId,
 				false /* success */,
 				false /* isDegraded */,
 				event.message.get.key.size,
@@ -174,7 +175,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		case SLAVE_PEER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resUpdateChunk(
 				buffer.size,
-				event.id,
+				event.instanceId, event.requestId,
 				success,
 				event.message.chunkUpdate.metadata.listId,
 				event.message.chunkUpdate.metadata.stripeId,
@@ -190,7 +191,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		case SLAVE_PEER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resUpdate(
 				buffer.size,
-				event.id,
+				event.instanceId, event.requestId,
 				success,
 				event.message.update.listId,
 				event.message.update.stripeId,
@@ -208,7 +209,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		case SLAVE_PEER_EVENT_TYPE_DELETE_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resDelete(
 				buffer.size,
-				event.id,
+				event.instanceId, event.requestId,
 				success,
 				event.message.del.listId,
 				event.message.del.stripeId,
@@ -223,7 +224,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		case SLAVE_PEER_EVENT_TYPE_DELETE_CHUNK_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resDeleteChunk(
 				buffer.size,
-				event.id,
+				event.instanceId, event.requestId,
 				success,
 				event.message.chunkUpdate.metadata.listId,
 				event.message.chunkUpdate.metadata.stripeId,
@@ -244,7 +245,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 
 			buffer.data = this->protocol.resGetChunk(
 				buffer.size,
-				event.id,
+				event.instanceId, event.requestId,
 				true,
 				event.message.chunk.metadata.listId,
 				event.message.chunk.metadata.stripeId,
@@ -256,7 +257,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		case SLAVE_PEER_EVENT_TYPE_GET_CHUNK_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resGetChunk(
 				buffer.size,
-				event.id,
+				event.instanceId, event.requestId,
 				false,
 				event.message.chunk.metadata.listId,
 				event.message.chunk.metadata.stripeId,
@@ -269,7 +270,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		case SLAVE_PEER_EVENT_TYPE_SET_CHUNK_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resSetChunk(
 				buffer.size,
-				event.id,
+				event.instanceId, event.requestId,
 				success,
 				event.message.chunk.metadata.listId,
 				event.message.chunk.metadata.stripeId,
@@ -299,6 +300,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		///////////
 		case SLAVE_PEER_EVENT_TYPE_BATCH_GET_CHUNKS:
 		{
+			uint16_t instanceId = Slave::instanceId;
 			uint32_t offset = 0;
 			size_t tmpSize, current, len;
 
@@ -313,6 +315,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 
 				this->protocol.reqGetChunk(
 					tmpSize,
+					instanceId,
 					requestIds->at( current ),
 					metadata->at( current ).listId,
 					metadata->at( current ).stripeId,
@@ -365,12 +368,13 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				__ERROR__( "SlaveWorker", "dispatch", "Invalid protocol header." );
 				goto quit_1;
 			}
-			event.id = header.id;
+			event.instanceId = header.instanceId;
+			event.requestId = header.requestId;
 			switch ( header.opcode ) {
 				case PROTO_OPCODE_REGISTER:
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
-							this->handleSlavePeerRegisterRequest( event.socket, buffer.data, buffer.size );
+							this->handleSlavePeerRegisterRequest( event.socket, header.instanceId, header.requestId, buffer.data, buffer.size );
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
 							event.socket->registered = true;

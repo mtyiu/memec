@@ -115,8 +115,8 @@ Pending::Pending() {
 }
 
 #define DEFINE_PENDING_APPLICATION_INSERT_METHOD( METHOD_NAME, VALUE_TYPE, VALUE_VAR ) \
-	bool Pending::METHOD_NAME( PendingType type, uint32_t id, void *ptr, VALUE_TYPE &VALUE_VAR, bool needsLock, bool needsUnlock ) { \
-		PendingIdentifier pid( id, id, ptr ); \
+	bool Pending::METHOD_NAME( PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr, VALUE_TYPE &VALUE_VAR, bool needsLock, bool needsUnlock ) { \
+		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, ptr ); \
 		std::pair<PendingIdentifier, VALUE_TYPE> p( pid, VALUE_VAR ); \
 		std::unordered_multimap<PendingIdentifier, VALUE_TYPE>::iterator ret; \
  		\
@@ -133,8 +133,8 @@ Pending::Pending() {
 	}
 
 #define DEFINE_PENDING_SLAVE_INSERT_METHOD( METHOD_NAME, VALUE_TYPE, VALUE_VAR ) \
-	bool Pending::METHOD_NAME( PendingType type, uint32_t id, uint32_t parentId, void *ptr, VALUE_TYPE &VALUE_VAR, bool needsLock, bool needsUnlock ) { \
-		PendingIdentifier pid( id, parentId, ptr ); \
+	bool Pending::METHOD_NAME( PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr, VALUE_TYPE &VALUE_VAR, bool needsLock, bool needsUnlock ) { \
+		PendingIdentifier pid( instanceId, parentInstanceId, requestId, parentRequestId, ptr ); \
 		std::pair<PendingIdentifier, VALUE_TYPE> p( pid, VALUE_VAR ); \
 		std::unordered_multimap<PendingIdentifier, VALUE_TYPE>::iterator ret; \
  		\
@@ -153,8 +153,8 @@ Pending::Pending() {
 #define DEFINE_PENDING_COORDINATOR_INSERT_METHOD DEFINE_PENDING_SLAVE_INSERT_METHOD
 
 #define DEFINE_PENDING_ERASE_METHOD( METHOD_NAME, VALUE_TYPE, VALUE_PTR_VAR ) \
-	bool Pending::METHOD_NAME( PendingType type, uint32_t id, void *ptr, PendingIdentifier *pidPtr, VALUE_TYPE *VALUE_PTR_VAR, bool needsLock, bool needsUnlock ) { \
-		PendingIdentifier pid( id, 0, ptr ); \
+	bool Pending::METHOD_NAME( PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr, PendingIdentifier *pidPtr, VALUE_TYPE *VALUE_PTR_VAR, bool needsLock, bool needsUnlock ) { \
+		PendingIdentifier pid( instanceId, 0, requestId, 0, ptr ); \
 		LOCK_T *lock; \
 		bool ret; \
 		\
@@ -169,7 +169,7 @@ Pending::Pending() {
 			ret = ( it != map->end() ); \
 		} else { \
 			it = map->find( pid ); \
-			ret = ( it != map->end() && it->first.id == id ); \
+			ret = ( it != map->end() && it->first.instanceId == instanceId && it->first.requestId == requestId ); \
 		} \
 		if ( ret ) { \
 			if ( pidPtr ) *pidPtr = it->first; \
@@ -201,12 +201,12 @@ DEFINE_PENDING_ERASE_METHOD( eraseRemapList, std::vector<uint32_t>, remapList )
 #undef DEFINE_PENDING_COORDINATOR_INSERT_METHOD
 #undef DEFINE_PENDING_ERASE_METHOD
 
-bool Pending::recordRequestStartTime( PendingType type, uint32_t id, uint32_t parentId, void *ptr, struct sockaddr_in addr ) {
+bool Pending::recordRequestStartTime( PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr, struct sockaddr_in addr ) {
 	RequestStartTime rst;
 	rst.addr = addr;
 	clock_gettime( CLOCK_REALTIME, &rst.sttime );
 
-	PendingIdentifier pid( id, parentId, ptr );
+	PendingIdentifier pid( instanceId, parentInstanceId, requestId, parentRequestId, ptr );
 
 	std::pair<PendingIdentifier, RequestStartTime> p( pid, rst );
 	std::unordered_multimap<PendingIdentifier, RequestStartTime>::iterator ret;
@@ -226,8 +226,8 @@ bool Pending::recordRequestStartTime( PendingType type, uint32_t id, uint32_t pa
 	return true; // ret.second;
 }
 
-bool Pending::eraseRequestStartTime( PendingType type, uint32_t id, void *ptr, struct timespec &elapsedTime, PendingIdentifier *pidPtr, RequestStartTime *rstPtr ) {
-	PendingIdentifier pid( id, 0, ptr );
+bool Pending::eraseRequestStartTime( PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr, struct timespec &elapsedTime, PendingIdentifier *pidPtr, RequestStartTime *rstPtr ) {
+	PendingIdentifier pid( instanceId, 0, requestId, 0, ptr );
 	std::unordered_multimap<PendingIdentifier, RequestStartTime>::iterator it, rit;
 	RequestStartTime rst;
 	bool ret;
@@ -235,8 +235,8 @@ bool Pending::eraseRequestStartTime( PendingType type, uint32_t id, void *ptr, s
 #define DO_SEARCH_FOR_ID( _TYPE_ ) \
 	do { \
 		tie( it, rit ) = this->stats._TYPE_.equal_range( pid ); \
-		while( it != rit && ptr && it->first.id == id && it->first.ptr != ptr ) it++; \
-		ret = ( it != rit && it->first.id == id && ( ! ptr || it->first.ptr == ptr ) ); \
+		while( it != rit && ptr && it->first.instanceId == instanceId && it->first.requestId == requestId && it->first.ptr != ptr ) it++; \
+		ret = ( it != rit && it->first.instanceId == instanceId && it->first.requestId == requestId && ( ! ptr || it->first.ptr == ptr ) ); \
 		if ( ret ) { \
 			pid = it->first; \
 			rst = it->second; \
@@ -292,8 +292,8 @@ bool Pending::eraseRequestStartTime( PendingType type, uint32_t id, void *ptr, s
 		} \
 	} while ( 0 )
 
-bool Pending::eraseKey( PendingType type, uint32_t id, void *ptr, PendingIdentifier *pidPtr, Key *keyPtr, bool needsLock, bool needsUnlock, bool checkKey, char* checkKeyPtr ) {
-	PendingIdentifier pid( id, 0, ptr );
+bool Pending::eraseKey( PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr, PendingIdentifier *pidPtr, Key *keyPtr, bool needsLock, bool needsUnlock, bool checkKey, char* checkKeyPtr ) {
+	PendingIdentifier pid( instanceId, 0, requestId, 0, ptr );
 	LOCK_T *lock;
 	bool ret;
 
@@ -316,8 +316,8 @@ bool Pending::eraseKey( PendingType type, uint32_t id, void *ptr, PendingIdentif
 	return ret;
 }
 
-bool Pending::eraseKeyValue( PendingType type, uint32_t id, void *ptr, PendingIdentifier *pidPtr, KeyValue *keyValuePtr, bool needsLock, bool needsUnlock, bool checkKey, char* checkKeyPtr ) {
-	PendingIdentifier pid( id, 0, ptr );
+bool Pending::eraseKeyValue( PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr, PendingIdentifier *pidPtr, KeyValue *keyValuePtr, bool needsLock, bool needsUnlock, bool checkKey, char* checkKeyPtr ) {
+	PendingIdentifier pid( instanceId, 0, requestId, 0, ptr );
 	LOCK_T *lock;
 	bool ret;
 
@@ -385,10 +385,10 @@ bool Pending::eraseKeyValue( PendingType type, uint32_t id, void *ptr, PendingId
 	return ret;
 }
 
-bool Pending::eraseKeyValueUpdate( PendingType type, uint32_t id, void *ptr, PendingIdentifier *pidPtr, KeyValueUpdate *keyValueUpdatePtr,
+bool Pending::eraseKeyValueUpdate( PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr, PendingIdentifier *pidPtr, KeyValueUpdate *keyValueUpdatePtr,
 	bool needsLock, bool needsUnlock, bool checkKey, char* checkKeyPtr
 ) {
-	PendingIdentifier pid( id, 0, ptr );
+	PendingIdentifier pid( instanceId, 0, requestId, 0, ptr );
 	LOCK_T *lock;
 	bool ret;
 
@@ -411,8 +411,8 @@ bool Pending::eraseKeyValueUpdate( PendingType type, uint32_t id, void *ptr, Pen
 	return ret;
 }
 
-bool Pending::findKey( PendingType type, uint32_t id, void *ptr, Key *keyPtr, bool checkKey, char* checkKeyPtr ) {
-	PendingIdentifier pid( id, 0, ptr );
+bool Pending::findKey( PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr, Key *keyPtr, bool checkKey, char* checkKeyPtr ) {
+	PendingIdentifier pid( instanceId, 0, requestId, 0, ptr );
 	LOCK_T *lock;
 	bool ret;
 
@@ -433,8 +433,8 @@ bool Pending::findKey( PendingType type, uint32_t id, void *ptr, Key *keyPtr, bo
 	return ret;
 }
 
-bool Pending::findKeyValueUpdate( PendingType type, uint32_t id, void *ptr, KeyValueUpdate *keyValuePtr, bool checkKey, char *checkKeyPtr ) {
-	PendingIdentifier pid( id, 0, ptr );
+bool Pending::findKeyValueUpdate( PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr, KeyValueUpdate *keyValuePtr, bool checkKey, char *checkKeyPtr ) {
+	PendingIdentifier pid( instanceId, 0, requestId, 0, ptr );
 	LOCK_T *lock;
 	bool ret;
 
@@ -455,8 +455,8 @@ bool Pending::findKeyValueUpdate( PendingType type, uint32_t id, void *ptr, KeyV
 	return ret;
 }
 
-bool Pending::findRemapList( PendingType type, uint32_t id, void *ptr, std::vector<uint32_t> *remapList ) {
-	PendingIdentifier pid( id, 0, ptr );
+bool Pending::findRemapList( PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr, std::vector<uint32_t> *remapList ) {
+	PendingIdentifier pid( instanceId, 0, requestId, 0, ptr );
 	LOCK_T *lock;
 	bool ret;
 
@@ -479,8 +479,8 @@ bool Pending::findRemapList( PendingType type, uint32_t id, void *ptr, std::vect
 
 #undef SEARCH_KEY_RANGE
 
-uint32_t Pending::count( PendingType type, uint32_t id, bool needsLock, bool needsUnlock ) {
-	PendingIdentifier pid( id, 0, 0 );
+uint32_t Pending::count( PendingType type, uint16_t instanceId, uint32_t requestId, bool needsLock, bool needsUnlock ) {
+	PendingIdentifier pid( instanceId, 0, requestId, 0, 0 );
 	LOCK_T *lock;
 	uint32_t ret = 0;
 	if ( type == PT_APPLICATION_UPDATE || type == PT_SLAVE_UPDATE ) {
@@ -492,7 +492,7 @@ uint32_t Pending::count( PendingType type, uint32_t id, bool needsLock, bool nee
 		if ( needsLock ) LOCK( lock );
 		ret = map->count( pid );
 		// it = map->lower_bound( pid );
-		// for ( ret = 0; it != map->end() && it->first.id == id; ret++, it++ );
+		// for ( ret = 0; it != map->end() && it->first.instanceId == instanceId && it->first.requestId == requestId; ret++, it++ );
 		if ( needsUnlock ) UNLOCK( lock );
 	} else if ( type == PT_SLAVE_REMAPPING_SET ) {
 		std::unordered_multimap<PendingIdentifier, RemappingRecord> *map;
@@ -503,7 +503,7 @@ uint32_t Pending::count( PendingType type, uint32_t id, bool needsLock, bool nee
 		if ( needsLock ) LOCK( lock );
 		ret = map->count( pid );
 		// it = map->lower_bound( pid );
-		// for ( ret = 0; it != map->end() && it->first.id == id; ret++, it++ );
+		// for ( ret = 0; it != map->end() && it->first.instanceId == instanceId && it->first.requestId == requestId; ret++, it++ );
 		if ( needsUnlock ) UNLOCK( lock );
 	} else {
 		std::unordered_multimap<PendingIdentifier, Key> *map;
@@ -514,7 +514,7 @@ uint32_t Pending::count( PendingType type, uint32_t id, bool needsLock, bool nee
 		if ( needsLock ) LOCK( lock );
 		ret = map->count( pid );
 		// it = map->lower_bound( pid );
-		// for ( ret = 0; it != map->end() && it->first.id == id; ret++, it++ );
+		// for ( ret = 0; it != map->end() && it->first.instanceId == instanceId && it->first.requestId == requestId; ret++, it++ );
 		if ( needsUnlock ) UNLOCK( lock );
 	}
 

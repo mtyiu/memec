@@ -1,8 +1,10 @@
 #include "worker.hh"
+#include "../main/slave.hh"
 
 bool SlaveWorker::handleReleaseDegradedLockRequest( CoordinatorEvent event, char *buf, size_t size ) {
 	struct ChunkHeader header;
 	uint32_t count = 0, requestId;
+	uint16_t instanceId = Slave::instanceId;
 
 	Metadata metadata;
 	ChunkRequest chunkRequest;
@@ -30,7 +32,7 @@ bool SlaveWorker::handleReleaseDegradedLockRequest( CoordinatorEvent event, char
 		count++;
 	}
 
-	SlaveWorker::pending->insertReleaseDegradedLock( event.id, event.socket, count );
+	SlaveWorker::pending->insertReleaseDegradedLock( event.instanceId, event.requestId, event.socket, count );
 
 	for ( size_t i = 0, len = chunks.size(); i < len; i++ ) {
 		// Determine the src
@@ -52,12 +54,12 @@ bool SlaveWorker::handleReleaseDegradedLockRequest( CoordinatorEvent event, char
 			chunks[ i ].listId, chunks[ i ].stripeId, chunks[ i ].chunkId,
 			socket, chunk, true /* isDegraded */
 		);
-		if ( ! SlaveWorker::pending->insertChunkRequest( PT_SLAVE_PEER_SET_CHUNK, requestId, event.id, socket, chunkRequest ) ) {
+		if ( ! SlaveWorker::pending->insertChunkRequest( PT_SLAVE_PEER_SET_CHUNK, instanceId, event.instanceId, requestId, event.requestId, socket, chunkRequest ) ) {
 			__ERROR__( "SlaveWorker", "performDegradedRead", "Cannot insert into slave CHUNK_REQUEST pending map." );
 		}
 
 		// If chunk is NULL, then the unsealed version of SET_CHUNK will be used
-		slavePeerEvent.reqSetChunk( socket, requestId, metadata, chunk, true );
+		slavePeerEvent.reqSetChunk( socket, instanceId, requestId, metadata, chunk, true );
 		SlaveWorker::eventQueue->insert( slavePeerEvent );
 	}
 
@@ -105,17 +107,17 @@ bool SlaveWorker::handleDegradedGetRequest( MasterEvent event, char *buf, size_t
 
 	if ( isKeyValueFound ) {
 		// Send the key-value pair to the master
-		event.resGet( event.socket, event.id, keyValue, true /* isDegraded */ );
+		event.resGet( event.socket, event.instanceId, event.requestId, keyValue, true /* isDegraded */ );
 		this->dispatch( event );
 	} else if ( chunk ) {
 		// Key not found
-		event.resGet( event.socket, event.id, key, true /* isDegraded */ );
+		event.resGet( event.socket, event.instanceId, event.requestId, key, true /* isDegraded */ );
 		this->dispatch( event );
 	} else {
 		key.dup();
 		ret = this->performDegradedRead(
 			event.socket, header.listId, header.stripeId, header.srcDataChunkId,
-			header.isSealed, PROTO_OPCODE_DEGRADED_GET, event.id, &key
+			header.isSealed, PROTO_OPCODE_DEGRADED_GET, event.instanceId, event.requestId, &key
 		);
 
 		if ( ! ret ) {
@@ -180,7 +182,7 @@ bool SlaveWorker::handleDegradedUpdateRequest( MasterEvent event, char *buf, siz
 	if ( isKeyValueFound ) {
 		keyValueUpdate.dup( 0, 0, ( void * ) event.socket );
 		// Insert into master UPDATE pending set
-		if ( ! SlaveWorker::pending->insertKeyValueUpdate( PT_MASTER_UPDATE, event.id, ( void * ) event.socket, keyValueUpdate ) ) {
+		if ( ! SlaveWorker::pending->insertKeyValueUpdate( PT_MASTER_UPDATE, event.instanceId, event.requestId, ( void * ) event.socket, keyValueUpdate ) ) {
 			__ERROR__( "SlaveWorker", "handleDegradedRequest", "Cannot insert into master UPDATE pending map." );
 		}
 
@@ -206,7 +208,7 @@ bool SlaveWorker::handleDegradedUpdateRequest( MasterEvent event, char *buf, siz
 			);
 
 			this->sendModifyChunkRequest(
-				event.id,
+				event.instanceId, event.requestId,
 				keyValueUpdate.size,
 				keyValueUpdate.data,
 				metadata,
@@ -242,7 +244,7 @@ bool SlaveWorker::handleDegradedUpdateRequest( MasterEvent event, char *buf, siz
 
 			// Send UPDATE request to the parity slaves
 			this->sendModifyChunkRequest(
-				event.id,
+				event.instanceId, event.requestId,
 				keyValueUpdate.size,
 				keyValueUpdate.data,
 				metadata,
@@ -257,7 +259,7 @@ bool SlaveWorker::handleDegradedUpdateRequest( MasterEvent event, char *buf, siz
 	} else if ( chunk ) {
 		// Key not found
 		event.resUpdate(
-			event.socket, event.id, key,
+			event.socket, event.instanceId, event.requestId, key,
 			header.data.keyValueUpdate.valueUpdateOffset,
 			header.data.keyValueUpdate.valueUpdateSize,
 			false, /* success */
@@ -278,7 +280,7 @@ bool SlaveWorker::handleDegradedUpdateRequest( MasterEvent event, char *buf, siz
 			event.socket,
 			header.listId, header.stripeId, header.srcDataChunkId,
 			header.isSealed, PROTO_OPCODE_DEGRADED_UPDATE,
-			event.id, &key, &keyValueUpdate
+			event.instanceId, event.requestId, &key, &keyValueUpdate
 		);
 
 		if ( ! ret ) {
@@ -335,7 +337,7 @@ bool SlaveWorker::handleDegradedDeleteRequest( MasterEvent event, char *buf, siz
 
 	if ( isKeyValueFound ) {
 		key.dup( 0, 0, ( void * ) event.socket );
-		if ( ! SlaveWorker::pending->insertKey( PT_MASTER_DEL, event.id, ( void * ) event.socket, key ) ) {
+		if ( ! SlaveWorker::pending->insertKey( PT_MASTER_DEL, event.instanceId, event.requestId, ( void * ) event.socket, key ) ) {
 			__ERROR__( "SlaveWorker", "handleDegradedDeleteRequest", "Cannot insert into master DELETE pending map." );
 		}
 
@@ -353,7 +355,7 @@ bool SlaveWorker::handleDegradedDeleteRequest( MasterEvent event, char *buf, siz
 
 			// Send DELETE_CHUNK request to the parity slaves
 			this->sendModifyChunkRequest(
-				event.id,
+				event.instanceId, event.requestId,
 				key.size,
 				key.data,
 				metadata,
@@ -376,7 +378,7 @@ bool SlaveWorker::handleDegradedDeleteRequest( MasterEvent event, char *buf, siz
 
 			// Send DELETE request to the parity slaves
 			this->sendModifyChunkRequest(
-				event.id,
+				event.instanceId, event.requestId,
 				key.size,
 				key.data,
 				metadata,
@@ -389,7 +391,7 @@ bool SlaveWorker::handleDegradedDeleteRequest( MasterEvent event, char *buf, siz
 	} else if ( chunk ) {
 		// Key not found
 		event.resDelete(
-			event.socket, event.id, key,
+			event.socket, event.instanceId, event.requestId, key,
 			false, /* needsFree */
 			true   /* isDegraded */
 		);
@@ -398,7 +400,7 @@ bool SlaveWorker::handleDegradedDeleteRequest( MasterEvent event, char *buf, siz
 		key.dup();
 		ret = this->performDegradedRead(
 			event.socket, header.listId, header.stripeId, header.srcDataChunkId,
-			header.isSealed, PROTO_OPCODE_DEGRADED_DELETE, event.id, &key
+			header.isSealed, PROTO_OPCODE_DEGRADED_DELETE, event.instanceId, event.requestId, &key
 		);
 
 		if ( ! ret ) {
@@ -409,7 +411,7 @@ bool SlaveWorker::handleDegradedDeleteRequest( MasterEvent event, char *buf, siz
 	return ret;
 }
 
-bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t listId, uint32_t stripeId, uint32_t lostChunkId, bool isSealed, uint8_t opcode, uint32_t parentId, Key *key, KeyValueUpdate *keyValueUpdate ) {
+bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t listId, uint32_t stripeId, uint32_t lostChunkId, bool isSealed, uint8_t opcode, uint16_t parentInstanceId, uint32_t parentRequestId, Key *key, KeyValueUpdate *keyValueUpdate ) {
 	Key mykey;
 	SlavePeerEvent event;
 	SlavePeerSocket *socket = 0;
@@ -420,7 +422,7 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 	if ( ! isSealed ) {
 		// Check whether there are surviving parity slaves
 		for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
-			socket = this->paritySlaveSockets[ ( parentId + i ) % SlaveWorker::parityChunkCount ];
+			socket = this->paritySlaveSockets[ ( parentRequestId + i ) % SlaveWorker::parityChunkCount ];
 			if ( socket->ready() ) break;
 		}
 		if ( ! socket ) {
@@ -445,6 +447,7 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 	}
 
 	// Add to degraded operation pending set
+	uint16_t instanceId = Slave::instanceId;
 	uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
 	DegradedOp op;
 	op.set( listId, stripeId, lostChunkId, isSealed, opcode, masterSocket );
@@ -457,7 +460,7 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 	}
 
 	if ( isSealed || ! socket->self ) {
-		if ( ! SlaveWorker::pending->insertDegradedOp( PT_SLAVE_PEER_DEGRADED_OPS, requestId, parentId, 0, op ) ) {
+		if ( ! SlaveWorker::pending->insertDegradedOp( PT_SLAVE_PEER_DEGRADED_OPS, instanceId, parentInstanceId, requestId, parentRequestId, 0, op ) ) {
 			__ERROR__( "SlaveWorker", "performDegradedRead", "Cannot insert into slave DEGRADED_OPS pending map." );
 		}
 	}
@@ -465,7 +468,7 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 	// Insert the degraded operation into degraded chunk buffer pending set
 	bool needsContinue;
 	if ( isSealed ) {
-		needsContinue = SlaveWorker::degradedChunkBuffer->map.insertDegradedChunk( listId, stripeId, lostChunkId, requestId );
+		needsContinue = SlaveWorker::degradedChunkBuffer->map.insertDegradedChunk( listId, stripeId, lostChunkId, instanceId, requestId );
 		// printf( "insertDegradedChunk(): (%u, %u, %u) - needsContinue: %d\n", listId, stripeId, lostChunkId, needsContinue );
 	} else {
 		Key k;
@@ -473,7 +476,7 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 			k.set( keyValueUpdate->size, keyValueUpdate->data );
 		else
 			k = *key;
-		needsContinue = SlaveWorker::degradedChunkBuffer->map.insertDegradedKey( k, requestId );
+		needsContinue = SlaveWorker::degradedChunkBuffer->map.insertDegradedKey( k, instanceId, requestId );
 		// printf( "insertDegradedKey(): (%.*s) - needsContinue: %d\n", k.size, k.data, needsContinue );
 	}
 
@@ -512,13 +515,13 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 					chunkBuffer->unlock( chunkBufferIndex );
 				}
 
-				if ( ! SlaveWorker::pending->insertChunkRequest( PT_SLAVE_PEER_GET_CHUNK, requestId, parentId, socket, chunkRequest ) ) {
+				if ( ! SlaveWorker::pending->insertChunkRequest( PT_SLAVE_PEER_GET_CHUNK, instanceId, parentInstanceId, requestId, parentRequestId, socket, chunkRequest ) ) {
 					__ERROR__( "SlaveWorker", "performDegradedRead", "Cannot insert into slave CHUNK_REQUEST pending map." );
 				}
 			} else if ( socket->ready() ) {
 				chunkRequest.chunk = 0;
 
-				if ( ! SlaveWorker::pending->insertChunkRequest( PT_SLAVE_PEER_GET_CHUNK, requestId, parentId, socket, chunkRequest ) ) {
+				if ( ! SlaveWorker::pending->insertChunkRequest( PT_SLAVE_PEER_GET_CHUNK, instanceId, parentInstanceId, requestId, parentRequestId, socket, chunkRequest ) ) {
 					__ERROR__( "SlaveWorker", "performDegradedRead", "Cannot insert into slave CHUNK_REQUEST pending map." );
 				}
 			} else {
@@ -542,7 +545,7 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 				selected++;
 			} else if ( socket->ready() ) {
 				metadata.chunkId = i;
-				event.reqGetChunk( socket, requestId, metadata );
+				event.reqGetChunk( socket, instanceId, requestId, metadata );
 				SlaveWorker::eventQueue->insert( event );
 				selected++;
 			}
@@ -578,10 +581,10 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 			switch( opcode ) {
 				case PROTO_OPCODE_DEGRADED_GET:
 					if ( success ) {
-						masterEvent.resGet( masterSocket, parentId, keyValue, true );
+						masterEvent.resGet( masterSocket, parentInstanceId, parentRequestId, keyValue, true );
 					} else {
 						// Return failure to master
-						masterEvent.resGet( masterSocket, parentId, mykey, true );
+						masterEvent.resGet( masterSocket, parentInstanceId, parentRequestId, mykey, true );
 					}
 					this->dispatch( masterEvent );
 					op.data.key.free();
@@ -616,7 +619,7 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 
 						// Send UPDATE request to the parity slaves
 						this->sendModifyChunkRequest(
-							event.id,
+							event.instanceId, event.requestId,
 							keyValueUpdate->size,
 							keyValueUpdate->data,
 							metadata,
@@ -629,7 +632,7 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 						);
 					} else {
 						masterEvent.resUpdate(
-							masterSocket, parentId, mykey,
+							masterSocket, parentInstanceId, parentRequestId, mykey,
 							keyValueUpdate->offset,
 							keyValueUpdate->length,
 							false, false, true
@@ -661,7 +664,8 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 						);
 
 						this->sendModifyChunkRequest(
-							parentId, mykey.size, mykey.data,
+							parentInstanceId, parentRequestId,
+							mykey.size, mykey.data,
 							metadata,
 							// not needed for deleting a key-value pair in an unsealed chunk:
 							0, 0, 0, 0,
@@ -671,7 +675,7 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 					} else {
 						masterEvent.resDelete(
 							masterSocket,
-							parentId,
+							parentInstanceId, parentRequestId,
 							mykey,
 							false, // needsFree
 							true   // isDegraded
@@ -684,19 +688,20 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 
 			return success;
 		} else if ( needsContinue ) {
-			if ( ! SlaveWorker::pending->insertKey( PT_SLAVE_PEER_GET, requestId, parentId, socket, op.data.key ) ) {
+			if ( ! SlaveWorker::pending->insertKey( PT_SLAVE_PEER_GET, instanceId, parentInstanceId, requestId, parentRequestId, socket, op.data.key ) ) {
 				__ERROR__( "SlaveWorker", "performDegradedRead", "Cannot insert into slave GET pending map." );
 			}
-			event.reqGet( socket, requestId, listId, lostChunkId, op.data.key );
+			event.reqGet( socket, instanceId, requestId, listId, lostChunkId, op.data.key );
 			this->dispatch( event );
 		}
 		return true;
 	}
 }
 
-bool SlaveWorker::sendModifyChunkRequest( uint32_t parentId, uint8_t keySize, char *keyStr, Metadata &metadata, uint32_t offset, uint32_t deltaSize, uint32_t valueUpdateOffset, char *delta, bool isSealed, bool isUpdate ) {
+bool SlaveWorker::sendModifyChunkRequest( uint16_t parentInstanceId, uint32_t parentRequestId, uint8_t keySize, char *keyStr, Metadata &metadata, uint32_t offset, uint32_t deltaSize, uint32_t valueUpdateOffset, char *delta, bool isSealed, bool isUpdate ) {
 	Key key;
 	KeyValueUpdate keyValueUpdate;
+	uint16_t instanceId = Slave::instanceId;
 	uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
 
 	key.set( keySize, keyStr );
@@ -719,7 +724,7 @@ bool SlaveWorker::sendModifyChunkRequest( uint32_t parentId, uint8_t keySize, ch
 			chunkUpdate.ptr = ( void * ) this->paritySlaveSockets[ i ];
 			if ( ! SlaveWorker::pending->insertChunkUpdate(
 				isUpdate ? PT_SLAVE_PEER_UPDATE_CHUNK : PT_SLAVE_PEER_DEL_CHUNK,
-				requestId, parentId,
+				instanceId, parentInstanceId, requestId, parentRequestId,
 				( void * ) this->paritySlaveSockets[ i ],
 				chunkUpdate
 			) ) {
@@ -744,7 +749,7 @@ bool SlaveWorker::sendModifyChunkRequest( uint32_t parentId, uint8_t keySize, ch
 				if ( isUpdate ) {
 					this->protocol.reqUpdateChunk(
 						size,
-						requestId,
+						instanceId, requestId,
 						metadata.listId,
 						metadata.stripeId,
 						metadata.chunkId,
@@ -757,7 +762,7 @@ bool SlaveWorker::sendModifyChunkRequest( uint32_t parentId, uint8_t keySize, ch
 				} else {
 					this->protocol.reqDeleteChunk(
 						size,
-						requestId,
+						instanceId, requestId,
 						metadata.listId,
 						metadata.stripeId,
 						metadata.chunkId,
@@ -803,7 +808,7 @@ bool SlaveWorker::sendModifyChunkRequest( uint32_t parentId, uint8_t keySize, ch
 		if ( isUpdate ) {
 			this->protocol.reqUpdate(
 				size,
-				requestId,
+				instanceId, requestId,
 				metadata.listId,
 				metadata.stripeId,
 				metadata.chunkId,
@@ -818,7 +823,7 @@ bool SlaveWorker::sendModifyChunkRequest( uint32_t parentId, uint8_t keySize, ch
 		} else {
 			this->protocol.reqDelete(
 				size,
-				requestId,
+				instanceId, requestId,
 				metadata.listId,
 				metadata.stripeId,
 				metadata.chunkId,
@@ -835,7 +840,7 @@ bool SlaveWorker::sendModifyChunkRequest( uint32_t parentId, uint8_t keySize, ch
 
 			if ( isUpdate ) {
 				if ( ! SlaveWorker::pending->insertKeyValueUpdate(
-					PT_SLAVE_PEER_UPDATE, requestId, parentId,
+					PT_SLAVE_PEER_UPDATE, instanceId, parentInstanceId, requestId, parentRequestId,
 					( void * ) this->paritySlaveSockets[ i ],
 					keyValueUpdate
 				) ) {
@@ -843,7 +848,7 @@ bool SlaveWorker::sendModifyChunkRequest( uint32_t parentId, uint8_t keySize, ch
 				}
 			} else {
 				if ( ! SlaveWorker::pending->insertKey(
-					PT_SLAVE_PEER_DEL, requestId, parentId,
+					PT_SLAVE_PEER_DEL, instanceId, parentInstanceId, requestId, parentRequestId,
 					( void * ) this->paritySlaveSockets[ i ],
 					key
 				) ) {

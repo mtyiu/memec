@@ -8,30 +8,31 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 		size_t size;
 		char *data;
 	} buffer;
+	uint16_t instanceId = Coordinator::instanceId;
 	uint32_t requestId;
 
 	switch( event.type ) {
 		case SLAVE_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
-			buffer.data = this->protocol.resRegisterSlave( buffer.size, event.id, true );
+			buffer.data = this->protocol.resRegisterSlave( buffer.size, event.instanceId, event.requestId, true );
 			isSend = true;
 			break;
 		case SLAVE_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resRegisterSlave( buffer.size, event.id, false );
+			buffer.data = this->protocol.resRegisterSlave( buffer.size, event.instanceId, event.requestId, false );
 			isSend = true;
 			break;
 		case SLAVE_EVENT_TYPE_REQUEST_SEAL_CHUNKS:
 			requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
-			buffer.data = this->protocol.reqSealChunks( buffer.size, requestId );
+			buffer.data = this->protocol.reqSealChunks( buffer.size, instanceId, requestId );
 			isSend = true;
 			break;
 		case SLAVE_EVENT_TYPE_REQUEST_FLUSH_CHUNKS:
 			requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
-			buffer.data = this->protocol.reqFlushChunks( buffer.size, requestId );
+			buffer.data = this->protocol.reqFlushChunks( buffer.size, instanceId, requestId );
 			isSend = true;
 			break;
 		case SLAVE_EVENT_TYPE_REQUEST_SYNC_META:
 			requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
-			buffer.data = this->protocol.reqSyncMeta( buffer.size, requestId );
+			buffer.data = this->protocol.reqSyncMeta( buffer.size, instanceId, requestId );
 			// add sync meta request to pending set
 			Coordinator::getInstance()->pending.addSyncMetaReq( requestId, event.message.sync );
 			isSend = true;
@@ -54,9 +55,8 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			isSend = false;
 			break;
 		case SLAVE_EVENT_TYPE_RESPONSE_HEARTBEAT:
-			requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
 			buffer.data = this->protocol.resHeartbeat(
-				buffer.size, requestId,
+				buffer.size, event.instanceId, event.requestId,
 				event.message.heartbeat.timestamp,
 				event.message.heartbeat.sealed,
 				event.message.heartbeat.keys,
@@ -75,7 +75,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 		ArrayMap<int, SlaveSocket> &slaves = Coordinator::getInstance()->sockets.slaves;
 		uint32_t requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
 
-		buffer.data = this->protocol.announceSlaveConnected( buffer.size, requestId, event.socket );
+		buffer.data = this->protocol.announceSlaveConnected( buffer.size, instanceId, requestId, event.socket );
 
 		LOCK( &slaves.lock );
 		for ( uint32_t i = 0; i < slaves.size(); i++ ) {
@@ -96,7 +96,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 		ArrayMap<int, SlaveSocket> &slaves = Coordinator::getInstance()->sockets.slaves;
 		uint32_t requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
 
-		buffer.data = this->protocol.announceSlaveReconstructed( buffer.size, requestId, event.message.reconstructed.src, event.message.reconstructed.dst );
+		buffer.data = this->protocol.announceSlaveReconstructed( buffer.size, instanceId, requestId, event.message.reconstructed.src, event.message.reconstructed.dst );
 
 		LOCK( &slaves.lock );
 		for ( uint32_t i = 0; i < slaves.size(); i++ ) {
@@ -144,7 +144,8 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 				goto quit_1;
 			}
 
-			event.id = header.id;
+			event.instanceId = header.instanceId;
+			event.requestId = header.requestId;
 			switch( header.opcode ) {
 				case PROTO_OPCODE_RELEASE_DEGRADED_LOCKS:
 					switch( header.magic ) {
@@ -233,7 +234,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 				{
 					std::set<struct sockaddr_in> *counter;
 					pthread_cond_t *allAcked;
-					bool found = this->pending->decrementRemappedDataRequest( event.id, event.socket->getAddr(), &counter, &allAcked );
+					bool found = this->pending->decrementRemappedDataRequest( event.requestId, event.socket->getAddr(), &counter, &allAcked );
 					if ( found && counter == 0 ) {
 						pthread_cond_broadcast( allAcked );
 					} else if ( ! found ) {
@@ -257,7 +258,7 @@ quit_1:
 }
 
 bool CoordinatorWorker::processHeartbeat( SlaveEvent event, char *buf, size_t size ) {
-	uint32_t count, requestId = event.id;
+	uint32_t count, requestId = event.requestId;
 	size_t processed, offset, failed = 0;
 	struct HeartbeatHeader heartbeat;
 	union {

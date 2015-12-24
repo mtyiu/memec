@@ -78,6 +78,8 @@ public:
 	SlaveLoading slaveLoading;
 	OverloadedSlave overloadedSlave;
 	Timer statsTimer;
+	/* Instance ID (assigned by coordinator) */
+	static uint16_t instanceId;
 	/* For debugging only */
 	struct {
 		bool isDegraded;

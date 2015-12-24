@@ -2,7 +2,7 @@
 
 size_t Protocol::generateHeartbeatMessage(
 	uint8_t magic, uint8_t to, uint8_t opcode,
-	uint32_t id, LOCK_T *lock,
+	uint16_t instanceId, uint32_t requestId, LOCK_T *lock,
 	std::unordered_multimap<uint32_t, Metadata> &sealed, uint32_t &sealedCount,
 	std::unordered_map<Key, MetadataBackup> &ops, uint32_t &opsCount,
 	bool &isCompleted
@@ -85,7 +85,7 @@ size_t Protocol::generateHeartbeatMessage(
 
 	// TODO tell coordinator whether this is the last packet of records
 
-	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, id );
+	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, instanceId, requestId );
 
 	return bytes;
 }

@@ -4,6 +4,11 @@
 #include "../ds/map.hh"
 #include "chunk_buffer.hh"
 
+struct pid_s {
+	uint16_t instanceId;
+	uint32_t requestId;
+};
+
 class DegradedMap {
 private:
 	/**
@@ -23,13 +28,13 @@ private:
 		 * Store the set of reconstructed chunks and the list of IDs of pending requests
 		 * (list ID, stripe ID, chunk ID) |-> pid.id
 		 */
-		std::unordered_map<Metadata, std::vector<uint32_t>> chunks;
+		std::unordered_map<Metadata, std::vector<struct pid_s>> chunks;
 		LOCK_T chunksLock;
 		/**
 		 * Store the set of keys in unsealed chunks and the list of IDs of pending requests
 		 * Key |-> pid.id
 		 */
-		std::unordered_map<Key, std::vector<uint32_t>> keys;
+		std::unordered_map<Key, std::vector<struct pid_s>> keys;
 		LOCK_T keysLock;
 	} degraded;
 
@@ -46,7 +51,7 @@ public:
 		std::unordered_set<Key> deleted;
 		LOCK_T lock;
 	} unsealed;
-	
+
 	DegradedMap();
 
 	void init( Map *map );
@@ -77,15 +82,15 @@ public:
 
 	bool insertDegradedChunk(
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
-		uint32_t pid
+		uint16_t instanceId, uint32_t requestId
 	);
 	bool deleteDegradedChunk(
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
-		std::vector<uint32_t> &pids
+		std::vector<struct pid_s> &pids
 	);
 
-	bool insertDegradedKey( Key key, uint32_t pid );
-	bool deleteDegradedKey( Key key, std::vector<uint32_t> &pids );
+	bool insertDegradedKey( Key key, uint16_t instanceId, uint32_t requestId );
+	bool deleteDegradedKey( Key key, std::vector<struct pid_s> &pids );
 
 	bool insertChunk(
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,

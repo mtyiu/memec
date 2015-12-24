@@ -139,7 +139,7 @@ bool SlaveSocket::handler( int fd, uint32_t events, void *data ) {
 						socket->done( fd ); // The socket is valid
 
 						MasterEvent event;
-						event.resRegister( masterSocket, header.id );
+						event.resRegister( masterSocket, header.instanceId, header.requestId );
 						slave->eventQueue.insert( event );
 					} else if ( header.from == PROTO_MAGIC_FROM_SLAVE ) {
 						SlavePeerSocket *s = 0;
@@ -159,7 +159,7 @@ bool SlaveSocket::handler( int fd, uint32_t events, void *data ) {
 
 						if ( s ) {
 							SlavePeerEvent event;
-							event.resRegister( s, true, header.id );
+							event.resRegister( s, true, header.instanceId, header.requestId );
 							slave->eventQueue.insert( event );
 						} else {
 							__ERROR__( "SlaveSocket", "handler", "Unexpected registration from slave." );

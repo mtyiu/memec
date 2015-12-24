@@ -94,6 +94,7 @@ public:
 	} log;
 	Timer statsTimer;
 	Pending pending;
+	static uint16_t instanceId;
 
 	static Coordinator *getInstance() {
 		static Coordinator coordinator;

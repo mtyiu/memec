@@ -144,7 +144,7 @@ bool SlaveWorker::handleBackupSlavePromotedMsg( CoordinatorEvent event, char *bu
 
 	// Insert the metadata into pending recovery map
 	SlaveWorker::pending->insertRecovery(
-		event.id,
+		event.instanceId, event.requestId,
 		event.socket,
 		header.addr,
 		header.port,
@@ -171,13 +171,14 @@ bool SlaveWorker::handleReconstructionRequest( CoordinatorEvent event, char *buf
 
 	if ( header.numStripes == 0 ) {
 		event.resReconstruction(
-			event.socket, event.id,
+			event.socket, event.instanceId, event.requestId,
 			header.listId, header.chunkId, header.numStripes
 		);
 		this->dispatch( event );
 		return true;
 	}
 
+	uint16_t instanceId = Slave::instanceId;
 	uint32_t chunkId, myChunkId = SlaveWorker::chunkCount, chunkCount, requestId;
 	ChunkRequest chunkRequest;
 	Metadata metadata;
@@ -206,7 +207,7 @@ bool SlaveWorker::handleReconstructionRequest( CoordinatorEvent event, char *buf
 	for ( uint32_t i = 0; i < header.numStripes; i++ )
 		stripeIds.insert( header.stripeIds[ i ] );
 	if ( ! SlaveWorker::pending->insertReconstruction(
-		event.id,
+		event.instanceId, event.requestId,
 		event.socket,
 		header.listId,
 		header.chunkId,
@@ -241,7 +242,7 @@ bool SlaveWorker::handleReconstructionRequest( CoordinatorEvent event, char *buf
 						metadata.listId, metadata.stripeId, metadata.chunkId,
 						socket, 0, false
 					);
-					if ( ! SlaveWorker::pending->insertChunkRequest( PT_SLAVE_PEER_GET_CHUNK, requestId, event.id, socket, chunkRequest ) ) {
+					if ( ! SlaveWorker::pending->insertChunkRequest( PT_SLAVE_PEER_GET_CHUNK, instanceId, event.instanceId, requestId, event.requestId, socket, chunkRequest ) ) {
 						__ERROR__( "SlaveWorker", "handleReconstructionRequest", "Cannot insert into slave CHUNK_REQUEST pending map." );
 					} else {
 						requestIds[ chunkId ]->push_back( requestId );
@@ -271,7 +272,7 @@ bool SlaveWorker::handleReconstructionRequest( CoordinatorEvent event, char *buf
 			metadata.listId, metadata.stripeId, myChunkId,
 			0, chunk, false
 		);
-		if ( ! SlaveWorker::pending->insertChunkRequest( PT_SLAVE_PEER_GET_CHUNK, requestId, event.id, 0, chunkRequest ) ) {
+		if ( ! SlaveWorker::pending->insertChunkRequest( PT_SLAVE_PEER_GET_CHUNK, instanceId, event.instanceId, requestId, event.requestId, 0, chunkRequest ) ) {
 			__ERROR__( "SlaveWorker", "performDegradedRead", "Cannot insert into slave CHUNK_REQUEST pending map." );
 		}
 	}

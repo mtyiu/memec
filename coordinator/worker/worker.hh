@@ -33,6 +33,7 @@ private:
 
 	// ---------- master_worker.cc ----------
 	void dispatch( MasterEvent event );
+	bool handleSyncMetadata( MasterEvent event, char *buf, size_t size );
 
 	// ---------- slave_worker.cc ----------
 	void dispatch( SlaveEvent event );

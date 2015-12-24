@@ -10,15 +10,15 @@ bool CoordinatorWorker::handlePromoteBackupSlaveResponse( SlaveEvent event, char
 	}
 	__DEBUG__(
 		BLUE, "CoordinatorWorker", "handlePromoteBackupSlaveResponse",
-		"[PROMOTE_BACKUP_SLAVE] Request ID: %u; Count: %u (%u:%u)",
-		event.id, header.count, header.addr, header.port
+		"[PROMOTE_BACKUP_SLAVE] Request ID: (%u, %u); Count: %u (%u:%u)",
+		event.instanceId, event.requestId, header.count, header.addr, header.port
 	);
 
 	uint32_t remaining, total;
 	double elapsedTime;
 
-	if ( ! CoordinatorWorker::pending->eraseRecovery( event.id, header.addr, header.port, header.count, event.socket, remaining, total, elapsedTime ) ) {
-		__ERROR__( "SlaveWorker", "handlePromoteBackupSlaveResponse", "Cannot find a pending RECOVERY request that matches the response. This message will be discarded. (ID: %u)", event.id );
+	if ( ! CoordinatorWorker::pending->eraseRecovery( event.instanceId, event.requestId, header.addr, header.port, header.count, event.socket, remaining, total, elapsedTime ) ) {
+		__ERROR__( "SlaveWorker", "handlePromoteBackupSlaveResponse", "Cannot find a pending RECOVERY request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		return false;
 	}
 
@@ -129,6 +129,7 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 	do {
 		buffer.data = this->protocol.promoteBackupSlave(
 			buffer.size,
+			Coordinator::instanceId,
 			requestId,
 			socket,
 			socket->map.chunks,
@@ -146,6 +147,7 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 	// Insert into pending recovery map
 	ServerAddr srcAddr = socket->getServerAddr();
 	if ( ! CoordinatorWorker::pending->insertRecovery(
+		Coordinator::instanceId,
 		requestId,
 		srcAddr.addr,
 		srcAddr.port,
@@ -215,6 +217,7 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 		requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
 
 		CoordinatorWorker::pending->insertReconstruction(
+			Coordinator::instanceId,
 			requestId,
 			listId, chunkId, stripeIds[ listId ],
 			lock, cond
@@ -232,6 +235,7 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 				if ( s->ready() && s != backupSlaveSocket ) {
 					buffer.data = this->protocol.reqReconstruction(
 						buffer.size,
+						Coordinator::instanceId,
 						requestId,
 						listId,
 						chunkId,
@@ -278,15 +282,15 @@ bool CoordinatorWorker::handleReconstructionResponse( SlaveEvent event, char *bu
 	}
 
 	uint32_t remaining;
-	if ( ! CoordinatorWorker::pending->eraseReconstruction( event.id, header.listId, header.chunkId, header.numStripes, remaining ) ) {
+	if ( ! CoordinatorWorker::pending->eraseReconstruction( event.instanceId, event.requestId, header.listId, header.chunkId, header.numStripes, remaining ) ) {
 		__ERROR__( "CoordinatorWorker", "handleReconstructionResponse", "The response does not match with the request!" );
 		return false;
 	}
 
 	__DEBUG__(
 		BLUE, "CoordinatorWorker", "handleReconstructionResponse",
-		"[RECONSTRUCTION] Request ID: %u; list ID: %u, chunk Id: %u, number of stripes: %u (%s)",
-		event.id, header.listId, header.chunkId, header.numStripes,
+		"[RECONSTRUCTION] Request ID: (%u, %u); list ID: %u, chunk Id: %u, number of stripes: %u (%s)",
+		event.instanceId, event.requestId, header.listId, header.chunkId, header.numStripes,
 		remaining == 0 ? "Done" : "In progress"
 	);
 
