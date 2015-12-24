@@ -2,6 +2,7 @@
 #define __SLAVE_DS_PENDING_HH__
 
 #include <set>
+#include "pending_data.hh"
 #include "../socket/coordinator_socket.hh"
 #include "../socket/master_socket.hh"
 #include "../socket/slave_peer_socket.hh"
@@ -134,32 +135,6 @@ public:
 			);
 			this->chunks.insert( metadata );
 		}
-	}
-};
-
-class PendingData {
-public:
-	uint32_t listId;
-	uint32_t chunkId;
-	Key key;
-	Value value;
-
-	void set( uint32_t listId, uint32_t chunkId, Key key, Value value ) {
-		this->listId = listId;
-		this->chunkId = chunkId;
-		this->key.dup( key.size, key.data );
-		this->value.dup( value.size, value.data );
-	}
-
-	void free() {
-		this->key.free();
-		this->value.free();
-	}
-
-	bool operator< ( const PendingData &p ) const {
-		return ( this->listId < p.listId || this->chunkId < p.chunkId ||
-			this->key < p.key || this->value.size < p.value.size
-		);
 	}
 };
 

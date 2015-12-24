@@ -21,6 +21,19 @@ public:
 		UNLOCK( &this->lock );
 		return ret;
 	}
+
+	uint32_t getVal() {
+		return this->value;
+	}
+
+	bool operator<( const Timestamp &rhs ) const {
+		return this->value < rhs.value;
+	}
+
+	bool operator==( const Timestamp &rhs ) const {
+		return this->value == rhs.value;
+	}
+
 };
 
 #endif

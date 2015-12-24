@@ -5,6 +5,7 @@ LIBS=-pthread
 BIN=$(PLIO_SRC_ROOT)/bin/slave
 
 OBJS= \
+	backup/backup.o \
 	buffer/chunk_buffer.o \
 	buffer/data_chunk_buffer.o \
 	buffer/degraded_chunk_buffer.o \

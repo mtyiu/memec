@@ -3,12 +3,15 @@
 
 #include "../../common/ds/array_map.hh"
 #include "../../common/socket/socket.hh"
+#include "../backup/backup.hh"
 
 class MasterSocket : public Socket {
 private:
 	static ArrayMap<int, MasterSocket> *masters;
 
 public:
+	SlaveBackup backup;
+
 	static void setArrayMap( ArrayMap<int, MasterSocket> *masters );
 	bool start();
 	void stop();
