@@ -87,7 +87,7 @@ public class PLIO {
 			Protocol.PROTO_MAGIC_REQUEST,
 			Protocol.PROTO_MAGIC_TO_MASTER,
 			Protocol.PROTO_OPCODE_REGISTER,
-			0,
+			0, 0,
 			id
 		);
 		try {
