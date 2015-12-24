@@ -16,8 +16,9 @@ enum CoordinatorEventType {
 class CoordinatorEvent : public Event {
 public:
 	CoordinatorEventType type;
-	uint32_t id;
 	CoordinatorSocket *socket;
+	uint16_t instanceId;
+	uint32_t requestId;
 	union {
 		struct {
 			uint32_t addr;
@@ -35,7 +36,7 @@ public:
 		ArrayMap< struct sockaddr_in, Latency > *slaveGetLatency,
 		ArrayMap< struct sockaddr_in, Latency > *slaveSetLatency
 	);
-	void resSyncRemappingRecords();
+	void resSyncRemappingRecords( uint16_t instanceId, uint32_t requestId );
 	void pending( CoordinatorSocket *socket );
 };
 

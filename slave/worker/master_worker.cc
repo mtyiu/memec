@@ -20,6 +20,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		case MASTER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS:
+		case MASTER_EVENT_TYPE_ACK_METADATA:
 			success = true;
 			break;
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
@@ -39,7 +40,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		// Register
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resRegisterMaster( buffer.size, event.id, success );
+			buffer.data = this->protocol.resRegisterMaster( buffer.size, event.instanceId, event.requestId, success );
 			break;
 		// GET
 		case MASTER_EVENT_TYPE_GET_RESPONSE_SUCCESS:
@@ -50,7 +51,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 			event.message.keyValue.deserialize( key, keySize, value, valueSize );
 			buffer.data = this->protocol.resGet(
 				buffer.size,
-				event.id,
+				event.instanceId, event.requestId,
 				success,
 				event.isDegraded,
 				keySize, key,
@@ -61,7 +62,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		case MASTER_EVENT_TYPE_GET_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resGet(
 				buffer.size,
-				event.id,
+				event.instanceId, event.requestId,
 				success,
 				event.isDegraded,
 				event.message.key.size,
@@ -72,11 +73,15 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		case MASTER_EVENT_TYPE_SET_RESPONSE_SUCCESS_DATA:
 			buffer.data = this->protocol.resSet(
 				buffer.size,
-				event.id,
+				event.instanceId, event.requestId,
 				event.message.set.timestamp,
 				event.message.set.listId,
 				event.message.set.stripeId,
 				event.message.set.chunkId,
+				event.message.set.isSealed,
+				event.message.set.sealedListId,
+				event.message.set.sealedStripeId,
+				event.message.set.sealedChunkId,
 				event.message.set.key.size,
 				event.message.set.key.data
 			);
@@ -85,7 +90,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		case MASTER_EVENT_TYPE_SET_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resSet(
 				buffer.size,
-				event.id,
+				event.instanceId, event.requestId,
 				success,
 				event.message.set.key.size,
 				event.message.set.key.data
@@ -96,7 +101,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 			buffer.data = this->protocol.resRemappingSet(
 				buffer.size,
 				true,
-				event.id,
+				event.instanceId, event.requestId,
 				success,
 				event.message.remap.listId,
 				event.message.remap.chunkId,
@@ -114,7 +119,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resUpdate(
 				buffer.size,
-				event.id,
+				event.instanceId, event.requestId,
 				success,
 				event.isDegraded,
 				event.message.keyValueUpdate.key.size,
@@ -131,7 +136,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 			// TODO: Include the timestamp and metadata
 			buffer.data = this->protocol.resDelete(
 				buffer.size,
-				event.id,
+				event.instanceId, event.requestId,
 				event.isDegraded,
 				event.message.del.timestamp,
 				event.message.del.listId,
@@ -147,7 +152,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		case MASTER_EVENT_TYPE_DELETE_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resDelete(
 				buffer.size,
-				event.id,
+				event.instanceId, event.requestId,
 				event.isDegraded,
 				event.message.del.key.size,
 				event.message.del.key.data
@@ -155,6 +160,15 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 
 			if ( event.needsFree )
 				event.message.del.key.free();
+			break;
+		// ACK
+		case MASTER_EVENT_TYPE_ACK_METADATA:
+			buffer.data = this->protocol.ackMetadata(
+				buffer.size,
+				event.instanceId, event.requestId,
+				event.message.ack.fromTimestamp,
+				event.message.ack.toTimestamp
+			);
 			break;
 		// Pending
 		case MASTER_EVENT_TYPE_PENDING:
@@ -185,7 +199,8 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 			if ( header.magic != PROTO_MAGIC_REQUEST || header.from != PROTO_MAGIC_FROM_MASTER ) {
 				__ERROR__( "SlaveWorker", "dispatch", "Invalid protocol header." );
 			} else {
-				event.id = header.id;
+				event.instanceId = header.instanceId;
+				event.requestId = header.requestId;
 				switch( header.opcode ) {
 					case PROTO_OPCODE_GET:
 						this->handleGetRequest( event, buffer.data, buffer.size );
@@ -250,10 +265,10 @@ bool SlaveWorker::handleGetRequest( MasterEvent event, char *buf, size_t size ) 
 	KeyValue keyValue;
 	RemappingRecord remappingRecord;
 	if ( map->findValueByKey( header.key, header.keySize, &keyValue, &key ) ) {
-		event.resGet( event.socket, event.id, keyValue, false );
+		event.resGet( event.socket, event.instanceId, event.requestId, keyValue, false );
 		ret = true;
 	} else {
-		event.resGet( event.socket, event.id, key, false );
+		event.resGet( event.socket, event.instanceId, event.requestId, key, false );
 		ret = false;
 	}
 	this->dispatch( event );
@@ -272,6 +287,8 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size, b
 		( int ) header.keySize, header.key, header.keySize, header.valueSize
 	);
 
+	bool isSealed;
+	Metadata sealed;
 	uint32_t listId, stripeId, chunkId;
 	listId = SlaveWorker::stripeList->get( header.key, header.keySize, 0, 0, &chunkId );
 
@@ -280,6 +297,7 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size, b
 		header.key, header.keySize,
 		header.value, header.valueSize,
 		PROTO_OPCODE_SET, stripeId, chunkId,
+		&isSealed, &sealed,
 		this->chunks, this->dataChunk, this->parityChunk
 	);
 
@@ -290,15 +308,16 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size, b
 	key.set( header.keySize, header.key );
 	if ( chunkId >= SlaveWorker::dataChunkCount ) {
 		event.resSet(
-			event.socket, event.id,
+			event.socket, event.instanceId, event.requestId,
 			key, true
 		);
 	} else {
 		// Data server responds with metadata
 		uint32_t timestamp = SlaveWorker::timestamp->nextVal();
 		event.resSet(
-			event.socket, event.id,
+			event.socket, event.instanceId, event.requestId,
 			timestamp, listId, stripeId, chunkId,
+			isSealed, sealed.listId, sealed.stripeId, sealed.chunkId,
 			key
 		);
 	}
@@ -337,8 +356,8 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 			keyValueUpdate.offset = header.valueUpdateOffset;
 			keyValueUpdate.length = header.valueUpdateSize;
 
-			if ( ! SlaveWorker::pending->insertKeyValueUpdate( PT_MASTER_UPDATE, event.id, ( void * ) event.socket, keyValueUpdate ) ) {
-				__ERROR__( "SlaveWorker", "handleUpdateRequest", "Cannot insert into master UPDATE pending map (ID = %u).", event.id );
+			if ( ! SlaveWorker::pending->insertKeyValueUpdate( PT_MASTER_UPDATE, event.instanceId, event.requestId, ( void * ) event.socket, keyValueUpdate ) ) {
+				__ERROR__( "SlaveWorker", "handleUpdateRequest", "Cannot insert into master UPDATE pending map (ID = (%u, %u)).", event.instanceId, event.requestId );
 			}
 		} else {
 			key.set( header.keySize, header.key, ( void * ) event.socket );
@@ -371,7 +390,7 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 
 		if ( SlaveWorker::parityChunkCount ) {
 			ret = this->sendModifyChunkRequest(
-				event.id, keyValueUpdate.size, keyValueUpdate.data,
+				event.instanceId, event.requestId, keyValueUpdate.size, keyValueUpdate.data,
 				metadata, offset,
 				header.valueUpdateSize,    /* deltaSize */
 				header.valueUpdateOffset,
@@ -381,7 +400,7 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 			);
 		} else {
 			event.resUpdate(
-				event.socket, event.id, key,
+				event.socket, event.instanceId, event.requestId, key,
 				header.valueUpdateOffset,
 				header.valueUpdateSize,
 				true, false, false
@@ -393,7 +412,7 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 			chunkBuffer->updateAndUnlockChunk( chunkBufferIndex );
 	} else {
 		event.resUpdate(
-			event.socket, event.id, key,
+			event.socket, event.instanceId, event.requestId, key,
 			header.valueUpdateOffset, header.valueUpdateSize,
 			false, false, false
 		);
@@ -430,7 +449,7 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 		// Add the current request to the pending set
 		if ( SlaveWorker::parityChunkCount ) {
 			key.dup( header.keySize, header.key, ( void * ) event.socket );
-			if ( ! SlaveWorker::pending->insertKey( PT_MASTER_DEL, event.id, ( void * ) event.socket, key ) ) {
+			if ( ! SlaveWorker::pending->insertKey( PT_MASTER_DEL, event.instanceId, event.requestId, ( void * ) event.socket, key ) ) {
 				__ERROR__( "SlaveWorker", "handleDeleteRequest", "Cannot insert into master DELETE pending map." );
 			}
 			delta = this->buffer.data;
@@ -478,7 +497,7 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 
 		if ( SlaveWorker::parityChunkCount ) {
 			ret = this->sendModifyChunkRequest(
-				event.id, key.size, key.data,
+				event.instanceId, event.requestId, key.size, key.data,
 				metadata, keyMetadata.offset, deltaSize, 0, delta,
 				chunkBufferIndex == -1 /* isSealed */,
 				false /* isUpdate */
@@ -487,7 +506,7 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 			uint32_t timestamp = SlaveWorker::timestamp->nextVal();
 			event.resDelete(
 				event.socket,
-				event.id,
+				event.instanceId, event.requestId,
 				timestamp,
 				metadata.listId,
 				metadata.stripeId,
@@ -505,7 +524,7 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 		key.set( header.keySize, header.key, ( void * ) event.socket );
 		event.resDelete(
 			event.socket,
-			event.id,
+			event.instanceId, event.requestId,
 			key,
 			false, // needsFree
 			false  // isDegraded

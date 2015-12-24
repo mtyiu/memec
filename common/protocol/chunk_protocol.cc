@@ -1,9 +1,9 @@
 #include "protocol.hh"
 
-size_t Protocol::generateChunkHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *sendBuf ) {
+size_t Protocol::generateChunkHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *sendBuf ) {
 	if ( ! sendBuf ) sendBuf = this->buffer.send;
 	char *buf = sendBuf + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_CHUNK_SIZE, id, sendBuf );
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_CHUNK_SIZE, instanceId, requestId, sendBuf );
 
 	*( ( uint32_t * )( buf      ) ) = htonl( listId );
 	*( ( uint32_t * )( buf +  4 ) ) = htonl( stripeId );
@@ -40,7 +40,7 @@ bool Protocol::parseChunkHeader( struct ChunkHeader &header, char *buf, size_t s
 	);
 }
 
-size_t Protocol::generateChunksHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t chunkId, std::vector<uint32_t> &stripeIds, uint32_t &count ) {
+size_t Protocol::generateChunksHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, std::vector<uint32_t> &stripeIds, uint32_t &count ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = PROTO_HEADER_SIZE;
 	uint32_t *tmp;
@@ -64,7 +64,7 @@ size_t Protocol::generateChunksHeader( uint8_t magic, uint8_t to, uint8_t opcode
 	}
 
 	*tmp = htonl( count );
-	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, id );
+	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, instanceId, requestId );
 
 	return bytes;
 }
@@ -106,9 +106,9 @@ bool Protocol::parseChunksHeader( struct ChunksHeader &header, char *buf, size_t
 	);
 }
 
-size_t Protocol::generateChunkDataHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t chunkSize, uint32_t chunkOffset, char *chunkData ) {
+size_t Protocol::generateChunkDataHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t chunkSize, uint32_t chunkOffset, char *chunkData ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_CHUNK_DATA_SIZE + chunkSize, id );
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_CHUNK_DATA_SIZE + chunkSize, instanceId, requestId );
 
 	*( ( uint32_t * )( buf      ) ) = htonl( listId );
 	*( ( uint32_t * )( buf +  4 ) ) = htonl( stripeId );
@@ -162,7 +162,7 @@ bool Protocol::parseChunkDataHeader( struct ChunkDataHeader &header, char *buf, 
 }
 
 size_t Protocol::generateChunkKeyValueHeader(
-	uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+	uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 	uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 	std::unordered_map<Key, KeyValue> *values,
 	std::unordered_multimap<Metadata, Key> *metadataRev,
@@ -270,7 +270,7 @@ size_t Protocol::generateChunkKeyValueHeader(
 
 	buf = this->buffer.send + PROTO_HEADER_SIZE;
 
-	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, id );
+	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, instanceId, requestId );
 
 	*( ( uint32_t * )( buf      ) ) = htonl( listId );
 	*( ( uint32_t * )( buf +  4 ) ) = htonl( stripeId );

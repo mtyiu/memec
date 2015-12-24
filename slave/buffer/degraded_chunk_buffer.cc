@@ -193,9 +193,9 @@ re_insert:
 	return this->slaveMap->insertOpMetadata( opcode, key, keyMetadata );
 }
 
-bool DegradedMap::insertDegradedChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t pid ) {
+bool DegradedMap::insertDegradedChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint16_t instanceId, uint32_t requestId ) {
 	Metadata metadata;
-	std::unordered_map<Metadata, std::vector<uint32_t>>::iterator it;
+	std::unordered_map<Metadata, std::vector<struct pid_s>>::iterator it;
 	bool ret = false;
 
 	metadata.set( listId, stripeId, chunkId );
@@ -203,19 +203,20 @@ bool DegradedMap::insertDegradedChunk( uint32_t listId, uint32_t stripeId, uint3
 	LOCK( &this->degraded.chunksLock );
 	it = this->degraded.chunks.find( metadata );
 	if ( it == this->degraded.chunks.end() ) {
-		std::vector<uint32_t> pids;
-		pids.push_back( pid );
+		std::vector<struct pid_s> pids;
+		struct pid_s data = { .instanceId = instanceId, .requestId = requestId };
+		pids.push_back( data );
 
-		std::pair<Metadata, std::vector<uint32_t>> p( metadata, pids );
-		std::pair<std::unordered_map<Metadata, std::vector<uint32_t>>::iterator, bool> r;
+		std::pair<Metadata, std::vector<struct pid_s>> p( metadata, pids );
+		std::pair<std::unordered_map<Metadata, std::vector<struct pid_s>>::iterator, bool> r;
 
 		r = this->degraded.chunks.insert( p );
 
 		ret = r.second;
 	} else {
-		std::vector<uint32_t> &pids = it->second;
-
-		pids.push_back( pid );
+		std::vector<struct pid_s> &pids = it->second;
+		struct pid_s data = { .instanceId = instanceId, .requestId = requestId };
+		pids.push_back( data );
 		ret = false;
 	}
 	UNLOCK( &this->degraded.chunksLock );
@@ -223,9 +224,9 @@ bool DegradedMap::insertDegradedChunk( uint32_t listId, uint32_t stripeId, uint3
 	return ret;
 }
 
-bool DegradedMap::deleteDegradedChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, std::vector<uint32_t> &pids ) {
+bool DegradedMap::deleteDegradedChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, std::vector<struct pid_s> &pids ) {
 	Metadata metadata;
-	std::unordered_map<Metadata, std::vector<uint32_t>>::iterator it;
+	std::unordered_map<Metadata, std::vector<struct pid_s>>::iterator it;
 
 	metadata.set( listId, stripeId, chunkId );
 
@@ -243,26 +244,28 @@ bool DegradedMap::deleteDegradedChunk( uint32_t listId, uint32_t stripeId, uint3
 	return true;
 }
 
-bool DegradedMap::insertDegradedKey( Key key, uint32_t pid ) {
-	std::unordered_map<Key, std::vector<uint32_t>>::iterator it;
+bool DegradedMap::insertDegradedKey( Key key, uint16_t instanceId, uint32_t requestId ) {
+	std::unordered_map<Key, std::vector<struct pid_s>>::iterator it;
 	bool ret = false;
 
 	LOCK( &this->degraded.keysLock );
 	it = this->degraded.keys.find( key );
 	if ( it == this->degraded.keys.end() ) {
-		std::vector<uint32_t> pids;
-		pids.push_back( pid );
+		std::vector<struct pid_s> pids;
+		struct pid_s data = { .instanceId = instanceId, .requestId = requestId };
+		pids.push_back( data );
 
-		std::pair<Key, std::vector<uint32_t>> p( key, pids );
-		std::pair<std::unordered_map<Key, std::vector<uint32_t>>::iterator, bool> r;
+		std::pair<Key, std::vector<struct pid_s>> p( key, pids );
+		std::pair<std::unordered_map<Key, std::vector<struct pid_s>>::iterator, bool> r;
 
 		r = this->degraded.keys.insert( p );
 
 		ret = r.second;
 	} else {
-		std::vector<uint32_t> &pids = it->second;
+		std::vector<struct pid_s> &pids = it->second;
+		struct pid_s data = { .instanceId = instanceId, .requestId = requestId };
 
-		pids.push_back( pid );
+		pids.push_back( data );
 		ret = false;
 	}
 	UNLOCK( &this->degraded.keysLock );
@@ -270,8 +273,8 @@ bool DegradedMap::insertDegradedKey( Key key, uint32_t pid ) {
 	return ret;
 }
 
-bool DegradedMap::deleteDegradedKey( Key key, std::vector<uint32_t> &pids ) {
-	std::unordered_map<Key, std::vector<uint32_t>>::iterator it;
+bool DegradedMap::deleteDegradedKey( Key key, std::vector<struct pid_s> &pids ) {
+	std::unordered_map<Key, std::vector<struct pid_s>>::iterator it;
 
 	LOCK( &this->degraded.keysLock );
 	it = this->degraded.keys.find( key );

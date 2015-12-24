@@ -233,14 +233,14 @@ public:
 
 	// Insert (Coordinator)
 	void insertReleaseDegradedLock(
-		uint32_t id, CoordinatorSocket *socket, uint32_t count
+		uint16_t instanceId, uint32_t requestId, CoordinatorSocket *socket, uint32_t count
 	);
 	bool insertReconstruction(
-		uint32_t id, CoordinatorSocket *socket, uint32_t listId, uint32_t chunkId,
+		uint16_t instanceId, uint32_t requestId, CoordinatorSocket *socket, uint32_t listId, uint32_t chunkId,
 		std::unordered_set<uint32_t> &stripeIds
 	);
 	bool insertRecovery(
-		uint32_t id, CoordinatorSocket *socket,
+		uint16_t instanceId, uint32_t requestId, CoordinatorSocket *socket,
 		uint32_t addr, uint16_t port,
 		uint32_t count,
 		uint32_t *buf
@@ -248,48 +248,48 @@ public:
 
 	// Insert (Master)
 	bool insertRemappingRecordKey(
-		PendingType type, uint32_t id, void *ptr,
+		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr,
 		RemappingRecordKey &remappingRecordKey,
 		bool needsLock = true, bool needsUnlock = true
 	);
 	bool insertKey(
-		PendingType type, uint32_t id, void *ptr,
+		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr,
 		Key &key,
 		bool needsLock = true, bool needsUnlock = true
 	);
 	bool insertKeyValueUpdate(
-		PendingType type, uint32_t id, void *ptr,
+		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr,
 		KeyValueUpdate &keyValueUpdate,
 		bool needsLock = true, bool needsUnlock = true
 	);
 	// Insert (Slave Peers)
 	bool insertRemappingRecordKey(
-		PendingType type, uint32_t id, uint32_t parentId, void *ptr,
+		PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
 		RemappingRecordKey &remappingRecordKey,
 		bool needsLock = true, bool needsUnlock = true
 	);
 	bool insertKey(
-		PendingType type, uint32_t id, uint32_t parentId, void *ptr,
+		PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
 		Key &key,
 		bool needsLock = true, bool needsUnlock = true
 	);
 	bool insertKeyValueUpdate(
-		PendingType type, uint32_t id, uint32_t parentId, void *ptr,
+		PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
 		KeyValueUpdate &keyValueUpdate,
 		bool needsLock = true, bool needsUnlock = true
 	);
 	bool insertDegradedOp(
-		PendingType type, uint32_t id, uint32_t parentId, void *ptr,
+		PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
 		DegradedOp &degradedOp,
 		bool needsLock = true, bool needsUnlock = true
 	);
 	bool insertChunkRequest(
-		PendingType type, uint32_t id, uint32_t parentId, void *ptr,
+		PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
 		ChunkRequest &chunkRequest,
 		bool needsLock = true, bool needsUnlock = true
 	);
 	bool insertChunkUpdate(
-		PendingType type, uint32_t id, uint32_t parentId, void *ptr,
+		PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
 		ChunkUpdate &chunkUpdate,
 		bool needsLock = true, bool needsUnlock = true
 	);
@@ -298,59 +298,59 @@ public:
 		Key key, Value value
 	);
 	bool insertRemapDataRequest(
-		uint32_t id, uint32_t parentId, uint32_t requestCount,
+		uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, uint32_t requestCount,
 		SlavePeerSocket *target
 	);
 	// Erase
 	bool eraseReleaseDegradedLock(
-		uint32_t id, uint32_t count,
+		uint16_t instanceId, uint32_t requestId, uint32_t count,
 		uint32_t &remaining,
 		uint32_t &total,
 		PendingIdentifier *pidPtr = 0
 	);
 	bool eraseReconstruction(
-		uint32_t id, CoordinatorSocket *&socket,
+		uint16_t instanceId, uint32_t requestId, CoordinatorSocket *&socket,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		uint32_t &remaining, uint32_t &total,
 		PendingIdentifier *pidPtr = 0
 	);
 	bool eraseRecovery(
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
-		uint32_t &id, CoordinatorSocket *&socket,
+		uint16_t &instanceId, uint32_t &requestId, CoordinatorSocket *&socket,
 		uint32_t &addr, uint16_t &port, uint32_t &remaining, uint32_t &total
 	);
 	bool eraseRemappingRecordKey(
-		PendingType type, uint32_t id, void *ptr = 0,
+		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr = 0,
 		PendingIdentifier *pidPtr = 0,
 		RemappingRecordKey *remappingRecordKeyPtr = 0,
 		bool needsLock = true, bool needsUnlock = true
 	);
 	bool eraseKey(
-		PendingType type, uint32_t id, void *ptr = 0,
+		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr = 0,
 		PendingIdentifier *pidPtr = 0,
 		Key *keyPtr = 0,
 		bool needsLock = true, bool needsUnlock = true
 	);
 	bool eraseKeyValueUpdate(
-		PendingType type, uint32_t id, void *ptr = 0,
+		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr = 0,
 		PendingIdentifier *pidPtr = 0,
 		KeyValueUpdate *keyValueUpdatePtr = 0,
 		bool needsLock = true, bool needsUnlock = true
 	);
 	bool eraseDegradedOp(
-		PendingType type, uint32_t id, void *ptr = 0,
+		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr = 0,
 		PendingIdentifier *pidPtr = 0,
 		DegradedOp *degradedOpPtr = 0,
 		bool needsLock = true, bool needsUnlock = true
 	);
 	bool eraseChunkRequest(
-		PendingType type, uint32_t id, void *ptr = 0,
+		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr = 0,
 		PendingIdentifier *pidPtr = 0,
 		ChunkRequest *chunkRequestPtr = 0,
 		bool needsLock = true, bool needsUnlock = true
 	);
 	bool eraseChunkUpdate(
-		PendingType type, uint32_t id, void *ptr = 0,
+		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr = 0,
 		PendingIdentifier *pidPtr = 0,
 		ChunkUpdate *chunkUpdatePtr = 0,
 		bool needsLock = true, bool needsUnlock = true
@@ -360,23 +360,23 @@ public:
 		std::set<PendingData> **pendingData
 	);
 	bool decrementRemapDataRequest(
-		uint32_t id, PendingIdentifier *pidPtr = 0,
+		uint16_t instanceId, uint32_t requestId, PendingIdentifier *pidPtr = 0,
 		uint32_t *requestCount = 0
 	);
 
 	bool findReconstruction(
-		uint32_t id,
+		uint16_t instanceId, uint32_t requestId,
 		uint32_t stripeId,
 		uint32_t &listId, uint32_t &chunkId
 	);
 	bool findChunkRequest(
-		PendingType type, uint32_t id, void *ptr,
+		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr,
 		std::unordered_multimap<PendingIdentifier, ChunkRequest>::iterator &it,
 		bool needsLock = true, bool needsUnlock = true
 	);
 
 	uint32_t count(
-		PendingType type, uint32_t id,
+		PendingType type, uint16_t instanceId, uint32_t requestId,
 		bool needsLock = true, bool needsUnlock = true
 	);
 };

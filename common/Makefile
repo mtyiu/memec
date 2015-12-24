@@ -10,14 +10,17 @@ OBJS= \
 	config/server_addr.o \
 	ds/bitmask_array.o \
 	ds/chunk.o \
+	ds/instance_id_generator.o \
 	ds/key_value.o \
 	ds/latency.o \
 	ds/load.o \
 	ds/sockaddr_in.o \
 	protocol/protocol.o \
+	protocol/ack_protocol.o \
 	protocol/address_protocol.o \
 	protocol/chunk_protocol.o \
 	protocol/degraded_protocol.o \
+	protocol/fault_protocol.o \
 	protocol/heartbeat_protocol.o \
 	protocol/load_protocol.o \
 	protocol/normal_protocol.o \

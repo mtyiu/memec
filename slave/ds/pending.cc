@@ -127,8 +127,8 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_map<struct so
 	return true;
 }
 #define DEFINE_PENDING_MASTER_INSERT_METHOD( METHOD_NAME, VALUE_TYPE, VALUE_VAR ) \
-	bool Pending::METHOD_NAME( PendingType type, uint32_t id, void *ptr, VALUE_TYPE &VALUE_VAR, bool needsLock, bool needsUnlock ) { \
-		PendingIdentifier pid( id, id, ptr ); \
+	bool Pending::METHOD_NAME( PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr, VALUE_TYPE &VALUE_VAR, bool needsLock, bool needsUnlock ) { \
+		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, ptr ); \
 		std::pair<PendingIdentifier, VALUE_TYPE> p( pid, VALUE_VAR ); \
 		std::unordered_multimap<PendingIdentifier, VALUE_TYPE>::iterator ret; \
  		\
@@ -145,8 +145,8 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_map<struct so
 	}
 
 #define DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( METHOD_NAME, VALUE_TYPE, VALUE_VAR ) \
-	bool Pending::METHOD_NAME( PendingType type, uint32_t id, uint32_t parentId, void *ptr, VALUE_TYPE &VALUE_VAR, bool needsLock, bool needsUnlock ) { \
-		PendingIdentifier pid( id, parentId, ptr ); \
+	bool Pending::METHOD_NAME( PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr, VALUE_TYPE &VALUE_VAR, bool needsLock, bool needsUnlock ) { \
+		PendingIdentifier pid( instanceId, parentInstanceId, requestId, parentRequestId, ptr ); \
 		std::pair<PendingIdentifier, VALUE_TYPE> p( pid, VALUE_VAR ); \
 		std::unordered_multimap<PendingIdentifier, VALUE_TYPE>::iterator ret; \
  		\
@@ -163,8 +163,8 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_map<struct so
 	}
 
 #define DEFINE_PENDING_ERASE_METHOD( METHOD_NAME, VALUE_TYPE, VALUE_PTR_VAR ) \
-	bool Pending::METHOD_NAME( PendingType type, uint32_t id, void *ptr, PendingIdentifier *pidPtr, VALUE_TYPE *VALUE_PTR_VAR, bool needsLock, bool needsUnlock ) { \
-		PendingIdentifier pid( id, 0, ptr ); \
+	bool Pending::METHOD_NAME( PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr, PendingIdentifier *pidPtr, VALUE_TYPE *VALUE_PTR_VAR, bool needsLock, bool needsUnlock ) { \
+		PendingIdentifier pid( instanceId, 0, requestId, 0, ptr ); \
 		LOCK_T *lock; \
 		bool ret; \
 		\
@@ -179,7 +179,7 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_map<struct so
 			ret = ( it != map->end() ); \
 		} else { \
 			it = map->find( pid ); \
-			ret = ( it != map->end() && it->first.id == id ); \
+			ret = ( it != map->end() && it->first.instanceId == instanceId && it->first.requestId == requestId ); \
 		} \
 		if ( ret ) { \
 			if ( pidPtr ) *pidPtr = it->first; \
@@ -213,8 +213,8 @@ DEFINE_PENDING_ERASE_METHOD( eraseChunkUpdate, ChunkUpdate, chunkUpdatePtr )
 #undef DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD
 #undef DEFINE_PENDING_ERASE_METHOD
 
-void Pending::insertReleaseDegradedLock( uint32_t id, CoordinatorSocket *socket, uint32_t count ) {
-	PendingIdentifier pid( id, id, socket );
+void Pending::insertReleaseDegradedLock( uint16_t instanceId, uint32_t requestId, CoordinatorSocket *socket, uint32_t count ) {
+	PendingIdentifier pid( instanceId, instanceId, requestId, requestId, socket );
 	std::unordered_map<PendingIdentifier, PendingDegradedLock>::iterator it;
 
 	LOCK( &this->coordinators.releaseDegradedLockLock );
@@ -232,8 +232,8 @@ void Pending::insertReleaseDegradedLock( uint32_t id, CoordinatorSocket *socket,
 	UNLOCK( &this->coordinators.releaseDegradedLockLock );
 }
 
-bool Pending::insertReconstruction( uint32_t id, CoordinatorSocket *socket, uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds ) {
-	PendingIdentifier pid( id, id, socket );
+bool Pending::insertReconstruction( uint16_t instanceId, uint32_t requestId, CoordinatorSocket *socket, uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds ) {
+	PendingIdentifier pid( instanceId, instanceId, requestId, requestId, socket );
 	PendingReconstruction r;
 	r.set( listId, chunkId, stripeIds );
 	std::unordered_map<PendingIdentifier, PendingReconstruction>::iterator it;
@@ -264,8 +264,8 @@ bool Pending::insertReconstruction( uint32_t id, CoordinatorSocket *socket, uint
 	return ret;
 }
 
-bool Pending::insertRecovery( uint32_t id, CoordinatorSocket *socket, uint32_t addr, uint16_t port, uint32_t count, uint32_t *buf ) {
-	PendingIdentifier pid( id, id, socket );
+bool Pending::insertRecovery( uint16_t instanceId, uint32_t requestId, CoordinatorSocket *socket, uint32_t addr, uint16_t port, uint32_t count, uint32_t *buf ) {
+	PendingIdentifier pid( instanceId, instanceId, requestId, requestId, socket );
 	PendingRecovery r( addr, port );
 
 	std::unordered_map<PendingIdentifier, PendingRecovery>::iterator it;
@@ -302,9 +302,9 @@ bool Pending::insertRemapData( struct sockaddr_in target, uint32_t listId, uint3
 	return true;
 }
 
-bool Pending::insertRemapDataRequest( uint32_t id, uint32_t parentId, uint32_t requestCount, SlavePeerSocket *target ) {
+bool Pending::insertRemapDataRequest( uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, uint32_t requestCount, SlavePeerSocket *target ) {
 	bool ret = false;
-	PendingIdentifier pid( id, parentId, target );
+	PendingIdentifier pid( instanceId, parentInstanceId, requestId, parentRequestId, target );
 	LOCK( &this->slavePeers.remappedDataRequestLock );
 	if ( this->slavePeers.remappedDataRequest.count( pid ) == 0 ){
 		ret = true;
@@ -314,8 +314,8 @@ bool Pending::insertRemapDataRequest( uint32_t id, uint32_t parentId, uint32_t r
 	return ret;
 }
 
-bool Pending::eraseReleaseDegradedLock( uint32_t id, uint32_t count, uint32_t &remaining, uint32_t &total, PendingIdentifier *pidPtr ) {
-	PendingIdentifier pid( id, id, 0 );
+bool Pending::eraseReleaseDegradedLock( uint16_t instanceId, uint32_t requestId, uint32_t count, uint32_t &remaining, uint32_t &total, PendingIdentifier *pidPtr ) {
+	PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
 	std::unordered_map<PendingIdentifier, PendingDegradedLock>::iterator it;
 
 	LOCK( &this->coordinators.releaseDegradedLockLock );
@@ -347,8 +347,8 @@ bool Pending::eraseRemapData( struct sockaddr_in target, std::set<PendingData> *
 	return found;
 }
 
-bool Pending::decrementRemapDataRequest( uint32_t id, PendingIdentifier *pidPtr, uint32_t *requestCount ) {
-	PendingIdentifier pid( id, 0, 0 );
+bool Pending::decrementRemapDataRequest( uint16_t instanceId, uint32_t requestId, PendingIdentifier *pidPtr, uint32_t *requestCount ) {
+	PendingIdentifier pid( instanceId, 0, requestId, 0, 0 );
 
 	LOCK( &this->slavePeers.remappedDataRequestLock );
 	auto it  = this->slavePeers.remappedDataRequest.find( pid );
@@ -368,8 +368,8 @@ bool Pending::decrementRemapDataRequest( uint32_t id, PendingIdentifier *pidPtr,
 	return ret;
 }
 
-bool Pending::eraseReconstruction( uint32_t id, CoordinatorSocket *&socket, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t &remaining, uint32_t &total, PendingIdentifier *pidPtr ) {
-	PendingIdentifier pid( id, id, 0 );
+bool Pending::eraseReconstruction( uint16_t instanceId, uint32_t requestId, CoordinatorSocket *&socket, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t &remaining, uint32_t &total, PendingIdentifier *pidPtr ) {
+	PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
 	std::unordered_map<PendingIdentifier, PendingReconstruction>::iterator it;
 	bool ret;
 
@@ -400,7 +400,7 @@ bool Pending::eraseReconstruction( uint32_t id, CoordinatorSocket *&socket, uint
 	return ret;
 }
 
-bool Pending::eraseRecovery( uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t &id, CoordinatorSocket *&socket, uint32_t &addr, uint16_t &port, uint32_t &remaining, uint32_t &total ) {
+bool Pending::eraseRecovery( uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint16_t &instanceId, uint32_t &requestId, CoordinatorSocket *&socket, uint32_t &addr, uint16_t &port, uint32_t &remaining, uint32_t &total ) {
 	std::unordered_map<PendingIdentifier, PendingRecovery>::iterator it;
 	Metadata metadata;
 	bool ret = false;
@@ -413,7 +413,8 @@ bool Pending::eraseRecovery( uint32_t listId, uint32_t stripeId, uint32_t chunkI
 		PendingRecovery &recovery = it->second;
 
 		if ( recovery.chunks.erase( metadata ) > 0 ) {
-			id = pid.id;
+			instanceId = pid.instanceId;
+			requestId = pid.requestId;
 			socket = ( CoordinatorSocket * ) pid.ptr;
 			addr = recovery.addr;
 			port = recovery.port;
@@ -432,8 +433,8 @@ bool Pending::eraseRecovery( uint32_t listId, uint32_t stripeId, uint32_t chunkI
 	return ret;
 }
 
-bool Pending::findReconstruction( uint32_t id, uint32_t stripeId, uint32_t &listId, uint32_t &chunkId ) {
-	PendingIdentifier pid( id, id, 0 );
+bool Pending::findReconstruction( uint16_t instanceId, uint32_t requestId, uint32_t stripeId, uint32_t &listId, uint32_t &chunkId ) {
+	PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
 	std::unordered_map<PendingIdentifier, PendingReconstruction>::iterator it;
 	size_t count;
 
@@ -451,8 +452,8 @@ bool Pending::findReconstruction( uint32_t id, uint32_t stripeId, uint32_t &list
 	return count > 0;
 }
 
-bool Pending::findChunkRequest( PendingType type, uint32_t id, void *ptr, std::unordered_multimap<PendingIdentifier, ChunkRequest>::iterator &it, bool needsLock, bool needsUnlock ) {
-	PendingIdentifier pid( id, 0, ptr );
+bool Pending::findChunkRequest( PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr, std::unordered_multimap<PendingIdentifier, ChunkRequest>::iterator &it, bool needsLock, bool needsUnlock ) {
+	PendingIdentifier pid( instanceId, 0, requestId, 0, ptr );
 	LOCK_T *lock;
 	bool ret;
 
@@ -466,15 +467,15 @@ bool Pending::findChunkRequest( PendingType type, uint32_t id, void *ptr, std::u
 		ret = ( it != map->end() );
 	} else {
 		it = map->find( pid );
-		ret = ( it != map->end() && it->first.id == id );
+		ret = ( it != map->end() && it->first.instanceId == instanceId && it->first.requestId == requestId );
 	}
 	if ( needsUnlock ) UNLOCK( lock );
 
 	return ret;
 }
 
-uint32_t Pending::count( PendingType type, uint32_t id, bool needsLock, bool needsUnlock ) {
-	PendingIdentifier pid( id, 0, 0 );
+uint32_t Pending::count( PendingType type, uint16_t instanceId, uint32_t requestId, bool needsLock, bool needsUnlock ) {
+	PendingIdentifier pid( instanceId, 0, requestId, 0, 0 );
 	LOCK_T *lock;
 	uint32_t ret = 0;
 	if ( type == PT_SLAVE_PEER_REMAPPING_SET ) {
@@ -486,7 +487,7 @@ uint32_t Pending::count( PendingType type, uint32_t id, bool needsLock, bool nee
 		if ( needsLock ) LOCK( lock );
 		ret = map->count( pid );
 		// it = map->count( pid );
-		// for ( ret = 0; it != map->end() && it->first.id == id; ret++, it++ );
+		// for ( ret = 0; it != map->end() && it->first.instanceId == instanceId && it->first.requestId == requestId; ret++, it++ );
 		if ( needsUnlock ) UNLOCK( lock );
 	} else if ( type == PT_SLAVE_PEER_DEGRADED_OPS ) {
 		std::unordered_multimap<PendingIdentifier, DegradedOp> *map;
@@ -497,7 +498,7 @@ uint32_t Pending::count( PendingType type, uint32_t id, bool needsLock, bool nee
 		if ( needsLock ) LOCK( lock );
 		ret = map->count( pid );
 		// it = map->count( pid );
-		// for ( ret = 0; it != map->end() && it->first.id == id; ret++, it++ );
+		// for ( ret = 0; it != map->end() && it->first.instanceId == instanceId && it->first.requestId == requestId; ret++, it++ );
 		if ( needsUnlock ) UNLOCK( lock );
 	} else if ( type == PT_SLAVE_PEER_UPDATE ) {
 		std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *map;
@@ -508,7 +509,7 @@ uint32_t Pending::count( PendingType type, uint32_t id, bool needsLock, bool nee
 		if ( needsLock ) LOCK( lock );
 		ret = map->count( pid );
 		// it = map->count( pid );
-		// for ( ret = 0; it != map->end() && it->first.id == id; ret++, it++ );
+		// for ( ret = 0; it != map->end() && it->first.instanceId == instanceId && it->first.requestId == requestId; ret++, it++ );
 		if ( needsUnlock ) UNLOCK( lock );
 	} else if ( type == PT_SLAVE_PEER_DEL ) {
 		std::unordered_multimap<PendingIdentifier, Key> *map;
@@ -519,7 +520,7 @@ uint32_t Pending::count( PendingType type, uint32_t id, bool needsLock, bool nee
 		if ( needsLock ) LOCK( lock );
 		ret = map->count( pid );
 		// it = map->count( pid );
-		// for ( ret = 0; it != map->end() && it->first.id == id; ret++, it++ );
+		// for ( ret = 0; it != map->end() && it->first.instanceId == instanceId && it->first.requestId == requestId; ret++, it++ );
 		if ( needsUnlock ) UNLOCK( lock );
 	} else if ( type == PT_SLAVE_PEER_GET_CHUNK || type == PT_SLAVE_PEER_SET_CHUNK ) {
 		std::unordered_multimap<PendingIdentifier, ChunkRequest> *map;
@@ -530,7 +531,7 @@ uint32_t Pending::count( PendingType type, uint32_t id, bool needsLock, bool nee
 		if ( needsLock ) LOCK( lock );
 		ret = map->count( pid );
 		// it = map->count( pid );
-		// for ( ret = 0; it != map->end() && it->first.id == id; ret++, it++ );
+		// for ( ret = 0; it != map->end() && it->first.instanceId == instanceId && it->first.requestId == requestId; ret++, it++ );
 		if ( needsUnlock ) UNLOCK( lock );
 	} else if ( type == PT_SLAVE_PEER_UPDATE_CHUNK || type == PT_SLAVE_PEER_DEL_CHUNK ) {
 		std::unordered_multimap<PendingIdentifier, ChunkUpdate> *map;
@@ -541,7 +542,7 @@ uint32_t Pending::count( PendingType type, uint32_t id, bool needsLock, bool nee
 		if ( needsLock ) LOCK( lock );
 		ret = map->count( pid );
 		// it = map->lower_bound( pid );
-		// for ( ret = 0; it != map->end() && it->first.id == id; ret++, it++ );
+		// for ( ret = 0; it != map->end() && it->first.instanceId == instanceId && it->first.requestId == requestId; ret++, it++ );
 		if ( needsUnlock ) UNLOCK( lock );
 	} else {
 		__ERROR__( "Pending", "count", "The count function is not implemented for this type." );

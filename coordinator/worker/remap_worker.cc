@@ -45,15 +45,15 @@ bool CoordinatorWorker::handleRemappingSetLockRequest( MasterEvent event, char *
 				LOCK( &Coordinator::getInstance()->pendingRemappingRecords.toSendLock );
 				Coordinator::getInstance()->pendingRemappingRecords.toSend[ key ] = remappingRecord;
 				UNLOCK( &Coordinator::getInstance()->pendingRemappingRecords.toSendLock );
-				event.resRemappingSetLock( event.socket, event.id, header.isRemapped, key, remappingRecord, true, header.sockfd );
+				event.resRemappingSetLock( event.socket, event.instanceId, event.requestId, header.isRemapped, key, remappingRecord, true, header.sockfd );
 			} else {
-				event.resRemappingSetLock( event.socket, event.id, header.isRemapped, key, remappingRecord, false, header.sockfd );
+				event.resRemappingSetLock( event.socket, event.instanceId, event.requestId, header.isRemapped, key, remappingRecord, false, header.sockfd );
 			}
 		} else {
-			event.resRemappingSetLock( event.socket, event.id, header.isRemapped, key, remappingRecord, true, header.sockfd );
+			event.resRemappingSetLock( event.socket, event.instanceId, event.requestId, header.isRemapped, key, remappingRecord, true, header.sockfd );
 		}
 	} else {
-		event.resRemappingSetLock( event.socket, event.id, header.isRemapped, key, remappingRecord, false, header.sockfd );
+		event.resRemappingSetLock( event.socket, event.instanceId, event.requestId, header.isRemapped, key, remappingRecord, false, header.sockfd );
 	}
 	this->dispatch( event );
 

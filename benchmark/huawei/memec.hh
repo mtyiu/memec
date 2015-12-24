@@ -50,6 +50,7 @@ private:
 	uint8_t keySize;
 	uint32_t chunkSize;
 	uint32_t batchSize;
+	uint16_t instanceId;
 	uint32_t id, fromId, toId;
 	struct sockaddr_in addr;
 	int sockfd;

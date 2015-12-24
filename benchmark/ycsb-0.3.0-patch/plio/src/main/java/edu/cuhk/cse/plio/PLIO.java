@@ -14,6 +14,7 @@ public class PLIO {
 	private int id;
 	private int fromId;
 	private int toId;
+	private int instanceId;
 	private Socket socket;
 	private BufferedInputStream in;
 	private OutputStream out;
@@ -28,6 +29,7 @@ public class PLIO {
 		this.host = host;
 		this.port = port;
 		this.id = fromId;
+		this.instanceId = 0;
 		this.fromId = fromId;
 		this.toId = toId;
 	}
@@ -103,6 +105,7 @@ public class PLIO {
 		}
 		if ( bytes == Protocol.PROTO_HEADER_SIZE ) {
 			this.protocol.parseHeader( bytes );
+			this.instanceId = this.protocol.header.instanceId;
 			if ( this.protocol.header.id != id ) {
 				System.err.println( "PLIO.connect(): [Error] The response does not match the request ID." );
 				return false;
@@ -152,7 +155,7 @@ public class PLIO {
 			Protocol.PROTO_MAGIC_REQUEST,
 			Protocol.PROTO_MAGIC_TO_MASTER,
 			Protocol.PROTO_OPCODE_GET,
-			id,
+			this.instanceId, id,
 			keySize, key
 		);
 		try {
@@ -205,7 +208,7 @@ public class PLIO {
 			Protocol.PROTO_MAGIC_REQUEST,
 			Protocol.PROTO_MAGIC_TO_MASTER,
 			Protocol.PROTO_OPCODE_SET,
-			id,
+			this.instanceId, id,
 			keySize, key,
 			valueSize, value
 		);
@@ -259,7 +262,7 @@ public class PLIO {
 			Protocol.PROTO_MAGIC_REQUEST,
 			Protocol.PROTO_MAGIC_TO_MASTER,
 			Protocol.PROTO_OPCODE_UPDATE,
-			id,
+			this.instanceId, id,
 			keySize, key,
 			valueUpdateOffset, valueUpdateSize, valueUpdate
 		);
@@ -312,7 +315,7 @@ public class PLIO {
 			Protocol.PROTO_MAGIC_REQUEST,
 			Protocol.PROTO_MAGIC_TO_MASTER,
 			Protocol.PROTO_OPCODE_DELETE,
-			id,
+			this.instanceId, id,
 			keySize, key
 		);
 		try {

@@ -78,6 +78,8 @@ public:
 	SlaveLoading slaveLoading;
 	OverloadedSlave overloadedSlave;
 	Timer statsTimer;
+	/* Instance ID (assigned by coordinator) */
+	static uint16_t instanceId;
 	/* For debugging only */
 	struct {
 		bool isDegraded;
@@ -97,6 +99,8 @@ public:
 	void debug( FILE *f = stdout );
 	void printPending( FILE *f = stdout );
 	void printRemapping( FILE *f = stdout );
+	void printBackup( FILE *f = stdout );
+	void syncMetadata();
 	void time();
 	double getElapsedTime();
 	void interactive();

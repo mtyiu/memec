@@ -6,8 +6,11 @@
 #include <fcntl.h>
 #include "application.hh"
 
+uint16_t Application::instanceId;
+
 Application::Application() {
 	this->isRunning = false;
+	Application::instanceId = 0;
 }
 
 void Application::free() {

@@ -1,9 +1,10 @@
 #include <vector>
 #include "master_event.hh"
 
-void MasterEvent::resRegister( MasterSocket *socket, uint32_t id, bool success ) {
+void MasterEvent::resRegister( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, bool success ) {
 	this->type = success ? MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS : MASTER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE;
-	this->id = id;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
 	this->socket = socket;
 }
 
@@ -16,9 +17,10 @@ void MasterEvent::reqPushLoadStats( MasterSocket *socket, ArrayMap<struct sockad
 	this->message.slaveLoading.overloadedSlaveSet = overloadedSlaveSet;
 }
 
-void MasterEvent::resRemappingSetLock( MasterSocket *socket, uint32_t id, bool isRemapped, Key &key, RemappingRecord &remappingRecord, bool success, uint32_t sockfd ) {
+void MasterEvent::resRemappingSetLock( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, bool isRemapped, Key &key, RemappingRecord &remappingRecord, bool success, uint32_t sockfd ) {
 	this->type = success ? MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_SUCCESS : MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_FAILURE;
-	this->id = id;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
 	this->socket = socket;
 	this->message.remap.key = key;
 	this->message.remap.listId = remappingRecord.listId;
@@ -46,9 +48,10 @@ void MasterEvent::syncRemappingRecords( MasterSocket *socket, std::vector<Packet
 	this->message.remap.syncPackets = packets;
 }
 
-void MasterEvent::resDegradedLock( MasterSocket *socket, uint32_t id, Key &key, bool isLocked, bool isSealed, uint32_t listId, uint32_t stripeId, uint32_t srcDataChunkId, uint32_t dstDataChunkId, uint32_t srcParityChunkId, uint32_t dstParityChunkId ) {
+void MasterEvent::resDegradedLock( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool isLocked, bool isSealed, uint32_t listId, uint32_t stripeId, uint32_t srcDataChunkId, uint32_t dstDataChunkId, uint32_t srcParityChunkId, uint32_t dstParityChunkId ) {
 	this->type = isLocked ? MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED : MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_WAS_LOCKED;
-	this->id = id;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
 	this->socket = socket;
 	this->message.degradedLock.key = key;
 	this->message.degradedLock.listId = listId;
@@ -60,9 +63,10 @@ void MasterEvent::resDegradedLock( MasterSocket *socket, uint32_t id, Key &key, 
 	this->message.degradedLock.isSealed = isSealed;
 }
 
-void MasterEvent::resDegradedLock( MasterSocket *socket, uint32_t id, Key &key, bool exist, uint32_t listId, uint32_t srcDataChunkId, uint32_t srcParityChunkId ) {
+void MasterEvent::resDegradedLock( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool exist, uint32_t listId, uint32_t srcDataChunkId, uint32_t srcParityChunkId ) {
 	this->type = exist ? MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_LOCKED : MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_FOUND;
-	this->id = id;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
 	this->socket = socket;
 	this->message.degradedLock.key = key;
 	this->message.degradedLock.listId = listId;
@@ -70,9 +74,10 @@ void MasterEvent::resDegradedLock( MasterSocket *socket, uint32_t id, Key &key, 
 	this->message.degradedLock.srcParityChunkId = srcParityChunkId;
 }
 
-void MasterEvent::resDegradedLock( MasterSocket *socket, uint32_t id, Key &key, uint32_t listId, uint32_t srcDataChunkId, uint32_t dstDataChunkId, uint32_t srcParityChunkId, uint32_t dstParityChunkId ) {
+void MasterEvent::resDegradedLock( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, uint32_t listId, uint32_t srcDataChunkId, uint32_t dstDataChunkId, uint32_t srcParityChunkId, uint32_t dstParityChunkId ) {
 	this->type = MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_REMAPPED;
-	this->id = id;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
 	this->socket = socket;
 	this->message.degradedLock.key = key;
 	this->message.degradedLock.listId = listId;

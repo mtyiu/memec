@@ -27,6 +27,7 @@ void ApplicationWorker::dispatch( ApplicationEvent event ) {
 
 void ApplicationWorker::dispatch( MasterEvent event ) {
 	bool connected, isSend;
+	uint16_t instanceId = Application::instanceId;
 	uint32_t requestId;
 	ssize_t ret;
 	struct {
@@ -54,7 +55,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 			valueSize = ( size_t ) ret;
 			buffer.data = this->protocol.reqSet(
 				buffer.size,
-				requestId,
+				instanceId, requestId,
 				event.message.set.key,
 				event.message.set.keySize,
 				this->buffer.value,
@@ -65,7 +66,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 		case MASTER_EVENT_TYPE_GET_REQUEST:
 			buffer.data = this->protocol.reqGet(
 				buffer.size,
-				requestId,
+				instanceId, requestId,
 				event.message.get.key,
 				event.message.get.keySize
 			);
@@ -82,7 +83,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 			valueSize = ( size_t ) ret;
 			buffer.data = this->protocol.reqUpdate(
 				buffer.size,
-				requestId,
+				instanceId, requestId,
 				event.message.update.key,
 				event.message.update.keySize,
 				this->buffer.value,
@@ -94,7 +95,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 		case MASTER_EVENT_TYPE_DELETE_REQUEST:
 			buffer.data = this->protocol.reqDelete(
 				buffer.size,
-				requestId,
+				instanceId, requestId,
 				event.message.del.key,
 				event.message.del.keySize
 			);
@@ -216,6 +217,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 				case PROTO_OPCODE_REGISTER:
 					if ( success ) {
 						event.socket->registered = true;
+						Application::instanceId = header.instanceId;
 					} else {
 						__ERROR__( "ApplicationWorker", "dispatch", "Failed to register with master." );
 					}

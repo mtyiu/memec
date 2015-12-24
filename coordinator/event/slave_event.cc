@@ -5,9 +5,10 @@ void SlaveEvent::pending( SlaveSocket *socket ) {
 	this->socket = socket;
 }
 
-void SlaveEvent::resRegister( SlaveSocket *socket, uint32_t id, bool success ) {
+void SlaveEvent::resRegister( SlaveSocket *socket, uint16_t instanceId, uint32_t requestId, bool success ) {
 	this->type = success ? SLAVE_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS : SLAVE_EVENT_TYPE_REGISTER_RESPONSE_FAILURE;
-	this->id = id;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
 	this->socket = socket;
 }
 
@@ -48,6 +49,15 @@ void SlaveEvent::reqReleaseDegradedLock( SlaveSocket *socket, bool *done ) {
 	this->type = SLAVE_EVENT_TYPE_REQUEST_RELEASE_DEGRADED_LOCK;
 	this->socket = socket;
 	this->message.degraded.done = done;
+}
+
+void SlaveEvent::resHeartbeat( SlaveSocket *socket, uint32_t timestamp, uint32_t sealed, uint32_t keys, bool isLast ) {
+	this->type = SLAVE_EVENT_TYPE_RESPONSE_HEARTBEAT;
+	this->socket = socket;
+	this->message.heartbeat.timestamp = timestamp;
+	this->message.heartbeat.sealed = sealed;
+	this->message.heartbeat.keys = keys;
+	this->message.heartbeat.isLast = isLast;
 }
 
 void SlaveEvent::disconnect( SlaveSocket *socket ) {

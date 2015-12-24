@@ -2,6 +2,7 @@
 #include "master_socket.hh"
 #include "../main/master.hh"
 #include "../../common/util/debug.hh"
+#include "../../common/ds/instance_id_generator.hh"
 
 #define SOCKET_COLOR YELLOW
 
@@ -59,6 +60,7 @@ void *MasterSocket::run( void *argv ) {
 bool MasterSocket::handler( int fd, uint32_t events, void *data ) {
 	MasterSocket *socket = ( MasterSocket * ) data;
 	static Master *master = Master::getInstance();
+	static InstanceIdGenerator *generator = InstanceIdGenerator::getInstance();
 
 	///////////////////////////////////////////////////////////////////////////
 	if ( ! ( events & EPOLLIN ) && ( ( events & EPOLLERR ) || ( events & EPOLLHUP ) || ( events & EPOLLRDHUP ) ) ) {
@@ -131,7 +133,8 @@ bool MasterSocket::handler( int fd, uint32_t events, void *data ) {
 						socket->done( fd ); // The socket is valid
 
 						ApplicationEvent event;
-						event.resRegister( applicationSocket, header.id );
+						uint16_t instanceId = generator->generate( applicationSocket );
+						event.resRegister( applicationSocket, instanceId, header.requestId );
 						master->eventQueue.insert( event );
 					} else {
 						::close( fd );

@@ -1,9 +1,9 @@
 #include "protocol.hh"
 
-size_t Protocol::generateAddressHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t addr, uint16_t port, char* buf ) {
+size_t Protocol::generateAddressHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, char* buf ) {
 	if ( ! buf ) buf = this->buffer.send;
 
-	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_ADDRESS_SIZE, id, buf );
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_ADDRESS_SIZE, instanceId, requestId, buf );
 
 	buf += bytes;
 
@@ -40,9 +40,9 @@ bool Protocol::parseAddressHeader( struct AddressHeader &header, char *buf, size
 	);
 }
 
-size_t Protocol::generateSrcDstAddressHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t srcAddr, uint16_t srcPort, uint32_t dstAddr, uint16_t dstPort ) {
+size_t Protocol::generateSrcDstAddressHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t srcAddr, uint16_t srcPort, uint32_t dstAddr, uint16_t dstPort ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_ADDRESS_SIZE * 2, id );
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_ADDRESS_SIZE * 2, instanceId, requestId );
 
 	// Already in network-byte order
 	*( ( uint32_t * )( buf     ) ) = srcAddr;

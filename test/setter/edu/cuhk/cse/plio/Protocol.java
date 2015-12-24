@@ -48,7 +48,7 @@ public class Protocol {
 
 	public static class Header {
 		public byte magic, from, to, opcode;
-		public int length, id;
+		public int length, instanceId, id;
 
 		public boolean isSuccessful() {
 			return this.magic == PROTO_MAGIC_RESPONSE_SUCCESS;
@@ -225,7 +225,7 @@ public class Protocol {
 		this.keyValueUpdateHeader.data = this.buf;
 	}
 
-	public int generateHeader( byte magic, byte to, byte opcode, int length, int id ) {
+	public int generateHeader( byte magic, byte to, byte opcode, int length, int instanceId, int id ) {
 		this.buf[ 0 ]  = ( byte )( magic & 0x07 );
 		this.buf[ 0 ] |= ( byte )( this.from & 0x18 );
 		this.buf[ 0 ] |= ( byte )( to & 0x60 );
@@ -242,8 +242,8 @@ public class Protocol {
 		return PROTO_HEADER_SIZE;
 	}
 
-	public int generateKeyHeader( byte magic, byte to, byte opcode, int id, int keySize, byte[] key ) {
-		int ret = this.generateHeader( magic, to, opcode, PROTO_KEY_SIZE + keySize, id );
+	public int generateKeyHeader( byte magic, byte to, byte opcode, int instanceId, int id, int keySize, byte[] key ) {
+		int ret = this.generateHeader( magic, to, opcode, PROTO_KEY_SIZE + keySize, instanceId, id );
 
 		this.buf[ ret ] = ( byte )( keySize & 0xFF );
 		ret++;
@@ -254,8 +254,8 @@ public class Protocol {
 		return ret;
 	}
 
-	public int generateKeyValueHeader( byte magic, byte to, byte opcode, int id, int keySize, byte[] key, int valueSize, byte[] value ) {
-		int ret = this.generateHeader( magic, to, opcode, PROTO_KEY_VALUE_SIZE + keySize + valueSize, id );
+	public int generateKeyValueHeader( byte magic, byte to, byte opcode, int instanceId, int id, int keySize, byte[] key, int valueSize, byte[] value ) {
+		int ret = this.generateHeader( magic, to, opcode, PROTO_KEY_VALUE_SIZE + keySize + valueSize, instanceId, id );
 
 		this.buf[ ret	  ] = ( byte )( keySize & 0xFF );
 		this.buf[ ret + 1 ] = ( byte )( ( valueSize >> 16 ) & 0xFF );
@@ -275,8 +275,8 @@ public class Protocol {
 		return ret;
 	}
 
-	public int generateKeyValueUpdateHeader( byte magic, byte to, byte opcode, int id, int keySize, byte[] key, int valueUpdateOffset, int valueUpdateSize, byte[] valueUpdate ) {
-		int ret = this.generateHeader( magic, to, opcode, PROTO_KEY_VALUE_UPDATE_SIZE + keySize + ( valueUpdate != null ? valueUpdateSize : 0 ), id );
+	public int generateKeyValueUpdateHeader( byte magic, byte to, byte opcode, int instanceId, int id, int keySize, byte[] key, int valueUpdateOffset, int valueUpdateSize, byte[] valueUpdate ) {
+		int ret = this.generateHeader( magic, to, opcode, PROTO_KEY_VALUE_UPDATE_SIZE + keySize + ( valueUpdate != null ? valueUpdateSize : 0 ), instanceId, id );
 
 		this.buf[ ret	  ] = ( byte )( keySize & 0xFF );
 		this.buf[ ret + 1 ] = ( byte )( ( valueUpdateSize	>> 16 ) & 0xFF );

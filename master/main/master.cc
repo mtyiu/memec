@@ -3,14 +3,17 @@
 #include "master.hh"
 #include "../remap/basic_remap_scheme.hh"
 
+uint16_t Master::instanceId;
+
 Master::Master() {
 	this->isRunning = false;
 	/* Set debug flag */
 	this->debugFlags.isDegraded = false;
+
+	Master::instanceId = 0;
 }
 
 void Master::updateSlavesCurrentLoading() {
-
 	int index = -1;
 	Latency *tempLatency = NULL;
 
@@ -531,6 +534,12 @@ void Master::interactive() {
 		} else if ( strcmp( command, "remapping" ) == 0 ) {
 			valid = true;
 			this->printRemapping();
+		} else if ( strcmp( command, "backup" ) == 0 ) {
+			valid = true;
+			this->printBackup();
+		} else if ( strcmp( command, "metadata" ) == 0 ) {
+			valid = true;
+			this->syncMetadata();
 		} else if ( strncmp( command, "set", 3 ) == 0 ) {
 			valid = this->setDebugFlag( command );
 		} else if ( strcmp( command, "time" ) == 0 ) {
@@ -594,6 +603,7 @@ bool Master::isDegraded( SlaveSocket *socket ) {
 void Master::printPending( FILE *f ) {
 	size_t i;
 	std::unordered_multimap<PendingIdentifier, Key>::iterator it;
+	std::unordered_multimap<PendingIdentifier, KeyValue>::iterator keyValueIt;
 	std::unordered_multimap<PendingIdentifier, KeyValueUpdate>::iterator keyValueUpdateIt;
 	std::unordered_multimap<PendingIdentifier, RemappingRecord>::iterator remappingRecordIt;
 
@@ -607,13 +617,18 @@ void Master::printPending( FILE *f ) {
 	);
 	i = 1;
 	for (
-		it = this->pending.applications.set.begin();
-		it != this->pending.applications.set.end();
-		it++, i++
+		keyValueIt = this->pending.applications.set.begin();
+		keyValueIt != this->pending.applications.set.end();
+		keyValueIt++, i++
 	) {
-		const PendingIdentifier &pid = it->first;
-		const Key &key = it->second;
-		fprintf( f, "%lu. ID: %u; Key: %.*s (size = %u); source: ", i, it->first.id, key.size, key.data, key.size );
+		const PendingIdentifier &pid = keyValueIt->first;
+		KeyValue &keyValue = keyValueIt->second;
+		Key key = keyValue.key();
+		fprintf(
+			f, "%lu. ID: (%u, %u); Key: %.*s (size = %u); source: ",
+			i, keyValueIt->first.instanceId, keyValueIt->first.requestId,
+			key.size, key.data, key.size
+		);
 		( ( Socket * ) pid.ptr )->printAddress( f );
 
 		for ( uint8_t i = 0; i < key.size; i++ ) {
@@ -640,7 +655,11 @@ void Master::printPending( FILE *f ) {
 	) {
 		const PendingIdentifier &pid = it->first;
 		const Key &key = it->second;
-		fprintf( f, "%lu. ID: %u; Key: %.*s (size = %u); source: ", i, it->first.id, key.size, key.data, key.size );
+		fprintf(
+			f, "%lu. ID: (%u, %u); Key: %.*s (size = %u); source: ",
+			i, it->first.instanceId, it->first.requestId,
+			key.size, key.data, key.size
+		);
 		if ( pid.ptr )
 			( ( Socket * ) pid.ptr )->printAddress( f );
 		else
@@ -664,8 +683,9 @@ void Master::printPending( FILE *f ) {
 		const PendingIdentifier &pid = it->first;
 		const KeyValueUpdate &keyValueUpdate = keyValueUpdateIt->second;
 		fprintf(
-			f, "%lu. ID: %u; Key: %.*s (size = %u, offset = %u, length = %u); source: ",
-			i, keyValueUpdateIt->first.id, keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
+			f, "%lu. ID: (%u, %u); Key: %.*s (size = %u, offset = %u, length = %u); source: ",
+			i, keyValueUpdateIt->first.instanceId, keyValueUpdateIt->first.requestId,
+			keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
 			keyValueUpdate.offset, keyValueUpdate.length
 		);
 		if ( pid.ptr )
@@ -690,7 +710,11 @@ void Master::printPending( FILE *f ) {
 	) {
 		const PendingIdentifier &pid = it->first;
 		const Key &key = it->second;
-		fprintf( f, "%lu. ID: %u; Key: %.*s (size = %u); source: ", i, it->first.id, key.size, key.data, key.size );
+		fprintf(
+			f, "%lu. ID: (%u, %u); Key: %.*s (size = %u); source: ",
+			i, it->first.instanceId, it->first.requestId,
+			key.size, key.data, key.size
+		);
 		if ( pid.ptr )
 			( ( Socket * ) pid.ptr )->printAddress( f );
 		else
@@ -716,7 +740,12 @@ void Master::printPending( FILE *f ) {
 	) {
 		const PendingIdentifier &pid = it->first;
 		const Key &key = it->second;
-		fprintf( f, "%lu. ID: %u, parent ID: %u; Key: %.*s (size = %u); target: ", i, it->first.id, it->first.parentId, key.size, key.data, key.size );
+		fprintf(
+			f, "%lu. ID: (%u, %u), parent ID: (%u, %u); Key: %.*s (size = %u); target: ",
+			i, it->first.instanceId, it->first.requestId,
+			it->first.parentInstanceId, it->first.parentRequestId,
+			key.size, key.data, key.size
+		);
 		( ( Socket * ) pid.ptr )->printAddress( f );
 		fprintf( f, "\n" );
 	}
@@ -736,7 +765,12 @@ void Master::printPending( FILE *f ) {
 		remappingRecordIt++, i++
 	) {
 		const RemappingRecord &record = remappingRecordIt->second;
-		fprintf( f, "%lu. ID: %u, parent ID: %u; list ID: %u, chunk ID: %u; target: ", i, remappingRecordIt->first.id, remappingRecordIt->first.parentId, record.listId, record.chunkId );
+		fprintf(
+			f, "%lu. ID: (%u, %u), parent ID: (%u, %u); list ID: %u, chunk ID: %u; target: ",
+			i, remappingRecordIt->first.instanceId, remappingRecordIt->first.requestId,
+			remappingRecordIt->first.parentInstanceId, remappingRecordIt->first.parentRequestId,
+			record.listId, record.chunkId
+		);
 		( ( Socket * ) remappingRecordIt->first.ptr )->printAddress( f );
 		fprintf( f, "\n" );
 	}
@@ -756,7 +790,12 @@ void Master::printPending( FILE *f ) {
 	) {
 		const PendingIdentifier &pid = it->first;
 		const Key &key = it->second;
-		fprintf( f, "%lu. ID: %u, parent ID: %u; Key: %.*s (size = %u); target: ", i, it->first.id, it->first.parentId, key.size, key.data, key.size );
+		fprintf(
+			f, "%lu. ID: (%u, %u), parent ID: (%u, %u); Key: %.*s (size = %u); target: ",
+			i, it->first.instanceId, it->first.requestId,
+			it->first.parentInstanceId, it->first.parentRequestId,
+			key.size, key.data, key.size
+		);
 		( ( Socket * ) pid.ptr )->printAddress( f );
 		fprintf( f, "\n" );
 	}
@@ -777,8 +816,10 @@ void Master::printPending( FILE *f ) {
 		const PendingIdentifier &pid = it->first;
 		const KeyValueUpdate &keyValueUpdate = keyValueUpdateIt->second;
 		fprintf(
-			f, "%lu. ID: %u, parent ID: %u; Key: %.*s (size = %u, offset = %u, length = %u); target: ",
-			i, keyValueUpdateIt->first.id, keyValueUpdateIt->first.parentId, keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
+			f, "%lu. ID: (%u, %u), parent ID: (%u, %u); Key: %.*s (size = %u, offset = %u, length = %u); target: ",
+			i, keyValueUpdateIt->first.instanceId, keyValueUpdateIt->first.requestId,
+			keyValueUpdateIt->first.parentInstanceId, keyValueUpdateIt->first.parentRequestId,
+			keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
 			keyValueUpdate.offset, keyValueUpdate.length
 		);
 		if ( pid.ptr )
@@ -803,7 +844,12 @@ void Master::printPending( FILE *f ) {
 	) {
 		const PendingIdentifier &pid = it->first;
 		const Key &key = it->second;
-		fprintf( f, "%lu. ID: %u, parent ID: %u; Key: %.*s (size = %u); target: ", i, it->first.id, it->first.parentId, key.size, key.data, key.size );
+		fprintf(
+			f, "%lu. ID: (%u, %u), parent ID: (%u, %u); Key: %.*s (size = %u); target: ",
+			i, it->first.instanceId, it->first.requestId,
+			it->first.parentInstanceId, it->first.parentRequestId,
+			key.size, key.data, key.size
+		);
 		( ( Socket * ) pid.ptr )->printAddress( f );
 		fprintf( f, "\n" );
 	}
@@ -858,6 +904,58 @@ void Master::printRemapping( FILE *f ) {
 	);
 }
 
+void Master::printBackup( FILE *f ) {
+	SlaveSocket *s;
+	LOCK( &this->sockets.slaves.lock );
+	std::vector<SlaveSocket *> &sockets = this->sockets.slaves.values;
+	for ( size_t i = 0, size = sockets.size(); i < size; i++ ) {
+		s = sockets[ i ];
+		s->printAddress();
+		printf( ":\n" );
+		s->backup.print( f );
+		printf( "\n" );
+	}
+	UNLOCK( &this->sockets.slaves.lock );
+}
+
+void Master::syncMetadata() {
+	uint32_t socketFromId, socketToId;
+	char tmp[ 16 ];
+	SlaveEvent event;
+
+	printf( "Which socket ([0-%lu] or all)? ", this->sockets.slaves.size() - 1 );
+	fflush( stdout );
+	if ( ! fgets( tmp, sizeof( tmp ), stdin ) )
+		return;
+	if ( strncmp( tmp, "all", 3 ) == 0 ) {
+		socketFromId = 0;
+		socketToId = this->sockets.slaves.size();
+	} else if ( sscanf( tmp, "%u", &socketFromId ) != 1 ) {
+		fprintf( stderr, "Invalid socket ID.\n" );
+		return;
+	} else if ( socketFromId >= this->sockets.slaves.size() ) {
+		fprintf( stderr, "The specified socket ID exceeds the range [0-%lu].\n", this->sockets.slaves.size() - 1 );
+		return;
+	} else {
+		socketToId = socketFromId + 1;
+	}
+
+	for ( uint32_t socketId = socketFromId; socketId < socketToId; socketId++ ) {
+		SlaveSocket *socket = this->sockets.slaves.values[ socketId ];
+		if ( ! socket ) {
+			fprintf( stderr, "Unknown socket ID!\n" );
+			return;
+		}
+
+		event.syncMetadata( socket );
+		this->eventQueue.insert( event );
+
+		printf( "Synchronize metadata backup for the slave: (#%u) ", socketId );
+		socket->printAddress();
+		printf( "\n" );
+	}
+}
+
 void Master::help() {
 	fprintf(
 		stdout,
@@ -867,6 +965,8 @@ void Master::help() {
 		"- debug: Show debug messages\n"
 		"- pending: Show all pending requests\n"
 		"- remapping: Show remapping info\n"
+		"- backup: Show backup info\n"
+		"- metadata: Synchronize metadata backup for a particular slave\n"
 		"- set: Set debug flag (degraded = [true|false])\n"
 		"- time: Show elapsed time\n"
 		"- exit: Terminate this client\n"

@@ -107,8 +107,8 @@ public:
 
 	~Pending() {}
 
-	bool insertReconstruction( uint32_t id, uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds, pthread_mutex_t *&lock, pthread_cond_t *&cond ) {
-		PendingIdentifier pid( id, id, 0 );
+	bool insertReconstruction( uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds, pthread_mutex_t *&lock, pthread_cond_t *&cond ) {
+		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
 		PendingReconstruction r;
 
 		r.set( listId, chunkId, stripeIds );
@@ -125,8 +125,8 @@ public:
 		return ret.second;
 	}
 
-	std::unordered_set<uint32_t> *findReconstruction( uint32_t id, uint32_t &listId, uint32_t &chunkId ) {
-		PendingIdentifier pid( id, id, 0 );
+	std::unordered_set<uint32_t> *findReconstruction( uint16_t instanceId, uint32_t requestId, uint32_t &listId, uint32_t &chunkId ) {
+		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
 		std::unordered_map<PendingIdentifier, PendingReconstruction>::iterator it;
 
 		LOCK( &this->reconstructionLock );
@@ -142,8 +142,8 @@ public:
 		return &( it->second.stripeIds );
 	}
 
-	bool eraseReconstruction( uint32_t id, uint32_t listId, uint32_t chunkId, uint32_t numStripes, uint32_t &remaining ) {
-		PendingIdentifier pid( id, id, 0 );
+	bool eraseReconstruction( uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t numStripes, uint32_t &remaining ) {
+		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
 		std::unordered_map<PendingIdentifier, PendingReconstruction>::iterator it;
 		bool ret;
 
@@ -172,8 +172,8 @@ public:
 		return ret;
 	}
 
-	bool insertRecovery( uint32_t id, uint32_t addr, uint16_t port, uint32_t total, struct timespec startTime, SlaveSocket *socket ) {
-		PendingIdentifier pid( id, id, socket );
+	bool insertRecovery( uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t total, struct timespec startTime, SlaveSocket *socket ) {
+		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
 		PendingRecovery r( addr, port, total, startTime, socket );
 
 		std::pair<PendingIdentifier, PendingRecovery> p( pid, r );
@@ -186,8 +186,8 @@ public:
 		return ret.second;
 	}
 
-	bool eraseRecovery( uint32_t id, uint32_t addr, uint16_t port, uint32_t numReconstructed, SlaveSocket *socket, uint32_t &remaining, uint32_t &total, double &elapsedTime ) {
-		PendingIdentifier pid( id, id, socket );
+	bool eraseRecovery( uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t numReconstructed, SlaveSocket *socket, uint32_t &remaining, uint32_t &total, double &elapsedTime ) {
+		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
 		std::unordered_map<PendingIdentifier, PendingRecovery>::iterator it;
 		bool ret;
 

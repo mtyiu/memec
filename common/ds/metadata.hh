@@ -83,6 +83,11 @@ public:
 	uint8_t opcode;
 };
 
+class MetadataBackup : public OpMetadata {
+public:
+	uint32_t timestamp;
+};
+
 class RemappingRecord {
 public:
 	bool sent;

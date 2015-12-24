@@ -17,18 +17,18 @@ public:
 	CoordinatorProtocol() : Protocol( ROLE_COORDINATOR ) {}
 
 	// ---------- protocol.cc ----------
-	char *reqSyncMeta( size_t &size, uint32_t id );
-	char *reqSealChunks( size_t &size, uint32_t id );
-	char *reqFlushChunks( size_t &size, uint32_t id );
+	char *reqSyncMeta( size_t &size, uint16_t instanceId, uint32_t requestId );
+	char *reqSealChunks( size_t &size, uint16_t instanceId, uint32_t requestId );
+	char *reqFlushChunks( size_t &size, uint16_t instanceId, uint32_t requestId );
 
 	// ---------- register_protocol.cc ----------
-	char *resRegisterMaster( size_t &size, uint32_t id, bool success );
-	char *resRegisterSlave( size_t &size, uint32_t id, bool success );
-	char *announceSlaveConnected( size_t &size, uint32_t id, SlaveSocket *socket );
+	char *resRegisterMaster( size_t &size, uint16_t instanceId, uint32_t requestId, bool success );
+	char *resRegisterSlave( size_t &size, uint16_t instanceId, uint32_t requestId, bool success );
+	char *announceSlaveConnected( size_t &size, uint16_t instanceId, uint32_t requestId, SlaveSocket *socket );
 
 	// ---------- load_protocol.cc ----------
 	char *reqPushLoadStats(
-		size_t &size, uint32_t id,
+		size_t &size, uint16_t instanceId, uint32_t requestId,
 		ArrayMap< struct sockaddr_in, Latency > *slaveGetLatency,
 		ArrayMap< struct sockaddr_in, Latency > *slaveSetLatency,
 		std::set< struct sockaddr_in > *overloadedSlaveSet
@@ -42,7 +42,7 @@ public:
 
 	// ---------- degraded_protocol.cc ----------
 	char *resDegradedLock(
-		size_t &size, uint32_t id,
+		size_t &size, uint16_t instanceId, uint32_t requestId,
 		bool isLocked, bool isSealed,
 		uint8_t keySize, char *key,
 		uint32_t listId, uint32_t stripeId,
@@ -50,20 +50,20 @@ public:
 		uint32_t srcParityChunkId, uint32_t dstParityChunkId
 	);
 	char *resDegradedLock(
-		size_t &size, uint32_t id,
+		size_t &size, uint16_t instanceId, uint32_t requestId,
 		uint8_t keySize, char *key,
 		uint32_t listId,
 		uint32_t srcDataChunkId, uint32_t dstDataChunkId,
 		uint32_t srcParityChunkId, uint32_t dstParityChunkId
 	);
 	char *resDegradedLock(
-		size_t &size, uint32_t id,
+		size_t &size, uint16_t instanceId, uint32_t requestId,
 		bool exist,
 		uint8_t keySize, char *key,
 		uint32_t listId, uint32_t srcDataChunkId, uint32_t srcParityChunkId
 	);
 	char *reqReleaseDegradedLock(
-		size_t &size, uint32_t id,
+		size_t &size, uint16_t instanceId, uint32_t requestId,
 		std::vector<Metadata> &chunks,
 		bool &isCompleted
 	);
@@ -77,34 +77,34 @@ public:
 		size_t offset = 0
 	);
 	char *resRemappingSetLock(
-		size_t &size, uint32_t id, bool success,
+		size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
 		uint32_t listId, uint32_t chunkId,
 		bool isRemapped, uint8_t keySize, char *key,
 		uint32_t sockfd = UINT_MAX
 	);
 	// Forward the whole remapping record message passed in (with the protocol header excluded) pfrom slave to masters
-	char *forwardRemappingRecords( size_t &size, uint32_t id, char *message );
+	char *forwardRemappingRecords( size_t &size, uint16_t instanceId, uint32_t requestId, char *message );
 	// Remapping
 	char *reqSyncRemappingRecord(
-		size_t &size, uint32_t id,
+		size_t &size, uint16_t instanceId, uint32_t requestId,
 		std::unordered_map<Key, RemappingRecord> &remappingRecords,
 		LOCK_T* lock,
 		bool &isLast,
 		char *buffer = 0
 	);
-	char *reqSyncRemappedData( size_t &size, uint32_t id, struct sockaddr_in target, char* buffer = 0 );
+	char *reqSyncRemappedData( size_t &size, uint16_t instanceId, uint32_t requestId, struct sockaddr_in target, char* buffer = 0 );
 
 	// ---------- recovery_protocol.cc ----------
-	char *announceSlaveReconstructed( size_t &size, uint32_t id, SlaveSocket *srcSocket, SlaveSocket *dstSocket );
+	char *announceSlaveReconstructed( size_t &size, uint16_t instanceId, uint32_t requestId, SlaveSocket *srcSocket, SlaveSocket *dstSocket );
 	char *promoteBackupSlave(
-		size_t &size, uint32_t id,
+		size_t &size, uint16_t instanceId, uint32_t requestId,
 		SlaveSocket *srcSocket,
 		std::unordered_set<Metadata> &chunks,
 		std::unordered_set<Metadata>::iterator &it,
 		bool &isCompleted
 	);
 	char *reqReconstruction(
-		size_t &size, uint32_t id,
+		size_t &size, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t chunkId,
 		std::unordered_set<uint32_t> &stripeIds,
 		std::unordered_set<uint32_t>::iterator &it,
@@ -112,6 +112,14 @@ public:
 		bool &isCompleted
 	);
 
+	// ---------- heartbeat_protocol.cc ----------
+	char *resHeartbeat(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		uint32_t timestamp,
+		uint32_t sealed,
+		uint32_t keys,
+		bool isLast
+	);
 };
 
 #endif

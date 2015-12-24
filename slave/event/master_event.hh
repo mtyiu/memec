@@ -28,6 +28,8 @@ enum MasterEventType {
 	// DELETE
 	MASTER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS,
 	MASTER_EVENT_TYPE_DELETE_RESPONSE_FAILURE,
+	// ACK
+	MASTER_EVENT_TYPE_ACK_METADATA,
 	// Pending
 	MASTER_EVENT_TYPE_PENDING
 };
@@ -35,7 +37,8 @@ enum MasterEventType {
 class MasterEvent : public Event {
 public:
 	MasterEventType type;
-	uint32_t id;
+	uint16_t instanceId;
+	uint32_t requestId;
 	bool needsFree;
 	bool isDegraded;
 	MasterSocket *socket;
@@ -47,6 +50,10 @@ public:
 			uint32_t listId;
 			uint32_t stripeId;
 			uint32_t chunkId;
+			bool isSealed;
+			uint32_t sealedListId;
+			uint32_t sealedStripeId;
+			uint32_t sealedChunkId;
 			Key key;
 		} set;
 		struct {
@@ -70,23 +77,29 @@ public:
 			uint32_t sockfd;
 			bool isRemapped;
 		} remap;
+		struct {
+			uint32_t fromTimestamp;
+			uint32_t toTimestamp;
+		} ack;
 	} message;
 
 	// Register
-	void resRegister( MasterSocket *socket, uint32_t id, bool success = true );
+	void resRegister( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, bool success = true );
 	// GET
-	void resGet( MasterSocket *socket, uint32_t id, KeyValue &keyValue, bool isDegraded );
-	void resGet( MasterSocket *socket, uint32_t id, Key &key, bool isDegraded );
+	void resGet( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, KeyValue &keyValue, bool isDegraded );
+	void resGet( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool isDegraded );
 	// SET
-	void resSet( MasterSocket *socket, uint32_t id, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key );
-	void resSet( MasterSocket *socket, uint32_t id, Key &key, bool success );
+	void resSet( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isSealed, uint32_t sealedListId, uint32_t sealedStripeId, uint32_t sealedChunkId, Key &key );
+	void resSet( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool success );
 	// REMAPPING_SET
-	void resRemappingSet( MasterSocket *socket, uint32_t id, Key &key, uint32_t listId, uint32_t chunkId, bool success, bool needsFree, uint32_t sockfd, bool remapped );
+	void resRemappingSet( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, uint32_t listId, uint32_t chunkId, bool success, bool needsFree, uint32_t sockfd, bool remapped );
 	// UPDATE
-	void resUpdate( MasterSocket *socket, uint32_t id, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool success, bool needsFree, bool isDegraded );
+	void resUpdate( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool success, bool needsFree, bool isDegraded );
 	// DELETE
-	void resDelete( MasterSocket *socket, uint32_t id, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key, bool needsFree, bool isDegraded );
-	void resDelete( MasterSocket *socket, uint32_t id, Key &key, bool needsFree, bool isDegraded );
+	void resDelete( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key, bool needsFree, bool isDegraded );
+	void resDelete( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool needsFree, bool isDegraded );
+	// ACK
+	void ackMetadata( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t fromTimestamp, uint32_t toTimestamp );
 	// Pending
 	void pending( MasterSocket *socket );
 };

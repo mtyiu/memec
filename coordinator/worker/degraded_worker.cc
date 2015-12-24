@@ -1,4 +1,5 @@
 #include "worker.hh"
+#include "../main/coordinator.hh"
 
 bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf, size_t size ) {
 	struct DegradedLockReqHeader header;
@@ -25,7 +26,7 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 		if ( remappingRecord.listId != header.listId || remappingRecord.chunkId != header.srcDataChunkId ) {
 			// Reject the degraded operation if the data chunk ID does not match
 			event.resDegradedLock(
-				event.socket, event.id, key,
+				event.socket, event.instanceId, event.requestId, key,
 				header.listId,
 				header.srcDataChunkId, remappingRecord.chunkId,
 				header.srcParityChunkId, header.srcParityChunkId
@@ -44,7 +45,7 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 	if ( ! map->findMetadataByKey( header.key, header.keySize, srcMetadata ) ) {
 		// Key not found
 		event.resDegradedLock(
-			event.socket, event.id,
+			event.socket, event.instanceId, event.requestId,
 			key, false,
 			header.listId, header.srcDataChunkId, header.srcParityChunkId
 		);
@@ -52,7 +53,7 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 	} else if ( header.srcDataChunkId != header.dstDataChunkId && map->findDegradedLock( srcMetadata.listId, srcMetadata.stripeId, header.srcDataChunkId, dstMetadata ) ) {
 		// The chunk is already locked
 		event.resDegradedLock(
-			event.socket, event.id, key,
+			event.socket, event.instanceId, event.requestId, key,
 			dstMetadata.listId == header.listId && dstMetadata.chunkId == header.dstDataChunkId, // the degraded lock is attained
 			map->isSealed( srcMetadata ), // the chunk is sealed
 			srcMetadata.listId, srcMetadata.stripeId,
@@ -62,7 +63,7 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 	} else if ( header.srcParityChunkId != header.dstParityChunkId && map->findDegradedLock( srcMetadata.listId, srcMetadata.stripeId, header.srcParityChunkId, dstMetadata ) ) {
 		// The chunk is already locked
 		event.resDegradedLock(
-			event.socket, event.id, key,
+			event.socket, event.instanceId, event.requestId, key,
 			dstMetadata.listId == header.listId && dstMetadata.chunkId == header.dstParityChunkId, // the degraded lock is attained
 			map->isSealed( srcMetadata ), // the chunk is sealed
 			srcMetadata.listId, srcMetadata.stripeId,
@@ -72,7 +73,7 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 	} else if ( header.srcDataChunkId == header.dstDataChunkId && header.srcParityChunkId == header.dstParityChunkId ) {
 		// No need to lock
 		event.resDegradedLock(
-			event.socket, event.id,
+			event.socket, event.instanceId, event.requestId,
 			key, true,
 			srcMetadata.listId,
 			header.srcDataChunkId,
@@ -99,7 +100,7 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 		if ( exist ) {
 			// Reject the lock request
 			event.resDegradedLock(
-				event.socket, event.id,
+				event.socket, event.instanceId, event.requestId,
 				key, true,
 				srcMetadata.listId,
 				header.srcDataChunkId,
@@ -118,7 +119,7 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 			}
 
 			event.resDegradedLock(
-				event.socket, event.id, key,
+				event.socket, event.instanceId, event.requestId, key,
 				true,                         // the degraded lock is attained
 				map->isSealed( srcMetadata ), // the chunk is sealed
 				srcMetadata.listId, srcMetadata.stripeId,
@@ -137,6 +138,7 @@ bool CoordinatorWorker::handleReleaseDegradedLockRequest( SlaveSocket *socket, b
 	Metadata dst;
 	SlaveSocket *dstSocket;
 	bool isCompleted, connected;
+	uint16_t instanceId;
 	uint32_t requestId;
 	ssize_t ret;
 	struct {
@@ -170,6 +172,7 @@ bool CoordinatorWorker::handleReleaseDegradedLockRequest( SlaveSocket *socket, b
 	}
 
 	// Update pending map
+	instanceId = Coordinator::instanceId;
 	requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
 
 	for ( chunksIt = chunks.begin(); chunksIt != chunks.end(); chunksIt++ ) {
@@ -183,7 +186,7 @@ bool CoordinatorWorker::handleReleaseDegradedLockRequest( SlaveSocket *socket, b
 		do {
 
 			buffer.data = this->protocol.reqReleaseDegradedLock(
-				buffer.size, requestId, srcs, isCompleted
+				buffer.size, instanceId, requestId, srcs, isCompleted
 			);
 			ret = dstSocket->send( buffer.data, buffer.size, connected );
 			if ( ret != ( ssize_t ) buffer.size )
@@ -205,10 +208,10 @@ bool CoordinatorWorker::handleReleaseDegradedLockResponse( SlaveEvent event, cha
 	__DEBUG__(
 		BLUE, "CoordinatorWorker", "handleReleaseDegradedLockResponse",
 		"[RELEASE_DEGRADED_LOCK] Request ID: %u; Count: %u",
-		event.id, header.count
+		event.instanceId, event.requestId, header.count
 	);
 
-	bool *done = CoordinatorWorker::pending->removeReleaseDegradedLock( event.id, header.count );
+	bool *done = CoordinatorWorker::pending->removeReleaseDegradedLock( event.requestId, header.count );
 	if ( done )
 		*done = true;
 	return true;

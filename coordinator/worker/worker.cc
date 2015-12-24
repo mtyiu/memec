@@ -40,7 +40,7 @@ void CoordinatorWorker::dispatch( CoordinatorEvent event ) {
 		{
 			Packet *packet;
 			std::vector<Packet*> packets;
-			uint32_t counter, id;
+			uint32_t counter, requestId;
 			bool empty = coordinator->pendingRemappingRecords.toSend.empty();
 			MasterEvent masterEvent;
 
@@ -54,13 +54,13 @@ void CoordinatorWorker::dispatch( CoordinatorEvent event ) {
 				break;
 			}
 			do {
-				id = coordinator->idGenerator.nextVal( this->workerId );
-				coordinator->pending.addRemappingRecords( id, event.message.remap.counter, event.message.remap.done );
+				requestId = coordinator->idGenerator.nextVal( this->workerId );
+				coordinator->pending.addRemappingRecords( requestId, event.message.remap.counter, event.message.remap.done );
 
 				packet = coordinator->packetPool.malloc();
 				buffer.data = packet->data;
 				this->protocol.reqSyncRemappingRecord(
-					buffer.size, id,
+					buffer.size, Coordinator::instanceId, requestId,
 					coordinator->pendingRemappingRecords.toSend, 0 /* no need to lock again */,
 					empty, buffer.data
 				);
@@ -103,19 +103,19 @@ void CoordinatorWorker::dispatch( CoordinatorEvent event ) {
 			break;
 		case COORDINATOR_EVENT_TYPE_SYNC_REMAPPED_PARITY:
 		{
-			uint32_t id = coordinator->idGenerator.nextVal( this->workerId );
+			uint32_t requestId = coordinator->idGenerator.nextVal( this->workerId );
 			SlaveEvent slaveEvent;
 
 			// prepare the request for all master
 			Packet *packet = coordinator->packetPool.malloc();
 			buffer.data = packet->data;
 			this->protocol.reqSyncRemappedData(
-				buffer.size, id,
+				buffer.size, Coordinator::instanceId, requestId,
 				event.message.parity.target, buffer.data
 			);
 			packet->size = buffer.size;
 
-			coordinator->pending.insertRemappedDataRequest( id, event.message.parity.counter, event.message.parity.allAcked );
+			coordinator->pending.insertRemappedDataRequest( requestId, event.message.parity.counter, event.message.parity.allAcked );
 
 			LOCK( &coordinator->sockets.slaves.lock );
 			packet->setReferenceCount( coordinator->sockets.slaves.size() );

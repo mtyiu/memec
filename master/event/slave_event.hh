@@ -10,14 +10,16 @@ enum SlaveEventType {
 	SLAVE_EVENT_TYPE_UNDEFINED,
 	SLAVE_EVENT_TYPE_REGISTER_REQUEST,
 	SLAVE_EVENT_TYPE_SEND,
+	SLAVE_EVENT_TYPE_SYNC_METADATA,
 	SLAVE_EVENT_TYPE_PENDING
 };
 
 class SlaveEvent : public Event {
 public:
 	SlaveEventType type;
-	uint32_t id;
 	SlaveSocket *socket;
+	uint16_t instanceId;
+	uint32_t requestId;
 	union {
 		struct {
 			uint32_t addr;
@@ -30,6 +32,7 @@ public:
 
 	void reqRegister( SlaveSocket *socket, uint32_t addr, uint16_t port );
 	void send( SlaveSocket *socket, Packet *packet );
+	void syncMetadata( SlaveSocket *socket );
 	void pending( SlaveSocket *socket );
 };
 

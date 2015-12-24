@@ -86,10 +86,11 @@ private:
 	bool handleGetResponse( SlaveEvent event, bool success, bool isDegraded, char *buf, size_t size );
 	bool handleUpdateResponse( SlaveEvent event, bool success, bool isDegraded, char *buf, size_t size );
 	bool handleDeleteResponse( SlaveEvent event, bool success, bool isDegraded, char *buf, size_t size );
+	bool handleAcknowledgement( SlaveEvent event, uint8_t opcode, char *buf, size_t size );
 
 	// ---------- degraded_worker.cc ----------
 	bool sendDegradedLockRequest(
-		uint32_t parentId, uint8_t opcode,
+		uint16_t parentInstanceId, uint32_t parentRequestId, uint8_t opcode,
 		uint32_t listId,
 		uint32_t dataChunkId, uint32_t newDataChunkId,
 		uint32_t parityChunkId, uint32_t newParityChunkId,

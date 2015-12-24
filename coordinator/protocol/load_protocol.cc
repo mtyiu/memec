@@ -3,7 +3,7 @@
 
 // TODO put into common/ as this is same as  MasterProtocol::reqPushLoadStats
 char *CoordinatorProtocol::reqPushLoadStats(
-		size_t &size, uint32_t id,
+		size_t &size, uint16_t instanceId, uint32_t requestId,
 		ArrayMap< struct sockaddr_in, Latency > *slaveGetLatency,
 		ArrayMap< struct sockaddr_in, Latency > *slaveSetLatency,
 		std::set< struct sockaddr_in > *overloadedSlaveSet )
@@ -12,7 +12,7 @@ char *CoordinatorProtocol::reqPushLoadStats(
 	size = this->generateLoadStatsHeader(
 		PROTO_MAGIC_LOADING_STATS,
 		PROTO_MAGIC_TO_MASTER,
-		id,
+		instanceId, requestId,
 		slaveGetLatency->size(),
 		slaveSetLatency->size(),
 		overloadedSlaveSet->size(),

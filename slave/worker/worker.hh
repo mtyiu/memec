@@ -4,6 +4,7 @@
 #include <vector>
 #include <cstdio>
 #include "worker_role.hh"
+#include "../ack/pending_ack.hh"
 #include "../buffer/mixed_chunk_buffer.hh"
 #include "../buffer/degraded_chunk_buffer.hh"
 #include "../config/slave_config.hh"
@@ -50,6 +51,7 @@ private:
 	static IDGenerator *idGenerator;
 	static ArrayMap<int, SlavePeerSocket> *slavePeers;
 	static Pending *pending;
+	static PendingAck *pendingAck;
 	static ServerAddr *slaveServerAddr;
 	static Coding *coding;
 	static SlaveEventQueue *eventQueue;
@@ -75,6 +77,7 @@ private:
 	// ---------- coordinator_worker.cc ----------
 	void dispatch( CoordinatorEvent event );
 	bool handleSlaveConnectedMsg( CoordinatorEvent event, char *buf, size_t size );
+	bool handleHeartbeatAck( CoordinatorEvent event, char *buf, size_t size );
 
 	// ---------- master_worker.cc ----------
 	void dispatch( MasterEvent event );
@@ -87,7 +90,7 @@ private:
 	void dispatch( SlavePeerEvent event );
 
 	// ---------- slave_peer_req_worker.cc ----------
-	bool handleSlavePeerRegisterRequest( SlavePeerSocket *socket, char *buf, size_t size );
+	bool handleSlavePeerRegisterRequest( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, char *buf, size_t size );
 	bool handleSetRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleGetRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleUpdateRequest( SlavePeerEvent event, char *buf, size_t size );
@@ -124,11 +127,12 @@ private:
 	bool performDegradedRead(
 		MasterSocket *masterSocket,
 		uint32_t listId, uint32_t stripeId, uint32_t lostChunkId,
-		bool isSealed, uint8_t opcode, uint32_t parentId,
+		bool isSealed, uint8_t opcode, uint16_t parentInstanceId, uint32_t parentRequestId,
 		Key *key, KeyValueUpdate *keyValueUpdate = 0
 	);
 	bool sendModifyChunkRequest(
-		uint32_t parentId, uint8_t keySize, char *keyStr,
+		uint16_t parentInstanceId, uint32_t parentRequestId,
+		uint8_t keySize, char *keyStr,
 		Metadata &metadata, uint32_t offset,
 		uint32_t deltaSize, /* valueUpdateSize */
 		uint32_t valueUpdateOffset,

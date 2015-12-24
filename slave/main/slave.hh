@@ -5,6 +5,7 @@
 #include <vector>
 #include <cstdio>
 #include <unistd.h>
+#include "../ack/pending_ack.hh"
 #include "../buffer/mixed_chunk_buffer.hh"
 #include "../buffer/degraded_chunk_buffer.hh"
 #include "../config/slave_config.hh"
@@ -61,6 +62,7 @@ public:
 	} sockets;
 	IDGenerator idGenerator;
 	Pending pending;
+	PendingAck pendingAck;
 	SlaveLoad load;
 	Map map;
 	SlaveEventQueue eventQueue;
@@ -73,6 +75,8 @@ public:
 	DegradedChunkBuffer degradedChunkBuffer;
 	Timestamp timestamp;
 	LOCK_T lock;
+	/* Instance ID (assigned by coordinator) */
+	static uint16_t instanceId;
 
 	static Slave *getInstance() {
 		static Slave slave;

@@ -17,13 +17,15 @@ enum SlaveEventType {
 	SLAVE_EVENT_TYPE_REQUEST_SYNC_META,
 	SLAVE_EVENT_TYPE_PARITY_MIGRATE,
 	SLAVE_EVENT_TYPE_REQUEST_RELEASE_DEGRADED_LOCK,
+	SLAVE_EVENT_TYPE_RESPONSE_HEARTBEAT,
 	SLAVE_EVENT_TYPE_DISCONNECT
 };
 
 class SlaveEvent : public Event {
 public:
 	SlaveEventType type;
-	uint32_t id;
+	uint16_t instanceId;
+	uint32_t requestId;
 	SlaveSocket *socket;
 	union {
 		struct {
@@ -37,10 +39,16 @@ public:
 			Packet *packet;
 		} parity;
 		bool *sync;
+		struct {
+			uint32_t timestamp;
+			uint32_t sealed;
+			uint32_t keys;
+			bool isLast;
+		} heartbeat;
 	} message;
 
 	void pending( SlaveSocket *socket );
-	void resRegister( SlaveSocket *socket, uint32_t id, bool success = true );
+	void resRegister( SlaveSocket *socket, uint16_t instanceId, uint32_t requestId, bool success = true );
 	void announceSlaveConnected( SlaveSocket *socket );
 	void announceSlaveReconstructed( SlaveSocket *srcSocket, SlaveSocket *dstSocket );
 	void reqSealChunks( SlaveSocket *socket );
@@ -48,6 +56,7 @@ public:
 	void reqSyncMeta( SlaveSocket *socket, bool *sync );
 	void reqReleaseDegradedLock( SlaveSocket *socket, bool *done = 0 );
 	void syncRemappedData( SlaveSocket *socket, Packet *packet );
+	void resHeartbeat( SlaveSocket *socket, uint32_t timestamp, uint32_t sealed, uint32_t keys, bool isLast );
 	void disconnect( SlaveSocket *socket );
 };
 

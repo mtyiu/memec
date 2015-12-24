@@ -13,6 +13,11 @@ void SlaveEvent::send( SlaveSocket *socket, Packet *packet ) {
 	this->message.send.packet = packet;
 }
 
+void SlaveEvent::syncMetadata( SlaveSocket *socket ) {
+	this->type = SLAVE_EVENT_TYPE_SYNC_METADATA;
+	this->socket = socket;
+}
+
 void SlaveEvent::pending( SlaveSocket *socket ) {
 	this->type = SLAVE_EVENT_TYPE_PENDING;
 	this->socket = socket;

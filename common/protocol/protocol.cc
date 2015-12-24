@@ -7,7 +7,7 @@
 
 #define PROTO_KEY_VALUE_SIZE	4 // 1 byte for key size, 3 bytes for value size
 
-size_t Protocol::generateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t length, uint32_t id, char *sendBuf ) {
+size_t Protocol::generateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t length, uint16_t instanceId, uint32_t requestId, char *sendBuf ) {
 	size_t bytes = 0;
 	if ( ! sendBuf ) sendBuf = this->buffer.send;
 
@@ -18,13 +18,16 @@ size_t Protocol::generateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint
 	*( ( uint32_t * )( sendBuf + bytes ) ) = htonl( length );
 	bytes += 4;
 
-	*( ( uint32_t * )( sendBuf + bytes ) ) = htonl( id );
+	*( ( uint16_t * )( sendBuf + bytes ) ) = htons( instanceId );
+	bytes += 2;
+
+	*( ( uint32_t * )( sendBuf + bytes ) ) = htonl( requestId );
 	bytes += 4;
 
 	return bytes;
 }
 
-bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t &opcode, uint32_t &length, uint32_t &id, char *buf, size_t size ) {
+bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t &opcode, uint32_t &length, uint16_t &instanceId, uint32_t &requestId, char *buf, size_t size ) {
 	if ( size < PROTO_HEADER_SIZE )
 		return false;
 
@@ -33,7 +36,8 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 	to = buf[ 0 ] & 0x60;
 	opcode = buf[ 1 ] & 0xFF;
 	length = ntohl( *( ( uint32_t * )( buf + 2 ) ) );
-	id = ntohl( *( ( uint32_t * )( buf + 6 ) ) );
+	instanceId = ntohs( *( ( uint32_t * )( buf + 6 ) ) );
+	requestId = ntohl( *( ( uint32_t * )( buf + 8 ) ) );
 
 	switch( magic ) {
 		case PROTO_MAGIC_HEARTBEAT:
@@ -43,9 +47,10 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_MAGIC_ANNOUNCEMENT:
 		case PROTO_MAGIC_LOADING_STATS:
 		case PROTO_MAGIC_REMAPPING:
+		case PROTO_MAGIC_ACKNOWLEDGEMENT:
 			break;
 		default:
-			fprintf( stderr, "Error #1: (magic, from, to, opcode, length, id) = (%x, %x, %x, %x, %u, %u)\n", magic, from, to, opcode, length, id );
+			fprintf( stderr, "Error #1: (magic, from, to, opcode, length, instanceId, requestId) = (%x, %x, %x, %x, %u, %u, %u)\n", magic, from, to, opcode, length, instanceId, requestId );
 			return false;
 	}
 
@@ -56,12 +61,12 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_MAGIC_FROM_SLAVE:
 			break;
 		default:
-			fprintf( stderr, "Error #2: (magic, from, to, opcode, length, id) = (%x, %x, %x, %x, %u, %u)\n", magic, from, to, opcode, length, id );
+			fprintf( stderr, "Error #2: (magic, from, to, opcode, length, instanceId, requestId) = (%x, %x, %x, %x, %u, %u, %u)\n", magic, from, to, opcode, length, instanceId, requestId );
 			return false;
 	}
 
 	if ( to != this->to ) {
-		fprintf( stderr, "Error #3: (magic, from, to, opcode, length, id) = (%x, %x, %x, %x, %u, %u)\n", magic, from, to, opcode, length, id );
+		fprintf( stderr, "Error #3: (magic, from, to, opcode, length, instanceId, requestId) = (%x, %x, %x, %x, %u, %u, %u)\n", magic, from, to, opcode, length, instanceId, requestId );
 		return false;
 	}
 
@@ -95,6 +100,9 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_OPCODE_DEGRADED_LOCK:
 		case PROTO_OPCODE_DEGRADED_UNLOCK:
 
+		case PROTO_OPCODE_ACK_METADATA:
+		case PROTO_OPCODE_ACK_REQUEST:
+
 		case PROTO_OPCODE_REMAPPING_LOCK:
 
 		case PROTO_OPCODE_REMAPPING_UNLOCK:
@@ -107,7 +115,7 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_OPCODE_SET_CHUNK_UNSEALED:
 			break;
 		default:
-			fprintf( stderr, "Error #4: (magic, from, to, opcode, length, id) = (%x, %x, %x, %x, %u, %u)\n", magic, from, to, opcode, length, id );
+			fprintf( stderr, "Error #4: (magic, from, to, opcode, length, instanceId, requestId) = (%x, %x, %x, %x, %u, %u, %u)\n", magic, from, to, opcode, length, instanceId, requestId );
 			return false;
 	}
 
@@ -125,7 +133,8 @@ bool Protocol::parseHeader( struct ProtocolHeader &header, char *buf, size_t siz
 		header.to,
 		header.opcode,
 		header.length,
-		header.id,
+		header.instanceId,
+		header.requestId,
 		buf, size
 	);
 }

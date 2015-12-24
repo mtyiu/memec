@@ -3,6 +3,7 @@
 
 void MasterWorker::dispatch( CoordinatorEvent event ) {
 	bool connected, isSend;
+	uint16_t instanceId = Master::instanceId;
 	uint32_t requestId;
 	ssize_t ret;
 	struct {
@@ -27,6 +28,7 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 			// TODO lock the latency when constructing msg ??
 			buffer.data = this->protocol.reqPushLoadStats(
 				buffer.size,
+				instanceId,
 				requestId,
 				event.message.loading.slaveGetLatency,
 				event.message.loading.slaveSetLatency
@@ -36,7 +38,8 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 		case COORDINATOR_EVENT_TYPE_RESPONSE_SYNC_REMAPPING_RECORDS:
 			buffer.data = this->protocol.resSyncRemappingRecords(
 				buffer.size,
-				event.id
+				event.instanceId,
+				event.requestId
 			);
 			isSend = true;
 			break;
@@ -81,12 +84,14 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 						break;
 				}
 
-				event.id = header.id;
+				event.instanceId = header.instanceId;
+				event.requestId = header.requestId;
 				switch( header.opcode ) {
 					case PROTO_OPCODE_REGISTER:
 						switch( header.magic ) {
 							case PROTO_MAGIC_RESPONSE_SUCCESS:
 								event.socket->registered = true;
+								Master::instanceId = header.instanceId;
 								break;
 							case PROTO_MAGIC_RESPONSE_FAILURE:
 								__ERROR__( "MasterWorker", "dispatch", "Failed to register with coordinator." );
@@ -145,7 +150,7 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 									map->insert( key, remappingRecord );
 								}
 							}
-							event.resSyncRemappingRecords();
+							event.resSyncRemappingRecords( header.instanceId, header.requestId );
 							this->dispatch( event );
 							//map->print();
 						} else {

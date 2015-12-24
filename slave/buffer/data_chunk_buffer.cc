@@ -40,12 +40,14 @@ void DataChunkBuffer::init( uint32_t listId, uint32_t stripeId, uint32_t chunkId
 	}
 }
 
-KeyMetadata DataChunkBuffer::set( SlaveWorker *worker, char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode, uint32_t &stripeId ) {
+KeyMetadata DataChunkBuffer::set( SlaveWorker *worker, char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode, uint32_t &stripeId, bool *isSealed, Metadata *sealed ) {
 	KeyMetadata keyMetadata;
 	uint32_t size = PROTO_KEY_VALUE_SIZE + keySize + valueSize, max = 0, tmp;
 	int index = -1;
 	Chunk *reInsertedChunk = 0, *chunk = 0;
 	char *ptr;
+
+	if ( isSealed ) *isSealed = false;
 
 	// Choose one chunk buffer with minimum free space
 	LOCK( &this->lock );
@@ -116,8 +118,11 @@ KeyMetadata DataChunkBuffer::set( SlaveWorker *worker, char *key, uint8_t keySiz
 			}
 		}
 
-		if ( index == -1 )
-			index = this->flush( worker, false, true );
+		if ( index == -1 ) {
+			// A chunk is sealed
+			if ( isSealed ) *isSealed = true;
+			index = this->flush( worker, false, true, sealed );
+		}
 
 		// Allocate memory in the selected chunk
 		LOCK( this->locks + index );
@@ -142,7 +147,8 @@ KeyMetadata DataChunkBuffer::set( SlaveWorker *worker, char *key, uint8_t keySiz
 	// Flush if the current buffer is full
 	if ( chunk->getSize() + PROTO_KEY_VALUE_SIZE + CHUNK_BUFFER_FLUSH_THRESHOLD >= ChunkBuffer::capacity ) {
 		if ( index != -1 ) {
-			this->flushAt( worker, index, false );
+			if ( isSealed ) *isSealed = true;
+			this->flushAt( worker, index, false, sealed );
 		} else {
 			worker->issueSealChunkRequest( chunk, chunk->lastDelPos );
 #ifdef REINSERTED_CHUNKS_IS_SET
@@ -296,7 +302,7 @@ void DataChunkBuffer::unlock( int index ) {
 	UNLOCK( &this->lock );
 }
 
-uint32_t DataChunkBuffer::flush( SlaveWorker *worker, bool lock, bool lockAtIndex ) {
+uint32_t DataChunkBuffer::flush( SlaveWorker *worker, bool lock, bool lockAtIndex, Metadata *sealed ) {
 	if ( lock )
 		LOCK( &this->lock );
 
@@ -327,7 +333,7 @@ uint32_t DataChunkBuffer::flush( SlaveWorker *worker, bool lock, bool lockAtInde
 	return index;
 }
 
-Chunk *DataChunkBuffer::flushAt( SlaveWorker *worker, int index, bool lock ) {
+Chunk *DataChunkBuffer::flushAt( SlaveWorker *worker, int index, bool lock, Metadata *sealed ) {
 	if ( lock ) {
 		LOCK( &this->lock );
 		LOCK( this->locks + index );
@@ -355,6 +361,13 @@ Chunk *DataChunkBuffer::flushAt( SlaveWorker *worker, int index, bool lock ) {
 		chunk->metadata.stripeId,
 		chunk->metadata.chunkId
 	);
+	if ( sealed ) {
+		sealed->set(
+			chunk->metadata.listId,
+			chunk->metadata.stripeId,
+			chunk->metadata.chunkId
+		);
+	}
 
 	if ( lock ) {
 		UNLOCK( this->locks + index );

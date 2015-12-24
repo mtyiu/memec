@@ -64,8 +64,10 @@
 #define PROTO_OPCODE_DEGRADED_DELETE              0x10
 // Master <-> Slave //
 #define PROTO_OPCODE_REMAPPING_SET                0x12
-#define PROTO_OPCODE_DEGRADED_LOCK                0X13
-#define PROTO_OPCODE_DEGRADED_UNLOCK              0X14
+#define PROTO_OPCODE_DEGRADED_LOCK                0x13
+#define PROTO_OPCODE_DEGRADED_UNLOCK              0x14
+#define PROTO_OPCODE_ACK_METADATA                 0x15
+#define PROTO_OPCODE_ACK_REQUEST                  0x16
 
 // Master <-> Coordinator (20-29) //
 #define PROTO_OPCODE_REMAPPING_LOCK               0x20
@@ -79,6 +81,8 @@
 #define PROTO_OPCODE_GET_CHUNKS                   0x55
 #define PROTO_OPCODE_SET_CHUNK                    0x56
 #define PROTO_OPCODE_SET_CHUNK_UNSEALED           0x57
+
+#define PROTO_UNINITIALIZED_INSTANCE              0
 
 /*********************
  * Key size (1 byte) *
@@ -109,11 +113,12 @@ enum Role {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#define PROTO_HEADER_SIZE 10
+#define PROTO_HEADER_SIZE 12
 struct ProtocolHeader {
 	uint8_t magic, from, to, opcode;
 	uint32_t length; // Content length
-	uint32_t id;
+	uint16_t instanceId;
+	uint32_t requestId;
 };
 
 //////////////
@@ -139,8 +144,9 @@ struct PromoteBackupSlaveHeader {
 //////////////////////////////////////////
 // Heartbeat & metadata synchronization //
 //////////////////////////////////////////
-#define PROTO_HEARTBEAT_SIZE 9
+#define PROTO_HEARTBEAT_SIZE 13
 struct HeartbeatHeader {
+    uint32_t timestamp;
 	uint32_t sealed;
 	uint32_t keys;
 	bool isLast;
@@ -204,15 +210,20 @@ struct KeySlaveHeader {
     char *key;
 };
 
-#define PROTO_KEY_BACKUP_FOR_DATA_SIZE 18
-#define PROTO_KEY_BACKUP_FOR_PARITY_SIZE 2
+#define PROTO_KEY_BACKUP_BASE_SIZE       2
+#define PROTO_KEY_BACKUP_FOR_DATA_SIZE   17
+#define PROTO_KEY_BACKUP_SEALED_SIZE     12
 struct KeyBackupHeader {
     bool isParity;
-    uint32_t timestamp; // Only for data servers
-    uint32_t listId;    // Only for data servers
-    uint32_t stripeId;  // Only for data servers
-    uint32_t chunkId;   // Only for data servers
-    uint8_t keySize;
+	uint8_t keySize;
+    uint32_t timestamp;      // Only for data servers
+    uint32_t listId;         // Only for data servers
+    uint32_t stripeId;       // Only for data servers
+    uint32_t chunkId;        // Only for data servers
+	bool isSealed;           // Only for data servers
+	uint32_t sealedListId;   // Only for data servers && isSealed
+	uint32_t sealedStripeId; // Only for data servers && isSealed
+	uint32_t sealedChunkId;  // Only for data servers && isSealed
     char *key;
 };
 
@@ -438,6 +449,15 @@ struct ChunkKeyValueHeader {
 
 #define PROTO_BUF_MIN_SIZE		65536
 
+/////////////////////
+// Acknowledgement //
+/////////////////////
+#define PROTO_ACK_BASE_SIZE 8
+struct AcknowledgementHeader {
+    uint32_t fromTimestamp;
+    uint32_t toTimestamp;
+};
+
 ///////////////////////////////////////////////////////////////////////////////
 
 class Protocol {
@@ -446,12 +466,12 @@ protected:
 	// ---------- protocol.cc ----------
 	size_t generateHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode,
-		uint32_t length, uint32_t id,
+		uint32_t length, uint16_t instanceId, uint32_t requestId,
 		char *sendBuf = 0
 	);
 	bool parseHeader(
 		uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t &opcode,
-		uint32_t &length, uint32_t &id,
+		uint32_t &length, uint16_t &instanceId, uint32_t &requestId,
 		char *buf, size_t size
 	);
 	//////////////
@@ -459,7 +479,7 @@ protected:
 	//////////////
 	// ---------- address_protocol.cc ----------
 	size_t generateAddressHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t addr, uint16_t port, char* buf = 0
 	);
 	bool parseAddressHeader(
@@ -472,20 +492,20 @@ protected:
 	////////////////////
 	// ---------- address_protocol.cc ----------
 	size_t generateSrcDstAddressHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t srcAddr, uint16_t srcPort,
 		uint32_t dstAddr, uint16_t dstPort
 	);
 	// ---------- recovery_protocol.cc ----------
 	size_t generatePromoteBackupSlaveHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t addr, uint16_t port,
 		std::unordered_set<Metadata> &chunks,
 		std::unordered_set<Metadata>::iterator &it,
 		bool &isCompleted
 	);
 	size_t generatePromoteBackupSlaveHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t addr, uint16_t port, uint32_t numReconstructed
 	);
 	bool parsePromoteBackupSlaveHeader(
@@ -503,13 +523,20 @@ protected:
 	//////////////////////////////////////////
 	// ---------- heartbeat_protocol.cc ----------
 	size_t generateHeartbeatMessage(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t timestamp,
 		LOCK_T *sealedLock, std::unordered_set<Metadata> &sealed, uint32_t &sealedCount,
 		LOCK_T *opsLock, std::unordered_map<Key, OpMetadata> &ops, uint32_t &opsCount,
 		bool &isCompleted
 	);
+	size_t generateHeartbeatMessage(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
+        uint32_t timestamp,
+        uint32_t sealed,
+        uint32_t keys,
+        bool isLast
+	);
 	bool parseHeartbeatHeader(
-		size_t offset, uint32_t &sealed, uint32_t &keys, bool isLast,
+		size_t offset, uint32_t &timestamp, uint32_t &sealed, uint32_t &keys, bool isLast,
 		char *buf, size_t size
 	);
 	bool parseMetadataHeader(
@@ -521,10 +548,18 @@ protected:
 		uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
 		char *&key, char *buf, size_t size
 	);
+	// ---------- fault_protocol.cc ----------
+	size_t generateHeartbeatMessage(
+		uint8_t magic, uint8_t to, uint8_t opcode,
+		uint16_t instanceId, uint32_t requestId, LOCK_T *lock,
+		std::unordered_multimap<uint32_t, Metadata> &sealed, uint32_t &sealedCount,
+		std::unordered_map<Key, MetadataBackup> &ops, uint32_t &opsCount,
+		bool &isCompleted
+	);
 
 	// ---------- remap_protocol.cc ----------
 	size_t generateRemappingRecordMessage(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		LOCK_T *lock, std::unordered_map<Key, RemappingRecord> &remapRecords,
 		size_t &remapCount, char *buf = 0
 	);
@@ -545,7 +580,7 @@ protected:
 	//////////////////////////
 	// ---------- load_protocol.cc ----------
 	size_t generateLoadStatsHeader(
-		uint8_t magic, uint8_t to, uint32_t id,
+		uint8_t magic, uint8_t to, uint16_t instanceId, uint32_t requestId,
 		uint32_t slaveGetCount, uint32_t slaveSetCount, uint32_t slaveOverloadCount,
 		uint32_t recordSize, uint32_t slaveAddrSize
 	);
@@ -559,30 +594,38 @@ protected:
 	///////////////////////
 	// ---------- normal_protocol.cc ----------
 	size_t generateKeyHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint8_t keySize, char *key, char *sendBuf = 0
 	);
 	bool parseKeyHeader( size_t offset, uint8_t &keySize, char *&key, char *buf, size_t size );
 
 	size_t generateKeyBackupHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
+		uint32_t timestamp,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		uint32_t sealedListId, uint32_t sealedStripeId, uint32_t sealedChunkId,
+		uint8_t keySize, char *key, char *sendBuf = 0
+	);
+	size_t generateKeyBackupHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
         uint32_t timestamp,
         uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		uint8_t keySize, char *key, char *sendBuf = 0
 	);
     size_t generateKeyBackupHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint8_t keySize, char *key, char *sendBuf = 0
 	);
 	bool parseKeyBackupHeader(
-        size_t offset, bool &isParity,
+        size_t offset, bool &isParity, uint8_t &keySize,
         uint32_t &timestamp, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
-        uint8_t &keySize, char *&key,
+		bool &isSealed, uint32_t &sealedListId, uint32_t &sealedStripeId, uint32_t &sealedChunkId,
+        char *&key,
         char *buf, size_t size
     );
 
 	size_t generateChunkKeyHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		uint8_t keySize, char *key, char *sendBuf = 0
 	);
@@ -593,7 +636,7 @@ protected:
 	);
 
 	size_t generateChunkKeyValueUpdateHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize,
 		uint32_t chunkUpdateOffset, char *valueUpdate, char *sendBuf = 0
@@ -612,7 +655,7 @@ protected:
 	);
 
 	size_t generateKeyValueHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint8_t keySize, char *key, uint32_t valueSize, char *value, char *sendBuf = 0
 	);
 	bool parseKeyValueHeader(
@@ -622,7 +665,7 @@ protected:
 	);
 
 	size_t generateKeyValueUpdateHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint8_t keySize, char *key,
 		uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate = 0
 	);
@@ -638,7 +681,7 @@ protected:
 	);
 
 	size_t generateChunkUpdateHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		uint32_t offset, uint32_t length, uint32_t updatingChunkId,
 		char *delta = 0, char *sendBuf = 0
@@ -659,7 +702,7 @@ protected:
 	///////////////
 	// ---------- remap_protocol.cc ----------
 	size_t generateRemappingLockHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t chunkId, bool isRemapped,
 		uint8_t keySize, char *key, uint32_t sockfd = UINT_MAX,
 		uint32_t payload = 0
@@ -671,7 +714,7 @@ protected:
 	);
 
 	size_t generateRemappingSetHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t chunkId,
 		uint8_t keySize, char *key,
 		uint32_t valueSize, char *value, char *sendBuf = 0,
@@ -692,7 +735,7 @@ protected:
 	////////////////////////
 	// ---------- degraded_protocol.cc ----------
 	size_t generateDegradedLockReqHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId,
 		uint32_t srcDataChunkId, uint32_t dstDataChunkId,
 		uint32_t srcParityChunkId, uint32_t dstParityChunkId,
@@ -708,24 +751,24 @@ protected:
 	);
 
 	size_t generateDegradedLockResHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint8_t type, uint8_t keySize, char *key, char *&buf
 	);
 	size_t generateDegradedLockResHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		bool isLocked, bool isSealed, uint8_t keySize, char *key,
 		uint32_t listId, uint32_t stripeId,
 		uint32_t srcDataChunkId, uint32_t dstDataChunkId,
 		uint32_t srcParityChunkId, uint32_t dstParityChunkId
 	);
 	size_t generateDegradedLockResHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		bool exist,
 		uint8_t keySize, char *key,
 		uint32_t listId, uint32_t srcDataChunkId, uint32_t srcParityChunkId
 	);
 	size_t generateDegradedLockResHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint8_t keySize, char *key,
 		uint32_t listId,
 		uint32_t srcDataChunkId, uint32_t dstDataChunkId,
@@ -756,7 +799,7 @@ protected:
 	);
 
 	size_t generateDegradedReqHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t stripeId,
 		uint32_t srcDataChunkId, uint32_t dstDataChunkId,
 		uint32_t srcParityChunkId, uint32_t dstParityChunkId,
@@ -764,7 +807,7 @@ protected:
 		uint8_t keySize, char *key
 	);
 	size_t generateDegradedReqHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t stripeId,
 		uint32_t srcDataChunkId, uint32_t dstDataChunkId,
 		uint32_t srcParityChunkId, uint32_t dstParityChunkId,
@@ -782,7 +825,7 @@ protected:
 	);
 
 	size_t generateListStripeKeyHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key
 	);
 	bool parseListStripeKeyHeader(
@@ -792,14 +835,14 @@ protected:
 	);
 
 	size_t generateDegradedReleaseReqHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		std::vector<Metadata> &chunks,
 		bool &isCompleted
 	);
     #define parseDegradedReleaseReqHeader parseChunkHeader
 
 	size_t generateDegradedReleaseResHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t count
 	);
 	bool parseDegradedReleaseResHeader(
@@ -813,7 +856,7 @@ protected:
 	////////////////////
 	// ---------- recovery_protocol.cc ----------
 	size_t generateReconstructionHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t chunkId,
 		std::unordered_set<uint32_t> &stripeIds,
 		std::unordered_set<uint32_t>::iterator &it,
@@ -821,7 +864,7 @@ protected:
 		bool &isCompleted
 	);
 	size_t generateReconstructionHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t chunkId,
 		uint32_t numChunks
 	);
@@ -842,7 +885,7 @@ protected:
 	//////////
 	// ---------- seal_protocol.cc ----------
 	size_t generateChunkSealHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		uint32_t count, uint32_t dataLength, char *sendBuf = 0
 	);
@@ -860,7 +903,7 @@ protected:
 	//////////////////////
 	// ---------- chunk_protocol.cc ----------
 	size_t generateChunkHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *sendBuf = 0
 	);
 	bool parseChunkHeader(
@@ -869,7 +912,7 @@ protected:
 	);
 
 	size_t generateChunksHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t chunkId, std::vector<uint32_t> &stripeIds,
 		uint32_t &count
 	);
@@ -880,7 +923,7 @@ protected:
 	);
 
 	size_t generateChunkDataHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		uint32_t chunkSize, uint32_t chunkOffset, char *chunkData
 	);
@@ -891,7 +934,7 @@ protected:
 	);
 
 	size_t generateChunkKeyValueHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		std::unordered_map<Key, KeyValue> *values,
 		std::unordered_multimap<Metadata, Key> *metadataRev,
@@ -902,6 +945,19 @@ protected:
 	bool parseChunkKeyValueHeader(
 		size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
 		uint32_t &deleted, uint32_t &count, bool &isCompleted, char *&dataPtr,
+		char *buf, size_t size
+	);
+
+	/////////////////////
+	// Acknowledgement //
+	/////////////////////
+	// ---------- ack_protocol.cc ----------
+	size_t generateAcknowledgementHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
+		uint32_t fromTimestamp, uint32_t toTimestamp, char* buf = 0
+	);
+	bool parseAcknowledgementHeader(
+		size_t offset, uint32_t &fromTimestamp, uint32_t &toTimestamp,
 		char *buf, size_t size
 	);
 
@@ -1086,6 +1142,14 @@ public:
 	);
 	bool parseChunkKeyValueHeader(
 		struct ChunkKeyValueHeader &header, char *&ptr,
+		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
+	/////////////////////
+	// Acknowledgement //
+	/////////////////////
+	// ---------- ack_protocol.cc ----------
+	bool parseAcknowledgementHeader(
+		struct AcknowledgementHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 };

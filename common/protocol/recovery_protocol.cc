@@ -1,7 +1,7 @@
 #include "protocol.hh"
 
 size_t Protocol::generatePromoteBackupSlaveHeader(
-	uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+	uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 	uint32_t addr, uint16_t port,
 	std::unordered_set<Metadata> &chunks,
 	std::unordered_set<Metadata>::iterator &it,
@@ -38,14 +38,14 @@ size_t Protocol::generatePromoteBackupSlaveHeader(
 
 	*( ( uint32_t * )( tmp ) ) = htonl( count );
 
-	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, id );
+	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, instanceId, requestId );
 
 	return bytes;
 }
 
-size_t Protocol::generatePromoteBackupSlaveHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t addr, uint16_t port, uint32_t numReconstructed ) {
+size_t Protocol::generatePromoteBackupSlaveHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t numReconstructed ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_PROMOTE_BACKUP_SLAVE_SIZE, id );
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_PROMOTE_BACKUP_SLAVE_SIZE, instanceId, requestId );
 
 	// Already in network-byte order
 	*( ( uint32_t * )( buf     ) ) = addr;
@@ -112,7 +112,7 @@ bool Protocol::parsePromoteBackupSlaveHeader( struct PromoteBackupSlaveHeader &h
 	}
 }
 
-size_t Protocol::generateReconstructionHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds, std::unordered_set<uint32_t>::iterator &it, uint32_t numChunks, bool &isCompleted ) {
+size_t Protocol::generateReconstructionHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds, std::unordered_set<uint32_t>::iterator &it, uint32_t numChunks, bool &isCompleted ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes;
 	uint32_t count = 0;
@@ -142,14 +142,14 @@ size_t Protocol::generateReconstructionHeader( uint8_t magic, uint8_t to, uint8_
 
 	*numStripes = htonl( count );
 
-	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, id, this->buffer.send );
+	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, instanceId, requestId, this->buffer.send );
 
 	return bytes;
 }
 
-size_t Protocol::generateReconstructionHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id, uint32_t listId, uint32_t chunkId, uint32_t numChunks ) {
+size_t Protocol::generateReconstructionHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t numChunks ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_RECONSTRUCTION_SIZE, id, this->buffer.send );
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_RECONSTRUCTION_SIZE, instanceId, requestId, this->buffer.send );
 
 	*( ( uint32_t * )( buf     ) ) = htonl( listId );
 	*( ( uint32_t * )( buf + 4 ) ) = htonl( chunkId );
