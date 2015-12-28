@@ -200,9 +200,9 @@ public:
 	);
 
 	// Find
-	bool findKey(
+	bool findKeyValue(
 		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr,
-		Key *keyPtr,
+		KeyValue *keyValuePtr,
 		bool checkKey = false, char *checkKeyPtr = 0
 	);
 	bool findKeyValueUpdate(
