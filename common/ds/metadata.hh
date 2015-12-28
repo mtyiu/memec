@@ -81,12 +81,10 @@ public:
 class OpMetadata : public Metadata {
 public:
 	uint8_t opcode;
-};
-
-class MetadataBackup : public OpMetadata {
-public:
 	uint32_t timestamp;
 };
+
+class MetadataBackup : public OpMetadata {};
 
 class RemappingRecord {
 public:

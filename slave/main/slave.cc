@@ -158,6 +158,7 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 		}
 	}
 	// Map //
+	this->map.setTimestamp( &this->timestamp );
 	this->degradedChunkBuffer.map.init( &this->map );
 
 	/* Workers, ID generator, packet pool and event queues */
@@ -606,6 +607,9 @@ void Slave::interactive() {
 		} else if ( strcmp( command, "debug" ) == 0 ) {
 			valid = true;
 			this->debug();
+		} else if ( strcmp( command, "id" ) == 0 ) {
+			valid = true;
+			this->printInstanceId();
 		} else if ( strcmp( command, "dump" ) == 0 ) {
 			valid = true;
 			this->dump();
@@ -904,6 +908,10 @@ void Slave::dump() {
 	this->map.dump();
 }
 
+void Slave::printInstanceId( FILE *f ) {
+	fprintf( f, "Instance ID = %u\n", Slave::instanceId );
+}
+
 void Slave::help() {
 	fprintf(
 		stdout,
@@ -911,6 +919,7 @@ void Slave::help() {
 		"- help: Show this help message\n"
 		"- info: Show configuration\n"
 		"- debug: Show debug messages\n"
+		"- id: Print instance ID\n"
 		"- seal: Seal all chunks in the chunk buffer\n"
 		"- flush: Flush all dirty chunks to disk\n"
 		"- metadata: Write metadata to disk\n"

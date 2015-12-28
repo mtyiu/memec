@@ -13,10 +13,12 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 
 	switch( event.type ) {
 		case SLAVE_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
+			event.socket->instanceId = event.instanceId;
 			buffer.data = this->protocol.resRegisterSlave( buffer.size, event.instanceId, event.requestId, true );
 			isSend = true;
 			break;
 		case SLAVE_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
+			event.socket->instanceId = event.instanceId;
 			buffer.data = this->protocol.resRegisterSlave( buffer.size, event.instanceId, event.requestId, false );
 			isSend = true;
 			break;
@@ -304,6 +306,7 @@ bool CoordinatorWorker::processHeartbeat( SlaveEvent event, char *buf, size_t si
 				header.op.stripeId,
 				header.op.chunkId,
 				header.op.opcode,
+				header.op.timestamp,
 				false, false
 			);
 		} else {

@@ -46,14 +46,16 @@ bool Map::insertChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, boo
 	return ret.second;
 }
 
-bool Map::insertKey( char *keyStr, uint8_t keySize, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint8_t opcode, bool needsLock, bool needsUnlock ) {
+bool Map::insertKey( char *keyStr, uint8_t keySize, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint8_t opcode, uint32_t timestamp, bool needsLock, bool needsUnlock ) {
 	Key key;
 	key.set( keySize, keyStr );
 
-	Metadata metadata;
-	metadata.set( listId, stripeId, chunkId );
+	OpMetadata opMetadata;
+	opMetadata.set( listId, stripeId, chunkId );
+	opMetadata.opcode = opcode;
+	opMetadata.timestamp = timestamp;
 
-	std::unordered_map<Key, Metadata>::iterator it;
+	std::unordered_map<Key, OpMetadata>::iterator it;
 	bool ret = true;
 
 	if ( needsLock ) LOCK( &this->keysLock );
@@ -61,8 +63,8 @@ bool Map::insertKey( char *keyStr, uint8_t keySize, uint32_t listId, uint32_t st
 	if ( it == this->keys.end() && ( opcode == PROTO_OPCODE_SET || opcode == PROTO_OPCODE_REMAPPING_SET ) ) {
 		key.dup();
 
-		std::pair<Key, Metadata> p( key, metadata );
-		std::pair<std::unordered_map<Key, Metadata>::iterator, bool> r;
+		std::pair<Key, OpMetadata> p( key, opMetadata );
+		std::pair<std::unordered_map<Key, OpMetadata>::iterator, bool> r;
 
 		r = this->keys.insert( p );
 		this->lockedKeys.erase( key );
@@ -81,7 +83,7 @@ bool Map::insertKey( char *keyStr, uint8_t keySize, uint32_t listId, uint32_t st
 			this->lockedKeys.insert( key );
 		}
 	} else {
-		printf( "Unknown key: %.*s for opcode %d.\n", keySize, keyStr, opcode );
+		printf( "Unknown key: %.*s for opcode %d (timestamp: %u vs. %u).\n", keySize, keyStr, opcode, timestamp, it->second.timestamp );
 		ret = false;
 	}
 	if ( needsUnlock ) UNLOCK( &this->keysLock );
@@ -114,7 +116,7 @@ bool Map::insertDegradedLock( Metadata srcMetadata, Metadata &dstMetadata, bool 
 }
 
 bool Map::findMetadataByKey( char *keyStr, uint8_t keySize, Metadata &metadata ) {
-	std::unordered_map<Key, Metadata>::iterator it;
+	std::unordered_map<Key, OpMetadata>::iterator it;
 	Key key;
 
 	key.set( keySize, keyStr );
@@ -186,7 +188,7 @@ size_t Map::dump( FILE *f ) {
 		fprintf( f, "(None)\n" );
 	} else {
 		/*
-		for ( std::unordered_map<Key, Metadata>::iterator it = this->keys.begin(); it != this->keys.end(); it++ ) {
+		for ( std::unordered_map<Key, OpMetadata>::iterator it = this->keys.begin(); it != this->keys.end(); it++ ) {
 			fprintf(
 				f, "%.*s --> (list ID: %u, stripe ID: %u, chunk ID: %u)\n",
 				it->first.size, it->first.data,
@@ -222,11 +224,11 @@ size_t Map::dump( FILE *f ) {
 
 void Map::persist( FILE *f ) {
 	LOCK( &this->keysLock );
-	for ( std::unordered_map<Key, Metadata>::iterator it = this->keys.begin(); it != this->keys.end(); it++ ) {
+	for ( std::unordered_map<Key, OpMetadata>::iterator it = this->keys.begin(); it != this->keys.end(); it++ ) {
 		Key key = it->first;
-		Metadata metadata = it->second;
+		OpMetadata opMetadata = it->second;
 
-		fprintf( f, "%.*s\t%u\t%u\t%u\n", key.size, key.data, metadata.listId, metadata.stripeId, metadata.chunkId );
+		fprintf( f, "%.*s\t%u\t%u\t%u\n", key.size, key.data, opMetadata.listId, opMetadata.stripeId, opMetadata.chunkId );
 	}
 	UNLOCK( &this->keysLock );
 }

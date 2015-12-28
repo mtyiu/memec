@@ -33,8 +33,8 @@ bool CoordinatorWorker::handleRemappingSetLockRequest( MasterEvent event, char *
 	RemappingRecord remappingRecord( header.listId, header.chunkId );
 	if ( map->insertKey(
 		header.key, header.keySize, header.listId, 0,
-		header.chunkId, PROTO_OPCODE_REMAPPING_LOCK,
-		true, true)
+		header.chunkId, PROTO_OPCODE_REMAPPING_LOCK, 0 /* timestamp */,
+		true, true )
 	) {
 		if ( header.isRemapped ) {
 			uint32_t originalChunkId;

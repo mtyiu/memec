@@ -118,7 +118,7 @@ bool CoordinatorRemapMsgHandler::stop() {
 				continue; \
 			}  \
 			/* set state for sync. and to avoid multiple start from others */ \
-			this->slavesState[ _ALL_SLAVES_->at(i) ] = ( start )? REMAP_INTERMEDIATE : REMAP_COORDINATED; \
+			this->slavesState[ _ALL_SLAVES_->at(i) ] = ( start ) ? REMAP_INTERMEDIATE : REMAP_COORDINATED; \
 			/* reset ack pool anyway */\
 			this->resetMasterAck( _ALL_SLAVES_->at(i) ); \
 			_CHECKED_SLAVES_.push_back( _ALL_SLAVES_->at(i) ); \
@@ -157,13 +157,48 @@ bool CoordinatorRemapMsgHandler::transitToDegraded( std::vector<struct sockaddr_
 	event.start = true;
 	vector<struct sockaddr_in> slavesToStart;
 
+	printf( "transitToDegraded() start\n" );
+
 	REMAP_PHASE_CHANGE_HANDLER( slaves, slavesToStart, event );
+
+	printf( "transitToDegraded() end\n" );
 
 	return true;
 }
 
 bool CoordinatorRemapMsgHandler::transitToDegradedEnd( const struct sockaddr_in &slave ) {
-	// all operation to slave get lock from coordinator,
+	// all operation to slave get lock from coordinator
+	Coordinator *coordinator = Coordinator::getInstance();
+	LOCK_T *lock = &coordinator->sockets.slaves.lock;
+	std::vector<SlaveSocket *> &slaves = coordinator->sockets.slaves.values;
+	SlaveSocket *target = 0;
+
+	LOCK( lock );
+	for ( size_t i = 0, size = slaves.size(); i < size; i++ ) {
+		if ( slaves[ i ]->equal( slave.sin_addr.s_addr, slave.sin_port ) ) {
+			target = slaves[ i ];
+			break;
+		}
+	}
+	UNLOCK( lock );
+
+	if ( target ) {
+		PendingTransition *pendingTransition = coordinator->pending.findPendingTransition( target->instanceId, true );
+
+		if ( pendingTransition ) {
+			pthread_mutex_lock( &pendingTransition->lock );
+			while ( pendingTransition->pending )
+				pthread_cond_wait( &pendingTransition->cond, &pendingTransition->lock );
+			pthread_mutex_unlock( &pendingTransition->lock );
+		} else {
+			fprintf( stderr, "Pending transition not found.\n" );
+		}
+	} else {
+		fprintf( stderr, "Slave not found.\n" );
+	}
+
+	printf( "Switching to degraded state...\n" );
+
 	return true;
 }
 
@@ -180,7 +215,7 @@ bool CoordinatorRemapMsgHandler::transitToNormal( std::vector<struct sockaddr_in
 bool CoordinatorRemapMsgHandler::transitToNormalEnd( const struct sockaddr_in &slave ) {
 	// backward migration before getting back to normal
 	Coordinator *coordinator = Coordinator::getInstance();
-	
+
 	// REMAP SET
 	coordinator->syncRemappedData( slave );
 	coordinator->remappingRecords.erase( slave );
@@ -191,6 +226,8 @@ bool CoordinatorRemapMsgHandler::transitToNormalEnd( const struct sockaddr_in &s
 	//bool done = false;
 	//coordinator->releaseDegradedLock( slave, ( bool * ) &done );
 	//while( ! done );
+
+	printf( "Switching to normal state...\n" );
 
 	return true;
 }

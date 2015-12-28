@@ -60,6 +60,18 @@ struct PendingDegradedLock {
 	bool *done;
 };
 
+struct PendingTransition {
+	pthread_mutex_t lock;
+	pthread_cond_t cond;
+	uint32_t pending;
+
+	PendingTransition() {
+		pthread_mutex_init( &this->lock, 0 );
+		pthread_cond_init( &this->cond, 0 );
+		this->pending = 0;
+	}
+};
+
 class Pending {
 private:
 	/*
@@ -70,6 +82,17 @@ private:
 
 	std::unordered_map<uint32_t, PendingDegradedLock> releaseDegradedLock;
 	LOCK_T releaseDegradedLockLock;
+
+	/*
+	 * State transition: (normal -> intermediate) or (degraded -> coordinated normal)
+	 * (Slave instance ID) |-> PendingTransition
+	 */
+	struct {
+		LOCK_T intermediateLock;
+		LOCK_T coordinatedLock;
+		std::unordered_map<uint16_t, PendingTransition> intermediate;
+		std::unordered_map<uint16_t, PendingTransition> coordinated;
+	} transition;
 
 	/*
 	 * syncRemappingRecordCounters: ( packet id, counter for a sync operation )
@@ -98,6 +121,8 @@ public:
 	Pending() {
 		LOCK_INIT( &this->syncMetaLock );
 		LOCK_INIT( &this->releaseDegradedLockLock );
+		LOCK_INIT( &this->transition.intermediateLock );
+		LOCK_INIT( &this->transition.coordinatedLock );
 		LOCK_INIT( &this->syncRemappingRecordLock );
 		LOCK_INIT( &this->reconstructionLock );
 		LOCK_INIT( &this->recoveryLock );
@@ -255,6 +280,42 @@ public:
 		}
 		UNLOCK( &this->releaseDegradedLockLock );
 		return done;
+	}
+
+	bool addPendingTransition( uint16_t instanceId, bool isDegraded, uint32_t pending ) {
+		pthread_mutex_t *lock = isDegraded ? &this->transition.intermediateLock : &this->transition.coordinatedLock;
+		std::unordered_map<uint16_t, PendingTransition>::iterator it;
+		std::unordered_map<uint16_t, PendingTransition> &map = isDegraded ? this->transition.intermediate : this->transition.coordinated;
+		bool ret = true;
+
+		pthread_mutex_lock( lock );
+		it = map.find( instanceId );
+		if ( it == map.end() ) {
+			map[ instanceId ] = PendingTransition();
+			PendingTransition &transition = map[ instanceId ];
+			transition.pending = pending;
+		} else {
+			__ERROR__( "Pending", "addPendingTransition", "This slave (instance ID = %u) is already under transition. This transition is ignored.", instanceId );
+			ret = false;
+		}
+		pthread_mutex_unlock( lock );
+
+		return ret;
+	}
+
+	PendingTransition *findPendingTransition( uint16_t instanceId, bool isDegraded ) {
+		pthread_mutex_t *lock = isDegraded ? &this->transition.intermediateLock : &this->transition.coordinatedLock;
+		std::unordered_map<uint16_t, PendingTransition>::iterator it;
+		std::unordered_map<uint16_t, PendingTransition> &map = isDegraded ? this->transition.intermediate : this->transition.coordinated;
+		PendingTransition *ret = 0;
+
+		pthread_mutex_lock( lock );
+		it = map.find( instanceId );
+		if ( it != map.end() )
+			ret = &( it->second );
+		pthread_mutex_unlock( lock );
+
+		return ret;
 	}
 
 	void addSyncMetaReq( uint32_t id, bool* sync ) {

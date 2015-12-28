@@ -48,6 +48,7 @@ EXTERNAL_LIB= \
 	$(PLIO_SRC_ROOT)/common/protocol/address_protocol.o \
 	$(PLIO_SRC_ROOT)/common/protocol/degraded_protocol.o \
 	$(PLIO_SRC_ROOT)/common/protocol/fault_protocol.o \
+	$(PLIO_SRC_ROOT)/common/protocol/heartbeat_protocol.o \
 	$(PLIO_SRC_ROOT)/common/protocol/load_protocol.o \
 	$(PLIO_SRC_ROOT)/common/protocol/normal_protocol.o \
 	$(PLIO_SRC_ROOT)/common/protocol/remap_protocol.o \
