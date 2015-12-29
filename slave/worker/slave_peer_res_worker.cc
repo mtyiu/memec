@@ -69,8 +69,9 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 
 		if ( success ) {
 			if ( op.opcode == PROTO_OPCODE_DEGRADED_DELETE ) {
+				uint32_t timestamp;
 				metadata.set( op.listId, op.stripeId, op.chunkId );
-				dmap->deleteValue( key, metadata, PROTO_OPCODE_DELETE );
+				dmap->deleteValue( key, metadata, PROTO_OPCODE_DELETE, timestamp );
 				keyValue.free();
 			} else if ( ! isInserted ) {
 				Metadata metadata;
@@ -590,6 +591,8 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 						char *delta = this->buffer.data;
 
 						if ( isKeyValueFound ) {
+							uint32_t timestamp;
+
 							// Insert into master DELETE pending set
 							op.data.key.ptr = op.socket;
 							if ( ! SlaveWorker::pending->insertKey( PT_MASTER_DEL, pid.parentInstanceId, pid.parentRequestId, op.socket, op.data.key ) ) {
@@ -597,7 +600,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 							}
 
 							SlaveWorker::degradedChunkBuffer->deleteKey(
-								PROTO_OPCODE_DELETE,
+								PROTO_OPCODE_DELETE, timestamp,
 								key.size, key.data,
 								metadata,
 								true /* isSealed */,

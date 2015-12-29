@@ -90,14 +90,15 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 		value.set( header.valueSize, header.value );
 		SlaveWorker::pending->insertRemapData( targetAddr, header.listId, header.chunkId, key, value );
 	} else {
-		uint32_t stripeId;
+		uint32_t timestamp, stripeId;
 		bool isSealed;
 		Metadata sealed;
 		SlaveWorker::chunkBuffer->at( header.listId )->set(
 			this,
 			header.key, header.keySize,
 			header.value, header.valueSize,
-			PROTO_OPCODE_REMAPPING_SET, stripeId, header.chunkId,
+			PROTO_OPCODE_REMAPPING_SET, timestamp,
+			stripeId, header.chunkId,
 			&isSealed, &sealed,
 			this->chunks, this->dataChunk, this->parityChunk
 		);
@@ -126,12 +127,12 @@ bool SlaveWorker::handleRemappingSetRequest( SlavePeerEvent event, char *buf, si
 
 	bool isSealed;
 	Metadata sealed;
-	uint32_t stripeId;
+	uint32_t timestamp, stripeId;
 	SlaveWorker::chunkBuffer->at( header.listId )->set(
 		this,
 		header.key, header.keySize,
 		header.value, header.valueSize,
-		PROTO_OPCODE_REMAPPING_SET,
+		PROTO_OPCODE_REMAPPING_SET, timestamp,
 		stripeId,
 		SlaveWorker::chunkBuffer->at( header.listId )->getChunkId(),
 		&isSealed, &sealed,

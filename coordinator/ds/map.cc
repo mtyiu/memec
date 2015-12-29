@@ -56,35 +56,83 @@ bool Map::insertKey( char *keyStr, uint8_t keySize, uint32_t listId, uint32_t st
 	opMetadata.timestamp = timestamp;
 
 	std::unordered_map<Key, OpMetadata>::iterator it;
-	bool ret = true;
+	bool ret = true, exist;
 
 	if ( needsLock ) LOCK( &this->keysLock );
 	it = this->keys.find( key );
-	if ( it == this->keys.end() && ( opcode == PROTO_OPCODE_SET || opcode == PROTO_OPCODE_REMAPPING_SET ) ) {
-		key.dup();
+	exist = it != this->keys.end();
 
-		std::pair<Key, OpMetadata> p( key, opMetadata );
-		std::pair<std::unordered_map<Key, OpMetadata>::iterator, bool> r;
+	switch( opcode ) {
+		case PROTO_OPCODE_SET:
+		case PROTO_OPCODE_REMAPPING_SET:
+			if ( exist ) {
+				if ( it->second.timestamp > timestamp ) {
+					switch( it->second.opcode ) {
+						case PROTO_OPCODE_SET:
+						case PROTO_OPCODE_REMAPPING_SET:
+							// Replace with the latest record
+							it->second = opMetadata;
+							break;
+						case PROTO_OPCODE_DELETE:
+							// This key should be deleted
+							key = it->first;
+							key.free();
+							this->keys.erase( it );
+							break;
+						default:
+							ret = false;
+					}
+				} else {
+					// Replace with the latest record
+					it->second = opMetadata;
+				}
+			} else {
+				key.dup();
 
-		r = this->keys.insert( p );
-		this->lockedKeys.erase( key );
+				std::pair<Key, OpMetadata> p( key, opMetadata );
+				std::pair<std::unordered_map<Key, OpMetadata>::iterator, bool> r;
 
-		ret = r.second;
-	} else if ( it != this->keys.end() && opcode == PROTO_OPCODE_DELETE ) {
-		key = it->first;
-		key.free();
-		this->keys.erase( it );
-	} else if ( it == this->keys.end() && opcode == PROTO_OPCODE_REMAPPING_LOCK ) {
-		// check if lock is already acquired by others
-		if ( this->lockedKeys.count( key ) ) {
+				r = this->keys.insert( p );
+				this->lockedKeys.erase( key );
+
+				ret = r.second;
+			}
+			break;
+		case PROTO_OPCODE_DELETE:
+			if ( exist ) {
+				key = it->first;
+				key.free();
+				this->keys.erase( it );
+			} else {
+				key.dup();
+
+				std::pair<Key, OpMetadata> p( key, opMetadata );
+				std::pair<std::unordered_map<Key, OpMetadata>::iterator, bool> r;
+
+				r = this->keys.insert( p );
+				this->lockedKeys.erase( key );
+
+				ret = r.second;
+			}
+			break;
+		case PROTO_OPCODE_REMAPPING_LOCK:
+			if ( exist ) {
+				fprintf( stderr, "TODO: Map::insertKey(): opcode == PROTO_OPCODE_REMAPPING_LOCK && exist.\n" );
+				ret = false;
+			} else {
+				// check if lock is already acquired by others
+				if ( this->lockedKeys.count( key ) ) {
+					ret = false;
+				} else {
+					key.dup();
+					this->lockedKeys.insert( key );
+				}
+			}
+			break;
+		default:
+			printf( "Unknown opcode %d for key: %.*s for (timestamp: %u vs. %u).\n", opcode, keySize, keyStr, timestamp, it->second.timestamp );
 			ret = false;
-		} else {
-			key.dup();
-			this->lockedKeys.insert( key );
-		}
-	} else {
-		printf( "Unknown key: %.*s for opcode %d (timestamp: %u vs. %u).\n", keySize, keyStr, opcode, timestamp, it->second.timestamp );
-		ret = false;
+			break;
 	}
 	if ( needsUnlock ) UNLOCK( &this->keysLock );
 
