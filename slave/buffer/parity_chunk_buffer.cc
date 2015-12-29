@@ -158,7 +158,6 @@ bool ParityChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t coun
 				offset,
 				prtIt->second.req.seal.offset
 			);
-			exit( 1 );
 		}
 
 		if ( it == this->keys.end() ) {
