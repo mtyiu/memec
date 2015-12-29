@@ -400,15 +400,14 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 		}
 		key = keyValue.key();
 
-		applicationEvent.resSet( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, keyValue, success );
-		MasterWorker::eventQueue->insert( applicationEvent );
-
-		// add a remaping record
+		// add a remapping record
 		if ( ! NO_REMAPPING ) {
-			key.set( header.keySize, header.key );
-			RemappingRecord record ( header.listId, header.chunkId );
+			RemappingRecord record( header.listId, header.chunkId );
 			MasterWorker::remappingRecords->insert( key, record, this->dataSlaveSockets[ originalChunkId ]->getAddr() );
 		}
+
+		applicationEvent.resSet( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, keyValue, success );
+		MasterWorker::eventQueue->insert( applicationEvent );
 	}
 
 #undef NO_REMAPPING

@@ -119,9 +119,9 @@ public:
 	void printLog();
 	void syncSlaveMeta( struct sockaddr_in slave, bool *sync );
 	void releaseDegradedLock();
-	void releaseDegradedLock( struct sockaddr_in slave, bool *done );
+	void releaseDegradedLock( struct sockaddr_in slave, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done );
 	void syncRemappingRecords( LOCK_T *lock, std::map<struct sockaddr_in, uint32_t> *counter, bool *done );
-	void syncRemappedData( struct sockaddr_in target );
+	void syncRemappedData( struct sockaddr_in target, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done );
 	double getElapsedTime();
 	void appendLog( Log log );
 	void interactive();

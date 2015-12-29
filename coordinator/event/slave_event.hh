@@ -33,6 +33,8 @@ public:
 			SlaveSocket *dst;
 		} reconstructed;
 		struct {
+			pthread_mutex_t *lock;
+			pthread_cond_t *cond;
 			bool *done;
 		} degraded;
 		struct {
@@ -54,7 +56,7 @@ public:
 	void reqSealChunks( SlaveSocket *socket );
 	void reqFlushChunks( SlaveSocket *socket );
 	void reqSyncMeta( SlaveSocket *socket, bool *sync );
-	void reqReleaseDegradedLock( SlaveSocket *socket, bool *done = 0 );
+	void reqReleaseDegradedLock( SlaveSocket *socket, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done );
 	void syncRemappedData( SlaveSocket *socket, Packet *packet );
 	void resHeartbeat( SlaveSocket *socket, uint32_t timestamp, uint32_t sealed, uint32_t keys, bool isLast );
 	void disconnect( SlaveSocket *socket );

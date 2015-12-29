@@ -55,8 +55,17 @@ public:
 	}
 };
 
+struct PendingRemapSync {
+	uint32_t count;
+	pthread_mutex_t *lock;
+	pthread_cond_t *cond;
+	bool *done;
+};
+
 struct PendingDegradedLock {
 	uint32_t count;
+	pthread_mutex_t *lock;
+	pthread_cond_t *cond;
 	bool *done;
 };
 
@@ -111,7 +120,7 @@ private:
 	std::map<struct sockaddr_in, Key> syncRemappedData;
 	LOCK_T syncRemappedDataLock;
 
-	std::unordered_map<uint32_t, std::pair< std::set<struct sockaddr_in>*, pthread_cond_t* > > syncRemappedDataRequest;
+	std::unordered_map<uint32_t, PendingRemapSync> syncRemappedDataRequest;
 	LOCK_T syncRemappedDataRequestLock;
 
 	std::unordered_map<PendingIdentifier, PendingRecovery> recovery;
@@ -245,7 +254,7 @@ public:
 		return ret;
 	}
 
-	void addReleaseDegradedLock( uint32_t id, uint32_t count, bool *done ) {
+	void addReleaseDegradedLock( uint32_t id, uint32_t count, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done ) {
 		std::unordered_map<uint32_t, PendingDegradedLock>::iterator it;
 
 		LOCK( &this->releaseDegradedLockLock );
@@ -253,6 +262,8 @@ public:
 		if ( it == this->releaseDegradedLock.end() ) {
 			PendingDegradedLock v;
 			v.count = count;
+			v.lock = lock;
+			v.cond = cond;
 			v.done = done;
 
 			this->releaseDegradedLock[ id ] = v;
@@ -262,16 +273,20 @@ public:
 		UNLOCK( &this->releaseDegradedLockLock );
 	}
 
-	bool *removeReleaseDegradedLock( uint32_t id, uint32_t count ) {
+	void removeReleaseDegradedLock( uint32_t id, uint32_t count, pthread_mutex_t *&lock, pthread_cond_t *&cond, bool *&done ) {
 		std::unordered_map<uint32_t, PendingDegradedLock>::iterator it;
 
-		bool *done = 0;
+		lock = 0;
+		cond = 0;
+		done = 0;
 
 		LOCK( &this->releaseDegradedLockLock );
 		it = this->releaseDegradedLock.find( id );
 		if ( it != this->releaseDegradedLock.end() ) {
 			it->second.count -= count;
 			if ( it->second.count == 0 ) {
+				lock = it->second.lock;
+				cond = it->second.cond;
 				done = it->second.done;
 				this->releaseDegradedLock.erase( it );
 			}
@@ -279,7 +294,6 @@ public:
 			__ERROR__( "Pending", "removeReleaseDegradedLock", "ID: %u Not found.\n", id );
 		}
 		UNLOCK( &this->releaseDegradedLockLock );
-		return done;
 	}
 
 	bool addPendingTransition( uint16_t instanceId, bool isDegraded, uint32_t pending ) {
@@ -313,6 +327,18 @@ public:
 		it = map.find( instanceId );
 		if ( it != map.end() )
 			ret = &( it->second );
+		pthread_mutex_unlock( lock );
+
+		return ret;
+	}
+
+	bool erasePendingTransition( uint16_t instanceId, bool isDegraded ) {
+		pthread_mutex_t *lock = isDegraded ? &this->transition.intermediateLock : &this->transition.coordinatedLock;
+		std::unordered_map<uint16_t, PendingTransition> &map = isDegraded ? this->transition.intermediate : this->transition.coordinated;
+		bool ret;
+
+		pthread_mutex_lock( lock );
+		ret = map.erase( instanceId ) > 0;
 		pthread_mutex_unlock( lock );
 
 		return ret;
@@ -409,32 +435,44 @@ public:
 		return map;
 	}
 
-	bool insertRemappedDataRequest( uint32_t id, std::set<struct sockaddr_in> *counter, pthread_cond_t *cond ) {
+	bool insertRemappedDataRequest( uint32_t id, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done, uint32_t count ) {
+		PendingRemapSync pendingRemapSync;
 		bool ret = false;
+
+		pendingRemapSync.lock = lock;
+		pendingRemapSync.cond = cond;
+		pendingRemapSync.done = done;
+		pendingRemapSync.count = count;
+
 		LOCK( &this->syncRemappedDataRequestLock );
 		if ( this->syncRemappedDataRequest.count( id ) == 0 ) {
-			this->syncRemappedDataRequest[ id ].first = counter;
-			this->syncRemappedDataRequest[ id ].second = cond;
+			this->syncRemappedDataRequest[ id ] = pendingRemapSync;
 			ret = true;
 		}
 		UNLOCK( &this->syncRemappedDataRequestLock );
 		return ret;
 	}
 
-	bool decrementRemappedDataRequest( uint32_t id, struct sockaddr_in target, std::set<struct sockaddr_in> **counter, pthread_cond_t **cond ) {
+	bool decrementRemappedDataRequest( uint32_t id, struct sockaddr_in target, pthread_mutex_t *&lock, pthread_cond_t *&cond, bool *&done, bool &isCompleted ) {
 		LOCK( &this->syncRemappedDataRequestLock );
-		auto it = this->syncRemappedDataRequest.find( id );
+		std::unordered_map<uint32_t, PendingRemapSync>::iterator it = this->syncRemappedDataRequest.find( id );
 		bool ret = ( it != this->syncRemappedDataRequest.end() );
-		if ( ret ) {
-			it->second.first->erase( target );
-			if ( cond ) *cond = it->second.second;
-			if ( counter ) {
-				if ( ! it->second.first->empty() ) {
-					*counter = it->second.first;
-				} else {
-					*counter = 0;
-					this->syncRemappedDataRequest.erase( id );
-				}
+
+		isCompleted = false;
+
+		if ( it != this->syncRemappedDataRequest.end() ) {
+			PendingRemapSync &pendingRemapSync = it->second;
+			pendingRemapSync.count--;
+			if ( pendingRemapSync.count ) {
+				lock = 0;
+				cond = 0;
+				done = 0;
+			} else {
+				lock = pendingRemapSync.lock;
+				cond = pendingRemapSync.cond;
+				done = pendingRemapSync.done;
+				isCompleted = true;
+				this->syncRemappedDataRequest.erase( it );
 			}
 		}
 		UNLOCK( &this->syncRemappedDataRequestLock );

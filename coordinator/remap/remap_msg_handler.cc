@@ -157,11 +157,7 @@ bool CoordinatorRemapMsgHandler::transitToDegraded( std::vector<struct sockaddr_
 	event.start = true;
 	vector<struct sockaddr_in> slavesToStart;
 
-	printf( "transitToDegraded() start\n" );
-
 	REMAP_PHASE_CHANGE_HANDLER( slaves, slavesToStart, event );
-
-	printf( "transitToDegraded() end\n" );
 
 	return true;
 }
@@ -216,16 +212,32 @@ bool CoordinatorRemapMsgHandler::transitToNormalEnd( const struct sockaddr_in &s
 	// backward migration before getting back to normal
 	Coordinator *coordinator = Coordinator::getInstance();
 
+	pthread_mutex_t lock;
+	pthread_cond_t cond;
+	bool done;
+
+	pthread_mutex_init( &lock, 0 );
+	pthread_cond_init( &cond, 0 );
+
 	// REMAP SET
-	coordinator->syncRemappedData( slave );
+	done = false;
+	coordinator->syncRemappedData( slave, &lock, &cond, &done );
+
+	pthread_mutex_lock( &lock );
+	while( ! done )
+		pthread_cond_wait( &cond, &lock );
+	pthread_mutex_unlock( &lock );
+
 	coordinator->remappingRecords.erase( slave );
 
-	// TODO DEGRADED
+	// DEGRADED
+	done = false;
+	coordinator->releaseDegradedLock( slave, &lock, &cond, &done );
 
-	// TO REMOVE?
-	//bool done = false;
-	//coordinator->releaseDegradedLock( slave, ( bool * ) &done );
-	//while( ! done );
+	pthread_mutex_lock( &lock );
+	while( ! done )
+		pthread_cond_wait( &cond, &lock );
+	pthread_mutex_unlock( &lock );
 
 	printf( "Switching to normal state...\n" );
 

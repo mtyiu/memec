@@ -44,7 +44,7 @@ private:
 
 	// ---------- degraded_worker.cc ----------
 	bool handleDegradedLockRequest( MasterEvent event, char *buf, size_t size );
-	bool handleReleaseDegradedLockRequest( SlaveSocket *socket, bool *done = 0 );
+	bool handleReleaseDegradedLockRequest( SlaveSocket *socket, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done );
 	bool handleReleaseDegradedLockResponse( SlaveEvent event, char *buf, size_t size );
 
 	// ---------- recovery_worker.cc ----------

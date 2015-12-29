@@ -401,11 +401,13 @@ bool CoordinatorWorker::handleSyncMetadata( MasterEvent event, char *buf, size_t
 			if ( pendingTransition->pending == 0 )
 				pthread_cond_signal( &pendingTransition->cond );
 			pthread_mutex_unlock( &pendingTransition->lock );
+
+			CoordinatorWorker::pending->erasePendingTransition( target->instanceId, true );
 		} else {
 			__ERROR__( "CoordinatorWorker", "handleSyncMetadata", "Pending transition not found (instance ID: %u).", target->instanceId );
 		}
-	} else {
-		printf( "requestId = %u, heartbeat.isLast = %d, failed = %lu\n", requestId, heartbeat.isLast, failed );
+	// } else {
+	// 	printf( "requestId = %u, heartbeat.isLast = %d, failed = %lu\n", requestId, heartbeat.isLast, failed );
 	}
 
 	return failed == 0;

@@ -322,7 +322,7 @@ uint32_t DataChunkBuffer::flush( SlaveWorker *worker, bool lock, bool lockAtInde
 	if ( lock || lockAtIndex )
 		LOCK( this->locks + index );
 
-	this->flushAt( worker, index, false );
+	this->flushAt( worker, index, false, sealed );
 
 	if ( lock || lockAtIndex )
 		UNLOCK( this->locks + index );

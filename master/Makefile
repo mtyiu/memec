@@ -1,5 +1,5 @@
 CC=g++
-CFLAGS=-std=c++11 -Wall -O2
+CFLAGS=-std=c++11 -Wall -O2 -g
 PLIO_SRC_ROOT=..
 LIBS=-pthread
 BIN=$(PLIO_SRC_ROOT)/bin/master

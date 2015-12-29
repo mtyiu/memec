@@ -132,7 +132,7 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 	return ret;
 }
 
-bool CoordinatorWorker::handleReleaseDegradedLockRequest( SlaveSocket *socket, bool *done ) {
+bool CoordinatorWorker::handleReleaseDegradedLockRequest( SlaveSocket *socket, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done ) {
 	std::unordered_map<Metadata, Metadata>::iterator dlsIt;
 	Map &map = socket->map;
 	Metadata dst;
@@ -167,7 +167,10 @@ bool CoordinatorWorker::handleReleaseDegradedLockRequest( SlaveSocket *socket, b
 
 	if ( chunks.size() == 0 ) {
 		// No chunks needed to be sync.
-		*done = true;
+		if ( lock ) pthread_mutex_lock( lock );
+		if ( done ) *done = true;
+		if ( cond ) pthread_cond_signal( cond );
+		if ( lock ) pthread_mutex_unlock( lock );
 		return true;
 	}
 
@@ -180,7 +183,7 @@ bool CoordinatorWorker::handleReleaseDegradedLockRequest( SlaveSocket *socket, b
 		dst = chunksIt->first;
 		dstSocket = CoordinatorWorker::stripeList->get( dst.listId, dst.chunkId );
 
-		CoordinatorWorker::pending->addReleaseDegradedLock( requestId, srcs.size(), done );
+		CoordinatorWorker::pending->addReleaseDegradedLock( requestId, srcs.size(), lock, cond, done );
 
 		isCompleted = true;
 		do {
@@ -211,8 +214,16 @@ bool CoordinatorWorker::handleReleaseDegradedLockResponse( SlaveEvent event, cha
 		event.instanceId, event.requestId, header.count
 	);
 
-	bool *done = CoordinatorWorker::pending->removeReleaseDegradedLock( event.requestId, header.count );
-	if ( done )
-		*done = true;
+	pthread_mutex_t *lock;
+	pthread_cond_t *cond;
+	bool *done;
+
+	CoordinatorWorker::pending->removeReleaseDegradedLock( event.requestId, header.count, lock, cond, done );
+
+	if ( lock ) pthread_mutex_lock( lock );
+	if ( done ) *done = true;
+	if ( cond ) pthread_cond_signal( cond );
+	if ( lock ) pthread_mutex_unlock( lock );
+
 	return true;
 }

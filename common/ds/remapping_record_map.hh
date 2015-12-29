@@ -26,7 +26,7 @@ public:
 	~RemappingRecordMap() {
 		Key key;
 		std::unordered_map<Key, RemappingRecord>::iterator it, saveptr;
-		for ( it = map.begin(), saveptr = map.begin(); it != map.end(); it = saveptr ) 
+		for ( it = map.begin(), saveptr = map.begin(); it != map.end(); it = saveptr )
 		{
 			saveptr++;
 			key = it->first;
@@ -36,13 +36,13 @@ public:
 			delete it.second;
 	}
 
-	bool insert( Key key, RemappingRecord record, struct sockaddr_in slave = {} ) {
-		LOCK ( &this->lock );
-		std::unordered_map<Key, RemappingRecord>::iterator it = map.find( key );
+	bool insert( Key key, RemappingRecord record, struct sockaddr_in slave ) {
+		LOCK( &this->lock );
+		std::unordered_map<Key, RemappingRecord>::iterator it = this->map.find( key );
 		if ( it != map.end() ) {
 			// do not allow overwriting of remapping records without delete
 			if ( record != it->second ) {
-				UNLOCK ( &this->lock );
+				UNLOCK( &this->lock );
 				return false;
 			}
 		} else {
@@ -54,30 +54,30 @@ public:
 				slaveToKeyMap[ slave ] = new std::unordered_set<Key>();
 			slaveToKeyMap[ slave ]->insert( keyDup );
 		}
-		UNLOCK ( &this->lock );
+		UNLOCK( &this->lock );
 		return true;
 	}
 
-	bool erase( Key key, RemappingRecord record, bool check = true ) {
+	bool erase( Key key, RemappingRecord record, bool check, bool needsLock, bool needsUnlock ) {
 		Key keyDup;
-		LOCK ( &this->lock );
+		if ( needsLock ) LOCK( &this->lock );
 		std::unordered_map<Key, RemappingRecord>::iterator it = map.find( key );
 		if ( it != map.end() ) {
 			// do not allow deleting key records if they are different
 			if ( check && record != it->second ) {
-				UNLOCK ( &this->lock );
+				if ( needsUnlock ) UNLOCK( &this->lock );
 				return false;
 			}
 			keyDup = it->first;
 			map.erase( it );
 			keyDup.free();
 		}
-		UNLOCK ( &this->lock );
+		if ( needsUnlock ) UNLOCK( &this->lock );
 		return true;
 	}
 
 	bool erase( struct sockaddr_in slave ) {
-		LOCK ( &this->lock );
+		LOCK( &this->lock );
 		std::unordered_map<struct sockaddr_in, std::unordered_set<Key>* >::iterator sit = slaveToKeyMap.find( slave );
 		RemappingRecord record;
 		if ( sit != slaveToKeyMap.end() ) {
@@ -85,11 +85,12 @@ public:
 			std::unordered_set<Key>* keys = sit->second;
 			for ( kit = keys->begin(), saveptr = keys->begin(); kit != keys->end(); kit = saveptr ) {
 				saveptr++;
-				this->erase( *kit , record, false );
+				this->erase( *kit , record, false, false, false );
 			}
 			delete keys;
+			slaveToKeyMap.erase( sit );
 		}
-		UNLOCK ( &this->lock );
+		UNLOCK( &this->lock );
 		return true;
 	}
 

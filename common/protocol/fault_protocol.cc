@@ -93,7 +93,7 @@ size_t Protocol::generateMetadataBackupMessage(
 	*opsPtr = htonl( opsCount );
 	*isLastPtr = isCompleted ? 1 : 0;
 
-	printf( "isCompleted = %d; count = %lu\n", isCompleted, ops.size() );
+	// printf( "isCompleted = %d; count = %lu\n", isCompleted, ops.size() );
 
 	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, instanceId, requestId );
 

@@ -56,7 +56,7 @@ SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId
 	RemappingRecord record;
 	bool found = false;
 	// if original slave is not in Normal state, search to see if this key is remapped
-	if ( ! Master::getInstance()->config.master.remap.forceNoCacheRecords && 
+	if ( ! Master::getInstance()->config.master.remap.forceNoCacheRecords &&
 		Master::getInstance()->remapMsgHandler.useCoordinatedFlow( this->dataSlaveSockets[ chunkId ]->getAddr() ) )
 	{
 		found = MasterWorker::remappingRecords->find( key, &record );

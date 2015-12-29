@@ -46,7 +46,12 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			isSend = true;
 			break;
 		case SLAVE_EVENT_TYPE_REQUEST_RELEASE_DEGRADED_LOCK:
-			this->handleReleaseDegradedLockRequest( event.socket, event.message.degraded.done );
+			this->handleReleaseDegradedLockRequest(
+				event.socket,
+				event.message.degraded.lock,
+				event.message.degraded.cond,
+				event.message.degraded.done
+			);
 			isSend = false;
 			break;
 		case SLAVE_EVENT_TYPE_PENDING:
@@ -132,12 +137,11 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 		// Parse requests from slaves
 		ProtocolHeader header;
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();
-		ArrayMap<int, MasterSocket> &masters = Coordinator::getInstance()->sockets.masters;
+
 		while( buffer.size > 0 ) {
 			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "CoordinatorWorker" );
 
 			// avvoid declaring variables after jump statements
-			size_t bytes, offset, count = 0;
 			buffer.data += PROTO_HEADER_SIZE;
 			buffer.size -= PROTO_HEADER_SIZE;
 			// Validate message
@@ -182,7 +186,10 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 							this->processHeartbeat( event, buffer.data, header.length );
 							break;
 						case PROTO_MAGIC_REMAPPING:
-						{
+						/* {
+							ArrayMap<int, MasterSocket> &masters = Coordinator::getInstance()->sockets.masters;
+							size_t bytes, offset, count = 0;
+
 							struct RemappingRecordHeader remappingRecordHeader;
 							struct SlaveSyncRemapHeader slaveSyncRemapHeader;
 							if ( ! this->protocol.parseRemappingRecordHeader( remappingRecordHeader, buffer.data, buffer.size ) ) {
@@ -205,9 +212,9 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 								remappingRecord.set( slaveSyncRemapHeader.listId, slaveSyncRemapHeader.chunkId, 0 );
 
 								if ( slaveSyncRemapHeader.opcode == 0 ) { // remove record
-									map->erase( key, remappingRecord );
+									map->erase( key, remappingRecord, true, true, true );
 								} else if ( slaveSyncRemapHeader.opcode == 1 ) { // add record
-									map->insert( key, remappingRecord );
+									map->insert( key, remappingRecord, {} );
 								}
 							}
 							//map->print();
@@ -225,7 +232,8 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 								);
 								CoordinatorWorker::eventQueue->insert( masterEvent );
 							}
-						}
+						} */
+							printf( "Deprecated: PROTO_MAGIC_REMAPPING.\n" );
 							break;
 						default:
 							__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );
@@ -234,12 +242,23 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 					break;
 				case PROTO_OPCODE_PARITY_MIGRATE:
 				{
-					std::set<struct sockaddr_in> *counter;
-					pthread_cond_t *allAcked;
-					bool found = this->pending->decrementRemappedDataRequest( event.requestId, event.socket->getAddr(), &counter, &allAcked );
-					if ( found && counter == 0 ) {
-						pthread_cond_broadcast( allAcked );
-					} else if ( ! found ) {
+					pthread_mutex_t *lock;
+					pthread_cond_t *cond;
+					bool *done, isCompleted;
+
+					bool found = this->pending->decrementRemappedDataRequest(
+						event.requestId, event.socket->getAddr(),
+						lock, cond, done, isCompleted
+					);
+
+					if ( found ) {
+						if ( isCompleted ) {
+							if ( lock ) pthread_mutex_lock( lock );
+							if ( done ) *done = true;
+							if ( cond ) pthread_cond_signal( cond );
+							if ( lock ) pthread_mutex_unlock( lock );
+						}
+					} else {
 						__ERROR__( "CoordinatorWorker", "dispatch", "Invalid id reply to parity migrate request." );
 					}
 				}
