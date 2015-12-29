@@ -534,12 +534,12 @@ bool SlaveWorker::handleSealChunkRequest( SlavePeerEvent event, char *buf, size_
 }
 
 bool SlaveWorker::issueSealChunkRequest( Chunk *chunk, uint32_t startPos ) {
-	printf(
-		"issueSealChunkRequest(): (%u, %u, %u)\n",
-		chunk->metadata.listId,
-		chunk->metadata.stripeId,
-		chunk->metadata.chunkId
-	);
+	// printf(
+	// 	"issueSealChunkRequest(): (%u, %u, %u)\n",
+	// 	chunk->metadata.listId,
+	// 	chunk->metadata.stripeId,
+	// 	chunk->metadata.chunkId
+	// );
 	// The chunk is locked when this function is called
 	// Only issue seal chunk request when new key-value pairs are received
 	if ( SlaveWorker::parityChunkCount && startPos < chunk->getSize() ) {
