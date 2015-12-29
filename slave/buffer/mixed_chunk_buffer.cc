@@ -32,6 +32,7 @@ bool MixedChunkBuffer::set(
 			return true;
 		case CBR_PARITY:
 			timestamp = 0;
+			if ( isSealed ) *isSealed = false;
 			return this->buffer.parity->set(
 				key, keySize, value, valueSize, chunkId,
 				dataChunks, dataChunk, parityChunk

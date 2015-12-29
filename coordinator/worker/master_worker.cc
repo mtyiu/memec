@@ -345,6 +345,12 @@ bool CoordinatorWorker::handleSyncMetadata( MasterEvent event, char *buf, size_t
 	LOCK( &target->map.chunksLock );
 	for ( count = 0; count < heartbeat.sealed; count++ ) {
 		if ( this->protocol.parseMetadataHeader( header.metadata, processed, buf, size, offset ) ) {
+			// fprintf(
+			// 	stderr, "(%u, %u, %u)\n",
+			// 	header.metadata.listId,
+			// 	header.metadata.stripeId,
+			// 	header.metadata.chunkId
+			// );
 			target->map.insertChunk(
 				header.metadata.listId,
 				header.metadata.stripeId,

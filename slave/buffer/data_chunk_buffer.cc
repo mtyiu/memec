@@ -340,6 +340,13 @@ Chunk *DataChunkBuffer::flushAt( SlaveWorker *worker, int index, bool lock, Meta
 	}
 
 	Chunk *chunk = this->chunks[ index ];
+	if ( sealed ) {
+		sealed->set(
+			chunk->metadata.listId,
+			chunk->metadata.stripeId,
+			chunk->metadata.chunkId
+		);
+	}
 
 	// Get a new chunk
 	this->sizes[ index ] = 0;
@@ -361,13 +368,6 @@ Chunk *DataChunkBuffer::flushAt( SlaveWorker *worker, int index, bool lock, Meta
 		chunk->metadata.stripeId,
 		chunk->metadata.chunkId
 	);
-	if ( sealed ) {
-		sealed->set(
-			chunk->metadata.listId,
-			chunk->metadata.stripeId,
-			chunk->metadata.chunkId
-		);
-	}
 
 	if ( lock ) {
 		UNLOCK( this->locks + index );

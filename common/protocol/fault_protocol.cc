@@ -38,6 +38,7 @@ size_t Protocol::generateMetadataBackupMessage(
 
 	/**** Sealed chunks *****/
 	LOCK( lock );
+	int current = 0;
 	for ( sealedIt = sealed.begin(); sealedIt != sealed.end(); sealedIt++ ) {
 		const Metadata &metadata = sealedIt->second;
 
@@ -45,6 +46,7 @@ size_t Protocol::generateMetadataBackupMessage(
 			maxTimestamp = sealedIt->first;
 
 		if ( this->buffer.size >= bytes + PROTO_METADATA_SIZE ) {
+			// printf( "[%d] (%u, %u, %u)\n", current++, metadata.listId, metadata.stripeId, metadata.chunkId );
 			*( ( uint32_t * )( buf     ) ) = htonl( metadata.listId );
 			*( ( uint32_t * )( buf + 4 ) ) = htonl( metadata.stripeId );
 			*( ( uint32_t * )( buf + 8 ) ) = htonl( metadata.chunkId );
