@@ -68,6 +68,7 @@ public:
 	uint16_t instanceId;
 	uint32_t requestId;
 	SlavePeerSocket *socket;
+	uint32_t timestamp;
 	struct {
 		struct {
 			Metadata metadata;

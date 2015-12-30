@@ -201,6 +201,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 			} else {
 				event.instanceId = header.instanceId;
 				event.requestId = header.requestId;
+				event.timestamp = header.timestamp;
 				switch( header.opcode ) {
 					case PROTO_OPCODE_GET:
 						this->handleGetRequest( event, buffer.data, buffer.size );
@@ -396,7 +397,8 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 				header.valueUpdateOffset,
 				header.valueUpdate,        /* delta */
 				chunkBufferIndex == -1,    /* isSealed */
-				true                      /* isUpdate */
+				true,                      /* isUpdate */
+				event.timestamp
 			);
 		} else {
 			event.resUpdate(

@@ -42,6 +42,7 @@ public:
 	bool needsFree;
 	bool isDegraded;
 	MasterSocket *socket;
+	uint32_t timestamp;
 	union {
 		Key key;
 		KeyValue keyValue;

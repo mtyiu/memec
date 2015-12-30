@@ -224,10 +224,14 @@ bool SlaveWorker::handleUpdateResponse( SlavePeerEvent event, bool success, char
 		__ERROR__( "SlaveWorker", "handleUpdateResponse", "Cannot find a pending slave UPDATE request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		return false;
 	}
+
+	// TODO erase backup
+
 	// Check pending slave UPDATE requests
 	pending = SlaveWorker::pending->count( PT_SLAVE_PEER_UPDATE, pid.instanceId, pid.requestId, false, true );
 
 	__DEBUG__( BLUE, "SlaveWorker", "handleUpdateResponse", "Pending slave UPDATE requests = %d (%s).", pending, success ? "success" : "fail" );
+
 	if ( pending == 0 ) {
 		// Only send master DELETE response when the number of pending slave DELETE requests equal 0
 		MasterEvent masterEvent;
@@ -271,6 +275,9 @@ bool SlaveWorker::handleDeleteResponse( SlavePeerEvent event, bool success, char
 		__ERROR__( "SlaveWorker", "handleDeleteResponse", "Cannot find a pending slave DELETE request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		return false;
 	}
+
+	// TODO erase backup
+
 	// Check pending slave UPDATE requests
 	pending = SlaveWorker::pending->count( PT_SLAVE_PEER_DEL, pid.instanceId, pid.requestId, false, true );
 
@@ -757,10 +764,14 @@ bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success,
 		__ERROR__( "SlaveWorker", "handleUpdateChunkResponse", "Cannot find a pending slave UPDATE_CHUNK request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		return false;
 	}
+
+	// TODO erase backup
+
 	// Check pending slave UPDATE requests
 	pending = SlaveWorker::pending->count( PT_SLAVE_PEER_UPDATE_CHUNK, pid.instanceId, pid.requestId, false, true );
 
 	__DEBUG__( BLUE, "SlaveWorker", "handleUpdateChunkResponse", "Pending slave UPDATE_CHUNK requests = %d (%s).", pending, success ? "success" : "fail" );
+
 	if ( pending == 0 ) {
 		// Only send application UPDATE response when the number of pending slave UPDATE_CHUNK requests equal 0
 		Key key;
@@ -812,6 +823,9 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 		__ERROR__( "SlaveWorker", "handleDeleteChunkResponse", "Cannot find a pending slave DELETE_CHUNK request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		return false;
 	}
+
+	// TODO erase backup
+
 	// Check pending slave UPDATE requests
 	pending = SlaveWorker::pending->count( PT_SLAVE_PEER_DEL_CHUNK, pid.instanceId, pid.requestId, false, true );
 

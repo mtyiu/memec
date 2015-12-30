@@ -1,9 +1,9 @@
 #include "protocol.hh"
 
-size_t Protocol::generateKeyHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint8_t keySize, char *key, char *sendBuf ) {
+size_t Protocol::generateKeyHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint8_t keySize, char *key, char *sendBuf, uint32_t timestamp ) {
 	if ( ! sendBuf ) sendBuf = this->buffer.send;
 	char *buf = sendBuf + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_KEY_SIZE + keySize, instanceId, requestId, sendBuf );
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_KEY_SIZE + keySize, instanceId, requestId, sendBuf, timestamp );
 
 	buf[ 0 ] = keySize;
 
@@ -184,10 +184,10 @@ bool Protocol::parseKeyBackupHeader( struct KeyBackupHeader &header, char *buf, 
 	);
 }
 
-size_t Protocol::generateChunkKeyHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint8_t keySize, char *key, char *sendBuf ) {
+size_t Protocol::generateChunkKeyHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint8_t keySize, char *key, char *sendBuf, uint32_t timestamp ) {
 	if ( ! sendBuf ) sendBuf = this->buffer.send;
 	char *buf = sendBuf + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_CHUNK_KEY_SIZE + keySize, instanceId, requestId, sendBuf );
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_CHUNK_KEY_SIZE + keySize, instanceId, requestId, sendBuf, timestamp );
 
 	*( ( uint32_t * )( buf     ) ) = htonl( listId );
 	*( ( uint32_t * )( buf + 4 ) ) = htonl( stripeId );
@@ -237,10 +237,10 @@ bool Protocol::parseChunkKeyHeader( struct ChunkKeyHeader &header, char *buf, si
 	);
 }
 
-size_t Protocol::generateChunkKeyValueUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t chunkUpdateOffset, char *valueUpdate, char *sendBuf ) {
+size_t Protocol::generateChunkKeyValueUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t chunkUpdateOffset, char *valueUpdate, char *sendBuf, uint32_t timestamp ) {
 	if ( ! sendBuf ) sendBuf = this->buffer.send;
 	char *buf = sendBuf + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_CHUNK_KEY_VALUE_UPDATE_SIZE + keySize + ( valueUpdate ? valueUpdateSize : 0 ), instanceId, requestId, sendBuf );
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_CHUNK_KEY_VALUE_UPDATE_SIZE + keySize + ( valueUpdate ? valueUpdateSize : 0 ), instanceId, requestId, sendBuf, timestamp );
 
 	*( ( uint32_t * )( buf     ) ) = htonl( listId );
 	*( ( uint32_t * )( buf + 4 ) ) = htonl( stripeId );
@@ -402,10 +402,10 @@ bool Protocol::parseChunkKeyValueUpdateHeader( struct ChunkKeyValueUpdateHeader 
 	}
 }
 
-size_t Protocol::generateKeyValueHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint8_t keySize, char *key, uint32_t valueSize, char *value, char *sendBuf ) {
+size_t Protocol::generateKeyValueHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint8_t keySize, char *key, uint32_t valueSize, char *value, char *sendBuf, uint32_t timestamp ) {
 	if ( ! sendBuf ) sendBuf = this->buffer.send;
 	char *buf = sendBuf + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_KEY_VALUE_SIZE + keySize + valueSize, instanceId, requestId, sendBuf );
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_KEY_VALUE_SIZE + keySize + valueSize, instanceId, requestId, sendBuf, timestamp );
 
 	buf[ 0 ] = keySize;
 
@@ -464,12 +464,12 @@ bool Protocol::parseKeyValueHeader( struct KeyValueHeader &header, char *buf, si
 	);
 }
 
-size_t Protocol::generateKeyValueUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate ) {
+size_t Protocol::generateKeyValueUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate, uint32_t timestamp ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader(
 		magic, to, opcode,
 		PROTO_KEY_VALUE_UPDATE_SIZE + keySize + ( valueUpdate ? valueUpdateSize : 0 ),
-		instanceId, requestId
+		instanceId, requestId, 0, timestamp
 	);
 
 	buf[ 0 ] = keySize;
@@ -587,10 +587,10 @@ bool Protocol::parseKeyValueUpdateHeader( struct KeyValueUpdateHeader &header, b
 	}
 }
 
-size_t Protocol::generateChunkUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta, char *sendBuf ) {
+size_t Protocol::generateChunkUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta, char *sendBuf, uint32_t timestamp ) {
 	if ( ! sendBuf ) sendBuf = this->buffer.send;
 	char *buf = sendBuf + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, delta ? PROTO_CHUNK_UPDATE_SIZE + length : PROTO_CHUNK_UPDATE_SIZE, instanceId, requestId, sendBuf );
+	size_t bytes = this->generateHeader( magic, to, opcode, delta ? PROTO_CHUNK_UPDATE_SIZE + length : PROTO_CHUNK_UPDATE_SIZE, instanceId, requestId, sendBuf, timestamp );
 
 	*( ( uint32_t * )( buf      ) ) = htonl( listId );
 	*( ( uint32_t * )( buf +  4 ) ) = htonl( stripeId );

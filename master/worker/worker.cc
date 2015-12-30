@@ -18,6 +18,7 @@ PacketPool *MasterWorker::packetPool;
 ArrayMap<int, SlaveSocket> *MasterWorker::slaveSockets;
 RemappingRecordMap *MasterWorker::remappingRecords;
 MasterRemapMsgHandler *MasterWorker::remapMsgHandler;
+Timestamp *MasterWorker::timestamp;
 
 void MasterWorker::dispatch( MixedEvent event ) {
 	switch( event.type ) {
@@ -294,6 +295,7 @@ bool MasterWorker::init() {
 	MasterWorker::remappingRecords = &master->remappingRecords;
 	MasterWorker::packetPool = &master->packetPool;
 	MasterWorker::remapMsgHandler = &master->remapMsgHandler;
+	MasterWorker::timestamp = &master->timestamp;
 	return true;
 }
 

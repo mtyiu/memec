@@ -698,7 +698,7 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 	}
 }
 
-bool SlaveWorker::sendModifyChunkRequest( uint16_t parentInstanceId, uint32_t parentRequestId, uint8_t keySize, char *keyStr, Metadata &metadata, uint32_t offset, uint32_t deltaSize, uint32_t valueUpdateOffset, char *delta, bool isSealed, bool isUpdate ) {
+bool SlaveWorker::sendModifyChunkRequest( uint16_t parentInstanceId, uint32_t parentRequestId, uint8_t keySize, char *keyStr, Metadata &metadata, uint32_t offset, uint32_t deltaSize, uint32_t valueUpdateOffset, char *delta, bool isSealed, bool isUpdate, uint32_t timestamp, MasterSocket *masterSocket ) {
 	Key key;
 	KeyValueUpdate keyValueUpdate;
 	uint16_t instanceId = Slave::instanceId;
@@ -746,10 +746,23 @@ bool SlaveWorker::sendModifyChunkRequest( uint16_t parentInstanceId, uint32_t pa
 				size_t size;
 				Packet *packet = SlaveWorker::packetPool->malloc();
 				packet->setReferenceCount( 1 );
+
+				// TODO backup parity delta
+				if ( masterSocket != 0 ) {
+					Timestamp timestamp ( timestamp );
+					Value value;
+					value.set( deltaSize, delta );
+					if ( isUpdate )
+						masterSocket->backup.insertDataUpdate( timestamp , key, value, metadata, isSealed, offset, requestId, 0 /* targetId */ );
+					else
+						masterSocket->backup.insertDataDelete( timestamp , key, value, metadata, isSealed, offset, requestId, 0 /* targetId */ );
+				}
+
 				if ( isUpdate ) {
 					this->protocol.reqUpdateChunk(
 						size,
-						instanceId, requestId,
+						parentInstanceId, 				// master Id 
+						requestId, 						// slave request Id
 						metadata.listId,
 						metadata.stripeId,
 						metadata.chunkId,
@@ -757,12 +770,14 @@ bool SlaveWorker::sendModifyChunkRequest( uint16_t parentInstanceId, uint32_t pa
 						deltaSize,                       // length
 						SlaveWorker::dataChunkCount + i, // updatingChunkId
 						delta,
-						packet->data
+						packet->data,
+						timestamp
 					);
 				} else {
 					this->protocol.reqDeleteChunk(
 						size,
-						instanceId, requestId,
+						parentInstanceId, 				// master Id
+						requestId,						// slave request Id
 						metadata.listId,
 						metadata.stripeId,
 						metadata.chunkId,
@@ -770,7 +785,8 @@ bool SlaveWorker::sendModifyChunkRequest( uint16_t parentInstanceId, uint32_t pa
 						deltaSize,                       // length
 						SlaveWorker::dataChunkCount + i, // updatingChunkId
 						delta,
-						packet->data
+						packet->data,
+						timestamp
 					);
 				}
 				packet->size = ( uint32_t ) size;
@@ -808,7 +824,8 @@ bool SlaveWorker::sendModifyChunkRequest( uint16_t parentInstanceId, uint32_t pa
 		if ( isUpdate ) {
 			this->protocol.reqUpdate(
 				size,
-				instanceId, requestId,
+				parentInstanceId, /* master Id */
+				requestId, /* slave request Id */
 				metadata.listId,
 				metadata.stripeId,
 				metadata.chunkId,
@@ -818,18 +835,21 @@ bool SlaveWorker::sendModifyChunkRequest( uint16_t parentInstanceId, uint32_t pa
 				valueUpdateOffset,
 				deltaSize /* valueUpdateSize */,
 				offset, // Chunk update offset
-				packet->data
+				packet->data,
+				timestamp
 			);
 		} else {
 			this->protocol.reqDelete(
 				size,
-				instanceId, requestId,
+				parentInstanceId, /* master Id */
+				requestId, /* slave request Id */
 				metadata.listId,
 				metadata.stripeId,
 				metadata.chunkId,
 				keyStr,
 				keySize,
-				packet->data
+				packet->data,
+				timestamp
 			);
 		}
 		packet->size = ( uint32_t ) size;
@@ -837,6 +857,17 @@ bool SlaveWorker::sendModifyChunkRequest( uint16_t parentInstanceId, uint32_t pa
 		for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
 			if ( this->paritySlaveSockets[ i ]->self )
 				continue;
+
+			// TODO backup parity delta
+			if ( masterSocket != 0 ) {
+				Timestamp timestamp ( timestamp );
+				Value value;
+				value.set( deltaSize, delta );
+				if ( isUpdate )
+					masterSocket->backup.insertDataUpdate( timestamp , key, value, metadata, isSealed, offset, requestId, 0 /* targetId */ );
+				else
+					masterSocket->backup.insertDataDelete( timestamp , key, value, metadata, isSealed, offset, requestId, 0 /* targetId */ );
+			}
 
 			if ( isUpdate ) {
 				if ( ! SlaveWorker::pending->insertKeyValueUpdate(

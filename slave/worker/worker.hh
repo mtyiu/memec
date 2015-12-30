@@ -137,7 +137,9 @@ private:
 		uint32_t deltaSize, /* valueUpdateSize */
 		uint32_t valueUpdateOffset,
 		char *delta,        /* valueUpdate */
-		bool isSealed, bool isUpdate
+		bool isSealed, bool isUpdate,
+		uint32_t timestamp = 0,
+		MasterSocket *masterSocket = 0
 	);
 
 	// ---------- recovery_worker.cc ----------

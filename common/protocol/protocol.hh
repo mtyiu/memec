@@ -103,6 +103,7 @@
 #include "../ds/key_value.hh"
 #include "../ds/metadata.hh"
 #include "../lock/lock.hh"
+#include "../timestamp/timestamp.hh"
 
 enum Role {
 	ROLE_APPLICATION,
@@ -113,12 +114,13 @@ enum Role {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#define PROTO_HEADER_SIZE 12
+#define PROTO_HEADER_SIZE 16
 struct ProtocolHeader {
 	uint8_t magic, from, to, opcode;
 	uint32_t length; // Content length
 	uint16_t instanceId;
 	uint32_t requestId;
+	uint32_t timestamp;
 };
 
 //////////////
@@ -467,13 +469,14 @@ protected:
 	size_t generateHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode,
 		uint32_t length, uint16_t instanceId, uint32_t requestId,
-		char *sendBuf = 0
+		char *sendBuf = 0, uint32_t requestTimestamp = 0 
 	);
 	bool parseHeader(
 		uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t &opcode,
 		uint32_t &length, uint16_t &instanceId, uint32_t &requestId,
-		char *buf, size_t size
+		uint32_t &requestTimestamp, char *buf, size_t size
 	);
+	Timestamp localTimestamp;
 	//////////////
 	// Register //
 	//////////////
@@ -595,7 +598,7 @@ protected:
 	// ---------- normal_protocol.cc ----------
 	size_t generateKeyHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
-		uint8_t keySize, char *key, char *sendBuf = 0
+		uint8_t keySize, char *key, char *sendBuf = 0, uint32_t timestamp = 0
 	);
 	bool parseKeyHeader( size_t offset, uint8_t &keySize, char *&key, char *buf, size_t size );
 
@@ -627,7 +630,7 @@ protected:
 	size_t generateChunkKeyHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
-		uint8_t keySize, char *key, char *sendBuf = 0
+		uint8_t keySize, char *key, char *sendBuf = 0, uint32_t timestamp = 0
 	);
 	bool parseChunkKeyHeader(
 		size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
@@ -639,7 +642,8 @@ protected:
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize,
-		uint32_t chunkUpdateOffset, char *valueUpdate, char *sendBuf = 0
+		uint32_t chunkUpdateOffset, char *valueUpdate, char *sendBuf = 0, 
+		uint32_t timestamp = 0
 	);
 	bool parseChunkKeyValueUpdateHeader(
 		size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
@@ -656,7 +660,8 @@ protected:
 
 	size_t generateKeyValueHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
-		uint8_t keySize, char *key, uint32_t valueSize, char *value, char *sendBuf = 0
+		uint8_t keySize, char *key, uint32_t valueSize, char *value, char *sendBuf = 0,
+		uint32_t timestamp = 0
 	);
 	bool parseKeyValueHeader(
 		size_t offset, uint8_t &keySize, char *&key,
@@ -667,7 +672,8 @@ protected:
 	size_t generateKeyValueUpdateHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint8_t keySize, char *key,
-		uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate = 0
+		uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate = 0, 
+		uint32_t timestamp = 0
 	);
 	bool parseKeyValueUpdateHeader(
 		size_t offset, uint8_t &keySize, char *&key,
@@ -684,7 +690,7 @@ protected:
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		uint32_t offset, uint32_t length, uint32_t updatingChunkId,
-		char *delta = 0, char *sendBuf = 0
+		char *delta = 0, char *sendBuf = 0, uint32_t timestamp = 0
 	);
 	bool parseChunkUpdateHeader(
 		size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
