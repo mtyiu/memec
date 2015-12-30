@@ -99,6 +99,7 @@ public:
 	bool stop();
 	void info( FILE *f = stdout );
 	void debug( FILE *f = stdout );
+	void printInstanceId( FILE *f = stdout );
 	void printPending( FILE *f = stdout );
 	void printRemapping( FILE *f = stdout );
 	void printBackup( FILE *f = stdout );

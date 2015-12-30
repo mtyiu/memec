@@ -341,12 +341,13 @@ bool SlaveWorker::handleDegradedDeleteRequest( MasterEvent event, char *buf, siz
 			__ERROR__( "SlaveWorker", "handleDegradedDeleteRequest", "Cannot insert into master DELETE pending map." );
 		}
 
+		uint32_t timestamp;
 		uint32_t deltaSize = this->buffer.size;
 		char *delta = this->buffer.data;
 
 		if ( chunk ) {
 			SlaveWorker::degradedChunkBuffer->deleteKey(
-				PROTO_OPCODE_DELETE,
+				PROTO_OPCODE_DELETE, timestamp,
 				key.size, key.data,
 				metadata,
 				true, /* isSealed */
@@ -369,7 +370,7 @@ bool SlaveWorker::handleDegradedDeleteRequest( MasterEvent event, char *buf, siz
 		} else {
 			uint32_t tmp = 0;
 			SlaveWorker::degradedChunkBuffer->deleteKey(
-				PROTO_OPCODE_DELETE,
+				PROTO_OPCODE_DELETE, timestamp,
 				key.size, key.data,
 				metadata,
 				false,
@@ -646,17 +647,18 @@ bool SlaveWorker::performDegradedRead( MasterSocket *masterSocket, uint32_t list
 					if ( success ) {
 						Metadata metadata;
 						KeyMetadata keyMetadata;
+						uint32_t timestamp;
 						metadata.set( listId, stripeId, lostChunkId );
 						keyMetadata.set( listId, stripeId, lostChunkId );
 
-						SlaveWorker::map->insertOpMetadata(
-							PROTO_OPCODE_DELETE,
-							mykey, keyMetadata
-						);
+						// SlaveWorker::map->insertOpMetadata(
+						// 	PROTO_OPCODE_DELETE, timestamp,
+						// 	mykey, keyMetadata
+						// );
 
 						uint32_t tmp = 0;
 						SlaveWorker::degradedChunkBuffer->deleteKey(
-							PROTO_OPCODE_DELETE,
+							PROTO_OPCODE_DELETE, timestamp,
 							mykey.size, mykey.data,
 							metadata,
 							true /* isSealed */,

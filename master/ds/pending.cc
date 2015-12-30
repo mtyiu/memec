@@ -122,8 +122,10 @@ Pending::Pending() {
  		\
 		LOCK_T *lock; \
 		std::unordered_multimap<PendingIdentifier, VALUE_TYPE> *map; \
-		if ( ! this->get( type, lock, map ) ) \
+		if ( ! this->get( type, lock, map ) ) { \
+			printf( "Cannot find lock & map.\n" ); \
 			return false; \
+		} \
  		\
 		if ( needsLock ) LOCK( lock ); \
 		ret = map->insert( p ); \
@@ -411,22 +413,67 @@ bool Pending::eraseKeyValueUpdate( PendingType type, uint16_t instanceId, uint32
 	return ret;
 }
 
-bool Pending::findKey( PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr, Key *keyPtr, bool checkKey, char* checkKeyPtr ) {
+bool Pending::findKeyValue( PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr, KeyValue *keyValuePtr, bool checkKey, char* checkKeyPtr ) {
 	PendingIdentifier pid( instanceId, 0, requestId, 0, ptr );
 	LOCK_T *lock;
 	bool ret;
 
-	std::unordered_multimap<PendingIdentifier, Key> *map;
-	std::unordered_multimap<PendingIdentifier, Key>::iterator lit, rit;
+	std::unordered_multimap<PendingIdentifier, KeyValue> *map;
+	std::unordered_multimap<PendingIdentifier, KeyValue>::iterator lit, rit;
 	if ( ! this->get( type, lock, map ) )
 		return false;
 
 	LOCK( lock );
 	tie( lit, rit ) = map->equal_range( pid );
-	SEARCH_KEY_RANGE( map, lit, rit, ptr, checkKey, checkKeyPtr, ret );
+	Key key;
+	/* prevent collision on id, use key and/or ptr as identifier as well */
+	if ( ptr ) {
+		while ( lit != rit ) {
+			if ( lit->first.ptr == ptr ) {
+				if ( ! checkKey || ! checkKeyPtr )
+					break;
+				key = lit->second.key();
+				if ( strncmp( checkKeyPtr, key.data, key.size ) == 0 )
+					break;
+			}
+			lit++;
+		}
+		/* match request id, ptr and/or key */
+		ret = false;
+		if ( lit != rit && lit->first.ptr == ptr ) {
+			if ( ! checkKey || ! checkKeyPtr )
+				ret = true;
+			else {
+				key = lit->second.key();
+				if ( strncmp( checkKeyPtr, key.data, key.size ) == 0 )
+					ret = true;
+			}
+		}
+	} else {
+		while ( lit != rit ) {
+			if ( ! checkKey || ! checkKeyPtr )
+				break;
+			key = lit->second.key();
+			if ( strncmp( checkKeyPtr, key.data, key.size ) == 0 )
+				break;
+
+			lit++;
+		}
+		/* match request and/or key */
+		ret = false;
+		if ( lit != rit ) {
+			if ( ! checkKey || ! checkKeyPtr )
+				ret = true;
+			else {
+				key = lit->second.key();
+				if ( strncmp( checkKeyPtr, key.data, key.size ) == 0 )
+					ret = true;
+			}
+		}
+	}
 
 	if ( ret ) {
-		if ( keyPtr ) *keyPtr = lit->second;
+		if ( keyValuePtr ) *keyValuePtr = lit->second;
 	}
 	UNLOCK( lock );
 

@@ -13,10 +13,12 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 
 	switch( event.type ) {
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
+			event.socket->instanceId = event.instanceId;
 			buffer.data = this->protocol.resRegisterMaster( buffer.size, event.instanceId, event.requestId, true );
 			isSend = true;
 			break;
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
+			event.socket->instanceId = event.instanceId;
 			buffer.data = this->protocol.resRegisterMaster( buffer.size, event.instanceId, event.requestId, false );
 			isSend = true;
 			break;
@@ -65,17 +67,44 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 			isSend = true;
 			break;
 		case MASTER_EVENT_TYPE_SWITCH_PHASE:
+		{
+			Coordinator *coordinator = Coordinator::getInstance();
+			std::vector<struct sockaddr_in> *slaves = event.message.remap.slaves;
+
 			isSend = false;
-			if ( event.message.remap.slaves == NULL || ! Coordinator::getInstance()->remapMsgHandler )
+			if ( slaves == NULL || ! coordinator->remapMsgHandler )
 				break;
 			// just trigger the handling of transition, no message need to be handled
 			if ( event.message.remap.toRemap ) {
-				coordinator->remapMsgHandler->transitToDegraded( event.message.remap.slaves ); // Phase 1a --> 2
+				size_t numMasters = coordinator->sockets.masters.size();
+				for ( size_t i = 0, numOverloadedSlaves = slaves->size(); i < numOverloadedSlaves; i++ ) {
+					uint16_t instanceId = 0;
+
+					for ( size_t j = 0, numSlaves = coordinator->sockets.slaves.size(); j < numSlaves; j++ ) {
+						struct sockaddr_in addr = slaves->at( i );
+						if ( coordinator->sockets.slaves[ j ]->equal( addr.sin_addr.s_addr, addr.sin_port ) ) {
+							instanceId = coordinator->sockets.slaves[ j ]->instanceId;
+							break;
+						}
+					}
+
+					if ( instanceId != 0 ) {
+						// Update pending set for metadata backup
+						CoordinatorWorker::pending->addPendingTransition(
+							instanceId, // instanceId
+							true,       // isDegraded
+							numMasters  // pending
+						);
+					}
+				}
+
+				coordinator->remapMsgHandler->transitToDegraded( slaves ); // Phase 1a --> 2
 			} else {
-				coordinator->remapMsgHandler->transitToNormal( event.message.remap.slaves ); // Phase 1b --> 0
+				coordinator->remapMsgHandler->transitToNormal( slaves ); // Phase 1b --> 0
 			}
 			// free the vector of slaves
-			delete event.message.remap.slaves;
+			delete slaves;
+		}
 			break;
 		case MASTER_EVENT_TYPE_SYNC_REMAPPING_RECORDS:
 			// TODO directly send packets out
@@ -250,7 +279,6 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 						goto quit_1;
 				}
 			} else if ( header.magic == PROTO_MAGIC_HEARTBEAT && header.opcode == PROTO_OPCODE_SYNC ) {
-				printf( "PROTO_OPCODE_SYNC\n" );
 				this->handleSyncMetadata( event, buffer.data, header.length );
 			} else {
 				__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from master." );
@@ -272,9 +300,11 @@ quit_1:
 }
 
 bool CoordinatorWorker::handleSyncMetadata( MasterEvent event, char *buf, size_t size ) {
-	/*
-	uint32_t count, requestId = event.instanceId, event.requestId;
+	// uint16_t instanceId = event.instanceId;
+	uint32_t count, requestId = event.requestId;
 	size_t processed, offset, failed = 0;
+	SlaveSocket *target = 0;
+	struct AddressHeader address;
 	struct HeartbeatHeader heartbeat;
 	union {
 		struct MetadataHeader metadata;
@@ -282,17 +312,46 @@ bool CoordinatorWorker::handleSyncMetadata( MasterEvent event, char *buf, size_t
 	} header;
 
 	offset = 0;
-	if ( ! this->protocol.parseHeartbeatHeader( heartbeat, buf, size ) ) {
+	if ( ! this->protocol.parseMetadataBackupMessage( address, heartbeat, buf, size ) ) {
 		__ERROR__( "CoordinatorWorker", "dispatch", "Invalid heartbeat protocol header." );
 		return false;
 	}
 
-	offset += PROTO_HEARTBEAT_SIZE;
+	offset += PROTO_ADDRESS_SIZE + PROTO_HEARTBEAT_SIZE;
 
-	LOCK( &event.socket->map.chunksLock );
+	char ipBuf[ 16 ];
+	Socket::ntoh_ip( address.addr, ipBuf, sizeof( ipBuf ) );
+	__DEBUG__(
+		YELLOW, "CoordinatorWorker", "handleSyncMetadata",
+		"Slave: %s:%u (sealed: %u; ops: %u).\n",
+		ipBuf, Socket::hton_port( address.port ),
+		heartbeat.sealed, heartbeat.keys
+	);
+
+	ArrayMap<int, SlaveSocket> &slaves = Coordinator::getInstance()->sockets.slaves;
+	LOCK( &slaves.lock );
+	for ( uint32_t i = 0; i < slaves.size(); i++ ) {
+		if ( slaves.values[ i ]->equal( address.addr, address.port ) ) {
+			target = slaves.values[ i ];
+			break;
+		}
+	}
+	UNLOCK( &slaves.lock );
+	if ( ! target ) {
+		__ERROR__( "CoordinatorWorker", "handleSyncMetadata", "Slave not found." );
+		return false;
+	}
+
+	LOCK( &target->map.chunksLock );
 	for ( count = 0; count < heartbeat.sealed; count++ ) {
 		if ( this->protocol.parseMetadataHeader( header.metadata, processed, buf, size, offset ) ) {
-			event.socket->map.insertChunk(
+			// fprintf(
+			// 	stderr, "(%u, %u, %u)\n",
+			// 	header.metadata.listId,
+			// 	header.metadata.stripeId,
+			// 	header.metadata.chunkId
+			// );
+			target->map.insertChunk(
 				header.metadata.listId,
 				header.metadata.stripeId,
 				header.metadata.chunkId,
@@ -303,12 +362,12 @@ bool CoordinatorWorker::handleSyncMetadata( MasterEvent event, char *buf, size_t
 		}
 		offset += processed;
 	}
-	UNLOCK( &event.socket->map.chunksLock );
+	UNLOCK( &target->map.chunksLock );
 
-	LOCK( &event.socket->map.keysLock );
+	LOCK( &target->map.keysLock );
 	for ( count = 0; count < heartbeat.keys; count++ ) {
 		if ( this->protocol.parseKeyOpMetadataHeader( header.op, processed, buf, size, offset ) ) {
-			SlaveSocket *s = event.socket;
+			SlaveSocket *s = target;
 			if ( header.op.opcode == PROTO_OPCODE_DELETE ) { // Handle keys from degraded DELETE
 				s = CoordinatorWorker::stripeList->get( header.op.listId, header.op.chunkId );
 			}
@@ -319,6 +378,7 @@ bool CoordinatorWorker::handleSyncMetadata( MasterEvent event, char *buf, size_t
 				header.op.stripeId,
 				header.op.chunkId,
 				header.op.opcode,
+				header.op.timestamp,
 				false, false
 			);
 		} else {
@@ -326,27 +386,35 @@ bool CoordinatorWorker::handleSyncMetadata( MasterEvent event, char *buf, size_t
 		}
 		offset += processed;
 	}
-	UNLOCK( &event.socket->map.keysLock );
+	UNLOCK( &target->map.keysLock );
 
 	if ( failed ) {
-		__ERROR__( "CoordinatorWorker", "processHeartbeat", "Number of failed objects = %lu", failed );
+		__ERROR__( "CoordinatorWorker", "handleSyncMetadata", "Number of failed objects = %lu", failed );
 	} else {
-		__ERROR__( "CoordinatorWorker", "processHeartbeat", "(sealed, keys) = (%u, %u)", heartbeat.sealed, heartbeat.keys );
-
 		// Send ACK message
-		event.resHeartbeat( event.socket, heartbeat.timestamp, heartbeat.sealed, heartbeat.keys, heartbeat.isLast );
-		this->dispatch( event );
+		// event.resHeartbeat( target, heartbeat.timestamp, heartbeat.sealed, heartbeat.keys, heartbeat.isLast );
+		// this->dispatch( event );
 	}
 
 	// check if this is the last packet for a sync operation
 	// remove pending meta sync requests
 	if ( requestId && heartbeat.isLast && ! failed ) {
-		bool *sync = Coordinator::getInstance()->pending.removeSyncMetaReq( requestId );
-		if ( sync )
-			*sync = true;
+		PendingTransition *pendingTransition = CoordinatorWorker::pending->findPendingTransition( target->instanceId, true );
+
+		if ( pendingTransition ) {
+			pthread_mutex_lock( &pendingTransition->lock );
+			pendingTransition->pending--;
+			if ( pendingTransition->pending == 0 )
+				pthread_cond_signal( &pendingTransition->cond );
+			pthread_mutex_unlock( &pendingTransition->lock );
+
+			CoordinatorWorker::pending->erasePendingTransition( target->instanceId, true );
+		} else {
+			__ERROR__( "CoordinatorWorker", "handleSyncMetadata", "Pending transition not found (instance ID: %u).", target->instanceId );
+		}
+	// } else {
+	// 	printf( "requestId = %u, heartbeat.isLast = %d, failed = %lu\n", requestId, heartbeat.isLast, failed );
 	}
 
 	return failed == 0;
-	*/
-	return true;
 }

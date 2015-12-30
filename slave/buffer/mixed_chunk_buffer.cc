@@ -15,7 +15,8 @@ bool MixedChunkBuffer::set(
 	SlaveWorker *worker,
 	char *key, uint8_t keySize,
 	char *value, uint32_t valueSize,
-	uint8_t opcode, uint32_t &stripeId, uint32_t chunkId,
+	uint8_t opcode, uint32_t &timestamp,
+	uint32_t &stripeId, uint32_t chunkId,
 	bool *isSealed, Metadata *sealed,
 	Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk
 ) {
@@ -25,11 +26,13 @@ bool MixedChunkBuffer::set(
 				worker,
 				key, keySize,
 				value, valueSize,
-				opcode, stripeId,
+				opcode, timestamp, stripeId,
 				isSealed, sealed
 			);
 			return true;
 		case CBR_PARITY:
+			timestamp = 0;
+			if ( isSealed ) *isSealed = false;
 			return this->buffer.parity->set(
 				key, keySize, value, valueSize, chunkId,
 				dataChunks, dataChunk, parityChunk

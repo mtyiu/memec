@@ -73,12 +73,12 @@ public:
 
 	bool insertKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata );
 	bool deleteKey(
-		Key key, uint8_t opcode, KeyMetadata &keyMetadata,
+		Key key, uint8_t opcode, uint32_t &timestamp, KeyMetadata &keyMetadata,
 		bool needsLock, bool needsUnlock
 	);
 
 	bool insertValue( KeyValue keyValue, Metadata metadata );
-	bool deleteValue( Key key, Metadata metadata, uint8_t opcode );
+	bool deleteValue( Key key, Metadata metadata, uint8_t opcode, uint32_t &timestamp );
 
 	bool insertDegradedChunk(
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
@@ -114,7 +114,7 @@ public:
 	void stop();
 
 	bool updateKeyValue( uint8_t keySize, char *keyStr, uint32_t valueUpdateSize, uint32_t valueUpdateOffset, uint32_t chunkUpdateOffset, char *valueUpdate, Chunk *chunk, bool isSealed );
-	bool deleteKey( uint8_t opcode, uint8_t keySize, char *keyStr, Metadata metadata, bool isSealed, uint32_t &deltaSize, char *delta, Chunk *chunk );
+	bool deleteKey( uint8_t opcode, uint32_t &timestamp, uint8_t keySize, char *keyStr, Metadata metadata, bool isSealed, uint32_t &deltaSize, char *delta, Chunk *chunk );
 
 	~DegradedChunkBuffer();
 };

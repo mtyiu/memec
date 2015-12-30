@@ -403,7 +403,6 @@ void MemEC::recvThread() {
 #ifdef WAIT_GET_RESPONSE
 						std::unordered_map<uint32_t, struct GetResponse>::iterator it;
 #endif
-
 						if ( common.magic == PROTO_MAGIC_RESPONSE_SUCCESS ) {
 							ret = this->protocol.parseKeyValueHeader(
 								header.keyValue,
@@ -427,7 +426,7 @@ void MemEC::recvThread() {
 						pthread_mutex_lock( &this->pending.getLock );
 						it = this->pending.get.find( common.requestId );
 						if ( it == this->pending.get.end() ) {
-							fprintf( stderr, "MemEC::recvThread(): Cannot find a pending GET request that matches the response. The message will be discarded.\n" );
+							fprintf( stderr, "MemEC::recvThread(): Cannot find a pending GET request that matches the response. The message will be discarded (ID: (%u, %u)).\n", common.instanceId, common.requestId );
 							pthread_mutex_unlock( &this->pending.getLock );
 						} else {
 #ifdef WAIT_GET_RESPONSE
@@ -470,7 +469,7 @@ void MemEC::recvThread() {
 						pthread_mutex_lock( &this->pending.setLock );
 						it = this->pending.set.find( common.requestId );
 						if ( it == this->pending.set.end() ) {
-							fprintf( stderr, "MemEC::recvThread(): Cannot find a pending SET request that matches the response. The message will be discarded.\n" );
+							fprintf( stderr, "MemEC::recvThread(): Cannot find a pending SET request that matches the response. The message will be discarded (ID: (%u, %u)).\n", common.instanceId, common.requestId );
 						} else {
 							this->pending.set.erase( it );
 							if ( this->pending.set.size() == 0 )
@@ -492,7 +491,7 @@ void MemEC::recvThread() {
 						pthread_mutex_lock( &this->pending.updateLock );
 						it = this->pending.update.find( common.requestId );
 						if ( it == this->pending.update.end() ) {
-							fprintf( stderr, "MemEC::recvThread(): Cannot find a pending SET request that matches the response. The message will be discarded.\n" );
+							fprintf( stderr, "MemEC::recvThread(): Cannot find a pending UPDATE request that matches the response. The message will be discarded (ID: (%u, %u)).\n", common.instanceId, common.requestId );
 						} else {
 							this->pending.update.erase( it );
 							if ( this->pending.update.size() == 0 )
@@ -514,7 +513,7 @@ void MemEC::recvThread() {
 						pthread_mutex_lock( &this->pending.delLock );
 						it = this->pending.del.find( common.requestId );
 						if ( it == this->pending.del.end() ) {
-							fprintf( stderr, "MemEC::recvThread(): Cannot find a pending SET request that matches the response. The message will be discarded.\n" );
+							fprintf( stderr, "MemEC::recvThread(): Cannot find a pending DELETE request that matches the response. The message will be discarded (ID: (%u, %u)).\n", common.instanceId, common.requestId );
 						} else {
 							this->pending.del.erase( it );
 							if ( this->pending.del.size() == 0 )

@@ -8,9 +8,11 @@
 #include "../../common/ds/metadata.hh"
 #include "../../common/lock/lock.hh"
 #include "../../common/protocol/protocol.hh"
+#include "../../common/timestamp/timestamp.hh"
 
 class Map {
 private:
+	Timestamp *timestamp;
 	/**
 	 * Store the mapping between keys and chunks
 	 * Key |-> (list ID, stripe ID, chunk ID, offset, length)
@@ -43,6 +45,10 @@ public:
 		LOCK_INIT( &this->cacheLock );
 		LOCK_INIT( &this->opsLock );
 		LOCK_INIT( &this->sealedLock );
+	}
+
+	void setTimestamp( Timestamp *timestamp ) {
+		this->timestamp = timestamp;
 	}
 
 	bool findValueByKey( char *data, uint8_t size, KeyValue *keyValue, Key *keyPtr ) {
@@ -127,7 +133,7 @@ public:
 		return it->second;
 	}
 
-	bool insertKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata, bool needsLock = true, bool needsUnlock = true, bool needsUpdateOpMetadata = true ) {
+	bool insertKey( Key key, uint8_t opcode, uint32_t &timestamp, KeyMetadata &keyMetadata, bool needsLock = true, bool needsUnlock = true, bool needsUpdateOpMetadata = true ) {
 		key.dup();
 
 		std::pair<Key, KeyMetadata> keyPair( key, keyMetadata );
@@ -141,10 +147,10 @@ public:
 		}
 		if ( needsUnlock ) UNLOCK( &this->keysLock );
 
-		return needsUpdateOpMetadata ? this->insertOpMetadata( opcode, key, keyMetadata ) : true;
+		return needsUpdateOpMetadata ? this->insertOpMetadata( opcode, timestamp, key, keyMetadata ) : true;
 	}
 
-	bool insertOpMetadata( uint8_t opcode, Key key, KeyMetadata keyMetadata, bool dup = true ) {
+	bool insertOpMetadata( uint8_t opcode, uint32_t &timestamp, Key key, KeyMetadata keyMetadata, bool dup = true ) {
 		bool ret;
 		std::unordered_map<Key, OpMetadata>::iterator opsIt;
 		std::pair<std::unordered_map<Key, OpMetadata>::iterator, bool> opRet;
@@ -155,6 +161,8 @@ public:
 			OpMetadata opMetadata;
 			opMetadata.clone( keyMetadata );
 			opMetadata.opcode = opcode;
+			opMetadata.timestamp = this->timestamp->nextVal();
+			timestamp = opMetadata.timestamp;
 
 			if ( dup ) key.dup();
 
@@ -229,7 +237,7 @@ public:
 		}
 	}
 
-	bool deleteKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata, bool needsLock, bool needsUnlock, bool needsUpdateOpMetadata = true ) {
+	bool deleteKey( Key key, uint8_t opcode, uint32_t &timestamp, KeyMetadata &keyMetadata, bool needsLock, bool needsUnlock, bool needsUpdateOpMetadata = true ) {
 		Key k;
 		std::unordered_map<Key, KeyMetadata>::iterator keysIt;
 		std::unordered_map<Key, OpMetadata>::iterator opsIt;
@@ -247,7 +255,7 @@ public:
 		}
 		if ( needsUnlock ) UNLOCK( &this->keysLock );
 
-		return needsUpdateOpMetadata ? this->insertOpMetadata( opcode, key, keyMetadata ) : true;
+		return needsUpdateOpMetadata ? this->insertOpMetadata( opcode, timestamp, key, keyMetadata ) : true;
 	}
 
 	void getKeysMap( std::unordered_map<Key, KeyMetadata> *&keys, LOCK_T *&lock ) {

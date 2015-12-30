@@ -33,14 +33,14 @@ bool CoordinatorWorker::handleRemappingSetLockRequest( MasterEvent event, char *
 	RemappingRecord remappingRecord( header.listId, header.chunkId );
 	if ( map->insertKey(
 		header.key, header.keySize, header.listId, 0,
-		header.chunkId, PROTO_OPCODE_REMAPPING_LOCK,
-		true, true)
+		header.chunkId, PROTO_OPCODE_REMAPPING_LOCK, 0 /* timestamp */,
+		true, true )
 	) {
 		if ( header.isRemapped ) {
 			uint32_t originalChunkId;
-			SlaveSocket* dataSlaveSockets[ dataChunkCount ];
-			this->stripeList->get( key.data, key.size, dataSlaveSockets, 0, &originalChunkId );
-			if ( CoordinatorWorker::remappingRecords->insert( key, remappingRecord, dataSlaveSockets[ originalChunkId ]->getAddr() ) ) {
+			SlaveSocket *dataSlaveSocket;
+			this->stripeList->get( key.data, key.size, &dataSlaveSocket, 0, &originalChunkId );
+			if ( CoordinatorWorker::remappingRecords->insert( key, remappingRecord, dataSlaveSocket->getAddr() ) ) {
 				key.dup();
 				LOCK( &Coordinator::getInstance()->pendingRemappingRecords.toSendLock );
 				Coordinator::getInstance()->pendingRemappingRecords.toSend[ key ] = remappingRecord;

@@ -29,11 +29,14 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 		{
 			uint32_t sealedCount, opsCount;
 			bool isCompleted;
+			struct sockaddr_in addr = event.socket->getAddr();
 
 			buffer.data = this->protocol.syncMetadataBackup(
 				buffer.size,
 				instanceId,
 				MasterWorker::idGenerator->nextVal( this->workerId ),
+				addr.sin_addr.s_addr,
+				addr.sin_port,
 				&event.socket->backup.lock,
 				event.socket->backup.sealed, sealedCount,
 				event.socket->backup.ops, opsCount,
@@ -506,7 +509,7 @@ bool MasterWorker::handleAcknowledgement( SlaveEvent event, uint8_t opcode, char
 		return false;
 	}
 
-	// __INFO__( YELLOW, "MasterWorker", "handleAcknowledgement", "Timestamp = (%u, %u).", header.fromTimestamp, header.toTimestamp );
+	__DEBUG__( YELLOW, "MasterWorker", "handleAcknowledgement", "Timestamp = (%u, %u).", header.fromTimestamp, header.toTimestamp );
 
 	event.socket->backup.erase( header.fromTimestamp, header.toTimestamp );
 

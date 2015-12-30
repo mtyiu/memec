@@ -59,9 +59,6 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();
 		ArrayMap<struct sockaddr_in, Latency> getLatency, setLatency;
 		struct LoadStatsHeader loadStatsHeader;
-		struct RemappingRecordHeader remappingRecordHeader;
-		struct SlaveSyncRemapHeader slaveSyncRemapHeader;
-		size_t offset, count, bytes;
 		Master *master = Master::getInstance();
 
 		while ( buffer.size > 0 ) {
@@ -123,7 +120,12 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 						}
 						break;
 					case PROTO_OPCODE_SYNC:
+					/*
 						if ( header.magic == PROTO_MAGIC_REMAPPING ) {
+							size_t offset, count, bytes;
+							struct RemappingRecordHeader remappingRecordHeader;
+							struct SlaveSyncRemapHeader slaveSyncRemapHeader;
+
 							if ( ! this->protocol.parseRemappingRecordHeader( remappingRecordHeader, buffer.data, buffer.size ) ) {
 								__ERROR__( "CoordinatorWorker", "dispatch", "Invalid remapping record protocol header." );
 								goto quit_1;
@@ -145,7 +147,7 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 								remappingRecord.set( slaveSyncRemapHeader.listId, slaveSyncRemapHeader.chunkId, 0 );
 
 								if ( slaveSyncRemapHeader.opcode == 0 ) { // remove record
-									map->erase( key, remappingRecord );
+									map->erase( key, remappingRecord, true, true, true );
 								} else if ( slaveSyncRemapHeader.opcode == 1 ) { // add record
 									map->insert( key, remappingRecord );
 								}
@@ -154,8 +156,9 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 							this->dispatch( event );
 							//map->print();
 						} else {
+					*/
 							__ERROR__( "MasterWorker", "dispatch", "Invalid magic code from coordinator." );
-						}
+						// }
 						break;
 					case PROTO_OPCODE_DEGRADED_LOCK:
 						this->handleDegradedLockResponse( event, success, buffer.data, buffer.size );

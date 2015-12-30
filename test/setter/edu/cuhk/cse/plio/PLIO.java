@@ -28,6 +28,7 @@ public class PLIO {
 		this.protocol = new Protocol( keySize, chunkSize );
 		this.host = host;
 		this.port = port;
+		this.instanceId = 0;
 		this.id = fromId;
 		this.fromId = fromId;
 		this.toId = toId;
@@ -155,7 +156,7 @@ public class PLIO {
 			Protocol.PROTO_MAGIC_REQUEST,
 			Protocol.PROTO_MAGIC_TO_MASTER,
 			Protocol.PROTO_OPCODE_GET,
-			instanceId, id,
+			this.instanceId, id,
 			keySize, key
 		);
 		try {
@@ -208,7 +209,7 @@ public class PLIO {
 			Protocol.PROTO_MAGIC_REQUEST,
 			Protocol.PROTO_MAGIC_TO_MASTER,
 			Protocol.PROTO_OPCODE_SET,
-			instanceId, id,
+			this.instanceId, id,
 			keySize, key,
 			valueSize, value
 		);
@@ -262,7 +263,7 @@ public class PLIO {
 			Protocol.PROTO_MAGIC_REQUEST,
 			Protocol.PROTO_MAGIC_TO_MASTER,
 			Protocol.PROTO_OPCODE_UPDATE,
-			instanceId, id,
+			this.instanceId, id,
 			keySize, key,
 			valueUpdateOffset, valueUpdateSize, valueUpdate
 		);
@@ -315,7 +316,7 @@ public class PLIO {
 			Protocol.PROTO_MAGIC_REQUEST,
 			Protocol.PROTO_MAGIC_TO_MASTER,
 			Protocol.PROTO_OPCODE_DELETE,
-			instanceId, id,
+			this.instanceId, id,
 			keySize, key
 		);
 		try {

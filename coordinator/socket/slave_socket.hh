@@ -17,6 +17,7 @@ private:
 	char *identifier;
 
 public:
+	uint16_t instanceId;
 	Map map;
 	SlaveSocket *failed;
 

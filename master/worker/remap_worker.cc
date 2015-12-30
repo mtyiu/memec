@@ -65,14 +65,16 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 		char *data;
 	} buffer;
 	Key key;
+	KeyValue keyValue;
 	uint16_t instanceId = Master::instanceId;
 	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
 
-	key.dup( header.keySize, header.key, ( void * ) event.socket );
+	keyValue.dup( header.key, header.keySize, header.value, header.valueSize );
+	key = keyValue.key();
 
 	// Insert the key into application SET pending map
-	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_SET, event.instanceId, event.requestId, ( void * ) event.socket, key ) ) {
-		__ERROR__( "MasterWorker", "handleRemappingSetRequest", "Cannot insert into application SET pending map." );
+	if ( ! MasterWorker::pending->insertKeyValue( PT_APPLICATION_SET, event.instanceId, event.requestId, ( void * ) event.socket, keyValue ) ) {
+		__ERROR__( "MasterWorker", "handleRemappingSetRequest", "Cannot insert into application SET pending map. (%u, %u)", event.instanceId, event.requestId );
 	}
 
 	// Not needed???
@@ -200,6 +202,7 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 	}
 
 	Key key;
+	KeyValue keyValue;
 	Value *value = ( Value * ) remappingRecord.ptr;
 
 	if ( ! socket ) {
@@ -208,11 +211,12 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 		return false;
 	}
 
-	if ( ! MasterWorker::pending->findKey( PT_APPLICATION_SET, pid.parentInstanceId, pid.parentRequestId, 0, &key, true, header.key ) ) {
+	if ( ! MasterWorker::pending->findKeyValue( PT_APPLICATION_SET, pid.parentInstanceId, pid.parentRequestId, 0, &keyValue, true, header.key ) ) {
 		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded. (ID: (%u, %u))", pid.parentInstanceId, pid.parentRequestId );
 		// set socket fd for counter
 		return false;
 	}
+	key = keyValue.key();
 
 
 	// get the socket of remapped data slave
@@ -339,6 +343,7 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 	ApplicationEvent applicationEvent;
 	PendingIdentifier pid;
 	Key key;
+	KeyValue keyValue;
 
 	// Find the cooresponding request
 	if ( ! MasterWorker::pending->eraseKey( PT_SLAVE_SET, event.instanceId, event.requestId, ( void * ) event.socket, &pid, &key, true, false ) ) {
@@ -389,20 +394,20 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 
 	if ( pending == 0 ) {
 		// Only send application SET response when the number of pending slave SET requests equal 0
-		if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_SET, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &key, true, true, true, header.key ) ) {
+		if ( ! MasterWorker::pending->eraseKeyValue( PT_APPLICATION_SET, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &keyValue, true, true, true, header.key ) ) {
 			__ERROR__( "MasterWorker", "handleRemappingSetResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded." );
 			return false;
 		}
+		key = keyValue.key();
 
-		applicationEvent.resSet( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, key, success );
-		MasterWorker::eventQueue->insert( applicationEvent );
-
-		// add a remaping record
+		// add a remapping record
 		if ( ! NO_REMAPPING ) {
-			key.set( header.keySize, header.key );
-			RemappingRecord record ( header.listId, header.chunkId );
+			RemappingRecord record( header.listId, header.chunkId );
 			MasterWorker::remappingRecords->insert( key, record, this->dataSlaveSockets[ originalChunkId ]->getAddr() );
 		}
+
+		applicationEvent.resSet( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, keyValue, success );
+		MasterWorker::eventQueue->insert( applicationEvent );
 	}
 
 #undef NO_REMAPPING

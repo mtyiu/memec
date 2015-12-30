@@ -41,7 +41,7 @@ public class Protocol {
 	/************************
 	 * Protocol header size *
 	 ************************/
-	public static final byte PROTO_HEADER_SIZE            = 10;
+	public static final byte PROTO_HEADER_SIZE            = 12;
 	public static final byte PROTO_KEY_SIZE               = 1;
 	public static final byte PROTO_KEY_VALUE_SIZE         = 4;
 	public static final byte PROTO_KEY_VALUE_UPDATE_SIZE  = 7;
@@ -230,20 +230,20 @@ public class Protocol {
 		this.buf[ 0 ] |= ( byte )( this.from & 0x18 );
 		this.buf[ 0 ] |= ( byte )( to & 0x60 );
 
-		this.buf[ 1 ] = ( byte )( opcode & 0xFF );
+		this.buf[  1 ] = ( byte )( opcode & 0xFF );
 
-		this.buf[ 2 ] = ( byte )( ( length >> 24 ) & 0xFF );
-		this.buf[ 3 ] = ( byte )( ( length >> 16 ) & 0xFF );
-		this.buf[ 4 ] = ( byte )( ( length >>  8 ) & 0xFF );
-		this.buf[ 5 ] = ( byte )( ( length		 ) & 0xFF );
+		this.buf[  2 ] = ( byte )( ( length >> 24 ) & 0xFF );
+		this.buf[  3 ] = ( byte )( ( length >> 16 ) & 0xFF );
+		this.buf[  4 ] = ( byte )( ( length >>  8 ) & 0xFF );
+		this.buf[  5 ] = ( byte )( ( length       ) & 0xFF );
 
-		this.buf[ 6 ] = ( byte )( ( instanceId >>  8 ) & 0xFF );
-		this.buf[ 7 ] = ( byte )( ( instanceId		 ) & 0xFF );
+		this.buf[  6 ] = ( byte )( ( instanceId >>  8 ) & 0xFF );
+		this.buf[  7 ] = ( byte )( ( instanceId       ) & 0xFF );
 
 		this.buf[  8 ] = ( byte )( ( id >> 24 ) & 0xFF );
 		this.buf[  9 ] = ( byte )( ( id >> 16 ) & 0xFF );
 		this.buf[ 10 ] = ( byte )( ( id >>  8 ) & 0xFF );
-		this.buf[ 11 ] = ( byte )( ( id		 ) & 0xFF );
+		this.buf[ 11 ] = ( byte )( ( id       ) & 0xFF );
 		return PROTO_HEADER_SIZE;
 	}
 
@@ -315,16 +315,22 @@ public class Protocol {
 		header.from	= ( byte )( this.buf[ 0 ] & 0x18 );
 		header.to	  = ( byte )( this.buf[ 0 ] & 0x60 );
 		header.opcode = ( byte )( this.buf[ 1 ] & 0xFF );
+
 		tmp			  = ( ( ( ( long ) this.buf[ 2 ] ) & 0xFF ) << 24 ) |
-							 ( ( ( ( long ) this.buf[ 3 ] ) & 0xFF ) << 16 ) |
-							 ( ( ( ( long ) this.buf[ 4 ] ) & 0xFF ) <<  8 ) |
-							 ( ( ( ( long ) this.buf[ 5 ] ) & 0xFF )		 );
+		                ( ( ( ( long ) this.buf[ 3 ] ) & 0xFF ) << 16 ) |
+		                ( ( ( ( long ) this.buf[ 4 ] ) & 0xFF ) <<  8 ) |
+		                ( ( ( ( long ) this.buf[ 5 ] ) & 0xFF )       );
 		header.length = ( int ) tmp;
-		tmp			  = ( ( ( ( long ) this.buf[ 6 ] ) & 0xFF ) << 24 ) |
-							 ( ( ( ( long ) this.buf[ 7 ] ) & 0xFF ) << 16 ) |
-							 ( ( ( ( long ) this.buf[ 8 ] ) & 0xFF ) <<  8 ) |
-							 ( ( ( ( long ) this.buf[ 9 ] ) & 0xFF )		 );
-		header.id = ( int ) tmp;
+
+		tmp			  = ( ( ( ( long ) this.buf[ 6 ] ) & 0xFF ) <<  8 ) |
+		                ( ( ( ( long ) this.buf[ 7 ] ) & 0xFF )       );
+		header.instanceId = ( int ) tmp;
+
+		tmp			  = ( ( ( ( long ) this.buf[  8 ] ) & 0xFF ) << 24 ) |
+		                ( ( ( ( long ) this.buf[  9 ] ) & 0xFF ) << 16 ) |
+		                ( ( ( ( long ) this.buf[ 10 ] ) & 0xFF ) <<  8 ) |
+		                ( ( ( ( long ) this.buf[ 11 ] ) & 0xFF )       );
+		header.id     = ( int ) tmp;
 
 		switch( header.magic ) {
 			case PROTO_MAGIC_REQUEST:

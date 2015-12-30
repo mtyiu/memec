@@ -112,7 +112,7 @@ bool DegradedMap::insertKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata )
 	return true;
 }
 
-bool DegradedMap::deleteKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata, bool needsLock, bool needsUnlock ) {
+bool DegradedMap::deleteKey( Key key, uint8_t opcode, uint32_t &timestamp, KeyMetadata &keyMetadata, bool needsLock, bool needsUnlock ) {
 	Key k;
 	std::unordered_map<Key, KeyMetadata>::iterator keysIt;
 
@@ -130,7 +130,7 @@ bool DegradedMap::deleteKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata, 
 	}
 	if ( needsUnlock ) UNLOCK( &this->keysLock );
 
-	return this->slaveMap->insertOpMetadata( opcode, key, keyMetadata );
+	return this->slaveMap->insertOpMetadata( opcode, timestamp, key, keyMetadata );
 }
 
 bool DegradedMap::insertValue( KeyValue keyValue, Metadata metadata ) { // KeyValue's data is allocated by malloc()
@@ -148,7 +148,7 @@ bool DegradedMap::insertValue( KeyValue keyValue, Metadata metadata ) { // KeyVa
 	return ret.second;
 }
 
-bool DegradedMap::deleteValue( Key key, Metadata metadata, uint8_t opcode ) {
+bool DegradedMap::deleteValue( Key key, Metadata metadata, uint8_t opcode, uint32_t &timestamp ) {
 	std::unordered_map<Key, KeyValue>::iterator valuesIt;
 	std::unordered_map<Key, Metadata>::iterator metadataIt;
 	std::pair<
@@ -190,7 +190,7 @@ re_insert:
 	KeyMetadata keyMetadata;
 	keyMetadata.set( metadata.listId, metadata.stripeId, metadata.chunkId );
 
-	return this->slaveMap->insertOpMetadata( opcode, key, keyMetadata );
+	return this->slaveMap->insertOpMetadata( opcode, timestamp, key, keyMetadata );
 }
 
 bool DegradedMap::insertDegradedChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint16_t instanceId, uint32_t requestId ) {
@@ -442,7 +442,7 @@ bool DegradedChunkBuffer::updateKeyValue( uint8_t keySize, char *keyStr, uint32_
 	return false;
 }
 
-bool DegradedChunkBuffer::deleteKey( uint8_t opcode, uint8_t keySize, char *keyStr, Metadata metadata, bool isSealed, uint32_t &deltaSize, char *delta, Chunk *chunk ) {
+bool DegradedChunkBuffer::deleteKey( uint8_t opcode, uint32_t &timestamp, uint8_t keySize, char *keyStr, Metadata metadata, bool isSealed, uint32_t &deltaSize, char *delta, Chunk *chunk ) {
 	Key key;
 	KeyMetadata keyMetadata;
 	bool ret;
@@ -458,14 +458,14 @@ bool DegradedChunkBuffer::deleteKey( uint8_t opcode, uint8_t keySize, char *keyS
 	LOCK( keysLock );
 	if ( isSealed ) {
 		LOCK( cacheLock );
-		ret = this->map.deleteKey( key, opcode, keyMetadata, false, false );
+		ret = this->map.deleteKey( key, opcode, timestamp, keyMetadata, false, false );
 		if ( ret ) {
 			deltaSize = chunk->deleteKeyValue( keys, keyMetadata, delta, deltaSize );
 			ret = true;
 		}
 		UNLOCK( cacheLock );
 	} else {
-		ret = this->map.deleteValue( key, metadata, opcode );
+		ret = this->map.deleteValue( key, metadata, opcode, timestamp );
 	}
 	UNLOCK( keysLock );
 

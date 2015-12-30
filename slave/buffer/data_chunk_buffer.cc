@@ -40,7 +40,7 @@ void DataChunkBuffer::init( uint32_t listId, uint32_t stripeId, uint32_t chunkId
 	}
 }
 
-KeyMetadata DataChunkBuffer::set( SlaveWorker *worker, char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode, uint32_t &stripeId, bool *isSealed, Metadata *sealed ) {
+KeyMetadata DataChunkBuffer::set( SlaveWorker *worker, char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode, uint32_t &timestamp, uint32_t &stripeId, bool *isSealed, Metadata *sealed ) {
 	KeyMetadata keyMetadata;
 	uint32_t size = PROTO_KEY_VALUE_SIZE + keySize + valueSize, max = 0, tmp;
 	int index = -1;
@@ -171,7 +171,7 @@ KeyMetadata DataChunkBuffer::set( SlaveWorker *worker, char *key, uint8_t keySiz
 	// Update key map
 	Key keyObj;
 	keyObj.set( keySize, key );
-	ChunkBuffer::map->insertKey( keyObj, opcode, keyMetadata );
+	ChunkBuffer::map->insertKey( keyObj, opcode, timestamp, keyMetadata );
 	stripeId = keyMetadata.stripeId;
 
 	return keyMetadata;
@@ -322,7 +322,7 @@ uint32_t DataChunkBuffer::flush( SlaveWorker *worker, bool lock, bool lockAtInde
 	if ( lock || lockAtIndex )
 		LOCK( this->locks + index );
 
-	this->flushAt( worker, index, false );
+	this->flushAt( worker, index, false, sealed );
 
 	if ( lock || lockAtIndex )
 		UNLOCK( this->locks + index );
@@ -340,6 +340,13 @@ Chunk *DataChunkBuffer::flushAt( SlaveWorker *worker, int index, bool lock, Meta
 	}
 
 	Chunk *chunk = this->chunks[ index ];
+	if ( sealed ) {
+		sealed->set(
+			chunk->metadata.listId,
+			chunk->metadata.stripeId,
+			chunk->metadata.chunkId
+		);
+	}
 
 	// Get a new chunk
 	this->sizes[ index ] = 0;
@@ -361,13 +368,6 @@ Chunk *DataChunkBuffer::flushAt( SlaveWorker *worker, int index, bool lock, Meta
 		chunk->metadata.stripeId,
 		chunk->metadata.chunkId
 	);
-	if ( sealed ) {
-		sealed->set(
-			chunk->metadata.listId,
-			chunk->metadata.stripeId,
-			chunk->metadata.chunkId
-		);
-	}
 
 	if ( lock ) {
 		UNLOCK( this->locks + index );

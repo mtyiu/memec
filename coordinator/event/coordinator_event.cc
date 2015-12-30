@@ -12,10 +12,10 @@ void CoordinatorEvent::syncRemappingRecords( LOCK_T *lock, std::map<struct socka
 	this->message.remap.done = done;
 }
 
-void CoordinatorEvent::syncRemappedData( LOCK_T *lock, std::set<struct sockaddr_in> *counter, pthread_cond_t *allAcked, struct sockaddr_in target ) {
+void CoordinatorEvent::syncRemappedData( struct sockaddr_in target, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done ) {
 	this->type = COORDINATOR_EVENT_TYPE_SYNC_REMAPPED_PARITY;
-	this->message.parity.lock = lock;
-	this->message.parity.counter = counter;
-	this->message.parity.allAcked = allAcked;
 	this->message.parity.target = target;
+	this->message.parity.lock = lock;
+	this->message.parity.cond = cond;
+	this->message.parity.done = done;
 }

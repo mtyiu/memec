@@ -24,7 +24,7 @@ public:
 	 * Store the mapping between keys and chunks
 	 * Key |-> (list ID, stripe ID, chunk ID)
 	 */
-	std::unordered_map<Key, Metadata> keys;
+	std::unordered_map<Key, OpMetadata> keys;
 	/**
 	 * Store the set of keys with lock acquired
 	 */
@@ -61,7 +61,7 @@ public:
 	bool insertKey(
 		char *keyStr, uint8_t keySize,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
-		uint8_t opcode, bool needsLock = true, bool needsUnlock = true
+		uint8_t opcode, uint32_t timestamp, bool needsLock = true, bool needsUnlock = true
 	);
 	bool insertDegradedLock(
 		Metadata srcMetadata, Metadata &dstMetadata,

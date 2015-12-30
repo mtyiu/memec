@@ -115,14 +115,19 @@ void CoordinatorWorker::dispatch( CoordinatorEvent event ) {
 			);
 			packet->size = buffer.size;
 
-			coordinator->pending.insertRemappedDataRequest( requestId, event.message.parity.counter, event.message.parity.allAcked );
-
 			LOCK( &coordinator->sockets.slaves.lock );
-			packet->setReferenceCount( coordinator->sockets.slaves.size() );
-			for ( uint32_t i = 0; i < coordinator->sockets.slaves.size(); i++ ) {
+			uint32_t numSlaves = coordinator->sockets.slaves.size();
+			coordinator->pending.insertRemappedDataRequest(
+				requestId,
+				event.message.parity.lock,
+				event.message.parity.cond,
+				event.message.parity.done,
+				numSlaves
+			);
+			packet->setReferenceCount( numSlaves );
+			for ( uint32_t i = 0; i < numSlaves; i++ ) {
 				SlaveSocket *socket = coordinator->sockets.slaves[ i ];
-				event.message.parity.counter->insert( socket->getAddr() );
-				slaveEvent.syncRemappedData( socket , packet );
+				slaveEvent.syncRemappedData( socket, packet );
 				coordinator->eventQueue.insert( slaveEvent );
 			}
 			UNLOCK( &coordinator->sockets.slaves.lock );

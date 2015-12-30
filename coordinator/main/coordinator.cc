@@ -41,7 +41,7 @@ void Coordinator::switchPhase( std::set<struct sockaddr_in> prevOverloadedSlaves
 	uint32_t prevOverloadedSlaveCount = prevOverloadedSlaves.size();
 
 	if ( curOverloadedSlaveCount > totalSlaveCount * startThreshold ) { // Phase 1 --> 2
-		//__INFO__( YELLOW, "Coordinator", "switchPhase", "%lf: Overload detected (overloaded slave = %u).", this->getElapsedTime(), curOverloadedSlaveCount );
+		// __INFO__( YELLOW, "Coordinator", "switchPhase", "%lf: Overload detected (overloaded slave = %u).", this->getElapsedTime(), curOverloadedSlaveCount );
 
 		// need to start remapping now
 		if ( prevOverloadedSlaveCount > totalSlaveCount * startThreshold ) {
@@ -506,7 +506,8 @@ void Coordinator::releaseDegradedLock() {
 			fprintf( stderr, "Unknown socket ID!\n" );
 			return;
 		}
-		event.reqReleaseDegradedLock( socket );
+
+		event.reqReleaseDegradedLock( socket, 0, 0, 0 );
 		this->eventQueue.insert( event );
 
 		printf( "Sending release degraded locks request to: (#%u) ", socketId );
@@ -515,7 +516,7 @@ void Coordinator::releaseDegradedLock() {
 	}
 }
 
-void Coordinator::releaseDegradedLock( struct sockaddr_in slave, bool *done ) {
+void Coordinator::releaseDegradedLock( struct sockaddr_in slave, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done ) {
 	uint32_t index = 0;
 	SlaveSocket *socket;
 	for ( uint32_t i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
@@ -537,7 +538,7 @@ void Coordinator::releaseDegradedLock( struct sockaddr_in slave, bool *done ) {
 	}
 
 	SlaveEvent event;
-	event.reqReleaseDegradedLock( socket, done );
+	event.reqReleaseDegradedLock( socket, lock, cond, done );
 	this->eventQueue.insert( event );
 
 	printf( "Sending release degraded locks request to: (#%u) ", index );
@@ -551,19 +552,10 @@ void Coordinator::syncRemappingRecords( LOCK_T *lock, std::map<struct sockaddr_i
 	this->eventQueue.insert( event );
 }
 
-void Coordinator::syncRemappedData( struct sockaddr_in slaveAddr ) {
+void Coordinator::syncRemappedData( struct sockaddr_in slaveAddr, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done ) {
 	CoordinatorEvent event;
-	LOCK_T lock;
-	LOCK_INIT( &lock );
-	pthread_cond_t allAcked;
-	pthread_cond_init( &allAcked, NULL );
-	std::set<struct sockaddr_in> ackedSlaves;
-	// let worker send the sync requests
-	event.syncRemappedData( &lock, &ackedSlaves, &allAcked, slaveAddr );
+	event.syncRemappedData( slaveAddr, lock, cond, done );
 	this->eventQueue.insert( event );
-	// wait for sync to complete
-	pthread_cond_wait( &allAcked, &lock );
-	UNLOCK( &lock );
 }
 
 double Coordinator::getElapsedTime() {
@@ -666,6 +658,9 @@ void Coordinator::interactive() {
 		} else if ( strcmp( command, "debug" ) == 0 ) {
 			valid = true;
 			this->debug();
+		} else if ( strcmp( command, "id" ) == 0 ) {
+			valid = true;
+			this->printInstanceId();
 		} else if ( strcmp( command, "dump" ) == 0 ) {
 			valid = true;
 			this->dump();
@@ -702,7 +697,10 @@ void Coordinator::interactive() {
 			valid = true;
 		} else if ( strcmp( command, "remapMigrate" ) == 0 ) {
 			for ( uint32_t i = 0; i < this->sockets.slaves.size(); i++ ){
-				this->syncRemappedData( this->sockets.slaves[ i ]->getAddr() );
+				this->syncRemappedData(
+					this->sockets.slaves[ i ]->getAddr(),
+					0, 0, 0
+				);
 			}
 			valid = true;
 		} else {
@@ -766,6 +764,10 @@ void Coordinator::printPending( FILE *f ) {
 	this->pending.printSyncRemappingRecords( f );
 }
 
+void Coordinator::printInstanceId( FILE *f ) {
+	fprintf( f, "Instance ID = %u\n", Coordinator::instanceId );
+}
+
 void Coordinator::help() {
 	fprintf(
 		stdout,
@@ -773,6 +775,7 @@ void Coordinator::help() {
 		"- help: Show this help message\n"
 		"- info: Show configuration\n"
 		"- debug: Show debug messages\n"
+		"- id: Print instance ID\n"
 		"- time: Show elapsed time\n"
 		"- seal: Force all slaves to seal all its chunks\n"
 		"- flush: Force all slaves to flush all its chunks\n"

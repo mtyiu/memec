@@ -528,6 +528,9 @@ void Master::interactive() {
 		} else if ( strcmp( command, "debug" ) == 0 ) {
 			valid = true;
 			this->debug();
+		} else if ( strcmp( command, "id" ) == 0 ) {
+			valid = true;
+			this->printInstanceId();
 		} else if ( strcmp( command, "pending" ) == 0 ) {
 			valid = true;
 			this->printPending();
@@ -598,6 +601,10 @@ bool Master::isDegraded( SlaveSocket *socket ) {
 			! this->config.master.degraded.disabled
 		)
 	);
+}
+
+void Master::printInstanceId( FILE *f ) {
+	fprintf( f, "Instance ID = %u\n", Master::instanceId );
 }
 
 void Master::printPending( FILE *f ) {
@@ -680,7 +687,7 @@ void Master::printPending( FILE *f ) {
 		keyValueUpdateIt != this->pending.applications.update.end();
 		keyValueUpdateIt++, i++
 	) {
-		const PendingIdentifier &pid = it->first;
+		const PendingIdentifier &pid = keyValueUpdateIt->first;
 		const KeyValueUpdate &keyValueUpdate = keyValueUpdateIt->second;
 		fprintf(
 			f, "%lu. ID: (%u, %u); Key: %.*s (size = %u, offset = %u, length = %u); source: ",
@@ -813,7 +820,7 @@ void Master::printPending( FILE *f ) {
 		keyValueUpdateIt != this->pending.slaves.update.end();
 		keyValueUpdateIt++, i++
 	) {
-		const PendingIdentifier &pid = it->first;
+		const PendingIdentifier &pid = keyValueUpdateIt->first;
 		const KeyValueUpdate &keyValueUpdate = keyValueUpdateIt->second;
 		fprintf(
 			f, "%lu. ID: (%u, %u), parent ID: (%u, %u); Key: %.*s (size = %u, offset = %u, length = %u); target: ",
@@ -963,6 +970,7 @@ void Master::help() {
 		"- help: Show this help message\n"
 		"- info: Show configuration\n"
 		"- debug: Show debug messages\n"
+		"- id: Print instance ID\n"
 		"- pending: Show all pending requests\n"
 		"- remapping: Show remapping info\n"
 		"- backup: Show backup info\n"

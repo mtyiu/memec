@@ -161,13 +161,14 @@ struct MetadataHeader {
 	uint32_t chunkId;
 };
 
-#define PROTO_KEY_OP_METADATA_SIZE 14
+#define PROTO_KEY_OP_METADATA_SIZE 18
 struct KeyOpMetadataHeader {
 	uint8_t keySize;
 	uint8_t opcode;
 	uint32_t listId;
 	uint32_t stripeId;
 	uint32_t chunkId;
+	uint32_t timestamp;
 	char *key;
 };
 
@@ -539,7 +540,7 @@ protected:
         bool isLast
 	);
 	bool parseHeartbeatHeader(
-		size_t offset, uint32_t &timestamp, uint32_t &sealed, uint32_t &keys, bool isLast,
+		size_t offset, uint32_t &timestamp, uint32_t &sealed, uint32_t &keys, bool &isLast,
 		char *buf, size_t size
 	);
 	bool parseMetadataHeader(
@@ -548,13 +549,15 @@ protected:
 	);
 	bool parseKeyOpMetadataHeader(
 		size_t offset, uint8_t &keySize, uint8_t &opcode,
-		uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
+		uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &timestamp,
 		char *&key, char *buf, size_t size
 	);
 	// ---------- fault_protocol.cc ----------
-	size_t generateHeartbeatMessage(
+	size_t generateMetadataBackupMessage(
 		uint8_t magic, uint8_t to, uint8_t opcode,
-		uint16_t instanceId, uint32_t requestId, LOCK_T *lock,
+		uint16_t instanceId, uint32_t requestId,
+		uint32_t addr, uint16_t port,
+		LOCK_T *lock,
 		std::unordered_multimap<uint32_t, Metadata> &sealed, uint32_t &sealedCount,
 		std::unordered_map<Key, MetadataBackup> &ops, uint32_t &opsCount,
 		bool &isCompleted
@@ -1016,6 +1019,12 @@ public:
 	);
 	bool parseKeyOpMetadataHeader(
 		struct KeyOpMetadataHeader &header, size_t &bytes,
+		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
+	// ---------- fault_protocol.cc ----------
+	bool parseMetadataBackupMessage(
+		struct AddressHeader &address,
+		struct HeartbeatHeader &heartbeat,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 	// ---------- remap_protocol.cc ----------

@@ -302,7 +302,7 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, bool isSealed, ch
 
 	if ( metadata.chunkId < SlaveWorker::dataChunkCount ) {
 		if ( isSealed ) {
-			uint32_t originalChunkSize;
+			uint32_t timestamp, originalChunkSize;
 			// Delete all keys in the chunk from the map
 			offset = 0;
 			originalChunkSize = chunkSize = chunk->getSize();
@@ -312,7 +312,7 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, bool isSealed, ch
 
 				key.set( key.size, key.data );
 				SlaveWorker::map->deleteKey(
-					key, 0, keyMetadata,
+					key, 0, timestamp, keyMetadata,
 					false, // needsLock
 					false, // needsUnlock
 					false  // needsUpdateOpMetadata
@@ -334,6 +334,8 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, bool isSealed, ch
 			offset = 0;
 			chunkSize = header.chunkData.size;
 			while( offset < chunkSize ) {
+				uint32_t timestamp;
+
 				keyValue = chunk->getKeyValue( offset );
 				keyValue.deserialize( key.data, key.size, valueStr, valueSize );
 				objSize = KEY_VALUE_METADATA_SIZE + key.size + valueSize;
@@ -345,7 +347,7 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, bool isSealed, ch
 				keyMetadata.length = objSize;
 
 				SlaveWorker::map->insertKey(
-					key, 0, keyMetadata,
+					key, 0, timestamp, keyMetadata,
 					false, // needsLock
 					false, // needsUnlock
 					false  // needsUpdateOpMetadata
@@ -370,6 +372,7 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, bool isSealed, ch
 			struct KeyHeader keyHeader;
 			struct KeyValueHeader keyValueHeader;
 			uint32_t offset = ptr - buf;
+			uint32_t timestamp;
 
 			// Handle removed keys in DEGRADED_DELETE
 			for ( uint32_t i = 0; i < header.chunkKeyValue.deleted; i++ ) {
@@ -380,7 +383,7 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, bool isSealed, ch
 				key.set( keyHeader.keySize, keyHeader.key );
 
 				// Update key map and chunk
-				if ( SlaveWorker::map->deleteKey( key, PROTO_OPCODE_DELETE, keyMetadata, false, false, false ) ) {
+				if ( SlaveWorker::map->deleteKey( key, PROTO_OPCODE_DELETE, timestamp, keyMetadata, false, false, false ) ) {
 					chunk->deleteKeyValue( keys, keyMetadata );
 				} else {
 					__ERROR__( "SlaveWorker", "handleSetChunkRequest", "The deleted key does not exist." );

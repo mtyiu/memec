@@ -139,7 +139,28 @@ void MasterRemapMsgHandler::setState( char* msg , int len ) {
 				if ( state == REMAP_WAIT_DEGRADED )
 					signal = state;
 				else {
-					// Insert a new event
+					Master *master = Master::getInstance();
+					LOCK_T &lock = master->sockets.slaves.lock;
+					std::vector<SlaveSocket *> &slaves = master->sockets.slaves.values;
+					SlaveSocket *target = 0;
+
+					LOCK( &lock );
+					for ( size_t i = 0, count = slaves.size(); i < count; i++ ) {
+						if ( slaves[ i ]->equal( slave.sin_addr.s_addr, slave.sin_port ) ) {
+							target = slaves[ i ];
+							break;
+						}
+					}
+					UNLOCK( &lock );
+
+					if ( target ) {
+						// Insert a new event
+						SlaveEvent event;
+						event.syncMetadata( target );
+						Master::getInstance()->eventQueue.insert( event );
+					} else {
+						__ERROR__( "MasterRemapMsgHandler", "setState", "SlaveSocket not found." );
+					}
 				}
 				break;
 			case REMAP_COORDINATED:
@@ -190,7 +211,8 @@ bool MasterRemapMsgHandler::removeAliveSlave( struct sockaddr_in slave ) {
 bool MasterRemapMsgHandler::useCoordinatedFlow( struct sockaddr_in slave ) {
 	if ( this->slavesState.count( slave ) == 0 )
 		return false;
-
+	return this->slavesState[ slave ] != REMAP_NORMAL;
+	/*
 	switch ( this->slavesState[ slave ] ) {
 		case REMAP_INTERMEDIATE:
 		case REMAP_DEGRADED:
@@ -200,6 +222,7 @@ bool MasterRemapMsgHandler::useCoordinatedFlow( struct sockaddr_in slave ) {
 			break;
 	}
 	return false;
+	*/
 }
 
 bool MasterRemapMsgHandler::allowRemapping( struct sockaddr_in slave ) {

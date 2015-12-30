@@ -55,6 +55,7 @@ size_t Protocol::generateHeartbeatMessage(
 			*( ( uint32_t * )( buf + 2 ) ) = htonl( opMetadata.listId );
 			*( ( uint32_t * )( buf + 6 ) ) = htonl( opMetadata.stripeId );
 			*( ( uint32_t * )( buf + 10 ) ) = htonl( opMetadata.chunkId );
+			*( ( uint32_t * )( buf + 14 ) ) = htonl( opMetadata.timestamp );
 
 			buf += PROTO_KEY_OP_METADATA_SIZE;
 			memcpy( buf, key.data, key.size );
@@ -72,9 +73,7 @@ size_t Protocol::generateHeartbeatMessage(
 
 	*sealedPtr = htonl( sealedCount );
 	*opsPtr = htonl( opsCount );
-	*isLastPtr = isCompleted? 1 : 0;
-
-	// TODO tell coordinator whether this is the last packet of records
+	*isLastPtr = isCompleted ? 1 : 0;
 
 	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, instanceId, requestId );
 
@@ -95,7 +94,7 @@ size_t Protocol::generateHeartbeatMessage( uint8_t magic, uint8_t to, uint8_t op
 	return bytes;
 }
 
-bool Protocol::parseHeartbeatHeader( size_t offset, uint32_t &timestamp, uint32_t &sealed, uint32_t &keys, bool isLast, char *buf, size_t size ) {
+bool Protocol::parseHeartbeatHeader( size_t offset, uint32_t &timestamp, uint32_t &sealed, uint32_t &keys, bool &isLast, char *buf, size_t size ) {
 	if ( size - offset < PROTO_HEARTBEAT_SIZE )
 		return false;
 
@@ -120,16 +119,17 @@ bool Protocol::parseMetadataHeader( size_t offset, uint32_t &listId, uint32_t &s
 	return true;
 }
 
-bool Protocol::parseKeyOpMetadataHeader( size_t offset, uint8_t &keySize, uint8_t &opcode, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, char *&key, char *buf, size_t size ) {
+bool Protocol::parseKeyOpMetadataHeader( size_t offset, uint8_t &keySize, uint8_t &opcode, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &timestamp, char *&key, char *buf, size_t size ) {
 	if ( size - offset < PROTO_KEY_OP_METADATA_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
-	keySize  = ( uint8_t ) ptr[ 0 ];
-	opcode   = ( uint8_t ) ptr[ 1 ];
-	listId   = ntohl( *( ( uint32_t * )( ptr +  2 ) ) );
-	stripeId = ntohl( *( ( uint32_t * )( ptr +  6 ) ) );
-	chunkId  = ntohl( *( ( uint32_t * )( ptr + 10 ) ) );
+	keySize   = ( uint8_t ) ptr[ 0 ];
+	opcode    = ( uint8_t ) ptr[ 1 ];
+	listId    = ntohl( *( ( uint32_t * )( ptr +  2 ) ) );
+	stripeId  = ntohl( *( ( uint32_t * )( ptr +  6 ) ) );
+	chunkId   = ntohl( *( ( uint32_t * )( ptr + 10 ) ) );
+	timestamp = ntohl( *( ( uint32_t * )( ptr + 14 ) ) );
 
 	if ( size - offset < PROTO_KEY_OP_METADATA_SIZE + ( size_t ) keySize )
 		return false;
@@ -182,6 +182,7 @@ bool Protocol::parseKeyOpMetadataHeader( struct KeyOpMetadataHeader &header, siz
 		header.listId,
 		header.stripeId,
 		header.chunkId,
+		header.timestamp,
 		header.key,
 		buf, size
 	);

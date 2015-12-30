@@ -126,7 +126,9 @@ public:
 
 	// ---------- fault_protocol.cc ----------
 	char *syncMetadataBackup(
-		size_t &size, uint16_t instanceId, uint32_t requestId, LOCK_T *lock,
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		uint32_t addr, uint16_t port,
+		LOCK_T *lock,
 		std::unordered_multimap<uint32_t, Metadata> &sealed, uint32_t &sealedCount,
 		std::unordered_map<Key, MetadataBackup> &ops, uint32_t &opsCount,
 		bool &isCompleted

@@ -67,7 +67,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 			break;
 		case APPLICATION_EVENT_TYPE_SET_RESPONSE_SUCCESS:
 		case APPLICATION_EVENT_TYPE_SET_RESPONSE_FAILURE:
-			if ( event.message.set.isKeyValue ){
+			if ( event.message.set.isKeyValue ) {
 				Key key = event.message.set.data.keyValue.key();
 				buffer.data = this->protocol.resSet(
 					buffer.size,

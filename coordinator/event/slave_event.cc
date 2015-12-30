@@ -45,9 +45,11 @@ void SlaveEvent::syncRemappedData( SlaveSocket *socket, Packet *packet ) {
 	this->message.parity.packet = packet;
 }
 
-void SlaveEvent::reqReleaseDegradedLock( SlaveSocket *socket, bool *done ) {
+void SlaveEvent::reqReleaseDegradedLock( SlaveSocket *socket, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done ) {
 	this->type = SLAVE_EVENT_TYPE_REQUEST_RELEASE_DEGRADED_LOCK;
 	this->socket = socket;
+	this->message.degraded.lock = lock;
+	this->message.degraded.cond = cond;
 	this->message.degraded.done = done;
 }
 
