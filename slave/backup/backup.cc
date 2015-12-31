@@ -30,20 +30,26 @@ SlaveBackup::~SlaveBackup() {
 		/* if this is data* delta */ \
 		BackupPendingIdentifier pi( requestId, targetSocket ); \
 		if ( isData ) { \
-			if ( this->idToTimestampMap.count( pi ) > 0 ) { \
-				__ERROR__( "SlaveBackup", "insertData*", "Duplicated request Id [%d] for %s!", requestId, #_VAR_TYPE_ ); \
-				ret = false; \
-			} else if ( this->idToTimestampMap.lower_bound( pi ) != this->idToTimestampMap.end() ) { \
-				/* keep one copy of backup, but mutltiple ref indexed by a request id */ \
-				duplicate = true; \
+			std::multimap<BackupPendingIdentifier, Timestamp>::iterator lit, rit; \
+			tie( lit, rit ) = this->idToTimestampMap.equal_range( pi ); \
+			int pending = 0; \
+			for( ; lit != rit; lit++ ) { \
+				if ( lit->first.targetSocket == targetSocket ) { \
+					__ERROR__( "SlaveBackup", "insertData*", "Duplicated request Id [%d] for %s!", requestId, #_OP_TYPE_ ); \
+					ret = false; \
+					break; \
+				} \
+				pending++; \
+			} \
+			/* keep one copy of backup, but mutltiple ref indexed by a request id */ \
+			duplicate = ( ! ret ) || ( lit == rit && pending > 0 ); \
+			if ( ret ) { \
+				this->idToTimestampMap.insert( std::pair<BackupPendingIdentifier, Timestamp>( pi, ts ) ); \
 			} \
 		} \
-		if ( ret ) { \
-			this->idToTimestampMap.insert( std::pair<BackupPendingIdentifier, Timestamp>( pi, ts ) ); \
-			if ( ! duplicate ) { \
-				backupDelta.set( metadata, key, value, isChunkDelta, offset, !isData, requestId ); \
-				map->insert( std::pair<Timestamp, BackupDelta>( ts, backupDelta ) ); \
-			} \
+		if ( ! duplicate && ret ) { \
+			backupDelta.set( metadata, key, value, isChunkDelta, offset, !isData, requestId ); \
+			map->insert( std::pair<Timestamp, BackupDelta>( ts, backupDelta ) ); \
 		} \
 		UNLOCK( lock ); \
 		return ret; \
@@ -104,23 +110,25 @@ SlaveBackup::~SlaveBackup() {
 		\
 		LOCK( lock );  \
 		BackupPendingIdentifier pi( requestId, targetSocket ); \
-		std::multimap<BackupPendingIdentifier, Timestamp>::iterator pit = this->idToTimestampMap.find( pi ); \
-		if ( pit == this->idToTimestampMap.end() ) { \
+		std::multimap<BackupPendingIdentifier, Timestamp>::iterator lpit, rpit, tpit; \
+		tie( lpit, rpit ) = this->idToTimestampMap.equal_range( pi ); \
+		for( tpit = lpit ; tpit != rpit && tpit->first.targetSocket != targetSocket; tpit++ ); \
+		if ( tpit == rpit ) { \
+			__ERROR__( "SlaveBackup", "removeById", "Cannnot find pending parity slave for request ID = %u from socket FD = %u.", requestId, targetSocket->getSocket() ); \
 			UNLOCK( lock ); \
 			return ret; \
-		} else { \
-			ts = pit->second; \
 		} \
-		this->idToTimestampMap.erase( pit ); \
-		/* see if there is more pending reference */ \
-		pit = this->idToTimestampMap.lower_bound( pi ); \
-		\
-		std::multimap<Timestamp, BackupDelta>::iterator lit, rit; \
-		\
-		lit = map->lower_bound( ts ); \
-		rit = map->upper_bound( ts ); \
-		/* only remove backup after all parity slave acked */ \
-		if ( lit != map->end() && pit == this->idToTimestampMap.end() ) { \
+		ts = tpit->second; \
+		int pending = 0; \
+		for ( ; lpit != rpit; lpit++ ) \
+			pending++; \
+		this->idToTimestampMap.erase( tpit ); \
+		/* if the only pending reference is removed, remove the backup as well */ \
+		if ( pending == 1 ) { \
+			std::multimap<Timestamp, BackupDelta>::iterator lit, rit; \
+			\
+			tie( lit, rit ) = map->equal_range( ts ); \
+			/* only remove backup after all parity slave acked */ \
 			for ( ; lit != rit; lit++ ) { \
 				if ( lit->second.requestId == requestId ) { \
 					ret = lit->second; \
@@ -129,6 +137,9 @@ SlaveBackup::~SlaveBackup() {
 					map->erase( lit ); \
 					break; \
 				} \
+			} \
+			if ( lit == rit ) { \
+				__ERROR__( "SlaveBackup" , "removeById", "Cannot find backup for request ID = %u at time = %u.", requestId, ts.getVal() ); \
 			} \
 		} \
 		\
@@ -178,15 +189,25 @@ void SlaveBackup::print( FILE *f, bool printDelta ) {
 	for ( auto& it : _MAP_ ) { \
 		i++; \
 		fprintf( _OUT_, \
-			"%7u key: (%u) %.*s;    delta: (%u) [%.*s]\n", \
+			"%7u  Timestamp: %10u;  key: (%4u) %.*s;  offset: %4u;  isChunkDelta:%1hhu;  isParity:%1hhu;  delta: (%4u) [", \
 			i, \
+			it.first.getVal(), \
 			it.second.key.size, \
 			it.second.key.size, \
 			( it.second.key.data )? it.second.key.data : "[N/A]", \
-			it.second.delta.data.size, \
-			it.second.delta.data.size, \
-			( it.second.delta.data.data )? it.second.delta.data.data : "[N/A]" \
+			it.second.delta.offset, \
+			it.second.isChunkDelta, \
+			it.second.isParity, \
+			it.second.delta.data.size \
 		); \
+		if ( ! it.second.delta.data.data ) { \
+			fprintf( _OUT_, "[N/A]\n" ); \
+		} else { \
+			for ( int i = 0, len = it.second.delta.data.size ; i < len; i++ ) { \
+				fprintf( _OUT_, "%hhx", it.second.delta.data.data[ i ] ); \
+			}; \
+			fprintf( _OUT_, "]\n" ); \
+		} \
 	} \
 }
 

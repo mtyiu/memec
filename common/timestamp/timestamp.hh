@@ -33,7 +33,7 @@ public:
 		UNLOCK( &this->lock );
 	}
 
-	uint32_t getVal() {
+	uint32_t getVal() const {
 		return this->value;
 	}
 
