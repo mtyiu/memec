@@ -11,6 +11,7 @@ enum SlaveEventType {
 	SLAVE_EVENT_TYPE_REGISTER_REQUEST,
 	SLAVE_EVENT_TYPE_SEND,
 	SLAVE_EVENT_TYPE_SYNC_METADATA,
+	SLAVE_EVENT_TYPE_ACK_PARITY_DELTA,
 	SLAVE_EVENT_TYPE_PENDING
 };
 
@@ -28,11 +29,16 @@ public:
 		struct {
 			Packet *packet;
 		} send;
+		struct {
+			uint32_t fromTimestamp;
+			uint32_t toTimestamp;
+		} ack;
 	} message;
 
 	void reqRegister( SlaveSocket *socket, uint32_t addr, uint16_t port );
 	void send( SlaveSocket *socket, Packet *packet );
 	void syncMetadata( SlaveSocket *socket );
+	void ackParityDelta( SlaveSocket *socket, uint32_t fromTimestamp, uint32_t toTimestamp );
 	void pending( SlaveSocket *socket );
 };
 

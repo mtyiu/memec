@@ -81,7 +81,10 @@ public:
 	/* Instance ID (assigned by coordinator) */
 	static uint16_t instanceId;
 	/* Timestamp */
-	Timestamp timestamp;
+	struct {
+		Timestamp current;
+		Timestamp lastParityDeltaAck;
+	} timestamp;
 	/* For debugging only */
 	struct {
 		bool isDegraded;
@@ -105,6 +108,7 @@ public:
 	void printBackup( FILE *f = stdout );
 	void syncMetadata();
 	void time();
+	void ackParityDelta();
 	double getElapsedTime();
 	void interactive();
 	bool setDebugFlag( char *input );

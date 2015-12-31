@@ -116,7 +116,7 @@ bool SlaveWorker::handleUpdateRequest( SlavePeerEvent event, char *buf, size_t s
 
 	key.set( header.keySize, header.key );
 
-	// TODO backup parity delta
+	// backup parity delta ( data delta from data slave )
 	Timestamp timestamp( event.timestamp );
 	Value value;
 	value.set( header.valueUpdateSize, header.valueUpdate );
@@ -159,7 +159,7 @@ bool SlaveWorker::handleDeleteRequest( SlavePeerEvent event, char *buf, size_t s
 
 	key.set( header.keySize, header.key );
 
-	// TODO backup parity delta
+	// backup parity delta ( data delta from data slave )
 	Timestamp timestamp( event.timestamp );
 	Value value;
 	value.set( 0, 0 );
@@ -485,7 +485,7 @@ bool SlaveWorker::handleUpdateChunkRequest( SlavePeerEvent event, char *buf, siz
 	Metadata metadata;
 	metadata.set( header.listId, header.stripeId, header.chunkId );
 
-	// TODO backup parity chunk delta
+	// backup parity chunk delta ( data chunk delta from data slave )
 	Timestamp timestamp( event.timestamp );
 	Key key;
 	key.set( 0, 0 );
@@ -532,7 +532,7 @@ bool SlaveWorker::handleDeleteChunkRequest( SlavePeerEvent event, char *buf, siz
 	Metadata metadata;
 	metadata.set( header.listId, header.stripeId, header.chunkId );
 
-	// TODO backup parity delta
+	// backup parity chunk delta ( data chunk delta from data slave )
 	Timestamp timestamp( event.timestamp );
 	Key key;
 	key.set( 0, 0 );

@@ -63,32 +63,44 @@ SlaveBackup::~SlaveBackup() {
 
 // ------------------------------- REMOVE ----------------------------------
 
+#define REMOVE_ITEMS( _LIT_, _RIT_, _FREE_, _RET_, _IS_DATA_ ) \
+	for ( ; _LIT_ != _RIT_; _LIT_++ ) { \
+		if ( _FREE_ ) \
+			_LIT_->second.free(); \
+		else \
+			_RET_.push_back( _LIT_->second ); \
+		if ( _IS_DATA_ ) { \
+			BackupPendingIdentifier pi ( _LIT_->second.requestId, 0 ) ; \
+			this->idToTimestampMap.erase( pi ); \
+		} \
+	} 
+
 #define DEFINE_REMOVE_BY_TIMESTAMP_METHOD( _CONTENT_TYPE_, _VAR_TYPE_, _OP_TYPE_ ) \
-	std::vector<BackupDelta> SlaveBackup::remove##_CONTENT_TYPE_##_OP_TYPE_( Timestamp ts, bool free ) { \
+	std::vector<BackupDelta> SlaveBackup::remove##_CONTENT_TYPE_##_OP_TYPE_( Timestamp from, Timestamp to, bool free ) { \
 		std::vector<BackupDelta> ret; \
 		LOCK_T *lock = &this->_VAR_TYPE_##_OP_TYPE_##Lock; \
 		std::multimap<Timestamp, BackupDelta> *map = &this->_VAR_TYPE_##_OP_TYPE_; \
 		\
-		std::multimap<Timestamp, BackupDelta>::iterator lit, rit; \
+		std::multimap<Timestamp, BackupDelta>::iterator lit, rit, it; \
 		bool isData = ( strncmp( #_CONTENT_TYPE_ , "Data", 4 ) == 0 ); \
 		\
 		LOCK( lock );  \
-		lit = map->lower_bound( ts ); \
-		rit = map->upper_bound( ts ); \
-		if ( lit != map->end() ) { \
-			for ( lit = map->begin(); lit != rit; lit++ ) { \
-				if ( free ) \
-					lit->second.free(); \
-				else \
-					ret.push_back( lit->second ); \
-				if ( isData ) { \
-					BackupPendingIdentifier pi ( lit->second.requestId, 0 ) ; \
-					if ( ! lit->second.isParity && this->idToTimestampMap.count( pi ) > 0 ) { \
-						this->idToTimestampMap.erase( pi ); \
-					} \
-				} \
-			} \
+		bool wrapped = ( from.getVal() > to.getVal() ); \
+		lit = map->lower_bound( from ); \
+		rit = map->upper_bound( to ); \
+		if ( wrapped ) { \
+			/* from --> end of map */ \
+			it = lit; \
+			REMOVE_ITEMS( it, map->end(), free, ret, isData ); \
+			map->erase( lit, map->end() ); \
+			/* start of map --> to */ \
+			it = map->begin(); \
+			REMOVE_ITEMS( it, rit, free, ret, isData ); \
 			map->erase( map->begin(), rit ); \
+		} else { \
+			it = lit; \
+			REMOVE_ITEMS( it, rit, free, ret, isData ); \
+			map->erase( lit, rit ); \
 		} \
 		UNLOCK( lock ); \
 		\
@@ -219,6 +231,8 @@ void SlaveBackup::print( FILE *f, bool printDelta ) {
 #undef PRINT_DELTA_IN_MAP
 
 }
+
+#undef REMOVE_ITEMS
 
 #undef DEFINE_INSERT_METHOD
 #undef DEFINE_INSERT_DATA_METHOD

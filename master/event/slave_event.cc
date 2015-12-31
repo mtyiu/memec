@@ -18,7 +18,15 @@ void SlaveEvent::syncMetadata( SlaveSocket *socket ) {
 	this->socket = socket;
 }
 
+void SlaveEvent::ackParityDelta( SlaveSocket *socket, uint32_t fromTimestamp, uint32_t toTimestamp ) {
+	this->type = SLAVE_EVENT_TYPE_ACK_PARITY_DELTA;
+	this->socket = socket;
+	this->message.ack.fromTimestamp = fromTimestamp;
+	this->message.ack.toTimestamp = toTimestamp;
+}
+
 void SlaveEvent::pending( SlaveSocket *socket ) {
 	this->type = SLAVE_EVENT_TYPE_PENDING;
 	this->socket = socket;
 }
+

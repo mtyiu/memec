@@ -133,6 +133,11 @@ public:
 		std::unordered_map<Key, MetadataBackup> &ops, uint32_t &opsCount,
 		bool &isCompleted
 	);
+
+	char *ackParityDeltaBackup(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		uint32_t fromTimestamp, uint32_t toTimestamp
+	);
 };
 
 #endif

@@ -376,6 +376,10 @@ bool Master::start() {
 		ret = false;
 	}
 
+	/* Timestamps */
+	this->timestamp.current.setVal( 0 );
+	this->timestamp.lastParityDeltaAck.setVal( 0 );
+
 	this->startTime = start_timer();
 	this->isRunning = true;
 
@@ -558,6 +562,9 @@ void Master::interactive() {
 		} else if ( strcmp( command, "time" ) == 0 ) {
 			valid = true;
 			this->time();
+		} else if ( strcmp( command, "ackparity" ) == 0 ) {
+			valid = true;
+			this->ackParityDelta();
 		} else {
 			valid = false;
 		}
@@ -987,6 +994,7 @@ void Master::help() {
 		"- metadata: Synchronize metadata backup for a particular slave\n"
 		"- set: Set debug flag (degraded = [true|false])\n"
 		"- time: Show elapsed time\n"
+		"- ackparity: Acknowledge parity delta\n"
 		"- exit: Terminate this client\n"
 	);
 	fflush( stdout );
@@ -995,4 +1003,25 @@ void Master::help() {
 void Master::time() {
 	fprintf( stdout, "Elapsed time: %12.6lf s\n", this->getElapsedTime() );
 	fflush( stdout );
+}
+
+void Master::ackParityDelta() {
+	SlaveEvent event;
+	fprintf( 
+		stdout, "Ack timestamps from %u to %u\n",
+		this->timestamp.lastParityDeltaAck.getVal(),
+		this->timestamp.current.getVal()
+	);
+		
+	for( int i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
+		event.ackParityDelta( 
+			this->sockets.slaves.values[ i ],
+			this->timestamp.lastParityDeltaAck.getVal(),
+			this->timestamp.current.getVal()
+		);
+		this->eventQueue.insert( event );
+	}
+	this->timestamp.lastParityDeltaAck.setVal( 
+		this->timestamp.current.getVal()
+	);
 }

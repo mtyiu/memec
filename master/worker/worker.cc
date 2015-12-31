@@ -295,7 +295,7 @@ bool MasterWorker::init() {
 	MasterWorker::remappingRecords = &master->remappingRecords;
 	MasterWorker::packetPool = &master->packetPool;
 	MasterWorker::remapMsgHandler = &master->remapMsgHandler;
-	MasterWorker::timestamp = &master->timestamp;
+	MasterWorker::timestamp = &master->timestamp.current;
 	return true;
 }
 

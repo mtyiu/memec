@@ -59,7 +59,7 @@ public:
 
 	bool operator==( const BackupPendingIdentifier &pi ) const {
 		// strict comparison
-		return ( this->requestId == pi.requestId && this->targetSocket == pi.targetSocket);
+		return ( this->requestId == pi.requestId && this->targetSocket == pi.targetSocket );
 	}
 
 };
@@ -77,11 +77,15 @@ private:
 	Timestamp *localTime;
 
 	// backup key-value in the pending structure
+	// timestamp -> delta
 	std::multimap<Timestamp, BackupDelta> dataUpdate;
 	std::multimap<Timestamp, BackupDelta> dataDelete;
+	// ( requestId, slaveSocket ) -> timestamp
 	std::multimap<BackupPendingIdentifier, Timestamp> idToTimestampMap;
+	// timestamp -> delta
 	std::multimap<Timestamp, BackupDelta> parityUpdate;
 	std::multimap<Timestamp, BackupDelta> parityDelete;
+	// locks
 	LOCK_T dataUpdateLock;
 	LOCK_T dataDeleteLock;
 	LOCK_T parityUpdateLock;
@@ -99,12 +103,14 @@ public:
 	bool insertParityDelete( Timestamp ts, Key key, Value value, Metadata metadata, bool isChunkDelta, uint32_t offset, uint32_t requestId = 0, Socket *targetSocket = 0 );
 
 	// clear key-value backup for update and delete at and before a timestamp (inclusive)
-	std::vector<BackupDelta> removeDataUpdate( Timestamp ts, bool free = true );
-	std::vector<BackupDelta> removeDataDelete( Timestamp ts, bool free = true );
+	// remove backup at and before a timestamp
+	std::vector<BackupDelta> removeDataUpdate( Timestamp from, Timestamp ts, bool free = true );
+	std::vector<BackupDelta> removeDataDelete( Timestamp from, Timestamp ts, bool free = true );
+	std::vector<BackupDelta> removeParityUpdate( Timestamp from, Timestamp to, bool free = true );
+	std::vector<BackupDelta> removeParityDelete( Timestamp from, Timestamp to, bool free = true );
+	// remove backup upon all parity acked using requestId
 	BackupDelta removeDataUpdate( uint32_t requestId, Socket *targetSocket, bool free = true );
 	BackupDelta removeDataDelete( uint32_t requestId, Socket *targetSocket, bool free = true );
-	std::vector<BackupDelta> removeParityUpdate( Timestamp ts, bool free = true );
-	std::vector<BackupDelta> removeParityDelete( Timestamp ts, bool free = true );
 
 	// find key-value backup for update and delete by a timestamp or request id
 	std::vector<BackupDelta> findDataUpdate( Timestamp ts ) const;
