@@ -370,6 +370,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 			}
 			event.instanceId = header.instanceId;
 			event.requestId = header.requestId;
+			event.timestamp = header.timestamp;
 			switch ( header.opcode ) {
 				case PROTO_OPCODE_REGISTER:
 					switch( header.magic ) {

@@ -14,6 +14,11 @@ public:
 		this->value = 0;
 	}
 
+	Timestamp( uint32_t ts ) {
+		LOCK_INIT( &this->lock );
+		this->value = ts;
+	}
+
 	inline uint32_t nextVal() {
 		uint32_t ret;
 		LOCK( &this->lock );
@@ -21,6 +26,25 @@ public:
 		UNLOCK( &this->lock );
 		return ret;
 	}
+
+	void setVal( uint32_t ts ) {
+		LOCK( &this->lock );
+		value = ts;
+		UNLOCK( &this->lock );
+	}
+
+	uint32_t getVal() {
+		return this->value;
+	}
+
+	bool operator<( const Timestamp &rhs ) const {
+		return this->value < rhs.value;
+	}
+
+	bool operator==( const Timestamp &rhs ) const {
+		return this->value == rhs.value;
+	}
+
 };
 
 #endif

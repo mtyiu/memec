@@ -105,6 +105,8 @@ bool SlaveWorker::handleUpdateRequest( SlavePeerEvent event, char *buf, size_t s
 		header.valueUpdateOffset, header.valueUpdateSize, header.valueUpdate
 	);
 	if ( ! ret ) {
+		// TODO backup the data delta
+		
 		// Use the chunkUpdateOffset
 		SlaveWorker::chunkBuffer->at( header.listId )->update(
 			header.stripeId, header.chunkId,
@@ -145,6 +147,9 @@ bool SlaveWorker::handleDeleteRequest( SlavePeerEvent event, char *buf, size_t s
 	bool ret = SlaveWorker::chunkBuffer->at( header.listId )->deleteKey( header.key, header.keySize );
 
 	key.set( header.keySize, header.key );
+
+	// TODO backup parity delta
+	
 	event.resDelete(
 		event.socket, event.instanceId, event.requestId,
 		header.listId, header.stripeId, header.chunkId,
@@ -456,6 +461,8 @@ bool SlaveWorker::handleUpdateChunkRequest( SlavePeerEvent event, char *buf, siz
 	);
 	ret = true;
 
+	// TODO backup parity chunk delta
+
 	Metadata metadata;
 	metadata.set( header.listId, header.stripeId, header.chunkId );
 
@@ -493,6 +500,8 @@ bool SlaveWorker::handleDeleteChunkRequest( SlavePeerEvent event, char *buf, siz
 
 	Metadata metadata;
 	metadata.set( header.listId, header.stripeId, header.chunkId );
+
+	// TODO backup parity delta
 
 	event.resDeleteChunk(
 		event.socket, event.instanceId, event.requestId, metadata,

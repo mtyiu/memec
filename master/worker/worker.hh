@@ -16,6 +16,7 @@
 #include "../../common/ds/packet_pool.hh"
 #include "../../common/ds/remapping_record_map.hh"
 #include "../../common/ds/sockaddr_in.hh"
+#include "../../common/timestamp/timestamp.hh"
 
 #define MASTER_WORKER_SEND_REPLICAS_PARALLEL
 
@@ -41,6 +42,7 @@ private:
 	static PacketPool *packetPool;
 	static MasterRemapMsgHandler *remapMsgHandler;
 	static RemappingRecordMap *remappingRecords;
+	static Timestamp *timestamp;
 
 	// ---------- worker.cc ----------
 	void dispatch( MixedEvent event );

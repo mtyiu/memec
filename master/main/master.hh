@@ -80,6 +80,8 @@ public:
 	Timer statsTimer;
 	/* Instance ID (assigned by coordinator) */
 	static uint16_t instanceId;
+	/* Timestamp */
+	Timestamp timestamp;
 	/* For debugging only */
 	struct {
 		bool isDegraded;

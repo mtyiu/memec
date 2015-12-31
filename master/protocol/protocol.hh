@@ -45,11 +45,13 @@ public:
 	char *reqUpdate(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		char *key, uint8_t keySize,
-		char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize
+		char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize,
+		uint32_t timestamp = 0
 	);
 	char *reqDelete(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
-		char *key, uint8_t keySize
+		char *key, uint8_t keySize,
+		uint32_t timestamp = 0
 	);
 
 	char *resSet(

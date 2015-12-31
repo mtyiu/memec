@@ -494,7 +494,7 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 		buffer.data = this->protocol.reqUpdate(
 			buffer.size, instanceId, requestId,
 			header.key, header.keySize,
-			header.valueUpdate, header.valueUpdateOffset, header.valueUpdateSize
+			header.valueUpdate, header.valueUpdateOffset, header.valueUpdateSize, this->timestamp->nextVal()
 		);
 
 		if ( ! MasterWorker::pending->insertKeyValueUpdate( PT_SLAVE_UPDATE, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, keyValueUpdate ) ) {
@@ -584,7 +584,8 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 
 		buffer.data = this->protocol.reqDelete(
 			buffer.size, instanceId, requestId,
-			header.key, header.keySize
+			header.key, header.keySize,
+			this->timestamp->nextVal()
 		);
 
 		if ( ! MasterWorker::pending->insertKey( PT_SLAVE_DEL, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, key ) ) {

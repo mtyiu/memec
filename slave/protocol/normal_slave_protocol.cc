@@ -32,7 +32,7 @@ char *SlaveProtocol::reqGet( size_t &size, uint16_t instanceId, uint32_t request
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::reqUpdate( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t chunkUpdateOffset, char *buf ) {
+char *SlaveProtocol::reqUpdate( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t chunkUpdateOffset, char *buf, uint32_t timestamp ) {
 	// -- common/protocol/normal_protocol.cc --
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateChunkKeyValueUpdateHeader(
@@ -49,7 +49,8 @@ char *SlaveProtocol::reqUpdate( size_t &size, uint16_t instanceId, uint32_t requ
 		valueUpdateSize,
 		chunkUpdateOffset,
 		valueUpdate,
-		buf
+		buf,
+		timestamp
 	);
 	return buf;
 }
@@ -75,7 +76,7 @@ char *SlaveProtocol::resUpdate( size_t &size, uint16_t instanceId, uint32_t requ
 	return buf;
 }
 
-char *SlaveProtocol::reqDelete( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, char *buf ) {
+char *SlaveProtocol::reqDelete( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, char *buf, uint32_t timestamp ) {
 	// -- common/protocol/normal_protocol.cc --
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateChunkKeyHeader(
@@ -88,7 +89,8 @@ char *SlaveProtocol::reqDelete( size_t &size, uint16_t instanceId, uint32_t requ
 		chunkId,
 		keySize,
 		key,
-		buf
+		buf,
+		timestamp
 	);
 	return buf;
 }
@@ -186,7 +188,7 @@ char *SlaveProtocol::resSetChunk( size_t &size, uint16_t instanceId, uint32_t re
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::reqUpdateChunk( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta, char *buf ) {
+char *SlaveProtocol::reqUpdateChunk( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta, char *buf, uint32_t timestamp ) {
 	// -- common/protocol/normal_protocol.cc --
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateChunkUpdateHeader(
@@ -197,7 +199,8 @@ char *SlaveProtocol::reqUpdateChunk( size_t &size, uint16_t instanceId, uint32_t
 		listId, stripeId, chunkId,
 		offset, length, updatingChunkId,
 		delta,
-		buf
+		buf,
+		timestamp
 	);
 	return buf;
 }
@@ -215,7 +218,7 @@ char *SlaveProtocol::resUpdateChunk( size_t &size, uint16_t instanceId, uint32_t
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::reqDeleteChunk( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta, char *buf ) {
+char *SlaveProtocol::reqDeleteChunk( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta, char *buf, uint32_t timestamp ) {
 	// -- common/protocol/normal_protocol.cc --
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateChunkUpdateHeader(
@@ -226,7 +229,8 @@ char *SlaveProtocol::reqDeleteChunk( size_t &size, uint16_t instanceId, uint32_t
 		listId, stripeId, chunkId,
 		offset, length, updatingChunkId,
 		delta,
-		buf
+		buf,
+		timestamp
 	);
 	return this->buffer.send;
 }
