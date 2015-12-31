@@ -133,7 +133,6 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 			break;
 		// DELETE
 		case MASTER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS:
-			// TODO: Include the timestamp and metadata
 			buffer.data = this->protocol.resDelete(
 				buffer.size,
 				event.instanceId, event.requestId,

@@ -186,6 +186,8 @@ bool CoordinatorRemapMsgHandler::transitToDegradedEnd( const struct sockaddr_in 
 			while ( pendingTransition->pending )
 				pthread_cond_wait( &pendingTransition->cond, &pendingTransition->lock );
 			pthread_mutex_unlock( &pendingTransition->lock );
+
+			coordinator->pending.erasePendingTransition( target->instanceId, true );
 		} else {
 			fprintf( stderr, "Pending transition not found.\n" );
 		}
