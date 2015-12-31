@@ -69,18 +69,10 @@ public:
 	);
 
 	// ---------- remap_protocol.cc ----------
-	// RemapList
-	bool parseRemappingLockHeader(
-		struct RemappingLockHeader &header,
-		char *buf, size_t size,
-		std::vector<uint32_t> *remapList = 0,
-		size_t offset = 0
-	);
 	char *resRemappingSetLock(
 		size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
-		uint32_t listId, uint32_t chunkId,
-		bool isRemapped, uint8_t keySize, char *key,
-		uint32_t sockfd = UINT_MAX
+		uint32_t *original, uint32_t *remapped, uint32_t remappedCount,
+		uint8_t keySize, char *key
 	);
 	char *reqSyncRemappedData( size_t &size, uint16_t instanceId, uint32_t requestId, struct sockaddr_in target, char* buffer = 0 );
 

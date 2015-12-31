@@ -269,14 +269,13 @@ struct ChunkUpdateHeader {
 ///////////////
 // Remapping //
 ///////////////
-#define PROTO_REMAPPING_LOCK_SIZE 14
+#define PROTO_REMAPPING_LOCK_SIZE 5
 struct RemappingLockHeader {
-	uint32_t listId;
-	uint32_t chunkId;
-	uint32_t sockfd;
-	bool isRemapped;
+	uint32_t remappedCount;
 	uint8_t keySize;
 	char *key;
+	uint32_t *original;
+	uint32_t *remapped;
 };
 
 #define PROTO_REMAPPING_SET_SIZE 17
@@ -680,14 +679,14 @@ protected:
 	// ---------- remap_protocol.cc ----------
 	size_t generateRemappingLockHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
-		uint32_t listId, uint32_t chunkId, bool isRemapped,
-		uint8_t keySize, char *key, uint32_t sockfd = UINT_MAX,
-		uint32_t payload = 0
+		uint32_t *original, uint32_t *remapped, uint32_t remappedCount,
+		uint8_t keySize, char *key
 	);
 	bool parseRemappingLockHeader(
-		size_t offset, uint32_t &listId, uint32_t &chunkId,
-		bool &isRemapped, uint8_t &keySize, char *&key,
-		char *buf, size_t size, uint32_t &sockfd
+		size_t offset, uint32_t &remappedCount,
+		uint32_t *&original, uint32_t *&remapped,
+		uint8_t &keySize, char *&key,
+		char *buf, size_t size
 	);
 
 	size_t generateRemappingSetHeader(
