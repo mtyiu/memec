@@ -219,14 +219,20 @@ bool SlaveWorker::handleUpdateResponse( SlavePeerEvent event, bool success, char
 	int pending;
 	KeyValueUpdate keyValueUpdate;
 	PendingIdentifier pid;
+	uint16_t instanceId = Slave::instanceId;
 
-	if ( ! SlaveWorker::pending->eraseKeyValueUpdate( PT_SLAVE_PEER_UPDATE, event.instanceId, event.requestId, event.socket, &pid, &keyValueUpdate, true, false ) ) {
+	if ( ! SlaveWorker::pending->eraseKeyValueUpdate( PT_SLAVE_PEER_UPDATE, instanceId, event.requestId, event.socket, &pid, &keyValueUpdate, true, false ) ) {
 		UNLOCK( &SlaveWorker::pending->slavePeers.updateLock );
 		__ERROR__( "SlaveWorker", "handleUpdateResponse", "Cannot find a pending slave UPDATE request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		return false;
 	}
 
 	// TODO erase backup
+	MasterSocket *masterSocket = Slave::getInstance()->sockets.mastersIdToSocketMap.get( event.instanceId );
+	if ( masterSocket )
+		masterSocket->backup.removeDataUpdate( event.requestId, event.socket );
+	else
+		__ERROR__( "SlaveWorker", "handleUpdateResponse", "Cannot find a pending parity slave UPDATE backup for instance ID = %hu, request ID = %u", event.instanceId, event.requestId );
 
 	// Check pending slave UPDATE requests
 	pending = SlaveWorker::pending->count( PT_SLAVE_PEER_UPDATE, pid.instanceId, pid.requestId, false, true );
@@ -278,6 +284,11 @@ bool SlaveWorker::handleDeleteResponse( SlavePeerEvent event, bool success, char
 	}
 
 	// TODO erase backup
+	MasterSocket *masterSocket = Slave::getInstance()->sockets.mastersIdToSocketMap.get( event.instanceId );
+	if ( masterSocket )
+		masterSocket->backup.removeDataDelete( event.requestId, event.socket );
+	else
+		__ERROR__( "SlaveWorker", "handleDeleteResponse", "Cannot find a pending parity slave UPDATE backup for instance ID = %hu, request ID = %u", event.instanceId, event.requestId );
 
 	// Check pending slave UPDATE requests
 	pending = SlaveWorker::pending->count( PT_SLAVE_PEER_DEL, pid.instanceId, pid.requestId, false, true );
@@ -698,13 +709,14 @@ bool SlaveWorker::handleSetChunkResponse( SlavePeerEvent event, bool success, ch
 
 	PendingIdentifier pid;
 	ChunkRequest chunkRequest;
+	uint16_t instanceId = Slave::instanceId;
 
 	chunkRequest.set(
 		header.listId, header.stripeId, header.chunkId,
 		event.socket, 0 // ptr
 	);
 
-	if ( ! SlaveWorker::pending->eraseChunkRequest( PT_SLAVE_PEER_SET_CHUNK, event.instanceId, event.requestId, event.socket, &pid, &chunkRequest ) ) {
+	if ( ! SlaveWorker::pending->eraseChunkRequest( PT_SLAVE_PEER_SET_CHUNK, instanceId, event.requestId, event.socket, &pid, &chunkRequest ) ) {
 		__ERROR__( "SlaveWorker", "handleSetChunkResponse", "Cannot find a pending slave SET_CHUNK request that matches the response. This message will be discarded." );
 	}
 
@@ -761,14 +773,20 @@ bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success,
 	int pending;
 	ChunkUpdate chunkUpdate;
 	PendingIdentifier pid;
+	uint16_t instanceId = Slave::instanceId;
 
-	if ( ! SlaveWorker::pending->eraseChunkUpdate( PT_SLAVE_PEER_UPDATE_CHUNK, event.instanceId, event.requestId, event.socket, &pid, &chunkUpdate, true, false ) ) {
+	if ( ! SlaveWorker::pending->eraseChunkUpdate( PT_SLAVE_PEER_UPDATE_CHUNK, instanceId, event.requestId, event.socket, &pid, &chunkUpdate, true, false ) ) {
 		UNLOCK( &SlaveWorker::pending->slavePeers.updateChunkLock );
 		__ERROR__( "SlaveWorker", "handleUpdateChunkResponse", "Cannot find a pending slave UPDATE_CHUNK request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		return false;
 	}
 
 	// TODO erase backup
+	MasterSocket *masterSocket = Slave::getInstance()->sockets.mastersIdToSocketMap.get( event.instanceId );
+	if ( masterSocket )
+		masterSocket->backup.removeDataUpdate( event.requestId, event.socket );
+	else
+		__ERROR__( "SlaveWorker", "handleUpdateChunkResponse", "Cannot find a pending parity slave UPDATE backup for instance ID = %hu, request ID = %u", event.instanceId, event.requestId );
 
 	// Check pending slave UPDATE requests
 	pending = SlaveWorker::pending->count( PT_SLAVE_PEER_UPDATE_CHUNK, pid.instanceId, pid.requestId, false, true );
@@ -813,6 +831,7 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 	int pending;
 	ChunkUpdate chunkUpdate;
 	PendingIdentifier pid;
+	uint16_t instanceId = Slave::instanceId;
 
 	chunkUpdate.set(
 		header.listId, header.stripeId, header.updatingChunkId,
@@ -821,13 +840,18 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 	chunkUpdate.setKeyValueUpdate( 0, 0, 0 );
 	chunkUpdate.ptr = ( void * ) event.socket;
 
-	if ( ! SlaveWorker::pending->eraseChunkUpdate( PT_SLAVE_PEER_DEL_CHUNK, event.instanceId, event.requestId, event.socket, &pid, &chunkUpdate, true, false ) ) {
+	if ( ! SlaveWorker::pending->eraseChunkUpdate( PT_SLAVE_PEER_DEL_CHUNK, instanceId, event.requestId, event.socket, &pid, &chunkUpdate, true, false ) ) {
 		UNLOCK( &SlaveWorker::pending->slavePeers.delChunkLock );
 		__ERROR__( "SlaveWorker", "handleDeleteChunkResponse", "Cannot find a pending slave DELETE_CHUNK request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		return false;
 	}
 
 	// TODO erase backup
+	MasterSocket *masterSocket = Slave::getInstance()->sockets.mastersIdToSocketMap.get( event.instanceId );
+	if ( masterSocket )
+		masterSocket->backup.removeDataDelete( event.requestId, event.socket );
+	else
+		__ERROR__( "SlaveWorker", "handleDeleteChunkResponse", "Cannot find a pending parity slave UPDATE backup for instance ID = %hu, request ID = %u", event.instanceId, event.requestId );
 
 	// Check pending slave UPDATE requests
 	pending = SlaveWorker::pending->count( PT_SLAVE_PEER_DEL_CHUNK, pid.instanceId, pid.requestId, false, true );

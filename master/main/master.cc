@@ -360,6 +360,16 @@ bool Master::start() {
 		ret = false;
 	}
 
+	// Wait until the instance ID is available from coordinator
+	while( ret && ! this->sockets.coordinators[ 0 ]->registered ) {
+		usleep(5);
+	}
+
+	// Register to slaves
+	for ( int i = 0, len = this->config.global.slaves.size(); i < len; i++ ) {
+		this->sockets.slaves[ i ]->registerMaster();
+	}
+
 	/* Remapping message handler */
 	if ( this->config.global.remap.enabled && ! this->remapMsgHandler.start() ) {
 		__ERROR__( "Master", "start", "Cannot start remapping message handler." );

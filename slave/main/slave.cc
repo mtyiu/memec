@@ -647,6 +647,9 @@ void Slave::interactive() {
 		} else if ( strcmp( command, "load" ) == 0 ) {
 			valid = true;
 			this->aggregateLoad( stdout );
+		} else if ( strcmp( command, "backup" ) == 0 ) {
+			valid = true;
+			this->backupStat( stdout );
 		} else if ( strcmp( command, "time" ) == 0 ) {
 			valid = true;
 			this->time();
@@ -930,6 +933,7 @@ void Slave::help() {
 		"- dump: Dump all key-value pairs\n"
 		"- memory: Print memory usage\n"
 		"- load: Show the load of each worker\n"
+		"- backup : Show the backup stats\n"
 		"- time: Show elapsed time\n"
 		"- exit: Terminate this client\n"
 	);
@@ -962,4 +966,16 @@ SlaveLoad &Slave::aggregateLoad( FILE *f ) {
 		this->load.print( f );
 	}
 	return this->load;
+}
+
+void Slave::backupStat( FILE *f ) {
+	fprintf( f, "\nSlave delta backup stats\n============================\n" );
+	for ( int i = 0, len = this->sockets.masters.size(); i < len; i++ ) {
+		fprintf( f, 
+			">> Master FD = %u\n-------------------\n", 
+			this->sockets.masters.keys[ i ] 
+		);
+		this->sockets.masters.values[ i ]->backup.print( f, true );
+		fprintf( f, "\n" );
+	}
 }

@@ -12,13 +12,16 @@ void SlaveSocket::setArrayMap( ArrayMap<int, SlaveSocket> *slaves ) {
 bool SlaveSocket::start() {
 	this->registered = false;
 	if ( this->connect() ) {
-		Master *master = Master::getInstance();
-		SlaveEvent event;
-		event.reqRegister( this, master->config.master.master.addr.addr, master->config.master.master.addr.port );
-		master->eventQueue.insert( event );
 		return true;
 	}
 	return false;
+}
+
+void SlaveSocket::registerMaster() {
+	Master *master = Master::getInstance();
+	SlaveEvent event;
+	event.reqRegister( this, master->config.master.master.addr.addr, master->config.master.master.addr.port );
+	master->eventQueue.insert( event );
 }
 
 void SlaveSocket::stop() {
