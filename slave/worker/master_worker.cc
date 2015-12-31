@@ -396,7 +396,8 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 				header.valueUpdate,        /* delta */
 				chunkBufferIndex == -1,    /* isSealed */
 				true,                      /* isUpdate */
-				event.timestamp
+				event.timestamp,
+				event.socket
 			);
 		} else {
 			event.resUpdate(

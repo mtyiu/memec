@@ -59,6 +59,7 @@ public:
 		ArrayMap<int, CoordinatorSocket> coordinators;
 		ArrayMap<int, MasterSocket> masters;
 		ArrayMap<int, SlavePeerSocket> slavePeers;
+		ArrayMap<uint16_t, MasterSocket> mastersIdToSocketMap;
 	} sockets;
 	IDGenerator idGenerator;
 	Pending pending;
@@ -104,6 +105,7 @@ public:
 	void printPending( FILE *f = stdout );
 	void printChunk();
 	void time();
+	void backupStat( FILE *f = stdout );
 
 	void alarm();
 
