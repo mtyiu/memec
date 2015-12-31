@@ -82,16 +82,6 @@ public:
 		bool isRemapped, uint8_t keySize, char *key,
 		uint32_t sockfd = UINT_MAX
 	);
-	// Forward the whole remapping record message passed in (with the protocol header excluded) pfrom slave to masters
-	char *forwardRemappingRecords( size_t &size, uint16_t instanceId, uint32_t requestId, char *message );
-	// Remapping
-	char *reqSyncRemappingRecord(
-		size_t &size, uint16_t instanceId, uint32_t requestId,
-		std::unordered_map<Key, RemappingRecord> &remappingRecords,
-		LOCK_T* lock,
-		bool &isLast,
-		char *buffer = 0
-	);
 	char *reqSyncRemappedData( size_t &size, uint16_t instanceId, uint32_t requestId, struct sockaddr_in target, char* buffer = 0 );
 
 	// ---------- recovery_protocol.cc ----------

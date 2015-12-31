@@ -185,56 +185,6 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 						case PROTO_MAGIC_HEARTBEAT:
 							this->processHeartbeat( event, buffer.data, header.length );
 							break;
-						case PROTO_MAGIC_REMAPPING:
-						/* {
-							ArrayMap<int, MasterSocket> &masters = Coordinator::getInstance()->sockets.masters;
-							size_t bytes, offset, count = 0;
-
-							struct RemappingRecordHeader remappingRecordHeader;
-							struct SlaveSyncRemapHeader slaveSyncRemapHeader;
-							if ( ! this->protocol.parseRemappingRecordHeader( remappingRecordHeader, buffer.data, buffer.size ) ) {
-								__ERROR__( "CoordinatorWorker", "dispatch", "Invalid remapping record protocol header." );
-								goto quit_1;
-							}
-							// start parsing the remapping records
-							// TODO buffer.size >> total size of remapping records?
-							offset = PROTO_REMAPPING_RECORD_SIZE;
-							RemappingRecordMap *map = CoordinatorWorker::remappingRecords;
-							for ( count = 0; offset < ( size_t ) buffer.size && count < remappingRecordHeader.remap; offset += bytes ) {
-								if ( ! this->protocol.parseSlaveSyncRemapHeader( slaveSyncRemapHeader, bytes, buffer.data, buffer.size - offset, offset ) )
-									break;
-								count++;
-
-								Key key;
-								key.set( slaveSyncRemapHeader.keySize, slaveSyncRemapHeader.key );
-
-								RemappingRecord remappingRecord;
-								remappingRecord.set( slaveSyncRemapHeader.listId, slaveSyncRemapHeader.chunkId, 0 );
-
-								if ( slaveSyncRemapHeader.opcode == 0 ) { // remove record
-									map->erase( key, remappingRecord, true, true, true );
-								} else if ( slaveSyncRemapHeader.opcode == 1 ) { // add record
-									map->insert( key, remappingRecord, {} );
-								}
-							}
-							//map->print();
-							//fprintf ( stderr, "Remapping Records no.=%lu (%u) upto=%lu size=%lu\n", count, remappingRecordHeader.remap, offset, buffer.size );
-
-							// forward the copies of message to masters
-							MasterEvent masterEvent;
-							for ( uint32_t i = 0; i < masters.size() ; i++ ) {
-								char *data = new char[ buffer.size ];
-								memcpy( data, buffer.data, buffer.size );
-								masterEvent.forwardRemappingRecords(
-									masters.values[ i ], // socket
-									buffer.size, // prevSize
-									data
-								);
-								CoordinatorWorker::eventQueue->insert( masterEvent );
-							}
-						} */
-							printf( "Deprecated: PROTO_MAGIC_REMAPPING.\n" );
-							break;
 						default:
 							__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );
 							break;

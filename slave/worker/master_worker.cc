@@ -263,7 +263,6 @@ bool SlaveWorker::handleGetRequest( MasterEvent event, char *buf, size_t size ) 
 
 	Key key;
 	KeyValue keyValue;
-	RemappingRecord remappingRecord;
 	if ( map->findValueByKey( header.key, header.keySize, &keyValue, &key ) ) {
 		event.resGet( event.socket, event.instanceId, event.requestId, keyValue, false );
 		ret = true;
@@ -347,7 +346,6 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 	KeyMetadata keyMetadata;
 	Metadata metadata;
 	Chunk *chunk;
-	RemappingRecord remappingRecord;
 	if ( map->findValueByKey( header.key, header.keySize, &keyValue, &key, &keyMetadata, &metadata, &chunk ) ) {
 		uint32_t offset = keyMetadata.offset + PROTO_KEY_VALUE_SIZE + header.keySize + header.valueUpdateOffset;
 
@@ -443,7 +441,6 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 	KeyMetadata keyMetadata;
 	Metadata metadata;
 	Chunk *chunk;
-	RemappingRecord remappingRecord;
 	if ( map->findValueByKey( header.key, header.keySize, &keyValue, 0, &keyMetadata, &metadata, &chunk ) ) {
 		uint32_t timestamp;
 		uint32_t deltaSize = 0;

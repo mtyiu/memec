@@ -546,12 +546,6 @@ void Coordinator::releaseDegradedLock( struct sockaddr_in slave, pthread_mutex_t
 	printf( "\n" );
 }
 
-void Coordinator::syncRemappingRecords( LOCK_T *lock, std::map<struct sockaddr_in, uint32_t> *counter, bool *done ) {
-	CoordinatorEvent event;
-	event.syncRemappingRecords( lock, counter, done );
-	this->eventQueue.insert( event );
-}
-
 void Coordinator::syncRemappedData( struct sockaddr_in slaveAddr, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done ) {
 	CoordinatorEvent event;
 	event.syncRemappedData( slaveAddr, lock, cond, done );
@@ -688,13 +682,6 @@ void Coordinator::interactive() {
 		} else if ( strcmp( command, "release" ) == 0 ) {
 			valid = true;
 			this->releaseDegradedLock();
-		} else if ( strcmp( command, "remapRecordSync" ) == 0 ) {
-			LOCK_T lock;
-			std::map<struct sockaddr_in, uint32_t> counter;
-			volatile bool done;
-			this->syncRemappingRecords( &lock, &counter, ( bool * ) &done );
-			while( ! done );
-			valid = true;
 		} else if ( strcmp( command, "remapMigrate" ) == 0 ) {
 			for ( uint32_t i = 0; i < this->sockets.slaves.size(); i++ ){
 				this->syncRemappedData(

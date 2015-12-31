@@ -16,7 +16,6 @@ MasterEventQueue *MasterWorker::eventQueue;
 StripeList<SlaveSocket> *MasterWorker::stripeList;
 PacketPool *MasterWorker::packetPool;
 ArrayMap<int, SlaveSocket> *MasterWorker::slaveSockets;
-RemappingRecordMap *MasterWorker::remappingRecords;
 MasterRemapMsgHandler *MasterWorker::remapMsgHandler;
 Timestamp *MasterWorker::timestamp;
 
@@ -43,8 +42,6 @@ void MasterWorker::dispatch( MasterEvent event ) {}
 
 SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId ) {
 	SlaveSocket *ret;
-
-	// use hashing to get original slave
 	Key key;
 	key.set( size, data );
 	listId = MasterWorker::stripeList->get(
@@ -53,27 +50,7 @@ SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId
 		this->paritySlaveSockets,
 		&chunkId, true
 	);
-
-	RemappingRecord record;
-	bool found = false;
-	// if original slave is not in Normal state, search to see if this key is remapped
-	if ( ! Master::getInstance()->config.master.remap.forceNoCacheRecords &&
-		Master::getInstance()->remapMsgHandler.useCoordinatedFlow( this->dataSlaveSockets[ chunkId ]->getAddr() ) )
-	{
-		found = MasterWorker::remappingRecords->find( key, &record );
-	}
-	if ( found ) { // remapped keys
-		//fprintf( stderr, "Redirect request to list=%u chunk=%u\n", record.listId, record.chunkId);
-		listId = record.listId;
-		chunkId = record.chunkId;
-		this->paritySlaveSockets = MasterWorker::stripeList->get(
-			listId,
-			this->paritySlaveSockets,
-			this->dataSlaveSockets
-		);
-	}
 	ret = this->dataSlaveSockets[ chunkId ];
-
 	return ret->ready() ? ret : 0;
 }
 
@@ -292,7 +269,6 @@ bool MasterWorker::init() {
 	MasterWorker::eventQueue = &master->eventQueue;
 	MasterWorker::stripeList = master->stripeList;
 	MasterWorker::slaveSockets = &master->sockets.slaves;
-	MasterWorker::remappingRecords = &master->remappingRecords;
 	MasterWorker::packetPool = &master->packetPool;
 	MasterWorker::remapMsgHandler = &master->remapMsgHandler;
 	MasterWorker::timestamp = &master->timestamp;

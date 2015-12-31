@@ -890,13 +890,6 @@ void Master::printPending( FILE *f ) {
 void Master::printRemapping( FILE *f ) {
 	fprintf(
 		f,
-		"\nRemapping Record Mapping\n"
-		"------------------------\n"
-	);
-	this->remappingRecords.print( f );
-
-	fprintf(
-		f,
 		"\nList of Tracking Slaves\n"
 		"------------------------\n"
 	);

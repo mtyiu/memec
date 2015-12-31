@@ -130,9 +130,6 @@ void MasterRemapMsgHandler::setState( char* msg , int len ) {
 		switch ( signal ) {
 			case REMAP_NORMAL:
 				__DEBUG__( BLUE, "MasterRemapMsgHandler", "setState", "REMAP_NORMAL %s:%hu", buf, slave.sin_port );
-				Master::getInstance()->remappingRecords.print();
-				Master::getInstance()->remappingRecords.erase( slave );
-				Master::getInstance()->remappingRecords.print();
 				break;
 			case REMAP_INTERMEDIATE:
 				__DEBUG__( BLUE, "MasterRemapMsgHandler", "setState", "REMAP_INTERMEDIATE %s:%hu", buf, slave.sin_port );

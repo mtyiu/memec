@@ -9,7 +9,6 @@
 
 enum CoordinatorEventType {
 	COORDINATOR_EVENT_TYPE_UNDEFINED,
-	COORDINATOR_EVENT_TYPE_SYNC_REMAPPING_RECORDS,
 	COORDINATOR_EVENT_TYPE_SYNC_REMAPPED_PARITY,
 	COORDINATOR_EVENT_TYPE_PENDING
 };
@@ -21,11 +20,6 @@ public:
 
 	struct {
 		struct {
-			LOCK_T *lock;
-			std::map<struct sockaddr_in, uint32_t> *counter;
-			bool *done;
-		} remap;
-		struct {
 			struct sockaddr_in target;
 			pthread_mutex_t *lock;
 			pthread_cond_t *cond;
@@ -34,7 +28,6 @@ public:
 	} message;
 
 	void pending( CoordinatorSocket *socket );
-	void syncRemappingRecords( LOCK_T *lock, std::map<struct sockaddr_in, uint32_t> *counter, bool *done );
 	void syncRemappedData( struct sockaddr_in target, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done );
 };
 

@@ -172,20 +172,6 @@ struct KeyOpMetadataHeader {
 	char *key;
 };
 
-#define PROTO_REMAPPING_RECORD_SIZE 4
-struct RemappingRecordHeader {
-	uint32_t remap;
-};
-
-#define PROTO_SLAVE_SYNC_REMAP_PER_SIZE 10
-struct SlaveSyncRemapHeader {
-	uint8_t keySize;
-	uint8_t opcode;
-	uint32_t listId;
-	uint32_t chunkId;
-	char *key;
-};
-
 #define PROTO_SLAVE_REMAPPED_PARITY_SIZE PROTO_ADDRESS_SIZE
 
 //////////////////////////
@@ -470,7 +456,7 @@ protected:
 	size_t generateHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode,
 		uint32_t length, uint16_t instanceId, uint32_t requestId,
-		char *sendBuf = 0, uint32_t requestTimestamp = 0 
+		char *sendBuf = 0, uint32_t requestTimestamp = 0
 	);
 	bool parseHeader(
 		uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t &opcode,
@@ -563,24 +549,6 @@ protected:
 		bool &isCompleted
 	);
 
-	// ---------- remap_protocol.cc ----------
-	size_t generateRemappingRecordMessage(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
-		LOCK_T *lock, std::unordered_map<Key, RemappingRecord> &remapRecords,
-		size_t &remapCount, char *buf = 0
-	);
-	bool parseRemappingRecordHeader(
-		size_t offset, uint32_t &remap,
-		char *buf, size_t size
-	);
-
-	// ---------- slave_sync_remap_protocol.cc ----------
-	bool parseSlaveSyncRemapHeader(
-		size_t offset, uint8_t &keySize, uint8_t &opcode,
-		uint32_t &listId, uint32_t &chunkId, char *&key,
-		char *buf, size_t size
-	);
-
 	//////////////////////////
 	// Load synchronization //
 	//////////////////////////
@@ -645,7 +613,7 @@ protected:
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize,
-		uint32_t chunkUpdateOffset, char *valueUpdate, char *sendBuf = 0, 
+		uint32_t chunkUpdateOffset, char *valueUpdate, char *sendBuf = 0,
 		uint32_t timestamp = 0
 	);
 	bool parseChunkKeyValueUpdateHeader(
@@ -675,7 +643,7 @@ protected:
 	size_t generateKeyValueUpdateHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint8_t keySize, char *key,
-		uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate = 0, 
+		uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate = 0,
 		uint32_t timestamp = 0
 	);
 	bool parseKeyValueUpdateHeader(
@@ -1026,17 +994,6 @@ public:
 		struct AddressHeader &address,
 		struct HeartbeatHeader &heartbeat,
 		char *buf = 0, size_t size = 0, size_t offset = 0
-	);
-	// ---------- remap_protocol.cc ----------
-	bool parseRemappingRecordHeader(
-		struct RemappingRecordHeader &header,
-		char *buf = 0, size_t size = 0, size_t offset = 0
-	);
-	// ---------- slave_sync_remap_protocol.cc ----------
-	bool parseSlaveSyncRemapHeader(
-		struct SlaveSyncRemapHeader &header,
-		size_t &bytes, char *buf = 0, size_t size = 0,
-		size_t offset = PROTO_HEADER_SIZE + PROTO_REMAPPING_RECORD_SIZE
 	);
 	//////////////////////////
 	// Load synchronization //

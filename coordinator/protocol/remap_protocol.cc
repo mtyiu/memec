@@ -28,39 +28,6 @@ char *CoordinatorProtocol::resRemappingSetLock( size_t &size, uint16_t instanceI
 	return this->buffer.send;
 }
 
-char *CoordinatorProtocol::forwardRemappingRecords( size_t &size, uint16_t instanceId, uint32_t requestId, char* message ) {
-	// -- common/protocol/protocol.cc --
-	size_t headerSize = this->generateHeader(
-		PROTO_MAGIC_REMAPPING,
-		PROTO_MAGIC_TO_MASTER,
-		PROTO_OPCODE_SYNC,
-		size,
-		instanceId, requestId
-	);
-	memcpy( this->buffer.send + headerSize, message, size );
-	size += headerSize;
-	return this->buffer.send;
-}
-
-char *CoordinatorProtocol::reqSyncRemappingRecord( size_t &size, uint16_t instanceId, uint32_t requestId, std::unordered_map<Key, RemappingRecord> &remappingRecords, LOCK_T* lock, bool &isLast, char* buffer ) {
-	// -- common/protocol/remap_protocol.cc --
-	size_t remapCount = 0;
-	if ( ! buffer ) buffer = this->buffer.send;
-	size = this->generateRemappingRecordMessage(
-		PROTO_MAGIC_REMAPPING,
-		PROTO_MAGIC_TO_MASTER,
-		PROTO_OPCODE_SYNC,
-		instanceId, requestId,
-		lock,
-		remappingRecords,
-		remapCount,
-		buffer
-	);
-	isLast = ( remapCount == 0 );
-
-	return buffer;
-}
-
 char *CoordinatorProtocol::reqSyncRemappedData( size_t &size, uint16_t instanceId, uint32_t requestId, struct sockaddr_in target, char* buffer ) {
 	// -- common/protocol/address_protocol.cc --
 	if ( ! buffer ) buffer = this->buffer.send;

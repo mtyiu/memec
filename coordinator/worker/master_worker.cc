@@ -8,8 +8,6 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 		size_t size;
 		char *data;
 	} buffer;
-	Coordinator *coordinator = Coordinator::getInstance();
-	Packet *packet = NULL;
 
 	switch( event.type ) {
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
@@ -37,17 +35,6 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 			delete event.message.slaveLoading.slaveGetLatency;
 			delete event.message.slaveLoading.slaveSetLatency;
 			delete event.message.slaveLoading.overloadedSlaveSet;
-			isSend = true;
-			break;
-		case MASTER_EVENT_TYPE_FORWARD_REMAPPING_RECORDS:
-			buffer.size = event.message.forward.prevSize;
-			buffer.data = this->protocol.forwardRemappingRecords(
-				buffer.size,
-				Coordinator::instanceId,
-				CoordinatorWorker::idGenerator->nextVal( this->workerId ),
-				event.message.forward.data
-			);
-			delete [] event.message.forward.data;
 			isSend = true;
 			break;
 		case MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_SUCCESS:
@@ -105,25 +92,6 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 			// free the vector of slaves
 			delete slaves;
 		}
-			break;
-		case MASTER_EVENT_TYPE_SYNC_REMAPPING_RECORDS:
-			// TODO directly send packets out
-		{
-			std::vector<Packet*> *packets = event.message.remap.syncPackets;
-
-			packet = packets->back();
-			buffer.data = packet->data;
-			buffer.size = packet->size;
-
-			packets->pop_back();
-
-			// check if this is the last packet to send
-			if ( packets->empty() )
-				delete packets;
-			else
-				coordinator->eventQueue.insert( event );
-		}
-			isSend = true;
 			break;
 		// Degraded operation
 		case MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED:
@@ -184,8 +152,6 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
-		if ( event.type == MASTER_EVENT_TYPE_SYNC_REMAPPING_RECORDS && packet )
-			coordinator->packetPool.free( packet );
 	} else if ( event.type == MASTER_EVENT_TYPE_SWITCH_PHASE ) {
 		// just to avoid error message
 		connected = true;
