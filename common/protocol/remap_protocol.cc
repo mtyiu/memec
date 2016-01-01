@@ -75,19 +75,20 @@ bool Protocol::parseRemappingLockHeader( struct RemappingLockHeader &header, cha
 	);
 }
 
-size_t Protocol::generateRemappingSetHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key, uint32_t valueSize, char *value, char *sendBuf, uint32_t sockfd, bool isParity, struct sockaddr_in *target ) {
+size_t Protocol::generateRemappingSetHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t *original, uint32_t *remapped, uint32_t remappedCount, uint8_t keySize, char *key, uint32_t valueSize, char *value, char *sendBuf ) {
 	if ( ! sendBuf ) sendBuf = this->buffer.send;
-	uint32_t payload = PROTO_REMAPPING_SET_SIZE + keySize + valueSize;
-	if ( target ) payload += 6; // ip + port
 	char *buf = sendBuf + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, payload, instanceId, requestId, sendBuf );
+	size_t bytes = this->generateHeader(
+		magic, to, opcode,
+		PROTO_REMAPPING_SET_SIZE + keySize + valueSize + remappedCount * 4 * 4,
+		instanceId, requestId, sendBuf
+	);
 
 	*( ( uint32_t * )( buf     ) ) = htonl( listId );
 	*( ( uint32_t * )( buf + 4 ) ) = htonl( chunkId );
-	*( ( uint32_t * )( buf + 8 ) ) = htonl( sockfd );
-	buf[ 12 ] = isParity;
-	bytes += 13;
-	buf += 13;
+	*( ( uint32_t * )( buf + 8 ) ) = htonl( remappedCount );
+	bytes += 12;
+	buf += 12;
 
 	unsigned char *tmp;
 	valueSize = htonl( valueSize );
@@ -108,27 +109,34 @@ size_t Protocol::generateRemappingSetHeader( uint8_t magic, uint8_t to, uint8_t 
 	bytes += valueSize;
 	buf += valueSize;
 
-	if ( target ) {
-		*( ( uint32_t * )( buf     ) ) = target->sin_addr.s_addr;
-		*( ( uint16_t * )( buf + 4 ) ) = target->sin_port;
-		bytes += 6;
+	if ( remappedCount ) {
+		remappedCount *= 2; // Include both list ID and chunk ID
+		for ( uint32_t i = 0; i < remappedCount; i++ ) {
+			*( ( uint32_t * )( buf ) ) = htonl( original[ i ] );
+			buf += 4;
+			bytes += 4;
+		}
+		for ( uint32_t i = 0; i < remappedCount; i++ ) {
+			*( ( uint32_t * )( buf ) ) = htonl( remapped[ i ] );
+			buf += 4;
+			bytes += 4;
+		}
 	}
 
 	return bytes;
 }
 
-bool Protocol::parseRemappingSetHeader( size_t offset, uint32_t &listId, uint32_t &chunkId, uint8_t &keySize, char *&key, uint32_t &valueSize, char *&value, char *buf, size_t size, uint32_t &sockfd, bool &isParity, struct sockaddr_in *target ) {
+bool Protocol::parseRemappingSetHeader( size_t offset, uint32_t &listId, uint32_t &chunkId, uint32_t &remappedCount, uint32_t *&original, uint32_t *&remapped, uint8_t &keySize, char *&key, uint32_t &valueSize, char *&value, char *buf, size_t size ) {
 	if ( size - offset < PROTO_REMAPPING_SET_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
 	unsigned char *tmp;
-	listId  = ntohl( *( ( uint32_t * )( ptr      ) ) );
-	chunkId = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
-	sockfd = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
-	isParity = *( ptr + 12 );
-	keySize = *( ptr + 13 );
-	ptr += 14;
+	listId        = ntohl( *( ( uint32_t * )( ptr      ) ) );
+	chunkId       = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
+	remappedCount = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
+	keySize = *( ptr + 12 );
+	ptr += 13;
 
 	valueSize = 0;
 	tmp = ( unsigned char * ) &valueSize;
@@ -143,13 +151,7 @@ bool Protocol::parseRemappingSetHeader( size_t offset, uint32_t &listId, uint32_
 
 	key = ptr;
 	value = ptr + keySize;
-
-	ptr += keySize + valueSize;
-
-	if ( size - offset >= PROTO_REMAPPING_SET_SIZE + keySize + valueSize + 6 && target != 0 ) {
-		target->sin_addr.s_addr = *( uint32_t * )( ptr );
-		target->sin_port = *( uint16_t * )( ptr + 4 );
-	}
+	
 	return true;
 }
 
@@ -162,13 +164,13 @@ bool Protocol::parseRemappingSetHeader( struct RemappingSetHeader &header, char 
 		offset,
 		header.listId,
 		header.chunkId,
+		header.remappedCount,
+		header.original,
+		header.remapped,
 		header.keySize,
 		header.key,
 		header.valueSize,
 		header.value,
-		buf, size,
-		header.sockfd,
-		header.remapped,
-		target
+		buf, size
 	);
 }

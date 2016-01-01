@@ -86,7 +86,7 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 	}
 }
 
-bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, std::vector<uint32_t> > *&map) {
+bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, RemapList> *&map) {
 	if ( type == PT_KEY_REMAP_LIST ) {
 		lock = &this->requests.remapListLock;
 		map = &this->requests.remapList;
@@ -111,7 +111,7 @@ Pending::Pending() {
 	LOCK_INIT( &this->slaves.delLock );
 	LOCK_INIT( &this->stats.getLock );
 	LOCK_INIT( &this->stats.setLock );
-	LOCK_INIT( &this->requests.remapListLock);
+	LOCK_INIT( &this->requests.remapListLock );
 }
 
 #define DEFINE_PENDING_APPLICATION_INSERT_METHOD( METHOD_NAME, VALUE_TYPE, VALUE_VAR ) \
@@ -184,7 +184,7 @@ Pending::Pending() {
 	}
 
 DEFINE_PENDING_COORDINATOR_INSERT_METHOD( insertDegradedLockData, DegradedLockData, degradedLockData )
-DEFINE_PENDING_COORDINATOR_INSERT_METHOD( insertRemapList, std::vector<uint32_t>, remapList );
+DEFINE_PENDING_COORDINATOR_INSERT_METHOD( insertRemapList, RemapList, remapList );
 
 DEFINE_PENDING_APPLICATION_INSERT_METHOD( insertKey, Key, key )
 DEFINE_PENDING_APPLICATION_INSERT_METHOD( insertKeyValue, KeyValue, keyValue )
@@ -196,7 +196,7 @@ DEFINE_PENDING_SLAVE_INSERT_METHOD( insertKeyValueUpdate, KeyValueUpdate, keyVal
 
 DEFINE_PENDING_ERASE_METHOD( eraseDegradedLockData, DegradedLockData, degradedLockDataPtr )
 DEFINE_PENDING_ERASE_METHOD( eraseRemappingRecord, RemappingRecord, remappingRecordPtr )
-DEFINE_PENDING_ERASE_METHOD( eraseRemapList, std::vector<uint32_t>, remapList )
+DEFINE_PENDING_ERASE_METHOD( eraseRemapList, RemapList, remapList )
 
 #undef DEFINE_PENDING_APPLICATION_INSERT_METHOD
 #undef DEFINE_PENDING_SLAVE_INSERT_METHOD
@@ -502,13 +502,13 @@ bool Pending::findKeyValueUpdate( PendingType type, uint16_t instanceId, uint32_
 	return ret;
 }
 
-bool Pending::findRemapList( PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr, std::vector<uint32_t> *remapList ) {
+bool Pending::findRemapList( PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr, RemapList *remapList ) {
 	PendingIdentifier pid( instanceId, 0, requestId, 0, ptr );
 	LOCK_T *lock;
 	bool ret;
 
-	std::unordered_multimap<PendingIdentifier, std::vector<uint32_t> > *map;
-	std::unordered_multimap<PendingIdentifier, std::vector<uint32_t> >::iterator lit;
+	std::unordered_multimap<PendingIdentifier, RemapList> *map;
+	std::unordered_multimap<PendingIdentifier, RemapList>::iterator lit;
 	if ( ! this->get( type, lock, map ) )
 		return false;
 

@@ -7,6 +7,7 @@
 #include "../ack/pending_ack.hh"
 #include "../buffer/mixed_chunk_buffer.hh"
 #include "../buffer/degraded_chunk_buffer.hh"
+#include "../buffer/remapped_buffer.hh"
 #include "../config/slave_config.hh"
 #include "../event/event_queue.hh"
 #include "../ds/map.hh"
@@ -61,6 +62,7 @@ private:
 	static MemoryPool<Chunk> *chunkPool;
 	static std::vector<MixedChunkBuffer *> *chunkBuffer;
 	static DegradedChunkBuffer *degradedChunkBuffer;
+	static RemappedBuffer *remappedBuffer;
 	static PacketPool *packetPool;
 	static Timestamp *timestamp;
 

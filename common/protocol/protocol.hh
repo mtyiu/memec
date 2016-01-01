@@ -278,16 +278,17 @@ struct RemappingLockHeader {
 	uint32_t *remapped;
 };
 
-#define PROTO_REMAPPING_SET_SIZE 17
+#define PROTO_REMAPPING_SET_SIZE 16
 struct RemappingSetHeader {
 	uint32_t listId;
 	uint32_t chunkId;
-	uint32_t sockfd;
-	bool remapped;
+	uint32_t remappedCount;
 	uint8_t keySize;
 	uint32_t valueSize; // 3 bytes
 	char *key;
 	char *value;
+	uint32_t *original;
+	uint32_t *remapped;
 };
 
 ////////////////////////
@@ -692,18 +693,18 @@ protected:
 	size_t generateRemappingSetHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t chunkId,
+		uint32_t *original, uint32_t *remapped, uint32_t remappedCount,
 		uint8_t keySize, char *key,
-		uint32_t valueSize, char *value, char *sendBuf = 0,
-		uint32_t sockfd = UINT_MAX, bool isParity = false,
-		struct sockaddr_in *target = 0
+		uint32_t valueSize, char *value,
+		char *sendBuf = 0
 	);
 	bool parseRemappingSetHeader(
 		size_t offset, uint32_t &listId, uint32_t &chunkId,
+		uint32_t &remappedCount,
+		uint32_t *&original, uint32_t *&remapped,
 		uint8_t &keySize, char *&key,
 		uint32_t &valueSize, char *&value,
-		char *buf, size_t size,
-		uint32_t &sockfd, bool &isParity,
-		struct sockaddr_in *target = 0
+		char *buf, size_t size
 	);
 
 	////////////////////////

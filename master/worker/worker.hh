@@ -25,6 +25,7 @@ private:
 	WorkerRole role;
 	MasterProtocol protocol;
 	// Temporary variables
+	uint32_t *original, *remapped;
 	SlaveSocket **dataSlaveSockets;
 	SlaveSocket **paritySlaveSockets;
 	static uint32_t dataChunkCount;
@@ -61,10 +62,9 @@ private:
 		bool &useDegradedMode
 	);
 	// For remapping
-	SlaveSocket *getSlaves(
+	bool getSlaves(
 		char *data, uint8_t size,
-		uint32_t &originalListId, uint32_t &originalChunkId,
-		uint32_t &remappedListId, std::vector<uint32_t> &remappedChunkId
+		uint32_t *&original, uint32_t *&remapped, uint32_t &remappedCount
 	);
 	SlaveSocket *getSlaves( uint32_t listId, uint32_t chunkId );
 	void free();

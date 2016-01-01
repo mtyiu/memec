@@ -105,10 +105,11 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 				success,
 				event.message.remap.listId,
 				event.message.remap.chunkId,
+				event.message.remap.original,
+				event.message.remap.remapped,
+				event.message.remap.remappedCount,
 				event.message.remap.key.size,
-				event.message.remap.key.data,
-				event.message.remap.sockfd,
-				event.message.remap.isRemapped
+				event.message.remap.key.data
 			);
 
 			if ( event.needsFree )

@@ -1,18 +1,23 @@
 #include "protocol.hh"
 
-char *SlaveProtocol::resRemappingSet( size_t &size, bool toMaster, uint16_t instanceId, uint32_t requestId, bool success, uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key, uint32_t sockfd, bool remapped ) {
+char *SlaveProtocol::resRemappingSet(
+	size_t &size, bool toMaster,
+	uint16_t instanceId, uint32_t requestId, bool success,
+	uint32_t listId, uint32_t chunkId,
+	uint32_t *original, uint32_t *remapped, uint32_t remappedCount,
+	uint8_t keySize, char *key
+) {
 	// -- common/protocol/remap_protocol.cc --
-	size = this->generateRemappingLockHeader(
+	size = this->generateRemappingSetHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 		toMaster ? PROTO_MAGIC_TO_MASTER : PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_REMAPPING_SET,
 		instanceId, requestId,
-		listId,
-		chunkId,
-		remapped, // TODO whether this is a true remapped key
-		keySize,
-		key,
-		sockfd
+		listId, chunkId,
+		original, remapped, remappedCount,
+		keySize, key,
+		0, // valueSize
+		0  // value
 	);
 	return this->buffer.send;
 }

@@ -76,22 +76,17 @@ public:
 	// ---------- remap_protocol.cc ----------
 	char *reqRemappingSetLock(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
-		uint32_t listId, std::vector<uint32_t> chunkId,
-		uint32_t reqRemapState,
-		char *key, uint8_t keySize,
-		uint32_t sockfd = UINT_MAX
+		uint32_t *original, uint32_t *remapped, uint32_t remappedCount,
+		char *key, uint8_t keySize
 	);
 	char *reqRemappingSet(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t chunkId,
+		uint32_t *original, uint32_t *remapped, uint32_t remappedCount,
 		char *key, uint8_t keySize,
 		char *value, uint32_t valueSize,
-		char *buf = 0,
-		uint32_t sockfd = UINT_MAX,
-		bool isParity = false,
-		struct sockaddr_in *target = 0 // embed original data/parity target
+		char *buf = 0
 	);
-	char *resSyncRemappingRecords( size_t &size, uint16_t instanceId, uint32_t requestId );
 
 	// ---------- degraded_protocol.cc ----------
 	char *reqDegradedLock(

@@ -48,11 +48,12 @@ public:
 		struct {
 			bool toRemap;
 			std::vector<struct sockaddr_in> *slaves;
+		} switchPhase;
+		struct {
+			uint32_t *original;
+			uint32_t *remapped;
+			uint32_t remappedCount;
 			Key key;
-			uint32_t listId;
-			uint32_t chunkId;
-			uint32_t isRemapped;
-			uint32_t sockfd;
 		} remap;
 		struct {
 			Key key;
@@ -91,9 +92,8 @@ public:
 	);
 	// REMAPPING_SET_LOCK
 	void resRemappingSetLock(
-		MasterSocket *socket, uint16_t instanceId, uint32_t requestId, bool isRemapped,
-		Key &key, RemappingRecord &remappingRecord, bool success,
-		uint32_t sockfd = UINT_MAX
+		MasterSocket *socket, uint16_t instanceId, uint32_t requestId, bool success,
+		uint32_t *original, uint32_t *remapped, uint32_t remappedCount, Key &key
 	);
 	// Pending
 	void pending( MasterSocket *socket );

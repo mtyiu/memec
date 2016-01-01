@@ -152,10 +152,11 @@ SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId
 	return socket->ready() ? socket : 0;
 }
 
-SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &originalListId, uint32_t &originalChunkId, uint32_t &remappedListId, std::vector<uint32_t> &remappedChunkId ) {
-	SlaveSocket *ret;
+bool MasterWorker::getSlaves( char *data, uint8_t size, uint32_t *&original, uint32_t *&remapped, uint32_t &remappedCount ) {
+	bool ret = true;
 
 	// Determine original data slave
+	uint32_t originalListId, originalChunkId;
 	originalListId = MasterWorker::stripeList->get(
 		data, ( size_t ) size,
 		this->dataSlaveSockets,
@@ -163,21 +164,36 @@ SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &origin
 		&originalChunkId, true
 	);
 
-	ret = this->dataSlaveSockets[ originalChunkId ];
+	original[ 0 ] = originalListId;
+	original[ 1 ] = originalChunkId;
+	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
+		original[ ( i + 1 ) * 2 ] = originalListId;
+		original[ ( i + 1 ) * 2 + 1 ] = MasterWorker::dataChunkCount + i;
+	}
 
 	// Determine remapped data slave
 	BasicRemappingScheme::getRemapTarget(
-		originalListId, originalChunkId,
-		remappedListId, remappedChunkId,
+		original, remapped, remappedCount,
 		MasterWorker::dataChunkCount, MasterWorker::parityChunkCount,
 		this->dataSlaveSockets, this->paritySlaveSockets
 	);
 
-	// BasicRemappingScheme::getRemapTarget() may replace this->dataSlaveSockets & this->paritySlaveSockets
-	this->getSlaves( originalListId, originalChunkId );
-	ret = this->dataSlaveSockets[ originalChunkId ];
+	if ( remappedCount ) {
+		uint32_t *_original = new uint32_t[ remappedCount * 2 ];
+		uint32_t *_remapped = new uint32_t[ remappedCount * 2 ];
+		for ( uint32_t i = 0; i < remappedCount * 2; i++ ) {
+			_original[ i ] = original[ i ];
+			_remapped[ i ] = remapped[ i ];
+		}
+		original = _original;
+		remapped = _remapped;
+	}
 
-	return ret->ready() ? ret : 0;
+	// BasicRemappingScheme::getRemapTarget() may replace this->dataSlaveSockets & this->paritySlaveSockets
+	// this->getSlaves( originalListId, originalChunkId );
+	// ret = this->dataSlaveSockets[ originalChunkId ];
+
+	return ret;
 }
 
 SlaveSocket *MasterWorker::getSlaves( uint32_t listId, uint32_t chunkId ) {
@@ -189,6 +205,8 @@ SlaveSocket *MasterWorker::getSlaves( uint32_t listId, uint32_t chunkId ) {
 
 void MasterWorker::free() {
 	this->protocol.free();
+	delete[] original;
+	delete[] remapped;
 	delete[] this->dataSlaveSockets;
 	delete[] this->paritySlaveSockets;
 }
@@ -282,6 +300,8 @@ bool MasterWorker::init( GlobalConfig &config, WorkerRole role, uint32_t workerI
 			config.size.chunk
 		)
 	);
+	this->original = new uint32_t[ ( MasterWorker::dataChunkCount + MasterWorker::parityChunkCount ) * 2 ];
+	this->remapped = new uint32_t[ ( MasterWorker::dataChunkCount + MasterWorker::parityChunkCount ) * 2 ];
 	this->dataSlaveSockets = new SlaveSocket*[ MasterWorker::dataChunkCount ];
 	this->paritySlaveSockets = new SlaveSocket*[ MasterWorker::parityChunkCount ];
 	this->role = role;

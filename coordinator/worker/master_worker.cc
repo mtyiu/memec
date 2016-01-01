@@ -44,25 +44,24 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 				buffer.size,
 				event.instanceId, event.requestId,
 				success,
-				event.message.remap.listId,
-				event.message.remap.chunkId,
-				event.message.remap.isRemapped,
+				event.message.remap.original,
+				event.message.remap.remapped,
+				event.message.remap.remappedCount,
 				event.message.remap.key.size,
-				event.message.remap.key.data,
-				event.message.remap.sockfd
+				event.message.remap.key.data
 			);
 			isSend = true;
 			break;
 		case MASTER_EVENT_TYPE_SWITCH_PHASE:
 		{
 			Coordinator *coordinator = Coordinator::getInstance();
-			std::vector<struct sockaddr_in> *slaves = event.message.remap.slaves;
+			std::vector<struct sockaddr_in> *slaves = event.message.switchPhase.slaves;
 
 			isSend = false;
 			if ( slaves == NULL || ! coordinator->remapMsgHandler )
 				break;
 			// just trigger the handling of transition, no message need to be handled
-			if ( event.message.remap.toRemap ) {
+			if ( event.message.switchPhase.toRemap ) {
 				size_t numMasters = coordinator->sockets.masters.size();
 				for ( size_t i = 0, numOverloadedSlaves = slaves->size(); i < numOverloadedSlaves; i++ ) {
 					uint16_t instanceId = 0;

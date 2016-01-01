@@ -126,18 +126,24 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 			);
 			break;
 		case SLAVE_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS:
+			__ERROR__( "SlaveWorker", "dispatch", "SLAVE_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS is not supported." );
 			success = true; // default is false
+			break;
 		case SLAVE_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resRemappingSet(
-				buffer.size,
-				false, // toMaster
-				event.instanceId, event.requestId,
-				success,
-				event.message.remap.listId,
-				event.message.remap.chunkId,
-				event.message.remap.key.size,
-				event.message.remap.key.data
-			);
+			__ERROR__( "SlaveWorker", "dispatch", "SLAVE_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE is not supported." );
+			// buffer.data = this->protocol.resRemappingSet(
+			// 	buffer.size,
+			// 	false, // toMaster
+			// 	event.instanceId, event.requestId,
+			// 	success,
+			// 	event.message.remap.listId,
+			// 	event.message.remap.chunkId,
+			// 	event.message.remap.original,
+			// 	event.message.remap.remapped,
+			// 	event.message.remap.remappedCount,
+			// 	event.message.remap.key.size,
+			// 	event.message.remap.key.data
+			// );
 			break;
 		// GET
 		case SLAVE_PEER_EVENT_TYPE_GET_RESPONSE_SUCCESS:
