@@ -17,16 +17,17 @@ size_t Protocol::generateRemappingLockHeader( uint8_t magic, uint8_t to, uint8_t
 	buf += keySize;
 	bytes += keySize;
 
-	remappedCount *= 2; // Include both list ID and chunk ID
 	for ( uint32_t i = 0; i < remappedCount; i++ ) {
-		*( ( uint32_t * )( buf ) ) = htonl( original[ i ] );
-		buf += 4;
-		bytes += 4;
+		*( ( uint32_t * )( buf     ) ) = htonl( original[ i * 2     ] );
+		*( ( uint32_t * )( buf + 4 ) ) = htonl( original[ i * 2 + 1 ] );
+		buf += 8;
+		bytes += 8;
 	}
 	for ( uint32_t i = 0; i < remappedCount; i++ ) {
-		*( ( uint32_t * )( buf ) ) = htonl( remapped[ i ] );
-		buf += 4;
-		bytes += 4;
+		*( ( uint32_t * )( buf     ) ) = htonl( remapped[ i * 2     ] );
+		*( ( uint32_t * )( buf + 4 ) ) = htonl( remapped[ i * 2 + 1 ] );
+		buf += 8;
+		bytes += 8;
 	}
 
 	return bytes;
@@ -151,7 +152,7 @@ bool Protocol::parseRemappingSetHeader( size_t offset, uint32_t &listId, uint32_
 
 	key = ptr;
 	value = ptr + keySize;
-	
+
 	return true;
 }
 

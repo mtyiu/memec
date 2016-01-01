@@ -46,7 +46,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 			if ( ! isCompleted )
 				MasterWorker::eventQueue->insert( event );
 
-			printf( "Sealed: %u; ops: %u\n", sealedCount, opsCount );
+			// printf( "Sealed: %u; ops: %u\n", sealedCount, opsCount );
 			isSend = false; // Send to coordinator instead
 		}
 			break;
@@ -524,4 +524,3 @@ bool MasterWorker::handleAcknowledgement( SlaveEvent event, uint8_t opcode, char
 
 	return true;
 }
-

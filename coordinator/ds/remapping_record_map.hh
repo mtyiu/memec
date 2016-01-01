@@ -5,11 +5,52 @@
 #include <unordered_set>
 #include <pthread.h>
 #include <assert.h>
-#include "key.hh"
-#include "metadata.hh"
-#include "../ds/sockaddr_in.hh"
-#include "../lock/lock.hh"
-#include "../stripe_list/stripe_list.hh"
+#include "../../common/ds/key.hh"
+#include "../../common/ds/metadata.hh"
+#include "../../common/ds/sockaddr_in.hh"
+#include "../../common/lock/lock.hh"
+#include "../../common/stripe_list/stripe_list.hh"
+
+struct RemappingRecord {
+	uint32_t *original;
+	uint32_t *remapped;
+	uint32_t remappedCount;
+
+	RemappingRecord() {
+		this->original = 0;
+		this->remapped = 0;
+		this->remappedCount = 0;
+	}
+
+	void set( uint32_t *original, uint32_t *remapped, uint32_t remappedCount ) {
+		this->original = remappedCount ? original : 0;
+		this->remapped = remappedCount ? remapped : 0;
+		this->remappedCount = remappedCount;
+	}
+
+	void dup( uint32_t *original, uint32_t *remapped, uint32_t remappedCount ) {
+		this->remappedCount = remappedCount;
+		if ( remappedCount ) {
+			this->original = new uint32_t[ remappedCount * 2 ];
+			this->remapped = new uint32_t[ remappedCount * 2 ];
+
+			for ( uint32_t i = 0; i < remappedCount; i++ ) {
+				this->original[ i * 2     ] = original[ i * 2     ];
+				this->original[ i * 2 + 1 ] = original[ i * 2 + 1 ];
+				this->remapped[ i * 2     ] = remapped[ i * 2     ];
+				this->remapped[ i * 2 + 1 ] = remapped[ i * 2 + 1 ];
+			}
+		}
+	}
+
+	void free() {
+		if ( this->original ) delete[] this->original;
+		if ( this->remapped ) delete[] this->remapped;
+		this->original = 0;
+		this->remapped = 0;
+		this->remappedCount = 0;
+	}
+};
 
 class RemappingRecordMap {
 private:
@@ -41,10 +82,8 @@ public:
 		std::unordered_map<Key, RemappingRecord>::iterator it = this->map.find( key );
 		if ( it != map.end() ) {
 			// do not allow overwriting of remapping records without delete
-			if ( record != it->second ) {
-				UNLOCK( &this->lock );
-				return false;
-			}
+			UNLOCK( &this->lock );
+			return false;
 		} else {
 			Key keyDup;
 			keyDup.dup( key.size, key.data );
@@ -60,20 +99,20 @@ public:
 
 	bool erase( Key key, RemappingRecord record, bool check, bool needsLock, bool needsUnlock ) {
 		Key keyDup;
+		bool ret;
 		if ( needsLock ) LOCK( &this->lock );
 		std::unordered_map<Key, RemappingRecord>::iterator it = map.find( key );
 		if ( it != map.end() ) {
-			// do not allow deleting key records if they are different
-			if ( check && record != it->second ) {
-				if ( needsUnlock ) UNLOCK( &this->lock );
-				return false;
-			}
 			keyDup = it->first;
+			it->second.free();
 			map.erase( it );
 			keyDup.free();
+			ret = true;
+		} else {
+			ret = false;
 		}
 		if ( needsUnlock ) UNLOCK( &this->lock );
-		return true;
+		return ret;
 	}
 
 	bool erase( struct sockaddr_in slave ) {
@@ -120,10 +159,21 @@ public:
 		fprintf( f, "%lu remapping records\n", map.size() );
 		for ( it = map.begin(); it != map.end() && listAll; it++, count++ ) {
 			fprintf(
-				f , "%lu: [%.*s](%d) to list %u chunk %u\n",
-				count, it->first.size, it->first.data, it->first.size,
-				it->second.listId, it->second.chunkId
+				f , "#%lu: [%.*s](%d) - ",
+				count, it->first.size, it->first.data, it->first.size
 			);
+			RemappingRecord &remappingRecord = it->second;
+			for ( uint32_t i = 0; i < remappingRecord.remappedCount; i++ ) {
+				fprintf(
+					f, "%s(%u, %u) |-> (%u, %u)",
+					i == 0 ? "" : "; ",
+					remappingRecord.original[ i * 2     ],
+					remappingRecord.original[ i * 2 + 1 ],
+					remappingRecord.remapped[ i * 2     ],
+					remappingRecord.remapped[ i * 2 + 1 ]
+				);
+			}
+			fprintf( f, ".\n" );
 		}
 	}
 };

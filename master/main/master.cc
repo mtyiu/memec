@@ -629,7 +629,6 @@ void Master::printPending( FILE *f ) {
 	std::unordered_multimap<PendingIdentifier, Key>::iterator it;
 	std::unordered_multimap<PendingIdentifier, KeyValue>::iterator keyValueIt;
 	std::unordered_multimap<PendingIdentifier, KeyValueUpdate>::iterator keyValueUpdateIt;
-	std::unordered_multimap<PendingIdentifier, RemappingRecord>::iterator remappingRecordIt;
 
 	LOCK( &this->pending.applications.setLock );
 	fprintf(
@@ -774,31 +773,6 @@ void Master::printPending( FILE *f ) {
 		fprintf( f, "\n" );
 	}
 	UNLOCK( &this->pending.slaves.setLock );
-
-	LOCK( &this->pending.slaves.remappingSetLock );
-	fprintf(
-		f,
-		"\n[REMAPPING_SET] Pending: %lu\n",
-		this->pending.slaves.remappingSet.size()
-	);
-
-	i = 1;
-	for (
-		remappingRecordIt = this->pending.slaves.remappingSet.begin();
-		remappingRecordIt != this->pending.slaves.remappingSet.end();
-		remappingRecordIt++, i++
-	) {
-		const RemappingRecord &record = remappingRecordIt->second;
-		fprintf(
-			f, "%lu. ID: (%u, %u), parent ID: (%u, %u); list ID: %u, chunk ID: %u; target: ",
-			i, remappingRecordIt->first.instanceId, remappingRecordIt->first.requestId,
-			remappingRecordIt->first.parentInstanceId, remappingRecordIt->first.parentRequestId,
-			record.listId, record.chunkId
-		);
-		( ( Socket * ) remappingRecordIt->first.ptr )->printAddress( f );
-		fprintf( f, "\n" );
-	}
-	UNLOCK( &this->pending.slaves.remappingSetLock );
 
 	LOCK( &this->pending.slaves.getLock );
 	fprintf(
@@ -1000,21 +974,21 @@ void Master::time() {
 
 void Master::ackParityDelta() {
 	SlaveEvent event;
-	fprintf( 
+	fprintf(
 		stdout, "Ack timestamps from %u to %u\n",
 		this->timestamp.lastParityDeltaAck.getVal(),
 		this->timestamp.current.getVal()
 	);
-		
+
 	for( int i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
-		event.ackParityDelta( 
+		event.ackParityDelta(
 			this->sockets.slaves.values[ i ],
 			this->timestamp.lastParityDeltaAck.getVal(),
 			this->timestamp.current.getVal()
 		);
 		this->eventQueue.insert( event );
 	}
-	this->timestamp.lastParityDeltaAck.setVal( 
+	this->timestamp.lastParityDeltaAck.setVal(
 		this->timestamp.current.getVal()
 	);
 }

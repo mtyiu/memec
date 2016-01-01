@@ -9,8 +9,8 @@ enum RemapState {
 	REMAP_COORDINATED,				// coordinated (phase 1b)
 	REMAP_DEGRADED,					// degraded (phase 2)
 	// master states (wait for all)
-	REMAP_WAIT_DEGRADED,			// wait for retruen to degraded
-	REMAP_WAIT_NORMAL				// wait for retruen to normal 
+	REMAP_WAIT_DEGRADED,			// wait for return to degraded
+	REMAP_WAIT_NORMAL				// wait for return to normal
 };
 
 enum RequestRemapState{

@@ -4,9 +4,9 @@
 #include <cstdio>
 #include "worker_role.hh"
 #include "../ds/pending.hh"
+#include "../ds/remapping_record_map.hh"
 #include "../event/event_queue.hh"
 #include "../protocol/protocol.hh"
-#include "../../common/ds/remapping_record_map.hh"
 #include "../../common/worker/worker.hh"
 #include "../../common/config/global_config.hh"
 #include "../../common/ds/id_generator.hh"

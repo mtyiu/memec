@@ -76,7 +76,7 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 
 	for ( size_t j = 0, size = stripeListIndex.size(); j < size; j++ ) {
 		if ( header.listId == stripeListIndex[ j ].listId &&
-			 header.chunkId == stripeListIndex[ j ].chunkId ) {
+			 ( header.chunkId == stripeListIndex[ j ].chunkId || stripeListIndex[ j ].chunkId >= SlaveWorker::dataChunkCount ) ) {
 			isRemapped = false;
 			bufferRemapData = false;
 			break;
@@ -85,9 +85,8 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 	if ( isRemapped ) {
 		struct sockaddr_in targetAddr;
 		for ( uint32_t i = 0; i < header.remappedCount; i++ ) {
-			if ( header.original[ i * 2     ] == header.listId &&
-			     header.original[ i * 2 + 1 ] == header.chunkId ) {
-
+			if (   header.original[ i * 2     ] == header.listId &&
+			     ( header.original[ i * 2 + 1 ] == header.chunkId ) ) {
 				targetAddr = SlaveWorker::stripeList->get( header.remapped[ i * 2 ], header.remapped[ i * 2 + 1 ] )->getAddr();
 
 				for ( size_t j = 0, size = stripeListIndex.size(); j < size; j++ ) {
@@ -102,9 +101,21 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 		}
 
 		if ( bufferRemapData ) {
+			printf( "Remapping " );
+			for ( uint32_t i = 0; i < header.remappedCount; i++ ) {
+				if ( i ) printf( "; " );
+				printf(
+					"(%u, %u) |-> (%u, %u)",
+					header.original[ i * 2 ], header.original[ i * 2 + 1 ],
+					header.remapped[ i * 2 ], header.remapped[ i * 2 + 1 ]
+				);
+			}
+			printf( " (count = %u).\n", header.remappedCount );
+			fflush( stdout );
 			__ERROR__(
 				"SlaveWorker", "handleRemappingSetRequest",
-				"Performing remapping data buffering."
+				"Performing remapping data buffering: (original: (%u, %u)).",
+				header.listId, header.chunkId
 			);
 
 			Key key;

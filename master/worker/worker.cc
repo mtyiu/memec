@@ -164,6 +164,9 @@ bool MasterWorker::getSlaves( char *data, uint8_t size, uint32_t *&original, uin
 		&originalChunkId, true
 	);
 
+	original = this->original;
+	remapped = this->remapped;
+
 	original[ 0 ] = originalListId;
 	original[ 1 ] = originalChunkId;
 	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
@@ -173,7 +176,7 @@ bool MasterWorker::getSlaves( char *data, uint8_t size, uint32_t *&original, uin
 
 	// Determine remapped data slave
 	BasicRemappingScheme::getRemapTarget(
-		original, remapped, remappedCount,
+		this->original, this->remapped, remappedCount,
 		MasterWorker::dataChunkCount, MasterWorker::parityChunkCount,
 		this->dataSlaveSockets, this->paritySlaveSockets
 	);

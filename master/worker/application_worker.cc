@@ -202,18 +202,15 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 	}
 
 	// decide whether any of the data / parity slave needs to use remapping flow
-	bool remapped = false;
-	for ( uint32_t i = 0; i < 1 + MasterWorker::parityChunkCount; i++ ) {
-		Master *master = Master::getInstance();
-		if ( i == 0 )
-			remapped |= master->remapMsgHandler.useCoordinatedFlow( socket->getAddr() );
-		else {
-			remapped |= master->remapMsgHandler.useCoordinatedFlow( this->paritySlaveSockets[ i - 1 ]->getAddr() );
+	Master *master = Master::getInstance();
+	if ( ! MasterWorker::disableRemappingSet ) {
+		for ( uint32_t i = 0; i < 1 + MasterWorker::parityChunkCount; i++ ) {
+			struct sockaddr_in addr = ( i == 0 ) ? socket->getAddr() : this->paritySlaveSockets[ i - 1 ]->getAddr();
+			if ( master->remapMsgHandler.useCoordinatedFlow( addr ) ) {
+				// printf( "(%u, %u) is overloaded!\n", listId, i == 0 ? chunkId : i - 1 + MasterWorker::dataChunkCount );
+				return this->handleRemappingSetRequest( event, buf, size );
+			}
 		}
-	}
-	remapped &= ( ! MasterWorker::disableRemappingSet );
-	if ( remapped ) {
-		return this->handleRemappingSetRequest( event, buf, size );
 	}
 
 	int sockfd = socket->getSocket();

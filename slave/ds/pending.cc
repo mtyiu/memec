@@ -1,24 +1,6 @@
 #include "pending.hh"
 #include "../../common/util/debug.hh"
 
-bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, RemappingRecordKey> *&map ) {
-	switch( type ) {
-		case PT_MASTER_REMAPPING_SET:
-			lock = &this->masters.remappingSetLock;
-			map = &this->masters.remappingSet;
-			break;
-		case PT_SLAVE_PEER_REMAPPING_SET:
-			lock = &this->slavePeers.remappingSetLock;
-			map = &this->slavePeers.remappingSet;
-			break;
-		default:
-			lock = 0;
-			map = 0;
-			return false;
-	}
-	return true;
-}
-
 bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, Key> *&map ) {
 	switch( type ) {
 		case PT_MASTER_GET:
@@ -191,18 +173,15 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_map<struct so
 		return ret; \
 	}
 
-DEFINE_PENDING_MASTER_INSERT_METHOD( insertRemappingRecordKey, RemappingRecordKey, remappingRecordKey )
 DEFINE_PENDING_MASTER_INSERT_METHOD( insertKey, Key, key )
 DEFINE_PENDING_MASTER_INSERT_METHOD( insertKeyValueUpdate, KeyValueUpdate, keyValueUpdate )
 
-DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( insertRemappingRecordKey, RemappingRecordKey, remappingRecordKey )
 DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( insertKey, Key, key )
 DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( insertKeyValueUpdate, KeyValueUpdate, keyValueUpdate )
 DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( insertDegradedOp, DegradedOp, degradedOp )
 DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( insertChunkRequest, ChunkRequest, chunkRequest )
 DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( insertChunkUpdate, ChunkUpdate, chunkUpdate )
 
-DEFINE_PENDING_ERASE_METHOD( eraseRemappingRecordKey, RemappingRecordKey, remappingRecordKeyPtr )
 DEFINE_PENDING_ERASE_METHOD( eraseKey, Key, keyPtr )
 DEFINE_PENDING_ERASE_METHOD( eraseKeyValueUpdate, KeyValueUpdate, keyValueUpdatePtr )
 DEFINE_PENDING_ERASE_METHOD( eraseDegradedOp, DegradedOp, degradedOpPtr )
@@ -478,18 +457,7 @@ uint32_t Pending::count( PendingType type, uint16_t instanceId, uint32_t request
 	PendingIdentifier pid( instanceId, 0, requestId, 0, 0 );
 	LOCK_T *lock;
 	uint32_t ret = 0;
-	if ( type == PT_SLAVE_PEER_REMAPPING_SET ) {
-		std::unordered_multimap<PendingIdentifier, RemappingRecordKey> *map;
-		std::unordered_multimap<PendingIdentifier, RemappingRecordKey>::iterator it;
-
-		if ( ! this->get( type, lock, map ) ) return 0;
-
-		if ( needsLock ) LOCK( lock );
-		ret = map->count( pid );
-		// it = map->count( pid );
-		// for ( ret = 0; it != map->end() && it->first.instanceId == instanceId && it->first.requestId == requestId; ret++, it++ );
-		if ( needsUnlock ) UNLOCK( lock );
-	} else if ( type == PT_SLAVE_PEER_DEGRADED_OPS ) {
+	if ( type == PT_SLAVE_PEER_DEGRADED_OPS ) {
 		std::unordered_multimap<PendingIdentifier, DegradedOp> *map;
 		std::unordered_multimap<PendingIdentifier, DegradedOp>::iterator it;
 

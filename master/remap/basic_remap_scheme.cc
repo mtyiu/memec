@@ -13,7 +13,7 @@ pthread_mutex_t BasicRemappingScheme::lock = PTHREAD_MUTEX_INITIALIZER;
 uint32_t BasicRemappingScheme::remapped = 0;
 uint32_t BasicRemappingScheme::lockonly= 0;
 
-void BasicRemappingScheme::getRemapTarget( uint32_t *&original, uint32_t *&remapped, uint32_t &remappedCount, uint32_t dataChunkCount, uint32_t parityChunkCount, SlaveSocket **dataSlaveSockets, SlaveSocket **paritySlaveSockets ) {
+void BasicRemappingScheme::getRemapTarget( uint32_t *original, uint32_t *remapped, uint32_t &remappedCount, uint32_t dataChunkCount, uint32_t parityChunkCount, SlaveSocket **dataSlaveSockets, SlaveSocket **paritySlaveSockets ) {
 	struct sockaddr_in slaveAddr;
 	std::unordered_set<struct sockaddr_in> selectedSlaves;
 
@@ -22,7 +22,10 @@ void BasicRemappingScheme::getRemapTarget( uint32_t *&original, uint32_t *&remap
 		return;
 	}
 
-	remappedCount = 1 + parityChunkCount;
+	LOCK( &slaveLoading->lock );
+	LOCK( &overloadedSlave->lock );
+
+	remappedCount = 0;
 	for ( uint32_t i = 0; i < 1 + parityChunkCount; i++ ) {
 		if ( i == 0 )
 			slaveAddr = dataSlaveSockets[ original[ 1 ] ]->getAddr();
@@ -32,37 +35,31 @@ void BasicRemappingScheme::getRemapTarget( uint32_t *&original, uint32_t *&remap
 		selectedSlaves.insert( slaveAddr ); // All original slaves should not be selected as remapped slaves
 
 		// Check if remapping is allowed && isOverloaded
-		if ( ! remapMsgHandler->allowRemapping( slaveAddr ) && overloadedSlave->slaveSet.count( slaveAddr ) ) {
-			// Indicate that remapping is not needed
-			original[ i * 2     ] = UINT32_MAX;
-			original[ i * 2 + 1 ] = UINT32_MAX;
-			remappedCount--;
+		if ( remapMsgHandler->allowRemapping( slaveAddr ) && overloadedSlave->slaveSet.count( slaveAddr ) ) {
+			remapped[ remappedCount * 2     ] = original[ i * 2     ];
+			remapped[ remappedCount * 2 + 1 ] = original[ i * 2 + 1 ];
+			remappedCount++;
 		}
 	}
 
 	if ( ! remappedCount ) {
 		pthread_mutex_lock( &BasicRemappingScheme::lock );
-		lockonly++;
+		BasicRemappingScheme::lockonly++;
 		pthread_mutex_unlock( &BasicRemappingScheme::lock );
+
+		UNLOCK( &slaveLoading->lock );
+		UNLOCK( &overloadedSlave->lock );
 		return;
 	} else {
 		pthread_mutex_lock( &BasicRemappingScheme::lock );
-		remapped++;
+		BasicRemappingScheme::remapped++;
 		pthread_mutex_unlock( &BasicRemappingScheme::lock );
 	}
 
 	for ( uint32_t i = 0; i < remappedCount; i++ ) {
-		if ( original[ i * 2 ] == UINT32_MAX && original[ i * 2 + 1 ] == UINT32_MAX ) {
-			// Eliminate entries that do not require remapping
-			for ( uint32_t j = i; j < parityChunkCount; j++ ) {
-				original[ j * 2     ] = original[ ( j + 1 ) * 2     ];
-				original[ j * 2 + 1 ] = original[ ( j + 1 ) * 2 + 1 ];
-			}
-		}
+		original[ i * 2     ] = remapped[ i * 2     ];
+		original[ i * 2 + 1 ] = remapped[ i * 2 + 1 ];
 	}
-
-	LOCK( &slaveLoading->lock );
-	LOCK( &overloadedSlave->lock );
 
 	int index = -1;
 	Latency *targetLatency, *nodeLatency;
@@ -86,9 +83,7 @@ void BasicRemappingScheme::getRemapTarget( uint32_t *&original, uint32_t *&remap
 
 			// Search the least-loaded node with the stripe list
 			nodeLatency = slaveLoading->cumulativeMirror.set.get( slaveAddr, &index );
-			if ( index == -1 ) // Skip not-yet-accessed node
-				continue;
-			if ( ! targetLatency || *nodeLatency < *targetLatency ) {
+			if ( ! targetLatency || ( nodeLatency && *nodeLatency < *targetLatency ) ) {
 				targetLatency = nodeLatency;
 				remapped[ i * 2     ] = original[ i * 2     ]; // List ID
 				remapped[ i * 2 + 1 ] = j;                     // Chunk ID
@@ -105,6 +100,9 @@ void BasicRemappingScheme::getRemapTarget( uint32_t *&original, uint32_t *&remap
 			selectedSlaves.insert( slaveAddr );
 		}
 	}
+
+	UNLOCK( &slaveLoading->lock );
+	UNLOCK( &overloadedSlave->lock );
 }
 
 /*

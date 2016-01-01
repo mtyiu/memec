@@ -14,7 +14,7 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 		( int ) header.keySize, header.key, header.keySize, header.valueSize
 	);
 
-	uint32_t *original = this->original, *remapped = this->remapped;
+	uint32_t *original, *remapped;
 	uint32_t remappedCount;
 	bool connected;
 	ssize_t sentBytes;
@@ -25,9 +25,18 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 		event.resSet( event.socket, event.instanceId, event.requestId, key, false, false );
 		this->dispatch( event );
 		return false;
+	} else {
+		// printf( "Remapping " );
+		// for ( uint32_t i = 0; i < remappedCount; i++ ) {
+		// 	if ( i ) printf( "; " );
+		// 	printf(
+		// 		"(%u, %u) |-> (%u, %u)",
+		// 		original[ i * 2 ], original[ i * 2 + 1 ],
+		// 		remapped[ i * 2 ], remapped[ i * 2 + 1 ]
+		// 	);
+		// }
+		// printf( " (count = %u).\n", remappedCount );
 	}
-
-	assert( remappedCount );
 
 	struct {
 		size_t size;
@@ -67,6 +76,8 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 		break; // Only send to one coordinator
 	}
 
+	// printf( "[%u] Requesting REMAPPING_SET_LOCK...\n", requestId );
+
 	return true;
 }
 
@@ -82,6 +93,8 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 		success ? "Success" : "Fail",
 		( int ) header.keySize, header.key, header.keySize
 	);
+
+	// printf( "[%u] Handling REMAPPING_SET_LOCK response...\n", event.requestId );
 
 	// Find the corresponding REMAPPING_SET_LOCK request //
 	PendingIdentifier pid;
@@ -201,12 +214,14 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 	}
 
+	// printf( "[%u] Sending REMAPPING_SET request...\n", pid.requestId );
+
 	return true;
 }
 
 bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, char *buf, size_t size ) {
-	struct RemappingLockHeader header;
-	if ( ! this->protocol.parseRemappingLockHeader( header, buf, size ) ) {
+	struct RemappingSetHeader header;
+	if ( ! this->protocol.parseRemappingSetHeader( header, buf, size ) ) {
 		__ERROR__( "MasterWorker", "handleRemappingSetResponse", "Invalid REMAPPING_SET Response." );
 		return false;
 	}
@@ -222,6 +237,8 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 	PendingIdentifier pid;
 	Key key;
 	KeyValue keyValue;
+
+	// printf( "[%u] Handling REMAPPING_SET response...\n", event.requestId );
 
 	// Find the cooresponding request //
 	if ( ! MasterWorker::pending->eraseKey( PT_SLAVE_SET, event.instanceId, event.requestId, ( void * ) event.socket, &pid, &key, true, false ) ) {
@@ -264,9 +281,9 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 		}
 	}
 
-	if ( pending ) {
-		__ERROR__( "MasterWorker", "handleRemappingSetResponse", "Pending slave REMAPPING_SET requests = %d (remapped count: %u).", pending, header.remappedCount );
-	}
+	// if ( pending ) {
+	// 	__ERROR__( "MasterWorker", "handleRemappingSetResponse", "Pending slave REMAPPING_SET requests = %d (remapped count: %u).", pending, header.remappedCount );
+	// }
 
 	if ( pending == 0 ) {
 		// Only send application SET response when the number of pending slave SET requests equal 0
@@ -277,7 +294,7 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 		key = keyValue.key();
 
 		applicationEvent.resSet( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, keyValue, success );
-		MasterWorker::eventQueue->insert( applicationEvent );
+		this->dispatch( applicationEvent );
 	}
 
 	return true;

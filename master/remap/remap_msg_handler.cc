@@ -228,6 +228,7 @@ bool MasterRemapMsgHandler::allowRemapping( struct sockaddr_in slave ) {
 
 	switch ( this->slavesState[ slave ] ) {
 		case REMAP_INTERMEDIATE:
+		case REMAP_WAIT_DEGRADED:
 		case REMAP_DEGRADED:
 			return true;
 		default:
