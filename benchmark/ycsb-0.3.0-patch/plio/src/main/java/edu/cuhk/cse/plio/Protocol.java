@@ -41,14 +41,14 @@ public class Protocol {
 	/************************
 	 * Protocol header size *
 	 ************************/
-	public static final byte PROTO_HEADER_SIZE            = 12;
+	public static final byte PROTO_HEADER_SIZE            = 16;
 	public static final byte PROTO_KEY_SIZE               = 1;
 	public static final byte PROTO_KEY_VALUE_SIZE         = 4;
 	public static final byte PROTO_KEY_VALUE_UPDATE_SIZE  = 7;
 
 	public static class Header {
 		public byte magic, from, to, opcode;
-		public int length, instanceId, id;
+		public int length, instanceId, id, timestamp;
 
 		public boolean isSuccessful() {
 			return this.magic == PROTO_MAGIC_RESPONSE_SUCCESS;
@@ -226,6 +226,10 @@ public class Protocol {
 	}
 
 	public int generateHeader( byte magic, byte to, byte opcode, int length, int instanceId, int id ) {
+		return this.generateHeader( magic, to, opcode, length, instanceId, id, 0 );
+	}
+
+	public int generateHeader( byte magic, byte to, byte opcode, int length, int instanceId, int id, int timestamp ) {
 		this.buf[ 0 ]  = ( byte )( magic & 0x07 );
 		this.buf[ 0 ] |= ( byte )( this.from & 0x18 );
 		this.buf[ 0 ] |= ( byte )( to & 0x60 );
@@ -244,6 +248,11 @@ public class Protocol {
 		this.buf[  9 ] = ( byte )( ( id >> 16 ) & 0xFF );
 		this.buf[ 10 ] = ( byte )( ( id >>  8 ) & 0xFF );
 		this.buf[ 11 ] = ( byte )( ( id       ) & 0xFF );
+
+		this.buf[ 12 ] = ( byte )( ( timestamp >> 24 ) & 0xFF );
+		this.buf[ 13 ] = ( byte )( ( timestamp >> 16 ) & 0xFF );
+		this.buf[ 14 ] = ( byte )( ( timestamp >>  8 ) & 0xFF );
+		this.buf[ 15 ] = ( byte )( ( timestamp       ) & 0xFF );
 		return PROTO_HEADER_SIZE;
 	}
 
@@ -331,6 +340,12 @@ public class Protocol {
 		                ( ( ( ( long ) this.buf[ 10 ] ) & 0xFF ) <<  8 ) |
 		                ( ( ( ( long ) this.buf[ 11 ] ) & 0xFF )       );
 		header.id     = ( int ) tmp;
+
+		tmp			  = ( ( ( ( long ) this.buf[ 12 ] ) & 0xFF ) << 24 ) |
+		                ( ( ( ( long ) this.buf[ 13 ] ) & 0xFF ) << 16 ) |
+		                ( ( ( ( long ) this.buf[ 14 ] ) & 0xFF ) <<  8 ) |
+		                ( ( ( ( long ) this.buf[ 15 ] ) & 0xFF )       );
+		header.timestamp = ( int ) tmp;
 
 		switch( header.magic ) {
 			case PROTO_MAGIC_REQUEST:
