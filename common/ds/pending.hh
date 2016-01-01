@@ -16,21 +16,27 @@ class PendingIdentifier {
 public:
 	uint16_t instanceId, parentInstanceId;
 	uint32_t requestId, parentRequestId;
+	uint32_t timestamp;
 	void *ptr;
 
 	PendingIdentifier() {
-		this->set( 0, 0, 0, 0, 0 );
+		this->set( 0, 0, 0, 0, 0, 0 );
 	}
 
 	PendingIdentifier( uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr ) {
-		this->set( instanceId, parentInstanceId, requestId, parentRequestId, ptr );
+		this->set( instanceId, parentInstanceId, requestId, parentRequestId, 0, ptr );
 	}
 
-	void set( uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr ) {
+	PendingIdentifier( uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, uint32_t timestamp, void *ptr ) {
+		this->set( instanceId, parentInstanceId, requestId, parentRequestId, timestamp, ptr );
+	}
+
+	void set( uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, uint32_t timestamp, void *ptr ) {
 		this->instanceId = instanceId;
 		this->parentInstanceId = parentInstanceId;
 		this->requestId = requestId;
 		this->parentRequestId = parentRequestId;
+		this->timestamp = timestamp;
 		this->ptr = ptr;
 	}
 

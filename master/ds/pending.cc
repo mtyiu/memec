@@ -115,8 +115,8 @@ Pending::Pending() {
 }
 
 #define DEFINE_PENDING_APPLICATION_INSERT_METHOD( METHOD_NAME, VALUE_TYPE, VALUE_VAR ) \
-	bool Pending::METHOD_NAME( PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr, VALUE_TYPE &VALUE_VAR, bool needsLock, bool needsUnlock ) { \
-		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, ptr ); \
+	bool Pending::METHOD_NAME( PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr, VALUE_TYPE &VALUE_VAR, bool needsLock, bool needsUnlock, uint32_t timestamp ) { \
+		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, timestamp, ptr ); \
 		std::pair<PendingIdentifier, VALUE_TYPE> p( pid, VALUE_VAR ); \
 		std::unordered_multimap<PendingIdentifier, VALUE_TYPE>::iterator ret; \
  		\

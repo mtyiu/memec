@@ -83,7 +83,11 @@ public:
 	/* Timestamp */
 	struct {
 		Timestamp current;
-		Timestamp lastParityDeltaAck;
+		Timestamp lastAck; // to slave
+		struct {
+			std::multiset<Timestamp> update;
+			std::multiset<Timestamp> del;
+		} pendingAck;
 	} timestamp;
 	/* For debugging only */
 	struct {
@@ -108,7 +112,7 @@ public:
 	void printBackup( FILE *f = stdout );
 	void syncMetadata();
 	void time();
-	void ackParityDelta();
+	void ackParityDelta( FILE *f = 0 );
 	double getElapsedTime();
 	void interactive();
 	bool setDebugFlag( char *input );
