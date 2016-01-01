@@ -22,7 +22,6 @@
 #include "../../common/ds/key_value.hh"
 #include "../../common/ds/latency.hh"
 #include "../../common/ds/packet_pool.hh"
-#include "../../common/ds/remapping_record_map.hh"
 #include "../../common/ds/sockaddr_in.hh"
 #include "../../common/stripe_list/stripe_list.hh"
 #include "../../common/socket/epoll.hh"
@@ -73,7 +72,6 @@ public:
 	StripeList<SlaveSocket> *stripeList;
 	/* Remapping */
 	MasterRemapMsgHandler remapMsgHandler;
-	RemappingRecordMap remappingRecords;
 	/* Loading statistics */
 	SlaveLoading slaveLoading;
 	OverloadedSlave overloadedSlave;

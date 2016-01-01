@@ -49,7 +49,12 @@ void MasterEvent::resSet( MasterSocket *socket, uint16_t instanceId, uint32_t re
 	this->message.set.sealedChunkId = sealedChunkId;
 }
 
-void MasterEvent::resRemappingSet( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, uint32_t listId, uint32_t chunkId, bool success, bool needsFree, uint32_t sockfd, bool remapped ) {
+void MasterEvent::resRemappingSet(
+	MasterSocket *socket, uint16_t instanceId, uint32_t requestId, bool success,
+	Key &key, uint32_t listId, uint32_t chunkId,
+	uint32_t *original, uint32_t *remapped, uint32_t remappedCount,
+	bool needsFree
+) {
 	this->type = success ? MASTER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS : MASTER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
@@ -58,8 +63,9 @@ void MasterEvent::resRemappingSet( MasterSocket *socket, uint16_t instanceId, ui
 	this->message.remap.key = key;
 	this->message.remap.listId = listId;
 	this->message.remap.chunkId = chunkId;
-	this->message.remap.sockfd = sockfd;
-	this->message.remap.isRemapped = remapped;
+	this->message.remap.original = original;
+	this->message.remap.remapped = remapped;
+	this->message.remap.remappedCount = remappedCount;
 }
 
 void MasterEvent::resUpdate( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool success, bool needsFree, bool isDegraded ) {

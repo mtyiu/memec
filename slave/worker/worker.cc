@@ -18,6 +18,7 @@ Map *SlaveWorker::map;
 MemoryPool<Chunk> *SlaveWorker::chunkPool;
 std::vector<MixedChunkBuffer *> *SlaveWorker::chunkBuffer;
 DegradedChunkBuffer *SlaveWorker::degradedChunkBuffer;
+RemappedBuffer *SlaveWorker::remappedBuffer;
 PacketPool *SlaveWorker::packetPool;
 Timestamp *SlaveWorker::timestamp;
 
@@ -213,6 +214,7 @@ bool SlaveWorker::init() {
 	SlaveWorker::chunkPool = slave->chunkPool;
 	SlaveWorker::chunkBuffer = &slave->chunkBuffer;
 	SlaveWorker::degradedChunkBuffer = &slave->degradedChunkBuffer;
+	SlaveWorker::remappedBuffer = &slave->remappedBuffer;
 	SlaveWorker::packetPool = &slave->packetPool;
 	SlaveWorker::timestamp = &slave->timestamp;
 	return true;

@@ -9,7 +9,6 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 		size_t size;
 		char *data;
 	} buffer;
-	std::unordered_map<Key, RemappingRecord>::iterator it, safeNextIt;
 
 	requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
 

@@ -8,7 +8,7 @@
 
 #define PROTO_KEY_VALUE_SIZE	4 // 1 byte for key size, 3 bytes for value size
 
-size_t Protocol::generateHeader( uint8_t magic, uint8_t opcode, uint32_t length, uint16_t instanceId, uint32_t requestId, char *buf ) {
+size_t Protocol::generateHeader( uint8_t magic, uint8_t opcode, uint32_t length, uint16_t instanceId, uint32_t requestId, char *buf, uint32_t requestTimestamp ) {
 	size_t bytes = 0;
 
 	buf[ 0 ] = ( ( magic & 0x07 ) | ( PROTO_MAGIC_FROM_APPLICATION & 0x18 ) | ( PROTO_MAGIC_TO_MASTER & 0x60 ) );
@@ -24,10 +24,13 @@ size_t Protocol::generateHeader( uint8_t magic, uint8_t opcode, uint32_t length,
 	*( ( uint32_t * )( buf + bytes ) ) = htonl( requestId );
 	bytes += 4;
 
+	*( ( uint32_t * )( buf + bytes ) ) = htonl( requestTimestamp );
+	bytes += 4;
+
 	return bytes;
 }
 
-bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t &opcode, uint32_t &length, uint16_t &instanceId, uint32_t &requestId, char *buf, size_t size ) {
+bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t &opcode, uint32_t &length, uint16_t &instanceId, uint32_t &requestId, uint32_t &requestTimestamp, char *buf, size_t size ) {
 	if ( size < PROTO_HEADER_SIZE )
 		return false;
 
@@ -38,6 +41,7 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 	length = ntohl( *( ( uint32_t * )( buf + 2 ) ) );
 	instanceId = ntohs( *( ( uint16_t * )( buf + 6 ) ) );
 	requestId = ntohl( *( ( uint32_t * )( buf + 8 ) ) );
+	requestTimestamp = ntohl( *( ( uint32_t * )( buf + 12 ) ) );
 
 	switch( magic ) {
 		case PROTO_MAGIC_REQUEST:
@@ -83,6 +87,7 @@ bool Protocol::parseHeader( struct ProtocolHeader &header, char *buf, size_t siz
 		header.length,
 		header.instanceId,
 		header.requestId,
+		header.timestamp,
 		buf, size
 	);
 }

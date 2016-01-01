@@ -86,48 +86,6 @@ public:
 
 class MetadataBackup : public OpMetadata {};
 
-class RemappingRecord {
-public:
-	bool sent;
-	bool valid;
-	uint32_t listId, chunkId;
-	void *ptr;
-
-	RemappingRecord() {
-		this->sent = false;
-		this->valid = false;
-		this->listId = 0;
-		this->chunkId = 0;
-		this->ptr = 0;
-	}
-
-	RemappingRecord( uint32_t listId, uint32_t chunkId, void *ptr = 0 ) {
-		this->sent = false;
-		this->valid = true;
-		this->set( listId, chunkId, ptr );
-	}
-
-	void set( uint32_t listId, uint32_t chunkId, void *ptr = 0 ) {
-		this->listId = listId;
-		this->chunkId = chunkId;
-		this->ptr = ptr;
-		this->valid = true;
-	}
-
-	void invalid() {
-		this->valid = false;
-		this->sent = false;
-	}
-
-	bool operator== ( const RemappingRecord &r ) {
-		return ( this->listId == r.listId && this->chunkId == r.chunkId );
-	}
-
-	bool operator!= ( const RemappingRecord &r ) {
-		return ( this->listId != r.listId || this->chunkId != r.chunkId );
-	}
-};
-
 class DegradedLock {
 public:
 	uint32_t srcListId;

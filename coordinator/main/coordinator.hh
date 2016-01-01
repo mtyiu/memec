@@ -8,6 +8,7 @@
 #include "../config/coordinator_config.hh"
 #include "../ds/log.hh"
 #include "../ds/pending.hh"
+#include "../ds/remapping_record_map.hh"
 #include "../event/event_queue.hh"
 #include "../remap/remap_msg_handler.hh"
 #include "../socket/coordinator_socket.hh"
@@ -17,7 +18,6 @@
 #include "../../common/config/global_config.hh"
 #include "../../common/ds/array_map.hh"
 #include "../../common/ds/id_generator.hh"
-#include "../../common/ds/remapping_record_map.hh"
 #include "../../common/lock/lock.hh"
 #include "../../common/signal/signal.hh"
 #include "../../common/socket/epoll.hh"
@@ -120,7 +120,6 @@ public:
 	void syncSlaveMeta( struct sockaddr_in slave, bool *sync );
 	void releaseDegradedLock();
 	void releaseDegradedLock( struct sockaddr_in slave, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done );
-	void syncRemappingRecords( LOCK_T *lock, std::map<struct sockaddr_in, uint32_t> *counter, bool *done );
 	void syncRemappedData( struct sockaddr_in target, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done );
 	double getElapsedTime();
 	void appendLog( Log log );

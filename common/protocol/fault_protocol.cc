@@ -38,7 +38,6 @@ size_t Protocol::generateMetadataBackupMessage(
 
 	/**** Sealed chunks *****/
 	LOCK( lock );
-	int current = 0;
 	for ( sealedIt = sealed.begin(); sealedIt != sealed.end(); sealedIt++ ) {
 		const Metadata &metadata = sealedIt->second;
 

@@ -3,57 +3,52 @@
 
 bool CoordinatorWorker::handleRemappingSetLockRequest( MasterEvent event, char *buf, size_t size ) {
 	struct RemappingLockHeader header;
-	std::vector<uint32_t> remapList;
-	if ( ! this->protocol.parseRemappingLockHeader( header, buf, size, &remapList ) ) {
+	if ( ! this->protocol.parseRemappingLockHeader( header, buf, size ) ) {
 		__ERROR__( "CoordinatorWorker", "handleRemappingSetLockRequest", "Invalid REMAPPING_SET_LOCK request (size = %lu).", size );
 		return false;
 	}
 
-	for ( uint32_t i = 1; i < remapList.size(); i++ ) {
-		if ( remapList[ i ] != CoordinatorWorker::dataChunkCount + i - 1 ) {
-			// TODO record the remapped parity locations
-			 //printf("remap parity: remapList[ %d ] = %u\n", i, remapList[ i ] );
-		}
-	}
-
 	__DEBUG__(
 		BLUE, "CoordinatorWorker", "handleRemappingSetLockRequest",
-		"[REMAPPING_SET_LOCK] Key: %.*s (key size = %u); remapped list ID: %u, remapped chunk ID: %u",
-		( int ) header.keySize, header.key, header.keySize, header.listId, header.chunkId
+		"[REMAPPING_SET_LOCK] Key: %.*s (key size = %u).",
+		( int ) header.keySize, header.key, header.keySize
 	);
 
 	Key key;
 	key.set( header.keySize, header.key );
 
-	// Find the SlaveSocket which stores the stripe with srcListId and srcChunkId
-	SlaveSocket *socket = CoordinatorWorker::stripeList->get( header.listId, header.chunkId );
-	Map *map = &socket->map;
+	uint32_t originalListId, originalChunkId;
 
-	// if already exists, does not allow remap; otherwise insert the remapping record
-	RemappingRecord remappingRecord( header.listId, header.chunkId );
+	// Get original list and chunk ID //
+	SlaveSocket *dataSlaveSocket;
+	originalListId = CoordinatorWorker::stripeList->get( header.key, header.keySize, &dataSlaveSocket, 0, &originalChunkId );
+	Map *map = &( dataSlaveSocket->map );
+
 	if ( map->insertKey(
-		header.key, header.keySize, header.listId, 0,
-		header.chunkId, PROTO_OPCODE_REMAPPING_LOCK, 0 /* timestamp */,
+		header.key, header.keySize,
+		originalListId, -1 /* stripeId */, originalChunkId,
+		PROTO_OPCODE_REMAPPING_LOCK, 0 /* timestamp */,
 		true, true )
 	) {
-		if ( header.isRemapped ) {
-			uint32_t originalChunkId;
-			SlaveSocket *dataSlaveSocket;
-			this->stripeList->get( key.data, key.size, &dataSlaveSocket, 0, &originalChunkId );
-			if ( CoordinatorWorker::remappingRecords->insert( key, remappingRecord, dataSlaveSocket->getAddr() ) ) {
-				key.dup();
-				LOCK( &Coordinator::getInstance()->pendingRemappingRecords.toSendLock );
-				Coordinator::getInstance()->pendingRemappingRecords.toSend[ key ] = remappingRecord;
-				UNLOCK( &Coordinator::getInstance()->pendingRemappingRecords.toSendLock );
-				event.resRemappingSetLock( event.socket, event.instanceId, event.requestId, header.isRemapped, key, remappingRecord, true, header.sockfd );
-			} else {
-				event.resRemappingSetLock( event.socket, event.instanceId, event.requestId, header.isRemapped, key, remappingRecord, false, header.sockfd );
-			}
+		RemappingRecord remappingRecord;
+		remappingRecord.dup( header.original, header.remapped, header.remappedCount );
+		if ( CoordinatorWorker::remappingRecords->insert( key, remappingRecord, dataSlaveSocket->getAddr() ) ) {
+			event.resRemappingSetLock(
+				event.socket, event.instanceId, event.requestId, true, // success
+				header.original, header.remapped, header.remappedCount, key
+			);
 		} else {
-			event.resRemappingSetLock( event.socket, event.instanceId, event.requestId, header.isRemapped, key, remappingRecord, true, header.sockfd );
+			event.resRemappingSetLock(
+				event.socket, event.instanceId, event.requestId, false, // success
+				0, 0, 0, key
+			);
 		}
 	} else {
-		event.resRemappingSetLock( event.socket, event.instanceId, event.requestId, header.isRemapped, key, remappingRecord, false, header.sockfd );
+		// The key already exists
+		event.resRemappingSetLock(
+			event.socket, event.instanceId, event.requestId, false, // success
+			0, 0, 0, key
+		);
 	}
 	this->dispatch( event );
 

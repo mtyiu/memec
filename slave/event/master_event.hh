@@ -72,11 +72,11 @@ public:
 		} keyValueUpdate;
 		struct {
 			Key key;
-			uint8_t opcode;
 			uint32_t listId;
 			uint32_t chunkId;
-			uint32_t sockfd;
-			bool isRemapped;
+			uint32_t *original;
+			uint32_t *remapped;
+			uint32_t remappedCount;
 		} remap;
 		struct {
 			uint32_t fromTimestamp;
@@ -93,7 +93,12 @@ public:
 	void resSet( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isSealed, uint32_t sealedListId, uint32_t sealedStripeId, uint32_t sealedChunkId, Key &key );
 	void resSet( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool success );
 	// REMAPPING_SET
-	void resRemappingSet( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, uint32_t listId, uint32_t chunkId, bool success, bool needsFree, uint32_t sockfd, bool remapped );
+	void resRemappingSet(
+		MasterSocket *socket, uint16_t instanceId, uint32_t requestId, bool success,
+		Key &key, uint32_t listId, uint32_t chunkId,
+		uint32_t *original, uint32_t *remapped, uint32_t remappedCount,
+		bool needsFree
+	);
 	// UPDATE
 	void resUpdate( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool success, bool needsFree, bool isDegraded );
 	// DELETE

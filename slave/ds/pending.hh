@@ -73,12 +73,6 @@ public:
 	}
 };
 
-class RemappingRecordKey {
-public:
-	RemappingRecord remap;
-	Key key;
-};
-
 struct PendingDegradedLock {
 	uint32_t count;
 	uint32_t total;
@@ -159,7 +153,6 @@ enum PendingType {
 class Pending {
 private:
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, Key> *&map );
-	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, RemappingRecordKey> *&map );
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *&map );
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, DegradedOp> *&map );
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, ChunkRequest> *&map );
@@ -176,18 +169,15 @@ public:
 		LOCK_T recoveryLock;
 	} coordinators;
 	struct {
-		std::unordered_multimap<PendingIdentifier, RemappingRecordKey> remappingSet;
 		std::unordered_multimap<PendingIdentifier, Key> get;
 		std::unordered_multimap<PendingIdentifier, KeyValueUpdate> update;
 		std::unordered_multimap<PendingIdentifier, Key> del;
-		LOCK_T remappingSetLock;
 		LOCK_T getLock;
 		LOCK_T updateLock;
 		LOCK_T delLock;
 	} masters;
    struct {
 		std::unordered_multimap<PendingIdentifier, DegradedOp> degradedOps;
-		std::unordered_multimap<PendingIdentifier, RemappingRecordKey> remappingSet;
 		std::unordered_multimap<PendingIdentifier, Key> get; // Degraded GET for unsealed chunks
 		std::unordered_multimap<PendingIdentifier, KeyValueUpdate> update;
 		std::unordered_multimap<PendingIdentifier, Key> del;
@@ -198,7 +188,6 @@ public:
 		std::unordered_map<struct sockaddr_in, std::set<PendingData>* > remappedData;
 		std::unordered_map<PendingIdentifier, uint32_t> remappedDataRequest;
 		LOCK_T degradedOpsLock;
-		LOCK_T remappingSetLock;
 		LOCK_T getLock;
 		LOCK_T updateLock;
 		LOCK_T delLock;
@@ -214,12 +203,10 @@ public:
 		LOCK_INIT( &this->coordinators.releaseDegradedLockLock );
 		LOCK_INIT( &this->coordinators.reconstructionLock );
 		LOCK_INIT( &this->coordinators.recoveryLock );
-		LOCK_INIT( &this->masters.remappingSetLock );
 		LOCK_INIT( &this->masters.getLock );
 		LOCK_INIT( &this->masters.updateLock );
 		LOCK_INIT( &this->masters.delLock );
 		LOCK_INIT( &this->slavePeers.degradedOpsLock );
-		LOCK_INIT( &this->slavePeers.remappingSetLock );
 		LOCK_INIT( &this->slavePeers.getLock );
 		LOCK_INIT( &this->slavePeers.updateLock );
 		LOCK_INIT( &this->slavePeers.delLock );
@@ -247,11 +234,6 @@ public:
 	);
 
 	// Insert (Master)
-	bool insertRemappingRecordKey(
-		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr,
-		RemappingRecordKey &remappingRecordKey,
-		bool needsLock = true, bool needsUnlock = true
-	);
 	bool insertKey(
 		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr,
 		Key &key,
@@ -263,11 +245,6 @@ public:
 		bool needsLock = true, bool needsUnlock = true
 	);
 	// Insert (Slave Peers)
-	bool insertRemappingRecordKey(
-		PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
-		RemappingRecordKey &remappingRecordKey,
-		bool needsLock = true, bool needsUnlock = true
-	);
 	bool insertKey(
 		PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
 		Key &key,
@@ -318,12 +295,6 @@ public:
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		uint16_t &instanceId, uint32_t &requestId, CoordinatorSocket *&socket,
 		uint32_t &addr, uint16_t &port, uint32_t &remaining, uint32_t &total
-	);
-	bool eraseRemappingRecordKey(
-		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr = 0,
-		PendingIdentifier *pidPtr = 0,
-		RemappingRecordKey *remappingRecordKeyPtr = 0,
-		bool needsLock = true, bool needsUnlock = true
 	);
 	bool eraseKey(
 		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr = 0,

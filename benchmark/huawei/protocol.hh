@@ -37,12 +37,13 @@
  ***********************/
 #define MAXIMUM_VALUE_SIZE 16777215
 
-#define PROTO_HEADER_SIZE 12
+#define PROTO_HEADER_SIZE 16
 struct ProtocolHeader {
 	uint8_t magic, from, to, opcode;
 	uint32_t length; // Content length
 	uint16_t instanceId;
 	uint32_t requestId;
+	uint32_t timestamp;
 };
 
  ///////////////////////
@@ -78,7 +79,7 @@ protected:
 	bool parseHeader(
 		uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t &opcode,
 		uint32_t &length, uint16_t &instanceId, uint32_t &requestId,
-		char *buf, size_t size
+		uint32_t &requestTimestamp, char *buf, size_t size
 	);
 	bool parseKeyHeader(
 		size_t offset,
@@ -100,7 +101,7 @@ public:
 	size_t generateHeader(
 		uint8_t magic, uint8_t opcode,
 		uint32_t length, uint16_t instanceId, uint32_t requestId,
-		char *buf
+		char *buf, uint32_t requestTimestamp = 0
 	);
 	size_t generateKeyHeader(
 		uint8_t magic, uint8_t opcode, uint16_t instanceId, uint32_t requestId,

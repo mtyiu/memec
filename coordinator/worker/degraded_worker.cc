@@ -23,6 +23,8 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 
 	if ( CoordinatorWorker::remappingRecords->find( key, &remappingRecord ) ) {
 		// Remapped
+		__ERROR__( "CoordinatorWorker", "handleDegradedLockRequest", "TODO: Handle remapped keys." );
+		/*
 		if ( remappingRecord.listId != header.listId || remappingRecord.chunkId != header.srcDataChunkId ) {
 			// Reject the degraded operation if the data chunk ID does not match
 			event.resDegradedLock(
@@ -34,6 +36,7 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 			this->dispatch( event );
 			return false;
 		}
+		*/
 	}
 
 	// Find the SlaveSocket which stores the stripe with listId and srcDataChunkId

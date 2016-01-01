@@ -46,7 +46,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 			if ( ! isCompleted )
 				MasterWorker::eventQueue->insert( event );
 
-			printf( "Sealed: %u; ops: %u\n", sealedCount, opsCount );
+			// printf( "Sealed: %u; ops: %u\n", sealedCount, opsCount );
 			isSend = false; // Send to coordinator instead
 		}
 			break;
@@ -499,7 +499,7 @@ bool MasterWorker::handleDeleteResponse( SlaveEvent event, bool success, bool is
 	original = ( SlaveSocket * ) pid.ptr;
 
 	if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_DEL, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &key, true, true, true, keyStr ) ) {
-		__ERROR__( "MasterWorker", "handleDeleteResponse", "Cannot find a pending application DELETE request that matches the response. This message will be discarded." );
+		__ERROR__( "MasterWorker", "handleDeleteResponse", "Cannot find a pending application DELETE request that matches the response. This message will be discarded. ID: (%u, %u); key: %.*s.", pid.parentInstanceId, pid.parentRequestId, keySize, keyStr );
 		return false;
 	}
 
@@ -542,4 +542,3 @@ bool MasterWorker::handleAcknowledgement( SlaveEvent event, uint8_t opcode, char
 
 	return true;
 }
-

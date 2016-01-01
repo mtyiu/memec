@@ -20,9 +20,6 @@ enum MasterEventType {
 	MASTER_EVENT_TYPE_PUSH_LOADING_STATS,
 	// REMAPPING_PHASE_SWITCH
 	MASTER_EVENT_TYPE_SWITCH_PHASE,
-	// REMAPPING_RECORDS
-	MASTER_EVENT_TYPE_FORWARD_REMAPPING_RECORDS,
-	MASTER_EVENT_TYPE_SYNC_REMAPPING_RECORDS,
 	// Degraded operation
 	MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED,
 	MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_WAS_LOCKED,
@@ -51,17 +48,13 @@ public:
 		struct {
 			bool toRemap;
 			std::vector<struct sockaddr_in> *slaves;
-			Key key;
-			uint32_t listId;
-			uint32_t chunkId;
-			uint32_t isRemapped;
-			uint32_t sockfd;
-			std::vector<Packet*> *syncPackets;
-		} remap;
+		} switchPhase;
 		struct {
-			size_t prevSize;
-			char *data;
-		} forward;
+			uint32_t *original;
+			uint32_t *remapped;
+			uint32_t remappedCount;
+			Key key;
+		} remap;
 		struct {
 			Key key;
 			uint32_t listId, stripeId;
@@ -99,14 +92,8 @@ public:
 	);
 	// REMAPPING_SET_LOCK
 	void resRemappingSetLock(
-		MasterSocket *socket, uint16_t instanceId, uint32_t requestId, bool isRemapped,
-		Key &key, RemappingRecord &remappingRecord, bool success,
-		uint32_t sockfd = UINT_MAX
-	);
-	// Remapping Records
-	void forwardRemappingRecords( MasterSocket *socket, size_t prevSize, char *data );
-	void syncRemappingRecords(
-		MasterSocket *socket, std::vector<Packet*> *packets
+		MasterSocket *socket, uint16_t instanceId, uint32_t requestId, bool success,
+		uint32_t *original, uint32_t *remapped, uint32_t remappedCount, Key &key
 	);
 	// Pending
 	void pending( MasterSocket *socket );

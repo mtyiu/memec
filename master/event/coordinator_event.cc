@@ -18,12 +18,6 @@ void CoordinatorEvent::reqSendLoadStats(
 	this->message.loading.slaveSetLatency = slaveSetLatency;
 }
 
-void CoordinatorEvent::resSyncRemappingRecords( uint16_t instanceId, uint32_t requestId ) {
-	this->type = COORDINATOR_EVENT_TYPE_RESPONSE_SYNC_REMAPPING_RECORDS;
-	this->instanceId = instanceId;
-	this->requestId = requestId;
-}
-
 void CoordinatorEvent::pending( CoordinatorSocket *socket ) {
 	this->type = COORDINATOR_EVENT_TYPE_PENDING;
 	this->socket = socket;

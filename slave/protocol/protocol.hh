@@ -59,10 +59,11 @@ public:
 
 	// ---------- remap_protocol.cc ----------
 	char *resRemappingSet(
-		size_t &size, bool toMaster, uint16_t instanceId, uint32_t requestId, bool success,
+		size_t &size, bool toMaster,
+		uint16_t instanceId, uint32_t requestId, bool success,
 		uint32_t listId, uint32_t chunkId,
-		uint8_t keySize, char *key,
-		uint32_t sockfd = UINT_MAX, bool remapped = false
+		uint32_t *original, uint32_t *remapped, uint32_t remappedCount,
+		uint8_t keySize, char *key
 	);
 	char *resRemapParity( size_t &size, uint16_t instanceId, uint32_t requestId );
 

@@ -18,9 +18,9 @@
 #endif
 
 typedef struct {
-	int listId;
-	int stripeId;
-	int chunkId;
+	uint32_t listId;
+	uint32_t stripeId;
+	uint32_t chunkId;
 	bool isParity;
 } StripeListIndex;
 

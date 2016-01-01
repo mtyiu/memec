@@ -16,7 +16,6 @@ MasterEventQueue *MasterWorker::eventQueue;
 StripeList<SlaveSocket> *MasterWorker::stripeList;
 PacketPool *MasterWorker::packetPool;
 ArrayMap<int, SlaveSocket> *MasterWorker::slaveSockets;
-RemappingRecordMap *MasterWorker::remappingRecords;
 MasterRemapMsgHandler *MasterWorker::remapMsgHandler;
 Timestamp *MasterWorker::timestamp;
 
@@ -43,8 +42,6 @@ void MasterWorker::dispatch( MasterEvent event ) {}
 
 SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId ) {
 	SlaveSocket *ret;
-
-	// use hashing to get original slave
 	Key key;
 	key.set( size, data );
 	listId = MasterWorker::stripeList->get(
@@ -53,27 +50,7 @@ SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId
 		this->paritySlaveSockets,
 		&chunkId, true
 	);
-
-	RemappingRecord record;
-	bool found = false;
-	// if original slave is not in Normal state, search to see if this key is remapped
-	if ( ! Master::getInstance()->config.master.remap.forceNoCacheRecords &&
-		Master::getInstance()->remapMsgHandler.useCoordinatedFlow( this->dataSlaveSockets[ chunkId ]->getAddr() ) )
-	{
-		found = MasterWorker::remappingRecords->find( key, &record );
-	}
-	if ( found ) { // remapped keys
-		//fprintf( stderr, "Redirect request to list=%u chunk=%u\n", record.listId, record.chunkId);
-		listId = record.listId;
-		chunkId = record.chunkId;
-		this->paritySlaveSockets = MasterWorker::stripeList->get(
-			listId,
-			this->paritySlaveSockets,
-			this->dataSlaveSockets
-		);
-	}
 	ret = this->dataSlaveSockets[ chunkId ];
-
 	return ret->ready() ? ret : 0;
 }
 
@@ -175,10 +152,11 @@ SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId
 	return socket->ready() ? socket : 0;
 }
 
-SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &originalListId, uint32_t &originalChunkId, uint32_t &remappedListId, std::vector<uint32_t> &remappedChunkId ) {
-	SlaveSocket *ret;
+bool MasterWorker::getSlaves( char *data, uint8_t size, uint32_t *&original, uint32_t *&remapped, uint32_t &remappedCount ) {
+	bool ret = true;
 
 	// Determine original data slave
+	uint32_t originalListId, originalChunkId;
 	originalListId = MasterWorker::stripeList->get(
 		data, ( size_t ) size,
 		this->dataSlaveSockets,
@@ -186,21 +164,39 @@ SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &origin
 		&originalChunkId, true
 	);
 
-	ret = this->dataSlaveSockets[ originalChunkId ];
+	original = this->original;
+	remapped = this->remapped;
+
+	original[ 0 ] = originalListId;
+	original[ 1 ] = originalChunkId;
+	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
+		original[ ( i + 1 ) * 2 ] = originalListId;
+		original[ ( i + 1 ) * 2 + 1 ] = MasterWorker::dataChunkCount + i;
+	}
 
 	// Determine remapped data slave
 	BasicRemappingScheme::getRemapTarget(
-		originalListId, originalChunkId,
-		remappedListId, remappedChunkId,
+		this->original, this->remapped, remappedCount,
 		MasterWorker::dataChunkCount, MasterWorker::parityChunkCount,
 		this->dataSlaveSockets, this->paritySlaveSockets
 	);
 
-	// BasicRemappingScheme::getRemapTarget() may replace this->dataSlaveSockets & this->paritySlaveSockets
-	this->getSlaves( originalListId, originalChunkId );
-	ret = this->dataSlaveSockets[ originalChunkId ];
+	if ( remappedCount ) {
+		uint32_t *_original = new uint32_t[ remappedCount * 2 ];
+		uint32_t *_remapped = new uint32_t[ remappedCount * 2 ];
+		for ( uint32_t i = 0; i < remappedCount * 2; i++ ) {
+			_original[ i ] = original[ i ];
+			_remapped[ i ] = remapped[ i ];
+		}
+		original = _original;
+		remapped = _remapped;
+	}
 
-	return ret->ready() ? ret : 0;
+	// BasicRemappingScheme::getRemapTarget() may replace this->dataSlaveSockets & this->paritySlaveSockets
+	// this->getSlaves( originalListId, originalChunkId );
+	// ret = this->dataSlaveSockets[ originalChunkId ];
+
+	return ret;
 }
 
 SlaveSocket *MasterWorker::getSlaves( uint32_t listId, uint32_t chunkId ) {
@@ -212,6 +208,8 @@ SlaveSocket *MasterWorker::getSlaves( uint32_t listId, uint32_t chunkId ) {
 
 void MasterWorker::free() {
 	this->protocol.free();
+	delete[] original;
+	delete[] remapped;
 	delete[] this->dataSlaveSockets;
 	delete[] this->paritySlaveSockets;
 }
@@ -292,7 +290,6 @@ bool MasterWorker::init() {
 	MasterWorker::eventQueue = &master->eventQueue;
 	MasterWorker::stripeList = master->stripeList;
 	MasterWorker::slaveSockets = &master->sockets.slaves;
-	MasterWorker::remappingRecords = &master->remappingRecords;
 	MasterWorker::packetPool = &master->packetPool;
 	MasterWorker::remapMsgHandler = &master->remapMsgHandler;
 	MasterWorker::timestamp = &master->timestamp.current;
@@ -306,6 +303,8 @@ bool MasterWorker::init( GlobalConfig &config, WorkerRole role, uint32_t workerI
 			config.size.chunk
 		)
 	);
+	this->original = new uint32_t[ ( MasterWorker::dataChunkCount + MasterWorker::parityChunkCount ) * 2 ];
+	this->remapped = new uint32_t[ ( MasterWorker::dataChunkCount + MasterWorker::parityChunkCount ) * 2 ];
 	this->dataSlaveSockets = new SlaveSocket*[ MasterWorker::dataChunkCount ];
 	this->paritySlaveSockets = new SlaveSocket*[ MasterWorker::parityChunkCount ];
 	this->role = role;

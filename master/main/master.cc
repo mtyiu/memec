@@ -629,7 +629,6 @@ void Master::printPending( FILE *f ) {
 	std::unordered_multimap<PendingIdentifier, Key>::iterator it;
 	std::unordered_multimap<PendingIdentifier, KeyValue>::iterator keyValueIt;
 	std::unordered_multimap<PendingIdentifier, KeyValueUpdate>::iterator keyValueUpdateIt;
-	std::unordered_multimap<PendingIdentifier, RemappingRecord>::iterator remappingRecordIt;
 
 	LOCK( &this->pending.applications.setLock );
 	fprintf(
@@ -775,31 +774,6 @@ void Master::printPending( FILE *f ) {
 	}
 	UNLOCK( &this->pending.slaves.setLock );
 
-	LOCK( &this->pending.slaves.remappingSetLock );
-	fprintf(
-		f,
-		"\n[REMAPPING_SET] Pending: %lu\n",
-		this->pending.slaves.remappingSet.size()
-	);
-
-	i = 1;
-	for (
-		remappingRecordIt = this->pending.slaves.remappingSet.begin();
-		remappingRecordIt != this->pending.slaves.remappingSet.end();
-		remappingRecordIt++, i++
-	) {
-		const RemappingRecord &record = remappingRecordIt->second;
-		fprintf(
-			f, "%lu. ID: (%u, %u), parent ID: (%u, %u); list ID: %u, chunk ID: %u; target: ",
-			i, remappingRecordIt->first.instanceId, remappingRecordIt->first.requestId,
-			remappingRecordIt->first.parentInstanceId, remappingRecordIt->first.parentRequestId,
-			record.listId, record.chunkId
-		);
-		( ( Socket * ) remappingRecordIt->first.ptr )->printAddress( f );
-		fprintf( f, "\n" );
-	}
-	UNLOCK( &this->pending.slaves.remappingSetLock );
-
 	LOCK( &this->pending.slaves.getLock );
 	fprintf(
 		f,
@@ -905,13 +879,6 @@ void Master::printPending( FILE *f ) {
 }
 
 void Master::printRemapping( FILE *f ) {
-	fprintf(
-		f,
-		"\nRemapping Record Mapping\n"
-		"------------------------\n"
-	);
-	this->remappingRecords.print( f );
-
 	fprintf(
 		f,
 		"\nList of Tracking Slaves\n"
@@ -1041,11 +1008,11 @@ void Master::ackParityDelta( FILE *f ) {
 			"Ack slave timestamps from %u to %u\n",
 			from, to
 		);
+
 	for( int i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
 		event.ackParityDelta( this->sockets.slaves[ i ], from, to );
 		this->eventQueue.insert( event );
-		this->timestamp.lastAck.setVal( 
-			this->timestamp.current.getVal()
-		);
 	}
+
+	this->timestamp.lastAck.setVal( to );
 }

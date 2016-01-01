@@ -36,14 +36,6 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 			);
 			isSend = true;
 			break;
-		case COORDINATOR_EVENT_TYPE_RESPONSE_SYNC_REMAPPING_RECORDS:
-			buffer.data = this->protocol.resSyncRemappingRecords(
-				buffer.size,
-				event.instanceId,
-				event.requestId
-			);
-			isSend = true;
-			break;
 		case COORDINATOR_EVENT_TYPE_PENDING:
 			isSend = false;
 			break;
@@ -119,47 +111,6 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 								__ERROR__( "MasterWorker", "dispatch", "Invalid magic code from coordinator." );
 								break;
 						}
-						break;
-					case PROTO_OPCODE_SYNC:
-					/*
-						if ( header.magic == PROTO_MAGIC_REMAPPING ) {
-							size_t offset, count, bytes;
-							struct RemappingRecordHeader remappingRecordHeader;
-							struct SlaveSyncRemapHeader slaveSyncRemapHeader;
-
-							if ( ! this->protocol.parseRemappingRecordHeader( remappingRecordHeader, buffer.data, buffer.size ) ) {
-								__ERROR__( "CoordinatorWorker", "dispatch", "Invalid remapping record protocol header." );
-								goto quit_1;
-							}
-							// start parsing the remapping records
-							offset = PROTO_REMAPPING_RECORD_SIZE;
-							RemappingRecordMap *map = MasterWorker::remappingRecords;
-							for ( count = 0; offset < ( size_t ) buffer.size && count < remappingRecordHeader.remap; offset += bytes ) {
-								if ( ! this->protocol.parseSlaveSyncRemapHeader( slaveSyncRemapHeader, bytes, buffer.data, buffer.size, offset ) ) {
-									__ERROR__( "CoordinatorWorker", "dispatch", "Failed to parse remapping record message. reading buffer of size %lu at %lu", buffer.size, offset );
-									break;
-								}
-								count++;
-
-								Key key;
-								key.set ( slaveSyncRemapHeader.keySize, slaveSyncRemapHeader.key );
-
-								RemappingRecord remappingRecord;
-								remappingRecord.set( slaveSyncRemapHeader.listId, slaveSyncRemapHeader.chunkId, 0 );
-
-								if ( slaveSyncRemapHeader.opcode == 0 ) { // remove record
-									map->erase( key, remappingRecord, true, true, true );
-								} else if ( slaveSyncRemapHeader.opcode == 1 ) { // add record
-									map->insert( key, remappingRecord );
-								}
-							}
-							event.resSyncRemappingRecords( header.instanceId, header.requestId );
-							this->dispatch( event );
-							//map->print();
-						} else {
-					*/
-							__ERROR__( "MasterWorker", "dispatch", "Invalid magic code from coordinator." );
-						// }
 						break;
 					case PROTO_OPCODE_DEGRADED_LOCK:
 						this->handleDegradedLockResponse( event, success, buffer.data, buffer.size );

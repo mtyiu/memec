@@ -1,32 +1,19 @@
 #include "protocol.hh"
 
-char *MasterProtocol::reqRemappingSetLock( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, std::vector<uint32_t> chunkId, uint32_t reqRemapState , char *key, uint8_t keySize, uint32_t sockfd ) {
+char *MasterProtocol::reqRemappingSetLock( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t *original, uint32_t *remapped, uint32_t remappedCount, char *key, uint8_t keySize ) {
 	// -- common/protocol/remap_protocol.cc --
 	size = this->generateRemappingLockHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_COORDINATOR,
 		PROTO_OPCODE_REMAPPING_LOCK,
 		instanceId, requestId,
-		listId,
-		chunkId[ 0 ],
-		reqRemapState,
-		keySize,
-		key,
-		sockfd,
-		( chunkId.size() - 1 ) * 4 + 1
+		original, remapped, remappedCount,
+		keySize, key
 	);
-
-	// append the list of parity slave ( may be remapped )
-	*( this->buffer.send + size ) = ( uint8_t ) chunkId.size() - 1;
-	size += 1;
-	for ( uint32_t i = 1; i < chunkId.size(); i++, size += 4 ) {
-		*( ( uint32_t * )( this->buffer.send + size ) ) = htonl( chunkId[ i ] );
-	}
-
 	return this->buffer.send;
 }
 
-char *MasterProtocol::reqRemappingSet( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf, uint32_t sockfd, bool isParity, struct sockaddr_in *target ) {
+char *MasterProtocol::reqRemappingSet( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t *original, uint32_t *remapped, uint32_t remappedCount, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf ) {
 	// -- common/protocol/remap_protocol.cc --
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateRemappingSetHeader(
@@ -34,28 +21,11 @@ char *MasterProtocol::reqRemappingSet( size_t &size, uint16_t instanceId, uint32
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_REMAPPING_SET,
 		instanceId, requestId,
-		listId,
-		chunkId,
-		keySize,
-		key,
-		valueSize,
-		value,
-		buf,
-		sockfd,
-		isParity,
-		target
+		listId, chunkId,
+		original, remapped, remappedCount,
+		keySize, key,
+		valueSize, value,
+		buf
 	);
 	return buf;
-}
-
-char *MasterProtocol::resSyncRemappingRecords( size_t &size, uint16_t instanceId, uint32_t requestId ) {
-	// -- common/protocol/protocol.cc --
-	size = this->generateHeader(
-		PROTO_MAGIC_REMAPPING,
-		PROTO_MAGIC_TO_COORDINATOR,
-		PROTO_OPCODE_SYNC,
-		0,
-		instanceId, requestId
-	);
-	return this->buffer.send;
 }

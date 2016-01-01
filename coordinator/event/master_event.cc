@@ -17,35 +17,21 @@ void MasterEvent::reqPushLoadStats( MasterSocket *socket, ArrayMap<struct sockad
 	this->message.slaveLoading.overloadedSlaveSet = overloadedSlaveSet;
 }
 
-void MasterEvent::resRemappingSetLock( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, bool isRemapped, Key &key, RemappingRecord &remappingRecord, bool success, uint32_t sockfd ) {
+void MasterEvent::resRemappingSetLock( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, bool success, uint32_t *original, uint32_t *remapped, uint32_t remappedCount, Key &key ) {
 	this->type = success ? MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_SUCCESS : MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_FAILURE;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
+	this->message.remap.original = original;
+	this->message.remap.remapped = remapped;
+	this->message.remap.remappedCount = remappedCount;
 	this->message.remap.key = key;
-	this->message.remap.listId = remappingRecord.listId;
-	this->message.remap.chunkId = remappingRecord.chunkId;
-	this->message.remap.isRemapped = isRemapped;
-	this->message.remap.sockfd = sockfd;
 }
 
 void MasterEvent::switchPhase( bool toRemap, std::set<struct sockaddr_in> slaves ) {
 	this->type = MASTER_EVENT_TYPE_SWITCH_PHASE;
-	this->message.remap.toRemap = toRemap;
-	this->message.remap.slaves = new std::vector<struct sockaddr_in>( slaves.begin(), slaves.end() );
-}
-
-void MasterEvent::forwardRemappingRecords( MasterSocket *socket, size_t prevSize, char *data ) {
-	this->type = MASTER_EVENT_TYPE_FORWARD_REMAPPING_RECORDS;
-	this->socket = socket;
-	this->message.forward.prevSize = prevSize;
-	this->message.forward.data = data;
-}
-
-void MasterEvent::syncRemappingRecords( MasterSocket *socket, std::vector<Packet*> *packets ) {
-	this->type = MASTER_EVENT_TYPE_SYNC_REMAPPING_RECORDS;
-	this->socket = socket;
-	this->message.remap.syncPackets = packets;
+	this->message.switchPhase.toRemap = toRemap;
+	this->message.switchPhase.slaves = new std::vector<struct sockaddr_in>( slaves.begin(), slaves.end() );
 }
 
 void MasterEvent::resDegradedLock( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool isLocked, bool isSealed, uint32_t listId, uint32_t stripeId, uint32_t srcDataChunkId, uint32_t dstDataChunkId, uint32_t srcParityChunkId, uint32_t dstParityChunkId ) {

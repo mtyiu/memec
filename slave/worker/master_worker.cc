@@ -105,10 +105,11 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 				success,
 				event.message.remap.listId,
 				event.message.remap.chunkId,
+				event.message.remap.original,
+				event.message.remap.remapped,
+				event.message.remap.remappedCount,
 				event.message.remap.key.size,
-				event.message.remap.key.data,
-				event.message.remap.sockfd,
-				event.message.remap.isRemapped
+				event.message.remap.key.data
 			);
 
 			if ( event.needsFree )
@@ -133,7 +134,6 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 			break;
 		// DELETE
 		case MASTER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS:
-			// TODO: Include the timestamp and metadata
 			buffer.data = this->protocol.resDelete(
 				buffer.size,
 				event.instanceId, event.requestId,
@@ -267,7 +267,6 @@ bool SlaveWorker::handleGetRequest( MasterEvent event, char *buf, size_t size ) 
 
 	Key key;
 	KeyValue keyValue;
-	RemappingRecord remappingRecord;
 	if ( map->findValueByKey( header.key, header.keySize, &keyValue, &key ) ) {
 		event.resGet( event.socket, event.instanceId, event.requestId, keyValue, false );
 		ret = true;
@@ -351,7 +350,6 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 	KeyMetadata keyMetadata;
 	Metadata metadata;
 	Chunk *chunk;
-	RemappingRecord remappingRecord;
 	if ( map->findValueByKey( header.key, header.keySize, &keyValue, &key, &keyMetadata, &metadata, &chunk ) ) {
 		uint32_t offset = keyMetadata.offset + PROTO_KEY_VALUE_SIZE + header.keySize + header.valueUpdateOffset;
 
@@ -448,7 +446,6 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 	KeyMetadata keyMetadata;
 	Metadata metadata;
 	Chunk *chunk;
-	RemappingRecord remappingRecord;
 	if ( map->findValueByKey( header.key, header.keySize, &keyValue, 0, &keyMetadata, &metadata, &chunk ) ) {
 		uint32_t timestamp;
 		uint32_t deltaSize = 0;
