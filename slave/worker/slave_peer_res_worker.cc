@@ -227,7 +227,7 @@ bool SlaveWorker::handleUpdateResponse( SlavePeerEvent event, bool success, char
 		return false;
 	}
 
-	// TODO erase backup
+	// erase data delta backup
 	MasterSocket *masterSocket = Slave::getInstance()->sockets.mastersIdToSocketMap.get( event.instanceId );
 	if ( masterSocket )
 		masterSocket->backup.removeDataUpdate( event.requestId, event.socket );
@@ -283,7 +283,7 @@ bool SlaveWorker::handleDeleteResponse( SlavePeerEvent event, bool success, char
 		return false;
 	}
 
-	// TODO erase backup
+	// erase data delta backup
 	MasterSocket *masterSocket = Slave::getInstance()->sockets.mastersIdToSocketMap.get( event.instanceId );
 	if ( masterSocket )
 		masterSocket->backup.removeDataDelete( event.requestId, event.socket );
@@ -781,7 +781,7 @@ bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success,
 		return false;
 	}
 
-	// TODO erase backup
+	// erase data delta backup
 	MasterSocket *masterSocket = Slave::getInstance()->sockets.mastersIdToSocketMap.get( event.instanceId );
 	if ( masterSocket )
 		masterSocket->backup.removeDataUpdate( event.requestId, event.socket );
@@ -846,7 +846,7 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 		return false;
 	}
 
-	// TODO erase backup
+	// erase data delta backup
 	MasterSocket *masterSocket = Slave::getInstance()->sockets.mastersIdToSocketMap.get( event.instanceId );
 	if ( masterSocket )
 		masterSocket->backup.removeDataDelete( event.requestId, event.socket );

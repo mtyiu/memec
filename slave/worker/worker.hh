@@ -87,6 +87,7 @@ private:
 	bool handleSetRequest( MasterEvent event, char *buf, size_t size, bool needResSet = true );
 	bool handleUpdateRequest( MasterEvent event, char *buf, size_t size );
 	bool handleDeleteRequest( MasterEvent event, char *buf, size_t size );
+	bool handleAckParityDeltaBackup( MasterEvent event, char *buf, size_t size );
 
 	// ---------- slave_peer_worker.cc ----------
 	void dispatch( SlavePeerEvent event );

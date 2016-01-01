@@ -68,6 +68,7 @@
 #define PROTO_OPCODE_DEGRADED_UNLOCK              0x14
 #define PROTO_OPCODE_ACK_METADATA                 0x15
 #define PROTO_OPCODE_ACK_REQUEST                  0x16
+#define PROTO_OPCODE_ACK_PARITY_DELTA             0x17
 
 // Master <-> Coordinator (20-29) //
 #define PROTO_OPCODE_REMAPPING_LOCK               0x20

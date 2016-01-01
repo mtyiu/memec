@@ -749,7 +749,7 @@ bool SlaveWorker::sendModifyChunkRequest( uint16_t parentInstanceId, uint32_t pa
 				Packet *packet = SlaveWorker::packetPool->malloc();
 				packet->setReferenceCount( 1 );
 
-				// TODO backup parity delta
+				// backup data delta, insert a pending record for each parity slave
 				if ( masterSocket != 0 ) {
 					Timestamp timestamp ( timestamp );
 					Value value;
@@ -860,7 +860,7 @@ bool SlaveWorker::sendModifyChunkRequest( uint16_t parentInstanceId, uint32_t pa
 			if ( this->paritySlaveSockets[ i ]->self )
 				continue;
 
-			// TODO backup parity delta
+			// backup data delta, insert a pending record for each parity slave
 			if ( masterSocket != 0 ) {
 				Timestamp timestamp ( timestamp );
 				Value value;

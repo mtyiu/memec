@@ -106,6 +106,7 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 
 		case PROTO_OPCODE_ACK_METADATA:
 		case PROTO_OPCODE_ACK_REQUEST:
+		case PROTO_OPCODE_ACK_PARITY_DELTA:
 
 		case PROTO_OPCODE_REMAPPING_LOCK:
 

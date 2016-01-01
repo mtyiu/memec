@@ -289,7 +289,7 @@ bool MasterWorker::init() {
 	MasterWorker::slaveSockets = &master->sockets.slaves;
 	MasterWorker::packetPool = &master->packetPool;
 	MasterWorker::remapMsgHandler = &master->remapMsgHandler;
-	MasterWorker::timestamp = &master->timestamp;
+	MasterWorker::timestamp = &master->timestamp.current;
 	return true;
 }
 

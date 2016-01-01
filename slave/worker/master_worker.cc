@@ -235,6 +235,9 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 						this->handleDegradedDeleteRequest( event, buffer.data, buffer.size );
 						this->load.del();
 						break;
+					case PROTO_OPCODE_ACK_PARITY_DELTA:
+						this->handleAckParityDeltaBackup( event, buffer.data, buffer.size );
+						break;
 					default:
 						__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from master." );
 						break;
@@ -536,4 +539,25 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 	}
 
 	return ret;
+}
+
+bool SlaveWorker::handleAckParityDeltaBackup( MasterEvent event, char *buf, size_t size ) {
+	AcknowledgementHeader header;
+	if ( ! this->protocol.parseAcknowledgementHeader( header, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleAckParityDeltaBackup", "Invalid ACK parity delta backup request." );
+		return false;
+	}
+	__DEBUG__(
+		BLUE, "SlaveWorker", "handleAckParityDeltaBackup",
+		"Ack. from master fd = %u from %u to %u.",
+		event.socket->getSocket(), header.fromTimestamp, header.toTimestamp
+	);
+
+	Timestamp from( header.fromTimestamp );
+	Timestamp to( header.toTimestamp );
+
+	event.socket->backup.removeParityUpdate( from, to );
+	event.socket->backup.removeParityDelete( from, to );
+
+	return true;
 }

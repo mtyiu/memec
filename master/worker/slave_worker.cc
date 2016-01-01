@@ -50,6 +50,15 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 			isSend = false; // Send to coordinator instead
 		}
 			break;
+		case SLAVE_EVENT_TYPE_ACK_PARITY_DELTA:
+			buffer.data = this->protocol.ackParityDeltaBackup(
+				buffer.size,
+				instanceId,
+				MasterWorker::idGenerator->nextVal( this->workerId ),
+				event.message.ack.fromTimestamp, event.message.ack.toTimestamp
+			);
+			isSend = true;
+			break;
 		case SLAVE_EVENT_TYPE_PENDING:
 			isSend = false;
 			break;
@@ -515,3 +524,4 @@ bool MasterWorker::handleAcknowledgement( SlaveEvent event, uint8_t opcode, char
 
 	return true;
 }
+
