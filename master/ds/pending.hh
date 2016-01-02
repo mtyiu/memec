@@ -153,16 +153,19 @@ public:
 	// Insert (Applications)
 	bool insertKey(
 		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr,
-		Key &key, bool needsLock = true, bool needsUnlock = true
+		Key &key, bool needsLock = true, bool needsUnlock = true,
+		uint32_t timestamp = 0
 	);
 	bool insertKeyValue(
 		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr,
-		KeyValue &keyValue, bool needsLock = true, bool needsUnlock = true
+		KeyValue &keyValue, bool needsLock = true, bool needsUnlock = true,
+		uint32_t timestamp = 0
 	);
 	bool insertKeyValueUpdate(
 		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr,
-		KeyValueUpdate &keyValueUpdate,
-		bool needsLock = true, bool needsUnlock = true
+		KeyValueUpdate &keyValueUpdate, 
+		bool needsLock = true, bool needsUnlock = true,
+		uint32_t timestamp = 0
 	);
 	// Insert (Slaves)
 	bool insertKey(

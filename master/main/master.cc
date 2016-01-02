@@ -378,7 +378,7 @@ bool Master::start() {
 
 	/* Timestamps */
 	this->timestamp.current.setVal( 0 );
-	this->timestamp.lastParityDeltaAck.setVal( 0 );
+	this->timestamp.lastAck.setVal( 0 );
 
 	this->startTime = start_timer();
 	this->isRunning = true;
@@ -564,7 +564,7 @@ void Master::interactive() {
 			this->time();
 		} else if ( strcmp( command, "ackparity" ) == 0 ) {
 			valid = true;
-			this->ackParityDelta();
+			this->ackParityDelta( stdout );
 		} else {
 			valid = false;
 		}
@@ -907,6 +907,15 @@ void Master::printBackup( FILE *f ) {
 		printf( "\n" );
 	}
 	UNLOCK( &this->sockets.slaves.lock );
+	fprintf( f,
+		"Pending timestamps to ack\n"
+		"----------------------------\n"
+		"Update: %10lu  Delete: %10lu\n"
+		"Last timestamp acked: %10u\n",
+		this->timestamp.pendingAck.update.size(),
+		this->timestamp.pendingAck.del.size(),
+		this->timestamp.lastAck.getVal()
+	);
 }
 
 void Master::syncMetadata() {
@@ -972,23 +981,38 @@ void Master::time() {
 	fflush( stdout );
 }
 
-void Master::ackParityDelta() {
+void Master::ackParityDelta( FILE *f ) {
 	SlaveEvent event;
-	fprintf(
-		stdout, "Ack timestamps from %u to %u\n",
-		this->timestamp.lastParityDeltaAck.getVal(),
-		this->timestamp.current.getVal()
-	);
+	uint32_t from, to, update, del;
+	from = this->timestamp.lastAck.getVal();
+	to = this->timestamp.current.getVal();
+
+	del = update = to;
+	
+	if ( ! this->timestamp.pendingAck.update.empty() )
+		update = this->timestamp.pendingAck.update.begin()->getVal() - 1;
+
+	if ( ! this->timestamp.pendingAck.del.empty() )
+		del = this->timestamp.pendingAck.del.begin()->getVal() - 1;
+
+	// find the small acked timestamp
+	to = update < to ? ( del < update ? del : update ) : to ;
+
+	// check the threshold is reached
+	if ( to - from < this->config.master.backup.ackBatchSize ) {
+		return;
+	}
+
+	if ( f )
+		fprintf( f, 
+			"Ack slave timestamps from %u to %u\n",
+			from, to
+		);
 
 	for( int i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
-		event.ackParityDelta(
-			this->sockets.slaves.values[ i ],
-			this->timestamp.lastParityDeltaAck.getVal(),
-			this->timestamp.current.getVal()
-		);
+		event.ackParityDelta( this->sockets.slaves[ i ], from, to );
 		this->eventQueue.insert( event );
 	}
-	this->timestamp.lastParityDeltaAck.setVal(
-		this->timestamp.current.getVal()
-	);
+
+	this->timestamp.lastAck.setVal( to );
 }

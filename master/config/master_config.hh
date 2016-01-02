@@ -59,6 +59,9 @@ public:
 		bool isFixed;
 		bool disabled;
 	} degraded;
+	struct {
+		uint32_t ackBatchSize; /* no. of request */
+	} backup;
 
 	MasterConfig();
 	bool merge( GlobalConfig &globalConfig );

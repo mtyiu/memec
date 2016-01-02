@@ -45,6 +45,13 @@ public:
 		return this->value == rhs.value;
 	}
 
+	Timestamp operator-( const Timestamp &rhs ) const {
+		uint32_t diff = this->value - rhs.value;
+		if ( this->value < rhs.value )
+			diff += UINT32_MAX;
+		return Timestamp( diff );
+	}
+
 };
 
 #endif

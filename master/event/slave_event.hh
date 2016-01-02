@@ -21,6 +21,7 @@ public:
 	SlaveSocket *socket;
 	uint16_t instanceId;
 	uint32_t requestId;
+	uint32_t timestamp;
 	union {
 		struct {
 			uint32_t addr;

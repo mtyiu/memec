@@ -426,8 +426,18 @@ bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, bool is
 		Master::getInstance()->remapMsgHandler.ackTransit( event.socket->getAddr() );
 	}
 
+	// remove pending timestamp
+	Master *master = Master::getInstance();
+	auto &updateSet = master->timestamp.pendingAck.update;
+	auto it = updateSet.find( pid.timestamp );
+	if ( it != updateSet.end() )
+		updateSet.erase( it );
+
 	applicationEvent.resUpdate( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, keyValueUpdate, success );
 	MasterWorker::eventQueue->insert( applicationEvent );
+
+	// check if ack is necessary
+	master->ackParityDelta();
 
 	return true;
 }
@@ -503,10 +513,18 @@ bool MasterWorker::handleDeleteResponse( SlaveEvent event, bool success, bool is
 		Master::getInstance()->remapMsgHandler.ackTransit( event.socket->getAddr() );
 	}
 
+	// remove pending timestamp
+	Master *master = Master::getInstance();
+	auto &delSet = master->timestamp.pendingAck.del;
+	auto it = delSet.find( pid.timestamp );
+	if ( it != delSet.end() )
+		delSet.erase( it );
+
 	applicationEvent.resDelete( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, key, success );
 	MasterWorker::eventQueue->insert( applicationEvent );
 
-	// TODO remove remapping records
+	// check if ack is necessary
+	master->ackParityDelta();
 
 	return true;
 }

@@ -16,6 +16,7 @@ MasterConfig::MasterConfig() {
 	this->remap.backgroundAck = 0;
 	this->degraded.isFixed = true;
 	this->degraded.disabled = false;
+	this->backup.ackBatchSize = 1000;
 }
 
 bool MasterConfig::merge( GlobalConfig &globalConfig ) {
@@ -120,6 +121,11 @@ bool MasterConfig::set( const char *section, const char *name, const char *value
 			this->degraded.isFixed = ! match( value, "dynamic" );
 		else if ( match ( name, "disabled" ) )
 			this->degraded.disabled = match( value, "true" );
+		else
+			return false;
+	} else if ( match ( section, "backup" ) ) {
+		if ( match( name, "ackBatchSize" ) )
+			this->backup.ackBatchSize = atoi( value );
 		else
 			return false;
 	} else {
