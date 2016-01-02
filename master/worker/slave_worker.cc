@@ -277,11 +277,7 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 		}
 
 		applicationEvent.resSet( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, keyValue, success );
-		MasterWorker::eventQueue->insert( applicationEvent );
-		uint32_t originalListId, originalChunkId;
-		SlaveSocket *original = this->getSlaves( keyStr, keySize, originalListId, originalChunkId );
-		int sockfd = original->getSocket();
-		MasterWorker::slaveSockets->get( sockfd )->counter.decreaseNormal();
+		this->dispatch( applicationEvent );
 	}
 	return true;
 }
@@ -312,14 +308,11 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, bool isDeg
 
 	ApplicationEvent applicationEvent;
 	PendingIdentifier pid;
-	SlaveSocket *original;
-	int sockfd;
 
 	if ( ! MasterWorker::pending->eraseKey( PT_SLAVE_GET, event.instanceId, event.requestId, event.socket, &pid, &key, true, true ) ) {
 		__ERROR__( "MasterWorker", "handleGetResponse", "Cannot find a pending slave GET request that matches the response. This message will be discarded (key = %.*s).", key.size, key.data );
 		return false;
 	}
-	original = ( SlaveSocket * ) pid.ptr;
 
 	// Mark the elapse time as latency
 	if ( ! isDegraded && MasterWorker::updateInterval ) {
@@ -328,7 +321,7 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, bool isDeg
 		RequestStartTime rst;
 
 		if ( ! MasterWorker::pending->eraseRequestStartTime( PT_SLAVE_GET, pid.instanceId, pid.requestId, ( void * ) event.socket, elapsedTime, 0, &rst ) ) {
-			__ERROR__( "MasterWorker", "handleGetResponse", "Cannot find a pending stats GET request that matches the response." );
+			__ERROR__( "MasterWorker", "handleGetResponse", "Cannot find a pending stats GET request that matches the response (ID: (%u, %u)).", pid.instanceId, pid.requestId );
 		} else {
 			int index = -1;
 			LOCK( &master->slaveLoading.lock );
@@ -352,16 +345,6 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, bool isDeg
 		return false;
 	}
 
-	if ( isDegraded ) {
-		sockfd = original->getSocket();
-		MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
-		Master::getInstance()->remapMsgHandler.ackTransit( original->getAddr() );
-	} else {
-		sockfd = event.socket->getSocket();
-		MasterWorker::slaveSockets->get( sockfd )->counter.decreaseNormal();
-		Master::getInstance()->remapMsgHandler.ackTransit( event.socket->getAddr() );
-	}
-
 	if ( success ) {
 		applicationEvent.resGet(
 			( ApplicationSocket * ) pid.ptr,
@@ -375,7 +358,6 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, bool isDeg
 	} else {
 		applicationEvent.resGet( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, key, false );
 	}
-	// MasterWorker::eventQueue->insert( applicationEvent );
 	this->dispatch( applicationEvent );
 	key.free();
 	return true;
@@ -398,15 +380,12 @@ bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, bool is
 	KeyValueUpdate keyValueUpdate;
 	ApplicationEvent applicationEvent;
 	PendingIdentifier pid;
-	SlaveSocket *original;
-	int sockfd;
 
 	// Find the cooresponding request
 	if ( ! MasterWorker::pending->eraseKeyValueUpdate( PT_SLAVE_UPDATE, event.instanceId, event.requestId, ( void * ) event.socket, &pid, &keyValueUpdate ) ) {
 		__ERROR__( "MasterWorker", "handleUpdateResponse", "Cannot find a pending slave UPDATE request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		return false;
 	}
-	original = ( SlaveSocket * ) pid.ptr;
 
 	if ( ! MasterWorker::pending->eraseKeyValueUpdate( PT_APPLICATION_UPDATE, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &keyValueUpdate, true, true, true, header.key ) ) {
 		__ERROR__( "MasterWorker", "handleUpdateResponse", "Cannot find a pending application UPDATE request that matches the response. This message will be discarded." );
@@ -416,16 +395,6 @@ bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, bool is
 	// free the updated value
 	delete[] ( ( char * )( keyValueUpdate.ptr ) );
 
-	if ( isDegraded ) {
-		sockfd = original->getSocket();
-		MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
-		Master::getInstance()->remapMsgHandler.ackTransit( original->getAddr() );
-	} else {
-		sockfd = event.socket->getSocket();
-		MasterWorker::slaveSockets->get( sockfd )->counter.decreaseNormal();
-		Master::getInstance()->remapMsgHandler.ackTransit( event.socket->getAddr() );
-	}
-
 	// remove pending timestamp
 	Master *master = Master::getInstance();
 	auto &updateSet = master->timestamp.pendingAck.update;
@@ -434,7 +403,7 @@ bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, bool is
 		updateSet.erase( it );
 
 	applicationEvent.resUpdate( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, keyValueUpdate, success );
-	MasterWorker::eventQueue->insert( applicationEvent );
+	this->dispatch( applicationEvent );
 
 	// check if ack is necessary
 	master->ackParityDelta();
@@ -489,28 +458,15 @@ bool MasterWorker::handleDeleteResponse( SlaveEvent event, bool success, bool is
 	ApplicationEvent applicationEvent;
 	PendingIdentifier pid;
 	Key key;
-	SlaveSocket *original;
-	int sockfd;
 
 	if ( ! MasterWorker::pending->eraseKey( PT_SLAVE_DEL, event.instanceId, event.requestId, ( void * ) event.socket, &pid, &key ) ) {
 		__ERROR__( "MasterWorker", "handleDeleteResponse", "Cannot find a pending slave DELETE request that matches the response. This message will be discarded." );
 		return false;
 	}
-	original = ( SlaveSocket * ) pid.ptr;
 
 	if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_DEL, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &key, true, true, true, keyStr ) ) {
 		__ERROR__( "MasterWorker", "handleDeleteResponse", "Cannot find a pending application DELETE request that matches the response. This message will be discarded. ID: (%u, %u); key: %.*s.", pid.parentInstanceId, pid.parentRequestId, keySize, keyStr );
 		return false;
-	}
-
-	if ( isDegraded ) {
-		sockfd = original->getSocket();
-		MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
-		Master::getInstance()->remapMsgHandler.ackTransit( original->getAddr() );
-	} else {
-		sockfd = event.socket->getSocket();
-		MasterWorker::slaveSockets->get( sockfd )->counter.decreaseNormal();
-		Master::getInstance()->remapMsgHandler.ackTransit( event.socket->getAddr() );
 	}
 
 	// remove pending timestamp
@@ -521,7 +477,7 @@ bool MasterWorker::handleDeleteResponse( SlaveEvent event, bool success, bool is
 		delSet.erase( it );
 
 	applicationEvent.resDelete( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, key, success );
-	MasterWorker::eventQueue->insert( applicationEvent );
+	this->dispatch( applicationEvent );
 
 	// check if ack is necessary
 	master->ackParityDelta();

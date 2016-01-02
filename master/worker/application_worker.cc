@@ -213,9 +213,6 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		}
 	}
 
-	int sockfd = socket->getSocket();
-	MasterWorker::slaveSockets->get( sockfd )->counter.increaseNormal();
-
 	struct {
 		size_t size;
 		char *data;
@@ -295,7 +292,6 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		if ( sentBytes != ( ssize_t ) buffer.size ) {
 			__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 
-			MasterWorker::slaveSockets->get( sockfd )->counter.decreaseNormal();
 			Master::getInstance()->remapMsgHandler.ackTransit( socket->getAddr() );
 
 			return false;
@@ -308,7 +304,6 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		if ( sentBytes != ( ssize_t ) buffer.size ) {
 			__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 
-			MasterWorker::slaveSockets->get( sockfd )->counter.decreaseNormal();
 			Master::getInstance()->remapMsgHandler.ackTransit( socket->getAddr() );
 
 			return false;
@@ -357,7 +352,6 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 	bool connected;
 	uint16_t instanceId = Master::instanceId;
 	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
-	int sockfd = socket->getSocket();
 
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
 	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_GET, event.instanceId, event.requestId, ( void * ) event.socket, key ) ) {
@@ -371,28 +365,24 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 		// 	"[GET] Key: %.*s (key size = %u): acquiring lock.",
 		// 	( int ) header.keySize, header.key, header.keySize
 		// );
-
-		MasterWorker::slaveSockets->get( sockfd )->counter.increaseDegraded();
 		return this->sendDegradedLockRequest(
 			event.instanceId, event.requestId, PROTO_OPCODE_GET,
 			original, reconstructed, reconstructedCount,
 			key.data, key.size
 		);
 	} else {
-		MasterWorker::slaveSockets->get( sockfd )->counter.increaseNormal();
-
 		buffer.data = this->protocol.reqGet(
 			buffer.size, instanceId, requestId,
 			header.key, header.keySize
 		);
 
-		if ( ! MasterWorker::pending->insertKey( PT_SLAVE_GET, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, key ) ) {
+		if ( ! MasterWorker::pending->insertKey( PT_SLAVE_GET, instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, key ) ) {
 			__ERROR__( "MasterWorker", "handleGetRequest", "Cannot insert into slave GET pending map." );
 		}
 
 		if ( MasterWorker::updateInterval ) {
 			// Mark the time when request is sent
-			MasterWorker::pending->recordRequestStartTime( PT_SLAVE_GET, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, socket->getAddr() );
+			MasterWorker::pending->recordRequestStartTime( PT_SLAVE_GET, instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, socket->getAddr() );
 		}
 
 		// Send GET request
@@ -447,7 +437,6 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 	bool connected;
 	uint16_t instanceId = Master::instanceId;
 	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
-	int sockfd = socket->getSocket();
 	uint32_t requestTimestamp = this->timestamp->nextVal();
 
 	char* valueUpdate = new char [ header.valueUpdateSize ];
@@ -461,7 +450,6 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 
 	if ( useCoordinatedFlow ) {
 		// Acquire degraded lock from the coordinator
-		MasterWorker::slaveSockets->get( sockfd )->counter.increaseDegraded();
 		return this->sendDegradedLockRequest(
 			event.instanceId, event.requestId, PROTO_OPCODE_UPDATE,
 			original, reconstructed, reconstructedCount,
@@ -471,8 +459,6 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 			( char * ) keyValueUpdate.ptr
 		);
 	} else {
-		MasterWorker::slaveSockets->get( sockfd )->counter.increaseNormal();
-
 		buffer.data = this->protocol.reqUpdate(
 			buffer.size, instanceId, requestId,
 			header.key, header.keySize,
@@ -535,7 +521,6 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 	uint16_t instanceId = Master::instanceId;
 	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
 	uint32_t requestTimestamp = this->timestamp->nextVal();
-	int sockfd = socket->getSocket();
 
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
 	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_DEL, event.instanceId, event.requestId, ( void * ) event.socket, key, true, true, requestTimestamp ) ) {
@@ -544,15 +529,12 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 
 	if ( useCoordinatedFlow ) {
 		// Acquire degraded lock from the coordinator
-		MasterWorker::slaveSockets->get( sockfd )->counter.increaseDegraded();
 		return this->sendDegradedLockRequest(
 			event.instanceId, event.requestId, PROTO_OPCODE_DELETE,
 			original, reconstructed, reconstructedCount,
 			key.data, key.size
 		);
 	} else {
-		MasterWorker::slaveSockets->get( sockfd )->counter.increaseNormal();
-
 		buffer.data = this->protocol.reqDelete(
 			buffer.size, instanceId, requestId,
 			header.key, header.keySize,

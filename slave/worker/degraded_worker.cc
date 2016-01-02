@@ -100,11 +100,11 @@ bool SlaveWorker::handleDegradedGetRequest( MasterEvent event, char *buf, size_t
 		if ( ( index == -1 ) ||
 		     ( header.original[ index * 2 + 1 ] >= SlaveWorker::dataChunkCount ) ) {
 			// No need to perform degraded read if only the parity slaves are redirected
-			return this->handleGetRequest( event, header.data.key );
+			return this->handleGetRequest( event, header.data.key, true );
 		}
 	} else {
 		// Use normal flow
-		return this->handleGetRequest( event, header.data.key );
+		return this->handleGetRequest( event, header.data.key, true );
 	}
 
 	uint32_t listId = header.original[ index * 2 ],

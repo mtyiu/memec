@@ -53,7 +53,6 @@ bool MasterWorker::sendDegradedLockRequest(
 bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool success, char *buf, size_t size ) {
 	uint32_t originalListId, originalChunkId;
 	SlaveSocket *socket = 0;
-	int sockfd;
 	struct DegradedLockResHeader header;
 	if ( ! this->protocol.parseDegradedLockResHeader( header, buf, size ) ) {
 		__ERROR__( "MasterWorker", "handleDegradedLockResponse", "Invalid DEGRADED_LOCK response." );
@@ -167,8 +166,10 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 						buffer.size, instanceId, requestId,
 						header.key, header.keySize
 					);
-					if ( MasterWorker::updateInterval )
+					if ( MasterWorker::updateInterval ) {
+						// printf( "[remapped] Request sent: %u, %u\n", instanceId, requestId );
 						MasterWorker::pending->recordRequestStartTime( PT_SLAVE_GET, instanceId, pid.parentInstanceId, requestId, pid.parentRequestId, ( void * ) socket, socket->getAddr() );
+					}
 					break;
 				case PROTO_DEGRADED_LOCK_RES_NOT_EXIST:
 					if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_GET, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &key, true, true, true, header.key ) ) {

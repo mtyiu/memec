@@ -209,7 +209,6 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 		socket->init( this->config.global.slaves[ i ], &this->sockets.epoll );
 		fd = socket->getSocket();
 		this->sockets.slaves.set( fd, socket );
-		this->counters.slaves[ socket->getAddr() ] = &( socket->counter );
 	}
 	/* Stripe list */
 	this->stripeList = new StripeList<SlaveSocket>(
@@ -852,30 +851,6 @@ void Master::printPending( FILE *f ) {
 		fprintf( f, "\n" );
 	}
 	UNLOCK( &this->pending.slaves.delLock );
-
-	fprintf(
-		f,
-		"\n\nCounters\n"
-		"--------\n"
-	);
-	LOCK( &this->sockets.slaves.lock );
-	char buf[ INET_ADDRSTRLEN ];
-	struct sockaddr_in addr;
-	uint32_t remapping, normal, lockOnly, degraded;
-	for ( uint32_t i = 0; i < this->sockets.slaves.size(); i++ ) {
-		addr = this->sockets.slaves.values[ i ]->getAddr();
-		inet_ntop( AF_INET, &addr.sin_addr, buf, INET_ADDRSTRLEN );
-		this->sockets.slaves.values[ i ]->counter.getAll( remapping, normal, lockOnly, degraded );
-		fprintf(
-			f,
-			"[REMAP] %s:%hu Normal: %u; Locking only: %u; Remapping: %u; Degraded: %u\n",
-			buf,
-			ntohs( this->sockets.slaves.values[ i ]->getAddr().sin_port ),
-			normal, lockOnly, remapping, degraded
-		);
-	}
-	UNLOCK( &this->sockets.slaves.lock );
-
 }
 
 void Master::printRemapping( FILE *f ) {
@@ -988,7 +963,7 @@ void Master::ackParityDelta( FILE *f ) {
 	to = this->timestamp.current.getVal();
 
 	del = update = to;
-	
+
 	if ( ! this->timestamp.pendingAck.update.empty() )
 		update = this->timestamp.pendingAck.update.begin()->getVal() - 1;
 
@@ -1004,7 +979,7 @@ void Master::ackParityDelta( FILE *f ) {
 	}
 
 	if ( f )
-		fprintf( f, 
+		fprintf( f,
 			"Ack slave timestamps from %u to %u\n",
 			from, to
 		);

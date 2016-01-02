@@ -263,18 +263,18 @@ bool SlaveWorker::handleGetRequest( MasterEvent event, char *buf, size_t size ) 
 		"[GET] Key: %.*s (key size = %u).",
 		( int ) header.keySize, header.key, header.keySize
 	);
-	return this->handleGetRequest( event, header );
+	return this->handleGetRequest( event, header, false );
 }
 
-bool SlaveWorker::handleGetRequest( MasterEvent event, struct KeyHeader &header ) {
+bool SlaveWorker::handleGetRequest( MasterEvent event, struct KeyHeader &header, bool isDegraded ) {
 	Key key;
 	KeyValue keyValue;
 	bool ret;
 	if ( map->findValueByKey( header.key, header.keySize, &keyValue, &key ) ) {
-		event.resGet( event.socket, event.instanceId, event.requestId, keyValue, false );
+		event.resGet( event.socket, event.instanceId, event.requestId, keyValue, isDegraded );
 		ret = true;
 	} else {
-		event.resGet( event.socket, event.instanceId, event.requestId, key, false );
+		event.resGet( event.socket, event.instanceId, event.requestId, key, isDegraded );
 		ret = false;
 	}
 	this->dispatch( event );

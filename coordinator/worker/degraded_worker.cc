@@ -21,8 +21,6 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 
 	if ( CoordinatorWorker::remappingRecords->find( key, &remappingRecord, &lock ) ) {
 		// Remapped
-		__ERROR__( "CoordinatorWorker", "handleDegradedLockRequest", "TODO: Handle remapped keys." );
-
 		event.resDegradedLock(
 			event.socket, event.instanceId, event.requestId, key,
 			remappingRecord.original, remappingRecord.remapped, remappingRecord.remappedCount
@@ -40,6 +38,7 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 	DegradedLock degradedLock;
 	bool ret = true;
 
+	lock = 0;
 	if ( ! map->findMetadataByKey( header.key, header.keySize, srcMetadata ) ) {
 		// Key not found
 		event.resDegradedLock(
@@ -86,7 +85,7 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 		);
 	}
 	this->dispatch( event );
-	UNLOCK( lock );
+	if ( lock ) UNLOCK( lock );
 	return ret;
 }
 

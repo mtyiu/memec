@@ -5,7 +5,6 @@
 #include <set>
 #include <cstdio>
 #include "../config/master_config.hh"
-#include "../ds/counter.hh"
 #include "../ds/pending.hh"
 #include "../ds/stats.hh"
 #include "../event/event_queue.hh"
@@ -62,9 +61,6 @@ public:
 		ArrayMap<int, CoordinatorSocket> coordinators;
 		ArrayMap<int, SlaveSocket> slaves;
 	} sockets;
-	struct {
-		std::map<struct sockaddr_in, Counter*> slaves;
-	} counters;
 	IDGenerator idGenerator;
 	Pending pending;
 	MasterEventQueue eventQueue;

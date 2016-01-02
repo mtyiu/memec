@@ -84,7 +84,7 @@ private:
 	// ---------- master_worker.cc ----------
 	void dispatch( MasterEvent event );
 	bool handleGetRequest( MasterEvent event, char *buf, size_t size );
-	bool handleGetRequest( MasterEvent event, KeyHeader &header );
+	bool handleGetRequest( MasterEvent event, KeyHeader &header, bool isDegraded );
 	bool handleSetRequest( MasterEvent event, char *buf, size_t size, bool needResSet = true );
 	bool handleSetRequest( MasterEvent event, KeyValueHeader &header, bool needResSet = true );
 	bool handleUpdateRequest( MasterEvent event, char *buf, size_t size );

@@ -3,7 +3,6 @@
 
 #include <cstdio>
 #include "worker_role.hh"
-#include "../ds/counter.hh"
 #include "../ds/pending.hh"
 #include "../event/event_queue.hh"
 #include "../protocol/protocol.hh"
@@ -37,7 +36,6 @@ private:
 	static Pending *pending;
 	static MasterEventQueue *eventQueue;
 	static StripeList<SlaveSocket> *stripeList;
-	//static Counter *counter;
 	static ArrayMap<int, SlaveSocket> *slaveSockets;
 	static PacketPool *packetPool;
 	static MasterRemapMsgHandler *remapMsgHandler;
