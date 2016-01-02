@@ -1,23 +1,29 @@
 #include "protocol.hh"
 
-char *CoordinatorProtocol::resDegradedLock( size_t &size, uint16_t instanceId, uint32_t requestId, bool isLocked, bool isSealed, uint8_t keySize, char *key, uint32_t listId, uint32_t stripeId, uint32_t srcDataChunkId, uint32_t dstDataChunkId, uint32_t srcParityChunkId, uint32_t dstParityChunkId ) {
+char *CoordinatorProtocol::resDegradedLock(
+	size_t &size, uint16_t instanceId, uint32_t requestId,
+	bool isLocked, uint8_t keySize, char *key,
+	bool isSealed, uint32_t stripeId,
+	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount
+) {
 	// -- common/protocol/degraded_protocol.cc --
 	size = this->generateDegradedLockResHeader(
 		isLocked ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_MASTER,
 		PROTO_OPCODE_DEGRADED_LOCK,
 		instanceId, requestId,
-		isLocked,
-		isSealed,
-		keySize, key,
-		listId, stripeId,
-		srcDataChunkId, dstDataChunkId,
-		srcParityChunkId, dstParityChunkId
+		isLocked, keySize, key,
+		isSealed, stripeId,
+		original, reconstructed, reconstructedCount
 	);
 	return this->buffer.send;
 }
 
-char *CoordinatorProtocol::resDegradedLock( size_t &size, uint16_t instanceId, uint32_t requestId, uint8_t keySize, char *key, uint32_t listId, uint32_t srcDataChunkId, uint32_t dstDataChunkId, uint32_t srcParityChunkId, uint32_t dstParityChunkId ) {
+char *CoordinatorProtocol::resDegradedLock(
+	size_t &size, uint16_t instanceId, uint32_t requestId,
+	uint8_t keySize, char *key,
+	uint32_t *original, uint32_t *remapped, uint32_t remappedCount
+) {
 	// -- common/protocol/degraded_protocol.cc --
 	size = this->generateDegradedLockResHeader(
 		PROTO_MAGIC_RESPONSE_FAILURE,
@@ -25,14 +31,16 @@ char *CoordinatorProtocol::resDegradedLock( size_t &size, uint16_t instanceId, u
 		PROTO_OPCODE_DEGRADED_LOCK,
 		instanceId, requestId,
 		keySize, key,
-		listId,
-		srcDataChunkId, dstDataChunkId,
-		srcParityChunkId, dstParityChunkId
+		original, remapped, remappedCount
 	);
 	return this->buffer.send;
 }
 
-char *CoordinatorProtocol::resDegradedLock( size_t &size, uint16_t instanceId, uint32_t requestId, bool exist, uint8_t keySize, char *key, uint32_t listId, uint32_t srcDataChunkId, uint32_t srcParityChunkId ) {
+char *CoordinatorProtocol::resDegradedLock(
+	size_t &size, uint16_t instanceId, uint32_t requestId,
+	bool exist,
+	uint8_t keySize, char *key
+) {
 	// -- common/protocol/degraded_protocol.cc --
 	size = this->generateDegradedLockResHeader(
 		PROTO_MAGIC_RESPONSE_FAILURE,
@@ -40,8 +48,7 @@ char *CoordinatorProtocol::resDegradedLock( size_t &size, uint16_t instanceId, u
 		PROTO_OPCODE_DEGRADED_LOCK,
 		instanceId, requestId,
 		exist,
-		keySize, key,
-		listId, srcDataChunkId, srcParityChunkId
+		keySize, key
 	);
 	return this->buffer.send;
 }

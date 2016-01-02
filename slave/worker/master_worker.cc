@@ -254,7 +254,6 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 
 bool SlaveWorker::handleGetRequest( MasterEvent event, char *buf, size_t size ) {
 	struct KeyHeader header;
-	bool ret;
 	if ( ! this->protocol.parseKeyHeader( header, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleGetRequest", "Invalid GET request." );
 		return false;
@@ -264,9 +263,13 @@ bool SlaveWorker::handleGetRequest( MasterEvent event, char *buf, size_t size ) 
 		"[GET] Key: %.*s (key size = %u).",
 		( int ) header.keySize, header.key, header.keySize
 	);
+	return this->handleGetRequest( event, header );
+}
 
+bool SlaveWorker::handleGetRequest( MasterEvent event, struct KeyHeader &header ) {
 	Key key;
 	KeyValue keyValue;
+	bool ret;
 	if ( map->findValueByKey( header.key, header.keySize, &keyValue, &key ) ) {
 		event.resGet( event.socket, event.instanceId, event.requestId, keyValue, false );
 		ret = true;
@@ -289,7 +292,10 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size, b
 		"[SET] Key: %.*s (key size = %u); Value: (value size = %u)",
 		( int ) header.keySize, header.key, header.keySize, header.valueSize
 	);
+	return this->handleSetRequest( event, header, needResSet );
+}
 
+bool SlaveWorker::handleSetRequest( MasterEvent event, struct KeyValueHeader &header, bool needResSet ) {
 	bool isSealed;
 	Metadata sealed;
 	uint32_t timestamp, listId, stripeId, chunkId;
@@ -332,7 +338,6 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size, b
 
 bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size ) {
 	struct KeyValueUpdateHeader header;
-	bool ret;
 	if ( ! this->protocol.parseKeyValueUpdateHeader( header, true, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleUpdateRequest", "Invalid UPDATE request." );
 		return false;
@@ -343,7 +348,11 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 		( int ) header.keySize, header.key, header.keySize,
 		header.valueUpdateSize, header.valueUpdateOffset
 	);
+	return this->handleUpdateRequest( event, header );
+}
 
+bool SlaveWorker::handleUpdateRequest( MasterEvent event, struct KeyValueUpdateHeader &header ) {
+	bool ret;
 	Key key;
 	KeyValue keyValue;
 	KeyValueUpdate keyValueUpdate;
@@ -430,7 +439,6 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 
 bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size ) {
 	struct KeyHeader header;
-	bool ret;
 	if ( ! this->protocol.parseKeyHeader( header, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleDeleteRequest", "Invalid DELETE request." );
 		return false;
@@ -440,7 +448,11 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 		"[DELETE] Key: %.*s (key size = %u).",
 		( int ) header.keySize, header.key, header.keySize
 	);
+	return this->handleDeleteRequest( event, header );
+}
 
+bool SlaveWorker::handleDeleteRequest( MasterEvent event, struct KeyHeader &header ) {
+	bool ret;
 	Key key;
 	KeyValue keyValue;
 	KeyMetadata keyMetadata;

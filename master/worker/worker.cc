@@ -54,6 +54,97 @@ SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId
 	return ret->ready() ? ret : 0;
 }
 
+bool MasterWorker::getSlaves(
+	uint8_t opcode, char *data, uint8_t size,
+	uint32_t *&original, uint32_t *&remapped, uint32_t &remappedCount,
+	SlaveSocket *&originalDataSlaveSocket, bool &useCoordinatedFlow
+) {
+	bool ret = true;
+
+	useCoordinatedFlow = false;
+
+	// Determine original data slave
+	uint32_t originalListId, originalChunkId;
+	originalListId = MasterWorker::stripeList->get(
+		data, ( size_t ) size,
+		this->dataSlaveSockets,
+		this->paritySlaveSockets,
+		&originalChunkId, true
+	);
+	originalDataSlaveSocket = this->dataSlaveSockets[ originalChunkId ];
+
+	Master *master = Master::getInstance();
+	switch( opcode ) {
+		case PROTO_OPCODE_SET:
+			// already checked in MasterWorker::handleSetRequest()
+			useCoordinatedFlow = true;
+			break;
+		case PROTO_OPCODE_GET:
+		// 	if ( master->isDegraded( originalDataSlaveSocket ) )
+		// 		useCoordinatedFlow = true;
+		// 	break;
+		case PROTO_OPCODE_UPDATE:
+		case PROTO_OPCODE_DELETE:
+			for ( uint32_t i = 0; i < 1 + MasterWorker::parityChunkCount; i++ ) {
+				if ( master->isDegraded(
+					( i == 0 ) ? originalDataSlaveSocket : this->paritySlaveSockets[ i - 1 ] )
+				) {
+					useCoordinatedFlow = true;
+					break;
+				}
+			}
+			break;
+	}
+
+	if ( ! useCoordinatedFlow ) {
+		remappedCount = 0;
+		original = 0;
+		remapped = 0;
+		return ret;
+	}
+
+	original = this->original;
+	remapped = this->remapped;
+
+	original[ 0 ] = originalListId;
+	original[ 1 ] = originalChunkId;
+	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
+		original[ ( i + 1 ) * 2 ] = originalListId;
+		original[ ( i + 1 ) * 2 + 1 ] = MasterWorker::dataChunkCount + i;
+	}
+
+	// Determine remapped data slave
+	BasicRemappingScheme::getRemapTarget(
+		this->original, this->remapped, remappedCount,
+		MasterWorker::dataChunkCount, MasterWorker::parityChunkCount,
+		this->dataSlaveSockets, this->paritySlaveSockets
+	);
+
+	if ( remappedCount ) {
+		uint32_t *_original = new uint32_t[ remappedCount * 2 ];
+		uint32_t *_remapped = new uint32_t[ remappedCount * 2 ];
+		for ( uint32_t i = 0; i < remappedCount * 2; i++ ) {
+			_original[ i ] = original[ i ];
+			_remapped[ i ] = remapped[ i ];
+		}
+		original = _original;
+		remapped = _remapped;
+	} else {
+		original = 0;
+		remapped = 0;
+	}
+
+	return ret;
+}
+
+SlaveSocket *MasterWorker::getSlaves( uint32_t listId, uint32_t chunkId ) {
+	SlaveSocket *ret;
+	MasterWorker::stripeList->get( listId, this->paritySlaveSockets, this->dataSlaveSockets );
+	ret = chunkId < MasterWorker::dataChunkCount ? this->dataSlaveSockets[ chunkId ] : this->paritySlaveSockets[ chunkId - MasterWorker::dataChunkCount ];
+	return ret->ready() ? ret : 0;
+}
+
+/*
 SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, uint32_t &newChunkId, bool &useDegradedMode, SlaveSocket *&original ) {
 	useDegradedMode = false;
 	original = this->getSlaves( data, size, listId, chunkId );
@@ -151,60 +242,7 @@ SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId
 	socket = this->dataSlaveSockets[ newDataChunkId ];
 	return socket->ready() ? socket : 0;
 }
-
-bool MasterWorker::getSlaves( char *data, uint8_t size, uint32_t *&original, uint32_t *&remapped, uint32_t &remappedCount ) {
-	bool ret = true;
-
-	// Determine original data slave
-	uint32_t originalListId, originalChunkId;
-	originalListId = MasterWorker::stripeList->get(
-		data, ( size_t ) size,
-		this->dataSlaveSockets,
-		this->paritySlaveSockets,
-		&originalChunkId, true
-	);
-
-	original = this->original;
-	remapped = this->remapped;
-
-	original[ 0 ] = originalListId;
-	original[ 1 ] = originalChunkId;
-	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
-		original[ ( i + 1 ) * 2 ] = originalListId;
-		original[ ( i + 1 ) * 2 + 1 ] = MasterWorker::dataChunkCount + i;
-	}
-
-	// Determine remapped data slave
-	BasicRemappingScheme::getRemapTarget(
-		this->original, this->remapped, remappedCount,
-		MasterWorker::dataChunkCount, MasterWorker::parityChunkCount,
-		this->dataSlaveSockets, this->paritySlaveSockets
-	);
-
-	if ( remappedCount ) {
-		uint32_t *_original = new uint32_t[ remappedCount * 2 ];
-		uint32_t *_remapped = new uint32_t[ remappedCount * 2 ];
-		for ( uint32_t i = 0; i < remappedCount * 2; i++ ) {
-			_original[ i ] = original[ i ];
-			_remapped[ i ] = remapped[ i ];
-		}
-		original = _original;
-		remapped = _remapped;
-	}
-
-	// BasicRemappingScheme::getRemapTarget() may replace this->dataSlaveSockets & this->paritySlaveSockets
-	// this->getSlaves( originalListId, originalChunkId );
-	// ret = this->dataSlaveSockets[ originalChunkId ];
-
-	return ret;
-}
-
-SlaveSocket *MasterWorker::getSlaves( uint32_t listId, uint32_t chunkId ) {
-	SlaveSocket *ret;
-	MasterWorker::stripeList->get( listId, this->paritySlaveSockets, this->dataSlaveSockets );
-	ret = chunkId < MasterWorker::dataChunkCount ? this->dataSlaveSockets[ chunkId ] : this->paritySlaveSockets[ chunkId - MasterWorker::dataChunkCount ];
-	return ret->ready() ? ret : 0;
-}
+*/
 
 void MasterWorker::free() {
 	this->protocol.free();

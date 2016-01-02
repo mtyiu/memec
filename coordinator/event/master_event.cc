@@ -34,43 +34,41 @@ void MasterEvent::switchPhase( bool toRemap, std::set<struct sockaddr_in> slaves
 	this->message.switchPhase.slaves = new std::vector<struct sockaddr_in>( slaves.begin(), slaves.end() );
 }
 
-void MasterEvent::resDegradedLock( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool isLocked, bool isSealed, uint32_t listId, uint32_t stripeId, uint32_t srcDataChunkId, uint32_t dstDataChunkId, uint32_t srcParityChunkId, uint32_t dstParityChunkId ) {
+void MasterEvent::resDegradedLock(
+	MasterSocket *socket, uint16_t instanceId, uint32_t requestId,
+	Key &key, bool isLocked, bool isSealed,
+	uint32_t stripeId,
+	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount
+) {
 	this->type = isLocked ? MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED : MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_WAS_LOCKED;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
 	this->message.degradedLock.key = key;
-	this->message.degradedLock.listId = listId;
-	this->message.degradedLock.stripeId = stripeId;
-	this->message.degradedLock.srcDataChunkId = srcDataChunkId;
-	this->message.degradedLock.dstDataChunkId = dstDataChunkId;
-	this->message.degradedLock.srcParityChunkId = srcParityChunkId;
-	this->message.degradedLock.dstParityChunkId = dstParityChunkId;
 	this->message.degradedLock.isSealed = isSealed;
+	this->message.degradedLock.stripeId = stripeId;
+	this->message.degradedLock.reconstructedCount = reconstructedCount;
+	this->message.degradedLock.original = original;
+	this->message.degradedLock.reconstructed = reconstructed;
 }
 
-void MasterEvent::resDegradedLock( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool exist, uint32_t listId, uint32_t srcDataChunkId, uint32_t srcParityChunkId ) {
+void MasterEvent::resDegradedLock( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool exist ) {
 	this->type = exist ? MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_LOCKED : MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_FOUND;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
 	this->message.degradedLock.key = key;
-	this->message.degradedLock.listId = listId;
-	this->message.degradedLock.srcDataChunkId = srcDataChunkId;
-	this->message.degradedLock.srcParityChunkId = srcParityChunkId;
 }
 
-void MasterEvent::resDegradedLock( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, uint32_t listId, uint32_t srcDataChunkId, uint32_t dstDataChunkId, uint32_t srcParityChunkId, uint32_t dstParityChunkId ) {
+void MasterEvent::resDegradedLock( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, uint32_t *original, uint32_t *remapped, uint32_t remappedCount ) {
 	this->type = MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_REMAPPED;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
 	this->message.degradedLock.key = key;
-	this->message.degradedLock.listId = listId;
-	this->message.degradedLock.srcDataChunkId = srcDataChunkId;
-	this->message.degradedLock.dstDataChunkId = dstDataChunkId;
-	this->message.degradedLock.srcParityChunkId = srcParityChunkId;
-	this->message.degradedLock.dstParityChunkId = dstParityChunkId;
+	this->message.degradedLock.remappedCount = remappedCount;
+	this->message.degradedLock.original = original;
+	this->message.degradedLock.remapped = remapped;
 }
 
 void MasterEvent::pending( MasterSocket *socket ) {

@@ -48,25 +48,27 @@ private:
 	void dispatch( MasterEvent event );
 	// For normal operations
 	SlaveSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId );
-	// For degraded GET
-	SlaveSocket *getSlaves(
-		char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, uint32_t &newChunkId,
-		bool &useDegradedMode, SlaveSocket *&original
-	);
-	// For degraded UPDATE / DELETE (which may involve failed parity slaves)
-	// Return the data server for handling the request
-	SlaveSocket *getSlaves(
-		char *data, uint8_t size, uint32_t &listId,
-		uint32_t &dataChunkId, uint32_t &newDataChunkId,
-		uint32_t &parityChunkId, uint32_t &newParityChunkId,
-		bool &useDegradedMode
-	);
-	// For remapping
+	// For both remapping and degraded operations
 	bool getSlaves(
-		char *data, uint8_t size,
-		uint32_t *&original, uint32_t *&remapped, uint32_t &remappedCount
+		uint8_t opcode, char *data, uint8_t size,
+		uint32_t *&original, uint32_t *&remapped, uint32_t &remappedCount,
+		SlaveSocket *&originalDataSlaveSocket, bool &useCoordinatedFlow
 	);
 	SlaveSocket *getSlaves( uint32_t listId, uint32_t chunkId );
+
+	// For degraded GET
+	// SlaveSocket *getSlaves(
+	// 	char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, uint32_t &newChunkId,
+	// 	bool &useDegradedMode, SlaveSocket *&original
+	// );
+	// For degraded UPDATE / DELETE (which may involve failed parity slaves)
+	// Return the data server for handling the request
+	// SlaveSocket *getSlaves(
+	// 	char *data, uint8_t size, uint32_t &listId,
+	// 	uint32_t &dataChunkId, uint32_t &newDataChunkId,
+	// 	uint32_t &parityChunkId, uint32_t &newParityChunkId,
+	// 	bool &useDegradedMode
+	// );
 	void free();
 	static void *run( void *argv );
 
@@ -91,9 +93,7 @@ private:
 	// ---------- degraded_worker.cc ----------
 	bool sendDegradedLockRequest(
 		uint16_t parentInstanceId, uint32_t parentRequestId, uint8_t opcode,
-		uint32_t listId,
-		uint32_t dataChunkId, uint32_t newDataChunkId,
-		uint32_t parityChunkId, uint32_t newParityChunkId,
+		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 		char *key, uint8_t keySize,
 		uint32_t valueUpdateSize = 0, uint32_t valueUpdateOffset = 0, char *valueUpdate = 0
 	);

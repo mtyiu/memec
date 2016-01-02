@@ -33,12 +33,11 @@ size_t Protocol::generateRemappingLockHeader( uint8_t magic, uint8_t to, uint8_t
 	return bytes;
 }
 
-bool Protocol::parseRemappingLockHeader( size_t offset, uint32_t &remappedCount, uint32_t *&original, uint32_t *&remapped, uint8_t &keySize, char *&key, char *buf, size_t size ) {
+bool Protocol::parseRemappingLockHeader( size_t offset, uint32_t *&original, uint32_t *&remapped, uint32_t &remappedCount, uint8_t &keySize, char *&key, char *buf, size_t size ) {
 	if ( size - offset < PROTO_REMAPPING_LOCK_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
-	uint32_t count;
 
 	remappedCount = ntohl( *( ( uint32_t * )( ptr      ) ) );
 	keySize = ptr[ 4 ];
@@ -49,12 +48,13 @@ bool Protocol::parseRemappingLockHeader( size_t offset, uint32_t &remappedCount,
 	key = ptr + 5;
 	ptr += PROTO_REMAPPING_LOCK_SIZE + keySize;
 
-	count = remappedCount * 2;
 	original = ( uint32_t * ) ptr;
-	remapped = ( ( uint32_t * ) ptr ) + count;
-	for ( uint32_t i = 0; i < count; i++ ) {
-		original[ i ] = ntohl( original[ i ] );
-		remapped[ i ] = ntohl( remapped[ i ] );
+	remapped = ( ( uint32_t * ) ptr ) + remappedCount * 2;
+	for ( uint32_t i = 0; i < remappedCount; i++ ) {
+		original[ i * 2     ] = ntohl( original[ i * 2     ] );
+		original[ i * 2 + 1 ] = ntohl( original[ i * 2 + 1 ] );
+		remapped[ i * 2     ] = ntohl( remapped[ i * 2     ] );
+		remapped[ i * 2 + 1 ] = ntohl( remapped[ i * 2 + 1 ] );
 	}
 
 	return true;
@@ -67,9 +67,9 @@ bool Protocol::parseRemappingLockHeader( struct RemappingLockHeader &header, cha
 	}
 	return this->parseRemappingLockHeader(
 		offset,
-		header.remappedCount,
 		header.original,
 		header.remapped,
+		header.remappedCount,
 		header.keySize,
 		header.key,
 		buf, size
@@ -127,7 +127,7 @@ size_t Protocol::generateRemappingSetHeader( uint8_t magic, uint8_t to, uint8_t 
 	return bytes;
 }
 
-bool Protocol::parseRemappingSetHeader( size_t offset, uint32_t &listId, uint32_t &chunkId, uint32_t &remappedCount, uint32_t *&original, uint32_t *&remapped, uint8_t &keySize, char *&key, uint32_t &valueSize, char *&value, char *buf, size_t size ) {
+bool Protocol::parseRemappingSetHeader( size_t offset, uint32_t &listId, uint32_t &chunkId, uint32_t *&original, uint32_t *&remapped, uint32_t &remappedCount, uint8_t &keySize, char *&key, uint32_t &valueSize, char *&value, char *buf, size_t size ) {
 	if ( size - offset < PROTO_REMAPPING_SET_SIZE )
 		return false;
 
@@ -180,9 +180,9 @@ bool Protocol::parseRemappingSetHeader( struct RemappingSetHeader &header, char 
 		offset,
 		header.listId,
 		header.chunkId,
-		header.remappedCount,
 		header.original,
 		header.remapped,
+		header.remappedCount,
 		header.keySize,
 		header.key,
 		header.valueSize,

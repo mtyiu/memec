@@ -91,32 +91,27 @@ public:
 	// ---------- degraded_protocol.cc ----------
 	char *reqDegradedLock(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
-		uint32_t listId,
-		uint32_t srcDataChunkId, uint32_t dstDataChunkId,
-		uint32_t srcParityChunkId, uint32_t dstParityChunkId,
+		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 		char *key, uint8_t keySize
 	);
 	char *reqDegradedGet(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
-		uint32_t listId, uint32_t stripeId,
-		uint32_t srcDataChunkId, uint32_t dstDataChunkId,
-		uint32_t srcParityChunkId, uint32_t dstParityChunkId,
-		bool isSealed, char *key, uint8_t keySize
+		bool isSealed, uint32_t stripeId,
+		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
+		char *key, uint8_t keySize
 	);
 	char *reqDegradedUpdate(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
-		uint32_t listId, uint32_t stripeId,
-		uint32_t srcDataChunkId, uint32_t dstDataChunkId,
-		uint32_t srcParityChunkId, uint32_t dstParityChunkId,
-		bool isSealed, char *key, uint8_t keySize,
+		bool isSealed, uint32_t stripeId,
+		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
+		char *key, uint8_t keySize,
 		char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize
 	);
 	char *reqDegradedDelete(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
-		uint32_t listId, uint32_t stripeId,
-		uint32_t srcDataChunkId, uint32_t dstDataChunkId,
-		uint32_t srcParityChunkId, uint32_t dstParityChunkId,
-		bool isSealed, char *key, uint8_t keySize
+		bool isSealed, uint32_t stripeId,
+		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
+		char *key, uint8_t keySize
 	);
 
 	// ---------- fault_protocol.cc ----------

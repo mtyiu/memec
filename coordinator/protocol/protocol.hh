@@ -43,24 +43,19 @@ public:
 	// ---------- degraded_protocol.cc ----------
 	char *resDegradedLock(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
-		bool isLocked, bool isSealed,
-		uint8_t keySize, char *key,
-		uint32_t listId, uint32_t stripeId,
-		uint32_t srcDataChunkId, uint32_t dstDataChunkId,
-		uint32_t srcParityChunkId, uint32_t dstParityChunkId
+		bool isLocked, uint8_t keySize, char *key,
+		bool isSealed, uint32_t stripeId,
+		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount
 	);
 	char *resDegradedLock(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		uint8_t keySize, char *key,
-		uint32_t listId,
-		uint32_t srcDataChunkId, uint32_t dstDataChunkId,
-		uint32_t srcParityChunkId, uint32_t dstParityChunkId
+		uint32_t *original, uint32_t *remapped, uint32_t remappedCount
 	);
 	char *resDegradedLock(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		bool exist,
-		uint8_t keySize, char *key,
-		uint32_t listId, uint32_t srcDataChunkId, uint32_t srcParityChunkId
+		uint8_t keySize, char *key
 	);
 	char *reqReleaseDegradedLock(
 		size_t &size, uint16_t instanceId, uint32_t requestId,

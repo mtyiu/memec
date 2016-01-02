@@ -84,9 +84,14 @@ private:
 	// ---------- master_worker.cc ----------
 	void dispatch( MasterEvent event );
 	bool handleGetRequest( MasterEvent event, char *buf, size_t size );
+	bool handleGetRequest( MasterEvent event, KeyHeader &header );
 	bool handleSetRequest( MasterEvent event, char *buf, size_t size, bool needResSet = true );
+	bool handleSetRequest( MasterEvent event, KeyValueHeader &header, bool needResSet = true );
 	bool handleUpdateRequest( MasterEvent event, char *buf, size_t size );
+	bool handleUpdateRequest( MasterEvent event, KeyValueUpdateHeader &header );
 	bool handleDeleteRequest( MasterEvent event, char *buf, size_t size );
+	bool handleDeleteRequest( MasterEvent event, KeyHeader &header );
+
 	bool handleAckParityDeltaBackup( MasterEvent event, char *buf, size_t size );
 
 	// ---------- slave_peer_worker.cc ----------
@@ -123,15 +128,19 @@ private:
 	bool handleRemappingSetResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 
 	// ---------- degraded_worker.cc ----------
+	int findInRedirectedList( uint32_t *reconstructed, uint32_t reconstructedCount );
 	bool handleReleaseDegradedLockRequest( CoordinatorEvent event, char *buf, size_t size );
 	bool handleDegradedGetRequest( MasterEvent event, char *buf, size_t size );
 	bool handleDegradedUpdateRequest( MasterEvent event, char *buf, size_t size );
 	bool handleDegradedDeleteRequest( MasterEvent event, char *buf, size_t size );
 	bool performDegradedRead(
+		uint8_t opcode,
 		MasterSocket *masterSocket,
+		uint16_t parentInstanceId, uint32_t parentRequestId,
 		uint32_t listId, uint32_t stripeId, uint32_t lostChunkId,
-		bool isSealed, uint8_t opcode, uint16_t parentInstanceId, uint32_t parentRequestId,
-		Key *key, KeyValueUpdate *keyValueUpdate = 0
+		Key *key, bool isSealed,
+		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
+		KeyValueUpdate *keyValueUpdate = 0
 	);
 	bool sendModifyChunkRequest(
 		uint16_t parentInstanceId, uint32_t parentRequestId,
