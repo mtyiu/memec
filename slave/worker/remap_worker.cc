@@ -100,24 +100,23 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 			}
 		}
 
+		// printf( "Remapping " );
+		// for ( uint32_t i = 0; i < header.remappedCount; i++ ) {
+		// 	if ( i ) printf( "; " );
+		// 	printf(
+		// 		"(%u, %u) |-> (%u, %u)",
+		// 		header.original[ i * 2 ], header.original[ i * 2 + 1 ],
+		// 		header.remapped[ i * 2 ], header.remapped[ i * 2 + 1 ]
+		// 	);
+		// }
+		// printf( " (count = %u).\n", header.remappedCount );
+
 		if ( bufferRemapData ) {
-			printf( "Remapping " );
-			for ( uint32_t i = 0; i < header.remappedCount; i++ ) {
-				if ( i ) printf( "; " );
-				printf(
-					"(%u, %u) |-> (%u, %u)",
-					header.original[ i * 2 ], header.original[ i * 2 + 1 ],
-					header.remapped[ i * 2 ], header.remapped[ i * 2 + 1 ]
-				);
-			}
-			printf( " (count = %u).\n", header.remappedCount );
-			fflush( stdout );
 			__ERROR__(
 				"SlaveWorker", "handleRemappingSetRequest",
 				"Performing remapping data buffering: (original: (%u, %u)).",
 				header.listId, header.chunkId
 			);
-
 			Key key;
 			key.set( header.keySize, header.key );
 			Value value;

@@ -147,11 +147,26 @@ bool Protocol::parseRemappingSetHeader( size_t offset, uint32_t &listId, uint32_
 	valueSize = ntohl( valueSize );
 	ptr += 3;
 
-	if ( size - offset < PROTO_REMAPPING_SET_SIZE + keySize + valueSize )
+	if ( size - offset < PROTO_REMAPPING_SET_SIZE + keySize + valueSize + remappedCount * 4 * 4 )
 		return false;
 
 	key = ptr;
 	value = ptr + keySize;
+
+	ptr += keySize + valueSize;
+
+	if ( remappedCount ) {
+		uint32_t count = remappedCount * 2;
+		original = ( uint32_t * ) ptr;
+		remapped = ( ( uint32_t * ) ptr ) + count;
+		for ( uint32_t i = 0; i < count; i++ ) {
+			original[ i ] = ntohl( original[ i ] );
+			remapped[ i ] = ntohl( remapped[ i ] );
+		}
+	} else {
+		original = 0;
+		remapped = 0;
+	}
 
 	return true;
 }
