@@ -61,6 +61,7 @@ public:
 		ArrayMap<int, MasterSocket> masters;
 		ArrayMap<int, SlavePeerSocket> slavePeers;
 		ArrayMap<uint16_t, MasterSocket> mastersIdToSocketMap;
+		ArrayMap<uint16_t, SlavePeerSocket> slavesIdToSocketMap;
 	} sockets;
 	IDGenerator idGenerator;
 	Pending pending;

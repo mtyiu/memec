@@ -542,22 +542,22 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 }
 
 bool SlaveWorker::handleAckParityDeltaBackup( MasterEvent event, char *buf, size_t size ) {
-	AcknowledgementHeader header;
-	if ( ! this->protocol.parseAcknowledgementHeader( header, buf, size ) ) {
+	ParityDeltaAcknowledgementHeader header;
+	if ( ! this->protocol.parseParityDeltaAcknowledgementHeader( header, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleAckParityDeltaBackup", "Invalid ACK parity delta backup request." );
 		return false;
 	}
 	__DEBUG__(
 		BLUE, "SlaveWorker", "handleAckParityDeltaBackup",
-		"Ack. from master fd = %u from %u to %u.",
-		event.socket->getSocket(), header.fromTimestamp, header.toTimestamp
+		"Ack. from master fd = %u from %u to %u for data slave id = %hu.",
+		event.socket->getSocket(), header.fromTimestamp, header.toTimestamp, header.targetId
 	);
 
 	Timestamp from( header.fromTimestamp );
 	Timestamp to( header.toTimestamp );
 
-	event.socket->backup.removeParityUpdate( from, to );
-	event.socket->backup.removeParityDelete( from, to );
+	event.socket->backup.removeParityUpdate( from, to, header.targetId );
+	event.socket->backup.removeParityDelete( from, to, header.targetId );
 
 	return true;
 }

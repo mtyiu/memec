@@ -351,6 +351,8 @@ bool Master::start() {
 	}
 	// Connect to slaves
 	for ( int i = 0, len = this->config.global.slaves.size(); i < len; i++ ) {
+		this->sockets.slaves[ i ]->timestamp.current.setVal( 0 );
+		this->sockets.slaves[ i ]->timestamp.lastAck.setVal( 0 );
 		if ( ! this->sockets.slaves[ i ]->start() )
 			ret = false;
 	}
@@ -375,10 +377,6 @@ bool Master::start() {
 		__ERROR__( "Master", "start", "Cannot start remapping message handler." );
 		ret = false;
 	}
-
-	/* Timestamps */
-	this->timestamp.current.setVal( 0 );
-	this->timestamp.lastAck.setVal( 0 );
 
 	this->startTime = start_timer();
 	this->isRunning = true;
@@ -905,17 +903,15 @@ void Master::printBackup( FILE *f ) {
 		printf( ":\n" );
 		s->backup.print( f );
 		printf( "\n" );
+		fprintf( f,
+			"Timestamps: Current: %10u  Last Ack: %10u; (Pending #) Update: %10lu  Delete: %10lu\n",
+			s->timestamp.current.getVal(),
+			s->timestamp.lastAck.getVal(),
+			s->timestamp.pendingAck.update.size(),
+			s->timestamp.pendingAck.del.size()
+		);
 	}
 	UNLOCK( &this->sockets.slaves.lock );
-	fprintf( f,
-		"Pending timestamps to ack\n"
-		"----------------------------\n"
-		"Update: %10lu  Delete: %10lu\n"
-		"Last timestamp acked: %10u\n",
-		this->timestamp.pendingAck.update.size(),
-		this->timestamp.pendingAck.del.size(),
-		this->timestamp.lastAck.getVal()
-	);
 }
 
 void Master::syncMetadata() {
@@ -981,38 +977,49 @@ void Master::time() {
 	fflush( stdout );
 }
 
-void Master::ackParityDelta( FILE *f ) {
+void Master::ackParityDelta( FILE *f, SlaveSocket *target ) {
 	SlaveEvent event;
 	uint32_t from, to, update, del;
-	from = this->timestamp.lastAck.getVal();
-	to = this->timestamp.current.getVal();
-
-	del = update = to;
-	
-	if ( ! this->timestamp.pendingAck.update.empty() )
-		update = this->timestamp.pendingAck.update.begin()->getVal() - 1;
-
-	if ( ! this->timestamp.pendingAck.del.empty() )
-		del = this->timestamp.pendingAck.del.begin()->getVal() - 1;
-
-	// find the small acked timestamp
-	to = update < to ? ( del < update ? del : update ) : to ;
-
-	// check the threshold is reached
-	if ( to - from < this->config.master.backup.ackBatchSize ) {
-		return;
-	}
-
-	if ( f )
-		fprintf( f, 
-			"Ack slave timestamps from %u to %u\n",
-			from, to
-		);
 
 	for( int i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
-		event.ackParityDelta( this->sockets.slaves[ i ], from, to );
-		this->eventQueue.insert( event );
+
+		SlaveSocket *s = this->sockets.slaves[ i ];
+
+		if ( target && target != s ) continue;
+
+		from = s->timestamp.lastAck.getVal();
+		to = s->timestamp.current.getVal();
+
+		del = update = to;
+
+		if ( ! s->timestamp.pendingAck.update.empty() )
+			update = s->timestamp.pendingAck.update.begin()->getVal() - 1;
+
+		if ( ! s->timestamp.pendingAck.del.empty() )
+			del = s->timestamp.pendingAck.del.begin()->getVal() - 1;
+
+		// find the small acked timestamp
+		to = update < to ? ( del < update ? del : update ) : to ;
+
+		// check the threshold is reached
+		if ( to - from < this->config.master.backup.ackBatchSize ) {
+			return;
+		}
+
+		if ( f ) {
+			fprintf( f, "Ack slave " );
+			s->printAddress();
+			fprintf( f, "timestamps from %u to %u\n", from, to );
+		}
+
+		for ( int j = 0; j < len; j++ ) {
+			SlaveSocket *p = this->sockets.slaves[ i ];
+			if ( p == s ) continue;
+			event.ackParityDelta( p, from, to, s->instanceId );
+			this->eventQueue.insert( event );
+		}
+
+		s->timestamp.lastAck.setVal( to );
 	}
 
-	this->timestamp.lastAck.setVal( to );
 }

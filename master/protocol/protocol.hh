@@ -131,7 +131,7 @@ public:
 
 	char *ackParityDeltaBackup(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
-		uint32_t fromTimestamp, uint32_t toTimestamp
+		uint32_t fromTimestamp, uint32_t toTimestamp, uint16_t targetId
 	);
 };
 

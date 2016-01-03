@@ -33,13 +33,14 @@ public:
 		struct {
 			uint32_t fromTimestamp;
 			uint32_t toTimestamp;
+			uint16_t targetId;
 		} ack;
 	} message;
 
 	void reqRegister( SlaveSocket *socket, uint32_t addr, uint16_t port );
 	void send( SlaveSocket *socket, Packet *packet );
 	void syncMetadata( SlaveSocket *socket );
-	void ackParityDelta( SlaveSocket *socket, uint32_t fromTimestamp, uint32_t toTimestamp );
+	void ackParityDelta( SlaveSocket *socket, uint32_t fromTimestamp, uint32_t toTimestamp, uint16_t targetId );
 	void pending( SlaveSocket *socket );
 };
 

@@ -55,7 +55,8 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 				buffer.size,
 				instanceId,
 				MasterWorker::idGenerator->nextVal( this->workerId ),
-				event.message.ack.fromTimestamp, event.message.ack.toTimestamp
+				event.message.ack.fromTimestamp, event.message.ack.toTimestamp,
+				event.message.ack.targetId
 			);
 			isSend = true;
 			break;
@@ -427,17 +428,22 @@ bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, bool is
 	}
 
 	// remove pending timestamp
+	// TODO handle degraded mode
 	Master *master = Master::getInstance();
-	auto &updateSet = master->timestamp.pendingAck.update;
-	auto it = updateSet.find( pid.timestamp );
-	if ( it != updateSet.end() )
-		updateSet.erase( it );
+	if ( ! isDegraded ) {
+		auto &updateSet = master->timestamp.pendingAck.update;
+		auto it = updateSet.find( pid.timestamp );
+		if ( it != updateSet.end() )
+			updateSet.erase( it );
+	}
 
 	applicationEvent.resUpdate( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, keyValueUpdate, success );
 	MasterWorker::eventQueue->insert( applicationEvent );
 
 	// check if ack is necessary
-	master->ackParityDelta();
+	// TODO handle degraded mode
+	if ( ! isDegraded )
+		master->ackParityDelta( 0, event.socket );
 
 	return true;
 }
@@ -514,17 +520,21 @@ bool MasterWorker::handleDeleteResponse( SlaveEvent event, bool success, bool is
 	}
 
 	// remove pending timestamp
+	// TODO handle degraded mode
 	Master *master = Master::getInstance();
-	auto &delSet = master->timestamp.pendingAck.del;
-	auto it = delSet.find( pid.timestamp );
-	if ( it != delSet.end() )
-		delSet.erase( it );
+	if ( !isDegraded ) {
+		auto &delSet = master->timestamp.pendingAck.del;
+		auto it = delSet.find( pid.timestamp );
+		if ( it != delSet.end() )
+			delSet.erase( it );
+	}
 
 	applicationEvent.resDelete( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, key, success );
 	MasterWorker::eventQueue->insert( applicationEvent );
 
 	// check if ack is necessary
-	master->ackParityDelta();
+	// TODO handle degraded mode
+	if ( ! isDegraded ) master->ackParityDelta( 0, event.socket );
 
 	return true;
 }

@@ -1,8 +1,10 @@
 #ifndef __MASTER_SOCKET_SLAVE_SOCKET_HH__
 #define __MASTER_SOCKET_SLAVE_SOCKET_HH__
 
+#include <set>
 #include "../../common/ds/array_map.hh"
 #include "../../common/socket/socket.hh"
+#include "../../common/timestamp/timestamp.hh"
 #include "../backup/backup.hh"
 #include "../ds/counter.hh"
 
@@ -14,6 +16,15 @@ public:
 	bool registered;
 	Counter counter;
 	Backup backup;
+	struct {
+		Timestamp current;
+		Timestamp lastAck; // to slave
+		struct {
+			std::multiset<Timestamp> update;
+			std::multiset<Timestamp> del;
+		} pendingAck;
+	} timestamp;
+	uint16_t instanceId;
 
 	static void setArrayMap( ArrayMap<int, SlaveSocket> *slaves );
 	bool start();

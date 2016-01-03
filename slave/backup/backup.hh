@@ -25,8 +25,9 @@ public:
 	bool isChunkDelta;
 	uint32_t requestId;
 	bool isParity;
+	uint16_t dataSlaveId;
 
-	void set( Metadata metadata, Key key, Value value, bool isChunkDelta, uint32_t offset, bool isParity, uint32_t requestId ) {
+	void set( Metadata metadata, Key key, Value value, bool isChunkDelta, uint32_t offset, bool isParity, uint32_t requestId, uint16_t dataSlaveId ) {
 		this->metadata = metadata;
 		this->delta.data.dup( value.size, value.data );
 		this->key.dup( key.size, key.data );
@@ -34,6 +35,7 @@ public:
 		this->delta.offset = offset;
 		this->isParity = isParity;
 		this->requestId = requestId;
+		this->dataSlaveId = dataSlaveId;
 	}
 
 	void free() {
@@ -91,6 +93,7 @@ private:
 	LOCK_T parityUpdateLock;
 	LOCK_T parityDeleteLock;
 
+	bool addPendingAck( BackupPendingIdentifier pi, Timestamp ts, bool &isDuplicated, const char* type );
 public:
 	
 	SlaveBackup();
@@ -99,24 +102,24 @@ public:
 	// backup key-value for update and delete
 	bool insertDataUpdate( Timestamp ts, Key key, Value value, Metadata metadata, bool isChunkDelta, uint32_t offset, uint32_t requestId, Socket *targetSocket );
 	bool insertDataDelete( Timestamp ts, Key key, Value value, Metadata metadata, bool isChunkDelta, uint32_t offset, uint32_t requestId, Socket *targetSocket );
-	bool insertParityUpdate( Timestamp ts, Key key, Value value, Metadata metadata, bool isChunkDelta, uint32_t offset, uint32_t requestId = 0, Socket *targetSocket = 0 );
-	bool insertParityDelete( Timestamp ts, Key key, Value value, Metadata metadata, bool isChunkDelta, uint32_t offset, uint32_t requestId = 0, Socket *targetSocket = 0 );
+	bool insertParityUpdate( Timestamp ts, Key key, Value value, Metadata metadata, bool isChunkDelta, uint32_t offset, uint16_t dataSlaveId, uint32_t requestId );
+	bool insertParityDelete( Timestamp ts, Key key, Value value, Metadata metadata, bool isChunkDelta, uint32_t offset, uint16_t dataSlaveId, uint32_t requestId );
 
 	// clear key-value backup for update and delete at and before a timestamp (inclusive)
 	// remove backup at and before a timestamp
-	std::vector<BackupDelta> removeDataUpdate( Timestamp from, Timestamp ts, bool free = true );
-	std::vector<BackupDelta> removeDataDelete( Timestamp from, Timestamp ts, bool free = true );
-	std::vector<BackupDelta> removeParityUpdate( Timestamp from, Timestamp to, bool free = true );
-	std::vector<BackupDelta> removeParityDelete( Timestamp from, Timestamp to, bool free = true );
+	std::vector<BackupDelta> removeDataUpdate( Timestamp from, Timestamp ts, uint16_t dataSlaveId = 0, bool free = true );
+	std::vector<BackupDelta> removeDataDelete( Timestamp from, Timestamp ts, uint16_t dataSlaveId = 0, bool free = true );
+	std::vector<BackupDelta> removeParityUpdate( Timestamp from, Timestamp to, uint16_t dataSlaveId = 0, bool free = true );
+	std::vector<BackupDelta> removeParityDelete( Timestamp from, Timestamp to, uint16_t dataSlaveId = 0, bool free = true );
 	// remove backup upon all parity acked using requestId
 	BackupDelta removeDataUpdate( uint32_t requestId, Socket *targetSocket, bool free = true );
 	BackupDelta removeDataDelete( uint32_t requestId, Socket *targetSocket, bool free = true );
 
 	// find key-value backup for update and delete by a timestamp or request id
-	std::vector<BackupDelta> findDataUpdate( Timestamp ts ) const;
-	BackupDelta findDataUpdate( uint32_t requestId ) const;
-	std::vector<BackupDelta> findDataDelete( Timestamp ts ) const;
-	BackupDelta findDataDelete( uint32_t requestId ) const;
+	std::vector<BackupDelta> findDataUpdate( uint32_t from, uint32_t to );
+	std::vector<BackupDelta> findDataDelete( uint32_t from, uint32_t to );
+	std::vector<BackupDelta> findParityUpdate( uint32_t from, uint32_t to );
+	std::vector<BackupDelta> findParityDelete( uint32_t from, uint32_t to );
 
 	// TODO : undo parity update on specific key 
 	

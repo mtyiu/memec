@@ -448,6 +448,13 @@ struct AcknowledgementHeader {
     uint32_t toTimestamp;
 };
 
+#define PROTO_ACK_PARITY_DELTA_SIZE 10
+struct ParityDeltaAcknowledgementHeader {
+	uint32_t fromTimestamp;
+	uint32_t toTimestamp;
+	uint16_t targetId;
+};
+
 ///////////////////////////////////////////////////////////////////////////////
 
 class Protocol {
@@ -938,6 +945,14 @@ protected:
 		size_t offset, uint32_t &fromTimestamp, uint32_t &toTimestamp,
 		char *buf, size_t size
 	);
+	size_t generateParityDeltaAcknowledgementHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
+		uint32_t fromTimestamp, uint32_t toTimestamp, uint16_t targetId, char* buf = 0
+	);
+	bool parseParityDeltaAcknowledgementHeader(
+		size_t offset, uint32_t &fromTimestamp, uint32_t &toTimestamp, uint16_t &targetId,
+		char *buf, size_t size
+	);
 
 public:
 	struct {
@@ -1123,6 +1138,10 @@ public:
 	// ---------- ack_protocol.cc ----------
 	bool parseAcknowledgementHeader(
 		struct AcknowledgementHeader &header,
+		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
+	bool parseParityDeltaAcknowledgementHeader(
+		struct ParityDeltaAcknowledgementHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 };

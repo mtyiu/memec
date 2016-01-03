@@ -16,14 +16,20 @@ bool SlaveWorker::handleSlavePeerRegisterRequest( SlavePeerSocket *socket, uint1
 			break;
 		}
 	}
+
+	socket->instanceId = instanceId;
+	Slave::getInstance()->sockets.slavesIdToSocketMap.set( instanceId, socket, false );
+	__DEBUG__( BLUE, "SlaveWorker", "handleSlavePeerRegisterRequest", "Slave fd = %u id = %hu", socket->getSocket(), instanceId );
+
 	if ( index == -1 ) {
 		__ERROR__( "SlaveWorker", "handleSlavePeerRegisterRequest", "The slave is not in the list. Ignoring this slave..." );
 		return false;
 	}
 
 	SlavePeerEvent event;
-	event.resRegister( slavePeers->values[ index ], instanceId, requestId, true );
+	event.resRegister( slavePeers->values[ index ], Slave::getInstance()->instanceId, requestId, true );
 	SlaveWorker::eventQueue->insert( event );
+
 	return true;
 }
 
@@ -124,7 +130,7 @@ bool SlaveWorker::handleUpdateRequest( SlavePeerEvent event, char *buf, size_t s
 	metadata.set( header.listId, header.stripeId, header.chunkId );
 	MasterSocket *masterSocket = Slave::getInstance()->sockets.mastersIdToSocketMap.get( event.instanceId );
 	if ( masterSocket )
-		masterSocket->backup.insertParityUpdate( timestamp, key, value, metadata, false, header.chunkUpdateOffset );
+		masterSocket->backup.insertParityUpdate( timestamp, key, value, metadata, false, header.chunkUpdateOffset, event.socket->instanceId, event.requestId );
 	else
 		__ERROR__( "SlaveWorker", "handleUpdateRequest", "Failed to backup delta at parity slave for instance ID = %hu request ID = %u.", event.instanceId, event.requestId );
 
@@ -167,7 +173,7 @@ bool SlaveWorker::handleDeleteRequest( SlavePeerEvent event, char *buf, size_t s
 	metadata.set( header.listId, header.stripeId, header.chunkId );
 	MasterSocket *masterSocket = Slave::getInstance()->sockets.mastersIdToSocketMap.get( event.instanceId );
 	if ( masterSocket )
-		masterSocket->backup.insertParityDelete( timestamp, key, value, metadata, false, 0 );
+		masterSocket->backup.insertParityDelete( timestamp, key, value, metadata, false, 0, event.socket->instanceId, event.requestId );
 	else
 		__ERROR__( "SlaveWorker", "handleDeleteRequest", "Failed to backup delta at parity slave for instance ID = %hu request ID = %u.", event.instanceId, event.requestId );
 	
@@ -493,7 +499,7 @@ bool SlaveWorker::handleUpdateChunkRequest( SlavePeerEvent event, char *buf, siz
 	value.set( header.length, header.delta );
 	MasterSocket *masterSocket = Slave::getInstance()->sockets.mastersIdToSocketMap.get( event.instanceId );
 	if ( masterSocket )
-		masterSocket->backup.insertParityUpdate( timestamp, key, value, metadata, false, header.offset );
+		masterSocket->backup.insertParityUpdate( timestamp, key, value, metadata, false, header.offset, event.socket->instanceId, event.requestId );
 	else
 		__ERROR__( "SlaveWorker", "handleUpdateChunkRequest", "Failed to backup delta at parity slave for instance ID = %hu request ID = %u.", event.instanceId, event.requestId );
 
@@ -540,7 +546,7 @@ bool SlaveWorker::handleDeleteChunkRequest( SlavePeerEvent event, char *buf, siz
 	value.set( header.length, header.delta );
 	MasterSocket *masterSocket = Slave::getInstance()->sockets.mastersIdToSocketMap.get( event.instanceId );
 	if ( masterSocket )
-		masterSocket->backup.insertParityDelete( timestamp, key, value, metadata, true, header.offset );
+		masterSocket->backup.insertParityDelete( timestamp, key, value, metadata, true, header.offset, event.socket->instanceId, event.requestId );
 	else
 		__ERROR__( "SlaveWorker", "handleDeleteRequest", "Failed to backup delta at parity slave for instance ID = %hu request ID = %u.", event.instanceId, event.requestId );
 

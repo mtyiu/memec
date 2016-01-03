@@ -25,14 +25,16 @@ char *MasterProtocol::syncMetadataBackup(
 
 char *MasterProtocol::ackParityDeltaBackup(
 	size_t &size, uint16_t instanceId, uint32_t requestId,
-	uint32_t fromTimestamp, uint32_t toTimestamp
+	uint32_t fromTimestamp, uint32_t toTimestamp,
+	uint16_t targetId
 ) {
-	size = this->generateAcknowledgementHeader(
+	size = this->generateParityDeltaAcknowledgementHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_ACK_PARITY_DELTA,
 		instanceId, requestId,
-		0, toTimestamp
+		fromTimestamp, toTimestamp,
+		targetId
 	);
 	return this->buffer.send;
 }

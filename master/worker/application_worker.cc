@@ -451,7 +451,9 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 	uint16_t instanceId = Master::instanceId;
 	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
 	int sockfd;
-	uint32_t requestTimestamp = this->timestamp->nextVal();
+	// handle degraded mode
+	uint32_t requestTimestamp = socket->timestamp.current.nextVal();
+	
 
 	char* valueUpdate = new char [ header.valueUpdateSize ];
 	memcpy( valueUpdate, header.valueUpdate, header.valueUpdateSize );
@@ -495,7 +497,7 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 			header.valueUpdate, header.valueUpdateOffset, header.valueUpdateSize, requestTimestamp
 		);
 		// add pending timestamp to ack
-		Master::getInstance()->timestamp.pendingAck.update.insert( Timestamp( requestTimestamp ) );
+		socket->timestamp.pendingAck.update.insert( Timestamp( requestTimestamp ) );
 
 		if ( ! MasterWorker::pending->insertKeyValueUpdate( PT_SLAVE_UPDATE, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, keyValueUpdate ) ) {
 			__ERROR__( "MasterWorker", "handleUpdateRequest", "Cannot insert into slave UPDATE pending map." );
@@ -552,7 +554,8 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 	ssize_t sentBytes;
 	uint16_t instanceId = Master::instanceId;
 	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
-	uint32_t requestTimestamp = this->timestamp->nextVal();
+	// TODO handle degraded mode
+	uint32_t requestTimestamp = socket->timestamp.current.nextVal();
 	int sockfd = socket->getSocket();
 
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
@@ -589,7 +592,7 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 			requestTimestamp
 		);
 		// add pending timestamp to ack.
-		Master::getInstance()->timestamp.pendingAck.del.insert( Timestamp( requestTimestamp ) );
+		socket->timestamp.pendingAck.del.insert( Timestamp( requestTimestamp ) );
 
 		if ( ! MasterWorker::pending->insertKey( PT_SLAVE_DEL, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, key ) ) {
 			__ERROR__( "MasterWorker", "handleDeleteRequest", "Cannot insert into slave DELETE pending map." );

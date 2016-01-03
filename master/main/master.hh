@@ -78,15 +78,6 @@ public:
 	Timer statsTimer;
 	/* Instance ID (assigned by coordinator) */
 	static uint16_t instanceId;
-	/* Timestamp */
-	struct {
-		Timestamp current;
-		Timestamp lastAck; // to slave
-		struct {
-			std::multiset<Timestamp> update;
-			std::multiset<Timestamp> del;
-		} pendingAck;
-	} timestamp;
 	/* For debugging only */
 	struct {
 		bool isDegraded;
@@ -110,7 +101,7 @@ public:
 	void printBackup( FILE *f = stdout );
 	void syncMetadata();
 	void time();
-	void ackParityDelta( FILE *f = 0 );
+	void ackParityDelta( FILE *f = 0, SlaveSocket *target = 0 );
 	double getElapsedTime();
 	void interactive();
 	bool setDebugFlag( char *input );
