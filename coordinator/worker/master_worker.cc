@@ -98,16 +98,14 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 			buffer.data = this->protocol.resDegradedLock(
 				buffer.size,
 				event.instanceId, event.requestId,
-				event.type == MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED /* success */,
-				event.message.degradedLock.isSealed,
+				event.type == MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED, // success
 				event.message.degradedLock.key.size,
 				event.message.degradedLock.key.data,
-				event.message.degradedLock.listId,
+				event.message.degradedLock.isSealed,
 				event.message.degradedLock.stripeId,
-				event.message.degradedLock.srcDataChunkId,
-				event.message.degradedLock.dstDataChunkId,
-				event.message.degradedLock.srcParityChunkId,
-				event.message.degradedLock.dstParityChunkId
+				event.message.degradedLock.original,
+				event.message.degradedLock.reconstructed,
+				event.message.degradedLock.reconstructedCount
 			);
 			isSend = true;
 			break;
@@ -116,12 +114,9 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 			buffer.data = this->protocol.resDegradedLock(
 				buffer.size,
 				event.instanceId, event.requestId,
-				event.type == MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_LOCKED /* exist */,
+				event.type == MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_LOCKED, // exist
 				event.message.degradedLock.key.size,
-				event.message.degradedLock.key.data,
-				event.message.degradedLock.listId,
-				event.message.degradedLock.srcDataChunkId,
-				event.message.degradedLock.srcParityChunkId
+				event.message.degradedLock.key.data
 			);
 			isSend = true;
 			break;
@@ -131,11 +126,9 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 				event.instanceId, event.requestId,
 				event.message.degradedLock.key.size,
 				event.message.degradedLock.key.data,
-				event.message.degradedLock.listId,
-				event.message.degradedLock.srcDataChunkId,
-				event.message.degradedLock.dstDataChunkId,
-				event.message.degradedLock.srcParityChunkId,
-				event.message.degradedLock.dstParityChunkId
+				event.message.degradedLock.original,
+				event.message.degradedLock.remapped,
+				event.message.degradedLock.remappedCount
 			);
 			isSend = true;
 			break;

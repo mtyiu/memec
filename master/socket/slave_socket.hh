@@ -6,7 +6,6 @@
 #include "../../common/socket/socket.hh"
 #include "../../common/timestamp/timestamp.hh"
 #include "../backup/backup.hh"
-#include "../ds/counter.hh"
 
 class SlaveSocket : public Socket {
 private:
@@ -14,7 +13,6 @@ private:
 
 public:
 	bool registered;
-	Counter counter;
 	Backup backup;
 	struct {
 		Timestamp current;

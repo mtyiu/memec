@@ -16,10 +16,11 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 
 	uint32_t *original, *remapped;
 	uint32_t remappedCount;
-	bool connected;
+	bool connected, useCoordinatedFlow;
 	ssize_t sentBytes;
+	SlaveSocket *originalDataSlaveSocket;
 
-	if ( ! this->getSlaves( header.key, header.keySize, original, remapped, remappedCount ) ) {
+	if ( ! this->getSlaves( PROTO_OPCODE_SET, header.key, header.keySize, original, remapped, remappedCount, originalDataSlaveSocket, useCoordinatedFlow ) ) {
 		Key key;
 		key.set( header.keySize, header.key );
 		event.resSet( event.socket, event.instanceId, event.requestId, key, false, false );

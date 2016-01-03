@@ -69,7 +69,8 @@ public class Main implements Runnable {
 		boolean ret;
 
 		while( i < numOps ) {
-			rand = this.random.nextInt( 4 );
+			// rand = this.random.nextInt( 4 );
+			rand = this.random.nextInt( 2 );
 			size = this.map.size();
 			ret = false;
 

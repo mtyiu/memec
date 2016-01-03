@@ -141,21 +141,27 @@ bool Map::insertKey( char *keyStr, uint8_t keySize, uint32_t listId, uint32_t st
 	return ret;
 }
 
-bool Map::insertDegradedLock( Metadata srcMetadata, Metadata &dstMetadata, bool needsLock, bool needsUnlock ) {
-	dstMetadata.stripeId = -1; // This field is not used - indicate this using a special value
+bool Map::insertDegradedLock( uint32_t listId, uint32_t stripeId,
+uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, bool needsLock, bool needsUnlock ) {
+	ListStripe listStripe;
+	DegradedLock degradedLock( original, reconstructed, reconstructedCount );
+	listStripe.set( listId, stripeId );
 
-	std::unordered_map<Metadata, Metadata>::iterator it;
-	std::pair<Metadata, Metadata> p( srcMetadata, dstMetadata );
+	std::unordered_map<ListStripe, DegradedLock>::iterator it;
 	bool ret = true;
 
 	if ( needsLock ) LOCK( &this->degradedLocksLock );
-	it = this->degradedLocks.find( srcMetadata );
+	it = this->degradedLocks.find( listStripe );
 	if ( it == this->degradedLocks.end() ) {
-		std::pair<std::unordered_map<Metadata, Metadata>::iterator, bool> r;
+		degradedLock.dup();
+
+		std::pair<std::unordered_map<ListStripe, DegradedLock>::iterator, bool> r;
+		std::pair<ListStripe, DegradedLock> p( listStripe, degradedLock );
+
 		r = this->degradedLocks.insert( p );
+
 		ret = r.second;
 	} else {
-		dstMetadata = it->second;
 		ret = false;
 	}
 	if ( needsUnlock ) UNLOCK( &this->degradedLocksLock );
@@ -181,21 +187,21 @@ bool Map::findMetadataByKey( char *keyStr, uint8_t keySize, Metadata &metadata )
 	return true;
 }
 
-bool Map::findDegradedLock( uint32_t srcListId, uint32_t srcStripeId, uint32_t srcChunkId, Metadata &dstMetadata ) {
-	std::unordered_map<Metadata, Metadata>::iterator it;
-	Metadata srcMetadata;
+bool Map::findDegradedLock( uint32_t listId, uint32_t stripeId, DegradedLock &degradedLock, bool needsLock, bool needsUnlock, LOCK_T **lock ) {
+	std::unordered_map<ListStripe, DegradedLock>::iterator it;
+	ListStripe listStripe;
+	listStripe.set( listId, stripeId );
 
-	srcMetadata.set( srcListId, srcStripeId, srcChunkId );
-
-	LOCK( &this->degradedLocksLock );
-	it = this->degradedLocks.find( srcMetadata );
+	if ( lock ) *lock = &this->degradedLocksLock;
+	if ( needsLock ) LOCK( &this->degradedLocksLock );
+	it = this->degradedLocks.find( listStripe );
 	if ( it == this->degradedLocks.end() ) {
-		UNLOCK( &this->degradedLocksLock );
-		return 0;
+		if ( needsUnlock ) UNLOCK( &this->degradedLocksLock );
+		return false;
 	} else {
-		dstMetadata = it->second;
+		degradedLock = it->second;
 	}
-	UNLOCK( &this->degradedLocksLock );
+	if ( needsUnlock ) UNLOCK( &this->degradedLocksLock );
 	return true;
 }
 
@@ -255,12 +261,22 @@ size_t Map::dump( FILE *f ) {
 	if ( ! this->degradedLocks.size() ) {
 		fprintf( f, "(None)\n" );
 	} else {
-		for ( std::unordered_map<Metadata, Metadata>::iterator it = this->degradedLocks.begin(); it != this->degradedLocks.end(); it++ ) {
+		for ( std::unordered_map<ListStripe, DegradedLock>::iterator it = this->degradedLocks.begin(); it != this->degradedLocks.end(); it++ ) {
 			fprintf(
-				f, "(%u, %u, %u) |-> (%u, %u)\n",
-				it->first.listId, it->first.stripeId, it->first.chunkId,
-				it->second.listId, it->second.chunkId
+				f, "(%u, %u): ",
+				it->first.listId, it->first.stripeId
 			);
+			for ( uint32_t i = 0; i < it->second.reconstructedCount; i++ ) {
+				fprintf(
+					f, "%s(%u, %u) |-> (%u, %u)",
+					i == 0 ? "" : "; ",
+					it->second.original[ i * 2     ],
+					it->second.original[ i * 2 + 1 ],
+					it->second.reconstructed[ i * 2     ],
+					it->second.reconstructed[ i * 2 + 1 ]
+				);
+			}
+			fprintf( f, "%s\n", it->second.reconstructedCount ? "" : " (none)" );
 		}
 		fprintf( f, "Count: %lu\n", this->degradedLocks.size() );
 	}

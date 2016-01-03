@@ -133,7 +133,7 @@ public:
 		return true;
 	}
 
-	bool find( Key key, RemappingRecord *record = NULL ) {
+	bool find( Key key, RemappingRecord *record = NULL, LOCK_T **lock = 0 ) {
 		bool ret = false;
 		LOCK( &this->lock );
 		std::unordered_map<Key, RemappingRecord>::iterator it = map.find( key );
@@ -141,7 +141,11 @@ public:
 			if ( record ) *record = it->second;
 			ret = true;
 		}
-		UNLOCK( &this->lock );
+		if ( ret && lock ) {
+			*lock = &this->lock;
+		} else {
+			UNLOCK( &this->lock );
+		}
 		return ret;
 	}
 

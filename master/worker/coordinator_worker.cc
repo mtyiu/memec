@@ -22,7 +22,6 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 				event.message.address.addr,
 				event.message.address.port
 			);
-			printf(" send coordinator register request\n" );
 			isSend = true;
 			break;
 		case COORDINATOR_EVENT_TYPE_PUSH_LOAD_STATS:

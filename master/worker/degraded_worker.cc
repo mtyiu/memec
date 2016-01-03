@@ -1,32 +1,26 @@
 #include "worker.hh"
 #include "../main/master.hh"
 
-bool MasterWorker::sendDegradedLockRequest( uint16_t parentInstanceId, uint32_t parentRequestId, uint8_t opcode, uint32_t listId, uint32_t dataChunkId, uint32_t newDataChunkId, uint32_t parityChunkId, uint32_t newParityChunkId, char *key, uint8_t keySize, uint32_t valueUpdateSize, uint32_t valueUpdateOffset, char *valueUpdate ) {
+bool MasterWorker::sendDegradedLockRequest(
+	uint16_t parentInstanceId, uint32_t parentRequestId, uint8_t opcode,
+	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
+	char *key, uint8_t keySize,
+	uint32_t valueUpdateSize, uint32_t valueUpdateOffset, char *valueUpdate
+) {
 	uint16_t instanceId = Master::instanceId;
 	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
 	CoordinatorSocket *socket = Master::getInstance()->sockets.coordinators.values[ 0 ];
 
 	// Add the degraded lock request to the pending set
 	DegradedLockData degradedLockData;
+	degradedLockData.set(
+		opcode,
+		original, reconstructed, reconstructedCount,
+		keySize, key
+	);
 
-	if ( parityChunkId == 0 ) {
-		degradedLockData.set(
-			opcode,
-			listId, 0 /* srcStripeId */, dataChunkId,
-			listId, newDataChunkId,
-			keySize, key
-		);
-	} else {
-		degradedLockData.set(
-			opcode,
-			listId, 0 /* srcStripeId */, parityChunkId,
-			listId, newParityChunkId,
-			keySize, key
-		);
-	}
-	if ( valueUpdateSize != 0 && valueUpdate ) {
+	if ( valueUpdateSize != 0 && valueUpdate )
 		degradedLockData.set( valueUpdateSize, valueUpdateOffset, valueUpdate );
-	}
 
 	if ( ! MasterWorker::pending->insertDegradedLockData( PT_COORDINATOR_DEGRADED_LOCK_DATA, instanceId, parentInstanceId, requestId, parentRequestId, ( void * ) socket, degradedLockData ) ) {
 		__ERROR__( "MasterWorker", "handleDegradedRequest", "Cannot insert into slave degraded lock pending map." );
@@ -42,9 +36,7 @@ bool MasterWorker::sendDegradedLockRequest( uint16_t parentInstanceId, uint32_t 
 
 	buffer.data = this->protocol.reqDegradedLock(
 		buffer.size, instanceId, requestId,
-		listId,
-		dataChunkId, newDataChunkId,
-		parityChunkId, newParityChunkId,
+		original, reconstructed, reconstructedCount,
 		key, keySize
 	);
 
@@ -59,102 +51,68 @@ bool MasterWorker::sendDegradedLockRequest( uint16_t parentInstanceId, uint32_t 
 }
 
 bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool success, char *buf, size_t size ) {
-	SlaveSocket *socket = 0, *original = 0;
-	int sockfd;
+	uint32_t originalListId, originalChunkId;
+	SlaveSocket *socket = 0;
 	struct DegradedLockResHeader header;
 	if ( ! this->protocol.parseDegradedLockResHeader( header, buf, size ) ) {
 		__ERROR__( "MasterWorker", "handleDegradedLockResponse", "Invalid DEGRADED_LOCK response." );
 		return false;
 	}
+
+	socket = this->getSlaves( header.key, header.keySize, originalListId, originalChunkId );
+
 	switch( header.type ) {
 		case PROTO_DEGRADED_LOCK_RES_IS_LOCKED:
 		case PROTO_DEGRADED_LOCK_RES_WAS_LOCKED:
 			__DEBUG__(
 				BLUE, "MasterWorker", "handleDegradedLockResponse",
-				"[%s Locked] Key: %.*s (key size = %u); list ID: %u, stripe ID: %u, data: (%u --> %u), parity: (%u --> %u). Is sealed? %s",
+				"[%s Locked] Key: %.*s (key size = %u); Stripe ID: %u; Is Sealed? %s.",
 				header.type == PROTO_DEGRADED_LOCK_RES_IS_LOCKED ? "Is" : "Was",
 				( int ) header.keySize, header.key, header.keySize,
-				header.listId,
 				header.stripeId,
-				header.srcDataChunkId, header.dstDataChunkId,
-				header.srcParityChunkId, header.dstParityChunkId,
 				header.isSealed ? "true" : "false"
 			);
 
-			if ( header.srcParityChunkId == 0 ) {
-				// Data server is redirected
-				original = this->getSlaves( header.listId, header.srcDataChunkId );
-				socket = this->getSlaves( header.listId, header.dstDataChunkId );
-			} else {
-				// Parity server is redirected; use the original data server
-				original = socket = this->getSlaves( header.listId, header.srcDataChunkId );
+			// Get redirected data slave socket
+			if ( header.reconstructedCount ) {
+				for ( uint32_t i = 0; i < header.reconstructedCount; i++ ) {
+					if ( header.original[ i * 2     ] == originalListId &&
+					     header.original[ i * 2 + 1 ] == originalChunkId ) {
+						socket = this->getSlaves(
+							header.reconstructed[ i * 2     ],
+							header.reconstructed[ i * 2 + 1 ]
+						);
+						break;
+					}
+				}
 			}
 			break;
 		case PROTO_DEGRADED_LOCK_RES_NOT_LOCKED:
 			__DEBUG__(
 				BLUE, "MasterWorker", "handleDegradedLockResponse",
-				"[Not Locked] Key: %.*s (key size = %u); (%u, %u)",
-				( int ) header.keySize, header.key, header.keySize,
-				header.listId, header.srcDataChunkId
+				"[Not Locked] Key: %.*s (key size = %u).",
+				( int ) header.keySize, header.key, header.keySize
 			);
-
-			if ( header.srcParityChunkId == 0 ) {
-				original = socket = this->getSlaves( header.listId, header.srcDataChunkId );
-				sockfd = socket->getSocket();
-				MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
-				MasterWorker::slaveSockets->get( sockfd )->counter.increaseNormal();
-				Master::getInstance()->remapMsgHandler.ackTransit( socket->getAddr() );
-			} else {
-				original = this->getSlaves( header.listId, header.srcDataChunkId );
-
-				// Decrease degraded counter for the parity server
-				socket = this->getSlaves( header.listId, header.srcParityChunkId );
-				sockfd = socket->getSocket();
-				MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
-				Master::getInstance()->remapMsgHandler.ackTransit( socket->getAddr() );
-
-				// Increase normal counter for the data server
-				sockfd = original->getSocket();
-				MasterWorker::slaveSockets->get( sockfd )->counter.increaseNormal();
-				Master::getInstance()->remapMsgHandler.ackTransit( original->getAddr() );
-
-				socket = original;
-			}
-
 			break;
 		case PROTO_DEGRADED_LOCK_RES_REMAPPED:
 			__DEBUG__(
 				BLUE, "MasterWorker", "handleDegradedLockResponse",
-				"[Remapped] Key: %.*s (key size = %u); (%u, %u)",
-				( int ) header.keySize, header.key, header.keySize,
-				header.dstListId, header.dstChunkId
+				"[Remapped] Key: %.*s (key size = %u).",
+				( int ) header.keySize, header.key, header.keySize
 			);
 
-			if ( header.srcParityChunkId == 0 ) {
-				// data server is remapped
-				socket = this->getSlaves( header.listId, header.srcDataChunkId );
-				sockfd = socket->getSocket();
-				MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
-
-				original = socket = this->getSlaves( header.listId, header.dstDataChunkId );
-				MasterWorker::slaveSockets->get( sockfd )->counter.increaseNormal();
-				Master::getInstance()->remapMsgHandler.ackTransit( socket->getAddr() );
-			} else {
-				// parity server is remapped
-				original = this->getSlaves( header.listId, header.srcDataChunkId );
-
-				// Decrease degraded counter for the parity server
-				socket = this->getSlaves( header.listId, header.srcParityChunkId );
-				sockfd = socket->getSocket();
-				MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
-				Master::getInstance()->remapMsgHandler.ackTransit( socket->getAddr() );
-
-				// Increase normal counter for the data server
-				sockfd = original->getSocket();
-				MasterWorker::slaveSockets->get( sockfd )->counter.increaseNormal();
-				Master::getInstance()->remapMsgHandler.ackTransit( original->getAddr() );
-
-				socket = original;
+			// Get redirected data slave socket
+			if ( header.remappedCount ) {
+				for ( uint32_t i = 0; i < header.remappedCount; i++ ) {
+					if ( header.original[ i * 2     ] == originalListId &&
+					     header.original[ i * 2 + 1 ] == originalChunkId ) {
+						socket = this->getSlaves(
+							header.remapped[ i * 2     ],
+							header.remapped[ i * 2 + 1 ]
+						);
+						break;
+					}
+				}
 			}
 			break;
 		case PROTO_DEGRADED_LOCK_RES_NOT_EXIST:
@@ -164,23 +122,6 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 				"[Not Fonud] Key: %.*s (key size = %u)",
 				( int ) header.keySize, header.key, header.keySize
 			);
-
-			if ( header.srcParityChunkId == 0 ) {
-				socket = this->getSlaves( header.listId, header.srcDataChunkId );
-				sockfd = socket->getSocket();
-				MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
-				Master::getInstance()->remapMsgHandler.ackTransit( socket->getAddr() );
-			} else {
-				original = this->getSlaves( header.listId, header.srcDataChunkId );
-
-				// Decrease degraded counter for the parity server
-				socket = this->getSlaves( header.listId, header.srcParityChunkId );
-				sockfd = socket->getSocket();
-				MasterWorker::slaveSockets->get( sockfd )->counter.decreaseDegraded();
-				Master::getInstance()->remapMsgHandler.ackTransit( socket->getAddr() );
-
-				socket = original;
-			}
 			break;
 	}
 
@@ -214,10 +155,8 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 				case PROTO_DEGRADED_LOCK_RES_WAS_LOCKED:
 					buffer.data = this->protocol.reqDegradedGet(
 						buffer.size, instanceId, requestId,
-						header.listId, header.stripeId,
-						header.srcDataChunkId, header.dstDataChunkId,
-						header.dstParityChunkId, header.dstParityChunkId,
-						header.isSealed,
+						header.isSealed, header.stripeId,
+						header.original, header.reconstructed, header.reconstructedCount,
 						degradedLockData.key, degradedLockData.keySize
 					);
 					break;
@@ -225,10 +164,12 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 				case PROTO_DEGRADED_LOCK_RES_REMAPPED:
 					buffer.data = this->protocol.reqGet(
 						buffer.size, instanceId, requestId,
-						degradedLockData.key, degradedLockData.keySize
+						header.key, header.keySize
 					);
-					if ( MasterWorker::updateInterval )
+					if ( MasterWorker::updateInterval ) {
+						// printf( "[remapped] Request sent: %u, %u\n", instanceId, requestId );
 						MasterWorker::pending->recordRequestStartTime( PT_SLAVE_GET, instanceId, pid.parentInstanceId, requestId, pid.parentRequestId, ( void * ) socket, socket->getAddr() );
+					}
 					break;
 				case PROTO_DEGRADED_LOCK_RES_NOT_EXIST:
 					if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_GET, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &key, true, true, true, header.key ) ) {
@@ -252,10 +193,8 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 				case PROTO_DEGRADED_LOCK_RES_WAS_LOCKED:
 					buffer.data = this->protocol.reqDegradedUpdate(
 						buffer.size, instanceId, requestId,
-						header.listId, header.stripeId,
-						header.srcDataChunkId, header.dstDataChunkId,
-						header.dstParityChunkId, header.dstParityChunkId,
-						header.isSealed,
+						header.isSealed, header.stripeId,
+						header.original, header.reconstructed, header.reconstructedCount,
 						degradedLockData.key, degradedLockData.keySize,
 						degradedLockData.valueUpdate, degradedLockData.valueUpdateOffset, degradedLockData.valueUpdateSize
 					);
@@ -293,10 +232,8 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 				case PROTO_DEGRADED_LOCK_RES_WAS_LOCKED:
 					buffer.data = this->protocol.reqDegradedDelete(
 						buffer.size, instanceId, requestId,
-						header.listId, header.stripeId,
-						header.srcDataChunkId, header.dstDataChunkId,
-						header.dstParityChunkId, header.dstParityChunkId,
-						header.isSealed,
+						header.isSealed, header.stripeId,
+						header.original, header.reconstructed, header.reconstructedCount,
 						degradedLockData.key, degradedLockData.keySize
 					);
 					break;
@@ -327,6 +264,8 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 			__ERROR__( "MasterWorker", "handleDegradedLockResponse", "Invalid opcode in DegradedLockData." );
 			return false;
 	}
+
+	degradedLockData.free();
 
 	// Send request
 	sentBytes = socket->send( buffer.data, buffer.size, connected );

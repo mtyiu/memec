@@ -56,11 +56,14 @@ public:
 			Key key;
 		} remap;
 		struct {
-			Key key;
-			uint32_t listId, stripeId;
-			uint32_t srcDataChunkId, dstDataChunkId;
-			uint32_t srcParityChunkId, dstParityChunkId;
 			bool isSealed;
+			uint32_t stripeId;
+			uint32_t reconstructedCount;
+			uint32_t remappedCount;
+			uint32_t *original;
+			uint32_t *reconstructed;
+			uint32_t *remapped;
+			Key key;
 		} degradedLock;
 	} message;
 
@@ -75,20 +78,19 @@ public:
 	void switchPhase( bool toRemap, std::set<struct sockaddr_in> slaves );
 	// Degraded lock
 	void resDegradedLock(
-		MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool isLocked, bool isSealed,
-		uint32_t listId, uint32_t stripeId,
-		uint32_t srcDataChunkId, uint32_t dstDataChunkId,
-		uint32_t srcParityChunkId, uint32_t dstParityChunkId
+		MasterSocket *socket, uint16_t instanceId, uint32_t requestId,
+		Key &key, bool isLocked, bool isSealed,
+		uint32_t stripeId,
+		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount
 	);
 	void resDegradedLock(
-		MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool exist,
-		uint32_t listId, uint32_t srcDataChunkId, uint32_t srcParityChunkId
+		MasterSocket *socket, uint16_t instanceId, uint32_t requestId,
+		Key &key, bool exist
 	);
 	void resDegradedLock(
-		MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key,
-		uint32_t listId,
-		uint32_t srcDataChunkId, uint32_t dstDataChunkId,
-		uint32_t srcParityChunkId, uint32_t dstParityChunkId
+		MasterSocket *socket, uint16_t instanceId, uint32_t requestId,
+		Key &key,
+		uint32_t *original, uint32_t *remapped, uint32_t remappedCount
 	);
 	// REMAPPING_SET_LOCK
 	void resRemappingSetLock(

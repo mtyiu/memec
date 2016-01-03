@@ -86,29 +86,4 @@ public:
 
 class MetadataBackup : public OpMetadata {};
 
-class DegradedLock {
-public:
-	uint32_t srcListId;
-	uint32_t srcStripeId;
-	uint32_t srcChunkId;
-	uint32_t dstListId;
-	uint32_t dstChunkId;
-
-	DegradedLock() {
-		this->srcListId = 0;
-		this->srcStripeId = 0;
-		this->srcChunkId = 0;
-		this->dstListId = 0;
-		this->dstChunkId = 0;
-	}
-
-	void set( uint32_t srcListId, uint32_t srcStripeId, uint32_t srcChunkId, uint32_t dstListId, uint32_t dstChunkId ) {
-		this->srcListId = srcListId;
-		this->srcStripeId = srcStripeId;
-		this->srcChunkId = srcChunkId;
-		this->dstListId = dstListId;
-		this->dstChunkId = dstChunkId;
-	}
-};
-
 #endif
