@@ -137,7 +137,7 @@ private:
 		uint8_t opcode,
 		MasterSocket *masterSocket,
 		uint16_t parentInstanceId, uint32_t parentRequestId,
-		uint32_t listId, uint32_t stripeId, uint32_t lostChunkId,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId, // chunkId refers to the current chunk ID
 		Key *key, bool isSealed,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 		KeyValueUpdate *keyValueUpdate = 0

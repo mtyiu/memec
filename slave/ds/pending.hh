@@ -58,18 +58,51 @@ public:
 	uint8_t opcode;
 	bool isSealed;
 	MasterSocket *socket;
+	uint32_t *original;
+	uint32_t *reconstructed;
+	uint32_t reconstructedCount;
 	union {
 		Key key;
 		KeyValueUpdate keyValueUpdate;
 	} data;
 
-	void set( uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isSealed, uint8_t opcode, MasterSocket *socket ) {
+	void set(
+		uint8_t opcode, bool isSealed, MasterSocket *socket,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, bool dup = true
+	) {
+		this->opcode = opcode;
+		this->isSealed = isSealed;
+		this->socket = socket;
 		this->listId = listId;
 		this->stripeId = stripeId;
 		this->chunkId = chunkId;
-		this->isSealed = isSealed;
-		this->opcode = opcode;
-		this->socket = socket;
+		if ( reconstructedCount ) {
+			if ( dup ) {
+				this->original = new uint32_t[ reconstructedCount * 2 ];
+				this->reconstructed = new uint32_t[ reconstructedCount * 2 ];
+				for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
+					this->original[ i * 2     ] = original[ i * 2    ];
+					this->original[ i * 2 + 1 ] = original[ i * 2 + 1 ];
+					this->reconstructed[ i * 2     ] = reconstructed[ i * 2    ];
+					this->reconstructed[ i * 2 + 1 ] = reconstructed[ i * 2 + 1 ];
+				}
+			} else {
+				this->original = original;
+				this->reconstructed = reconstructed;
+				this->reconstructedCount = reconstructedCount;
+			}
+		} else {
+			this->original = 0;
+			this->reconstructed = 0;
+		}
+	}
+
+	void free() {
+		if ( this->original ) delete[] this->original;
+		if ( this->reconstructed ) delete[] this->reconstructed;
+		this->original = 0;
+		this->reconstructed = 0;
 	}
 };
 
