@@ -19,7 +19,6 @@ bool SlaveWorker::handleSlavePeerRegisterRequest( SlavePeerSocket *socket, uint1
 
 	socket->instanceId = instanceId;
 	Slave::getInstance()->sockets.slavesIdToSocketMap.set( instanceId, socket, false );
-	__DEBUG__( BLUE, "SlaveWorker", "handleSlavePeerRegisterRequest", "Slave fd = %u id = %hu", socket->getSocket(), instanceId );
 
 	if ( index == -1 ) {
 		__ERROR__( "SlaveWorker", "handleSlavePeerRegisterRequest", "The slave is not in the list. Ignoring this slave..." );

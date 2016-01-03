@@ -16,7 +16,7 @@ MasterConfig::MasterConfig() {
 	this->remap.backgroundAck = 0;
 	this->degraded.isFixed = true;
 	this->degraded.disabled = false;
-	this->backup.ackBatchSize = 1000;
+	this->backup.ackBatchSize = 100;
 }
 
 bool MasterConfig::merge( GlobalConfig &globalConfig ) {

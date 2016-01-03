@@ -44,7 +44,7 @@ size_t Protocol::generateParityDeltaAcknowledgementHeader( uint8_t magic, uint8_
 
 	*( ( uint32_t * )( buf     ) ) = htonl( fromTimestamp );
 	*( ( uint32_t * )( buf + 4 ) ) = htonl( toTimestamp );
-	*( ( uint32_t * )( buf + 8 ) ) = htonl( targetId );
+	*( ( uint16_t * )( buf + 8 ) ) = htons( targetId );
 
 	bytes += PROTO_ACK_PARITY_DELTA_SIZE;
 
@@ -58,7 +58,7 @@ bool Protocol::parseParityDeltaAcknowledgementHeader( size_t offset, uint32_t &f
 	char *ptr = buf + offset;
 	fromTimestamp = ntohl( *( ( uint32_t * )( ptr     ) ) );
 	toTimestamp   = ntohl( *( ( uint32_t * )( ptr + 4 ) ) );
-	targetId      = ntohl( *( ( uint32_t * )( ptr + 8 ) ) );
+	targetId      = ntohs( *( ( uint16_t * )( ptr + 8 ) ) );
 
 	return true;
 }

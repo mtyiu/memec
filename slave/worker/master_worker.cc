@@ -40,7 +40,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		// Register
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resRegisterMaster( buffer.size, event.instanceId, event.requestId, success );
+			buffer.data = this->protocol.resRegisterMaster( buffer.size, Slave::instanceId, event.requestId, success );
 			break;
 		// GET
 		case MASTER_EVENT_TYPE_GET_RESPONSE_SUCCESS:

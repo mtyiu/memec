@@ -118,6 +118,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 					case PROTO_OPCODE_REGISTER:
 						if ( success ) {
 							event.socket->registered = true;
+							event.socket->instanceId = header.instanceId;
 						} else {
 							__ERROR__( "MasterWorker", "dispatch", "Failed to register with slave." );
 						}
@@ -400,7 +401,7 @@ bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, bool is
 	// TODO handle degraded mode
 	Master *master = Master::getInstance();
 	if ( ! isDegraded ) {
-		auto &updateSet = master->timestamp.pendingAck.update;
+		auto &updateSet = event.socket->timestamp.pendingAck.update;
 		auto it = updateSet.find( pid.timestamp );
 		if ( it != updateSet.end() )
 			updateSet.erase( it );
@@ -479,7 +480,7 @@ bool MasterWorker::handleDeleteResponse( SlaveEvent event, bool success, bool is
 	// TODO handle degraded mode
 	Master *master = Master::getInstance();
 	if ( !isDegraded ) {
-		auto &delSet = master->timestamp.pendingAck.del;
+		auto &delSet = event.socket->timestamp.pendingAck.del;
 		auto it = delSet.find( pid.timestamp );
 		if ( it != delSet.end() )
 			delSet.erase( it );

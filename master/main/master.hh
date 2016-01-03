@@ -97,7 +97,7 @@ public:
 	void printBackup( FILE *f = stdout );
 	void syncMetadata();
 	void time();
-	void ackParityDelta( FILE *f = 0, SlaveSocket *target = 0 );
+	void ackParityDelta( FILE *f = 0, SlaveSocket *target = 0, bool force = false );
 	double getElapsedTime();
 	void interactive();
 	bool setDebugFlag( char *input );

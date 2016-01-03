@@ -17,7 +17,6 @@ StripeList<SlaveSocket> *MasterWorker::stripeList;
 PacketPool *MasterWorker::packetPool;
 ArrayMap<int, SlaveSocket> *MasterWorker::slaveSockets;
 MasterRemapMsgHandler *MasterWorker::remapMsgHandler;
-Timestamp *MasterWorker::timestamp;
 
 void MasterWorker::dispatch( MixedEvent event ) {
 	switch( event.type ) {
@@ -330,7 +329,6 @@ bool MasterWorker::init() {
 	MasterWorker::slaveSockets = &master->sockets.slaves;
 	MasterWorker::packetPool = &master->packetPool;
 	MasterWorker::remapMsgHandler = &master->remapMsgHandler;
-	MasterWorker::timestamp = &master->timestamp.current;
 	return true;
 }
 

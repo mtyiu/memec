@@ -121,7 +121,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		case SLAVE_PEER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resRegisterSlavePeer(
 				buffer.size,
-				event.instanceId, event.requestId,
+				Slave::instanceId, event.requestId,
 				success
 			);
 			break;
@@ -387,7 +387,6 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 							event.socket->registered = true;
 							event.socket->instanceId = header.instanceId;
 							Slave::getInstance()->sockets.slavesIdToSocketMap.set( header.instanceId, event.socket, true );
-							__DEBUG__( BLUE, "SlaveWorker", "dispatch", "Slave fd = %u id = %hu", event.socket->getSocket(), header.instanceId );
 							break;
 						case PROTO_MAGIC_RESPONSE_FAILURE:
 							__ERROR__( "SlaveWorker", "dispatch", "Failed to register with slave." );

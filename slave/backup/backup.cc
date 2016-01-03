@@ -72,7 +72,7 @@ bool SlaveBackup::insertData##_OP_TYPE_( Timestamp ts, Key key, Value value, Met
 	saveIt = _LIT_; \
 	for ( ; _LIT_ != _RIT_; _LIT_ = saveIt ) { \
 		saveIt++; \
-		if ( _SLAVE_ID_ != 0 && _LIT_->second.dataSlaveId == _SLAVE_ID_ ) \
+		if ( _SLAVE_ID_ != 0 && _LIT_->second.dataSlaveId != _SLAVE_ID_ ) \
 			continue; \
 		if ( _FREE_ ) \
 			_LIT_->second.free(); \

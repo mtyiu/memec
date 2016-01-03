@@ -14,7 +14,6 @@
 #include "../../common/ds/id_generator.hh"
 #include "../../common/ds/packet_pool.hh"
 #include "../../common/ds/sockaddr_in.hh"
-#include "../../common/timestamp/timestamp.hh"
 
 #define MASTER_WORKER_SEND_REPLICAS_PARALLEL
 
@@ -39,7 +38,6 @@ private:
 	static ArrayMap<int, SlaveSocket> *slaveSockets;
 	static PacketPool *packetPool;
 	static MasterRemapMsgHandler *remapMsgHandler;
-	static Timestamp *timestamp;
 
 	// ---------- worker.cc ----------
 	void dispatch( MixedEvent event );

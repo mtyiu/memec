@@ -561,7 +561,7 @@ void Master::interactive() {
 			this->time();
 		} else if ( strcmp( command, "ackparity" ) == 0 ) {
 			valid = true;
-			this->ackParityDelta( stdout );
+			this->ackParityDelta( stdout, 0, true );
 		} else {
 			valid = false;
 		}
@@ -952,7 +952,7 @@ void Master::time() {
 	fflush( stdout );
 }
 
-void Master::ackParityDelta( FILE *f, SlaveSocket *target ) {
+void Master::ackParityDelta( FILE *f, SlaveSocket *target, bool force ) {
 	SlaveEvent event;
 	uint32_t from, to, update, del;
 
@@ -977,7 +977,7 @@ void Master::ackParityDelta( FILE *f, SlaveSocket *target ) {
 		to = update < to ? ( del < update ? del : update ) : to ;
 
 		// check the threshold is reached
-		if ( to - from < this->config.master.backup.ackBatchSize ) {
+		if ( ! force && to - from < this->config.master.backup.ackBatchSize ) {
 			return;
 		}
 
@@ -988,7 +988,7 @@ void Master::ackParityDelta( FILE *f, SlaveSocket *target ) {
 		}
 
 		for ( int j = 0; j < len; j++ ) {
-			SlaveSocket *p = this->sockets.slaves[ i ];
+			SlaveSocket *p = this->sockets.slaves[ j ];
 			if ( p == s ) continue;
 			event.ackParityDelta( p, from, to, s->instanceId );
 			this->eventQueue.insert( event );
