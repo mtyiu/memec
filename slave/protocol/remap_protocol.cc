@@ -33,3 +33,20 @@ char *SlaveProtocol::resRemapParity( size_t &size, uint16_t instanceId, uint32_t
 	);
 	return this->buffer.send;
 };
+
+char *SlaveProtocol::reqSet( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf ) {
+	// -- common/protocol/normal_protocol.cc --
+	if ( ! buf ) buf = this->buffer.send;
+	size = this->generateKeyValueHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_SET,
+		instanceId, requestId,
+		keySize,
+		key,
+		valueSize,
+		value,
+		buf
+	);
+	return buf;
+}

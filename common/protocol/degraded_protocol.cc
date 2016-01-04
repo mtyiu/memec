@@ -493,6 +493,293 @@ bool Protocol::parseDegradedReqHeader( struct DegradedReqHeader &header, uint8_t
 	return ret;
 }
 
+size_t Protocol::generateDegradedSetReqHeader(
+	uint8_t magic, uint8_t to, uint8_t opcode,
+	uint16_t instanceId, uint32_t requestId,
+	uint8_t degradedOpcode, uint32_t listId, uint32_t chunkId,
+	uint8_t keySize, char *key, uint32_t valueSize, char *value,
+	uint32_t valueUpdateSize, uint32_t valueUpdateOffset, char *valueUpdate
+) {
+	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
+	size_t bytes = this->generateHeader(
+		magic, to, opcode,
+		PROTO_DEGRADED_SET_BASE_SIZE + keySize + valueSize +
+			( opcode == PROTO_OPCODE_DEGRADED_UPDATE ? PROTO_DEGRADED_SET_UPDATE_SIZE + valueUpdateSize : 0 ),
+		instanceId, requestId
+	);
+
+	buf[ 0 ] = degradedOpcode;
+	buf += 1;
+	bytes += 1;
+
+	*( ( uint32_t * )( buf     ) ) = htonl( listId );
+	*( ( uint32_t * )( buf + 4 ) ) = htonl( chunkId );
+	buf[ 8 ] = keySize;
+	buf += 9;
+	bytes += 9;
+
+	unsigned char *tmp;
+	valueSize = htonl( valueSize );
+	tmp = ( unsigned char * ) &valueSize;
+	buf[ 0 ] = tmp[ 1 ];
+	buf[ 1 ] = tmp[ 2 ];
+	buf[ 2 ] = tmp[ 3 ];
+	valueSize = ntohl( valueSize );
+	buf += 3;
+	bytes += 3;
+
+	memmove( buf, key, keySize );
+	memmove( buf + keySize, value, valueSize );
+	buf += keySize + valueSize;
+	bytes += keySize + valueSize;
+
+	if ( degradedOpcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
+		valueUpdateSize = htonl( valueUpdateSize );
+		tmp = ( unsigned char * ) &valueUpdateSize;
+		buf[ 0 ] = tmp[ 1 ];
+		buf[ 1 ] = tmp[ 2 ];
+		buf[ 2 ] = tmp[ 3 ];
+		valueUpdateSize = ntohl( valueUpdateSize );
+
+		tmp = ( unsigned char * ) &valueUpdateOffset;
+		buf[ 3 ] = tmp[ 1 ];
+		buf[ 4 ] = tmp[ 2 ];
+		buf[ 5 ] = tmp[ 3 ];
+		valueUpdateSize = ntohl( valueUpdateOffset );
+
+		buf += PROTO_DEGRADED_SET_UPDATE_SIZE;
+		bytes += PROTO_DEGRADED_SET_UPDATE_SIZE;
+
+		memmove( buf, valueUpdate, valueUpdateSize );
+	}
+
+	return bytes;
+}
+
+bool Protocol::parseDegradedSetReqHeader(
+	size_t offset, uint8_t &opcode,
+	uint32_t &listId, uint32_t &chunkId,
+	uint8_t &keySize, uint32_t &valueSize,
+	char *&key, char *&value,
+	uint32_t &valueUpdateSize, uint32_t &valueUpdateOffset, char *&valueUpdate,
+	char *buf, size_t size
+) {
+	if ( size - offset < PROTO_DEGRADED_SET_BASE_SIZE )
+		return false;
+
+	char *ptr = buf + offset;
+	unsigned char *tmp;
+
+	opcode = ptr[ 0 ];
+	ptr += 1;
+
+	listId  = ntohl( *( ( uint32_t * )( ptr     ) ) );
+	chunkId = ntohl( *( ( uint32_t * )( ptr + 4 ) ) );
+	keySize = ptr[ 8 ];
+	ptr += 9;
+
+	valueSize = 0;
+	tmp = ( unsigned char * ) &valueSize;
+	tmp[ 1 ] = ptr[ 0 ];
+	tmp[ 2 ] = ptr[ 1 ];
+	tmp[ 3 ] = ptr[ 2 ];
+	valueSize = ntohl( valueSize );
+	ptr += 3;
+
+	if ( size - offset < ( size_t ) PROTO_DEGRADED_SET_BASE_SIZE + keySize + valueSize )
+		return false;
+
+	key = ptr;
+	value = ptr + keySize;
+	ptr += keySize + valueSize;
+
+	if ( opcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
+		if ( size - offset < ( size_t ) PROTO_DEGRADED_SET_BASE_SIZE + keySize + valueSize + PROTO_DEGRADED_SET_UPDATE_SIZE )
+			return false;
+
+		valueUpdateSize = 0;
+		tmp = ( unsigned char * ) &valueUpdateSize;
+		tmp[ 1 ] = ptr[ 0 ];
+		tmp[ 2 ] = ptr[ 1 ];
+		tmp[ 3 ] = ptr[ 2 ];
+		valueUpdateSize = ntohl( valueUpdateSize );
+
+		valueUpdateOffset = 0;
+		tmp = ( unsigned char * ) &valueUpdateOffset;
+		tmp[ 1 ] = ptr[ 3 ];
+		tmp[ 2 ] = ptr[ 4 ];
+		tmp[ 3 ] = ptr[ 5 ];
+		valueUpdateOffset = ntohl( valueUpdateOffset );
+
+		ptr += PROTO_DEGRADED_SET_UPDATE_SIZE;
+
+		if ( size - offset < ( size_t ) PROTO_DEGRADED_SET_BASE_SIZE + keySize + valueSize + PROTO_DEGRADED_SET_UPDATE_SIZE + valueUpdateSize )
+			return false;
+
+		valueUpdate = ptr;
+	}
+
+	return true;
+}
+
+bool Protocol::parseDegradedSetReqHeader( struct DegradedSetHeader &header, char *buf, size_t size, size_t offset ) {
+	if ( ! buf || ! size ) {
+		buf = this->buffer.recv;
+		size = this->buffer.size;
+	}
+	return this->parseDegradedSetReqHeader(
+		offset,
+		header.opcode,
+		header.listId,
+		header.chunkId,
+		header.keySize,
+		header.valueSize,
+		header.key,
+		header.value,
+		header.valueUpdateSize,
+		header.valueUpdateOffset,
+		header.valueUpdate,
+		buf, size
+	);
+}
+
+size_t Protocol::generateDegradedSetResHeader(
+	uint8_t magic, uint8_t to, uint8_t opcode,
+	uint16_t instanceId, uint32_t requestId,
+	uint8_t degradedOpcode, uint32_t listId, uint32_t chunkId,
+	uint8_t keySize, char *key, uint32_t valueSize,
+	uint32_t valueUpdateSize, uint32_t valueUpdateOffset
+) {
+	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
+	size_t bytes = this->generateHeader(
+		magic, to, opcode,
+		PROTO_DEGRADED_SET_BASE_SIZE + keySize +
+			( opcode == PROTO_OPCODE_DEGRADED_UPDATE ? PROTO_DEGRADED_SET_UPDATE_SIZE : 0 ),
+		instanceId, requestId
+	);
+
+	buf[ 0 ] = degradedOpcode;
+	buf += 1;
+	bytes += 1;
+
+	*( ( uint32_t * )( buf     ) ) = htonl( listId );
+	*( ( uint32_t * )( buf + 4 ) ) = htonl( chunkId );
+	buf[ 8 ] = keySize;
+	buf += 9;
+	bytes += 9;
+
+	unsigned char *tmp;
+	valueSize = htonl( valueSize );
+	tmp = ( unsigned char * ) &valueSize;
+	buf[ 0 ] = tmp[ 1 ];
+	buf[ 1 ] = tmp[ 2 ];
+	buf[ 2 ] = tmp[ 3 ];
+	valueSize = ntohl( valueSize );
+	buf += 3;
+	bytes += 3;
+
+	memmove( buf, key, keySize );
+	buf += keySize;
+	bytes += keySize;
+
+	if ( degradedOpcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
+		valueUpdateSize = htonl( valueUpdateSize );
+		tmp = ( unsigned char * ) &valueUpdateSize;
+		buf[ 0 ] = tmp[ 1 ];
+		buf[ 1 ] = tmp[ 2 ];
+		buf[ 2 ] = tmp[ 3 ];
+		valueUpdateSize = ntohl( valueUpdateSize );
+
+		tmp = ( unsigned char * ) &valueUpdateOffset;
+		buf[ 3 ] = tmp[ 1 ];
+		buf[ 4 ] = tmp[ 2 ];
+		buf[ 5 ] = tmp[ 3 ];
+		valueUpdateSize = ntohl( valueUpdateOffset );
+
+		buf += PROTO_DEGRADED_SET_UPDATE_SIZE;
+		bytes += PROTO_DEGRADED_SET_UPDATE_SIZE;
+	}
+
+	return bytes;
+}
+
+bool Protocol::parseDegradedSetResHeader(
+	size_t offset, uint8_t &opcode,
+	uint32_t &listId, uint32_t &chunkId,
+	uint8_t &keySize, uint32_t &valueSize,
+	char *&key,
+	uint32_t &valueUpdateSize, uint32_t &valueUpdateOffset,
+	char *buf, size_t size
+) {
+	if ( size - offset < PROTO_DEGRADED_SET_BASE_SIZE )
+		return false;
+
+	char *ptr = buf + offset;
+	unsigned char *tmp;
+
+	opcode = ptr[ 0 ];
+	ptr += 1;
+
+	listId  = ntohl( *( ( uint32_t * )( ptr     ) ) );
+	chunkId = ntohl( *( ( uint32_t * )( ptr + 4 ) ) );
+	keySize = ptr[ 8 ];
+	ptr += 9;
+
+	valueSize = 0;
+	tmp = ( unsigned char * ) &valueSize;
+	tmp[ 1 ] = ptr[ 0 ];
+	tmp[ 2 ] = ptr[ 1 ];
+	tmp[ 3 ] = ptr[ 2 ];
+	valueSize = ntohl( valueSize );
+	ptr += 3;
+
+	if ( size - offset < ( size_t ) PROTO_DEGRADED_SET_BASE_SIZE + keySize )
+		return false;
+
+	key = ptr;
+	ptr += keySize;
+
+	if ( opcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
+		if ( size - offset < ( size_t ) PROTO_DEGRADED_SET_BASE_SIZE + keySize + valueSize + PROTO_DEGRADED_SET_UPDATE_SIZE )
+			return false;
+
+		valueUpdateSize = 0;
+		tmp = ( unsigned char * ) &valueUpdateSize;
+		tmp[ 1 ] = ptr[ 0 ];
+		tmp[ 2 ] = ptr[ 1 ];
+		tmp[ 3 ] = ptr[ 2 ];
+		valueUpdateSize = ntohl( valueUpdateSize );
+
+		valueUpdateOffset = 0;
+		tmp = ( unsigned char * ) &valueUpdateOffset;
+		tmp[ 1 ] = ptr[ 3 ];
+		tmp[ 2 ] = ptr[ 4 ];
+		tmp[ 3 ] = ptr[ 5 ];
+		valueUpdateOffset = ntohl( valueUpdateOffset );
+	}
+
+	return true;
+}
+
+bool Protocol::parseDegradedSetResHeader( struct DegradedSetHeader &header, char *buf, size_t size, size_t offset ) {
+	if ( ! buf || ! size ) {
+		buf = this->buffer.recv;
+		size = this->buffer.size;
+	}
+	return this->parseDegradedSetResHeader(
+		offset,
+		header.opcode,
+		header.listId,
+		header.chunkId,
+		header.keySize,
+		header.valueSize,
+		header.key,
+		header.valueUpdateSize,
+		header.valueUpdateOffset,
+		buf, size
+	);
+}
+
 size_t Protocol::generateListStripeKeyHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_LIST_STRIPE_KEY_SIZE + keySize, instanceId, requestId );

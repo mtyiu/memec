@@ -12,7 +12,6 @@
 #include "../config/slave_config.hh"
 #include "../ds/map.hh"
 #include "../ds/pending.hh"
-#include "../ds/slave_load.hh"
 #include "../event/event_queue.hh"
 #include "../socket/coordinator_socket.hh"
 #include "../socket/master_socket.hh"
@@ -66,7 +65,6 @@ public:
 	IDGenerator idGenerator;
 	Pending pending;
 	PendingAck pendingAck;
-	SlaveLoad load;
 	Map map;
 	SlaveEventQueue eventQueue;
 	PacketPool packetPool;
@@ -112,7 +110,6 @@ public:
 
 	void alarm();
 
-	SlaveLoad &aggregateLoad( FILE *f = 0 );
 	double getElapsedTime();
 	void interactive();
 };

@@ -1,37 +1,5 @@
 #include "protocol.hh"
 
-char *SlaveProtocol::reqSet( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf ) {
-	// -- common/protocol/normal_protocol.cc --
-	if ( ! buf ) buf = this->buffer.send;
-	size = this->generateKeyValueHeader(
-		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
-		PROTO_OPCODE_SET,
-		instanceId, requestId,
-		keySize,
-		key,
-		valueSize,
-		value,
-		buf
-	);
-	return buf;
-}
-
-char *SlaveProtocol::reqGet( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key ) {
-	// -- common/protocol/degraded_protocol.cc --
-	size = this->generateListStripeKeyHeader(
-		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
-		PROTO_OPCODE_GET,
-		instanceId, requestId,
-		listId,
-		chunkId,
-		keySize,
-		key
-	);
-	return this->buffer.send;
-}
-
 char *SlaveProtocol::reqUpdate( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t chunkUpdateOffset, char *buf, uint32_t timestamp ) {
 	// -- common/protocol/normal_protocol.cc --
 	if ( ! buf ) buf = this->buffer.send;

@@ -34,6 +34,83 @@ bool SlaveWorker::handleSlavePeerRegisterRequest( SlavePeerSocket *socket, uint1
 
 ////////////////////////////////////////////////////////////////////////////////
 
+bool SlaveWorker::handleDegradedSetRequest( SlavePeerEvent event, char *buf, size_t size ) {
+	struct DegradedSetHeader header;
+	if ( ! this->protocol.parseDegradedSetReqHeader( header, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleDegradedSetRequest", "Invalid DEGRADED_SET request (size = %lu).", size );
+		return false;
+	}
+	if ( header.opcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
+		__INFO__(
+			BLUE, "SlaveWorker", "handleDegradedSetRequest",
+			"[DEGRADED_SET] Degraded opcode: 0x%x; list ID: %u, chunk ID: %u; key: %.*s (size = %u); value size: %u; value update size: %u, offset: %u.",
+			header.opcode, header.listId, header.chunkId,
+			header.keySize, header.key, header.keySize,
+			header.valueSize, header.valueUpdateSize, header.valueUpdateOffset
+		);
+	} else {
+		__INFO__(
+			BLUE, "SlaveWorker", "handleDegradedSetRequest",
+			"[DEGRADED_SET] Degraded opcode: 0x%x; list ID: %u, chunk ID: %u; key: %.*s (size = %u); value size: %u.",
+			header.opcode, header.listId, header.chunkId,
+			header.keySize, header.key, header.keySize,
+			header.valueSize
+		);
+	}
+
+	Key key;
+	KeyValue keyValue;
+	Metadata metadata;
+	DegradedMap *dmap = &SlaveWorker::degradedChunkBuffer->map;
+	bool isInserted;
+	uint32_t timestamp;
+
+	metadata.set( header.listId, 0, header.chunkId );
+	key.set( header.keySize, header.key );
+
+	switch( header.opcode ) {
+		case PROTO_OPCODE_DEGRADED_GET:
+			keyValue.dup( header.key, header.keySize, header.value, header.valueSize );
+			isInserted = dmap->insertValue( keyValue, metadata );
+			break;
+		case PROTO_OPCODE_DEGRADED_UPDATE:
+			keyValue.dup( header.key, header.keySize, header.value, header.valueSize );
+
+			// Modify the key-value pair before inserting into DegradedMap
+			isInserted = dmap->insertValue( keyValue, metadata );
+			if ( isInserted ) {
+				uint32_t dataUpdateOffset = KeyValue::getChunkUpdateOffset( 0, header.valueUpdateSize, header.valueUpdateOffset );
+				// Compute data delta
+				Coding::bitwiseXOR(
+					header.valueUpdate,
+					keyValue.data + dataUpdateOffset, // original data
+					header.valueUpdate,               // new data
+					header.valueUpdateSize
+				);
+				// Perform actual data update
+				Coding::bitwiseXOR(
+					keyValue.data + dataUpdateOffset,
+					keyValue.data + dataUpdateOffset, // original data
+					header.valueUpdate,               // new data
+					header.valueUpdateSize
+				);
+			}
+			break;
+		case PROTO_OPCODE_DEGRADED_DELETE:
+			// TODO: Store the original key-value pair into backup
+			// Remove the key-value pair from DegradedMap
+			dmap->deleteValue( key, metadata, PROTO_OPCODE_DELETE, timestamp );
+			break;
+		default:
+			__ERROR__( "SlaveWorker", "handleDegradedSetRequest", "Undefined degraded opcode." );
+			return false;
+	}
+
+	return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 bool SlaveWorker::handleSetRequest( SlavePeerEvent event, char *buf, size_t size ) {
 	struct KeyValueHeader header;
 	if ( ! this->protocol.parseKeyValueHeader( header, buf, size ) ) {
@@ -49,12 +126,9 @@ bool SlaveWorker::handleSetRequest( SlavePeerEvent event, char *buf, size_t size
 	MasterEvent masterEvent;
 	bool success = this->handleSetRequest( masterEvent, buf, size, false );
 
-	uint32_t listId, chunkId;
-	listId = SlaveWorker::stripeList->get( header.key, header.keySize, 0, 0, &chunkId );
-
 	Key key;
 	key.set( header.keySize, header.key );
-	event.resSet( event.socket, event.instanceId, event.requestId, listId, chunkId, key, success );
+	event.resSet( event.socket, event.instanceId, event.requestId, key, success );
 	this->dispatch( event );
 
 	return success;
@@ -175,7 +249,7 @@ bool SlaveWorker::handleDeleteRequest( SlavePeerEvent event, char *buf, size_t s
 		masterSocket->backup.insertParityDelete( timestamp, key, value, metadata, false, 0, event.socket->instanceId, event.requestId );
 	else
 		__ERROR__( "SlaveWorker", "handleDeleteRequest", "Failed to backup delta at parity slave for instance ID = %hu request ID = %u.", event.instanceId, event.requestId );
-	
+
 	event.resDelete(
 		event.socket, event.instanceId, event.requestId,
 		header.listId, header.stripeId, header.chunkId,

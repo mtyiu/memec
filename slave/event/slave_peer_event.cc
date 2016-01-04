@@ -23,25 +23,52 @@ void SlavePeerEvent::resRemappingSet( SlavePeerSocket *socket, uint16_t instance
 	this->message.remap.chunkId = chunkId;
 }
 
-void SlavePeerEvent::reqSet( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, Key key, Value value ) {
+void SlavePeerEvent::reqSet( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key key, Value value ) {
 	this->type = SLAVE_PEER_EVENT_TYPE_SET_REQUEST;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
-	this->message.parity.key = key;
-	this->message.parity.value = value;
-	this->message.parity.listId = listId;
-	this->message.parity.chunkId = chunkId;
+	this->message.set.key = key;
+	this->message.set.value = value;
 }
 
-void SlavePeerEvent::resSet( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, Key key, bool success ) {
+void SlavePeerEvent::resSet( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key key, bool success ) {
 	this->type = success ? SLAVE_PEER_EVENT_TYPE_SET_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_SET_RESPONSE_FAILURE;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
-	this->message.parity.key = key;
-	this->message.parity.listId = listId;
-	this->message.parity.chunkId = chunkId;
+	this->message.set.key = key;
+}
+
+void SlavePeerEvent::reqDegradedSet(
+	SlavePeerSocket *socket,
+	uint8_t opcode,
+	uint16_t instanceId, uint32_t requestId,
+	uint32_t listId, uint32_t chunkId,
+	uint8_t keySize, uint32_t valueSize,
+	char *key, char *value,
+	uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate
+) {
+	this->type = SLAVE_PEER_EVENT_TYPE_DEGRADED_SET_REQUEST;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
+	this->socket = socket;
+	this->message.degradedSet.opcode = opcode;
+	this->message.degradedSet.listId = listId;
+	this->message.degradedSet.chunkId = chunkId;
+	this->message.degradedSet.keySize = keySize;
+	this->message.degradedSet.valueSize = valueSize;
+	this->message.degradedSet.key = key;
+	this->message.degradedSet.value = value;
+	if ( opcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
+		this->message.degradedSet.update.offset = valueUpdateOffset;
+		this->message.degradedSet.update.length = valueUpdateSize;
+		this->message.degradedSet.update.data = valueUpdate;
+	} else {
+		this->message.degradedSet.update.offset = 0;
+		this->message.degradedSet.update.length = 0;
+		this->message.degradedSet.update.data = 0;
+	}
 }
 
 void SlavePeerEvent::reqGet( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, Key &key ) {

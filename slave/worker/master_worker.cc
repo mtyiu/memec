@@ -181,15 +181,10 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "SlaveWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
-
-		if ( ret > 0 )
-			this->load.sentBytes( ret );
 	} else {
 		// Parse requests from masters
 		ProtocolHeader header;
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();
-		if ( ret > 0 )
-			this->load.recvBytes( ret );
 		while ( buffer.size > 0 ) {
 			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "SlaveWorker (master)" );
 
@@ -205,35 +200,27 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 				switch( header.opcode ) {
 					case PROTO_OPCODE_GET:
 						this->handleGetRequest( event, buffer.data, buffer.size );
-						this->load.get();
 						break;
 					case PROTO_OPCODE_SET:
 						this->handleSetRequest( event, buffer.data, buffer.size );
-						this->load.set();
 						break;
 					case PROTO_OPCODE_REMAPPING_SET:
 						this->handleRemappingSetRequest( event, buffer.data, buffer.size );
-						this->load.set();
 						break;
 					case PROTO_OPCODE_UPDATE:
 						this->handleUpdateRequest( event, buffer.data, buffer.size );
-						this->load.update();
 						break;
 					case PROTO_OPCODE_DELETE:
 						this->handleDeleteRequest( event, buffer.data, buffer.size );
-						this->load.del();
 						break;
 					case PROTO_OPCODE_DEGRADED_GET:
 						this->handleDegradedGetRequest( event, buffer.data, buffer.size );
-						this->load.get();
 						break;
 					case PROTO_OPCODE_DEGRADED_UPDATE:
 						this->handleDegradedUpdateRequest( event, buffer.data, buffer.size );
-						this->load.update();
 						break;
 					case PROTO_OPCODE_DEGRADED_DELETE:
 						this->handleDegradedDeleteRequest( event, buffer.data, buffer.size );
-						this->load.del();
 						break;
 					case PROTO_OPCODE_ACK_PARITY_DELTA:
 						this->handleAckParityDeltaBackup( event, buffer.data, buffer.size );

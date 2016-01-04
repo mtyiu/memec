@@ -173,6 +173,7 @@ enum PendingType {
 	PT_MASTER_DEL,
 	PT_SLAVE_PEER_DEGRADED_OPS,
 	PT_SLAVE_PEER_REMAPPING_SET,
+	PT_SLAVE_PEER_SET,
 	PT_SLAVE_PEER_GET,
 	PT_SLAVE_PEER_UPDATE,
 	PT_SLAVE_PEER_DEL,
@@ -186,6 +187,7 @@ enum PendingType {
 class Pending {
 private:
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, Key> *&map );
+	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, KeyValue> *&map );
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *&map );
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, DegradedOp> *&map );
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, ChunkRequest> *&map );
@@ -211,6 +213,7 @@ public:
 	} masters;
    struct {
 		std::unordered_multimap<PendingIdentifier, DegradedOp> degradedOps;
+		std::unordered_multimap<PendingIdentifier, KeyValue> set; // Degraded SET for unsealed chunks
 		std::unordered_multimap<PendingIdentifier, Key> get; // Degraded GET for unsealed chunks
 		std::unordered_multimap<PendingIdentifier, KeyValueUpdate> update;
 		std::unordered_multimap<PendingIdentifier, Key> del;
@@ -221,6 +224,7 @@ public:
 		std::unordered_map<struct sockaddr_in, std::set<PendingData>* > remappedData;
 		std::unordered_map<PendingIdentifier, uint32_t> remappedDataRequest;
 		LOCK_T degradedOpsLock;
+		LOCK_T setLock;
 		LOCK_T getLock;
 		LOCK_T updateLock;
 		LOCK_T delLock;
@@ -240,6 +244,7 @@ public:
 		LOCK_INIT( &this->masters.updateLock );
 		LOCK_INIT( &this->masters.delLock );
 		LOCK_INIT( &this->slavePeers.degradedOpsLock );
+		LOCK_INIT( &this->slavePeers.setLock );
 		LOCK_INIT( &this->slavePeers.getLock );
 		LOCK_INIT( &this->slavePeers.updateLock );
 		LOCK_INIT( &this->slavePeers.delLock );
@@ -281,6 +286,11 @@ public:
 	bool insertKey(
 		PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
 		Key &key,
+		bool needsLock = true, bool needsUnlock = true
+	);
+	bool insertKeyValue(
+		PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
+		KeyValue &keyValue,
 		bool needsLock = true, bool needsUnlock = true
 	);
 	bool insertKeyValueUpdate(
@@ -333,6 +343,12 @@ public:
 		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr = 0,
 		PendingIdentifier *pidPtr = 0,
 		Key *keyPtr = 0,
+		bool needsLock = true, bool needsUnlock = true
+	);
+	bool eraseKeyValue(
+		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr = 0,
+		PendingIdentifier *pidPtr = 0,
+		KeyValue *keyValuePtr = 0,
 		bool needsLock = true, bool needsUnlock = true
 	);
 	bool eraseKeyValueUpdate(

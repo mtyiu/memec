@@ -644,9 +644,6 @@ void Slave::interactive() {
 		} else if ( strcmp( command, "sync" ) == 0 ) {
 			valid = true;
 			this->sync();
-		} else if ( strcmp( command, "load" ) == 0 ) {
-			valid = true;
-			this->aggregateLoad( stdout );
 		} else if ( strcmp( command, "backup" ) == 0 ) {
 			valid = true;
 			this->backupStat( stdout );
@@ -932,7 +929,6 @@ void Slave::help() {
 		"- pending: Print all pending requests\n"
 		"- dump: Dump all key-value pairs\n"
 		"- memory: Print memory usage\n"
-		"- load: Show the load of each worker\n"
 		"- backup : Show the backup stats\n"
 		"- time: Show elapsed time\n"
 		"- exit: Terminate this client\n"
@@ -949,31 +945,12 @@ void Slave::alarm() {
 	::alarm( this->config.global.sync.timeout );
 }
 
-SlaveLoad &Slave::aggregateLoad( FILE *f ) {
-	this->load.reset();
-	for ( int i = 0, len = this->workers.size(); i < len; i++ ) {
-		SlaveLoad &load = this->workers[ i ].load;
-		this->load.aggregate( load );
-
-		if ( f ) {
-			fprintf( f,	"Load of Worker #%d:\n-------------------\n", i + 1 );
-			load.print( f );
-			fprintf( f, "\n" );
-		}
-	}
-	if ( f ) {
-		fprintf( f,	"Aggregated load:\n----------------\n" );
-		this->load.print( f );
-	}
-	return this->load;
-}
-
 void Slave::backupStat( FILE *f ) {
 	fprintf( f, "\nSlave delta backup stats\n============================\n" );
 	for ( int i = 0, len = this->sockets.masters.size(); i < len; i++ ) {
-		fprintf( f, 
-			">> Master FD = %u\n-------------------\n", 
-			this->sockets.masters.keys[ i ] 
+		fprintf( f,
+			">> Master FD = %u\n-------------------\n",
+			this->sockets.masters.keys[ i ]
 		);
 		this->sockets.masters.values[ i ]->backup.print( f, true );
 		fprintf( f, "\n" );

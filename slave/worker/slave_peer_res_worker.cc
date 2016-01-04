@@ -1,6 +1,15 @@
 #include "worker.hh"
 #include "../main/slave.hh"
 
+bool SlaveWorker::handleDegradedSetResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
+	struct DegradedSetHeader header;
+	if ( ! this->protocol.parseDegradedSetResHeader( header, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleDegradedSetResponse", "Invalid DEGRADED_SET response (size = %lu).", size );
+		return false;
+	}
+	return true;
+}
+
 bool SlaveWorker::handleSetResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
 	PendingIdentifier pid;
 	uint32_t requestCount;
