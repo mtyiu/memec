@@ -9,6 +9,7 @@
 #include "../../common/ds/metadata.hh"
 #include "../../common/ds/pending.hh"
 #include "../../common/lock/lock.hh"
+#include "../../common/timestamp/timestamp.hh"
 
 #define GIGA ( 1000 * 1000 * 1000 )
 
@@ -22,7 +23,29 @@ enum PendingType {
 	PT_SLAVE_SET,
 	PT_SLAVE_UPDATE,
 	PT_SLAVE_DEL,
-	PT_KEY_REMAP_LIST
+	PT_KEY_REMAP_LIST,
+	PT_ACK_REVERT_PARITY
+};
+
+class AcknowledgementInfo {
+public:
+	std::pair<Timestamp, Timestamp> range;
+	pthread_cond_t *condition;
+	LOCK_T *lock;
+	uint32_t *counter;
+
+	AcknowledgementInfo() {
+		condition = 0;
+		lock = 0;
+		counter = 0;
+	}
+
+	AcknowledgementInfo( Timestamp from, Timestamp to, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter ) {
+		this->range = std::pair<Timestamp, Timestamp>( from, to );
+		this->condition = condition;
+		this->lock = lock;
+		this->counter = counter;
+	}
 };
 
 class RemapList {
@@ -104,7 +127,7 @@ private:
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *&map );
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, RemapList> *&map );
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, DegradedLockData> *&map );
-	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, std::vector<uint32_t> > *&map );
+	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, AcknowledgementInfo > *&map );
 
 public:
 	struct {
@@ -141,6 +164,10 @@ public:
 		LOCK_T getLock;
 		LOCK_T setLock;
 	} stats;
+	struct {
+		std::unordered_multimap<PendingIdentifier, AcknowledgementInfo > revert;
+		LOCK_T revertLock;
+	} ack;
 
 	Pending();
 
@@ -187,7 +214,13 @@ public:
 		RemapList &remapList,
 		bool needsLock = true, bool needsUnlock = true
 	);
-
+	// Insert (Ack)
+	bool insertAck(
+		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr,
+		AcknowledgementInfo &ackInfo,
+		bool needsLock = true, bool needsUnlock = true,
+		uint32_t timestamp = 0
+	);
 	// Erase
 	bool eraseDegradedLockData(
 		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr = 0,
@@ -227,6 +260,20 @@ public:
 		bool needsLock = true, bool needsUnlock = true
 	);
 
+	bool eraseAck(
+		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr = 0,
+		PendingIdentifier *pidPtr = 0,
+		AcknowledgementInfo *ackInfoPtr = 0,
+		bool needsLock = true, bool needsUnlock = true
+	);
+
+	// remove all the pending ack with a specific instanceId
+	bool eraseAck( 
+		PendingType type, uint16_t instanceId,
+		std::vector<PendingIdentifier> *pidPtr = 0,
+		bool needsLock = true, bool needsUnlock = true
+	);
+		
 	// Find
 	bool findKeyValue(
 		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr,

@@ -35,7 +35,7 @@ bool SlaveBackup::addPendingAck( BackupPendingIdentifier pi, Timestamp ts, bool 
 }
 
 #define DEFINE_INSERT_DATA_METHOD( _OP_TYPE_ ) \
-bool SlaveBackup::insertData##_OP_TYPE_( Timestamp ts, Key key, Value value, Metadata metadata, bool isChunkDelta, uint32_t offset, uint32_t requestId, Socket *targetSocket ) { \
+bool SlaveBackup::insertData##_OP_TYPE_( Timestamp ts, Key key, Value value, Metadata metadata, bool isChunkDelta, uint32_t valueOffset, uint32_t chunkOffset, uint32_t requestId, Socket *targetSocket ) { \
 	LOCK_T *lock = &this->data##_OP_TYPE_##Lock; \
 	std::multimap<Timestamp, BackupDelta> *map = &this->data##_OP_TYPE_; \
 	BackupDelta backupDelta; \
@@ -46,7 +46,7 @@ bool SlaveBackup::insertData##_OP_TYPE_( Timestamp ts, Key key, Value value, Met
 	ret = this->addPendingAck( pi, ts, duplicate, #_OP_TYPE_ ); \
 	/* keep one copy of backup, but mutltiple ref indexed by a request id */ \
 	if ( ! duplicate && ret ) { \
-		backupDelta.set( metadata, key, value, isChunkDelta, offset, false, requestId, 0 ); \
+		backupDelta.set( metadata, key, value, isChunkDelta, valueOffset, chunkOffset, false, requestId, 0 ); \
 		map->insert( std::pair<Timestamp, BackupDelta>( ts, backupDelta ) ); \
 	} \
 	UNLOCK( lock ); \
@@ -54,13 +54,13 @@ bool SlaveBackup::insertData##_OP_TYPE_( Timestamp ts, Key key, Value value, Met
 } 
 
 #define DEFINE_INSERT_PARITY_METHOD( _OP_TYPE_ ) \
-	bool SlaveBackup::insertParity##_OP_TYPE_( Timestamp ts, Key key, Value value, Metadata metadata, bool isChunkDelta, uint32_t offset, uint16_t dataSlaveId, uint32_t requestId ) { \
+	bool SlaveBackup::insertParity##_OP_TYPE_( Timestamp ts, Key key, Value value, Metadata metadata, bool isChunkDelta, uint32_t valueOffset, uint32_t chunkOffset, uint16_t dataSlaveId, uint32_t requestId ) { \
 		LOCK_T *lock = &this->parity##_OP_TYPE_##Lock; \
 		std::multimap<Timestamp, BackupDelta> *map = &this->parity##_OP_TYPE_; \
 		BackupDelta backupDelta; \
 		\
 		LOCK( lock ); \
-		backupDelta.set( metadata, key, value, isChunkDelta, offset, true, requestId, dataSlaveId ); \
+		backupDelta.set( metadata, key, value, isChunkDelta, valueOffset, chunkOffset, true, requestId, dataSlaveId ); \
 		map->insert( std::pair<Timestamp, BackupDelta>( ts, backupDelta ) ); \
 		UNLOCK( lock ); \
 		return true; \
@@ -247,14 +247,15 @@ void SlaveBackup::print( FILE *f, bool printDelta ) {
 	for ( auto& it : _MAP_ ) { \
 		i++; \
 		fprintf( _OUT_, \
-			"%7u  Timestamp: %10u;  From: %5hu; key: (%4u) %.*s;  offset: %4u;  isChunkDelta:%1hhu;  isParity:%1hhu;  delta: (%4u) [", \
+			"%7u  Timestamp: %10u;  From: %5hu; key: (%4u) %.*s;  offset: %4u %4u;  isChunkDelta:%1hhu;  isParity:%1hhu;  delta: (%4u) [", \
 			i, \
 			it.first.getVal(), \
 			it.second.dataSlaveId, \
 			it.second.key.size, \
 			it.second.key.size, \
 			( it.second.key.data )? it.second.key.data : "[N/A]", \
-			it.second.delta.offset, \
+			it.second.delta.valueOffset, \
+			it.second.delta.chunkOffset, \
 			it.second.isChunkDelta, \
 			it.second.isParity, \
 			it.second.delta.data.size \

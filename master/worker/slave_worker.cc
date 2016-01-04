@@ -60,6 +60,33 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 			);
 			isSend = true;
 			break;
+		case SLAVE_EVENT_TYPE_REVERT_PARITY_DELTA:
+		{
+			uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
+
+			AcknowledgementInfo ackInfo( 
+				Timestamp( event.message.ack.fromTimestamp ),
+				Timestamp( event.message.ack.toTimestamp ),
+				event.message.ack.condition,
+				event.message.ack.lock,
+				event.message.ack.counter
+			);
+			
+			MasterWorker::pending->insertAck( 
+				PT_ACK_REVERT_PARITY, 
+				event.socket->instanceId, requestId, 0,
+				ackInfo, 0
+			);
+				
+			buffer.data = this->protocol.revertParityDelta(
+				buffer.size,
+				instanceId, requestId,
+				event.message.ack.fromTimestamp, event.message.ack.toTimestamp,
+				event.message.ack.targetId
+			);
+			isSend = true;
+		}
+			break;
 		case SLAVE_EVENT_TYPE_PENDING:
 			isSend = false;
 			break;
@@ -144,6 +171,10 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 					case PROTO_OPCODE_ACK_METADATA:
 					case PROTO_OPCODE_ACK_REQUEST:
 						this->handleAcknowledgement( event, header.opcode, buffer.data, header.length );
+						break;
+					case PROTO_OPCODE_ACK_PARITY_DELTA:
+					case PROTO_OPCODE_REVERT_PARITY_DELTA:
+						this->handleParityDeltaAcknowledgement( event, header.opcode, buffer.data, header.length );
 						break;
 					default:
 						__ERROR__( "MasterWorker", "dispatch", "Invalid opcode from slave." );
@@ -506,6 +537,42 @@ bool MasterWorker::handleAcknowledgement( SlaveEvent event, uint8_t opcode, char
 	__DEBUG__( YELLOW, "MasterWorker", "handleAcknowledgement", "Timestamp = (%u, %u).", header.fromTimestamp, header.toTimestamp );
 
 	event.socket->backup.erase( header.fromTimestamp, header.toTimestamp );
+
+	return true;
+}
+
+bool MasterWorker::handleParityDeltaAcknowledgement( SlaveEvent event, uint8_t opcode, char *buf, size_t size ) {
+	struct ParityDeltaAcknowledgementHeader header;
+	PendingIdentifier pid;
+	if ( ! this->protocol.parseParityDeltaAcknowledgementHeader( header, buf, size ) ) {
+		__ERROR__( "MasterWorker", "handleParityDeltaAcknowledgement", "Invalid ACK." );
+		return false;
+	}
+
+	if ( opcode == PROTO_OPCODE_REVERT_PARITY_DELTA ) {
+		__DEBUG__( YELLOW, "MasterWorker", "handleParityDeltaAcknowledgement", 
+				"GOT ack for instance id = %u from instance id = %u request id = %u",
+				header.targetId, event.instanceId, event.requestId
+		);
+		AcknowledgementInfo ackInfo;
+		if ( ! MasterWorker::pending->eraseAck( PT_ACK_REVERT_PARITY, event.instanceId, event.requestId, 0, &pid, &ackInfo ) ) {
+			__ERROR__( "MasterWorker", "handleParityDeltaAcknowledgement", 
+				"Cannot find the pending ack info for instacne id = %u from instance id = %u request id = %u",
+				header.targetId, event.instanceId, event.requestId
+			);
+		}
+		if ( ackInfo.lock ) LOCK( ackInfo.lock );
+		if ( ackInfo.counter ) {
+			*ackInfo.counter -= 1;
+			if ( *ackInfo.counter == 0 && ackInfo.condition ) {
+				__INFO__( GREEN, "MasterWorker", "handleParityDeltaAcknowledgement", 
+						"Complete ack for counter at %p", ackInfo.counter
+				);
+				pthread_cond_signal( ackInfo.condition );
+			}
+		}
+		if ( ackInfo.lock ) UNLOCK( ackInfo.lock );
+	}
 
 	return true;
 }

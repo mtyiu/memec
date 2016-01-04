@@ -561,7 +561,24 @@ void Master::interactive() {
 			this->time();
 		} else if ( strcmp( command, "ackparity" ) == 0 ) {
 			valid = true;
-			this->ackParityDelta( stdout, 0, true );
+			this->ackParityDelta( stdout, 0, 0, 0, 0, true );
+		} else if ( strcmp( command, "revertparity" ) == 0 ) {
+			pthread_cond_t condition;
+			pthread_mutex_t lock;
+			uint32_t counter = 0;
+
+			pthread_cond_init( &condition, 0 );
+			pthread_mutex_init( &lock, 0 );
+
+			this->revertParityDelta( stdout, 0, &condition, &lock, &counter, true );
+			// wait for all ack, skip waiting if there is nothing to revert
+			LOCK( &lock );
+			if ( counter > 0 ) {
+				printf( "waiting for %u acknowledgements with counter at %p\n", counter, &counter );
+				UNLOCK( &lock );
+				pthread_cond_wait( &condition, &lock );
+			}
+			valid = true;
 		} else {
 			valid = false;
 		}
@@ -942,6 +959,7 @@ void Master::help() {
 		"- set: Set debug flag (degraded = [true|false])\n"
 		"- time: Show elapsed time\n"
 		"- ackparity: Acknowledge parity delta\n"
+		"- revertparity: Revert unacknowledged parity delta\n"
 		"- exit: Terminate this client\n"
 	);
 	fflush( stdout );
@@ -952,49 +970,55 @@ void Master::time() {
 	fflush( stdout );
 }
 
-void Master::ackParityDelta( FILE *f, SlaveSocket *target, bool force ) {
-	SlaveEvent event;
-	uint32_t from, to, update, del;
-
-	for( int i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
-
-		SlaveSocket *s = this->sockets.slaves[ i ];
-
-		if ( target && target != s ) continue;
-
-		from = s->timestamp.lastAck.getVal();
-		to = s->timestamp.current.getVal();
-
-		del = update = to;
-
-		if ( ! s->timestamp.pendingAck.update.empty() )
-			update = s->timestamp.pendingAck.update.begin()->getVal() - 1;
-
-		if ( ! s->timestamp.pendingAck.del.empty() )
-			del = s->timestamp.pendingAck.del.begin()->getVal() - 1;
-
-		// find the small acked timestamp
-		to = update < to ? ( del < update ? del : update ) : to ;
-
-		// check the threshold is reached
-		if ( ! force && to - from < this->config.master.backup.ackBatchSize ) {
-			return;
-		}
-
-		if ( f ) {
-			fprintf( f, "Ack slave " );
-			s->printAddress();
-			fprintf( f, "timestamps from %u to %u\n", from, to );
-		}
-
-		for ( int j = 0; j < len; j++ ) {
-			SlaveSocket *p = this->sockets.slaves[ j ];
-			if ( p == s ) continue;
-			event.ackParityDelta( p, from, to, s->instanceId );
-			this->eventQueue.insert( event );
-		}
-
-		s->timestamp.lastAck.setVal( to );
+#define DEFINE_PARITY_DELTA_METHOD( _METHOD_NAME_ ) \
+	void Master::_METHOD_NAME_( FILE *f, SlaveSocket *target, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter, bool force ) { \
+		SlaveEvent event; \
+		uint32_t from, to, update, del; \
+		\
+		for( int i = 0, len = this->sockets.slaves.size(); i < len; i++ ) { \
+			\
+			SlaveSocket *s = this->sockets.slaves[ i ]; \
+			\
+			if ( target && target != s ) continue; \
+			\
+			from = s->timestamp.lastAck.getVal(); \
+			to = s->timestamp.current.getVal(); \
+			del = update = to; \
+			\
+			if ( ! s->timestamp.pendingAck.update.empty() ) \
+				update = s->timestamp.pendingAck.update.begin()->getVal() - 1; \
+			if ( ! s->timestamp.pendingAck.del.empty() ) \
+				del = s->timestamp.pendingAck.del.begin()->getVal() - 1; \
+			/* find the small acked timestamp */ \
+			to = update < to ? ( del < update ? del : update ) : to ; \
+			/* check the threshold is reached */ \
+			if ( \
+				( ! force && to - from < this->config.master.backup.ackBatchSize ) || \
+				( force && to - from == 0 ) \
+			) { \
+				return; \
+			} \
+			\
+			if ( f ) { \
+				fprintf( f, "%s  ", #_METHOD_NAME_ ); \
+				s->printAddress(); \
+				fprintf( f, "  timestamps from %u to %u\n", from, to ); \
+			} \
+			for ( int j = 0; j < len; j++ ) { \
+				SlaveSocket *p = this->sockets.slaves[ j ]; \
+				if ( p == s ) continue; \
+				if ( lock ) LOCK( lock ); \
+				if ( counter ) *counter += 1; \
+				event._METHOD_NAME_( p, from, to, s->instanceId, condition, lock, counter ); \
+				if ( lock ) UNLOCK( lock ); \
+				this->eventQueue.insert( event ); \
+			} \
+			s->timestamp.lastAck.setVal( to ); \
+		} \
 	}
 
-}
+DEFINE_PARITY_DELTA_METHOD( ackParityDelta )
+DEFINE_PARITY_DELTA_METHOD( revertParityDelta )
+
+#undef DEFINE_PARITY_DELTA_METHOD
+
