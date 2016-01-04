@@ -700,8 +700,7 @@ bool SlaveWorker::performDegradedRead(
 							),
 							opcode,
 							instanceId, requestId,
-							original[ i * 2     ],
-							original[ i * 2 + 1 ],
+							listId, stripeId, original[ i * 2 + 1 ],
 							keySize, valueSize,
 							keyStr, valueStr
 						);
@@ -713,8 +712,7 @@ bool SlaveWorker::performDegradedRead(
 							),
 							opcode,
 							instanceId, requestId,
-							original[ i * 2     ],
-							original[ i * 2 + 1 ],
+							listId, stripeId, original[ i * 2 + 1 ],
 							keySize, valueSize,
 							keyStr, valueStr,
 							keyValueUpdate->offset,

@@ -105,6 +105,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				event.instanceId, event.requestId,
 				event.message.degradedSet.opcode,
 				event.message.degradedSet.listId,
+				event.message.degradedSet.stripeId,
 				event.message.degradedSet.chunkId,
 				event.message.degradedSet.keySize,
 				event.message.degradedSet.key,
@@ -124,6 +125,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				success,
 				event.message.degradedSet.opcode,
 				event.message.degradedSet.listId,
+				event.message.degradedSet.stripeId,
 				event.message.degradedSet.chunkId,
 				event.message.degradedSet.keySize,
 				event.message.degradedSet.key,
@@ -186,11 +188,11 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 			buffer.data = this->protocol.resGet(
 				buffer.size,
 				event.instanceId, event.requestId,
-				true /* success */,
-				false /* isDegraded */,
+				true,  // success
+				false, // isDegraded
 				keySize, key,
 				valueSize, value,
-				false /* toMaster */
+				false  // toMaster
 			);
 		}
 			break;
@@ -198,12 +200,12 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 			buffer.data = this->protocol.resGet(
 				buffer.size,
 				event.instanceId, event.requestId,
-				false /* success */,
-				false /* isDegraded */,
+				false, // success
+				false, // isDegraded
 				event.message.get.key.size,
 				event.message.get.key.data,
 				0, 0,
-				false /* toMaster */
+				false  // toMaster
 			);
 			break;
 		// UPDATE_CHUNK

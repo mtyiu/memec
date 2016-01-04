@@ -496,7 +496,7 @@ bool Protocol::parseDegradedReqHeader( struct DegradedReqHeader &header, uint8_t
 size_t Protocol::generateDegradedSetReqHeader(
 	uint8_t magic, uint8_t to, uint8_t opcode,
 	uint16_t instanceId, uint32_t requestId,
-	uint8_t degradedOpcode, uint32_t listId, uint32_t chunkId,
+	uint8_t degradedOpcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 	uint8_t keySize, char *key, uint32_t valueSize, char *value,
 	uint32_t valueUpdateSize, uint32_t valueUpdateOffset, char *valueUpdate
 ) {
@@ -513,10 +513,11 @@ size_t Protocol::generateDegradedSetReqHeader(
 	bytes += 1;
 
 	*( ( uint32_t * )( buf     ) ) = htonl( listId );
-	*( ( uint32_t * )( buf + 4 ) ) = htonl( chunkId );
-	buf[ 8 ] = keySize;
-	buf += 9;
-	bytes += 9;
+	*( ( uint32_t * )( buf + 4) ) = htonl( stripeId );
+	*( ( uint32_t * )( buf + 8 ) ) = htonl( chunkId );
+	buf[ 12 ] = keySize;
+	buf += 13;
+	bytes += 13;
 
 	unsigned char *tmp;
 	valueSize = htonl( valueSize );
@@ -558,7 +559,7 @@ size_t Protocol::generateDegradedSetReqHeader(
 
 bool Protocol::parseDegradedSetReqHeader(
 	size_t offset, uint8_t &opcode,
-	uint32_t &listId, uint32_t &chunkId,
+	uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
 	uint8_t &keySize, uint32_t &valueSize,
 	char *&key, char *&value,
 	uint32_t &valueUpdateSize, uint32_t &valueUpdateOffset, char *&valueUpdate,
@@ -573,10 +574,11 @@ bool Protocol::parseDegradedSetReqHeader(
 	opcode = ptr[ 0 ];
 	ptr += 1;
 
-	listId  = ntohl( *( ( uint32_t * )( ptr     ) ) );
-	chunkId = ntohl( *( ( uint32_t * )( ptr + 4 ) ) );
-	keySize = ptr[ 8 ];
-	ptr += 9;
+	listId   = ntohl( *( ( uint32_t * )( ptr     ) ) );
+	stripeId = ntohl( *( ( uint32_t * )( ptr + 4 ) ) );
+	chunkId  = ntohl( *( ( uint32_t * )( ptr + 8 ) ) );
+	keySize = ptr[ 12 ];
+	ptr += 13;
 
 	valueSize = 0;
 	tmp = ( unsigned char * ) &valueSize;
@@ -631,6 +633,7 @@ bool Protocol::parseDegradedSetReqHeader( struct DegradedSetHeader &header, char
 		offset,
 		header.opcode,
 		header.listId,
+		header.stripeId,
 		header.chunkId,
 		header.keySize,
 		header.valueSize,
@@ -646,7 +649,7 @@ bool Protocol::parseDegradedSetReqHeader( struct DegradedSetHeader &header, char
 size_t Protocol::generateDegradedSetResHeader(
 	uint8_t magic, uint8_t to, uint8_t opcode,
 	uint16_t instanceId, uint32_t requestId,
-	uint8_t degradedOpcode, uint32_t listId, uint32_t chunkId,
+	uint8_t degradedOpcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 	uint8_t keySize, char *key, uint32_t valueSize,
 	uint32_t valueUpdateSize, uint32_t valueUpdateOffset
 ) {
@@ -663,10 +666,11 @@ size_t Protocol::generateDegradedSetResHeader(
 	bytes += 1;
 
 	*( ( uint32_t * )( buf     ) ) = htonl( listId );
-	*( ( uint32_t * )( buf + 4 ) ) = htonl( chunkId );
-	buf[ 8 ] = keySize;
-	buf += 9;
-	bytes += 9;
+	*( ( uint32_t * )( buf + 4 ) ) = htonl( stripeId );
+	*( ( uint32_t * )( buf + 8 ) ) = htonl( chunkId );
+	buf[ 12 ] = keySize;
+	buf += 13;
+	bytes += 13;
 
 	unsigned char *tmp;
 	valueSize = htonl( valueSize );
@@ -705,7 +709,7 @@ size_t Protocol::generateDegradedSetResHeader(
 
 bool Protocol::parseDegradedSetResHeader(
 	size_t offset, uint8_t &opcode,
-	uint32_t &listId, uint32_t &chunkId,
+	uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
 	uint8_t &keySize, uint32_t &valueSize,
 	char *&key,
 	uint32_t &valueUpdateSize, uint32_t &valueUpdateOffset,
@@ -720,10 +724,11 @@ bool Protocol::parseDegradedSetResHeader(
 	opcode = ptr[ 0 ];
 	ptr += 1;
 
-	listId  = ntohl( *( ( uint32_t * )( ptr     ) ) );
-	chunkId = ntohl( *( ( uint32_t * )( ptr + 4 ) ) );
-	keySize = ptr[ 8 ];
-	ptr += 9;
+	listId   = ntohl( *( ( uint32_t * )( ptr     ) ) );
+	stripeId = ntohl( *( ( uint32_t * )( ptr + 4 ) ) );
+	chunkId  = ntohl( *( ( uint32_t * )( ptr + 8 ) ) );
+	keySize = ptr[ 12 ];
+	ptr += 13;
 
 	valueSize = 0;
 	tmp = ( unsigned char * ) &valueSize;
@@ -770,6 +775,7 @@ bool Protocol::parseDegradedSetResHeader( struct DegradedSetHeader &header, char
 		offset,
 		header.opcode,
 		header.listId,
+		header.stripeId,
 		header.chunkId,
 		header.keySize,
 		header.valueSize,

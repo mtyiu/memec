@@ -56,10 +56,14 @@ public:
 		} size;
 	} eventQueue;
 	struct {
+		bool disabled;
+	} seal;
+	struct {
 		StorageType type;
 		char path[ STORAGE_PATH_MAX ];
 	} storage;
 
+	SlaveConfig();
 	bool merge( GlobalConfig &globalConfig );
 	bool parse( const char *path );
 	bool override( OptionList &options );

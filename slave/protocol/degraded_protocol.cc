@@ -2,7 +2,7 @@
 
 char *SlaveProtocol::reqDegradedSet(
 	size_t &size, uint16_t instanceId, uint32_t requestId,
-	uint8_t opcode, uint32_t listId, uint32_t chunkId,
+	uint8_t opcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 	uint8_t keySize, char *key,
 	uint32_t valueSize, char *value,
 	uint32_t valueUpdateSize, uint32_t valueUpdateOffset, char *valueUpdate
@@ -13,7 +13,7 @@ char *SlaveProtocol::reqDegradedSet(
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_DEGRADED_SET,
 		instanceId, requestId,
-		opcode, listId, chunkId,
+		opcode, listId, stripeId, chunkId,
 		keySize, key,
 		valueSize, value,
 		valueUpdateSize, valueUpdateOffset, valueUpdate
@@ -23,7 +23,7 @@ char *SlaveProtocol::reqDegradedSet(
 
 char *SlaveProtocol::resDegradedSet(
 	size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
-	uint8_t opcode, uint32_t listId, uint32_t chunkId,
+	uint8_t opcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 	uint8_t keySize, char *key,
 	uint32_t valueSize,
 	uint32_t valueUpdateSize, uint32_t valueUpdateOffset
@@ -34,7 +34,7 @@ char *SlaveProtocol::resDegradedSet(
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_DEGRADED_SET,
 		instanceId, requestId,
-		opcode, listId, chunkId,
+		opcode, listId, stripeId, chunkId,
 		keySize, key,
 		valueSize,
 		valueUpdateSize, valueUpdateOffset

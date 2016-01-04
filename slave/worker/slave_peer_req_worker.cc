@@ -65,7 +65,7 @@ bool SlaveWorker::handleDegradedSetRequest( SlavePeerEvent event, char *buf, siz
 	bool isInserted;
 	uint32_t timestamp;
 
-	metadata.set( header.listId, 0, header.chunkId );
+	metadata.set( header.listId, header.stripeId, header.chunkId );
 	key.set( header.keySize, header.key );
 
 	switch( header.opcode ) {
@@ -105,6 +105,18 @@ bool SlaveWorker::handleDegradedSetRequest( SlavePeerEvent event, char *buf, siz
 			__ERROR__( "SlaveWorker", "handleDegradedSetRequest", "Undefined degraded opcode." );
 			return false;
 	}
+
+	event.resDegradedSet(
+		event.socket,
+		true, // success
+		header.opcode,
+		event.instanceId, event.requestId,
+		header.listId, header.stripeId, header.chunkId,
+		header.keySize, header.valueSize,
+		header.key,
+		header.valueUpdateOffset, header.valueUpdateSize
+	);
+	this->dispatch( event );
 
 	return true;
 }
@@ -663,6 +675,9 @@ bool SlaveWorker::handleSealChunkRequest( SlavePeerEvent event, char *buf, size_
 }
 
 bool SlaveWorker::issueSealChunkRequest( Chunk *chunk, uint32_t startPos ) {
+	if ( SlaveWorker::disableSeal )
+		return false;
+
 	// printf(
 	// 	"issueSealChunkRequest(): (%u, %u, %u)\n",
 	// 	chunk->metadata.listId,

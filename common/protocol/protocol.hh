@@ -343,11 +343,12 @@ struct DegradedReqHeader {
 	} data;
 };
 
-#define PROTO_DEGRADED_SET_BASE_SIZE 13
+#define PROTO_DEGRADED_SET_BASE_SIZE 17
 #define PROTO_DEGRADED_SET_UPDATE_SIZE 6
 struct DegradedSetHeader {
 	uint8_t opcode;
 	uint32_t listId;
+	uint32_t stripeId;
 	uint32_t chunkId;
 	uint8_t keySize;
 	uint32_t valueSize; // 3 bytes
@@ -801,13 +802,13 @@ protected:
     size_t generateDegradedSetReqHeader(
     	uint8_t magic, uint8_t to, uint8_t opcode,
     	uint16_t instanceId, uint32_t requestId,
-    	uint8_t degradedOpcode, uint32_t listId, uint32_t chunkId,
+    	uint8_t degradedOpcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
     	uint8_t keySize, char *key, uint32_t valueSize, char *value,
     	uint32_t valueUpdateSize, uint32_t valueUpdateOffset, char *valueUpdate
     );
     bool parseDegradedSetReqHeader(
     	size_t offset, uint8_t &opcode,
-    	uint32_t &listId, uint32_t &chunkId,
+    	uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
     	uint8_t &keySize, uint32_t &valueSize,
     	char *&key, char *&value,
     	uint32_t &valueUpdateSize, uint32_t &valueUpdateOffset, char *&valueUpdate,
@@ -817,13 +818,13 @@ protected:
     size_t generateDegradedSetResHeader(
     	uint8_t magic, uint8_t to, uint8_t opcode,
     	uint16_t instanceId, uint32_t requestId,
-    	uint8_t degradedOpcode, uint32_t listId, uint32_t chunkId,
+    	uint8_t degradedOpcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
     	uint8_t keySize, char *key, uint32_t valueSize,
     	uint32_t valueUpdateSize, uint32_t valueUpdateOffset
     );
     bool parseDegradedSetResHeader(
     	size_t offset, uint8_t &opcode,
-    	uint32_t &listId, uint32_t &chunkId,
+    	uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
     	uint8_t &keySize, uint32_t &valueSize,
     	char *&key,
     	uint32_t &valueUpdateSize, uint32_t &valueUpdateOffset,

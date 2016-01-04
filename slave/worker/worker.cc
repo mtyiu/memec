@@ -4,6 +4,7 @@
 uint32_t SlaveWorker::dataChunkCount;
 uint32_t SlaveWorker::parityChunkCount;
 uint32_t SlaveWorker::chunkCount;
+bool SlaveWorker::disableSeal;
 unsigned int SlaveWorker::delay;
 IDGenerator *SlaveWorker::idGenerator;
 ArrayMap<int, SlavePeerSocket> *SlaveWorker::slavePeers;
@@ -201,6 +202,7 @@ bool SlaveWorker::init() {
 	SlaveWorker::dataChunkCount = slave->config.global.coding.params.getDataChunkCount();
 	SlaveWorker::parityChunkCount = slave->config.global.coding.params.getParityChunkCount();
 	SlaveWorker::chunkCount = SlaveWorker::dataChunkCount + SlaveWorker::parityChunkCount;
+	SlaveWorker::disableSeal = slave->config.slave.seal.disabled;
 	SlaveWorker::delay = 0;
 	SlaveWorker::slavePeers = &slave->sockets.slavePeers;
 	SlaveWorker::pending = &slave->pending;

@@ -44,7 +44,7 @@ void SlavePeerEvent::reqDegradedSet(
 	SlavePeerSocket *socket,
 	uint8_t opcode,
 	uint16_t instanceId, uint32_t requestId,
-	uint32_t listId, uint32_t chunkId,
+	uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 	uint8_t keySize, uint32_t valueSize,
 	char *key, char *value,
 	uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate
@@ -55,6 +55,7 @@ void SlavePeerEvent::reqDegradedSet(
 	this->socket = socket;
 	this->message.degradedSet.opcode = opcode;
 	this->message.degradedSet.listId = listId;
+	this->message.degradedSet.stripeId = stripeId;
 	this->message.degradedSet.chunkId = chunkId;
 	this->message.degradedSet.keySize = keySize;
 	this->message.degradedSet.valueSize = valueSize;
@@ -69,6 +70,37 @@ void SlavePeerEvent::reqDegradedSet(
 		this->message.degradedSet.update.length = 0;
 		this->message.degradedSet.update.data = 0;
 	}
+}
+
+void SlavePeerEvent::resDegradedSet(
+	SlavePeerSocket *socket, bool success,
+	uint8_t opcode,
+	uint16_t instanceId, uint32_t requestId,
+	uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+	uint8_t keySize, uint32_t valueSize,
+	char *key,
+	uint32_t valueUpdateOffset, uint32_t valueUpdateSize
+) {
+	this->type = success ? SLAVE_PEER_EVENT_TYPE_DEGRADED_SET_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_DEGRADED_SET_RESPONSE_FAILURE;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
+	this->socket = socket;
+	this->message.degradedSet.opcode = opcode;
+	this->message.degradedSet.listId = listId;
+	this->message.degradedSet.stripeId = stripeId;
+	this->message.degradedSet.chunkId = chunkId;
+	this->message.degradedSet.keySize = keySize;
+	this->message.degradedSet.valueSize = valueSize;
+	this->message.degradedSet.key = key;
+	if ( opcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
+		this->message.degradedSet.update.offset = valueUpdateOffset;
+		this->message.degradedSet.update.length = valueUpdateSize;
+	} else {
+		this->message.degradedSet.update.offset = 0;
+		this->message.degradedSet.update.length = 0;
+	}
+	this->message.degradedSet.value = 0;
+	this->message.degradedSet.update.data = 0;
 }
 
 void SlavePeerEvent::reqGet( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, Key &key ) {

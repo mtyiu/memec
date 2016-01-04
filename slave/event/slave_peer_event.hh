@@ -116,7 +116,7 @@ public:
 		} set;
 		struct {
 			uint8_t opcode;
-			uint32_t listId, chunkId;
+			uint32_t listId, stripeId, chunkId;
 			uint8_t keySize;
 			uint32_t valueSize;
 			char *key, *value;
@@ -140,10 +140,19 @@ public:
 		SlavePeerSocket *socket,
 		uint8_t opcode,
 		uint16_t instanceId, uint32_t requestId,
-		uint32_t listId, uint32_t chunkId,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		uint8_t keySize, uint32_t valueSize,
 		char *key, char *value,
 		uint32_t valueUpdateOffset = 0, uint32_t valueUpdateSize = 0, char *valueUpdate = 0
+	);
+	void resDegradedSet(
+		SlavePeerSocket *socket, bool success,
+		uint8_t opcode,
+		uint16_t instanceId, uint32_t requestId,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		uint8_t keySize, uint32_t valueSize,
+		char *key,
+		uint32_t valueUpdateOffset = 0, uint32_t valueUpdateSize = 0
 	);
 	// GET
 	void reqGet( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, Key &key );

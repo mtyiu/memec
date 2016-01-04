@@ -79,14 +79,14 @@ public:
 
 	char *reqDegradedSet(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
-		uint8_t opcode, uint32_t listId, uint32_t chunkId,
+		uint8_t opcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		uint8_t keySize, char *key,
 		uint32_t valueSize, char *value,
 		uint32_t valueUpdateSize = 0, uint32_t valueUpdateOffset = 0, char *valueUpdate = 0
 	);
 	char *resDegradedSet(
 		size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
-		uint8_t opcode, uint32_t listId, uint32_t chunkId,
+		uint8_t opcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		uint8_t keySize, char *key,
 		uint32_t valueSize,
 		uint32_t valueUpdateSize = 0, uint32_t valueUpdateOffset = 0

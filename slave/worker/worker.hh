@@ -48,6 +48,7 @@ private:
 	static uint32_t dataChunkCount;
 	static uint32_t parityChunkCount;
 	static uint32_t chunkCount;
+	static bool disableSeal;
 	static IDGenerator *idGenerator;
 	static ArrayMap<int, SlavePeerSocket> *slavePeers;
 	static Pending *pending;

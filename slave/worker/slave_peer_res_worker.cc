@@ -7,6 +7,23 @@ bool SlaveWorker::handleDegradedSetResponse( SlavePeerEvent event, bool success,
 		__ERROR__( "SlaveWorker", "handleDegradedSetResponse", "Invalid DEGRADED_SET response (size = %lu).", size );
 		return false;
 	}
+	if ( header.opcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
+		__INFO__(
+			BLUE, "SlaveWorker", "handleDegradedSetResponse",
+			"[DEGRADED_SET] Degraded opcode: 0x%x; list ID: %u, chunk ID: %u; key: %.*s (size = %u); value size: %u; value update size: %u, offset: %u.",
+			header.opcode, header.listId, header.chunkId,
+			header.keySize, header.key, header.keySize,
+			header.valueSize, header.valueUpdateSize, header.valueUpdateOffset
+		);
+	} else {
+		__INFO__(
+			BLUE, "SlaveWorker", "handleDegradedSetResponse",
+			"[DEGRADED_SET] Degraded opcode: 0x%x; list ID: %u, chunk ID: %u; key: %.*s (size = %u); value size: %u.",
+			header.opcode, header.listId, header.chunkId,
+			header.keySize, header.key, header.keySize,
+			header.valueSize
+		);
+	}
 	return true;
 }
 
@@ -191,8 +208,8 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 						metadata,
 						// not needed for deleting a key-value pair in an unsealed chunk:
 						0, 0, 0, 0,
-						false /* isSealed */,
-						false /* isUpdate */
+						false, // isSealed
+						false  // isUpdate
 					);
 				} else {
 					masterEvent.resDelete(
