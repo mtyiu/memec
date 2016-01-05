@@ -1,11 +1,11 @@
 #include "protocol.hh"
 
-char *CoordinatorProtocol::announceSlaveReconstructed( size_t &size, uint16_t instanceId, uint32_t requestId, SlaveSocket *srcSocket, SlaveSocket *dstSocket ) {
+char *CoordinatorProtocol::announceSlaveReconstructed( size_t &size, uint16_t instanceId, uint32_t requestId, SlaveSocket *srcSocket, SlaveSocket *dstSocket, bool toSlave ) {
 	// -- common/protocol/address_protocol.cc --
 	ServerAddr srcAddr = srcSocket->getServerAddr(), dstAddr = dstSocket->getServerAddr();
 	size = this->generateSrcDstAddressHeader(
 		PROTO_MAGIC_ANNOUNCEMENT,
-		PROTO_MAGIC_TO_SLAVE,
+		toSlave ? PROTO_MAGIC_TO_SLAVE : PROTO_MAGIC_TO_MASTER,
 		PROTO_OPCODE_SLAVE_RECONSTRUCTED,
 		instanceId, requestId,
 		srcAddr.addr,

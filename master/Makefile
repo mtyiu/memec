@@ -28,6 +28,7 @@ OBJS= \
 	worker/application_worker.o \
 	worker/coordinator_worker.o \
 	worker/degraded_worker.o \
+	worker/recovery_worker.o \
 	worker/remap_worker.o \
 	worker/slave_worker.o \
 	main/master.o \

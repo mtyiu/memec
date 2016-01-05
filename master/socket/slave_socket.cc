@@ -28,9 +28,9 @@ void SlaveSocket::registerMaster() {
 }
 
 void SlaveSocket::stop() {
-	int newFd = - this->sockfd;
-
+	int newFd = -INT_MIN + this->sockfd;
 	SlaveSocket::slaves->replaceKey( this->sockfd, newFd );
+	this->sockfd = newFd;
 	Socket::stop();
 }
 

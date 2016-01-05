@@ -4,6 +4,7 @@
 #include <climits>
 #include <set>
 #include "../socket/master_socket.hh"
+#include "../socket/slave_socket.hh"
 #include "../../common/ds/key.hh"
 #include "../../common/ds/latency.hh"
 #include "../../common/ds/key.hh"
@@ -29,6 +30,8 @@ enum MasterEventType {
 	// REMAPPING_SET_LOCK
 	MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_SUCCESS,
 	MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_FAILURE,
+	// Recovery
+	MASTER_EVENT_TYPE_ANNOUNCE_SLAVE_RECONSTRUCTED,
 	// PENDING
 	MASTER_EVENT_TYPE_PENDING
 };
@@ -65,6 +68,10 @@ public:
 			uint32_t *remapped;
 			Key key;
 		} degradedLock;
+		struct {
+			SlaveSocket *src;
+			SlaveSocket *dst;
+		} reconstructed;
 	} message;
 
 	void resRegister( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, bool success = true );
@@ -97,6 +104,8 @@ public:
 		MasterSocket *socket, uint16_t instanceId, uint32_t requestId, bool success,
 		uint32_t *original, uint32_t *remapped, uint32_t remappedCount, Key &key
 	);
+	// Recovery
+	void announceSlaveReconstructed( SlaveSocket *srcSocket, SlaveSocket *dstSocket );
 	// Pending
 	void pending( MasterSocket *socket );
 };

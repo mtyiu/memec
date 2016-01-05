@@ -71,6 +71,12 @@ void MasterEvent::resDegradedLock( MasterSocket *socket, uint16_t instanceId, ui
 	this->message.degradedLock.remapped = remapped;
 }
 
+void MasterEvent::announceSlaveReconstructed( SlaveSocket *srcSocket, SlaveSocket *dstSocket ) {
+	this->type = MASTER_EVENT_TYPE_ANNOUNCE_SLAVE_RECONSTRUCTED;
+	this->message.reconstructed.src = srcSocket;
+	this->message.reconstructed.dst = dstSocket;
+}
+
 void MasterEvent::pending( MasterSocket *socket ) {
 	this->type = MASTER_EVENT_TYPE_PENDING;
 	this->socket = socket;

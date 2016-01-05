@@ -128,6 +128,9 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 						}
 						this->handleRemappingSetLockResponse( event, success, buffer.data, buffer.size );
 						break;
+					case PROTO_OPCODE_SLAVE_RECONSTRUCTED:
+						this->handleSlaveReconstructedMsg( event, buffer.data, header.length );
+						break;
 					default:
 						__ERROR__( "MasterWorker", "dispatch", "Invalid opcode from coordinator." );
 						break;

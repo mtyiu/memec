@@ -103,10 +103,15 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 		ArrayMap<int, SlaveSocket> &slaves = Coordinator::getInstance()->sockets.slaves;
 		uint32_t requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
 
-		buffer.data = this->protocol.announceSlaveReconstructed( buffer.size, instanceId, requestId, event.message.reconstructed.src, event.message.reconstructed.dst );
+		buffer.data = this->protocol.announceSlaveReconstructed(
+			buffer.size, instanceId, requestId,
+			event.message.reconstructed.src,
+			event.message.reconstructed.dst,
+			true // toSlave
+		);
 
 		LOCK( &slaves.lock );
-		for ( uint32_t i = 0; i < slaves.size(); i++ ) {
+		for ( uint32_t i = 0, size = slaves.size(); i < size; i++ ) {
 			SlaveSocket *slave = slaves.values[ i ];
 			if ( slave->equal( event.message.reconstructed.dst ) || ! slave->ready() )
 				continue; // No need to tell the backup server

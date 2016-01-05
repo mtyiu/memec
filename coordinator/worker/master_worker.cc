@@ -132,6 +132,10 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 			);
 			isSend = true;
 			break;
+		// Recovery
+		case MASTER_EVENT_TYPE_ANNOUNCE_SLAVE_RECONSTRUCTED:
+			isSend = false;
+			break;
 		// Pending
 		case MASTER_EVENT_TYPE_PENDING:
 			isSend = false;
@@ -145,8 +149,31 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 	} else if ( event.type == MASTER_EVENT_TYPE_SWITCH_PHASE ) {
-		// just to avoid error message
-		connected = true;
+		connected = true; // just to avoid error message
+	} else if ( event.type == MASTER_EVENT_TYPE_ANNOUNCE_SLAVE_RECONSTRUCTED ) {
+		ArrayMap<int, MasterSocket> &masters = Coordinator::getInstance()->sockets.masters;
+		uint32_t requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
+
+		buffer.data = this->protocol.announceSlaveReconstructed(
+			buffer.size, Coordinator::instanceId, requestId,
+			event.message.reconstructed.src,
+			event.message.reconstructed.dst,
+			false // toSlave
+		);
+
+		LOCK( &masters.lock );
+		for ( uint32_t i = 0, size = masters.size(); i < size; i++ ) {
+			MasterSocket *master = masters.values[ i ];
+			if ( ! master->ready() )
+				continue; // Skip failed masters
+
+			ret = master->send( buffer.data, buffer.size, connected );
+			if ( ret != ( ssize_t ) buffer.size )
+				__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+		}
+		UNLOCK( &masters.lock );
+
+		connected = true; // just to avoid error message
 	} else {
 		ProtocolHeader header;
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();

@@ -64,20 +64,20 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 		{
 			uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
 
-			AcknowledgementInfo ackInfo( 
+			AcknowledgementInfo ackInfo(
 				Timestamp( event.message.ack.fromTimestamp ),
 				Timestamp( event.message.ack.toTimestamp ),
 				event.message.ack.condition,
 				event.message.ack.lock,
 				event.message.ack.counter
 			);
-			
-			MasterWorker::pending->insertAck( 
-				PT_ACK_REVERT_PARITY, 
+
+			MasterWorker::pending->insertAck(
+				PT_ACK_REVERT_PARITY,
 				event.socket->instanceId, requestId, 0,
 				ackInfo
 			);
-				
+
 			buffer.data = this->protocol.revertParityDelta(
 				buffer.size,
 				instanceId, requestId,
@@ -544,13 +544,13 @@ bool MasterWorker::handleParityDeltaAcknowledgement( SlaveEvent event, uint8_t o
 	}
 
 	if ( opcode == PROTO_OPCODE_REVERT_PARITY_DELTA ) {
-		__DEBUG__( YELLOW, "MasterWorker", "handleParityDeltaAcknowledgement", 
+		__DEBUG__( YELLOW, "MasterWorker", "handleParityDeltaAcknowledgement",
 				"GOT ack for instance id = %u from instance id = %u request id = %u",
 				header.targetId, event.instanceId, event.requestId
 		);
 		AcknowledgementInfo ackInfo;
 		if ( ! MasterWorker::pending->eraseAck( PT_ACK_REVERT_PARITY, event.instanceId, event.requestId, 0, &pid, &ackInfo ) ) {
-			__ERROR__( "MasterWorker", "handleParityDeltaAcknowledgement", 
+			__ERROR__( "MasterWorker", "handleParityDeltaAcknowledgement",
 				"Cannot find the pending ack info for instacne id = %u from instance id = %u request id = %u",
 				header.targetId, event.instanceId, event.requestId
 			);
@@ -559,7 +559,7 @@ bool MasterWorker::handleParityDeltaAcknowledgement( SlaveEvent event, uint8_t o
 		if ( ackInfo.counter ) {
 			*ackInfo.counter -= 1;
 			if ( *ackInfo.counter == 0 && ackInfo.condition ) {
-				__INFO__( GREEN, "MasterWorker", "handleParityDeltaAcknowledgement", 
+				__INFO__( GREEN, "MasterWorker", "handleParityDeltaAcknowledgement",
 						"Complete ack for counter at %p", ackInfo.counter
 				);
 				pthread_cond_signal( ackInfo.condition );

@@ -81,6 +81,13 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 	slaveEvent.announceSlaveReconstructed( socket, backupSlaveSocket );
 	CoordinatorWorker::eventQueue->insert( slaveEvent );
 
+	/////////////////////////////
+	// Announce to the masters //
+	/////////////////////////////
+	MasterEvent masterEvent;
+	masterEvent.announceSlaveReconstructed( socket, backupSlaveSocket );
+	CoordinatorWorker::eventQueue->insert( masterEvent );
+
 	////////////////////////////////////////////////////////////////////////////
 
 	uint32_t numLostChunks = 0, listId, stripeId, chunkId, requestId = 0;

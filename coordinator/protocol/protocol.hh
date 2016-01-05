@@ -72,7 +72,11 @@ public:
 	char *reqSyncRemappedData( size_t &size, uint16_t instanceId, uint32_t requestId, struct sockaddr_in target, char* buffer = 0 );
 
 	// ---------- recovery_protocol.cc ----------
-	char *announceSlaveReconstructed( size_t &size, uint16_t instanceId, uint32_t requestId, SlaveSocket *srcSocket, SlaveSocket *dstSocket );
+	char *announceSlaveReconstructed(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		SlaveSocket *srcSocket, SlaveSocket *dstSocket,
+		bool toSlave
+	);
 	char *promoteBackupSlave(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		SlaveSocket *srcSocket,

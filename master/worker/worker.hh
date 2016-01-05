@@ -101,6 +101,9 @@ private:
 	bool handleRemappingSetLockResponse( CoordinatorEvent event, bool success, char *buf, size_t size );
 	bool handleRemappingSetResponse( SlaveEvent event, bool success, char *buf, size_t size );
 
+	// ---------- recovery_worker.cc ----------
+	bool handleSlaveReconstructedMsg( CoordinatorEvent event, char *buf, size_t size );
+
 public:
 	// ---------- worker.cc ----------
 	static bool init();
