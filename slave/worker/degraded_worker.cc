@@ -896,6 +896,9 @@ bool SlaveWorker::sendModifyChunkRequest(
 	}
 
 	key.set( keySize, keyStr );
+	keyValueUpdate.set( keySize, keyStr );
+	keyValueUpdate.offset = valueUpdateOffset;
+	keyValueUpdate.length = deltaSize;
 	this->getSlaves( metadata.listId );
 
 	if ( isSealed ) {
@@ -1093,6 +1096,8 @@ bool SlaveWorker::sendModifyChunkRequest(
 #else
 			this->dispatch( slavePeerEvent );
 #endif
+
+			// printf( "Sending UPDATE request for key: %.*s...\n", keySize, keyStr );
 		}
 
 		if ( ! self ) {

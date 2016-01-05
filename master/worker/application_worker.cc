@@ -92,7 +92,6 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 			}
 			break;
 		case APPLICATION_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
-			printf( "Update done.\n" );
 		case APPLICATION_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resUpdate(
 				buffer.size,

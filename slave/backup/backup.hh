@@ -90,7 +90,7 @@ private:
 	// locks
 	LOCK_T dataUpdateLock;
 	LOCK_T dataDeleteLock;
-	LOCK_T idToTimestampMapLock;
+	// LOCK_T idToTimestampMapLock;
 	LOCK_T parityUpdateLock;
 	LOCK_T parityDeleteLock;
 

@@ -751,12 +751,67 @@ void Slave::printPending( FILE *f ) {
 	}
 	UNLOCK( &this->pending.masters.delLock );
 
-	LOCK( &this->pending.slavePeers.updateChunkLock );
+	LOCK( &this->pending.slavePeers.updateLock );
 	fprintf(
 		f,
 		"\n\nPending requests for slave peers\n"
 		"--------------------------------\n"
-		"[UPDATE_CHUNK] Pending: %lu\n",
+		"[UPDATE] Pending: %lu\n",
+		this->pending.slavePeers.update.size()
+	);
+	i = 1;
+	for (
+		keyValueUpdateIt = this->pending.slavePeers.update.begin();
+		keyValueUpdateIt != this->pending.slavePeers.update.end();
+		keyValueUpdateIt++, i++
+	) {
+		const PendingIdentifier &pid = keyValueUpdateIt->first;
+		const KeyValueUpdate &keyValueUpdate = keyValueUpdateIt->second;
+		fprintf(
+			f, "%lu. ID: (%u, %u); Key: %.*s (size = %u, offset = %u, length = %u); source: ",
+			i, keyValueUpdateIt->first.instanceId, keyValueUpdateIt->first.requestId,
+			keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
+			keyValueUpdate.offset, keyValueUpdate.length
+		);
+		if ( pid.ptr )
+			( ( Socket * ) pid.ptr )->printAddress( f );
+		else
+			fprintf( f, "(nil)\n" );
+		fprintf( f, "\n" );
+	}
+	UNLOCK( &this->pending.slavePeers.updateLock );
+
+	LOCK( &this->pending.slavePeers.delLock );
+	fprintf(
+		f,
+		"\n[DELETE] Pending: %lu\n",
+		this->pending.slavePeers.del.size()
+	);
+	i = 1;
+	for (
+		it = this->pending.slavePeers.del.begin();
+		it != this->pending.slavePeers.del.end();
+		it++, i++
+	) {
+		const PendingIdentifier &pid = it->first;
+		const Key &key = it->second;
+		fprintf(
+			f, "%lu. ID: (%u, %u); Key: %.*s (size = %u); source: ",
+			i, it->first.instanceId, it->first.requestId,
+			key.size, key.data, key.size
+		);
+		if ( pid.ptr )
+			( ( Socket * ) pid.ptr )->printAddress( f );
+		else
+			fprintf( f, "(nil)\n" );
+		fprintf( f, "\n" );
+	}
+	UNLOCK( &this->pending.slavePeers.delLock );
+
+	LOCK( &this->pending.slavePeers.updateChunkLock );
+	fprintf(
+		f,
+		"\n[UPDATE_CHUNK] Pending: %lu\n",
 		this->pending.slavePeers.updateChunk.size()
 	);
 	i = 1;
