@@ -504,7 +504,7 @@ bool SlaveWorker::performDegradedRead(
 			return false;
 		}
 	} else {
-		if ( this->dataSlaveSockets[ chunkId ]->self ) {
+		if ( this->dataSlaveSockets[ chunkId ] && this->dataSlaveSockets[ chunkId ]->self ) {
 			socket = this->dataSlaveSockets[ chunkId ];
 		} else {
 			// Check whether there are surviving parity slaves
@@ -515,7 +515,22 @@ bool SlaveWorker::performDegradedRead(
 				}
 			}
 			if ( numSurvivingParity == 0 ) {
-				__ERROR__( "SlaveWorker", "performDegradedRead", "There are no surviving parity slaves. The data cannot be recovered." );
+				__ERROR__(
+					"SlaveWorker", "performDegradedRead",
+					"There are no surviving parity slaves. The data cannot be recovered. (numSurvivingParity = %u, reconstructedCount = %u)",
+					numSurvivingParity, reconstructedCount
+				);
+				for ( uint32_t j = 0; j < reconstructedCount; j++ ) {
+					printf(
+						"%s(%u, %u) |--> (%u, %u)%s",
+						j == 0 ? "" : ", ",
+						original[ j * 2     ],
+						original[ j * 2 + 1 ],
+						reconstructed[ j * 2     ],
+						reconstructed[ j * 2 + 1 ],
+						j == reconstructedCount - 1 ? "\n" : ""
+					);
+				}
 				return false;
 			} else {
 				for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {

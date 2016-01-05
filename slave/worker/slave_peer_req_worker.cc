@@ -675,8 +675,9 @@ bool SlaveWorker::handleSealChunkRequest( SlavePeerEvent event, char *buf, size_
 }
 
 bool SlaveWorker::issueSealChunkRequest( Chunk *chunk, uint32_t startPos ) {
-	if ( SlaveWorker::disableSeal )
+	if ( SlaveWorker::disableSeal ) {
 		return false;
+	}
 
 	// printf(
 	// 	"issueSealChunkRequest(): (%u, %u, %u)\n",

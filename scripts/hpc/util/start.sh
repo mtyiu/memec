@@ -20,10 +20,10 @@ for i in {1..6}; do
 done
 
 sleep ${SLEEP_TIME}
+sleep ${SLEEP_TIME}
 
-# ssh hpc15 "screen -S master -p 0 -X stuff \"$(printf '\r\r')${BOOTSTRAP_SCRIPT_PATH}/start-plio-master.sh ${1}$(printf '\r\r')\""
+ssh hpc15 "screen -S master -p 0 -X stuff \"$(printf '\r\r')${BOOTSTRAP_SCRIPT_PATH}/start-plio-master.sh ${1}$(printf '\r\r')\""
 sleep 5
-ssh hpc15 "screen -S master -p 0 -X stuff \"$(printf '\r\r')${BASE_PATH}/plio/benchmark/huawei/scripts/start_master.sh 10$(printf '\r\r')\""
 
 sleep ${SLEEP_TIME}
 

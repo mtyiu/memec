@@ -65,7 +65,7 @@ void BasicRemappingScheme::getRemapTarget( uint32_t *original, uint32_t *remappe
 	Latency *targetLatency, *nodeLatency;
 	for ( uint32_t i = 0; i < remappedCount; i++ ) {
 		slaveAddr = BasicRemappingScheme::stripeList->get( original[ i * 2 ], original[ i * 2 + 1 ] )->getAddr();
-		targetLatency = slaveLoading->cumulativeMirror.set.get( slaveAddr, &index );
+		targetLatency = 0; // slaveLoading->cumulativeMirror.set.get( slaveAddr, &index );
 
 		// Baseline
 		remapped[ i * 2     ] = original[ i * 2     ];
@@ -77,13 +77,24 @@ void BasicRemappingScheme::getRemapTarget( uint32_t *original, uint32_t *remappe
 			else
 				slaveAddr = paritySlaveSockets[ j - dataChunkCount ]->getAddr();
 
-			if ( selectedSlaves.count( slaveAddr ) || // skip selected slave
-			     overloadedSlave->slaveSet.count( slaveAddr ) > 0 ) // Skip overloaded slave
+			if ( selectedSlaves.count( slaveAddr ) ){
+				// skip selected and original slaves
+				// printf( "--- (%u, %u) is selected ---\n", original[ i * 2 ], j );
 				continue;
+			} else if ( overloadedSlave->slaveSet.count( slaveAddr ) > 0 ) {
+				// Skip overloaded slave
+				// printf( "--- (%u, %u) is overloaded ---\n", original[ i * 2 ], j );
+				continue;
+			}
 
-			// Search the least-loaded node with the stripe list
 			nodeLatency = slaveLoading->cumulativeMirror.set.get( slaveAddr, &index );
-			if ( ! targetLatency || ( nodeLatency && *nodeLatency < *targetLatency ) ) {
+			if ( ( remapped[ i * 2     ] == original[ i * 2     ] ) && ( remapped[ i * 2 + 1 ] == original[ i * 2 + 1 ] ) ) {
+				// Always remap to another slave first
+				targetLatency = nodeLatency;
+				remapped[ i * 2     ] = original[ i * 2     ]; // List ID
+				remapped[ i * 2 + 1 ] = j;                     // Chunk ID
+			} else if ( targetLatency && nodeLatency && *nodeLatency < *targetLatency ) {
+				// Search the least-loaded node with the stripe list
 				targetLatency = nodeLatency;
 				remapped[ i * 2     ] = original[ i * 2     ]; // List ID
 				remapped[ i * 2 + 1 ] = j;                     // Chunk ID
@@ -92,7 +103,7 @@ void BasicRemappingScheme::getRemapTarget( uint32_t *original, uint32_t *remappe
 
 		if ( remapped[ i * 2     ] == original[ i * 2     ] &&
 		     remapped[ i * 2 + 1 ] == original[ i * 2 + 1 ] ) {
-			__ERROR__( "BasicRemappingScheme", "getRemapTarget", "Cannot get remapping target for (%u, %u).", original[ i * 2 ], original[ i * 2 + 1 ] );
+			__ERROR__( "BasicRemappingScheme", "getRemapTarget", "Cannot get remapping target for (%u, %u); i = %u / %u.", original[ i * 2 ], original[ i * 2 + 1 ], i, remappedCount );
 		} else {
 			slaveAddr = BasicRemappingScheme::stripeList->get( remapped[ i * 2 ], remapped[ i * 2 + 1 ] )->getAddr();
 			nodeLatency = slaveLoading->cumulativeMirror.set.get( slaveAddr, &index );
