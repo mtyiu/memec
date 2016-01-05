@@ -75,7 +75,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 			MasterWorker::pending->insertAck( 
 				PT_ACK_REVERT_PARITY, 
 				event.socket->instanceId, requestId, 0,
-				ackInfo, 0
+				ackInfo
 			);
 				
 			buffer.data = this->protocol.revertParityDelta(
@@ -572,6 +572,8 @@ bool MasterWorker::handleParityDeltaAcknowledgement( SlaveEvent event, uint8_t o
 			}
 		}
 		if ( ackInfo.lock ) UNLOCK( ackInfo.lock );
+
+		// TODO call check all slave acked at remap_msg_handler
 	}
 
 	return true;

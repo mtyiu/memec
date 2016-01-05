@@ -970,55 +970,78 @@ void Master::time() {
 	fflush( stdout );
 }
 
-#define DEFINE_PARITY_DELTA_METHOD( _METHOD_NAME_ ) \
-	void Master::_METHOD_NAME_( FILE *f, SlaveSocket *target, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter, bool force ) { \
+#define DISPATCH_EVENT_TO_OTHER_SLAVES( _METHOD_NAME_, _S_, _COND_, _LOCK_, _COUNTER_ )  \
+	for ( int j = 0, len = this->sockets.slaves.size(); j < len; j++ ) { \
 		SlaveEvent event; \
-		uint32_t from, to, update, del; \
-		\
-		for( int i = 0, len = this->sockets.slaves.size(); i < len; i++ ) { \
-			\
-			SlaveSocket *s = this->sockets.slaves[ i ]; \
-			\
-			if ( target && target != s ) continue; \
-			\
-			from = s->timestamp.lastAck.getVal(); \
-			to = s->timestamp.current.getVal(); \
-			del = update = to; \
-			\
-			if ( ! s->timestamp.pendingAck.update.empty() ) \
-				update = s->timestamp.pendingAck.update.begin()->getVal() - 1; \
-			if ( ! s->timestamp.pendingAck.del.empty() ) \
-				del = s->timestamp.pendingAck.del.begin()->getVal() - 1; \
-			/* find the small acked timestamp */ \
-			to = update < to ? ( del < update ? del : update ) : to ; \
-			/* check the threshold is reached */ \
-			if ( \
-				( ! force && to - from < this->config.master.backup.ackBatchSize ) || \
-				( force && to - from == 0 ) \
-			) { \
-				return; \
-			} \
-			\
-			if ( f ) { \
-				fprintf( f, "%s  ", #_METHOD_NAME_ ); \
-				s->printAddress(); \
-				fprintf( f, "  timestamps from %u to %u\n", from, to ); \
-			} \
-			for ( int j = 0; j < len; j++ ) { \
-				SlaveSocket *p = this->sockets.slaves[ j ]; \
-				if ( p == s ) continue; \
-				if ( lock ) LOCK( lock ); \
-				if ( counter ) *counter += 1; \
-				event._METHOD_NAME_( p, from, to, s->instanceId, condition, lock, counter ); \
-				if ( lock ) UNLOCK( lock ); \
-				this->eventQueue.insert( event ); \
-			} \
-			s->timestamp.lastAck.setVal( to ); \
-		} \
+		SlaveSocket *p = this->sockets.slaves[ j ]; \
+		if ( p == _S_ ) continue; \
+		if ( _LOCK_ ) LOCK( _LOCK_ ); \
+		if ( _COUNTER_ ) *_COUNTER_ += 1; \
+		event._METHOD_NAME_( p, from, to, _S_->instanceId, _COND_, _LOCK_, _COUNTER_ ); \
+		if ( _LOCK_ ) UNLOCK( _LOCK_ ); \
+		this->eventQueue.insert( event ); \
+	} 
+
+void Master::ackParityDelta( FILE *f, SlaveSocket *target, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter, bool force ) {
+	uint32_t from, to, update, del;
+	
+	for( int i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
+		SlaveSocket *s = this->sockets.slaves[ i ];
+
+		if ( target && target != s )
+			continue;
+
+		from = s->timestamp.lastAck.getVal();
+		to = s->timestamp.current.getVal();
+		del = update = to;
+		if ( ! s->timestamp.pendingAck.update.empty() )
+			update = s->timestamp.pendingAck.update.begin()->getVal() - 1;
+		if ( ! s->timestamp.pendingAck.del.empty() )
+			del = s->timestamp.pendingAck.del.begin()->getVal() - 1;
+
+		/* find the small acked timestamp */
+		to = update < to ? ( del < update ? del : update ) : to ;
+
+		/* check the threshold is reached */
+		if ( ! force && to - from < this->config.master.backup.ackBatchSize )
+			continue;
+
+		if ( f ) {
+			s->printAddress();
+			fprintf( f, " ack parity delta for timestamps from %u to %u\n", from, to );
+		}
+
+		DISPATCH_EVENT_TO_OTHER_SLAVES( ackParityDelta, s, condition, lock, counter );
+
+		s->timestamp.lastAck.setVal( to );
+	}
+}
+
+void Master::revertParityDelta( FILE *f, SlaveSocket *target, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter, bool force ) {
+	uint32_t from, to, update, del;
+
+	// process one target slave at a time
+	if ( ! target )
+		return;
+
+	from = target->timestamp.lastAck.getVal();
+	to = target->timestamp.current.getVal();
+	del = update = from;
+	if ( ! target->timestamp.pendingAck.update.empty() )
+		update = target->timestamp.pendingAck.update.begin()->getVal() - 1;
+	if ( ! target->timestamp.pendingAck.del.empty() )
+		del = target->timestamp.pendingAck.del.begin()->getVal() - 1;
+
+	from = update < from ? ( del < update ? del : update ) : from ;
+
+	if ( to - from == 0 )
+		return;
+
+	if ( f ) {
+		target->printAddress();
+		fprintf( f, " revert parity delta for timestamps from %u to %u\n", from, to );
 	}
 
-DEFINE_PARITY_DELTA_METHOD( ackParityDelta )
-DEFINE_PARITY_DELTA_METHOD( revertParityDelta )
-
-#undef DEFINE_PARITY_DELTA_METHOD
+	DISPATCH_EVENT_TO_OTHER_SLAVES( revertParityDelta, target, condition, lock, counter );
+}
 
