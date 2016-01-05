@@ -401,10 +401,7 @@ bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, bool is
 	// TODO handle degraded mode
 	Master *master = Master::getInstance();
 	if ( ! isDegraded ) {
-		auto &updateSet = event.socket->timestamp.pendingAck.update;
-		auto it = updateSet.find( pid.timestamp );
-		if ( it != updateSet.end() )
-			updateSet.erase( it );
+		event.socket->timestamp.pendingAck.eraseUpdate( pid.timestamp );
 	}
 
 	applicationEvent.resUpdate( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, keyValueUpdate, success );
@@ -480,10 +477,7 @@ bool MasterWorker::handleDeleteResponse( SlaveEvent event, bool success, bool is
 	// TODO handle degraded mode
 	Master *master = Master::getInstance();
 	if ( !isDegraded ) {
-		auto &delSet = event.socket->timestamp.pendingAck.del;
-		auto it = delSet.find( pid.timestamp );
-		if ( it != delSet.end() )
-			delSet.erase( it );
+		event.socket->timestamp.pendingAck.eraseDel( pid.timestamp );
 	}
 
 	applicationEvent.resDelete( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, key, success );

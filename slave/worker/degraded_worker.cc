@@ -163,7 +163,7 @@ bool SlaveWorker::handleDegradedUpdateRequest( MasterEvent event, char *buf, siz
 		__ERROR__( "SlaveWorker", "handleDegradedUpdateRequest", "Invalid degraded UPDATE request." );
 		return false;
 	}
-	__DEBUG__(
+	__INFO__(
 		BLUE, "SlaveWorker", "handleDegradedRequest",
 		"[UPDATE] Key: %.*s (key size = %u); Value: (update size = %u, offset = %u).",
 		( int ) header.data.keyValueUpdate.keySize,
@@ -890,6 +890,10 @@ bool SlaveWorker::sendModifyChunkRequest(
 	KeyValueUpdate keyValueUpdate;
 	uint16_t instanceId = Slave::instanceId;
 	uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
+
+	if ( SlaveWorker::disableSeal ) {
+		isSealed = false;
+	}
 
 	key.set( keySize, keyStr );
 	this->getSlaves( metadata.listId );

@@ -263,7 +263,7 @@ bool SlaveWorker::handleUpdateResponse( SlavePeerEvent event, bool success, char
 	// Check pending slave UPDATE requests
 	pending = SlaveWorker::pending->count( PT_SLAVE_PEER_UPDATE, pid.instanceId, pid.requestId, false, true );
 
-	__DEBUG__( BLUE, "SlaveWorker", "handleUpdateResponse", "Pending slave UPDATE requests = %d (%s).", pending, success ? "success" : "fail" );
+	__DEBUG__( YELLOW, "SlaveWorker", "handleUpdateResponse", "Pending slave UPDATE requests = %d (%s) (Key: %.*s).", pending, success ? "success" : "fail", ( int ) header.keySize, header.key );
 
 	if ( pending == 0 ) {
 		// Only send master DELETE response when the number of pending slave DELETE requests equal 0
