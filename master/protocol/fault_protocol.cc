@@ -38,3 +38,19 @@ char *MasterProtocol::ackParityDeltaBackup(
 	);
 	return this->buffer.send;
 }
+
+char *MasterProtocol::revertParityDelta(
+	size_t &size, uint16_t instanceId, uint32_t requestId,
+	uint32_t fromTimestamp, uint32_t toTimestamp,
+	uint16_t targetId
+) {
+	size = this->generateParityDeltaAcknowledgementHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_REVERT_PARITY_DELTA,
+		instanceId, requestId,
+		fromTimestamp, toTimestamp,
+		targetId
+	);
+	return this->buffer.send;
+}

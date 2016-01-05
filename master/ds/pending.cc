@@ -74,10 +74,22 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 	}
 }
 
-bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, RemapList> *&map) {
+bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, RemapList> *&map ) {
 	if ( type == PT_KEY_REMAP_LIST ) {
 		lock = &this->requests.remapListLock;
 		map = &this->requests.remapList;
+		return true;
+	} else {
+		lock = 0;
+		map = 0;
+		return false;
+	}
+}
+
+bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, AcknowledgementInfo > *&map ) {
+	if ( type == PT_ACK_REVERT_PARITY ) {
+		lock = &this->ack.revertLock;
+		map = &this->ack.revert;
 		return true;
 	} else {
 		lock = 0;
@@ -99,6 +111,7 @@ Pending::Pending() {
 	LOCK_INIT( &this->stats.getLock );
 	LOCK_INIT( &this->stats.setLock );
 	LOCK_INIT( &this->requests.remapListLock );
+	LOCK_INIT( &this->ack.revertLock );
 }
 
 #define DEFINE_PENDING_APPLICATION_INSERT_METHOD( METHOD_NAME, VALUE_TYPE, VALUE_VAR ) \
@@ -120,6 +133,8 @@ Pending::Pending() {
  		\
 		return true; /* ret.second; */ \
 	}
+
+#define DEFINE_PENDING_ACK_INSERT_METHOD DEFINE_PENDING_APPLICATION_INSERT_METHOD
 
 #define DEFINE_PENDING_SLAVE_INSERT_METHOD( METHOD_NAME, VALUE_TYPE, VALUE_VAR ) \
 	bool Pending::METHOD_NAME( PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr, VALUE_TYPE &VALUE_VAR, bool needsLock, bool needsUnlock ) { \
@@ -180,8 +195,11 @@ DEFINE_PENDING_APPLICATION_INSERT_METHOD( insertKeyValueUpdate, KeyValueUpdate, 
 DEFINE_PENDING_SLAVE_INSERT_METHOD( insertKey, Key, key )
 DEFINE_PENDING_SLAVE_INSERT_METHOD( insertKeyValueUpdate, KeyValueUpdate, keyValueUpdate )
 
+DEFINE_PENDING_ACK_INSERT_METHOD( insertAck, AcknowledgementInfo, ackInfo )
+
 DEFINE_PENDING_ERASE_METHOD( eraseDegradedLockData, DegradedLockData, degradedLockDataPtr )
 DEFINE_PENDING_ERASE_METHOD( eraseRemapList, RemapList, remapList )
+DEFINE_PENDING_ERASE_METHOD( eraseAck, AcknowledgementInfo , ackInfoPtr )
 
 #undef DEFINE_PENDING_APPLICATION_INSERT_METHOD
 #undef DEFINE_PENDING_SLAVE_INSERT_METHOD
@@ -396,6 +414,29 @@ bool Pending::eraseKeyValueUpdate( PendingType type, uint16_t instanceId, uint32
 	if ( needsUnlock ) UNLOCK( lock );
 
 	return ret;
+}
+
+bool Pending::eraseAck( PendingType type, uint16_t instanceId, std::vector<PendingIdentifier> *pidPtr, bool needsLock, bool needsUnlock ) {
+
+	PendingIdentifier pid( instanceId, 0, 0, 0, 0 );
+	std::unordered_multimap<PendingIdentifier, AcknowledgementInfo> *map;
+	std::unordered_multimap<PendingIdentifier, AcknowledgementInfo>::iterator it, saveIt;
+	LOCK_T *lock;
+
+	if ( ! this->get( type, lock, map ) )
+		return false;
+	if ( needsLock ) LOCK( lock );
+	for ( it = map->begin(), saveIt = map->begin(); it != map->end(); it = saveIt ) {
+		saveIt++;
+		if ( it->first.instanceId == instanceId ) {
+			if ( pidPtr ) 
+				pidPtr->push_back( it->first );
+			map->erase( it );
+		}
+	}
+	if ( needsUnlock ) UNLOCK( lock );
+
+	return true;
 }
 
 bool Pending::findKeyValue( PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr, KeyValue *keyValuePtr, bool checkKey, char* checkKeyPtr ) {

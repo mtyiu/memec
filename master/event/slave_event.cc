@@ -18,12 +18,26 @@ void SlaveEvent::syncMetadata( SlaveSocket *socket ) {
 	this->socket = socket;
 }
 
-void SlaveEvent::ackParityDelta( SlaveSocket *socket, uint32_t fromTimestamp, uint32_t toTimestamp, uint16_t targetId ) {
+void SlaveEvent::ackParityDelta( SlaveSocket *socket, uint32_t fromTimestamp, uint32_t toTimestamp, uint16_t targetId, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter ) {
 	this->type = SLAVE_EVENT_TYPE_ACK_PARITY_DELTA;
 	this->socket = socket;
 	this->message.ack.fromTimestamp = fromTimestamp;
 	this->message.ack.toTimestamp = toTimestamp;
 	this->message.ack.targetId = targetId;
+	this->message.ack.condition = condition;
+	this->message.ack.lock = lock;
+	this->message.ack.counter = counter;
+}
+
+void SlaveEvent::revertParityDelta( SlaveSocket *socket, uint32_t fromTimestamp, uint32_t toTimestamp, uint16_t targetId, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter ) {
+	this->type = SLAVE_EVENT_TYPE_REVERT_PARITY_DELTA;
+	this->socket = socket;
+	this->message.ack.fromTimestamp = fromTimestamp;
+	this->message.ack.toTimestamp = toTimestamp;
+	this->message.ack.targetId = targetId;
+	this->message.ack.condition = condition;
+	this->message.ack.lock = lock;
+	this->message.ack.counter = counter;
 }
 
 void SlaveEvent::pending( SlaveSocket *socket ) {
