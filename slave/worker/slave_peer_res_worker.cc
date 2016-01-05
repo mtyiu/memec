@@ -254,11 +254,15 @@ bool SlaveWorker::handleUpdateResponse( SlavePeerEvent event, bool success, char
 	}
 
 	// erase data delta backup
-	MasterSocket *masterSocket = Slave::getInstance()->sockets.mastersIdToSocketMap.get( event.instanceId );
-	if ( masterSocket )
+	Slave *slave = Slave::getInstance();
+	LOCK( &slave->sockets.mastersIdToSocketLock );
+	try {
+		MasterSocket *masterSocket = slave->sockets.mastersIdToSocketMap.at( event.instanceId );
 		masterSocket->backup.removeDataUpdate( event.requestId, event.socket );
-	else
-		__ERROR__( "SlaveWorker", "handleUpdateResponse", "Cannot find a pending parity slave UPDATE backup for instance ID = %hu, request ID = %u", event.instanceId, event.requestId );
+	} catch ( std::out_of_range &e ) {
+		__ERROR__( "SlaveWorker", "handleUpdateResponse", "Cannot find a pending parity slave UPDATE backup for instance ID = %hu, request ID = %u. (Socket mapping not found)", event.instanceId, event.requestId );
+	}
+	UNLOCK( &slave->sockets.mastersIdToSocketLock );
 
 	// Check pending slave UPDATE requests
 	pending = SlaveWorker::pending->count( PT_SLAVE_PEER_UPDATE, pid.instanceId, pid.requestId, false, true );
@@ -310,11 +314,15 @@ bool SlaveWorker::handleDeleteResponse( SlavePeerEvent event, bool success, char
 	}
 
 	// erase data delta backup
-	MasterSocket *masterSocket = Slave::getInstance()->sockets.mastersIdToSocketMap.get( event.instanceId );
-	if ( masterSocket )
+	Slave *slave = Slave::getInstance();
+	LOCK( &slave->sockets.mastersIdToSocketLock );
+	try {
+		MasterSocket *masterSocket = slave->sockets.mastersIdToSocketMap.at( event.instanceId );
 		masterSocket->backup.removeDataDelete( event.requestId, event.socket );
-	else
-		__ERROR__( "SlaveWorker", "handleDeleteResponse", "Cannot find a pending parity slave UPDATE backup for instance ID = %hu, request ID = %u", event.instanceId, event.requestId );
+	} catch ( std::out_of_range &e ) {
+		__ERROR__( "SlaveWorker", "handleDeleteResponse", "Cannot find a pending parity slave UPDATE backup for instance ID = %hu, request ID = %u. (Socket mapping not found)", event.instanceId, event.requestId );
+	}
+	UNLOCK( &slave->sockets.mastersIdToSocketLock );
 
 	// Check pending slave UPDATE requests
 	pending = SlaveWorker::pending->count( PT_SLAVE_PEER_DEL, pid.instanceId, pid.requestId, false, true );
@@ -808,11 +816,15 @@ bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success,
 	}
 
 	// erase data delta backup
-	MasterSocket *masterSocket = Slave::getInstance()->sockets.mastersIdToSocketMap.get( event.instanceId );
-	if ( masterSocket )
+	Slave *slave = Slave::getInstance();
+	LOCK( &slave->sockets.mastersIdToSocketLock );
+	try {
+		MasterSocket *masterSocket = slave->sockets.mastersIdToSocketMap.at( event.instanceId );
 		masterSocket->backup.removeDataUpdate( event.requestId, event.socket );
-	else
-		__ERROR__( "SlaveWorker", "handleUpdateChunkResponse", "Cannot find a pending parity slave UPDATE backup for instance ID = %hu, request ID = %u", event.instanceId, event.requestId );
+	} catch ( std::out_of_range &e ) {
+		__ERROR__( "SlaveWorker", "handleUpdateChunkResponse", "Cannot find a pending parity slave UPDATE backup for instance ID = %hu, request ID = %u. (Socket mapping not found)", event.instanceId, event.requestId );
+	}
+	UNLOCK( &slave->sockets.mastersIdToSocketLock );
 
 	// Check pending slave UPDATE requests
 	pending = SlaveWorker::pending->count( PT_SLAVE_PEER_UPDATE_CHUNK, pid.instanceId, pid.requestId, false, true );
@@ -873,11 +885,15 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 	}
 
 	// erase data delta backup
-	MasterSocket *masterSocket = Slave::getInstance()->sockets.mastersIdToSocketMap.get( event.instanceId );
-	if ( masterSocket )
+	Slave *slave = Slave::getInstance();
+	LOCK( &slave->sockets.mastersIdToSocketLock );
+	try {
+		MasterSocket *masterSocket = slave->sockets.mastersIdToSocketMap.at( event.instanceId );
 		masterSocket->backup.removeDataDelete( event.requestId, event.socket );
-	else
-		__ERROR__( "SlaveWorker", "handleDeleteChunkResponse", "Cannot find a pending parity slave UPDATE backup for instance ID = %hu, request ID = %u", event.instanceId, event.requestId );
+	} catch ( std::out_of_range &e ) {
+		__ERROR__( "SlaveWorker", "handleDeleteChunkResponse", "Cannot find a pending parity slave UPDATE backup for instance ID = %hu, request ID = %u. (Socket mapping not found)", event.instanceId, event.requestId );
+	}
+	UNLOCK( &slave->sockets.mastersIdToSocketLock );
 
 	// Check pending slave UPDATE requests
 	pending = SlaveWorker::pending->count( PT_SLAVE_PEER_DEL_CHUNK, pid.instanceId, pid.requestId, false, true );

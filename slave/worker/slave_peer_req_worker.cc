@@ -18,7 +18,10 @@ bool SlaveWorker::handleSlavePeerRegisterRequest( SlavePeerSocket *socket, uint1
 	}
 
 	socket->instanceId = instanceId;
-	Slave::getInstance()->sockets.slavesIdToSocketMap.set( instanceId, socket, false );
+	Slave *slave = Slave::getInstance();
+	LOCK( &slave->sockets.slavesIdToSocketLock );
+	slave->sockets.slavesIdToSocketMap[ instanceId ] = socket;
+	UNLOCK( &slave->sockets.slavesIdToSocketLock );
 
 	if ( index == -1 ) {
 		__ERROR__( "SlaveWorker", "handleSlavePeerRegisterRequest", "The slave is not in the list. Ignoring this slave..." );
@@ -215,11 +218,16 @@ bool SlaveWorker::handleUpdateRequest( SlavePeerEvent event, char *buf, size_t s
 	value.set( header.valueUpdateSize, header.valueUpdate );
 	Metadata metadata;
 	metadata.set( header.listId, header.stripeId, header.chunkId );
-	MasterSocket *masterSocket = Slave::getInstance()->sockets.mastersIdToSocketMap.get( event.instanceId );
-	if ( masterSocket )
-		masterSocket->backup.insertParityUpdate( timestamp, key, value, metadata, isChunkDelta, header.valueUpdateOffset, header.chunkUpdateOffset, event.socket->instanceId, event.requestId );
-	else
-		__ERROR__( "SlaveWorker", "handleUpdateRequest", "Failed to backup delta at parity slave for instance ID = %hu request ID = %u.", event.instanceId, event.requestId );
+	Slave *slave = Slave::getInstance();
+	LOCK( &slave->sockets.mastersIdToSocketLock );
+	try {
+		MasterSocket *masterSocket = slave->sockets.mastersIdToSocketMap.at( event.instanceId );
+		if ( masterSocket )
+			masterSocket->backup.insertParityUpdate( timestamp, key, value, metadata, isChunkDelta, header.valueUpdateOffset, header.chunkUpdateOffset, event.socket->instanceId, event.requestId );
+	} catch ( std::out_of_range &e ) {
+		__ERROR__( "SlaveWorker", "handleUpdateRequest", "Failed to backup delta at parity slave for instance ID = %hu request ID = %u (Socket mapping not found).", event.instanceId, event.requestId );
+	}
+	UNLOCK( &slave->sockets.mastersIdToSocketLock );
 
 	event.resUpdate(
 		event.socket, event.instanceId, event.requestId,
@@ -262,11 +270,15 @@ bool SlaveWorker::handleDeleteRequest( SlavePeerEvent event, char *buf, size_t s
 	Timestamp timestamp( event.timestamp );
 	Metadata metadata;
 	metadata.set( header.listId, header.stripeId, header.chunkId );
-	MasterSocket *masterSocket = Slave::getInstance()->sockets.mastersIdToSocketMap.get( event.instanceId );
-	if ( masterSocket )
+	Slave *slave = Slave::getInstance();
+	LOCK( &slave->sockets.mastersIdToSocketLock );
+	try {
+		MasterSocket *masterSocket = slave->sockets.mastersIdToSocketMap.at( event.instanceId );
 		masterSocket->backup.insertParityDelete( timestamp, key, value, metadata, false, 0, 0, event.socket->instanceId, event.requestId );
-	else
-		__ERROR__( "SlaveWorker", "handleDeleteRequest", "Failed to backup delta at parity slave for instance ID = %hu request ID = %u.", event.instanceId, event.requestId );
+	} catch ( std::out_of_range &e ) {
+		__ERROR__( "SlaveWorker", "handleDeleteRequest", "Failed to backup delta at parity slave for instance ID = %hu request ID = %u (Socket mapping not found).", event.instanceId, event.requestId );
+	}
+	UNLOCK( &slave->sockets.mastersIdToSocketLock );
 
 	ret = SlaveWorker::chunkBuffer->at( header.listId )->deleteKey( header.key, header.keySize );
 
@@ -590,11 +602,15 @@ bool SlaveWorker::handleUpdateChunkRequest( SlavePeerEvent event, char *buf, siz
 	key.set( 0, 0 );
 	Value value;
 	value.set( header.length, header.delta );
-	MasterSocket *masterSocket = Slave::getInstance()->sockets.mastersIdToSocketMap.get( event.instanceId );
-	if ( masterSocket )
+	Slave *slave = Slave::getInstance();
+	LOCK( &slave->sockets.mastersIdToSocketLock );
+	try {
+		MasterSocket *masterSocket = slave->sockets.mastersIdToSocketMap.at( event.instanceId );
 		masterSocket->backup.insertParityUpdate( timestamp, key, value, metadata, true, 0, header.offset, event.socket->instanceId, event.requestId );
-	else
-		__ERROR__( "SlaveWorker", "handleUpdateChunkRequest", "Failed to backup delta at parity slave for instance ID = %hu request ID = %u.", event.instanceId, event.requestId );
+	} catch ( std::out_of_range &e ) {
+		__ERROR__( "SlaveWorker", "handleUpdateChunkRequest", "Failed to backup delta at parity slave for instance ID = %hu request ID = %u (Socket mapping not found).", event.instanceId, event.requestId );
+	}
+	UNLOCK( &slave->sockets.mastersIdToSocketLock );
 
 	event.resUpdateChunk(
 		event.socket, event.instanceId, event.requestId, metadata,
@@ -637,11 +653,15 @@ bool SlaveWorker::handleDeleteChunkRequest( SlavePeerEvent event, char *buf, siz
 	key.set( 0, 0 );
 	Value value;
 	value.set( header.length, header.delta );
-	MasterSocket *masterSocket = Slave::getInstance()->sockets.mastersIdToSocketMap.get( event.instanceId );
-	if ( masterSocket )
+	Slave *slave = Slave::getInstance();
+	LOCK( &slave->sockets.mastersIdToSocketLock );
+	try{
+		MasterSocket *masterSocket = slave->sockets.mastersIdToSocketMap.at( event.instanceId );
 		masterSocket->backup.insertParityDelete( timestamp, key, value, metadata, true, 0, header.offset, event.socket->instanceId, event.requestId );
-	else
-		__ERROR__( "SlaveWorker", "handleDeleteChunkRequest", "Failed to backup delta at parity slave for instance ID = %hu request ID = %u.", event.instanceId, event.requestId );
+	} catch ( std::out_of_range &e ) {
+		__ERROR__( "SlaveWorker", "handleDeleteChunkRequest", "Failed to backup delta at parity slave for instance ID = %hu request ID = %u (Socket mapping not found).", event.instanceId, event.requestId );
+	}
+	UNLOCK( &slave->sockets.mastersIdToSocketLock );
 
 	event.resDeleteChunk(
 		event.socket, event.instanceId, event.requestId, metadata,
