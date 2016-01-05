@@ -15,3 +15,4 @@ common/stripe_list/fairness
 common/stripe_list/results
 temp/permutation
 temp/stripe_list
+setget/test
