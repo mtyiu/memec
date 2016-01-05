@@ -1,6 +1,32 @@
 #include "worker.hh"
 #include "../main/slave.hh"
 
+bool SlaveWorker::handleDegradedSetResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
+	struct DegradedSetHeader header;
+	if ( ! this->protocol.parseDegradedSetResHeader( header, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleDegradedSetResponse", "Invalid DEGRADED_SET response (size = %lu).", size );
+		return false;
+	}
+	if ( header.opcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
+		__INFO__(
+			BLUE, "SlaveWorker", "handleDegradedSetResponse",
+			"[DEGRADED_SET] Degraded opcode: 0x%x; list ID: %u, chunk ID: %u; key: %.*s (size = %u); value size: %u; value update size: %u, offset: %u.",
+			header.opcode, header.listId, header.chunkId,
+			header.keySize, header.key, header.keySize,
+			header.valueSize, header.valueUpdateSize, header.valueUpdateOffset
+		);
+	} else {
+		__INFO__(
+			BLUE, "SlaveWorker", "handleDegradedSetResponse",
+			"[DEGRADED_SET] Degraded opcode: 0x%x; list ID: %u, chunk ID: %u; key: %.*s (size = %u); value size: %u.",
+			header.opcode, header.listId, header.chunkId,
+			header.keySize, header.key, header.keySize,
+			header.valueSize
+		);
+	}
+	return true;
+}
+
 bool SlaveWorker::handleSetResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
 	PendingIdentifier pid;
 	uint32_t requestCount;
@@ -182,8 +208,8 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 						metadata,
 						// not needed for deleting a key-value pair in an unsealed chunk:
 						0, 0, 0, 0,
-						false /* isSealed */,
-						false /* isUpdate */
+						false, // isSealed
+						false  // isUpdate
 					);
 				} else {
 					masterEvent.resDelete(
@@ -237,7 +263,7 @@ bool SlaveWorker::handleUpdateResponse( SlavePeerEvent event, bool success, char
 	// Check pending slave UPDATE requests
 	pending = SlaveWorker::pending->count( PT_SLAVE_PEER_UPDATE, pid.instanceId, pid.requestId, false, true );
 
-	__DEBUG__( BLUE, "SlaveWorker", "handleUpdateResponse", "Pending slave UPDATE requests = %d (%s).", pending, success ? "success" : "fail" );
+	__DEBUG__( YELLOW, "SlaveWorker", "handleUpdateResponse", "Pending slave UPDATE requests = %d (%s) (Key: %.*s).", pending, success ? "success" : "fail", ( int ) header.keySize, header.key );
 
 	if ( pending == 0 ) {
 		// Only send master DELETE response when the number of pending slave DELETE requests equal 0

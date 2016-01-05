@@ -115,12 +115,13 @@ private:
 	// locks
 	LOCK_T dataUpdateLock;
 	LOCK_T dataDeleteLock;
+	LOCK_T idToTimestampMapLock;
 	LOCK_T parityUpdateLock;
 	LOCK_T parityDeleteLock;
 
 	bool addPendingAck( BackupPendingIdentifier pi, Timestamp ts, bool &isDuplicated, const char* type );
 public:
-	
+
 	SlaveBackup();
 	~SlaveBackup();
 
@@ -146,11 +147,11 @@ public:
 	std::vector<BackupDelta> findParityUpdate( uint32_t from, uint32_t to );
 	std::vector<BackupDelta> findParityDelete( uint32_t from, uint32_t to );
 
-	// TODO : undo parity update on specific key 
-	
+	// TODO : undo parity update on specific key
+
 	// TODO : undo parity delete on specific key (key-recompaction??)
-	
-	
+
+
 	void print( FILE *f = stdout, bool printDelta = false );
 };
 

@@ -24,6 +24,10 @@ enum SlavePeerEventType {
 	SLAVE_PEER_EVENT_TYPE_SET_REQUEST,
 	SLAVE_PEER_EVENT_TYPE_SET_RESPONSE_SUCCESS,
 	SLAVE_PEER_EVENT_TYPE_SET_RESPONSE_FAILURE,
+	// DEGRADED_SET
+	SLAVE_PEER_EVENT_TYPE_DEGRADED_SET_REQUEST,
+	SLAVE_PEER_EVENT_TYPE_DEGRADED_SET_RESPONSE_SUCCESS,
+	SLAVE_PEER_EVENT_TYPE_DEGRADED_SET_RESPONSE_FAILURE,
 	// GET
 	SLAVE_PEER_EVENT_TYPE_GET_REQUEST,
 	SLAVE_PEER_EVENT_TYPE_GET_RESPONSE_SUCCESS,
@@ -103,14 +107,24 @@ public:
 			std::vector<Metadata> *metadata;
 		} batchGetChunks;
 		struct {
-			Key key;
 			uint32_t listId, chunkId;
+			Key key;
 		} remap;
 		struct {
 			Key key;
 			Value value;
-			uint32_t listId, chunkId;
-		} parity;
+		} set;
+		struct {
+			uint8_t opcode;
+			uint32_t listId, stripeId, chunkId;
+			uint8_t keySize;
+			uint32_t valueSize;
+			char *key, *value;
+			struct {
+				uint32_t offset, length;
+				char *data;
+			} update;
+		} degradedSet;
 	} message;
 
 	// Register
@@ -119,8 +133,27 @@ public:
 	// REMAPPING_SET
 	void resRemappingSet( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, uint32_t listId, uint32_t chunkId, bool success );
 	// SET
-	void reqSet( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, Key key, Value value );
-	void resSet( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, Key key, bool success );
+	void reqSet( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key key, Value value );
+	void resSet( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key key, bool success );
+	// Degraded SET
+	void reqDegradedSet(
+		SlavePeerSocket *socket,
+		uint8_t opcode,
+		uint16_t instanceId, uint32_t requestId,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		uint8_t keySize, uint32_t valueSize,
+		char *key, char *value,
+		uint32_t valueUpdateOffset = 0, uint32_t valueUpdateSize = 0, char *valueUpdate = 0
+	);
+	void resDegradedSet(
+		SlavePeerSocket *socket, bool success,
+		uint8_t opcode,
+		uint16_t instanceId, uint32_t requestId,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		uint8_t keySize, uint32_t valueSize,
+		char *key,
+		uint32_t valueUpdateOffset = 0, uint32_t valueUpdateSize = 0
+	);
 	// GET
 	void reqGet( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, Key &key );
 	void resGet( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, KeyValue &keyValue );

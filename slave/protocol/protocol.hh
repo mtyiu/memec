@@ -67,8 +67,36 @@ public:
 	);
 	char *resRemapParity( size_t &size, uint16_t instanceId, uint32_t requestId );
 
+	char *reqSet(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		char *key, uint8_t keySize,
+		char *value, uint32_t valueSize,
+		char *buf = 0
+	);
+
 	// ---------- degraded_protocol.cc ----------
 	char *resReleaseDegradedLock( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t count );
+
+	char *reqDegradedSet(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		uint8_t opcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		uint8_t keySize, char *key,
+		uint32_t valueSize, char *value,
+		uint32_t valueUpdateSize = 0, uint32_t valueUpdateOffset = 0, char *valueUpdate = 0
+	);
+	char *resDegradedSet(
+		size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
+		uint8_t opcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		uint8_t keySize, char *key,
+		uint32_t valueSize,
+		uint32_t valueUpdateSize = 0, uint32_t valueUpdateOffset = 0
+	);
+
+	char *reqGet(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		uint32_t listId, uint32_t chunkId,
+		uint8_t keySize, char *key
+	);
 
 	// ---------- seal_protocol.cc ----------
 	char *reqSealChunk( size_t &size, uint16_t instanceId, uint32_t requestId, Chunk *chunk, uint32_t startPos, char *buf = 0 );
@@ -78,19 +106,6 @@ public:
 	char *resPromoteBackupSlave( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t numStripes );
 
 	// ---------- normal_slave_protocol.cc ----------
-	char *reqSet(
-		size_t &size, uint16_t instanceId, uint32_t requestId,
-		char *key, uint8_t keySize,
-		char *value, uint32_t valueSize,
-		char *buf = 0
-	);
-
-	char *reqGet(
-		size_t &size, uint16_t instanceId, uint32_t requestId,
-		uint32_t listId, uint32_t chunkId,
-		uint8_t keySize, char *key
-	);
-
 	char *reqUpdate(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,

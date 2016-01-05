@@ -92,6 +92,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 			}
 			break;
 		case APPLICATION_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
+			printf( "Update done.\n" );
 		case APPLICATION_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resUpdate(
 				buffer.size,
@@ -439,7 +440,7 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
 	// TODO handle degraded mode
 	uint32_t requestTimestamp = socket->timestamp.current.nextVal();
-	
+
 	char* valueUpdate = new char [ header.valueUpdateSize ];
 	memcpy( valueUpdate, header.valueUpdate, header.valueUpdateSize );
 	keyValueUpdate.dup( header.keySize, header.key, valueUpdate );
@@ -466,7 +467,7 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 			header.valueUpdate, header.valueUpdateOffset, header.valueUpdateSize, requestTimestamp
 		);
 		// add pending timestamp to ack
-		socket->timestamp.pendingAck.update.insert( Timestamp( requestTimestamp ) );
+		socket->timestamp.pendingAck.insertUpdate( Timestamp( requestTimestamp ) );
 
 		if ( ! MasterWorker::pending->insertKeyValueUpdate( PT_SLAVE_UPDATE, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, keyValueUpdate ) ) {
 			__ERROR__( "MasterWorker", "handleUpdateRequest", "Cannot insert into slave UPDATE pending map." );
@@ -543,7 +544,7 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 			requestTimestamp
 		);
 		// add pending timestamp to ack.
-		socket->timestamp.pendingAck.del.insert( Timestamp( requestTimestamp ) );
+		socket->timestamp.pendingAck.insertDel( Timestamp( requestTimestamp ) );
 
 		if ( ! MasterWorker::pending->insertKey( PT_SLAVE_DEL, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, key ) ) {
 			__ERROR__( "MasterWorker", "handleDeleteRequest", "Cannot insert into slave DELETE pending map." );

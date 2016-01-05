@@ -899,8 +899,8 @@ void Master::printBackup( FILE *f ) {
 			"Timestamps: Current: %10u  Last Ack: %10u; (Pending #) Update: %10lu  Delete: %10lu\n",
 			s->timestamp.current.getVal(),
 			s->timestamp.lastAck.getVal(),
-			s->timestamp.pendingAck.update.size(),
-			s->timestamp.pendingAck.del.size()
+			s->timestamp.pendingAck._update.size(),
+			s->timestamp.pendingAck._del.size()
 		);
 	}
 	UNLOCK( &this->sockets.slaves.lock );
@@ -994,10 +994,16 @@ void Master::ackParityDelta( FILE *f, SlaveSocket *target, pthread_cond_t *condi
 		from = s->timestamp.lastAck.getVal();
 		to = s->timestamp.current.getVal();
 		del = update = to;
-		if ( ! s->timestamp.pendingAck.update.empty() )
-			update = s->timestamp.pendingAck.update.begin()->getVal() - 1;
-		if ( ! s->timestamp.pendingAck.del.empty() )
-			del = s->timestamp.pendingAck.del.begin()->getVal() - 1;
+
+		LOCK( &s->timestamp.pendingAck.updateLock );
+		if ( ! s->timestamp.pendingAck._update.empty() )
+			update = s->timestamp.pendingAck._update.begin()->getVal() - 1;
+		UNLOCK( &s->timestamp.pendingAck.updateLock );
+
+		LOCK( &s->timestamp.pendingAck.delLock );
+		if ( ! s->timestamp.pendingAck._del.empty() )
+			del = s->timestamp.pendingAck._del.begin()->getVal() - 1;
+		UNLOCK( &s->timestamp.pendingAck.delLock );
 
 		/* find the small acked timestamp */
 		to = update < to ? ( del < update ? del : update ) : to ;

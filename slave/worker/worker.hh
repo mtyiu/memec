@@ -12,7 +12,6 @@
 #include "../event/event_queue.hh"
 #include "../ds/map.hh"
 #include "../ds/pending.hh"
-#include "../ds/slave_load.hh"
 #include "../protocol/protocol.hh"
 #include "../storage/allstorage.hh"
 #include "../../common/coding/coding.hh"
@@ -49,6 +48,7 @@ private:
 	static uint32_t dataChunkCount;
 	static uint32_t parityChunkCount;
 	static uint32_t chunkCount;
+	static bool disableSeal;
 	static IDGenerator *idGenerator;
 	static ArrayMap<int, SlavePeerSocket> *slavePeers;
 	static Pending *pending;
@@ -100,6 +100,7 @@ private:
 
 	// ---------- slave_peer_req_worker.cc ----------
 	bool handleSlavePeerRegisterRequest( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, char *buf, size_t size );
+	bool handleDegradedSetRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleSetRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleGetRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleUpdateRequest( SlavePeerEvent event, char *buf, size_t size );
@@ -112,6 +113,7 @@ private:
 	bool handleSealChunkRequest( SlavePeerEvent event, char *buf, size_t size );
 
 	// ---------- slave_peer_res_worker.cc ----------
+	bool handleDegradedSetResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleSetResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleGetResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleUpdateResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
@@ -138,7 +140,7 @@ private:
 		uint8_t opcode,
 		MasterSocket *masterSocket,
 		uint16_t parentInstanceId, uint32_t parentRequestId,
-		uint32_t listId, uint32_t stripeId, uint32_t lostChunkId,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId, // chunkId refers to the current chunk ID
 		Key *key, bool isSealed,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 		KeyValueUpdate *keyValueUpdate = 0
@@ -147,12 +149,14 @@ private:
 		uint16_t parentInstanceId, uint32_t parentRequestId,
 		uint8_t keySize, char *keyStr,
 		Metadata &metadata, uint32_t offset,
-		uint32_t deltaSize, /* valueUpdateSize */
+		uint32_t deltaSize, // valueUpdateSize
 		uint32_t valueUpdateOffset,
-		char *delta,        /* valueUpdate */
+		char *delta,        // valueUpdate
 		bool isSealed, bool isUpdate,
 		uint32_t timestamp = 0,
-		MasterSocket *masterSocket = 0
+		MasterSocket *masterSocket = 0,
+		uint32_t *original = 0, uint32_t *reconstructed = 0, uint32_t reconstructedCount = 0,
+		char *valueStr = 0, uint32_t valueSize = 0
 	);
 
 	// ---------- recovery_worker.cc ----------
@@ -162,7 +166,6 @@ private:
 
 public:
 	static unsigned int delay;
-	SlaveLoad load;
 
 	// ---------- worker.cc ----------
 	static bool init();

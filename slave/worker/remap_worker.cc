@@ -39,7 +39,7 @@ bool SlaveWorker::handleRemappedData( CoordinatorEvent event, char *buf, size_t 
 		// TODO : batched SET
 		uint32_t requestSent = 0;
 		for ( PendingData pendingData : *remappedData) {
-			slavePeerEvent.reqSet( socket, instanceId, requestId, pendingData.listId, pendingData.chunkId, pendingData.key, pendingData.value );
+			slavePeerEvent.reqSet( socket, instanceId, requestId, pendingData.key, pendingData.value );
 			slave->eventQueue.insert( slavePeerEvent );
 			requestSent++;
 			if ( requestSent % BATCH_THRESHOLD == 0 ) {

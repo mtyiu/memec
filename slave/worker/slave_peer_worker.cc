@@ -81,10 +81,10 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 			buffer.data = this->protocol.reqSet(
 				buffer.size,
 				event.instanceId, event.requestId,
-				event.message.parity.key.data,
-				event.message.parity.key.size,
-				event.message.parity.value.data,
-				event.message.parity.value.size
+				event.message.set.key.data,
+				event.message.set.key.size,
+				event.message.set.value.data,
+				event.message.set.value.size
 			);
 			break;
 		case SLAVE_PEER_EVENT_TYPE_SET_RESPONSE_SUCCESS:
@@ -93,10 +93,43 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 			buffer.data = this->protocol.resSet(
 				buffer.size,
 				event.instanceId, event.requestId,
-				success, /* success */
-				event.message.parity.key.size,
-				event.message.parity.key.data,
-				false /* to master */
+				success,
+				event.message.set.key.size,
+				event.message.set.key.data,
+				false // to master
+			);
+			break;
+		case SLAVE_PEER_EVENT_TYPE_DEGRADED_SET_REQUEST:
+			buffer.data = this->protocol.reqDegradedSet(
+				buffer.size,
+				event.instanceId, event.requestId,
+				event.message.degradedSet.opcode,
+				event.message.degradedSet.listId,
+				event.message.degradedSet.stripeId,
+				event.message.degradedSet.chunkId,
+				event.message.degradedSet.keySize,
+				event.message.degradedSet.key,
+				event.message.degradedSet.valueSize,
+				event.message.degradedSet.value,
+				event.message.degradedSet.update.length,
+				event.message.degradedSet.update.offset,
+				event.message.degradedSet.update.data
+			);
+			break;
+		case SLAVE_PEER_EVENT_TYPE_DEGRADED_SET_RESPONSE_SUCCESS:
+			success = true;
+		case SLAVE_PEER_EVENT_TYPE_DEGRADED_SET_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resDegradedSet(
+				buffer.size,
+				event.instanceId, event.requestId,
+				success,
+				event.message.degradedSet.opcode,
+				event.message.degradedSet.listId,
+				event.message.degradedSet.stripeId,
+				event.message.degradedSet.chunkId,
+				event.message.degradedSet.keySize,
+				event.message.degradedSet.key,
+				event.message.degradedSet.valueSize
 			);
 			break;
 		case SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_REQUEST:
@@ -155,11 +188,11 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 			buffer.data = this->protocol.resGet(
 				buffer.size,
 				event.instanceId, event.requestId,
-				true /* success */,
-				false /* isDegraded */,
+				true,  // success
+				false, // isDegraded
 				keySize, key,
 				valueSize, value,
-				false /* toMaster */
+				false  // toMaster
 			);
 		}
 			break;
@@ -167,12 +200,12 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 			buffer.data = this->protocol.resGet(
 				buffer.size,
 				event.instanceId, event.requestId,
-				false /* success */,
-				false /* isDegraded */,
+				false, // success
+				false, // isDegraded
 				event.message.get.key.size,
 				event.message.get.key.data,
 				0, 0,
-				false /* toMaster */
+				false  // toMaster
 			);
 			break;
 		// UPDATE_CHUNK
@@ -400,7 +433,6 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
 							this->handleSealChunkRequest( event, buffer.data, header.length );
-							this->load.sealChunk();
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
 							this->handleSealChunkResponse( event, true, buffer.data, buffer.size );
@@ -417,7 +449,6 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
 							this->handleRemappingSetRequest( event, buffer.data, header.length );
-							this->load.set();
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
 							this->handleRemappingSetResponse( event, true, buffer.data, header.length );
@@ -430,11 +461,26 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 							break;
 					}
 					break;
+				case PROTO_OPCODE_DEGRADED_SET:
+					switch ( header.magic ) {
+						case PROTO_MAGIC_REQUEST:
+							this->handleDegradedSetRequest( event, buffer.data, buffer.size );
+							break;
+						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							this->handleDegradedSetResponse( event, true, buffer.data, buffer.size );
+							break;
+						case PROTO_MAGIC_RESPONSE_FAILURE:
+							this->handleDegradedSetResponse( event, false, buffer.data, buffer.size );
+							break;
+						default:
+							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x for SET.", header.magic );
+							break;
+					}
+					break;
 				case PROTO_OPCODE_SET:
 					switch ( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
 							this->handleSetRequest( event, buffer.data, buffer.size );
-							this->load.set();
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
 							this->handleSetResponse( event, true, buffer.data, buffer.size );
@@ -451,7 +497,6 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
 							this->handleGetRequest( event, buffer.data, buffer.size );
-							this->load.get();
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
 							this->handleGetResponse( event, true, buffer.data, buffer.size );
@@ -468,7 +513,6 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
 							this->handleUpdateRequest( event, buffer.data, buffer.size );
-							this->load.update();
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
 							this->handleUpdateResponse( event, true, buffer.data, buffer.size );
@@ -485,7 +529,6 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
 							this->handleDeleteRequest( event, buffer.data, buffer.size );
-							this->load.del();
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
 							this->handleDeleteResponse( event, true, buffer.data, buffer.size );
@@ -502,7 +545,6 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
 							this->handleUpdateChunkRequest( event, buffer.data, buffer.size );
-							this->load.updateChunk();
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
 							this->handleUpdateChunkResponse( event, true, buffer.data, buffer.size );
@@ -519,7 +561,6 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
 							this->handleDeleteChunkRequest( event, buffer.data, buffer.size );
-							this->load.delChunk();
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
 							this->handleDeleteChunkResponse( event, true, buffer.data, buffer.size );
@@ -536,7 +577,6 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
 							this->handleGetChunkRequest( event, buffer.data, buffer.size );
-							this->load.getChunk();
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
 							this->handleGetChunkResponse( event, true, buffer.data, buffer.size );
@@ -554,7 +594,6 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
 							this->handleSetChunkRequest( event, header.opcode == PROTO_OPCODE_SET_CHUNK, buffer.data, buffer.size );
-							this->load.setChunk();
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
 							this->handleSetChunkResponse( event, true, buffer.data, buffer.size );

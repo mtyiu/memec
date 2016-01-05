@@ -2,6 +2,10 @@
 #include <sys/stat.h>
 #include "slave_config.hh"
 
+SlaveConfig::SlaveConfig() {
+	this->seal.disabled = false;
+}
+
 bool SlaveConfig::merge( GlobalConfig &globalConfig ) {
 	this->epoll.maxEvents = globalConfig.epoll.maxEvents;
 	this->epoll.timeout = globalConfig.epoll.timeout;
@@ -98,6 +102,11 @@ bool SlaveConfig::set( const char *section, const char *name, const char *value 
 			this->eventQueue.size.separated.slave = atoi( value );
 		else if ( match( name, "slave_peer" ) )
 			this->eventQueue.size.separated.slavePeer = atoi( value );
+		else
+			return false;
+	} else if ( match( section, "seal" ) ) {
+		if ( match( name, "disabled" ) )
+			this->seal.disabled = match( value, "true" );
 		else
 			return false;
 	} else if ( match( section, "storage" ) ) {

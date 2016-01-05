@@ -62,6 +62,7 @@
 #define PROTO_OPCODE_DEGRADED_GET                 0x08
 #define PROTO_OPCODE_DEGRADED_UPDATE              0x09
 #define PROTO_OPCODE_DEGRADED_DELETE              0x10
+#define PROTO_OPCODE_DEGRADED_SET                 0x11
 // Master <-> Slave //
 #define PROTO_OPCODE_REMAPPING_SET                0x12
 #define PROTO_OPCODE_DEGRADED_LOCK                0x13
@@ -341,6 +342,24 @@ struct DegradedReqHeader {
 		struct KeyHeader key;
 		struct KeyValueUpdateHeader keyValueUpdate;
 	} data;
+};
+
+#define PROTO_DEGRADED_SET_BASE_SIZE 17
+#define PROTO_DEGRADED_SET_UPDATE_SIZE 6
+struct DegradedSetHeader {
+	uint8_t opcode;
+	uint32_t listId;
+	uint32_t stripeId;
+	uint32_t chunkId;
+	uint8_t keySize;
+	uint32_t valueSize; // 3 bytes
+	char *key;
+	char *value;
+
+	// Only for DEGRADED_UPDATE
+	uint32_t valueUpdateSize;   // 3 bytes
+	uint32_t valueUpdateOffset; // 3 bytes
+	char *valueUpdate;
 };
 
 // For retrieving key-value pair in unsealed chunks from parity slave
@@ -781,6 +800,38 @@ protected:
 		char *buf, size_t size
 	);
 
+    size_t generateDegradedSetReqHeader(
+    	uint8_t magic, uint8_t to, uint8_t opcode,
+    	uint16_t instanceId, uint32_t requestId,
+    	uint8_t degradedOpcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+    	uint8_t keySize, char *key, uint32_t valueSize, char *value,
+    	uint32_t valueUpdateSize, uint32_t valueUpdateOffset, char *valueUpdate
+    );
+    bool parseDegradedSetReqHeader(
+    	size_t offset, uint8_t &opcode,
+    	uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
+    	uint8_t &keySize, uint32_t &valueSize,
+    	char *&key, char *&value,
+    	uint32_t &valueUpdateSize, uint32_t &valueUpdateOffset, char *&valueUpdate,
+    	char *buf, size_t size
+    );
+
+    size_t generateDegradedSetResHeader(
+    	uint8_t magic, uint8_t to, uint8_t opcode,
+    	uint16_t instanceId, uint32_t requestId,
+    	uint8_t degradedOpcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+    	uint8_t keySize, char *key, uint32_t valueSize,
+    	uint32_t valueUpdateSize, uint32_t valueUpdateOffset
+    );
+    bool parseDegradedSetResHeader(
+    	size_t offset, uint8_t &opcode,
+    	uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
+    	uint8_t &keySize, uint32_t &valueSize,
+    	char *&key,
+    	uint32_t &valueUpdateSize, uint32_t &valueUpdateOffset,
+    	char *buf, size_t size
+    );
+
 	size_t generateListStripeKeyHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key
@@ -1052,6 +1103,14 @@ public:
 		struct DegradedReqHeader &header, uint8_t opcode,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
+    bool parseDegradedSetReqHeader(
+        struct DegradedSetHeader &header,
+        char *buf = 0, size_t size = 0, size_t offset = 0
+    );
+    bool parseDegradedSetResHeader(
+        struct DegradedSetHeader &header,
+        char *buf = 0, size_t size = 0, size_t offset = 0
+    );
 	bool parseListStripeKeyHeader(
 		struct ListStripeKeyHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
