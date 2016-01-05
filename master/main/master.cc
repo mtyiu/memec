@@ -1033,10 +1033,15 @@ void Master::revertParityDelta( FILE *f, SlaveSocket *target, pthread_cond_t *co
 	from = target->timestamp.lastAck.getVal();
 	to = target->timestamp.current.getVal();
 	del = update = from;
-	if ( ! target->timestamp.pendingAck.update.empty() )
-		update = target->timestamp.pendingAck.update.begin()->getVal() - 1;
-	if ( ! target->timestamp.pendingAck.del.empty() )
-		del = target->timestamp.pendingAck.del.begin()->getVal() - 1;
+	LOCK( &target->timestamp.pendingAck.updateLock );
+	if ( ! target->timestamp.pendingAck._update.empty() )
+		update = target->timestamp.pendingAck._update.begin()->getVal() - 1;
+	UNLOCK( &target->timestamp.pendingAck.updateLock );
+
+	LOCK( &target->timestamp.pendingAck.delLock );
+	if ( ! target->timestamp.pendingAck._del.empty() )
+		del = target->timestamp.pendingAck._del.begin()->getVal() - 1;
+	UNLOCK( &target->timestamp.pendingAck.delLock );
 
 	from = update < from ? ( del < update ? del : update ) : from ;
 
