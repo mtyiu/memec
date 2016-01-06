@@ -46,7 +46,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 			if ( ! isCompleted )
 				MasterWorker::eventQueue->insert( event );
 
-			// printf( "Sealed: %u; ops: %u\n", sealedCount, opsCount );
+			printf( "Sealed: %u; ops: %u\n", sealedCount, opsCount );
 			isSend = false; // Send to coordinator instead
 		}
 			break;
@@ -590,7 +590,7 @@ bool MasterWorker::handleParityDeltaAcknowledgement( SlaveEvent event, uint8_t o
 		);
 		return ret;
 	}
-	
+
 	if ( ackInfo.lock ) LOCK( ackInfo.lock );
 	if ( ackInfo.counter ) {
 		*ackInfo.counter -= 1;
@@ -612,7 +612,7 @@ bool MasterWorker::handleParityDeltaAcknowledgement( SlaveEvent event, uint8_t o
 			LOCK( &master->sockets.slavesIdToSocketLock );
 			try {
 				struct sockaddr_in saddr = master->sockets.slavesIdToSocketMap.at( header.targetId )->getAddr();
-				master->remapMsgHandler.ackTransit( saddr ); 
+				master->remapMsgHandler.ackTransit( saddr );
 			} catch ( std::out_of_range &e ) {
 				__ERROR__( "MasterWorker", "handleParityDeltaAcknowledgement",
 					"Cannot find slave socket for instacne id = %u", header.targetId

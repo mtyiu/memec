@@ -104,7 +104,6 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 	////////////////////////////////////////////////////////////////////////////
 
 	uint32_t numLostChunks = 0, listId, stripeId, chunkId, requestId = 0;
-	std::set<Metadata> unsealedChunks;
 	bool connected, isCompleted, isAllCompleted;
 	ssize_t ret;
 	struct {
@@ -113,6 +112,7 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 	} buffer;
 
 	std::unordered_set<Metadata>::iterator chunksIt;
+	std::unordered_map<Key, OpMetadata>::iterator keysIt;
 	std::unordered_map<uint32_t, std::unordered_set<uint32_t>> stripeIds;
 	std::unordered_map<uint32_t, std::unordered_set<uint32_t>>::iterator stripeIdsIt;
 	std::unordered_set<uint32_t>::iterator stripeIdSetIt;
@@ -285,7 +285,36 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 	////////////////////////////
 	// Handle unsealed chunks //
 	////////////////////////////
-	// TODO
+	// Construct the set of keys in unsealed chunks
+	std::map<Metadata, std::vector<Key>> unsealed;
+	std::map<Metadata, std::vector<Key>>::iterator unsealedIt;
+
+	printf( "socket->map.keys.size = %lu\n", socket->map.keys.size() );
+	for ( keysIt = socket->map.keys.begin(); keysIt != socket->map.keys.end(); keysIt++ ) {
+		const Key &key = keysIt->first;
+		const OpMetadata &opMetadata = keysIt->second;
+
+		chunksIt = socket->map.chunks.find( opMetadata );
+		if ( chunksIt == socket->map.chunks.end() ) {
+			unsealedIt = unsealed.find( opMetadata );
+			if ( unsealedIt == unsealed.end() ) {
+				std::pair<Metadata, std::vector<Key>> p( opMetadata, std::vector<Key>() );
+				std::pair<std::map<Metadata, std::vector<Key>>::iterator, bool> r = unsealed.insert( p );
+				unsealedIt = r.first;
+			}
+			unsealedIt->second.push_back( key );
+		}
+	}
+	printf( "Number of unsealed chunks: %lu\n", unsealed.size() );
+	for ( unsealedIt = unsealed.begin(); unsealedIt != unsealed.end(); unsealedIt++ ) {
+		// printf(
+		// 	"- (%u, %u, %u): %lu keys\n",
+		// 	unsealedIt->first.listId,
+		// 	unsealedIt->first.stripeId,
+		// 	unsealedIt->first.chunkId,
+		// 	unsealedIt->second.size()
+		// );
+	}
 
 	UNLOCK( &socket->map.keysLock );
 	UNLOCK( &socket->map.chunksLock );

@@ -107,12 +107,12 @@ size_t Backup::erase( uint32_t fromTimestamp, uint32_t toTimestamp ) {
 		const MetadataBackup &metadataBackup = opsIt->second;
 		if ( isWrappedAround ) {
 			selected = (
-				metadataBackup.timestamp > fromTimestamp ||
+				metadataBackup.timestamp >= fromTimestamp ||
 				metadataBackup.timestamp < toTimestamp
 			);
 		} else {
 			selected = (
-				metadataBackup.timestamp > fromTimestamp &&
+				metadataBackup.timestamp >= fromTimestamp &&
 				metadataBackup.timestamp < toTimestamp
 			);
 		}
@@ -129,12 +129,12 @@ size_t Backup::erase( uint32_t fromTimestamp, uint32_t toTimestamp ) {
 	for ( sealedIt = this->sealed.begin(); sealedIt != this->sealed.end(); ) {
 		if ( isWrappedAround ) {
 			selected = (
-				sealedIt->first > fromTimestamp ||
+				sealedIt->first >= fromTimestamp ||
 				sealedIt->first < toTimestamp
 			);
 		} else {
 			selected = (
-				sealedIt->first > fromTimestamp &&
+				sealedIt->first >= fromTimestamp &&
 				sealedIt->first < toTimestamp
 			);
 		}
@@ -146,8 +146,10 @@ size_t Backup::erase( uint32_t fromTimestamp, uint32_t toTimestamp ) {
 		}
 	}
 	// printf(
-	// 	"Number of metadata backup: (released) %lu; (remaining) %lu; "
-	// 	"Number of sealed chunk backup: (released) %lu; (remaining) %lu.\n",
+	// 	"Erased backup from %u to %u:\n"
+	// 	"- Number of metadata backup: (released) %lu; (remaining) %lu;\n"
+	// 	"- Number of sealed chunk backup: (released) %lu; (remaining) %lu.\n",
+	// 	fromTimestamp, toTimestamp,
 	// 	opsCount, this->ops.size(),
 	// 	sealedCount, this->sealed.size()
 	// );

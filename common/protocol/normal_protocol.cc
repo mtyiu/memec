@@ -133,6 +133,7 @@ bool Protocol::parseKeyBackupHeader( size_t offset, bool &isParity, uint8_t &key
 	if ( isParity ) {
 		if ( size - offset < ( size_t ) PROTO_KEY_BACKUP_BASE_SIZE + keySize )
 			return false;
+		key = ptr;
 	} else {
 		if ( size - offset < ( size_t ) PROTO_KEY_BACKUP_BASE_SIZE + PROTO_KEY_BACKUP_FOR_DATA_SIZE + keySize )
 			return false;
