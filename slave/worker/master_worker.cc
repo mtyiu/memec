@@ -21,6 +21,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_ACK_METADATA:
+		case MASTER_EVENT_TYPE_ACK_PARITY_BACKUP:
 		case MASTER_EVENT_TYPE_REVERT_PARITY_DELTA_SUCCESS:
 			success = true;
 			break;
@@ -170,6 +171,15 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 				event.instanceId, event.requestId,
 				event.message.ack.fromTimestamp,
 				event.message.ack.toTimestamp
+			);
+			break;
+		case MASTER_EVENT_TYPE_ACK_PARITY_BACKUP:
+			buffer.data = this->protocol.ackParityDeltaBackup(
+				buffer.size,
+				Slave::instanceId, event.requestId,
+				event.message.revert.fromTimestamp,
+				event.message.revert.toTimestamp,
+				event.message.revert.targetId
 			);
 			break;
 		case MASTER_EVENT_TYPE_REVERT_PARITY_DELTA_SUCCESS:
@@ -586,6 +596,9 @@ bool SlaveWorker::handleAckParityDeltaBackup( MasterEvent event, char *buf, size
 
 	event.socket->backup.removeParityUpdate( from, to, header.targetId );
 	event.socket->backup.removeParityDelete( from, to, header.targetId );
+
+	event.resAckParityDelta( event.socket, Slave::instanceId, event.requestId, header.fromTimestamp, header.toTimestamp, header.targetId );
+	this->dispatch( event );
 
 	return true;
 }

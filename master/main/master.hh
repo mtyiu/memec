@@ -60,6 +60,8 @@ public:
 		ArrayMap<int, ApplicationSocket> applications;
 		ArrayMap<int, CoordinatorSocket> coordinators;
 		ArrayMap<int, SlaveSocket> slaves;
+		std::unordered_map<uint16_t, SlaveSocket*> slavesIdToSocketMap;
+		LOCK_T slavesIdToSocketLock;
 	} sockets;
 	IDGenerator idGenerator;
 	Pending pending;
@@ -98,7 +100,7 @@ public:
 	void syncMetadata();
 	void time();
 	void ackParityDelta( FILE *f = 0, SlaveSocket *target = 0, pthread_cond_t *condition = 0, LOCK_T *lock = 0, uint32_t *counter = 0, bool force = false );
-	void revertParityDelta( FILE *f = 0, SlaveSocket *target = 0, pthread_cond_t *condition = 0, LOCK_T *lock = 0, uint32_t *counter = 0, bool force = false );
+	bool revertParityDelta( FILE *f = 0, SlaveSocket *target = 0, pthread_cond_t *condition = 0, LOCK_T *lock = 0, uint32_t *counter = 0, bool force = false );
 	double getElapsedTime();
 	void interactive();
 	bool setDebugFlag( char *input );

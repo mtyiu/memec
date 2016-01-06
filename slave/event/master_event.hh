@@ -30,6 +30,7 @@ enum MasterEventType {
 	MASTER_EVENT_TYPE_DELETE_RESPONSE_FAILURE,
 	// ACK
 	MASTER_EVENT_TYPE_ACK_METADATA,
+	MASTER_EVENT_TYPE_ACK_PARITY_BACKUP,
 	// FAULT TOLERANCE
 	MASTER_EVENT_TYPE_REVERT_PARITY_DELTA_SUCCESS,
 	MASTER_EVENT_TYPE_REVERT_PARITY_DELTA_FAILURE,
@@ -113,6 +114,7 @@ public:
 	void resDelete( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key, bool needsFree, bool isDegraded );
 	void resDelete( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool needsFree, bool isDegraded );
 	// FAULT TOLERANCE
+	void resAckParityDelta( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t fromTimestamp, uint32_t toTimestamp, uint16_t dataSlaveId );
 	void resRevertParityDelta( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, bool success, uint32_t fromTimestamp, uint32_t toTimestamp, uint16_t dataSlaveId );
 	// ACK
 	void ackMetadata( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t fromTimestamp, uint32_t toTimestamp );

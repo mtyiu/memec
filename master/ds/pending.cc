@@ -91,6 +91,10 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 		lock = &this->ack.revertLock;
 		map = &this->ack.revert;
 		return true;
+	} else if ( type == PT_ACK_REMOVE_PARITY ) {
+		lock = &this->ack.removeLock;
+		map = &this->ack.remove;
+		return true;
 	} else {
 		lock = 0;
 		map = 0;

@@ -24,6 +24,7 @@ enum PendingType {
 	PT_SLAVE_UPDATE,
 	PT_SLAVE_DEL,
 	PT_KEY_REMAP_LIST,
+	PT_ACK_REMOVE_PARITY,
 	PT_ACK_REVERT_PARITY
 };
 
@@ -165,7 +166,9 @@ public:
 		LOCK_T setLock;
 	} stats;
 	struct {
+		std::unordered_multimap<PendingIdentifier, AcknowledgementInfo > remove;
 		std::unordered_multimap<PendingIdentifier, AcknowledgementInfo > revert;
+		LOCK_T removeLock;
 		LOCK_T revertLock;
 	} ack;
 

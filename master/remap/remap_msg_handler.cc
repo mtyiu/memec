@@ -132,7 +132,7 @@ void MasterRemapMsgHandler::setState( char* msg , int len ) {
 				__DEBUG__( BLUE, "MasterRemapMsgHandler", "setState", "REMAP_NORMAL %s:%hu", buf, slave.sin_port );
 				break;
 			case REMAP_INTERMEDIATE:
-				__DEBUG__( BLUE, "MasterRemapMsgHandler", "setState", "REMAP_INTERMEDIATE %s:%hu", buf, slave.sin_port );
+				__INFO__( BLUE, "MasterRemapMsgHandler", "setState", "REMAP_INTERMEDIATE %s:%hu", buf, slave.sin_port );
 				if ( state == REMAP_WAIT_DEGRADED )
 					signal = state;
 				else {
@@ -155,21 +155,30 @@ void MasterRemapMsgHandler::setState( char* msg , int len ) {
 						SlaveEvent event;
 						event.syncMetadata( target );
 						Master::getInstance()->eventQueue.insert( event );
+						// revert parity deltas
+						Master::getInstance()->revertParityDelta( 
+							0, target, 0,
+							&this->stateTransitInfo[ slave ].counter.parityRevert.lock, 
+							&this->stateTransitInfo[ slave ].counter.parityRevert.value, 
+							true
+						); 
 					} else {
 						__ERROR__( "MasterRemapMsgHandler", "setState", "SlaveSocket not found." );
 					}
 				}
 				break;
 			case REMAP_COORDINATED:
-				__DEBUG__( BLUE, "MasterRemapMsgHandler", "setState", "REMAP_COORDINATED %s:%hu", buf, slave.sin_port );
+				__INFO__( BLUE, "MasterRemapMsgHandler", "setState", "REMAP_COORDINATED %s:%hu", buf, slave.sin_port );
 				if ( state == REMAP_WAIT_NORMAL )
 					signal = state;
 				break;
 			case REMAP_DEGRADED:
-				__DEBUG__( BLUE, "MasterRemapMsgHandler", "setState", "REMAP_DEGRADED %s:%hu", buf, slave.sin_port );
+				__INFO__( BLUE, "MasterRemapMsgHandler", "setState", "REMAP_DEGRADED %s:%hu", buf, slave.sin_port );
+				if ( state == REMAP_INTERMEDIATE )
+					__ERROR__( "MasterRemapMsgHandler", "setState", "Not yet ready for transition to DEGRADED!\n" );
 				break;
 			default:
-				__DEBUG__( BLUE, "MasterRemapMsgHandler", "setState", "Unknown %d %s:%hu", signal, buf, slave.sin_port );
+				__INFO__( BLUE, "MasterRemapMsgHandler", "setState", "Unknown %d %s:%hu", signal, buf, slave.sin_port );
 				UNLOCK( &this->slavesStateLock[ slave ] );
 				return;
 		}
@@ -190,6 +199,7 @@ bool MasterRemapMsgHandler::addAliveSlave( struct sockaddr_in slave ) {
 		return false;
 	}
 	this->slavesState[ slave ] = REMAP_NORMAL;
+	this->stateTransitInfo[ slave ] = StateTransitInfo();
 	UNLOCK( &this->aliveSlavesLock );
 	return true;
 }
@@ -201,6 +211,7 @@ bool MasterRemapMsgHandler::removeAliveSlave( struct sockaddr_in slave ) {
 		return false;
 	}
 	this->slavesState.erase( slave );
+	this->stateTransitInfo.erase( slave );
 	UNLOCK( &this->aliveSlavesLock );
 	return true;
 }
@@ -291,10 +302,13 @@ bool MasterRemapMsgHandler::ackTransit( struct sockaddr_in *slave ) {
 bool MasterRemapMsgHandler::checkAckForSlave( struct sockaddr_in slave ) {
 	LOCK( &this->slavesStateLock[ slave ] );
 	RemapState state = this->slavesState[ slave ];
+	char buf[ INET_ADDRSTRLEN ];
+	inet_ntop( AF_INET, &slave.sin_addr.s_addr, buf, INET_ADDRSTRLEN );
 
-	if ( ( state == REMAP_NORMAL ) ||
-	     ( state == REMAP_INTERMEDIATE && false /* yet sync all meta */ && false /* yet undo all parity */ ) ||
-	     ( state == REMAP_COORDINATED && false /* yet replay all requests? */ ) ) {
+	if ( 
+		( state == REMAP_NORMAL ) ||
+	    ( state == REMAP_INTERMEDIATE && ( false /* yet sync all meta */ || this->stateTransitInfo[ slave ].getParityRevertCounterVal() > 0 /* yet undo all parity */ ) ) ||
+	    ( state == REMAP_COORDINATED ) ) {
 		UNLOCK( &this->slavesStateLock[ slave ] );
 		return false;
 	}

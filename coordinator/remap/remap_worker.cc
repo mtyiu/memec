@@ -17,6 +17,17 @@ bool CoordinatorRemapWorker::transitToDegraded( RemapStateEvent event ) { // Pha
 	char buf[ INET_ADDRSTRLEN ];
 	inet_ntop( AF_INET, &event.slave.sin_addr.s_addr, buf, INET_ADDRSTRLEN );
 	// wait for "sync meta ack" to proceed, release lock once acquired
+	__INFO__( CYAN, "CoordinatorRemapWorker", "transitToDegraded",
+		"Start transition to degraded for slave %s:%u.",
+		buf, event.slave.sin_port
+	);
+
+	// any cleanup to be done (request for metadata sync. and parity revert)
+	// wait for metadata sync to complete
+	crmh->transitToDegradedEnd( event.slave );
+
+	// wait for parity revert to complete
+	// obtaining ack from all masters to ensure all masters already complete reverting parity 
 	if ( crmh->isAllMasterAcked( event.slave ) == false )
 		pthread_cond_wait( &crmh->ackSignal[ event.slave ], &crmh->ackSignalLock );
 	pthread_mutex_unlock( &crmh->ackSignalLock );
@@ -29,13 +40,11 @@ bool CoordinatorRemapWorker::transitToDegraded( RemapStateEvent event ) { // Pha
 		UNLOCK( &crmh->slavesStateLock[ event.slave ] );
 		return false;
 	}
-	// any cleanup to be done (request for metadata sync.)
-	crmh->transitToDegradedEnd( event.slave );
 
 	// broadcast to master: the transition is completed
 	crmh->slavesState[ event.slave ] = REMAP_DEGRADED; // Phase 2
 	if ( crmh->sendStateToMasters( event.slave ) == false ) {
-		__ERROR__( "CoordinatorRemapWorker", "transitToNormal",
+		__ERROR__( "CoordinatorRemapWorker", "transitToDegraded",
 			"Failed to broadcast state changes on slave %s:%u!",
 			buf, event.slave.sin_port
 		);
