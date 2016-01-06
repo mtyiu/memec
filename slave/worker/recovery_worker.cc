@@ -296,3 +296,7 @@ bool SlaveWorker::handleReconstructionRequest( CoordinatorEvent event, char *buf
 
 	return false;
 }
+
+bool SlaveWorker::handleCompletedReconstructionAck() {
+	return Slave::getInstance()->initChunkBuffer();
+}

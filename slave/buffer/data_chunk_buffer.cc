@@ -20,23 +20,27 @@ DataChunkBuffer::DataChunkBuffer( uint32_t count, uint32_t listId, uint32_t stri
 #endif
 	}
 
-	if ( isReady )
-		this->init( listId, stripeId, chunkId );
-}
-
-void DataChunkBuffer::init( uint32_t listId, uint32_t stripeId, uint32_t chunkId ) {
 	this->listId = listId;
 	this->stripeId = stripeId;
 	this->chunkId = chunkId;
+	if ( isReady )
+		this->init();
+}
 
+void DataChunkBuffer::init() {
 	for ( uint32_t i = 0; i < this->count; i++ ) {
 		Metadata &metadata = this->chunks[ i ]->metadata;
 		metadata.listId = this->listId;
-		metadata.stripeId = this->stripeId;
+		metadata.stripeId = ChunkBuffer::map->nextStripeID( this->listId, this->stripeId );
 		metadata.chunkId = this->chunkId;
-		ChunkBuffer::map->setChunk( this->listId, this->stripeId, this->chunkId, this->chunks[ i ], false );
-
-		this->stripeId++;
+		ChunkBuffer::map->setChunk(
+			metadata.listId,
+			metadata.stripeId,
+			metadata.chunkId,
+			this->chunks[ i ],
+			false // isParity
+		);
+		this->stripeId = metadata.stripeId + 1;
 	}
 }
 
@@ -353,13 +357,19 @@ Chunk *DataChunkBuffer::flushAt( SlaveWorker *worker, int index, bool lock, Meta
 	Chunk *newChunk = ChunkBuffer::chunkPool->malloc();
 	newChunk->clear();
 	newChunk->metadata.listId = this->listId;
-	newChunk->metadata.stripeId = this->stripeId;
+	newChunk->metadata.stripeId = ChunkBuffer::map->nextStripeID( this->listId, this->stripeId );
 	newChunk->metadata.chunkId = this->chunkId;
 	newChunk->isParity = false;
 	// ChunkBuffer::map->cache[ newChunk->metadata ] = newChunk;
-	ChunkBuffer::map->setChunk( this->listId, this->stripeId, this->chunkId, newChunk, false );
+	ChunkBuffer::map->setChunk(
+		newChunk->metadata.listId,
+		newChunk->metadata.stripeId,
+		newChunk->metadata.chunkId,
+		newChunk,
+		false // isParity
+	);
 	this->chunks[ index ] = newChunk;
-	this->stripeId++;
+	this->stripeId = newChunk->metadata.stripeId + 1;
 
 	// Notify the parity slaves to seal the chunk
 	if ( worker->issueSealChunkRequest( chunk ) ) {

@@ -25,6 +25,9 @@ bool CoordinatorWorker::handlePromoteBackupSlaveResponse( SlaveEvent event, char
 	if ( remaining == 0 ) {
 		__INFO__( CYAN, "CoordinatorWorker", "handlePromoteBackupSlaveResponse", "Recovery is completed. Number of chunks reconstructed = %u; elapsed time = %lf s.\n", total, elapsedTime );
 
+		event.ackCompletedReconstruction( event.socket, event.instanceId, event.requestId, true );
+		this->dispatch( event );
+
 		// notify the remap message handler of a "removed" slave
 		Coordinator *coordinator = Coordinator::getInstance();
 		if ( coordinator->remapMsgHandler )

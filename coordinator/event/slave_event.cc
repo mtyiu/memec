@@ -71,3 +71,10 @@ void SlaveEvent::disconnect( SlaveSocket *socket ) {
 	this->type = SLAVE_EVENT_TYPE_DISCONNECT;
 	this->socket = socket;
 }
+
+void SlaveEvent::ackCompletedReconstruction( SlaveSocket *socket, uint16_t instanceId, uint32_t requestId, bool success ) {
+	this->type = success ? SLAVE_EVENT_TYPE_ACK_RECONSTRUCTION_SUCCESS : SLAVE_EVENT_TYPE_ACK_RECONSTRUCTION_FAILURE;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
+	this->socket = socket;
+}

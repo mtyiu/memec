@@ -9,6 +9,7 @@
 #include "../../common/lock/lock.hh"
 #include "../../common/protocol/protocol.hh"
 #include "../../common/timestamp/timestamp.hh"
+#include "../../common/util/debug.hh"
 
 class Map {
 private:
@@ -25,6 +26,13 @@ private:
 	 */
 	std::unordered_map<Metadata, Chunk *> cache;
 	LOCK_T cacheLock;
+
+	/**
+	 * Store the used stripe IDs
+	 * (list ID) |-> std::unordered_set<(stripe ID)>
+	 */
+	std::unordered_map<uint32_t, std::unordered_set<uint32_t>> stripeIds;
+	LOCK_T stripeIdsLock;
 
 public:
 	/**
@@ -43,6 +51,7 @@ public:
 	Map() {
 		LOCK_INIT( &this->keysLock );
 		LOCK_INIT( &this->cacheLock );
+		LOCK_INIT( &this->stripeIdsLock );
 		LOCK_INIT( &this->opsLock );
 		LOCK_INIT( &this->sealedLock );
 	}
@@ -202,8 +211,15 @@ public:
 		metadata.set( listId, stripeId, chunkId );
 
 		if ( needsLock ) LOCK( &this->cacheLock );
+		if ( this->cache.find( metadata ) != this->cache.end() ) {
+			__ERROR__( "Map", "setChunk", "This chunk (%u, %u, %u) already exists.", listId, stripeId, chunkId );
+		}
 		this->cache[ metadata ] = chunk;
 		if ( needsUnlock ) UNLOCK( &this->cacheLock );
+
+		if ( needsLock ) LOCK( &this->stripeIdsLock );
+		this->stripeIds[ listId ].insert( stripeId );
+		if ( needsUnlock ) UNLOCK( &this->stripeIdsLock );
 
 		if ( ! isParity ) {
 			char *ptr = chunk->getData();
@@ -235,6 +251,17 @@ public:
 			}
 			if ( needsUnlock ) UNLOCK( &this->keysLock );
 		}
+	}
+
+	uint32_t nextStripeID( uint32_t listId, uint32_t from = 0 ) {
+		uint32_t ret = from;
+		LOCK( &this->stripeIdsLock );
+		std::unordered_set<uint32_t> &sids = this->stripeIds[ listId ];
+		std::unordered_set<uint32_t>::iterator end = sids.end();
+		while ( sids.find( ret ) != end )
+			ret++;
+		UNLOCK( &this->stripeIdsLock );
+		return ret;
 	}
 
 	bool deleteKey( Key key, uint8_t opcode, uint32_t &timestamp, KeyMetadata &keyMetadata, bool needsLock, bool needsUnlock, bool needsUpdateOpMetadata = true ) {

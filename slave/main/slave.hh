@@ -38,6 +38,7 @@ private:
 	bool isRunning;
 	struct timespec startTime;
 	std::vector<SlaveWorker> workers;
+	int mySlaveIndex;
 
 	Slave();
 	// Do not implement
@@ -91,6 +92,7 @@ public:
 
 	bool init( char *path, OptionList &options, bool verbose );
 	bool init( int mySlaveIndex );
+	bool initChunkBuffer();
 	bool start();
 	bool stop();
 

@@ -75,6 +75,14 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 		case SLAVE_EVENT_TYPE_TRIGGER_RECONSTRUCTION:
 			isSend = false;
 			break;
+		case SLAVE_EVENT_TYPE_ACK_RECONSTRUCTION_SUCCESS:
+		case SLAVE_EVENT_TYPE_ACK_RECONSTRUCTION_FAILURE:
+			buffer.data = this->protocol.ackCompletedReconstruction(
+				buffer.size, event.instanceId, event.requestId,
+				event.type == SLAVE_EVENT_TYPE_ACK_RECONSTRUCTION_SUCCESS
+			);
+			isSend = true;
+			break;
 		default:
 			return;
 	}

@@ -50,7 +50,6 @@ void Slave::signalHandler( int signal ) {
 }
 
 bool Slave::init( char *path, OptionList &options, bool verbose ) {
-	int mySlaveIndex;
 	// Parse configuration files //
 	if ( ( ! this->config.global.parse( path ) ) ||
 	     ( ! this->config.slave.merge( this->config.global ) ) ||
@@ -59,7 +58,7 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 	) {
 		return false;
 	}
-	mySlaveIndex = this->config.slave.validate( this->config.global.slaves );
+	this->mySlaveIndex = this->config.slave.validate( this->config.global.slaves );
 
 	// Initialize modules //
 	/* Socket */
@@ -243,6 +242,7 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 }
 
 bool Slave::init( int mySlaveIndex ) {
+	this->mySlaveIndex = mySlaveIndex;
 	if ( mySlaveIndex == -1 )
 		return false;
 
@@ -271,6 +271,18 @@ bool Slave::init( int mySlaveIndex ) {
 				)
 			);
 		}
+	}
+
+	return true;
+}
+
+bool Slave::initChunkBuffer() {
+	if ( this->mySlaveIndex == -1 )
+		return false;
+
+	for ( uint32_t i = 0, size = this->stripeListIndex.size(); i < size; i++ ) {
+		uint32_t listId = this->stripeListIndex[ i ].listId;
+		this->chunkBuffer[ listId ]->init();
 	}
 
 	return true;

@@ -32,6 +32,7 @@ public:
 	);
 
 	// For DataChunkBuffer only
+	void init();
 	size_t seal( SlaveWorker *worker );
 	bool reInsert( SlaveWorker *worker, Chunk *chunk, uint32_t sizeToBeFreed, bool needsLock, bool needsUnlock );
 	// For ParityChunkBuffer only

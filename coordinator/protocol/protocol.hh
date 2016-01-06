@@ -92,6 +92,7 @@ public:
 		uint32_t numChunks,
 		bool &isCompleted
 	);
+	char *ackCompletedReconstruction( size_t &size, uint16_t instanceId, uint32_t requestId, bool success );
 
 	// ---------- heartbeat_protocol.cc ----------
 	char *resHeartbeat(

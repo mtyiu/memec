@@ -19,7 +19,9 @@ enum SlaveEventType {
 	SLAVE_EVENT_TYPE_REQUEST_RELEASE_DEGRADED_LOCK,
 	SLAVE_EVENT_TYPE_RESPONSE_HEARTBEAT,
 	SLAVE_EVENT_TYPE_DISCONNECT,
-	SLAVE_EVENT_TYPE_TRIGGER_RECONSTRUCTION
+	SLAVE_EVENT_TYPE_TRIGGER_RECONSTRUCTION,
+	SLAVE_EVENT_TYPE_ACK_RECONSTRUCTION_SUCCESS,
+	SLAVE_EVENT_TYPE_ACK_RECONSTRUCTION_FAILURE
 };
 
 class SlaveEvent : public Event {
@@ -63,6 +65,7 @@ public:
 	void resHeartbeat( SlaveSocket *socket, uint32_t timestamp, uint32_t sealed, uint32_t keys, bool isLast );
 	void disconnect( SlaveSocket *socket );
 	void triggerReconstruction( struct sockaddr_in addr );
+	void ackCompletedReconstruction( SlaveSocket *socket, uint16_t instanceId, uint32_t requestId, bool success );
 };
 
 #endif
