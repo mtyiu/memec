@@ -232,6 +232,10 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 	// Set signal handlers //
 	Signal::setHandler( Slave::signalHandler );
 
+	// Init lock for instance id to socket mapping //
+	LOCK_INIT( &this->sockets.mastersIdToSocketLock );
+	LOCK_INIT( &this->sockets.slavesIdToSocketLock );
+
 	// Show configuration //
 	if ( verbose )
 		this->info();

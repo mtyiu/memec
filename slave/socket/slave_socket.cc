@@ -135,7 +135,9 @@ bool SlaveSocket::handler( int fd, uint32_t events, void *data ) {
 						// Ignore the address header for master socket
 						slave->sockets.masters.set( fd, masterSocket );
 						// add socket to the instance-id-to-master-socket mapping
-						slave->sockets.mastersIdToSocketMap.set( header.instanceId, masterSocket );
+						LOCK( &slave->sockets.mastersIdToSocketLock );
+						slave->sockets.mastersIdToSocketMap[ header.instanceId ] = masterSocket;
+						UNLOCK( &slave->sockets.mastersIdToSocketLock );
 						socket->sockets.removeAt( index );
 
 						socket->done( fd ); // The socket is valid

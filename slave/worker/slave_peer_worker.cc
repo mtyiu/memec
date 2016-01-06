@@ -417,9 +417,14 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 							this->handleSlavePeerRegisterRequest( event.socket, header.instanceId, header.requestId, buffer.data, buffer.size );
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
+						{
 							event.socket->registered = true;
 							event.socket->instanceId = header.instanceId;
-							Slave::getInstance()->sockets.slavesIdToSocketMap.set( header.instanceId, event.socket, true );
+							Slave *slave = Slave::getInstance();
+							LOCK( &slave->sockets.slavesIdToSocketLock );
+							slave->sockets.slavesIdToSocketMap[ header.instanceId ] = event.socket;
+							UNLOCK( &slave->sockets.slavesIdToSocketLock );
+						}
 							break;
 						case PROTO_MAGIC_RESPONSE_FAILURE:
 							__ERROR__( "SlaveWorker", "dispatch", "Failed to register with slave." );

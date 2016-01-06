@@ -59,8 +59,10 @@ public:
 		ArrayMap<int, CoordinatorSocket> coordinators;
 		ArrayMap<int, MasterSocket> masters;
 		ArrayMap<int, SlavePeerSocket> slavePeers;
-		ArrayMap<uint16_t, MasterSocket> mastersIdToSocketMap;
-		ArrayMap<uint16_t, SlavePeerSocket> slavesIdToSocketMap;
+		std::unordered_map<uint16_t, MasterSocket*> mastersIdToSocketMap;
+		std::unordered_map<uint16_t, SlavePeerSocket*> slavesIdToSocketMap;
+		LOCK_T mastersIdToSocketLock;
+		LOCK_T slavesIdToSocketLock;
 	} sockets;
 	IDGenerator idGenerator;
 	Pending pending;
