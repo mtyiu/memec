@@ -319,6 +319,10 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 	}
 	this->statsTimer.setInterval( sec, msec );
 
+	// Socket mapping lock //
+	LOCK_INIT( &this->sockets.slavesIdToSocketLock );
+
+
 	// Set signal handlers //
 	Signal::setHandler( Master::signalHandler );
 
@@ -560,8 +564,21 @@ void Master::interactive() {
 			valid = true;
 			this->time();
 		} else if ( strcmp( command, "ackparity" ) == 0 ) {
+			pthread_cond_t condition;
+			pthread_mutex_t lock;
+			uint32_t counter = 0;
+
+			pthread_cond_init( &condition, 0 );
+			pthread_mutex_init( &lock, 0 );
+			this->ackParityDelta( stdout, 0, &condition, &lock, &counter, true );
+			// wait for all ack, skip waiting if there is nothing to revert
+			LOCK( &lock );
+			if ( counter > 0 ) {
+				printf( "waiting for %u acknowledgements with counter at %p\n", counter, &counter );
+				UNLOCK( &lock );
+				pthread_cond_wait( &condition, &lock );
+			}
 			valid = true;
-			this->ackParityDelta( stdout, 0, 0, 0, 0, true );
 		} else if ( strcmp( command, "revertparity" ) == 0 ) {
 			pthread_cond_t condition;
 			pthread_mutex_t lock;
@@ -866,6 +883,13 @@ void Master::printPending( FILE *f ) {
 		fprintf( f, "\n" );
 	}
 	UNLOCK( &this->pending.slaves.delLock );
+
+	fprintf(
+		f,
+		"\n[ACK] Parity backup: (remove)%10lu  (revert)%10lu\n",
+		this->pending.ack.remove.size(),
+		this->pending.ack.revert.size()
+	);
 }
 
 void Master::printRemapping( FILE *f ) {
@@ -1023,16 +1047,21 @@ void Master::ackParityDelta( FILE *f, SlaveSocket *target, pthread_cond_t *condi
 	}
 }
 
-void Master::revertParityDelta( FILE *f, SlaveSocket *target, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter, bool force ) {
+bool Master::revertParityDelta( FILE *f, SlaveSocket *target, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter, bool force ) {
 	uint32_t from, to, update, del;
 
 	// process one target slave at a time
 	if ( ! target )
-		return;
+		return false;
 
-	from = target->timestamp.lastAck.getVal();
+	// ack parity delta as well, but do not wait for it to complete
+	//this->ackParityDelta( f, target, 0, 0, 0, force );
+
+	// find the smallest unacknowledged timestamp
+	from = target->timestamp.current.getVal();
 	to = target->timestamp.current.getVal();
 	del = update = from;
+
 	LOCK( &target->timestamp.pendingAck.updateLock );
 	if ( ! target->timestamp.pendingAck._update.empty() )
 		update = target->timestamp.pendingAck._update.begin()->getVal() - 1;
@@ -1046,7 +1075,7 @@ void Master::revertParityDelta( FILE *f, SlaveSocket *target, pthread_cond_t *co
 	from = update < from ? ( del < update ? del : update ) : from ;
 
 	if ( to - from == 0 )
-		return;
+		return false;
 
 	if ( f ) {
 		target->printAddress();
@@ -1054,5 +1083,7 @@ void Master::revertParityDelta( FILE *f, SlaveSocket *target, pthread_cond_t *co
 	}
 
 	DISPATCH_EVENT_TO_OTHER_SLAVES( revertParityDelta, target, condition, lock, counter );
+
+	return true;
 }
 

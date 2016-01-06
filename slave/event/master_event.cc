@@ -114,6 +114,16 @@ void MasterEvent::resRevertParityDelta( MasterSocket *socket, uint16_t instanceI
 	this->message.revert.targetId = dataSlaveId;
 }
 
+void MasterEvent::resAckParityDelta( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t fromTimestamp, uint32_t toTimestamp, uint16_t dataSlaveId ) {
+	this->type = MASTER_EVENT_TYPE_ACK_PARITY_BACKUP;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
+	this->socket = socket;
+	this->message.revert.fromTimestamp = fromTimestamp;
+	this->message.revert.toTimestamp = toTimestamp;
+	this->message.revert.targetId = dataSlaveId;
+}
+
 void MasterEvent::ackMetadata( MasterSocket	*socket, uint16_t instanceId, uint32_t requestId, uint32_t fromTimestamp, uint32_t toTimestamp ) {
 	this->instanceId = instanceId;
 	this->requestId = requestId;

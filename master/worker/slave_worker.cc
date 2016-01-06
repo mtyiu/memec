@@ -51,14 +51,32 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 		}
 			break;
 		case SLAVE_EVENT_TYPE_ACK_PARITY_DELTA:
+		{
+			uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
+
+			AcknowledgementInfo ackInfo(
+				Timestamp( event.message.ack.fromTimestamp ),
+				Timestamp( event.message.ack.toTimestamp ),
+				event.message.ack.condition,
+				event.message.ack.lock,
+				event.message.ack.counter
+			);
+
+			MasterWorker::pending->insertAck(
+				PT_ACK_REMOVE_PARITY,
+				event.socket->instanceId, requestId, 0,
+				ackInfo
+			);
+
 			buffer.data = this->protocol.ackParityDeltaBackup(
 				buffer.size,
 				instanceId,
-				MasterWorker::idGenerator->nextVal( this->workerId ),
+				requestId,
 				event.message.ack.fromTimestamp, event.message.ack.toTimestamp,
 				event.message.ack.targetId
 			);
 			isSend = true;
+		}
 			break;
 		case SLAVE_EVENT_TYPE_REVERT_PARITY_DELTA:
 		{
@@ -146,6 +164,10 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 						if ( success ) {
 							event.socket->registered = true;
 							event.socket->instanceId = header.instanceId;
+							Master *master = Master::getInstance();
+							LOCK( &master->sockets.slavesIdToSocketLock );
+							master->sockets.slavesIdToSocketMap[ header.instanceId ] = event.socket;
+							UNLOCK( &master->sockets.slavesIdToSocketLock );
 						} else {
 							__ERROR__( "MasterWorker", "dispatch", "Failed to register with slave." );
 						}
@@ -543,32 +565,63 @@ bool MasterWorker::handleParityDeltaAcknowledgement( SlaveEvent event, uint8_t o
 		return false;
 	}
 
-	if ( opcode == PROTO_OPCODE_REVERT_PARITY_DELTA ) {
-		__DEBUG__( YELLOW, "MasterWorker", "handleParityDeltaAcknowledgement",
-				"GOT ack for instance id = %u from instance id = %u request id = %u",
-				header.targetId, event.instanceId, event.requestId
-		);
-		AcknowledgementInfo ackInfo;
-		if ( ! MasterWorker::pending->eraseAck( PT_ACK_REVERT_PARITY, event.instanceId, event.requestId, 0, &pid, &ackInfo ) ) {
-			__ERROR__( "MasterWorker", "handleParityDeltaAcknowledgement",
-				"Cannot find the pending ack info for instacne id = %u from instance id = %u request id = %u",
-				header.targetId, event.instanceId, event.requestId
-			);
-		}
-		if ( ackInfo.lock ) LOCK( ackInfo.lock );
-		if ( ackInfo.counter ) {
-			*ackInfo.counter -= 1;
-			if ( *ackInfo.counter == 0 && ackInfo.condition ) {
-				__INFO__( GREEN, "MasterWorker", "handleParityDeltaAcknowledgement",
-						"Complete ack for counter at %p", ackInfo.counter
-				);
-				pthread_cond_signal( ackInfo.condition );
-			}
-		}
-		if ( ackInfo.lock ) UNLOCK( ackInfo.lock );
+	bool ret = true;
+	AcknowledgementInfo ackInfo;
 
-		// TODO call check all slave acked at remap_msg_handler
+	switch( opcode ) {
+		case PROTO_OPCODE_ACK_PARITY_DELTA:
+			ret = MasterWorker::pending->eraseAck( PT_ACK_REMOVE_PARITY, event.instanceId, event.requestId, 0, &pid, &ackInfo );
+			break;
+		case PROTO_OPCODE_REVERT_PARITY_DELTA:
+			ret = MasterWorker::pending->eraseAck( PT_ACK_REVERT_PARITY, event.instanceId, event.requestId, 0, &pid, &ackInfo );
+			break;
+		default:
+			__ERROR__( "MasterWorker", "handleParityDeltaAcknowledgement",
+					"Unknown ack for instance id = %u from instance id = %u request id = %u",
+					header.targetId, event.instanceId, event.requestId
+			);
+			return false;
 	}
 
-	return true;
+	if ( ! ret ) {
+		__ERROR__( "MasterWorker", "handleParityDeltaAcknowledgement",
+			"Cannot find the pending ack info for instacne id = %u from instance id = %u request id = %u",
+			header.targetId, event.instanceId, event.requestId
+		);
+		return ret;
+	}
+	
+	if ( ackInfo.lock ) LOCK( ackInfo.lock );
+	if ( ackInfo.counter ) {
+		*ackInfo.counter -= 1;
+		if ( *ackInfo.counter == 0 ) {
+			__INFO__( GREEN, "MasterWorker", "handleParityDeltaAcknowledgement",
+					"Complete ack for counter at %p", ackInfo.counter
+			);
+			if ( ackInfo.condition )
+				pthread_cond_signal( ackInfo.condition );
+		}
+	}
+	if ( ackInfo.lock ) UNLOCK( ackInfo.lock );
+
+	Master *master = Master::getInstance();
+	switch( opcode ) {
+		case PROTO_OPCODE_ACK_PARITY_DELTA:
+			break;
+		case PROTO_OPCODE_REVERT_PARITY_DELTA:
+			LOCK( &master->sockets.slavesIdToSocketLock );
+			try {
+				struct sockaddr_in saddr = master->sockets.slavesIdToSocketMap.at( header.targetId )->getAddr();
+				master->remapMsgHandler.ackTransit( saddr ); 
+			} catch ( std::out_of_range &e ) {
+				__ERROR__( "MasterWorker", "handleParityDeltaAcknowledgement",
+					"Cannot find slave socket for instacne id = %u", header.targetId
+				);
+			}
+			UNLOCK( &master->sockets.slavesIdToSocketLock );
+			break;
+		default:
+			return false;
+	}
+	return ret;
 }
