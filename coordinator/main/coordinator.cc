@@ -26,6 +26,21 @@ void Coordinator::free() {
 	Map::free();
 }
 
+void Coordinator::switchPhaseForCrashedSlave( SlaveSocket *slaveSocket ) {
+	struct sockaddr_in addr = slaveSocket->getAddr();
+	MasterEvent event;
+
+	LOCK( &this->overloadedSlaves.lock );
+	std::set<struct sockaddr_in>::iterator it = this->overloadedSlaves.slaveSet.find( addr );
+	if ( it == this->overloadedSlaves.slaveSet.end() ) {
+		std::set<struct sockaddr_in> overloadedSlaves;
+		overloadedSlaves.insert( addr );
+		event.switchPhase( true, overloadedSlaves );
+		this->eventQueue.insert( event );
+	}
+	UNLOCK( &this->overloadedSlaves.lock );
+}
+
 void Coordinator::switchPhase( std::set<struct sockaddr_in> prevOverloadedSlaves ) {
 	// skip if remap feature is disabled
 	if ( ! this->config.global.remap.enabled )

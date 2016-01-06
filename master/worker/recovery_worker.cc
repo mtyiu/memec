@@ -49,8 +49,9 @@ bool MasterWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *bu
 	// Update sockfd in the array Map
 	sockfd = s->getSocket();
 	slaves->set( index, sockfd, s );
-	MasterWorker::stripeList->update();
-	delete original;
+
+	// add the slave addrs to remapMsgHandler
+	master->remapMsgHandler.addAliveSlave( s->getAddr() );
 
 	// Connect to the slave
 	slaves->values[ index ]->timestamp.current.setVal( 0 );
@@ -59,6 +60,9 @@ bool MasterWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *bu
 		__ERROR__( "MasterWorker", "handleSlaveReconstructedMsg", "Cannot start socket." );
 	}
 	s->registerMaster();
+
+	MasterWorker::stripeList->update();
+	delete original;
 
 	return true;
 }

@@ -101,6 +101,8 @@ public:
 		return &coordinator;
 	}
 
+	void switchPhaseForCrashedSlave( SlaveSocket *slaveSocket );
+
 	static void signalHandler( int signal );
 
 	bool init( char *path, OptionList &options, bool verbose );

@@ -635,7 +635,7 @@ bool SlaveWorker::handleRevertParityDelta( MasterEvent event, char *buf, size_t 
 			}
 		}
 		it.free();
-	} 
+	}
 
 	for ( auto& it : del ) {
 		it.print();

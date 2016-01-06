@@ -205,6 +205,17 @@ bool CoordinatorRemapMsgHandler::transitToNormal( std::vector<struct sockaddr_in
 	event.start = false;
 	vector<struct sockaddr_in> slavesToStop;
 
+	LOCK( &this->aliveSlavesLock );
+	for ( auto it = slaves->begin(); it != slaves->end(); ) {
+		if ( this->crashedSlaves.count( *it ) > 0 ) {
+			// Never transit to normal state if it is crashed
+			it = slaves->erase( it );
+		} else {
+			it++;
+		}
+	}
+	UNLOCK( &this->aliveSlavesLock );
+
 	REMAP_PHASE_CHANGE_HANDLER( slaves, slavesToStop, event );
 
 	return true;
@@ -446,6 +457,17 @@ bool CoordinatorRemapMsgHandler::addAliveSlave( struct sockaddr_in slave ) {
 	return true;
 }
 
+bool CoordinatorRemapMsgHandler::addCrashedSlave( struct sockaddr_in slave ) {
+	LOCK( &this->aliveSlavesLock );
+	if ( this->crashedSlaves.count( slave ) > 0 ) {
+		UNLOCK( &this->aliveSlavesLock );
+		return false;
+	}
+	crashedSlaves.insert( slave );
+	UNLOCK( &this->aliveSlavesLock );
+	return true;
+}
+
 bool CoordinatorRemapMsgHandler::removeAliveSlave( struct sockaddr_in slave ) {
 	// alive slaves list
 	LOCK( &this->aliveSlavesLock );
@@ -454,7 +476,9 @@ bool CoordinatorRemapMsgHandler::removeAliveSlave( struct sockaddr_in slave ) {
 		return false;
 	}
 	aliveSlaves.erase( slave );
+	crashedSlaves.erase( slave );
 	UNLOCK( &this->aliveSlavesLock );
+
 	// add the state
 	LOCK( &this->slavesStateLock[ slave ] );
 	slavesState.erase( slave );

@@ -25,6 +25,11 @@ bool CoordinatorWorker::handlePromoteBackupSlaveResponse( SlaveEvent event, char
 	if ( remaining == 0 ) {
 		__INFO__( CYAN, "CoordinatorWorker", "handlePromoteBackupSlaveResponse", "Recovery is completed. Number of chunks reconstructed = %u; elapsed time = %lf s.\n", total, elapsedTime );
 
+		// notify the remap message handler of a "removed" slave
+		Coordinator *coordinator = Coordinator::getInstance();
+		if ( coordinator->remapMsgHandler )
+			coordinator->remapMsgHandler->removeAliveSlave( event.socket->getAddr() );
+
 		Log log;
 		log.setRecovery(
 			header.addr,
@@ -33,8 +38,6 @@ bool CoordinatorWorker::handlePromoteBackupSlaveResponse( SlaveEvent event, char
 			elapsedTime
 		);
 		Coordinator::getInstance()->appendLog( log );
-
-		// system( "ssh testbed-node10 'screen -S experiment -p 0 -X stuff \"$(printf '\r')\"'" );
 	}
 
 	return true;

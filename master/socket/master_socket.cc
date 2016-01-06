@@ -78,7 +78,8 @@ bool MasterSocket::handler( int fd, uint32_t events, void *data ) {
 			} else if ( coordinatorSocket ) {
 				coordinatorSocket->stop();
 			} else if ( slaveSocket ) {
-				slaveSocket->stop();
+				// Wait for the coordinator's announcement
+				// slaveSocket->stop();
 			} else {
 				__ERROR__( "MasterSocket", "handler", "Unknown socket." );
 				return false;

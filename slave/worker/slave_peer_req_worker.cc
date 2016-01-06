@@ -465,6 +465,7 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, bool isSealed, ch
 				keyMetadata.set( metadata.listId, metadata.stripeId, metadata.chunkId );
 				keyMetadata.offset = offset;
 				keyMetadata.length = objSize;
+				keyMetadata.ptr = ( char * ) chunk;
 
 				SlaveWorker::map->insertKey(
 					key, 0, timestamp, keyMetadata,

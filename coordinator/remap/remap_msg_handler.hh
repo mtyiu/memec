@@ -32,11 +32,12 @@ private:
 	/* ack map for each slave, identify by slave addr, and contains the set of acked masters */
 	std::map<struct sockaddr_in, std::set<std::string>* > ackMasters;
 	LOCK_T mastersAckLock;
-	
+
 	bool isListening;
 
 	CoordinatorRemapWorker *workers;
 	std::set<struct sockaddr_in> aliveSlaves;
+	std::set<struct sockaddr_in> crashedSlaves;
 	LOCK_T aliveSlavesLock;
 
 	/* handle master join or leave */
@@ -84,8 +85,9 @@ public:
 	bool sendStateToMasters( std::vector<struct sockaddr_in> &slaves );
 	bool sendStateToMasters( struct sockaddr_in slave );
 
-	// keep track of the alive slaves 
+	// keep track of the alive slaves
 	bool addAliveSlave( struct sockaddr_in slave );
+	bool addCrashedSlave( struct sockaddr_in slave );
 	bool removeAliveSlave( struct sockaddr_in slave );
 
 

@@ -24,7 +24,7 @@ test: $(OBJS) test.cc
 	$(CC) $(CFLAGS) $(INCLUDE) $(LIBS) -c -o $@ $<
 
 run:
-	./test 255 4096 256 100000000 20 127.0.0.1 10091
+	./test 255 4096 256 10000000 20 127.0.0.1 10091
 
 clean:
 	rm -f $(OBJS) $(BIN)

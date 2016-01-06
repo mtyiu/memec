@@ -126,10 +126,9 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			Coordinator::getInstance()->remapMsgHandler->addAliveSlave( slaveAddr );
 		UNLOCK( &slaves.lock );
 	} else if ( event.type == SLAVE_EVENT_TYPE_DISCONNECT ) {
+		// Mark it as failed
+		Coordinator::getInstance()->switchPhaseForCrashedSlave( event.socket );
 		this->handleReconstructionRequest( event.socket );
-		// notify the remap message handler of a "removed" slave
-		if ( Coordinator::getInstance()->remapMsgHandler )
-			Coordinator::getInstance()->remapMsgHandler->removeAliveSlave( event.socket->getAddr() );
 	} else if ( isSend ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
 		if ( ret != ( ssize_t ) buffer.size )
