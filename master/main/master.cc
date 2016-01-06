@@ -1017,6 +1017,7 @@ void Master::ackParityDelta( FILE *f, SlaveSocket *target, pthread_cond_t *condi
 		if ( target && target != s )
 			continue;
 
+		LOCK( &target->ackParityDeltaBackupLock );
 		from = s->timestamp.lastAck.getVal();
 		to = s->timestamp.current.getVal();
 		del = update = to;
@@ -1035,8 +1036,10 @@ void Master::ackParityDelta( FILE *f, SlaveSocket *target, pthread_cond_t *condi
 		to = update < to ? ( del < update ? del : update ) : to ;
 
 		/* check the threshold is reached */
-		if ( ! force && to - from < this->config.master.backup.ackBatchSize )
+		if ( ! force && to - from < this->config.master.backup.ackBatchSize ) {
+			UNLOCK( &target->ackParityDeltaBackupLock );
 			continue;
+		}
 
 		if ( f ) {
 			s->printAddress();
@@ -1046,6 +1049,7 @@ void Master::ackParityDelta( FILE *f, SlaveSocket *target, pthread_cond_t *condi
 		DISPATCH_EVENT_TO_OTHER_SLAVES( ackParityDelta, s, condition, lock, counter );
 
 		s->timestamp.lastAck.setVal( to );
+		UNLOCK( &target->ackParityDeltaBackupLock );
 	}
 }
 

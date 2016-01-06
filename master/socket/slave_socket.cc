@@ -12,6 +12,7 @@ void SlaveSocket::setArrayMap( ArrayMap<int, SlaveSocket> *slaves ) {
 bool SlaveSocket::start() {
 	LOCK_INIT( &this->timestamp.pendingAck.updateLock );
 	LOCK_INIT( &this->timestamp.pendingAck.delLock );
+	LOCK_INIT( &this->ackParityDeltaBackupLock );
 
 	this->registered = false;
 	if ( this->connect() ) {
