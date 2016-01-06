@@ -35,6 +35,10 @@ public:
 	MIXED_EVENT_SET( SlaveEvent, EVENT_TYPE_SLAVE, slave )
 	MIXED_EVENT_SET( SlavePeerEvent, EVENT_TYPE_SLAVE_PEER, slavePeer )
 #undef MIXED_EVENT_SET
+
+	void set() {
+		this->type = EVENT_TYPE_DUMMY;
+	}
 };
 
 #endif

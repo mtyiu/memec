@@ -29,6 +29,10 @@ public:
 	MIXED_EVENT_SET( MasterEvent, EVENT_TYPE_MASTER, master )
 	MIXED_EVENT_SET( SlaveEvent, EVENT_TYPE_SLAVE, slave )
 #undef MIXED_EVENT_SET
+
+	void set() {
+		this->type = EVENT_TYPE_DUMMY;
+	}
 };
 
 #endif

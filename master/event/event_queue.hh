@@ -138,11 +138,18 @@ public:
 					this->priority.count++;
 					ret = this->priority.mixed->insert( mixedEvent );
 					UNLOCK( &this->priority.lock );
+
+					// Avoid all worker threads are blocked by the empty normal queue
+					if ( this->mixed->count() == 0 ) {
+						mixedEvent.set();
+						this->mixed->insert( mixedEvent );
+					}
+
 					return ret;
+				} else {
+					UNLOCK( &this->priority.lock );
+					return this->mixed->insert( mixedEvent );
 				}
-				UNLOCK( &this->priority.lock );
-				ret = this->mixed->insert( mixedEvent );
-				return ret;
 			} else {
 				ret = this->mixed->insert( mixedEvent );
 				return ret;

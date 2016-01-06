@@ -50,7 +50,6 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 			char *key, *value;
 			uint8_t keySize;
 			uint32_t valueSize;
-			fprintf( stderr, "event.message.keyValue.data = %p\n", event.message.keyValue.data );
 			event.message.keyValue.deserialize( key, keySize, value, valueSize );
 			buffer.data = this->protocol.resGet(
 				buffer.size,

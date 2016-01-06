@@ -107,7 +107,8 @@ void BasicRemappingScheme::getRemapTarget( uint32_t *original, uint32_t *remappe
 		} else {
 			slaveAddr = BasicRemappingScheme::stripeList->get( remapped[ i * 2 ], remapped[ i * 2 + 1 ] )->getAddr();
 			nodeLatency = slaveLoading->cumulativeMirror.set.get( slaveAddr, &index );
-			*nodeLatency = *nodeLatency + increment;
+			if ( nodeLatency )
+				*nodeLatency = *nodeLatency + increment;
 			selectedSlaves.insert( slaveAddr );
 		}
 	}
