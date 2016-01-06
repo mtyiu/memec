@@ -411,7 +411,7 @@ bool CoordinatorRemapMsgHandler::updateState( char *subject, char *msg, int len 
 			inet_ntop( AF_INET, &slave.sin_addr.s_addr, buf, INET_ADDRSTRLEN );
 			fprintf(
 				stderr, "master [%s] or slave [%s:%hu] not found !!",
-				subject, buf , slave.sin_port
+				subject, buf, ntohs( slave.sin_port )
 			);
 		}
 		// check if all master acked
@@ -525,10 +525,6 @@ bool CoordinatorRemapMsgHandler::isAllMasterAcked( struct sockaddr_in slave ) {
 		return true;
 	}
 	allAcked = ( aliveMasters.size() == ackMasters[ slave ]->size() );
-	//if ( allAcked ) {
-	//	fprintf( stderr, "all masters acked slave %s:%hu on %d\n", buf, slave.sin_port, this->slavesState[ slave ] );
-	//}
-	//fprintf( stderr, "%lu of %lu masters acked slave %s:%hu\n", ackMasters[ slave ]->size(), aliveMasters.size(), buf , slave.sin_port );
 	if ( allAcked ) {
 		printf( "Slave %s:%hu changes its state to: ", buf, ntohs( slave.sin_port ) );
 		switch( this->slavesState[ slave ] ) {

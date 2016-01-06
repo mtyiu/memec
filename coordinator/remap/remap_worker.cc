@@ -19,7 +19,7 @@ bool CoordinatorRemapWorker::transitToDegraded( RemapStateEvent event ) { // Pha
 	// wait for "sync meta ack" to proceed, release lock once acquired
 	__INFO__( CYAN, "CoordinatorRemapWorker", "transitToDegraded",
 		"Start transition to degraded for slave %s:%u.",
-		buf, event.slave.sin_port
+		buf, ntohs( event.slave.sin_port )
 	);
 
 	// any cleanup to be done (request for metadata sync. and parity revert)
@@ -27,7 +27,7 @@ bool CoordinatorRemapWorker::transitToDegraded( RemapStateEvent event ) { // Pha
 	crmh->transitToDegradedEnd( event.slave );
 
 	// wait for parity revert to complete
-	// obtaining ack from all masters to ensure all masters already complete reverting parity 
+	// obtaining ack from all masters to ensure all masters already complete reverting parity
 	if ( crmh->isAllMasterAcked( event.slave ) == false )
 		pthread_cond_wait( &crmh->ackSignal[ event.slave ], &crmh->ackSignalLock );
 	pthread_mutex_unlock( &crmh->ackSignalLock );
@@ -46,7 +46,7 @@ bool CoordinatorRemapWorker::transitToDegraded( RemapStateEvent event ) { // Pha
 	if ( crmh->sendStateToMasters( event.slave ) == false ) {
 		__ERROR__( "CoordinatorRemapWorker", "transitToDegraded",
 			"Failed to broadcast state changes on slave %s:%u!",
-			buf, event.slave.sin_port
+			buf, ntohs( event.slave.sin_port )
 		);
 		UNLOCK( &crmh->slavesStateLock[ event.slave ] );
 		return false;
@@ -84,7 +84,7 @@ bool CoordinatorRemapWorker::transitToNormal( RemapStateEvent event ) { // Phase
 	if ( crmh->sendStateToMasters( event.slave ) == false ) {
 		__ERROR__( "CoordinatorRemapWorker", "transitToNormal",
 			"Failed to broadcast state changes on salve %s:%u!",
-			buf, event.slave.sin_port
+			buf, ntohs( event.slave.sin_port )
 		);
 		UNLOCK( &crmh->slavesStateLock[ event.slave ] );
 		return false;

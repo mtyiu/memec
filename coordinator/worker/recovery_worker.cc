@@ -307,13 +307,13 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 	}
 	printf( "Number of unsealed chunks: %lu\n", unsealed.size() );
 	for ( unsealedIt = unsealed.begin(); unsealedIt != unsealed.end(); unsealedIt++ ) {
-		// printf(
-		// 	"- (%u, %u, %u): %lu keys\n",
-		// 	unsealedIt->first.listId,
-		// 	unsealedIt->first.stripeId,
-		// 	unsealedIt->first.chunkId,
-		// 	unsealedIt->second.size()
-		// );
+		printf(
+			"- (%u, %u, %u): %lu keys\n",
+			unsealedIt->first.listId,
+			unsealedIt->first.stripeId,
+			unsealedIt->first.chunkId,
+			unsealedIt->second.size()
+		);
 	}
 
 	UNLOCK( &socket->map.keysLock );
