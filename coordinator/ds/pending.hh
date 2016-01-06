@@ -44,14 +44,16 @@ public:
 	uint32_t total;
 	struct timespec startTime;
 	SlaveSocket *socket;
+	SlaveSocket *original;
 
-	PendingRecovery( uint32_t addr, uint16_t port, uint32_t total, struct timespec startTime, SlaveSocket *socket ) {
+	PendingRecovery( uint32_t addr, uint16_t port, uint32_t total, struct timespec startTime, SlaveSocket *socket, SlaveSocket *original ) {
 		this->addr = addr;
 		this->port = port;
 		this->remaining = total;
 		this->total = total;
 		this->startTime = startTime;
 		this->socket = socket;
+		this->original = original;
 	}
 };
 
@@ -206,9 +208,9 @@ public:
 		return ret;
 	}
 
-	bool insertRecovery( uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t total, struct timespec startTime, SlaveSocket *socket ) {
+	bool insertRecovery( uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t total, struct timespec startTime, SlaveSocket *socket, SlaveSocket *original ) {
 		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
-		PendingRecovery r( addr, port, total, startTime, socket );
+		PendingRecovery r( addr, port, total, startTime, socket, original );
 
 		std::pair<PendingIdentifier, PendingRecovery> p( pid, r );
 		std::pair<std::unordered_map<PendingIdentifier, PendingRecovery>::iterator, bool> ret;
@@ -220,7 +222,7 @@ public:
 		return ret.second;
 	}
 
-	bool eraseRecovery( uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t numReconstructed, SlaveSocket *socket, uint32_t &remaining, uint32_t &total, double &elapsedTime ) {
+	bool eraseRecovery( uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t numReconstructed, SlaveSocket *socket, uint32_t &remaining, uint32_t &total, double &elapsedTime, SlaveSocket *&original ) {
 		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
 		std::unordered_map<PendingIdentifier, PendingRecovery>::iterator it;
 		bool ret;
@@ -237,6 +239,7 @@ public:
 			remaining = it->second.remaining;
 			total = it->second.total;
 			elapsedTime = get_elapsed_time( it->second.startTime );
+			original = it->second.original;
 			if ( it->second.remaining == 0 )
 				this->recovery.erase( it );
 		} else {

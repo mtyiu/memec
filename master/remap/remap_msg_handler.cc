@@ -121,7 +121,7 @@ void MasterRemapMsgHandler::setState( char* msg , int len ) {
 		char buf[ INET_ADDRSTRLEN ];
 		inet_ntop( AF_INET, &slave.sin_addr.s_addr, buf, INET_ADDRSTRLEN );
 		if ( this->slavesState.count( slave ) == 0 ) {
-			__ERROR__( "MasterRemapMsgHandler", "setState" , "slave %s:%hu not found\n", buf, slave.sin_port );
+			__ERROR__( "MasterRemapMsgHandler", "setState" , "slave %s:%hu not found\n", buf, ntohs( slave.sin_port ) );
 			continue;
 		}
 
@@ -129,10 +129,10 @@ void MasterRemapMsgHandler::setState( char* msg , int len ) {
 		RemapState state = this->slavesState[ slave ];
 		switch ( signal ) {
 			case REMAP_NORMAL:
-				__DEBUG__( BLUE, "MasterRemapMsgHandler", "setState", "REMAP_NORMAL %s:%hu", buf, slave.sin_port );
+				__DEBUG__( BLUE, "MasterRemapMsgHandler", "setState", "REMAP_NORMAL %s:%hu", buf, ntohs( slave.sin_port ) );
 				break;
 			case REMAP_INTERMEDIATE:
-				__DEBUG__( BLUE, "MasterRemapMsgHandler", "setState", "REMAP_INTERMEDIATE %s:%hu", buf, slave.sin_port );
+				__DEBUG__( BLUE, "MasterRemapMsgHandler", "setState", "REMAP_INTERMEDIATE %s:%hu", buf, ntohs( slave.sin_port ) );
 				if ( state == REMAP_WAIT_DEGRADED )
 					signal = state;
 				else {
@@ -161,15 +161,15 @@ void MasterRemapMsgHandler::setState( char* msg , int len ) {
 				}
 				break;
 			case REMAP_COORDINATED:
-				__DEBUG__( BLUE, "MasterRemapMsgHandler", "setState", "REMAP_COORDINATED %s:%hu", buf, slave.sin_port );
+				__DEBUG__( BLUE, "MasterRemapMsgHandler", "setState", "REMAP_COORDINATED %s:%hu", buf, ntohs( slave.sin_port ) );
 				if ( state == REMAP_WAIT_NORMAL )
 					signal = state;
 				break;
 			case REMAP_DEGRADED:
-				__DEBUG__( BLUE, "MasterRemapMsgHandler", "setState", "REMAP_DEGRADED %s:%hu", buf, slave.sin_port );
+				__DEBUG__( BLUE, "MasterRemapMsgHandler", "setState", "REMAP_DEGRADED %s:%hu", buf, ntohs( slave.sin_port ) );
 				break;
 			default:
-				__DEBUG__( BLUE, "MasterRemapMsgHandler", "setState", "Unknown %d %s:%hu", signal, buf, slave.sin_port );
+				__DEBUG__( BLUE, "MasterRemapMsgHandler", "setState", "Unknown %d %s:%hu", signal, buf, ntohs( slave.sin_port ) );
 				UNLOCK( &this->slavesStateLock[ slave ] );
 				return;
 		}
