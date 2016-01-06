@@ -62,6 +62,11 @@ void SlaveEvent::resHeartbeat( SlaveSocket *socket, uint32_t timestamp, uint32_t
 	this->message.heartbeat.isLast = isLast;
 }
 
+void SlaveEvent::triggerReconstruction( struct sockaddr_in addr ) {
+	this->type = SLAVE_EVENT_TYPE_TRIGGER_RECONSTRUCTION;
+	this->message.addr = addr;
+}
+
 void SlaveEvent::disconnect( SlaveSocket *socket ) {
 	this->type = SLAVE_EVENT_TYPE_DISCONNECT;
 	this->socket = socket;

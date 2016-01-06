@@ -18,7 +18,8 @@ enum SlaveEventType {
 	SLAVE_EVENT_TYPE_PARITY_MIGRATE,
 	SLAVE_EVENT_TYPE_REQUEST_RELEASE_DEGRADED_LOCK,
 	SLAVE_EVENT_TYPE_RESPONSE_HEARTBEAT,
-	SLAVE_EVENT_TYPE_DISCONNECT
+	SLAVE_EVENT_TYPE_DISCONNECT,
+	SLAVE_EVENT_TYPE_TRIGGER_RECONSTRUCTION
 };
 
 class SlaveEvent : public Event {
@@ -47,6 +48,7 @@ public:
 			uint32_t keys;
 			bool isLast;
 		} heartbeat;
+		struct sockaddr_in addr;
 	} message;
 
 	void pending( SlaveSocket *socket );
@@ -60,6 +62,7 @@ public:
 	void syncRemappedData( SlaveSocket *socket, Packet *packet );
 	void resHeartbeat( SlaveSocket *socket, uint32_t timestamp, uint32_t sealed, uint32_t keys, bool isLast );
 	void disconnect( SlaveSocket *socket );
+	void triggerReconstruction( struct sockaddr_in addr );
 };
 
 #endif

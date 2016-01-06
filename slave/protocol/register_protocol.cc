@@ -14,6 +14,7 @@ char *SlaveProtocol::reqRegisterCoordinator( size_t &size, uint32_t requestId, u
 
 char *SlaveProtocol::resRegisterMaster( size_t &size, uint16_t instanceId, uint32_t requestId, bool success ) {
 	// -- common/protocol/protocol.cc --
+	success = true; // always success
 	size = this->generateHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_MASTER,

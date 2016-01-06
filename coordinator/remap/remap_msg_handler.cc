@@ -195,6 +195,14 @@ bool CoordinatorRemapMsgHandler::transitToDegradedEnd( const struct sockaddr_in 
 		fprintf( stderr, "Slave not found.\n" );
 	}
 
+	LOCK( &this->aliveSlavesLock );
+	if ( this->crashedSlaves.find( slave ) != this->crashedSlaves.end() ) {
+		printf( "Triggering reconstruction for crashed slave...\n" );
+		SlaveEvent event;
+		event.triggerReconstruction( slave );
+		coordinator->eventQueue.insert( event );
+	}
+	UNLOCK( &this->aliveSlavesLock );
 	printf( "Switching to degraded state...\n" );
 
 	return true;

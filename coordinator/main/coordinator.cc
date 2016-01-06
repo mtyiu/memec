@@ -35,7 +35,7 @@ void Coordinator::switchPhaseForCrashedSlave( SlaveSocket *slaveSocket ) {
 	if ( it == this->overloadedSlaves.slaveSet.end() ) {
 		std::set<struct sockaddr_in> overloadedSlaves;
 		overloadedSlaves.insert( addr );
-		event.switchPhase( true, overloadedSlaves );
+		event.switchPhase( true, overloadedSlaves, true );
 		this->eventQueue.insert( event );
 	}
 	UNLOCK( &this->overloadedSlaves.lock );
