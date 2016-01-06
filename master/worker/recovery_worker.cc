@@ -51,6 +51,7 @@ bool MasterWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *bu
 	slaves->set( index, sockfd, s );
 
 	// add the slave addrs to remapMsgHandler
+	master->remapMsgHandler.removeAliveSlave( original->getAddr() );
 	master->remapMsgHandler.addAliveSlave( s->getAddr() );
 
 	// Connect to the slave

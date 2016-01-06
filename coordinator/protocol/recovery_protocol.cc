@@ -47,3 +47,14 @@ char *CoordinatorProtocol::reqReconstruction( size_t &size, uint16_t instanceId,
 	);
 	return this->buffer.send;
 }
+
+char *CoordinatorProtocol::ackCompletedReconstruction( size_t &size, uint16_t instanceId, uint32_t requestId, bool success ) {
+	size = this->generateHeader(
+		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_RECONSTRUCTION,
+		0, // length
+		instanceId, requestId
+	);
+	return this->buffer.send;
+}

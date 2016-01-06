@@ -42,6 +42,11 @@ bool MixedChunkBuffer::set(
 	}
 }
 
+void MixedChunkBuffer::init() {
+	if ( this->role == CBR_DATA )
+		this->buffer.data->init();
+}
+
 size_t MixedChunkBuffer::seal( SlaveWorker *worker ) {
 	switch( this->role ) {
 		case CBR_DATA:

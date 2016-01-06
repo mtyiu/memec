@@ -28,9 +28,10 @@ void MasterEvent::resRemappingSetLock( MasterSocket *socket, uint16_t instanceId
 	this->message.remap.key = key;
 }
 
-void MasterEvent::switchPhase( bool toRemap, std::set<struct sockaddr_in> slaves ) {
+void MasterEvent::switchPhase( bool toRemap, std::set<struct sockaddr_in> slaves, bool isCrashed ) {
 	this->type = MASTER_EVENT_TYPE_SWITCH_PHASE;
 	this->message.switchPhase.toRemap = toRemap;
+	this->message.switchPhase.isCrashed = isCrashed;
 	this->message.switchPhase.slaves = new std::vector<struct sockaddr_in>( slaves.begin(), slaves.end() );
 }
 

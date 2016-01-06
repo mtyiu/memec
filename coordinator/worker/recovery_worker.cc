@@ -16,8 +16,9 @@ bool CoordinatorWorker::handlePromoteBackupSlaveResponse( SlaveEvent event, char
 
 	uint32_t remaining, total;
 	double elapsedTime;
+	SlaveSocket *original;
 
-	if ( ! CoordinatorWorker::pending->eraseRecovery( event.instanceId, event.requestId, header.addr, header.port, header.count, event.socket, remaining, total, elapsedTime ) ) {
+	if ( ! CoordinatorWorker::pending->eraseRecovery( event.instanceId, event.requestId, header.addr, header.port, header.count, event.socket, remaining, total, elapsedTime, original ) ) {
 		__ERROR__( "SlaveWorker", "handlePromoteBackupSlaveResponse", "Cannot find a pending RECOVERY request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		return false;
 	}
@@ -25,10 +26,13 @@ bool CoordinatorWorker::handlePromoteBackupSlaveResponse( SlaveEvent event, char
 	if ( remaining == 0 ) {
 		__INFO__( CYAN, "CoordinatorWorker", "handlePromoteBackupSlaveResponse", "Recovery is completed. Number of chunks reconstructed = %u; elapsed time = %lf s.\n", total, elapsedTime );
 
+		event.ackCompletedReconstruction( event.socket, event.instanceId, event.requestId, true );
+		this->dispatch( event );
+
 		// notify the remap message handler of a "removed" slave
 		Coordinator *coordinator = Coordinator::getInstance();
 		if ( coordinator->remapMsgHandler )
-			coordinator->remapMsgHandler->removeAliveSlave( event.socket->getAddr() );
+			coordinator->remapMsgHandler->removeAliveSlave( original->getAddr() );
 
 		Log log;
 		log.setRecovery(
@@ -55,8 +59,9 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 	/////////////////////////////////////////////////////////////////////
 	// Choose a backup slave socket for reconstructing the failed node //
 	/////////////////////////////////////////////////////////////////////
-	ArrayMap<int, SlaveSocket> &slaves = Coordinator::getInstance()->sockets.slaves;
-	ArrayMap<int, SlaveSocket> &backupSlaves = Coordinator::getInstance()->sockets.backupSlaves;
+	Coordinator *coordinator = Coordinator::getInstance();
+	ArrayMap<int, SlaveSocket> &slaves = coordinator->sockets.slaves;
+	ArrayMap<int, SlaveSocket> &backupSlaves = coordinator->sockets.backupSlaves;
 	int fd;
 	SlaveSocket *backupSlaveSocket;
 
@@ -76,6 +81,11 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 	fd = backupSlaveSocket->getSocket();
 	backupSlaveSocket->failed = socket;
 	slaves.set( index, fd, backupSlaveSocket );
+
+	////////////////////////////////////////////
+	// Add the slave addrs to remapMsgHandler //
+	////////////////////////////////////////////
+	coordinator->remapMsgHandler->addAliveSlave( backupSlaveSocket->getAddr() );
 
 	////////////////////////////
 	// Announce to the slaves //
@@ -163,7 +173,8 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 		srcAddr.port,
 		socket->map.chunks.size(),
 		startTime,
-		backupSlaveSocket
+		backupSlaveSocket,
+		socket
 	) ) {
 		__ERROR__( "CoordinatorWorker", "handleReconstructionRequest", "Cannot insert into pending recovery map." );
 	}

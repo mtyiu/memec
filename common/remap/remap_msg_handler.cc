@@ -77,13 +77,36 @@ void RemapMsgHandler::listAliveSlaves() {
 	uint32_t slaveCount = this->slavesState.size();
 	char buf[ INET_ADDRSTRLEN ];
 	for ( auto slave : this->slavesState ) {
-		inet_ntop( AF_INET, &slave.first.sin_addr, buf, INET_ADDRSTRLEN ), 
-		fprintf( 
-			stderr, 
-			"\tSlave %s:%hu\n", 
+		inet_ntop( AF_INET, &slave.first.sin_addr, buf, INET_ADDRSTRLEN ),
+		fprintf(
+			stderr,
+			"\tSlave %s:%hu --> ",
 			buf,
-			ntohs( slave.first.sin_port ) 
+			ntohs( slave.first.sin_port )
 		);
+		switch( slave.second ) {
+			case REMAP_UNDEFINED:
+				fprintf( stderr, "REMAP_UNDEFINED\n" );
+				break;
+			case REMAP_NORMAL:
+				fprintf( stderr, "REMAP_NORMAL\n" );
+				break;
+			case REMAP_INTERMEDIATE:
+				fprintf( stderr, "REMAP_INTERMEDIATE\n" );
+				break;
+			case REMAP_COORDINATED:
+				fprintf( stderr, "REMAP_COORDINATED\n" );
+				break;
+			case REMAP_DEGRADED:
+				fprintf( stderr, "REMAP_DEGRADED\n" );
+				break;
+			case REMAP_WAIT_DEGRADED:
+				fprintf( stderr, "REMAP_WAIT_DEGRADED\n" );
+				break;
+			case REMAP_WAIT_NORMAL:
+				fprintf( stderr, "REMAP_WAIT_NORMAL\n" );
+				break;
+		}
 	}
 	fprintf( stderr, "No. of slaves = %u\n", slaveCount );
 }

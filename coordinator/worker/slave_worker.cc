@@ -72,7 +72,16 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			isSend = true;
 			break;
 		case SLAVE_EVENT_TYPE_DISCONNECT:
+		case SLAVE_EVENT_TYPE_TRIGGER_RECONSTRUCTION:
 			isSend = false;
+			break;
+		case SLAVE_EVENT_TYPE_ACK_RECONSTRUCTION_SUCCESS:
+		case SLAVE_EVENT_TYPE_ACK_RECONSTRUCTION_FAILURE:
+			buffer.data = this->protocol.ackCompletedReconstruction(
+				buffer.size, event.instanceId, event.requestId,
+				event.type == SLAVE_EVENT_TYPE_ACK_RECONSTRUCTION_SUCCESS
+			);
+			isSend = true;
 			break;
 		default:
 			return;
@@ -128,7 +137,24 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 	} else if ( event.type == SLAVE_EVENT_TYPE_DISCONNECT ) {
 		// Mark it as failed
 		Coordinator::getInstance()->switchPhaseForCrashedSlave( event.socket );
-		this->handleReconstructionRequest( event.socket );
+	} else if ( event.type == SLAVE_EVENT_TYPE_TRIGGER_RECONSTRUCTION ) {
+		SlaveSocket *s = 0;
+		ArrayMap<int, SlaveSocket> &slaves = Coordinator::getInstance()->sockets.slaves;
+
+		LOCK( &slaves.lock );
+		for ( uint32_t i = 0, size = slaves.size(); i < size; i++ ) {
+			if ( slaves.values[ i ]->equal( event.message.addr.sin_addr.s_addr, event.message.addr.sin_port ) ) {
+				s = slaves.values[ i ];
+				break;
+			}
+		}
+		UNLOCK( &slaves.lock );
+
+		if ( s ) {
+			this->handleReconstructionRequest( s );
+		} else {
+			__ERROR__( "CoordinatorWorker", "dispatch", "Unknown crashed slave." );
+		}
 	} else if ( isSend ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
 		if ( ret != ( ssize_t ) buffer.size )

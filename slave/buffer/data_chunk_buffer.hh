@@ -29,7 +29,7 @@ private:
 
 public:
 	DataChunkBuffer( uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isReady );
-	void init( uint32_t listId, uint32_t stripeId, uint32_t chunkId );
+	void init();
 
 	inline uint32_t getChunkId() { return this->chunkId; }
 

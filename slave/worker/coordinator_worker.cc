@@ -145,7 +145,18 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 						this->handleReleaseDegradedLockRequest( event, buffer.data, header.length );
 						break;
 					case PROTO_OPCODE_RECONSTRUCTION:
-						this->handleReconstructionRequest( event, buffer.data, header.length );
+						switch( header.magic ) {
+							case PROTO_MAGIC_REQUEST:
+								this->handleReconstructionRequest( event, buffer.data, header.length );
+								break;
+							case PROTO_MAGIC_RESPONSE_SUCCESS:
+								this->handleCompletedReconstructionAck();
+								break;
+							case PROTO_MAGIC_RESPONSE_FAILURE:
+							default:
+								__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from coordinator." );
+								break;
+						}
 						break;
 					case PROTO_OPCODE_PARITY_MIGRATE:
 						this->handleRemappedData( event, buffer.data, buffer.size );

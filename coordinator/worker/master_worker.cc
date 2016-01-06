@@ -82,6 +82,9 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 							numMasters  // pending
 						);
 					}
+
+					if ( event.message.switchPhase.isCrashed )
+						coordinator->remapMsgHandler->addCrashedSlave( slaves->at( i ) );
 				}
 
 				coordinator->remapMsgHandler->transitToDegraded( slaves ); // Phase 1a --> 2
