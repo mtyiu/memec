@@ -420,21 +420,21 @@ bool Pending::eraseKeyValueUpdate( PendingType type, uint16_t instanceId, uint32
 	return ret;
 }
 
-bool Pending::eraseAck( PendingType type, uint16_t instanceId, std::vector<PendingIdentifier> *pidPtr, bool needsLock, bool needsUnlock ) {
+bool Pending::eraseAck( PendingType type, uint16_t instanceId, std::vector<AcknowledgementInfo> *ackPtr, bool needsLock, bool needsUnlock ) {
 
-	PendingIdentifier pid( instanceId, 0, 0, 0, 0 );
 	std::unordered_multimap<PendingIdentifier, AcknowledgementInfo> *map;
 	std::unordered_multimap<PendingIdentifier, AcknowledgementInfo>::iterator it, saveIt;
 	LOCK_T *lock;
 
 	if ( ! this->get( type, lock, map ) )
 		return false;
+
 	if ( needsLock ) LOCK( lock );
 	for ( it = map->begin(), saveIt = map->begin(); it != map->end(); it = saveIt ) {
 		saveIt++;
 		if ( it->first.instanceId == instanceId ) {
-			if ( pidPtr ) 
-				pidPtr->push_back( it->first );
+			if ( ackPtr ) 
+				ackPtr->push_back( it->second );
 			map->erase( it );
 		}
 	}

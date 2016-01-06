@@ -243,6 +243,33 @@ SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId
 }
 */
 
+void MasterWorker::removePending( SlaveSocket *slave, bool needsAck ) {
+
+	struct sockaddr_in saddr = slave->getAddr();
+	char buf[ INET_ADDRSTRLEN ];
+	inet_ntop( AF_INET, &saddr.sin_addr.s_addr, buf, INET_ADDRSTRLEN );
+	// remove pending ack
+	std::vector<AcknowledgementInfo> ackInfoList;
+	// remove parity backup ack
+	MasterWorker::pending->eraseAck( PT_ACK_REMOVE_PARITY, slave->instanceId, &ackInfoList );
+	for ( AcknowledgementInfo &it : ackInfoList ) {
+		if ( it.lock ) LOCK( it.lock );
+		if ( it.counter ) *it.counter -= 1;
+		if ( it.lock ) UNLOCK( it.lock );
+	}
+	// revert parity ack
+	ackInfoList.clear();
+	MasterWorker::pending->eraseAck( PT_ACK_REVERT_PARITY, slave->instanceId, &ackInfoList );
+	for ( AcknowledgementInfo &it : ackInfoList ) {
+		if ( it.lock ) LOCK( it.lock );
+		if ( it.counter ) *it.counter -= 1;
+		if ( it.lock ) UNLOCK( it.lock );
+	}
+	
+	if ( needsAck )
+		Master::getInstance()->remapMsgHandler.ackTransit(); 
+}
+
 void MasterWorker::free() {
 	this->protocol.free();
 	delete[] original;

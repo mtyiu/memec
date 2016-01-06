@@ -1011,7 +1011,7 @@ void Slave::backupStat( FILE *f ) {
 			">> Master FD = %u\n-------------------\n",
 			this->sockets.masters.keys[ i ]
 		);
-		this->sockets.masters.values[ i ]->backup.print( f, true );
+		this->sockets.masters.values[ i ]->backup.print( f );
 		fprintf( f, "\n" );
 	}
 }

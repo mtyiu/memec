@@ -209,8 +209,10 @@ quit_1:
 		}
 		if ( connected ) event.socket->done();
 	}
-	if ( ! connected )
+	if ( ! connected ) {
 		__ERROR__( "MasterWorker", "dispatch", "The slave is disconnected." );
+		this->removePending( event.socket );
+	}
 }
 
 bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf, size_t size ) {

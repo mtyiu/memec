@@ -19,7 +19,7 @@ bool CoordinatorRemapWorker::transitToDegraded( RemapStateEvent event ) { // Pha
 	// wait for "sync meta ack" to proceed, release lock once acquired
 	__INFO__( CYAN, "CoordinatorRemapWorker", "transitToDegraded",
 		"Start transition to degraded for slave %s:%u.",
-		buf, event.slave.sin_port
+		buf, ntohs( event.slave.sin_port )
 	);
 
 	// any cleanup to be done (request for metadata sync. and parity revert)

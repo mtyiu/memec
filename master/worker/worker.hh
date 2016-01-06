@@ -112,6 +112,8 @@ public:
 	void stop();
 	void print( FILE *f = stdout );
 	inline WorkerRole getRole() { return this->role; }
+
+	static void removePending( SlaveSocket *slave, bool needsAck = true );
 };
 
 #endif

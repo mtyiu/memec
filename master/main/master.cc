@@ -998,7 +998,9 @@ void Master::time() {
 	for ( int j = 0, len = this->sockets.slaves.size(); j < len; j++ ) { \
 		SlaveEvent event; \
 		SlaveSocket *p = this->sockets.slaves[ j ]; \
-		if ( p == _S_ ) continue; \
+		struct sockaddr_in saddr = p->getAddr(); \
+		/* skip myself, and any node declared to be failed */ \
+		if ( p == _S_ || this->remapMsgHandler.useCoordinatedFlow( saddr ) ) continue; \
 		if ( _LOCK_ ) LOCK( _LOCK_ ); \
 		if ( _COUNTER_ ) *_COUNTER_ += 1; \
 		event._METHOD_NAME_( p, from, to, _S_->instanceId, _COND_, _LOCK_, _COUNTER_ ); \
