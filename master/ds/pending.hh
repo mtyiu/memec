@@ -273,7 +273,7 @@ public:
 	// remove all the pending ack with a specific instanceId
 	bool eraseAck( 
 		PendingType type, uint16_t instanceId,
-		std::vector<PendingIdentifier> *pidPtr = 0,
+		std::vector<AcknowledgementInfo> *ackPtr = 0,
 		bool needsLock = true, bool needsUnlock = true
 	);
 		

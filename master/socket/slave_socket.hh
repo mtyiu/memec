@@ -55,6 +55,7 @@ public:
 			}
 		} pendingAck;
 	} timestamp;
+	LOCK_T ackParityDeltaBackupLock;
 	uint16_t instanceId;
 
 	static void setArrayMap( ArrayMap<int, SlaveSocket> *slaves );

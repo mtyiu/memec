@@ -121,7 +121,26 @@ void MasterRemapMsgHandler::setState( char* msg , int len ) {
 		char buf[ INET_ADDRSTRLEN ];
 		inet_ntop( AF_INET, &slave.sin_addr.s_addr, buf, INET_ADDRSTRLEN );
 		if ( this->slavesState.count( slave ) == 0 ) {
-			__ERROR__( "MasterRemapMsgHandler", "setState" , "slave %s:%hu not found\n", buf, ntohs( slave.sin_port ) );
+			__ERROR__( "MasterRemapMsgHandler", "setState" , "Slave %s:%hu not found\n", buf, ntohs( slave.sin_port ) );
+			continue;
+		}
+
+		Master *master = Master::getInstance();
+		LOCK_T &lock = master->sockets.slaves.lock;
+		std::vector<SlaveSocket *> &slaves = master->sockets.slaves.values;
+		SlaveSocket *target = 0;
+
+		LOCK( &lock );
+		for ( size_t i = 0, count = slaves.size(); i < count; i++ ) {
+			if ( slaves[ i ]->equal( slave.sin_addr.s_addr, slave.sin_port ) ) {
+				target = slaves[ i ];
+				break;
+			}
+		}
+		UNLOCK( &lock );
+
+		if ( ! target ) {
+			__ERROR__( "MasterRemapMsgHandler", "setState" , "SlaveSocket for %s:%hu not found\n", buf, ntohs( slave.sin_port ) );
 			continue;
 		}
 
@@ -136,35 +155,17 @@ void MasterRemapMsgHandler::setState( char* msg , int len ) {
 				if ( state == REMAP_WAIT_DEGRADED )
 					signal = state;
 				else {
-					Master *master = Master::getInstance();
-					LOCK_T &lock = master->sockets.slaves.lock;
-					std::vector<SlaveSocket *> &slaves = master->sockets.slaves.values;
-					SlaveSocket *target = 0;
-
-					LOCK( &lock );
-					for ( size_t i = 0, count = slaves.size(); i < count; i++ ) {
-						if ( slaves[ i ]->equal( slave.sin_addr.s_addr, slave.sin_port ) ) {
-							target = slaves[ i ];
-							break;
-						}
-					}
-					UNLOCK( &lock );
-
-					if ( target ) {
-						// Insert a new event
-						SlaveEvent event;
-						event.syncMetadata( target );
-						Master::getInstance()->eventQueue.insert( event );
-						// revert parity deltas
-						Master::getInstance()->revertParityDelta(
-							0, target, 0,
-							&this->stateTransitInfo[ slave ].counter.parityRevert.lock,
-							&this->stateTransitInfo[ slave ].counter.parityRevert.value,
-							true
-						);
-					} else {
-						__ERROR__( "MasterRemapMsgHandler", "setState", "SlaveSocket not found." );
-					}
+					// Insert a new event
+					SlaveEvent event;
+					event.syncMetadata( target );
+					Master::getInstance()->eventQueue.insert( event );
+					// revert parity deltas
+					Master::getInstance()->revertParityDelta( 
+						0, target, 0,
+						&this->stateTransitInfo[ slave ].counter.parityRevert.lock, 
+						&this->stateTransitInfo[ slave ].counter.parityRevert.value, 
+						true
+					); 
 				}
 				break;
 			case REMAP_COORDINATED:
@@ -184,6 +185,11 @@ void MasterRemapMsgHandler::setState( char* msg , int len ) {
 		}
 		this->slavesState[ slave ] = signal;
 		UNLOCK( &this->slavesStateLock[ slave ] );
+
+		// clean up pending items associated with this slave
+		// TODO handle the case when insert happened after cleanup ( useCoordinatedFlow returns false > erase > add )
+		if ( signal == REMAP_INTERMEDIATE )
+			MasterWorker::removePending( target, false );
 
 		// check if the change can be immediately acked
 		if ( signal == REMAP_INTERMEDIATE || signal == REMAP_COORDINATED )

@@ -111,6 +111,7 @@ bool SlaveBackup::insertData##_OP_TYPE_( Timestamp ts, Key key, Value value, Met
 			it = lit; \
 			REMOVE_ITEMS( map, it, map->end(), free, ret, isData, dataSlaveId ); \
 			/* start of map --> to */ \
+			rit = map->upper_bound( to ); \
 			it = map->begin(); \
 			REMOVE_ITEMS( map, it, rit, free, ret, isData, dataSlaveId ); \
 		} else { \
