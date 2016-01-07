@@ -42,6 +42,11 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 	switch( event.type ) {
 		// Register
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
+			if ( Slave::instanceId == 0 ) {
+				// Wait until the slave get an instance ID
+				SlaveWorker::eventQueue->insert( event );
+				return;
+			}
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resRegisterMaster( buffer.size, Slave::instanceId, event.requestId, success );
 			break;

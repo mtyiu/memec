@@ -70,8 +70,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 
 			buffer.data = this->protocol.ackParityDeltaBackup(
 				buffer.size,
-				instanceId,
-				requestId,
+				instanceId, requestId,
 				event.message.ack.fromTimestamp, event.message.ack.toTimestamp,
 				event.message.ack.targetId
 			);
@@ -587,7 +586,7 @@ bool MasterWorker::handleParityDeltaAcknowledgement( SlaveEvent event, uint8_t o
 
 	if ( ! ret ) {
 		__ERROR__( "MasterWorker", "handleParityDeltaAcknowledgement",
-			"Cannot find the pending ack info for instacne id = %u from instance id = %u request id = %u",
+			"Cannot find the pending ack info for instance id = %u from instance id = %u request id = %u",
 			header.targetId, event.instanceId, event.requestId
 		);
 		return ret;
