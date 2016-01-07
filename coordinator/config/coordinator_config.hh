@@ -34,6 +34,7 @@ public:
 		bool block;
 		struct {
 			uint32_t mixed;
+			uint32_t pMixed;
 			struct {
 				uint32_t coordinator;
 				uint32_t master;
@@ -48,10 +49,11 @@ public:
 		uint32_t packets;
 	} pool;
 	struct {
-		uint8_t worker;
-		uint16_t queue;
+		uint32_t worker;
+		uint32_t queue;
 	} remap;
 
+	CoordinatorConfig();
 	bool merge( GlobalConfig &globalConfig );
 	bool parse( const char *path );
 	bool override( OptionList &options );

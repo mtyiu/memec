@@ -142,7 +142,7 @@ public:
 					UNLOCK( &this->priority.lock );
 
 					// Avoid all worker threads are blocked by the empty normal queue
-					if ( this->mixed->count() == 0 ) {
+					if ( this->mixed->count() < ( int ) count ) {
 						mixedEvent.set();
 						this->mixed->insert( mixedEvent );
 					}

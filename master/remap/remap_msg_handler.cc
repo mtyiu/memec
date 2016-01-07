@@ -160,12 +160,12 @@ void MasterRemapMsgHandler::setState( char* msg , int len ) {
 					event.syncMetadata( target );
 					Master::getInstance()->eventQueue.insert( event );
 					// revert parity deltas
-					Master::getInstance()->revertParityDelta( 
+					Master::getInstance()->revertParityDelta(
 						0, target, 0,
-						&this->stateTransitInfo[ slave ].counter.parityRevert.lock, 
-						&this->stateTransitInfo[ slave ].counter.parityRevert.value, 
+						&this->stateTransitInfo[ slave ].counter.parityRevert.lock,
+						&this->stateTransitInfo[ slave ].counter.parityRevert.value,
 						true
-					); 
+					);
 				}
 				break;
 			case REMAP_COORDINATED:
@@ -314,7 +314,7 @@ bool MasterRemapMsgHandler::checkAckForSlave( struct sockaddr_in slave ) {
 	if (
 		( state == REMAP_NORMAL ) ||
 	    ( state == REMAP_INTERMEDIATE && ( false /* yet sync all meta */ || this->stateTransitInfo[ slave ].getParityRevertCounterVal() > 0 /* yet undo all parity */ ) ) ||
-	    ( state == REMAP_COORDINATED ) ) {
+	    ( state == REMAP_COORDINATED && false ) ) {
 		UNLOCK( &this->slavesStateLock[ slave ] );
 		return false;
 	}

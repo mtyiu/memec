@@ -13,13 +13,15 @@ private:
 public:
 	uint32_t size;
 	char *data;
+	bool inPool;
 
-	Packet() {
+	Packet( bool inPool = true ) {
 		this->referenceCount = 0;
 		this->capacity = 0;
 		this->size = 0;
 		LOCK_INIT( &this->lock );
 		this->data = 0;
+		this->inPool = inPool;
 	}
 
 	~Packet() {
@@ -81,11 +83,16 @@ public:
 class PacketPool {
 private:
 	MemoryPool<Packet> *pool;
+	uint32_t size;
 	size_t capacity;
+	LOCK_T lock;
+	uint32_t extraCount;
 
 public:
 	PacketPool() {
 		this->pool = 0;
+		LOCK_INIT( &this->lock );
+		this->extraCount = 0;
 	}
 
 	~PacketPool() {
@@ -95,22 +102,37 @@ public:
 	void init( size_t capacity, size_t size ) {
 		this->pool = MemoryPool<Packet>::getInstance();
 		this->pool->init( capacity, Packet::initFn, ( void * ) &size );
+		this->size = size;
 		this->capacity = capacity;
 	}
 
 	Packet *malloc() {
-		Packet *packet = this->pool->malloc();
+		Packet *packet = this->pool->malloc( 0, 1, false );
+		if ( ! packet ) {
+			packet = new Packet( false );
+			packet->init( size );
+			LOCK( &this->lock );
+			this->extraCount++;
+			UNLOCK( &this->lock );
+		}
 		return packet;
 	}
 
 	void free( Packet *packet ) {
 		if ( packet->decrement() ) { // Reference count == 0
-			this->pool->free( packet );
+			if ( packet->inPool )
+				this->pool->free( packet );
+			else {
+				delete packet;
+				LOCK( &this->lock );
+				this->extraCount--;
+				UNLOCK( &this->lock );
+			}
 		}
 	}
 
 	void print( FILE *f ) {
-		fprintf( f, "Count : %lu / %lu\n", this->pool->getCount(), this->capacity );
+		fprintf( f, "Count : %lu / %lu\n", this->pool->getCount() + this->extraCount, this->capacity );
 	}
 };
 

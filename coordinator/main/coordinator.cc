@@ -120,7 +120,7 @@ std::set<struct sockaddr_in> Coordinator::updateOverloadedSlaveSet( ArrayMap<str
 			/* if (1) sec > avgSec or (2) sec == avgSec && nsec > avgNsec */ \
 			if ( ( double ) slave##_TYPE_##Latency->values[ i ]->sec > avgSec * threshold || \
 					( ( A_EQUAL_B ( slave##_TYPE_##Latency->values[ i ]->sec, avgSec * threshold ) && \
-						(double) slave##_TYPE_##Latency->values[ i ]->nsec >= avgNsec * threshold ) ) ) {\
+						(double) slave##_TYPE_##Latency->values[ i ]->nsec >= avgNsec * threshold ) ) ) { \
 				this->overloadedSlaves.slaveSet.insert( slave##_TYPE_##Latency->keys[ i ] ); \
 				slaveSet->insert( slave##_TYPE_##Latency->keys[ i ] ); \
 				/* printf( "Slave #%u overloaded %u %u !!!!\n", i, slave##_TYPE_##Latency->values[ i ]->sec, slave##_TYPE_##Latency->values[ i ]->nsec ); */ \
@@ -131,6 +131,7 @@ std::set<struct sockaddr_in> Coordinator::updateOverloadedSlaveSet( ArrayMap<str
 
 	GET_OVERLOADED_SLAVES( Get );
 	GET_OVERLOADED_SLAVES( Set );
+
 #undef GET_OVERLOADED_SLAVES
 	UNLOCK( &this->overloadedSlaves.lock );
 	return prevOverloadedSlaves;
@@ -294,7 +295,8 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 		this->idGenerator.init( this->config.coordinator.workers.number.mixed );
 		this->eventQueue.init(
 			this->config.coordinator.eventQueue.block,
-			this->config.coordinator.eventQueue.size.mixed
+			this->config.coordinator.eventQueue.size.mixed,
+			this->config.coordinator.eventQueue.size.pMixed
 		);
 		CoordinatorWorker::init();
 		this->workers.reserve( this->config.coordinator.workers.number.mixed );

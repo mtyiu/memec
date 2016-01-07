@@ -60,6 +60,7 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 			isSend = false;
 			if ( slaves == NULL || ! coordinator->remapMsgHandler )
 				break;
+
 			// just trigger the handling of transition, no message need to be handled
 			if ( event.message.switchPhase.toRemap ) {
 				size_t numMasters = coordinator->sockets.masters.size();
