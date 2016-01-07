@@ -27,6 +27,10 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 			success = false;
 			isSend = true;
 			break;
+		case APPLICATION_EVENT_TYPE_REPLAY_SET:
+		case APPLICATION_EVENT_TYPE_REPLAY_GET:
+		case APPLICATION_EVENT_TYPE_REPLAY_UPDATE:
+		case APPLICATION_EVENT_TYPE_REPLAY_DEL:
 		case APPLICATION_EVENT_TYPE_PENDING:
 		default:
 			isSend = false;
@@ -116,6 +120,64 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 			);
 			if ( event.needsFree )
 				event.message.key.free();
+			break;
+		case APPLICATION_EVENT_TYPE_REPLAY_SET:
+			{
+				Key key;
+				char *valueStr;
+				uint32_t valueSize;
+				event.message.replay.set.keyValue.deserialize( key.data, key.size, valueStr, valueSize );
+				buffer.data = this->protocol.replaySet(
+					buffer.size,
+					event.instanceId, event.requestId,
+					key.data, key.size, valueStr, valueSize
+				);
+				this->handleSetRequest( event, buffer.data, buffer.size );
+				// free keyValue
+				event.message.replay.set.keyValue.free();
+			}
+			break;
+		case APPLICATION_EVENT_TYPE_REPLAY_GET:
+			{
+				buffer.data = this->protocol.replayGet(
+					buffer.size,
+					event.instanceId, event.requestId,
+					event.message.replay.get.key.data,
+					event.message.replay.get.key.size
+				);
+				this->handleGetRequest( event, buffer.data, buffer.size );
+				// free keyValue
+				event.message.replay.get.key.free();
+			}
+			break;
+		case APPLICATION_EVENT_TYPE_REPLAY_UPDATE:
+			{
+				buffer.data = this->protocol.replayUpdate(
+					buffer.size,
+					event.instanceId, event.requestId,
+					event.message.replay.update.keyValueUpdate.data,
+					event.message.replay.update.keyValueUpdate.size,
+					( char* ) event.message.replay.update.keyValueUpdate.ptr,
+					event.message.replay.update.keyValueUpdate.offset,
+					event.message.replay.update.keyValueUpdate.length
+				);
+				this->handleUpdateRequest( event, buffer.data, buffer.size );
+				// free keyValue
+				event.message.replay.update.keyValueUpdate.free();
+			}
+			break;
+		case APPLICATION_EVENT_TYPE_REPLAY_DEL:
+			{
+				buffer.data = this->protocol.replayDelete(
+					buffer.size,
+					event.instanceId, event.requestId,
+					event.message.replay.del.key.data,
+					event.message.replay.del.key.size
+				);
+				this->handleDeleteRequest( event, buffer.data, buffer.size );
+				// free keyValue
+				event.message.replay.del.key.free();
+			}
 			break;
 		case APPLICATION_EVENT_TYPE_PENDING:
 			break;
@@ -445,7 +507,7 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 	keyValueUpdate.dup( header.keySize, header.key, valueUpdate );
 	keyValueUpdate.offset = header.valueUpdateOffset;
 	keyValueUpdate.length = header.valueUpdateSize;
-	if ( ! MasterWorker::pending->insertKeyValueUpdate( PT_APPLICATION_UPDATE, event.instanceId, event.requestId, ( void * ) event.socket, keyValueUpdate, true, true, requestTimestamp ) ) {
+	if ( ! MasterWorker::pending->insertKeyValueUpdate( PT_APPLICATION_UPDATE, event.instanceId, event.requestId, ( void * ) event.socket, keyValueUpdate, true, true, Master::getInstance()->timestamp.nextVal() ) ) {
 		__ERROR__( "MasterWorker", "handleUpdateRequest", "Cannot insert into application UPDATE pending map." );
 	}
 
@@ -468,7 +530,7 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 		// add pending timestamp to ack
 		socket->timestamp.pendingAck.insertUpdate( Timestamp( requestTimestamp ) );
 
-		if ( ! MasterWorker::pending->insertKeyValueUpdate( PT_SLAVE_UPDATE, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, keyValueUpdate ) ) {
+		if ( ! MasterWorker::pending->insertKeyValueUpdate( PT_SLAVE_UPDATE, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, keyValueUpdate, requestTimestamp ) ) {
 			__ERROR__( "MasterWorker", "handleUpdateRequest", "Cannot insert into slave UPDATE pending map." );
 		}
 
@@ -525,7 +587,7 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 	uint32_t requestTimestamp = socket->timestamp.current.nextVal();
 
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
-	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_DEL, event.instanceId, event.requestId, ( void * ) event.socket, key, true, true, requestTimestamp ) ) {
+	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_DEL, event.instanceId, event.requestId, ( void * ) event.socket, key, true, true, Master::getInstance()->timestamp.nextVal() ) ) {
 		__ERROR__( "MasterWorker", "handleDeleteRequest", "Cannot insert into application DELETE pending map." );
 	}
 
@@ -545,7 +607,7 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 		// add pending timestamp to ack.
 		socket->timestamp.pendingAck.insertDel( Timestamp( requestTimestamp ) );
 
-		if ( ! MasterWorker::pending->insertKey( PT_SLAVE_DEL, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, key ) ) {
+		if ( ! MasterWorker::pending->insertKey( PT_SLAVE_DEL, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, key, requestTimestamp ) ) {
 			__ERROR__( "MasterWorker", "handleDeleteRequest", "Cannot insert into slave DELETE pending map." );
 		}
 

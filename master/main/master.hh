@@ -80,6 +80,7 @@ public:
 	struct {
 		bool isDegraded;
 	} debugFlags;
+	Timestamp timestamp;
 
 	static Master *getInstance() {
 		static Master master;

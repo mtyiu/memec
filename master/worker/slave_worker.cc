@@ -333,8 +333,11 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 			return false;
 		}
 
-		applicationEvent.resSet( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, keyValue, success );
-		this->dispatch( applicationEvent );
+		// not to response if the request is "canceled" due to replay
+		if ( pid.ptr ) {
+			applicationEvent.resSet( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, keyValue, success );
+			this->dispatch( applicationEvent );
+		}
 	}
 	return true;
 }
@@ -444,6 +447,8 @@ bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, bool is
 		return false;
 	}
 
+	uint32_t timestamp = pid.timestamp;
+
 	if ( ! MasterWorker::pending->eraseKeyValueUpdate( PT_APPLICATION_UPDATE, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &keyValueUpdate, true, true, true, header.key ) ) {
 		__ERROR__( "MasterWorker", "handleUpdateResponse", "Cannot find a pending application UPDATE request that matches the response. This message will be discarded." );
 		return false;
@@ -456,7 +461,7 @@ bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, bool is
 	// TODO handle degraded mode
 	Master *master = Master::getInstance();
 	if ( ! isDegraded ) {
-		event.socket->timestamp.pendingAck.eraseUpdate( pid.timestamp );
+		event.socket->timestamp.pendingAck.eraseUpdate( timestamp );
 	}
 
 	applicationEvent.resUpdate( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, keyValueUpdate, success );
@@ -523,6 +528,8 @@ bool MasterWorker::handleDeleteResponse( SlaveEvent event, bool success, bool is
 		return false;
 	}
 
+	uint32_t timestamp = pid.timestamp;
+
 	if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_DEL, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &key, true, true, true, keyStr ) ) {
 		__ERROR__( "MasterWorker", "handleDeleteResponse", "Cannot find a pending application DELETE request that matches the response. This message will be discarded. ID: (%u, %u); key: %.*s.", pid.parentInstanceId, pid.parentRequestId, keySize, keyStr );
 		return false;
@@ -532,7 +539,7 @@ bool MasterWorker::handleDeleteResponse( SlaveEvent event, bool success, bool is
 	// TODO handle degraded mode
 	Master *master = Master::getInstance();
 	if ( !isDegraded ) {
-		event.socket->timestamp.pendingAck.eraseDel( pid.timestamp );
+		event.socket->timestamp.pendingAck.eraseDel( timestamp );
 	}
 
 	applicationEvent.resDelete( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, key, success );

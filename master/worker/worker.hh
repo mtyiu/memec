@@ -114,6 +114,8 @@ public:
 	inline WorkerRole getRole() { return this->role; }
 
 	static void removePending( SlaveSocket *slave, bool needsAck = true );
+	static void replayRequestPrepare( SlaveSocket *slave );
+	static void replayRequest( SlaveSocket *slave );
 };
 
 #endif

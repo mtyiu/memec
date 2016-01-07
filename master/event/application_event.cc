@@ -52,8 +52,7 @@ void ApplicationEvent::resUpdate( ApplicationSocket *socket, uint16_t instanceId
 	this->type = success ? APPLICATION_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS : APPLICATION_EVENT_TYPE_UPDATE_RESPONSE_FAILURE;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
-	this->socket = socket;
-	this->message.keyValueUpdate = keyValueUpdate;
+	this->socket = socket; this->message.keyValueUpdate = keyValueUpdate;
 	this->needsFree = needsFree;
 }
 
@@ -64,6 +63,38 @@ void ApplicationEvent::resDelete( ApplicationSocket *socket, uint16_t instanceId
 	this->socket = socket;
 	this->message.key = key;
 	this->needsFree = needsFree;
+}
+
+void ApplicationEvent::replaySetRequest( ApplicationSocket *socket, uint16_t instanceId, uint32_t requestId, KeyValue keyValue ) {
+	this->type = APPLICATION_EVENT_TYPE_REPLAY_SET;
+	this->socket = socket;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
+	this->message.replay.set.keyValue= keyValue;
+}
+
+void ApplicationEvent::replayGetRequest( ApplicationSocket *socket, uint16_t instanceId, uint32_t requestId, Key key ) {
+	this->type = APPLICATION_EVENT_TYPE_REPLAY_GET;
+	this->socket = socket;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
+	this->message.replay.get.key = key;
+}
+
+void ApplicationEvent::replayUpdateRequest( ApplicationSocket *socket, uint16_t instanceId, uint32_t requestId, KeyValueUpdate keyValueUpdate ) {
+	this->type = APPLICATION_EVENT_TYPE_REPLAY_UPDATE;
+	this->socket = socket;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
+	this->message.replay.update.keyValueUpdate = keyValueUpdate;
+}
+
+void ApplicationEvent::replayDeleteRequest( ApplicationSocket *socket, uint16_t instanceId, uint32_t requestId, Key key ) {
+	this->type = APPLICATION_EVENT_TYPE_REPLAY_DEL;
+	this->socket = socket;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
+	this->message.replay.del.key = key;
 }
 
 void ApplicationEvent::pending( ApplicationSocket *socket ) {

@@ -166,6 +166,8 @@ void MasterRemapMsgHandler::setState( char* msg , int len ) {
 						&this->stateTransitInfo[ slave ].counter.parityRevert.value, 
 						true
 					); 
+					// gather the requests to be replayed
+					//MasterWorker::replayRequestPrepare( target );
 				}
 				break;
 			case REMAP_COORDINATED:
@@ -184,16 +186,28 @@ void MasterRemapMsgHandler::setState( char* msg , int len ) {
 				return;
 		}
 		this->slavesState[ slave ] = signal;
+		state = this->slavesState[ slave ];
 		UNLOCK( &this->slavesStateLock[ slave ] );
 
-		// clean up pending items associated with this slave
-		// TODO handle the case when insert happened after cleanup ( useCoordinatedFlow returns false > erase > add )
-		if ( signal == REMAP_INTERMEDIATE )
-			MasterWorker::removePending( target, false );
-
-		// check if the change can be immediately acked
-		if ( signal == REMAP_INTERMEDIATE || signal == REMAP_COORDINATED )
-			this->ackTransit( &slave );
+		// actions/cleanup after state change
+		switch( state ) 
+			case REMAP_INTERMEDIATE:
+				// clean up pending items associated with this slave
+				// TODO handle the case when insert happened after cleanup ( useCoordinatedFlow returns false > erase > add )
+				MasterWorker::removePending( target );
+				this->ackTransit();
+				break;
+			case REMAP_COORDINATED:
+				// check if the change can be immediately acked
+				this->ackTransit( &slave );
+				break;
+			case REMAP_DEGRADED:
+				// start replaying the requests
+				//MasterWorker::replayRequest( target );
+				break;
+			default:
+				break;
+		}
 	}
 
 }

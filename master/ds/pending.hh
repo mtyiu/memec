@@ -25,7 +25,76 @@ enum PendingType {
 	PT_SLAVE_DEL,
 	PT_KEY_REMAP_LIST,
 	PT_ACK_REMOVE_PARITY,
-	PT_ACK_REVERT_PARITY
+	PT_ACK_REVERT_PARITY,
+	PT_REQUEST_REPLAY
+};
+
+class RequestInfo {
+public:
+	void *application;
+	uint16_t instanceId;
+	uint32_t requestId;
+	uint8_t opcode;
+	union {
+		KeyValueUpdate keyValueUpdate;
+		KeyValue keyValue;
+		Key key;
+	};
+
+	RequestInfo() {
+	}
+
+	RequestInfo( void *application, uint16_t instanceId, uint32_t requestId, uint8_t opcode, Key key ) {
+		this->application = application;
+		this->instanceId = instanceId;
+		this->requestId = requestId;
+		this->opcode = opcode;
+		this->key.set( key.size, key.data, key.ptr );
+	}
+
+	RequestInfo( void *application, uint16_t instanceId, uint32_t requestId, uint8_t opcode, KeyValue keyValue ) {
+		this->application = application;
+		this->instanceId = instanceId;
+		this->requestId = requestId;
+		this->opcode = opcode;
+		this->keyValue.set( keyValue.data, keyValue.ptr );
+	}
+
+	RequestInfo( void *application, uint16_t instanceId, uint32_t requestId, uint8_t opcode, KeyValueUpdate keyValueUpdate ) {
+		this->application = application;
+		this->instanceId = instanceId;
+		this->requestId = requestId;
+		this->opcode = opcode;
+		this->keyValueUpdate.set( keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.ptr );
+		this->keyValueUpdate.offset = keyValueUpdate.offset;
+		this->keyValueUpdate.length = keyValueUpdate.length;
+	}
+
+	void set( void *application, uint16_t instanceId, uint32_t requestId, uint8_t opcode, Key key ) {
+		this->application = application;
+		this->instanceId = instanceId;
+		this->requestId = requestId;
+		this->opcode = opcode;
+		this->key.set( key.size, key.data, key.ptr );
+	}
+
+	void set( void *application, uint16_t instanceId, uint32_t requestId, uint8_t opcode, KeyValue keyValue ) {
+		this->application = application;
+		this->instanceId = instanceId;
+		this->requestId = requestId;
+		this->opcode = opcode;
+		this->keyValue.set( keyValue.data, keyValue.ptr );
+	}
+
+	void set( void *application, uint16_t instanceId, uint32_t requestId, uint8_t opcode, KeyValueUpdate keyValueUpdate ) {
+		this->application = application;
+		this->instanceId = instanceId;
+		this->requestId = requestId;
+		this->opcode = opcode;
+		this->keyValueUpdate.set( keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.ptr );
+		this->keyValueUpdate.offset = keyValueUpdate.offset;
+		this->keyValueUpdate.length = keyValueUpdate.length;
+	}
 };
 
 class AcknowledgementInfo {
@@ -166,11 +235,16 @@ public:
 		LOCK_T setLock;
 	} stats;
 	struct {
-		std::unordered_multimap<PendingIdentifier, AcknowledgementInfo > remove;
-		std::unordered_multimap<PendingIdentifier, AcknowledgementInfo > revert;
+		std::unordered_multimap<PendingIdentifier, AcknowledgementInfo> remove;
+		std::unordered_multimap<PendingIdentifier, AcknowledgementInfo> revert;
 		LOCK_T removeLock;
 		LOCK_T revertLock;
 	} ack;
+	struct {
+		std::unordered_map<uint16_t, std::map<uint32_t, RequestInfo> > requests; // slave instance id -> (timestamp, request)
+		std::unordered_map<uint16_t, uint32_t> requestsStartTime; // slave instance id -> first timestamp to start remap
+		std::unordered_map<uint16_t, LOCK_T> requestsLock;
+	} replay;
 
 	Pending();
 
