@@ -190,7 +190,7 @@ void MasterRemapMsgHandler::setState( char* msg , int len ) {
 		UNLOCK( &this->slavesStateLock[ slave ] );
 
 		// actions/cleanup after state change
-		switch( state ) 
+		switch ( state ) {
 			case REMAP_INTERMEDIATE:
 				// clean up pending items associated with this slave
 				// TODO handle the case when insert happened after cleanup ( useCoordinatedFlow returns false > erase > add )
