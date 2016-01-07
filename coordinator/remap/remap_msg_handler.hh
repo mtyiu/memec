@@ -92,7 +92,7 @@ public:
 
 	// check slave state
 	bool isInTransition( const struct sockaddr_in &slave );
-
+	bool reachMaximumRemapped( uint32_t maximum );
 
 };
 

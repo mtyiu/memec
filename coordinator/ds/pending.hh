@@ -312,7 +312,6 @@ public:
 			PendingTransition &transition = map[ instanceId ];
 			transition.pending = pending;
 		} else {
-			__ERROR__( "Pending", "addPendingTransition", "This slave (instance ID = %u) is already under transition. This transition is ignored.", instanceId );
 			ret = false;
 		}
 		pthread_mutex_unlock( lock );

@@ -557,3 +557,21 @@ bool CoordinatorRemapMsgHandler::isInTransition( const struct sockaddr_in &slave
 	UNLOCK( &this->slavesStateLock[ slave ] );
 	return ret;
 }
+
+bool CoordinatorRemapMsgHandler::reachMaximumRemapped( uint32_t maximum ) {
+	uint32_t count = 0;
+	LOCK( &this->aliveSlavesLock );
+	for ( auto it = this->aliveSlaves.begin(); it != this->aliveSlaves.end(); it++ ) {
+		const struct sockaddr_in &slave = ( *it );
+		LOCK( &this->slavesStateLock[ slave ] );
+		if ( slavesState[ slave ] != REMAP_NORMAL ) {
+			count++;
+		}
+		UNLOCK( &this->slavesStateLock[ slave ] );
+
+		if ( count == maximum )
+			break;
+	}
+	UNLOCK( &this->aliveSlavesLock );
+	return ( count == maximum );
+}

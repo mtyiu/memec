@@ -1,6 +1,10 @@
 #include <cstdlib>
 #include "global_config.hh"
 
+GlobalConfig::GlobalConfig() {
+	this->remap.maximum = 0;
+}
+
 bool GlobalConfig::parse( const char *path ) {
 	return Config::parse( path, "global.ini" );
 }
@@ -61,6 +65,8 @@ bool GlobalConfig::set( const char *section, const char *name, const char *value
 				return false;
 		} else if ( match( name, "smoothingFactor" ) ) {
 			this->remap.smoothingFactor = atof( value );
+		} else if ( match( name, "maximum" ) ) {
+			this->remap.maximum = atoi( value );
 		} else
 			return false;
 	} else if ( match( section, "buffer" ) ) {

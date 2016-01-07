@@ -58,6 +58,12 @@ void Coordinator::switchPhase( std::set<struct sockaddr_in> prevOverloadedSlaves
 	if ( curOverloadedSlaveCount > totalSlaveCount * startThreshold ) { // Phase 1 --> 2
 		// __INFO__( YELLOW, "Coordinator", "switchPhase", "%lf: Overload detected (overloaded slave = %u).", this->getElapsedTime(), curOverloadedSlaveCount );
 
+		if ( this->config.global.remap.maximum > 0 && ( curOverloadedSlaveCount > this->config.global.remap.maximum || this->remapMsgHandler->reachMaximumRemapped( this->config.global.remap.maximum ) ) ) {
+			// Limit the number of remapped slaves
+			UNLOCK( &this->overloadedSlaves.lock );
+			return;
+		}
+
 		// need to start remapping now
 		if ( prevOverloadedSlaveCount > totalSlaveCount * startThreshold ) {
 			std::set<struct sockaddr_in> newOverloadedSlaves = this->overloadedSlaves.slaveSet;
