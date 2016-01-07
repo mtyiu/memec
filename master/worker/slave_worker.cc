@@ -293,11 +293,16 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 	if ( ! MasterWorker::pending->eraseKey( PT_SLAVE_SET, event.instanceId, event.requestId, event.socket, &pid, &key, true, false ) ) {
 		UNLOCK( &MasterWorker::pending->slaves.setLock );
 		__ERROR__( "MasterWorker", "handleSetResponse", "Cannot find a pending slave SET request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
+		event.socket->printAddress();
 		return false;
 	}
+
+	// FOR REPLAY TESTING ONLY
+	//PendingIdentifier dpid = pid;
+
 	// Check pending slave SET requests
 	pending = MasterWorker::pending->count( PT_SLAVE_SET, pid.instanceId, pid.requestId, false, true );
-
+	
 	// Mark the elapse time as latency
 	Master* master = Master::getInstance();
 	if ( MasterWorker::updateInterval ) {
@@ -333,6 +338,17 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 			return false;
 		}
 
+		// FOR REPLAY TESTING ONLY
+		// SET //
+		//char *valueStr;
+		//uint32_t valueSize;
+		//keyValue.deserialize( key.data, key.size, valueStr, valueSize );
+		//KeyValue kv;
+		//kv.dup( key.data, key.size, valueStr, valueSize );
+		//MasterWorker::pending->insertKeyValue( PT_APPLICATION_SET, pid.instanceId, pid.requestId, 0, kv, true, true, pid.timestamp );
+		//key = kv.key();
+		//MasterWorker::pending->insertKey( PT_SLAVE_SET, dpid.instanceId, dpid.parentInstanceId, dpid.requestId, dpid.parentRequestId, dpid.ptr, key );
+		
 		// not to response if the request is "canceled" due to replay
 		if ( pid.ptr ) {
 			applicationEvent.resSet( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, keyValue, success );
@@ -374,6 +390,9 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, bool isDeg
 		return false;
 	}
 
+	// FOR REPLAY TESTING ONLY
+	//PendingIdentifier dpid = pid;
+
 	// Mark the elapse time as latency
 	if ( ! isDegraded && MasterWorker::updateInterval ) {
 		Master* master = Master::getInstance();
@@ -405,20 +424,29 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, bool isDeg
 		return false;
 	}
 
-	if ( success ) {
-		applicationEvent.resGet(
-			( ApplicationSocket * ) pid.ptr,
-			pid.instanceId, pid.requestId,
-			key.size,
-			valueSize,
-			key.data,
-			valueStr,
-			false
-		);
-	} else {
-		applicationEvent.resGet( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, key, false );
+	// FOR REPLAY TESTING ONLY
+	// GET //
+	//Key k;
+	//k.dup( key.size, key.data, key.ptr );
+	//MasterWorker::pending->insertKey( PT_APPLICATION_GET, pid.instanceId, pid.requestId, 0, k, true, true, pid.timestamp );
+	//MasterWorker::pending->insertKey( PT_SLAVE_GET, dpid.instanceId, dpid.parentInstanceId, dpid.requestId, dpid.parentRequestId, dpid.ptr, key );
+
+	if ( pid.ptr ) {
+		if ( success ) {
+			applicationEvent.resGet(
+				( ApplicationSocket * ) pid.ptr,
+				pid.instanceId, pid.requestId,
+				key.size,
+				valueSize,
+				key.data,
+				valueStr,
+				false
+			);
+		} else {
+			applicationEvent.resGet( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, key, false );
+		}
+		this->dispatch( applicationEvent );
 	}
-	this->dispatch( applicationEvent );
 	key.free();
 	return true;
 }
@@ -447,6 +475,9 @@ bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, bool is
 		return false;
 	}
 
+	// FOR REPLAY TESTING ONLY
+	//PendingIdentifier dpid = pid;
+
 	uint32_t timestamp = pid.timestamp;
 
 	if ( ! MasterWorker::pending->eraseKeyValueUpdate( PT_APPLICATION_UPDATE, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &keyValueUpdate, true, true, true, header.key ) ) {
@@ -464,8 +495,19 @@ bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, bool is
 		event.socket->timestamp.pendingAck.eraseUpdate( timestamp );
 	}
 
-	applicationEvent.resUpdate( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, keyValueUpdate, success );
-	this->dispatch( applicationEvent );
+		// FOR REPLAY TESTING ONLY
+		// UPDATE //
+		//KeyValueUpdate kvu;
+		//kvu.dup( keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.ptr );
+		//kvu.offset = keyValueUpdate.offset;
+		//kvu.length = keyValueUpdate.length;
+		//MasterWorker::pending->insertKeyValueUpdate( PT_APPLICATION_UPDATE, pid.instanceId, pid.requestId, 0, kvu, true, true, pid.timestamp );
+		//MasterWorker::pending->insertKeyValueUpdate( PT_SLAVE_UPDATE, dpid.instanceId, dpid.parentInstanceId, dpid.requestId, dpid.parentRequestId, dpid.ptr, kvu );
+
+	if ( pid.ptr ) {
+		applicationEvent.resUpdate( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, keyValueUpdate, success );
+		this->dispatch( applicationEvent );
+	}
 
 	// check if ack is necessary
 	// TODO handle degraded mode
@@ -542,8 +584,10 @@ bool MasterWorker::handleDeleteResponse( SlaveEvent event, bool success, bool is
 		event.socket->timestamp.pendingAck.eraseDel( timestamp );
 	}
 
-	applicationEvent.resDelete( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, key, success );
-	this->dispatch( applicationEvent );
+	if ( pid.ptr ) {
+		applicationEvent.resDelete( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, key, success );
+		this->dispatch( applicationEvent );
+	}
 
 	// check if ack is necessary
 	// TODO handle degraded mode

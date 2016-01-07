@@ -3,7 +3,7 @@
 #include "../../common/ds/instance_id_generator.hh"
 
 void MasterWorker::dispatch( ApplicationEvent event ) {
-	bool success = true, connected, isSend;
+	bool success = true, connected, isSend, isReplay = false;
 	ssize_t ret;
 	struct {
 		size_t size;
@@ -31,6 +31,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 		case APPLICATION_EVENT_TYPE_REPLAY_GET:
 		case APPLICATION_EVENT_TYPE_REPLAY_UPDATE:
 		case APPLICATION_EVENT_TYPE_REPLAY_DEL:
+			isReplay = true;
 		case APPLICATION_EVENT_TYPE_PENDING:
 		default:
 			isSend = false;
@@ -132,9 +133,12 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 					event.instanceId, event.requestId,
 					key.data, key.size, valueStr, valueSize
 				);
+				buffer.data += PROTO_HEADER_SIZE;
+				buffer.size -= PROTO_HEADER_SIZE;
 				this->handleSetRequest( event, buffer.data, buffer.size );
-				// free keyValue
 				event.message.replay.set.keyValue.free();
+				buffer.data -= PROTO_HEADER_SIZE;
+				buffer.size += PROTO_HEADER_SIZE;
 			}
 			break;
 		case APPLICATION_EVENT_TYPE_REPLAY_GET:
@@ -145,9 +149,12 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 					event.message.replay.get.key.data,
 					event.message.replay.get.key.size
 				);
+				buffer.data += PROTO_HEADER_SIZE;
+				buffer.size -= PROTO_HEADER_SIZE;
 				this->handleGetRequest( event, buffer.data, buffer.size );
-				// free keyValue
 				event.message.replay.get.key.free();
+				buffer.data -= PROTO_HEADER_SIZE;
+				buffer.size += PROTO_HEADER_SIZE;
 			}
 			break;
 		case APPLICATION_EVENT_TYPE_REPLAY_UPDATE:
@@ -161,9 +168,12 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 					event.message.replay.update.keyValueUpdate.offset,
 					event.message.replay.update.keyValueUpdate.length
 				);
+				buffer.data += PROTO_HEADER_SIZE;
+				buffer.size -= PROTO_HEADER_SIZE;
 				this->handleUpdateRequest( event, buffer.data, buffer.size );
-				// free keyValue
 				event.message.replay.update.keyValueUpdate.free();
+				buffer.data -= PROTO_HEADER_SIZE;
+				buffer.size += PROTO_HEADER_SIZE;
 			}
 			break;
 		case APPLICATION_EVENT_TYPE_REPLAY_DEL:
@@ -174,9 +184,12 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 					event.message.replay.del.key.data,
 					event.message.replay.del.key.size
 				);
+				buffer.data += PROTO_HEADER_SIZE;
+				buffer.size -= PROTO_HEADER_SIZE;
 				this->handleDeleteRequest( event, buffer.data, buffer.size );
-				// free keyValue
 				event.message.replay.del.key.free();
+				buffer.data -= PROTO_HEADER_SIZE;
+				buffer.size += PROTO_HEADER_SIZE;
 			}
 			break;
 		case APPLICATION_EVENT_TYPE_PENDING:
@@ -189,7 +202,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "MasterWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
-	} else {
+	} else if ( ! isReplay ) {
 		// Parse requests from applications
 		ProtocolHeader header;
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();
@@ -227,7 +240,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 		if ( connected ) event.socket->done();
 	}
 
-	if ( ! connected ) {
+	if ( ! connected && ! isReplay ) {
 		__DEBUG__( RED, "MasterWorker", "dispatch", "The application is disconnected." );
 		// delete event.socket;
 	}
@@ -302,7 +315,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 	keyValue.dup( header.key, header.keySize, header.value, header.valueSize );
 	key = keyValue.key();
 
-	if ( ! MasterWorker::pending->insertKeyValue( PT_APPLICATION_SET, event.instanceId, event.requestId, ( void * ) event.socket, keyValue ) ) {
+	if ( ! MasterWorker::pending->insertKeyValue( PT_APPLICATION_SET, event.instanceId, event.requestId, ( void * ) event.socket, keyValue, true, true, Master::getInstance()->timestamp.nextVal() ) ) {
 		__ERROR__( "MasterWorker", "handleSetRequest", "Cannot insert into application SET pending map." );
 	}
 
@@ -416,7 +429,7 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
 
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
-	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_GET, event.instanceId, event.requestId, ( void * ) event.socket, key ) ) {
+	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_GET, event.instanceId, event.requestId, ( void * ) event.socket, key, true, true, Master::getInstance()->timestamp.nextVal() ) ) {
 		__ERROR__( "MasterWorker", "handleGetRequest", "Cannot insert into application GET pending map." );
 	}
 

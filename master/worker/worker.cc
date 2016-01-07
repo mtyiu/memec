@@ -289,6 +289,7 @@ void MasterWorker::replayRequestPrepare( SlaveSocket *slave ) {
 #define SEARCH_MAP_FOR_REQUEST( _OPCODE_, _SLAVE_VALUE_TYPE_, _APPLICATION_VALUE_TYPE_, _APPLICATION_VALUE_VAR_, _PENDING_TYPE_, _PENDING_SET_NAME_ ) \
 	do { \
 		_APPLICATION_VALUE_TYPE_ _APPLICATION_VALUE_VAR_; \
+		bool needsDup = false; \
 		LOCK( pendingLock ); \
 		for ( \
 			std::unordered_multimap<PendingIdentifier, _SLAVE_VALUE_TYPE_>::iterator it = pending->slaves._PENDING_SET_NAME_.begin(), safeIt = it; \
@@ -296,26 +297,29 @@ void MasterWorker::replayRequestPrepare( SlaveSocket *slave ) {
 		) { \
 			/* hold a save ptr for safe erase */ \
 			safeIt++; \
-			/* skip request other than the target slave */ \
-			if ( it->first.instanceId != instanceId ) \
+			/* skip requests other than those associated with target slave */ \
+			if ( it->first.ptr != slave ) \
 				continue; \
 			/* skip request if backup is not available */ \
-			if ( ! pending->erase##_APPLICATION_VALUE_TYPE_( PT_APPLICATION_##_PENDING_TYPE_, it->first.instanceId, it->first.requestId, ( void* ) 0, &pid, &_APPLICATION_VALUE_VAR_, true, true, true, it->second.data ) ) { \
-				__ERROR__( "MasterWorker", "replayRequestPrepare", "Cannot find the SET request backup for ID = (%u, %u).", it->first.instanceId, it->first.requestId ); \
+			if ( ! pending->erase##_APPLICATION_VALUE_TYPE_( PT_APPLICATION_##_PENDING_TYPE_, it->first.parentInstanceId, it->first.parentRequestId, ( void* ) 0, &pid, &_APPLICATION_VALUE_VAR_, true, true, true, it->second.data ) ) { \
+				__ERROR__( "MasterWorker", "replayRequestPrepare", "Cannot find the SET request backup for ID = (%u, %u).", it->first.parentInstanceId, it->first.parentRequestId ); \
 				continue; \
 			} \
-			/* cancel the request by setting application socket to 0 */ \
-			if ( ! MasterWorker::pending->insert##_APPLICATION_VALUE_TYPE_( PT_APPLICATION_##_PENDING_TYPE_, pid.instanceId, pid.requestId, 0, _APPLICATION_VALUE_VAR_ ) ) \
-				__ERROR__( "MasterWorker", "replayRequestPrepare", "Failed to reinsert the %s request backup for ID = (%u, %u).", \
-					#_OPCODE_, it->first.instanceId, it->first.requestId \
-				); \
-			__INFO__( YELLOW, "MasterWorker", "replayRequestPrepare", "Going to replay %s request with timestamp %u\n", #_OPCODE_, pid.timestamp ); \
-			/* mark the frist timestamp to start replay */ \
+			/* cancel the request reply to application by setting application socket to 0 */ \
+			if ( MasterWorker::pending->count( PT_SLAVE_##_PENDING_TYPE_, it->first.instanceId, it->first.requestId, false, false /* already locked (pendingLock) */ ) > 1 ) { \
+				__DEBUG__( YELLOW, "MasterWorker", "replayRequestPrepare", "Reinsert ID = (%u,%u)\n", ( ( SlaveSocket * ) it->first.ptr )->getSocket(), it->first.parentInstanceId, it->first.parentRequestId ); \
+				if ( ! MasterWorker::pending->insert##_APPLICATION_VALUE_TYPE_( PT_APPLICATION_##_PENDING_TYPE_, pid.instanceId, pid.requestId, 0, _APPLICATION_VALUE_VAR_ ) ) \
+					__ERROR__( "MasterWorker", "replayRequestPrepare", "Failed to reinsert the %s request backup for ID = (%u, %u).", #_OPCODE_, pid.instanceId, pid.requestId ); \
+				else \
+					needsDup = true; \
+			} \
+			__DEBUG__( YELLOW, "MasterWorker", "replayRequestPrepare", "Add %s request ID = (%u,%u) with timestamp %u to replay.", #_OPCODE_, pid.instanceId, pid.requestId, pid.timestamp ); \
+			/* mark the first timestamp to start the replay */ \
 			if ( pending->replay.requestsStartTime.count( instanceId ) == 0 ) { \
 				pending->replay.requestsStartTime[ instanceId ] = pid.timestamp; \
 			} \
 			/* insert the request into pending set for replay */ \
-			requestInfo.set( pid.ptr, pid.instanceId, pid.requestId, PROTO_OPCODE_##_OPCODE_, _APPLICATION_VALUE_VAR_ ); \
+			requestInfo.set( pid.ptr, pid.instanceId, pid.requestId, PROTO_OPCODE_##_OPCODE_, _APPLICATION_VALUE_VAR_, !needsDup ); \
 			map->insert( std::pair<uint32_t, RequestInfo>( pid.timestamp, requestInfo ) ); \
 			/* remove the pending ack */ \
 			pending->slaves._PENDING_SET_NAME_.erase( it ); \
@@ -352,19 +356,22 @@ void MasterWorker::replayRequest( SlaveSocket *slave ) {
 		__ERROR__( "MasterWorker", "replayRequest", "Cannot replay request for slave with id = %u.", instanceId );
 		return;
 	}
-
 	LOCK_T *lock = &MasterWorker::pending->replay.requestsLock.at( instanceId );
+
 	std::map<uint32_t, RequestInfo> *map = &MasterWorker::pending->replay.requests.at( instanceId );
 	std::map<uint32_t, RequestInfo>::iterator lit, rit;
-	// from the first timestamp, to the first timestamp
-	lit = map->find( pending->replay.requestsStartTime[ instanceId ] );
-	rit = lit;
 	ApplicationEvent event;
+
 	LOCK( lock ); 
-	if ( map->empty() ) {
+
+	if ( ! MasterWorker::pending->replay.requestsStartTime.count( instanceId ) || map->empty() ) {
 		UNLOCK( lock );
 		return;
 	}
+
+	// from the first timestamp, to the first timestamp
+	lit = map->find( pending->replay.requestsStartTime[ instanceId ] );
+	rit = lit;
 	// replay requests
 	do {
 		switch ( lit->second.opcode ) {
@@ -397,7 +404,7 @@ void MasterWorker::replayRequest( SlaveSocket *slave ) {
 				);
 				break;
 			default:
-				__ERROR__( "MasterWorker", "replayRequest", "Unknown request OPCODE = 0x%x\n", lit->second.opcode );
+				__ERROR__( "MasterWorker", "replayRequest", "Unknown request OPCODE = 0x%0x\n", lit->second.opcode );
 				continue;
 		}
 		MasterWorker::eventQueue->insert( event );
@@ -405,8 +412,10 @@ void MasterWorker::replayRequest( SlaveSocket *slave ) {
 		if ( lit == map->end() )
 			lit = map->begin();
 	} while( lit != rit && lit != map->end() );
+
 	map->clear();
 	pending->replay.requestsStartTime.erase( instanceId );
+
 	UNLOCK( lock );
 }
 

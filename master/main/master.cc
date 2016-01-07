@@ -596,6 +596,17 @@ void Master::interactive() {
 				pthread_cond_wait( &condition, &lock );
 			}
 			valid = true;
+		} else if ( strcmp( command, "replay" ) == 0 ) {
+			// FOR REPLAY TESTING ONLY
+			for ( int i = 0, len = this->sockets.slaves.size(); i < len; i ++ ) {
+				printf("Prepare replay for slave id = %hu fd = %u\n", this->sockets.slaves[ i ]->instanceId, this->sockets.slaves[ i ]->getSocket() );
+				MasterWorker::replayRequestPrepare( this->sockets.slaves[ i ] );
+				sleep( 30 );
+				printf("Replay for slave id = %hu fd = %u\n", this->sockets.slaves[ i ]->instanceId, this->sockets.slaves[ i ]->getSocket() );
+				MasterWorker::replayRequest( this->sockets.slaves[ i ] );
+				sleep( 30 );
+			}
+			valid = true;
 		} else {
 			valid = false;
 		}
@@ -679,11 +690,15 @@ void Master::printPending( FILE *f ) {
 		KeyValue &keyValue = keyValueIt->second;
 		Key key = keyValue.key();
 		fprintf(
-			f, "%lu. ID: (%u, %u); Key: %.*s (size = %u); source: ",
+			f, "%lu. ID: (%u, %u); Key: %.*s (size = %u); Timestamp: %u source: ",
 			i, keyValueIt->first.instanceId, keyValueIt->first.requestId,
-			key.size, key.data, key.size
+			key.size, key.data, key.size,
+			keyValueIt->first.timestamp
 		);
-		( ( Socket * ) pid.ptr )->printAddress( f );
+		if ( pid.ptr ) 
+			( ( Socket * ) pid.ptr )->printAddress( f );
+		else
+			fprintf( f, "[N/A]\n" );
 
 		for ( uint8_t i = 0; i < key.size; i++ ) {
 			if ( ! isprint( key.data[ i ] ) ) {

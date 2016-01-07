@@ -70,28 +70,42 @@ public:
 		this->keyValueUpdate.length = keyValueUpdate.length;
 	}
 
-	void set( void *application, uint16_t instanceId, uint32_t requestId, uint8_t opcode, Key key ) {
+	void set( void *application, uint16_t instanceId, uint32_t requestId, uint8_t opcode, Key key, bool needsDup ) {
 		this->application = application;
 		this->instanceId = instanceId;
 		this->requestId = requestId;
 		this->opcode = opcode;
-		this->key.set( key.size, key.data, key.ptr );
+		if ( needsDup ) 
+			this->key.dup( key.size, key.data, key.ptr );
+		else
+			this->key.set( key.size, key.data, key.ptr );
 	}
 
-	void set( void *application, uint16_t instanceId, uint32_t requestId, uint8_t opcode, KeyValue keyValue ) {
+	void set( void *application, uint16_t instanceId, uint32_t requestId, uint8_t opcode, KeyValue keyValue, bool needsDup ) {
 		this->application = application;
 		this->instanceId = instanceId;
 		this->requestId = requestId;
 		this->opcode = opcode;
-		this->keyValue.set( keyValue.data, keyValue.ptr );
+		if ( needsDup ) {
+			Key key;
+			char* valueStr;
+			uint32_t valueSize;
+			keyValue.deserialize( key.data, key.size, valueStr, valueSize );
+			this->keyValue.dup( key.data, key.size, valueStr, valueSize, keyValue.ptr );
+		} else {
+			this->keyValue.set( keyValue.data, keyValue.ptr );
+		}
 	}
 
-	void set( void *application, uint16_t instanceId, uint32_t requestId, uint8_t opcode, KeyValueUpdate keyValueUpdate ) {
+	void set( void *application, uint16_t instanceId, uint32_t requestId, uint8_t opcode, KeyValueUpdate keyValueUpdate, bool needsDup ) {
 		this->application = application;
 		this->instanceId = instanceId;
 		this->requestId = requestId;
 		this->opcode = opcode;
-		this->keyValueUpdate.set( keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.ptr );
+		if ( needsDup )
+			this->keyValueUpdate.dup( keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.ptr );
+		else 
+			this->keyValueUpdate.set( keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.ptr );
 		this->keyValueUpdate.offset = keyValueUpdate.offset;
 		this->keyValueUpdate.length = keyValueUpdate.length;
 	}
