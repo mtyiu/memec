@@ -60,6 +60,7 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 			isSend = false;
 			if ( slaves == NULL || ! coordinator->remapMsgHandler )
 				break;
+
 			// just trigger the handling of transition, no message need to be handled
 			if ( event.message.switchPhase.toRemap ) {
 				size_t numMasters = coordinator->sockets.masters.size();
@@ -76,11 +77,13 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 
 					if ( instanceId != 0 ) {
 						// Update pending set for metadata backup
-						CoordinatorWorker::pending->addPendingTransition(
+						if ( ! CoordinatorWorker::pending->addPendingTransition(
 							instanceId, // instanceId
 							true,       // isDegraded
 							numMasters  // pending
-						);
+						) ) {
+							__ERROR__( "CoordinatorWorker", "dispatch", "Warning: This slave (instance ID = %u) is already under transition to degraded state.", instanceId );
+						}
 					}
 
 					if ( event.message.switchPhase.isCrashed )

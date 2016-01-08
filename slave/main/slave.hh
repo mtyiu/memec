@@ -111,6 +111,7 @@ public:
 	void printChunk();
 	void time();
 	void backupStat( FILE *f = stdout );
+	void lookup();
 
 	void alarm();
 

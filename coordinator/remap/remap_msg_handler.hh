@@ -82,7 +82,7 @@ public:
 	bool isAllMasterAcked( struct sockaddr_in slave );
 
 	// notify master of slaves' state
-	bool sendStateToMasters( std::vector<struct sockaddr_in> &slaves );
+	bool sendStateToMasters( std::vector<struct sockaddr_in> slaves );
 	bool sendStateToMasters( struct sockaddr_in slave );
 
 	// keep track of the alive slaves
@@ -90,6 +90,10 @@ public:
 	bool addCrashedSlave( struct sockaddr_in slave );
 	bool removeAliveSlave( struct sockaddr_in slave );
 
+	// check slave state
+	bool isInTransition( const struct sockaddr_in &slave );
+	bool allowRemapping( const struct sockaddr_in &slave );
+	bool reachMaximumRemapped( uint32_t maximum );
 
 };
 

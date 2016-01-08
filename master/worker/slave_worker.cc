@@ -46,7 +46,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 			if ( ! isCompleted )
 				MasterWorker::eventQueue->insert( event );
 
-			// printf( "Sealed: %u; ops: %u\n", sealedCount, opsCount );
+			printf( "Sealed: %u; ops: %u\n", sealedCount, opsCount );
 			isSend = false; // Send to coordinator instead
 		}
 			break;
@@ -70,8 +70,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 
 			buffer.data = this->protocol.ackParityDeltaBackup(
 				buffer.size,
-				instanceId,
-				requestId,
+				instanceId, requestId,
 				event.message.ack.fromTimestamp, event.message.ack.toTimestamp,
 				event.message.ack.targetId
 			);
@@ -293,7 +292,7 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 	if ( ! MasterWorker::pending->eraseKey( PT_SLAVE_SET, event.instanceId, event.requestId, event.socket, &pid, &key, true, false ) ) {
 		UNLOCK( &MasterWorker::pending->slaves.setLock );
 		__ERROR__( "MasterWorker", "handleSetResponse", "Cannot find a pending slave SET request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
-		event.socket->printAddress();
+		// event.socket->printAddress();
 		return false;
 	}
 
@@ -302,7 +301,7 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 
 	// Check pending slave SET requests
 	pending = MasterWorker::pending->count( PT_SLAVE_SET, pid.instanceId, pid.requestId, false, true );
-	
+
 	// Mark the elapse time as latency
 	Master* master = Master::getInstance();
 	if ( MasterWorker::updateInterval ) {
@@ -348,7 +347,7 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 		//MasterWorker::pending->insertKeyValue( PT_APPLICATION_SET, pid.instanceId, pid.requestId, 0, kv, true, true, pid.timestamp );
 		//key = kv.key();
 		//MasterWorker::pending->insertKey( PT_SLAVE_SET, dpid.instanceId, dpid.parentInstanceId, dpid.requestId, dpid.parentRequestId, dpid.ptr, key );
-		
+
 		// not to response if the request is "canceled" due to replay
 		if ( pid.ptr ) {
 			applicationEvent.resSet( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, keyValue, success );
@@ -638,12 +637,12 @@ bool MasterWorker::handleParityDeltaAcknowledgement( SlaveEvent event, uint8_t o
 
 	if ( ! ret ) {
 		__ERROR__( "MasterWorker", "handleParityDeltaAcknowledgement",
-			"Cannot find the pending ack info for instacne id = %u from instance id = %u request id = %u",
+			"Cannot find the pending ack info for instance id = %u from instance id = %u request id = %u",
 			header.targetId, event.instanceId, event.requestId
 		);
 		return ret;
 	}
-	
+
 	if ( ackInfo.lock ) LOCK( ackInfo.lock );
 	if ( ackInfo.counter ) {
 		*ackInfo.counter -= 1;
@@ -665,7 +664,7 @@ bool MasterWorker::handleParityDeltaAcknowledgement( SlaveEvent event, uint8_t o
 			LOCK( &master->sockets.slavesIdToSocketLock );
 			try {
 				struct sockaddr_in saddr = master->sockets.slavesIdToSocketMap.at( header.targetId )->getAddr();
-				master->remapMsgHandler.ackTransit( saddr ); 
+				master->remapMsgHandler.ackTransit( saddr );
 			} catch ( std::out_of_range &e ) {
 				__ERROR__( "MasterWorker", "handleParityDeltaAcknowledgement",
 					"Cannot find slave socket for instacne id = %u", header.targetId

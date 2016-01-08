@@ -522,6 +522,31 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 			if ( ! SlaveWorker::pending->eraseDegradedOp( PT_SLAVE_PEER_DEGRADED_OPS, event.instanceId, event.requestId, event.socket, &pid, &op ) ) {
 				__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot find a pending slave DEGRADED_OPS request that matches the response. This message will be discarded." );
 			} else {
+				int index = this->findInRedirectedList( op.reconstructed, op.reconstructedCount );
+
+				// Check whether the reconstructed parity chunks need to be forwarded
+				bool needsForwarding = false;
+				for ( uint32_t i = 0; i < op.reconstructedCount; i++ ) {
+					if ( op.original[ i * 2 + 1 ] >= SlaveWorker::dataChunkCount ) {
+						needsForwarding = true;
+						break;
+					}
+				}
+				if ( needsForwarding ) {
+					printf( "Needs forwarding: self: (%u, %u, %u); ", op.listId, op.stripeId, op.chunkId );
+					for ( uint32_t i = 0; i < op.reconstructedCount; i++ ) {
+						printf(
+							"%s%u |-> %u%s",
+							i == 0 ? "" : "; ",
+							op.original[ i * 2 + 1 ],
+							op.reconstructed[ i * 2 + 1 ],
+							i == op.reconstructedCount - 1 ? "\n" : ""
+						);
+					}
+				}
+
+				// TODO: Handle the case when index == -1
+
 				DegradedMap *dmap = &SlaveWorker::degradedChunkBuffer->map;
 				bool isKeyValueFound, isSealed;
 				Key key;
@@ -547,6 +572,42 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 					}
 
 					// Find the chunk from the map
+					if ( index == -1 ) {
+						__INFO__( BLUE, "SlaveWorker", "handleGetChunkResponse", "TODO: Handle the case when index == -1." );
+
+						MasterEvent masterEvent;
+						masterEvent.instanceId = pid.parentInstanceId;
+						masterEvent.requestId = pid.parentRequestId;
+						masterEvent.socket = ( MasterSocket * ) pid.ptr;
+
+						if ( op.opcode == PROTO_OPCODE_DEGRADED_GET ) {
+							struct KeyHeader header;
+							header.keySize = op.data.key.size;
+							header.key = op.data.key.data;
+							this->handleGetRequest( masterEvent, header, true );
+						} else if ( op.opcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
+							struct KeyValueUpdateHeader header;
+							header.keySize = op.data.keyValueUpdate.size;
+							header.valueUpdateSize = op.data.keyValueUpdate.length;
+							header.valueUpdateOffset = op.data.keyValueUpdate.offset;
+							header.key = op.data.keyValueUpdate.data;
+							header.valueUpdate = ( char * ) op.data.keyValueUpdate.ptr;
+
+							// TODO: Handle failed parity servers
+							this->handleUpdateRequest( masterEvent, header );
+						} else if ( op.opcode == PROTO_OPCODE_DEGRADED_DELETE ) {
+							struct KeyHeader header;
+							header.keySize = op.data.key.size;
+							header.key = op.data.key.data;
+
+							// TODO: Handle failed parity servers
+							this->handleDeleteRequest( masterEvent, header );
+						}
+
+						continue;
+					}
+
+
 					Chunk *chunk = dmap->findChunkById( op.listId, op.stripeId, op.chunkId );
 
 					if ( ! chunk ) {
@@ -577,6 +638,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 					}
 
 					isKeyValueFound = dmap->findValueByKey( key.data, key.size, isSealed, &keyValue, &key, &keyMetadata );
+
 					// Send response
 					if ( op.opcode == PROTO_OPCODE_DEGRADED_GET ) {
 						MasterEvent event;

@@ -82,14 +82,19 @@ public:
 		}
 	}
 
-	T *malloc( T **buffer = 0, uint64_t count = 1 ) {
+	T *malloc( T **buffer = 0, uint64_t count = 1, bool wait = true ) {
 		T *ret = 0;
 
 		pthread_mutex_lock( &this->mAccess );
 		while( this->count + count > this->capacity ) {
 			// Check whether the pool can provide the requested number of T
 			// Doing this outside the loop to avoid deadlock!
-			pthread_cond_wait( &this->cvEmpty, &this->mAccess );
+			if ( wait ) {
+				pthread_cond_wait( &this->cvEmpty, &this->mAccess );
+			} else {
+				pthread_mutex_unlock( &this->mAccess );
+				return 0;
+			}
 		}
 
 		if ( buffer && count ) {

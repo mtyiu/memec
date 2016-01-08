@@ -163,7 +163,7 @@ bool SlaveWorker::handleDegradedUpdateRequest( MasterEvent event, char *buf, siz
 		__ERROR__( "SlaveWorker", "handleDegradedUpdateRequest", "Invalid degraded UPDATE request." );
 		return false;
 	}
-	__INFO__(
+	__DEBUG__(
 		BLUE, "SlaveWorker", "handleDegradedRequest",
 		"[UPDATE] Key: %.*s (key size = %u); Value: (update size = %u, offset = %u).",
 		( int ) header.data.keyValueUpdate.keySize,
@@ -187,11 +187,6 @@ bool SlaveWorker::handleDegradedUpdateRequest( MasterEvent event, char *buf, siz
 		return this->handleUpdateRequest( event, header.data.keyValueUpdate );
 	}
 
-	if ( index == -1 ) {
-		// Data chunk is NOT reconstructed
-		__ERROR__( "SlaveWorker", "handleDegradedUpdateRequest", "TODO: Handle the case when the data chunk does NOT need reconstruction." );
-	}
-
 	Key key;
 	KeyValue keyValue;
 	KeyValueUpdate keyValueUpdate;
@@ -199,14 +194,28 @@ bool SlaveWorker::handleDegradedUpdateRequest( MasterEvent event, char *buf, siz
 	Metadata metadata;
 	bool ret = true;
 	DegradedMap *dmap = &SlaveWorker::degradedChunkBuffer->map;
+	bool isSealed, isKeyValueFound;
+	Chunk *chunk;
 
 	keyMetadata.offset = 0;
 
+	if ( index == -1 ) {
+		// Data chunk is NOT reconstructed
+		__INFO__( YELLOW, "SlaveWorker", "handleDegradedUpdateRequest", "TODO: Handle the case when the data chunk does NOT need reconstruction (isSealed: %s).", header.isSealed ? "true" : "false	" );
+
+		// Set up key
+		key.set( header.data.keyValueUpdate.keySize, header.data.keyValueUpdate.key );
+		// Set up KeyValueUpdate
+		keyValueUpdate.set( key.size, key.data, ( void * ) event.socket );
+		keyValueUpdate.offset = header.data.keyValueUpdate.valueUpdateOffset;
+		keyValueUpdate.length = header.data.keyValueUpdate.valueUpdateSize;
+		goto force_degraded_read;
+	}
+
 	// Check if the chunk is already fetched
-	Chunk *chunk = dmap->findChunkById( listId, stripeId, chunkId );
+	chunk = dmap->findChunkById( listId, stripeId, chunkId );
 	// Check if the key exists or is in a unsealed chunk
-	bool isSealed;
-	bool isKeyValueFound = dmap->findValueByKey(
+	isKeyValueFound = dmap->findValueByKey(
 		header.data.keyValueUpdate.key,
 		header.data.keyValueUpdate.keySize,
 		isSealed,
@@ -308,6 +317,7 @@ bool SlaveWorker::handleDegradedUpdateRequest( MasterEvent event, char *buf, siz
 		);
 		this->dispatch( event );
 	} else {
+force_degraded_read:
 		key.dup();
 		keyValueUpdate.dup( 0, 0, ( void * ) event.socket );
 

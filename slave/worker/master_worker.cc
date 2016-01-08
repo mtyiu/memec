@@ -42,6 +42,11 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 	switch( event.type ) {
 		// Register
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
+			if ( Slave::instanceId == 0 ) {
+				// Wait until the slave get an instance ID
+				SlaveWorker::eventQueue->insert( event );
+				return;
+			}
 		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resRegisterMaster( buffer.size, Slave::instanceId, event.requestId, success );
 			break;
@@ -312,8 +317,9 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, struct KeyValueHeader &he
 	bool isSealed;
 	Metadata sealed;
 	uint32_t timestamp, listId, stripeId, chunkId;
+	SlavePeerSocket *dataSlaveSocket;
 
-	listId = SlaveWorker::stripeList->get( header.key, header.keySize, 0, 0, &chunkId );
+	listId = SlaveWorker::stripeList->get( header.key, header.keySize, &dataSlaveSocket, 0, &chunkId );
 
 	if ( SlaveWorker::disableSeal ) {
 		SlaveWorker::chunkBuffer->at( listId )->set(
@@ -343,7 +349,7 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, struct KeyValueHeader &he
 
 	Key key;
 	key.set( header.keySize, header.key );
-	if ( chunkId >= SlaveWorker::dataChunkCount ) {
+	if ( ! dataSlaveSocket->self ) {
 		event.resSet(
 			event.socket, event.instanceId, event.requestId,
 			key, true

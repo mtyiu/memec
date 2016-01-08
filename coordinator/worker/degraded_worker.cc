@@ -63,26 +63,88 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 			event.socket, event.instanceId, event.requestId,
 			key, true
 		);
-	} else if ( map->insertDegradedLock(
+	} else {
+		// Check whether the "failed" servers are in intermediate or degraded state
+		CoordinatorRemapMsgHandler *crmh = CoordinatorRemapMsgHandler::getInstance();
+		// bool isPrinted = false;
+		for ( uint32_t i = 0; i < header.reconstructedCount; ) {
+			SlaveSocket *s = CoordinatorWorker::stripeList->get(
+				header.original[ i * 2    ],
+				header.original[ i * 2 + 1 ]
+			);
+			struct sockaddr_in addr = s->getAddr();
+			if ( ! crmh->allowRemapping( addr ) ) {
+				/*
+				if ( ! isPrinted ) {
+					for ( uint32_t i = 0; i < header.reconstructedCount; i++ ) {
+						printf(
+							"%s(%u, %u) |-> (%u, %u)%s",
+							i == 0 ? "Original: " : "; ",
+							header.original[ i * 2     ],
+							header.original[ i * 2 + 1 ],
+							header.reconstructed[ i * 2     ],
+							header.reconstructed[ i * 2 + 1 ],
+							i == header.reconstructedCount - 1 ? " || " : ""
+						);
+					}
+					isPrinted = true;
+				}
+				printf(
+					"** Not in intermediate or degraded state: (%u, %u) **",
+					header.original[ i * 2    ],
+					header.original[ i * 2 + 1 ]
+				);
+				*/
+				for ( uint32_t j = i; j < header.reconstructedCount - 1; j++ ) {
+					header.original[ j * 2     ] = header.original[ ( j + 1 ) * 2     ];
+					header.original[ j * 2 + 1 ] = header.original[ ( j + 1 ) * 2 + 1 ];
+					header.reconstructed[ j * 2     ] = header.reconstructed[ ( j + 1 ) * 2     ];
+					header.reconstructed[ j * 2 + 1 ] = header.reconstructed[ ( j + 1 ) * 2 + 1 ];
+				}
+				header.reconstructedCount--;
+			} else {
+				i++;
+			}
+		}
+		/*
+		if ( isPrinted ) {
+			for ( uint32_t i = 0; i < header.reconstructedCount; i++ ) {
+				printf(
+					"%s(%u, %u) |-> (%u, %u)%s",
+					i == 0 ? "Modified: " : "; ",
+					header.original[ i * 2     ],
+					header.original[ i * 2 + 1 ],
+					header.reconstructed[ i * 2     ],
+					header.reconstructed[ i * 2 + 1 ],
+					i == header.reconstructedCount - 1 ? "\n" : ""
+				);
+			}
+		}
+		*/
+
+		ret = map->insertDegradedLock(
 			srcMetadata.listId, srcMetadata.stripeId,
 			header.original, header.reconstructed, header.reconstructedCount,
 			false, false
-		) ) {
-		event.resDegradedLock(
-			event.socket, event.instanceId, event.requestId, key,
-			true,                         // the degraded lock is attained
-			map->isSealed( srcMetadata ), // the chunk is sealed
-			srcMetadata.stripeId,
-			header.original,
-			header.reconstructed,
-			header.reconstructedCount
 		);
-	} else {
-		// Cannot lock
-		event.resDegradedLock(
-			event.socket, event.instanceId, event.requestId,
-			key, true
-		);
+
+		if ( ret ) {
+			event.resDegradedLock(
+				event.socket, event.instanceId, event.requestId, key,
+				true,                         // the degraded lock is attained
+				map->isSealed( srcMetadata ), // the chunk is sealed
+				srcMetadata.stripeId,
+				header.original,
+				header.reconstructed,
+				header.reconstructedCount
+			);
+		} else {
+			// Cannot lock
+			event.resDegradedLock(
+				event.socket, event.instanceId, event.requestId,
+				key, true
+			);
+		}
 	}
 	this->dispatch( event );
 	if ( lock ) UNLOCK( lock );

@@ -39,7 +39,7 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 				isCompleted
 			);
 
-			if ( opsCount )
+			if ( sealedCount || opsCount )
 				SlaveWorker::pendingAck->insert( timestamp );
 
 			if ( ! isCompleted )
@@ -221,6 +221,8 @@ bool SlaveWorker::handleHeartbeatAck( CoordinatorEvent event, char *buf, size_t 
 		return false;
 	}
 
+	__DEBUG__( YELLOW, "SlaveWorker", "handleAcknowledgement", "Timestamp: %u.", header.timestamp );
+
 	uint32_t fromTimestamp;
 	if ( SlaveWorker::pendingAck->erase( header.timestamp, fromTimestamp ) ) {
 		// Send ACK to masters
@@ -238,8 +240,6 @@ bool SlaveWorker::handleHeartbeatAck( CoordinatorEvent event, char *buf, size_t 
 			SlaveWorker::eventQueue->insert( masterEvent );
 		}
 		UNLOCK( lock );
-	} else {
-		__DEBUG__( YELLOW, "SlaveWorker", "handleAcknowledgement", "Timestamp: %u.", header.timestamp );
 	}
 	return true;
 }

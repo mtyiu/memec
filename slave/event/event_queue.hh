@@ -150,7 +150,9 @@ public:
 		if ( this->isMixed ) {
 			MixedEvent mixedEvent;
 			mixedEvent.set( event );
-			if ( this->mixed->count() && LOCK( &this->priority.lock ) == 0 ) {
+			size_t count, size;
+			count = ( size_t ) this->mixed->count( &size );
+			if ( count && TRY_LOCK( &this->priority.lock ) == 0 ) {
 				// Locked
 				if ( this->priority.count < this->priority.capacity ) {
 					this->priority.count++;
@@ -158,7 +160,7 @@ public:
 					UNLOCK( &this->priority.lock );
 
 					// Avoid all worker threads are blocked by the empty normal queue
-					if ( this->mixed->count() == 0 ) {
+					if ( this->mixed->count() < ( int ) count ) {
 						mixedEvent.set();
 						this->mixed->insert( mixedEvent );
 					}

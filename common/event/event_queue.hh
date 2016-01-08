@@ -53,7 +53,8 @@ public:
 		return ret;
 	}
 
-	int count() {
+	inline int count( size_t *size = 0 ) {
+		if ( size ) *size = this->config.size;
 		return this->queue->GetCount();
 	}
 };

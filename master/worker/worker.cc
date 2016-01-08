@@ -265,9 +265,9 @@ void MasterWorker::removePending( SlaveSocket *slave, bool needsAck ) {
 		if ( it.counter ) *it.counter -= 1;
 		if ( it.lock ) UNLOCK( it.lock );
 	}
-	
+
 	if ( needsAck )
-		Master::getInstance()->remapMsgHandler.ackTransit(); 
+		Master::getInstance()->remapMsgHandler.ackTransit();
 }
 
 void MasterWorker::replayRequestPrepare( SlaveSocket *slave ) {
@@ -310,7 +310,7 @@ void MasterWorker::replayRequestPrepare( SlaveSocket *slave ) {
 			/* cancel the request reply to application by setting application socket to 0 */ \
 			if ( MasterWorker::pending->count( PT_SLAVE_##_PENDING_TYPE_, it->first.instanceId, it->first.requestId, false, false /* already locked (pendingLock) */ ) > 1 ) { \
 				__DEBUG__( YELLOW, "MasterWorker", "replayRequestPrepare", "Reinsert ID = (%u,%u)\n", ( ( SlaveSocket * ) it->first.ptr )->getSocket(), it->first.parentInstanceId, it->first.parentRequestId ); \
-				if ( ! MasterWorker::pending->insert##_APPLICATION_VALUE_TYPE_( PT_APPLICATION_##_PENDING_TYPE_, pid.instanceId, pid.requestId, 0, _APPLICATION_VALUE_VAR_ ) ) \
+				if ( ! MasterWorker::pending->insert##_APPLICATION_VALUE_TYPE_( PT_APPLICATION_##_PENDING_TYPE_, pid.instanceId, pid.requestId, pid.ptr, _APPLICATION_VALUE_VAR_ ) ) \
 					__ERROR__( "MasterWorker", "replayRequestPrepare", "Failed to reinsert the %s request backup for ID = (%u, %u).", #_OPCODE_, pid.instanceId, pid.requestId ); \
 				else \
 					needsDup = true; \
@@ -328,9 +328,9 @@ void MasterWorker::replayRequestPrepare( SlaveSocket *slave ) {
 			pending->slaves._PENDING_SET_NAME_.erase( it ); \
 		} \
 		UNLOCK( pendingLock ); \
-	} while( 0 );
+	} while( 0 )
 
-	LOCK( lock ); 
+	LOCK( lock );
 	// SET
 	pendingLock = &pending->slaves.setLock;
 	SEARCH_MAP_FOR_REQUEST( SET, Key, KeyValue, keyValue, SET, set );
@@ -360,9 +360,9 @@ void MasterWorker::replayRequestPrepare( SlaveSocket *slave ) {
 
 void MasterWorker::replayRequest( SlaveSocket *slave ) {
 	uint16_t instanceId = slave->instanceId;
-	
-	if ( 
-		MasterWorker::pending->replay.requestsLock.count( instanceId ) == 0 || 
+
+	if (
+		MasterWorker::pending->replay.requestsLock.count( instanceId ) == 0 ||
 		MasterWorker::pending->replay.requests.count( instanceId ) == 0
 	) {
 		__ERROR__( "MasterWorker", "replayRequest", "Cannot replay request for slave with id = %u.", instanceId );
@@ -374,7 +374,7 @@ void MasterWorker::replayRequest( SlaveSocket *slave ) {
 	std::map<uint32_t, RequestInfo>::iterator lit, rit;
 	ApplicationEvent event;
 
-	LOCK( lock ); 
+	LOCK( lock );
 
 	if ( ! MasterWorker::pending->replay.requestsStartTime.count( instanceId ) || map->empty() ) {
 		UNLOCK( lock );

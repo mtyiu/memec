@@ -125,6 +125,7 @@ void MasterEvent::resAckParityDelta( MasterSocket *socket, uint16_t instanceId, 
 }
 
 void MasterEvent::ackMetadata( MasterSocket	*socket, uint16_t instanceId, uint32_t requestId, uint32_t fromTimestamp, uint32_t toTimestamp ) {
+	this->type = MASTER_EVENT_TYPE_ACK_METADATA;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;

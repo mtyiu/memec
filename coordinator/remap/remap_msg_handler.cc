@@ -22,10 +22,10 @@ CoordinatorRemapMsgHandler::CoordinatorRemapMsgHandler() :
 
 	Coordinator* coordinator = Coordinator::getInstance();
 
-	uint8_t queue = coordinator->config.coordinator.remap.queue;
+	uint32_t queue = coordinator->config.coordinator.remap.queue;
 	this->eventQueue = new EventQueue<RemapStateEvent>( queue < 2 ? 2 : queue );
 
-	uint8_t workers = coordinator->config.coordinator.remap.worker;
+	uint32_t workers = coordinator->config.coordinator.remap.worker;
 	this->workers = new CoordinatorRemapWorker[ workers < 1 ? 1 : workers ];
 }
 
@@ -203,7 +203,6 @@ bool CoordinatorRemapMsgHandler::transitToDegradedEnd( const struct sockaddr_in 
 		coordinator->eventQueue.insert( event );
 	}
 	UNLOCK( &this->aliveSlavesLock );
-	printf( "Switching to degraded state...\n" );
 
 	return true;
 }
@@ -249,7 +248,9 @@ bool CoordinatorRemapMsgHandler::transitToNormalEnd( const struct sockaddr_in &s
 		pthread_cond_wait( &cond, &lock );
 	pthread_mutex_unlock( &lock );
 
-	coordinator->remappingRecords.erase( slave );
+	size_t original = coordinator->remappingRecords.size();
+	size_t count = coordinator->remappingRecords.erase( slave );
+	printf( "Erased %lu remapping records (original = %lu, remaining = %lu).\n", count, original, coordinator->remappingRecords.size() );
 
 	// DEGRADED
 	done = false;
@@ -259,8 +260,6 @@ bool CoordinatorRemapMsgHandler::transitToNormalEnd( const struct sockaddr_in &s
 	while( ! done )
 		pthread_cond_wait( &cond, &lock );
 	pthread_mutex_unlock( &lock );
-
-	printf( "Switching to normal state...\n" );
 
 	return true;
 }
@@ -307,7 +306,7 @@ bool CoordinatorRemapMsgHandler::isMasterJoin( int service, char *msg, char *sub
 /*
  * packet: [# of slaves](1) [ [ip addr](4) [port](2) [state](1) ](7) [..](7) [..](7) ...
  */
-bool CoordinatorRemapMsgHandler::sendStateToMasters( std::vector<struct sockaddr_in> &slaves ) {
+bool CoordinatorRemapMsgHandler::sendStateToMasters( std::vector<struct sockaddr_in> slaves ) {
 	int recordSize = this->slaveStateRecordSize;
 
 	if ( slaves.size() == 0 ) {
@@ -411,7 +410,7 @@ bool CoordinatorRemapMsgHandler::updateState( char *subject, char *msg, int len 
 			inet_ntop( AF_INET, &slave.sin_addr.s_addr, buf, INET_ADDRSTRLEN );
 			fprintf(
 				stderr, "master [%s] or slave [%s:%hu] not found !!",
-				subject, buf , slave.sin_port
+				subject, buf, ntohs( slave.sin_port )
 			);
 		}
 		// check if all master acked
@@ -525,34 +524,66 @@ bool CoordinatorRemapMsgHandler::isAllMasterAcked( struct sockaddr_in slave ) {
 		return true;
 	}
 	allAcked = ( aliveMasters.size() == ackMasters[ slave ]->size() );
-	//if ( allAcked ) {
-	//	fprintf( stderr, "all masters acked slave %s:%hu on %d\n", buf, slave.sin_port, this->slavesState[ slave ] );
-	//}
-	//fprintf( stderr, "%lu of %lu masters acked slave %s:%hu\n", ackMasters[ slave ]->size(), aliveMasters.size(), buf , slave.sin_port );
 	if ( allAcked ) {
-		printf( "Slave %s:%hu changes its state to: ", buf, ntohs( slave.sin_port ) );
+		/*
+		printf( "Slave %s:%hu changes its state to: (%d) ", buf, ntohs( slave.sin_port ), this->slavesState[ slave ] );
 		switch( this->slavesState[ slave ] ) {
 			case REMAP_UNDEFINED:
-				printf( "[REMAP_UNDEFINED] - 0, undefined\n" );
+				printf( "REMAP_UNDEFINED\n" );
 				break;
 			case REMAP_NORMAL:
-				printf( "[REMAP_NORMAL] - no remapping (phase 0)\n" );
+				printf( "REMAP_NORMAL\n" );
 				break;
 			case REMAP_INTERMEDIATE:
-				printf( "[REMAP_INTERMEDIATE] - intermediate (phase 1a)\n" );
+				printf( "REMAP_INTERMEDIATE\n" );
 				break;
 			case REMAP_DEGRADED:
-				printf( "[REMAP_DEGRADED] - degraded (phase 2)\n" );
+				printf( "REMAP_DEGRADED\n" );
 				break;
 			case REMAP_COORDINATED:
-				printf( "[REMAP_COORDINATED] - coordinated (phase 1b)\n" );
+				printf( "REMAP_COORDINATED\n" );
 				break;
 			default:
-				printf( "[UNKNOWN] - signal not known\n" );
+				printf( "UNKNOWN\n" );
 				break;
 		}
+		*/
 		pthread_cond_broadcast( &this->ackSignal[ slave ] );
 	}
 	UNLOCK( &this->mastersAckLock );
 	return allAcked;
+}
+
+bool CoordinatorRemapMsgHandler::isInTransition( const struct sockaddr_in &slave ) {
+	bool ret;
+	LOCK( &this->slavesStateLock[ slave ] );
+	ret = ( slavesState[ slave ] == REMAP_INTERMEDIATE ) || ( slavesState[ slave ] == REMAP_COORDINATED );
+	UNLOCK( &this->slavesStateLock[ slave ] );
+	return ret;
+}
+
+bool CoordinatorRemapMsgHandler::allowRemapping( const struct sockaddr_in &slave ) {
+	bool ret;
+	LOCK( &this->slavesStateLock[ slave ] );
+	ret = ( slavesState[ slave ] == REMAP_INTERMEDIATE ) || ( slavesState[ slave ] == REMAP_DEGRADED );
+	UNLOCK( &this->slavesStateLock[ slave ] );
+	return ret;
+}
+
+bool CoordinatorRemapMsgHandler::reachMaximumRemapped( uint32_t maximum ) {
+	uint32_t count = 0;
+	LOCK( &this->aliveSlavesLock );
+	for ( auto it = this->aliveSlaves.begin(); it != this->aliveSlaves.end(); it++ ) {
+		const struct sockaddr_in &slave = ( *it );
+		LOCK( &this->slavesStateLock[ slave ] );
+		if ( slavesState[ slave ] != REMAP_NORMAL ) {
+			count++;
+		}
+		UNLOCK( &this->slavesStateLock[ slave ] );
+
+		if ( count == maximum )
+			break;
+	}
+	UNLOCK( &this->aliveSlavesLock );
+	return ( count == maximum );
 }

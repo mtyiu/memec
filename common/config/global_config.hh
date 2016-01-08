@@ -34,6 +34,7 @@ public:
 		float stopThreshold;
 		float overloadThreshold;
 		float smoothingFactor;
+		uint32_t maximum;
 	} remap;
 	struct {
 		uint16_t chunksPerList;
@@ -43,6 +44,7 @@ public:
 		CodingParams params;
 	} coding;
 
+	GlobalConfig();
 	bool parse( const char *path );
 	bool set( const char *section, const char *name, const char *value );
 	bool validate();
