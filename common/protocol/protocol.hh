@@ -269,6 +269,19 @@ struct ChunkUpdateHeader {
 	char *delta;
 };
 
+//////////////////////
+// Batch operations //
+//////////////////////
+#define PROTO_BATCH_KEY_SIZE 4
+struct BatchKeyHeader {
+	uint32_t count;
+};
+
+#define PROTO_BATCH_KEY_VALUE_SIZE 4
+struct BatchKeyValueHeader {
+	uint32_t count;
+};
+
 ///////////////
 // Remapping //
 ///////////////

@@ -302,7 +302,7 @@ void MasterWorker::replayRequestPrepare( SlaveSocket *slave ) {
 				continue; \
 			/* skip request if backup is not available */ \
 			if ( ! pending->erase##_APPLICATION_VALUE_TYPE_( PT_APPLICATION_##_PENDING_TYPE_, it->first.parentInstanceId, it->first.parentRequestId, ( void* ) 0, &pid, &_APPLICATION_VALUE_VAR_, true, true, true, it->second.data ) ) { \
-				__ERROR__( "MasterWorker", "replayRequestPrepare", "Cannot find the SET request backup for ID = (%u, %u).", it->first.parentInstanceId, it->first.parentRequestId ); \
+				__ERROR__( "MasterWorker", "replayRequestPrepare", "Cannot find the %s request backup for ID = (%u, %u).", #_OPCODE_, it->first.parentInstanceId, it->first.parentRequestId ); \
 				continue; \
 			} \
 			/* cancel the request reply to application by setting application socket to 0 */ \
@@ -376,6 +376,7 @@ void MasterWorker::replayRequest( SlaveSocket *slave ) {
 	do {
 		switch ( lit->second.opcode ) {
 			case PROTO_OPCODE_SET:
+				printf("Replaying (%u, %u)\n", lit->second.instanceId, lit->second.requestId );
 				event.replaySetRequest(
 					( ApplicationSocket * ) lit->second.application,
 					lit->second.instanceId, lit->second.requestId,

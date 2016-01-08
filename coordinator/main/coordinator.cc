@@ -533,9 +533,9 @@ void Coordinator::releaseDegradedLock() {
 		event.reqReleaseDegradedLock( socket, 0, 0, 0 );
 		this->eventQueue.insert( event );
 
-		printf( "Sending release degraded locks request to: (#%u) ", socketId );
-		socket->printAddress();
-		printf( "\n" );
+		// printf( "Sending release degraded locks request to: (#%u) ", socketId );
+		// socket->printAddress();
+		// printf( "\n" );
 	}
 }
 

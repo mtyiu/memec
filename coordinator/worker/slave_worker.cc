@@ -136,7 +136,13 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 		UNLOCK( &slaves.lock );
 	} else if ( event.type == SLAVE_EVENT_TYPE_DISCONNECT ) {
 		// Mark it as failed
-		Coordinator::getInstance()->switchPhaseForCrashedSlave( event.socket );
+		if ( Coordinator::getInstance()->config.global.remap.enabled ) {
+			Coordinator::getInstance()->switchPhaseForCrashedSlave( event.socket );
+		} else {
+			SlaveEvent slaveEvent;
+			slaveEvent.triggerReconstruction( event.socket->getAddr() );
+			this->dispatch( slaveEvent );
+		}
 	} else if ( event.type == SLAVE_EVENT_TYPE_TRIGGER_RECONSTRUCTION ) {
 		SlaveSocket *s = 0;
 		ArrayMap<int, SlaveSocket> &slaves = Coordinator::getInstance()->sockets.slaves;

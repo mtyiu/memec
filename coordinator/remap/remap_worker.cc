@@ -17,7 +17,7 @@ bool CoordinatorRemapWorker::transitToDegraded( RemapStateEvent event ) { // Pha
 	char buf[ INET_ADDRSTRLEN ];
 	inet_ntop( AF_INET, &event.slave.sin_addr.s_addr, buf, INET_ADDRSTRLEN );
 	// wait for "sync meta ack" to proceed, release lock once acquired
-	__INFO__( CYAN, "CoordinatorRemapWorker", "transitToDegraded",
+	__DEBUG__( CYAN, "CoordinatorRemapWorker", "transitToDegraded",
 		"Start transition to degraded for slave %s:%u.",
 		buf, ntohs( event.slave.sin_port )
 	);

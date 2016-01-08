@@ -85,7 +85,8 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 	////////////////////////////////////////////
 	// Add the slave addrs to remapMsgHandler //
 	////////////////////////////////////////////
-	coordinator->remapMsgHandler->addAliveSlave( backupSlaveSocket->getAddr() );
+	if ( coordinator->remapMsgHandler )
+		coordinator->remapMsgHandler->addAliveSlave( backupSlaveSocket->getAddr() );
 
 	////////////////////////////
 	// Announce to the slaves //
@@ -314,6 +315,9 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 			unsealedIt->first.chunkId,
 			unsealedIt->second.size()
 		);
+		// TODO:
+		// - Reset the stripe IDs
+		// - Ask the parity servers to send the unsealed keys to the reconstructed server
 	}
 
 	UNLOCK( &socket->map.keysLock );

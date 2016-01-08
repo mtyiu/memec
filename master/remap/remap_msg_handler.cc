@@ -237,7 +237,7 @@ bool MasterRemapMsgHandler::removeAliveSlave( struct sockaddr_in slave ) {
 	return true;
 }
 
-bool MasterRemapMsgHandler::useCoordinatedFlow( struct sockaddr_in slave ) {
+bool MasterRemapMsgHandler::useCoordinatedFlow( const struct sockaddr_in &slave ) {
 	if ( this->slavesState.count( slave ) == 0 )
 		return false;
 	return this->slavesState[ slave ] != REMAP_NORMAL;
@@ -254,7 +254,7 @@ bool MasterRemapMsgHandler::useCoordinatedFlow( struct sockaddr_in slave ) {
 	*/
 }
 
-bool MasterRemapMsgHandler::allowRemapping( struct sockaddr_in slave ) {
+bool MasterRemapMsgHandler::allowRemapping( const struct sockaddr_in &slave ) {
 	if ( this->slavesState.count( slave ) == 0 )
 		return false;
 
@@ -268,6 +268,24 @@ bool MasterRemapMsgHandler::allowRemapping( struct sockaddr_in slave ) {
 	}
 
 	return false;
+}
+
+bool MasterRemapMsgHandler::acceptNormalResponse( const struct sockaddr_in &slave ) {
+	if ( this->slavesState.count( slave ) == 0 )
+		return true;
+
+	switch( this->slavesState[ slave ] ) {
+		case REMAP_UNDEFINED:
+		case REMAP_NORMAL:
+		case REMAP_INTERMEDIATE:
+		case REMAP_COORDINATED:
+		case REMAP_WAIT_DEGRADED:
+		case REMAP_WAIT_NORMAL:
+			return true;
+		case REMAP_DEGRADED:
+		default:
+			return false;
+	}
 }
 
 bool MasterRemapMsgHandler::sendStateToCoordinator( std::vector<struct sockaddr_in> slaves ) {

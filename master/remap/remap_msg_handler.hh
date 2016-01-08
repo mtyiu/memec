@@ -71,12 +71,12 @@ private:
 	static void *ackTransitThread( void *argv );
 
 	/* return if master need to ack coordinator for slave */
-	bool checkAckForSlave( struct sockaddr_in slave ); 
+	bool checkAckForSlave( struct sockaddr_in slave );
 
 	/* send a list of states of slaves */
 	bool sendStateToCoordinator( std::vector<struct sockaddr_in> slaves );
 	bool sendStateToCoordinator( struct sockaddr_in slave );
-	
+
 public:
 	std::unordered_map<struct sockaddr_in, StateTransitInfo> stateTransitInfo;
 
@@ -92,10 +92,11 @@ public:
 	bool addAliveSlave( struct sockaddr_in slave );
 	bool removeAliveSlave( struct sockaddr_in slave );
 
-	bool useCoordinatedFlow( struct sockaddr_in slave );
-	bool allowRemapping( struct sockaddr_in slave );
+	bool useCoordinatedFlow( const struct sockaddr_in &slave );
+	bool allowRemapping( const struct sockaddr_in &slave );
+	bool acceptNormalResponse( const struct sockaddr_in &slave );
 
-	// ack specific slave if necessary, 
+	// ack specific slave if necessary,
 	// empty slave will trigger full search on possible slaves to ack
 	bool ackTransit( struct sockaddr_in *slave = NULL );
 	bool ackTransit( struct sockaddr_in slave );

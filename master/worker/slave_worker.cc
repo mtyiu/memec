@@ -46,7 +46,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 			if ( ! isCompleted )
 				MasterWorker::eventQueue->insert( event );
 
-			printf( "Sealed: %u; ops: %u\n", sealedCount, opsCount );
+			// printf( "Sealed: %u; ops: %u\n", sealedCount, opsCount );
 			isSend = false; // Send to coordinator instead
 		}
 			break;
@@ -131,6 +131,9 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 		}
 	} else {
 		// Parse responses from slaves
+		MasterRemapMsgHandler &mrmh = Master::getInstance()->remapMsgHandler;
+		const struct sockaddr_in &addr = event.socket->getAddr();
+
 		ProtocolHeader header;
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();
 		while ( buffer.size > 0 ) {
@@ -172,20 +175,36 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 						}
 						break;
 					case PROTO_OPCODE_GET:
+						if ( ! mrmh.acceptNormalResponse( addr ) ) {
+							__INFO__( YELLOW, "Master", "dispatch", "Ignoring normal GET response..." );
+							break;
+						}
 					case PROTO_OPCODE_DEGRADED_GET:
 						this->handleGetResponse( event, success, header.opcode == PROTO_OPCODE_DEGRADED_GET, buffer.data, header.length );
 						break;
 					case PROTO_OPCODE_SET:
+						if ( ! mrmh.acceptNormalResponse( addr ) ) {
+							__INFO__( YELLOW, "Master", "dispatch", "Ignoring normal SET response..." );
+							break;
+						}
 						this->handleSetResponse( event, success, buffer.data, header.length );
 						break;
 					case PROTO_OPCODE_REMAPPING_SET:
 						this->handleRemappingSetResponse( event, success, buffer.data, header.length );
 						break;
 					case PROTO_OPCODE_UPDATE:
+						if ( ! mrmh.acceptNormalResponse( addr ) ) {
+							__INFO__( YELLOW, "Master", "dispatch", "Ignoring normal UPDATE response..." );
+							break;
+						}
 					case PROTO_OPCODE_DEGRADED_UPDATE:
 						this->handleUpdateResponse( event, success, header.opcode == PROTO_OPCODE_DEGRADED_UPDATE, buffer.data, header.length );
 						break;
 					case PROTO_OPCODE_DELETE:
+						if ( ! mrmh.acceptNormalResponse( addr ) ) {
+							__INFO__( YELLOW, "Master", "dispatch", "Ignoring normal DELETE response..." );
+							break;
+						}
 					case PROTO_OPCODE_DEGRADED_DELETE:
 						this->handleDeleteResponse( event, success, header.opcode == PROTO_OPCODE_DEGRADED_DELETE, buffer.data, header.length );
 						break;
