@@ -266,7 +266,8 @@ public:
 	bool insertDegradedLockData(
 		PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
 		DegradedLockData &degradedLockData,
-		bool needsLock = true, bool needsUnlock = true
+		bool needsLock = true, bool needsUnlock = true,
+		uint32_t timestamp = 0
 	);
 	// Insert (Applications)
 	bool insertKey(
@@ -288,12 +289,14 @@ public:
 	// Insert (Slaves)
 	bool insertKey(
 		PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
-		Key &key, bool needsLock = true, bool needsUnlock = true
+		Key &key, bool needsLock = true, bool needsUnlock = true,
+		uint32_t timestamp = 0
 	);
 	bool insertKeyValueUpdate(
 		PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
 		KeyValueUpdate &keyValueUpdate,
-		bool needsLock = true, bool needsUnlock = true
+		bool needsLock = true, bool needsUnlock = true,
+		uint32_t timestamp = 0
 	);
 	bool recordRequestStartTime(
 		PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
@@ -303,7 +306,8 @@ public:
 	bool insertRemapList(
 		PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
 		RemapList &remapList,
-		bool needsLock = true, bool needsUnlock = true
+		bool needsLock = true, bool needsUnlock = true,
+		uint32_t timestamp = 0
 	);
 	// Insert (Ack)
 	bool insertAck(
