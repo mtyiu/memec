@@ -1,6 +1,7 @@
 GCC=gcc
 CC=g++
 CFLAGS=-std=c++11 -Wall -O2
+FLAGS= #-DUSE_ISAL
 
 PLIO_SRC_ROOT=../..
 LIBS=
@@ -23,7 +24,7 @@ OBJS= \
 JOBJS= $(foreach d,$(JSRC_FILES),$(patsubst %.c,%.o,$(notdir $d)))
 GFOBJS= $(foreach d,$(GFSRC_FILES),$(patsubst %.c,%.o,$(notdir $d)))
 
-all: $(JOBJS) $(GFOBJS) $(OBJS)
+all: $(JOBJS) $(GFOBJS) $(OBJS) 
 
 $(JOBJS): %.o: $(JLIB_DIR)/src/%.c
 	$(GCC) $(INCLUDE) -c -o $@ $<
@@ -32,7 +33,7 @@ $(GFOBJS): %.o: $(GFLIB_DIR)/src/%.c
 	$(GCC) $(INCLUDE) -c -o $@ $<
 
 $(OBJS): %.o: %.cc %.hh
-	$(CC) $(CFLAGS) $(INCLUDE) $(LIBS) -c -o $@ $<
+	$(CC) $(CFLAGS) $(FLAGS) $(INCLUDE) $(LIBS) -c -o $@ $<
 
 clean:
-	rm -f $(OBJS) $(JOBJS) $(GFOBJS)
+	rm -f $(OBJS) $(JOBJS) $(ISAOBJS) $(GFOBJS)

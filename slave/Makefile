@@ -1,7 +1,7 @@
 CC=g++
 CFLAGS=-std=c++11 -Wall -O2 -g
 PLIO_SRC_ROOT=..
-LIBS=-pthread
+LIBS=-pthread -L$(PLIO_SRC_ROOT)/lib/isa-l-2.14.0/libisal.la
 BIN=$(PLIO_SRC_ROOT)/bin/slave
 
 OBJS= \

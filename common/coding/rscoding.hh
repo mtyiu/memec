@@ -2,6 +2,7 @@
 #define __COMMON_CODING_RSCODING_HH__
 
 #include "coding.hh"
+#define RS_N_MAX (32)
 
 class RSCoding : public Coding {
 private:
@@ -26,7 +27,12 @@ private:
 	uint32_t _w;
 	uint32_t _chunkSize;
 
+#ifdef USE_ISAL
+	unsigned char _gftbl[ RS_N_MAX * RS_N_MAX ];
+	unsigned char _encodeMatrix[ RS_N_MAX * RS_N_MAX ];
+#else
 	int *_jmatrix;
+#endif
 
 public:
 	RSCoding( uint32_t k = 0, uint32_t m = 0, uint32_t chunkSize = 0 );

@@ -1,7 +1,7 @@
 CC=g++
 CFLAGS=-std=c++11 -Wall -O2
 PLIO_SRC_ROOT=../../..
-LIBS=
+LIBS= -L${PLIO_SRC_ROOT}/lib/isa-l-2.14.0/libisal.la
 INCLUDE=-I$(PLIO_SRC_ROOT)/lib/jerasure/include -I$(PLIO_SRC_ROOT)/lib/gf_complete/include
 FLAGS=-DTEST_DELTA
 

@@ -11,8 +11,10 @@ sudo apt-get install adduser spread libspread1 libspread1-dev
 ```
 For Ubuntu 13.x - 15.x:
 
-Search and download the following libraries from [http://packages.ubuntu.com/](http://packages.ubuntu.com/):
+Search and download the following packages from [http://packages.ubuntu.com/](http://packages.ubuntu.com/):
+```
 adduser, spread, libspread1, libspread1-dev
+```
 
 Manually install the packages,
 
@@ -33,7 +35,6 @@ Configure under `lib/isa-l-2.14.0/`,
 
 ```
 ./configure
-
 ```
 
 The system uses Jerasure for coding by default (for RS and CRS), uncomment `-DUSE_ISAL` in `common/coding/Makefile` to use ISA-L instead
