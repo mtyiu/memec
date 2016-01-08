@@ -285,6 +285,8 @@ void MasterWorker::replayRequestPrepare( SlaveSocket *slave ) {
 	LOCK_T *pendingLock;
 	RequestInfo requestInfo;
 	PendingIdentifier pid;
+	uint32_t currentTime = Master::getInstance()->timestamp.getVal();
+	uint32_t smallestTime = currentTime, smallestTimeAfterCurrent = currentTime;
 
 #define SEARCH_MAP_FOR_REQUEST( _OPCODE_, _SLAVE_VALUE_TYPE_, _APPLICATION_VALUE_TYPE_, _APPLICATION_VALUE_VAR_, _PENDING_TYPE_, _PENDING_SET_NAME_ ) \
 	do { \
@@ -314,13 +316,14 @@ void MasterWorker::replayRequestPrepare( SlaveSocket *slave ) {
 					needsDup = true; \
 			} \
 			__DEBUG__( YELLOW, "MasterWorker", "replayRequestPrepare", "Add %s request ID = (%u,%u) with timestamp %u to replay.", #_OPCODE_, pid.instanceId, pid.requestId, pid.timestamp ); \
-			/* mark the first timestamp to start the replay */ \
-			if ( pending->replay.requestsStartTime.count( instanceId ) == 0 ) { \
-				pending->replay.requestsStartTime[ instanceId ] = pid.timestamp; \
-			} \
 			/* insert the request into pending set for replay */ \
 			requestInfo.set( pid.ptr, pid.instanceId, pid.requestId, PROTO_OPCODE_##_OPCODE_, _APPLICATION_VALUE_VAR_, !needsDup ); \
 			map->insert( std::pair<uint32_t, RequestInfo>( pid.timestamp, requestInfo ) ); \
+			/* update for finding the first timestamp for replay */ \
+			if ( pid.timestamp < smallestTime ) \
+				smallestTime = pid.timestamp; \
+			if ( pid.timestamp > currentTime && ( pid.timestamp < smallestTimeAfterCurrent || smallestTimeAfterCurrent == currentTime ) ) \
+				smallestTimeAfterCurrent = pid.timestamp; \
 			/* remove the pending ack */ \
 			pending->slaves._PENDING_SET_NAME_.erase( it ); \
 		} \
@@ -341,6 +344,15 @@ void MasterWorker::replayRequestPrepare( SlaveSocket *slave ) {
 	pendingLock = &pending->slaves.delLock;
 	SEARCH_MAP_FOR_REQUEST( DELETE, Key, Key, key, DEL, del );
 	
+	/* mark the first timestamp to start the replay */
+	if ( ! pending->replay.requests.empty() || pending->replay.requestsStartTime.count( instanceId ) == 0 ) {
+		if ( smallestTimeAfterCurrent == currentTime )
+			pending->replay.requestsStartTime[ instanceId ] = smallestTime;
+		else if ( smallestTimeAfterCurrent > currentTime ) // wrapped around case
+			pending->replay.requestsStartTime[ instanceId ] = smallestTimeAfterCurrent;
+		else
+			; // BUG
+	}
 	UNLOCK( lock );
 
 #undef SEARCH_MAP_FOR_REQUEST
@@ -371,6 +383,7 @@ void MasterWorker::replayRequest( SlaveSocket *slave ) {
 
 	// from the first timestamp, to the first timestamp
 	lit = map->find( pending->replay.requestsStartTime[ instanceId ] );
+	__DEBUG__( GREEN, "MasterWorker", "replayRequest", "Start from time %u with current time %u", pending->replay.requestsStartTime[ instanceId ], Master::getInstance()->timestamp.getVal() );
 	rit = lit;
 	// replay requests
 	do {
@@ -404,7 +417,7 @@ void MasterWorker::replayRequest( SlaveSocket *slave ) {
 				);
 				break;
 			default:
-				__ERROR__( "MasterWorker", "replayRequest", "Unknown request OPCODE = 0x%0x\n", lit->second.opcode );
+				__ERROR__( "MasterWorker", "replayRequest", "Unknown request OPCODE = 0x%02x", lit->second.opcode );
 				continue;
 		}
 		MasterWorker::eventQueue->insert( event );
@@ -412,6 +425,10 @@ void MasterWorker::replayRequest( SlaveSocket *slave ) {
 		if ( lit == map->end() )
 			lit = map->begin();
 	} while( lit != rit && lit != map->end() );
+	if ( lit == map->begin() )
+		lit = map->end();
+	lit--;
+	__DEBUG__( YELLOW, "MasterWorker", "replayRequest", "Last replayed request OPCODE = 0x%02x at time %u", lit->second.opcode, lit->first );
 
 	map->clear();
 	pending->replay.requestsStartTime.erase( instanceId );
