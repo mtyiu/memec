@@ -31,8 +31,12 @@ bool CoordinatorWorker::handleRemappingSetLockRequest( MasterEvent event, char *
 		true, true )
 	) {
 		RemappingRecord remappingRecord;
-		remappingRecord.dup( header.original, header.remapped, header.remappedCount );
-		if ( CoordinatorWorker::remappingRecords->insert( key, remappingRecord, dataSlaveSocket->getAddr() ) ) {
+		if ( header.remappedCount )
+			remappingRecord.dup( header.original, header.remapped, header.remappedCount );
+		else
+			remappingRecord.set( 0, 0, 0 );
+
+		if ( header.remappedCount == 0 /* no need to insert */ || CoordinatorWorker::remappingRecords->insert( key, remappingRecord, dataSlaveSocket->getAddr() ) ) {
 			event.resRemappingSetLock(
 				event.socket, event.instanceId, event.requestId, true, // success
 				header.original, header.remapped, header.remappedCount, key

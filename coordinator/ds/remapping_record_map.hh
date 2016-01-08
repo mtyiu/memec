@@ -115,7 +115,8 @@ public:
 		return ret;
 	}
 
-	bool erase( struct sockaddr_in slave ) {
+	size_t erase( struct sockaddr_in slave ) {
+		size_t count = 0;
 		LOCK( &this->lock );
 		std::unordered_map<struct sockaddr_in, std::unordered_set<Key>* >::iterator sit = slaveToKeyMap.find( slave );
 		RemappingRecord record;
@@ -125,12 +126,13 @@ public:
 			for ( kit = keys->begin(), saveptr = keys->begin(); kit != keys->end(); kit = saveptr ) {
 				saveptr++;
 				this->erase( *kit , record, false, false, false );
+				count++;
 			}
 			delete keys;
 			slaveToKeyMap.erase( sit );
 		}
 		UNLOCK( &this->lock );
-		return true;
+		return count;
 	}
 
 	bool find( Key key, RemappingRecord *record = NULL, LOCK_T **lock = 0 ) {

@@ -248,7 +248,9 @@ bool CoordinatorRemapMsgHandler::transitToNormalEnd( const struct sockaddr_in &s
 		pthread_cond_wait( &cond, &lock );
 	pthread_mutex_unlock( &lock );
 
-	coordinator->remappingRecords.erase( slave );
+	size_t original = coordinator->remappingRecords.size();
+	size_t count = coordinator->remappingRecords.erase( slave );
+	printf( "Erased %lu remapping records (original = %lu, remaining = %lu).\n", count, original, coordinator->remappingRecords.size() );
 
 	// DEGRADED
 	done = false;
