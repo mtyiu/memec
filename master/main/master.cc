@@ -322,7 +322,6 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 	// Socket mapping lock //
 	LOCK_INIT( &this->sockets.slavesIdToSocketLock );
 
-
 	// Set signal handlers //
 	Signal::setHandler( Master::signalHandler );
 
@@ -601,10 +600,10 @@ void Master::interactive() {
 			for ( int i = 0, len = this->sockets.slaves.size(); i < len; i ++ ) {
 				printf("Prepare replay for slave id = %hu fd = %u\n", this->sockets.slaves[ i ]->instanceId, this->sockets.slaves[ i ]->getSocket() );
 				MasterWorker::replayRequestPrepare( this->sockets.slaves[ i ] );
-				sleep( 30 );
+			}
+			for ( int i = 0, len = this->sockets.slaves.size(); i < len; i ++ ) {
 				printf("Replay for slave id = %hu fd = %u\n", this->sockets.slaves[ i ]->instanceId, this->sockets.slaves[ i ]->getSocket() );
 				MasterWorker::replayRequest( this->sockets.slaves[ i ] );
-				sleep( 30 );
 			}
 			valid = true;
 		} else {
