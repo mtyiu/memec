@@ -522,7 +522,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 			if ( ! SlaveWorker::pending->eraseDegradedOp( PT_SLAVE_PEER_DEGRADED_OPS, event.instanceId, event.requestId, event.socket, &pid, &op ) ) {
 				__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot find a pending slave DEGRADED_OPS request that matches the response. This message will be discarded." );
 			} else {
-				int index = this->findInRedirectedList( header.reconstructed, header.reconstructedCount );
+				int index = this->findInRedirectedList( op.reconstructed, op.reconstructedCount );
 
 				// TODO: Handle the case when index == -1
 
@@ -551,7 +551,6 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 					}
 
 					// Find the chunk from the map
-					Chunk *chunk;
 					if ( index == -1 ) {
 						__INFO__( BLUE, "SlaveWorker", "handleGetChunkResponse", "TODO: Handle the case when index == -1." );
 
@@ -565,14 +564,14 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 							struct KeyHeader header;
 							header.keySize = op.data.key.size;
 							header.key = op.data.key.data;
-							this->handleGetRequest( masterEvent, header );
+							this->handleGetRequest( masterEvent, header, true );
 						} else if ( op.opcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
 							struct KeyValueUpdateHeader header;
 							header.keySize = op.data.keyValueUpdate.size;
 							header.valueUpdateSize = op.data.keyValueUpdate.length;
 							header.valueUpdateOffset = op.data.keyValueUpdate.offset;
 							header.key = op.data.keyValueUpdate.data;
-							header.valueUpdate = op.data.keyValueUpdate.ptr;
+							header.valueUpdate = ( char * ) op.data.keyValueUpdate.ptr;
 
 							// TODO: Handle failed parity servers
 							this->handleUpdateRequest( masterEvent, header );
