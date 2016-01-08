@@ -525,6 +525,7 @@ bool CoordinatorRemapMsgHandler::isAllMasterAcked( struct sockaddr_in slave ) {
 	}
 	allAcked = ( aliveMasters.size() == ackMasters[ slave ]->size() );
 	if ( allAcked ) {
+		/*
 		printf( "Slave %s:%hu changes its state to: (%d) ", buf, ntohs( slave.sin_port ), this->slavesState[ slave ] );
 		switch( this->slavesState[ slave ] ) {
 			case REMAP_UNDEFINED:
@@ -546,6 +547,7 @@ bool CoordinatorRemapMsgHandler::isAllMasterAcked( struct sockaddr_in slave ) {
 				printf( "UNKNOWN\n" );
 				break;
 		}
+		*/
 		pthread_cond_broadcast( &this->ackSignal[ slave ] );
 	}
 	UNLOCK( &this->mastersAckLock );
@@ -556,6 +558,14 @@ bool CoordinatorRemapMsgHandler::isInTransition( const struct sockaddr_in &slave
 	bool ret;
 	LOCK( &this->slavesStateLock[ slave ] );
 	ret = ( slavesState[ slave ] == REMAP_INTERMEDIATE ) || ( slavesState[ slave ] == REMAP_COORDINATED );
+	UNLOCK( &this->slavesStateLock[ slave ] );
+	return ret;
+}
+
+bool CoordinatorRemapMsgHandler::allowRemapping( const struct sockaddr_in &slave ) {
+	bool ret;
+	LOCK( &this->slavesStateLock[ slave ] );
+	ret = ( slavesState[ slave ] == REMAP_INTERMEDIATE ) || ( slavesState[ slave ] == REMAP_DEGRADED );
 	UNLOCK( &this->slavesStateLock[ slave ] );
 	return ret;
 }

@@ -24,6 +24,7 @@ public:
 		char *key, uint8_t keySize,
 		char *value, uint32_t valueSize
 	);
+	bool find( uint8_t keySize, char *keyStr, RemappedKeyValue *remappedKeyValue = 0 );
 };
 
 #endif

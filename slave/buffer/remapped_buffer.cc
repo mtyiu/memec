@@ -53,3 +53,20 @@ bool RemappedBuffer::insert( uint32_t listId, uint32_t chunkId, uint32_t *origin
 
 	return ret.second;
 }
+
+bool RemappedBuffer::find( uint8_t keySize, char *keyStr, RemappedKeyValue *remappedKeyValue ) {
+	std::unordered_map<Key, RemappedKeyValue>::iterator it;
+	Key key;
+	bool ret;
+	key.set( keySize, keyStr );
+
+	LOCK( &this->keysLock );
+	it = this->keys.find( key );
+	ret = ( it != this->keys.end() );
+	if ( ret && remappedKeyValue ) {
+		*remappedKeyValue = it->second;
+	}
+	UNLOCK( &this->keysLock );
+
+	return ret;
+}

@@ -678,6 +678,12 @@ void Coordinator::interactive() {
 		} else if ( strcmp( command, "id" ) == 0 ) {
 			valid = true;
 			this->printInstanceId();
+		} else if ( strcmp( command, "hash" ) == 0 ) {
+			valid = true;
+			this->hash();
+		} else if ( strcmp( command, "lookup" ) == 0 ) {
+			valid = true;
+			this->lookup();
 		} else if ( strcmp( command, "dump" ) == 0 ) {
 			valid = true;
 			this->dump();
@@ -787,6 +793,8 @@ void Coordinator::help() {
 		"- debug: Show debug messages\n"
 		"- id: Print instance ID\n"
 		"- time: Show elapsed time\n"
+		"- hash: Show the stripe list hashed by an input key\n"
+		"- lookup: Search for the metadata of an input key\n"
 		"- seal: Force all slaves to seal all its chunks\n"
 		"- flush: Force all slaves to flush all its chunks\n"
 		"- log: Write the log to coordinator.log\n"
@@ -803,6 +811,102 @@ void Coordinator::help() {
 void Coordinator::time() {
 	fprintf( stdout, "Elapsed time (s): %12.6lf\n", this->getElapsedTime() );
 	fflush( stdout );
+}
+
+void Coordinator::hash() {
+	char key[ 256 ];
+	uint8_t keySize;
+	uint32_t listId, dataChunkId, dataChunkCount, parityChunkCount;
+
+	printf( "Input key: " );
+	fflush( stdout );
+	if ( ! fgets( key, sizeof( key ), stdin ) ) {
+		fprintf( stderr, "Invalid input!\n" );
+		return;
+	}
+	keySize = ( uint8_t ) strnlen( key, sizeof( key ) ) - 1;
+
+	dataChunkCount = this->config.global.coding.params.getDataChunkCount();
+	parityChunkCount = this->config.global.coding.params.getParityChunkCount();
+
+	SlaveSocket **dataSlaveSockets = new SlaveSocket *[ dataChunkCount ];
+	SlaveSocket **paritySlaveSockets = new SlaveSocket *[ parityChunkCount ];
+
+	listId = this->stripeList->get( key, keySize, dataSlaveSockets, paritySlaveSockets, &dataChunkId, true );
+
+	printf( "\n--- Hashed to List #%u ---\n", listId );
+	for ( uint32_t i = 0; i < dataChunkCount; i++ ) {
+		printf( "[ %u]: ", i );
+		dataSlaveSockets[ i ]->printAddress();
+		if ( i == dataChunkId )
+			printf( " ***" );
+		printf( "\n" );
+	}
+	for ( uint32_t i = 0; i < parityChunkCount; i++ ) {
+		printf( "[p%u]: ", ( i + dataChunkCount ) );
+		paritySlaveSockets[ i ]->printAddress();
+		printf( " ***\n" );
+	}
+
+	delete[] dataSlaveSockets;
+	delete[] paritySlaveSockets;
+}
+
+void Coordinator::lookup() {
+	char key[ 256 ];
+	uint8_t keySize;
+
+	printf( "Input key: " );
+	fflush( stdout );
+	if ( ! fgets( key, sizeof( key ), stdin ) ) {
+		fprintf( stderr, "Invalid input!\n" );
+		return;
+	}
+	keySize = ( uint8_t ) strnlen( key, sizeof( key ) ) - 1;
+
+	Metadata metadata;
+	SlaveSocket *dataSlaveSocket;
+	this->stripeList->get( key, keySize, &dataSlaveSocket );
+
+	if ( dataSlaveSocket->map.findMetadataByKey( key, keySize, metadata ) ) {
+		printf( "Metadata: (%u, %u, %u); Is sealed? %s\n", metadata.listId, metadata.stripeId, metadata.chunkId, dataSlaveSocket->map.isSealed( metadata ) ? "yes" : "no" );
+
+		Key k;
+		RemappingRecord remappingRecord;
+		k.set( keySize, key );
+		if ( this->remappingRecords.find( k, &remappingRecord ) ) {
+			printf( "Remapping record found: " );
+			for ( uint32_t i = 0; i < remappingRecord.remappedCount; i++ ) {
+				printf(
+					"%s(%u, %u) |-> (%u, %u)%s",
+					i == 0 ? "" : "; ",
+					remappingRecord.original[ i * 2     ],
+					remappingRecord.original[ i * 2 + 1 ],
+					remappingRecord.remapped[ i * 2     ],
+					remappingRecord.remapped[ i * 2 + 1 ],
+					i == remappingRecord.remappedCount - 1 ? "\n" : ""
+				);
+			}
+		}
+
+		DegradedLock degradedLock;
+		if ( dataSlaveSocket->map.findDegradedLock( metadata.listId, metadata.stripeId, degradedLock ) ) {
+			printf( "Degraded lock found: " );
+			for ( uint32_t i = 0; i < degradedLock.reconstructedCount; i++ ) {
+				printf(
+					"%s(%u, %u) |-> (%u, %u)%s",
+					i == 0 ? "" : "; ",
+					degradedLock.original[ i * 2     ],
+					degradedLock.original[ i * 2 + 1 ],
+					degradedLock.reconstructed[ i * 2     ],
+					degradedLock.reconstructed[ i * 2 + 1 ],
+					i == degradedLock.reconstructedCount - 1 ? "\n" : ""
+				);
+			}
+		}
+	} else {
+		printf( "Key not found.\n" );
+	}
 }
 
 void Coordinator::appendLog( Log log ) {

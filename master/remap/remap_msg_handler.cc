@@ -167,7 +167,7 @@ void MasterRemapMsgHandler::setState( char* msg , int len ) {
 						true
 					);
 					// gather the requests to be replayed
-					MasterWorker::replayRequestPrepare( target );
+					// MasterWorker::replayRequestPrepare( target );
 				}
 				break;
 			case REMAP_COORDINATED:
@@ -203,6 +203,7 @@ void MasterRemapMsgHandler::setState( char* msg , int len ) {
 				break;
 			case REMAP_DEGRADED:
 				// start replaying the requests
+				MasterWorker::replayRequestPrepare( target );
 				MasterWorker::replayRequest( target );
 				break;
 			default:

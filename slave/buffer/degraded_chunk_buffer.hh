@@ -38,6 +38,13 @@ private:
 		LOCK_T keysLock;
 	} degraded;
 
+	/**
+	 * Store the parity chunks reconstructed in the data server (either redirected or not)
+	 * (list ID, stripe ID, data chunk ID) |-> vector of parity chunk IDs
+	 */
+	std::unordered_map<Metadata, std::vector<uint32_t>> parity;
+	LOCK_T parityLock;
+
 	Map *slaveMap;
 
 public:

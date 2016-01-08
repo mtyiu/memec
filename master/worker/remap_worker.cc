@@ -95,7 +95,7 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 		( int ) header.keySize, header.key, header.keySize
 	);
 
-	// printf( "[%u] Handling REMAPPING_SET_LOCK response...\n", event.requestId );
+	// printf( "[%u, %u] Handling REMAPPING_SET_LOCK response...\n", event.instanceId, event.requestId );
 
 	// Find the corresponding REMAPPING_SET_LOCK request //
 	PendingIdentifier pid;
@@ -107,10 +107,20 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 		remapList.free();
 	}
 
+	// printf( "[%u, %u] Handling REMAPPING_SET_LOCK response...\n", pid.instanceId, pid.requestId );
+
 	// Handle the case when the lock cannot be acquired //
 	if ( ! success ) {
-		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "TODO: Handle the case when the lock cannot be acquired." );
+		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "TODO: Handle the case when the lock cannot be acquired (ID: (%u, %u), key: %.*s).", event.instanceId, event.requestId, header.keySize, header.key );
 		// if lock fails report to application directly ..
+		KeyValue keyValue;
+		if ( ! MasterWorker::pending->eraseKeyValue( PT_APPLICATION_SET, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &keyValue, true, true, true, header.key ) ) {
+			__ERROR__( "MasterWorker", "handleSetResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded. (Key = %.*s, ID = (%u, %u))", header.keySize, header.key, pid.parentInstanceId, pid.parentRequestId );
+			return false;
+		// } else {
+		// 	Master::getInstance()->printPending();
+		// 	printf( "Request found.\n" );
+		}
 		return false;
 	}
 
@@ -295,6 +305,7 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 		key = keyValue.key();
 
 		applicationEvent.resSet( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, keyValue, success );
+		assert( pid.ptr );
 		this->dispatch( applicationEvent );
 	}
 

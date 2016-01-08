@@ -77,6 +77,7 @@ public:
 		this->listId = listId;
 		this->stripeId = stripeId;
 		this->chunkId = chunkId;
+		this->reconstructedCount = reconstructedCount;
 		if ( reconstructedCount ) {
 			if ( dup ) {
 				this->original = new uint32_t[ reconstructedCount * 2 ];
@@ -90,7 +91,6 @@ public:
 			} else {
 				this->original = original;
 				this->reconstructed = reconstructed;
-				this->reconstructedCount = reconstructedCount;
 			}
 		} else {
 			this->original = 0;

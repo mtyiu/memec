@@ -524,6 +524,27 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 			} else {
 				int index = this->findInRedirectedList( op.reconstructed, op.reconstructedCount );
 
+				// Check whether the reconstructed parity chunks need to be forwarded
+				bool needsForwarding = false;
+				for ( uint32_t i = 0; i < op.reconstructedCount; i++ ) {
+					if ( op.original[ i * 2 + 1 ] >= SlaveWorker::dataChunkCount ) {
+						needsForwarding = true;
+						break;
+					}
+				}
+				if ( needsForwarding ) {
+					printf( "Needs forwarding: self: (%u, %u, %u); ", op.listId, op.stripeId, op.chunkId );
+					for ( uint32_t i = 0; i < op.reconstructedCount; i++ ) {
+						printf(
+							"%s%u |-> %u%s",
+							i == 0 ? "" : "; ",
+							op.original[ i * 2 + 1 ],
+							op.reconstructed[ i * 2 + 1 ],
+							i == op.reconstructedCount - 1 ? "\n" : ""
+						);
+					}
+				}
+
 				// TODO: Handle the case when index == -1
 
 				DegradedMap *dmap = &SlaveWorker::degradedChunkBuffer->map;
@@ -559,7 +580,6 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 						masterEvent.requestId = pid.parentRequestId;
 						masterEvent.socket = ( MasterSocket * ) pid.ptr;
 
-						// Hint: Use normal request handler
 						if ( op.opcode == PROTO_OPCODE_DEGRADED_GET ) {
 							struct KeyHeader header;
 							header.keySize = op.data.key.size;
