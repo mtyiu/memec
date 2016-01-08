@@ -3,7 +3,7 @@
 #include "../../common/ds/instance_id_generator.hh"
 
 void MasterWorker::dispatch( ApplicationEvent event ) {
-	bool success = true, connected, isSend;
+	bool success = true, connected, isSend, isReplay = false;
 	ssize_t ret;
 	struct {
 		size_t size;
@@ -27,6 +27,11 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 			success = false;
 			isSend = true;
 			break;
+		case APPLICATION_EVENT_TYPE_REPLAY_SET:
+		case APPLICATION_EVENT_TYPE_REPLAY_GET:
+		case APPLICATION_EVENT_TYPE_REPLAY_UPDATE:
+		case APPLICATION_EVENT_TYPE_REPLAY_DEL:
+			isReplay = true;
 		case APPLICATION_EVENT_TYPE_PENDING:
 		default:
 			isSend = false;
@@ -117,6 +122,76 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 			if ( event.needsFree )
 				event.message.key.free();
 			break;
+		case APPLICATION_EVENT_TYPE_REPLAY_SET:
+			{
+				Key key;
+				char *valueStr;
+				uint32_t valueSize;
+				event.message.replay.set.keyValue.deserialize( key.data, key.size, valueStr, valueSize );
+				buffer.data = this->protocol.replaySet(
+					buffer.size,
+					event.instanceId, event.requestId,
+					key.data, key.size, valueStr, valueSize
+				);
+				buffer.data += PROTO_HEADER_SIZE;
+				buffer.size -= PROTO_HEADER_SIZE;
+				this->handleSetRequest( event, buffer.data, buffer.size );
+				event.message.replay.set.keyValue.free();
+				buffer.data -= PROTO_HEADER_SIZE;
+				buffer.size += PROTO_HEADER_SIZE;
+			}
+			break;
+		case APPLICATION_EVENT_TYPE_REPLAY_GET:
+			{
+				buffer.data = this->protocol.replayGet(
+					buffer.size,
+					event.instanceId, event.requestId,
+					event.message.replay.get.key.data,
+					event.message.replay.get.key.size
+				);
+				buffer.data += PROTO_HEADER_SIZE;
+				buffer.size -= PROTO_HEADER_SIZE;
+				this->handleGetRequest( event, buffer.data, buffer.size );
+				event.message.replay.get.key.free();
+				buffer.data -= PROTO_HEADER_SIZE;
+				buffer.size += PROTO_HEADER_SIZE;
+			}
+			break;
+		case APPLICATION_EVENT_TYPE_REPLAY_UPDATE:
+			{
+				buffer.data = this->protocol.replayUpdate(
+					buffer.size,
+					event.instanceId, event.requestId,
+					event.message.replay.update.keyValueUpdate.data,
+					event.message.replay.update.keyValueUpdate.size,
+					( char* ) event.message.replay.update.keyValueUpdate.ptr,
+					event.message.replay.update.keyValueUpdate.offset,
+					event.message.replay.update.keyValueUpdate.length
+				);
+				buffer.data += PROTO_HEADER_SIZE;
+				buffer.size -= PROTO_HEADER_SIZE;
+				this->handleUpdateRequest( event, buffer.data, buffer.size );
+				event.message.replay.update.keyValueUpdate.free();
+				buffer.data -= PROTO_HEADER_SIZE;
+				buffer.size += PROTO_HEADER_SIZE;
+			}
+			break;
+		case APPLICATION_EVENT_TYPE_REPLAY_DEL:
+			{
+				buffer.data = this->protocol.replayDelete(
+					buffer.size,
+					event.instanceId, event.requestId,
+					event.message.replay.del.key.data,
+					event.message.replay.del.key.size
+				);
+				buffer.data += PROTO_HEADER_SIZE;
+				buffer.size -= PROTO_HEADER_SIZE;
+				this->handleDeleteRequest( event, buffer.data, buffer.size );
+				event.message.replay.del.key.free();
+				buffer.data -= PROTO_HEADER_SIZE;
+				buffer.size += PROTO_HEADER_SIZE;
+			}
+			break;
 		case APPLICATION_EVENT_TYPE_PENDING:
 			break;
 		default:
@@ -127,7 +202,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "MasterWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
-	} else {
+	} else if ( ! isReplay ) {
 		// Parse requests from applications
 		ProtocolHeader header;
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();
@@ -165,7 +240,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 		if ( connected ) event.socket->done();
 	}
 
-	if ( ! connected ) {
+	if ( ! connected && ! isReplay ) {
 		__DEBUG__( RED, "MasterWorker", "dispatch", "The application is disconnected." );
 		// delete event.socket;
 	}
@@ -240,7 +315,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 	keyValue.dup( header.key, header.keySize, header.value, header.valueSize );
 	key = keyValue.key();
 
-	if ( ! MasterWorker::pending->insertKeyValue( PT_APPLICATION_SET, event.instanceId, event.requestId, ( void * ) event.socket, keyValue ) ) {
+	if ( ! MasterWorker::pending->insertKeyValue( PT_APPLICATION_SET, event.instanceId, event.requestId, ( void * ) event.socket, keyValue, true, true, Master::getInstance()->timestamp.nextVal() ) ) {
 		__ERROR__( "MasterWorker", "handleSetRequest", "Cannot insert into application SET pending map." );
 	}
 
@@ -354,7 +429,7 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
 
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
-	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_GET, event.instanceId, event.requestId, ( void * ) event.socket, key ) ) {
+	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_GET, event.instanceId, event.requestId, ( void * ) event.socket, key, true, true, Master::getInstance()->timestamp.nextVal() ) ) {
 		__ERROR__( "MasterWorker", "handleGetRequest", "Cannot insert into application GET pending map." );
 	}
 
@@ -445,7 +520,7 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 	keyValueUpdate.dup( header.keySize, header.key, valueUpdate );
 	keyValueUpdate.offset = header.valueUpdateOffset;
 	keyValueUpdate.length = header.valueUpdateSize;
-	if ( ! MasterWorker::pending->insertKeyValueUpdate( PT_APPLICATION_UPDATE, event.instanceId, event.requestId, ( void * ) event.socket, keyValueUpdate, true, true, requestTimestamp ) ) {
+	if ( ! MasterWorker::pending->insertKeyValueUpdate( PT_APPLICATION_UPDATE, event.instanceId, event.requestId, ( void * ) event.socket, keyValueUpdate, true, true, Master::getInstance()->timestamp.nextVal() ) ) {
 		__ERROR__( "MasterWorker", "handleUpdateRequest", "Cannot insert into application UPDATE pending map." );
 	}
 
@@ -468,7 +543,7 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 		// add pending timestamp to ack
 		socket->timestamp.pendingAck.insertUpdate( Timestamp( requestTimestamp ) );
 
-		if ( ! MasterWorker::pending->insertKeyValueUpdate( PT_SLAVE_UPDATE, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, keyValueUpdate ) ) {
+		if ( ! MasterWorker::pending->insertKeyValueUpdate( PT_SLAVE_UPDATE, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, keyValueUpdate, requestTimestamp ) ) {
 			__ERROR__( "MasterWorker", "handleUpdateRequest", "Cannot insert into slave UPDATE pending map." );
 		}
 
@@ -525,7 +600,7 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 	uint32_t requestTimestamp = socket->timestamp.current.nextVal();
 
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
-	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_DEL, event.instanceId, event.requestId, ( void * ) event.socket, key, true, true, requestTimestamp ) ) {
+	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_DEL, event.instanceId, event.requestId, ( void * ) event.socket, key, true, true, Master::getInstance()->timestamp.nextVal() ) ) {
 		__ERROR__( "MasterWorker", "handleDeleteRequest", "Cannot insert into application DELETE pending map." );
 	}
 
@@ -545,7 +620,7 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 		// add pending timestamp to ack.
 		socket->timestamp.pendingAck.insertDel( Timestamp( requestTimestamp ) );
 
-		if ( ! MasterWorker::pending->insertKey( PT_SLAVE_DEL, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, key ) ) {
+		if ( ! MasterWorker::pending->insertKey( PT_SLAVE_DEL, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, key, requestTimestamp ) ) {
 			__ERROR__( "MasterWorker", "handleDeleteRequest", "Cannot insert into slave DELETE pending map." );
 		}
 

@@ -133,6 +133,29 @@ public:
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		uint32_t fromTimestamp, uint32_t toTimestamp, uint16_t targetId
 	);
+
+	// ---------- replay_protocol.cc ----------
+	// same protocol as in application, but writes header into buffer.recv by default
+	char *replaySet(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		char *key, uint8_t keySize, char *value, uint8_t valueSize
+	);
+
+	char *replayGet(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		char *key, uint8_t keySize
+	);
+
+	char *replayUpdate(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		char *key, uint8_t keySize, 
+		char *valueUpdate, uint8_t valueUpdateOffset, uint32_t valueUpdateSize
+	);
+
+	char *replayDelete(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		char *key, uint8_t keySize
+	);
 };
 
 #endif

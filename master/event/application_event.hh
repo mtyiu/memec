@@ -19,6 +19,10 @@ enum ApplicationEventType {
 	APPLICATION_EVENT_TYPE_UPDATE_RESPONSE_FAILURE,
 	APPLICATION_EVENT_TYPE_DELETE_RESPONSE_SUCCESS,
 	APPLICATION_EVENT_TYPE_DELETE_RESPONSE_FAILURE,
+	APPLICATION_EVENT_TYPE_REPLAY_SET,
+	APPLICATION_EVENT_TYPE_REPLAY_GET,
+	APPLICATION_EVENT_TYPE_REPLAY_UPDATE,
+	APPLICATION_EVENT_TYPE_REPLAY_DEL,
 	APPLICATION_EVENT_TYPE_PENDING
 };
 
@@ -45,6 +49,20 @@ public:
 			char *valueStr;
 		} get;
 		KeyValueUpdate keyValueUpdate;
+		union {
+			struct {
+				KeyValue keyValue;
+			} set;
+			struct {
+				Key key;
+			} get;
+			struct {
+				KeyValueUpdate keyValueUpdate;
+			} update;
+			struct {
+				Key key;
+			} del;
+		} replay;
 	} message;
 
 	void resRegister( ApplicationSocket *socket, uint16_t instanceId, uint32_t requestId, bool success = true );
@@ -54,6 +72,12 @@ public:
 	void resSet( ApplicationSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool success, bool needsFree = true );
 	void resUpdate( ApplicationSocket *socket, uint16_t instanceId, uint32_t requestId, KeyValueUpdate &keyValueUpdate, bool success, bool needsFree = true );
 	void resDelete( ApplicationSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool success, bool needsFree = true );
+
+	void replaySetRequest( ApplicationSocket *socket, uint16_t instanceId, uint32_t requestId, KeyValue keyValue );
+	void replayGetRequest( ApplicationSocket *socket, uint16_t instanceId, uint32_t requestId, Key key );
+	void replayUpdateRequest( ApplicationSocket *socket, uint16_t instanceId, uint32_t requestId, KeyValueUpdate keyValueUpdate );
+	void replayDeleteRequest( ApplicationSocket *socket, uint16_t instanceId, uint32_t requestId, Key key );
+
 	void pending( ApplicationSocket *socket );
 };
 

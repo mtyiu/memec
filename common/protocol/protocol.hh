@@ -667,6 +667,7 @@ protected:
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint8_t keySize, char *key,
 		uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate = 0,
+		char *sendBuf = 0,
 		uint32_t timestamp = 0
 	);
 	bool parseKeyValueUpdateHeader(

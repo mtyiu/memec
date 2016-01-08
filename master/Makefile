@@ -18,6 +18,7 @@ OBJS= \
 	protocol/normal_protocol.o \
 	protocol/register_protocol.o \
 	protocol/remap_protocol.o \
+	protocol/replay_protocol.o \
 	remap/basic_remap_scheme.o \
 	remap/remap_msg_handler.o \
 	socket/application_socket.o \

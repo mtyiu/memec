@@ -42,6 +42,7 @@ char *MasterProtocol::reqUpdate( size_t &size, uint16_t instanceId, uint32_t req
 		valueUpdateOffset,
 		valueUpdateSize,
 		valueUpdate,
+		0,
 		timestamp
 	);
 	return this->buffer.send;
