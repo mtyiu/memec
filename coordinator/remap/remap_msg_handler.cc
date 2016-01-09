@@ -22,11 +22,15 @@ CoordinatorRemapMsgHandler::CoordinatorRemapMsgHandler() :
 
 	Coordinator* coordinator = Coordinator::getInstance();
 
-	uint32_t queue = coordinator->config.coordinator.remap.queue;
-	this->eventQueue = new EventQueue<RemapStateEvent>( queue < 2 ? 2 : queue );
+	uint32_t &queue = coordinator->config.coordinator.remap.queue;
+	if ( queue < 2 )
+		queue = 2;
+	this->eventQueue = new EventQueue<RemapStateEvent>( queue );
 
-	uint32_t workers = coordinator->config.coordinator.remap.worker;
-	this->workers = new CoordinatorRemapWorker[ workers < 1 ? 1 : workers ];
+	uint32_t &workers = coordinator->config.coordinator.remap.worker;
+	if ( workers < 1 )
+		workers = 1;
+	this->workers = new CoordinatorRemapWorker[ workers ];
 }
 
 CoordinatorRemapMsgHandler::~CoordinatorRemapMsgHandler() {
@@ -69,8 +73,8 @@ bool CoordinatorRemapMsgHandler::start() {
 	}
 	this->isListening = true;
 	// start all workers
-	uint8_t workers = Coordinator::getInstance()->config.coordinator.remap.worker;
-	for ( int i = 0; i < workers; i++ ) {
+	uint32_t workers = Coordinator::getInstance()->config.coordinator.remap.worker;
+	for ( uint32_t i = 0; i < workers; i++ ) {
 		this->workers[i].start();
 	}
 	return true;
@@ -88,8 +92,8 @@ bool CoordinatorRemapMsgHandler::stop() {
 	// avoid blocking call from blocking the stop action
 	ret = pthread_cancel( this->reader );
 	// stop all workers
-	uint8_t workers = Coordinator::getInstance()->config.coordinator.remap.worker;
-	for ( int i = 0; i < workers; i++ ) {
+	uint32_t workers = Coordinator::getInstance()->config.coordinator.remap.worker;
+	for ( uint32_t i = 0; i < workers; i++ ) {
 		this->workers[i].stop();
 	}
 	return ( ret == 0 );
