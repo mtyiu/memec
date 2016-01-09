@@ -50,7 +50,6 @@ EXTERNAL_LIB= \
 	$(PLIO_SRC_ROOT)/common/protocol/normal_protocol.o \
 	$(PLIO_SRC_ROOT)/common/protocol/recovery_protocol.o \
 	$(PLIO_SRC_ROOT)/common/protocol/remap_protocol.o \
-	$(PLIO_SRC_ROOT)/common/protocol/slave_sync_remap_protocol.o \
 	$(PLIO_SRC_ROOT)/common/remap/remap_msg_handler.o \
 	$(PLIO_SRC_ROOT)/common/socket/socket.o \
 	$(PLIO_SRC_ROOT)/common/socket/epoll.o \
