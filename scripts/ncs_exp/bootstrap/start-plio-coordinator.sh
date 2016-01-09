@@ -1,7 +1,7 @@
 #!/bin/bash
 
 COORDINATOR_NAME=$(hostname | sed 's/testbed-//g')
-COORDINATOR_IP=$(hostname -I | xargs)
+COORDINATOR_IP=$(hostname -I | awk '{print $1}' | xargs)
 COORDINATOR_PORT=9110
 CONFIG_PATH=bin/config/ncs_exp
 PLIO_PATH=~/mtyiu/plio
