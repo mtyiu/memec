@@ -11,16 +11,40 @@ MixedChunkBuffer::MixedChunkBuffer( ParityChunkBuffer *parityChunkBuffer ) {
 	this->buffer.parity = parityChunkBuffer;
 }
 
-bool MixedChunkBuffer::set( SlaveWorker *worker, char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode, uint32_t chunkId, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk ) {
+bool MixedChunkBuffer::set(
+	SlaveWorker *worker,
+	char *key, uint8_t keySize,
+	char *value, uint32_t valueSize,
+	uint8_t opcode, uint32_t &timestamp,
+	uint32_t &stripeId, uint32_t chunkId,
+	bool *isSealed, Metadata *sealed,
+	Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk
+) {
 	switch( this->role ) {
 		case CBR_DATA:
-			this->buffer.data->set( worker, key, keySize, value, valueSize, opcode );
+			this->buffer.data->set(
+				worker,
+				key, keySize,
+				value, valueSize,
+				opcode, timestamp, stripeId,
+				isSealed, sealed
+			);
 			return true;
 		case CBR_PARITY:
-			return this->buffer.parity->set( key, keySize, value, valueSize, chunkId, dataChunks, dataChunk, parityChunk );
+			timestamp = 0;
+			if ( isSealed ) *isSealed = false;
+			return this->buffer.parity->set(
+				key, keySize, value, valueSize, chunkId,
+				dataChunks, dataChunk, parityChunk
+			);
 		default:
 			return false;
 	}
+}
+
+void MixedChunkBuffer::init() {
+	if ( this->role == CBR_DATA )
+		this->buffer.data->init();
 }
 
 size_t MixedChunkBuffer::seal( SlaveWorker *worker ) {

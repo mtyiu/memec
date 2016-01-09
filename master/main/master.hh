@@ -5,9 +5,7 @@
 #include <set>
 #include <cstdio>
 #include "../config/master_config.hh"
-#include "../ds/counter.hh"
 #include "../ds/pending.hh"
-#include "../ds/remap_flag.hh"
 #include "../ds/stats.hh"
 #include "../event/event_queue.hh"
 #include "../remap/remap_msg_handler.hh"
@@ -23,7 +21,6 @@
 #include "../../common/ds/key_value.hh"
 #include "../../common/ds/latency.hh"
 #include "../../common/ds/packet_pool.hh"
-#include "../../common/ds/remapping_record_map.hh"
 #include "../../common/ds/sockaddr_in.hh"
 #include "../../common/stripe_list/stripe_list.hh"
 #include "../../common/socket/epoll.hh"
@@ -63,27 +60,27 @@ public:
 		ArrayMap<int, ApplicationSocket> applications;
 		ArrayMap<int, CoordinatorSocket> coordinators;
 		ArrayMap<int, SlaveSocket> slaves;
+		std::unordered_map<uint16_t, SlaveSocket*> slavesIdToSocketMap;
+		LOCK_T slavesIdToSocketLock;
 	} sockets;
-	struct {
-		std::map<struct sockaddr_in, Counter*> slaves;
-	} counters;
 	IDGenerator idGenerator;
 	Pending pending;
 	MasterEventQueue eventQueue;
 	PacketPool packetPool;
 	StripeList<SlaveSocket> *stripeList;
 	/* Remapping */
-	RemapFlag remapFlag;
 	MasterRemapMsgHandler remapMsgHandler;
-	RemappingRecordMap remappingRecords;
 	/* Loading statistics */
 	SlaveLoading slaveLoading;
 	OverloadedSlave overloadedSlave;
 	Timer statsTimer;
+	/* Instance ID (assigned by coordinator) */
+	static uint16_t instanceId;
 	/* For debugging only */
 	struct {
 		bool isDegraded;
 	} debugFlags;
+	Timestamp timestamp;
 
 	static Master *getInstance() {
 		static Master master;
@@ -97,9 +94,14 @@ public:
 	bool stop();
 	void info( FILE *f = stdout );
 	void debug( FILE *f = stdout );
+	void printInstanceId( FILE *f = stdout );
 	void printPending( FILE *f = stdout );
 	void printRemapping( FILE *f = stdout );
+	void printBackup( FILE *f = stdout );
+	void syncMetadata();
 	void time();
+	void ackParityDelta( FILE *f = 0, SlaveSocket *target = 0, pthread_cond_t *condition = 0, LOCK_T *lock = 0, uint32_t *counter = 0, bool force = false );
+	bool revertParityDelta( FILE *f = 0, SlaveSocket *target = 0, pthread_cond_t *condition = 0, LOCK_T *lock = 0, uint32_t *counter = 0, bool force = false );
 	double getElapsedTime();
 	void interactive();
 	bool setDebugFlag( char *input );
@@ -108,7 +110,10 @@ public:
 	bool isDegraded( SlaveSocket *socket );
 
 	// Helper function to update slave stats
-	void mergeSlaveCumulativeLoading ( ArrayMap< struct sockaddr_in, Latency > *getLatency, ArrayMap< struct sockaddr_in, Latency> *setLatency );
+	void mergeSlaveCumulativeLoading(
+		ArrayMap<struct sockaddr_in, Latency> *getLatency,
+		ArrayMap<struct sockaddr_in, Latency> *setLatency
+	);
 };
 
 #endif

@@ -8,70 +8,185 @@
 
 class SlaveProtocol : public Protocol {
 public:
-	volatile bool *status; // Indicate which slave in the stripe is accessing the internal buffer
-
 	SlaveProtocol() : Protocol( ROLE_SLAVE ) {}
-	bool init( size_t size, uint32_t dataChunkCount );
-	void free();
 
-	/* Coordinator */
-	// Register
-	char *reqRegisterCoordinator( size_t &size, uint32_t id, uint32_t addr, uint16_t port );
-	// Heartbeat
-	char *sendHeartbeat( size_t &size, uint32_t id, LOCK_T *sealedLock, std::unordered_set<Metadata> &sealed, uint32_t &sealedCount, LOCK_T *opsLock, std::unordered_map<Key, OpMetadata> &ops, uint32_t &opsCount, bool &isCompleted );
-	// Remapping Records
-	char *sendRemappingRecords( size_t &size, uint32_t id, std::unordered_map<Key, RemappingRecord> &remapRecord, LOCK_T *lock, size_t &remapCount );
-	// Degraded operations
-	char *resReleaseDegradedLock( size_t &size, uint32_t id, uint32_t count );
-	// Remapped parity
-	char *resRemapParity( size_t &size, uint32_t id );
+	// ---------- register_protocol.cc ----------
+	char *reqRegisterCoordinator( size_t &size, uint32_t requestId, uint32_t addr, uint16_t port );
+	char *resRegisterMaster( size_t &size, uint16_t instanceId, uint32_t requestId, bool success );
+	char *reqRegisterSlavePeer( size_t &size, uint16_t instanceId, uint32_t requestId, ServerAddr *addr );
+	char *resRegisterSlavePeer( size_t &size, uint16_t instanceId, uint32_t requestId, bool success );
 
-	/* Master */
-	// Register
-	char *resRegisterMaster( size_t &size, uint32_t id, bool success );
-	// SET
-	char *resSet( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key, bool toMaster = true );
-	// REMAPPING_SET
-	char *resRemappingSet( size_t &size, bool toMaster, uint32_t id, bool success, uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key, uint32_t sockfd = UINT_MAX, bool remapped = false );
-	// GET
-	char *resGet( size_t &size, uint32_t id, bool success, bool isDegraded, uint8_t keySize, char *key, uint32_t valueSize = 0, char *value = 0, bool toMaster = true );
-	// UPDATE
-	char *resUpdate( size_t &size, uint32_t id, bool success, bool isDegraded, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize );
-	// DELETE
-	char *resDelete( size_t &size, uint32_t id, bool success, bool isDegraded, uint8_t keySize, char *key, bool toMaster = true );
-	// Redirect
-	char *resRedirect( size_t &size, uint32_t id, uint8_t opcode, uint8_t keySize, char *key, uint32_t remappedListId, uint32_t remappedChunkId );
+	// ---------- heartbeat_protocol.cc ----------
+	char *sendHeartbeat(
+		size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t timestamp,
+		LOCK_T *sealedLock, std::unordered_set<Metadata> &sealed, uint32_t &sealedCount,
+		LOCK_T *opsLock, std::unordered_map<Key, OpMetadata> &ops, uint32_t &opsCount,
+		bool &isCompleted
+	);
 
-	/* Slave */
-	// Register
-	char *reqRegisterSlavePeer( size_t &size, uint32_t id, ServerAddr *addr );
-	char *resRegisterSlavePeer( size_t &size, uint32_t id, bool success );
-	// REMAPPING_SET
-	char *reqRemappingSet( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, bool needsForwarding, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf = 0 );
-	// SEAL_CHUNK
-	char *reqSealChunk( size_t &size, uint32_t id, Chunk *chunk, uint32_t startPos, char *buf = 0 );
-	// SET
-	char *reqSet( size_t &size, uint32_t id, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf = 0 );
-	// GET
-	char *reqGet( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key );
-	// UPDATE
-	char *reqUpdate( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t chunkUpdateOffset, char *buf = 0 );
-	char *resUpdate( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t chunkUpdateOffset, char *buf = 0 );
-	// DELETE
-	char *reqDelete( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, char *buf = 0 );
-	char *resDelete( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, char *buf = 0 );
-	// UPDATE_CHUNK
-	char *reqUpdateChunk( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta, char *buf = 0 );
-	char *resUpdateChunk( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId );
-	// DELETE_CHUNK
-	char *reqDeleteChunk( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta, char *buf = 0 );
-	char *resDeleteChunk( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId );
-	// GET_CHUNK
-	char *reqGetChunk( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId );
-	char *resGetChunk( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t chunkSize = 0, uint32_t chunkOffset = 0, char *chunkData = 0 );
-	// SET_CHUNK
-	char *reqSetChunk( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t chunkSize, uint32_t chunkOffset, char *chunkData );
-	char *reqSetChunk( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, std::unordered_map<Key, KeyValue> *values, std::unordered_multimap<Metadata, Key> *metadataRev, std::unordered_set<Key> *deleted, LOCK_T *lock, bool &isCompleted );
-	char *resSetChunk( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId );
+	// ---------- normal_master_protocol.cc ----------
+	char *resSet(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		bool isSealed, uint32_t sealedListId, uint32_t sealedStripeId, uint32_t sealedChunkId,
+		uint8_t keySize, char *key
+	);
+	char *resSet(
+		size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
+		uint8_t keySize, char *key, bool toMaster = true
+	);
+	char *resGet(
+		size_t &size, uint16_t instanceId, uint32_t requestId, bool success, bool isDegraded,
+		uint8_t keySize, char *key, uint32_t valueSize = 0, char *value = 0,
+		bool toMaster = true
+	);
+	char *resUpdate(
+		size_t &size, uint16_t instanceId, uint32_t requestId, bool success, bool isDegraded,
+		uint8_t keySize, char *key,
+		uint32_t valueUpdateOffset, uint32_t valueUpdateSize
+	);
+	char *resDelete(
+		size_t &size, uint16_t instanceId, uint32_t requestId, bool isDegraded,
+		uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		uint8_t keySize, char *key,
+		bool toMaster = true
+	);
+	char *resDelete(
+		size_t &size, uint16_t instanceId, uint32_t requestId, bool isDegraded,
+		uint8_t keySize, char *key,
+		bool toMaster = true
+	);
+
+	// ---------- remap_protocol.cc ----------
+	char *resRemappingSet(
+		size_t &size, bool toMaster,
+		uint16_t instanceId, uint32_t requestId, bool success,
+		uint32_t listId, uint32_t chunkId,
+		uint32_t *original, uint32_t *remapped, uint32_t remappedCount,
+		uint8_t keySize, char *key
+	);
+	char *resRemapParity( size_t &size, uint16_t instanceId, uint32_t requestId );
+
+	char *reqSet(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		char *key, uint8_t keySize,
+		char *value, uint32_t valueSize,
+		char *buf = 0
+	);
+
+	// ---------- degraded_protocol.cc ----------
+	char *resReleaseDegradedLock( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t count );
+
+	char *reqDegradedSet(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		uint8_t opcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		uint8_t keySize, char *key,
+		uint32_t valueSize, char *value,
+		uint32_t valueUpdateSize = 0, uint32_t valueUpdateOffset = 0, char *valueUpdate = 0
+	);
+	char *resDegradedSet(
+		size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
+		uint8_t opcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		uint8_t keySize, char *key,
+		uint32_t valueSize,
+		uint32_t valueUpdateSize = 0, uint32_t valueUpdateOffset = 0
+	);
+
+	char *reqGet(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		uint32_t listId, uint32_t chunkId,
+		uint8_t keySize, char *key
+	);
+
+	// ---------- seal_protocol.cc ----------
+	char *reqSealChunk( size_t &size, uint16_t instanceId, uint32_t requestId, Chunk *chunk, uint32_t startPos, char *buf = 0 );
+
+	// ---------- recovery_protocol.cc ----------
+	char *resReconstruction( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t numStripes );
+	char *resPromoteBackupSlave( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t numStripes );
+
+	// ---------- normal_slave_protocol.cc ----------
+	char *reqUpdate(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		char *key, uint8_t keySize,
+		char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize,
+		uint32_t chunkUpdateOffset, char *buf = 0, uint32_t timestamp = 0
+	);
+	char *resUpdate(
+		size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		char *key, uint8_t keySize, uint32_t valueUpdateOffset, uint32_t valueUpdateSize,
+		uint32_t chunkUpdateOffset, char *buf = 0
+	);
+
+	char *reqDelete(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		char *key, uint8_t keySize, char *buf = 0, uint32_t timestamp = 0
+	);
+	char *resDelete(
+		size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		char *key, uint8_t keySize, char *buf = 0
+	);
+
+	char *reqGetChunk(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		char *buf = 0
+	);
+	char *resGetChunk(
+		size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		uint32_t chunkSize = 0, uint32_t chunkOffset = 0, char *chunkData = 0
+	);
+
+	char *reqSetChunk(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		uint32_t chunkSize, uint32_t chunkOffset, char *chunkData
+	);
+	char *reqSetChunk(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		std::unordered_map<Key, KeyValue> *values,
+		std::unordered_multimap<Metadata, Key> *metadataRev,
+		std::unordered_set<Key> *deleted,
+		LOCK_T *lock, bool &isCompleted
+	);
+	char *resSetChunk(
+		size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId
+	);
+
+	char *reqUpdateChunk(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		uint32_t offset, uint32_t length, uint32_t updatingChunkId,
+		char *delta, char *buf = 0, uint32_t timestamp = 0
+	);
+	char *resUpdateChunk(
+		size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		uint32_t offset, uint32_t length, uint32_t updatingChunkId
+	);
+
+	char *reqDeleteChunk(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		uint32_t offset, uint32_t length, uint32_t updatingChunkId,
+		char *delta, char *buf = 0, uint32_t timestamp = 0
+	);
+	char *resDeleteChunk(
+		size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		uint32_t offset, uint32_t length, uint32_t updatingChunkId
+	);
+
+	// ---------- ack_protocol.cc ----------
+	char *ackMetadata( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t fromTimestamp, uint32_t toTimestamp );
+	char *ackParityDeltaBackup( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t fromTimestamp, uint32_t toTimestamp, uint16_t targetId );
+	char *resRevertParityDelta( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, uint32_t fromTimestamp, uint32_t toTimestamp, uint16_t targetId );
 };
 #endif

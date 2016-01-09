@@ -4,6 +4,11 @@
 #include "../ds/map.hh"
 #include "chunk_buffer.hh"
 
+struct pid_s {
+	uint16_t instanceId;
+	uint32_t requestId;
+};
+
 class DegradedMap {
 private:
 	/**
@@ -23,15 +28,22 @@ private:
 		 * Store the set of reconstructed chunks and the list of IDs of pending requests
 		 * (list ID, stripe ID, chunk ID) |-> pid.id
 		 */
-		std::unordered_map<Metadata, std::vector<uint32_t>> chunks;
+		std::unordered_map<Metadata, std::vector<struct pid_s>> chunks;
 		LOCK_T chunksLock;
 		/**
 		 * Store the set of keys in unsealed chunks and the list of IDs of pending requests
 		 * Key |-> pid.id
 		 */
-		std::unordered_map<Key, std::vector<uint32_t>> keys;
+		std::unordered_map<Key, std::vector<struct pid_s>> keys;
 		LOCK_T keysLock;
 	} degraded;
+
+	/**
+	 * Store the parity chunks reconstructed in the data server (either redirected or not)
+	 * (list ID, stripe ID, data chunk ID) |-> vector of parity chunk IDs
+	 */
+	std::unordered_map<Metadata, std::vector<uint32_t>> parity;
+	LOCK_T parityLock;
 
 	Map *slaveMap;
 
@@ -46,7 +58,7 @@ public:
 		std::unordered_set<Key> deleted;
 		LOCK_T lock;
 	} unsealed;
-	
+
 	DegradedMap();
 
 	void init( Map *map );
@@ -68,24 +80,24 @@ public:
 
 	bool insertKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata );
 	bool deleteKey(
-		Key key, uint8_t opcode, KeyMetadata &keyMetadata,
+		Key key, uint8_t opcode, uint32_t &timestamp, KeyMetadata &keyMetadata,
 		bool needsLock, bool needsUnlock
 	);
 
 	bool insertValue( KeyValue keyValue, Metadata metadata );
-	bool deleteValue( Key key, Metadata metadata, uint8_t opcode );
+	bool deleteValue( Key key, Metadata metadata, uint8_t opcode, uint32_t &timestamp );
 
 	bool insertDegradedChunk(
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
-		uint32_t pid
+		uint16_t instanceId, uint32_t requestId
 	);
 	bool deleteDegradedChunk(
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
-		std::vector<uint32_t> &pids
+		std::vector<struct pid_s> &pids
 	);
 
-	bool insertDegradedKey( Key key, uint32_t pid );
-	bool deleteDegradedKey( Key key, std::vector<uint32_t> &pids );
+	bool insertDegradedKey( Key key, uint16_t instanceId, uint32_t requestId );
+	bool deleteDegradedKey( Key key, std::vector<struct pid_s> &pids );
 
 	bool insertChunk(
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
@@ -109,7 +121,7 @@ public:
 	void stop();
 
 	bool updateKeyValue( uint8_t keySize, char *keyStr, uint32_t valueUpdateSize, uint32_t valueUpdateOffset, uint32_t chunkUpdateOffset, char *valueUpdate, Chunk *chunk, bool isSealed );
-	bool deleteKey( uint8_t opcode, uint8_t keySize, char *keyStr, Metadata metadata, bool isSealed, uint32_t &deltaSize, char *delta, Chunk *chunk );
+	bool deleteKey( uint8_t opcode, uint32_t &timestamp, uint8_t keySize, char *keyStr, Metadata metadata, bool isSealed, uint32_t &deltaSize, char *delta, Chunk *chunk );
 
 	~DegradedChunkBuffer();
 };

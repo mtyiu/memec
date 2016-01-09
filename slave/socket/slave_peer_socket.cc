@@ -70,8 +70,9 @@ bool SlavePeerSocket::start() {
 
 void SlavePeerSocket::stop() {
 	if ( ! this->self ) {
-		int newFd = - this->sockfd;
+		int newFd = -INT_MIN + this->sockfd;
 		SlavePeerSocket::slavePeers->replaceKey( this->sockfd, newFd );
+		this->sockfd = newFd;
 	}
 	Socket::stop();
 }

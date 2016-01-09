@@ -20,7 +20,7 @@
 #define PROTO_MAGIC_ANNOUNCEMENT                  0x04 // -----100
 #define PROTO_MAGIC_LOADING_STATS                 0x05 // -----101
 #define PROTO_MAGIC_REMAPPING                     0x06 // -----110
-#define PROTO_MAGIC_RESERVED_4                    0x07 // -----111
+#define PROTO_MAGIC_ACKNOWLEDGEMENT               0x07 // -----111
 // (Bit: 3-4) //
 #define PROTO_MAGIC_FROM_APPLICATION              0x00 // ---00---
 #define PROTO_MAGIC_FROM_COORDINATOR              0x08 // ---01---
@@ -44,11 +44,12 @@
 #define PROTO_OPCODE_COORDINATOR_PUSH_STATS       0x34
 #define PROTO_OPCODE_SEAL_CHUNKS                  0x35
 #define PROTO_OPCODE_FLUSH_CHUNKS                 0x36
-#define PROTO_OPCODE_RECOVERY                     0x37
+#define PROTO_OPCODE_RECONSTRUCTION               0x37
 #define PROTO_OPCODE_SYNC_META                    0x38
 #define PROTO_OPCODE_RELEASE_DEGRADED_LOCKS       0x39
 #define PROTO_OPCODE_SLAVE_RECONSTRUCTED          0x40
-#define PROTO_OPCODE_PARITY_MIGRATE               0x41
+#define PROTO_OPCODE_BACKUP_SLAVE_PROMOTED        0x41
+#define PROTO_OPCODE_PARITY_MIGRATE               0x42
 
 // Application <-> Master or Master <-> Slave (0-19) //
 #define PROTO_OPCODE_GET                          0x01
@@ -61,10 +62,15 @@
 #define PROTO_OPCODE_DEGRADED_GET                 0x08
 #define PROTO_OPCODE_DEGRADED_UPDATE              0x09
 #define PROTO_OPCODE_DEGRADED_DELETE              0x10
+#define PROTO_OPCODE_DEGRADED_SET                 0x11
 // Master <-> Slave //
 #define PROTO_OPCODE_REMAPPING_SET                0x12
-#define PROTO_OPCODE_DEGRADED_LOCK                0X13
-#define PROTO_OPCODE_DEGRADED_UNLOCK              0X14
+#define PROTO_OPCODE_DEGRADED_LOCK                0x13
+#define PROTO_OPCODE_DEGRADED_UNLOCK              0x14
+#define PROTO_OPCODE_ACK_METADATA                 0x15
+#define PROTO_OPCODE_ACK_REQUEST                  0x16
+#define PROTO_OPCODE_ACK_PARITY_DELTA             0x17
+#define PROTO_OPCODE_REVERT_PARITY_DELTA          0x18
 
 // Master <-> Coordinator (20-29) //
 #define PROTO_OPCODE_REMAPPING_LOCK               0x20
@@ -75,8 +81,11 @@
 #define PROTO_OPCODE_UPDATE_CHUNK                 0x52
 #define PROTO_OPCODE_DELETE_CHUNK                 0x53
 #define PROTO_OPCODE_GET_CHUNK                    0x54
-#define PROTO_OPCODE_SET_CHUNK                    0x55
-#define PROTO_OPCODE_SET_CHUNK_UNSEALED           0x56
+#define PROTO_OPCODE_GET_CHUNKS                   0x55
+#define PROTO_OPCODE_SET_CHUNK                    0x56
+#define PROTO_OPCODE_SET_CHUNK_UNSEALED           0x57
+
+#define PROTO_UNINITIALIZED_INSTANCE              0
 
 /*********************
  * Key size (1 byte) *
@@ -97,6 +106,7 @@
 #include "../ds/key_value.hh"
 #include "../ds/metadata.hh"
 #include "../lock/lock.hh"
+#include "../timestamp/timestamp.hh"
 
 enum Role {
 	ROLE_APPLICATION,
@@ -107,11 +117,13 @@ enum Role {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#define PROTO_HEADER_SIZE 10
+#define PROTO_HEADER_SIZE 16
 struct ProtocolHeader {
 	uint8_t magic, from, to, opcode;
 	uint32_t length; // Content length
-	uint32_t id;
+	uint16_t instanceId;
+	uint32_t requestId;
+	uint32_t timestamp;
 };
 
 //////////////
@@ -123,14 +135,26 @@ struct AddressHeader {
 	uint16_t port;
 };
 
+//////////////
+// Recovery //
+//////////////
+#define PROTO_PROMOTE_BACKUP_SLAVE_SIZE 10
+struct PromoteBackupSlaveHeader {
+	uint32_t addr;
+	uint16_t port;
+	uint32_t count;
+	uint32_t *metadata;
+};
+
 //////////////////////////////////////////
 // Heartbeat & metadata synchronization //
 //////////////////////////////////////////
-#define PROTO_HEARTBEAT_SIZE 9
+#define PROTO_HEARTBEAT_SIZE 13
 struct HeartbeatHeader {
-    uint32_t sealed;
-    uint32_t keys;
-    bool isLast;
+    uint32_t timestamp;
+	uint32_t sealed;
+	uint32_t keys;
+	bool isLast;
 };
 
 #define PROTO_METADATA_SIZE 12
@@ -140,27 +164,14 @@ struct MetadataHeader {
 	uint32_t chunkId;
 };
 
-#define PROTO_KEY_OP_METADATA_SIZE 14
+#define PROTO_KEY_OP_METADATA_SIZE 18
 struct KeyOpMetadataHeader {
 	uint8_t keySize;
 	uint8_t opcode;
 	uint32_t listId;
 	uint32_t stripeId;
 	uint32_t chunkId;
-	char *key;
-};
-
-#define PROTO_REMAPPING_RECORD_SIZE 4
-struct RemappingRecordHeader {
-	uint32_t remap;
-};
-
-#define PROTO_SLAVE_SYNC_REMAP_PER_SIZE 10
-struct SlaveSyncRemapHeader {
-	uint8_t keySize;
-	uint8_t opcode;
-	uint32_t listId;
-	uint32_t chunkId;
+	uint32_t timestamp;
 	char *key;
 };
 
@@ -183,6 +194,29 @@ struct LoadStatsHeader {
 struct KeyHeader {
 	uint8_t keySize;
 	char *key;
+};
+
+#define PROTO_KEY_SLAVE_SIZE 17
+struct KeySlaveHeader {
+    uint8_t keySize;
+    char *key;
+};
+
+#define PROTO_KEY_BACKUP_BASE_SIZE       2
+#define PROTO_KEY_BACKUP_FOR_DATA_SIZE   17
+#define PROTO_KEY_BACKUP_SEALED_SIZE     12
+struct KeyBackupHeader {
+    bool isParity;
+	uint8_t keySize;
+    uint32_t timestamp;      // Only for data servers
+    uint32_t listId;         // Only for data servers
+    uint32_t stripeId;       // Only for data servers
+    uint32_t chunkId;        // Only for data servers
+	bool isSealed;           // Only for data servers
+	uint32_t sealedListId;   // Only for data servers && isSealed
+	uint32_t sealedStripeId; // Only for data servers && isSealed
+	uint32_t sealedChunkId;  // Only for data servers && isSealed
+    char *key;
 };
 
 #define PROTO_CHUNK_KEY_SIZE 13
@@ -235,88 +269,110 @@ struct ChunkUpdateHeader {
 	char *delta;
 };
 
+//////////////////////
+// Batch operations //
+//////////////////////
+#define PROTO_BATCH_KEY_SIZE 4
+struct BatchKeyHeader {
+	uint32_t count;
+};
+
+#define PROTO_BATCH_KEY_VALUE_SIZE 4
+struct BatchKeyValueHeader {
+	uint32_t count;
+};
+
 ///////////////
 // Remapping //
 ///////////////
-#define PROTO_REMAPPING_LOCK_SIZE 14
+#define PROTO_REMAPPING_LOCK_SIZE 5
 struct RemappingLockHeader {
-	uint32_t listId;
-	uint32_t chunkId;
-	uint32_t sockfd;
-	bool isRemapped;
+	uint32_t remappedCount;
 	uint8_t keySize;
 	char *key;
+	uint32_t *original;
+	uint32_t *remapped;
 };
 
-#define PROTO_REMAPPING_SET_SIZE 18
+#define PROTO_REMAPPING_SET_SIZE 16
 struct RemappingSetHeader {
 	uint32_t listId;
 	uint32_t chunkId;
-	uint32_t sockfd;
-	bool remapped;
-	bool needsForwarding;
+	uint32_t remappedCount;
 	uint8_t keySize;
 	uint32_t valueSize; // 3 bytes
 	char *key;
 	char *value;
-};
-
-#define PROTO_REDIRECT_SIZE 8 /* first 2 fields embedded as KeyHeader */
-struct RedirectHeader {
-	uint8_t keySize;
-	char* key;
-	uint32_t listId;
-	uint32_t chunkId;
+	uint32_t *original;
+	uint32_t *remapped;
 };
 
 ////////////////////////
 // Degraded operation //
 ////////////////////////
-#define PROTO_DEGRADED_LOCK_REQ_SIZE 17
+#define PROTO_DEGRADED_LOCK_REQ_SIZE 5
 struct DegradedLockReqHeader {
-	// Indicate where the reconstructed chunk should be stored
-	// using one of the stripe list that the server belongs to
-	uint32_t srcListId;
-	uint32_t srcChunkId;
-	uint32_t dstListId;
-	uint32_t dstChunkId;
+	uint32_t reconstructedCount;
 	uint8_t keySize;
 	char *key;
+	uint32_t *original;
+	uint32_t *reconstructed;
 };
 
 // Size
-#define PROTO_DEGRADED_LOCK_RES_BASE_SIZE 2
-#define PROTO_DEGRADED_LOCK_RES_LOCK_SIZE 21
-#define PROTO_DEGRADED_LOCK_RES_REMAP_SIZE 16
-#define PROTO_DEGRADED_LOCK_RES_NOT_SIZE 8
+#define PROTO_DEGRADED_LOCK_RES_BASE_SIZE   2 // type: 1, 2, 3, 4, 5
+#define PROTO_DEGRADED_LOCK_RES_LOCK_SIZE   9 // type: 1, 2
+#define PROTO_DEGRADED_LOCK_RES_REMAP_SIZE  4 // type: 4
+#define PROTO_DEGRADED_LOCK_RES_NOT_SIZE    0 // type: 3, 5
 // Type
-#define PROTO_DEGRADED_LOCK_RES_IS_LOCKED  1   // Return src* and dst* (same as the client request)
-#define PROTO_DEGRADED_LOCK_RES_WAS_LOCKED 2   // Return src* and dst* (different from the client request)
-#define PROTO_DEGRADED_LOCK_RES_NOT_LOCKED 3   // Return original srcListId and srcChunkId without dst*
-#define PROTO_DEGRADED_LOCK_RES_REMAPPED   4   // Return original srcListId and srcChunkId and remapped dstListId and dstChunkId
-#define PROTO_DEGRADED_LOCK_RES_NOT_EXIST  5   // Return original srcListId and srcChunkId
+#define PROTO_DEGRADED_LOCK_RES_IS_LOCKED   1
+#define PROTO_DEGRADED_LOCK_RES_WAS_LOCKED  2
+#define PROTO_DEGRADED_LOCK_RES_NOT_LOCKED  3
+#define PROTO_DEGRADED_LOCK_RES_REMAPPED    4
+#define PROTO_DEGRADED_LOCK_RES_NOT_EXIST   5
 struct DegradedLockResHeader {
-	uint8_t type;
-	uint8_t keySize;
-	char *key;
-	uint32_t srcListId;
-	uint32_t srcStripeId;
-	uint32_t srcChunkId;
-	uint32_t dstListId;
-	uint32_t dstChunkId;
-	bool isSealed;
+	uint8_t type;                  // type: 1, 2, 3, 4, 5
+	uint8_t keySize;               // type: 1, 2, 3, 4, 5
+	char *key;                     // type: 1, 2, 3, 4, 5
+
+	bool isSealed;                 // type: 1, 2
+	uint32_t stripeId;             // type: 1, 2
+	uint32_t reconstructedCount;   // type: 1, 2
+	uint32_t remappedCount;        // type: 4
+	uint32_t *original;            // type: 1, 2, 4
+	uint32_t *reconstructed;       // type: 1, 2
+	uint32_t *remapped;            // type: 4
 };
 
-#define PROTO_DEGRADED_REQ_BASE_SIZE 13
+#define PROTO_DEGRADED_REQ_BASE_SIZE 9
 struct DegradedReqHeader {
-	uint32_t listId;
-	uint32_t stripeId;
-	uint32_t chunkId;
 	bool isSealed;
+	uint32_t stripeId;
+	uint32_t reconstructedCount;
+	uint32_t *original;
+	uint32_t *reconstructed;
 	union {
 		struct KeyHeader key;
 		struct KeyValueUpdateHeader keyValueUpdate;
 	} data;
+};
+
+#define PROTO_DEGRADED_SET_BASE_SIZE 17
+#define PROTO_DEGRADED_SET_UPDATE_SIZE 6
+struct DegradedSetHeader {
+	uint8_t opcode;
+	uint32_t listId;
+	uint32_t stripeId;
+	uint32_t chunkId;
+	uint8_t keySize;
+	uint32_t valueSize; // 3 bytes
+	char *key;
+	char *value;
+
+	// Only for DEGRADED_UPDATE
+	uint32_t valueUpdateSize;   // 3 bytes
+	uint32_t valueUpdateOffset; // 3 bytes
+	char *valueUpdate;
 };
 
 // For retrieving key-value pair in unsealed chunks from parity slave
@@ -343,11 +399,11 @@ struct DegradedReleaseResHeader {
 	uint32_t count;
 };
 
-//////////////
-// Recovery //
-//////////////
-#define PROTO_RECOVERY_SIZE 12
-struct RecoveryHeader {
+////////////////////
+// Reconstruction //
+////////////////////
+#define PROTO_RECONSTRUCTION_SIZE 12
+struct ReconstructionHeader {
 	uint32_t listId;
 	uint32_t chunkId;
 	uint32_t numStripes;
@@ -381,6 +437,14 @@ struct ChunkHeader {
 	uint32_t chunkId;
 };
 
+#define PROTO_CHUNKS_SIZE 12
+struct ChunksHeader {
+	uint32_t listId;
+	uint32_t chunkId;
+	uint32_t numStripes;
+	uint32_t *stripeIds;
+};
+
 #define PROTO_CHUNK_DATA_SIZE 20
 struct ChunkDataHeader {
 	uint32_t listId;
@@ -403,27 +467,45 @@ struct ChunkKeyValueHeader {
 
 #define PROTO_BUF_MIN_SIZE		65536
 
+/////////////////////
+// Acknowledgement //
+/////////////////////
+#define PROTO_ACK_BASE_SIZE 8
+struct AcknowledgementHeader {
+    uint32_t fromTimestamp;
+    uint32_t toTimestamp;
+};
+
+#define PROTO_ACK_PARITY_DELTA_SIZE 10
+struct ParityDeltaAcknowledgementHeader {
+	uint32_t fromTimestamp;
+	uint32_t toTimestamp;
+	uint16_t targetId;
+};
+
 ///////////////////////////////////////////////////////////////////////////////
 
 class Protocol {
 protected:
 	uint8_t from, to;
-
+	// ---------- protocol.cc ----------
 	size_t generateHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode,
-		uint32_t length, uint32_t id,
-		char *sendBuf = 0
+		uint32_t length, uint16_t instanceId, uint32_t requestId,
+		char *sendBuf = 0, uint32_t requestTimestamp = 0
 	);
 	bool parseHeader(
 		uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t &opcode,
-		uint32_t &length, uint32_t &id,
-		char *buf, size_t size
+		uint32_t &length, uint16_t &instanceId, uint32_t &requestId,
+		uint32_t &requestTimestamp, char *buf, size_t size
 	);
+	Timestamp localTimestamp;
 	//////////////
 	// Register //
 	//////////////
+	// ---------- address_protocol.cc ----------
 	size_t generateAddressHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t addr, uint16_t port, char* buf = 0
 	);
 	bool parseAddressHeader(
@@ -431,23 +513,56 @@ protected:
 		char *buf, size_t size
 	);
 
+	////////////////////
+	// Reconstruction //
+	////////////////////
+	// ---------- address_protocol.cc ----------
 	size_t generateSrcDstAddressHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t srcAddr, uint16_t srcPort,
 		uint32_t dstAddr, uint16_t dstPort
+	);
+	// ---------- recovery_protocol.cc ----------
+	size_t generatePromoteBackupSlaveHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
+		uint32_t addr, uint16_t port,
+		std::unordered_set<Metadata> &chunks,
+		std::unordered_set<Metadata>::iterator &it,
+		bool &isCompleted
+	);
+	size_t generatePromoteBackupSlaveHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
+		uint32_t addr, uint16_t port, uint32_t numReconstructed
+	);
+	bool parsePromoteBackupSlaveHeader(
+		size_t offset, uint32_t &addr, uint16_t &port, uint32_t &count,
+		uint32_t *&metadata,
+		char *buf, size_t size
+	);
+	bool parsePromoteBackupSlaveHeader(
+		size_t offset, uint32_t &addr, uint16_t &port, uint32_t &numReconstructed,
+		char *buf, size_t size
 	);
 
 	//////////////////////////////////////////
 	// Heartbeat & metadata synchronization //
 	//////////////////////////////////////////
+	// ---------- heartbeat_protocol.cc ----------
 	size_t generateHeartbeatMessage(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t timestamp,
 		LOCK_T *sealedLock, std::unordered_set<Metadata> &sealed, uint32_t &sealedCount,
 		LOCK_T *opsLock, std::unordered_map<Key, OpMetadata> &ops, uint32_t &opsCount,
 		bool &isCompleted
 	);
+	size_t generateHeartbeatMessage(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
+        uint32_t timestamp,
+        uint32_t sealed,
+        uint32_t keys,
+        bool isLast
+	);
 	bool parseHeartbeatHeader(
-		size_t offset, uint32_t &sealed, uint32_t &keys, bool isLast,
+		size_t offset, uint32_t &timestamp, uint32_t &sealed, uint32_t &keys, bool &isLast,
 		char *buf, size_t size
 	);
 	bool parseMetadataHeader(
@@ -456,30 +571,26 @@ protected:
 	);
 	bool parseKeyOpMetadataHeader(
 		size_t offset, uint8_t &keySize, uint8_t &opcode,
-		uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
+		uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &timestamp,
 		char *&key, char *buf, size_t size
 	);
-
-	size_t generateRemappingRecordMessage(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
-		LOCK_T *lock, std::unordered_map<Key, RemappingRecord> &remapRecords,
-		size_t &remapCount, char *buf = 0
-	);
-	bool parseRemappingRecordHeader(
-		size_t offset, uint32_t &remap,
-		char *buf, size_t size
-	);
-	bool parseSlaveSyncRemapHeader(
-		size_t offset, uint8_t &keySize, uint8_t &opcode,
-		uint32_t &listId, uint32_t &chunkId, char *&key,
-		char *buf, size_t size
+	// ---------- fault_protocol.cc ----------
+	size_t generateMetadataBackupMessage(
+		uint8_t magic, uint8_t to, uint8_t opcode,
+		uint16_t instanceId, uint32_t requestId,
+		uint32_t addr, uint16_t port,
+		LOCK_T *lock,
+		std::unordered_multimap<uint32_t, Metadata> &sealed, uint32_t &sealedCount,
+		std::unordered_map<Key, MetadataBackup> &ops, uint32_t &opsCount,
+		bool &isCompleted
 	);
 
 	//////////////////////////
 	// Load synchronization //
 	//////////////////////////
+	// ---------- load_protocol.cc ----------
 	size_t generateLoadStatsHeader(
-		uint8_t magic, uint8_t to, uint32_t id,
+		uint8_t magic, uint8_t to, uint16_t instanceId, uint32_t requestId,
 		uint32_t slaveGetCount, uint32_t slaveSetCount, uint32_t slaveOverloadCount,
 		uint32_t recordSize, uint32_t slaveAddrSize
 	);
@@ -491,16 +602,42 @@ protected:
 	///////////////////////
 	// Normal operations //
 	///////////////////////
+	// ---------- normal_protocol.cc ----------
 	size_t generateKeyHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
-		uint8_t keySize, char *key, char *sendBuf = 0
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
+		uint8_t keySize, char *key, char *sendBuf = 0, uint32_t timestamp = 0
 	);
 	bool parseKeyHeader( size_t offset, uint8_t &keySize, char *&key, char *buf, size_t size );
 
-	size_t generateChunkKeyHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+	size_t generateKeyBackupHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
+		uint32_t timestamp,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		uint32_t sealedListId, uint32_t sealedStripeId, uint32_t sealedChunkId,
 		uint8_t keySize, char *key, char *sendBuf = 0
+	);
+	size_t generateKeyBackupHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
+        uint32_t timestamp,
+        uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		uint8_t keySize, char *key, char *sendBuf = 0
+	);
+    size_t generateKeyBackupHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
+		uint8_t keySize, char *key, char *sendBuf = 0
+	);
+	bool parseKeyBackupHeader(
+        size_t offset, bool &isParity, uint8_t &keySize,
+        uint32_t &timestamp, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
+		bool &isSealed, uint32_t &sealedListId, uint32_t &sealedStripeId, uint32_t &sealedChunkId,
+        char *&key,
+        char *buf, size_t size
+    );
+
+	size_t generateChunkKeyHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		uint8_t keySize, char *key, char *sendBuf = 0, uint32_t timestamp = 0
 	);
 	bool parseChunkKeyHeader(
 		size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
@@ -509,10 +646,11 @@ protected:
 	);
 
 	size_t generateChunkKeyValueUpdateHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize,
-		uint32_t chunkUpdateOffset, char *valueUpdate, char *sendBuf = 0
+		uint32_t chunkUpdateOffset, char *valueUpdate, char *sendBuf = 0,
+		uint32_t timestamp = 0
 	);
 	bool parseChunkKeyValueUpdateHeader(
 		size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
@@ -528,8 +666,9 @@ protected:
 	);
 
 	size_t generateKeyValueHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
-		uint8_t keySize, char *key, uint32_t valueSize, char *value, char *sendBuf = 0
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
+		uint8_t keySize, char *key, uint32_t valueSize, char *value, char *sendBuf = 0,
+		uint32_t timestamp = 0
 	);
 	bool parseKeyValueHeader(
 		size_t offset, uint8_t &keySize, char *&key,
@@ -538,9 +677,11 @@ protected:
 	);
 
 	size_t generateKeyValueUpdateHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint8_t keySize, char *key,
-		uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate = 0
+		uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate = 0,
+		char *sendBuf = 0,
+		uint32_t timestamp = 0
 	);
 	bool parseKeyValueUpdateHeader(
 		size_t offset, uint8_t &keySize, char *&key,
@@ -554,10 +695,10 @@ protected:
 	);
 
 	size_t generateChunkUpdateHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		uint32_t offset, uint32_t length, uint32_t updatingChunkId,
-		char *delta = 0, char *sendBuf = 0
+		char *delta = 0, char *sendBuf = 0, uint32_t timestamp = 0
 	);
 	bool parseChunkUpdateHeader(
 		size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
@@ -573,84 +714,68 @@ protected:
 	///////////////
 	// Remapping //
 	///////////////
+	// ---------- remap_protocol.cc ----------
 	size_t generateRemappingLockHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
-		uint32_t listId, uint32_t chunkId, bool isRemapped,
-		uint8_t keySize, char *key, uint32_t sockfd = UINT_MAX,
-		uint32_t payload = 0
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
+		uint32_t *original, uint32_t *remapped, uint32_t remappedCount,
+		uint8_t keySize, char *key
 	);
 	bool parseRemappingLockHeader(
-		size_t offset, uint32_t &listId, uint32_t &chunkId,
-		bool &isRemapped, uint8_t &keySize, char *&key,
-		char *buf, size_t size, uint32_t &sockfd
+		size_t offset,
+		uint32_t *&original, uint32_t *&remapped, uint32_t &remappedCount,
+		uint8_t &keySize, char *&key,
+		char *buf, size_t size
 	);
 
 	size_t generateRemappingSetHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
-		uint32_t listId, uint32_t chunkId, bool needsForwarding,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
+		uint32_t listId, uint32_t chunkId,
+		uint32_t *original, uint32_t *remapped, uint32_t remappedCount,
 		uint8_t keySize, char *key,
-		uint32_t valueSize, char *value, char *sendBuf = 0,
-		uint32_t sockfd = UINT_MAX, bool isParity = false,
-		struct sockaddr_in *target = 0
+		uint32_t valueSize, char *value,
+		char *sendBuf = 0
 	);
 	bool parseRemappingSetHeader(
 		size_t offset, uint32_t &listId, uint32_t &chunkId,
-		bool &needsForwarding, uint8_t &keySize, char *&key,
+		uint32_t *&original, uint32_t *&remapped, uint32_t &remappedCount,
+		uint8_t &keySize, char *&key,
 		uint32_t &valueSize, char *&value,
-		char *buf, size_t size,
-		uint32_t &sockfd, bool &isParity,
-		struct sockaddr_in *target = 0
-	);
-
-	size_t generateRedirectHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
-		uint8_t keySize, char *key,
-		uint32_t remappedListId, uint32_t remappedChunkId
-	);
-	bool parseRedirectHeader(
-		size_t offset, uint8_t &keySize, char *&key,
-		uint32_t &remappedListId, uint32_t &remappedChunkId,
 		char *buf, size_t size
 	);
 
 	////////////////////////
 	// Degraded operation //
 	////////////////////////
+	// ---------- degraded_protocol.cc ----------
 	size_t generateDegradedLockReqHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
-		uint32_t srcListId, uint32_t srcChunkId,
-		uint32_t dstListId, uint32_t dstChunkId,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
+		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 		uint8_t keySize, char *key
 	);
 	bool parseDegradedLockReqHeader(
 		size_t offset,
-		uint32_t &srcListId, uint32_t &srcChunkId,
-		uint32_t &dstListId, uint32_t &dstChunkId,
-		uint8_t &keySize, char *&key,
-		char *buf, size_t size
+		uint32_t *&original, uint32_t *&reconstructed, uint32_t &reconstructedCount,
+		uint8_t &keySize, char *&key, char *buf, size_t size
 	);
 
 	size_t generateDegradedLockResHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
-		uint8_t type, uint8_t keySize, char *key, char *&buf
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
+		uint32_t length, uint8_t type, uint8_t keySize, char *key, char *&buf
 	);
 	size_t generateDegradedLockResHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
-		bool isLocked, bool isSealed, uint8_t keySize, char *key,
-		uint32_t srcListId, uint32_t srcStripeId, uint32_t srcChunkId,
-		uint32_t dstListId, uint32_t dstChunkId
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
+		bool isLocked, uint8_t keySize, char *key,
+		bool isSealed, uint32_t stripeId,
+		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount
 	);
 	size_t generateDegradedLockResHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
-		bool exist,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
+		bool exist, uint8_t keySize, char *key
+	);
+	size_t generateDegradedLockResHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint8_t keySize, char *key,
-		uint32_t listId, uint32_t chunkId
-	);
-	size_t generateDegradedLockResHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
-		uint8_t keySize, char *key,
-		uint32_t srcListId, uint32_t srcChunkId,
-		uint32_t dstListId, uint32_t dstChunkId
+		uint32_t *original, uint32_t *remapped, uint32_t remappedCount
 	);
 	bool parseDegradedLockResHeader(
 		size_t offset, uint8_t &type,
@@ -658,42 +783,71 @@ protected:
 		char *buf, size_t size
 	);
 	bool parseDegradedLockResHeader(
-		size_t offset,
-		uint32_t &srcListId, uint32_t &srcStripeId, uint32_t &srcChunkId,
-		uint32_t &dstListId, uint32_t &dstChunkId, bool &isSealed,
+		size_t offset, bool &isSealed,
+		uint32_t &stripeId,
+		uint32_t *&original, uint32_t *&reconstructed, uint32_t &reconstructedCount,
 		char *buf, size_t size
 	);
 	bool parseDegradedLockResHeader(
 		size_t offset,
-		uint32_t &listId, uint32_t &chunkId,
-		char *buf, size_t size
-	);
-	bool parseDegradedLockResHeader(
-		size_t offset,
-		uint32_t &srcListId, uint32_t &srcChunkId,
-		uint32_t &dstListId, uint32_t &dstChunkId,
+		uint32_t *&original, uint32_t *&remapped, uint32_t &remappedCount,
 		char *buf, size_t size
 	);
 
 	size_t generateDegradedReqHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
-		uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isSealed,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
+		bool isSealed, uint32_t stripeId,
+		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 		uint8_t keySize, char *key
 	);
 	size_t generateDegradedReqHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
-		uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isSealed,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
+		bool isSealed, uint32_t stripeId,
+		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 		uint8_t keySize, char *key,
 		uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate
 	);
 	bool parseDegradedReqHeader(
 		size_t offset,
-		uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, bool &isSealed,
+		bool &isSealed, uint32_t &stripeId,
+		uint32_t *&original, uint32_t *&reconstructed, uint32_t &reconstructedCount,
 		char *buf, size_t size
 	);
 
+    size_t generateDegradedSetReqHeader(
+    	uint8_t magic, uint8_t to, uint8_t opcode,
+    	uint16_t instanceId, uint32_t requestId,
+    	uint8_t degradedOpcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+    	uint8_t keySize, char *key, uint32_t valueSize, char *value,
+    	uint32_t valueUpdateSize, uint32_t valueUpdateOffset, char *valueUpdate
+    );
+    bool parseDegradedSetReqHeader(
+    	size_t offset, uint8_t &opcode,
+    	uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
+    	uint8_t &keySize, uint32_t &valueSize,
+    	char *&key, char *&value,
+    	uint32_t &valueUpdateSize, uint32_t &valueUpdateOffset, char *&valueUpdate,
+    	char *buf, size_t size
+    );
+
+    size_t generateDegradedSetResHeader(
+    	uint8_t magic, uint8_t to, uint8_t opcode,
+    	uint16_t instanceId, uint32_t requestId,
+    	uint8_t degradedOpcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+    	uint8_t keySize, char *key, uint32_t valueSize,
+    	uint32_t valueUpdateSize, uint32_t valueUpdateOffset
+    );
+    bool parseDegradedSetResHeader(
+    	size_t offset, uint8_t &opcode,
+    	uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
+    	uint8_t &keySize, uint32_t &valueSize,
+    	char *&key,
+    	uint32_t &valueUpdateSize, uint32_t &valueUpdateOffset,
+    	char *buf, size_t size
+    );
+
 	size_t generateListStripeKeyHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key
 	);
 	bool parseListStripeKeyHeader(
@@ -703,14 +857,14 @@ protected:
 	);
 
 	size_t generateDegradedReleaseReqHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		std::vector<Metadata> &chunks,
 		bool &isCompleted
 	);
     #define parseDegradedReleaseReqHeader parseChunkHeader
 
 	size_t generateDegradedReleaseResHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t count
 	);
 	bool parseDegradedReleaseResHeader(
@@ -719,29 +873,41 @@ protected:
 		char *buf, size_t size
 	);
 
-	//////////////
-	// Recovery //
-	//////////////
-	size_t generateRecoveryHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+	////////////////////
+	// Reconstruction //
+	////////////////////
+	// ---------- recovery_protocol.cc ----------
+	size_t generateReconstructionHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t chunkId,
 		std::unordered_set<uint32_t> &stripeIds,
 		std::unordered_set<uint32_t>::iterator &it,
 		uint32_t numChunks,
 		bool &isCompleted
 	);
-	bool parseRecoveryHeader(
+	size_t generateReconstructionHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
+		uint32_t listId, uint32_t chunkId,
+		uint32_t numChunks
+	);
+	bool parseReconstructionHeader(
 		size_t offset,
 		uint32_t &listId, uint32_t &chunkId, uint32_t &numStripes,
 		uint32_t *&stripeIds,
+		char *buf, size_t size
+	);
+	bool parseReconstructionHeader(
+		size_t offset,
+		uint32_t &listId, uint32_t &chunkId, uint32_t &numStripes,
 		char *buf, size_t size
 	);
 
 	//////////
 	// Seal //
 	//////////
+	// ---------- seal_protocol.cc ----------
 	size_t generateChunkSealHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		uint32_t count, uint32_t dataLength, char *sendBuf = 0
 	);
@@ -757,17 +923,29 @@ protected:
 	//////////////////////
 	// Chunk operations //
 	//////////////////////
+	// ---------- chunk_protocol.cc ----------
 	size_t generateChunkHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
-		uint32_t listId, uint32_t stripeId, uint32_t chunkId
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *sendBuf = 0
 	);
 	bool parseChunkHeader(
 		size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
 		char *buf, size_t size
 	);
 
+	size_t generateChunksHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
+		uint32_t listId, uint32_t chunkId, std::vector<uint32_t> &stripeIds,
+		uint32_t &count
+	);
+	bool parseChunksHeader(
+		size_t offset, uint32_t &listId, uint32_t &chunkId,
+		uint32_t &numStripes, uint32_t *&stripeIds,
+		char *buf, size_t size
+	);
+
 	size_t generateChunkDataHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		uint32_t chunkSize, uint32_t chunkOffset, char *chunkData
 	);
@@ -778,7 +956,7 @@ protected:
 	);
 
 	size_t generateChunkKeyValueHeader(
-		uint8_t magic, uint8_t to, uint8_t opcode, uint32_t id,
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		std::unordered_map<Key, KeyValue> *values,
 		std::unordered_multimap<Metadata, Key> *metadataRev,
@@ -792,6 +970,27 @@ protected:
 		char *buf, size_t size
 	);
 
+	/////////////////////
+	// Acknowledgement //
+	/////////////////////
+	// ---------- ack_protocol.cc ----------
+	size_t generateAcknowledgementHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
+		uint32_t fromTimestamp, uint32_t toTimestamp, char* buf = 0
+	);
+	bool parseAcknowledgementHeader(
+		size_t offset, uint32_t &fromTimestamp, uint32_t &toTimestamp,
+		char *buf, size_t size
+	);
+	size_t generateParityDeltaAcknowledgementHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
+		uint32_t fromTimestamp, uint32_t toTimestamp, uint16_t targetId, char* buf = 0
+	);
+	bool parseParityDeltaAcknowledgementHeader(
+		size_t offset, uint32_t &fromTimestamp, uint32_t &toTimestamp, uint16_t &targetId,
+		char *buf, size_t size
+	);
+
 public:
 	struct {
 		size_t size;
@@ -799,20 +998,17 @@ public:
 		char *recv;
 	} buffer;
 
-	static size_t getSuggestedBufferSize( uint32_t keySize, uint32_t chunkSize );
-
+	// ---------- protocol.cc ----------
 	Protocol( Role role );
 	bool init( size_t size = 0 );
 	void free();
-
-	bool parseHeader(
-		struct ProtocolHeader &header,
-		char *buf = 0, size_t size = 0
-	);
+	bool parseHeader( struct ProtocolHeader &header, char *buf = 0, size_t size = 0 );
+	static size_t getSuggestedBufferSize( uint32_t keySize, uint32_t chunkSize );
 
 	//////////////
 	// Register //
 	//////////////
+	// ---------- address_protocol.cc ----------
 	bool parseAddressHeader(
 		struct AddressHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
@@ -822,9 +1018,18 @@ public:
 		struct AddressHeader &dstHeader,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
+	////////////////////
+	// Reconstruction //
+	////////////////////
+	// ---------- recovery_protocol.cc ----------
+	bool parsePromoteBackupSlaveHeader(
+		struct PromoteBackupSlaveHeader &header, bool isRequest,
+		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
 	//////////////////////////////////////////
 	// Heartbeat & metadata synchronization //
 	//////////////////////////////////////////
+	// ---------- heartbeat_protocol.cc ----------
 	bool parseHeartbeatHeader(
 		struct HeartbeatHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
@@ -837,18 +1042,16 @@ public:
 		struct KeyOpMetadataHeader &header, size_t &bytes,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
-	bool parseRemappingRecordHeader(
-		struct RemappingRecordHeader &header,
+	// ---------- fault_protocol.cc ----------
+	bool parseMetadataBackupMessage(
+		struct AddressHeader &address,
+		struct HeartbeatHeader &heartbeat,
 		char *buf = 0, size_t size = 0, size_t offset = 0
-	);
-	bool parseSlaveSyncRemapHeader(
-		struct SlaveSyncRemapHeader &header,
-		size_t &bytes, char *buf = 0, size_t size = 0,
-		size_t offset = PROTO_HEADER_SIZE + PROTO_REMAPPING_RECORD_SIZE
 	);
 	//////////////////////////
 	// Load synchronization //
 	//////////////////////////
+	// ---------- load_protocol.cc ----------
 	bool parseLoadStatsHeader(
 		struct LoadStatsHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
@@ -856,8 +1059,13 @@ public:
 	///////////////////////
 	// Normal operations //
 	///////////////////////
+	// ---------- normal_protocol.cc ----------
 	bool parseKeyHeader(
 		struct KeyHeader &header,
+		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
+	bool parseKeyBackupHeader(
+		struct KeyBackupHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 	bool parseChunkKeyHeader(
@@ -883,6 +1091,7 @@ public:
 	///////////////
 	// Remapping //
 	///////////////
+	// ---------- remap_protocol.cc ----------
 	bool parseRemappingLockHeader(
 		struct RemappingLockHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
@@ -892,13 +1101,10 @@ public:
 		char *buf = 0, size_t size = 0, size_t offset = 0,
 		struct sockaddr_in *target = 0
 	);
-	bool parseRedirectHeader(
-		struct RedirectHeader &header,
-		char *buf = 0, size_t size = 0, size_t offset = 0
-	);
 	////////////////////////
 	// Degraded operation //
 	////////////////////////
+	// ---------- degraded_protocol.cc ----------
 	bool parseDegradedLockReqHeader(
 		struct DegradedLockReqHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
@@ -911,6 +1117,14 @@ public:
 		struct DegradedReqHeader &header, uint8_t opcode,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
+    bool parseDegradedSetReqHeader(
+        struct DegradedSetHeader &header,
+        char *buf = 0, size_t size = 0, size_t offset = 0
+    );
+    bool parseDegradedSetResHeader(
+        struct DegradedSetHeader &header,
+        char *buf = 0, size_t size = 0, size_t offset = 0
+    );
 	bool parseListStripeKeyHeader(
 		struct ListStripeKeyHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
@@ -923,16 +1137,18 @@ public:
 		struct DegradedReleaseResHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
-	//////////////
-	// Recovery //
-	//////////////
-	bool parseRecoveryHeader(
-		struct RecoveryHeader &header,
+	////////////////////
+	// Reconstruction //
+	////////////////////
+	// ---------- recovery_protocol.cc ----------
+	bool parseReconstructionHeader(
+		struct ReconstructionHeader &header, bool isRequest,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 	//////////
 	// Seal //
 	//////////
+	// ---------- seal_protocol.cc ----------
 	bool parseChunkSealHeader(
 		struct ChunkSealHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
@@ -944,8 +1160,13 @@ public:
 	//////////////////////
 	// Chunk operations //
 	//////////////////////
+	// ---------- chunk_protocol.cc ----------
 	bool parseChunkHeader(
 		struct ChunkHeader &header,
+		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
+	bool parseChunksHeader(
+		struct ChunksHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 	bool parseChunkDataHeader(
@@ -954,6 +1175,18 @@ public:
 	);
 	bool parseChunkKeyValueHeader(
 		struct ChunkKeyValueHeader &header, char *&ptr,
+		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
+	/////////////////////
+	// Acknowledgement //
+	/////////////////////
+	// ---------- ack_protocol.cc ----------
+	bool parseAcknowledgementHeader(
+		struct AcknowledgementHeader &header,
+		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
+	bool parseParityDeltaAcknowledgementHeader(
+		struct ParityDeltaAcknowledgementHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 };

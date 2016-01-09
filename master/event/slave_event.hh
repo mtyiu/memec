@@ -10,14 +10,19 @@ enum SlaveEventType {
 	SLAVE_EVENT_TYPE_UNDEFINED,
 	SLAVE_EVENT_TYPE_REGISTER_REQUEST,
 	SLAVE_EVENT_TYPE_SEND,
+	SLAVE_EVENT_TYPE_SYNC_METADATA,
+	SLAVE_EVENT_TYPE_ACK_PARITY_DELTA,
+	SLAVE_EVENT_TYPE_REVERT_PARITY_DELTA,
 	SLAVE_EVENT_TYPE_PENDING
 };
 
 class SlaveEvent : public Event {
 public:
 	SlaveEventType type;
-	uint32_t id;
 	SlaveSocket *socket;
+	uint16_t instanceId;
+	uint32_t requestId;
+	uint32_t timestamp;
 	union {
 		struct {
 			uint32_t addr;
@@ -26,10 +31,21 @@ public:
 		struct {
 			Packet *packet;
 		} send;
+		struct {
+			uint32_t fromTimestamp;
+			uint32_t toTimestamp;
+			uint16_t targetId;
+			pthread_cond_t *condition;
+			LOCK_T *lock;
+			uint32_t *counter;
+		} ack;
 	} message;
 
 	void reqRegister( SlaveSocket *socket, uint32_t addr, uint16_t port );
 	void send( SlaveSocket *socket, Packet *packet );
+	void syncMetadata( SlaveSocket *socket );
+	void ackParityDelta( SlaveSocket *socket, uint32_t fromTimestamp, uint32_t toTimestamp, uint16_t targetId, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter );
+	void revertParityDelta( SlaveSocket *socket, uint32_t fromTimestamp, uint32_t toTimestamp, uint16_t targetId, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter );
 	void pending( SlaveSocket *socket );
 };
 

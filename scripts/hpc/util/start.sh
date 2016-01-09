@@ -13,15 +13,17 @@ ssh hpc15 "screen -S coordinator -p 0 -X stuff \"$(printf '\r\r')${BOOTSTRAP_SCR
 
 sleep ${SLEEP_TIME}
 
-for i in {1..6}; do
+for i in {1..7}; do
 	port=$(expr $i + 9110)
 	node_id=$(expr $i + 8)
 	ssh hpc${node_id} "screen -S slave$i -p 0 -X stuff \"$(printf '\r\r')${BOOTSTRAP_SCRIPT_PATH}/start-plio-slave.sh ${1}$(printf '\r\r')\"" &
 done
 
 sleep ${SLEEP_TIME}
+sleep ${SLEEP_TIME}
 
 ssh hpc15 "screen -S master -p 0 -X stuff \"$(printf '\r\r')${BOOTSTRAP_SCRIPT_PATH}/start-plio-master.sh ${1}$(printf '\r\r')\""
+sleep 5
 
 sleep ${SLEEP_TIME}
 
@@ -40,7 +42,7 @@ else
 	TERM_COMMAND="$(printf '\r\r')clear$(printf '\r')"
 fi
 
-for i in {1..6}; do
+for i in {1..7}; do
 	node_id=$(expr $i + 8)
 	ssh hpc${node_id} "screen -S slave$i -p 0 -X stuff \"${TERM_COMMAND}\"" &
 done

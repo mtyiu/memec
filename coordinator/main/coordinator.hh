@@ -6,7 +6,9 @@
 #include <set>
 #include <unordered_map>
 #include "../config/coordinator_config.hh"
+#include "../ds/log.hh"
 #include "../ds/pending.hh"
+#include "../ds/remapping_record_map.hh"
 #include "../event/event_queue.hh"
 #include "../remap/remap_msg_handler.hh"
 #include "../socket/coordinator_socket.hh"
@@ -16,7 +18,6 @@
 #include "../../common/config/global_config.hh"
 #include "../../common/ds/array_map.hh"
 #include "../../common/ds/id_generator.hh"
-#include "../../common/ds/remapping_record_map.hh"
 #include "../../common/lock/lock.hh"
 #include "../../common/signal/signal.hh"
 #include "../../common/socket/epoll.hh"
@@ -87,13 +88,20 @@ public:
 		std::set< struct sockaddr_in > slaveSet;
 		LOCK_T lock;
 	} overloadedSlaves;
+	struct {
+		std::vector<Log> items;
+		LOCK_T lock;
+	} log;
 	Timer statsTimer;
 	Pending pending;
+	static uint16_t instanceId;
 
 	static Coordinator *getInstance() {
 		static Coordinator coordinator;
 		return &coordinator;
 	}
+
+	void switchPhaseForCrashedSlave( SlaveSocket *slaveSocket );
 
 	static void signalHandler( int signal );
 
@@ -103,18 +111,22 @@ public:
 	void info( FILE *f = stdout );
 	void debug( FILE *f = stdout );
 	void dump();
+	void printInstanceId( FILE *f = stdout );
 	void printRemapping( FILE *f = stdout );
 	void printPending( FILE *f = stdout );
 	void time();
 	void seal();
 	void flush();
 	void metadata();
+	void printLog();
 	void syncSlaveMeta( struct sockaddr_in slave, bool *sync );
 	void releaseDegradedLock();
-	void releaseDegradedLock( struct sockaddr_in slave, bool *done );
-	void syncRemappingRecords( LOCK_T *lock, std::map<struct sockaddr_in, uint32_t> *counter, bool *done );
-	void syncRemappedParity( struct sockaddr_in target );
+	void releaseDegradedLock( struct sockaddr_in slave, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done );
+	void syncRemappedData( struct sockaddr_in target, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done );
 	double getElapsedTime();
+	void hash();
+	void lookup();
+	void appendLog( Log log );
 	void interactive();
 };
 

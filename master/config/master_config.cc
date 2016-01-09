@@ -11,10 +11,12 @@ MasterConfig::MasterConfig() {
 	this->eventQueue.size.pMixed = 1024;
 	this->pool.packets = 128;
 	this->loadingStats.updateInterval = 30;
-	this->remap.forceEnabled = false;
+	this->remap.disableRemappingSet = false;
 	this->remap.forceNoCacheRecords = false;
+	this->remap.backgroundAck = 0;
 	this->degraded.isFixed = true;
 	this->degraded.disabled = false;
+	this->backup.ackBatchSize = 100;
 }
 
 bool MasterConfig::merge( GlobalConfig &globalConfig ) {
@@ -106,10 +108,12 @@ bool MasterConfig::set( const char *section, const char *name, const char *value
 		else
 			return false;
 	} else if ( match( section, "remap" ) ) {
-		if ( match ( name, "force_enabled" ) )
-			this->remap.forceEnabled = ! match( value, "false" );
+		if ( match ( name, "disable_remapping_set" ) )
+			this->remap.disableRemappingSet = ! match( value, "false" );
 		else if ( match ( name, "force_no_record_cache_search" ) )
 			this->remap.forceNoCacheRecords = ! match( value, "false" );
+		else if ( match ( name, "background_ack" ) )
+			this->remap.backgroundAck= atoi( value );
 		else
 			return false;
 	} else if ( match( section, "degraded" ) ) {
@@ -117,6 +121,11 @@ bool MasterConfig::set( const char *section, const char *name, const char *value
 			this->degraded.isFixed = ! match( value, "dynamic" );
 		else if ( match ( name, "disabled" ) )
 			this->degraded.disabled = match( value, "true" );
+		else
+			return false;
+	} else if ( match ( section, "backup" ) ) {
+		if ( match( name, "ackBatchSize" ) )
+			this->backup.ackBatchSize = atoi( value );
 		else
 			return false;
 	} else {
@@ -244,7 +253,7 @@ void MasterConfig::print( FILE *f ) {
 		"\t- %-*s : %s\n",
 		width, "Packets", this->pool.packets,
 		width, "Update interval (ms)", this->loadingStats.updateInterval,
-		width, "Force enabled?", this->remap.forceEnabled ? "true" : "false",
+		width, "Disable remapping SET?", this->remap.disableRemappingSet ? "true" : "false",
 		width, "No search on cached records?", this->remap.forceNoCacheRecords ? "true" : "false",
 		width, "Target", this->degraded.isFixed ? "Fixed" : "Dynamic",
 		width, "Disabled", this->degraded.disabled ? "true" : "false"

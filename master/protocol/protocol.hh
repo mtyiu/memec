@@ -10,52 +10,152 @@
 
 class MasterProtocol : public Protocol {
 public:
-	volatile bool *status; // Indicate which slave in the stripe is accessing the internal buffer
-
 	MasterProtocol() : Protocol( ROLE_MASTER ) {}
-	bool init( size_t size, uint32_t parityChunkCount );
-	void free();
 
-	/* Coordinator */
-	// Register
-	char *reqRegisterCoordinator( size_t &size, uint32_t id, uint32_t addr, uint16_t port );
-	// Loading statistics
-	char *reqPushLoadStats( size_t &size, uint32_t id, ArrayMap< struct sockaddr_in, Latency > *slaveGetLatency, ArrayMap< struct sockaddr_in, Latency > *slaveSetLatency );
-	bool parseLoadingStats( const LoadStatsHeader& loadStatsHeader, ArrayMap< struct sockaddr_in, Latency > &slaveGetLatency, ArrayMap< struct sockaddr_in, Latency > &slaveSetLatency, std::set<struct sockaddr_in> &overloadedSlaveSet, char* buffer, uint32_t size );
-	// Degraded operation
-	char *reqDegradedLock( size_t &size, uint32_t id, uint32_t srcListId, uint32_t srcChunkId, uint32_t dstListId, uint32_t dstChunkId, char *key, uint8_t keySize );
-	// Remapping Records
-	char *resSyncRemappingRecords( size_t &size, uint32_t id );
+	// ---------- register_protocol.cc ----------
+	char *reqRegisterCoordinator( size_t &size, uint32_t requestId, uint32_t addr, uint16_t port );
+	char *reqRegisterSlave( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port );
+	char *resRegisterApplication( size_t &size, uint16_t instanceId, uint32_t requestId, bool success );
 
-	/* Slave */
-	// Register
-	char *reqRegisterSlave( size_t &size, uint32_t id, uint32_t addr, uint16_t port );
-	// SET
-	char *reqSet( size_t &size, uint32_t id, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf = 0 );
-	// Remapping SET
-	char *reqRemappingSetLock( size_t &size, uint32_t id, uint32_t listId, std::vector<uint32_t> chunkId, uint32_t reqRemapState, char *key, uint8_t keySize, uint32_t sockfd = UINT_MAX );
-	char *reqRemappingSet( size_t &size, uint32_t id, uint32_t listId, uint32_t chunkId, bool needsForwarding, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf = 0, uint32_t sockfd = UINT_MAX, bool isParity = false, struct sockaddr_in *target = 0 );
-	// GET
-	char *reqGet( size_t &size, uint32_t id, char *key, uint8_t keySize );
-	char *reqDegradedGet( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isSealed, char *key, uint8_t keySize );
-	// UPDATE
-	char *reqUpdate( size_t &size, uint32_t id, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize );
-	char *reqDegradedUpdate( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isSealed, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize );
-	// DELETE
-	char *reqDelete( size_t &size, uint32_t id, char *key, uint8_t keySize );
-	char *reqDegradedDelete( size_t &size, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isSealed, char *key, uint8_t keySize );
+	// ---------- load_protocol.cc ----------
+	char *reqPushLoadStats(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
+		ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency
+	);
+	bool parseLoadingStats(
+		const LoadStatsHeader& loadStatsHeader,
+		ArrayMap<struct sockaddr_in, Latency> &slaveGetLatency,
+		ArrayMap<struct sockaddr_in, Latency> &slaveSetLatency,
+		std::set<struct sockaddr_in> &overloadedSlaveSet,
+		char* buffer, uint32_t size
+	);
 
-	/* Application */
-	// Register
-	char *resRegisterApplication( size_t &size, uint32_t id, bool success );
-	// SET
-	char *resSet( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key );
-	// GET
-	char *resGet( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key, uint32_t valueSize = 0, char *value = 0 );
-	// UPDATE
-	char *resUpdate( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize );
-	// DELETE
-	char *resDelete( size_t &size, uint32_t id, bool success, uint8_t keySize, char *key );
+	// ---------- normal_protocol.cc ----------
+	char *reqSet(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		char *key, uint8_t keySize,
+		char *value, uint32_t valueSize,
+		char *buf = 0
+	);
+	char *reqGet(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		char *key, uint8_t keySize
+	);
+	char *reqUpdate(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		char *key, uint8_t keySize,
+		char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize,
+		uint32_t timestamp = 0
+	);
+	char *reqDelete(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		char *key, uint8_t keySize,
+		uint32_t timestamp = 0
+	);
+
+	char *resSet(
+		size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
+		uint8_t keySize, char *key
+	);
+	char *resGet(
+		size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
+		uint8_t keySize, char *key,
+		uint32_t valueSize = 0, char *value = 0
+	);
+	char *resUpdate(
+		size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
+		uint8_t keySize, char *key,
+		uint32_t valueUpdateOffset, uint32_t valueUpdateSize
+	);
+	char *resDelete(
+		size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
+		uint8_t keySize, char *key
+	);
+
+	// ---------- remap_protocol.cc ----------
+	char *reqRemappingSetLock(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		uint32_t *original, uint32_t *remapped, uint32_t remappedCount,
+		char *key, uint8_t keySize
+	);
+	char *reqRemappingSet(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		uint32_t listId, uint32_t chunkId,
+		uint32_t *original, uint32_t *remapped, uint32_t remappedCount,
+		char *key, uint8_t keySize,
+		char *value, uint32_t valueSize,
+		char *buf = 0
+	);
+
+	// ---------- degraded_protocol.cc ----------
+	char *reqDegradedLock(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
+		char *key, uint8_t keySize
+	);
+	char *reqDegradedGet(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		bool isSealed, uint32_t stripeId,
+		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
+		char *key, uint8_t keySize
+	);
+	char *reqDegradedUpdate(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		bool isSealed, uint32_t stripeId,
+		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
+		char *key, uint8_t keySize,
+		char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize
+	);
+	char *reqDegradedDelete(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		bool isSealed, uint32_t stripeId,
+		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
+		char *key, uint8_t keySize
+	);
+
+	// ---------- fault_protocol.cc ----------
+	char *syncMetadataBackup(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		uint32_t addr, uint16_t port,
+		LOCK_T *lock,
+		std::unordered_multimap<uint32_t, Metadata> &sealed, uint32_t &sealedCount,
+		std::unordered_map<Key, MetadataBackup> &ops, uint32_t &opsCount,
+		bool &isCompleted
+	);
+
+	char *ackParityDeltaBackup(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		uint32_t fromTimestamp, uint32_t toTimestamp, uint16_t targetId
+	);
+
+	char *revertParityDelta(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		uint32_t fromTimestamp, uint32_t toTimestamp, uint16_t targetId
+	);
+
+	// ---------- replay_protocol.cc ----------
+	// same protocol as in application, but writes header into buffer.recv by default
+	char *replaySet(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		char *key, uint8_t keySize, char *value, uint8_t valueSize
+	);
+
+	char *replayGet(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		char *key, uint8_t keySize
+	);
+
+	char *replayUpdate(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		char *key, uint8_t keySize, 
+		char *valueUpdate, uint8_t valueUpdateOffset, uint32_t valueUpdateSize
+	);
+
+	char *replayDelete(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		char *key, uint8_t keySize
+	);
 };
 
 #endif

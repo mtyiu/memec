@@ -1,6 +1,10 @@
 #include <cstdlib>
 #include "coordinator_config.hh"
 
+CoordinatorConfig::CoordinatorConfig() {
+	this->eventQueue.size.pMixed = 1024;
+}
+
 bool CoordinatorConfig::merge( GlobalConfig &globalConfig ) {
 	this->epoll.maxEvents = globalConfig.epoll.maxEvents;
 	this->epoll.timeout = globalConfig.epoll.timeout;
@@ -10,7 +14,7 @@ bool CoordinatorConfig::merge( GlobalConfig &globalConfig ) {
 bool CoordinatorConfig::parse( const char *path ) {
 	if ( Config::parse( path, "coordinator.ini" ) ) {
 		if ( this->workers.type == WORKER_TYPE_SEPARATED )
-			this->workers.number.separated.total = 
+			this->workers.number.separated.total =
 				this->workers.number.separated.coordinator +
 				this->workers.number.separated.master +
 				this->workers.number.separated.slave;
@@ -51,6 +55,8 @@ bool CoordinatorConfig::set( const char *section, const char *name, const char *
 				this->workers.type = WORKER_TYPE_UNDEFINED;
 		} else if ( match( name, "mixed" ) )
 			this->workers.number.mixed = atoi( value );
+		else if ( match( name, "prioritized_mixed" ) )
+			this->eventQueue.size.pMixed = atoi( value );
 		else if ( match( name, "coordinator" ) )
 			this->workers.number.separated.coordinator = atoi( value );
 		else if ( match( name, "master" ) )
@@ -80,7 +86,14 @@ bool CoordinatorConfig::set( const char *section, const char *name, const char *
 	} else if ( match( section, "loadingStats" ) ) {
 		if ( match( name, "updateInterval" ) )
 			this->loadingStats.updateInterval = atoi( value );
-		else 
+		else
+			return false;
+	} else if ( match( section, "remap" ) ) {
+		if ( match( name, "concurrent" ) )
+			this->remap.worker = atoi( value );
+		else if ( match( name, "queue_len" ) )
+			this->remap.queue = atoi( value );
+		else
 			return false;
 	} else {
 		return false;
@@ -104,6 +117,8 @@ bool CoordinatorConfig::validate() {
 				CFG_PARSE_ERROR( "CoordinatorConfig", "The number of workers should be at least 1." );
 			if ( this->eventQueue.size.mixed < this->workers.number.mixed )
 				CFG_PARSE_ERROR( "CoordinatorConfig", "The size of the event queue should be at least the number of workers." );
+			if ( this->eventQueue.size.pMixed < this->workers.number.mixed )
+				CFG_PARSE_ERROR( "MasterConfig", "The size of the prioritized event queue should be at least the number of workers." );
 			break;
 		case WORKER_TYPE_SEPARATED:
 			if ( this->workers.number.separated.coordinator < 1 )
@@ -166,10 +181,10 @@ void CoordinatorConfig::print( FILE *f ) {
 			"\t- %-*s : %u\n"
 			"- Event queues\n"
 			"\t- %-*s : %s\n"
-			"\t- %-*s : %u\n",
+			"\t- %-*s : %u; %u (prioritized)\n",
 			width, "Number of workers", this->workers.number.mixed,
 			width, "Blocking?", this->eventQueue.block ? "Yes" : "No",
-			width, "Size", this->eventQueue.size.mixed
+			width, "Size", this->eventQueue.size.mixed, this->eventQueue.size.pMixed
 		);
 	} else {
 		fprintf(

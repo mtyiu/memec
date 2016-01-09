@@ -24,6 +24,10 @@ enum SlavePeerEventType {
 	SLAVE_PEER_EVENT_TYPE_SET_REQUEST,
 	SLAVE_PEER_EVENT_TYPE_SET_RESPONSE_SUCCESS,
 	SLAVE_PEER_EVENT_TYPE_SET_RESPONSE_FAILURE,
+	// DEGRADED_SET
+	SLAVE_PEER_EVENT_TYPE_DEGRADED_SET_REQUEST,
+	SLAVE_PEER_EVENT_TYPE_DEGRADED_SET_RESPONSE_SUCCESS,
+	SLAVE_PEER_EVENT_TYPE_DEGRADED_SET_RESPONSE_FAILURE,
 	// GET
 	SLAVE_PEER_EVENT_TYPE_GET_REQUEST,
 	SLAVE_PEER_EVENT_TYPE_GET_RESPONSE_SUCCESS,
@@ -44,6 +48,8 @@ enum SlavePeerEventType {
 	SLAVE_PEER_EVENT_TYPE_GET_CHUNK_REQUEST,
 	SLAVE_PEER_EVENT_TYPE_GET_CHUNK_RESPONSE_SUCCESS,
 	SLAVE_PEER_EVENT_TYPE_GET_CHUNK_RESPONSE_FAILURE,
+	// Batch GET_CHUNK
+	SLAVE_PEER_EVENT_TYPE_BATCH_GET_CHUNKS,
 	// SET_CHUNK
 	SLAVE_PEER_EVENT_TYPE_SET_CHUNK_REQUEST,
 	SLAVE_PEER_EVENT_TYPE_SET_CHUNK_RESPONSE_SUCCESS,
@@ -63,8 +69,10 @@ enum SlavePeerEventType {
 class SlavePeerEvent : public Event {
 public:
 	SlavePeerEventType type;
-	uint32_t id;
+	uint16_t instanceId;
+	uint32_t requestId;
 	SlavePeerSocket *socket;
+	uint32_t timestamp;
 	struct {
 		struct {
 			Metadata metadata;
@@ -95,45 +103,80 @@ public:
 			Packet *packet;
 		} send;
 		struct {
-			Key key;
+			std::vector<uint32_t> *requestIds;
+			std::vector<Metadata> *metadata;
+		} batchGetChunks;
+		struct {
 			uint32_t listId, chunkId;
+			Key key;
 		} remap;
 		struct {
 			Key key;
 			Value value;
-			uint32_t listId, chunkId;
-		} parity;
+		} set;
+		struct {
+			uint8_t opcode;
+			uint32_t listId, stripeId, chunkId;
+			uint8_t keySize;
+			uint32_t valueSize;
+			char *key, *value;
+			struct {
+				uint32_t offset, length;
+				char *data;
+			} update;
+		} degradedSet;
 	} message;
 
 	// Register
 	void reqRegister( SlavePeerSocket *socket );
-	void resRegister( SlavePeerSocket *socket, uint32_t id, bool success = true );
+	void resRegister( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, bool success = true );
 	// REMAPPING_SET
-	void resRemappingSet( SlavePeerSocket *socket, uint32_t id, Key &key, uint32_t listId, uint32_t chunkId, bool success );
+	void resRemappingSet( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, uint32_t listId, uint32_t chunkId, bool success );
 	// SET
-	void reqSet( SlavePeerSocket *socket, uint32_t id, uint32_t listId, uint32_t chunkId, Key key, Value value );
-	void resSet( SlavePeerSocket *socket, uint32_t id, uint32_t listId, uint32_t chunkId, Key key, bool success );
+	void reqSet( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key key, Value value );
+	void resSet( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key key, bool success );
+	// Degraded SET
+	void reqDegradedSet(
+		SlavePeerSocket *socket,
+		uint8_t opcode,
+		uint16_t instanceId, uint32_t requestId,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		uint8_t keySize, uint32_t valueSize,
+		char *key, char *value,
+		uint32_t valueUpdateOffset = 0, uint32_t valueUpdateSize = 0, char *valueUpdate = 0
+	);
+	void resDegradedSet(
+		SlavePeerSocket *socket, bool success,
+		uint8_t opcode,
+		uint16_t instanceId, uint32_t requestId,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		uint8_t keySize, uint32_t valueSize,
+		char *key,
+		uint32_t valueUpdateOffset = 0, uint32_t valueUpdateSize = 0
+	);
 	// GET
-	void reqGet( SlavePeerSocket *socket, uint32_t id, uint32_t listId, uint32_t chunkId, Key &key );
-	void resGet( SlavePeerSocket *socket, uint32_t id, KeyValue &keyValue );
-	void resGet( SlavePeerSocket *socket, uint32_t id, Key &key );
+	void reqGet( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, Key &key );
+	void resGet( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, KeyValue &keyValue );
+	void resGet( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key );
 	// UPDATE
-	void resUpdate( SlavePeerSocket *socket, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key, uint32_t valueUpdateOffset, uint32_t length, uint32_t chunkUpdateOffset, bool success );
+	void resUpdate( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key, uint32_t valueUpdateOffset, uint32_t length, uint32_t chunkUpdateOffset, bool success );
 	// DELETE
-	void resDelete( SlavePeerSocket *socket, uint32_t id, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key, bool success );
+	void resDelete( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key, bool success );
 	// UPDATE_CHUNK
-	void resUpdateChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, bool success );
+	void resUpdateChunk( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, bool success );
 	// DELETE_CHUNK
-	void resDeleteChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, bool success );
+	void resDeleteChunk( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, bool success );
 	// GET_CHUNK
-	void reqGetChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata );
-	void resGetChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, bool success, Chunk *chunk = 0 );
+	void reqGetChunk( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata );
+	void resGetChunk( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, bool success, Chunk *chunk = 0 );
+	// Batch GET_CHUNK
+	void batchGetChunks( SlavePeerSocket *socket, std::vector<uint32_t> *requestIds, std::vector<Metadata> *metadata );
 	// SET_CHUNK
-	void reqSetChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, Chunk *chunk, bool needsFree );
-	void resSetChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, bool success );
+	void reqSetChunk( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, Chunk *chunk, bool needsFree );
+	void resSetChunk( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, bool success );
 	// SEAL_CHUNK
 	void reqSealChunk( Chunk *chunk );
-	void resSealChunk( SlavePeerSocket *socket, uint32_t id, Metadata &metadata, bool success );
+	void resSealChunk( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, bool success );
 	// Seal chunk buffer
 	void reqSealChunks( MixedChunkBuffer *chunkBuffer );
 	// Send

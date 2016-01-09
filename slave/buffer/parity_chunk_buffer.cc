@@ -46,6 +46,8 @@ ParityChunkWrapper &ParityChunkBuffer::getWrapper( uint32_t stripeId, bool needs
 		wrapper.chunk->metadata.set( this->listId, stripeId, this->chunkId );
 
 		ChunkBuffer::map->setChunk( this->listId, stripeId, this->chunkId, wrapper.chunk, true );
+		// Insert into the sealed map such that the coordinator knows the existence of the new parity chunk
+		ChunkBuffer::map->seal( this->listId, stripeId, this->chunkId );
 
 		this->chunks[ stripeId ] = wrapper;
 		it = this->chunks.find( stripeId );
@@ -148,12 +150,12 @@ bool ParityChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t coun
 		prtIt = this->pending.find( key );
 		if ( prtIt != this->pending.end() ) {
 			printf(
-				"prtIt != this->pending.end(); (%u, %u, %u, %u) vs. (%u, %u)\n",
+				"prtIt != this->pending.end(); (list ID: %u, stripe ID: %u vs. %u, chunk ID: %u, offset: %u vs. %u)\n",
 				this->listId,
 				stripeId,
+				prtIt->second.req.seal.stripeId,
 				chunkId,
 				offset,
-				prtIt->second.req.seal.stripeId,
 				prtIt->second.req.seal.offset
 			);
 		}
@@ -169,7 +171,7 @@ bool ParityChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t coun
 
 			ret = this->pending.insert( p );
 			if ( ! ret.second ) {
-				__ERROR__( "ParityChunkBuffer", "seal", "Key: %.*s (size = %u) cannot be inserted into pending keys map.\n", keySize, keyStr, keySize );
+				__ERROR__( "ParityChunkBuffer", "seal", "Key: %.*s (size = %u) cannot be inserted into pending keys map.", keySize, keyStr, keySize );
 			}
 		} else {
 			keyValue = it->second;

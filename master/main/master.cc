@@ -3,14 +3,17 @@
 #include "master.hh"
 #include "../remap/basic_remap_scheme.hh"
 
+uint16_t Master::instanceId;
+
 Master::Master() {
 	this->isRunning = false;
 	/* Set debug flag */
 	this->debugFlags.isDegraded = false;
+
+	Master::instanceId = 0;
 }
 
 void Master::updateSlavesCurrentLoading() {
-
 	int index = -1;
 	Latency *tempLatency = NULL;
 
@@ -206,7 +209,6 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 		socket->init( this->config.global.slaves[ i ], &this->sockets.epoll );
 		fd = socket->getSocket();
 		this->sockets.slaves.set( fd, socket );
-		this->counters.slaves[ socket->getAddr() ] = &( socket->counter );
 	}
 	/* Stripe list */
 	this->stripeList = new StripeList<SlaveSocket>(
@@ -215,8 +217,6 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 		this->config.global.stripeList.count,
 		this->sockets.slaves.values
 	);
-	/* Remap flag */
-	this->remapFlag.set( this->config.master.remap.forceEnabled );
 	/* Workers, ID generator, packet pool and event queues */
 	if ( this->config.master.workers.type == WORKER_TYPE_MIXED ) {
 		this->idGenerator.init( this->config.master.workers.number.mixed );
@@ -319,6 +319,9 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 	}
 	this->statsTimer.setInterval( sec, msec );
 
+	// Socket mapping lock //
+	LOCK_INIT( &this->sockets.slavesIdToSocketLock );
+
 	// Set signal handlers //
 	Signal::setHandler( Master::signalHandler );
 
@@ -350,6 +353,8 @@ bool Master::start() {
 	}
 	// Connect to slaves
 	for ( int i = 0, len = this->config.global.slaves.size(); i < len; i++ ) {
+		this->sockets.slaves[ i ]->timestamp.current.setVal( 0 );
+		this->sockets.slaves[ i ]->timestamp.lastAck.setVal( 0 );
 		if ( ! this->sockets.slaves[ i ]->start() )
 			ret = false;
 	}
@@ -357,6 +362,16 @@ bool Master::start() {
 	if ( ! this->sockets.self.start() ) {
 		__ERROR__( "Master", "start", "Cannot start socket." );
 		ret = false;
+	}
+
+	// Wait until the instance ID is available from coordinator
+	while( ret && ! this->sockets.coordinators[ 0 ]->registered ) {
+		usleep(5);
+	}
+
+	// Register to slaves
+	for ( int i = 0, len = this->config.global.slaves.size(); i < len; i++ ) {
+		this->sockets.slaves[ i ]->registerMaster();
 	}
 
 	/* Remapping message handler */
@@ -527,17 +542,70 @@ void Master::interactive() {
 		} else if ( strcmp( command, "debug" ) == 0 ) {
 			valid = true;
 			this->debug();
+		} else if ( strcmp( command, "id" ) == 0 ) {
+			valid = true;
+			this->printInstanceId();
 		} else if ( strcmp( command, "pending" ) == 0 ) {
 			valid = true;
 			this->printPending();
 		} else if ( strcmp( command, "remapping" ) == 0 ) {
 			valid = true;
 			this->printRemapping();
+		} else if ( strcmp( command, "backup" ) == 0 ) {
+			valid = true;
+			this->printBackup();
+		} else if ( strcmp( command, "metadata" ) == 0 ) {
+			valid = true;
+			this->syncMetadata();
 		} else if ( strncmp( command, "set", 3 ) == 0 ) {
 			valid = this->setDebugFlag( command );
 		} else if ( strcmp( command, "time" ) == 0 ) {
 			valid = true;
 			this->time();
+		} else if ( strcmp( command, "ackparity" ) == 0 ) {
+			pthread_cond_t condition;
+			pthread_mutex_t lock;
+			uint32_t counter = 0;
+
+			pthread_cond_init( &condition, 0 );
+			pthread_mutex_init( &lock, 0 );
+			this->ackParityDelta( stdout, 0, &condition, &lock, &counter, true );
+			// wait for all ack, skip waiting if there is nothing to revert
+			LOCK( &lock );
+			if ( counter > 0 ) {
+				printf( "waiting for %u acknowledgements with counter at %p\n", counter, &counter );
+				UNLOCK( &lock );
+				pthread_cond_wait( &condition, &lock );
+			}
+			valid = true;
+		} else if ( strcmp( command, "revertparity" ) == 0 ) {
+			pthread_cond_t condition;
+			pthread_mutex_t lock;
+			uint32_t counter = 0;
+
+			pthread_cond_init( &condition, 0 );
+			pthread_mutex_init( &lock, 0 );
+
+			this->revertParityDelta( stdout, 0, &condition, &lock, &counter, true );
+			// wait for all ack, skip waiting if there is nothing to revert
+			LOCK( &lock );
+			if ( counter > 0 ) {
+				printf( "waiting for %u acknowledgements with counter at %p\n", counter, &counter );
+				UNLOCK( &lock );
+				pthread_cond_wait( &condition, &lock );
+			}
+			valid = true;
+		} else if ( strcmp( command, "replay" ) == 0 ) {
+			// FOR REPLAY TESTING ONLY
+			for ( int i = 0, len = this->sockets.slaves.size(); i < len; i ++ ) {
+				printf("Prepare replay for slave id = %hu fd = %u\n", this->sockets.slaves[ i ]->instanceId, this->sockets.slaves[ i ]->getSocket() );
+				MasterWorker::replayRequestPrepare( this->sockets.slaves[ i ] );
+			}
+			for ( int i = 0, len = this->sockets.slaves.size(); i < len; i ++ ) {
+				printf("Replay for slave id = %hu fd = %u\n", this->sockets.slaves[ i ]->instanceId, this->sockets.slaves[ i ]->getSocket() );
+				MasterWorker::replayRequest( this->sockets.slaves[ i ] );
+			}
+			valid = true;
 		} else {
 			valid = false;
 		}
@@ -587,17 +655,21 @@ bool Master::isDegraded( SlaveSocket *socket ) {
 		( this->debugFlags.isDegraded )
 		||
 		(
-			this->remapMsgHandler.useRemappingFlow( socket->getAddr() ) &&
+			this->remapMsgHandler.useCoordinatedFlow( socket->getAddr() ) &&
 			! this->config.master.degraded.disabled
 		)
 	);
 }
 
+void Master::printInstanceId( FILE *f ) {
+	fprintf( f, "Instance ID = %u\n", Master::instanceId );
+}
+
 void Master::printPending( FILE *f ) {
 	size_t i;
 	std::unordered_multimap<PendingIdentifier, Key>::iterator it;
+	std::unordered_multimap<PendingIdentifier, KeyValue>::iterator keyValueIt;
 	std::unordered_multimap<PendingIdentifier, KeyValueUpdate>::iterator keyValueUpdateIt;
-	std::unordered_multimap<PendingIdentifier, RemappingRecord>::iterator remappingRecordIt;
 
 	LOCK( &this->pending.applications.setLock );
 	fprintf(
@@ -609,13 +681,23 @@ void Master::printPending( FILE *f ) {
 	);
 	i = 1;
 	for (
-		it = this->pending.applications.set.begin();
-		it != this->pending.applications.set.end();
-		it++, i++
+		keyValueIt = this->pending.applications.set.begin();
+		keyValueIt != this->pending.applications.set.end();
+		keyValueIt++, i++
 	) {
-		const Key &key = it->second;
-		fprintf( f, "%lu. ID: %u; Key: %.*s (size = %u); source: ", i, it->first.id, key.size, key.data, key.size );
-		( ( Socket * ) key.ptr )->printAddress( f );
+		const PendingIdentifier &pid = keyValueIt->first;
+		KeyValue &keyValue = keyValueIt->second;
+		Key key = keyValue.key();
+		fprintf(
+			f, "%lu. ID: (%u, %u); Key: %.*s (size = %u); Timestamp: %u source: ",
+			i, keyValueIt->first.instanceId, keyValueIt->first.requestId,
+			key.size, key.data, key.size,
+			keyValueIt->first.timestamp
+		);
+		if ( pid.ptr ) 
+			( ( Socket * ) pid.ptr )->printAddress( f );
+		else
+			fprintf( f, "[N/A]\n" );
 
 		for ( uint8_t i = 0; i < key.size; i++ ) {
 			if ( ! isprint( key.data[ i ] ) ) {
@@ -639,10 +721,15 @@ void Master::printPending( FILE *f ) {
 		it != this->pending.applications.get.end();
 		it++, i++
 	) {
+		const PendingIdentifier &pid = it->first;
 		const Key &key = it->second;
-		fprintf( f, "%lu. ID: %u; Key: %.*s (size = %u); source: ", i, it->first.id, key.size, key.data, key.size );
-		if ( key.ptr )
-			( ( Socket * ) key.ptr )->printAddress( f );
+		fprintf(
+			f, "%lu. ID: (%u, %u); Key: %.*s (size = %u); source: ",
+			i, it->first.instanceId, it->first.requestId,
+			key.size, key.data, key.size
+		);
+		if ( pid.ptr )
+			( ( Socket * ) pid.ptr )->printAddress( f );
 		else
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
@@ -661,14 +748,16 @@ void Master::printPending( FILE *f ) {
 		keyValueUpdateIt != this->pending.applications.update.end();
 		keyValueUpdateIt++, i++
 	) {
+		const PendingIdentifier &pid = keyValueUpdateIt->first;
 		const KeyValueUpdate &keyValueUpdate = keyValueUpdateIt->second;
 		fprintf(
-			f, "%lu. ID: %u; Key: %.*s (size = %u, offset = %u, length = %u); source: ",
-			i, keyValueUpdateIt->first.id, keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
+			f, "%lu. ID: (%u, %u); Key: %.*s (size = %u, offset = %u, length = %u); source: ",
+			i, keyValueUpdateIt->first.instanceId, keyValueUpdateIt->first.requestId,
+			keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
 			keyValueUpdate.offset, keyValueUpdate.length
 		);
-		if ( keyValueUpdate.ptr )
-			( ( Socket * ) keyValueUpdate.ptr )->printAddress( f );
+		if ( pid.ptr )
+			( ( Socket * ) pid.ptr )->printAddress( f );
 		else
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
@@ -687,10 +776,15 @@ void Master::printPending( FILE *f ) {
 		it != this->pending.applications.del.end();
 		it++, i++
 	) {
+		const PendingIdentifier &pid = it->first;
 		const Key &key = it->second;
-		fprintf( f, "%lu. ID: %u; Key: %.*s (size = %u); source: ", i, it->first.id, key.size, key.data, key.size );
-		if ( key.ptr )
-			( ( Socket * ) key.ptr )->printAddress( f );
+		fprintf(
+			f, "%lu. ID: (%u, %u); Key: %.*s (size = %u); source: ",
+			i, it->first.instanceId, it->first.requestId,
+			key.size, key.data, key.size
+		);
+		if ( pid.ptr )
+			( ( Socket * ) pid.ptr )->printAddress( f );
 		else
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
@@ -712,32 +806,18 @@ void Master::printPending( FILE *f ) {
 		it != this->pending.slaves.set.end();
 		it++, i++
 	) {
+		const PendingIdentifier &pid = it->first;
 		const Key &key = it->second;
-		fprintf( f, "%lu. ID: %u, parent ID: %u; Key: %.*s (size = %u); target: ", i, it->first.id, it->first.parentId, key.size, key.data, key.size );
-		( ( Socket * ) key.ptr )->printAddress( f );
+		fprintf(
+			f, "%lu. ID: (%u, %u), parent ID: (%u, %u); Key: %.*s (size = %u); target: ",
+			i, it->first.instanceId, it->first.requestId,
+			it->first.parentInstanceId, it->first.parentRequestId,
+			key.size, key.data, key.size
+		);
+		( ( Socket * ) pid.ptr )->printAddress( f );
 		fprintf( f, "\n" );
 	}
 	UNLOCK( &this->pending.slaves.setLock );
-
-	LOCK( &this->pending.slaves.remappingSetLock );
-	fprintf(
-		f,
-		"\n[REMAPPING_SET] Pending: %lu\n",
-		this->pending.slaves.remappingSet.size()
-	);
-
-	i = 1;
-	for (
-		remappingRecordIt = this->pending.slaves.remappingSet.begin();
-		remappingRecordIt != this->pending.slaves.remappingSet.end();
-		remappingRecordIt++, i++
-	) {
-		const RemappingRecord &record = remappingRecordIt->second;
-		fprintf( f, "%lu. ID: %u, parent ID: %u; list ID: %u, chunk ID: %u; target: ", i, remappingRecordIt->first.id, remappingRecordIt->first.parentId, record.listId, record.chunkId );
-		( ( Socket * ) remappingRecordIt->first.ptr )->printAddress( f );
-		fprintf( f, "\n" );
-	}
-	UNLOCK( &this->pending.slaves.remappingSetLock );
 
 	LOCK( &this->pending.slaves.getLock );
 	fprintf(
@@ -751,9 +831,15 @@ void Master::printPending( FILE *f ) {
 		it != this->pending.slaves.get.end();
 		it++, i++
 	) {
+		const PendingIdentifier &pid = it->first;
 		const Key &key = it->second;
-		fprintf( f, "%lu. ID: %u, parent ID: %u; Key: %.*s (size = %u); target: ", i, it->first.id, it->first.parentId, key.size, key.data, key.size );
-		( ( Socket * ) key.ptr )->printAddress( f );
+		fprintf(
+			f, "%lu. ID: (%u, %u), parent ID: (%u, %u); Key: %.*s (size = %u); target: ",
+			i, it->first.instanceId, it->first.requestId,
+			it->first.parentInstanceId, it->first.parentRequestId,
+			key.size, key.data, key.size
+		);
+		( ( Socket * ) pid.ptr )->printAddress( f );
 		fprintf( f, "\n" );
 	}
 	UNLOCK( &this->pending.slaves.getLock );
@@ -770,14 +856,17 @@ void Master::printPending( FILE *f ) {
 		keyValueUpdateIt != this->pending.slaves.update.end();
 		keyValueUpdateIt++, i++
 	) {
+		const PendingIdentifier &pid = keyValueUpdateIt->first;
 		const KeyValueUpdate &keyValueUpdate = keyValueUpdateIt->second;
 		fprintf(
-			f, "%lu. ID: %u, parent ID: %u; Key: %.*s (size = %u, offset = %u, length = %u); target: ",
-			i, keyValueUpdateIt->first.id, keyValueUpdateIt->first.parentId, keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
+			f, "%lu. ID: (%u, %u), parent ID: (%u, %u); Key: %.*s (size = %u, offset = %u, length = %u); target: ",
+			i, keyValueUpdateIt->first.instanceId, keyValueUpdateIt->first.requestId,
+			keyValueUpdateIt->first.parentInstanceId, keyValueUpdateIt->first.parentRequestId,
+			keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
 			keyValueUpdate.offset, keyValueUpdate.length
 		);
-		if ( keyValueUpdate.ptr )
-			( ( Socket * ) keyValueUpdate.ptr )->printAddress( f );
+		if ( pid.ptr )
+			( ( Socket * ) pid.ptr )->printAddress( f );
 		else
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
@@ -796,46 +885,28 @@ void Master::printPending( FILE *f ) {
 		it != this->pending.slaves.del.end();
 		it++, i++
 	) {
+		const PendingIdentifier &pid = it->first;
 		const Key &key = it->second;
-		fprintf( f, "%lu. ID: %u, parent ID: %u; Key: %.*s (size = %u); target: ", i, it->first.id, it->first.parentId, key.size, key.data, key.size );
-		( ( Socket * ) key.ptr )->printAddress( f );
+		fprintf(
+			f, "%lu. ID: (%u, %u), parent ID: (%u, %u); Key: %.*s (size = %u); target: ",
+			i, it->first.instanceId, it->first.requestId,
+			it->first.parentInstanceId, it->first.parentRequestId,
+			key.size, key.data, key.size
+		);
+		( ( Socket * ) pid.ptr )->printAddress( f );
 		fprintf( f, "\n" );
 	}
 	UNLOCK( &this->pending.slaves.delLock );
 
 	fprintf(
 		f,
-		"\n\nCounters\n"
-		"--------\n"
+		"\n[ACK] Parity backup: (remove)%10lu  (revert)%10lu\n",
+		this->pending.ack.remove.size(),
+		this->pending.ack.revert.size()
 	);
-	LOCK( &this->sockets.slaves.lock );
-	char buf[ INET_ADDRSTRLEN ];
-	struct sockaddr_in addr;
-	uint32_t remapping, normal, lockOnly, degraded;
-	for ( uint32_t i = 0; i < this->sockets.slaves.size(); i++ ) {
-		addr = this->sockets.slaves.values[ i ]->getAddr();
-		inet_ntop( AF_INET, &addr.sin_addr, buf, INET_ADDRSTRLEN );
-		this->sockets.slaves.values[ i ]->counter.getAll( remapping, normal, lockOnly, degraded );
-		fprintf(
-			f,
-			"[REMAP] %s:%hu Normal: %u; Locking only: %u; Remapping: %u; Degraded: %u\n",
-			buf,
-			ntohs( this->sockets.slaves.values[ i ]->getAddr().sin_port ),
-			normal, lockOnly, remapping, degraded
-		);
-	}
-	UNLOCK( &this->sockets.slaves.lock );
-
 }
 
 void Master::printRemapping( FILE *f ) {
-	fprintf(
-		f,
-		"\nRemapping Record Mapping\n"
-		"------------------------\n"
-	);
-	this->remappingRecords.print( f );
-
 	fprintf(
 		f,
 		"\nList of Tracking Slaves\n"
@@ -852,6 +923,65 @@ void Master::printRemapping( FILE *f ) {
 	);
 }
 
+void Master::printBackup( FILE *f ) {
+	SlaveSocket *s;
+	LOCK( &this->sockets.slaves.lock );
+	std::vector<SlaveSocket *> &sockets = this->sockets.slaves.values;
+	for ( size_t i = 0, size = sockets.size(); i < size; i++ ) {
+		s = sockets[ i ];
+		s->printAddress();
+		printf( ":\n" );
+		s->backup.print( f );
+		printf( "\n" );
+		fprintf( f,
+			"Timestamps: Current: %10u  Last Ack: %10u; (Pending #) Update: %10lu  Delete: %10lu\n",
+			s->timestamp.current.getVal(),
+			s->timestamp.lastAck.getVal(),
+			s->timestamp.pendingAck._update.size(),
+			s->timestamp.pendingAck._del.size()
+		);
+	}
+	UNLOCK( &this->sockets.slaves.lock );
+}
+
+void Master::syncMetadata() {
+	uint32_t socketFromId, socketToId;
+	char tmp[ 16 ];
+	SlaveEvent event;
+
+	printf( "Which socket ([0-%lu] or all)? ", this->sockets.slaves.size() - 1 );
+	fflush( stdout );
+	if ( ! fgets( tmp, sizeof( tmp ), stdin ) )
+		return;
+	if ( strncmp( tmp, "all", 3 ) == 0 ) {
+		socketFromId = 0;
+		socketToId = this->sockets.slaves.size();
+	} else if ( sscanf( tmp, "%u", &socketFromId ) != 1 ) {
+		fprintf( stderr, "Invalid socket ID.\n" );
+		return;
+	} else if ( socketFromId >= this->sockets.slaves.size() ) {
+		fprintf( stderr, "The specified socket ID exceeds the range [0-%lu].\n", this->sockets.slaves.size() - 1 );
+		return;
+	} else {
+		socketToId = socketFromId + 1;
+	}
+
+	for ( uint32_t socketId = socketFromId; socketId < socketToId; socketId++ ) {
+		SlaveSocket *socket = this->sockets.slaves.values[ socketId ];
+		if ( ! socket ) {
+			fprintf( stderr, "Unknown socket ID!\n" );
+			return;
+		}
+
+		event.syncMetadata( socket );
+		this->eventQueue.insert( event );
+
+		printf( "Synchronize metadata backup for the slave: (#%u) ", socketId );
+		socket->printAddress();
+		printf( "\n" );
+	}
+}
+
 void Master::help() {
 	fprintf(
 		stdout,
@@ -859,10 +989,15 @@ void Master::help() {
 		"- help: Show this help message\n"
 		"- info: Show configuration\n"
 		"- debug: Show debug messages\n"
+		"- id: Print instance ID\n"
 		"- pending: Show all pending requests\n"
 		"- remapping: Show remapping info\n"
+		"- backup: Show backup info\n"
+		"- metadata: Synchronize metadata backup for a particular slave\n"
 		"- set: Set debug flag (degraded = [true|false])\n"
 		"- time: Show elapsed time\n"
+		"- ackparity: Acknowledge parity delta\n"
+		"- revertparity: Revert unacknowledged parity delta\n"
 		"- exit: Terminate this client\n"
 	);
 	fflush( stdout );
@@ -872,3 +1007,103 @@ void Master::time() {
 	fprintf( stdout, "Elapsed time: %12.6lf s\n", this->getElapsedTime() );
 	fflush( stdout );
 }
+
+#define DISPATCH_EVENT_TO_OTHER_SLAVES( _METHOD_NAME_, _S_, _COND_, _LOCK_, _COUNTER_ )  \
+	for ( int j = 0, len = this->sockets.slaves.size(); j < len; j++ ) { \
+		SlaveEvent event; \
+		SlaveSocket *p = this->sockets.slaves[ j ]; \
+		struct sockaddr_in saddr = p->getAddr(); \
+		/* skip myself, and any node declared to be failed */ \
+		if ( p == _S_ || this->remapMsgHandler.useCoordinatedFlow( saddr ) ) continue; \
+		if ( _LOCK_ ) LOCK( _LOCK_ ); \
+		if ( _COUNTER_ ) *_COUNTER_ += 1; \
+		event._METHOD_NAME_( p, from, to, _S_->instanceId, _COND_, _LOCK_, _COUNTER_ ); \
+		if ( _LOCK_ ) UNLOCK( _LOCK_ ); \
+		this->eventQueue.insert( event ); \
+	} 
+
+void Master::ackParityDelta( FILE *f, SlaveSocket *target, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter, bool force ) {
+	uint32_t from, to, update, del;
+	
+	for( int i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
+		SlaveSocket *s = this->sockets.slaves[ i ];
+
+		if ( target && target != s )
+			continue;
+
+		LOCK( &target->ackParityDeltaBackupLock );
+		from = s->timestamp.lastAck.getVal();
+		to = s->timestamp.current.getVal();
+		del = update = to;
+
+		LOCK( &s->timestamp.pendingAck.updateLock );
+		if ( ! s->timestamp.pendingAck._update.empty() )
+			update = s->timestamp.pendingAck._update.begin()->getVal() - 1;
+		UNLOCK( &s->timestamp.pendingAck.updateLock );
+
+		LOCK( &s->timestamp.pendingAck.delLock );
+		if ( ! s->timestamp.pendingAck._del.empty() )
+			del = s->timestamp.pendingAck._del.begin()->getVal() - 1;
+		UNLOCK( &s->timestamp.pendingAck.delLock );
+
+		/* find the small acked timestamp */
+		to = update < to ? ( del < update ? del : update ) : to ;
+
+		/* check the threshold is reached */
+		if ( ! force && to - from < this->config.master.backup.ackBatchSize ) {
+			UNLOCK( &target->ackParityDeltaBackupLock );
+			continue;
+		}
+
+		if ( f ) {
+			s->printAddress();
+			fprintf( f, " ack parity delta for timestamps from %u to %u\n", from, to );
+		}
+
+		DISPATCH_EVENT_TO_OTHER_SLAVES( ackParityDelta, s, condition, lock, counter );
+
+		s->timestamp.lastAck.setVal( to );
+		UNLOCK( &target->ackParityDeltaBackupLock );
+	}
+}
+
+bool Master::revertParityDelta( FILE *f, SlaveSocket *target, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter, bool force ) {
+	uint32_t from, to, update, del;
+
+	// process one target slave at a time
+	if ( ! target )
+		return false;
+
+	// ack parity delta as well, but do not wait for it to complete
+	//this->ackParityDelta( f, target, 0, 0, 0, force );
+
+	// find the smallest unacknowledged timestamp
+	from = target->timestamp.current.getVal();
+	to = target->timestamp.current.getVal();
+	del = update = from;
+
+	LOCK( &target->timestamp.pendingAck.updateLock );
+	if ( ! target->timestamp.pendingAck._update.empty() )
+		update = target->timestamp.pendingAck._update.begin()->getVal() - 1;
+	UNLOCK( &target->timestamp.pendingAck.updateLock );
+
+	LOCK( &target->timestamp.pendingAck.delLock );
+	if ( ! target->timestamp.pendingAck._del.empty() )
+		del = target->timestamp.pendingAck._del.begin()->getVal() - 1;
+	UNLOCK( &target->timestamp.pendingAck.delLock );
+
+	from = update < from ? ( del < update ? del : update ) : from ;
+
+	if ( to - from == 0 )
+		return false;
+
+	if ( f ) {
+		target->printAddress();
+		fprintf( f, " revert parity delta for timestamps from %u to %u\n", from, to );
+	}
+
+	DISPATCH_EVENT_TO_OTHER_SLAVES( revertParityDelta, target, condition, lock, counter );
+
+	return true;
+}
+

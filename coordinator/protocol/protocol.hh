@@ -16,13 +16,19 @@ class CoordinatorProtocol : public Protocol {
 public:
 	CoordinatorProtocol() : Protocol( ROLE_COORDINATOR ) {}
 
-	/* Master */
-	// Register
-	char *resRegisterMaster( size_t &size, uint32_t id, bool success );
-	// char *resRegisterMaster( size_t &size, GlobalConfig &globalConfig, MasterConfig *masterConfig = 0 );
-	// Load statistics
+	// ---------- protocol.cc ----------
+	char *reqSyncMeta( size_t &size, uint16_t instanceId, uint32_t requestId );
+	char *reqSealChunks( size_t &size, uint16_t instanceId, uint32_t requestId );
+	char *reqFlushChunks( size_t &size, uint16_t instanceId, uint32_t requestId );
+
+	// ---------- register_protocol.cc ----------
+	char *resRegisterMaster( size_t &size, uint16_t instanceId, uint32_t requestId, bool success );
+	char *resRegisterSlave( size_t &size, uint16_t instanceId, uint32_t requestId, bool success );
+	char *announceSlaveConnected( size_t &size, uint16_t instanceId, uint32_t requestId, SlaveSocket *socket );
+
+	// ---------- load_protocol.cc ----------
 	char *reqPushLoadStats(
-		size_t &size, uint32_t id,
+		size_t &size, uint16_t instanceId, uint32_t requestId,
 		ArrayMap< struct sockaddr_in, Latency > *slaveGetLatency,
 		ArrayMap< struct sockaddr_in, Latency > *slaveSetLatency,
 		std::set< struct sockaddr_in > *overloadedSlaveSet
@@ -33,61 +39,68 @@ public:
 		ArrayMap< struct sockaddr_in, Latency >& slaveSetLatency,
 		char* buffer, uint32_t size
 	);
-	// RemapList
-	bool parseRemappingLockHeader( 
-		struct RemappingLockHeader &header, 
-		char *buf, size_t size, 
-		std::vector<uint32_t> *remapList = 0, 
-		size_t offset = 0 
-	);
-	// Forward the whole remapping record message passed in (with the protocol header excluded) pfrom slave to masters
-	char *forwardRemappingRecords( size_t &size, uint32_t id, char *message );
-	// Degraded operation
-	char *resDegradedLock(
-		size_t &size, uint32_t id,
-		bool isLocked, bool isSealed,
-		uint8_t keySize, char *key,
-		uint32_t srcListId, uint32_t srcStripeId, uint32_t srcChunkId,
-		uint32_t dstListId, uint32_t dstChunkId
-	);
-	char *resDegradedLock(
-		size_t &size, uint32_t id,
-		uint8_t keySize, char *key,
-		uint32_t srcListId, uint32_t srcChunkId,
-		uint32_t dstListId, uint32_t dstChunkId
-	);
-	char *resDegradedLock(
-		size_t &size, uint32_t id,
-		bool exist,
-		uint8_t keySize, char *key,
-		uint32_t listId, uint32_t chunkId
-	);
 
-	/* Slave */
-	// Register
-	char *resRegisterSlave( size_t &size, uint32_t id, bool success );
-	// char *resRegisterSlave( size_t &size, GlobalConfig &globalConfig, SlaveConfig *slaveConfig = 0 );
-	char *announceSlaveConnected( size_t &size, uint32_t id, SlaveSocket *socket );
-	char *announceSlaveReconstructed( size_t &size, uint32_t id, SlaveSocket *srcSocket, SlaveSocket *dstSocket );
-	char *reqSealChunks( size_t &size, uint32_t id );
-	char *reqFlushChunks( size_t &size, uint32_t id );
-	char *reqSyncMeta( size_t &size, uint32_t id );
+	// ---------- degraded_protocol.cc ----------
+	char *resDegradedLock(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		bool isLocked, uint8_t keySize, char *key,
+		bool isSealed, uint32_t stripeId,
+		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount
+	);
+	char *resDegradedLock(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		uint8_t keySize, char *key,
+		uint32_t *original, uint32_t *remapped, uint32_t remappedCount
+	);
+	char *resDegradedLock(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		bool exist,
+		uint8_t keySize, char *key
+	);
 	char *reqReleaseDegradedLock(
-		size_t &size, uint32_t id,
+		size_t &size, uint16_t instanceId, uint32_t requestId,
 		std::vector<Metadata> &chunks,
 		bool &isCompleted
 	);
-	char *reqSyncRemappingRecord( size_t &size, uint32_t id, std::unordered_map<Key, RemappingRecord> &remappingRecords, LOCK_T* lock, bool &isLast, char *buffer = 0 );
-	char *reqSyncRemappedParity( size_t &size, uint32_t id, struct sockaddr_in target, char* buffer = 0 );
-	char *resRemappingSetLock( size_t &size, uint32_t id, bool success, uint32_t listId, uint32_t chunkId, bool isRemapped, uint8_t keySize, char *key, uint32_t sockfd = UINT_MAX );
-	// Recovery
-	char *reqRecovery(
-		size_t &size, uint32_t id,
+
+	// ---------- remap_protocol.cc ----------
+	char *resRemappingSetLock(
+		size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
+		uint32_t *original, uint32_t *remapped, uint32_t remappedCount,
+		uint8_t keySize, char *key
+	);
+	char *reqSyncRemappedData( size_t &size, uint16_t instanceId, uint32_t requestId, struct sockaddr_in target, char* buffer = 0 );
+
+	// ---------- recovery_protocol.cc ----------
+	char *announceSlaveReconstructed(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		SlaveSocket *srcSocket, SlaveSocket *dstSocket,
+		bool toSlave
+	);
+	char *promoteBackupSlave(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		SlaveSocket *srcSocket,
+		std::unordered_set<Metadata> &chunks,
+		std::unordered_set<Metadata>::iterator &it,
+		bool &isCompleted
+	);
+	char *reqReconstruction(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t chunkId,
 		std::unordered_set<uint32_t> &stripeIds,
 		std::unordered_set<uint32_t>::iterator &it,
 		uint32_t numChunks,
 		bool &isCompleted
+	);
+	char *ackCompletedReconstruction( size_t &size, uint16_t instanceId, uint32_t requestId, bool success );
+
+	// ---------- heartbeat_protocol.cc ----------
+	char *resHeartbeat(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		uint32_t timestamp,
+		uint32_t sealed,
+		uint32_t keys,
+		bool isLast
 	);
 };
 

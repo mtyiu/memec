@@ -11,6 +11,7 @@ public class PLIO {
 	private Protocol protocol;
 	private String host;
 	private int port;
+	private int instanceId;
 	private int id;
 	private int fromId;
 	private int toId;
@@ -27,6 +28,7 @@ public class PLIO {
 		this.protocol = new Protocol( keySize, chunkSize );
 		this.host = host;
 		this.port = port;
+		this.instanceId = 0;
 		this.id = fromId;
 		this.fromId = fromId;
 		this.toId = toId;
@@ -86,6 +88,7 @@ public class PLIO {
 			Protocol.PROTO_MAGIC_TO_MASTER,
 			Protocol.PROTO_OPCODE_REGISTER,
 			0,
+			0,
 			id
 		);
 		try {
@@ -103,6 +106,7 @@ public class PLIO {
 		}
 		if ( bytes == Protocol.PROTO_HEADER_SIZE ) {
 			this.protocol.parseHeader( bytes );
+			this.instanceId = this.protocol.header.instanceId;
 			if ( this.protocol.header.id != id ) {
 				System.err.println( "PLIO.connect(): [Error] The response does not match the request ID." );
 				return false;
@@ -152,7 +156,7 @@ public class PLIO {
 			Protocol.PROTO_MAGIC_REQUEST,
 			Protocol.PROTO_MAGIC_TO_MASTER,
 			Protocol.PROTO_OPCODE_GET,
-			id,
+			this.instanceId, id,
 			keySize, key
 		);
 		try {
@@ -191,7 +195,7 @@ public class PLIO {
 			} else {
 				this.protocol.parseKeyHeader( bytes, 0 );
 				// this.debug( this.protocol.keyHeader.toString() );
-				System.err.println( "PLIO.get(): [Error] Key not found." );
+				// System.err.println( "PLIO.get(): [Error] Key not found." );
 			}
 		} else {
 			System.err.println( "PLIO.get(): [Error] Header length mismatch: " + bytes + " vs. " + this.protocol.header.length + "." );
@@ -205,7 +209,7 @@ public class PLIO {
 			Protocol.PROTO_MAGIC_REQUEST,
 			Protocol.PROTO_MAGIC_TO_MASTER,
 			Protocol.PROTO_OPCODE_SET,
-			id,
+			this.instanceId, id,
 			keySize, key,
 			valueSize, value
 		);
@@ -259,7 +263,7 @@ public class PLIO {
 			Protocol.PROTO_MAGIC_REQUEST,
 			Protocol.PROTO_MAGIC_TO_MASTER,
 			Protocol.PROTO_OPCODE_UPDATE,
-			id,
+			this.instanceId, id,
 			keySize, key,
 			valueUpdateOffset, valueUpdateSize, valueUpdate
 		);
@@ -312,7 +316,7 @@ public class PLIO {
 			Protocol.PROTO_MAGIC_REQUEST,
 			Protocol.PROTO_MAGIC_TO_MASTER,
 			Protocol.PROTO_OPCODE_DELETE,
-			id,
+			this.instanceId, id,
 			keySize, key
 		);
 		try {

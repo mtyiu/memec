@@ -3,8 +3,11 @@
 #include <unistd.h>
 #include "slave.hh"
 
+uint16_t Slave::instanceId;
+
 Slave::Slave() {
 	this->isRunning = false;
+	Slave::instanceId = 0;
 }
 
 void Slave::free() {
@@ -27,13 +30,8 @@ void Slave::sync( uint32_t requestId ) {
 	CoordinatorEvent event;
 	for ( int i = 0, len = this->config.global.coordinators.size(); i < len; i++ ) {
 		// Can only sync with one coordinator
-		event.sync( this->sockets.coordinators[ i ], requestId );
+		event.sync( this->sockets.coordinators[ i ], Slave::instanceId, requestId );
 		this->eventQueue.insert( event );
-		// Avoid empty messages
-		if ( this->map.remap.size() > 0 ) {
-			event.syncRemap( this->sockets.coordinators[ i ] );
-			this->eventQueue.insert( event );
-		}
 	}
 }
 
@@ -52,7 +50,6 @@ void Slave::signalHandler( int signal ) {
 }
 
 bool Slave::init( char *path, OptionList &options, bool verbose ) {
-	int mySlaveIndex;
 	// Parse configuration files //
 	if ( ( ! this->config.global.parse( path ) ) ||
 	     ( ! this->config.slave.merge( this->config.global ) ) ||
@@ -61,7 +58,7 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 	) {
 		return false;
 	}
-	mySlaveIndex = this->config.slave.validate( this->config.global.slaves );
+	this->mySlaveIndex = this->config.slave.validate( this->config.global.slaves );
 
 	// Initialize modules //
 	/* Socket */
@@ -160,6 +157,7 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 		}
 	}
 	// Map //
+	this->map.setTimestamp( &this->timestamp );
 	this->degradedChunkBuffer.map.init( &this->map );
 
 	/* Workers, ID generator, packet pool and event queues */
@@ -233,6 +231,10 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 	// Set signal handlers //
 	Signal::setHandler( Slave::signalHandler );
 
+	// Init lock for instance id to socket mapping //
+	LOCK_INIT( &this->sockets.mastersIdToSocketLock );
+	LOCK_INIT( &this->sockets.slavesIdToSocketLock );
+
 	// Show configuration //
 	if ( verbose )
 		this->info();
@@ -240,6 +242,7 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 }
 
 bool Slave::init( int mySlaveIndex ) {
+	this->mySlaveIndex = mySlaveIndex;
 	if ( mySlaveIndex == -1 )
 		return false;
 
@@ -268,6 +271,18 @@ bool Slave::init( int mySlaveIndex ) {
 				)
 			);
 		}
+	}
+
+	return true;
+}
+
+bool Slave::initChunkBuffer() {
+	if ( this->mySlaveIndex == -1 )
+		return false;
+
+	for ( uint32_t i = 0, size = this->stripeListIndex.size(); i < size; i++ ) {
+		uint32_t listId = this->stripeListIndex[ i ].listId;
+		this->chunkBuffer[ listId ]->init();
 	}
 
 	return true;
@@ -368,7 +383,7 @@ void Slave::seal() {
 	printf( "\nSealing %lu chunk buffer:\n", count );
 }
 
-void Slave::flush() {
+void Slave::flush( bool parityOnly ) {
 	IOEvent ioEvent;
 	std::unordered_map<Metadata, Chunk *>::iterator it;
 	std::unordered_map<Metadata, Chunk *> *cache;
@@ -382,7 +397,9 @@ void Slave::flush() {
 	for ( it = cache->begin(); it != cache->end(); it++ ) {
 		chunk = it->second;
 		if ( chunk->status == CHUNK_STATUS_DIRTY ) {
-			ioEvent.flush( chunk );
+			if ( parityOnly && ! chunk->isParity )
+				continue;
+			ioEvent.flush( chunk, parityOnly );
 			this->eventQueue.insert( ioEvent );
 			count++;
 		}
@@ -464,6 +481,18 @@ void Slave::memory( FILE *f ) {
 		width, "Total size (bytes)", allocated,
 		width, "Utilization", ( double ) occupied / allocated * 100.0
 	);
+}
+
+void Slave::setDelay() {
+	unsigned int delay;
+
+	printf( "How much delay (in usec)? " );
+	fflush( stdout );
+	if ( scanf( "%u", &delay ) == 1 )  {
+		SlaveWorker::delay = delay;
+	} else {
+		printf( "Invalid input.\n" );
+	}
 }
 
 double Slave::getElapsedTime() {
@@ -594,15 +623,24 @@ void Slave::interactive() {
 		} else if ( strcmp( command, "debug" ) == 0 ) {
 			valid = true;
 			this->debug();
+		} else if ( strcmp( command, "id" ) == 0 ) {
+			valid = true;
+			this->printInstanceId();
 		} else if ( strcmp( command, "dump" ) == 0 ) {
 			valid = true;
 			this->dump();
+		} else if ( strcmp( command, "lookup" ) == 0 ) {
+			valid = true;
+			this->lookup();
 		} else if ( strcmp( command, "seal" ) == 0 ) {
 			valid = true;
 			this->seal();
 		} else if ( strcmp( command, "flush" ) == 0 ) {
 			valid = true;
 			this->flush();
+		} else if ( strcmp( command, "p2disk" ) == 0 ) {
+			valid = true;
+			this->flush( true );
 		} else if ( strcmp( command, "memory" ) == 0 ) {
 			valid = true;
 			this->memory();
@@ -610,6 +648,9 @@ void Slave::interactive() {
 			FILE *f = fopen( "memory.log", "w" );
 			this->memory( f );
 			fclose( f );
+		} else if ( strcmp( command, "delay" ) == 0 ) {
+			valid = true;
+			this->setDelay();
 		} else if ( strcmp( command, "metadata" ) == 0 ) {
 			valid = true;
 			this->metadata();
@@ -622,9 +663,9 @@ void Slave::interactive() {
 		} else if ( strcmp( command, "sync" ) == 0 ) {
 			valid = true;
 			this->sync();
-		} else if ( strcmp( command, "load" ) == 0 ) {
+		} else if ( strcmp( command, "backup" ) == 0 ) {
 			valid = true;
-			this->aggregateLoad( stdout );
+			this->backupStat( stdout );
 		} else if ( strcmp( command, "time" ) == 0 ) {
 			valid = true;
 			this->time();
@@ -659,10 +700,15 @@ void Slave::printPending( FILE *f ) {
 		it != this->pending.masters.get.end();
 		it++, i++
 	) {
+		const PendingIdentifier &pid = it->first;
 		const Key &key = it->second;
-		fprintf( f, "%lu. ID: %u; Key: %.*s (size = %u); source: ", i, it->first.id, key.size, key.data, key.size );
-		if ( key.ptr )
-			( ( Socket * ) key.ptr )->printAddress( f );
+		fprintf(
+			f, "%lu. ID: (%u, %u); Key: %.*s (size = %u); source: ",
+			i, it->first.instanceId, it->first.requestId,
+			key.size, key.data, key.size
+		);
+		if ( pid.ptr )
+			( ( Socket * ) pid.ptr )->printAddress( f );
 		else
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
@@ -681,14 +727,16 @@ void Slave::printPending( FILE *f ) {
 		keyValueUpdateIt != this->pending.masters.update.end();
 		keyValueUpdateIt++, i++
 	) {
+		const PendingIdentifier &pid = keyValueUpdateIt->first;
 		const KeyValueUpdate &keyValueUpdate = keyValueUpdateIt->second;
 		fprintf(
-			f, "%lu. ID: %u; Key: %.*s (size = %u, offset = %u, length = %u); source: ",
-			i, keyValueUpdateIt->first.id, keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
+			f, "%lu. ID: (%u, %u); Key: %.*s (size = %u, offset = %u, length = %u); source: ",
+			i, keyValueUpdateIt->first.instanceId, keyValueUpdateIt->first.requestId,
+			keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
 			keyValueUpdate.offset, keyValueUpdate.length
 		);
-		if ( keyValueUpdate.ptr )
-			( ( Socket * ) keyValueUpdate.ptr )->printAddress( f );
+		if ( pid.ptr )
+			( ( Socket * ) pid.ptr )->printAddress( f );
 		else
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
@@ -707,22 +755,82 @@ void Slave::printPending( FILE *f ) {
 		it != this->pending.masters.del.end();
 		it++, i++
 	) {
+		const PendingIdentifier &pid = it->first;
 		const Key &key = it->second;
-		fprintf( f, "%lu. ID: %u; Key: %.*s (size = %u); source: ", i, it->first.id, key.size, key.data, key.size );
-		if ( key.ptr )
-			( ( Socket * ) key.ptr )->printAddress( f );
+		fprintf(
+			f, "%lu. ID: (%u, %u); Key: %.*s (size = %u); source: ",
+			i, it->first.instanceId, it->first.requestId,
+			key.size, key.data, key.size
+		);
+		if ( pid.ptr )
+			( ( Socket * ) pid.ptr )->printAddress( f );
 		else
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
 	}
 	UNLOCK( &this->pending.masters.delLock );
 
-	LOCK( &this->pending.slavePeers.updateChunkLock );
+	LOCK( &this->pending.slavePeers.updateLock );
 	fprintf(
 		f,
 		"\n\nPending requests for slave peers\n"
 		"--------------------------------\n"
-		"[UPDATE_CHUNK] Pending: %lu\n",
+		"[UPDATE] Pending: %lu\n",
+		this->pending.slavePeers.update.size()
+	);
+	i = 1;
+	for (
+		keyValueUpdateIt = this->pending.slavePeers.update.begin();
+		keyValueUpdateIt != this->pending.slavePeers.update.end();
+		keyValueUpdateIt++, i++
+	) {
+		const PendingIdentifier &pid = keyValueUpdateIt->first;
+		const KeyValueUpdate &keyValueUpdate = keyValueUpdateIt->second;
+		fprintf(
+			f, "%lu. ID: (%u, %u); Key: %.*s (size = %u, offset = %u, length = %u); source: ",
+			i, keyValueUpdateIt->first.instanceId, keyValueUpdateIt->first.requestId,
+			keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
+			keyValueUpdate.offset, keyValueUpdate.length
+		);
+		if ( pid.ptr )
+			( ( Socket * ) pid.ptr )->printAddress( f );
+		else
+			fprintf( f, "(nil)\n" );
+		fprintf( f, "\n" );
+	}
+	UNLOCK( &this->pending.slavePeers.updateLock );
+
+	LOCK( &this->pending.slavePeers.delLock );
+	fprintf(
+		f,
+		"\n[DELETE] Pending: %lu\n",
+		this->pending.slavePeers.del.size()
+	);
+	i = 1;
+	for (
+		it = this->pending.slavePeers.del.begin();
+		it != this->pending.slavePeers.del.end();
+		it++, i++
+	) {
+		const PendingIdentifier &pid = it->first;
+		const Key &key = it->second;
+		fprintf(
+			f, "%lu. ID: (%u, %u); Key: %.*s (size = %u); source: ",
+			i, it->first.instanceId, it->first.requestId,
+			key.size, key.data, key.size
+		);
+		if ( pid.ptr )
+			( ( Socket * ) pid.ptr )->printAddress( f );
+		else
+			fprintf( f, "(nil)\n" );
+		fprintf( f, "\n" );
+	}
+	UNLOCK( &this->pending.slavePeers.delLock );
+
+	LOCK( &this->pending.slavePeers.updateChunkLock );
+	fprintf(
+		f,
+		"\n[UPDATE_CHUNK] Pending: %lu\n",
 		this->pending.slavePeers.updateChunk.size()
 	);
 	i = 1;
@@ -733,8 +841,9 @@ void Slave::printPending( FILE *f ) {
 	) {
 		const ChunkUpdate &chunkUpdate = chunkUpdateIt->second;
 		fprintf(
-			f, "%lu. ID: %u; List ID: %u, stripe ID: %u, chunk ID: %u; Key: %.*s (key size = %u, offset = %u, length = %u, value update offset = %u); target: ",
-			i, chunkUpdateIt->first.id, chunkUpdate.listId, chunkUpdate.stripeId, chunkUpdate.chunkId,
+			f, "%lu. ID: (%u, %u); List ID: %u, stripe ID: %u, chunk ID: %u; Key: %.*s (key size = %u, offset = %u, length = %u, value update offset = %u); target: ",
+			i, chunkUpdateIt->first.instanceId, chunkUpdateIt->first.requestId,
+			chunkUpdate.listId, chunkUpdate.stripeId, chunkUpdate.chunkId,
 			chunkUpdate.keySize, chunkUpdate.key, chunkUpdate.keySize,
 			chunkUpdate.offset, chunkUpdate.length, chunkUpdate.valueUpdateOffset
 		);
@@ -760,8 +869,9 @@ void Slave::printPending( FILE *f ) {
 	) {
 		const ChunkUpdate &chunkUpdate = chunkUpdateIt->second;
 		fprintf(
-			f, "%lu. ID: %u; List ID: %u, stripe ID: %u, chunk ID: %u; Key: %.*s (key size = %u, offset = %u, length = %u); target: ",
-			i, chunkUpdateIt->first.id, chunkUpdate.listId, chunkUpdate.stripeId, chunkUpdate.chunkId,
+			f, "%lu. ID: (%u, %u); List ID: %u, stripe ID: %u, chunk ID: %u; Key: %.*s (key size = %u, offset = %u, length = %u); target: ",
+			i, chunkUpdateIt->first.instanceId, chunkUpdateIt->first.requestId,
+			chunkUpdate.listId, chunkUpdate.stripeId, chunkUpdate.chunkId,
 			chunkUpdate.keySize, chunkUpdate.key, chunkUpdate.keySize,
 			chunkUpdate.offset, chunkUpdate.length
 		);
@@ -787,8 +897,9 @@ void Slave::printPending( FILE *f ) {
 	) {
 		const ChunkRequest &chunkRequest = chunkRequestIt->second;
 		fprintf(
-			f, "%lu. ID: %u; List ID: %u, stripe ID: %u, chunk ID: %u; chunk: %p; target: ",
-			i, chunkRequestIt->first.id, chunkRequest.listId, chunkRequest.stripeId, chunkRequest.chunkId, chunkRequest.chunk
+			f, "%lu. ID: (%u, %u); List ID: %u, stripe ID: %u, chunk ID: %u; chunk: %p; target: ",
+			i, chunkRequestIt->first.instanceId, chunkRequestIt->first.requestId,
+			chunkRequest.listId, chunkRequest.stripeId, chunkRequest.chunkId, chunkRequest.chunk
 		);
 		if ( chunkRequest.socket )
 			chunkRequest.socket->printAddress( f );
@@ -812,8 +923,9 @@ void Slave::printPending( FILE *f ) {
 	) {
 		const ChunkRequest &chunkRequest = chunkRequestIt->second;
 		fprintf(
-			f, "%lu. ID: %u; List ID: %u, stripe ID: %u, chunk ID: %u; target: ",
-			i, chunkRequestIt->first.id, chunkRequest.listId, chunkRequest.stripeId, chunkRequest.chunkId
+			f, "%lu. ID: (%u, %u); List ID: %u, stripe ID: %u, chunk ID: %u; target: ",
+			i, chunkRequestIt->first.instanceId, chunkRequestIt->first.requestId,
+			chunkRequest.listId, chunkRequest.stripeId, chunkRequest.chunkId
 		);
 		if ( chunkRequest.socket )
 			chunkRequest.socket->printAddress( f );
@@ -830,7 +942,7 @@ void Slave::printPending( FILE *f ) {
 		"\n[REMAP_DATA] Pending: %lu slaves\n",
 		this->pending.slavePeers.remappedData.size()
 	);
-	for ( 
+	for (
 		auto slave = this->pending.slavePeers.remappedData.begin();
 		slave != this->pending.slavePeers.remappedData.end();
 		slave++
@@ -839,10 +951,10 @@ void Slave::printPending( FILE *f ) {
 		Socket::ntoh_ip( slave->first.sin_addr.s_addr, addrstr, INET_ADDRSTRLEN );
 		fprintf( f, "\tSlave %s:%hu\n", addrstr, ntohs( slave->first.sin_port ) );
 		for ( auto record : *slave->second ) {
-			fprintf( 
-				f, 
+			fprintf(
+				f,
 				"\t\t List ID: %u Chunk Id: %u Key: %.*s\n",
-				record.listId, record.chunkId, 
+				record.listId, record.chunkId,
 				record.key.size, record.key.data
 			);
 		}
@@ -870,6 +982,10 @@ void Slave::dump() {
 	this->map.dump();
 }
 
+void Slave::printInstanceId( FILE *f ) {
+	fprintf( f, "Instance ID = %u\n", Slave::instanceId );
+}
+
 void Slave::help() {
 	fprintf(
 		stdout,
@@ -877,19 +993,75 @@ void Slave::help() {
 		"- help: Show this help message\n"
 		"- info: Show configuration\n"
 		"- debug: Show debug messages\n"
+		"- id: Print instance ID\n"
+		"- lookup: Search for the metadata of an input key\n"
 		"- seal: Seal all chunks in the chunk buffer\n"
 		"- flush: Flush all dirty chunks to disk\n"
 		"- metadata: Write metadata to disk\n"
+		"- delay: Add constant delay to each client response\n"
 		"- sync: Synchronize with coordinator\n"
 		"- chunk: Print the debug message for a chunk\n"
 		"- pending: Print all pending requests\n"
 		"- dump: Dump all key-value pairs\n"
 		"- memory: Print memory usage\n"
-		"- load: Show the load of each worker\n"
+		"- backup : Show the backup stats\n"
 		"- time: Show elapsed time\n"
 		"- exit: Terminate this client\n"
 	);
 	fflush( stdout );
+}
+
+void Slave::lookup() {
+	char key[ 256 ];
+	uint8_t keySize;
+
+	printf( "Input key: " );
+	fflush( stdout );
+	if ( ! fgets( key, sizeof( key ), stdin ) ) {
+		fprintf( stderr, "Invalid input!\n" );
+		return;
+	}
+	keySize = ( uint8_t ) strnlen( key, sizeof( key ) ) - 1;
+
+	bool found = false;
+
+	KeyMetadata keyMetadata;
+	if ( this->map.findValueByKey( key, keySize, 0, 0, &keyMetadata, 0, 0 ) ) {
+		printf(
+			"Metadata: (%u, %u, %u); offset: %u, length: %u\n", keyMetadata.listId, keyMetadata.stripeId, keyMetadata.chunkId,
+			keyMetadata.offset, keyMetadata.length
+		);
+		found = true;
+	}
+
+	RemappedKeyValue remappedKeyValue;
+	if ( this->remappedBuffer.find( keySize, key, &remappedKeyValue ) ) {
+		printf( "Remapped key found [%u, %u]: ", remappedKeyValue.listId, remappedKeyValue.chunkId );
+		for ( uint32_t i = 0; i < remappedKeyValue.remappedCount; i++ ) {
+			printf(
+				"%s(%u, %u) |-> (%u, %u)%s",
+				i == 0 ? "" : "; ",
+				remappedKeyValue.original[ i * 2     ],
+				remappedKeyValue.original[ i * 2 + 1 ],
+				remappedKeyValue.remapped[ i * 2     ],
+				remappedKeyValue.remapped[ i * 2 + 1 ],
+				i == remappedKeyValue.remappedCount - 1 ? "\n" : ""
+			);
+		}
+		found = true;
+	}
+
+	bool isSealed;
+	if ( this->degradedChunkBuffer.map.findValueByKey( key, keySize, isSealed, 0, 0, &keyMetadata ) ) {
+		printf(
+			"Reconstructed chunk found: (%u, %u, %u); offset: %u, length: %u; is sealed? %s\n",
+			keyMetadata.listId, keyMetadata.stripeId, keyMetadata.chunkId, keyMetadata.offset, keyMetadata.length,
+			isSealed ? "yes" : "no"
+		);
+	}
+
+	if ( ! found )
+		printf( "Key not found.\n" );
 }
 
 void Slave::time() {
@@ -901,21 +1073,14 @@ void Slave::alarm() {
 	::alarm( this->config.global.sync.timeout );
 }
 
-SlaveLoad &Slave::aggregateLoad( FILE *f ) {
-	this->load.reset();
-	for ( int i = 0, len = this->workers.size(); i < len; i++ ) {
-		SlaveLoad &load = this->workers[ i ].load;
-		this->load.aggregate( load );
-
-		if ( f ) {
-			fprintf( f,	"Load of Worker #%d:\n-------------------\n", i + 1 );
-			load.print( f );
-			fprintf( f, "\n" );
-		}
+void Slave::backupStat( FILE *f ) {
+	fprintf( f, "\nSlave delta backup stats\n============================\n" );
+	for ( int i = 0, len = this->sockets.masters.size(); i < len; i++ ) {
+		fprintf( f,
+			">> Master FD = %u\n-------------------\n",
+			this->sockets.masters.keys[ i ]
+		);
+		this->sockets.masters.values[ i ]->backup.print( f );
+		fprintf( f, "\n" );
 	}
-	if ( f ) {
-		fprintf( f,	"Aggregated load:\n----------------\n" );
-		this->load.print( f );
-	}
-	return this->load;
 }

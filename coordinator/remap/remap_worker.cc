@@ -3,95 +3,111 @@
 #include "../../common/util/debug.hh"
 #include "arpa/inet.h"
 
-#define POLL_ACK_TIME_INTVL	 1   // in seconds
-
 CoordinatorRemapWorker::CoordinatorRemapWorker() {
 }
 
 CoordinatorRemapWorker::~CoordinatorRemapWorker() {
 }
 
-bool CoordinatorRemapWorker::startRemap( RemapStatusEvent event ) {
+bool CoordinatorRemapWorker::transitToDegraded( RemapStateEvent event ) { // Phase 1a --> 2
 	CoordinatorRemapMsgHandler *crmh = CoordinatorRemapMsgHandler::getInstance();
 
 	pthread_mutex_t lock;
 	pthread_mutex_init( &lock, NULL );
 	char buf[ INET_ADDRSTRLEN ];
 	inet_ntop( AF_INET, &event.slave.sin_addr.s_addr, buf, INET_ADDRSTRLEN );
-	// wait for ack, release lock once acquired
+	// wait for "sync meta ack" to proceed, release lock once acquired
+	__DEBUG__( CYAN, "CoordinatorRemapWorker", "transitToDegraded",
+		"Start transition to degraded for slave %s:%u.",
+		buf, ntohs( event.slave.sin_port )
+	);
+
+	// any cleanup to be done (request for metadata sync. and parity revert)
+	// wait for metadata sync to complete
+	crmh->transitToDegradedEnd( event.slave );
+
+	// wait for parity revert to complete
+	// obtaining ack from all masters to ensure all masters already complete reverting parity
+	pthread_mutex_lock( &crmh->ackSignalLock );
 	if ( crmh->isAllMasterAcked( event.slave ) == false )
 		pthread_cond_wait( &crmh->ackSignal[ event.slave ], &crmh->ackSignalLock );
 	pthread_mutex_unlock( &crmh->ackSignalLock );
 
-	LOCK( &crmh->slavesStatusLock[ event.slave ] );
+	LOCK( &crmh->slavesStateLock[ event.slave ] );
 	// for multi-threaded environment, it is possible that other workers change
-	// the status while this worker is waiting
+	// the state while this worker is waiting
 	// just abort and late comers to take over
-	if ( crmh->slavesStatus[ event.slave ] != REMAP_PREPARE_START ) {
-		UNLOCK( &crmh->slavesStatusLock[ event.slave ] );
+	if ( crmh->slavesState[ event.slave ] != REMAP_INTERMEDIATE ) {
+		UNLOCK( &crmh->slavesStateLock[ event.slave ] );
 		return false;
 	}
-	// any cleanup to be done (request for metadata sync.)
-	crmh->startRemapEnd( event.slave );
 
-	// ask master to start remap
-	crmh->slavesStatus[ event.slave ] = REMAP_START; // Phase 4
-	if ( crmh->sendStatusToMasters( event.slave ) == false ) {
-		__ERROR__( "CoordinatorRemapWorker", "stopRemap", 
-			"Failed to broadcast status changes on salve %s:%u!", 
-			buf, event.slave.sin_port 
+	// broadcast to master: the transition is completed
+	crmh->slavesState[ event.slave ] = REMAP_DEGRADED; // Phase 2
+	if ( crmh->sendStateToMasters( event.slave ) == false ) {
+		__ERROR__( "CoordinatorRemapWorker", "transitToDegraded",
+			"Failed to broadcast state changes on slave %s:%u!",
+			buf, ntohs( event.slave.sin_port )
 		);
-		UNLOCK( &crmh->slavesStatusLock[ event.slave ] );
+		UNLOCK( &crmh->slavesStateLock[ event.slave ] );
 		return false;
 	}
 
-	UNLOCK( &crmh->slavesStatusLock[ event.slave ] );
+	UNLOCK( &crmh->slavesStateLock[ event.slave ] );
 	return true;
 }
 
-bool CoordinatorRemapWorker::stopRemap( RemapStatusEvent event ) { // Phase 4 --> 3
+bool CoordinatorRemapWorker::transitToNormal( RemapStateEvent event ) { // Phase 1b --> 0
 	CoordinatorRemapMsgHandler *crmh = CoordinatorRemapMsgHandler::getInstance();
 
 	pthread_mutex_t lock;
 	pthread_mutex_init( &lock, NULL );
 	char buf[ INET_ADDRSTRLEN ];
 	inet_ntop( AF_INET, &event.slave.sin_addr.s_addr, buf, INET_ADDRSTRLEN );
-	// wait for ack, release lock once acquired
+
+	// wait for "all coordinated req. ack", release lock once acquired
+	pthread_mutex_lock( &crmh->ackSignalLock );
 	if ( crmh->isAllMasterAcked( event.slave ) == false )
 		pthread_cond_wait( &crmh->ackSignal[ event.slave ], &crmh->ackSignalLock );
 	pthread_mutex_unlock( &crmh->ackSignalLock );
 
-	LOCK( &crmh->slavesStatusLock[ event.slave ] );
+	LOCK( &crmh->slavesStateLock[ event.slave ] );
 	// for multi-threaded environment, it is possible that other workers change
-	// the tatus while this worker is waiting.
+	// the status while this worker is waiting.
 	// just abort and late comers to take over
-	if ( crmh->slavesStatus[ event.slave ] != REMAP_PREPARE_END ) {
-		UNLOCK( &crmh->slavesStatusLock[ event.slave ] );
+	if ( crmh->slavesState[ event.slave ] != REMAP_COORDINATED ) {
+		__ERROR__(
+			"CoordinatorRemapWorker", "transitToNormal",
+			"State changed to %d: %s:%u.",
+			crmh->slavesState[ event.slave ],
+			buf, ntohs( event.slave.sin_port )
+		);
+		UNLOCK( &crmh->slavesStateLock[ event.slave ] );
 		return false;
 	}
 	// any cleanup to be done
-	crmh->stopRemapEnd( event.slave ); // Prepare for switching to Phase 1 from Phase 3
+	crmh->transitToNormalEnd( event.slave ); // Prepare for switching to Phase 1b from Phase 0
 
 	// ask master to use normal SET workflow
-	crmh->slavesStatus[ event.slave ] = REMAP_NONE ;
-	if ( crmh->sendStatusToMasters( event.slave ) == false ) {
-		__ERROR__( "CoordinatorRemapWorker", "stopRemap", 
-			"Failed to broadcast status changes on salve %s:%u!", 
-			buf, event.slave.sin_port 
+	crmh->slavesState[ event.slave ] = REMAP_NORMAL;
+	if ( crmh->sendStateToMasters( event.slave ) == false ) {
+		__ERROR__( "CoordinatorRemapWorker", "transitToNormal",
+			"Failed to broadcast state changes on slave %s:%u!",
+			buf, ntohs( event.slave.sin_port )
 		);
-		UNLOCK( &crmh->slavesStatusLock[ event.slave ] );
+		UNLOCK( &crmh->slavesStateLock[ event.slave ] );
 		return false;
 	}
-	UNLOCK( &crmh->slavesStatusLock[ event.slave ] );
+	UNLOCK( &crmh->slavesStateLock[ event.slave ] );
 	return true;
 }
 
 void *CoordinatorRemapWorker::run( void* argv ) {
 	CoordinatorRemapMsgHandler *crmh = CoordinatorRemapMsgHandler::getInstance();
 	CoordinatorRemapWorker *worker = ( CoordinatorRemapWorker *) argv;
-	RemapStatusEvent event;
+	RemapStateEvent event;
 	bool ret;
-	
+
 	while ( true ) {
 		ret = crmh->eventQueue->extract( event );
 		if ( ! ret ) {
@@ -101,9 +117,9 @@ void *CoordinatorRemapWorker::run( void* argv ) {
 			continue;
 		}
 		if ( event.start )
-			worker->startRemap( event );
+			worker->transitToDegraded( event );
 		else
-			worker->stopRemap( event );
+			worker->transitToNormal( event );
 	}
 
 	__DEBUG__( BLUE, "CoordinatorRemapWorker", "run" "Worker thread stop running." );

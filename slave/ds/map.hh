@@ -8,9 +8,12 @@
 #include "../../common/ds/metadata.hh"
 #include "../../common/lock/lock.hh"
 #include "../../common/protocol/protocol.hh"
+#include "../../common/timestamp/timestamp.hh"
+#include "../../common/util/debug.hh"
 
 class Map {
 private:
+	Timestamp *timestamp;
 	/**
 	 * Store the mapping between keys and chunks
 	 * Key |-> (list ID, stripe ID, chunk ID, offset, length)
@@ -23,6 +26,13 @@ private:
 	 */
 	std::unordered_map<Metadata, Chunk *> cache;
 	LOCK_T cacheLock;
+
+	/**
+	 * Store the used stripe IDs
+	 * (list ID) |-> std::unordered_set<(stripe ID)>
+	 */
+	std::unordered_map<uint32_t, std::unordered_set<uint32_t>> stripeIds;
+	LOCK_T stripeIdsLock;
 
 public:
 	/**
@@ -37,24 +47,17 @@ public:
 	 */
 	std::unordered_set<Metadata> sealed;
 	LOCK_T sealedLock;
-	/**
-	 * Store the pending-to-send remapping records
-	 * Key |-> (list ID, chunk ID)
-	 */
-	std::unordered_map<Key, RemappingRecord> remap;
-	/**
-	 * Store the alread-sent remapping records
-	 * Key |-> (list ID, chunk ID)
-	 */
-	std::unordered_map<Key, RemappingRecord> remapSent;
-	LOCK_T remapLock;
 
 	Map() {
 		LOCK_INIT( &this->keysLock );
 		LOCK_INIT( &this->cacheLock );
+		LOCK_INIT( &this->stripeIdsLock );
 		LOCK_INIT( &this->opsLock );
 		LOCK_INIT( &this->sealedLock );
-		LOCK_INIT( &this->remapLock );
+	}
+
+	void setTimestamp( Timestamp *timestamp ) {
+		this->timestamp = timestamp;
 	}
 
 	bool findValueByKey( char *data, uint8_t size, KeyValue *keyValue, Key *keyPtr ) {
@@ -139,31 +142,7 @@ public:
 		return it->second;
 	}
 
-	bool findRemappingRecordByKey( char *data, uint8_t size, RemappingRecord *remappingRecordPtr = 0, Key *keyPtr = 0 ) {
-		std::unordered_map<Key, RemappingRecord>::iterator it;
-		Key key;
-
-		key.set( size, data );
-		if ( keyPtr ) *keyPtr = key;
-
-		LOCK( &this->remapLock );
-		// check the sent records
-		it = this->remapSent.find( key );
-		if ( it == this->remapSent.end() ) {
-			// check the unsent records
-			it = this->remap.find( key );
-			if ( it == this->remap.end() ) {
-				UNLOCK( &this->remapLock );
-				return false;
-			}
-		}
-
-		if ( remappingRecordPtr ) *remappingRecordPtr = it->second;
-		UNLOCK( &this->remapLock );
-		return true;
-	}
-
-	bool insertKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata, bool needsLock = true, bool needsUnlock = true, bool needsUpdateOpMetadata = true ) {
+	bool insertKey( Key key, uint8_t opcode, uint32_t &timestamp, KeyMetadata &keyMetadata, bool needsLock = true, bool needsUnlock = true, bool needsUpdateOpMetadata = true ) {
 		key.dup();
 
 		std::pair<Key, KeyMetadata> keyPair( key, keyMetadata );
@@ -177,10 +156,10 @@ public:
 		}
 		if ( needsUnlock ) UNLOCK( &this->keysLock );
 
-		return needsUpdateOpMetadata ? this->insertOpMetadata( opcode, key, keyMetadata ) : true;
+		return needsUpdateOpMetadata ? this->insertOpMetadata( opcode, timestamp, key, keyMetadata ) : true;
 	}
 
-	bool insertOpMetadata( uint8_t opcode, Key key, KeyMetadata keyMetadata, bool dup = true ) {
+	bool insertOpMetadata( uint8_t opcode, uint32_t &timestamp, Key key, KeyMetadata keyMetadata, bool dup = true ) {
 		bool ret;
 		std::unordered_map<Key, OpMetadata>::iterator opsIt;
 		std::pair<std::unordered_map<Key, OpMetadata>::iterator, bool> opRet;
@@ -191,6 +170,8 @@ public:
 			OpMetadata opMetadata;
 			opMetadata.clone( keyMetadata );
 			opMetadata.opcode = opcode;
+			opMetadata.timestamp = this->timestamp->nextVal();
+			timestamp = opMetadata.timestamp;
 
 			if ( dup ) key.dup();
 
@@ -225,35 +206,20 @@ public:
 		return ret.second;
 	}
 
-	bool insertRemappingRecord( Key key, RemappingRecord &remappingRecord ) {
-		key.dup( key.size, key.data );
-
-		std::pair<Key, RemappingRecord> p( key, remappingRecord );
-		std::pair<std::unordered_map<Key, RemappingRecord>::iterator, bool> ret;
-
-		LOCK( &this->remapLock );
-		ret = this->remap.insert( p );
-		if ( ! ret.second ) {
-			UNLOCK( &this->remapLock );
-			return false;
-		}
-		UNLOCK( &this->remapLock );
-
-		KeyMetadata keyMetadata;
-
-		keyMetadata.listId = remappingRecord.listId;
-		keyMetadata.chunkId = remappingRecord.chunkId;
-
-		return this->insertOpMetadata( PROTO_OPCODE_REMAPPING_LOCK, key, keyMetadata, false );
-	}
-
-	void setChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, Chunk *chunk, bool isParity = false ) {
+	void setChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, Chunk *chunk, bool isParity = false, bool needsLock = true, bool needsUnlock = true ) {
 		Metadata metadata;
 		metadata.set( listId, stripeId, chunkId );
 
-		LOCK( &this->cacheLock );
+		if ( needsLock ) LOCK( &this->cacheLock );
+		if ( this->cache.find( metadata ) != this->cache.end() ) {
+			__ERROR__( "Map", "setChunk", "This chunk (%u, %u, %u) already exists.", listId, stripeId, chunkId );
+		}
 		this->cache[ metadata ] = chunk;
-		UNLOCK( &this->cacheLock );
+		if ( needsUnlock ) UNLOCK( &this->cacheLock );
+
+		if ( needsLock ) LOCK( &this->stripeIdsLock );
+		this->stripeIds[ listId ].insert( stripeId );
+		if ( needsUnlock ) UNLOCK( &this->stripeIdsLock );
 
 		if ( ! isParity ) {
 			char *ptr = chunk->getData();
@@ -261,7 +227,7 @@ public:
 			uint8_t keySize;
 			uint32_t valueSize, offset = 0, size;
 
-			LOCK( &this->keysLock );
+			if ( needsLock ) LOCK( &this->keysLock );
 			while( ptr < chunk->getData() + Chunk::capacity ) {
 				KeyValue::deserialize( ptr, keyPtr, keySize, valuePtr, valueSize );
 				if ( keySize == 0 && valueSize == 0 )
@@ -283,11 +249,22 @@ public:
 
 				ptr += size;
 			}
-			UNLOCK( &this->keysLock );
+			if ( needsUnlock ) UNLOCK( &this->keysLock );
 		}
 	}
 
-	bool deleteKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata, bool needsLock, bool needsUnlock, bool needsUpdateOpMetadata = true ) {
+	uint32_t nextStripeID( uint32_t listId, uint32_t from = 0 ) {
+		uint32_t ret = from;
+		LOCK( &this->stripeIdsLock );
+		std::unordered_set<uint32_t> &sids = this->stripeIds[ listId ];
+		std::unordered_set<uint32_t>::iterator end = sids.end();
+		while ( sids.find( ret ) != end )
+			ret++;
+		UNLOCK( &this->stripeIdsLock );
+		return ret;
+	}
+
+	bool deleteKey( Key key, uint8_t opcode, uint32_t &timestamp, KeyMetadata &keyMetadata, bool needsLock, bool needsUnlock, bool needsUpdateOpMetadata = true ) {
 		Key k;
 		std::unordered_map<Key, KeyMetadata>::iterator keysIt;
 		std::unordered_map<Key, OpMetadata>::iterator opsIt;
@@ -305,7 +282,7 @@ public:
 		}
 		if ( needsUnlock ) UNLOCK( &this->keysLock );
 
-		return needsUpdateOpMetadata ? this->insertOpMetadata( opcode, key, keyMetadata ) : true;
+		return needsUpdateOpMetadata ? this->insertOpMetadata( opcode, timestamp, key, keyMetadata ) : true;
 	}
 
 	void getKeysMap( std::unordered_map<Key, KeyMetadata> *&keys, LOCK_T *&lock ) {

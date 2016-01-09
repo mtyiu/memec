@@ -10,21 +10,28 @@ void SlaveSocket::setArrayMap( ArrayMap<int, SlaveSocket> *slaves ) {
 }
 
 bool SlaveSocket::start() {
+	LOCK_INIT( &this->timestamp.pendingAck.updateLock );
+	LOCK_INIT( &this->timestamp.pendingAck.delLock );
+	LOCK_INIT( &this->ackParityDeltaBackupLock );
+
 	this->registered = false;
 	if ( this->connect() ) {
-		Master *master = Master::getInstance();
-		SlaveEvent event;
-		event.reqRegister( this, master->config.master.master.addr.addr, master->config.master.master.addr.port );
-		master->eventQueue.insert( event );
 		return true;
 	}
 	return false;
 }
 
-void SlaveSocket::stop() {
-	int newFd = - this->sockfd;
+void SlaveSocket::registerMaster() {
+	Master *master = Master::getInstance();
+	SlaveEvent event;
+	event.reqRegister( this, master->config.master.master.addr.addr, master->config.master.master.addr.port );
+	master->eventQueue.insert( event );
+}
 
+void SlaveSocket::stop() {
+	int newFd = -INT_MIN + this->sockfd;
 	SlaveSocket::slaves->replaceKey( this->sockfd, newFd );
+	this->sockfd = newFd;
 	Socket::stop();
 }
 

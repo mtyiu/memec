@@ -9,6 +9,7 @@ private:
 	static ArrayMap<int, MasterSocket> *masters;
 
 public:
+	uint16_t instanceId;
 	struct {
 		uint32_t addr;
 		uint16_t port;

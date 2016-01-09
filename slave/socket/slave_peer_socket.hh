@@ -18,6 +18,7 @@ public:
 	volatile bool registered;
 	char *identifier;
 	bool self;
+	uint16_t instanceId;
 
 	SlavePeerSocket();
 	static void setArrayMap( ArrayMap<int, SlavePeerSocket> *slavePeers );

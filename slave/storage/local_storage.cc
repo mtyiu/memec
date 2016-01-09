@@ -119,7 +119,7 @@ ssize_t LocalStorage::write( Chunk *chunk, bool sync, long offset, size_t length
 	}
 	ret = ::write( fd, chunk->getData() + offset, length );
 	if ( ret == -1 ) {
-		__ERROR__( "LocalStorage", "write", "write(): %s", strerror( errno ) );
+		__ERROR__( "LocalStorage", "write", "write(): %s (data: %p, offset = %ld)", strerror( errno ), chunk->getData(), offset );
 	} else {
 		if ( ret < ( ssize_t ) length ) {
 			__ERROR__( "LocalStorage", "write", "write(): Number of bytes written is fewer than the specified size." );

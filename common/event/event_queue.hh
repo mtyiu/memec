@@ -52,6 +52,11 @@ public:
 		ret = this->queue->Extract( &event ) == 0;
 		return ret;
 	}
+
+	inline int count( size_t *size = 0 ) {
+		if ( size ) *size = this->config.size;
+		return this->queue->GetCount();
+	}
 };
 
 #endif

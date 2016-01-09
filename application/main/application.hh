@@ -47,6 +47,7 @@ public:
 	IDGenerator idGenerator;
 	Pending pending;
 	ApplicationEventQueue eventQueue;
+	static uint16_t instanceId;
 
 	static Application *getInstance() {
 		static Application application;

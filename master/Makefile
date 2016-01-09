@@ -5,13 +5,20 @@ LIBS=-pthread
 BIN=$(PLIO_SRC_ROOT)/bin/master
 
 OBJS= \
+	backup/backup.o \
 	config/master_config.o \
 	ds/pending.o \
 	event/application_event.o \
 	event/coordinator_event.o \
 	event/master_event.o \
 	event/slave_event.o \
-	protocol/protocol.o \
+	protocol/degraded_protocol.o \
+	protocol/fault_protocol.o \
+	protocol/load_protocol.o \
+	protocol/normal_protocol.o \
+	protocol/register_protocol.o \
+	protocol/remap_protocol.o \
+	protocol/replay_protocol.o \
 	remap/basic_remap_scheme.o \
 	remap/remap_msg_handler.o \
 	socket/application_socket.o \
@@ -19,6 +26,12 @@ OBJS= \
 	socket/master_socket.o \
 	socket/slave_socket.o \
 	worker/worker.o \
+	worker/application_worker.o \
+	worker/coordinator_worker.o \
+	worker/degraded_worker.o \
+	worker/recovery_worker.o \
+	worker/remap_worker.o \
+	worker/slave_worker.o \
 	main/master.o \
 	main/main.o
 
@@ -27,11 +40,21 @@ EXTERNAL_LIB= \
 	$(PLIO_SRC_ROOT)/common/config/global_config.o \
 	$(PLIO_SRC_ROOT)/common/config/server_addr.o \
 	$(PLIO_SRC_ROOT)/common/ds/bitmask_array.o \
+	$(PLIO_SRC_ROOT)/common/ds/instance_id_generator.o \
 	$(PLIO_SRC_ROOT)/common/ds/key_value.o \
 	$(PLIO_SRC_ROOT)/common/ds/latency.o \
 	$(PLIO_SRC_ROOT)/common/ds/load.o \
 	$(PLIO_SRC_ROOT)/common/ds/sockaddr_in.o \
 	$(PLIO_SRC_ROOT)/common/protocol/protocol.o \
+	$(PLIO_SRC_ROOT)/common/protocol/ack_protocol.o \
+	$(PLIO_SRC_ROOT)/common/protocol/address_protocol.o \
+	$(PLIO_SRC_ROOT)/common/protocol/degraded_protocol.o \
+	$(PLIO_SRC_ROOT)/common/protocol/fault_protocol.o \
+	$(PLIO_SRC_ROOT)/common/protocol/heartbeat_protocol.o \
+	$(PLIO_SRC_ROOT)/common/protocol/load_protocol.o \
+	$(PLIO_SRC_ROOT)/common/protocol/normal_protocol.o \
+	$(PLIO_SRC_ROOT)/common/protocol/remap_protocol.o \
+	$(PLIO_SRC_ROOT)/common/protocol/slave_sync_remap_protocol.o \
 	$(PLIO_SRC_ROOT)/common/remap/remap_msg_handler.o \
 	$(PLIO_SRC_ROOT)/common/socket/socket.o \
 	$(PLIO_SRC_ROOT)/common/socket/epoll.o \

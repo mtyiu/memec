@@ -5,27 +5,82 @@
 #include <set>
 #include <unordered_set>
 #include <unordered_map>
+#include "../socket/slave_socket.hh"
 #include "../../common/lock/lock.hh"
 #include "../../common/ds/sockaddr_in.hh"
 #include "../../common/ds/pending.hh"
 #include "../../common/util/debug.hh"
+#include "../../common/util/time.hh"
 
-class PendingRecovery {
+class PendingReconstruction {
 public:
 	uint32_t listId;
 	uint32_t chunkId;
+	uint32_t remaining;
+	uint32_t total;
 	std::unordered_set<uint32_t> stripeIds;
+	pthread_mutex_t lock;
+	pthread_cond_t cond;
+
+	PendingReconstruction() {
+		pthread_mutex_init( &this->lock, 0 );
+		pthread_cond_init( &this->cond, 0 );
+	}
 
 	void set( uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds ) {
 		this->listId = listId;
 		this->chunkId = chunkId;
 		this->stripeIds = stripeIds;
+		this->total = ( uint32_t ) this->stripeIds.size();
+		this->remaining = this->total;
 	}
+};
+
+class PendingRecovery {
+public:
+	uint32_t addr;
+	uint16_t port;
+	uint32_t remaining;
+	uint32_t total;
+	struct timespec startTime;
+	SlaveSocket *socket;
+	SlaveSocket *original;
+
+	PendingRecovery( uint32_t addr, uint16_t port, uint32_t total, struct timespec startTime, SlaveSocket *socket, SlaveSocket *original ) {
+		this->addr = addr;
+		this->port = port;
+		this->remaining = total;
+		this->total = total;
+		this->startTime = startTime;
+		this->socket = socket;
+		this->original = original;
+	}
+};
+
+struct PendingRemapSync {
+	uint32_t count;
+	pthread_mutex_t *lock;
+	pthread_cond_t *cond;
+	bool *done;
 };
 
 struct PendingDegradedLock {
 	uint32_t count;
+	pthread_mutex_t *lock;
+	pthread_cond_t *cond;
 	bool *done;
+};
+
+struct PendingTransition {
+	pthread_mutex_t lock;
+	pthread_cond_t cond;
+	uint32_t pending;
+
+	PendingTransition() {
+		pthread_mutex_init( &this->lock, 0 );
+		pthread_cond_init( &this->cond, 0 );
+		this->pending = 0;
+	}
 };
 
 class Pending {
@@ -40,6 +95,17 @@ private:
 	LOCK_T releaseDegradedLockLock;
 
 	/*
+	 * State transition: (normal -> intermediate) or (degraded -> coordinated normal)
+	 * (Slave instance ID) |-> PendingTransition
+	 */
+	struct {
+		LOCK_T intermediateLock;
+		LOCK_T coordinatedLock;
+		std::unordered_map<uint16_t, PendingTransition> intermediate;
+		std::unordered_map<uint16_t, PendingTransition> coordinated;
+	} transition;
+
+	/*
 	 * syncRemappingRecordCounters: ( packet id, counter for a sync operation )
 	 * syncRemappingRecordCountersReverse: ( counter for a sync operation, set of packet ids associated )
 	 * syncRemappingRecordIndicators: ( counter for a sync operations, indicator whether the op is completed )
@@ -50,11 +116,14 @@ private:
 	std::map<std::map<struct sockaddr_in, uint32_t>*, bool*> syncRemappingRecordIndicators;
 	LOCK_T syncRemappingRecordLock;
 
-	std::map<struct sockaddr_in, Key> syncRemappedParity;
-	LOCK_T syncRemappedParityLock;
+	std::unordered_map<PendingIdentifier, PendingReconstruction> reconstruction;
+	LOCK_T reconstructionLock;
 
-	std::unordered_map<uint32_t, std::pair< std::set<struct sockaddr_in>*, pthread_cond_t* > > syncRemappedParityRequest;
-	LOCK_T syncRemappedParityRequestLock;
+	std::map<struct sockaddr_in, Key> syncRemappedData;
+	LOCK_T syncRemappedDataLock;
+
+	std::unordered_map<uint32_t, PendingRemapSync> syncRemappedDataRequest;
+	LOCK_T syncRemappedDataRequestLock;
 
 	std::unordered_map<PendingIdentifier, PendingRecovery> recovery;
 	LOCK_T recoveryLock;
@@ -63,19 +132,85 @@ public:
 	Pending() {
 		LOCK_INIT( &this->syncMetaLock );
 		LOCK_INIT( &this->releaseDegradedLockLock );
+		LOCK_INIT( &this->transition.intermediateLock );
+		LOCK_INIT( &this->transition.coordinatedLock );
 		LOCK_INIT( &this->syncRemappingRecordLock );
+		LOCK_INIT( &this->reconstructionLock );
 		LOCK_INIT( &this->recoveryLock );
-		LOCK_INIT( &this->syncRemappedParityLock );
-		LOCK_INIT( &this->syncRemappedParityRequestLock );
+		LOCK_INIT( &this->syncRemappedDataLock );
+		LOCK_INIT( &this->syncRemappedDataRequestLock );
 	}
 
 	~Pending() {}
 
-	bool insertRecovery( uint32_t id, uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds ) {
-		PendingIdentifier pid( id, id, 0 );
-		PendingRecovery r;
+	bool insertReconstruction( uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds, pthread_mutex_t *&lock, pthread_cond_t *&cond ) {
+		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
+		PendingReconstruction r;
 
 		r.set( listId, chunkId, stripeIds );
+
+		std::pair<PendingIdentifier, PendingReconstruction> p( pid, r );
+		std::pair<std::unordered_map<PendingIdentifier, PendingReconstruction>::iterator, bool> ret;
+
+		LOCK( &this->reconstructionLock );
+		ret = this->reconstruction.insert( p );
+		lock = &( ret.first )->second.lock;
+		cond = &( ret.first )->second.cond;
+		UNLOCK( &this->reconstructionLock );
+
+		return ret.second;
+	}
+
+	std::unordered_set<uint32_t> *findReconstruction( uint16_t instanceId, uint32_t requestId, uint32_t &listId, uint32_t &chunkId ) {
+		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
+		std::unordered_map<PendingIdentifier, PendingReconstruction>::iterator it;
+
+		LOCK( &this->reconstructionLock );
+		it = this->reconstruction.find( pid );
+		if ( it == this->reconstruction.end() ) {
+			UNLOCK( &this->reconstructionLock );
+			return 0;
+		}
+		listId = it->second.listId;
+		chunkId = it->second.chunkId;
+		UNLOCK( &this->reconstructionLock );
+
+		return &( it->second.stripeIds );
+	}
+
+	bool eraseReconstruction( uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t numStripes, uint32_t &remaining ) {
+		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
+		std::unordered_map<PendingIdentifier, PendingReconstruction>::iterator it;
+		bool ret;
+
+		LOCK( &this->reconstructionLock );
+		it = this->reconstruction.find( pid );
+		if ( it == this->reconstruction.end() ) {
+			UNLOCK( &this->reconstructionLock );
+			return false;
+		}
+		ret = ( listId == it->second.listId && chunkId == it->second.chunkId && it->second.remaining >= numStripes );
+		if ( ret ) {
+			pthread_cond_signal( &it->second.cond );
+			it->second.remaining -= numStripes;
+			remaining = it->second.remaining;
+			if ( it->second.remaining == 0 )
+				this->reconstruction.erase( it );
+		} else {
+			printf(
+				"(%u, %u, %u) vs. (%u, %u, %u)\n",
+				listId, chunkId, numStripes,
+				it->second.listId, it->second.chunkId, it->second.remaining
+			);
+		}
+		UNLOCK( &this->reconstructionLock );
+
+		return ret;
+	}
+
+	bool insertRecovery( uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t total, struct timespec startTime, SlaveSocket *socket, SlaveSocket *original ) {
+		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
+		PendingRecovery r( addr, port, total, startTime, socket, original );
 
 		std::pair<PendingIdentifier, PendingRecovery> p( pid, r );
 		std::pair<std::unordered_map<PendingIdentifier, PendingRecovery>::iterator, bool> ret;
@@ -87,24 +222,42 @@ public:
 		return ret.second;
 	}
 
-	std::unordered_set<uint32_t> *findRecovery( uint32_t id, uint32_t &listId, uint32_t &chunkId ) {
-		PendingIdentifier pid( id, id, 0 );
+	bool eraseRecovery( uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t numReconstructed, SlaveSocket *socket, uint32_t &remaining, uint32_t &total, double &elapsedTime, SlaveSocket *&original ) {
+		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
 		std::unordered_map<PendingIdentifier, PendingRecovery>::iterator it;
+		bool ret;
 
 		LOCK( &this->recoveryLock );
 		it = this->recovery.find( pid );
 		if ( it == this->recovery.end() ) {
 			UNLOCK( &this->recoveryLock );
-			return 0;
+			return false;
 		}
-		listId = it->second.listId;
-		chunkId = it->second.chunkId;
+		ret = ( addr == it->second.addr && port == it->second.port && it->second.remaining >= numReconstructed && socket == it->second.socket );
+		if ( ret ) {
+			it->second.remaining -= numReconstructed;
+			remaining = it->second.remaining;
+			total = it->second.total;
+			elapsedTime = get_elapsed_time( it->second.startTime );
+			original = it->second.original;
+			if ( it->second.remaining == 0 )
+				this->recovery.erase( it );
+		} else {
+			printf(
+				"(%u, %u, %u, %p) vs. (%u, %u, %u, %p)\n",
+				addr, port, numReconstructed, socket,
+				it->second.addr,
+				it->second.port,
+				it->second.remaining,
+				it->second.socket
+			);
+		}
 		UNLOCK( &this->recoveryLock );
 
-		return &( it->second.stripeIds );
+		return ret;
 	}
 
-	void addReleaseDegradedLock( uint32_t id, uint32_t count, bool *done ) {
+	void addReleaseDegradedLock( uint32_t id, uint32_t count, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done ) {
 		std::unordered_map<uint32_t, PendingDegradedLock>::iterator it;
 
 		LOCK( &this->releaseDegradedLockLock );
@@ -112,6 +265,8 @@ public:
 		if ( it == this->releaseDegradedLock.end() ) {
 			PendingDegradedLock v;
 			v.count = count;
+			v.lock = lock;
+			v.cond = cond;
 			v.done = done;
 
 			this->releaseDegradedLock[ id ] = v;
@@ -121,16 +276,20 @@ public:
 		UNLOCK( &this->releaseDegradedLockLock );
 	}
 
-	bool *removeReleaseDegradedLock( uint32_t id, uint32_t count ) {
+	void removeReleaseDegradedLock( uint32_t id, uint32_t count, pthread_mutex_t *&lock, pthread_cond_t *&cond, bool *&done ) {
 		std::unordered_map<uint32_t, PendingDegradedLock>::iterator it;
 
-		bool *done = 0;
+		lock = 0;
+		cond = 0;
+		done = 0;
 
 		LOCK( &this->releaseDegradedLockLock );
 		it = this->releaseDegradedLock.find( id );
 		if ( it != this->releaseDegradedLock.end() ) {
 			it->second.count -= count;
 			if ( it->second.count == 0 ) {
+				lock = it->second.lock;
+				cond = it->second.cond;
 				done = it->second.done;
 				this->releaseDegradedLock.erase( it );
 			}
@@ -138,7 +297,53 @@ public:
 			__ERROR__( "Pending", "removeReleaseDegradedLock", "ID: %u Not found.\n", id );
 		}
 		UNLOCK( &this->releaseDegradedLockLock );
-		return done;
+	}
+
+	bool addPendingTransition( uint16_t instanceId, bool isDegraded, uint32_t pending ) {
+		pthread_mutex_t *lock = isDegraded ? &this->transition.intermediateLock : &this->transition.coordinatedLock;
+		std::unordered_map<uint16_t, PendingTransition>::iterator it;
+		std::unordered_map<uint16_t, PendingTransition> &map = isDegraded ? this->transition.intermediate : this->transition.coordinated;
+		bool ret = true;
+
+		pthread_mutex_lock( lock );
+		it = map.find( instanceId );
+		if ( it == map.end() ) {
+			map[ instanceId ] = PendingTransition();
+			PendingTransition &transition = map[ instanceId ];
+			transition.pending = pending;
+		} else {
+			ret = false;
+		}
+		pthread_mutex_unlock( lock );
+
+		return ret;
+	}
+
+	PendingTransition *findPendingTransition( uint16_t instanceId, bool isDegraded ) {
+		pthread_mutex_t *lock = isDegraded ? &this->transition.intermediateLock : &this->transition.coordinatedLock;
+		std::unordered_map<uint16_t, PendingTransition>::iterator it;
+		std::unordered_map<uint16_t, PendingTransition> &map = isDegraded ? this->transition.intermediate : this->transition.coordinated;
+		PendingTransition *ret = 0;
+
+		pthread_mutex_lock( lock );
+		it = map.find( instanceId );
+		if ( it != map.end() )
+			ret = &( it->second );
+		pthread_mutex_unlock( lock );
+
+		return ret;
+	}
+
+	bool erasePendingTransition( uint16_t instanceId, bool isDegraded ) {
+		pthread_mutex_t *lock = isDegraded ? &this->transition.intermediateLock : &this->transition.coordinatedLock;
+		std::unordered_map<uint16_t, PendingTransition> &map = isDegraded ? this->transition.intermediate : this->transition.coordinated;
+		bool ret;
+
+		pthread_mutex_lock( lock );
+		ret = map.erase( instanceId ) > 0;
+		pthread_mutex_unlock( lock );
+
+		return ret;
 	}
 
 	void addSyncMetaReq( uint32_t id, bool* sync ) {
@@ -232,35 +437,47 @@ public:
 		return map;
 	}
 
-	bool insertRemappedParityRequest( uint32_t id, std::set<struct sockaddr_in> *counter, pthread_cond_t *cond ) {
+	bool insertRemappedDataRequest( uint32_t id, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done, uint32_t count ) {
+		PendingRemapSync pendingRemapSync;
 		bool ret = false;
-		LOCK( &this->syncRemappedParityRequestLock );
-		if ( this->syncRemappedParityRequest.count( id ) == 0 ) {
-			this->syncRemappedParityRequest[ id ].first = counter;
-			this->syncRemappedParityRequest[ id ].second = cond;
+
+		pendingRemapSync.lock = lock;
+		pendingRemapSync.cond = cond;
+		pendingRemapSync.done = done;
+		pendingRemapSync.count = count;
+
+		LOCK( &this->syncRemappedDataRequestLock );
+		if ( this->syncRemappedDataRequest.count( id ) == 0 ) {
+			this->syncRemappedDataRequest[ id ] = pendingRemapSync;
 			ret = true;
 		}
-		UNLOCK( &this->syncRemappedParityRequestLock );
+		UNLOCK( &this->syncRemappedDataRequestLock );
 		return ret;
 	}
-	
-	bool decrementRemappedParityRequest( uint32_t id, struct sockaddr_in target, std::set<struct sockaddr_in> **counter, pthread_cond_t **cond ) {
-		LOCK( &this->syncRemappedParityRequestLock );
-		auto it = this->syncRemappedParityRequest.find( id );
-		bool ret = ( it != this->syncRemappedParityRequest.end() );
-		if ( ret ) {
-			it->second.first->erase( target );
-			if ( cond ) *cond = it->second.second;
-			if ( counter ) { 
-				if ( ! it->second.first->empty() ) {
-					*counter = it->second.first;
-				} else {
-					*counter = 0;
-					this->syncRemappedParityRequest.erase( id );
-				}
+
+	bool decrementRemappedDataRequest( uint32_t id, struct sockaddr_in target, pthread_mutex_t *&lock, pthread_cond_t *&cond, bool *&done, bool &isCompleted ) {
+		LOCK( &this->syncRemappedDataRequestLock );
+		std::unordered_map<uint32_t, PendingRemapSync>::iterator it = this->syncRemappedDataRequest.find( id );
+		bool ret = ( it != this->syncRemappedDataRequest.end() );
+
+		isCompleted = false;
+
+		if ( it != this->syncRemappedDataRequest.end() ) {
+			PendingRemapSync &pendingRemapSync = it->second;
+			pendingRemapSync.count--;
+			if ( pendingRemapSync.count ) {
+				lock = 0;
+				cond = 0;
+				done = 0;
+			} else {
+				lock = pendingRemapSync.lock;
+				cond = pendingRemapSync.cond;
+				done = pendingRemapSync.done;
+				isCompleted = true;
+				this->syncRemappedDataRequest.erase( it );
 			}
 		}
-		UNLOCK( &this->syncRemappedParityRequestLock );
+		UNLOCK( &this->syncRemappedDataRequestLock );
 		return ret;
 	}
 

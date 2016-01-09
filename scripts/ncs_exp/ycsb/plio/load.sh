@@ -3,7 +3,7 @@
 YCSB_PATH=~/mtyiu/ycsb/0.3.0
 
 if [ $# != 1 ]; then
-	echo "Usage: $0 [Number of threads] [Output file of raw datapoints]"
+	echo "Usage: $0 [Number of threads]"
 	exit 1
 fi
 

@@ -5,9 +5,10 @@ void SlaveEvent::pending( SlaveSocket *socket ) {
 	this->socket = socket;
 }
 
-void SlaveEvent::resRegister( SlaveSocket *socket, uint32_t id, bool success ) {
+void SlaveEvent::resRegister( SlaveSocket *socket, uint16_t instanceId, uint32_t requestId, bool success ) {
 	this->type = success ? SLAVE_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS : SLAVE_EVENT_TYPE_REGISTER_RESPONSE_FAILURE;
-	this->id = id;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
 	this->socket = socket;
 }
 
@@ -38,19 +39,42 @@ void SlaveEvent::reqSyncMeta( SlaveSocket *socket, bool *sync ) {
 	this->message.sync = sync;
 }
 
-void SlaveEvent::syncRemappedParity( SlaveSocket *socket, Packet *packet ) {
+void SlaveEvent::syncRemappedData( SlaveSocket *socket, Packet *packet ) {
 	this->type = SLAVE_EVENT_TYPE_PARITY_MIGRATE;
 	this->socket = socket;
 	this->message.parity.packet = packet;
 }
 
-void SlaveEvent::reqReleaseDegradedLock( SlaveSocket *socket, bool *done ) {
+void SlaveEvent::reqReleaseDegradedLock( SlaveSocket *socket, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done ) {
 	this->type = SLAVE_EVENT_TYPE_REQUEST_RELEASE_DEGRADED_LOCK;
 	this->socket = socket;
+	this->message.degraded.lock = lock;
+	this->message.degraded.cond = cond;
 	this->message.degraded.done = done;
+}
+
+void SlaveEvent::resHeartbeat( SlaveSocket *socket, uint32_t timestamp, uint32_t sealed, uint32_t keys, bool isLast ) {
+	this->type = SLAVE_EVENT_TYPE_RESPONSE_HEARTBEAT;
+	this->socket = socket;
+	this->message.heartbeat.timestamp = timestamp;
+	this->message.heartbeat.sealed = sealed;
+	this->message.heartbeat.keys = keys;
+	this->message.heartbeat.isLast = isLast;
+}
+
+void SlaveEvent::triggerReconstruction( struct sockaddr_in addr ) {
+	this->type = SLAVE_EVENT_TYPE_TRIGGER_RECONSTRUCTION;
+	this->message.addr = addr;
 }
 
 void SlaveEvent::disconnect( SlaveSocket *socket ) {
 	this->type = SLAVE_EVENT_TYPE_DISCONNECT;
+	this->socket = socket;
+}
+
+void SlaveEvent::ackCompletedReconstruction( SlaveSocket *socket, uint16_t instanceId, uint32_t requestId, bool success ) {
+	this->type = success ? SLAVE_EVENT_TYPE_ACK_RECONSTRUCTION_SUCCESS : SLAVE_EVENT_TYPE_ACK_RECONSTRUCTION_FAILURE;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
 	this->socket = socket;
 }

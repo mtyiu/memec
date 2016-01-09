@@ -81,73 +81,9 @@ public:
 class OpMetadata : public Metadata {
 public:
 	uint8_t opcode;
+	uint32_t timestamp;
 };
 
-class RemappingRecord {
-public:
-	bool sent;
-	bool valid;
-	uint32_t listId, chunkId;
-	void *ptr;
-
-	RemappingRecord() {
-		this->sent = false;
-		this->valid = false;
-		this->listId = 0;
-		this->chunkId = 0;
-		this->ptr = 0;
-	}
-
-	RemappingRecord( uint32_t listId, uint32_t chunkId, void *ptr = 0 ) {
-		this->sent = false;
-		this->valid = true;
-		this->set( listId, chunkId, ptr );
-	}
-
-	void set( uint32_t listId, uint32_t chunkId, void *ptr = 0 ) {
-		this->listId = listId;
-		this->chunkId = chunkId;
-		this->ptr = ptr;
-		this->valid = true;
-	}
-
-	void invalid() {
-		this->valid = false;
-		this->sent = false;
-	}
-
-	bool operator== ( const RemappingRecord &r ) {
-		return ( this->listId == r.listId && this->chunkId == r.chunkId );
-	}
-
-	bool operator!= ( const RemappingRecord &r ) {
-		return ( this->listId != r.listId || this->chunkId != r.chunkId );
-	}
-};
-
-class DegradedLock {
-public:
-	uint32_t srcListId;
-	uint32_t srcStripeId;
-	uint32_t srcChunkId;
-	uint32_t dstListId;
-	uint32_t dstChunkId;
-
-	DegradedLock() {
-		this->srcListId = 0;
-		this->srcStripeId = 0;
-		this->srcChunkId = 0;
-		this->dstListId = 0;
-		this->dstChunkId = 0;
-	}
-
-	void set( uint32_t srcListId, uint32_t srcStripeId, uint32_t srcChunkId, uint32_t dstListId, uint32_t dstChunkId ) {
-		this->srcListId = srcListId;
-		this->srcStripeId = srcStripeId;
-		this->srcChunkId = srcChunkId;
-		this->dstListId = dstListId;
-		this->dstChunkId = dstChunkId;
-	}
-};
+class MetadataBackup : public OpMetadata {};
 
 #endif

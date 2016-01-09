@@ -51,13 +51,17 @@ public:
 		uint32_t updateInterval;
 	} loadingStats;
 	struct {
-		bool forceEnabled;
+		bool disableRemappingSet;
 		bool forceNoCacheRecords;
+		uint32_t backgroundAck;
 	} remap;
 	struct {
 		bool isFixed;
 		bool disabled;
 	} degraded;
+	struct {
+		uint32_t ackBatchSize; /* no. of request */
+	} backup;
 
 	MasterConfig();
 	bool merge( GlobalConfig &globalConfig );
