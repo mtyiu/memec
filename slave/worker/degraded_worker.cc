@@ -144,7 +144,8 @@ bool SlaveWorker::handleDegradedGetRequest( MasterEvent event, char *buf, size_t
 			event.instanceId, event.requestId,
 			listId, stripeId, chunkId,
 			&key, header.isSealed,
-			header.original, header.reconstructed, header.reconstructedCount
+			header.original, header.reconstructed, header.reconstructedCount,
+			0, event.timestamp
 		);
 
 		if ( ! ret ) {
@@ -266,7 +267,9 @@ bool SlaveWorker::handleDegradedUpdateRequest( MasterEvent event, char *buf, siz
 				keyValueUpdate.offset,
 				valueUpdate,
 				true /* isSealed */,
-				true /* isUpdate */
+				true /* isUpdate */,
+				event.timestamp,
+				event.socket
 			);
 		} else {
 			// Send UPDATE request to the parity slaves
@@ -302,7 +305,9 @@ bool SlaveWorker::handleDegradedUpdateRequest( MasterEvent event, char *buf, siz
 				keyValueUpdate.offset,
 				valueUpdate,
 				false /* isSealed */,
-				true /* isUpdate */
+				true /* isUpdate */,
+				event.timestamp,
+				event.socket
 			);
 		}
 	} else if ( chunk ) {
@@ -333,7 +338,8 @@ force_degraded_read:
 			listId, stripeId, chunkId,
 			&key, header.isSealed,
 			header.original, header.reconstructed, header.reconstructedCount,
-			&keyValueUpdate
+			&keyValueUpdate,
+			event.timestamp
 		);
 
 		if ( ! ret ) {
@@ -431,7 +437,9 @@ bool SlaveWorker::handleDegradedDeleteRequest( MasterEvent event, char *buf, siz
 				0,   /* valueUpdateOffset */
 				delta,
 				true /* isSealed */,
-				false /* isUpdate */
+				false /* isUpdate */,
+				event.timestamp,
+				event.socket
 			);
 		} else {
 			uint32_t tmp = 0;
@@ -452,7 +460,9 @@ bool SlaveWorker::handleDegradedDeleteRequest( MasterEvent event, char *buf, siz
 				// not needed for deleting a key-value pair in an unsealed chunk:
 				0, 0, 0, 0,
 				false /* isSealed */,
-				false /* isUpdate */
+				false /* isUpdate */,
+				event.timestamp,
+				event.socket
 			);
 		}
 	} else if ( chunk ) {
@@ -471,7 +481,8 @@ bool SlaveWorker::handleDegradedDeleteRequest( MasterEvent event, char *buf, siz
 			event.instanceId, event.requestId,
 			listId, stripeId, chunkId,
 			&key, header.isSealed,
-			header.original, header.reconstructed, header.reconstructedCount
+			header.original, header.reconstructed, header.reconstructedCount,
+			0, event.timestamp
 		);
 
 		if ( ! ret ) {
@@ -489,7 +500,7 @@ bool SlaveWorker::performDegradedRead(
 	uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 	Key *key, bool isSealed,
 	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
-	KeyValueUpdate *keyValueUpdate
+	KeyValueUpdate *keyValueUpdate, uint32_t timestamp
 ) {
 	Key mykey;
 	SlavePeerEvent event;
@@ -561,7 +572,8 @@ bool SlaveWorker::performDegradedRead(
 	op.set(
 		opcode, isSealed, masterSocket,
 		listId, stripeId, chunkId,
-		original, reconstructed, reconstructedCount, true
+		original, reconstructed, reconstructedCount,
+		timestamp, true
 	);
 	if ( opcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
 		op.data.keyValueUpdate = *keyValueUpdate;

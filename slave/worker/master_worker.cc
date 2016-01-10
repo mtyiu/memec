@@ -549,7 +549,9 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, struct KeyHeader &head
 				event.instanceId, event.requestId, key.size, key.data,
 				metadata, keyMetadata.offset, deltaSize, 0, delta,
 				chunkBufferIndex == -1 /* isSealed */,
-				false /* isUpdate */
+				false /* isUpdate */,
+				event.timestamp,
+				event.socket
 			);
 		} else {
 			uint32_t timestamp = SlaveWorker::timestamp->nextVal();
