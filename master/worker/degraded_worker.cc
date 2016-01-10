@@ -178,6 +178,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 						return false;
 					}
 					applicationEvent.resGet( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, key );
+					// printf( "handleDegradedLockResponse(): Key %.*s not found.\n", key.size, key.data );
 					MasterWorker::eventQueue->insert( applicationEvent );
 					return true;
 			}

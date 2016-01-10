@@ -118,8 +118,9 @@ public class Main implements Runnable {
 
 					if ( ret ) {
 						ret = v.equals( value );
-						if ( ! ret )
-							System.out.println( "Value mismatch: " + v.length() + " vs. " + value.length() );
+						if ( ! ret ) {
+							System.out.println( "Value mismatch (key: " + key + "): (wrong) " + v.length() + " vs. (correct) " + value.length() );
+						}
 					}
 
 					this.completed[ 1 ]++;

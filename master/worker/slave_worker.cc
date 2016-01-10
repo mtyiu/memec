@@ -460,6 +460,10 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, bool isDeg
 				false
 			);
 		} else {
+			event.socket->printAddress();
+			printf( "handleGetResponse(): Key %.*s not found.\n", key.size, key.data );
+			Master::getInstance()->printRemapping();
+			exit( 1 );
 			applicationEvent.resGet( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, key, false );
 		}
 		this->dispatch( applicationEvent );

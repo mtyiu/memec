@@ -7,9 +7,7 @@
 struct RemappedKeyValue {
 	uint32_t listId, chunkId;
 	uint32_t *original, *remapped, remappedCount;
-	uint8_t keySize;
-	uint32_t valueSize;
-	char *key, *value;
+	KeyValue keyValue;
 };
 
 class RemappedBuffer {

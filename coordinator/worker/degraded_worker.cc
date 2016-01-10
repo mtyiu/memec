@@ -32,8 +32,8 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 
 	// Find the SlaveSocket which stores the stripe with listId and srcDataChunkId
 	SlaveSocket *socket;
-	uint32_t chunkId, ongoingAtChunk;
-	CoordinatorWorker::stripeList->get( header.key, header.keySize, &socket, 0, &chunkId );
+	uint32_t ongoingAtChunk;
+	CoordinatorWorker::stripeList->get( header.key, header.keySize, &socket, 0, &ongoingAtChunk );
 	Map *map = &( socket->map );
 	Metadata srcMetadata; // set via findMetadataByKey()
 	DegradedLock degradedLock;

@@ -136,7 +136,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 				buffer.data += PROTO_HEADER_SIZE;
 				buffer.size -= PROTO_HEADER_SIZE;
 				this->handleSetRequest( event, buffer.data, buffer.size );
-				// event.message.replay.set.keyValue.free();
+				event.message.replay.set.keyValue.free();
 				buffer.data -= PROTO_HEADER_SIZE;
 				buffer.size += PROTO_HEADER_SIZE;
 			}
@@ -152,7 +152,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 				buffer.data += PROTO_HEADER_SIZE;
 				buffer.size -= PROTO_HEADER_SIZE;
 				this->handleGetRequest( event, buffer.data, buffer.size );
-				// event.message.replay.get.key.free();
+				event.message.replay.get.key.free();
 				buffer.data -= PROTO_HEADER_SIZE;
 				buffer.size += PROTO_HEADER_SIZE;
 			}
@@ -171,7 +171,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 				buffer.data += PROTO_HEADER_SIZE;
 				buffer.size -= PROTO_HEADER_SIZE;
 				this->handleUpdateRequest( event, buffer.data, buffer.size );
-				// event.message.replay.update.keyValueUpdate.free();
+				event.message.replay.update.keyValueUpdate.free();
 				buffer.data -= PROTO_HEADER_SIZE;
 				buffer.size += PROTO_HEADER_SIZE;
 			}
@@ -187,7 +187,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 				buffer.data += PROTO_HEADER_SIZE;
 				buffer.size -= PROTO_HEADER_SIZE;
 				this->handleDeleteRequest( event, buffer.data, buffer.size );
-				// event.message.replay.del.key.free();
+				event.message.replay.del.key.free();
 				buffer.data -= PROTO_HEADER_SIZE;
 				buffer.size += PROTO_HEADER_SIZE;
 			}
@@ -435,11 +435,11 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 
 	if ( useCoordinatedFlow ) {
 		// Acquire degraded lock from the coordinator
-		// __INFO__(
-		// 	BLUE, "MasterWorker", "handleGetRequest",
-		// 	"[GET] Key: %.*s (key size = %u): acquiring lock.",
-		// 	( int ) header.keySize, header.key, header.keySize
-		// );
+		__DEBUG__(
+			BLUE, "MasterWorker", "handleGetRequest",
+			"[GET] Key: %.*s (key size = %u): acquiring lock.",
+			( int ) header.keySize, header.key, header.keySize
+		);
 		return this->sendDegradedLockRequest(
 			event.instanceId, event.requestId, PROTO_OPCODE_GET,
 			original, reconstructed, reconstructedCount,

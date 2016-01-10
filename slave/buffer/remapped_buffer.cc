@@ -10,13 +10,7 @@ bool RemappedBuffer::insert( uint32_t listId, uint32_t chunkId, uint32_t *origin
 	remappedKeyValue.listId = listId;
 	remappedKeyValue.chunkId = chunkId;
 	remappedKeyValue.remappedCount = remappedCount;
-	remappedKeyValue.key = new char[ keySize ];
-	remappedKeyValue.keySize = keySize;
-	remappedKeyValue.value = new char[ valueSize ];
-	remappedKeyValue.valueSize = valueSize;
-
-	memcpy( remappedKeyValue.key, keyStr, keySize );
-	memcpy( remappedKeyValue.value, valueStr, valueSize );
+	remappedKeyValue.keyValue.dup( keyStr, keySize, valueStr, valueSize );
 
 	if ( remappedCount ) {
 		remappedKeyValue.original = new uint32_t[ remappedCount * 2 ];
@@ -32,8 +26,7 @@ bool RemappedBuffer::insert( uint32_t listId, uint32_t chunkId, uint32_t *origin
 		remappedKeyValue.remapped = 0;
 	}
 
-	Key key;
-	key.set( keySize, remappedKeyValue.key );
+	Key key = remappedKeyValue.keyValue.key();
 
 	std::pair<Key, RemappedKeyValue> p( key, remappedKeyValue );
 	std::pair<std::unordered_map<Key, RemappedKeyValue>::iterator, bool> ret;
@@ -47,8 +40,7 @@ bool RemappedBuffer::insert( uint32_t listId, uint32_t chunkId, uint32_t *origin
 			delete[] remappedKeyValue.original;
 			delete[] remappedKeyValue.remapped;
 		}
-		delete[] remappedKeyValue.key;
-		delete[] remappedKeyValue.value;
+		remappedKeyValue.keyValue.free();
 	}
 
 	return ret.second;

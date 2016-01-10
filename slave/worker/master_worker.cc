@@ -287,9 +287,14 @@ bool SlaveWorker::handleGetRequest( MasterEvent event, char *buf, size_t size ) 
 bool SlaveWorker::handleGetRequest( MasterEvent event, struct KeyHeader &header, bool isDegraded ) {
 	Key key;
 	KeyValue keyValue;
+	RemappedKeyValue remappedKeyValue;
 	bool ret;
 	if ( map->findValueByKey( header.key, header.keySize, &keyValue, &key ) ) {
 		event.resGet( event.socket, event.instanceId, event.requestId, keyValue, isDegraded );
+		ret = true;
+	} else if ( remappedBuffer->find( header.keySize, header.key, &remappedKeyValue ) ) {
+		// Handle remapped keys
+		event.resGet( event.socket, event.instanceId, event.requestId, remappedKeyValue.keyValue, isDegraded );
 		ret = true;
 	} else {
 		event.resGet( event.socket, event.instanceId, event.requestId, key, isDegraded );

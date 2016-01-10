@@ -141,7 +141,7 @@ public:
 	// same protocol as in application, but writes header into buffer.recv by default
 	char *replaySet(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
-		char *key, uint8_t keySize, char *value, uint8_t valueSize
+		char *key, uint8_t keySize, char *value, uint32_t valueSize
 	);
 
 	char *replayGet(
@@ -152,7 +152,7 @@ public:
 	char *replayUpdate(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		char *key, uint8_t keySize,
-		char *valueUpdate, uint8_t valueUpdateOffset, uint32_t valueUpdateSize
+		char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize
 	);
 
 	char *replayDelete(
