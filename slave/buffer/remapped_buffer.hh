@@ -23,6 +23,11 @@ public:
 		char *value, uint32_t valueSize
 	);
 	bool find( uint8_t keySize, char *keyStr, RemappedKeyValue *remappedKeyValue = 0 );
+	bool update(
+		uint8_t keySize, char *keyStr,
+		uint32_t valueUpdateSize, uint32_t valueUpdateOffset, char *valueUpdate,
+		RemappedKeyValue *remappedKeyValue = 0
+	);
 };
 
 #endif

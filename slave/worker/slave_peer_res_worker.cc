@@ -270,7 +270,7 @@ bool SlaveWorker::handleUpdateResponse( SlavePeerEvent event, bool success, char
 	__DEBUG__( YELLOW, "SlaveWorker", "handleUpdateResponse", "Pending slave UPDATE requests = %d (%s) (Key: %.*s).", pending, success ? "success" : "fail", ( int ) header.keySize, header.key );
 
 	if ( pending == 0 ) {
-		// Only send master DELETE response when the number of pending slave DELETE requests equal 0
+		// Only send master UPDATE response when the number of pending slave UPDATE requests equal 0
 		MasterEvent masterEvent;
 
 		if ( ! SlaveWorker::pending->eraseKeyValueUpdate( PT_MASTER_UPDATE, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &keyValueUpdate ) ) {
@@ -285,7 +285,7 @@ bool SlaveWorker::handleUpdateResponse( SlavePeerEvent event, bool success, char
 			header.valueUpdateSize,
 			success, true, false
 		);
-		SlaveWorker::eventQueue->insert( masterEvent );
+		this->dispatch( masterEvent );
 	}
 	return true;
 }

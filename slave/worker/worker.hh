@@ -128,7 +128,11 @@ private:
 	bool handleRemappedData( CoordinatorEvent event, char *buf, size_t size );
 	bool handleRemappingSetRequest( MasterEvent event, char *buf, size_t size );
 	bool handleRemappingSetRequest( SlavePeerEvent event, char *buf, size_t size );
+	bool handleRemappedUpdateRequest( SlavePeerEvent event, char *buf, size_t size );
+	bool handleRemappedDeleteRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleRemappingSetResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
+	bool handleRemappedUpdateResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
+	bool handleRemappedDeleteResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 
 	// ---------- degraded_worker.cc ----------
 	int findInRedirectedList( uint32_t *reconstructed, uint32_t reconstructedCount );

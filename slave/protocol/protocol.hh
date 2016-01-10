@@ -73,6 +73,28 @@ public:
 		char *value, uint32_t valueSize,
 		char *buf = 0
 	);
+	char *reqRemappedUpdate(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		char *key, uint8_t keySize,
+		char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize,
+		char *buf = 0, uint32_t timestamp = 0
+	);
+	char *reqRemappedDelete(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		char *key, uint8_t keySize,
+		char *buf = 0, uint32_t timestamp = 0
+	);
+	char *resRemappedUpdate(
+		size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
+		char *key, uint8_t keySize,
+		uint32_t valueUpdateOffset, uint32_t valueUpdateSize,
+		char *buf = 0, uint32_t timestamp = 0
+	);
+	char *resRemappedDelete(
+		size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
+		char *key, uint8_t keySize,
+		char *buf = 0, uint32_t timestamp = 0
+	);
 
 	// ---------- degraded_protocol.cc ----------
 	char *resReleaseDegradedLock( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t count );
