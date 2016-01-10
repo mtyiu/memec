@@ -163,6 +163,7 @@ private:
 	bool handleSlaveReconstructedMsg( CoordinatorEvent event, char *buf, size_t size );
 	bool handleBackupSlavePromotedMsg( CoordinatorEvent event, char *buf, size_t size );
 	bool handleReconstructionRequest( CoordinatorEvent event, char *buf, size_t size );
+	bool handleReconstructionUnsealedRequest( CoordinatorEvent event, char *buf, size_t size );
 	bool handleCompletedReconstructionAck();
 
 public:

@@ -98,8 +98,8 @@ bool SlaveWorker::handleBackupSlavePromotedMsg( CoordinatorEvent event, char *bu
 	// 	YELLOW,
 	__ERROR__(
 		"SlaveWorker", "handleBackupSlavePromotedMsg",
-		"This slave is promoted to replace %s:%s (chunk count = %u).",
-		tmp, tmp + 16, header.count
+		"This slave is promoted to replace %s:%s (chunk count = %u, unsealed key count = %u).",
+		tmp, tmp + 16, header.chunkCount, header.unsealedCount
 	);
 
 	// Find the slave peer socket in the array map
@@ -148,8 +148,8 @@ bool SlaveWorker::handleBackupSlavePromotedMsg( CoordinatorEvent event, char *bu
 		event.socket,
 		header.addr,
 		header.port,
-		header.count,
-		header.metadata
+		header.chunkCount, header.metadata,
+		header.unsealedCount, header.keys
 	);
 
 	return true;
@@ -159,6 +159,7 @@ bool SlaveWorker::handleReconstructionRequest( CoordinatorEvent event, char *buf
 	struct ReconstructionHeader header;
 	std::unordered_set<uint32_t> stripeIds;
 	std::unordered_set<uint32_t>::iterator it;
+	std::unordered_set<Key> unsealedKeys;
 	if ( ! this->protocol.parseReconstructionHeader( header, true, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleReconstructionRequest", "Invalid RECONSTRUCTION request." );
 		return false;
@@ -211,7 +212,8 @@ bool SlaveWorker::handleReconstructionRequest( CoordinatorEvent event, char *buf
 		event.socket,
 		header.listId,
 		header.chunkId,
-		stripeIds
+		stripeIds,
+		unsealedKeys
 	) ) {
 		__ERROR__( "SlaveWorker", "handleReconstructionRequest", "Cannot insert into coordinator RECONSTRUCTION pending map." );
 	}
@@ -295,6 +297,48 @@ bool SlaveWorker::handleReconstructionRequest( CoordinatorEvent event, char *buf
 	delete[] metadataList;
 
 	return false;
+}
+
+bool SlaveWorker::handleReconstructionUnsealedRequest( CoordinatorEvent event, char *buf, size_t size ) {
+	printf( "handleReconstructionUnsealedRequest\n" );
+	struct BatchKeyHeader header;
+
+	if ( ! this->protocol.parseBatchKeyHeader( header, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleReconstructionUnsealedRequest", "Invalid RECONSTRUCTION_UNSEALED request." );
+		return false;
+	}
+
+	std::unordered_set<Key> unsealedKeys;
+	std::unordered_set<uint32_t> stripeIds;
+	uint32_t listId, chunkId;
+
+	for ( uint32_t i = 0, offset = 0; i < header.count; i++ ) {
+		uint8_t keySize;
+		char *keyStr;
+		Key key;
+
+		this->protocol.nextKeyInBatchKeyHeader( header, keySize, keyStr, offset );
+		key.dup( keySize, keyStr );
+		unsealedKeys.insert( key );
+
+		if ( i == 0 ) {
+			this->getSlaves( keyStr, keySize, listId, chunkId );
+		}
+
+		// printf( "[%u] %.*s\n", i, keySize, keyStr );
+	}
+
+	if ( ! SlaveWorker::pending->insertReconstruction(
+		event.instanceId, event.requestId,
+		event.socket,
+		listId, chunkId,
+		stripeIds,
+		unsealedKeys
+	) ) {
+		__ERROR__( "SlaveWorker", "handleReconstructionUnsealedRequest", "Cannot insert into coordinator RECONSTRUCTION pending map." );
+	}
+
+	return true;
 }
 
 bool SlaveWorker::handleCompletedReconstructionAck() {

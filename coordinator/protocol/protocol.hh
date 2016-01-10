@@ -81,7 +81,9 @@ public:
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		SlaveSocket *srcSocket,
 		std::unordered_set<Metadata> &chunks,
-		std::unordered_set<Metadata>::iterator &it,
+		std::unordered_set<Metadata>::iterator &chunksIt,
+		std::unordered_set<Key> &keys,
+		std::unordered_set<Key>::iterator &keysIt,
 		bool &isCompleted
 	);
 	char *reqReconstruction(
@@ -90,6 +92,11 @@ public:
 		std::unordered_set<uint32_t> &stripeIds,
 		std::unordered_set<uint32_t>::iterator &it,
 		uint32_t numChunks,
+		bool &isCompleted
+	);
+	char *reqReconstructionUnsealed(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		std::unordered_set<Key> &keys, std::unordered_set<Key>::iterator &it, uint32_t &keysCount,
 		bool &isCompleted
 	);
 	char *ackCompletedReconstruction( size_t &size, uint16_t instanceId, uint32_t requestId, bool success );

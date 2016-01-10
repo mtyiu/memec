@@ -832,19 +832,19 @@ bool SlaveWorker::handleSetChunkResponse( SlavePeerEvent event, bool success, ch
 		}
 	} else {
 		// Reconstruction
-		uint32_t remaining, total;
+		uint32_t remainingChunks, remainingKeys, totalChunks, totalKeys;
 		CoordinatorSocket *socket;
-		if ( ! SlaveWorker::pending->eraseReconstruction( pid.parentInstanceId, pid.parentRequestId, socket, header.listId, header.stripeId, header.chunkId, remaining, total, &pid ) ) {
+		if ( ! SlaveWorker::pending->eraseReconstruction( pid.parentInstanceId, pid.parentRequestId, socket, header.listId, header.stripeId, header.chunkId, remainingChunks, remainingKeys, totalChunks, totalKeys, &pid ) ) {
 			__ERROR__( "SlaveWorker", "handleSetChunkResponse", "Cannot find a pending coordinator RECONSTRUCTION request that matches the response. The message will be discarded." );
 			return false;
 		}
 
-		if ( remaining == 0 ) {
+		if ( remainingChunks == 0 ) {
 			// Tell the coordinator that the reconstruction task is completed
 			CoordinatorEvent coordinatorEvent;
 			coordinatorEvent.resReconstruction(
 				socket, pid.instanceId, pid.requestId,
-				header.listId, header.chunkId, total /* numStripes */
+				header.listId, header.chunkId, totalChunks /* numStripes */
 			);
 			SlaveWorker::eventQueue->insert( coordinatorEvent );
 		}

@@ -16,9 +16,16 @@ class PendingReconstruction {
 public:
 	uint32_t listId;
 	uint32_t chunkId;
-	uint32_t remaining;
-	uint32_t total;
-	std::unordered_set<uint32_t> stripeIds;
+	struct {
+		uint32_t remaining;
+		uint32_t total;
+		std::unordered_set<uint32_t> stripeIds;
+	} chunks;
+	struct {
+		uint32_t remaining;
+		uint32_t total;
+		std::unordered_set<Key> keys;
+	} unsealed;
 	pthread_mutex_t lock;
 	pthread_cond_t cond;
 
@@ -27,12 +34,17 @@ public:
 		pthread_cond_init( &this->cond, 0 );
 	}
 
-	void set( uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds ) {
+	void set( uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds, std::unordered_set<Key> &unsealedKeys ) {
 		this->listId = listId;
 		this->chunkId = chunkId;
-		this->stripeIds = stripeIds;
-		this->total = ( uint32_t ) this->stripeIds.size();
-		this->remaining = this->total;
+
+		this->chunks.stripeIds = stripeIds;
+		this->chunks.total = ( uint32_t ) this->chunks.stripeIds.size();
+		this->chunks.remaining = this->chunks.total;
+
+		this->unsealed.keys = unsealedKeys;
+		this->unsealed.total = ( uint32_t ) this->unsealed.keys.size();
+		this->unsealed.remaining = this->unsealed.total;
 	}
 };
 
@@ -40,17 +52,25 @@ class PendingRecovery {
 public:
 	uint32_t addr;
 	uint16_t port;
-	uint32_t remaining;
-	uint32_t total;
+	struct {
+		uint32_t remaining;
+		uint32_t total;
+	} chunks;
+	struct {
+		uint32_t remaining;
+		uint32_t total;
+	} unsealed;
 	struct timespec startTime;
 	SlaveSocket *socket;
 	SlaveSocket *original;
 
-	PendingRecovery( uint32_t addr, uint16_t port, uint32_t total, struct timespec startTime, SlaveSocket *socket, SlaveSocket *original ) {
+	PendingRecovery( uint32_t addr, uint16_t port, uint32_t chunkCount, uint32_t unsealedCount, struct timespec startTime, SlaveSocket *socket, SlaveSocket *original ) {
 		this->addr = addr;
 		this->port = port;
-		this->remaining = total;
-		this->total = total;
+		this->chunks.remaining = chunkCount;
+		this->chunks.total = chunkCount;
+		this->unsealed.remaining = unsealedCount;
+		this->unsealed.total = unsealedCount;
 		this->startTime = startTime;
 		this->socket = socket;
 		this->original = original;
@@ -143,11 +163,11 @@ public:
 
 	~Pending() {}
 
-	bool insertReconstruction( uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds, pthread_mutex_t *&lock, pthread_cond_t *&cond ) {
+	bool insertReconstruction( uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds, std::unordered_set<Key> &unsealedKeys, pthread_mutex_t *&lock, pthread_cond_t *&cond ) {
 		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
 		PendingReconstruction r;
 
-		r.set( listId, chunkId, stripeIds );
+		r.set( listId, chunkId, stripeIds, unsealedKeys );
 
 		std::pair<PendingIdentifier, PendingReconstruction> p( pid, r );
 		std::pair<std::unordered_map<PendingIdentifier, PendingReconstruction>::iterator, bool> ret;
@@ -161,7 +181,7 @@ public:
 		return ret.second;
 	}
 
-	std::unordered_set<uint32_t> *findReconstruction( uint16_t instanceId, uint32_t requestId, uint32_t &listId, uint32_t &chunkId ) {
+	bool findReconstruction( uint16_t instanceId, uint32_t requestId, uint32_t &listId, uint32_t &chunkId, std::unordered_set<uint32_t> *&stripeIds, std::unordered_set<Key> *&unsealedKeys ) {
 		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
 		std::unordered_map<PendingIdentifier, PendingReconstruction>::iterator it;
 
@@ -169,16 +189,20 @@ public:
 		it = this->reconstruction.find( pid );
 		if ( it == this->reconstruction.end() ) {
 			UNLOCK( &this->reconstructionLock );
-			return 0;
+			return false;
 		}
 		listId = it->second.listId;
 		chunkId = it->second.chunkId;
+
+		stripeIds = &( it->second.chunks.stripeIds );
+		unsealedKeys = &( it->second.unsealed.keys );
+
 		UNLOCK( &this->reconstructionLock );
 
-		return &( it->second.stripeIds );
+		return true;
 	}
 
-	bool eraseReconstruction( uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t numStripes, uint32_t &remaining ) {
+	bool eraseReconstruction( uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t numStripes, uint32_t numKeys, uint32_t &remainingChunks, uint32_t &remainingKeys ) {
 		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
 		std::unordered_map<PendingIdentifier, PendingReconstruction>::iterator it;
 		bool ret;
@@ -189,18 +213,20 @@ public:
 			UNLOCK( &this->reconstructionLock );
 			return false;
 		}
-		ret = ( listId == it->second.listId && chunkId == it->second.chunkId && it->second.remaining >= numStripes );
+		ret = ( listId == it->second.listId && chunkId == it->second.chunkId && it->second.chunks.remaining >= numStripes && it->second.unsealed.remaining >= numKeys );
 		if ( ret ) {
 			pthread_cond_signal( &it->second.cond );
-			it->second.remaining -= numStripes;
-			remaining = it->second.remaining;
-			if ( it->second.remaining == 0 )
+			it->second.chunks.remaining -= numStripes;
+			it->second.unsealed.remaining -= numKeys;
+			remainingChunks = it->second.chunks.remaining;
+			remainingKeys = it->second.unsealed.remaining;
+			if ( remainingChunks == 0 && remainingKeys == 0 )
 				this->reconstruction.erase( it );
 		} else {
 			printf(
-				"(%u, %u, %u) vs. (%u, %u, %u)\n",
-				listId, chunkId, numStripes,
-				it->second.listId, it->second.chunkId, it->second.remaining
+				"(%u, %u, %u, %u) vs. (%u, %u, %u, %u)\n",
+				listId, chunkId, numStripes, numKeys,
+				it->second.listId, it->second.chunkId, it->second.chunks.remaining, it->second.unsealed.remaining
 			);
 		}
 		UNLOCK( &this->reconstructionLock );
@@ -208,9 +234,9 @@ public:
 		return ret;
 	}
 
-	bool insertRecovery( uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t total, struct timespec startTime, SlaveSocket *socket, SlaveSocket *original ) {
+	bool insertRecovery( uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t chunkCount, uint32_t unsealedCount, struct timespec startTime, SlaveSocket *socket, SlaveSocket *original ) {
 		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
-		PendingRecovery r( addr, port, total, startTime, socket, original );
+		PendingRecovery r( addr, port, chunkCount, unsealedCount, startTime, socket, original );
 
 		std::pair<PendingIdentifier, PendingRecovery> p( pid, r );
 		std::pair<std::unordered_map<PendingIdentifier, PendingRecovery>::iterator, bool> ret;
@@ -222,7 +248,7 @@ public:
 		return ret.second;
 	}
 
-	bool eraseRecovery( uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t numReconstructed, SlaveSocket *socket, uint32_t &remaining, uint32_t &total, double &elapsedTime, SlaveSocket *&original ) {
+	bool eraseRecovery( uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t numReconstructedChunks, uint32_t numReconstructedKeys, SlaveSocket *socket, uint32_t &remainingChunks, uint32_t &totalChunks, uint32_t &remainingKeys, uint32_t &totalKeys, double &elapsedTime, SlaveSocket *&original ) {
 		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
 		std::unordered_map<PendingIdentifier, PendingRecovery>::iterator it;
 		bool ret;
@@ -233,22 +259,26 @@ public:
 			UNLOCK( &this->recoveryLock );
 			return false;
 		}
-		ret = ( addr == it->second.addr && port == it->second.port && it->second.remaining >= numReconstructed && socket == it->second.socket );
+		ret = ( addr == it->second.addr && port == it->second.port && it->second.chunks.remaining >= numReconstructedChunks && it->second.unsealed.remaining >= numReconstructedKeys && socket == it->second.socket );
 		if ( ret ) {
-			it->second.remaining -= numReconstructed;
-			remaining = it->second.remaining;
-			total = it->second.total;
+			it->second.chunks.remaining -= numReconstructedChunks;
+			it->second.unsealed.remaining -= numReconstructedKeys;
+			remainingChunks = it->second.chunks.remaining;
+			totalChunks = it->second.chunks.total;
+			remainingKeys = it->second.unsealed.remaining;
+			totalKeys = it->second.unsealed.total;
 			elapsedTime = get_elapsed_time( it->second.startTime );
 			original = it->second.original;
-			if ( it->second.remaining == 0 )
+			if ( remainingChunks == 0 && remainingKeys == 0 )
 				this->recovery.erase( it );
 		} else {
 			printf(
-				"(%u, %u, %u, %p) vs. (%u, %u, %u, %p)\n",
-				addr, port, numReconstructed, socket,
+				"(%u, %u, %u, %u, %p) vs. (%u, %u, %u, %u, %p)\n",
+				addr, port, numReconstructedChunks, numReconstructedKeys, socket,
 				it->second.addr,
 				it->second.port,
-				it->second.remaining,
+				it->second.chunks.remaining,
+				it->second.unsealed.remaining,
 				it->second.socket
 			);
 		}

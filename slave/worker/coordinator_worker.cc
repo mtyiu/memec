@@ -72,7 +72,8 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 				event.instanceId, event.requestId,
 				event.message.promote.addr,
 				event.message.promote.port,
-				event.message.promote.count
+				event.message.promote.numChunks,
+				event.message.promote.numUnsealedKeys
 			);
 			isSend = true;
 			break;
@@ -152,6 +153,18 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 							case PROTO_MAGIC_RESPONSE_SUCCESS:
 								this->handleCompletedReconstructionAck();
 								break;
+							case PROTO_MAGIC_RESPONSE_FAILURE:
+							default:
+								__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from coordinator." );
+								break;
+						}
+						break;
+					case PROTO_OPCODE_RECONSTRUCTION_UNSEALED:
+						switch( header.magic ) {
+							case PROTO_MAGIC_REQUEST:
+								this->handleReconstructionUnsealedRequest( event, buffer.data, header.length );
+								break;
+							case PROTO_MAGIC_RESPONSE_SUCCESS:
 							case PROTO_MAGIC_RESPONSE_FAILURE:
 							default:
 								__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from coordinator." );

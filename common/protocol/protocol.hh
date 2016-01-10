@@ -45,11 +45,12 @@
 #define PROTO_OPCODE_SEAL_CHUNKS                  0x35
 #define PROTO_OPCODE_FLUSH_CHUNKS                 0x36
 #define PROTO_OPCODE_RECONSTRUCTION               0x37
-#define PROTO_OPCODE_SYNC_META                    0x38
-#define PROTO_OPCODE_RELEASE_DEGRADED_LOCKS       0x39
-#define PROTO_OPCODE_SLAVE_RECONSTRUCTED          0x40
-#define PROTO_OPCODE_BACKUP_SLAVE_PROMOTED        0x41
-#define PROTO_OPCODE_PARITY_MIGRATE               0x42
+#define PROTO_OPCODE_RECONSTRUCTION_UNSEALED      0x38
+#define PROTO_OPCODE_SYNC_META                    0x39
+#define PROTO_OPCODE_RELEASE_DEGRADED_LOCKS       0x40
+#define PROTO_OPCODE_SLAVE_RECONSTRUCTED          0x41
+#define PROTO_OPCODE_BACKUP_SLAVE_PROMOTED        0x42
+#define PROTO_OPCODE_PARITY_MIGRATE               0x43
 
 // Application <-> Master or Master <-> Slave (0-19) //
 #define PROTO_OPCODE_GET                          0x01
@@ -138,12 +139,14 @@ struct AddressHeader {
 //////////////
 // Recovery //
 //////////////
-#define PROTO_PROMOTE_BACKUP_SLAVE_SIZE 10
+#define PROTO_PROMOTE_BACKUP_SLAVE_SIZE 14
 struct PromoteBackupSlaveHeader {
 	uint32_t addr;
 	uint16_t port;
-	uint32_t count;
+	uint32_t chunkCount;
+	uint32_t unsealedCount;
 	uint32_t *metadata;
+	char *keys;
 };
 
 //////////////////////////////////////////
@@ -275,11 +278,13 @@ struct ChunkUpdateHeader {
 #define PROTO_BATCH_KEY_SIZE 4
 struct BatchKeyHeader {
 	uint32_t count;
+	char *keys;
 };
 
 #define PROTO_BATCH_KEY_VALUE_SIZE 4
 struct BatchKeyValueHeader {
 	uint32_t count;
+	char *keyValues;
 };
 
 ///////////////
@@ -527,20 +532,24 @@ protected:
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t addr, uint16_t port,
 		std::unordered_set<Metadata> &chunks,
-		std::unordered_set<Metadata>::iterator &it,
+		std::unordered_set<Metadata>::iterator &chunksIt,
+		std::unordered_set<Key> &keys,
+		std::unordered_set<Key>::iterator &keysIt,
 		bool &isCompleted
 	);
 	size_t generatePromoteBackupSlaveHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
-		uint32_t addr, uint16_t port, uint32_t numReconstructed
+		uint32_t addr, uint16_t port, uint32_t numReconstructedChunks, uint32_t numReconstructedKeys
 	);
 	bool parsePromoteBackupSlaveHeader(
-		size_t offset, uint32_t &addr, uint16_t &port, uint32_t &count,
-		uint32_t *&metadata,
+		size_t offset, uint32_t &addr, uint16_t &port,
+		uint32_t &chunkCount, uint32_t &unsealedCount,
+		uint32_t *&metadata, char *&keys,
 		char *buf, size_t size
 	);
 	bool parsePromoteBackupSlaveHeader(
-		size_t offset, uint32_t &addr, uint16_t &port, uint32_t &numReconstructed,
+		size_t offset, uint32_t &addr, uint16_t &port,
+		uint32_t &numReconstructedChunks, uint32_t &numReconstructedKeys,
 		char *buf, size_t size
 	);
 
@@ -709,6 +718,26 @@ protected:
 		size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
 		uint32_t &updateOffset, uint32_t &updateLength, uint32_t &updatingChunkId,
 		char *&delta, char *buf, size_t size
+	);
+
+	//////////////////////
+	// Batch operations //
+	//////////////////////
+	// ---------- batch_protocol.cc ----------
+	size_t generateBatchKeyHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode,
+		uint16_t instanceId, uint32_t requestId,
+		std::unordered_set<Key> &keys, std::unordered_set<Key>::iterator &it, uint32_t &keysCount,
+		bool &isCompleted
+	);
+	bool parseBatchKeyHeader(
+		size_t offset, uint32_t &count, char *&keys,
+		char *buf, size_t size
+	);
+
+	bool parseBatchKeyValueHeader(
+		size_t offset, uint32_t &count, char *&keyValues,
+		char *buf, size_t size
 	);
 
 	///////////////
@@ -1087,6 +1116,28 @@ public:
 	bool parseChunkUpdateHeader(
 		struct ChunkUpdateHeader &header, bool withDelta,
 		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
+	//////////////////////
+	// Batch operations //
+	//////////////////////
+	// ---------- batch_protocol.cc ----------
+	bool parseBatchKeyHeader(
+		struct BatchKeyHeader &header,
+		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
+	void nextKeyInBatchKeyHeader(
+		struct BatchKeyHeader &header,
+		uint8_t &keySize, char *&key, uint32_t &offset
+	);
+
+	bool parseBatchKeyValueHeader(
+		struct BatchKeyValueHeader &header,
+		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
+	void nextKeyValueInBatchKeyValueHeader(
+		struct BatchKeyValueHeader &header,
+		uint8_t &keySize, uint32_t &valueSize, char *&key, char *&value,
+		uint32_t &offset
 	);
 	///////////////
 	// Remapping //

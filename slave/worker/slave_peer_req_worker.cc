@@ -417,15 +417,15 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, bool isSealed, ch
 
 		// Remove the chunk from pending chunk set
 		uint16_t instanceId;
-		uint32_t requestId, addr, remaining, total;
+		uint32_t requestId, addr, remainingChunks, remainingKeys, totalChunks, totalKeys;
 		uint16_t port;
 		CoordinatorSocket *coordinatorSocket;
-		if ( SlaveWorker::pending->eraseRecovery( metadata.listId, metadata.stripeId, metadata.chunkId, instanceId, requestId, coordinatorSocket, addr, port, remaining, total ) ) {
+		if ( SlaveWorker::pending->eraseRecovery( metadata.listId, metadata.stripeId, metadata.chunkId, instanceId, requestId, coordinatorSocket, addr, port, remainingChunks, remainingKeys, totalChunks, totalKeys ) ) {
 			// printf( "Received (%u, %u, %u). Number of remaining pending chunks = %u / %u.\n", metadata.listId, metadata.stripeId, metadata.chunkId, remaining, total );
 
-			if ( remaining == 0 ) {
+			if ( remainingChunks == 0 ) {
 				notifyCoordinator = true;
-				coordinatorEvent.resPromoteBackupSlave( coordinatorSocket, instanceId, requestId, addr, port, total );
+				coordinatorEvent.resPromoteBackupSlave( coordinatorSocket, instanceId, requestId, addr, port, totalChunks, 0 );
 			}
 		} else {
 			// __ERROR__( "SlaveWorker", "handleSetChunkRequest", "Cannot find the chunk (%u, %u, %u) from pending chunk set.", metadata.listId, metadata.stripeId, metadata.chunkId );

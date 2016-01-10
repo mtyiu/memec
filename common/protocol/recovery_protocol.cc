@@ -4,12 +4,14 @@ size_t Protocol::generatePromoteBackupSlaveHeader(
 	uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 	uint32_t addr, uint16_t port,
 	std::unordered_set<Metadata> &chunks,
-	std::unordered_set<Metadata>::iterator &it,
+	std::unordered_set<Metadata>::iterator &chunksIt,
+	std::unordered_set<Key> &keys,
+	std::unordered_set<Key>::iterator &keysIt,
 	bool &isCompleted
 ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE, *tmp;
 	size_t bytes = PROTO_HEADER_SIZE;
-	uint32_t count = 0;
+	uint32_t chunkCount = 0, unsealedCount = 0;
 
 	isCompleted = true;
 
@@ -21,68 +23,94 @@ size_t Protocol::generatePromoteBackupSlaveHeader(
 	buf += PROTO_PROMOTE_BACKUP_SLAVE_SIZE;
 	bytes += PROTO_PROMOTE_BACKUP_SLAVE_SIZE;
 
-	for ( ; it != chunks.end(); it++ ) {
-		const Metadata &metadata = *it;
+	for ( ; chunksIt != chunks.end(); chunksIt++ ) {
+		const Metadata &metadata = *chunksIt;
 		if ( this->buffer.size >= bytes + PROTO_METADATA_SIZE ) {
 			*( ( uint32_t * )( buf     ) ) = htonl( metadata.listId );
 			*( ( uint32_t * )( buf + 4 ) ) = htonl( metadata.stripeId );
 			*( ( uint32_t * )( buf + 8 ) ) = htonl( metadata.chunkId );
 			buf   += PROTO_METADATA_SIZE;
 			bytes += PROTO_METADATA_SIZE;
-			count++;
+			chunkCount++;
 		} else {
 			isCompleted = false;
 			break;
 		}
 	}
 
-	*( ( uint32_t * )( tmp ) ) = htonl( count );
+	if ( isCompleted ) {
+		for ( ; keysIt != keys.end(); keysIt++ ) {
+			const Key &key = *keysIt;
+			if ( this->buffer.size >= bytes + PROTO_KEY_SIZE + key.size ) {
+				buf[ 0 ] = key.size;
+				memcpy( buf + 1, key.data, key.size );
+
+				buf   += PROTO_KEY_SIZE + key.size;
+				bytes += PROTO_KEY_SIZE + key.size;
+				unsealedCount++;
+			} else {
+				isCompleted = false;
+				break;
+			}
+		}
+	}
+
+	*( ( uint32_t * )( tmp ) ) = htonl( chunkCount );
+	*( ( uint32_t * )( tmp + 4 ) ) = htonl( unsealedCount );
 
 	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, instanceId, requestId );
 
 	return bytes;
 }
 
-size_t Protocol::generatePromoteBackupSlaveHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t numReconstructed ) {
+size_t Protocol::generatePromoteBackupSlaveHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t numReconstructedChunks, uint32_t numReconstructedKeys ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_PROMOTE_BACKUP_SLAVE_SIZE, instanceId, requestId );
 
 	// Already in network-byte order
 	*( ( uint32_t * )( buf     ) ) = addr;
 	*( ( uint16_t * )( buf + 4 ) ) = port;
-	*( ( uint32_t * )( buf + 6 ) ) = htonl( numReconstructed );
+	*( ( uint32_t * )( buf + 6 ) ) = htonl( numReconstructedChunks );
+	*( ( uint32_t * )( buf + 10 ) ) = htonl( numReconstructedKeys );
 
 	bytes += PROTO_PROMOTE_BACKUP_SLAVE_SIZE;
 	return bytes;
 }
 
-bool Protocol::parsePromoteBackupSlaveHeader( size_t offset, uint32_t &addr, uint16_t &port, uint32_t &count, uint32_t *&metadata, char *buf, size_t size ) {
+bool Protocol::parsePromoteBackupSlaveHeader( size_t offset, uint32_t &addr, uint16_t &port, uint32_t &chunkCount, uint32_t &unsealedCount, uint32_t *&metadata, char *&keys, char *buf, size_t size ) {
 	if ( size - offset < PROTO_PROMOTE_BACKUP_SLAVE_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
 	addr = *( ( uint32_t * )( ptr     ) );
 	port = *( ( uint16_t * )( ptr + 4 ) );
-	count = ntohl( *( ( uint32_t * )( ptr + 6 ) ) );
-	metadata = ( uint32_t * )( ptr + 10 );
+	chunkCount = ntohl( *( ( uint32_t * )( ptr + 6 ) ) );
+	unsealedCount = ntohl( *( ( uint32_t * )( ptr + 10 ) ) );
 
-	for ( uint32_t i = 0; i < count; i++ ) {
+	ptr += PROTO_PROMOTE_BACKUP_SLAVE_SIZE;
+
+	metadata = ( uint32_t * )( ptr );
+	for ( uint32_t i = 0; i < chunkCount; i++ ) {
 		for ( uint32_t j = 0; j < 3; j++ ) {
 			metadata[ i * 3 + j ] = ntohl( metadata[ i * 3 + j ] );
 		}
+		ptr += PROTO_METADATA_SIZE;
 	}
+
+	keys = ptr;
 
 	return true;
 }
 
-bool Protocol::parsePromoteBackupSlaveHeader( size_t offset, uint32_t &addr, uint16_t &port, uint32_t &numReconstructed, char *buf, size_t size ) {
+bool Protocol::parsePromoteBackupSlaveHeader( size_t offset, uint32_t &addr, uint16_t &port, uint32_t &numReconstructedChunks, uint32_t &numReconstructedKeys, char *buf, size_t size ) {
 	if ( size - offset < PROTO_PROMOTE_BACKUP_SLAVE_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
 	addr = *( ( uint32_t * )( ptr     ) );
 	port = *( ( uint16_t * )( ptr + 4 ) );
-	numReconstructed = ntohl( *( ( uint32_t * )( ptr + 6 ) ) );
+	numReconstructedChunks = ntohl( *( ( uint32_t * )( ptr + 6 ) ) );
+	numReconstructedKeys   = ntohl( *( ( uint32_t * )( ptr + 10 ) ) );
 
 	return true;
 }
@@ -97,8 +125,10 @@ bool Protocol::parsePromoteBackupSlaveHeader( struct PromoteBackupSlaveHeader &h
 			offset,
 			header.addr,
 			header.port,
-			header.count,
+			header.chunkCount,
+			header.unsealedCount,
 			header.metadata,
+			header.keys,
 			buf, size
 		);
 	} else {
@@ -106,7 +136,8 @@ bool Protocol::parsePromoteBackupSlaveHeader( struct PromoteBackupSlaveHeader &h
 			offset,
 			header.addr,
 			header.port,
-			header.count,
+			header.chunkCount,
+			header.unsealedCount,
 			buf, size
 		);
 	}
