@@ -109,7 +109,8 @@ size_t Protocol::generateDegradedLockResHeader(
 	uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 	bool isLocked, uint8_t keySize, char *key,
 	bool isSealed, uint32_t stripeId,
-	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount
+	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
+	uint32_t ongoingAtChunk
 ) {
 	char *buf;
 	size_t bytes = this->generateDegradedLockResHeader(
@@ -125,8 +126,9 @@ size_t Protocol::generateDegradedLockResHeader(
 
 	*( ( uint32_t * )( buf      ) ) = htonl( stripeId );
 	*( ( uint32_t * )( buf +  4 ) ) = htonl( reconstructedCount );
-	buf += 8;
-	bytes += 8;
+	*( ( uint32_t * )( buf +  8 ) ) = htonl( ongoingAtChunk );
+	buf += 12;
+	bytes += 12;
 
 	for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
 		*( ( uint32_t * )( buf     ) ) = htonl( original[ i * 2     ] );
@@ -211,6 +213,7 @@ bool Protocol::parseDegradedLockResHeader(
 	size_t offset, bool &isSealed,
 	uint32_t &stripeId,
 	uint32_t *&original, uint32_t *&reconstructed, uint32_t &reconstructedCount,
+	uint32_t &ongoingAtChunk,
 	char *buf, size_t size
 ) {
 	if ( size - offset < PROTO_DEGRADED_LOCK_RES_LOCK_SIZE )
@@ -223,7 +226,8 @@ bool Protocol::parseDegradedLockResHeader(
 
 	stripeId           = ntohl( *( ( uint32_t * )( ptr      ) ) );
 	reconstructedCount = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
-	ptr += 8;
+	ongoingAtChunk     = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
+	ptr += 12;
 
 	original = ( uint32_t * ) ptr;
 	reconstructed = ( ( uint32_t * ) ptr ) + reconstructedCount * 2;
@@ -288,6 +292,7 @@ bool Protocol::parseDegradedLockResHeader( struct DegradedLockResHeader &header,
 				header.original,
 				header.reconstructed,
 				header.reconstructedCount,
+				header.ongoingAtChunk,
 				buf, size
 			);
 			break;
@@ -313,6 +318,7 @@ size_t Protocol::generateDegradedReqHeader(
 	uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 	bool isSealed, uint32_t stripeId,
 	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
+	uint32_t ongoingAtChunk,
 	uint8_t keySize, char *key
 ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
@@ -328,8 +334,9 @@ size_t Protocol::generateDegradedReqHeader(
 
 	*( ( uint32_t * )( buf      ) ) = htonl( stripeId );
 	*( ( uint32_t * )( buf +  4 ) ) = htonl( reconstructedCount );
-	buf += 8;
-	bytes += 8;
+	*( ( uint32_t * )( buf +  8 ) ) = htonl( ongoingAtChunk );
+	buf += 12;
+	bytes += 12;
 
 	for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
 		*( ( uint32_t * )( buf     ) ) = htonl( original[ i * 2     ] );
@@ -358,6 +365,7 @@ size_t Protocol::generateDegradedReqHeader(
 	uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 	bool isSealed, uint32_t stripeId,
 	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
+	uint32_t ongoingAtChunk,
 	uint8_t keySize, char *key,
 	uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate
 ) {
@@ -374,8 +382,9 @@ size_t Protocol::generateDegradedReqHeader(
 
 	*( ( uint32_t * )( buf      ) ) = htonl( stripeId );
 	*( ( uint32_t * )( buf +  4 ) ) = htonl( reconstructedCount );
-	buf += 8;
-	bytes += 8;
+	*( ( uint32_t * )( buf +  8 ) ) = htonl( ongoingAtChunk );
+	buf += 12;
+	bytes += 12;
 
 	for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
 		*( ( uint32_t * )( buf     ) ) = htonl( original[ i * 2     ] );
@@ -422,6 +431,7 @@ bool Protocol::parseDegradedReqHeader(
 	size_t offset,
 	bool &isSealed, uint32_t &stripeId,
 	uint32_t *&original, uint32_t *&reconstructed, uint32_t &reconstructedCount,
+	uint32_t &ongoingAtChunk,
 	char *buf, size_t size
 ) {
 	if ( size - offset < PROTO_DEGRADED_REQ_BASE_SIZE )
@@ -434,7 +444,8 @@ bool Protocol::parseDegradedReqHeader(
 
 	stripeId           = ntohl( *( ( uint32_t * )( ptr      ) ) );
 	reconstructedCount = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
-	ptr += 8;
+	ongoingAtChunk     = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
+	ptr += 12;
 
 	original = ( uint32_t * ) ptr;
 	reconstructed = ( ( uint32_t * ) ptr ) + reconstructedCount * 2;
@@ -460,6 +471,7 @@ bool Protocol::parseDegradedReqHeader( struct DegradedReqHeader &header, uint8_t
 		header.original,
 		header.reconstructed,
 		header.reconstructedCount,
+		header.ongoingAtChunk,
 		buf, size
 	);
 	if ( ! ret )

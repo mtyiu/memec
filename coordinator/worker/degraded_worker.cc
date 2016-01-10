@@ -32,7 +32,8 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 
 	// Find the SlaveSocket which stores the stripe with listId and srcDataChunkId
 	SlaveSocket *socket;
-	CoordinatorWorker::stripeList->get( header.key, header.keySize, &socket );
+	uint32_t chunkId, ongoingAtChunk;
+	CoordinatorWorker::stripeList->get( header.key, header.keySize, &socket, 0, &chunkId );
 	Map *map = &( socket->map );
 	Metadata srcMetadata; // set via findMetadataByKey()
 	DegradedLock degradedLock;
@@ -55,7 +56,8 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 			srcMetadata.stripeId,
 			degradedLock.original,
 			degradedLock.reconstructed,
-			degradedLock.reconstructedCount
+			degradedLock.reconstructedCount,
+			degradedLock.ongoingAtChunk
 		);
 	} else if ( ! header.reconstructedCount ) {
 		// No need to lock
@@ -121,10 +123,17 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 			}
 		}
 		*/
+		for ( uint32_t i = 0; i < header.reconstructedCount; i++ ) {
+			if ( ongoingAtChunk == header.original[ i * 2 + 1 ] ) {
+				ongoingAtChunk = header.reconstructed[ i * 2 + 1 ];
+				break;
+			}
+		}
 
 		ret = map->insertDegradedLock(
 			srcMetadata.listId, srcMetadata.stripeId,
 			header.original, header.reconstructed, header.reconstructedCount,
+			ongoingAtChunk,
 			false, false
 		);
 
@@ -136,7 +145,8 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 				srcMetadata.stripeId,
 				header.original,
 				header.reconstructed,
-				header.reconstructedCount
+				header.reconstructedCount,
+				ongoingAtChunk
 			);
 		} else {
 			// Cannot lock

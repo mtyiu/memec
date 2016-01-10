@@ -176,7 +176,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 						break;
 					case PROTO_OPCODE_GET:
 						if ( ! mrmh.acceptNormalResponse( addr ) ) {
-							__INFO__( YELLOW, "Master", "dispatch", "Ignoring normal GET response..." );
+							// __INFO__( YELLOW, "Master", "dispatch", "Ignoring normal GET response..." );
 							break;
 						}
 					case PROTO_OPCODE_DEGRADED_GET:
@@ -184,7 +184,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 						break;
 					case PROTO_OPCODE_SET:
 						if ( ! mrmh.acceptNormalResponse( addr ) ) {
-							__INFO__( YELLOW, "Master", "dispatch", "Ignoring normal SET response..." );
+							// __INFO__( YELLOW, "Master", "dispatch", "Ignoring normal SET response..." );
 							break;
 						}
 						this->handleSetResponse( event, success, buffer.data, header.length );
@@ -194,7 +194,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 						break;
 					case PROTO_OPCODE_UPDATE:
 						if ( ! mrmh.acceptNormalResponse( addr ) ) {
-							__INFO__( YELLOW, "Master", "dispatch", "Ignoring normal UPDATE response..." );
+							// __INFO__( YELLOW, "Master", "dispatch", "Ignoring normal UPDATE response..." );
 							break;
 						}
 					case PROTO_OPCODE_DEGRADED_UPDATE:
@@ -202,7 +202,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 						break;
 					case PROTO_OPCODE_DELETE:
 						if ( ! mrmh.acceptNormalResponse( addr ) ) {
-							__INFO__( YELLOW, "Master", "dispatch", "Ignoring normal DELETE response..." );
+							// __INFO__( YELLOW, "Master", "dispatch", "Ignoring normal DELETE response..." );
 							break;
 						}
 					case PROTO_OPCODE_DEGRADED_DELETE:
@@ -310,8 +310,7 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 
 	if ( ! MasterWorker::pending->eraseKey( PT_SLAVE_SET, event.instanceId, event.requestId, event.socket, &pid, &key, true, false ) ) {
 		UNLOCK( &MasterWorker::pending->slaves.setLock );
-		__ERROR__( "MasterWorker", "handleSetResponse", "Cannot find a pending slave SET request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
-		// event.socket->printAddress();
+		__ERROR__( "MasterWorker", "handleSetResponse", "Cannot find a pending slave SET request that matches the response. This message will be discarded. (ID: (%u, %u); key: %.*s)", event.instanceId, event.requestId, keySize, keyStr );
 		return false;
 	}
 

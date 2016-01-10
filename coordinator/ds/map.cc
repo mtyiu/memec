@@ -146,9 +146,9 @@ bool Map::insertKey( char *keyStr, uint8_t keySize, uint32_t listId, uint32_t st
 }
 
 bool Map::insertDegradedLock( uint32_t listId, uint32_t stripeId,
-uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, bool needsLock, bool needsUnlock ) {
+uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32_t ongoingAtChunk, bool needsLock, bool needsUnlock ) {
 	ListStripe listStripe;
-	DegradedLock degradedLock( original, reconstructed, reconstructedCount );
+	DegradedLock degradedLock( original, reconstructed, reconstructedCount, ongoingAtChunk );
 	listStripe.set( listId, stripeId );
 
 	std::unordered_map<ListStripe, DegradedLock>::iterator it;

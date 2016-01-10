@@ -111,7 +111,8 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 				event.message.degradedLock.stripeId,
 				event.message.degradedLock.original,
 				event.message.degradedLock.reconstructed,
-				event.message.degradedLock.reconstructedCount
+				event.message.degradedLock.reconstructedCount,
+				event.message.degradedLock.ongoingAtChunk
 			);
 			isSend = true;
 			break;

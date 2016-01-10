@@ -68,19 +68,22 @@ namespace std {
 struct DegradedLock {
 	uint32_t *original, *reconstructed;
 	uint32_t reconstructedCount;
+	uint32_t ongoingAtChunk;
 
-	DegradedLock( uint32_t *original = 0, uint32_t *reconstructed = 0, uint32_t reconstructedCount = 0 ) {
-		this->set( original, reconstructed, reconstructedCount );
+	DegradedLock( uint32_t *original = 0, uint32_t *reconstructed = 0, uint32_t reconstructedCount = 0, uint32_t ongoingAtChunk = 0 ) {
+		this->set( original, reconstructed, reconstructedCount, ongoingAtChunk );
 	}
 
-	void set( uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount ) {
+	void set( uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32_t ongoingAtChunk ) {
 		if ( ! reconstructedCount ) {
 			this->original = 0;
 			this->reconstructed = 0;
+			this->ongoingAtChunk = -1;
 		} else {
 			this->original = original;
 			this->reconstructed = reconstructed;
 			this->reconstructedCount = reconstructedCount;
+			this->ongoingAtChunk = ongoingAtChunk;
 		}
 	}
 
@@ -165,6 +168,7 @@ public:
 	bool insertDegradedLock(
 		uint32_t listId, uint32_t stripeId,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
+		uint32_t ongoingAtChunk,
 		bool needsLock = true, bool needsUnlock = true
 	);
 

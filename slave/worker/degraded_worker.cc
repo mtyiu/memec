@@ -201,7 +201,7 @@ bool SlaveWorker::handleDegradedUpdateRequest( MasterEvent event, char *buf, siz
 
 	if ( index == -1 ) {
 		// Data chunk is NOT reconstructed
-		__INFO__( YELLOW, "SlaveWorker", "handleDegradedUpdateRequest", "TODO: Handle the case when the data chunk does NOT need reconstruction (isSealed: %s).", header.isSealed ? "true" : "false	" );
+		__INFO__( YELLOW, "SlaveWorker", "handleDegradedUpdateRequest", "TODO: Handle the case when the data chunk does NOT need reconstruction (isSealed: %s).", header.isSealed ? "true" : "false" );
 
 		// Set up key
 		key.set( header.data.keyValueUpdate.keySize, header.data.keyValueUpdate.key );

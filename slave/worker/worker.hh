@@ -159,6 +159,9 @@ private:
 		char *valueStr = 0, uint32_t valueSize = 0
 	);
 
+	// Perform UPDATE/DELETE on local data chunk and send reconstructed and modified parity chunks to the failed parity servers
+	bool handleUpdateRequestBySetChunk( MasterEvent event, KeyValueUpdateHeader &header );
+
 	// ---------- recovery_worker.cc ----------
 	bool handleSlaveReconstructedMsg( CoordinatorEvent event, char *buf, size_t size );
 	bool handleBackupSlavePromotedMsg( CoordinatorEvent event, char *buf, size_t size );

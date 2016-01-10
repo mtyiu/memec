@@ -61,7 +61,7 @@ void BasicRemappingScheme::getRemapTarget( uint32_t *original, uint32_t *remappe
 		original[ i * 2 + 1 ] = remapped[ i * 2 + 1 ];
 	}
 
-	int index = -1;
+	int index = -1, selected;
 	Latency *targetLatency, *nodeLatency;
 	for ( uint32_t i = 0; i < remappedCount; i++ ) {
 		slaveAddr = BasicRemappingScheme::stripeList->get( original[ i * 2 ], original[ i * 2 + 1 ] )->getAddr();
@@ -70,6 +70,7 @@ void BasicRemappingScheme::getRemapTarget( uint32_t *original, uint32_t *remappe
 		// Baseline
 		remapped[ i * 2     ] = original[ i * 2     ];
 		remapped[ i * 2 + 1 ] = original[ i * 2 + 1 ];
+		selected = false;
 
 		for ( uint32_t j = 0; j < dataChunkCount + parityChunkCount; j++ ) {
 			if ( j < dataChunkCount )
@@ -93,17 +94,19 @@ void BasicRemappingScheme::getRemapTarget( uint32_t *original, uint32_t *remappe
 				targetLatency = nodeLatency;
 				remapped[ i * 2     ] = original[ i * 2     ]; // List ID
 				remapped[ i * 2 + 1 ] = j;                     // Chunk ID
+				selected = true;
 			} else if ( targetLatency && nodeLatency && *nodeLatency < *targetLatency ) {
 				// Search the least-loaded node with the stripe list
 				targetLatency = nodeLatency;
 				remapped[ i * 2     ] = original[ i * 2     ]; // List ID
 				remapped[ i * 2 + 1 ] = j;                     // Chunk ID
+				selected = true;
 			}
 		}
 
 		if ( remapped[ i * 2     ] == original[ i * 2     ] &&
 		     remapped[ i * 2 + 1 ] == original[ i * 2 + 1 ] ) {
-			__ERROR__( "BasicRemappingScheme", "getRemapTarget", "Cannot get remapping target for (%u, %u); i = %u / %u.", original[ i * 2 ], original[ i * 2 + 1 ], i, remappedCount );
+			__ERROR__( "BasicRemappingScheme", "getRemapTarget", "Cannot get remapping target for (%u, %u); i = %u / %u; selected: %s.", original[ i * 2 ], original[ i * 2 + 1 ], i, remappedCount, selected ? "true" : "false" );
 		} else {
 			slaveAddr = BasicRemappingScheme::stripeList->get( remapped[ i * 2 ], remapped[ i * 2 + 1 ] )->getAddr();
 			nodeLatency = slaveLoading->cumulativeMirror.set.get( slaveAddr, &index );

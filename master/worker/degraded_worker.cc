@@ -157,6 +157,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 						buffer.size, instanceId, requestId,
 						header.isSealed, header.stripeId,
 						header.original, header.reconstructed, header.reconstructedCount,
+						header.ongoingAtChunk,
 						degradedLockData.key, degradedLockData.keySize
 					);
 					break;
@@ -195,6 +196,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 						buffer.size, instanceId, requestId,
 						header.isSealed, header.stripeId,
 						header.original, header.reconstructed, header.reconstructedCount,
+						header.ongoingAtChunk,
 						degradedLockData.key, degradedLockData.keySize,
 						degradedLockData.valueUpdate, degradedLockData.valueUpdateOffset, degradedLockData.valueUpdateSize
 					);
@@ -234,6 +236,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 						buffer.size, instanceId, requestId,
 						header.isSealed, header.stripeId,
 						header.original, header.reconstructed, header.reconstructedCount,
+						header.ongoingAtChunk,
 						degradedLockData.key, degradedLockData.keySize
 					);
 					break;

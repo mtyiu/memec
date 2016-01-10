@@ -18,6 +18,10 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 			lock = &this->slaves.setLock;
 			map = &this->slaves.set;
 			break;
+		case PT_SLAVE_REMAPPING_SET:
+			lock = &this->slaves.remappingSetLock;
+			map = &this->slaves.remappingSet;
+			break;
 		case PT_SLAVE_DEL:
 			lock = &this->slaves.delLock;
 			map = &this->slaves.del;
@@ -110,6 +114,7 @@ Pending::Pending() {
 	LOCK_INIT( &this->applications.delLock );
 	LOCK_INIT( &this->slaves.getLock );
 	LOCK_INIT( &this->slaves.setLock );
+	LOCK_INIT( &this->slaves.remappingSetLock );
 	LOCK_INIT( &this->slaves.updateLock );
 	LOCK_INIT( &this->slaves.delLock );
 	LOCK_INIT( &this->stats.getLock );
@@ -224,7 +229,7 @@ bool Pending::recordRequestStartTime( PendingType type, uint16_t instanceId, uin
 		LOCK( &this->stats.getLock );
 		ret = this->stats.get.insert( p );
 		UNLOCK( &this->stats.getLock );
-	} else if ( type == PT_SLAVE_SET ) {
+	} else if ( type == PT_SLAVE_SET || type == PT_SLAVE_REMAPPING_SET ) {
 		LOCK( &this->stats.setLock );
 		ret = this->stats.set.insert( p );
 		UNLOCK( &this->stats.setLock );
@@ -259,7 +264,7 @@ bool Pending::eraseRequestStartTime( PendingType type, uint16_t instanceId, uint
 		LOCK( &this->stats.getLock );
 		DO_SEARCH_FOR_ID( get );
 		UNLOCK( &this->stats.getLock );
-	} else if ( type == PT_SLAVE_SET ) {
+	} else if ( type == PT_SLAVE_SET || type == PT_SLAVE_REMAPPING_SET ) {
 		LOCK( &this->stats.setLock );
 		DO_SEARCH_FOR_ID( set );
 		UNLOCK( &this->stats.setLock );
@@ -433,7 +438,7 @@ bool Pending::eraseAck( PendingType type, uint16_t instanceId, std::vector<Ackno
 	for ( it = map->begin(), saveIt = map->begin(); it != map->end(); it = saveIt ) {
 		saveIt++;
 		if ( it->first.instanceId == instanceId ) {
-			if ( ackPtr ) 
+			if ( ackPtr )
 				ackPtr->push_back( it->second );
 			map->erase( it );
 		}

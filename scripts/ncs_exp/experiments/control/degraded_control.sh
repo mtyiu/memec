@@ -21,8 +21,7 @@ function restore_overload {
 
 workloads='workloada workloadc'
 
-iter=$1
-# for iter in {1..30}; do
+for iter in {1..1}; do
 	echo "******************** Iteration #$iter ********************"
 	screen -S manage -p 0 -X stuff "${BASE_PATH}/scripts/util/start.sh $(printf '\r')"
 	sleep 30
@@ -61,7 +60,7 @@ iter=$1
 	done
 
 	echo "Done"
-	
+
 	restore_overload
 
 	screen -S manage -p 0 -X stuff "$(printf '\r\r')"
@@ -72,4 +71,4 @@ iter=$1
 		scp testbed-node$n:${BASE_PATH}/results/degraded/*.txt ${BASE_PATH}/results/degraded_control/$iter/node$n
 		ssh testbed-node$n 'rm -rf ${BASE_PATH}/results/*'
 	done
-# done
+done
