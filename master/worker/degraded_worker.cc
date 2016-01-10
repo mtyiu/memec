@@ -117,9 +117,9 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 			break;
 		case PROTO_DEGRADED_LOCK_RES_NOT_EXIST:
 		default:
-			__DEBUG__(
+			__INFO__(
 				BLUE, "MasterWorker", "handleDegradedLockResponse",
-				"[Not Fonud] Key: %.*s (key size = %u)",
+				"[Not Found] Key: %.*s (key size = %u)",
 				( int ) header.keySize, header.key, header.keySize
 			);
 			break;

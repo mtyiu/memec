@@ -74,7 +74,7 @@ public class Main implements Runnable {
 			size = this.map.size();
 			ret = false;
 
-			// if ( rand == 1 ) rand = 2;
+			if ( rand == 1 ) rand = 2;
 
 			if ( rand == 0 ) {
 				// SET

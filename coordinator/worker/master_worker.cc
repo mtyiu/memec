@@ -118,11 +118,6 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 			break;
 		case MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_LOCKED:
 		case MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_FOUND:
-			printf(
-				"MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_FOUND: %.*s\n",
-				event.message.degradedLock.key.size,
-				event.message.degradedLock.key.data
-			);
 			buffer.data = this->protocol.resDegradedLock(
 				buffer.size,
 				event.instanceId, event.requestId,

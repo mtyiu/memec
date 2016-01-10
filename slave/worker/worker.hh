@@ -135,7 +135,7 @@ private:
 	bool handleRemappedDeleteResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 
 	// ---------- degraded_worker.cc ----------
-	int findInRedirectedList( uint32_t *reconstructed, uint32_t reconstructedCount );
+	int findInRedirectedList( uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32_t ongoingAtChunk, bool &reconstructParity );
 	bool handleReleaseDegradedLockRequest( CoordinatorEvent event, char *buf, size_t size );
 	bool handleDegradedGetRequest( MasterEvent event, char *buf, size_t size );
 	bool handleDegradedUpdateRequest( MasterEvent event, char *buf, size_t size );

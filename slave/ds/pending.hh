@@ -61,6 +61,7 @@ public:
 	uint32_t *original;
 	uint32_t *reconstructed;
 	uint32_t reconstructedCount;
+	uint32_t ongoingAtChunk;
 	union {
 		Key key;
 		KeyValueUpdate keyValueUpdate;
@@ -69,7 +70,9 @@ public:
 	void set(
 		uint8_t opcode, bool isSealed, MasterSocket *socket,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
-		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, bool dup = true
+		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
+		uint32_t ongoingAtChunk,
+		bool dup = true
 	) {
 		this->opcode = opcode;
 		this->isSealed = isSealed;
@@ -78,6 +81,7 @@ public:
 		this->stripeId = stripeId;
 		this->chunkId = chunkId;
 		this->reconstructedCount = reconstructedCount;
+		this->ongoingAtChunk = ongoingAtChunk;
 		if ( reconstructedCount ) {
 			if ( dup ) {
 				this->original = new uint32_t[ reconstructedCount * 2 ];

@@ -21,8 +21,11 @@ char *SlaveProtocol::reqSealChunk( size_t &size, uint16_t instanceId, uint32_t r
 		bytes += PROTO_CHUNK_SEAL_DATA_SIZE + keySize;
 		ptr += PROTO_CHUNK_SEAL_DATA_SIZE + keySize;
 
+		// printf( "%.*s ", keySize, key );
+
 		currentOffset = nextOffset;
 	}
+	// printf( "\n" );
 
 	// The seal request should not exceed the size of the send buffer
 	assert( bytes <= this->buffer.size );

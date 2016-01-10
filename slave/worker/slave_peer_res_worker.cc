@@ -522,7 +522,11 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 			if ( ! SlaveWorker::pending->eraseDegradedOp( PT_SLAVE_PEER_DEGRADED_OPS, event.instanceId, event.requestId, event.socket, &pid, &op ) ) {
 				__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot find a pending slave DEGRADED_OPS request that matches the response. This message will be discarded." );
 			} else {
-				int index = this->findInRedirectedList( op.reconstructed, op.reconstructedCount );
+				bool reconstructParity;
+				int index = this->findInRedirectedList(
+					op.original, op.reconstructed, op.reconstructedCount,
+					op.ongoingAtChunk, reconstructParity
+				);
 
 				// Check whether the reconstructed parity chunks need to be forwarded
 				bool needsForwarding = false;

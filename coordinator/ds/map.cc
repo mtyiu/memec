@@ -2,12 +2,16 @@
 
 uint32_t *Map::stripes;
 LOCK_T Map::stripesLock;
+std::unordered_map<ListStripe, DegradedLock> Map::degradedLocks;
+std::unordered_map<ListStripe, DegradedLock> Map::releasingDegradedLocks;
+LOCK_T Map::degradedLocksLock;
 
 void Map::init( uint32_t numStripeList ) {
 	Map::stripes = new uint32_t[ numStripeList ];
 	LOCK_INIT( &Map::stripesLock );
 	for ( uint32_t i = 0; i < numStripeList; i++ )
 		Map::stripes[ i ] = 0;
+	LOCK_INIT( &Map::degradedLocksLock );
 }
 
 void Map::free() {
@@ -17,7 +21,6 @@ void Map::free() {
 Map::Map() {
 	LOCK_INIT( &this->chunksLock );
 	LOCK_INIT( &this->keysLock );
-	LOCK_INIT( &this->degradedLocksLock );
 }
 
 bool Map::updateMaxStripeId( uint32_t listId, uint32_t stripeId ) {

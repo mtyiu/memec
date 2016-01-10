@@ -137,13 +137,13 @@ public:
 	 * Store the degraded locks
 	 * (list ID, stripe ID) |-> (original, reconstructed, reconstructedCount)
 	 */
-	std::unordered_map<ListStripe, DegradedLock> degradedLocks;
+	static std::unordered_map<ListStripe, DegradedLock> degradedLocks;
 	/**
 	 * Store the to-be-released degraded locks
 	 * (list ID, stripe ID, chunk ID) |-> (list ID, chunk ID)
 	 */
-	std::unordered_map<ListStripe, DegradedLock> releasingDegradedLocks;
-	LOCK_T degradedLocksLock;
+	static std::unordered_map<ListStripe, DegradedLock> releasingDegradedLocks;
+	static LOCK_T degradedLocksLock;
 
 	/**
 	 * Store the current stripe ID of each list.

@@ -131,6 +131,11 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 				header.value, header.valueSize
 			);
 		}
+	} else if (
+		( map->findValueByKey( header.key, header.keySize, 0, 0 ) ) ||
+		( SlaveWorker::chunkBuffer->at( header.listId )->findValueByKey( header.key, header.keySize, 0, 0 ) )
+	) {
+		// success = false;
 	} else {
 		// Store the key-value pair
 		uint32_t timestamp, stripeId;

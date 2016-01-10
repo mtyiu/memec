@@ -122,6 +122,14 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 		// 	Master::getInstance()->printPending();
 		// 	printf( "Request found.\n" );
 		}
+
+		ApplicationEvent applicationEvent;
+		applicationEvent.resSet(
+			( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId,
+			keyValue, false // success
+		);
+		this->dispatch( applicationEvent );
+
 		return false;
 	}
 

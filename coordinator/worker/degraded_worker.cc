@@ -42,6 +42,10 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 	lock = 0;
 	if ( ! map->findMetadataByKey( header.key, header.keySize, srcMetadata ) ) {
 		// Key not found
+		printf( "Key: %.*s not found at : ", header.keySize, header.key );
+		socket->printAddress();
+		printf( "\n" );
+
 		event.resDegradedLock(
 			event.socket, event.instanceId, event.requestId,
 			key, false

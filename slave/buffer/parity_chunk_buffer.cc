@@ -125,6 +125,7 @@ bool ParityChunkBuffer::set( char *keyStr, uint8_t keySize, char *valueStr, uint
 }
 
 bool ParityChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t count, char *sealData, size_t sealDataSize, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk ) {
+	bool ret = true;
 	char *data = dataChunk->getData();
 	dataChunk->clear();
 
@@ -158,6 +159,7 @@ bool ParityChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t coun
 				offset,
 				prtIt->second.req.seal.offset
 			);
+			ret = false;
 		}
 
 		if ( it == this->keys.end() ) {
@@ -167,11 +169,17 @@ bool ParityChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t coun
 			pendingRequest.seal( stripeId, offset );
 
 			std::pair<Key, PendingRequest> p( key, pendingRequest );
-			std::pair<std::unordered_map<Key, PendingRequest>::iterator, bool> ret;
+			std::pair<std::unordered_map<Key, PendingRequest>::iterator, bool> r;
 
-			ret = this->pending.insert( p );
-			if ( ! ret.second ) {
-				__ERROR__( "ParityChunkBuffer", "seal", "Key: %.*s (size = %u) cannot be inserted into pending keys map.", keySize, keyStr, keySize );
+			r = this->pending.insert( p );
+			if ( ! r.second ) {
+				__ERROR__(
+					"ParityChunkBuffer", "seal", "Key: %.*s (size = %u) cannot be inserted into pending keys map (stripe ID: %u vs. %u, offset: %u vs. %u).",
+					keySize, keyStr, keySize,
+					r.first->second.req.seal.stripeId, stripeId,
+					r.first->second.req.seal.offset, offset
+				);
+				ret = false;
 			}
 		} else {
 			keyValue = it->second;
@@ -199,7 +207,7 @@ bool ParityChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t coun
 	this->update( stripeId, chunkId, 0, curPos, dataChunks, dataChunk, parityChunk, false, false, true );
 	UNLOCK( &this->lock );
 
-	return true;
+	return ret;
 }
 
 bool ParityChunkBuffer::findValueByKey( char *data, uint8_t size, KeyValue *keyValuePtr, Key *keyPtr ) {
