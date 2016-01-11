@@ -222,6 +222,7 @@ enum PendingType {
 	PT_SLAVE_PEER_DEL,
 	PT_SLAVE_PEER_GET_CHUNK,
 	PT_SLAVE_PEER_SET_CHUNK,
+	PT_SLAVE_PEER_FORWARD_PARITY_CHUNK,
 	PT_SLAVE_PEER_UPDATE_CHUNK,
 	PT_SLAVE_PEER_DEL_CHUNK,
 	PT_SLAVE_PEER_PARITY
@@ -262,6 +263,7 @@ public:
 		std::unordered_multimap<PendingIdentifier, Key> del;
 		std::unordered_multimap<PendingIdentifier, ChunkRequest> getChunk;
 		std::unordered_multimap<PendingIdentifier, ChunkRequest> setChunk;
+		std::unordered_multimap<PendingIdentifier, ChunkRequest> forwardParityChunk;
 		std::unordered_multimap<PendingIdentifier, ChunkUpdate> updateChunk;
 		std::unordered_multimap<PendingIdentifier, ChunkUpdate> deleteChunk;
 		std::unordered_map<struct sockaddr_in, std::set<PendingData>* > remappedData;
@@ -273,6 +275,7 @@ public:
 		LOCK_T delLock;
 		LOCK_T getChunkLock;
 		LOCK_T setChunkLock;
+		LOCK_T forwardParityChunkLock;
 		LOCK_T updateChunkLock;
 		LOCK_T delChunkLock;
 		LOCK_T remappedDataLock;
@@ -293,6 +296,7 @@ public:
 		LOCK_INIT( &this->slavePeers.delLock );
 		LOCK_INIT( &this->slavePeers.getChunkLock );
 		LOCK_INIT( &this->slavePeers.setChunkLock );
+		LOCK_INIT( &this->slavePeers.forwardParityChunkLock );
 		LOCK_INIT( &this->slavePeers.updateChunkLock );
 		LOCK_INIT( &this->slavePeers.delChunkLock );
 		LOCK_INIT( &this->slavePeers.remappedDataLock );

@@ -739,8 +739,9 @@ void Coordinator::dump() {
 
 		numKeys += this->sockets.slaves[ i ]->map.dump();
 	}
-
 	fprintf( f, "Total number of key-value pairs = %lu.\n", numKeys );
+
+	Map::dumpDegradedLocks();
 }
 
 void Coordinator::metadata() {
@@ -894,12 +895,13 @@ void Coordinator::lookup() {
 			printf( "Degraded lock found: " );
 			for ( uint32_t i = 0; i < degradedLock.reconstructedCount; i++ ) {
 				printf(
-					"%s(%u, %u) |-> (%u, %u)%s",
+					"%s(%u, %u) |-> (%u, %u) (ongoing: %u)%s",
 					i == 0 ? "" : "; ",
 					degradedLock.original[ i * 2     ],
 					degradedLock.original[ i * 2 + 1 ],
 					degradedLock.reconstructed[ i * 2     ],
 					degradedLock.reconstructed[ i * 2 + 1 ],
+					degradedLock.ongoingAtChunk,
 					i == degradedLock.reconstructedCount - 1 ? "\n" : ""
 				);
 			}

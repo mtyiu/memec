@@ -263,12 +263,17 @@ size_t Map::dump( FILE *f ) {
 	UNLOCK( &this->keysLock );
 	fprintf( f, "\n" );
 
-	fprintf( f, "List of degraded locks:\n-----------------------\n" );
-	LOCK( &this->degradedLocksLock );
-	if ( ! this->degradedLocks.size() ) {
+	return numKeys;
+}
+
+size_t Map::dumpDegradedLocks( FILE *f ) {
+	size_t ret;
+	fprintf( f, "#### List of degraded locks ####\n" );
+	LOCK( &Map::degradedLocksLock );
+	if ( ! Map::degradedLocks.size() ) {
 		fprintf( f, "(None)\n" );
 	} else {
-		for ( std::unordered_map<ListStripe, DegradedLock>::iterator it = this->degradedLocks.begin(); it != this->degradedLocks.end(); it++ ) {
+		for ( std::unordered_map<ListStripe, DegradedLock>::iterator it = Map::degradedLocks.begin(); it != Map::degradedLocks.end(); it++ ) {
 			fprintf(
 				f, "(%u, %u): ",
 				it->first.listId, it->first.stripeId
@@ -285,12 +290,13 @@ size_t Map::dump( FILE *f ) {
 			}
 			fprintf( f, "%s\n", it->second.reconstructedCount ? "" : " (none)" );
 		}
-		fprintf( f, "Count: %lu\n", this->degradedLocks.size() );
+		fprintf( f, "Count: %lu\n", Map::degradedLocks.size() );
 	}
-	UNLOCK( &this->degradedLocksLock );
+	ret = Map::degradedLocks.size();
+	UNLOCK( &Map::degradedLocksLock );
 	fprintf( f, "\n" );
 
-	return numKeys;
+	return ret;
 }
 
 void Map::persist( FILE *f ) {

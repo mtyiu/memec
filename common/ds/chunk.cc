@@ -133,6 +133,15 @@ void Chunk::swap( Chunk *c ) {
 #endif
 }
 
+void Chunk::copy( Chunk *c ) {
+	this->status = c->status;
+	this->count = c->count;
+	this->size = c->size;
+	this->metadata = c->metadata;
+	this->isParity = c->isParity;
+	memcpy( this->data, c->getData(), c->getSize() );
+}
+
 char *Chunk::alloc( uint32_t size, uint32_t &offset ) {
 #ifdef USE_CHUNK_LOCK
 	LOCK( &this->lock );

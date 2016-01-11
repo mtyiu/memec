@@ -83,6 +83,10 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 			lock = &this->slavePeers.setChunkLock;
 			map = &this->slavePeers.setChunk;
 			break;
+		case PT_SLAVE_PEER_FORWARD_PARITY_CHUNK:
+			lock = &this->slavePeers.forwardParityChunkLock;
+			map = &this->slavePeers.forwardParityChunk;
+			break;
 		default:
 			lock = 0;
 			map = 0;

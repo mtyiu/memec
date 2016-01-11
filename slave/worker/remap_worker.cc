@@ -150,6 +150,15 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 			&isSealed, &sealed,
 			this->chunks, this->dataChunk, this->parityChunk
 		);
+
+		if ( header.chunkId < SlaveWorker::dataChunkCount ) {
+			// Insert remapping record
+			SlaveWorker::remappedBuffer->insert(
+				header.listId, header.chunkId,
+				header.original, header.remapped, header.remappedCount,
+				header.key, header.keySize
+			);
+		}
 	}
 
 	Key key;

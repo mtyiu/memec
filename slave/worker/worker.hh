@@ -41,6 +41,10 @@ private:
 	BitmaskArray *chunkStatus;
 	Chunk *dataChunk, *parityChunk;
 	Chunk **chunks;
+	struct {
+		Chunk *dataChunk, *parityChunk;
+		Chunk **chunks;
+	} forward; // For forwarding parity chunk
 	Chunk *freeChunks;
 	SlavePeerSocket **dataSlaveSockets;
 	SlavePeerSocket **paritySlaveSockets;
@@ -88,9 +92,21 @@ private:
 	bool handleSetRequest( MasterEvent event, char *buf, size_t size, bool needResSet = true );
 	bool handleSetRequest( MasterEvent event, KeyValueHeader &header, bool needResSet = true );
 	bool handleUpdateRequest( MasterEvent event, char *buf, size_t size );
-	bool handleUpdateRequest( MasterEvent event, KeyValueUpdateHeader &header );
+	bool handleUpdateRequest(
+		MasterEvent event, KeyValueUpdateHeader &header,
+		uint32_t *original = 0, uint32_t *reconstructed = 0, uint32_t reconstructedCount = 0,
+		bool reconstructParity = false,
+		Chunk **chunks = 0,
+		bool endOfDegradedOp = false
+	);
 	bool handleDeleteRequest( MasterEvent event, char *buf, size_t size );
-	bool handleDeleteRequest( MasterEvent event, KeyHeader &header );
+	bool handleDeleteRequest(
+		MasterEvent event, KeyHeader &header,
+		uint32_t *original = 0, uint32_t *reconstructed = 0, uint32_t reconstructedCount = 0,
+		bool reconstructParity = false,
+		Chunk **chunks = 0,
+		bool endOfDegradedOp = false
+	);
 
 	bool handleAckParityDeltaBackup( MasterEvent event, char *buf, size_t size );
 	bool handleRevertParityDelta( MasterEvent event, char *buf, size_t size );
@@ -135,7 +151,10 @@ private:
 	bool handleRemappedDeleteResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 
 	// ---------- degraded_worker.cc ----------
-	int findInRedirectedList( uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32_t ongoingAtChunk, bool &reconstructParity );
+	int findInRedirectedList(
+		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
+		uint32_t ongoingAtChunk, bool &reconstructParity, bool &reconstructData
+	);
 	bool handleReleaseDegradedLockRequest( CoordinatorEvent event, char *buf, size_t size );
 	bool handleDegradedGetRequest( MasterEvent event, char *buf, size_t size );
 	bool handleDegradedUpdateRequest( MasterEvent event, char *buf, size_t size );
@@ -160,7 +179,8 @@ private:
 		uint32_t timestamp = 0,
 		MasterSocket *masterSocket = 0,
 		uint32_t *original = 0, uint32_t *reconstructed = 0, uint32_t reconstructedCount = 0,
-		char *valueStr = 0, uint32_t valueSize = 0
+		bool reconstructParity = false,
+		Chunk **chunks = 0, bool endOfDegradedOp = false
 	);
 
 	// Perform UPDATE/DELETE on local data chunk and send reconstructed and modified parity chunks to the failed parity servers

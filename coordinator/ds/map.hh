@@ -182,6 +182,7 @@ public:
 
 	// Debug //
 	size_t dump( FILE *f = stdout );
+	static size_t dumpDegradedLocks( FILE *f = stdout );
 	void persist( FILE *f );
 };
 

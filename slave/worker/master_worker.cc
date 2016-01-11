@@ -402,7 +402,12 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 	return this->handleUpdateRequest( event, header );
 }
 
-bool SlaveWorker::handleUpdateRequest( MasterEvent event, struct KeyValueUpdateHeader &header ) {
+bool SlaveWorker::handleUpdateRequest(
+	MasterEvent event, struct KeyValueUpdateHeader &header,
+	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
+	bool reconstructParity,
+	Chunk **chunks, bool endOfDegradedOp
+) {
 	bool ret;
 	Key key;
 	KeyValue keyValue;
@@ -410,8 +415,27 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, struct KeyValueUpdateH
 	KeyMetadata keyMetadata;
 	Metadata metadata;
 	RemappedKeyValue remappedKeyValue;
+	RemappingRecord remappingRecord;
 	Chunk *chunk;
+
 	if ( map->findValueByKey( header.key, header.keySize, &keyValue, &key, &keyMetadata, &metadata, &chunk ) ) {
+		if ( keyMetadata.isParityRemapped ) {
+			assert( ! original && ! reconstructed && ! reconstructedCount );
+
+			// Find remapping record and store it to {original, reconstructed, reconstructedCount}
+			if ( remappedBuffer->find( header.keySize, header.key, &remappingRecord ) ) {
+				original = remappingRecord.original;
+				reconstructed = remappingRecord.remapped;
+				reconstructedCount = remappingRecord.remappedCount;
+			} else {
+				__ERROR__( "SlaveWorker", "handleUpdateRequest", "[%u, %u] Cannot find remapping record for key: %.*s.", event.instanceId, event.requestId, header.keySize, header.key );
+			}
+
+			reconstructParity = false;
+			chunks = 0;
+			endOfDegradedOp = false;
+		}
+
 		uint32_t offset = keyMetadata.offset + PROTO_KEY_VALUE_SIZE + header.keySize + header.valueUpdateOffset;
 
 		if ( SlaveWorker::parityChunkCount ) {
@@ -454,15 +478,19 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, struct KeyValueUpdateH
 
 		if ( SlaveWorker::parityChunkCount ) {
 			ret = this->sendModifyChunkRequest(
-				event.instanceId, event.requestId, keyValueUpdate.size, keyValueUpdate.data,
+				event.instanceId, event.requestId,
+				keyValueUpdate.size, keyValueUpdate.data,
 				metadata, offset,
-				header.valueUpdateSize,    /* deltaSize */
+				header.valueUpdateSize,    // deltaSize
 				header.valueUpdateOffset,
-				header.valueUpdate,        /* delta */
-				chunkBufferIndex == -1,    /* isSealed */
-				true,                      /* isUpdate */
+				header.valueUpdate,        // delta
+				chunkBufferIndex == -1,    // isSealed
+				true,                      // isUpdate
 				event.timestamp,
-				event.socket
+				event.socket,              // masterSocket
+				original, reconstructed, reconstructedCount,
+				reconstructParity,
+				chunks, endOfDegradedOp
 			);
 		} else {
 			event.resUpdate(
@@ -478,7 +506,7 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, struct KeyValueUpdateH
 			chunkBuffer->updateAndUnlockChunk( chunkBufferIndex );
 	} else if ( remappedBuffer->update( header.keySize, header.key, header.valueUpdateSize, header.valueUpdateOffset, header.valueUpdate, &remappedKeyValue ) ) {
 		// Handle remapped key
-		__DEBUG__( GREEN, "SlaveWorker", "handleUpdateRequest", "Handle remapped key: %.*s!", header.keySize, header.key );
+		__INFO__( GREEN, "SlaveWorker", "handleUpdateRequest", "Handle remapped key: %.*s!", header.keySize, header.key );
 
 		if ( SlaveWorker::parityChunkCount ) {
 			// Add the current request to the pending set
@@ -597,7 +625,12 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 	return this->handleDeleteRequest( event, header );
 }
 
-bool SlaveWorker::handleDeleteRequest( MasterEvent event, struct KeyHeader &header ) {
+bool SlaveWorker::handleDeleteRequest(
+	MasterEvent event, struct KeyHeader &header,
+	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
+	bool reconstructParity,
+	Chunk **chunks, bool endOfDegradedOp
+) {
 	bool ret;
 	Key key;
 	KeyValue keyValue;
@@ -663,8 +696,13 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, struct KeyHeader &head
 			ret = this->sendModifyChunkRequest(
 				event.instanceId, event.requestId, key.size, key.data,
 				metadata, keyMetadata.offset, deltaSize, 0, delta,
-				chunkBufferIndex == -1 /* isSealed */,
-				false /* isUpdate */
+				chunkBufferIndex == -1, // isSealed
+				false,                  // isUpdate
+				0,                      // timestamp
+				0,                      // masterSocket
+				original, reconstructed, reconstructedCount,
+				reconstructParity,
+				chunks, endOfDegradedOp
 			);
 		} else {
 			uint32_t timestamp = SlaveWorker::timestamp->nextVal();

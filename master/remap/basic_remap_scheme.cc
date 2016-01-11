@@ -102,6 +102,10 @@ void BasicRemappingScheme::getRemapTarget( uint32_t *original, uint32_t *remappe
 				remapped[ i * 2 + 1 ] = j;                     // Chunk ID
 				selected = true;
 			}
+
+			// FOR DEBUG ONLY
+			// if ( original[ i * 2 + 1 ] >= dataChunkCount )
+			// 	remapped[ i * 2 + 1 ] = 0;
 		}
 
 		if ( remapped[ i * 2     ] == original[ i * 2     ] &&
