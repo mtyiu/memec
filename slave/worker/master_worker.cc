@@ -506,7 +506,7 @@ bool SlaveWorker::handleUpdateRequest(
 			chunkBuffer->updateAndUnlockChunk( chunkBufferIndex );
 	} else if ( remappedBuffer->update( header.keySize, header.key, header.valueUpdateSize, header.valueUpdateOffset, header.valueUpdate, &remappedKeyValue ) ) {
 		// Handle remapped key
-		__INFO__( GREEN, "SlaveWorker", "handleUpdateRequest", "Handle remapped key: %.*s!", header.keySize, header.key );
+		// __INFO__( GREEN, "SlaveWorker", "handleUpdateRequest", "Handle remapped key: %.*s!", header.keySize, header.key );
 
 		if ( SlaveWorker::parityChunkCount ) {
 			// Add the current request to the pending set
@@ -723,7 +723,7 @@ bool SlaveWorker::handleDeleteRequest(
 		if ( chunkBufferIndex != -1 )
 			chunkBuffer->updateAndUnlockChunk( chunkBufferIndex );
 	} else if ( remappedBuffer->find( header.keySize, header.key, &remappedKeyValue ) ) {
-		__INFO__( GREEN, "SlaveWorker", "handleDeleteRequest", "Handle remapped key: %.*s!", header.keySize, header.key );
+		// __INFO__( GREEN, "SlaveWorker", "handleDeleteRequest", "Handle remapped key: %.*s!", header.keySize, header.key );
 		ret = true;
 	} else {
 		key.set( header.keySize, header.key, ( void * ) event.socket );
