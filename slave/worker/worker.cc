@@ -110,11 +110,19 @@ void SlaveWorker::free() {
 	this->buffer.data = 0;
 	this->buffer.size = 0;
 	delete this->chunkStatus;
+
 	this->dataChunk->free();
 	this->parityChunk->free();
 	delete this->dataChunk;
 	delete this->parityChunk;
 	delete[] this->chunks;
+
+	this->forward.dataChunk->free();
+	this->forward.parityChunk->free();
+	delete this->forward.dataChunk;
+	delete this->forward.parityChunk;
+	delete[] this->forward.chunks;
+
 	delete[] this->freeChunks;
 	delete[] this->dataSlaveSockets;
 	delete[] this->paritySlaveSockets;
@@ -234,9 +242,15 @@ bool SlaveWorker::init( GlobalConfig &globalConfig, SlaveConfig &slaveConfig, Wo
 	this->buffer.data = new char[ globalConfig.size.chunk ];
 	this->buffer.size = globalConfig.size.chunk;
 	this->chunkStatus = new BitmaskArray( SlaveWorker::chunkCount, 1 );
+
 	this->dataChunk = new Chunk();
 	this->parityChunk = new Chunk();
 	this->chunks = new Chunk*[ SlaveWorker::chunkCount ];
+
+	this->forward.dataChunk = new Chunk();
+	this->forward.parityChunk = new Chunk();
+	this->forward.chunks = new Chunk*[ SlaveWorker::chunkCount ];
+
 	this->freeChunks = new Chunk[ SlaveWorker::dataChunkCount ];
 	for( uint32_t i = 0; i < SlaveWorker::dataChunkCount; i++ ) {
 		this->freeChunks[ i ].init( globalConfig.size.chunk );
@@ -246,6 +260,10 @@ bool SlaveWorker::init( GlobalConfig &globalConfig, SlaveConfig &slaveConfig, Wo
 	this->parityChunk->init( globalConfig.size.chunk );
 	this->dataChunk->init();
 	this->parityChunk->init();
+
+	this->forward.dataChunk->init();
+	this->forward.parityChunk->init();
+
 	this->dataSlaveSockets = new SlavePeerSocket*[ SlaveWorker::dataChunkCount ];
 	this->paritySlaveSockets = new SlavePeerSocket*[ SlaveWorker::parityChunkCount ];
 	switch( this->role ) {

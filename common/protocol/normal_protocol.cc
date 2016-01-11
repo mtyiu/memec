@@ -471,7 +471,7 @@ size_t Protocol::generateKeyValueUpdateHeader( uint8_t magic, uint8_t to, uint8_
 	size_t bytes = this->generateHeader(
 		magic, to, opcode,
 		PROTO_KEY_VALUE_UPDATE_SIZE + keySize + ( valueUpdate ? valueUpdateSize : 0 ),
-		instanceId, requestId, 0, timestamp
+		instanceId, requestId, sendBuf, timestamp
 	);
 
 	buf[ 0 ] = keySize;

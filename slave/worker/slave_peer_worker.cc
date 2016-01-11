@@ -257,6 +257,32 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				event.message.del.key.size
 			);
 			break;
+		// REMAPPING_UPDATE
+		case SLAVE_PEER_EVENT_TYPE_REMAPPED_UPDATE_RESPONSE_SUCCESS:
+			success = true;
+		case SLAVE_PEER_EVENT_TYPE_REMAPPED_UPDATE_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resRemappedUpdate(
+				buffer.size,
+				event.instanceId, event.requestId,
+				success,
+				event.message.remappingUpdate.key.data,
+				event.message.remappingUpdate.key.size,
+				event.message.remappingUpdate.valueUpdateOffset,
+				event.message.remappingUpdate.valueUpdateSize
+			);
+			break;
+		// REMAPPING_DELETE
+		case SLAVE_PEER_EVENT_TYPE_REMAPPED_DELETE_RESPONSE_SUCCESS:
+			success = true;
+		case SLAVE_PEER_EVENT_TYPE_REMAPPED_DELETE_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resRemappedDelete(
+				buffer.size,
+				event.instanceId, event.requestId,
+				success,
+				event.message.remappingDel.key.data,
+				event.message.remappingDel.key.size
+			);
+			break;
 		// DELETE_CHUNK
 		case SLAVE_PEER_EVENT_TYPE_DELETE_CHUNK_RESPONSE_SUCCESS:
 			success = true; // default is false
@@ -540,6 +566,38 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 							break;
 						case PROTO_MAGIC_RESPONSE_FAILURE:
 							this->handleDeleteResponse( event, false, buffer.data, buffer.size );
+							break;
+						default:
+							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
+							break;
+					}
+					break;
+				case PROTO_OPCODE_REMAPPED_UPDATE:
+					switch( header.magic ) {
+						case PROTO_MAGIC_REQUEST:
+							this->handleRemappedUpdateRequest( event, buffer.data, buffer.size );
+							break;
+						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							this->handleRemappedUpdateResponse( event, true, buffer.data, buffer.size );
+							break;
+						case PROTO_MAGIC_RESPONSE_FAILURE:
+							this->handleRemappedUpdateResponse( event, false, buffer.data, buffer.size );
+							break;
+						default:
+							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
+							break;
+					}
+					break;
+				case PROTO_OPCODE_REMAPPED_DELETE:
+					switch( header.magic ) {
+						case PROTO_MAGIC_REQUEST:
+							this->handleRemappedDeleteRequest( event, buffer.data, buffer.size );
+							break;
+						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							this->handleRemappedDeleteResponse( event, true, buffer.data, buffer.size );
+							break;
+						case PROTO_MAGIC_RESPONSE_FAILURE:
+							this->handleRemappedDeleteResponse( event, false, buffer.data, buffer.size );
 							break;
 						default:
 							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );

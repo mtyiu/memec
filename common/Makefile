@@ -18,6 +18,7 @@ OBJS= \
 	protocol/protocol.o \
 	protocol/ack_protocol.o \
 	protocol/address_protocol.o \
+	protocol/batch_protocol.o \
 	protocol/chunk_protocol.o \
 	protocol/degraded_protocol.o \
 	protocol/fault_protocol.o \

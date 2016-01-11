@@ -66,7 +66,7 @@ find_in_values:
 		return false;
 	} else {
 		if ( keyPtr ) *keyPtr = it->first;
-		*keyValue = it->second;
+		if ( keyValue ) *keyValue = it->second;
 	}
 	UNLOCK( &this->unsealed.lock );
 

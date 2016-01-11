@@ -4,7 +4,8 @@ char *CoordinatorProtocol::resDegradedLock(
 	size_t &size, uint16_t instanceId, uint32_t requestId,
 	bool isLocked, uint8_t keySize, char *key,
 	bool isSealed, uint32_t stripeId,
-	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount
+	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
+	uint32_t ongoingAtChunk
 ) {
 	// -- common/protocol/degraded_protocol.cc --
 	size = this->generateDegradedLockResHeader(
@@ -14,7 +15,8 @@ char *CoordinatorProtocol::resDegradedLock(
 		instanceId, requestId,
 		isLocked, keySize, key,
 		isSealed, stripeId,
-		original, reconstructed, reconstructedCount
+		original, reconstructed, reconstructedCount,
+		ongoingAtChunk
 	);
 	return this->buffer.send;
 }

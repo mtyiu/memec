@@ -83,6 +83,7 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_OPCODE_SEAL_CHUNKS:
 		case PROTO_OPCODE_FLUSH_CHUNKS:
 		case PROTO_OPCODE_RECONSTRUCTION:
+		case PROTO_OPCODE_RECONSTRUCTION_UNSEALED:
 		case PROTO_OPCODE_SYNC_META:
 		case PROTO_OPCODE_RELEASE_DEGRADED_LOCKS:
 		case PROTO_OPCODE_SLAVE_RECONSTRUCTED:
@@ -121,6 +122,8 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_OPCODE_GET_CHUNKS:
 		case PROTO_OPCODE_SET_CHUNK:
 		case PROTO_OPCODE_SET_CHUNK_UNSEALED:
+		case PROTO_OPCODE_REMAPPED_UPDATE:
+		case PROTO_OPCODE_REMAPPED_DELETE:
 			break;
 		default:
 			fprintf( stderr, "Error #4: (magic, from, to, opcode, length, instanceId, requestId) = (%x, %x, %x, %x, %u, %u, %u)\n", magic, from, to, opcode, length, instanceId, requestId );

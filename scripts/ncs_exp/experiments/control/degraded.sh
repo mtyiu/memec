@@ -26,6 +26,8 @@ for iter in {1..1}; do
 	screen -S manage -p 0 -X stuff "${BASE_PATH}/scripts/util/start.sh $(printf '\r')"
 	sleep 30
 
+	set_overload
+
 	echo "-------------------- Load --------------------"
 	for n in 3 4 8 9; do
 		ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/master/degraded.sh load $(printf '\r')\"" &
@@ -40,8 +42,6 @@ for iter in {1..1}; do
 		fi
 		pending=$(expr $pending + 1)
 	done
-
-	set_overload
 
 	for w in $workloads; do
 		for n in 3 4 8 9; do

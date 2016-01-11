@@ -138,6 +138,7 @@ KeyMetadata DataChunkBuffer::set( SlaveWorker *worker, char *key, uint8_t keySiz
 	keyMetadata.stripeId = chunk->metadata.stripeId;
 	keyMetadata.chunkId = chunk->metadata.chunkId;
 	keyMetadata.length = size;
+	keyMetadata.isParityRemapped = ( opcode == PROTO_OPCODE_REMAPPING_SET );
 	keyMetadata.ptr = ( char * ) chunk;
 
 	// Allocate memory from chunk

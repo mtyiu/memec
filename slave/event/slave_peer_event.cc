@@ -154,6 +154,24 @@ void SlavePeerEvent::resDelete( SlavePeerSocket *socket, uint16_t instanceId, ui
 	this->message.del.key = key;
 }
 
+void SlavePeerEvent::resRemappedUpdate( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool success ) {
+	this->type = success ? SLAVE_PEER_EVENT_TYPE_REMAPPED_UPDATE_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_REMAPPED_UPDATE_RESPONSE_FAILURE;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
+	this->socket = socket;
+	this->message.remappingUpdate.key = key;
+	this->message.remappingUpdate.valueUpdateOffset = valueUpdateOffset;
+	this->message.remappingUpdate.valueUpdateSize = valueUpdateSize;
+}
+
+void SlavePeerEvent::resRemappedDelete( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool success ) {
+	this->type = success ? SLAVE_PEER_EVENT_TYPE_REMAPPED_DELETE_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_REMAPPED_DELETE_RESPONSE_FAILURE;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
+	this->socket = socket;
+	this->message.remappingDel.key = key;
+}
+
 void SlavePeerEvent::resUpdateChunk( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, bool success ) {
 	this->type = success ? SLAVE_PEER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_FAILURE;
 	this->instanceId = instanceId;

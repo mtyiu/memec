@@ -32,7 +32,8 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 
 	// Find the SlaveSocket which stores the stripe with listId and srcDataChunkId
 	SlaveSocket *socket;
-	CoordinatorWorker::stripeList->get( header.key, header.keySize, &socket );
+	uint32_t ongoingAtChunk;
+	CoordinatorWorker::stripeList->get( header.key, header.keySize, &socket, 0, &ongoingAtChunk );
 	Map *map = &( socket->map );
 	Metadata srcMetadata; // set via findMetadataByKey()
 	DegradedLock degradedLock;
@@ -41,6 +42,10 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 	lock = 0;
 	if ( ! map->findMetadataByKey( header.key, header.keySize, srcMetadata ) ) {
 		// Key not found
+		printf( "Key: %.*s not found at : ", header.keySize, header.key );
+		socket->printAddress();
+		printf( "\n" );
+
 		event.resDegradedLock(
 			event.socket, event.instanceId, event.requestId,
 			key, false
@@ -55,7 +60,8 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 			srcMetadata.stripeId,
 			degradedLock.original,
 			degradedLock.reconstructed,
-			degradedLock.reconstructedCount
+			degradedLock.reconstructedCount,
+			degradedLock.ongoingAtChunk
 		);
 	} else if ( ! header.reconstructedCount ) {
 		// No need to lock
@@ -121,10 +127,17 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 			}
 		}
 		*/
+		for ( uint32_t i = 0; i < header.reconstructedCount; i++ ) {
+			if ( ongoingAtChunk == header.original[ i * 2 + 1 ] ) {
+				ongoingAtChunk = header.reconstructed[ i * 2 + 1 ];
+				break;
+			}
+		}
 
 		ret = map->insertDegradedLock(
 			srcMetadata.listId, srcMetadata.stripeId,
 			header.original, header.reconstructed, header.reconstructedCount,
+			ongoingAtChunk,
 			false, false
 		);
 
@@ -136,7 +149,8 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 				srcMetadata.stripeId,
 				header.original,
 				header.reconstructed,
-				header.reconstructedCount
+				header.reconstructedCount,
+				ongoingAtChunk
 			);
 		} else {
 			// Cannot lock

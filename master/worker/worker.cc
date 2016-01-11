@@ -343,7 +343,7 @@ void MasterWorker::replayRequestPrepare( SlaveSocket *slave ) {
 	// DELETE
 	pendingLock = &pending->slaves.delLock;
 	SEARCH_MAP_FOR_REQUEST( DELETE, Key, Key, key, DEL, del );
-	
+
 	/* mark the first timestamp to start the replay */
 	if ( ! pending->replay.requests.empty() || pending->replay.requestsStartTime.count( instanceId ) == 0 ) {
 		if ( smallestTimeAfterCurrent == currentTime )
@@ -389,7 +389,6 @@ void MasterWorker::replayRequest( SlaveSocket *slave ) {
 	do {
 		switch ( lit->second.opcode ) {
 			case PROTO_OPCODE_SET:
-				printf("Replaying (%u, %u)\n", lit->second.instanceId, lit->second.requestId );
 				event.replaySetRequest(
 					( ApplicationSocket * ) lit->second.application,
 					lit->second.instanceId, lit->second.requestId,

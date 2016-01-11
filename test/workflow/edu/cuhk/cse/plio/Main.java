@@ -70,11 +70,12 @@ public class Main implements Runnable {
 
 		while( i < numOps ) {
 			// rand = this.random.nextInt( 4 );
-			rand = this.random.nextInt( 2 );
+			rand = this.random.nextInt( 3 );
 			size = this.map.size();
 			ret = false;
 
 			// if ( rand == 1 ) rand = 2;
+			if ( size != numRecords ) rand = 0;
 
 			if ( rand == 0 ) {
 				// SET
@@ -118,8 +119,9 @@ public class Main implements Runnable {
 
 					if ( ret ) {
 						ret = v.equals( value );
-						if ( ! ret )
-							System.out.println( "Value mismatch: " + v.length() + " vs. " + value.length() );
+						if ( ! ret ) {
+							System.out.println( "Value mismatch (key: " + key + "): (wrong) " + v.length() + " vs. (correct) " + value.length() );
+						}
 					}
 
 					this.completed[ 1 ]++;

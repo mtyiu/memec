@@ -88,7 +88,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 			}
 			break;
 		case PROTO_DEGRADED_LOCK_RES_NOT_LOCKED:
-			__DEBUG__(
+			__INFO__(
 				BLUE, "MasterWorker", "handleDegradedLockResponse",
 				"[Not Locked] Key: %.*s (key size = %u).",
 				( int ) header.keySize, header.key, header.keySize
@@ -117,9 +117,9 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 			break;
 		case PROTO_DEGRADED_LOCK_RES_NOT_EXIST:
 		default:
-			__DEBUG__(
+			__INFO__(
 				BLUE, "MasterWorker", "handleDegradedLockResponse",
-				"[Not Fonud] Key: %.*s (key size = %u)",
+				"[Not Found] Key: %.*s (key size = %u)",
 				( int ) header.keySize, header.key, header.keySize
 			);
 			break;
@@ -157,6 +157,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 						buffer.size, instanceId, requestId,
 						header.isSealed, header.stripeId,
 						header.original, header.reconstructed, header.reconstructedCount,
+						header.ongoingAtChunk,
 						degradedLockData.key, degradedLockData.keySize
 					);
 					break;
@@ -167,7 +168,6 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 						header.key, header.keySize
 					);
 					if ( MasterWorker::updateInterval ) {
-						// printf( "[remapped] Request sent: %u, %u\n", instanceId, requestId );
 						MasterWorker::pending->recordRequestStartTime( PT_SLAVE_GET, instanceId, pid.parentInstanceId, requestId, pid.parentRequestId, ( void * ) socket, socket->getAddr() );
 					}
 					break;
@@ -177,6 +177,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 						return false;
 					}
 					applicationEvent.resGet( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, key );
+					// printf( "handleDegradedLockResponse(): Key %.*s not found.\n", key.size, key.data );
 					MasterWorker::eventQueue->insert( applicationEvent );
 					return true;
 			}
@@ -195,6 +196,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 						buffer.size, instanceId, requestId,
 						header.isSealed, header.stripeId,
 						header.original, header.reconstructed, header.reconstructedCount,
+						header.ongoingAtChunk,
 						degradedLockData.key, degradedLockData.keySize,
 						degradedLockData.valueUpdate, degradedLockData.valueUpdateOffset, degradedLockData.valueUpdateSize
 					);
@@ -234,6 +236,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 						buffer.size, instanceId, requestId,
 						header.isSealed, header.stripeId,
 						header.original, header.reconstructed, header.reconstructedCount,
+						header.ongoingAtChunk,
 						degradedLockData.key, degradedLockData.keySize
 					);
 					break;

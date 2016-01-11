@@ -50,3 +50,65 @@ char *SlaveProtocol::reqSet( size_t &size, uint16_t instanceId, uint32_t request
 	);
 	return buf;
 }
+
+char *SlaveProtocol::reqRemappedUpdate( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *buf, uint32_t timestamp ) {
+	// -- common/protocol/normal_protocol.cc --
+	if ( ! buf ) buf = this->buffer.send;
+	size = this->generateKeyValueUpdateHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_REMAPPED_UPDATE,
+		instanceId, requestId,
+		keySize,
+		key,
+		valueUpdateOffset,
+		valueUpdateSize,
+		valueUpdate,
+		buf, timestamp
+	);
+	return buf;
+}
+
+char *SlaveProtocol::reqRemappedDelete( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize, char *buf, uint32_t timestamp ) {
+	// -- common/protocol/normal_protocol.cc --
+	if ( ! buf ) buf = this->buffer.send;
+	size = this->generateKeyHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_REMAPPED_DELETE,
+		instanceId, requestId,
+		keySize,
+		key,
+		buf, timestamp
+	);
+	return buf;
+}
+
+char *SlaveProtocol::resRemappedUpdate( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, char *key, uint8_t keySize, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *buf, uint32_t timestamp ) {
+	// -- common/protocol/normal_protocol.cc --
+	if ( ! buf ) buf = this->buffer.send;
+	size = this->generateKeyValueUpdateHeader(
+		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_REMAPPED_UPDATE,
+		instanceId, requestId,
+		keySize, key,
+		valueUpdateOffset, valueUpdateSize, 0,
+		buf, timestamp
+	);
+	return buf;
+}
+
+char *SlaveProtocol::resRemappedDelete( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, char *key, uint8_t keySize, char *buf, uint32_t timestamp ) {
+	// -- common/protocol/normal_protocol.cc --
+	if ( ! buf ) buf = this->buffer.send;
+	size = this->generateKeyHeader(
+		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_REMAPPED_DELETE,
+		instanceId, requestId,
+		keySize, key,
+		buf, timestamp
+	);
+	return buf;
+}

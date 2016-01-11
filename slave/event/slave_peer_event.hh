@@ -38,6 +38,12 @@ enum SlavePeerEventType {
 	// UPDATE
 	SLAVE_PEER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS,
 	SLAVE_PEER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE,
+	// REMAPPED_UPDATE
+	SLAVE_PEER_EVENT_TYPE_REMAPPED_UPDATE_RESPONSE_SUCCESS,
+	SLAVE_PEER_EVENT_TYPE_REMAPPED_UPDATE_RESPONSE_FAILURE,
+	// REMAPPED_DELETE
+	SLAVE_PEER_EVENT_TYPE_REMAPPED_DELETE_RESPONSE_SUCCESS,
+	SLAVE_PEER_EVENT_TYPE_REMAPPED_DELETE_RESPONSE_FAILURE,
 	// UPDATE_CHUNK
 	SLAVE_PEER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_SUCCESS,
 	SLAVE_PEER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_FAILURE,
@@ -125,6 +131,14 @@ public:
 				char *data;
 			} update;
 		} degradedSet;
+		struct {
+			Key key;
+			uint32_t valueUpdateOffset;
+			uint32_t valueUpdateSize;
+		} remappingUpdate;
+		struct {
+			Key key;
+		} remappingDel;
 	} message;
 
 	// Register
@@ -162,6 +176,10 @@ public:
 	void resUpdate( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key, uint32_t valueUpdateOffset, uint32_t length, uint32_t chunkUpdateOffset, bool success );
 	// DELETE
 	void resDelete( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key, bool success );
+	// REMAPPED_UPDATE
+	void resRemappedUpdate( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool success );
+	// REMAPPED_DELETE
+	void resRemappedDelete( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool success );
 	// UPDATE_CHUNK
 	void resUpdateChunk( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, bool success );
 	// DELETE_CHUNK

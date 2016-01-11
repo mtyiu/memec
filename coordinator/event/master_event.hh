@@ -64,6 +64,7 @@ public:
 			uint32_t stripeId;
 			uint32_t reconstructedCount;
 			uint32_t remappedCount;
+			uint32_t ongoingAtChunk;
 			uint32_t *original;
 			uint32_t *reconstructed;
 			uint32_t *remapped;
@@ -89,7 +90,8 @@ public:
 		MasterSocket *socket, uint16_t instanceId, uint32_t requestId,
 		Key &key, bool isLocked, bool isSealed,
 		uint32_t stripeId,
-		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount
+		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
+		uint32_t ongoingAtChunk
 	);
 	void resDegradedLock(
 		MasterSocket *socket, uint16_t instanceId, uint32_t requestId,

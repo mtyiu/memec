@@ -417,15 +417,15 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, bool isSealed, ch
 
 		// Remove the chunk from pending chunk set
 		uint16_t instanceId;
-		uint32_t requestId, addr, remaining, total;
+		uint32_t requestId, addr, remainingChunks, remainingKeys, totalChunks, totalKeys;
 		uint16_t port;
 		CoordinatorSocket *coordinatorSocket;
-		if ( SlaveWorker::pending->eraseRecovery( metadata.listId, metadata.stripeId, metadata.chunkId, instanceId, requestId, coordinatorSocket, addr, port, remaining, total ) ) {
+		if ( SlaveWorker::pending->eraseRecovery( metadata.listId, metadata.stripeId, metadata.chunkId, instanceId, requestId, coordinatorSocket, addr, port, remainingChunks, remainingKeys, totalChunks, totalKeys ) ) {
 			// printf( "Received (%u, %u, %u). Number of remaining pending chunks = %u / %u.\n", metadata.listId, metadata.stripeId, metadata.chunkId, remaining, total );
 
-			if ( remaining == 0 ) {
+			if ( remainingChunks == 0 ) {
 				notifyCoordinator = true;
-				coordinatorEvent.resPromoteBackupSlave( coordinatorSocket, instanceId, requestId, addr, port, total );
+				coordinatorEvent.resPromoteBackupSlave( coordinatorSocket, instanceId, requestId, addr, port, totalChunks, 0 );
 			}
 		} else {
 			// __ERROR__( "SlaveWorker", "handleSetChunkRequest", "Cannot find the chunk (%u, %u, %u) from pending chunk set.", metadata.listId, metadata.stripeId, metadata.chunkId );
@@ -697,8 +697,12 @@ bool SlaveWorker::handleSealChunkRequest( SlavePeerEvent event, char *buf, size_
 		this->chunks, this->dataChunk, this->parityChunk
 	);
 
-	if ( ! ret )
-		__ERROR__( "SlaveWorker", "handleSealChunkRequest", "Cannot update parity chunk." );
+	if ( ! ret ) {
+		event.socket->printAddress();
+		printf( " " );
+		fflush( stdout );
+		__ERROR__( "SlaveWorker", "handleSealChunkRequest", "[%u, %u] Cannot update parity chunk.", event.instanceId, event.requestId );
+	}
 
 	return true;
 }
@@ -708,12 +712,6 @@ bool SlaveWorker::issueSealChunkRequest( Chunk *chunk, uint32_t startPos ) {
 		return false;
 	}
 
-	// printf(
-	// 	"issueSealChunkRequest(): (%u, %u, %u)\n",
-	// 	chunk->metadata.listId,
-	// 	chunk->metadata.stripeId,
-	// 	chunk->metadata.chunkId
-	// );
 	// The chunk is locked when this function is called
 	// Only issue seal chunk request when new key-value pairs are received
 	if ( SlaveWorker::parityChunkCount && startPos < chunk->getSize() ) {
@@ -722,6 +720,14 @@ bool SlaveWorker::issueSealChunkRequest( Chunk *chunk, uint32_t startPos ) {
 		uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
 		Packet *packet = SlaveWorker::packetPool->malloc();
 		packet->setReferenceCount( SlaveWorker::parityChunkCount );
+
+		// printf(
+		// 	"[%u, %u] issueSealChunkRequest(): (%u, %u, %u)\n",
+		// 	instanceId, requestId,
+		// 	chunk->metadata.listId,
+		// 	chunk->metadata.stripeId,
+		// 	chunk->metadata.chunkId
+		// );
 
 		// Find parity slaves
 		this->getSlaves( chunk->metadata.listId );

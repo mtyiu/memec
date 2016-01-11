@@ -1,7 +1,7 @@
 #!/bin/bash
 
 SLAVE_NAME=$(hostname | sed 's/testbed-//g')
-SLAVE_IP=$(hostname -I | xargs)
+SLAVE_IP=$(hostname -I | awk '{print $1}' | xargs)
 SLAVE_PORT=9111
 STORAGE_PATH=~/mtyiu/tmp/${SLAVE_NAME}
 CONFIG_PATH=bin/config/ncs_exp

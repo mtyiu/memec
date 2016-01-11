@@ -14,17 +14,17 @@ bool CoordinatorWorker::handlePromoteBackupSlaveResponse( SlaveEvent event, char
 		event.instanceId, event.requestId, header.count, header.addr, header.port
 	);
 
-	uint32_t remaining, total;
+	uint32_t remainingChunks, remainingKeys, totalChunks, totalKeys;
 	double elapsedTime;
 	SlaveSocket *original;
 
-	if ( ! CoordinatorWorker::pending->eraseRecovery( event.instanceId, event.requestId, header.addr, header.port, header.count, event.socket, remaining, total, elapsedTime, original ) ) {
+	if ( ! CoordinatorWorker::pending->eraseRecovery( event.instanceId, event.requestId, header.addr, header.port, header.chunkCount, header.unsealedCount, event.socket, remainingChunks, remainingKeys, totalChunks, totalKeys, elapsedTime, original ) ) {
 		__ERROR__( "SlaveWorker", "handlePromoteBackupSlaveResponse", "Cannot find a pending RECOVERY request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		return false;
 	}
 
-	if ( remaining == 0 ) {
-		__INFO__( CYAN, "CoordinatorWorker", "handlePromoteBackupSlaveResponse", "Recovery is completed. Number of chunks reconstructed = %u; elapsed time = %lf s.\n", total, elapsedTime );
+	if ( remainingChunks == 0 && remainingKeys == 0 ) {
+		__INFO__( CYAN, "CoordinatorWorker", "handlePromoteBackupSlaveResponse", "Recovery is completed. Number of chunks reconstructed = %u; number of keys reconstructed = %u; elapsed time = %lf s.\n", totalChunks, totalKeys, elapsedTime );
 
 		event.ackCompletedReconstruction( event.socket, event.instanceId, event.requestId, true );
 		this->dispatch( event );
@@ -38,7 +38,8 @@ bool CoordinatorWorker::handlePromoteBackupSlaveResponse( SlaveEvent event, char
 		log.setRecovery(
 			header.addr,
 			header.port,
-			header.count,
+			header.chunkCount,
+			header.unsealedCount,
 			elapsedTime
 		);
 		Coordinator::getInstance()->appendLog( log );
@@ -104,7 +105,7 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 
 	////////////////////////////////////////////////////////////////////////////
 
-	uint32_t numLostChunks = 0, listId, stripeId, chunkId, requestId = 0;
+	uint32_t numLostChunks = 0, numLostUnsealedKeys = 0, listId, stripeId, chunkId, requestId = 0;
 	bool connected, isCompleted, isAllCompleted;
 	ssize_t ret;
 	struct {
@@ -118,10 +119,16 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 	std::unordered_map<uint32_t, std::unordered_set<uint32_t>>::iterator stripeIdsIt;
 	std::unordered_set<uint32_t>::iterator stripeIdSetIt;
 	std::unordered_map<uint32_t, SlaveSocket **> sockets;
+	std::unordered_map<uint32_t, std::unordered_set<Key>> unsealed;
+	std::unordered_map<uint32_t, std::unordered_set<Key>>::iterator unsealedIt;
+	std::unordered_set<Key> unsealedKeysAggregated;
+	std::unordered_set<Key>::iterator unsealedKeysIt;
 
 	std::vector<StripeListIndex> lists = CoordinatorWorker::stripeList->list( ( uint32_t ) index );
 
 	ArrayMap<int, SlaveSocket> &map = Coordinator::getInstance()->sockets.slaves;
+
+	CoordinatorRemapMsgHandler *crmh = CoordinatorRemapMsgHandler::getInstance();
 
 	//////////////////////////////////////////////////
 	// Get the SlaveSockets of the surviving slaves //
@@ -134,6 +141,12 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 			CoordinatorWorker::stripeList->get(
 				listId, s + CoordinatorWorker::dataChunkCount, s
 			);
+
+			for ( uint32_t j = 0; j < CoordinatorWorker::chunkCount; j++ ) {
+				if ( ! s[ j ] || ! s[ j ]->ready() || crmh->allowRemapping( s[ j ]->getAddr() ) )
+					s[ j ] = 0; // Don't use this slave
+			}
+
 			sockets[ listId ] = s;
 		}
 	}
@@ -142,19 +155,65 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 	LOCK( &socket->map.chunksLock );
 	LOCK( &socket->map.keysLock );
 
+	///////////////////////////////////////
+	// Prepare the list of sealed chunks //
+	///////////////////////////////////////
+	for ( chunksIt = socket->map.chunks.begin(); chunksIt != socket->map.chunks.end(); chunksIt++ ) {
+		listId = chunksIt->listId;
+		stripeId = chunksIt->stripeId;
+
+		stripeIdsIt = stripeIds.find( listId );
+		if ( stripeIdsIt == stripeIds.end() ) {
+			std::unordered_set<uint32_t> ids;
+			ids.insert( stripeId );
+			stripeIds[ listId ] = ids;
+		} else {
+			stripeIdsIt->second.insert( stripeId );
+		}
+		numLostChunks++;
+	}
+	assert( numLostChunks == socket->map.chunks.size() );
+
+	///////////////////////////////////////
+	// Prepare the list of unsealed keys //
+	///////////////////////////////////////
+	for ( keysIt = socket->map.keys.begin(); keysIt != socket->map.keys.end(); keysIt++ ) {
+		const Key &key = keysIt->first;
+		OpMetadata &opMetadata = keysIt->second;
+
+		chunksIt = socket->map.chunks.find( opMetadata );
+		if ( chunksIt == socket->map.chunks.end() ) {
+			unsealedIt = unsealed.find( opMetadata.listId );
+			if ( unsealedIt == unsealed.end() ) {
+				std::pair<uint32_t, std::unordered_set<Key>> p( opMetadata.listId, std::unordered_set<Key>() );
+				std::pair<std::unordered_map<uint32_t, std::unordered_set<Key>>::iterator, bool> r = unsealed.insert( p );
+				unsealedIt = r.first;
+			}
+			unsealedKeysIt = unsealedKeysAggregated.find( key );
+			if ( unsealedKeysIt == unsealedKeysAggregated.end() ) {
+				unsealedIt->second.insert( key );
+				unsealedKeysAggregated.insert( key );
+				numLostUnsealedKeys++;
+			}
+			opMetadata.stripeId = -1; // Reset stripe ID
+		}
+	}
+	printf( "Number of unsealed chunks: %lu\n", unsealed.size() );
+
 	//////////////////////////////
 	// Promote the backup slave //
 	//////////////////////////////
 	requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
 	chunksIt = socket->map.chunks.begin();
+	unsealedKeysIt = unsealedKeysAggregated.begin();
 	do {
 		buffer.data = this->protocol.promoteBackupSlave(
 			buffer.size,
 			Coordinator::instanceId,
 			requestId,
 			socket,
-			socket->map.chunks,
-			chunksIt,
+			socket->map.chunks, chunksIt,
+			unsealedKeysAggregated, unsealedKeysIt,
 			isCompleted
 		);
 
@@ -173,6 +232,7 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 		srcAddr.addr,
 		srcAddr.port,
 		socket->map.chunks.size(),
+		numLostUnsealedKeys,
 		startTime,
 		backupSlaveSocket,
 		socket
@@ -183,25 +243,11 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 	/////////////////////////////////////////////////////////////////
 	// Distribute the reconstruction tasks to the surviving slaves //
 	/////////////////////////////////////////////////////////////////
-	for ( chunksIt = socket->map.chunks.begin(); chunksIt != socket->map.chunks.end(); chunksIt++ ) {
-		listId = chunksIt->listId;
-		stripeId = chunksIt->stripeId;
-
-		stripeIdsIt = stripeIds.find( listId );
-		if ( stripeIdsIt == stripeIds.end() ) {
-			std::unordered_set<uint32_t> ids;
-			ids.insert( stripeId );
-			stripeIds[ listId ] = ids;
-		} else {
-			stripeIdsIt->second.insert( stripeId );
-		}
-		numLostChunks++;
-	}
-	assert( numLostChunks == socket->map.chunks.size() );
 	// Distribute the reconstruction task among the slaves in the same stripe list
 	for ( uint32_t i = 0, size = lists.size(); i < size; i++ ) {
 		uint32_t numSurvivingSlaves = 0;
 		uint32_t numStripePerSlave;
+		uint32_t numUnsealedKeys;
 
 		listId = lists[ i ].listId;
 		chunkId = lists[ i ].chunkId;
@@ -224,7 +270,7 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 
 		for ( uint32_t j = 0; j < CoordinatorWorker::chunkCount; j++ ) {
 			SlaveSocket *s = sockets[ listId ][ j ];
-			if ( s->ready() && s != backupSlaveSocket )
+			if ( s && s->ready() && s != backupSlaveSocket )
 				numSurvivingSlaves++;
 		}
 
@@ -241,20 +287,24 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 		CoordinatorWorker::pending->insertReconstruction(
 			Coordinator::instanceId,
 			requestId,
-			listId, chunkId, stripeIds[ listId ],
+			listId, chunkId,
+			stripeIds[ listId ],
+			unsealed[ listId ],
 			lock, cond
 		);
 
 		// Distribute the task
 		stripeIdSetIt = stripeIds[ listId ].begin();
+		unsealedKeysIt = unsealed[ listId ].begin();
 		do {
 			isAllCompleted = true;
+			// Task to all slaves: Reconstruct sealed chunks
 			for ( uint32_t j = 0; j < CoordinatorWorker::chunkCount; j++ ) {
 				if ( stripeIdSetIt == stripeIds[ listId ].end() )
 					break;
 
 				SlaveSocket *s = sockets[ listId ][ j ];
-				if ( s->ready() && s != backupSlaveSocket ) {
+				if ( s && s->ready() && s != backupSlaveSocket ) {
 					buffer.data = this->protocol.reqReconstruction(
 						buffer.size,
 						Coordinator::instanceId,
@@ -271,6 +321,7 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 					if ( ret != ( ssize_t ) buffer.size )
 						__ERROR__( "CoordinatorWorker", "handleReconstructionRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 
+					// Avoid generating too many requests
 					pthread_mutex_lock( lock );
 					pthread_cond_wait( cond, lock );
 					pthread_mutex_unlock( lock );
@@ -279,45 +330,41 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 				}
 			}
 		} while ( ! isAllCompleted );
+		do {
+			isAllCompleted = true;
+			// Task to parity slaves: Send unsealed keys
+			for ( uint32_t j = 0; j < CoordinatorWorker::parityChunkCount; j++ ) {
+				if ( unsealedKeysIt == unsealed[ listId ].end() )
+					break;
 
-		__INFO__( YELLOW, "CoordinatorWorker", "handleReconstructionRequest", "[%u] (%u, %u): Number of surviving slaves: %u; number of stripes per slave: %u; total number of stripes: %lu", requestId, listId, chunkId, numSurvivingSlaves, numStripePerSlave, stripeIds[ listId ].size() );
-	}
+				SlaveSocket *s = sockets[ listId ][ CoordinatorWorker::dataChunkCount + j ];
+				if ( s && s->ready() && s != backupSlaveSocket ) {
+					buffer.data = this->protocol.reqReconstructionUnsealed(
+						buffer.size,
+						Coordinator::instanceId,
+						requestId,
+						unsealed[ listId ],
+						unsealedKeysIt,
+						numUnsealedKeys,
+						isCompleted
+					);
+					isAllCompleted &= isCompleted;
+				}
 
-	////////////////////////////
-	// Handle unsealed chunks //
-	////////////////////////////
-	// Construct the set of keys in unsealed chunks
-	std::map<Metadata, std::vector<Key>> unsealed;
-	std::map<Metadata, std::vector<Key>>::iterator unsealedIt;
+				ret = s->send( buffer.data, buffer.size, connected );
+				if ( ret != ( ssize_t ) buffer.size )
+					__ERROR__( "CoordinatorWorker", "handleReconstructionRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 
-	printf( "socket->map.keys.size = %lu\n", socket->map.keys.size() );
-	for ( keysIt = socket->map.keys.begin(); keysIt != socket->map.keys.end(); keysIt++ ) {
-		const Key &key = keysIt->first;
-		const OpMetadata &opMetadata = keysIt->second;
+				// Avoid generating too many requests
+				pthread_mutex_lock( lock );
+				pthread_cond_wait( cond, lock );
+				pthread_mutex_unlock( lock );
 
-		chunksIt = socket->map.chunks.find( opMetadata );
-		if ( chunksIt == socket->map.chunks.end() ) {
-			unsealedIt = unsealed.find( opMetadata );
-			if ( unsealedIt == unsealed.end() ) {
-				std::pair<Metadata, std::vector<Key>> p( opMetadata, std::vector<Key>() );
-				std::pair<std::map<Metadata, std::vector<Key>>::iterator, bool> r = unsealed.insert( p );
-				unsealedIt = r.first;
+				isAllCompleted &= isCompleted;
 			}
-			unsealedIt->second.push_back( key );
-		}
-	}
-	printf( "Number of unsealed chunks: %lu\n", unsealed.size() );
-	for ( unsealedIt = unsealed.begin(); unsealedIt != unsealed.end(); unsealedIt++ ) {
-		printf(
-			"- (%u, %u, %u): %lu keys\n",
-			unsealedIt->first.listId,
-			unsealedIt->first.stripeId,
-			unsealedIt->first.chunkId,
-			unsealedIt->second.size()
-		);
-		// TODO:
-		// - Reset the stripe IDs
-		// - Ask the parity servers to send the unsealed keys to the reconstructed server
+		} while ( ! isAllCompleted );
+
+		__INFO__( YELLOW, "CoordinatorWorker", "handleReconstructionRequest", "[%u] (%u, %u): Number of surviving slaves: %u; number of stripes per slave: %u; total number of stripes: %lu; total number of unsealed keys: %lu", requestId, listId, chunkId, numSurvivingSlaves, numStripePerSlave, stripeIds[ listId ].size(), unsealed[ listId ].size() );
 	}
 
 	UNLOCK( &socket->map.keysLock );
@@ -335,8 +382,8 @@ bool CoordinatorWorker::handleReconstructionResponse( SlaveEvent event, char *bu
 		return false;
 	}
 
-	uint32_t remaining;
-	if ( ! CoordinatorWorker::pending->eraseReconstruction( event.instanceId, event.requestId, header.listId, header.chunkId, header.numStripes, remaining ) ) {
+	uint32_t remainingChunks, remainingKeys;
+	if ( ! CoordinatorWorker::pending->eraseReconstruction( event.instanceId, event.requestId, header.listId, header.chunkId, header.numStripes, 0, remainingChunks, remainingKeys ) ) {
 		__ERROR__( "CoordinatorWorker", "handleReconstructionResponse", "The response does not match with the request!" );
 		return false;
 	}
@@ -345,7 +392,37 @@ bool CoordinatorWorker::handleReconstructionResponse( SlaveEvent event, char *bu
 		BLUE, "CoordinatorWorker", "handleReconstructionResponse",
 		"[RECONSTRUCTION] Request ID: (%u, %u); list ID: %u, chunk Id: %u, number of stripes: %u (%s)",
 		event.instanceId, event.requestId, header.listId, header.chunkId, header.numStripes,
-		remaining == 0 ? "Done" : "In progress"
+		remainingChunks == 0 && remainingKeys == 0 ? "Done" : "In progress"
+	);
+
+	return true;
+}
+
+bool CoordinatorWorker::handleReconstructionUnsealedResponse( SlaveEvent event, char *buf, size_t size ) {
+	struct BatchKeyHeader header;
+	if ( ! this->protocol.parseBatchKeyHeader( header, buf, size ) ) {
+		__ERROR__( "CoordinatorWorker", "handleReconstructionUnsealedResponse", "Invalid RECONSTRUCTION_UNSEALED response (size = %lu).", size );
+		return false;
+	}
+
+	// Determine the list ID and chunk ID
+	uint8_t keySize = ( uint8_t ) header.keys[ 0 ];
+	char *key = header.keys + 1;
+	uint32_t listId, chunkId;
+
+	listId = CoordinatorWorker::stripeList->get( key, keySize, 0, 0, &chunkId );
+
+	uint32_t remainingChunks, remainingKeys;
+	if ( ! CoordinatorWorker::pending->eraseReconstruction( event.instanceId, event.requestId, listId, chunkId, 0, header.count, remainingChunks, remainingKeys ) ) {
+		__ERROR__( "CoordinatorWorker", "handleReconstructionResponse", "The response does not match with the request!" );
+		return false;
+	}
+
+	__DEBUG__(
+		BLUE, "CoordinatorWorker", "handleReconstructionResponse",
+		"[RECONSTRUCTION] Request ID: (%u, %u); list ID: %u, chunk Id: %u, number of stripes: %u (%s)",
+		event.instanceId, event.requestId, header.listId, header.chunkId, header.numStripes,
+		remainingChunks == 0 && remainingKeys == 0 ? "Done" : "In progress"
 	);
 
 	return true;

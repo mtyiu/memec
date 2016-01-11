@@ -194,7 +194,7 @@ void MasterRemapMsgHandler::setState( char* msg , int len ) {
 			case REMAP_INTERMEDIATE:
 				// clean up pending items associated with this slave
 				// TODO handle the case when insert happened after cleanup ( useCoordinatedFlow returns false > erase > add )
-				MasterWorker::removePending( target );
+				// MasterWorker::removePending( target );
 				this->ackTransit();
 				break;
 			case REMAP_COORDINATED:
@@ -203,8 +203,8 @@ void MasterRemapMsgHandler::setState( char* msg , int len ) {
 				break;
 			case REMAP_DEGRADED:
 				// start replaying the requests
-				MasterWorker::replayRequestPrepare( target );
-				MasterWorker::replayRequest( target );
+				// MasterWorker::replayRequestPrepare( target );
+				// MasterWorker::replayRequest( target );
 				break;
 			default:
 				break;

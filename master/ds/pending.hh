@@ -21,6 +21,7 @@ enum PendingType {
 	PT_APPLICATION_DEL,
 	PT_SLAVE_GET,
 	PT_SLAVE_SET,
+	PT_SLAVE_REMAPPING_SET,
 	PT_SLAVE_UPDATE,
 	PT_SLAVE_DEL,
 	PT_KEY_REMAP_LIST,
@@ -75,7 +76,7 @@ public:
 		this->instanceId = instanceId;
 		this->requestId = requestId;
 		this->opcode = opcode;
-		if ( needsDup ) 
+		if ( needsDup )
 			this->key.dup( key.size, key.data, key.ptr );
 		else
 			this->key.set( key.size, key.data, key.ptr );
@@ -104,7 +105,7 @@ public:
 		this->opcode = opcode;
 		if ( needsDup )
 			this->keyValueUpdate.dup( keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.ptr );
-		else 
+		else
 			this->keyValueUpdate.set( keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.ptr );
 		this->keyValueUpdate.offset = keyValueUpdate.offset;
 		this->keyValueUpdate.length = keyValueUpdate.length;
@@ -231,10 +232,12 @@ public:
 	struct {
 		std::unordered_multimap<PendingIdentifier, Key> get;
 		std::unordered_multimap<PendingIdentifier, Key> set;
+		std::unordered_multimap<PendingIdentifier, Key> remappingSet;
 		std::unordered_multimap<PendingIdentifier, KeyValueUpdate> update;
 		std::unordered_multimap<PendingIdentifier, Key> del;
 		LOCK_T getLock;
 		LOCK_T setLock;
+		LOCK_T remappingSetLock;
 		LOCK_T updateLock;
 		LOCK_T delLock;
 	} slaves;
@@ -282,7 +285,7 @@ public:
 	);
 	bool insertKeyValueUpdate(
 		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr,
-		KeyValueUpdate &keyValueUpdate, 
+		KeyValueUpdate &keyValueUpdate,
 		bool needsLock = true, bool needsUnlock = true,
 		uint32_t timestamp = 0
 	);
@@ -363,12 +366,12 @@ public:
 	);
 
 	// remove all the pending ack with a specific instanceId
-	bool eraseAck( 
+	bool eraseAck(
 		PendingType type, uint16_t instanceId,
 		std::vector<AcknowledgementInfo> *ackPtr = 0,
 		bool needsLock = true, bool needsUnlock = true
 	);
-		
+
 	// Find
 	bool findKeyValue(
 		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr,

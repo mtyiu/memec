@@ -7,8 +7,8 @@ if [ $# != 2 ]; then
 	exit 1
 fi
 
-RECORD_COUNT=10000000
-OPERATION_COUNT=$(expr ${RECORD_COUNT} \/ 4)
+RECORD_COUNT=1000000
+OPERATION_COUNT=1000000 # $(expr ${RECORD_COUNT} \/ 4)
 
 ${YCSB_PATH}/bin/ycsb \
 	run plio \

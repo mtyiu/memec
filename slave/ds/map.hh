@@ -16,7 +16,7 @@ private:
 	Timestamp *timestamp;
 	/**
 	 * Store the mapping between keys and chunks
-	 * Key |-> (list ID, stripe ID, chunk ID, offset, length)
+	 * Key |-> (list ID, stripe ID, chunk ID, offset, length, isPartyRemapped)
 	 */
 	std::unordered_map<Key, KeyMetadata> keys;
 	LOCK_T keysLock;
@@ -33,6 +33,13 @@ private:
 	 */
 	std::unordered_map<uint32_t, std::unordered_set<uint32_t>> stripeIds;
 	LOCK_T stripeIdsLock;
+
+	/**
+	 * Store the forwarded, reconstructed chunks
+	 * (list ID, stripe ID, chunk ID) (src) |-> (list ID, stripe ID, chunk ID) (dst)
+	 */
+	std::unordered_map<Metadata, Metadata> forwarded;
+	LOCK_T forwardedLock;
 
 public:
 	/**
@@ -52,6 +59,7 @@ public:
 		LOCK_INIT( &this->keysLock );
 		LOCK_INIT( &this->cacheLock );
 		LOCK_INIT( &this->stripeIdsLock );
+		LOCK_INIT( &this->forwardedLock );
 		LOCK_INIT( &this->opsLock );
 		LOCK_INIT( &this->sealedLock );
 	}
@@ -261,6 +269,56 @@ public:
 		while ( sids.find( ret ) != end )
 			ret++;
 		UNLOCK( &this->stripeIdsLock );
+		return ret;
+	}
+
+	bool insertForwardedChunk(
+		uint32_t srcListId, uint32_t srcStripeId, uint32_t srcChunkId,
+		uint32_t dstListId, uint32_t dstStripeId, uint32_t dstChunkId
+	) {
+		Metadata srcMetadata, dstMetadata;
+		srcMetadata.set( srcListId, srcStripeId, srcChunkId );
+		dstMetadata.set( dstListId, dstStripeId, dstChunkId );
+
+		std::pair<std::unordered_map<Metadata, Metadata>::iterator, bool> ret;
+		std::pair<Metadata, Metadata> p( srcMetadata, dstMetadata );
+
+		LOCK( &this->forwardedLock );
+		ret = this->forwarded.insert( p );
+		UNLOCK( &this->forwardedLock );
+
+		return ret.second;
+	}
+
+	bool findForwardedChunk( uint32_t srcListId, uint32_t srcStripeId, uint32_t srcChunkId, Metadata &dstMetadata ) {
+		Metadata srcMetadata;
+		srcMetadata.set( srcListId, srcStripeId, srcChunkId );
+
+		std::unordered_map<Metadata, Metadata>::iterator it;
+		bool ret = false;
+
+		LOCK( &this->forwardedLock );
+		it = this->forwarded.find( srcMetadata );
+		if ( it != this->forwarded.end() ) {
+			dstMetadata = it->second;
+			ret = true;
+		}
+		UNLOCK( &this->forwardedLock );
+
+		return ret;
+	}
+
+	bool eraseForwardedChunk( uint32_t srcListId, uint32_t srcStripeId, uint32_t srcChunkId ) {
+		Metadata srcMetadata;
+		srcMetadata.set( srcListId, srcStripeId, srcChunkId );
+
+		std::unordered_map<Metadata, Metadata>::iterator it;
+		bool ret;
+
+		LOCK( &this->forwardedLock );
+		ret = this->forwarded.erase( srcMetadata ) > 0;
+		UNLOCK( &this->forwardedLock );
+
 		return ret;
 	}
 

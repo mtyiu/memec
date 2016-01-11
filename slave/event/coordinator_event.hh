@@ -36,7 +36,8 @@ public:
 		struct {
 			uint32_t addr;
 			uint16_t port;
-			uint32_t count;
+			uint32_t numChunks;
+			uint32_t numUnsealedKeys;
 		} promote;
 	} message;
 
@@ -46,7 +47,7 @@ public:
 	void resRemappedData( CoordinatorSocket *socket, uint16_t instanceId, uint32_t requestId );
 	void resReleaseDegradedLock( CoordinatorSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t count );
 	void resReconstruction( CoordinatorSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t numStripes );
-	void resPromoteBackupSlave( CoordinatorSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t count );
+	void resPromoteBackupSlave( CoordinatorSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t numChunks, uint32_t numUnsealedKeys );
 	void pending( CoordinatorSocket *socket );
 };
 

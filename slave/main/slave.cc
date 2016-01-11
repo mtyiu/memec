@@ -1038,13 +1038,18 @@ void Slave::lookup() {
 	if ( this->remappedBuffer.find( keySize, key, &remappedKeyValue ) ) {
 		printf( "Remapped key found [%u, %u]: ", remappedKeyValue.listId, remappedKeyValue.chunkId );
 		for ( uint32_t i = 0; i < remappedKeyValue.remappedCount; i++ ) {
+			uint8_t keySize;
+			uint32_t valueSize;
+			char *keyStr, *valueStr;
+			remappedKeyValue.keyValue.deserialize( keyStr, keySize, valueStr, valueSize );
 			printf(
-				"%s(%u, %u) |-> (%u, %u)%s",
+				"%s(%u, %u) |-> (%u, %u); length: %u%s",
 				i == 0 ? "" : "; ",
 				remappedKeyValue.original[ i * 2     ],
 				remappedKeyValue.original[ i * 2 + 1 ],
 				remappedKeyValue.remapped[ i * 2     ],
 				remappedKeyValue.remapped[ i * 2 + 1 ],
+				valueSize,
 				i == remappedKeyValue.remappedCount - 1 ? "\n" : ""
 			);
 		}
