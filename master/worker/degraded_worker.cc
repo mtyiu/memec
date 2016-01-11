@@ -88,7 +88,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 			}
 			break;
 		case PROTO_DEGRADED_LOCK_RES_NOT_LOCKED:
-			__DEBUG__(
+			__INFO__(
 				BLUE, "MasterWorker", "handleDegradedLockResponse",
 				"[Not Locked] Key: %.*s (key size = %u).",
 				( int ) header.keySize, header.key, header.keySize
@@ -168,7 +168,6 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 						header.key, header.keySize
 					);
 					if ( MasterWorker::updateInterval ) {
-						// printf( "[remapped] Request sent: %u, %u\n", instanceId, requestId );
 						MasterWorker::pending->recordRequestStartTime( PT_SLAVE_GET, instanceId, pid.parentInstanceId, requestId, pid.parentRequestId, ( void * ) socket, socket->getAddr() );
 					}
 					break;

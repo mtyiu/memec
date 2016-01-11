@@ -35,7 +35,7 @@ void BasicRemappingScheme::getRemapTarget( uint32_t *original, uint32_t *remappe
 		selectedSlaves.insert( slaveAddr ); // All original slaves should not be selected as remapped slaves
 
 		// Check if remapping is allowed && isOverloaded
-		if ( remapMsgHandler->allowRemapping( slaveAddr ) && overloadedSlave->slaveSet.count( slaveAddr ) ) {
+		if ( remapMsgHandler->allowRemapping( slaveAddr ) ) { // && overloadedSlave->slaveSet.count( slaveAddr ) ) {
 			remapped[ remappedCount * 2     ] = original[ i * 2     ];
 			remapped[ remappedCount * 2 + 1 ] = original[ i * 2 + 1 ];
 			remappedCount++;

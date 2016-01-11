@@ -8,7 +8,7 @@ if [ $# != 1 ]; then
 fi
 
 ID=$(hostname | sed 's/testbed-node//g')
-RECORD_COUNT=10000000
+RECORD_COUNT=1000000
 INSERT_COUNT=$(expr ${RECORD_COUNT} \/ 4)
 if [ $ID == 3 ]; then
 	INSERT_START=0

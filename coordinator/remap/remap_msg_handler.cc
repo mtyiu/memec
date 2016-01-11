@@ -579,11 +579,11 @@ bool CoordinatorRemapMsgHandler::reachMaximumRemapped( uint32_t maximum ) {
 	LOCK( &this->aliveSlavesLock );
 	for ( auto it = this->aliveSlaves.begin(); it != this->aliveSlaves.end(); it++ ) {
 		const struct sockaddr_in &slave = ( *it );
-		LOCK( &this->slavesStateLock[ slave ] );
+		// LOCK( &this->slavesStateLock[ slave ] );
 		if ( slavesState[ slave ] != REMAP_NORMAL ) {
 			count++;
 		}
-		UNLOCK( &this->slavesStateLock[ slave ] );
+		// UNLOCK( &this->slavesStateLock[ slave ] );
 
 		if ( count == maximum )
 			break;
