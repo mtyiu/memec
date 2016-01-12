@@ -194,8 +194,6 @@ void Coordinator::updateAverageSlaveLoading( ArrayMap<struct sockaddr_in, Latenc
 	CLEAN_2D_ARRAY_MAP( this->slaveLoading.latestGet );
 	CLEAN_2D_ARRAY_MAP( this->slaveLoading.latestSet );
 #undef CLEAN_2D_ARRAY_MAP
-	//this->slaveLoading.latestGet.clear();
-	//this->slaveLoading.latestSet.clear();
 	UNLOCK( &this->slaveLoading.lock );
 }
 
@@ -208,27 +206,27 @@ void Coordinator::signalHandler( int signal ) {
 	switch ( signal ) {
 		case SIGALRM:
 			coordinator->updateAverageSlaveLoading( slaveGetLatency, slaveSetLatency );
-			coordinator->switchPhase( coordinator->updateOverloadedSlaveSet( slaveGetLatency, slaveSetLatency, overloadedSlaveSet ) );
-			// TODO start / stop remapping according to criteria
-			// push the stats back to masters
-			// leave the free of ArrayMaps to workers after constructing the data buffer
-			LOCK( &sockets.lock );
-			//fprintf( stderr, "queuing events get %lu set %lu\n", slaveGetLatency->size(), slaveSetLatency->size() );
-			if ( slaveGetLatency->size() > 0 || slaveSetLatency->size() > 0 ) {
-				MasterEvent event;
-				for ( uint32_t i = 0; i < sockets.size(); i++ ) {
-					event.reqPushLoadStats(
-						sockets.values[ i ],
-						new ArrayMap<struct sockaddr_in, Latency>( *slaveGetLatency ),
-						new ArrayMap<struct sockaddr_in, Latency>( *slaveSetLatency ),
-						new std::set<struct sockaddr_in>( *overloadedSlaveSet )
-					);
-					coordinator->eventQueue.insert( event );
+			// start / stop remapping according to criteria ( in non-manual mode )
+			if ( coordinator->config.global.remap.manual == 0 ) {
+				coordinator->switchPhase( coordinator->updateOverloadedSlaveSet( slaveGetLatency, slaveSetLatency, overloadedSlaveSet ) );
+				// push the stats back to masters
+				// leave the free of ArrayMaps to workers after constructing the data buffer
+				LOCK( &sockets.lock );
+				//fprintf( stderr, "queuing events get %lu set %lu\n", slaveGetLatency->size(), slaveSetLatency->size() );
+				if ( slaveGetLatency->size() > 0 || slaveSetLatency->size() > 0 ) {
+					MasterEvent event;
+					for ( uint32_t i = 0; i < sockets.size(); i++ ) {
+						event.reqPushLoadStats(
+							sockets.values[ i ],
+							new ArrayMap<struct sockaddr_in, Latency>( *slaveGetLatency ),
+							new ArrayMap<struct sockaddr_in, Latency>( *slaveSetLatency ),
+							new std::set<struct sockaddr_in>( *overloadedSlaveSet )
+						);
+						coordinator->eventQueue.insert( event );
+					}
 				}
+				UNLOCK( &sockets.lock );
 			}
-			UNLOCK( &sockets.lock );
-			// set timer for next push
-			//alarm( coordinator->config.coordinator.loadingStats.updateInterval );
 			break;
 		default:
 			Coordinator::getInstance()->stop();
@@ -417,7 +415,6 @@ bool Coordinator::start() {
 	this->isRunning = true;
 
 	/* Slave loading stats */
-	//alarm( this->config.coordinator.loadingStats.updateInterval );
 	statsTimer.start();
 
 	return true;
@@ -719,6 +716,18 @@ void Coordinator::interactive() {
 				);
 			}
 			valid = true;
+		} else if ( strcmp( command, "overload" ) == 0 ) {
+			this->setSlave( true );
+			valid = true;
+		} else if ( strcmp( command, "underload" ) == 0 ) {
+			this->setSlave( false );
+			valid = true;
+		} else if ( strcmp( command, "manual" ) == 0 ) {
+			this->switchToManualOverload();
+			valid = true;
+		} else if ( strcmp( command, "auto" ) == 0 ) {
+			this->switchToAutoOverload();
+			valid = true;
 		} else {
 			valid = false;
 		}
@@ -803,6 +812,10 @@ void Coordinator::help() {
 		"- remapping: Show remapping info\n"
 		"- remapRecordSync: Force all remapping records to masters\n"
 		"- remapMigrate: Force all remapped kv to migrate\n"
+		"- overload: Force a slave to overload ( normal > degraded )\n"
+		"- underload: Force a slave to underload ( degraded > normal) \n"
+		"- manual: Switch to overload slaves manually\n"
+		"- auto: Switch to detect overload slaves using loading statistics\n"
 		"- exit: Terminate this client\n"
 	);
 	fflush( stdout );
@@ -956,4 +969,43 @@ void Coordinator::flush() {
 		}
 	}
 	printf( "Sending flush requests to %lu slaves...\n", count );
+}
+
+void Coordinator::setSlave( bool overloaded ) {
+	int socket, i, len;
+	MasterEvent event;
+
+	printf( "\nSlave sockets\n-------------\n" );
+	for ( i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
+		printf( "%d. ", i + 1 );
+		this->sockets.slaves[ i ]->print( stdout );
+	}
+	if ( len == 0 ) printf( "(None)\n" );
+
+	printf( "Which slave to %s (socket fd, enter 0 to exit) ? ", overloaded ? "overload" : "underload" );
+	fflush( stdout );
+	std::set<struct sockaddr_in> slaves;
+	SlaveSocket *s = 0;
+	while ( scanf( "%u", &socket) == 1 ) {
+		s = this->sockets.slaves.get( socket );
+		if ( ! s ) break;
+
+		slaves.insert( s->getAddr() );
+		printf( "Added slave " );
+		s->printAddress();
+		printf( "\nWhich slave to %s (socket fd, enter 0 to exit) ? ", overloaded ? "overload" : "underload" );
+		fflush( stdout );
+	}
+	if ( this->config.global.remap.manual == 0 )
+		printf( "\nWARNING: Not in manual state for setting overloaded slaves.\n" );
+	event.switchPhase( overloaded, slaves, false /* isCrushed */, true /* isforced */ );
+	this->eventQueue.insert( event );
+}
+
+void Coordinator::switchToManualOverload() {
+	this->config.global.remap.manual = true;
+}
+
+void Coordinator::switchToAutoOverload() {
+	this->config.global.remap.manual = false;
 }

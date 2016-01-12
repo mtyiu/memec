@@ -35,6 +35,7 @@ public:
 		float overloadThreshold;
 		float smoothingFactor;
 		uint32_t maximum;
+		bool manual; // manual overload instead of using load stats 
 	} remap;
 	struct {
 		uint16_t chunksPerList;
