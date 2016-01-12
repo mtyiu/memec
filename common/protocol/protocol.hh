@@ -836,7 +836,8 @@ protected:
 		bool isSealed, uint32_t stripeId,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 		uint32_t ongoingAtChunk,
-		uint8_t keySize, char *key
+		uint8_t keySize, char *key,
+		uint32_t timestamp = 0
 	);
 	size_t generateDegradedReqHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
@@ -844,7 +845,8 @@ protected:
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 		uint32_t ongoingAtChunk,
 		uint8_t keySize, char *key,
-		uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate
+		uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate,
+		uint32_t timestamp = 0
 	);
 	bool parseDegradedReqHeader(
 		size_t offset,
