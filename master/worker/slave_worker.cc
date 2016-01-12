@@ -287,8 +287,8 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 			}
 		}
 	} else {
-		struct KeyHeader header;
-		if ( ! this->protocol.parseKeyHeader( header, buf, size ) ) {
+		struct KeyBackupHeader header;
+		if ( ! this->protocol.parseKeyBackupHeader( header, buf, size ) ) {
 			__ERROR__( "MasterWorker", "handleSetResponse", "Invalid SET response." );
 			return false;
 		}
