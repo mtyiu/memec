@@ -169,6 +169,7 @@ bool SlaveWorker::handleDegradedGetRequest( MasterEvent event, char *buf, size_t
 			listId, stripeId, chunkId,
 			&key, header.isSealed,
 			header.original, header.reconstructed, header.reconstructedCount,
+			header.ongoingAtChunk,
 			0, event.timestamp
 		);
 
@@ -410,6 +411,7 @@ force_degraded_read:
 			listId, stripeId, chunkId,
 			&key, header.isSealed,
 			header.original, header.reconstructed, header.reconstructedCount,
+			header.ongoingAtChunk,
 			&keyValueUpdate,
 			event.timestamp
 		);
@@ -558,6 +560,7 @@ bool SlaveWorker::handleDegradedDeleteRequest( MasterEvent event, char *buf, siz
 			listId, stripeId, chunkId,
 			&key, header.isSealed,
 			header.original, header.reconstructed, header.reconstructedCount,
+			header.ongoingAtChunk,
 			0, event.timestamp
 		);
 
@@ -576,6 +579,7 @@ bool SlaveWorker::performDegradedRead(
 	uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 	Key *key, bool isSealed,
 	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
+	uint32_t ongoingAtChunk,
 	KeyValueUpdate *keyValueUpdate, uint32_t timestamp
 ) {
 	Key mykey;
@@ -649,6 +653,7 @@ bool SlaveWorker::performDegradedRead(
 		opcode, isSealed, masterSocket,
 		listId, stripeId, chunkId,
 		original, reconstructed, reconstructedCount,
+		ongoingAtChunk,
 		timestamp, true
 	);
 	if ( opcode == PROTO_OPCODE_DEGRADED_UPDATE ) {

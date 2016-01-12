@@ -166,6 +166,7 @@ private:
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId, // chunkId refers to the current chunk ID
 		Key *key, bool isSealed,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
+		uint32_t ongoingAtChunk,
 		KeyValueUpdate *keyValueUpdate = 0,
 		uint32_t timestamp = 0
 	);
