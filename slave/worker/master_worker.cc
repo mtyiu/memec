@@ -179,24 +179,32 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 			);
 			break;
 		case MASTER_EVENT_TYPE_ACK_PARITY_BACKUP:
+		{
+			std::vector<uint32_t> *timestamps = event.message.revert.timestamps;
 			buffer.data = this->protocol.ackParityDeltaBackup(
 				buffer.size,
 				Slave::instanceId, event.requestId,
-				event.message.revert.fromTimestamp,
-				event.message.revert.toTimestamp,
+				timestamps ? *timestamps : std::vector<uint32_t>(),
 				event.message.revert.targetId
 			);
+			if ( timestamps )
+				delete timestamps;
+		}
 			break;
 		case MASTER_EVENT_TYPE_REVERT_PARITY_DELTA_SUCCESS:
 		case MASTER_EVENT_TYPE_REVERT_PARITY_DELTA_FAILURE:
+		{
+			std::vector<uint32_t> *timestamps = event.message.revert.timestamps;
 			buffer.data = this->protocol.resRevertParityDelta(
 				buffer.size,
 				Slave::instanceId, event.requestId,
 				success,
-				event.message.revert.fromTimestamp,
-				event.message.revert.toTimestamp,
+				timestamps ? *timestamps : std::vector<uint32_t>(),
 				event.message.revert.targetId
 			);
+			if ( timestamps )
+				delete timestamps;
+		}
 			break;
 		// Pending
 		case MASTER_EVENT_TYPE_PENDING:
@@ -254,7 +262,8 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 						this->handleAckParityDeltaBackup( event, buffer.data, buffer.size );
 						break;
 					case PROTO_OPCODE_REVERT_PARITY_DELTA:
-						this->handleRevertParityDelta( event, buffer.data, buffer.size );
+						event.message.revert.isParityDeltaRevert = true;
+						this->handleRevertDelta( event, buffer.data, buffer.size );
 						break;
 					default:
 						__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from master." );
@@ -553,17 +562,6 @@ bool SlaveWorker::handleUpdateRequest(
 
 			// Insert the UPDATE request to slave pending set
 			for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
-				// backup data delta, insert a pending record for each parity slave
-				// if ( masterSocket != 0 ) {
-				// 	Timestamp timestamp ( event.timestamp );
-				// 	Value value;
-				// 	value.set( deltaSize, delta );
-				// 	if ( isUpdate )
-				// 		masterSocket->backup.insertDataUpdate( timestamp , key, value, metadata, isSealed, 0 /* TODO */, offset, requestId, this->paritySlaveSockets[ i ] );
-				// 	else
-				// 		masterSocket->backup.insertDataDelete( timestamp , key, value, metadata, isSealed, 0 /* TODO */, offset, requestId, this->paritySlaveSockets[ i ] );
-				// }
-
 				if ( ! SlaveWorker::pending->insertKeyValueUpdate(
 					PT_SLAVE_PEER_UPDATE, instanceId, event.instanceId, requestId, event.requestId,
 					( void * ) this->paritySlaveSockets[ i ],
@@ -742,51 +740,77 @@ bool SlaveWorker::handleDeleteRequest(
 }
 
 bool SlaveWorker::handleAckParityDeltaBackup( MasterEvent event, char *buf, size_t size ) {
-	ParityDeltaAcknowledgementHeader header;
-	if ( ! this->protocol.parseParityDeltaAcknowledgementHeader( header, buf, size ) ) {
+	DeltaAcknowledgementHeader header;
+	std::vector<uint32_t> timestamps;
+
+	if ( ! this->protocol.parseDeltaAcknowledgementHeader( header, &timestamps, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleAckParityDeltaBackup", "Invalid ACK parity delta backup request." );
 		return false;
 	}
-	__DEBUG__(
-		BLUE, "SlaveWorker", "handleAckParityDeltaBackup",
-		"Ack. from master fd = %u from %u to %u for data slave id = %hu.",
-		event.socket->getSocket(), header.fromTimestamp, header.toTimestamp, header.targetId
-	);
 
-	Timestamp from( header.fromTimestamp );
-	Timestamp to( header.toTimestamp );
+	if ( header.count < 2 ) {
+		__ERROR__( "SlaveWorker", "handleAckParityDeltaBackup", "Invalid ACK parity delta backup request (count < 2)." );
+	} else {
+		__INFO__(
+			BLUE, "SlaveWorker", "handleAckParityDeltaBackup",
+			"Ack. from master fd = %u from %u to %u for data slave id = %hu.",
+			event.socket->getSocket(), timestamps.at( 0 ), timestamps.at( 1 ), header.targetId
+		);
 
-	event.socket->backup.removeParityUpdate( from, to, header.targetId );
-	event.socket->backup.removeParityDelete( from, to, header.targetId );
+		Timestamp from( timestamps.at( 0 ) );
+		Timestamp to( timestamps.at( 1 ) );
 
-	event.resAckParityDelta( event.socket, Slave::instanceId, event.requestId, header.fromTimestamp, header.toTimestamp, header.targetId );
+		event.socket->backup.removeParityUpdate( from, to, header.targetId );
+		event.socket->backup.removeParityDelete( from, to, header.targetId );
+	}
+
+	event.resAckParityDelta( event.socket, Slave::instanceId, event.requestId, std::vector<uint32_t>() , header.targetId );
 	this->dispatch( event );
 
 	return true;
 }
 
-bool SlaveWorker::handleRevertParityDelta( MasterEvent event, char *buf, size_t size ) {
+bool SlaveWorker::handleRevertDelta( MasterEvent event, char *buf, size_t size ) {
+	DeltaAcknowledgementHeader header;
+	std::vector<uint32_t> timestamps;
+	std::set<uint32_t> timestampSet;
 
-	ParityDeltaAcknowledgementHeader header;
-	if ( ! this->protocol.parseParityDeltaAcknowledgementHeader( header, buf, size ) ) {
-		__ERROR__( "SlaveWorker", "handleRevertParityDelta", "Invalid REVERT parity delta request." );
+	if ( ! this->protocol.parseDeltaAcknowledgementHeader( header, &timestamps, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleRevertDelta", "Invalid REVERT delta request." );
 		return false;
 	}
+
+	if ( event.message.revert.isParityDeltaRevert && header.count == 0 ) {
+		__ERROR__( "SlaveWorker", "handleRevertDelta", "Invalid REVERT parity delta request." );
+		event.resRevertParityDelta( event.socket, Slave::instanceId, event.requestId, false /* success */, std::vector<uint32_t>(), header.targetId );
+		this->dispatch( event );
+		return false;
+	}
+
 	__INFO__(
-		BLUE, "SlaveWorker", "handleRevertParityDelta",
-		"Revert request from master fd = %u from %u to %u for data slave id = %hu.",
-		event.socket->getSocket(), header.fromTimestamp, header.toTimestamp, header.targetId
+		BLUE, "SlaveWorker", "handleRevertDelta",
+		"Revert request from master fd = %u from %u to %u size = %u for data slave id = %hu.",
+		event.socket->getSocket(),
+		header.count > 0 ? timestamps.at( 0 ) : 0,
+		header.count > 1 ? timestamps.at( header.count - 1 ) : UINT32_MAX,
+		header.count, header.targetId
 	);
 
-	Timestamp from( header.fromTimestamp );
-	Timestamp to( header.toTimestamp );
 	uint32_t timestamp;
 	bool success = true;
+	std::vector<BackupDelta> update, del;
 
-	std::vector<BackupDelta> update = event.socket->backup.removeParityUpdate( from, to, header.targetId, false );
-	std::vector<BackupDelta> del = event.socket->backup.removeParityDelete( from, to, header.targetId, false );
+	if ( event.message.revert.isParityDeltaRevert ) {
+		// parity delta
+		timestampSet.insert( timestamps.begin(), timestamps.end() );
+		update = event.socket->backup.removeParityUpdate( timestampSet, header.targetId, false );
+		del = event.socket->backup.removeParityDelete( timestampSet, header.targetId, false );
+	} else {
+		// data delta
+		update = event.socket->backup.removeDataUpdate( timestampSet, header.targetId, false );
+		del = event.socket->backup.removeDataDelete( timestampSet, header.targetId, false );
+	}
 
-	// Revert parity delta
 	for ( auto& it : update ) {
 		it.print();
 		if ( it.isChunkDelta ) {
@@ -800,7 +824,7 @@ bool SlaveWorker::handleRevertParityDelta( MasterEvent event, char *buf, size_t 
 				it.key.data, it.key.size,
 				it.delta.valueOffset, it.delta.data.size, it.delta.data.data
 			);
-			// apply to chunk if seal after backup
+			/* apply to chunk if seal after backup */
 			if ( ! ret ) {
 				SlaveWorker::chunkBuffer->at( it.metadata.listId )->update(
 					it.metadata.stripeId, it.metadata.chunkId,
@@ -822,8 +846,8 @@ bool SlaveWorker::handleRevertParityDelta( MasterEvent event, char *buf, size_t 
 				true /* isDelete */
 			);
 		} else {
-			// set key-value pair back
-			// TODO what if the chunk is sealed after backup ...
+			/* set key-value pair back */
+			/* TODO what if the chunk is sealed after backup ... */
 			bool isSealed;
 			Metadata sealed;
 			SlaveWorker::chunkBuffer->at( it.metadata.listId )->set(
@@ -839,7 +863,10 @@ bool SlaveWorker::handleRevertParityDelta( MasterEvent event, char *buf, size_t 
 		it.free();
 	}
 
-	event.resRevertParityDelta( event.socket, Slave::instanceId, event.requestId, success, header.fromTimestamp, header.toTimestamp, header.targetId );
+	if ( event.message.revert.isParityDeltaRevert )
+		event.resRevertParityDelta( event.socket, Slave::instanceId, event.requestId, success, std::vector<uint32_t>(), header.targetId );
+	else
+		; // TODO data delta revert res
 	this->dispatch( event );
 
 	return success;

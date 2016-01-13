@@ -487,11 +487,10 @@ struct AcknowledgementHeader {
     uint32_t toTimestamp;
 };
 
-#define PROTO_ACK_PARITY_DELTA_SIZE 10
-struct ParityDeltaAcknowledgementHeader {
-	uint32_t fromTimestamp;
-	uint32_t toTimestamp;
-	uint16_t targetId;
+#define PROTO_ACK_PARITY_DELTA_SIZE 6
+struct DeltaAcknowledgementHeader {
+	uint32_t count;         // number of timestamps
+	uint16_t targetId;      // source data slave
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1024,12 +1023,12 @@ protected:
 		size_t offset, uint32_t &fromTimestamp, uint32_t &toTimestamp,
 		char *buf, size_t size
 	);
-	size_t generateParityDeltaAcknowledgementHeader(
+	size_t generateDeltaAcknowledgementHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
-		uint32_t fromTimestamp, uint32_t toTimestamp, uint16_t targetId, char* buf = 0
+		std::vector<uint32_t> &timestamp, uint16_t targetId, char* buf = 0
 	);
-	bool parseParityDeltaAcknowledgementHeader(
-		size_t offset, uint32_t &fromTimestamp, uint32_t &toTimestamp, uint16_t &targetId,
+	bool parseDeltaAcknowledgementHeader(
+		size_t offset, uint32_t &count, std::vector<uint32_t> *timestamps, uint16_t &targetId,
 		char *buf, size_t size
 	);
 
@@ -1249,8 +1248,9 @@ public:
 		struct AcknowledgementHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
-	bool parseParityDeltaAcknowledgementHeader(
-		struct ParityDeltaAcknowledgementHeader &header,
+	bool parseDeltaAcknowledgementHeader(
+		struct DeltaAcknowledgementHeader &header,
+		std::vector<uint32_t> *timestamps = 0,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 };

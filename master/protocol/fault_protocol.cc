@@ -25,32 +25,34 @@ char *MasterProtocol::syncMetadataBackup(
 
 char *MasterProtocol::ackParityDeltaBackup(
 	size_t &size, uint16_t instanceId, uint32_t requestId,
-	uint32_t fromTimestamp, uint32_t toTimestamp,
+	std::vector<uint32_t> timestamps,
 	uint16_t targetId
 ) {
-	size = this->generateParityDeltaAcknowledgementHeader(
+	size = this->generateDeltaAcknowledgementHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_ACK_PARITY_DELTA,
 		instanceId, requestId,
-		fromTimestamp, toTimestamp,
+		timestamps,
 		targetId
 	);
+
 	return this->buffer.send;
 }
 
 char *MasterProtocol::revertParityDelta(
 	size_t &size, uint16_t instanceId, uint32_t requestId,
-	uint32_t fromTimestamp, uint32_t toTimestamp,
+	std::vector<uint32_t> timestamps,
 	uint16_t targetId
 ) {
-	size = this->generateParityDeltaAcknowledgementHeader(
+	size = this->generateDeltaAcknowledgementHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
 		PROTO_OPCODE_REVERT_PARITY_DELTA,
 		instanceId, requestId,
-		fromTimestamp, toTimestamp,
+		timestamps,
 		targetId
 	);
+
 	return this->buffer.send;
 }

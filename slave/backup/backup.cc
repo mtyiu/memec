@@ -41,7 +41,7 @@ bool SlaveBackup::addPendingAck( BackupPendingIdentifier pi, Timestamp ts, bool 
 }
 
 #define DEFINE_INSERT_DATA_METHOD( _OP_TYPE_ ) \
-bool SlaveBackup::insertData##_OP_TYPE_( Timestamp ts, Key key, Value value, Metadata metadata, bool isChunkDelta, uint32_t valueOffset, uint32_t chunkOffset, uint32_t requestId, Socket *targetSocket ) { \
+bool SlaveBackup::insertData##_OP_TYPE_( Timestamp ts, Key key, Value value, Metadata metadata, bool isChunkDelta, uint32_t valueOffset, uint32_t chunkOffset, uint32_t requestId, uint16_t targetId, Socket *targetSocket ) { \
 	LOCK_T *lock = &this->data##_OP_TYPE_##Lock; \
 	std::multimap<Timestamp, BackupDelta> *map = &this->data##_OP_TYPE_; \
 	BackupDelta backupDelta; \
@@ -53,7 +53,18 @@ bool SlaveBackup::insertData##_OP_TYPE_( Timestamp ts, Key key, Value value, Met
 	/* keep one copy of backup, but mutltiple ref indexed by a request id */ \
 	if ( ! duplicate && ret ) { \
 		backupDelta.set( metadata, key, value, isChunkDelta, valueOffset, chunkOffset, false, requestId, 0 ); \
+		backupDelta.paritySlaves.insert( targetId ); \
 		map->insert( std::pair<Timestamp, BackupDelta>( ts, backupDelta ) ); \
+	} else if ( ret ) { \
+		/* maintain a list of parity slaves for data delta */ \
+		std::multimap<Timestamp, BackupDelta>::iterator lit, rit; \
+		tie( lit, rit ) = map->equal_range( ts ); \
+		\
+		for ( ; lit != rit; lit++ ) { \
+			if ( lit->second.requestId == requestId ) { \
+				lit->second.paritySlaves.insert( targetId ); \
+			} \
+		} \
 	} \
 	UNLOCK( lock ); \
 	return ret; \
@@ -78,8 +89,29 @@ bool SlaveBackup::insertData##_OP_TYPE_( Timestamp ts, Key key, Value value, Met
 	saveIt = _LIT_; \
 	for ( ; _LIT_ != _RIT_; _LIT_ = saveIt ) { \
 		saveIt++; \
-		if ( _SLAVE_ID_ != 0 && _LIT_->second.dataSlaveId != _SLAVE_ID_ ) \
+		/* 
+		 * skip if target slave id is specified, and  
+		 *
+		 * (1) (a) isParity && data source != target slave id, and
+		 *     (b) a set of timestamps is specified but the backup timestamp is not in the set;
+		 *
+		 * OR
+		 *
+		 * (2) isData && target slave id not in  parity slaves (no need to check timstamps, 
+		 *     since yet removed > yet all parity acked > must revert;
+		 *     TODO what if master send revert to parity before ack from data slave reach master??
+		 */ \
+		if ( \
+			_SLAVE_ID_ != 0 && \
+			( \
+				( ( ! _IS_DATA_ && _LIT_->second.dataSlaveId != _SLAVE_ID_ ) && \
+			  	  ( ! timestamps.empty() && timestamps.count( _LIT_->first.getVal() ) == 0 ) \
+				) || \
+				( _IS_DATA_ && _LIT_->second.paritySlaves.count( _SLAVE_ID_ ) == 0 ) \
+			) \
+		) { \
 			continue; \
+		} \
 		if ( _FREE_ ) \
 			_LIT_->second.free(); \
 		else \
@@ -93,7 +125,7 @@ bool SlaveBackup::insertData##_OP_TYPE_( Timestamp ts, Key key, Value value, Met
 		_MAP_->erase( _LIT_ ); \
 	}
 
-#define DEFINE_REMOVE_BY_TIMESTAMP_METHOD( _CONTENT_TYPE_, _VAR_TYPE_, _OP_TYPE_ ) \
+#define DEFINE_REMOVE_BY_TIMESTAMP_METHOD1( _CONTENT_TYPE_, _VAR_TYPE_, _OP_TYPE_ ) \
 	std::vector<BackupDelta> SlaveBackup::remove##_CONTENT_TYPE_##_OP_TYPE_( Timestamp from, Timestamp to, uint16_t dataSlaveId, bool free ) { \
 		std::vector<BackupDelta> ret; \
 		LOCK_T *lock = &this->_VAR_TYPE_##_OP_TYPE_##Lock; \
@@ -101,6 +133,7 @@ bool SlaveBackup::insertData##_OP_TYPE_( Timestamp ts, Key key, Value value, Met
 		\
 		std::multimap<Timestamp, BackupDelta>::iterator lit, rit, it, saveIt; \
 		bool isData = ( strncmp( #_CONTENT_TYPE_ , "Data", 4 ) == 0 ); \
+		std::set<uint32_t> timestamps; \
 		\
 		LOCK( lock );  \
 		bool wrapped = ( from.getVal() > to.getVal() ); \
@@ -122,14 +155,47 @@ bool SlaveBackup::insertData##_OP_TYPE_( Timestamp ts, Key key, Value value, Met
 		return ret; \
 	}
 
-#define DEFINE_REMOVE_PARITY_METHOD( _OP_TYPE_ ) \
-	DEFINE_REMOVE_BY_TIMESTAMP_METHOD( Parity, parity, _OP_TYPE_ )
+#define DEFINE_REMOVE_BY_TIMESTAMP_METHOD2( _CONTENT_TYPE_, _VAR_TYPE_, _OP_TYPE_ ) \
+	std::vector<BackupDelta> SlaveBackup::remove##_CONTENT_TYPE_##_OP_TYPE_( std::set<uint32_t> timestamps, uint16_t dataSlaveId, bool free ) { \
+		std::vector<BackupDelta> ret; \
+		LOCK_T *lock = &this->_VAR_TYPE_##_OP_TYPE_##Lock; \
+		std::multimap<Timestamp, BackupDelta> *map = &this->_VAR_TYPE_##_OP_TYPE_; \
+		\
+		std::multimap<Timestamp, BackupDelta>::iterator lit, rit, it, saveIt; \
+		bool isData = ( strncmp( #_CONTENT_TYPE_ , "Data", 4 ) == 0 ); \
+		\
+		LOCK( lock );  \
+		uint32_t from = *timestamps.begin(), to = *timestamps.end(); \
+		bool wrapped = ( from > to ); \
+		lit = map->lower_bound( Timestamp( from ) ); \
+		rit = map->upper_bound( Timestamp( to ) ); \
+		if ( wrapped ) { \
+			/* from --> end of map */ \
+			it = lit; \
+			REMOVE_ITEMS( map, it, map->end(), free, ret, isData, dataSlaveId ); \
+			/* start of map --> to */ \
+			rit = map->upper_bound( to ); \
+			it = map->begin(); \
+			REMOVE_ITEMS( map, it, rit, free, ret, isData, dataSlaveId ); \
+		} else { \
+			it = lit; \
+			REMOVE_ITEMS( map, it, rit, free, ret, isData, dataSlaveId ); \
+		} \
+		UNLOCK( lock ); \
+		return ret; \
+	}
 
 #define DEFINE_REMOVE_DATA_METHOD( _OP_TYPE_ ) \
-	DEFINE_REMOVE_BY_TIMESTAMP_METHOD( Data, data, _OP_TYPE_ )
+	DEFINE_REMOVE_BY_TIMESTAMP_METHOD2( Data, data, _OP_TYPE_ )
+
+#define DEFINE_REMOVE_PARITY_BY_TIMESTAMPS_METHOD( _OP_TYPE_ ) \
+	DEFINE_REMOVE_BY_TIMESTAMP_METHOD2( Parity, parity, _OP_TYPE_ )
+
+#define DEFINE_REMOVE_PARITY_BY_TIMESTAMP_RANGE_METHOD( _OP_TYPE_ ) \
+	DEFINE_REMOVE_BY_TIMESTAMP_METHOD1( Parity, parity, _OP_TYPE_ )
 
 #define DEFINE_REMOVE_BY_ID_METHOD( _CONTENT_TYPE_, _VAR_TYPE_, _OP_TYPE_ ) \
-	BackupDelta SlaveBackup::remove##_CONTENT_TYPE_##_OP_TYPE_( uint32_t requestId, Socket *targetSocket, bool free ) { \
+	BackupDelta SlaveBackup::remove##_CONTENT_TYPE_##_OP_TYPE_( uint32_t requestId, uint16_t targetId, Socket *targetSocket, bool free ) { \
 		BackupDelta ret; \
 		Timestamp ts; \
 		LOCK_T *lock = &this->_VAR_TYPE_##_OP_TYPE_##Lock; \
@@ -151,25 +217,28 @@ bool SlaveBackup::insertData##_OP_TYPE_( Timestamp ts, Key key, Value value, Met
 		for ( ; lpit != rpit; lpit++ ) \
 			pending++; \
 		this->idToTimestampMap.erase( tpit ); \
+		std::multimap<Timestamp, BackupDelta>::iterator lit, rit; \
+		\
+		tie( lit, rit ) = map->equal_range( ts ); \
+		/* only remove backup after all parity slave acked */ \
+		for ( ; lit != rit; lit++ ) { \
+			if ( lit->second.requestId == requestId ) { \
+				break; \
+			} \
+		} \
+		if ( lit == rit ) { \
+			__ERROR__( "SlaveBackup" , "removeById", "Cannot find backup for request ID = %u at time = %u.", requestId, ts.getVal() ); \
+			return ret; \
+		} \
 		/* UNLOCK( &this->idToTimestampMapLock ); */ \
 		/* if the only pending reference is removed, remove the backup as well */ \
 		if ( pending == 1 ) { \
-			std::multimap<Timestamp, BackupDelta>::iterator lit, rit; \
-			\
-			tie( lit, rit ) = map->equal_range( ts ); \
-			/* only remove backup after all parity slave acked */ \
-			for ( ; lit != rit; lit++ ) { \
-				if ( lit->second.requestId == requestId ) { \
-					ret = lit->second; \
-					if ( free ) \
-						lit->second.free(); \
-					map->erase( lit ); \
-					break; \
-				} \
-			} \
-			if ( lit == rit ) { \
-				__ERROR__( "SlaveBackup" , "removeById", "Cannot find backup for request ID = %u at time = %u.", requestId, ts.getVal() ); \
-			} \
+			ret = lit->second; \
+			if ( free ) \
+				lit->second.free(); \
+			map->erase( lit ); \
+		} else { \
+			lit->second.paritySlaves.erase( targetId ); \
 		} \
 		\
 		UNLOCK( lock ); \
@@ -189,14 +258,17 @@ DEFINE_INSERT_PARITY_METHOD( Delete )
 
 DEFINE_REMOVE_DATA_METHOD( Update )
 DEFINE_REMOVE_DATA_METHOD( Delete )
-DEFINE_REMOVE_PARITY_METHOD( Update )
-DEFINE_REMOVE_PARITY_METHOD( Delete )
+DEFINE_REMOVE_PARITY_BY_TIMESTAMPS_METHOD( Update )
+DEFINE_REMOVE_PARITY_BY_TIMESTAMPS_METHOD( Delete )
 
-DEFINE_REMOVE_DATA_BY_ID_METHOD( Update );
-DEFINE_REMOVE_DATA_BY_ID_METHOD( Delete );
+DEFINE_REMOVE_DATA_BY_ID_METHOD( Update )
+DEFINE_REMOVE_DATA_BY_ID_METHOD( Delete )
+
+DEFINE_REMOVE_PARITY_BY_TIMESTAMP_RANGE_METHOD( Update )
+DEFINE_REMOVE_PARITY_BY_TIMESTAMP_RANGE_METHOD( Delete )
+
 
 // ------------------------------- FIND ----------------------------------
-
 
 #define DEFINE_FIND_BY_TIMESTAMPS_METHOD( _CONTENT_TYPE_, _VAR_TYPE_, _OP_TYPE_ ) \
 	std::vector<BackupDelta> SlaveBackup::find##_CONTENT_TYPE_##_OP_TYPE_( uint32_t from, uint32_t to ) { \
@@ -258,7 +330,7 @@ void SlaveBackup::print( FILE *f, bool printDelta ) {
 	for ( auto& it : _MAP_ ) { \
 		i++; \
 		fprintf( _OUT_, \
-			"%7u  Timestamp: %10u;  From: %5hu; key: (%4u) %.*s;  offset: %4u %4u;  isChunkDelta:%1hhu;  isParity:%1hhu;  delta: (%4u) [", \
+			"%7u  Timestamp: %10u;  From: %5hu; key: (%4u) %.*s;  offset: %4u %4u;  isChunkDelta:%1hhu;  isParity:%1hhu (%3lu);  delta: (%4u) [", \
 			i, \
 			it.first.getVal(), \
 			it.second.dataSlaveId, \
@@ -269,6 +341,7 @@ void SlaveBackup::print( FILE *f, bool printDelta ) {
 			it.second.delta.chunkOffset, \
 			it.second.isChunkDelta, \
 			it.second.isParity, \
+			it.second.paritySlaves.size(), \
 			it.second.delta.data.size \
 		); \
 		if ( ! it.second.delta.data.data ) { \
@@ -293,13 +366,20 @@ void SlaveBackup::print( FILE *f, bool printDelta ) {
 
 #undef REMOVE_ITEMS
 
-#undef DEFINE_INSERT_METHOD
 #undef DEFINE_INSERT_DATA_METHOD
 #undef DEFINE_INSERT_PARITY_METHOD
+
 #undef DEFINE_REMOVE_METHOD
+#undef DEFINE_REMOVE_BY_TIMESTAMP_METHOD1
+#undef DEFINE_REMOVE_BY_TIMESTAMP_METHOD2
+#undef DEFINE_REMOVE_BY_ID_METHOD
+
+#undef DEFINE_REMOVE_DATA_METHOD
 #undef DEFINE_REMOVE_DATA_BY_ID_METHOD
 #undef DEFINE_REMOVE_PARITY_BY_ID_METHOD
-#undef DEFINE_REMOVE_DATA_BY_ID_METHOD
+#undef DEFINE_REMOVE_PARITY_BY_TIMESTAMPS_METHOD
+#undef DEFINE_REMOVE_PARITY_BY_TIMESTAMP_RANGE_METHOD
+
 #undef DEFINE_FIND_BY_TIMESTAMPS_METHOD
 #undef DEFINE_FIND_DATA_BY_TIMESTAMPS_METHOD
 #undef DEFINE_FIND_PARITY_BY_TIMESTAMPS_METHOD

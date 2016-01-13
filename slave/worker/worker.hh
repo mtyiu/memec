@@ -109,7 +109,7 @@ private:
 	);
 
 	bool handleAckParityDeltaBackup( MasterEvent event, char *buf, size_t size );
-	bool handleRevertParityDelta( MasterEvent event, char *buf, size_t size );
+	bool handleRevertDelta( MasterEvent event, char *buf, size_t size );
 
 	// ---------- slave_peer_worker.cc ----------
 	void dispatch( SlavePeerEvent event );
