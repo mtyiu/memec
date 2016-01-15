@@ -7,7 +7,8 @@ if [ $# != 2 ]; then
 	exit 1
 fi
 
-RECORD_COUNT=1000000
+ID=$(hostname | sed 's/testbed-node//g')
+RECORD_COUNT=10000000
 INSERT_COUNT=$(expr ${RECORD_COUNT} \/ 4)
 OPERATION_COUNT=$(expr ${RECORD_COUNT} \/ 4)
 if [ $ID == 3 ]; then
