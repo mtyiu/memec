@@ -120,6 +120,16 @@ public:
 		uint8_t keySize, char *key
 	);
 
+	char *reqForwardChunk(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		uint32_t chunkSize, uint32_t chunkOffset, char *chunkData
+	);
+	char *resForwardChunk(
+		size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId
+	);
+
 	// ---------- seal_protocol.cc ----------
 	char *reqSealChunk( size_t &size, uint16_t instanceId, uint32_t requestId, Chunk *chunk, uint32_t startPos, char *buf = 0 );
 

@@ -159,6 +159,8 @@ private:
 	bool handleDegradedGetRequest( MasterEvent event, char *buf, size_t size );
 	bool handleDegradedUpdateRequest( MasterEvent event, char *buf, size_t size );
 	bool handleDegradedDeleteRequest( MasterEvent event, char *buf, size_t size );
+	bool handleForwardChunkRequest( SlavePeerEvent event, char *buf, size_t size );
+	bool handleForwardChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool performDegradedRead(
 		uint8_t opcode,
 		MasterSocket *masterSocket,

@@ -305,7 +305,7 @@ bool ParityChunkBuffer::updateKeyValue( char *keyStr, uint8_t keySize, uint32_t 
 	return true;
 }
 
-void ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, bool needsLock, bool needsUnlock, bool isSeal, bool isDelete ) {
+bool ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, bool needsLock, bool needsUnlock, bool isSeal, bool isDelete ) {
 	// Prepare the stripe
 	for ( uint32_t i = 0; i < ChunkBuffer::dataChunkCount; i++ )
 		dataChunks[ i ] = Coding::zeros;
@@ -339,14 +339,16 @@ void ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t of
 		wrapper.pending[ chunkId ] = true;
 	UNLOCK( &wrapper.lock );
 	if ( needsUnlock ) UNLOCK( &this->lock );
+
+	return true;
 }
 
-void ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, char *dataDelta, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, bool isDelete ) {
+bool ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, char *dataDelta, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, bool isDelete ) {
 	// Prepare data delta
 	dataChunk->clear();
 	dataChunk->setSize( offset + size );
 	memcpy( dataChunk->getData() + offset, dataDelta, size );
-	this->update( stripeId, chunkId, offset, size, dataChunks, dataChunk, parityChunk, true, true, false, true );
+	return this->update( stripeId, chunkId, offset, size, dataChunks, dataChunk, parityChunk, true, true, false, true );
 }
 
 void ParityChunkBuffer::print( FILE *f ) {

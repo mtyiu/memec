@@ -85,8 +85,9 @@
 #define PROTO_OPCODE_GET_CHUNKS                   0x55
 #define PROTO_OPCODE_SET_CHUNK                    0x56
 #define PROTO_OPCODE_SET_CHUNK_UNSEALED           0x57
-#define PROTO_OPCODE_REMAPPED_UPDATE              0x58
-#define PROTO_OPCODE_REMAPPED_DELETE              0x59
+#define PROTO_OPCODE_FORWARD_CHUNK                0x58
+#define PROTO_OPCODE_REMAPPED_UPDATE              0x59
+#define PROTO_OPCODE_REMAPPED_DELETE              0x60
 
 #define PROTO_UNINITIALIZED_INSTANCE              0
 

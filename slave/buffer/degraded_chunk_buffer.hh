@@ -75,7 +75,8 @@ public:
 
 	Chunk *findChunkById(
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
-		Metadata *metadataPtr = 0
+		Metadata *metadataPtr = 0,
+		bool needsLock = true, bool needsUnlock = true
 	);
 
 	bool insertKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata );
@@ -101,7 +102,8 @@ public:
 
 	bool insertChunk(
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
-		Chunk *chunk, bool isParity = false
+		Chunk *chunk, bool isParity = false,
+		bool needsLock = true, bool needsUnlock = true
 	);
 	Chunk *deleteChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, Metadata *metadataPtr = 0 );
 
@@ -120,8 +122,24 @@ public:
 	void print( FILE *f = stdout );
 	void stop();
 
-	bool updateKeyValue( uint8_t keySize, char *keyStr, uint32_t valueUpdateSize, uint32_t valueUpdateOffset, uint32_t chunkUpdateOffset, char *valueUpdate, Chunk *chunk, bool isSealed );
-	bool deleteKey( uint8_t opcode, uint32_t &timestamp, uint8_t keySize, char *keyStr, Metadata metadata, bool isSealed, uint32_t &deltaSize, char *delta, Chunk *chunk );
+	// For reconstructed data chunks
+	bool updateKeyValue(
+		uint8_t keySize, char *keyStr,
+		uint32_t valueUpdateSize, uint32_t valueUpdateOffset, uint32_t chunkUpdateOffset,
+		char *valueUpdate, Chunk *chunk, bool isSealed
+	);
+	bool deleteKey(
+		uint8_t opcode, uint32_t &timestamp,
+		uint8_t keySize, char *keyStr, Metadata metadata, bool isSealed,
+		uint32_t &deltaSize, char *delta, Chunk *chunk
+	);
+
+	// For reconstructed parity chunks
+	bool update(
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t updatingChunkId,
+		uint32_t offset, uint32_t size, char *dataDelta,
+		Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk
+	);
 
 	~DegradedChunkBuffer();
 };

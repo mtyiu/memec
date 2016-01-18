@@ -68,3 +68,33 @@ char *SlaveProtocol::resReleaseDegradedLock( size_t &size, uint16_t instanceId, 
 	);
 	return this->buffer.send;
 }
+
+char *SlaveProtocol::reqForwardChunk(
+	size_t &size, uint16_t instanceId, uint32_t requestId,
+	uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+	uint32_t chunkSize, uint32_t chunkOffset, char *chunkData
+) {
+	size = this->generateChunkDataHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_FORWARD_CHUNK,
+		instanceId, requestId,
+		listId, stripeId, chunkId,
+		chunkSize, chunkOffset, chunkData
+	);
+	return this->buffer.send;
+}
+
+char *SlaveProtocol::resForwardChunk(
+	size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
+	uint32_t listId, uint32_t stripeId, uint32_t chunkId
+) {
+	size = this->generateChunkHeader(
+		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_FORWARD_CHUNK,
+		instanceId, requestId,
+		listId, stripeId, chunkId
+	);
+	return this->buffer.send;
+}

@@ -60,6 +60,10 @@ enum SlavePeerEventType {
 	SLAVE_PEER_EVENT_TYPE_SET_CHUNK_REQUEST,
 	SLAVE_PEER_EVENT_TYPE_SET_CHUNK_RESPONSE_SUCCESS,
 	SLAVE_PEER_EVENT_TYPE_SET_CHUNK_RESPONSE_FAILURE,
+	// FORWARD_CHUNK
+	SLAVE_PEER_EVENT_TYPE_FORWARD_CHUNK_REQUEST,
+	SLAVE_PEER_EVENT_TYPE_FORWARD_CHUNK_RESPONSE_SUCCESS,
+	SLAVE_PEER_EVENT_TYPE_FORWARD_CHUNK_RESPONSE_FAILURE,
 	// SEAL_CHUNK
 	SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_REQUEST,
 	SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_RESPONSE_SUCCESS,
@@ -192,6 +196,9 @@ public:
 	// SET_CHUNK
 	void reqSetChunk( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, Chunk *chunk, bool needsFree );
 	void resSetChunk( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, bool success );
+	// FORWARD_CHUNK
+	void reqForwardChunk( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, Chunk *chunk, bool needsFree );
+	void resForwardChunk( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, bool success );
 	// SEAL_CHUNK
 	void reqSealChunk( Chunk *chunk );
 	void resSealChunk( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, bool success );
