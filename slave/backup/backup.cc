@@ -52,7 +52,7 @@ bool SlaveBackup::insertData##_OP_TYPE_( Timestamp ts, Key key, Value value, Met
 	ret = this->addPendingAck( pi, ts, duplicate, #_OP_TYPE_ ); \
 	/* keep one copy of backup, but mutltiple ref indexed by a request id */ \
 	if ( ! duplicate && ret ) { \
-		backupDelta.set( metadata, key, value, isChunkDelta, valueOffset, chunkOffset, false, requestId, 0 ); \
+		backupDelta.set( metadata, key, value, isChunkDelta, valueOffset, chunkOffset, false, requestId, 0, ts.getVal() ); \
 		backupDelta.paritySlaves.insert( targetId ); \
 		map->insert( std::pair<Timestamp, BackupDelta>( ts, backupDelta ) ); \
 	} else if ( ret ) { \
@@ -77,7 +77,7 @@ bool SlaveBackup::insertData##_OP_TYPE_( Timestamp ts, Key key, Value value, Met
 		BackupDelta backupDelta; \
 		\
 		LOCK( lock ); \
-		backupDelta.set( metadata, key, value, isChunkDelta, valueOffset, chunkOffset, true, requestId, dataSlaveId ); \
+		backupDelta.set( metadata, key, value, isChunkDelta, valueOffset, chunkOffset, true, requestId, dataSlaveId, ts.getVal() ); \
 		map->insert( std::pair<Timestamp, BackupDelta>( ts, backupDelta ) ); \
 		UNLOCK( lock ); \
 		return true; \

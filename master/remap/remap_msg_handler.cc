@@ -160,7 +160,7 @@ void MasterRemapMsgHandler::setState( char* msg , int len ) {
 					event.syncMetadata( target );
 					Master::getInstance()->eventQueue.insert( event );
 					// revert parity deltas
-					Master::getInstance()->revertParityDelta(
+					Master::getInstance()->revertDelta(
 						0, target, 0,
 						&this->stateTransitInfo[ slave ].counter.parityRevert.lock,
 						&this->stateTransitInfo[ slave ].counter.parityRevert.value,

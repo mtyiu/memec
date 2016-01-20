@@ -51,7 +51,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 		}
 			break;
 		case SLAVE_EVENT_TYPE_ACK_PARITY_DELTA:
-		case SLAVE_EVENT_TYPE_REVERT_PARITY_DELTA:
+		case SLAVE_EVENT_TYPE_REVERT_DELTA:
 		{
 			bool isAck = ( event.type == SLAVE_EVENT_TYPE_ACK_PARITY_DELTA );
 				
@@ -64,14 +64,17 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 			);
 
 			MasterWorker::pending->insertAck(
-				( isAck )? PT_ACK_REMOVE_PARITY : PT_ACK_REVERT_PARITY,
+				( isAck )? PT_ACK_REMOVE_PARITY : PT_ACK_REVERT_DELTA,
 				event.socket->instanceId, requestId, 0,
 				ackInfo
 			);
 
 			std::vector<uint32_t> timestamps;
+			std::vector<Key> requests;
 			if ( ! event.message.ack.timestamps )
 				event.message.ack.timestamps = &timestamps;
+			if ( ! event.message.ack.requests )
+				event.message.ack.requests = &requests;
 
 			if ( isAck ) {
 				buffer.data = this->protocol.ackParityDeltaBackup(
@@ -81,12 +84,21 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 					event.message.ack.targetId
 				);
 			} else {
-				buffer.data = this->protocol.revertParityDelta(
+				buffer.data = this->protocol.revertDelta(
 					buffer.size,
 					instanceId, requestId,
 					*event.message.ack.timestamps,
+					*event.message.ack.requests,
 					event.message.ack.targetId
 				);
+			}
+
+			if ( event.message.ack.timestamps != &timestamps )
+				delete event.message.ack.timestamps;
+			if ( event.message.ack.requests != &requests ) {
+				for( Key &k : requests )
+					k.free();
+				delete event.message.ack.requests;
 			}
 
 			isSend = true;
@@ -201,7 +213,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 						this->handleAcknowledgement( event, header.opcode, buffer.data, header.length );
 						break;
 					case PROTO_OPCODE_ACK_PARITY_DELTA:
-					case PROTO_OPCODE_REVERT_PARITY_DELTA:
+					case PROTO_OPCODE_REVERT_DELTA:
 						this->handleDeltaAcknowledgement( event, header.opcode, buffer.data, header.length );
 						break;
 					default:
@@ -346,13 +358,14 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 		// FOR REPLAY TESTING ONLY
 		// SET //
 		//char *valueStr;
-		//uint32_t valueSize;
+		//uint32_t valueSize, chunkId;
 		//keyValue.deserialize( key.data, key.size, valueStr, valueSize );
 		//KeyValue kv;
 		//kv.dup( key.data, key.size, valueStr, valueSize );
 		//MasterWorker::pending->insertKeyValue( PT_APPLICATION_SET, pid.instanceId, pid.requestId, 0, kv, true, true, pid.timestamp );
 		//key = kv.key();
-		//MasterWorker::pending->insertKey( PT_SLAVE_SET, dpid.instanceId, dpid.parentInstanceId, dpid.requestId, dpid.parentRequestId, dpid.ptr, key );
+		//this->stripeList->get( key.data, key.size, this->dataSlaveSockets, 0, &chunkId );
+		//MasterWorker::pending->insertKey( PT_SLAVE_SET, dpid.instanceId, dpid.parentInstanceId, dpid.requestId, dpid.parentRequestId, this->dataSlaveSockets[ chunkId ], key );
 
 		// not to response if the request is "canceled" due to replay
 		if ( pid.ptr ) {
@@ -620,7 +633,7 @@ bool MasterWorker::handleAcknowledgement( SlaveEvent event, uint8_t opcode, char
 bool MasterWorker::handleDeltaAcknowledgement( SlaveEvent event, uint8_t opcode, char *buf, size_t size ) {
 	struct DeltaAcknowledgementHeader header;
 	PendingIdentifier pid;
-	if ( ! this->protocol.parseDeltaAcknowledgementHeader( header, 0, buf, size ) ) {
+	if ( ! this->protocol.parseDeltaAcknowledgementHeader( header, 0, 0, buf, size ) ) {
 		__ERROR__( "MasterWorker", "handleDeltaAcknowledgement", "Invalid ACK." );
 		return false;
 	}
@@ -632,8 +645,8 @@ bool MasterWorker::handleDeltaAcknowledgement( SlaveEvent event, uint8_t opcode,
 		case PROTO_OPCODE_ACK_PARITY_DELTA:
 			ret = MasterWorker::pending->eraseAck( PT_ACK_REMOVE_PARITY, event.instanceId, event.requestId, 0, &pid, &ackInfo );
 			break;
-		case PROTO_OPCODE_REVERT_PARITY_DELTA:
-			ret = MasterWorker::pending->eraseAck( PT_ACK_REVERT_PARITY, event.instanceId, event.requestId, 0, &pid, &ackInfo );
+		case PROTO_OPCODE_REVERT_DELTA:
+			ret = MasterWorker::pending->eraseAck( PT_ACK_REVERT_DELTA, event.instanceId, event.requestId, 0, &pid, &ackInfo );
 			break;
 		default:
 			__ERROR__( "MasterWorker", "handleDeltaAcknowledgement",
@@ -668,7 +681,7 @@ bool MasterWorker::handleDeltaAcknowledgement( SlaveEvent event, uint8_t opcode,
 	switch( opcode ) {
 		case PROTO_OPCODE_ACK_PARITY_DELTA:
 			break;
-		case PROTO_OPCODE_REVERT_PARITY_DELTA:
+		case PROTO_OPCODE_REVERT_DELTA:
 			LOCK( &master->sockets.slavesIdToSocketLock );
 			try {
 				struct sockaddr_in saddr = master->sockets.slavesIdToSocketMap.at( header.targetId )->getAddr();

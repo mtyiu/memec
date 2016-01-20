@@ -71,7 +71,7 @@
 #define PROTO_OPCODE_ACK_METADATA                 0x15
 #define PROTO_OPCODE_ACK_REQUEST                  0x16
 #define PROTO_OPCODE_ACK_PARITY_DELTA             0x17
-#define PROTO_OPCODE_REVERT_PARITY_DELTA          0x18
+#define PROTO_OPCODE_REVERT_DELTA                 0x18
 
 // Master <-> Coordinator (20-29) //
 #define PROTO_OPCODE_REMAPPING_LOCK               0x20
@@ -487,9 +487,10 @@ struct AcknowledgementHeader {
     uint32_t toTimestamp;
 };
 
-#define PROTO_ACK_PARITY_DELTA_SIZE 6
+#define PROTO_ACK_DELTA_SIZE 10
 struct DeltaAcknowledgementHeader {
-	uint32_t count;         // number of timestamps
+	uint32_t tsCount;         // number of timestamps
+	uint32_t keyCount;       // number of requests ids 
 	uint16_t targetId;      // source data slave
 };
 
@@ -1025,11 +1026,13 @@ protected:
 	);
 	size_t generateDeltaAcknowledgementHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
-		std::vector<uint32_t> &timestamp, uint16_t targetId, char* buf = 0
+		const std::vector<uint32_t> &timestamp, const std::vector<Key> &requests,
+		uint16_t targetId, char* buf = 0
 	);
 	bool parseDeltaAcknowledgementHeader(
-		size_t offset, uint32_t &count, std::vector<uint32_t> *timestamps, uint16_t &targetId,
-		char *buf, size_t size
+		size_t offset, uint32_t &tsCount, uint32_t &keyCount,
+		std::vector<uint32_t> *timestamps, std::vector<Key> *requests,
+		uint16_t &targetId, char *buf, size_t size
 	);
 
 public:
@@ -1251,6 +1254,7 @@ public:
 	bool parseDeltaAcknowledgementHeader(
 		struct DeltaAcknowledgementHeader &header,
 		std::vector<uint32_t> *timestamps = 0,
+		std::vector<Key> *requests = 0,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 };

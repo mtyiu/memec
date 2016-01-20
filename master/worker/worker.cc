@@ -259,7 +259,7 @@ void MasterWorker::removePending( SlaveSocket *slave, bool needsAck ) {
 	}
 	// revert parity ack
 	ackInfoList.clear();
-	MasterWorker::pending->eraseAck( PT_ACK_REVERT_PARITY, slave->instanceId, &ackInfoList );
+	MasterWorker::pending->eraseAck( PT_ACK_REVERT_DELTA, slave->instanceId, &ackInfoList );
 	for ( AcknowledgementInfo &it : ackInfoList ) {
 		if ( it.lock ) LOCK( it.lock );
 		if ( it.counter ) *it.counter -= 1;

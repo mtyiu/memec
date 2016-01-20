@@ -104,12 +104,13 @@ void MasterEvent::resDelete( MasterSocket *socket, uint16_t instanceId, uint32_t
 	this->message.del.key = key;
 }
 
-void MasterEvent::resRevertParityDelta( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, bool success, std::vector<uint32_t> timestamps, uint16_t dataSlaveId ) {
-	this->type = success ? MASTER_EVENT_TYPE_REVERT_PARITY_DELTA_SUCCESS : MASTER_EVENT_TYPE_REVERT_PARITY_DELTA_FAILURE;
+void MasterEvent::resRevertDelta( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, bool success, std::vector<uint32_t> timestamps, std::vector<Key> requests, uint16_t dataSlaveId ) {
+	this->type = success ? MASTER_EVENT_TYPE_REVERT_DELTA_SUCCESS : MASTER_EVENT_TYPE_REVERT_DELTA_FAILURE;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
 	this->message.revert.timestamps = timestamps.empty() ? 0 : new std::vector<uint32_t>( timestamps );
+	this->message.revert.requests = requests.empty() ? 0 : new std::vector<Key>( requests );
 	this->message.revert.targetId = dataSlaveId;
 }
 

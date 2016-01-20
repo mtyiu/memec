@@ -25,31 +25,44 @@ public:
 	} delta;
 	Metadata metadata;
 	bool isChunkDelta;
-	uint32_t requestId;
+
 	bool isParity;
-	uint16_t dataSlaveId;
 	std::set<uint16_t> paritySlaves;
 
-	void set( Metadata metadata, Key key, Value value, bool isChunkDelta, uint32_t valueOffset, uint32_t chunkOffset, bool isParity, uint32_t requestId, uint16_t dataSlaveId ) {
+	uint32_t requestId;
+	uint16_t dataSlaveId;
+	uint32_t timestamp;
+
+	void set( Metadata metadata, Key key, Value value, bool isChunkDelta, uint32_t valueOffset, uint32_t chunkOffset, bool isParity, uint32_t requestId, uint16_t dataSlaveId, uint32_t timestamp ) {
 		this->metadata = metadata;
-		this->delta.data.dup( value.size, value.data );
-		this->key.dup( key.size, key.data );
+		if ( value.size > 0 )
+			this->delta.data.dup( value.size, value.data );
+		else
+			this->delta.data.set( 0, 0 );
+		if ( key.size > 0 )
+			this->key.dup( key.size, key.data );
+		else
+			this->key.set( 0, 0 );
 		this->isChunkDelta = isChunkDelta;
 		this->delta.valueOffset = valueOffset;
 		this->delta.chunkOffset = chunkOffset;
 		this->isParity = isParity;
 		this->requestId = requestId;
 		this->dataSlaveId = dataSlaveId;
+		this->timestamp = timestamp;
 	}
 
 	void free() {
-		this->key.free();
-		this->delta.data.free();
+		if ( key.size )
+			this->key.free();
+		if ( delta.data.size )
+			this->delta.data.free();
 	}
 
 	void print( FILE *f = stdout ) {
 		fprintf( f,
-			"From: %5hu; key: (%4u) %.*s;  offset: %4u %4u;  isChunkDelta:%1hhu;  isParity:%1hhu (%3lu);  delta: (%4u) [",
+			"Timestamp: %10u; From: %5hu; key: (%4u) %.*s;  offset: %4u %4u;  isChunkDelta:%1hhu;  isParity:%1hhu (%3lu);  delta: (%4u) [",
+			this->timestamp,
 			this->dataSlaveId,
 			this->key.size,
 			this->key.size,
@@ -118,7 +131,7 @@ private:
 	// locks
 	LOCK_T dataUpdateLock;
 	LOCK_T dataDeleteLock;
-	// LOCK_T idToTimestampMapLock;
+	//LOCK_T idToTimestampMapLock;
 	LOCK_T parityUpdateLock;
 	LOCK_T parityDeleteLock;
 

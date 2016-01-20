@@ -279,7 +279,7 @@ public:
 		LOCK_T setChunkLock;
 		LOCK_T forwardParityChunkLock;
 		LOCK_T updateChunkLock;
-		LOCK_T delChunkLock;
+		LOCK_T deleteChunkLock;
 		LOCK_T remappedDataLock;
 		LOCK_T remappedDataRequestLock;
 	} slavePeers;
@@ -300,7 +300,7 @@ public:
 		LOCK_INIT( &this->slavePeers.setChunkLock );
 		LOCK_INIT( &this->slavePeers.forwardParityChunkLock );
 		LOCK_INIT( &this->slavePeers.updateChunkLock );
-		LOCK_INIT( &this->slavePeers.delChunkLock );
+		LOCK_INIT( &this->slavePeers.deleteChunkLock );
 		LOCK_INIT( &this->slavePeers.remappedDataLock );
 		LOCK_INIT( &this->slavePeers.remappedDataRequestLock );
 	}

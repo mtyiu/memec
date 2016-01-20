@@ -102,7 +102,7 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 			map = &this->slavePeers.updateChunk;
 			break;
 		case PT_SLAVE_PEER_DEL_CHUNK:
-			lock = &this->slavePeers.delChunkLock;
+			lock = &this->slavePeers.deleteChunkLock;
 			map = &this->slavePeers.deleteChunk;
 			break;
 		default:

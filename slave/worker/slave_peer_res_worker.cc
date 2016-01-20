@@ -277,10 +277,27 @@ bool SlaveWorker::handleUpdateResponse( SlavePeerEvent event, bool success, char
 		// Only send master UPDATE response when the number of pending slave UPDATE requests equal 0
 		MasterEvent masterEvent;
 
+		// FOR TESTING REVERT ONLY (parity slave fails and skip waiting)
+		//PendingIdentifier dpid = pid;
+
 		if ( ! SlaveWorker::pending->eraseKeyValueUpdate( PT_MASTER_UPDATE, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &keyValueUpdate ) ) {
 			__ERROR__( "SlaveWorker", "handleUpdateResponse", "Cannot find a pending master UPDATE request that matches the response. This message will be discarded." );
 			return false;
 		}
+
+
+		// FOR TESTING REVERT ONLY (parity slave fails and skip waiting)
+		//SlavePeerSocket *s = 0;
+		//this->stripeList->get( keyValueUpdate.data, keyValueUpdate.size, 0, this->paritySlaveSockets );
+		//for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
+		//	if ( this->paritySlaveSockets[ i ]->instanceId == 2 ) {
+		//		s = this->paritySlaveSockets[ i ];
+		//		break;
+		//	}
+		//}
+		//SlaveWorker::pending->insertKeyValueUpdate( PT_MASTER_UPDATE, pid.instanceId, pid.requestId, pid.ptr , keyValueUpdate ); 
+		//SlaveWorker::pending->insertKeyValueUpdate( PT_SLAVE_PEER_UPDATE, dpid.instanceId, pid.instanceId, dpid.requestId, pid.requestId, ( void * ) s, keyValueUpdate );
+		//keyValueUpdate.dup();
 
 		masterEvent.resUpdate(
 			( MasterSocket * ) pid.ptr, pid.instanceId, pid.requestId,
@@ -938,7 +955,7 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 	chunkUpdate.ptr = ( void * ) event.socket;
 
 	if ( ! SlaveWorker::pending->eraseChunkUpdate( PT_SLAVE_PEER_DEL_CHUNK, instanceId, event.requestId, event.socket, &pid, &chunkUpdate, true, false ) ) {
-		UNLOCK( &SlaveWorker::pending->slavePeers.delChunkLock );
+		UNLOCK( &SlaveWorker::pending->slavePeers.deleteChunkLock );
 		__ERROR__( "SlaveWorker", "handleDeleteChunkResponse", "Cannot find a pending slave DELETE_CHUNK request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		return false;
 	}

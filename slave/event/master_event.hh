@@ -32,8 +32,8 @@ enum MasterEventType {
 	MASTER_EVENT_TYPE_ACK_METADATA,
 	MASTER_EVENT_TYPE_ACK_PARITY_BACKUP,
 	// FAULT TOLERANCE
-	MASTER_EVENT_TYPE_REVERT_PARITY_DELTA_SUCCESS,
-	MASTER_EVENT_TYPE_REVERT_PARITY_DELTA_FAILURE,
+	MASTER_EVENT_TYPE_REVERT_DELTA_SUCCESS,
+	MASTER_EVENT_TYPE_REVERT_DELTA_FAILURE,
 	// Pending
 	MASTER_EVENT_TYPE_PENDING
 };
@@ -88,8 +88,8 @@ public:
 		} ack;
 		struct {
 			std::vector<uint32_t> *timestamps;
+			std::vector<Key> *requests;
 			uint16_t targetId;
-			bool isParityDeltaRevert;
 		} revert;
 	} message;
 
@@ -115,7 +115,7 @@ public:
 	void resDelete( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool needsFree, bool isDegraded );
 	// FAULT TOLERANCE
 	void resAckParityDelta( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, std::vector<uint32_t> timestamps, uint16_t dataSlaveId );
-	void resRevertParityDelta( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, bool success, std::vector<uint32_t> timestamps, uint16_t dataSlaveId );
+	void resRevertDelta( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, bool success, std::vector<uint32_t> timestamps, std::vector<Key> requests, uint16_t dataSlaveId );
 	// ACK
 	void ackMetadata( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t fromTimestamp, uint32_t toTimestamp );
 

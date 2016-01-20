@@ -12,7 +12,7 @@ enum SlaveEventType {
 	SLAVE_EVENT_TYPE_SEND,
 	SLAVE_EVENT_TYPE_SYNC_METADATA,
 	SLAVE_EVENT_TYPE_ACK_PARITY_DELTA,
-	SLAVE_EVENT_TYPE_REVERT_PARITY_DELTA,
+	SLAVE_EVENT_TYPE_REVERT_DELTA,
 	SLAVE_EVENT_TYPE_PENDING
 };
 
@@ -33,6 +33,7 @@ public:
 		} send;
 		struct {
 			std::vector<uint32_t> *timestamps;
+			std::vector<Key> *requests;
 			uint16_t targetId;
 			pthread_cond_t *condition;
 			LOCK_T *lock;
@@ -44,7 +45,7 @@ public:
 	void send( SlaveSocket *socket, Packet *packet );
 	void syncMetadata( SlaveSocket *socket );
 	void ackParityDelta( SlaveSocket *socket, std::vector<uint32_t> timestamps, uint16_t targetId, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter );
-	void revertParityDelta( SlaveSocket *socket, std::vector<uint32_t> timestamps, uint16_t targetId, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter );
+	void revertDelta( SlaveSocket *socket, std::vector<uint32_t> timestamps, std::vector<Key> requests, uint16_t targetId, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter );
 	void pending( SlaveSocket *socket );
 };
 
