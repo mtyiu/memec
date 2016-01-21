@@ -18,7 +18,7 @@ bool CoordinatorWorker::handlePromoteBackupSlaveResponse( SlaveEvent event, char
 	double elapsedTime;
 	SlaveSocket *original;
 
-	if ( ! CoordinatorWorker::pending->eraseRecovery( event.instanceId, event.requestId, header.addr, header.port, header.chunkCount, header.unsealedCount, event.socket, remainingChunks, remainingKeys, totalChunks, totalKeys, elapsedTime, original ) ) {
+	if ( ! CoordinatorWorker::pending->eraseRecovery( event.instanceId, event.requestId, header.addr, header.port, header.chunkCount, header.unsealedCount, event.socket, remainingChunks, totalChunks, remainingKeys, totalKeys, elapsedTime, original ) ) {
 		__ERROR__( "SlaveWorker", "handlePromoteBackupSlaveResponse", "Cannot find a pending RECOVERY request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		return false;
 	}
@@ -43,6 +43,8 @@ bool CoordinatorWorker::handlePromoteBackupSlaveResponse( SlaveEvent event, char
 			elapsedTime
 		);
 		Coordinator::getInstance()->appendLog( log );
+
+		// system( "ssh testbed-node10 'screen -S experiment -p 0 -X stuff \"$(printf '\r')\"'" );
 	}
 
 	return true;

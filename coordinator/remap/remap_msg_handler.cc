@@ -156,12 +156,22 @@ bool CoordinatorRemapMsgHandler::stop() {
 	} while (0)
 
 
-bool CoordinatorRemapMsgHandler::transitToDegraded( std::vector<struct sockaddr_in> *slaves ) {
+bool CoordinatorRemapMsgHandler::transitToDegraded( std::vector<struct sockaddr_in> *slaves, bool forced ) {
 	RemapStateEvent event;
 	event.start = true;
 	vector<struct sockaddr_in> slavesToStart;
 
-	REMAP_PHASE_CHANGE_HANDLER( slaves, slavesToStart, event );
+	if ( forced ) {
+		for ( uint32_t i = 0, len = slaves->size(); i < len; i++ ) {
+			LOCK( &this->slavesStateLock[ slaves->at(i) ] );
+			this->slavesState[ slaves->at( i ) ] = REMAP_INTERMEDIATE;
+			UNLOCK( &this->slavesStateLock[ slaves->at(i) ] );
+		}
+		this->sendStateToMasters( *slaves );
+		this->insertRepeatedEvents( event, slaves );
+	} else {
+		REMAP_PHASE_CHANGE_HANDLER( slaves, slavesToStart, event );
+	}
 
 	return true;
 }
@@ -211,7 +221,7 @@ bool CoordinatorRemapMsgHandler::transitToDegradedEnd( const struct sockaddr_in 
 	return true;
 }
 
-bool CoordinatorRemapMsgHandler::transitToNormal( std::vector<struct sockaddr_in> *slaves ) {
+bool CoordinatorRemapMsgHandler::transitToNormal( std::vector<struct sockaddr_in> *slaves, bool forced ) {
 	RemapStateEvent event;
 	event.start = false;
 	vector<struct sockaddr_in> slavesToStop;
@@ -227,7 +237,17 @@ bool CoordinatorRemapMsgHandler::transitToNormal( std::vector<struct sockaddr_in
 	}
 	UNLOCK( &this->aliveSlavesLock );
 
-	REMAP_PHASE_CHANGE_HANDLER( slaves, slavesToStop, event );
+	if ( forced ) {
+		for ( uint32_t i = 0, len = slaves->size(); i < len; i++ ) {
+			LOCK( &this->slavesStateLock[ slaves->at(i) ] );
+			this->slavesState[ slaves->at( i ) ] = REMAP_COORDINATED;
+			UNLOCK( &this->slavesStateLock[ slaves->at(i) ] );
+		}
+		this->sendStateToMasters( *slaves );
+		this->insertRepeatedEvents( event, slaves );
+	} else {
+		REMAP_PHASE_CHANGE_HANDLER( slaves, slavesToStop, event );
+	}
 
 	return true;
 }
@@ -591,3 +611,4 @@ bool CoordinatorRemapMsgHandler::reachMaximumRemapped( uint32_t maximum ) {
 	UNLOCK( &this->aliveSlavesLock );
 	return ( count == maximum );
 }
+

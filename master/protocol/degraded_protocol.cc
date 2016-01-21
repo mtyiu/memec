@@ -28,7 +28,7 @@ char *MasterProtocol::reqDegradedGet( size_t &size, uint16_t instanceId, uint32_
 	return this->buffer.send;
 }
 
-char *MasterProtocol::reqDegradedUpdate( size_t &size, uint16_t instanceId, uint32_t requestId, bool isSealed, uint32_t stripeId, uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32_t ongoingAtChunk, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize ) {
+char *MasterProtocol::reqDegradedUpdate( size_t &size, uint16_t instanceId, uint32_t requestId, bool isSealed, uint32_t stripeId, uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32_t ongoingAtChunk, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t timestamp ) {
 	// -- common/protocol/degraded_protocol.cc --
 	size = this->generateDegradedReqHeader(
 		PROTO_MAGIC_REQUEST,
@@ -39,12 +39,13 @@ char *MasterProtocol::reqDegradedUpdate( size_t &size, uint16_t instanceId, uint
 		original, reconstructed, reconstructedCount,
 		ongoingAtChunk,
 		keySize, key,
-		valueUpdateOffset, valueUpdateSize, valueUpdate
+		valueUpdateOffset, valueUpdateSize, valueUpdate,
+		timestamp
 	);
 	return this->buffer.send;
 }
 
-char *MasterProtocol::reqDegradedDelete( size_t &size, uint16_t instanceId, uint32_t requestId, bool isSealed, uint32_t stripeId, uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32_t ongoingAtChunk, char *key, uint8_t keySize ) {
+char *MasterProtocol::reqDegradedDelete( size_t &size, uint16_t instanceId, uint32_t requestId, bool isSealed, uint32_t stripeId, uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32_t ongoingAtChunk, char *key, uint8_t keySize, uint32_t timestamp ) {
 	// -- common/protocol/degraded_protocol.cc --
 	size = this->generateDegradedReqHeader(
 		PROTO_MAGIC_REQUEST,
@@ -54,7 +55,8 @@ char *MasterProtocol::reqDegradedDelete( size_t &size, uint16_t instanceId, uint
 		isSealed, stripeId,
 		original, reconstructed, reconstructedCount,
 		ongoingAtChunk,
-		keySize, key
+		keySize, key,
+		timestamp
 	);
 	return this->buffer.send;
 }

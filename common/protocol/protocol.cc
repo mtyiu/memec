@@ -122,6 +122,7 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_OPCODE_GET_CHUNKS:
 		case PROTO_OPCODE_SET_CHUNK:
 		case PROTO_OPCODE_SET_CHUNK_UNSEALED:
+		case PROTO_OPCODE_FORWARD_CHUNK:
 		case PROTO_OPCODE_REMAPPED_UPDATE:
 		case PROTO_OPCODE_REMAPPED_DELETE:
 			break;

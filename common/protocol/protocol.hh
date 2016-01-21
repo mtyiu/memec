@@ -85,8 +85,9 @@
 #define PROTO_OPCODE_GET_CHUNKS                   0x55
 #define PROTO_OPCODE_SET_CHUNK                    0x56
 #define PROTO_OPCODE_SET_CHUNK_UNSEALED           0x57
-#define PROTO_OPCODE_REMAPPED_UPDATE              0x58
-#define PROTO_OPCODE_REMAPPED_DELETE              0x59
+#define PROTO_OPCODE_FORWARD_CHUNK                0x58
+#define PROTO_OPCODE_REMAPPED_UPDATE              0x59
+#define PROTO_OPCODE_REMAPPED_DELETE              0x60
 
 #define PROTO_UNINITIALIZED_INSTANCE              0
 
@@ -836,7 +837,8 @@ protected:
 		bool isSealed, uint32_t stripeId,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 		uint32_t ongoingAtChunk,
-		uint8_t keySize, char *key
+		uint8_t keySize, char *key,
+		uint32_t timestamp = 0
 	);
 	size_t generateDegradedReqHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
@@ -844,7 +846,8 @@ protected:
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 		uint32_t ongoingAtChunk,
 		uint8_t keySize, char *key,
-		uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate
+		uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate,
+		uint32_t timestamp = 0
 	);
 	bool parseDegradedReqHeader(
 		size_t offset,

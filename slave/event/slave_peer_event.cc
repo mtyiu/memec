@@ -238,6 +238,25 @@ void SlavePeerEvent::resSetChunk( SlavePeerSocket *socket, uint16_t instanceId, 
 	this->message.chunk.chunk = 0;
 }
 
+void SlavePeerEvent::reqForwardChunk( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, Chunk *chunk, bool needsFree ) {
+	this->type = SLAVE_PEER_EVENT_TYPE_FORWARD_CHUNK_REQUEST;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
+	this->socket = socket;
+	this->message.chunk.metadata = metadata;
+	this->message.chunk.chunk = chunk;
+	this->message.chunk.needsFree = needsFree;
+}
+
+void SlavePeerEvent::resForwardChunk( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, bool success ) {
+	this->type = success ? SLAVE_PEER_EVENT_TYPE_FORWARD_CHUNK_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_FORWARD_CHUNK_RESPONSE_FAILURE;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
+	this->socket = socket;
+	this->message.chunk.metadata = metadata;
+	this->message.chunk.chunk = 0;
+}
+
 void SlavePeerEvent::reqSealChunk( Chunk *chunk ) {
 	this->type = SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_REQUEST;
 	this->message.chunk.chunk = chunk;

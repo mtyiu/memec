@@ -159,6 +159,8 @@ private:
 	bool handleDegradedGetRequest( MasterEvent event, char *buf, size_t size );
 	bool handleDegradedUpdateRequest( MasterEvent event, char *buf, size_t size );
 	bool handleDegradedDeleteRequest( MasterEvent event, char *buf, size_t size );
+	bool handleForwardChunkRequest( SlavePeerEvent event, char *buf, size_t size );
+	bool handleForwardChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool performDegradedRead(
 		uint8_t opcode,
 		MasterSocket *masterSocket,
@@ -166,7 +168,9 @@ private:
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId, // chunkId refers to the current chunk ID
 		Key *key, bool isSealed,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
-		KeyValueUpdate *keyValueUpdate = 0
+		uint32_t ongoingAtChunk,
+		KeyValueUpdate *keyValueUpdate = 0,
+		uint32_t timestamp = 0
 	);
 	bool sendModifyChunkRequest(
 		uint16_t parentInstanceId, uint32_t parentRequestId,

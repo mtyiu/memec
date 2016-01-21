@@ -76,6 +76,12 @@ public class Main implements Runnable {
 
 			// if ( rand == 1 ) rand = 2;
 			if ( size != numRecords ) rand = 0;
+			if ( i == numRecords ) {
+				System.err.println( "Sleep for 2 seconds." );
+				try {
+					Thread.sleep( 2000 );
+				} catch ( Exception e ) {}
+			}
 
 			if ( rand == 0 ) {
 				// SET

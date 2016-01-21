@@ -52,6 +52,7 @@ public:
 			bool toRemap;
 			bool isCrashed;
 			std::vector<struct sockaddr_in> *slaves;
+			bool forced;
 		} switchPhase;
 		struct {
 			uint32_t *original;
@@ -84,7 +85,7 @@ public:
 		ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency,
 		std::set<struct sockaddr_in> *slaveSet
 	);
-	void switchPhase( bool toRemap, std::set<struct sockaddr_in> slaves, bool isCrashed = false );
+	void switchPhase( bool toRemap, std::set<struct sockaddr_in> slaves, bool isCrashed = false, bool forced = false );
 	// Degraded lock
 	void resDegradedLock(
 		MasterSocket *socket, uint16_t instanceId, uint32_t requestId,

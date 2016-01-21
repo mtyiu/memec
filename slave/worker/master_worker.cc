@@ -698,8 +698,8 @@ bool SlaveWorker::handleDeleteRequest(
 				metadata, keyMetadata.offset, deltaSize, 0, delta,
 				chunkBufferIndex == -1, // isSealed
 				false,                  // isUpdate
-				0,                      // timestamp
-				0,                      // masterSocket
+				event.timestamp,        // timestamp
+				event.socket,           // masterSocket
 				original, reconstructed, reconstructedCount,
 				reconstructParity,
 				chunks, endOfDegradedOp

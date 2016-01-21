@@ -132,6 +132,18 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				event.message.degradedSet.valueSize
 			);
 			break;
+		case SLAVE_PEER_EVENT_TYPE_FORWARD_CHUNK_REQUEST:
+			buffer.data = this->protocol.reqForwardChunk(
+				buffer.size,
+				event.instanceId, event.requestId,
+				event.message.chunk.metadata.listId,
+				event.message.chunk.metadata.stripeId,
+				event.message.chunk.metadata.chunkId,
+				event.message.chunk.chunk->getSize(),
+				0,
+				event.message.chunk.chunk->getData()
+			);
+			break;
 		case SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_REQUEST:
 			this->issueSealChunkRequest( event.message.chunk.chunk );
 			return;
@@ -334,6 +346,19 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 			success = true; // default is false
 		case SLAVE_PEER_EVENT_TYPE_SET_CHUNK_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resSetChunk(
+				buffer.size,
+				event.instanceId, event.requestId,
+				success,
+				event.message.chunk.metadata.listId,
+				event.message.chunk.metadata.stripeId,
+				event.message.chunk.metadata.chunkId
+			);
+			break;
+		// FORWARD_CHUNK
+		case SLAVE_PEER_EVENT_TYPE_FORWARD_CHUNK_RESPONSE_SUCCESS:
+			success = true;
+		case SLAVE_PEER_EVENT_TYPE_FORWARD_CHUNK_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resForwardChunk(
 				buffer.size,
 				event.instanceId, event.requestId,
 				success,
@@ -663,6 +688,22 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 							break;
 						case PROTO_MAGIC_RESPONSE_FAILURE:
 							this->handleSetChunkResponse( event, false, buffer.data, buffer.size );
+							break;
+						default:
+							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave." );
+							break;
+					}
+					break;
+				case PROTO_OPCODE_FORWARD_CHUNK:
+					switch ( header.magic ) {
+						case PROTO_MAGIC_REQUEST:
+							this->handleForwardChunkRequest( event, buffer.data, buffer.size );
+							break;
+						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							this->handleForwardChunkResponse( event, true, buffer.data, buffer.size );
+							break;
+						case PROTO_MAGIC_RESPONSE_FAILURE:
+							this->handleForwardChunkResponse( event, false, buffer.data, buffer.size );
 							break;
 						default:
 							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave." );

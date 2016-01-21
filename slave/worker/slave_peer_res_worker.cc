@@ -71,6 +71,7 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 	DegradedOp op;
 	std::vector<struct pid_s> pids;
 	bool isInserted = false;
+	uint32_t timestamp;
 
 	if ( ! SlaveWorker::pending->eraseKey( PT_SLAVE_PEER_GET, event.instanceId, event.requestId, event.socket, &pid ) ) {
 		__ERROR__( "SlaveWorker", "handleGetResponse", "Cannot find a pending slave UNSEALED_GET request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
@@ -95,7 +96,6 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 
 		if ( success ) {
 			if ( op.opcode == PROTO_OPCODE_DEGRADED_DELETE ) {
-				uint32_t timestamp;
 				metadata.set( op.listId, op.stripeId, op.chunkId );
 				dmap->deleteValue( key, metadata, PROTO_OPCODE_DELETE, timestamp );
 				keyValue.free();
@@ -176,7 +176,9 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 						op.data.keyValueUpdate.offset,
 						valueUpdate,
 						false /* isSealed */,
-						true /* isUpdate */
+						true /* isUpdate */,
+						op.timestamp,
+						op.socket
 					);
 
 					delete[] valueUpdate;
@@ -209,7 +211,9 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 						// not needed for deleting a key-value pair in an unsealed chunk:
 						0, 0, 0, 0,
 						false, // isSealed
-						false  // isUpdate
+						false,  // isUpdate
+						op.timestamp,
+						op.socket
 					);
 				} else {
 					masterEvent.resDelete(
@@ -672,7 +676,9 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 								op.data.keyValueUpdate.offset,
 								valueUpdate,
 								true /* isSealed */,
-								true /* isUpdate */
+								true /* isUpdate */,
+								op.timestamp,
+								op.socket
 							);
 
 							delete[] valueUpdate;
@@ -714,7 +720,9 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 								pid.parentInstanceId, pid.parentRequestId, key.size, key.data,
 								metadata, keyMetadata.offset, deltaSize, 0, delta,
 								true /* isSealed */,
-								false /* isUpdate */
+								false /* isUpdate */,
+								op.timestamp,
+								op.socket
 							);
 						} else {
 							MasterEvent event;

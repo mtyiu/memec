@@ -319,13 +319,15 @@ size_t Protocol::generateDegradedReqHeader(
 	bool isSealed, uint32_t stripeId,
 	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 	uint32_t ongoingAtChunk,
-	uint8_t keySize, char *key
+	uint8_t keySize, char *key,
+	uint32_t timestamp
 ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader(
 		magic, to, opcode,
 		PROTO_DEGRADED_REQ_BASE_SIZE + reconstructedCount * 4 * 4 + PROTO_KEY_SIZE + keySize,
-		instanceId, requestId
+		instanceId, requestId, 0,
+		timestamp
 	);
 
 	buf[ 0 ] = isSealed;
@@ -367,13 +369,16 @@ size_t Protocol::generateDegradedReqHeader(
 	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 	uint32_t ongoingAtChunk,
 	uint8_t keySize, char *key,
-	uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate
+	uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate,
+	uint32_t timestamp
 ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader(
 		magic, to, opcode,
 		PROTO_DEGRADED_REQ_BASE_SIZE + reconstructedCount * 4 * 4 + PROTO_KEY_VALUE_UPDATE_SIZE + keySize + valueUpdateSize,
-		instanceId, requestId
+		instanceId, requestId,
+		0, 
+		timestamp
 	);
 
 	buf[ 0 ] = isSealed;

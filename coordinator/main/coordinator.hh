@@ -127,6 +127,9 @@ public:
 	void hash();
 	void lookup();
 	void appendLog( Log log );
+	void setSlave( bool overloaded );
+	void switchToManualOverload();
+	void switchToAutoOverload();
 	void interactive();
 };
 
