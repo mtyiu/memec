@@ -4,11 +4,28 @@
 int SlaveWorker::findInRedirectedList( uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32_t ongoingAtChunk, bool &reconstructParity, bool &reconstructData ) {
 	int ret = -1;
 	bool self = false;
+	uint32_t listId;
 
 	std::vector<StripeListIndex> &lists = Slave::getInstance()->stripeListIndex;
+	int listIndex = -1;
 
 	reconstructParity = false;
 	reconstructData = false;
+
+	if ( reconstructedCount ) {
+		listId = reconstructed[ 0 ];
+		for ( uint32_t i = 0, size = lists.size(); i < size; i++ ) {
+			if ( listId == lists[ i ].listId ) {
+				listIndex = ( int ) i;
+				break;
+			}
+		}
+
+		if ( listIndex == -1 ) {
+			__ERROR__( "SlaveWorker", "findInRedirectedList", "This slave is not in the reconstructed list." );
+			return -1;
+		}
+	}
 
 	for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
 		if ( original[ i * 2 + 1 ] >= SlaveWorker::dataChunkCount )
@@ -17,10 +34,9 @@ int SlaveWorker::findInRedirectedList( uint32_t *original, uint32_t *reconstruct
 			reconstructData = true;
 
 		if ( ret == -1 ) {
-			uint32_t listId = reconstructed[ i * 2 ];
-			if ( ! self && lists[ listId ].chunkId == ongoingAtChunk )
+			if ( ! self && lists[ listIndex ].chunkId == ongoingAtChunk )
 				self = true;
-			if ( reconstructed[ i * 2 + 1 ] == lists[ listId ].chunkId ) {
+			if ( reconstructed[ i * 2 + 1 ] == lists[ listIndex ].chunkId ) {
 				ret = ( int ) i;
 				break;
 			}
@@ -49,10 +65,11 @@ bool SlaveWorker::handleReleaseDegradedLockRequest( CoordinatorEvent event, char
 			__ERROR__( "SlaveWorker", "handleReleaseDegradedLockRequest", "Invalid DEGRADED_RELEASE request." );
 			return false;
 		}
-		__DEBUG__(
+		__INFO__(
 			BLUE, "SlaveWorker", "handleGetRequest",
-			"[DEGRADED_RELEASE] (%u, %u, %u) (remaining = %lu).",
-			header.listId, header.stripeId, header.chunkId
+			"[DEGRADED_RELEASE] (%u, %u, %u) (count = %u).",
+			header.listId, header.stripeId, header.chunkId,
+			count
 		);
 		buf += PROTO_DEGRADED_RELEASE_REQ_SIZE;
 		size -= PROTO_DEGRADED_RELEASE_REQ_SIZE;
@@ -749,9 +766,9 @@ bool SlaveWorker::performDegradedRead(
 	}
 
 	// Insert the degraded operation into degraded chunk buffer pending set
-	bool needsContinue;
+	bool needsContinue, isReconstructed;
 	if ( isSealed ) {
-		needsContinue = SlaveWorker::degradedChunkBuffer->map.insertDegradedChunk( listId, stripeId, chunkId, instanceId, requestId );
+		needsContinue = SlaveWorker::degradedChunkBuffer->map.insertDegradedChunk( listId, stripeId, chunkId, instanceId, requestId, isReconstructed );
 		// printf( "insertDegradedChunk(): (%u, %u, %u) - needsContinue: %d\n", listId, stripeId, chunkId, needsContinue );
 	} else {
 		Key k;
@@ -759,13 +776,20 @@ bool SlaveWorker::performDegradedRead(
 			k.set( keyValueUpdate->size, keyValueUpdate->data );
 		else
 			k = *key;
-		needsContinue = SlaveWorker::degradedChunkBuffer->map.insertDegradedKey( k, instanceId, requestId );
+		needsContinue = SlaveWorker::degradedChunkBuffer->map.insertDegradedKey( k, instanceId, requestId, isReconstructed );
 		// printf( "insertDegradedKey(): (%.*s) - needsContinue: %d\n", k.size, k.data, needsContinue );
 	}
 
 	if ( isSealed ) {
-		if ( ! needsContinue ) // already in progress
-			return true;
+		if ( ! needsContinue ) {
+			if ( isReconstructed ) {
+				__ERROR__( "SlaveWorker", "performDegradedRead", "! needsContinue && isReconstructed" );
+				return false;
+			} else {
+				// Reconstruction in progress
+				return true;
+			}
+		}
 
 		// Send GET_CHUNK requests to surviving nodes
 		Metadata metadata;
@@ -852,11 +876,15 @@ bool SlaveWorker::performDegradedRead(
 			uint8_t keySize = 0;
 			uint32_t valueSize = 0;
 
-			bool success = SlaveWorker::chunkBuffer->at( listId )->findValueByKey( mykey.data, mykey.size, &keyValue, &mykey );
+			bool success = SlaveWorker::map->findValueByKey( mykey.data, mykey.size, &keyValue, &mykey );
+			if ( ! success )
+				success = SlaveWorker::chunkBuffer->at( listId )->findValueByKey( mykey.data, mykey.size, &keyValue, &mykey );
 
 			if ( success ) {
 				keyValue.deserialize( keyStr, keySize, valueStr, valueSize );
 				keyValue.dup( keyStr, keySize, valueStr, valueSize );
+			} else {
+				__ERROR__( "SlaveWorker", "performDegradedRead", "findValueByKey() failed (list ID: %u, key: %.*s).", listId, mykey.size, mykey.data );
 			}
 
 			// Insert into degraded chunk buffer if this is not the original data server (i.e., the data server fails)
@@ -1052,6 +1080,8 @@ bool SlaveWorker::performDegradedRead(
 			}
 			event.reqGet( socket, instanceId, requestId, listId, chunkId, op.data.key );
 			this->dispatch( event );
+		} else if ( isReconstructed ) {
+			__ERROR__( "SlaveWorker", "performDegradedRead", "! needsContinue && isReconstructed" );
 		}
 		return true;
 	}
@@ -1356,20 +1386,34 @@ bool SlaveWorker::sendModifyChunkRequest(
 
 		// Start sending packets only after all the insertion to the slave peer DELETE pending set is completed
 		for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
-			// Insert into event queue
-			SlavePeerEvent slavePeerEvent;
-			slavePeerEvent.send( this->paritySlaveSockets[ i ], packet );
+			if ( this->paritySlaveSockets[ i ]->self ) {
+				bool r = false;
+				if ( isUpdate ) {
+					r = SlaveWorker::chunkBuffer->at( metadata.listId )->updateKeyValue(
+						keyStr, keySize,
+						valueUpdateOffset, deltaSize, delta
+					);
+				} else {
+					__ERROR__( "SlaveWorker", "sendModifyChunkRequest", "TODO: Handle DELETE request on self slave socket." );
+				}
+
+				__INFO__( YELLOW, "SlaveWorker", "sendModifyChunkRequest", "SELF SOCKET (r = %s).", r ? "true" : "false" );
+			} else {
+				// Insert into event queue
+				SlavePeerEvent slavePeerEvent;
+				slavePeerEvent.send( this->paritySlaveSockets[ i ], packet );
 
 #ifdef SLAVE_WORKER_SEND_REPLICAS_PARALLEL
-			if ( i == SlaveWorker::parityChunkCount - 1 )
-				this->dispatch( slavePeerEvent );
-			else
-				SlaveWorker::eventQueue->prioritizedInsert( slavePeerEvent );
+				if ( i == SlaveWorker::parityChunkCount - 1 )
+					this->dispatch( slavePeerEvent );
+				else
+					SlaveWorker::eventQueue->prioritizedInsert( slavePeerEvent );
 #else
-			this->dispatch( slavePeerEvent );
+				this->dispatch( slavePeerEvent );
 #endif
 
-			// printf( "Sending UPDATE request for key: %.*s...\n", keySize, keyStr );
+				// printf( "Sending UPDATE request for key: %.*s...\n", keySize, keyStr );
+			}
 		}
 
 		if ( ! self ) {

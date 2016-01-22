@@ -377,7 +377,7 @@ size_t Protocol::generateDegradedReqHeader(
 		magic, to, opcode,
 		PROTO_DEGRADED_REQ_BASE_SIZE + reconstructedCount * 4 * 4 + PROTO_KEY_VALUE_UPDATE_SIZE + keySize + valueUpdateSize,
 		instanceId, requestId,
-		0, 
+		0,
 		timestamp
 	);
 
@@ -521,7 +521,7 @@ size_t Protocol::generateDegradedSetReqHeader(
 	size_t bytes = this->generateHeader(
 		magic, to, opcode,
 		PROTO_DEGRADED_SET_BASE_SIZE + keySize + valueSize +
-			( opcode == PROTO_OPCODE_DEGRADED_UPDATE ? PROTO_DEGRADED_SET_UPDATE_SIZE + valueUpdateSize : 0 ),
+			( degradedOpcode == PROTO_OPCODE_DEGRADED_UPDATE ? PROTO_DEGRADED_SET_UPDATE_SIZE + valueUpdateSize : 0 ),
 		instanceId, requestId
 	);
 
@@ -530,7 +530,7 @@ size_t Protocol::generateDegradedSetReqHeader(
 	bytes += 1;
 
 	*( ( uint32_t * )( buf     ) ) = htonl( listId );
-	*( ( uint32_t * )( buf + 4) ) = htonl( stripeId );
+	*( ( uint32_t * )( buf + 4 ) ) = htonl( stripeId );
 	*( ( uint32_t * )( buf + 8 ) ) = htonl( chunkId );
 	buf[ 12 ] = keySize;
 	buf += 13;
@@ -569,6 +569,9 @@ size_t Protocol::generateDegradedSetReqHeader(
 		bytes += PROTO_DEGRADED_SET_UPDATE_SIZE;
 
 		memmove( buf, valueUpdate, valueUpdateSize );
+
+		buf += valueUpdateSize;
+		bytes += valueUpdateSize;
 	}
 
 	return bytes;
@@ -674,7 +677,7 @@ size_t Protocol::generateDegradedSetResHeader(
 	size_t bytes = this->generateHeader(
 		magic, to, opcode,
 		PROTO_DEGRADED_SET_BASE_SIZE + keySize +
-			( opcode == PROTO_OPCODE_DEGRADED_UPDATE ? PROTO_DEGRADED_SET_UPDATE_SIZE : 0 ),
+			( degradedOpcode == PROTO_OPCODE_DEGRADED_UPDATE ? PROTO_DEGRADED_SET_UPDATE_SIZE : 0 ),
 		instanceId, requestId
 	);
 
@@ -762,7 +765,7 @@ bool Protocol::parseDegradedSetResHeader(
 	ptr += keySize;
 
 	if ( opcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
-		if ( size - offset < ( size_t ) PROTO_DEGRADED_SET_BASE_SIZE + keySize + valueSize + PROTO_DEGRADED_SET_UPDATE_SIZE )
+		if ( size - offset < ( size_t ) PROTO_DEGRADED_SET_BASE_SIZE + keySize + PROTO_DEGRADED_SET_UPDATE_SIZE )
 			return false;
 
 		valueUpdateSize = 0;

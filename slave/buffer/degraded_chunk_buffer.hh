@@ -29,12 +29,14 @@ private:
 		 * (list ID, stripe ID, chunk ID) |-> pid.id
 		 */
 		std::unordered_map<Metadata, std::vector<struct pid_s>> chunks;
+		std::unordered_set<Metadata> reconstructedChunks;
 		LOCK_T chunksLock;
 		/**
 		 * Store the set of keys in unsealed chunks and the list of IDs of pending requests
 		 * Key |-> pid.id
 		 */
 		std::unordered_map<Key, std::vector<struct pid_s>> keys;
+		std::unordered_set<Key> reconstructedKeys;
 		LOCK_T keysLock;
 	} degraded;
 
@@ -90,14 +92,14 @@ public:
 
 	bool insertDegradedChunk(
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
-		uint16_t instanceId, uint32_t requestId
+		uint16_t instanceId, uint32_t requestId, bool &isReconstructed
 	);
 	bool deleteDegradedChunk(
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		std::vector<struct pid_s> &pids
 	);
 
-	bool insertDegradedKey( Key key, uint16_t instanceId, uint32_t requestId );
+	bool insertDegradedKey( Key key, uint16_t instanceId, uint32_t requestId, bool &isReconstructed );
 	bool deleteDegradedKey( Key key, std::vector<struct pid_s> &pids );
 
 	bool insertChunk(

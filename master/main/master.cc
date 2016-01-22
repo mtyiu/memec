@@ -694,7 +694,7 @@ void Master::printPending( FILE *f ) {
 			key.size, key.data, key.size,
 			keyValueIt->first.timestamp
 		);
-		if ( pid.ptr ) 
+		if ( pid.ptr )
 			( ( Socket * ) pid.ptr )->printAddress( f );
 		else
 			fprintf( f, "[N/A]\n" );
@@ -913,14 +913,6 @@ void Master::printRemapping( FILE *f ) {
 		"------------------------\n"
 	);
 	this->remapMsgHandler.listAliveSlaves();
-
-	fprintf(
-		f,
-		"\nRemapped SET Ops: %d\n"
-		"\nLockOnly SET Ops: %d\n",
-		BasicRemappingScheme::remapped,
-		BasicRemappingScheme::lockonly
-	);
 }
 
 void Master::printBackup( FILE *f ) {
@@ -1020,11 +1012,11 @@ void Master::time() {
 		event._METHOD_NAME_( p, from, to, _S_->instanceId, _COND_, _LOCK_, _COUNTER_ ); \
 		if ( _LOCK_ ) UNLOCK( _LOCK_ ); \
 		this->eventQueue.insert( event ); \
-	} 
+	}
 
 void Master::ackParityDelta( FILE *f, SlaveSocket *target, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter, bool force ) {
 	uint32_t from, to, update, del;
-	
+
 	for( int i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
 		SlaveSocket *s = this->sockets.slaves[ i ];
 
@@ -1106,4 +1098,3 @@ bool Master::revertParityDelta( FILE *f, SlaveSocket *target, pthread_cond_t *co
 
 	return true;
 }
-

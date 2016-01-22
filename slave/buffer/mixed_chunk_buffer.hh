@@ -44,7 +44,7 @@ public:
 	void updateAndUnlockChunk( int index );
 	void unlock( int index = -1 );
 
-	bool findValueByKey( char *data, uint8_t size, KeyValue *keyValuePtr, Key *keyPtr = 0 );
+	bool findValueByKey( char *data, uint8_t size, KeyValue *keyValuePtr, Key *keyPtr = 0, bool verbose = true );
 
 	bool deleteKey( char *keyStr, uint8_t keySize );
 

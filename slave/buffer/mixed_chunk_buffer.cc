@@ -109,10 +109,13 @@ void MixedChunkBuffer::unlock( int index ) {
 	}
 }
 
-bool MixedChunkBuffer::findValueByKey( char *data, uint8_t size, KeyValue *keyValuePtr, Key *keyPtr ) {
+bool MixedChunkBuffer::findValueByKey( char *data, uint8_t size, KeyValue *keyValuePtr, Key *keyPtr, bool verbose ) {
 	switch( this->role ) {
 		case CBR_PARITY:
 			return this->buffer.parity->findValueByKey( data, size, keyValuePtr, keyPtr );
+		case CBR_DATA:
+			if ( verbose )
+				__ERROR__( "MixedChunkBuffer", "findValueByKey", "Error: Calling this function in DataChunkBuffer." );
 		default:
 			return false;
 	}

@@ -79,9 +79,9 @@ bool MasterWorker::getSlaves(
 			useCoordinatedFlow = true;
 			break;
 		case PROTO_OPCODE_GET:
-		// 	if ( master->isDegraded( originalDataSlaveSocket ) )
-		// 		useCoordinatedFlow = true;
-		// 	break;
+			if ( master->isDegraded( originalDataSlaveSocket ) )
+				useCoordinatedFlow = true;
+			break;
 		case PROTO_OPCODE_UPDATE:
 		case PROTO_OPCODE_DELETE:
 			for ( uint32_t i = 0; i < 1 + MasterWorker::parityChunkCount; i++ ) {
@@ -113,10 +113,11 @@ bool MasterWorker::getSlaves(
 	}
 
 	// Determine remapped data slave
-	BasicRemappingScheme::getRemapTarget(
+	BasicRemappingScheme::redirect(
 		this->original, this->remapped, remappedCount,
 		MasterWorker::dataChunkCount, MasterWorker::parityChunkCount,
-		this->dataSlaveSockets, this->paritySlaveSockets
+		this->dataSlaveSockets, this->paritySlaveSockets,
+		opcode == PROTO_OPCODE_GET
 	);
 
 	if ( remappedCount ) {

@@ -329,7 +329,7 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, struct KeyValueHeader &he
 
 	if (
 		( map->findValueByKey( header.key, header.keySize, 0, 0 ) ) ||
-		( SlaveWorker::chunkBuffer->at( listId )->findValueByKey( header.key, header.keySize, 0, 0 ) )
+		( SlaveWorker::chunkBuffer->at( listId )->findValueByKey( header.key, header.keySize, 0, 0, false ) )
 	) {
 		exist = true;
 		// printf( "The key already exists: %.*s\n", header.keySize, header.key );
