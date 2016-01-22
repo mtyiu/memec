@@ -372,7 +372,26 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 			applicationEvent.resSet( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, keyValue, success );
 			this->dispatch( applicationEvent );
 		}
+
+		// Check if all normal requests completes
+		SlaveSocket *slave = 0;
+		struct sockaddr_in addr;
+		MasterRemapMsgHandler *remapMsgHandler = &Master::getInstance()->remapMsgHandler;
+		this->stripeList->get( keyStr, key.size, 0, this->paritySlaveSockets );
+		for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
+			slave = this->paritySlaveSockets[ i ];
+			addr = slave->getAddr();
+			if ( ! remapMsgHandler->useCoordinatedFlow( addr ) || remapMsgHandler->stateTransitInfo.at( addr ).isCompleted() )
+				continue;
+			if ( remapMsgHandler->stateTransitInfo.at( addr ).removePendingRequest( event.requestId ) == 0 ) {
+				__INFO__( GREEN, "MasterWorker", "handleSetResponse", "Ack transition for slave id = %u.", slave->instanceId );
+				remapMsgHandler->stateTransitInfo.at( addr ).setCompleted();
+				remapMsgHandler->ackTransit( addr );
+			}
+		}
+
 	}
+
 	return true;
 }
 
@@ -529,6 +548,23 @@ bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, bool is
 		this->dispatch( applicationEvent );
 	}
 
+	// Check if all normal requests completes
+	SlaveSocket *slave = 0;
+	struct sockaddr_in addr;
+	MasterRemapMsgHandler *remapMsgHandler = &Master::getInstance()->remapMsgHandler;
+	this->stripeList->get( header.key, header.keySize, 0, this->paritySlaveSockets );
+	for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
+		slave = this->paritySlaveSockets[ i ];
+		addr = slave->getAddr();
+		if ( ! remapMsgHandler->useCoordinatedFlow( addr ) || remapMsgHandler->stateTransitInfo.at( addr ).isCompleted() )
+			continue;
+		if ( remapMsgHandler->stateTransitInfo.at( addr ).removePendingRequest( pid.requestId ) == 0 ) {
+			__INFO__( GREEN, "MasterWorker", "handleUpdateResponse", "Ack transition for slave id = %u.", slave->instanceId );
+			remapMsgHandler->stateTransitInfo.at( addr ).setCompleted();
+			remapMsgHandler->ackTransit( addr );
+		}
+	}
+
 	// check if ack is necessary
 	// TODO handle degraded mode
 	if ( ! isDegraded )
@@ -607,6 +643,23 @@ bool MasterWorker::handleDeleteResponse( SlaveEvent event, bool success, bool is
 	if ( pid.ptr ) {
 		applicationEvent.resDelete( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, key, success );
 		this->dispatch( applicationEvent );
+	}
+
+	// Check if all normal requests completes
+	SlaveSocket *slave = 0;
+	struct sockaddr_in addr;
+	MasterRemapMsgHandler *remapMsgHandler = &Master::getInstance()->remapMsgHandler;
+	this->stripeList->get( keyStr, key.size, 0, this->paritySlaveSockets );
+	for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
+		slave = this->paritySlaveSockets[ i ];
+		addr = slave->getAddr();
+		if ( ! remapMsgHandler->useCoordinatedFlow( addr ) || remapMsgHandler->stateTransitInfo.at( addr ).isCompleted() )
+			continue;
+		if ( remapMsgHandler->stateTransitInfo.at( addr ).removePendingRequest( pid.requestId ) == 0 ) {
+			__INFO__( GREEN, "MasterWorker", "handleDeleteResponse", "Ack transition for slave id = %u.", slave->instanceId );
+			remapMsgHandler->stateTransitInfo.at( addr ).setCompleted();
+			remapMsgHandler->ackTransit( addr );
+		}
 	}
 
 	// check if ack is necessary

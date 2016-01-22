@@ -436,6 +436,61 @@ void MasterWorker::replayRequest( SlaveSocket *slave ) {
 	UNLOCK( lock );
 }
 
+void MasterWorker::gatherPendingNormalRequests( SlaveSocket *target, bool needsAck ) {
+
+	std::unordered_set<uint32_t> listIds;
+	// find the lists including the failed slave as parity server
+	for ( uint32_t i = 0, len = stripeList->getNumList(); i < len; i++ ) {
+		for ( uint32_t j = 0; j < parityChunkCount; j++ ) {
+			if ( stripeList->get( i, j + dataChunkCount ) == target )
+				listIds.insert( i );
+		}
+	}
+	__DEBUG__( CYAN, "MasterWorker", "gatherPendingNormalRequest", "%lu list(s) included the slave as parity", listIds.size() );
+
+	uint32_t listId;
+	struct sockaddr_in addr = target->getAddr();
+	bool hasPending = false;
+
+	MasterRemapMsgHandler *mh = &Master::getInstance()->remapMsgHandler;
+
+	LOCK ( &mh->stateTransitInfo[ addr ].counter.pendingNormalRequests.lock );
+
+#define GATHER_PENDING_NORMAL_REQUESTS( _OP_TYPE_, _MAP_VALUE_TYPE_ ) { \
+	LOCK ( &pending->slaves._OP_TYPE_##Lock ); \
+	std::unordered_multimap<PendingIdentifier, _MAP_VALUE_TYPE_> *map = &pending->slaves._OP_TYPE_; \
+	std::unordered_multimap<PendingIdentifier, _MAP_VALUE_TYPE_>::iterator it, saveIt; \
+	for( it = map->begin(), saveIt = it; it != map->end(); it = saveIt ) { \
+		saveIt++; \
+		listId = stripeList->get( it->second.data, it->second.size, 0, 0 ); \
+		if ( listIds.count( listId ) == 0 ) \
+			continue; \
+		/* put the completion of request in account for state transition */\
+		mh->stateTransitInfo.at( addr ).addPendingRequest( it->first.requestId, false, false ); \
+		__INFO__( CYAN, "MasterWorker", "gatherPendingNormalRequest", "Pending normal request id=%u for transit.", it->first.requestId ); \
+		hasPending = true; \
+	} \
+	UNLOCK ( &pending->slaves._OP_TYPE_##Lock ); \
+}
+	// SET
+	GATHER_PENDING_NORMAL_REQUESTS( set, Key );
+	// UPDATE
+	GATHER_PENDING_NORMAL_REQUESTS( update, KeyValueUpdate );
+	// DELETE
+	GATHER_PENDING_NORMAL_REQUESTS( del, Key );
+
+	UNLOCK ( &mh->stateTransitInfo[ addr ].counter.pendingNormalRequests.lock );
+
+	if ( ! hasPending  ) {
+		__INFO__( GREEN, "MasterWorker", "gatherPendingNormalRequest", "No pending normal requests for transit." );
+		Master::getInstance()->remapMsgHandler.stateTransitInfo[ addr ].setCompleted();
+		if ( needsAck ) 
+			Master::getInstance()->remapMsgHandler.ackTransit( addr );
+	}
+
+#undef GATHER_PENDING_NORMAL_REQUESTS
+}
+
 void MasterWorker::free() {
 	this->protocol.free();
 	delete[] original;

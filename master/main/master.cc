@@ -919,11 +919,30 @@ void Master::printRemapping( FILE *f ) {
 
 	fprintf(
 		f,
+		"\nSlaves Transit. Info\n"
+		"------------------------\n"
+	);
+	char buf[ 16 ];
+	for ( auto &info : this->remapMsgHandler.stateTransitInfo ) {
+		Socket::ntoh_ip( info.first.sin_addr.s_addr, buf, 16 );
+		fprintf(
+			f,
+			"\t%s:%hu Revert: %7u   Pending Normal: %7u\n",
+			buf, ntohs( info.first.sin_port ),
+			info.second.getParityRevertCounterVal(),
+			info.second.getPendingRequestCount()
+		);
+	}
+
+	fprintf(
+		f,
 		"\nRemapped SET Ops: %d\n"
 		"\nLockOnly SET Ops: %d\n",
 		BasicRemappingScheme::remapped,
 		BasicRemappingScheme::lockonly
 	);
+
+
 }
 
 void Master::printBackup( FILE *f ) {
@@ -1011,7 +1030,8 @@ void Master::time() {
 	fflush( stdout );
 }
 
-#define DISPATCH_EVENT_TO_OTHER_SLAVES( _METHOD_NAME_, _S_, _COND_, _LOCK_, _COUNTER_ )  \
+#define DISPATCH_EVENT_TO_OTHER_SLAVES( _METHOD_NAME_, _S_, _COND_, _LOCK_, _COUNTER_ ) {  \
+	std::vector<SlaveEvent> events; \
 	for ( int j = 0, len = this->sockets.slaves.size(); j < len; j++ ) { \
 		SlaveEvent event; \
 		SlaveSocket *p = this->sockets.slaves[ j ]; \
@@ -1020,14 +1040,19 @@ void Master::time() {
 		if ( p == _S_ || this->remapMsgHandler.useCoordinatedFlow( saddr ) ) continue; \
 		if ( _LOCK_ ) LOCK( _LOCK_ ); \
 		if ( _COUNTER_ ) *_COUNTER_ += 1; \
+		if ( _LOCK_ ) UNLOCK( _LOCK_ ); \
 		if ( strcmp( #_METHOD_NAME_, "ackParityDelta" ) == 0 ) {\
 			event.ackParityDelta( p, timestamps, _S_->instanceId, _COND_, _LOCK_, _COUNTER_ ); \
 		} else if ( strcmp( #_METHOD_NAME_, "revertDelta" ) == 0 ) { \
 			event.revertDelta( p, timestamps, requests, _S_->instanceId, _COND_, _LOCK_, _COUNTER_ ); \
 		} \
-		if ( _LOCK_ ) UNLOCK( _LOCK_ ); \
-		this->eventQueue.insert( event ); \
-	} 
+		/* avoid counter going 0 (mistaken as finished) before all requests are sent */ \
+		events.push_back( event ); \
+	} \
+	for ( uint32_t j = 0; j < events.size(); j++ ) { \
+		this->eventQueue.insert( events[ j ] ); \
+	} \
+}
 
 void Master::ackParityDelta( FILE *f, SlaveSocket *target, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter, bool force ) {
 	uint32_t from, to, update, del;
@@ -1099,7 +1124,6 @@ bool Master::revertDelta( FILE *f, SlaveSocket *target, pthread_cond_t *conditio
 	//this->ackParityDelta( f, target, 0, 0, 0, force );
 
 	// UPDATE / DELETE
-	// find the smallest unacknowledged timestamp
 	LOCK( &target->timestamp.pendingAck.updateLock );
 	for ( auto &ts : target->timestamp.pendingAck._update )
 		timestampSet.insert( ts.getVal() );
@@ -1122,23 +1146,23 @@ bool Master::revertDelta( FILE *f, SlaveSocket *target, pthread_cond_t *conditio
 			continue;
 		listIndex = this->stripeList->get( it->second.data, it->second.size, 0, 0, &chunkIndex );
 		dataSlave = this->stripeList->get( listIndex, chunkIndex );
-		// skip if failed slave is not the data slave, but see if the request can be immediately replied
+		// skip revert if failed slave is not the data slave, but see if the request can be immediately replied
 		if ( dataSlave != target ) {
-			if ( this->pending.count( PT_SLAVE_SET, pid.instanceId, pid.requestId, false, false ) != 1 )
-				continue;
-			if ( ! this->pending.eraseKeyValue( PT_APPLICATION_SET, it->first.parentInstanceId, it->first.parentRequestId, 0, &pid, &keyValue, true, true, true, it->second.data ) )
-				continue;
+			if ( 
+				this->pending.count( PT_SLAVE_SET, it->first.instanceId, it->first.requestId, false, false ) == 1 &&
+				this->pending.eraseKeyValue( PT_APPLICATION_SET, it->first.parentInstanceId, it->first.parentRequestId, 0, &pid, &keyValue, true, true, true, it->second.data ) 
+			) {
 
-			keyValue.deserialize( key.data, key.size, valueStr, valueSize );
-			keyValueDup.dup( key.data, key.size, valueStr, valueSize, 0 );
+				keyValue.deserialize( key.data, key.size, valueStr, valueSize );
+				keyValueDup.dup( key.data, key.size, valueStr, valueSize, 0 );
 
-			// duplicate the key for reply
-			if ( pid.ptr ) {
-				ApplicationEvent applicationEvent;
-				applicationEvent.resSet( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, keyValueDup, true, true );
-				this->eventQueue.insert( applicationEvent );
+				// duplicate the key for reply
+				if ( pid.ptr ) {
+					ApplicationEvent applicationEvent;
+					applicationEvent.resSet( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, keyValueDup, true, true );
+					this->eventQueue.insert( applicationEvent );
+				}
 			}
-			
 			this->pending.slaves.set.erase( it );
 			continue;
 		}

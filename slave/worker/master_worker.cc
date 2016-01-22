@@ -911,6 +911,7 @@ bool SlaveWorker::handleRevertDelta( MasterEvent event, char *buf, size_t size )
 					true, /* needsFree */ \
 					false /* isDegraded */ \
 				); \
+				this->dispatch( masterEvent ); \
 				__INFO__( YELLOW, "SlaveWorker", "handleRevertDelta", "Skip waiting for key %.*s for failed slave id=%u", key.size, key.data, header.targetId ); \
 			} \
 		} \

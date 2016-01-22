@@ -116,6 +116,7 @@ public:
 	static void removePending( SlaveSocket *slave, bool needsAck = true );
 	static void replayRequestPrepare( SlaveSocket *slave );
 	static void replayRequest( SlaveSocket *slave );
+	static void gatherPendingNormalRequests( SlaveSocket *target, bool needsAck = false );
 };
 
 #endif
