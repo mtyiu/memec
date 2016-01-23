@@ -38,9 +38,9 @@ for delay in $delays; do
 		pending=0
 		for n in 3 4 8 9; do
 			if [ $n == 3 ]; then
-				read -p "Pending: ${pending} / 4" -t 60
+				read -p "Pending: ${pending} / 4" -t 300
 			else
-				read -p "Pending: ${pending} / 4" -t 120
+				read -p "Pending: ${pending} / 4" -t 60
 			fi
 			pending=$(expr $pending + 1)
 		done
@@ -48,6 +48,7 @@ for delay in $delays; do
 		set_overload $delay
 	
 		for w in $workloads; do
+			echo "-------------------- Run ($w) --------------------"
 			for n in 3 4 8 9; do
 				ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/master/degraded.sh $w $(printf '\r')\"" &
 			done
@@ -55,7 +56,7 @@ for delay in $delays; do
 			pending=0
 			for n in 3 4 8 9; do
 				if [ $n == 3 ]; then
-					read -p "Pending: ${pending} / 4" -t 500
+					read -p "Pending: ${pending} / 4" -t 300
 				else
 					read -p "Pending: ${pending} / 4" -t 60
 				fi
@@ -71,8 +72,8 @@ for delay in $delays; do
 		sleep 30
 	
 		for n in 3 4 8 9; do
-			mkdir -p ${BASE_PATH}/results/degraded_control/$iter/node$n
-			scp testbed-node$n:${BASE_PATH}/results/degraded/*.txt ${BASE_PATH}/results/degraded_control/$iter/node$n
+			mkdir -p ${BASE_PATH}/results/degraded_control/$delay/$iter/node$n
+			scp testbed-node$n:${BASE_PATH}/results/degraded/*.txt ${BASE_PATH}/results/degraded_control/$delay/$iter/node$n
 			ssh testbed-node$n 'rm -rf ${BASE_PATH}/results/*'
 		done
 	done

@@ -70,8 +70,8 @@ for delay in $delays; do
 		sleep 30
 	
 		for n in 3 4 8 9; do
-			mkdir -p ${BASE_PATH}/results/degraded/$iter/node$n
-			scp testbed-node$n:${BASE_PATH}/results/degraded/*.txt ${BASE_PATH}/results/degraded/$iter/node$n
+			mkdir -p ${BASE_PATH}/results/degraded/$delay/$iter/node$n
+			scp testbed-node$n:${BASE_PATH}/results/degraded/*.txt ${BASE_PATH}/results/degraded/$delay/$iter/node$n
 			ssh testbed-node$n 'rm -rf ${BASE_PATH}/results/*'
 		done
 	done
