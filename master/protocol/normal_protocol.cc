@@ -64,6 +64,7 @@ char *MasterProtocol::reqDelete( size_t &size, uint16_t instanceId, uint32_t req
 
 char *MasterProtocol::resSet( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, uint8_t keySize, char *key ) {
 	// -- common/protocol/normal_protocol.cc --
+	success = true;
 	size = this->generateKeyHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_APPLICATION,
