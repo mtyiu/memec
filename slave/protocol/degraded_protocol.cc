@@ -11,7 +11,7 @@ char *SlaveProtocol::reqForwardKey(
 	size = this->generateForwardKeyReqHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
-		PROTO_OPCODE_DEGRADED_SET,
+		PROTO_OPCODE_FORWARD_KEY,
 		instanceId, requestId,
 		opcode, listId, stripeId, chunkId,
 		keySize, key,
@@ -32,7 +32,7 @@ char *SlaveProtocol::resForwardKey(
 	size = this->generateForwardKeyResHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_SLAVE,
-		PROTO_OPCODE_DEGRADED_SET,
+		PROTO_OPCODE_FORWARD_KEY,
 		instanceId, requestId,
 		opcode, listId, stripeId, chunkId,
 		keySize, key,
