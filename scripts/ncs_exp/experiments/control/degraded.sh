@@ -22,6 +22,7 @@ function restore_overload {
 }
 
 workloads='workloada workloadc'
+delays='0.4 0.8 1.2 1.6'
 
 for delay in $delays; do
 	for iter in {1..10}; do
@@ -44,6 +45,7 @@ for delay in $delays; do
 			pending=$(expr $pending + 1)
 		done
 	
+		ssh testbed-node1 "screen -S coordinator -p 0 -X stuff \"overload$(printf '\r')7$(printf '\r')0$(printf '\r')\""
 		set_overload $delay
 	
 		for w in $workloads; do
