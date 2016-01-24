@@ -510,7 +510,7 @@ bool Protocol::parseDegradedReqHeader( struct DegradedReqHeader &header, uint8_t
 	return ret;
 }
 
-size_t Protocol::generateDegradedSetReqHeader(
+size_t Protocol::generateForwardKeyReqHeader(
 	uint8_t magic, uint8_t to, uint8_t opcode,
 	uint16_t instanceId, uint32_t requestId,
 	uint8_t degradedOpcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
@@ -520,8 +520,8 @@ size_t Protocol::generateDegradedSetReqHeader(
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader(
 		magic, to, opcode,
-		PROTO_DEGRADED_SET_BASE_SIZE + keySize + valueSize +
-			( degradedOpcode == PROTO_OPCODE_DEGRADED_UPDATE ? PROTO_DEGRADED_SET_UPDATE_SIZE + valueUpdateSize : 0 ),
+		PROTO_FORWARD_KEY_BASE_SIZE + keySize + valueSize +
+			( degradedOpcode == PROTO_OPCODE_DEGRADED_UPDATE ? PROTO_FORWARD_KEY_UPDATE_SIZE + valueUpdateSize : 0 ),
 		instanceId, requestId
 	);
 
@@ -565,8 +565,8 @@ size_t Protocol::generateDegradedSetReqHeader(
 		buf[ 5 ] = tmp[ 3 ];
 		valueUpdateSize = ntohl( valueUpdateOffset );
 
-		buf += PROTO_DEGRADED_SET_UPDATE_SIZE;
-		bytes += PROTO_DEGRADED_SET_UPDATE_SIZE;
+		buf += PROTO_FORWARD_KEY_UPDATE_SIZE;
+		bytes += PROTO_FORWARD_KEY_UPDATE_SIZE;
 
 		memmove( buf, valueUpdate, valueUpdateSize );
 
@@ -577,7 +577,7 @@ size_t Protocol::generateDegradedSetReqHeader(
 	return bytes;
 }
 
-bool Protocol::parseDegradedSetReqHeader(
+bool Protocol::parseForwardKeyReqHeader(
 	size_t offset, uint8_t &opcode,
 	uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
 	uint8_t &keySize, uint32_t &valueSize,
@@ -585,7 +585,7 @@ bool Protocol::parseDegradedSetReqHeader(
 	uint32_t &valueUpdateSize, uint32_t &valueUpdateOffset, char *&valueUpdate,
 	char *buf, size_t size
 ) {
-	if ( size - offset < PROTO_DEGRADED_SET_BASE_SIZE )
+	if ( size - offset < PROTO_FORWARD_KEY_BASE_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
@@ -608,7 +608,7 @@ bool Protocol::parseDegradedSetReqHeader(
 	valueSize = ntohl( valueSize );
 	ptr += 3;
 
-	if ( size - offset < ( size_t ) PROTO_DEGRADED_SET_BASE_SIZE + keySize + valueSize )
+	if ( size - offset < ( size_t ) PROTO_FORWARD_KEY_BASE_SIZE + keySize + valueSize )
 		return false;
 
 	key = ptr;
@@ -616,7 +616,7 @@ bool Protocol::parseDegradedSetReqHeader(
 	ptr += keySize + valueSize;
 
 	if ( opcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
-		if ( size - offset < ( size_t ) PROTO_DEGRADED_SET_BASE_SIZE + keySize + valueSize + PROTO_DEGRADED_SET_UPDATE_SIZE )
+		if ( size - offset < ( size_t ) PROTO_FORWARD_KEY_BASE_SIZE + keySize + valueSize + PROTO_FORWARD_KEY_UPDATE_SIZE )
 			return false;
 
 		valueUpdateSize = 0;
@@ -633,9 +633,9 @@ bool Protocol::parseDegradedSetReqHeader(
 		tmp[ 3 ] = ptr[ 5 ];
 		valueUpdateOffset = ntohl( valueUpdateOffset );
 
-		ptr += PROTO_DEGRADED_SET_UPDATE_SIZE;
+		ptr += PROTO_FORWARD_KEY_UPDATE_SIZE;
 
-		if ( size - offset < ( size_t ) PROTO_DEGRADED_SET_BASE_SIZE + keySize + valueSize + PROTO_DEGRADED_SET_UPDATE_SIZE + valueUpdateSize )
+		if ( size - offset < ( size_t ) PROTO_FORWARD_KEY_BASE_SIZE + keySize + valueSize + PROTO_FORWARD_KEY_UPDATE_SIZE + valueUpdateSize )
 			return false;
 
 		valueUpdate = ptr;
@@ -644,12 +644,12 @@ bool Protocol::parseDegradedSetReqHeader(
 	return true;
 }
 
-bool Protocol::parseDegradedSetReqHeader( struct DegradedSetHeader &header, char *buf, size_t size, size_t offset ) {
+bool Protocol::parseForwardKeyReqHeader( struct ForwardKeyHeader &header, char *buf, size_t size, size_t offset ) {
 	if ( ! buf || ! size ) {
 		buf = this->buffer.recv;
 		size = this->buffer.size;
 	}
-	return this->parseDegradedSetReqHeader(
+	return this->parseForwardKeyReqHeader(
 		offset,
 		header.opcode,
 		header.listId,
@@ -666,7 +666,7 @@ bool Protocol::parseDegradedSetReqHeader( struct DegradedSetHeader &header, char
 	);
 }
 
-size_t Protocol::generateDegradedSetResHeader(
+size_t Protocol::generateForwardKeyResHeader(
 	uint8_t magic, uint8_t to, uint8_t opcode,
 	uint16_t instanceId, uint32_t requestId,
 	uint8_t degradedOpcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
@@ -676,8 +676,8 @@ size_t Protocol::generateDegradedSetResHeader(
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader(
 		magic, to, opcode,
-		PROTO_DEGRADED_SET_BASE_SIZE + keySize +
-			( degradedOpcode == PROTO_OPCODE_DEGRADED_UPDATE ? PROTO_DEGRADED_SET_UPDATE_SIZE : 0 ),
+		PROTO_FORWARD_KEY_BASE_SIZE + keySize +
+			( degradedOpcode == PROTO_OPCODE_DEGRADED_UPDATE ? PROTO_FORWARD_KEY_UPDATE_SIZE : 0 ),
 		instanceId, requestId
 	);
 
@@ -720,14 +720,14 @@ size_t Protocol::generateDegradedSetResHeader(
 		buf[ 5 ] = tmp[ 3 ];
 		valueUpdateSize = ntohl( valueUpdateOffset );
 
-		buf += PROTO_DEGRADED_SET_UPDATE_SIZE;
-		bytes += PROTO_DEGRADED_SET_UPDATE_SIZE;
+		buf += PROTO_FORWARD_KEY_UPDATE_SIZE;
+		bytes += PROTO_FORWARD_KEY_UPDATE_SIZE;
 	}
 
 	return bytes;
 }
 
-bool Protocol::parseDegradedSetResHeader(
+bool Protocol::parseForwardKeyResHeader(
 	size_t offset, uint8_t &opcode,
 	uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
 	uint8_t &keySize, uint32_t &valueSize,
@@ -735,7 +735,7 @@ bool Protocol::parseDegradedSetResHeader(
 	uint32_t &valueUpdateSize, uint32_t &valueUpdateOffset,
 	char *buf, size_t size
 ) {
-	if ( size - offset < PROTO_DEGRADED_SET_BASE_SIZE )
+	if ( size - offset < PROTO_FORWARD_KEY_BASE_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
@@ -758,14 +758,14 @@ bool Protocol::parseDegradedSetResHeader(
 	valueSize = ntohl( valueSize );
 	ptr += 3;
 
-	if ( size - offset < ( size_t ) PROTO_DEGRADED_SET_BASE_SIZE + keySize )
+	if ( size - offset < ( size_t ) PROTO_FORWARD_KEY_BASE_SIZE + keySize )
 		return false;
 
 	key = ptr;
 	ptr += keySize;
 
 	if ( opcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
-		if ( size - offset < ( size_t ) PROTO_DEGRADED_SET_BASE_SIZE + keySize + PROTO_DEGRADED_SET_UPDATE_SIZE )
+		if ( size - offset < ( size_t ) PROTO_FORWARD_KEY_BASE_SIZE + keySize + PROTO_FORWARD_KEY_UPDATE_SIZE )
 			return false;
 
 		valueUpdateSize = 0;
@@ -786,12 +786,12 @@ bool Protocol::parseDegradedSetResHeader(
 	return true;
 }
 
-bool Protocol::parseDegradedSetResHeader( struct DegradedSetHeader &header, char *buf, size_t size, size_t offset ) {
+bool Protocol::parseForwardKeyResHeader( struct ForwardKeyHeader &header, char *buf, size_t size, size_t offset ) {
 	if ( ! buf || ! size ) {
 		buf = this->buffer.recv;
 		size = this->buffer.size;
 	}
-	return this->parseDegradedSetResHeader(
+	return this->parseForwardKeyResHeader(
 		offset,
 		header.opcode,
 		header.listId,

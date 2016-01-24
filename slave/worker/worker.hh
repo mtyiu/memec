@@ -116,7 +116,7 @@ private:
 
 	// ---------- slave_peer_req_worker.cc ----------
 	bool handleSlavePeerRegisterRequest( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, char *buf, size_t size );
-	bool handleDegradedSetRequest( SlavePeerEvent event, char *buf, size_t size );
+	bool handleForwardKeyRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleSetRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleGetRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleUpdateRequest( SlavePeerEvent event, char *buf, size_t size );
@@ -129,7 +129,7 @@ private:
 	bool handleSealChunkRequest( SlavePeerEvent event, char *buf, size_t size );
 
 	// ---------- slave_peer_res_worker.cc ----------
-	bool handleDegradedSetResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
+	bool handleForwardKeyResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleSetResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleGetResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleUpdateResponse( SlavePeerEvent event, bool success, char *buf, size_t size );

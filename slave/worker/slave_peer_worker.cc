@@ -99,37 +99,37 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				false // to master
 			);
 			break;
-		case SLAVE_PEER_EVENT_TYPE_DEGRADED_SET_REQUEST:
-			buffer.data = this->protocol.reqDegradedSet(
+		case SLAVE_PEER_EVENT_TYPE_FORWARD_KEY_REQUEST:
+			buffer.data = this->protocol.reqForwardKey(
 				buffer.size,
 				event.instanceId, event.requestId,
-				event.message.degradedSet.opcode,
-				event.message.degradedSet.listId,
-				event.message.degradedSet.stripeId,
-				event.message.degradedSet.chunkId,
-				event.message.degradedSet.keySize,
-				event.message.degradedSet.key,
-				event.message.degradedSet.valueSize,
-				event.message.degradedSet.value,
-				event.message.degradedSet.update.length,
-				event.message.degradedSet.update.offset,
-				event.message.degradedSet.update.data
+				event.message.forwardKey.opcode,
+				event.message.forwardKey.listId,
+				event.message.forwardKey.stripeId,
+				event.message.forwardKey.chunkId,
+				event.message.forwardKey.keySize,
+				event.message.forwardKey.key,
+				event.message.forwardKey.valueSize,
+				event.message.forwardKey.value,
+				event.message.forwardKey.update.length,
+				event.message.forwardKey.update.offset,
+				event.message.forwardKey.update.data
 			);
 			break;
-		case SLAVE_PEER_EVENT_TYPE_DEGRADED_SET_RESPONSE_SUCCESS:
+		case SLAVE_PEER_EVENT_TYPE_FORWARD_KEY_RESPONSE_SUCCESS:
 			success = true;
-		case SLAVE_PEER_EVENT_TYPE_DEGRADED_SET_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resDegradedSet(
+		case SLAVE_PEER_EVENT_TYPE_FORWARD_KEY_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resForwardKey(
 				buffer.size,
 				event.instanceId, event.requestId,
 				success,
-				event.message.degradedSet.opcode,
-				event.message.degradedSet.listId,
-				event.message.degradedSet.stripeId,
-				event.message.degradedSet.chunkId,
-				event.message.degradedSet.keySize,
-				event.message.degradedSet.key,
-				event.message.degradedSet.valueSize
+				event.message.forwardKey.opcode,
+				event.message.forwardKey.listId,
+				event.message.forwardKey.stripeId,
+				event.message.forwardKey.chunkId,
+				event.message.forwardKey.keySize,
+				event.message.forwardKey.key,
+				event.message.forwardKey.valueSize
 			);
 			break;
 		case SLAVE_PEER_EVENT_TYPE_FORWARD_CHUNK_REQUEST:
@@ -517,16 +517,16 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 							break;
 					}
 					break;
-				case PROTO_OPCODE_DEGRADED_SET:
+				case PROTO_OPCODE_FORWARD_KEY:
 					switch ( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
-							this->handleDegradedSetRequest( event, buffer.data, buffer.size );
+							this->handleForwardKeyRequest( event, buffer.data, buffer.size );
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
-							this->handleDegradedSetResponse( event, true, buffer.data, buffer.size );
+							this->handleForwardKeyResponse( event, true, buffer.data, buffer.size );
 							break;
 						case PROTO_MAGIC_RESPONSE_FAILURE:
-							this->handleDegradedSetResponse( event, false, buffer.data, buffer.size );
+							this->handleForwardKeyResponse( event, false, buffer.data, buffer.size );
 							break;
 						default:
 							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x for SET.", header.magic );

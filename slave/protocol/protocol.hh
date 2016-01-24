@@ -99,14 +99,14 @@ public:
 	// ---------- degraded_protocol.cc ----------
 	char *resReleaseDegradedLock( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t count );
 
-	char *reqDegradedSet(
+	char *reqForwardKey(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		uint8_t opcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		uint8_t keySize, char *key,
 		uint32_t valueSize, char *value,
 		uint32_t valueUpdateSize = 0, uint32_t valueUpdateOffset = 0, char *valueUpdate = 0
 	);
-	char *resDegradedSet(
+	char *resForwardKey(
 		size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
 		uint8_t opcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		uint8_t keySize, char *key,

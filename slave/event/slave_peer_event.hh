@@ -24,10 +24,10 @@ enum SlavePeerEventType {
 	SLAVE_PEER_EVENT_TYPE_SET_REQUEST,
 	SLAVE_PEER_EVENT_TYPE_SET_RESPONSE_SUCCESS,
 	SLAVE_PEER_EVENT_TYPE_SET_RESPONSE_FAILURE,
-	// DEGRADED_SET
-	SLAVE_PEER_EVENT_TYPE_DEGRADED_SET_REQUEST,
-	SLAVE_PEER_EVENT_TYPE_DEGRADED_SET_RESPONSE_SUCCESS,
-	SLAVE_PEER_EVENT_TYPE_DEGRADED_SET_RESPONSE_FAILURE,
+	// FORWARD_KEY
+	SLAVE_PEER_EVENT_TYPE_FORWARD_KEY_REQUEST,
+	SLAVE_PEER_EVENT_TYPE_FORWARD_KEY_RESPONSE_SUCCESS,
+	SLAVE_PEER_EVENT_TYPE_FORWARD_KEY_RESPONSE_FAILURE,
 	// GET
 	SLAVE_PEER_EVENT_TYPE_GET_REQUEST,
 	SLAVE_PEER_EVENT_TYPE_GET_RESPONSE_SUCCESS,
@@ -134,7 +134,7 @@ public:
 				uint32_t offset, length;
 				char *data;
 			} update;
-		} degradedSet;
+		} forwardKey;
 		struct {
 			Key key;
 			uint32_t valueUpdateOffset;
@@ -154,7 +154,7 @@ public:
 	void reqSet( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key key, Value value );
 	void resSet( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key key, bool success );
 	// Degraded SET
-	void reqDegradedSet(
+	void reqForwardKey(
 		SlavePeerSocket *socket,
 		uint8_t opcode,
 		uint16_t instanceId, uint32_t requestId,
@@ -163,7 +163,7 @@ public:
 		char *key, char *value,
 		uint32_t valueUpdateOffset = 0, uint32_t valueUpdateSize = 0, char *valueUpdate = 0
 	);
-	void resDegradedSet(
+	void resForwardKey(
 		SlavePeerSocket *socket, bool success,
 		uint8_t opcode,
 		uint16_t instanceId, uint32_t requestId,

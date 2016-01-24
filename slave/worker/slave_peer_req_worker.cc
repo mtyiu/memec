@@ -37,23 +37,23 @@ bool SlaveWorker::handleSlavePeerRegisterRequest( SlavePeerSocket *socket, uint1
 
 ////////////////////////////////////////////////////////////////////////////////
 
-bool SlaveWorker::handleDegradedSetRequest( SlavePeerEvent event, char *buf, size_t size ) {
-	struct DegradedSetHeader header;
-	if ( ! this->protocol.parseDegradedSetReqHeader( header, buf, size ) ) {
-		__ERROR__( "SlaveWorker", "handleDegradedSetRequest", "Invalid DEGRADED_SET request (size = %lu).", size );
+bool SlaveWorker::handleForwardKeyRequest( SlavePeerEvent event, char *buf, size_t size ) {
+	struct ForwardKeyHeader header;
+	if ( ! this->protocol.parseForwardKeyReqHeader( header, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleForwardKeyRequest", "Invalid DEGRADED_SET request (size = %lu).", size );
 		return false;
 	}
 	if ( header.opcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
-		__INFO__(
-			BLUE, "SlaveWorker", "handleDegradedSetRequest",
+		__DEBUG__(
+			BLUE, "SlaveWorker", "handleForwardKeyRequest",
 			"[DEGRADED_SET] Degraded opcode: 0x%x; list ID: %u, chunk ID: %u; key: %.*s (size = %u); value size: %u; value update size: %u, offset: %u.",
 			header.opcode, header.listId, header.chunkId,
 			header.keySize, header.key, header.keySize,
 			header.valueSize, header.valueUpdateSize, header.valueUpdateOffset
 		);
 	} else {
-		__INFO__(
-			BLUE, "SlaveWorker", "handleDegradedSetRequest",
+		__DEBUG__(
+			BLUE, "SlaveWorker", "handleForwardKeyRequest",
 			"[DEGRADED_SET] Degraded opcode: 0x%x; list ID: %u, chunk ID: %u; key: %.*s (size = %u); value size: %u.",
 			header.opcode, header.listId, header.chunkId,
 			header.keySize, header.key, header.keySize,
@@ -105,11 +105,11 @@ bool SlaveWorker::handleDegradedSetRequest( SlavePeerEvent event, char *buf, siz
 			dmap->deleteValue( key, metadata, PROTO_OPCODE_DELETE, timestamp );
 			break;
 		default:
-			__ERROR__( "SlaveWorker", "handleDegradedSetRequest", "Undefined degraded opcode." );
+			__ERROR__( "SlaveWorker", "handleForwardKeyRequest", "Undefined degraded opcode." );
 			return false;
 	}
 
-	event.resDegradedSet(
+	event.resForwardKey(
 		event.socket,
 		true, // success
 		header.opcode,

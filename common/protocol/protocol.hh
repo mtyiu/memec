@@ -86,8 +86,9 @@
 #define PROTO_OPCODE_SET_CHUNK                    0x56
 #define PROTO_OPCODE_SET_CHUNK_UNSEALED           0x57
 #define PROTO_OPCODE_FORWARD_CHUNK                0x58
-#define PROTO_OPCODE_REMAPPED_UPDATE              0x59
-#define PROTO_OPCODE_REMAPPED_DELETE              0x60
+#define PROTO_OPCODE_FORWARD_KEY                  0x59
+#define PROTO_OPCODE_REMAPPED_UPDATE              0x60
+#define PROTO_OPCODE_REMAPPED_DELETE              0x61
 
 #define PROTO_UNINITIALIZED_INSTANCE              0
 
@@ -369,9 +370,9 @@ struct DegradedReqHeader {
 	} data;
 };
 
-#define PROTO_DEGRADED_SET_BASE_SIZE 17
-#define PROTO_DEGRADED_SET_UPDATE_SIZE 6
-struct DegradedSetHeader {
+#define PROTO_FORWARD_KEY_BASE_SIZE 17
+#define PROTO_FORWARD_KEY_UPDATE_SIZE 6
+struct ForwardKeyHeader {
 	uint8_t opcode;
 	uint32_t listId;
 	uint32_t stripeId;
@@ -857,14 +858,14 @@ protected:
 		char *buf, size_t size
 	);
 
-    size_t generateDegradedSetReqHeader(
+    size_t generateForwardKeyReqHeader(
     	uint8_t magic, uint8_t to, uint8_t opcode,
     	uint16_t instanceId, uint32_t requestId,
     	uint8_t degradedOpcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
     	uint8_t keySize, char *key, uint32_t valueSize, char *value,
     	uint32_t valueUpdateSize, uint32_t valueUpdateOffset, char *valueUpdate
     );
-    bool parseDegradedSetReqHeader(
+    bool parseForwardKeyReqHeader(
     	size_t offset, uint8_t &opcode,
     	uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
     	uint8_t &keySize, uint32_t &valueSize,
@@ -873,14 +874,14 @@ protected:
     	char *buf, size_t size
     );
 
-    size_t generateDegradedSetResHeader(
+    size_t generateForwardKeyResHeader(
     	uint8_t magic, uint8_t to, uint8_t opcode,
     	uint16_t instanceId, uint32_t requestId,
     	uint8_t degradedOpcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
     	uint8_t keySize, char *key, uint32_t valueSize,
     	uint32_t valueUpdateSize, uint32_t valueUpdateOffset
     );
-    bool parseDegradedSetResHeader(
+    bool parseForwardKeyResHeader(
     	size_t offset, uint8_t &opcode,
     	uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
     	uint8_t &keySize, uint32_t &valueSize,
@@ -1182,12 +1183,12 @@ public:
 		struct DegradedReqHeader &header, uint8_t opcode,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
-    bool parseDegradedSetReqHeader(
-        struct DegradedSetHeader &header,
+    bool parseForwardKeyReqHeader(
+        struct ForwardKeyHeader &header,
         char *buf = 0, size_t size = 0, size_t offset = 0
     );
-    bool parseDegradedSetResHeader(
-        struct DegradedSetHeader &header,
+    bool parseForwardKeyResHeader(
+        struct ForwardKeyHeader &header,
         char *buf = 0, size_t size = 0, size_t offset = 0
     );
 	bool parseListStripeKeyHeader(
