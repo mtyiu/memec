@@ -26,7 +26,7 @@ enum PendingType {
 	PT_SLAVE_DEL,
 	PT_KEY_REMAP_LIST,
 	PT_ACK_REMOVE_PARITY,
-	PT_ACK_REVERT_PARITY,
+	PT_ACK_REVERT_DELTA,
 	PT_REQUEST_REPLAY
 };
 
@@ -114,7 +114,6 @@ public:
 
 class AcknowledgementInfo {
 public:
-	std::pair<Timestamp, Timestamp> range;
 	pthread_cond_t *condition;
 	LOCK_T *lock;
 	uint32_t *counter;
@@ -125,8 +124,7 @@ public:
 		counter = 0;
 	}
 
-	AcknowledgementInfo( Timestamp from, Timestamp to, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter ) {
-		this->range = std::pair<Timestamp, Timestamp>( from, to );
+	AcknowledgementInfo( pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter ) {
 		this->condition = condition;
 		this->lock = lock;
 		this->counter = counter;

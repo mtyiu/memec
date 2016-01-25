@@ -855,7 +855,7 @@ void Slave::printPending( FILE *f ) {
 	}
 	UNLOCK( &this->pending.slavePeers.updateChunkLock );
 
-	LOCK( &this->pending.slavePeers.delChunkLock );
+	LOCK( &this->pending.slavePeers.deleteChunkLock );
 	fprintf(
 		f,
 		"\n[DELETE_CHUNK] Pending: %lu\n",
@@ -881,7 +881,7 @@ void Slave::printPending( FILE *f ) {
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
 	}
-	UNLOCK( &this->pending.slavePeers.delChunkLock );
+	UNLOCK( &this->pending.slavePeers.deleteChunkLock );
 
 	LOCK( &this->pending.slavePeers.getChunkLock );
 	fprintf(

@@ -1248,13 +1248,13 @@ bool SlaveWorker::sendModifyChunkRequest(
 
 				// backup data delta, insert a pending record for each parity slave
 				if ( masterSocket != 0 ) {
-					Timestamp timestamp ( timestamp );
+					Timestamp ts( timestamp );
 					Value value;
 					value.set( deltaSize, delta );
 					if ( isUpdate )
-						masterSocket->backup.insertDataUpdate( timestamp , key, value, metadata, isSealed, 0 /* TODO */, offset, requestId, this->paritySlaveSockets[ i ] );
+						masterSocket->backup.insertDataUpdate( ts, key, value, metadata, isSealed, valueUpdateOffset, offset, requestId, this->paritySlaveSockets[ i ]->instanceId, this->paritySlaveSockets[ i ] );
 					else
-						masterSocket->backup.insertDataDelete( timestamp , key, value, metadata, isSealed, 0 /* TODO */, offset, requestId, this->paritySlaveSockets[ i ] );
+						masterSocket->backup.insertDataDelete( ts, key, value, metadata, isSealed, valueUpdateOffset, offset, requestId, this->paritySlaveSockets[ i ]->instanceId, this->paritySlaveSockets[ i ] );
 				}
 
 				if ( isUpdate ) {
@@ -1399,13 +1399,13 @@ bool SlaveWorker::sendModifyChunkRequest(
 
 			// backup data delta, insert a pending record for each parity slave
 			if ( masterSocket != 0 ) {
-				Timestamp timestamp ( timestamp );
+				Timestamp ts ( timestamp );
 				Value value;
 				value.set( deltaSize, delta );
 				if ( isUpdate )
-					masterSocket->backup.insertDataUpdate( timestamp , key, value, metadata, isSealed, 0 /* TODO */, offset, requestId, this->paritySlaveSockets[ i ] );
+					masterSocket->backup.insertDataUpdate( ts, key, value, metadata, isSealed, valueUpdateOffset, offset, requestId, this->paritySlaveSockets[ i ]->instanceId, this->paritySlaveSockets[ i ] );
 				else
-					masterSocket->backup.insertDataDelete( timestamp , key, value, metadata, isSealed, 0 /* TODO */, offset, requestId, this->paritySlaveSockets[ i ] );
+					masterSocket->backup.insertDataDelete( ts, key, value, metadata, isSealed, valueUpdateOffset, offset, requestId, this->paritySlaveSockets[ i ]->instanceId, this->paritySlaveSockets[ i ] );
 			}
 
 			if ( isUpdate ) {

@@ -219,7 +219,7 @@ public:
 
 	// ---------- ack_protocol.cc ----------
 	char *ackMetadata( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t fromTimestamp, uint32_t toTimestamp );
-	char *ackParityDeltaBackup( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t fromTimestamp, uint32_t toTimestamp, uint16_t targetId );
-	char *resRevertParityDelta( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, uint32_t fromTimestamp, uint32_t toTimestamp, uint16_t targetId );
+	char *ackParityDeltaBackup( size_t &size, uint16_t instanceId, uint32_t requestId, std::vector<uint32_t> timestamps, uint16_t targetId );
+	char *resRevertDelta( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, std::vector<uint32_t> timestamps, std::vector<Key> requests, uint16_t targetId );
 };
 #endif

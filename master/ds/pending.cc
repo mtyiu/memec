@@ -91,7 +91,7 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 }
 
 bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, AcknowledgementInfo > *&map ) {
-	if ( type == PT_ACK_REVERT_PARITY ) {
+	if ( type == PT_ACK_REVERT_DELTA ) {
 		lock = &this->ack.revertLock;
 		map = &this->ack.revert;
 		return true;

@@ -51,56 +51,56 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 		}
 			break;
 		case SLAVE_EVENT_TYPE_ACK_PARITY_DELTA:
+		case SLAVE_EVENT_TYPE_REVERT_DELTA:
 		{
+			bool isAck = ( event.type == SLAVE_EVENT_TYPE_ACK_PARITY_DELTA );
+				
 			uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
 
 			AcknowledgementInfo ackInfo(
-				Timestamp( event.message.ack.fromTimestamp ),
-				Timestamp( event.message.ack.toTimestamp ),
 				event.message.ack.condition,
 				event.message.ack.lock,
 				event.message.ack.counter
 			);
 
 			MasterWorker::pending->insertAck(
-				PT_ACK_REMOVE_PARITY,
+				( isAck )? PT_ACK_REMOVE_PARITY : PT_ACK_REVERT_DELTA,
 				event.socket->instanceId, requestId, 0,
 				ackInfo
 			);
 
-			buffer.data = this->protocol.ackParityDeltaBackup(
-				buffer.size,
-				instanceId, requestId,
-				event.message.ack.fromTimestamp, event.message.ack.toTimestamp,
-				event.message.ack.targetId
-			);
-			isSend = true;
-		}
-			break;
-		case SLAVE_EVENT_TYPE_REVERT_PARITY_DELTA:
-		{
-			uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
+			std::vector<uint32_t> timestamps;
+			std::vector<Key> requests;
+			if ( ! event.message.ack.timestamps )
+				event.message.ack.timestamps = &timestamps;
+			if ( ! event.message.ack.requests )
+				event.message.ack.requests = &requests;
 
-			AcknowledgementInfo ackInfo(
-				Timestamp( event.message.ack.fromTimestamp ),
-				Timestamp( event.message.ack.toTimestamp ),
-				event.message.ack.condition,
-				event.message.ack.lock,
-				event.message.ack.counter
-			);
+			if ( isAck ) {
+				buffer.data = this->protocol.ackParityDeltaBackup(
+					buffer.size,
+					instanceId, requestId,
+					*event.message.ack.timestamps,
+					event.message.ack.targetId
+				);
+			} else {
+				buffer.data = this->protocol.revertDelta(
+					buffer.size,
+					instanceId, requestId,
+					*event.message.ack.timestamps,
+					*event.message.ack.requests,
+					event.message.ack.targetId
+				);
+			}
 
-			MasterWorker::pending->insertAck(
-				PT_ACK_REVERT_PARITY,
-				event.socket->instanceId, requestId, 0,
-				ackInfo
-			);
+			if ( event.message.ack.timestamps != &timestamps )
+				delete event.message.ack.timestamps;
+			if ( event.message.ack.requests != &requests ) {
+				for( Key &k : requests )
+					k.free();
+				delete event.message.ack.requests;
+			}
 
-			buffer.data = this->protocol.revertParityDelta(
-				buffer.size,
-				instanceId, requestId,
-				event.message.ack.fromTimestamp, event.message.ack.toTimestamp,
-				event.message.ack.targetId
-			);
 			isSend = true;
 		}
 			break;
@@ -213,8 +213,8 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 						this->handleAcknowledgement( event, header.opcode, buffer.data, header.length );
 						break;
 					case PROTO_OPCODE_ACK_PARITY_DELTA:
-					case PROTO_OPCODE_REVERT_PARITY_DELTA:
-						this->handleParityDeltaAcknowledgement( event, header.opcode, buffer.data, header.length );
+					case PROTO_OPCODE_REVERT_DELTA:
+						this->handleDeltaAcknowledgement( event, header.opcode, buffer.data, header.length );
 						break;
 					default:
 						__ERROR__( "MasterWorker", "dispatch", "Invalid opcode from slave." );
@@ -358,20 +358,40 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 		// FOR REPLAY TESTING ONLY
 		// SET //
 		//char *valueStr;
-		//uint32_t valueSize;
+		//uint32_t valueSize, chunkId;
 		//keyValue.deserialize( key.data, key.size, valueStr, valueSize );
 		//KeyValue kv;
 		//kv.dup( key.data, key.size, valueStr, valueSize );
 		//MasterWorker::pending->insertKeyValue( PT_APPLICATION_SET, pid.instanceId, pid.requestId, 0, kv, true, true, pid.timestamp );
 		//key = kv.key();
-		//MasterWorker::pending->insertKey( PT_SLAVE_SET, dpid.instanceId, dpid.parentInstanceId, dpid.requestId, dpid.parentRequestId, dpid.ptr, key );
+		//this->stripeList->get( key.data, key.size, this->dataSlaveSockets, 0, &chunkId );
+		//MasterWorker::pending->insertKey( PT_SLAVE_SET, dpid.instanceId, dpid.parentInstanceId, dpid.requestId, dpid.parentRequestId, this->dataSlaveSockets[ chunkId ], key );
 
 		// not to response if the request is "canceled" due to replay
 		if ( pid.ptr ) {
 			applicationEvent.resSet( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, keyValue, success );
 			this->dispatch( applicationEvent );
 		}
+
+		// Check if all normal requests completes
+		SlaveSocket *slave = 0;
+		struct sockaddr_in addr;
+		MasterRemapMsgHandler *remapMsgHandler = &Master::getInstance()->remapMsgHandler;
+		this->stripeList->get( keyStr, key.size, 0, this->paritySlaveSockets );
+		for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
+			slave = this->paritySlaveSockets[ i ];
+			addr = slave->getAddr();
+			if ( ! remapMsgHandler->useCoordinatedFlow( addr ) || remapMsgHandler->stateTransitInfo.at( addr ).isCompleted() )
+				continue;
+			if ( remapMsgHandler->stateTransitInfo.at( addr ).removePendingRequest( event.requestId ) == 0 ) {
+				__INFO__( GREEN, "MasterWorker", "handleSetResponse", "Ack transition for slave id = %u.", slave->instanceId );
+				remapMsgHandler->stateTransitInfo.at( addr ).setCompleted();
+				remapMsgHandler->ackTransit( addr );
+			}
+		}
+
 	}
+
 	return true;
 }
 
@@ -528,6 +548,23 @@ bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, bool is
 		this->dispatch( applicationEvent );
 	}
 
+	// Check if all normal requests completes
+	SlaveSocket *slave = 0;
+	struct sockaddr_in addr;
+	MasterRemapMsgHandler *remapMsgHandler = &Master::getInstance()->remapMsgHandler;
+	this->stripeList->get( header.key, header.keySize, 0, this->paritySlaveSockets );
+	for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
+		slave = this->paritySlaveSockets[ i ];
+		addr = slave->getAddr();
+		if ( ! remapMsgHandler->useCoordinatedFlow( addr ) || remapMsgHandler->stateTransitInfo.at( addr ).isCompleted() )
+			continue;
+		if ( remapMsgHandler->stateTransitInfo.at( addr ).removePendingRequest( pid.requestId ) == 0 ) {
+			__INFO__( GREEN, "MasterWorker", "handleUpdateResponse", "Ack transition for slave id = %u.", slave->instanceId );
+			remapMsgHandler->stateTransitInfo.at( addr ).setCompleted();
+			remapMsgHandler->ackTransit( addr );
+		}
+	}
+
 	// check if ack is necessary
 	// TODO handle degraded mode
 	if ( ! isDegraded )
@@ -608,6 +645,23 @@ bool MasterWorker::handleDeleteResponse( SlaveEvent event, bool success, bool is
 		this->dispatch( applicationEvent );
 	}
 
+	// Check if all normal requests completes
+	SlaveSocket *slave = 0;
+	struct sockaddr_in addr;
+	MasterRemapMsgHandler *remapMsgHandler = &Master::getInstance()->remapMsgHandler;
+	this->stripeList->get( keyStr, key.size, 0, this->paritySlaveSockets );
+	for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
+		slave = this->paritySlaveSockets[ i ];
+		addr = slave->getAddr();
+		if ( ! remapMsgHandler->useCoordinatedFlow( addr ) || remapMsgHandler->stateTransitInfo.at( addr ).isCompleted() )
+			continue;
+		if ( remapMsgHandler->stateTransitInfo.at( addr ).removePendingRequest( pid.requestId ) == 0 ) {
+			__INFO__( GREEN, "MasterWorker", "handleDeleteResponse", "Ack transition for slave id = %u.", slave->instanceId );
+			remapMsgHandler->stateTransitInfo.at( addr ).setCompleted();
+			remapMsgHandler->ackTransit( addr );
+		}
+	}
+
 	// check if ack is necessary
 	// TODO handle degraded mode
 	if ( ! isDegraded ) master->ackParityDelta( 0, event.socket );
@@ -629,11 +683,11 @@ bool MasterWorker::handleAcknowledgement( SlaveEvent event, uint8_t opcode, char
 	return true;
 }
 
-bool MasterWorker::handleParityDeltaAcknowledgement( SlaveEvent event, uint8_t opcode, char *buf, size_t size ) {
-	struct ParityDeltaAcknowledgementHeader header;
+bool MasterWorker::handleDeltaAcknowledgement( SlaveEvent event, uint8_t opcode, char *buf, size_t size ) {
+	struct DeltaAcknowledgementHeader header;
 	PendingIdentifier pid;
-	if ( ! this->protocol.parseParityDeltaAcknowledgementHeader( header, buf, size ) ) {
-		__ERROR__( "MasterWorker", "handleParityDeltaAcknowledgement", "Invalid ACK." );
+	if ( ! this->protocol.parseDeltaAcknowledgementHeader( header, 0, 0, buf, size ) ) {
+		__ERROR__( "MasterWorker", "handleDeltaAcknowledgement", "Invalid ACK." );
 		return false;
 	}
 
@@ -644,11 +698,11 @@ bool MasterWorker::handleParityDeltaAcknowledgement( SlaveEvent event, uint8_t o
 		case PROTO_OPCODE_ACK_PARITY_DELTA:
 			ret = MasterWorker::pending->eraseAck( PT_ACK_REMOVE_PARITY, event.instanceId, event.requestId, 0, &pid, &ackInfo );
 			break;
-		case PROTO_OPCODE_REVERT_PARITY_DELTA:
-			ret = MasterWorker::pending->eraseAck( PT_ACK_REVERT_PARITY, event.instanceId, event.requestId, 0, &pid, &ackInfo );
+		case PROTO_OPCODE_REVERT_DELTA:
+			ret = MasterWorker::pending->eraseAck( PT_ACK_REVERT_DELTA, event.instanceId, event.requestId, 0, &pid, &ackInfo );
 			break;
 		default:
-			__ERROR__( "MasterWorker", "handleParityDeltaAcknowledgement",
+			__ERROR__( "MasterWorker", "handleDeltaAcknowledgement",
 					"Unknown ack for instance id = %u from instance id = %u request id = %u",
 					header.targetId, event.instanceId, event.requestId
 			);
@@ -656,7 +710,7 @@ bool MasterWorker::handleParityDeltaAcknowledgement( SlaveEvent event, uint8_t o
 	}
 
 	if ( ! ret ) {
-		__ERROR__( "MasterWorker", "handleParityDeltaAcknowledgement",
+		__ERROR__( "MasterWorker", "handleDeltaAcknowledgement",
 			"Cannot find the pending ack info for instance id = %u from instance id = %u request id = %u",
 			header.targetId, event.instanceId, event.requestId
 		);
@@ -667,7 +721,7 @@ bool MasterWorker::handleParityDeltaAcknowledgement( SlaveEvent event, uint8_t o
 	if ( ackInfo.counter ) {
 		*ackInfo.counter -= 1;
 		if ( *ackInfo.counter == 0 ) {
-			__INFO__( GREEN, "MasterWorker", "handleParityDeltaAcknowledgement",
+			__INFO__( GREEN, "MasterWorker", "handleDeltaAcknowledgement",
 					"Complete ack for counter at %p", ackInfo.counter
 			);
 			if ( ackInfo.condition )
@@ -680,13 +734,13 @@ bool MasterWorker::handleParityDeltaAcknowledgement( SlaveEvent event, uint8_t o
 	switch( opcode ) {
 		case PROTO_OPCODE_ACK_PARITY_DELTA:
 			break;
-		case PROTO_OPCODE_REVERT_PARITY_DELTA:
+		case PROTO_OPCODE_REVERT_DELTA:
 			LOCK( &master->sockets.slavesIdToSocketLock );
 			try {
 				struct sockaddr_in saddr = master->sockets.slavesIdToSocketMap.at( header.targetId )->getAddr();
 				master->remapMsgHandler.ackTransit( saddr );
 			} catch ( std::out_of_range &e ) {
-				__ERROR__( "MasterWorker", "handleParityDeltaAcknowledgement",
+				__ERROR__( "MasterWorker", "handleDeltaAcknowledgement",
 					"Cannot find slave socket for instacne id = %u", header.targetId
 				);
 			}
