@@ -591,7 +591,6 @@ bool SlaveWorker::handleUpdateChunkRequest( SlavePeerEvent event, char *buf, siz
 	Metadata metadata;
 	metadata.set( header.listId, header.stripeId, header.chunkId );
 
-<<<<<<< HEAD
 	uint32_t myChunkId = SlaveWorker::chunkBuffer->at( header.listId )->getChunkId();
 
 	if ( header.updatingChunkId == myChunkId ) {
@@ -659,7 +658,6 @@ bool SlaveWorker::handleDeleteChunkRequest( SlavePeerEvent event, char *buf, siz
 	Metadata metadata;
 	metadata.set( header.listId, header.stripeId, header.chunkId );
 
-<<<<<<< HEAD
 	uint32_t myChunkId = SlaveWorker::chunkBuffer->at( header.listId )->getChunkId();
 
 	if ( header.updatingChunkId == myChunkId ) {
