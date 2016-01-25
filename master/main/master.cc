@@ -933,14 +933,6 @@ void Master::printRemapping( FILE *f ) {
 			info.second.getPendingRequestCount()
 		);
 	}
-
-	fprintf(
-		f,
-		"\nRemapped SET Ops: %d\n"
-		"\nLockOnly SET Ops: %d\n",
-		BasicRemappingScheme::remapped,
-		BasicRemappingScheme::lockonly
-	);
 }
 
 void Master::printBackup( FILE *f ) {
@@ -1039,7 +1031,6 @@ void Master::time() {
 		if ( _LOCK_ ) LOCK( _LOCK_ ); \
 		if ( _COUNTER_ ) *_COUNTER_ += 1; \
 		if ( _LOCK_ ) UNLOCK( _LOCK_ ); \
-
 		if ( strcmp( #_METHOD_NAME_, "ackParityDelta" ) == 0 ) {\
 			event.ackParityDelta( p, timestamps, _S_->instanceId, _COND_, _LOCK_, _COUNTER_ ); \
 		} else if ( strcmp( #_METHOD_NAME_, "revertDelta" ) == 0 ) { \
