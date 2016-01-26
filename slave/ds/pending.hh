@@ -225,6 +225,7 @@ enum PendingType {
 	PT_SLAVE_PEER_GET_CHUNK,
 	PT_SLAVE_PEER_SET_CHUNK,
 	PT_SLAVE_PEER_FORWARD_PARITY_CHUNK,
+	PT_SLAVE_PEER_FORWARD_KEYS,
 	PT_SLAVE_PEER_UPDATE_CHUNK,
 	PT_SLAVE_PEER_DEL_CHUNK,
 	PT_SLAVE_PEER_PARITY
@@ -232,6 +233,7 @@ enum PendingType {
 
 class Pending {
 private:
+	bool get( PendingType type, LOCK_T *&lock, std::unordered_set<PendingIdentifier> *&map );
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, Key> *&map );
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, KeyValue> *&map );
 	bool get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *&map );
@@ -266,10 +268,12 @@ public:
 		std::unordered_multimap<PendingIdentifier, ChunkRequest> getChunk;
 		std::unordered_multimap<PendingIdentifier, ChunkRequest> setChunk;
 		std::unordered_multimap<PendingIdentifier, ChunkRequest> forwardParityChunk;
+		std::unordered_set<PendingIdentifier> forwardKeys;
 		std::unordered_multimap<PendingIdentifier, ChunkUpdate> updateChunk;
 		std::unordered_multimap<PendingIdentifier, ChunkUpdate> deleteChunk;
 		std::unordered_map<struct sockaddr_in, std::set<PendingData>* > remappedData;
 		std::unordered_map<PendingIdentifier, uint32_t> remappedDataRequest;
+
 		LOCK_T degradedOpsLock;
 		LOCK_T setLock;
 		LOCK_T getLock;
@@ -278,6 +282,7 @@ public:
 		LOCK_T getChunkLock;
 		LOCK_T setChunkLock;
 		LOCK_T forwardParityChunkLock;
+		LOCK_T forwardKeysLock;
 		LOCK_T updateChunkLock;
 		LOCK_T deleteChunkLock;
 		LOCK_T remappedDataLock;
@@ -299,6 +304,7 @@ public:
 		LOCK_INIT( &this->slavePeers.getChunkLock );
 		LOCK_INIT( &this->slavePeers.setChunkLock );
 		LOCK_INIT( &this->slavePeers.forwardParityChunkLock );
+		LOCK_INIT( &this->slavePeers.forwardKeysLock );
 		LOCK_INIT( &this->slavePeers.updateChunkLock );
 		LOCK_INIT( &this->slavePeers.deleteChunkLock );
 		LOCK_INIT( &this->slavePeers.remappedDataLock );
@@ -372,6 +378,10 @@ public:
 		uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, uint32_t requestCount,
 		SlavePeerSocket *target
 	);
+	bool insert(
+		PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
+		bool needsLock = true, bool needsUnlock = true
+	);
 	// Erase
 	bool eraseReleaseDegradedLock(
 		uint16_t instanceId, uint32_t requestId, uint32_t count,
@@ -392,7 +402,7 @@ public:
 		uint8_t keySize, char *keyStr,
 		uint32_t &remainingChunks, uint32_t &remainingKeys,
 		uint32_t &totalChunks, uint32_t &totalKeys,
-		PendingIdentifier *pidPtr
+		PendingIdentifier *pidPtr = 0
 	);
 	bool eraseRecovery(
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
@@ -442,6 +452,11 @@ public:
 		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr = 0,
 		PendingIdentifier *pidPtr = 0,
 		ChunkUpdate *chunkUpdatePtr = 0,
+		bool needsLock = true, bool needsUnlock = true
+	);
+	bool erase(
+		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr = 0,
+		PendingIdentifier *pidPtr = 0,
 		bool needsLock = true, bool needsUnlock = true
 	);
 	bool eraseRemapData(

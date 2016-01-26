@@ -9,6 +9,7 @@ enum CoordinatorEventType {
 	COORDINATOR_EVENT_TYPE_SYNC,
 	COORDINATOR_EVENT_TYPE_RELEASE_DEGRADED_LOCK_RESPONSE_SUCCESS,
 	COORDINATOR_EVENT_TYPE_RECONSTRUCTION_RESPONSE_SUCCESS,
+	COORDINATOR_EVENT_TYPE_RECONSTRUCTION_UNSEALED_RESPONSE_SUCCESS,
 	COORDINATOR_EVENT_TYPE_PROMOTE_BACKUP_SERVER_RESPONSE_SUCCESS,
 	COORDINATOR_EVENT_TYPE_RESPONSE_PARITY_MIGRATE,
 	COORDINATOR_EVENT_TYPE_PENDING
@@ -34,6 +35,11 @@ public:
 			uint32_t numStripes;
 		} reconstruction;
 		struct {
+			uint32_t listId;
+			uint32_t chunkId;
+			uint32_t keysCount;
+		} reconstructionUnsealed;
+		struct {
 			uint32_t addr;
 			uint16_t port;
 			uint32_t numChunks;
@@ -47,6 +53,7 @@ public:
 	void resRemappedData( CoordinatorSocket *socket, uint16_t instanceId, uint32_t requestId );
 	void resReleaseDegradedLock( CoordinatorSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t count );
 	void resReconstruction( CoordinatorSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t numStripes );
+	void resReconstructionUnsealed( CoordinatorSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t keysCount );
 	void resPromoteBackupSlave( CoordinatorSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t numChunks, uint32_t numUnsealedKeys );
 	void pending( CoordinatorSocket *socket );
 };

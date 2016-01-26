@@ -88,6 +88,7 @@
 #define PROTO_OPCODE_FORWARD_KEY                  0x59
 #define PROTO_OPCODE_REMAPPED_UPDATE              0x60
 #define PROTO_OPCODE_REMAPPED_DELETE              0x61
+#define PROTO_OPCODE_BATCH_KEY_VALUES             0x62
 
 #define PROTO_UNINITIALIZED_INSTANCE              0
 
@@ -491,7 +492,7 @@ struct AcknowledgementHeader {
 #define PROTO_ACK_DELTA_SIZE 10
 struct DeltaAcknowledgementHeader {
 	uint32_t tsCount;         // number of timestamps
-	uint32_t keyCount;       // number of requests ids 
+	uint32_t keyCount;       // number of requests ids
 	uint16_t targetId;      // source data slave
 };
 
@@ -737,11 +738,24 @@ protected:
 		std::unordered_set<Key> &keys, std::unordered_set<Key>::iterator &it, uint32_t &keysCount,
 		bool &isCompleted
 	);
+	size_t generateBatchKeyHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode,
+		uint16_t instanceId, uint32_t requestId,
+		struct BatchKeyValueHeader &header
+	);
 	bool parseBatchKeyHeader(
 		size_t offset, uint32_t &count, char *&keys,
 		char *buf, size_t size
 	);
 
+	size_t generateBatchKeyValueHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode,
+		uint16_t instanceId, uint32_t requestId,
+		std::unordered_set<Key> &keys, std::unordered_set<Key>::iterator &it,
+		std::unordered_map<Key, KeyValue> *values, LOCK_T *lock,
+		uint32_t &keyValuesCount,
+		bool &isCompleted
+	);
 	bool parseBatchKeyValueHeader(
 		size_t offset, uint32_t &count, char *&keyValues,
 		char *buf, size_t size

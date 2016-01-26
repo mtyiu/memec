@@ -127,6 +127,7 @@ private:
 	bool handleUpdateChunkRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleDeleteChunkRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleSealChunkRequest( SlavePeerEvent event, char *buf, size_t size );
+	bool handleBatchKeyValueRequest( SlavePeerEvent event, char *buf, size_t size );
 
 	// ---------- slave_peer_res_worker.cc ----------
 	bool handleForwardKeyResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
@@ -139,6 +140,7 @@ private:
 	bool handleUpdateChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleDeleteChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleSealChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
+	bool handleBatchKeyValueResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 
 	// ---------- remap_worker.cc ----------
 	bool handleRemappedData( CoordinatorEvent event, char *buf, size_t size );

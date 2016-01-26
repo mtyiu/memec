@@ -276,6 +276,14 @@ void SlavePeerEvent::resSealChunk( SlavePeerSocket *socket, uint16_t instanceId,
 	this->message.chunk.chunk = 0;
 }
 
+void SlavePeerEvent::resUnsealedKeys( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, struct BatchKeyValueHeader &header, bool success ) {
+	this->type = success ? SLAVE_PEER_EVENT_TYPE_UNSEALED_KEYS_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_UNSEALED_KEYS_RESPONSE_FAILURE;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
+	this->socket = socket;
+	this->message.unsealedKeys.header = header;
+}
+
 void SlavePeerEvent::send( SlavePeerSocket *socket, Packet *packet ) {
 	this->type = SLAVE_PEER_EVENT_TYPE_SEND;
 	this->socket = socket;

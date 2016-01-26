@@ -52,7 +52,7 @@ public class Main implements Runnable {
 		synchronized( Main.lock ) {
 			this.completedOps++;
 			ret = this.completedOps;
-			if ( this.completedOps % ( Main.numOps / 10 ) == 0 )
+			if ( this.completedOps % ( Main.numOps / 100 ) == 0 )
 				System.out.printf( "Completed operations: %d (%.2f%%)\r", this.completedOps, ( double ) this.completedOps / Main.numOps * 100.0 );
 		}
 		return ret;

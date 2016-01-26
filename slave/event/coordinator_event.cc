@@ -43,6 +43,16 @@ void CoordinatorEvent::resReconstruction( CoordinatorSocket *socket, uint16_t in
 	this->message.reconstruction.numStripes = numStripes;
 }
 
+void CoordinatorEvent::resReconstructionUnsealed( CoordinatorSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t keysCount ) {
+	this->type = COORDINATOR_EVENT_TYPE_RECONSTRUCTION_UNSEALED_RESPONSE_SUCCESS;
+	this->socket = socket;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
+	this->message.reconstructionUnsealed.listId = listId;
+	this->message.reconstructionUnsealed.chunkId = chunkId;
+	this->message.reconstructionUnsealed.keysCount = keysCount;
+}
+
 void CoordinatorEvent::resPromoteBackupSlave( CoordinatorSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t numChunks, uint32_t numUnsealedKeys ) {
 	this->type = COORDINATOR_EVENT_TYPE_PROMOTE_BACKUP_SERVER_RESPONSE_SUCCESS;
 	this->socket = socket;

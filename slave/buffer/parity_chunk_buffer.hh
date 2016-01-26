@@ -92,6 +92,7 @@ public:
 	bool seal( uint32_t stripeId, uint32_t chunkId, uint32_t count, char *sealData, size_t sealDataSize, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk );
 
 	bool findValueByKey( char *data, uint8_t size, KeyValue *keyValuePtr, Key *keyPtr = 0 );
+	void getKeyValueMap( std::unordered_map<Key, KeyValue> *&map, LOCK_T *&lock );
 
 	bool deleteKey( char *keyStr, uint8_t keySize );
 

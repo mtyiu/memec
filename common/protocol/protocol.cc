@@ -125,6 +125,7 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_OPCODE_FORWARD_KEY:
 		case PROTO_OPCODE_REMAPPED_UPDATE:
 		case PROTO_OPCODE_REMAPPED_DELETE:
+		case PROTO_OPCODE_BATCH_KEY_VALUES:
 			break;
 		default:
 			fprintf( stderr, "Error #4: (magic, from, to, opcode, length, instanceId, requestId) = (%x, %x, %x, %x, %u, %u, %u)\n", magic, from, to, opcode, length, instanceId, requestId );

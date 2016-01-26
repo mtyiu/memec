@@ -121,7 +121,7 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 	std::unordered_map<uint32_t, std::unordered_set<uint32_t>>::iterator stripeIdsIt;
 	std::unordered_set<uint32_t>::iterator stripeIdSetIt;
 	std::unordered_map<uint32_t, SlaveSocket **> sockets;
-	std::unordered_map<uint32_t, std::unordered_set<Key>> unsealed;
+	std::unordered_map<uint32_t, std::unordered_set<Key>> unsealed; // List ID |-> Key
 	std::unordered_map<uint32_t, std::unordered_set<Key>>::iterator unsealedIt;
 	std::unordered_set<Key> unsealedKeysAggregated;
 	std::unordered_set<Key>::iterator unsealedKeysIt;
@@ -332,6 +332,7 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 				}
 			}
 		} while ( ! isAllCompleted );
+
 		do {
 			isAllCompleted = true;
 			// Task to parity slaves: Send unsealed keys
@@ -366,7 +367,11 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 			}
 		} while ( ! isAllCompleted );
 
-		__INFO__( YELLOW, "CoordinatorWorker", "handleReconstructionRequest", "[%u] (%u, %u): Number of surviving slaves: %u; number of stripes per slave: %u; total number of stripes: %lu; total number of unsealed keys: %lu", requestId, listId, chunkId, numSurvivingSlaves, numStripePerSlave, stripeIds[ listId ].size(), unsealed[ listId ].size() );
+		__INFO__(
+			YELLOW, "CoordinatorWorker", "handleReconstructionRequest",
+			"[%u] (%u, %u): Number of surviving slaves: %u; number of stripes per slave: %u; total number of stripes: %lu; total number of unsealed keys: %lu",
+			requestId, listId, chunkId, numSurvivingSlaves, numStripePerSlave, stripeIds[ listId ].size(), unsealed[ listId ].size()
+		);
 	}
 
 	UNLOCK( &socket->map.keysLock );
@@ -401,28 +406,22 @@ bool CoordinatorWorker::handleReconstructionResponse( SlaveEvent event, char *bu
 }
 
 bool CoordinatorWorker::handleReconstructionUnsealedResponse( SlaveEvent event, char *buf, size_t size ) {
-	struct BatchKeyHeader header;
-	if ( ! this->protocol.parseBatchKeyHeader( header, buf, size ) ) {
+	struct ReconstructionHeader header;
+	if ( ! this->protocol.parseReconstructionHeader( header, false /* isRequest */, buf, size ) ) {
 		__ERROR__( "CoordinatorWorker", "handleReconstructionUnsealedResponse", "Invalid RECONSTRUCTION_UNSEALED response (size = %lu).", size );
 		return false;
 	}
 
 	// Determine the list ID and chunk ID
-	uint8_t keySize = ( uint8_t ) header.keys[ 0 ];
-	char *key = header.keys + 1;
-	uint32_t listId, chunkId;
-
-	listId = CoordinatorWorker::stripeList->get( key, keySize, 0, 0, &chunkId );
-
 	uint32_t remainingChunks, remainingKeys;
-	if ( ! CoordinatorWorker::pending->eraseReconstruction( event.instanceId, event.requestId, listId, chunkId, 0, header.count, remainingChunks, remainingKeys ) ) {
-		__ERROR__( "CoordinatorWorker", "handleReconstructionResponse", "The response does not match with the request!" );
+	if ( ! CoordinatorWorker::pending->eraseReconstruction( event.instanceId, event.requestId, header.listId, header.chunkId, 0, header.numStripes, remainingChunks, remainingKeys ) ) {
+		__ERROR__( "CoordinatorWorker", "handleReconstructionUnsealedResponse", "The response does not match with the request!" );
 		return false;
 	}
 
-	__DEBUG__(
-		BLUE, "CoordinatorWorker", "handleReconstructionResponse",
-		"[RECONSTRUCTION] Request ID: (%u, %u); list ID: %u, chunk Id: %u, number of stripes: %u (%s)",
+	__INFO__(
+		BLUE, "CoordinatorWorker", "handleReconstructionUnsealedResponse",
+		"[RECONSTRUCTION] Request ID: (%u, %u); list ID: %u, chunk Id: %u, number of unsealed keys: %u (%s)",
 		event.instanceId, event.requestId, header.listId, header.chunkId, header.numStripes,
 		remainingChunks == 0 && remainingKeys == 0 ? "Done" : "In progress"
 	);

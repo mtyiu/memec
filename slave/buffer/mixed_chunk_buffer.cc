@@ -121,6 +121,19 @@ bool MixedChunkBuffer::findValueByKey( char *data, uint8_t size, KeyValue *keyVa
 	}
 }
 
+bool MixedChunkBuffer::getKeyValueMap( std::unordered_map<Key, KeyValue> *&map, LOCK_T *&lock, bool verbose ) {
+	switch( this->role ) {
+		case CBR_PARITY:
+			this->buffer.parity->getKeyValueMap( map, lock );
+			return true;
+		case CBR_DATA:
+			if ( verbose )
+				__ERROR__( "MixedChunkBuffer", "getKeyValueMap", "Error: Calling this function in DataChunkBuffer." );
+		default:
+			return false;
+	}
+}
+
 bool MixedChunkBuffer::deleteKey( char *keyStr, uint8_t keySize ) {
 	switch( this->role ) {
 		case CBR_PARITY:

@@ -207,6 +207,15 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 							__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );
 					}
 					break;
+				case PROTO_OPCODE_RECONSTRUCTION_UNSEALED:
+					switch( header.magic ) {
+						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							this->handleReconstructionUnsealedResponse( event, buffer.data, header.length );
+							break;
+						default:
+							__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );
+					}
+					break;
 				case PROTO_OPCODE_BACKUP_SLAVE_PROMOTED:
 					switch( header.magic ) {
 						case PROTO_MAGIC_RESPONSE_SUCCESS:

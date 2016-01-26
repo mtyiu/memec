@@ -424,7 +424,7 @@ bool SlaveWorker::handleUpdateResponse( SlavePeerEvent event, bool success, char
 		//		break;
 		//	}
 		//}
-		//SlaveWorker::pending->insertKeyValueUpdate( PT_MASTER_UPDATE, pid.instanceId, pid.requestId, pid.ptr , keyValueUpdate ); 
+		//SlaveWorker::pending->insertKeyValueUpdate( PT_MASTER_UPDATE, pid.instanceId, pid.requestId, pid.ptr , keyValueUpdate );
 		//SlaveWorker::pending->insertKeyValueUpdate( PT_SLAVE_PEER_UPDATE, dpid.instanceId, pid.instanceId, dpid.requestId, pid.requestId, ( void * ) s, keyValueUpdate );
 		//keyValueUpdate.dup();
 
@@ -1136,4 +1136,70 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 
 bool SlaveWorker::handleSealChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
 	return true;
+}
+
+bool SlaveWorker::handleBatchKeyValueResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
+	struct BatchKeyHeader header;
+	if ( ! this->protocol.parseBatchKeyHeader( header, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleBatchKeyValueResponse", "Invalid BATCH_KEY_VALUE response." );
+		return false;
+	}
+
+	PendingIdentifier pid;
+	CoordinatorSocket *coordinatorSocket;
+	if ( ! SlaveWorker::pending->erase( PT_SLAVE_PEER_FORWARD_KEYS, event.instanceId, event.requestId, event.socket, &pid ) ) {
+		__ERROR__( "SlaveWorker", "handleBatchKeyValueResponse", "Cannot insert find pending BATCH_KEY_VALUE request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
+	}
+
+	printf( "--- header.count = %u ---\n", header.count );
+
+	uint32_t listId, chunkId;
+	uint32_t remainingChunks, remainingKeys, totalChunks, totalKeys;
+	for ( uint32_t i = 0, offset = 0; i < header.count; i++ ) {
+		uint8_t keySize;
+		char *keyStr;
+
+		this->protocol.nextKeyInBatchKeyHeader( header, keySize, keyStr, offset );
+
+		if ( i == 0 ) {
+			// Find the corresponding reconstruction request
+			if ( ! SlaveWorker::pending->findReconstruction(
+				pid.parentInstanceId, pid.parentRequestId,
+				keySize, keyStr,
+				listId, chunkId
+			) ) {
+				__ERROR__( "SlaveWorker", "handleBatchKeyValueResponse", "Cannot find a matching reconstruction request. (ID: (%u, %u))", pid.parentInstanceId, pid.parentRequestId );
+				return false;
+			}
+		}
+
+		if ( ! SlaveWorker::pending->eraseReconstruction(
+			pid.parentInstanceId, pid.parentRequestId, coordinatorSocket,
+			listId, chunkId,
+			keySize, keyStr,
+			remainingChunks, remainingKeys,
+			totalChunks, totalKeys,
+			&pid
+		) ) {
+			__ERROR__(
+				"SlaveWorker", "handleBatchKeyValueResponse",
+				"Cannot erase the key: %.*s for the corresponding reconstruction request. (ID: (%u, %u))",
+				keySize, keyStr,
+				pid.parentInstanceId, pid.parentRequestId
+			);
+		}
+	}
+
+	printf( "handleBatchKeyValueResponse(): Chunks: %u / %u; keys: %u / %u\n", remainingChunks, totalChunks, remainingKeys, totalKeys );
+
+	if ( remainingKeys == 0 ) {
+		CoordinatorEvent coordinatorEvent;
+		coordinatorEvent.resReconstructionUnsealed(
+			coordinatorSocket, pid.instanceId, pid.requestId,
+			listId, chunkId, totalKeys
+		);
+		SlaveWorker::eventQueue->insert( coordinatorEvent );
+	}
+
+	return false;
 }

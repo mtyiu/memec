@@ -135,8 +135,19 @@ public:
 
 	// ---------- recovery_protocol.cc ----------
 	char *resReconstruction( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t numStripes );
-	char *resReconstructionUnsealed( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t numUnsealedKeys );
+	char *resReconstructionUnsealed( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t numUnsealedKeys );
 	char *resPromoteBackupSlave( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t numStripes, uint32_t numUnsealedKeys );
+	char *sendUnsealedKeys(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		std::unordered_set<Key> &keys, std::unordered_set<Key>::iterator &it,
+		std::unordered_map<Key, KeyValue> *values, LOCK_T *lock,
+		uint32_t &keyValuesCount,
+		bool &isCompleted
+	);
+	char *resUnsealedKeys(
+		size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
+		struct BatchKeyValueHeader &header
+	);
 
 	// ---------- normal_slave_protocol.cc ----------
 	char *reqUpdate(

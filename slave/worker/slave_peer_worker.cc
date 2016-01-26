@@ -379,6 +379,19 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		case SLAVE_PEER_EVENT_TYPE_SEAL_CHUNKS:
 			printf( "\tSealing %lu chunks...\n", event.message.chunkBuffer->seal( this ) );
 			return;
+		/////////////////////////////////
+		// Reconstructed unsealed keys //
+		/////////////////////////////////
+		case SLAVE_PEER_EVENT_TYPE_UNSEALED_KEYS_RESPONSE_SUCCESS:
+			success = true;
+		case SLAVE_PEER_EVENT_TYPE_UNSEALED_KEYS_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resUnsealedKeys(
+				buffer.size,
+				event.instanceId, event.requestId,
+				success,
+				event.message.unsealedKeys.header
+			);
+			break;
 		//////////
 		// Send //
 		//////////
@@ -704,6 +717,22 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 							break;
 						case PROTO_MAGIC_RESPONSE_FAILURE:
 							this->handleForwardChunkResponse( event, false, buffer.data, buffer.size );
+							break;
+						default:
+							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave." );
+							break;
+					}
+					break;
+				case PROTO_OPCODE_BATCH_KEY_VALUES:
+					switch( header.magic ) {
+						case PROTO_MAGIC_REQUEST:
+							this->handleBatchKeyValueRequest( event, buffer.data, buffer.size );
+							break;
+						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							this->handleBatchKeyValueResponse( event, true, buffer.data, buffer.size );
+							break;
+						case PROTO_MAGIC_RESPONSE_FAILURE:
+							this->handleBatchKeyValueResponse( event, false, buffer.data, buffer.size );
 							break;
 						default:
 							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave." );
