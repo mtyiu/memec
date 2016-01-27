@@ -103,11 +103,11 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 	SlaveEvent slaveEvent;
 
 	pthread_mutex_init( &annoucement.lock, 0 );
-	pthread_mutex_cond( &annoucement.cond, 0 );
+	pthread_cond_init( &annoucement.cond, 0 );
 	annoucement.count = 0;
 	slaveEvent.announceSlaveReconstructed(
-		Coordinator::instanceId, Worker::idGenerator->nextVal( this->workerId ),
-		&annoucement.lock, &annoucement.cond, &count,
+		Coordinator::instanceId, CoordinatorWorker::idGenerator->nextVal( this->workerId ),
+		&annoucement.lock, &annoucement.cond, &annoucement.count,
 		socket, backupSlaveSocket
 	);
 	this->dispatch( slaveEvent );

@@ -125,7 +125,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			SlaveSocket *slave = slaves.values[ i ];
 			if ( slave->equal( event.message.reconstructed.dst ) || ! slave->ready() )
 				continue; // No need to tell the backup server
-			*( event.message.reconstructed.count )++;
+			( *event.message.reconstructed.count )++;
 		}
 		// Insert into pending set
 		CoordinatorWorker::pending->insertAnnouncement(
@@ -217,7 +217,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 				case PROTO_OPCODE_SLAVE_RECONSTRUCTED:
 					switch( header.magic ) {
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
-							SlaveWorker::pending->eraseAnnouncement( header.instanceId, header.requestId );
+							CoordinatorWorker::pending->eraseAnnouncement( header.instanceId, header.requestId );
 							break;
 						default:
 							__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );

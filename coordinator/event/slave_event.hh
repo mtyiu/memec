@@ -59,7 +59,11 @@ public:
 	void pending( SlaveSocket *socket );
 	void resRegister( SlaveSocket *socket, uint16_t instanceId, uint32_t requestId, bool success = true );
 	void announceSlaveConnected( SlaveSocket *socket );
-	void announceSlaveReconstructed( SlaveSocket *srcSocket, SlaveSocket *dstSocket );
+	void announceSlaveReconstructed(
+		uint16_t instanceId, uint32_t requestId,
+		pthread_mutex_t *lock, pthread_cond_t *cond, uint32_t *count,
+		SlaveSocket *srcSocket, SlaveSocket *dstSocket
+	);
 	void reqSealChunks( SlaveSocket *socket );
 	void reqFlushChunks( SlaveSocket *socket );
 	void reqSyncMeta( SlaveSocket *socket, bool *sync );

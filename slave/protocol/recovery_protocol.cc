@@ -1,6 +1,6 @@
 #include "protocol.hh"
 
-char *SlaveProtocol::resSlaveReconstructedMsg( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId ) {
+char *SlaveProtocol::resSlaveReconstructedMsg( size_t &size, uint16_t instanceId, uint32_t requestId ) {
 	// -- common/protocol/recovery_protocol.cc --
 	size = this->generateHeader(
 		PROTO_MAGIC_RESPONSE_SUCCESS,

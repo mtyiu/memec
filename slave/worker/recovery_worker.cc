@@ -82,7 +82,7 @@ bool SlaveWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *buf
 		s->start();
 
 	// Send response to the coordinator
-	event.resSlaveReconstructedMsg( event.instanceId, event.requestId );
+	event.resSlaveReconstructedMsg( event.socket, event.instanceId, event.requestId );
 	this->dispatch( event );
 
 	return true;

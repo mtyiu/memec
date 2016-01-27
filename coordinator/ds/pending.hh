@@ -268,18 +268,17 @@ public:
 	bool eraseAnnouncement( uint16_t instanceId, uint32_t requestId ) {
 		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
 		std::unordered_map<PendingIdentifier, PendingAnnouncement>::iterator it;
-		bool ret;
 
 		LOCK( &this->announcementLock );
-		ret = this->announcement.find( pid );
+		it = this->announcement.find( pid );
 		if ( it == this->announcement.end() ) {
 			UNLOCK( &this->announcementLock );
 			return false;
 		}
 		PendingAnnouncement a = it->second;
 		pthread_mutex_lock( a.lock );
-		*( a.count )--;
-		if ( *( a.count ) == 0 ) {
+		( *a.count )++;
+		if ( *a.count == 0 ) {
 			pthread_cond_signal( a.cond );
 			this->announcement.erase( it );
 		}
