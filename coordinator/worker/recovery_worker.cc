@@ -98,26 +98,24 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 	struct {
 		pthread_mutex_t lock;
 		pthread_cond_t cond;
-		uint32_t count;
+		std::unordered_set<SlaveSocket *> sockets;
 	} annoucement;
 	SlaveEvent slaveEvent;
 
 	pthread_mutex_init( &annoucement.lock, 0 );
 	pthread_cond_init( &annoucement.cond, 0 );
-	annoucement.count = 0;
 	slaveEvent.announceSlaveReconstructed(
 		Coordinator::instanceId, CoordinatorWorker::idGenerator->nextVal( this->workerId ),
-		&annoucement.lock, &annoucement.cond, &annoucement.count,
+		&annoucement.lock, &annoucement.cond, &annoucement.sockets,
 		socket, backupSlaveSocket
 	);
 	this->dispatch( slaveEvent );
 
 	pthread_mutex_lock( &annoucement.lock );
-	while( annoucement.count ) {
+	while( annoucement.sockets.size() )
 		pthread_cond_wait( &annoucement.cond, &annoucement.lock );
-	}
 	pthread_mutex_unlock( &annoucement.lock );
-	printf( "All announced.\n" );
+	printf( "~~~ All announced ~~~\n" );
 
 	/////////////////////////////
 	// Announce to the masters //
@@ -373,18 +371,18 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 						isCompleted
 					);
 					isAllCompleted &= isCompleted;
+
+					ret = s->send( buffer.data, buffer.size, connected );
+					if ( ret != ( ssize_t ) buffer.size )
+						__ERROR__( "CoordinatorWorker", "handleReconstructionRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+
+					// Avoid generating too many requests
+					pthread_mutex_lock( lock );
+					pthread_cond_wait( cond, lock );
+					pthread_mutex_unlock( lock );
+
+					isAllCompleted &= isCompleted;
 				}
-
-				ret = s->send( buffer.data, buffer.size, connected );
-				if ( ret != ( ssize_t ) buffer.size )
-					__ERROR__( "CoordinatorWorker", "handleReconstructionRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
-
-				// Avoid generating too many requests
-				pthread_mutex_lock( lock );
-				pthread_cond_wait( cond, lock );
-				pthread_mutex_unlock( lock );
-
-				isAllCompleted &= isCompleted;
 			}
 		} while ( ! isAllCompleted );
 

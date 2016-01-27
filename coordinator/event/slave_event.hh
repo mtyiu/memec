@@ -36,7 +36,7 @@ public:
 			SlaveSocket *dst;
 			pthread_mutex_t *lock;
 			pthread_cond_t *cond;
-			uint32_t *count;
+			std::unordered_set<SlaveSocket *> *sockets;
 		} reconstructed;
 		struct {
 			pthread_mutex_t *lock;
@@ -61,7 +61,7 @@ public:
 	void announceSlaveConnected( SlaveSocket *socket );
 	void announceSlaveReconstructed(
 		uint16_t instanceId, uint32_t requestId,
-		pthread_mutex_t *lock, pthread_cond_t *cond, uint32_t *count,
+		pthread_mutex_t *lock, pthread_cond_t *cond, std::unordered_set<SlaveSocket *> *sockets,
 		SlaveSocket *srcSocket, SlaveSocket *dstSocket
 	);
 	void reqSealChunks( SlaveSocket *socket );

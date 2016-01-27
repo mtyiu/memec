@@ -15,12 +15,12 @@
 struct PendingAnnouncement { // For slave reconstructed announcement
 	pthread_mutex_t *lock;
 	pthread_cond_t *cond;
-	uint32_t *count;
+	std::unordered_set<SlaveSocket *> *sockets;
 
-	void set( pthread_mutex_t *lock, pthread_cond_t *cond, uint32_t *count ) {
+	void set( pthread_mutex_t *lock, pthread_cond_t *cond, std::unordered_set<SlaveSocket *> *sockets ) {
 		this->lock = lock;
 		this->cond = cond;
-		this->count = count;
+		this->sockets = sockets;
 	}
 };
 
@@ -250,10 +250,10 @@ public:
 		return ret;
 	}
 
-	bool insertAnnouncement( uint16_t instanceId, uint32_t requestId, pthread_mutex_t *lock, pthread_cond_t *cond, uint32_t *count ) {
+	bool insertAnnouncement( uint16_t instanceId, uint32_t requestId, pthread_mutex_t *lock, pthread_cond_t *cond, std::unordered_set<SlaveSocket *> *sockets ) {
 		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
 		PendingAnnouncement a;
-		a.set( lock, cond, count );
+		a.set( lock, cond, sockets );
 
 		std::pair<PendingIdentifier, PendingAnnouncement> p( pid, a );
 		std::pair<std::unordered_map<PendingIdentifier, PendingAnnouncement>::iterator, bool> ret;
@@ -265,7 +265,7 @@ public:
 		return ret.second;
 	}
 
-	bool eraseAnnouncement( uint16_t instanceId, uint32_t requestId ) {
+	bool eraseAnnouncement( uint16_t instanceId, uint32_t requestId, SlaveSocket *socket ) {
 		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
 		std::unordered_map<PendingIdentifier, PendingAnnouncement>::iterator it;
 
@@ -277,15 +277,35 @@ public:
 		}
 		PendingAnnouncement a = it->second;
 		pthread_mutex_lock( a.lock );
-		( *a.count )++;
-		if ( *a.count == 0 ) {
-			pthread_cond_signal( a.cond );
+		a.sockets->erase( socket );
+		if ( a.sockets->size() == 0 ) {
 			this->announcement.erase( it );
+			pthread_cond_signal( a.cond );
 		}
 		pthread_mutex_unlock( a.lock );
 		UNLOCK( &this->announcementLock );
 
 		return true;
+	}
+
+	void eraseAnnouncement( SlaveSocket *socket ) {
+		std::unordered_map<PendingIdentifier, PendingAnnouncement>::iterator it;
+
+		LOCK( &this->announcementLock );
+		for ( it = this->announcement.begin(); it != this->announcement.end(); ) {
+			PendingAnnouncement a = it->second;
+
+			pthread_mutex_lock( a.lock );
+			a.sockets->erase( socket );
+			if ( a.sockets->size() == 0 ) {
+				it = this->announcement.erase( it );
+				pthread_cond_signal( a.cond );
+			} else {
+				it++;
+			}
+			pthread_mutex_unlock( a.lock );
+		}
+		UNLOCK( &this->announcementLock );
 	}
 
 	bool insertRecovery( uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t chunkCount, uint32_t unsealedCount, struct timespec startTime, SlaveSocket *socket, SlaveSocket *original ) {
