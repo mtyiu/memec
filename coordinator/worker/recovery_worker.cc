@@ -25,6 +25,7 @@ bool CoordinatorWorker::handlePromoteBackupSlaveResponse( SlaveEvent event, char
 
 	if ( remainingChunks == 0 && remainingKeys == 0 ) {
 		__INFO__( CYAN, "CoordinatorWorker", "handlePromoteBackupSlaveResponse", "Recovery is completed. Number of chunks reconstructed = %u; number of keys reconstructed = %u; elapsed time = %lf s.\n", totalChunks, totalKeys, elapsedTime );
+		event.socket->printAddress();
 
 		event.ackCompletedReconstruction( event.socket, event.instanceId, event.requestId, true );
 		this->dispatch( event );
@@ -94,9 +95,29 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 	////////////////////////////
 	// Announce to the slaves //
 	////////////////////////////
+	struct {
+		pthread_mutex_t lock;
+		pthread_cond_t cond;
+		uint32_t count;
+	} annoucement;
 	SlaveEvent slaveEvent;
-	slaveEvent.announceSlaveReconstructed( socket, backupSlaveSocket );
-	CoordinatorWorker::eventQueue->insert( slaveEvent );
+
+	pthread_mutex_init( &annoucement.lock, 0 );
+	pthread_mutex_cond( &annoucement.cond, 0 );
+	annoucement.count = 0;
+	slaveEvent.announceSlaveReconstructed(
+		Coordinator::instanceId, Worker::idGenerator->nextVal( this->workerId ),
+		&annoucement.lock, &annoucement.cond, &count,
+		socket, backupSlaveSocket
+	);
+	this->dispatch( slaveEvent );
+
+	pthread_mutex_lock( &annoucement.lock );
+	while( annoucement.count ) {
+		pthread_cond_wait( &annoucement.cond, &annoucement.lock );
+	}
+	pthread_mutex_unlock( &annoucement.lock );
+	printf( "All announced.\n" );
 
 	/////////////////////////////
 	// Announce to the masters //

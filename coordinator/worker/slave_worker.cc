@@ -110,16 +110,32 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 		UNLOCK( &slaves.lock );
 	} else if ( event.type == SLAVE_EVENT_TYPE_ANNOUNCE_SLAVE_RECONSTRUCTED ) {
 		ArrayMap<int, SlaveSocket> &slaves = Coordinator::getInstance()->sockets.slaves;
-		uint32_t requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
 
 		buffer.data = this->protocol.announceSlaveReconstructed(
-			buffer.size, instanceId, requestId,
+			buffer.size, event.instanceId, event.requestId,
 			event.message.reconstructed.src,
 			event.message.reconstructed.dst,
 			true // toSlave
 		);
 
 		LOCK( &slaves.lock );
+		*event.message.reconstructed.count = 0;
+		// Count the number of surviving slaves
+		for ( uint32_t i = 0, size = slaves.size(); i < size; i++ ) {
+			SlaveSocket *slave = slaves.values[ i ];
+			if ( slave->equal( event.message.reconstructed.dst ) || ! slave->ready() )
+				continue; // No need to tell the backup server
+			*( event.message.reconstructed.count )++;
+		}
+		// Insert into pending set
+		CoordinatorWorker::pending->insertAnnouncement(
+			event.instanceId, event.requestId,
+			event.message.reconstructed.lock,
+			event.message.reconstructed.cond,
+			event.message.reconstructed.count
+		);
+
+		// Send requests
 		for ( uint32_t i = 0, size = slaves.size(); i < size; i++ ) {
 			SlaveSocket *slave = slaves.values[ i ];
 			if ( slave->equal( event.message.reconstructed.dst ) || ! slave->ready() )
@@ -193,6 +209,15 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 					switch( header.magic ) {
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
 							this->handleReleaseDegradedLockResponse( event, buffer.data, header.length );
+							break;
+						default:
+							__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );
+					}
+					break;
+				case PROTO_OPCODE_SLAVE_RECONSTRUCTED:
+					switch( header.magic ) {
+						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							SlaveWorker::pending->eraseAnnouncement( header.instanceId, header.requestId );
 							break;
 						default:
 							__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );

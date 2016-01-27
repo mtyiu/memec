@@ -33,6 +33,13 @@ void CoordinatorEvent::resRemappedData( CoordinatorSocket *socket, uint16_t inst
 	this->requestId = requestId;
 }
 
+void CoordinatorEvent::resSlaveReconstructedMsg( CoordinatorSocket *socket, uint16_t instanceId, uint32_t requestId ) {
+	this->type = COORDINATOR_EVENT_TYPE_SLAVE_RECONSTRUCTED_MESSAGE_RESPONSE;
+	this->socket = socket;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
+}
+
 void CoordinatorEvent::resReconstruction( CoordinatorSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t numStripes ) {
 	this->type = COORDINATOR_EVENT_TYPE_RECONSTRUCTION_RESPONSE_SUCCESS;
 	this->socket = socket;

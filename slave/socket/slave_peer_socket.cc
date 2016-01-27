@@ -78,7 +78,7 @@ void SlavePeerSocket::stop() {
 }
 
 bool SlavePeerSocket::ready() {
-	return this->self || ( Socket::ready() );
+	return this->self || ( this->connected && this->registered );
 }
 
 void SlavePeerSocket::free() {

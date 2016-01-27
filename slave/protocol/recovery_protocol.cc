@@ -1,5 +1,17 @@
 #include "protocol.hh"
 
+char *SlaveProtocol::resSlaveReconstructedMsg( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId ) {
+	// -- common/protocol/recovery_protocol.cc --
+	size = this->generateHeader(
+		PROTO_MAGIC_RESPONSE_SUCCESS,
+		PROTO_MAGIC_TO_COORDINATOR,
+		PROTO_OPCODE_SLAVE_RECONSTRUCTED,
+		0, // length
+		instanceId, requestId
+	);
+	return this->buffer.send;
+}
+
 char *SlaveProtocol::resReconstruction( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t numStripes ) {
 	// -- common/protocol/recovery_protocol.cc --
 	size = this->generateReconstructionHeader(

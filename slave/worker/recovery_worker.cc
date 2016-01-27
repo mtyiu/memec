@@ -81,6 +81,10 @@ bool SlaveWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *buf
 	if ( ! self )
 		s->start();
 
+	// Send response to the coordinator
+	event.resSlaveReconstructedMsg( event.instanceId, event.requestId );
+	this->dispatch( event );
+
 	return true;
 }
 
@@ -128,7 +132,7 @@ bool SlaveWorker::handleBackupSlavePromotedMsg( CoordinatorEvent event, char *bu
 	s = new SlavePeerSocket();
 	s->init(
 		sockfd, addr,
-		&Slave::getInstance()->sockets.epoll,
+		&( slave->sockets.epoll ),
 		true
 	);
 

@@ -34,6 +34,9 @@ public:
 		struct {
 			SlaveSocket *src;
 			SlaveSocket *dst;
+			pthread_mutex_t *lock;
+			pthread_cond_t *cond;
+			uint32_t *count;
 		} reconstructed;
 		struct {
 			pthread_mutex_t *lock;

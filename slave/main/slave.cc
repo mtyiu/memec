@@ -235,6 +235,10 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 	LOCK_INIT( &this->sockets.mastersIdToSocketLock );
 	LOCK_INIT( &this->sockets.slavesIdToSocketLock );
 
+	// Set status //
+	this->status.isRecovering = ( mySlaveIndex == -1 );
+	LOCK_INIT( &this->status.lock );
+
 	// Show configuration //
 	if ( verbose )
 		this->info();

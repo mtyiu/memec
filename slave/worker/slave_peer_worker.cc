@@ -164,6 +164,20 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		case SLAVE_PEER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
 			success = true; // default is false
 		case SLAVE_PEER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
+		{
+			Slave *slave = Slave::getInstance();
+			bool isRecovering;
+
+			LOCK( &slave->status.lock );
+			isRecovering = slave->status.isRecovering;
+			UNLOCK( &slave->status.lock );
+
+			if ( isRecovering ) {
+				// Hold all register requests
+				printf( "Hold all register requests\n" );
+				return;
+			}
+		}
 			buffer.data = this->protocol.resRegisterSlavePeer(
 				buffer.size,
 				Slave::instanceId, event.requestId,
@@ -749,6 +763,8 @@ quit_1:
 		}
 		if ( connected ) event.socket->done();
 	}
-	if ( ! connected )
+	if ( ! connected ) {
+		event.socket->print();
 		__ERROR__( "SlaveWorker", "dispatch", "The slave is disconnected." );
+	}
 }

@@ -56,6 +56,13 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 			);
 			isSend = true;
 			break;
+		case COORDINATOR_EVENT_TYPE_SLAVE_RECONSTRUCTED_MESSAGE_RESPONSE:
+			buffer.data = this->protocol.resSlaveReconstructedMsg(
+				buffer.size,
+				event.instanceId, event.requestId
+			);
+			isSend = true;
+			break;
 		case COORDINATOR_EVENT_TYPE_RECONSTRUCTION_RESPONSE_SUCCESS:
 			buffer.data = this->protocol.resReconstruction(
 				buffer.size,
