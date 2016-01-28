@@ -78,7 +78,7 @@ void BasicRemappingScheme::redirect(
 				// skip selected and original slaves
 				// printf( "--- (%u, %u) is selected ---\n", original[ i * 2 ], j );
 				continue;
-			} else if ( overloadedSlave->slaveSet.count( slaveAddr ) > 0 ) {
+			} else if ( remapMsgHandler->useCoordinatedFlow( slaveAddr ) ) {
 				// Skip overloaded slave
 				// printf( "--- (%u, %u) is overloaded ---\n", original[ i * 2 ], j );
 				continue;
