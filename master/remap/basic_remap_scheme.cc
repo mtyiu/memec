@@ -82,7 +82,7 @@ void BasicRemappingScheme::getRemapTarget( uint32_t *original, uint32_t *remappe
 				// skip selected and original slaves
 				// printf( "--- (%u, %u) is selected ---\n", original[ i * 2 ], j );
 				continue;
-			} else if ( overloadedSlave->slaveSet.count( slaveAddr ) > 0 ) {
+			} else if ( remapMsgHandler->useCoordinatedFlow( slaveAddr ) ) {
 				// Skip overloaded slave
 				// printf( "--- (%u, %u) is overloaded ---\n", original[ i * 2 ], j );
 				continue;
@@ -318,7 +318,7 @@ void BasicRemappingScheme::getDegradedOpTarget( uint32_t listId, uint32_t origin
 		// TODO if this node had not been accessed, should we take the risk and try?
 		if ( index == -1 )
 			continue;
-		if ( overloadedSlave->slaveSet.count( slaveAddr ) > 0 ) {
+		if ( remapMsgHandler->useCoordinatedFlow( slaveAddr ) ) {
 			// scan for the least overloaded node, in case all nodes are overloaded
 			if ( *nodeLatency < *overloadLatency ) {
 				overloadLatency = nodeLatency;
