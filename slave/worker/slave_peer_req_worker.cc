@@ -297,7 +297,6 @@ bool SlaveWorker::handleDeleteRequest( SlavePeerEvent event, char *buf, size_t s
 
 bool SlaveWorker::handleGetChunkRequest( SlavePeerEvent event, char *buf, size_t size ) {
 	struct ChunkHeader header;
-	bool ret;
 	if ( ! this->protocol.parseChunkHeader( header, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleGetChunkRequest", "Invalid GET_CHUNK request." );
 		return false;
@@ -307,6 +306,11 @@ bool SlaveWorker::handleGetChunkRequest( SlavePeerEvent event, char *buf, size_t
 		"[GET_CHUNK] List ID: %u; stripe ID: %u; chunk ID: %u.",
 		header.listId, header.stripeId, header.chunkId
 	);
+	return this->handleGetChunkRequest( event, header );
+}
+
+bool SlaveWorker::handleGetChunkRequest( SlavePeerEvent event, struct ChunkHeader &header ) {
+	bool ret;
 
 	Metadata metadata;
 	Chunk *chunk = map->findChunkById( header.listId, header.stripeId, header.chunkId, &metadata );
@@ -332,10 +336,11 @@ bool SlaveWorker::handleGetChunkRequest( SlavePeerEvent event, char *buf, size_t
 		);
 	}
 
-	event.resGetChunk( event.socket, event.instanceId, event.requestId, metadata, ret, isSealed ? chunk : 0 );
-	this->dispatch( event );
+	event.resGetChunk( event.socket, event.instanceId, event.requestId, metadata, ret, chunkBufferIndex, isSealed ? chunk : 0 );
 
-	chunkBuffer->unlock( chunkBufferIndex );
+	this->dispatch( event );
+	// Unlock in the dispatcher
+	// chunkBuffer->unlock( chunkBufferIndex );
 
 	return ret;
 }
@@ -797,7 +802,7 @@ bool SlaveWorker::issueSealChunkRequest( Chunk *chunk, uint32_t startPos ) {
 bool SlaveWorker::handleBatchKeyValueRequest( SlavePeerEvent event, char *buf, size_t size ) {
 	struct BatchKeyValueHeader header;
 	if ( ! this->protocol.parseBatchKeyValueHeader( header, buf, size ) ) {
-		__ERROR__( "SlaveWorker", "handleBatchKeyValueRequest", "Invalid BATCH_KEY_VALUE response." );
+		__ERROR__( "SlaveWorker", "handleBatchKeyValueRequest", "Invalid BATCH_KEY_VALUE request." );
 		return false;
 	}
 
@@ -854,6 +859,29 @@ bool SlaveWorker::handleBatchKeyValueRequest( SlavePeerEvent event, char *buf, s
 	// Send response to the slave peer
 	event.resUnsealedKeys( event.socket, event.instanceId, event.requestId, header, true );
 	this->dispatch( event );
+
+	return false;
+}
+
+bool SlaveWorker::handleBatchChunksRequest( SlavePeerEvent event, char *buf, size_t size ) {
+	struct BatchChunkHeader header;
+	if ( ! this->protocol.parseBatchChunkHeader( header, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleBatchChunksRequest", "Invalid BATCH_CHUNKS request." );
+		return false;
+	}
+
+	uint32_t offset = 0;
+	for ( uint32_t i = 0; i < header.count; i++ ) {
+		uint32_t responseId;
+		struct ChunkHeader chunkHeader;
+		if ( ! this->protocol.nextChunkInBatchChunkHeader( header, responseId, chunkHeader, size, offset ) ) {
+			__ERROR__( "SlaveWorker", "handleBatchChunksRequest", "Invalid ChunkHeader in the BATCH_CHUNKS request." );
+		}
+
+		// Convert into a normal GET_CHUNK event
+		event.requestId = responseId;
+		this->handleGetChunkRequest( event, chunkHeader );
+	}
 
 	return false;
 }

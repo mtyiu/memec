@@ -203,13 +203,14 @@ void SlavePeerEvent::reqGetChunk( SlavePeerSocket *socket, uint16_t instanceId, 
 	this->message.chunk.chunk = 0;
 }
 
-void SlavePeerEvent::resGetChunk( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, bool success, Chunk *chunk ) {
+void SlavePeerEvent::resGetChunk( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, bool success, uint32_t chunkBufferIndex, Chunk *chunk ) {
 	this->type = success ? SLAVE_PEER_EVENT_TYPE_GET_CHUNK_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_GET_CHUNK_RESPONSE_FAILURE;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
 	this->message.chunk.metadata = metadata;
 	this->message.chunk.chunk = chunk;
+	this->message.chunk.chunkBufferIndex = chunkBufferIndex;
 }
 
 void SlavePeerEvent::batchGetChunks( SlavePeerSocket *socket, std::vector<uint32_t> *requestIds, std::vector<Metadata> *metadata ) {

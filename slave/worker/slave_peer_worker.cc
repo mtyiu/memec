@@ -343,6 +343,10 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				event.message.chunk.metadata.chunkId,
 				size, offset, data
 			);
+
+			SlaveWorker::chunkBuffer
+				->at( event.message.chunk.metadata.listId )
+				->unlock( event.message.chunk.chunkBufferIndex );
 		}
 			break;
 		case SLAVE_PEER_EVENT_TYPE_GET_CHUNK_RESPONSE_FAILURE:
@@ -354,6 +358,9 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				event.message.chunk.metadata.stripeId,
 				event.message.chunk.metadata.chunkId
 			);
+			SlaveWorker::chunkBuffer
+				->at( event.message.chunk.metadata.listId )
+				->unlock( event.message.chunk.chunkBufferIndex );
 			break;
 		// SET_CHUNK
 		case SLAVE_PEER_EVENT_TYPE_SET_CHUNK_RESPONSE_SUCCESS:
@@ -418,40 +425,26 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		case SLAVE_PEER_EVENT_TYPE_BATCH_GET_CHUNKS:
 		{
 			uint16_t instanceId = Slave::instanceId;
-			uint32_t offset = 0;
-			size_t tmpSize, current, len;
+			uint32_t chunksCount = 0;
+			bool isCompleted = false;
 
-			buffer.data = this->protocol.buffer.send;
-			buffer.size = 0;
-			std::vector<uint32_t> *requestIds = event.message.batchGetChunks.requestIds;
-			std::vector<Metadata> *metadata = event.message.batchGetChunks.metadata;
+			buffer.data = this->protocol.reqBatchGetChunks(
+				buffer.size,
+				instanceId,
+				SlaveWorker::idGenerator->nextVal( this->workerId ),
+				event.message.batchGetChunks.requestIds,
+				event.message.batchGetChunks.metadata,
+				chunksCount,
+				isCompleted
+			);
 
-			for ( current = 0, len = metadata->size(); current < len; current++ ) {
-				if ( buffer.size + PROTO_CHUNK_SIZE > this->protocol.buffer.size )
-					break;
-
-				this->protocol.reqGetChunk(
-					tmpSize,
-					instanceId,
-					requestIds->at( current ),
-					metadata->at( current ).listId,
-					metadata->at( current ).stripeId,
-					metadata->at( current ).chunkId,
-					buffer.data + offset
+			if ( ! isCompleted ) {
+				event.batchGetChunks(
+					event.socket,
+					event.message.batchGetChunks.requestIds,
+					event.message.batchGetChunks.metadata
 				);
-
-				offset += tmpSize;
-				buffer.size += tmpSize;
-			}
-			if ( current == len ) {
-				// All sent
-				delete requestIds;
-				delete metadata;
-			} else {
-				requestIds->erase( requestIds->begin(), requestIds->begin() + current );
-				metadata->erase( metadata->begin(), metadata->begin() + current );
-				event.batchGetChunks( event.socket, requestIds, metadata );
-				this->dispatch( event );
+				SlaveWorker::eventQueue->insert( event ); // Cannot use dispatch() because the send buffer is dirty
 			}
 		}
 			break;
@@ -731,6 +724,16 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 							break;
 						case PROTO_MAGIC_RESPONSE_FAILURE:
 							this->handleForwardChunkResponse( event, false, buffer.data, buffer.size );
+							break;
+						default:
+							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave." );
+							break;
+					}
+					break;
+				case PROTO_OPCODE_BATCH_CHUNKS:
+					switch ( header.magic ) {
+						case PROTO_MAGIC_REQUEST:
+							this->handleBatchChunksRequest( event, buffer.data, buffer.size );
 							break;
 						default:
 							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave." );

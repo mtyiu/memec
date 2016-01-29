@@ -81,13 +81,13 @@
 #define PROTO_OPCODE_UPDATE_CHUNK                 0x52
 #define PROTO_OPCODE_DELETE_CHUNK                 0x53
 #define PROTO_OPCODE_GET_CHUNK                    0x54
-#define PROTO_OPCODE_GET_CHUNKS                   0x55
-#define PROTO_OPCODE_SET_CHUNK                    0x56
-#define PROTO_OPCODE_SET_CHUNK_UNSEALED           0x57
-#define PROTO_OPCODE_FORWARD_CHUNK                0x58
-#define PROTO_OPCODE_FORWARD_KEY                  0x59
-#define PROTO_OPCODE_REMAPPED_UPDATE              0x60
-#define PROTO_OPCODE_REMAPPED_DELETE              0x61
+#define PROTO_OPCODE_SET_CHUNK                    0x55
+#define PROTO_OPCODE_SET_CHUNK_UNSEALED           0x56
+#define PROTO_OPCODE_FORWARD_CHUNK                0x57
+#define PROTO_OPCODE_FORWARD_KEY                  0x58
+#define PROTO_OPCODE_REMAPPED_UPDATE              0x59
+#define PROTO_OPCODE_REMAPPED_DELETE              0x60
+#define PROTO_OPCODE_BATCH_CHUNKS                 0x61
 #define PROTO_OPCODE_BATCH_KEY_VALUES             0x62
 
 #define PROTO_UNINITIALIZED_INSTANCE              0
@@ -279,6 +279,20 @@ struct ChunkUpdateHeader {
 //////////////////////
 // Batch operations //
 //////////////////////
+#define PROTO_BATCH_CHUNK_SIZE 4
+struct BatchChunkHeader {
+	uint32_t count;
+	char *chunks; // Array of (request ID + ChunkHeader)
+};
+
+/*
+#define PROTO_BATCH_CHUNK_DATA_SIZE 4
+struct BatchChunkDataHeader {
+	uint32_t count;
+	char *chunks; // Array of ChunkDataHeader
+};
+*/
+
 #define PROTO_BATCH_KEY_SIZE 4
 struct BatchKeyHeader {
 	uint32_t count;
@@ -732,6 +746,25 @@ protected:
 	// Batch operations //
 	//////////////////////
 	// ---------- batch_protocol.cc ----------
+	size_t generateBatchChunkHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode,
+		uint16_t instanceId, uint32_t requestId,
+		std::vector<uint32_t> *requestIds,
+		std::vector<Metadata> *metadata,
+		uint32_t &chunksCount,
+		bool &isCompleted
+	);
+	bool parseBatchChunkHeader( size_t offset, uint32_t &count, char *&chunks, char *buf, size_t size );
+
+	/*
+	size_t generateBatchChunkDataHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode,
+		uint16_t instanceId, uint32_t requestId,
+		uint32_t chunksBytes
+	);
+	bool parseBatchChunkDataHeader( size_t offset, uint32_t &count, char *&chunks, char *buf, size_t size );
+	*/
+
 	size_t generateBatchKeyHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode,
 		uint16_t instanceId, uint32_t requestId,
@@ -1151,6 +1184,30 @@ public:
 	// Batch operations //
 	//////////////////////
 	// ---------- batch_protocol.cc ----------
+	bool parseBatchChunkHeader(
+		struct BatchChunkHeader &header,
+		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
+	bool nextChunkInBatchChunkHeader(
+		struct BatchChunkHeader &header,
+		uint32_t &responseId,
+		struct ChunkHeader &chunkHeader,
+		uint32_t size, uint32_t &offset
+	);
+
+	/*
+	bool parseBatchChunkDataHeader(
+		struct BatchChunkDataHeader &header,
+		char *buf, size_t size, size_t offset
+	);
+	bool nextChunkDataInBatchChunkDataHeader(
+		struct BatchChunkDataHeader &header,
+		struct ChunkDataHeader &chunkDataHeader,
+		uint32_t size,
+		uint32_t &offset
+	);
+	*/
+
 	bool parseBatchKeyHeader(
 		struct BatchKeyHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0

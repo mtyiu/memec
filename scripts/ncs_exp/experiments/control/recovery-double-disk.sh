@@ -52,6 +52,9 @@ for s in $sizes; do
 
 		n1=$(expr $RANDOM % 13 + 11)
 		n2=$(expr $RANDOM % 13 + 11)
+		while [ $n1 == $n2 ]; do
+			n2=$(expr $RANDOM % 13 + 11)
+		done
 		echo "Killing node $n1 & $n2..."
 
 		ssh testbed-node${n1} "screen -S slave -p 0 -X stuff \"$(printf '\r\r')sync$(printf '\r\r')\""
@@ -71,6 +74,17 @@ for s in $sizes; do
 		ssh testbed-node1 "screen -S coordinator -p 0 -X stuff \"$(printf '\r\r')log$(printf '\r\r')\""
 
 		screen -S manage -p 0 -X stuff "$(printf '\r\r')"
+
+		if [ $# -gt 0 ]; then
+			# Debug mode
+			TERM_COMMAND="$(printf '\r\r')quit$(printf '\r')clear$(printf '\r')"
+		else
+			TERM_COMMAND="$(printf '\r\r')clear$(printf '\r')"
+		fi
+		for i in 2 5 6 7; do
+			ssh testbed-node$i "screen -S slave -p 0 -X stuff \"${TERM_COMMAND}\"" &
+		done
+
 		sleep 10
 
 		scp testbed-node$n1:${PLIO_PATH}/memory.log ${BASE_PATH}/results/recovery-double-disk/$s/$iter/memory-${n1}.log

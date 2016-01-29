@@ -109,6 +109,7 @@ public:
 		struct {
 			Metadata metadata;
 			Chunk *chunk;
+			uint32_t chunkBufferIndex;
 			bool needsFree;
 		} chunk;
 		MixedChunkBuffer *chunkBuffer;
@@ -196,7 +197,7 @@ public:
 	void resDeleteChunk( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, bool success );
 	// GET_CHUNK
 	void reqGetChunk( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata );
-	void resGetChunk( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, bool success, Chunk *chunk = 0 );
+	void resGetChunk( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, bool success, uint32_t chunkBufferIndex, Chunk *chunk = 0 );
 	// Batch GET_CHUNK
 	void batchGetChunks( SlavePeerSocket *socket, std::vector<uint32_t> *requestIds, std::vector<Metadata> *metadata );
 	// SET_CHUNK
