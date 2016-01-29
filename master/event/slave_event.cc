@@ -18,23 +18,23 @@ void SlaveEvent::syncMetadata( SlaveSocket *socket ) {
 	this->socket = socket;
 }
 
-void SlaveEvent::ackParityDelta( SlaveSocket *socket, uint32_t fromTimestamp, uint32_t toTimestamp, uint16_t targetId, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter ) {
+void SlaveEvent::ackParityDelta( SlaveSocket *socket, std::vector<uint32_t> timestamps, uint16_t targetId, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter ) {
 	this->type = SLAVE_EVENT_TYPE_ACK_PARITY_DELTA;
 	this->socket = socket;
-	this->message.ack.fromTimestamp = fromTimestamp;
-	this->message.ack.toTimestamp = toTimestamp;
+	this->message.ack.timestamps = ( timestamps.empty() )? 0 : new std::vector<uint32_t>( timestamps );
+	this->message.ack.requests = 0;
 	this->message.ack.targetId = targetId;
 	this->message.ack.condition = condition;
 	this->message.ack.lock = lock;
 	this->message.ack.counter = counter;
 }
 
-void SlaveEvent::revertParityDelta( SlaveSocket *socket, uint32_t fromTimestamp, uint32_t toTimestamp, uint16_t targetId, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter ) {
-	this->type = SLAVE_EVENT_TYPE_REVERT_PARITY_DELTA;
+void SlaveEvent::revertDelta( SlaveSocket *socket, std::vector<uint32_t> timestamps, std::vector<Key> requests, uint16_t targetId, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter ) {
+	this->type = SLAVE_EVENT_TYPE_REVERT_DELTA;
 	this->socket = socket;
-	this->message.ack.fromTimestamp = fromTimestamp;
-	this->message.ack.toTimestamp = toTimestamp;
-	this->message.ack.targetId = targetId;
+	this->message.ack.timestamps = ( timestamps.empty() )? 0 : new std::vector<uint32_t>( timestamps );
+	this->message.ack.requests = ( requests.empty() )? 0 : new std::vector<Key>( requests );
+	this->message.ack.targetId = targetId;           // source data slave
 	this->message.ack.condition = condition;
 	this->message.ack.lock = lock;
 	this->message.ack.counter = counter;

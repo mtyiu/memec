@@ -17,8 +17,17 @@ void SlaveEvent::announceSlaveConnected( SlaveSocket *socket ) {
 	this->socket = socket;
 }
 
-void SlaveEvent::announceSlaveReconstructed( SlaveSocket *srcSocket, SlaveSocket *dstSocket ) {
+void SlaveEvent::announceSlaveReconstructed(
+	uint16_t instanceId, uint32_t requestId,
+	pthread_mutex_t *lock, pthread_cond_t *cond, std::unordered_set<SlaveSocket *> *sockets,
+	SlaveSocket *srcSocket, SlaveSocket *dstSocket
+) {
 	this->type = SLAVE_EVENT_TYPE_ANNOUNCE_SLAVE_RECONSTRUCTED;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
+	this->message.reconstructed.lock = lock;
+	this->message.reconstructed.cond = cond;
+	this->message.reconstructed.sockets = sockets;
 	this->message.reconstructed.src = srcSocket;
 	this->message.reconstructed.dst = dstSocket;
 }

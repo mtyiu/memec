@@ -100,7 +100,6 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_OPCODE_DEGRADED_GET:
 		case PROTO_OPCODE_DEGRADED_UPDATE:
 		case PROTO_OPCODE_DEGRADED_DELETE:
-		case PROTO_OPCODE_DEGRADED_SET:
 
 		case PROTO_OPCODE_REMAPPING_SET:
 		case PROTO_OPCODE_DEGRADED_LOCK:
@@ -110,7 +109,7 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_OPCODE_ACK_REQUEST:
 		case PROTO_OPCODE_ACK_PARITY_DELTA:
 
-		case PROTO_OPCODE_REVERT_PARITY_DELTA:
+		case PROTO_OPCODE_REVERT_DELTA:
 
 		case PROTO_OPCODE_REMAPPING_LOCK:
 
@@ -123,8 +122,10 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_OPCODE_SET_CHUNK:
 		case PROTO_OPCODE_SET_CHUNK_UNSEALED:
 		case PROTO_OPCODE_FORWARD_CHUNK:
+		case PROTO_OPCODE_FORWARD_KEY:
 		case PROTO_OPCODE_REMAPPED_UPDATE:
 		case PROTO_OPCODE_REMAPPED_DELETE:
+		case PROTO_OPCODE_BATCH_KEY_VALUES:
 			break;
 		default:
 			fprintf( stderr, "Error #4: (magic, from, to, opcode, length, instanceId, requestId) = (%x, %x, %x, %x, %u, %u, %u)\n", magic, from, to, opcode, length, instanceId, requestId );

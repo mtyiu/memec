@@ -234,6 +234,11 @@ bool ParityChunkBuffer::findValueByKey( char *data, uint8_t size, KeyValue *keyV
 	return true;
 }
 
+void ParityChunkBuffer::getKeyValueMap( std::unordered_map<Key, KeyValue> *&map, LOCK_T *&lock ) {
+	map = &this->keys;
+	lock = &this->lock;
+}
+
 bool ParityChunkBuffer::deleteKey( char *keyStr, uint8_t keySize ) {
 	std::unordered_map<Key, KeyValue>::iterator it;
 	Key key;

@@ -110,24 +110,44 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 		UNLOCK( &slaves.lock );
 	} else if ( event.type == SLAVE_EVENT_TYPE_ANNOUNCE_SLAVE_RECONSTRUCTED ) {
 		ArrayMap<int, SlaveSocket> &slaves = Coordinator::getInstance()->sockets.slaves;
-		uint32_t requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
 
 		buffer.data = this->protocol.announceSlaveReconstructed(
-			buffer.size, instanceId, requestId,
+			buffer.size, event.instanceId, event.requestId,
 			event.message.reconstructed.src,
 			event.message.reconstructed.dst,
 			true // toSlave
 		);
 
 		LOCK( &slaves.lock );
+		// Count the number of surviving slaves
+		for ( uint32_t i = 0, size = slaves.size(); i < size; i++ ) {
+			SlaveSocket *slave = slaves.values[ i ];
+			if ( slave->equal( event.message.reconstructed.dst ) || ! slave->ready() )
+				continue; // No need to tell the backup server
+			event.message.reconstructed.sockets->insert( slave );
+
+			printf( "[%u, %u] Waiting for ", event.instanceId, event.requestId );
+			slave->print();
+		}
+		// Insert into pending set
+		CoordinatorWorker::pending->insertAnnouncement(
+			event.instanceId, event.requestId,
+			event.message.reconstructed.lock,
+			event.message.reconstructed.cond,
+			event.message.reconstructed.sockets
+		);
+
+		// Send requests
 		for ( uint32_t i = 0, size = slaves.size(); i < size; i++ ) {
 			SlaveSocket *slave = slaves.values[ i ];
 			if ( slave->equal( event.message.reconstructed.dst ) || ! slave->ready() )
 				continue; // No need to tell the backup server
 
 			ret = slave->send( buffer.data, buffer.size, connected );
-			if ( ret != ( ssize_t ) buffer.size )
+			if ( ret != ( ssize_t ) buffer.size ) {
 				__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+				CoordinatorWorker::pending->eraseAnnouncement( event.instanceId, event.requestId, slave );
+			}
 		}
 		// notify the remap message handler of the new slave
 		struct sockaddr_in slaveAddr = event.message.reconstructed.dst->getAddr();
@@ -135,6 +155,9 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			Coordinator::getInstance()->remapMsgHandler->addAliveSlave( slaveAddr );
 		UNLOCK( &slaves.lock );
 	} else if ( event.type == SLAVE_EVENT_TYPE_DISCONNECT ) {
+		// Remove the slave from the pending set of annoucement
+		CoordinatorWorker::pending->eraseAnnouncement( event.socket );
+
 		// Mark it as failed
 		if ( Coordinator::getInstance()->config.global.remap.enabled ) {
 			Coordinator::getInstance()->switchPhaseForCrashedSlave( event.socket );
@@ -198,10 +221,29 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 							__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );
 					}
 					break;
+				case PROTO_OPCODE_SLAVE_RECONSTRUCTED:
+					switch( header.magic ) {
+						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							CoordinatorWorker::pending->eraseAnnouncement( header.instanceId, header.requestId, event.socket );
+							break;
+						default:
+							__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );
+					}
+					break;
 				case PROTO_OPCODE_RECONSTRUCTION:
 					switch( header.magic ) {
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
 							this->handleReconstructionResponse( event, buffer.data, header.length );
+							break;
+						default:
+							__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );
+					}
+					break;
+				case PROTO_OPCODE_RECONSTRUCTION_UNSEALED:
+					switch( header.magic ) {
+						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							printf( "--- PROTO_OPCODE_RECONSTRUCTION_UNSEALED ---\n" );
+							this->handleReconstructionUnsealedResponse( event, buffer.data, header.length );
 							break;
 						default:
 							__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );

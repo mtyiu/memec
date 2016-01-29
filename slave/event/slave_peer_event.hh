@@ -24,10 +24,10 @@ enum SlavePeerEventType {
 	SLAVE_PEER_EVENT_TYPE_SET_REQUEST,
 	SLAVE_PEER_EVENT_TYPE_SET_RESPONSE_SUCCESS,
 	SLAVE_PEER_EVENT_TYPE_SET_RESPONSE_FAILURE,
-	// DEGRADED_SET
-	SLAVE_PEER_EVENT_TYPE_DEGRADED_SET_REQUEST,
-	SLAVE_PEER_EVENT_TYPE_DEGRADED_SET_RESPONSE_SUCCESS,
-	SLAVE_PEER_EVENT_TYPE_DEGRADED_SET_RESPONSE_FAILURE,
+	// FORWARD_KEY
+	SLAVE_PEER_EVENT_TYPE_FORWARD_KEY_REQUEST,
+	SLAVE_PEER_EVENT_TYPE_FORWARD_KEY_RESPONSE_SUCCESS,
+	SLAVE_PEER_EVENT_TYPE_FORWARD_KEY_RESPONSE_FAILURE,
 	// GET
 	SLAVE_PEER_EVENT_TYPE_GET_REQUEST,
 	SLAVE_PEER_EVENT_TYPE_GET_RESPONSE_SUCCESS,
@@ -70,6 +70,9 @@ enum SlavePeerEventType {
 	SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_RESPONSE_FAILURE,
 	// Seal chunk buffer
 	SLAVE_PEER_EVENT_TYPE_SEAL_CHUNKS,
+	// Reconstructed unsealed keys
+	SLAVE_PEER_EVENT_TYPE_UNSEALED_KEYS_RESPONSE_SUCCESS,
+	SLAVE_PEER_EVENT_TYPE_UNSEALED_KEYS_RESPONSE_FAILURE,
 	// Send
 	SLAVE_PEER_EVENT_TYPE_SEND,
 	// Pending
@@ -134,7 +137,7 @@ public:
 				uint32_t offset, length;
 				char *data;
 			} update;
-		} degradedSet;
+		} forwardKey;
 		struct {
 			Key key;
 			uint32_t valueUpdateOffset;
@@ -143,6 +146,9 @@ public:
 		struct {
 			Key key;
 		} remappingDel;
+		struct {
+			struct BatchKeyValueHeader header;
+		} unsealedKeys;
 	} message;
 
 	// Register
@@ -154,7 +160,7 @@ public:
 	void reqSet( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key key, Value value );
 	void resSet( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key key, bool success );
 	// Degraded SET
-	void reqDegradedSet(
+	void reqForwardKey(
 		SlavePeerSocket *socket,
 		uint8_t opcode,
 		uint16_t instanceId, uint32_t requestId,
@@ -163,7 +169,7 @@ public:
 		char *key, char *value,
 		uint32_t valueUpdateOffset = 0, uint32_t valueUpdateSize = 0, char *valueUpdate = 0
 	);
-	void resDegradedSet(
+	void resForwardKey(
 		SlavePeerSocket *socket, bool success,
 		uint8_t opcode,
 		uint16_t instanceId, uint32_t requestId,
@@ -204,6 +210,8 @@ public:
 	void resSealChunk( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, bool success );
 	// Seal chunk buffer
 	void reqSealChunks( MixedChunkBuffer *chunkBuffer );
+	// Reconstructed unsealed keys
+	void resUnsealedKeys( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, struct BatchKeyValueHeader &header, bool success );
 	// Send
 	void send( SlavePeerSocket *socket, Packet *packet );
 	// Pending

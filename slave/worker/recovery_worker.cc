@@ -81,6 +81,10 @@ bool SlaveWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *buf
 	if ( ! self )
 		s->start();
 
+	// Send response to the coordinator
+	event.resSlaveReconstructedMsg( event.socket, event.instanceId, event.requestId );
+	this->dispatch( event );
+
 	return true;
 }
 
@@ -128,7 +132,7 @@ bool SlaveWorker::handleBackupSlavePromotedMsg( CoordinatorEvent event, char *bu
 	s = new SlavePeerSocket();
 	s->init(
 		sockfd, addr,
-		&Slave::getInstance()->sockets.epoll,
+		&( slave->sockets.epoll ),
 		true
 	);
 
@@ -300,17 +304,22 @@ bool SlaveWorker::handleReconstructionRequest( CoordinatorEvent event, char *buf
 }
 
 bool SlaveWorker::handleReconstructionUnsealedRequest( CoordinatorEvent event, char *buf, size_t size ) {
-	printf( "handleReconstructionUnsealedRequest\n" );
 	struct BatchKeyHeader header;
-
 	if ( ! this->protocol.parseBatchKeyHeader( header, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleReconstructionUnsealedRequest", "Invalid RECONSTRUCTION_UNSEALED request." );
 		return false;
 	}
 
+	printf( "handleReconstructionUnsealedRequest: %u\n", header.count );
+
 	std::unordered_set<Key> unsealedKeys;
+	std::unordered_set<Key>::iterator unsealedKeysIt;
 	std::unordered_set<uint32_t> stripeIds;
 	uint32_t listId, chunkId;
+	SlavePeerSocket *reconstructedSlave = 0;
+
+	std::unordered_map<Key, KeyValue> *keyValueMap;
+	LOCK_T *lock;
 
 	for ( uint32_t i = 0, offset = 0; i < header.count; i++ ) {
 		uint8_t keySize;
@@ -318,14 +327,27 @@ bool SlaveWorker::handleReconstructionUnsealedRequest( CoordinatorEvent event, c
 		Key key;
 
 		this->protocol.nextKeyInBatchKeyHeader( header, keySize, keyStr, offset );
-		key.dup( keySize, keyStr );
-		unsealedKeys.insert( key );
 
 		if ( i == 0 ) {
-			this->getSlaves( keyStr, keySize, listId, chunkId );
+			reconstructedSlave = this->getSlaves( keyStr, keySize, listId, chunkId );
+
+			if ( ! SlaveWorker::chunkBuffer->at( listId )->getKeyValueMap( keyValueMap, lock ) ) {
+				__ERROR__(
+					"SlaveWorker", "handleReconstructionUnsealedRequest",
+					"Cannot get key-value map."
+				);
+				return false;
+			}
 		}
 
-		// printf( "[%u] %.*s\n", i, keySize, keyStr );
+		key.set( keySize, keyStr );
+		key.dup();
+		unsealedKeys.insert( key );
+		// printf(
+		// 	"[%u] (%u) %.*s / (%u) %.*s\n",
+		// 	i, key.size, key.size, key.data,
+		// 	keySize, keySize, keyStr
+		// );
 	}
 
 	if ( ! SlaveWorker::pending->insertReconstruction(
@@ -337,6 +359,49 @@ bool SlaveWorker::handleReconstructionUnsealedRequest( CoordinatorEvent event, c
 	) ) {
 		__ERROR__( "SlaveWorker", "handleReconstructionUnsealedRequest", "Cannot insert into coordinator RECONSTRUCTION pending map." );
 	}
+
+	// Send unsealed key-value pairs
+	bool isCompleted = false;
+	struct {
+		size_t size;
+		char *data;
+	} buffer;
+	uint32_t requestId;
+	uint32_t keyValuesCount = 0, totalKeyValuesCount = 0;
+
+	unsealedKeysIt = unsealedKeys.begin();
+	while ( ! isCompleted ) {
+		requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
+		if ( ! SlaveWorker::pending->insert(
+			PT_SLAVE_PEER_FORWARD_KEYS,
+			Slave::instanceId, event.instanceId,
+			requestId, event.requestId,
+			( void * ) reconstructedSlave
+		) ) {
+			__ERROR__( "SlaveWorker", "handleReconstructionUnsealedRequest", "Cannot insert into pending set." );
+		}
+
+		buffer.data = this->protocol.sendUnsealedKeys(
+			buffer.size, Slave::instanceId, requestId,
+			unsealedKeys, unsealedKeysIt,
+			keyValueMap, lock,
+			keyValuesCount,
+			isCompleted
+		);
+		totalKeyValuesCount += keyValuesCount;
+
+		if ( reconstructedSlave ) {
+			bool connected;
+			ssize_t ret;
+
+			ret = reconstructedSlave->send( buffer.data, buffer.size, connected );
+			if ( ret != ( ssize_t ) buffer.size )
+				__ERROR__( "SlaveWorker", "handleReconstructionUnsealedRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+		} else {
+			__ERROR__( "SlaveWorker", "handleReconstructionUnsealedRequest", "Reconstructed slave not available!" );
+		}
+	}
+	printf( "Total number of unsealed key-values sent: %u\n", totalKeyValuesCount );
 
 	return true;
 }

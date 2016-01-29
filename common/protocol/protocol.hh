@@ -63,7 +63,6 @@
 #define PROTO_OPCODE_DEGRADED_GET                 0x08
 #define PROTO_OPCODE_DEGRADED_UPDATE              0x09
 #define PROTO_OPCODE_DEGRADED_DELETE              0x10
-#define PROTO_OPCODE_DEGRADED_SET                 0x11
 // Master <-> Slave //
 #define PROTO_OPCODE_REMAPPING_SET                0x12
 #define PROTO_OPCODE_DEGRADED_LOCK                0x13
@@ -71,7 +70,7 @@
 #define PROTO_OPCODE_ACK_METADATA                 0x15
 #define PROTO_OPCODE_ACK_REQUEST                  0x16
 #define PROTO_OPCODE_ACK_PARITY_DELTA             0x17
-#define PROTO_OPCODE_REVERT_PARITY_DELTA          0x18
+#define PROTO_OPCODE_REVERT_DELTA                 0x18
 
 // Master <-> Coordinator (20-29) //
 #define PROTO_OPCODE_REMAPPING_LOCK               0x20
@@ -86,8 +85,10 @@
 #define PROTO_OPCODE_SET_CHUNK                    0x56
 #define PROTO_OPCODE_SET_CHUNK_UNSEALED           0x57
 #define PROTO_OPCODE_FORWARD_CHUNK                0x58
-#define PROTO_OPCODE_REMAPPED_UPDATE              0x59
-#define PROTO_OPCODE_REMAPPED_DELETE              0x60
+#define PROTO_OPCODE_FORWARD_KEY                  0x59
+#define PROTO_OPCODE_REMAPPED_UPDATE              0x60
+#define PROTO_OPCODE_REMAPPED_DELETE              0x61
+#define PROTO_OPCODE_BATCH_KEY_VALUES             0x62
 
 #define PROTO_UNINITIALIZED_INSTANCE              0
 
@@ -369,9 +370,9 @@ struct DegradedReqHeader {
 	} data;
 };
 
-#define PROTO_DEGRADED_SET_BASE_SIZE 17
-#define PROTO_DEGRADED_SET_UPDATE_SIZE 6
-struct DegradedSetHeader {
+#define PROTO_FORWARD_KEY_BASE_SIZE 17
+#define PROTO_FORWARD_KEY_UPDATE_SIZE 6
+struct ForwardKeyHeader {
 	uint8_t opcode;
 	uint32_t listId;
 	uint32_t stripeId;
@@ -488,11 +489,11 @@ struct AcknowledgementHeader {
     uint32_t toTimestamp;
 };
 
-#define PROTO_ACK_PARITY_DELTA_SIZE 10
-struct ParityDeltaAcknowledgementHeader {
-	uint32_t fromTimestamp;
-	uint32_t toTimestamp;
-	uint16_t targetId;
+#define PROTO_ACK_DELTA_SIZE 10
+struct DeltaAcknowledgementHeader {
+	uint32_t tsCount;         // number of timestamps
+	uint32_t keyCount;       // number of requests ids
+	uint16_t targetId;      // source data slave
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -737,11 +738,24 @@ protected:
 		std::unordered_set<Key> &keys, std::unordered_set<Key>::iterator &it, uint32_t &keysCount,
 		bool &isCompleted
 	);
+	size_t generateBatchKeyHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode,
+		uint16_t instanceId, uint32_t requestId,
+		struct BatchKeyValueHeader &header
+	);
 	bool parseBatchKeyHeader(
 		size_t offset, uint32_t &count, char *&keys,
 		char *buf, size_t size
 	);
 
+	size_t generateBatchKeyValueHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode,
+		uint16_t instanceId, uint32_t requestId,
+		std::unordered_set<Key> &keys, std::unordered_set<Key>::iterator &it,
+		std::unordered_map<Key, KeyValue> *values, LOCK_T *lock,
+		uint32_t &keyValuesCount,
+		bool &isCompleted
+	);
 	bool parseBatchKeyValueHeader(
 		size_t offset, uint32_t &count, char *&keyValues,
 		char *buf, size_t size
@@ -857,14 +871,14 @@ protected:
 		char *buf, size_t size
 	);
 
-    size_t generateDegradedSetReqHeader(
+    size_t generateForwardKeyReqHeader(
     	uint8_t magic, uint8_t to, uint8_t opcode,
     	uint16_t instanceId, uint32_t requestId,
     	uint8_t degradedOpcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
     	uint8_t keySize, char *key, uint32_t valueSize, char *value,
     	uint32_t valueUpdateSize, uint32_t valueUpdateOffset, char *valueUpdate
     );
-    bool parseDegradedSetReqHeader(
+    bool parseForwardKeyReqHeader(
     	size_t offset, uint8_t &opcode,
     	uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
     	uint8_t &keySize, uint32_t &valueSize,
@@ -873,14 +887,14 @@ protected:
     	char *buf, size_t size
     );
 
-    size_t generateDegradedSetResHeader(
+    size_t generateForwardKeyResHeader(
     	uint8_t magic, uint8_t to, uint8_t opcode,
     	uint16_t instanceId, uint32_t requestId,
     	uint8_t degradedOpcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
     	uint8_t keySize, char *key, uint32_t valueSize,
     	uint32_t valueUpdateSize, uint32_t valueUpdateOffset
     );
-    bool parseDegradedSetResHeader(
+    bool parseForwardKeyResHeader(
     	size_t offset, uint8_t &opcode,
     	uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
     	uint8_t &keySize, uint32_t &valueSize,
@@ -1025,13 +1039,15 @@ protected:
 		size_t offset, uint32_t &fromTimestamp, uint32_t &toTimestamp,
 		char *buf, size_t size
 	);
-	size_t generateParityDeltaAcknowledgementHeader(
+	size_t generateDeltaAcknowledgementHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
-		uint32_t fromTimestamp, uint32_t toTimestamp, uint16_t targetId, char* buf = 0
+		const std::vector<uint32_t> &timestamp, const std::vector<Key> &requests,
+		uint16_t targetId, char* buf = 0
 	);
-	bool parseParityDeltaAcknowledgementHeader(
-		size_t offset, uint32_t &fromTimestamp, uint32_t &toTimestamp, uint16_t &targetId,
-		char *buf, size_t size
+	bool parseDeltaAcknowledgementHeader(
+		size_t offset, uint32_t &tsCount, uint32_t &keyCount,
+		std::vector<uint32_t> *timestamps, std::vector<Key> *requests,
+		uint16_t &targetId, char *buf, size_t size
 	);
 
 public:
@@ -1182,12 +1198,12 @@ public:
 		struct DegradedReqHeader &header, uint8_t opcode,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
-    bool parseDegradedSetReqHeader(
-        struct DegradedSetHeader &header,
+    bool parseForwardKeyReqHeader(
+        struct ForwardKeyHeader &header,
         char *buf = 0, size_t size = 0, size_t offset = 0
     );
-    bool parseDegradedSetResHeader(
-        struct DegradedSetHeader &header,
+    bool parseForwardKeyResHeader(
+        struct ForwardKeyHeader &header,
         char *buf = 0, size_t size = 0, size_t offset = 0
     );
 	bool parseListStripeKeyHeader(
@@ -1250,8 +1266,10 @@ public:
 		struct AcknowledgementHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
-	bool parseParityDeltaAcknowledgementHeader(
-		struct ParityDeltaAcknowledgementHeader &header,
+	bool parseDeltaAcknowledgementHeader(
+		struct DeltaAcknowledgementHeader &header,
+		std::vector<uint32_t> *timestamps = 0,
+		std::vector<Key> *requests = 0,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 };

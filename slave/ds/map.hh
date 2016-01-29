@@ -38,8 +38,11 @@ private:
 	 * Store the forwarded, reconstructed chunks
 	 * (list ID, stripe ID, chunk ID) (src) |-> (list ID, stripe ID, chunk ID) (dst)
 	 */
-	std::unordered_map<Metadata, Metadata> forwarded;
-	LOCK_T forwardedLock;
+	struct {
+		std::unordered_map<Key, Metadata> keys;
+		std::unordered_map<Metadata, Metadata> chunks;
+		LOCK_T lock;
+	} forwarded;
 
 public:
 	/**
@@ -59,7 +62,7 @@ public:
 		LOCK_INIT( &this->keysLock );
 		LOCK_INIT( &this->cacheLock );
 		LOCK_INIT( &this->stripeIdsLock );
-		LOCK_INIT( &this->forwardedLock );
+		LOCK_INIT( &this->forwarded.lock );
 		LOCK_INIT( &this->opsLock );
 		LOCK_INIT( &this->sealedLock );
 	}
@@ -283,9 +286,9 @@ public:
 		std::pair<std::unordered_map<Metadata, Metadata>::iterator, bool> ret;
 		std::pair<Metadata, Metadata> p( srcMetadata, dstMetadata );
 
-		LOCK( &this->forwardedLock );
-		ret = this->forwarded.insert( p );
-		UNLOCK( &this->forwardedLock );
+		LOCK( &this->forwarded.lock );
+		ret = this->forwarded.chunks.insert( p );
+		UNLOCK( &this->forwarded.lock );
 
 		return ret.second;
 	}
@@ -297,13 +300,13 @@ public:
 		std::unordered_map<Metadata, Metadata>::iterator it;
 		bool ret = false;
 
-		LOCK( &this->forwardedLock );
-		it = this->forwarded.find( srcMetadata );
-		if ( it != this->forwarded.end() ) {
+		LOCK( &this->forwarded.lock );
+		it = this->forwarded.chunks.find( srcMetadata );
+		if ( it != this->forwarded.chunks.end() ) {
 			dstMetadata = it->second;
 			ret = true;
 		}
-		UNLOCK( &this->forwardedLock );
+		UNLOCK( &this->forwarded.lock );
 
 		return ret;
 	}
@@ -315,9 +318,64 @@ public:
 		std::unordered_map<Metadata, Metadata>::iterator it;
 		bool ret;
 
-		LOCK( &this->forwardedLock );
-		ret = this->forwarded.erase( srcMetadata ) > 0;
-		UNLOCK( &this->forwardedLock );
+		LOCK( &this->forwarded.lock );
+		ret = this->forwarded.chunks.erase( srcMetadata ) > 0;
+		UNLOCK( &this->forwarded.lock );
+
+		return ret;
+	}
+
+	bool insertForwardedKey(
+		uint8_t keySize, char *keyStr,
+		uint32_t dstListId, uint32_t dstChunkId
+	) {
+		Metadata dstMetadata;
+		Key key;
+
+		key.set( keySize, keyStr );
+		dstMetadata.set( dstListId, -1, dstChunkId );
+
+		std::pair<std::unordered_map<Key, Metadata>::iterator, bool> ret;
+
+		LOCK( &this->forwarded.lock );
+		if ( this->forwarded.keys.find( key ) == this->forwarded.keys.end() )
+			key.dup();
+
+		std::pair<Key, Metadata> p( key, dstMetadata );
+		ret = this->forwarded.keys.insert( p );
+		UNLOCK( &this->forwarded.lock );
+
+		return ret.second;
+	}
+
+	bool findForwardedKey( uint8_t keySize, char *keyStr, Metadata &dstMetadata ) {
+		Key key;
+		key.set( keySize, keyStr );
+
+		std::unordered_map<Key, Metadata>::iterator it;
+		bool ret = false;
+
+		LOCK( &this->forwarded.lock );
+		it = this->forwarded.keys.find( key );
+		if ( it != this->forwarded.keys.end() ) {
+			dstMetadata = it->second;
+			ret = true;
+		}
+		UNLOCK( &this->forwarded.lock );
+
+		return ret;
+	}
+
+	bool eraseForwardedKey( uint8_t keySize, char *keyStr ) {
+		Key key;
+		key.set( keySize, keyStr );
+
+		std::unordered_map<Key, Metadata>::iterator it;
+		bool ret;
+
+		LOCK( &this->forwarded.lock );
+		ret = this->forwarded.keys.erase( key ) > 0;
+		UNLOCK( &this->forwarded.lock );
 
 		return ret;
 	}

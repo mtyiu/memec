@@ -85,7 +85,7 @@ private:
 	bool handleUpdateResponse( SlaveEvent event, bool success, bool isDegraded, char *buf, size_t size );
 	bool handleDeleteResponse( SlaveEvent event, bool success, bool isDegraded, char *buf, size_t size );
 	bool handleAcknowledgement( SlaveEvent event, uint8_t opcode, char *buf, size_t size );
-	bool handleParityDeltaAcknowledgement( SlaveEvent event, uint8_t opcode, char *buf, size_t size );
+	bool handleDeltaAcknowledgement( SlaveEvent event, uint8_t opcode, char *buf, size_t size );
 
 	// ---------- degraded_worker.cc ----------
 	bool sendDegradedLockRequest(
@@ -116,6 +116,7 @@ public:
 	static void removePending( SlaveSocket *slave, bool needsAck = true );
 	static void replayRequestPrepare( SlaveSocket *slave );
 	static void replayRequest( SlaveSocket *slave );
+	static void gatherPendingNormalRequests( SlaveSocket *target, bool needsAck = false );
 };
 
 #endif

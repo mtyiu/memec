@@ -193,26 +193,33 @@ re_insert:
 	return this->slaveMap->insertOpMetadata( opcode, timestamp, key, keyMetadata );
 }
 
-bool DegradedMap::insertDegradedChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint16_t instanceId, uint32_t requestId ) {
+bool DegradedMap::insertDegradedChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint16_t instanceId, uint32_t requestId, bool &isReconstructed ) {
 	Metadata metadata;
 	std::unordered_map<Metadata, std::vector<struct pid_s>>::iterator it;
 	bool ret = false;
 
+	isReconstructed = false;
 	metadata.set( listId, stripeId, chunkId );
 
 	LOCK( &this->degraded.chunksLock );
 	it = this->degraded.chunks.find( metadata );
 	if ( it == this->degraded.chunks.end() ) {
-		std::vector<struct pid_s> pids;
-		struct pid_s data = { .instanceId = instanceId, .requestId = requestId };
-		pids.push_back( data );
+		if ( this->degraded.reconstructedChunks.find( metadata ) == this->degraded.reconstructedChunks.end() ) {
+			// Reconstruction in progress
+			std::vector<struct pid_s> pids;
+			struct pid_s data = { .instanceId = instanceId, .requestId = requestId };
+			pids.push_back( data );
 
-		std::pair<Metadata, std::vector<struct pid_s>> p( metadata, pids );
-		std::pair<std::unordered_map<Metadata, std::vector<struct pid_s>>::iterator, bool> r;
+			std::pair<Metadata, std::vector<struct pid_s>> p( metadata, pids );
+			std::pair<std::unordered_map<Metadata, std::vector<struct pid_s>>::iterator, bool> r;
 
-		r = this->degraded.chunks.insert( p );
+			r = this->degraded.chunks.insert( p );
 
-		ret = r.second;
+			ret = r.second;
+		} else {
+			isReconstructed = true;
+			return false;
+		}
 	} else {
 		std::vector<struct pid_s> &pids = it->second;
 		struct pid_s data = { .instanceId = instanceId, .requestId = requestId };
@@ -238,29 +245,39 @@ bool DegradedMap::deleteDegradedChunk( uint32_t listId, uint32_t stripeId, uint3
 	} else {
 		pids = it->second;
 		this->degraded.chunks.erase( it );
+
+		this->degraded.reconstructedChunks.insert( metadata );
 	}
 	UNLOCK( &this->degraded.chunksLock );
 
 	return true;
 }
 
-bool DegradedMap::insertDegradedKey( Key key, uint16_t instanceId, uint32_t requestId ) {
+bool DegradedMap::insertDegradedKey( Key key, uint16_t instanceId, uint32_t requestId, bool &isReconstructed ) {
 	std::unordered_map<Key, std::vector<struct pid_s>>::iterator it;
 	bool ret = false;
+
+	isReconstructed = false;
 
 	LOCK( &this->degraded.keysLock );
 	it = this->degraded.keys.find( key );
 	if ( it == this->degraded.keys.end() ) {
-		std::vector<struct pid_s> pids;
-		struct pid_s data = { .instanceId = instanceId, .requestId = requestId };
-		pids.push_back( data );
+		if ( this->degraded.reconstructedKeys.find( key ) == this->degraded.reconstructedKeys.end() ) {
+			// Reconstruction in progress
+			std::vector<struct pid_s> pids;
+			struct pid_s data = { .instanceId = instanceId, .requestId = requestId };
+			pids.push_back( data );
 
-		std::pair<Key, std::vector<struct pid_s>> p( key, pids );
-		std::pair<std::unordered_map<Key, std::vector<struct pid_s>>::iterator, bool> r;
+			std::pair<Key, std::vector<struct pid_s>> p( key, pids );
+			std::pair<std::unordered_map<Key, std::vector<struct pid_s>>::iterator, bool> r;
 
-		r = this->degraded.keys.insert( p );
+			r = this->degraded.keys.insert( p );
 
-		ret = r.second;
+			ret = r.second;
+		} else {
+			isReconstructed = true;
+			return false;
+		}
 	} else {
 		std::vector<struct pid_s> &pids = it->second;
 		struct pid_s data = { .instanceId = instanceId, .requestId = requestId };
@@ -284,6 +301,10 @@ bool DegradedMap::deleteDegradedKey( Key key, std::vector<struct pid_s> &pids ) 
 	} else {
 		pids = it->second;
 		this->degraded.keys.erase( it );
+
+		Key k = key;
+		k.dup();
+		this->degraded.reconstructedKeys.insert( k );
 	}
 	UNLOCK( &this->degraded.keysLock );
 

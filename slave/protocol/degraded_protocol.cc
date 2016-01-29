@@ -1,6 +1,6 @@
 #include "protocol.hh"
 
-char *SlaveProtocol::reqDegradedSet(
+char *SlaveProtocol::reqForwardKey(
 	size_t &size, uint16_t instanceId, uint32_t requestId,
 	uint8_t opcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 	uint8_t keySize, char *key,
@@ -8,10 +8,10 @@ char *SlaveProtocol::reqDegradedSet(
 	uint32_t valueUpdateSize, uint32_t valueUpdateOffset, char *valueUpdate
 ) {
 	// -- common/protocol/degraded_protocol.cc --
-	size = this->generateDegradedSetReqHeader(
+	size = this->generateForwardKeyReqHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
-		PROTO_OPCODE_DEGRADED_SET,
+		PROTO_OPCODE_FORWARD_KEY,
 		instanceId, requestId,
 		opcode, listId, stripeId, chunkId,
 		keySize, key,
@@ -21,7 +21,7 @@ char *SlaveProtocol::reqDegradedSet(
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::resDegradedSet(
+char *SlaveProtocol::resForwardKey(
 	size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
 	uint8_t opcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 	uint8_t keySize, char *key,
@@ -29,10 +29,10 @@ char *SlaveProtocol::resDegradedSet(
 	uint32_t valueUpdateSize, uint32_t valueUpdateOffset
 ) {
 	// -- common/protocol/degraded_protocol.cc --
-	size = this->generateDegradedSetResHeader(
+	size = this->generateForwardKeyResHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 		PROTO_MAGIC_TO_SLAVE,
-		PROTO_OPCODE_DEGRADED_SET,
+		PROTO_OPCODE_FORWARD_KEY,
 		instanceId, requestId,
 		opcode, listId, stripeId, chunkId,
 		keySize, key,

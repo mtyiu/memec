@@ -109,14 +109,14 @@ private:
 	);
 
 	bool handleAckParityDeltaBackup( MasterEvent event, char *buf, size_t size );
-	bool handleRevertParityDelta( MasterEvent event, char *buf, size_t size );
+	bool handleRevertDelta( MasterEvent event, char *buf, size_t size );
 
 	// ---------- slave_peer_worker.cc ----------
 	void dispatch( SlavePeerEvent event );
 
 	// ---------- slave_peer_req_worker.cc ----------
 	bool handleSlavePeerRegisterRequest( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, char *buf, size_t size );
-	bool handleDegradedSetRequest( SlavePeerEvent event, char *buf, size_t size );
+	bool handleForwardKeyRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleSetRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleGetRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleUpdateRequest( SlavePeerEvent event, char *buf, size_t size );
@@ -127,9 +127,10 @@ private:
 	bool handleUpdateChunkRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleDeleteChunkRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleSealChunkRequest( SlavePeerEvent event, char *buf, size_t size );
+	bool handleBatchKeyValueRequest( SlavePeerEvent event, char *buf, size_t size );
 
 	// ---------- slave_peer_res_worker.cc ----------
-	bool handleDegradedSetResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
+	bool handleForwardKeyResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleSetResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleGetResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleUpdateResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
@@ -139,6 +140,7 @@ private:
 	bool handleUpdateChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleDeleteChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleSealChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
+	bool handleBatchKeyValueResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 
 	// ---------- remap_worker.cc ----------
 	bool handleRemappedData( CoordinatorEvent event, char *buf, size_t size );

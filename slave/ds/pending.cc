@@ -1,6 +1,20 @@
 #include "pending.hh"
 #include "../../common/util/debug.hh"
 
+bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_set<PendingIdentifier> *&map ) {
+	switch( type ) {
+		case PT_SLAVE_PEER_FORWARD_KEYS:
+			lock = &this->slavePeers.forwardKeysLock;
+			map = &this->slavePeers.forwardKeys;
+			break;
+		default:
+			lock = 0;
+			map = 0;
+			return false;
+	}
+	return true;
+}
+
 bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, Key> *&map ) {
 	switch( type ) {
 		case PT_MASTER_GET:
@@ -102,7 +116,7 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 			map = &this->slavePeers.updateChunk;
 			break;
 		case PT_SLAVE_PEER_DEL_CHUNK:
-			lock = &this->slavePeers.delChunkLock;
+			lock = &this->slavePeers.deleteChunkLock;
 			map = &this->slavePeers.deleteChunk;
 			break;
 		default:
@@ -316,6 +330,25 @@ bool Pending::insertRemapDataRequest( uint16_t instanceId, uint16_t parentInstan
 	return ret;
 }
 
+bool Pending::insert(
+	PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
+	bool needsLock, bool needsUnlock
+) {
+	PendingIdentifier pid( instanceId, parentInstanceId, requestId, parentRequestId, ptr );
+	std::pair<std::unordered_set<PendingIdentifier>::iterator, bool> ret;
+	LOCK_T *lock;
+	std::unordered_set<PendingIdentifier> *set;
+
+	if ( ! this->get( type, lock, set ) )
+		return false;
+
+	if ( needsLock ) LOCK( lock );
+	ret = set->insert( pid );
+	if ( needsUnlock ) UNLOCK( lock );
+
+	return true;
+}
+
 bool Pending::eraseReleaseDegradedLock( uint16_t instanceId, uint32_t requestId, uint32_t count, uint32_t &remaining, uint32_t &total, PendingIdentifier *pidPtr ) {
 	PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
 	std::unordered_map<PendingIdentifier, PendingDegradedLock>::iterator it;
@@ -507,6 +540,37 @@ bool Pending::eraseRecovery( uint8_t keySize, char *keyStr, uint16_t &instanceId
 		}
 	}
 	UNLOCK( &this->coordinators.recoveryLock );
+
+	return ret;
+}
+
+bool Pending::erase(
+	PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr,
+	PendingIdentifier *pidPtr,
+	bool needsLock, bool needsUnlock
+) {
+	PendingIdentifier pid( instanceId, 0, requestId, 0, ptr );
+	LOCK_T *lock;
+	bool ret;
+
+	std::unordered_set<PendingIdentifier> *set;
+	std::unordered_set<PendingIdentifier>::iterator it;
+	if ( ! this->get( type, lock, set ) )
+		return false;
+
+	if ( needsLock ) LOCK( lock );
+	if ( ptr ) {
+		it = set->find( pid );
+		ret = ( it != set->end() );
+	} else {
+		it = set->find( pid );
+		ret = ( it != set->end() && it->instanceId == instanceId && it->requestId == requestId );
+	}
+	if ( ret ) {
+		if ( pidPtr ) *pidPtr = *it;
+		set->erase( it );
+	}
+	if ( needsUnlock ) UNLOCK( lock );
 
 	return ret;
 }
