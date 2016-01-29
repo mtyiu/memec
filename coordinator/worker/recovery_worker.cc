@@ -45,7 +45,23 @@ bool CoordinatorWorker::handlePromoteBackupSlaveResponse( SlaveEvent event, char
 		);
 		Coordinator::getInstance()->appendLog( log );
 
+		// Start recovery
+		SlaveSocket *failedSlaveSocket = 0;
+		LOCK( &coordinator->waitingForRecovery.lock );
+		coordinator->waitingForRecovery.isRecovering = false;
+		if ( coordinator->waitingForRecovery.sockets.size() ) {
+			failedSlaveSocket = coordinator->waitingForRecovery.sockets[ 0 ];
+			coordinator->waitingForRecovery.sockets.erase( coordinator->waitingForRecovery.sockets.begin() );
+		}
+		UNLOCK( &coordinator->waitingForRecovery.lock );
+
 		// system( "ssh testbed-node10 'screen -S experiment -p 0 -X stuff \"$(printf '\r')\"'" );
+
+		if ( failedSlaveSocket ) {
+			event.handleReconstructionRequest( failedSlaveSocket );
+			// Must use another worker thread as the function call handleReconstructionRequest() blocks while waiting for the response from other slaves
+			CoordinatorWorker::eventQueue->insert( event );
+		}
 	}
 
 	return true;
@@ -68,6 +84,19 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 	ArrayMap<int, SlaveSocket> &backupSlaves = coordinator->sockets.backupSlaves;
 	int fd;
 	SlaveSocket *backupSlaveSocket;
+
+	//////////////////////////////////////////////
+	// Check if there is other ongoing recovery //
+	//////////////////////////////////////////////
+	LOCK( &coordinator->waitingForRecovery.lock );
+	if ( coordinator->waitingForRecovery.isRecovering ) {
+		coordinator->waitingForRecovery.sockets.push_back( socket );
+		UNLOCK( &coordinator->waitingForRecovery.lock );
+		return false;
+	} else {
+		coordinator->waitingForRecovery.isRecovering = true;
+	}
+	UNLOCK( &coordinator->waitingForRecovery.lock );
 
 	///////////////////////////////////////////////////////
 	// Choose a backup slave to replace the failed slave //
@@ -115,7 +144,7 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 	while( annoucement.sockets.size() )
 		pthread_cond_wait( &annoucement.cond, &annoucement.lock );
 	pthread_mutex_unlock( &annoucement.lock );
-	printf( "~~~ All announced ~~~\n" );
+	// __INFO__( "CoordinatorWorker", "handleReconstructionRequest", "All announced." );
 
 	/////////////////////////////
 	// Announce to the masters //

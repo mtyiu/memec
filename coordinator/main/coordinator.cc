@@ -377,6 +377,10 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 	/* Log */
 	LOCK_INIT( &this->log.lock );
 
+	/* Waiting for recovery */
+	LOCK_INIT( &this->waitingForRecovery.lock );
+	this->waitingForRecovery.isRecovering = false;
+
 	// Set signal handlers //
 	Signal::setHandler( Coordinator::signalHandler );
 

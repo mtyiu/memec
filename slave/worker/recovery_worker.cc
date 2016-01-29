@@ -310,7 +310,7 @@ bool SlaveWorker::handleReconstructionUnsealedRequest( CoordinatorEvent event, c
 		return false;
 	}
 
-	printf( "handleReconstructionUnsealedRequest: %u\n", header.count );
+	// printf( "handleReconstructionUnsealedRequest: %u\n", header.count );
 
 	std::unordered_set<Key> unsealedKeys;
 	std::unordered_set<Key>::iterator unsealedKeysIt;
@@ -401,7 +401,7 @@ bool SlaveWorker::handleReconstructionUnsealedRequest( CoordinatorEvent event, c
 			__ERROR__( "SlaveWorker", "handleReconstructionUnsealedRequest", "Reconstructed slave not available!" );
 		}
 	}
-	printf( "Total number of unsealed key-values sent: %u\n", totalKeyValuesCount );
+	// printf( "Total number of unsealed key-values sent: %u\n", totalKeyValuesCount );
 
 	return true;
 }

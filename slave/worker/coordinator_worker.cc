@@ -84,6 +84,29 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 			isSend = true;
 			break;
 		case COORDINATOR_EVENT_TYPE_PROMOTE_BACKUP_SERVER_RESPONSE_SUCCESS:
+		{
+			Slave *slave = Slave::getInstance();
+			LOCK( &slave->status.lock );
+			slave->status.isRecovering = false;
+			UNLOCK( &slave->status.lock );
+
+			// Check if there are any held slave peer registration requests
+			struct {
+				uint32_t requestId;
+				SlavePeerSocket *socket;
+				bool success;
+			} registration;
+			while ( SlaveWorker::pending->eraseSlavePeerRegistration( registration.requestId, registration.socket, registration.success ) ) {
+				SlavePeerEvent slavePeerEvent;
+				slavePeerEvent.resRegister(
+					registration.socket,
+					Slave::instanceId,
+					registration.requestId,
+					registration.success
+				);
+				SlaveWorker::eventQueue->insert( slavePeerEvent );
+			}
+		}
 			buffer.data = this->protocol.resPromoteBackupSlave(
 				buffer.size,
 				event.instanceId, event.requestId,

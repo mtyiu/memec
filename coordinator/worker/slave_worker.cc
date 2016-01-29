@@ -73,6 +73,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			break;
 		case SLAVE_EVENT_TYPE_DISCONNECT:
 		case SLAVE_EVENT_TYPE_TRIGGER_RECONSTRUCTION:
+		case SLAVE_EVENT_TYPE_HANDLE_RECONSTRUCTION_REQUEST:
 			isSend = false;
 			break;
 		case SLAVE_EVENT_TYPE_ACK_RECONSTRUCTION_SUCCESS:
@@ -110,6 +111,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 		UNLOCK( &slaves.lock );
 	} else if ( event.type == SLAVE_EVENT_TYPE_ANNOUNCE_SLAVE_RECONSTRUCTED ) {
 		ArrayMap<int, SlaveSocket> &slaves = Coordinator::getInstance()->sockets.slaves;
+		ArrayMap<int, SlaveSocket> &backupSlaves = Coordinator::getInstance()->sockets.backupSlaves;
 
 		buffer.data = this->protocol.announceSlaveReconstructed(
 			buffer.size, event.instanceId, event.requestId,
@@ -120,14 +122,14 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 
 		LOCK( &slaves.lock );
 		// Count the number of surviving slaves
-		for ( uint32_t i = 0, size = slaves.size(); i < size; i++ ) {
-			SlaveSocket *slave = slaves.values[ i ];
+		for ( uint32_t i = 0, slavesSize = slaves.size(), size = slaves.size() + backupSlaves.size(); i < size; i++ ) {
+			SlaveSocket *slave = i < slavesSize ? slaves.values[ i ] : backupSlaves.values[ i - slavesSize ];
 			if ( slave->equal( event.message.reconstructed.dst ) || ! slave->ready() )
 				continue; // No need to tell the backup server
 			event.message.reconstructed.sockets->insert( slave );
 
-			printf( "[%u, %u] Waiting for ", event.instanceId, event.requestId );
-			slave->print();
+			// printf( "[%u, %u] Waiting for ", event.instanceId, event.requestId );
+			// slave->print();
 		}
 		// Insert into pending set
 		CoordinatorWorker::pending->insertAnnouncement(
@@ -138,8 +140,8 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 		);
 
 		// Send requests
-		for ( uint32_t i = 0, size = slaves.size(); i < size; i++ ) {
-			SlaveSocket *slave = slaves.values[ i ];
+		for ( uint32_t i = 0, slavesSize = slaves.size(), size = slaves.size() + backupSlaves.size(); i < size; i++ ) {
+			SlaveSocket *slave = i < slavesSize ? slaves.values[ i ] : backupSlaves.values[ i - slavesSize ];
 			if ( slave->equal( event.message.reconstructed.dst ) || ! slave->ready() )
 				continue; // No need to tell the backup server
 
@@ -184,6 +186,8 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 		} else {
 			__ERROR__( "CoordinatorWorker", "dispatch", "Unknown crashed slave." );
 		}
+	} else if ( event.type == SLAVE_EVENT_TYPE_HANDLE_RECONSTRUCTION_REQUEST ) {
+		this->handleReconstructionRequest( event.socket );
 	} else if ( isSend ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
 		if ( ret != ( ssize_t ) buffer.size )
@@ -224,6 +228,8 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 				case PROTO_OPCODE_SLAVE_RECONSTRUCTED:
 					switch( header.magic ) {
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							// printf( "Received response from " );
+							// event.socket->print( stdout );
 							CoordinatorWorker::pending->eraseAnnouncement( header.instanceId, header.requestId, event.socket );
 							break;
 						default:
@@ -242,7 +248,6 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 				case PROTO_OPCODE_RECONSTRUCTION_UNSEALED:
 					switch( header.magic ) {
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
-							printf( "--- PROTO_OPCODE_RECONSTRUCTION_UNSEALED ---\n" );
 							this->handleReconstructionUnsealedResponse( event, buffer.data, header.length );
 							break;
 						default:
