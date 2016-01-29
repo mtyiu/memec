@@ -880,6 +880,7 @@ bool SlaveWorker::handleBatchChunksRequest( SlavePeerEvent event, char *buf, siz
 
 		// Convert into a normal GET_CHUNK event
 		event.requestId = responseId;
+		printf( "handleGetChunkRequest\n" );
 		this->handleGetChunkRequest( event, chunkHeader );
 	}
 

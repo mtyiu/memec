@@ -73,6 +73,8 @@ enum SlavePeerEventType {
 	// Reconstructed unsealed keys
 	SLAVE_PEER_EVENT_TYPE_UNSEALED_KEYS_RESPONSE_SUCCESS,
 	SLAVE_PEER_EVENT_TYPE_UNSEALED_KEYS_RESPONSE_FAILURE,
+	// Defer
+	SLAVE_PEER_EVENT_TYPE_DEFERRED,
 	// Send
 	SLAVE_PEER_EVENT_TYPE_SEND,
 	// Pending
@@ -150,6 +152,11 @@ public:
 		struct {
 			struct BatchKeyValueHeader header;
 		} unsealedKeys;
+		struct {
+			uint8_t opcode;
+			char *buf;
+			size_t size;
+		} defer;
 	} message;
 
 	// Register
@@ -213,6 +220,8 @@ public:
 	void reqSealChunks( MixedChunkBuffer *chunkBuffer );
 	// Reconstructed unsealed keys
 	void resUnsealedKeys( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, struct BatchKeyValueHeader &header, bool success );
+	// Defer
+	void defer( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, uint8_t opcode, char *buf, size_t size );
 	// Send
 	void send( SlavePeerSocket *socket, Packet *packet );
 	// Pending
