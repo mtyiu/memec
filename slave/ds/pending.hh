@@ -210,6 +210,19 @@ public:
 	}
 };
 
+class PendingRegistration {
+public:
+	SlavePeerSocket *socket;
+	uint32_t requestId;
+	bool success;
+
+	void set( SlavePeerSocket *socket, uint32_t requestId, bool success ) {
+		this->socket = socket;
+		this->requestId = requestId;
+		this->success = success;
+	}
+};
+
 enum PendingType {
 	PT_COORDINATOR_RECONSTRUCTION,
 	PT_MASTER_REMAPPING_SET,
@@ -228,7 +241,8 @@ enum PendingType {
 	PT_SLAVE_PEER_FORWARD_KEYS,
 	PT_SLAVE_PEER_UPDATE_CHUNK,
 	PT_SLAVE_PEER_DEL_CHUNK,
-	PT_SLAVE_PEER_PARITY
+	PT_SLAVE_PEER_PARITY,
+	PT_SLAVE_PEER_REGISTRATION
 };
 
 class Pending {
@@ -273,6 +287,7 @@ public:
 		std::unordered_multimap<PendingIdentifier, ChunkUpdate> deleteChunk;
 		std::unordered_map<struct sockaddr_in, std::set<PendingData>* > remappedData;
 		std::unordered_map<PendingIdentifier, uint32_t> remappedDataRequest;
+		std::vector<PendingRegistration> registration;
 
 		LOCK_T degradedOpsLock;
 		LOCK_T setLock;
@@ -287,6 +302,7 @@ public:
 		LOCK_T deleteChunkLock;
 		LOCK_T remappedDataLock;
 		LOCK_T remappedDataRequestLock;
+		LOCK_T registrationLock;
 	} slavePeers;
 
 	Pending() {
@@ -309,6 +325,7 @@ public:
 		LOCK_INIT( &this->slavePeers.deleteChunkLock );
 		LOCK_INIT( &this->slavePeers.remappedDataLock );
 		LOCK_INIT( &this->slavePeers.remappedDataRequestLock );
+		LOCK_INIT( &this->slavePeers.registrationLock );
 	}
 
 	// Insert (Coordinator)
@@ -378,6 +395,7 @@ public:
 		uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, uint32_t requestCount,
 		SlavePeerSocket *target
 	);
+	void insertSlavePeerRegistration( uint32_t requestId, SlavePeerSocket *socket, bool success );
 	bool insert(
 		PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
 		bool needsLock = true, bool needsUnlock = true
@@ -454,6 +472,7 @@ public:
 		ChunkUpdate *chunkUpdatePtr = 0,
 		bool needsLock = true, bool needsUnlock = true
 	);
+	bool eraseSlavePeerRegistration( uint32_t &requestId, SlavePeerSocket *&socket, bool &success );
 	bool erase(
 		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr = 0,
 		PendingIdentifier *pidPtr = 0,

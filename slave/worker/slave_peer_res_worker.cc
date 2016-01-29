@@ -642,6 +642,36 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 					chunkRequest.listId, chunkRequest.stripeId, i,
 					chunkSize
 				);
+				/*
+				for ( uint32_t x = 0; x < SlaveWorker::chunkCount; x++ ) {
+					printf( "#%u: ", x );
+					switch( this->chunks[ x ]->status ) {
+						case CHUNK_STATUS_EMPTY:
+							printf( "CHUNK_STATUS_EMPTY" );
+							break;
+						case CHUNK_STATUS_DIRTY:
+							printf( "CHUNK_STATUS_DIRTY" );
+							break;
+						case CHUNK_STATUS_CACHED:
+							printf( "CHUNK_STATUS_CACHED" );
+							break;
+						case CHUNK_STATUS_NEEDS_LOAD_FROM_DISK:
+							printf( "CHUNK_STATUS_NEEDS_LOAD_FROM_DISK" );
+							break;
+						case CHUNK_STATUS_FROM_GET_CHUNK:
+							printf( "CHUNK_STATUS_FROM_GET_CHUNK" );
+							break;
+						case CHUNK_STATUS_RECONSTRUCTED:
+							printf( "CHUNK_STATUS_RECONSTRUCTED" );
+							break;
+						case CHUNK_STATUS_TEMPORARY:
+							printf( "CHUNK_STATUS_TEMPORARY" );
+							break;
+					}
+					printf( ";" );
+				}
+				printf( "\n" );
+				*/
 			}
 		}
 
@@ -1151,7 +1181,7 @@ bool SlaveWorker::handleBatchKeyValueResponse( SlavePeerEvent event, bool succes
 		__ERROR__( "SlaveWorker", "handleBatchKeyValueResponse", "Cannot insert find pending BATCH_KEY_VALUE request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 	}
 
-	printf( "--- header.count = %u ---\n", header.count );
+	// printf( "--- header.count = %u ---\n", header.count );
 
 	uint32_t listId, chunkId;
 	uint32_t remainingChunks, remainingKeys, totalChunks, totalKeys;
@@ -1190,7 +1220,7 @@ bool SlaveWorker::handleBatchKeyValueResponse( SlavePeerEvent event, bool succes
 		}
 	}
 
-	printf( "handleBatchKeyValueResponse(): Chunks: %u / %u; keys: %u / %u\n", remainingChunks, totalChunks, remainingKeys, totalKeys );
+	// printf( "handleBatchKeyValueResponse(): Chunks: %u / %u; keys: %u / %u\n", remainingChunks, totalChunks, remainingKeys, totalKeys );
 
 	if ( remainingKeys == 0 ) {
 		CoordinatorEvent coordinatorEvent;

@@ -502,7 +502,7 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, bool isSealed, ch
 				// The chunk is compacted before. Need to seal the chunk first
 				// Seal from chunk->lastDelPos
 				if ( chunk->lastDelPos > 0 && chunk->lastDelPos < chunk->getSize() ) {
-					printf( "chunk->lastDelPos = %u; chunk->getSize() = %u\n", chunk->lastDelPos, chunk->getSize() );
+					// printf( "chunk->lastDelPos = %u; chunk->getSize() = %u\n", chunk->lastDelPos, chunk->getSize() );
 					// Only issue seal chunk request when new key-value pairs are received
 					this->issueSealChunkRequest( chunk, chunk->lastDelPos );
 				}
@@ -854,7 +854,7 @@ bool SlaveWorker::handleBatchKeyValueRequest( SlavePeerEvent event, char *buf, s
 		}
 	}
 
-	printf( "handleBatchKeyValueRequest: Inserted objects = %u\n", header.count );
+	// printf( "handleBatchKeyValueRequest: Inserted objects = %u\n", header.count );
 
 	// Send response to the slave peer
 	event.resUnsealedKeys( event.socket, event.instanceId, event.requestId, header, true );
@@ -880,7 +880,6 @@ bool SlaveWorker::handleBatchChunksRequest( SlavePeerEvent event, char *buf, siz
 
 		// Convert into a normal GET_CHUNK event
 		event.requestId = responseId;
-		printf( "handleGetChunkRequest\n" );
 		this->handleGetChunkRequest( event, chunkHeader );
 	}
 

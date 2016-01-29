@@ -330,6 +330,14 @@ bool Pending::insertRemapDataRequest( uint16_t instanceId, uint16_t parentInstan
 	return ret;
 }
 
+void Pending::insertSlavePeerRegistration( uint32_t requestId, SlavePeerSocket *socket, bool success ) {
+	PendingRegistration reg;
+	reg.set( socket, requestId, success );
+	LOCK( &this->slavePeers.registrationLock );
+	this->slavePeers.registration.push_back( reg );
+	UNLOCK( &this->slavePeers.registrationLock );
+}
+
 bool Pending::insert(
 	PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
 	bool needsLock, bool needsUnlock
@@ -541,6 +549,24 @@ bool Pending::eraseRecovery( uint8_t keySize, char *keyStr, uint16_t &instanceId
 	}
 	UNLOCK( &this->coordinators.recoveryLock );
 
+	return ret;
+}
+
+bool Pending::eraseSlavePeerRegistration( uint32_t &requestId, SlavePeerSocket *&socket, bool &success ) {
+	bool ret = false;
+	LOCK( &this->slavePeers.registrationLock );
+	if ( this->slavePeers.registration.size() ) {
+		ret = true;
+		PendingRegistration reg = this->slavePeers.registration.back();
+		this->slavePeers.registration.pop_back();
+
+		requestId = reg.requestId;
+		socket = reg.socket;
+		success = reg.success;
+	} else {
+		ret = false;
+	}
+	UNLOCK( &this->slavePeers.registrationLock );
 	return ret;
 }
 

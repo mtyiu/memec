@@ -92,6 +92,11 @@ public:
 		std::vector<Log> items;
 		LOCK_T lock;
 	} log;
+	struct {
+		bool isRecovering;
+		std::vector<SlaveSocket *> sockets;
+		LOCK_T lock;
+	} waitingForRecovery;
 	Timer statsTimer;
 	Pending pending;
 	static uint16_t instanceId;

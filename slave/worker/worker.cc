@@ -85,7 +85,7 @@ SlavePeerSocket *SlaveWorker::getSlaves( char *data, uint8_t size, uint32_t &lis
 
 	ret = *this->dataSlaveSockets;
 
-	return ret->ready() ? ret : 0;
+	return ret;
 }
 
 bool SlaveWorker::getSlaves( uint32_t listId ) {

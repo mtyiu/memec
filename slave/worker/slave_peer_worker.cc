@@ -174,7 +174,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 
 			if ( isRecovering ) {
 				// Hold all register requests
-				printf( "Hold all register requests\n" );
+				SlaveWorker::pending->insertSlavePeerRegistration( event.requestId, event.socket, success );
 				return;
 			}
 		}
@@ -799,6 +799,6 @@ quit_1:
 	}
 	if ( ! connected ) {
 		event.socket->print();
-		__ERROR__( "SlaveWorker", "dispatch", "The slave is disconnected." );
+		__ERROR__( "SlaveWorker", "dispatch", "The slave is disconnected. Event type: %d.", event.type );
 	}
 }
