@@ -48,6 +48,26 @@ char *SlaveProtocol::resPromoteBackupSlave( size_t &size, uint16_t instanceId, u
 	return this->buffer.send;
 }
 
+char *SlaveProtocol::reqBatchGetChunks(
+	size_t &size, uint16_t instanceId, uint32_t requestId,
+	std::vector<uint32_t> *requestIds,
+	std::vector<Metadata> *metadata,
+	uint32_t &chunksCount,
+	bool &isCompleted
+) {
+	size = this->generateBatchChunkHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_BATCH_CHUNKS,
+		instanceId, requestId,
+		requestIds,
+		metadata,
+		chunksCount,
+		isCompleted
+	);
+	return this->buffer.send;
+}
+
 char *SlaveProtocol::sendUnsealedKeys(
 	size_t &size, uint16_t instanceId, uint32_t requestId,
 	std::unordered_set<Key> &keys, std::unordered_set<Key>::iterator &it,

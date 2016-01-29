@@ -169,8 +169,8 @@ void *stop( void *argv ) {
 #endif
 
 int main( int argc, char **argv ) {
-	if ( argc <= 7 ) {
-		fprintf( stderr, "Usage: %s [Key size] [Chunk size] [Data size] [Total size] [Number of threads] [Master IP] [Master port(s)]\n", argv[ 0 ] );
+	if ( argc <= 8 ) {
+		fprintf( stderr, "Usage: %s [Key size] [Chunk size] [Data size] [Total size] [Number of threads] [Test download (true/false)?] [Master IP] [Master port(s)]\n", argv[ 0 ] );
 		return 1;
 	}
 	struct sockaddr_in addr;
@@ -183,14 +183,14 @@ int main( int argc, char **argv ) {
 	config.clientId = 0; // ( uint32_t ) atol( argv[ 6 ] );
 	config.numClients = 1; // ( uint32_t ) atol( argv[ 7 ] );
 	config.numThreads = atoi( argv[ 5 ] );
-	config.testDownload = true; // ( strcmp( argv[ 9 ], "true" ) == 0 );
+	config.testDownload = ( strcmp( argv[ 6 ], "true" ) == 0 );
 	memset( &addr, 0, sizeof( addr ) );
-	inet_pton( AF_INET, argv[ 6 ], &( addr.sin_addr ) );
+	inet_pton( AF_INET, argv[ 7 ], &( addr.sin_addr ) );
 	config.addr = addr.sin_addr.s_addr;
-	config.numPorts = argc - 7;
+	config.numPorts = argc - 8;
 	config.ports = new uint16_t[ config.numPorts ];
 	for ( int i = 0; i < config.numPorts; i++ )
-		config.ports[ i ] = htons( atoi( argv[ i + 7 ] ) );
+		config.ports[ i ] = htons( atoi( argv[ i + 8 ] ) );
 
 	config.totalSizePerThread = config.totalSize / config.numThreads;
 	config.waiting = 0;

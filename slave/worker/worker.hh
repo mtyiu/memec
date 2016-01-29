@@ -123,11 +123,13 @@ private:
 	bool handleDeleteRequest( SlavePeerEvent event, char *buf, size_t size );
 
 	bool handleGetChunkRequest( SlavePeerEvent event, char *buf, size_t size );
+	bool handleGetChunkRequest( SlavePeerEvent event, struct ChunkHeader &header );
 	bool handleSetChunkRequest( SlavePeerEvent event, bool isSealed, char *buf, size_t size );
 	bool handleUpdateChunkRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleDeleteChunkRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleSealChunkRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleBatchKeyValueRequest( SlavePeerEvent event, char *buf, size_t size );
+	bool handleBatchChunksRequest( SlavePeerEvent event, char *buf, size_t size );
 
 	// ---------- slave_peer_res_worker.cc ----------
 	bool handleForwardKeyResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
