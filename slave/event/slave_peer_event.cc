@@ -285,6 +285,17 @@ void SlavePeerEvent::resUnsealedKeys( SlavePeerSocket *socket, uint16_t instance
 	this->message.unsealedKeys.header = header;
 }
 
+void SlavePeerEvent::defer( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, uint8_t opcode, char *buf, size_t size ) {
+	this->type = SLAVE_PEER_EVENT_TYPE_DEFERRED;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
+	this->socket = socket;
+	this->message.defer.opcode = opcode;
+	this->message.defer.buf = new char[ size ];
+	this->message.defer.size = size;
+	memcpy( this->message.defer.buf, buf, size );
+}
+
 void SlavePeerEvent::send( SlavePeerSocket *socket, Packet *packet ) {
 	this->type = SLAVE_PEER_EVENT_TYPE_SEND;
 	this->socket = socket;

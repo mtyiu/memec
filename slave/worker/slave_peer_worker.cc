@@ -9,7 +9,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		char *data;
 	} buffer;
 
-	isSend = ( event.type != SLAVE_PEER_EVENT_TYPE_PENDING );
+	isSend = ( event.type != SLAVE_PEER_EVENT_TYPE_PENDING && event.type != SLAVE_PEER_EVENT_TYPE_DEFERRED );
 	success = false;
 	switch( event.type ) {
 		//////////////
@@ -413,6 +413,23 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				event.message.unsealedKeys.header
 			);
 			break;
+		////////////////////
+		// Deferred event //
+		////////////////////
+		case SLAVE_PEER_EVENT_TYPE_DEFERRED:
+			switch( event.message.defer.opcode ) {
+				case PROTO_OPCODE_BATCH_CHUNKS:
+					this->handleBatchChunksRequest(
+						event,
+						event.message.defer.buf,
+						event.message.defer.size
+					);
+					break;
+				default:
+					__ERROR__( "SlaveWorker", "dispatch", "Undefined deferred event." );
+			}
+			delete[] event.message.defer.buf;
+			break;
 		//////////
 		// Send //
 		//////////
@@ -733,7 +750,21 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				case PROTO_OPCODE_BATCH_CHUNKS:
 					switch ( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
-							this->handleBatchChunksRequest( event, buffer.data, buffer.size );
+						{
+							// Dump the buffer
+							SlavePeerEvent deferredEvent;
+							deferredEvent.defer(
+								event.socket,
+								event.instanceId,
+								event.requestId,
+								header.opcode,
+								buffer.data,
+								buffer.size
+							);
+							SlaveWorker::eventQueue->insert( deferredEvent );
+
+							// this->handleBatchChunksRequest( event, buffer.data, buffer.size );
+						}
 							break;
 						default:
 							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave." );
