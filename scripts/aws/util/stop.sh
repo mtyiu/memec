@@ -24,7 +24,7 @@ for i in {1..4}; do
 	ssh client "screen -S master${i} -p 0 -X stuff \"${TERM_COMMAND}\"" &
 	ssh client "screen -S ycsb${i} -p 0 -X stuff \"${TERM_COMMAND}\"" &
 done
-screen -S coordinator -p 0 -X stuff \"${TERM_COMMAND}\" &
+screen -S coordinator -p 0 -X stuff ${TERM_COMMAND} &
 
 sleep ${SLEEP_TIME}
 
