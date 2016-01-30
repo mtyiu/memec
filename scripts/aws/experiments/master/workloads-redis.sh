@@ -2,9 +2,8 @@
 
 BASE_PATH=${HOME}/mtyiu
 PLIO_PATH=${BASE_PATH}/plio
-HOSTNAME=$(hostname)
-CONTROL_NODE=coordinator
 
+ID=$(echo $STY | sed 's/^.*\(.\)$/\1/g')
 c=$1 # coding
 t=$2 # threads
 w=$3 # worklaod
@@ -17,11 +16,11 @@ echo "Running experiment with coding scheme = $c and thread count = $t..."
 if [ $w == "load" ]; then
 	echo "-------------------- Load (workloada) --------------------"
 	# ${BASE_PATH}/scripts/ycsb/plio/load.sh $t 2>&1 | tee ${BASE_PATH}/results/workloads/$c/$t/load.txt
-	${BASE_PATH}/scripts/ycsb/redis/load.sh $t 2>&1 | tee ${BASE_PATH}/results/workloads/$c/$t/load.txt
+	${BASE_PATH}/scripts/ycsb/redis/load.sh $t 2>&1 | tee ${BASE_PATH}/results/client-ycsb${ID}/workloads/$c/$t/load.txt
 else
 	echo "-------------------- Run ($w) --------------------"
 	# ${BASE_PATH}/scripts/ycsb/plio/run.sh $t $w 2>&1 | tee ${BASE_PATH}/results/workloads/$c/$t/$w.txt
-	${BASE_PATH}/scripts/ycsb/redis/run.sh $t $w 2>&1 | tee ${BASE_PATH}/results/workloads/$c/$t/$w.txt
+	${BASE_PATH}/scripts/ycsb/redis/run.sh $t $w 2>&1 | tee ${BASE_PATH}/results/client-ycsb${ID}/workloads/$c/$t/$w.txt
 fi
 
 # Tell the control node that this iteration is finished
