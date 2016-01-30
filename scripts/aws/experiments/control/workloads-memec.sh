@@ -53,7 +53,7 @@ for iter in {1..10}; do
 			sleep 10
 
 			for n in {1..4}; do
-				mkdir -p ${BASE_PATH}/results/workloads/memec/$iter/client-ycsb$n
+				mkdir -p ${BASE_PATH}/results/workloads/memec/$iter/client-ycsb${n}
 				scp client:${BASE_PATH}/results/client-ycsb${n}/workloads/$c/$t/*.txt ${BASE_PATH}/results/workloads/memec/$iter/client-ycsb${n}
 				ssh client "rm -rf ${BASE_PATH}/results/client-ycsb${n}/*"
 			done
