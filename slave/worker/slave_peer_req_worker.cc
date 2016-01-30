@@ -60,13 +60,25 @@ bool SlaveWorker::handleForwardKeyRequest( SlavePeerEvent event, char *buf, size
 			header.valueSize
 		);
 	}
+	return this->handleForwardKeyRequest( event, header, false );
+}
 
+bool SlaveWorker::handleForwardKeyRequest( SlavePeerEvent event, struct ForwardKeyHeader &header, bool self ) {
 	Key key;
 	KeyValue keyValue;
 	Metadata metadata;
 	DegradedMap *dmap = &SlaveWorker::degradedChunkBuffer->map;
 	bool isInserted;
 	uint32_t timestamp;
+
+	__DEBUG__(
+		BLUE, "SlaveWorker", "handleForwardKeyRequest",
+		"Degraded opcode: 0x%x; list ID: %u, chunk ID: %u; key: %.*s (size = %u); value size: %u; value update size: %u, offset: %u; self = %s.",
+		header.opcode, header.listId, header.chunkId,
+		header.keySize, header.key, header.keySize,
+		header.valueSize, header.valueUpdateSize, header.valueUpdateOffset,
+		self ? "true" : "false"
+	);
 
 	metadata.set( header.listId, header.stripeId, header.chunkId );
 	key.set( header.keySize, header.key );
@@ -82,21 +94,18 @@ bool SlaveWorker::handleForwardKeyRequest( SlavePeerEvent event, char *buf, size
 			// Modify the key-value pair before inserting into DegradedMap
 			isInserted = dmap->insertValue( keyValue, metadata );
 			if ( isInserted ) {
-				uint32_t dataUpdateOffset = KeyValue::getChunkUpdateOffset( 0, header.valueUpdateSize, header.valueUpdateOffset );
-				// Compute data delta
-				Coding::bitwiseXOR(
-					header.valueUpdate,
-					keyValue.data + dataUpdateOffset, // original data
-					header.valueUpdate,               // new data
-					header.valueUpdateSize
+				uint32_t dataUpdateOffset = KeyValue::getChunkUpdateOffset(
+					0,                       // chunkOffset
+					header.keySize,          // keySize
+					header.valueUpdateOffset // valueUpdateOffset
 				);
-				// Perform actual data update
-				Coding::bitwiseXOR(
+				memcpy(
 					keyValue.data + dataUpdateOffset,
-					keyValue.data + dataUpdateOffset, // original data
-					header.valueUpdate,               // new data
+					header.valueUpdate,
 					header.valueUpdateSize
 				);
+			} else {
+				keyValue.free();
 			}
 			break;
 		case PROTO_OPCODE_DEGRADED_DELETE:
@@ -109,17 +118,19 @@ bool SlaveWorker::handleForwardKeyRequest( SlavePeerEvent event, char *buf, size
 			return false;
 	}
 
-	event.resForwardKey(
-		event.socket,
-		true, // success
-		header.opcode,
-		event.instanceId, event.requestId,
-		header.listId, header.stripeId, header.chunkId,
-		header.keySize, header.valueSize,
-		header.key,
-		header.valueUpdateOffset, header.valueUpdateSize
-	);
-	this->dispatch( event );
+	if ( ! self ) {
+		event.resForwardKey(
+			event.socket,
+			true, // success
+			header.opcode,
+			event.instanceId, event.requestId,
+			header.listId, header.stripeId, header.chunkId,
+			header.keySize, header.valueSize,
+			header.key,
+			header.valueUpdateOffset, header.valueUpdateSize
+		);
+		this->dispatch( event );
+	}
 
 	return true;
 }
@@ -237,6 +248,7 @@ bool SlaveWorker::handleUpdateRequest( SlavePeerEvent event, char *buf, size_t s
 		header.chunkUpdateOffset,
 		ret
 	);
+	if ( ! ret ) printf( "Failed UPDATE request by slave peer!\n" );
 	this->dispatch( event );
 
 	return ret;

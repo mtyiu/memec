@@ -9,6 +9,7 @@
 class KeyValueUpdate : public Key {
 public:
 	uint32_t offset, length;
+	bool isDegraded;
 };
 
 class PendingIdentifier {

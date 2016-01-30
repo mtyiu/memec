@@ -363,7 +363,7 @@ bool SlaveWorker::handleRemappedUpdateResponse( SlavePeerEvent event, bool succe
 			keyValueUpdate,
 			header.valueUpdateOffset,
 			header.valueUpdateSize,
-			success, true, false
+			success, true, keyValueUpdate.isDegraded
 		);
 		this->dispatch( masterEvent );
 	}

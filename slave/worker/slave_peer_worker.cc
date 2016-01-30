@@ -475,6 +475,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 	}
 
 	if ( isSend ) {
+		assert( ! event.socket->self );
 		ret = event.socket->send( buffer.data, buffer.size, connected );
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "SlaveWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
