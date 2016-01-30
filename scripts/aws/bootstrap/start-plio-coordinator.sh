@@ -10,7 +10,7 @@ cd ${PLIO_PATH}
 if [ $# -gt 0 ]; then
 	# Debug mode
 	gdb bin/coordinator -ex "r -v \
-		-p ${CONFIG_PATH}
+		-p ${CONFIG_PATH}"
 else
 	bin/coordinator \
 		-p ${CONFIG_PATH}
