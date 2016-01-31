@@ -141,17 +141,6 @@ size_t Protocol::generateDegradedLockResHeader(
 			bytes += 8;
 		}
 	}
-	for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
-		uint32_t chunkId = original[ i * 2 + 1 ];
-		if ( ( chunkId < dataChunkCount && chunkId == dataChunkId ) ||
-		     ( chunkId >= dataChunkCount ) ) {
-			*( ( uint32_t * )( buf     ) ) = htonl( reconstructed[ i * 2     ] );
-			*( ( uint32_t * )( buf + 4 ) ) = htonl( reconstructed[ i * 2 + 1 ] );
-			buf += 8;
-			bytes += 8;
-		}
-	}
-
 	// Entries that are not related to this key
 	for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
 		uint32_t chunkId = original[ i * 2 + 1 ];
@@ -165,6 +154,19 @@ size_t Protocol::generateDegradedLockResHeader(
 			bytes += 8;
 		}
 	}
+
+	// Entries that are related to this key
+	for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
+		uint32_t chunkId = original[ i * 2 + 1 ];
+		if ( ( chunkId < dataChunkCount && chunkId == dataChunkId ) ||
+		     ( chunkId >= dataChunkCount ) ) {
+			*( ( uint32_t * )( buf     ) ) = htonl( reconstructed[ i * 2     ] );
+			*( ( uint32_t * )( buf + 4 ) ) = htonl( reconstructed[ i * 2 + 1 ] );
+			buf += 8;
+			bytes += 8;
+		}
+	}
+	// Entries that are not related to this key
 	for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
 		uint32_t chunkId = original[ i * 2 + 1 ];
 		if ( ( chunkId < dataChunkCount && chunkId == dataChunkId ) ||

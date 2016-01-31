@@ -298,7 +298,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 				fflush( stdout );
 				break;
 			case PROTO_DEGRADED_LOCK_RES_WAS_LOCKED:
-				printf( "PROTO_DEGRADED_LOCK_RES_WAS_LOCKED\n" );
+				printf( "PROTO_DEGRADED_LOCK_RES_WAS_LOCKED: %.*s\n", header.keySize, header.key );
 				for ( uint32_t i = 0; i < header.reconstructedCount; i++ ) {
 					printf(
 						"%s(%u, %u) |-> (%u, %u)%s",
