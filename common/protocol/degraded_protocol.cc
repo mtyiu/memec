@@ -108,14 +108,25 @@ size_t Protocol::generateDegradedLockResHeader( uint8_t magic, uint8_t to, uint8
 size_t Protocol::generateDegradedLockResHeader(
 	uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 	bool isLocked, uint8_t keySize, char *key,
-	bool isSealed, uint32_t stripeId,
+	bool isSealed, uint32_t stripeId, uint32_t dataChunkId, uint32_t dataChunkCount,
 	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 	uint32_t ongoingAtChunk
 ) {
+	// Count the number of entries that need to be sent
+	uint32_t reconstructedCountSend = 0;
+	for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
+		uint32_t chunkId = original[ i * 2 + 1 ];
+		if ( chunkId < dataChunkCount && chunkId == dataChunkId ) {
+			reconstructedCountSend++;
+		} else if ( chunkId >= dataChunkCount ) {
+			reconstructedCountSend++;
+		}
+	}
+
 	char *buf;
 	size_t bytes = this->generateDegradedLockResHeader(
 		magic, to, opcode, instanceId, requestId,
-		PROTO_DEGRADED_LOCK_RES_LOCK_SIZE + reconstructedCount * 4 * 4,
+		PROTO_DEGRADED_LOCK_RES_LOCK_SIZE + reconstructedCountSend * 4 * 4,
 		isLocked ? PROTO_DEGRADED_LOCK_RES_IS_LOCKED : PROTO_DEGRADED_LOCK_RES_WAS_LOCKED,
 		keySize, key, buf
 	);
@@ -125,23 +136,33 @@ size_t Protocol::generateDegradedLockResHeader(
 	bytes++;
 
 	*( ( uint32_t * )( buf      ) ) = htonl( stripeId );
-	*( ( uint32_t * )( buf +  4 ) ) = htonl( reconstructedCount );
+	*( ( uint32_t * )( buf +  4 ) ) = htonl( reconstructedCountSend );
 	*( ( uint32_t * )( buf +  8 ) ) = htonl( ongoingAtChunk );
 	buf += 12;
 	bytes += 12;
 
 	for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
-		*( ( uint32_t * )( buf     ) ) = htonl( original[ i * 2     ] );
-		*( ( uint32_t * )( buf + 4 ) ) = htonl( original[ i * 2 + 1 ] );
-		buf += 8;
-		bytes += 8;
+		uint32_t chunkId = original[ i * 2 + 1 ];
+		if ( ( chunkId < dataChunkCount && chunkId == dataChunkId ) ||
+		     ( chunkId >= dataChunkCount ) ) {
+			*( ( uint32_t * )( buf     ) ) = htonl( original[ i * 2     ] );
+			*( ( uint32_t * )( buf + 4 ) ) = htonl( original[ i * 2 + 1 ] );
+			buf += 8;
+			bytes += 8;
+		}
 	}
 	for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
-		*( ( uint32_t * )( buf     ) ) = htonl( reconstructed[ i * 2     ] );
-		*( ( uint32_t * )( buf + 4 ) ) = htonl( reconstructed[ i * 2 + 1 ] );
-		buf += 8;
-		bytes += 8;
+		uint32_t chunkId = original[ i * 2 + 1 ];
+		if ( ( chunkId < dataChunkCount && chunkId == dataChunkId ) ||
+		     ( chunkId >= dataChunkCount ) ) {
+			*( ( uint32_t * )( buf     ) ) = htonl( reconstructed[ i * 2     ] );
+			*( ( uint32_t * )( buf + 4 ) ) = htonl( reconstructed[ i * 2 + 1 ] );
+			buf += 8;
+			bytes += 8;
+		}
 	}
+
+
 
 	return bytes;
 }

@@ -66,6 +66,8 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 			false, // isLocked
 			map->isSealed( srcMetadata ), // the chunk is sealed
 			srcMetadata.stripeId,
+			srcMetadata.chunkId,
+			CoordinatorWorker::dataChunkCount,
 			degradedLock.original,
 			degradedLock.reconstructed,
 			degradedLock.reconstructedCount,
@@ -155,6 +157,8 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 				true,                         // the degraded lock is attained
 				map->isSealed( srcMetadata ), // the chunk is sealed
 				srcMetadata.stripeId,
+				srcMetadata.chunkId,
+				CoordinatorWorker::dataChunkCount,
 				header.original,
 				header.reconstructed,
 				header.reconstructedCount,

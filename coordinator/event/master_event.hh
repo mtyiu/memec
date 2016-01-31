@@ -63,6 +63,8 @@ public:
 		struct {
 			bool isSealed;
 			uint32_t stripeId;
+			uint32_t dataChunkId;
+			uint32_t dataChunkCount;
 			uint32_t reconstructedCount;
 			uint32_t remappedCount;
 			uint32_t ongoingAtChunk;
@@ -90,7 +92,7 @@ public:
 	void resDegradedLock(
 		MasterSocket *socket, uint16_t instanceId, uint32_t requestId,
 		Key &key, bool isLocked, bool isSealed,
-		uint32_t stripeId,
+		uint32_t stripeId, uint32_t dataChunkId, uint32_t dataChunkCount,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 		uint32_t ongoingAtChunk
 	);

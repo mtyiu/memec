@@ -109,6 +109,8 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 				event.message.degradedLock.key.data,
 				event.message.degradedLock.isSealed,
 				event.message.degradedLock.stripeId,
+				event.message.degradedLock.dataChunkId,
+				event.message.degradedLock.dataChunkCount,
 				event.message.degradedLock.original,
 				event.message.degradedLock.reconstructed,
 				event.message.degradedLock.reconstructedCount,

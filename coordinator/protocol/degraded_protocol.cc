@@ -3,7 +3,7 @@
 char *CoordinatorProtocol::resDegradedLock(
 	size_t &size, uint16_t instanceId, uint32_t requestId,
 	bool isLocked, uint8_t keySize, char *key,
-	bool isSealed, uint32_t stripeId,
+	bool isSealed, uint32_t stripeId, uint32_t dataChunkId, uint32_t dataChunkCount,
 	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 	uint32_t ongoingAtChunk
 ) {
@@ -14,7 +14,7 @@ char *CoordinatorProtocol::resDegradedLock(
 		PROTO_OPCODE_DEGRADED_LOCK,
 		instanceId, requestId,
 		isLocked, keySize, key,
-		isSealed, stripeId,
+		isSealed, stripeId, dataChunkId, dataChunkCount,
 		original, reconstructed, reconstructedCount,
 		ongoingAtChunk
 	);
