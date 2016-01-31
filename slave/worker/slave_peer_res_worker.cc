@@ -106,7 +106,9 @@ bool SlaveWorker::handleForwardKeyResponse( struct ForwardKeyHeader &header, boo
 						false /* isSealed */,
 						true /* isUpdate */,
 						op.timestamp,
-						op.socket
+						op.socket,
+						op.original, op.reconstructed, op.reconstructedCount,
+						false // reconstructParity - already reconstructed
 					);
 
 					delete[] valueUpdate;
@@ -141,7 +143,9 @@ bool SlaveWorker::handleForwardKeyResponse( struct ForwardKeyHeader &header, boo
 						false, // isSealed
 						false,  // isUpdate
 						op.timestamp,
-						op.socket
+						op.socket,
+						op.original, op.reconstructed, op.reconstructedCount,
+						false // reconstructParity - already reconstructed
 					);
 				} else {
 					masterEvent.resDelete(
@@ -258,9 +262,9 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 		}
 
 		MasterEvent masterEvent;
-		LOCK( &dmap->unsealed.lock );
 		switch( op.opcode ) {
 			case PROTO_OPCODE_DEGRADED_GET:
+				LOCK( &dmap->unsealed.lock );
 				if ( success ) {
 					masterEvent.resGet( op.socket, pid.parentInstanceId, pid.parentRequestId, keyValue, true );
 				} else {
@@ -272,6 +276,8 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 				break;
 			case PROTO_OPCODE_DEGRADED_UPDATE:
 				if ( success ) {
+					LOCK( &dmap->unsealed.lock );
+
 					Metadata metadata;
 					metadata.set( op.listId, op.stripeId, op.chunkId );
 					uint32_t dataUpdateOffset = KeyValue::getChunkUpdateOffset(
@@ -303,6 +309,8 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 						op.data.keyValueUpdate.length
 					);
 
+					UNLOCK( &dmap->unsealed.lock );
+
 					// Send UPDATE request to the parity slaves
 					this->sendModifyChunkRequest(
 						pid.parentInstanceId, pid.parentRequestId,
@@ -316,15 +324,13 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 						false /* isSealed */,
 						true /* isUpdate */,
 						op.timestamp,
-						op.socket
+						op.socket,
+						op.original, op.reconstructed, op.reconstructedCount,
+						false // reconstructParity - already reconstructed
 					);
-
-					UNLOCK( &dmap->unsealed.lock );
 
 					delete[] valueUpdate;
 				} else {
-					UNLOCK( &dmap->unsealed.lock );
-
 					masterEvent.resUpdate(
 						op.socket, pid.parentInstanceId, pid.parentRequestId, key,
 						op.data.keyValueUpdate.offset,
@@ -355,13 +361,11 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 						false, // isSealed
 						false,  // isUpdate
 						op.timestamp,
-						op.socket
+						op.socket,
+						op.original, op.reconstructed, op.reconstructedCount,
+						false // reconstructParity - already reconstructed
 					);
-
-					UNLOCK( &dmap->unsealed.lock );
 				} else {
-					UNLOCK( &dmap->unsealed.lock );
-
 					masterEvent.resDelete(
 						op.socket, pid.parentInstanceId, pid.parentRequestId,
 						key,

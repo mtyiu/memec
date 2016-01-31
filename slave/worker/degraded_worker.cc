@@ -397,7 +397,9 @@ bool SlaveWorker::handleDegradedUpdateRequest( MasterEvent event, char *buf, siz
 				true /* isSealed */,
 				true /* isUpdate */,
 				event.timestamp,
-				event.socket
+				event.socket,
+				header.original, header.reconstructed, header.reconstructedCount,
+				false // reconstructParity - already reconstructed
 			);
 		} else {
 			// Send UPDATE request to the parity slaves
@@ -435,7 +437,9 @@ bool SlaveWorker::handleDegradedUpdateRequest( MasterEvent event, char *buf, siz
 				false /* isSealed */,
 				true /* isUpdate */,
 				event.timestamp,
-				event.socket
+				event.socket,
+				header.original, header.reconstructed, header.reconstructedCount,
+				false // reconstructParity - already reconstructed
 			);
 		}
 	} else if ( chunk ) {
@@ -591,7 +595,9 @@ bool SlaveWorker::handleDegradedDeleteRequest( MasterEvent event, char *buf, siz
 				true /* isSealed */,
 				false /* isUpdate */,
 				event.timestamp,
-				event.socket
+				event.socket,
+				header.original, header.reconstructed, header.reconstructedCount,
+				false // reconstructParity - already reconstructed
 			);
 		} else {
 			uint32_t tmp = 0;
@@ -614,7 +620,9 @@ bool SlaveWorker::handleDegradedDeleteRequest( MasterEvent event, char *buf, siz
 				false /* isSealed */,
 				false /* isUpdate */,
 				event.timestamp,
-				event.socket
+				event.socket,
+				header.original, header.reconstructed, header.reconstructedCount,
+				false // reconstructParity - already reconstructed
 			);
 		}
 	} else if ( chunk ) {
@@ -1482,13 +1490,6 @@ bool SlaveWorker::sendModifyChunkRequest(
 				} else {
 					__ERROR__( "SlaveWorker", "sendModifyChunkRequest", "TODO: Handle DELETE request on self slave socket." );
 				}
-
-				__DEBUG__(
-					YELLOW, "SlaveWorker", "sendModifyChunkRequest",
-					"SELF SOCKET (updated? %s), my chunk ID = %u.",
-					r ? "true" : "false",
-					SlaveWorker::chunkBuffer->at( metadata.listId )->getChunkId()
-				);
 			} else {
 				// Insert into event queue
 				SlavePeerEvent slavePeerEvent;
@@ -1502,7 +1503,6 @@ bool SlaveWorker::sendModifyChunkRequest(
 #else
 				this->dispatch( slavePeerEvent );
 #endif
-				// printf( "Sending UPDATE request for key: %.*s...\n", keySize, keyStr );
 			}
 		}
 
