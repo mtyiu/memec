@@ -25,6 +25,10 @@ bool SlaveWorker::handleForwardKeyResponse( SlavePeerEvent event, bool success, 
 		);
 	}
 
+	return this->handleForwardKeyResponse( header, success, false );
+}
+
+bool SlaveWorker::handleForwardKeyResponse( struct ForwardKeyHeader &header, bool success, bool self ) {
 	DegradedMap *dmap = &SlaveWorker::degradedChunkBuffer->map;
 	Key key;
 	PendingIdentifier pid;
@@ -34,13 +38,14 @@ bool SlaveWorker::handleForwardKeyResponse( SlavePeerEvent event, bool success, 
 	key.set( header.keySize, header.key );
 
 	if ( ! dmap->deleteDegradedKey( key, pids ) ) {
-		__ERROR__( "SlaveWorker", "handleForwardKeyResponse", "SlaveWorker::degradedChunkBuffer->deleteDegradedKey() failed: %.*s.", header.keySize, header.key );
+		__ERROR__( "SlaveWorker", "handleForwardKeyResponse", "SlaveWorker::degradedChunkBuffer->deleteDegradedKey() failed: %.*s (self? %s).", header.keySize, header.key, self ? "yes" : "no" );
+		return false;
 	}
 
 	KeyValue keyValue;
 	if ( map->findValueByKey( header.key, header.keySize, &keyValue, &key ) ) {
 	} else {
-		printf( "OOPS\n" );
+		__ERROR__( "SlaveWorker", "handleForwardKeyResponse", "Cannot find the forwarded object locally." );
 	}
 
 	for ( int pidsIndex = 0, len = pids.size(); pidsIndex < len; pidsIndex++ ) {
@@ -253,6 +258,7 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 		}
 
 		MasterEvent masterEvent;
+		LOCK( &dmap->unsealed.lock );
 		switch( op.opcode ) {
 			case PROTO_OPCODE_DEGRADED_GET:
 				if ( success ) {
@@ -262,6 +268,7 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 				}
 				op.data.key.free();
 				this->dispatch( masterEvent );
+				UNLOCK( &dmap->unsealed.lock );
 				break;
 			case PROTO_OPCODE_DEGRADED_UPDATE:
 				if ( success ) {
@@ -312,8 +319,12 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 						op.socket
 					);
 
+					UNLOCK( &dmap->unsealed.lock );
+
 					delete[] valueUpdate;
 				} else {
+					UNLOCK( &dmap->unsealed.lock );
+
 					masterEvent.resUpdate(
 						op.socket, pid.parentInstanceId, pid.parentRequestId, key,
 						op.data.keyValueUpdate.offset,
@@ -346,7 +357,11 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 						op.timestamp,
 						op.socket
 					);
+
+					UNLOCK( &dmap->unsealed.lock );
 				} else {
+					UNLOCK( &dmap->unsealed.lock );
+
 					masterEvent.resDelete(
 						op.socket, pid.parentInstanceId, pid.parentRequestId,
 						key,

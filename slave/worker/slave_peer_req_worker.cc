@@ -87,6 +87,8 @@ bool SlaveWorker::handleForwardKeyRequest( SlavePeerEvent event, struct ForwardK
 		case PROTO_OPCODE_DEGRADED_GET:
 			keyValue.dup( header.key, header.keySize, header.value, header.valueSize );
 			isInserted = dmap->insertValue( keyValue, metadata );
+			if ( ! isInserted )
+				keyValue.free();
 			break;
 		case PROTO_OPCODE_DEGRADED_UPDATE:
 			keyValue.dup( header.key, header.keySize, header.value, header.valueSize );
@@ -130,6 +132,8 @@ bool SlaveWorker::handleForwardKeyRequest( SlavePeerEvent event, struct ForwardK
 			header.valueUpdateOffset, header.valueUpdateSize
 		);
 		this->dispatch( event );
+	} else {
+		this->handleForwardKeyResponse( header, true, true );
 	}
 
 	return true;

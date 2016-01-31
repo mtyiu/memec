@@ -134,6 +134,7 @@ private:
 
 	// ---------- slave_peer_res_worker.cc ----------
 	bool handleForwardKeyResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
+	bool handleForwardKeyResponse( struct ForwardKeyHeader &header, bool success, bool self );
 	bool handleSetResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleGetResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleUpdateResponse( SlavePeerEvent event, bool success, char *buf, size_t size );

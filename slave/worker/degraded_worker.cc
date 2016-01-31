@@ -837,12 +837,12 @@ bool SlaveWorker::performDegradedRead(
 	}
 
 	// Insert the degraded operation into degraded chunk buffer pending set
+	Key k;
 	bool needsContinue;
 	if ( isSealed ) {
 		needsContinue = SlaveWorker::degradedChunkBuffer->map.insertDegradedChunk( listId, stripeId, chunkId, instanceId, requestId, isReconstructed );
 		// printf( "insertDegradedChunk(): (%u, %u, %u) - needsContinue: %d\n", listId, stripeId, chunkId, needsContinue );
 	} else {
-		Key k;
 		if ( opcode == PROTO_OPCODE_DEGRADED_UPDATE )
 			k.set( keyValueUpdate->size, keyValueUpdate->data );
 		else
@@ -938,6 +938,9 @@ bool SlaveWorker::performDegradedRead(
 		return ( selected >= SlaveWorker::dataChunkCount );
 	} else {
 		////////// Key-value pairs in unsealed chunks //////////
+		if ( ! needsContinue || isReconstructed )
+			return false;
+
 		if ( socket->self ) {
 			// Get the requested key-value pairs from local key-value store
 			KeyValue keyValue;
@@ -978,12 +981,6 @@ bool SlaveWorker::performDegradedRead(
 
 				if ( ! SlaveWorker::pending->insertDegradedOp( PT_SLAVE_PEER_DEGRADED_OPS, instanceId, parentInstanceId, requestId, parentRequestId, 0, op ) ) {
 					__ERROR__( "SlaveWorker", "performDegradedRead", "Cannot insert into slave DEGRADED_OPS pending map." );
-				}
-
-				for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
-					if ( ! SlaveWorker::pending->insertKeyValue( PT_SLAVE_PEER_SET, instanceId, parentInstanceId, requestId, parentRequestId, socket, keyValue ) ) {
-						__ERROR__( "SlaveWorker", "performDegradedRead", "Cannot insert into slave SET pending map." );
-					}
 				}
 
 				for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
@@ -1058,69 +1055,15 @@ bool SlaveWorker::performDegradedRead(
 				}
 
 				return true;
-			}
-
-			////////////////////////////////////////////////////////////////////
-			switch( opcode ) {
-				case PROTO_OPCODE_DEGRADED_GET:
-					if ( success ) {
-						// masterEvent.resGet( masterSocket, parentInstanceId, parentRequestId, keyValue, true );
-					} else {
+			} else {
+				switch( opcode ) {
+					case PROTO_OPCODE_DEGRADED_GET:
 						// Return failure to master
 						masterEvent.resGet( masterSocket, parentInstanceId, parentRequestId, mykey, true );
-					}
-					this->dispatch( masterEvent );
-					op.data.key.free();
-					break;
-				case PROTO_OPCODE_DEGRADED_UPDATE:
-					if ( success ) {
-						/*
-						if ( ! needsSend ) {
-							Metadata metadata;
-							metadata.set( listId, stripeId, chunkId );
-
-							uint32_t dataUpdateOffset = KeyValue::getChunkUpdateOffset(
-								0,                     // chunkOffset
-								keyValueUpdate->size,  // keySize
-								keyValueUpdate->offset // valueUpdateOffset
-							);
-
-							char *valueUpdate = ( char * ) keyValueUpdate->ptr;
-
-							// Compute data delta
-							Coding::bitwiseXOR(
-								valueUpdate,
-								keyValue.data + dataUpdateOffset, // original data
-								valueUpdate,                      // new data
-								keyValueUpdate->length
-							);
-							// Perform actual data update
-							Coding::bitwiseXOR(
-								keyValue.data + dataUpdateOffset,
-								keyValue.data + dataUpdateOffset, // original data
-								valueUpdate,                      // new data
-								keyValueUpdate->length
-							);
-
-							// Send UPDATE request to the parity slaves
-							this->sendModifyChunkRequest(
-								event.instanceId, event.requestId,
-								keyValueUpdate->size,
-								keyValueUpdate->data,
-								metadata,
-								0, // chunkUpdateOffset
-								keyValueUpdate->length, // deltaSize
-								keyValueUpdate->offset,
-								valueUpdate,
-								false, // isSealed
-								true,  // isUpdate
-								0,     // timestamp
-								0,     // masterSocket
-								original, reconstructed, reconstructedCount
-							);
-						}
-						*/
-					} else {
+						this->dispatch( masterEvent );
+						op.data.key.free();
+						break;
+					case PROTO_OPCODE_DEGRADED_UPDATE:
 						masterEvent.resUpdate(
 							masterSocket, parentInstanceId, parentRequestId, mykey,
 							keyValueUpdate->offset,
@@ -1128,47 +1071,10 @@ bool SlaveWorker::performDegradedRead(
 							false, false, true
 						);
 						this->dispatch( masterEvent );
-					}
-					op.data.keyValueUpdate.free();
-					delete[] ( ( char * ) op.data.keyValueUpdate.ptr );
-					break;
-				case PROTO_OPCODE_DEGRADED_DELETE:
-					if ( success ) {
-						/*
-						Metadata metadata;
-						KeyMetadata keyMetadata;
-						uint32_t timestamp;
-						metadata.set( listId, stripeId, chunkId );
-						keyMetadata.set( listId, stripeId, chunkId );
-
-						// SlaveWorker::map->insertOpMetadata(
-						// 	PROTO_OPCODE_DELETE, timestamp,
-						// 	mykey, keyMetadata
-						// );
-
-						uint32_t tmp = 0;
-						SlaveWorker::degradedChunkBuffer->deleteKey(
-							PROTO_OPCODE_DELETE, timestamp,
-							mykey.size, mykey.data,
-							metadata,
-							true, // isSealed
-							tmp, 0, 0
-						);
-
-						this->sendModifyChunkRequest(
-							parentInstanceId, parentRequestId,
-							mykey.size, mykey.data,
-							metadata,
-							// not needed for deleting a key-value pair in an unsealed chunk:
-							0, 0, 0, 0,
-							false, // isSealed
-							false, // isUpdate
-							0,     // timestamp
-							0,     // masterSocket
-							original, reconstructed, reconstructedCount
-						);
-						*/
-					} else {
+						op.data.keyValueUpdate.free();
+						delete[] ( ( char * ) op.data.keyValueUpdate.ptr );
+						break;
+					case PROTO_OPCODE_DEGRADED_DELETE:
 						masterEvent.resDelete(
 							masterSocket,
 							parentInstanceId, parentRequestId,
@@ -1177,21 +1083,19 @@ bool SlaveWorker::performDegradedRead(
 							true   // isDegraded
 						);
 						this->dispatch( masterEvent );
-					}
-					op.data.key.free();
-					break;
+						op.data.key.free();
+						break;
+				}
 			}
 
 			return success;
-		} else if ( needsContinue ) {
+		} else {
 			// Send GET request to surviving parity slave
 			if ( ! SlaveWorker::pending->insertKey( PT_SLAVE_PEER_GET, instanceId, parentInstanceId, requestId, parentRequestId, socket, op.data.key ) ) {
 				__ERROR__( "SlaveWorker", "performDegradedRead", "Cannot insert into slave GET pending map." );
 			}
 			event.reqGet( socket, instanceId, requestId, listId, chunkId, op.data.key );
 			this->dispatch( event );
-		} else if ( isReconstructed ) {
-			return false;
 		}
 		return true;
 	}
