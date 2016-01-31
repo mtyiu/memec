@@ -128,7 +128,9 @@ public:
 	bool updateKeyValue(
 		uint8_t keySize, char *keyStr,
 		uint32_t valueUpdateSize, uint32_t valueUpdateOffset, uint32_t chunkUpdateOffset,
-		char *valueUpdate, Chunk *chunk, bool isSealed
+		char *valueUpdate, Chunk *chunk, bool isSealed,
+		KeyValue *keyValuePtr = 0,
+		Metadata *metadataPtr = 0
 	);
 	bool deleteKey(
 		uint8_t opcode, uint32_t &timestamp,

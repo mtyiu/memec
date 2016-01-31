@@ -89,15 +89,15 @@ bool SlaveBackup::insertData##_OP_TYPE_( Timestamp ts, Key key, Value value, Met
 	saveIt = _LIT_; \
 	for ( ; _LIT_ != _RIT_; _LIT_ = saveIt ) { \
 		saveIt++; \
-		/* 
-		 * skip if target slave id is specified, and  
+		/*
+		 * skip if target slave id is specified, and
 		 *
 		 * (1) (a) isParity && data source != target slave id, and
 		 *     (b) a set of timestamps is specified but the backup timestamp is not in the set;
 		 *
 		 * OR
 		 *
-		 * (2) isData && target slave id not in  parity slaves (no need to check timstamps, 
+		 * (2) isData && target slave id not in  parity slaves (no need to check timstamps,
 		 *     since yet removed > yet all parity acked > must revert;
 		 *     TODO what if master send revert to parity before ack from data slave reach master??
 		 */ \

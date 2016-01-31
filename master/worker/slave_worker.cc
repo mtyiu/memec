@@ -54,7 +54,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 		case SLAVE_EVENT_TYPE_REVERT_DELTA:
 		{
 			bool isAck = ( event.type == SLAVE_EVENT_TYPE_ACK_PARITY_DELTA );
-				
+
 			uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
 
 			AcknowledgementInfo ackInfo(
@@ -194,7 +194,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 						break;
 					case PROTO_OPCODE_UPDATE:
 						if ( ! mrmh.acceptNormalResponse( addr ) ) {
-							// __INFO__( YELLOW, "Master", "dispatch", "Ignoring normal UPDATE response..." );
+							__INFO__( YELLOW, "Master", "dispatch", "Ignoring normal UPDATE response..." );
 							break;
 						}
 					case PROTO_OPCODE_DEGRADED_UPDATE:
@@ -520,7 +520,7 @@ bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, bool is
 	uint32_t timestamp = pid.timestamp;
 
 	if ( ! MasterWorker::pending->eraseKeyValueUpdate( PT_APPLICATION_UPDATE, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &keyValueUpdate, true, true, true, header.key ) ) {
-		__ERROR__( "MasterWorker", "handleUpdateResponse", "Cannot find a pending application UPDATE request that matches the response. This message will be discarded." );
+		__ERROR__( "MasterWorker", "handleUpdateResponse", "Cannot find a pending application UPDATE request that matches the response. This message will be discarded (%u, %u).", pid.parentInstanceId, pid.parentRequestId );
 		return false;
 	}
 
@@ -549,19 +549,21 @@ bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, bool is
 	}
 
 	// Check if all normal requests completes
-	SlaveSocket *slave = 0;
-	struct sockaddr_in addr;
-	MasterRemapMsgHandler *remapMsgHandler = &Master::getInstance()->remapMsgHandler;
-	this->stripeList->get( header.key, header.keySize, 0, this->paritySlaveSockets );
-	for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
-		slave = this->paritySlaveSockets[ i ];
-		addr = slave->getAddr();
-		if ( ! remapMsgHandler->useCoordinatedFlow( addr ) || remapMsgHandler->stateTransitInfo.at( addr ).isCompleted() )
-			continue;
-		if ( remapMsgHandler->stateTransitInfo.at( addr ).removePendingRequest( pid.requestId ) == 0 ) {
-			__INFO__( GREEN, "MasterWorker", "handleUpdateResponse", "Ack transition for slave id = %u.", slave->instanceId );
-			remapMsgHandler->stateTransitInfo.at( addr ).setCompleted();
-			remapMsgHandler->ackTransit( addr );
+	if ( ! isDegraded ) {
+		SlaveSocket *slave = 0;
+		struct sockaddr_in addr;
+		MasterRemapMsgHandler *remapMsgHandler = &Master::getInstance()->remapMsgHandler;
+		this->stripeList->get( header.key, header.keySize, 0, this->paritySlaveSockets );
+		for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
+			slave = this->paritySlaveSockets[ i ];
+			addr = slave->getAddr();
+			if ( ! remapMsgHandler->useCoordinatedFlow( addr ) || remapMsgHandler->stateTransitInfo.at( addr ).isCompleted() )
+				continue;
+			if ( remapMsgHandler->stateTransitInfo.at( addr ).removePendingRequest( pid.requestId ) == 0 ) {
+				__INFO__( GREEN, "MasterWorker", "handleUpdateResponse", "Ack transition for slave id = %u.", slave->instanceId );
+				remapMsgHandler->stateTransitInfo.at( addr ).setCompleted();
+				remapMsgHandler->ackTransit( addr );
+			}
 		}
 	}
 

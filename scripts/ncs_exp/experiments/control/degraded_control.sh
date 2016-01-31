@@ -22,19 +22,19 @@ function restore_overload {
 }
 
 workloads='workloada workloadc'
-delays='0.4 0.8 1.2 1.6'
+delays='0.4 0.8 1.2 1.6 2.0'
 
 for delay in $delays; do
 	for iter in {1..10}; do
 		echo "******************** Iteration #$iter ********************"
 		screen -S manage -p 0 -X stuff "${BASE_PATH}/scripts/util/start.sh $(printf '\r')"
 		sleep 30
-	
+
 		echo "-------------------- Load --------------------"
 		for n in 3 4 8 9; do
 			ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/master/degraded.sh load $(printf '\r')\"" &
 		done
-	
+
 		pending=0
 		for n in 3 4 8 9; do
 			if [ $n == 3 ]; then
@@ -44,15 +44,15 @@ for delay in $delays; do
 			fi
 			pending=$(expr $pending + 1)
 		done
-	
+
 		set_overload $delay
-	
+
 		for w in $workloads; do
 			echo "-------------------- Run ($w) --------------------"
 			for n in 3 4 8 9; do
 				ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/master/degraded.sh $w $(printf '\r')\"" &
 			done
-	
+
 			pending=0
 			for n in 3 4 8 9; do
 				if [ $n == 3 ]; then
@@ -63,14 +63,14 @@ for delay in $delays; do
 				pending=$(expr $pending + 1)
 			done
 		done
-	
+
 		echo "Done"
-	
+
 		restore_overload
-	
+
 		screen -S manage -p 0 -X stuff "$(printf '\r\r')"
 		sleep 30
-	
+
 		for n in 3 4 8 9; do
 			mkdir -p ${BASE_PATH}/results/degraded_control/$delay/$iter/node$n
 			scp testbed-node$n:${BASE_PATH}/results/degraded/*.txt ${BASE_PATH}/results/degraded_control/$delay/$iter/node$n

@@ -83,7 +83,7 @@ Chunk *DegradedMap::findChunkById( uint32_t listId, uint32_t stripeId, uint32_t 
 	if ( needsLock ) LOCK( &this->cacheLock );
 	it = this->cache.find( metadata );
 	if ( it == this->cache.end() ) {
-		UNLOCK( &this->cacheLock );
+		if ( needsUnlock ) UNLOCK( &this->cacheLock );
 		return 0;
 	}
 	if ( needsUnlock ) UNLOCK( &this->cacheLock );
@@ -218,6 +218,7 @@ bool DegradedMap::insertDegradedChunk( uint32_t listId, uint32_t stripeId, uint3
 			ret = r.second;
 		} else {
 			isReconstructed = true;
+			UNLOCK( &this->degraded.chunksLock );
 			return false;
 		}
 	} else {
@@ -276,6 +277,7 @@ bool DegradedMap::insertDegradedKey( Key key, uint16_t instanceId, uint32_t requ
 			ret = r.second;
 		} else {
 			isReconstructed = true;
+			UNLOCK( &this->degraded.keysLock );
 			return false;
 		}
 	} else {
@@ -433,18 +435,18 @@ void DegradedChunkBuffer::print( FILE *f ) {
 
 void DegradedChunkBuffer::stop() {}
 
-bool DegradedChunkBuffer::updateKeyValue( uint8_t keySize, char *keyStr, uint32_t valueUpdateSize, uint32_t valueUpdateOffset, uint32_t chunkUpdateOffset, char *valueUpdate, Chunk *chunk, bool isSealed ) {
+bool DegradedChunkBuffer::updateKeyValue( uint8_t keySize, char *keyStr, uint32_t valueUpdateSize, uint32_t valueUpdateOffset, uint32_t chunkUpdateOffset, char *valueUpdate, Chunk *chunk, bool isSealed, KeyValue *keyValuePtr, Metadata *metadataPtr ) {
 	Key key;
 	LOCK_T *keysLock, *cacheLock;
 	std::unordered_map<Key, KeyMetadata> *keys;
 	std::unordered_map<Metadata, Chunk *> *cache;
+	bool ret = false;
 
 	this->map.getKeysMap( keys, keysLock );
 	this->map.getCacheMap( cache, cacheLock );
 
 	key.set( keySize, keyStr );
 
-	LOCK( keysLock );
 	if ( isSealed ) {
 		LOCK( cacheLock );
 		chunk->computeDelta(
@@ -455,12 +457,57 @@ bool DegradedChunkBuffer::updateKeyValue( uint8_t keySize, char *keyStr, uint32_
 			true // perform update
 		);
 		UNLOCK( cacheLock );
+		ret = true;
 	} else {
+		LOCK( &this->map.unsealed.lock );
+		std::unordered_map<Key, KeyValue>::iterator it = this->map.unsealed.values.find( key );
+		if ( it == this->map.unsealed.values.end() ) {
+			if ( ! metadataPtr || ! keyValuePtr ) {
+				UNLOCK( &this->map.unsealed.lock );
+				return false;
+			}
 
+			Metadata metadata = *metadataPtr;
+			KeyValue keyValue = *keyValuePtr;
+			std::pair<std::unordered_map<Key, KeyValue>::iterator, bool> r;
+
+			uint8_t tmpKeySize;
+			uint32_t tmpValueSize;
+			char *tmpKeyStr, *tmpValueStr;
+			keyValue.deserialize( tmpKeyStr, tmpKeySize, tmpValueStr, tmpValueSize );
+
+			keyValue.dup( tmpKeyStr, tmpKeySize, tmpValueStr, tmpValueSize );
+			key = keyValue.key();
+
+			std::pair<Key, KeyValue> p1( key, keyValue );
+			std::pair<Metadata, Key> p2( metadata, key );
+
+			r = this->map.unsealed.values.insert( p1 );
+			if ( r.second )
+				this->map.unsealed.metadataRev.insert( p2 );
+
+			UNLOCK( &this->map.unsealed.lock );
+
+			return r.second;
+		} else {
+			KeyValue &keyValue = it->second;
+			uint32_t dataUpdateOffset = KeyValue::getChunkUpdateOffset(
+				0,                // chunkOffset
+				keySize,          // keySize
+				valueUpdateOffset // valueUpdateOffset
+			);
+			memcpy(
+				keyValue.data + dataUpdateOffset,
+				valueUpdate,
+				valueUpdateSize
+			);
+		}
+		UNLOCK( &this->map.unsealed.lock );
+
+		ret = true;
 	}
-	UNLOCK( keysLock );
 
-	return false;
+	return ret;
 }
 
 bool DegradedChunkBuffer::deleteKey( uint8_t opcode, uint32_t &timestamp, uint8_t keySize, char *keyStr, Metadata metadata, bool isSealed, uint32_t &deltaSize, char *delta, Chunk *chunk ) {

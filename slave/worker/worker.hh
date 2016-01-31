@@ -117,6 +117,7 @@ private:
 	// ---------- slave_peer_req_worker.cc ----------
 	bool handleSlavePeerRegisterRequest( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, char *buf, size_t size );
 	bool handleForwardKeyRequest( SlavePeerEvent event, char *buf, size_t size );
+	bool handleForwardKeyRequest( SlavePeerEvent event, struct ForwardKeyHeader &header, bool self );
 	bool handleSetRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleGetRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleUpdateRequest( SlavePeerEvent event, char *buf, size_t size );
@@ -133,6 +134,7 @@ private:
 
 	// ---------- slave_peer_res_worker.cc ----------
 	bool handleForwardKeyResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
+	bool handleForwardKeyResponse( struct ForwardKeyHeader &header, bool success, bool self );
 	bool handleSetResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleGetResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleUpdateResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
@@ -164,6 +166,7 @@ private:
 	bool handleDegradedUpdateRequest( MasterEvent event, char *buf, size_t size );
 	bool handleDegradedDeleteRequest( MasterEvent event, char *buf, size_t size );
 	bool handleForwardChunkRequest( SlavePeerEvent event, char *buf, size_t size );
+	bool handleForwardChunkRequest( struct ChunkDataHeader &header );
 	bool handleForwardChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool performDegradedRead(
 		uint8_t opcode,
@@ -173,6 +176,7 @@ private:
 		Key *key, bool isSealed,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 		uint32_t ongoingAtChunk,
+		bool &isReconstructed,
 		KeyValueUpdate *keyValueUpdate = 0,
 		uint32_t timestamp = 0
 	);

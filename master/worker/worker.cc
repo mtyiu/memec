@@ -144,106 +144,6 @@ SlaveSocket *MasterWorker::getSlaves( uint32_t listId, uint32_t chunkId ) {
 	return ret->ready() ? ret : 0;
 }
 
-/*
-SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, uint32_t &newChunkId, bool &useDegradedMode, SlaveSocket *&original ) {
-	useDegradedMode = false;
-	original = this->getSlaves( data, size, listId, chunkId );
-	newChunkId = chunkId;
-	if ( Master::getInstance()->isDegraded( original ) ) {
-		// Perform degraded operation
-		useDegradedMode = true;
-		if ( MasterWorker::degradedTargetIsFixed ) {
-			if ( ! BasicRemappingScheme::isOverloaded( original ) || ! Master::getInstance()->remapMsgHandler.allowRemapping( original->getAddr() ) )
-				return original; // not overloaded
-
-			// Pick a new server from the same stripe list to handle the request
-			for ( uint32_t jump = 0, chunkCount = MasterWorker::dataChunkCount + MasterWorker::parityChunkCount; jump < chunkCount; jump++ ) {
-				SlaveSocket *target = MasterWorker::stripeList->get( listId, chunkId, jump, &newChunkId );
-				if ( chunkId == newChunkId )
-					continue;
-				if ( target && target->ready() )
-					return target;
-			}
-			__ERROR__( "MasterWorker", "getSlaves", "No slaves are available for degraded operations." );
-			return 0;
-		} else {
-			BasicRemappingScheme::getDegradedOpTarget(
-				listId, chunkId, newChunkId,
-				MasterWorker::dataChunkCount,
-				MasterWorker::parityChunkCount,
-				this->dataSlaveSockets,
-				this->paritySlaveSockets
-			);
-			if ( newChunkId < MasterWorker::dataChunkCount )
-				return this->dataSlaveSockets[ newChunkId ];
-			return this->paritySlaveSockets[ newChunkId - MasterWorker::dataChunkCount ];
-		}
-	}
-	return original;
-}
-
-SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &dataChunkId, uint32_t &newDataChunkId, uint32_t &parityChunkId, uint32_t &newParityChunkId, bool &useDegradedMode ) {
-	SlaveSocket *socket;
-	bool found = false;
-
-	useDegradedMode = false;
-	this->getSlaves( data, size, listId, dataChunkId );
-	newDataChunkId = dataChunkId;
-	parityChunkId = newParityChunkId = 0; // baseline: no need to redirect parity servers
-
-	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount + 1; i++ ) {
-		// Already redirect a data or parity slave
-		if ( useDegradedMode )
-			break;
-
-		socket = i == 0 ? this->dataSlaveSockets[ dataChunkId ] : this->paritySlaveSockets[ i - 1 ];
-		if ( Master::getInstance()->isDegraded( socket ) ) {
-			// Perform degraded operation
-			useDegradedMode = true;
-
-			uint32_t &chunkId = i == 0 ? dataChunkId : parityChunkId;
-			uint32_t &newChunkId = i == 0 ? newDataChunkId : newParityChunkId;
-
-			if ( i != 0 )
-				chunkId = ( MasterWorker::dataChunkCount + i - 1 ); // set parity chunk ID
-
-			if ( MasterWorker::degradedTargetIsFixed ) {
-				if ( ! BasicRemappingScheme::isOverloaded( socket ) || ! Master::getInstance()->remapMsgHandler.allowRemapping( socket->getAddr() ) ) {
-					useDegradedMode = false;
-					continue;
-				}
-
-				// Pick a new server from the same stripe list to handle the request
-				for ( uint32_t jump = 0, chunkCount = MasterWorker::dataChunkCount + MasterWorker::parityChunkCount; jump < chunkCount; jump++ ) {
-					SlaveSocket *target = MasterWorker::stripeList->get( listId, chunkId, jump, &newChunkId );
-					if ( chunkId == newChunkId )
-						continue;
-					if ( target && target->ready() ) {
-						found = true;
-						break;
-					}
-				}
-
-				if ( ! found )
-					__ERROR__( "MasterWorker", "getSlaves", "No slaves are available for degraded operations." );
-				break;
-			} else {
-				BasicRemappingScheme::getDegradedOpTarget(
-					listId, chunkId, newChunkId,
-					MasterWorker::dataChunkCount,
-					MasterWorker::parityChunkCount,
-					this->dataSlaveSockets,
-					this->paritySlaveSockets
-				);
-			}
-		}
-	}
-
-	socket = this->dataSlaveSockets[ newDataChunkId ];
-	return socket->ready() ? socket : 0;
-}
-*/
-
 void MasterWorker::removePending( SlaveSocket *slave, bool needsAck ) {
 
 	struct sockaddr_in saddr = slave->getAddr();
@@ -485,7 +385,7 @@ void MasterWorker::gatherPendingNormalRequests( SlaveSocket *target, bool needsA
 	if ( ! hasPending  ) {
 		__INFO__( GREEN, "MasterWorker", "gatherPendingNormalRequest", "No pending normal requests for transit." );
 		Master::getInstance()->remapMsgHandler.stateTransitInfo[ addr ].setCompleted();
-		if ( needsAck ) 
+		if ( needsAck )
 			Master::getInstance()->remapMsgHandler.ackTransit( addr );
 	}
 

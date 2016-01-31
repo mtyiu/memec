@@ -14,10 +14,13 @@ for i in {1..10}; do
 	if [ $i == 10 ]; then
 		screen_id=slave_10
 	fi
-	screen -S ${screen_id} -p 0 -X stuff \
-		"bin/slave ${VERBOSE} -o slave slave${i} tcp://127.0.0.1:${port} -o storage path /tmp/plio/slave${i} $(printf '\r')"
-	# screen -S slave${i} -p 0 -X stuff \
-	# 	"gdb bin/slave -ex \"r -v -o slave slave${i} tcp://127.0.0.1:911${i} -o storage path /tmp/plio/slave${i}\" $(printf '\r')  $(printf '\r') $(printf '\r') $(printf '\r')"
+	if [ $# == 0 ]; then
+		screen -S ${screen_id} -p 0 -X stuff \
+			"bin/slave ${VERBOSE} -o slave slave${i} tcp://127.0.0.1:${port} -o storage path /tmp/plio/slave${i} 2>&1 | tee ${port}.txt $(printf '\r')"
+	else
+		screen -S slave${i} -p 0 -X stuff \
+			"gdb bin/slave -ex \"r -v -o slave slave${i} tcp://127.0.0.1:911${i} -o storage path /tmp/plio/slave${i}\" $(printf '\r')  $(printf '\r') $(printf '\r') $(printf '\r')"
+	fi
 done
 
 # sleep 1

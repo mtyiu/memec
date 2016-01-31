@@ -559,11 +559,12 @@ size_t Protocol::generateForwardKeyReqHeader(
 		buf[ 2 ] = tmp[ 3 ];
 		valueUpdateSize = ntohl( valueUpdateSize );
 
+		valueUpdateOffset = htonl( valueUpdateOffset );
 		tmp = ( unsigned char * ) &valueUpdateOffset;
 		buf[ 3 ] = tmp[ 1 ];
 		buf[ 4 ] = tmp[ 2 ];
 		buf[ 5 ] = tmp[ 3 ];
-		valueUpdateSize = ntohl( valueUpdateOffset );
+		valueUpdateOffset = ntohl( valueUpdateOffset );
 
 		buf += PROTO_FORWARD_KEY_UPDATE_SIZE;
 		bytes += PROTO_FORWARD_KEY_UPDATE_SIZE;
@@ -714,11 +715,12 @@ size_t Protocol::generateForwardKeyResHeader(
 		buf[ 2 ] = tmp[ 3 ];
 		valueUpdateSize = ntohl( valueUpdateSize );
 
+		valueUpdateOffset = htonl( valueUpdateOffset );
 		tmp = ( unsigned char * ) &valueUpdateOffset;
 		buf[ 3 ] = tmp[ 1 ];
 		buf[ 4 ] = tmp[ 2 ];
 		buf[ 5 ] = tmp[ 3 ];
-		valueUpdateSize = ntohl( valueUpdateOffset );
+		valueUpdateOffset = ntohl( valueUpdateOffset );
 
 		buf += PROTO_FORWARD_KEY_UPDATE_SIZE;
 		bytes += PROTO_FORWARD_KEY_UPDATE_SIZE;

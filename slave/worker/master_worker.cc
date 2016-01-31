@@ -458,6 +458,7 @@ bool SlaveWorker::handleUpdateRequest(
 			keyValueUpdate.dup( header.keySize, header.key, ( void * ) event.socket );
 			keyValueUpdate.offset = header.valueUpdateOffset;
 			keyValueUpdate.length = header.valueUpdateSize;
+			keyValueUpdate.isDegraded = reconstructedCount > 0;
 
 			if ( ! SlaveWorker::pending->insertKeyValueUpdate( PT_MASTER_UPDATE, event.instanceId, event.requestId, ( void * ) event.socket, keyValueUpdate ) ) {
 				__ERROR__( "SlaveWorker", "handleUpdateRequest", "Cannot insert into master UPDATE pending map (ID = (%u, %u)).", event.instanceId, event.requestId );
@@ -528,6 +529,7 @@ bool SlaveWorker::handleUpdateRequest(
 			keyValueUpdate.dup( header.keySize, header.key, ( void * ) event.socket );
 			keyValueUpdate.offset = header.valueUpdateOffset;
 			keyValueUpdate.length = header.valueUpdateSize;
+			keyValueUpdate.isDegraded = reconstructedCount > 0;
 
 			if ( ! SlaveWorker::pending->insertKeyValueUpdate( PT_MASTER_UPDATE, event.instanceId, event.requestId, ( void * ) event.socket, keyValueUpdate ) ) {
 				__ERROR__( "SlaveWorker", "handleUpdateRequest", "Cannot insert into master UPDATE pending map (ID = (%u, %u)).", event.instanceId, event.requestId );

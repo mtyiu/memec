@@ -68,10 +68,11 @@ for s in $sizes; do
 		sleep 2
 
 		# sleep 20
-		read -p "Press Enter after recovery (1)..." -t $(expr $s \/ 100000000)
-		read -p "Press Enter after recovery (2)..." -t $(expr $s \/ 100000000)
+		read -p "Press Enter after recovery (1)..." -t $(expr $s \/ 25000000)
+		read -p "Press Enter after recovery (2)..." -t $(expr $s \/ 25000000)
 
 		ssh testbed-node1 "screen -S coordinator -p 0 -X stuff \"$(printf '\r\r')log$(printf '\r\r')\""
+		sleep 2
 
 		screen -S manage -p 0 -X stuff "$(printf '\r\r')"
 

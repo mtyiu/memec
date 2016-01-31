@@ -278,6 +278,54 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 	degradedLockData.free();
 
 	// Send request
+	if ( Master::getInstance()->isDegraded( socket ) ) {
+		printf( "ERROR Sending to failed slave socket!\n" );
+		switch ( header.type ) {
+			case PROTO_DEGRADED_LOCK_RES_IS_LOCKED:
+				printf( "PROTO_DEGRADED_LOCK_RES_IS_LOCKED\n" );
+				for ( uint32_t i = 0; i < header.reconstructedCount; i++ ) {
+					printf(
+						"%s(%u, %u) |-> (%u, %u)%s",
+						i == 0 ? "Original: " : "; ",
+						header.original[ i * 2     ],
+						header.original[ i * 2 + 1 ],
+						header.reconstructed[ i * 2     ],
+						header.reconstructed[ i * 2 + 1 ],
+						i == header.reconstructedCount - 1 ? " || " : ""
+					);
+				}
+				printf( "\n" );
+				fflush( stdout );
+				break;
+			case PROTO_DEGRADED_LOCK_RES_WAS_LOCKED:
+				printf( "PROTO_DEGRADED_LOCK_RES_WAS_LOCKED\n" );
+				for ( uint32_t i = 0; i < header.reconstructedCount; i++ ) {
+					printf(
+						"%s(%u, %u) |-> (%u, %u)%s",
+						i == 0 ? "Original: " : "; ",
+						header.original[ i * 2     ],
+						header.original[ i * 2 + 1 ],
+						header.reconstructed[ i * 2     ],
+						header.reconstructed[ i * 2 + 1 ],
+						i == header.reconstructedCount - 1 ? " || " : ""
+					);
+				}
+				printf( "\n" );
+				fflush( stdout );
+				break;
+			case PROTO_DEGRADED_LOCK_RES_NOT_LOCKED:
+				printf( "PROTO_DEGRADED_LOCK_RES_NOT_LOCKED\n" );
+				break;
+			case PROTO_DEGRADED_LOCK_RES_REMAPPED:
+				printf( "PROTO_DEGRADED_LOCK_RES_REMAPPED\n" );
+				break;
+			case PROTO_DEGRADED_LOCK_RES_NOT_EXIST:
+				printf( "PROTO_DEGRADED_LOCK_RES_NOT_EXIST\n" );
+				break;
+		}
+
+		assert( false );
+	}
 	sentBytes = socket->send( buffer.data, buffer.size, connected );
 	if ( sentBytes != ( ssize_t ) buffer.size ) {
 		__ERROR__( "MasterWorker", "handleGetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
