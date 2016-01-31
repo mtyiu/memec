@@ -52,6 +52,14 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 		);
 		ret = false;
 	} else if ( map->findDegradedLock( srcMetadata.listId, srcMetadata.stripeId, degradedLock, true, false, &lock ) ) {
+		map->expandDegradedLock(
+			srcMetadata.listId, srcMetadata.stripeId,
+			header.original, header.reconstructed, header.reconstructedCount,
+			ongoingAtChunk,
+			degradedLock,
+			false, false
+		);
+
 		// The chunk is already locked
 		event.resDegradedLock(
 			event.socket, event.instanceId, event.requestId, key,

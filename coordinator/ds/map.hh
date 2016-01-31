@@ -102,6 +102,93 @@ struct DegradedLock {
 		}
 	}
 
+	void expand( uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32_t ongoingAtChunk ) {
+		if ( ! this->reconstructedCount ) {
+			this->set( original, reconstructed, reconstructedCount, ongoingAtChunk );
+			this->dup();
+		}
+		if ( ! reconstructedCount )
+			return;
+
+
+		// Count the number of new entries
+		uint32_t newReconstructedCount = 0;
+		for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
+			uint32_t newListId  = original[ i * 2     ];
+			uint32_t newChunkId = original[ i * 2 + 1 ];
+			bool found = false;
+			for ( uint32_t j = 0; j < this->reconstructedCount; j++ ) {
+				if ( this->original[ j * 2 ] == newListId && this->original[ j * 2 + 1 ] == newChunkId ) {
+					found = true;
+					break;
+				}
+			}
+			if ( ! found )
+				newReconstructedCount++;
+		}
+
+		if ( newReconstructedCount == 0 )
+			return;
+
+		newReconstructedCount += this->reconstructedCount;
+		uint32_t *_original = new uint32_t[ newReconstructedCount ];
+		uint32_t *_reconstructed = new uint32_t[ newReconstructedCount ];
+
+		// Copy the original entries
+		memcpy( _original, this->original, this->reconstructedCount * 2 * sizeof( uint32_t ) );
+		memcpy( _reconstructed, this->reconstructed, this->reconstructedCount * 2 * sizeof( uint32_t ) );
+
+		// Copy the new entries
+		uint32_t tmp = this->reconstructedCount;
+		for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
+			uint32_t newListId  = original[ i * 2     ];
+			uint32_t newChunkId = original[ i * 2 + 1 ];
+			bool found = false;
+			for ( uint32_t j = 0; j < this->reconstructedCount; j++ ) {
+				if ( this->original[ j * 2 ] == newListId && this->original[ j * 2 + 1 ] == newChunkId ) {
+					found = true;
+					break;
+				}
+			}
+			if ( ! found ) {
+				_original[ tmp * 2     ] = original[ i * 2     ];
+				_original[ tmp * 2 + 1 ] = original[ i * 2 + 1 ];
+				_reconstructed[ tmp * 2     ] = reconstructed[ i * 2     ];
+				_reconstructed[ tmp * 2 + 1 ] = reconstructed[ i * 2 + 1 ];
+				tmp++;
+			}
+		}
+
+		delete[] this->original;
+		delete[] this->reconstructed;
+		this->reconstructedCount = newReconstructedCount;
+		this->original = _original;
+		this->reconstructed = _reconstructed;
+
+		// Sort by original chunk ID (selection sort implemented)
+		for ( uint32_t i = 0; i < this->reconstructedCount; i++ ) {
+			uint32_t tmpOriginalListId       = this->original[ i * 2     ],
+			         tmpOriginalChunkId      = this->original[ i * 2 + 1 ],
+			         tmpReconstructedListId  = this->reconstructed[ i * 2     ],
+			         tmpReconstructedChunkId = this->reconstructed[ i * 2 + 1 ],
+			         minIndex = i;
+			for ( uint32_t j = i + 1; j < this->reconstructedCount; j++ ) {
+				if ( this->original[ j * 2 + 1 ] < this->original[ minIndex * 2 + 1 ] )
+					minIndex = j;
+			}
+			// Swap minIndex <-> i
+			this->original[ i * 2     ] = this->original[ minIndex * 2     ];
+			this->original[ i * 2 + 1 ] = this->original[ minIndex * 2 + 1 ];
+			this->reconstructed[ i * 2     ] = this->reconstructed[ minIndex * 2     ];
+			this->reconstructed[ i * 2 + 1 ] = this->reconstructed[ minIndex * 2 + 1 ];
+
+			this->original[ minIndex * 2     ] = tmpOriginalListId;
+			this->original[ minIndex * 2 + 1 ] = tmpOriginalChunkId;
+			this->reconstructed[ minIndex * 2     ] = tmpReconstructedListId;
+			this->reconstructed[ minIndex * 2 + 1 ] = tmpReconstructedChunkId;
+		}
+	}
+
 	void free() {
 		if ( this->original ) delete[] this->original;
 		if ( this->reconstructed ) delete[] this->reconstructed;
@@ -169,6 +256,13 @@ public:
 		uint32_t listId, uint32_t stripeId,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 		uint32_t ongoingAtChunk,
+		bool needsLock = true, bool needsUnlock = true
+	);
+	bool expandDegradedLock(
+		uint32_t listId, uint32_t stripeId,
+		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
+		uint32_t ongoingAtChunk,
+		DegradedLock &degradedLock,
 		bool needsLock = true, bool needsUnlock = true
 	);
 
