@@ -6,7 +6,7 @@ PLIO_PATH=${BASE_PATH}/plio
 function set_overload {
 	delay=$1
 	variation=$(echo "scale = 1; $delay / 2" | bc | awk '{printf "%2.1f", $0}')
-	for n in 11; do
+	for n in 11 23; do
 		echo "Adding $delay +- $variation ms network delay to node $n..."
 		ssh testbed-node$n "screen -S ethtool -p 0 -X stuff \"sudo tc qdisc add dev eth0 root netem delay ${delay}ms ${variation}ms distribution normal $(printf '\r')\""
 		sleep 10
@@ -14,7 +14,7 @@ function set_overload {
 }
 
 function restore_overload {
-	for n in 11; do
+	for n in 11 23; do
 		echo "Removing the network delay from node $n"
 		ssh testbed-node$n "screen -S ethtool -p 0 -X stuff \"sudo tc qdisc del root dev eth0 $(printf '\r')\""
 		sleep 10
