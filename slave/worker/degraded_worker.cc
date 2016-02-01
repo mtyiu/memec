@@ -1,7 +1,7 @@
 #include "worker.hh"
 #include "../main/slave.hh"
 
-int SlaveWorker::findInRedirectedList( uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32_t ongoingAtChunk, bool &reconstructParity, bool &reconstructData ) {
+int SlaveWorker::findInRedirectedList( uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32_t ongoingAtChunk, bool &reconstructParity, bool &reconstructData, uint32_t dataChunkId ) {
 	int ret = -1;
 	bool self = false;
 	uint32_t listId;
@@ -30,7 +30,7 @@ int SlaveWorker::findInRedirectedList( uint32_t *original, uint32_t *reconstruct
 	for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
 		if ( original[ i * 2 + 1 ] >= SlaveWorker::dataChunkCount )
 			reconstructParity = true;
-		else
+		else if ( dataChunkId == original[ i * 2 + 1 ] )
 			reconstructData = true;
 
 		if ( ret == -1 ) {
@@ -131,10 +131,20 @@ bool SlaveWorker::handleDegradedGetRequest( MasterEvent event, char *buf, size_t
 
 	int index = -1;
 	bool reconstructParity, reconstructData;
+	uint32_t listId = header.original[ index * 2 ],
+	         stripeId = header.stripeId,
+	         chunkId = header.original[ index * 2 + 1 ];
 	if ( header.reconstructedCount ) {
+		this->getSlaves(
+			header.data.key.key,
+			header.data.key.keySize,
+			listId,
+			chunkId
+		);
 		index = this->findInRedirectedList(
 			header.original, header.reconstructed, header.reconstructedCount,
-			header.ongoingAtChunk, reconstructParity, reconstructData
+			header.ongoingAtChunk, reconstructParity, reconstructData,
+			chunkId
 		);
 		if ( ( index == -1 ) ||
 		     ( header.original[ index * 2 + 1 ] >= SlaveWorker::dataChunkCount ) ) {
@@ -147,9 +157,6 @@ bool SlaveWorker::handleDegradedGetRequest( MasterEvent event, char *buf, size_t
 	}
 
 	////////// Degraded read //////////
-	uint32_t listId = header.original[ index * 2 ],
-	         stripeId = header.stripeId,
-	         chunkId = header.original[ index * 2 + 1 ];
 	Key key;
 	KeyValue keyValue;
 	KeyMetadata keyMetadata;
@@ -188,7 +195,7 @@ degraded_get_check:
 			listId, stripeId, chunkId,
 			&key, header.isSealed,
 			header.original, header.reconstructed, header.reconstructedCount,
-			header.ongoingAtChunk,
+			header.ongoingAtChunk, header.numSurvivingChunkIds, header.survivingChunkIds,
 			isReconstructed,
 			0, event.timestamp
 		);
@@ -237,7 +244,8 @@ bool SlaveWorker::handleDegradedUpdateRequest( MasterEvent event, char *buf, siz
 		);
 		index = this->findInRedirectedList(
 			header.original, header.reconstructed, header.reconstructedCount,
-			header.ongoingAtChunk, reconstructParity, reconstructData
+			header.ongoingAtChunk, reconstructParity, reconstructData,
+			chunkId
 		);
 
 		if ( reconstructParity ) {
@@ -283,6 +291,11 @@ bool SlaveWorker::handleDegradedUpdateRequest( MasterEvent event, char *buf, siz
 				);
 			} else {
 				// UPDATE data chunk and reconstructed parity chunks
+				// printf(
+				// 	"handleDegradedUpdateRequest(): %.*s - 1\n",
+				// 	header.data.keyValueUpdate.keySize,
+				// 	header.data.keyValueUpdate.key
+				// );
 				return this->handleUpdateRequest(
 					event, header.data.keyValueUpdate,
 					header.original, header.reconstructed, header.reconstructedCount,
@@ -473,7 +486,7 @@ force_degraded_read:
 			listId, stripeId, chunkId,
 			&key, header.isSealed,
 			header.original, header.reconstructed, header.reconstructedCount,
-			header.ongoingAtChunk,
+			header.ongoingAtChunk, header.numSurvivingChunkIds, header.survivingChunkIds,
 			isReconstructed,
 			&keyValueUpdate,
 			event.timestamp
@@ -526,7 +539,8 @@ bool SlaveWorker::handleDegradedDeleteRequest( MasterEvent event, char *buf, siz
 		);
 		index = this->findInRedirectedList(
 			header.original, header.reconstructed, header.reconstructedCount,
-			header.ongoingAtChunk, reconstructParity, reconstructData
+			header.ongoingAtChunk, reconstructParity, reconstructData,
+			chunkId
 		);
 	} else {
 		// Use normal flow
@@ -644,7 +658,7 @@ force_degraded_read:
 			listId, stripeId, chunkId,
 			&key, header.isSealed,
 			header.original, header.reconstructed, header.reconstructedCount,
-			header.ongoingAtChunk,
+			header.ongoingAtChunk, header.numSurvivingChunkIds, header.survivingChunkIds,
 			isReconstructed,
 			0, event.timestamp
 		);
@@ -752,7 +766,7 @@ bool SlaveWorker::performDegradedRead(
 	uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 	Key *key, bool isSealed,
 	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
-	uint32_t ongoingAtChunk,
+	uint32_t ongoingAtChunk, uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds,
 	bool &isReconstructed,
 	KeyValueUpdate *keyValueUpdate, uint32_t timestamp
 ) {
@@ -762,6 +776,26 @@ bool SlaveWorker::performDegradedRead(
 	uint32_t selected = 0;
 
 	SlaveWorker::stripeList->get( listId, this->paritySlaveSockets, this->dataSlaveSockets );
+
+	for ( uint32_t i = 0; i < reconstructedCount; ) {
+		uint32_t tmp = original[ i * 2 + 1 ];
+		bool toNext = true;
+		if ( tmp < SlaveWorker::dataChunkCount ) {
+			if ( tmp != chunkId ) {
+				// Remove this entry as the reconstructed data chunk is not accessed in this request
+				for ( uint32_t j = i; j < reconstructedCount - 1; j++ ) {
+					original[ j * 2     ] = original[ ( j + 1 ) * 2     ];
+					original[ j * 2 + 1 ] = original[ ( j + 1 ) * 2 + 1 ];
+					reconstructed[ j * 2     ] = reconstructed[ ( j + 1 ) * 2     ];
+					reconstructed[ j * 2 + 1 ] = reconstructed[ ( j + 1 ) * 2 + 1 ];
+				}
+				reconstructedCount--;
+				toNext = false;
+			}
+		}
+		if ( toNext )
+			i++;
+	}
 
 	// Determine the list of surviving nodes
 	for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
@@ -875,8 +909,10 @@ bool SlaveWorker::performDegradedRead(
 		metadata.set( listId, stripeId, 0 );
 		selected = 0;
 
-		// printf( "Reconstructing using: " );
-		for ( uint32_t i = 0; i < SlaveWorker::chunkCount; i++ ) {
+		// printf( "Reconstructing (%u, %u, %u; key: %.*s) using: ", listId, stripeId, chunkId, key->size, key->data );
+		for ( uint32_t x = 0; x < numSurvivingChunkIds; x++ ) {
+			uint32_t i = survivingChunkIds[ x ];
+
 			if ( selected >= SlaveWorker::dataChunkCount )
 				break;
 
@@ -920,9 +956,12 @@ bool SlaveWorker::performDegradedRead(
 			selected++;
 		}
 		// printf( "\n" );
+		// fflush( stdout );
 
 		selected = 0;
-		for ( uint32_t i = 0; i < SlaveWorker::chunkCount; i++ ) {
+		for ( uint32_t x = 0; x < numSurvivingChunkIds; x++ ) {
+			uint32_t i = survivingChunkIds[ x ];
+
 			if ( selected >= SlaveWorker::dataChunkCount )
 				break;
 
@@ -950,6 +989,7 @@ bool SlaveWorker::performDegradedRead(
 			return false;
 
 		if ( socket->self ) {
+			// printf( "performDegradedRead(): %.*s - 1\n", mykey.size, mykey.data );
 			// Get the requested key-value pairs from local key-value store
 			KeyValue keyValue;
 			MasterEvent masterEvent;
@@ -1098,6 +1138,7 @@ bool SlaveWorker::performDegradedRead(
 
 			return success;
 		} else {
+			// printf( "performDegradedRead(): %.*s - 2\n", mykey.size, mykey.data );
 			// Send GET request to surviving parity slave
 			if ( ! SlaveWorker::pending->insertKey( PT_SLAVE_PEER_GET, instanceId, parentInstanceId, requestId, parentRequestId, socket, op.data.key ) ) {
 				__ERROR__( "SlaveWorker", "performDegradedRead", "Cannot insert into slave GET pending map." );
@@ -1463,8 +1504,9 @@ bool SlaveWorker::sendModifyChunkRequest(
 			if ( ! this->paritySlaveSockets[ i ] ) {
 				continue;
 			} else if ( this->paritySlaveSockets[ i ]->self ) {
-				bool r = false;
 				if ( isUpdate ) {
+					/* Updated in the caller
+					bool r = false;
 					r = SlaveWorker::chunkBuffer->at( metadata.listId )->updateKeyValue(
 						keyStr, keySize,
 						valueUpdateOffset, deltaSize, delta
@@ -1487,6 +1529,7 @@ bool SlaveWorker::sendModifyChunkRequest(
 							found ? &myMetadata : 0
 						);
 					}
+					*/
 				} else {
 					__ERROR__( "SlaveWorker", "sendModifyChunkRequest", "TODO: Handle DELETE request on self slave socket." );
 				}

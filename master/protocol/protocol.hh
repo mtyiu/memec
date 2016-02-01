@@ -98,14 +98,14 @@ public:
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		bool isSealed, uint32_t stripeId,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
-		uint32_t ongoingAtChunk,
+		uint32_t ongoingAtChunk, uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds,
 		char *key, uint8_t keySize
 	);
 	char *reqDegradedUpdate(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		bool isSealed, uint32_t stripeId,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
-		uint32_t ongoingAtChunk,
+		uint32_t ongoingAtChunk, uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds,
 		char *key, uint8_t keySize,
 		char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize,
 		uint32_t timestamp
@@ -114,7 +114,7 @@ public:
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		bool isSealed, uint32_t stripeId,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
-		uint32_t ongoingAtChunk,
+		uint32_t ongoingAtChunk, uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds,
 		char *key, uint8_t keySize,
 		uint32_t timestamp
 	);

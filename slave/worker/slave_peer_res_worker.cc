@@ -276,6 +276,22 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 				break;
 			case PROTO_OPCODE_DEGRADED_UPDATE:
 				if ( success ) {
+					/* {
+						uint8_t _keySize;
+						uint32_t _valueSize;
+						char *_keyStr, *_valueStr;
+						KeyValue kv;
+						bool isSealed;
+						dmap->findValueByKey(
+							key.data,
+							key.size,
+							isSealed,
+							&kv
+						);
+						kv.deserialize( _keyStr, _keySize, _valueStr, _valueSize );
+						printf( "Before: %.*s - %.*s (%p vs %p) / update: %.*s (size = %u)\n", _keySize, _keyStr, _valueSize, _valueStr, kv.data, keyValue.data, op.data.keyValueUpdate.size, ( char * ) op.data.keyValueUpdate.ptr, op.data.keyValueUpdate.size );
+					} */
+
 					LOCK( &dmap->unsealed.lock );
 
 					Metadata metadata;
@@ -311,6 +327,22 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 
 					UNLOCK( &dmap->unsealed.lock );
 
+					/* {
+						uint8_t _keySize;
+						uint32_t _valueSize;
+						char *_keyStr, *_valueStr;
+						KeyValue kv;
+						bool isSealed;
+						dmap->findValueByKey(
+							key.data,
+							key.size,
+							isSealed,
+							&kv
+						);
+						kv.deserialize( _keyStr, _keySize, _valueStr, _valueSize );
+						printf( "Intermediate: %.*s - %.*s (%p vs %p)\n", _keySize, _keyStr, _valueSize, _valueStr, kv.data, keyValue.data );
+					} */
+
 					// Send UPDATE request to the parity slaves
 					this->sendModifyChunkRequest(
 						pid.parentInstanceId, pid.parentRequestId,
@@ -330,6 +362,22 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 					);
 
 					delete[] valueUpdate;
+
+					/* {
+						uint8_t _keySize;
+						uint32_t _valueSize;
+						char *_keyStr, *_valueStr;
+						KeyValue kv;
+						bool isSealed;
+						dmap->findValueByKey(
+							key.data,
+							key.size,
+							isSealed,
+							&kv
+						);
+						kv.deserialize( _keyStr, _keySize, _valueStr, _valueSize );
+						printf( "After: %.*s - %.*s (%p vs %p)\n", _keySize, _keyStr, _valueSize, _valueStr, kv.data, keyValue.data );
+					} */
 				} else {
 					masterEvent.resUpdate(
 						op.socket, pid.parentInstanceId, pid.parentRequestId, key,
@@ -665,9 +713,8 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 					chunkRequest.listId, chunkRequest.stripeId, i,
 					chunkSize
 				);
-				/*
 				for ( uint32_t x = 0; x < SlaveWorker::chunkCount; x++ ) {
-					printf( "#%u: ", x );
+					printf( "\t#[%u, %u]: ", chunkRequest.listId, x );
 					switch( this->chunks[ x ]->status ) {
 						case CHUNK_STATUS_EMPTY:
 							printf( "CHUNK_STATUS_EMPTY" );
@@ -691,10 +738,9 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 							printf( "CHUNK_STATUS_TEMPORARY" );
 							break;
 					}
-					printf( ";" );
+					printf( "\n" );
 				}
 				printf( "\n" );
-				*/
 			}
 		}
 
@@ -716,7 +762,8 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 				bool reconstructParity, reconstructData;
 				int index = this->findInRedirectedList(
 					op.original, op.reconstructed, op.reconstructedCount,
-					op.ongoingAtChunk, reconstructParity, reconstructData
+					op.ongoingAtChunk, reconstructParity, reconstructData,
+					op.chunkId
 				);
 
 				// Check whether the reconstructed parity chunks need to be forwarded

@@ -77,6 +77,7 @@ void CoordinatorWorker::dispatch( CoordinatorEvent event ) {
 
 void CoordinatorWorker::free() {
 	this->protocol.free();
+	delete[] this->survivingChunkIds;
 }
 
 void *CoordinatorWorker::run( void *argv ) {
@@ -153,6 +154,7 @@ bool CoordinatorWorker::init( GlobalConfig &config, WorkerRole role, uint32_t wo
 	);
 	this->role = role;
 	this->workerId = workerId;
+	this->survivingChunkIds = new uint32_t[ CoordinatorWorker::chunkCount ];
 	return role != WORKER_ROLE_UNDEFINED;
 }
 

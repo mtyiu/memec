@@ -17,6 +17,7 @@ private:
 	uint32_t workerId;
 	WorkerRole role;
 	CoordinatorProtocol protocol;
+	uint32_t *survivingChunkIds;
 	static uint32_t dataChunkCount;
 	static uint32_t parityChunkCount;
 	static uint32_t chunkCount;

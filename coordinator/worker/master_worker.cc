@@ -101,6 +101,27 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 		// Degraded operation
 		case MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED:
 		case MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_WAS_LOCKED:
+		{
+			uint8_t numSurvivingChunkIds = 0;
+			uint32_t ptr = 0;
+			CoordinatorRemapMsgHandler *crmh = CoordinatorRemapMsgHandler::getInstance();
+			if ( event.message.degradedLock.reconstructedCount ) {
+				uint32_t listId = event.message.degradedLock.original[ 0 ];
+				for ( uint32_t i = 0; i < CoordinatorWorker::chunkCount; i++ ) {
+					SlaveSocket *s = CoordinatorWorker::stripeList->get( listId, i );
+					struct sockaddr_in addr = s->getAddr();
+					if ( ! crmh->allowRemapping( addr ) ) {
+						numSurvivingChunkIds++;
+						this->survivingChunkIds[ ptr++ ] = i;
+					}
+				}
+			} else {
+				for ( uint32_t i = 0; i < CoordinatorWorker::chunkCount; i++ ) {
+					numSurvivingChunkIds++;
+					this->survivingChunkIds[ ptr++ ] = i;
+				}
+			}
+
 			buffer.data = this->protocol.resDegradedLock(
 				buffer.size,
 				event.instanceId, event.requestId,
@@ -114,8 +135,11 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 				event.message.degradedLock.original,
 				event.message.degradedLock.reconstructed,
 				event.message.degradedLock.reconstructedCount,
-				event.message.degradedLock.ongoingAtChunk
+				event.message.degradedLock.ongoingAtChunk,
+				numSurvivingChunkIds,
+				this->survivingChunkIds
 			);
+		}
 			isSend = true;
 			break;
 		case MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_LOCKED:
