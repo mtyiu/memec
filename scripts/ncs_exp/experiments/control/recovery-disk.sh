@@ -60,7 +60,7 @@ for s in $sizes; do
 		ssh testbed-node$n "killall -9 slave; screen -S slave -p 0 -X stuff \"$(printf '\r\r')\""
 
 		# sleep 20
-		read -p "Press Enter after recovery..." -t $(expr $s \/ 100000000)
+		read -p "Press Enter after recovery..." -t $(expr $s \/ 10000000)
 
 		ssh testbed-node1 "screen -S coordinator -p 0 -X stuff \"$(printf '\r\r')log$(printf '\r\r')\""
 
