@@ -741,6 +741,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 					printf( "\n" );
 				}
 				printf( "\n" );
+				fflush( stdout );
 			}
 		}
 
