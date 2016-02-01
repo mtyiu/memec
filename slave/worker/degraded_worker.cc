@@ -291,11 +291,6 @@ bool SlaveWorker::handleDegradedUpdateRequest( MasterEvent event, char *buf, siz
 				);
 			} else {
 				// UPDATE data chunk and reconstructed parity chunks
-				// printf(
-				// 	"handleDegradedUpdateRequest(): %.*s - 1\n",
-				// 	header.data.keyValueUpdate.keySize,
-				// 	header.data.keyValueUpdate.key
-				// );
 				return this->handleUpdateRequest(
 					event, header.data.keyValueUpdate,
 					header.original, header.reconstructed, header.reconstructedCount,
@@ -1138,7 +1133,6 @@ bool SlaveWorker::performDegradedRead(
 
 			return success;
 		} else {
-			// printf( "performDegradedRead(): %.*s - 2\n", mykey.size, mykey.data );
 			// Send GET request to surviving parity slave
 			if ( ! SlaveWorker::pending->insertKey( PT_SLAVE_PEER_GET, instanceId, parentInstanceId, requestId, parentRequestId, socket, op.data.key ) ) {
 				__ERROR__( "SlaveWorker", "performDegradedRead", "Cannot insert into slave GET pending map." );
@@ -1220,6 +1214,7 @@ bool SlaveWorker::sendModifyChunkRequest(
 		}
 
 		// Start sending packets only after all the insertion to the slave peer DELETE_CHUNK pending set is completed
+		uint32_t numSurvivingParity = 0;
 		for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
 			if ( ! this->paritySlaveSockets[ i ] ) {
 				/////////////////////////////////////////////////////
@@ -1349,6 +1344,7 @@ bool SlaveWorker::sendModifyChunkRequest(
 				// Insert into event queue
 				SlavePeerEvent slavePeerEvent;
 				slavePeerEvent.send( this->paritySlaveSockets[ i ], packet );
+				numSurvivingParity++;
 
 #ifdef SLAVE_WORKER_SEND_REPLICAS_PARALLEL
 				if ( i == SlaveWorker::parityChunkCount - 1 )
@@ -1358,6 +1354,33 @@ bool SlaveWorker::sendModifyChunkRequest(
 #else
 				this->dispatch( slavePeerEvent );
 #endif
+			}
+		}
+
+		if ( ! numSurvivingParity ) {
+			// No UPDATE_CHUNK / DELETE_CHUNK requests
+			if ( isUpdate ) {
+				Key key;
+				KeyValueUpdate keyValueUpdate;
+				MasterEvent masterEvent;
+				PendingIdentifier pid;
+
+				if ( ! SlaveWorker::pending->eraseKeyValueUpdate( PT_MASTER_UPDATE, parentInstanceId, parentRequestId, 0, &pid, &keyValueUpdate ) ) {
+					__ERROR__( "SlaveWorker", "sendModifyChunkRequest", "Cannot find a pending master UPDATE request that matches the response. This message will be discarded." );
+					return false;
+				}
+
+				key.set( keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.ptr );
+				masterEvent.resUpdate(
+					( MasterSocket * ) pid.ptr, pid.instanceId, pid.requestId, key,
+					keyValueUpdate.offset, keyValueUpdate.length,
+					true, // success
+					true,
+					keyValueUpdate.isDegraded // isDegraded
+				);
+				this->dispatch( masterEvent );
+			} else {
+				printf( "TODO: Handle DELETE request.\n" );
 			}
 		}
 
