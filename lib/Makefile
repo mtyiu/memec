@@ -4,13 +4,10 @@ TARGET= \
 
 .PHONY: all $(TARGET)
 
-all: $(TARGET) isal
+all: $(TARGET)
 	@for dir in $(TARGET); do \
 		$(MAKE) -C $$dir; \
 	done
-
-isal:
-	$(MAKE) -C isa-l-2.14.0 libisal.la
 
 clean:
 	@for dir in $(TARGET); do \

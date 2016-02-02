@@ -34,7 +34,8 @@ sudo apt-get install automake yasm
 Configure under `lib/isa-l-2.14.0/`,
 
 ```
-./configure
+./configure --prefix=$(pwd)
+make install
 ```
 
 The system uses Jerasure for coding by default (for RS and CRS), uncomment `-DUSE_ISAL` in `common/coding/Makefile` to use ISA-L instead

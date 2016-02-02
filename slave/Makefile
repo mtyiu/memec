@@ -1,7 +1,7 @@
 CC=g++
 CFLAGS=-std=c++11 -Wall -O2 -g
 PLIO_SRC_ROOT=..
-LIBS=-pthread -L$(PLIO_SRC_ROOT)/lib/isa-l-2.14.0/libisal.la
+LIBS=-pthread
 BIN=$(PLIO_SRC_ROOT)/bin/slave
 
 OBJS= \
@@ -70,7 +70,8 @@ EXTERNAL_LIB= \
 	$(PLIO_SRC_ROOT)/common/socket/socket.o \
 	$(PLIO_SRC_ROOT)/common/socket/epoll.o \
 	$(PLIO_SRC_ROOT)/lib/death_handler/death_handler.o \
-	$(PLIO_SRC_ROOT)/lib/inih/ini.o
+	$(PLIO_SRC_ROOT)/lib/inih/ini.o \
+	${PLIO_SRC_ROOT}/lib/isa-l-2.14.0/lib/libisal.a
 
 LD_LIB= \
 	-lrt \

@@ -42,3 +42,4 @@ all: $(OBJS)
 
 clean:
 	rm -f $(OBJS)
+	make -C coding clean
