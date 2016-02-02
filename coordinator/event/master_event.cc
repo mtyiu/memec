@@ -41,7 +41,7 @@ void MasterEvent::resDegradedLock(
 	Key &key, bool isLocked, bool isSealed,
 	uint32_t stripeId, uint32_t dataChunkId, uint32_t dataChunkCount,
 	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
-	uint32_t ongoingAtChunk
+	uint32_t ongoingAtChunk, uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds
 ) {
 	this->type = isLocked ? MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED : MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_WAS_LOCKED;
 	this->instanceId = instanceId;
@@ -56,6 +56,8 @@ void MasterEvent::resDegradedLock(
 	this->message.degradedLock.original = original;
 	this->message.degradedLock.reconstructed = reconstructed;
 	this->message.degradedLock.ongoingAtChunk = ongoingAtChunk;
+	this->message.degradedLock.numSurvivingChunkIds = numSurvivingChunkIds;
+	this->message.degradedLock.survivingChunkIds = survivingChunkIds;
 }
 
 void MasterEvent::resDegradedLock( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool exist ) {

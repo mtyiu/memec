@@ -84,9 +84,13 @@ bool MasterWorker::getSlaves(
 			break;
 		case PROTO_OPCODE_UPDATE:
 		case PROTO_OPCODE_DELETE:
-			for ( uint32_t i = 0; i < 1 + MasterWorker::parityChunkCount; i++ ) {
+			// Check the whole stripe
+			for ( uint32_t i = 0, chunkCount = MasterWorker::dataChunkCount + MasterWorker::parityChunkCount; i < chunkCount; i++ ) {
 				if ( master->isDegraded(
-					( i == 0 ) ? originalDataSlaveSocket : this->paritySlaveSockets[ i - 1 ] )
+						( i < MasterWorker::dataChunkCount ) ?
+						this->dataSlaveSockets[ i ] :
+						this->paritySlaveSockets[ i - MasterWorker::dataChunkCount ]
+					)
 				) {
 					useCoordinatedFlow = true;
 					break;
@@ -105,16 +109,32 @@ bool MasterWorker::getSlaves(
 	original = this->original;
 	remapped = this->remapped;
 
-	original[ 0 ] = originalListId;
-	original[ 1 ] = originalChunkId;
+	uint32_t numEntries = 0;
+	original[ numEntries * 2     ] = originalListId;
+	original[ numEntries * 2 + 1 ] = originalChunkId;
+	numEntries++;
 	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
-		original[ ( i + 1 ) * 2 ] = originalListId;
-		original[ ( i + 1 ) * 2 + 1 ] = MasterWorker::dataChunkCount + i;
+		// Parity server fails
+		original[ numEntries * 2 ] = originalListId;
+		original[ numEntries * 2 + 1 ] = MasterWorker::dataChunkCount + i;
+		numEntries++;
+	}
+	if ( opcode == PROTO_OPCODE_UPDATE || opcode == PROTO_OPCODE_DELETE ) {
+		// Always perform a degraded read if some other data chunks in the same stripe are lost
+		for ( uint32_t i = 0; i < MasterWorker::dataChunkCount; i++ ) {
+			if ( i == originalChunkId )
+				continue;
+			if ( master->isDegraded( this->dataSlaveSockets[ i ] ) ) {
+				original[ numEntries * 2 ] = originalListId;
+				original[ numEntries * 2 + 1 ] = i;
+				numEntries++;
+			}
+		}
 	}
 
 	// Determine remapped data slave
 	BasicRemappingScheme::redirect(
-		this->original, this->remapped, remappedCount,
+		this->original, this->remapped, numEntries, remappedCount,
 		MasterWorker::dataChunkCount, MasterWorker::parityChunkCount,
 		this->dataSlaveSockets, this->paritySlaveSockets,
 		opcode == PROTO_OPCODE_GET
@@ -129,6 +149,22 @@ bool MasterWorker::getSlaves(
 		}
 		original = _original;
 		remapped = _remapped;
+
+		/*
+		printf( "[%s] %.*s: ", opcode == PROTO_OPCODE_GET ? "GET" : "UPDATE", size, data );
+		for ( uint32_t i = 0; i < remappedCount; i++ ) {
+			printf(
+				"%s(%u, %u) |-> (%u, %u)",
+				i == 0 ? "" : "; ",
+				original[ i * 2     ],
+				original[ i * 2 + 1 ],
+				remapped[ i * 2     ],
+				remapped[ i * 2 + 1 ]
+			);
+		}
+		printf( "\n" );
+		fflush( stdout );
+		*/
 	} else {
 		original = 0;
 		remapped = 0;

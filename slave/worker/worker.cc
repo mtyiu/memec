@@ -18,6 +18,7 @@ std::vector<StripeListIndex> *SlaveWorker::stripeListIndex;
 Map *SlaveWorker::map;
 MemoryPool<Chunk> *SlaveWorker::chunkPool;
 std::vector<MixedChunkBuffer *> *SlaveWorker::chunkBuffer;
+GetChunkBuffer *SlaveWorker::getChunkBuffer;
 DegradedChunkBuffer *SlaveWorker::degradedChunkBuffer;
 RemappedBuffer *SlaveWorker::remappedBuffer;
 PacketPool *SlaveWorker::packetPool;
@@ -223,6 +224,7 @@ bool SlaveWorker::init() {
 	SlaveWorker::map = &slave->map;
 	SlaveWorker::chunkPool = slave->chunkPool;
 	SlaveWorker::chunkBuffer = &slave->chunkBuffer;
+	SlaveWorker::getChunkBuffer = &slave->getChunkBuffer;
 	SlaveWorker::degradedChunkBuffer = &slave->degradedChunkBuffer;
 	SlaveWorker::remappedBuffer = &slave->remappedBuffer;
 	SlaveWorker::packetPool = &slave->packetPool;

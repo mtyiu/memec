@@ -3,6 +3,7 @@
 
 #include <unordered_map>
 #include <unordered_set>
+#include <cassert>
 #include "../../common/ds/key.hh"
 #include "../../common/ds/metadata.hh"
 #include "../../common/lock/lock.hh"
@@ -87,25 +88,68 @@ struct DegradedLock {
 		}
 	}
 
-	void dup() {
+	void dup( uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds, uint32_t chunkCount ) {
 		if ( this->reconstructedCount ) {
-			uint32_t *_original = new uint32_t[ reconstructedCount * 2 ];
-			uint32_t *_reconstructed = new uint32_t[ reconstructedCount * 2 ];
-			for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
+			uint32_t listId = this->original[ 0 ];
+			uint32_t newReconstructedCount = chunkCount - numSurvivingChunkIds - this->reconstructedCount;
+			assert( newReconstructedCount < chunkCount );
+
+			uint32_t *_original = new uint32_t[ reconstructedCount * 2 + newReconstructedCount ];
+			uint32_t *_reconstructed = new uint32_t[ reconstructedCount * 2 + newReconstructedCount ];
+			for ( uint32_t i = 0; i < this->reconstructedCount; i++ ) {
 				_original[ i * 2     ] = this->original[ i * 2     ];
 				_original[ i * 2 + 1 ] = this->original[ i * 2 + 1 ];
 				_reconstructed[ i * 2     ] = this->reconstructed[ i * 2     ];
 				_reconstructed[ i * 2 + 1 ] = this->reconstructed[ i * 2 + 1 ];
 			}
+
+			if ( newReconstructedCount ) {
+				std::unordered_set<uint32_t> redirectedChunkIds;
+				std::unordered_set<uint32_t> handledChunkIds;
+				std::unordered_set<uint32_t>::iterator it;
+				uint32_t ptr = this->reconstructedCount;
+
+				for ( uint32_t i = 0; i < this->reconstructedCount; i++ ) {
+					handledChunkIds.insert( this->original[ i * 2 + 1 ] );
+					redirectedChunkIds.insert( this->reconstructed[ i * 2 + 1 ] );
+				}
+				for ( uint32_t i = 0; i < numSurvivingChunkIds; i++ )
+					handledChunkIds.insert( survivingChunkIds[ i ] );
+
+				for ( uint32_t i = 0; i < chunkCount; i++ ) {
+					if ( ! handledChunkIds.count( i ) ) {
+						// Not handled (neither surviving or reconstructed) - add new entries
+						_original[ ptr * 2     ] = listId;
+						_original[ ptr * 2 + 1 ] = i;
+						_reconstructed[ ptr * 2     ] = listId;
+						for ( uint32_t j = 0; j < numSurvivingChunkIds; j++ ) {
+							if ( ! redirectedChunkIds.count( survivingChunkIds[ j ] ) ) {
+								// Redirect to a not-yet-used server
+								_reconstructed[ ptr * 2 + 1 ] = survivingChunkIds[ j ];
+								break;
+							}
+						}
+						ptr++;
+					}
+				}
+
+				this->reconstructedCount += newReconstructedCount;
+			}
+
 			this->original = _original;
 			this->reconstructed = _reconstructed;
+
+			if ( newReconstructedCount ) {
+				this->sort();
+				// this->print();
+			}
 		}
 	}
 
-	void expand( uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32_t ongoingAtChunk ) {
+	void expand( uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32_t ongoingAtChunk, uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds, uint32_t chunkCount ) {
 		if ( ! this->reconstructedCount ) {
 			this->set( original, reconstructed, reconstructedCount, ongoingAtChunk );
-			this->dup();
+			this->dup( numSurvivingChunkIds, survivingChunkIds, chunkCount );
 		}
 		if ( ! reconstructedCount )
 			return;
@@ -165,6 +209,10 @@ struct DegradedLock {
 		this->original = _original;
 		this->reconstructed = _reconstructed;
 
+		this->sort();
+	}
+
+	void sort() {
 		// Sort by original chunk ID (selection sort implemented)
 		for ( uint32_t i = 0; i < this->reconstructedCount; i++ ) {
 			uint32_t tmpOriginalListId       = this->original[ i * 2     ],
@@ -187,6 +235,20 @@ struct DegradedLock {
 			this->reconstructed[ minIndex * 2     ] = tmpReconstructedListId;
 			this->reconstructed[ minIndex * 2 + 1 ] = tmpReconstructedChunkId;
 		}
+	}
+
+	void print() {
+		for ( uint32_t i = 0; i < this->reconstructedCount; i++ ) {
+			printf(
+				"%s(%u, %u) |-> (%u, %u)",
+				i == 0 ? "" : "; ",
+				this->original[ i * 2     ],
+				this->original[ i * 2 + 1 ],
+				this->reconstructed[ i * 2     ],
+				this->reconstructed[ i * 2 + 1 ]
+			);
+		}
+		printf( "; ongoingAtChunk: %u\n", this->ongoingAtChunk );
 	}
 
 	void free() {
@@ -255,13 +317,13 @@ public:
 	bool insertDegradedLock(
 		uint32_t listId, uint32_t stripeId,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
-		uint32_t ongoingAtChunk,
+		uint32_t ongoingAtChunk, uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds, uint32_t chunkCount,
 		bool needsLock = true, bool needsUnlock = true
 	);
 	bool expandDegradedLock(
 		uint32_t listId, uint32_t stripeId,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
-		uint32_t ongoingAtChunk,
+		uint32_t ongoingAtChunk, uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds, uint32_t chunkCount,
 		DegradedLock &degradedLock,
 		bool needsLock = true, bool needsUnlock = true
 	);

@@ -668,9 +668,10 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 					}
 					break;
 				case PROTO_OPCODE_UPDATE_CHUNK:
+				case PROTO_OPCODE_UPDATE_CHUNK_CHECK:
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
-							this->handleUpdateChunkRequest( event, buffer.data, buffer.size );
+							this->handleUpdateChunkRequest( event, buffer.data, buffer.size, header.opcode == PROTO_OPCODE_UPDATE_CHUNK_CHECK );
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
 							this->handleUpdateChunkResponse( event, true, buffer.data, buffer.size );
@@ -684,9 +685,10 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 					}
 					break;
 				case PROTO_OPCODE_DELETE_CHUNK:
+				case PROTO_OPCODE_DELETE_CHUNK_CHECK:
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
-							this->handleDeleteChunkRequest( event, buffer.data, buffer.size );
+							this->handleDeleteChunkRequest( event, buffer.data, buffer.size, header.opcode == PROTO_OPCODE_DELETE_CHUNK_CHECK );
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
 							this->handleDeleteChunkResponse( event, true, buffer.data, buffer.size );

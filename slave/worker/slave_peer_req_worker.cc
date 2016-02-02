@@ -329,13 +329,22 @@ bool SlaveWorker::handleGetChunkRequest( SlavePeerEvent event, struct ChunkHeade
 	bool ret;
 
 	Metadata metadata;
+	metadata.set( header.listId, header.stripeId, header.chunkId );
+
 	Chunk *chunk = map->findChunkById( header.listId, header.stripeId, header.chunkId, &metadata );
+
 	ret = chunk;
 
 	// Check whether the chunk is sealed or not
 	MixedChunkBuffer *chunkBuffer = SlaveWorker::chunkBuffer->at( header.listId );
 	int chunkBufferIndex = chunkBuffer->lockChunk( chunk, true );
 	bool isSealed = ( chunkBufferIndex == -1 );
+
+	Chunk *backupChunk = SlaveWorker::getChunkBuffer->find( metadata, true, false );
+	if ( backupChunk ) {
+		// __INFO__( GREEN, "SlaveWorker", "handleGetChunkRequest", "Use backup for (%u, %u, %u) in the GetChunkBuffer.", header.listId, header.stripeId, header.chunkId );
+		chunk = backupChunk;
+	}
 
 	// if ( ! chunk ) {
 	// 	__ERROR__( "SlaveWorker", "handleGetChunkRequest", "The chunk (%u, %u, %u) does not exist.", header.listId, header.stripeId, header.chunkId );
@@ -353,6 +362,9 @@ bool SlaveWorker::handleGetChunkRequest( SlavePeerEvent event, struct ChunkHeade
 	}
 
 	event.resGetChunk( event.socket, event.instanceId, event.requestId, metadata, ret, chunkBufferIndex, isSealed ? chunk : 0 );
+
+	// ACK GET_CHUNK
+	SlaveWorker::getChunkBuffer->ack( metadata, false, true );
 
 	this->dispatch( event );
 	// Unlock in the dispatcher
@@ -594,7 +606,7 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, bool isSealed, ch
 }
 
 
-bool SlaveWorker::handleUpdateChunkRequest( SlavePeerEvent event, char *buf, size_t size ) {
+bool SlaveWorker::handleUpdateChunkRequest( SlavePeerEvent event, char *buf, size_t size, bool checkGetChunk ) {
 	struct ChunkUpdateHeader header;
 	bool ret;
 	if ( ! this->protocol.parseChunkUpdateHeader( header, true, buf, size ) ) {
@@ -616,6 +628,16 @@ bool SlaveWorker::handleUpdateChunkRequest( SlavePeerEvent event, char *buf, siz
 
 	if ( header.updatingChunkId == myChunkId ) {
 		// Normal UPDATE_CHUNK request //
+		if ( checkGetChunk ) {
+			Chunk *chunk = map->findChunkById( header.listId, header.stripeId, header.updatingChunkId );
+			MixedChunkBuffer *chunkBuffer = SlaveWorker::chunkBuffer->at( header.listId );
+			int chunkBufferIndex = chunkBuffer->lockChunk( chunk, true );
+			metadata.chunkId = header.updatingChunkId;
+			SlaveWorker::getChunkBuffer->insert( metadata, chunk );
+			metadata.chunkId = header.chunkId;
+			chunkBuffer->unlock( chunkBufferIndex );
+		}
+
 		ret = SlaveWorker::chunkBuffer->at( header.listId )->update(
 			header.stripeId, header.chunkId,
 			header.offset, header.length, header.delta,
@@ -662,7 +684,7 @@ bool SlaveWorker::handleUpdateChunkRequest( SlavePeerEvent event, char *buf, siz
 	return ret;
 }
 
-bool SlaveWorker::handleDeleteChunkRequest( SlavePeerEvent event, char *buf, size_t size ) {
+bool SlaveWorker::handleDeleteChunkRequest( SlavePeerEvent event, char *buf, size_t size, bool checkGetChunk ) {
 	struct ChunkUpdateHeader header;
 	bool ret;
 	if ( ! this->protocol.parseChunkUpdateHeader( header, true, buf, size ) ) {

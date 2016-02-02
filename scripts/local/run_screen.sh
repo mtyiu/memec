@@ -3,7 +3,7 @@
 SLEEP_TIME=0.4
 # VERBOSE=-v
 
-screen -S coordinator -p 0 -X stuff "bin/coordinator ${VERBOSE} $(printf '\r')"
+screen -S coordinator -p 0 -X stuff "bin/coordinator ${VERBOSE} 2>&1 | tee coordinator.txt $(printf '\r')"
 sleep ${SLEEP_TIME}
 
 for i in {1..10}; do
@@ -25,7 +25,7 @@ done
 
 # sleep 1
 
-screen -S master -p 0 -X stuff "bin/master ${VERBOSE} $(printf '\r')"
+screen -S master -p 0 -X stuff "bin/master ${VERBOSE} 2>&1 | tee master.txt $(printf '\r')"
 sleep ${SLEEP_TIME}
 
 # screen -S application -p 0 -X stuff "bin/application -v $(printf '\r')"

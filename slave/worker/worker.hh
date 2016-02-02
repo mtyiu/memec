@@ -7,6 +7,7 @@
 #include "../ack/pending_ack.hh"
 #include "../buffer/mixed_chunk_buffer.hh"
 #include "../buffer/degraded_chunk_buffer.hh"
+#include "../buffer/get_chunk_buffer.hh"
 #include "../buffer/remapped_buffer.hh"
 #include "../config/slave_config.hh"
 #include "../event/event_queue.hh"
@@ -65,6 +66,7 @@ private:
 	static Map *map;
 	static MemoryPool<Chunk> *chunkPool;
 	static std::vector<MixedChunkBuffer *> *chunkBuffer;
+	static GetChunkBuffer *getChunkBuffer;
 	static DegradedChunkBuffer *degradedChunkBuffer;
 	static RemappedBuffer *remappedBuffer;
 	static PacketPool *packetPool;
@@ -97,7 +99,8 @@ private:
 		uint32_t *original = 0, uint32_t *reconstructed = 0, uint32_t reconstructedCount = 0,
 		bool reconstructParity = false,
 		Chunk **chunks = 0,
-		bool endOfDegradedOp = false
+		bool endOfDegradedOp = false,
+		bool checkGetChunk = false
 	);
 	bool handleDeleteRequest( MasterEvent event, char *buf, size_t size );
 	bool handleDeleteRequest(
@@ -126,8 +129,8 @@ private:
 	bool handleGetChunkRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleGetChunkRequest( SlavePeerEvent event, struct ChunkHeader &header );
 	bool handleSetChunkRequest( SlavePeerEvent event, bool isSealed, char *buf, size_t size );
-	bool handleUpdateChunkRequest( SlavePeerEvent event, char *buf, size_t size );
-	bool handleDeleteChunkRequest( SlavePeerEvent event, char *buf, size_t size );
+	bool handleUpdateChunkRequest( SlavePeerEvent event, char *buf, size_t size, bool checkGetChunk );
+	bool handleDeleteChunkRequest( SlavePeerEvent event, char *buf, size_t size, bool checkGetChunk );
 	bool handleSealChunkRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleBatchKeyValueRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleBatchChunksRequest( SlavePeerEvent event, char *buf, size_t size );
@@ -167,7 +170,7 @@ private:
 	bool handleDegradedUpdateRequest( MasterEvent event, char *buf, size_t size );
 	bool handleDegradedDeleteRequest( MasterEvent event, char *buf, size_t size );
 	bool handleForwardChunkRequest( SlavePeerEvent event, char *buf, size_t size );
-	bool handleForwardChunkRequest( struct ChunkDataHeader &header );
+	bool handleForwardChunkRequest( struct ChunkDataHeader &header, bool xorIfExists );
 	bool handleForwardChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool performDegradedRead(
 		uint8_t opcode,
@@ -193,7 +196,8 @@ private:
 		MasterSocket *masterSocket = 0,
 		uint32_t *original = 0, uint32_t *reconstructed = 0, uint32_t reconstructedCount = 0,
 		bool reconstructParity = false,
-		Chunk **chunks = 0, bool endOfDegradedOp = false
+		Chunk **chunks = 0, bool endOfDegradedOp = false,
+		bool checkGetChunk = false
 	);
 
 	// Perform UPDATE/DELETE on local data chunk and send reconstructed and modified parity chunks to the failed parity servers

@@ -126,6 +126,8 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_OPCODE_REMAPPED_DELETE:
 		case PROTO_OPCODE_BATCH_CHUNKS:
 		case PROTO_OPCODE_BATCH_KEY_VALUES:
+		case PROTO_OPCODE_UPDATE_CHUNK_CHECK:
+		case PROTO_OPCODE_DELETE_CHUNK_CHECK:
 			break;
 		default:
 			fprintf( stderr, "Error #4: (magic, from, to, opcode, length, instanceId, requestId) = (%x, %x, %x, %x, %u, %u, %u)\n", magic, from, to, opcode, length, instanceId, requestId );

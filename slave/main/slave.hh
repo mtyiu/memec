@@ -8,6 +8,7 @@
 #include "../ack/pending_ack.hh"
 #include "../buffer/mixed_chunk_buffer.hh"
 #include "../buffer/degraded_chunk_buffer.hh"
+#include "../buffer/get_chunk_buffer.hh"
 #include "../buffer/remapped_buffer.hh"
 #include "../config/slave_config.hh"
 #include "../ds/map.hh"
@@ -76,6 +77,7 @@ public:
 	std::vector<StripeListIndex> stripeListIndex;
 	MemoryPool<Chunk> *chunkPool;
 	std::vector<MixedChunkBuffer *> chunkBuffer;
+	GetChunkBuffer getChunkBuffer;
 	RemappedBuffer remappedBuffer;
 	DegradedChunkBuffer degradedChunkBuffer;
 	Timestamp timestamp;

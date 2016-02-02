@@ -126,6 +126,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		// UPDATE
 		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
+			// assert( success );
 			buffer.data = this->protocol.resUpdate(
 				buffer.size,
 				event.instanceId, event.requestId,
@@ -421,7 +422,8 @@ bool SlaveWorker::handleUpdateRequest(
 	MasterEvent event, struct KeyValueUpdateHeader &header,
 	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 	bool reconstructParity,
-	Chunk **chunks, bool endOfDegradedOp
+	Chunk **chunks, bool endOfDegradedOp,
+	bool checkGetChunk
 ) {
 	bool ret;
 	Key key;
@@ -480,6 +482,14 @@ bool SlaveWorker::handleUpdateRequest(
 		LOCK( keysLock );
 		LOCK( cacheLock );
 		// Compute delta and perform update
+
+		if ( checkGetChunk ) {
+			SlaveWorker::getChunkBuffer->insert(
+				metadata,
+				chunkBufferIndex == -1 /* isSealed */ ? chunk : 0
+			);
+		}
+
 		chunk->computeDelta(
 			header.valueUpdate, // delta
 			header.valueUpdate, // new data
@@ -506,7 +516,8 @@ bool SlaveWorker::handleUpdateRequest(
 				event.socket,              // masterSocket
 				original, reconstructed, reconstructedCount,
 				reconstructParity,
-				chunks, endOfDegradedOp
+				chunks, endOfDegradedOp,
+				checkGetChunk
 			);
 		} else {
 			event.resUpdate(

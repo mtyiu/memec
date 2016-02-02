@@ -601,9 +601,12 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 			return false;
 		}
 		__DEBUG__(
-			BLUE, "SlaveWorker", "handleGetChunkResponse",
+			YELLOW, "SlaveWorker", "handleGetChunkResponse",
 			"[GET_CHUNK (success)] List ID: %u, stripe ID: %u, chunk ID: %u; chunk size = %u.",
-			header.chunkData.listId, header.chunkData.stripeId, header.chunkData.chunkId, header.chunkData.size
+			header.chunkData.listId,
+			header.chunkData.stripeId,
+			header.chunkData.chunkId,
+			header.chunkData.size
 		);
 		listId = header.chunkData.listId;
 		stripeId = header.chunkData.stripeId;
@@ -778,8 +781,8 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 
 				keyMetadata.offset = 0;
 
-				if ( ! dmap->deleteDegradedChunk( op.listId, op.stripeId, op.chunkId, pids ) ) {
-					__ERROR__( "SlaveWorker", "handleGetChunkResponse", "dmap->deleteDegradedChunk() failed (%u, %u, %u).", op.listId, op.stripeId, op.chunkId );
+				if ( ! dmap->deleteDegradedChunk( op.listId, op.stripeId, op.chunkId, pids, true /* force */ ) ) {
+					// __ERROR__( "SlaveWorker", "handleGetChunkResponse", "dmap->deleteDegradedChunk() failed (%u, %u, %u).", op.listId, op.stripeId, op.chunkId );
 				}
 				metadata.set( op.listId, op.stripeId, op.chunkId );
 
@@ -1079,6 +1082,46 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 							this->dispatch( event );
 							op.data.key.free();
 						}
+					}
+				}
+
+				////////////////////////////////////////
+				// Forward the modified parity chunks //
+				////////////////////////////////////////
+				SlavePeerEvent event;
+				uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
+				for ( uint32_t i = 0; i < op.reconstructedCount; i++ ) {
+					SlavePeerSocket *s = SlaveWorker::stripeList->get( op.reconstructed[ i * 2 ], op.reconstructed[ i * 2 + 1 ] );
+
+					// fprintf(
+					// 	stderr, "Forwarding the %s chunk (%u, %u, %u: %p; size: %u) to #%u (self? %s).\n",
+					// 	op.original[ i * 2 + 1 ] >= SlaveWorker::dataChunkCount ? "parity" : "data",
+					// 	metadata.listId, metadata.stripeId, op.original[ i * 2 + 1 ],
+					// 	this->chunks[ op.original[ i * 2 + 1 ] ],
+					// 	this->chunks[ op.original[ i * 2 + 1 ] ]->getSize(),
+					// 	op.reconstructed[ i * 2 + 1 ],
+					// 	s->self ? "yes" : "no"
+					// );
+					if ( ! this->chunks[ op.original[ i * 2 + 1 ] ]->getSize() )
+						continue; // No need to send
+
+					if ( s->self ) {
+						// struct ChunkDataHeader chunkDataHeader = {
+						// 	.listId = metadata.listId,
+						// 	.stripeId = metadata.stripeId,
+						// 	.chunkId = op.original[ i * 2 + 1 ],
+						// 	.size = this->chunks[ op.original[ i * 2 + 1 ] ]->getSize(),
+						// 	.offset = 0,
+						// 	.data = this->chunks[ op.original[ i * 2 + 1 ] ]->getData()
+						// };
+						// this->handleForwardChunkRequest( chunkDataHeader, false );
+					} else {
+						metadata.chunkId = op.original[ i * 2 + 1 ];
+						event.reqForwardChunk(
+							s, Slave::instanceId, requestId,
+							metadata, this->chunks[ op.original[ i * 2 + 1 ] ], false
+						);
+						this->dispatch( event );
 					}
 				}
 			}

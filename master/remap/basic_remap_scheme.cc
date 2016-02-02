@@ -11,7 +11,7 @@ MasterRemapMsgHandler *BasicRemappingScheme::remapMsgHandler = NULL;
 Latency BasicRemappingScheme::increment ( 0, 100 );
 
 void BasicRemappingScheme::redirect(
-	uint32_t *original, uint32_t *remapped, uint32_t &remappedCount,
+	uint32_t *original, uint32_t *remapped, uint32_t numEntries, uint32_t &remappedCount,
 	uint32_t dataChunkCount, uint32_t parityChunkCount,
 	SlaveSocket **dataSlaveSockets, SlaveSocket **paritySlaveSockets,
 	bool isGet
@@ -28,17 +28,18 @@ void BasicRemappingScheme::redirect(
 	LOCK( &overloadedSlave->lock );
 
 	remappedCount = 0;
-	for ( uint32_t i = 0; i < 1 + parityChunkCount; i++ ) {
-		if ( i == 0 )
-			slaveAddr = dataSlaveSockets[ original[ 1 ] ]->getAddr();
+	for ( uint32_t i = 0; i < numEntries; i++ ) {
+		uint32_t chunkId = original[ i * 2 + 1 ];
+		if ( chunkId < dataChunkCount )
+			slaveAddr = dataSlaveSockets[ chunkId ]->getAddr();
 		else
-			slaveAddr = paritySlaveSockets[ original[ i * 2 + 1 ] - dataChunkCount ]->getAddr();
+			slaveAddr = paritySlaveSockets[ chunkId - dataChunkCount ]->getAddr();
 
-		selectedSlaves.insert( slaveAddr ); // All original slaves should not be selected as remapped slaves
+		selectedSlaves.insert( slaveAddr ); // All original or failed slaves should not be selected as remapped slaves
 
 		// Check if remapping is allowed
 		if ( remapMsgHandler->allowRemapping( slaveAddr ) ) {
-			if ( ! isGet || original[ i * 2 + 1 ] < dataChunkCount ) {
+			if ( ! isGet || chunkId < dataChunkCount ) {
 				remapped[ remappedCount * 2     ] = original[ i * 2     ];
 				remapped[ remappedCount * 2 + 1 ] = original[ i * 2 + 1 ];
 				remappedCount++;

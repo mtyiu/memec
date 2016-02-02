@@ -156,13 +156,13 @@ char *SlaveProtocol::resSetChunk( size_t &size, uint16_t instanceId, uint32_t re
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::reqUpdateChunk( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta, char *buf, uint32_t timestamp ) {
+char *SlaveProtocol::reqUpdateChunk( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta, char *buf, uint32_t timestamp, bool checkGetChunk ) {
 	// -- common/protocol/normal_protocol.cc --
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateChunkUpdateHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
-		PROTO_OPCODE_UPDATE_CHUNK,
+		checkGetChunk ? PROTO_OPCODE_UPDATE_CHUNK_CHECK : PROTO_OPCODE_UPDATE_CHUNK,
 		instanceId, requestId,
 		listId, stripeId, chunkId,
 		offset, length, updatingChunkId,
@@ -186,13 +186,13 @@ char *SlaveProtocol::resUpdateChunk( size_t &size, uint16_t instanceId, uint32_t
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::reqDeleteChunk( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta, char *buf, uint32_t timestamp ) {
+char *SlaveProtocol::reqDeleteChunk( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta, char *buf, uint32_t timestamp, bool checkGetChunk ) {
 	// -- common/protocol/normal_protocol.cc --
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateChunkUpdateHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
-		PROTO_OPCODE_DELETE_CHUNK,
+		checkGetChunk ? PROTO_OPCODE_DELETE_CHUNK_CHECK : PROTO_OPCODE_DELETE_CHUNK,
 		instanceId, requestId,
 		listId, stripeId, chunkId,
 		offset, length, updatingChunkId,

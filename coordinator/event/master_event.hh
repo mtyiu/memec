@@ -71,6 +71,8 @@ public:
 			uint32_t *original;
 			uint32_t *reconstructed;
 			uint32_t *remapped;
+			uint8_t numSurvivingChunkIds;
+			uint32_t *survivingChunkIds;
 			Key key;
 		} degradedLock;
 		struct {
@@ -94,7 +96,7 @@ public:
 		Key &key, bool isLocked, bool isSealed,
 		uint32_t stripeId, uint32_t dataChunkId, uint32_t dataChunkCount,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
-		uint32_t ongoingAtChunk
+		uint32_t ongoingAtChunk, uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds
 	);
 	void resDegradedLock(
 		MasterSocket *socket, uint16_t instanceId, uint32_t requestId,

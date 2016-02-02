@@ -10,7 +10,7 @@
 class BasicRemappingScheme {
 public:
 	static void redirect(
-		uint32_t *original, uint32_t *remapped, uint32_t &remappedCount,
+		uint32_t *original, uint32_t *remapped, uint32_t numEntries, uint32_t &remappedCount,
 		uint32_t dataChunkCount, uint32_t parityChunkCount,
 		SlaveSocket **dataSlaveSockets, SlaveSocket **paritySlaveSockets,
 		bool isGet

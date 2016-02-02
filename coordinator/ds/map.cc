@@ -149,7 +149,7 @@ bool Map::insertKey( char *keyStr, uint8_t keySize, uint32_t listId, uint32_t st
 }
 
 bool Map::insertDegradedLock( uint32_t listId, uint32_t stripeId,
-uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32_t ongoingAtChunk, bool needsLock, bool needsUnlock ) {
+uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32_t ongoingAtChunk, uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds, uint32_t chunkCount, bool needsLock, bool needsUnlock ) {
 	ListStripe listStripe;
 	DegradedLock degradedLock( original, reconstructed, reconstructedCount, ongoingAtChunk );
 	listStripe.set( listId, stripeId );
@@ -160,12 +160,16 @@ uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32
 	if ( needsLock ) LOCK( &this->degradedLocksLock );
 	it = this->degradedLocks.find( listStripe );
 	if ( it == this->degradedLocks.end() ) {
-		degradedLock.dup();
+		degradedLock.dup( numSurvivingChunkIds, survivingChunkIds, chunkCount );
 
 		std::pair<std::unordered_map<ListStripe, DegradedLock>::iterator, bool> r;
 		std::pair<ListStripe, DegradedLock> p( listStripe, degradedLock );
 
 		r = this->degradedLocks.insert( p );
+
+		// printf( "[%u, %u]: ", listId, stripeId );
+		// degradedLock.print();
+		// fflush( stdout );
 
 		ret = r.second;
 	} else {
@@ -177,7 +181,7 @@ uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32
 }
 
 bool Map::expandDegradedLock( uint32_t listId, uint32_t stripeId,
-uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32_t ongoingAtChunk, DegradedLock &degradedLock, bool needsLock, bool needsUnlock ) {
+uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32_t ongoingAtChunk, uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds, uint32_t chunkCount, DegradedLock &degradedLock, bool needsLock, bool needsUnlock ) {
 	ListStripe listStripe;
 	listStripe.set( listId, stripeId );
 
@@ -190,7 +194,7 @@ uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32
 		ret = false;
 	} else {
 		DegradedLock &d = it->second;
-		d.expand( original, reconstructed, reconstructedCount, ongoingAtChunk );
+		d.expand( original, reconstructed, reconstructedCount, ongoingAtChunk, numSurvivingChunkIds, survivingChunkIds, chunkCount );
 		degradedLock = d;
 	}
 	if ( needsUnlock ) UNLOCK( &this->degradedLocksLock );

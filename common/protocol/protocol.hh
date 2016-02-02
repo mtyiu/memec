@@ -89,6 +89,8 @@
 #define PROTO_OPCODE_REMAPPED_DELETE              0x60
 #define PROTO_OPCODE_BATCH_CHUNKS                 0x61
 #define PROTO_OPCODE_BATCH_KEY_VALUES             0x62
+#define PROTO_OPCODE_UPDATE_CHUNK_CHECK           0x63
+#define PROTO_OPCODE_DELETE_CHUNK_CHECK           0x64
 
 #define PROTO_UNINITIALIZED_INSTANCE              0
 

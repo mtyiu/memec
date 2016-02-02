@@ -156,6 +156,7 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 			}
 		}
 	}
+	GetChunkBuffer::init();
 	// Map //
 	this->map.setTimestamp( &this->timestamp );
 	this->degradedChunkBuffer.map.init( &this->map );

@@ -9,6 +9,7 @@ OBJS= \
 	buffer/chunk_buffer.o \
 	buffer/data_chunk_buffer.o \
 	buffer/degraded_chunk_buffer.o \
+	buffer/get_chunk_buffer.o \
 	buffer/mixed_chunk_buffer.o \
 	buffer/parity_chunk_buffer.o \
 	buffer/remapped_buffer.o \

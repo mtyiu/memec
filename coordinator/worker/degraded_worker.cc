@@ -33,11 +33,23 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 	// Find the SlaveSocket which stores the stripe with listId and srcDataChunkId
 	SlaveSocket *socket;
 	uint32_t ongoingAtChunk;
-	CoordinatorWorker::stripeList->get( header.key, header.keySize, &socket, 0, &ongoingAtChunk );
+	uint32_t listId = CoordinatorWorker::stripeList->get( header.key, header.keySize, &socket, 0, &ongoingAtChunk );
 	Map *map = &( socket->map );
 	Metadata srcMetadata; // set via findMetadataByKey()
 	DegradedLock degradedLock;
 	bool ret = true;
+
+	uint8_t numSurvivingChunkIds = 0;
+	uint32_t ptr = 0;
+	CoordinatorRemapMsgHandler *crmh = CoordinatorRemapMsgHandler::getInstance();
+	for ( uint32_t i = 0; i < CoordinatorWorker::chunkCount; i++ ) {
+		SlaveSocket *s = CoordinatorWorker::stripeList->get( listId, i );
+		struct sockaddr_in addr = s->getAddr();
+		if ( ! crmh->allowRemapping( addr ) ) {
+			numSurvivingChunkIds++;
+			this->survivingChunkIds[ ptr++ ] = i;
+		}
+	}
 
 	lock = 0;
 	if ( ! map->findMetadataByKey( header.key, header.keySize, srcMetadata ) ) {
@@ -56,6 +68,9 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 			srcMetadata.listId, srcMetadata.stripeId,
 			header.original, header.reconstructed, header.reconstructedCount,
 			ongoingAtChunk,
+			numSurvivingChunkIds,
+			this->survivingChunkIds,
+			CoordinatorWorker::chunkCount,
 			degradedLock,
 			false, false
 		);
@@ -71,7 +86,9 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 			degradedLock.original,
 			degradedLock.reconstructed,
 			degradedLock.reconstructedCount,
-			degradedLock.ongoingAtChunk
+			degradedLock.ongoingAtChunk,
+			numSurvivingChunkIds,
+			this->survivingChunkIds
 		);
 	} else if ( ! header.reconstructedCount ) {
 		// No need to lock
@@ -81,7 +98,6 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 		);
 	} else {
 		// Check whether the "failed" servers are in intermediate or degraded state
-		CoordinatorRemapMsgHandler *crmh = CoordinatorRemapMsgHandler::getInstance();
 		// bool isPrinted = false;
 		for ( uint32_t i = 0; i < header.reconstructedCount; ) {
 			SlaveSocket *s = CoordinatorWorker::stripeList->get(
@@ -144,25 +160,31 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 			}
 		}
 
-		ret = map->insertDegradedLock(
+		map->insertDegradedLock(
 			srcMetadata.listId, srcMetadata.stripeId,
 			header.original, header.reconstructed, header.reconstructedCount,
 			ongoingAtChunk,
+			numSurvivingChunkIds,
+			this->survivingChunkIds,
+			CoordinatorWorker::chunkCount,
 			false, false
 		);
+		ret = map->findDegradedLock( srcMetadata.listId, srcMetadata.stripeId, degradedLock, false, false );
 
 		if ( ret ) {
 			event.resDegradedLock(
 				event.socket, event.instanceId, event.requestId, key,
-				true,                         // the degraded lock is attained
+				true, // isLocked
 				map->isSealed( srcMetadata ), // the chunk is sealed
 				srcMetadata.stripeId,
 				srcMetadata.chunkId,
 				CoordinatorWorker::dataChunkCount,
-				header.original,
-				header.reconstructed,
-				header.reconstructedCount,
-				ongoingAtChunk
+				degradedLock.original,
+				degradedLock.reconstructed,
+				degradedLock.reconstructedCount,
+				degradedLock.ongoingAtChunk,
+				numSurvivingChunkIds,
+				this->survivingChunkIds
 			);
 		} else {
 			// Cannot lock

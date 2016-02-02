@@ -216,7 +216,8 @@ public:
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		uint32_t offset, uint32_t length, uint32_t updatingChunkId,
-		char *delta, char *buf = 0, uint32_t timestamp = 0
+		char *delta, char *buf = 0, uint32_t timestamp = 0,
+		bool checkGetChunk = false
 	);
 	char *resUpdateChunk(
 		size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
@@ -228,7 +229,8 @@ public:
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		uint32_t offset, uint32_t length, uint32_t updatingChunkId,
-		char *delta, char *buf = 0, uint32_t timestamp = 0
+		char *delta, char *buf = 0, uint32_t timestamp = 0,
+		bool checkGetChunk = false
 	);
 	char *resDeleteChunk(
 		size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
