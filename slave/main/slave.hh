@@ -80,6 +80,10 @@ public:
 	DegradedChunkBuffer degradedChunkBuffer;
 	Timestamp timestamp;
 	LOCK_T lock;
+	struct {
+		bool isRecovering;
+		LOCK_T lock;
+	} status;
 	/* Instance ID (assigned by coordinator) */
 	static uint16_t instanceId;
 
@@ -111,6 +115,7 @@ public:
 	void printChunk();
 	void time();
 	void backupStat( FILE *f = stdout );
+	void lookup();
 
 	void alarm();
 

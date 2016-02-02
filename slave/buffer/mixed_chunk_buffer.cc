@@ -109,10 +109,26 @@ void MixedChunkBuffer::unlock( int index ) {
 	}
 }
 
-bool MixedChunkBuffer::findValueByKey( char *data, uint8_t size, KeyValue *keyValuePtr, Key *keyPtr ) {
+bool MixedChunkBuffer::findValueByKey( char *data, uint8_t size, KeyValue *keyValuePtr, Key *keyPtr, bool verbose ) {
 	switch( this->role ) {
 		case CBR_PARITY:
 			return this->buffer.parity->findValueByKey( data, size, keyValuePtr, keyPtr );
+		case CBR_DATA:
+			if ( verbose )
+				__ERROR__( "MixedChunkBuffer", "findValueByKey", "Error: Calling this function in DataChunkBuffer." );
+		default:
+			return false;
+	}
+}
+
+bool MixedChunkBuffer::getKeyValueMap( std::unordered_map<Key, KeyValue> *&map, LOCK_T *&lock, bool verbose ) {
+	switch( this->role ) {
+		case CBR_PARITY:
+			this->buffer.parity->getKeyValueMap( map, lock );
+			return true;
+		case CBR_DATA:
+			if ( verbose )
+				__ERROR__( "MixedChunkBuffer", "getKeyValueMap", "Error: Calling this function in DataChunkBuffer." );
 		default:
 			return false;
 	}
@@ -136,13 +152,12 @@ bool MixedChunkBuffer::updateKeyValue( char *keyStr, uint8_t keySize, uint32_t o
 	}
 }
 
-void MixedChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, char *dataDelta, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, bool isDelete ) {
+bool MixedChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, char *dataDelta, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, bool isDelete ) {
 	switch( this->role ) {
 		case CBR_PARITY:
-			this->buffer.parity->update( stripeId, chunkId, offset, size, dataDelta, dataChunks, dataChunk, parityChunk, isDelete );
-			break;
+			return this->buffer.parity->update( stripeId, chunkId, offset, size, dataDelta, dataChunks, dataChunk, parityChunk, isDelete );
 		default:
-			return;
+			return false;
 	}
 }
 

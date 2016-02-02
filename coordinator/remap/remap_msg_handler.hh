@@ -71,8 +71,8 @@ public:
 	bool stop();
 
 	// batch transit (start)
-	bool transitToDegraded( std::vector<struct sockaddr_in> *slaves );
-	bool transitToNormal( std::vector<struct sockaddr_in> *slaves );
+	bool transitToDegraded( std::vector<struct sockaddr_in> *slaves, bool forced = false );
+	bool transitToNormal( std::vector<struct sockaddr_in> *slaves, bool froced = false );
 	// clean up before transition ends
 	bool transitToDegradedEnd( const struct sockaddr_in &slave );
 	bool transitToNormalEnd( const struct sockaddr_in &slave );
@@ -92,6 +92,7 @@ public:
 
 	// check slave state
 	bool isInTransition( const struct sockaddr_in &slave );
+	bool allowRemapping( const struct sockaddr_in &slave );
 	bool reachMaximumRemapped( uint32_t maximum );
 
 };

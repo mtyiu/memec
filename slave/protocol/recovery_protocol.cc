@@ -1,5 +1,17 @@
 #include "protocol.hh"
 
+char *SlaveProtocol::resSlaveReconstructedMsg( size_t &size, uint16_t instanceId, uint32_t requestId ) {
+	// -- common/protocol/recovery_protocol.cc --
+	size = this->generateHeader(
+		PROTO_MAGIC_RESPONSE_SUCCESS,
+		PROTO_MAGIC_TO_COORDINATOR,
+		PROTO_OPCODE_SLAVE_RECONSTRUCTED,
+		0, // length
+		instanceId, requestId
+	);
+	return this->buffer.send;
+}
+
 char *SlaveProtocol::resReconstruction( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t numStripes ) {
 	// -- common/protocol/recovery_protocol.cc --
 	size = this->generateReconstructionHeader(
@@ -12,14 +24,59 @@ char *SlaveProtocol::resReconstruction( size_t &size, uint16_t instanceId, uint3
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::resPromoteBackupSlave( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t numStripes ) {
+char *SlaveProtocol::resReconstructionUnsealed( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t numUnsealedKeys ) {
+	// -- common/protocol/recovery_protocol.cc --
+	size = this->generateReconstructionHeader(
+		PROTO_MAGIC_RESPONSE_SUCCESS,
+		PROTO_MAGIC_TO_COORDINATOR,
+		PROTO_OPCODE_RECONSTRUCTION_UNSEALED,
+		instanceId, requestId,
+		listId, chunkId, numUnsealedKeys
+	);
+	return this->buffer.send;
+}
+
+char *SlaveProtocol::resPromoteBackupSlave( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t numStripes, uint32_t numUnsealedKeys ) {
 	// -- common/protocol/recovery_protocol.cc --
 	size = this->generatePromoteBackupSlaveHeader(
 		PROTO_MAGIC_RESPONSE_SUCCESS,
 		PROTO_MAGIC_TO_COORDINATOR,
 		PROTO_OPCODE_BACKUP_SLAVE_PROMOTED,
 		instanceId, requestId,
-		addr, port, numStripes
+		addr, port, numStripes, numUnsealedKeys
+	);
+	return this->buffer.send;
+}
+
+char *SlaveProtocol::sendUnsealedKeys(
+	size_t &size, uint16_t instanceId, uint32_t requestId,
+	std::unordered_set<Key> &keys, std::unordered_set<Key>::iterator &it,
+	std::unordered_map<Key, KeyValue> *values, LOCK_T *lock,
+	uint32_t &keyValuesCount,
+	bool &isCompleted
+) {
+	// -- common/protocol/batch_protocol.cc --
+	size = this->generateBatchKeyValueHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_BATCH_KEY_VALUES,
+		instanceId, requestId,
+		keys, it, values, lock, keyValuesCount,
+		isCompleted
+	);
+	return this->buffer.send;
+}
+
+char *SlaveProtocol::resUnsealedKeys(
+	size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
+	struct BatchKeyValueHeader &header
+) {
+	size = this->generateBatchKeyHeader(
+		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_BATCH_KEY_VALUES,
+		instanceId, requestId,
+		header
 	);
 	return this->buffer.send;
 }

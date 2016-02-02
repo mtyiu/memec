@@ -9,12 +9,12 @@
 
 class BasicRemappingScheme {
 public:
-	static void getRemapTarget(
+	static void redirect(
 		uint32_t *original, uint32_t *remapped, uint32_t &remappedCount,
 		uint32_t dataChunkCount, uint32_t parityChunkCount,
-		SlaveSocket **dataSlaveSockets, SlaveSocket **paritySlaveSockets
+		SlaveSocket **dataSlaveSockets, SlaveSocket **paritySlaveSockets,
+		bool isGet
 	);
-	static void getDegradedOpTarget( uint32_t listId, uint32_t originalChunkId, uint32_t &newChunkId, uint32_t dataCount, uint32_t parityCount, SlaveSocket **data, SlaveSocket **parity );
 	static bool isOverloaded( SlaveSocket *socket );
 
 	static SlaveLoading *slaveLoading;
@@ -22,11 +22,6 @@ public:
 	static StripeList<SlaveSocket> *stripeList;
 	static MasterRemapMsgHandler *remapMsgHandler;
 	static Latency increment;
-
-	static pthread_mutex_t lock;
-	static uint32_t remapped;
-	static uint32_t lockonly;
-
 };
 
 #endif

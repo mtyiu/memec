@@ -37,23 +37,23 @@ bool SlaveWorker::handleSlavePeerRegisterRequest( SlavePeerSocket *socket, uint1
 
 ////////////////////////////////////////////////////////////////////////////////
 
-bool SlaveWorker::handleDegradedSetRequest( SlavePeerEvent event, char *buf, size_t size ) {
-	struct DegradedSetHeader header;
-	if ( ! this->protocol.parseDegradedSetReqHeader( header, buf, size ) ) {
-		__ERROR__( "SlaveWorker", "handleDegradedSetRequest", "Invalid DEGRADED_SET request (size = %lu).", size );
+bool SlaveWorker::handleForwardKeyRequest( SlavePeerEvent event, char *buf, size_t size ) {
+	struct ForwardKeyHeader header;
+	if ( ! this->protocol.parseForwardKeyReqHeader( header, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleForwardKeyRequest", "Invalid DEGRADED_SET request (size = %lu).", size );
 		return false;
 	}
 	if ( header.opcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
-		__INFO__(
-			BLUE, "SlaveWorker", "handleDegradedSetRequest",
+		__DEBUG__(
+			BLUE, "SlaveWorker", "handleForwardKeyRequest",
 			"[DEGRADED_SET] Degraded opcode: 0x%x; list ID: %u, chunk ID: %u; key: %.*s (size = %u); value size: %u; value update size: %u, offset: %u.",
 			header.opcode, header.listId, header.chunkId,
 			header.keySize, header.key, header.keySize,
 			header.valueSize, header.valueUpdateSize, header.valueUpdateOffset
 		);
 	} else {
-		__INFO__(
-			BLUE, "SlaveWorker", "handleDegradedSetRequest",
+		__DEBUG__(
+			BLUE, "SlaveWorker", "handleForwardKeyRequest",
 			"[DEGRADED_SET] Degraded opcode: 0x%x; list ID: %u, chunk ID: %u; key: %.*s (size = %u); value size: %u.",
 			header.opcode, header.listId, header.chunkId,
 			header.keySize, header.key, header.keySize,
@@ -105,11 +105,11 @@ bool SlaveWorker::handleDegradedSetRequest( SlavePeerEvent event, char *buf, siz
 			dmap->deleteValue( key, metadata, PROTO_OPCODE_DELETE, timestamp );
 			break;
 		default:
-			__ERROR__( "SlaveWorker", "handleDegradedSetRequest", "Undefined degraded opcode." );
+			__ERROR__( "SlaveWorker", "handleForwardKeyRequest", "Undefined degraded opcode." );
 			return false;
 	}
 
-	event.resDegradedSet(
+	event.resForwardKey(
 		event.socket,
 		true, // success
 		header.opcode,
@@ -274,7 +274,8 @@ bool SlaveWorker::handleDeleteRequest( SlavePeerEvent event, char *buf, size_t s
 	LOCK( &slave->sockets.mastersIdToSocketLock );
 	try {
 		MasterSocket *masterSocket = slave->sockets.mastersIdToSocketMap.at( event.instanceId );
-		masterSocket->backup.insertParityDelete( timestamp, key, value, metadata, false, 0, 0, event.socket->instanceId, event.requestId );
+		if ( masterSocket )
+			masterSocket->backup.insertParityDelete( timestamp, key, value, metadata, false, 0, 0, event.socket->instanceId, event.requestId );
 	} catch ( std::out_of_range &e ) {
 		__ERROR__( "SlaveWorker", "handleDeleteRequest", "Failed to backup delta at parity slave for instance ID = %hu request ID = %u (Socket mapping not found).", event.instanceId, event.requestId );
 	}
@@ -417,15 +418,15 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, bool isSealed, ch
 
 		// Remove the chunk from pending chunk set
 		uint16_t instanceId;
-		uint32_t requestId, addr, remaining, total;
+		uint32_t requestId, addr, remainingChunks, remainingKeys, totalChunks, totalKeys;
 		uint16_t port;
 		CoordinatorSocket *coordinatorSocket;
-		if ( SlaveWorker::pending->eraseRecovery( metadata.listId, metadata.stripeId, metadata.chunkId, instanceId, requestId, coordinatorSocket, addr, port, remaining, total ) ) {
+		if ( SlaveWorker::pending->eraseRecovery( metadata.listId, metadata.stripeId, metadata.chunkId, instanceId, requestId, coordinatorSocket, addr, port, remainingChunks, remainingKeys, totalChunks, totalKeys ) ) {
 			// printf( "Received (%u, %u, %u). Number of remaining pending chunks = %u / %u.\n", metadata.listId, metadata.stripeId, metadata.chunkId, remaining, total );
 
-			if ( remaining == 0 ) {
+			if ( remainingChunks == 0 ) {
 				notifyCoordinator = true;
-				coordinatorEvent.resPromoteBackupSlave( coordinatorSocket, instanceId, requestId, addr, port, total );
+				coordinatorEvent.resPromoteBackupSlave( coordinatorSocket, instanceId, requestId, addr, port, totalChunks, 0 );
 			}
 		} else {
 			// __ERROR__( "SlaveWorker", "handleSetChunkRequest", "Cannot find the chunk (%u, %u, %u) from pending chunk set.", metadata.listId, metadata.stripeId, metadata.chunkId );
@@ -587,31 +588,48 @@ bool SlaveWorker::handleUpdateChunkRequest( SlavePeerEvent event, char *buf, siz
 		header.updatingChunkId
 	);
 
-	SlaveWorker::chunkBuffer->at( header.listId )->update(
-		header.stripeId, header.chunkId,
-		header.offset, header.length, header.delta,
-		this->chunks, this->dataChunk, this->parityChunk
-	);
-	ret = true;
-
 	Metadata metadata;
 	metadata.set( header.listId, header.stripeId, header.chunkId );
 
-	// backup parity chunk delta ( data chunk delta from data slave )
-	Timestamp timestamp( event.timestamp );
-	Key key;
-	key.set( 0, 0 );
-	Value value;
-	value.set( header.length, header.delta );
-	Slave *slave = Slave::getInstance();
-	LOCK( &slave->sockets.mastersIdToSocketLock );
-	try {
-		MasterSocket *masterSocket = slave->sockets.mastersIdToSocketMap.at( event.instanceId );
-		masterSocket->backup.insertParityUpdate( timestamp, key, value, metadata, true, 0, header.offset, event.socket->instanceId, event.requestId );
-	} catch ( std::out_of_range &e ) {
-		__ERROR__( "SlaveWorker", "handleUpdateChunkRequest", "Failed to backup delta at parity slave for instance ID = %hu request ID = %u (Socket mapping not found).", event.instanceId, event.requestId );
+	uint32_t myChunkId = SlaveWorker::chunkBuffer->at( header.listId )->getChunkId();
+
+	if ( header.updatingChunkId == myChunkId ) {
+		// Normal UPDATE_CHUNK request //
+		ret = SlaveWorker::chunkBuffer->at( header.listId )->update(
+			header.stripeId, header.chunkId,
+			header.offset, header.length, header.delta,
+			this->chunks, this->dataChunk, this->parityChunk
+		);
+
+		// backup parity chunk delta ( data chunk delta from data slave )
+		Timestamp timestamp( event.timestamp );
+		Key key;
+		key.set( 0, 0 );
+		Value value;
+		value.set( header.length, header.delta );
+		Slave *slave = Slave::getInstance();
+		LOCK( &slave->sockets.mastersIdToSocketLock );
+		try {
+			MasterSocket *masterSocket = slave->sockets.mastersIdToSocketMap.at( event.instanceId );
+			if ( masterSocket )
+			masterSocket->backup.insertParityUpdate( timestamp, key, value, metadata, true, 0, header.offset, event.socket->instanceId, event.requestId );
+		} catch ( std::out_of_range &e ) {
+			__ERROR__( "SlaveWorker", "handleUpdateChunkRequest", "Failed to backup delta at parity slave for instance ID = %hu request ID = %u (Socket mapping not found).", event.instanceId, event.requestId );
+		}
+		UNLOCK( &slave->sockets.mastersIdToSocketLock );
+	} else {
+		// Update to reconstructed chunk //
+		ret = SlaveWorker::degradedChunkBuffer->update(
+			header.listId, header.stripeId, header.chunkId,
+			header.updatingChunkId, // For verifying the reconstructed chunk exists
+			header.offset, header.length, header.delta,
+			this->chunks, this->dataChunk, this->parityChunk
+		);
+
+		if ( ! ret ) {
+			__ERROR__( "SlaveWorker", "handleUpdateChunkRequest", "Chunk not found: (%u, %u, %u).", header.listId, header.stripeId, header.updatingChunkId );
+		}
 	}
-	UNLOCK( &slave->sockets.mastersIdToSocketLock );
 
 	event.resUpdateChunk(
 		event.socket, event.instanceId, event.requestId, metadata,
@@ -637,32 +655,49 @@ bool SlaveWorker::handleDeleteChunkRequest( SlavePeerEvent event, char *buf, siz
 		header.offset, header.length, header.updatingChunkId
 	);
 
-	SlaveWorker::chunkBuffer->at( header.listId )->update(
-		header.stripeId, header.chunkId,
-		header.offset, header.length, header.delta,
-		this->chunks, this->dataChunk, this->parityChunk,
-		true /* isDelete */
-	);
-	ret = true;
-
 	Metadata metadata;
 	metadata.set( header.listId, header.stripeId, header.chunkId );
 
-	// backup parity chunk delta ( data chunk delta from data slave )
-	Timestamp timestamp( event.timestamp );
-	Key key;
-	key.set( 0, 0 );
-	Value value;
-	value.set( header.length, header.delta );
-	Slave *slave = Slave::getInstance();
-	LOCK( &slave->sockets.mastersIdToSocketLock );
-	try{
-		MasterSocket *masterSocket = slave->sockets.mastersIdToSocketMap.at( event.instanceId );
-		masterSocket->backup.insertParityDelete( timestamp, key, value, metadata, true, 0, header.offset, event.socket->instanceId, event.requestId );
-	} catch ( std::out_of_range &e ) {
-		__ERROR__( "SlaveWorker", "handleDeleteChunkRequest", "Failed to backup delta at parity slave for instance ID = %hu request ID = %u (Socket mapping not found).", event.instanceId, event.requestId );
+	uint32_t myChunkId = SlaveWorker::chunkBuffer->at( header.listId )->getChunkId();
+
+	if ( header.updatingChunkId == myChunkId ) {
+		// Normal DELETE_CHUNK request //
+		ret = SlaveWorker::chunkBuffer->at( header.listId )->update(
+			header.stripeId, header.chunkId,
+			header.offset, header.length, header.delta,
+			this->chunks, this->dataChunk, this->parityChunk,
+			true // isDelete
+		);
+
+		// backup parity chunk delta ( data chunk delta from data slave )
+		Timestamp timestamp( event.timestamp );
+		Key key;
+		key.set( 0, 0 );
+		Value value;
+		value.set( header.length, header.delta );
+		Slave *slave = Slave::getInstance();
+		LOCK( &slave->sockets.mastersIdToSocketLock );
+		try{
+			MasterSocket *masterSocket = slave->sockets.mastersIdToSocketMap.at( event.instanceId );
+			if ( masterSocket )
+				masterSocket->backup.insertParityDelete( timestamp, key, value, metadata, true, 0, header.offset, event.socket->instanceId, event.requestId );
+		} catch ( std::out_of_range &e ) {
+			__ERROR__( "SlaveWorker", "handleDeleteChunkRequest", "Failed to backup delta at parity slave for instance ID = %hu request ID = %u (Socket mapping not found).", event.instanceId, event.requestId );
+		}
+		UNLOCK( &slave->sockets.mastersIdToSocketLock );
+	} else {
+		// Update to reconstructed chunk //
+		ret = SlaveWorker::degradedChunkBuffer->update(
+			header.listId, header.stripeId, header.chunkId,
+			header.updatingChunkId, // For verifying the reconstructed chunk exists
+			header.offset, header.length, header.delta,
+			this->chunks, this->dataChunk, this->parityChunk
+		);
+
+		if ( ! ret ) {
+			__ERROR__( "SlaveWorker", "handleUpdateChunkRequest", "Chunk not found: (%u, %u, %u).", header.listId, header.stripeId, header.updatingChunkId );
+		}
 	}
-	UNLOCK( &slave->sockets.mastersIdToSocketLock );
 
 	event.resDeleteChunk(
 		event.socket, event.instanceId, event.requestId, metadata,
@@ -697,8 +732,12 @@ bool SlaveWorker::handleSealChunkRequest( SlavePeerEvent event, char *buf, size_
 		this->chunks, this->dataChunk, this->parityChunk
 	);
 
-	if ( ! ret )
-		__ERROR__( "SlaveWorker", "handleSealChunkRequest", "Cannot update parity chunk." );
+	if ( ! ret ) {
+		event.socket->printAddress();
+		printf( " " );
+		fflush( stdout );
+		__ERROR__( "SlaveWorker", "handleSealChunkRequest", "[%u, %u] Cannot update parity chunk.", event.instanceId, event.requestId );
+	}
 
 	return true;
 }
@@ -708,12 +747,6 @@ bool SlaveWorker::issueSealChunkRequest( Chunk *chunk, uint32_t startPos ) {
 		return false;
 	}
 
-	// printf(
-	// 	"issueSealChunkRequest(): (%u, %u, %u)\n",
-	// 	chunk->metadata.listId,
-	// 	chunk->metadata.stripeId,
-	// 	chunk->metadata.chunkId
-	// );
 	// The chunk is locked when this function is called
 	// Only issue seal chunk request when new key-value pairs are received
 	if ( SlaveWorker::parityChunkCount && startPos < chunk->getSize() ) {
@@ -722,6 +755,14 @@ bool SlaveWorker::issueSealChunkRequest( Chunk *chunk, uint32_t startPos ) {
 		uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
 		Packet *packet = SlaveWorker::packetPool->malloc();
 		packet->setReferenceCount( SlaveWorker::parityChunkCount );
+
+		// printf(
+		// 	"[%u, %u] issueSealChunkRequest(): (%u, %u, %u)\n",
+		// 	instanceId, requestId,
+		// 	chunk->metadata.listId,
+		// 	chunk->metadata.stripeId,
+		// 	chunk->metadata.chunkId
+		// );
 
 		// Find parity slaves
 		this->getSlaves( chunk->metadata.listId );
@@ -751,4 +792,68 @@ bool SlaveWorker::issueSealChunkRequest( Chunk *chunk, uint32_t startPos ) {
 		}
 	}
 	return true;
+}
+
+bool SlaveWorker::handleBatchKeyValueRequest( SlavePeerEvent event, char *buf, size_t size ) {
+	struct BatchKeyValueHeader header;
+	if ( ! this->protocol.parseBatchKeyValueHeader( header, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleBatchKeyValueRequest", "Invalid BATCH_KEY_VALUE response." );
+		return false;
+	}
+
+	uint32_t listId = 0, chunkId = 0;
+	uint16_t instanceId, port;
+	uint32_t requestId, addr, remainingChunks, remainingKeys, totalChunks, totalKeys;
+	CoordinatorSocket *coordinatorSocket;
+
+	for ( uint32_t i = 0, offset = 0; i < header.count; i++ ) {
+		uint8_t keySize;
+		uint32_t valueSize;
+		uint32_t timestamp, stripeId;
+		char *keyStr, *valueStr;
+
+		this->protocol.nextKeyValueInBatchKeyValueHeader( header, keySize, valueSize, keyStr, valueStr, offset );
+
+		if ( i == 0 )
+			this->getSlaves( keyStr, keySize, listId, chunkId );
+
+		if ( SlaveWorker::disableSeal ) {
+			SlaveWorker::chunkBuffer->at( listId )->set(
+				this,
+				keyStr, keySize,
+				valueStr, valueSize,
+				PROTO_OPCODE_SET, timestamp, // generated by DataChunkBuffer
+				stripeId, chunkId,
+				0, 0,
+				this->chunks, this->dataChunk, this->parityChunk
+			);
+		} else {
+			SlaveWorker::chunkBuffer->at( listId )->set(
+				this,
+				keyStr, keySize,
+				valueStr, valueSize,
+				PROTO_OPCODE_SET, timestamp, // generated by DataChunkBuffer
+				stripeId, chunkId,
+				0, 0,
+				this->chunks, this->dataChunk, this->parityChunk
+			);
+		}
+
+		// Check if recovery is done
+		if ( SlaveWorker::pending->eraseRecovery( keySize, keyStr, instanceId, requestId, coordinatorSocket, addr, port, remainingChunks, remainingKeys, totalChunks, totalKeys ) ) {
+			if ( remainingKeys == 0 ) {
+				CoordinatorEvent coordinatorEvent;
+				coordinatorEvent.resPromoteBackupSlave( coordinatorSocket, instanceId, requestId, addr, port, 0, totalKeys );
+				this->dispatch( coordinatorEvent );
+			}
+		}
+	}
+
+	printf( "handleBatchKeyValueRequest: Inserted objects = %u\n", header.count );
+
+	// Send response to the slave peer
+	event.resUnsealedKeys( event.socket, event.instanceId, event.requestId, header, true );
+	this->dispatch( event );
+
+	return false;
 }

@@ -90,9 +90,9 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 						coordinator->remapMsgHandler->addCrashedSlave( slaves->at( i ) );
 				}
 
-				coordinator->remapMsgHandler->transitToDegraded( slaves ); // Phase 1a --> 2
+				coordinator->remapMsgHandler->transitToDegraded( slaves, event.message.switchPhase.forced ); // Phase 1a --> 2
 			} else {
-				coordinator->remapMsgHandler->transitToNormal( slaves ); // Phase 1b --> 0
+				coordinator->remapMsgHandler->transitToNormal( slaves, event.message.switchPhase.forced ); // Phase 1b --> 0
 			}
 			// free the vector of slaves
 			delete slaves;
@@ -111,7 +111,8 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 				event.message.degradedLock.stripeId,
 				event.message.degradedLock.original,
 				event.message.degradedLock.reconstructed,
-				event.message.degradedLock.reconstructedCount
+				event.message.degradedLock.reconstructedCount,
+				event.message.degradedLock.ongoingAtChunk
 			);
 			isSend = true;
 			break;

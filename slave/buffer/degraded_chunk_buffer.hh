@@ -29,14 +29,23 @@ private:
 		 * (list ID, stripe ID, chunk ID) |-> pid.id
 		 */
 		std::unordered_map<Metadata, std::vector<struct pid_s>> chunks;
+		std::unordered_set<Metadata> reconstructedChunks;
 		LOCK_T chunksLock;
 		/**
 		 * Store the set of keys in unsealed chunks and the list of IDs of pending requests
 		 * Key |-> pid.id
 		 */
 		std::unordered_map<Key, std::vector<struct pid_s>> keys;
+		std::unordered_set<Key> reconstructedKeys;
 		LOCK_T keysLock;
 	} degraded;
+
+	/**
+	 * Store the parity chunks reconstructed in the data server (either redirected or not)
+	 * (list ID, stripe ID, data chunk ID) |-> vector of parity chunk IDs
+	 */
+	std::unordered_map<Metadata, std::unordered_set<uint32_t>> parity;
+	LOCK_T parityLock;
 
 	Map *slaveMap;
 
@@ -68,7 +77,8 @@ public:
 
 	Chunk *findChunkById(
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
-		Metadata *metadataPtr = 0
+		Metadata *metadataPtr = 0,
+		bool needsLock = true, bool needsUnlock = true
 	);
 
 	bool insertKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata );
@@ -82,19 +92,20 @@ public:
 
 	bool insertDegradedChunk(
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
-		uint16_t instanceId, uint32_t requestId
+		uint16_t instanceId, uint32_t requestId, bool &isReconstructed
 	);
 	bool deleteDegradedChunk(
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		std::vector<struct pid_s> &pids
 	);
 
-	bool insertDegradedKey( Key key, uint16_t instanceId, uint32_t requestId );
+	bool insertDegradedKey( Key key, uint16_t instanceId, uint32_t requestId, bool &isReconstructed );
 	bool deleteDegradedKey( Key key, std::vector<struct pid_s> &pids );
 
 	bool insertChunk(
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
-		Chunk *chunk, bool isParity = false
+		Chunk *chunk, bool isParity = false,
+		bool needsLock = true, bool needsUnlock = true
 	);
 	Chunk *deleteChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, Metadata *metadataPtr = 0 );
 
@@ -113,8 +124,24 @@ public:
 	void print( FILE *f = stdout );
 	void stop();
 
-	bool updateKeyValue( uint8_t keySize, char *keyStr, uint32_t valueUpdateSize, uint32_t valueUpdateOffset, uint32_t chunkUpdateOffset, char *valueUpdate, Chunk *chunk, bool isSealed );
-	bool deleteKey( uint8_t opcode, uint32_t &timestamp, uint8_t keySize, char *keyStr, Metadata metadata, bool isSealed, uint32_t &deltaSize, char *delta, Chunk *chunk );
+	// For reconstructed data chunks
+	bool updateKeyValue(
+		uint8_t keySize, char *keyStr,
+		uint32_t valueUpdateSize, uint32_t valueUpdateOffset, uint32_t chunkUpdateOffset,
+		char *valueUpdate, Chunk *chunk, bool isSealed
+	);
+	bool deleteKey(
+		uint8_t opcode, uint32_t &timestamp,
+		uint8_t keySize, char *keyStr, Metadata metadata, bool isSealed,
+		uint32_t &deltaSize, char *delta, Chunk *chunk
+	);
+
+	// For reconstructed parity chunks
+	bool update(
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t updatingChunkId,
+		uint32_t offset, uint32_t size, char *dataDelta,
+		Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk
+	);
 
 	~DegradedChunkBuffer();
 };

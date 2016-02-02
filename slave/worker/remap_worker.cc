@@ -131,6 +131,11 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 				header.value, header.valueSize
 			);
 		}
+	} else if (
+		( map->findValueByKey( header.key, header.keySize, 0, 0 ) ) ||
+		( SlaveWorker::chunkBuffer->at( header.listId )->findValueByKey( header.key, header.keySize, 0, 0 ) )
+	) {
+		// success = false;
 	} else {
 		// Store the key-value pair
 		uint32_t timestamp, stripeId;
@@ -145,6 +150,15 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 			&isSealed, &sealed,
 			this->chunks, this->dataChunk, this->parityChunk
 		);
+
+		if ( header.chunkId < SlaveWorker::dataChunkCount ) {
+			// Insert remapping record
+			SlaveWorker::remappedBuffer->insert(
+				header.listId, header.chunkId,
+				header.original, header.remapped, header.remappedCount,
+				header.key, header.keySize
+			);
+		}
 	}
 
 	Key key;
@@ -246,4 +260,117 @@ bool SlaveWorker::handleRemappingSetResponse( SlavePeerEvent event, bool success
 
 	return true;
 	*/
+}
+
+bool SlaveWorker::handleRemappedUpdateRequest( SlavePeerEvent event, char *buf, size_t size ) {
+	struct KeyValueUpdateHeader header;
+	bool ret;
+	if ( ! this->protocol.parseKeyValueUpdateHeader( header, true, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleRemappedUpdateRequest", "Invalid UPDATE request." );
+		return false;
+	}
+	__DEBUG__(
+		BLUE, "SlaveWorker", "handleRemappedUpdateRequest",
+		"[UPDATE] Key: %.*s (key size = %u); Value: (update size = %u, offset = %u).",
+		( int ) header.keySize, header.key, header.keySize,
+		header.valueUpdateSize, header.valueUpdateOffset
+	);
+
+	uint32_t listId, chunkId;
+	Key key;
+
+	this->getSlaves( header.key, header.keySize, listId, chunkId );
+	key.set( header.keySize, header.key );
+
+	if ( SlaveWorker::chunkBuffer->at( listId )->updateKeyValue(
+		header.key, header.keySize,
+		header.valueUpdateOffset, header.valueUpdateSize, header.valueUpdate
+	) ) {
+		// Parity not remapped
+		ret = true;
+	} else if ( remappedBuffer->update( header.keySize, header.key, header.valueUpdateSize, header.valueUpdateOffset, header.valueUpdate ) ) {
+		// Parity remapped
+		ret = false;
+	} else {
+		ret = false;
+	}
+
+	event.resRemappedUpdate(
+		event.socket, event.instanceId, event.requestId, key,
+		header.valueUpdateOffset, header.valueUpdateSize, ret
+	);
+	this->dispatch( event );
+
+	return ret;
+}
+
+bool SlaveWorker::handleRemappedDeleteRequest( SlavePeerEvent event, char *buf, size_t size ) {
+	printf( "handleRemappedDeleteRequest\n" );
+	return true;
+}
+
+bool SlaveWorker::handleRemappedUpdateResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
+	struct KeyValueUpdateHeader header;
+	if ( ! this->protocol.parseKeyValueUpdateHeader( header, false, buf, size ) ) {
+		__ERROR__( "SlaveWorker", "handleRemappedUpdateResponse", "Invalid UPDATE request." );
+		return false;
+	}
+	__DEBUG__(
+		BLUE, "SlaveWorker", "handleRemappedUpdateResponse",
+		"[UPDATE] Key: %.*s (key size = %u); Value: (update size = %u, offset = %u).",
+		( int ) header.keySize, header.key, header.keySize,
+		header.valueUpdateSize, header.valueUpdateOffset
+	);
+
+	int pending;
+	KeyValueUpdate keyValueUpdate;
+	PendingIdentifier pid;
+	uint16_t instanceId = Slave::instanceId;
+
+	if ( ! SlaveWorker::pending->eraseKeyValueUpdate( PT_SLAVE_PEER_UPDATE, instanceId, event.requestId, event.socket, &pid, &keyValueUpdate, true, false ) ) {
+		UNLOCK( &SlaveWorker::pending->slavePeers.updateLock );
+		__ERROR__( "SlaveWorker", "handleRemappedUpdateResponse", "Cannot find a pending slave UPDATE request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
+		return false;
+	}
+
+	// erase data delta backup
+	// Slave *slave = Slave::getInstance();
+	// LOCK( &slave->sockets.mastersIdToSocketLock );
+	// try {
+	// 	MasterSocket *masterSocket = slave->sockets.mastersIdToSocketMap.at( event.instanceId );
+	// 	masterSocket->backup.removeDataUpdate( event.requestId, event.socket );
+	// } catch ( std::out_of_range &e ) {
+	// 	__ERROR__( "SlaveWorker", "handleUpdateResponse", "Cannot find a pending parity slave UPDATE backup for instance ID = %hu, request ID = %u. (Socket mapping not found)", event.instanceId, event.requestId );
+	// }
+	// UNLOCK( &slave->sockets.mastersIdToSocketLock );
+
+	// Check pending slave UPDATE requests
+	pending = SlaveWorker::pending->count( PT_SLAVE_PEER_UPDATE, pid.instanceId, pid.requestId, false, true );
+
+	__DEBUG__( YELLOW, "SlaveWorker", "handleRemappedUpdateResponse", "Pending slave UPDATE requests = %d (%s) (Key: %.*s).", pending, success ? "success" : "fail", ( int ) header.keySize, header.key );
+
+	if ( pending == 0 ) {
+		// Only send master UPDATE response when the number of pending slave UPDATE requests equal 0
+		MasterEvent masterEvent;
+
+		if ( ! SlaveWorker::pending->eraseKeyValueUpdate( PT_MASTER_UPDATE, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &keyValueUpdate ) ) {
+			__ERROR__( "SlaveWorker", "handleUpdateResponse", "Cannot find a pending master UPDATE request that matches the response. This message will be discarded." );
+			return false;
+		}
+
+		masterEvent.resUpdate(
+			( MasterSocket * ) pid.ptr, pid.instanceId, pid.requestId,
+			keyValueUpdate,
+			header.valueUpdateOffset,
+			header.valueUpdateSize,
+			success, true, false
+		);
+		this->dispatch( masterEvent );
+	}
+	return true;
+}
+
+bool SlaveWorker::handleRemappedDeleteResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
+	printf( "handleRemappedDeleteResponse\n" );
+	return true;
 }

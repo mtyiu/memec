@@ -1,6 +1,20 @@
 #include "pending.hh"
 #include "../../common/util/debug.hh"
 
+bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_set<PendingIdentifier> *&map ) {
+	switch( type ) {
+		case PT_SLAVE_PEER_FORWARD_KEYS:
+			lock = &this->slavePeers.forwardKeysLock;
+			map = &this->slavePeers.forwardKeys;
+			break;
+		default:
+			lock = 0;
+			map = 0;
+			return false;
+	}
+	return true;
+}
+
 bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, Key> *&map ) {
 	switch( type ) {
 		case PT_MASTER_GET:
@@ -83,6 +97,10 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 			lock = &this->slavePeers.setChunkLock;
 			map = &this->slavePeers.setChunk;
 			break;
+		case PT_SLAVE_PEER_FORWARD_PARITY_CHUNK:
+			lock = &this->slavePeers.forwardParityChunkLock;
+			map = &this->slavePeers.forwardParityChunk;
+			break;
 		default:
 			lock = 0;
 			map = 0;
@@ -98,7 +116,7 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 			map = &this->slavePeers.updateChunk;
 			break;
 		case PT_SLAVE_PEER_DEL_CHUNK:
-			lock = &this->slavePeers.delChunkLock;
+			lock = &this->slavePeers.deleteChunkLock;
 			map = &this->slavePeers.deleteChunk;
 			break;
 		default:
@@ -227,10 +245,10 @@ void Pending::insertReleaseDegradedLock( uint16_t instanceId, uint32_t requestId
 	UNLOCK( &this->coordinators.releaseDegradedLockLock );
 }
 
-bool Pending::insertReconstruction( uint16_t instanceId, uint32_t requestId, CoordinatorSocket *socket, uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds ) {
+bool Pending::insertReconstruction( uint16_t instanceId, uint32_t requestId, CoordinatorSocket *socket, uint32_t listId, uint32_t chunkId, std::unordered_set<uint32_t> &stripeIds, std::unordered_set<Key> &unsealedKeys ) {
 	PendingIdentifier pid( instanceId, instanceId, requestId, requestId, socket );
 	PendingReconstruction r;
-	r.set( listId, chunkId, stripeIds );
+	r.set( listId, chunkId, stripeIds, unsealedKeys );
 	std::unordered_map<PendingIdentifier, PendingReconstruction>::iterator it;
 	bool ret;
 
@@ -242,24 +260,25 @@ bool Pending::insertReconstruction( uint16_t instanceId, uint32_t requestId, Coo
 		r = this->coordinators.reconstruction.insert( p );
 		ret = r.second;
 
-		printf( "(%u, %u): Number of pending chunks = %lu\n", listId, chunkId, stripeIds.size() );
+		printf( "(%u, %u): Number of pending chunks = %lu; number of unsealed keys: %lu\n", listId, chunkId, stripeIds.size(), unsealedKeys.size() );
 	} else {
 		PendingReconstruction &reconstruction = it->second;
 		if ( reconstruction.listId == listId && reconstruction.chunkId == chunkId ) {
-			reconstruction.merge( stripeIds );
+			if ( stripeIds.size() ) reconstruction.merge( stripeIds );
+			if ( unsealedKeys.size() ) reconstruction.merge( unsealedKeys );
 			ret = true;
 		} else {
 			ret = false;
 		}
 
-		printf( "(%u, %u): Number of pending chunks = %lu\n", listId, chunkId, reconstruction.stripeIds.size() );
+		printf( "(%u, %u): Number of pending chunks = %lu; number of unsealed keys: %lu\n", listId, chunkId, reconstruction.chunks.stripeIds.size(), reconstruction.unsealed.keys.size() );
 	}
 	UNLOCK( &this->coordinators.reconstructionLock );
 
 	return ret;
 }
 
-bool Pending::insertRecovery( uint16_t instanceId, uint32_t requestId, CoordinatorSocket *socket, uint32_t addr, uint16_t port, uint32_t count, uint32_t *buf ) {
+bool Pending::insertRecovery( uint16_t instanceId, uint32_t requestId, CoordinatorSocket *socket, uint32_t addr, uint16_t port, uint32_t chunkCount, uint32_t *metadataBuf, uint32_t unsealedCount, char *keysBuf ) {
 	PendingIdentifier pid( instanceId, instanceId, requestId, requestId, socket );
 	PendingRecovery r( addr, port );
 
@@ -269,14 +288,16 @@ bool Pending::insertRecovery( uint16_t instanceId, uint32_t requestId, Coordinat
 	LOCK( &this->coordinators.recoveryLock );
 	it = this->coordinators.recovery.find( pid );
 	if ( it == this->coordinators.recovery.end() ) {
-		r.insert( count, buf );
+		r.insertMetadata( chunkCount, metadataBuf );
+		r.insertKeys( unsealedCount, keysBuf );
 
 		std::pair<PendingIdentifier, PendingRecovery> p( pid, r );
 		std::pair<std::unordered_map<PendingIdentifier, PendingRecovery>::iterator, bool> r;
 		r = this->coordinators.recovery.insert( p );
 		ret = r.second;
 	} else {
-		it->second.insert( count, buf );
+		it->second.insertMetadata( chunkCount, metadataBuf );
+		it->second.insertKeys( unsealedCount, keysBuf );
 		ret = true;
 	}
 	UNLOCK( &this->coordinators.recoveryLock );
@@ -307,6 +328,25 @@ bool Pending::insertRemapDataRequest( uint16_t instanceId, uint16_t parentInstan
 	}
 	UNLOCK( &this->slavePeers.remappedDataRequestLock );
 	return ret;
+}
+
+bool Pending::insert(
+	PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
+	bool needsLock, bool needsUnlock
+) {
+	PendingIdentifier pid( instanceId, parentInstanceId, requestId, parentRequestId, ptr );
+	std::pair<std::unordered_set<PendingIdentifier>::iterator, bool> ret;
+	LOCK_T *lock;
+	std::unordered_set<PendingIdentifier> *set;
+
+	if ( ! this->get( type, lock, set ) )
+		return false;
+
+	if ( needsLock ) LOCK( lock );
+	ret = set->insert( pid );
+	if ( needsUnlock ) UNLOCK( lock );
+
+	return true;
 }
 
 bool Pending::eraseReleaseDegradedLock( uint16_t instanceId, uint32_t requestId, uint32_t count, uint32_t &remaining, uint32_t &total, PendingIdentifier *pidPtr ) {
@@ -363,7 +403,7 @@ bool Pending::decrementRemapDataRequest( uint16_t instanceId, uint32_t requestId
 	return ret;
 }
 
-bool Pending::eraseReconstruction( uint16_t instanceId, uint32_t requestId, CoordinatorSocket *&socket, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t &remaining, uint32_t &total, PendingIdentifier *pidPtr ) {
+bool Pending::eraseReconstruction( uint16_t instanceId, uint32_t requestId, CoordinatorSocket *&socket, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t &remainingChunks, uint32_t &remainingKeys, uint32_t &totalChunks, uint32_t &totalKeys, PendingIdentifier *pidPtr ) {
 	PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
 	std::unordered_map<PendingIdentifier, PendingReconstruction>::iterator it;
 	bool ret;
@@ -379,12 +419,14 @@ bool Pending::eraseReconstruction( uint16_t instanceId, uint32_t requestId, Coor
 		size_t count;
 		if ( pidPtr ) *pidPtr = it->first;
 		socket = ( CoordinatorSocket * ) it->first.ptr;
-		count = it->second.stripeIds.erase( stripeId );
+		count = it->second.chunks.stripeIds.erase( stripeId );
 		ret = count > 0;
-		remaining = it->second.stripeIds.size();
-		total = it->second.total;
+		remainingChunks = it->second.chunks.stripeIds.size();
+		remainingKeys = it->second.unsealed.keys.size();
+		totalChunks = it->second.chunks.total;
+		totalKeys = it->second.unsealed.total;
 
-		if ( remaining == 0 )
+		if ( remainingChunks == 0 && remainingKeys == 0 )
 			this->coordinators.reconstruction.erase( it );
 	} else {
 		socket = 0;
@@ -395,7 +437,44 @@ bool Pending::eraseReconstruction( uint16_t instanceId, uint32_t requestId, Coor
 	return ret;
 }
 
-bool Pending::eraseRecovery( uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint16_t &instanceId, uint32_t &requestId, CoordinatorSocket *&socket, uint32_t &addr, uint16_t &port, uint32_t &remaining, uint32_t &total ) {
+bool Pending::eraseReconstruction( uint16_t instanceId, uint32_t requestId, CoordinatorSocket *&socket, uint32_t listId, uint32_t chunkId, uint8_t keySize, char *keyStr, uint32_t &remainingChunks, uint32_t &remainingKeys, uint32_t &totalChunks, uint32_t &totalKeys, PendingIdentifier *pidPtr ) {
+	PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
+	std::unordered_map<PendingIdentifier, PendingReconstruction>::iterator it;
+	bool ret;
+
+	LOCK( &this->coordinators.reconstructionLock );
+	it = this->coordinators.reconstruction.find( pid );
+	if ( it == this->coordinators.reconstruction.end() ) {
+		UNLOCK( &this->coordinators.reconstructionLock );
+		return false;
+	}
+	// Check whether the list ID and chunk ID match
+	if ( listId == it->second.listId && chunkId == it->second.chunkId ) {
+		size_t count;
+		Key key;
+		key.set( keySize, keyStr );
+
+		if ( pidPtr ) *pidPtr = it->first;
+		socket = ( CoordinatorSocket * ) it->first.ptr;
+		count = it->second.unsealed.keys.erase( key );
+		ret = count > 0;
+		remainingChunks = it->second.chunks.stripeIds.size();
+		remainingKeys = it->second.unsealed.keys.size();
+		totalChunks = it->second.chunks.total;
+		totalKeys = it->second.unsealed.total;
+
+		if ( remainingChunks == 0 && remainingKeys == 0 )
+			this->coordinators.reconstruction.erase( it );
+	} else {
+		socket = 0;
+		ret = false;
+	}
+	UNLOCK( &this->coordinators.reconstructionLock );
+
+	return ret;
+}
+
+bool Pending::eraseRecovery( uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint16_t &instanceId, uint32_t &requestId, CoordinatorSocket *&socket, uint32_t &addr, uint16_t &port, uint32_t &remainingChunks, uint32_t &remainingKeys, uint32_t &totalChunks, uint32_t &totalKeys ) {
 	std::unordered_map<PendingIdentifier, PendingRecovery>::iterator it;
 	Metadata metadata;
 	bool ret = false;
@@ -407,16 +486,18 @@ bool Pending::eraseRecovery( uint32_t listId, uint32_t stripeId, uint32_t chunkI
 		const PendingIdentifier &pid = it->first;
 		PendingRecovery &recovery = it->second;
 
-		if ( recovery.chunks.erase( metadata ) > 0 ) {
+		if ( recovery.chunks.metadata.erase( metadata ) > 0 ) {
 			instanceId = pid.instanceId;
 			requestId = pid.requestId;
 			socket = ( CoordinatorSocket * ) pid.ptr;
 			addr = recovery.addr;
 			port = recovery.port;
-			remaining = recovery.chunks.size();
-			total = recovery.total;
+			remainingChunks = recovery.chunks.metadata.size();
+			totalChunks = recovery.chunks.total;
+			remainingKeys = recovery.unsealed.keys.size();
+			totalKeys = recovery.unsealed.total;
 
-			if ( remaining == 0 )
+			if ( remainingChunks == 0 && remainingKeys == 0 )
 				this->coordinators.recovery.erase( it );
 
 			ret = true;
@@ -424,6 +505,72 @@ bool Pending::eraseRecovery( uint32_t listId, uint32_t stripeId, uint32_t chunkI
 		}
 	}
 	UNLOCK( &this->coordinators.recoveryLock );
+
+	return ret;
+}
+
+bool Pending::eraseRecovery( uint8_t keySize, char *keyStr, uint16_t &instanceId, uint32_t &requestId, CoordinatorSocket *&socket, uint32_t &addr, uint16_t &port, uint32_t &remainingChunks, uint32_t &remainingKeys, uint32_t &totalChunks, uint32_t &totalKeys ) {
+	std::unordered_map<PendingIdentifier, PendingRecovery>::iterator it;
+	Key key;
+	bool ret = false;
+
+	key.set( keySize, keyStr );
+
+	LOCK( &this->coordinators.recoveryLock );
+	for ( it = this->coordinators.recovery.begin(); it != this->coordinators.recovery.end(); it++ ) {
+		const PendingIdentifier &pid = it->first;
+		PendingRecovery &recovery = it->second;
+
+		if ( recovery.unsealed.keys.erase( key ) > 0 ) {
+			instanceId = pid.instanceId;
+			requestId = pid.requestId;
+			socket = ( CoordinatorSocket * ) pid.ptr;
+			addr = recovery.addr;
+			port = recovery.port;
+			remainingChunks = recovery.chunks.metadata.size();
+			totalChunks = recovery.chunks.total;
+			remainingKeys = recovery.unsealed.keys.size();
+			totalKeys = recovery.unsealed.total;
+
+			if ( remainingChunks == 0 && remainingKeys == 0 )
+				this->coordinators.recovery.erase( it );
+
+			ret = true;
+			break;
+		}
+	}
+	UNLOCK( &this->coordinators.recoveryLock );
+
+	return ret;
+}
+
+bool Pending::erase(
+	PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr,
+	PendingIdentifier *pidPtr,
+	bool needsLock, bool needsUnlock
+) {
+	PendingIdentifier pid( instanceId, 0, requestId, 0, ptr );
+	LOCK_T *lock;
+	bool ret;
+
+	std::unordered_set<PendingIdentifier> *set;
+	std::unordered_set<PendingIdentifier>::iterator it;
+	if ( ! this->get( type, lock, set ) )
+		return false;
+
+	if ( needsLock ) LOCK( lock );
+	if ( ptr ) {
+		it = set->find( pid );
+		ret = ( it != set->end() );
+	} else {
+		it = set->find( pid );
+		ret = ( it != set->end() && it->instanceId == instanceId && it->requestId == requestId );
+	}
+	if ( ret ) {
+		if ( pidPtr ) *pidPtr = *it;
+		set->erase( it );
+	}
+	if ( needsUnlock ) UNLOCK( lock );
 
 	return ret;
 }
@@ -441,7 +588,29 @@ bool Pending::findReconstruction( uint16_t instanceId, uint32_t requestId, uint3
 	}
 	listId = it->second.listId;
 	chunkId = it->second.chunkId;
-	count = it->second.stripeIds.count( stripeId );
+	count = it->second.chunks.stripeIds.count( stripeId );
+	UNLOCK( &this->coordinators.reconstructionLock );
+
+	return count > 0;
+}
+
+bool Pending::findReconstruction( uint16_t instanceId, uint32_t requestId, uint8_t keySize, char *keyStr, uint32_t &listId, uint32_t &chunkId ) {
+	PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
+	std::unordered_map<PendingIdentifier, PendingReconstruction>::iterator it;
+	Key key;
+	size_t count;
+
+	key.set( keySize, keyStr );
+
+	LOCK( &this->coordinators.reconstructionLock );
+	it = this->coordinators.reconstruction.find( pid );
+	if ( it == this->coordinators.reconstruction.end() ) {
+		UNLOCK( &this->coordinators.reconstructionLock );
+		return 0;
+	}
+	listId = it->second.listId;
+	chunkId = it->second.chunkId;
+	count = it->second.unsealed.keys.count( key );
 	UNLOCK( &this->coordinators.reconstructionLock );
 
 	return count > 0;

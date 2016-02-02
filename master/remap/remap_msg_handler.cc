@@ -160,14 +160,15 @@ void MasterRemapMsgHandler::setState( char* msg , int len ) {
 					event.syncMetadata( target );
 					Master::getInstance()->eventQueue.insert( event );
 					// revert parity deltas
-					Master::getInstance()->revertParityDelta(
+					this->stateTransitInfo[ slave ].unsetCompleted( true );
+					Master::getInstance()->revertDelta(
 						0, target, 0,
 						&this->stateTransitInfo[ slave ].counter.parityRevert.lock,
 						&this->stateTransitInfo[ slave ].counter.parityRevert.value,
 						true
 					);
-					// gather the requests to be replayed
-					MasterWorker::replayRequestPrepare( target );
+					// scan for normal requests to be completed
+					MasterWorker::gatherPendingNormalRequests( target );
 				}
 				break;
 			case REMAP_COORDINATED:
@@ -194,7 +195,7 @@ void MasterRemapMsgHandler::setState( char* msg , int len ) {
 			case REMAP_INTERMEDIATE:
 				// clean up pending items associated with this slave
 				// TODO handle the case when insert happened after cleanup ( useCoordinatedFlow returns false > erase > add )
-				MasterWorker::removePending( target );
+				// MasterWorker::removePending( target );
 				this->ackTransit();
 				break;
 			case REMAP_COORDINATED:
@@ -203,7 +204,8 @@ void MasterRemapMsgHandler::setState( char* msg , int len ) {
 				break;
 			case REMAP_DEGRADED:
 				// start replaying the requests
-				MasterWorker::replayRequest( target );
+				// MasterWorker::replayRequestPrepare( target );
+				// MasterWorker::replayRequest( target );
 				break;
 			default:
 				break;
@@ -236,7 +238,7 @@ bool MasterRemapMsgHandler::removeAliveSlave( struct sockaddr_in slave ) {
 	return true;
 }
 
-bool MasterRemapMsgHandler::useCoordinatedFlow( struct sockaddr_in slave ) {
+bool MasterRemapMsgHandler::useCoordinatedFlow( const struct sockaddr_in &slave ) {
 	if ( this->slavesState.count( slave ) == 0 )
 		return false;
 	return this->slavesState[ slave ] != REMAP_NORMAL;
@@ -253,7 +255,7 @@ bool MasterRemapMsgHandler::useCoordinatedFlow( struct sockaddr_in slave ) {
 	*/
 }
 
-bool MasterRemapMsgHandler::allowRemapping( struct sockaddr_in slave ) {
+bool MasterRemapMsgHandler::allowRemapping( const struct sockaddr_in &slave ) {
 	if ( this->slavesState.count( slave ) == 0 )
 		return false;
 
@@ -267,6 +269,24 @@ bool MasterRemapMsgHandler::allowRemapping( struct sockaddr_in slave ) {
 	}
 
 	return false;
+}
+
+bool MasterRemapMsgHandler::acceptNormalResponse( const struct sockaddr_in &slave ) {
+	if ( this->slavesState.count( slave ) == 0 )
+		return true;
+
+	switch( this->slavesState[ slave ] ) {
+		case REMAP_UNDEFINED:
+		case REMAP_NORMAL:
+		case REMAP_INTERMEDIATE:
+		case REMAP_COORDINATED:
+		case REMAP_WAIT_DEGRADED:
+		case REMAP_WAIT_NORMAL:
+			return true;
+		case REMAP_DEGRADED:
+		default:
+			return false;
+	}
 }
 
 bool MasterRemapMsgHandler::sendStateToCoordinator( std::vector<struct sockaddr_in> slaves ) {
@@ -327,7 +347,13 @@ bool MasterRemapMsgHandler::checkAckForSlave( struct sockaddr_in slave ) {
 
 	if (
 		( state == REMAP_NORMAL ) ||
-	    ( state == REMAP_INTERMEDIATE && ( false /* yet sync all meta */ || this->stateTransitInfo[ slave ].getParityRevertCounterVal() > 0 /* yet undo all parity */ ) ) ||
+	    ( state == REMAP_INTERMEDIATE && 
+			( 
+				false /* yet sync all meta */ || 
+				this->stateTransitInfo[ slave ].getParityRevertCounterVal() > 0 /* yet undo all parity */ || 
+				! this->stateTransitInfo[ slave ].counter.pendingNormalRequests.completed /* yet complete all normal requests */ 
+			)
+		) ||
 	    ( state == REMAP_COORDINATED && false ) ) {
 		UNLOCK( &this->slavesStateLock[ slave ] );
 		return false;

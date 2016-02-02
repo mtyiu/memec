@@ -18,6 +18,10 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 			lock = &this->slaves.setLock;
 			map = &this->slaves.set;
 			break;
+		case PT_SLAVE_REMAPPING_SET:
+			lock = &this->slaves.remappingSetLock;
+			map = &this->slaves.remappingSet;
+			break;
 		case PT_SLAVE_DEL:
 			lock = &this->slaves.delLock;
 			map = &this->slaves.del;
@@ -87,7 +91,7 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 }
 
 bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, AcknowledgementInfo > *&map ) {
-	if ( type == PT_ACK_REVERT_PARITY ) {
+	if ( type == PT_ACK_REVERT_DELTA ) {
 		lock = &this->ack.revertLock;
 		map = &this->ack.revert;
 		return true;
@@ -110,6 +114,7 @@ Pending::Pending() {
 	LOCK_INIT( &this->applications.delLock );
 	LOCK_INIT( &this->slaves.getLock );
 	LOCK_INIT( &this->slaves.setLock );
+	LOCK_INIT( &this->slaves.remappingSetLock );
 	LOCK_INIT( &this->slaves.updateLock );
 	LOCK_INIT( &this->slaves.delLock );
 	LOCK_INIT( &this->stats.getLock );
@@ -141,8 +146,8 @@ Pending::Pending() {
 #define DEFINE_PENDING_ACK_INSERT_METHOD DEFINE_PENDING_APPLICATION_INSERT_METHOD
 
 #define DEFINE_PENDING_SLAVE_INSERT_METHOD( METHOD_NAME, VALUE_TYPE, VALUE_VAR ) \
-	bool Pending::METHOD_NAME( PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr, VALUE_TYPE &VALUE_VAR, bool needsLock, bool needsUnlock ) { \
-		PendingIdentifier pid( instanceId, parentInstanceId, requestId, parentRequestId, ptr ); \
+	bool Pending::METHOD_NAME( PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr, VALUE_TYPE &VALUE_VAR, bool needsLock, bool needsUnlock, uint32_t timestamp ) { \
+		PendingIdentifier pid( instanceId, parentInstanceId, requestId, parentRequestId, timestamp, ptr ); \
 		std::pair<PendingIdentifier, VALUE_TYPE> p( pid, VALUE_VAR ); \
 		std::unordered_multimap<PendingIdentifier, VALUE_TYPE>::iterator ret; \
  		\
@@ -224,7 +229,7 @@ bool Pending::recordRequestStartTime( PendingType type, uint16_t instanceId, uin
 		LOCK( &this->stats.getLock );
 		ret = this->stats.get.insert( p );
 		UNLOCK( &this->stats.getLock );
-	} else if ( type == PT_SLAVE_SET ) {
+	} else if ( type == PT_SLAVE_SET || type == PT_SLAVE_REMAPPING_SET ) {
 		LOCK( &this->stats.setLock );
 		ret = this->stats.set.insert( p );
 		UNLOCK( &this->stats.setLock );
@@ -259,7 +264,7 @@ bool Pending::eraseRequestStartTime( PendingType type, uint16_t instanceId, uint
 		LOCK( &this->stats.getLock );
 		DO_SEARCH_FOR_ID( get );
 		UNLOCK( &this->stats.getLock );
-	} else if ( type == PT_SLAVE_SET ) {
+	} else if ( type == PT_SLAVE_SET || type == PT_SLAVE_REMAPPING_SET ) {
 		LOCK( &this->stats.setLock );
 		DO_SEARCH_FOR_ID( set );
 		UNLOCK( &this->stats.setLock );
@@ -433,7 +438,7 @@ bool Pending::eraseAck( PendingType type, uint16_t instanceId, std::vector<Ackno
 	for ( it = map->begin(), saveIt = map->begin(); it != map->end(); it = saveIt ) {
 		saveIt++;
 		if ( it->first.instanceId == instanceId ) {
-			if ( ackPtr ) 
+			if ( ackPtr )
 				ackPtr->push_back( it->second );
 			map->erase( it );
 		}

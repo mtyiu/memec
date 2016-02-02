@@ -79,9 +79,9 @@ bool MasterWorker::getSlaves(
 			useCoordinatedFlow = true;
 			break;
 		case PROTO_OPCODE_GET:
-		// 	if ( master->isDegraded( originalDataSlaveSocket ) )
-		// 		useCoordinatedFlow = true;
-		// 	break;
+			if ( master->isDegraded( originalDataSlaveSocket ) )
+				useCoordinatedFlow = true;
+			break;
 		case PROTO_OPCODE_UPDATE:
 		case PROTO_OPCODE_DELETE:
 			for ( uint32_t i = 0; i < 1 + MasterWorker::parityChunkCount; i++ ) {
@@ -113,10 +113,11 @@ bool MasterWorker::getSlaves(
 	}
 
 	// Determine remapped data slave
-	BasicRemappingScheme::getRemapTarget(
+	BasicRemappingScheme::redirect(
 		this->original, this->remapped, remappedCount,
 		MasterWorker::dataChunkCount, MasterWorker::parityChunkCount,
-		this->dataSlaveSockets, this->paritySlaveSockets
+		this->dataSlaveSockets, this->paritySlaveSockets,
+		opcode == PROTO_OPCODE_GET
 	);
 
 	if ( remappedCount ) {
@@ -259,15 +260,15 @@ void MasterWorker::removePending( SlaveSocket *slave, bool needsAck ) {
 	}
 	// revert parity ack
 	ackInfoList.clear();
-	MasterWorker::pending->eraseAck( PT_ACK_REVERT_PARITY, slave->instanceId, &ackInfoList );
+	MasterWorker::pending->eraseAck( PT_ACK_REVERT_DELTA, slave->instanceId, &ackInfoList );
 	for ( AcknowledgementInfo &it : ackInfoList ) {
 		if ( it.lock ) LOCK( it.lock );
 		if ( it.counter ) *it.counter -= 1;
 		if ( it.lock ) UNLOCK( it.lock );
 	}
-	
+
 	if ( needsAck )
-		Master::getInstance()->remapMsgHandler.ackTransit(); 
+		Master::getInstance()->remapMsgHandler.ackTransit();
 }
 
 void MasterWorker::replayRequestPrepare( SlaveSocket *slave ) {
@@ -285,6 +286,8 @@ void MasterWorker::replayRequestPrepare( SlaveSocket *slave ) {
 	LOCK_T *pendingLock;
 	RequestInfo requestInfo;
 	PendingIdentifier pid;
+	uint32_t currentTime = Master::getInstance()->timestamp.getVal();
+	uint32_t smallestTime = currentTime, smallestTimeAfterCurrent = currentTime;
 
 #define SEARCH_MAP_FOR_REQUEST( _OPCODE_, _SLAVE_VALUE_TYPE_, _APPLICATION_VALUE_TYPE_, _APPLICATION_VALUE_VAR_, _PENDING_TYPE_, _PENDING_SET_NAME_ ) \
 	do { \
@@ -302,32 +305,33 @@ void MasterWorker::replayRequestPrepare( SlaveSocket *slave ) {
 				continue; \
 			/* skip request if backup is not available */ \
 			if ( ! pending->erase##_APPLICATION_VALUE_TYPE_( PT_APPLICATION_##_PENDING_TYPE_, it->first.parentInstanceId, it->first.parentRequestId, ( void* ) 0, &pid, &_APPLICATION_VALUE_VAR_, true, true, true, it->second.data ) ) { \
-				__ERROR__( "MasterWorker", "replayRequestPrepare", "Cannot find the SET request backup for ID = (%u, %u).", it->first.parentInstanceId, it->first.parentRequestId ); \
+				__ERROR__( "MasterWorker", "replayRequestPrepare", "Cannot find the %s request backup for ID = (%u, %u).", #_OPCODE_, it->first.parentInstanceId, it->first.parentRequestId ); \
 				continue; \
 			} \
 			/* cancel the request reply to application by setting application socket to 0 */ \
 			if ( MasterWorker::pending->count( PT_SLAVE_##_PENDING_TYPE_, it->first.instanceId, it->first.requestId, false, false /* already locked (pendingLock) */ ) > 1 ) { \
 				__DEBUG__( YELLOW, "MasterWorker", "replayRequestPrepare", "Reinsert ID = (%u,%u)\n", ( ( SlaveSocket * ) it->first.ptr )->getSocket(), it->first.parentInstanceId, it->first.parentRequestId ); \
-				if ( ! MasterWorker::pending->insert##_APPLICATION_VALUE_TYPE_( PT_APPLICATION_##_PENDING_TYPE_, pid.instanceId, pid.requestId, 0, _APPLICATION_VALUE_VAR_ ) ) \
+				if ( ! MasterWorker::pending->insert##_APPLICATION_VALUE_TYPE_( PT_APPLICATION_##_PENDING_TYPE_, pid.instanceId, pid.requestId, pid.ptr, _APPLICATION_VALUE_VAR_ ) ) \
 					__ERROR__( "MasterWorker", "replayRequestPrepare", "Failed to reinsert the %s request backup for ID = (%u, %u).", #_OPCODE_, pid.instanceId, pid.requestId ); \
 				else \
 					needsDup = true; \
 			} \
 			__DEBUG__( YELLOW, "MasterWorker", "replayRequestPrepare", "Add %s request ID = (%u,%u) with timestamp %u to replay.", #_OPCODE_, pid.instanceId, pid.requestId, pid.timestamp ); \
-			/* mark the first timestamp to start the replay */ \
-			if ( pending->replay.requestsStartTime.count( instanceId ) == 0 ) { \
-				pending->replay.requestsStartTime[ instanceId ] = pid.timestamp; \
-			} \
 			/* insert the request into pending set for replay */ \
 			requestInfo.set( pid.ptr, pid.instanceId, pid.requestId, PROTO_OPCODE_##_OPCODE_, _APPLICATION_VALUE_VAR_, !needsDup ); \
 			map->insert( std::pair<uint32_t, RequestInfo>( pid.timestamp, requestInfo ) ); \
+			/* update for finding the first timestamp for replay */ \
+			if ( pid.timestamp < smallestTime ) \
+				smallestTime = pid.timestamp; \
+			if ( pid.timestamp > currentTime && ( pid.timestamp < smallestTimeAfterCurrent || smallestTimeAfterCurrent == currentTime ) ) \
+				smallestTimeAfterCurrent = pid.timestamp; \
 			/* remove the pending ack */ \
 			pending->slaves._PENDING_SET_NAME_.erase( it ); \
 		} \
 		UNLOCK( pendingLock ); \
-	} while( 0 );
+	} while( 0 )
 
-	LOCK( lock ); 
+	LOCK( lock );
 	// SET
 	pendingLock = &pending->slaves.setLock;
 	SEARCH_MAP_FOR_REQUEST( SET, Key, KeyValue, keyValue, SET, set );
@@ -340,7 +344,16 @@ void MasterWorker::replayRequestPrepare( SlaveSocket *slave ) {
 	// DELETE
 	pendingLock = &pending->slaves.delLock;
 	SEARCH_MAP_FOR_REQUEST( DELETE, Key, Key, key, DEL, del );
-	
+
+	/* mark the first timestamp to start the replay */
+	if ( ! pending->replay.requests.empty() || pending->replay.requestsStartTime.count( instanceId ) == 0 ) {
+		if ( smallestTimeAfterCurrent == currentTime )
+			pending->replay.requestsStartTime[ instanceId ] = smallestTime;
+		else if ( smallestTimeAfterCurrent > currentTime ) // wrapped around case
+			pending->replay.requestsStartTime[ instanceId ] = smallestTimeAfterCurrent;
+		else
+			; // BUG
+	}
 	UNLOCK( lock );
 
 #undef SEARCH_MAP_FOR_REQUEST
@@ -348,9 +361,9 @@ void MasterWorker::replayRequestPrepare( SlaveSocket *slave ) {
 
 void MasterWorker::replayRequest( SlaveSocket *slave ) {
 	uint16_t instanceId = slave->instanceId;
-	
-	if ( 
-		MasterWorker::pending->replay.requestsLock.count( instanceId ) == 0 || 
+
+	if (
+		MasterWorker::pending->replay.requestsLock.count( instanceId ) == 0 ||
 		MasterWorker::pending->replay.requests.count( instanceId ) == 0
 	) {
 		__ERROR__( "MasterWorker", "replayRequest", "Cannot replay request for slave with id = %u.", instanceId );
@@ -362,7 +375,7 @@ void MasterWorker::replayRequest( SlaveSocket *slave ) {
 	std::map<uint32_t, RequestInfo>::iterator lit, rit;
 	ApplicationEvent event;
 
-	LOCK( lock ); 
+	LOCK( lock );
 
 	if ( ! MasterWorker::pending->replay.requestsStartTime.count( instanceId ) || map->empty() ) {
 		UNLOCK( lock );
@@ -371,6 +384,7 @@ void MasterWorker::replayRequest( SlaveSocket *slave ) {
 
 	// from the first timestamp, to the first timestamp
 	lit = map->find( pending->replay.requestsStartTime[ instanceId ] );
+	__DEBUG__( GREEN, "MasterWorker", "replayRequest", "Start from time %u with current time %u", pending->replay.requestsStartTime[ instanceId ], Master::getInstance()->timestamp.getVal() );
 	rit = lit;
 	// replay requests
 	do {
@@ -404,7 +418,7 @@ void MasterWorker::replayRequest( SlaveSocket *slave ) {
 				);
 				break;
 			default:
-				__ERROR__( "MasterWorker", "replayRequest", "Unknown request OPCODE = 0x%0x\n", lit->second.opcode );
+				__ERROR__( "MasterWorker", "replayRequest", "Unknown request OPCODE = 0x%02x", lit->second.opcode );
 				continue;
 		}
 		MasterWorker::eventQueue->insert( event );
@@ -412,11 +426,70 @@ void MasterWorker::replayRequest( SlaveSocket *slave ) {
 		if ( lit == map->end() )
 			lit = map->begin();
 	} while( lit != rit && lit != map->end() );
+	if ( lit == map->begin() )
+		lit = map->end();
+	lit--;
+	__DEBUG__( YELLOW, "MasterWorker", "replayRequest", "Last replayed request OPCODE = 0x%02x at time %u", lit->second.opcode, lit->first );
 
 	map->clear();
 	pending->replay.requestsStartTime.erase( instanceId );
 
 	UNLOCK( lock );
+}
+
+void MasterWorker::gatherPendingNormalRequests( SlaveSocket *target, bool needsAck ) {
+
+	std::unordered_set<uint32_t> listIds;
+	// find the lists including the failed slave as parity server
+	for ( uint32_t i = 0, len = stripeList->getNumList(); i < len; i++ ) {
+		for ( uint32_t j = 0; j < parityChunkCount; j++ ) {
+			if ( stripeList->get( i, j + dataChunkCount ) == target )
+				listIds.insert( i );
+		}
+	}
+	__DEBUG__( CYAN, "MasterWorker", "gatherPendingNormalRequest", "%lu list(s) included the slave as parity", listIds.size() );
+
+	uint32_t listId;
+	struct sockaddr_in addr = target->getAddr();
+	bool hasPending = false;
+
+	MasterRemapMsgHandler *mh = &Master::getInstance()->remapMsgHandler;
+
+	LOCK ( &mh->stateTransitInfo[ addr ].counter.pendingNormalRequests.lock );
+
+#define GATHER_PENDING_NORMAL_REQUESTS( _OP_TYPE_, _MAP_VALUE_TYPE_ ) { \
+	LOCK ( &pending->slaves._OP_TYPE_##Lock ); \
+	std::unordered_multimap<PendingIdentifier, _MAP_VALUE_TYPE_> *map = &pending->slaves._OP_TYPE_; \
+	std::unordered_multimap<PendingIdentifier, _MAP_VALUE_TYPE_>::iterator it, saveIt; \
+	for( it = map->begin(), saveIt = it; it != map->end(); it = saveIt ) { \
+		saveIt++; \
+		listId = stripeList->get( it->second.data, it->second.size, 0, 0 ); \
+		if ( listIds.count( listId ) == 0 ) \
+			continue; \
+		/* put the completion of request in account for state transition */\
+		mh->stateTransitInfo.at( addr ).addPendingRequest( it->first.requestId, false, false ); \
+		__INFO__( CYAN, "MasterWorker", "gatherPendingNormalRequest", "Pending normal request id=%u for transit.", it->first.requestId ); \
+		hasPending = true; \
+	} \
+	UNLOCK ( &pending->slaves._OP_TYPE_##Lock ); \
+}
+	// SET
+	GATHER_PENDING_NORMAL_REQUESTS( set, Key );
+	// UPDATE
+	GATHER_PENDING_NORMAL_REQUESTS( update, KeyValueUpdate );
+	// DELETE
+	GATHER_PENDING_NORMAL_REQUESTS( del, Key );
+
+	UNLOCK ( &mh->stateTransitInfo[ addr ].counter.pendingNormalRequests.lock );
+
+	if ( ! hasPending  ) {
+		__INFO__( GREEN, "MasterWorker", "gatherPendingNormalRequest", "No pending normal requests for transit." );
+		Master::getInstance()->remapMsgHandler.stateTransitInfo[ addr ].setCompleted();
+		if ( needsAck ) 
+			Master::getInstance()->remapMsgHandler.ackTransit( addr );
+	}
+
+#undef GATHER_PENDING_NORMAL_REQUESTS
 }
 
 void MasterWorker::free() {

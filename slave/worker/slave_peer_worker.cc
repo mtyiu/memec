@@ -99,37 +99,49 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				false // to master
 			);
 			break;
-		case SLAVE_PEER_EVENT_TYPE_DEGRADED_SET_REQUEST:
-			buffer.data = this->protocol.reqDegradedSet(
+		case SLAVE_PEER_EVENT_TYPE_FORWARD_KEY_REQUEST:
+			buffer.data = this->protocol.reqForwardKey(
 				buffer.size,
 				event.instanceId, event.requestId,
-				event.message.degradedSet.opcode,
-				event.message.degradedSet.listId,
-				event.message.degradedSet.stripeId,
-				event.message.degradedSet.chunkId,
-				event.message.degradedSet.keySize,
-				event.message.degradedSet.key,
-				event.message.degradedSet.valueSize,
-				event.message.degradedSet.value,
-				event.message.degradedSet.update.length,
-				event.message.degradedSet.update.offset,
-				event.message.degradedSet.update.data
+				event.message.forwardKey.opcode,
+				event.message.forwardKey.listId,
+				event.message.forwardKey.stripeId,
+				event.message.forwardKey.chunkId,
+				event.message.forwardKey.keySize,
+				event.message.forwardKey.key,
+				event.message.forwardKey.valueSize,
+				event.message.forwardKey.value,
+				event.message.forwardKey.update.length,
+				event.message.forwardKey.update.offset,
+				event.message.forwardKey.update.data
 			);
 			break;
-		case SLAVE_PEER_EVENT_TYPE_DEGRADED_SET_RESPONSE_SUCCESS:
+		case SLAVE_PEER_EVENT_TYPE_FORWARD_KEY_RESPONSE_SUCCESS:
 			success = true;
-		case SLAVE_PEER_EVENT_TYPE_DEGRADED_SET_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resDegradedSet(
+		case SLAVE_PEER_EVENT_TYPE_FORWARD_KEY_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resForwardKey(
 				buffer.size,
 				event.instanceId, event.requestId,
 				success,
-				event.message.degradedSet.opcode,
-				event.message.degradedSet.listId,
-				event.message.degradedSet.stripeId,
-				event.message.degradedSet.chunkId,
-				event.message.degradedSet.keySize,
-				event.message.degradedSet.key,
-				event.message.degradedSet.valueSize
+				event.message.forwardKey.opcode,
+				event.message.forwardKey.listId,
+				event.message.forwardKey.stripeId,
+				event.message.forwardKey.chunkId,
+				event.message.forwardKey.keySize,
+				event.message.forwardKey.key,
+				event.message.forwardKey.valueSize
+			);
+			break;
+		case SLAVE_PEER_EVENT_TYPE_FORWARD_CHUNK_REQUEST:
+			buffer.data = this->protocol.reqForwardChunk(
+				buffer.size,
+				event.instanceId, event.requestId,
+				event.message.chunk.metadata.listId,
+				event.message.chunk.metadata.stripeId,
+				event.message.chunk.metadata.chunkId,
+				event.message.chunk.chunk->getSize(),
+				0,
+				event.message.chunk.chunk->getData()
 			);
 			break;
 		case SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_REQUEST:
@@ -152,6 +164,20 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		case SLAVE_PEER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
 			success = true; // default is false
 		case SLAVE_PEER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
+		{
+			Slave *slave = Slave::getInstance();
+			bool isRecovering;
+
+			LOCK( &slave->status.lock );
+			isRecovering = slave->status.isRecovering;
+			UNLOCK( &slave->status.lock );
+
+			if ( isRecovering ) {
+				// Hold all register requests
+				printf( "Hold all register requests\n" );
+				return;
+			}
+		}
 			buffer.data = this->protocol.resRegisterSlavePeer(
 				buffer.size,
 				Slave::instanceId, event.requestId,
@@ -257,6 +283,32 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				event.message.del.key.size
 			);
 			break;
+		// REMAPPING_UPDATE
+		case SLAVE_PEER_EVENT_TYPE_REMAPPED_UPDATE_RESPONSE_SUCCESS:
+			success = true;
+		case SLAVE_PEER_EVENT_TYPE_REMAPPED_UPDATE_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resRemappedUpdate(
+				buffer.size,
+				event.instanceId, event.requestId,
+				success,
+				event.message.remappingUpdate.key.data,
+				event.message.remappingUpdate.key.size,
+				event.message.remappingUpdate.valueUpdateOffset,
+				event.message.remappingUpdate.valueUpdateSize
+			);
+			break;
+		// REMAPPING_DELETE
+		case SLAVE_PEER_EVENT_TYPE_REMAPPED_DELETE_RESPONSE_SUCCESS:
+			success = true;
+		case SLAVE_PEER_EVENT_TYPE_REMAPPED_DELETE_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resRemappedDelete(
+				buffer.size,
+				event.instanceId, event.requestId,
+				success,
+				event.message.remappingDel.key.data,
+				event.message.remappingDel.key.size
+			);
+			break;
 		// DELETE_CHUNK
 		case SLAVE_PEER_EVENT_TYPE_DELETE_CHUNK_RESPONSE_SUCCESS:
 			success = true; // default is false
@@ -316,6 +368,19 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				event.message.chunk.metadata.chunkId
 			);
 			break;
+		// FORWARD_CHUNK
+		case SLAVE_PEER_EVENT_TYPE_FORWARD_CHUNK_RESPONSE_SUCCESS:
+			success = true;
+		case SLAVE_PEER_EVENT_TYPE_FORWARD_CHUNK_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resForwardChunk(
+				buffer.size,
+				event.instanceId, event.requestId,
+				success,
+				event.message.chunk.metadata.listId,
+				event.message.chunk.metadata.stripeId,
+				event.message.chunk.metadata.chunkId
+			);
+			break;
 		// SEAL_CHUNK
 		case SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_RESPONSE_SUCCESS:
 			success = true; // default is false
@@ -328,6 +393,19 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		case SLAVE_PEER_EVENT_TYPE_SEAL_CHUNKS:
 			printf( "\tSealing %lu chunks...\n", event.message.chunkBuffer->seal( this ) );
 			return;
+		/////////////////////////////////
+		// Reconstructed unsealed keys //
+		/////////////////////////////////
+		case SLAVE_PEER_EVENT_TYPE_UNSEALED_KEYS_RESPONSE_SUCCESS:
+			success = true;
+		case SLAVE_PEER_EVENT_TYPE_UNSEALED_KEYS_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resUnsealedKeys(
+				buffer.size,
+				event.instanceId, event.requestId,
+				success,
+				event.message.unsealedKeys.header
+			);
+			break;
 		//////////
 		// Send //
 		//////////
@@ -466,16 +544,16 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 							break;
 					}
 					break;
-				case PROTO_OPCODE_DEGRADED_SET:
+				case PROTO_OPCODE_FORWARD_KEY:
 					switch ( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
-							this->handleDegradedSetRequest( event, buffer.data, buffer.size );
+							this->handleForwardKeyRequest( event, buffer.data, buffer.size );
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
-							this->handleDegradedSetResponse( event, true, buffer.data, buffer.size );
+							this->handleForwardKeyResponse( event, true, buffer.data, buffer.size );
 							break;
 						case PROTO_MAGIC_RESPONSE_FAILURE:
-							this->handleDegradedSetResponse( event, false, buffer.data, buffer.size );
+							this->handleForwardKeyResponse( event, false, buffer.data, buffer.size );
 							break;
 						default:
 							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x for SET.", header.magic );
@@ -540,6 +618,38 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 							break;
 						case PROTO_MAGIC_RESPONSE_FAILURE:
 							this->handleDeleteResponse( event, false, buffer.data, buffer.size );
+							break;
+						default:
+							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
+							break;
+					}
+					break;
+				case PROTO_OPCODE_REMAPPED_UPDATE:
+					switch( header.magic ) {
+						case PROTO_MAGIC_REQUEST:
+							this->handleRemappedUpdateRequest( event, buffer.data, buffer.size );
+							break;
+						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							this->handleRemappedUpdateResponse( event, true, buffer.data, buffer.size );
+							break;
+						case PROTO_MAGIC_RESPONSE_FAILURE:
+							this->handleRemappedUpdateResponse( event, false, buffer.data, buffer.size );
+							break;
+						default:
+							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
+							break;
+					}
+					break;
+				case PROTO_OPCODE_REMAPPED_DELETE:
+					switch( header.magic ) {
+						case PROTO_MAGIC_REQUEST:
+							this->handleRemappedDeleteRequest( event, buffer.data, buffer.size );
+							break;
+						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							this->handleRemappedDeleteResponse( event, true, buffer.data, buffer.size );
+							break;
+						case PROTO_MAGIC_RESPONSE_FAILURE:
+							this->handleRemappedDeleteResponse( event, false, buffer.data, buffer.size );
 							break;
 						default:
 							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
@@ -611,6 +721,38 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 							break;
 					}
 					break;
+				case PROTO_OPCODE_FORWARD_CHUNK:
+					switch ( header.magic ) {
+						case PROTO_MAGIC_REQUEST:
+							this->handleForwardChunkRequest( event, buffer.data, buffer.size );
+							break;
+						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							this->handleForwardChunkResponse( event, true, buffer.data, buffer.size );
+							break;
+						case PROTO_MAGIC_RESPONSE_FAILURE:
+							this->handleForwardChunkResponse( event, false, buffer.data, buffer.size );
+							break;
+						default:
+							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave." );
+							break;
+					}
+					break;
+				case PROTO_OPCODE_BATCH_KEY_VALUES:
+					switch( header.magic ) {
+						case PROTO_MAGIC_REQUEST:
+							this->handleBatchKeyValueRequest( event, buffer.data, buffer.size );
+							break;
+						case PROTO_MAGIC_RESPONSE_SUCCESS:
+							this->handleBatchKeyValueResponse( event, true, buffer.data, buffer.size );
+							break;
+						case PROTO_MAGIC_RESPONSE_FAILURE:
+							this->handleBatchKeyValueResponse( event, false, buffer.data, buffer.size );
+							break;
+						default:
+							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave." );
+							break;
+					}
+					break;
 				default:
 					__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from slave. opcode = %x", header.opcode );
 					goto quit_1;
@@ -621,6 +763,8 @@ quit_1:
 		}
 		if ( connected ) event.socket->done();
 	}
-	if ( ! connected )
+	if ( ! connected ) {
+		event.socket->print();
 		__ERROR__( "SlaveWorker", "dispatch", "The slave is disconnected." );
+	}
 }

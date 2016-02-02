@@ -21,11 +21,12 @@ enum PendingType {
 	PT_APPLICATION_DEL,
 	PT_SLAVE_GET,
 	PT_SLAVE_SET,
+	PT_SLAVE_REMAPPING_SET,
 	PT_SLAVE_UPDATE,
 	PT_SLAVE_DEL,
 	PT_KEY_REMAP_LIST,
 	PT_ACK_REMOVE_PARITY,
-	PT_ACK_REVERT_PARITY,
+	PT_ACK_REVERT_DELTA,
 	PT_REQUEST_REPLAY
 };
 
@@ -75,7 +76,7 @@ public:
 		this->instanceId = instanceId;
 		this->requestId = requestId;
 		this->opcode = opcode;
-		if ( needsDup ) 
+		if ( needsDup )
 			this->key.dup( key.size, key.data, key.ptr );
 		else
 			this->key.set( key.size, key.data, key.ptr );
@@ -104,7 +105,7 @@ public:
 		this->opcode = opcode;
 		if ( needsDup )
 			this->keyValueUpdate.dup( keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.ptr );
-		else 
+		else
 			this->keyValueUpdate.set( keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.ptr );
 		this->keyValueUpdate.offset = keyValueUpdate.offset;
 		this->keyValueUpdate.length = keyValueUpdate.length;
@@ -113,7 +114,6 @@ public:
 
 class AcknowledgementInfo {
 public:
-	std::pair<Timestamp, Timestamp> range;
 	pthread_cond_t *condition;
 	LOCK_T *lock;
 	uint32_t *counter;
@@ -124,8 +124,7 @@ public:
 		counter = 0;
 	}
 
-	AcknowledgementInfo( Timestamp from, Timestamp to, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter ) {
-		this->range = std::pair<Timestamp, Timestamp>( from, to );
+	AcknowledgementInfo( pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter ) {
 		this->condition = condition;
 		this->lock = lock;
 		this->counter = counter;
@@ -231,10 +230,12 @@ public:
 	struct {
 		std::unordered_multimap<PendingIdentifier, Key> get;
 		std::unordered_multimap<PendingIdentifier, Key> set;
+		std::unordered_multimap<PendingIdentifier, Key> remappingSet;
 		std::unordered_multimap<PendingIdentifier, KeyValueUpdate> update;
 		std::unordered_multimap<PendingIdentifier, Key> del;
 		LOCK_T getLock;
 		LOCK_T setLock;
+		LOCK_T remappingSetLock;
 		LOCK_T updateLock;
 		LOCK_T delLock;
 	} slaves;
@@ -266,7 +267,8 @@ public:
 	bool insertDegradedLockData(
 		PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
 		DegradedLockData &degradedLockData,
-		bool needsLock = true, bool needsUnlock = true
+		bool needsLock = true, bool needsUnlock = true,
+		uint32_t timestamp = 0
 	);
 	// Insert (Applications)
 	bool insertKey(
@@ -281,19 +283,21 @@ public:
 	);
 	bool insertKeyValueUpdate(
 		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr,
-		KeyValueUpdate &keyValueUpdate, 
+		KeyValueUpdate &keyValueUpdate,
 		bool needsLock = true, bool needsUnlock = true,
 		uint32_t timestamp = 0
 	);
 	// Insert (Slaves)
 	bool insertKey(
 		PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
-		Key &key, bool needsLock = true, bool needsUnlock = true
+		Key &key, bool needsLock = true, bool needsUnlock = true,
+		uint32_t timestamp = 0
 	);
 	bool insertKeyValueUpdate(
 		PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
 		KeyValueUpdate &keyValueUpdate,
-		bool needsLock = true, bool needsUnlock = true
+		bool needsLock = true, bool needsUnlock = true,
+		uint32_t timestamp = 0
 	);
 	bool recordRequestStartTime(
 		PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
@@ -303,7 +307,8 @@ public:
 	bool insertRemapList(
 		PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
 		RemapList &remapList,
-		bool needsLock = true, bool needsUnlock = true
+		bool needsLock = true, bool needsUnlock = true,
+		uint32_t timestamp = 0
 	);
 	// Insert (Ack)
 	bool insertAck(
@@ -359,12 +364,12 @@ public:
 	);
 
 	// remove all the pending ack with a specific instanceId
-	bool eraseAck( 
+	bool eraseAck(
 		PendingType type, uint16_t instanceId,
 		std::vector<AcknowledgementInfo> *ackPtr = 0,
 		bool needsLock = true, bool needsUnlock = true
 	);
-		
+
 	// Find
 	bool findKeyValue(
 		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr,

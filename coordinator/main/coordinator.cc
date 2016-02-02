@@ -194,8 +194,6 @@ void Coordinator::updateAverageSlaveLoading( ArrayMap<struct sockaddr_in, Latenc
 	CLEAN_2D_ARRAY_MAP( this->slaveLoading.latestGet );
 	CLEAN_2D_ARRAY_MAP( this->slaveLoading.latestSet );
 #undef CLEAN_2D_ARRAY_MAP
-	//this->slaveLoading.latestGet.clear();
-	//this->slaveLoading.latestSet.clear();
 	UNLOCK( &this->slaveLoading.lock );
 }
 
@@ -208,27 +206,27 @@ void Coordinator::signalHandler( int signal ) {
 	switch ( signal ) {
 		case SIGALRM:
 			coordinator->updateAverageSlaveLoading( slaveGetLatency, slaveSetLatency );
-			coordinator->switchPhase( coordinator->updateOverloadedSlaveSet( slaveGetLatency, slaveSetLatency, overloadedSlaveSet ) );
-			// TODO start / stop remapping according to criteria
-			// push the stats back to masters
-			// leave the free of ArrayMaps to workers after constructing the data buffer
-			LOCK( &sockets.lock );
-			//fprintf( stderr, "queuing events get %lu set %lu\n", slaveGetLatency->size(), slaveSetLatency->size() );
-			if ( slaveGetLatency->size() > 0 || slaveSetLatency->size() > 0 ) {
-				MasterEvent event;
-				for ( uint32_t i = 0; i < sockets.size(); i++ ) {
-					event.reqPushLoadStats(
-						sockets.values[ i ],
-						new ArrayMap<struct sockaddr_in, Latency>( *slaveGetLatency ),
-						new ArrayMap<struct sockaddr_in, Latency>( *slaveSetLatency ),
-						new std::set<struct sockaddr_in>( *overloadedSlaveSet )
-					);
-					coordinator->eventQueue.insert( event );
+			// start / stop remapping according to criteria ( in non-manual mode )
+			if ( coordinator->config.global.remap.manual == 0 ) {
+				coordinator->switchPhase( coordinator->updateOverloadedSlaveSet( slaveGetLatency, slaveSetLatency, overloadedSlaveSet ) );
+				// push the stats back to masters
+				// leave the free of ArrayMaps to workers after constructing the data buffer
+				LOCK( &sockets.lock );
+				//fprintf( stderr, "queuing events get %lu set %lu\n", slaveGetLatency->size(), slaveSetLatency->size() );
+				if ( slaveGetLatency->size() > 0 || slaveSetLatency->size() > 0 ) {
+					MasterEvent event;
+					for ( uint32_t i = 0; i < sockets.size(); i++ ) {
+						event.reqPushLoadStats(
+							sockets.values[ i ],
+							new ArrayMap<struct sockaddr_in, Latency>( *slaveGetLatency ),
+							new ArrayMap<struct sockaddr_in, Latency>( *slaveSetLatency ),
+							new std::set<struct sockaddr_in>( *overloadedSlaveSet )
+						);
+						coordinator->eventQueue.insert( event );
+					}
 				}
+				UNLOCK( &sockets.lock );
 			}
-			UNLOCK( &sockets.lock );
-			// set timer for next push
-			//alarm( coordinator->config.coordinator.loadingStats.updateInterval );
 			break;
 		default:
 			Coordinator::getInstance()->stop();
@@ -417,7 +415,6 @@ bool Coordinator::start() {
 	this->isRunning = true;
 
 	/* Slave loading stats */
-	//alarm( this->config.coordinator.loadingStats.updateInterval );
 	statsTimer.start();
 
 	return true;
@@ -533,9 +530,9 @@ void Coordinator::releaseDegradedLock() {
 		event.reqReleaseDegradedLock( socket, 0, 0, 0 );
 		this->eventQueue.insert( event );
 
-		printf( "Sending release degraded locks request to: (#%u) ", socketId );
-		socket->printAddress();
-		printf( "\n" );
+		// printf( "Sending release degraded locks request to: (#%u) ", socketId );
+		// socket->printAddress();
+		// printf( "\n" );
 	}
 }
 
@@ -678,6 +675,12 @@ void Coordinator::interactive() {
 		} else if ( strcmp( command, "id" ) == 0 ) {
 			valid = true;
 			this->printInstanceId();
+		} else if ( strcmp( command, "hash" ) == 0 ) {
+			valid = true;
+			this->hash();
+		} else if ( strcmp( command, "lookup" ) == 0 ) {
+			valid = true;
+			this->lookup();
 		} else if ( strcmp( command, "dump" ) == 0 ) {
 			valid = true;
 			this->dump();
@@ -713,6 +716,18 @@ void Coordinator::interactive() {
 				);
 			}
 			valid = true;
+		} else if ( strcmp( command, "overload" ) == 0 ) {
+			this->setSlave( true );
+			valid = true;
+		} else if ( strcmp( command, "underload" ) == 0 ) {
+			this->setSlave( false );
+			valid = true;
+		} else if ( strcmp( command, "manual" ) == 0 ) {
+			this->switchToManualOverload();
+			valid = true;
+		} else if ( strcmp( command, "auto" ) == 0 ) {
+			this->switchToAutoOverload();
+			valid = true;
 		} else {
 			valid = false;
 		}
@@ -733,8 +748,9 @@ void Coordinator::dump() {
 
 		numKeys += this->sockets.slaves[ i ]->map.dump();
 	}
-
 	fprintf( f, "Total number of key-value pairs = %lu.\n", numKeys );
+
+	Map::dumpDegradedLocks();
 }
 
 void Coordinator::metadata() {
@@ -787,6 +803,8 @@ void Coordinator::help() {
 		"- debug: Show debug messages\n"
 		"- id: Print instance ID\n"
 		"- time: Show elapsed time\n"
+		"- hash: Show the stripe list hashed by an input key\n"
+		"- lookup: Search for the metadata of an input key\n"
 		"- seal: Force all slaves to seal all its chunks\n"
 		"- flush: Force all slaves to flush all its chunks\n"
 		"- log: Write the log to coordinator.log\n"
@@ -795,6 +813,10 @@ void Coordinator::help() {
 		"- remapping: Show remapping info\n"
 		"- remapRecordSync: Force all remapping records to masters\n"
 		"- remapMigrate: Force all remapped kv to migrate\n"
+		"- overload: Force a slave to overload ( normal > degraded )\n"
+		"- underload: Force a slave to underload ( degraded > normal) \n"
+		"- manual: Switch to overload slaves manually\n"
+		"- auto: Switch to detect overload slaves using loading statistics\n"
 		"- exit: Terminate this client\n"
 	);
 	fflush( stdout );
@@ -803,6 +825,103 @@ void Coordinator::help() {
 void Coordinator::time() {
 	fprintf( stdout, "Elapsed time (s): %12.6lf\n", this->getElapsedTime() );
 	fflush( stdout );
+}
+
+void Coordinator::hash() {
+	char key[ 256 ];
+	uint8_t keySize;
+	uint32_t listId, dataChunkId, dataChunkCount, parityChunkCount;
+
+	printf( "Input key: " );
+	fflush( stdout );
+	if ( ! fgets( key, sizeof( key ), stdin ) ) {
+		fprintf( stderr, "Invalid input!\n" );
+		return;
+	}
+	keySize = ( uint8_t ) strnlen( key, sizeof( key ) ) - 1;
+
+	dataChunkCount = this->config.global.coding.params.getDataChunkCount();
+	parityChunkCount = this->config.global.coding.params.getParityChunkCount();
+
+	SlaveSocket **dataSlaveSockets = new SlaveSocket *[ dataChunkCount ];
+	SlaveSocket **paritySlaveSockets = new SlaveSocket *[ parityChunkCount ];
+
+	listId = this->stripeList->get( key, keySize, dataSlaveSockets, paritySlaveSockets, &dataChunkId, true );
+
+	printf( "\n--- Hashed to List #%u ---\n", listId );
+	for ( uint32_t i = 0; i < dataChunkCount; i++ ) {
+		printf( "[ %u]: ", i );
+		dataSlaveSockets[ i ]->printAddress();
+		if ( i == dataChunkId )
+			printf( " ***" );
+		printf( "\n" );
+	}
+	for ( uint32_t i = 0; i < parityChunkCount; i++ ) {
+		printf( "[p%u]: ", ( i + dataChunkCount ) );
+		paritySlaveSockets[ i ]->printAddress();
+		printf( " ***\n" );
+	}
+
+	delete[] dataSlaveSockets;
+	delete[] paritySlaveSockets;
+}
+
+void Coordinator::lookup() {
+	char key[ 256 ];
+	uint8_t keySize;
+
+	printf( "Input key: " );
+	fflush( stdout );
+	if ( ! fgets( key, sizeof( key ), stdin ) ) {
+		fprintf( stderr, "Invalid input!\n" );
+		return;
+	}
+	keySize = ( uint8_t ) strnlen( key, sizeof( key ) ) - 1;
+
+	Metadata metadata;
+	SlaveSocket *dataSlaveSocket;
+	this->stripeList->get( key, keySize, &dataSlaveSocket );
+
+	if ( dataSlaveSocket->map.findMetadataByKey( key, keySize, metadata ) ) {
+		printf( "Metadata: (%u, %u, %u); Is sealed? %s\n", metadata.listId, metadata.stripeId, metadata.chunkId, dataSlaveSocket->map.isSealed( metadata ) ? "yes" : "no" );
+
+		Key k;
+		RemappingRecord remappingRecord;
+		k.set( keySize, key );
+		if ( this->remappingRecords.find( k, &remappingRecord ) ) {
+			printf( "Remapping record found: " );
+			for ( uint32_t i = 0; i < remappingRecord.remappedCount; i++ ) {
+				printf(
+					"%s(%u, %u) |-> (%u, %u)%s",
+					i == 0 ? "" : "; ",
+					remappingRecord.original[ i * 2     ],
+					remappingRecord.original[ i * 2 + 1 ],
+					remappingRecord.remapped[ i * 2     ],
+					remappingRecord.remapped[ i * 2 + 1 ],
+					i == remappingRecord.remappedCount - 1 ? "\n" : ""
+				);
+			}
+		}
+
+		DegradedLock degradedLock;
+		if ( dataSlaveSocket->map.findDegradedLock( metadata.listId, metadata.stripeId, degradedLock ) ) {
+			printf( "Degraded lock found: " );
+			for ( uint32_t i = 0; i < degradedLock.reconstructedCount; i++ ) {
+				printf(
+					"%s(%u, %u) |-> (%u, %u) (ongoing: %u)%s",
+					i == 0 ? "" : "; ",
+					degradedLock.original[ i * 2     ],
+					degradedLock.original[ i * 2 + 1 ],
+					degradedLock.reconstructed[ i * 2     ],
+					degradedLock.reconstructed[ i * 2 + 1 ],
+					degradedLock.ongoingAtChunk,
+					i == degradedLock.reconstructedCount - 1 ? "\n" : ""
+				);
+			}
+		}
+	} else {
+		printf( "Key not found.\n" );
+	}
 }
 
 void Coordinator::appendLog( Log log ) {
@@ -852,4 +971,43 @@ void Coordinator::flush() {
 		}
 	}
 	printf( "Sending flush requests to %lu slaves...\n", count );
+}
+
+void Coordinator::setSlave( bool overloaded ) {
+	int socket, i, len;
+	MasterEvent event;
+
+	printf( "\nSlave sockets\n-------------\n" );
+	for ( i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
+		printf( "%d. ", i + 1 );
+		this->sockets.slaves[ i ]->print( stdout );
+	}
+	if ( len == 0 ) printf( "(None)\n" );
+
+	printf( "Which slave to %s (socket fd, enter 0 to exit) ? ", overloaded ? "overload" : "underload" );
+	fflush( stdout );
+	std::set<struct sockaddr_in> slaves;
+	SlaveSocket *s = 0;
+	while ( scanf( "%u", &socket) == 1 ) {
+		s = this->sockets.slaves.get( socket );
+		if ( ! s ) break;
+
+		slaves.insert( s->getAddr() );
+		printf( "Added slave " );
+		s->printAddress();
+		printf( "\nWhich slave to %s (socket fd, enter 0 to exit) ? ", overloaded ? "overload" : "underload" );
+		fflush( stdout );
+	}
+	if ( this->config.global.remap.manual == 0 )
+		printf( "\nWARNING: Not in manual state for setting overloaded slaves.\n" );
+	event.switchPhase( overloaded, slaves, false /* isCrushed */, true /* isforced */ );
+	this->eventQueue.insert( event );
+}
+
+void Coordinator::switchToManualOverload() {
+	this->config.global.remap.manual = true;
+}
+
+void Coordinator::switchToAutoOverload() {
+	this->config.global.remap.manual = false;
 }

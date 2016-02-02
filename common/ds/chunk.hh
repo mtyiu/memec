@@ -49,6 +49,7 @@ public:
 	static void init( uint32_t capacity );
 	void init();
 	void swap( Chunk *c );
+	void copy( Chunk *c );
 	void loadFromGetChunkRequest( uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isParity, uint32_t size, uint32_t offset, char *data );
 	void loadFromSetChunkRequest( char *data, uint32_t size, uint32_t offset, bool isParity );
 	// Access data inside the chunk

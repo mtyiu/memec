@@ -41,6 +41,10 @@ private:
 	BitmaskArray *chunkStatus;
 	Chunk *dataChunk, *parityChunk;
 	Chunk **chunks;
+	struct {
+		Chunk *dataChunk, *parityChunk;
+		Chunk **chunks;
+	} forward; // For forwarding parity chunk
 	Chunk *freeChunks;
 	SlavePeerSocket **dataSlaveSockets;
 	SlavePeerSocket **paritySlaveSockets;
@@ -88,19 +92,31 @@ private:
 	bool handleSetRequest( MasterEvent event, char *buf, size_t size, bool needResSet = true );
 	bool handleSetRequest( MasterEvent event, KeyValueHeader &header, bool needResSet = true );
 	bool handleUpdateRequest( MasterEvent event, char *buf, size_t size );
-	bool handleUpdateRequest( MasterEvent event, KeyValueUpdateHeader &header );
+	bool handleUpdateRequest(
+		MasterEvent event, KeyValueUpdateHeader &header,
+		uint32_t *original = 0, uint32_t *reconstructed = 0, uint32_t reconstructedCount = 0,
+		bool reconstructParity = false,
+		Chunk **chunks = 0,
+		bool endOfDegradedOp = false
+	);
 	bool handleDeleteRequest( MasterEvent event, char *buf, size_t size );
-	bool handleDeleteRequest( MasterEvent event, KeyHeader &header );
+	bool handleDeleteRequest(
+		MasterEvent event, KeyHeader &header,
+		uint32_t *original = 0, uint32_t *reconstructed = 0, uint32_t reconstructedCount = 0,
+		bool reconstructParity = false,
+		Chunk **chunks = 0,
+		bool endOfDegradedOp = false
+	);
 
 	bool handleAckParityDeltaBackup( MasterEvent event, char *buf, size_t size );
-	bool handleRevertParityDelta( MasterEvent event, char *buf, size_t size );
+	bool handleRevertDelta( MasterEvent event, char *buf, size_t size );
 
 	// ---------- slave_peer_worker.cc ----------
 	void dispatch( SlavePeerEvent event );
 
 	// ---------- slave_peer_req_worker.cc ----------
 	bool handleSlavePeerRegisterRequest( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, char *buf, size_t size );
-	bool handleDegradedSetRequest( SlavePeerEvent event, char *buf, size_t size );
+	bool handleForwardKeyRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleSetRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleGetRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleUpdateRequest( SlavePeerEvent event, char *buf, size_t size );
@@ -111,9 +127,10 @@ private:
 	bool handleUpdateChunkRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleDeleteChunkRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleSealChunkRequest( SlavePeerEvent event, char *buf, size_t size );
+	bool handleBatchKeyValueRequest( SlavePeerEvent event, char *buf, size_t size );
 
 	// ---------- slave_peer_res_worker.cc ----------
-	bool handleDegradedSetResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
+	bool handleForwardKeyResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleSetResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleGetResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleUpdateResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
@@ -123,19 +140,29 @@ private:
 	bool handleUpdateChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleDeleteChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool handleSealChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
+	bool handleBatchKeyValueResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 
 	// ---------- remap_worker.cc ----------
 	bool handleRemappedData( CoordinatorEvent event, char *buf, size_t size );
 	bool handleRemappingSetRequest( MasterEvent event, char *buf, size_t size );
 	bool handleRemappingSetRequest( SlavePeerEvent event, char *buf, size_t size );
+	bool handleRemappedUpdateRequest( SlavePeerEvent event, char *buf, size_t size );
+	bool handleRemappedDeleteRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleRemappingSetResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
+	bool handleRemappedUpdateResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
+	bool handleRemappedDeleteResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 
 	// ---------- degraded_worker.cc ----------
-	int findInRedirectedList( uint32_t *reconstructed, uint32_t reconstructedCount );
+	int findInRedirectedList(
+		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
+		uint32_t ongoingAtChunk, bool &reconstructParity, bool &reconstructData
+	);
 	bool handleReleaseDegradedLockRequest( CoordinatorEvent event, char *buf, size_t size );
 	bool handleDegradedGetRequest( MasterEvent event, char *buf, size_t size );
 	bool handleDegradedUpdateRequest( MasterEvent event, char *buf, size_t size );
 	bool handleDegradedDeleteRequest( MasterEvent event, char *buf, size_t size );
+	bool handleForwardChunkRequest( SlavePeerEvent event, char *buf, size_t size );
+	bool handleForwardChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool performDegradedRead(
 		uint8_t opcode,
 		MasterSocket *masterSocket,
@@ -143,7 +170,9 @@ private:
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId, // chunkId refers to the current chunk ID
 		Key *key, bool isSealed,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
-		KeyValueUpdate *keyValueUpdate = 0
+		uint32_t ongoingAtChunk,
+		KeyValueUpdate *keyValueUpdate = 0,
+		uint32_t timestamp = 0
 	);
 	bool sendModifyChunkRequest(
 		uint16_t parentInstanceId, uint32_t parentRequestId,
@@ -156,13 +185,18 @@ private:
 		uint32_t timestamp = 0,
 		MasterSocket *masterSocket = 0,
 		uint32_t *original = 0, uint32_t *reconstructed = 0, uint32_t reconstructedCount = 0,
-		char *valueStr = 0, uint32_t valueSize = 0
+		bool reconstructParity = false,
+		Chunk **chunks = 0, bool endOfDegradedOp = false
 	);
+
+	// Perform UPDATE/DELETE on local data chunk and send reconstructed and modified parity chunks to the failed parity servers
+	bool handleUpdateRequestBySetChunk( MasterEvent event, KeyValueUpdateHeader &header );
 
 	// ---------- recovery_worker.cc ----------
 	bool handleSlaveReconstructedMsg( CoordinatorEvent event, char *buf, size_t size );
 	bool handleBackupSlavePromotedMsg( CoordinatorEvent event, char *buf, size_t size );
 	bool handleReconstructionRequest( CoordinatorEvent event, char *buf, size_t size );
+	bool handleReconstructionUnsealedRequest( CoordinatorEvent event, char *buf, size_t size );
 	bool handleCompletedReconstructionAck();
 
 public:

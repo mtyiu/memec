@@ -51,6 +51,7 @@ private:
 	bool handlePromoteBackupSlaveResponse( SlaveEvent event, char *buf, size_t size );
 	bool handleReconstructionRequest( SlaveSocket *socket );
 	bool handleReconstructionResponse( SlaveEvent event, char *buf, size_t size );
+	bool handleReconstructionUnsealedResponse( SlaveEvent event, char *buf, size_t size );
 
 public:
 	static RemappingRecordMap *remappingRecords;

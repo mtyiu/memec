@@ -88,10 +88,16 @@ void *upload( void *argv ) {
 		memec->set( key, keySize, value, valueSize );
 		totalSize += keySize + valueSize;
 
+		if ( i % 100 == 0 ) {
+			printf( "\rSent bytes: %lu / %lu", totalSize, config.totalSizePerThread );
+			fflush( stdout );
+		}
+
 		// if ( i % ( 1000 / config.numThreads ) == 0 ) {
 		// 	usleep( 20000 );
 		// }
 	}
+	printf( "\n" );
 	memec->flush();
 
 	pthread_mutex_lock( &config.lock );

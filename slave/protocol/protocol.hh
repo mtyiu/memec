@@ -73,18 +73,40 @@ public:
 		char *value, uint32_t valueSize,
 		char *buf = 0
 	);
+	char *reqRemappedUpdate(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		char *key, uint8_t keySize,
+		char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize,
+		char *buf = 0, uint32_t timestamp = 0
+	);
+	char *reqRemappedDelete(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		char *key, uint8_t keySize,
+		char *buf = 0, uint32_t timestamp = 0
+	);
+	char *resRemappedUpdate(
+		size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
+		char *key, uint8_t keySize,
+		uint32_t valueUpdateOffset, uint32_t valueUpdateSize,
+		char *buf = 0, uint32_t timestamp = 0
+	);
+	char *resRemappedDelete(
+		size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
+		char *key, uint8_t keySize,
+		char *buf = 0, uint32_t timestamp = 0
+	);
 
 	// ---------- degraded_protocol.cc ----------
 	char *resReleaseDegradedLock( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t count );
 
-	char *reqDegradedSet(
+	char *reqForwardKey(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		uint8_t opcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		uint8_t keySize, char *key,
 		uint32_t valueSize, char *value,
 		uint32_t valueUpdateSize = 0, uint32_t valueUpdateOffset = 0, char *valueUpdate = 0
 	);
-	char *resDegradedSet(
+	char *resForwardKey(
 		size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
 		uint8_t opcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		uint8_t keySize, char *key,
@@ -98,12 +120,35 @@ public:
 		uint8_t keySize, char *key
 	);
 
+	char *reqForwardChunk(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		uint32_t chunkSize, uint32_t chunkOffset, char *chunkData
+	);
+	char *resForwardChunk(
+		size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId
+	);
+
 	// ---------- seal_protocol.cc ----------
 	char *reqSealChunk( size_t &size, uint16_t instanceId, uint32_t requestId, Chunk *chunk, uint32_t startPos, char *buf = 0 );
 
 	// ---------- recovery_protocol.cc ----------
+	char *resSlaveReconstructedMsg( size_t &size, uint16_t instanceId, uint32_t requestId );
 	char *resReconstruction( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t numStripes );
-	char *resPromoteBackupSlave( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t numStripes );
+	char *resReconstructionUnsealed( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t numUnsealedKeys );
+	char *resPromoteBackupSlave( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t numStripes, uint32_t numUnsealedKeys );
+	char *sendUnsealedKeys(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		std::unordered_set<Key> &keys, std::unordered_set<Key>::iterator &it,
+		std::unordered_map<Key, KeyValue> *values, LOCK_T *lock,
+		uint32_t &keyValuesCount,
+		bool &isCompleted
+	);
+	char *resUnsealedKeys(
+		size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
+		struct BatchKeyValueHeader &header
+	);
 
 	// ---------- normal_slave_protocol.cc ----------
 	char *reqUpdate(
@@ -186,7 +231,7 @@ public:
 
 	// ---------- ack_protocol.cc ----------
 	char *ackMetadata( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t fromTimestamp, uint32_t toTimestamp );
-	char *ackParityDeltaBackup( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t fromTimestamp, uint32_t toTimestamp, uint16_t targetId );
-	char *resRevertParityDelta( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, uint32_t fromTimestamp, uint32_t toTimestamp, uint16_t targetId );
+	char *ackParityDeltaBackup( size_t &size, uint16_t instanceId, uint32_t requestId, std::vector<uint32_t> timestamps, uint16_t targetId );
+	char *resRevertDelta( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, std::vector<uint32_t> timestamps, std::vector<Key> requests, uint16_t targetId );
 };
 #endif

@@ -24,6 +24,65 @@ bool CoordinatorWorker::handleRemappingSetLockRequest( MasterEvent event, char *
 	originalListId = CoordinatorWorker::stripeList->get( header.key, header.keySize, &dataSlaveSocket, 0, &originalChunkId );
 	Map *map = &( dataSlaveSocket->map );
 
+	// Check whether the "failed" servers are in intermediate or degraded state
+	CoordinatorRemapMsgHandler *crmh = CoordinatorRemapMsgHandler::getInstance();
+
+	// bool isPrinted = false;
+	for ( uint32_t i = 0; i < header.remappedCount; ) {
+		SlaveSocket *s = CoordinatorWorker::stripeList->get(
+			header.original[ i * 2    ],
+			header.original[ i * 2 + 1 ]
+		);
+		struct sockaddr_in addr = s->getAddr();
+		if ( ! crmh->allowRemapping( addr ) ) {
+			/*
+			if ( ! isPrinted ) {
+				for ( uint32_t i = 0; i < header.remappedCount; i++ ) {
+					printf(
+						"%s(%u, %u) |-> (%u, %u)%s",
+						i == 0 ? "Original: " : "; ",
+						header.original[ i * 2     ],
+						header.original[ i * 2 + 1 ],
+						header.remapped[ i * 2     ],
+						header.remapped[ i * 2 + 1 ],
+						i == header.remappedCount - 1 ? " || " : ""
+					);
+				}
+				isPrinted = true;
+			}
+			printf(
+				"** Not in intermediate or degraded state: (%u, %u) **",
+				header.original[ i * 2    ],
+				header.original[ i * 2 + 1 ]
+			);
+			*/
+			for ( uint32_t j = i; j < header.remappedCount - 1; j++ ) {
+				header.original[ j * 2     ] = header.original[ ( j + 1 ) * 2     ];
+				header.original[ j * 2 + 1 ] = header.original[ ( j + 1 ) * 2 + 1 ];
+				header.remapped[ j * 2     ] = header.remapped[ ( j + 1 ) * 2     ];
+				header.remapped[ j * 2 + 1 ] = header.remapped[ ( j + 1 ) * 2 + 1 ];
+			}
+			header.remappedCount--;
+		} else {
+			i++;
+		}
+	}
+	/*
+	if ( isPrinted ) {
+		for ( uint32_t i = 0; i < header.remappedCount; i++ ) {
+			printf(
+				"%s(%u, %u) |-> (%u, %u)%s",
+				i == 0 ? "Modified: " : "; ",
+				header.original[ i * 2     ],
+				header.original[ i * 2 + 1 ],
+				header.remapped[ i * 2     ],
+				header.remapped[ i * 2 + 1 ],
+				i == header.remappedCount - 1 ? "\n" : ""
+			);
+		}
+	}
+	*/
+
 	if ( map->insertKey(
 		header.key, header.keySize,
 		originalListId, -1 /* stripeId */, originalChunkId,

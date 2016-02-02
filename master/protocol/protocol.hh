@@ -98,20 +98,25 @@ public:
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		bool isSealed, uint32_t stripeId,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
+		uint32_t ongoingAtChunk,
 		char *key, uint8_t keySize
 	);
 	char *reqDegradedUpdate(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		bool isSealed, uint32_t stripeId,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
+		uint32_t ongoingAtChunk,
 		char *key, uint8_t keySize,
-		char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize
+		char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize,
+		uint32_t timestamp
 	);
 	char *reqDegradedDelete(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		bool isSealed, uint32_t stripeId,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
-		char *key, uint8_t keySize
+		uint32_t ongoingAtChunk,
+		char *key, uint8_t keySize,
+		uint32_t timestamp
 	);
 
 	// ---------- fault_protocol.cc ----------
@@ -126,19 +131,20 @@ public:
 
 	char *ackParityDeltaBackup(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
-		uint32_t fromTimestamp, uint32_t toTimestamp, uint16_t targetId
+		std::vector<uint32_t> timestamps, uint16_t targetId
 	);
 
-	char *revertParityDelta(
+	char *revertDelta(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
-		uint32_t fromTimestamp, uint32_t toTimestamp, uint16_t targetId
+		std::vector<uint32_t> timestamps, std::vector<Key> requests,
+		uint16_t targetId
 	);
 
 	// ---------- replay_protocol.cc ----------
 	// same protocol as in application, but writes header into buffer.recv by default
 	char *replaySet(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
-		char *key, uint8_t keySize, char *value, uint8_t valueSize
+		char *key, uint8_t keySize, char *value, uint32_t valueSize
 	);
 
 	char *replayGet(
@@ -148,8 +154,8 @@ public:
 
 	char *replayUpdate(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
-		char *key, uint8_t keySize, 
-		char *valueUpdate, uint8_t valueUpdateOffset, uint32_t valueUpdateSize
+		char *key, uint8_t keySize,
+		char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize
 	);
 
 	char *replayDelete(

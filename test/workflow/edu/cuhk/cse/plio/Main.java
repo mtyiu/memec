@@ -26,14 +26,16 @@ public class Main implements Runnable {
 	private PLIO plio;
 	private HashMap<String, String> map;
 	private Random random;
+	private int id;
 	public int[] completed, succeeded;
 
-	public Main( int fromId, int toId ) {
+	public Main( int fromId, int toId, int id ) {
 		this.plio = new PLIO( Main.keySize, Main.chunkSize, Main.host, Main.port, fromId, toId );
 		this.map = new HashMap<String, String>( Main.numRecords / Main.numThreads );
 		this.completed = new int[ 4 ];
 		this.succeeded = new int[ 4 ];
 		this.random = new Random();
+		this.id = id;
 	}
 
 	private String generate( int size, boolean toLower ) {
@@ -50,7 +52,7 @@ public class Main implements Runnable {
 		synchronized( Main.lock ) {
 			this.completedOps++;
 			ret = this.completedOps;
-			if ( this.completedOps % ( Main.numOps / 10 ) == 0 )
+			if ( this.completedOps % ( Main.numOps / 100 ) == 0 )
 				System.out.printf( "Completed operations: %d (%.2f%%)\r", this.completedOps, ( double ) this.completedOps / Main.numOps * 100.0 );
 		}
 		return ret;
@@ -70,11 +72,20 @@ public class Main implements Runnable {
 
 		while( i < numOps ) {
 			// rand = this.random.nextInt( 4 );
-			rand = this.random.nextInt( 2 );
+			rand = this.random.nextInt( 3 );
 			size = this.map.size();
 			ret = false;
 
-			if ( rand == 1 ) rand = 2;
+			// if ( rand == 1 ) rand = 2;
+			if ( size != numRecords ) rand = 0;
+			if ( i == numRecords ) {
+				System.err.println( "[" + this.id + "] Sleep for 2 seconds." );
+				try {
+					Thread.sleep( 2000 );
+				} catch ( Exception e ) {}
+
+				if ( rand == 0 ) rand = 1;
+			}
 
 			if ( rand == 0 ) {
 				// SET
@@ -118,8 +129,9 @@ public class Main implements Runnable {
 
 					if ( ret ) {
 						ret = v.equals( value );
-						if ( ! ret )
-							System.out.println( "Value mismatch: " + v.length() + " vs. " + value.length() );
+						if ( ! ret ) {
+							System.out.println( "Value mismatch (key: " + key + "): (wrong) " + v.length() + " vs. (correct) " + value.length() );
+						}
 					}
 
 					this.completed[ 1 ]++;
@@ -202,7 +214,7 @@ public class Main implements Runnable {
 		for ( int i = 0; i < Main.numThreads; i++ ) {
 			int fromId = Integer.MAX_VALUE / Main.numThreads * i;
 			int toId = Integer.MAX_VALUE / Main.numThreads * ( i + 1 );
-			Main.mainObjs[ i ] = new Main( fromId, toId );
+			Main.mainObjs[ i ] = new Main( fromId, toId, i );
 			Main.threads[ i ] = new Thread( Main.mainObjs[ i ] );
 		}
 

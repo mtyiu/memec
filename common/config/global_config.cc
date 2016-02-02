@@ -67,6 +67,8 @@ bool GlobalConfig::set( const char *section, const char *name, const char *value
 			this->remap.smoothingFactor = atof( value );
 		} else if ( match( name, "maximum" ) ) {
 			this->remap.maximum = atoi( value );
+		} else if ( match( name, "manual" ) ) {
+			this->remap.manual = ( atoi( value ) !=  0 );
 		} else
 			return false;
 	} else if ( match( section, "buffer" ) ) {
@@ -308,6 +310,8 @@ void GlobalConfig::print( FILE *f ) {
 			fprintf( f, "Undefined coding scheme\n" );
 			break;
 	}
+
+	fprintf( f, "- Manual state transition: %s\n", ( this->remap.manual )? "On" : "Off" );
 
 	fprintf( f, "- Coordinators\n" );
 	for ( int i = 0, len = this->coordinators.size(); i < len; i++ ) {

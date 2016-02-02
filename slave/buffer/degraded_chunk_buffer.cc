@@ -66,27 +66,27 @@ find_in_values:
 		return false;
 	} else {
 		if ( keyPtr ) *keyPtr = it->first;
-		*keyValue = it->second;
+		if ( keyValue ) *keyValue = it->second;
 	}
 	UNLOCK( &this->unsealed.lock );
 
 	return true;
 }
 
-Chunk *DegradedMap::findChunkById( uint32_t listId, uint32_t stripeId, uint32_t chunkId, Metadata *metadataPtr ) {
+Chunk *DegradedMap::findChunkById( uint32_t listId, uint32_t stripeId, uint32_t chunkId, Metadata *metadataPtr, bool needsLock, bool needsUnlock ) {
 	std::unordered_map<Metadata, Chunk *>::iterator it;
 	Metadata metadata;
 
 	metadata.set( listId, stripeId, chunkId );
 	if ( metadataPtr ) *metadataPtr = metadata;
 
-	LOCK( &this->cacheLock );
+	if ( needsLock ) LOCK( &this->cacheLock );
 	it = this->cache.find( metadata );
 	if ( it == this->cache.end() ) {
 		UNLOCK( &this->cacheLock );
 		return 0;
 	}
-	UNLOCK( &this->cacheLock );
+	if ( needsUnlock ) UNLOCK( &this->cacheLock );
 	return it->second;
 }
 
@@ -193,26 +193,33 @@ re_insert:
 	return this->slaveMap->insertOpMetadata( opcode, timestamp, key, keyMetadata );
 }
 
-bool DegradedMap::insertDegradedChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint16_t instanceId, uint32_t requestId ) {
+bool DegradedMap::insertDegradedChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint16_t instanceId, uint32_t requestId, bool &isReconstructed ) {
 	Metadata metadata;
 	std::unordered_map<Metadata, std::vector<struct pid_s>>::iterator it;
 	bool ret = false;
 
+	isReconstructed = false;
 	metadata.set( listId, stripeId, chunkId );
 
 	LOCK( &this->degraded.chunksLock );
 	it = this->degraded.chunks.find( metadata );
 	if ( it == this->degraded.chunks.end() ) {
-		std::vector<struct pid_s> pids;
-		struct pid_s data = { .instanceId = instanceId, .requestId = requestId };
-		pids.push_back( data );
+		if ( this->degraded.reconstructedChunks.find( metadata ) == this->degraded.reconstructedChunks.end() ) {
+			// Reconstruction in progress
+			std::vector<struct pid_s> pids;
+			struct pid_s data = { .instanceId = instanceId, .requestId = requestId };
+			pids.push_back( data );
 
-		std::pair<Metadata, std::vector<struct pid_s>> p( metadata, pids );
-		std::pair<std::unordered_map<Metadata, std::vector<struct pid_s>>::iterator, bool> r;
+			std::pair<Metadata, std::vector<struct pid_s>> p( metadata, pids );
+			std::pair<std::unordered_map<Metadata, std::vector<struct pid_s>>::iterator, bool> r;
 
-		r = this->degraded.chunks.insert( p );
+			r = this->degraded.chunks.insert( p );
 
-		ret = r.second;
+			ret = r.second;
+		} else {
+			isReconstructed = true;
+			return false;
+		}
 	} else {
 		std::vector<struct pid_s> &pids = it->second;
 		struct pid_s data = { .instanceId = instanceId, .requestId = requestId };
@@ -238,29 +245,39 @@ bool DegradedMap::deleteDegradedChunk( uint32_t listId, uint32_t stripeId, uint3
 	} else {
 		pids = it->second;
 		this->degraded.chunks.erase( it );
+
+		this->degraded.reconstructedChunks.insert( metadata );
 	}
 	UNLOCK( &this->degraded.chunksLock );
 
 	return true;
 }
 
-bool DegradedMap::insertDegradedKey( Key key, uint16_t instanceId, uint32_t requestId ) {
+bool DegradedMap::insertDegradedKey( Key key, uint16_t instanceId, uint32_t requestId, bool &isReconstructed ) {
 	std::unordered_map<Key, std::vector<struct pid_s>>::iterator it;
 	bool ret = false;
+
+	isReconstructed = false;
 
 	LOCK( &this->degraded.keysLock );
 	it = this->degraded.keys.find( key );
 	if ( it == this->degraded.keys.end() ) {
-		std::vector<struct pid_s> pids;
-		struct pid_s data = { .instanceId = instanceId, .requestId = requestId };
-		pids.push_back( data );
+		if ( this->degraded.reconstructedKeys.find( key ) == this->degraded.reconstructedKeys.end() ) {
+			// Reconstruction in progress
+			std::vector<struct pid_s> pids;
+			struct pid_s data = { .instanceId = instanceId, .requestId = requestId };
+			pids.push_back( data );
 
-		std::pair<Key, std::vector<struct pid_s>> p( key, pids );
-		std::pair<std::unordered_map<Key, std::vector<struct pid_s>>::iterator, bool> r;
+			std::pair<Key, std::vector<struct pid_s>> p( key, pids );
+			std::pair<std::unordered_map<Key, std::vector<struct pid_s>>::iterator, bool> r;
 
-		r = this->degraded.keys.insert( p );
+			r = this->degraded.keys.insert( p );
 
-		ret = r.second;
+			ret = r.second;
+		} else {
+			isReconstructed = true;
+			return false;
+		}
 	} else {
 		std::vector<struct pid_s> &pids = it->second;
 		struct pid_s data = { .instanceId = instanceId, .requestId = requestId };
@@ -284,22 +301,26 @@ bool DegradedMap::deleteDegradedKey( Key key, std::vector<struct pid_s> &pids ) 
 	} else {
 		pids = it->second;
 		this->degraded.keys.erase( it );
+
+		Key k = key;
+		k.dup();
+		this->degraded.reconstructedKeys.insert( k );
 	}
 	UNLOCK( &this->degraded.keysLock );
 
 	return true;
 }
 
-bool DegradedMap::insertChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, Chunk *chunk, bool isParity ) {
+bool DegradedMap::insertChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, Chunk *chunk, bool isParity, bool needsLock, bool needsUnlock ) {
 	Metadata metadata;
 	metadata.set( listId, stripeId, chunkId );
 
 	std::pair<Metadata, Chunk *> p( metadata, chunk );
 	std::pair<std::unordered_map<Metadata, Chunk *>::iterator, bool> ret;
 
-	LOCK( &this->cacheLock );
+	if ( needsLock ) LOCK( &this->cacheLock );
 	ret = this->cache.insert( p );
-	UNLOCK( &this->cacheLock );
+	if ( needsUnlock ) UNLOCK( &this->cacheLock );
 
 	if ( ret.second && ! isParity ) {
 		char *ptr = chunk->getData();
@@ -470,6 +491,65 @@ bool DegradedChunkBuffer::deleteKey( uint8_t opcode, uint32_t &timestamp, uint8_
 	UNLOCK( keysLock );
 
 	return ret;
+}
+
+bool DegradedChunkBuffer::update(
+	uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t updatingChunkId,
+	uint32_t offset, uint32_t size, char *dataDelta,
+	Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk
+) {
+	Metadata metadata;
+	metadata.set( listId, stripeId, updatingChunkId );
+
+	LOCK_T *cacheLock;
+	std::unordered_map<Metadata, Chunk *> *cache;
+	std::unordered_map<Metadata, Chunk *>::iterator it;
+	Chunk *chunk;
+	this->map.getCacheMap( cache, cacheLock );
+
+	// Prepare data delta
+	dataChunk->clear();
+	dataChunk->setSize( offset + size );
+	memcpy( dataChunk->getData() + offset, dataDelta, size );
+
+	// Prepare the stripe
+	for ( uint32_t i = 0; i < ChunkBuffer::dataChunkCount; i++ )
+		dataChunks[ i ] = Coding::zeros;
+	dataChunks[ chunkId ] = dataChunk;
+
+	parityChunk->clear();
+
+	// Compute parity delta
+	ChunkBuffer::coding->encode(
+		dataChunks, parityChunk, updatingChunkId - ChunkBuffer::dataChunkCount + 1,
+		offset + chunkId * ChunkBuffer::capacity,
+		offset + chunkId * ChunkBuffer::capacity + size
+	);
+
+	// Update the parity chunk
+	LOCK( cacheLock );
+	it = cache->find( metadata );
+	if ( it == cache->end() ) {
+		// Allocate new chunk
+		chunk = ChunkBuffer::chunkPool->malloc();
+		chunk->setReconstructed( listId, stripeId, chunkId, chunkId >= ChunkBuffer::dataChunkCount );
+		chunk->lastDelPos = 0;
+
+		std::pair<Metadata, Chunk *> p( metadata, chunk );
+		cache->insert( p );
+	} else {
+		chunk = it->second;
+	}
+	char *parity = chunk->getData();
+	Coding::bitwiseXOR(
+		parity,
+		parity,
+		parityChunk->getData(),
+		ChunkBuffer::capacity
+	);
+	UNLOCK( cacheLock );
+
+	return true;
 }
 
 DegradedChunkBuffer::~DegradedChunkBuffer() {}

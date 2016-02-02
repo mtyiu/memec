@@ -235,6 +235,10 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 	LOCK_INIT( &this->sockets.mastersIdToSocketLock );
 	LOCK_INIT( &this->sockets.slavesIdToSocketLock );
 
+	// Set status //
+	this->status.isRecovering = ( mySlaveIndex == -1 );
+	LOCK_INIT( &this->status.lock );
+
 	// Show configuration //
 	if ( verbose )
 		this->info();
@@ -629,6 +633,9 @@ void Slave::interactive() {
 		} else if ( strcmp( command, "dump" ) == 0 ) {
 			valid = true;
 			this->dump();
+		} else if ( strcmp( command, "lookup" ) == 0 ) {
+			valid = true;
+			this->lookup();
 		} else if ( strcmp( command, "seal" ) == 0 ) {
 			valid = true;
 			this->seal();
@@ -852,7 +859,7 @@ void Slave::printPending( FILE *f ) {
 	}
 	UNLOCK( &this->pending.slavePeers.updateChunkLock );
 
-	LOCK( &this->pending.slavePeers.delChunkLock );
+	LOCK( &this->pending.slavePeers.deleteChunkLock );
 	fprintf(
 		f,
 		"\n[DELETE_CHUNK] Pending: %lu\n",
@@ -878,7 +885,7 @@ void Slave::printPending( FILE *f ) {
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
 	}
-	UNLOCK( &this->pending.slavePeers.delChunkLock );
+	UNLOCK( &this->pending.slavePeers.deleteChunkLock );
 
 	LOCK( &this->pending.slavePeers.getChunkLock );
 	fprintf(
@@ -991,6 +998,7 @@ void Slave::help() {
 		"- info: Show configuration\n"
 		"- debug: Show debug messages\n"
 		"- id: Print instance ID\n"
+		"- lookup: Search for the metadata of an input key\n"
 		"- seal: Seal all chunks in the chunk buffer\n"
 		"- flush: Flush all dirty chunks to disk\n"
 		"- metadata: Write metadata to disk\n"
@@ -1005,6 +1013,64 @@ void Slave::help() {
 		"- exit: Terminate this client\n"
 	);
 	fflush( stdout );
+}
+
+void Slave::lookup() {
+	char key[ 256 ];
+	uint8_t keySize;
+
+	printf( "Input key: " );
+	fflush( stdout );
+	if ( ! fgets( key, sizeof( key ), stdin ) ) {
+		fprintf( stderr, "Invalid input!\n" );
+		return;
+	}
+	keySize = ( uint8_t ) strnlen( key, sizeof( key ) ) - 1;
+
+	bool found = false;
+
+	KeyMetadata keyMetadata;
+	if ( this->map.findValueByKey( key, keySize, 0, 0, &keyMetadata, 0, 0 ) ) {
+		printf(
+			"Metadata: (%u, %u, %u); offset: %u, length: %u\n", keyMetadata.listId, keyMetadata.stripeId, keyMetadata.chunkId,
+			keyMetadata.offset, keyMetadata.length
+		);
+		found = true;
+	}
+
+	RemappedKeyValue remappedKeyValue;
+	if ( this->remappedBuffer.find( keySize, key, &remappedKeyValue ) ) {
+		printf( "Remapped key found [%u, %u]: ", remappedKeyValue.listId, remappedKeyValue.chunkId );
+		for ( uint32_t i = 0; i < remappedKeyValue.remappedCount; i++ ) {
+			uint8_t keySize;
+			uint32_t valueSize;
+			char *keyStr, *valueStr;
+			remappedKeyValue.keyValue.deserialize( keyStr, keySize, valueStr, valueSize );
+			printf(
+				"%s(%u, %u) |-> (%u, %u); length: %u%s",
+				i == 0 ? "" : "; ",
+				remappedKeyValue.original[ i * 2     ],
+				remappedKeyValue.original[ i * 2 + 1 ],
+				remappedKeyValue.remapped[ i * 2     ],
+				remappedKeyValue.remapped[ i * 2 + 1 ],
+				valueSize,
+				i == remappedKeyValue.remappedCount - 1 ? "\n" : ""
+			);
+		}
+		found = true;
+	}
+
+	bool isSealed;
+	if ( this->degradedChunkBuffer.map.findValueByKey( key, keySize, isSealed, 0, 0, &keyMetadata ) ) {
+		printf(
+			"Reconstructed chunk found: (%u, %u, %u); offset: %u, length: %u; is sealed? %s\n",
+			keyMetadata.listId, keyMetadata.stripeId, keyMetadata.chunkId, keyMetadata.offset, keyMetadata.length,
+			isSealed ? "yes" : "no"
+		);
+	}
+
+	if ( ! found )
+		printf( "Key not found.\n" );
 }
 
 void Slave::time() {

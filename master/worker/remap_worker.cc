@@ -90,12 +90,13 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 	}
 	__DEBUG__(
 		BLUE, "MasterWorker", "handleRemappingSetLockResponse",
-		"[REMAPPING_SET_LOCK (%s)] Key: %.*s (key size = %u)",
+		"[REMAPPING_SET_LOCK (%s)] [%u, %u] Key: %.*s (key size = %u)",
 		success ? "Success" : "Fail",
+		event.instanceId, event.requestId,
 		( int ) header.keySize, header.key, header.keySize
 	);
 
-	// printf( "[%u] Handling REMAPPING_SET_LOCK response...\n", event.requestId );
+	// printf( "[%u, %u] Handling REMAPPING_SET_LOCK response...\n", event.instanceId, event.requestId );
 
 	// Find the corresponding REMAPPING_SET_LOCK request //
 	PendingIdentifier pid;
@@ -107,10 +108,28 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 		remapList.free();
 	}
 
+	// printf( "[%u, %u] Handling REMAPPING_SET_LOCK response...\n", pid.instanceId, pid.requestId );
+
 	// Handle the case when the lock cannot be acquired //
 	if ( ! success ) {
-		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "TODO: Handle the case when the lock cannot be acquired." );
+		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "TODO: Handle the case when the lock cannot be acquired (ID: (%u, %u), key: %.*s).", event.instanceId, event.requestId, header.keySize, header.key );
 		// if lock fails report to application directly ..
+		KeyValue keyValue;
+		if ( ! MasterWorker::pending->eraseKeyValue( PT_APPLICATION_SET, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &keyValue, true, true, true, header.key ) ) {
+			__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded. (Key = %.*s, ID = (%u, %u))", header.keySize, header.key, pid.parentInstanceId, pid.parentRequestId );
+			return false;
+		// } else {
+		// 	Master::getInstance()->printPending();
+		// 	printf( "Request found.\n" );
+		}
+
+		ApplicationEvent applicationEvent;
+		applicationEvent.resSet(
+			( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId,
+			keyValue, false // success
+		);
+		this->dispatch( applicationEvent );
+
 		return false;
 	}
 
@@ -148,7 +167,7 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 	// Insert pending SET requests for each involved slaves //
 	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount + 1; i++ ) {
 		if ( ! MasterWorker::pending->insertKey(
-			PT_SLAVE_SET, pid.instanceId, pid.parentInstanceId, pid.requestId, pid.parentRequestId,
+			PT_SLAVE_REMAPPING_SET, pid.instanceId, pid.parentInstanceId, pid.requestId, pid.parentRequestId,
 			( i == 0 ) ? dataSlaveSocket : this->paritySlaveSockets[ i - 1 ],
 			key
 		) ) {
@@ -175,10 +194,14 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 		);
 		packet->size = buffer.size;
 
+		// printf( "[%u, %u] Sending %.*s to ", pid.parentInstanceId, pid.parentRequestId, keySize, keyStr );
+		// this->paritySlaveSockets[ i ]->printAddress();
+		// printf( "\n" );
+
 		if ( MasterWorker::updateInterval ) {
 			// Mark the time when request is sent
 			MasterWorker::pending->recordRequestStartTime(
-				PT_SLAVE_SET, pid.instanceId, pid.parentInstanceId, pid.requestId, pid.parentRequestId,
+				PT_SLAVE_REMAPPING_SET, pid.instanceId, pid.parentInstanceId, pid.requestId, pid.parentRequestId,
 				( void * ) this->paritySlaveSockets[ i ],
 				this->paritySlaveSockets[ i ]->getAddr()
 			);
@@ -198,7 +221,7 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 	bool connected;
 	if ( MasterWorker::updateInterval ) {
 		MasterWorker::pending->recordRequestStartTime(
-			PT_SLAVE_SET, pid.instanceId, pid.parentInstanceId, pid.requestId, pid.parentRequestId,
+			PT_SLAVE_REMAPPING_SET, pid.instanceId, pid.parentInstanceId, pid.requestId, pid.parentRequestId,
 			( void * ) dataSlaveSocket,
 			dataSlaveSocket->getAddr()
 		);
@@ -242,19 +265,13 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 	// printf( "[%u] Handling REMAPPING_SET response...\n", event.requestId );
 
 	// Find the cooresponding request //
-	if ( ! MasterWorker::pending->eraseKey( PT_SLAVE_SET, event.instanceId, event.requestId, ( void * ) event.socket, &pid, &key, true, false ) ) {
+	if ( ! MasterWorker::pending->eraseKey( PT_SLAVE_REMAPPING_SET, event.instanceId, event.requestId, ( void * ) event.socket, &pid, &key, true, false ) ) {
 		UNLOCK( &MasterWorker::pending->slaves.setLock );
-		__ERROR__( "MasterWorker", "handleRemappingSetResponse", "Cannot find a pending slave SET request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
-		__ERROR__(
-			"MasterWorker", "handleRemappingSetResponse",
-			"[REMAPPING_SET (%s)] Key: %.*s (key size = %u)",
-			success ? "Success" : "Fail",
-			( int ) header.keySize, header.key, header.keySize
-		);
+		__ERROR__( "MasterWorker", "handleRemappingSetResponse", "Cannot find a pending slave SET request that matches the response. This message will be discarded. (Key: %.*s; ID: (%u, %u); list ID: %u, chunk ID: %u)", header.keySize, header.key, event.instanceId, event.requestId, header.listId, header.chunkId );
 		return false;
 	}
 	// Check pending slave SET requests //
-	pending = MasterWorker::pending->count( PT_SLAVE_SET, pid.instanceId, pid.requestId, false, true );
+	pending = MasterWorker::pending->count( PT_SLAVE_REMAPPING_SET, pid.instanceId, pid.requestId, false, true );
 
 	// Mark the elapse time as latency //
 	Master *master = Master::getInstance();
@@ -262,7 +279,7 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 		struct timespec elapsedTime;
 		RequestStartTime rst;
 
-		if ( ! MasterWorker::pending->eraseRequestStartTime( PT_SLAVE_SET, pid.instanceId, pid.requestId, ( void * ) event.socket, elapsedTime, 0, &rst ) ) {
+		if ( ! MasterWorker::pending->eraseRequestStartTime( PT_SLAVE_REMAPPING_SET, pid.instanceId, pid.requestId, ( void * ) event.socket, elapsedTime, 0, &rst ) ) {
 			__ERROR__( "MasterWorker", "handleRemappingSetResponse", "Cannot find a pending stats SET request that matches the response." );
 		} else {
 			int index = -1;
@@ -295,6 +312,7 @@ bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, c
 		key = keyValue.key();
 
 		applicationEvent.resSet( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, keyValue, success );
+		assert( pid.ptr );
 		this->dispatch( applicationEvent );
 	}
 

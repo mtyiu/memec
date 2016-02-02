@@ -1,5 +1,5 @@
 CC=g++
-CFLAGS=-std=c++11 -Wall -O2 -g
+CFLAGS=-std=c++11 -Wall -O2
 PLIO_SRC_ROOT=..
 LIBS=-pthread
 BIN=$(PLIO_SRC_ROOT)/bin/slave
@@ -60,6 +60,7 @@ EXTERNAL_LIB= \
 	$(PLIO_SRC_ROOT)/common/protocol/protocol.o \
 	$(PLIO_SRC_ROOT)/common/protocol/ack_protocol.o \
 	$(PLIO_SRC_ROOT)/common/protocol/address_protocol.o \
+	$(PLIO_SRC_ROOT)/common/protocol/batch_protocol.o \
 	$(PLIO_SRC_ROOT)/common/protocol/chunk_protocol.o \
 	$(PLIO_SRC_ROOT)/common/protocol/degraded_protocol.o \
 	$(PLIO_SRC_ROOT)/common/protocol/heartbeat_protocol.o \

@@ -14,6 +14,7 @@ private:
 			uint32_t addr;
 			uint16_t port;
 			uint32_t numChunks;
+			uint32_t numUnsealedKeys;
 			double elapsedTime;
 		} recovery;
 	} data;
@@ -23,11 +24,12 @@ public:
 		this->timestamp = timestamp;
 	}
 
-	void setRecovery( uint32_t addr, uint16_t port, uint32_t numChunks, double elapsedTime ) {
+	void setRecovery( uint32_t addr, uint16_t port, uint32_t numChunks, uint32_t numUnsealedKeys, double elapsedTime ) {
 		this->type = LOG_TYPE_RECOVERY;
 		this->data.recovery.addr = addr;
 		this->data.recovery.port = port;
 		this->data.recovery.numChunks = numChunks;
+		this->data.recovery.numUnsealedKeys = numUnsealedKeys;
 		this->data.recovery.elapsedTime = elapsedTime;
 	}
 
@@ -36,10 +38,11 @@ public:
 		switch( this->type ) {
 			case LOG_TYPE_RECOVERY:
 				fprintf(
-					f, "recovery\t%u\t%u\t%u\t%lf\n",
+					f, "recovery\t%u\t%u\t%u\t%u\t%lf\n",
 					this->data.recovery.addr,
 					this->data.recovery.port,
 					this->data.recovery.numChunks,
+					this->data.recovery.numUnsealedKeys,
 					this->data.recovery.elapsedTime
 				);
 				break;

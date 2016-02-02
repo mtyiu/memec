@@ -16,7 +16,7 @@ char *CoordinatorProtocol::announceSlaveReconstructed( size_t &size, uint16_t in
 	return this->buffer.send;
 }
 
-char *CoordinatorProtocol::promoteBackupSlave( size_t &size, uint16_t instanceId, uint32_t requestId, SlaveSocket *srcSocket, std::unordered_set<Metadata> &chunks, std::unordered_set<Metadata>::iterator &it, bool &isCompleted ) {
+char *CoordinatorProtocol::promoteBackupSlave( size_t &size, uint16_t instanceId, uint32_t requestId, SlaveSocket *srcSocket, std::unordered_set<Metadata> &chunks, std::unordered_set<Metadata>::iterator &chunksIt, std::unordered_set<Key> &keys, std::unordered_set<Key>::iterator &keysIt, bool &isCompleted ) {
 	// -- common/protocol/recovery_protocol.cc --
 	ServerAddr srcAddr = srcSocket->getServerAddr();
 	size = this->generatePromoteBackupSlaveHeader(
@@ -26,7 +26,9 @@ char *CoordinatorProtocol::promoteBackupSlave( size_t &size, uint16_t instanceId
 		instanceId, requestId,
 		srcAddr.addr,
 		srcAddr.port,
-		chunks, it, isCompleted
+		chunks, chunksIt,
+		keys, keysIt,
+		isCompleted
 	);
 	return this->buffer.send;
 }
@@ -43,6 +45,19 @@ char *CoordinatorProtocol::reqReconstruction( size_t &size, uint16_t instanceId,
 		stripeIds,
 		it,
 		numChunks,
+		isCompleted
+	);
+	return this->buffer.send;
+}
+
+char *CoordinatorProtocol::reqReconstructionUnsealed( size_t &size, uint16_t instanceId, uint32_t requestId, std::unordered_set<Key> &keys, std::unordered_set<Key>::iterator &it, uint32_t &keysCount, bool &isCompleted ) {
+	// -- common/protocol/batch_protocol.cc --
+	size = this->generateBatchKeyHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SLAVE,
+		PROTO_OPCODE_RECONSTRUCTION_UNSEALED,
+		instanceId, requestId,
+		keys, it, keysCount,
 		isCompleted
 	);
 	return this->buffer.send;

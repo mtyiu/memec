@@ -41,6 +41,25 @@ void KeyValue::setSize( uint8_t keySize, uint32_t valueSize ) {
 	valueSize = ntohl( valueSize );
 }
 
+uint32_t KeyValue::getSize( uint8_t *keySizePtr, uint32_t *valueSizePtr ) const {
+	uint8_t keySize;
+	uint32_t valueSize;
+
+	keySize = ( uint8_t ) data[ 0 ];
+
+	valueSize = 0;
+	unsigned char *tmp = ( unsigned char * ) &valueSize;
+	tmp[ 1 ] = data[ 1 ];
+	tmp[ 2 ] = data[ 2 ];
+	tmp[ 3 ] = data[ 3 ];
+	valueSize = ntohl( valueSize );
+
+	if ( keySizePtr ) *keySizePtr = keySize;
+	if ( valueSizePtr ) *valueSizePtr = valueSize;
+
+	return ( KEY_VALUE_METADATA_SIZE + keySize + valueSize );
+}
+
 char *KeyValue::serialize( char *key, uint8_t keySize, char *value, uint32_t valueSize ) {
 	return KeyValue::serialize( this->data, key, keySize, value, valueSize );
 }

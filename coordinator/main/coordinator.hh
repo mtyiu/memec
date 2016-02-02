@@ -124,7 +124,12 @@ public:
 	void releaseDegradedLock( struct sockaddr_in slave, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done );
 	void syncRemappedData( struct sockaddr_in target, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done );
 	double getElapsedTime();
+	void hash();
+	void lookup();
 	void appendLog( Log log );
+	void setSlave( bool overloaded );
+	void switchToManualOverload();
+	void switchToAutoOverload();
 	void interactive();
 };
 
