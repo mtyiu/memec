@@ -8,8 +8,8 @@ function set_overload {
 	variation=$(echo "scale = 1; $delay / 2" | bc | awk '{printf "%2.1f", $0}')
 	for n in 11; do
 		echo "Adding $delay +- $variation ms network delay to node $n..."
-		ssh testbed-node$n "screen -S ethtool -p 0 -X stuff \"sudo tc qdisc add dev eth0 root netem delay ${delay}ms ${variation}ms distribution normal $(printf '\r')\""
-		sleep 10
+		ssh testbed-node$n "screen -S ethtool -p 0 -X stuff \"sudo tc qdisc add dev eth0 root netem delay ${delay}ms ${variation}ms distribution normal $(printf '\r')\"" &
+		# sleep 10
 	done
 }
 
@@ -17,7 +17,7 @@ function restore_overload {
 	for n in 11; do
 		echo "Removing the network delay from node $n"
 		ssh testbed-node$n "screen -S ethtool -p 0 -X stuff \"sudo tc qdisc del root dev eth0 $(printf '\r')\""
-		sleep 10
+		sleep 3
 	done
 }
 
@@ -45,13 +45,14 @@ for delay in $delays; do
 			pending=$(expr $pending + 1)
 		done
 
-		set_overload $delay
-
 		for w in $workloads; do
 			echo "-------------------- Run ($w) --------------------"
 			for n in 3 4 8 9; do
 				ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/master/temporary-timeseries.sh $w $(printf '\r')\"" &
 			done
+		
+			sleep 10
+			set_overload $delay
 
 			pending=0
 			for n in 3 4 8 9; do
@@ -62,11 +63,12 @@ for delay in $delays; do
 				fi
 				pending=$(expr $pending + 1)
 			done
+		
+			restore_overload
 		done
 
 		echo "Done"
 
-		restore_overload
 
 		screen -S manage -p 0 -X stuff "$(printf '\r\r')"
 		sleep 30

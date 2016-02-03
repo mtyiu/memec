@@ -44,4 +44,5 @@ ${YCSB_PATH}/bin/ycsb \
 	-p plio.port=9112 \
 	-p plio.key_size=255 \
 	-p plio.chunk_size=4096 \
-	-p measurementtype=timeseries
+	-p measurementtype=hdrhistogram \
+	-p status.interval=1
