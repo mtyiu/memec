@@ -978,7 +978,8 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 								   op.original, op.reconstructed, op.reconstructedCount,
 								   reconstructParity,
 								   this->chunks,
-								   pidsIndex == len - 1
+								   pidsIndex == len - 1,
+								   true
 								);
 
 								delete[] valueUpdate;
@@ -1030,7 +1031,8 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 							   op.original, op.reconstructed, op.reconstructedCount,
 							   reconstructParity,
 							   this->chunks,
-							   pidsIndex == len - 1
+							   pidsIndex == len - 1,
+							   true
 							);
 
 							delete[] valueUpdate;
@@ -1081,7 +1083,8 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 								op.original, op.reconstructed, op.reconstructedCount,
 								reconstructParity,
 								this->chunks,
-								pidsIndex == len - 1
+								pidsIndex == len - 1,
+								true
 							);
 						} else {
 							MasterEvent event;

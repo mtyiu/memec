@@ -429,7 +429,6 @@ bool SlaveWorker::handleUpdateRequest(
 	Chunk **chunks, bool endOfDegradedOp,
 	bool checkGetChunk
 ) {
-	assert( checkGetChunk );
 	bool ret;
 	Key key;
 	KeyValue keyValue;

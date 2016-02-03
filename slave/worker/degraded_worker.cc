@@ -32,8 +32,12 @@ int SlaveWorker::findInRedirectedList( uint32_t *original, uint32_t *reconstruct
 			reconstructParity = true;
 		else if ( dataChunkId == original[ i * 2 + 1 ] )
 			reconstructData = true;
-		else if ( dataChunkId == ongoingAtChunk )
-			reconstructData = true;
+
+		if ( dataChunkId == ongoingAtChunk ) {
+			// Need to reconstruct
+			if ( original[ i * 2 + 1 ] < SlaveWorker::dataChunkCount )
+				reconstructData = true;
+		}
 
 		if ( ret == -1 ) {
 			if ( ! self && lists[ listIndex ].chunkId == ongoingAtChunk )
@@ -46,6 +50,8 @@ int SlaveWorker::findInRedirectedList( uint32_t *original, uint32_t *reconstruct
 	}
 
 	reconstructParity = reconstructParity && ( self || ! isSealed );
+	if ( reconstructData )
+		reconstructParity = false;
 
 	return ret;
 }
@@ -729,6 +735,12 @@ bool SlaveWorker::handleForwardChunkRequest( struct ChunkDataHeader &header, boo
 	std::unordered_map<Metadata, Chunk *> *cache;
 	LOCK_T *lock;
 	DegradedMap *dmap = &SlaveWorker::degradedChunkBuffer->map;
+
+	__DEBUG__(
+		GREEN, "SlaveWorker", "handleForwardChunkRequest",
+		"Received forwarded chunk: (%u, %u, %u).",
+		header.listId, header.stripeId, header.chunkId
+	);
 
 	dmap->getCacheMap( cache, lock );
 

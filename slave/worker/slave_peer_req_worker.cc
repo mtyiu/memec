@@ -607,6 +607,7 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, bool isSealed, ch
 
 
 bool SlaveWorker::handleUpdateChunkRequest( SlavePeerEvent event, char *buf, size_t size, bool checkGetChunk ) {
+	assert( checkGetChunk );
 	struct ChunkUpdateHeader header;
 	bool ret;
 	if ( ! this->protocol.parseChunkUpdateHeader( header, true, buf, size ) ) {
