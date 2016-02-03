@@ -133,9 +133,8 @@ bool SlaveWorker::handleDegradedGetRequest( MasterEvent event, char *buf, size_t
 
 	int index = -1;
 	bool reconstructParity, reconstructData;
-	uint32_t listId = header.original[ index * 2 ],
-	         stripeId = header.stripeId,
-	         chunkId = header.original[ index * 2 + 1 ];
+	uint32_t listId, stripeId, chunkId;
+	stripeId = header.stripeId;
 	if ( header.reconstructedCount ) {
 		this->getSlaves(
 			header.data.key.key,
@@ -181,11 +180,17 @@ degraded_get_check:
 
 	if ( isKeyValueFound ) {
 		// Send the key-value pair to the master
-		event.resGet( event.socket, event.instanceId, event.requestId, keyValue, true /* isDegraded */ );
+		event.resGet(
+			event.socket, event.instanceId, event.requestId,
+			keyValue, true // isDegraded
+		);
 		this->dispatch( event );
 	} else if ( chunk ) {
 		// Key not found
-		event.resGet( event.socket, event.instanceId, event.requestId, key, true /* isDegraded */ );
+		event.resGet(
+			event.socket, event.instanceId, event.requestId,
+			key, true // isDegraded
+		);
 		this->dispatch( event );
 	} else {
 		bool isReconstructed;
@@ -740,6 +745,9 @@ bool SlaveWorker::handleForwardChunkRequest( struct ChunkDataHeader &header, boo
 	);
 	if ( chunk ) {
 		// Already exists
+		__ERROR__( "SlaveWorker", "handleForwardChunkRequest", "The chunk (%u, %u, %u) is forwarded multiple times.", header.listId, header.stripeId, header.chunkId );
+
+		xorIfExists = false;
 		if ( xorIfExists ) {
 			char *parity = chunk->getData();
 			Coding::bitwiseXOR(
@@ -803,11 +811,48 @@ bool SlaveWorker::handleForwardChunkRequest( struct ChunkDataHeader &header, boo
 			masterEvent.requestId = pid.parentRequestId;
 			masterEvent.socket = op.socket;
 
+			Key key;
+			KeyValue keyValue;
+			KeyMetadata keyMetadata;
+			uint32_t listId, stripeId, chunkId;
+			DegradedMap *dmap = &SlaveWorker::degradedChunkBuffer->map;
+
+			stripeId = op.stripeId;
+			this->getSlaves( key.data, key.size, listId, chunkId );
+
+			// Check if the chunk is already fetched //
+			Chunk *chunk = dmap->findChunkById(
+				listId, stripeId, chunkId
+			);
+			// Check if the key exists or is in a unsealed chunk //
+			bool isSealed;
+			bool isKeyValueFound = dmap->findValueByKey(
+				key.data, key.size,
+				isSealed,
+				&keyValue, 0, &keyMetadata
+			);
+
 			if ( op.opcode == PROTO_OPCODE_DEGRADED_GET ) {
-				struct KeyHeader header;
-				header.keySize = op.data.key.size;
-				header.key = op.data.key.data;
-				this->handleGetRequest( masterEvent, header, true );
+				if ( isKeyValueFound ) {
+					// Send the key-value pair to the master
+					masterEvent.resGet(
+						masterEvent.socket,
+						masterEvent.instanceId,
+						masterEvent.requestId,
+						keyValue, true // isDegraded
+					);
+					this->dispatch( masterEvent );
+				} else {
+					// Key not found
+					fprintf( stderr, "Chunk (%u, %u, %u) %s found (0x%p); header: (%u, %u, %u); pid_s.chunkId = %u.\n", listId, stripeId, chunkId, chunk ? "is" : "is not", chunk, header.listId, header.stripeId, header.chunkId, pids[ pidsIndex ].chunkId );
+					masterEvent.resGet(
+						masterEvent.socket,
+						masterEvent.instanceId,
+						masterEvent.requestId,
+						key, true // isDegraded
+					);
+					this->dispatch( masterEvent );
+				}
 			} else if ( op.opcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
 				struct KeyValueUpdateHeader header;
 				header.keySize = op.data.keyValueUpdate.size;
@@ -1285,6 +1330,13 @@ force_reconstruct_chunks:
 					needsContinue = true;
 					break;
 				}
+			}
+
+			if ( needsContinue ) {
+				needsContinue = SlaveWorker::degradedChunkBuffer->map.insertDegradedChunk(
+					listId, stripeId, chunkId,
+					isReconstructed
+				);
 			}
 
 			if ( needsContinue ) {

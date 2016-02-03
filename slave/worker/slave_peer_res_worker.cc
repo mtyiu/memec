@@ -1106,15 +1106,15 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 						continue; // No need to send
 
 					if ( s->self ) {
-						// struct ChunkDataHeader chunkDataHeader = {
-						// 	.listId = metadata.listId,
-						// 	.stripeId = metadata.stripeId,
-						// 	.chunkId = op.original[ i * 2 + 1 ],
-						// 	.size = this->chunks[ op.original[ i * 2 + 1 ] ]->getSize(),
-						// 	.offset = 0,
-						// 	.data = this->chunks[ op.original[ i * 2 + 1 ] ]->getData()
-						// };
-						// this->handleForwardChunkRequest( chunkDataHeader, false );
+						struct ChunkDataHeader chunkDataHeader = {
+							.listId = metadata.listId,
+							.stripeId = metadata.stripeId,
+							.chunkId = op.original[ i * 2 + 1 ],
+							.size = this->chunks[ op.original[ i * 2 + 1 ] ]->getSize(),
+							.offset = 0,
+							.data = this->chunks[ op.original[ i * 2 + 1 ] ]->getData()
+						};
+						this->handleForwardChunkRequest( chunkDataHeader, false );
 					} else {
 						metadata.chunkId = op.original[ i * 2 + 1 ];
 						event.reqForwardChunk(

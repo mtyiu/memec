@@ -1065,11 +1065,16 @@ void Slave::lookup() {
 	KeyValue keyValue;
 	if ( this->degradedChunkBuffer.map.findValueByKey( key, keySize, isSealed, &keyValue, 0, &keyMetadata ) ) {
 		if ( isSealed ) {
+			uint8_t keySize;
+			uint32_t valueSize;
+			char *keyStr, *valueStr;
+			keyValue.deserialize( keyStr, keySize, valueStr, valueSize );
 			printf(
 				"Reconstructed chunk found: (%u, %u, %u); offset: %u, length: %u; is sealed? %s\n",
 				keyMetadata.listId, keyMetadata.stripeId, keyMetadata.chunkId, keyMetadata.offset, keyMetadata.length,
 				isSealed ? "yes" : "no"
 			);
+			fflush( stdout );
 		} else {
 			uint8_t keySize;
 			uint32_t valueSize;

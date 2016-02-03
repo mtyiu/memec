@@ -68,6 +68,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		}
 			break;
 		case MASTER_EVENT_TYPE_GET_RESPONSE_FAILURE:
+			fprintf( stderr, "[%u, %u] %.*s (key size = %u)\n", event.instanceId, event.requestId, event.message.key.size, event.message.key.data, event.message.key.size );
 			buffer.data = this->protocol.resGet(
 				buffer.size,
 				event.instanceId, event.requestId,
@@ -127,6 +128,9 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
 			// assert( success );
+			if ( ! success )
+				fprintf( stderr, "Failed UPDATE: %.*s\n", event.message.keyValueUpdate.key.size,
+				event.message.keyValueUpdate.key.data );
 			buffer.data = this->protocol.resUpdate(
 				buffer.size,
 				event.instanceId, event.requestId,

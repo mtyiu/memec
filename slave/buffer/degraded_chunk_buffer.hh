@@ -7,6 +7,7 @@
 struct pid_s {
 	uint16_t instanceId;
 	uint32_t requestId;
+	uint32_t chunkId;
 };
 
 class DegradedMap {
@@ -93,6 +94,10 @@ public:
 	bool insertDegradedChunk(
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		uint16_t instanceId, uint32_t requestId, bool &isReconstructed
+	);
+	bool insertDegradedChunk(
+		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
+		bool &isReconstructed
 	);
 	bool deleteDegradedChunk(
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,

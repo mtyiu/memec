@@ -113,7 +113,9 @@ void BasicRemappingScheme::redirect(
 			nodeLatency = slaveLoading->cumulativeMirror.set.get( slaveAddr, &index );
 			if ( nodeLatency )
 				*nodeLatency = *nodeLatency + increment;
-			selectedSlaves.insert( slaveAddr );
+
+			// Allow repetition
+			// selectedSlaves.insert( slaveAddr );
 		}
 	}
 
