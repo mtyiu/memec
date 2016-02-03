@@ -76,6 +76,7 @@ public class Main implements Runnable {
 			size = this.map.size();
 			ret = false;
 
+			/*
 			if ( size != numRecords ) rand = 0;
 			if ( i == numRecords ) {
 				System.err.println( "[" + this.id + "] Sleep for 2 seconds." );
@@ -85,6 +86,7 @@ public class Main implements Runnable {
 
 				if ( rand == 0 ) rand = 1;
 			}
+			*/
 
 			if ( rand == 0 ) {
 				// SET

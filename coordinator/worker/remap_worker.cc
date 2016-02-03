@@ -101,10 +101,28 @@ bool CoordinatorWorker::handleRemappingSetLockRequest( MasterEvent event, char *
 				header.original, header.remapped, header.remappedCount, key
 			);
 		} else {
-			event.resRemappingSetLock(
-				event.socket, event.instanceId, event.requestId, false, // success
-				0, 0, 0, key
-			);
+			// event.resRemappingSetLock(
+			// 	event.socket, event.instanceId, event.requestId, false, // success
+			// 	0, 0, 0, key
+			// );
+
+			// ---------- HACK FOR YCSB which sends duplicated keys for SET ----------
+			LOCK_T *lock;
+			if ( CoordinatorWorker::remappingRecords->find( key, &remappingRecord, &lock ) ) {
+				// Remapped
+				event.resRemappingSetLock(
+					event.socket, event.instanceId, event.requestId, true, // success
+					remappingRecord.original, remappingRecord.remapped, remappingRecord.remappedCount, key
+				);
+				this->dispatch( event );
+				UNLOCK( lock );
+				return true;
+			} else {
+				event.resRemappingSetLock(
+					event.socket, event.instanceId, event.requestId, false, // success
+					0, 0, 0, key
+				);
+			}
 		}
 	} else {
 		// The key already exists

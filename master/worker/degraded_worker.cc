@@ -88,7 +88,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 			}
 			break;
 		case PROTO_DEGRADED_LOCK_RES_NOT_LOCKED:
-			__INFO__(
+			__DEBUG__(
 				BLUE, "MasterWorker", "handleDegradedLockResponse",
 				"[Not Locked] Key: %.*s (key size = %u).",
 				( int ) header.keySize, header.key, header.keySize
