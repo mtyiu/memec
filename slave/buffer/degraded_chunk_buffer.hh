@@ -102,7 +102,8 @@ public:
 	bool deleteDegradedChunk(
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		std::vector<struct pid_s> &pids,
-		bool force = false
+		bool force = false,
+		bool ignoreChunkId = false
 	);
 
 	bool insertDegradedKey( Key key, uint16_t instanceId, uint32_t requestId, bool &isReconstructed );

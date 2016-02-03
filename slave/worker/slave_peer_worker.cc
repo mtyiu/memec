@@ -133,6 +133,16 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 			);
 			break;
 		case SLAVE_PEER_EVENT_TYPE_FORWARD_CHUNK_REQUEST:
+			// fprintf(
+			// 	stderr, "Forwarding the %s chunk (%u, %u, %u: %p; size: %u) to ",
+			// 	event.message.chunk.metadata.chunkId ? "parity" : "data",
+			// 	event.message.chunk.metadata.listId,
+			// 	event.message.chunk.metadata.stripeId,
+			// 	event.message.chunk.metadata.chunkId,
+			// 	event.message.chunk.chunk,
+			// 	event.message.chunk.chunk->getSize()
+			// );
+			// event.socket->print( stderr );
 			buffer.data = this->protocol.reqForwardChunk(
 				buffer.size,
 				event.instanceId, event.requestId,

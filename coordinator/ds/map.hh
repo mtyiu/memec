@@ -139,10 +139,8 @@ struct DegradedLock {
 			this->original = _original;
 			this->reconstructed = _reconstructed;
 
-			if ( newReconstructedCount ) {
-				this->sort();
-				// this->print();
-			}
+			this->sort();
+			// this->print();
 		}
 	}
 

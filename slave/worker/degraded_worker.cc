@@ -1,7 +1,7 @@
 #include "worker.hh"
 #include "../main/slave.hh"
 
-int SlaveWorker::findInRedirectedList( uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32_t ongoingAtChunk, bool &reconstructParity, bool &reconstructData, uint32_t dataChunkId ) {
+int SlaveWorker::findInRedirectedList( uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32_t ongoingAtChunk, bool &reconstructParity, bool &reconstructData, uint32_t dataChunkId, bool isSealed ) {
 	int ret = -1;
 	bool self = false;
 	uint32_t listId;
@@ -45,7 +45,7 @@ int SlaveWorker::findInRedirectedList( uint32_t *original, uint32_t *reconstruct
 		}
 	}
 
-	reconstructParity = reconstructParity && self;
+	reconstructParity = reconstructParity && ( self || ! isSealed );
 
 	return ret;
 }
@@ -145,7 +145,7 @@ bool SlaveWorker::handleDegradedGetRequest( MasterEvent event, char *buf, size_t
 		index = this->findInRedirectedList(
 			header.original, header.reconstructed, header.reconstructedCount,
 			header.ongoingAtChunk, reconstructParity, reconstructData,
-			chunkId
+			chunkId, header.isSealed
 		);
 		if ( ( index == -1 ) ||
 		     ( header.original[ index * 2 + 1 ] >= SlaveWorker::dataChunkCount ) ) {
@@ -194,7 +194,7 @@ degraded_get_check:
 		this->dispatch( event );
 	} else {
 		bool isReconstructed;
-		key.dup();
+		key.dup( key.size, key.data );
 		ret = this->performDegradedRead(
 			PROTO_OPCODE_DEGRADED_GET,
 			event.socket,
@@ -223,36 +223,42 @@ degraded_get_check:
 
 bool SlaveWorker::handleDegradedUpdateRequest( MasterEvent event, char *buf, size_t size ) {
 	struct DegradedReqHeader header;
-	uint32_t listId, stripeId, chunkId;
-	int index = -1;
-	bool reconstructParity, reconstructData, inProgress = false;
 	if ( ! this->protocol.parseDegradedReqHeader( header, PROTO_OPCODE_DEGRADED_UPDATE, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleDegradedUpdateRequest", "Invalid degraded UPDATE request." );
 		return false;
 	}
 	__DEBUG__(
 		BLUE, "SlaveWorker", "handleDegradedUpdateRequest",
-		"[UPDATE] Key: %.*s (key size = %u); Value: (update size = %u, offset = %u), reconstruction count = %u.",
+		"[UPDATE] Key: %.*s (key size = %u); Value: (update size = %u, offset = %u), reconstruction count = %u; stripe ID = %u.",
 		( int ) header.data.keyValueUpdate.keySize,
 		header.data.keyValueUpdate.key,
 		header.data.keyValueUpdate.keySize,
 		header.data.keyValueUpdate.valueUpdateSize,
 		header.data.keyValueUpdate.valueUpdateOffset,
-		header.reconstructedCount
+		header.reconstructedCount,
+		header.stripeId
+	);
+	return this->handleDegradedUpdateRequest( event, header );
+}
+
+bool SlaveWorker::handleDegradedUpdateRequest( MasterEvent event, struct DegradedReqHeader &header, bool jump ) {
+	uint32_t listId, stripeId, chunkId;
+	int index = -1;
+	bool reconstructParity, reconstructData, inProgress = false;
+
+	this->getSlaves(
+		header.data.keyValueUpdate.key,
+		header.data.keyValueUpdate.keySize,
+		listId,
+		chunkId
 	);
 
 	if ( header.reconstructedCount ) {
 		stripeId = header.stripeId;
-		this->getSlaves(
-			header.data.keyValueUpdate.key,
-			header.data.keyValueUpdate.keySize,
-			listId,
-			chunkId
-		);
 		index = this->findInRedirectedList(
 			header.original, header.reconstructed, header.reconstructedCount,
 			header.ongoingAtChunk, reconstructParity, reconstructData,
-			chunkId
+			chunkId, header.isSealed
 		);
 
 		/*
@@ -374,7 +380,8 @@ bool SlaveWorker::handleDegradedUpdateRequest( MasterEvent event, char *buf, siz
 		keyValueUpdate.set( key.size, key.data, ( void * ) event.socket );
 		keyValueUpdate.offset = header.data.keyValueUpdate.valueUpdateOffset;
 		keyValueUpdate.length = header.data.keyValueUpdate.valueUpdateSize;
-		goto force_degraded_read;
+		if ( ! jump )
+			goto force_degraded_read;
 	}
 
 	// Check if the chunk is already fetched
@@ -486,19 +493,6 @@ bool SlaveWorker::handleDegradedUpdateRequest( MasterEvent event, char *buf, siz
 			);
 		}
 	} else if ( chunk ) {
-		printf( "[UPDATE] (%u, %u, %u) %.*s: ", listId, stripeId, chunkId, header.data.keyValueUpdate.keySize, header.data.keyValueUpdate.key );
-		for ( uint32_t i = 0; i < header.reconstructedCount; i++ ) {
-			printf(
-				"%s(%u, %u) |-> (%u, %u)%s",
-				i == 0 ? "" : ", ",
-				header.original[ i * 2     ],
-				header.original[ i * 2 + 1 ],
-				header.reconstructed[ i * 2     ],
-				header.reconstructed[ i * 2 + 1 ],
-				i == header.reconstructedCount - 1 ? "\n" : ""
-			);
-		}
-		fflush( stdout );
 		// Key not found
 		event.resUpdate(
 			event.socket, event.instanceId, event.requestId, key,
@@ -586,7 +580,7 @@ bool SlaveWorker::handleDegradedDeleteRequest( MasterEvent event, char *buf, siz
 		index = this->findInRedirectedList(
 			header.original, header.reconstructed, header.reconstructedCount,
 			header.ongoingAtChunk, reconstructParity, reconstructData,
-			chunkId
+			chunkId, header.isSealed
 		);
 	} else {
 		// Use normal flow
@@ -745,9 +739,9 @@ bool SlaveWorker::handleForwardChunkRequest( struct ChunkDataHeader &header, boo
 	);
 	if ( chunk ) {
 		// Already exists
-		__ERROR__( "SlaveWorker", "handleForwardChunkRequest", "The chunk (%u, %u, %u) is forwarded multiple times.", header.listId, header.stripeId, header.chunkId );
+		// __ERROR__( "SlaveWorker", "handleForwardChunkRequest", "The chunk (%u, %u, %u) is forwarded multiple times.", header.listId, header.stripeId, header.chunkId );
 
-		xorIfExists = false;
+		xorIfExists = true;
 		if ( xorIfExists ) {
 			char *parity = chunk->getData();
 			Coding::bitwiseXOR(
@@ -792,7 +786,8 @@ bool SlaveWorker::handleForwardChunkRequest( struct ChunkDataHeader &header, boo
 		Key key;
 		for ( int pidsIndex = 0, len = pids.size(); pidsIndex < len; pidsIndex++ ) {
 			if ( ! SlaveWorker::pending->eraseDegradedOp( PT_SLAVE_PEER_DEGRADED_OPS, pids[ pidsIndex ].instanceId, pids[ pidsIndex ].requestId, 0, &pid, &op ) ) {
-				__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot find a pending slave DEGRADED_OPS request that matches the response. This message will be discarded." );
+				__ERROR__( "SlaveWorker", "handleForwardChunkRequest", "Cannot find a pending slave DEGRADED_OPS request that matches the response. This message will be discarded." );
+				continue;
 			}
 
 			switch( op.opcode ) {
@@ -803,6 +798,8 @@ bool SlaveWorker::handleForwardChunkRequest( struct ChunkDataHeader &header, boo
 				case PROTO_OPCODE_DEGRADED_UPDATE:
 					key.set( op.data.keyValueUpdate.size, op.data.keyValueUpdate.data );
 					break;
+				default:
+					continue;
 			}
 
 			// Find the chunk from the map
@@ -811,7 +808,6 @@ bool SlaveWorker::handleForwardChunkRequest( struct ChunkDataHeader &header, boo
 			masterEvent.requestId = pid.parentRequestId;
 			masterEvent.socket = op.socket;
 
-			Key key;
 			KeyValue keyValue;
 			KeyMetadata keyMetadata;
 			uint32_t listId, stripeId, chunkId;
@@ -844,7 +840,6 @@ bool SlaveWorker::handleForwardChunkRequest( struct ChunkDataHeader &header, boo
 					this->dispatch( masterEvent );
 				} else {
 					// Key not found
-					fprintf( stderr, "Chunk (%u, %u, %u) %s found (0x%p); header: (%u, %u, %u); pid_s.chunkId = %u.\n", listId, stripeId, chunkId, chunk ? "is" : "is not", chunk, header.listId, header.stripeId, header.chunkId, pids[ pidsIndex ].chunkId );
 					masterEvent.resGet(
 						masterEvent.socket,
 						masterEvent.instanceId,
@@ -854,31 +849,62 @@ bool SlaveWorker::handleForwardChunkRequest( struct ChunkDataHeader &header, boo
 					this->dispatch( masterEvent );
 				}
 			} else if ( op.opcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
-				struct KeyValueUpdateHeader header;
-				header.keySize = op.data.keyValueUpdate.size;
-				header.valueUpdateSize = op.data.keyValueUpdate.length;
-				header.valueUpdateOffset = op.data.keyValueUpdate.offset;
-				header.key = op.data.keyValueUpdate.data;
-				header.valueUpdate = ( char * ) op.data.keyValueUpdate.ptr;
+				if ( isKeyValueFound ) {
+					struct DegradedReqHeader header;
+					header.isSealed = chunk != 0;
+					header.stripeId = stripeId;
+					header.reconstructedCount = op.reconstructedCount;
+					header.original = op.original;
+					header.reconstructed = op.reconstructed;
+					header.ongoingAtChunk = op.ongoingAtChunk;
+					header.data.keyValueUpdate.keySize = key.size;
+					header.data.keyValueUpdate.valueUpdateSize = op.data.keyValueUpdate.length;
+					header.data.keyValueUpdate.valueUpdateOffset = op.data.keyValueUpdate.offset;
+					header.data.keyValueUpdate.key = key.data,
+					header.data.keyValueUpdate.valueUpdate = ( char * ) op.data.keyValueUpdate.ptr;
 
-				this->handleUpdateRequest(
-					masterEvent, header,
-					op.original, op.reconstructed, op.reconstructedCount,
-					false,
-					this->chunks,
-					pidsIndex == len - 1
-				);
+					this->handleDegradedUpdateRequest( masterEvent, header, true );
+				} else {
+					// Key not found
+					masterEvent.resUpdate(
+						masterEvent.socket,
+						masterEvent.instanceId,
+						masterEvent.requestId,
+						key,
+						op.data.keyValueUpdate.offset,
+						op.data.keyValueUpdate.length,
+						false, // success
+						false, // needsFree
+						true   // isDegraded
+					);
+					this->dispatch( masterEvent );
+				}
+
+				// struct KeyValueUpdateHeader header;
+				// header.keySize = op.data.keyValueUpdate.size;
+				// header.valueUpdateSize = op.data.keyValueUpdate.length;
+				// header.valueUpdateOffset = op.data.keyValueUpdate.offset;
+				// header.key = op.data.keyValueUpdate.data;
+				// header.valueUpdate = ( char * ) op.data.keyValueUpdate.ptr;
+				//
+				// this->handleUpdateRequest(
+				// 	masterEvent, header,
+				// 	op.original, op.reconstructed, op.reconstructedCount,
+				// 	false,
+				// 	this->chunks,
+				// 	pidsIndex == len - 1
+				// );
 			} else if ( op.opcode == PROTO_OPCODE_DEGRADED_DELETE ) {
-				struct KeyHeader header;
-				header.keySize = op.data.key.size;
-				header.key = op.data.key.data;
-				this->handleDeleteRequest(
-					masterEvent, header,
-					op.original, op.reconstructed, op.reconstructedCount,
-					false,
-					this->chunks,
-					pidsIndex == len - 1
-				);
+				// struct KeyHeader header;
+				// header.keySize = op.data.key.size;
+				// header.key = op.data.key.data;
+				// this->handleDeleteRequest(
+				// 	masterEvent, header,
+				// 	op.original, op.reconstructed, op.reconstructedCount,
+				// 	false,
+				// 	this->chunks,
+				// 	pidsIndex == len - 1
+				// );
 			}
 		}
 	}
@@ -1036,8 +1062,11 @@ bool SlaveWorker::performDegradedRead(
 			isReconstructed = false;
 			// __INFO__(
 			// 	YELLOW, "SlaveWorker", "performDegradedRead",
-			// 	"Chunk ID mismatch for key: %.*s (%u, %u, %u) - ongoingAtChunk: %u, my chunk ID: %u.",
-			// 	mykey.size, mykey.data,
+			// 	"[%u, %u/ parent: %u, %u] opcode: %x; Chunk ID mismatch for key at 0x%p: %.*s (%u, %u, %u) - ongoingAtChunk: %u, my chunk ID: %u.",
+			// 	instanceId, requestId,
+			// 	parentInstanceId, parentRequestId,
+			// 	op.opcode, op.data.key.data,
+			// 	op.data.key.size, op.data.key.data,
 			// 	listId, stripeId, chunkId,
 			// 	ongoingAtChunk,
 			// 	SlaveWorker::chunkBuffer->at( listId )->getChunkId()
@@ -1048,7 +1077,6 @@ bool SlaveWorker::performDegradedRead(
 				instanceId, requestId,
 				isReconstructed
 			);
-			// printf( "insertDegradedChunk(): (%u, %u, %u) - needsContinue: %d\n", listId, stripeId, chunkId, needsContinue );
 		}
 	} else {
 		if ( opcode == PROTO_OPCODE_DEGRADED_UPDATE )
@@ -1056,10 +1084,10 @@ bool SlaveWorker::performDegradedRead(
 		else
 			k = *key;
 		needsContinue = SlaveWorker::degradedChunkBuffer->map.insertDegradedKey( k, instanceId, requestId, isReconstructed );
-		// printf( "insertDegradedKey(): (%.*s) - needsContinue: %d\n", k.size, k.data, needsContinue );
 	}
 
 	if ( isSealed ) {
+		// fprintf( stderr, "insertDegradedChunk(): (%u, %u, %u) - needsContinue: %s; isReconstructed: %s\n", listId, stripeId, chunkId, needsContinue ? "true" : "false", isReconstructed ? "true" : "false" );
 		if ( ! needsContinue ) {
 			if ( isReconstructed ) {
 				// The chunk is already reconstructed
@@ -1160,6 +1188,7 @@ force_reconstruct_chunks:
 
 		return ( selected >= SlaveWorker::dataChunkCount );
 	} else {
+		// fprintf( stderr, "performDegradedRead(): (%u, %u, %u) - %.*s - needsContinue: %s; isReconstructed: %s\n", listId, stripeId, chunkId, mykey.size, mykey.data, needsContinue ? "true" : "false", isReconstructed ? "true" : "false" );
 		////////// Key-value pairs in unsealed chunks //////////
 		if ( ! needsContinue || isReconstructed )
 			return false;
@@ -1340,6 +1369,8 @@ force_reconstruct_chunks:
 			}
 
 			if ( needsContinue ) {
+				op.opcode = 0;
+				requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
 				if ( ! SlaveWorker::pending->insertDegradedOp( PT_SLAVE_PEER_DEGRADED_OPS, instanceId, parentInstanceId, requestId, parentRequestId, 0, op ) ) {
 					__ERROR__( "SlaveWorker", "performDegradedRead", "Cannot insert into slave DEGRADED_OPS pending map." );
 				}

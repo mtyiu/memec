@@ -127,10 +127,10 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		// UPDATE
 		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
+			// if ( ! success )
+			// 	fprintf( stderr, "Failed UPDATE: %.*s\n", event.message.keyValueUpdate.key.size,
+			// 	event.message.keyValueUpdate.key.data );
 			// assert( success );
-			if ( ! success )
-				fprintf( stderr, "Failed UPDATE: %.*s\n", event.message.keyValueUpdate.key.size,
-				event.message.keyValueUpdate.key.data );
 			buffer.data = this->protocol.resUpdate(
 				buffer.size,
 				event.instanceId, event.requestId,

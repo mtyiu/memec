@@ -223,7 +223,7 @@ bool DegradedMap::insertDegradedChunk( uint32_t listId, uint32_t stripeId, uint3
 		}
 	} else {
 		std::vector<struct pid_s> &pids = it->second;
-		struct pid_s data = { .instanceId = instanceId, .requestId = requestId };
+		struct pid_s data = { .instanceId = instanceId, .requestId = requestId, .chunkId = chunkId };
 		pids.push_back( data );
 		ret = false;
 	}
@@ -273,7 +273,7 @@ bool DegradedMap::insertDegradedChunk( uint32_t listId, uint32_t stripeId, uint3
 	return ret;
 }
 
-bool DegradedMap::deleteDegradedChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, std::vector<struct pid_s> &pids, bool force ) {
+bool DegradedMap::deleteDegradedChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, std::vector<struct pid_s> &pids, bool force, bool ignoreChunkId ) {
 	Metadata metadata;
 	std::unordered_map<Metadata, std::vector<struct pid_s>>::iterator it;
 
@@ -290,7 +290,7 @@ bool DegradedMap::deleteDegradedChunk( uint32_t listId, uint32_t stripeId, uint3
 		std::vector<struct pid_s>::iterator pidsIt;
 		for ( pidsIt = it->second.begin(); pidsIt != it->second.end(); ) {
 			struct pid_s pid = *pidsIt;
-			if ( pid.chunkId == chunkId ) {
+			if ( ignoreChunkId || pid.chunkId == chunkId ) {
 				pids.push_back( pid );
 				pidsIt = it->second.erase( pidsIt );
 			} else {

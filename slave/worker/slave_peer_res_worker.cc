@@ -58,6 +58,9 @@ bool SlaveWorker::handleForwardKeyResponse( struct ForwardKeyHeader &header, boo
 			continue;
 		}
 
+		if ( op.opcode == 0 )
+			continue;
+
 		MasterEvent masterEvent;
 		switch( op.opcode ) {
 			case PROTO_OPCODE_DEGRADED_UPDATE:
@@ -232,6 +235,9 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 			if ( success ) keyValue.free();
 			continue;
 		}
+
+		if ( op.opcode == 0 )
+			continue;
 
 		if ( success ) {
 			if ( op.opcode == PROTO_OPCODE_DEGRADED_DELETE ) {
@@ -767,7 +773,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 				int index = this->findInRedirectedList(
 					op.original, op.reconstructed, op.reconstructedCount,
 					op.ongoingAtChunk, reconstructParity, reconstructData,
-					op.chunkId
+					op.chunkId, op.isSealed
 				);
 
 				// Check whether the reconstructed parity chunks need to be forwarded
@@ -781,7 +787,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 
 				keyMetadata.offset = 0;
 
-				if ( ! dmap->deleteDegradedChunk( op.listId, op.stripeId, op.chunkId, pids, true /* force */ ) ) {
+				if ( ! dmap->deleteDegradedChunk( op.listId, op.stripeId, op.chunkId, pids, true /* force */, true /* ignoreChunkId */ ) ) {
 					// __ERROR__( "SlaveWorker", "handleGetChunkResponse", "dmap->deleteDegradedChunk() failed (%u, %u, %u).", op.listId, op.stripeId, op.chunkId );
 				}
 				metadata.set( op.listId, op.stripeId, op.chunkId );
@@ -803,6 +809,8 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 						case PROTO_OPCODE_DEGRADED_UPDATE:
 							key.set( op.data.keyValueUpdate.size, op.data.keyValueUpdate.data );
 							break;
+						default:
+							continue;
 					}
 
 					// Find the chunk from the map
@@ -911,9 +919,10 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 							break;
 						case PROTO_OPCODE_DEGRADED_GET:
 						case PROTO_OPCODE_DEGRADED_DELETE:
-						default:
 							key.set( op.data.key.size, op.data.key.data );
 							break;
+						default:
+							continue;
 					}
 
 					isKeyValueFound = dmap->findValueByKey( key.data, key.size, isSealed, &keyValue, &key, &keyMetadata );
@@ -1025,9 +1034,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 
 							delete[] valueUpdate;
 						} else {
-							printf( "Key not found: %.*s\n", key.size, key.data );
 							MasterEvent event;
-
 							event.resUpdate(
 								op.socket, pid.parentInstanceId, pid.parentRequestId, key,
 								op.data.keyValueUpdate.offset,
@@ -1093,15 +1100,6 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 				for ( uint32_t i = 0; i < op.reconstructedCount; i++ ) {
 					SlavePeerSocket *s = SlaveWorker::stripeList->get( op.reconstructed[ i * 2 ], op.reconstructed[ i * 2 + 1 ] );
 
-					// fprintf(
-					// 	stderr, "Forwarding the %s chunk (%u, %u, %u: %p; size: %u) to #%u (self? %s).\n",
-					// 	op.original[ i * 2 + 1 ] >= SlaveWorker::dataChunkCount ? "parity" : "data",
-					// 	metadata.listId, metadata.stripeId, op.original[ i * 2 + 1 ],
-					// 	this->chunks[ op.original[ i * 2 + 1 ] ],
-					// 	this->chunks[ op.original[ i * 2 + 1 ] ]->getSize(),
-					// 	op.reconstructed[ i * 2 + 1 ],
-					// 	s->self ? "yes" : "no"
-					// );
 					if ( ! this->chunks[ op.original[ i * 2 + 1 ] ]->getSize() )
 						continue; // No need to send
 

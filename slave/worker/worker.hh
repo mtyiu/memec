@@ -163,11 +163,12 @@ private:
 	int findInRedirectedList(
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 		uint32_t ongoingAtChunk, bool &reconstructParity, bool &reconstructData,
-		uint32_t dataChunkId
+		uint32_t dataChunkId, bool isSealed
 	);
 	bool handleReleaseDegradedLockRequest( CoordinatorEvent event, char *buf, size_t size );
 	bool handleDegradedGetRequest( MasterEvent event, char *buf, size_t size );
 	bool handleDegradedUpdateRequest( MasterEvent event, char *buf, size_t size );
+	bool handleDegradedUpdateRequest( MasterEvent event, struct DegradedReqHeader &header, bool jump = false );
 	bool handleDegradedDeleteRequest( MasterEvent event, char *buf, size_t size );
 	bool handleForwardChunkRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleForwardChunkRequest( struct ChunkDataHeader &header, bool xorIfExists );

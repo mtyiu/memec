@@ -46,7 +46,7 @@ bool SlaveWorker::handleForwardKeyRequest( SlavePeerEvent event, char *buf, size
 	if ( header.opcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
 		__DEBUG__(
 			BLUE, "SlaveWorker", "handleForwardKeyRequest",
-			"[DEGRADED_SET] Degraded opcode: 0x%x; list ID: %u, chunk ID: %u; key: %.*s (size = %u); value size: %u; value update size: %u, offset: %u.",
+			"Degraded opcode: 0x%x; list ID: %u, chunk ID: %u; key: %.*s (size = %u); value size: %u; value update size: %u, offset: %u.",
 			header.opcode, header.listId, header.chunkId,
 			header.keySize, header.key, header.keySize,
 			header.valueSize, header.valueUpdateSize, header.valueUpdateOffset
@@ -54,7 +54,7 @@ bool SlaveWorker::handleForwardKeyRequest( SlavePeerEvent event, char *buf, size
 	} else {
 		__DEBUG__(
 			BLUE, "SlaveWorker", "handleForwardKeyRequest",
-			"[DEGRADED_SET] Degraded opcode: 0x%x; list ID: %u, chunk ID: %u; key: %.*s (size = %u); value size: %u.",
+			"Degraded opcode: 0x%x; list ID: %u, chunk ID: %u; key: %.*s (size = %u); value size: %u.",
 			header.opcode, header.listId, header.chunkId,
 			header.keySize, header.key, header.keySize,
 			header.valueSize

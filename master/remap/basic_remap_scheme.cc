@@ -17,7 +17,7 @@ void BasicRemappingScheme::redirect(
 	bool isGet
 ) {
 	struct sockaddr_in slaveAddr;
-	std::unordered_set<struct sockaddr_in> selectedSlaves;
+	std::unordered_set<struct sockaddr_in> selectedSlaves, redirectedSlaves;
 
 	if ( slaveLoading == NULL || overloadedSlave == NULL || stripeList == NULL || remapMsgHandler == NULL ) {
 		fprintf( stderr, "The scheme is not yet initialized!! Abort remapping!!\n" );
@@ -75,9 +75,12 @@ void BasicRemappingScheme::redirect(
 			else
 				slaveAddr = paritySlaveSockets[ j - dataChunkCount ]->getAddr();
 
-			if ( selectedSlaves.count( slaveAddr ) ){
-				// skip selected and original slaves
+			if ( selectedSlaves.count( slaveAddr ) ) {
+				// Skip original slaves
 				// printf( "--- (%u, %u) is selected ---\n", original[ i * 2 ], j );
+				continue;
+			} else if ( redirectedSlaves.count( slaveAddr ) ) {
+				// Skip selected slaves
 				continue;
 			} else if ( remapMsgHandler->useCoordinatedFlow( slaveAddr ) ) {
 				// Skip overloaded slave
@@ -114,8 +117,7 @@ void BasicRemappingScheme::redirect(
 			if ( nodeLatency )
 				*nodeLatency = *nodeLatency + increment;
 
-			// Allow repetition
-			// selectedSlaves.insert( slaveAddr );
+			redirectedSlaves.insert( slaveAddr );
 		}
 	}
 
