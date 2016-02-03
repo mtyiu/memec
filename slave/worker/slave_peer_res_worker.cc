@@ -838,7 +838,8 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 								op.original, op.reconstructed, op.reconstructedCount,
 								reconstructParity,
 								this->chunks,
-								pidsIndex == len - 1
+								pidsIndex == len - 1,
+								true
 							);
 						} else if ( op.opcode == PROTO_OPCODE_DEGRADED_DELETE ) {
 							struct KeyHeader header;
