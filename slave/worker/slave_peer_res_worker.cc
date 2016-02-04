@@ -667,24 +667,109 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 						header.chunkData.offset,
 						header.chunkData.data
 					);
+					tmp->second.isSealed = true;
+					if ( header.chunkData.chunkId < SlaveWorker::dataChunkCount ) {
+						this->sealIndicators[ SlaveWorker::parityChunkCount ][ header.chunkData.chunkId ] = true;
+					}
 				} else {
 					// The requested chunk is not yet sealed
+					tmp->second.isSealed = false;
 					tmp->second.chunk = Coding::zeros;
+					if ( header.chunkData.chunkId < SlaveWorker::dataChunkCount ) {
+						this->sealIndicators[ SlaveWorker::parityChunkCount ][ header.chunkData.chunkId ] = false;
+					}
+				}
+
+				if ( chunkId >= SlaveWorker::dataChunkCount ) {
+					tmp->second.setSealStatus(
+						header.chunkData.size, // isSealed
+						header.chunkData.sealIndicatorCount,
+						header.chunkData.sealIndicator
+					);
+					this->sealIndicators[ header.chunkData.chunkId - SlaveWorker::dataChunkCount ] = header.chunkData.sealIndicator;
 				}
 			} else {
 				tmp->second.chunk = Coding::zeros;
 			}
+
 			this->chunks[ chunkId ] = tmp->second.chunk;
 		} else if ( ! tmp->second.chunk ) {
 			// The chunk is not received yet
 			pending++;
 		} else {
 			this->chunks[ tmp->second.chunkId ] = tmp->second.chunk;
+			if ( tmp->second.chunkId < SlaveWorker::dataChunkCount ) {
+				this->sealIndicators[ SlaveWorker::parityChunkCount ][ tmp->second.chunkId ] = tmp->second.isSealed;
+			} else {
+				this->sealIndicators[ tmp->second.chunkId - SlaveWorker::dataChunkCount ] = tmp->second.sealIndicator;
+			}
 		}
 		tmp++;
 	}
-	if ( pending == 0 )
-		SlaveWorker::pending->slavePeers.getChunk.erase( it, tmp );
+	if ( pending == 0 ) {
+		// Check seal indicator
+		bool valid = true;
+		for ( uint32_t i = 0; i < SlaveWorker::dataChunkCount; i++ ) {
+			bool isSealed = this->sealIndicators[ SlaveWorker::parityChunkCount ][ i ];
+			for ( uint32_t j = 0; j < SlaveWorker::parityChunkCount; j++ ) {
+				if ( this->chunks[ j + SlaveWorker::dataChunkCount ] ) {
+					if ( this->sealIndicators[ j ][ i ] != isSealed ) {
+						valid = false;
+						break;
+					}
+				}
+			}
+			if ( ! valid )
+				break;
+		}
+		if ( valid ) {
+			SlaveWorker::pending->slavePeers.getChunk.erase( it, tmp );
+		} else {
+			SlaveWorker::stripeList->get( listId, this->paritySlaveSockets, this->dataSlaveSockets );
+
+			fprintf( stderr, "[GET_CHUNK] (%u, %u) - Inconsistent chunks received. Seal indicators:\n", listId, stripeId );
+			for ( uint32_t j = 0; j < SlaveWorker::parityChunkCount + 1; j++ ) {
+				if ( j == SlaveWorker::parityChunkCount || this->chunks[ j + SlaveWorker::dataChunkCount ] ) {
+					fprintf( stderr, "\t#%u:", j );
+					for ( uint32_t i = 0; i < SlaveWorker::dataChunkCount; i++ ) {
+						fprintf( stderr, " %d", this->sealIndicators[ j ][ i ] ? 1 : 0 );
+					}
+					fprintf( stderr, "\n" );
+				}
+			}
+
+			for ( uint32_t j = 0; j < SlaveWorker::parityChunkCount; j++ ) {
+				bool valid = true;
+				if ( j == SlaveWorker::parityChunkCount || this->chunks[ j + SlaveWorker::dataChunkCount ] ) {
+					for ( uint32_t i = 0; i < SlaveWorker::dataChunkCount; i++ ) {
+						if ( this->sealIndicators[ j ][ i ] != this->sealIndicators[ SlaveWorker::parityChunkCount ][ i ] ) {
+							valid = false;
+							break;
+						}
+					}
+				}
+				//
+				if ( ! valid ) {
+					__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Retrieve chunk (%u, %u, %u) again.", listId, stripeId, j + SlaveWorker::dataChunkCount );
+
+					Metadata metadata;
+					SlavePeerSocket *socket;
+
+					metadata.set( listId, stripeId, j + SlaveWorker::dataChunkCount );
+					SlavePeerEvent slavePeerEvent;
+					socket = this->paritySlaveSockets[ j ];
+
+					slavePeerEvent.reqGetChunk( socket, event.instanceId, event.requestId, metadata );
+
+					SlaveWorker::eventQueue->insert( slavePeerEvent );
+				}
+			}
+
+			UNLOCK( &SlaveWorker::pending->slavePeers.getChunkLock );
+			return true;
+		}
+	}
+
 	UNLOCK( &SlaveWorker::pending->slavePeers.getChunkLock );
 
 	if ( pending == 0 ) {
@@ -747,10 +832,23 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 							printf( "CHUNK_STATUS_TEMPORARY" );
 							break;
 					}
-					printf( "\n" );
+					printf( " (size = %u)\n", this->chunks[ x ]->getSize() );
 				}
 				printf( "\n" );
 				fflush( stdout );
+
+				fprintf( stderr, "[GET_CHUNK] (%u, %u) - Inconsistent chunks received. Seal indicators:\n", listId, stripeId );
+				for ( uint32_t j = 0; j < SlaveWorker::parityChunkCount + 1; j++ ) {
+					if ( j == SlaveWorker::parityChunkCount || this->chunks[ j + SlaveWorker::dataChunkCount ]->status != CHUNK_STATUS_RECONSTRUCTED ) {
+						fprintf( stderr, "\t#%u:", j );
+						for ( uint32_t i = 0; i < SlaveWorker::dataChunkCount; i++ ) {
+							fprintf( stderr, " %d", this->sealIndicators[ j ][ i ] ? 1 : 0 );
+						}
+						fprintf( stderr, "\n" );
+					}
+				}
+
+				return true;
 			}
 		}
 
@@ -1108,14 +1206,15 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 						continue; // No need to send
 
 					if ( s->self ) {
-						struct ChunkDataHeader chunkDataHeader = {
-							.listId = metadata.listId,
-							.stripeId = metadata.stripeId,
-							.chunkId = op.original[ i * 2 + 1 ],
-							.size = this->chunks[ op.original[ i * 2 + 1 ] ]->getSize(),
-							.offset = 0,
-							.data = this->chunks[ op.original[ i * 2 + 1 ] ]->getData()
-						};
+						struct ChunkDataHeader chunkDataHeader;
+						chunkDataHeader.listId = metadata.listId;
+						chunkDataHeader.stripeId = metadata.stripeId;
+						chunkDataHeader.chunkId = op.original[ i * 2 + 1 ];
+						chunkDataHeader.size = this->chunks[ op.original[ i * 2 + 1 ] ]->getSize();
+						chunkDataHeader.offset = 0;
+						chunkDataHeader.data = this->chunks[ op.original[ i * 2 + 1 ] ]->getData();
+						chunkDataHeader.sealIndicatorCount = 0;
+						chunkDataHeader.sealIndicator = 0;
 						this->handleForwardChunkRequest( chunkDataHeader, false );
 					} else {
 						metadata.chunkId = op.original[ i * 2 + 1 ];

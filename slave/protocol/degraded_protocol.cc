@@ -80,7 +80,8 @@ char *SlaveProtocol::reqForwardChunk(
 		PROTO_OPCODE_FORWARD_CHUNK,
 		instanceId, requestId,
 		listId, stripeId, chunkId,
-		chunkSize, chunkOffset, chunkData
+		chunkSize, chunkOffset, chunkData,
+		0, 0
 	);
 	return this->buffer.send;
 }

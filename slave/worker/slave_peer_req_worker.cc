@@ -317,11 +317,13 @@ bool SlaveWorker::handleGetChunkRequest( SlavePeerEvent event, char *buf, size_t
 		__ERROR__( "SlaveWorker", "handleGetChunkRequest", "Invalid GET_CHUNK request." );
 		return false;
 	}
-	__DEBUG__(
-		BLUE, "SlaveWorker", "handleGetChunkRequest",
-		"[GET_CHUNK] List ID: %u; stripe ID: %u; chunk ID: %u.",
-		header.listId, header.stripeId, header.chunkId
-	);
+	if ( header.chunkId >= SlaveWorker::dataChunkCount ) {
+		__INFO__(
+			BLUE, "SlaveWorker", "handleGetChunkRequest",
+			"[GET_CHUNK] List ID: %u; stripe ID: %u; chunk ID: %u.",
+			header.listId, header.stripeId, header.chunkId
+		);
+	}
 	return this->handleGetChunkRequest( event, header );
 }
 
@@ -336,13 +338,29 @@ bool SlaveWorker::handleGetChunkRequest( SlavePeerEvent event, struct ChunkHeade
 	ret = chunk;
 
 	// Check whether the chunk is sealed or not
+	uint8_t sealIndicatorCount = 0, _sealIndicatorCount = 0;
+	bool *sealIndicator = 0, *_sealIndicator, exists;
+	LOCK_T *parityChunkBufferLock = 0;
+
 	MixedChunkBuffer *chunkBuffer = SlaveWorker::chunkBuffer->at( header.listId );
 	int chunkBufferIndex = chunkBuffer->lockChunk( chunk, true );
 	bool isSealed = ( chunkBufferIndex == -1 );
 
-	Chunk *backupChunk = SlaveWorker::getChunkBuffer->find( metadata, true, false );
-	if ( backupChunk ) {
+	sealIndicator = chunkBuffer->getSealIndicator( header.stripeId, sealIndicatorCount, true, false, &parityChunkBufferLock );
+
+	Chunk *backupChunk = SlaveWorker::getChunkBuffer->find( metadata, exists, _sealIndicatorCount, _sealIndicator, true, false );
+
+	if ( header.chunkId >= SlaveWorker::dataChunkCount ) {
+		fprintf( stderr, "Searching: [%u, %u, %u] sealIndicatorCount = %u, _sealIndicatorCount = %u; exists: %s\n", header.listId, header.stripeId, header.chunkId, sealIndicatorCount, _sealIndicatorCount, exists ? "true" : "false" );
+	}
+
+	if ( exists ) {
 		// __INFO__( GREEN, "SlaveWorker", "handleGetChunkRequest", "Use backup for (%u, %u, %u) in the GetChunkBuffer.", header.listId, header.stripeId, header.chunkId );
+		delete[] sealIndicator;
+		sealIndicator = _sealIndicator;
+		sealIndicatorCount = _sealIndicatorCount;
+		if ( parityChunkBufferLock )
+			UNLOCK( parityChunkBufferLock );
 		chunk = backupChunk;
 	}
 
@@ -361,7 +379,18 @@ bool SlaveWorker::handleGetChunkRequest( SlavePeerEvent event, struct ChunkHeade
 		);
 	}
 
-	event.resGetChunk( event.socket, event.instanceId, event.requestId, metadata, ret, chunkBufferIndex, isSealed ? chunk : 0 );
+	event.resGetChunk(
+		event.socket, event.instanceId, event.requestId,
+		metadata, ret, chunkBufferIndex,
+		isSealed ? chunk : 0,
+		sealIndicatorCount, sealIndicator
+	);
+
+	fprintf( stderr, "handleGetChunkRequest(): " );
+	for ( uint32_t i = 0; i < sealIndicatorCount; i++ ) {
+		fprintf( stderr, " %d", sealIndicator[ i ] ? 1 : 0 );
+	}
+	fprintf( stderr, "\n" );
 
 	// ACK GET_CHUNK
 	SlaveWorker::getChunkBuffer->ack( metadata, false, true );
@@ -369,6 +398,8 @@ bool SlaveWorker::handleGetChunkRequest( SlavePeerEvent event, struct ChunkHeade
 	this->dispatch( event );
 	// Unlock in the dispatcher
 	// chunkBuffer->unlock( chunkBufferIndex );
+	if ( parityChunkBufferLock && ! exists )
+		UNLOCK( parityChunkBufferLock );
 
 	return ret;
 }
@@ -762,18 +793,41 @@ bool SlaveWorker::handleSealChunkRequest( SlavePeerEvent event, char *buf, size_
 		__ERROR__( "SlaveWorker", "handleSealChunkRequest", "Invalid SEAL_CHUNK request." );
 		return false;
 	}
-	__DEBUG__(
+	__INFO__(
 		BLUE, "SlaveWorker", "handleSealChunkRequest",
 		"[SEAL_CHUNK] List ID: %u, stripe ID: %u, chunk ID: %u; count = %u.",
 		header.listId, header.stripeId, header.chunkId, header.count
 	);
 
+	uint8_t sealIndicatorCount;
+	bool exists, *sealIndicator;
+	Chunk *backupChunk = 0;
+	Metadata metadata;
+
+	metadata.set( header.listId, header.stripeId, header.chunkId );
+	SlaveWorker::getChunkBuffer->find( metadata, exists, sealIndicatorCount, sealIndicator, true, false );
+	if ( exists ) {
+		SlaveWorker::getChunkBuffer->erase( metadata, false, false );
+		backupChunk = SlaveWorker::chunkPool->malloc();
+	}
+
 	ret = SlaveWorker::chunkBuffer->at( header.listId )->seal(
 		header.stripeId, header.chunkId, header.count,
 		buf + PROTO_CHUNK_SEAL_SIZE,
 		size - PROTO_CHUNK_SEAL_SIZE,
-		this->chunks, this->dataChunk, this->parityChunk
+		this->chunks, this->dataChunk, this->parityChunk,
+		backupChunk, &sealIndicatorCount, &sealIndicator
 	);
+
+	// if ( exists ) {
+		fprintf( stderr, "[%u, %u, %u] sealIndicatorCount = %u; exists? %s; seal indicator: ", header.listId, header.stripeId, header.chunkId, sealIndicatorCount, exists ? "true" : "false" );
+		for ( uint32_t i = 0; i < sealIndicatorCount; i++ ) {
+			fprintf( stderr, " %d", sealIndicator[ i ] ? 1 : 0 );
+		}
+		fprintf( stderr, "\n" );
+		SlaveWorker::getChunkBuffer->insert( metadata, backupChunk, sealIndicatorCount, sealIndicator, false, false );
+	// }
+	SlaveWorker::getChunkBuffer->unlock();
 
 	if ( ! ret ) {
 		event.socket->printAddress();

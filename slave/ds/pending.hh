@@ -42,6 +42,9 @@ public:
 	SlavePeerSocket *socket;
 	mutable Chunk *chunk;
 	bool isDegraded;
+	bool isSealed;
+	uint8_t sealIndicatorCount;
+	bool *sealIndicator;
 
 	void set( uint32_t listId, uint32_t stripeId, uint32_t chunkId, SlavePeerSocket *socket, Chunk *chunk = 0, bool isDegraded = true ) {
 		this->listId = listId;
@@ -50,6 +53,20 @@ public:
 		this->socket = socket;
 		this->chunk = chunk;
 		this->isDegraded = isDegraded;
+		this->isSealed = false;
+		this->sealIndicatorCount = 0;
+		this->sealIndicator = 0;
+	}
+
+	void setSealStatus( bool isSealed, uint8_t sealIndicatorCount, bool *sealIndicator ) {
+		this->isSealed = isSealed;
+		this->sealIndicatorCount = sealIndicatorCount;
+		this->sealIndicator = 0;
+		if ( sealIndicatorCount ) {
+			this->sealIndicator = new bool[ sealIndicatorCount ];
+			for ( uint8_t i = 0; i < sealIndicatorCount; i++ )
+				this->sealIndicator[ i ] = sealIndicator[ i ];
+		}
 	}
 };
 

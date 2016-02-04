@@ -351,8 +351,13 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				event.message.chunk.metadata.listId,
 				event.message.chunk.metadata.stripeId,
 				event.message.chunk.metadata.chunkId,
-				size, offset, data
+				size, offset, data,
+				event.message.chunk.sealIndicatorCount,
+				event.message.chunk.sealIndicator
 			);
+
+			if ( event.message.chunk.sealIndicatorCount )
+				delete[] event.message.chunk.sealIndicator;
 
 			SlaveWorker::chunkBuffer
 				->at( event.message.chunk.metadata.listId )

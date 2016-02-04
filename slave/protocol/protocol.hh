@@ -191,7 +191,8 @@ public:
 	char *resGetChunk(
 		size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
-		uint32_t chunkSize = 0, uint32_t chunkOffset = 0, char *chunkData = 0
+		uint32_t chunkSize = 0, uint32_t chunkOffset = 0, char *chunkData = 0,
+		uint8_t sealIndicatorCount = 0, bool *sealIndicator = 0
 	);
 
 	char *reqSetChunk(

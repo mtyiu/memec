@@ -49,6 +49,7 @@ private:
 	Chunk *freeChunks;
 	SlavePeerSocket **dataSlaveSockets;
 	SlavePeerSocket **paritySlaveSockets;
+	bool **sealIndicators;
 
 	static uint32_t dataChunkCount;
 	static uint32_t parityChunkCount;

@@ -1139,20 +1139,25 @@ force_reconstruct_chunks:
 				// Check whether the chunk is sealed or not
 				if ( ! chunkRequest.chunk ) {
 					chunkRequest.chunk = Coding::zeros;
+					chunkRequest.isSealed = false;
 				} else {
 					MixedChunkBuffer *chunkBuffer = SlaveWorker::chunkBuffer->at( listId );
 					int chunkBufferIndex = chunkBuffer->lockChunk( chunkRequest.chunk, true );
-					bool isSealed = ( chunkBufferIndex == -1 );
+					bool isSealed = ( chunkBufferIndex == -1 ), exists;
 					if ( isSealed ) {
 						// Find from backup
-						Chunk *backupChunk = SlaveWorker::getChunkBuffer->find( metadata, true, false );
-						if ( backupChunk ) {
-							chunkRequest.chunk = backupChunk;
+						uint8_t sealIndicatorCount;
+						bool *sealIndicator;
+						Chunk *backupChunk = SlaveWorker::getChunkBuffer->find( metadata, exists, sealIndicatorCount, sealIndicator, true, false );
+						if ( exists ) {
+							chunkRequest.chunk = backupChunk ? backupChunk : Coding::zeros;
 						}
 						SlaveWorker::getChunkBuffer->ack( metadata, false, true );
 						// chunkRequest.chunk = Coding::zeros;
+						chunkRequest.isSealed = true;
 					} else {
 						chunkRequest.chunk = Coding::zeros;
+						chunkRequest.isSealed = false;
 					}
 					chunkBuffer->unlock( chunkBufferIndex );
 				}

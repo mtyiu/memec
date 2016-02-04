@@ -95,7 +95,7 @@ char *SlaveProtocol::reqGetChunk( size_t &size, uint16_t instanceId, uint32_t re
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::resGetChunk( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t chunkSize, uint32_t chunkOffset, char *chunkData ) {
+char *SlaveProtocol::resGetChunk( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t chunkSize, uint32_t chunkOffset, char *chunkData, uint8_t sealIndicatorCount, bool *sealIndicator ) {
 	// -- common/protocol/normal_protocol.cc --
 	if ( success ) {
 		size = this->generateChunkDataHeader(
@@ -104,7 +104,8 @@ char *SlaveProtocol::resGetChunk( size_t &size, uint16_t instanceId, uint32_t re
 			PROTO_OPCODE_GET_CHUNK,
 			instanceId, requestId,
 			listId, stripeId, chunkId,
-			chunkSize, chunkOffset, chunkData
+			chunkSize, chunkOffset, chunkData,
+			sealIndicatorCount, sealIndicator
 		);
 	} else {
 		size = this->generateChunkHeader(
@@ -126,7 +127,8 @@ char *SlaveProtocol::reqSetChunk( size_t &size, uint16_t instanceId, uint32_t re
 		PROTO_OPCODE_SET_CHUNK,
 		instanceId, requestId,
 		listId, stripeId, chunkId,
-		chunkSize, chunkOffset, chunkData
+		chunkSize, chunkOffset, chunkData,
+		0, 0
 	);
 	return this->buffer.send;
 }

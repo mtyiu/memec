@@ -67,10 +67,10 @@ bool MixedChunkBuffer::reInsert( SlaveWorker *worker, Chunk *chunk, uint32_t siz
 	}
 }
 
-bool MixedChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t count, char *sealData, size_t sealDataSize, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk ) {
+bool MixedChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t count, char *sealData, size_t sealDataSize, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, Chunk *backupChunk, uint8_t *sealIndicatorCount, bool **sealIndicator ) {
 	switch( this->role ) {
 		case CBR_PARITY:
-			return this->buffer.parity->seal( stripeId, chunkId, count, sealData, sealDataSize, dataChunks, dataChunk, parityChunk );
+			return this->buffer.parity->seal( stripeId, chunkId, count, sealData, sealDataSize, dataChunks, dataChunk, parityChunk, backupChunk, sealIndicatorCount, sealIndicator );
 		case CBR_DATA:
 		default:
 			return false;
@@ -152,12 +152,27 @@ bool MixedChunkBuffer::updateKeyValue( char *keyStr, uint8_t keySize, uint32_t o
 	}
 }
 
-bool MixedChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, char *dataDelta, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, bool isDelete ) {
+bool MixedChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, char *dataDelta, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, bool isDelete, Chunk *backupChunk ) {
 	switch( this->role ) {
 		case CBR_PARITY:
-			return this->buffer.parity->update( stripeId, chunkId, offset, size, dataDelta, dataChunks, dataChunk, parityChunk, isDelete );
+			return this->buffer.parity->update(
+				stripeId, chunkId, offset,
+				size, dataDelta,
+				dataChunks, dataChunk, parityChunk,
+				isDelete, backupChunk
+			);
 		default:
 			return false;
+	}
+}
+
+bool *MixedChunkBuffer::getSealIndicator( uint32_t stripeId, uint8_t &sealIndicatorCount, bool needsLock, bool needsUnlock, LOCK_T **lock ) {
+	switch( this->role ) {
+		case CBR_PARITY:
+			return this->buffer.parity->getSealIndicator( stripeId, sealIndicatorCount, needsLock, needsUnlock, lock );
+		default:
+			sealIndicatorCount = 0;
+			return 0;
 	}
 }
 

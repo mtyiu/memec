@@ -36,7 +36,7 @@ public:
 	size_t seal( SlaveWorker *worker );
 	bool reInsert( SlaveWorker *worker, Chunk *chunk, uint32_t sizeToBeFreed, bool needsLock, bool needsUnlock );
 	// For ParityChunkBuffer only
-	bool seal( uint32_t stripeId, uint32_t chunkId, uint32_t count, char *sealData, size_t sealDataSize, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk );
+	bool seal( uint32_t stripeId, uint32_t chunkId, uint32_t count, char *sealData, size_t sealDataSize, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, Chunk *backupChunk, uint8_t *sealIndicatorCount, bool **sealIndicator );
 
 	inline uint32_t getChunkId() { return this->role == CBR_DATA ? this->buffer.data->getChunkId() : this->buffer.parity->getChunkId(); }
 
@@ -44,14 +44,16 @@ public:
 	void updateAndUnlockChunk( int index );
 	void unlock( int index = -1 );
 
-	bool findValueByKey( char *data, uint8_t size, KeyValue *keyValuePtr, Key *keyPtr = 0, bool verbose = true );
-	bool getKeyValueMap( std::unordered_map<Key, KeyValue> *&map, LOCK_T *&lock, bool verbose = true );
+	bool findValueByKey( char *data, uint8_t size, KeyValue *keyValuePtr, Key *keyPtr = 0, bool verbose = false );
+	bool getKeyValueMap( std::unordered_map<Key, KeyValue> *&map, LOCK_T *&lock, bool verbose = false );
 
 	bool deleteKey( char *keyStr, uint8_t keySize );
 
 	bool updateKeyValue( char *keyStr, uint8_t keySize, uint32_t offset, uint32_t length, char *valueUpdate );
 
-	bool update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, char *dataDelta, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, bool isDelete = false );
+	bool update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, char *dataDelta, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, bool isDelete = false, Chunk *backupChunk = 0 );
+
+	bool *getSealIndicator( uint32_t stripeId, uint8_t &sealIndicatorCount, bool needsLock, bool needsUnlock, LOCK_T **lock );
 
 	void print( FILE *f = stdout );
 	void stop();
