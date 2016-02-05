@@ -693,7 +693,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 							header.chunkData.sealIndicatorCount,
 							header.chunkData.sealIndicator
 						);
-						this->sealIndicators[ header.chunkData.chunkId - SlaveWorker::dataChunkCount ] = header.chunkData.sealIndicator;
+						this->sealIndicators[ header.chunkData.chunkId - SlaveWorker::dataChunkCount ] = tmp->second.sealIndicator;
 					}
 				}
 			} else {
@@ -706,6 +706,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 		} else if ( tmp->second.self ) {
 			// Do nothing
 			selfIt = tmp;
+			this->chunks[ tmp->second.chunkId ] = Coding::zeros;
 		} else if ( ! tmp->second.chunk ) {
 			// The chunk is not received yet
 			pending++;
@@ -722,15 +723,14 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 
 	if ( pending == 0 ) {
 		for ( uint32_t i = 0; i < SlaveWorker::dataChunkCount; i++ ) {
-			this->sealIndicators[ SlaveWorker::parityChunkCount + 1 ][ i ] = 0;
+			if ( ! this->chunks[ i ] ) { // To be reconstructed
+				this->sealIndicators[ SlaveWorker::parityChunkCount     ][ i ] = true;
+			}
+			this->sealIndicators[ SlaveWorker::parityChunkCount + 1 ][ i ] = false; // Reset
 		}
 		for ( uint32_t j = 0; j < SlaveWorker::parityChunkCount; j++ ) {
 			if ( this->chunks[ j + SlaveWorker::dataChunkCount ] && this->chunks[ j + SlaveWorker::dataChunkCount ] != Coding::zeros ) {
 				for ( uint32_t i = 0; i < SlaveWorker::dataChunkCount; i++ ) {
-					if ( ! this->chunks[ i ] ) { // To be reconstructed
-						this->sealIndicators[ j ][ i ] = false;
-					}
-
 					this->sealIndicators[ SlaveWorker::parityChunkCount + 1 ][ i ] |= this->sealIndicators[ j ][ i ];
 				}
 			}
@@ -746,8 +746,8 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 				continue;
 
 			if ( this->sealIndicators[ SlaveWorker::parityChunkCount ][ i ] != this->sealIndicators[ SlaveWorker::parityChunkCount + 1 ][ i ] ) {
-				__ERROR__(
-					"SlaveWorker", "handleGetChunkResponse",
+				__DEBUG__(
+					GREEN, "SlaveWorker", "handleGetChunkResponse",
 					"Need to retrieve the sealed data chunk (%u, %u, %u): %d vs %d.",
 					listId, stripeId, i,
 					this->sealIndicators[ SlaveWorker::parityChunkCount ][ i ],
@@ -811,7 +811,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 					// chunkRequest.chunk = Coding::zeros;
 					this->sealIndicators[ SlaveWorker::parityChunkCount ][ selfChunkId ] = true;
 				} else {
-					chunkRequest.chunk = Coding::zeros;
+					selfChunk = Coding::zeros;
 					this->sealIndicators[ SlaveWorker::parityChunkCount ][ selfChunkId ] = false;
 				}
 				chunkBuffer->unlock( chunkBufferIndex );
@@ -839,6 +839,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 		} else {
 			SlaveWorker::stripeList->get( listId, this->paritySlaveSockets, this->dataSlaveSockets );
 
+			/*
 			fprintf( stderr, "[GET_CHUNK] (%u, %u) - Inconsistent chunks received. Seal indicators:\n", listId, stripeId );
 			for ( uint32_t j = 0; j < SlaveWorker::parityChunkCount + 1; j++ ) {
 				if ( j == SlaveWorker::parityChunkCount || this->chunks[ j + SlaveWorker::dataChunkCount ] ) {
@@ -849,6 +850,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 					fprintf( stderr, "\n" );
 				}
 			}
+			*/
 
 			for ( uint32_t j = 0; j < SlaveWorker::parityChunkCount; j++ ) {
 				bool valid = true;
@@ -862,7 +864,8 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 				}
 
 				if ( ! valid ) {
-					uint32_t fixedDataCount = Coding::forceSeal(
+					// uint32_t fixedDataCount = Coding::forceSeal(
+					Coding::forceSeal(
 						SlaveWorker::coding,
 						this->chunks,
 						&( this->freeChunks[ 0 ] ),
@@ -871,16 +874,18 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 						SlaveWorker::parityChunkCount
 					);
 
+					/*
 					fprintf( stderr, "[GET_CHUNK] (%u, %u) - Inconsistent chunks fixed (data chunk count: %u). Seal indicators:\n", listId, stripeId, fixedDataCount );
 					for ( uint32_t j = 0; j < SlaveWorker::parityChunkCount + 1; j++ ) {
 						if ( j == SlaveWorker::parityChunkCount || this->chunks[ j + SlaveWorker::dataChunkCount ] ) {
-							fprintf( stderr, "\t#%u:", j );
+							fprintf( stderr, "\t#%u (0x%p):", j, this->sealIndicators[ j ] );
 							for ( uint32_t i = 0; i < SlaveWorker::dataChunkCount; i++ ) {
 								fprintf( stderr, " %d", this->sealIndicators[ j ][ i ] ? 1 : 0 );
 							}
 							fprintf( stderr, "\n" );
 						}
 					}
+					*/
 				}
 			}
 		}
@@ -952,6 +957,18 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 				}
 				printf( "\n" );
 				fflush( stdout );
+
+				fprintf( stderr, "Seal indicator for (%u, %u):\n", listId, stripeId );
+				for ( uint32_t j = 0; j < SlaveWorker::parityChunkCount + 1; j++ ) {
+					if ( j == SlaveWorker::parityChunkCount || this->chunks[ j + SlaveWorker::dataChunkCount ]->status == CHUNK_STATUS_FROM_GET_CHUNK ) {
+						fprintf( stderr, "\t#%u:", j );
+						for ( uint32_t i = 0; i < SlaveWorker::dataChunkCount; i++ ) {
+							fprintf( stderr, " %d", this->sealIndicators[ j ][ i ] ? 1 : 0 );
+						}
+						fprintf( stderr, "\n" );
+					}
+				}
+
 				// this->chunks[ i ]->clear();
 				// this->chunks[ i ]->status = CHUNK_STATUS_RECONSTRUCTED;
 				return true;
@@ -995,6 +1012,27 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 					// __ERROR__( "SlaveWorker", "handleGetChunkResponse", "dmap->deleteDegradedChunk() failed (%u, %u, %u).", op.listId, op.stripeId, op.chunkId );
 				}
 				metadata.set( op.listId, op.stripeId, op.chunkId );
+
+				// Forward chunk locally
+				for ( uint32_t i = 0; i < op.reconstructedCount; i++ ) {
+					SlavePeerSocket *s = SlaveWorker::stripeList->get( op.reconstructed[ i * 2 ], op.reconstructed[ i * 2 + 1 ] );
+
+					if ( ! this->chunks[ op.original[ i * 2 + 1 ] ]->getSize() )
+						continue; // No need to send
+
+					if ( s->self ) {
+						struct ChunkDataHeader chunkDataHeader;
+						chunkDataHeader.listId = metadata.listId;
+						chunkDataHeader.stripeId = metadata.stripeId;
+						chunkDataHeader.chunkId = op.original[ i * 2 + 1 ];
+						chunkDataHeader.size = this->chunks[ op.original[ i * 2 + 1 ] ]->getSize();
+						chunkDataHeader.offset = 0;
+						chunkDataHeader.data = this->chunks[ op.original[ i * 2 + 1 ] ]->getData();
+						chunkDataHeader.sealIndicatorCount = 0;
+						chunkDataHeader.sealIndicator = 0;
+						this->handleForwardChunkRequest( chunkDataHeader, false );
+					}
+				}
 
 				for ( int pidsIndex = 0, len = pids.size(); pidsIndex < len; pidsIndex++ ) {
 					if ( pidsIndex == 0 ) {
@@ -1138,8 +1176,10 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 
 						if ( isKeyValueFound )
 							event.resGet( op.socket, pid.parentInstanceId, pid.parentRequestId, keyValue, true );
-						else
+						else {
+							fprintf( stderr, "KEY NOT FOUND: %.*s\n", key.size, key.data );
 							event.resGet( op.socket, pid.parentInstanceId, pid.parentRequestId, key, true );
+						}
 						this->dispatch( event );
 						op.data.key.free();
 					} else if ( op.opcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
@@ -1249,6 +1289,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 								false, false, true
 							);
 							this->dispatch( event );
+							fprintf( stderr, "Before delete[] 0x%p: %.*s (data = 0x%p)\n", op.data.keyValueUpdate.ptr, key.size, key.data, op.data.keyValueUpdate.data );
 							op.data.keyValueUpdate.free();
 							delete[] ( ( char * ) op.data.keyValueUpdate.ptr );
 						}
@@ -1312,6 +1353,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 						continue; // No need to send
 
 					if ( s->self ) {
+						continue;
 						struct ChunkDataHeader chunkDataHeader;
 						chunkDataHeader.listId = metadata.listId;
 						chunkDataHeader.stripeId = metadata.stripeId;

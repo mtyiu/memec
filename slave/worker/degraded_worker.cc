@@ -252,6 +252,37 @@ bool SlaveWorker::handleDegradedUpdateRequest( MasterEvent event, struct Degrade
 	int index = -1;
 	bool reconstructParity, reconstructData, inProgress = false;
 
+	// Check whether the key is sealed
+	Chunk *chunk;
+	Metadata metadata;
+	if ( map->findValueByKey(
+			header.data.keyValueUpdate.key,
+			header.data.keyValueUpdate.keySize,
+			0, // &keyValue
+			0, // &key
+			0, // &keyMetadata
+			&metadata,
+			&chunk
+		)
+	) {
+		MixedChunkBuffer *chunkBuffer = SlaveWorker::chunkBuffer->at( metadata.listId );
+		int chunkBufferIndex = chunkBuffer->lockChunk( chunk, true );
+		if ( chunkBufferIndex != -1 ) {
+			// Not sealed
+			chunkBuffer->unlock( chunkBufferIndex );
+			return this->handleUpdateRequest(
+				event, header.data.keyValueUpdate,
+				header.original, header.reconstructed, header.reconstructedCount,
+				false, // reconstructParity
+				0,     // chunks
+				false, // endOfDegradedOp
+				true   // checkGetChunk
+			);
+		} else {
+			chunkBuffer->unlock( chunkBufferIndex );
+		}
+	}
+
 	this->getSlaves(
 		header.data.keyValueUpdate.key,
 		header.data.keyValueUpdate.keySize,
@@ -369,11 +400,9 @@ bool SlaveWorker::handleDegradedUpdateRequest( MasterEvent event, struct Degrade
 	KeyValue keyValue;
 	KeyValueUpdate keyValueUpdate;
 	KeyMetadata keyMetadata;
-	Metadata metadata;
 	bool ret = true;
 	DegradedMap *dmap = &SlaveWorker::degradedChunkBuffer->map;
 	bool isSealed, isKeyValueFound;
-	Chunk *chunk;
 
 	keyMetadata.offset = 0;
 

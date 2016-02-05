@@ -88,6 +88,7 @@ bool CoordinatorWorker::handleRemappingSetLockRequest( MasterEvent event, char *
 		originalListId, -1 /* stripeId */, originalChunkId,
 		PROTO_OPCODE_REMAPPING_LOCK, 0 /* timestamp */,
 		true, true )
+		|| true /***** HACK FOR YCSB which sends duplicated keys for SET *****/
 	) {
 		RemappingRecord remappingRecord;
 		if ( header.remappedCount )
