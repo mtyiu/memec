@@ -124,7 +124,7 @@ bool ParityChunkBuffer::set( char *keyStr, uint8_t keySize, char *valueStr, uint
 	return true;
 }
 
-bool ParityChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t count, char *sealData, size_t sealDataSize, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, Chunk *backupChunk, uint8_t *sealIndicatorCount, bool **sealIndicator ) {
+bool ParityChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t count, char *sealData, size_t sealDataSize, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk ) {
 	bool ret = true;
 	char *data = dataChunk->getData();
 	dataChunk->clear();
@@ -209,9 +209,7 @@ bool ParityChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t coun
 		0, curPos,
 		dataChunks, dataChunk, parityChunk,
 		false, false,
-		true, false,
-		backupChunk,
-		sealIndicatorCount, sealIndicator
+		true, false
 	);
 	UNLOCK( &this->lock );
 
@@ -318,7 +316,7 @@ bool ParityChunkBuffer::updateKeyValue( char *keyStr, uint8_t keySize, uint32_t 
 	return true;
 }
 
-bool ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, bool needsLock, bool needsUnlock, bool isSeal, bool isDelete, Chunk *backupChunk, uint8_t *sealIndicatorCount, bool **sealIndicator ) {
+bool ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, bool needsLock, bool needsUnlock, bool isSeal, bool isDelete ) {
 	// Prepare the stripe
 	for ( uint32_t i = 0; i < ChunkBuffer::dataChunkCount; i++ )
 		dataChunks[ i ] = Coding::zeros;
@@ -353,23 +351,13 @@ bool ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t of
 		wrapper.pending[ chunkId ] = true;
 	}
 
-	if ( backupChunk )
-		backupChunk->copy( wrapper.chunk );
-	if ( sealIndicatorCount && sealIndicator ) {
-		*sealIndicatorCount = ChunkBuffer::dataChunkCount;
-		*sealIndicator = new bool[ ChunkBuffer::dataChunkCount ];
-		for ( uint32_t i = 0; i < ChunkBuffer::dataChunkCount; i++ ) {
-			( *sealIndicator )[ i ] = ( ! wrapper.pending[ i ] );
-		}
-	}
-
 	UNLOCK( &wrapper.lock );
 	if ( needsUnlock ) UNLOCK( &this->lock );
 
 	return true;
 }
 
-bool ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, char *dataDelta, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, bool isDelete, Chunk *backupChunk, uint8_t *sealIndicatorCount, bool **sealIndicator ) {
+bool ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, char *dataDelta, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, bool isDelete ) {
 	// Prepare data delta
 	dataChunk->clear();
 	dataChunk->setSize( offset + size );
@@ -381,9 +369,7 @@ bool ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t of
 		true,     // needsLock
 		true,     // needsUnlock
 		false,    // isSeal
-		isDelete, // isDelete
-		backupChunk,
-		sealIndicatorCount, sealIndicator
+		isDelete  // isDelete
 	);
 }
 

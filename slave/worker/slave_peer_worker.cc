@@ -356,9 +356,6 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				event.message.chunk.sealIndicator
 			);
 
-			if ( event.message.chunk.sealIndicatorCount )
-				delete[] event.message.chunk.sealIndicator;
-
 			SlaveWorker::chunkBuffer
 				->at( event.message.chunk.metadata.listId )
 				->unlock( event.message.chunk.chunkBufferIndex );

@@ -119,6 +119,7 @@ void SlaveWorker::free() {
 	delete[] this->chunks;
 
 	delete[] this->sealIndicators[ SlaveWorker::parityChunkCount ];
+	delete[] this->sealIndicators[ SlaveWorker::parityChunkCount + 1 ];
 	delete[] this->sealIndicators;
 
 	this->forward.dataChunk->free();
@@ -269,8 +270,9 @@ bool SlaveWorker::init( GlobalConfig &globalConfig, SlaveConfig &slaveConfig, Wo
 	this->forward.dataChunk->init();
 	this->forward.parityChunk->init();
 
-	this->sealIndicators = new bool*[ SlaveWorker::parityChunkCount + 1 ];
+	this->sealIndicators = new bool*[ SlaveWorker::parityChunkCount + 2 ];
 	this->sealIndicators[ SlaveWorker::parityChunkCount ] = new bool[ SlaveWorker::dataChunkCount ];
+	this->sealIndicators[ SlaveWorker::parityChunkCount + 1 ] = new bool[ SlaveWorker::dataChunkCount ];
 
 	this->dataSlaveSockets = new SlavePeerSocket*[ SlaveWorker::dataChunkCount ];
 	this->paritySlaveSockets = new SlavePeerSocket*[ SlaveWorker::parityChunkCount ];

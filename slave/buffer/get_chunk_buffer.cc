@@ -27,36 +27,9 @@ GetChunkBuffer::~GetChunkBuffer() {
 	UNLOCK( &this->lock );
 }
 
-// bool GetChunkBuffer::insert( Metadata metadata, Chunk *chunk, bool needsLock, bool needsUnlock ) {
-// 	bool ret = true;
-// 	std::unordered_map<Metadata, GetChunkWrapper>::iterator it;
-//
-// 	if ( needsLock ) LOCK( &this->lock );
-// 	it = this->chunks.find( metadata );
-// 	if ( it == this->chunks.end() ) {
-// 		// Copy the chunk
-// 		Chunk *newChunk;
-//
-// 		if ( chunk ) {
-// 			newChunk = GetChunkBuffer::chunkPool->malloc();
-// 			newChunk->copy( chunk );
-// 		} else {
-// 			newChunk = 0;
-// 		}
-//
-// 		GetChunkWrapper wrapper;
-// 		wrapper.chunk = newChunk;
-//
-// 		std::pair<Metadata, GetChunkWrapper> p( metadata, wrapper );
-// 		this->chunks.insert( p );
-// 	} else {
-// 		// Do nothing
-// 	}
-// 	if ( needsUnlock ) UNLOCK( &this->lock );
-// 	return ret;
-// }
-
 bool GetChunkBuffer::insert( Metadata metadata, Chunk *chunk, uint8_t sealIndicatorCount, bool *sealIndicator, bool needsLock, bool needsUnlock ) {
+	if ( ! chunk )
+		return false;
 	bool ret = true;
 	std::unordered_map<Metadata, GetChunkWrapper>::iterator it;
 
@@ -81,10 +54,13 @@ bool GetChunkBuffer::insert( Metadata metadata, Chunk *chunk, uint8_t sealIndica
 		std::pair<Metadata, GetChunkWrapper> p( metadata, wrapper );
 		this->chunks.insert( p );
 	} else {
-		// Do nothing
-		if ( ! it->second.chunk )
-			it->second.chunk = GetChunkBuffer::chunkPool->malloc();
-		it->second.chunk->copy( chunk );
+		if ( chunk ) {
+			if ( ! it->second.chunk )
+				it->second.chunk = GetChunkBuffer::chunkPool->malloc();
+			it->second.chunk->copy( chunk );
+		} else {
+			it->second.chunk = 0;
+		}
 		it->second.sealIndicatorCount = sealIndicatorCount;
 		it->second.sealIndicator = sealIndicator;
 	}
@@ -111,7 +87,7 @@ Chunk *GetChunkBuffer::find( Metadata metadata, bool &exists, uint8_t &sealIndic
 	return ret;
 }
 
-bool GetChunkBuffer::ack( Metadata metadata, bool needsLock, bool needsUnlock ) {
+bool GetChunkBuffer::ack( Metadata metadata, bool needsLock, bool needsUnlock, bool needsFree ) {
 	bool ret = true;
 	std::unordered_map<Metadata, GetChunkWrapper>::iterator it;
 
@@ -120,13 +96,17 @@ bool GetChunkBuffer::ack( Metadata metadata, bool needsLock, bool needsUnlock ) 
 	if ( it == this->chunks.end() ) {
 		GetChunkWrapper wrapper;
 		wrapper.chunk = 0;
+		wrapper.sealIndicator = 0;
+		wrapper.sealIndicatorCount = 0;
 		std::pair<Metadata, GetChunkWrapper> p( metadata, wrapper );
 		this->chunks.insert( p );
 	} else {
-		if ( it->second.chunk )
-			GetChunkBuffer::chunkPool->free( it->second.chunk );
-		if ( it->second.sealIndicator )
-			delete[] it->second.sealIndicator;
+		if ( needsFree ) {
+			if ( it->second.chunk )
+				GetChunkBuffer::chunkPool->free( it->second.chunk );
+			if ( it->second.sealIndicator )
+				delete[] it->second.sealIndicator;
+		}
 		it->second.chunk = 0;
 		it->second.sealIndicator = 0;
 		it->second.sealIndicatorCount = 0;

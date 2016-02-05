@@ -134,12 +134,16 @@ void Chunk::swap( Chunk *c ) {
 }
 
 void Chunk::copy( Chunk *c ) {
+	uint32_t size = c->getSize();
+
 	this->status = c->status;
 	this->count = c->count;
 	this->size = c->size;
 	this->metadata = c->metadata;
 	this->isParity = c->isParity;
-	memcpy( this->data, c->getData(), c->getSize() );
+	memcpy( this->data, c->getData(), size );
+	if ( size < Chunk::capacity )
+		memset( this->data + size, 0, Chunk::capacity - size );
 }
 
 char *Chunk::alloc( uint32_t size, uint32_t &offset ) {

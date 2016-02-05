@@ -1,3 +1,4 @@
+#include <cassert>
 #include "coding.hh"
 #include "all_coding.hh"
 #include "../util/debug.hh"
@@ -117,4 +118,72 @@ Chunk *Coding::bitwiseXOR( Chunk *dst, Chunk *srcA, Chunk *srcB, uint32_t size )
 	);
 	dst->setSize( size > dst->getSize() ? size : dst->getSize() );
 	return dst;
+}
+
+uint32_t Coding::forceSeal( Coding *coding, Chunk **chunks, Chunk *tmpParityChunk, bool **sealIndicator, uint32_t dataChunkCount, uint32_t parityChunkCount ) {
+	Chunk **tmpChunks = new Chunk *[ dataChunkCount ];
+	bool *trueSealIndicator = sealIndicator[ parityChunkCount ];
+	uint32_t fixedDataCount = 0;
+
+	// Follow the seal indicators of the parity chunks
+
+	for ( uint32_t j = 0; j < dataChunkCount; j++ ) {
+		uint32_t count = 0, total = 0;
+		char indicator = -1;
+		for ( uint32_t i = 0; i < parityChunkCount; i++ ) {
+			if ( ! chunks[ i + dataChunkCount ] )
+				continue;
+			total++;
+			if ( sealIndicator[ i ][ j ] )
+				count++;
+			indicator = sealIndicator[ i ][ j ];
+		}
+		if ( count == 0 || count == total ) {
+			// All parity chunk is consistent in terms of the seal indicator of data chunk #j
+			if ( indicator != trueSealIndicator[ j ] ) {
+				assert( trueSealIndicator[ j ] );
+				// Remove the j-th entry from chunks
+				chunks[ j ] = Coding::zeros;
+				trueSealIndicator[ j ] = false;
+			}
+		}
+	}
+
+	// Follow the seal indicators of GET_CHUNK
+	for ( uint32_t i = 0; i < parityChunkCount; i++ ) {
+		if ( ! chunks[ i + dataChunkCount ] )
+			continue;
+		for ( uint32_t j = 0; j < dataChunkCount; j++ ) {
+			if ( sealIndicator[ i ][ j ] != trueSealIndicator[ j ] ) {
+				assert( trueSealIndicator[ j ] );
+
+				// Seal the i-th parity chunk with the j-th data chunk
+				for ( uint32_t k = 0; k < dataChunkCount; k++ ) {
+					tmpChunks[ k ] = ( k == j ) ? chunks[ j ] : Coding::zeros;
+				}
+
+				tmpParityChunk->clear();
+
+				coding->encode(
+					tmpChunks, tmpParityChunk, i,
+					0, Chunk::capacity
+				);
+
+				char *parity = chunks[ i + dataChunkCount ]->getData();
+				Coding::bitwiseXOR(
+					parity,
+					parity,
+					tmpParityChunk->getData(),
+					Chunk::capacity
+				);
+				sealIndicator[ i ][ j ] = true;
+
+				fixedDataCount++;
+			}
+		}
+	}
+
+	delete[] tmpChunks;
+
+	return fixedDataCount;
 }

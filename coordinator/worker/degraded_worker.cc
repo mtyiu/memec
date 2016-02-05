@@ -135,7 +135,26 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 				}
 				header.reconstructedCount--;
 			} else {
-				i++;
+				// Ignore unsealed chunks
+				Metadata tmpMetadata;
+				tmpMetadata.set(
+					srcMetadata.listId,
+					srcMetadata.stripeId,
+					header.original[ i * 2 + 1 ]
+				);
+
+				if ( ! map->isSealed( tmpMetadata ) && ongoingAtChunk != header.original[ i * 2 + 1 ] ) {
+					// fprintf( stderr, "Skip reconstructing (%u, %u, %u)\n", tmpMetadata.listId, tmpMetadata.stripeId, tmpMetadata.chunkId );
+					for ( uint32_t j = i; j < header.reconstructedCount - 1; j++ ) {
+						header.original[ j * 2     ] = header.original[ ( j + 1 ) * 2     ];
+						header.original[ j * 2 + 1 ] = header.original[ ( j + 1 ) * 2 + 1 ];
+						header.reconstructed[ j * 2     ] = header.reconstructed[ ( j + 1 ) * 2     ];
+						header.reconstructed[ j * 2 + 1 ] = header.reconstructed[ ( j + 1 ) * 2 + 1 ];
+					}
+					header.reconstructedCount--;
+				} else {
+					i++;
+				}
 			}
 		}
 		/*
@@ -153,45 +172,53 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 			}
 		}
 		*/
-		for ( uint32_t i = 0; i < header.reconstructedCount; i++ ) {
-			if ( ongoingAtChunk == header.original[ i * 2 + 1 ] ) {
-				ongoingAtChunk = header.reconstructed[ i * 2 + 1 ];
-				break;
-			}
-		}
 
-		map->insertDegradedLock(
-			srcMetadata.listId, srcMetadata.stripeId,
-			header.original, header.reconstructed, header.reconstructedCount,
-			ongoingAtChunk,
-			numSurvivingChunkIds,
-			this->survivingChunkIds,
-			CoordinatorWorker::chunkCount,
-			false, false
-		);
-		ret = map->findDegradedLock( srcMetadata.listId, srcMetadata.stripeId, degradedLock, false, false );
-
-		if ( ret ) {
-			event.resDegradedLock(
-				event.socket, event.instanceId, event.requestId, key,
-				true, // isLocked
-				map->isSealed( srcMetadata ), // the chunk is sealed
-				srcMetadata.stripeId,
-				srcMetadata.chunkId,
-				CoordinatorWorker::dataChunkCount,
-				degradedLock.original,
-				degradedLock.reconstructed,
-				degradedLock.reconstructedCount,
-				degradedLock.ongoingAtChunk,
-				numSurvivingChunkIds,
-				this->survivingChunkIds
-			);
-		} else {
-			// Cannot lock
+		if ( ! header.reconstructedCount ) {
 			event.resDegradedLock(
 				event.socket, event.instanceId, event.requestId,
 				key, true
 			);
+		} else {
+			for ( uint32_t i = 0; i < header.reconstructedCount; i++ ) {
+				if ( ongoingAtChunk == header.original[ i * 2 + 1 ] ) {
+					ongoingAtChunk = header.reconstructed[ i * 2 + 1 ];
+					break;
+				}
+			}
+
+			map->insertDegradedLock(
+				srcMetadata.listId, srcMetadata.stripeId,
+				header.original, header.reconstructed, header.reconstructedCount,
+				ongoingAtChunk,
+				numSurvivingChunkIds,
+				this->survivingChunkIds,
+				CoordinatorWorker::chunkCount,
+				false, false
+			);
+			ret = map->findDegradedLock( srcMetadata.listId, srcMetadata.stripeId, degradedLock, false, false );
+
+			if ( ret ) {
+				event.resDegradedLock(
+					event.socket, event.instanceId, event.requestId, key,
+					true, // isLocked
+					map->isSealed( srcMetadata ), // the chunk is sealed
+					srcMetadata.stripeId,
+					srcMetadata.chunkId,
+					CoordinatorWorker::dataChunkCount,
+					degradedLock.original,
+					degradedLock.reconstructed,
+					degradedLock.reconstructedCount,
+					degradedLock.ongoingAtChunk,
+					numSurvivingChunkIds,
+					this->survivingChunkIds
+				);
+			} else {
+				// Cannot lock
+				event.resDegradedLock(
+					event.socket, event.instanceId, event.requestId,
+					key, true
+				);
+			}
 		}
 	}
 	this->dispatch( event );

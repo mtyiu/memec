@@ -43,10 +43,11 @@ public:
 	mutable Chunk *chunk;
 	bool isDegraded;
 	bool isSealed;
+	bool self;
 	uint8_t sealIndicatorCount;
 	bool *sealIndicator;
 
-	void set( uint32_t listId, uint32_t stripeId, uint32_t chunkId, SlavePeerSocket *socket, Chunk *chunk = 0, bool isDegraded = true ) {
+	void set( uint32_t listId, uint32_t stripeId, uint32_t chunkId, SlavePeerSocket *socket, Chunk *chunk = 0, bool isDegraded = true, bool self = false ) {
 		this->listId = listId;
 		this->stripeId = stripeId;
 		this->chunkId = chunkId;
@@ -56,6 +57,7 @@ public:
 		this->isSealed = false;
 		this->sealIndicatorCount = 0;
 		this->sealIndicator = 0;
+		this->self = self;
 	}
 
 	void setSealStatus( bool isSealed, uint8_t sealIndicatorCount, bool *sealIndicator ) {

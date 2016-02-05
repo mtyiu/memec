@@ -27,7 +27,7 @@ public:
 	// bool insert( Metadata metadata, Chunk *chunk, bool needsLock = true, bool needsUnlock = true );
 	bool insert( Metadata metadata, Chunk *chunk, uint8_t sealIndicatorCount = 0, bool *sealIndicator = 0, bool needsLock = true, bool needsUnlock = true );
 	Chunk *find( Metadata metadata, bool &exists, uint8_t &sealIndicatorCount, bool *&sealIndicator, bool needsLock = true, bool needsUnlock = true );
-	bool ack( Metadata metadata, bool needsLock = true, bool needsUnlock = true );
+	bool ack( Metadata metadata, bool needsLock = true, bool needsUnlock = true, bool needsFree = true );
 	bool erase( Metadata metadata, bool needsLock = true, bool needsUnlock = true );
 	void unlock();
 };

@@ -67,10 +67,10 @@ bool MixedChunkBuffer::reInsert( SlaveWorker *worker, Chunk *chunk, uint32_t siz
 	}
 }
 
-bool MixedChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t count, char *sealData, size_t sealDataSize, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, Chunk *backupChunk, uint8_t *sealIndicatorCount, bool **sealIndicator ) {
+bool MixedChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t count, char *sealData, size_t sealDataSize, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk ) {
 	switch( this->role ) {
 		case CBR_PARITY:
-			return this->buffer.parity->seal( stripeId, chunkId, count, sealData, sealDataSize, dataChunks, dataChunk, parityChunk, backupChunk, sealIndicatorCount, sealIndicator );
+			return this->buffer.parity->seal( stripeId, chunkId, count, sealData, sealDataSize, dataChunks, dataChunk, parityChunk );
 		case CBR_DATA:
 		default:
 			return false;
@@ -152,14 +152,14 @@ bool MixedChunkBuffer::updateKeyValue( char *keyStr, uint8_t keySize, uint32_t o
 	}
 }
 
-bool MixedChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, char *dataDelta, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, bool isDelete, Chunk *backupChunk ) {
+bool MixedChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, char *dataDelta, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, bool isDelete ) {
 	switch( this->role ) {
 		case CBR_PARITY:
 			return this->buffer.parity->update(
 				stripeId, chunkId, offset,
 				size, dataDelta,
 				dataChunks, dataChunk, parityChunk,
-				isDelete, backupChunk
+				isDelete
 			);
 		default:
 			return false;

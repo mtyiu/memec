@@ -1135,6 +1135,8 @@ force_reconstruct_chunks:
 			chunkRequest.set( listId, stripeId, i, socket, 0, true );
 			// printf( "(%u, %u, %u) ", listId, stripeId, i );
 			if ( socket->self ) {
+				chunkRequest.self = true;
+				/*
 				chunkRequest.chunk = SlaveWorker::map->findChunkById( listId, stripeId, i );
 				// Check whether the chunk is sealed or not
 				if ( ! chunkRequest.chunk ) {
@@ -1152,7 +1154,7 @@ force_reconstruct_chunks:
 						if ( exists ) {
 							chunkRequest.chunk = backupChunk ? backupChunk : Coding::zeros;
 						}
-						SlaveWorker::getChunkBuffer->ack( metadata, false, true );
+						SlaveWorker::getChunkBuffer->ack( metadata, false, true, false );
 						// chunkRequest.chunk = Coding::zeros;
 						chunkRequest.isSealed = true;
 					} else {
@@ -1161,18 +1163,14 @@ force_reconstruct_chunks:
 					}
 					chunkBuffer->unlock( chunkBufferIndex );
 				}
-
-				if ( ! SlaveWorker::pending->insertChunkRequest( PT_SLAVE_PEER_GET_CHUNK, instanceId, parentInstanceId, requestId, parentRequestId, socket, chunkRequest ) ) {
-					__ERROR__( "SlaveWorker", "performDegradedRead", "Cannot insert into slave CHUNK_REQUEST pending map." );
-				}
+				*/
 			} else if ( socket->ready() ) {
 				chunkRequest.chunk = 0;
-
-				if ( ! SlaveWorker::pending->insertChunkRequest( PT_SLAVE_PEER_GET_CHUNK, instanceId, parentInstanceId, requestId, parentRequestId, socket, chunkRequest ) ) {
-					__ERROR__( "SlaveWorker", "performDegradedRead", "Cannot insert into slave CHUNK_REQUEST pending map." );
-				}
 			} else {
 				continue;
+			}
+			if ( ! SlaveWorker::pending->insertChunkRequest( PT_SLAVE_PEER_GET_CHUNK, instanceId, parentInstanceId, requestId, parentRequestId, socket, chunkRequest ) ) {
+				__ERROR__( "SlaveWorker", "performDegradedRead", "Cannot insert into slave CHUNK_REQUEST pending map." );
 			}
 			selected++;
 		}
