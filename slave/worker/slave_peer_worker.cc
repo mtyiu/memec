@@ -356,9 +356,9 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				event.message.chunk.sealIndicator
 			);
 
-			SlaveWorker::chunkBuffer
-				->at( event.message.chunk.metadata.listId )
-				->unlock( event.message.chunk.chunkBufferIndex );
+			// SlaveWorker::chunkBuffer
+			// 	->at( event.message.chunk.metadata.listId )
+			// 	->unlock( event.message.chunk.chunkBufferIndex );
 		}
 			break;
 		case SLAVE_PEER_EVENT_TYPE_GET_CHUNK_RESPONSE_FAILURE:

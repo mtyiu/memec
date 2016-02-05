@@ -362,8 +362,9 @@ bool SlaveWorker::handleGetChunkRequest( SlavePeerEvent event, struct ChunkHeade
 		delete[] sealIndicator;
 		sealIndicator = _sealIndicator;
 		sealIndicatorCount = _sealIndicatorCount;
-		if ( parityChunkBufferLock )
-			UNLOCK( parityChunkBufferLock );
+		// if ( parityChunkBufferLock )
+		// 	UNLOCK( parityChunkBufferLock );
+		// parityChunkBufferLock = 0;
 		chunk = backupChunk;
 	}
 
@@ -415,10 +416,12 @@ bool SlaveWorker::handleGetChunkRequest( SlavePeerEvent event, struct ChunkHeade
 	// ACK GET_CHUNK
 	if ( isSealed )
 		SlaveWorker::getChunkBuffer->ack( metadata, false, true );
-	// Unlock in the dispatcher
-	// chunkBuffer->unlock( chunkBufferIndex );
-	if ( parityChunkBufferLock && ! exists )
+	else
+		SlaveWorker::getChunkBuffer->unlock();
+	if ( parityChunkBufferLock )
 		UNLOCK( parityChunkBufferLock );
+	// Unlock in the dispatcher
+	chunkBuffer->unlock( chunkBufferIndex );
 
 	return ret;
 }
