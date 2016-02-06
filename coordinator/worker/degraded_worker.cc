@@ -30,6 +30,12 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 		return false;
 	}
 
+	__INFO__(
+		BLUE, "CoordinatorWorker", "handleDegradedLockRequest",
+		"[DEGRADED_LOCK] Key: %.*s (key size = %u).",
+		( int ) header.keySize, header.key, header.keySize
+	);
+
 	// Find the SlaveSocket which stores the stripe with listId and srcDataChunkId
 	SlaveSocket *socket;
 	uint32_t ongoingAtChunk;
@@ -63,42 +69,8 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 			key, true
 		);
 		ret = false;
-	} else if ( map->findDegradedLock( srcMetadata.listId, srcMetadata.stripeId, degradedLock, true, false, &lock ) ) {
-		map->expandDegradedLock(
-			srcMetadata.listId, srcMetadata.stripeId,
-			header.original, header.reconstructed, header.reconstructedCount,
-			ongoingAtChunk,
-			numSurvivingChunkIds,
-			this->survivingChunkIds,
-			CoordinatorWorker::chunkCount,
-			degradedLock,
-			false, false
-		);
-
-		// The chunk is already locked
-		event.resDegradedLock(
-			event.socket, event.instanceId, event.requestId, key,
-			false, // isLocked
-			map->isSealed( srcMetadata ), // the chunk is sealed
-			srcMetadata.stripeId,
-			srcMetadata.chunkId,
-			CoordinatorWorker::dataChunkCount,
-			degradedLock.original,
-			degradedLock.reconstructed,
-			degradedLock.reconstructedCount,
-			degradedLock.ongoingAtChunk,
-			numSurvivingChunkIds,
-			this->survivingChunkIds
-		);
-	} else if ( ! header.reconstructedCount ) {
-		// No need to lock
-		event.resDegradedLock(
-			event.socket, event.instanceId, event.requestId,
-			key, true
-		);
 	} else {
 		// Check whether the "failed" servers are in intermediate or degraded state
-		// bool isPrinted = false;
 		for ( uint32_t i = 0; i < header.reconstructedCount; ) {
 			SlaveSocket *s = CoordinatorWorker::stripeList->get(
 				header.original[ i * 2    ],
@@ -106,27 +78,6 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 			);
 			struct sockaddr_in addr = s->getAddr();
 			if ( ! crmh->allowRemapping( addr ) ) {
-				/*
-				if ( ! isPrinted ) {
-					for ( uint32_t i = 0; i < header.reconstructedCount; i++ ) {
-						printf(
-							"%s(%u, %u) |-> (%u, %u)%s",
-							i == 0 ? "Original: " : "; ",
-							header.original[ i * 2     ],
-							header.original[ i * 2 + 1 ],
-							header.reconstructed[ i * 2     ],
-							header.reconstructed[ i * 2 + 1 ],
-							i == header.reconstructedCount - 1 ? " || " : ""
-						);
-					}
-					isPrinted = true;
-				}
-				printf(
-					"** Not in intermediate or degraded state: (%u, %u) **",
-					header.original[ i * 2    ],
-					header.original[ i * 2 + 1 ]
-				);
-				*/
 				for ( uint32_t j = i; j < header.reconstructedCount - 1; j++ ) {
 					header.original[ j * 2     ] = header.original[ ( j + 1 ) * 2     ];
 					header.original[ j * 2 + 1 ] = header.original[ ( j + 1 ) * 2 + 1 ];
@@ -134,7 +85,7 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 					header.reconstructed[ j * 2 + 1 ] = header.reconstructed[ ( j + 1 ) * 2 + 1 ];
 				}
 				header.reconstructedCount--;
-			} else {
+			} else if ( header.original[ i * 2 + 1 ] < CoordinatorWorker::dataChunkCount ) {
 				// Ignore unsealed chunks
 				Metadata tmpMetadata;
 				tmpMetadata.set(
@@ -155,69 +106,108 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 				} else {
 					i++;
 				}
+			} else {
+				i++;
 			}
 		}
-		/*
-		if ( isPrinted ) {
-			for ( uint32_t i = 0; i < header.reconstructedCount; i++ ) {
-				printf(
-					"%s(%u, %u) |-> (%u, %u)%s",
-					i == 0 ? "Modified: " : "; ",
-					header.original[ i * 2     ],
-					header.original[ i * 2 + 1 ],
-					header.reconstructed[ i * 2     ],
-					header.reconstructed[ i * 2 + 1 ],
-					i == header.reconstructedCount - 1 ? "\n" : ""
-				);
-			}
-		}
-		*/
 
-		if ( ! header.reconstructedCount ) {
-			event.resDegradedLock(
-				event.socket, event.instanceId, event.requestId,
-				key, true
-			);
-		} else {
-			for ( uint32_t i = 0; i < header.reconstructedCount; i++ ) {
-				if ( ongoingAtChunk == header.original[ i * 2 + 1 ] ) {
-					ongoingAtChunk = header.reconstructed[ i * 2 + 1 ];
-					break;
-				}
-			}
-
-			map->insertDegradedLock(
+		if ( map->findDegradedLock( srcMetadata.listId, srcMetadata.stripeId, degradedLock, true, false, &lock ) ) {
+			map->expandDegradedLock(
 				srcMetadata.listId, srcMetadata.stripeId,
 				header.original, header.reconstructed, header.reconstructedCount,
 				ongoingAtChunk,
 				numSurvivingChunkIds,
 				this->survivingChunkIds,
 				CoordinatorWorker::chunkCount,
+				degradedLock,
 				false, false
 			);
-			ret = map->findDegradedLock( srcMetadata.listId, srcMetadata.stripeId, degradedLock, false, false );
 
-			if ( ret ) {
-				event.resDegradedLock(
-					event.socket, event.instanceId, event.requestId, key,
-					true, // isLocked
-					map->isSealed( srcMetadata ), // the chunk is sealed
-					srcMetadata.stripeId,
-					srcMetadata.chunkId,
-					CoordinatorWorker::dataChunkCount,
-					degradedLock.original,
-					degradedLock.reconstructed,
-					degradedLock.reconstructedCount,
-					degradedLock.ongoingAtChunk,
-					numSurvivingChunkIds,
-					this->survivingChunkIds
-				);
-			} else {
-				// Cannot lock
+			// The chunk is already locked
+			event.resDegradedLock(
+				event.socket, event.instanceId, event.requestId, key,
+				false, // isLocked
+				map->isSealed( srcMetadata ), // the chunk is sealed
+				srcMetadata.stripeId,
+				srcMetadata.chunkId,
+				CoordinatorWorker::dataChunkCount,
+				degradedLock.original,
+				degradedLock.reconstructed,
+				degradedLock.reconstructedCount,
+				degradedLock.ongoingAtChunk,
+				numSurvivingChunkIds,
+				this->survivingChunkIds
+			);
+		} else if ( ! header.reconstructedCount ) {
+			// No need to lock
+			event.resDegradedLock(
+				event.socket, event.instanceId, event.requestId,
+				key, true
+			);
+		} else {
+			/*
+			bool isPrinted = false;
+			if ( isPrinted ) {
+				for ( uint32_t i = 0; i < header.reconstructedCount; i++ ) {
+					printf(
+						"%s(%u, %u) |-> (%u, %u)%s",
+						i == 0 ? "Modified: " : "; ",
+						header.original[ i * 2     ],
+						header.original[ i * 2 + 1 ],
+						header.reconstructed[ i * 2     ],
+						header.reconstructed[ i * 2 + 1 ],
+						i == header.reconstructedCount - 1 ? "\n" : ""
+					);
+				}
+			}
+			*/
+
+			if ( ! header.reconstructedCount ) {
 				event.resDegradedLock(
 					event.socket, event.instanceId, event.requestId,
 					key, true
 				);
+			} else {
+				for ( uint32_t i = 0; i < header.reconstructedCount; i++ ) {
+					if ( ongoingAtChunk == header.original[ i * 2 + 1 ] ) {
+						ongoingAtChunk = header.reconstructed[ i * 2 + 1 ];
+						break;
+					}
+				}
+
+				map->insertDegradedLock(
+					srcMetadata.listId, srcMetadata.stripeId,
+					header.original, header.reconstructed, header.reconstructedCount,
+					ongoingAtChunk,
+					numSurvivingChunkIds,
+					this->survivingChunkIds,
+					CoordinatorWorker::chunkCount,
+					false, false
+				);
+				ret = map->findDegradedLock( srcMetadata.listId, srcMetadata.stripeId, degradedLock, false, false );
+
+				if ( ret ) {
+					event.resDegradedLock(
+						event.socket, event.instanceId, event.requestId, key,
+						true, // isLocked
+						map->isSealed( srcMetadata ), // the chunk is sealed
+						srcMetadata.stripeId,
+						srcMetadata.chunkId,
+						CoordinatorWorker::dataChunkCount,
+						degradedLock.original,
+						degradedLock.reconstructed,
+						degradedLock.reconstructedCount,
+						degradedLock.ongoingAtChunk,
+						numSurvivingChunkIds,
+						this->survivingChunkIds
+					);
+				} else {
+					// Cannot lock
+					event.resDegradedLock(
+						event.socket, event.instanceId, event.requestId,
+						key, true
+					);
+				}
 			}
 		}
 	}

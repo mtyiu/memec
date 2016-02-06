@@ -279,7 +279,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 
 	// Send request
 	if ( Master::getInstance()->isDegraded( socket ) ) {
-		printf( "ERROR Sending to failed slave socket (opcode = %u)!\n", degradedLockData.opcode );
+		printf( "ERROR Sending to failed slave socket (opcode = %u, key = %.*s)!\n", degradedLockData.opcode, header.keySize, header.key );
 		switch ( header.type ) {
 			case PROTO_DEGRADED_LOCK_RES_IS_LOCKED:
 				printf( "PROTO_DEGRADED_LOCK_RES_IS_LOCKED\n" );

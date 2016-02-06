@@ -472,20 +472,21 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, bool isSealed, ch
 	bool notifyCoordinator = false;
 	CoordinatorEvent coordinatorEvent;
 
+	chunk = SlaveWorker::map->findChunkById(
+		metadata.listId, metadata.stripeId, metadata.chunkId, 0,
+		true, // needsLock
+		true // needsUnlock
+	);
+
 	SlaveWorker::map->getKeysMap( keys, keysLock );
 	SlaveWorker::map->getCacheMap( cache, cacheLock );
 
-	LOCK( keysLock );
-	LOCK( cacheLock );
-
-	chunk = SlaveWorker::map->findChunkById(
-		metadata.listId, metadata.stripeId, metadata.chunkId, 0,
-		false, // needsLock
-		false // needsUnlock
-	);
 	// Lock the data chunk buffer
 	MixedChunkBuffer *chunkBuffer = SlaveWorker::chunkBuffer->at( metadata.listId );
-	int chunkBufferIndex = chunkBuffer->lockChunk( chunk, false );
+	int chunkBufferIndex = chunkBuffer->lockChunk( chunk, true );
+
+	LOCK( keysLock );
+	LOCK( cacheLock );
 
 	ret = chunk;
 	if ( ! chunk ) {
@@ -645,6 +646,8 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, bool isSealed, ch
 	UNLOCK( keysLock );
 	if ( chunkBufferIndex != -1 )
 		chunkBuffer->updateAndUnlockChunk( chunkBufferIndex );
+	else
+		chunkBuffer->unlock( chunkBufferIndex );
 
 	if ( notifyCoordinator ) {
 		SlaveWorker::eventQueue->insert( coordinatorEvent );

@@ -120,11 +120,11 @@ bool Map::insertKey( char *keyStr, uint8_t keySize, uint32_t listId, uint32_t st
 			break;
 		case PROTO_OPCODE_REMAPPING_LOCK:
 			if ( exist ) {
-				fprintf(
-					stderr, "TODO: Map::insertKey(): opcode == PROTO_OPCODE_REMAPPING_LOCK && exist. Key = %.*s at (%u, %u, %u).\n",
-					it->first.size, it->first.data,
-					it->second.listId, it->second.stripeId, it->second.chunkId
-				);
+				// fprintf(
+				// 	stderr, "TODO: Map::insertKey(): opcode == PROTO_OPCODE_REMAPPING_LOCK && exist. Key = %.*s at (%u, %u, %u).\n",
+				// 	it->first.size, it->first.data,
+				// 	it->second.listId, it->second.stripeId, it->second.chunkId
+				// );
 				ret = false;
 			} else {
 				// check if lock is already acquired by others

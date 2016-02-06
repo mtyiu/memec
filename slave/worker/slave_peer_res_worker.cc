@@ -595,6 +595,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 	std::unordered_map<PendingIdentifier, ChunkRequest>::iterator it, tmp, end, selfIt;
 	ChunkRequest chunkRequest;
 	PendingIdentifier pid;
+	Chunk *toBeFreed = 0;
 	union {
 		struct ChunkDataHeader chunkData;
 		struct ChunkHeader chunk;
@@ -724,7 +725,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 	if ( pending == 0 ) {
 		for ( uint32_t i = 0; i < SlaveWorker::dataChunkCount; i++ ) {
 			if ( ! this->chunks[ i ] ) { // To be reconstructed
-				this->sealIndicators[ SlaveWorker::parityChunkCount     ][ i ] = true;
+				this->sealIndicators[ SlaveWorker::parityChunkCount ][ i ] = true;
 			}
 			this->sealIndicators[ SlaveWorker::parityChunkCount + 1 ][ i ] = false; // Reset
 		}
@@ -806,6 +807,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 						Chunk *newChunk = SlaveWorker::chunkPool->malloc();
 						newChunk->copy( selfChunk );
 						selfChunk = newChunk;
+						toBeFreed = newChunk;
 					}
 					SlaveWorker::getChunkBuffer->ack( selfMetadata, false, true, false );
 					// chunkRequest.chunk = Coding::zeros;
@@ -969,9 +971,8 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 					}
 				}
 
-				// this->chunks[ i ]->clear();
-				// this->chunks[ i ]->status = CHUNK_STATUS_RECONSTRUCTED;
-				return true;
+				this->chunks[ i ]->clear();
+				// return true;
 			}
 		}
 
@@ -1174,13 +1175,20 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 					if ( op.opcode == PROTO_OPCODE_DEGRADED_GET ) {
 						MasterEvent event;
 
-						if ( isKeyValueFound )
+						if ( isKeyValueFound ) {
 							event.resGet( op.socket, pid.parentInstanceId, pid.parentRequestId, keyValue, true );
-						else {
+							this->dispatch( event );
+						} else {
 							fprintf( stderr, "KEY NOT FOUND: %.*s\n", key.size, key.data );
-							event.resGet( op.socket, pid.parentInstanceId, pid.parentRequestId, key, true );
+							// event.resGet( op.socket, pid.parentInstanceId, pid.parentRequestId, key, true );
+							event.instanceId = pid.parentInstanceId;
+							event.requestId = pid.parentRequestId;
+							event.socket = op.socket;
+							struct KeyHeader header;
+							header.key = key.data;
+							header.keySize = key.size;
+							this->handleGetRequest( event, header, true );
 						}
-						this->dispatch( event );
 						op.data.key.free();
 					} else if ( op.opcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
 						uint32_t chunkUpdateOffset = KeyValue::getChunkUpdateOffset(
@@ -1240,12 +1248,12 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 
 						    SlaveWorker::map->getKeysMap( keys, keysLock );
 						    SlaveWorker::map->getCacheMap( cache, cacheLock );
-						    // Lock the data chunk buffer
-						    MixedChunkBuffer *chunkBuffer = SlaveWorker::chunkBuffer->at( metadata.listId );
-						    int chunkBufferIndex = chunkBuffer->lockChunk( chunk, true );
 
 						    LOCK( keysLock );
 						    LOCK( cacheLock );
+						    // Lock the data chunk buffer
+						    MixedChunkBuffer *chunkBuffer = SlaveWorker::chunkBuffer->at( metadata.listId );
+						    int chunkBufferIndex = chunkBuffer->lockChunk( chunk, true );
 						    // Compute delta and perform update
 						    chunk->computeDelta(
 						 	   valueUpdate, // delta
@@ -1253,11 +1261,6 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 						 	   offset, op.data.keyValueUpdate.length,
 						 	   true // perform update
 						    );
-						    // Release the locks
-						    UNLOCK( cacheLock );
-						    UNLOCK( keysLock );
-						    if ( chunkBufferIndex == -1 )
-						 	   chunkBuffer->unlock();
 						    ///// ^^^^^ Copied from handleUpdateRequest() ^^^^^ /////
 
 							this->sendModifyChunkRequest(
@@ -1279,17 +1282,47 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 							   true
 							);
 
+							// Release the locks
+							if ( chunkBufferIndex == -1 )
+						 		chunkBuffer->unlock();
+							else
+								chunkBuffer->updateAndUnlockChunk( chunkBufferIndex );
+						    UNLOCK( cacheLock );
+						    UNLOCK( keysLock );
+
 							delete[] valueUpdate;
 						} else {
 							MasterEvent event;
-							event.resUpdate(
-								op.socket, pid.parentInstanceId, pid.parentRequestId, key,
-								op.data.keyValueUpdate.offset,
-								op.data.keyValueUpdate.length,
-								false, false, true
+							struct KeyValueUpdateHeader header;
+
+							event.instanceId = pid.parentInstanceId;
+							event.requestId = pid.parentRequestId;
+							event.socket = op.socket;
+
+							header.keySize = op.data.keyValueUpdate.size;
+							header.valueUpdateSize = op.data.keyValueUpdate.length;
+							header.valueUpdateOffset = op.data.keyValueUpdate.offset;
+							header.key = op.data.keyValueUpdate.data;
+							header.valueUpdate = ( char * ) op.data.keyValueUpdate.ptr;
+
+							this->handleUpdateRequest(
+								event,
+								header,
+								op.original, op.reconstructed, op.reconstructedCount,
+								reconstructParity,
+								this->chunks,
+								pidsIndex == len - 1,
+ 								true
 							);
-							this->dispatch( event );
-							fprintf( stderr, "Before delete[] 0x%p: %.*s (data = 0x%p)\n", op.data.keyValueUpdate.ptr, key.size, key.data, op.data.keyValueUpdate.data );
+
+							// MasterEvent event;
+							// event.resUpdate(
+							// 	op.socket, pid.parentInstanceId, pid.parentRequestId, key,
+							// 	op.data.keyValueUpdate.offset,
+							// 	op.data.keyValueUpdate.length,
+							// 	false, false, true
+							// );
+							// this->dispatch( event );
 							op.data.keyValueUpdate.free();
 							delete[] ( ( char * ) op.data.keyValueUpdate.ptr );
 						}
@@ -1412,6 +1445,8 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 
 		// Return chunks to chunk pool
 		for ( uint32_t i = 0; i < SlaveWorker::chunkCount; i++ ) {
+			if ( this->chunks[ i ] == toBeFreed )
+				continue;
 			switch( this->chunks[ i ]->status ) {
 				case CHUNK_STATUS_FROM_GET_CHUNK:
 					SlaveWorker::chunkPool->free( this->chunks[ i ] );
@@ -1424,6 +1459,8 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 			}
 		}
 	}
+	if ( toBeFreed )
+		SlaveWorker::chunkPool->free( toBeFreed );
 	return true;
 }
 

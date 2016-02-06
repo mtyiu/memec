@@ -107,6 +107,8 @@ bool CoordinatorWorker::handleRemappingSetLockRequest( MasterEvent event, char *
 			// 	0, 0, 0, key
 			// );
 
+			remappingRecord.free();
+
 			// ---------- HACK FOR YCSB which sends duplicated keys for SET ----------
 			LOCK_T *lock;
 			if ( CoordinatorWorker::remappingRecords->find( key, &remappingRecord, &lock ) ) {
