@@ -767,8 +767,9 @@ bool SlaveWorker::handleForwardChunkRequest( struct ChunkDataHeader &header, boo
 
 	__DEBUG__(
 		GREEN, "SlaveWorker", "handleForwardChunkRequest",
-		"Received forwarded chunk: (%u, %u, %u).",
-		header.listId, header.stripeId, header.chunkId
+		"Received forwarded chunk: (%u, %u, %u; size = %u).",
+		header.listId, header.stripeId, header.chunkId,
+		header.size
 	);
 
 	dmap->getCacheMap( cache, lock );

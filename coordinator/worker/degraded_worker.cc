@@ -30,12 +30,6 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 		return false;
 	}
 
-	__INFO__(
-		BLUE, "CoordinatorWorker", "handleDegradedLockRequest",
-		"[DEGRADED_LOCK] Key: %.*s (key size = %u).",
-		( int ) header.keySize, header.key, header.keySize
-	);
-
 	// Find the SlaveSocket which stores the stripe with listId and srcDataChunkId
 	SlaveSocket *socket;
 	uint32_t ongoingAtChunk;
@@ -122,6 +116,12 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 				degradedLock,
 				false, false
 			);
+
+			// if ( ! map->isSealed( srcMetadata ) ) {
+			// 	printf( "(Not sealed) [%u, %u]: ", srcMetadata.listId, srcMetadata.stripeId );
+			// 	degradedLock.print();
+			// 	fflush( stdout );
+			// }
 
 			// The chunk is already locked
 			event.resDegradedLock(
