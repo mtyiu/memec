@@ -685,6 +685,9 @@ void Coordinator::interactive() {
 		} else if ( strcmp( command, "lookup" ) == 0 ) {
 			valid = true;
 			this->lookup();
+		} else if ( strcmp( command, "stripe" ) == 0 ) {
+			valid = true;
+			this->stripe();
 		} else if ( strcmp( command, "dump" ) == 0 ) {
 			valid = true;
 			this->dump();
@@ -809,6 +812,7 @@ void Coordinator::help() {
 		"- time: Show elapsed time\n"
 		"- hash: Show the stripe list hashed by an input key\n"
 		"- lookup: Search for the metadata of an input key\n"
+		"- stripe: Query the seal status of a stripe\n"
 		"- seal: Force all slaves to seal all its chunks\n"
 		"- flush: Force all slaves to flush all its chunks\n"
 		"- log: Write the log to coordinator.log\n"
@@ -925,6 +929,33 @@ void Coordinator::lookup() {
 		}
 	} else {
 		printf( "Key not found.\n" );
+	}
+}
+
+void Coordinator::stripe() {
+	SlaveSocket *s;
+	uint32_t chunkCount, dataChunkCount;
+	Metadata metadata;
+
+	printf( "Input list ID & stripe ID: " );
+	fflush( stdout );
+
+	if ( fscanf( stdin, "%u %u", &metadata.listId, &metadata.stripeId ) != 2 ) {
+		fprintf( stderr, "Invalid input!\n" );
+		return;
+	}
+
+	chunkCount = this->config.global.coding.params.getChunkCount();
+	dataChunkCount = this->config.global.coding.params.getDataChunkCount();
+	for ( uint32_t i = 0; i < chunkCount; i++ ) {
+		s = this->stripeList->get( metadata.listId, i );
+		metadata.chunkId = i;
+		printf(
+			"\t(%u, %u, %s%u): %s\n",
+			metadata.listId, metadata.stripeId,
+			i >= dataChunkCount ? "p" : "", i,
+			s->map.isSealed( metadata ) ? "sealed" : "not sealed"
+		);
 	}
 }
 

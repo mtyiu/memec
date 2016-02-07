@@ -138,15 +138,18 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 		// success = false;
 	} else {
 		// Store the key-value pair
-		uint32_t timestamp, stripeId;
+		uint32_t timestamp, stripeId, dataChunkId;
 		bool isSealed;
 		Metadata sealed;
+
+		SlaveWorker::stripeList->get( header.key, header.keySize, 0, 0, &dataChunkId );
+
 		SlaveWorker::chunkBuffer->at( header.listId )->set(
 			this,
 			header.key, header.keySize,
 			header.value, header.valueSize,
 			PROTO_OPCODE_REMAPPING_SET, timestamp,
-			stripeId, header.chunkId,
+			stripeId, dataChunkId,
 			&isSealed, &sealed,
 			this->chunks, this->dataChunk, this->parityChunk
 		);

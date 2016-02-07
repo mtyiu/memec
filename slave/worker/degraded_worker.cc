@@ -1166,34 +1166,7 @@ force_reconstruct_chunks:
 			// printf( "(%u, %u, %u) ", listId, stripeId, i );
 			if ( socket->self ) {
 				chunkRequest.self = true;
-				/*
-				chunkRequest.chunk = SlaveWorker::map->findChunkById( listId, stripeId, i );
-				// Check whether the chunk is sealed or not
-				if ( ! chunkRequest.chunk ) {
-					chunkRequest.chunk = Coding::zeros;
-					chunkRequest.isSealed = false;
-				} else {
-					MixedChunkBuffer *chunkBuffer = SlaveWorker::chunkBuffer->at( listId );
-					int chunkBufferIndex = chunkBuffer->lockChunk( chunkRequest.chunk, true );
-					bool isSealed = ( chunkBufferIndex == -1 ), exists;
-					if ( isSealed ) {
-						// Find from backup
-						uint8_t sealIndicatorCount;
-						bool *sealIndicator;
-						Chunk *backupChunk = SlaveWorker::getChunkBuffer->find( metadata, exists, sealIndicatorCount, sealIndicator, true, false );
-						if ( exists ) {
-							chunkRequest.chunk = backupChunk ? backupChunk : Coding::zeros;
-						}
-						SlaveWorker::getChunkBuffer->ack( metadata, false, true, false );
-						// chunkRequest.chunk = Coding::zeros;
-						chunkRequest.isSealed = true;
-					} else {
-						chunkRequest.chunk = Coding::zeros;
-						chunkRequest.isSealed = false;
-					}
-					chunkBuffer->unlock( chunkBufferIndex );
-				}
-				*/
+				assert( chunkRequest.chunkId == SlaveWorker::chunkBuffer->at( listId )->getChunkId() );
 			} else if ( socket->ready() ) {
 				chunkRequest.chunk = 0;
 			} else {

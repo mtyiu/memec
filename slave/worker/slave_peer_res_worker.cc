@@ -764,7 +764,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 				continue;
 
 			if ( this->sealIndicators[ SlaveWorker::parityChunkCount ][ i ] != this->sealIndicators[ SlaveWorker::parityChunkCount + 1 ][ i ] ) {
-				__DEBUG__(
+				__INFO__(
 					GREEN, "SlaveWorker", "handleGetChunkResponse",
 					"Need to retrieve the sealed data chunk (%u, %u, %u): %d vs %d.",
 					listId, stripeId, i,
@@ -794,13 +794,16 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 			return false;
 		}
 
-		SlaveWorker::pending->slavePeers.getChunk.erase( it, tmp );
-		UNLOCK( &SlaveWorker::pending->slavePeers.getChunkLock );
-
 		if ( selfIt != SlaveWorker::pending->slavePeers.getChunk.end() ) {
+			Metadata selfMetadata;
 			uint32_t selfChunkId = selfIt->second.chunkId;
+
+			selfMetadata.set( listId, stripeId, selfChunkId );
+
 			Chunk *selfChunk = SlaveWorker::map->findChunkById( listId, stripeId, selfChunkId );
 
+			if ( selfChunkId >= SlaveWorker::dataChunkCount )
+				__ERROR__( "SlaveWorker", "handleGetChunkResponse", "selfChunkId >= SlaveWorker::dataChunkCount: (%u, %u, %u)", listId, stripeId, selfChunkId );
 			assert( selfChunkId < SlaveWorker::dataChunkCount );
 
 			// Check whether the chunk is sealed or not
@@ -815,10 +818,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 					// Find from backup
 					uint8_t sealIndicatorCount;
 					bool *sealIndicator;
-					Metadata selfMetadata;
 					bool exists;
-
-					selfMetadata.set( listId, stripeId, selfChunkId );
 
 					Chunk *backupChunk = SlaveWorker::getChunkBuffer->find( selfMetadata, exists, sealIndicatorCount, sealIndicator, true, false );
 					if ( exists && backupChunk ) {
@@ -832,14 +832,20 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 					SlaveWorker::getChunkBuffer->ack( selfMetadata, false, true, false );
 					// chunkRequest.chunk = Coding::zeros;
 					this->sealIndicators[ SlaveWorker::parityChunkCount ][ selfChunkId ] = true;
+					this->sealIndicators[ SlaveWorker::parityChunkCount + 1 ][ selfChunkId ] = true;
 				} else {
 					selfChunk = Coding::zeros;
 					this->sealIndicators[ SlaveWorker::parityChunkCount ][ selfChunkId ] = false;
+					this->sealIndicators[ SlaveWorker::parityChunkCount + 1 ][ selfChunkId ] = false;
 				}
 				chunkBuffer->unlock( chunkBufferIndex );
 			}
 			this->chunks[ selfChunkId ] = selfChunk;
 		}
+
+		// Do not erase before the above if-branch as selfIt is still in-use!
+		SlaveWorker::pending->slavePeers.getChunk.erase( it, tmp );
+		UNLOCK( &SlaveWorker::pending->slavePeers.getChunkLock );
 
 		// Check seal indicator
 		bool valid = true;
@@ -861,7 +867,6 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 		} else {
 			SlaveWorker::stripeList->get( listId, this->paritySlaveSockets, this->dataSlaveSockets );
 
-			/*
 			fprintf( stderr, "[GET_CHUNK] (%u, %u) - Inconsistent chunks received. Seal indicators:\n", listId, stripeId );
 			for ( uint32_t j = 0; j < SlaveWorker::parityChunkCount + 1; j++ ) {
 				if ( j == SlaveWorker::parityChunkCount || this->chunks[ j + SlaveWorker::dataChunkCount ] ) {
@@ -872,7 +877,6 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 					fprintf( stderr, "\n" );
 				}
 			}
-			*/
 
 			for ( uint32_t j = 0; j < SlaveWorker::parityChunkCount; j++ ) {
 				bool valid = true;
@@ -886,7 +890,6 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 				}
 
 				if ( ! valid ) {
-					// uint32_t fixedDataCount = Coding::forceSeal(
 					Coding::forceSeal(
 						SlaveWorker::coding,
 						this->chunks,
@@ -896,8 +899,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 						SlaveWorker::parityChunkCount
 					);
 
-					/*
-					fprintf( stderr, "[GET_CHUNK] (%u, %u) - Inconsistent chunks fixed (data chunk count: %u). Seal indicators:\n", listId, stripeId, fixedDataCount );
+					fprintf( stderr, "[GET_CHUNK] (%u, %u) - Inconsistent chunks fixed. Seal indicators:\n", listId, stripeId );
 					for ( uint32_t j = 0; j < SlaveWorker::parityChunkCount + 1; j++ ) {
 						if ( j == SlaveWorker::parityChunkCount || this->chunks[ j + SlaveWorker::dataChunkCount ] ) {
 							fprintf( stderr, "\t#%u (0x%p):", j, this->sealIndicators[ j ] );
@@ -907,7 +909,6 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 							fprintf( stderr, "\n" );
 						}
 					}
-					*/
 				}
 			}
 		}
@@ -976,6 +977,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 							break;
 					}
 					printf( " (size = %u)\n", this->chunks[ x ]->getSize() );
+					this->chunks[ x ]->print();
 				}
 				printf( "\n" );
 				fflush( stdout );
@@ -990,6 +992,10 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 						fprintf( stderr, "\n" );
 					}
 				}
+
+				printf( "Chunk status: " );
+				this->chunkStatus->print();
+				fflush( stdout );
 
 				this->chunks[ i ]->clear();
 				// return true;

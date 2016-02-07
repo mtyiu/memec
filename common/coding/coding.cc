@@ -149,7 +149,6 @@ uint32_t Coding::forceSeal( Coding *coding, Chunk **chunks, Chunk *tmpParityChun
 	}
 
 	// Follow the seal indicators of GET_CHUNK
-	/*
 	for ( uint32_t i = 0; i < parityChunkCount; i++ ) {
 		if ( ! chunks[ i + dataChunkCount ] )
 			continue;
@@ -182,7 +181,6 @@ uint32_t Coding::forceSeal( Coding *coding, Chunk **chunks, Chunk *tmpParityChun
 			}
 		}
 	}
-	*/
 
 	delete[] tmpChunks;
 

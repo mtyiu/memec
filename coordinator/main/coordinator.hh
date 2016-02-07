@@ -131,6 +131,7 @@ public:
 	double getElapsedTime();
 	void hash();
 	void lookup();
+	void stripe();
 	void appendLog( Log log );
 	void setSlave( bool overloaded );
 	void switchToManualOverload();
