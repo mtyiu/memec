@@ -57,9 +57,9 @@ for delay in $delays; do
 			pending=0
 			for n in 3 4 8 9; do
 				if [ $n == 3 ]; then
-					read -p "Pending: ${pending} / 4" -t 300
+					read -p "Pending: ${pending} / 4" -t 90
 				else
-					read -p "Pending: ${pending} / 4" -t 60
+					read -p "Pending: ${pending} / 4" -t 10
 				fi
 				pending=$(expr $pending + 1)
 			done
@@ -70,7 +70,7 @@ for delay in $delays; do
 		restore_overload
 
 		screen -S manage -p 0 -X stuff "$(printf '\r\r')"
-		sleep 30
+		sleep 10
 
 		for n in 3 4 8 9; do
 			mkdir -p ${BASE_PATH}/results/temporary-double/$delay/$iter/node$n

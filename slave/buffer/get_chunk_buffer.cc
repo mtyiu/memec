@@ -38,18 +38,18 @@ bool GetChunkBuffer::insert( Metadata metadata, Chunk *chunk, uint8_t sealIndica
 	if ( it == this->chunks.end() ) {
 		// Copy the chunk
 		Chunk *newChunk;
+		GetChunkWrapper wrapper;
 
 		if ( chunk ) {
 			newChunk = GetChunkBuffer::chunkPool->malloc();
 			newChunk->copy( chunk );
+			wrapper.sealIndicatorCount = sealIndicatorCount;
+			wrapper.sealIndicator = sealIndicator;
 		} else {
 			newChunk = 0;
 		}
 
-		GetChunkWrapper wrapper;
 		wrapper.chunk = newChunk;
-		wrapper.sealIndicatorCount = sealIndicatorCount;
-		wrapper.sealIndicator = sealIndicator;
 		wrapper.acked = false;
 
 		std::pair<Metadata, GetChunkWrapper> p( metadata, wrapper );
@@ -59,12 +59,12 @@ bool GetChunkBuffer::insert( Metadata metadata, Chunk *chunk, uint8_t sealIndica
 			if ( ! it->second.chunk ) {
 				it->second.chunk = GetChunkBuffer::chunkPool->malloc();
 				it->second.chunk->copy( chunk );
+				it->second.sealIndicatorCount = sealIndicatorCount;
+				it->second.sealIndicator = sealIndicator;
 			}
 		} else {
 			it->second.chunk = 0;
 		}
-		it->second.sealIndicatorCount = sealIndicatorCount;
-		it->second.sealIndicator = sealIndicator;
 	}
 	if ( needsUnlock ) UNLOCK( &this->lock );
 	return ret;

@@ -4,6 +4,7 @@
 #include <cstdio>
 #include "data_chunk_buffer.hh"
 #include "parity_chunk_buffer.hh"
+#include "get_chunk_buffer.hh"
 
 enum ChunkBufferRole {
 	CBR_DATA,
@@ -28,7 +29,8 @@ public:
 		uint8_t opcode, uint32_t &timestamp,
 		uint32_t &stripeId, uint32_t chunkId,
 		bool *isSealed, Metadata *sealed,
-		Chunk **chunks, Chunk *dataChunk, Chunk *parityChunk
+		Chunk **chunks, Chunk *dataChunk, Chunk *parityChunk,
+		GetChunkBuffer *getChunkBuffer
 	);
 
 	// For DataChunkBuffer only

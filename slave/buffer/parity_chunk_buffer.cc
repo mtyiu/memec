@@ -57,7 +57,7 @@ ParityChunkWrapper &ParityChunkBuffer::getWrapper( uint32_t stripeId, bool needs
 	return wrapper;
 }
 
-bool ParityChunkBuffer::set( char *keyStr, uint8_t keySize, char *valueStr, uint32_t valueSize, uint32_t chunkId, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk ) {
+bool ParityChunkBuffer::set( char *keyStr, uint8_t keySize, char *valueStr, uint32_t valueSize, uint32_t chunkId, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, GetChunkBuffer *getChunkBuffer ) {
 	Key key;
 	std::unordered_map<Key, PendingRequest>::iterator it;
 
@@ -108,7 +108,11 @@ bool ParityChunkBuffer::set( char *keyStr, uint8_t keySize, char *valueStr, uint
 					pendingRequest.req.seal.offset,
 					KEY_VALUE_METADATA_SIZE + keySize + valueSize,
 					dataChunks, dataChunk, parityChunk,
-					false, false
+					false, // needsLock
+					false, // needsUnlock
+					false, // isSeal
+					false, // isDelete
+					getChunkBuffer
 				);
 				break;
 			case PRT_UPDATE:
@@ -316,7 +320,7 @@ bool ParityChunkBuffer::updateKeyValue( char *keyStr, uint8_t keySize, uint32_t 
 	return true;
 }
 
-bool ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, bool needsLock, bool needsUnlock, bool isSeal, bool isDelete ) {
+bool ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, bool needsLock, bool needsUnlock, bool isSeal, bool isDelete, GetChunkBuffer *getChunkBuffer ) {
 	// Prepare the stripe
 	for ( uint32_t i = 0; i < ChunkBuffer::dataChunkCount; i++ )
 		dataChunks[ i ] = Coding::zeros;
@@ -333,6 +337,33 @@ bool ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t of
 
 	if ( needsLock ) LOCK( &this->lock );
 	ParityChunkWrapper &wrapper = this->getWrapper( stripeId, false, false );
+
+	// Update the backup of a sealed chunk
+	if ( getChunkBuffer ) {
+		Metadata metadata;
+		bool exists;
+		uint8_t sealIndicatorCount;
+		bool *sealIndicator;
+		Chunk *backupChunk;
+
+		metadata.set( this->listId, stripeId, this->chunkId );
+
+		backupChunk = getChunkBuffer->find( metadata, exists, sealIndicatorCount, sealIndicator, true, false );
+
+		if ( exists && backupChunk ) {
+			if ( sealIndicator[ chunkId ] ) {
+				char *parity = backupChunk->getData();
+				Coding::bitwiseXOR(
+					parity,
+					parity,
+					backupChunk->getData(),
+					ChunkBuffer::capacity
+				);
+			}
+		}
+
+		getChunkBuffer->unlock();
+	}
 
 	LOCK( &wrapper.lock );
 	wrapper.chunk->status = CHUNK_STATUS_DIRTY;

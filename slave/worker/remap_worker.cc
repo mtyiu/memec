@@ -151,7 +151,8 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 			PROTO_OPCODE_REMAPPING_SET, timestamp,
 			stripeId, dataChunkId,
 			&isSealed, &sealed,
-			this->chunks, this->dataChunk, this->parityChunk
+			this->chunks, this->dataChunk, this->parityChunk,
+			SlaveWorker::getChunkBuffer
 		);
 
 		if ( header.chunkId < SlaveWorker::dataChunkCount ) {

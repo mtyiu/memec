@@ -912,6 +912,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 		UNLOCK( &SlaveWorker::pending->slavePeers.getChunkLock );
 	}
 
+	std::unordered_set<uint32_t> invalidChunks;
 	if ( pending == 0 ) {
 		// Set up chunk buffer for storing reconstructed chunks
 		for ( uint32_t i = 0, j = 0; i < SlaveWorker::chunkCount; i++ ) {
@@ -968,6 +969,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 				fflush( stdout );
 
 				this->chunks[ i ]->clear();
+				invalidChunks.insert( i );
 				// return true;
 			}
 		}
@@ -1016,8 +1018,11 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 				for ( uint32_t i = 0; i < op.reconstructedCount; i++ ) {
 					SlavePeerSocket *s = SlaveWorker::stripeList->get( op.reconstructed[ i * 2 ], op.reconstructed[ i * 2 + 1 ] );
 
-					if ( ! this->chunks[ op.original[ i * 2 + 1 ] ]->getSize() )
+					if ( invalidChunks.count( op.original[ i * 2 + 1 ] ) ) {
+						// Do nothing
+					} else if ( ! this->chunks[ op.original[ i * 2 + 1 ] ]->getSize() ) {
 						continue; // No need to send
+					}
 
 					if ( s->self ) {
 						struct ChunkDataHeader chunkDataHeader;
@@ -1393,8 +1398,11 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 				for ( uint32_t i = 0; i < op.reconstructedCount; i++ ) {
 					SlavePeerSocket *s = SlaveWorker::stripeList->get( op.reconstructed[ i * 2 ], op.reconstructed[ i * 2 + 1 ] );
 
-					if ( ! this->chunks[ op.original[ i * 2 + 1 ] ]->getSize() )
+					if ( invalidChunks.count( op.original[ i * 2 + 1 ] ) ) {
+						// Do nothing
+					} else if ( ! this->chunks[ op.original[ i * 2 + 1 ] ]->getSize() ) {
 						continue; // No need to send
+					}
 
 					if ( s->self ) {
 						continue;

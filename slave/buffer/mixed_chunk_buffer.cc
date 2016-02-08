@@ -18,7 +18,8 @@ bool MixedChunkBuffer::set(
 	uint8_t opcode, uint32_t &timestamp,
 	uint32_t &stripeId, uint32_t chunkId,
 	bool *isSealed, Metadata *sealed,
-	Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk
+	Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk,
+	GetChunkBuffer *getChunkBuffer
 ) {
 	switch( this->role ) {
 		case CBR_DATA:
@@ -35,7 +36,8 @@ bool MixedChunkBuffer::set(
 			if ( isSealed ) *isSealed = false;
 			return this->buffer.parity->set(
 				key, keySize, value, valueSize, chunkId,
-				dataChunks, dataChunk, parityChunk
+				dataChunks, dataChunk, parityChunk,
+				getChunkBuffer
 			);
 		default:
 			return false;
