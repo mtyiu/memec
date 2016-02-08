@@ -738,6 +738,9 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 				}
 			}
 		}
+		// for ( uint32_t i = 0; i < SlaveWorker::dataChunkCount; i++ ) {
+		// 	this->sealIndicators[ SlaveWorker::parityChunkCount + 1 ][ i ] |= this->sealIndicators[ SlaveWorker::parityChunkCount ][ i ];
+		// }
 
 		/*
 		fprintf( stderr, "SEAL INDICATOR OF %u, %u:\n", listId, stripeId );
@@ -763,7 +766,10 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 			if ( ! this->chunks[ i ] ) // To be reconstructed
 				continue;
 
-			if ( this->sealIndicators[ SlaveWorker::parityChunkCount ][ i ] != this->sealIndicators[ SlaveWorker::parityChunkCount + 1 ][ i ] ) {
+			if (
+				this->sealIndicators[ SlaveWorker::parityChunkCount + 1 ][ i ] &&
+				this->sealIndicators[ SlaveWorker::parityChunkCount ][ i ] != this->sealIndicators[ SlaveWorker::parityChunkCount + 1 ][ i ]
+			) {
 				__INFO__(
 					GREEN, "SlaveWorker", "handleGetChunkResponse",
 					"Need to retrieve the sealed data chunk (%u, %u, %u): %d vs %d.",
@@ -867,20 +873,41 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 		} else {
 			SlaveWorker::stripeList->get( listId, this->paritySlaveSockets, this->dataSlaveSockets );
 
-			// fprintf( stderr, "[GET_CHUNK] (%u, %u) - Inconsistent chunks received. Seal indicators:\n", listId, stripeId );
-			// for ( uint32_t j = 0; j < SlaveWorker::parityChunkCount + 1; j++ ) {
-			// 	if ( j == SlaveWorker::parityChunkCount || this->chunks[ j + SlaveWorker::dataChunkCount ] ) {
-			// 		fprintf( stderr, "\t#%u:", j );
-			// 		for ( uint32_t i = 0; i < SlaveWorker::dataChunkCount; i++ ) {
-			// 			fprintf( stderr, " %d", this->sealIndicators[ j ][ i ] ? 1 : 0 );
-			// 		}
-			// 		fprintf( stderr, "\n" );
-			// 	}
-			// }
+			fprintf( stderr, "[GET_CHUNK] (%u, %u) - Inconsistent chunks received. Seal indicators:\n", listId, stripeId );
+			for ( uint32_t j = 0; j < SlaveWorker::parityChunkCount + 1; j++ ) {
+				if ( j == SlaveWorker::parityChunkCount || this->chunks[ j + SlaveWorker::dataChunkCount ] ) {
+					fprintf( stderr, "\t#%u:", j );
+					for ( uint32_t i = 0; i < SlaveWorker::dataChunkCount; i++ ) {
+						fprintf( stderr, " %d", this->sealIndicators[ j ][ i ] ? 1 : 0 );
+					}
+					fprintf( stderr, "\n" );
+				}
+			}
 
+			Coding::forceSeal(
+				SlaveWorker::coding,
+				this->chunks,
+				&( this->freeChunks[ 0 ] ),
+				this->sealIndicators,
+				SlaveWorker::dataChunkCount,
+				SlaveWorker::parityChunkCount
+			);
+
+			fprintf( stderr, "[GET_CHUNK] (%u, %u) - Inconsistent chunks fixed. Seal indicators:\n", listId, stripeId );
+			for ( uint32_t j = 0; j < SlaveWorker::parityChunkCount + 1; j++ ) {
+				if ( j == SlaveWorker::parityChunkCount || this->chunks[ j + SlaveWorker::dataChunkCount ] ) {
+					fprintf( stderr, "\t#%u (0x%p):", j, this->sealIndicators[ j ] );
+					for ( uint32_t i = 0; i < SlaveWorker::dataChunkCount; i++ ) {
+						fprintf( stderr, " %d", this->sealIndicators[ j ][ i ] ? 1 : 0 );
+					}
+					fprintf( stderr, "\n" );
+				}
+			}
+
+			/*
 			for ( uint32_t j = 0; j < SlaveWorker::parityChunkCount; j++ ) {
 				bool valid = true;
-				if ( j == SlaveWorker::parityChunkCount || this->chunks[ j + SlaveWorker::dataChunkCount ] ) {
+				if ( j == SlaveWorker::parityChunkCount || ( this->chunks[ j + SlaveWorker::dataChunkCount ] && this->chunks[ j + SlaveWorker::dataChunkCount ] != Coding::zeros ) ) {
 					for ( uint32_t i = 0; i < SlaveWorker::dataChunkCount; i++ ) {
 						if ( this->sealIndicators[ j ][ i ] != this->sealIndicators[ SlaveWorker::parityChunkCount ][ i ] ) {
 							valid = false;
@@ -899,18 +926,19 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 						SlaveWorker::parityChunkCount
 					);
 
-					// fprintf( stderr, "[GET_CHUNK] (%u, %u) - Inconsistent chunks fixed. Seal indicators:\n", listId, stripeId );
-					// for ( uint32_t j = 0; j < SlaveWorker::parityChunkCount + 1; j++ ) {
-					// 	if ( j == SlaveWorker::parityChunkCount || this->chunks[ j + SlaveWorker::dataChunkCount ] ) {
-					// 		fprintf( stderr, "\t#%u (0x%p):", j, this->sealIndicators[ j ] );
-					// 		for ( uint32_t i = 0; i < SlaveWorker::dataChunkCount; i++ ) {
-					// 			fprintf( stderr, " %d", this->sealIndicators[ j ][ i ] ? 1 : 0 );
-					// 		}
-					// 		fprintf( stderr, "\n" );
-					// 	}
-					// }
+					fprintf( stderr, "[GET_CHUNK] (%u, %u) - Inconsistent chunks fixed. Seal indicators:\n", listId, stripeId );
+					for ( uint32_t j = 0; j < SlaveWorker::parityChunkCount + 1; j++ ) {
+						if ( j == SlaveWorker::parityChunkCount || this->chunks[ j + SlaveWorker::dataChunkCount ] ) {
+							fprintf( stderr, "\t#%u (0x%p):", j, this->sealIndicators[ j ] );
+							for ( uint32_t i = 0; i < SlaveWorker::dataChunkCount; i++ ) {
+								fprintf( stderr, " %d", this->sealIndicators[ j ][ i ] ? 1 : 0 );
+							}
+							fprintf( stderr, "\n" );
+						}
+					}
 				}
 			}
+			*/
 		}
 	} else {
 		UNLOCK( &SlaveWorker::pending->slavePeers.getChunkLock );
@@ -951,34 +979,8 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 					chunkRequest.listId, chunkRequest.stripeId, i,
 					chunkSize
 				);
-				for ( uint32_t x = 0; x < SlaveWorker::chunkCount; x++ ) {
-					printf( "\t#[%u, %u]: ", chunkRequest.listId, x );
-					switch( this->chunks[ x ]->status ) {
-						case CHUNK_STATUS_EMPTY:
-							printf( "CHUNK_STATUS_EMPTY" );
-							break;
-						case CHUNK_STATUS_DIRTY:
-							printf( "CHUNK_STATUS_DIRTY" );
-							break;
-						case CHUNK_STATUS_CACHED:
-							printf( "CHUNK_STATUS_CACHED" );
-							break;
-						case CHUNK_STATUS_NEEDS_LOAD_FROM_DISK:
-							printf( "CHUNK_STATUS_NEEDS_LOAD_FROM_DISK" );
-							break;
-						case CHUNK_STATUS_FROM_GET_CHUNK:
-							printf( "CHUNK_STATUS_FROM_GET_CHUNK" );
-							break;
-						case CHUNK_STATUS_RECONSTRUCTED:
-							printf( "CHUNK_STATUS_RECONSTRUCTED" );
-							break;
-						case CHUNK_STATUS_TEMPORARY:
-							printf( "CHUNK_STATUS_TEMPORARY" );
-							break;
-					}
-					printf( " (size = %u)\n", this->chunks[ x ]->getSize() );
+				for ( uint32_t x = 0; x < SlaveWorker::chunkCount; x++ )
 					this->chunks[ x ]->print();
-				}
 				printf( "\n" );
 				fflush( stdout );
 
@@ -1065,10 +1067,23 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 
 				for ( int pidsIndex = 0, len = pids.size(); pidsIndex < len; pidsIndex++ ) {
 					if ( pidsIndex == 0 ) {
-						assert( pids[ pidsIndex ].instanceId == pid.instanceId && pids[ pidsIndex ].requestId == pid.requestId );
+						if ( ! ( pids[ pidsIndex ].instanceId == pid.instanceId && pids[ pidsIndex ].requestId == pid.requestId ) ) {
+							fprintf(
+								stderr,
+								"[%u, %u, %u] instanceId: %u vs. %u; "
+								"requestId:  %u vs. %u\n",
+								listId, stripeId, chunkId,
+								pids[ pidsIndex ].instanceId,
+								pid.instanceId,
+								pids[ pidsIndex ].requestId,
+								pid.requestId
+							);
+						}
+						// assert( pids[ pidsIndex ].instanceId == pid.instanceId && pids[ pidsIndex ].requestId == pid.requestId );
 					} else {
 						if ( ! SlaveWorker::pending->eraseDegradedOp( PT_SLAVE_PEER_DEGRADED_OPS, pids[ pidsIndex ].instanceId, pids[ pidsIndex ].requestId, 0, &pid, &op ) ) {
 							__ERROR__( "SlaveWorker", "handleGetChunkResponse", "Cannot find a pending slave DEGRADED_OPS request that matches the response. This message will be discarded." );
+							continue;
 						}
 					}
 

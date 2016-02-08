@@ -50,10 +50,11 @@ bool GetChunkBuffer::insert( Metadata metadata, Chunk *chunk, uint8_t sealIndica
 		wrapper.chunk = newChunk;
 		wrapper.sealIndicatorCount = sealIndicatorCount;
 		wrapper.sealIndicator = sealIndicator;
+		wrapper.acked = false;
 
 		std::pair<Metadata, GetChunkWrapper> p( metadata, wrapper );
 		this->chunks.insert( p );
-	} else {
+	} else if ( ! it->second.acked ) {
 		if ( chunk ) {
 			if ( ! it->second.chunk ) {
 				it->second.chunk = GetChunkBuffer::chunkPool->malloc();
@@ -99,6 +100,7 @@ bool GetChunkBuffer::ack( Metadata metadata, bool needsLock, bool needsUnlock, b
 		wrapper.chunk = 0;
 		wrapper.sealIndicator = 0;
 		wrapper.sealIndicatorCount = 0;
+		wrapper.acked = true;
 		std::pair<Metadata, GetChunkWrapper> p( metadata, wrapper );
 		this->chunks.insert( p );
 	} else {
@@ -111,6 +113,7 @@ bool GetChunkBuffer::ack( Metadata metadata, bool needsLock, bool needsUnlock, b
 		it->second.chunk = 0;
 		it->second.sealIndicator = 0;
 		it->second.sealIndicatorCount = 0;
+		it->second.acked = true;
 	}
 	if ( needsUnlock ) UNLOCK( &this->lock );
 	return ret;

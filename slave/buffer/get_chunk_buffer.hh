@@ -8,6 +8,7 @@
 #include "../../common/lock/lock.hh"
 
 struct GetChunkWrapper {
+	bool acked;
 	Chunk *chunk;
 	uint8_t sealIndicatorCount;
 	bool *sealIndicator;
