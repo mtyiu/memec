@@ -1004,7 +1004,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 			}
 		}
 
-		// fprintf( stderr, "Reconstructed: (%u %u)\n", listId, stripeId );
+		// fprintf( stderr, "Reconstructed: (%u, %u)\n", listId, stripeId );
 
 		for ( uint32_t i = SlaveWorker::dataChunkCount; i < SlaveWorker::chunkCount; i++ ) {
 			if ( this->chunks[ i ]->status == CHUNK_STATUS_RECONSTRUCTED ) {

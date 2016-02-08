@@ -252,38 +252,6 @@ bool SlaveWorker::handleDegradedUpdateRequest( MasterEvent event, struct Degrade
 	int index = -1;
 	bool reconstructParity, reconstructData, inProgress = false;
 
-	// Check whether the key is sealed
-	Chunk *chunk;
-	Metadata metadata;
-	if ( map->findValueByKey(
-			header.data.keyValueUpdate.key,
-			header.data.keyValueUpdate.keySize,
-			0, // &keyValue
-			0, // &key
-			0, // &keyMetadata
-			&metadata,
-			&chunk
-		)
-	) {
-		MixedChunkBuffer *chunkBuffer = SlaveWorker::chunkBuffer->at( metadata.listId );
-		int chunkBufferIndex = chunkBuffer->lockChunk( chunk, true );
-		if ( chunkBufferIndex != -1 ) {
-			// Not sealed
-			chunkBuffer->unlock( chunkBufferIndex );
-			// fprintf( stderr, "handleDegradedUpdateRequest(): %.*s - 1\n", header.data.keyValueUpdate.keySize, header.data.keyValueUpdate.key );
-			return this->handleUpdateRequest(
-				event, header.data.keyValueUpdate,
-				header.original, header.reconstructed, header.reconstructedCount,
-				false, // reconstructParity
-				0,     // chunks
-				false, // endOfDegradedOp
-				true   // checkGetChunk
-			);
-		} else {
-			chunkBuffer->unlock( chunkBufferIndex );
-		}
-	}
-
 	this->getSlaves(
 		header.data.keyValueUpdate.key,
 		header.data.keyValueUpdate.keySize,
@@ -404,9 +372,45 @@ bool SlaveWorker::handleDegradedUpdateRequest( MasterEvent event, struct Degrade
 	KeyValue keyValue;
 	KeyValueUpdate keyValueUpdate;
 	KeyMetadata keyMetadata;
+	Metadata metadata;
+	Chunk *chunk;
 	bool ret = true;
 	DegradedMap *dmap = &SlaveWorker::degradedChunkBuffer->map;
 	bool isSealed, isKeyValueFound;
+
+	if ( map->findValueByKey(
+			header.data.keyValueUpdate.key,
+			header.data.keyValueUpdate.keySize,
+			0, // &keyValue
+			0, // &key
+			0, // &keyMetadata
+			&metadata,
+			&chunk
+		)
+	) {
+		MixedChunkBuffer *chunkBuffer = SlaveWorker::chunkBuffer->at( metadata.listId );
+		int chunkBufferIndex = chunkBuffer->lockChunk( chunk, true );
+		// Check whether the key is sealed
+		if ( chunkBufferIndex != -1 ) {
+			// Not sealed
+			chunkBuffer->unlock( chunkBufferIndex );
+			// fprintf( stderr, "handleDegradedUpdateRequest(): %.*s - 1\n", header.data.keyValueUpdate.keySize, header.data.keyValueUpdate.key );
+			/*
+			this->handleUpdateRequest(
+				event, header.data.keyValueUpdate,
+				header.original, header.reconstructed, header.reconstructedCount,
+				false, // reconstructParity
+				0,     // chunks
+				false, // endOfDegradedOp
+				true   // checkGetChunk
+			);
+			*/
+
+			// goto force_degraded_read;
+		} else {
+			chunkBuffer->unlock( chunkBufferIndex );
+		}
+	}
 
 	keyMetadata.offset = 0;
 
@@ -989,8 +993,11 @@ bool SlaveWorker::performDegradedRead(
 	SlavePeerEvent event;
 	SlavePeerSocket *socket = 0;
 	uint32_t selected = 0;
+	bool isReconstructedChunks = false;
 
 	SlaveWorker::stripeList->get( listId, this->paritySlaveSockets, this->dataSlaveSockets );
+
+	// fprintf( stderr, "performDegradedRead(): %u, %u, %u - isSealed? %s\n", listId, stripeId, chunkId, isSealed ? "true" : "false" );
 
 	/*
 	for ( uint32_t i = 0; i < reconstructedCount; ) {
@@ -1098,6 +1105,7 @@ bool SlaveWorker::performDegradedRead(
 	Key k;
 	bool needsContinue;
 	if ( isSealed ) {
+		isReconstructedChunks = true;
 		if ( ongoingAtChunk != SlaveWorker::chunkBuffer->at( listId )->getChunkId() ) {
 			SlaveWorker::degradedChunkBuffer->map.insertDegradedChunk(
 				listId, stripeId, chunkId,
@@ -1375,6 +1383,8 @@ force_reconstruct_chunks:
 		///////////////////////////////////////////////////////////
 		if ( ongoingAtChunk == SlaveWorker::chunkBuffer->at( listId )->getChunkId() ) {
 			// Check if there are any other lost data chunks
+			// fprintf( stderr, "performDegradedRead(): %u, %u, %u (ongoing: %u)\n", listId, stripeId, chunkId, ongoingAtChunk );
+
 			needsContinue = false;
 			for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
 				if ( original[ i * 2 + 1 ] < SlaveWorker::dataChunkCount && original[ i * 2 + 1 ] != chunkId ) {
