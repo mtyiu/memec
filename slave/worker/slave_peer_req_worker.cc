@@ -210,19 +210,57 @@ bool SlaveWorker::handleUpdateRequest( SlavePeerEvent event, char *buf, size_t s
 
 	Key key;
 	bool isChunkDelta = false;
+	Metadata metadata;
+	metadata.set( header.listId, header.stripeId, header.chunkId );
+
 	bool ret = SlaveWorker::chunkBuffer->at( header.listId )->updateKeyValue(
 		header.key, header.keySize,
 		header.valueUpdateOffset, header.valueUpdateSize, header.valueUpdate
 	);
 	if ( ! ret ) {
 		isChunkDelta = true;
-		// Use the chunkUpdateOffset
-		SlaveWorker::chunkBuffer->at( header.listId )->update(
-			header.stripeId, header.chunkId,
-			header.chunkUpdateOffset, header.valueUpdateSize, header.valueUpdate,
-			this->chunks, this->dataChunk, this->parityChunk
-		);
-		ret = true;
+
+		uint32_t myChunkId = SlaveWorker::chunkBuffer->at( header.listId )->getChunkId();
+
+		if ( myChunkId < SlaveWorker::dataChunkCount ) {
+			// Check remap buffer
+			ret = true;
+		} else {
+			// Sealed
+			bool checkGetChunk = true; // Force backup
+			if ( checkGetChunk ) {
+				Chunk *chunk = map->findChunkById( header.listId, header.stripeId, myChunkId );
+				MixedChunkBuffer *chunkBuffer = SlaveWorker::chunkBuffer->at( header.listId );
+
+				uint8_t sealIndicatorCount = 0;
+				bool *sealIndicator = 0;
+				LOCK_T *parityChunkBufferLock = 0;
+
+				sealIndicator = chunkBuffer->getSealIndicator( header.stripeId, sealIndicatorCount, true, false, &parityChunkBufferLock );
+
+				metadata.chunkId = myChunkId;
+				SlaveWorker::getChunkBuffer->insert( metadata, chunk, sealIndicatorCount, sealIndicator );
+				metadata.chunkId = header.chunkId;
+
+				/*
+				fprintf( stderr, "Storing backup for (%u, %u, %u / %u): %p - %.*s\n", header.listId, header.stripeId, myChunkId, header.chunkId, chunk, header.keySize, header.key );
+				if ( chunk )
+					chunk->print();
+				fflush( stdout );
+				*/
+
+				if ( parityChunkBufferLock )
+					UNLOCK( parityChunkBufferLock );
+			}
+
+			// Use the chunkUpdateOffset
+			SlaveWorker::chunkBuffer->at( header.listId )->update(
+				header.stripeId, header.chunkId,
+				header.chunkUpdateOffset, header.valueUpdateSize, header.valueUpdate,
+				this->chunks, this->dataChunk, this->parityChunk
+			);
+			ret = true;
+		}
 	}
 
 	key.set( header.keySize, header.key );
@@ -231,8 +269,6 @@ bool SlaveWorker::handleUpdateRequest( SlavePeerEvent event, char *buf, size_t s
 	Timestamp timestamp( event.timestamp );
 	Value value;
 	value.set( header.valueUpdateSize, header.valueUpdate );
-	Metadata metadata;
-	metadata.set( header.listId, header.stripeId, header.chunkId );
 	Slave *slave = Slave::getInstance();
 	LOCK( &slave->sockets.mastersIdToSocketLock );
 	try {

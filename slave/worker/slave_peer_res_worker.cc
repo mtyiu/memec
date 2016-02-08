@@ -873,6 +873,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 		} else {
 			SlaveWorker::stripeList->get( listId, this->paritySlaveSockets, this->dataSlaveSockets );
 
+			/*
 			fprintf( stderr, "[GET_CHUNK] (%u, %u) - Inconsistent chunks received. Seal indicators:\n", listId, stripeId );
 			for ( uint32_t j = 0; j < SlaveWorker::parityChunkCount + 1; j++ ) {
 				if ( j == SlaveWorker::parityChunkCount || this->chunks[ j + SlaveWorker::dataChunkCount ] ) {
@@ -883,6 +884,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 					fprintf( stderr, "\n" );
 				}
 			}
+			*/
 
 			Coding::forceSeal(
 				SlaveWorker::coding,
@@ -893,6 +895,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 				SlaveWorker::parityChunkCount
 			);
 
+			/*
 			fprintf( stderr, "[GET_CHUNK] (%u, %u) - Inconsistent chunks fixed. Seal indicators:\n", listId, stripeId );
 			for ( uint32_t j = 0; j < SlaveWorker::parityChunkCount + 1; j++ ) {
 				if ( j == SlaveWorker::parityChunkCount || this->chunks[ j + SlaveWorker::dataChunkCount ] ) {
@@ -901,41 +904,6 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 						fprintf( stderr, " %d", this->sealIndicators[ j ][ i ] ? 1 : 0 );
 					}
 					fprintf( stderr, "\n" );
-				}
-			}
-
-			/*
-			for ( uint32_t j = 0; j < SlaveWorker::parityChunkCount; j++ ) {
-				bool valid = true;
-				if ( j == SlaveWorker::parityChunkCount || ( this->chunks[ j + SlaveWorker::dataChunkCount ] && this->chunks[ j + SlaveWorker::dataChunkCount ] != Coding::zeros ) ) {
-					for ( uint32_t i = 0; i < SlaveWorker::dataChunkCount; i++ ) {
-						if ( this->sealIndicators[ j ][ i ] != this->sealIndicators[ SlaveWorker::parityChunkCount ][ i ] ) {
-							valid = false;
-							break;
-						}
-					}
-				}
-
-				if ( ! valid ) {
-					Coding::forceSeal(
-						SlaveWorker::coding,
-						this->chunks,
-						&( this->freeChunks[ 0 ] ),
-						this->sealIndicators,
-						SlaveWorker::dataChunkCount,
-						SlaveWorker::parityChunkCount
-					);
-
-					fprintf( stderr, "[GET_CHUNK] (%u, %u) - Inconsistent chunks fixed. Seal indicators:\n", listId, stripeId );
-					for ( uint32_t j = 0; j < SlaveWorker::parityChunkCount + 1; j++ ) {
-						if ( j == SlaveWorker::parityChunkCount || this->chunks[ j + SlaveWorker::dataChunkCount ] ) {
-							fprintf( stderr, "\t#%u (0x%p):", j, this->sealIndicators[ j ] );
-							for ( uint32_t i = 0; i < SlaveWorker::dataChunkCount; i++ ) {
-								fprintf( stderr, " %d", this->sealIndicators[ j ][ i ] ? 1 : 0 );
-							}
-							fprintf( stderr, "\n" );
-						}
-					}
 				}
 			}
 			*/
