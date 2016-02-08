@@ -270,6 +270,7 @@ bool SlaveWorker::handleDegradedUpdateRequest( MasterEvent event, struct Degrade
 		if ( chunkBufferIndex != -1 ) {
 			// Not sealed
 			chunkBuffer->unlock( chunkBufferIndex );
+			// fprintf( stderr, "handleDegradedUpdateRequest(): %.*s - 1\n", header.data.keyValueUpdate.keySize, header.data.keyValueUpdate.key );
 			return this->handleUpdateRequest(
 				event, header.data.keyValueUpdate,
 				header.original, header.reconstructed, header.reconstructedCount,
@@ -357,6 +358,7 @@ bool SlaveWorker::handleDegradedUpdateRequest( MasterEvent event, struct Degrade
 				);
 			} else {
 				// UPDATE data chunk and reconstructed parity chunks
+				// fprintf( stderr, "handleDegradedUpdateRequest(): %.*s - 2\n", header.data.keyValueUpdate.keySize, header.data.keyValueUpdate.key );
 				return this->handleUpdateRequest(
 					event, header.data.keyValueUpdate,
 					header.original, header.reconstructed, header.reconstructedCount,
@@ -381,6 +383,7 @@ bool SlaveWorker::handleDegradedUpdateRequest( MasterEvent event, struct Degrade
 				);
 			}
 			*/
+			// fprintf( stderr, "handleDegradedUpdateRequest(): %.*s - 3\n", header.data.keyValueUpdate.keySize, header.data.keyValueUpdate.key );
 			return this->handleUpdateRequest(
 				event, header.data.keyValueUpdate,
 				header.original, header.reconstructed, header.reconstructedCount,
@@ -392,6 +395,7 @@ bool SlaveWorker::handleDegradedUpdateRequest( MasterEvent event, struct Degrade
 		}
 	} else {
 		// Use normal flow
+		fprintf( stderr, "handleDegradedUpdateRequest(): %.*s - 4\n", header.data.keyValueUpdate.keySize, header.data.keyValueUpdate.key );
 		return this->handleUpdateRequest( event, header.data.keyValueUpdate );
 	}
 

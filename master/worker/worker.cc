@@ -150,21 +150,19 @@ bool MasterWorker::getSlaves(
 		original = _original;
 		remapped = _remapped;
 
-		/*
-		printf( "[%s] %.*s: ", opcode == PROTO_OPCODE_GET ? "GET" : "UPDATE", size, data );
-		for ( uint32_t i = 0; i < remappedCount; i++ ) {
-			printf(
-				"%s(%u, %u) |-> (%u, %u)",
-				i == 0 ? "" : "; ",
-				original[ i * 2     ],
-				original[ i * 2 + 1 ],
-				remapped[ i * 2     ],
-				remapped[ i * 2 + 1 ]
-			);
-		}
-		printf( "\n" );
-		fflush( stdout );
-		*/
+		// printf( "[%s] %.*s: ", opcode == PROTO_OPCODE_GET ? "GET" : "UPDATE", size, data );
+		// for ( uint32_t i = 0; i < remappedCount; i++ ) {
+		// 	printf(
+		// 		"%s(%u, %u) |-> (%u, %u)",
+		// 		i == 0 ? "" : "; ",
+		// 		original[ i * 2     ],
+		// 		original[ i * 2 + 1 ],
+		// 		remapped[ i * 2     ],
+		// 		remapped[ i * 2 + 1 ]
+		// 	);
+		// }
+		// printf( "\n" );
+		// fflush( stdout );
 	} else {
 		original = 0;
 		remapped = 0;

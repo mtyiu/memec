@@ -46,12 +46,14 @@ public:
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		char *key, uint8_t keySize,
 		char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize,
-		uint32_t timestamp = 0
+		uint32_t timestamp = 0,
+		bool checkGetChunk = false
 	);
 	char *reqDelete(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		char *key, uint8_t keySize,
-		uint32_t timestamp = 0
+		uint32_t timestamp = 0,
+		bool checkGetChunk = false
 	);
 
 	char *resSet(

@@ -57,12 +57,11 @@
 #define PROTO_OPCODE_SET                          0x02
 #define PROTO_OPCODE_UPDATE                       0x03
 #define PROTO_OPCODE_DELETE                       0x04
-#define PROTO_OPCODE_REDIRECT_GET                 0x05
-#define PROTO_OPCODE_REDIRECT_UPDATE              0x06
-#define PROTO_OPCODE_REDIRECT_DELETE              0x07
-#define PROTO_OPCODE_DEGRADED_GET                 0x08
-#define PROTO_OPCODE_DEGRADED_UPDATE              0x09
-#define PROTO_OPCODE_DEGRADED_DELETE              0x10
+#define PROTO_OPCODE_UPDATE_CHECK                 0x05
+#define PROTO_OPCODE_DELETE_CHECK                 0x06
+#define PROTO_OPCODE_DEGRADED_GET                 0x07
+#define PROTO_OPCODE_DEGRADED_UPDATE              0x08
+#define PROTO_OPCODE_DEGRADED_DELETE              0x09
 // Master <-> Slave //
 #define PROTO_OPCODE_REMAPPING_SET                0x12
 #define PROTO_OPCODE_DEGRADED_LOCK                0x13

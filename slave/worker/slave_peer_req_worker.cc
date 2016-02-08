@@ -358,7 +358,7 @@ bool SlaveWorker::handleGetChunkRequest( SlavePeerEvent event, struct ChunkHeade
 	);
 
 	if ( exists && backupChunk ) {
-		__INFO__( GREEN, "SlaveWorker", "handleGetChunkRequest", "Use backup for (%u, %u, %u) in the GetChunkBuffer: size = %u.", header.listId, header.stripeId, header.chunkId, backupChunk->getSize() );
+		// __INFO__( GREEN, "SlaveWorker", "handleGetChunkRequest", "Use backup for (%u, %u, %u) in the GetChunkBuffer: size = %u.", header.listId, header.stripeId, header.chunkId, backupChunk->getSize() );
 		delete[] sealIndicator;
 		sealIndicator = _sealIndicator;
 		sealIndicatorCount = _sealIndicatorCount;

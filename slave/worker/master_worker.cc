@@ -126,6 +126,11 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		// UPDATE
 		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
 		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
+			if ( ! success ) {
+				fprintf( stderr, "UPDATE FAILED: %.*s\n", event.message.keyValueUpdate.key.size,
+				event.message.keyValueUpdate.key.data );
+				// assert( success );
+			}
 			buffer.data = this->protocol.resUpdate(
 				buffer.size,
 				event.instanceId, event.requestId,
@@ -251,10 +256,16 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 						this->handleRemappingSetRequest( event, buffer.data, buffer.size );
 						break;
 					case PROTO_OPCODE_UPDATE:
-						this->handleUpdateRequest( event, buffer.data, buffer.size );
+						this->handleUpdateRequest( event, buffer.data, buffer.size, false );
+						break;
+					case PROTO_OPCODE_UPDATE_CHECK:
+						this->handleUpdateRequest( event, buffer.data, buffer.size, true );
 						break;
 					case PROTO_OPCODE_DELETE:
-						this->handleDeleteRequest( event, buffer.data, buffer.size );
+						this->handleDeleteRequest( event, buffer.data, buffer.size, false );
+						break;
+					case PROTO_OPCODE_DELETE_CHECK:
+						this->handleDeleteRequest( event, buffer.data, buffer.size, true );
 						break;
 					case PROTO_OPCODE_DEGRADED_GET:
 						this->handleDegradedGetRequest( event, buffer.data, buffer.size );
@@ -402,7 +413,7 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, struct KeyValueHeader &he
 	return true;
 }
 
-bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size ) {
+bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size, bool checkGetChunk ) {
 	struct KeyValueUpdateHeader header;
 	if ( ! this->protocol.parseKeyValueUpdateHeader( header, true, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleUpdateRequest", "Invalid UPDATE request." );
@@ -414,7 +425,14 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 		( int ) header.keySize, header.key, header.keySize,
 		header.valueUpdateSize, header.valueUpdateOffset
 	);
-	return this->handleUpdateRequest( event, header );
+	return this->handleUpdateRequest(
+		event, header,
+		0, 0, 0,
+		false,
+		0,
+		false,
+		checkGetChunk
+	);
 }
 
 bool SlaveWorker::handleUpdateRequest(
@@ -434,6 +452,8 @@ bool SlaveWorker::handleUpdateRequest(
 	RemappingRecord remappingRecord;
 	Chunk *chunk;
 
+	// checkGetChunk = true;
+
 	if ( map->findValueByKey( header.key, header.keySize, &keyValue, &key, &keyMetadata, &metadata, &chunk ) ) {
 		if ( keyMetadata.isParityRemapped ) {
 			assert( ! original && ! reconstructed && ! reconstructedCount );
@@ -450,6 +470,7 @@ bool SlaveWorker::handleUpdateRequest(
 			reconstructParity = false;
 			chunks = 0;
 			endOfDegradedOp = false;
+			checkGetChunk = true;
 		}
 
 		uint32_t offset = keyMetadata.offset + PROTO_KEY_VALUE_SIZE + header.keySize + header.valueUpdateOffset;
@@ -627,7 +648,7 @@ bool SlaveWorker::handleUpdateRequest(
 	return ret;
 }
 
-bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size ) {
+bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size, bool checkGetChunk ) {
 	struct KeyHeader header;
 	if ( ! this->protocol.parseKeyHeader( header, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleDeleteRequest", "Invalid DELETE request." );
@@ -638,14 +659,22 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 		"[DELETE] Key: %.*s (key size = %u).",
 		( int ) header.keySize, header.key, header.keySize
 	);
-	return this->handleDeleteRequest( event, header );
+	return this->handleDeleteRequest(
+		event, header,
+		0, 0, 0,
+		false,
+		0,
+		false,
+		checkGetChunk
+	);
 }
 
 bool SlaveWorker::handleDeleteRequest(
 	MasterEvent event, struct KeyHeader &header,
 	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 	bool reconstructParity,
-	Chunk **chunks, bool endOfDegradedOp
+	Chunk **chunks, bool endOfDegradedOp,
+	bool checkGetChunk
 ) {
 	bool ret;
 	Key key;

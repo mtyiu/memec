@@ -66,10 +66,10 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 		case PROTO_DEGRADED_LOCK_RES_WAS_LOCKED:
 			__DEBUG__(
 				BLUE, "MasterWorker", "handleDegradedLockResponse",
-				"[%s Locked] Key: %.*s (key size = %u); Stripe ID: %u; Is Sealed? %s.",
+				"[%s Locked] [%u, %u, %u] Key: %.*s (key size = %u); Is Sealed? %s.",
 				header.type == PROTO_DEGRADED_LOCK_RES_IS_LOCKED ? "Is" : "Was",
+				originalListId, header.stripeId, originalChunkId,
 				( int ) header.keySize, header.key, header.keySize,
-				header.stripeId,
 				header.isSealed ? "true" : "false"
 			);
 
@@ -90,14 +90,16 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 		case PROTO_DEGRADED_LOCK_RES_NOT_LOCKED:
 			__DEBUG__(
 				BLUE, "MasterWorker", "handleDegradedLockResponse",
-				"[Not Locked] Key: %.*s (key size = %u).",
+				"[Not Locked] [%u, %u] Key: %.*s (key size = %u).",
+				originalListId, originalChunkId,
 				( int ) header.keySize, header.key, header.keySize
 			);
 			break;
 		case PROTO_DEGRADED_LOCK_RES_REMAPPED:
 			__DEBUG__(
 				BLUE, "MasterWorker", "handleDegradedLockResponse",
-				"[Remapped] Key: %.*s (key size = %u).",
+				"[Remapped] [%u, %u] Key: %.*s (key size = %u).",
+				originalListId, originalChunkId,
 				( int ) header.keySize, header.key, header.keySize
 			);
 
@@ -117,7 +119,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 			break;
 		case PROTO_DEGRADED_LOCK_RES_NOT_EXIST:
 		default:
-			__INFO__(
+			__DEBUG__(
 				BLUE, "MasterWorker", "handleDegradedLockResponse",
 				"[Not Found] Key: %.*s (key size = %u)",
 				( int ) header.keySize, header.key, header.keySize
@@ -210,7 +212,8 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 						buffer.size, instanceId, requestId,
 						degradedLockData.key, degradedLockData.keySize,
 						degradedLockData.valueUpdate, degradedLockData.valueUpdateOffset, degradedLockData.valueUpdateSize,
-						requestTimestamp
+						requestTimestamp,
+						true
 					);
 					break;
 				case PROTO_DEGRADED_LOCK_RES_NOT_EXIST:
@@ -251,7 +254,8 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 					buffer.data = this->protocol.reqDelete(
 						buffer.size, instanceId, requestId,
 						degradedLockData.key, degradedLockData.keySize,
-						requestTimestamp
+						requestTimestamp,
+						true
 					);
 					break;
 				case PROTO_DEGRADED_LOCK_RES_NOT_EXIST:

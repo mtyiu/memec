@@ -94,7 +94,7 @@ private:
 	bool handleGetRequest( MasterEvent event, KeyHeader &header, bool isDegraded );
 	bool handleSetRequest( MasterEvent event, char *buf, size_t size, bool needResSet = true );
 	bool handleSetRequest( MasterEvent event, KeyValueHeader &header, bool needResSet = true );
-	bool handleUpdateRequest( MasterEvent event, char *buf, size_t size );
+	bool handleUpdateRequest( MasterEvent event, char *buf, size_t size, bool checkGetChunk );
 	bool handleUpdateRequest(
 		MasterEvent event, KeyValueUpdateHeader &header,
 		uint32_t *original = 0, uint32_t *reconstructed = 0, uint32_t reconstructedCount = 0,
@@ -103,13 +103,14 @@ private:
 		bool endOfDegradedOp = false,
 		bool checkGetChunk = false
 	);
-	bool handleDeleteRequest( MasterEvent event, char *buf, size_t size );
+	bool handleDeleteRequest( MasterEvent event, char *buf, size_t size, bool checkGetChunk );
 	bool handleDeleteRequest(
 		MasterEvent event, KeyHeader &header,
 		uint32_t *original = 0, uint32_t *reconstructed = 0, uint32_t reconstructedCount = 0,
 		bool reconstructParity = false,
 		Chunk **chunks = 0,
-		bool endOfDegradedOp = false
+		bool endOfDegradedOp = false,
+		bool checkGetChunk = false
 	);
 
 	bool handleAckParityDeltaBackup( MasterEvent event, char *buf, size_t size );

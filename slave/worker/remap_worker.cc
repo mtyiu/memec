@@ -293,7 +293,7 @@ bool SlaveWorker::handleRemappedUpdateRequest( SlavePeerEvent event, char *buf, 
 		ret = true;
 	} else if ( remappedBuffer->update( header.keySize, header.key, header.valueUpdateSize, header.valueUpdateOffset, header.valueUpdate ) ) {
 		// Parity remapped
-		ret = false;
+		ret = true;
 	} else {
 		ret = false;
 	}

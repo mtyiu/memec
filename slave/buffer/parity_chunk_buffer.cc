@@ -98,7 +98,7 @@ bool ParityChunkBuffer::set( char *keyStr, uint8_t keySize, char *valueStr, uint
 
 		switch ( pendingRequest.type ) {
 			case PRT_SEAL:
-				// fprintf( stderr, "--- PRT_SEAL: Key = %.*s ---\n", keySize, keyStr );
+				// fprintf( stderr, "--- PRT_SEAL: Key = %.*s (%u, %u, %u) ---\n", keySize, keyStr, this->listId, pendingRequest.req.seal.stripeId, this->chunkId );
 				KeyValue::serialize( data + pendingRequest.req.seal.offset, keyStr, keySize, valueStr, valueSize );
 				dataChunk->setSize( pendingRequest.req.seal.offset + KEY_VALUE_METADATA_SIZE + keySize + valueSize );
 
@@ -350,6 +350,16 @@ bool ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t of
 		assert( false );
 		wrapper.pending[ chunkId ] = true;
 	}
+
+	// if ( isSeal ) {
+	// 	printf( "----- SEALED ------\n" );
+	// 	wrapper.chunk->print();
+	// 	fflush( stdout );
+	// } else {
+	// 	printf( "----- UPDATE ------\n" );
+	// 	wrapper.chunk->print();
+	// 	fflush( stdout );
+	// }
 
 	UNLOCK( &wrapper.lock );
 	if ( needsUnlock ) UNLOCK( &this->lock );

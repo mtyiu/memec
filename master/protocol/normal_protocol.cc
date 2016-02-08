@@ -30,12 +30,12 @@ char *MasterProtocol::reqGet( size_t &size, uint16_t instanceId, uint32_t reques
 	return this->buffer.send;
 }
 
-char *MasterProtocol::reqUpdate( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t timestamp ) {
+char *MasterProtocol::reqUpdate( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t timestamp, bool checkGetChunk ) {
 	// -- common/protocol/normal_protocol.cc --
 	size = this->generateKeyValueUpdateHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
-		PROTO_OPCODE_UPDATE,
+		checkGetChunk ? PROTO_OPCODE_UPDATE_CHECK : PROTO_OPCODE_UPDATE,
 		instanceId, requestId,
 		keySize,
 		key,
@@ -48,12 +48,12 @@ char *MasterProtocol::reqUpdate( size_t &size, uint16_t instanceId, uint32_t req
 	return this->buffer.send;
 }
 
-char *MasterProtocol::reqDelete( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize, uint32_t timestamp ) {
+char *MasterProtocol::reqDelete( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize, uint32_t timestamp, bool checkGetChunk ) {
 	// -- common/protocol/normal_protocol.cc --
 	size = this->generateKeyHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SLAVE,
-		PROTO_OPCODE_DELETE,
+		checkGetChunk ? PROTO_OPCODE_DELETE_CHECK : PROTO_OPCODE_DELETE,
 		instanceId, requestId,
 		keySize,
 		key, 0,

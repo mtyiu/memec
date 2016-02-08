@@ -55,9 +55,10 @@ bool GetChunkBuffer::insert( Metadata metadata, Chunk *chunk, uint8_t sealIndica
 		this->chunks.insert( p );
 	} else {
 		if ( chunk ) {
-			if ( ! it->second.chunk )
+			if ( ! it->second.chunk ) {
 				it->second.chunk = GetChunkBuffer::chunkPool->malloc();
-			it->second.chunk->copy( chunk );
+				it->second.chunk->copy( chunk );
+			}
 		} else {
 			it->second.chunk = 0;
 		}
