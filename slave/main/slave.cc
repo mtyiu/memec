@@ -228,6 +228,19 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 		WORKER_INIT_LOOP( slavePeer, WORKER_ROLE_SLAVE_PEER )
 #undef WORKER_INIT_LOOP
 	}
+	/* Remapping message handler; Remapping scheme */
+	if ( this->config.global.remap.enabled ) {
+		char slaveName[ 11 ];
+		memset( slaveName, 0, 11 );
+		sprintf( slaveName, "%s%04d", SLAVE_PREFIX, this->config.slave.slave.addr.id );
+		remapMsgHandler.init( this->config.global.remap.spreaddAddr.addr, this->config.global.remap.spreaddAddr.port, slaveName );
+		LOCK( &this->sockets.slavePeers.lock );
+		for ( uint32_t i = 0; i < this->sockets.slavePeers.size(); i++ ) {
+			remapMsgHandler.addAliveSlave( this->sockets.slavePeers.values[ i ]->getAddr() );
+		}
+		UNLOCK( &this->sockets.slavePeers.lock );
+		remapMsgHandler.listAliveSlaves();
+	}
 
 	// Set signal handlers //
 	Signal::setHandler( Slave::signalHandler );
@@ -320,6 +333,12 @@ bool Slave::start() {
 		return false;
 	}
 
+	/* Remapping message handler */
+	if ( this->config.global.remap.enabled && ! this->remapMsgHandler.start() ) {
+		__ERROR__( "Slave", "start", "Cannot start remapping message handler." );
+		return false;
+	}
+
 	this->startTime = start_timer();
 	this->isRunning = true;
 
@@ -362,6 +381,12 @@ bool Slave::stop() {
 		this->sockets.slavePeers[ i ]->free();
 	}
 	this->sockets.slavePeers.clear();
+
+	 /* Remapping message handler */
+	if ( this->config.global.remap.enabled ) {
+		this->remapMsgHandler.stop();
+		this->remapMsgHandler.quit();
+	}
 
 	/* Chunk buffer */
 	for ( size_t i = 0, size = this->chunkBuffer.size(); i < size; i++ ) {
@@ -671,6 +696,9 @@ void Slave::interactive() {
 		} else if ( strcmp( command, "backup" ) == 0 ) {
 			valid = true;
 			this->backupStat( stdout );
+		} else if ( strcmp( command, "remapping" ) == 0 ) {
+			valid = true;
+			this->printRemapping();
 		} else if ( strcmp( command, "time" ) == 0 ) {
 			valid = true;
 			this->time();
@@ -1007,6 +1035,7 @@ void Slave::help() {
 		"- sync: Synchronize with coordinator\n"
 		"- chunk: Print the debug message for a chunk\n"
 		"- pending: Print all pending requests\n"
+		"- remapping: Show remapping info\n"
 		"- dump: Dump all key-value pairs\n"
 		"- memory: Print memory usage\n"
 		"- backup : Show the backup stats\n"
@@ -1091,6 +1120,15 @@ void Slave::lookup() {
 
 	if ( ! found )
 		printf( "Key not found.\n" );
+}
+
+void Slave::printRemapping( FILE *f ) {
+	fprintf(
+		f,
+		"\nList of Tracking Slaves\n"
+		"------------------------\n"
+	);
+	this->remapMsgHandler.listAliveSlaves();
 }
 
 void Slave::time() {

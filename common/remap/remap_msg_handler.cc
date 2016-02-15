@@ -12,9 +12,9 @@ RemapMsgHandler::RemapMsgHandler() {
 RemapMsgHandler::~RemapMsgHandler() {
 }
 
-bool RemapMsgHandler::sendState( std::vector<struct sockaddr_in> &slaves, const char *targetGroup ) {
+bool RemapMsgHandler::sendState( std::vector<struct sockaddr_in> &slaves, int numGroup, const char targetGroup[][ MAX_GROUP_NAME ] ) {
 	char buf[ MAX_MESSLEN ];
-	int len = 0;
+	int len = 0, ret = 0;
 	int recordSize = this->slaveStateRecordSize;
 
 	buf[0] = ( uint8_t ) slaves.size();
@@ -27,7 +27,12 @@ bool RemapMsgHandler::sendState( std::vector<struct sockaddr_in> &slaves, const 
 		*( ( uint32_t * )( buf + len + sizeof( uint32_t ) + sizeof( uint16_t ) ) ) = ( uint8_t ) this->slavesState[ slaves.at(i) ];
 		len += recordSize;
 	}
-	return ( SP_multicast ( this->mbox, MSG_TYPE, targetGroup , 0, len, buf ) > 0 );
+	if ( numGroup > 1 ) {
+		ret = SP_multigroup_multicast ( this->mbox, MSG_TYPE, numGroup, targetGroup , 0, len, buf ) > 0;
+	} else {
+		ret = SP_multicast ( this->mbox, MSG_TYPE, targetGroup[0], 0, len, buf ) > 0;
+	}
+	return ret;
 }
 
 bool RemapMsgHandler::init( const char *spread, const char *user ) {

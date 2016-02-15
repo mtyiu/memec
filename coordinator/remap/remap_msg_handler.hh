@@ -41,8 +41,10 @@ private:
 	LOCK_T aliveSlavesLock;
 
 	/* handle master join or leave */
-	bool isMasterLeft( int service, char *msg, char *subject );
 	bool isMasterJoin( int service, char *msg, char *subject );
+	bool isMasterLeft( int service, char *msg, char *subject );
+	bool isSlaveJoin( int service, char *msg, char *subject );
+	bool isSlaveLeft( int service, char *msg, char *subject );
 
 	static void *readMessages( void *argv );
 	bool updateState( char *subject, char *msg, int len );
@@ -81,9 +83,12 @@ public:
 	bool resetMasterAck( struct sockaddr_in slave );
 	bool isAllMasterAcked( struct sockaddr_in slave );
 
-	// notify master of slaves' state
+	// notify masters of slaves' state
 	bool sendStateToMasters( std::vector<struct sockaddr_in> slaves );
 	bool sendStateToMasters( struct sockaddr_in slave );
+	// notify both masters and slaves
+	bool broadcastState( std::vector<struct sockaddr_in> slaves );
+	bool broadcastState( struct sockaddr_in slave );
 
 	// keep track of the alive slaves
 	bool addAliveSlave( struct sockaddr_in slave );

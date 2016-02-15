@@ -21,6 +21,7 @@ OBJS= \
 	event/master_event.o \
 	event/slave_event.o \
 	event/slave_peer_event.o \
+	remap/remap_msg_handler.o \
 	protocol/ack_protocol.o \
 	protocol/degraded_protocol.o \
 	protocol/heartbeat_protocol.o \
@@ -58,6 +59,7 @@ EXTERNAL_LIB= \
 	$(PLIO_SRC_ROOT)/common/ds/key_value.o \
 	$(PLIO_SRC_ROOT)/common/ds/load.o \
 	$(PLIO_SRC_ROOT)/common/ds/sockaddr_in.o \
+	$(PLIO_SRC_ROOT)/common/remap/remap_msg_handler.o \
 	$(PLIO_SRC_ROOT)/common/protocol/protocol.o \
 	$(PLIO_SRC_ROOT)/common/protocol/ack_protocol.o \
 	$(PLIO_SRC_ROOT)/common/protocol/address_protocol.o \
@@ -76,7 +78,8 @@ EXTERNAL_LIB= \
 
 LD_LIB= \
 	-lrt \
-	-ldl
+	-ldl \
+	-lspread
 
 .PHONY: clean
 

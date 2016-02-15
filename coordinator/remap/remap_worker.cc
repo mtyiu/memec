@@ -44,7 +44,7 @@ bool CoordinatorRemapWorker::transitToDegraded( RemapStateEvent event ) { // Pha
 
 	// broadcast to master: the transition is completed
 	crmh->slavesState[ event.slave ] = REMAP_DEGRADED; // Phase 2
-	if ( crmh->sendStateToMasters( event.slave ) == false ) {
+	if ( crmh->broadcastState( event.slave ) == false ) {
 		__ERROR__( "CoordinatorRemapWorker", "transitToDegraded",
 			"Failed to broadcast state changes on slave %s:%u!",
 			buf, ntohs( event.slave.sin_port )
@@ -90,7 +90,7 @@ bool CoordinatorRemapWorker::transitToNormal( RemapStateEvent event ) { // Phase
 
 	// ask master to use normal SET workflow
 	crmh->slavesState[ event.slave ] = REMAP_NORMAL;
-	if ( crmh->sendStateToMasters( event.slave ) == false ) {
+	if ( crmh->broadcastState( event.slave ) == false ) {
 		__ERROR__( "CoordinatorRemapWorker", "transitToNormal",
 			"Failed to broadcast state changes on slave %s:%u!",
 			buf, ntohs( event.slave.sin_port )

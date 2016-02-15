@@ -14,6 +14,7 @@
 #include "../ds/map.hh"
 #include "../ds/pending.hh"
 #include "../event/event_queue.hh"
+#include "../remap/remap_msg_handler.hh"
 #include "../socket/coordinator_socket.hh"
 #include "../socket/master_socket.hh"
 #include "../socket/slave_socket.hh"
@@ -88,6 +89,8 @@ public:
 	} status;
 	/* Instance ID (assigned by coordinator) */
 	static uint16_t instanceId;
+	/* Remapping */
+	SlaveRemapMsgHandler remapMsgHandler;
 
 	static Slave *getInstance() {
 		static Slave slave;
@@ -116,6 +119,7 @@ public:
 	void printPending( FILE *f = stdout );
 	void printChunk();
 	void time();
+	void printRemapping( FILE *f = stdout );
 	void backupStat( FILE *f = stdout );
 	void lookup();
 

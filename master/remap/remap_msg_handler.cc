@@ -290,6 +290,7 @@ bool MasterRemapMsgHandler::acceptNormalResponse( const struct sockaddr_in &slav
 }
 
 bool MasterRemapMsgHandler::sendStateToCoordinator( std::vector<struct sockaddr_in> slaves ) {
+	char group[ 1 ][ MAX_GROUP_NAME ];
 	uint32_t recordSize = this->slaveStateRecordSize;
 	if ( slaves.size() == 0 ) {
 		// TODO send all slave state
@@ -299,8 +300,8 @@ bool MasterRemapMsgHandler::sendStateToCoordinator( std::vector<struct sockaddr_
 		fprintf( stderr, "Too much slaves to include in message" );
 		return false;
 	}
-	return sendState( slaves, COORD_GROUP );
-
+	strcpy( group[ 0 ], COORD_GROUP );
+	return sendState( slaves, 1, group );
 }
 
 bool MasterRemapMsgHandler::sendStateToCoordinator( struct sockaddr_in slave ) {

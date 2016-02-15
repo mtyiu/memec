@@ -34,7 +34,7 @@ protected:
 	const static uint32_t slaveStateRecordSize = 4 + 2 + 1; // sizeof( IP, port, state ) = 7
 
 	// send a vector of slave state
-	bool sendState ( std::vector<struct sockaddr_in> &slaves, const char *targetGroup );
+	bool sendState ( std::vector<struct sockaddr_in> &slaves, int numGroup, const char targetGroup[][ MAX_GROUP_NAME ] );
 
 	inline void increMsgCount() {
 		this->msgCount++;

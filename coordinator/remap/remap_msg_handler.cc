@@ -130,7 +130,7 @@ bool CoordinatorRemapMsgHandler::stop() {
 			_ALL_SLAVES_->erase( _ALL_SLAVES_->begin() + i ); \
 		} \
 		/* ask master to change state */ \
-		if ( this->sendStateToMasters( _CHECKED_SLAVES_ ) == false ) { \
+		if ( this->broadcastState( _CHECKED_SLAVES_ ) == false ) { \
 			/* revert the state if failed to start */ \
 			for ( uint32_t i = 0; i < _CHECKED_SLAVES_.size() ; i++ ) { \
 				LOCK( &this->slavesStateLock[ _ALL_SLAVES_->at(i) ] ); \
@@ -167,7 +167,7 @@ bool CoordinatorRemapMsgHandler::transitToDegraded( std::vector<struct sockaddr_
 			this->slavesState[ slaves->at( i ) ] = REMAP_INTERMEDIATE;
 			UNLOCK( &this->slavesStateLock[ slaves->at(i) ] );
 		}
-		this->sendStateToMasters( *slaves );
+		this->broadcastState( *slaves );
 		this->insertRepeatedEvents( event, slaves );
 	} else {
 		REMAP_PHASE_CHANGE_HANDLER( slaves, slavesToStart, event );
@@ -243,7 +243,7 @@ bool CoordinatorRemapMsgHandler::transitToNormal( std::vector<struct sockaddr_in
 			this->slavesState[ slaves->at( i ) ] = REMAP_COORDINATED;
 			UNLOCK( &this->slavesStateLock[ slaves->at(i) ] );
 		}
-		this->sendStateToMasters( *slaves );
+		this->broadcastState( *slaves );
 		this->insertRepeatedEvents( event, slaves );
 	} else {
 		REMAP_PHASE_CHANGE_HANDLER( slaves, slavesToStop, event );
@@ -307,30 +307,30 @@ bool CoordinatorRemapMsgHandler::insertRepeatedEvents( RemapStateEvent event, st
 	return ret;
 }
 
-bool CoordinatorRemapMsgHandler::isMasterLeft( int service, char *msg, char *subject ) {
-	// assume masters name themselves "[PREFIX][0-9]*"
-	if ( this->isMemberLeave( service ) ) {
-		if ( strncmp( subject + 1, MASTER_PREFIX , MASTER_PREFIX_LEN ) == 0 ) {
-			return true;
-		}
-	}
-	return false;
-}
-
 bool CoordinatorRemapMsgHandler::isMasterJoin( int service, char *msg, char *subject ) {
 	// assume masters name themselves "[PREFIX][0-9]*"
-	if ( this->isMemberJoin( service ) ) {
-		if ( strncmp( subject + 1, MASTER_PREFIX , MASTER_PREFIX_LEN ) == 0 ) {
-			return true;
-		}
-	}
-	return false;
+	return ( this->isMemberJoin( service ) && strncmp( subject + 1, MASTER_PREFIX , MASTER_PREFIX_LEN ) == 0 ); 
+}
+
+bool CoordinatorRemapMsgHandler::isMasterLeft( int service, char *msg, char *subject ) {
+	// assume masters name themselves "[PREFIX][0-9]*"
+	return ( this->isMemberLeave( service ) && strncmp( subject + 1, MASTER_PREFIX , MASTER_PREFIX_LEN ) == 0 ); 
+}
+
+bool CoordinatorRemapMsgHandler::isSlaveJoin( int service, char *msg, char *subject ) {
+	// assume masters name themselves "[PREFIX][0-9]*"
+	return ( this->isMemberJoin( service ) && strncmp( subject + 1, SLAVE_PREFIX , SLAVE_PREFIX_LEN ) == 0 ); 
+}
+bool CoordinatorRemapMsgHandler::isSlaveLeft( int service, char *msg, char *subject ) {
+	// assume masters name themselves "[PREFIX][0-9]*"
+	return ( this->isMemberLeave( service ) && strncmp( subject + 1, SLAVE_PREFIX , SLAVE_PREFIX_LEN ) == 0 ); 
 }
 
 /*
  * packet: [# of slaves](1) [ [ip addr](4) [port](2) [state](1) ](7) [..](7) [..](7) ...
  */
 bool CoordinatorRemapMsgHandler::sendStateToMasters( std::vector<struct sockaddr_in> slaves ) {
+	char group[ 1 ][ MAX_GROUP_NAME ];
 	int recordSize = this->slaveStateRecordSize;
 
 	if ( slaves.size() == 0 ) {
@@ -340,13 +340,35 @@ bool CoordinatorRemapMsgHandler::sendStateToMasters( std::vector<struct sockaddr
 		return false;
 	}
 
-	return sendState( slaves, MASTER_GROUP );
+	strcpy( group[ 0 ], MASTER_GROUP );
+	return sendState( slaves, 1, group );
 }
 
 bool CoordinatorRemapMsgHandler::sendStateToMasters( struct sockaddr_in slave ) {
 	std::vector<struct sockaddr_in> slaves;
 	slaves.push_back( slave );
 	return sendStateToMasters( slaves );
+}
+
+bool CoordinatorRemapMsgHandler::broadcastState( std::vector<struct sockaddr_in> slaves ) {
+	char groups[ MAX_GROUP_NUM ][ MAX_GROUP_NAME ];
+	int recordSize = this->slaveStateRecordSize;
+	if ( slaves.size() == 0 ) {
+		slaves = std::vector<struct sockaddr_in>( this->aliveSlaves.begin(), this->aliveSlaves.end() );
+	} else if ( slaves.size() > 255 || slaves.size() * recordSize + 1 > MAX_MESSLEN ) {
+		fprintf( stderr, "Too much slaves to include in message" );
+		return false;
+	}
+	// send to masters and slaves
+	strcpy( groups[ 0 ], MASTER_GROUP );
+	strcpy( groups[ 1 ], SLAVE_GROUP );
+	return sendState( slaves, 2, groups );
+}
+
+bool CoordinatorRemapMsgHandler::broadcastState( struct sockaddr_in slave ) {
+	std::vector<struct sockaddr_in> slaves;
+	slaves.push_back( slave );
+	return broadcastState( slaves );
 }
 
 void *CoordinatorRemapMsgHandler::readMessages( void *argv ) {
@@ -369,16 +391,26 @@ void *CoordinatorRemapMsgHandler::readMessages( void *argv ) {
 		regular = myself->isRegularMessage( service );
 		fromMaster = ( strncmp( sender, MASTER_GROUP, MASTER_GROUP_LEN ) == 0 );
 
-		if ( ! regular && fromMaster && myself->isMasterJoin( service , msg, subject ) ) {
-			// master joined ( masters group )
-			myself->addAliveMaster( subject );
-			// notify the new master about the remapping state
+		if ( ! regular ) {
 			std::vector<struct sockaddr_in> slaves;
-			myself->sendStateToMasters( slaves );
-		} else if ( ! regular && myself->isMasterLeft( service , msg, subject ) ) {
-			// master left
-			myself->removeAliveMaster( subject );
-		} else if ( regular ){
+			if ( fromMaster && myself->isMasterJoin( service , msg, subject ) ) {
+				// master joined ( masters group )
+				myself->addAliveMaster( subject );
+				// notify the new master about the remapping state
+				myself->sendStateToMasters( slaves );
+			} else if ( myself->isMasterLeft( service, msg, subject ) ) {
+				// master left
+				myself->removeAliveMaster( subject );
+			} else if ( myself->isSlaveJoin( service, msg, subject ) ) {
+				// slave join
+				myself->broadcastState( slaves );
+			} else if ( myself->isSlaveLeft( service, msg, subject ) ) {
+				// slave left
+				// TODO: change state ?
+			} else {
+				// ignored
+			}
+		} else {
 			// ack from masters, etc.
 			myself->updateState( sender, msg, ret );
 		}
