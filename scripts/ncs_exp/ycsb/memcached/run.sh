@@ -1,15 +1,24 @@
 #!/bin/bash
 
+###################################################
+#
+# Run the workload using YCSB client
+# INPUT: (1) Number of threads to use in each client, (2) name of the YCSB workload
+#
+###################################################
+
 YCSB_PATH=~/mtyiu/ycsb/0.3.0
 
 if [ $# != 2 ]; then
-	echo "Usage: $0 [Number of threads] [Workload] [Output file of raw datapoints]"
+	echo "Usage: $0 [Number of threads] [Workload]"
 	exit 1
 fi
 
+# Evenly distribute the # of ops to YCSB clients ( 4 in the experiment setting )
 RECORD_COUNT=10000000
 OPERATION_COUNT=$(expr ${RECORD_COUNT} \/ 4)
 
+# Run the target workload
 ${YCSB_PATH}/bin/ycsb \
 	run memcached-cluster \
 	-s \

@@ -3,11 +3,21 @@
 YCSB_PATH=~/mtyiu/ycsb/0.3.0
 
 if [ $# != 1 ]; then
-	echo "Usage: $0 [Number of threads] [Output file of raw datapoints]"
+	echo "Usage: $0 [Number of threads]"
 	exit 1
 fi
 
+###################################################
+#
+# Load key-value pairs using YCSB client
+# INPUT: (1) Number of threads to use in each client, (2) name of the YCSB workload
+#
+###################################################
+
 ID=$(hostname | sed 's/testbed-node//g')
+
+# Evenly distribute the # of ops to YCSB clients ( 4 in the experiment setting )
+# Each client inserts pairs of an independent key range
 RECORD_COUNT=100000000
 INSERT_COUNT=$(expr ${RECORD_COUNT} \/ 4)
 if [ $ID == 3 ]; then
@@ -20,6 +30,7 @@ elif [ $ID == 9 ]; then
 	INSERT_START=$(expr ${INSERT_COUNT} \* 3)
 fi
 
+# Load the store with key-value pairs
 ${YCSB_PATH}/bin/ycsb \
 	load tachyon \
 	-s \
