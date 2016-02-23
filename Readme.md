@@ -38,6 +38,13 @@ Configure under `lib/isa-l-2.14.0/`,
 make install
 ```
 
+If you encounter the error "Libtool library used but 'LIBTOOL' is undefined",
+
+1. Install `libtool`: `$ sudo apt-get install libtool`
+2. Add `AC_CONFIG_MACRO_DIR([m4])` to `configure.ac`
+3. Add libtool support: `$ libtoolize`
+4. Continue to install: `$ ./configure --prefix=$(pwd); make install`
+
 The system uses Jerasure for coding by default (for RS and CRS), uncomment `-DUSE_ISAL` in `common/coding/Makefile` to use ISA-L instead
 ```
 FLAGS= -DUSE_ISAL
