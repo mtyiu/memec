@@ -3,7 +3,7 @@
 #include <arpa/inet.h>
 #include "../../../common/remap/remap_msg_handler.hh"
 #include "../../../coordinator/remap/remap_msg_handler.hh"
-#include "../../../master/remap/remap_msg_handler.hh"
+#include "../../../client/remap/remap_msg_handler.hh"
 
 #define SLAVE_COUNT		8
 #define REMAP_COUNT		2
@@ -68,4 +68,3 @@ bool meetStatus( RemapMsgHandler *handler, const std::vector<struct sockaddr_in>
 	}
 	return ret;
 }
-

@@ -28,7 +28,7 @@ function restore_overload {
 function set_config {
 	sed -i "s/^smoothingFactor=.*$/smoothingFactor=$1/g" ${PLIO_PATH}/bin/config/ncs_exp/global.ini
 	sed -i "s/^updateInterval=.*$/updateInterval=$2/g" ${PLIO_PATH}/bin/config/ncs_exp/coordinator.ini
-	sed -i "s/^updateInterval=.*$/updateInterval=$2/g" ${PLIO_PATH}/bin/config/ncs_exp/master.ini
+	sed -i "s/^updateInterval=.*$/updateInterval=$2/g" ${PLIO_PATH}/bin/config/ncs_exp/client.ini
 }
 
 if [ $# != 2 ]; then
@@ -50,7 +50,7 @@ stat_exchange_freq=$2
 			read -p "Press Enter when ready..."
 
 			for n in 3 4 8 9; do
-				ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/master/workloads-memec.sh $coding $threads $workload $(printf '\r')\"" &
+				ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/client/workloads-memec.sh $coding $threads $workload $(printf '\r')\"" &
 			done
 
 			sleep 3
@@ -72,4 +72,3 @@ stat_exchange_freq=$2
 		done
 # 	done
 # done
-

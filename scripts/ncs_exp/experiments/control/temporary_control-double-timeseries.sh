@@ -32,7 +32,7 @@ for delay in $delays; do
 
 		echo "-------------------- Load --------------------"
 		for n in 3 4 8 9; do
-			ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/master/temporary-timeseries.sh load $(printf '\r')\"" &
+			ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/client/temporary-timeseries.sh load $(printf '\r')\"" &
 		done
 
 		pending=0
@@ -48,7 +48,7 @@ for delay in $delays; do
 		for w in $workloads; do
 			echo "-------------------- Run ($w) --------------------"
 			for n in 3 4 8 9; do
-				ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/master/temporary-timeseries.sh $w $(printf '\r')\"" &
+				ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/client/temporary-timeseries.sh $w $(printf '\r')\"" &
 			done
 
 			sleep 10

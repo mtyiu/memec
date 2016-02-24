@@ -9,8 +9,8 @@
 #include "../../common/protocol/protocol.hh"
 #include "../../common/config/global_config.hh"
 #include "../../common/config/server_addr.hh"
-#include "../../master/config/master_config.hh"
-#include "../../slave/config/slave_config.hh"
+#include "../../client/config/master_config.hh"
+#include "../../server/config/slave_config.hh"
 
 class CoordinatorProtocol : public Protocol {
 public:

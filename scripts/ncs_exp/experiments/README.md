@@ -22,17 +22,17 @@
     - In `global.ini`,
         - Encoding scheme under `coding`
         - Encoding parameters under the names of coding schemes
-        - Enable degraded mode by setting 1 for `remap > enabled` 
+        - Enable degraded mode by setting 1 for `remap > enabled`
         - Enable manual transition by setting 1 for `remap > enabled`
-    - In `coordinator.ini`, `master.ini`, and `slave.ini`,
+    - In `coordinator.ini`, `client.ini`, and `server.ini`,
         - Tune the number of worker threads under `workers`
-    - In `master.ini`,
+    - In `client.ini`,
         - Tune the number of acks to batch before acknowledging parity delta backups under `backup > ackBatchSize`
-    - In `slave.ini`,
+    - In `server.ini`,
         - Tune the storage capacity of each slave under `pool > chunks` (in bytes)
 4. Modify the `BASE_PATH` and `PLIO_PATH` in the scripts to the folder containing the scripts, and the path to PLIO folder respectively.
 5. Synchronize the scripts, together with PLIO components, to all the nodes (we assume a homogenous setting, i.e., same `BASE_PATH` and `PLIO_PATH`).
-6. Run an experiment script in the screen `experiment` on `node10` 
+6. Run an experiment script in the screen `experiment` on `node10`
 
 # Notes to scripts execution
 - Control flow: `control` >  `../bootstrap`, `master`, or `../util` > `../ycsb/`

@@ -33,7 +33,7 @@ for iter in {1..1}; do
 				fi
 
 				for n in {11..18}; do
-					ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts_huawei/experiments/master/workloads-memec.sh $c $t $w $(printf '\r')\"" &
+					ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts_huawei/experiments/client/workloads-memec.sh $c $t $w $(printf '\r')\"" &
 				done
 
 				pending=0

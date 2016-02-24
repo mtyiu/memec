@@ -30,7 +30,7 @@ for iter in {1..30}; do
 				fi
 
 				for n in 3 4 8 9; do
-					ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/master/workloads-memcached.sh $c $t $w $(printf '\r')\"" &
+					ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/client/workloads-memcached.sh $c $t $w $(printf '\r')\"" &
 				done
 
 				pending=0

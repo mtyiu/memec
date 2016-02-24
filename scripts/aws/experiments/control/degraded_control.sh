@@ -34,7 +34,7 @@ for delay in $delays; do
 
 		echo "-------------------- Load --------------------"
 		for n in {1..4}; do
-			ssh client "screen -S ycsb${n} -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/master/degraded.sh load $(printf '\r')\"" &
+			ssh client "screen -S ycsb${n} -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/client/degraded.sh load $(printf '\r')\"" &
 		done
 
 		pending=0
@@ -52,7 +52,7 @@ for delay in $delays; do
 		for w in $workloads; do
 			echo "-------------------- Run ($w) --------------------"
 			for n in {1..4}; do
-				ssh client "screen -S ycsb${n} -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/master/degraded.sh $w $(printf '\r')\"" &
+				ssh client "screen -S ycsb${n} -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/client/degraded.sh $w $(printf '\r')\"" &
 			done
 
 			pending=0

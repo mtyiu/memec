@@ -35,7 +35,7 @@ function restore_overload {
 
 ## DELAY
 for i in ${DELAYS[@]}; do
-DELAY_BASE=$i 
+DELAY_BASE=$i
 echo ${DELAY_BASE}
 
 if [ $IS_CONTROL -eq 1 ]; then
@@ -67,7 +67,7 @@ for iter in {1..10}; do
 
 	echo "-------------------- Load --------------------"
 	for n in 3 4 8 9; do
-		ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/master/degraded.sh load $(printf '\r')\"" &
+		ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/client/degraded.sh load $(printf '\r')\"" &
 	done
 
 	pending=0
@@ -90,7 +90,7 @@ for iter in {1..10}; do
 
 	for w in $workloads; do
 		for n in 3 4 8 9; do
-			ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/master/degraded.sh $w $(printf '\r')\"" &
+			ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/client/degraded.sh $w $(printf '\r')\"" &
 		done
 
 		pending=0

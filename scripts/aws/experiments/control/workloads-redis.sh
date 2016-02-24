@@ -33,7 +33,7 @@ for iter in {1..10}; do
 				fi
 
 				for n in {1..4}; do
-					ssh client "screen -S ycsb${n} -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/master/workloads-redis.sh $c $t $w $(printf '\r')\"" &
+					ssh client "screen -S ycsb${n} -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/client/workloads-redis.sh $c $t $w $(printf '\r')\"" &
 				done
 
 				pending=0

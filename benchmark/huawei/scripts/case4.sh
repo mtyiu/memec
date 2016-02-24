@@ -14,8 +14,8 @@ TOTAL_SIZE=$(expr $2 \* 1073741824) # 250 MB
 CLIENT_ID=0 #$4
 NUM_CLIENTS=1 #$5
 NUM_THREADS=$3
-MASTER_IP=$(head -n 1 scripts/master.conf)
-MASTER_PORTS=$(tail -n +2 scripts/master.conf)
+MASTER_IP=$(head -n 1 scripts/client.conf)
+MASTER_PORTS=$(tail -n +2 scripts/client.conf)
 
 if [ ${CLIENT_ID} -ge ${NUM_CLIENTS} ]; then
 	echo "The specified client ID is invalid. It should ranges from [0..$(expr ${NUM_CLIENTS} - 1)]"

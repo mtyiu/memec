@@ -2,7 +2,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include "../../../common/remap/remap_status.hh"
-#include "../../../master/remap/remap_msg_handler.hh"
+#include "../../../client/remap/remap_msg_handler.hh"
 
 #define TIME_OUT 1
 
@@ -36,10 +36,10 @@ int main ( int argc, char **argv ) {
 		// simulate the flow of start/end of remapping phase
 		for ( int i = 0; i < ROUNDS; i++ ) {
 			fprintf( stderr, ".. Waiting start of remapping phase\n" );
-			while ( meetStatus( mh, slaves, REMAP_PREPARE_START ) == false && 
+			while ( meetStatus( mh, slaves, REMAP_PREPARE_START ) == false &&
 				meetStatus( mh, slaves, REMAP_START ) == false &&
-				meetStatus( mh, slaves, REMAP_PREPARE_END ) == false 
-			) 
+				meetStatus( mh, slaves, REMAP_PREPARE_END ) == false
+			)
 				sleep( TIME_OUT );
 			fprintf( stderr, ".. Waiting end of remapping phase\n" );
 			mh->ackRemap();

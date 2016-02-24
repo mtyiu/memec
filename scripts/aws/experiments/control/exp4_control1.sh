@@ -33,7 +33,7 @@ iter=$1
 
 	echo "-------------------- Load --------------------"
 	for n in {1..4}; do
-		ssh node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/master/degraded.sh load $(printf '\r')\"" &
+		ssh node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/client/degraded.sh load $(printf '\r')\"" &
 	done
 
 	pending=0
@@ -48,7 +48,7 @@ iter=$1
 
 	for w in $workloads; do
 		for n in {1..4}; do
-			ssh node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/master/degraded.sh $w $(printf '\r')\"" &
+			ssh node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/client/degraded.sh $w $(printf '\r')\"" &
 		done
 
 		pending=0

@@ -5,24 +5,24 @@ LIBS=-pthread
 
 TARGETS= \
 	coordinator_remap \
-	master_remap
+	client_remap
 
-MSTR_OBJS= \
-	$(PLIO_SRC_ROOT)/master/config/master_config.o \
-	$(PLIO_SRC_ROOT)/master/ds/pending.o \
-	$(PLIO_SRC_ROOT)/master/event/application_event.o \
-	$(PLIO_SRC_ROOT)/master/event/coordinator_event.o \
-	$(PLIO_SRC_ROOT)/master/event/master_event.o \
-	$(PLIO_SRC_ROOT)/master/event/slave_event.o \
-	$(PLIO_SRC_ROOT)/master/protocol/protocol.o \
-	$(PLIO_SRC_ROOT)/master/remap/remap_msg_handler.o \
-	$(PLIO_SRC_ROOT)/master/remap/basic_remap_scheme.o \
-	$(PLIO_SRC_ROOT)/master/socket/application_socket.o \
-	$(PLIO_SRC_ROOT)/master/socket/coordinator_socket.o \
-	$(PLIO_SRC_ROOT)/master/socket/master_socket.o \
-	$(PLIO_SRC_ROOT)/master/socket/slave_socket.o \
-	$(PLIO_SRC_ROOT)/master/worker/worker.o \
-	$(PLIO_SRC_ROOT)/master/main/master.o 
+CLIENT_OBJS= \
+	$(PLIO_SRC_ROOT)/client/config/master_config.o \
+	$(PLIO_SRC_ROOT)/client/ds/pending.o \
+	$(PLIO_SRC_ROOT)/client/event/application_event.o \
+	$(PLIO_SRC_ROOT)/client/event/coordinator_event.o \
+	$(PLIO_SRC_ROOT)/client/event/master_event.o \
+	$(PLIO_SRC_ROOT)/client/event/slave_event.o \
+	$(PLIO_SRC_ROOT)/client/protocol/protocol.o \
+	$(PLIO_SRC_ROOT)/client/remap/remap_msg_handler.o \
+	$(PLIO_SRC_ROOT)/client/remap/basic_remap_scheme.o \
+	$(PLIO_SRC_ROOT)/client/socket/application_socket.o \
+	$(PLIO_SRC_ROOT)/client/socket/coordinator_socket.o \
+	$(PLIO_SRC_ROOT)/client/socket/master_socket.o \
+	$(PLIO_SRC_ROOT)/client/socket/slave_socket.o \
+	$(PLIO_SRC_ROOT)/client/worker/worker.o \
+	$(PLIO_SRC_ROOT)/client/main/master.o
 
 COOR_OBJS= \
 	$(PLIO_SRC_ROOT)/coordinator/worker/worker.o \
@@ -40,7 +40,7 @@ COOR_OBJS= \
 	$(PLIO_SRC_ROOT)/coordinator/remap/remap_worker.o
 
 OBJS= \
-	$(MSTR_OBJS) \
+	$(CLIENT_OBJS) \
 	$(COOR_OBJS)
 
 EXTERNAL_LIBS = \
@@ -67,8 +67,8 @@ all: $(OBJS) $(TARGETS)
 #$(TARGETS): % : %.cc $(OBJS)
 #	$(CC) $(CFLAGS) $(INCLUDE) $(LIBS) -o $@ $< $(OBJS) $(EXTERNAL_LIBS)
 
-master_remap: % : %.cc $(MSTR_OBJS)
-	$(CC) $(CFLAGS) $(INCLUDE) $(LIBS) -o $@ $< $(MSTR_OBJS) $(EXTERNAL_LIBS)
+client_remap: % : %.cc $(CLIENT_OBJS)
+	$(CC) $(CFLAGS) $(INCLUDE) $(LIBS) -o $@ $< $(CLIENT_OBJS) $(EXTERNAL_LIBS)
 
 coordinator_remap: % : %.cc $(CORD_OBJS)
 	$(CC) $(CFLAGS) $(INCLUDE) $(LIBS) -o $@ $< $(COOR_OBJS) $(EXTERNAL_LIBS)

@@ -3,7 +3,7 @@
 SLEEP_TIME=1
 
 for i in {1..23} {37..39}; do
-	ssh testbed-node$i 'killall -9 application coordinator master slave ycsb 1>&2 2> /dev/null' &
+	ssh testbed-node$i 'killall -9 application coordinator client server ycsb 1>&2 2> /dev/null' &
 done
 
 sleep ${SLEEP_TIME}
@@ -16,10 +16,10 @@ else
 fi
 
 for i in {19..23} {37..39}; do
-	ssh testbed-node$i "screen -S slave -p 0 -X stuff \"${TERM_COMMAND}\"" &
+	ssh testbed-node$i "screen -S server -p 0 -X stuff \"${TERM_COMMAND}\"" &
 done
 for i in {11..18}; do
-	ssh testbed-node$i "screen -S master -p 0 -X stuff \"${TERM_COMMAND}\"" &
+	ssh testbed-node$i "screen -S client -p 0 -X stuff \"${TERM_COMMAND}\"" &
 	ssh testbed-node$i "screen -S ycsb -p 0 -X stuff \"${TERM_COMMAND}\"" &
 done
 ssh testbed-node1 "screen -S coordinator -p 0 -X stuff \"${TERM_COMMAND}\"" &

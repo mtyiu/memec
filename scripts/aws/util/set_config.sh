@@ -14,8 +14,8 @@ stop_th=12
 overload_th=130
 
 ## make the changes to specific files
-sed -i "s/\(updateInterval=\).*/\1${stats_interval}/" ${CONFIG_DIR}/master.ini
-sed -i "s/\(updateInterval=\).*/\1${stats_interval}/" ${CONFIG_DIR}/master.ini
+sed -i "s/\(updateInterval=\).*/\1${stats_interval}/" ${CONFIG_DIR}/client.ini
+sed -i "s/\(updateInterval=\).*/\1${stats_interval}/" ${CONFIG_DIR}/client.ini
 
 sed -i "s/\(scheme=\).*/\1${scheme}/" ${CONFIG_DIR}/global.ini
 sed -i "s/\(enabled=\).*/\1${remap}/" ${CONFIG_DIR}/global.ini

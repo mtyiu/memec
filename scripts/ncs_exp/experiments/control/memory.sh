@@ -15,7 +15,7 @@ for iter in {1..30}; do
 		screen -S manage -p 0 -X stuff "${BASE_PATH}/scripts/util/start.sh $1$(printf '\r')"
 		sleep 30
 
-		ssh testbed-node3 "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/master/memory.sh $w $t$(printf '\r')\""
+		ssh testbed-node3 "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/client/memory.sh $w $t$(printf '\r')\""
 
 		pending=0
 		read -p "Waiting for completion..."

@@ -2,7 +2,7 @@ CC=g++
 CFLAGS=-std=c++11 -Wall -O2
 PLIO_SRC_ROOT=..
 LIBS=-pthread
-BIN=$(PLIO_SRC_ROOT)/bin/master
+BIN=$(PLIO_SRC_ROOT)/bin/client
 
 OBJS= \
 	backup/backup.o \

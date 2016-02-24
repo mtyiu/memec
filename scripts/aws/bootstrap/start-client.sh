@@ -13,11 +13,11 @@ cd ${PLIO_PATH}
 
 if [ $# -gt 0 ]; then
 	# Debug mode
-	gdb bin/master -ex "r -v \
+	gdb bin/client -ex "r -v \
 		-p ${CONFIG_PATH} \
 		-o master ${MASTER_NAME} tcp://${MASTER_IP}:${MASTER_PORT}/"
 else
-	bin/master -v \
+	bin/client -v \
 		-p ${CONFIG_PATH} \
 		-o master ${MASTER_NAME} tcp://${MASTER_IP}:${MASTER_PORT}/
 fi

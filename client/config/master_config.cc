@@ -26,7 +26,7 @@ bool MasterConfig::merge( GlobalConfig &globalConfig ) {
 }
 
 bool MasterConfig::parse( const char *path ) {
-	if ( Config::parse( path, "master.ini" ) ) {
+	if ( Config::parse( path, "client.ini" ) ) {
 		if ( this->workers.type == WORKER_TYPE_SEPARATED )
 			this->workers.number.separated.total =
 				this->workers.number.separated.application +

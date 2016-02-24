@@ -13,7 +13,7 @@ bool SlaveConfig::merge( GlobalConfig &globalConfig ) {
 }
 
 bool SlaveConfig::parse( const char *path ) {
-	if ( Config::parse( path, "slave.ini" ) ) {
+	if ( Config::parse( path, "server.ini" ) ) {
 		if ( this->workers.type == WORKER_TYPE_SEPARATED )
 			this->workers.number.separated.total =
 				this->workers.number.separated.coding +

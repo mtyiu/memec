@@ -36,7 +36,7 @@ workloads='workloada'
 for i in ${DELAY[@]}; do
 
 DELAY_BASE=$i
-DELAY_VAR="$(expr ${DELAY_BASE} \/ 2)us" 
+DELAY_VAR="$(expr ${DELAY_BASE} \/ 2)us"
 DELAY_BASE="${i}us"
 OUT_PATH="${BASE_PATH}/results/exp4_control1/double/${DELAY_BASE}/"
 
@@ -55,7 +55,7 @@ for iter in {1..10}; do
 
 	echo "-------------------- Load --------------------"
 	for n in 3 4 8 9; do
-		ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/master/degraded.sh load $(printf '\r')\"" &
+		ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/client/degraded.sh load $(printf '\r')\"" &
 	done
 
 	pending=0
@@ -72,7 +72,7 @@ for iter in {1..10}; do
 
 	for w in $workloads; do
 		for n in 3 4 8 9; do
-			ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/master/degraded.sh $w $(printf '\r')\"" &
+			ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/client/degraded.sh $w $(printf '\r')\"" &
 		done
 
 		pending=0

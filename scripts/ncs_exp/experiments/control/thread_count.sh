@@ -13,7 +13,7 @@ for t in $threads; do
 	mkdir -p ${BASE_PATH}/results/thread_count/$t
 
 	for n in 3 4 8 9; do
-		ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/master/thread_count.sh $t$(printf '\r')\"" &
+		ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/client/thread_count.sh $t$(printf '\r')\"" &
 	done
 
 	pending=0
