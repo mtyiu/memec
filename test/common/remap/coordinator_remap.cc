@@ -1,7 +1,7 @@
 #include <vector>
 #include <arpa/inet.h>
 #include <unistd.h>
-#include "../../../common/remap/remap_status.hh"
+#include "../../../common/remap/remap_state.hh"
 #include "../../../coordinator/remap/remap_msg_handler.hh"
 
 #define TIME_OUT 2
@@ -32,14 +32,14 @@ int main () {
 			sleep( TIME_OUT );
 			fprintf( stderr, ".. Start remapping phase\n" );
 			startRemap( ch, slaves );
-			while( meetStatus( ch, slaves, REMAP_START ) == false )
+			while( meetStatus( ch, slaves, REMAP_DEGRADED) == false )
 				sleep( TIME_OUT );
 			fprintf( stderr, ".. Stop remapping phase\n" );
 			for ( int i = 0; i < REMAP_COUNT; i++ ) {
 				stopRemap( ch, slaves );
 				sleep( TIME_OUT );
 			}
-			while( meetStatus( ch, slaves, REMAP_NONE ) == false )
+			while( meetStatus( ch, slaves, REMAP_NORMAL ) == false )
 				sleep( TIME_OUT );
 		}
 		ch->stop();

@@ -38,7 +38,7 @@ void startRemap( CoordinatorRemapMsgHandler *handler, const std::vector<struct s
 		slavesToRemap.push_back( slaves[ idx ] );
 		fprintf( stderr, "\t\t Start Remap Slaves%d %u:%hu\n", idx, slaves[ idx ].sin_addr.s_addr, slaves[ idx ].sin_port );
 	}
-	handler->startRemap( &slavesToRemap );
+	handler->transitToDegraded( &slavesToRemap );
 }
 
 // randomly select a set of slaves to stop remapping
@@ -49,20 +49,20 @@ void stopRemap( CoordinatorRemapMsgHandler *handler, const std::vector<struct so
 		int idx = rand() % slaves.size();
 		slavesToStop.push_back( slaves[ idx ] );
 	}
-	handler->stopRemap( &slavesToStop );
+	handler->transitToNormal( &slavesToStop );
 	count++;
 }
 
 #endif
 
 // check for status change completion
-bool meetStatus( RemapMsgHandler *handler, const std::vector<struct sockaddr_in> &slaves, RemapStatus target ) {
+bool meetStatus( RemapMsgHandler *handler, const std::vector<struct sockaddr_in> &slaves, RemapState target ) {
 	bool ret = true;
-	RemapStatus current;
+	RemapState current;
 	srand( SEED / SLAVE_COUNT );
 	for ( int i = 0; i < REMAP_COUNT; i ++ ) {
 		int idx = rand() % slaves.size();
-		current = handler->getStatus( slaves[ idx ] );
+		current = handler->getState( slaves[ idx ] );
 		fprintf( stderr, "\t\t Slave %u:%hu status=%d\n", slaves[ idx ].sin_addr.s_addr, slaves[ idx ].sin_port, current );
 		ret = ( ret && current == target );
 	}
