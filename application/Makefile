@@ -7,9 +7,9 @@ BIN=$(PLIO_SRC_ROOT)/bin/application
 OBJS= \
 	config/application_config.o \
 	event/application_event.o \
-	event/master_event.o \
+	event/client_event.o \
 	protocol/protocol.o \
-	socket/master_socket.o \
+	socket/client_socket.o \
 	worker/worker.o \
 	main/application.o \
 	main/main.o

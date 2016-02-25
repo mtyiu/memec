@@ -1,10 +1,10 @@
 #include "protocol.hh"
 
-char *ApplicationProtocol::reqRegisterMaster( size_t &size, uint32_t requestId ) {
+char *ApplicationProtocol::reqRegisterClient( size_t &size, uint32_t requestId ) {
 	// -- common/protocol/protocol.cc --
 	size = this->generateHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_MASTER,
+		PROTO_MAGIC_TO_CLIENT,
 		PROTO_OPCODE_REGISTER,
 		0, // length
 		PROTO_UNINITIALIZED_INSTANCE, requestId
@@ -16,7 +16,7 @@ char *ApplicationProtocol::reqSet( size_t &size, uint16_t instanceId, uint32_t r
 	// -- common/protocol/normal_protocol.cc --
 	size = this->generateKeyValueHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_MASTER,
+		PROTO_MAGIC_TO_CLIENT,
 		PROTO_OPCODE_SET,
 		instanceId, requestId,
 		keySize,
@@ -31,7 +31,7 @@ char *ApplicationProtocol::reqGet( size_t &size, uint16_t instanceId, uint32_t r
 	// -- common/protocol/normal_protocol.cc --
 	size = this->generateKeyHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_MASTER,
+		PROTO_MAGIC_TO_CLIENT,
 		PROTO_OPCODE_GET,
 		instanceId, requestId,
 		keySize,
@@ -44,7 +44,7 @@ char *ApplicationProtocol::reqUpdate( size_t &size, uint16_t instanceId, uint32_
 	// -- common/protocol/normal_protocol.cc --
 	size = this->generateKeyValueUpdateHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_MASTER,
+		PROTO_MAGIC_TO_CLIENT,
 		PROTO_OPCODE_UPDATE,
 		instanceId, requestId,
 		keySize,
@@ -60,7 +60,7 @@ char *ApplicationProtocol::reqDelete( size_t &size, uint16_t instanceId, uint32_
 	// -- common/protocol/normal_protocol.cc --
 	size = this->generateKeyHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_MASTER,
+		PROTO_MAGIC_TO_CLIENT,
 		PROTO_OPCODE_DELETE,
 		instanceId, requestId,
 		keySize,

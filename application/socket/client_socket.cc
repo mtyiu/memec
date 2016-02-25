@@ -1,19 +1,19 @@
-#include "../event/master_event.hh"
+#include "../event/client_event.hh"
 #include "../main/application.hh"
-#include "master_socket.hh"
+#include "client_socket.hh"
 
-ArrayMap<int, MasterSocket> *MasterSocket::masters;
+ArrayMap<int, ClientSocket> *ClientSocket::clients;
 
-void MasterSocket::setArrayMap( ArrayMap<int, MasterSocket> *masters ) {
-	MasterSocket::masters = masters;
-	masters->needsDelete = false;
+void ClientSocket::setArrayMap( ArrayMap<int, ClientSocket> *clients ) {
+	ClientSocket::clients = clients;
+	clients->needsDelete = false;
 }
 
-bool MasterSocket::start() {
+bool ClientSocket::start() {
 	this->registered = false;
 	if ( this->connect() ) {
 		Application *application = Application::getInstance();
-		MasterEvent event;
+		ClientEvent event;
 		event.reqRegister( this );
 		application->eventQueue.insert( event );
 		return true;
@@ -21,23 +21,23 @@ bool MasterSocket::start() {
 	return false;
 }
 
-ssize_t MasterSocket::send( char *buf, size_t ulen, bool &connected ) {
+ssize_t ClientSocket::send( char *buf, size_t ulen, bool &connected ) {
 	return Socket::send( this->sockfd, buf, ulen, connected );
 }
 
-ssize_t MasterSocket::recv( char *buf, size_t ulen, bool &connected, bool wait ) {
+ssize_t ClientSocket::recv( char *buf, size_t ulen, bool &connected, bool wait ) {
 	return Socket::recv( this->sockfd, buf, ulen, connected, wait );
 }
 
-ssize_t MasterSocket::recvRem( char *buf, size_t expected, char *prevBuf, size_t prevSize, bool &connected ) {
+ssize_t ClientSocket::recvRem( char *buf, size_t expected, char *prevBuf, size_t prevSize, bool &connected ) {
 	return Socket::recvRem( this->sockfd, buf, expected, prevBuf, prevSize, connected );
 }
 
-bool MasterSocket::done() {
+bool ClientSocket::done() {
 	return Socket::done( this->sockfd );
 }
 
-void MasterSocket::print( FILE *f ) {
+void ClientSocket::print( FILE *f ) {
 	char buf[ 16 ];
 	Socket::ntoh_ip( this->addr.sin_addr.s_addr, buf, 16 );
 	fprintf( f, "[%4d] %s:%u ", this->sockfd, buf, Socket::ntoh_port( this->addr.sin_port ) );

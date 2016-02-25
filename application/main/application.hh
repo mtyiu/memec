@@ -5,7 +5,7 @@
 #include <pthread.h>
 #include "../config/application_config.hh"
 #include "../ds/pending.hh"
-#include "../socket/master_socket.hh"
+#include "../socket/client_socket.hh"
 #include "../worker/worker.hh"
 #include "../../common/ds/array_map.hh"
 #include "../../common/ds/id_generator.hh"
@@ -42,7 +42,7 @@ public:
 	} config;
 	struct {
 		EPoll epoll;
-		ArrayMap<int, MasterSocket> masters;
+		ArrayMap<int, ClientSocket> clients;
 	} sockets;
 	IDGenerator idGenerator;
 	Pending pending;

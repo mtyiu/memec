@@ -61,8 +61,8 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 	switch( from ) {
 		case PROTO_MAGIC_FROM_APPLICATION:
 		case PROTO_MAGIC_FROM_COORDINATOR:
-		case PROTO_MAGIC_FROM_MASTER:
-		case PROTO_MAGIC_FROM_SLAVE:
+		case PROTO_MAGIC_FROM_CLIENT:
+		case PROTO_MAGIC_FROM_SERVER:
 			break;
 		default:
 			fprintf( stderr, "Error #2: (magic, from, to, opcode, length, instanceId, requestId) = (%x, %x, %x, %x, %u, %u, %u)\n", magic, from, to, opcode, length, instanceId, requestId );
@@ -168,12 +168,12 @@ Protocol::Protocol( Role role ) {
 			this->to = PROTO_MAGIC_TO_COORDINATOR;
 			break;
 		case ROLE_MASTER:
-			this->from = PROTO_MAGIC_FROM_MASTER;
-			this->to = PROTO_MAGIC_TO_MASTER;
+			this->from = PROTO_MAGIC_FROM_CLIENT;
+			this->to = PROTO_MAGIC_TO_CLIENT;
 			break;
 		case ROLE_SLAVE:
-			this->from = PROTO_MAGIC_FROM_SLAVE;
-			this->to = PROTO_MAGIC_TO_SLAVE;
+			this->from = PROTO_MAGIC_FROM_SERVER;
+			this->to = PROTO_MAGIC_TO_SERVER;
 			break;
 		default:
 			__ERROR__( "Protocol", "Protocol", "Unknown server role." );

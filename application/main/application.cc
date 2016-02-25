@@ -33,18 +33,18 @@ void *Application::run( void *argv ) {
 
 bool Application::epollHandler( int fd, uint32_t events, void *data ) {
 	Application *application = ( Application * ) data;
-	MasterSocket *masterSocket = application->sockets.masters.get( fd );
+	ClientSocket *clientSocket = application->sockets.clients.get( fd );
 
-	if ( ! masterSocket ) {
+	if ( ! clientSocket ) {
 		__ERROR__( "Application", "epollHandler", "Unknown socket." );
 		return false;
 	}
 
 	if ( ! ( events & EPOLLIN ) && ( ( events & EPOLLERR ) || ( events & EPOLLHUP ) || ( events & EPOLLRDHUP ) ) ) {
-		masterSocket->stop();
+		clientSocket->stop();
 	} else {
-		MasterEvent event;
-		event.pending( masterSocket );
+		ClientEvent event;
+		event.pending( clientSocket );
 		application->eventQueue.insert( event );
 	}
 	return true;
@@ -68,57 +68,30 @@ bool Application::init( char *path, OptionList &options, bool verbose ) {
 	}
 	/* Vectors and other sockets */
 	Socket::init( &this->sockets.epoll );
-	MasterSocket::setArrayMap( &this->sockets.masters );
-	this->sockets.masters.reserve( this->config.application.masters.size() );
-	for ( int i = 0, len = this->config.application.masters.size(); i < len; i++ ) {
-		MasterSocket *socket = new MasterSocket();
+	ClientSocket::setArrayMap( &this->sockets.clients );
+	this->sockets.clients.reserve( this->config.application.clients.size() );
+	for ( int i = 0, len = this->config.application.clients.size(); i < len; i++ ) {
+		ClientSocket *socket = new ClientSocket();
 		int fd;
 
-		socket->init( this->config.application.masters[ i ], &this->sockets.epoll );
+		socket->init( this->config.application.clients[ i ], &this->sockets.epoll );
 		fd = socket->getSocket();
-		this->sockets.masters.set( fd, socket );
+		this->sockets.clients.set( fd, socket );
 	}
 	/* Workers, ID generator and event queues */
-	if ( this->config.application.workers.type == WORKER_TYPE_MIXED ) {
-		this->idGenerator.init( this->config.application.eventQueue.size.mixed );
-		this->eventQueue.init(
-			this->config.application.eventQueue.block,
-			this->config.application.eventQueue.size.mixed
+	this->idGenerator.init( this->config.application.eventQueue.size );
+	this->eventQueue.init(
+		this->config.application.eventQueue.block,
+		this->config.application.eventQueue.size
+	);
+	ApplicationWorker::init();
+	this->workers.reserve( this->config.application.workers.count );
+	for ( int i = 0, len = this->config.application.workers.count; i < len; i++ ) {
+		this->workers.push_back( ApplicationWorker() );
+		this->workers[ i ].init(
+			this->config.application,
+			i // worker ID
 		);
-		ApplicationWorker::init();
-		this->workers.reserve( this->config.application.workers.number.mixed );
-		for ( int i = 0, len = this->config.application.workers.number.mixed; i < len; i++ ) {
-			this->workers.push_back( ApplicationWorker() );
-			this->workers[ i ].init(
-				this->config.application,
-				WORKER_ROLE_MIXED,
-				i // worker ID
-			);
-		}
-	} else {
-		this->idGenerator.init( this->config.application.workers.number.separated.total );
-		this->workers.reserve( this->config.application.workers.number.separated.total );
-		this->eventQueue.init(
-			this->config.application.eventQueue.block,
-			this->config.application.eventQueue.size.separated.application,
-			this->config.application.eventQueue.size.separated.master
-		);
-		ApplicationWorker::init();
-
-		int index = 0;
-#define WORKER_INIT_LOOP( _FIELD_, _CONSTANT_ ) \
-		for ( int i = 0, len = this->config.application.workers.number.separated._FIELD_; i < len; i++, index++ ) { \
-			this->workers.push_back( ApplicationWorker() ); \
-			this->workers[ index ].init( \
-				this->config.application, \
-				_CONSTANT_, \
-				index \
-			); \
-		}
-
-		WORKER_INIT_LOOP( application, WORKER_ROLE_APPLICATION )
-		WORKER_INIT_LOOP( master, WORKER_ROLE_MASTER )
-#undef WORKER_INIT_LOOP
 	}
 
 	// Set signal handlers //
@@ -133,14 +106,8 @@ bool Application::init( char *path, OptionList &options, bool verbose ) {
 bool Application::start() {
 	/* Workers and event queues */
 	this->eventQueue.start();
-	if ( this->config.application.workers.type == WORKER_TYPE_MIXED ) {
-		for ( int i = 0, len = this->config.application.workers.number.mixed; i < len; i++ ) {
-			this->workers[ i ].start();
-		}
-	} else {
-		for ( int i = 0, len = this->config.application.workers.number.separated.total; i < len; i++ ) {
-			this->workers[ i ].start();
-		}
+	for ( int i = 0, len = this->config.application.workers.count; i < len; i++ ) {
+		this->workers[ i ].start();
 	}
 
 	/* Start epoll thread */
@@ -150,9 +117,9 @@ bool Application::start() {
 	}
 
 	/* Socket */
-	// Connect to masters
-	for ( int i = 0, len = this->config.application.masters.size(); i < len; i++ ) {
-		if ( ! this->sockets.masters[ i ]->start() )
+	// Connect to clients
+	for ( int i = 0, len = this->config.application.clients.size(); i < len; i++ ) {
+		if ( ! this->sockets.clients[ i ]->start() )
 			return false;
 	}
 
@@ -185,9 +152,9 @@ bool Application::stop() {
 		this->workers[ i ].join();
 
 	/* Sockets */
-	for ( i = 0, len = this->sockets.masters.size(); i < len; i++ )
-		this->sockets.masters[ i ]->stop();
-	this->sockets.masters.clear();
+	for ( i = 0, len = this->sockets.clients.size(); i < len; i++ )
+		this->sockets.clients[ i ]->stop();
+	this->sockets.clients.clear();
 
 	this->free();
 	this->isRunning = false;
@@ -206,10 +173,10 @@ void Application::info( FILE *f ) {
 void Application::debug( FILE *f ) {
 	int i, len;
 
-	fprintf( f, "\nMaster sockets\n-------------\n" );
-	for ( i = 0, len = this->sockets.masters.size(); i < len; i++ ) {
+	fprintf( f, "\nClient sockets\n-------------\n" );
+	for ( i = 0, len = this->sockets.clients.size(); i < len; i++ ) {
 		fprintf( f, "%d. ", i + 1 );
-		this->sockets.masters[ i ]->print( f );
+		this->sockets.clients[ i ]->print( f );
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
 
@@ -439,15 +406,15 @@ void Application::printPending( FILE *f ) {
 
 	fprintf(
 		f,
-		"\n\nPending requests for master\n"
+		"\n\nPending requests for client\n"
 		"---------------------------\n"
 		"[SET] Pending: %lu\n",
-		this->pending.masters.set.size()
+		this->pending.clients.set.size()
 	);
 	i = 1;
 	for (
-		it = this->pending.masters.set.begin();
-		it != this->pending.masters.set.end();
+		it = this->pending.clients.set.begin();
+		it != this->pending.clients.set.end();
 		it++, i++
 	) {
 		const Key &key = *it;
@@ -459,12 +426,12 @@ void Application::printPending( FILE *f ) {
 	fprintf(
 		f,
 		"\n[GET] Pending: %lu\n",
-		this->pending.masters.get.size()
+		this->pending.clients.get.size()
 	);
 	i = 1;
 	for (
-		it = this->pending.masters.get.begin();
-		it != this->pending.masters.get.end();
+		it = this->pending.clients.get.begin();
+		it != this->pending.clients.get.end();
 		it++, i++
 	) {
 		const Key &key = *it;
@@ -476,12 +443,12 @@ void Application::printPending( FILE *f ) {
 	fprintf(
 		f,
 		"\n[UPDATE] Pending: %lu\n",
-		this->pending.masters.update.size()
+		this->pending.clients.update.size()
 	);
 	i = 1;
 	for (
-		keyValueUpdateIt = this->pending.masters.update.begin();
-		keyValueUpdateIt != this->pending.masters.update.end();
+		keyValueUpdateIt = this->pending.clients.update.begin();
+		keyValueUpdateIt != this->pending.clients.update.end();
 		keyValueUpdateIt++, i++
 	) {
 		const KeyValueUpdate &keyValueUpdate = *keyValueUpdateIt;
@@ -497,12 +464,12 @@ void Application::printPending( FILE *f ) {
 	fprintf(
 		f,
 		"\n[DELETE] Pending: %lu\n",
-		this->pending.masters.del.size()
+		this->pending.clients.del.size()
 	);
 	i = 1;
 	for (
-		it = this->pending.masters.del.begin();
-		it != this->pending.masters.del.end();
+		it = this->pending.clients.del.begin();
+		it != this->pending.clients.del.end();
 		it++, i++
 	) {
 		const Key &key = *it;
@@ -514,7 +481,7 @@ void Application::printPending( FILE *f ) {
 
 bool Application::set( char *key, char *path ) {
 	int fd;
-	MasterEvent event;
+	ClientEvent event;
 
 	fd = ::open( path, O_RDONLY );
 	if ( fd == -1 ) {
@@ -528,7 +495,7 @@ bool Application::set( char *key, char *path ) {
 		return false;
 	}
 
-	event.reqSet( this->sockets.masters[ 0 ], key, strlen( key ), fd );
+	event.reqSet( this->sockets.clients[ 0 ], key, strlen( key ), fd );
 	this->eventQueue.insert( event );
 
 	return true;
@@ -536,7 +503,7 @@ bool Application::set( char *key, char *path ) {
 
 bool Application::get( char *key, char *path ) {
 	int fd;
-	MasterEvent event;
+	ClientEvent event;
 
 	fd = ::open( path, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR );
 	if ( fd == -1 ) {
@@ -550,7 +517,7 @@ bool Application::get( char *key, char *path ) {
 		return false;
 	}
 
-	event.reqGet( this->sockets.masters[ 0 ], key, strlen( key ), fd );
+	event.reqGet( this->sockets.clients[ 0 ], key, strlen( key ), fd );
 	this->eventQueue.insert( event );
 
 	return true;
@@ -558,7 +525,7 @@ bool Application::get( char *key, char *path ) {
 
 bool Application::update( char *key, char *path, uint32_t offset ) {
 	int fd;
-	MasterEvent event;
+	ClientEvent event;
 
 	fd = ::open( path, O_RDONLY );
 	if ( fd == -1 ) {
@@ -572,14 +539,14 @@ bool Application::update( char *key, char *path, uint32_t offset ) {
 		return false;
 	}
 
-	event.reqUpdate( this->sockets.masters[ 0 ], key, strlen( key ), fd, offset );
+	event.reqUpdate( this->sockets.clients[ 0 ], key, strlen( key ), fd, offset );
 	this->eventQueue.insert( event );
 
 	return true;
 }
 
 bool Application::del( char *key ) {
-	MasterEvent event;
+	ClientEvent event;
 
 	key = strdup( key );
 	if ( ! key ) {
@@ -587,7 +554,7 @@ bool Application::del( char *key ) {
 		return false;
 	}
 
-	event.reqDelete( this->sockets.masters[ 0 ], key, strlen( key ) );
+	event.reqDelete( this->sockets.clients[ 0 ], key, strlen( key ) );
 	this->eventQueue.insert( event );
 
 	return true;

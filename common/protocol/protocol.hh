@@ -24,13 +24,13 @@
 // (Bit: 3-4) //
 #define PROTO_MAGIC_FROM_APPLICATION              0x00 // ---00---
 #define PROTO_MAGIC_FROM_COORDINATOR              0x08 // ---01---
-#define PROTO_MAGIC_FROM_MASTER                   0x10 // ---10---
-#define PROTO_MAGIC_FROM_SLAVE                    0x18 // ---11---
+#define PROTO_MAGIC_FROM_CLIENT                   0x10 // ---10---
+#define PROTO_MAGIC_FROM_SERVER                   0x18 // ---11---
  // (Bit: 5-6) //
 #define PROTO_MAGIC_TO_APPLICATION                0x00 // -00-----
 #define PROTO_MAGIC_TO_COORDINATOR                0x20 // -01-----
-#define PROTO_MAGIC_TO_MASTER                     0x40 // -10-----
-#define PROTO_MAGIC_TO_SLAVE                      0x60 // -11-----
+#define PROTO_MAGIC_TO_CLIENT                     0x40 // -10-----
+#define PROTO_MAGIC_TO_SERVER                     0x60 // -11-----
 // (Bit: 7): Reserved //
 
 /*******************

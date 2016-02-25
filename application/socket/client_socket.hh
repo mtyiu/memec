@@ -1,17 +1,17 @@
-#ifndef __APPLICATION_SOCKET_MASTER_SOCKET_HH__
-#define __APPLICATION_SOCKET_MASTER_SOCKET_HH__
+#ifndef __APPLICATION_SOCKET_CLIENT_SOCKET_HH__
+#define __APPLICATION_SOCKET_CLIENT_SOCKET_HH__
 
 #include "../../common/ds/array_map.hh"
 #include "../../common/socket/socket.hh"
 
-class MasterSocket : public Socket {
+class ClientSocket : public Socket {
 private:
-	static ArrayMap<int, MasterSocket> *masters;
+	static ArrayMap<int, ClientSocket> *clients;
 
 public:
 	bool registered;
 
-	static void setArrayMap( ArrayMap<int, MasterSocket> *masters );
+	static void setArrayMap( ArrayMap<int, ClientSocket> *clients );
 	bool start();
 	ssize_t send( char *buf, size_t ulen, bool &connected );
 	ssize_t recv( char *buf, size_t ulen, bool &connected, bool wait );

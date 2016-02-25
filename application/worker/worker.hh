@@ -2,7 +2,6 @@
 #define __APPLICATION_WORKER_WORKER_HH__
 
 #include <cstdio>
-#include "worker_role.hh"
 #include "../config/application_config.hh"
 #include "../ds/pending.hh"
 #include "../event/event_queue.hh"
@@ -13,7 +12,6 @@
 class ApplicationWorker : public Worker {
 private:
 	uint32_t workerId;
-	WorkerRole role;
 	ApplicationProtocol protocol;
 	struct {
 		char *value;
@@ -25,20 +23,16 @@ private:
 
 	void dispatch( MixedEvent event );
 	void dispatch( ApplicationEvent event );
-	void dispatch( MasterEvent event );
+	void dispatch( ClientEvent event );
 	void free();
 	static void *run( void *argv );
 
 public:
 	static bool init();
-	bool init( ApplicationConfig &config, WorkerRole role, uint32_t workerId );
+	bool init( ApplicationConfig &config, uint32_t workerId );
 	bool start();
 	void stop();
 	void print( FILE *f = stdout );
-
-	inline WorkerRole getRole() {
-		return this->role;
-	}
 };
 
 #endif
