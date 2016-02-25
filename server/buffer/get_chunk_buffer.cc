@@ -1,5 +1,5 @@
 #include "get_chunk_buffer.hh"
-#include "../main/slave.hh"
+#include "../main/server.hh"
 #include "../../common/util/debug.hh"
 
 MemoryPool<Chunk> *GetChunkBuffer::chunkPool;

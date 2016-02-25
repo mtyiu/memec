@@ -1,6 +1,6 @@
 #include <cerrno>
 #include "slave_socket.hh"
-#include "../main/slave.hh"
+#include "../main/server.hh"
 #include "../../common/util/debug.hh"
 
 #define SOCKET_COLOR YELLOW
@@ -129,7 +129,7 @@ bool SlaveSocket::handler( int fd, uint32_t events, void *data ) {
 					struct AddressHeader addressHeader;
 					socket->protocol.parseAddressHeader( addressHeader, socket->buffer.data + PROTO_HEADER_SIZE, socket->buffer.size - PROTO_HEADER_SIZE );
 					// Register message expected
-					if ( header.from == PROTO_MAGIC_FROM_MASTER ) {
+					if ( header.from == PROTO_MAGIC_FROM_CLIENT ) {
 						MasterSocket *masterSocket = new MasterSocket();
 						masterSocket->init( fd, *addr );
 						// Ignore the address header for master socket
@@ -145,7 +145,7 @@ bool SlaveSocket::handler( int fd, uint32_t events, void *data ) {
 						MasterEvent event;
 						event.resRegister( masterSocket, header.instanceId, header.requestId );
 						slave->eventQueue.insert( event );
-					} else if ( header.from == PROTO_MAGIC_FROM_SLAVE ) {
+					} else if ( header.from == PROTO_MAGIC_FROM_SERVER ) {
 						SlavePeerSocket *s = 0;
 
 						for ( int i = 0, len = slave->sockets.slavePeers.size(); i < len; i++ ) {

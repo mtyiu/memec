@@ -203,7 +203,7 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 			buffer.size -= PROTO_HEADER_SIZE;
 
 			// Validate message
-			if ( header.from != PROTO_MAGIC_FROM_MASTER ) {
+			if ( header.from != PROTO_MAGIC_FROM_CLIENT ) {
 				__ERROR__( "CoordinatorWorker", "dispatch", "Invalid message source from master." );
 			}
 

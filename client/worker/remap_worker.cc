@@ -1,5 +1,5 @@
 #include "worker.hh"
-#include "../main/master.hh"
+#include "../main/client.hh"
 #include "../../common/ds/value.hh"
 
 bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf, size_t size ) {

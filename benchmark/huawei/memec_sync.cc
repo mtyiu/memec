@@ -116,7 +116,7 @@ MemEC::~MemEC() {
 
 bool MemEC::connect() {
 	if ( ::connect( this->sockfd, ( struct sockaddr * ) &this->addr, sizeof( this->addr ) ) != 0 ) {
-		fprintf( stderr, "MemEC::connect(): Cannot connect to the master: %s.\n", strerror( errno ) );
+		fprintf( stderr, "MemEC::connect(): Cannot connect to the client: %s.\n", strerror( errno ) );
 		return false;
 	}
 
@@ -133,13 +133,13 @@ bool MemEC::connect() {
 
 	size = this->read( PROTO_HEADER_SIZE, connected );
 	if ( size != PROTO_HEADER_SIZE ) {
-		fprintf( stderr, "MemEC::connect(): Cannot register with the master.\n" );
+		fprintf( stderr, "MemEC::connect(): Cannot register with the client.\n" );
 		return false;
 	}
 
 	struct ProtocolHeader header;
 	if ( ! this->protocol.parseHeader( header, this->buffer.recv.data, this->buffer.recv.len ) ) {
-		fprintf( stderr, "MemEC::connect(): Cannot parse register response message from the master.\n" );
+		fprintf( stderr, "MemEC::connect(): Cannot parse register response message from the client.\n" );
 		return false;
 	}
 	if ( header.id != id ) {

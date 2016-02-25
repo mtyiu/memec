@@ -1,8 +1,8 @@
 #!/bin/bash
 
 ## path to config files
-PLIO_ROOT=/home/ubuntu/mtyiu/plio
-CONFIG_DIR=${PLIO_ROOT}/bin/config/aws
+MEMEC_ROOT=/home/ubuntu/mtyiu/memec
+CONFIG_DIR=${MEMEC_ROOT}/bin/config/aws
 SCRIPT_DIR=/home/ubuntu/mtyiu/scripts/util
 
 ## configurations

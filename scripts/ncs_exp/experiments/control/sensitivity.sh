@@ -1,7 +1,7 @@
 #!/bin/bash
 
 BASE_PATH=${HOME}/mtyiu
-PLIO_PATH=${BASE_PATH}/plio
+MEMEC_PATH=${BASE_PATH}/memec
 
 coding=raid0
 threads=64
@@ -26,9 +26,9 @@ function restore_overload {
 }
 
 function set_config {
-	sed -i "s/^smoothingFactor=.*$/smoothingFactor=$1/g" ${PLIO_PATH}/bin/config/ncs_exp/global.ini
-	sed -i "s/^updateInterval=.*$/updateInterval=$2/g" ${PLIO_PATH}/bin/config/ncs_exp/coordinator.ini
-	sed -i "s/^updateInterval=.*$/updateInterval=$2/g" ${PLIO_PATH}/bin/config/ncs_exp/client.ini
+	sed -i "s/^smoothingFactor=.*$/smoothingFactor=$1/g" ${MEMEC_PATH}/bin/config/ncs_exp/global.ini
+	sed -i "s/^updateInterval=.*$/updateInterval=$2/g" ${MEMEC_PATH}/bin/config/ncs_exp/coordinator.ini
+	sed -i "s/^updateInterval=.*$/updateInterval=$2/g" ${MEMEC_PATH}/bin/config/ncs_exp/client.ini
 }
 
 if [ $# != 2 ]; then

@@ -5,7 +5,7 @@ char *SlaveProtocol::resSet( size_t &size, uint16_t instanceId, uint32_t request
 	if ( isSealed ) {
 		size = this->generateKeyBackupHeader(
 			PROTO_MAGIC_RESPONSE_SUCCESS,
-			PROTO_MAGIC_TO_MASTER,
+			PROTO_MAGIC_TO_CLIENT,
 			PROTO_OPCODE_SET,
 			instanceId, requestId,
 			timestamp,
@@ -21,7 +21,7 @@ char *SlaveProtocol::resSet( size_t &size, uint16_t instanceId, uint32_t request
 	} else {
 		size = this->generateKeyBackupHeader(
 			PROTO_MAGIC_RESPONSE_SUCCESS,
-			PROTO_MAGIC_TO_MASTER,
+			PROTO_MAGIC_TO_CLIENT,
 			PROTO_OPCODE_SET,
 			instanceId, requestId,
 			timestamp,
@@ -39,7 +39,7 @@ char *SlaveProtocol::resSet( size_t &size, uint16_t instanceId, uint32_t request
 	// -- common/protocol/normal_protocol.cc --
 	size = this->generateKeyBackupHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
-		toMaster ? PROTO_MAGIC_TO_MASTER : PROTO_MAGIC_TO_SLAVE,
+		toMaster ? PROTO_MAGIC_TO_CLIENT : PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_SET,
 		instanceId, requestId,
 		keySize,
@@ -53,7 +53,7 @@ char *SlaveProtocol::resGet( size_t &size, uint16_t instanceId, uint32_t request
 	if ( success ) {
 		size = this->generateKeyValueHeader(
 			PROTO_MAGIC_RESPONSE_SUCCESS,
-			toMaster ? PROTO_MAGIC_TO_MASTER : PROTO_MAGIC_TO_SLAVE,
+			toMaster ? PROTO_MAGIC_TO_CLIENT : PROTO_MAGIC_TO_SERVER,
 			isDegraded ? PROTO_OPCODE_DEGRADED_GET : PROTO_OPCODE_GET,
 			instanceId, requestId,
 			keySize,
@@ -64,7 +64,7 @@ char *SlaveProtocol::resGet( size_t &size, uint16_t instanceId, uint32_t request
 	} else {
 		size = this->generateKeyHeader(
 			PROTO_MAGIC_RESPONSE_FAILURE,
-			toMaster ? PROTO_MAGIC_TO_MASTER : PROTO_MAGIC_TO_SLAVE,
+			toMaster ? PROTO_MAGIC_TO_CLIENT : PROTO_MAGIC_TO_SERVER,
 			isDegraded ? PROTO_OPCODE_DEGRADED_GET : PROTO_OPCODE_GET,
 			instanceId, requestId,
 			keySize,
@@ -78,7 +78,7 @@ char *SlaveProtocol::resUpdate( size_t &size, uint16_t instanceId, uint32_t requ
 	// -- common/protocol/normal_protocol.cc --
 	size = this->generateKeyValueUpdateHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
-		PROTO_MAGIC_TO_MASTER,
+		PROTO_MAGIC_TO_CLIENT,
 		isDegraded ? PROTO_OPCODE_DEGRADED_UPDATE : PROTO_OPCODE_UPDATE,
 		instanceId, requestId,
 		keySize, key,
@@ -91,7 +91,7 @@ char *SlaveProtocol::resDelete( size_t &size, uint16_t instanceId, uint32_t requ
 	// -- common/protocol/normal_protocol.cc --
 	size = this->generateKeyBackupHeader(
 		PROTO_MAGIC_RESPONSE_SUCCESS,
-		toMaster ? PROTO_MAGIC_TO_MASTER : PROTO_MAGIC_TO_SLAVE,
+		toMaster ? PROTO_MAGIC_TO_CLIENT : PROTO_MAGIC_TO_SERVER,
 		isDegraded ? PROTO_OPCODE_DEGRADED_DELETE : PROTO_OPCODE_DELETE,
 		instanceId, requestId,
 		timestamp,
@@ -108,7 +108,7 @@ char *SlaveProtocol::resDelete( size_t &size, uint16_t instanceId, uint32_t requ
 	// -- common/protocol/normal_protocol.cc --
 	size = this->generateKeyBackupHeader(
 		PROTO_MAGIC_RESPONSE_FAILURE,
-		toMaster ? PROTO_MAGIC_TO_MASTER : PROTO_MAGIC_TO_SLAVE,
+		toMaster ? PROTO_MAGIC_TO_CLIENT : PROTO_MAGIC_TO_SERVER,
 		isDegraded ? PROTO_OPCODE_DEGRADED_DELETE : PROTO_OPCODE_DELETE,
 		instanceId, requestId,
 		keySize,

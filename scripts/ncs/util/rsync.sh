@@ -7,5 +7,5 @@ for i in {1..8} 10; do
 		--progress \
 		--verbose \
 		--archive \
-		~/mtyiu/plio/ testbed-node$i:mtyiu/plio/
+		~/mtyiu/memec/ testbed-node$i:mtyiu/memec/
 done

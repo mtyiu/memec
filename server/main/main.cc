@@ -1,7 +1,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <getopt.h>
-#include "slave.hh"
+#include "server.hh"
 #include "../../common/util/option.hh"
 #include "../../lib/death_handler/death_handler.h"
 

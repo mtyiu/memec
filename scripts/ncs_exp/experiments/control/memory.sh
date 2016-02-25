@@ -1,9 +1,9 @@
 #!/bin/bash
 
 BASE_PATH=${HOME}/mtyiu
-PLIO_PATH=${BASE_PATH}/plio
+MEMEC_PATH=${BASE_PATH}/memec
 
-sed -i "s/^scheme=.*$/scheme=evenodd/g" ${PLIO_PATH}/bin/config/ncs_exp/global.ini
+sed -i "s/^scheme=.*$/scheme=evenodd/g" ${MEMEC_PATH}/bin/config/ncs_exp/global.ini
 ${BASE_PATH}/scripts/util/rsync.sh
 
 for iter in {1..30}; do
@@ -30,7 +30,7 @@ for iter in {1..30}; do
 		sleep 10
 
 		for n in {11..23} {37..39}; do
-			scp testbed-node$n:${PLIO_PATH}/memory.log ${BASE_PATH}/results/memory/$iter/workload$w/$n.log
+			scp testbed-node$n:${MEMEC_PATH}/memory.log ${BASE_PATH}/results/memory/$iter/workload$w/$n.log
 		done
 	done
 done

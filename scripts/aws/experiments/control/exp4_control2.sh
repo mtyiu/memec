@@ -3,7 +3,7 @@
 echo "NOT YET MODIFIED!"
 
 BASE_PATH=${HOME}/mtyiu
-PLIO_PATH=${BASE_PATH}/plio
+MEMEC_PATH=${BASE_PATH}/memec
 
 function set_overload {
 	for n in 11; do

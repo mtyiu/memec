@@ -208,7 +208,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			buffer.data += PROTO_HEADER_SIZE;
 			buffer.size -= PROTO_HEADER_SIZE;
 			// Validate message
-			if ( header.from != PROTO_MAGIC_FROM_SLAVE ) {
+			if ( header.from != PROTO_MAGIC_FROM_SERVER ) {
 				__ERROR__( "CoordinatorWorker", "dispatch", "Invalid message source from slave." );
 				goto quit_1;
 			}

@@ -4,11 +4,11 @@ COORDINATOR_NAME=$(hostname | sed 's/testbed-//g')
 COORDINATOR_IP=$(hostname -I | awk '{print $1}' | xargs)
 COORDINATOR_PORT=9110
 CONFIG_PATH=bin/config/ncs_exp
-PLIO_PATH=~/mtyiu/plio
+MEMEC_PATH=~/mtyiu/memec
 
 echo "Starting coordinator [${COORDINATOR_NAME}]..."
 
-cd ${PLIO_PATH}
+cd ${MEMEC_PATH}
 
 if [ $# -gt 0 ]; then
 	# Debug mode
@@ -18,5 +18,5 @@ if [ $# -gt 0 ]; then
 else
 	bin/coordinator \
 		-p ${CONFIG_PATH} \
-		-o coordinator ${COORDINATOR_NAME} tcp://${COORDINATOR_IP}:${COORDINATOR_PORT}/ 2>&1 | tee ${PLIO_PATH}/coordinator.log
+		-o coordinator ${COORDINATOR_NAME} tcp://${COORDINATOR_IP}:${COORDINATOR_PORT}/ 2>&1 | tee ${MEMEC_PATH}/coordinator.log
 fi

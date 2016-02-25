@@ -5,21 +5,21 @@ if [ $# != 1 ]; then
 	exit 1
 fi
 
-MASTER_NAME_PREFIX="$(hostname):"
-MASTER_IP=$(hostname -I | xargs)
+CLIENT_NAME_PREFIX="$(hostname):"
+CLIENT_IP=$(hostname -I | xargs)
 CONFIG_PATH=bin/config/hpc
-MASTER_PORT_START=10091
-MASTER_PORT_END=$(expr ${MASTER_PORT_START} + $1 - 1)
-PLIO_PATH=~/mtyiu/plio
+CLIENT_PORT_START=10091
+CLIENT_PORT_END=$(expr ${CLIENT_PORT_START} + $1 - 1)
+MEMEC_PATH=~/mtyiu/memec
 
-cd ${PLIO_PATH}
+cd ${MEMEC_PATH}
 
-for port in $(seq ${MASTER_PORT_START} ${MASTER_PORT_END}); do
+for port in $(seq ${CLIENT_PORT_START} ${CLIENT_PORT_END}); do
 	echo "Starting client at port: ${port}..."
 	screen -d -m -S client-${port} \
 		bin/client -v \
 		-p ${CONFIG_PATH} \
-		-o client ${MASTER_NAME_PREFIX}${port} tcp://${MASTER_IP}:${port}/ &
+		-o client ${CLIENT_NAME_PREFIX}${port} tcp://${CLIENT_IP}:${port}/ &
 done
 
 read -p "Press Enter to terminate all clients..."

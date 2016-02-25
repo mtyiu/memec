@@ -1,8 +1,8 @@
 #!/bin/bash
 
 ## path to config files
-PLIO_ROOT=/home/ncsgroup/mtyiu/plio
-CONFIG_DIR=${PLIO_ROOT}/bin/config/ncs
+MEMEC_ROOT=/home/ncsgroup/mtyiu/memec
+CONFIG_DIR=${MEMEC_ROOT}/bin/config/ncs
 SCRIPT_DIR=/home/ncsgroup/mtyiu/scripts/util
 
 ## configurations

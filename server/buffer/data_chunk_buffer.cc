@@ -1,5 +1,5 @@
 #include "data_chunk_buffer.hh"
-#include "../main/slave.hh"
+#include "../main/server.hh"
 #include "../worker/worker.hh"
 
 DataChunkBuffer::DataChunkBuffer( uint32_t count, uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isReady ) : ChunkBuffer( isReady ) {

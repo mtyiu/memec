@@ -1,5 +1,5 @@
 #include "worker.hh"
-#include "../main/slave.hh"
+#include "../main/server.hh"
 
 void SlaveWorker::dispatch( SlavePeerEvent event ) {
 	bool success, connected, isSend, isCompleted = true;
@@ -504,7 +504,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 			buffer.data += PROTO_HEADER_SIZE;
 			buffer.size -= PROTO_HEADER_SIZE;
 			// Validate message
-			if ( header.from != PROTO_MAGIC_FROM_SLAVE ) {
+			if ( header.from != PROTO_MAGIC_FROM_SERVER ) {
 				__ERROR__( "SlaveWorker", "dispatch", "Invalid protocol header." );
 				goto quit_1;
 			}

@@ -1,5 +1,5 @@
 #include "worker.hh"
-#include "../main/slave.hh"
+#include "../main/server.hh"
 
 int SlaveWorker::findInRedirectedList( uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32_t ongoingAtChunk, bool &reconstructParity, bool &reconstructData, uint32_t dataChunkId, bool isSealed ) {
 	int ret = -1;

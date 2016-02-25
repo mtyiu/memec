@@ -1,7 +1,7 @@
 #!/bin/bash
 
 BASE_PATH=${HOME}/mtyiu
-PLIO_PATH=${BASE_PATH}/plio
+MEMEC_PATH=${BASE_PATH}/memec
 DELAY_BASE="0.2ms"
 DELAY_VAR="0.1ms"
 DELAY=("400" "800" "1200" "1600" "2000")

@@ -1,8 +1,8 @@
 CC=g++
 CFLAGS=-std=c++11 -Wall -O2
-PLIO_SRC_ROOT=..
+MEMEC_SRC_ROOT=..
 LIBS=-pthread
-BIN=$(PLIO_SRC_ROOT)/bin/application
+BIN=$(MEMEC_SRC_ROOT)/bin/application
 
 OBJS= \
 	config/application_config.o \
@@ -15,15 +15,15 @@ OBJS= \
 	main/main.o
 
 EXTERNAL_LIB= \
-	$(PLIO_SRC_ROOT)/common/config/config.o \
-	$(PLIO_SRC_ROOT)/common/config/server_addr.o \
-	$(PLIO_SRC_ROOT)/common/ds/key_value.o \
-	$(PLIO_SRC_ROOT)/common/protocol/protocol.o \
-	$(PLIO_SRC_ROOT)/common/protocol/normal_protocol.o \
-	$(PLIO_SRC_ROOT)/common/socket/socket.o \
-	$(PLIO_SRC_ROOT)/common/socket/epoll.o \
-	$(PLIO_SRC_ROOT)/lib/death_handler/death_handler.o \
-	$(PLIO_SRC_ROOT)/lib/inih/ini.o
+	$(MEMEC_SRC_ROOT)/common/config/config.o \
+	$(MEMEC_SRC_ROOT)/common/config/server_addr.o \
+	$(MEMEC_SRC_ROOT)/common/ds/key_value.o \
+	$(MEMEC_SRC_ROOT)/common/protocol/protocol.o \
+	$(MEMEC_SRC_ROOT)/common/protocol/normal_protocol.o \
+	$(MEMEC_SRC_ROOT)/common/socket/socket.o \
+	$(MEMEC_SRC_ROOT)/common/socket/epoll.o \
+	$(MEMEC_SRC_ROOT)/lib/death_handler/death_handler.o \
+	$(MEMEC_SRC_ROOT)/lib/inih/ini.o
 
 LD_LIB= \
 	-lrt \

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 BASE_PATH=${HOME}/mtyiu
-PLIO_PATH=${BASE_PATH}/plio
+MEMEC_PATH=${BASE_PATH}/memec
 CONTROL_NODE=testbed-node10
 
 c=$1 # coding
@@ -14,10 +14,10 @@ echo "Running experiment with coding scheme = $c and thread count = $t..."
 
 if [ $w == "load" ]; then
 	echo "-------------------- Load (workloada) --------------------"
-	${BASE_PATH}/scripts_huawei/ycsb/plio/load.sh $t 2>&1 | tee ${BASE_PATH}/results/encoding/$c/$t/$w.txt
+	${BASE_PATH}/scripts_huawei/ycsb/memec/load.sh $t 2>&1 | tee ${BASE_PATH}/results/encoding/$c/$t/$w.txt
 else
 	echo "-------------------- Run ($w) --------------------"
-	${BASE_PATH}/scripts_huawei/ycsb/plio/run.sh $t $w 2>&1 | tee ${BASE_PATH}/results/encoding/$c/$t/$w.txt
+	${BASE_PATH}/scripts_huawei/ycsb/memec/run.sh $t $w 2>&1 | tee ${BASE_PATH}/results/encoding/$c/$t/$w.txt
 fi
 
 # Tell the control node that this iteration is finished

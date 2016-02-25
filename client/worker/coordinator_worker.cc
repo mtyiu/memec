@@ -1,5 +1,5 @@
 #include "worker.hh"
-#include "../main/master.hh"
+#include "../main/client.hh"
 
 void MasterWorker::dispatch( CoordinatorEvent event ) {
 	bool connected, isSend;

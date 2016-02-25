@@ -1,7 +1,7 @@
 #!/bin/bash
 
 BASE_PATH=${HOME}/mtyiu
-PLIO_PATH=${BASE_PATH}/plio
+MEMEC_PATH=${BASE_PATH}/memec
 
 threads='2 4 6 8 10 12 16 24 32 48 64 96 128 192 256 400 512 1000'
 

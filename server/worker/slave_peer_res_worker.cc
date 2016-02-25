@@ -1,5 +1,5 @@
 #include "worker.hh"
-#include "../main/slave.hh"
+#include "../main/server.hh"
 
 bool SlaveWorker::handleForwardKeyResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
 	struct ForwardKeyHeader header;

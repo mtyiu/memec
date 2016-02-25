@@ -30,7 +30,7 @@ char *MasterProtocol::ackParityDeltaBackup(
 ) {
 	size = this->generateDeltaAcknowledgementHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_ACK_PARITY_DELTA,
 		instanceId, requestId,
 		timestamps,
@@ -49,7 +49,7 @@ char *MasterProtocol::revertDelta(
 ) {
 	size = this->generateDeltaAcknowledgementHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_REVERT_DELTA,
 		instanceId, requestId,
 		timestamps,

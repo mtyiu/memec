@@ -1,5 +1,5 @@
 #include "worker.hh"
-#include "../main/slave.hh"
+#include "../main/server.hh"
 
 void SlaveWorker::dispatch( MasterEvent event ) {
 	bool success = true, connected, isSend = true;
@@ -239,7 +239,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 			buffer.data += PROTO_HEADER_SIZE;
 			buffer.size -= PROTO_HEADER_SIZE;
 			// Validate message
-			if ( header.magic != PROTO_MAGIC_REQUEST || header.from != PROTO_MAGIC_FROM_MASTER ) {
+			if ( header.magic != PROTO_MAGIC_REQUEST || header.from != PROTO_MAGIC_FROM_CLIENT ) {
 				__ERROR__( "SlaveWorker", "dispatch", "Invalid protocol header." );
 			} else {
 				event.instanceId = header.instanceId;

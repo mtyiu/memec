@@ -1,5 +1,5 @@
 #include "chunk_buffer.hh"
-#include "../main/slave.hh"
+#include "../main/server.hh"
 
 uint32_t ChunkBuffer::capacity;
 uint32_t ChunkBuffer::dataChunkCount;

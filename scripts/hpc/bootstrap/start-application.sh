@@ -4,11 +4,11 @@ MASTER_NAME=$(hostname)
 MASTER_IP=$(hostname -I | xargs)
 MASTER_PORT=9112
 CONFIG_PATH=bin/config/hpc
-PLIO_PATH=~/mtyiu/plio
+MEMEC_PATH=~/mtyiu/memec
 
 echo "Starting application [${MASTER_NAME}]..."
 
-cd ${PLIO_PATH}
+cd ${MEMEC_PATH}
 
 if [ $# -gt 0 ]; then
 	# Debug mode

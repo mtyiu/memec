@@ -10,7 +10,7 @@ char *SlaveProtocol::resRemappingSet(
 	// -- common/protocol/remap_protocol.cc --
 	size = this->generateRemappingSetHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
-		toMaster ? PROTO_MAGIC_TO_MASTER : PROTO_MAGIC_TO_SLAVE,
+		toMaster ? PROTO_MAGIC_TO_CLIENT : PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_REMAPPING_SET,
 		instanceId, requestId,
 		listId, chunkId,
@@ -39,7 +39,7 @@ char *SlaveProtocol::reqSet( size_t &size, uint16_t instanceId, uint32_t request
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateKeyValueHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_SET,
 		instanceId, requestId,
 		keySize,
@@ -56,7 +56,7 @@ char *SlaveProtocol::reqRemappedUpdate( size_t &size, uint16_t instanceId, uint3
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateKeyValueUpdateHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_REMAPPED_UPDATE,
 		instanceId, requestId,
 		keySize,
@@ -74,7 +74,7 @@ char *SlaveProtocol::reqRemappedDelete( size_t &size, uint16_t instanceId, uint3
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateKeyHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_REMAPPED_DELETE,
 		instanceId, requestId,
 		keySize,
@@ -89,7 +89,7 @@ char *SlaveProtocol::resRemappedUpdate( size_t &size, uint16_t instanceId, uint3
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateKeyValueUpdateHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_REMAPPED_UPDATE,
 		instanceId, requestId,
 		keySize, key,
@@ -104,7 +104,7 @@ char *SlaveProtocol::resRemappedDelete( size_t &size, uint16_t instanceId, uint3
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateKeyHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_REMAPPED_DELETE,
 		instanceId, requestId,
 		keySize, key,

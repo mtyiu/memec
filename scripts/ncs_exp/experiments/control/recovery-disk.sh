@@ -1,7 +1,7 @@
 #!/bin/bash
 
 BASE_PATH=${HOME}/mtyiu
-PLIO_PATH=${BASE_PATH}/plio
+MEMEC_PATH=${BASE_PATH}/memec
 
 sizes='1000000000 2000000000 4000000000 8000000000 10000000000'
 
@@ -67,7 +67,7 @@ for s in $sizes; do
 		screen -S manage -p 0 -X stuff "$(printf '\r\r')"
 		sleep 10
 
-		scp testbed-node$n:${PLIO_PATH}/memory.log ${BASE_PATH}/results/recovery-disk/$s/$iter/
-		scp testbed-node1:${PLIO_PATH}/coordinator.log ${BASE_PATH}/results/recovery-disk/$s/$iter/
+		scp testbed-node$n:${MEMEC_PATH}/memory.log ${BASE_PATH}/results/recovery-disk/$s/$iter/
+		scp testbed-node1:${MEMEC_PATH}/coordinator.log ${BASE_PATH}/results/recovery-disk/$s/$iter/
 	done
 done

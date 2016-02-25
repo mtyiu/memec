@@ -1,7 +1,7 @@
 #!/bin/bash
 
 BASE_PATH=${HOME}/mtyiu
-PLIO_PATH=${BASE_PATH}/plio
+MEMEC_PATH=${BASE_PATH}/memec
 
 function set_overload {
 	delay=$1
@@ -77,6 +77,6 @@ for delay in $delays; do
 			scp testbed-node$n:${BASE_PATH}/results/temporary/*.txt ${BASE_PATH}/results/temporary/$delay/$iter/node$n
 			ssh testbed-node$n 'rm -rf ${BASE_PATH}/results/*'
 		done
-		scp testbed-node1:${PLIO_PATH}/coordinator.log ${BASE_PATH}/results/temporary-double/$delay/$iter/node$n
+		scp testbed-node1:${MEMEC_PATH}/coordinator.log ${BASE_PATH}/results/temporary-double/$delay/$iter/node$n
 	done
 done

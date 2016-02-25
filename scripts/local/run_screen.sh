@@ -7,8 +7,8 @@ screen -S coordinator -p 0 -X stuff "bin/coordinator ${VERBOSE} 2>&1 | tee coord
 sleep ${SLEEP_TIME}
 
 for i in {1..10}; do
-	rm -rf /tmp/plio/server${i}
-	mkdir -p /tmp/plio/server${i} 2> /dev/null
+	rm -rf /tmp/memec/server${i}
+	mkdir -p /tmp/memec/server${i} 2> /dev/null
 	port=$(expr $i + 9110)
 	screen_id=server${i}
 	if [ $i == 10 ]; then
@@ -16,10 +16,10 @@ for i in {1..10}; do
 	fi
 	if [ $# == 0 ]; then
 		screen -S ${screen_id} -p 0 -X stuff \
-			"bin/server ${VERBOSE} -o server server${i} tcp://127.0.0.1:${port} -o storage path /tmp/plio/server${i} 2>&1 | tee ${port}.txt $(printf '\r')"
+			"bin/server ${VERBOSE} -o server server${i} tcp://127.0.0.1:${port} -o storage path /tmp/memec/server${i} 2>&1 | tee ${port}.txt $(printf '\r')"
 	else
 		screen -S server${i} -p 0 -X stuff \
-			"gdb bin/server -ex \"r -v -o server server${i} tcp://127.0.0.1:911${i} -o storage path /tmp/plio/server${i}\" $(printf '\r')  $(printf '\r') $(printf '\r') $(printf '\r')"
+			"gdb bin/server -ex \"r -v -o server server${i} tcp://127.0.0.1:911${i} -o storage path /tmp/memec/server${i}\" $(printf '\r')  $(printf '\r') $(printf '\r') $(printf '\r')"
 	fi
 done
 

@@ -1,6 +1,6 @@
 CC=g++
 CFLAGS=-std=c++11 -Wall -O2
-PLIO_SRC_ROOT=../../..
+MEMEC_SRC_ROOT=../../..
 LIBS=
 
 OBJS= \
@@ -11,10 +11,10 @@ EXTERNAL_LIB=
 
 all: $(OBJS) $(EXTERNAL_LIB)
 
-bitmask_array: bitmask_array.cc $(PLIO_SRC_ROOT)/common/ds/bitmask_array.o
+bitmask_array: bitmask_array.cc $(MEMEC_SRC_ROOT)/common/ds/bitmask_array.o
 	$(CC) $(CFLAGS) -Wno-unused-result $(LIBS) -o $@ $^
 
-id_generator: id_generator.cc $(PLIO_SRC_ROOT)/common/ds/id_generator.hh
+id_generator: id_generator.cc $(MEMEC_SRC_ROOT)/common/ds/id_generator.hh
 	$(CC) $(CFLAGS) -Wno-unused-result $(LIBS) -o $@ $^
 
 clean:

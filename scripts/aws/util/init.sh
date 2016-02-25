@@ -6,4 +6,4 @@ rm -rf ${BASE_PATH}/results
 rm ${BASE_PATH}/scripts
 
 mkdir ${BASE_PATH}/results
-ln -s ${BASE_PATH}/plio/scripts/aws/ ${BASE_PATH}/scripts
+ln -s ${BASE_PATH}/memec/scripts/aws/ ${BASE_PATH}/scripts

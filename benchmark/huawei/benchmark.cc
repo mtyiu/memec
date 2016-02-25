@@ -164,7 +164,7 @@ void *stop( void *argv ) {
 
 int main( int argc, char **argv ) {
 	if ( argc <= 11 ) {
-		fprintf( stderr, "Usage: %s [Key size] [Chunk size] [Batch size] [Data size] [Total size] [Client ID] [Total number of clients] [Number of threads] [Test download (true|false)?] [Master IP] [Master port(s)]\n", argv[ 0 ] );
+		fprintf( stderr, "Usage: %s [Key size] [Chunk size] [Batch size] [Data size] [Total size] [Client ID] [Total number of clients] [Number of threads] [Test download (true|false)?] [Client IP] [Client port(s)]\n", argv[ 0 ] );
 		return 1;
 	}
 	struct sockaddr_in addr;
@@ -214,7 +214,7 @@ int main( int argc, char **argv ) {
 		width, "Batch Size", config.batchSize,
 		width, "Data Size", config.dataSize,
 		width, "Total Size", config.totalSize,
-		width, "Master", ipStr
+		width, "Client", ipStr
 	);
 	for ( int i = 0; i < config.numPorts; i++ ) {
 		printf( "%s%u", i == 0 ? "" : "|", ntohs( config.ports[ i ] ) );

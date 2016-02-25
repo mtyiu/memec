@@ -17,7 +17,7 @@ char *SlaveProtocol::resRegisterMaster( size_t &size, uint16_t instanceId, uint3
 	success = true; // always success
 	size = this->generateHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
-		PROTO_MAGIC_TO_MASTER,
+		PROTO_MAGIC_TO_CLIENT,
 		PROTO_OPCODE_REGISTER,
 		0, // length
 		instanceId, requestId
@@ -29,7 +29,7 @@ char *SlaveProtocol::reqRegisterSlavePeer( size_t &size, uint16_t instanceId, ui
 	// -- common/protocol/address_protocol.cc --
 	size = this->generateAddressHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_REGISTER,
 		instanceId, requestId,
 		addr->addr, addr->port
@@ -41,7 +41,7 @@ char *SlaveProtocol::resRegisterSlavePeer( size_t &size, uint16_t instanceId, ui
 	// -- common/protocol/protocol.cc --
 	size = this->generateHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_REGISTER,
 		0, // length
 		instanceId, requestId

@@ -5,7 +5,7 @@ char *CoordinatorProtocol::announceSlaveReconstructed( size_t &size, uint16_t in
 	ServerAddr srcAddr = srcSocket->getServerAddr(), dstAddr = dstSocket->getServerAddr();
 	size = this->generateSrcDstAddressHeader(
 		PROTO_MAGIC_ANNOUNCEMENT,
-		toSlave ? PROTO_MAGIC_TO_SLAVE : PROTO_MAGIC_TO_MASTER,
+		toSlave ? PROTO_MAGIC_TO_SERVER : PROTO_MAGIC_TO_CLIENT,
 		PROTO_OPCODE_SLAVE_RECONSTRUCTED,
 		instanceId, requestId,
 		srcAddr.addr,
@@ -21,7 +21,7 @@ char *CoordinatorProtocol::promoteBackupSlave( size_t &size, uint16_t instanceId
 	ServerAddr srcAddr = srcSocket->getServerAddr();
 	size = this->generatePromoteBackupSlaveHeader(
 		PROTO_MAGIC_ANNOUNCEMENT,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_BACKUP_SLAVE_PROMOTED,
 		instanceId, requestId,
 		srcAddr.addr,
@@ -37,7 +37,7 @@ char *CoordinatorProtocol::reqReconstruction( size_t &size, uint16_t instanceId,
 	// -- common/protocol/recovery_protocol.cc --
 	size = this->generateReconstructionHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_RECONSTRUCTION,
 		instanceId, requestId,
 		listId,
@@ -54,7 +54,7 @@ char *CoordinatorProtocol::reqReconstructionUnsealed( size_t &size, uint16_t ins
 	// -- common/protocol/batch_protocol.cc --
 	size = this->generateBatchKeyHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_RECONSTRUCTION_UNSEALED,
 		instanceId, requestId,
 		keys, it, keysCount,
@@ -66,7 +66,7 @@ char *CoordinatorProtocol::reqReconstructionUnsealed( size_t &size, uint16_t ins
 char *CoordinatorProtocol::ackCompletedReconstruction( size_t &size, uint16_t instanceId, uint32_t requestId, bool success ) {
 	size = this->generateHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_RECONSTRUCTION,
 		0, // length
 		instanceId, requestId

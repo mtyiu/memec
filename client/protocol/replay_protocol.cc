@@ -3,7 +3,7 @@
 char *MasterProtocol::replaySet( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize, char *value, uint32_t valueSize ) {
 	size = this->generateKeyValueHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_MASTER,
+		PROTO_MAGIC_TO_CLIENT,
 		PROTO_OPCODE_SET,
 		instanceId, requestId,
 		keySize,
@@ -18,7 +18,7 @@ char *MasterProtocol::replaySet( size_t &size, uint16_t instanceId, uint32_t req
 char *MasterProtocol::replayGet( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize ) {
 	size = this->generateKeyHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_MASTER,
+		PROTO_MAGIC_TO_CLIENT,
 		PROTO_OPCODE_GET,
 		instanceId, requestId,
 		keySize,
@@ -31,7 +31,7 @@ char *MasterProtocol::replayGet( size_t &size, uint16_t instanceId, uint32_t req
 char *MasterProtocol::replayUpdate( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize) {
 	size = this->generateKeyValueUpdateHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_MASTER,
+		PROTO_MAGIC_TO_CLIENT,
 		PROTO_OPCODE_SET,
 		instanceId, requestId,
 		keySize,
@@ -47,7 +47,7 @@ char *MasterProtocol::replayUpdate( size_t &size, uint16_t instanceId, uint32_t 
 char *MasterProtocol::replayDelete( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize ) {
 	size = this->generateKeyHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_MASTER,
+		PROTO_MAGIC_TO_CLIENT,
 		PROTO_OPCODE_DELETE,
 		instanceId, requestId,
 		keySize,

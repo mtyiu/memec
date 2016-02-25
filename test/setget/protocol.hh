@@ -13,10 +13,10 @@
 #define PROTO_MAGIC_RESPONSE_FAILURE              0x03 // -----011
 // (Bit: 3-4) //
 #define PROTO_MAGIC_FROM_APPLICATION              0x00 // ---00---
-#define PROTO_MAGIC_FROM_MASTER                   0x10 // ---10---
+#define PROTO_MAGIC_FROM_CLIENT                   0x10 // ---10---
  // (Bit: 5-6) //
 #define PROTO_MAGIC_TO_APPLICATION                0x00 // -00-----
-#define PROTO_MAGIC_TO_MASTER                     0x40 // -10-----
+#define PROTO_MAGIC_TO_CLIENT                     0x40 // -10-----
 // (Bit: 7): Reserved //
 
 /*******************

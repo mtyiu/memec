@@ -4,7 +4,7 @@ char *CoordinatorProtocol::reqSyncMeta( size_t &size, uint16_t instanceId, uint3
 	// -- common/protocol/protocol.cc --
 	size = this->generateHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_SYNC_META,
 		0, // length
 		instanceId, requestId
@@ -16,7 +16,7 @@ char *CoordinatorProtocol::reqSealChunks( size_t &size, uint16_t instanceId, uin
 	// -- common/protocol/protocol.cc --
 	size = this->generateHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_SEAL_CHUNKS,
 		0, // length
 		instanceId, requestId
@@ -28,7 +28,7 @@ char *CoordinatorProtocol::reqFlushChunks( size_t &size, uint16_t instanceId, ui
 	// -- common/protocol/protocol.cc --
 	size = this->generateHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_FLUSH_CHUNKS,
 		0, // length
 		instanceId, requestId

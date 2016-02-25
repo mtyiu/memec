@@ -15,7 +15,7 @@
 #define MAX_MESSLEN	 4096
 #define MAX_SPREAD_NAME 1024
 #define MAX_GROUP_NUM   10
-#define GROUP_NAME	  "plio"
+#define GROUP_NAME	  "memec"
 #define MSG_TYPE		FIFO_MESS
 
 class RemapMsgHandler {

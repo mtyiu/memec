@@ -32,7 +32,7 @@ char *SlaveProtocol::reqSealChunk( size_t &size, uint16_t instanceId, uint32_t r
 
 	size = this->generateChunkSealHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_SEAL_CHUNK,
 		instanceId, requestId,
 		chunk->metadata.listId,

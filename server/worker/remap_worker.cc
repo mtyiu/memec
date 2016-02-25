@@ -1,5 +1,5 @@
 #include "worker.hh"
-#include "../main/slave.hh"
+#include "../main/server.hh"
 
 #define BATCH_THRESHOLD		20
 static struct timespec BATCH_INTVL = { 0, 500000 };

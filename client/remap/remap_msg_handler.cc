@@ -4,7 +4,7 @@
 #include <string.h>
 #include "../../common/remap/remap_group.hh"
 #include "../../common/util/debug.hh"
-#include "../main/master.hh"
+#include "../main/client.hh"
 #include "remap_msg_handler.hh"
 
 MasterRemapMsgHandler::MasterRemapMsgHandler() :

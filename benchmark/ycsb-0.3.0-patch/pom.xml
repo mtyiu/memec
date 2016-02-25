@@ -112,8 +112,7 @@ LICENSE file.
     <module>mongodb</module>
     <!--module>nosqldb</module-->
     <module>orientdb</module>
-    <module>plio</module>
-    <module>plio_direct</module>
+    <module>memec</module>
     <module>dummy</module>
     <module>redis</module>
     <module>tarantool</module>

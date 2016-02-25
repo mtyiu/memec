@@ -3,16 +3,16 @@
 SLAVE_NAME=$(cat ~/.hostname)
 SLAVE_IP=$(hostname -I | awk '{print $1}' | xargs)
 SLAVE_PORT=9111
-STORAGE_PATH=/tmp/plio/${SLAVE_NAME}
+STORAGE_PATH=/tmp/memec/${SLAVE_NAME}
 CONFIG_PATH=bin/config/aws
-PLIO_PATH=~/mtyiu/plio
+MEMEC_PATH=~/mtyiu/memec
 
 echo "Starting backup slave [${SLAVE_NAME}]..."
 
 rm -rf ${STORAGE_PATH}
 mkdir -p ${STORAGE_PATH}
 
-cd ${PLIO_PATH}
+cd ${MEMEC_PATH}
 
 if [ $# -gt 0 ]; then
 	# Debug mode

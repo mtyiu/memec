@@ -34,7 +34,7 @@ void CoordinatorEvent::resRemappedData( CoordinatorSocket *socket, uint16_t inst
 }
 
 void CoordinatorEvent::resSlaveReconstructedMsg( CoordinatorSocket *socket, uint16_t instanceId, uint32_t requestId ) {
-	this->type = COORDINATOR_EVENT_TYPE_SLAVE_RECONSTRUCTED_MESSAGE_RESPONSE;
+	this->type = COORDINATOR_EVENT_TYPE_SERVER_RECONSTRUCTED_MESSAGE_RESPONSE;
 	this->socket = socket;
 	this->instanceId = instanceId;
 	this->requestId = requestId;

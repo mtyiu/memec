@@ -151,7 +151,7 @@ void *stop( void *argv ) {
 
 int main( int argc, char **argv ) {
 	if ( argc <= 12 ) {
-		fprintf( stderr, "Usage: %s [Key size] [Chunk size] [Batch size] [Data size] [Number of windows] [Window rate] [Items per window] [Client ID] [Total number of clients] [Number of threads] [Master IP] [Master port(s)]\n", argv[ 0 ] );
+		fprintf( stderr, "Usage: %s [Key size] [Chunk size] [Batch size] [Data size] [Number of windows] [Window rate] [Items per window] [Client ID] [Total number of clients] [Number of threads] [Client IP] [Client port(s)]\n", argv[ 0 ] );
 		return 1;
 	}
 	struct sockaddr_in addr;
@@ -203,7 +203,7 @@ int main( int argc, char **argv ) {
 		width, "Number of windows", config.numWindows,
 		width, "Window rate", config.windowRate,
 		width, "Items per window", config.itemsPerWindow,
-		width, "Master", ipStr
+		width, "Client", ipStr
 	);
 	for ( int i = 0; i < config.numPorts; i++ ) {
 		printf( "%s%u", i == 0 ? "" : "|", ntohs( config.ports[ i ] ) );

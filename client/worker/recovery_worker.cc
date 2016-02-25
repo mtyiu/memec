@@ -1,5 +1,5 @@
 #include "worker.hh"
-#include "../main/master.hh"
+#include "../main/client.hh"
 
 bool MasterWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *buf, size_t size ) {
 	struct AddressHeader srcHeader, dstHeader;

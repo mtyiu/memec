@@ -4,11 +4,11 @@ MASTER_NAME=$(hostname | sed 's/testbed-//g')
 MASTER_IP=$(hostname -I | awk '{print $1}' | xargs)
 MASTER_PORT=9112
 CONFIG_PATH=bin/config/ncs_exp
-PLIO_PATH=~/mtyiu/plio
+MEMEC_PATH=~/mtyiu/memec
 
 echo "Starting master [${MASTER_NAME}]..."
 
-cd ${PLIO_PATH}
+cd ${MEMEC_PATH}
 
 if [ $# -gt 0 ]; then
 	# Debug mode

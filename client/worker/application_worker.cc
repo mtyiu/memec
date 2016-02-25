@@ -1,5 +1,5 @@
 #include "worker.hh"
-#include "../main/master.hh"
+#include "../main/client.hh"
 #include "../../common/ds/instance_id_generator.hh"
 
 void MasterWorker::dispatch( ApplicationEvent event ) {

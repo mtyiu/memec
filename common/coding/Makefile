@@ -2,10 +2,10 @@ GCC=gcc
 CC=g++
 CFLAGS=-std=c++11 -Wall -O2
 
-PLIO_SRC_ROOT=../..
+MEMEC_SRC_ROOT=../..
 LIBS=
-JLIB_DIR=$(PLIO_SRC_ROOT)/lib/jerasure
-GFLIB_DIR=$(PLIO_SRC_ROOT)/lib/gf_complete
+JLIB_DIR=$(MEMEC_SRC_ROOT)/lib/jerasure
+GFLIB_DIR=$(MEMEC_SRC_ROOT)/lib/gf_complete
 INCLUDE=-I$(JLIB_DIR)/include -I$(GFLIB_DIR)/include
 JSRC_FILES=$(wildcard $(JLIB_DIR)/src/*.c)
 GFSRC_FILES=$(wildcard $(GFLIB_DIR)/src/*.c)

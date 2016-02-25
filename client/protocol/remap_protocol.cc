@@ -18,7 +18,7 @@ char *MasterProtocol::reqRemappingSet( size_t &size, uint16_t instanceId, uint32
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateRemappingSetHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_REMAPPING_SET,
 		instanceId, requestId,
 		listId, chunkId,

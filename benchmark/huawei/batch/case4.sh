@@ -2,7 +2,7 @@
 
 BASE_PATH=${HOME}/mtyiu
 
-cd ${BASE_PATH}/plio/benchmark/huawei
+cd ${BASE_PATH}/memec/benchmark/huawei
 
 DATA_SIZE=10240
 

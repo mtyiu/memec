@@ -1,5 +1,5 @@
 #include "backup.hh"
-#include "../main/slave.hh"
+#include "../main/server.hh"
 
 SlaveBackup::SlaveBackup() {
 	Slave* slave = Slave::getInstance();

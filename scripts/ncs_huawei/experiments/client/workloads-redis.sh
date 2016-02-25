@@ -1,7 +1,7 @@
 #!/bin/bash
 
 BASE_PATH=${HOME}/mtyiu
-PLIO_PATH=${BASE_PATH}/plio
+MEMEC_PATH=${BASE_PATH}/memec
 HOSTNAME=$(hostname)
 CONTROL_NODE=testbed-node10
 
@@ -16,11 +16,11 @@ echo "Running experiment with coding scheme = $c and thread count = $t..."
 # Run workload A, B, C, F, D first
 if [ $w == "load" ]; then
 	echo "-------------------- Load (workloada) --------------------"
-	# ${BASE_PATH}/scripts_huawei/ycsb/plio/load.sh $t 2>&1 | tee ${BASE_PATH}/results/workloads/$c/$t/load.txt
+	# ${BASE_PATH}/scripts_huawei/ycsb/memec/load.sh $t 2>&1 | tee ${BASE_PATH}/results/workloads/$c/$t/load.txt
 	${BASE_PATH}/scripts_huawei/ycsb/redis/load.sh $t 2>&1 | tee ${BASE_PATH}/results/workloads/$c/$t/load.txt
 else
 	echo "-------------------- Run ($w) --------------------"
-	# ${BASE_PATH}/scripts_huawei/ycsb/plio/run.sh $t $w 2>&1 | tee ${BASE_PATH}/results/workloads/$c/$t/$w.txt
+	# ${BASE_PATH}/scripts_huawei/ycsb/memec/run.sh $t $w 2>&1 | tee ${BASE_PATH}/results/workloads/$c/$t/$w.txt
 	${BASE_PATH}/scripts_huawei/ycsb/redis/run.sh $t $w 2>&1 | tee ${BASE_PATH}/results/workloads/$c/$t/$w.txt
 fi
 

@@ -5,7 +5,7 @@ char *MasterProtocol::reqSet( size_t &size, uint16_t instanceId, uint32_t reques
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateKeyValueHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_SET,
 		instanceId, requestId,
 		keySize,
@@ -21,7 +21,7 @@ char *MasterProtocol::reqGet( size_t &size, uint16_t instanceId, uint32_t reques
 	// -- common/protocol/normal_protocol.cc --
 	size = this->generateKeyHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_GET,
 		instanceId, requestId,
 		keySize,
@@ -34,7 +34,7 @@ char *MasterProtocol::reqUpdate( size_t &size, uint16_t instanceId, uint32_t req
 	// -- common/protocol/normal_protocol.cc --
 	size = this->generateKeyValueUpdateHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		checkGetChunk ? PROTO_OPCODE_UPDATE_CHECK : PROTO_OPCODE_UPDATE,
 		instanceId, requestId,
 		keySize,
@@ -52,7 +52,7 @@ char *MasterProtocol::reqDelete( size_t &size, uint16_t instanceId, uint32_t req
 	// -- common/protocol/normal_protocol.cc --
 	size = this->generateKeyHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		checkGetChunk ? PROTO_OPCODE_DELETE_CHECK : PROTO_OPCODE_DELETE,
 		instanceId, requestId,
 		keySize,

@@ -1,11 +1,11 @@
 #!/bin/bash
 
 CONFIG_PATH=bin/config/aws
-PLIO_PATH=~/mtyiu/plio
+MEMEC_PATH=~/mtyiu/memec
 
 echo "Starting coordinator [${COORDINATOR_NAME}]..."
 
-cd ${PLIO_PATH}
+cd ${MEMEC_PATH}
 
 if [ $# -gt 0 ]; then
 	# Debug mode

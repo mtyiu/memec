@@ -1,8 +1,8 @@
 CC=g++
 CFLAGS=-std=c++11 -Wall -O2
-PLIO_SRC_ROOT=..
+MEMEC_SRC_ROOT=..
 LIBS=-pthread
-BIN=$(PLIO_SRC_ROOT)/bin/client
+BIN=$(MEMEC_SRC_ROOT)/bin/client
 
 OBJS= \
 	backup/backup.o \
@@ -32,33 +32,33 @@ OBJS= \
 	worker/recovery_worker.o \
 	worker/remap_worker.o \
 	worker/slave_worker.o \
-	main/master.o \
+	main/client.o \
 	main/main.o
 
 EXTERNAL_LIB= \
-	$(PLIO_SRC_ROOT)/common/config/config.o \
-	$(PLIO_SRC_ROOT)/common/config/global_config.o \
-	$(PLIO_SRC_ROOT)/common/config/server_addr.o \
-	$(PLIO_SRC_ROOT)/common/ds/bitmask_array.o \
-	$(PLIO_SRC_ROOT)/common/ds/instance_id_generator.o \
-	$(PLIO_SRC_ROOT)/common/ds/key_value.o \
-	$(PLIO_SRC_ROOT)/common/ds/latency.o \
-	$(PLIO_SRC_ROOT)/common/ds/load.o \
-	$(PLIO_SRC_ROOT)/common/ds/sockaddr_in.o \
-	$(PLIO_SRC_ROOT)/common/protocol/protocol.o \
-	$(PLIO_SRC_ROOT)/common/protocol/ack_protocol.o \
-	$(PLIO_SRC_ROOT)/common/protocol/address_protocol.o \
-	$(PLIO_SRC_ROOT)/common/protocol/degraded_protocol.o \
-	$(PLIO_SRC_ROOT)/common/protocol/fault_protocol.o \
-	$(PLIO_SRC_ROOT)/common/protocol/heartbeat_protocol.o \
-	$(PLIO_SRC_ROOT)/common/protocol/load_protocol.o \
-	$(PLIO_SRC_ROOT)/common/protocol/normal_protocol.o \
-	$(PLIO_SRC_ROOT)/common/protocol/remap_protocol.o \
-	$(PLIO_SRC_ROOT)/common/remap/remap_msg_handler.o \
-	$(PLIO_SRC_ROOT)/common/socket/socket.o \
-	$(PLIO_SRC_ROOT)/common/socket/epoll.o \
-	$(PLIO_SRC_ROOT)/lib/death_handler/death_handler.o \
-	$(PLIO_SRC_ROOT)/lib/inih/ini.o
+	$(MEMEC_SRC_ROOT)/common/config/config.o \
+	$(MEMEC_SRC_ROOT)/common/config/global_config.o \
+	$(MEMEC_SRC_ROOT)/common/config/server_addr.o \
+	$(MEMEC_SRC_ROOT)/common/ds/bitmask_array.o \
+	$(MEMEC_SRC_ROOT)/common/ds/instance_id_generator.o \
+	$(MEMEC_SRC_ROOT)/common/ds/key_value.o \
+	$(MEMEC_SRC_ROOT)/common/ds/latency.o \
+	$(MEMEC_SRC_ROOT)/common/ds/load.o \
+	$(MEMEC_SRC_ROOT)/common/ds/sockaddr_in.o \
+	$(MEMEC_SRC_ROOT)/common/protocol/protocol.o \
+	$(MEMEC_SRC_ROOT)/common/protocol/ack_protocol.o \
+	$(MEMEC_SRC_ROOT)/common/protocol/address_protocol.o \
+	$(MEMEC_SRC_ROOT)/common/protocol/degraded_protocol.o \
+	$(MEMEC_SRC_ROOT)/common/protocol/fault_protocol.o \
+	$(MEMEC_SRC_ROOT)/common/protocol/heartbeat_protocol.o \
+	$(MEMEC_SRC_ROOT)/common/protocol/load_protocol.o \
+	$(MEMEC_SRC_ROOT)/common/protocol/normal_protocol.o \
+	$(MEMEC_SRC_ROOT)/common/protocol/remap_protocol.o \
+	$(MEMEC_SRC_ROOT)/common/remap/remap_msg_handler.o \
+	$(MEMEC_SRC_ROOT)/common/socket/socket.o \
+	$(MEMEC_SRC_ROOT)/common/socket/epoll.o \
+	$(MEMEC_SRC_ROOT)/lib/death_handler/death_handler.o \
+	$(MEMEC_SRC_ROOT)/lib/inih/ini.o
 
 LD_LIB= \
 	-lrt \

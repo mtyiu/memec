@@ -7,7 +7,7 @@ for i in {1..10}; do
 		--progress \
 		--verbose \
 		--archive \
-		~/mtyiu/plio/ node$i:mtyiu/plio/
+		~/mtyiu/memec/ node$i:mtyiu/memec/
 done
 
 rsync \
@@ -16,4 +16,4 @@ rsync \
 	--progress \
 	--verbose \
 	--archive \
-	~/mtyiu/plio/ client:mtyiu/plio/
+	~/mtyiu/memec/ client:mtyiu/memec/

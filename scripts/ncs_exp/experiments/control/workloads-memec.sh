@@ -1,7 +1,7 @@
 #!/bin/bash
 
 BASE_PATH=${HOME}/mtyiu
-PLIO_PATH=${BASE_PATH}/plio
+MEMEC_PATH=${BASE_PATH}/memec
 HOSTNAME=$(hostname)
 
 coding='raid0' # raid1 raid5 rdp cauchy rs evenodd'
@@ -14,7 +14,7 @@ for iter in {1..10}; do
 	for c in $coding; do
 		echo "Preparing for the experiments with coding scheme = $c..."
 
-		sed -i "s/^scheme=.*$/scheme=$c/g" ${PLIO_PATH}/bin/config/ncs_exp/global.ini
+		sed -i "s/^scheme=.*$/scheme=$c/g" ${MEMEC_PATH}/bin/config/ncs_exp/global.ini
 
 		${BASE_PATH}/scripts/util/rsync.sh
 
@@ -63,6 +63,6 @@ for iter in {1..10}; do
 	done
 done
 
-sed -i "s/^scheme=.*$/scheme=raid0/g" ${PLIO_PATH}/bin/config/ncs_exp/global.ini
+sed -i "s/^scheme=.*$/scheme=raid0/g" ${MEMEC_PATH}/bin/config/ncs_exp/global.ini
 
 ${BASE_PATH}/scripts/util/rsync.sh

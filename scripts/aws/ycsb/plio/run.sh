@@ -24,7 +24,7 @@ elif [ $ID == 4 ]; then
 fi
 
 ${YCSB_PATH}/bin/ycsb \
-	run plio \
+	run memec \
 	-s \
 	-P ${YCSB_PATH}/workloads/$2 \
 	-p fieldcount=1 \
@@ -39,7 +39,7 @@ ${YCSB_PATH}/bin/ycsb \
 	-p operationcount=${OPERATION_COUNT} \
 	-p threadcount=$1 \
 	-p histogram.buckets=200000 \
-	-p plio.host=$(hostname -I | xargs) \
-	-p plio.port=${MASTER_PORT} \
-	-p plio.key_size=255 \
-	-p plio.chunk_size=4096
+	-p memec.host=$(hostname -I | xargs) \
+	-p memec.port=${MASTER_PORT} \
+	-p memec.key_size=255 \
+	-p memec.chunk_size=4096

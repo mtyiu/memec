@@ -1,5 +1,5 @@
 #include "worker.hh"
-#include "../main/slave.hh"
+#include "../main/server.hh"
 
 uint32_t SlaveWorker::dataChunkCount;
 uint32_t SlaveWorker::parityChunkCount;
@@ -35,13 +35,13 @@ void SlaveWorker::dispatch( MixedEvent event ) {
 		case EVENT_TYPE_IO:
 			this->dispatch( event.event.io );
 			break;
-		case EVENT_TYPE_MASTER:
+		case EVENT_TYPE_CLIENT:
 			this->dispatch( event.event.master );
 			break;
-		case EVENT_TYPE_SLAVE:
+		case EVENT_TYPE_SERVER:
 			this->dispatch( event.event.slave );
 			break;
-		case EVENT_TYPE_SLAVE_PEER:
+		case EVENT_TYPE_SERVER_PEER:
 			this->dispatch( event.event.slavePeer );
 			break;
 		default:

@@ -128,7 +128,7 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 				if ( ret && header.magic == PROTO_MAGIC_REQUEST && header.opcode == PROTO_OPCODE_REGISTER ) {
 					struct AddressHeader addressHeader;
 					socket->protocol.parseAddressHeader( addressHeader, socket->buffer.data + PROTO_HEADER_SIZE, socket->buffer.size - PROTO_HEADER_SIZE );
-					if ( header.from == PROTO_MAGIC_FROM_MASTER ) {
+					if ( header.from == PROTO_MAGIC_FROM_CLIENT ) {
 						MasterSocket *masterSocket = new MasterSocket();
 						masterSocket->init( fd, *addr );
 						masterSocket->setListenAddr( addressHeader.addr, addressHeader.port );
@@ -141,7 +141,7 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 						instanceId = generator->generate( masterSocket );
 						event.resRegister( masterSocket, instanceId, header.requestId );
 						coordinator->eventQueue.insert( event );
-					} else if ( header.from == PROTO_MAGIC_FROM_SLAVE ) {
+					} else if ( header.from == PROTO_MAGIC_FROM_SERVER ) {
 						SlaveSocket *s = 0;
 
 						for ( int i = 0, len = coordinator->sockets.slaves.size(); i < len; i++ ) {

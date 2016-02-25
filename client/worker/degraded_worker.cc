@@ -1,5 +1,5 @@
 #include "worker.hh"
-#include "../main/master.hh"
+#include "../main/client.hh"
 
 bool MasterWorker::sendDegradedLockRequest(
 	uint16_t parentInstanceId, uint32_t parentRequestId, uint8_t opcode,

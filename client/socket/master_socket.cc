@@ -1,6 +1,6 @@
 #include <cerrno>
 #include "master_socket.hh"
-#include "../main/master.hh"
+#include "../main/client.hh"
 #include "../../common/util/debug.hh"
 #include "../../common/ds/instance_id_generator.hh"
 

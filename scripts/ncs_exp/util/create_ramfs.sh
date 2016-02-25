@@ -4,7 +4,7 @@ BASE_PATH=${HOME}/mtyiu
 BOOTSTRAP_SCRIPT_PATH=${BASE_PATH}/scripts/bootstrap
 
 SIZE="4g"
-TARGET_DIR="/tmp/plio"
+TARGET_DIR="/tmp/memec"
 
 rm -f .job
 

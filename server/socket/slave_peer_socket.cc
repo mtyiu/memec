@@ -1,7 +1,7 @@
 #include <cerrno>
 #include "slave_peer_socket.hh"
 #include "../event/slave_peer_event.hh"
-#include "../main/slave.hh"
+#include "../main/server.hh"
 #include "../../common/util/debug.hh"
 
 ArrayMap<int, SlavePeerSocket> *SlavePeerSocket::slavePeers;

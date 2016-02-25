@@ -1,5 +1,5 @@
 #include "worker.hh"
-#include "../main/master.hh"
+#include "../main/client.hh"
 
 void MasterWorker::dispatch( SlaveEvent event ) {
 	bool connected, isSend;
@@ -142,7 +142,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 			buffer.data += PROTO_HEADER_SIZE;
 			buffer.size -= PROTO_HEADER_SIZE;
 			// Validate message
-			if ( header.from != PROTO_MAGIC_FROM_SLAVE ) {
+			if ( header.from != PROTO_MAGIC_FROM_SERVER ) {
 				__ERROR__( "MasterWorker", "dispatch", "Invalid message source from slave." );
 			} else {
 				bool success;

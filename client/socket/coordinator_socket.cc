@@ -1,5 +1,5 @@
 #include "../event/coordinator_event.hh"
-#include "../main/master.hh"
+#include "../main/client.hh"
 #include "coordinator_socket.hh"
 
 ArrayMap<int, CoordinatorSocket> *CoordinatorSocket::coordinators;

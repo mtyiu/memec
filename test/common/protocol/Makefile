@@ -1,6 +1,6 @@
 CC=g++
 CFLAGS=-std=c++11 -Wall -O2
-PLIO_SRC_ROOT=../../..
+MEMEC_SRC_ROOT=../../..
 LIBS=
 
 OBJS= \
@@ -10,7 +10,7 @@ EXTERNAL_LIB=
 
 all: $(OBJS) $(EXTERNAL_LIB)
 
-protocol: protocol.cc $(PLIO_SRC_ROOT)/common/protocol/protocol.o
+protocol: protocol.cc $(MEMEC_SRC_ROOT)/common/protocol/protocol.o
 	$(CC) $(CFLAGS) $(LIBS) -o $@ $^
 
 clean:

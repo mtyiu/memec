@@ -16,7 +16,7 @@ char *MasterProtocol::reqRegisterSlave( size_t &size, uint16_t instanceId, uint3
 	// -- common/protocol/address_protocol.cc --
 	size = this->generateAddressHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_REGISTER,
 		instanceId, requestId,
 		addr,

@@ -8,7 +8,7 @@ if [ $# != 2 ]; then
 fi
 
 ${YCSB_PATH}/bin/ycsb \
-	run plio \
+	run memec \
 	-s \
 	-P ${YCSB_PATH}/workloads/$2 \
 	-p fieldcount=1 \
@@ -18,7 +18,7 @@ ${YCSB_PATH}/bin/ycsb \
 	-p recordcount=1000000 \
 	-p operationcount=1000000 \
 	-p threadcount=$1 \
-	-p plio.host=192.168.0.19 \
-	-p plio.port=9112 \
-	-p plio.key_size=255 \
-	-p plio.chunk_size=4096
+	-p memec.host=192.168.0.19 \
+	-p memec.port=9112 \
+	-p memec.key_size=255 \
+	-p memec.chunk_size=4096

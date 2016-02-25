@@ -57,7 +57,7 @@ char *SlaveProtocol::reqBatchGetChunks(
 ) {
 	size = this->generateBatchChunkHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_BATCH_CHUNKS,
 		instanceId, requestId,
 		requestIds,
@@ -78,7 +78,7 @@ char *SlaveProtocol::sendUnsealedKeys(
 	// -- common/protocol/batch_protocol.cc --
 	size = this->generateBatchKeyValueHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_BATCH_KEY_VALUES,
 		instanceId, requestId,
 		keys, it, values, lock, keyValuesCount,
@@ -93,7 +93,7 @@ char *SlaveProtocol::resUnsealedKeys(
 ) {
 	size = this->generateBatchKeyHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_BATCH_KEY_VALUES,
 		instanceId, requestId,
 		header

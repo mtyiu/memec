@@ -10,7 +10,7 @@ char *SlaveProtocol::reqForwardKey(
 	// -- common/protocol/degraded_protocol.cc --
 	size = this->generateForwardKeyReqHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_FORWARD_KEY,
 		instanceId, requestId,
 		opcode, listId, stripeId, chunkId,
@@ -31,7 +31,7 @@ char *SlaveProtocol::resForwardKey(
 	// -- common/protocol/degraded_protocol.cc --
 	size = this->generateForwardKeyResHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_FORWARD_KEY,
 		instanceId, requestId,
 		opcode, listId, stripeId, chunkId,
@@ -46,7 +46,7 @@ char *SlaveProtocol::reqGet( size_t &size, uint16_t instanceId, uint32_t request
 	// -- common/protocol/degraded_protocol.cc --
 	size = this->generateListStripeKeyHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_GET,
 		instanceId, requestId,
 		listId,
@@ -76,7 +76,7 @@ char *SlaveProtocol::reqForwardChunk(
 ) {
 	size = this->generateChunkDataHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_FORWARD_CHUNK,
 		instanceId, requestId,
 		listId, stripeId, chunkId,
@@ -92,7 +92,7 @@ char *SlaveProtocol::resForwardChunk(
 ) {
 	size = this->generateChunkHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_FORWARD_CHUNK,
 		instanceId, requestId,
 		listId, stripeId, chunkId

@@ -2,7 +2,7 @@
 #include <ctype.h>
 #include <utility>
 #include "worker.hh"
-#include "../main/master.hh"
+#include "../main/client.hh"
 #include "../remap/basic_remap_scheme.hh"
 
 uint32_t MasterWorker::dataChunkCount;
@@ -26,10 +26,10 @@ void MasterWorker::dispatch( MixedEvent event ) {
 		case EVENT_TYPE_COORDINATOR:
 			this->dispatch( event.event.coordinator );
 			break;
-		case EVENT_TYPE_MASTER:
+		case EVENT_TYPE_CLIENT:
 			this->dispatch( event.event.master );
 			break;
-		case EVENT_TYPE_SLAVE:
+		case EVENT_TYPE_SERVER:
 			this->dispatch( event.event.slave );
 			break;
 		default:

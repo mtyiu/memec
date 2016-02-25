@@ -6,7 +6,7 @@ char *SlaveProtocol::reqUpdate( size_t &size, uint16_t instanceId, uint32_t requ
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateChunkKeyValueUpdateHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_UPDATE,
 		instanceId, requestId,
 		listId,
@@ -29,7 +29,7 @@ char *SlaveProtocol::resUpdate( size_t &size, uint16_t instanceId, uint32_t requ
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateChunkKeyValueUpdateHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_UPDATE,
 		instanceId, requestId,
 		listId,
@@ -50,7 +50,7 @@ char *SlaveProtocol::reqDelete( size_t &size, uint16_t instanceId, uint32_t requ
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateChunkKeyHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_DELETE,
 		instanceId, requestId,
 		listId,
@@ -69,7 +69,7 @@ char *SlaveProtocol::resDelete( size_t &size, uint16_t instanceId, uint32_t requ
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateChunkKeyHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_DELETE,
 		instanceId, requestId,
 		listId,
@@ -86,7 +86,7 @@ char *SlaveProtocol::reqGetChunk( size_t &size, uint16_t instanceId, uint32_t re
 	// -- common/protocol/normal_protocol.cc --
 	size = this->generateChunkHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_GET_CHUNK,
 		instanceId, requestId,
 		listId, stripeId, chunkId,
@@ -100,7 +100,7 @@ char *SlaveProtocol::resGetChunk( size_t &size, uint16_t instanceId, uint32_t re
 	if ( success ) {
 		size = this->generateChunkDataHeader(
 			PROTO_MAGIC_RESPONSE_SUCCESS,
-			PROTO_MAGIC_TO_SLAVE,
+			PROTO_MAGIC_TO_SERVER,
 			PROTO_OPCODE_GET_CHUNK,
 			instanceId, requestId,
 			listId, stripeId, chunkId,
@@ -110,7 +110,7 @@ char *SlaveProtocol::resGetChunk( size_t &size, uint16_t instanceId, uint32_t re
 	} else {
 		size = this->generateChunkHeader(
 			PROTO_MAGIC_RESPONSE_FAILURE,
-			PROTO_MAGIC_TO_SLAVE,
+			PROTO_MAGIC_TO_SERVER,
 			PROTO_OPCODE_GET_CHUNK,
 			instanceId, requestId,
 			listId, stripeId, chunkId
@@ -123,7 +123,7 @@ char *SlaveProtocol::reqSetChunk( size_t &size, uint16_t instanceId, uint32_t re
 	// -- common/protocol/normal_protocol.cc --
 	size = this->generateChunkDataHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_SET_CHUNK,
 		instanceId, requestId,
 		listId, stripeId, chunkId,
@@ -137,7 +137,7 @@ char *SlaveProtocol::reqSetChunk( size_t &size, uint16_t instanceId, uint32_t re
 	// -- common/protocol/normal_protocol.cc --
 	size = this->generateChunkKeyValueHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_SET_CHUNK_UNSEALED,
 		instanceId, requestId,
 		listId, stripeId, chunkId,
@@ -151,7 +151,7 @@ char *SlaveProtocol::resSetChunk( size_t &size, uint16_t instanceId, uint32_t re
 	// -- common/protocol/normal_protocol.cc --
 	size = this->generateChunkHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_SET_CHUNK,
 		instanceId, requestId,
 		listId, stripeId, chunkId
@@ -164,7 +164,7 @@ char *SlaveProtocol::reqUpdateChunk( size_t &size, uint16_t instanceId, uint32_t
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateChunkUpdateHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		checkGetChunk ? PROTO_OPCODE_UPDATE_CHUNK_CHECK : PROTO_OPCODE_UPDATE_CHUNK,
 		instanceId, requestId,
 		listId, stripeId, chunkId,
@@ -180,7 +180,7 @@ char *SlaveProtocol::resUpdateChunk( size_t &size, uint16_t instanceId, uint32_t
 	// -- common/protocol/normal_protocol.cc --
 	size = this->generateChunkUpdateHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_UPDATE_CHUNK,
 		instanceId, requestId,
 		listId, stripeId, chunkId,
@@ -194,7 +194,7 @@ char *SlaveProtocol::reqDeleteChunk( size_t &size, uint16_t instanceId, uint32_t
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateChunkUpdateHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		checkGetChunk ? PROTO_OPCODE_DELETE_CHUNK_CHECK : PROTO_OPCODE_DELETE_CHUNK,
 		instanceId, requestId,
 		listId, stripeId, chunkId,
@@ -210,7 +210,7 @@ char *SlaveProtocol::resDeleteChunk( size_t &size, uint16_t instanceId, uint32_t
 	// -- common/protocol/normal_protocol.cc --
 	size = this->generateChunkUpdateHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_DELETE_CHUNK,
 		instanceId, requestId,
 		listId, stripeId, chunkId,

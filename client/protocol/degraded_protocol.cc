@@ -17,7 +17,7 @@ char *MasterProtocol::reqDegradedGet( size_t &size, uint16_t instanceId, uint32_
 	// -- common/protocol/degraded_protocol.cc --
 	size = this->generateDegradedReqHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_DEGRADED_GET,
 		instanceId, requestId,
 		isSealed, stripeId,
@@ -32,7 +32,7 @@ char *MasterProtocol::reqDegradedUpdate( size_t &size, uint16_t instanceId, uint
 	// -- common/protocol/degraded_protocol.cc --
 	size = this->generateDegradedReqHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_DEGRADED_UPDATE,
 		instanceId, requestId,
 		isSealed, stripeId,
@@ -49,7 +49,7 @@ char *MasterProtocol::reqDegradedDelete( size_t &size, uint16_t instanceId, uint
 	// -- common/protocol/degraded_protocol.cc --
 	size = this->generateDegradedReqHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_DEGRADED_DELETE,
 		instanceId, requestId,
 		isSealed, stripeId,

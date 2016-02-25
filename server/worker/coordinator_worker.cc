@@ -1,5 +1,5 @@
 #include "worker.hh"
-#include "../main/slave.hh"
+#include "../main/server.hh"
 
 void SlaveWorker::dispatch( CoordinatorEvent event ) {
 	bool connected, isSend;
@@ -56,7 +56,7 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 			);
 			isSend = true;
 			break;
-		case COORDINATOR_EVENT_TYPE_SLAVE_RECONSTRUCTED_MESSAGE_RESPONSE:
+		case COORDINATOR_EVENT_TYPE_SERVER_RECONSTRUCTED_MESSAGE_RESPONSE:
 			buffer.data = this->protocol.resSlaveReconstructedMsg(
 				buffer.size,
 				event.instanceId, event.requestId

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 BASE_PATH=${HOME}/mtyiu
-PLIO_PATH=${BASE_PATH}/plio
+MEMEC_PATH=${BASE_PATH}/memec
 
 coding='raid0' # raid1 raid5 rdp cauchy rs evenodd'
 threads=64 # '16 32 64 128 256 512 1000'

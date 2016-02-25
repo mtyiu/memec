@@ -11,7 +11,7 @@ char *CoordinatorProtocol::reqPushLoadStats(
 	// -- common/protocol/load_protocol.cc --
 	size = this->generateLoadStatsHeader(
 		PROTO_MAGIC_LOADING_STATS,
-		PROTO_MAGIC_TO_MASTER,
+		PROTO_MAGIC_TO_CLIENT,
 		instanceId, requestId,
 		slaveGetLatency->size(),
 		slaveSetLatency->size(),

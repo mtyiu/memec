@@ -10,7 +10,7 @@ char *CoordinatorProtocol::resDegradedLock(
 	// -- common/protocol/degraded_protocol.cc --
 	size = this->generateDegradedLockResHeader(
 		isLocked ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
-		PROTO_MAGIC_TO_MASTER,
+		PROTO_MAGIC_TO_CLIENT,
 		PROTO_OPCODE_DEGRADED_LOCK,
 		instanceId, requestId,
 		isLocked, keySize, key,
@@ -29,7 +29,7 @@ char *CoordinatorProtocol::resDegradedLock(
 	// -- common/protocol/degraded_protocol.cc --
 	size = this->generateDegradedLockResHeader(
 		PROTO_MAGIC_RESPONSE_FAILURE,
-		PROTO_MAGIC_TO_MASTER,
+		PROTO_MAGIC_TO_CLIENT,
 		PROTO_OPCODE_DEGRADED_LOCK,
 		instanceId, requestId,
 		keySize, key,
@@ -46,7 +46,7 @@ char *CoordinatorProtocol::resDegradedLock(
 	// -- common/protocol/degraded_protocol.cc --
 	size = this->generateDegradedLockResHeader(
 		PROTO_MAGIC_RESPONSE_FAILURE,
-		PROTO_MAGIC_TO_MASTER,
+		PROTO_MAGIC_TO_CLIENT,
 		PROTO_OPCODE_DEGRADED_LOCK,
 		instanceId, requestId,
 		exist,
@@ -59,7 +59,7 @@ char *CoordinatorProtocol::reqReleaseDegradedLock( size_t &size, uint16_t instan
 	// -- common/protocol/degraded_protocol.cc --
 	size = this->generateDegradedReleaseReqHeader(
 		PROTO_MAGIC_REQUEST,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_RELEASE_DEGRADED_LOCKS,
 		instanceId, requestId,
 		chunks,

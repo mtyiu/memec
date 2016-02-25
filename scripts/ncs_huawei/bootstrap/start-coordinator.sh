@@ -4,11 +4,11 @@ COORDINATOR_NAME=$(hostname | sed 's/testbed-//g')
 COORDINATOR_IP=$(hostname -I | xargs)
 COORDINATOR_PORT=9110
 CONFIG_PATH=bin/config/ncs_huawei
-PLIO_PATH=~/mtyiu/plio
+MEMEC_PATH=~/mtyiu/memec
 
 echo "Starting coordinator [${COORDINATOR_NAME}]..."
 
-cd ${PLIO_PATH}
+cd ${MEMEC_PATH}
 
 if [ $# -gt 0 ]; then
 	# Debug mode
