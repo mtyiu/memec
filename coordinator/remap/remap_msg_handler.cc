@@ -329,7 +329,7 @@ bool CoordinatorRemapMsgHandler::isSlaveLeft( int service, char *msg, char *subj
 /*
  * packet: [# of slaves](1) [ [ip addr](4) [port](2) [state](1) ](7) [..](7) [..](7) ...
  */
-bool CoordinatorRemapMsgHandler::sendStateToMasters( std::vector<struct sockaddr_in> slaves ) {
+int CoordinatorRemapMsgHandler::sendStateToMasters( std::vector<struct sockaddr_in> slaves ) {
 	char group[ 1 ][ MAX_GROUP_NAME ];
 	int recordSize = this->slaveStateRecordSize;
 
@@ -344,13 +344,13 @@ bool CoordinatorRemapMsgHandler::sendStateToMasters( std::vector<struct sockaddr
 	return sendState( slaves, 1, group );
 }
 
-bool CoordinatorRemapMsgHandler::sendStateToMasters( struct sockaddr_in slave ) {
+int CoordinatorRemapMsgHandler::sendStateToMasters( struct sockaddr_in slave ) {
 	std::vector<struct sockaddr_in> slaves;
 	slaves.push_back( slave );
 	return sendStateToMasters( slaves );
 }
 
-bool CoordinatorRemapMsgHandler::broadcastState( std::vector<struct sockaddr_in> slaves ) {
+int CoordinatorRemapMsgHandler::broadcastState( std::vector<struct sockaddr_in> slaves ) {
 	char groups[ MAX_GROUP_NUM ][ MAX_GROUP_NAME ];
 	int recordSize = this->slaveStateRecordSize;
 	if ( slaves.size() == 0 ) {
@@ -365,7 +365,7 @@ bool CoordinatorRemapMsgHandler::broadcastState( std::vector<struct sockaddr_in>
 	return sendState( slaves, 2, groups );
 }
 
-bool CoordinatorRemapMsgHandler::broadcastState( struct sockaddr_in slave ) {
+int CoordinatorRemapMsgHandler::broadcastState( struct sockaddr_in slave ) {
 	std::vector<struct sockaddr_in> slaves;
 	slaves.push_back( slave );
 	return broadcastState( slaves );
@@ -384,26 +384,30 @@ void *CoordinatorRemapMsgHandler::readMessages( void *argv ) {
 
 	CoordinatorRemapMsgHandler *myself = ( CoordinatorRemapMsgHandler* ) argv;
 
-	while( myself->isListening && ret >= 0 ) {
+	while( myself->isListening ) {
 		ret = SP_receive( myself->mbox, &service, sender, MAX_GROUP_NUM, &groups, targetGroups, &msgType, &endian, MAX_MESSLEN, msg );
 
 		subject = &msg[ SP_get_vs_set_offset_memb_mess() ];
 		regular = myself->isRegularMessage( service );
 		fromMaster = ( strncmp( sender, MASTER_GROUP, MASTER_GROUP_LEN ) == 0 );
 
-		if ( ! regular ) {
+		if ( ret < 0 ) {
+			__ERROR__( "CoordinatorRemapMsgHandler", "readMessage", "Failed to receive messages %d\n", ret );
+		} else if ( ! regular ) {
 			std::vector<struct sockaddr_in> slaves;
 			if ( fromMaster && myself->isMasterJoin( service , msg, subject ) ) {
 				// master joined ( masters group )
 				myself->addAliveMaster( subject );
 				// notify the new master about the remapping state
-				myself->sendStateToMasters( slaves );
+				if ( ( ret = myself->sendStateToMasters( slaves ) ) < 0 )
+					__ERROR__( "CoordinatorRemapMsgHandler", "readMessages", "Failed to broadcast states to masters %d", ret );
 			} else if ( myself->isMasterLeft( service, msg, subject ) ) {
 				// master left
 				myself->removeAliveMaster( subject );
 			} else if ( myself->isSlaveJoin( service, msg, subject ) ) {
 				// slave join
-				myself->broadcastState( slaves );
+				if ( ( ret = myself->broadcastState( slaves ) ) < 0 )
+					__ERROR__( "CoordinatorRemapMsgHandler", "readMessages", "Failed to broadcast states to masters %d", ret );
 			} else if ( myself->isSlaveLeft( service, msg, subject ) ) {
 				// slave left
 				// TODO: change state ?
@@ -417,8 +421,6 @@ void *CoordinatorRemapMsgHandler::readMessages( void *argv ) {
 
 		myself->increMsgCount();
 	}
-	if ( ret < 0 )
-		fprintf( stderr, "coord reader exits with error code %d\n", ret );
 
 	return ( void* ) &myself->msgCount;
 }

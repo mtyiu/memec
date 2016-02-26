@@ -70,16 +70,15 @@ void *SlaveRemapMsgHandler::readMessages( void *argv ) {
 	char targetGroups[ MAX_GROUP_NUM ][ MAX_GROUP_NAME ];
 
 	// handler messages
-	while ( myself->isListening && ret >= 0 ) {
+	while ( myself->isListening ) {
 		ret = SP_receive( myself->mbox, &service, sender, MAX_GROUP_NUM, &groups, targetGroups, &msgType, &endian, MAX_MESSLEN, msg );
 		if ( ret > 0 && myself->isRegularMessage( service ) ) {
 			// change state accordingly
 			myself->setState( msg, ret );
 			myself->increMsgCount();
+		} else if ( ret < 0 ) {
+			__ERROR__( "SlaveRemapMsgHandler", "readMessages" , "Failed to receive message %d\n", ret );
 		}
-	}
-	if ( ret < 0 ) {
-		__ERROR__( "SlaveRemapMsgHandler", "readMessages" , "Reader extis with error code %d\n", ret );
 	}
 
 	pthread_exit( ( void * ) &myself->msgCount );

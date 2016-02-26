@@ -23,7 +23,7 @@ public:
 	bool addAliveSlave( struct sockaddr_in slave );
 	bool removeAliveSlave( struct sockaddr_in slave );
 
-	bool sendStatePub ( std::vector<struct sockaddr_in> &slaves, int numGroup, const char targetGroup[][ MAX_GROUP_NAME ] );
+	int sendStatePub ( std::vector<struct sockaddr_in> &slaves, int numGroup, const char targetGroup[][ MAX_GROUP_NAME ] );
 
 	std::atomic<int> masters; 
 	std::atomic<int> slaves;

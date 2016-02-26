@@ -64,6 +64,10 @@ void *SimpleRemapMsgHandler::readMessages( void* argv ) {
 
 	while ( ret >= 0 ) {
 		ret = SP_receive( myself->mbox, &service, sender, MAX_GROUP_NUM, &groups, targetGroups, &msgType, &endian, MAX_MESSLEN, msg );
+		if ( ret < 0 ) {
+			fprintf( stderr, "[Error] SP_receive returns %d\n", ret );
+			continue;
+		}
 		subject = &msg[ SP_get_vs_set_offset_memb_mess() ];
         regular = myself->isRegularMessage( service );
         fromMaster = ( strncmp( sender, MASTER_GROUP, MASTER_GROUP_LEN ) == 0 );
@@ -85,6 +89,6 @@ void *SimpleRemapMsgHandler::readMessages( void* argv ) {
 	return 0;
 }
 
-bool SimpleRemapMsgHandler::sendStatePub ( std::vector<struct sockaddr_in> &slaves, int numGroup, const char targetGroup[][ MAX_GROUP_NAME ] ) {
+int SimpleRemapMsgHandler::sendStatePub ( std::vector<struct sockaddr_in> &slaves, int numGroup, const char targetGroup[][ MAX_GROUP_NAME ] ) {
 	return sendState( slaves, numGroup, targetGroup );
 }

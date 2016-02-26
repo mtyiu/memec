@@ -1,3 +1,4 @@
+#include <cmath>						// NAN
 #include <cstdio>
 #include <cstring>
 #include <unistd.h>
@@ -29,7 +30,7 @@ int main( int argc, char **argv ) {
 	ch.init( argv[ 1 ], userbuf );
 	ch.join( SLAVE_GROUP );
 	if ( ch.start() == false ) {
-		fprintf( stderr, "Failed to start\n" );
+		fprintf( stderr, ">> Failed to start! <<\n" );
 		return -1;
 	}
 
@@ -45,25 +46,29 @@ int main( int argc, char **argv ) {
 	strcpy( targetGroups[ 1 ], SLAVE_GROUP );
 
 	// wait for all clients to join
-	printf("Wait for clients...\n");
+	printf( "Wait for clients...\n" );
 	while( ch.masters + ch.slaves < target )
 		usleep(500);
 
 	int numGroups = ( ch.masters > 0 && ch.slaves > 0 )? 2 : 1;
 
-	printf("All clients are ready...\n");
+	printf( "All clients are ready...\n" );
 	// start of benchmark
+	int i = 0;
 	struct timespec startTime = start_timer();
-	for ( int i = 0; i < ROUNDS; i++ ) {
-		ch.sendStatePub( slaves, numGroups , targetGroups );
+	for ( i = 0; i < ROUNDS; i++ ) {
+		if ( ch.sendStatePub( slaves, numGroups , targetGroups ) == false ) {
+			fprintf( stderr, ">> Failed to send states! <<\n" );
+			break;
+		}
 	}
 	double duration = get_elapsed_time( startTime );
 	printf(
 		"%d boardcast to %d groups and %d receivers;"
 		" duration = %.10lf;"
 		" average = %.10lf\n",
-		ROUNDS, numGroups , target,
-		duration, duration / ROUNDS
+		i, numGroups , target,
+		duration, i > 0 ? duration / i : NAN
 	);
 	// end of benchmark
 

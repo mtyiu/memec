@@ -76,16 +76,15 @@ void *MasterRemapMsgHandler::readMessages( void *argv ) {
 	char targetGroups[ MAX_GROUP_NUM ][ MAX_GROUP_NAME ];
 
 	// handler messages
-	while ( myself->isListening && ret >= 0 ) {
+	while ( myself->isListening ) {
 		ret = SP_receive( myself->mbox, &service, sender, MAX_GROUP_NUM, &groups, targetGroups, &msgType, &endian, MAX_MESSLEN, msg );
 		if ( ret > 0 && myself->isRegularMessage( service ) ) {
 			// change state accordingly
 			myself->setState( msg, ret );
 			myself->increMsgCount();
+		} else if ( ret < 0 ) {
+			__ERROR__ ( "MasterRemapMsgHandler", "readMessages", "Failed to read message %d\n", ret );
 		}
-	}
-	if ( ret < 0 ) {
-		__ERROR__( "MasterRemapMsgHandler", "readMessages" , "Reader extis with error code %d\n", ret );
 	}
 
 	pthread_exit( ( void * ) &myself->msgCount );
@@ -289,7 +288,7 @@ bool MasterRemapMsgHandler::acceptNormalResponse( const struct sockaddr_in &slav
 	}
 }
 
-bool MasterRemapMsgHandler::sendStateToCoordinator( std::vector<struct sockaddr_in> slaves ) {
+int MasterRemapMsgHandler::sendStateToCoordinator( std::vector<struct sockaddr_in> slaves ) {
 	char group[ 1 ][ MAX_GROUP_NAME ];
 	uint32_t recordSize = this->slaveStateRecordSize;
 	if ( slaves.size() == 0 ) {
@@ -304,7 +303,7 @@ bool MasterRemapMsgHandler::sendStateToCoordinator( std::vector<struct sockaddr_
 	return sendState( slaves, 1, group );
 }
 
-bool MasterRemapMsgHandler::sendStateToCoordinator( struct sockaddr_in slave ) {
+int MasterRemapMsgHandler::sendStateToCoordinator( struct sockaddr_in slave ) {
 	std::vector<struct sockaddr_in> slaves;
 	slaves.push_back( slave );
 	return sendStateToCoordinator( slaves );

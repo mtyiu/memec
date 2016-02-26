@@ -12,11 +12,11 @@
 #include "../lock/lock.hh"
 #include "../ds/sockaddr_in.hh"
 
-#define MAX_MESSLEN	 4096
-#define MAX_SPREAD_NAME 1024
-#define MAX_GROUP_NUM   10
-#define GROUP_NAME	  "memec"
-#define MSG_TYPE		FIFO_MESS
+#define MAX_MESSLEN         ( 4096 )         // max length of messages
+#define MAX_SPREAD_NAME     ( 1024 )		 // max length of a group name
+#define MAX_GROUP_NUM       ( 128 )          // max number of members in a group
+#define GROUP_NAME          "memec"          // default group 
+#define MSG_TYPE            FIFO_MESS        // default message type
 
 class RemapMsgHandler {
 protected:
@@ -34,7 +34,7 @@ protected:
 	const static uint32_t slaveStateRecordSize = 4 + 2 + 1; // sizeof( IP, port, state ) = 7
 
 	// send a vector of slave state
-	bool sendState ( std::vector<struct sockaddr_in> &slaves, int numGroup, const char targetGroup[][ MAX_GROUP_NAME ] );
+	int sendState ( std::vector<struct sockaddr_in> &slaves, int numGroup, const char targetGroup[][ MAX_GROUP_NAME ] );
 
 	inline void increMsgCount() {
 		this->msgCount++;

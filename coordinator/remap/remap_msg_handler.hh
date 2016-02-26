@@ -84,11 +84,11 @@ public:
 	bool isAllMasterAcked( struct sockaddr_in slave );
 
 	// notify masters of slaves' state
-	bool sendStateToMasters( std::vector<struct sockaddr_in> slaves );
-	bool sendStateToMasters( struct sockaddr_in slave );
+	int sendStateToMasters( std::vector<struct sockaddr_in> slaves );
+	int sendStateToMasters( struct sockaddr_in slave );
 	// notify both masters and slaves
-	bool broadcastState( std::vector<struct sockaddr_in> slaves );
-	bool broadcastState( struct sockaddr_in slave );
+	int broadcastState( std::vector<struct sockaddr_in> slaves );
+	int broadcastState( struct sockaddr_in slave );
 
 	// keep track of the alive slaves
 	bool addAliveSlave( struct sockaddr_in slave );

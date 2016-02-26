@@ -127,8 +127,8 @@ private:
 	bool checkAckForSlave( struct sockaddr_in slave );
 
 	/* send a list of states of slaves */
-	bool sendStateToCoordinator( std::vector<struct sockaddr_in> slaves );
-	bool sendStateToCoordinator( struct sockaddr_in slave );
+	int sendStateToCoordinator( std::vector<struct sockaddr_in> slaves );
+	int sendStateToCoordinator( struct sockaddr_in slave );
 
 public:
 	std::unordered_map<struct sockaddr_in, StateTransitInfo> stateTransitInfo;
