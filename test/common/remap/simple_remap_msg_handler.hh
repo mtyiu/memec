@@ -9,7 +9,7 @@ class SimpleRemapMsgHandler : public RemapMsgHandler {
 private:
 	bool isMasterJoin( int service, char *msg, char *subject );
 	bool isSlaveJoin( int service, char *msg, char *subject );
-	
+
 	static void *readMessages( void *argv );
 public:
 	SimpleRemapMsgHandler();
@@ -20,13 +20,13 @@ public:
 	bool stop();
 	bool join( const char* group );
 
-	bool addAliveSlave( struct sockaddr_in slave );
-	bool removeAliveSlave( struct sockaddr_in slave );
+	bool addAliveSlave( struct sockaddr_in server );
+	bool removeAliveSlave( struct sockaddr_in server );
 
-	int sendStatePub ( std::vector<struct sockaddr_in> &slaves, int numGroup, const char targetGroup[][ MAX_GROUP_NAME ] );
+	int sendStatePub ( std::vector<struct sockaddr_in> &servers, int numGroup, const char targetGroup[][ MAX_GROUP_NAME ] );
 
-	std::atomic<int> masters; 
-	std::atomic<int> slaves;
+	std::atomic<int> clients;
+	std::atomic<int> servers;
 };
 
 #endif

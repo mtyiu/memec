@@ -11,12 +11,12 @@ TARGETS= \
 
 CLIENT_OBJS= \
 	$(MEMEC_SRC_ROOT)/client/backup/*.o \
-	$(MEMEC_SRC_ROOT)/client/config/master_config.o \
+	$(MEMEC_SRC_ROOT)/client/config/client_config.o \
 	$(MEMEC_SRC_ROOT)/client/ds/pending.o \
 	$(MEMEC_SRC_ROOT)/client/event/application_event.o \
 	$(MEMEC_SRC_ROOT)/client/event/coordinator_event.o \
-	$(MEMEC_SRC_ROOT)/client/event/master_event.o \
-	$(MEMEC_SRC_ROOT)/client/event/slave_event.o \
+	$(MEMEC_SRC_ROOT)/client/event/client_event.o \
+	$(MEMEC_SRC_ROOT)/client/event/server_event.o \
 	$(MEMEC_SRC_ROOT)/client/protocol/*.o \
 	$(MEMEC_SRC_ROOT)/client/remap/remap_msg_handler.o \
 	$(MEMEC_SRC_ROOT)/client/remap/basic_remap_scheme.o \
@@ -30,8 +30,8 @@ COOR_OBJS= \
 	$(MEMEC_SRC_ROOT)/coordinator/config/coordinator_config.o \
 	$(MEMEC_SRC_ROOT)/coordinator/ds/map.o \
 	$(MEMEC_SRC_ROOT)/coordinator/event/coordinator_event.o \
-	$(MEMEC_SRC_ROOT)/coordinator/event/master_event.o \
-	$(MEMEC_SRC_ROOT)/coordinator/event/slave_event.o \
+	$(MEMEC_SRC_ROOT)/coordinator/event/client_event.o \
+	$(MEMEC_SRC_ROOT)/coordinator/event/server_event.o \
 	$(MEMEC_SRC_ROOT)/coordinator/protocol/*.o \
 	$(MEMEC_SRC_ROOT)/coordinator/socket/*.o \
 	$(MEMEC_SRC_ROOT)/coordinator/remap/remap_msg_handler.o \

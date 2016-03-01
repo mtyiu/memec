@@ -94,14 +94,14 @@ public class MemEC {
 		try {
 			this.out.write( this.protocol.buf, 0, bytes );
 		} catch( IOException e ) {
-			System.err.println( "MemEC.connect(): [Error] Unable to send register request to master." );
+			System.err.println( "MemEC.connect(): [Error] Unable to send register request to client." );
 			System.exit( 1 );
 		}
 
 		try {
 			bytes = this.read( Protocol.PROTO_HEADER_SIZE );
 		} catch( IOException e ) {
-			System.err.println( "MemEC.connect(): [Error] Unable to read response from master." );
+			System.err.println( "MemEC.connect(): [Error] Unable to read response from client." );
 			return false;
 		}
 		if ( bytes == Protocol.PROTO_HEADER_SIZE ) {
@@ -162,14 +162,14 @@ public class MemEC {
 		try {
 			this.out.write( this.protocol.buf, 0, bytes );
 		} catch( IOException e ) {
-			System.err.println( "MemEC.get(): [Error] Unable to send GET request to master." );
+			System.err.println( "MemEC.get(): [Error] Unable to send GET request to client." );
 			return null;
 		}
 
 		try {
 			bytes = this.read( Protocol.PROTO_HEADER_SIZE );
 		} catch( IOException e ) {
-			System.err.println( "MemEC.get(): [Error] Unable to read GET response from master." );
+			System.err.println( "MemEC.get(): [Error] Unable to read GET response from client." );
 			return null;
 		}
 		if ( bytes == Protocol.PROTO_HEADER_SIZE ) {
@@ -180,7 +180,7 @@ public class MemEC {
 		try {
 			bytes = this.read( this.protocol.header.length );
 		} catch( IOException e ) {
-			System.err.println( "MemEC.get(): [Error] Unable to read GET response from master." );
+			System.err.println( "MemEC.get(): [Error] Unable to read GET response from client." );
 			return null;
 		}
 		if ( bytes == this.protocol.header.length ) {
@@ -216,14 +216,14 @@ public class MemEC {
 		try {
 			this.out.write( this.protocol.buf, 0, bytes );
 		} catch( IOException e ) {
-			System.err.println( "MemEC.set(): [Error] Unable to send SET request to master." );
+			System.err.println( "MemEC.set(): [Error] Unable to send SET request to client." );
 			return false;
 		}
 
 		try {
 			bytes = this.read( Protocol.PROTO_HEADER_SIZE );
 		} catch( IOException e ) {
-			System.err.println( "MemEC.set(): [Error] Unable to read SET response from master." );
+			System.err.println( "MemEC.set(): [Error] Unable to read SET response from client." );
 			return false;
 		}
 		if ( bytes == Protocol.PROTO_HEADER_SIZE ) {
@@ -234,7 +234,7 @@ public class MemEC {
 		try {
 			bytes = this.read( this.protocol.header.length );
 		} catch( IOException e ) {
-			System.err.println( "MemEC.set(): [Error] Unable to read SET response from master." );
+			System.err.println( "MemEC.set(): [Error] Unable to read SET response from client." );
 			return false;
 		}
 		if ( bytes == this.protocol.header.length ) {
@@ -270,14 +270,14 @@ public class MemEC {
 		try {
 			this.out.write( this.protocol.buf, 0, bytes );
 		} catch( IOException e ) {
-			System.err.println( "MemEC.update(): [Error] Unable to send UPDATE request to master." );
+			System.err.println( "MemEC.update(): [Error] Unable to send UPDATE request to client." );
 			return false;
 		}
 
 		try {
 			bytes = this.read( Protocol.PROTO_HEADER_SIZE );
 		} catch( IOException e ) {
-			System.err.println( "MemEC.update(): [Error] Unable to read UPDATE response from master." );
+			System.err.println( "MemEC.update(): [Error] Unable to read UPDATE response from client." );
 			return false;
 		}
 		if ( bytes == Protocol.PROTO_HEADER_SIZE ) {
@@ -288,7 +288,7 @@ public class MemEC {
 		try {
 			bytes = this.read( this.protocol.header.length );
 		} catch( IOException e ) {
-			System.err.println( "MemEC.update(): [Error] Unable to read UPDATE response from master." );
+			System.err.println( "MemEC.update(): [Error] Unable to read UPDATE response from client." );
 			return false;
 		}
 		if ( bytes == this.protocol.header.length ) {
@@ -322,14 +322,14 @@ public class MemEC {
 		try {
 			this.out.write( this.protocol.buf, 0, bytes );
 		} catch( IOException e ) {
-			System.err.println( "MemEC.delete(): [Error] Unable to send DELETE request to master." );
+			System.err.println( "MemEC.delete(): [Error] Unable to send DELETE request to client." );
 			return false;
 		}
 
 		try {
 			bytes = this.read( Protocol.PROTO_HEADER_SIZE );
 		} catch( IOException e ) {
-			System.err.println( "MemEC.delete(): [Error] Unable to read DELETE response from master." );
+			System.err.println( "MemEC.delete(): [Error] Unable to read DELETE response from client." );
 			return false;
 		}
 		if ( bytes == Protocol.PROTO_HEADER_SIZE ) {
@@ -340,7 +340,7 @@ public class MemEC {
 		try {
 			bytes = this.read( this.protocol.header.length );
 		} catch( IOException e ) {
-			System.err.println( "MemEC.delete(): [Error] Unable to read DELETE response from master." );
+			System.err.println( "MemEC.delete(): [Error] Unable to read DELETE response from client." );
 			return false;
 		}
 		if ( bytes == this.protocol.header.length ) {

@@ -31,19 +31,19 @@ int main ( int argc, char **argv ) {
 	if ( ! mh->start() ) {
 		fprintf( stderr, "!! Cannot start reading message with message handler !!\n" );
 	} else {
-		fprintf( stderr, ".. Add random slaves\n" );
-		std::vector<struct sockaddr_in> slaves = addSlaves( mh );
+		fprintf( stderr, ".. Add random servers\n" );
+		std::vector<struct sockaddr_in> servers = addSlaves( mh );
 		// simulate the flow of start/end of remapping phase
 		for ( int i = 0; i < ROUNDS; i++ ) {
 			fprintf( stderr, ".. Waiting start of remapping phase\n" );
-			while ( meetStatus( mh, slaves, REMAP_INTERMEDIATE ) == false &&
-				meetStatus( mh, slaves, REMAP_WAIT_DEGRADED ) == false &&
-				meetStatus( mh, slaves, REMAP_WAIT_NORMAL ) == false
+			while ( meetStatus( mh, servers, REMAP_INTERMEDIATE ) == false &&
+				meetStatus( mh, servers, REMAP_WAIT_DEGRADED ) == false &&
+				meetStatus( mh, servers, REMAP_WAIT_NORMAL ) == false
 			)
 				sleep( TIME_OUT );
 			fprintf( stderr, ".. Waiting end of remapping phase\n" );
 			mh->ackTransit();
-			while ( meetStatus( mh, slaves, REMAP_NORMAL ) == false )
+			while ( meetStatus( mh, servers, REMAP_NORMAL ) == false )
 				sleep( TIME_OUT );
 			fprintf( stderr, "... Stop listening to incomming messages\n" );
 		}

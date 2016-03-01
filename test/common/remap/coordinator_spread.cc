@@ -35,10 +35,10 @@ int main( int argc, char **argv ) {
 	}
 
 	// init the dummy variables
-	std::vector<struct sockaddr_in> slaves;
-	struct sockaddr_in slave;
+	std::vector<struct sockaddr_in> servers;
+	struct sockaddr_in server;
 	for ( int i = 0; i < NUM_SLAVES_IN_MSG; i++ ) {
-		slaves.push_back( slave );
+		servers.push_back( server );
 	}
 
 	char targetGroups[ 2 ][ MAX_GROUP_NAME ];
@@ -47,17 +47,17 @@ int main( int argc, char **argv ) {
 
 	// wait for all clients to join
 	printf( "Wait for clients...\n" );
-	while( ch.masters + ch.slaves < target )
+	while( ch.clients + ch.servers < target )
 		usleep(500);
 
-	int numGroups = ( ch.masters > 0 && ch.slaves > 0 )? 2 : 1;
+	int numGroups = ( ch.clients > 0 && ch.servers > 0 )? 2 : 1;
 
 	printf( "All clients are ready...\n" );
 	// start of benchmark
 	int i = 0;
 	struct timespec startTime = start_timer();
 	for ( i = 0; i < ROUNDS; i++ ) {
-		if ( ch.sendStatePub( slaves, numGroups , targetGroups ) == false ) {
+		if ( ch.sendStatePub( servers, numGroups , targetGroups ) == false ) {
 			fprintf( stderr, ">> Failed to send states! <<\n" );
 			break;
 		}

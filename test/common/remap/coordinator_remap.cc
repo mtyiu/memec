@@ -26,20 +26,20 @@ int main () {
 	} else {
 		fprintf( stderr, ".. wait for masters to join in %d seconds\n", JOIN_TIME_OUT );
 		sleep( JOIN_TIME_OUT );
-		fprintf( stderr, " .. Add random slaves\n" );
-		std::vector<struct sockaddr_in> slaves = addSlaves( ch );
+		fprintf( stderr, " .. Add random servers\n" );
+		std::vector<struct sockaddr_in> servers = addSlaves( ch );
 		for ( int i = 0; i < ROUNDS; i++ ) {
 			sleep( TIME_OUT );
 			fprintf( stderr, ".. Start remapping phase\n" );
-			startRemap( ch, slaves );
-			while( meetStatus( ch, slaves, REMAP_DEGRADED) == false )
+			startRemap( ch, servers );
+			while( meetStatus( ch, servers, REMAP_DEGRADED) == false )
 				sleep( TIME_OUT );
 			fprintf( stderr, ".. Stop remapping phase\n" );
 			for ( int i = 0; i < REMAP_COUNT; i++ ) {
-				stopRemap( ch, slaves );
+				stopRemap( ch, servers );
 				sleep( TIME_OUT );
 			}
-			while( meetStatus( ch, slaves, REMAP_NORMAL ) == false )
+			while( meetStatus( ch, servers, REMAP_NORMAL ) == false )
 				sleep( TIME_OUT );
 		}
 		ch->stop();

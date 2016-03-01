@@ -8,8 +8,8 @@ SimpleRemapMsgHandler::SimpleRemapMsgHandler() :
 SimpleRemapMsgHandler::SimpleRemapMsgHandler( char *group ) :
 		RemapMsgHandler() {
 	this->group = group;
-	this->masters = 0;
-	this->slaves = 0;
+	this->clients = 0;
+	this->servers = 0;
 }
 
 SimpleRemapMsgHandler::~SimpleRemapMsgHandler() {
@@ -41,11 +41,11 @@ bool SimpleRemapMsgHandler::isSlaveJoin( int service, char *msg, char *subject )
 	return ( this->isMemberJoin( service ) && strncmp( subject + 1, SLAVE_PREFIX, SLAVE_PREFIX_LEN ) == 0 );
 }
 
-bool SimpleRemapMsgHandler::addAliveSlave( struct sockaddr_in slave ) { 
+bool SimpleRemapMsgHandler::addAliveSlave( struct sockaddr_in server ) {
 	return false;
 }
 
-bool SimpleRemapMsgHandler::removeAliveSlave( struct sockaddr_in slave ) {
+bool SimpleRemapMsgHandler::removeAliveSlave( struct sockaddr_in server ) {
 	return false;
 }
 
@@ -77,18 +77,18 @@ void *SimpleRemapMsgHandler::readMessages( void* argv ) {
 			continue;
 
 		if ( fromMaster && myself->isMasterJoin( service, msg, subject ) ) {
-			myself->masters++;
-			//printf( "Master %s joins (%d)\n", subject, ( int ) myself->masters );
+			myself->clients++;
+			//printf( "Master %s joins (%d)\n", subject, ( int ) myself->clients );
 		} else if ( fromSlave && myself->isSlaveJoin( service, msg, subject ) ) {
-			myself->slaves++;
-			//printf( "Slave %s joins (%d)\n", subject, ( int ) myself->slaves );
+			myself->servers++;
+			//printf( "Slave %s joins (%d)\n", subject, ( int ) myself->servers );
 		} else {
 		}
 	}
-	
+
 	return 0;
 }
 
-int SimpleRemapMsgHandler::sendStatePub ( std::vector<struct sockaddr_in> &slaves, int numGroup, const char targetGroup[][ MAX_GROUP_NAME ] ) {
-	return sendState( slaves, numGroup, targetGroup );
+int SimpleRemapMsgHandler::sendStatePub ( std::vector<struct sockaddr_in> &servers, int numGroup, const char targetGroup[][ MAX_GROUP_NAME ] ) {
+	return sendState( servers, numGroup, targetGroup );
 }
