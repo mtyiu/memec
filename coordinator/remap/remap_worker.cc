@@ -33,27 +33,27 @@ bool CoordinatorRemapWorker::transitToDegraded( RemapStateEvent event ) { // Pha
 		pthread_cond_wait( &crmh->ackSignal[ event.slave ], &crmh->ackSignalLock );
 	pthread_mutex_unlock( &crmh->ackSignalLock );
 
-	LOCK( &crmh->slavesStateLock[ event.slave ] );
+	LOCK( &crmh->serversStateLock[ event.slave ] );
 	// for multi-threaded environment, it is possible that other workers change
 	// the state while this worker is waiting
 	// just abort and late comers to take over
-	if ( crmh->slavesState[ event.slave ] != REMAP_INTERMEDIATE ) {
-		UNLOCK( &crmh->slavesStateLock[ event.slave ] );
+	if ( crmh->serversState[ event.slave ] != REMAP_INTERMEDIATE ) {
+		UNLOCK( &crmh->serversStateLock[ event.slave ] );
 		return false;
 	}
 
 	// broadcast to master: the transition is completed
-	crmh->slavesState[ event.slave ] = REMAP_DEGRADED; // Phase 2
+	crmh->serversState[ event.slave ] = REMAP_DEGRADED; // Phase 2
 	if ( crmh->broadcastState( event.slave ) < 0 ) {
 		__ERROR__( "CoordinatorRemapWorker", "transitToDegraded",
 			"Failed to broadcast state changes on slave %s:%u!",
 			buf, ntohs( event.slave.sin_port )
 		);
-		UNLOCK( &crmh->slavesStateLock[ event.slave ] );
+		UNLOCK( &crmh->serversStateLock[ event.slave ] );
 		return false;
 	}
 
-	UNLOCK( &crmh->slavesStateLock[ event.slave ] );
+	UNLOCK( &crmh->serversStateLock[ event.slave ] );
 	return true;
 }
 
@@ -71,34 +71,34 @@ bool CoordinatorRemapWorker::transitToNormal( RemapStateEvent event ) { // Phase
 		pthread_cond_wait( &crmh->ackSignal[ event.slave ], &crmh->ackSignalLock );
 	pthread_mutex_unlock( &crmh->ackSignalLock );
 
-	LOCK( &crmh->slavesStateLock[ event.slave ] );
+	LOCK( &crmh->serversStateLock[ event.slave ] );
 	// for multi-threaded environment, it is possible that other workers change
 	// the status while this worker is waiting.
 	// just abort and late comers to take over
-	if ( crmh->slavesState[ event.slave ] != REMAP_COORDINATED ) {
+	if ( crmh->serversState[ event.slave ] != REMAP_COORDINATED ) {
 		__ERROR__(
 			"CoordinatorRemapWorker", "transitToNormal",
 			"State changed to %d: %s:%u.",
-			crmh->slavesState[ event.slave ],
+			crmh->serversState[ event.slave ],
 			buf, ntohs( event.slave.sin_port )
 		);
-		UNLOCK( &crmh->slavesStateLock[ event.slave ] );
+		UNLOCK( &crmh->serversStateLock[ event.slave ] );
 		return false;
 	}
 	// any cleanup to be done
 	crmh->transitToNormalEnd( event.slave ); // Prepare for switching to Phase 1b from Phase 0
 
 	// ask master to use normal SET workflow
-	crmh->slavesState[ event.slave ] = REMAP_NORMAL;
+	crmh->serversState[ event.slave ] = REMAP_NORMAL;
 	if ( crmh->broadcastState( event.slave ) < 0 ) {
 		__ERROR__( "CoordinatorRemapWorker", "transitToNormal",
 			"Failed to broadcast state changes on slave %s:%u!",
 			buf, ntohs( event.slave.sin_port )
 		);
-		UNLOCK( &crmh->slavesStateLock[ event.slave ] );
+		UNLOCK( &crmh->serversStateLock[ event.slave ] );
 		return false;
 	}
-	UNLOCK( &crmh->slavesStateLock[ event.slave ] );
+	UNLOCK( &crmh->serversStateLock[ event.slave ] );
 	return true;
 }
 

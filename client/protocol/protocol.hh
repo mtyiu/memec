@@ -20,13 +20,13 @@ public:
 	// ---------- load_protocol.cc ----------
 	char *reqPushLoadStats(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
-		ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
-		ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency
+		ArrayMap<struct sockaddr_in, Latency> *serverGetLatency,
+		ArrayMap<struct sockaddr_in, Latency> *serverSetLatency
 	);
 	bool parseLoadingStats(
 		const LoadStatsHeader& loadStatsHeader,
-		ArrayMap<struct sockaddr_in, Latency> &slaveGetLatency,
-		ArrayMap<struct sockaddr_in, Latency> &slaveSetLatency,
+		ArrayMap<struct sockaddr_in, Latency> &serverGetLatency,
+		ArrayMap<struct sockaddr_in, Latency> &serverSetLatency,
 		std::set<struct sockaddr_in> &overloadedSlaveSet,
 		char* buffer, uint32_t size
 	);

@@ -3,22 +3,22 @@
 
 char *MasterProtocol::reqPushLoadStats(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
-		ArrayMap< struct sockaddr_in, Latency > *slaveGetLatency,
-		ArrayMap< struct sockaddr_in, Latency > *slaveSetLatency )
+		ArrayMap< struct sockaddr_in, Latency > *serverGetLatency,
+		ArrayMap< struct sockaddr_in, Latency > *serverSetLatency )
 {
 	// -- common/protocol/load_protocol.cc --
 	size = this->generateLoadStatsHeader(
 		PROTO_MAGIC_LOADING_STATS,
 		PROTO_MAGIC_TO_COORDINATOR,
 		instanceId, requestId,
-		slaveGetLatency->size(),
-		slaveSetLatency->size(),
+		serverGetLatency->size(),
+		serverSetLatency->size(),
 		0,
 		sizeof( uint32_t ) * 3 + sizeof( uint16_t ),
 		sizeof( uint32_t ) + sizeof( uint16_t )
 	);
 
-	// TODO only send stats of most heavily loaded slave in case buffer overflows
+	// TODO only send stats of most heavily loaded server in case buffer overflows
 
 	uint32_t addr, sec, nsec;
 	uint16_t port;
@@ -29,14 +29,14 @@ char *MasterProtocol::reqPushLoadStats(
 	sec = _SRC_->values[ idx ]->sec; \
 	nsec = _SRC_->values[ idx ]->nsec; \
 
-	for ( uint32_t i = 0; i < slaveGetLatency->size() + slaveSetLatency->size(); i++ ) {
+	for ( uint32_t i = 0; i < serverGetLatency->size() + serverSetLatency->size(); i++ ) {
 		uint32_t idx = i;
 		// serialize the loading stats
-		if ( i < slaveGetLatency->size() ) {
-			SET_FIELDS_VAR( slaveGetLatency );
+		if ( i < serverGetLatency->size() ) {
+			SET_FIELDS_VAR( serverGetLatency );
 		} else {
-			idx = i - slaveGetLatency->size();
-			SET_FIELDS_VAR( slaveSetLatency );
+			idx = i - serverGetLatency->size();
+			SET_FIELDS_VAR( serverSetLatency );
 		}
 
 		//fprintf ( stderr, " stats send %d IP %u:%u time %us %unsec\n", i, ntohl( addr ), ntohs( port ), sec, nsec );
@@ -61,8 +61,8 @@ char *MasterProtocol::reqPushLoadStats(
 
 bool MasterProtocol::parseLoadingStats(
 		const LoadStatsHeader& loadStatsHeader,
-		ArrayMap< struct sockaddr_in, Latency > &slaveGetLatency,
-		ArrayMap< struct sockaddr_in, Latency > &slaveSetLatency,
+		ArrayMap< struct sockaddr_in, Latency > &serverGetLatency,
+		ArrayMap< struct sockaddr_in, Latency > &serverSetLatency,
 		std::set< struct sockaddr_in > &overloadedSlaveSet,
 		char* buffer, uint32_t size )
 {
@@ -70,35 +70,35 @@ bool MasterProtocol::parseLoadingStats(
 	Latency *tempLatency = NULL;
 
 	uint32_t recordSize = sizeof( uint32_t ) * 3 + sizeof( uint16_t );
-	uint32_t slaveAddrSize = sizeof( uint32_t ) + sizeof ( uint16_t );
+	uint32_t serverAddrSize = sizeof( uint32_t ) + sizeof ( uint16_t );
 
 	// check if the all stats are received properly
-	if ( size < ( loadStatsHeader.slaveGetCount + loadStatsHeader.slaveSetCount ) * recordSize +
-			loadStatsHeader.slaveOverloadCount * slaveAddrSize )
+	if ( size < ( loadStatsHeader.serverGetCount + loadStatsHeader.serverSetCount ) * recordSize +
+			loadStatsHeader.serverOverloadCount * serverAddrSize )
 		return false;
 
-	for ( uint32_t i = 0; i < loadStatsHeader.slaveGetCount + loadStatsHeader.slaveSetCount; i++ ) {
+	for ( uint32_t i = 0; i < loadStatsHeader.serverGetCount + loadStatsHeader.serverSetCount; i++ ) {
 		addr.sin_addr.s_addr = *( uint32_t * )( buffer );
 		addr.sin_port = *( uint16_t * )( buffer + sizeof( uint32_t ) );
 		tempLatency = new Latency();
 		tempLatency->sec = ntohl( *( uint32_t * )( buffer + sizeof( uint32_t ) + sizeof( uint16_t ) ) );
 		tempLatency->nsec = ntohl( *( uint32_t * )( buffer + sizeof( uint32_t ) * 2 + sizeof( uint16_t ) ) );
 
-		if ( i < loadStatsHeader.slaveGetCount )
-			slaveGetLatency.set( addr, tempLatency );
+		if ( i < loadStatsHeader.serverGetCount )
+			serverGetLatency.set( addr, tempLatency );
 		else
-			slaveSetLatency.set( addr, tempLatency );
+			serverSetLatency.set( addr, tempLatency );
 
 		buffer += recordSize;
 	}
 
-	for  ( uint32_t i = 0; i < loadStatsHeader.slaveOverloadCount; i++ ) {
+	for  ( uint32_t i = 0; i < loadStatsHeader.serverOverloadCount; i++ ) {
 		addr.sin_addr.s_addr = *( uint32_t * )( buffer );
 		addr.sin_port = *( uint16_t * )( buffer + sizeof( uint32_t ) );
 
 		overloadedSlaveSet.insert( addr );
 
-		buffer += slaveAddrSize;
+		buffer += serverAddrSize;
 	}
 
 	return true;

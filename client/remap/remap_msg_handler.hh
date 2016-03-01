@@ -72,7 +72,7 @@ public:
 		if ( needsLock ) LOCK( &counter.pendingNormalRequests.lock );
 		counter.pendingNormalRequests.requestIds.insert( requestId );
 		return getPendingRequestCount( false, needsUnlock );
-		
+
 	}
 
 	uint32_t removePendingRequest( uint32_t requestId, bool needsLock = true, bool needsUnlock = true ) {
@@ -113,22 +113,22 @@ private:
 	pthread_t acker;
 	uint32_t bgAckInterval;
 
-	/* lock on the list of alive slaves connected */
+	/* lock on the list of alive servers connected */
 	LOCK_T aliveSlavesLock;
 
-	/* parse a message and set state of slaves accordingly */
+	/* parse a message and set state of servers accordingly */
 	void setState( char* msg, int len );
 
 	// threaded background process
 	static void *readMessages( void *argv );
 	static void *ackTransitThread( void *argv );
 
-	/* return if master need to ack coordinator for slave */
-	bool checkAckForSlave( struct sockaddr_in slave );
+	/* return if master need to ack coordinator for server */
+	bool checkAckForSlave( struct sockaddr_in server );
 
-	/* send a list of states of slaves */
-	int sendStateToCoordinator( std::vector<struct sockaddr_in> slaves );
-	int sendStateToCoordinator( struct sockaddr_in slave );
+	/* send a list of states of servers */
+	int sendStateToCoordinator( std::vector<struct sockaddr_in> servers );
+	int sendStateToCoordinator( struct sockaddr_in server );
 
 public:
 	std::unordered_map<struct sockaddr_in, StateTransitInfo> stateTransitInfo;
@@ -142,17 +142,17 @@ public:
 	bool start();
 	bool stop();
 
-	bool addAliveSlave( struct sockaddr_in slave );
-	bool removeAliveSlave( struct sockaddr_in slave );
+	bool addAliveSlave( struct sockaddr_in server );
+	bool removeAliveSlave( struct sockaddr_in server );
 
-	bool useCoordinatedFlow( const struct sockaddr_in &slave );
-	bool allowRemapping( const struct sockaddr_in &slave );
-	bool acceptNormalResponse( const struct sockaddr_in &slave );
+	bool useCoordinatedFlow( const struct sockaddr_in &server );
+	bool allowRemapping( const struct sockaddr_in &server );
+	bool acceptNormalResponse( const struct sockaddr_in &server );
 
-	// ack specific slave if necessary,
-	// empty slave will trigger full search on possible slaves to ack
-	bool ackTransit( struct sockaddr_in *slave = NULL );
-	bool ackTransit( struct sockaddr_in slave );
+	// ack specific server if necessary,
+	// empty server will trigger full search on possible servers to ack
+	bool ackTransit( struct sockaddr_in *server = NULL );
+	bool ackTransit( struct sockaddr_in server );
 };
 
 #endif

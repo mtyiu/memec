@@ -109,7 +109,7 @@ void MasterRemapMsgHandler::setState( char* msg , int len ) {
 	uint8_t slaveCount = ( uint8_t ) msg[0];
 	struct sockaddr_in slave;
 	int ofs = 1;
-	uint32_t recordSize = this->slaveStateRecordSize;
+	uint32_t recordSize = this->serverStateRecordSize;
 
 	for ( uint8_t i = 0; i < slaveCount; i++ ) {
 		slave.sin_addr.s_addr = (*( ( uint32_t * )( msg + ofs ) ) );
@@ -119,7 +119,7 @@ void MasterRemapMsgHandler::setState( char* msg , int len ) {
 
 		char buf[ INET_ADDRSTRLEN ];
 		inet_ntop( AF_INET, &slave.sin_addr.s_addr, buf, INET_ADDRSTRLEN );
-		if ( this->slavesState.count( slave ) == 0 ) {
+		if ( this->serversState.count( slave ) == 0 ) {
 			__ERROR__( "MasterRemapMsgHandler", "setState" , "Slave %s:%hu not found\n", buf, ntohs( slave.sin_port ) );
 			continue;
 		}
@@ -143,8 +143,8 @@ void MasterRemapMsgHandler::setState( char* msg , int len ) {
 			continue;
 		}
 
-		LOCK( &this->slavesStateLock[ slave ] );
-		RemapState state = this->slavesState[ slave ];
+		LOCK( &this->serversStateLock[ slave ] );
+		RemapState state = this->serversState[ slave ];
 		switch ( signal ) {
 			case REMAP_NORMAL:
 				__DEBUG__( BLUE, "MasterRemapMsgHandler", "setState", "REMAP_NORMAL %s:%hu", buf, ntohs( slave.sin_port ) );
@@ -182,12 +182,12 @@ void MasterRemapMsgHandler::setState( char* msg , int len ) {
 				break;
 			default:
 				__INFO__( BLUE, "MasterRemapMsgHandler", "setState", "Unknown %d %s:%hu", signal, buf, ntohs( slave.sin_port ) );
-				UNLOCK( &this->slavesStateLock[ slave ] );
+				UNLOCK( &this->serversStateLock[ slave ] );
 				return;
 		}
-		this->slavesState[ slave ] = signal;
-		state = this->slavesState[ slave ];
-		UNLOCK( &this->slavesStateLock[ slave ] );
+		this->serversState[ slave ] = signal;
+		state = this->serversState[ slave ];
+		UNLOCK( &this->serversStateLock[ slave ] );
 
 		// actions/cleanup after state change
 		switch ( state ) {
@@ -215,11 +215,11 @@ void MasterRemapMsgHandler::setState( char* msg , int len ) {
 
 bool MasterRemapMsgHandler::addAliveSlave( struct sockaddr_in slave ) {
 	LOCK( &this->aliveSlavesLock );
-	if ( this->slavesState.count( slave ) >= 1 ) {
+	if ( this->serversState.count( slave ) >= 1 ) {
 		UNLOCK( &this->aliveSlavesLock );
 		return false;
 	}
-	this->slavesState[ slave ] = REMAP_NORMAL;
+	this->serversState[ slave ] = REMAP_NORMAL;
 	this->stateTransitInfo[ slave ] = StateTransitInfo();
 	UNLOCK( &this->aliveSlavesLock );
 	return true;
@@ -227,22 +227,22 @@ bool MasterRemapMsgHandler::addAliveSlave( struct sockaddr_in slave ) {
 
 bool MasterRemapMsgHandler::removeAliveSlave( struct sockaddr_in slave ) {
 	LOCK( &this->aliveSlavesLock );
-	if ( this->slavesState.count( slave ) < 1 ) {
+	if ( this->serversState.count( slave ) < 1 ) {
 		UNLOCK( &this->aliveSlavesLock );
 		return false;
 	}
-	this->slavesState.erase( slave );
+	this->serversState.erase( slave );
 	this->stateTransitInfo.erase( slave );
 	UNLOCK( &this->aliveSlavesLock );
 	return true;
 }
 
 bool MasterRemapMsgHandler::useCoordinatedFlow( const struct sockaddr_in &slave ) {
-	if ( this->slavesState.count( slave ) == 0 )
+	if ( this->serversState.count( slave ) == 0 )
 		return false;
-	return this->slavesState[ slave ] != REMAP_NORMAL;
+	return this->serversState[ slave ] != REMAP_NORMAL;
 	/*
-	switch ( this->slavesState[ slave ] ) {
+	switch ( this->serversState[ slave ] ) {
 		case REMAP_INTERMEDIATE:
 		case REMAP_DEGRADED:
 		case REMAP_COORDINATED:
@@ -255,10 +255,10 @@ bool MasterRemapMsgHandler::useCoordinatedFlow( const struct sockaddr_in &slave 
 }
 
 bool MasterRemapMsgHandler::allowRemapping( const struct sockaddr_in &slave ) {
-	if ( this->slavesState.count( slave ) == 0 )
+	if ( this->serversState.count( slave ) == 0 )
 		return false;
 
-	switch ( this->slavesState[ slave ] ) {
+	switch ( this->serversState[ slave ] ) {
 		case REMAP_INTERMEDIATE:
 		case REMAP_WAIT_DEGRADED:
 		case REMAP_DEGRADED:
@@ -271,10 +271,10 @@ bool MasterRemapMsgHandler::allowRemapping( const struct sockaddr_in &slave ) {
 }
 
 bool MasterRemapMsgHandler::acceptNormalResponse( const struct sockaddr_in &slave ) {
-	if ( this->slavesState.count( slave ) == 0 )
+	if ( this->serversState.count( slave ) == 0 )
 		return true;
 
-	switch( this->slavesState[ slave ] ) {
+	switch( this->serversState[ slave ] ) {
 		case REMAP_UNDEFINED:
 		case REMAP_NORMAL:
 		case REMAP_INTERMEDIATE:
@@ -290,7 +290,7 @@ bool MasterRemapMsgHandler::acceptNormalResponse( const struct sockaddr_in &slav
 
 int MasterRemapMsgHandler::sendStateToCoordinator( std::vector<struct sockaddr_in> slaves ) {
 	char group[ 1 ][ MAX_GROUP_NAME ];
-	uint32_t recordSize = this->slaveStateRecordSize;
+	uint32_t recordSize = this->serverStateRecordSize;
 	if ( slaves.size() == 0 ) {
 		// TODO send all slave state
 		//slaves = std::vector<struct sockaddr_in>( this->aliveSlaves.begin(), this->aliveSlaves.end() );
@@ -318,7 +318,7 @@ bool MasterRemapMsgHandler::ackTransit( struct sockaddr_in *slave ) {
 	LOCK( &this->aliveSlavesLock );
 	if ( slave ) {
 		// specific slave
-		if ( this->slavesStateLock.count( *slave ) == 0 ) {
+		if ( this->serversStateLock.count( *slave ) == 0 ) {
 			UNLOCK( &this->aliveSlavesLock );
 			return false;
 		}
@@ -327,7 +327,7 @@ bool MasterRemapMsgHandler::ackTransit( struct sockaddr_in *slave ) {
 	} else {
 		// check all slaves
 		std::vector<struct sockaddr_in> slavesToAck;
-		for ( auto s : this->slavesState ) {
+		for ( auto s : this->serversState ) {
 			if ( this->checkAckForSlave( s.first ) )
 				slavesToAck.push_back( s.first );
 		}
@@ -340,22 +340,22 @@ bool MasterRemapMsgHandler::ackTransit( struct sockaddr_in *slave ) {
 }
 
 bool MasterRemapMsgHandler::checkAckForSlave( struct sockaddr_in slave ) {
-	LOCK( &this->slavesStateLock[ slave ] );
-	RemapState state = this->slavesState[ slave ];
+	LOCK( &this->serversStateLock[ slave ] );
+	RemapState state = this->serversState[ slave ];
 	char buf[ INET_ADDRSTRLEN ];
 	inet_ntop( AF_INET, &slave.sin_addr.s_addr, buf, INET_ADDRSTRLEN );
 
 	if (
 		( state == REMAP_NORMAL ) ||
-	    ( state == REMAP_INTERMEDIATE && 
-			( 
-				false /* yet sync all meta */ || 
-				this->stateTransitInfo[ slave ].getParityRevertCounterVal() > 0 /* yet undo all parity */ || 
-				! this->stateTransitInfo[ slave ].counter.pendingNormalRequests.completed /* yet complete all normal requests */ 
+	    ( state == REMAP_INTERMEDIATE &&
+			(
+				false /* yet sync all meta */ ||
+				this->stateTransitInfo[ slave ].getParityRevertCounterVal() > 0 /* yet undo all parity */ ||
+				! this->stateTransitInfo[ slave ].counter.pendingNormalRequests.completed /* yet complete all normal requests */
 			)
 		) ||
 	    ( state == REMAP_COORDINATED && false ) ) {
-		UNLOCK( &this->slavesStateLock[ slave ] );
+		UNLOCK( &this->serversStateLock[ slave ] );
 		return false;
 	}
 
@@ -367,11 +367,11 @@ bool MasterRemapMsgHandler::checkAckForSlave( struct sockaddr_in slave ) {
 			state = REMAP_WAIT_NORMAL;
 			break;
 		default:
-			UNLOCK( &this->slavesStateLock[ slave ] );
+			UNLOCK( &this->serversStateLock[ slave ] );
 			return false;
 	}
-	this->slavesState[ slave ] = state;
-	UNLOCK( &this->slavesStateLock[ slave ] );
+	this->serversState[ slave ] = state;
+	UNLOCK( &this->serversStateLock[ slave ] );
 
 	return true;
 }

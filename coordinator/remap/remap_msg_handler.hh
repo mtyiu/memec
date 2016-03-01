@@ -29,7 +29,7 @@ private:
 	std::set<std::string> aliveMasters;
 	LOCK_T mastersLock;
 
-	/* ack map for each slave, identify by slave addr, and contains the set of acked masters */
+	/* ack map for each server, identify by server addr, and contains the set of acked masters */
 	std::map<struct sockaddr_in, std::set<std::string>* > ackMasters;
 	LOCK_T mastersAckLock;
 
@@ -53,8 +53,8 @@ private:
 	void addAliveMaster( char *name );
 	void removeAliveMaster( char *name );
 
-	/* insert the same event for one or more slaves */
-	bool insertRepeatedEvents ( RemapStateEvent event, std::vector<struct sockaddr_in> *slaves );
+	/* insert the same event for one or more servers */
+	bool insertRepeatedEvents ( RemapStateEvent event, std::vector<struct sockaddr_in> *servers );
 
 public:
 	EventQueue<RemapStateEvent> *eventQueue;
@@ -73,31 +73,31 @@ public:
 	bool stop();
 
 	// batch transit (start)
-	bool transitToDegraded( std::vector<struct sockaddr_in> *slaves, bool forced = false );
-	bool transitToNormal( std::vector<struct sockaddr_in> *slaves, bool froced = false );
+	bool transitToDegraded( std::vector<struct sockaddr_in> *servers, bool forced = false );
+	bool transitToNormal( std::vector<struct sockaddr_in> *servers, bool froced = false );
 	// clean up before transition ends
-	bool transitToDegradedEnd( const struct sockaddr_in &slave );
-	bool transitToNormalEnd( const struct sockaddr_in &slave );
+	bool transitToDegradedEnd( const struct sockaddr_in &server );
+	bool transitToNormalEnd( const struct sockaddr_in &server );
 
 	// manage master ack
-	bool resetMasterAck( struct sockaddr_in slave );
-	bool isAllMasterAcked( struct sockaddr_in slave );
+	bool resetMasterAck( struct sockaddr_in server );
+	bool isAllMasterAcked( struct sockaddr_in server );
 
-	// notify masters of slaves' state
-	int sendStateToMasters( std::vector<struct sockaddr_in> slaves );
-	int sendStateToMasters( struct sockaddr_in slave );
-	// notify both masters and slaves
-	int broadcastState( std::vector<struct sockaddr_in> slaves );
-	int broadcastState( struct sockaddr_in slave );
+	// notify masters of servers' state
+	int sendStateToMasters( std::vector<struct sockaddr_in> servers );
+	int sendStateToMasters( struct sockaddr_in server );
+	// notify both masters and servers
+	int broadcastState( std::vector<struct sockaddr_in> servers );
+	int broadcastState( struct sockaddr_in server );
 
-	// keep track of the alive slaves
-	bool addAliveSlave( struct sockaddr_in slave );
-	bool addCrashedSlave( struct sockaddr_in slave );
-	bool removeAliveSlave( struct sockaddr_in slave );
+	// keep track of the alive servers
+	bool addAliveSlave( struct sockaddr_in server );
+	bool addCrashedSlave( struct sockaddr_in server );
+	bool removeAliveSlave( struct sockaddr_in server );
 
-	// check slave state
-	bool isInTransition( const struct sockaddr_in &slave );
-	bool allowRemapping( const struct sockaddr_in &slave );
+	// check server state
+	bool isInTransition( const struct sockaddr_in &server );
+	bool allowRemapping( const struct sockaddr_in &server );
 	bool reachMaximumRemapped( uint32_t maximum );
 
 };

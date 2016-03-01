@@ -12,10 +12,10 @@ class SlaveRemapMsgHandler : public RemapMsgHandler {
 private:
 	bool isListening;
 
-	/* lock on the list of alive slaves connected */
+	/* lock on the list of alive servers connected */
 	LOCK_T aliveSlavesLock;
 
-	/* parse a message and set state of slaves accordingly */
+	/* parse a message and set state of servers accordingly */
 	void setState( char* msg, int len );
 
 	// threaded background process
@@ -31,12 +31,12 @@ public:
 	bool start();
 	bool stop();
 
-	bool addAliveSlave( struct sockaddr_in slave );
-	bool removeAliveSlave( struct sockaddr_in slave );
+	bool addAliveSlave( struct sockaddr_in server );
+	bool removeAliveSlave( struct sockaddr_in server );
 
-	bool useCoordinatedFlow( const struct sockaddr_in &slave );
-	bool allowRemapping( const struct sockaddr_in &slave );
-	bool acceptNormalResponse( const struct sockaddr_in &slave );
+	bool useCoordinatedFlow( const struct sockaddr_in &server );
+	bool allowRemapping( const struct sockaddr_in &server );
+	bool acceptNormalResponse( const struct sockaddr_in &server );
 };
 
 #endif
