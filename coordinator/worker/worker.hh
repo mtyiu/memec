@@ -32,11 +32,11 @@ private:
 	void free();
 	static void *run( void *argv );
 
-	// ---------- master_worker.cc ----------
+	// ---------- client_worker.cc ----------
 	void dispatch( MasterEvent event );
 	bool handleSyncMetadata( MasterEvent event, char *buf, size_t size );
 
-	// ---------- slave_worker.cc ----------
+	// ---------- server_worker.cc ----------
 	void dispatch( SlaveEvent event );
 	bool processHeartbeat( SlaveEvent event, char *buf, size_t size );
 

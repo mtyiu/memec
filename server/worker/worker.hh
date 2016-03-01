@@ -1,5 +1,5 @@
-#ifndef __SLAVE_WORKER_WORKER_HH__
-#define __SLAVE_WORKER_WORKER_HH__
+#ifndef __SERVER_WORKER_WORKER_HH__
+#define __SERVER_WORKER_WORKER_HH__
 
 #include <vector>
 #include <cstdio>
@@ -26,7 +26,7 @@
 #include "../../common/timestamp/timestamp.hh"
 #include "../../common/worker/worker.hh"
 
-#define SLAVE_WORKER_SEND_REPLICAS_PARALLEL
+#define SERVER_WORKER_SEND_REPLICAS_PARALLEL
 
 class SlaveWorker : public Worker {
 private:
@@ -88,7 +88,7 @@ private:
 	bool handleSlaveConnectedMsg( CoordinatorEvent event, char *buf, size_t size );
 	bool handleHeartbeatAck( CoordinatorEvent event, char *buf, size_t size );
 
-	// ---------- master_worker.cc ----------
+	// ---------- client_worker.cc ----------
 	void dispatch( MasterEvent event );
 	bool handleGetRequest( MasterEvent event, char *buf, size_t size );
 	bool handleGetRequest( MasterEvent event, KeyHeader &header, bool isDegraded );

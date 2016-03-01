@@ -138,7 +138,7 @@ void *SlaveWorker::run( void *argv ) {
 	WorkerRole role = worker->getRole();
 	SlaveEventQueue *eventQueue = SlaveWorker::eventQueue;
 
-#define SLAVE_WORKER_EVENT_LOOP(_EVENT_TYPE_, _EVENT_QUEUE_) \
+#define SERVER_WORKER_EVENT_LOOP(_EVENT_TYPE_, _EVENT_QUEUE_) \
 	do { \
 		_EVENT_TYPE_ event; \
 		bool ret; \
@@ -150,7 +150,7 @@ void *SlaveWorker::run( void *argv ) {
 
 	switch ( role ) {
 		case WORKER_ROLE_MIXED:
-			// SLAVE_WORKER_EVENT_LOOP(
+			// SERVER_WORKER_EVENT_LOOP(
 			// 	MixedEvent,
 			// 	eventQueue->mixed
 			// );
@@ -164,37 +164,37 @@ void *SlaveWorker::run( void *argv ) {
 		}
 			break;
 		case WORKER_ROLE_CODING:
-			SLAVE_WORKER_EVENT_LOOP(
+			SERVER_WORKER_EVENT_LOOP(
 				CodingEvent,
 				eventQueue->separated.coding
 			);
 			break;
 		case WORKER_ROLE_COORDINATOR:
-			SLAVE_WORKER_EVENT_LOOP(
+			SERVER_WORKER_EVENT_LOOP(
 				CoordinatorEvent,
 				eventQueue->separated.coordinator
 			);
 			break;
 		case WORKER_ROLE_IO:
-			SLAVE_WORKER_EVENT_LOOP(
+			SERVER_WORKER_EVENT_LOOP(
 				IOEvent,
 				eventQueue->separated.io
 			);
 			break;
 		case WORKER_ROLE_MASTER:
-			SLAVE_WORKER_EVENT_LOOP(
+			SERVER_WORKER_EVENT_LOOP(
 				MasterEvent,
 				eventQueue->separated.master
 			);
 			break;
 		case WORKER_ROLE_SLAVE:
-			SLAVE_WORKER_EVENT_LOOP(
+			SERVER_WORKER_EVENT_LOOP(
 				SlaveEvent,
 				eventQueue->separated.slave
 			);
 			break;
 		case WORKER_ROLE_SLAVE_PEER:
-			SLAVE_WORKER_EVENT_LOOP(
+			SERVER_WORKER_EVENT_LOOP(
 				SlavePeerEvent,
 				eventQueue->separated.slavePeer
 			);

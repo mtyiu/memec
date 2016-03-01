@@ -209,7 +209,7 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 
 		SlaveEvent slaveEvent;
 		slaveEvent.send( this->paritySlaveSockets[ i ], packet );
-#ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
+#ifdef CLIENT_WORKER_SEND_REPLICAS_PARALLEL
 		MasterWorker::eventQueue->prioritizedInsert( slaveEvent );
 #else
 		this->dispatch( slaveEvent );

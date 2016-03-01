@@ -1,5 +1,5 @@
-#ifndef __MASTER_WORKER_WORKER_HH__
-#define __MASTER_WORKER_WORKER_HH__
+#ifndef __CLIENT_WORKER_WORKER_HH__
+#define __CLIENT_WORKER_WORKER_HH__
 
 #include <cstdio>
 #include "worker_role.hh"
@@ -15,7 +15,7 @@
 #include "../../common/ds/packet_pool.hh"
 #include "../../common/ds/sockaddr_in.hh"
 
-#define MASTER_WORKER_SEND_REPLICAS_PARALLEL
+#define CLIENT_WORKER_SEND_REPLICAS_PARALLEL
 
 class MasterWorker : public Worker {
 private:
@@ -78,7 +78,7 @@ private:
 	bool handleUpdateRequest( ApplicationEvent event, char *buf, size_t size );
 	bool handleDeleteRequest( ApplicationEvent event, char *buf, size_t size );
 
-	// ---------- slave_worker.cc ----------
+	// ---------- server_worker.cc ----------
 	void dispatch( SlaveEvent event );
 	bool handleSetResponse( SlaveEvent event, bool success, char *buf, size_t size );
 	bool handleGetResponse( SlaveEvent event, bool success, bool isDegraded, char *buf, size_t size );

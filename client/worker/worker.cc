@@ -439,7 +439,7 @@ void *MasterWorker::run( void *argv ) {
 	WorkerRole role = worker->getRole();
 	MasterEventQueue *eventQueue = MasterWorker::eventQueue;
 
-#define MASTER_WORKER_EVENT_LOOP(_EVENT_TYPE_, _EVENT_QUEUE_) \
+#define CLIENT_WORKER_EVENT_LOOP(_EVENT_TYPE_, _EVENT_QUEUE_) \
 	do { \
 		_EVENT_TYPE_ event; \
 		bool ret; \
@@ -451,7 +451,7 @@ void *MasterWorker::run( void *argv ) {
 
 	switch ( role ) {
 		case WORKER_ROLE_MIXED:
-			// MASTER_WORKER_EVENT_LOOP(
+			// CLIENT_WORKER_EVENT_LOOP(
 			// 	MixedEvent,
 			// 	eventQueue->mixed
 			// );
@@ -465,25 +465,25 @@ void *MasterWorker::run( void *argv ) {
 		}
 			break;
 		case WORKER_ROLE_APPLICATION:
-			MASTER_WORKER_EVENT_LOOP(
+			CLIENT_WORKER_EVENT_LOOP(
 				ApplicationEvent,
 				eventQueue->separated.application
 			);
 			break;
 		case WORKER_ROLE_COORDINATOR:
-			MASTER_WORKER_EVENT_LOOP(
+			CLIENT_WORKER_EVENT_LOOP(
 				CoordinatorEvent,
 				eventQueue->separated.coordinator
 			);
 			break;
 		case WORKER_ROLE_MASTER:
-			MASTER_WORKER_EVENT_LOOP(
+			CLIENT_WORKER_EVENT_LOOP(
 				MasterEvent,
 				eventQueue->separated.master
 			);
 			break;
 		case WORKER_ROLE_SLAVE:
-			MASTER_WORKER_EVENT_LOOP(
+			CLIENT_WORKER_EVENT_LOOP(
 				SlaveEvent,
 				eventQueue->separated.slave
 			);

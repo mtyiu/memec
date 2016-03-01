@@ -297,7 +297,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 	uint16_t instanceId = Master::instanceId;
 	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
 
-#ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
+#ifdef CLIENT_WORKER_SEND_REPLICAS_PARALLEL
 	Packet *packet = 0;
 	if ( MasterWorker::parityChunkCount ) {
 		packet = MasterWorker::packetPool->malloc();
@@ -343,7 +343,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 				);
 			}
 
-#ifdef MASTER_WORKER_SEND_REPLICAS_PARALLEL
+#ifdef CLIENT_WORKER_SEND_REPLICAS_PARALLEL
 			SlaveEvent slaveEvent;
 			slaveEvent.send( this->paritySlaveSockets[ i ], packet );
 			MasterWorker::eventQueue->prioritizedInsert( slaveEvent );

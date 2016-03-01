@@ -1658,7 +1658,7 @@ bool SlaveWorker::sendModifyChunkRequest(
 				slavePeerEvent.send( this->paritySlaveSockets[ i ], packet );
 				numSurvivingParity++;
 
-#ifdef SLAVE_WORKER_SEND_REPLICAS_PARALLEL
+#ifdef SERVER_WORKER_SEND_REPLICAS_PARALLEL
 				if ( i == SlaveWorker::parityChunkCount - 1 )
 					this->dispatch( slavePeerEvent );
 				else
@@ -1874,7 +1874,7 @@ bool SlaveWorker::sendModifyChunkRequest(
 				SlavePeerEvent slavePeerEvent;
 				slavePeerEvent.send( this->paritySlaveSockets[ i ], packet );
 
-#ifdef SLAVE_WORKER_SEND_REPLICAS_PARALLEL
+#ifdef SERVER_WORKER_SEND_REPLICAS_PARALLEL
 				if ( i == SlaveWorker::parityChunkCount - 1 )
 					this->dispatch( slavePeerEvent );
 				else
