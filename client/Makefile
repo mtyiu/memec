@@ -6,11 +6,11 @@ BIN=$(MEMEC_SRC_ROOT)/bin/client
 
 OBJS= \
 	backup/backup.o \
-	config/master_config.o \
+	config/client_config.o \
 	ds/pending.o \
 	event/application_event.o \
 	event/coordinator_event.o \
-	event/master_event.o \
+	event/client_event.o \
 	event/slave_event.o \
 	protocol/degraded_protocol.o \
 	protocol/fault_protocol.o \
@@ -23,7 +23,7 @@ OBJS= \
 	remap/remap_msg_handler.o \
 	socket/application_socket.o \
 	socket/coordinator_socket.o \
-	socket/master_socket.o \
+	socket/client_socket.o \
 	socket/slave_socket.o \
 	worker/worker.o \
 	worker/application_worker.o \
@@ -31,7 +31,7 @@ OBJS= \
 	worker/degraded_worker.o \
 	worker/recovery_worker.o \
 	worker/remap_worker.o \
-	worker/slave_worker.o \
+	worker/server_worker.o \
 	main/client.o \
 	main/main.o
 

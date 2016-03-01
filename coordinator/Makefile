@@ -24,7 +24,7 @@ OBJS= \
 	socket/slave_socket.o \
 	worker/worker.o \
 	worker/degraded_worker.o \
-	worker/master_worker.o \
+	worker/client_worker.o \
 	worker/recovery_worker.o \
 	worker/remap_worker.o \
 	worker/slave_worker.o \
