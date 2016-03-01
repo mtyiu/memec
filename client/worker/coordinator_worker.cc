@@ -128,7 +128,7 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 						}
 						this->handleRemappingSetLockResponse( event, success, buffer.data, buffer.size );
 						break;
-					case PROTO_OPCODE_SLAVE_RECONSTRUCTED:
+					case PROTO_OPCODE_SERVER_RECONSTRUCTED:
 						this->handleSlaveReconstructedMsg( event, buffer.data, header.length );
 						break;
 					default:

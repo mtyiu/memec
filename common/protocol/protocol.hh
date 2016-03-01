@@ -39,7 +39,7 @@
 // Coordinator-specific opcodes (30-49) //
 #define PROTO_OPCODE_REGISTER                     0x00
 #define PROTO_OPCODE_SYNC                         0x31
-#define PROTO_OPCODE_SLAVE_CONNECTED              0x32
+#define PROTO_OPCODE_SERVER_CONNECTED             0x32
 #define PROTO_OPCODE_CLIENT_PUSH_STATS            0x33
 #define PROTO_OPCODE_COORDINATOR_PUSH_STATS       0x34
 #define PROTO_OPCODE_SEAL_CHUNKS                  0x35
@@ -48,8 +48,8 @@
 #define PROTO_OPCODE_RECONSTRUCTION_UNSEALED      0x38
 #define PROTO_OPCODE_SYNC_META                    0x39
 #define PROTO_OPCODE_RELEASE_DEGRADED_LOCKS       0x40
-#define PROTO_OPCODE_SLAVE_RECONSTRUCTED          0x41
-#define PROTO_OPCODE_BACKUP_SLAVE_PROMOTED        0x42
+#define PROTO_OPCODE_SERVER_RECONSTRUCTED         0x41
+#define PROTO_OPCODE_BACKUP_SERVER_PROMOTED       0x42
 #define PROTO_OPCODE_PARITY_MIGRATE               0x43
 
 // Application <-> Client or Client <-> Server (0-19) //
@@ -144,7 +144,7 @@ struct AddressHeader {
 //////////////
 // Recovery //
 //////////////
-#define PROTO_PROMOTE_BACKUP_SLAVE_SIZE 14
+#define PROTO_PROMOTE_BACKUP_SERVER_SIZE 14
 struct PromoteBackupSlaveHeader {
 	uint32_t addr;
 	uint16_t port;
@@ -183,16 +183,16 @@ struct KeyOpMetadataHeader {
 	char *key;
 };
 
-#define PROTO_SLAVE_REMAPPED_PARITY_SIZE PROTO_ADDRESS_SIZE
+#define PROTO_SERVER_REMAPPED_PARITY_SIZE PROTO_ADDRESS_SIZE
 
 //////////////////////////
 // Load synchronization //
 //////////////////////////
 #define PROTO_LOAD_STATS_SIZE 12
 struct LoadStatsHeader {
-	uint32_t slaveGetCount;
-	uint32_t slaveSetCount;
-	uint32_t slaveOverloadCount;
+	uint32_t serverGetCount;
+	uint32_t serverSetCount;
+	uint32_t serverOverloadCount;
 };
 
 ///////////////////////
@@ -204,7 +204,7 @@ struct KeyHeader {
 	char *key;
 };
 
-#define PROTO_KEY_SLAVE_SIZE 17
+#define PROTO_KEY_SERVER_SIZE 17
 struct KeySlaveHeader {
     uint8_t keySize;
     char *key;
@@ -407,7 +407,7 @@ struct ForwardKeyHeader {
 	char *valueUpdate;
 };
 
-// For retrieving key-value pair in unsealed chunks from parity slave
+// For retrieving key-value pair in unsealed chunks from parity server
 #define PROTO_LIST_STRIPE_KEY_SIZE 9
 struct ListStripeKeyHeader {
 	uint32_t listId;
@@ -416,7 +416,7 @@ struct ListStripeKeyHeader {
 	char *key;
 };
 
-// For asking slaves to send back the modified reconstructed chunks to the overloaded slave
+// For asking servers to send back the modified reconstructed chunks to the overloaded server
 #define PROTO_DEGRADED_RELEASE_REQ_SIZE 20
 struct DegradedReleaseReqHeader {
 	uint32_t srcListId;
@@ -514,7 +514,7 @@ struct AcknowledgementHeader {
 struct DeltaAcknowledgementHeader {
 	uint32_t tsCount;         // number of timestamps
 	uint32_t keyCount;       // number of requests ids
-	uint16_t targetId;      // source data slave
+	uint16_t targetId;      // source data server
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -629,11 +629,11 @@ protected:
 	// ---------- load_protocol.cc ----------
 	size_t generateLoadStatsHeader(
 		uint8_t magic, uint8_t to, uint16_t instanceId, uint32_t requestId,
-		uint32_t slaveGetCount, uint32_t slaveSetCount, uint32_t slaveOverloadCount,
-		uint32_t recordSize, uint32_t slaveAddrSize
+		uint32_t serverGetCount, uint32_t serverSetCount, uint32_t serverOverloadCount,
+		uint32_t recordSize, uint32_t serverAddrSize
 	);
 	bool parseLoadStatsHeader(
-		size_t offset, uint32_t &slaveGetCount, uint32_t &slaveSetCount, uint32_t &slaveOverloadCount,
+		size_t offset, uint32_t &serverGetCount, uint32_t &serverSetCount, uint32_t &serverOverloadCount,
 		char *buf, size_t size
 	);
 

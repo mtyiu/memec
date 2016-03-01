@@ -20,8 +20,8 @@ size_t Protocol::generatePromoteBackupSlaveHeader(
 	*( ( uint16_t * )( buf + 4 ) ) = port;
 	tmp = buf + 6;
 
-	buf += PROTO_PROMOTE_BACKUP_SLAVE_SIZE;
-	bytes += PROTO_PROMOTE_BACKUP_SLAVE_SIZE;
+	buf += PROTO_PROMOTE_BACKUP_SERVER_SIZE;
+	bytes += PROTO_PROMOTE_BACKUP_SERVER_SIZE;
 
 	for ( ; chunksIt != chunks.end(); chunksIt++ ) {
 		const Metadata &metadata = *chunksIt;
@@ -65,7 +65,7 @@ size_t Protocol::generatePromoteBackupSlaveHeader(
 
 size_t Protocol::generatePromoteBackupSlaveHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t numReconstructedChunks, uint32_t numReconstructedKeys ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_PROMOTE_BACKUP_SLAVE_SIZE, instanceId, requestId );
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_PROMOTE_BACKUP_SERVER_SIZE, instanceId, requestId );
 
 	// Already in network-byte order
 	*( ( uint32_t * )( buf     ) ) = addr;
@@ -73,12 +73,12 @@ size_t Protocol::generatePromoteBackupSlaveHeader( uint8_t magic, uint8_t to, ui
 	*( ( uint32_t * )( buf + 6 ) ) = htonl( numReconstructedChunks );
 	*( ( uint32_t * )( buf + 10 ) ) = htonl( numReconstructedKeys );
 
-	bytes += PROTO_PROMOTE_BACKUP_SLAVE_SIZE;
+	bytes += PROTO_PROMOTE_BACKUP_SERVER_SIZE;
 	return bytes;
 }
 
 bool Protocol::parsePromoteBackupSlaveHeader( size_t offset, uint32_t &addr, uint16_t &port, uint32_t &chunkCount, uint32_t &unsealedCount, uint32_t *&metadata, char *&keys, char *buf, size_t size ) {
-	if ( size - offset < PROTO_PROMOTE_BACKUP_SLAVE_SIZE )
+	if ( size - offset < PROTO_PROMOTE_BACKUP_SERVER_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
@@ -87,7 +87,7 @@ bool Protocol::parsePromoteBackupSlaveHeader( size_t offset, uint32_t &addr, uin
 	chunkCount = ntohl( *( ( uint32_t * )( ptr + 6 ) ) );
 	unsealedCount = ntohl( *( ( uint32_t * )( ptr + 10 ) ) );
 
-	ptr += PROTO_PROMOTE_BACKUP_SLAVE_SIZE;
+	ptr += PROTO_PROMOTE_BACKUP_SERVER_SIZE;
 
 	metadata = ( uint32_t * )( ptr );
 	for ( uint32_t i = 0; i < chunkCount; i++ ) {
@@ -103,7 +103,7 @@ bool Protocol::parsePromoteBackupSlaveHeader( size_t offset, uint32_t &addr, uin
 }
 
 bool Protocol::parsePromoteBackupSlaveHeader( size_t offset, uint32_t &addr, uint16_t &port, uint32_t &numReconstructedChunks, uint32_t &numReconstructedKeys, char *buf, size_t size ) {
-	if ( size - offset < PROTO_PROMOTE_BACKUP_SLAVE_SIZE )
+	if ( size - offset < PROTO_PROMOTE_BACKUP_SERVER_SIZE )
 		return false;
 
 	char *ptr = buf + offset;

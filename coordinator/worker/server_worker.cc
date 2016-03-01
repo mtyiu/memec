@@ -225,7 +225,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 							__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );
 					}
 					break;
-				case PROTO_OPCODE_SLAVE_RECONSTRUCTED:
+				case PROTO_OPCODE_SERVER_RECONSTRUCTED:
 					switch( header.magic ) {
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
 							// printf( "Received response from " );
@@ -254,7 +254,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 							__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );
 					}
 					break;
-				case PROTO_OPCODE_BACKUP_SLAVE_PROMOTED:
+				case PROTO_OPCODE_BACKUP_SERVER_PROMOTED:
 					switch( header.magic ) {
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
 							this->handlePromoteBackupSlaveResponse( event, buffer.data, header.length );

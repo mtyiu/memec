@@ -40,7 +40,7 @@ bool GlobalConfig::set( const char *section, const char *name, const char *value
 			this->coordinators.push_back( addr );
 		else
 			return false;
-	} else if ( match( section, "slaves" ) ) {
+	} else if ( match( section, "servers" ) ) {
 		ServerAddr addr;
 		if ( addr.parse( name, value ) )
 			this->slaves.push_back( addr );
@@ -175,7 +175,7 @@ bool GlobalConfig::validate() {
 		CFG_PARSE_ERROR( "GlobalConfig", "There should be at least one coordinator." );
 
 	if ( this->slaves.empty() )
-		CFG_PARSE_ERROR( "GlobalConfig", "There should be at least one slave." );
+		CFG_PARSE_ERROR( "GlobalConfig", "There should be at least one server." );
 
 	if ( this->buffer.chunksPerList < 1 )
 		CFG_PARSE_ERROR( "GlobalConfig", "The number of temporary chunks per stripe list should be at least 1." );
@@ -319,7 +319,7 @@ void GlobalConfig::print( FILE *f ) {
 		this->coordinators[ i ].print( f );
 	}
 
-	fprintf( f, "- Slaves\n" );
+	fprintf( f, "- Servers\n" );
 	for ( int i = 0, len = this->slaves.size(); i < len; i++ ) {
 		fprintf( f, "\t%d. ", ( i + 1 ) );
 		this->slaves[ i ].print( f );

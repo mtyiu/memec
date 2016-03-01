@@ -29,7 +29,7 @@ char *CoordinatorProtocol::announceSlaveConnected( size_t &size, uint16_t instan
 	size = this->generateAddressHeader(
 		PROTO_MAGIC_ANNOUNCEMENT,
 		PROTO_MAGIC_TO_SERVER,
-		PROTO_OPCODE_SLAVE_CONNECTED,
+		PROTO_OPCODE_SERVER_CONNECTED,
 		instanceId, requestId,
 		addr.addr,
 		addr.port

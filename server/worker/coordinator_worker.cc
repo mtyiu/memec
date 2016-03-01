@@ -164,13 +164,13 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 								break;
 						}
 						break;
-					case PROTO_OPCODE_SLAVE_CONNECTED:
+					case PROTO_OPCODE_SERVER_CONNECTED:
 						this->handleSlaveConnectedMsg( event, buffer.data, header.length );
 						break;
-					case PROTO_OPCODE_SLAVE_RECONSTRUCTED:
+					case PROTO_OPCODE_SERVER_RECONSTRUCTED:
 						this->handleSlaveReconstructedMsg( event, buffer.data, header.length );
 						break;
-					case PROTO_OPCODE_BACKUP_SLAVE_PROMOTED:
+					case PROTO_OPCODE_BACKUP_SERVER_PROMOTED:
 						this->handleBackupSlavePromotedMsg( event, buffer.data, header.length );
 						break;
 					case PROTO_OPCODE_SEAL_CHUNKS:

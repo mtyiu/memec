@@ -6,7 +6,7 @@ char *CoordinatorProtocol::announceSlaveReconstructed( size_t &size, uint16_t in
 	size = this->generateSrcDstAddressHeader(
 		PROTO_MAGIC_ANNOUNCEMENT,
 		toSlave ? PROTO_MAGIC_TO_SERVER : PROTO_MAGIC_TO_CLIENT,
-		PROTO_OPCODE_SLAVE_RECONSTRUCTED,
+		PROTO_OPCODE_SERVER_RECONSTRUCTED,
 		instanceId, requestId,
 		srcAddr.addr,
 		srcAddr.port,
@@ -22,7 +22,7 @@ char *CoordinatorProtocol::promoteBackupSlave( size_t &size, uint16_t instanceId
 	size = this->generatePromoteBackupSlaveHeader(
 		PROTO_MAGIC_ANNOUNCEMENT,
 		PROTO_MAGIC_TO_SERVER,
-		PROTO_OPCODE_BACKUP_SLAVE_PROMOTED,
+		PROTO_OPCODE_BACKUP_SERVER_PROMOTED,
 		instanceId, requestId,
 		srcAddr.addr,
 		srcAddr.port,

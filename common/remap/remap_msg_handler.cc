@@ -12,19 +12,19 @@ RemapMsgHandler::RemapMsgHandler() {
 RemapMsgHandler::~RemapMsgHandler() {
 }
 
-int RemapMsgHandler::sendState( std::vector<struct sockaddr_in> &slaves, int numGroup, const char targetGroup[][ MAX_GROUP_NAME ] ) {
+int RemapMsgHandler::sendState( std::vector<struct sockaddr_in> &servers, int numGroup, const char targetGroup[][ MAX_GROUP_NAME ] ) {
 	char buf[ MAX_MESSLEN ];
 	int len = 0, ret = 0;
-	int recordSize = this->slaveStateRecordSize;
+	int recordSize = this->serverStateRecordSize;
 
-	buf[0] = ( uint8_t ) slaves.size();
+	buf[0] = ( uint8_t ) servers.size();
 	len += 1;
 
-	for ( uint32_t i = 0; i < slaves.size(); i++ ) {
-		// slave info
-		*( ( uint32_t * )( buf + len ) ) = slaves.at(i).sin_addr.s_addr;
-		*( ( uint32_t * )( buf + len + sizeof( uint32_t ) ) ) = slaves.at(i).sin_port;
-		*( ( uint32_t * )( buf + len + sizeof( uint32_t ) + sizeof( uint16_t ) ) ) = ( uint8_t ) this->slavesState[ slaves.at(i) ];
+	for ( uint32_t i = 0; i < servers.size(); i++ ) {
+		// server info
+		*( ( uint32_t * )( buf + len ) ) = servers.at(i).sin_addr.s_addr;
+		*( ( uint32_t * )( buf + len + sizeof( uint32_t ) ) ) = servers.at(i).sin_port;
+		*( ( uint32_t * )( buf + len + sizeof( uint32_t ) + sizeof( uint16_t ) ) ) = ( uint8_t ) this->serversState[ servers.at(i) ];
 		len += recordSize;
 	}
 	if ( numGroup > 1 ) {
@@ -47,7 +47,7 @@ bool RemapMsgHandler::init( const char *spread, const char *user ) {
 	}
 
 	this->msgCount = 0;
-	slavesStateLock.clear();
+	serversStateLock.clear();
 
 	// construct the spread name, username
 	// connect to spread daemon
@@ -79,17 +79,17 @@ void RemapMsgHandler::quit() {
 }
 
 void RemapMsgHandler::listAliveSlaves() {
-	uint32_t slaveCount = this->slavesState.size();
+	uint32_t serverCount = this->serversState.size();
 	char buf[ INET_ADDRSTRLEN ];
-	for ( auto slave : this->slavesState ) {
-		inet_ntop( AF_INET, &slave.first.sin_addr, buf, INET_ADDRSTRLEN ),
+	for ( auto server : this->serversState ) {
+		inet_ntop( AF_INET, &server.first.sin_addr, buf, INET_ADDRSTRLEN ),
 		fprintf(
 			stderr,
-			"\tSlave %s:%hu --> ",
+			"\tServer %s:%hu --> ",
 			buf,
-			ntohs( slave.first.sin_port )
+			ntohs( server.first.sin_port )
 		);
-		switch( slave.second ) {
+		switch( server.second ) {
 			case REMAP_UNDEFINED:
 				fprintf( stderr, "REMAP_UNDEFINED\n" );
 				break;
@@ -113,5 +113,5 @@ void RemapMsgHandler::listAliveSlaves() {
 				break;
 		}
 	}
-	fprintf( stderr, "No. of slaves = %u\n", slaveCount );
+	fprintf( stderr, "No. of servers = %u\n", serverCount );
 }

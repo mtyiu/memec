@@ -5,7 +5,7 @@ char *SlaveProtocol::resSlaveReconstructedMsg( size_t &size, uint16_t instanceId
 	size = this->generateHeader(
 		PROTO_MAGIC_RESPONSE_SUCCESS,
 		PROTO_MAGIC_TO_COORDINATOR,
-		PROTO_OPCODE_SLAVE_RECONSTRUCTED,
+		PROTO_OPCODE_SERVER_RECONSTRUCTED,
 		0, // length
 		instanceId, requestId
 	);
@@ -41,7 +41,7 @@ char *SlaveProtocol::resPromoteBackupSlave( size_t &size, uint16_t instanceId, u
 	size = this->generatePromoteBackupSlaveHeader(
 		PROTO_MAGIC_RESPONSE_SUCCESS,
 		PROTO_MAGIC_TO_COORDINATOR,
-		PROTO_OPCODE_BACKUP_SLAVE_PROMOTED,
+		PROTO_OPCODE_BACKUP_SERVER_PROMOTED,
 		instanceId, requestId,
 		addr, port, numStripes, numUnsealedKeys
 	);
