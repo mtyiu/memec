@@ -10,18 +10,18 @@
 #include "../../common/lock/lock.hh"
 #include "../../common/socket/socket.hh"
 
-class SlaveSocket : public Socket {
+class ServerSocket : public Socket {
 private:
-	static ArrayMap<int, SlaveSocket> *slaves;
+	static ArrayMap<int, ServerSocket> *slaves;
 	struct sockaddr_in recvAddr;
 	char *identifier;
 
 public:
 	uint16_t instanceId;
 	Map map;
-	SlaveSocket *failed;
+	ServerSocket *failed;
 
-	static void setArrayMap( ArrayMap<int, SlaveSocket> *slaves );
+	static void setArrayMap( ArrayMap<int, ServerSocket> *slaves );
 	bool init( int tmpfd, ServerAddr &addr, EPoll *epoll );
 	bool start();
 	void stop();

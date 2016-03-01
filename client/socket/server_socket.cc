@@ -2,14 +2,14 @@
 #include "../main/client.hh"
 #include "server_socket.hh"
 
-ArrayMap<int, SlaveSocket> *SlaveSocket::slaves;
+ArrayMap<int, ServerSocket> *ServerSocket::slaves;
 
-void SlaveSocket::setArrayMap( ArrayMap<int, SlaveSocket> *slaves ) {
-	SlaveSocket::slaves = slaves;
+void ServerSocket::setArrayMap( ArrayMap<int, ServerSocket> *slaves ) {
+	ServerSocket::slaves = slaves;
 	slaves->needsDelete = false;
 }
 
-bool SlaveSocket::start() {
+bool ServerSocket::start() {
 	LOCK_INIT( &this->timestamp.pendingAck.updateLock );
 	LOCK_INIT( &this->timestamp.pendingAck.delLock );
 	LOCK_INIT( &this->ackParityDeltaBackupLock );
@@ -21,41 +21,41 @@ bool SlaveSocket::start() {
 	return false;
 }
 
-void SlaveSocket::registerMaster() {
+void ServerSocket::registerMaster() {
 	Master *master = Master::getInstance();
 	SlaveEvent event;
 	event.reqRegister( this, master->config.master.master.addr.addr, master->config.master.master.addr.port );
 	master->eventQueue.insert( event );
 }
 
-void SlaveSocket::stop() {
+void ServerSocket::stop() {
 	int newFd = -INT_MIN + this->sockfd;
-	SlaveSocket::slaves->replaceKey( this->sockfd, newFd );
+	ServerSocket::slaves->replaceKey( this->sockfd, newFd );
 	this->sockfd = newFd;
 	Socket::stop();
 }
 
-ssize_t SlaveSocket::send( char *buf, size_t ulen, bool &connected ) {
+ssize_t ServerSocket::send( char *buf, size_t ulen, bool &connected ) {
 	return Socket::send( this->sockfd, buf, ulen, connected );
 }
 
-ssize_t SlaveSocket::recv( char *buf, size_t ulen, bool &connected, bool wait ) {
+ssize_t ServerSocket::recv( char *buf, size_t ulen, bool &connected, bool wait ) {
 	return Socket::recv( this->sockfd, buf, ulen, connected, wait );
 }
 
-ssize_t SlaveSocket::recvRem( char *buf, size_t expected, char *prevBuf, size_t prevSize, bool &connected ) {
+ssize_t ServerSocket::recvRem( char *buf, size_t expected, char *prevBuf, size_t prevSize, bool &connected ) {
 	return Socket::recvRem( this->sockfd, buf, expected, prevBuf, prevSize, connected );
 }
 
-bool SlaveSocket::done() {
+bool ServerSocket::done() {
 	return Socket::done( this->sockfd );
 }
 
-bool SlaveSocket::ready() {
+bool ServerSocket::ready() {
 	return this->connected && this->registered;
 }
 
-void SlaveSocket::print( FILE *f ) {
+void ServerSocket::print( FILE *f ) {
 	char buf[ 16 ];
 	Socket::ntoh_ip( this->addr.sin_addr.s_addr, buf, 16 );
 	fprintf( f, "[%4d] %s:%u ", this->sockfd, buf, Socket::ntoh_port( this->addr.sin_port ) );

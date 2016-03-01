@@ -39,7 +39,7 @@ public:
 
 class ChunkRequest : public Metadata {
 public:
-	SlavePeerSocket *socket;
+	ServerPeerSocket *socket;
 	mutable Chunk *chunk;
 	bool isDegraded;
 	bool isSealed;
@@ -47,7 +47,7 @@ public:
 	uint8_t sealIndicatorCount;
 	bool *sealIndicator;
 
-	void set( uint32_t listId, uint32_t stripeId, uint32_t chunkId, SlavePeerSocket *socket, Chunk *chunk = 0, bool isDegraded = true, bool self = false ) {
+	void set( uint32_t listId, uint32_t stripeId, uint32_t chunkId, ServerPeerSocket *socket, Chunk *chunk = 0, bool isDegraded = true, bool self = false ) {
 		this->listId = listId;
 		this->stripeId = stripeId;
 		this->chunkId = chunkId;
@@ -76,7 +76,7 @@ class DegradedOp : public Metadata {
 public:
 	uint8_t opcode;
 	bool isSealed;
-	MasterSocket *socket;
+	ClientSocket *socket;
 	uint32_t *original;
 	uint32_t *reconstructed;
 	uint32_t reconstructedCount;
@@ -88,7 +88,7 @@ public:
 	uint32_t timestamp; // from Master
 
 	void set(
-		uint8_t opcode, bool isSealed, MasterSocket *socket,
+		uint8_t opcode, bool isSealed, ClientSocket *socket,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 		uint32_t ongoingAtChunk, uint32_t timestamp,
@@ -231,11 +231,11 @@ public:
 
 class PendingRegistration {
 public:
-	SlavePeerSocket *socket;
+	ServerPeerSocket *socket;
 	uint32_t requestId;
 	bool success;
 
-	void set( SlavePeerSocket *socket, uint32_t requestId, bool success ) {
+	void set( ServerPeerSocket *socket, uint32_t requestId, bool success ) {
 		this->socket = socket;
 		this->requestId = requestId;
 		this->success = success;
@@ -412,9 +412,9 @@ public:
 	);
 	bool insertRemapDataRequest(
 		uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, uint32_t requestCount,
-		SlavePeerSocket *target
+		ServerPeerSocket *target
 	);
-	void insertSlavePeerRegistration( uint32_t requestId, SlavePeerSocket *socket, bool success );
+	void insertSlavePeerRegistration( uint32_t requestId, ServerPeerSocket *socket, bool success );
 	bool insert(
 		PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
 		bool needsLock = true, bool needsUnlock = true
@@ -491,7 +491,7 @@ public:
 		ChunkUpdate *chunkUpdatePtr = 0,
 		bool needsLock = true, bool needsUnlock = true
 	);
-	bool eraseSlavePeerRegistration( uint32_t &requestId, SlavePeerSocket *&socket, bool &success );
+	bool eraseSlavePeerRegistration( uint32_t &requestId, ServerPeerSocket *&socket, bool &success );
 	bool erase(
 		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr = 0,
 		PendingIdentifier *pidPtr = 0,

@@ -26,8 +26,8 @@ void Coordinator::free() {
 	Map::free();
 }
 
-void Coordinator::switchPhaseForCrashedSlave( SlaveSocket *slaveSocket ) {
-	struct sockaddr_in addr = slaveSocket->getAddr();
+void Coordinator::switchPhaseForCrashedSlave( ServerSocket *serverSocket ) {
+	struct sockaddr_in addr = serverSocket->getAddr();
 	MasterEvent event;
 
 	LOCK( &this->overloadedSlaves.lock );
@@ -199,7 +199,7 @@ void Coordinator::updateAverageSlaveLoading( ArrayMap<struct sockaddr_in, Latenc
 
 void Coordinator::signalHandler( int signal ) {
 	Coordinator *coordinator = Coordinator::getInstance();
-	ArrayMap<int, MasterSocket> &sockets = coordinator->sockets.masters;
+	ArrayMap<int, ClientSocket> &sockets = coordinator->sockets.masters;
 	ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency = new ArrayMap<struct sockaddr_in, Latency>();
 	ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency = new ArrayMap<struct sockaddr_in, Latency>();
 	std::set<struct sockaddr_in> *overloadedSlaveSet = new std::set<struct sockaddr_in>();
@@ -267,20 +267,20 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 
 	/* Vectors and other sockets */
 	Socket::init( &this->sockets.epoll );
-	MasterSocket::setArrayMap( &this->sockets.masters );
-	SlaveSocket::setArrayMap( &this->sockets.slaves );
+	ClientSocket::setArrayMap( &this->sockets.masters );
+	ServerSocket::setArrayMap( &this->sockets.slaves );
 	this->sockets.masters.reserve( this->config.global.slaves.size() );
 	this->sockets.slaves.reserve( this->config.global.slaves.size() );
 	this->sockets.backupSlaves.needsDelete = false;
 	for ( int i = 0, len = this->config.global.slaves.size(); i < len; i++ ) {
-		SlaveSocket *socket = new SlaveSocket();
+		ServerSocket *socket = new ServerSocket();
 		int tmpfd = - ( i + 1 );
 		socket->init( tmpfd, this->config.global.slaves[ i ], &this->sockets.epoll );
 		this->sockets.slaves.set( tmpfd, socket );
 	}
 	Map::init( this->config.global.stripeList.count );
 	/* Stripe list */
-	this->stripeList = new StripeList<SlaveSocket>(
+	this->stripeList = new StripeList<ServerSocket>(
 		this->config.global.coding.params.getChunkCount(),
 		this->config.global.coding.params.getDataChunkCount(),
 		this->config.global.stripeList.count,
@@ -479,7 +479,7 @@ bool Coordinator::stop() {
 
 void Coordinator::syncSlaveMeta( struct sockaddr_in slave, bool *sync ) {
 	SlaveEvent event;
-	SlaveSocket *socket = NULL;
+	ServerSocket *socket = NULL;
 	struct sockaddr_in addr;
 
 	// find the corresponding socket for slave by address
@@ -525,7 +525,7 @@ void Coordinator::releaseDegradedLock() {
 	}
 
 	for ( uint32_t socketId = socketFromId; socketId < socketToId; socketId++ ) {
-		SlaveSocket *socket = this->sockets.slaves.values[ socketId ];
+		ServerSocket *socket = this->sockets.slaves.values[ socketId ];
 		if ( ! socket ) {
 			fprintf( stderr, "Unknown socket ID!\n" );
 			return;
@@ -542,7 +542,7 @@ void Coordinator::releaseDegradedLock() {
 
 void Coordinator::releaseDegradedLock( struct sockaddr_in slave, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done ) {
 	uint32_t index = 0;
-	SlaveSocket *socket;
+	ServerSocket *socket;
 	for ( uint32_t i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
 		socket = this->sockets.slaves.values[ i ];
 		if ( ! socket )
@@ -851,27 +851,27 @@ void Coordinator::hash() {
 	dataChunkCount = this->config.global.coding.params.getDataChunkCount();
 	parityChunkCount = this->config.global.coding.params.getParityChunkCount();
 
-	SlaveSocket **dataSlaveSockets = new SlaveSocket *[ dataChunkCount ];
-	SlaveSocket **paritySlaveSockets = new SlaveSocket *[ parityChunkCount ];
+	ServerSocket **dataServerSockets = new ServerSocket *[ dataChunkCount ];
+	ServerSocket **parityServerSockets = new ServerSocket *[ parityChunkCount ];
 
-	listId = this->stripeList->get( key, keySize, dataSlaveSockets, paritySlaveSockets, &dataChunkId, true );
+	listId = this->stripeList->get( key, keySize, dataServerSockets, parityServerSockets, &dataChunkId, true );
 
 	printf( "\n--- Hashed to List #%u ---\n", listId );
 	for ( uint32_t i = 0; i < dataChunkCount; i++ ) {
 		printf( "[ %u]: ", i );
-		dataSlaveSockets[ i ]->printAddress();
+		dataServerSockets[ i ]->printAddress();
 		if ( i == dataChunkId )
 			printf( " ***" );
 		printf( "\n" );
 	}
 	for ( uint32_t i = 0; i < parityChunkCount; i++ ) {
 		printf( "[p%u]: ", ( i + dataChunkCount ) );
-		paritySlaveSockets[ i ]->printAddress();
+		parityServerSockets[ i ]->printAddress();
 		printf( " ***\n" );
 	}
 
-	delete[] dataSlaveSockets;
-	delete[] paritySlaveSockets;
+	delete[] dataServerSockets;
+	delete[] parityServerSockets;
 }
 
 void Coordinator::lookup() {
@@ -887,11 +887,11 @@ void Coordinator::lookup() {
 	keySize = ( uint8_t ) strnlen( key, sizeof( key ) ) - 1;
 
 	Metadata metadata;
-	SlaveSocket *dataSlaveSocket;
-	this->stripeList->get( key, keySize, &dataSlaveSocket );
+	ServerSocket *dataServerSocket;
+	this->stripeList->get( key, keySize, &dataServerSocket );
 
-	if ( dataSlaveSocket->map.findMetadataByKey( key, keySize, metadata ) ) {
-		printf( "Metadata: (%u, %u, %u); Is sealed? %s\n", metadata.listId, metadata.stripeId, metadata.chunkId, dataSlaveSocket->map.isSealed( metadata ) ? "yes" : "no" );
+	if ( dataServerSocket->map.findMetadataByKey( key, keySize, metadata ) ) {
+		printf( "Metadata: (%u, %u, %u); Is sealed? %s\n", metadata.listId, metadata.stripeId, metadata.chunkId, dataServerSocket->map.isSealed( metadata ) ? "yes" : "no" );
 
 		Key k;
 		RemappingRecord remappingRecord;
@@ -912,7 +912,7 @@ void Coordinator::lookup() {
 		}
 
 		DegradedLock degradedLock;
-		if ( dataSlaveSocket->map.findDegradedLock( metadata.listId, metadata.stripeId, degradedLock ) ) {
+		if ( dataServerSocket->map.findDegradedLock( metadata.listId, metadata.stripeId, degradedLock ) ) {
 			printf( "Degraded lock found: " );
 			for ( uint32_t i = 0; i < degradedLock.reconstructedCount; i++ ) {
 				printf(
@@ -933,7 +933,7 @@ void Coordinator::lookup() {
 }
 
 void Coordinator::stripe() {
-	SlaveSocket *s;
+	ServerSocket *s;
 	uint32_t chunkCount, dataChunkCount;
 	Metadata metadata;
 
@@ -1022,7 +1022,7 @@ void Coordinator::setSlave( bool overloaded ) {
 	printf( "Which slave to %s (socket fd, enter 0 to exit) ? ", overloaded ? "overload" : "underload" );
 	fflush( stdout );
 	std::set<struct sockaddr_in> slaves;
-	SlaveSocket *s = 0;
+	ServerSocket *s = 0;
 	while ( scanf( "%u", &socket) == 1 ) {
 		s = this->sockets.slaves.get( socket );
 		if ( ! s ) break;

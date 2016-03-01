@@ -261,7 +261,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 	uint32_t listId, chunkId;
 	bool connected;
 	ssize_t sentBytes;
-	SlaveSocket *socket;
+	ServerSocket *socket;
 
 	socket = this->getSlaves(
 		header.key, header.keySize,
@@ -280,7 +280,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 	Master *master = Master::getInstance();
 	if ( ! MasterWorker::disableRemappingSet ) {
 		for ( uint32_t i = 0; i < 1 + MasterWorker::parityChunkCount; i++ ) {
-			struct sockaddr_in addr = ( i == 0 ) ? socket->getAddr() : this->paritySlaveSockets[ i - 1 ]->getAddr();
+			struct sockaddr_in addr = ( i == 0 ) ? socket->getAddr() : this->parityServerSockets[ i - 1 ]->getAddr();
 			if ( master->remapMsgHandler.useCoordinatedFlow( addr ) ) {
 				// printf( "(%u, %u) is overloaded!\n", listId, i == 0 ? chunkId : i - 1 + MasterWorker::dataChunkCount );
 				return this->handleRemappingSetRequest( event, buf, size );
@@ -324,7 +324,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount + 1; i++ ) {
 		if ( ! MasterWorker::pending->insertKey(
 			PT_SLAVE_SET, Master::instanceId, event.instanceId, requestId, event.requestId,
-			( void * )( i == 0 ? socket : this->paritySlaveSockets[ i - 1 ] ),
+			( void * )( i == 0 ? socket : this->parityServerSockets[ i - 1 ] ),
 			key
 		) ) {
 			__ERROR__( "MasterWorker", "handleSetRequest", "Cannot insert into slave SET pending map." );
@@ -338,14 +338,14 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 				// Mark the time when request is sent
 				MasterWorker::pending->recordRequestStartTime(
 					PT_SLAVE_SET, Master::instanceId, event.instanceId, requestId, event.requestId,
-					( void * ) this->paritySlaveSockets[ i ],
-					this->paritySlaveSockets[ i ]->getAddr()
+					( void * ) this->parityServerSockets[ i ],
+					this->parityServerSockets[ i ]->getAddr()
 				);
 			}
 
 #ifdef CLIENT_WORKER_SEND_REPLICAS_PARALLEL
 			SlaveEvent slaveEvent;
-			slaveEvent.send( this->paritySlaveSockets[ i ], packet );
+			slaveEvent.send( this->parityServerSockets[ i ], packet );
 			MasterWorker::eventQueue->prioritizedInsert( slaveEvent );
 		}
 
@@ -355,7 +355,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		slaveEvent.send( socket, packet );
 		this->dispatch( slaveEvent );
 #else
-			sentBytes = this->paritySlaveSockets[ i ]->send( buffer.data, buffer.size, connected );
+			sentBytes = this->parityServerSockets[ i ]->send( buffer.data, buffer.size, connected );
 			if ( sentBytes != ( ssize_t ) buffer.size ) {
 				__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 			}
@@ -404,7 +404,7 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 
 	uint32_t *original, *reconstructed, reconstructedCount;
 	bool useCoordinatedFlow;
-	SlaveSocket *socket;
+	ServerSocket *socket;
 	if ( ! this->getSlaves(
 		PROTO_OPCODE_GET,
 		header.key, header.keySize,
@@ -486,7 +486,7 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 
 	uint32_t *original, *reconstructed, reconstructedCount;
 	bool useCoordinatedFlow;
-	SlaveSocket *socket;
+	ServerSocket *socket;
 
 	if ( ! this->getSlaves(
 		PROTO_OPCODE_UPDATE,
@@ -572,7 +572,7 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 
 	uint32_t *original, *reconstructed, reconstructedCount;
 	bool useCoordinatedFlow;
-	SlaveSocket *socket;
+	ServerSocket *socket;
 
 	if ( ! this->getSlaves(
 		PROTO_OPCODE_DELETE,

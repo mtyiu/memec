@@ -78,8 +78,8 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 	/* Vectors and other sockets */
 	Socket::init( &this->sockets.epoll );
 	CoordinatorSocket::setArrayMap( &this->sockets.coordinators );
-	MasterSocket::setArrayMap( &this->sockets.masters );
-	SlavePeerSocket::setArrayMap( &this->sockets.slavePeers );
+	ClientSocket::setArrayMap( &this->sockets.masters );
+	ServerPeerSocket::setArrayMap( &this->sockets.slavePeers );
 	this->sockets.coordinators.reserve( this->config.global.coordinators.size() );
 	for ( int i = 0, len = this->config.global.coordinators.size(); i < len; i++ ) {
 		CoordinatorSocket *socket = new CoordinatorSocket();
@@ -91,7 +91,7 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 	}
 	this->sockets.slavePeers.reserve( this->config.global.slaves.size() );
 	for ( int i = 0, len = this->config.global.slaves.size(); i < len; i++ ) {
-		SlavePeerSocket *socket = new SlavePeerSocket();
+		ServerPeerSocket *socket = new ServerPeerSocket();
 		int tmpfd = - ( i + 1 );
 		socket->init(
 			tmpfd,
@@ -108,7 +108,7 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 		this->config.global.size.chunk
 	);
 	/* Stripe list */
-	this->stripeList = new StripeList<SlavePeerSocket>(
+	this->stripeList = new StripeList<ServerPeerSocket>(
 		this->config.global.coding.params.getChunkCount(),
 		this->config.global.coding.params.getDataChunkCount(),
 		this->config.global.stripeList.count,

@@ -4,28 +4,28 @@
 #include "../main/server.hh"
 #include "../../common/util/debug.hh"
 
-ArrayMap<int, SlavePeerSocket> *SlavePeerSocket::slavePeers;
+ArrayMap<int, ServerPeerSocket> *ServerPeerSocket::slavePeers;
 
-void SlavePeerSocket::setArrayMap( ArrayMap<int, SlavePeerSocket> *slavePeers ) {
-	SlavePeerSocket::slavePeers = slavePeers;
+void ServerPeerSocket::setArrayMap( ArrayMap<int, ServerPeerSocket> *slavePeers ) {
+	ServerPeerSocket::slavePeers = slavePeers;
 	slavePeers->needsDelete = false;
 }
 
-void SlavePeerSocket::registerTo() {
+void ServerPeerSocket::registerTo() {
 	Slave *slave = Slave::getInstance();
 	SlavePeerEvent event;
 	event.reqRegister( this );
 	slave->eventQueue.insert( event );
 }
 
-SlavePeerSocket::SlavePeerSocket() {
+ServerPeerSocket::ServerPeerSocket() {
 	this->identifier = 0;
 	this->received = false;
 	this->registered = false;
 	this->self = false;
 }
 
-bool SlavePeerSocket::init( int tmpfd, ServerAddr &addr, EPoll *epoll, bool self ) {
+bool ServerPeerSocket::init( int tmpfd, ServerAddr &addr, EPoll *epoll, bool self ) {
 	this->identifier = strdup( addr.name );
 	this->self = self;
 	this->epoll = epoll;
@@ -41,14 +41,14 @@ bool SlavePeerSocket::init( int tmpfd, ServerAddr &addr, EPoll *epoll, bool self
 	return true;
 }
 
-int SlavePeerSocket::init() {
+int ServerPeerSocket::init() {
 	if ( this->self )
 		return 0;
 	this->registered = false;
 
 	this->sockfd = socket( AF_INET, this->type, 0 );
 	if ( this->sockfd < 0 ) {
-		__ERROR__( "SlavePeerSocket", "start", "%s", strerror( errno ) );
+		__ERROR__( "ServerPeerSocket", "start", "%s", strerror( errno ) );
 		return -1;
 	}
 
@@ -58,7 +58,7 @@ int SlavePeerSocket::init() {
 	return this->sockfd;
 }
 
-bool SlavePeerSocket::start() {
+bool ServerPeerSocket::start() {
 	if ( this->connect() ) {
 		this->received = true;
 		this->epoll->add( this->sockfd, EPOLL_EVENT_SET );
@@ -68,27 +68,27 @@ bool SlavePeerSocket::start() {
 	return false;
 }
 
-void SlavePeerSocket::stop() {
+void ServerPeerSocket::stop() {
 	if ( ! this->self ) {
 		int newFd = -INT_MIN + this->sockfd;
-		SlavePeerSocket::slavePeers->replaceKey( this->sockfd, newFd );
+		ServerPeerSocket::slavePeers->replaceKey( this->sockfd, newFd );
 		this->sockfd = newFd;
 	}
 	Socket::stop();
 }
 
-bool SlavePeerSocket::ready() {
+bool ServerPeerSocket::ready() {
 	return this->self || ( this->connected && this->registered );
 }
 
-void SlavePeerSocket::free() {
+void ServerPeerSocket::free() {
 	if ( this->identifier ) {
 		::free( this->identifier );
 		this->identifier = 0;
 	}
 }
 
-bool SlavePeerSocket::setRecvFd( int fd, struct sockaddr_in *addr ) {
+bool ServerPeerSocket::setRecvFd( int fd, struct sockaddr_in *addr ) {
 	bool ret = false;
 	this->received = true;
 	this->recvAddr = *addr;
@@ -102,31 +102,31 @@ bool SlavePeerSocket::setRecvFd( int fd, struct sockaddr_in *addr ) {
 	return ret;
 }
 
-ssize_t SlavePeerSocket::send( char *buf, size_t ulen, bool &connected ) {
+ssize_t ServerPeerSocket::send( char *buf, size_t ulen, bool &connected ) {
 	if ( this->self ) {
-		__ERROR__( "SlavePeerSocket", "send", "send() should not be called for self-socket (opcode = 0x%x)!", buf[ 1 ] );
+		__ERROR__( "ServerPeerSocket", "send", "send() should not be called for self-socket (opcode = 0x%x)!", buf[ 1 ] );
 		return 0;
 	}
 	return Socket::send( this->sockfd, buf, ulen, connected );
 }
 
-ssize_t SlavePeerSocket::recv( char *buf, size_t ulen, bool &connected, bool wait ) {
+ssize_t ServerPeerSocket::recv( char *buf, size_t ulen, bool &connected, bool wait ) {
 	if ( this->self ) {
-		__ERROR__( "SlavePeerSocket", "recv", "recv() should not be called for self-socket!" );
+		__ERROR__( "ServerPeerSocket", "recv", "recv() should not be called for self-socket!" );
 		return 0;
 	}
 	return Socket::recv( this->sockfd, buf, ulen, connected, wait );
 }
 
-ssize_t SlavePeerSocket::recvRem( char *buf, size_t expected, char *prevBuf, size_t prevSize, bool &connected ) {
+ssize_t ServerPeerSocket::recvRem( char *buf, size_t expected, char *prevBuf, size_t prevSize, bool &connected ) {
 	return Socket::recvRem( this->sockfd, buf, expected, prevBuf, prevSize, connected );
 }
 
-bool SlavePeerSocket::done() {
+bool ServerPeerSocket::done() {
 	return Socket::done( this->sockfd );
 }
 
-void SlavePeerSocket::print( FILE *f ) {
+void ServerPeerSocket::print( FILE *f ) {
 	char buf[ 16 ];
 	Socket::ntoh_ip( this->addr.sin_addr.s_addr, buf, 16 );
 	fprintf( f, "[%4d] %s:%u ", this->sockfd, buf, Socket::ntoh_port( this->addr.sin_port ) );

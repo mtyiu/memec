@@ -1,24 +1,24 @@
 #include "server_event.hh"
 
-void SlaveEvent::reqRegister( SlaveSocket *socket, uint32_t addr, uint16_t port ) {
+void SlaveEvent::reqRegister( ServerSocket *socket, uint32_t addr, uint16_t port ) {
 	this->type = SLAVE_EVENT_TYPE_REGISTER_REQUEST;
 	this->socket = socket;
 	this->message.address.addr = addr;
 	this->message.address.port = port;
 }
 
-void SlaveEvent::send( SlaveSocket *socket, Packet *packet ) {
+void SlaveEvent::send( ServerSocket *socket, Packet *packet ) {
 	this->type = SLAVE_EVENT_TYPE_SEND;
 	this->socket = socket;
 	this->message.send.packet = packet;
 }
 
-void SlaveEvent::syncMetadata( SlaveSocket *socket ) {
+void SlaveEvent::syncMetadata( ServerSocket *socket ) {
 	this->type = SLAVE_EVENT_TYPE_SYNC_METADATA;
 	this->socket = socket;
 }
 
-void SlaveEvent::ackParityDelta( SlaveSocket *socket, std::vector<uint32_t> timestamps, uint16_t targetId, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter ) {
+void SlaveEvent::ackParityDelta( ServerSocket *socket, std::vector<uint32_t> timestamps, uint16_t targetId, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter ) {
 	this->type = SLAVE_EVENT_TYPE_ACK_PARITY_DELTA;
 	this->socket = socket;
 	this->message.ack.timestamps = ( timestamps.empty() )? 0 : new std::vector<uint32_t>( timestamps );
@@ -29,7 +29,7 @@ void SlaveEvent::ackParityDelta( SlaveSocket *socket, std::vector<uint32_t> time
 	this->message.ack.counter = counter;
 }
 
-void SlaveEvent::revertDelta( SlaveSocket *socket, std::vector<uint32_t> timestamps, std::vector<Key> requests, uint16_t targetId, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter ) {
+void SlaveEvent::revertDelta( ServerSocket *socket, std::vector<uint32_t> timestamps, std::vector<Key> requests, uint16_t targetId, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter ) {
 	this->type = SLAVE_EVENT_TYPE_REVERT_DELTA;
 	this->socket = socket;
 	this->message.ack.timestamps = ( timestamps.empty() )? 0 : new std::vector<uint32_t>( timestamps );
@@ -40,7 +40,7 @@ void SlaveEvent::revertDelta( SlaveSocket *socket, std::vector<uint32_t> timesta
 	this->message.ack.counter = counter;
 }
 
-void SlaveEvent::pending( SlaveSocket *socket ) {
+void SlaveEvent::pending( ServerSocket *socket ) {
 	this->type = SLAVE_EVENT_TYPE_PENDING;
 	this->socket = socket;
 }

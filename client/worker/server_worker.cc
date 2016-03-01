@@ -364,8 +364,8 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 		//kv.dup( key.data, key.size, valueStr, valueSize );
 		//MasterWorker::pending->insertKeyValue( PT_APPLICATION_SET, pid.instanceId, pid.requestId, 0, kv, true, true, pid.timestamp );
 		//key = kv.key();
-		//this->stripeList->get( key.data, key.size, this->dataSlaveSockets, 0, &chunkId );
-		//MasterWorker::pending->insertKey( PT_SLAVE_SET, dpid.instanceId, dpid.parentInstanceId, dpid.requestId, dpid.parentRequestId, this->dataSlaveSockets[ chunkId ], key );
+		//this->stripeList->get( key.data, key.size, this->dataServerSockets, 0, &chunkId );
+		//MasterWorker::pending->insertKey( PT_SLAVE_SET, dpid.instanceId, dpid.parentInstanceId, dpid.requestId, dpid.parentRequestId, this->dataServerSockets[ chunkId ], key );
 
 		// not to response if the request is "canceled" due to replay
 		if ( pid.ptr ) {
@@ -374,12 +374,12 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 		}
 
 		// Check if all normal requests completes
-		SlaveSocket *slave = 0;
+		ServerSocket *slave = 0;
 		struct sockaddr_in addr;
 		MasterRemapMsgHandler *remapMsgHandler = &Master::getInstance()->remapMsgHandler;
-		this->stripeList->get( keyStr, key.size, 0, this->paritySlaveSockets );
+		this->stripeList->get( keyStr, key.size, 0, this->parityServerSockets );
 		for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
-			slave = this->paritySlaveSockets[ i ];
+			slave = this->parityServerSockets[ i ];
 			addr = slave->getAddr();
 			if ( ! remapMsgHandler->useCoordinatedFlow( addr ) || remapMsgHandler->stateTransitInfo.at( addr ).isCompleted() )
 				continue;
@@ -550,12 +550,12 @@ bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, bool is
 
 	// Check if all normal requests completes
 	if ( ! isDegraded ) {
-		SlaveSocket *slave = 0;
+		ServerSocket *slave = 0;
 		struct sockaddr_in addr;
 		MasterRemapMsgHandler *remapMsgHandler = &Master::getInstance()->remapMsgHandler;
-		this->stripeList->get( header.key, header.keySize, 0, this->paritySlaveSockets );
+		this->stripeList->get( header.key, header.keySize, 0, this->parityServerSockets );
 		for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
-			slave = this->paritySlaveSockets[ i ];
+			slave = this->parityServerSockets[ i ];
 			addr = slave->getAddr();
 			if ( ! remapMsgHandler->useCoordinatedFlow( addr ) || remapMsgHandler->stateTransitInfo.at( addr ).isCompleted() )
 				continue;
@@ -648,12 +648,12 @@ bool MasterWorker::handleDeleteResponse( SlaveEvent event, bool success, bool is
 	}
 
 	// Check if all normal requests completes
-	SlaveSocket *slave = 0;
+	ServerSocket *slave = 0;
 	struct sockaddr_in addr;
 	MasterRemapMsgHandler *remapMsgHandler = &Master::getInstance()->remapMsgHandler;
-	this->stripeList->get( keyStr, key.size, 0, this->paritySlaveSockets );
+	this->stripeList->get( keyStr, key.size, 0, this->parityServerSockets );
 	for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
-		slave = this->paritySlaveSockets[ i ];
+		slave = this->parityServerSockets[ i ];
 		addr = slave->getAddr();
 		if ( ! remapMsgHandler->useCoordinatedFlow( addr ) || remapMsgHandler->stateTransitInfo.at( addr ).isCompleted() )
 			continue;

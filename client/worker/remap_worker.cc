@@ -18,9 +18,9 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 	uint32_t remappedCount;
 	bool connected, useCoordinatedFlow;
 	ssize_t sentBytes;
-	SlaveSocket *originalDataSlaveSocket;
+	ServerSocket *originalDataServerSocket;
 
-	if ( ! this->getSlaves( PROTO_OPCODE_SET, header.key, header.keySize, original, remapped, remappedCount, originalDataSlaveSocket, useCoordinatedFlow ) ) {
+	if ( ! this->getSlaves( PROTO_OPCODE_SET, header.key, header.keySize, original, remapped, remappedCount, originalDataServerSocket, useCoordinatedFlow ) ) {
 		Key key;
 		key.set( header.keySize, header.key );
 		event.resSet( event.socket, event.instanceId, event.requestId, key, false, false );
@@ -133,21 +133,21 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 		return false;
 	}
 
-	// Prepare the list of SlaveSockets for the SET request //
+	// Prepare the list of ServerSockets for the SET request //
 	uint32_t originalListId, originalChunkId;
-	SlaveSocket *dataSlaveSocket = this->getSlaves(
+	ServerSocket *dataServerSocket = this->getSlaves(
 		header.key, header.keySize,
 		originalListId, originalChunkId
 	);
 	for ( uint32_t i = 0; i < header.remappedCount; i++ ) {
-		SlaveSocket *s = this->getSlaves(
+		ServerSocket *s = this->getSlaves(
 			header.remapped[ i * 2     ],
 			header.remapped[ i * 2 + 1 ]
 		);
 		if ( header.original[ i * 2 + 1 ] < MasterWorker::dataChunkCount ) {
-			dataSlaveSocket = s;
+			dataServerSocket = s;
 		} else {
-			this->paritySlaveSockets[ header.original[ i * 2 + 1 ] - MasterWorker::dataChunkCount ] = s;
+			this->parityServerSockets[ header.original[ i * 2 + 1 ] - MasterWorker::dataChunkCount ] = s;
 		}
 	}
 
@@ -168,7 +168,7 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount + 1; i++ ) {
 		if ( ! MasterWorker::pending->insertKey(
 			PT_SLAVE_REMAPPING_SET, pid.instanceId, pid.parentInstanceId, pid.requestId, pid.parentRequestId,
-			( i == 0 ) ? dataSlaveSocket : this->paritySlaveSockets[ i - 1 ],
+			( i == 0 ) ? dataServerSocket : this->parityServerSockets[ i - 1 ],
 			key
 		) ) {
 			__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Cannot insert into slave SET pending map." );
@@ -195,20 +195,20 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 		packet->size = buffer.size;
 
 		// printf( "[%u, %u] Sending %.*s to ", pid.parentInstanceId, pid.parentRequestId, keySize, keyStr );
-		// this->paritySlaveSockets[ i ]->printAddress();
+		// this->parityServerSockets[ i ]->printAddress();
 		// printf( "\n" );
 
 		if ( MasterWorker::updateInterval ) {
 			// Mark the time when request is sent
 			MasterWorker::pending->recordRequestStartTime(
 				PT_SLAVE_REMAPPING_SET, pid.instanceId, pid.parentInstanceId, pid.requestId, pid.parentRequestId,
-				( void * ) this->paritySlaveSockets[ i ],
-				this->paritySlaveSockets[ i ]->getAddr()
+				( void * ) this->parityServerSockets[ i ],
+				this->parityServerSockets[ i ]->getAddr()
 			);
 		}
 
 		SlaveEvent slaveEvent;
-		slaveEvent.send( this->paritySlaveSockets[ i ], packet );
+		slaveEvent.send( this->parityServerSockets[ i ], packet );
 #ifdef CLIENT_WORKER_SEND_REPLICAS_PARALLEL
 		MasterWorker::eventQueue->prioritizedInsert( slaveEvent );
 #else
@@ -222,8 +222,8 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 	if ( MasterWorker::updateInterval ) {
 		MasterWorker::pending->recordRequestStartTime(
 			PT_SLAVE_REMAPPING_SET, pid.instanceId, pid.parentInstanceId, pid.requestId, pid.parentRequestId,
-			( void * ) dataSlaveSocket,
-			dataSlaveSocket->getAddr()
+			( void * ) dataServerSocket,
+			dataServerSocket->getAddr()
 		);
 	}
 	buffer.data = this->protocol.reqRemappingSet(
@@ -233,7 +233,7 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 		keyStr, keySize,
 		valueStr, valueSize
 	);
-	sentBytes = dataSlaveSocket->send( buffer.data, buffer.size, connected );
+	sentBytes = dataServerSocket->send( buffer.data, buffer.size, connected );
 	if ( sentBytes != ( ssize_t ) buffer.size ) {
 		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 	}

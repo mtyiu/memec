@@ -15,9 +15,9 @@
 struct PendingAnnouncement { // For slave reconstructed announcement
 	pthread_mutex_t *lock;
 	pthread_cond_t *cond;
-	std::unordered_set<SlaveSocket *> *sockets;
+	std::unordered_set<ServerSocket *> *sockets;
 
-	void set( pthread_mutex_t *lock, pthread_cond_t *cond, std::unordered_set<SlaveSocket *> *sockets ) {
+	void set( pthread_mutex_t *lock, pthread_cond_t *cond, std::unordered_set<ServerSocket *> *sockets ) {
 		this->lock = lock;
 		this->cond = cond;
 		this->sockets = sockets;
@@ -73,10 +73,10 @@ public:
 		uint32_t total;
 	} unsealed;
 	struct timespec startTime;
-	SlaveSocket *socket;
-	SlaveSocket *original;
+	ServerSocket *socket;
+	ServerSocket *original;
 
-	PendingRecovery( uint32_t addr, uint16_t port, uint32_t chunkCount, uint32_t unsealedCount, struct timespec startTime, SlaveSocket *socket, SlaveSocket *original ) {
+	PendingRecovery( uint32_t addr, uint16_t port, uint32_t chunkCount, uint32_t unsealedCount, struct timespec startTime, ServerSocket *socket, ServerSocket *original ) {
 		this->addr = addr;
 		this->port = port;
 		this->chunks.remaining = chunkCount;
@@ -250,7 +250,7 @@ public:
 		return ret;
 	}
 
-	bool insertAnnouncement( uint16_t instanceId, uint32_t requestId, pthread_mutex_t *lock, pthread_cond_t *cond, std::unordered_set<SlaveSocket *> *sockets ) {
+	bool insertAnnouncement( uint16_t instanceId, uint32_t requestId, pthread_mutex_t *lock, pthread_cond_t *cond, std::unordered_set<ServerSocket *> *sockets ) {
 		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
 		PendingAnnouncement a;
 		a.set( lock, cond, sockets );
@@ -265,7 +265,7 @@ public:
 		return ret.second;
 	}
 
-	bool eraseAnnouncement( uint16_t instanceId, uint32_t requestId, SlaveSocket *socket ) {
+	bool eraseAnnouncement( uint16_t instanceId, uint32_t requestId, ServerSocket *socket ) {
 		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
 		std::unordered_map<PendingIdentifier, PendingAnnouncement>::iterator it;
 
@@ -288,7 +288,7 @@ public:
 		return true;
 	}
 
-	void eraseAnnouncement( SlaveSocket *socket ) {
+	void eraseAnnouncement( ServerSocket *socket ) {
 		std::unordered_map<PendingIdentifier, PendingAnnouncement>::iterator it;
 
 		LOCK( &this->announcementLock );
@@ -308,7 +308,7 @@ public:
 		UNLOCK( &this->announcementLock );
 	}
 
-	bool insertRecovery( uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t chunkCount, uint32_t unsealedCount, struct timespec startTime, SlaveSocket *socket, SlaveSocket *original ) {
+	bool insertRecovery( uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t chunkCount, uint32_t unsealedCount, struct timespec startTime, ServerSocket *socket, ServerSocket *original ) {
 		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
 		PendingRecovery r( addr, port, chunkCount, unsealedCount, startTime, socket, original );
 
@@ -322,7 +322,7 @@ public:
 		return ret.second;
 	}
 
-	bool eraseRecovery( uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t numReconstructedChunks, uint32_t numReconstructedKeys, SlaveSocket *socket, uint32_t &remainingChunks, uint32_t &totalChunks, uint32_t &remainingKeys, uint32_t &totalKeys, double &elapsedTime, SlaveSocket *&original ) {
+	bool eraseRecovery( uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t numReconstructedChunks, uint32_t numReconstructedKeys, ServerSocket *socket, uint32_t &remainingChunks, uint32_t &totalChunks, uint32_t &remainingKeys, uint32_t &totalKeys, double &elapsedTime, ServerSocket *&original ) {
 		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
 		std::unordered_map<PendingIdentifier, PendingRecovery>::iterator it;
 		bool ret;

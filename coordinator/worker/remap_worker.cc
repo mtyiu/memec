@@ -20,16 +20,16 @@ bool CoordinatorWorker::handleRemappingSetLockRequest( MasterEvent event, char *
 	uint32_t originalListId, originalChunkId;
 
 	// Get original list and chunk ID //
-	SlaveSocket *dataSlaveSocket;
-	originalListId = CoordinatorWorker::stripeList->get( header.key, header.keySize, &dataSlaveSocket, 0, &originalChunkId );
-	Map *map = &( dataSlaveSocket->map );
+	ServerSocket *dataServerSocket;
+	originalListId = CoordinatorWorker::stripeList->get( header.key, header.keySize, &dataServerSocket, 0, &originalChunkId );
+	Map *map = &( dataServerSocket->map );
 
 	// Check whether the "failed" servers are in intermediate or degraded state
 	CoordinatorRemapMsgHandler *crmh = CoordinatorRemapMsgHandler::getInstance();
 
 	// bool isPrinted = false;
 	for ( uint32_t i = 0; i < header.remappedCount; ) {
-		SlaveSocket *s = CoordinatorWorker::stripeList->get(
+		ServerSocket *s = CoordinatorWorker::stripeList->get(
 			header.original[ i * 2    ],
 			header.original[ i * 2 + 1 ]
 		);
@@ -96,7 +96,7 @@ bool CoordinatorWorker::handleRemappingSetLockRequest( MasterEvent event, char *
 		else
 			remappingRecord.set( 0, 0, 0 );
 
-		if ( header.remappedCount == 0 /* no need to insert */ || CoordinatorWorker::remappingRecords->insert( key, remappingRecord, dataSlaveSocket->getAddr() ) ) {
+		if ( header.remappedCount == 0 /* no need to insert */ || CoordinatorWorker::remappingRecords->insert( key, remappingRecord, dataServerSocket->getAddr() ) ) {
 			event.resRemappingSetLock(
 				event.socket, event.instanceId, event.requestId, true, // success
 				header.original, header.remapped, header.remappedCount, key

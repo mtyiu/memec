@@ -13,9 +13,9 @@ enum SlaveEventType {
 class SlaveEvent : public Event {
 public:
 	SlaveEventType type;
-	SlaveSocket *socket;
+	ServerSocket *socket;
 
-	void pending( SlaveSocket *socket );
+	void pending( ServerSocket *socket );
 };
 
 #endif

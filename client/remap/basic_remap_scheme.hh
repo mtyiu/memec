@@ -12,14 +12,14 @@ public:
 	static void redirect(
 		uint32_t *original, uint32_t *remapped, uint32_t numEntries, uint32_t &remappedCount,
 		uint32_t dataChunkCount, uint32_t parityChunkCount,
-		SlaveSocket **dataSlaveSockets, SlaveSocket **paritySlaveSockets,
+		ServerSocket **dataServerSockets, ServerSocket **parityServerSockets,
 		bool isGet
 	);
-	static bool isOverloaded( SlaveSocket *socket );
+	static bool isOverloaded( ServerSocket *socket );
 
 	static SlaveLoading *slaveLoading;
 	static OverloadedSlave *overloadedSlave;
-	static StripeList<SlaveSocket> *stripeList;
+	static StripeList<ServerSocket> *stripeList;
 	static MasterRemapMsgHandler *remapMsgHandler;
 	static Latency increment;
 };

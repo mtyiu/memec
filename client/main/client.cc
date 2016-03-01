@@ -190,7 +190,7 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 	Socket::init( &this->sockets.epoll );
 	ApplicationSocket::setArrayMap( &this->sockets.applications );
 	CoordinatorSocket::setArrayMap( &this->sockets.coordinators );
-	SlaveSocket::setArrayMap( &this->sockets.slaves );
+	ServerSocket::setArrayMap( &this->sockets.slaves );
 	// this->sockets.applications.reserve( 20000 );
 	this->sockets.coordinators.reserve( this->config.global.coordinators.size() );
 	for ( int i = 0, len = this->config.global.coordinators.size(); i < len; i++ ) {
@@ -203,7 +203,7 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 	}
 	this->sockets.slaves.reserve( this->config.global.slaves.size() );
 	for ( int i = 0, len = this->config.global.slaves.size(); i < len; i++ ) {
-		SlaveSocket *socket = new SlaveSocket();
+		ServerSocket *socket = new ServerSocket();
 		int fd;
 
 		socket->init( this->config.global.slaves[ i ], &this->sockets.epoll );
@@ -211,7 +211,7 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 		this->sockets.slaves.set( fd, socket );
 	}
 	/* Stripe list */
-	this->stripeList = new StripeList<SlaveSocket>(
+	this->stripeList = new StripeList<ServerSocket>(
 		this->config.global.coding.params.getChunkCount(),
 		this->config.global.coding.params.getDataChunkCount(),
 		this->config.global.stripeList.count,
@@ -650,7 +650,7 @@ bool Master::setDebugFlag( char *input ) {
 	return ret;
 }
 
-bool Master::isDegraded( SlaveSocket *socket ) {
+bool Master::isDegraded( ServerSocket *socket ) {
 	return (
 		( this->debugFlags.isDegraded )
 		||
@@ -936,9 +936,9 @@ void Master::printRemapping( FILE *f ) {
 }
 
 void Master::printBackup( FILE *f ) {
-	SlaveSocket *s;
+	ServerSocket *s;
 	LOCK( &this->sockets.slaves.lock );
-	std::vector<SlaveSocket *> &sockets = this->sockets.slaves.values;
+	std::vector<ServerSocket *> &sockets = this->sockets.slaves.values;
 	for ( size_t i = 0, size = sockets.size(); i < size; i++ ) {
 		s = sockets[ i ];
 		s->printAddress();
@@ -979,7 +979,7 @@ void Master::syncMetadata() {
 	}
 
 	for ( uint32_t socketId = socketFromId; socketId < socketToId; socketId++ ) {
-		SlaveSocket *socket = this->sockets.slaves.values[ socketId ];
+		ServerSocket *socket = this->sockets.slaves.values[ socketId ];
 		if ( ! socket ) {
 			fprintf( stderr, "Unknown socket ID!\n" );
 			return;
@@ -1024,7 +1024,7 @@ void Master::time() {
 	std::vector<SlaveEvent> events; \
 	for ( int j = 0, len = this->sockets.slaves.size(); j < len; j++ ) { \
 		SlaveEvent event; \
-		SlaveSocket *p = this->sockets.slaves[ j ]; \
+		ServerSocket *p = this->sockets.slaves[ j ]; \
 		struct sockaddr_in saddr = p->getAddr(); \
 		/* skip myself, and any node declared to be failed */ \
 		if ( p == _S_ || this->remapMsgHandler.useCoordinatedFlow( saddr ) ) continue; \
@@ -1044,13 +1044,13 @@ void Master::time() {
 	} \
 }
 
-void Master::ackParityDelta( FILE *f, SlaveSocket *target, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter, bool force ) {
+void Master::ackParityDelta( FILE *f, ServerSocket *target, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter, bool force ) {
 	uint32_t from, to, update, del;
 	std::vector<uint32_t> timestamps;
 	std::vector<Key> requests;
 
 	for( int i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
-		SlaveSocket *s = this->sockets.slaves[ i ];
+		ServerSocket *s = this->sockets.slaves[ i ];
 
 		if ( target && target != s )
 			continue;
@@ -1094,7 +1094,7 @@ void Master::ackParityDelta( FILE *f, SlaveSocket *target, pthread_cond_t *condi
 	}
 }
 
-bool Master::revertDelta( FILE *f, SlaveSocket *target, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter, bool force ) {
+bool Master::revertDelta( FILE *f, ServerSocket *target, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter, bool force ) {
 	std::vector<uint32_t> timestamps;
 	std::vector<Key> requests;
 	std::set<uint32_t> timestampSet;
@@ -1127,7 +1127,7 @@ bool Master::revertDelta( FILE *f, SlaveSocket *target, pthread_cond_t *conditio
 	// SET
 	std::unordered_multimap<PendingIdentifier, Key>::iterator it, saveIt;
 	uint32_t listIndex, chunkIndex;
-	SlaveSocket *dataSlave = 0;
+	ServerSocket *dataSlave = 0;
 	LOCK ( &this->pending.slaves.setLock );
 	for( it = this->pending.slaves.set.begin(), saveIt = it; it != this->pending.slaves.set.end(); it = saveIt ) {
 		saveIt++;

@@ -41,7 +41,7 @@ public:
 	MasterEventType type;
 	uint16_t instanceId;
 	uint32_t requestId;
-	MasterSocket *socket;
+	ClientSocket *socket;
 	union {
 		struct {
 			ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency;
@@ -76,15 +76,15 @@ public:
 			Key key;
 		} degradedLock;
 		struct {
-			SlaveSocket *src;
-			SlaveSocket *dst;
+			ServerSocket *src;
+			ServerSocket *dst;
 		} reconstructed;
 	} message;
 
-	void resRegister( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, bool success = true );
+	void resRegister( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, bool success = true );
 
 	void reqPushLoadStats (
-		MasterSocket *socket,
+		ClientSocket *socket,
 		ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
 		ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency,
 		std::set<struct sockaddr_in> *slaveSet
@@ -92,30 +92,30 @@ public:
 	void switchPhase( bool toRemap, std::set<struct sockaddr_in> slaves, bool isCrashed = false, bool forced = false );
 	// Degraded lock
 	void resDegradedLock(
-		MasterSocket *socket, uint16_t instanceId, uint32_t requestId,
+		ClientSocket *socket, uint16_t instanceId, uint32_t requestId,
 		Key &key, bool isLocked, bool isSealed,
 		uint32_t stripeId, uint32_t dataChunkId, uint32_t dataChunkCount,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 		uint32_t ongoingAtChunk, uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds
 	);
 	void resDegradedLock(
-		MasterSocket *socket, uint16_t instanceId, uint32_t requestId,
+		ClientSocket *socket, uint16_t instanceId, uint32_t requestId,
 		Key &key, bool exist
 	);
 	void resDegradedLock(
-		MasterSocket *socket, uint16_t instanceId, uint32_t requestId,
+		ClientSocket *socket, uint16_t instanceId, uint32_t requestId,
 		Key &key,
 		uint32_t *original, uint32_t *remapped, uint32_t remappedCount
 	);
 	// REMAPPING_SET_LOCK
 	void resRemappingSetLock(
-		MasterSocket *socket, uint16_t instanceId, uint32_t requestId, bool success,
+		ClientSocket *socket, uint16_t instanceId, uint32_t requestId, bool success,
 		uint32_t *original, uint32_t *remapped, uint32_t remappedCount, Key &key
 	);
 	// Recovery
-	void announceSlaveReconstructed( SlaveSocket *srcSocket, SlaveSocket *dstSocket );
+	void announceSlaveReconstructed( ServerSocket *srcSocket, ServerSocket *dstSocket );
 	// Pending
-	void pending( MasterSocket *socket );
+	void pending( ClientSocket *socket );
 };
 
 #endif

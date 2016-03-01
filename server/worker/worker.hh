@@ -47,8 +47,8 @@ private:
 		Chunk **chunks;
 	} forward; // For forwarding parity chunk
 	Chunk *freeChunks;
-	SlavePeerSocket **dataSlaveSockets;
-	SlavePeerSocket **paritySlaveSockets;
+	ServerPeerSocket **dataServerSockets;
+	ServerPeerSocket **parityServerSockets;
 	bool **sealIndicators;
 
 	static uint32_t dataChunkCount;
@@ -56,13 +56,13 @@ private:
 	static uint32_t chunkCount;
 	static bool disableSeal;
 	static IDGenerator *idGenerator;
-	static ArrayMap<int, SlavePeerSocket> *slavePeers;
+	static ArrayMap<int, ServerPeerSocket> *slavePeers;
 	static Pending *pending;
 	static PendingAck *pendingAck;
 	static ServerAddr *slaveServerAddr;
 	static Coding *coding;
 	static SlaveEventQueue *eventQueue;
-	static StripeList<SlavePeerSocket> *stripeList;
+	static StripeList<ServerPeerSocket> *stripeList;
 	static std::vector<StripeListIndex> *stripeListIndex;
 	static Map *map;
 	static MemoryPool<Chunk> *chunkPool;
@@ -78,7 +78,7 @@ private:
 	void dispatch( CodingEvent event );
 	void dispatch( IOEvent event );
 	void dispatch( SlaveEvent event );
-	SlavePeerSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId );
+	ServerPeerSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId );
 	bool getSlaves( uint32_t listId );
 	void free();
 	static void *run( void *argv );
@@ -120,7 +120,7 @@ private:
 	void dispatch( SlavePeerEvent event );
 
 	// ---------- slave_peer_req_worker.cc ----------
-	bool handleSlavePeerRegisterRequest( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, char *buf, size_t size );
+	bool handleSlavePeerRegisterRequest( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, char *buf, size_t size );
 	bool handleForwardKeyRequest( SlavePeerEvent event, char *buf, size_t size );
 	bool handleForwardKeyRequest( SlavePeerEvent event, struct ForwardKeyHeader &header, bool self );
 	bool handleSetRequest( SlavePeerEvent event, char *buf, size_t size );
@@ -177,7 +177,7 @@ private:
 	bool handleForwardChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size );
 	bool performDegradedRead(
 		uint8_t opcode,
-		MasterSocket *masterSocket,
+		ClientSocket *clientSocket,
 		uint16_t parentInstanceId, uint32_t parentRequestId,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId, // chunkId refers to the current chunk ID
 		Key *key, bool isSealed,
@@ -196,7 +196,7 @@ private:
 		char *delta,        // valueUpdate
 		bool isSealed, bool isUpdate,
 		uint32_t timestamp = 0,
-		MasterSocket *masterSocket = 0,
+		ClientSocket *clientSocket = 0,
 		uint32_t *original = 0, uint32_t *reconstructed = 0, uint32_t reconstructedCount = 0,
 		bool reconstructParity = false,
 		Chunk **chunks = 0, bool endOfDegradedOp = false,

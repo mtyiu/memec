@@ -24,8 +24,8 @@ private:
 	MasterProtocol protocol;
 	// Temporary variables
 	uint32_t *original, *remapped;
-	SlaveSocket **dataSlaveSockets;
-	SlaveSocket **paritySlaveSockets;
+	ServerSocket **dataServerSockets;
+	ServerSocket **parityServerSockets;
 	static uint32_t dataChunkCount;
 	static uint32_t parityChunkCount;
 	static uint32_t updateInterval;
@@ -34,8 +34,8 @@ private:
 	static IDGenerator *idGenerator;
 	static Pending *pending;
 	static MasterEventQueue *eventQueue;
-	static StripeList<SlaveSocket> *stripeList;
-	static ArrayMap<int, SlaveSocket> *slaveSockets;
+	static StripeList<ServerSocket> *stripeList;
+	static ArrayMap<int, ServerSocket> *serverSockets;
 	static PacketPool *packetPool;
 	static MasterRemapMsgHandler *remapMsgHandler;
 
@@ -43,23 +43,23 @@ private:
 	void dispatch( MixedEvent event );
 	void dispatch( MasterEvent event );
 	// For normal operations
-	SlaveSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId );
+	ServerSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId );
 	// For both remapping and degraded operations
 	bool getSlaves(
 		uint8_t opcode, char *data, uint8_t size,
 		uint32_t *&original, uint32_t *&remapped, uint32_t &remappedCount,
-		SlaveSocket *&originalDataSlaveSocket, bool &useCoordinatedFlow
+		ServerSocket *&originalDataServerSocket, bool &useCoordinatedFlow
 	);
-	SlaveSocket *getSlaves( uint32_t listId, uint32_t chunkId );
+	ServerSocket *getSlaves( uint32_t listId, uint32_t chunkId );
 
 	// For degraded GET
-	// SlaveSocket *getSlaves(
+	// ServerSocket *getSlaves(
 	// 	char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, uint32_t &newChunkId,
-	// 	bool &useDegradedMode, SlaveSocket *&original
+	// 	bool &useDegradedMode, ServerSocket *&original
 	// );
 	// For degraded UPDATE / DELETE (which may involve failed parity slaves)
 	// Return the data server for handling the request
-	// SlaveSocket *getSlaves(
+	// ServerSocket *getSlaves(
 	// 	char *data, uint8_t size, uint32_t &listId,
 	// 	uint32_t &dataChunkId, uint32_t &newDataChunkId,
 	// 	uint32_t &parityChunkId, uint32_t &newParityChunkId,
@@ -113,10 +113,10 @@ public:
 	void print( FILE *f = stdout );
 	inline WorkerRole getRole() { return this->role; }
 
-	static void removePending( SlaveSocket *slave, bool needsAck = true );
-	static void replayRequestPrepare( SlaveSocket *slave );
-	static void replayRequest( SlaveSocket *slave );
-	static void gatherPendingNormalRequests( SlaveSocket *target, bool needsAck = false );
+	static void removePending( ServerSocket *slave, bool needsAck = true );
+	static void replayRequestPrepare( ServerSocket *slave );
+	static void replayRequest( ServerSocket *slave );
+	static void gatherPendingNormalRequests( ServerSocket *target, bool needsAck = false );
 };
 
 #endif

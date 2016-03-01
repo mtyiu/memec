@@ -348,10 +348,10 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, struct KeyValueHeader &he
 	bool isSealed;
 	Metadata sealed;
 	uint32_t timestamp, listId, stripeId, chunkId;
-	SlavePeerSocket *dataSlaveSocket;
+	ServerPeerSocket *dataServerSocket;
 	bool exist = false;
 
-	listId = SlaveWorker::stripeList->get( header.key, header.keySize, &dataSlaveSocket, 0, &chunkId );
+	listId = SlaveWorker::stripeList->get( header.key, header.keySize, &dataServerSocket, 0, &chunkId );
 
 	if (
 		( map->findValueByKey( header.key, header.keySize, 0, 0 ) ) ||
@@ -396,7 +396,7 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, struct KeyValueHeader &he
 			event.socket, event.instanceId, event.requestId,
 			key, false
 		);
-	} else if ( ! dataSlaveSocket->self ) {
+	} else if ( ! dataServerSocket->self ) {
 		event.resSet(
 			event.socket, event.instanceId, event.requestId,
 			key, true
@@ -535,7 +535,7 @@ bool SlaveWorker::handleUpdateRequest(
 				chunkBufferIndex == -1,    // isSealed
 				true,                      // isUpdate
 				event.timestamp,
-				event.socket,              // masterSocket
+				event.socket,              // clientSocket
 				original, reconstructed, reconstructedCount,
 				reconstructParity,
 				chunks, endOfDegradedOp,
@@ -574,7 +574,7 @@ bool SlaveWorker::handleUpdateRequest(
 				uint32_t srcChunkId = remappedKeyValue.original[ i * 2 + 1 ];
 
 				if ( srcChunkId >= SlaveWorker::dataChunkCount ) {
-					this->paritySlaveSockets[ srcChunkId - SlaveWorker::dataChunkCount ] = SlaveWorker::stripeList->get(
+					this->parityServerSockets[ srcChunkId - SlaveWorker::dataChunkCount ] = SlaveWorker::stripeList->get(
 						remappedKeyValue.remapped[ i * 2     ],
 						remappedKeyValue.remapped[ i * 2 + 1 ]
 					);
@@ -605,7 +605,7 @@ bool SlaveWorker::handleUpdateRequest(
 			for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
 				if ( ! SlaveWorker::pending->insertKeyValueUpdate(
 					PT_SLAVE_PEER_UPDATE, instanceId, event.instanceId, requestId, event.requestId,
-					( void * ) this->paritySlaveSockets[ i ],
+					( void * ) this->parityServerSockets[ i ],
 					keyValueUpdate
 				) ) {
 					__ERROR__( "SlaveWorker", "handleUpdateRequest", "Cannot insert into slave UPDATE pending map." );
@@ -616,7 +616,7 @@ bool SlaveWorker::handleUpdateRequest(
 			for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
 				// Insert into event queue
 				SlavePeerEvent slavePeerEvent;
-				slavePeerEvent.send( this->paritySlaveSockets[ i ], packet );
+				slavePeerEvent.send( this->parityServerSockets[ i ], packet );
 
 #ifdef SERVER_WORKER_SEND_REPLICAS_PARALLEL
 				if ( i == SlaveWorker::parityChunkCount - 1 )
@@ -746,7 +746,7 @@ bool SlaveWorker::handleDeleteRequest(
 				chunkBufferIndex == -1, // isSealed
 				false,                  // isUpdate
 				event.timestamp,        // timestamp
-				event.socket,           // masterSocket
+				event.socket,           // clientSocket
 				original, reconstructed, reconstructedCount,
 				reconstructParity,
 				chunks, endOfDegradedOp
@@ -921,7 +921,7 @@ bool SlaveWorker::handleRevertDelta( MasterEvent event, char *buf, size_t size )
 	std::unordered_multimap<PendingIdentifier, _MAP_VALUE_TYPE_> *map = &SlaveWorker::pending->slavePeers._OP_TYPE_; \
 	for ( it = map->begin(), saveIt = it; it != map->end(); it = saveIt ) { \
 		saveIt++; \
-		if ( ( ( SlavePeerSocket * ) ( it->first.ptr ) )->instanceId != header.targetId ) \
+		if ( ( ( ServerPeerSocket * ) ( it->first.ptr ) )->instanceId != header.targetId ) \
 			continue; \
 		if ( SlaveWorker::pending->count( _PT_TYPE_, it->first.instanceId, it->first.requestId, false, false ) == 1 ) { \
 			/* response immediately */ \
@@ -935,7 +935,7 @@ bool SlaveWorker::handleRevertDelta( MasterEvent event, char *buf, size_t size )
 					continue; \
 				} \
 				masterEvent.resUpdate( \
-					( MasterSocket * ) pid.ptr, pid.instanceId, pid.requestId, \
+					( ClientSocket * ) pid.ptr, pid.instanceId, pid.requestId, \
 					keyValueUpdate, \
 					keyValueUpdate.offset, \
 					keyValueUpdate.length, \
@@ -949,7 +949,7 @@ bool SlaveWorker::handleRevertDelta( MasterEvent event, char *buf, size_t size )
 					continue; \
 				} \
 				masterEvent.resDelete( \
-					( MasterSocket * ) pid.ptr, \
+					( ClientSocket * ) pid.ptr, \
 					pid.instanceId, pid.requestId, \
 					key, \
 					true, /* needsFree */ \
@@ -973,7 +973,7 @@ bool SlaveWorker::handleRevertDelta( MasterEvent event, char *buf, size_t size )
 	uint32_t chunkId, listId;
 
 	for( Key &k : requests ) {
-		listId = SlaveWorker::stripeList->get( k.data, k.size, this->dataSlaveSockets, 0, &chunkId );
+		listId = SlaveWorker::stripeList->get( k.data, k.size, this->dataServerSockets, 0, &chunkId );
 		// check if this slave handles chunks for the stripe list
 		if ( SlaveWorker::chunkBuffer->size() < listId + 1 || SlaveWorker::chunkBuffer->at( listId ) == 0 )
 			continue;

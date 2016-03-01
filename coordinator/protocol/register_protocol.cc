@@ -23,7 +23,7 @@ char *CoordinatorProtocol::resRegisterSlave( size_t &size, uint16_t instanceId, 
 	return this->buffer.send;
 }
 
-char *CoordinatorProtocol::announceSlaveConnected( size_t &size, uint16_t instanceId, uint32_t requestId, SlaveSocket *socket ) {
+char *CoordinatorProtocol::announceSlaveConnected( size_t &size, uint16_t instanceId, uint32_t requestId, ServerSocket *socket ) {
 	// -- common/protocol/address_protocol.cc --
 	ServerAddr addr = socket->getServerAddr();
 	size = this->generateAddressHeader(

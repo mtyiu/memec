@@ -93,7 +93,7 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 			// Check if there are any held slave peer registration requests
 			struct {
 				uint32_t requestId;
-				SlavePeerSocket *socket;
+				ServerPeerSocket *socket;
 				bool success;
 			} registration;
 			while ( SlaveWorker::pending->eraseSlavePeerRegistration( registration.requestId, registration.socket, registration.success ) ) {
@@ -285,7 +285,7 @@ bool SlaveWorker::handleHeartbeatAck( CoordinatorEvent event, char *buf, size_t 
 
 		Slave *slave = Slave::getInstance();
 		LOCK_T *lock = &slave->sockets.masters.lock;
-		std::vector<MasterSocket *> &sockets = slave->sockets.masters.values;
+		std::vector<ClientSocket *> &sockets = slave->sockets.masters.values;
 
 		LOCK( lock );
 		for ( size_t i = 0, size = sockets.size(); i < size; i++ ) {

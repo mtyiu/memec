@@ -86,7 +86,7 @@ public:
 	SlavePeerEventType type;
 	uint16_t instanceId;
 	uint32_t requestId;
-	SlavePeerSocket *socket;
+	ServerPeerSocket *socket;
 	uint32_t timestamp;
 	struct {
 		struct {
@@ -162,16 +162,16 @@ public:
 	} message;
 
 	// Register
-	void reqRegister( SlavePeerSocket *socket );
-	void resRegister( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, bool success = true );
+	void reqRegister( ServerPeerSocket *socket );
+	void resRegister( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, bool success = true );
 	// REMAPPING_SET
-	void resRemappingSet( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, uint32_t listId, uint32_t chunkId, bool success );
+	void resRemappingSet( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, uint32_t listId, uint32_t chunkId, bool success );
 	// SET
-	void reqSet( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key key, Value value );
-	void resSet( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key key, bool success );
+	void reqSet( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key key, Value value );
+	void resSet( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key key, bool success );
 	// Degraded SET
 	void reqForwardKey(
-		SlavePeerSocket *socket,
+		ServerPeerSocket *socket,
 		uint8_t opcode,
 		uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
@@ -180,7 +180,7 @@ public:
 		uint32_t valueUpdateOffset = 0, uint32_t valueUpdateSize = 0, char *valueUpdate = 0
 	);
 	void resForwardKey(
-		SlavePeerSocket *socket, bool success,
+		ServerPeerSocket *socket, bool success,
 		uint8_t opcode,
 		uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
@@ -189,45 +189,45 @@ public:
 		uint32_t valueUpdateOffset = 0, uint32_t valueUpdateSize = 0
 	);
 	// GET
-	void reqGet( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, Key &key );
-	void resGet( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, KeyValue &keyValue );
-	void resGet( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key );
+	void reqGet( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, Key &key );
+	void resGet( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, KeyValue &keyValue );
+	void resGet( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key );
 	// UPDATE
-	void resUpdate( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key, uint32_t valueUpdateOffset, uint32_t length, uint32_t chunkUpdateOffset, bool success );
+	void resUpdate( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key, uint32_t valueUpdateOffset, uint32_t length, uint32_t chunkUpdateOffset, bool success );
 	// DELETE
-	void resDelete( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key, bool success );
+	void resDelete( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key, bool success );
 	// REMAPPED_UPDATE
-	void resRemappedUpdate( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool success );
+	void resRemappedUpdate( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool success );
 	// REMAPPED_DELETE
-	void resRemappedDelete( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool success );
+	void resRemappedDelete( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool success );
 	// UPDATE_CHUNK
-	void resUpdateChunk( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, bool success );
+	void resUpdateChunk( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, bool success );
 	// DELETE_CHUNK
-	void resDeleteChunk( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, bool success );
+	void resDeleteChunk( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, bool success );
 	// GET_CHUNK
-	void reqGetChunk( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata );
-	void resGetChunk( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, bool success, uint32_t chunkBufferIndex, Chunk *chunk, uint8_t sealIndicatorCount, bool *sealIndicator );
+	void reqGetChunk( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata );
+	void resGetChunk( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, bool success, uint32_t chunkBufferIndex, Chunk *chunk, uint8_t sealIndicatorCount, bool *sealIndicator );
 	// Batch GET_CHUNK
-	void batchGetChunks( SlavePeerSocket *socket, std::vector<uint32_t> *requestIds, std::vector<Metadata> *metadata );
+	void batchGetChunks( ServerPeerSocket *socket, std::vector<uint32_t> *requestIds, std::vector<Metadata> *metadata );
 	// SET_CHUNK
-	void reqSetChunk( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, Chunk *chunk, bool needsFree );
-	void resSetChunk( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, bool success );
+	void reqSetChunk( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, Chunk *chunk, bool needsFree );
+	void resSetChunk( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, bool success );
 	// FORWARD_CHUNK
-	void reqForwardChunk( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, Chunk *chunk, bool needsFree );
-	void resForwardChunk( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, bool success );
+	void reqForwardChunk( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, Chunk *chunk, bool needsFree );
+	void resForwardChunk( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, bool success );
 	// SEAL_CHUNK
 	void reqSealChunk( Chunk *chunk );
-	void resSealChunk( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, bool success );
+	void resSealChunk( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, bool success );
 	// Seal chunk buffer
 	void reqSealChunks( MixedChunkBuffer *chunkBuffer );
 	// Reconstructed unsealed keys
-	void resUnsealedKeys( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, struct BatchKeyValueHeader &header, bool success );
+	void resUnsealedKeys( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, struct BatchKeyValueHeader &header, bool success );
 	// Defer
-	void defer( SlavePeerSocket *socket, uint16_t instanceId, uint32_t requestId, uint8_t opcode, char *buf, size_t size );
+	void defer( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, uint8_t opcode, char *buf, size_t size );
 	// Send
-	void send( SlavePeerSocket *socket, Packet *packet );
+	void send( ServerPeerSocket *socket, Packet *packet );
 	// Pending
-	void pending( SlavePeerSocket *socket );
+	void pending( ServerPeerSocket *socket );
 };
 
 #endif

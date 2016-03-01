@@ -5,7 +5,7 @@
 
 #define SOCKET_COLOR YELLOW
 
-SlaveSocket::SlaveSocket() {
+ServerSocket::ServerSocket() {
 	this->isRunning = false;
 	this->tid = 0;
 	this->epoll = 0;
@@ -14,7 +14,7 @@ SlaveSocket::SlaveSocket() {
 	this->sockets.needsDelete = true;
 }
 
-bool SlaveSocket::init( int type, uint32_t addr, uint16_t port, char *name, EPoll *epoll ) {
+bool ServerSocket::init( int type, uint32_t addr, uint16_t port, char *name, EPoll *epoll ) {
 	this->epoll = epoll;
 	this->identifier = strdup( name );
 	return (
@@ -24,16 +24,16 @@ bool SlaveSocket::init( int type, uint32_t addr, uint16_t port, char *name, EPol
 	);
 }
 
-bool SlaveSocket::start() {
-	if ( pthread_create( &this->tid, NULL, SlaveSocket::run, ( void * ) this ) != 0 ) {
-		__ERROR__( "SlaveSocket", "start", "Cannot start SlaveSocket thread." );
+bool ServerSocket::start() {
+	if ( pthread_create( &this->tid, NULL, ServerSocket::run, ( void * ) this ) != 0 ) {
+		__ERROR__( "ServerSocket", "start", "Cannot start ServerSocket thread." );
 		return false;
 	}
 	this->isRunning = true;
 	return true;
 }
 
-void SlaveSocket::stop() {
+void ServerSocket::stop() {
 	if ( this->isRunning ) {
 		this->epoll->stop( this->tid );
 		this->isRunning = false;
@@ -45,25 +45,25 @@ void SlaveSocket::stop() {
 	}
 }
 
-void SlaveSocket::print( FILE *f ) {
+void ServerSocket::print( FILE *f ) {
 	char buf[ 16 ];
 	Socket::ntoh_ip( this->addr.sin_addr.s_addr, buf, 16 );
 	fprintf( f, "[%4d] %s:%u (%slistening)\n", this->sockfd, buf, Socket::ntoh_port( this->addr.sin_port ), this->isRunning ? "" : "not " );
 }
 
-void SlaveSocket::printThread( FILE *f ) {
-	fprintf( f, "SlaveSocket thread for epoll (#%lu): %srunning\n", this->tid, this->isRunning ? "" : "not " );
+void ServerSocket::printThread( FILE *f ) {
+	fprintf( f, "ServerSocket thread for epoll (#%lu): %srunning\n", this->tid, this->isRunning ? "" : "not " );
 }
 
-void *SlaveSocket::run( void *argv ) {
-	SlaveSocket *socket = ( SlaveSocket * ) argv;
-	socket->epoll->start( SlaveSocket::handler, socket );
+void *ServerSocket::run( void *argv ) {
+	ServerSocket *socket = ( ServerSocket * ) argv;
+	socket->epoll->start( ServerSocket::handler, socket );
 	pthread_exit( 0 );
 	return 0;
 }
 
-bool SlaveSocket::handler( int fd, uint32_t events, void *data ) {
-	SlaveSocket *socket = ( SlaveSocket * ) data;
+bool ServerSocket::handler( int fd, uint32_t events, void *data ) {
+	ServerSocket *socket = ( ServerSocket * ) data;
 	static Slave *slave = Slave::getInstance();
 
 	///////////////////////////////////////////////////////////////////////////
@@ -74,17 +74,17 @@ bool SlaveSocket::handler( int fd, uint32_t events, void *data ) {
 			::close( fd );
 			socket->sockets.removeAt( index );
 		} else {
-			MasterSocket *masterSocket = slave->sockets.masters.get( fd );
-			CoordinatorSocket *coordinatorSocket = masterSocket ? 0 : slave->sockets.coordinators.get( fd );
-			SlavePeerSocket *slavePeerSocket = ( masterSocket || coordinatorSocket ) ? 0 : slave->sockets.slavePeers.get( fd );
-			if ( masterSocket ) {
-				masterSocket->stop();
+			ClientSocket *clientSocket = slave->sockets.masters.get( fd );
+			CoordinatorSocket *coordinatorSocket = clientSocket ? 0 : slave->sockets.coordinators.get( fd );
+			ServerPeerSocket *serverPeerSocket = ( clientSocket || coordinatorSocket ) ? 0 : slave->sockets.slavePeers.get( fd );
+			if ( clientSocket ) {
+				clientSocket->stop();
 			} else if ( coordinatorSocket ) {
 				coordinatorSocket->stop();
-			} else if ( slavePeerSocket ) {
-				slavePeerSocket->stop();
+			} else if ( serverPeerSocket ) {
+				serverPeerSocket->stop();
 			} else {
-				__ERROR__( "SlaveSocket", "handler", "Unknown socket." );
+				__ERROR__( "ServerSocket", "handler", "Unknown socket." );
 				return false;
 			}
 		}
@@ -98,12 +98,12 @@ bool SlaveSocket::handler( int fd, uint32_t events, void *data ) {
 			if ( fd == -1 ) {
 				delete addr;
 				if ( errno != EAGAIN && errno != EWOULDBLOCK ) {
-					__ERROR__( "SlaveSocket", "handler", "%s", strerror( errno ) );
+					__ERROR__( "ServerSocket", "handler", "%s", strerror( errno ) );
 					return false;
 				}
 				break;
 			}
-			SlaveSocket::setNonBlocking( fd );
+			ServerSocket::setNonBlocking( fd );
 			socket->sockets.set( fd, addr, false );
 			socket->epoll->add( fd, EPOLL_EVENT_SET );
 		}
@@ -119,7 +119,7 @@ bool SlaveSocket::handler( int fd, uint32_t events, void *data ) {
 
 			ret = socket->recv( fd, socket->buffer.data, socket->buffer.size, connected, true );
 			if ( ret < 0 ) {
-				__ERROR__( "SlaveSocket", "handler", "Cannot receive message." );
+				__ERROR__( "ServerSocket", "handler", "Cannot receive message." );
 				return false;
 			} else if ( ( size_t ) ret == socket->buffer.size ) {
 				ProtocolHeader header;
@@ -130,23 +130,23 @@ bool SlaveSocket::handler( int fd, uint32_t events, void *data ) {
 					socket->protocol.parseAddressHeader( addressHeader, socket->buffer.data + PROTO_HEADER_SIZE, socket->buffer.size - PROTO_HEADER_SIZE );
 					// Register message expected
 					if ( header.from == PROTO_MAGIC_FROM_CLIENT ) {
-						MasterSocket *masterSocket = new MasterSocket();
-						masterSocket->init( fd, *addr );
+						ClientSocket *clientSocket = new ClientSocket();
+						clientSocket->init( fd, *addr );
 						// Ignore the address header for master socket
-						slave->sockets.masters.set( fd, masterSocket );
+						slave->sockets.masters.set( fd, clientSocket );
 						// add socket to the instance-id-to-master-socket mapping
 						LOCK( &slave->sockets.mastersIdToSocketLock );
-						slave->sockets.mastersIdToSocketMap[ header.instanceId ] = masterSocket;
+						slave->sockets.mastersIdToSocketMap[ header.instanceId ] = clientSocket;
 						UNLOCK( &slave->sockets.mastersIdToSocketLock );
 						socket->sockets.removeAt( index );
 
 						socket->done( fd ); // The socket is valid
 
 						MasterEvent event;
-						event.resRegister( masterSocket, header.instanceId, header.requestId );
+						event.resRegister( clientSocket, header.instanceId, header.requestId );
 						slave->eventQueue.insert( event );
 					} else if ( header.from == PROTO_MAGIC_FROM_SERVER ) {
-						SlavePeerSocket *s = 0;
+						ServerPeerSocket *s = 0;
 
 						for ( int i = 0, len = slave->sockets.slavePeers.size(); i < len; i++ ) {
 							if ( slave->sockets.slavePeers[ i ]->equal( addressHeader.addr, addressHeader.port ) ) {
@@ -166,7 +166,7 @@ bool SlaveSocket::handler( int fd, uint32_t events, void *data ) {
 							event.resRegister( s, true, header.instanceId, header.requestId );
 							slave->eventQueue.insert( event );
 						} else {
-							__ERROR__( "SlaveSocket", "handler", "Unexpected registration from slave." );
+							__ERROR__( "ServerSocket", "handler", "Unexpected registration from slave." );
 							socket->sockets.removeAt( index );
 							::close( fd );
 							return false;
@@ -174,37 +174,37 @@ bool SlaveSocket::handler( int fd, uint32_t events, void *data ) {
 					} else {
 						::close( fd );
 						socket->sockets.removeAt( index );
-						__ERROR__( "SlaveSocket", "handler", "Invalid register message source." );
+						__ERROR__( "ServerSocket", "handler", "Invalid register message source." );
 						return false;
 					}
 				} else {
-					__ERROR__( "SlaveSocket", "handler", "Invalid register message." );
+					__ERROR__( "ServerSocket", "handler", "Invalid register message." );
 					return false;
 				}
 			} else {
-				__ERROR__( "SlaveSocket", "handler", "Message corrupted." );
+				__ERROR__( "ServerSocket", "handler", "Message corrupted." );
 				return false;
 			}
 		} else {
 			int index;
-			MasterSocket *masterSocket = slave->sockets.masters.get( fd );
-			CoordinatorSocket *coordinatorSocket = masterSocket ? 0 : slave->sockets.coordinators.get( fd );
-			SlavePeerSocket *slavePeerSocket = ( masterSocket || coordinatorSocket ) ? 0 : slave->sockets.slavePeers.get( fd, &index );
+			ClientSocket *clientSocket = slave->sockets.masters.get( fd );
+			CoordinatorSocket *coordinatorSocket = clientSocket ? 0 : slave->sockets.coordinators.get( fd );
+			ServerPeerSocket *serverPeerSocket = ( clientSocket || coordinatorSocket ) ? 0 : slave->sockets.slavePeers.get( fd, &index );
 
-			if ( masterSocket ) {
+			if ( clientSocket ) {
 				MasterEvent event;
-				event.pending( masterSocket );
+				event.pending( clientSocket );
 				slave->eventQueue.insert( event );
 			} else if ( coordinatorSocket ) {
 				CoordinatorEvent event;
 				event.pending( coordinatorSocket );
 				slave->eventQueue.insert( event );
-			} else if ( slavePeerSocket ) {
+			} else if ( serverPeerSocket ) {
 				SlavePeerEvent event;
-				event.pending( slavePeerSocket );
+				event.pending( serverPeerSocket );
 				slave->eventQueue.insert( event );
 			} else {
-				// __ERROR__( "SlaveSocket", "handler", "Unknown socket: fd = %d.", fd );
+				// __ERROR__( "ServerSocket", "handler", "Unknown socket: fd = %d.", fd );
 				return false;
 			}
 		}

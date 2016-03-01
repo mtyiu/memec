@@ -30,14 +30,14 @@ public:
 	SlaveEventType type;
 	uint16_t instanceId;
 	uint32_t requestId;
-	SlaveSocket *socket;
+	ServerSocket *socket;
 	union {
 		struct {
-			SlaveSocket *src;
-			SlaveSocket *dst;
+			ServerSocket *src;
+			ServerSocket *dst;
 			pthread_mutex_t *lock;
 			pthread_cond_t *cond;
-			std::unordered_set<SlaveSocket *> *sockets;
+			std::unordered_set<ServerSocket *> *sockets;
 		} reconstructed;
 		struct {
 			pthread_mutex_t *lock;
@@ -57,24 +57,24 @@ public:
 		struct sockaddr_in addr;
 	} message;
 
-	void pending( SlaveSocket *socket );
-	void resRegister( SlaveSocket *socket, uint16_t instanceId, uint32_t requestId, bool success = true );
-	void announceSlaveConnected( SlaveSocket *socket );
+	void pending( ServerSocket *socket );
+	void resRegister( ServerSocket *socket, uint16_t instanceId, uint32_t requestId, bool success = true );
+	void announceSlaveConnected( ServerSocket *socket );
 	void announceSlaveReconstructed(
 		uint16_t instanceId, uint32_t requestId,
-		pthread_mutex_t *lock, pthread_cond_t *cond, std::unordered_set<SlaveSocket *> *sockets,
-		SlaveSocket *srcSocket, SlaveSocket *dstSocket
+		pthread_mutex_t *lock, pthread_cond_t *cond, std::unordered_set<ServerSocket *> *sockets,
+		ServerSocket *srcSocket, ServerSocket *dstSocket
 	);
-	void reqSealChunks( SlaveSocket *socket );
-	void reqFlushChunks( SlaveSocket *socket );
-	void reqSyncMeta( SlaveSocket *socket, bool *sync );
-	void reqReleaseDegradedLock( SlaveSocket *socket, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done );
-	void syncRemappedData( SlaveSocket *socket, Packet *packet );
-	void resHeartbeat( SlaveSocket *socket, uint32_t timestamp, uint32_t sealed, uint32_t keys, bool isLast );
-	void disconnect( SlaveSocket *socket );
+	void reqSealChunks( ServerSocket *socket );
+	void reqFlushChunks( ServerSocket *socket );
+	void reqSyncMeta( ServerSocket *socket, bool *sync );
+	void reqReleaseDegradedLock( ServerSocket *socket, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done );
+	void syncRemappedData( ServerSocket *socket, Packet *packet );
+	void resHeartbeat( ServerSocket *socket, uint32_t timestamp, uint32_t sealed, uint32_t keys, bool isLast );
+	void disconnect( ServerSocket *socket );
 	void triggerReconstruction( struct sockaddr_in addr );
-	void handleReconstructionRequest( SlaveSocket *socket );
-	void ackCompletedReconstruction( SlaveSocket *socket, uint16_t instanceId, uint32_t requestId, bool success );
+	void handleReconstructionRequest( ServerSocket *socket );
+	void ackCompletedReconstruction( ServerSocket *socket, uint16_t instanceId, uint32_t requestId, bool success );
 };
 
 #endif

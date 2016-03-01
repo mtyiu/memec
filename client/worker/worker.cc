@@ -13,9 +13,9 @@ bool MasterWorker::degradedTargetIsFixed;
 IDGenerator *MasterWorker::idGenerator;
 Pending *MasterWorker::pending;
 MasterEventQueue *MasterWorker::eventQueue;
-StripeList<SlaveSocket> *MasterWorker::stripeList;
+StripeList<ServerSocket> *MasterWorker::stripeList;
 PacketPool *MasterWorker::packetPool;
-ArrayMap<int, SlaveSocket> *MasterWorker::slaveSockets;
+ArrayMap<int, ServerSocket> *MasterWorker::serverSockets;
 MasterRemapMsgHandler *MasterWorker::remapMsgHandler;
 
 void MasterWorker::dispatch( MixedEvent event ) {
@@ -39,24 +39,24 @@ void MasterWorker::dispatch( MixedEvent event ) {
 
 void MasterWorker::dispatch( MasterEvent event ) {}
 
-SlaveSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId ) {
-	SlaveSocket *ret;
+ServerSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId ) {
+	ServerSocket *ret;
 	Key key;
 	key.set( size, data );
 	listId = MasterWorker::stripeList->get(
 		data, ( size_t ) size,
-		this->dataSlaveSockets,
-		this->paritySlaveSockets,
+		this->dataServerSockets,
+		this->parityServerSockets,
 		&chunkId, true
 	);
-	ret = this->dataSlaveSockets[ chunkId ];
+	ret = this->dataServerSockets[ chunkId ];
 	return ret->ready() ? ret : 0;
 }
 
 bool MasterWorker::getSlaves(
 	uint8_t opcode, char *data, uint8_t size,
 	uint32_t *&original, uint32_t *&remapped, uint32_t &remappedCount,
-	SlaveSocket *&originalDataSlaveSocket, bool &useCoordinatedFlow
+	ServerSocket *&originalDataServerSocket, bool &useCoordinatedFlow
 ) {
 	bool ret = true;
 
@@ -66,11 +66,11 @@ bool MasterWorker::getSlaves(
 	uint32_t originalListId, originalChunkId;
 	originalListId = MasterWorker::stripeList->get(
 		data, ( size_t ) size,
-		this->dataSlaveSockets,
-		this->paritySlaveSockets,
+		this->dataServerSockets,
+		this->parityServerSockets,
 		&originalChunkId, true
 	);
-	originalDataSlaveSocket = this->dataSlaveSockets[ originalChunkId ];
+	originalDataServerSocket = this->dataServerSockets[ originalChunkId ];
 
 	Master *master = Master::getInstance();
 	switch( opcode ) {
@@ -79,7 +79,7 @@ bool MasterWorker::getSlaves(
 			useCoordinatedFlow = true;
 			break;
 		case PROTO_OPCODE_GET:
-			if ( master->isDegraded( originalDataSlaveSocket ) )
+			if ( master->isDegraded( originalDataServerSocket ) )
 				useCoordinatedFlow = true;
 			break;
 		case PROTO_OPCODE_UPDATE:
@@ -88,8 +88,8 @@ bool MasterWorker::getSlaves(
 			for ( uint32_t i = 0, chunkCount = MasterWorker::dataChunkCount + MasterWorker::parityChunkCount; i < chunkCount; i++ ) {
 				if ( master->isDegraded(
 						( i < MasterWorker::dataChunkCount ) ?
-						this->dataSlaveSockets[ i ] :
-						this->paritySlaveSockets[ i - MasterWorker::dataChunkCount ]
+						this->dataServerSockets[ i ] :
+						this->parityServerSockets[ i - MasterWorker::dataChunkCount ]
 					)
 				) {
 					useCoordinatedFlow = true;
@@ -124,7 +124,7 @@ bool MasterWorker::getSlaves(
 		for ( uint32_t i = 0; i < MasterWorker::dataChunkCount; i++ ) {
 			if ( i == originalChunkId )
 				continue;
-			if ( master->isDegraded( this->dataSlaveSockets[ i ] ) ) {
+			if ( master->isDegraded( this->dataServerSockets[ i ] ) ) {
 				original[ numEntries * 2 ] = originalListId;
 				original[ numEntries * 2 + 1 ] = i;
 				numEntries++;
@@ -136,7 +136,7 @@ bool MasterWorker::getSlaves(
 	BasicRemappingScheme::redirect(
 		this->original, this->remapped, numEntries, remappedCount,
 		MasterWorker::dataChunkCount, MasterWorker::parityChunkCount,
-		this->dataSlaveSockets, this->paritySlaveSockets,
+		this->dataServerSockets, this->parityServerSockets,
 		opcode == PROTO_OPCODE_GET
 	);
 
@@ -171,14 +171,14 @@ bool MasterWorker::getSlaves(
 	return ret;
 }
 
-SlaveSocket *MasterWorker::getSlaves( uint32_t listId, uint32_t chunkId ) {
-	SlaveSocket *ret;
-	MasterWorker::stripeList->get( listId, this->paritySlaveSockets, this->dataSlaveSockets );
-	ret = chunkId < MasterWorker::dataChunkCount ? this->dataSlaveSockets[ chunkId ] : this->paritySlaveSockets[ chunkId - MasterWorker::dataChunkCount ];
+ServerSocket *MasterWorker::getSlaves( uint32_t listId, uint32_t chunkId ) {
+	ServerSocket *ret;
+	MasterWorker::stripeList->get( listId, this->parityServerSockets, this->dataServerSockets );
+	ret = chunkId < MasterWorker::dataChunkCount ? this->dataServerSockets[ chunkId ] : this->parityServerSockets[ chunkId - MasterWorker::dataChunkCount ];
 	return ret->ready() ? ret : 0;
 }
 
-void MasterWorker::removePending( SlaveSocket *slave, bool needsAck ) {
+void MasterWorker::removePending( ServerSocket *slave, bool needsAck ) {
 
 	struct sockaddr_in saddr = slave->getAddr();
 	char buf[ INET_ADDRSTRLEN ];
@@ -205,7 +205,7 @@ void MasterWorker::removePending( SlaveSocket *slave, bool needsAck ) {
 		Master::getInstance()->remapMsgHandler.ackTransit();
 }
 
-void MasterWorker::replayRequestPrepare( SlaveSocket *slave ) {
+void MasterWorker::replayRequestPrepare( ServerSocket *slave ) {
 	uint16_t instanceId = slave->instanceId;
 	Pending *pending = MasterWorker::pending;
 	if ( pending->replay.requestsLock.count( instanceId ) == 0 ) {
@@ -244,7 +244,7 @@ void MasterWorker::replayRequestPrepare( SlaveSocket *slave ) {
 			} \
 			/* cancel the request reply to application by setting application socket to 0 */ \
 			if ( MasterWorker::pending->count( PT_SLAVE_##_PENDING_TYPE_, it->first.instanceId, it->first.requestId, false, false /* already locked (pendingLock) */ ) > 1 ) { \
-				__DEBUG__( YELLOW, "MasterWorker", "replayRequestPrepare", "Reinsert ID = (%u,%u)\n", ( ( SlaveSocket * ) it->first.ptr )->getSocket(), it->first.parentInstanceId, it->first.parentRequestId ); \
+				__DEBUG__( YELLOW, "MasterWorker", "replayRequestPrepare", "Reinsert ID = (%u,%u)\n", ( ( ServerSocket * ) it->first.ptr )->getSocket(), it->first.parentInstanceId, it->first.parentRequestId ); \
 				if ( ! MasterWorker::pending->insert##_APPLICATION_VALUE_TYPE_( PT_APPLICATION_##_PENDING_TYPE_, pid.instanceId, pid.requestId, pid.ptr, _APPLICATION_VALUE_VAR_ ) ) \
 					__ERROR__( "MasterWorker", "replayRequestPrepare", "Failed to reinsert the %s request backup for ID = (%u, %u).", #_OPCODE_, pid.instanceId, pid.requestId ); \
 				else \
@@ -293,7 +293,7 @@ void MasterWorker::replayRequestPrepare( SlaveSocket *slave ) {
 #undef SEARCH_MAP_FOR_REQUEST
 }
 
-void MasterWorker::replayRequest( SlaveSocket *slave ) {
+void MasterWorker::replayRequest( ServerSocket *slave ) {
 	uint16_t instanceId = slave->instanceId;
 
 	if (
@@ -371,7 +371,7 @@ void MasterWorker::replayRequest( SlaveSocket *slave ) {
 	UNLOCK( lock );
 }
 
-void MasterWorker::gatherPendingNormalRequests( SlaveSocket *target, bool needsAck ) {
+void MasterWorker::gatherPendingNormalRequests( ServerSocket *target, bool needsAck ) {
 
 	std::unordered_set<uint32_t> listIds;
 	// find the lists including the failed slave as parity server
@@ -430,8 +430,8 @@ void MasterWorker::free() {
 	this->protocol.free();
 	delete[] original;
 	delete[] remapped;
-	delete[] this->dataSlaveSockets;
-	delete[] this->paritySlaveSockets;
+	delete[] this->dataServerSockets;
+	delete[] this->parityServerSockets;
 }
 
 void *MasterWorker::run( void *argv ) {
@@ -509,7 +509,7 @@ bool MasterWorker::init() {
 	MasterWorker::pending = &master->pending;
 	MasterWorker::eventQueue = &master->eventQueue;
 	MasterWorker::stripeList = master->stripeList;
-	MasterWorker::slaveSockets = &master->sockets.slaves;
+	MasterWorker::serverSockets = &master->sockets.slaves;
 	MasterWorker::packetPool = &master->packetPool;
 	MasterWorker::remapMsgHandler = &master->remapMsgHandler;
 	return true;
@@ -524,8 +524,8 @@ bool MasterWorker::init( GlobalConfig &config, WorkerRole role, uint32_t workerI
 	);
 	this->original = new uint32_t[ ( MasterWorker::dataChunkCount + MasterWorker::parityChunkCount ) * 2 ];
 	this->remapped = new uint32_t[ ( MasterWorker::dataChunkCount + MasterWorker::parityChunkCount ) * 2 ];
-	this->dataSlaveSockets = new SlaveSocket*[ MasterWorker::dataChunkCount ];
-	this->paritySlaveSockets = new SlaveSocket*[ MasterWorker::parityChunkCount ];
+	this->dataServerSockets = new ServerSocket*[ MasterWorker::dataChunkCount ];
+	this->parityServerSockets = new ServerSocket*[ MasterWorker::parityChunkCount ];
 	this->role = role;
 	this->workerId = workerId;
 	return role != WORKER_ROLE_UNDEFINED;

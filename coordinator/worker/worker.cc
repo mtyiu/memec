@@ -9,7 +9,7 @@ uint32_t CoordinatorWorker::chunkCount;
 IDGenerator *CoordinatorWorker::idGenerator;
 CoordinatorEventQueue *CoordinatorWorker::eventQueue;
 RemappingRecordMap *CoordinatorWorker::remappingRecords;
-StripeList<SlaveSocket> *CoordinatorWorker::stripeList;
+StripeList<ServerSocket> *CoordinatorWorker::stripeList;
 Pending *CoordinatorWorker::pending;
 
 void CoordinatorWorker::dispatch( MixedEvent event ) {
@@ -61,7 +61,7 @@ void CoordinatorWorker::dispatch( CoordinatorEvent event ) {
 			);
 			packet->setReferenceCount( numSlaves );
 			for ( uint32_t i = 0; i < numSlaves; i++ ) {
-				SlaveSocket *socket = coordinator->sockets.slaves[ i ];
+				ServerSocket *socket = coordinator->sockets.slaves[ i ];
 				slaveEvent.syncRemappedData( socket, packet );
 				coordinator->eventQueue.insert( slaveEvent );
 			}

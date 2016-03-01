@@ -4,9 +4,9 @@
 #include "../../common/ds/array_map.hh"
 #include "../../common/socket/socket.hh"
 
-class SlavePeerSocket : public Socket {
+class ServerPeerSocket : public Socket {
 private:
-	static ArrayMap<int, SlavePeerSocket> *slavePeers;
+	static ArrayMap<int, ServerPeerSocket> *slavePeers;
 
 	bool received;
 	struct sockaddr_in recvAddr;
@@ -20,8 +20,8 @@ public:
 	bool self;
 	uint16_t instanceId;
 
-	SlavePeerSocket();
-	static void setArrayMap( ArrayMap<int, SlavePeerSocket> *slavePeers );
+	ServerPeerSocket();
+	static void setArrayMap( ArrayMap<int, ServerPeerSocket> *slavePeers );
 	bool init( int tmpfd, ServerAddr &addr, EPoll *epoll, bool self );
 	int init();
 	bool start();

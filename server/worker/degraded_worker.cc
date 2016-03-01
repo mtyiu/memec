@@ -65,7 +65,7 @@ bool SlaveWorker::handleReleaseDegradedLockRequest( CoordinatorEvent event, char
 	ChunkRequest chunkRequest;
 	std::vector<Metadata> chunks;
 	SlavePeerEvent slavePeerEvent;
-	SlavePeerSocket *socket = NULL;
+	ServerPeerSocket *socket = NULL;
 	Chunk *chunk;
 
 	while( size ) {
@@ -96,8 +96,8 @@ bool SlaveWorker::handleReleaseDegradedLockRequest( CoordinatorEvent event, char
 			// The target is the same for all chunks in this request
 			this->getSlaves( chunks[ i ].listId );
 			socket =   chunks[ i ].chunkId < SlaveWorker::dataChunkCount
-			         ? this->dataSlaveSockets[ chunks[ i ].chunkId ]
-			         : this->paritySlaveSockets[ chunks[ i ].chunkId - SlaveWorker::dataChunkCount ];
+			         ? this->dataServerSockets[ chunks[ i ].chunkId ]
+			         : this->parityServerSockets[ chunks[ i ].chunkId - SlaveWorker::dataChunkCount ];
 		}
 
 		requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
@@ -989,7 +989,7 @@ bool SlaveWorker::handleForwardChunkResponse( SlavePeerEvent event, bool success
 
 bool SlaveWorker::performDegradedRead(
 	uint8_t opcode,
-	MasterSocket *masterSocket,
+	ClientSocket *clientSocket,
 	uint16_t parentInstanceId, uint32_t parentRequestId,
 	uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 	Key *key, bool isSealed,
@@ -1000,10 +1000,10 @@ bool SlaveWorker::performDegradedRead(
 ) {
 	Key mykey;
 	SlavePeerEvent event;
-	SlavePeerSocket *socket = 0;
+	ServerPeerSocket *socket = 0;
 	uint32_t selected = 0;
 
-	SlaveWorker::stripeList->get( listId, this->paritySlaveSockets, this->dataSlaveSockets );
+	SlaveWorker::stripeList->get( listId, this->parityServerSockets, this->dataServerSockets );
 
 	// fprintf( stderr, "performDegradedRead(): %u, %u, %u - isSealed? %s\n", listId, stripeId, chunkId, isSealed ? "true" : "false" );
 
@@ -1032,9 +1032,9 @@ bool SlaveWorker::performDegradedRead(
 	for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
 		uint32_t originalChunkId = original[ i * 2 + 1 ];
 		if ( originalChunkId < SlaveWorker::dataChunkCount )
-			this->dataSlaveSockets[ originalChunkId ] = 0;
+			this->dataServerSockets[ originalChunkId ] = 0;
 		else
-			this->paritySlaveSockets[ originalChunkId - SlaveWorker::dataChunkCount ] = 0;
+			this->parityServerSockets[ originalChunkId - SlaveWorker::dataChunkCount ] = 0;
 	}
 
 	if ( isSealed ) {
@@ -1044,8 +1044,8 @@ bool SlaveWorker::performDegradedRead(
 			return false;
 		}
 	} else {
-		if ( this->dataSlaveSockets[ chunkId ] && this->dataSlaveSockets[ chunkId ]->self ) {
-			socket = this->dataSlaveSockets[ chunkId ];
+		if ( this->dataServerSockets[ chunkId ] && this->dataServerSockets[ chunkId ]->self ) {
+			socket = this->dataServerSockets[ chunkId ];
 		} else {
 			// Check whether there are surviving parity slaves
 			uint32_t numSurvivingParity = SlaveWorker::parityChunkCount;
@@ -1074,7 +1074,7 @@ bool SlaveWorker::performDegradedRead(
 				return false;
 			} else {
 				for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
-					SlavePeerSocket *tmp = this->paritySlaveSockets[ ( parentRequestId + i ) % SlaveWorker::parityChunkCount ]; // Add "randomness"
+					ServerPeerSocket *tmp = this->parityServerSockets[ ( parentRequestId + i ) % SlaveWorker::parityChunkCount ]; // Add "randomness"
 					if ( tmp ) {
 						socket = tmp;
 						break;
@@ -1089,7 +1089,7 @@ bool SlaveWorker::performDegradedRead(
 	uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
 	DegradedOp op;
 	op.set(
-		opcode, isSealed, masterSocket,
+		opcode, isSealed, clientSocket,
 		listId, stripeId, chunkId,
 		original, reconstructed, reconstructedCount,
 		ongoingAtChunk,
@@ -1173,8 +1173,8 @@ force_reconstruct_chunks:
 				break;
 
 			socket = ( i < SlaveWorker::dataChunkCount ) ?
-			         ( this->dataSlaveSockets[ i ] ) :
-			         ( this->paritySlaveSockets[ i - SlaveWorker::dataChunkCount ] );
+			         ( this->dataServerSockets[ i ] ) :
+			         ( this->parityServerSockets[ i - SlaveWorker::dataChunkCount ] );
 
 			if ( ! socket )
 				continue;
@@ -1207,8 +1207,8 @@ force_reconstruct_chunks:
 				break;
 
 			socket = ( i < SlaveWorker::dataChunkCount ) ?
-			         ( this->dataSlaveSockets[ i ] ) :
-			         ( this->paritySlaveSockets[ i - SlaveWorker::dataChunkCount ] );
+			         ( this->dataServerSockets[ i ] ) :
+			         ( this->parityServerSockets[ i - SlaveWorker::dataChunkCount ] );
 
 			if ( ! socket )
 				continue;
@@ -1253,7 +1253,7 @@ force_reconstruct_chunks:
 			}
 
 			// Insert into degraded chunk buffer if this is not the original data server (i.e., the data server fails)
-			if ( ! this->dataSlaveSockets[ chunkId ]->self ) {
+			if ( ! this->dataServerSockets[ chunkId ]->self ) {
 				if ( success && opcode != PROTO_OPCODE_DEGRADED_DELETE ) {
 					// Insert into degradedChunkBuffer
 					Metadata metadata;
@@ -1275,7 +1275,7 @@ force_reconstruct_chunks:
 				}
 
 				for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
-					SlavePeerSocket *s = SlaveWorker::stripeList->get(
+					ServerPeerSocket *s = SlaveWorker::stripeList->get(
 						reconstructed[ i * 2     ],
 						reconstructed[ i * 2 + 1 ]
 					);
@@ -1348,13 +1348,13 @@ force_reconstruct_chunks:
 				switch( opcode ) {
 					case PROTO_OPCODE_DEGRADED_GET:
 						// Return failure to master
-						masterEvent.resGet( masterSocket, parentInstanceId, parentRequestId, mykey, true );
+						masterEvent.resGet( clientSocket, parentInstanceId, parentRequestId, mykey, true );
 						this->dispatch( masterEvent );
 						op.data.key.free();
 						break;
 					case PROTO_OPCODE_DEGRADED_UPDATE:
 						masterEvent.resUpdate(
-							masterSocket, parentInstanceId, parentRequestId, mykey,
+							clientSocket, parentInstanceId, parentRequestId, mykey,
 							keyValueUpdate->offset,
 							keyValueUpdate->length,
 							false, false, true
@@ -1365,7 +1365,7 @@ force_reconstruct_chunks:
 						break;
 					case PROTO_OPCODE_DEGRADED_DELETE:
 						masterEvent.resDelete(
-							masterSocket,
+							clientSocket,
 							parentInstanceId, parentRequestId,
 							mykey,
 							false, // needsFree
@@ -1432,7 +1432,7 @@ bool SlaveWorker::sendModifyChunkRequest(
 	Metadata &metadata, uint32_t offset,
 	uint32_t deltaSize, uint32_t valueUpdateOffset, char *delta,
 	bool isSealed, bool isUpdate,
-	uint32_t timestamp, MasterSocket *masterSocket,
+	uint32_t timestamp, ClientSocket *clientSocket,
 	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 	bool reconstructParity,
 	Chunk **chunks, bool endOfDegradedOp,
@@ -1459,9 +1459,9 @@ bool SlaveWorker::sendModifyChunkRequest(
 			if ( original[ i * 2 + 1 ] >= SlaveWorker::dataChunkCount ) {
 				if ( reconstructParity ) {
 					this->forward.chunks[ original[ i * 2 + 1 ] ] = chunks[ original[ i * 2 + 1 ] ];
-					this->paritySlaveSockets[ original[ i * 2 + 1 ] - SlaveWorker::dataChunkCount ] = 0;
+					this->parityServerSockets[ original[ i * 2 + 1 ] - SlaveWorker::dataChunkCount ] = 0;
 				} else {
-					this->paritySlaveSockets[ original[ i * 2 + 1 ] - SlaveWorker::dataChunkCount ] = SlaveWorker::stripeList->get(
+					this->parityServerSockets[ original[ i * 2 + 1 ] - SlaveWorker::dataChunkCount ] = SlaveWorker::stripeList->get(
 						reconstructed[ i * 2     ],
 						reconstructed[ i * 2 + 1 ]
 					);
@@ -1480,16 +1480,16 @@ bool SlaveWorker::sendModifyChunkRequest(
 		chunkUpdate.setKeyValueUpdate( key.size, key.data, offset );
 
 		for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
-			if ( ! this->paritySlaveSockets[ i ] || this->paritySlaveSockets[ i ]->self ) {
+			if ( ! this->parityServerSockets[ i ] || this->parityServerSockets[ i ]->self ) {
 				continue;
 			}
 
 			chunkUpdate.chunkId = SlaveWorker::dataChunkCount + i; // updatingChunkId
-			chunkUpdate.ptr = ( void * ) this->paritySlaveSockets[ i ];
+			chunkUpdate.ptr = ( void * ) this->parityServerSockets[ i ];
 			if ( ! SlaveWorker::pending->insertChunkUpdate(
 				isUpdate ? PT_SLAVE_PEER_UPDATE_CHUNK : PT_SLAVE_PEER_DEL_CHUNK,
 				instanceId, parentInstanceId, requestId, parentRequestId,
-				( void * ) this->paritySlaveSockets[ i ],
+				( void * ) this->parityServerSockets[ i ],
 				chunkUpdate
 			) ) {
 				__ERROR__( "SlaveWorker", "sendModifyChunkRequest", "Cannot insert into slave %s pending map.", isUpdate ? "UPDATE_CHUNK" : "DELETE_CHUNK" );
@@ -1499,7 +1499,7 @@ bool SlaveWorker::sendModifyChunkRequest(
 		// Start sending packets only after all the insertion to the slave peer DELETE_CHUNK pending set is completed
 		uint32_t numSurvivingParity = 0;
 		for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
-			if ( ! this->paritySlaveSockets[ i ] ) {
+			if ( ! this->parityServerSockets[ i ] ) {
 				/////////////////////////////////////////////////////
 				// Update the parity chunks that will be forwarded //
 				/////////////////////////////////////////////////////
@@ -1565,7 +1565,7 @@ bool SlaveWorker::sendModifyChunkRequest(
 					Chunk::capacity
 				);
 				/////////////////////////////////////////////////////
-			} else if ( this->paritySlaveSockets[ i ]->self ) {
+			} else if ( this->parityServerSockets[ i ]->self ) {
 				uint32_t myChunkId = SlaveWorker::chunkBuffer->at( metadata.listId )->getChunkId(), tmpChunkId;
 				if ( myChunkId >= SlaveWorker::dataChunkCount ) {
 					bool checkGetChunk = true; // Force backup
@@ -1607,14 +1607,14 @@ bool SlaveWorker::sendModifyChunkRequest(
 
 				// backup data delta, insert a pending record for each parity slave
 				/* Seems that we don't need the data delta...
-				if ( masterSocket != 0 ) {
+				if ( clientSocket != 0 ) {
 					Timestamp ts( timestamp );
 					Value value;
 					value.set( deltaSize, delta );
 					if ( isUpdate )
-						masterSocket->backup.insertDataUpdate( ts, key, value, metadata, isSealed, valueUpdateOffset, offset, requestId, this->paritySlaveSockets[ i ]->instanceId, this->paritySlaveSockets[ i ] );
+						clientSocket->backup.insertDataUpdate( ts, key, value, metadata, isSealed, valueUpdateOffset, offset, requestId, this->parityServerSockets[ i ]->instanceId, this->parityServerSockets[ i ] );
 					else
-						masterSocket->backup.insertDataDelete( ts, key, value, metadata, isSealed, valueUpdateOffset, offset, requestId, this->paritySlaveSockets[ i ]->instanceId, this->paritySlaveSockets[ i ] );
+						clientSocket->backup.insertDataDelete( ts, key, value, metadata, isSealed, valueUpdateOffset, offset, requestId, this->parityServerSockets[ i ]->instanceId, this->parityServerSockets[ i ] );
 				}
 				*/
 
@@ -1655,7 +1655,7 @@ bool SlaveWorker::sendModifyChunkRequest(
 
 				// Insert into event queue
 				SlavePeerEvent slavePeerEvent;
-				slavePeerEvent.send( this->paritySlaveSockets[ i ], packet );
+				slavePeerEvent.send( this->parityServerSockets[ i ], packet );
 				numSurvivingParity++;
 
 #ifdef SERVER_WORKER_SEND_REPLICAS_PARALLEL
@@ -1684,7 +1684,7 @@ bool SlaveWorker::sendModifyChunkRequest(
 
 				key.set( keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.ptr );
 				masterEvent.resUpdate(
-					( MasterSocket * ) pid.ptr, pid.instanceId, pid.requestId, key,
+					( ClientSocket * ) pid.ptr, pid.instanceId, pid.requestId, key,
 					keyValueUpdate.offset, keyValueUpdate.length,
 					true, // success
 					true,
@@ -1709,7 +1709,7 @@ bool SlaveWorker::sendModifyChunkRequest(
 					fprintf( stderr, "Forwarding data chunk (%u, %u, %u)\n", metadata.listId, metadata.stripeId, original[ i * 2 + 1 ] );
 				}
 
-				SlavePeerSocket *s = SlaveWorker::stripeList->get( reconstructed[ i * 2 ], reconstructed[ i * 2 + 1 ] );
+				ServerPeerSocket *s = SlaveWorker::stripeList->get( reconstructed[ i * 2 ], reconstructed[ i * 2 + 1 ] );
 
 				if ( s->self ) {
 					struct ChunkDataHeader chunkDataHeader = {
@@ -1748,9 +1748,9 @@ bool SlaveWorker::sendModifyChunkRequest(
 		uint32_t self = 0;
 		uint32_t parityServerCount = SlaveWorker::parityChunkCount;
 		for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
-			if ( ! this->paritySlaveSockets[ i ] ) {
+			if ( ! this->parityServerSockets[ i ] ) {
 				parityServerCount--;
-			} else if ( this->paritySlaveSockets[ i ]->self ) {
+			} else if ( this->parityServerSockets[ i ]->self ) {
 				parityServerCount--;
 				self = i + 1;
 				break;
@@ -1800,26 +1800,26 @@ bool SlaveWorker::sendModifyChunkRequest(
 		}
 
 		for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
-			if ( ! this->paritySlaveSockets[ i ] || this->paritySlaveSockets[ i ]->self )
+			if ( ! this->parityServerSockets[ i ] || this->parityServerSockets[ i ]->self )
 				continue;
 
 			// backup data delta, insert a pending record for each parity slave
 			/* Seems that we don't need the data delta...
-			if ( masterSocket != 0 ) {
+			if ( clientSocket != 0 ) {
 				Timestamp ts ( timestamp );
 				Value value;
 				value.set( deltaSize, delta );
 				if ( isUpdate )
-					masterSocket->backup.insertDataUpdate( ts, key, value, metadata, isSealed, valueUpdateOffset, offset, requestId, this->paritySlaveSockets[ i ]->instanceId, this->paritySlaveSockets[ i ] );
+					clientSocket->backup.insertDataUpdate( ts, key, value, metadata, isSealed, valueUpdateOffset, offset, requestId, this->parityServerSockets[ i ]->instanceId, this->parityServerSockets[ i ] );
 				else
-					masterSocket->backup.insertDataDelete( ts, key, value, metadata, isSealed, valueUpdateOffset, offset, requestId, this->paritySlaveSockets[ i ]->instanceId, this->paritySlaveSockets[ i ] );
+					clientSocket->backup.insertDataDelete( ts, key, value, metadata, isSealed, valueUpdateOffset, offset, requestId, this->parityServerSockets[ i ]->instanceId, this->parityServerSockets[ i ] );
 			}
 			*/
 
 			if ( isUpdate ) {
 				if ( ! SlaveWorker::pending->insertKeyValueUpdate(
 					PT_SLAVE_PEER_UPDATE, instanceId, parentInstanceId, requestId, parentRequestId,
-					( void * ) this->paritySlaveSockets[ i ],
+					( void * ) this->parityServerSockets[ i ],
 					keyValueUpdate
 				) ) {
 					__ERROR__( "SlaveWorker", "handleUpdateRequest", "Cannot insert into slave UPDATE pending map." );
@@ -1827,7 +1827,7 @@ bool SlaveWorker::sendModifyChunkRequest(
 			} else {
 				if ( ! SlaveWorker::pending->insertKey(
 					PT_SLAVE_PEER_DEL, instanceId, parentInstanceId, requestId, parentRequestId,
-					( void * ) this->paritySlaveSockets[ i ],
+					( void * ) this->parityServerSockets[ i ],
 					key
 				) ) {
 					__ERROR__( "SlaveWorker", "handleDeleteRequest", "Cannot insert into slave DELETE pending map." );
@@ -1837,9 +1837,9 @@ bool SlaveWorker::sendModifyChunkRequest(
 
 		// Start sending packets only after all the insertion to the slave peer DELETE pending set is completed
 		for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
-			if ( ! this->paritySlaveSockets[ i ] ) {
+			if ( ! this->parityServerSockets[ i ] ) {
 				continue;
-			} else if ( this->paritySlaveSockets[ i ]->self ) {
+			} else if ( this->parityServerSockets[ i ]->self ) {
 				if ( isUpdate ) {
 					/* Updated in the caller
 					bool r = false;
@@ -1872,7 +1872,7 @@ bool SlaveWorker::sendModifyChunkRequest(
 			} else {
 				// Insert into event queue
 				SlavePeerEvent slavePeerEvent;
-				slavePeerEvent.send( this->paritySlaveSockets[ i ], packet );
+				slavePeerEvent.send( this->parityServerSockets[ i ], packet );
 
 #ifdef SERVER_WORKER_SEND_REPLICAS_PARALLEL
 				if ( i == SlaveWorker::parityChunkCount - 1 )
@@ -1913,7 +1913,7 @@ bool SlaveWorker::sendModifyChunkRequest(
 					);
 				} else {
 					// This case never happens
-					// this->dataSlaveSockets[ original[ i * 2 + 1 ] ] = 0;
+					// this->dataServerSockets[ original[ i * 2 + 1 ] ] = 0;
 				}
 			}
 		}

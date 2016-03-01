@@ -180,8 +180,8 @@ bool CoordinatorRemapMsgHandler::transitToDegradedEnd( const struct sockaddr_in 
 	// all operation to slave get lock from coordinator
 	Coordinator *coordinator = Coordinator::getInstance();
 	LOCK_T *lock = &coordinator->sockets.slaves.lock;
-	std::vector<SlaveSocket *> &slaves = coordinator->sockets.slaves.values;
-	SlaveSocket *target = 0;
+	std::vector<ServerSocket *> &slaves = coordinator->sockets.slaves.values;
+	ServerSocket *target = 0;
 
 	LOCK( lock );
 	for ( size_t i = 0, size = slaves.size(); i < size; i++ ) {

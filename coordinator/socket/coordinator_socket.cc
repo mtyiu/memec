@@ -74,13 +74,13 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 			::close( fd );
 			socket->sockets.removeAt( index );
 		} else {
-			MasterSocket *masterSocket = coordinator->sockets.masters.get( fd );
-			SlaveSocket *slaveSocket = masterSocket ? 0 : coordinator->sockets.slaves.get( fd );
-			slaveSocket = slaveSocket ? slaveSocket : coordinator->sockets.backupSlaves.get( fd );
-			if ( masterSocket ) {
-				masterSocket->stop();
-			} else if ( slaveSocket ) {
-				slaveSocket->stop();
+			ClientSocket *clientSocket = coordinator->sockets.masters.get( fd );
+			ServerSocket *serverSocket = clientSocket ? 0 : coordinator->sockets.slaves.get( fd );
+			serverSocket = serverSocket ? serverSocket : coordinator->sockets.backupSlaves.get( fd );
+			if ( clientSocket ) {
+				clientSocket->stop();
+			} else if ( serverSocket ) {
+				serverSocket->stop();
 			} else {
 				__ERROR__( "CoordinatorSocket", "handler", "Unknown socket." );
 				return false;
@@ -129,20 +129,20 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 					struct AddressHeader addressHeader;
 					socket->protocol.parseAddressHeader( addressHeader, socket->buffer.data + PROTO_HEADER_SIZE, socket->buffer.size - PROTO_HEADER_SIZE );
 					if ( header.from == PROTO_MAGIC_FROM_CLIENT ) {
-						MasterSocket *masterSocket = new MasterSocket();
-						masterSocket->init( fd, *addr );
-						masterSocket->setListenAddr( addressHeader.addr, addressHeader.port );
-						coordinator->sockets.masters.set( fd, masterSocket );
+						ClientSocket *clientSocket = new ClientSocket();
+						clientSocket->init( fd, *addr );
+						clientSocket->setListenAddr( addressHeader.addr, addressHeader.port );
+						coordinator->sockets.masters.set( fd, clientSocket );
 						socket->sockets.removeAt( index );
 
 						socket->done( fd ); // The socket is valid
 
 						MasterEvent event;
-						instanceId = generator->generate( masterSocket );
-						event.resRegister( masterSocket, instanceId, header.requestId );
+						instanceId = generator->generate( clientSocket );
+						event.resRegister( clientSocket, instanceId, header.requestId );
 						coordinator->eventQueue.insert( event );
 					} else if ( header.from == PROTO_MAGIC_FROM_SERVER ) {
-						SlaveSocket *s = 0;
+						ServerSocket *s = 0;
 
 						for ( int i = 0, len = coordinator->sockets.slaves.size(); i < len; i++ ) {
 							if ( coordinator->sockets.slaves[ i ]->equal( addressHeader.addr, addressHeader.port ) ) {
@@ -168,7 +168,7 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 						} else {
 							// Treat it as backup slaves
 							ServerAddr serverAddr( "backup", addressHeader.addr, addressHeader.port );
-							s = new SlaveSocket();
+							s = new ServerSocket();
 							s->init( fd, serverAddr, socket->epoll );
 							s->setRecvFd( fd, addr );
 							coordinator->sockets.backupSlaves.set( fd, s );
@@ -201,16 +201,16 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 				return false;
 			}
 		} else {
-			MasterSocket *masterSocket = coordinator->sockets.masters.get( fd );
-			SlaveSocket *slaveSocket = masterSocket ? 0 : coordinator->sockets.slaves.get( fd );
-			slaveSocket = slaveSocket ? slaveSocket : coordinator->sockets.backupSlaves.get( fd );
-			if ( masterSocket ) {
+			ClientSocket *clientSocket = coordinator->sockets.masters.get( fd );
+			ServerSocket *serverSocket = clientSocket ? 0 : coordinator->sockets.slaves.get( fd );
+			serverSocket = serverSocket ? serverSocket : coordinator->sockets.backupSlaves.get( fd );
+			if ( clientSocket ) {
 				MasterEvent event;
-				event.pending( masterSocket );
+				event.pending( clientSocket );
 				coordinator->eventQueue.insert( event );
-			} else if ( slaveSocket ) {
+			} else if ( serverSocket ) {
 				SlaveEvent event;
-				event.pending( slaveSocket );
+				event.pending( serverSocket );
 				coordinator->eventQueue.insert( event );
 			} else {
 				__ERROR__( "CoordinatorSocket", "handler", "Unknown socket (fd = %d).", fd );

@@ -8,7 +8,7 @@
 #include "../../common/socket/socket.hh"
 #include "../../common/socket/epoll.hh"
 
-class MasterSocket : public Socket {
+class ClientSocket : public Socket {
 public:
 	bool isRunning;
 	pthread_t tid;
@@ -20,7 +20,7 @@ public:
 		char data[ PROTO_HEADER_SIZE ];
 	} buffer;
 
-	MasterSocket();
+	ClientSocket();
 	bool init( int type, uint32_t addr, uint16_t port, EPoll *epoll );
 	bool start();
 	void stop();

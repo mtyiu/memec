@@ -23,9 +23,9 @@ bool MasterWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *bu
 
 	// Find the slave peer socket in the array map
 	int index = -1, sockfd = -1;
-	SlaveSocket *original, *s;
+	ServerSocket *original, *s;
 	Master *master = Master::getInstance();
-	ArrayMap<int, SlaveSocket> *slaves = &master->sockets.slaves;
+	ArrayMap<int, ServerSocket> *slaves = &master->sockets.slaves;
 
 	// Remove the failed slave
 	for ( int i = 0, len = slaves->size(); i < len; i++ ) {
@@ -43,7 +43,7 @@ bool MasterWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *bu
 
 	// Create a new socket for the reconstructed slave
 	ServerAddr serverAddr( 0, dstHeader.addr, dstHeader.port );
-	s = new SlaveSocket();
+	s = new ServerSocket();
 	s->init( serverAddr, &master->sockets.epoll );
 
 	// Update sockfd in the array Map

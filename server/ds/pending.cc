@@ -318,7 +318,7 @@ bool Pending::insertRemapData( struct sockaddr_in target, uint32_t listId, uint3
 	return true;
 }
 
-bool Pending::insertRemapDataRequest( uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, uint32_t requestCount, SlavePeerSocket *target ) {
+bool Pending::insertRemapDataRequest( uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, uint32_t requestCount, ServerPeerSocket *target ) {
 	bool ret = false;
 	PendingIdentifier pid( instanceId, parentInstanceId, requestId, parentRequestId, target );
 	LOCK( &this->slavePeers.remappedDataRequestLock );
@@ -330,7 +330,7 @@ bool Pending::insertRemapDataRequest( uint16_t instanceId, uint16_t parentInstan
 	return ret;
 }
 
-void Pending::insertSlavePeerRegistration( uint32_t requestId, SlavePeerSocket *socket, bool success ) {
+void Pending::insertSlavePeerRegistration( uint32_t requestId, ServerPeerSocket *socket, bool success ) {
 	PendingRegistration reg;
 	reg.set( socket, requestId, success );
 	LOCK( &this->slavePeers.registrationLock );
@@ -552,7 +552,7 @@ bool Pending::eraseRecovery( uint8_t keySize, char *keyStr, uint16_t &instanceId
 	return ret;
 }
 
-bool Pending::eraseSlavePeerRegistration( uint32_t &requestId, SlavePeerSocket *&socket, bool &success ) {
+bool Pending::eraseSlavePeerRegistration( uint32_t &requestId, ServerPeerSocket *&socket, bool &success ) {
 	bool ret = false;
 	LOCK( &this->slavePeers.registrationLock );
 	if ( this->slavePeers.registration.size() ) {

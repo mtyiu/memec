@@ -57,13 +57,13 @@ public:
 		SlaveConfig slave;
 	} config;
 	struct {
-		SlaveSocket self;
+		ServerSocket self;
 		EPoll epoll;
 		ArrayMap<int, CoordinatorSocket> coordinators;
-		ArrayMap<int, MasterSocket> masters;
-		ArrayMap<int, SlavePeerSocket> slavePeers;
-		std::unordered_map<uint16_t, MasterSocket*> mastersIdToSocketMap;
-		std::unordered_map<uint16_t, SlavePeerSocket*> slavesIdToSocketMap;
+		ArrayMap<int, ClientSocket> masters;
+		ArrayMap<int, ServerPeerSocket> slavePeers;
+		std::unordered_map<uint16_t, ClientSocket*> mastersIdToSocketMap;
+		std::unordered_map<uint16_t, ServerPeerSocket*> slavesIdToSocketMap;
 		LOCK_T mastersIdToSocketLock;
 		LOCK_T slavesIdToSocketLock;
 	} sockets;
@@ -74,7 +74,7 @@ public:
 	SlaveEventQueue eventQueue;
 	PacketPool packetPool;
 	Coding *coding;
-	StripeList<SlavePeerSocket> *stripeList;
+	StripeList<ServerPeerSocket> *stripeList;
 	std::vector<StripeListIndex> stripeListIndex;
 	MemoryPool<Chunk> *chunkPool;
 	std::vector<MixedChunkBuffer *> chunkBuffer;

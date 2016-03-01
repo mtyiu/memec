@@ -89,14 +89,14 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 	}
 
 	if ( event.type == SLAVE_EVENT_TYPE_ANNOUNCE_SLAVE_CONNECTED ) {
-		ArrayMap<int, SlaveSocket> &slaves = Coordinator::getInstance()->sockets.slaves;
+		ArrayMap<int, ServerSocket> &slaves = Coordinator::getInstance()->sockets.slaves;
 		uint32_t requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
 
 		buffer.data = this->protocol.announceSlaveConnected( buffer.size, instanceId, requestId, event.socket );
 
 		LOCK( &slaves.lock );
 		for ( uint32_t i = 0; i < slaves.size(); i++ ) {
-			SlaveSocket *slave = slaves.values[ i ];
+			ServerSocket *slave = slaves.values[ i ];
 			if ( event.socket->equal( slave ) || ! slave->ready() )
 				continue; // No need to tell the new socket
 
@@ -110,8 +110,8 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			Coordinator::getInstance()->remapMsgHandler->addAliveSlave( slaveAddr );
 		UNLOCK( &slaves.lock );
 	} else if ( event.type == SLAVE_EVENT_TYPE_ANNOUNCE_SLAVE_RECONSTRUCTED ) {
-		ArrayMap<int, SlaveSocket> &slaves = Coordinator::getInstance()->sockets.slaves;
-		ArrayMap<int, SlaveSocket> &backupSlaves = Coordinator::getInstance()->sockets.backupSlaves;
+		ArrayMap<int, ServerSocket> &slaves = Coordinator::getInstance()->sockets.slaves;
+		ArrayMap<int, ServerSocket> &backupSlaves = Coordinator::getInstance()->sockets.backupSlaves;
 
 		buffer.data = this->protocol.announceSlaveReconstructed(
 			buffer.size, event.instanceId, event.requestId,
@@ -123,7 +123,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 		LOCK( &slaves.lock );
 		// Count the number of surviving slaves
 		for ( uint32_t i = 0, slavesSize = slaves.size(), size = slaves.size() + backupSlaves.size(); i < size; i++ ) {
-			SlaveSocket *slave = i < slavesSize ? slaves.values[ i ] : backupSlaves.values[ i - slavesSize ];
+			ServerSocket *slave = i < slavesSize ? slaves.values[ i ] : backupSlaves.values[ i - slavesSize ];
 			if ( slave->equal( event.message.reconstructed.dst ) || ! slave->ready() )
 				continue; // No need to tell the backup server
 			event.message.reconstructed.sockets->insert( slave );
@@ -141,7 +141,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 
 		// Send requests
 		for ( uint32_t i = 0, slavesSize = slaves.size(), size = slaves.size() + backupSlaves.size(); i < size; i++ ) {
-			SlaveSocket *slave = i < slavesSize ? slaves.values[ i ] : backupSlaves.values[ i - slavesSize ];
+			ServerSocket *slave = i < slavesSize ? slaves.values[ i ] : backupSlaves.values[ i - slavesSize ];
 			if ( slave->equal( event.message.reconstructed.dst ) || ! slave->ready() )
 				continue; // No need to tell the backup server
 
@@ -169,8 +169,8 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			this->dispatch( slaveEvent );
 		}
 	} else if ( event.type == SLAVE_EVENT_TYPE_TRIGGER_RECONSTRUCTION ) {
-		SlaveSocket *s = 0;
-		ArrayMap<int, SlaveSocket> &slaves = Coordinator::getInstance()->sockets.slaves;
+		ServerSocket *s = 0;
+		ArrayMap<int, ServerSocket> &slaves = Coordinator::getInstance()->sockets.slaves;
 
 		LOCK( &slaves.lock );
 		for ( uint32_t i = 0, size = slaves.size(); i < size; i++ ) {
@@ -347,7 +347,7 @@ bool CoordinatorWorker::processHeartbeat( SlaveEvent event, char *buf, size_t si
 	LOCK( &event.socket->map.keysLock );
 	for ( count = 0; count < heartbeat.keys; count++ ) {
 		if ( this->protocol.parseKeyOpMetadataHeader( header.op, processed, buf, size, offset ) ) {
-			SlaveSocket *s = event.socket;
+			ServerSocket *s = event.socket;
 			if ( header.op.opcode == PROTO_OPCODE_DELETE ) { // Handle keys from degraded DELETE
 				s = CoordinatorWorker::stripeList->get( header.op.listId, header.op.chunkId );
 			}

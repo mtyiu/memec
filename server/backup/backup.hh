@@ -123,7 +123,7 @@ private:
 	// timestamp -> delta
 	std::multimap<Timestamp, BackupDelta> dataUpdate;
 	std::multimap<Timestamp, BackupDelta> dataDelete;
-	// ( requestId, slaveSocket ) -> timestamp
+	// ( requestId, serverSocket ) -> timestamp
 	std::multimap<BackupPendingIdentifier, Timestamp> idToTimestampMap;
 	// timestamp -> delta
 	std::multimap<Timestamp, BackupDelta> parityUpdate;

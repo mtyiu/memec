@@ -24,7 +24,7 @@ public:
 	// ---------- register_protocol.cc ----------
 	char *resRegisterMaster( size_t &size, uint16_t instanceId, uint32_t requestId, bool success );
 	char *resRegisterSlave( size_t &size, uint16_t instanceId, uint32_t requestId, bool success );
-	char *announceSlaveConnected( size_t &size, uint16_t instanceId, uint32_t requestId, SlaveSocket *socket );
+	char *announceSlaveConnected( size_t &size, uint16_t instanceId, uint32_t requestId, ServerSocket *socket );
 
 	// ---------- load_protocol.cc ----------
 	char *reqPushLoadStats(
@@ -75,12 +75,12 @@ public:
 	// ---------- recovery_protocol.cc ----------
 	char *announceSlaveReconstructed(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
-		SlaveSocket *srcSocket, SlaveSocket *dstSocket,
+		ServerSocket *srcSocket, ServerSocket *dstSocket,
 		bool toSlave
 	);
 	char *promoteBackupSlave(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
-		SlaveSocket *srcSocket,
+		ServerSocket *srcSocket,
 		std::unordered_set<Metadata> &chunks,
 		std::unordered_set<Metadata>::iterator &chunksIt,
 		std::unordered_set<Key> &keys,

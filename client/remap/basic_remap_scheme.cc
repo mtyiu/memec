@@ -5,7 +5,7 @@
 
 SlaveLoading *BasicRemappingScheme::slaveLoading = NULL;
 OverloadedSlave *BasicRemappingScheme::overloadedSlave = NULL;
-StripeList<SlaveSocket> *BasicRemappingScheme::stripeList = NULL;
+StripeList<ServerSocket> *BasicRemappingScheme::stripeList = NULL;
 MasterRemapMsgHandler *BasicRemappingScheme::remapMsgHandler = NULL;
 
 Latency BasicRemappingScheme::increment ( 0, 100 );
@@ -13,7 +13,7 @@ Latency BasicRemappingScheme::increment ( 0, 100 );
 void BasicRemappingScheme::redirect(
 	uint32_t *original, uint32_t *remapped, uint32_t numEntries, uint32_t &remappedCount,
 	uint32_t dataChunkCount, uint32_t parityChunkCount,
-	SlaveSocket **dataSlaveSockets, SlaveSocket **paritySlaveSockets,
+	ServerSocket **dataServerSockets, ServerSocket **parityServerSockets,
 	bool isGet
 ) {
 	struct sockaddr_in slaveAddr;
@@ -31,9 +31,9 @@ void BasicRemappingScheme::redirect(
 	for ( uint32_t i = 0; i < numEntries; i++ ) {
 		uint32_t chunkId = original[ i * 2 + 1 ];
 		if ( chunkId < dataChunkCount )
-			slaveAddr = dataSlaveSockets[ chunkId ]->getAddr();
+			slaveAddr = dataServerSockets[ chunkId ]->getAddr();
 		else
-			slaveAddr = paritySlaveSockets[ chunkId - dataChunkCount ]->getAddr();
+			slaveAddr = parityServerSockets[ chunkId - dataChunkCount ]->getAddr();
 
 		selectedSlaves.insert( slaveAddr ); // All original or failed slaves should not be selected as remapped slaves
 
@@ -71,9 +71,9 @@ void BasicRemappingScheme::redirect(
 
 		for ( uint32_t j = 0; j < dataChunkCount + parityChunkCount; j++ ) {
 			if ( j < dataChunkCount )
-				slaveAddr = dataSlaveSockets[ j ]->getAddr();
+				slaveAddr = dataServerSockets[ j ]->getAddr();
 			else
-				slaveAddr = paritySlaveSockets[ j - dataChunkCount ]->getAddr();
+				slaveAddr = parityServerSockets[ j - dataChunkCount ]->getAddr();
 
 			if ( selectedSlaves.count( slaveAddr ) ) {
 				// Skip original slaves
@@ -125,7 +125,7 @@ void BasicRemappingScheme::redirect(
 	UNLOCK( &overloadedSlave->lock );
 }
 
-bool BasicRemappingScheme::isOverloaded( SlaveSocket *socket ) {
+bool BasicRemappingScheme::isOverloaded( ServerSocket *socket ) {
 	struct sockaddr_in slaveAddr;
 
 	if ( slaveLoading == NULL || overloadedSlave == NULL || stripeList == NULL || remapMsgHandler == NULL ) {

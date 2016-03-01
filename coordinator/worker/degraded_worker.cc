@@ -30,8 +30,8 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 		return false;
 	}
 
-	// Find the SlaveSocket which stores the stripe with listId and srcDataChunkId
-	SlaveSocket *socket;
+	// Find the ServerSocket which stores the stripe with listId and srcDataChunkId
+	ServerSocket *socket;
 	uint32_t ongoingAtChunk;
 	uint32_t listId = CoordinatorWorker::stripeList->get( header.key, header.keySize, &socket, 0, &ongoingAtChunk );
 	Map *map = &( socket->map );
@@ -43,7 +43,7 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 	uint32_t ptr = 0;
 	CoordinatorRemapMsgHandler *crmh = CoordinatorRemapMsgHandler::getInstance();
 	for ( uint32_t i = 0; i < CoordinatorWorker::chunkCount; i++ ) {
-		SlaveSocket *s = CoordinatorWorker::stripeList->get( listId, i );
+		ServerSocket *s = CoordinatorWorker::stripeList->get( listId, i );
 		struct sockaddr_in addr = s->getAddr();
 		if ( ! crmh->allowRemapping( addr ) ) {
 			numSurvivingChunkIds++;
@@ -66,7 +66,7 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 	} else {
 		// Check whether the "failed" servers are in intermediate or degraded state
 		for ( uint32_t i = 0; i < header.reconstructedCount; ) {
-			SlaveSocket *s = CoordinatorWorker::stripeList->get(
+			ServerSocket *s = CoordinatorWorker::stripeList->get(
 				header.original[ i * 2    ],
 				header.original[ i * 2 + 1 ]
 			);
@@ -216,10 +216,10 @@ bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf,
 	return ret;
 }
 
-bool CoordinatorWorker::handleReleaseDegradedLockRequest( SlaveSocket *socket, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done ) {
+bool CoordinatorWorker::handleReleaseDegradedLockRequest( ServerSocket *socket, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done ) {
 	std::unordered_map<ListStripe, DegradedLock>::iterator dlsIt;
 	Map &map = socket->map;
-	SlaveSocket *dstSocket;
+	ServerSocket *dstSocket;
 	bool isCompleted, connected;
 	uint16_t instanceId;
 	uint32_t requestId;

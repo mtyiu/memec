@@ -23,7 +23,7 @@ private:
 	static uint32_t chunkCount;
 	static IDGenerator *idGenerator;
 	static CoordinatorEventQueue *eventQueue;
-	static StripeList<SlaveSocket> *stripeList;
+	static StripeList<ServerSocket> *stripeList;
 	static Pending *pending;
 
 	// ---------- worker.cc ----------
@@ -45,12 +45,12 @@ private:
 
 	// ---------- degraded_worker.cc ----------
 	bool handleDegradedLockRequest( MasterEvent event, char *buf, size_t size );
-	bool handleReleaseDegradedLockRequest( SlaveSocket *socket, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done );
+	bool handleReleaseDegradedLockRequest( ServerSocket *socket, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done );
 	bool handleReleaseDegradedLockResponse( SlaveEvent event, char *buf, size_t size );
 
 	// ---------- recovery_worker.cc ----------
 	bool handlePromoteBackupSlaveResponse( SlaveEvent event, char *buf, size_t size );
-	bool handleReconstructionRequest( SlaveSocket *socket );
+	bool handleReconstructionRequest( ServerSocket *socket );
 	bool handleReconstructionResponse( SlaveEvent event, char *buf, size_t size );
 	bool handleReconstructionUnsealedResponse( SlaveEvent event, char *buf, size_t size );
 

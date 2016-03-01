@@ -2,14 +2,14 @@
 #include "../main/coordinator.hh"
 #include "../event/server_event.hh"
 
-ArrayMap<int, SlaveSocket> *SlaveSocket::slaves;
+ArrayMap<int, ServerSocket> *ServerSocket::slaves;
 
-void SlaveSocket::setArrayMap( ArrayMap<int, SlaveSocket> *slaves ) {
-	SlaveSocket::slaves = slaves;
+void ServerSocket::setArrayMap( ArrayMap<int, ServerSocket> *slaves ) {
+	ServerSocket::slaves = slaves;
 	slaves->needsDelete = false;
 }
 
-bool SlaveSocket::init( int tmpfd, ServerAddr &addr, EPoll *epoll ) {
+bool ServerSocket::init( int tmpfd, ServerAddr &addr, EPoll *epoll ) {
 	this->identifier = strdup( addr.name );
 	this->mode = SOCKET_MODE_UNDEFINED;
 	this->connected = false;
@@ -22,14 +22,14 @@ bool SlaveSocket::init( int tmpfd, ServerAddr &addr, EPoll *epoll ) {
 	return true;
 }
 
-bool SlaveSocket::start() {
+bool ServerSocket::start() {
 	return this->connect();
 }
 
-void SlaveSocket::stop() {
+void ServerSocket::stop() {
 	int newFd = - this->sockfd;
 
-	SlaveSocket::slaves->replaceKey( this->sockfd, newFd );
+	ServerSocket::slaves->replaceKey( this->sockfd, newFd );
 	Socket::stop();
 
 	SlaveEvent event;
@@ -40,7 +40,7 @@ void SlaveSocket::stop() {
 	// delete this;
 }
 
-bool SlaveSocket::setRecvFd( int fd, struct sockaddr_in *addr ) {
+bool ServerSocket::setRecvFd( int fd, struct sockaddr_in *addr ) {
 	bool ret = false;
 	this->recvAddr = *addr;
 	this->mode = SOCKET_MODE_CONNECT;
@@ -53,18 +53,18 @@ bool SlaveSocket::setRecvFd( int fd, struct sockaddr_in *addr ) {
 	return ret;
 }
 
-ssize_t SlaveSocket::send( char *buf, size_t ulen, bool &connected ) {
+ssize_t ServerSocket::send( char *buf, size_t ulen, bool &connected ) {
 	return Socket::send( this->sockfd, buf, ulen, connected );
 }
 
-ssize_t SlaveSocket::recv( char *buf, size_t ulen, bool &connected, bool wait ) {
+ssize_t ServerSocket::recv( char *buf, size_t ulen, bool &connected, bool wait ) {
 	return Socket::recv( this->sockfd, buf, ulen, connected, wait );
 }
 
-ssize_t SlaveSocket::recvRem( char *buf, size_t expected, char *prevBuf, size_t prevSize, bool &connected ) {
+ssize_t ServerSocket::recvRem( char *buf, size_t expected, char *prevBuf, size_t prevSize, bool &connected ) {
 	return Socket::recvRem( this->sockfd, buf, expected, prevBuf, prevSize, connected );
 }
 
-bool SlaveSocket::done() {
+bool ServerSocket::done() {
 	return Socket::done( this->sockfd );
 }

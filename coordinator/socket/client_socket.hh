@@ -4,9 +4,9 @@
 #include "../../common/ds/array_map.hh"
 #include "../../common/socket/socket.hh"
 
-class MasterSocket : public Socket {
+class ClientSocket : public Socket {
 private:
-	static ArrayMap<int, MasterSocket> *masters;
+	static ArrayMap<int, ClientSocket> *masters;
 
 public:
 	uint16_t instanceId;
@@ -15,7 +15,7 @@ public:
 		uint16_t port;
 	} listenAddr;
 
-	static void setArrayMap( ArrayMap<int, MasterSocket> *masters );
+	static void setArrayMap( ArrayMap<int, ClientSocket> *masters );
 	bool start();
 	void stop();
 	void setListenAddr( uint32_t addr, uint16_t port );

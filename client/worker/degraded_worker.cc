@@ -52,7 +52,7 @@ bool MasterWorker::sendDegradedLockRequest(
 
 bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool success, char *buf, size_t size ) {
 	uint32_t originalListId, originalChunkId;
-	SlaveSocket *socket = 0;
+	ServerSocket *socket = 0;
 	struct DegradedLockResHeader header;
 	if ( ! this->protocol.parseDegradedLockResHeader( header, buf, size ) ) {
 		__ERROR__( "MasterWorker", "handleDegradedLockResponse", "Invalid DEGRADED_LOCK response." );

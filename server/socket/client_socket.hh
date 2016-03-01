@@ -5,14 +5,14 @@
 #include "../../common/socket/socket.hh"
 #include "../backup/backup.hh"
 
-class MasterSocket : public Socket {
+class ClientSocket : public Socket {
 private:
-	static ArrayMap<int, MasterSocket> *masters;
+	static ArrayMap<int, ClientSocket> *masters;
 
 public:
 	SlaveBackup backup;
 
-	static void setArrayMap( ArrayMap<int, MasterSocket> *masters );
+	static void setArrayMap( ArrayMap<int, ClientSocket> *masters );
 	bool start();
 	void stop();
 	ssize_t send( char *buf, size_t ulen, bool &connected );

@@ -19,7 +19,7 @@ enum SlaveEventType {
 class SlaveEvent : public Event {
 public:
 	SlaveEventType type;
-	SlaveSocket *socket;
+	ServerSocket *socket;
 	uint16_t instanceId;
 	uint32_t requestId;
 	uint32_t timestamp;
@@ -41,12 +41,12 @@ public:
 		} ack;
 	} message;
 
-	void reqRegister( SlaveSocket *socket, uint32_t addr, uint16_t port );
-	void send( SlaveSocket *socket, Packet *packet );
-	void syncMetadata( SlaveSocket *socket );
-	void ackParityDelta( SlaveSocket *socket, std::vector<uint32_t> timestamps, uint16_t targetId, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter );
-	void revertDelta( SlaveSocket *socket, std::vector<uint32_t> timestamps, std::vector<Key> requests, uint16_t targetId, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter );
-	void pending( SlaveSocket *socket );
+	void reqRegister( ServerSocket *socket, uint32_t addr, uint16_t port );
+	void send( ServerSocket *socket, Packet *packet );
+	void syncMetadata( ServerSocket *socket );
+	void ackParityDelta( ServerSocket *socket, std::vector<uint32_t> timestamps, uint16_t targetId, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter );
+	void revertDelta( ServerSocket *socket, std::vector<uint32_t> timestamps, std::vector<Key> requests, uint16_t targetId, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter );
+	void pending( ServerSocket *socket );
 };
 
 #endif

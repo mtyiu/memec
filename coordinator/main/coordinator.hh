@@ -61,14 +61,14 @@ public:
 	struct {
 		CoordinatorSocket self;
 		EPoll epoll;
-		ArrayMap<int, MasterSocket> masters;
-		ArrayMap<int, SlaveSocket> slaves;
-		ArrayMap<int, SlaveSocket> backupSlaves;
+		ArrayMap<int, ClientSocket> masters;
+		ArrayMap<int, ServerSocket> slaves;
+		ArrayMap<int, ServerSocket> backupSlaves;
 	} sockets;
 	IDGenerator idGenerator;
 	CoordinatorEventQueue eventQueue;
 	/* Stripe list */
-	StripeList<SlaveSocket> *stripeList;
+	StripeList<ServerSocket> *stripeList;
 	/* Remapping */
 	CoordinatorRemapMsgHandler *remapMsgHandler;
 	RemappingRecordMap remappingRecords;
@@ -94,7 +94,7 @@ public:
 	} log;
 	struct {
 		bool isRecovering;
-		std::vector<SlaveSocket *> sockets;
+		std::vector<ServerSocket *> sockets;
 		LOCK_T lock;
 	} waitingForRecovery;
 	Timer statsTimer;
@@ -106,7 +106,7 @@ public:
 		return &coordinator;
 	}
 
-	void switchPhaseForCrashedSlave( SlaveSocket *slaveSocket );
+	void switchPhaseForCrashedSlave( ServerSocket *serverSocket );
 
 	static void signalHandler( int signal );
 

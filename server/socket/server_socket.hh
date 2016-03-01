@@ -8,7 +8,7 @@
 #include "../../common/socket/socket.hh"
 #include "../../common/socket/epoll.hh"
 
-class SlaveSocket : public Socket {
+class ServerSocket : public Socket {
 public:
 	bool isRunning;
 	pthread_t tid;
@@ -21,7 +21,7 @@ public:
 	} buffer;
 	char *identifier;
 
-	SlaveSocket();
+	ServerSocket();
 	bool init( int type, uint32_t addr, uint16_t port, char *name, EPoll *epoll );
 	bool start();
 	void stop();

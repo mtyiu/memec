@@ -164,7 +164,7 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 	} else if ( event.type == MASTER_EVENT_TYPE_SWITCH_PHASE ) {
 		connected = true; // just to avoid error message
 	} else if ( event.type == MASTER_EVENT_TYPE_ANNOUNCE_SLAVE_RECONSTRUCTED ) {
-		ArrayMap<int, MasterSocket> &masters = Coordinator::getInstance()->sockets.masters;
+		ArrayMap<int, ClientSocket> &masters = Coordinator::getInstance()->sockets.masters;
 		uint32_t requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
 
 		buffer.data = this->protocol.announceSlaveReconstructed(
@@ -176,7 +176,7 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 
 		LOCK( &masters.lock );
 		for ( uint32_t i = 0, size = masters.size(); i < size; i++ ) {
-			MasterSocket *master = masters.values[ i ];
+			ClientSocket *master = masters.values[ i ];
 			if ( ! master->ready() )
 				continue; // Skip failed masters
 
@@ -301,7 +301,7 @@ bool CoordinatorWorker::handleSyncMetadata( MasterEvent event, char *buf, size_t
 	// uint16_t instanceId = event.instanceId;
 	uint32_t count, requestId = event.requestId;
 	size_t processed, offset, failed = 0;
-	SlaveSocket *target = 0;
+	ServerSocket *target = 0;
 	struct AddressHeader address;
 	struct HeartbeatHeader heartbeat;
 	union {
@@ -326,7 +326,7 @@ bool CoordinatorWorker::handleSyncMetadata( MasterEvent event, char *buf, size_t
 		heartbeat.sealed, heartbeat.keys
 	);
 
-	ArrayMap<int, SlaveSocket> &slaves = Coordinator::getInstance()->sockets.slaves;
+	ArrayMap<int, ServerSocket> &slaves = Coordinator::getInstance()->sockets.slaves;
 	LOCK( &slaves.lock );
 	for ( uint32_t i = 0; i < slaves.size(); i++ ) {
 		if ( slaves.values[ i ]->equal( address.addr, address.port ) ) {
@@ -365,7 +365,7 @@ bool CoordinatorWorker::handleSyncMetadata( MasterEvent event, char *buf, size_t
 	LOCK( &target->map.keysLock );
 	for ( count = 0; count < heartbeat.keys; count++ ) {
 		if ( this->protocol.parseKeyOpMetadataHeader( header.op, processed, buf, size, offset ) ) {
-			SlaveSocket *s = target;
+			ServerSocket *s = target;
 			if ( header.op.opcode == PROTO_OPCODE_DELETE ) { // Handle keys from degraded DELETE
 				s = CoordinatorWorker::stripeList->get( header.op.listId, header.op.chunkId );
 			}

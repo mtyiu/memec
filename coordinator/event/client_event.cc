@@ -1,14 +1,14 @@
 #include <vector>
 #include "client_event.hh"
 
-void MasterEvent::resRegister( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, bool success ) {
+void MasterEvent::resRegister( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, bool success ) {
 	this->type = success ? MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS : MASTER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
 }
 
-void MasterEvent::reqPushLoadStats( MasterSocket *socket, ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
+void MasterEvent::reqPushLoadStats( ClientSocket *socket, ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
 		ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency, std::set<struct sockaddr_in> *overloadedSlaveSet ) {
 	this->type = MASTER_EVENT_TYPE_PUSH_LOADING_STATS;
 	this->socket = socket;
@@ -17,7 +17,7 @@ void MasterEvent::reqPushLoadStats( MasterSocket *socket, ArrayMap<struct sockad
 	this->message.slaveLoading.overloadedSlaveSet = overloadedSlaveSet;
 }
 
-void MasterEvent::resRemappingSetLock( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, bool success, uint32_t *original, uint32_t *remapped, uint32_t remappedCount, Key &key ) {
+void MasterEvent::resRemappingSetLock( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, bool success, uint32_t *original, uint32_t *remapped, uint32_t remappedCount, Key &key ) {
 	this->type = success ? MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_SUCCESS : MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_FAILURE;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
@@ -37,7 +37,7 @@ void MasterEvent::switchPhase( bool toRemap, std::set<struct sockaddr_in> slaves
 }
 
 void MasterEvent::resDegradedLock(
-	MasterSocket *socket, uint16_t instanceId, uint32_t requestId,
+	ClientSocket *socket, uint16_t instanceId, uint32_t requestId,
 	Key &key, bool isLocked, bool isSealed,
 	uint32_t stripeId, uint32_t dataChunkId, uint32_t dataChunkCount,
 	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
@@ -60,7 +60,7 @@ void MasterEvent::resDegradedLock(
 	this->message.degradedLock.survivingChunkIds = survivingChunkIds;
 }
 
-void MasterEvent::resDegradedLock( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool exist ) {
+void MasterEvent::resDegradedLock( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool exist ) {
 	this->type = exist ? MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_LOCKED : MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_FOUND;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
@@ -68,7 +68,7 @@ void MasterEvent::resDegradedLock( MasterSocket *socket, uint16_t instanceId, ui
 	this->message.degradedLock.key = key;
 }
 
-void MasterEvent::resDegradedLock( MasterSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, uint32_t *original, uint32_t *remapped, uint32_t remappedCount ) {
+void MasterEvent::resDegradedLock( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, uint32_t *original, uint32_t *remapped, uint32_t remappedCount ) {
 	this->type = MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_REMAPPED;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
@@ -79,13 +79,13 @@ void MasterEvent::resDegradedLock( MasterSocket *socket, uint16_t instanceId, ui
 	this->message.degradedLock.remapped = remapped;
 }
 
-void MasterEvent::announceSlaveReconstructed( SlaveSocket *srcSocket, SlaveSocket *dstSocket ) {
+void MasterEvent::announceSlaveReconstructed( ServerSocket *srcSocket, ServerSocket *dstSocket ) {
 	this->type = MASTER_EVENT_TYPE_ANNOUNCE_SLAVE_RECONSTRUCTED;
 	this->message.reconstructed.src = srcSocket;
 	this->message.reconstructed.dst = dstSocket;
 }
 
-void MasterEvent::pending( MasterSocket *socket ) {
+void MasterEvent::pending( ClientSocket *socket ) {
 	this->type = MASTER_EVENT_TYPE_PENDING;
 	this->socket = socket;
 }

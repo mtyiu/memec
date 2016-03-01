@@ -17,7 +17,7 @@ bool SlaveWorker::handleRemappedData( CoordinatorEvent event, char *buf, size_t 
 	struct sockaddr_in target;
 	target.sin_addr.s_addr = header.addr;
 	target.sin_port = header.port;
-	SlavePeerSocket *socket = 0;
+	ServerPeerSocket *socket = 0;
 	for ( uint32_t i = 0; i < slave->sockets.slavePeers.size(); i++ ) {
 		if ( slave->sockets.slavePeers.values[ i ]->getAddr() == target ) {
 			socket = slave->sockets.slavePeers.values[ i ];
@@ -255,7 +255,7 @@ bool SlaveWorker::handleRemappingSetResponse( SlavePeerEvent event, bool success
 		}
 
 		masterEvent.resRemappingSet(
-			( MasterSocket * ) pid.ptr, pid.instanceId, pid.requestId, record.key,
+			( ClientSocket * ) pid.ptr, pid.instanceId, pid.requestId, record.key,
 			record.remap.listId, record.remap.chunkId, success, true,
 			header.sockfd, header.isRemapped
 		);
@@ -341,8 +341,8 @@ bool SlaveWorker::handleRemappedUpdateResponse( SlavePeerEvent event, bool succe
 	// Slave *slave = Slave::getInstance();
 	// LOCK( &slave->sockets.mastersIdToSocketLock );
 	// try {
-	// 	MasterSocket *masterSocket = slave->sockets.mastersIdToSocketMap.at( event.instanceId );
-	// 	masterSocket->backup.removeDataUpdate( event.requestId, event.socket );
+	// 	ClientSocket *clientSocket = slave->sockets.mastersIdToSocketMap.at( event.instanceId );
+	// 	clientSocket->backup.removeDataUpdate( event.requestId, event.socket );
 	// } catch ( std::out_of_range &e ) {
 	// 	__ERROR__( "SlaveWorker", "handleUpdateResponse", "Cannot find a pending parity slave UPDATE backup for instance ID = %hu, request ID = %u. (Socket mapping not found)", event.instanceId, event.requestId );
 	// }
@@ -363,7 +363,7 @@ bool SlaveWorker::handleRemappedUpdateResponse( SlavePeerEvent event, bool succe
 		}
 
 		masterEvent.resUpdate(
-			( MasterSocket * ) pid.ptr, pid.instanceId, pid.requestId,
+			( ClientSocket * ) pid.ptr, pid.instanceId, pid.requestId,
 			keyValueUpdate,
 			header.valueUpdateOffset,
 			header.valueUpdateSize,

@@ -55,19 +55,19 @@ public:
 		MasterConfig master;
 	} config;
 	struct {
-		MasterSocket self;
+		ClientSocket self;
 		EPoll epoll;
 		ArrayMap<int, ApplicationSocket> applications;
 		ArrayMap<int, CoordinatorSocket> coordinators;
-		ArrayMap<int, SlaveSocket> slaves;
-		std::unordered_map<uint16_t, SlaveSocket*> slavesIdToSocketMap;
+		ArrayMap<int, ServerSocket> slaves;
+		std::unordered_map<uint16_t, ServerSocket*> slavesIdToSocketMap;
 		LOCK_T slavesIdToSocketLock;
 	} sockets;
 	IDGenerator idGenerator;
 	Pending pending;
 	MasterEventQueue eventQueue;
 	PacketPool packetPool;
-	StripeList<SlaveSocket> *stripeList;
+	StripeList<ServerSocket> *stripeList;
 	/* Remapping */
 	MasterRemapMsgHandler remapMsgHandler;
 	/* Loading statistics */
@@ -100,14 +100,14 @@ public:
 	void printBackup( FILE *f = stdout );
 	void syncMetadata();
 	void time();
-	void ackParityDelta( FILE *f = 0, SlaveSocket *target = 0, pthread_cond_t *condition = 0, LOCK_T *lock = 0, uint32_t *counter = 0, bool force = false );
-	bool revertDelta( FILE *f = 0, SlaveSocket *target = 0, pthread_cond_t *condition = 0, LOCK_T *lock = 0, uint32_t *counter = 0, bool force = false );
+	void ackParityDelta( FILE *f = 0, ServerSocket *target = 0, pthread_cond_t *condition = 0, LOCK_T *lock = 0, uint32_t *counter = 0, bool force = false );
+	bool revertDelta( FILE *f = 0, ServerSocket *target = 0, pthread_cond_t *condition = 0, LOCK_T *lock = 0, uint32_t *counter = 0, bool force = false );
 	double getElapsedTime();
 	void interactive();
 	bool setDebugFlag( char *input );
 
 	// Helper function for detecting whether degraded mode is enabled
-	bool isDegraded( SlaveSocket *socket );
+	bool isDegraded( ServerSocket *socket );
 
 	// Helper function to update slave stats
 	void mergeSlaveCumulativeLoading(

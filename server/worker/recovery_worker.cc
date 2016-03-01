@@ -23,7 +23,7 @@ bool SlaveWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *buf
 
 	// Find the slave peer socket in the array map
 	int index = -1, sockfd = -1;
-	SlavePeerSocket *original, *s;
+	ServerPeerSocket *original, *s;
 	Slave *slave = Slave::getInstance();
 	bool self = false;
 
@@ -60,7 +60,7 @@ bool SlaveWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *buf
 		slave->init( mySlaveIndex );
 	}
 
-	s = new SlavePeerSocket();
+	s = new ServerPeerSocket();
 	s->init(
 		sockfd, serverAddr,
 		&Slave::getInstance()->sockets.epoll,
@@ -108,7 +108,7 @@ bool SlaveWorker::handleBackupSlavePromotedMsg( CoordinatorEvent event, char *bu
 
 	// Find the slave peer socket in the array map
 	int index = -1, sockfd = -1;
-	SlavePeerSocket *original, *s;
+	ServerPeerSocket *original, *s;
 	Slave *slave = Slave::getInstance();
 	bool self = false;
 
@@ -129,7 +129,7 @@ bool SlaveWorker::handleBackupSlavePromotedMsg( CoordinatorEvent event, char *bu
 	ServerAddr addr( 0, header.addr, header.port );
 	slave->init( index );
 
-	s = new SlavePeerSocket();
+	s = new ServerPeerSocket();
 	s->init(
 		sockfd, addr,
 		&( slave->sockets.epoll ),
@@ -188,17 +188,17 @@ bool SlaveWorker::handleReconstructionRequest( CoordinatorEvent event, char *buf
 	ChunkRequest chunkRequest;
 	Metadata metadata;
 	Chunk *chunk;
-	SlavePeerSocket *socket = 0;
+	ServerPeerSocket *socket = 0;
 
 	// Check whether the number of surviving nodes >= k
-	SlaveWorker::stripeList->get( header.listId, this->paritySlaveSockets, this->dataSlaveSockets );
+	SlaveWorker::stripeList->get( header.listId, this->parityServerSockets, this->dataServerSockets );
 	chunkCount = 0;
 	for ( uint32_t i = 0; i < SlaveWorker::chunkCount; i++ ) {
 		if ( i == header.chunkId )
 			continue;
 		socket = ( i < SlaveWorker::dataChunkCount ) ?
-				 ( this->dataSlaveSockets[ i ] ) :
-				 ( this->paritySlaveSockets[ i - SlaveWorker::dataChunkCount ] );
+				 ( this->dataServerSockets[ i ] ) :
+				 ( this->parityServerSockets[ i - SlaveWorker::dataChunkCount ] );
 		if ( socket->ready() ) chunkCount++;
 		if ( socket->self ) myChunkId = i;
 	}
@@ -240,8 +240,8 @@ bool SlaveWorker::handleReconstructionRequest( CoordinatorEvent event, char *buf
 		while( chunkCount < SlaveWorker::dataChunkCount - 1 ) {
 			if ( chunkId != header.chunkId ) { // skip the chunk to be reconstructed
 				socket = ( chunkId < SlaveWorker::dataChunkCount ) ?
-						 ( this->dataSlaveSockets[ chunkId ] ) :
-						 ( this->paritySlaveSockets[ chunkId - SlaveWorker::dataChunkCount ] );
+						 ( this->dataServerSockets[ chunkId ] ) :
+						 ( this->parityServerSockets[ chunkId - SlaveWorker::dataChunkCount ] );
 				if ( socket->ready() && ! socket->self ) { // use this slave
 					metadata.chunkId = chunkId;
 					chunkRequest.set(
@@ -286,8 +286,8 @@ bool SlaveWorker::handleReconstructionRequest( CoordinatorEvent event, char *buf
 	for ( uint32_t i = 0; i < SlaveWorker::chunkCount; i++ ) {
 		if ( metadataList[ i ]->size() > 0 ) {
 			socket = ( i < SlaveWorker::dataChunkCount ) ?
-					 ( this->dataSlaveSockets[ i ] ) :
-					 ( this->paritySlaveSockets[ i - SlaveWorker::dataChunkCount ] );
+					 ( this->dataServerSockets[ i ] ) :
+					 ( this->parityServerSockets[ i - SlaveWorker::dataChunkCount ] );
 
 			slavePeerEvent.batchGetChunks( socket, requestIds[ i ], metadataList[ i ] );
 			// SlaveWorker::eventQueue->insert( slavePeerEvent );
@@ -316,7 +316,7 @@ bool SlaveWorker::handleReconstructionUnsealedRequest( CoordinatorEvent event, c
 	std::unordered_set<Key>::iterator unsealedKeysIt;
 	std::unordered_set<uint32_t> stripeIds;
 	uint32_t listId, chunkId;
-	SlavePeerSocket *reconstructedSlave = 0;
+	ServerPeerSocket *reconstructedSlave = 0;
 
 	std::unordered_map<Key, KeyValue> *keyValueMap;
 	LOCK_T *lock;

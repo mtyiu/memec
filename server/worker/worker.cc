@@ -7,13 +7,13 @@ uint32_t SlaveWorker::chunkCount;
 bool SlaveWorker::disableSeal;
 unsigned int SlaveWorker::delay;
 IDGenerator *SlaveWorker::idGenerator;
-ArrayMap<int, SlavePeerSocket> *SlaveWorker::slavePeers;
+ArrayMap<int, ServerPeerSocket> *SlaveWorker::slavePeers;
 Pending *SlaveWorker::pending;
 PendingAck *SlaveWorker::pendingAck;
 ServerAddr *SlaveWorker::slaveServerAddr;
 Coding *SlaveWorker::coding;
 SlaveEventQueue *SlaveWorker::eventQueue;
-StripeList<SlavePeerSocket> *SlaveWorker::stripeList;
+StripeList<ServerPeerSocket> *SlaveWorker::stripeList;
 std::vector<StripeListIndex> *SlaveWorker::stripeListIndex;
 Map *SlaveWorker::map;
 MemoryPool<Chunk> *SlaveWorker::chunkPool;
@@ -75,28 +75,28 @@ void SlaveWorker::dispatch( IOEvent event ) {
 void SlaveWorker::dispatch( SlaveEvent event ) {
 }
 
-SlavePeerSocket *SlaveWorker::getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId ) {
-	SlavePeerSocket *ret;
+ServerPeerSocket *SlaveWorker::getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId ) {
+	ServerPeerSocket *ret;
 	listId = SlaveWorker::stripeList->get(
 		data, ( size_t ) size,
-		this->dataSlaveSockets,
-		this->paritySlaveSockets,
+		this->dataServerSockets,
+		this->parityServerSockets,
 		&chunkId, false
 	);
 
-	ret = *this->dataSlaveSockets;
+	ret = *this->dataServerSockets;
 
 	return ret;
 }
 
 bool SlaveWorker::getSlaves( uint32_t listId ) {
-	SlaveWorker::stripeList->get( listId, this->paritySlaveSockets, this->dataSlaveSockets );
+	SlaveWorker::stripeList->get( listId, this->parityServerSockets, this->dataServerSockets );
 
 	for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ )
-		if ( ! this->paritySlaveSockets[ i ]->ready() )
+		if ( ! this->parityServerSockets[ i ]->ready() )
 			return false;
 	for ( uint32_t i = 0; i < SlaveWorker::dataChunkCount; i++ )
-		if ( ! this->dataSlaveSockets[ i ]->ready() )
+		if ( ! this->dataServerSockets[ i ]->ready() )
 			return false;
 	return true;
 }
@@ -129,8 +129,8 @@ void SlaveWorker::free() {
 	delete[] this->forward.chunks;
 
 	delete[] this->freeChunks;
-	delete[] this->dataSlaveSockets;
-	delete[] this->paritySlaveSockets;
+	delete[] this->dataServerSockets;
+	delete[] this->parityServerSockets;
 }
 
 void *SlaveWorker::run( void *argv ) {
@@ -274,8 +274,8 @@ bool SlaveWorker::init( GlobalConfig &globalConfig, SlaveConfig &slaveConfig, Wo
 	this->sealIndicators[ SlaveWorker::parityChunkCount ] = new bool[ SlaveWorker::dataChunkCount ];
 	this->sealIndicators[ SlaveWorker::parityChunkCount + 1 ] = new bool[ SlaveWorker::dataChunkCount ];
 
-	this->dataSlaveSockets = new SlavePeerSocket*[ SlaveWorker::dataChunkCount ];
-	this->paritySlaveSockets = new SlavePeerSocket*[ SlaveWorker::parityChunkCount ];
+	this->dataServerSockets = new ServerPeerSocket*[ SlaveWorker::dataChunkCount ];
+	this->parityServerSockets = new ServerPeerSocket*[ SlaveWorker::parityChunkCount ];
 	switch( this->role ) {
 		case WORKER_ROLE_MIXED:
 		case WORKER_ROLE_IO:

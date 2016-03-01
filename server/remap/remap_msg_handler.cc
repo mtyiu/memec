@@ -107,8 +107,8 @@ void SlaveRemapMsgHandler::setState( char* msg , int len ) {
 
 		Slave *slave = Slave::getInstance();
 		LOCK_T &lock = slave->sockets.slavePeers.lock;
-		std::vector<SlavePeerSocket *> &slaves = slave->sockets.slavePeers.values;
-		SlavePeerSocket *target = 0;
+		std::vector<ServerPeerSocket *> &slaves = slave->sockets.slavePeers.values;
+		ServerPeerSocket *target = 0;
 
 		LOCK( &lock );
 		for ( size_t i = 0, count = slaves.size(); i < count; i++ ) {
@@ -120,7 +120,7 @@ void SlaveRemapMsgHandler::setState( char* msg , int len ) {
 		UNLOCK( &lock );
 
 		if ( ! target ) {
-			__ERROR__( "SlaveRemapMsgHandler", "setState" , "SlaveSocket for %s:%hu not found\n", buf, ntohs( slavePeer.sin_port ) );
+			__ERROR__( "SlaveRemapMsgHandler", "setState" , "ServerSocket for %s:%hu not found\n", buf, ntohs( slavePeer.sin_port ) );
 			continue;
 		}
 

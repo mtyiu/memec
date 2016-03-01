@@ -466,8 +466,8 @@ bool SlaveWorker::handleUpdateResponse( SlavePeerEvent event, bool success, char
 	Slave *slave = Slave::getInstance();
 	LOCK( &slave->sockets.mastersIdToSocketLock );
 	try {
-		MasterSocket *masterSocket = slave->sockets.mastersIdToSocketMap.at( event.instanceId );
-		masterSocket->backup.removeDataUpdate( event.requestId, event.instanceId, event.socket );
+		ClientSocket *clientSocket = slave->sockets.mastersIdToSocketMap.at( event.instanceId );
+		clientSocket->backup.removeDataUpdate( event.requestId, event.instanceId, event.socket );
 	} catch ( std::out_of_range &e ) {
 		__ERROR__( "SlaveWorker", "handleUpdateResponse", "Cannot find a pending parity slave UPDATE backup for instance ID = %hu, request ID = %u. (Socket mapping not found)", event.instanceId, event.requestId );
 	}
@@ -493,11 +493,11 @@ bool SlaveWorker::handleUpdateResponse( SlavePeerEvent event, bool success, char
 
 
 		// FOR TESTING REVERT ONLY (parity slave fails and skip waiting)
-		//SlavePeerSocket *s = 0;
-		//this->stripeList->get( keyValueUpdate.data, keyValueUpdate.size, 0, this->paritySlaveSockets );
+		//ServerPeerSocket *s = 0;
+		//this->stripeList->get( keyValueUpdate.data, keyValueUpdate.size, 0, this->parityServerSockets );
 		//for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
-		//	if ( this->paritySlaveSockets[ i ]->instanceId == 2 ) {
-		//		s = this->paritySlaveSockets[ i ];
+		//	if ( this->parityServerSockets[ i ]->instanceId == 2 ) {
+		//		s = this->parityServerSockets[ i ];
 		//		break;
 		//	}
 		//}
@@ -506,7 +506,7 @@ bool SlaveWorker::handleUpdateResponse( SlavePeerEvent event, bool success, char
 		//keyValueUpdate.dup();
 
 		masterEvent.resUpdate(
-			( MasterSocket * ) pid.ptr, pid.instanceId, pid.requestId,
+			( ClientSocket * ) pid.ptr, pid.instanceId, pid.requestId,
 			keyValueUpdate,
 			header.valueUpdateOffset,
 			header.valueUpdateSize,
@@ -544,8 +544,8 @@ bool SlaveWorker::handleDeleteResponse( SlavePeerEvent event, bool success, char
 	Slave *slave = Slave::getInstance();
 	LOCK( &slave->sockets.mastersIdToSocketLock );
 	try {
-		MasterSocket *masterSocket = slave->sockets.mastersIdToSocketMap.at( event.instanceId );
-		masterSocket->backup.removeDataDelete( event.requestId, event.instanceId, event.socket );
+		ClientSocket *clientSocket = slave->sockets.mastersIdToSocketMap.at( event.instanceId );
+		clientSocket->backup.removeDataDelete( event.requestId, event.instanceId, event.socket );
 	} catch ( std::out_of_range &e ) {
 		__ERROR__( "SlaveWorker", "handleDeleteResponse", "Cannot find a pending parity slave UPDATE backup for instance ID = %hu, request ID = %u. (Socket mapping not found)", event.instanceId, event.requestId );
 	}
@@ -569,7 +569,7 @@ bool SlaveWorker::handleDeleteResponse( SlavePeerEvent event, bool success, char
 			__ERROR__( "SlaveWorker", "handleDeleteResponse", "TODO: server/worker/slave_peer_res_worker.cc - Line 289: Include the timestamp and metadata in the response.\n" );
 			// uint32_t timestamp = SlaveWorker::timestamp->nextVal();
 			masterEvent.resDelete(
-				( MasterSocket * ) pid.ptr,
+				( ClientSocket * ) pid.ptr,
 				pid.instanceId, pid.requestId,
 				key,
 				true, // needsFree
@@ -577,7 +577,7 @@ bool SlaveWorker::handleDeleteResponse( SlavePeerEvent event, bool success, char
 			);
 		} else {
 			masterEvent.resDelete(
-				( MasterSocket * ) pid.ptr,
+				( ClientSocket * ) pid.ptr,
 				pid.instanceId, pid.requestId,
 				key,
 				true, // needsFree
@@ -757,7 +757,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 		*/
 
 		bool getChunkAgain = false;
-		SlaveWorker::stripeList->get( listId, this->paritySlaveSockets, this->dataSlaveSockets );
+		SlaveWorker::stripeList->get( listId, this->parityServerSockets, this->dataServerSockets );
 		// Only check if there are at least one surviving parity chunks
 		for ( uint32_t i = 0; i < SlaveWorker::dataChunkCount && numSurvivingParityChunks; i++ ) {
 			if ( i == selfIt->second.chunkId ) // Skip self
@@ -784,7 +784,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 				tmpMetadata.set( listId, stripeId, i );
 
 				slavePeerEvent.reqGetChunk(
-					this->dataSlaveSockets[ i ],
+					this->dataServerSockets[ i ],
 					event.instanceId,
 					event.requestId,
 					tmpMetadata
@@ -871,7 +871,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 		if ( valid ) {
 			// Do nothing
 		} else {
-			SlaveWorker::stripeList->get( listId, this->paritySlaveSockets, this->dataSlaveSockets );
+			SlaveWorker::stripeList->get( listId, this->parityServerSockets, this->dataServerSockets );
 
 			/*
 			fprintf( stderr, "[GET_CHUNK] (%u, %u) - Inconsistent chunks received. Seal indicators:\n", listId, stripeId );
@@ -1016,7 +1016,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 
 				// Forward chunk locally
 				for ( uint32_t i = 0; i < op.reconstructedCount; i++ ) {
-					SlavePeerSocket *s = SlaveWorker::stripeList->get( op.reconstructed[ i * 2 ], op.reconstructed[ i * 2 + 1 ] );
+					ServerPeerSocket *s = SlaveWorker::stripeList->get( op.reconstructed[ i * 2 ], op.reconstructed[ i * 2 + 1 ] );
 
 					if ( invalidChunks.count( op.original[ i * 2 + 1 ] ) ) {
 						// Do nothing
@@ -1396,7 +1396,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 				SlavePeerEvent event;
 				uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
 				for ( uint32_t i = 0; i < op.reconstructedCount; i++ ) {
-					SlavePeerSocket *s = SlaveWorker::stripeList->get( op.reconstructed[ i * 2 ], op.reconstructed[ i * 2 + 1 ] );
+					ServerPeerSocket *s = SlaveWorker::stripeList->get( op.reconstructed[ i * 2 ], op.reconstructed[ i * 2 + 1 ] );
 
 					if ( invalidChunks.count( op.original[ i * 2 + 1 ] ) ) {
 						// Do nothing
@@ -1434,10 +1434,10 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 			// printf( "%u\n", chunkId );
 			// fflush( stdout );
 
-			SlaveWorker::stripeList->get( listId, this->paritySlaveSockets, this->dataSlaveSockets );
-			SlavePeerSocket *target = ( chunkId < SlaveWorker::dataChunkCount ) ?
-				( this->dataSlaveSockets[ chunkId ] ) :
-				( this->paritySlaveSockets[ chunkId - SlaveWorker::dataChunkCount ] );
+			SlaveWorker::stripeList->get( listId, this->parityServerSockets, this->dataServerSockets );
+			ServerPeerSocket *target = ( chunkId < SlaveWorker::dataChunkCount ) ?
+				( this->dataServerSockets[ chunkId ] ) :
+				( this->parityServerSockets[ chunkId - SlaveWorker::dataChunkCount ] );
 
 			// __ERROR__( "SlaveWorker", "handleGetChunkResponse", "TODO: Handle the case for reconstruction: (%u, %u, %u); target = %p.", listId, stripeId, chunkId, target );
 
@@ -1576,8 +1576,8 @@ bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success,
 	Slave *slave = Slave::getInstance();
 	LOCK( &slave->sockets.mastersIdToSocketLock );
 	try {
-		MasterSocket *masterSocket = slave->sockets.mastersIdToSocketMap.at( event.instanceId );
-		masterSocket->backup.removeDataUpdate( event.requestId, event.instanceId, event.socket );
+		ClientSocket *clientSocket = slave->sockets.mastersIdToSocketMap.at( event.instanceId );
+		clientSocket->backup.removeDataUpdate( event.requestId, event.instanceId, event.socket );
 	} catch ( std::out_of_range &e ) {
 		__ERROR__( "SlaveWorker", "handleUpdateChunkResponse", "Cannot find a pending parity slave UPDATE backup for instance ID = %hu, request ID = %u. (Socket mapping not found)", event.instanceId, event.requestId );
 	}
@@ -1602,7 +1602,7 @@ bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success,
 
 		key.set( keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.ptr );
 		masterEvent.resUpdate(
-			( MasterSocket * ) pid.ptr, pid.instanceId, pid.requestId, key,
+			( ClientSocket * ) pid.ptr, pid.instanceId, pid.requestId, key,
 			keyValueUpdate.offset, keyValueUpdate.length,
 			success, true,
 			keyValueUpdate.isDegraded // isDegraded
@@ -1647,8 +1647,8 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 	Slave *slave = Slave::getInstance();
 	LOCK( &slave->sockets.mastersIdToSocketLock );
 	try {
-		MasterSocket *masterSocket = slave->sockets.mastersIdToSocketMap.at( event.instanceId );
-		masterSocket->backup.removeDataDelete( event.requestId, event.instanceId, event.socket );
+		ClientSocket *clientSocket = slave->sockets.mastersIdToSocketMap.at( event.instanceId );
+		clientSocket->backup.removeDataDelete( event.requestId, event.instanceId, event.socket );
 	} catch ( std::out_of_range &e ) {
 		__ERROR__( "SlaveWorker", "handleDeleteChunkResponse", "Cannot find a pending parity slave UPDATE backup for instance ID = %hu, request ID = %u. (Socket mapping not found)", event.instanceId, event.requestId );
 	}
@@ -1672,7 +1672,7 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 		if ( success ) {
 			uint32_t timestamp = SlaveWorker::timestamp->nextVal();
 			masterEvent.resDelete(
-				( MasterSocket * ) pid.ptr, pid.instanceId, pid.requestId,
+				( ClientSocket * ) pid.ptr, pid.instanceId, pid.requestId,
 				timestamp,
 				header.listId, header.stripeId, header.chunkId,
 				key,
@@ -1681,7 +1681,7 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 			);
 		} else {
 			masterEvent.resDelete(
-				( MasterSocket * ) pid.ptr, pid.instanceId, pid.requestId,
+				( ClientSocket * ) pid.ptr, pid.instanceId, pid.requestId,
 				key,
 				true, // needsFree
 				false // isDegraded

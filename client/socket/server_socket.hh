@@ -8,9 +8,9 @@
 #include "../../common/timestamp/timestamp.hh"
 #include "../backup/backup.hh"
 
-class SlaveSocket : public Socket {
+class ServerSocket : public Socket {
 private:
-	static ArrayMap<int, SlaveSocket> *slaves;
+	static ArrayMap<int, ServerSocket> *slaves;
 
 public:
 	bool registered;
@@ -58,7 +58,7 @@ public:
 	LOCK_T ackParityDeltaBackupLock;
 	uint16_t instanceId;
 
-	static void setArrayMap( ArrayMap<int, SlaveSocket> *slaves );
+	static void setArrayMap( ArrayMap<int, ServerSocket> *slaves );
 	bool start();
 	void stop();
 	void registerMaster();

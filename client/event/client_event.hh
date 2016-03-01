@@ -16,9 +16,9 @@ enum MasterEventType {
 class MasterEvent : public Event {
 public:
 	MasterEventType type;
-	MasterSocket *socket;
+	ClientSocket *socket;
 
-	void pending( MasterSocket *socket );
+	void pending( ClientSocket *socket );
 };
 
 #endif
