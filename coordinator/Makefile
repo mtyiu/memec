@@ -8,8 +8,8 @@ OBJS= \
 	config/coordinator_config.o \
 	ds/map.o \
 	event/coordinator_event.o \
-	event/master_event.o \
-	event/slave_event.o \
+	event/client_event.o \
+	event/server_event.o \
 	protocol/protocol.o \
 	protocol/degraded_protocol.o \
 	protocol/load_protocol.o \
@@ -20,14 +20,14 @@ OBJS= \
 	remap/remap_msg_handler.o \
 	remap/remap_worker.o \
 	socket/coordinator_socket.o \
-	socket/master_socket.o \
-	socket/slave_socket.o \
+	socket/client_socket.o \
+	socket/server_socket.o \
 	worker/worker.o \
 	worker/degraded_worker.o \
 	worker/client_worker.o \
 	worker/recovery_worker.o \
 	worker/remap_worker.o \
-	worker/slave_worker.o \
+	worker/server_worker.o \
 	main/coordinator.o \
 	main/main.o
 

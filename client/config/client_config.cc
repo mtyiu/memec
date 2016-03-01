@@ -1,5 +1,5 @@
 #include <cstdlib>
-#include "master_config.hh"
+#include "client_config.hh"
 
 MasterConfig::MasterConfig() {
 	this->epoll.maxEvents = 64;

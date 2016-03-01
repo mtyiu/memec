@@ -11,7 +11,7 @@ OBJS= \
 	event/application_event.o \
 	event/coordinator_event.o \
 	event/client_event.o \
-	event/slave_event.o \
+	event/server_event.o \
 	protocol/degraded_protocol.o \
 	protocol/fault_protocol.o \
 	protocol/load_protocol.o \
@@ -24,7 +24,7 @@ OBJS= \
 	socket/application_socket.o \
 	socket/coordinator_socket.o \
 	socket/client_socket.o \
-	socket/slave_socket.o \
+	socket/server_socket.o \
 	worker/worker.o \
 	worker/application_worker.o \
 	worker/coordinator_worker.o \

@@ -13,28 +13,28 @@ OBJS= \
 	buffer/mixed_chunk_buffer.o \
 	buffer/parity_chunk_buffer.o \
 	buffer/remapped_buffer.o \
-	config/slave_config.o \
+	config/server_config.o \
 	ds/pending.o \
 	event/coding_event.o \
 	event/coordinator_event.o \
 	event/io_event.o \
-	event/master_event.o \
-	event/slave_event.o \
-	event/slave_peer_event.o \
+	event/client_event.o \
+	event/server_event.o \
+	event/server_peer_event.o \
 	remap/remap_msg_handler.o \
 	protocol/ack_protocol.o \
 	protocol/degraded_protocol.o \
 	protocol/heartbeat_protocol.o \
-	protocol/normal_master_protocol.o \
-	protocol/normal_slave_protocol.o \
+	protocol/normal_client_protocol.o \
+	protocol/normal_server_protocol.o \
 	protocol/recovery_protocol.o \
 	protocol/register_protocol.o \
 	protocol/remap_protocol.o \
 	protocol/seal_protocol.o \
 	socket/coordinator_socket.o \
-	socket/master_socket.o \
-	socket/slave_socket.o \
-	socket/slave_peer_socket.o \
+	socket/client_socket.o \
+	socket/server_socket.o \
+	socket/server_peer_socket.o \
 	storage/storage.o \
 	storage/local_storage.o \
 	worker/worker.o \
