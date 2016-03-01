@@ -7,7 +7,7 @@
 #include "../event/event_queue.hh"
 #include "../protocol/protocol.hh"
 #include "../remap/remap_msg_handler.hh"
-#include "../socket/slave_socket.hh"
+#include "../socket/server_socket.hh"
 #include "../../common/worker/worker.hh"
 #include "../../common/config/global_config.hh"
 #include "../../common/stripe_list/stripe_list.hh"

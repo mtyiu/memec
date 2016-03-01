@@ -1,6 +1,6 @@
-#include "slave_socket.hh"
+#include "server_socket.hh"
 #include "../main/coordinator.hh"
-#include "../event/slave_event.hh"
+#include "../event/server_event.hh"
 
 ArrayMap<int, SlaveSocket> *SlaveSocket::slaves;
 

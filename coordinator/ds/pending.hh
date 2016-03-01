@@ -5,7 +5,7 @@
 #include <set>
 #include <unordered_set>
 #include <unordered_map>
-#include "../socket/slave_socket.hh"
+#include "../socket/server_socket.hh"
 #include "../../common/lock/lock.hh"
 #include "../../common/ds/sockaddr_in.hh"
 #include "../../common/ds/pending.hh"

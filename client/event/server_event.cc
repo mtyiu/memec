@@ -1,4 +1,4 @@
-#include "slave_event.hh"
+#include "server_event.hh"
 
 void SlaveEvent::reqRegister( SlaveSocket *socket, uint32_t addr, uint16_t port ) {
 	this->type = SLAVE_EVENT_TYPE_REGISTER_REQUEST;

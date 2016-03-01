@@ -1,7 +1,7 @@
 #ifndef __COORDINATOR_EVENT_SLAVE_EVENT_HH__
 #define __COORDINATOR_EVENT_SLAVE_EVENT_HH__
 
-#include "../socket/slave_socket.hh"
+#include "../socket/server_socket.hh"
 #include "../../common/ds/packet_pool.hh"
 #include "../../common/event/event.hh"
 

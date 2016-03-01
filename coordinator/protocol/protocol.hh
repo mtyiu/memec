@@ -2,15 +2,15 @@
 #define __COORDINATOR_PROTOCOL_PROTOCOL_HH__
 
 #include <unordered_map>
-#include "../socket/slave_socket.hh"
+#include "../socket/server_socket.hh"
 #include "../../common/ds/latency.hh"
 #include "../../common/ds/metadata.hh"
 #include "../../common/lock/lock.hh"
 #include "../../common/protocol/protocol.hh"
 #include "../../common/config/global_config.hh"
 #include "../../common/config/server_addr.hh"
-#include "../../client/config/master_config.hh"
-#include "../../server/config/slave_config.hh"
+#include "../../client/config/client_config.hh"
+#include "../../server/config/server_config.hh"
 
 class CoordinatorProtocol : public Protocol {
 public:

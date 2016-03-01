@@ -4,8 +4,8 @@
 #include <set>
 #include "pending_data.hh"
 #include "../socket/coordinator_socket.hh"
-#include "../socket/master_socket.hh"
-#include "../socket/slave_peer_socket.hh"
+#include "../socket/client_socket.hh"
+#include "../socket/server_peer_socket.hh"
 #include "../../common/ds/chunk.hh"
 #include "../../common/ds/metadata.hh"
 #include "../../common/ds/pending.hh"

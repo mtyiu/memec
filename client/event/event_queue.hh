@@ -5,8 +5,8 @@
 #include "mixed_event.hh"
 #include "application_event.hh"
 #include "coordinator_event.hh"
-#include "master_event.hh"
-#include "slave_event.hh"
+#include "client_event.hh"
+#include "server_event.hh"
 #include "../../common/event/event_queue.hh"
 #include "../../common/lock/lock.hh"
 

@@ -2,7 +2,7 @@
 #define __MASTER_REMAP_BASIC_REMAP_SCHEME_HH__
 
 #include "remap_msg_handler.hh"
-#include "../socket/slave_socket.hh"
+#include "../socket/server_socket.hh"
 #include "../ds/stats.hh"
 #include "../../common/lock/lock.hh"
 #include "../../common/stripe_list/stripe_list.hh"

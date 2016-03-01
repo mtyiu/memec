@@ -2,7 +2,7 @@
 #define __SLAVE_EVENT_SLAVE_PEER_EVENT_HH__
 
 #include "../protocol/protocol.hh"
-#include "../socket/slave_peer_socket.hh"
+#include "../socket/server_peer_socket.hh"
 #include "../../common/ds/metadata.hh"
 #include "../../common/ds/chunk.hh"
 #include "../../common/ds/packet_pool.hh"

@@ -2,7 +2,7 @@
 #define __SLAVE_STORAGE_STORAGE_HH__
 
 #include "storage_type.hh"
-#include "../config/slave_config.hh"
+#include "../config/server_config.hh"
 #include "../../common/ds/chunk.hh"
 
 class Storage {

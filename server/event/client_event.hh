@@ -1,7 +1,7 @@
 #ifndef __SLAVE_EVENT_MASTER_EVENT_HH__
 #define __SLAVE_EVENT_MASTER_EVENT_HH__
 
-#include "../socket/master_socket.hh"
+#include "../socket/client_socket.hh"
 #include "../../common/ds/key.hh"
 #include "../../common/ds/key_value.hh"
 #include "../../common/ds/metadata.hh"

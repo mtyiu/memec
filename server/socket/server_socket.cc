@@ -1,5 +1,5 @@
 #include <cerrno>
-#include "slave_socket.hh"
+#include "server_socket.hh"
 #include "../main/server.hh"
 #include "../../common/util/debug.hh"
 

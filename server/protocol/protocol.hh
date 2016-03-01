@@ -24,7 +24,7 @@ public:
 		bool &isCompleted
 	);
 
-	// ---------- normal_master_protocol.cc ----------
+	// ---------- normal_client_protocol.cc ----------
 	char *resSet(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
@@ -157,7 +157,7 @@ public:
 		struct BatchKeyValueHeader &header
 	);
 
-	// ---------- normal_slave_protocol.cc ----------
+	// ---------- normal_server_protocol.cc ----------
 	char *reqUpdate(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,

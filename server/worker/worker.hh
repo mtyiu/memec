@@ -9,7 +9,7 @@
 #include "../buffer/degraded_chunk_buffer.hh"
 #include "../buffer/get_chunk_buffer.hh"
 #include "../buffer/remapped_buffer.hh"
-#include "../config/slave_config.hh"
+#include "../config/server_config.hh"
 #include "../event/event_queue.hh"
 #include "../ds/map.hh"
 #include "../ds/pending.hh"

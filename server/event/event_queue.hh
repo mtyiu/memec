@@ -6,9 +6,9 @@
 #include "coding_event.hh"
 #include "coordinator_event.hh"
 #include "io_event.hh"
-#include "master_event.hh"
-#include "slave_event.hh"
-#include "slave_peer_event.hh"
+#include "client_event.hh"
+#include "server_event.hh"
+#include "server_peer_event.hh"
 #include "../../common/event/event_queue.hh"
 #include "../../common/lock/lock.hh"
 

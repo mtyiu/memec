@@ -1,4 +1,4 @@
-#include "slave_peer_event.hh"
+#include "server_peer_event.hh"
 #include "../buffer/mixed_chunk_buffer.hh"
 
 void SlavePeerEvent::reqRegister( SlavePeerSocket *socket ) {

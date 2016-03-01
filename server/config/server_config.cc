@@ -1,6 +1,6 @@
 #include <cstdlib>
 #include <sys/stat.h>
-#include "slave_config.hh"
+#include "server_config.hh"
 
 SlaveConfig::SlaveConfig() {
 	this->seal.disabled = false;

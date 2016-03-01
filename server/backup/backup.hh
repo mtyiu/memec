@@ -6,7 +6,7 @@
 #include <map>
 #include <vector>
 #include <set>
-#include "../socket/slave_socket.hh"
+#include "../socket/server_socket.hh"
 #include "../../common/ds/key.hh"
 #include "../../common/ds/metadata.hh"
 #include "../../common/ds/value.hh"
