@@ -2,17 +2,17 @@
 #include <sys/stat.h>
 #include "server_config.hh"
 
-SlaveConfig::SlaveConfig() {
+ServerConfig::ServerConfig() {
 	this->seal.disabled = false;
 }
 
-bool SlaveConfig::merge( GlobalConfig &globalConfig ) {
+bool ServerConfig::merge( GlobalConfig &globalConfig ) {
 	this->epoll.maxEvents = globalConfig.epoll.maxEvents;
 	this->epoll.timeout = globalConfig.epoll.timeout;
 	return true;
 }
 
-bool SlaveConfig::parse( const char *path ) {
+bool ServerConfig::parse( const char *path ) {
 	if ( Config::parse( path, "server.ini" ) ) {
 		if ( this->workers.type == WORKER_TYPE_SEPARATED )
 			this->workers.number.separated.total =
@@ -27,7 +27,7 @@ bool SlaveConfig::parse( const char *path ) {
 	return false;
 }
 
-bool SlaveConfig::override( OptionList &options ) {
+bool ServerConfig::override( OptionList &options ) {
 	bool ret = true;
 	for ( int i = 0, size = options.size(); i < size; i++ ) {
 		ret &= this->set(
@@ -39,7 +39,7 @@ bool SlaveConfig::override( OptionList &options ) {
 	return ret;
 }
 
-bool SlaveConfig::set( const char *section, const char *name, const char *value ) {
+bool ServerConfig::set( const char *section, const char *name, const char *value ) {
 	if ( match( section, "slave" ) ) {
 		return this->slave.addr.parse( name, value );
 	} else if ( match( section, "slave_peers" ) ) {
@@ -128,84 +128,84 @@ bool SlaveConfig::set( const char *section, const char *name, const char *value 
 	return true;
 }
 
-bool SlaveConfig::validate() {
+bool ServerConfig::validate() {
 	if ( ! this->slave.addr.isInitialized() )
-		CFG_PARSE_ERROR( "SlaveConfig", "The slave is not assigned with an valid address." );
+		CFG_PARSE_ERROR( "ServerConfig", "The slave is not assigned with an valid address." );
 
 	if ( this->epoll.maxEvents < 1 )
-		CFG_PARSE_ERROR( "SlaveConfig", "Maximum number of events in epoll should be at least 1." );
+		CFG_PARSE_ERROR( "ServerConfig", "Maximum number of events in epoll should be at least 1." );
 
 	if ( this->epoll.timeout < -1 )
-		CFG_PARSE_ERROR( "SlaveConfig", "The timeout value of epoll should be either -1 (infinite blocking), 0 (non-blocking) or a positive value (representing the number of milliseconds to block)." );
+		CFG_PARSE_ERROR( "ServerConfig", "The timeout value of epoll should be either -1 (infinite blocking), 0 (non-blocking) or a positive value (representing the number of milliseconds to block)." );
 
 	if ( this->pool.chunks < 1 )
-		CFG_PARSE_ERROR( "SlaveConfig", "The size of chunk pool should be greater than 0." );
+		CFG_PARSE_ERROR( "ServerConfig", "The size of chunk pool should be greater than 0." );
 
 	switch( this->workers.type ) {
 		case WORKER_TYPE_MIXED:
 			if ( this->workers.number.mixed < 1 )
-				CFG_PARSE_ERROR( "SlaveConfig", "The number of workers should be at least 1." );
+				CFG_PARSE_ERROR( "ServerConfig", "The number of workers should be at least 1." );
 			if ( this->eventQueue.size.mixed < this->workers.number.mixed )
-				CFG_PARSE_ERROR( "SlaveConfig", "The size of the event queue should be at least the number of workers." );
+				CFG_PARSE_ERROR( "ServerConfig", "The size of the event queue should be at least the number of workers." );
 			if ( this->eventQueue.size.pMixed < this->workers.number.mixed )
-				CFG_PARSE_ERROR( "SlaveConfig", "The size of the prioritized event queue should be at least the number of workers." );
+				CFG_PARSE_ERROR( "ServerConfig", "The size of the prioritized event queue should be at least the number of workers." );
 			break;
 		case WORKER_TYPE_SEPARATED:
 			if ( this->workers.number.separated.coding < 1 )
-				CFG_PARSE_ERROR( "SlaveConfig", "The number of coding workers should be at least 1." );
+				CFG_PARSE_ERROR( "ServerConfig", "The number of coding workers should be at least 1." );
 			if ( this->workers.number.separated.coordinator < 1 )
-				CFG_PARSE_ERROR( "SlaveConfig", "The number of coordinator workers should be at least 1." );
+				CFG_PARSE_ERROR( "ServerConfig", "The number of coordinator workers should be at least 1." );
 			if ( this->workers.number.separated.io < 1 )
-				CFG_PARSE_ERROR( "SlaveConfig", "The number of I/O workers should be at least 1." );
+				CFG_PARSE_ERROR( "ServerConfig", "The number of I/O workers should be at least 1." );
 			if ( this->workers.number.separated.master < 1 )
-				CFG_PARSE_ERROR( "SlaveConfig", "The number of master workers should be at least 1." );
+				CFG_PARSE_ERROR( "ServerConfig", "The number of master workers should be at least 1." );
 			if ( this->workers.number.separated.slave < 1 )
-				CFG_PARSE_ERROR( "SlaveConfig", "The number of slave workers should be at least 1." );
+				CFG_PARSE_ERROR( "ServerConfig", "The number of slave workers should be at least 1." );
 			if ( this->workers.number.separated.slavePeer < 1 )
-				CFG_PARSE_ERROR( "SlaveConfig", "The number of slave peer workers should be at least 1." );
+				CFG_PARSE_ERROR( "ServerConfig", "The number of slave peer workers should be at least 1." );
 
 			if ( this->eventQueue.size.separated.coding < this->workers.number.separated.coding )
-				CFG_PARSE_ERROR( "SlaveConfig", "The size of the coding event queue should be at least the number of workers." );
+				CFG_PARSE_ERROR( "ServerConfig", "The size of the coding event queue should be at least the number of workers." );
 			if ( this->eventQueue.size.separated.coordinator < this->workers.number.separated.coordinator )
-				CFG_PARSE_ERROR( "SlaveConfig", "The size of the coordinator event queue should be at least the number of workers." );
+				CFG_PARSE_ERROR( "ServerConfig", "The size of the coordinator event queue should be at least the number of workers." );
 			if ( this->eventQueue.size.separated.io < this->workers.number.separated.io )
-				CFG_PARSE_ERROR( "SlaveConfig", "The size of the I/O event queue should be at least the number of workers." );
+				CFG_PARSE_ERROR( "ServerConfig", "The size of the I/O event queue should be at least the number of workers." );
 			if ( this->eventQueue.size.separated.master < this->workers.number.separated.master )
-				CFG_PARSE_ERROR( "SlaveConfig", "The size of the master event queue should be at least the number of workers." );
+				CFG_PARSE_ERROR( "ServerConfig", "The size of the master event queue should be at least the number of workers." );
 			if ( this->eventQueue.size.separated.slave < this->workers.number.separated.slave )
-				CFG_PARSE_ERROR( "SlaveConfig", "The size of the slave event queue should be at least the number of workers." );
+				CFG_PARSE_ERROR( "ServerConfig", "The size of the slave event queue should be at least the number of workers." );
 			if ( this->eventQueue.size.separated.slavePeer < this->workers.number.separated.slavePeer )
-				CFG_PARSE_ERROR( "SlaveConfig", "The size of the slave peer event queue should be at least the number of workers." );
+				CFG_PARSE_ERROR( "ServerConfig", "The size of the slave peer event queue should be at least the number of workers." );
 			break;
 		default:
-			CFG_PARSE_ERROR( "SlaveConfig", "The type of event queue should be either \"mixed\" or \"separated\"." );
+			CFG_PARSE_ERROR( "ServerConfig", "The type of event queue should be either \"mixed\" or \"separated\"." );
 	}
 
 	if ( this->storage.type == STORAGE_TYPE_UNDEFINED )
-		CFG_PARSE_ERROR( "SlaveConfig", "The specified storage type is invalid." );
+		CFG_PARSE_ERROR( "ServerConfig", "The specified storage type is invalid." );
 
 	struct stat st;
 	if ( stat( this->storage.path, &st ) != 0 )
-		CFG_PARSE_ERROR( "SlaveConfig", "The specified storage path does not exist." );
+		CFG_PARSE_ERROR( "ServerConfig", "The specified storage path does not exist." );
 
 	if ( ! S_ISDIR( st.st_mode ) )
-		CFG_PARSE_ERROR( "SlaveConfig", "The specified storage path is not a directory." );
+		CFG_PARSE_ERROR( "ServerConfig", "The specified storage path is not a directory." );
 
 	return true;
 }
 
-int SlaveConfig::validate( std::vector<ServerAddr> slaves ) {
+int ServerConfig::validate( std::vector<ServerAddr> slaves ) {
 	if ( this->validate() ) {
 		for ( int i = 0, len = slaves.size(); i < len; i++ ) {
 			if ( this->slave.addr == slaves[ i ] )
 				return i;
 		}
-		__ERROR__( "SlaveConfig", "validate", "The assigned address does not match with the global slave list." );
+		__ERROR__( "ServerConfig", "validate", "The assigned address does not match with the global slave list." );
 	}
 	return -1;
 }
 
-void SlaveConfig::print( FILE *f ) {
+void ServerConfig::print( FILE *f ) {
 	int width = 24;
 	fprintf(
 		f,

@@ -1,7 +1,7 @@
 #include "worker.hh"
 #include "../main/coordinator.hh"
 
-void CoordinatorWorker::dispatch( MasterEvent event ) {
+void CoordinatorWorker::dispatch( ClientEvent event ) {
 	bool connected = false, isSend, success = false;
 	ssize_t ret;
 	struct {
@@ -10,17 +10,17 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 	} buffer;
 
 	switch( event.type ) {
-		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
+		case CLIENT_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
 			event.socket->instanceId = event.instanceId;
 			buffer.data = this->protocol.resRegisterMaster( buffer.size, event.instanceId, event.requestId, true );
 			isSend = true;
 			break;
-		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
+		case CLIENT_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
 			event.socket->instanceId = event.instanceId;
 			buffer.data = this->protocol.resRegisterMaster( buffer.size, event.instanceId, event.requestId, false );
 			isSend = true;
 			break;
-		case MASTER_EVENT_TYPE_PUSH_LOADING_STATS:
+		case CLIENT_EVENT_TYPE_PUSH_LOADING_STATS:
 			buffer.data = this->protocol.reqPushLoadStats(
 				buffer.size,
 				Coordinator::instanceId,
@@ -37,9 +37,9 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 			delete event.message.slaveLoading.overloadedSlaveSet;
 			isSend = true;
 			break;
-		case MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_SUCCESS:
+		case CLIENT_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_SUCCESS:
 			success = true;
-		case MASTER_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_FAILURE:
+		case CLIENT_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resRemappingSetLock(
 				buffer.size,
 				event.instanceId, event.requestId,
@@ -52,7 +52,7 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 			);
 			isSend = true;
 			break;
-		case MASTER_EVENT_TYPE_SWITCH_PHASE:
+		case CLIENT_EVENT_TYPE_SWITCH_PHASE:
 		{
 			Coordinator *coordinator = Coordinator::getInstance();
 			std::vector<struct sockaddr_in> *slaves = event.message.switchPhase.slaves;
@@ -99,13 +99,13 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 		}
 			break;
 		// Degraded operation
-		case MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED:
-		case MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_WAS_LOCKED:
+		case CLIENT_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED:
+		case CLIENT_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_WAS_LOCKED:
 		{
 			buffer.data = this->protocol.resDegradedLock(
 				buffer.size,
 				event.instanceId, event.requestId,
-				event.type == MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED, // success
+				event.type == CLIENT_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED, // success
 				event.message.degradedLock.key.size,
 				event.message.degradedLock.key.data,
 				event.message.degradedLock.isSealed,
@@ -122,18 +122,18 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 		}
 			isSend = true;
 			break;
-		case MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_LOCKED:
-		case MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_FOUND:
+		case CLIENT_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_LOCKED:
+		case CLIENT_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_FOUND:
 			buffer.data = this->protocol.resDegradedLock(
 				buffer.size,
 				event.instanceId, event.requestId,
-				event.type == MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_LOCKED, // exist
+				event.type == CLIENT_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_LOCKED, // exist
 				event.message.degradedLock.key.size,
 				event.message.degradedLock.key.data
 			);
 			isSend = true;
 			break;
-		case MASTER_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_REMAPPED:
+		case CLIENT_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_REMAPPED:
 			buffer.data = this->protocol.resDegradedLock(
 				buffer.size,
 				event.instanceId, event.requestId,
@@ -146,11 +146,11 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 			isSend = true;
 			break;
 		// Recovery
-		case MASTER_EVENT_TYPE_ANNOUNCE_SLAVE_RECONSTRUCTED:
+		case CLIENT_EVENT_TYPE_ANNOUNCE_SLAVE_RECONSTRUCTED:
 			isSend = false;
 			break;
 		// Pending
-		case MASTER_EVENT_TYPE_PENDING:
+		case CLIENT_EVENT_TYPE_PENDING:
 			isSend = false;
 			break;
 		default:
@@ -161,9 +161,9 @@ void CoordinatorWorker::dispatch( MasterEvent event ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
-	} else if ( event.type == MASTER_EVENT_TYPE_SWITCH_PHASE ) {
+	} else if ( event.type == CLIENT_EVENT_TYPE_SWITCH_PHASE ) {
 		connected = true; // just to avoid error message
-	} else if ( event.type == MASTER_EVENT_TYPE_ANNOUNCE_SLAVE_RECONSTRUCTED ) {
+	} else if ( event.type == CLIENT_EVENT_TYPE_ANNOUNCE_SLAVE_RECONSTRUCTED ) {
 		ArrayMap<int, ClientSocket> &masters = Coordinator::getInstance()->sockets.masters;
 		uint32_t requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
 
@@ -297,7 +297,7 @@ quit_1:
 		__ERROR__( "CoordinatorWorker", "dispatch", "The master is disconnected." );
 }
 
-bool CoordinatorWorker::handleSyncMetadata( MasterEvent event, char *buf, size_t size ) {
+bool CoordinatorWorker::handleSyncMetadata( ClientEvent event, char *buf, size_t size ) {
 	// uint16_t instanceId = event.instanceId;
 	uint32_t count, requestId = event.requestId;
 	size_t processed, offset, failed = 0;

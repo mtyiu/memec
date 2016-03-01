@@ -1,5 +1,5 @@
-#ifndef __MASTER_CONFIG_MASTER_CONFIG_HH__
-#define __MASTER_CONFIG_MASTER_CONFIG_HH__
+#ifndef __CLIENT_CONFIG_CLIENT_CONFIG_HH__
+#define __CLIENT_CONFIG_CLIENT_CONFIG_HH__
 
 #include <vector>
 #include <stdint.h>
@@ -9,7 +9,7 @@
 #include "../../common/util/option.hh"
 #include "../../common/worker/worker_type.hh"
 
-class MasterConfig : public Config {
+class ClientConfig : public Config {
 public:
 	struct {
 		ServerAddr addr;
@@ -63,7 +63,7 @@ public:
 		uint32_t ackBatchSize; /* no. of request */
 	} backup;
 
-	MasterConfig();
+	ClientConfig();
 	bool merge( GlobalConfig &globalConfig );
 	bool parse( const char *path );
 	bool override( OptionList &options );

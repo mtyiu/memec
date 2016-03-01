@@ -1,5 +1,5 @@
-#ifndef __MASTER_EVENT_APPLICATION_EVENT_HH__
-#define __MASTER_EVENT_APPLICATION_EVENT_HH__
+#ifndef __CLIENT_EVENT_APPLICATION_EVENT_HH__
+#define __CLIENT_EVENT_APPLICATION_EVENT_HH__
 
 #include "../socket/application_socket.hh"
 #include "../../common/ds/key.hh"

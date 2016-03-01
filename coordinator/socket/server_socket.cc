@@ -32,7 +32,7 @@ void ServerSocket::stop() {
 	ServerSocket::slaves->replaceKey( this->sockfd, newFd );
 	Socket::stop();
 
-	SlaveEvent event;
+	ServerEvent event;
 	event.disconnect( this );
 	Coordinator::getInstance()->eventQueue.insert( event );
 

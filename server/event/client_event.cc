@@ -1,14 +1,14 @@
 #include "client_event.hh"
 
-void MasterEvent::resRegister( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, bool success ) {
-	this->type = success ? MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS : MASTER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE;
+void ClientEvent::resRegister( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, bool success ) {
+	this->type = success ? CLIENT_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS : CLIENT_EVENT_TYPE_REGISTER_RESPONSE_FAILURE;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
 }
 
-void MasterEvent::resGet( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, KeyValue &keyValue, bool isDegraded ) {
-	this->type = MASTER_EVENT_TYPE_GET_RESPONSE_SUCCESS;
+void ClientEvent::resGet( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, KeyValue &keyValue, bool isDegraded ) {
+	this->type = CLIENT_EVENT_TYPE_GET_RESPONSE_SUCCESS;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->isDegraded = isDegraded;
@@ -16,8 +16,8 @@ void MasterEvent::resGet( ClientSocket *socket, uint16_t instanceId, uint32_t re
 	this->message.keyValue = keyValue;
 }
 
-void MasterEvent::resGet( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool isDegraded ) {
-	this->type = MASTER_EVENT_TYPE_GET_RESPONSE_FAILURE;
+void ClientEvent::resGet( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool isDegraded ) {
+	this->type = CLIENT_EVENT_TYPE_GET_RESPONSE_FAILURE;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->isDegraded = isDegraded;
@@ -25,16 +25,16 @@ void MasterEvent::resGet( ClientSocket *socket, uint16_t instanceId, uint32_t re
 	this->message.key = key;
 }
 
-void MasterEvent::resSet( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool success ) {
-	this->type = success ? MASTER_EVENT_TYPE_SET_RESPONSE_SUCCESS_PARITY : MASTER_EVENT_TYPE_SET_RESPONSE_FAILURE;
+void ClientEvent::resSet( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool success ) {
+	this->type = success ? CLIENT_EVENT_TYPE_SET_RESPONSE_SUCCESS_PARITY : CLIENT_EVENT_TYPE_SET_RESPONSE_FAILURE;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
 	this->message.set.key = key;
 }
 
-void MasterEvent::resSet( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isSealed, uint32_t sealedListId, uint32_t sealedStripeId, uint32_t sealedChunkId, Key &key ) {
-	this->type = MASTER_EVENT_TYPE_SET_RESPONSE_SUCCESS_DATA;
+void ClientEvent::resSet( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isSealed, uint32_t sealedListId, uint32_t sealedStripeId, uint32_t sealedChunkId, Key &key ) {
+	this->type = CLIENT_EVENT_TYPE_SET_RESPONSE_SUCCESS_DATA;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
@@ -49,13 +49,13 @@ void MasterEvent::resSet( ClientSocket *socket, uint16_t instanceId, uint32_t re
 	this->message.set.sealedChunkId = sealedChunkId;
 }
 
-void MasterEvent::resRemappingSet(
+void ClientEvent::resRemappingSet(
 	ClientSocket *socket, uint16_t instanceId, uint32_t requestId, bool success,
 	Key &key, uint32_t listId, uint32_t chunkId,
 	uint32_t *original, uint32_t *remapped, uint32_t remappedCount,
 	bool needsFree
 ) {
-	this->type = success ? MASTER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS : MASTER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE;
+	this->type = success ? CLIENT_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS : CLIENT_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->needsFree = needsFree;
@@ -68,8 +68,8 @@ void MasterEvent::resRemappingSet(
 	this->message.remap.remappedCount = remappedCount;
 }
 
-void MasterEvent::resUpdate( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool success, bool needsFree, bool isDegraded ) {
-	this->type = success ? MASTER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS : MASTER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE;
+void ClientEvent::resUpdate( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool success, bool needsFree, bool isDegraded ) {
+	this->type = success ? CLIENT_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS : CLIENT_EVENT_TYPE_UPDATE_RESPONSE_FAILURE;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->needsFree = needsFree;
@@ -80,8 +80,8 @@ void MasterEvent::resUpdate( ClientSocket *socket, uint16_t instanceId, uint32_t
 	this->message.keyValueUpdate.valueUpdateSize = valueUpdateSize;
 }
 
-void MasterEvent::resDelete( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key, bool needsFree, bool isDegraded ) {
-	this->type = MASTER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS;
+void ClientEvent::resDelete( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key, bool needsFree, bool isDegraded ) {
+	this->type = CLIENT_EVENT_TYPE_DELETE_RESPONSE_SUCCESS;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->needsFree = needsFree;
@@ -94,8 +94,8 @@ void MasterEvent::resDelete( ClientSocket *socket, uint16_t instanceId, uint32_t
 	this->message.del.chunkId = chunkId;
 }
 
-void MasterEvent::resDelete( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool needsFree, bool isDegraded ) {
-	this->type =  MASTER_EVENT_TYPE_DELETE_RESPONSE_FAILURE;
+void ClientEvent::resDelete( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool needsFree, bool isDegraded ) {
+	this->type =  CLIENT_EVENT_TYPE_DELETE_RESPONSE_FAILURE;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->needsFree = needsFree;
@@ -104,8 +104,8 @@ void MasterEvent::resDelete( ClientSocket *socket, uint16_t instanceId, uint32_t
 	this->message.del.key = key;
 }
 
-void MasterEvent::resRevertDelta( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, bool success, std::vector<uint32_t> timestamps, std::vector<Key> requests, uint16_t dataSlaveId ) {
-	this->type = success ? MASTER_EVENT_TYPE_REVERT_DELTA_SUCCESS : MASTER_EVENT_TYPE_REVERT_DELTA_FAILURE;
+void ClientEvent::resRevertDelta( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, bool success, std::vector<uint32_t> timestamps, std::vector<Key> requests, uint16_t dataSlaveId ) {
+	this->type = success ? CLIENT_EVENT_TYPE_REVERT_DELTA_SUCCESS : CLIENT_EVENT_TYPE_REVERT_DELTA_FAILURE;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
@@ -114,8 +114,8 @@ void MasterEvent::resRevertDelta( ClientSocket *socket, uint16_t instanceId, uin
 	this->message.revert.targetId = dataSlaveId;
 }
 
-void MasterEvent::resAckParityDelta( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, std::vector<uint32_t> timestamps , uint16_t dataSlaveId ) {
-	this->type = MASTER_EVENT_TYPE_ACK_PARITY_BACKUP;
+void ClientEvent::resAckParityDelta( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, std::vector<uint32_t> timestamps , uint16_t dataSlaveId ) {
+	this->type = CLIENT_EVENT_TYPE_ACK_PARITY_BACKUP;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
@@ -123,8 +123,8 @@ void MasterEvent::resAckParityDelta( ClientSocket *socket, uint16_t instanceId, 
 	this->message.revert.targetId = dataSlaveId;
 }
 
-void MasterEvent::ackMetadata( ClientSocket	*socket, uint16_t instanceId, uint32_t requestId, uint32_t fromTimestamp, uint32_t toTimestamp ) {
-	this->type = MASTER_EVENT_TYPE_ACK_METADATA;
+void ClientEvent::ackMetadata( ClientSocket	*socket, uint16_t instanceId, uint32_t requestId, uint32_t fromTimestamp, uint32_t toTimestamp ) {
+	this->type = CLIENT_EVENT_TYPE_ACK_METADATA;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
@@ -132,7 +132,7 @@ void MasterEvent::ackMetadata( ClientSocket	*socket, uint16_t instanceId, uint32
 	this->message.ack.toTimestamp = toTimestamp;
 }
 
-void MasterEvent::pending( ClientSocket *socket ) {
-	this->type = MASTER_EVENT_TYPE_PENDING;
+void ClientEvent::pending( ClientSocket *socket ) {
+	this->type = CLIENT_EVENT_TYPE_PENDING;
 	this->socket = socket;
 }

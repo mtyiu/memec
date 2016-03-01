@@ -142,7 +142,7 @@ bool ServerSocket::handler( int fd, uint32_t events, void *data ) {
 
 						socket->done( fd ); // The socket is valid
 
-						MasterEvent event;
+						ClientEvent event;
 						event.resRegister( clientSocket, header.instanceId, header.requestId );
 						slave->eventQueue.insert( event );
 					} else if ( header.from == PROTO_MAGIC_FROM_SERVER ) {
@@ -162,7 +162,7 @@ bool ServerSocket::handler( int fd, uint32_t events, void *data ) {
 						}
 
 						if ( s ) {
-							SlavePeerEvent event;
+							ServerPeerEvent event;
 							event.resRegister( s, true, header.instanceId, header.requestId );
 							slave->eventQueue.insert( event );
 						} else {
@@ -192,7 +192,7 @@ bool ServerSocket::handler( int fd, uint32_t events, void *data ) {
 			ServerPeerSocket *serverPeerSocket = ( clientSocket || coordinatorSocket ) ? 0 : slave->sockets.slavePeers.get( fd, &index );
 
 			if ( clientSocket ) {
-				MasterEvent event;
+				ClientEvent event;
 				event.pending( clientSocket );
 				slave->eventQueue.insert( event );
 			} else if ( coordinatorSocket ) {
@@ -200,7 +200,7 @@ bool ServerSocket::handler( int fd, uint32_t events, void *data ) {
 				event.pending( coordinatorSocket );
 				slave->eventQueue.insert( event );
 			} else if ( serverPeerSocket ) {
-				SlavePeerEvent event;
+				ServerPeerEvent event;
 				event.pending( serverPeerSocket );
 				slave->eventQueue.insert( event );
 			} else {

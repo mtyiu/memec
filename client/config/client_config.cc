@@ -1,7 +1,7 @@
 #include <cstdlib>
 #include "client_config.hh"
 
-MasterConfig::MasterConfig() {
+ClientConfig::ClientConfig() {
 	this->epoll.maxEvents = 64;
 	this->epoll.timeout = -1;
 	this->workers.type = WORKER_TYPE_MIXED;
@@ -19,13 +19,13 @@ MasterConfig::MasterConfig() {
 	this->backup.ackBatchSize = 100;
 }
 
-bool MasterConfig::merge( GlobalConfig &globalConfig ) {
+bool ClientConfig::merge( GlobalConfig &globalConfig ) {
 	this->epoll.maxEvents = globalConfig.epoll.maxEvents;
 	this->epoll.timeout = globalConfig.epoll.timeout;
 	return true;
 }
 
-bool MasterConfig::parse( const char *path ) {
+bool ClientConfig::parse( const char *path ) {
 	if ( Config::parse( path, "client.ini" ) ) {
 		if ( this->workers.type == WORKER_TYPE_SEPARATED )
 			this->workers.number.separated.total =
@@ -38,7 +38,7 @@ bool MasterConfig::parse( const char *path ) {
 	return false;
 }
 
-bool MasterConfig::override( OptionList &options ) {
+bool ClientConfig::override( OptionList &options ) {
 	bool ret = true;
 	for ( int i = 0, size = options.size(); i < size; i++ ) {
 		ret &= this->set(
@@ -50,7 +50,7 @@ bool MasterConfig::override( OptionList &options ) {
 	return ret;
 }
 
-bool MasterConfig::set( const char *section, const char *name, const char *value ) {
+bool ClientConfig::set( const char *section, const char *name, const char *value ) {
 	if ( match( section, "master" ) ) {
 		return this->master.addr.parse( name, value );
 	} else if ( match( section, "epoll" ) ) {
@@ -134,55 +134,55 @@ bool MasterConfig::set( const char *section, const char *name, const char *value
 	return true;
 }
 
-bool MasterConfig::validate() {
+bool ClientConfig::validate() {
 	if ( ! this->master.addr.isInitialized() )
-		CFG_PARSE_ERROR( "MasterConfig", "The master is not assigned with an valid address." );
+		CFG_PARSE_ERROR( "ClientConfig", "The master is not assigned with an valid address." );
 
 	if ( this->epoll.maxEvents < 1 )
-		CFG_PARSE_ERROR( "MasterConfig", "Maximum number of events in epoll should be at least 1." );
+		CFG_PARSE_ERROR( "ClientConfig", "Maximum number of events in epoll should be at least 1." );
 
 	if ( this->epoll.timeout < -1 )
-		CFG_PARSE_ERROR( "MasterConfig", "The timeout value of epoll should be either -1 (infinite blocking), 0 (non-blocking) or a positive value (representing the number of milliseconds to block)." );
+		CFG_PARSE_ERROR( "ClientConfig", "The timeout value of epoll should be either -1 (infinite blocking), 0 (non-blocking) or a positive value (representing the number of milliseconds to block)." );
 
 	if ( this->pool.packets < this->workers.number.mixed )
-		CFG_PARSE_ERROR( "MasterConfig", "The packet pool should be at least the number of workers." );
+		CFG_PARSE_ERROR( "ClientConfig", "The packet pool should be at least the number of workers." );
 
 	switch( this->workers.type ) {
 		case WORKER_TYPE_MIXED:
 			if ( this->workers.number.mixed < 1 )
-				CFG_PARSE_ERROR( "MasterConfig", "The number of workers should be at least 1." );
+				CFG_PARSE_ERROR( "ClientConfig", "The number of workers should be at least 1." );
 			if ( this->eventQueue.size.mixed < this->workers.number.mixed )
-				CFG_PARSE_ERROR( "MasterConfig", "The size of the event queue should be at least the number of workers." );
+				CFG_PARSE_ERROR( "ClientConfig", "The size of the event queue should be at least the number of workers." );
 			if ( this->eventQueue.size.pMixed < this->workers.number.mixed )
-				CFG_PARSE_ERROR( "MasterConfig", "The size of the prioritized event queue should be at least the number of workers." );
+				CFG_PARSE_ERROR( "ClientConfig", "The size of the prioritized event queue should be at least the number of workers." );
 			break;
 		case WORKER_TYPE_SEPARATED:
 			if ( this->workers.number.separated.application < 1 )
-				CFG_PARSE_ERROR( "MasterConfig", "The number of application workers should be at least 1." );
+				CFG_PARSE_ERROR( "ClientConfig", "The number of application workers should be at least 1." );
 			if ( this->workers.number.separated.coordinator < 1 )
-				CFG_PARSE_ERROR( "MasterConfig", "The number of coordinator workers should be at least 1." );
+				CFG_PARSE_ERROR( "ClientConfig", "The number of coordinator workers should be at least 1." );
 			if ( this->workers.number.separated.master < 1 )
-				CFG_PARSE_ERROR( "MasterConfig", "The number of master workers should be at least 1." );
+				CFG_PARSE_ERROR( "ClientConfig", "The number of master workers should be at least 1." );
 			if ( this->workers.number.separated.slave < 1 )
-				CFG_PARSE_ERROR( "MasterConfig", "The number of slave workers should be at least 1." );
+				CFG_PARSE_ERROR( "ClientConfig", "The number of slave workers should be at least 1." );
 
 			if ( this->eventQueue.size.separated.application < this->workers.number.separated.application )
-				CFG_PARSE_ERROR( "MasterConfig", "The size of the application event queue should be at least the number of workers." );
+				CFG_PARSE_ERROR( "ClientConfig", "The size of the application event queue should be at least the number of workers." );
 			if ( this->eventQueue.size.separated.coordinator < this->workers.number.separated.coordinator )
-				CFG_PARSE_ERROR( "MasterConfig", "The size of the coordinator event queue should be at least the number of workers." );
+				CFG_PARSE_ERROR( "ClientConfig", "The size of the coordinator event queue should be at least the number of workers." );
 			if ( this->eventQueue.size.separated.master < this->workers.number.separated.master )
-				CFG_PARSE_ERROR( "MasterConfig", "The size of the master event queue should be at least the number of workers." );
+				CFG_PARSE_ERROR( "ClientConfig", "The size of the master event queue should be at least the number of workers." );
 			if ( this->eventQueue.size.separated.slave < this->workers.number.separated.slave )
-				CFG_PARSE_ERROR( "MasterConfig", "The size of the slave event queue should be at least the number of workers." );
+				CFG_PARSE_ERROR( "ClientConfig", "The size of the slave event queue should be at least the number of workers." );
 			break;
 		default:
-			CFG_PARSE_ERROR( "MasterConfig", "The type of event queue should be either \"mixed\" or \"separated\"." );
+			CFG_PARSE_ERROR( "ClientConfig", "The type of event queue should be either \"mixed\" or \"separated\"." );
 	}
 
 	return true;
 }
 
-void MasterConfig::print( FILE *f ) {
+void ClientConfig::print( FILE *f ) {
 	int width = 29;
 	fprintf(
 		f,

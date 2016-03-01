@@ -19,7 +19,7 @@ protected:
 
 	static Coding *coding;                 // Coding module
 	static MemoryPool<Chunk> *chunkPool;   // Memory pool for chunks
-	static SlaveEventQueue *eventQueue;    // Event queue
+	static ServerEventQueue *eventQueue;    // Event queue
 	static Map *map;                       // Maps in slave
 
 public:

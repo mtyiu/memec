@@ -11,7 +11,7 @@ private:
 	void generatePath( uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isParity );
 
 public:
-	void init( SlaveConfig &config );
+	void init( ServerConfig &config );
 	bool start();
 	bool read( Chunk *chunk, uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isParity, long offset = 0, size_t length = 0 );
 	ssize_t write( Chunk *chunk, bool sync, long offset = 0, size_t length = 0 );

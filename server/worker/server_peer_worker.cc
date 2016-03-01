@@ -1,7 +1,7 @@
 #include "worker.hh"
 #include "../main/server.hh"
 
-void SlaveWorker::dispatch( SlavePeerEvent event ) {
+void SlaveWorker::dispatch( ServerPeerEvent event ) {
 	bool success, connected, isSend, isCompleted = true;
 	ssize_t ret;
 	struct {
@@ -9,13 +9,13 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		char *data;
 	} buffer;
 
-	isSend = ( event.type != SLAVE_PEER_EVENT_TYPE_PENDING && event.type != SLAVE_PEER_EVENT_TYPE_DEFERRED );
+	isSend = ( event.type != SERVER_PEER_EVENT_TYPE_PENDING && event.type != SERVER_PEER_EVENT_TYPE_DEFERRED );
 	success = false;
 	switch( event.type ) {
 		//////////////
 		// Requests //
 		//////////////
-		case SLAVE_PEER_EVENT_TYPE_REGISTER_REQUEST:
+		case SERVER_PEER_EVENT_TYPE_REGISTER_REQUEST:
 			buffer.data = this->protocol.reqRegisterSlavePeer(
 				buffer.size,
 				Slave::instanceId,
@@ -23,7 +23,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				SlaveWorker::slaveServerAddr
 			);
 			break;
-		case SLAVE_PEER_EVENT_TYPE_GET_CHUNK_REQUEST:
+		case SERVER_PEER_EVENT_TYPE_GET_CHUNK_REQUEST:
 			buffer.data = this->protocol.reqGetChunk(
 				buffer.size,
 				event.instanceId, event.requestId,
@@ -32,7 +32,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				event.message.chunk.metadata.chunkId
 			);
 			break;
-		case SLAVE_PEER_EVENT_TYPE_SET_CHUNK_REQUEST:
+		case SERVER_PEER_EVENT_TYPE_SET_CHUNK_REQUEST:
 			if ( event.message.chunk.chunk ) {
 				uint32_t offset, size;
 				char *data;
@@ -66,7 +66,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 					isCompleted
 				);
 				if ( ! isCompleted ) {
-					SlavePeerEvent newEvent;
+					ServerPeerEvent newEvent;
 					newEvent.reqSetChunk(
 						event.socket,
 						event.instanceId, event.requestId,
@@ -77,7 +77,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				}
 			}
 			break;
-		case SLAVE_PEER_EVENT_TYPE_SET_REQUEST:
+		case SERVER_PEER_EVENT_TYPE_SET_REQUEST:
 			buffer.data = this->protocol.reqSet(
 				buffer.size,
 				event.instanceId, event.requestId,
@@ -87,9 +87,9 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				event.message.set.value.size
 			);
 			break;
-		case SLAVE_PEER_EVENT_TYPE_SET_RESPONSE_SUCCESS:
+		case SERVER_PEER_EVENT_TYPE_SET_RESPONSE_SUCCESS:
 			success = true;
-		case SLAVE_PEER_EVENT_TYPE_SET_RESPONSE_FAILURE:
+		case SERVER_PEER_EVENT_TYPE_SET_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resSet(
 				buffer.size,
 				event.instanceId, event.requestId,
@@ -99,7 +99,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				false // to master
 			);
 			break;
-		case SLAVE_PEER_EVENT_TYPE_FORWARD_KEY_REQUEST:
+		case SERVER_PEER_EVENT_TYPE_FORWARD_KEY_REQUEST:
 			buffer.data = this->protocol.reqForwardKey(
 				buffer.size,
 				event.instanceId, event.requestId,
@@ -116,9 +116,9 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				event.message.forwardKey.update.data
 			);
 			break;
-		case SLAVE_PEER_EVENT_TYPE_FORWARD_KEY_RESPONSE_SUCCESS:
+		case SERVER_PEER_EVENT_TYPE_FORWARD_KEY_RESPONSE_SUCCESS:
 			success = true;
-		case SLAVE_PEER_EVENT_TYPE_FORWARD_KEY_RESPONSE_FAILURE:
+		case SERVER_PEER_EVENT_TYPE_FORWARD_KEY_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resForwardKey(
 				buffer.size,
 				event.instanceId, event.requestId,
@@ -132,7 +132,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				event.message.forwardKey.valueSize
 			);
 			break;
-		case SLAVE_PEER_EVENT_TYPE_FORWARD_CHUNK_REQUEST:
+		case SERVER_PEER_EVENT_TYPE_FORWARD_CHUNK_REQUEST:
 			// fprintf(
 			// 	stderr, "Forwarding the %s chunk (%u, %u, %u: %p; size: %u) to ",
 			// 	event.message.chunk.metadata.chunkId ? "parity" : "data",
@@ -154,10 +154,10 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				event.message.chunk.chunk->getData()
 			);
 			break;
-		case SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_REQUEST:
+		case SERVER_PEER_EVENT_TYPE_SEAL_CHUNK_REQUEST:
 			this->issueSealChunkRequest( event.message.chunk.chunk );
 			return;
-		case SLAVE_PEER_EVENT_TYPE_GET_REQUEST:
+		case SERVER_PEER_EVENT_TYPE_GET_REQUEST:
 			buffer.data = this->protocol.reqGet(
 				buffer.size,
 				event.instanceId, event.requestId,
@@ -171,9 +171,9 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		// Responses //
 		///////////////
 		// Register
-		case SLAVE_PEER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
+		case SERVER_PEER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
 			success = true; // default is false
-		case SLAVE_PEER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
+		case SERVER_PEER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
 		{
 			Slave *slave = Slave::getInstance();
 			bool isRecovering;
@@ -194,12 +194,12 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				success
 			);
 			break;
-		case SLAVE_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS:
-			__ERROR__( "SlaveWorker", "dispatch", "SLAVE_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS is not supported." );
+		case SERVER_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS:
+			__ERROR__( "SlaveWorker", "dispatch", "SERVER_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS is not supported." );
 			success = true; // default is false
 			break;
-		case SLAVE_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE:
-			__ERROR__( "SlaveWorker", "dispatch", "SLAVE_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE is not supported." );
+		case SERVER_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE:
+			__ERROR__( "SlaveWorker", "dispatch", "SERVER_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE is not supported." );
 			// buffer.data = this->protocol.resRemappingSet(
 			// 	buffer.size,
 			// 	false, // toMaster
@@ -215,7 +215,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 			// );
 			break;
 		// GET
-		case SLAVE_PEER_EVENT_TYPE_GET_RESPONSE_SUCCESS:
+		case SERVER_PEER_EVENT_TYPE_GET_RESPONSE_SUCCESS:
 		{
 			char *key, *value;
 			uint8_t keySize;
@@ -232,7 +232,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 			);
 		}
 			break;
-		case SLAVE_PEER_EVENT_TYPE_GET_RESPONSE_FAILURE:
+		case SERVER_PEER_EVENT_TYPE_GET_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resGet(
 				buffer.size,
 				event.instanceId, event.requestId,
@@ -245,9 +245,9 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 			);
 			break;
 		// UPDATE_CHUNK
-		case SLAVE_PEER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_SUCCESS:
+		case SERVER_PEER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_SUCCESS:
 			success = true; // default is false
-		case SLAVE_PEER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_FAILURE:
+		case SERVER_PEER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resUpdateChunk(
 				buffer.size,
 				event.instanceId, event.requestId,
@@ -261,9 +261,9 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 			);
 			break;
 		// UPDATE
-		case SLAVE_PEER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
+		case SERVER_PEER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
 			success = true; // default is false
-		case SLAVE_PEER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
+		case SERVER_PEER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resUpdate(
 				buffer.size,
 				event.instanceId, event.requestId,
@@ -279,9 +279,9 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 			);
 			break;
 		// DELETE
-		case SLAVE_PEER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS:
+		case SERVER_PEER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS:
 			success = true; // default is false
-		case SLAVE_PEER_EVENT_TYPE_DELETE_RESPONSE_FAILURE:
+		case SERVER_PEER_EVENT_TYPE_DELETE_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resDelete(
 				buffer.size,
 				event.instanceId, event.requestId,
@@ -294,9 +294,9 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 			);
 			break;
 		// REMAPPING_UPDATE
-		case SLAVE_PEER_EVENT_TYPE_REMAPPED_UPDATE_RESPONSE_SUCCESS:
+		case SERVER_PEER_EVENT_TYPE_REMAPPED_UPDATE_RESPONSE_SUCCESS:
 			success = true;
-		case SLAVE_PEER_EVENT_TYPE_REMAPPED_UPDATE_RESPONSE_FAILURE:
+		case SERVER_PEER_EVENT_TYPE_REMAPPED_UPDATE_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resRemappedUpdate(
 				buffer.size,
 				event.instanceId, event.requestId,
@@ -308,9 +308,9 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 			);
 			break;
 		// REMAPPING_DELETE
-		case SLAVE_PEER_EVENT_TYPE_REMAPPED_DELETE_RESPONSE_SUCCESS:
+		case SERVER_PEER_EVENT_TYPE_REMAPPED_DELETE_RESPONSE_SUCCESS:
 			success = true;
-		case SLAVE_PEER_EVENT_TYPE_REMAPPED_DELETE_RESPONSE_FAILURE:
+		case SERVER_PEER_EVENT_TYPE_REMAPPED_DELETE_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resRemappedDelete(
 				buffer.size,
 				event.instanceId, event.requestId,
@@ -320,9 +320,9 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 			);
 			break;
 		// DELETE_CHUNK
-		case SLAVE_PEER_EVENT_TYPE_DELETE_CHUNK_RESPONSE_SUCCESS:
+		case SERVER_PEER_EVENT_TYPE_DELETE_CHUNK_RESPONSE_SUCCESS:
 			success = true; // default is false
-		case SLAVE_PEER_EVENT_TYPE_DELETE_CHUNK_RESPONSE_FAILURE:
+		case SERVER_PEER_EVENT_TYPE_DELETE_CHUNK_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resDeleteChunk(
 				buffer.size,
 				event.instanceId, event.requestId,
@@ -336,7 +336,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 			);
 			break;
 		// GET_CHUNK
-		case SLAVE_PEER_EVENT_TYPE_GET_CHUNK_RESPONSE_SUCCESS:
+		case SERVER_PEER_EVENT_TYPE_GET_CHUNK_RESPONSE_SUCCESS:
 		{
 			char *data = 0;
 			uint32_t size = 0, offset = 0;
@@ -361,7 +361,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 			// 	->unlock( event.message.chunk.chunkBufferIndex );
 		}
 			break;
-		case SLAVE_PEER_EVENT_TYPE_GET_CHUNK_RESPONSE_FAILURE:
+		case SERVER_PEER_EVENT_TYPE_GET_CHUNK_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resGetChunk(
 				buffer.size,
 				event.instanceId, event.requestId,
@@ -375,9 +375,9 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 				->unlock( event.message.chunk.chunkBufferIndex );
 			break;
 		// SET_CHUNK
-		case SLAVE_PEER_EVENT_TYPE_SET_CHUNK_RESPONSE_SUCCESS:
+		case SERVER_PEER_EVENT_TYPE_SET_CHUNK_RESPONSE_SUCCESS:
 			success = true; // default is false
-		case SLAVE_PEER_EVENT_TYPE_SET_CHUNK_RESPONSE_FAILURE:
+		case SERVER_PEER_EVENT_TYPE_SET_CHUNK_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resSetChunk(
 				buffer.size,
 				event.instanceId, event.requestId,
@@ -388,9 +388,9 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 			);
 			break;
 		// FORWARD_CHUNK
-		case SLAVE_PEER_EVENT_TYPE_FORWARD_CHUNK_RESPONSE_SUCCESS:
+		case SERVER_PEER_EVENT_TYPE_FORWARD_CHUNK_RESPONSE_SUCCESS:
 			success = true;
-		case SLAVE_PEER_EVENT_TYPE_FORWARD_CHUNK_RESPONSE_FAILURE:
+		case SERVER_PEER_EVENT_TYPE_FORWARD_CHUNK_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resForwardChunk(
 				buffer.size,
 				event.instanceId, event.requestId,
@@ -401,23 +401,23 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 			);
 			break;
 		// SEAL_CHUNK
-		case SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_RESPONSE_SUCCESS:
+		case SERVER_PEER_EVENT_TYPE_SEAL_CHUNK_RESPONSE_SUCCESS:
 			success = true; // default is false
-		case SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_RESPONSE_FAILURE:
+		case SERVER_PEER_EVENT_TYPE_SEAL_CHUNK_RESPONSE_FAILURE:
 			// TODO: Is a response message for SEAL_CHUNK request required?
 			return;
 		/////////////////////////////////////
 		// Seal chunks in the chunk buffer //
 		/////////////////////////////////////
-		case SLAVE_PEER_EVENT_TYPE_SEAL_CHUNKS:
+		case SERVER_PEER_EVENT_TYPE_SEAL_CHUNKS:
 			printf( "\tSealing %lu chunks...\n", event.message.chunkBuffer->seal( this ) );
 			return;
 		/////////////////////////////////
 		// Reconstructed unsealed keys //
 		/////////////////////////////////
-		case SLAVE_PEER_EVENT_TYPE_UNSEALED_KEYS_RESPONSE_SUCCESS:
+		case SERVER_PEER_EVENT_TYPE_UNSEALED_KEYS_RESPONSE_SUCCESS:
 			success = true;
-		case SLAVE_PEER_EVENT_TYPE_UNSEALED_KEYS_RESPONSE_FAILURE:
+		case SERVER_PEER_EVENT_TYPE_UNSEALED_KEYS_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resUnsealedKeys(
 				buffer.size,
 				event.instanceId, event.requestId,
@@ -428,7 +428,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		////////////////////
 		// Deferred event //
 		////////////////////
-		case SLAVE_PEER_EVENT_TYPE_DEFERRED:
+		case SERVER_PEER_EVENT_TYPE_DEFERRED:
 			switch( event.message.defer.opcode ) {
 				case PROTO_OPCODE_BATCH_CHUNKS:
 					this->handleBatchChunksRequest(
@@ -445,13 +445,13 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		//////////
 		// Send //
 		//////////
-		case SLAVE_PEER_EVENT_TYPE_SEND:
+		case SERVER_PEER_EVENT_TYPE_SEND:
 			event.message.send.packet->read( buffer.data, buffer.size );
 			break;
 		///////////
 		// Batch //
 		///////////
-		case SLAVE_PEER_EVENT_TYPE_BATCH_GET_CHUNKS:
+		case SERVER_PEER_EVENT_TYPE_BATCH_GET_CHUNKS:
 		{
 			uint16_t instanceId = Slave::instanceId;
 			uint32_t chunksCount = 0;
@@ -480,7 +480,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		/////////////
 		// Pending //
 		/////////////
-		case SLAVE_PEER_EVENT_TYPE_PENDING:
+		case SERVER_PEER_EVENT_TYPE_PENDING:
 			break;
 		default:
 			return;
@@ -492,7 +492,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "SlaveWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 
-		if ( event.type == SLAVE_PEER_EVENT_TYPE_SEND ) {
+		if ( event.type == SERVER_PEER_EVENT_TYPE_SEND ) {
 			SlaveWorker::packetPool->free( event.message.send.packet );
 		}
 	} else {
@@ -767,7 +767,7 @@ void SlaveWorker::dispatch( SlavePeerEvent event ) {
 						case PROTO_MAGIC_REQUEST:
 						{
 							// Dump the buffer
-							SlavePeerEvent deferredEvent;
+							ServerPeerEvent deferredEvent;
 							deferredEvent.defer(
 								event.socket,
 								event.instanceId,

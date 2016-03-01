@@ -39,7 +39,7 @@ void CoordinatorWorker::dispatch( CoordinatorEvent event ) {
 		case COORDINATOR_EVENT_TYPE_SYNC_REMAPPED_PARITY:
 		{
 			uint32_t requestId = coordinator->idGenerator.nextVal( this->workerId );
-			SlaveEvent slaveEvent;
+			ServerEvent serverEvent;
 
 			// prepare the request for all master
 			Packet *packet = coordinator->packetPool.malloc();
@@ -62,8 +62,8 @@ void CoordinatorWorker::dispatch( CoordinatorEvent event ) {
 			packet->setReferenceCount( numSlaves );
 			for ( uint32_t i = 0; i < numSlaves; i++ ) {
 				ServerSocket *socket = coordinator->sockets.slaves[ i ];
-				slaveEvent.syncRemappedData( socket, packet );
-				coordinator->eventQueue.insert( slaveEvent );
+				serverEvent.syncRemappedData( socket, packet );
+				coordinator->eventQueue.insert( serverEvent );
 			}
 			UNLOCK( &coordinator->sockets.slaves.lock );
 
@@ -110,13 +110,13 @@ void *CoordinatorWorker::run( void *argv ) {
 			break;
 		case WORKER_ROLE_CLIENT:
 			COORDINATOR_WORKER_EVENT_LOOP(
-				MasterEvent,
+				ClientEvent,
 				eventQueue->separated.master
 			);
 			break;
 		case WORKER_ROLE_SERVER:
 			COORDINATOR_WORKER_EVENT_LOOP(
-				SlaveEvent,
+				ServerEvent,
 				eventQueue->separated.slave
 			);
 			break;

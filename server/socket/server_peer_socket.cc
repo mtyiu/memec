@@ -13,7 +13,7 @@ void ServerPeerSocket::setArrayMap( ArrayMap<int, ServerPeerSocket> *slavePeers 
 
 void ServerPeerSocket::registerTo() {
 	Slave *slave = Slave::getInstance();
-	SlavePeerEvent event;
+	ServerPeerEvent event;
 	event.reqRegister( this );
 	slave->eventQueue.insert( event );
 }

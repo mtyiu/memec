@@ -11,7 +11,7 @@ bool SlaveWorker::handleRemappedData( CoordinatorEvent event, char *buf, size_t 
 		return false;
 	}
 
-	SlavePeerEvent slavePeerEvent;
+	ServerPeerEvent slavePeerEvent;
 	Slave *slave = Slave::getInstance();
 
 	struct sockaddr_in target;
@@ -57,7 +57,7 @@ bool SlaveWorker::handleRemappedData( CoordinatorEvent event, char *buf, size_t 
 	return false;
 }
 
-bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_t size ) {
+bool SlaveWorker::handleRemappingSetRequest( ClientEvent event, char *buf, size_t size ) {
 	struct RemappingSetHeader header;
 	if ( ! this->protocol.parseRemappingSetHeader( header, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleRemappingSetRequest", "Invalid REMAPPING_SET request (size = %lu).", size );
@@ -178,7 +178,7 @@ bool SlaveWorker::handleRemappingSetRequest( MasterEvent event, char *buf, size_
 	return true;
 }
 
-bool SlaveWorker::handleRemappingSetRequest( SlavePeerEvent event, char *buf, size_t size ) {
+bool SlaveWorker::handleRemappingSetRequest( ServerPeerEvent event, char *buf, size_t size ) {
 	__ERROR__( "SlaveWorker", "handleRemappingSetRequest", "Why remapping SET request is sent by slave peer?" );
 	return false;
 	/*
@@ -217,7 +217,7 @@ bool SlaveWorker::handleRemappingSetRequest( SlavePeerEvent event, char *buf, si
 	*/
 }
 
-bool SlaveWorker::handleRemappingSetResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
+bool SlaveWorker::handleRemappingSetResponse( ServerPeerEvent event, bool success, char *buf, size_t size ) {
 	__ERROR__( "SlaveWorker", "handleRemappingSetRequest", "Why remapping SET response is received by slave peer?" );
 	return false;
 	/*
@@ -247,26 +247,26 @@ bool SlaveWorker::handleRemappingSetResponse( SlavePeerEvent event, bool success
 	__DEBUG__( BLUE, "SlaveWorker", "handleRemappingSetResponse", "Pending slave REMAPPING_SET requests = %d (%s).", pending, success ? "success" : "fail" );
 	if ( pending == 0 ) {
 		// Only send master REMAPPING_SET response when the number of pending slave REMAPPING_SET requests equal 0
-		MasterEvent masterEvent;
+		ClientEvent clientEvent;
 
 		if ( ! SlaveWorker::pending->eraseRemappingRecordKey( PT_MASTER_REMAPPING_SET, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &record ) ) {
 			__ERROR__( "SlaveWorker", "handleRemappingSetResponse", "Cannot find a pending master REMAPPING_SET request that matches the response. This message will be discarded." );
 			return false;
 		}
 
-		masterEvent.resRemappingSet(
+		clientEvent.resRemappingSet(
 			( ClientSocket * ) pid.ptr, pid.instanceId, pid.requestId, record.key,
 			record.remap.listId, record.remap.chunkId, success, true,
 			header.sockfd, header.isRemapped
 		);
-		SlaveWorker::eventQueue->insert( masterEvent );
+		SlaveWorker::eventQueue->insert( clientEvent );
 	}
 
 	return true;
 	*/
 }
 
-bool SlaveWorker::handleRemappedUpdateRequest( SlavePeerEvent event, char *buf, size_t size ) {
+bool SlaveWorker::handleRemappedUpdateRequest( ServerPeerEvent event, char *buf, size_t size ) {
 	struct KeyValueUpdateHeader header;
 	bool ret;
 	if ( ! this->protocol.parseKeyValueUpdateHeader( header, true, buf, size ) ) {
@@ -308,12 +308,12 @@ bool SlaveWorker::handleRemappedUpdateRequest( SlavePeerEvent event, char *buf, 
 	return ret;
 }
 
-bool SlaveWorker::handleRemappedDeleteRequest( SlavePeerEvent event, char *buf, size_t size ) {
+bool SlaveWorker::handleRemappedDeleteRequest( ServerPeerEvent event, char *buf, size_t size ) {
 	printf( "handleRemappedDeleteRequest\n" );
 	return true;
 }
 
-bool SlaveWorker::handleRemappedUpdateResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
+bool SlaveWorker::handleRemappedUpdateResponse( ServerPeerEvent event, bool success, char *buf, size_t size ) {
 	struct KeyValueUpdateHeader header;
 	if ( ! this->protocol.parseKeyValueUpdateHeader( header, false, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleRemappedUpdateResponse", "Invalid UPDATE request." );
@@ -355,26 +355,26 @@ bool SlaveWorker::handleRemappedUpdateResponse( SlavePeerEvent event, bool succe
 
 	if ( pending == 0 ) {
 		// Only send master UPDATE response when the number of pending slave UPDATE requests equal 0
-		MasterEvent masterEvent;
+		ClientEvent clientEvent;
 
 		if ( ! SlaveWorker::pending->eraseKeyValueUpdate( PT_MASTER_UPDATE, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &keyValueUpdate ) ) {
 			__ERROR__( "SlaveWorker", "handleUpdateResponse", "Cannot find a pending master UPDATE request that matches the response. This message will be discarded." );
 			return false;
 		}
 
-		masterEvent.resUpdate(
+		clientEvent.resUpdate(
 			( ClientSocket * ) pid.ptr, pid.instanceId, pid.requestId,
 			keyValueUpdate,
 			header.valueUpdateOffset,
 			header.valueUpdateSize,
 			success, true, keyValueUpdate.isDegraded
 		);
-		this->dispatch( masterEvent );
+		this->dispatch( clientEvent );
 	}
 	return true;
 }
 
-bool SlaveWorker::handleRemappedDeleteResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
+bool SlaveWorker::handleRemappedDeleteResponse( ServerPeerEvent event, bool success, char *buf, size_t size ) {
 	printf( "handleRemappedDeleteResponse\n" );
 	return true;
 }

@@ -21,8 +21,8 @@ public:
 	} priority;
 	struct {
 		EventQueue<CoordinatorEvent> *coordinator;
-		EventQueue<MasterEvent> *master;
-		EventQueue<SlaveEvent> *slave;
+		EventQueue<ClientEvent> *master;
+		EventQueue<ServerEvent> *slave;
 	} separated;
 
 	CoordinatorEventQueue() {
@@ -46,8 +46,8 @@ public:
 	void init( bool block, uint32_t coordinator, uint32_t master, uint32_t slave ) {
 		this->isMixed = false;
 		this->separated.coordinator = new EventQueue<CoordinatorEvent>( coordinator, block );
-		this->separated.master = new EventQueue<MasterEvent>( master, block );
-		this->separated.slave = new EventQueue<SlaveEvent>( slave, block );
+		this->separated.master = new EventQueue<ClientEvent>( master, block );
+		this->separated.slave = new EventQueue<ServerEvent>( slave, block );
 	}
 
 	void start() {
@@ -111,11 +111,11 @@ public:
 	}
 
 	COORDINATOR_EVENT_QUEUE_INSERT( CoordinatorEvent, coordinator )
-	COORDINATOR_EVENT_QUEUE_INSERT( MasterEvent, master )
-	COORDINATOR_EVENT_QUEUE_INSERT( SlaveEvent, slave )
+	COORDINATOR_EVENT_QUEUE_INSERT( ClientEvent, master )
+	COORDINATOR_EVENT_QUEUE_INSERT( ServerEvent, slave )
 #undef COORDINATOR_EVENT_QUEUE_INSERT
 
-	bool prioritizedInsert( MasterEvent &event ) {
+	bool prioritizedInsert( ClientEvent &event ) {
 		bool ret;
 		if ( this->isMixed ) {
 			MixedEvent mixedEvent;

@@ -1,5 +1,5 @@
-#ifndef __MASTER_EVENT_MASTER_EVENT_QUEUE_HH__
-#define __MASTER_EVENT_MASTER_EVENT_QUEUE_HH__
+#ifndef __CLIENT_EVENT_CLIENT_EVENT_QUEUE_HH__
+#define __CLIENT_EVENT_CLIENT_EVENT_QUEUE_HH__
 
 #include <stdint.h>
 #include "mixed_event.hh"
@@ -10,7 +10,7 @@
 #include "../../common/event/event_queue.hh"
 #include "../../common/lock/lock.hh"
 
-class MasterEventQueue {
+class ClientEventQueue {
 public:
 	bool isMixed;
 	EventQueue<MixedEvent> *mixed;
@@ -24,11 +24,11 @@ public:
 	struct {
 		EventQueue<ApplicationEvent> *application;
 		EventQueue<CoordinatorEvent> *coordinator;
-		EventQueue<MasterEvent> *master;
-		EventQueue<SlaveEvent> *slave;
+		EventQueue<ClientEvent> *master;
+		EventQueue<ServerEvent> *slave;
 	} separated;
 
-	MasterEventQueue() {
+	ClientEventQueue() {
 		this->mixed = 0;
 		this->priority.mixed = 0;
 		this->priority.capacity = 0;
@@ -51,8 +51,8 @@ public:
 		this->isMixed = false;
 		this->separated.application = new EventQueue<ApplicationEvent>( application, block );
 		this->separated.coordinator = new EventQueue<CoordinatorEvent>( coordinator, block );
-		this->separated.master = new EventQueue<MasterEvent>( master, block );
-		this->separated.slave = new EventQueue<SlaveEvent>( slave, block );
+		this->separated.master = new EventQueue<ClientEvent>( master, block );
+		this->separated.slave = new EventQueue<ServerEvent>( slave, block );
 	}
 
 	void start() {
@@ -109,7 +109,7 @@ public:
 		}
 	}
 
-#define MASTER_EVENT_QUEUE_INSERT(_EVENT_TYPE_, _EVENT_QUEUE_) \
+#define CLIENT_EVENT_QUEUE_INSERT(_EVENT_TYPE_, _EVENT_QUEUE_) \
 	bool insert( _EVENT_TYPE_ &event ) { \
 		if ( this->isMixed ) { \
 			MixedEvent mixedEvent; \
@@ -121,13 +121,13 @@ public:
 		} \
 	}
 
-	MASTER_EVENT_QUEUE_INSERT( ApplicationEvent, application )
-	MASTER_EVENT_QUEUE_INSERT( CoordinatorEvent, coordinator )
-	MASTER_EVENT_QUEUE_INSERT( MasterEvent, master )
-	MASTER_EVENT_QUEUE_INSERT( SlaveEvent, slave )
-#undef MASTER_EVENT_QUEUE_INSERT
+	CLIENT_EVENT_QUEUE_INSERT( ApplicationEvent, application )
+	CLIENT_EVENT_QUEUE_INSERT( CoordinatorEvent, coordinator )
+	CLIENT_EVENT_QUEUE_INSERT( ClientEvent, master )
+	CLIENT_EVENT_QUEUE_INSERT( ServerEvent, slave )
+#undef CLIENT_EVENT_QUEUE_INSERT
 
-	bool prioritizedInsert( SlaveEvent &event ) {
+	bool prioritizedInsert( ServerEvent &event ) {
 		bool ret;
 		if ( this->isMixed ) {
 			MixedEvent mixedEvent;

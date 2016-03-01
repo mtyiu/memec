@@ -959,7 +959,7 @@ void Master::printBackup( FILE *f ) {
 void Master::syncMetadata() {
 	uint32_t socketFromId, socketToId;
 	char tmp[ 16 ];
-	SlaveEvent event;
+	ServerEvent event;
 
 	printf( "Which socket ([0-%lu] or all)? ", this->sockets.slaves.size() - 1 );
 	fflush( stdout );
@@ -1021,9 +1021,9 @@ void Master::time() {
 }
 
 #define DISPATCH_EVENT_TO_OTHER_SLAVES( _METHOD_NAME_, _S_, _COND_, _LOCK_, _COUNTER_ ) {  \
-	std::vector<SlaveEvent> events; \
+	std::vector<ServerEvent> events; \
 	for ( int j = 0, len = this->sockets.slaves.size(); j < len; j++ ) { \
-		SlaveEvent event; \
+		ServerEvent event; \
 		ServerSocket *p = this->sockets.slaves[ j ]; \
 		struct sockaddr_in saddr = p->getAddr(); \
 		/* skip myself, and any node declared to be failed */ \

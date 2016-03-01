@@ -1,7 +1,7 @@
 #include "worker.hh"
 #include "../main/client.hh"
 
-void MasterWorker::dispatch( SlaveEvent event ) {
+void MasterWorker::dispatch( ServerEvent event ) {
 	bool connected, isSend;
 	ssize_t ret;
 	struct {
@@ -11,7 +11,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 	uint16_t instanceId = Master::instanceId;
 
 	switch( event.type ) {
-		case SLAVE_EVENT_TYPE_REGISTER_REQUEST:
+		case SERVER_EVENT_TYPE_REGISTER_REQUEST:
 			buffer.data = this->protocol.reqRegisterSlave(
 				buffer.size,
 				instanceId,
@@ -21,11 +21,11 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 			);
 			isSend = true;
 			break;
-		case SLAVE_EVENT_TYPE_SEND:
+		case SERVER_EVENT_TYPE_SEND:
 			event.message.send.packet->read( buffer.data, buffer.size );
 			isSend = true;
 			break;
-		case SLAVE_EVENT_TYPE_SYNC_METADATA:
+		case SERVER_EVENT_TYPE_SYNC_METADATA:
 		{
 			uint32_t sealedCount, opsCount;
 			bool isCompleted;
@@ -50,10 +50,10 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 			isSend = false; // Send to coordinator instead
 		}
 			break;
-		case SLAVE_EVENT_TYPE_ACK_PARITY_DELTA:
-		case SLAVE_EVENT_TYPE_REVERT_DELTA:
+		case SERVER_EVENT_TYPE_ACK_PARITY_DELTA:
+		case SERVER_EVENT_TYPE_REVERT_DELTA:
 		{
-			bool isAck = ( event.type == SLAVE_EVENT_TYPE_ACK_PARITY_DELTA );
+			bool isAck = ( event.type == SERVER_EVENT_TYPE_ACK_PARITY_DELTA );
 
 			uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
 
@@ -104,7 +104,7 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 			isSend = true;
 		}
 			break;
-		case SLAVE_EVENT_TYPE_PENDING:
+		case SERVER_EVENT_TYPE_PENDING:
 			isSend = false;
 			break;
 		default:
@@ -116,12 +116,12 @@ void MasterWorker::dispatch( SlaveEvent event ) {
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "MasterWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 
-		if ( event.type == SLAVE_EVENT_TYPE_SEND ) {
+		if ( event.type == SERVER_EVENT_TYPE_SEND ) {
 			MasterWorker::packetPool->free( event.message.send.packet );
 			// fprintf( stderr, "- After free(): " );
 			// MasterWorker::packetPool->print( stderr );
 		}
-	} else if ( event.type == SLAVE_EVENT_TYPE_SYNC_METADATA ) {
+	} else if ( event.type == SERVER_EVENT_TYPE_SYNC_METADATA ) {
 		std::vector<CoordinatorSocket *> &coordinators = Master::getInstance()->sockets.coordinators.values;
 		for ( int i = 0, len = coordinators.size(); i < len; i++ ) {
 			ret = coordinators[ i ]->send( buffer.data, buffer.size, connected );
@@ -233,7 +233,7 @@ quit_1:
 	}
 }
 
-bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf, size_t size ) {
+bool MasterWorker::handleSetResponse( ServerEvent event, bool success, char *buf, size_t size ) {
 	uint8_t keySize;
 	char *keyStr;
 	if ( success ) {
@@ -395,7 +395,7 @@ bool MasterWorker::handleSetResponse( SlaveEvent event, bool success, char *buf,
 	return true;
 }
 
-bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, bool isDegraded, char *buf, size_t size ) {
+bool MasterWorker::handleGetResponse( ServerEvent event, bool success, bool isDegraded, char *buf, size_t size ) {
 	Key key;
 	uint32_t valueSize = 0;
 	char *valueStr = 0;
@@ -490,7 +490,7 @@ bool MasterWorker::handleGetResponse( SlaveEvent event, bool success, bool isDeg
 	return true;
 }
 
-bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, bool isDegraded, char *buf, size_t size ) {
+bool MasterWorker::handleUpdateResponse( ServerEvent event, bool success, bool isDegraded, char *buf, size_t size ) {
 	struct KeyValueUpdateHeader header;
 	if ( ! this->protocol.parseKeyValueUpdateHeader( header, false, buf, size ) ) {
 		__ERROR__( "MasterWorker", "handleUpdateResponse", "Invalid UPDATE Response." );
@@ -575,7 +575,7 @@ bool MasterWorker::handleUpdateResponse( SlaveEvent event, bool success, bool is
 	return true;
 }
 
-bool MasterWorker::handleDeleteResponse( SlaveEvent event, bool success, bool isDegraded, char *buf, size_t size ) {
+bool MasterWorker::handleDeleteResponse( ServerEvent event, bool success, bool isDegraded, char *buf, size_t size ) {
 	char *keyStr;
 	uint8_t keySize;
 	if ( success ) {
@@ -671,7 +671,7 @@ bool MasterWorker::handleDeleteResponse( SlaveEvent event, bool success, bool is
 	return true;
 }
 
-bool MasterWorker::handleAcknowledgement( SlaveEvent event, uint8_t opcode, char *buf, size_t size ) {
+bool MasterWorker::handleAcknowledgement( ServerEvent event, uint8_t opcode, char *buf, size_t size ) {
 	struct AcknowledgementHeader header;
 	if ( ! this->protocol.parseAcknowledgementHeader( header, buf, size ) ) {
 		__ERROR__( "MasterWorker", "handleAcknowledgement", "Invalid ACK." );
@@ -685,7 +685,7 @@ bool MasterWorker::handleAcknowledgement( SlaveEvent event, uint8_t opcode, char
 	return true;
 }
 
-bool MasterWorker::handleDeltaAcknowledgement( SlaveEvent event, uint8_t opcode, char *buf, size_t size ) {
+bool MasterWorker::handleDeltaAcknowledgement( ServerEvent event, uint8_t opcode, char *buf, size_t size ) {
 	struct DeltaAcknowledgementHeader header;
 	PendingIdentifier pid;
 	if ( ! this->protocol.parseDeltaAcknowledgementHeader( header, 0, 0, buf, size ) ) {

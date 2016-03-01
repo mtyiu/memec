@@ -97,7 +97,7 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 				bool success;
 			} registration;
 			while ( SlaveWorker::pending->eraseSlavePeerRegistration( registration.requestId, registration.socket, registration.success ) ) {
-				SlavePeerEvent slavePeerEvent;
+				ServerPeerEvent slavePeerEvent;
 				slavePeerEvent.resRegister(
 					registration.socket,
 					Slave::instanceId,
@@ -279,7 +279,7 @@ bool SlaveWorker::handleHeartbeatAck( CoordinatorEvent event, char *buf, size_t 
 	uint32_t fromTimestamp;
 	if ( SlaveWorker::pendingAck->erase( header.timestamp, fromTimestamp ) ) {
 		// Send ACK to masters
-		MasterEvent masterEvent;
+		ClientEvent clientEvent;
 		uint16_t instanceId = Slave::instanceId;
 		uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
 
@@ -289,8 +289,8 @@ bool SlaveWorker::handleHeartbeatAck( CoordinatorEvent event, char *buf, size_t 
 
 		LOCK( lock );
 		for ( size_t i = 0, size = sockets.size(); i < size; i++ ) {
-			masterEvent.ackMetadata( sockets[ i ], instanceId, requestId, fromTimestamp, header.timestamp );
-			SlaveWorker::eventQueue->insert( masterEvent );
+			clientEvent.ackMetadata( sockets[ i ], instanceId, requestId, fromTimestamp, header.timestamp );
+			SlaveWorker::eventQueue->insert( clientEvent );
 		}
 		UNLOCK( lock );
 	}

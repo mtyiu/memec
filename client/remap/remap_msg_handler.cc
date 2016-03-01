@@ -155,7 +155,7 @@ void MasterRemapMsgHandler::setState( char* msg , int len ) {
 					signal = state;
 				else {
 					// Insert a new event
-					SlaveEvent event;
+					ServerEvent event;
 					event.syncMetadata( target );
 					Master::getInstance()->eventQueue.insert( event );
 					// revert parity deltas

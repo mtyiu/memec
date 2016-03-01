@@ -33,7 +33,7 @@ private:
 	static bool degradedTargetIsFixed;
 	static IDGenerator *idGenerator;
 	static Pending *pending;
-	static MasterEventQueue *eventQueue;
+	static ClientEventQueue *eventQueue;
 	static StripeList<ServerSocket> *stripeList;
 	static ArrayMap<int, ServerSocket> *serverSockets;
 	static PacketPool *packetPool;
@@ -41,7 +41,7 @@ private:
 
 	// ---------- worker.cc ----------
 	void dispatch( MixedEvent event );
-	void dispatch( MasterEvent event );
+	void dispatch( ClientEvent event );
 	// For normal operations
 	ServerSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId );
 	// For both remapping and degraded operations
@@ -79,13 +79,13 @@ private:
 	bool handleDeleteRequest( ApplicationEvent event, char *buf, size_t size );
 
 	// ---------- server_worker.cc ----------
-	void dispatch( SlaveEvent event );
-	bool handleSetResponse( SlaveEvent event, bool success, char *buf, size_t size );
-	bool handleGetResponse( SlaveEvent event, bool success, bool isDegraded, char *buf, size_t size );
-	bool handleUpdateResponse( SlaveEvent event, bool success, bool isDegraded, char *buf, size_t size );
-	bool handleDeleteResponse( SlaveEvent event, bool success, bool isDegraded, char *buf, size_t size );
-	bool handleAcknowledgement( SlaveEvent event, uint8_t opcode, char *buf, size_t size );
-	bool handleDeltaAcknowledgement( SlaveEvent event, uint8_t opcode, char *buf, size_t size );
+	void dispatch( ServerEvent event );
+	bool handleSetResponse( ServerEvent event, bool success, char *buf, size_t size );
+	bool handleGetResponse( ServerEvent event, bool success, bool isDegraded, char *buf, size_t size );
+	bool handleUpdateResponse( ServerEvent event, bool success, bool isDegraded, char *buf, size_t size );
+	bool handleDeleteResponse( ServerEvent event, bool success, bool isDegraded, char *buf, size_t size );
+	bool handleAcknowledgement( ServerEvent event, uint8_t opcode, char *buf, size_t size );
+	bool handleDeltaAcknowledgement( ServerEvent event, uint8_t opcode, char *buf, size_t size );
 
 	// ---------- degraded_worker.cc ----------
 	bool sendDegradedLockRequest(
@@ -99,7 +99,7 @@ private:
 	// ---------- remap_worker.cc ----------
 	bool handleRemappingSetRequest( ApplicationEvent event, char *buf, size_t size );
 	bool handleRemappingSetLockResponse( CoordinatorEvent event, bool success, char *buf, size_t size );
-	bool handleRemappingSetResponse( SlaveEvent event, bool success, char *buf, size_t size );
+	bool handleRemappingSetResponse( ServerEvent event, bool success, char *buf, size_t size );
 
 	// ---------- recovery_worker.cc ----------
 	bool handleSlaveReconstructedMsg( CoordinatorEvent event, char *buf, size_t size );

@@ -118,7 +118,7 @@ bool CoordinatorConfig::validate() {
 			if ( this->eventQueue.size.mixed < this->workers.number.mixed )
 				CFG_PARSE_ERROR( "CoordinatorConfig", "The size of the event queue should be at least the number of workers." );
 			if ( this->eventQueue.size.pMixed < this->workers.number.mixed )
-				CFG_PARSE_ERROR( "MasterConfig", "The size of the prioritized event queue should be at least the number of workers." );
+				CFG_PARSE_ERROR( "ClientConfig", "The size of the prioritized event queue should be at least the number of workers." );
 			break;
 		case WORKER_TYPE_SEPARATED:
 			if ( this->workers.number.separated.coordinator < 1 )

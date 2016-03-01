@@ -12,7 +12,7 @@ bool MasterWorker::disableRemappingSet;
 bool MasterWorker::degradedTargetIsFixed;
 IDGenerator *MasterWorker::idGenerator;
 Pending *MasterWorker::pending;
-MasterEventQueue *MasterWorker::eventQueue;
+ClientEventQueue *MasterWorker::eventQueue;
 StripeList<ServerSocket> *MasterWorker::stripeList;
 PacketPool *MasterWorker::packetPool;
 ArrayMap<int, ServerSocket> *MasterWorker::serverSockets;
@@ -37,7 +37,7 @@ void MasterWorker::dispatch( MixedEvent event ) {
 	}
 }
 
-void MasterWorker::dispatch( MasterEvent event ) {}
+void MasterWorker::dispatch( ClientEvent event ) {}
 
 ServerSocket *MasterWorker::getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId ) {
 	ServerSocket *ret;
@@ -437,7 +437,7 @@ void MasterWorker::free() {
 void *MasterWorker::run( void *argv ) {
 	MasterWorker *worker = ( MasterWorker * ) argv;
 	WorkerRole role = worker->getRole();
-	MasterEventQueue *eventQueue = MasterWorker::eventQueue;
+	ClientEventQueue *eventQueue = MasterWorker::eventQueue;
 
 #define CLIENT_WORKER_EVENT_LOOP(_EVENT_TYPE_, _EVENT_QUEUE_) \
 	do { \
@@ -478,13 +478,13 @@ void *MasterWorker::run( void *argv ) {
 			break;
 		case WORKER_ROLE_CLIENT:
 			CLIENT_WORKER_EVENT_LOOP(
-				MasterEvent,
+				ClientEvent,
 				eventQueue->separated.master
 			);
 			break;
 		case WORKER_ROLE_SERVER:
 			CLIENT_WORKER_EVENT_LOOP(
-				SlaveEvent,
+				ServerEvent,
 				eventQueue->separated.slave
 			);
 			break;

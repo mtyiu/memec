@@ -1,7 +1,7 @@
 #include "worker.hh"
 #include "../main/coordinator.hh"
 
-bool CoordinatorWorker::handleRemappingSetLockRequest( MasterEvent event, char *buf, size_t size ) {
+bool CoordinatorWorker::handleRemappingSetLockRequest( ClientEvent event, char *buf, size_t size ) {
 	struct RemappingLockHeader header;
 	if ( ! this->protocol.parseRemappingLockHeader( header, buf, size ) ) {
 		__ERROR__( "CoordinatorWorker", "handleRemappingSetLockRequest", "Invalid REMAPPING_SET_LOCK request (size = %lu).", size );

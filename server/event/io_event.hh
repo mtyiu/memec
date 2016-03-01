@@ -1,5 +1,5 @@
-#ifndef __SLAVE_EVENT_IO_EVENT_HH__
-#define __SLAVE_EVENT_IO_EVENT_HH__
+#ifndef __SERVER_EVENT_IO_EVENT_HH__
+#define __SERVER_EVENT_IO_EVENT_HH__
 
 #include "../../common/ds/chunk.hh"
 #include "../../common/event/event.hh"

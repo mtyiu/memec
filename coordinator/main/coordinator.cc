@@ -28,7 +28,7 @@ void Coordinator::free() {
 
 void Coordinator::switchPhaseForCrashedSlave( ServerSocket *serverSocket ) {
 	struct sockaddr_in addr = serverSocket->getAddr();
-	MasterEvent event;
+	ClientEvent event;
 
 	LOCK( &this->overloadedSlaves.lock );
 	std::set<struct sockaddr_in>::iterator it = this->overloadedSlaves.slaveSet.find( addr );
@@ -46,7 +46,7 @@ void Coordinator::switchPhase( std::set<struct sockaddr_in> prevOverloadedSlaves
 	if ( ! this->config.global.remap.enabled )
 		return;
 
-	MasterEvent event;
+	ClientEvent event;
 	LOCK( &this->overloadedSlaves.lock );
 
 	double startThreshold = this->config.global.remap.startThreshold;
@@ -214,7 +214,7 @@ void Coordinator::signalHandler( int signal ) {
 				LOCK( &sockets.lock );
 				//fprintf( stderr, "queuing events get %lu set %lu\n", slaveGetLatency->size(), slaveSetLatency->size() );
 				if ( slaveGetLatency->size() > 0 || slaveSetLatency->size() > 0 ) {
-					MasterEvent event;
+					ClientEvent event;
 					for ( uint32_t i = 0; i < sockets.size(); i++ ) {
 						event.reqPushLoadStats(
 							sockets.values[ i ],
@@ -478,7 +478,7 @@ bool Coordinator::stop() {
 }
 
 void Coordinator::syncSlaveMeta( struct sockaddr_in slave, bool *sync ) {
-	SlaveEvent event;
+	ServerEvent event;
 	ServerSocket *socket = NULL;
 	struct sockaddr_in addr;
 
@@ -505,7 +505,7 @@ void Coordinator::syncSlaveMeta( struct sockaddr_in slave, bool *sync ) {
 void Coordinator::releaseDegradedLock() {
 	uint32_t socketFromId, socketToId;
 	char tmp[ 16 ];
-	SlaveEvent event;
+	ServerEvent event;
 
 	printf( "Which socket ([0-%lu] or all)? ", this->sockets.slaves.size() - 1 );
 	fflush( stdout );
@@ -561,7 +561,7 @@ void Coordinator::releaseDegradedLock( struct sockaddr_in slave, pthread_mutex_t
 		return;
 	}
 
-	SlaveEvent event;
+	ServerEvent event;
 	event.reqReleaseDegradedLock( socket, lock, cond, done );
 	this->eventQueue.insert( event );
 
@@ -983,7 +983,7 @@ void Coordinator::printLog() {
 }
 
 void Coordinator::seal() {
-	SlaveEvent event;
+	ServerEvent event;
 	size_t count = 0;
 	for ( size_t i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
 		if ( this->sockets.slaves[ i ]->ready() ) {
@@ -996,7 +996,7 @@ void Coordinator::seal() {
 }
 
 void Coordinator::flush() {
-	SlaveEvent event;
+	ServerEvent event;
 	size_t count = 0;
 	for ( size_t i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
 		if ( this->sockets.slaves[ i ]->ready() ) {
@@ -1010,7 +1010,7 @@ void Coordinator::flush() {
 
 void Coordinator::setSlave( bool overloaded ) {
 	int socket, i, len;
-	MasterEvent event;
+	ClientEvent event;
 
 	printf( "\nSlave sockets\n-------------\n" );
 	for ( i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {

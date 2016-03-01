@@ -344,16 +344,16 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 			}
 
 #ifdef CLIENT_WORKER_SEND_REPLICAS_PARALLEL
-			SlaveEvent slaveEvent;
-			slaveEvent.send( this->parityServerSockets[ i ], packet );
-			MasterWorker::eventQueue->prioritizedInsert( slaveEvent );
+			ServerEvent serverEvent;
+			serverEvent.send( this->parityServerSockets[ i ], packet );
+			MasterWorker::eventQueue->prioritizedInsert( serverEvent );
 		}
 
 		if ( MasterWorker::updateInterval )
 			MasterWorker::pending->recordRequestStartTime( PT_SLAVE_SET, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, socket->getAddr() );
-		SlaveEvent slaveEvent;
-		slaveEvent.send( socket, packet );
-		this->dispatch( slaveEvent );
+		ServerEvent serverEvent;
+		serverEvent.send( socket, packet );
+		this->dispatch( serverEvent );
 #else
 			sentBytes = this->parityServerSockets[ i ]->send( buffer.data, buffer.size, connected );
 			if ( sentBytes != ( ssize_t ) buffer.size ) {

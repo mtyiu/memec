@@ -1,5 +1,5 @@
-#ifndef __SLAVE_EVENT_CODING_EVENT_HH__
-#define __SLAVE_EVENT_CODING_EVENT_HH__
+#ifndef __SERVER_EVENT_CODING_EVENT_HH__
+#define __SERVER_EVENT_CODING_EVENT_HH__
 
 #include "../../common/ds/bitmask_array.hh"
 #include "../../common/ds/chunk.hh"

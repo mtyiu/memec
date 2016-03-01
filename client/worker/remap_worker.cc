@@ -207,12 +207,12 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 			);
 		}
 
-		SlaveEvent slaveEvent;
-		slaveEvent.send( this->parityServerSockets[ i ], packet );
+		ServerEvent serverEvent;
+		serverEvent.send( this->parityServerSockets[ i ], packet );
 #ifdef CLIENT_WORKER_SEND_REPLICAS_PARALLEL
-		MasterWorker::eventQueue->prioritizedInsert( slaveEvent );
+		MasterWorker::eventQueue->prioritizedInsert( serverEvent );
 #else
-		this->dispatch( slaveEvent );
+		this->dispatch( serverEvent );
 #endif
 	}
 
@@ -243,7 +243,7 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 	return true;
 }
 
-bool MasterWorker::handleRemappingSetResponse( SlaveEvent event, bool success, char *buf, size_t size ) {
+bool MasterWorker::handleRemappingSetResponse( ServerEvent event, bool success, char *buf, size_t size ) {
 	struct RemappingSetHeader header;
 	if ( ! this->protocol.parseRemappingSetHeader( header, buf, size ) ) {
 		__ERROR__( "MasterWorker", "handleRemappingSetResponse", "Invalid REMAPPING_SET Response." );

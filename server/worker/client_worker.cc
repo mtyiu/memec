@@ -1,7 +1,7 @@
 #include "worker.hh"
 #include "../main/server.hh"
 
-void SlaveWorker::dispatch( MasterEvent event ) {
+void SlaveWorker::dispatch( ClientEvent event ) {
 	bool success = true, connected, isSend = true;
 	ssize_t ret;
 	struct {
@@ -13,25 +13,25 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		usleep( SlaveWorker::delay );
 
 	switch( event.type ) {
-		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
-		case MASTER_EVENT_TYPE_GET_RESPONSE_SUCCESS:
-		case MASTER_EVENT_TYPE_SET_RESPONSE_SUCCESS_DATA:
-		case MASTER_EVENT_TYPE_SET_RESPONSE_SUCCESS_PARITY:
-		case MASTER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS:
-		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
-		case MASTER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS:
-		case MASTER_EVENT_TYPE_ACK_METADATA:
-		case MASTER_EVENT_TYPE_ACK_PARITY_BACKUP:
-		case MASTER_EVENT_TYPE_REVERT_DELTA_SUCCESS:
+		case CLIENT_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
+		case CLIENT_EVENT_TYPE_GET_RESPONSE_SUCCESS:
+		case CLIENT_EVENT_TYPE_SET_RESPONSE_SUCCESS_DATA:
+		case CLIENT_EVENT_TYPE_SET_RESPONSE_SUCCESS_PARITY:
+		case CLIENT_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS:
+		case CLIENT_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
+		case CLIENT_EVENT_TYPE_DELETE_RESPONSE_SUCCESS:
+		case CLIENT_EVENT_TYPE_ACK_METADATA:
+		case CLIENT_EVENT_TYPE_ACK_PARITY_BACKUP:
+		case CLIENT_EVENT_TYPE_REVERT_DELTA_SUCCESS:
 			success = true;
 			break;
-		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
-		case MASTER_EVENT_TYPE_GET_RESPONSE_FAILURE:
-		case MASTER_EVENT_TYPE_SET_RESPONSE_FAILURE:
-		case MASTER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE:
-		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
-		case MASTER_EVENT_TYPE_DELETE_RESPONSE_FAILURE:
-		case MASTER_EVENT_TYPE_REVERT_DELTA_FAILURE:
+		case CLIENT_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
+		case CLIENT_EVENT_TYPE_GET_RESPONSE_FAILURE:
+		case CLIENT_EVENT_TYPE_SET_RESPONSE_FAILURE:
+		case CLIENT_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE:
+		case CLIENT_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
+		case CLIENT_EVENT_TYPE_DELETE_RESPONSE_FAILURE:
+		case CLIENT_EVENT_TYPE_REVERT_DELTA_FAILURE:
 			success = false;
 			break;
 		default:
@@ -41,17 +41,17 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 
 	switch( event.type ) {
 		// Register
-		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
+		case CLIENT_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
 			if ( Slave::instanceId == 0 ) {
 				// Wait until the slave get an instance ID
 				SlaveWorker::eventQueue->insert( event );
 				return;
 			}
-		case MASTER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
+		case CLIENT_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resRegisterMaster( buffer.size, Slave::instanceId, event.requestId, success );
 			break;
 		// GET
-		case MASTER_EVENT_TYPE_GET_RESPONSE_SUCCESS:
+		case CLIENT_EVENT_TYPE_GET_RESPONSE_SUCCESS:
 		{
 			char *key, *value;
 			uint8_t keySize;
@@ -67,7 +67,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 			);
 		}
 			break;
-		case MASTER_EVENT_TYPE_GET_RESPONSE_FAILURE:
+		case CLIENT_EVENT_TYPE_GET_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resGet(
 				buffer.size,
 				event.instanceId, event.requestId,
@@ -78,7 +78,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 			);
 			break;
 		// SET
-		case MASTER_EVENT_TYPE_SET_RESPONSE_SUCCESS_DATA:
+		case CLIENT_EVENT_TYPE_SET_RESPONSE_SUCCESS_DATA:
 			buffer.data = this->protocol.resSet(
 				buffer.size,
 				event.instanceId, event.requestId,
@@ -94,8 +94,8 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 				event.message.set.key.data
 			);
 			break;
-		case MASTER_EVENT_TYPE_SET_RESPONSE_SUCCESS_PARITY:
-		case MASTER_EVENT_TYPE_SET_RESPONSE_FAILURE:
+		case CLIENT_EVENT_TYPE_SET_RESPONSE_SUCCESS_PARITY:
+		case CLIENT_EVENT_TYPE_SET_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resSet(
 				buffer.size,
 				event.instanceId, event.requestId,
@@ -104,8 +104,8 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 				event.message.set.key.data
 			);
 			break;
-		case MASTER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS:
-		case MASTER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE:
+		case CLIENT_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS:
+		case CLIENT_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resRemappingSet(
 				buffer.size,
 				true,
@@ -124,8 +124,8 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 				event.message.keyValueUpdate.key.free();
 			break;
 		// UPDATE
-		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
-		case MASTER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
+		case CLIENT_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
+		case CLIENT_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
 			if ( ! success ) {
 				fprintf( stderr, "UPDATE FAILED: %.*s\n", event.message.keyValueUpdate.key.size,
 				event.message.keyValueUpdate.key.data );
@@ -146,7 +146,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 				event.message.keyValueUpdate.key.free();
 			break;
 		// DELETE
-		case MASTER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS:
+		case CLIENT_EVENT_TYPE_DELETE_RESPONSE_SUCCESS:
 			buffer.data = this->protocol.resDelete(
 				buffer.size,
 				event.instanceId, event.requestId,
@@ -162,7 +162,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 			if ( event.needsFree )
 				event.message.del.key.free();
 			break;
-		case MASTER_EVENT_TYPE_DELETE_RESPONSE_FAILURE:
+		case CLIENT_EVENT_TYPE_DELETE_RESPONSE_FAILURE:
 			buffer.data = this->protocol.resDelete(
 				buffer.size,
 				event.instanceId, event.requestId,
@@ -175,7 +175,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 				event.message.del.key.free();
 			break;
 		// ACK
-		case MASTER_EVENT_TYPE_ACK_METADATA:
+		case CLIENT_EVENT_TYPE_ACK_METADATA:
 			buffer.data = this->protocol.ackMetadata(
 				buffer.size,
 				event.instanceId, event.requestId,
@@ -183,7 +183,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 				event.message.ack.toTimestamp
 			);
 			break;
-		case MASTER_EVENT_TYPE_ACK_PARITY_BACKUP:
+		case CLIENT_EVENT_TYPE_ACK_PARITY_BACKUP:
 		{
 			std::vector<uint32_t> *timestamps = event.message.revert.timestamps;
 			buffer.data = this->protocol.ackParityDeltaBackup(
@@ -196,8 +196,8 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 				delete timestamps;
 		}
 			break;
-		case MASTER_EVENT_TYPE_REVERT_DELTA_SUCCESS:
-		case MASTER_EVENT_TYPE_REVERT_DELTA_FAILURE:
+		case CLIENT_EVENT_TYPE_REVERT_DELTA_SUCCESS:
+		case CLIENT_EVENT_TYPE_REVERT_DELTA_FAILURE:
 		{
 			std::vector<uint32_t> *timestamps = event.message.revert.timestamps;
 			std::vector<Key> *requests = event.message.revert.requests;
@@ -219,7 +219,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		}
 			break;
 		// Pending
-		case MASTER_EVENT_TYPE_PENDING:
+		case CLIENT_EVENT_TYPE_PENDING:
 			break;
 		default:
 			return;
@@ -296,7 +296,7 @@ void SlaveWorker::dispatch( MasterEvent event ) {
 		__ERROR__( "SlaveWorker", "dispatch", "The master is disconnected." );
 }
 
-bool SlaveWorker::handleGetRequest( MasterEvent event, char *buf, size_t size ) {
+bool SlaveWorker::handleGetRequest( ClientEvent event, char *buf, size_t size ) {
 	struct KeyHeader header;
 	if ( ! this->protocol.parseKeyHeader( header, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleGetRequest", "Invalid GET request." );
@@ -310,7 +310,7 @@ bool SlaveWorker::handleGetRequest( MasterEvent event, char *buf, size_t size ) 
 	return this->handleGetRequest( event, header, false );
 }
 
-bool SlaveWorker::handleGetRequest( MasterEvent event, struct KeyHeader &header, bool isDegraded ) {
+bool SlaveWorker::handleGetRequest( ClientEvent event, struct KeyHeader &header, bool isDegraded ) {
 	Key key;
 	KeyValue keyValue;
 	RemappedKeyValue remappedKeyValue;
@@ -330,7 +330,7 @@ bool SlaveWorker::handleGetRequest( MasterEvent event, struct KeyHeader &header,
 	return ret;
 }
 
-bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size, bool needResSet ) {
+bool SlaveWorker::handleSetRequest( ClientEvent event, char *buf, size_t size, bool needResSet ) {
 	struct KeyValueHeader header;
 	if ( ! this->protocol.parseKeyValueHeader( header, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleSetRequest", "Invalid SET request (size = %lu).", size );
@@ -344,7 +344,7 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, char *buf, size_t size, b
 	return this->handleSetRequest( event, header, needResSet );
 }
 
-bool SlaveWorker::handleSetRequest( MasterEvent event, struct KeyValueHeader &header, bool needResSet ) {
+bool SlaveWorker::handleSetRequest( ClientEvent event, struct KeyValueHeader &header, bool needResSet ) {
 	bool isSealed;
 	Metadata sealed;
 	uint32_t timestamp, listId, stripeId, chunkId;
@@ -415,7 +415,7 @@ bool SlaveWorker::handleSetRequest( MasterEvent event, struct KeyValueHeader &he
 	return true;
 }
 
-bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size, bool checkGetChunk ) {
+bool SlaveWorker::handleUpdateRequest( ClientEvent event, char *buf, size_t size, bool checkGetChunk ) {
 	struct KeyValueUpdateHeader header;
 	if ( ! this->protocol.parseKeyValueUpdateHeader( header, true, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleUpdateRequest", "Invalid UPDATE request." );
@@ -438,7 +438,7 @@ bool SlaveWorker::handleUpdateRequest( MasterEvent event, char *buf, size_t size
 }
 
 bool SlaveWorker::handleUpdateRequest(
-	MasterEvent event, struct KeyValueUpdateHeader &header,
+	ClientEvent event, struct KeyValueUpdateHeader &header,
 	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 	bool reconstructParity,
 	Chunk **chunks, bool endOfDegradedOp,
@@ -615,7 +615,7 @@ bool SlaveWorker::handleUpdateRequest(
 			// Forward the request to the parity servers
 			for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
 				// Insert into event queue
-				SlavePeerEvent slavePeerEvent;
+				ServerPeerEvent slavePeerEvent;
 				slavePeerEvent.send( this->parityServerSockets[ i ], packet );
 
 #ifdef SERVER_WORKER_SEND_REPLICAS_PARALLEL
@@ -650,7 +650,7 @@ bool SlaveWorker::handleUpdateRequest(
 	return ret;
 }
 
-bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size, bool checkGetChunk ) {
+bool SlaveWorker::handleDeleteRequest( ClientEvent event, char *buf, size_t size, bool checkGetChunk ) {
 	struct KeyHeader header;
 	if ( ! this->protocol.parseKeyHeader( header, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleDeleteRequest", "Invalid DELETE request." );
@@ -672,7 +672,7 @@ bool SlaveWorker::handleDeleteRequest( MasterEvent event, char *buf, size_t size
 }
 
 bool SlaveWorker::handleDeleteRequest(
-	MasterEvent event, struct KeyHeader &header,
+	ClientEvent event, struct KeyHeader &header,
 	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 	bool reconstructParity,
 	Chunk **chunks, bool endOfDegradedOp,
@@ -788,7 +788,7 @@ bool SlaveWorker::handleDeleteRequest(
 	return ret;
 }
 
-bool SlaveWorker::handleAckParityDeltaBackup( MasterEvent event, char *buf, size_t size ) {
+bool SlaveWorker::handleAckParityDeltaBackup( ClientEvent event, char *buf, size_t size ) {
 	DeltaAcknowledgementHeader header;
 	std::vector<uint32_t> timestamps;
 
@@ -819,7 +819,7 @@ bool SlaveWorker::handleAckParityDeltaBackup( MasterEvent event, char *buf, size
 	return true;
 }
 
-bool SlaveWorker::handleRevertDelta( MasterEvent event, char *buf, size_t size ) {
+bool SlaveWorker::handleRevertDelta( ClientEvent event, char *buf, size_t size ) {
 	DeltaAcknowledgementHeader header;
 	std::vector<uint32_t> timestamps;
 	std::set<uint32_t> timestampSet;
@@ -925,7 +925,7 @@ bool SlaveWorker::handleRevertDelta( MasterEvent event, char *buf, size_t size )
 			continue; \
 		if ( SlaveWorker::pending->count( _PT_TYPE_, it->first.instanceId, it->first.requestId, false, false ) == 1 ) { \
 			/* response immediately */ \
-			MasterEvent masterEvent; \
+			ClientEvent clientEvent; \
 			KeyValueUpdate keyValueUpdate; \
 			Key key; \
 			PendingIdentifier pid; \
@@ -934,28 +934,28 @@ bool SlaveWorker::handleRevertDelta( MasterEvent event, char *buf, size_t size )
 					__ERROR__( "SlaveWorker", "handleRevertDelta", "Cannot find a pending master UPDATE request that matches the response. This message will be discarded." ); \
 					continue; \
 				} \
-				masterEvent.resUpdate( \
+				clientEvent.resUpdate( \
 					( ClientSocket * ) pid.ptr, pid.instanceId, pid.requestId, \
 					keyValueUpdate, \
 					keyValueUpdate.offset, \
 					keyValueUpdate.length, \
 					success, true, false \
 				); \
-				this->dispatch( masterEvent ); \
+				this->dispatch( clientEvent ); \
 				__INFO__( YELLOW, "SlaveWorker", "handleRevertDelta", "Skip waiting for key %.*s for failed slave id=%u", keyValueUpdate.size, keyValueUpdate.data, header.targetId ); \
 			} else if ( strcmp( #_OP_TYPE_, "delete" ) == 0 || strcmp( #_OP_TYPE_, "deleteChunk" ) == 0 ) { \
 				if ( ! SlaveWorker::pending->eraseKey( _PT_MASTER_TYPE_, it->first.parentInstanceId, it->first.parentRequestId, 0, &pid, &key ) ) { \
 					__ERROR__( "SlaveWorker", "handleRevertDelta", "Cannot find a pending master DELETE request that matches the response. This message will be discarded." ); \
 					continue; \
 				} \
-				masterEvent.resDelete( \
+				clientEvent.resDelete( \
 					( ClientSocket * ) pid.ptr, \
 					pid.instanceId, pid.requestId, \
 					key, \
 					true, /* needsFree */ \
 					false /* isDegraded */ \
 				); \
-				this->dispatch( masterEvent ); \
+				this->dispatch( clientEvent ); \
 				__INFO__( YELLOW, "SlaveWorker", "handleRevertDelta", "Skip waiting for key %.*s for failed slave id=%u", key.size, key.data, header.targetId ); \
 			} \
 		} \

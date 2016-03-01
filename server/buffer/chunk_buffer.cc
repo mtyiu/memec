@@ -5,7 +5,7 @@ uint32_t ChunkBuffer::capacity;
 uint32_t ChunkBuffer::dataChunkCount;
 Coding *ChunkBuffer::coding;
 MemoryPool<Chunk> *ChunkBuffer::chunkPool;
-SlaveEventQueue *ChunkBuffer::eventQueue;
+ServerEventQueue *ChunkBuffer::eventQueue;
 Map *ChunkBuffer::map;
 
 void ChunkBuffer::init() {

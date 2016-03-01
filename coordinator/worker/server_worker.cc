@@ -1,7 +1,7 @@
 #include "worker.hh"
 #include "../main/coordinator.hh"
 
-void CoordinatorWorker::dispatch( SlaveEvent event ) {
+void CoordinatorWorker::dispatch( ServerEvent event ) {
 	bool connected, isSend;
 	ssize_t ret;
 	struct {
@@ -12,27 +12,27 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 	uint32_t requestId;
 
 	switch( event.type ) {
-		case SLAVE_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
+		case SERVER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
 			event.socket->instanceId = event.instanceId;
 			buffer.data = this->protocol.resRegisterSlave( buffer.size, event.instanceId, event.requestId, true );
 			isSend = true;
 			break;
-		case SLAVE_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
+		case SERVER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
 			event.socket->instanceId = event.instanceId;
 			buffer.data = this->protocol.resRegisterSlave( buffer.size, event.instanceId, event.requestId, false );
 			isSend = true;
 			break;
-		case SLAVE_EVENT_TYPE_REQUEST_SEAL_CHUNKS:
+		case SERVER_EVENT_TYPE_REQUEST_SEAL_CHUNKS:
 			requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
 			buffer.data = this->protocol.reqSealChunks( buffer.size, instanceId, requestId );
 			isSend = true;
 			break;
-		case SLAVE_EVENT_TYPE_REQUEST_FLUSH_CHUNKS:
+		case SERVER_EVENT_TYPE_REQUEST_FLUSH_CHUNKS:
 			requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
 			buffer.data = this->protocol.reqFlushChunks( buffer.size, instanceId, requestId );
 			isSend = true;
 			break;
-		case SLAVE_EVENT_TYPE_REQUEST_SYNC_META:
+		case SERVER_EVENT_TYPE_REQUEST_SYNC_META:
 			requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
 			buffer.data = this->protocol.reqSyncMeta( buffer.size, instanceId, requestId );
 			// add sync meta request to pending set
@@ -40,12 +40,12 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			isSend = true;
 			break;
 		// reampped parity migration
-		case SLAVE_EVENT_TYPE_PARITY_MIGRATE:
+		case SERVER_EVENT_TYPE_PARITY_MIGRATE:
 			buffer.data = event.message.parity.packet->data;
 			buffer.size = event.message.parity.packet->size;
 			isSend = true;
 			break;
-		case SLAVE_EVENT_TYPE_REQUEST_RELEASE_DEGRADED_LOCK:
+		case SERVER_EVENT_TYPE_REQUEST_RELEASE_DEGRADED_LOCK:
 			this->handleReleaseDegradedLockRequest(
 				event.socket,
 				event.message.degraded.lock,
@@ -54,14 +54,14 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			);
 			isSend = false;
 			break;
-		case SLAVE_EVENT_TYPE_PENDING:
+		case SERVER_EVENT_TYPE_PENDING:
 			isSend = false;
 			break;
-		case SLAVE_EVENT_TYPE_ANNOUNCE_SLAVE_CONNECTED:
-		case SLAVE_EVENT_TYPE_ANNOUNCE_SLAVE_RECONSTRUCTED:
+		case SERVER_EVENT_TYPE_ANNOUNCE_SLAVE_CONNECTED:
+		case SERVER_EVENT_TYPE_ANNOUNCE_SLAVE_RECONSTRUCTED:
 			isSend = false;
 			break;
-		case SLAVE_EVENT_TYPE_RESPONSE_HEARTBEAT:
+		case SERVER_EVENT_TYPE_RESPONSE_HEARTBEAT:
 			buffer.data = this->protocol.resHeartbeat(
 				buffer.size, event.instanceId, event.requestId,
 				event.message.heartbeat.timestamp,
@@ -71,16 +71,16 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			);
 			isSend = true;
 			break;
-		case SLAVE_EVENT_TYPE_DISCONNECT:
-		case SLAVE_EVENT_TYPE_TRIGGER_RECONSTRUCTION:
-		case SLAVE_EVENT_TYPE_HANDLE_RECONSTRUCTION_REQUEST:
+		case SERVER_EVENT_TYPE_DISCONNECT:
+		case SERVER_EVENT_TYPE_TRIGGER_RECONSTRUCTION:
+		case SERVER_EVENT_TYPE_HANDLE_RECONSTRUCTION_REQUEST:
 			isSend = false;
 			break;
-		case SLAVE_EVENT_TYPE_ACK_RECONSTRUCTION_SUCCESS:
-		case SLAVE_EVENT_TYPE_ACK_RECONSTRUCTION_FAILURE:
+		case SERVER_EVENT_TYPE_ACK_RECONSTRUCTION_SUCCESS:
+		case SERVER_EVENT_TYPE_ACK_RECONSTRUCTION_FAILURE:
 			buffer.data = this->protocol.ackCompletedReconstruction(
 				buffer.size, event.instanceId, event.requestId,
-				event.type == SLAVE_EVENT_TYPE_ACK_RECONSTRUCTION_SUCCESS
+				event.type == SERVER_EVENT_TYPE_ACK_RECONSTRUCTION_SUCCESS
 			);
 			isSend = true;
 			break;
@@ -88,7 +88,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			return;
 	}
 
-	if ( event.type == SLAVE_EVENT_TYPE_ANNOUNCE_SLAVE_CONNECTED ) {
+	if ( event.type == SERVER_EVENT_TYPE_ANNOUNCE_SLAVE_CONNECTED ) {
 		ArrayMap<int, ServerSocket> &slaves = Coordinator::getInstance()->sockets.slaves;
 		uint32_t requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
 
@@ -109,7 +109,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 		if ( Coordinator::getInstance()->remapMsgHandler )
 			Coordinator::getInstance()->remapMsgHandler->addAliveSlave( slaveAddr );
 		UNLOCK( &slaves.lock );
-	} else if ( event.type == SLAVE_EVENT_TYPE_ANNOUNCE_SLAVE_RECONSTRUCTED ) {
+	} else if ( event.type == SERVER_EVENT_TYPE_ANNOUNCE_SLAVE_RECONSTRUCTED ) {
 		ArrayMap<int, ServerSocket> &slaves = Coordinator::getInstance()->sockets.slaves;
 		ArrayMap<int, ServerSocket> &backupSlaves = Coordinator::getInstance()->sockets.backupSlaves;
 
@@ -156,7 +156,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 		if ( Coordinator::getInstance()->remapMsgHandler )
 			Coordinator::getInstance()->remapMsgHandler->addAliveSlave( slaveAddr );
 		UNLOCK( &slaves.lock );
-	} else if ( event.type == SLAVE_EVENT_TYPE_DISCONNECT ) {
+	} else if ( event.type == SERVER_EVENT_TYPE_DISCONNECT ) {
 		// Remove the slave from the pending set of annoucement
 		CoordinatorWorker::pending->eraseAnnouncement( event.socket );
 
@@ -164,11 +164,11 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 		if ( Coordinator::getInstance()->config.global.remap.enabled ) {
 			Coordinator::getInstance()->switchPhaseForCrashedSlave( event.socket );
 		} else {
-			SlaveEvent slaveEvent;
-			slaveEvent.triggerReconstruction( event.socket->getAddr() );
-			this->dispatch( slaveEvent );
+			ServerEvent serverEvent;
+			serverEvent.triggerReconstruction( event.socket->getAddr() );
+			this->dispatch( serverEvent );
 		}
-	} else if ( event.type == SLAVE_EVENT_TYPE_TRIGGER_RECONSTRUCTION ) {
+	} else if ( event.type == SERVER_EVENT_TYPE_TRIGGER_RECONSTRUCTION ) {
 		ServerSocket *s = 0;
 		ArrayMap<int, ServerSocket> &slaves = Coordinator::getInstance()->sockets.slaves;
 
@@ -186,7 +186,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 		} else {
 			__ERROR__( "CoordinatorWorker", "dispatch", "Unknown crashed slave." );
 		}
-	} else if ( event.type == SLAVE_EVENT_TYPE_HANDLE_RECONSTRUCTION_REQUEST ) {
+	} else if ( event.type == SERVER_EVENT_TYPE_HANDLE_RECONSTRUCTION_REQUEST ) {
 		this->handleReconstructionRequest( event.socket );
 	} else if ( isSend ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
@@ -194,7 +194,7 @@ void CoordinatorWorker::dispatch( SlaveEvent event ) {
 			__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 		if ( ! connected )
 			__ERROR__( "CoordinatorWorker", "dispatch", "The slave is disconnected." );
-		if ( event.type == SLAVE_EVENT_TYPE_PARITY_MIGRATE )
+		if ( event.type == SERVER_EVENT_TYPE_PARITY_MIGRATE )
 			Coordinator::getInstance()->packetPool.free( event.message.parity.packet );
 	} else {
 		// Parse requests from slaves
@@ -311,7 +311,7 @@ quit_1:
 	}
 }
 
-bool CoordinatorWorker::processHeartbeat( SlaveEvent event, char *buf, size_t size ) {
+bool CoordinatorWorker::processHeartbeat( ServerEvent event, char *buf, size_t size ) {
 	uint32_t count, requestId = event.requestId;
 	size_t processed, offset, failed = 0;
 	struct HeartbeatHeader heartbeat;

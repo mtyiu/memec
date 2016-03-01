@@ -33,26 +33,26 @@ private:
 	static void *run( void *argv );
 
 	// ---------- client_worker.cc ----------
-	void dispatch( MasterEvent event );
-	bool handleSyncMetadata( MasterEvent event, char *buf, size_t size );
+	void dispatch( ClientEvent event );
+	bool handleSyncMetadata( ClientEvent event, char *buf, size_t size );
 
 	// ---------- server_worker.cc ----------
-	void dispatch( SlaveEvent event );
-	bool processHeartbeat( SlaveEvent event, char *buf, size_t size );
+	void dispatch( ServerEvent event );
+	bool processHeartbeat( ServerEvent event, char *buf, size_t size );
 
 	// ---------- remap_worker.cc ----------
-	bool handleRemappingSetLockRequest( MasterEvent event, char* buf, size_t size );
+	bool handleRemappingSetLockRequest( ClientEvent event, char* buf, size_t size );
 
 	// ---------- degraded_worker.cc ----------
-	bool handleDegradedLockRequest( MasterEvent event, char *buf, size_t size );
+	bool handleDegradedLockRequest( ClientEvent event, char *buf, size_t size );
 	bool handleReleaseDegradedLockRequest( ServerSocket *socket, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done );
-	bool handleReleaseDegradedLockResponse( SlaveEvent event, char *buf, size_t size );
+	bool handleReleaseDegradedLockResponse( ServerEvent event, char *buf, size_t size );
 
 	// ---------- recovery_worker.cc ----------
-	bool handlePromoteBackupSlaveResponse( SlaveEvent event, char *buf, size_t size );
+	bool handlePromoteBackupSlaveResponse( ServerEvent event, char *buf, size_t size );
 	bool handleReconstructionRequest( ServerSocket *socket );
-	bool handleReconstructionResponse( SlaveEvent event, char *buf, size_t size );
-	bool handleReconstructionUnsealedResponse( SlaveEvent event, char *buf, size_t size );
+	bool handleReconstructionResponse( ServerEvent event, char *buf, size_t size );
+	bool handleReconstructionUnsealedResponse( ServerEvent event, char *buf, size_t size );
 
 public:
 	static RemappingRecordMap *remappingRecords;

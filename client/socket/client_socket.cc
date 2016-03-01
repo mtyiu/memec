@@ -164,7 +164,7 @@ bool ClientSocket::handler( int fd, uint32_t events, void *data ) {
 				event.pending( coordinatorSocket );
 				master->eventQueue.insert( event );
 			} else if ( serverSocket ) {
-				SlaveEvent event;
+				ServerEvent event;
 				event.pending( serverSocket );
 				master->eventQueue.prioritizedInsert( event );
 			} else {

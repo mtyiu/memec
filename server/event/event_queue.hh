@@ -1,5 +1,5 @@
-#ifndef __SLAVE_EVENT_SLAVE_EVENT_QUEUE_HH__
-#define __SLAVE_EVENT_SLAVE_EVENT_QUEUE_HH__
+#ifndef __SERVER_EVENT_SERVER_EVENT_QUEUE_HH__
+#define __SERVER_EVENT_SERVER_EVENT_QUEUE_HH__
 
 #include <stdint.h>
 #include "mixed_event.hh"
@@ -12,7 +12,7 @@
 #include "../../common/event/event_queue.hh"
 #include "../../common/lock/lock.hh"
 
-class SlaveEventQueue {
+class ServerEventQueue {
 public:
 	bool isMixed;
 	EventQueue<MixedEvent> *mixed;
@@ -27,12 +27,12 @@ public:
 		EventQueue<CodingEvent> *coding;
 		EventQueue<CoordinatorEvent> *coordinator;
 		EventQueue<IOEvent> *io;
-		EventQueue<MasterEvent> *master;
-		EventQueue<SlaveEvent> *slave;
-		EventQueue<SlavePeerEvent> *slavePeer;
+		EventQueue<ClientEvent> *master;
+		EventQueue<ServerEvent> *slave;
+		EventQueue<ServerPeerEvent> *slavePeer;
 	} separated;
 
-	SlaveEventQueue() {
+	ServerEventQueue() {
 		this->mixed = 0;
 		this->priority.mixed = 0;
 		this->priority.capacity = 0;
@@ -58,9 +58,9 @@ public:
 		this->separated.coding = new EventQueue<CodingEvent>( coding, block );
 		this->separated.coordinator = new EventQueue<CoordinatorEvent>( coordinator, block );
 		this->separated.io = new EventQueue<IOEvent>( io, block );
-		this->separated.master = new EventQueue<MasterEvent>( master, block );
-		this->separated.slave = new EventQueue<SlaveEvent>( slave, block );
-		this->separated.slavePeer = new EventQueue<SlavePeerEvent>( slave, block );
+		this->separated.master = new EventQueue<ClientEvent>( master, block );
+		this->separated.slave = new EventQueue<ServerEvent>( slave, block );
+		this->separated.slavePeer = new EventQueue<ServerPeerEvent>( slave, block );
 	}
 
 	void start() {
@@ -127,7 +127,7 @@ public:
 		}
 	}
 
-#define SLAVE_EVENT_QUEUE_INSERT(_EVENT_TYPE_, _EVENT_QUEUE_) \
+#define SERVER_EVENT_QUEUE_INSERT(_EVENT_TYPE_, _EVENT_QUEUE_) \
 	bool insert( _EVENT_TYPE_ &event ) { \
 		if ( this->isMixed ) { \
 			MixedEvent mixedEvent; \
@@ -138,15 +138,15 @@ public:
 		} \
 	}
 
-	SLAVE_EVENT_QUEUE_INSERT( CodingEvent, coding )
-	SLAVE_EVENT_QUEUE_INSERT( CoordinatorEvent, coordinator )
-	SLAVE_EVENT_QUEUE_INSERT( IOEvent, io )
-	SLAVE_EVENT_QUEUE_INSERT( MasterEvent, master )
-	SLAVE_EVENT_QUEUE_INSERT( SlaveEvent, slave )
-	SLAVE_EVENT_QUEUE_INSERT( SlavePeerEvent, slavePeer )
-#undef SLAVE_EVENT_QUEUE_INSERT
+	SERVER_EVENT_QUEUE_INSERT( CodingEvent, coding )
+	SERVER_EVENT_QUEUE_INSERT( CoordinatorEvent, coordinator )
+	SERVER_EVENT_QUEUE_INSERT( IOEvent, io )
+	SERVER_EVENT_QUEUE_INSERT( ClientEvent, master )
+	SERVER_EVENT_QUEUE_INSERT( ServerEvent, slave )
+	SERVER_EVENT_QUEUE_INSERT( ServerPeerEvent, slavePeer )
+#undef SERVER_EVENT_QUEUE_INSERT
 
-	bool prioritizedInsert( SlavePeerEvent &event ) {
+	bool prioritizedInsert( ServerPeerEvent &event ) {
 		if ( this->isMixed ) {
 			MixedEvent mixedEvent;
 			mixedEvent.set( event );

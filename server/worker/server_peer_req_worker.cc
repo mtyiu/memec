@@ -28,7 +28,7 @@ bool SlaveWorker::handleSlavePeerRegisterRequest( ServerPeerSocket *socket, uint
 		return false;
 	}
 
-	SlavePeerEvent event;
+	ServerPeerEvent event;
 	event.resRegister( slavePeers->values[ index ], Slave::getInstance()->instanceId, requestId, true );
 	SlaveWorker::eventQueue->insert( event );
 
@@ -37,7 +37,7 @@ bool SlaveWorker::handleSlavePeerRegisterRequest( ServerPeerSocket *socket, uint
 
 ////////////////////////////////////////////////////////////////////////////////
 
-bool SlaveWorker::handleForwardKeyRequest( SlavePeerEvent event, char *buf, size_t size ) {
+bool SlaveWorker::handleForwardKeyRequest( ServerPeerEvent event, char *buf, size_t size ) {
 	struct ForwardKeyHeader header;
 	if ( ! this->protocol.parseForwardKeyReqHeader( header, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleForwardKeyRequest", "Invalid DEGRADED_SET request (size = %lu).", size );
@@ -63,7 +63,7 @@ bool SlaveWorker::handleForwardKeyRequest( SlavePeerEvent event, char *buf, size
 	return this->handleForwardKeyRequest( event, header, false );
 }
 
-bool SlaveWorker::handleForwardKeyRequest( SlavePeerEvent event, struct ForwardKeyHeader &header, bool self ) {
+bool SlaveWorker::handleForwardKeyRequest( ServerPeerEvent event, struct ForwardKeyHeader &header, bool self ) {
 	Key key;
 	KeyValue keyValue;
 	Metadata metadata;
@@ -141,7 +141,7 @@ bool SlaveWorker::handleForwardKeyRequest( SlavePeerEvent event, struct ForwardK
 
 ////////////////////////////////////////////////////////////////////////////////
 
-bool SlaveWorker::handleSetRequest( SlavePeerEvent event, char *buf, size_t size ) {
+bool SlaveWorker::handleSetRequest( ServerPeerEvent event, char *buf, size_t size ) {
 	struct KeyValueHeader header;
 	if ( ! this->protocol.parseKeyValueHeader( header, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleSetRequest (SlavePeer)", "Invalid SET request (size = %lu).", size );
@@ -153,8 +153,8 @@ bool SlaveWorker::handleSetRequest( SlavePeerEvent event, char *buf, size_t size
 		( int ) header.keySize, header.key, header.keySize, header.valueSize
 	);
 	// same flow as set from masters
-	MasterEvent masterEvent;
-	bool success = this->handleSetRequest( masterEvent, buf, size, false );
+	ClientEvent clientEvent;
+	bool success = this->handleSetRequest( clientEvent, buf, size, false );
 
 	Key key;
 	key.set( header.keySize, header.key );
@@ -164,7 +164,7 @@ bool SlaveWorker::handleSetRequest( SlavePeerEvent event, char *buf, size_t size
 	return success;
 }
 
-bool SlaveWorker::handleGetRequest( SlavePeerEvent event, char *buf, size_t size ) {
+bool SlaveWorker::handleGetRequest( ServerPeerEvent event, char *buf, size_t size ) {
 	struct ListStripeKeyHeader header;
 	bool ret;
 	if ( ! this->protocol.parseListStripeKeyHeader( header, buf, size ) ) {
@@ -192,7 +192,7 @@ bool SlaveWorker::handleGetRequest( SlavePeerEvent event, char *buf, size_t size
 	return ret;
 }
 
-bool SlaveWorker::handleUpdateRequest( SlavePeerEvent event, char *buf, size_t size ) {
+bool SlaveWorker::handleUpdateRequest( ServerPeerEvent event, char *buf, size_t size ) {
 	struct ChunkKeyValueUpdateHeader header;
 	if ( ! this->protocol.parseChunkKeyValueUpdateHeader( header, true, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleUpdateRequest", "Invalid UPDATE request." );
@@ -294,7 +294,7 @@ bool SlaveWorker::handleUpdateRequest( SlavePeerEvent event, char *buf, size_t s
 	return ret;
 }
 
-bool SlaveWorker::handleDeleteRequest( SlavePeerEvent event, char *buf, size_t size ) {
+bool SlaveWorker::handleDeleteRequest( ServerPeerEvent event, char *buf, size_t size ) {
 	struct ChunkKeyHeader header;
 	if ( ! this->protocol.parseChunkKeyHeader( header, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleDeleteRequest", "Invalid DELETE request." );
@@ -347,7 +347,7 @@ bool SlaveWorker::handleDeleteRequest( SlavePeerEvent event, char *buf, size_t s
 
 ////////////////////////////////////////////////////////////////////////////////
 
-bool SlaveWorker::handleGetChunkRequest( SlavePeerEvent event, char *buf, size_t size ) {
+bool SlaveWorker::handleGetChunkRequest( ServerPeerEvent event, char *buf, size_t size ) {
 	struct ChunkHeader header;
 	if ( ! this->protocol.parseChunkHeader( header, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleGetChunkRequest", "Invalid GET_CHUNK request." );
@@ -361,7 +361,7 @@ bool SlaveWorker::handleGetChunkRequest( SlavePeerEvent event, char *buf, size_t
 	return this->handleGetChunkRequest( event, header );
 }
 
-bool SlaveWorker::handleGetChunkRequest( SlavePeerEvent event, struct ChunkHeader &header ) {
+bool SlaveWorker::handleGetChunkRequest( ServerPeerEvent event, struct ChunkHeader &header ) {
 	bool ret;
 
 	Metadata metadata;
@@ -459,7 +459,7 @@ bool SlaveWorker::handleGetChunkRequest( SlavePeerEvent event, struct ChunkHeade
 	return ret;
 }
 
-bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, bool isSealed, char *buf, size_t size ) {
+bool SlaveWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, char *buf, size_t size ) {
 	union {
 		struct ChunkDataHeader chunkData;
 		struct ChunkKeyValueHeader chunkKeyValue;
@@ -695,7 +695,7 @@ bool SlaveWorker::handleSetChunkRequest( SlavePeerEvent event, bool isSealed, ch
 }
 
 
-bool SlaveWorker::handleUpdateChunkRequest( SlavePeerEvent event, char *buf, size_t size, bool checkGetChunk ) {
+bool SlaveWorker::handleUpdateChunkRequest( ServerPeerEvent event, char *buf, size_t size, bool checkGetChunk ) {
 	struct ChunkUpdateHeader header;
 	bool ret;
 	if ( ! this->protocol.parseChunkUpdateHeader( header, true, buf, size ) ) {
@@ -785,7 +785,7 @@ bool SlaveWorker::handleUpdateChunkRequest( SlavePeerEvent event, char *buf, siz
 	return ret;
 }
 
-bool SlaveWorker::handleDeleteChunkRequest( SlavePeerEvent event, char *buf, size_t size, bool checkGetChunk ) {
+bool SlaveWorker::handleDeleteChunkRequest( ServerPeerEvent event, char *buf, size_t size, bool checkGetChunk ) {
 	struct ChunkUpdateHeader header;
 	bool ret;
 	if ( ! this->protocol.parseChunkUpdateHeader( header, true, buf, size ) ) {
@@ -856,7 +856,7 @@ bool SlaveWorker::handleDeleteChunkRequest( SlavePeerEvent event, char *buf, siz
 
 ////////////////////////////////////////////////////////////////////////////////
 
-bool SlaveWorker::handleSealChunkRequest( SlavePeerEvent event, char *buf, size_t size ) {
+bool SlaveWorker::handleSealChunkRequest( ServerPeerEvent event, char *buf, size_t size ) {
 	struct ChunkSealHeader header;
 	bool ret;
 	if ( ! this->protocol.parseChunkSealHeader( header, buf, size ) ) {
@@ -922,7 +922,7 @@ bool SlaveWorker::issueSealChunkRequest( Chunk *chunk, uint32_t startPos ) {
 		}
 
 		for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ ) {
-			SlavePeerEvent slavePeerEvent;
+			ServerPeerEvent slavePeerEvent;
 			slavePeerEvent.send( this->parityServerSockets[ i ], packet );
 
 #ifdef SERVER_WORKER_SEND_REPLICAS_PARALLEL
@@ -938,7 +938,7 @@ bool SlaveWorker::issueSealChunkRequest( Chunk *chunk, uint32_t startPos ) {
 	return true;
 }
 
-bool SlaveWorker::handleBatchKeyValueRequest( SlavePeerEvent event, char *buf, size_t size ) {
+bool SlaveWorker::handleBatchKeyValueRequest( ServerPeerEvent event, char *buf, size_t size ) {
 	struct BatchKeyValueHeader header;
 	if ( ! this->protocol.parseBatchKeyValueHeader( header, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleBatchKeyValueRequest", "Invalid BATCH_KEY_VALUE request." );
@@ -1004,7 +1004,7 @@ bool SlaveWorker::handleBatchKeyValueRequest( SlavePeerEvent event, char *buf, s
 	return false;
 }
 
-bool SlaveWorker::handleBatchChunksRequest( SlavePeerEvent event, char *buf, size_t size ) {
+bool SlaveWorker::handleBatchChunksRequest( ServerPeerEvent event, char *buf, size_t size ) {
 	struct BatchChunkHeader header;
 	if ( ! this->protocol.parseBatchChunkHeader( header, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleBatchChunksRequest", "Invalid BATCH_CHUNKS request." );

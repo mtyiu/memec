@@ -223,7 +223,7 @@ bool SlaveWorker::handleReconstructionRequest( CoordinatorEvent event, char *buf
 	}
 
 	// Send GET_CHUNK requests to surviving nodes
-	SlavePeerEvent slavePeerEvent;
+	ServerPeerEvent slavePeerEvent;
 	std::vector<uint32_t> **requestIds = new std::vector<uint32_t> *[ SlaveWorker::chunkCount ];
 	std::vector<Metadata> **metadataList = new std::vector<Metadata> *[ SlaveWorker::chunkCount ];
 	for ( uint32_t i = 0; i < SlaveWorker::chunkCount; i++ ) {

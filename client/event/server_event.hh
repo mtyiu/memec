@@ -1,24 +1,24 @@
-#ifndef __MASTER_EVENT_SLAVE_EVENT_HH__
-#define __MASTER_EVENT_SLAVE_EVENT_HH__
+#ifndef __CLIENT_EVENT_SERVER_EVENT_HH__
+#define __CLIENT_EVENT_SERVER_EVENT_HH__
 
 #include "../protocol/protocol.hh"
 #include "../socket/server_socket.hh"
 #include "../../common/ds/packet_pool.hh"
 #include "../../common/event/event.hh"
 
-enum SlaveEventType {
-	SLAVE_EVENT_TYPE_UNDEFINED,
-	SLAVE_EVENT_TYPE_REGISTER_REQUEST,
-	SLAVE_EVENT_TYPE_SEND,
-	SLAVE_EVENT_TYPE_SYNC_METADATA,
-	SLAVE_EVENT_TYPE_ACK_PARITY_DELTA,
-	SLAVE_EVENT_TYPE_REVERT_DELTA,
-	SLAVE_EVENT_TYPE_PENDING
+enum ServerEventType {
+	SERVER_EVENT_TYPE_UNDEFINED,
+	SERVER_EVENT_TYPE_REGISTER_REQUEST,
+	SERVER_EVENT_TYPE_SEND,
+	SERVER_EVENT_TYPE_SYNC_METADATA,
+	SERVER_EVENT_TYPE_ACK_PARITY_DELTA,
+	SERVER_EVENT_TYPE_REVERT_DELTA,
+	SERVER_EVENT_TYPE_PENDING
 };
 
-class SlaveEvent : public Event {
+class ServerEvent : public Event {
 public:
-	SlaveEventType type;
+	ServerEventType type;
 	ServerSocket *socket;
 	uint16_t instanceId;
 	uint32_t requestId;

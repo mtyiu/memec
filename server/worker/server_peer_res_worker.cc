@@ -1,7 +1,7 @@
 #include "worker.hh"
 #include "../main/server.hh"
 
-bool SlaveWorker::handleForwardKeyResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
+bool SlaveWorker::handleForwardKeyResponse( ServerPeerEvent event, bool success, char *buf, size_t size ) {
 	struct ForwardKeyHeader header;
 	if ( ! this->protocol.parseForwardKeyResHeader( header, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleForwardKeyResponse", "Invalid DEGRADED_SET response (size = %lu).", size );
@@ -61,7 +61,7 @@ bool SlaveWorker::handleForwardKeyResponse( struct ForwardKeyHeader &header, boo
 		if ( op.opcode == 0 )
 			continue;
 
-		MasterEvent masterEvent;
+		ClientEvent clientEvent;
 		switch( op.opcode ) {
 			case PROTO_OPCODE_DEGRADED_UPDATE:
 				if ( success ) {
@@ -116,13 +116,13 @@ bool SlaveWorker::handleForwardKeyResponse( struct ForwardKeyHeader &header, boo
 
 					delete[] valueUpdate;
 				} else {
-					masterEvent.resUpdate(
+					clientEvent.resUpdate(
 						op.socket, pid.parentInstanceId, pid.parentRequestId, key,
 						op.data.keyValueUpdate.offset,
 						op.data.keyValueUpdate.length,
 						false, false, true
 					);
-					this->dispatch( masterEvent );
+					this->dispatch( clientEvent );
 
 					op.data.keyValueUpdate.free();
 					delete[] ( ( char * ) op.data.keyValueUpdate.ptr );
@@ -151,13 +151,13 @@ bool SlaveWorker::handleForwardKeyResponse( struct ForwardKeyHeader &header, boo
 						false // reconstructParity - already reconstructed
 					);
 				} else {
-					masterEvent.resDelete(
+					clientEvent.resDelete(
 						op.socket, pid.parentInstanceId, pid.parentRequestId,
 						key,
 						false, // needsFree
 						true   // isDegraded
 					);
-					this->dispatch( masterEvent );
+					this->dispatch( clientEvent );
 				}
 				op.data.key.free();
 				break;
@@ -169,7 +169,7 @@ bool SlaveWorker::handleForwardKeyResponse( struct ForwardKeyHeader &header, boo
 	return true;
 }
 
-bool SlaveWorker::handleSetResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
+bool SlaveWorker::handleSetResponse( ServerPeerEvent event, bool success, char *buf, size_t size ) {
 	PendingIdentifier pid;
 	uint32_t requestCount;
 	bool found = SlaveWorker::pending->decrementRemapDataRequest( event.instanceId, event.requestId, &pid, &requestCount );
@@ -185,7 +185,7 @@ bool SlaveWorker::handleSetResponse( SlavePeerEvent event, bool success, char *b
 	return found;
 }
 
-bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
+bool SlaveWorker::handleGetResponse( ServerPeerEvent event, bool success, char *buf, size_t size ) {
 	Key key;
 	KeyValue keyValue;
 	Metadata metadata;
@@ -267,17 +267,17 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 			}
 		}
 
-		MasterEvent masterEvent;
+		ClientEvent clientEvent;
 		switch( op.opcode ) {
 			case PROTO_OPCODE_DEGRADED_GET:
 				LOCK( &dmap->unsealed.lock );
 				if ( success ) {
-					masterEvent.resGet( op.socket, pid.parentInstanceId, pid.parentRequestId, keyValue, true );
+					clientEvent.resGet( op.socket, pid.parentInstanceId, pid.parentRequestId, keyValue, true );
 				} else {
-					masterEvent.resGet( op.socket, pid.parentInstanceId, pid.parentRequestId, key, true );
+					clientEvent.resGet( op.socket, pid.parentInstanceId, pid.parentRequestId, key, true );
 				}
 				op.data.key.free();
-				this->dispatch( masterEvent );
+				this->dispatch( clientEvent );
 				UNLOCK( &dmap->unsealed.lock );
 				break;
 			case PROTO_OPCODE_DEGRADED_UPDATE:
@@ -385,13 +385,13 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 						printf( "After: %.*s - %.*s (%p vs %p)\n", _keySize, _keyStr, _valueSize, _valueStr, kv.data, keyValue.data );
 					} */
 				} else {
-					masterEvent.resUpdate(
+					clientEvent.resUpdate(
 						op.socket, pid.parentInstanceId, pid.parentRequestId, key,
 						op.data.keyValueUpdate.offset,
 						op.data.keyValueUpdate.length,
 						false, false, true
 					);
-					this->dispatch( masterEvent );
+					this->dispatch( clientEvent );
 
 					op.data.keyValueUpdate.free();
 					delete[] ( ( char * ) op.data.keyValueUpdate.ptr );
@@ -420,13 +420,13 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 						false // reconstructParity - already reconstructed
 					);
 				} else {
-					masterEvent.resDelete(
+					clientEvent.resDelete(
 						op.socket, pid.parentInstanceId, pid.parentRequestId,
 						key,
 						false, // needsFree
 						true   // isDegraded
 					);
-					this->dispatch( masterEvent );
+					this->dispatch( clientEvent );
 				}
 				op.data.key.free();
 				break;
@@ -436,7 +436,7 @@ bool SlaveWorker::handleGetResponse( SlavePeerEvent event, bool success, char *b
 	return true;
 }
 
-bool SlaveWorker::handleUpdateResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
+bool SlaveWorker::handleUpdateResponse( ServerPeerEvent event, bool success, char *buf, size_t size ) {
 	struct ChunkKeyValueUpdateHeader header;
 	if ( ! this->protocol.parseChunkKeyValueUpdateHeader( header, false, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleUpdateResponse", "Invalid UPDATE response." );
@@ -481,7 +481,7 @@ bool SlaveWorker::handleUpdateResponse( SlavePeerEvent event, bool success, char
 
 	if ( pending == 0 ) {
 		// Only send master UPDATE response when the number of pending slave UPDATE requests equal 0
-		MasterEvent masterEvent;
+		ClientEvent clientEvent;
 
 		// FOR TESTING REVERT ONLY (parity slave fails and skip waiting)
 		//PendingIdentifier dpid = pid;
@@ -505,19 +505,19 @@ bool SlaveWorker::handleUpdateResponse( SlavePeerEvent event, bool success, char
 		//SlaveWorker::pending->insertKeyValueUpdate( PT_SLAVE_PEER_UPDATE, dpid.instanceId, pid.instanceId, dpid.requestId, pid.requestId, ( void * ) s, keyValueUpdate );
 		//keyValueUpdate.dup();
 
-		masterEvent.resUpdate(
+		clientEvent.resUpdate(
 			( ClientSocket * ) pid.ptr, pid.instanceId, pid.requestId,
 			keyValueUpdate,
 			header.valueUpdateOffset,
 			header.valueUpdateSize,
 			success, true, keyValueUpdate.isDegraded
 		);
-		this->dispatch( masterEvent );
+		this->dispatch( clientEvent );
 	}
 	return true;
 }
 
-bool SlaveWorker::handleDeleteResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
+bool SlaveWorker::handleDeleteResponse( ServerPeerEvent event, bool success, char *buf, size_t size ) {
 	struct ChunkKeyHeader header;
 	if ( ! this->protocol.parseChunkKeyHeader( header, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleDeleteRequest", "Invalid DELETE response." );
@@ -557,7 +557,7 @@ bool SlaveWorker::handleDeleteResponse( SlavePeerEvent event, bool success, char
 	__DEBUG__( BLUE, "SlaveWorker", "handleDeleteResponse", "Pending slave DELETE requests = %d (%s).", pending, success ? "success" : "fail" );
 	if ( pending == 0 ) {
 		// Only send master DELETE response when the number of pending slave DELETE requests equal 0
-		MasterEvent masterEvent;
+		ClientEvent clientEvent;
 		Key key;
 
 		if ( ! SlaveWorker::pending->eraseKey( PT_MASTER_DEL, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &key ) ) {
@@ -568,7 +568,7 @@ bool SlaveWorker::handleDeleteResponse( SlavePeerEvent event, bool success, char
 		if ( success ) {
 			__ERROR__( "SlaveWorker", "handleDeleteResponse", "TODO: server/worker/slave_peer_res_worker.cc - Line 289: Include the timestamp and metadata in the response.\n" );
 			// uint32_t timestamp = SlaveWorker::timestamp->nextVal();
-			masterEvent.resDelete(
+			clientEvent.resDelete(
 				( ClientSocket * ) pid.ptr,
 				pid.instanceId, pid.requestId,
 				key,
@@ -576,7 +576,7 @@ bool SlaveWorker::handleDeleteResponse( SlavePeerEvent event, bool success, char
 				false // isDegraded
 			);
 		} else {
-			masterEvent.resDelete(
+			clientEvent.resDelete(
 				( ClientSocket * ) pid.ptr,
 				pid.instanceId, pid.requestId,
 				key,
@@ -584,12 +584,12 @@ bool SlaveWorker::handleDeleteResponse( SlavePeerEvent event, bool success, char
 				false // isDegraded
 			);
 		}
-		SlaveWorker::eventQueue->insert( masterEvent );
+		SlaveWorker::eventQueue->insert( clientEvent );
 	}
 	return true;
 }
 
-bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
+bool SlaveWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, char *buf, size_t size ) {
 	int pending;
 	uint32_t listId, stripeId, chunkId;
 	std::unordered_map<PendingIdentifier, ChunkRequest>::iterator it, tmp, end, selfIt;
@@ -778,7 +778,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 					this->sealIndicators[ SlaveWorker::parityChunkCount + 1 ][ i ]
 				);
 
-				SlavePeerEvent slavePeerEvent;
+				ServerPeerEvent slavePeerEvent;
 				Metadata tmpMetadata;
 
 				tmpMetadata.set( listId, stripeId, i );
@@ -1074,16 +1074,16 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 
 					// Find the chunk from the map
 					if ( index == -1 ) {
-						MasterEvent masterEvent;
-						masterEvent.instanceId = pid.parentInstanceId;
-						masterEvent.requestId = pid.parentRequestId;
-						masterEvent.socket = op.socket;
+						ClientEvent clientEvent;
+						clientEvent.instanceId = pid.parentInstanceId;
+						clientEvent.requestId = pid.parentRequestId;
+						clientEvent.socket = op.socket;
 
 						if ( op.opcode == PROTO_OPCODE_DEGRADED_GET ) {
 							struct KeyHeader header;
 							header.keySize = op.data.key.size;
 							header.key = op.data.key.data;
-							this->handleGetRequest( masterEvent, header, true );
+							this->handleGetRequest( clientEvent, header, true );
 						} else if ( op.opcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
 							struct KeyValueUpdateHeader header;
 							header.keySize = op.data.keyValueUpdate.size;
@@ -1093,7 +1093,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 							header.valueUpdate = ( char * ) op.data.keyValueUpdate.ptr;
 
 							this->handleUpdateRequest(
-								masterEvent, header,
+								clientEvent, header,
 								op.original, op.reconstructed, op.reconstructedCount,
 								reconstructParity,
 								this->chunks,
@@ -1105,7 +1105,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 							header.keySize = op.data.key.size;
 							header.key = op.data.key.data;
 							this->handleDeleteRequest(
-								masterEvent, header,
+								clientEvent, header,
 								op.original, op.reconstructed, op.reconstructedCount,
 								reconstructParity,
 								this->chunks,
@@ -1189,7 +1189,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 
 					// Send response
 					if ( op.opcode == PROTO_OPCODE_DEGRADED_GET ) {
-						MasterEvent event;
+						ClientEvent event;
 
 						if ( isKeyValueFound ) {
 							event.resGet( op.socket, pid.parentInstanceId, pid.parentRequestId, keyValue, true );
@@ -1308,7 +1308,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 
 							delete[] valueUpdate;
 						} else {
-							MasterEvent event;
+							ClientEvent event;
 							struct KeyValueUpdateHeader header;
 
 							event.instanceId = pid.parentInstanceId;
@@ -1331,7 +1331,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
  								true
 							);
 
-							// MasterEvent event;
+							// ClientEvent event;
 							// event.resUpdate(
 							// 	op.socket, pid.parentInstanceId, pid.parentRequestId, key,
 							// 	op.data.keyValueUpdate.offset,
@@ -1381,7 +1381,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 								true
 							);
 						} else {
-							MasterEvent event;
+							ClientEvent event;
 
 							event.resDelete( op.socket, pid.parentInstanceId, pid.parentRequestId, key, false, true );
 							this->dispatch( event );
@@ -1393,7 +1393,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 				////////////////////////////////////////
 				// Forward the modified parity chunks //
 				////////////////////////////////////////
-				SlavePeerEvent event;
+				ServerPeerEvent event;
 				uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
 				for ( uint32_t i = 0; i < op.reconstructedCount; i++ ) {
 					ServerPeerSocket *s = SlaveWorker::stripeList->get( op.reconstructed[ i * 2 ], op.reconstructed[ i * 2 + 1 ] );
@@ -1483,7 +1483,7 @@ bool SlaveWorker::handleGetChunkResponse( SlavePeerEvent event, bool success, ch
 	return true;
 }
 
-bool SlaveWorker::handleSetChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
+bool SlaveWorker::handleSetChunkResponse( ServerPeerEvent event, bool success, char *buf, size_t size ) {
 	struct ChunkHeader header;
 	if ( ! this->protocol.parseChunkHeader( header, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleSetChunkResponse", "Invalid SET_CHUNK response." );
@@ -1546,7 +1546,7 @@ bool SlaveWorker::handleSetChunkResponse( SlavePeerEvent event, bool success, ch
 	return true;
 }
 
-bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
+bool SlaveWorker::handleUpdateChunkResponse( ServerPeerEvent event, bool success, char *buf, size_t size ) {
 	struct ChunkUpdateHeader header;
 	if ( ! this->protocol.parseChunkUpdateHeader( header, false, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleUpdateChunkResponse", "Invalid UPDATE_CHUNK response." );
@@ -1593,7 +1593,7 @@ bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success,
 		// Only send application UPDATE response when the number of pending slave UPDATE_CHUNK requests equal 0
 		Key key;
 		KeyValueUpdate keyValueUpdate;
-		MasterEvent masterEvent;
+		ClientEvent clientEvent;
 
 		if ( ! SlaveWorker::pending->eraseKeyValueUpdate( PT_MASTER_UPDATE, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &keyValueUpdate ) ) {
 			__ERROR__( "SlaveWorker", "handleUpdateChunkResponse", "Cannot find a pending master UPDATE request that matches the response. This message will be discarded." );
@@ -1601,18 +1601,18 @@ bool SlaveWorker::handleUpdateChunkResponse( SlavePeerEvent event, bool success,
 		}
 
 		key.set( keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.ptr );
-		masterEvent.resUpdate(
+		clientEvent.resUpdate(
 			( ClientSocket * ) pid.ptr, pid.instanceId, pid.requestId, key,
 			keyValueUpdate.offset, keyValueUpdate.length,
 			success, true,
 			keyValueUpdate.isDegraded // isDegraded
 		);
-		this->dispatch( masterEvent );
+		this->dispatch( clientEvent );
 	}
 	return true;
 }
 
-bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
+bool SlaveWorker::handleDeleteChunkResponse( ServerPeerEvent event, bool success, char *buf, size_t size ) {
 	struct ChunkUpdateHeader header;
 	if ( ! this->protocol.parseChunkUpdateHeader( header, false, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleDeleteChunkResponse", "Invalid DELETE_CHUNK response." );
@@ -1660,7 +1660,7 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 	// __ERROR__( "SlaveWorker", "handleDeleteChunkResponse", "Pending slave DELETE_CHUNK requests = %d.", pending );
 	if ( pending == 0 ) {
 		// Only send master DELETE response when the number of pending slave DELETE_CHUNK requests equal 0
-		MasterEvent masterEvent;
+		ClientEvent clientEvent;
 		Key key;
 
 		if ( ! SlaveWorker::pending->eraseKey( PT_MASTER_DEL, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &key ) ) {
@@ -1671,7 +1671,7 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 		// TODO: Include the timestamp and metadata in the response
 		if ( success ) {
 			uint32_t timestamp = SlaveWorker::timestamp->nextVal();
-			masterEvent.resDelete(
+			clientEvent.resDelete(
 				( ClientSocket * ) pid.ptr, pid.instanceId, pid.requestId,
 				timestamp,
 				header.listId, header.stripeId, header.chunkId,
@@ -1680,23 +1680,23 @@ bool SlaveWorker::handleDeleteChunkResponse( SlavePeerEvent event, bool success,
 				false // isDegraded
 			);
 		} else {
-			masterEvent.resDelete(
+			clientEvent.resDelete(
 				( ClientSocket * ) pid.ptr, pid.instanceId, pid.requestId,
 				key,
 				true, // needsFree
 				false // isDegraded
 			);
 		}
-		SlaveWorker::eventQueue->insert( masterEvent );
+		SlaveWorker::eventQueue->insert( clientEvent );
 	}
 	return true;
 }
 
-bool SlaveWorker::handleSealChunkResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
+bool SlaveWorker::handleSealChunkResponse( ServerPeerEvent event, bool success, char *buf, size_t size ) {
 	return true;
 }
 
-bool SlaveWorker::handleBatchKeyValueResponse( SlavePeerEvent event, bool success, char *buf, size_t size ) {
+bool SlaveWorker::handleBatchKeyValueResponse( ServerPeerEvent event, bool success, char *buf, size_t size ) {
 	struct BatchKeyHeader header;
 	if ( ! this->protocol.parseBatchKeyHeader( header, buf, size ) ) {
 		__ERROR__( "SlaveWorker", "handleBatchKeyValueResponse", "Invalid BATCH_KEY_VALUE response." );

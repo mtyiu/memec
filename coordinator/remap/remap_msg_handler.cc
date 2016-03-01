@@ -212,7 +212,7 @@ bool CoordinatorRemapMsgHandler::transitToDegradedEnd( const struct sockaddr_in 
 	LOCK( &this->aliveSlavesLock );
 	if ( this->crashedSlaves.find( slave ) != this->crashedSlaves.end() ) {
 		printf( "Triggering reconstruction for crashed slave...\n" );
-		SlaveEvent event;
+		ServerEvent event;
 		event.triggerReconstruction( slave );
 		coordinator->eventQueue.insert( event );
 	}

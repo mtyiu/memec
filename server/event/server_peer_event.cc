@@ -1,20 +1,20 @@
 #include "server_peer_event.hh"
 #include "../buffer/mixed_chunk_buffer.hh"
 
-void SlavePeerEvent::reqRegister( ServerPeerSocket *socket ) {
-	this->type = SLAVE_PEER_EVENT_TYPE_REGISTER_REQUEST;
+void ServerPeerEvent::reqRegister( ServerPeerSocket *socket ) {
+	this->type = SERVER_PEER_EVENT_TYPE_REGISTER_REQUEST;
 	this->socket = socket;
 }
 
-void SlavePeerEvent::resRegister( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, bool success ) {
-	this->type = success ? SLAVE_PEER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE;
+void ServerPeerEvent::resRegister( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, bool success ) {
+	this->type = success ? SERVER_PEER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS : SERVER_PEER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
 }
 
-void SlavePeerEvent::resRemappingSet( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, uint32_t listId, uint32_t chunkId, bool success ) {
-	this->type = success ? SLAVE_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE;
+void ServerPeerEvent::resRemappingSet( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, uint32_t listId, uint32_t chunkId, bool success ) {
+	this->type = success ? SERVER_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS : SERVER_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
@@ -23,8 +23,8 @@ void SlavePeerEvent::resRemappingSet( ServerPeerSocket *socket, uint16_t instanc
 	this->message.remap.chunkId = chunkId;
 }
 
-void SlavePeerEvent::reqSet( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key key, Value value ) {
-	this->type = SLAVE_PEER_EVENT_TYPE_SET_REQUEST;
+void ServerPeerEvent::reqSet( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key key, Value value ) {
+	this->type = SERVER_PEER_EVENT_TYPE_SET_REQUEST;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
@@ -32,15 +32,15 @@ void SlavePeerEvent::reqSet( ServerPeerSocket *socket, uint16_t instanceId, uint
 	this->message.set.value = value;
 }
 
-void SlavePeerEvent::resSet( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key key, bool success ) {
-	this->type = success ? SLAVE_PEER_EVENT_TYPE_SET_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_SET_RESPONSE_FAILURE;
+void ServerPeerEvent::resSet( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key key, bool success ) {
+	this->type = success ? SERVER_PEER_EVENT_TYPE_SET_RESPONSE_SUCCESS : SERVER_PEER_EVENT_TYPE_SET_RESPONSE_FAILURE;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
 	this->message.set.key = key;
 }
 
-void SlavePeerEvent::reqForwardKey(
+void ServerPeerEvent::reqForwardKey(
 	ServerPeerSocket *socket,
 	uint8_t opcode,
 	uint16_t instanceId, uint32_t requestId,
@@ -49,7 +49,7 @@ void SlavePeerEvent::reqForwardKey(
 	char *key, char *value,
 	uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate
 ) {
-	this->type = SLAVE_PEER_EVENT_TYPE_FORWARD_KEY_REQUEST;
+	this->type = SERVER_PEER_EVENT_TYPE_FORWARD_KEY_REQUEST;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
@@ -72,7 +72,7 @@ void SlavePeerEvent::reqForwardKey(
 	}
 }
 
-void SlavePeerEvent::resForwardKey(
+void ServerPeerEvent::resForwardKey(
 	ServerPeerSocket *socket, bool success,
 	uint8_t opcode,
 	uint16_t instanceId, uint32_t requestId,
@@ -81,7 +81,7 @@ void SlavePeerEvent::resForwardKey(
 	char *key,
 	uint32_t valueUpdateOffset, uint32_t valueUpdateSize
 ) {
-	this->type = success ? SLAVE_PEER_EVENT_TYPE_FORWARD_KEY_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_FORWARD_KEY_RESPONSE_FAILURE;
+	this->type = success ? SERVER_PEER_EVENT_TYPE_FORWARD_KEY_RESPONSE_SUCCESS : SERVER_PEER_EVENT_TYPE_FORWARD_KEY_RESPONSE_FAILURE;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
@@ -103,8 +103,8 @@ void SlavePeerEvent::resForwardKey(
 	this->message.forwardKey.update.data = 0;
 }
 
-void SlavePeerEvent::reqGet( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, Key &key ) {
-	this->type = SLAVE_PEER_EVENT_TYPE_GET_REQUEST;
+void ServerPeerEvent::reqGet( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, Key &key ) {
+	this->type = SERVER_PEER_EVENT_TYPE_GET_REQUEST;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
@@ -113,24 +113,24 @@ void SlavePeerEvent::reqGet( ServerPeerSocket *socket, uint16_t instanceId, uint
 	this->message.get.key = key;
 }
 
-void SlavePeerEvent::resGet( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, KeyValue &keyValue ) {
-	this->type = SLAVE_PEER_EVENT_TYPE_GET_RESPONSE_SUCCESS;
+void ServerPeerEvent::resGet( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, KeyValue &keyValue ) {
+	this->type = SERVER_PEER_EVENT_TYPE_GET_RESPONSE_SUCCESS;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
 	this->message.get.keyValue = keyValue;
 }
 
-void SlavePeerEvent::resGet( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key ) {
-	this->type = SLAVE_PEER_EVENT_TYPE_GET_RESPONSE_FAILURE;
+void ServerPeerEvent::resGet( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key ) {
+	this->type = SERVER_PEER_EVENT_TYPE_GET_RESPONSE_FAILURE;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
 	this->message.get.key = key;
 }
 
-void SlavePeerEvent::resUpdate( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key, uint32_t valueUpdateOffset, uint32_t length, uint32_t chunkUpdateOffset, bool success ) {
-	this->type = success ? SLAVE_PEER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE;
+void ServerPeerEvent::resUpdate( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key, uint32_t valueUpdateOffset, uint32_t length, uint32_t chunkUpdateOffset, bool success ) {
+	this->type = success ? SERVER_PEER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS : SERVER_PEER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
@@ -143,8 +143,8 @@ void SlavePeerEvent::resUpdate( ServerPeerSocket *socket, uint16_t instanceId, u
 	this->message.update.key = key;
 }
 
-void SlavePeerEvent::resDelete( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key, bool success ) {
-	this->type = success ? SLAVE_PEER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_DELETE_RESPONSE_FAILURE;
+void ServerPeerEvent::resDelete( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key, bool success ) {
+	this->type = success ? SERVER_PEER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS : SERVER_PEER_EVENT_TYPE_DELETE_RESPONSE_FAILURE;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
@@ -154,8 +154,8 @@ void SlavePeerEvent::resDelete( ServerPeerSocket *socket, uint16_t instanceId, u
 	this->message.del.key = key;
 }
 
-void SlavePeerEvent::resRemappedUpdate( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool success ) {
-	this->type = success ? SLAVE_PEER_EVENT_TYPE_REMAPPED_UPDATE_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_REMAPPED_UPDATE_RESPONSE_FAILURE;
+void ServerPeerEvent::resRemappedUpdate( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, bool success ) {
+	this->type = success ? SERVER_PEER_EVENT_TYPE_REMAPPED_UPDATE_RESPONSE_SUCCESS : SERVER_PEER_EVENT_TYPE_REMAPPED_UPDATE_RESPONSE_FAILURE;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
@@ -164,16 +164,16 @@ void SlavePeerEvent::resRemappedUpdate( ServerPeerSocket *socket, uint16_t insta
 	this->message.remappingUpdate.valueUpdateSize = valueUpdateSize;
 }
 
-void SlavePeerEvent::resRemappedDelete( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool success ) {
-	this->type = success ? SLAVE_PEER_EVENT_TYPE_REMAPPED_DELETE_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_REMAPPED_DELETE_RESPONSE_FAILURE;
+void ServerPeerEvent::resRemappedDelete( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool success ) {
+	this->type = success ? SERVER_PEER_EVENT_TYPE_REMAPPED_DELETE_RESPONSE_SUCCESS : SERVER_PEER_EVENT_TYPE_REMAPPED_DELETE_RESPONSE_FAILURE;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
 	this->message.remappingDel.key = key;
 }
 
-void SlavePeerEvent::resUpdateChunk( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, bool success ) {
-	this->type = success ? SLAVE_PEER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_FAILURE;
+void ServerPeerEvent::resUpdateChunk( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, bool success ) {
+	this->type = success ? SERVER_PEER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_SUCCESS : SERVER_PEER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_FAILURE;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
@@ -183,8 +183,8 @@ void SlavePeerEvent::resUpdateChunk( ServerPeerSocket *socket, uint16_t instance
 	this->message.chunkUpdate.updatingChunkId = updatingChunkId;
 }
 
-void SlavePeerEvent::resDeleteChunk( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, bool success ) {
-	this->type = success ? SLAVE_PEER_EVENT_TYPE_DELETE_CHUNK_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_DELETE_CHUNK_RESPONSE_FAILURE;
+void ServerPeerEvent::resDeleteChunk( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, uint32_t offset, uint32_t length, uint32_t updatingChunkId, bool success ) {
+	this->type = success ? SERVER_PEER_EVENT_TYPE_DELETE_CHUNK_RESPONSE_SUCCESS : SERVER_PEER_EVENT_TYPE_DELETE_CHUNK_RESPONSE_FAILURE;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
@@ -194,8 +194,8 @@ void SlavePeerEvent::resDeleteChunk( ServerPeerSocket *socket, uint16_t instance
 	this->message.chunkUpdate.updatingChunkId = updatingChunkId;
 }
 
-void SlavePeerEvent::reqGetChunk( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata ) {
-	this->type = SLAVE_PEER_EVENT_TYPE_GET_CHUNK_REQUEST;
+void ServerPeerEvent::reqGetChunk( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata ) {
+	this->type = SERVER_PEER_EVENT_TYPE_GET_CHUNK_REQUEST;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
@@ -203,8 +203,8 @@ void SlavePeerEvent::reqGetChunk( ServerPeerSocket *socket, uint16_t instanceId,
 	this->message.chunk.chunk = 0;
 }
 
-void SlavePeerEvent::resGetChunk( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, bool success, uint32_t chunkBufferIndex, Chunk *chunk, uint8_t sealIndicatorCount, bool *sealIndicator ) {
-	this->type = success ? SLAVE_PEER_EVENT_TYPE_GET_CHUNK_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_GET_CHUNK_RESPONSE_FAILURE;
+void ServerPeerEvent::resGetChunk( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, bool success, uint32_t chunkBufferIndex, Chunk *chunk, uint8_t sealIndicatorCount, bool *sealIndicator ) {
+	this->type = success ? SERVER_PEER_EVENT_TYPE_GET_CHUNK_RESPONSE_SUCCESS : SERVER_PEER_EVENT_TYPE_GET_CHUNK_RESPONSE_FAILURE;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
@@ -215,15 +215,15 @@ void SlavePeerEvent::resGetChunk( ServerPeerSocket *socket, uint16_t instanceId,
 	this->message.chunk.sealIndicator = sealIndicator;
 }
 
-void SlavePeerEvent::batchGetChunks( ServerPeerSocket *socket, std::vector<uint32_t> *requestIds, std::vector<Metadata> *metadata ) {
-	this->type = SLAVE_PEER_EVENT_TYPE_BATCH_GET_CHUNKS;
+void ServerPeerEvent::batchGetChunks( ServerPeerSocket *socket, std::vector<uint32_t> *requestIds, std::vector<Metadata> *metadata ) {
+	this->type = SERVER_PEER_EVENT_TYPE_BATCH_GET_CHUNKS;
 	this->socket = socket;
 	this->message.batchGetChunks.requestIds = requestIds;
 	this->message.batchGetChunks.metadata = metadata;
 }
 
-void SlavePeerEvent::reqSetChunk( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, Chunk *chunk, bool needsFree ) {
-	this->type = SLAVE_PEER_EVENT_TYPE_SET_CHUNK_REQUEST;
+void ServerPeerEvent::reqSetChunk( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, Chunk *chunk, bool needsFree ) {
+	this->type = SERVER_PEER_EVENT_TYPE_SET_CHUNK_REQUEST;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
@@ -232,8 +232,8 @@ void SlavePeerEvent::reqSetChunk( ServerPeerSocket *socket, uint16_t instanceId,
 	this->message.chunk.needsFree = needsFree;
 }
 
-void SlavePeerEvent::resSetChunk( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, bool success ) {
-	this->type = success ? SLAVE_PEER_EVENT_TYPE_SET_CHUNK_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_SET_CHUNK_RESPONSE_FAILURE;
+void ServerPeerEvent::resSetChunk( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, bool success ) {
+	this->type = success ? SERVER_PEER_EVENT_TYPE_SET_CHUNK_RESPONSE_SUCCESS : SERVER_PEER_EVENT_TYPE_SET_CHUNK_RESPONSE_FAILURE;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
@@ -241,8 +241,8 @@ void SlavePeerEvent::resSetChunk( ServerPeerSocket *socket, uint16_t instanceId,
 	this->message.chunk.chunk = 0;
 }
 
-void SlavePeerEvent::reqForwardChunk( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, Chunk *chunk, bool needsFree ) {
-	this->type = SLAVE_PEER_EVENT_TYPE_FORWARD_CHUNK_REQUEST;
+void ServerPeerEvent::reqForwardChunk( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, Chunk *chunk, bool needsFree ) {
+	this->type = SERVER_PEER_EVENT_TYPE_FORWARD_CHUNK_REQUEST;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
@@ -251,8 +251,8 @@ void SlavePeerEvent::reqForwardChunk( ServerPeerSocket *socket, uint16_t instanc
 	this->message.chunk.needsFree = needsFree;
 }
 
-void SlavePeerEvent::resForwardChunk( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, bool success ) {
-	this->type = success ? SLAVE_PEER_EVENT_TYPE_FORWARD_CHUNK_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_FORWARD_CHUNK_RESPONSE_FAILURE;
+void ServerPeerEvent::resForwardChunk( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, bool success ) {
+	this->type = success ? SERVER_PEER_EVENT_TYPE_FORWARD_CHUNK_RESPONSE_SUCCESS : SERVER_PEER_EVENT_TYPE_FORWARD_CHUNK_RESPONSE_FAILURE;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
@@ -260,18 +260,18 @@ void SlavePeerEvent::resForwardChunk( ServerPeerSocket *socket, uint16_t instanc
 	this->message.chunk.chunk = 0;
 }
 
-void SlavePeerEvent::reqSealChunk( Chunk *chunk ) {
-	this->type = SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_REQUEST;
+void ServerPeerEvent::reqSealChunk( Chunk *chunk ) {
+	this->type = SERVER_PEER_EVENT_TYPE_SEAL_CHUNK_REQUEST;
 	this->message.chunk.chunk = chunk;
 }
 
-void SlavePeerEvent::reqSealChunks( MixedChunkBuffer *chunkBuffer ) {
-	this->type = SLAVE_PEER_EVENT_TYPE_SEAL_CHUNKS;
+void ServerPeerEvent::reqSealChunks( MixedChunkBuffer *chunkBuffer ) {
+	this->type = SERVER_PEER_EVENT_TYPE_SEAL_CHUNKS;
 	this->message.chunkBuffer = chunkBuffer;
 }
 
-void SlavePeerEvent::resSealChunk( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, bool success ) {
-	this->type = success ? SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_SEAL_CHUNK_RESPONSE_FAILURE;
+void ServerPeerEvent::resSealChunk( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Metadata &metadata, bool success ) {
+	this->type = success ? SERVER_PEER_EVENT_TYPE_SEAL_CHUNK_RESPONSE_SUCCESS : SERVER_PEER_EVENT_TYPE_SEAL_CHUNK_RESPONSE_FAILURE;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
@@ -279,16 +279,16 @@ void SlavePeerEvent::resSealChunk( ServerPeerSocket *socket, uint16_t instanceId
 	this->message.chunk.chunk = 0;
 }
 
-void SlavePeerEvent::resUnsealedKeys( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, struct BatchKeyValueHeader &header, bool success ) {
-	this->type = success ? SLAVE_PEER_EVENT_TYPE_UNSEALED_KEYS_RESPONSE_SUCCESS : SLAVE_PEER_EVENT_TYPE_UNSEALED_KEYS_RESPONSE_FAILURE;
+void ServerPeerEvent::resUnsealedKeys( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, struct BatchKeyValueHeader &header, bool success ) {
+	this->type = success ? SERVER_PEER_EVENT_TYPE_UNSEALED_KEYS_RESPONSE_SUCCESS : SERVER_PEER_EVENT_TYPE_UNSEALED_KEYS_RESPONSE_FAILURE;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
 	this->message.unsealedKeys.header = header;
 }
 
-void SlavePeerEvent::defer( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, uint8_t opcode, char *buf, size_t size ) {
-	this->type = SLAVE_PEER_EVENT_TYPE_DEFERRED;
+void ServerPeerEvent::defer( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, uint8_t opcode, char *buf, size_t size ) {
+	this->type = SERVER_PEER_EVENT_TYPE_DEFERRED;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;
@@ -298,13 +298,13 @@ void SlavePeerEvent::defer( ServerPeerSocket *socket, uint16_t instanceId, uint3
 	memcpy( this->message.defer.buf, buf, size );
 }
 
-void SlavePeerEvent::send( ServerPeerSocket *socket, Packet *packet ) {
-	this->type = SLAVE_PEER_EVENT_TYPE_SEND;
+void ServerPeerEvent::send( ServerPeerSocket *socket, Packet *packet ) {
+	this->type = SERVER_PEER_EVENT_TYPE_SEND;
 	this->socket = socket;
 	this->message.send.packet = packet;
 }
 
-void SlavePeerEvent::pending( ServerPeerSocket *socket ) {
-	this->type = SLAVE_PEER_EVENT_TYPE_PENDING;
+void ServerPeerEvent::pending( ServerPeerSocket *socket ) {
+	this->type = SERVER_PEER_EVENT_TYPE_PENDING;
 	this->socket = socket;
 }

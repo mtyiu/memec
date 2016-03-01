@@ -402,7 +402,7 @@ bool Slave::stop() {
 
 void Slave::seal() {
 	size_t count = 0;
-	SlavePeerEvent event;
+	ServerPeerEvent event;
 	for ( int i = 0, size = this->chunkBuffer.size(); i < size; i++ ) {
 		if ( this->chunkBuffer[ i ] ) {
 			event.reqSealChunks( this->chunkBuffer[ i ] );

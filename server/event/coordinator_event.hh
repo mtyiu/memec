@@ -1,5 +1,5 @@
-#ifndef __SLAVE_EVENT_COORDINATOR_EVENT_HH__
-#define __SLAVE_EVENT_COORDINATOR_EVENT_HH__
+#ifndef __SERVER_EVENT_COORDINATOR_EVENT_HH__
+#define __SERVER_EVENT_COORDINATOR_EVENT_HH__
 
 #include "../socket/coordinator_socket.hh"
 #include "../../common/event/event.hh"

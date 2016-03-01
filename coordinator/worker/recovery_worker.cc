@@ -2,7 +2,7 @@
 #include "../ds/log.hh"
 #include "../main/coordinator.hh"
 
-bool CoordinatorWorker::handlePromoteBackupSlaveResponse( SlaveEvent event, char *buf, size_t size ) {
+bool CoordinatorWorker::handlePromoteBackupSlaveResponse( ServerEvent event, char *buf, size_t size ) {
 	struct PromoteBackupSlaveHeader header;
 	if ( ! this->protocol.parsePromoteBackupSlaveHeader( header, false /* isRequest */, buf, size ) ) {
 		__ERROR__( "CoordinatorWorker", "handlePromoteBackupSlaveResponse", "Invalid PROMOTE_BACKUP_SLAVE response (size = %lu).", size );
@@ -129,16 +129,16 @@ bool CoordinatorWorker::handleReconstructionRequest( ServerSocket *socket ) {
 		pthread_cond_t cond;
 		std::unordered_set<ServerSocket *> sockets;
 	} annoucement;
-	SlaveEvent slaveEvent;
+	ServerEvent serverEvent;
 
 	pthread_mutex_init( &annoucement.lock, 0 );
 	pthread_cond_init( &annoucement.cond, 0 );
-	slaveEvent.announceSlaveReconstructed(
+	serverEvent.announceSlaveReconstructed(
 		Coordinator::instanceId, CoordinatorWorker::idGenerator->nextVal( this->workerId ),
 		&annoucement.lock, &annoucement.cond, &annoucement.sockets,
 		socket, backupServerSocket
 	);
-	this->dispatch( slaveEvent );
+	this->dispatch( serverEvent );
 
 	pthread_mutex_lock( &annoucement.lock );
 	while( annoucement.sockets.size() )
@@ -149,9 +149,9 @@ bool CoordinatorWorker::handleReconstructionRequest( ServerSocket *socket ) {
 	/////////////////////////////
 	// Announce to the masters //
 	/////////////////////////////
-	MasterEvent masterEvent;
-	masterEvent.announceSlaveReconstructed( socket, backupServerSocket );
-	CoordinatorWorker::eventQueue->insert( masterEvent );
+	ClientEvent clientEvent;
+	clientEvent.announceSlaveReconstructed( socket, backupServerSocket );
+	CoordinatorWorker::eventQueue->insert( clientEvent );
 
 	////////////////////////////////////////////////////////////////////////////
 
@@ -430,7 +430,7 @@ bool CoordinatorWorker::handleReconstructionRequest( ServerSocket *socket ) {
 	return true;
 }
 
-bool CoordinatorWorker::handleReconstructionResponse( SlaveEvent event, char *buf, size_t size ) {
+bool CoordinatorWorker::handleReconstructionResponse( ServerEvent event, char *buf, size_t size ) {
 	struct ReconstructionHeader header;
 	if ( ! this->protocol.parseReconstructionHeader( header, false /* isRequest */, buf, size ) ) {
 		__ERROR__( "CoordinatorWorker", "handleReconstructionResponse", "Invalid RECONSTRUCTION response (size = %lu).", size );
@@ -453,7 +453,7 @@ bool CoordinatorWorker::handleReconstructionResponse( SlaveEvent event, char *bu
 	return true;
 }
 
-bool CoordinatorWorker::handleReconstructionUnsealedResponse( SlaveEvent event, char *buf, size_t size ) {
+bool CoordinatorWorker::handleReconstructionUnsealedResponse( ServerEvent event, char *buf, size_t size ) {
 	struct ReconstructionHeader header;
 	if ( ! this->protocol.parseReconstructionHeader( header, false /* isRequest */, buf, size ) ) {
 		__ERROR__( "CoordinatorWorker", "handleReconstructionUnsealedResponse", "Invalid RECONSTRUCTION_UNSEALED response (size = %lu).", size );

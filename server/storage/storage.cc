@@ -5,7 +5,7 @@ StorageType Storage::type;
 
 Storage::~Storage() {}
 
-Storage *Storage::instantiate( SlaveConfig &config ) {
+Storage *Storage::instantiate( ServerConfig &config ) {
 	Storage *ret;
 	Storage::type = config.storage.type;
 	switch( config.storage.type ) {

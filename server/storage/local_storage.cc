@@ -18,7 +18,7 @@ void LocalStorage::generatePath( uint32_t listId, uint32_t stripeId, uint32_t ch
 	);
 }
 
-void LocalStorage::init( SlaveConfig &config ) {
+void LocalStorage::init( ServerConfig &config ) {
 	strcpy( this->path, config.storage.path );
 	this->pathLength = strlen( this->path );
 }

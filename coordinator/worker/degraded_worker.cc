@@ -1,7 +1,7 @@
 #include "worker.hh"
 #include "../main/coordinator.hh"
 
-bool CoordinatorWorker::handleDegradedLockRequest( MasterEvent event, char *buf, size_t size ) {
+bool CoordinatorWorker::handleDegradedLockRequest( ClientEvent event, char *buf, size_t size ) {
 	struct DegradedLockReqHeader header;
 	if ( ! this->protocol.parseDegradedLockReqHeader( header, buf, size ) ) {
 		__ERROR__( "CoordinatorWorker", "handleDegradedLockRequest", "Invalid DEGRADED_LOCK request (size = %lu).", size );
@@ -302,7 +302,7 @@ bool CoordinatorWorker::handleReleaseDegradedLockRequest( ServerSocket *socket, 
 	return true;
 }
 
-bool CoordinatorWorker::handleReleaseDegradedLockResponse( SlaveEvent event, char *buf, size_t size ) {
+bool CoordinatorWorker::handleReleaseDegradedLockResponse( ServerEvent event, char *buf, size_t size ) {
 	struct DegradedReleaseResHeader header;
 	if ( ! this->protocol.parseDegradedReleaseResHeader( header, buf, size ) ) {
 		__ERROR__( "CoordinatorWorker", "handleReleaseDegradedLockResponse", "Invalid RELEASE_DEGRADED_LOCK request (size = %lu).", size );

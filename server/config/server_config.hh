@@ -1,5 +1,5 @@
-#ifndef __SLAVE_CONFIG_SLAVE_CONFIG_HH__
-#define __SLAVE_CONFIG_SLAVE_CONFIG_HH__
+#ifndef __SERVER_CONFIG_SERVER_CONFIG_HH__
+#define __SERVER_CONFIG_SERVER_CONFIG_HH__
 
 #include <vector>
 #include <stdint.h>
@@ -10,7 +10,7 @@
 #include "../../common/util/option.hh"
 #include "../../common/worker/worker_type.hh"
 
-class SlaveConfig : public Config {
+class ServerConfig : public Config {
 public:
 	struct {
 		ServerAddr addr;
@@ -63,7 +63,7 @@ public:
 		char path[ STORAGE_PATH_MAX ];
 	} storage;
 
-	SlaveConfig();
+	ServerConfig();
 	bool merge( GlobalConfig &globalConfig );
 	bool parse( const char *path );
 	bool override( OptionList &options );

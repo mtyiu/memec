@@ -12,7 +12,7 @@ Pending *SlaveWorker::pending;
 PendingAck *SlaveWorker::pendingAck;
 ServerAddr *SlaveWorker::slaveServerAddr;
 Coding *SlaveWorker::coding;
-SlaveEventQueue *SlaveWorker::eventQueue;
+ServerEventQueue *SlaveWorker::eventQueue;
 StripeList<ServerPeerSocket> *SlaveWorker::stripeList;
 std::vector<StripeListIndex> *SlaveWorker::stripeListIndex;
 Map *SlaveWorker::map;
@@ -72,7 +72,7 @@ void SlaveWorker::dispatch( IOEvent event ) {
 	}
 }
 
-void SlaveWorker::dispatch( SlaveEvent event ) {
+void SlaveWorker::dispatch( ServerEvent event ) {
 }
 
 ServerPeerSocket *SlaveWorker::getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId ) {
@@ -136,7 +136,7 @@ void SlaveWorker::free() {
 void *SlaveWorker::run( void *argv ) {
 	SlaveWorker *worker = ( SlaveWorker * ) argv;
 	WorkerRole role = worker->getRole();
-	SlaveEventQueue *eventQueue = SlaveWorker::eventQueue;
+	ServerEventQueue *eventQueue = SlaveWorker::eventQueue;
 
 #define SERVER_WORKER_EVENT_LOOP(_EVENT_TYPE_, _EVENT_QUEUE_) \
 	do { \
@@ -183,19 +183,19 @@ void *SlaveWorker::run( void *argv ) {
 			break;
 		case WORKER_ROLE_CLIENT:
 			SERVER_WORKER_EVENT_LOOP(
-				MasterEvent,
+				ClientEvent,
 				eventQueue->separated.master
 			);
 			break;
 		case WORKER_ROLE_SERVER:
 			SERVER_WORKER_EVENT_LOOP(
-				SlaveEvent,
+				ServerEvent,
 				eventQueue->separated.slave
 			);
 			break;
 		case WORKER_ROLE_SERVER_PEER:
 			SERVER_WORKER_EVENT_LOOP(
-				SlavePeerEvent,
+				ServerPeerEvent,
 				eventQueue->separated.slavePeer
 			);
 			break;
@@ -236,7 +236,7 @@ bool SlaveWorker::init() {
 	return true;
 }
 
-bool SlaveWorker::init( GlobalConfig &globalConfig, SlaveConfig &slaveConfig, WorkerRole role, uint32_t workerId ) {
+bool SlaveWorker::init( GlobalConfig &globalConfig, ServerConfig &serverConfig, WorkerRole role, uint32_t workerId ) {
 	this->protocol.init(
 		Protocol::getSuggestedBufferSize(
 			globalConfig.size.key,
@@ -279,7 +279,7 @@ bool SlaveWorker::init( GlobalConfig &globalConfig, SlaveConfig &slaveConfig, Wo
 	switch( this->role ) {
 		case WORKER_ROLE_MIXED:
 		case WORKER_ROLE_IO:
-			this->storage = Storage::instantiate( slaveConfig );
+			this->storage = Storage::instantiate( serverConfig );
 			this->storage->start();
 			break;
 		default:

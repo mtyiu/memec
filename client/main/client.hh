@@ -52,7 +52,7 @@ private:
 public:
 	struct {
 		GlobalConfig global;
-		MasterConfig master;
+		ClientConfig master;
 	} config;
 	struct {
 		ClientSocket self;
@@ -65,7 +65,7 @@ public:
 	} sockets;
 	IDGenerator idGenerator;
 	Pending pending;
-	MasterEventQueue eventQueue;
+	ClientEventQueue eventQueue;
 	PacketPool packetPool;
 	StripeList<ServerSocket> *stripeList;
 	/* Remapping */

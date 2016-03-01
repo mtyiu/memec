@@ -23,7 +23,7 @@ bool ServerSocket::start() {
 
 void ServerSocket::registerMaster() {
 	Master *master = Master::getInstance();
-	SlaveEvent event;
+	ServerEvent event;
 	event.reqRegister( this, master->config.master.master.addr.addr, master->config.master.master.addr.port );
 	master->eventQueue.insert( event );
 }

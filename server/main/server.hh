@@ -54,7 +54,7 @@ private:
 public:
 	struct {
 		GlobalConfig global;
-		SlaveConfig slave;
+		ServerConfig slave;
 	} config;
 	struct {
 		ServerSocket self;
@@ -71,7 +71,7 @@ public:
 	Pending pending;
 	PendingAck pendingAck;
 	Map map;
-	SlaveEventQueue eventQueue;
+	ServerEventQueue eventQueue;
 	PacketPool packetPool;
 	Coding *coding;
 	StripeList<ServerPeerSocket> *stripeList;

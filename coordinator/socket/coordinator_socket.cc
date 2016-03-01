@@ -137,7 +137,7 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 
 						socket->done( fd ); // The socket is valid
 
-						MasterEvent event;
+						ClientEvent event;
 						instanceId = generator->generate( clientSocket );
 						event.resRegister( clientSocket, instanceId, header.requestId );
 						coordinator->eventQueue.insert( event );
@@ -158,7 +158,7 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 						}
 
 						if ( s ) {
-							SlaveEvent event;
+							ServerEvent event;
 							instanceId = generator->generate( s );
 							event.resRegister( s, instanceId, header.requestId );
 							coordinator->eventQueue.insert( event );
@@ -176,7 +176,7 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 							socket->sockets.removeAt( index );
 							socket->done( fd );
 
-							SlaveEvent event;
+							ServerEvent event;
 							instanceId = generator->generate( s );
 							event.resRegister( s, instanceId, header.requestId );
 							coordinator->eventQueue.insert( event );
@@ -205,11 +205,11 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 			ServerSocket *serverSocket = clientSocket ? 0 : coordinator->sockets.slaves.get( fd );
 			serverSocket = serverSocket ? serverSocket : coordinator->sockets.backupSlaves.get( fd );
 			if ( clientSocket ) {
-				MasterEvent event;
+				ClientEvent event;
 				event.pending( clientSocket );
 				coordinator->eventQueue.insert( event );
 			} else if ( serverSocket ) {
-				SlaveEvent event;
+				ServerEvent event;
 				event.pending( serverSocket );
 				coordinator->eventQueue.insert( event );
 			} else {
