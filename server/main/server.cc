@@ -223,9 +223,9 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 		WORKER_INIT_LOOP( coding, WORKER_ROLE_CODING )
 		WORKER_INIT_LOOP( coordinator, WORKER_ROLE_COORDINATOR )
 		WORKER_INIT_LOOP( io, WORKER_ROLE_IO )
-		WORKER_INIT_LOOP( master, WORKER_ROLE_MASTER )
-		WORKER_INIT_LOOP( slave, WORKER_ROLE_SLAVE )
-		WORKER_INIT_LOOP( slavePeer, WORKER_ROLE_SLAVE_PEER )
+		WORKER_INIT_LOOP( master, WORKER_ROLE_CLIENT )
+		WORKER_INIT_LOOP( slave, WORKER_ROLE_SERVER )
+		WORKER_INIT_LOOP( slavePeer, WORKER_ROLE_SERVER_PEER )
 #undef WORKER_INIT_LOOP
 	}
 	/* Remapping message handler; Remapping scheme */

@@ -10,7 +10,7 @@
 
 class MasterProtocol : public Protocol {
 public:
-	MasterProtocol() : Protocol( ROLE_MASTER ) {}
+	MasterProtocol() : Protocol( ROLE_CLIENT ) {}
 
 	// ---------- register_protocol.cc ----------
 	char *reqRegisterCoordinator( size_t &size, uint32_t requestId, uint32_t addr, uint16_t port );

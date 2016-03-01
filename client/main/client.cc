@@ -274,8 +274,8 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 		MasterWorker::init();
 		WORKER_INIT_LOOP( application, WORKER_ROLE_APPLICATION )
 		WORKER_INIT_LOOP( coordinator, WORKER_ROLE_COORDINATOR )
-		WORKER_INIT_LOOP( master, WORKER_ROLE_MASTER )
-		WORKER_INIT_LOOP( slave, WORKER_ROLE_SLAVE )
+		WORKER_INIT_LOOP( master, WORKER_ROLE_CLIENT )
+		WORKER_INIT_LOOP( slave, WORKER_ROLE_SERVER )
 #undef WORKER_INIT_LOOP
 	}
 
@@ -283,7 +283,7 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 	if ( this->config.global.remap.enabled ) {
 		char masterName[ 11 ];
 		memset( masterName, 0, 11 );
-		sprintf( masterName, "%s%04d", MASTER_PREFIX, this->config.master.master.addr.id );
+		sprintf( masterName, "%s%04d", CLIENT_PREFIX, this->config.master.master.addr.id );
 		remapMsgHandler.init( this->config.global.remap.spreaddAddr.addr, this->config.global.remap.spreaddAddr.port, masterName );
 		BasicRemappingScheme::slaveLoading = &this->slaveLoading;
 		BasicRemappingScheme::overloadedSlave = &this->overloadedSlave;

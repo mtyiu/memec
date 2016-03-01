@@ -28,7 +28,7 @@ int main( int argc, char **argv ) {
 	SimpleRemapMsgHandler ch;
 	sprintf( userbuf, "%s%d", COORD_PREFIX, 1 );
 	ch.init( argv[ 1 ], userbuf );
-	ch.join( SLAVE_GROUP );
+	ch.join( SERVER_GROUP );
 	if ( ch.start() == false ) {
 		fprintf( stderr, ">> Failed to start! <<\n" );
 		return -1;
@@ -42,8 +42,8 @@ int main( int argc, char **argv ) {
 	}
 
 	char targetGroups[ 2 ][ MAX_GROUP_NAME ];
-	strcpy( targetGroups[ 0 ], MASTER_GROUP );
-	strcpy( targetGroups[ 1 ], SLAVE_GROUP );
+	strcpy( targetGroups[ 0 ], CLIENT_GROUP );
+	strcpy( targetGroups[ 1 ], SERVER_GROUP );
 
 	// wait for all clients to join
 	printf( "Wait for clients...\n" );

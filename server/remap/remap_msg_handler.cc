@@ -9,7 +9,7 @@
 
 SlaveRemapMsgHandler::SlaveRemapMsgHandler() :
 		RemapMsgHandler() {
-	this->group = ( char* )SLAVE_GROUP;
+	this->group = ( char* )SERVER_GROUP;
 	LOCK_INIT( &this->aliveSlavesLock );
 }
 

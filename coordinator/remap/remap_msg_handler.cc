@@ -49,7 +49,7 @@ bool CoordinatorRemapMsgHandler::init( const int ip, const int port, const char 
 	pthread_mutex_init( &this->ackSignalLock, 0 );
 
 	this->isListening = false;
-	return ( SP_join( this->mbox, MASTER_GROUP ) == 0 );
+	return ( SP_join( this->mbox, CLIENT_GROUP ) == 0 );
 }
 
 void CoordinatorRemapMsgHandler::quit() {
@@ -309,12 +309,12 @@ bool CoordinatorRemapMsgHandler::insertRepeatedEvents( RemapStateEvent event, st
 
 bool CoordinatorRemapMsgHandler::isMasterJoin( int service, char *msg, char *subject ) {
 	// assume masters name themselves "[PREFIX][0-9]*"
-	return ( this->isMemberJoin( service ) && strncmp( subject + 1, MASTER_PREFIX , MASTER_PREFIX_LEN ) == 0 ); 
+	return ( this->isMemberJoin( service ) && strncmp( subject + 1, CLIENT_PREFIX , CLIENT_PREFIX_LEN ) == 0 ); 
 }
 
 bool CoordinatorRemapMsgHandler::isMasterLeft( int service, char *msg, char *subject ) {
 	// assume masters name themselves "[PREFIX][0-9]*"
-	return ( this->isMemberLeave( service ) && strncmp( subject + 1, MASTER_PREFIX , MASTER_PREFIX_LEN ) == 0 ); 
+	return ( this->isMemberLeave( service ) && strncmp( subject + 1, CLIENT_PREFIX , CLIENT_PREFIX_LEN ) == 0 ); 
 }
 
 bool CoordinatorRemapMsgHandler::isSlaveJoin( int service, char *msg, char *subject ) {
@@ -340,7 +340,7 @@ int CoordinatorRemapMsgHandler::sendStateToMasters( std::vector<struct sockaddr_
 		return false;
 	}
 
-	strcpy( group[ 0 ], MASTER_GROUP );
+	strcpy( group[ 0 ], CLIENT_GROUP );
 	return sendState( slaves, 1, group );
 }
 
@@ -360,8 +360,8 @@ int CoordinatorRemapMsgHandler::broadcastState( std::vector<struct sockaddr_in> 
 		return false;
 	}
 	// send to masters and slaves
-	strcpy( groups[ 0 ], MASTER_GROUP );
-	strcpy( groups[ 1 ], SLAVE_GROUP );
+	strcpy( groups[ 0 ], CLIENT_GROUP );
+	strcpy( groups[ 1 ], SERVER_GROUP );
 	return sendState( slaves, 2, groups );
 }
 
@@ -389,7 +389,7 @@ void *CoordinatorRemapMsgHandler::readMessages( void *argv ) {
 
 		subject = &msg[ SP_get_vs_set_offset_memb_mess() ];
 		regular = myself->isRegularMessage( service );
-		fromMaster = ( strncmp( sender, MASTER_GROUP, MASTER_GROUP_LEN ) == 0 );
+		fromMaster = ( strncmp( sender, CLIENT_GROUP, CLIENT_GROUP_LEN ) == 0 );
 
 		if ( ret < 0 ) {
 			__ERROR__( "CoordinatorRemapMsgHandler", "readMessage", "Failed to receive messages %d\n", ret );
@@ -431,7 +431,7 @@ void *CoordinatorRemapMsgHandler::readMessages( void *argv ) {
 bool CoordinatorRemapMsgHandler::updateState( char *subject, char *msg, int len ) {
 
 	// ignore messages that not from masters
-	if ( strncmp( subject + 1, MASTER_PREFIX, MASTER_PREFIX_LEN ) != 0 ) {
+	if ( strncmp( subject + 1, CLIENT_PREFIX, CLIENT_PREFIX_LEN ) != 0 ) {
 		return false;
 	}
 

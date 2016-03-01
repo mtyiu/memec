@@ -335,8 +335,8 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 		}
 
 		WORKER_INIT_LOOP( coordinator, WORKER_ROLE_COORDINATOR )
-		WORKER_INIT_LOOP( master, WORKER_ROLE_MASTER )
-		WORKER_INIT_LOOP( slave, WORKER_ROLE_SLAVE )
+		WORKER_INIT_LOOP( master, WORKER_ROLE_CLIENT )
+		WORKER_INIT_LOOP( slave, WORKER_ROLE_SERVER )
 #undef WORKER_INIT_LOOP
 	}
 

@@ -8,12 +8,12 @@ enum RemapState {
 	REMAP_INTERMEDIATE,				// intermediate (phase 1a)
 	REMAP_COORDINATED,				// coordinated (phase 1b)
 	REMAP_DEGRADED,					// degraded (phase 2)
-	// master states (wait for all)
+	// client states (wait for all)
 	REMAP_WAIT_DEGRADED,			// wait for return to degraded
 	REMAP_WAIT_NORMAL				// wait for return to normal
 };
 
-enum RequestRemapState{
+enum RequestRemapState {
 	NO_REMAP,
 	DATA_REMAP,
 	PARITY_REMAP,

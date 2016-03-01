@@ -9,7 +9,7 @@
 
 MasterRemapMsgHandler::MasterRemapMsgHandler() :
 		RemapMsgHandler() {
-	this->group = ( char* )MASTER_GROUP;
+	this->group = ( char* )CLIENT_GROUP;
 	LOCK_INIT( &this->aliveSlavesLock );
 }
 

@@ -2,7 +2,7 @@
 #include "simple_remap_msg_handler.hh"
 
 SimpleRemapMsgHandler::SimpleRemapMsgHandler() :
-	 SimpleRemapMsgHandler( ( char * )MASTER_GROUP ) {
+	 SimpleRemapMsgHandler( ( char * )CLIENT_GROUP ) {
 }
 
 SimpleRemapMsgHandler::SimpleRemapMsgHandler( char *group ) :
@@ -34,7 +34,7 @@ bool SimpleRemapMsgHandler::join( const char *group ) {
 }
 
 bool SimpleRemapMsgHandler::isMasterJoin( int service, char *msg, char *subject ) {
-	return ( this->isMemberJoin( service ) && strncmp( subject + 1, MASTER_PREFIX, MASTER_PREFIX_LEN ) == 0 );
+	return ( this->isMemberJoin( service ) && strncmp( subject + 1, CLIENT_PREFIX, CLIENT_PREFIX_LEN ) == 0 );
 }
 
 bool SimpleRemapMsgHandler::isSlaveJoin( int service, char *msg, char *subject ) {
@@ -70,8 +70,8 @@ void *SimpleRemapMsgHandler::readMessages( void* argv ) {
 		}
 		subject = &msg[ SP_get_vs_set_offset_memb_mess() ];
         regular = myself->isRegularMessage( service );
-        fromMaster = ( strncmp( sender, MASTER_GROUP, MASTER_GROUP_LEN ) == 0 );
-        fromSlave = ( strncmp( sender, SLAVE_GROUP, SLAVE_GROUP_LEN ) == 0 );
+        fromMaster = ( strncmp( sender, CLIENT_GROUP, CLIENT_GROUP_LEN ) == 0 );
+        fromSlave = ( strncmp( sender, SERVER_GROUP, SERVER_GROUP_LEN ) == 0 );
 
 		if ( regular )
 			continue;

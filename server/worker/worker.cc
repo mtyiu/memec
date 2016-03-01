@@ -181,19 +181,19 @@ void *SlaveWorker::run( void *argv ) {
 				eventQueue->separated.io
 			);
 			break;
-		case WORKER_ROLE_MASTER:
+		case WORKER_ROLE_CLIENT:
 			SERVER_WORKER_EVENT_LOOP(
 				MasterEvent,
 				eventQueue->separated.master
 			);
 			break;
-		case WORKER_ROLE_SLAVE:
+		case WORKER_ROLE_SERVER:
 			SERVER_WORKER_EVENT_LOOP(
 				SlaveEvent,
 				eventQueue->separated.slave
 			);
 			break;
-		case WORKER_ROLE_SLAVE_PEER:
+		case WORKER_ROLE_SERVER_PEER:
 			SERVER_WORKER_EVENT_LOOP(
 				SlavePeerEvent,
 				eventQueue->separated.slavePeer
@@ -317,13 +317,13 @@ void SlaveWorker::print( FILE *f ) {
 		case WORKER_ROLE_IO:
 			strcpy( role, "I/O" );
 			break;
-		case WORKER_ROLE_MASTER:
+		case WORKER_ROLE_CLIENT:
 			strcpy( role, "Master" );
 			break;
-		case WORKER_ROLE_SLAVE:
+		case WORKER_ROLE_SERVER:
 			strcpy( role, "Slave" );
 			break;
-		case WORKER_ROLE_SLAVE_PEER:
+		case WORKER_ROLE_SERVER_PEER:
 			strcpy( role, "Slave peer" );
 			break;
 		default:

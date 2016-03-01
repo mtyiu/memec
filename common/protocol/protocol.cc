@@ -78,7 +78,7 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_OPCODE_REGISTER:
 		case PROTO_OPCODE_SYNC:
 		case PROTO_OPCODE_SLAVE_CONNECTED:
-		case PROTO_OPCODE_MASTER_PUSH_STATS:
+		case PROTO_OPCODE_CLIENT_PUSH_STATS:
 		case PROTO_OPCODE_COORDINATOR_PUSH_STATS:
 		case PROTO_OPCODE_SEAL_CHUNKS:
 		case PROTO_OPCODE_FLUSH_CHUNKS:
@@ -167,11 +167,11 @@ Protocol::Protocol( Role role ) {
 			this->from = PROTO_MAGIC_FROM_COORDINATOR;
 			this->to = PROTO_MAGIC_TO_COORDINATOR;
 			break;
-		case ROLE_MASTER:
+		case ROLE_CLIENT:
 			this->from = PROTO_MAGIC_FROM_CLIENT;
 			this->to = PROTO_MAGIC_TO_CLIENT;
 			break;
-		case ROLE_SLAVE:
+		case ROLE_SERVER:
 			this->from = PROTO_MAGIC_FROM_SERVER;
 			this->to = PROTO_MAGIC_TO_SERVER;
 			break;

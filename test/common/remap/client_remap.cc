@@ -24,7 +24,7 @@ int main ( int argc, char **argv ) {
 	// init. the hanlder with an address and a user name
 	struct in_addr addr;
 	inet_pton( AF_INET, "127.0.0.1", &addr );
-	sprintf( namebuf, "%s%s", MASTER_PREFIX, argv[1] );
+	sprintf( namebuf, "%s%s", CLIENT_PREFIX, argv[1] );
 
 	mh->init( addr.s_addr, htons( 4803 ), namebuf );
 	// start listening to incomming messages from coordinator (via spread daemon)

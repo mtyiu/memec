@@ -476,13 +476,13 @@ void *MasterWorker::run( void *argv ) {
 				eventQueue->separated.coordinator
 			);
 			break;
-		case WORKER_ROLE_MASTER:
+		case WORKER_ROLE_CLIENT:
 			CLIENT_WORKER_EVENT_LOOP(
 				MasterEvent,
 				eventQueue->separated.master
 			);
 			break;
-		case WORKER_ROLE_SLAVE:
+		case WORKER_ROLE_SERVER:
 			CLIENT_WORKER_EVENT_LOOP(
 				SlaveEvent,
 				eventQueue->separated.slave
@@ -556,10 +556,10 @@ void MasterWorker::print( FILE *f ) {
 		case WORKER_ROLE_COORDINATOR:
 			strcpy( role, "Coordinator" );
 			break;
-		case WORKER_ROLE_MASTER:
+		case WORKER_ROLE_CLIENT:
 			strcpy( role, "Master" );
 			break;
-		case WORKER_ROLE_SLAVE:
+		case WORKER_ROLE_SERVER:
 			strcpy( role, "Slave" );
 			break;
 		default:
