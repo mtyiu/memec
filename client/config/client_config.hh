@@ -13,54 +13,15 @@ class ClientConfig : public Config {
 public:
 	struct {
 		ServerAddr addr;
-	} master;
+	} client;
 	struct {
-		uint32_t maxEvents;
-		int32_t timeout;
-	} epoll;
-	struct {
-		WorkerType type;
-		struct {
-			uint8_t mixed;
-			struct {
-				uint16_t total;
-				uint8_t application;
-				uint8_t coordinator;
-				uint8_t master;
-				uint8_t slave;
-			} separated;
-		} number;
-	} workers;
-	struct {
-		bool block;
-		struct {
-			uint32_t mixed;
-			uint32_t pMixed;
-			struct {
-				uint32_t application;
-				uint32_t coordinator;
-				uint32_t master;
-				uint32_t slave;
-			} separated;
-		} size;
-	} eventQueue;
-	struct {
-		uint32_t packets;
-	} pool;
-	struct {
-		uint32_t updateInterval;
-	} loadingStats;
-	struct {
-		bool disableRemappingSet;
-		bool forceNoCacheRecords;
-		uint32_t backgroundAck;
-	} remap;
-	struct {
-		bool isFixed;
 		bool disabled;
 	} degraded;
 	struct {
-		uint32_t ackBatchSize; /* no. of request */
+		uint32_t ackTimeout;
+	} states;
+	struct {
+		uint32_t ackBatchSize;
 	} backup;
 
 	ClientConfig();

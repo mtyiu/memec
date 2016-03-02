@@ -52,7 +52,7 @@ private:
 public:
 	struct {
 		GlobalConfig global;
-		ClientConfig master;
+		ClientConfig client;
 	} config;
 	struct {
 		ClientSocket self;

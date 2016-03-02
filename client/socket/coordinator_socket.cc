@@ -14,7 +14,7 @@ bool CoordinatorSocket::start() {
 	if ( this->connect() ) {
 		Master *master = Master::getInstance();
 		CoordinatorEvent event;
-		event.reqRegister( this, master->config.master.master.addr.addr, master->config.master.master.addr.port );
+		event.reqRegister( this, master->config.client.client.addr.addr, master->config.client.client.addr.port );
 		master->eventQueue.insert( event );
 		return true;
 	}

@@ -20,7 +20,6 @@
 class MasterWorker : public Worker {
 private:
 	uint32_t workerId;
-	WorkerRole role;
 	MasterProtocol protocol;
 	// Temporary variables
 	uint32_t *original, *remapped;
@@ -29,8 +28,7 @@ private:
 	static uint32_t dataChunkCount;
 	static uint32_t parityChunkCount;
 	static uint32_t updateInterval;
-	static bool disableRemappingSet;
-	static bool degradedTargetIsFixed;
+	static bool disableDegraded;
 	static IDGenerator *idGenerator;
 	static Pending *pending;
 	static ClientEventQueue *eventQueue;
@@ -107,11 +105,10 @@ private:
 public:
 	// ---------- worker.cc ----------
 	static bool init();
-	bool init( GlobalConfig &config, WorkerRole role, uint32_t workerId );
+	bool init( GlobalConfig &config, uint32_t workerId );
 	bool start();
 	void stop();
 	void print( FILE *f = stdout );
-	inline WorkerRole getRole() { return this->role; }
 
 	static void removePending( ServerSocket *slave, bool needsAck = true );
 	static void replayRequestPrepare( ServerSocket *slave );

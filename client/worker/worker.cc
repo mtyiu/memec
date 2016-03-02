@@ -8,8 +8,7 @@
 uint32_t MasterWorker::dataChunkCount;
 uint32_t MasterWorker::parityChunkCount;
 uint32_t MasterWorker::updateInterval;
-bool MasterWorker::disableRemappingSet;
-bool MasterWorker::degradedTargetIsFixed;
+bool MasterWorker::disableDegraded;
 IDGenerator *MasterWorker::idGenerator;
 Pending *MasterWorker::pending;
 ClientEventQueue *MasterWorker::eventQueue;
@@ -436,60 +435,13 @@ void MasterWorker::free() {
 
 void *MasterWorker::run( void *argv ) {
 	MasterWorker *worker = ( MasterWorker * ) argv;
-	WorkerRole role = worker->getRole();
 	ClientEventQueue *eventQueue = MasterWorker::eventQueue;
 
-#define CLIENT_WORKER_EVENT_LOOP(_EVENT_TYPE_, _EVENT_QUEUE_) \
-	do { \
-		_EVENT_TYPE_ event; \
-		bool ret; \
-		while( worker->getIsRunning() | ( ret = _EVENT_QUEUE_->extract( event ) ) ) { \
-			if ( ret ) \
-				worker->dispatch( event ); \
-		} \
-	} while( 0 )
-
-	switch ( role ) {
-		case WORKER_ROLE_MIXED:
-			// CLIENT_WORKER_EVENT_LOOP(
-			// 	MixedEvent,
-			// 	eventQueue->mixed
-			// );
-		{
-			MixedEvent event;
-			bool ret;
-			while( worker->getIsRunning() | ( ret = eventQueue->extractMixed( event ) ) ) {
-				if ( ret )
-					worker->dispatch( event );
-			}
-		}
-			break;
-		case WORKER_ROLE_APPLICATION:
-			CLIENT_WORKER_EVENT_LOOP(
-				ApplicationEvent,
-				eventQueue->separated.application
-			);
-			break;
-		case WORKER_ROLE_COORDINATOR:
-			CLIENT_WORKER_EVENT_LOOP(
-				CoordinatorEvent,
-				eventQueue->separated.coordinator
-			);
-			break;
-		case WORKER_ROLE_CLIENT:
-			CLIENT_WORKER_EVENT_LOOP(
-				ClientEvent,
-				eventQueue->separated.master
-			);
-			break;
-		case WORKER_ROLE_SERVER:
-			CLIENT_WORKER_EVENT_LOOP(
-				ServerEvent,
-				eventQueue->separated.slave
-			);
-			break;
-		default:
-			break;
+	MixedEvent event;
+	bool ret;
+	while( worker->getIsRunning() | ( ret = eventQueue->extractMixed( event ) ) ) {
+		if ( ret )
+			worker->dispatch( event );
 	}
 
 	worker->free();
@@ -503,9 +455,8 @@ bool MasterWorker::init() {
 	MasterWorker::idGenerator = &master->idGenerator;
 	MasterWorker::dataChunkCount = master->config.global.coding.params.getDataChunkCount();
 	MasterWorker::parityChunkCount = master->config.global.coding.params.getParityChunkCount();
-	MasterWorker::updateInterval = master->config.master.loadingStats.updateInterval;
-	MasterWorker::disableRemappingSet = master->config.master.remap.disableRemappingSet;
-	MasterWorker::degradedTargetIsFixed = master->config.master.degraded.isFixed;
+	MasterWorker::updateInterval = master->config.global.timeout.load;
+	MasterWorker::disableDegraded = master->config.client.degraded.disabled;
 	MasterWorker::pending = &master->pending;
 	MasterWorker::eventQueue = &master->eventQueue;
 	MasterWorker::stripeList = master->stripeList;
@@ -515,7 +466,7 @@ bool MasterWorker::init() {
 	return true;
 }
 
-bool MasterWorker::init( GlobalConfig &config, WorkerRole role, uint32_t workerId ) {
+bool MasterWorker::init( GlobalConfig &config, uint32_t workerId ) {
 	this->protocol.init(
 		Protocol::getSuggestedBufferSize(
 			config.size.key,
@@ -526,9 +477,8 @@ bool MasterWorker::init( GlobalConfig &config, WorkerRole role, uint32_t workerI
 	this->remapped = new uint32_t[ ( MasterWorker::dataChunkCount + MasterWorker::parityChunkCount ) * 2 ];
 	this->dataServerSockets = new ServerSocket*[ MasterWorker::dataChunkCount ];
 	this->parityServerSockets = new ServerSocket*[ MasterWorker::parityChunkCount ];
-	this->role = role;
 	this->workerId = workerId;
-	return role != WORKER_ROLE_UNDEFINED;
+	return true;
 }
 
 bool MasterWorker::start() {
@@ -545,25 +495,5 @@ void MasterWorker::stop() {
 }
 
 void MasterWorker::print( FILE *f ) {
-	char role[ 16 ];
-	switch( this->role ) {
-		case WORKER_ROLE_MIXED:
-			strcpy( role, "Mixed" );
-			break;
-		case WORKER_ROLE_APPLICATION:
-			strcpy( role, "Application" );
-			break;
-		case WORKER_ROLE_COORDINATOR:
-			strcpy( role, "Coordinator" );
-			break;
-		case WORKER_ROLE_CLIENT:
-			strcpy( role, "Master" );
-			break;
-		case WORKER_ROLE_SERVER:
-			strcpy( role, "Slave" );
-			break;
-		default:
-			return;
-	}
-	fprintf( f, "%11s worker (Thread ID = %lu): %srunning\n", role, this->tid, this->isRunning ? "" : "not " );
+	fprintf( f, "Worker (Thread ID = %lu): %srunning\n", this->tid, this->isRunning ? "" : "not " );
 }

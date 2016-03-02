@@ -278,7 +278,7 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 
 	// decide whether any of the data / parity slave needs to use remapping flow
 	Master *master = Master::getInstance();
-	if ( ! MasterWorker::disableRemappingSet ) {
+	if ( ! MasterWorker::disableDegraded ) {
 		for ( uint32_t i = 0; i < 1 + MasterWorker::parityChunkCount; i++ ) {
 			struct sockaddr_in addr = ( i == 0 ) ? socket->getAddr() : this->parityServerSockets[ i - 1 ]->getAddr();
 			if ( master->remapMsgHandler.useCoordinatedFlow( addr ) ) {

@@ -46,7 +46,7 @@ bool MasterRemapMsgHandler::start() {
 		__ERROR__( "MasterRemapMsgHandler", "start", "Master FAILED to start reading remapping messages\n" );
 		return false;
 	}
-	this->bgAckInterval = Master::getInstance()->config.master.remap.backgroundAck;
+	this->bgAckInterval = Master::getInstance()->config.client.states.ackTimeout;
 	if ( this->bgAckInterval > 0 && pthread_create( &this->acker, NULL, MasterRemapMsgHandler::ackTransitThread, this ) < 0 ){
 		__ERROR__( "MasterRemapMsgHandler", "start", "Master FAILED to start background ack. service.\n" );
 	}

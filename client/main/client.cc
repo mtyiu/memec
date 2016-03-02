@@ -154,7 +154,7 @@ void Master::signalHandler( int signal ) {
 			UNLOCK( &master->slaveLoading.lock );
 
 			// set next update alarm
-			//alarm ( master->config.master.loadingStats.updateInterval );
+			//alarm ( master->config.global.timeout.load );
 			break;
 		default:
 			master->stop();
@@ -166,20 +166,20 @@ void Master::signalHandler( int signal ) {
 bool Master::init( char *path, OptionList &options, bool verbose ) {
 	// Parse configuration files //
 	if ( ( ! this->config.global.parse( path ) ) ||
-	     ( ! this->config.master.parse( path ) ) ||
-	     ( ! this->config.master.override( options ) ) ) {
+	     ( ! this->config.client.parse( path ) ) ||
+	     ( ! this->config.client.override( options ) ) ) {
 		return false;
 	}
 
 	// Initialize modules //
 	/* Socket */
 	if ( ! this->sockets.epoll.init(
-			this->config.master.epoll.maxEvents,
-			this->config.master.epoll.timeout
+			this->config.global.epoll.maxEvents,
+			this->config.global.epoll.timeout
 		) || ! this->sockets.self.init(
-			this->config.master.master.addr.type,
-			this->config.master.master.addr.addr,
-			this->config.master.master.addr.port,
+			this->config.client.client.addr.type,
+			this->config.client.client.addr.addr,
+			this->config.client.client.addr.port,
 			&this->sockets.epoll
 		) ) {
 		__ERROR__( "Master", "init", "Cannot initialize socket." );
@@ -217,72 +217,34 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 		this->sockets.slaves.values
 	);
 	/* Workers, ID generator, packet pool and event queues */
-	if ( this->config.master.workers.type == WORKER_TYPE_MIXED ) {
-		this->idGenerator.init( this->config.master.workers.number.mixed );
-		this->packetPool.init(
-			this->config.master.pool.packets,
-			Protocol::getSuggestedBufferSize(
-				this->config.global.size.key,
-				this->config.global.size.chunk
-			)
+	this->idGenerator.init( this->config.global.workers.count );
+	this->packetPool.init(
+		this->config.global.pool.packets,
+		Protocol::getSuggestedBufferSize(
+			this->config.global.size.key,
+			this->config.global.size.chunk
+		)
+	);
+	this->eventQueue.init(
+		this->config.global.eventQueue.block,
+		this->config.global.eventQueue.size,
+		this->config.global.eventQueue.prioritized
+	);
+	this->workers.reserve( this->config.global.workers.count );
+	MasterWorker::init();
+	for ( int i = 0, len = this->config.global.workers.count; i < len; i++ ) {
+		this->workers.push_back( MasterWorker() );
+		this->workers[ i ].init(
+			this->config.global,
+			i // worker ID
 		);
-		this->eventQueue.init(
-			this->config.master.eventQueue.block,
-			this->config.master.eventQueue.size.mixed,
-			this->config.master.eventQueue.size.pMixed
-		);
-		this->workers.reserve( this->config.master.workers.number.mixed );
-		MasterWorker::init();
-		for ( int i = 0, len = this->config.master.workers.number.mixed; i < len; i++ ) {
-			this->workers.push_back( MasterWorker() );
-			this->workers[ i ].init(
-				this->config.global,
-				WORKER_ROLE_MIXED,
-				i // worker ID
-			);
-		}
-	} else {
-		this->idGenerator.init( this->config.master.workers.number.separated.total );
-		this->packetPool.init(
-			this->config.master.pool.packets,
-			Protocol::getSuggestedBufferSize(
-				this->config.global.size.key,
-				this->config.global.size.chunk
-			)
-		);
-		this->workers.reserve( this->config.master.workers.number.separated.total );
-		this->eventQueue.init(
-			this->config.master.eventQueue.block,
-			this->config.master.eventQueue.size.separated.application,
-			this->config.master.eventQueue.size.separated.coordinator,
-			this->config.master.eventQueue.size.separated.master,
-			this->config.master.eventQueue.size.separated.slave
-		);
-
-		int index = 0;
-#define WORKER_INIT_LOOP( _FIELD_, _CONSTANT_ ) \
-		for ( int i = 0, len = this->config.master.workers.number.separated._FIELD_; i < len; i++, index++ ) { \
-			this->workers.push_back( MasterWorker() ); \
-			this->workers[ index ].init( \
-				this->config.global, \
-				_CONSTANT_, \
-				index \
-			); \
-		}
-
-		MasterWorker::init();
-		WORKER_INIT_LOOP( application, WORKER_ROLE_APPLICATION )
-		WORKER_INIT_LOOP( coordinator, WORKER_ROLE_COORDINATOR )
-		WORKER_INIT_LOOP( master, WORKER_ROLE_CLIENT )
-		WORKER_INIT_LOOP( slave, WORKER_ROLE_SERVER )
-#undef WORKER_INIT_LOOP
 	}
 
 	/* Remapping message handler; Remapping scheme */
 	if ( this->config.global.states.enabled ) {
 		char masterName[ 11 ];
 		memset( masterName, 0, 11 );
-		sprintf( masterName, "%s%04d", CLIENT_PREFIX, this->config.master.master.addr.id );
+		sprintf( masterName, "%s%04d", CLIENT_PREFIX, this->config.client.client.addr.id );
 		remapMsgHandler.init( this->config.global.states.spreaddAddr.addr, this->config.global.states.spreaddAddr.port, masterName );
 		BasicRemappingScheme::slaveLoading = &this->slaveLoading;
 		BasicRemappingScheme::overloadedSlave = &this->overloadedSlave;
@@ -302,7 +264,7 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 
 	/* Loading statistics update */
 	uint32_t sec, msec;
-	if ( this->config.master.loadingStats.updateInterval > 0 ) {
+	if ( this->config.global.timeout.load > 0 ) {
 		LOCK_INIT ( &this->slaveLoading.lock );
 		this->slaveLoading.past.get.clear();
 		this->slaveLoading.past.set.clear();
@@ -310,8 +272,8 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 		this->slaveLoading.current.set.clear();
 		this->slaveLoading.cumulative.get.clear();
 		this->slaveLoading.cumulative.set.clear();
-		sec = this->config.master.loadingStats.updateInterval / 1000;
-		msec = this->config.master.loadingStats.updateInterval % 1000;
+		sec = this->config.global.timeout.load / 1000;
+		msec = this->config.global.timeout.load % 1000;
 	} else {
 		sec = 0;
 		msec = 0;
@@ -334,14 +296,8 @@ bool Master::start() {
 	bool ret = true;
 	/* Workers and event queues */
 	this->eventQueue.start();
-	if ( this->config.master.workers.type == WORKER_TYPE_MIXED ) {
-		for ( int i = 0, len = this->config.master.workers.number.mixed; i < len; i++ ) {
-			this->workers[ i ].start();
-		}
-	} else {
-		for ( int i = 0, len = this->config.master.workers.number.separated.total; i < len; i++ ) {
-			this->workers[ i ].start();
-		}
+	for ( int i = 0, len = this->config.global.workers.count; i < len; i++ ) {
+		this->workers[ i ].start();
 	}
 
 	/* Socket */
@@ -383,8 +339,8 @@ bool Master::start() {
 	this->isRunning = true;
 
 	/* Loading statistics update */
-	//fprintf( stderr, "Update loading stats every %d seconds\n", this->config.master.loadingStats.updateInterval );
-	//alarm ( this->config.master.loadingStats.updateInterval );
+	//fprintf( stderr, "Update loading stats every %d seconds\n", this->config.global.timeout.load );
+	//alarm ( this->config.global.timeout.load );
 	this->statsTimer.start();
 
 	return ret;
@@ -449,7 +405,7 @@ double Master::getElapsedTime() {
 
 void Master::info( FILE *f ) {
 	this->config.global.print( f );
-	this->config.master.print( f );
+	this->config.client.print( f );
 	this->stripeList->print( f );
 }
 
@@ -655,7 +611,7 @@ bool Master::isDegraded( ServerSocket *socket ) {
 		||
 		(
 			this->remapMsgHandler.useCoordinatedFlow( socket->getAddr() ) &&
-			! this->config.master.degraded.disabled
+			! this->config.client.degraded.disabled
 		)
 	);
 }
@@ -1073,7 +1029,7 @@ void Master::ackParityDelta( FILE *f, ServerSocket *target, pthread_cond_t *cond
 		to = update < to ? ( del < update ? del : update ) : to ;
 
 		/* check the threshold is reached */
-		if ( ! force && Timestamp( to ) - Timestamp( from ) < this->config.master.backup.ackBatchSize ) {
+		if ( ! force && Timestamp( to ) - Timestamp( from ) < this->config.client.backup.ackBatchSize ) {
 			UNLOCK( &target->ackParityDeltaBackupLock );
 			continue;
 		}
