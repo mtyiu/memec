@@ -1,5 +1,5 @@
-#ifndef __MASTER_PROTOCOL_PROTOCOL_HH__
-#define __MASTER_PROTOCOL_PROTOCOL_HH__
+#ifndef __CLIENT_PROTOCOL_PROTOCOL_HH__
+#define __CLIENT_PROTOCOL_PROTOCOL_HH__
 
 #include "../../common/config/server_addr.hh"
 #include "../../common/ds/array_map.hh"

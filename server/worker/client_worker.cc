@@ -484,7 +484,7 @@ bool ServerWorker::handleUpdateRequest(
 			keyValueUpdate.length = header.valueUpdateSize;
 			keyValueUpdate.isDegraded = reconstructedCount > 0;
 
-			if ( ! ServerWorker::pending->insertKeyValueUpdate( PT_MASTER_UPDATE, event.instanceId, event.requestId, ( void * ) event.socket, keyValueUpdate ) ) {
+			if ( ! ServerWorker::pending->insertKeyValueUpdate( PT_CLIENT_UPDATE, event.instanceId, event.requestId, ( void * ) event.socket, keyValueUpdate ) ) {
 				__ERROR__( "ServerWorker", "handleUpdateRequest", "Cannot insert into master UPDATE pending map (ID = (%u, %u)).", event.instanceId, event.requestId );
 			}
 		} else {
@@ -564,7 +564,7 @@ bool ServerWorker::handleUpdateRequest(
 			keyValueUpdate.length = header.valueUpdateSize;
 			keyValueUpdate.isDegraded = reconstructedCount > 0;
 
-			if ( ! ServerWorker::pending->insertKeyValueUpdate( PT_MASTER_UPDATE, event.instanceId, event.requestId, ( void * ) event.socket, keyValueUpdate ) ) {
+			if ( ! ServerWorker::pending->insertKeyValueUpdate( PT_CLIENT_UPDATE, event.instanceId, event.requestId, ( void * ) event.socket, keyValueUpdate ) ) {
 				__ERROR__( "ServerWorker", "handleUpdateRequest", "Cannot insert into master UPDATE pending map (ID = (%u, %u)).", event.instanceId, event.requestId );
 			}
 
@@ -604,7 +604,7 @@ bool ServerWorker::handleUpdateRequest(
 			// Insert the UPDATE request to slave pending set
 			for ( uint32_t i = 0; i < ServerWorker::parityChunkCount; i++ ) {
 				if ( ! ServerWorker::pending->insertKeyValueUpdate(
-					PT_SLAVE_PEER_UPDATE, instanceId, event.instanceId, requestId, event.requestId,
+					PT_SERVER_PEER_UPDATE, instanceId, event.instanceId, requestId, event.requestId,
 					( void * ) this->parityServerSockets[ i ],
 					keyValueUpdate
 				) ) {
@@ -693,7 +693,7 @@ bool ServerWorker::handleDeleteRequest(
 		// Add the current request to the pending set
 		if ( ServerWorker::parityChunkCount ) {
 			key.dup( header.keySize, header.key, ( void * ) event.socket );
-			if ( ! ServerWorker::pending->insertKey( PT_MASTER_DEL, event.instanceId, event.requestId, ( void * ) event.socket, key ) ) {
+			if ( ! ServerWorker::pending->insertKey( PT_CLIENT_DEL, event.instanceId, event.requestId, ( void * ) event.socket, key ) ) {
 				__ERROR__( "ServerWorker", "handleDeleteRequest", "Cannot insert into master DELETE pending map." );
 			}
 			delta = this->buffer.data;
@@ -914,7 +914,7 @@ bool ServerWorker::handleRevertDelta( ClientEvent event, char *buf, size_t size 
 	}
 
 	// data response for UPDATE / DELETE //
-#define CHECK_RESPONSE_FOR_FAILED_PARITY( _PT_TYPE_, _PT_MASTER_TYPE_, _OP_TYPE_, _MAP_VALUE_TYPE_ ) \
+#define CHECK_RESPONSE_FOR_FAILED_PARITY( _PT_TYPE_, _PT_CLIENT_TYPE_, _OP_TYPE_, _MAP_VALUE_TYPE_ ) \
 	LOCK( &ServerWorker::pending->slavePeers._OP_TYPE_##Lock ); \
 	{ \
 	std::unordered_multimap<PendingIdentifier, _MAP_VALUE_TYPE_>::iterator it, saveIt; \
@@ -930,7 +930,7 @@ bool ServerWorker::handleRevertDelta( ClientEvent event, char *buf, size_t size 
 			Key key; \
 			PendingIdentifier pid; \
 			if ( strcmp( #_OP_TYPE_, "update" ) == 0 || strcmp( #_OP_TYPE_, "updateChunk" ) == 0 ) { \
-				if ( ! ServerWorker::pending->eraseKeyValueUpdate( _PT_MASTER_TYPE_, it->first.parentInstanceId, it->first.parentRequestId, 0, &pid, &keyValueUpdate ) ) { \
+				if ( ! ServerWorker::pending->eraseKeyValueUpdate( _PT_CLIENT_TYPE_, it->first.parentInstanceId, it->first.parentRequestId, 0, &pid, &keyValueUpdate ) ) { \
 					__ERROR__( "ServerWorker", "handleRevertDelta", "Cannot find a pending master UPDATE request that matches the response. This message will be discarded." ); \
 					continue; \
 				} \
@@ -944,7 +944,7 @@ bool ServerWorker::handleRevertDelta( ClientEvent event, char *buf, size_t size 
 				this->dispatch( clientEvent ); \
 				__INFO__( YELLOW, "ServerWorker", "handleRevertDelta", "Skip waiting for key %.*s for failed slave id=%u", keyValueUpdate.size, keyValueUpdate.data, header.targetId ); \
 			} else if ( strcmp( #_OP_TYPE_, "delete" ) == 0 || strcmp( #_OP_TYPE_, "deleteChunk" ) == 0 ) { \
-				if ( ! ServerWorker::pending->eraseKey( _PT_MASTER_TYPE_, it->first.parentInstanceId, it->first.parentRequestId, 0, &pid, &key ) ) { \
+				if ( ! ServerWorker::pending->eraseKey( _PT_CLIENT_TYPE_, it->first.parentInstanceId, it->first.parentRequestId, 0, &pid, &key ) ) { \
 					__ERROR__( "ServerWorker", "handleRevertDelta", "Cannot find a pending master DELETE request that matches the response. This message will be discarded." ); \
 					continue; \
 				} \
@@ -964,10 +964,10 @@ bool ServerWorker::handleRevertDelta( ClientEvent event, char *buf, size_t size 
 	UNLOCK( &ServerWorker::pending->slavePeers._OP_TYPE_##Lock ); \
 	}
 
-	CHECK_RESPONSE_FOR_FAILED_PARITY( PT_SLAVE_PEER_UPDATE, PT_MASTER_UPDATE, update, KeyValueUpdate );
-	CHECK_RESPONSE_FOR_FAILED_PARITY( PT_SLAVE_PEER_UPDATE_CHUNK, PT_MASTER_UPDATE, updateChunk, ChunkUpdate );
-	CHECK_RESPONSE_FOR_FAILED_PARITY( PT_SLAVE_PEER_DEL, PT_MASTER_DEL, del, Key );
-	CHECK_RESPONSE_FOR_FAILED_PARITY( PT_SLAVE_PEER_DEL_CHUNK, PT_MASTER_DEL, deleteChunk, ChunkUpdate );
+	CHECK_RESPONSE_FOR_FAILED_PARITY( PT_SERVER_PEER_UPDATE, PT_CLIENT_UPDATE, update, KeyValueUpdate );
+	CHECK_RESPONSE_FOR_FAILED_PARITY( PT_SERVER_PEER_UPDATE_CHUNK, PT_CLIENT_UPDATE, updateChunk, ChunkUpdate );
+	CHECK_RESPONSE_FOR_FAILED_PARITY( PT_SERVER_PEER_DEL, PT_CLIENT_DEL, del, Key );
+	CHECK_RESPONSE_FOR_FAILED_PARITY( PT_SERVER_PEER_DEL_CHUNK, PT_CLIENT_DEL, deleteChunk, ChunkUpdate );
 
 	// parity revert for SET //
 	uint32_t chunkId, listId;

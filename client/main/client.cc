@@ -975,7 +975,7 @@ void Master::time() {
 	fflush( stdout );
 }
 
-#define DISPATCH_EVENT_TO_OTHER_SLAVES( _METHOD_NAME_, _S_, _COND_, _LOCK_, _COUNTER_ ) {  \
+#define DISPATCH_EVENT_TO_OTHER_SERVERS( _METHOD_NAME_, _S_, _COND_, _LOCK_, _COUNTER_ ) {  \
 	std::vector<ServerEvent> events; \
 	for ( int j = 0, len = this->sockets.slaves.size(); j < len; j++ ) { \
 		ServerEvent event; \
@@ -1042,7 +1042,7 @@ void Master::ackParityDelta( FILE *f, ServerSocket *target, pthread_cond_t *cond
 		timestamps.clear();
 		timestamps.push_back( from );
 		timestamps.push_back( to );
-		DISPATCH_EVENT_TO_OTHER_SLAVES( ackParityDelta, s, condition, lock, counter );
+		DISPATCH_EVENT_TO_OTHER_SERVERS( ackParityDelta, s, condition, lock, counter );
 
 		s->timestamp.lastAck.setVal( to );
 		UNLOCK( &target->ackParityDeltaBackupLock );
@@ -1094,7 +1094,7 @@ bool Master::revertDelta( FILE *f, ServerSocket *target, pthread_cond_t *conditi
 		// skip revert if failed slave is not the data slave, but see if the request can be immediately replied
 		if ( dataSlave != target ) {
 			if (
-				this->pending.count( PT_SLAVE_SET, it->first.instanceId, it->first.requestId, false, false ) == 1 &&
+				this->pending.count( PT_SERVER_SET, it->first.instanceId, it->first.requestId, false, false ) == 1 &&
 				this->pending.eraseKeyValue( PT_APPLICATION_SET, it->first.parentInstanceId, it->first.parentRequestId, 0, &pid, &keyValue, true, true, true, it->second.data )
 			) {
 
@@ -1137,7 +1137,7 @@ bool Master::revertDelta( FILE *f, ServerSocket *target, pthread_cond_t *conditi
 
 	timestamps.insert( timestamps.begin(), timestampSet.begin(), timestampSet.end() ); // ordered timestamps
 
-	DISPATCH_EVENT_TO_OTHER_SLAVES( revertDelta, target, condition, lock, counter );
+	DISPATCH_EVENT_TO_OTHER_SERVERS( revertDelta, target, condition, lock, counter );
 
 	return true;
 }

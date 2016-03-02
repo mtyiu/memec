@@ -1,5 +1,5 @@
-#ifndef __MASTER_BACKUP_BACKUP_HH__
-#define __MASTER_BACKUP_BACKUP_HH__
+#ifndef __CLIENT_BACKUP_BACKUP_HH__
+#define __CLIENT_BACKUP_BACKUP_HH__
 
 #include <unordered_map>
 #include "../../common/ds/key.hh"

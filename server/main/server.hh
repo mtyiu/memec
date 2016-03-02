@@ -1,5 +1,5 @@
-#ifndef __SLAVE_MAIN_SLAVE_HH__
-#define __SLAVE_MAIN_SLAVE_HH__
+#ifndef __SERVER_MAIN_SERVER_HH__
+#define __SERVER_MAIN_SERVER_HH__
 
 #include <map>
 #include <vector>

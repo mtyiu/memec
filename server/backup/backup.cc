@@ -85,7 +85,7 @@ bool SlaveBackup::insertData##_OP_TYPE_( Timestamp ts, Key key, Value value, Met
 
 // ------------------------------- REMOVE ----------------------------------
 
-#define REMOVE_ITEMS( _MAP_, _LIT_, _RIT_, _FREE_, _RET_, _IS_DATA_, _SLAVE_ID_ ) \
+#define REMOVE_ITEMS( _MAP_, _LIT_, _RIT_, _FREE_, _RET_, _IS_DATA_, _SERVER_ID_ ) \
 	saveIt = _LIT_; \
 	for ( ; _LIT_ != _RIT_; _LIT_ = saveIt ) { \
 		saveIt++; \
@@ -102,12 +102,12 @@ bool SlaveBackup::insertData##_OP_TYPE_( Timestamp ts, Key key, Value value, Met
 		 *     TODO what if master send revert to parity before ack from data slave reach master??
 		 */ \
 		if ( \
-			_SLAVE_ID_ != 0 && \
+			_SERVER_ID_ != 0 && \
 			( \
-				( ( ! _IS_DATA_ && _LIT_->second.dataSlaveId != _SLAVE_ID_ ) && \
+				( ( ! _IS_DATA_ && _LIT_->second.dataSlaveId != _SERVER_ID_ ) && \
 			  	  ( ! timestamps.empty() && timestamps.count( _LIT_->first.getVal() ) == 0 ) \
 				) || \
-				( _IS_DATA_ && _LIT_->second.paritySlaves.count( _SLAVE_ID_ ) == 0 ) \
+				( _IS_DATA_ && _LIT_->second.paritySlaves.count( _SERVER_ID_ ) == 0 ) \
 			) \
 		) { \
 			continue; \

@@ -1,5 +1,5 @@
-#ifndef __MASTER_REMAP_REMAP_MSG_HANDLER_HH__
-#define __MASTER_REMAP_REMAP_MSG_HANDLER_HH__
+#ifndef __CLIENT_REMAP_REMAP_MSG_HANDLER_HH__
+#define __CLIENT_REMAP_REMAP_MSG_HANDLER_HH__
 
 #include <unordered_map>
 #include <unordered_set>

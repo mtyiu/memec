@@ -167,7 +167,7 @@ bool ClientWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 	// Insert pending SET requests for each involved slaves //
 	for ( uint32_t i = 0; i < ClientWorker::parityChunkCount + 1; i++ ) {
 		if ( ! ClientWorker::pending->insertKey(
-			PT_SLAVE_REMAPPING_SET, pid.instanceId, pid.parentInstanceId, pid.requestId, pid.parentRequestId,
+			PT_SERVER_REMAPPING_SET, pid.instanceId, pid.parentInstanceId, pid.requestId, pid.parentRequestId,
 			( i == 0 ) ? dataServerSocket : this->parityServerSockets[ i - 1 ],
 			key
 		) ) {
@@ -201,7 +201,7 @@ bool ClientWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 		if ( ClientWorker::updateInterval ) {
 			// Mark the time when request is sent
 			ClientWorker::pending->recordRequestStartTime(
-				PT_SLAVE_REMAPPING_SET, pid.instanceId, pid.parentInstanceId, pid.requestId, pid.parentRequestId,
+				PT_SERVER_REMAPPING_SET, pid.instanceId, pid.parentInstanceId, pid.requestId, pid.parentRequestId,
 				( void * ) this->parityServerSockets[ i ],
 				this->parityServerSockets[ i ]->getAddr()
 			);
@@ -221,7 +221,7 @@ bool ClientWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 	bool connected;
 	if ( ClientWorker::updateInterval ) {
 		ClientWorker::pending->recordRequestStartTime(
-			PT_SLAVE_REMAPPING_SET, pid.instanceId, pid.parentInstanceId, pid.requestId, pid.parentRequestId,
+			PT_SERVER_REMAPPING_SET, pid.instanceId, pid.parentInstanceId, pid.requestId, pid.parentRequestId,
 			( void * ) dataServerSocket,
 			dataServerSocket->getAddr()
 		);
@@ -265,13 +265,13 @@ bool ClientWorker::handleRemappingSetResponse( ServerEvent event, bool success, 
 	// printf( "[%u] Handling REMAPPING_SET response...\n", event.requestId );
 
 	// Find the cooresponding request //
-	if ( ! ClientWorker::pending->eraseKey( PT_SLAVE_REMAPPING_SET, event.instanceId, event.requestId, ( void * ) event.socket, &pid, &key, true, false ) ) {
+	if ( ! ClientWorker::pending->eraseKey( PT_SERVER_REMAPPING_SET, event.instanceId, event.requestId, ( void * ) event.socket, &pid, &key, true, false ) ) {
 		UNLOCK( &ClientWorker::pending->slaves.setLock );
 		__ERROR__( "ClientWorker", "handleRemappingSetResponse", "Cannot find a pending slave SET request that matches the response. This message will be discarded. (Key: %.*s; ID: (%u, %u); list ID: %u, chunk ID: %u)", header.keySize, header.key, event.instanceId, event.requestId, header.listId, header.chunkId );
 		return false;
 	}
 	// Check pending slave SET requests //
-	pending = ClientWorker::pending->count( PT_SLAVE_REMAPPING_SET, pid.instanceId, pid.requestId, false, true );
+	pending = ClientWorker::pending->count( PT_SERVER_REMAPPING_SET, pid.instanceId, pid.requestId, false, true );
 
 	// Mark the elapse time as latency //
 	Master *master = Master::getInstance();
@@ -279,7 +279,7 @@ bool ClientWorker::handleRemappingSetResponse( ServerEvent event, bool success, 
 		struct timespec elapsedTime;
 		RequestStartTime rst;
 
-		if ( ! ClientWorker::pending->eraseRequestStartTime( PT_SLAVE_REMAPPING_SET, pid.instanceId, pid.requestId, ( void * ) event.socket, elapsedTime, 0, &rst ) ) {
+		if ( ! ClientWorker::pending->eraseRequestStartTime( PT_SERVER_REMAPPING_SET, pid.instanceId, pid.requestId, ( void * ) event.socket, elapsedTime, 0, &rst ) ) {
 			__ERROR__( "ClientWorker", "handleRemappingSetResponse", "Cannot find a pending stats SET request that matches the response." );
 		} else {
 			int index = -1;

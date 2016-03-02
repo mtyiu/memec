@@ -5,12 +5,12 @@
 bool CoordinatorWorker::handlePromoteBackupSlaveResponse( ServerEvent event, char *buf, size_t size ) {
 	struct PromoteBackupSlaveHeader header;
 	if ( ! this->protocol.parsePromoteBackupSlaveHeader( header, false /* isRequest */, buf, size ) ) {
-		__ERROR__( "CoordinatorWorker", "handlePromoteBackupSlaveResponse", "Invalid PROMOTE_BACKUP_SLAVE response (size = %lu).", size );
+		__ERROR__( "CoordinatorWorker", "handlePromoteBackupSlaveResponse", "Invalid PROMOTE_BACKUP_SERVER response (size = %lu).", size );
 		return false;
 	}
 	__DEBUG__(
 		BLUE, "CoordinatorWorker", "handlePromoteBackupSlaveResponse",
-		"[PROMOTE_BACKUP_SLAVE] Request ID: (%u, %u); Count: %u (%u:%u)",
+		"[PROMOTE_BACKUP_SERVER] Request ID: (%u, %u); Count: %u (%u:%u)",
 		event.instanceId, event.requestId, header.count, header.addr, header.port
 	);
 

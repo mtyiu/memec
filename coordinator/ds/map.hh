@@ -1,5 +1,5 @@
-#ifndef __SLAVE_MAP_MAP_HH__
-#define __SLAVE_MAP_MAP_HH__
+#ifndef __SERVER_MAP_MAP_HH__
+#define __SERVER_MAP_MAP_HH__
 
 #include <unordered_map>
 #include <unordered_set>

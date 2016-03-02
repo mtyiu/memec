@@ -91,60 +91,60 @@ bool CoordinatorRemapMsgHandler::stop() {
 	return ( ret == 0 );
 }
 
-#define REMAP_PHASE_CHANGE_HANDLER( _ALL_SLAVES_, _CHECKED_SLAVES_, _EVENT_ ) \
+#define REMAP_PHASE_CHANGE_HANDLER( _ALL_SERVERS_, _CHECKED_SERVERS_, _EVENT_ ) \
 	do { \
-		_CHECKED_SLAVES_.clear(); \
+		_CHECKED_SERVERS_.clear(); \
 		\
 		bool start = _EVENT_.start; \
-		for ( uint32_t i = 0; i < _ALL_SLAVES_->size(); ) { \
-			LOCK( &this->serversStateLock[ _ALL_SLAVES_->at(i) ] ); \
+		for ( uint32_t i = 0; i < _ALL_SERVERS_->size(); ) { \
+			LOCK( &this->serversStateLock[ _ALL_SERVERS_->at(i) ] ); \
 			/* check if slave is alive  \
-			if ( this->serversState.count( _ALL_SLAVES_->at(i) ) == 0 ) { \
-				UNLOCK( &this->serversStateLock[ _ALL_SLAVES_->at(i) ] ); \
+			if ( this->serversState.count( _ALL_SERVERS_->at(i) ) == 0 ) { \
+				UNLOCK( &this->serversStateLock[ _ALL_SERVERS_->at(i) ] ); \
 				i++; \
 				continue; \
 			} */  \
-			RemapState state = this->serversState[ _ALL_SLAVES_->at(i) ]; \
+			RemapState state = this->serversState[ _ALL_SERVERS_->at(i) ]; \
 			/* no need to trigger remapping if is undefined / already entered / already exited remapping phase */ \
 			if ( ( state == REMAP_UNDEFINED ) || ( start && state != REMAP_NORMAL ) || \
 				( ( ! start ) && state != REMAP_DEGRADED ) ) \
 			{ \
-				UNLOCK( &this->serversStateLock[ _ALL_SLAVES_->at(i) ] ); \
+				UNLOCK( &this->serversStateLock[ _ALL_SERVERS_->at(i) ] ); \
 				i++; \
 				continue; \
 			}  \
 			/* set state for sync. and to avoid multiple start from others */ \
-			this->serversState[ _ALL_SLAVES_->at(i) ] = ( start ) ? REMAP_INTERMEDIATE : REMAP_COORDINATED; \
+			this->serversState[ _ALL_SERVERS_->at(i) ] = ( start ) ? REMAP_INTERMEDIATE : REMAP_COORDINATED; \
 			/* reset ack pool anyway */\
-			this->resetMasterAck( _ALL_SLAVES_->at(i) ); \
-			_CHECKED_SLAVES_.push_back( _ALL_SLAVES_->at(i) ); \
-			UNLOCK( &this->serversStateLock[ _ALL_SLAVES_->at(i) ] ); \
-			_ALL_SLAVES_->erase( _ALL_SLAVES_->begin() + i ); \
+			this->resetMasterAck( _ALL_SERVERS_->at(i) ); \
+			_CHECKED_SERVERS_.push_back( _ALL_SERVERS_->at(i) ); \
+			UNLOCK( &this->serversStateLock[ _ALL_SERVERS_->at(i) ] ); \
+			_ALL_SERVERS_->erase( _ALL_SERVERS_->begin() + i ); \
 		} \
 		/* ask master to change state */ \
-		if ( this->broadcastState( _CHECKED_SLAVES_ ) == false ) { \
+		if ( this->broadcastState( _CHECKED_SERVERS_ ) == false ) { \
 			/* revert the state if failed to start */ \
-			for ( uint32_t i = 0; i < _CHECKED_SLAVES_.size() ; i++ ) { \
-				LOCK( &this->serversStateLock[ _ALL_SLAVES_->at(i) ] ); \
+			for ( uint32_t i = 0; i < _CHECKED_SERVERS_.size() ; i++ ) { \
+				LOCK( &this->serversStateLock[ _ALL_SERVERS_->at(i) ] ); \
 				/* TODO is the previous state deterministic ?? */ \
-				if ( start && this->serversState[ _ALL_SLAVES_->at(i) ] == REMAP_INTERMEDIATE ) { \
-					this->serversState[ _ALL_SLAVES_->at(i) ] = REMAP_NORMAL; \
-				} else if ( ( ! start ) && this->serversState[ _ALL_SLAVES_->at(i) ] == REMAP_COORDINATED ) { \
-					this->serversState[ _ALL_SLAVES_->at(i) ] = REMAP_DEGRADED; \
+				if ( start && this->serversState[ _ALL_SERVERS_->at(i) ] == REMAP_INTERMEDIATE ) { \
+					this->serversState[ _ALL_SERVERS_->at(i) ] = REMAP_NORMAL; \
+				} else if ( ( ! start ) && this->serversState[ _ALL_SERVERS_->at(i) ] == REMAP_COORDINATED ) { \
+					this->serversState[ _ALL_SERVERS_->at(i) ] = REMAP_DEGRADED; \
 				} else { \
 					fprintf( stderr, "unexpected state of slave %u as %d\n",  \
-						_ALL_SLAVES_->at(i).sin_addr.s_addr, this->serversState[ _ALL_SLAVES_->at(i) ]  \
+						_ALL_SERVERS_->at(i).sin_addr.s_addr, this->serversState[ _ALL_SERVERS_->at(i) ]  \
 					); \
 				} \
-				UNLOCK( &this->serversStateLock[ _ALL_SLAVES_->at(i) ] ); \
+				UNLOCK( &this->serversStateLock[ _ALL_SERVERS_->at(i) ] ); \
 			} \
 			/* let the caller know all slaves failed */ \
-			_ALL_SLAVES_->insert( _ALL_SLAVES_->end(), _CHECKED_SLAVES_.begin(), _CHECKED_SLAVES_.end() ); \
+			_ALL_SERVERS_->insert( _ALL_SERVERS_->end(), _CHECKED_SERVERS_.begin(), _CHECKED_SERVERS_.end() ); \
 			return false; \
 		} \
 		/* keep retrying until success */ \
 		/* TODO reset only failed ones instead */ \
-		while ( ! this->insertRepeatedEvents( _EVENT_, &_CHECKED_SLAVES_ ) ); \
+		while ( ! this->insertRepeatedEvents( _EVENT_, &_CHECKED_SERVERS_ ) ); \
 	} while (0)
 
 
@@ -311,11 +311,11 @@ bool CoordinatorRemapMsgHandler::isMasterLeft( int service, char *msg, char *sub
 
 bool CoordinatorRemapMsgHandler::isSlaveJoin( int service, char *msg, char *subject ) {
 	// assume masters name themselves "[PREFIX][0-9]*"
-	return ( this->isMemberJoin( service ) && strncmp( subject + 1, SLAVE_PREFIX , SLAVE_PREFIX_LEN ) == 0 );
+	return ( this->isMemberJoin( service ) && strncmp( subject + 1, SERVER_PREFIX , SERVER_PREFIX_LEN ) == 0 );
 }
 bool CoordinatorRemapMsgHandler::isSlaveLeft( int service, char *msg, char *subject ) {
 	// assume masters name themselves "[PREFIX][0-9]*"
-	return ( this->isMemberLeave( service ) && strncmp( subject + 1, SLAVE_PREFIX , SLAVE_PREFIX_LEN ) == 0 );
+	return ( this->isMemberLeave( service ) && strncmp( subject + 1, SERVER_PREFIX , SERVER_PREFIX_LEN ) == 0 );
 }
 
 /*

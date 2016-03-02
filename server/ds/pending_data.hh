@@ -1,5 +1,5 @@
-#ifndef __SLAVE_DS_PENDING_DATA_HH__
-#define __SLAVE_DS_PENDING_DATA_HH__
+#ifndef __SERVER_DS_PENDING_DATA_HH__
+#define __SERVER_DS_PENDING_DATA_HH__
 
 #include "../../common/ds/key.hh"
 #include "../../common/ds/value.hh"

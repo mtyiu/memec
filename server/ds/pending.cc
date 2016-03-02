@@ -3,7 +3,7 @@
 
 bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_set<PendingIdentifier> *&map ) {
 	switch( type ) {
-		case PT_SLAVE_PEER_FORWARD_KEYS:
+		case PT_SERVER_PEER_FORWARD_KEYS:
 			lock = &this->slavePeers.forwardKeysLock;
 			map = &this->slavePeers.forwardKeys;
 			break;
@@ -17,19 +17,19 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_set<PendingId
 
 bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, Key> *&map ) {
 	switch( type ) {
-		case PT_MASTER_GET:
+		case PT_CLIENT_GET:
 			lock = &this->masters.getLock;
 			map = &this->masters.get;
 			break;
-		case PT_MASTER_DEL:
+		case PT_CLIENT_DEL:
 			lock = &this->masters.delLock;
 			map = &this->masters.del;
 			break;
-		case PT_SLAVE_PEER_GET:
+		case PT_SERVER_PEER_GET:
 			lock = &this->slavePeers.getLock;
 			map = &this->slavePeers.get;
 			break;
-		case PT_SLAVE_PEER_DEL:
+		case PT_SERVER_PEER_DEL:
 			lock = &this->slavePeers.delLock;
 			map = &this->slavePeers.del;
 			break;
@@ -43,7 +43,7 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 
 bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, KeyValue> *&map ) {
 	switch( type ) {
-		case PT_SLAVE_PEER_SET:
+		case PT_SERVER_PEER_SET:
 			lock = &this->slavePeers.setLock;
 			map = &this->slavePeers.set;
 			break;
@@ -57,11 +57,11 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 
 bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *&map ) {
 	switch( type ) {
-		case PT_MASTER_UPDATE:
+		case PT_CLIENT_UPDATE:
 			lock = &this->masters.updateLock;
 			map = &this->masters.update;
 			break;
-		case PT_SLAVE_PEER_UPDATE:
+		case PT_SERVER_PEER_UPDATE:
 			lock = &this->slavePeers.updateLock;
 			map = &this->slavePeers.update;
 			break;
@@ -75,7 +75,7 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 
 bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, DegradedOp> *&map ) {
 	switch( type ) {
-		case PT_SLAVE_PEER_DEGRADED_OPS:
+		case PT_SERVER_PEER_DEGRADED_OPS:
 			lock = &this->slavePeers.degradedOpsLock;
 			map = &this->slavePeers.degradedOps;
 			break;
@@ -89,15 +89,15 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 
 bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, ChunkRequest> *&map ) {
 	switch( type ) {
-		case PT_SLAVE_PEER_GET_CHUNK:
+		case PT_SERVER_PEER_GET_CHUNK:
 			lock = &this->slavePeers.getChunkLock;
 			map = &this->slavePeers.getChunk;
 			break;
-		case PT_SLAVE_PEER_SET_CHUNK:
+		case PT_SERVER_PEER_SET_CHUNK:
 			lock = &this->slavePeers.setChunkLock;
 			map = &this->slavePeers.setChunk;
 			break;
-		case PT_SLAVE_PEER_FORWARD_PARITY_CHUNK:
+		case PT_SERVER_PEER_FORWARD_PARITY_CHUNK:
 			lock = &this->slavePeers.forwardParityChunkLock;
 			map = &this->slavePeers.forwardParityChunk;
 			break;
@@ -111,11 +111,11 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 
 bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, ChunkUpdate> *&map ) {
 	switch( type ) {
-		case PT_SLAVE_PEER_UPDATE_CHUNK:
+		case PT_SERVER_PEER_UPDATE_CHUNK:
 			lock = &this->slavePeers.updateChunkLock;
 			map = &this->slavePeers.updateChunk;
 			break;
-		case PT_SLAVE_PEER_DEL_CHUNK:
+		case PT_SERVER_PEER_DEL_CHUNK:
 			lock = &this->slavePeers.deleteChunkLock;
 			map = &this->slavePeers.deleteChunk;
 			break;
@@ -129,7 +129,7 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 
 bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_map<struct sockaddr_in, std::set<PendingData>* > *&map ) {
 	switch( type ) {
-		case PT_SLAVE_PEER_PARITY:
+		case PT_SERVER_PEER_PARITY:
 			lock = &this->slavePeers.remappedDataLock;
 			map = &this->slavePeers.remappedData;
 			break;
@@ -140,7 +140,7 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_map<struct so
 	}
 	return true;
 }
-#define DEFINE_PENDING_MASTER_INSERT_METHOD( METHOD_NAME, VALUE_TYPE, VALUE_VAR ) \
+#define DEFINE_PENDING_CLIENT_INSERT_METHOD( METHOD_NAME, VALUE_TYPE, VALUE_VAR ) \
 	bool Pending::METHOD_NAME( PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr, VALUE_TYPE &VALUE_VAR, bool needsLock, bool needsUnlock ) { \
 		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, ptr ); \
 		std::pair<PendingIdentifier, VALUE_TYPE> p( pid, VALUE_VAR ); \
@@ -158,7 +158,7 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_map<struct so
 		return true; /* ret.second; */ \
 	}
 
-#define DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( METHOD_NAME, VALUE_TYPE, VALUE_VAR ) \
+#define DEFINE_PENDING_SERVER_PEER_INSERT_METHOD( METHOD_NAME, VALUE_TYPE, VALUE_VAR ) \
 	bool Pending::METHOD_NAME( PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr, VALUE_TYPE &VALUE_VAR, bool needsLock, bool needsUnlock ) { \
 		PendingIdentifier pid( instanceId, parentInstanceId, requestId, parentRequestId, ptr ); \
 		std::pair<PendingIdentifier, VALUE_TYPE> p( pid, VALUE_VAR ); \
@@ -205,15 +205,15 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_map<struct so
 		return ret; \
 	}
 
-DEFINE_PENDING_MASTER_INSERT_METHOD( insertKey, Key, key )
-DEFINE_PENDING_MASTER_INSERT_METHOD( insertKeyValueUpdate, KeyValueUpdate, keyValueUpdate )
+DEFINE_PENDING_CLIENT_INSERT_METHOD( insertKey, Key, key )
+DEFINE_PENDING_CLIENT_INSERT_METHOD( insertKeyValueUpdate, KeyValueUpdate, keyValueUpdate )
 
-DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( insertKey, Key, key )
-DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( insertKeyValue, KeyValue, keyValue )
-DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( insertKeyValueUpdate, KeyValueUpdate, keyValueUpdate )
-DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( insertDegradedOp, DegradedOp, degradedOp )
-DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( insertChunkRequest, ChunkRequest, chunkRequest )
-DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD( insertChunkUpdate, ChunkUpdate, chunkUpdate )
+DEFINE_PENDING_SERVER_PEER_INSERT_METHOD( insertKey, Key, key )
+DEFINE_PENDING_SERVER_PEER_INSERT_METHOD( insertKeyValue, KeyValue, keyValue )
+DEFINE_PENDING_SERVER_PEER_INSERT_METHOD( insertKeyValueUpdate, KeyValueUpdate, keyValueUpdate )
+DEFINE_PENDING_SERVER_PEER_INSERT_METHOD( insertDegradedOp, DegradedOp, degradedOp )
+DEFINE_PENDING_SERVER_PEER_INSERT_METHOD( insertChunkRequest, ChunkRequest, chunkRequest )
+DEFINE_PENDING_SERVER_PEER_INSERT_METHOD( insertChunkUpdate, ChunkUpdate, chunkUpdate )
 
 DEFINE_PENDING_ERASE_METHOD( eraseKey, Key, keyPtr )
 DEFINE_PENDING_ERASE_METHOD( eraseKeyValue, KeyValue, keyValuePtr )
@@ -222,8 +222,8 @@ DEFINE_PENDING_ERASE_METHOD( eraseDegradedOp, DegradedOp, degradedOpPtr )
 DEFINE_PENDING_ERASE_METHOD( eraseChunkRequest, ChunkRequest, chunkRequestPtr )
 DEFINE_PENDING_ERASE_METHOD( eraseChunkUpdate, ChunkUpdate, chunkUpdatePtr )
 
-#undef DEFINE_PENDING_MASTER_INSERT_METHOD
-#undef DEFINE_PENDING_SLAVE_PEER_INSERT_METHOD
+#undef DEFINE_PENDING_CLIENT_INSERT_METHOD
+#undef DEFINE_PENDING_SERVER_PEER_INSERT_METHOD
 #undef DEFINE_PENDING_ERASE_METHOD
 
 void Pending::insertReleaseDegradedLock( uint16_t instanceId, uint32_t requestId, CoordinatorSocket *socket, uint32_t count ) {
@@ -668,7 +668,7 @@ uint32_t Pending::count( PendingType type, uint16_t instanceId, uint32_t request
 	PendingIdentifier pid( instanceId, 0, requestId, 0, 0 );
 	LOCK_T *lock;
 	uint32_t ret = 0;
-	if ( type == PT_SLAVE_PEER_DEGRADED_OPS ) {
+	if ( type == PT_SERVER_PEER_DEGRADED_OPS ) {
 		std::unordered_multimap<PendingIdentifier, DegradedOp> *map;
 		std::unordered_multimap<PendingIdentifier, DegradedOp>::iterator it;
 
@@ -679,7 +679,7 @@ uint32_t Pending::count( PendingType type, uint16_t instanceId, uint32_t request
 		// it = map->count( pid );
 		// for ( ret = 0; it != map->end() && it->first.instanceId == instanceId && it->first.requestId == requestId; ret++, it++ );
 		if ( needsUnlock ) UNLOCK( lock );
-	} else if ( type == PT_SLAVE_PEER_SET ) {
+	} else if ( type == PT_SERVER_PEER_SET ) {
 		std::unordered_multimap<PendingIdentifier, KeyValue> *map;
 		std::unordered_multimap<PendingIdentifier, KeyValue>::iterator it;
 
@@ -690,7 +690,7 @@ uint32_t Pending::count( PendingType type, uint16_t instanceId, uint32_t request
 		// it = map->count( pid );
 		// for ( ret = 0; it != map->end() && it->first.instanceId == instanceId && it->first.requestId == requestId; ret++, it++ );
 		if ( needsUnlock ) UNLOCK( lock );
-	} else if ( type == PT_SLAVE_PEER_UPDATE ) {
+	} else if ( type == PT_SERVER_PEER_UPDATE ) {
 		std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *map;
 		std::unordered_multimap<PendingIdentifier, KeyValueUpdate>::iterator it;
 
@@ -701,7 +701,7 @@ uint32_t Pending::count( PendingType type, uint16_t instanceId, uint32_t request
 		// it = map->count( pid );
 		// for ( ret = 0; it != map->end() && it->first.instanceId == instanceId && it->first.requestId == requestId; ret++, it++ );
 		if ( needsUnlock ) UNLOCK( lock );
-	} else if ( type == PT_SLAVE_PEER_DEL ) {
+	} else if ( type == PT_SERVER_PEER_DEL ) {
 		std::unordered_multimap<PendingIdentifier, Key> *map;
 		std::unordered_multimap<PendingIdentifier, Key>::iterator it;
 
@@ -712,7 +712,7 @@ uint32_t Pending::count( PendingType type, uint16_t instanceId, uint32_t request
 		// it = map->count( pid );
 		// for ( ret = 0; it != map->end() && it->first.instanceId == instanceId && it->first.requestId == requestId; ret++, it++ );
 		if ( needsUnlock ) UNLOCK( lock );
-	} else if ( type == PT_SLAVE_PEER_GET_CHUNK || type == PT_SLAVE_PEER_SET_CHUNK ) {
+	} else if ( type == PT_SERVER_PEER_GET_CHUNK || type == PT_SERVER_PEER_SET_CHUNK ) {
 		std::unordered_multimap<PendingIdentifier, ChunkRequest> *map;
 		std::unordered_multimap<PendingIdentifier, ChunkRequest>::iterator it;
 
@@ -723,7 +723,7 @@ uint32_t Pending::count( PendingType type, uint16_t instanceId, uint32_t request
 		// it = map->count( pid );
 		// for ( ret = 0; it != map->end() && it->first.instanceId == instanceId && it->first.requestId == requestId; ret++, it++ );
 		if ( needsUnlock ) UNLOCK( lock );
-	} else if ( type == PT_SLAVE_PEER_UPDATE_CHUNK || type == PT_SLAVE_PEER_DEL_CHUNK ) {
+	} else if ( type == PT_SERVER_PEER_UPDATE_CHUNK || type == PT_SERVER_PEER_DEL_CHUNK ) {
 		std::unordered_multimap<PendingIdentifier, ChunkUpdate> *map;
 		std::unordered_multimap<PendingIdentifier, ChunkUpdate>::iterator it;
 

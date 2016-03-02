@@ -188,7 +188,7 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 	if ( this->config.global.states.enabled ) {
 		char slaveName[ 11 ];
 		memset( slaveName, 0, 11 );
-		sprintf( slaveName, "%s%04d", SLAVE_PREFIX, this->config.server.server.addr.id );
+		sprintf( slaveName, "%s%04d", SERVER_PREFIX, this->config.server.server.addr.id );
 		remapMsgHandler.init( this->config.global.states.spreaddAddr.addr, this->config.global.states.spreaddAddr.port, slaveName );
 		LOCK( &this->sockets.slavePeers.lock );
 		for ( uint32_t i = 0; i < this->sockets.slavePeers.size(); i++ ) {

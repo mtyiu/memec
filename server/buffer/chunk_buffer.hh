@@ -1,5 +1,5 @@
-#ifndef __SLAVE_BUFFER_CHUNK_BUFFER_HH__
-#define __SLAVE_BUFFER_CHUNK_BUFFER_HH__
+#ifndef __SERVER_BUFFER_CHUNK_BUFFER_HH__
+#define __SERVER_BUFFER_CHUNK_BUFFER_HH__
 
 #include <cstdio>
 #include <pthread.h>

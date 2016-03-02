@@ -38,7 +38,7 @@ bool SimpleRemapMsgHandler::isMasterJoin( int service, char *msg, char *subject 
 }
 
 bool SimpleRemapMsgHandler::isSlaveJoin( int service, char *msg, char *subject ) {
-	return ( this->isMemberJoin( service ) && strncmp( subject + 1, SLAVE_PREFIX, SLAVE_PREFIX_LEN ) == 0 );
+	return ( this->isMemberJoin( service ) && strncmp( subject + 1, SERVER_PREFIX, SERVER_PREFIX_LEN ) == 0 );
 }
 
 bool SimpleRemapMsgHandler::addAliveSlave( struct sockaddr_in server ) {

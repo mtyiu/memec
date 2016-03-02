@@ -57,8 +57,8 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 		case SERVER_EVENT_TYPE_PENDING:
 			isSend = false;
 			break;
-		case SERVER_EVENT_TYPE_ANNOUNCE_SLAVE_CONNECTED:
-		case SERVER_EVENT_TYPE_ANNOUNCE_SLAVE_RECONSTRUCTED:
+		case SERVER_EVENT_TYPE_ANNOUNCE_SERVER_CONNECTED:
+		case SERVER_EVENT_TYPE_ANNOUNCE_SERVER_RECONSTRUCTED:
 			isSend = false;
 			break;
 		case SERVER_EVENT_TYPE_RESPONSE_HEARTBEAT:
@@ -88,7 +88,7 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 			return;
 	}
 
-	if ( event.type == SERVER_EVENT_TYPE_ANNOUNCE_SLAVE_CONNECTED ) {
+	if ( event.type == SERVER_EVENT_TYPE_ANNOUNCE_SERVER_CONNECTED ) {
 		ArrayMap<int, ServerSocket> &slaves = Coordinator::getInstance()->sockets.slaves;
 		uint32_t requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
 
@@ -109,7 +109,7 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 		if ( Coordinator::getInstance()->remapMsgHandler )
 			Coordinator::getInstance()->remapMsgHandler->addAliveSlave( slaveAddr );
 		UNLOCK( &slaves.lock );
-	} else if ( event.type == SERVER_EVENT_TYPE_ANNOUNCE_SLAVE_RECONSTRUCTED ) {
+	} else if ( event.type == SERVER_EVENT_TYPE_ANNOUNCE_SERVER_RECONSTRUCTED ) {
 		ArrayMap<int, ServerSocket> &slaves = Coordinator::getInstance()->sockets.slaves;
 		ArrayMap<int, ServerSocket> &backupSlaves = Coordinator::getInstance()->sockets.backupSlaves;
 

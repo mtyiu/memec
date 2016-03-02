@@ -1,5 +1,5 @@
-#ifndef __MASTER_REMAP_BASIC_REMAP_SCHEME_HH__
-#define __MASTER_REMAP_BASIC_REMAP_SCHEME_HH__
+#ifndef __CLIENT_REMAP_BASIC_REMAP_SCHEME_HH__
+#define __CLIENT_REMAP_BASIC_REMAP_SCHEME_HH__
 
 #include "remap_msg_handler.hh"
 #include "../socket/server_socket.hh"

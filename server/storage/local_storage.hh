@@ -1,5 +1,5 @@
-#ifndef __SLAVE_STORAGE_LOCAL_STORAGE_HH__
-#define __SLAVE_STORAGE_LOCAL_STORAGE_HH__
+#ifndef __SERVER_STORAGE_LOCAL_STORAGE_HH__
+#define __SERVER_STORAGE_LOCAL_STORAGE_HH__
 
 #include "storage.hh"
 

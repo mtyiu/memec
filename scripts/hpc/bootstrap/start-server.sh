@@ -1,13 +1,13 @@
 #!/bin/bash
 
-SLAVE_NAME=$(hostname)
-SLAVE_IP=$(hostname -I | xargs)
-SLAVE_PORT=9111
-STORAGE_PATH=/tmp/memec/${SLAVE_NAME}
+SERVER_NAME=$(hostname)
+SERVER_IP=$(hostname -I | xargs)
+SERVER_PORT=9111
+STORAGE_PATH=/tmp/memec/${SERVER_NAME}
 CONFIG_PATH=bin/config/hpc
 MEMEC_PATH=~/mtyiu/memec
 
-echo "Starting slave [${SLAVE_NAME}]..."
+echo "Starting slave [${SERVER_NAME}]..."
 
 rm -rf ${STORAGE_PATH}
 mkdir -p ${STORAGE_PATH}
@@ -19,10 +19,10 @@ if [ $# -gt 0 ]; then
 	gdb bin/server -ex "r -v \
 		-p ${CONFIG_PATH} \
 		-o storage path ${STORAGE_PATH} \
-		-o slave ${SLAVE_NAME} tcp://${SLAVE_IP}:${SLAVE_PORT}/"
+		-o slave ${SERVER_NAME} tcp://${SERVER_IP}:${SERVER_PORT}/"
 else
 	bin/server -v \
 		-p ${CONFIG_PATH} \
 		-o storage path ${STORAGE_PATH} \
-		-o slave ${SLAVE_NAME} tcp://${SLAVE_IP}:${SLAVE_PORT}/
+		-o slave ${SERVER_NAME} tcp://${SERVER_IP}:${SERVER_PORT}/
 fi

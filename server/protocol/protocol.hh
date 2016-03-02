@@ -1,5 +1,5 @@
-#ifndef __SLAVE_PROTOCOL_PROTOCOL_HH__
-#define __SLAVE_PROTOCOL_PROTOCOL_HH__
+#ifndef __SERVER_PROTOCOL_PROTOCOL_HH__
+#define __SERVER_PROTOCOL_PROTOCOL_HH__
 
 #include "../../common/config/server_addr.hh"
 #include "../../common/ds/chunk.hh"

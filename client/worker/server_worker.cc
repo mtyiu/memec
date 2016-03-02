@@ -308,7 +308,7 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 	Key key;
 	KeyValue keyValue;
 
-	if ( ! ClientWorker::pending->eraseKey( PT_SLAVE_SET, event.instanceId, event.requestId, event.socket, &pid, &key, true, false ) ) {
+	if ( ! ClientWorker::pending->eraseKey( PT_SERVER_SET, event.instanceId, event.requestId, event.socket, &pid, &key, true, false ) ) {
 		UNLOCK( &ClientWorker::pending->slaves.setLock );
 		__ERROR__( "ClientWorker", "handleSetResponse", "Cannot find a pending slave SET request that matches the response. This message will be discarded. (ID: (%u, %u); key: %.*s)", event.instanceId, event.requestId, keySize, keyStr );
 		return false;
@@ -318,7 +318,7 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 	//PendingIdentifier dpid = pid;
 
 	// Check pending slave SET requests
-	pending = ClientWorker::pending->count( PT_SLAVE_SET, pid.instanceId, pid.requestId, false, true );
+	pending = ClientWorker::pending->count( PT_SERVER_SET, pid.instanceId, pid.requestId, false, true );
 
 	// Mark the elapse time as latency
 	Master* master = Master::getInstance();
@@ -326,7 +326,7 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 		struct timespec elapsedTime;
 		RequestStartTime rst;
 
-		if ( ! ClientWorker::pending->eraseRequestStartTime( PT_SLAVE_SET, pid.instanceId, pid.requestId, ( void * ) event.socket, elapsedTime, 0, &rst ) ) {
+		if ( ! ClientWorker::pending->eraseRequestStartTime( PT_SERVER_SET, pid.instanceId, pid.requestId, ( void * ) event.socket, elapsedTime, 0, &rst ) ) {
 			__ERROR__( "ClientWorker", "handleSetResponse", "Cannot find a pending stats SET request that matches the response." );
 		} else {
 			int index = -1;
@@ -365,7 +365,7 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 		//ClientWorker::pending->insertKeyValue( PT_APPLICATION_SET, pid.instanceId, pid.requestId, 0, kv, true, true, pid.timestamp );
 		//key = kv.key();
 		//this->stripeList->get( key.data, key.size, this->dataServerSockets, 0, &chunkId );
-		//ClientWorker::pending->insertKey( PT_SLAVE_SET, dpid.instanceId, dpid.parentInstanceId, dpid.requestId, dpid.parentRequestId, this->dataServerSockets[ chunkId ], key );
+		//ClientWorker::pending->insertKey( PT_SERVER_SET, dpid.instanceId, dpid.parentInstanceId, dpid.requestId, dpid.parentRequestId, this->dataServerSockets[ chunkId ], key );
 
 		// not to response if the request is "canceled" due to replay
 		if ( pid.ptr ) {
@@ -422,7 +422,7 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 	ApplicationEvent applicationEvent;
 	PendingIdentifier pid;
 
-	if ( ! ClientWorker::pending->eraseKey( PT_SLAVE_GET, event.instanceId, event.requestId, event.socket, &pid, &key, true, true ) ) {
+	if ( ! ClientWorker::pending->eraseKey( PT_SERVER_GET, event.instanceId, event.requestId, event.socket, &pid, &key, true, true ) ) {
 		__ERROR__( "ClientWorker", "handleGetResponse", "Cannot find a pending slave GET request that matches the response. This message will be discarded (key = %.*s).", key.size, key.data );
 		return false;
 	}
@@ -436,7 +436,7 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 		struct timespec elapsedTime;
 		RequestStartTime rst;
 
-		if ( ! ClientWorker::pending->eraseRequestStartTime( PT_SLAVE_GET, pid.instanceId, pid.requestId, ( void * ) event.socket, elapsedTime, 0, &rst ) ) {
+		if ( ! ClientWorker::pending->eraseRequestStartTime( PT_SERVER_GET, pid.instanceId, pid.requestId, ( void * ) event.socket, elapsedTime, 0, &rst ) ) {
 			__ERROR__( "ClientWorker", "handleGetResponse", "Cannot find a pending stats GET request that matches the response (ID: (%u, %u)).", pid.instanceId, pid.requestId );
 		} else {
 			int index = -1;
@@ -466,7 +466,7 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 	//Key k;
 	//k.dup( key.size, key.data, key.ptr );
 	//ClientWorker::pending->insertKey( PT_APPLICATION_GET, pid.instanceId, pid.requestId, 0, k, true, true, pid.timestamp );
-	//ClientWorker::pending->insertKey( PT_SLAVE_GET, dpid.instanceId, dpid.parentInstanceId, dpid.requestId, dpid.parentRequestId, dpid.ptr, key );
+	//ClientWorker::pending->insertKey( PT_SERVER_GET, dpid.instanceId, dpid.parentInstanceId, dpid.requestId, dpid.parentRequestId, dpid.ptr, key );
 
 	if ( pid.ptr ) {
 		if ( success ) {
@@ -509,7 +509,7 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 	PendingIdentifier pid;
 
 	// Find the cooresponding request
-	if ( ! ClientWorker::pending->eraseKeyValueUpdate( PT_SLAVE_UPDATE, event.instanceId, event.requestId, ( void * ) event.socket, &pid, &keyValueUpdate ) ) {
+	if ( ! ClientWorker::pending->eraseKeyValueUpdate( PT_SERVER_UPDATE, event.instanceId, event.requestId, ( void * ) event.socket, &pid, &keyValueUpdate ) ) {
 		__ERROR__( "ClientWorker", "handleUpdateResponse", "Cannot find a pending slave UPDATE request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		return false;
 	}
@@ -541,7 +541,7 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 		//kvu.offset = keyValueUpdate.offset;
 		//kvu.length = keyValueUpdate.length;
 		//ClientWorker::pending->insertKeyValueUpdate( PT_APPLICATION_UPDATE, pid.instanceId, pid.requestId, 0, kvu, true, true, pid.timestamp );
-		//ClientWorker::pending->insertKeyValueUpdate( PT_SLAVE_UPDATE, dpid.instanceId, dpid.parentInstanceId, dpid.requestId, dpid.parentRequestId, dpid.ptr, kvu );
+		//ClientWorker::pending->insertKeyValueUpdate( PT_SERVER_UPDATE, dpid.instanceId, dpid.parentInstanceId, dpid.requestId, dpid.parentRequestId, dpid.ptr, kvu );
 
 	if ( pid.ptr ) {
 		applicationEvent.resUpdate( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, keyValueUpdate, success );
@@ -623,7 +623,7 @@ bool ClientWorker::handleDeleteResponse( ServerEvent event, bool success, bool i
 	PendingIdentifier pid;
 	Key key;
 
-	if ( ! ClientWorker::pending->eraseKey( PT_SLAVE_DEL, event.instanceId, event.requestId, ( void * ) event.socket, &pid, &key ) ) {
+	if ( ! ClientWorker::pending->eraseKey( PT_SERVER_DEL, event.instanceId, event.requestId, ( void * ) event.socket, &pid, &key ) ) {
 		__ERROR__( "ClientWorker", "handleDeleteResponse", "Cannot find a pending slave DELETE request that matches the response. This message will be discarded." );
 		return false;
 	}

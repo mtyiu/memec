@@ -110,7 +110,7 @@ std::set<struct sockaddr_in> Coordinator::updateOverloadedSlaveSet( ArrayMap<str
 	double threshold = this->config.coordinator.states.threshold.overload;
 
 	// compare each slave latency with the avg multipled by threshold
-#define GET_OVERLOADED_SLAVES( _TYPE_ ) { \
+#define GET_OVERLOADED_SERVERS( _TYPE_ ) { \
 	uint32_t slaveCount = slave##_TYPE_##Latency->size(); \
 	avgSec = 0.0; \
 	avgNsec = 0.0; \
@@ -135,10 +135,10 @@ std::set<struct sockaddr_in> Coordinator::updateOverloadedSlaveSet( ArrayMap<str
 	} \
 }
 
-	GET_OVERLOADED_SLAVES( Get );
-	GET_OVERLOADED_SLAVES( Set );
+	GET_OVERLOADED_SERVERS( Get );
+	GET_OVERLOADED_SERVERS( Set );
 
-#undef GET_OVERLOADED_SLAVES
+#undef GET_OVERLOADED_SERVERS
 	UNLOCK( &this->overloadedSlaves.lock );
 	return prevOverloadedSlaves;
 }
@@ -151,7 +151,7 @@ void Coordinator::updateAverageSlaveLoading( ArrayMap<struct sockaddr_in, Latenc
 	double avgSec = 0.0, avgNsec = 0.0;
 
 	// calculate the average from existing stat from masters
-#define SET_AVG_SLAVE_LATENCY( _TYPE_ ) \
+#define SET_AVG_SERVER_LATENCY( _TYPE_ ) \
 	latest = &this->slaveLoading.latest##_TYPE_; \
 	for ( uint32_t i = 0; i < latest->size(); i++ ) { \
 		avgSec = 0.0; \
@@ -179,9 +179,9 @@ void Coordinator::updateAverageSlaveLoading( ArrayMap<struct sockaddr_in, Latenc
 		} \
 	}
 
-	SET_AVG_SLAVE_LATENCY( Get );
-	SET_AVG_SLAVE_LATENCY( Set );
-#undef SET_AVG_SLAVE_LATENCY
+	SET_AVG_SERVER_LATENCY( Get );
+	SET_AVG_SERVER_LATENCY( Set );
+#undef SET_AVG_SERVER_LATENCY
 
 	// clean up the current stats
 	// TODO release the arrayMaps??

@@ -11,10 +11,10 @@
 
 #define CLIENT_PREFIX   "client"
 #define COORD_PREFIX    "coord"
-#define SLAVE_PREFIX    "server"
+#define SERVER_PREFIX    "server"
 
 #define COORD_PREFIX_LEN    ( sizeof( COORD_PREFIX ) - 1 )
 #define CLIENT_PREFIX_LEN   ( sizeof( CLIENT_PREFIX ) - 1 )
-#define SLAVE_PREFIX_LEN    ( sizeof( SLAVE_PREFIX ) - 1 )
+#define SERVER_PREFIX_LEN    ( sizeof( SERVER_PREFIX ) - 1 )
 
 #endif

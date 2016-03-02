@@ -323,7 +323,7 @@ bool ClientWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 
 	for ( uint32_t i = 0; i < ClientWorker::parityChunkCount + 1; i++ ) {
 		if ( ! ClientWorker::pending->insertKey(
-			PT_SLAVE_SET, Master::instanceId, event.instanceId, requestId, event.requestId,
+			PT_SERVER_SET, Master::instanceId, event.instanceId, requestId, event.requestId,
 			( void * )( i == 0 ? socket : this->parityServerSockets[ i - 1 ] ),
 			key
 		) ) {
@@ -337,7 +337,7 @@ bool ClientWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 			if ( ClientWorker::updateInterval ) {
 				// Mark the time when request is sent
 				ClientWorker::pending->recordRequestStartTime(
-					PT_SLAVE_SET, Master::instanceId, event.instanceId, requestId, event.requestId,
+					PT_SERVER_SET, Master::instanceId, event.instanceId, requestId, event.requestId,
 					( void * ) this->parityServerSockets[ i ],
 					this->parityServerSockets[ i ]->getAddr()
 				);
@@ -350,7 +350,7 @@ bool ClientWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		}
 
 		if ( ClientWorker::updateInterval )
-			ClientWorker::pending->recordRequestStartTime( PT_SLAVE_SET, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, socket->getAddr() );
+			ClientWorker::pending->recordRequestStartTime( PT_SERVER_SET, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, socket->getAddr() );
 		ServerEvent serverEvent;
 		serverEvent.send( socket, packet );
 		this->dispatch( serverEvent );
@@ -362,7 +362,7 @@ bool ClientWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		}
 
 		if ( ClientWorker::updateInterval )
-			ClientWorker::pending->recordRequestStartTime( PT_SLAVE_SET, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, socket->getAddr() );
+			ClientWorker::pending->recordRequestStartTime( PT_SERVER_SET, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, socket->getAddr() );
 		sentBytes = socket->send( buffer.data, buffer.size, connected );
 		if ( sentBytes != ( ssize_t ) buffer.size ) {
 			__ERROR__( "ClientWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
@@ -374,7 +374,7 @@ bool ClientWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 #endif
 	} else {
 		if ( ClientWorker::updateInterval )
-			ClientWorker::pending->recordRequestStartTime( PT_SLAVE_SET, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, socket->getAddr() );
+			ClientWorker::pending->recordRequestStartTime( PT_SERVER_SET, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, socket->getAddr() );
 		sentBytes = socket->send( buffer.data, buffer.size, connected );
 		if ( sentBytes != ( ssize_t ) buffer.size ) {
 			__ERROR__( "ClientWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
@@ -451,13 +451,13 @@ bool ClientWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 			header.key, header.keySize
 		);
 
-		if ( ! ClientWorker::pending->insertKey( PT_SLAVE_GET, instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, key ) ) {
+		if ( ! ClientWorker::pending->insertKey( PT_SERVER_GET, instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, key ) ) {
 			__ERROR__( "ClientWorker", "handleGetRequest", "Cannot insert into slave GET pending map." );
 		}
 
 		if ( ClientWorker::updateInterval ) {
 			// Mark the time when request is sent
-			ClientWorker::pending->recordRequestStartTime( PT_SLAVE_GET, instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, socket->getAddr() );
+			ClientWorker::pending->recordRequestStartTime( PT_SERVER_GET, instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, socket->getAddr() );
 		}
 
 		// Send GET request
@@ -543,7 +543,7 @@ bool ClientWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 		// add pending timestamp to ack
 		socket->timestamp.pendingAck.insertUpdate( Timestamp( requestTimestamp ) );
 
-		if ( ! ClientWorker::pending->insertKeyValueUpdate( PT_SLAVE_UPDATE, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, keyValueUpdate, true, true, requestTimestamp ) ) {
+		if ( ! ClientWorker::pending->insertKeyValueUpdate( PT_SERVER_UPDATE, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, keyValueUpdate, true, true, requestTimestamp ) ) {
 			__ERROR__( "ClientWorker", "handleUpdateRequest", "Cannot insert into slave UPDATE pending map." );
 		}
 
@@ -620,7 +620,7 @@ bool ClientWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 		// add pending timestamp to ack.
 		socket->timestamp.pendingAck.insertDel( Timestamp( requestTimestamp ) );
 
-		if ( ! ClientWorker::pending->insertKey( PT_SLAVE_DEL, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, key, true, true, requestTimestamp ) ) {
+		if ( ! ClientWorker::pending->insertKey( PT_SERVER_DEL, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, key, true, true, requestTimestamp ) ) {
 			__ERROR__( "ClientWorker", "handleDeleteRequest", "Cannot insert into slave DELETE pending map." );
 		}
 

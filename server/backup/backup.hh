@@ -1,5 +1,5 @@
-#ifndef __SLAVE_BACKUP_SLAVE_BACKUP_HH__
-#define __SLAVE_BACKUP_SLAVE_BACKUP_HH__
+#ifndef __SERVER_BACKUP_SERVER_BACKUP_HH__
+#define __SERVER_BACKUP_SERVER_BACKUP_HH__
 
 #include <cstdio>
 #include <cstddef>

@@ -80,7 +80,7 @@ void ClientEvent::resDegradedLock( ClientSocket *socket, uint16_t instanceId, ui
 }
 
 void ClientEvent::announceSlaveReconstructed( ServerSocket *srcSocket, ServerSocket *dstSocket ) {
-	this->type = CLIENT_EVENT_TYPE_ANNOUNCE_SLAVE_RECONSTRUCTED;
+	this->type = CLIENT_EVENT_TYPE_ANNOUNCE_SERVER_RECONSTRUCTED;
 	this->message.reconstructed.src = srcSocket;
 	this->message.reconstructed.dst = dstSocket;
 }

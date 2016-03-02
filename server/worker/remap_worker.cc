@@ -236,20 +236,20 @@ bool ServerWorker::handleRemappingSetResponse( ServerPeerEvent event, bool succe
 	PendingIdentifier pid;
 	RemappingRecordKey record;
 
-	if ( ! ServerWorker::pending->eraseRemappingRecordKey( PT_SLAVE_PEER_REMAPPING_SET, event.instanceId, event.requestId, event.socket, &pid, &record, true, false ) ) {
+	if ( ! ServerWorker::pending->eraseRemappingRecordKey( PT_SERVER_PEER_REMAPPING_SET, event.instanceId, event.requestId, event.socket, &pid, &record, true, false ) ) {
 		UNLOCK( &ServerWorker::pending->slavePeers.remappingSetLock );
 		__ERROR__( "ServerWorker", "handleRemappingSetResponse", "Cannot find a pending slave REMAPPING_SET request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		return false;
 	}
 	// Check pending slave UPDATE requests
-	pending = ServerWorker::pending->count( PT_SLAVE_PEER_REMAPPING_SET, pid.instanceId, pid.requestId, false, true );
+	pending = ServerWorker::pending->count( PT_SERVER_PEER_REMAPPING_SET, pid.instanceId, pid.requestId, false, true );
 
 	__DEBUG__( BLUE, "ServerWorker", "handleRemappingSetResponse", "Pending slave REMAPPING_SET requests = %d (%s).", pending, success ? "success" : "fail" );
 	if ( pending == 0 ) {
 		// Only send master REMAPPING_SET response when the number of pending slave REMAPPING_SET requests equal 0
 		ClientEvent clientEvent;
 
-		if ( ! ServerWorker::pending->eraseRemappingRecordKey( PT_MASTER_REMAPPING_SET, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &record ) ) {
+		if ( ! ServerWorker::pending->eraseRemappingRecordKey( PT_CLIENT_REMAPPING_SET, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &record ) ) {
 			__ERROR__( "ServerWorker", "handleRemappingSetResponse", "Cannot find a pending master REMAPPING_SET request that matches the response. This message will be discarded." );
 			return false;
 		}
@@ -331,7 +331,7 @@ bool ServerWorker::handleRemappedUpdateResponse( ServerPeerEvent event, bool suc
 	PendingIdentifier pid;
 	uint16_t instanceId = Slave::instanceId;
 
-	if ( ! ServerWorker::pending->eraseKeyValueUpdate( PT_SLAVE_PEER_UPDATE, instanceId, event.requestId, event.socket, &pid, &keyValueUpdate, true, false ) ) {
+	if ( ! ServerWorker::pending->eraseKeyValueUpdate( PT_SERVER_PEER_UPDATE, instanceId, event.requestId, event.socket, &pid, &keyValueUpdate, true, false ) ) {
 		UNLOCK( &ServerWorker::pending->slavePeers.updateLock );
 		__ERROR__( "ServerWorker", "handleRemappedUpdateResponse", "Cannot find a pending slave UPDATE request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		return false;
@@ -349,7 +349,7 @@ bool ServerWorker::handleRemappedUpdateResponse( ServerPeerEvent event, bool suc
 	// UNLOCK( &slave->sockets.mastersIdToSocketLock );
 
 	// Check pending slave UPDATE requests
-	pending = ServerWorker::pending->count( PT_SLAVE_PEER_UPDATE, pid.instanceId, pid.requestId, false, true );
+	pending = ServerWorker::pending->count( PT_SERVER_PEER_UPDATE, pid.instanceId, pid.requestId, false, true );
 
 	__DEBUG__( YELLOW, "ServerWorker", "handleRemappedUpdateResponse", "Pending slave UPDATE requests = %d (%s) (Key: %.*s).", pending, success ? "success" : "fail", ( int ) header.keySize, header.key );
 
@@ -357,7 +357,7 @@ bool ServerWorker::handleRemappedUpdateResponse( ServerPeerEvent event, bool suc
 		// Only send master UPDATE response when the number of pending slave UPDATE requests equal 0
 		ClientEvent clientEvent;
 
-		if ( ! ServerWorker::pending->eraseKeyValueUpdate( PT_MASTER_UPDATE, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &keyValueUpdate ) ) {
+		if ( ! ServerWorker::pending->eraseKeyValueUpdate( PT_CLIENT_UPDATE, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &keyValueUpdate ) ) {
 			__ERROR__( "ServerWorker", "handleUpdateResponse", "Cannot find a pending master UPDATE request that matches the response. This message will be discarded." );
 			return false;
 		}

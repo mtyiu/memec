@@ -1,5 +1,5 @@
-#ifndef __SLAVE_BUFFER_REMAPPED_BUFFER_HH__
-#define __SLAVE_BUFFER_REMAPPED_BUFFER_HH__
+#ifndef __SERVER_BUFFER_REMAPPED_BUFFER_HH__
+#define __SERVER_BUFFER_REMAPPED_BUFFER_HH__
 
 #include "../../common/ds/key_value.hh"
 #include "../../common/lock/lock.hh"

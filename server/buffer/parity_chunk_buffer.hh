@@ -1,5 +1,5 @@
-#ifndef __SLAVE_BUFFER_PARITY_CHUNK_BUFFER_HH__
-#define __SLAVE_BUFFER_PARITY_CHUNK_BUFFER_HH__
+#ifndef __SERVER_BUFFER_PARITY_CHUNK_BUFFER_HH__
+#define __SERVER_BUFFER_PARITY_CHUNK_BUFFER_HH__
 
 #include <unordered_map>
 #include "chunk_buffer.hh"

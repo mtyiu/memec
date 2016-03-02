@@ -146,7 +146,7 @@ void CoordinatorWorker::dispatch( ClientEvent event ) {
 			isSend = true;
 			break;
 		// Recovery
-		case CLIENT_EVENT_TYPE_ANNOUNCE_SLAVE_RECONSTRUCTED:
+		case CLIENT_EVENT_TYPE_ANNOUNCE_SERVER_RECONSTRUCTED:
 			isSend = false;
 			break;
 		// Pending
@@ -163,7 +163,7 @@ void CoordinatorWorker::dispatch( ClientEvent event ) {
 			__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 	} else if ( event.type == CLIENT_EVENT_TYPE_SWITCH_PHASE ) {
 		connected = true; // just to avoid error message
-	} else if ( event.type == CLIENT_EVENT_TYPE_ANNOUNCE_SLAVE_RECONSTRUCTED ) {
+	} else if ( event.type == CLIENT_EVENT_TYPE_ANNOUNCE_SERVER_RECONSTRUCTED ) {
 		ArrayMap<int, ClientSocket> &masters = Coordinator::getInstance()->sockets.masters;
 		uint32_t requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
 
@@ -219,18 +219,18 @@ void CoordinatorWorker::dispatch( ClientEvent event ) {
 				// set the latest loading stats
 				//fprintf( stderr, "fd %d IP %u:%hu\n", event.socket->getSocket(), ntohl( event.socket->getAddr().sin_addr.s_addr ), ntohs( event.socket->getAddr().sin_port ) );
 
-#define SET_SLAVE_LATENCY_FOR_MASTER( _MASTER_ADDR_, _SRC_, _DST_ ) \
+#define SET_SERVER_LATENCY_FOR_CLIENT( _CLIENT_ADDR_, _SRC_, _DST_ ) \
 	for ( uint32_t i = 0; i < _SRC_.size(); i++ ) { \
 		coordinator->slaveLoading._DST_.get( _SRC_.keys[ i ], &index ); \
 		if ( index == -1 ) { \
 			coordinator->slaveLoading._DST_.set( _SRC_.keys[ i ], new ArrayMap<struct sockaddr_in, Latency> () ); \
 			index = coordinator->slaveLoading._DST_.size() - 1; \
-			coordinator->slaveLoading._DST_.values[ index ]->set( _MASTER_ADDR_, _SRC_.values[ i ] ); \
+			coordinator->slaveLoading._DST_.values[ index ]->set( _CLIENT_ADDR_, _SRC_.values[ i ] ); \
 		} else { \
 			latencyPool = coordinator->slaveLoading._DST_.values[ index ]; \
-			latencyPool->get( _MASTER_ADDR_, &index ); \
+			latencyPool->get( _CLIENT_ADDR_, &index ); \
 			if ( index == -1 ) { \
-				latencyPool->set( _MASTER_ADDR_, _SRC_.values[ i ] ); \
+				latencyPool->set( _CLIENT_ADDR_, _SRC_.values[ i ] ); \
 			} else { \
 				delete latencyPool->values[ index ]; \
 				latencyPool->values[ index ] = _SRC_.values[ i ]; \
@@ -240,8 +240,8 @@ void CoordinatorWorker::dispatch( ClientEvent event ) {
 
 				masterAddr = event.socket->getAddr();
 				LOCK ( &coordinator->slaveLoading.lock );
-				SET_SLAVE_LATENCY_FOR_MASTER( masterAddr, getLatency, latestGet );
-				SET_SLAVE_LATENCY_FOR_MASTER( masterAddr, setLatency, latestSet );
+				SET_SERVER_LATENCY_FOR_CLIENT( masterAddr, getLatency, latestGet );
+				SET_SERVER_LATENCY_FOR_CLIENT( masterAddr, setLatency, latestSet );
 				UNLOCK ( &coordinator->slaveLoading.lock );
 
 				getLatency.needsDelete = false;
@@ -283,7 +283,7 @@ void CoordinatorWorker::dispatch( ClientEvent event ) {
 				goto quit_1;
 			}
 
-#undef SET_SLAVE_LATENCY_FOR_MASTER
+#undef SET_SERVER_LATENCY_FOR_CLIENT
 quit_1:
 			buffer.data += header.length;
 			buffer.size -= header.length;

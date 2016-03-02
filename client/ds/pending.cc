@@ -10,19 +10,19 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 			lock = &this->applications.delLock;
 			map = &this->applications.del;
 			break;
-		case PT_SLAVE_GET:
+		case PT_SERVER_GET:
 			lock = &this->slaves.getLock;
 			map = &this->slaves.get;
 			break;
-		case PT_SLAVE_SET:
+		case PT_SERVER_SET:
 			lock = &this->slaves.setLock;
 			map = &this->slaves.set;
 			break;
-		case PT_SLAVE_REMAPPING_SET:
+		case PT_SERVER_REMAPPING_SET:
 			lock = &this->slaves.remappingSetLock;
 			map = &this->slaves.remappingSet;
 			break;
-		case PT_SLAVE_DEL:
+		case PT_SERVER_DEL:
 			lock = &this->slaves.delLock;
 			map = &this->slaves.del;
 			break;
@@ -54,7 +54,7 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 			lock = &this->applications.updateLock;
 			map = &this->applications.update;
 			break;
-		case PT_SLAVE_UPDATE:
+		case PT_SERVER_UPDATE:
 			lock = &this->slaves.updateLock;
 			map = &this->slaves.update;
 			break;
@@ -145,7 +145,7 @@ Pending::Pending() {
 
 #define DEFINE_PENDING_ACK_INSERT_METHOD DEFINE_PENDING_APPLICATION_INSERT_METHOD
 
-#define DEFINE_PENDING_SLAVE_INSERT_METHOD( METHOD_NAME, VALUE_TYPE, VALUE_VAR ) \
+#define DEFINE_PENDING_SERVER_INSERT_METHOD( METHOD_NAME, VALUE_TYPE, VALUE_VAR ) \
 	bool Pending::METHOD_NAME( PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr, VALUE_TYPE &VALUE_VAR, bool needsLock, bool needsUnlock, uint32_t timestamp ) { \
 		PendingIdentifier pid( instanceId, parentInstanceId, requestId, parentRequestId, timestamp, ptr ); \
 		std::pair<PendingIdentifier, VALUE_TYPE> p( pid, VALUE_VAR ); \
@@ -163,7 +163,7 @@ Pending::Pending() {
 		return true; /* ret.second; */ \
 	}
 
-#define DEFINE_PENDING_COORDINATOR_INSERT_METHOD DEFINE_PENDING_SLAVE_INSERT_METHOD
+#define DEFINE_PENDING_COORDINATOR_INSERT_METHOD DEFINE_PENDING_SERVER_INSERT_METHOD
 
 #define DEFINE_PENDING_ERASE_METHOD( METHOD_NAME, VALUE_TYPE, VALUE_PTR_VAR ) \
 	bool Pending::METHOD_NAME( PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr, PendingIdentifier *pidPtr, VALUE_TYPE *VALUE_PTR_VAR, bool needsLock, bool needsUnlock ) { \
@@ -201,8 +201,8 @@ DEFINE_PENDING_APPLICATION_INSERT_METHOD( insertKey, Key, key )
 DEFINE_PENDING_APPLICATION_INSERT_METHOD( insertKeyValue, KeyValue, keyValue )
 DEFINE_PENDING_APPLICATION_INSERT_METHOD( insertKeyValueUpdate, KeyValueUpdate, keyValueUpdate )
 
-DEFINE_PENDING_SLAVE_INSERT_METHOD( insertKey, Key, key )
-DEFINE_PENDING_SLAVE_INSERT_METHOD( insertKeyValueUpdate, KeyValueUpdate, keyValueUpdate )
+DEFINE_PENDING_SERVER_INSERT_METHOD( insertKey, Key, key )
+DEFINE_PENDING_SERVER_INSERT_METHOD( insertKeyValueUpdate, KeyValueUpdate, keyValueUpdate )
 
 DEFINE_PENDING_ACK_INSERT_METHOD( insertAck, AcknowledgementInfo, ackInfo )
 
@@ -211,7 +211,7 @@ DEFINE_PENDING_ERASE_METHOD( eraseRemapList, RemapList, remapList )
 DEFINE_PENDING_ERASE_METHOD( eraseAck, AcknowledgementInfo , ackInfoPtr )
 
 #undef DEFINE_PENDING_APPLICATION_INSERT_METHOD
-#undef DEFINE_PENDING_SLAVE_INSERT_METHOD
+#undef DEFINE_PENDING_SERVER_INSERT_METHOD
 #undef DEFINE_PENDING_COORDINATOR_INSERT_METHOD
 #undef DEFINE_PENDING_ERASE_METHOD
 
@@ -225,11 +225,11 @@ bool Pending::recordRequestStartTime( PendingType type, uint16_t instanceId, uin
 	std::pair<PendingIdentifier, RequestStartTime> p( pid, rst );
 	std::unordered_multimap<PendingIdentifier, RequestStartTime>::iterator ret;
 
-	if ( type == PT_SLAVE_GET ) {
+	if ( type == PT_SERVER_GET ) {
 		LOCK( &this->stats.getLock );
 		ret = this->stats.get.insert( p );
 		UNLOCK( &this->stats.getLock );
-	} else if ( type == PT_SLAVE_SET || type == PT_SLAVE_REMAPPING_SET ) {
+	} else if ( type == PT_SERVER_SET || type == PT_SERVER_REMAPPING_SET ) {
 		LOCK( &this->stats.setLock );
 		ret = this->stats.set.insert( p );
 		UNLOCK( &this->stats.setLock );
@@ -260,11 +260,11 @@ bool Pending::eraseRequestStartTime( PendingType type, uint16_t instanceId, uint
 		} \
 	} while (0)
 
-	if ( type == PT_SLAVE_GET ) {
+	if ( type == PT_SERVER_GET ) {
 		LOCK( &this->stats.getLock );
 		DO_SEARCH_FOR_ID( get );
 		UNLOCK( &this->stats.getLock );
-	} else if ( type == PT_SLAVE_SET || type == PT_SLAVE_REMAPPING_SET ) {
+	} else if ( type == PT_SERVER_SET || type == PT_SERVER_REMAPPING_SET ) {
 		LOCK( &this->stats.setLock );
 		DO_SEARCH_FOR_ID( set );
 		UNLOCK( &this->stats.setLock );
@@ -565,7 +565,7 @@ uint32_t Pending::count( PendingType type, uint16_t instanceId, uint32_t request
 	PendingIdentifier pid( instanceId, 0, requestId, 0, 0 );
 	LOCK_T *lock;
 	uint32_t ret = 0;
-	if ( type == PT_APPLICATION_UPDATE || type == PT_SLAVE_UPDATE ) {
+	if ( type == PT_APPLICATION_UPDATE || type == PT_SERVER_UPDATE ) {
 		std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *map;
 		std::unordered_multimap<PendingIdentifier, KeyValueUpdate>::iterator it;
 

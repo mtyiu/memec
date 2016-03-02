@@ -23,7 +23,7 @@ int main( int argc, char **argv ) {
 	}
 	// decide the role of this spread client
 	char *group = isServer? ( char* ) SERVER_GROUP : ( char* ) CLIENT_GROUP;
-	char *prefix = isServer? ( char* ) SLAVE_PREFIX : ( char* ) CLIENT_PREFIX;
+	char *prefix = isServer? ( char* ) SERVER_PREFIX : ( char* ) CLIENT_PREFIX;
 	char userbuf[ 32 ];
 
 	// connect to spread daemon

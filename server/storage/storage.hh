@@ -1,5 +1,5 @@
-#ifndef __SLAVE_STORAGE_STORAGE_HH__
-#define __SLAVE_STORAGE_STORAGE_HH__
+#ifndef __SERVER_STORAGE_STORAGE_HH__
+#define __SERVER_STORAGE_STORAGE_HH__
 
 #include "storage_type.hh"
 #include "../config/server_config.hh"

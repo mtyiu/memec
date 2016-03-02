@@ -110,7 +110,7 @@ bool ServerWorker::handleReleaseDegradedLockRequest( CoordinatorEvent event, cha
 			chunks[ i ].listId, chunks[ i ].stripeId, chunks[ i ].chunkId,
 			socket, chunk, true /* isDegraded */
 		);
-		if ( ! ServerWorker::pending->insertChunkRequest( PT_SLAVE_PEER_SET_CHUNK, instanceId, event.instanceId, requestId, event.requestId, socket, chunkRequest ) ) {
+		if ( ! ServerWorker::pending->insertChunkRequest( PT_SERVER_PEER_SET_CHUNK, instanceId, event.instanceId, requestId, event.requestId, socket, chunkRequest ) ) {
 			__ERROR__( "ServerWorker", "handleReleaseDegradedLockRequest", "Cannot insert into slave CHUNK_REQUEST pending map." );
 		}
 
@@ -456,7 +456,7 @@ bool ServerWorker::handleDegradedUpdateRequest( ClientEvent event, struct Degrad
 		keyValueUpdate.dup( 0, 0, ( void * ) event.socket );
 		keyValueUpdate.isDegraded = true;
 		// Insert into master UPDATE pending set
-		if ( ! ServerWorker::pending->insertKeyValueUpdate( PT_MASTER_UPDATE, event.instanceId, event.requestId, ( void * ) event.socket, keyValueUpdate ) ) {
+		if ( ! ServerWorker::pending->insertKeyValueUpdate( PT_CLIENT_UPDATE, event.instanceId, event.requestId, ( void * ) event.socket, keyValueUpdate ) ) {
 			__ERROR__( "ServerWorker", "handleDegradedUpdateRequest", "Cannot insert into master UPDATE pending map." );
 		}
 
@@ -671,7 +671,7 @@ bool ServerWorker::handleDegradedDeleteRequest( ClientEvent event, char *buf, si
 
 	if ( isKeyValueFound ) {
 		key.dup( 0, 0, ( void * ) event.socket );
-		if ( ! ServerWorker::pending->insertKey( PT_MASTER_DEL, event.instanceId, event.requestId, ( void * ) event.socket, key ) ) {
+		if ( ! ServerWorker::pending->insertKey( PT_CLIENT_DEL, event.instanceId, event.requestId, ( void * ) event.socket, key ) ) {
 			__ERROR__( "ServerWorker", "handleDegradedDeleteRequest", "Cannot insert into master DELETE pending map." );
 		}
 
@@ -844,7 +844,7 @@ bool ServerWorker::handleForwardChunkRequest( struct ChunkDataHeader &header, bo
 		DegradedOp op;
 		Key key;
 		for ( int pidsIndex = 0, len = pids.size(); pidsIndex < len; pidsIndex++ ) {
-			if ( ! ServerWorker::pending->eraseDegradedOp( PT_SLAVE_PEER_DEGRADED_OPS, pids[ pidsIndex ].instanceId, pids[ pidsIndex ].requestId, 0, &pid, &op ) ) {
+			if ( ! ServerWorker::pending->eraseDegradedOp( PT_SERVER_PEER_DEGRADED_OPS, pids[ pidsIndex ].instanceId, pids[ pidsIndex ].requestId, 0, &pid, &op ) ) {
 				__ERROR__( "ServerWorker", "handleForwardChunkRequest", "Cannot find a pending slave DEGRADED_OPS request that matches the response. This message will be discarded." );
 				continue;
 			}
@@ -1104,7 +1104,7 @@ bool ServerWorker::performDegradedRead(
 	}
 
 	if ( isSealed || ! socket->self ) {
-		if ( ! ServerWorker::pending->insertDegradedOp( PT_SLAVE_PEER_DEGRADED_OPS, instanceId, parentInstanceId, requestId, parentRequestId, 0, op ) ) {
+		if ( ! ServerWorker::pending->insertDegradedOp( PT_SERVER_PEER_DEGRADED_OPS, instanceId, parentInstanceId, requestId, parentRequestId, 0, op ) ) {
 			__ERROR__( "ServerWorker", "performDegradedRead", "Cannot insert into slave DEGRADED_OPS pending map." );
 		}
 	}
@@ -1191,7 +1191,7 @@ force_reconstruct_chunks:
 			} else {
 				continue;
 			}
-			if ( ! ServerWorker::pending->insertChunkRequest( PT_SLAVE_PEER_GET_CHUNK, instanceId, parentInstanceId, requestId, parentRequestId, socket, chunkRequest ) ) {
+			if ( ! ServerWorker::pending->insertChunkRequest( PT_SERVER_PEER_GET_CHUNK, instanceId, parentInstanceId, requestId, parentRequestId, socket, chunkRequest ) ) {
 				__ERROR__( "ServerWorker", "performDegradedRead", "Cannot insert into slave CHUNK_REQUEST pending map." );
 			}
 			selected++;
@@ -1270,7 +1270,7 @@ force_reconstruct_chunks:
 			if ( success ) {
 				// Need to send the key-value pair to reconstructed servers even if this is a DELETE request because of the need of creating backup
 
-				if ( ! ServerWorker::pending->insertDegradedOp( PT_SLAVE_PEER_DEGRADED_OPS, instanceId, parentInstanceId, requestId, parentRequestId, 0, op ) ) {
+				if ( ! ServerWorker::pending->insertDegradedOp( PT_SERVER_PEER_DEGRADED_OPS, instanceId, parentInstanceId, requestId, parentRequestId, 0, op ) ) {
 					__ERROR__( "ServerWorker", "performDegradedRead", "Cannot insert into slave DEGRADED_OPS pending map." );
 				}
 
@@ -1378,7 +1378,7 @@ force_reconstruct_chunks:
 			}
 		} else {
 			// Send GET request to surviving parity slave
-			if ( ! ServerWorker::pending->insertKey( PT_SLAVE_PEER_GET, instanceId, parentInstanceId, requestId, parentRequestId, socket, op.data.key ) ) {
+			if ( ! ServerWorker::pending->insertKey( PT_SERVER_PEER_GET, instanceId, parentInstanceId, requestId, parentRequestId, socket, op.data.key ) ) {
 				__ERROR__( "ServerWorker", "performDegradedRead", "Cannot insert into slave GET pending map." );
 			}
 			event.reqGet( socket, instanceId, requestId, listId, chunkId, op.data.key );
@@ -1415,7 +1415,7 @@ force_reconstruct_chunks:
 			if ( needsContinue ) {
 				op.opcode = 0;
 				requestId = ServerWorker::idGenerator->nextVal( this->workerId );
-				if ( ! ServerWorker::pending->insertDegradedOp( PT_SLAVE_PEER_DEGRADED_OPS, instanceId, parentInstanceId, requestId, parentRequestId, 0, op ) ) {
+				if ( ! ServerWorker::pending->insertDegradedOp( PT_SERVER_PEER_DEGRADED_OPS, instanceId, parentInstanceId, requestId, parentRequestId, 0, op ) ) {
 					__ERROR__( "ServerWorker", "performDegradedRead", "Cannot insert into slave DEGRADED_OPS pending map." );
 				}
 				goto force_reconstruct_chunks;
@@ -1487,7 +1487,7 @@ bool ServerWorker::sendModifyChunkRequest(
 			chunkUpdate.chunkId = ServerWorker::dataChunkCount + i; // updatingChunkId
 			chunkUpdate.ptr = ( void * ) this->parityServerSockets[ i ];
 			if ( ! ServerWorker::pending->insertChunkUpdate(
-				isUpdate ? PT_SLAVE_PEER_UPDATE_CHUNK : PT_SLAVE_PEER_DEL_CHUNK,
+				isUpdate ? PT_SERVER_PEER_UPDATE_CHUNK : PT_SERVER_PEER_DEL_CHUNK,
 				instanceId, parentInstanceId, requestId, parentRequestId,
 				( void * ) this->parityServerSockets[ i ],
 				chunkUpdate
@@ -1677,7 +1677,7 @@ bool ServerWorker::sendModifyChunkRequest(
 				ClientEvent clientEvent;
 				PendingIdentifier pid;
 
-				if ( ! ServerWorker::pending->eraseKeyValueUpdate( PT_MASTER_UPDATE, parentInstanceId, parentRequestId, 0, &pid, &keyValueUpdate ) ) {
+				if ( ! ServerWorker::pending->eraseKeyValueUpdate( PT_CLIENT_UPDATE, parentInstanceId, parentRequestId, 0, &pid, &keyValueUpdate ) ) {
 					__ERROR__( "ServerWorker", "sendModifyChunkRequest", "Cannot find a pending master UPDATE request that matches the response. This message will be discarded." );
 					return false;
 				}
@@ -1818,7 +1818,7 @@ bool ServerWorker::sendModifyChunkRequest(
 
 			if ( isUpdate ) {
 				if ( ! ServerWorker::pending->insertKeyValueUpdate(
-					PT_SLAVE_PEER_UPDATE, instanceId, parentInstanceId, requestId, parentRequestId,
+					PT_SERVER_PEER_UPDATE, instanceId, parentInstanceId, requestId, parentRequestId,
 					( void * ) this->parityServerSockets[ i ],
 					keyValueUpdate
 				) ) {
@@ -1826,7 +1826,7 @@ bool ServerWorker::sendModifyChunkRequest(
 				}
 			} else {
 				if ( ! ServerWorker::pending->insertKey(
-					PT_SLAVE_PEER_DEL, instanceId, parentInstanceId, requestId, parentRequestId,
+					PT_SERVER_PEER_DEL, instanceId, parentInstanceId, requestId, parentRequestId,
 					( void * ) this->parityServerSockets[ i ],
 					key
 				) ) {

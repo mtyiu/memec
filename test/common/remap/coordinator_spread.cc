@@ -9,7 +9,7 @@
 #include "simple_remap_msg_handler.hh"
 
 #define ROUNDS	( 1000 * 50 )			// 50k messages
-#define NUM_SLAVES_IN_MSG ( 2 ) 		// double failure
+#define NUM_SERVERS_IN_MSG ( 2 ) 		// double failure
 
 void usage( char *prog ) {
 	printf( "Usage: %s [spread daemon addr in \"port@ip\"] [num of client]\n", prog );
@@ -37,7 +37,7 @@ int main( int argc, char **argv ) {
 	// init the dummy variables
 	std::vector<struct sockaddr_in> servers;
 	struct sockaddr_in server;
-	for ( int i = 0; i < NUM_SLAVES_IN_MSG; i++ ) {
+	for ( int i = 0; i < NUM_SERVERS_IN_MSG; i++ ) {
 		servers.push_back( server );
 	}
 

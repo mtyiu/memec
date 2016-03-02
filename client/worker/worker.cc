@@ -222,13 +222,13 @@ void ClientWorker::replayRequestPrepare( ServerSocket *slave ) {
 	uint32_t currentTime = Master::getInstance()->timestamp.getVal();
 	uint32_t smallestTime = currentTime, smallestTimeAfterCurrent = currentTime;
 
-#define SEARCH_MAP_FOR_REQUEST( _OPCODE_, _SLAVE_VALUE_TYPE_, _APPLICATION_VALUE_TYPE_, _APPLICATION_VALUE_VAR_, _PENDING_TYPE_, _PENDING_SET_NAME_ ) \
+#define SEARCH_MAP_FOR_REQUEST( _OPCODE_, _SERVER_VALUE_TYPE_, _APPLICATION_VALUE_TYPE_, _APPLICATION_VALUE_VAR_, _PENDING_TYPE_, _PENDING_SET_NAME_ ) \
 	do { \
 		_APPLICATION_VALUE_TYPE_ _APPLICATION_VALUE_VAR_; \
 		bool needsDup = false; \
 		LOCK( pendingLock ); \
 		for ( \
-			std::unordered_multimap<PendingIdentifier, _SLAVE_VALUE_TYPE_>::iterator it = pending->slaves._PENDING_SET_NAME_.begin(), safeIt = it; \
+			std::unordered_multimap<PendingIdentifier, _SERVER_VALUE_TYPE_>::iterator it = pending->slaves._PENDING_SET_NAME_.begin(), safeIt = it; \
 			it != pending->slaves._PENDING_SET_NAME_.end(); it = safeIt \
 		) { \
 			/* hold a save ptr for safe erase */ \
@@ -242,7 +242,7 @@ void ClientWorker::replayRequestPrepare( ServerSocket *slave ) {
 				continue; \
 			} \
 			/* cancel the request reply to application by setting application socket to 0 */ \
-			if ( ClientWorker::pending->count( PT_SLAVE_##_PENDING_TYPE_, it->first.instanceId, it->first.requestId, false, false /* already locked (pendingLock) */ ) > 1 ) { \
+			if ( ClientWorker::pending->count( PT_SERVER_##_PENDING_TYPE_, it->first.instanceId, it->first.requestId, false, false /* already locked (pendingLock) */ ) > 1 ) { \
 				__DEBUG__( YELLOW, "ClientWorker", "replayRequestPrepare", "Reinsert ID = (%u,%u)\n", ( ( ServerSocket * ) it->first.ptr )->getSocket(), it->first.parentInstanceId, it->first.parentRequestId ); \
 				if ( ! ClientWorker::pending->insert##_APPLICATION_VALUE_TYPE_( PT_APPLICATION_##_PENDING_TYPE_, pid.instanceId, pid.requestId, pid.ptr, _APPLICATION_VALUE_VAR_ ) ) \
 					__ERROR__( "ClientWorker", "replayRequestPrepare", "Failed to reinsert the %s request backup for ID = (%u, %u).", #_OPCODE_, pid.instanceId, pid.requestId ); \

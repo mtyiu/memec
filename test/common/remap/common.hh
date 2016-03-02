@@ -5,7 +5,7 @@
 #include "../../../coordinator/remap/remap_msg_handler.hh"
 #include "../../../client/remap/remap_msg_handler.hh"
 
-#define SLAVE_COUNT		8
+#define SERVER_COUNT		8
 #define REMAP_COUNT		2
 #define SEED			7654321
 #define ROUNDS 2
@@ -15,7 +15,7 @@ std::vector<struct sockaddr_in> addSlaves( RemapMsgHandler *handler ) {
 	srand( SEED );
 	std::vector<struct sockaddr_in> slaves;
 	struct sockaddr_in slave;
-	for ( int i = 0; i < SLAVE_COUNT; i++ ) {
+	for ( int i = 0; i < SERVER_COUNT; i++ ) {
 		slave.sin_addr.s_addr = rand() % UINT_MAX;
 		slave.sin_port = rand() % USHRT_MAX;
 		handler->addAliveSlave( slave );
@@ -31,7 +31,7 @@ static int count = 1;
 
 // randomly select a set of slaves to start remapping
 void startRemap( CoordinatorRemapMsgHandler *handler, const std::vector<struct sockaddr_in> &slaves ) {
-	srand( SEED / SLAVE_COUNT );
+	srand( SEED / SERVER_COUNT );
 	std::vector<struct sockaddr_in> slavesToRemap;
 	for ( int i = 0; i < REMAP_COUNT; i++ ) {
 		int idx = rand() % slaves.size();
@@ -43,7 +43,7 @@ void startRemap( CoordinatorRemapMsgHandler *handler, const std::vector<struct s
 
 // randomly select a set of slaves to stop remapping
 void stopRemap( CoordinatorRemapMsgHandler *handler, const std::vector<struct sockaddr_in> &slaves ) {
-	srand( SEED / SLAVE_COUNT );
+	srand( SEED / SERVER_COUNT );
 	std::vector<struct sockaddr_in> slavesToStop;
 	for ( int i = 0; i < count; i++ ) {
 		int idx = rand() % slaves.size();
@@ -59,7 +59,7 @@ void stopRemap( CoordinatorRemapMsgHandler *handler, const std::vector<struct so
 bool meetStatus( RemapMsgHandler *handler, const std::vector<struct sockaddr_in> &slaves, RemapState target ) {
 	bool ret = true;
 	RemapState current;
-	srand( SEED / SLAVE_COUNT );
+	srand( SEED / SERVER_COUNT );
 	for ( int i = 0; i < REMAP_COUNT; i ++ ) {
 		int idx = rand() % slaves.size();
 		current = handler->getState( slaves[ idx ] );

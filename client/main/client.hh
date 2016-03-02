@@ -1,5 +1,5 @@
-#ifndef __MASTER_MAIN_MASTER_HH__
-#define __MASTER_MAIN_MASTER_HH__
+#ifndef __CLIENT_MAIN_CLIENT_HH__
+#define __CLIENT_MAIN_CLIENT_HH__
 
 #include <map>
 #include <set>

@@ -171,7 +171,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 						header.key, header.keySize
 					);
 					if ( ClientWorker::updateInterval ) {
-						ClientWorker::pending->recordRequestStartTime( PT_SLAVE_GET, instanceId, pid.parentInstanceId, requestId, pid.parentRequestId, ( void * ) socket, socket->getAddr() );
+						ClientWorker::pending->recordRequestStartTime( PT_SERVER_GET, instanceId, pid.parentInstanceId, requestId, pid.parentRequestId, ( void * ) socket, socket->getAddr() );
 					}
 					break;
 				case PROTO_DEGRADED_LOCK_RES_NOT_EXIST:
@@ -187,7 +187,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 
 			// Insert into slave GET pending map
 			key.set( degradedLockData.keySize, degradedLockData.key, ( void * ) original );
-			if ( ! ClientWorker::pending->insertKey( PT_SLAVE_GET, instanceId, pid.parentInstanceId, requestId, pid.parentRequestId, ( void * ) socket, key ) ) {
+			if ( ! ClientWorker::pending->insertKey( PT_SERVER_GET, instanceId, pid.parentInstanceId, requestId, pid.parentRequestId, ( void * ) socket, key ) ) {
 				__ERROR__( "ClientWorker", "handleDegradedLockResponse", "Cannot insert into slave GET pending map." );
 			}
 			break;
@@ -231,7 +231,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 			keyValueUpdate.set( degradedLockData.keySize, degradedLockData.key, ( void * ) original );
 			keyValueUpdate.offset = degradedLockData.valueUpdateOffset;
 			keyValueUpdate.length = degradedLockData.valueUpdateSize;
-			if ( ! ClientWorker::pending->insertKeyValueUpdate( PT_SLAVE_UPDATE, instanceId, pid.parentInstanceId, requestId, pid.parentRequestId, ( void * ) socket, keyValueUpdate, true, true, requestTimestamp ) ) {
+			if ( ! ClientWorker::pending->insertKeyValueUpdate( PT_SERVER_UPDATE, instanceId, pid.parentInstanceId, requestId, pid.parentRequestId, ( void * ) socket, keyValueUpdate, true, true, requestTimestamp ) ) {
 				__ERROR__( "ClientWorker", "handleUpdateRequest", "Cannot insert into slave UPDATE pending map." );
 			}
 			break;
@@ -270,7 +270,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 
 			// Insert into slave DELETE pending map
 			key.set( degradedLockData.keySize, degradedLockData.key, ( void * ) original );
-			if ( ! ClientWorker::pending->insertKey( PT_SLAVE_DEL, instanceId, pid.parentInstanceId, requestId, pid.parentRequestId, ( void * ) socket, key, true, true, requestTimestamp ) ) {
+			if ( ! ClientWorker::pending->insertKey( PT_SERVER_DEL, instanceId, pid.parentInstanceId, requestId, pid.parentRequestId, ( void * ) socket, key, true, true, requestTimestamp ) ) {
 				__ERROR__( "ClientWorker", "handleDegradedLockResponse", "Cannot insert into slave DELETE pending map." );
 			}
 			break;

@@ -6,9 +6,9 @@
 
 #define TIME_OUT 1
 
-#define MASTER_REMAP_UNIT_TEST
+#define CLIENT_REMAP_UNIT_TEST
 #include "common.hh"
-#undef MASTER_REMAP_UNIT_TEST
+#undef CLIENT_REMAP_UNIT_TEST
 
 int main ( int argc, char **argv ) {
 

@@ -1,5 +1,5 @@
-#ifndef __SLAVE_ACK_PENDING_ACK_HH__
-#define __SLAVE_ACK_PENDING_ACK_HH__
+#ifndef __SERVER_ACK_PENDING_ACK_HH__
+#define __SERVER_ACK_PENDING_ACK_HH__
 
 #include <unordered_set>
 #include <cstdint>

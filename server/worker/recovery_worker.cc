@@ -248,7 +248,7 @@ bool ServerWorker::handleReconstructionRequest( CoordinatorEvent event, char *bu
 						metadata.listId, metadata.stripeId, metadata.chunkId,
 						socket, 0, false
 					);
-					if ( ! ServerWorker::pending->insertChunkRequest( PT_SLAVE_PEER_GET_CHUNK, instanceId, event.instanceId, requestId, event.requestId, socket, chunkRequest ) ) {
+					if ( ! ServerWorker::pending->insertChunkRequest( PT_SERVER_PEER_GET_CHUNK, instanceId, event.instanceId, requestId, event.requestId, socket, chunkRequest ) ) {
 						__ERROR__( "ServerWorker", "handleReconstructionRequest", "Cannot insert into slave CHUNK_REQUEST pending map." );
 					} else {
 						requestIds[ chunkId ]->push_back( requestId );
@@ -278,7 +278,7 @@ bool ServerWorker::handleReconstructionRequest( CoordinatorEvent event, char *bu
 			metadata.listId, metadata.stripeId, myChunkId,
 			0, chunk, false
 		);
-		if ( ! ServerWorker::pending->insertChunkRequest( PT_SLAVE_PEER_GET_CHUNK, instanceId, event.instanceId, requestId, event.requestId, 0, chunkRequest ) ) {
+		if ( ! ServerWorker::pending->insertChunkRequest( PT_SERVER_PEER_GET_CHUNK, instanceId, event.instanceId, requestId, event.requestId, 0, chunkRequest ) ) {
 			__ERROR__( "ServerWorker", "handleReconstructionRequest", "Cannot insert into slave CHUNK_REQUEST pending map." );
 		}
 	}
@@ -373,7 +373,7 @@ bool ServerWorker::handleReconstructionUnsealedRequest( CoordinatorEvent event, 
 	while ( ! isCompleted ) {
 		requestId = ServerWorker::idGenerator->nextVal( this->workerId );
 		if ( ! ServerWorker::pending->insert(
-			PT_SLAVE_PEER_FORWARD_KEYS,
+			PT_SERVER_PEER_FORWARD_KEYS,
 			Slave::instanceId, event.instanceId,
 			requestId, event.requestId,
 			( void * ) reconstructedSlave
