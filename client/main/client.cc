@@ -241,7 +241,7 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 	}
 
 	/* Remapping message handler; Remapping scheme */
-	if ( this->config.global.states.enabled ) {
+	if ( ! this->config.global.states.disabled ) {
 		char masterName[ 11 ];
 		memset( masterName, 0, 11 );
 		sprintf( masterName, "%s%04d", CLIENT_PREFIX, this->config.client.client.addr.id );
@@ -330,7 +330,7 @@ bool Master::start() {
 	}
 
 	/* Remapping message handler */
-	if ( this->config.global.states.enabled && ! this->remapMsgHandler.start() ) {
+	if ( ! this->config.global.states.disabled && ! this->remapMsgHandler.start() ) {
 		__ERROR__( "Master", "start", "Cannot start remapping message handler." );
 		ret = false;
 	}
@@ -384,7 +384,7 @@ bool Master::stop() {
 	this->sockets.slaves.clear();
 
 	 /* Remapping message handler */
-	if ( this->config.global.states.enabled ) {
+	if ( ! this->config.global.states.disabled ) {
 		this->remapMsgHandler.stop();
 		this->remapMsgHandler.quit();
 	}

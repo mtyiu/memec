@@ -44,7 +44,7 @@ public:
 		CodingParams params;
 	} coding;
 	struct {
-		bool enabled;
+		bool disabled;
 		ServerAddr spreaddAddr;
 		uint16_t workers;
 		uint32_t queue;

@@ -43,7 +43,7 @@ void Coordinator::switchPhaseForCrashedSlave( ServerSocket *serverSocket ) {
 
 void Coordinator::switchPhase( std::set<struct sockaddr_in> prevOverloadedSlaves ) {
 	// skip if remap feature is disabled
-	if ( ! this->config.global.states.enabled )
+	if ( this->config.global.states.disabled )
 		return;
 
 	ClientEvent event;
@@ -311,7 +311,7 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 	}
 
 	/* Remapping message handler */
-	if ( this->config.global.states.enabled ) {
+	if ( ! this->config.global.states.disabled ) {
 		char coordName[ 11 ];
 		memset( coordName, 0, 11 );
 		sprintf( coordName, "%s%04d", COORD_PREFIX, this->config.coordinator.coordinator.addr.id );
@@ -374,7 +374,7 @@ bool Coordinator::start() {
 	}
 
 	/* Remapping message handler */
-	if ( this->config.global.states.enabled && ! this->remapMsgHandler->start() ) {
+	if ( ! this->config.global.states.disabled && ! this->remapMsgHandler->start() ) {
 		__ERROR__( "Coordinator", "start", "Cannot start remapping message handler." );
 		return false;
 	}
@@ -426,7 +426,7 @@ bool Coordinator::stop() {
 
 	/* Remapping message handler */
 	printf( "Stopping remapping message handler...\n" );
-	if ( this->config.global.states.enabled ) {
+	if ( ! this->config.global.states.disabled ) {
 		this->remapMsgHandler->stop();
 		this->remapMsgHandler->quit();
 	}
@@ -589,7 +589,7 @@ void Coordinator::debug( FILE *f ) {
 	fprintf( f, "\nOther threads\n--------------\n" );
 	this->sockets.self.printThread();
 
-	if ( this->config.global.states.enabled ) {
+	if ( ! this->config.global.states.disabled ) {
 		fprintf( f, "\nRemapping handler event queue\n------------------\n" );
 		this->remapMsgHandler->eventQueue->print();
 	}
@@ -743,7 +743,7 @@ void Coordinator::printRemapping( FILE *f ) {
 	fprintf( f, "\nRemapping Records\n" );
 	fprintf( f, "----------------------------------------\n" );
 	this->remappingRecords.print( f );
-	if ( this->config.global.states.enabled ) {
+	if ( ! this->config.global.states.disabled ) {
 		fprintf( f, "\nList of Tracking Slaves\n" );
 		fprintf( f, "----------------------------------------\n" );
 		this->remapMsgHandler->listAliveSlaves();

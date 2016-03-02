@@ -161,7 +161,7 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 		CoordinatorWorker::pending->eraseAnnouncement( event.socket );
 
 		// Mark it as failed
-		if ( Coordinator::getInstance()->config.global.states.enabled ) {
+		if ( ! Coordinator::getInstance()->config.global.states.disabled ) {
 			Coordinator::getInstance()->switchPhaseForCrashedSlave( event.socket );
 		} else {
 			ServerEvent serverEvent;

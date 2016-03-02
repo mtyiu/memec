@@ -25,7 +25,7 @@ GlobalConfig::GlobalConfig() {
 	this->coding.scheme = CS_RAID0;
 	this->coding.params.setN( 1 );
 
-	this->states.enabled = false;
+	this->states.disabled = true;
 	this->states.workers = 4;
 	this->states.queue = 256;
 	this->states.smoothingFactor = 0.3;
@@ -94,8 +94,8 @@ bool GlobalConfig::set( const char *section, const char *name, const char *value
 		else
 			return false;
 	} else if ( match( section, "states" ) ) {
-		if ( match( name, "enabled" ) ) {
-			this->states.enabled = ( atoi( value ) >= 1 );
+		if ( match( name, "disabled" ) ) {
+			this->states.disabled = match( value, "true" );
 		} else if ( match( name, "spreadd" ) ) {
 			ServerAddr addr;
 			if ( addr.parse( name, value ) )
@@ -222,7 +222,7 @@ bool GlobalConfig::validate() {
 	if ( this->servers.empty() )
 		CFG_PARSE_ERROR( "GlobalConfig", "There should be at least one server." );
 
-	if ( this->states.enabled ) {
+	if ( ! this->states.disabled ) {
 		if ( ! this->states.spreaddAddr.isInitialized() )
 			CFG_PARSE_ERROR( "GlobalConfig", "The spread daemon address is not an valid address." );
 		if ( this->states.workers < 1 )
@@ -339,10 +339,10 @@ void GlobalConfig::print( FILE *f ) {
 		width, "Size", this->eventQueue.size, this->eventQueue.prioritized,
 		width, "Metadata", this->timeout.metadata,
 		width, "Load", this->timeout.load,
-		width, "Enabled?", this->states.enabled ? "Yes" : "No"
+		width, "Disabled?", this->states.disabled ? "Yes" : "No"
 	);
 
-	if ( this->states.enabled ) {
+	if ( ! this->states.disabled ) {
 		fprintf(
 			f,
 			"\t- %-*s : ",
