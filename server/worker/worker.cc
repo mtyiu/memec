@@ -1,30 +1,30 @@
 #include "worker.hh"
 #include "../main/server.hh"
 
-uint32_t SlaveWorker::dataChunkCount;
-uint32_t SlaveWorker::parityChunkCount;
-uint32_t SlaveWorker::chunkCount;
-bool SlaveWorker::disableSeal;
-unsigned int SlaveWorker::delay;
-IDGenerator *SlaveWorker::idGenerator;
-ArrayMap<int, ServerPeerSocket> *SlaveWorker::slavePeers;
-Pending *SlaveWorker::pending;
-PendingAck *SlaveWorker::pendingAck;
-ServerAddr *SlaveWorker::slaveServerAddr;
-Coding *SlaveWorker::coding;
-ServerEventQueue *SlaveWorker::eventQueue;
-StripeList<ServerPeerSocket> *SlaveWorker::stripeList;
-std::vector<StripeListIndex> *SlaveWorker::stripeListIndex;
-Map *SlaveWorker::map;
-MemoryPool<Chunk> *SlaveWorker::chunkPool;
-std::vector<MixedChunkBuffer *> *SlaveWorker::chunkBuffer;
-GetChunkBuffer *SlaveWorker::getChunkBuffer;
-DegradedChunkBuffer *SlaveWorker::degradedChunkBuffer;
-RemappedBuffer *SlaveWorker::remappedBuffer;
-PacketPool *SlaveWorker::packetPool;
-Timestamp *SlaveWorker::timestamp;
+uint32_t ServerWorker::dataChunkCount;
+uint32_t ServerWorker::parityChunkCount;
+uint32_t ServerWorker::chunkCount;
+bool ServerWorker::disableSeal;
+unsigned int ServerWorker::delay;
+IDGenerator *ServerWorker::idGenerator;
+ArrayMap<int, ServerPeerSocket> *ServerWorker::slavePeers;
+Pending *ServerWorker::pending;
+PendingAck *ServerWorker::pendingAck;
+ServerAddr *ServerWorker::slaveServerAddr;
+Coding *ServerWorker::coding;
+ServerEventQueue *ServerWorker::eventQueue;
+StripeList<ServerPeerSocket> *ServerWorker::stripeList;
+std::vector<StripeListIndex> *ServerWorker::stripeListIndex;
+Map *ServerWorker::map;
+MemoryPool<Chunk> *ServerWorker::chunkPool;
+std::vector<MixedChunkBuffer *> *ServerWorker::chunkBuffer;
+GetChunkBuffer *ServerWorker::getChunkBuffer;
+DegradedChunkBuffer *ServerWorker::degradedChunkBuffer;
+RemappedBuffer *ServerWorker::remappedBuffer;
+PacketPool *ServerWorker::packetPool;
+Timestamp *ServerWorker::timestamp;
 
-void SlaveWorker::dispatch( MixedEvent event ) {
+void ServerWorker::dispatch( MixedEvent event ) {
 	switch( event.type ) {
 		case EVENT_TYPE_CODING:
 			this->dispatch( event.event.coding );
@@ -49,17 +49,17 @@ void SlaveWorker::dispatch( MixedEvent event ) {
 	}
 }
 
-void SlaveWorker::dispatch( CodingEvent event ) {
+void ServerWorker::dispatch( CodingEvent event ) {
 	switch( event.type ) {
 		case CODING_EVENT_TYPE_DECODE:
-			SlaveWorker::coding->decode( event.message.decode.chunks, event.message.decode.status );
+			ServerWorker::coding->decode( event.message.decode.chunks, event.message.decode.status );
 			break;
 		default:
 			return;
 	}
 }
 
-void SlaveWorker::dispatch( IOEvent event ) {
+void ServerWorker::dispatch( IOEvent event ) {
 	switch( event.type ) {
 		case IO_EVENT_TYPE_FLUSH_CHUNK:
 			this->storage->write(
@@ -72,12 +72,12 @@ void SlaveWorker::dispatch( IOEvent event ) {
 	}
 }
 
-void SlaveWorker::dispatch( ServerEvent event ) {
+void ServerWorker::dispatch( ServerEvent event ) {
 }
 
-ServerPeerSocket *SlaveWorker::getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId ) {
+ServerPeerSocket *ServerWorker::getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId ) {
 	ServerPeerSocket *ret;
-	listId = SlaveWorker::stripeList->get(
+	listId = ServerWorker::stripeList->get(
 		data, ( size_t ) size,
 		this->dataServerSockets,
 		this->parityServerSockets,
@@ -89,19 +89,19 @@ ServerPeerSocket *SlaveWorker::getSlaves( char *data, uint8_t size, uint32_t &li
 	return ret;
 }
 
-bool SlaveWorker::getSlaves( uint32_t listId ) {
-	SlaveWorker::stripeList->get( listId, this->parityServerSockets, this->dataServerSockets );
+bool ServerWorker::getSlaves( uint32_t listId ) {
+	ServerWorker::stripeList->get( listId, this->parityServerSockets, this->dataServerSockets );
 
-	for ( uint32_t i = 0; i < SlaveWorker::parityChunkCount; i++ )
+	for ( uint32_t i = 0; i < ServerWorker::parityChunkCount; i++ )
 		if ( ! this->parityServerSockets[ i ]->ready() )
 			return false;
-	for ( uint32_t i = 0; i < SlaveWorker::dataChunkCount; i++ )
+	for ( uint32_t i = 0; i < ServerWorker::dataChunkCount; i++ )
 		if ( ! this->dataServerSockets[ i ]->ready() )
 			return false;
 	return true;
 }
 
-void SlaveWorker::free() {
+void ServerWorker::free() {
 	if ( this->storage ) {
 		this->storage->stop();
 		Storage::destroy( this->storage );
@@ -118,8 +118,8 @@ void SlaveWorker::free() {
 	delete this->parityChunk;
 	delete[] this->chunks;
 
-	delete[] this->sealIndicators[ SlaveWorker::parityChunkCount ];
-	delete[] this->sealIndicators[ SlaveWorker::parityChunkCount + 1 ];
+	delete[] this->sealIndicators[ ServerWorker::parityChunkCount ];
+	delete[] this->sealIndicators[ ServerWorker::parityChunkCount + 1 ];
 	delete[] this->sealIndicators;
 
 	this->forward.dataChunk->free();
@@ -133,9 +133,9 @@ void SlaveWorker::free() {
 	delete[] this->parityServerSockets;
 }
 
-void *SlaveWorker::run( void *argv ) {
-	SlaveWorker *worker = ( SlaveWorker * ) argv;
-	ServerEventQueue *eventQueue = SlaveWorker::eventQueue;
+void *ServerWorker::run( void *argv ) {
+	ServerWorker *worker = ( ServerWorker * ) argv;
+	ServerEventQueue *eventQueue = ServerWorker::eventQueue;
 
 	MixedEvent event;
 	bool ret;
@@ -149,35 +149,35 @@ void *SlaveWorker::run( void *argv ) {
 	return 0;
 }
 
-bool SlaveWorker::init() {
+bool ServerWorker::init() {
 	Slave *slave = Slave::getInstance();
 
-	SlaveWorker::idGenerator = &slave->idGenerator;
-	SlaveWorker::dataChunkCount = slave->config.global.coding.params.getDataChunkCount();
-	SlaveWorker::parityChunkCount = slave->config.global.coding.params.getParityChunkCount();
-	SlaveWorker::chunkCount = SlaveWorker::dataChunkCount + SlaveWorker::parityChunkCount;
-	SlaveWorker::disableSeal = slave->config.server.seal.disabled;
-	SlaveWorker::delay = 0;
-	SlaveWorker::slavePeers = &slave->sockets.slavePeers;
-	SlaveWorker::pending = &slave->pending;
-	SlaveWorker::pendingAck = &slave->pendingAck;
-	SlaveWorker::slaveServerAddr = &slave->config.server.server.addr;
-	SlaveWorker::coding = slave->coding;
-	SlaveWorker::eventQueue = &slave->eventQueue;
-	SlaveWorker::stripeList = slave->stripeList;
-	SlaveWorker::stripeListIndex = &slave->stripeListIndex;
-	SlaveWorker::map = &slave->map;
-	SlaveWorker::chunkPool = slave->chunkPool;
-	SlaveWorker::chunkBuffer = &slave->chunkBuffer;
-	SlaveWorker::getChunkBuffer = &slave->getChunkBuffer;
-	SlaveWorker::degradedChunkBuffer = &slave->degradedChunkBuffer;
-	SlaveWorker::remappedBuffer = &slave->remappedBuffer;
-	SlaveWorker::packetPool = &slave->packetPool;
-	SlaveWorker::timestamp = &slave->timestamp;
+	ServerWorker::idGenerator = &slave->idGenerator;
+	ServerWorker::dataChunkCount = slave->config.global.coding.params.getDataChunkCount();
+	ServerWorker::parityChunkCount = slave->config.global.coding.params.getParityChunkCount();
+	ServerWorker::chunkCount = ServerWorker::dataChunkCount + ServerWorker::parityChunkCount;
+	ServerWorker::disableSeal = slave->config.server.seal.disabled;
+	ServerWorker::delay = 0;
+	ServerWorker::slavePeers = &slave->sockets.slavePeers;
+	ServerWorker::pending = &slave->pending;
+	ServerWorker::pendingAck = &slave->pendingAck;
+	ServerWorker::slaveServerAddr = &slave->config.server.server.addr;
+	ServerWorker::coding = slave->coding;
+	ServerWorker::eventQueue = &slave->eventQueue;
+	ServerWorker::stripeList = slave->stripeList;
+	ServerWorker::stripeListIndex = &slave->stripeListIndex;
+	ServerWorker::map = &slave->map;
+	ServerWorker::chunkPool = slave->chunkPool;
+	ServerWorker::chunkBuffer = &slave->chunkBuffer;
+	ServerWorker::getChunkBuffer = &slave->getChunkBuffer;
+	ServerWorker::degradedChunkBuffer = &slave->degradedChunkBuffer;
+	ServerWorker::remappedBuffer = &slave->remappedBuffer;
+	ServerWorker::packetPool = &slave->packetPool;
+	ServerWorker::timestamp = &slave->timestamp;
 	return true;
 }
 
-bool SlaveWorker::init( GlobalConfig &globalConfig, ServerConfig &serverConfig, uint32_t workerId ) {
+bool ServerWorker::init( GlobalConfig &globalConfig, ServerConfig &serverConfig, uint32_t workerId ) {
 	this->protocol.init(
 		Protocol::getSuggestedBufferSize(
 			globalConfig.size.key,
@@ -187,18 +187,18 @@ bool SlaveWorker::init( GlobalConfig &globalConfig, ServerConfig &serverConfig, 
 	this->workerId = workerId;
 	this->buffer.data = new char[ globalConfig.size.chunk ];
 	this->buffer.size = globalConfig.size.chunk;
-	this->chunkStatus = new BitmaskArray( SlaveWorker::chunkCount, 1 );
+	this->chunkStatus = new BitmaskArray( ServerWorker::chunkCount, 1 );
 
 	this->dataChunk = new Chunk();
 	this->parityChunk = new Chunk();
-	this->chunks = new Chunk*[ SlaveWorker::chunkCount ];
+	this->chunks = new Chunk*[ ServerWorker::chunkCount ];
 
 	this->forward.dataChunk = new Chunk();
 	this->forward.parityChunk = new Chunk();
-	this->forward.chunks = new Chunk*[ SlaveWorker::chunkCount ];
+	this->forward.chunks = new Chunk*[ ServerWorker::chunkCount ];
 
-	this->freeChunks = new Chunk[ SlaveWorker::dataChunkCount ];
-	for( uint32_t i = 0; i < SlaveWorker::dataChunkCount; i++ ) {
+	this->freeChunks = new Chunk[ ServerWorker::dataChunkCount ];
+	for( uint32_t i = 0; i < ServerWorker::dataChunkCount; i++ ) {
 		this->freeChunks[ i ].init( globalConfig.size.chunk );
 		this->freeChunks[ i ].init();
 	}
@@ -210,12 +210,12 @@ bool SlaveWorker::init( GlobalConfig &globalConfig, ServerConfig &serverConfig, 
 	this->forward.dataChunk->init();
 	this->forward.parityChunk->init();
 
-	this->sealIndicators = new bool*[ SlaveWorker::parityChunkCount + 2 ];
-	this->sealIndicators[ SlaveWorker::parityChunkCount ] = new bool[ SlaveWorker::dataChunkCount ];
-	this->sealIndicators[ SlaveWorker::parityChunkCount + 1 ] = new bool[ SlaveWorker::dataChunkCount ];
+	this->sealIndicators = new bool*[ ServerWorker::parityChunkCount + 2 ];
+	this->sealIndicators[ ServerWorker::parityChunkCount ] = new bool[ ServerWorker::dataChunkCount ];
+	this->sealIndicators[ ServerWorker::parityChunkCount + 1 ] = new bool[ ServerWorker::dataChunkCount ];
 
-	this->dataServerSockets = new ServerPeerSocket*[ SlaveWorker::dataChunkCount ];
-	this->parityServerSockets = new ServerPeerSocket*[ SlaveWorker::parityChunkCount ];
+	this->dataServerSockets = new ServerPeerSocket*[ ServerWorker::dataChunkCount ];
+	this->parityServerSockets = new ServerPeerSocket*[ ServerWorker::parityChunkCount ];
 
 	this->storage = Storage::instantiate( serverConfig );
 	this->storage->start();
@@ -223,19 +223,19 @@ bool SlaveWorker::init( GlobalConfig &globalConfig, ServerConfig &serverConfig, 
 	return true;
 }
 
-bool SlaveWorker::start() {
+bool ServerWorker::start() {
 	this->isRunning = true;
-	if ( pthread_create( &this->tid, NULL, SlaveWorker::run, ( void * ) this ) != 0 ) {
-		__ERROR__( "SlaveWorker", "start", "Cannot start worker thread." );
+	if ( pthread_create( &this->tid, NULL, ServerWorker::run, ( void * ) this ) != 0 ) {
+		__ERROR__( "ServerWorker", "start", "Cannot start worker thread." );
 		return false;
 	}
 	return true;
 }
 
-void SlaveWorker::stop() {
+void ServerWorker::stop() {
 	this->isRunning = false;
 }
 
-void SlaveWorker::print( FILE *f ) {
+void ServerWorker::print( FILE *f ) {
 	fprintf( f, "Worker (Thread ID = %lu): %srunning\n", this->tid, this->isRunning ? "" : "not " );
 }

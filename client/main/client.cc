@@ -231,9 +231,9 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 		this->config.global.eventQueue.prioritized
 	);
 	this->workers.reserve( this->config.global.workers.count );
-	MasterWorker::init();
+	ClientWorker::init();
 	for ( int i = 0, len = this->config.global.workers.count; i < len; i++ ) {
-		this->workers.push_back( MasterWorker() );
+		this->workers.push_back( ClientWorker() );
 		this->workers[ i ].init(
 			this->config.global,
 			i // worker ID
@@ -554,11 +554,11 @@ void Master::interactive() {
 			// FOR REPLAY TESTING ONLY
 			for ( int i = 0, len = this->sockets.slaves.size(); i < len; i ++ ) {
 				printf("Prepare replay for slave id = %hu fd = %u\n", this->sockets.slaves[ i ]->instanceId, this->sockets.slaves[ i ]->getSocket() );
-				MasterWorker::replayRequestPrepare( this->sockets.slaves[ i ] );
+				ClientWorker::replayRequestPrepare( this->sockets.slaves[ i ] );
 			}
 			for ( int i = 0, len = this->sockets.slaves.size(); i < len; i ++ ) {
 				printf("Replay for slave id = %hu fd = %u\n", this->sockets.slaves[ i ]->instanceId, this->sockets.slaves[ i ]->getSocket() );
-				MasterWorker::replayRequest( this->sockets.slaves[ i ] );
+				ClientWorker::replayRequest( this->sockets.slaves[ i ] );
 			}
 			valid = true;
 		} else {

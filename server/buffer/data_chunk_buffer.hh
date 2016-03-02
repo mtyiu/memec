@@ -9,7 +9,7 @@
 
 #include "chunk_buffer.hh"
 
-class SlaveWorker;
+class ServerWorker;
 
 class DataChunkBuffer : public ChunkBuffer {
 private:
@@ -33,19 +33,19 @@ public:
 
 	inline uint32_t getChunkId() { return this->chunkId; }
 
-	KeyMetadata set( SlaveWorker *worker, char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode, uint32_t &timestamp, uint32_t &stripeId, bool *isSealed = 0, Metadata *sealed = 0 );
+	KeyMetadata set( ServerWorker *worker, char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode, uint32_t &timestamp, uint32_t &stripeId, bool *isSealed = 0, Metadata *sealed = 0 );
 
-	size_t seal( SlaveWorker *worker );
+	size_t seal( ServerWorker *worker );
 
 	// Re-insert into the buffer after a DELETE operation
-	bool reInsert( SlaveWorker *worker, Chunk *chunk, uint32_t sizeToBeFreed, bool needsLock, bool needsUnlock );
+	bool reInsert( ServerWorker *worker, Chunk *chunk, uint32_t sizeToBeFreed, bool needsLock, bool needsUnlock );
 
 	int lockChunk( Chunk *chunk, bool keepGlobalLock );
 	void updateAndUnlockChunk( int index );
 	void unlock( int index = -1 );
 
-	uint32_t flush( SlaveWorker *worker, bool lock = true, bool lockAtIndex = false, Metadata *sealed = 0 );
-	Chunk *flushAt( SlaveWorker *worker, int index, bool lock = true, Metadata *sealed = 0 );
+	uint32_t flush( ServerWorker *worker, bool lock = true, bool lockAtIndex = false, Metadata *sealed = 0 );
+	Chunk *flushAt( ServerWorker *worker, int index, bool lock = true, Metadata *sealed = 0 );
 
 	void print( FILE *f = stdout );
 	void stop();

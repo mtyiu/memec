@@ -17,7 +17,7 @@
 
 #define CLIENT_WORKER_SEND_REPLICAS_PARALLEL
 
-class MasterWorker : public Worker {
+class ClientWorker : public Worker {
 private:
 	uint32_t workerId;
 	MasterProtocol protocol;

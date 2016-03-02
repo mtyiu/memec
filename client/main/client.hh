@@ -33,7 +33,7 @@ class Master {
 private:
 	bool isRunning;
 	struct timespec startTime;
-	std::vector<MasterWorker> workers;
+	std::vector<ClientWorker> workers;
 
 	Master();
 	// Do not implement

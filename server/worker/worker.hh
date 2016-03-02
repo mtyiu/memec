@@ -28,7 +28,7 @@
 
 #define SERVER_WORKER_SEND_REPLICAS_PARALLEL
 
-class SlaveWorker : public Worker {
+class ServerWorker : public Worker {
 private:
 	uint32_t workerId;
 	SlaveProtocol protocol;

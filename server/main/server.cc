@@ -174,10 +174,10 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 		this->config.global.eventQueue.size,
 		this->config.global.eventQueue.prioritized
 	);
-	SlaveWorker::init();
+	ServerWorker::init();
 	this->workers.reserve( this->config.global.workers.count );
 	for ( int i = 0, len = this->config.global.workers.count; i < len; i++ ) {
-		this->workers.push_back( SlaveWorker() );
+		this->workers.push_back( ServerWorker() );
 		this->workers[ i ].init(
 			this->config.global,
 			this->config.server,
@@ -469,7 +469,7 @@ void Slave::setDelay() {
 	printf( "How much delay (in usec)? " );
 	fflush( stdout );
 	if ( scanf( "%u", &delay ) == 1 )  {
-		SlaveWorker::delay = delay;
+		ServerWorker::delay = delay;
 	} else {
 		printf( "Invalid input.\n" );
 	}

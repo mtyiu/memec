@@ -1,7 +1,7 @@
 #include "worker.hh"
 #include "../main/client.hh"
 
-void MasterWorker::dispatch( CoordinatorEvent event ) {
+void ClientWorker::dispatch( CoordinatorEvent event ) {
 	bool connected, isSend;
 	uint16_t instanceId = Master::instanceId;
 	uint32_t requestId;
@@ -12,7 +12,7 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 	} buffer;
 
 	if ( event.type != COORDINATOR_EVENT_TYPE_PENDING )
-		requestId = MasterWorker::idGenerator->nextVal( this->workerId );
+		requestId = ClientWorker::idGenerator->nextVal( this->workerId );
 
 	switch( event.type ) {
 		case COORDINATOR_EVENT_TYPE_REGISTER_REQUEST:
@@ -45,7 +45,7 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 	if ( isSend ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
 		if ( ret != ( ssize_t ) buffer.size )
-			__ERROR__( "MasterWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+			__ERROR__( "ClientWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 	} else {
 		ProtocolHeader header;
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();
@@ -54,13 +54,13 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 		Master *master = Master::getInstance();
 
 		while ( buffer.size > 0 ) {
-			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "MasterWorker" );
+			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "ClientWorker" );
 
 			buffer.data += PROTO_HEADER_SIZE;
 			buffer.size -= PROTO_HEADER_SIZE;
 			// Validate message
 			if ( header.from != PROTO_MAGIC_FROM_COORDINATOR ) {
-				__ERROR__( "MasterWorker", "dispatch", "Invalid message source from coordinator." );
+				__ERROR__( "ClientWorker", "dispatch", "Invalid message source from coordinator." );
 			} else {
 				bool success;
 				switch( header.magic ) {
@@ -83,7 +83,7 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 								Master::instanceId = header.instanceId;
 								break;
 							case PROTO_MAGIC_RESPONSE_FAILURE:
-								__ERROR__( "MasterWorker", "dispatch", "Failed to register with coordinator." );
+								__ERROR__( "ClientWorker", "dispatch", "Failed to register with coordinator." );
 								break;
 							case PROTO_MAGIC_LOADING_STATS:
 								this->protocol.parseLoadStatsHeader( loadStatsHeader, buffer.data, buffer.size );
@@ -107,7 +107,7 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 
 								break;
 							default:
-								__ERROR__( "MasterWorker", "dispatch", "Invalid magic code from coordinator." );
+								__ERROR__( "ClientWorker", "dispatch", "Invalid magic code from coordinator." );
 								break;
 						}
 						break;
@@ -123,7 +123,7 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 								success = false;
 								break;
 							default:
-								__ERROR__( "MasterWorker", "dispatch", "Invalid magic code from coordinator." );
+								__ERROR__( "ClientWorker", "dispatch", "Invalid magic code from coordinator." );
 								goto quit_1;
 						}
 						this->handleRemappingSetLockResponse( event, success, buffer.data, buffer.size );
@@ -132,7 +132,7 @@ void MasterWorker::dispatch( CoordinatorEvent event ) {
 						this->handleSlaveReconstructedMsg( event, buffer.data, header.length );
 						break;
 					default:
-						__ERROR__( "MasterWorker", "dispatch", "Invalid opcode from coordinator." );
+						__ERROR__( "ClientWorker", "dispatch", "Invalid opcode from coordinator." );
 						break;
 				}
 			}
@@ -144,5 +144,5 @@ quit_1:
 		if ( connected ) event.socket->done();
 	}
 	if ( ! connected )
-		__ERROR__( "MasterWorker", "dispatch", "The coordinator is disconnected." );
+		__ERROR__( "ClientWorker", "dispatch", "The coordinator is disconnected." );
 }

@@ -1,10 +1,10 @@
 #include "worker.hh"
 #include "../main/client.hh"
 
-bool MasterWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *buf, size_t size ) {
+bool ClientWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *buf, size_t size ) {
 	struct AddressHeader srcHeader, dstHeader;
 	if ( ! this->protocol.parseSrcDstAddressHeader( srcHeader, dstHeader, buf, size ) ) {
-		__ERROR__( "MasterWorker", "handleSlaveReconstructedMsg", "Invalid address header." );
+		__ERROR__( "ClientWorker", "handleSlaveReconstructedMsg", "Invalid address header." );
 		return false;
 	}
 
@@ -16,7 +16,7 @@ bool MasterWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *bu
 	// __DEBUG__(
 	// 	YELLOW,
 	__ERROR__(
-		"MasterWorker", "handleSlaveReconstructedMsg",
+		"ClientWorker", "handleSlaveReconstructedMsg",
 		"Slave: %s:%s is reconstructed at %s:%s.",
 		srcTmp, srcTmp + 16, dstTmp, dstTmp + 16
 	);
@@ -36,7 +36,7 @@ bool MasterWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *bu
 		}
 	}
 	if ( index == -1 ) {
-		__ERROR__( "MasterWorker", "handleSlaveReconstructedMsg", "The slave is not in the list. Ignoring this slave..." );
+		__ERROR__( "ClientWorker", "handleSlaveReconstructedMsg", "The slave is not in the list. Ignoring this slave..." );
 		return false;
 	}
 	original->stop();
@@ -58,11 +58,11 @@ bool MasterWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *bu
 	slaves->values[ index ]->timestamp.current.setVal( 0 );
 	slaves->values[ index ]->timestamp.lastAck.setVal( 0 );
 	if ( ! s->start() ) {
-		__ERROR__( "MasterWorker", "handleSlaveReconstructedMsg", "Cannot start socket." );
+		__ERROR__( "ClientWorker", "handleSlaveReconstructedMsg", "Cannot start socket." );
 	}
 	s->registerMaster();
 
-	MasterWorker::stripeList->update();
+	ClientWorker::stripeList->update();
 	delete original;
 
 	return true;

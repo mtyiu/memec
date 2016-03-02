@@ -2,7 +2,7 @@
 #include "../main/client.hh"
 #include "../../common/ds/instance_id_generator.hh"
 
-void MasterWorker::dispatch( ApplicationEvent event ) {
+void ClientWorker::dispatch( ApplicationEvent event ) {
 	bool success = true, connected, isSend, isReplay = false;
 	ssize_t ret;
 	struct {
@@ -201,18 +201,18 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 	if ( isSend ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
 		if ( ret != ( ssize_t ) buffer.size )
-			__ERROR__( "MasterWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+			__ERROR__( "ClientWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 	} else if ( ! isReplay ) {
 		// Parse requests from applications
 		ProtocolHeader header;
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();
 		while ( buffer.size > 0 ) {
-			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "MasterWorker" );
+			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "ClientWorker" );
 
 			buffer.data += PROTO_HEADER_SIZE;
 			buffer.size -= PROTO_HEADER_SIZE;
 			if ( header.magic != PROTO_MAGIC_REQUEST || header.from != PROTO_MAGIC_FROM_APPLICATION ) {
-				__ERROR__( "MasterWorker", "dispatch", "Invalid protocol header." );
+				__ERROR__( "ClientWorker", "dispatch", "Invalid protocol header." );
 			} else {
 				event.instanceId = header.instanceId;
 				event.requestId = header.requestId;
@@ -230,7 +230,7 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 						this->handleDeleteRequest( event, buffer.data, buffer.size );
 						break;
 					default:
-						__ERROR__( "MasterWorker", "dispatch", "Invalid opcode from application." );
+						__ERROR__( "ClientWorker", "dispatch", "Invalid opcode from application." );
 						break;
 				}
 			}
@@ -241,19 +241,19 @@ void MasterWorker::dispatch( ApplicationEvent event ) {
 	}
 
 	if ( ! connected && ! isReplay ) {
-		__DEBUG__( RED, "MasterWorker", "dispatch", "The application is disconnected." );
+		__DEBUG__( RED, "ClientWorker", "dispatch", "The application is disconnected." );
 		// delete event.socket;
 	}
 }
 
-bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t size ) {
+bool ClientWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t size ) {
 	struct KeyValueHeader header;
 	if ( ! this->protocol.parseKeyValueHeader( header, buf, size ) ) {
-		__ERROR__( "MasterWorker", "handleSetRequest", "Invalid SET request." );
+		__ERROR__( "ClientWorker", "handleSetRequest", "Invalid SET request." );
 		return false;
 	}
 	__DEBUG__(
-		BLUE, "MasterWorker", "handleSetRequest",
+		BLUE, "ClientWorker", "handleSetRequest",
 		"[SET] Key: %.*s (key size = %u); Value: (value size = %u)",
 		( int ) header.keySize, header.key, header.keySize, header.valueSize
 	);
@@ -278,11 +278,11 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 
 	// decide whether any of the data / parity slave needs to use remapping flow
 	Master *master = Master::getInstance();
-	if ( ! MasterWorker::disableDegraded ) {
-		for ( uint32_t i = 0; i < 1 + MasterWorker::parityChunkCount; i++ ) {
+	if ( ! ClientWorker::disableDegraded ) {
+		for ( uint32_t i = 0; i < 1 + ClientWorker::parityChunkCount; i++ ) {
 			struct sockaddr_in addr = ( i == 0 ) ? socket->getAddr() : this->parityServerSockets[ i - 1 ]->getAddr();
 			if ( master->remapMsgHandler.useCoordinatedFlow( addr ) ) {
-				// printf( "(%u, %u) is overloaded!\n", listId, i == 0 ? chunkId : i - 1 + MasterWorker::dataChunkCount );
+				// printf( "(%u, %u) is overloaded!\n", listId, i == 0 ? chunkId : i - 1 + ClientWorker::dataChunkCount );
 				return this->handleRemappingSetRequest( event, buf, size );
 			}
 		}
@@ -295,13 +295,13 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 	Key key;
 	KeyValue keyValue;
 	uint16_t instanceId = Master::instanceId;
-	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
+	uint32_t requestId = ClientWorker::idGenerator->nextVal( this->workerId );
 
 #ifdef CLIENT_WORKER_SEND_REPLICAS_PARALLEL
 	Packet *packet = 0;
-	if ( MasterWorker::parityChunkCount ) {
-		packet = MasterWorker::packetPool->malloc();
-		packet->setReferenceCount( 1 + MasterWorker::parityChunkCount );
+	if ( ClientWorker::parityChunkCount ) {
+		packet = ClientWorker::packetPool->malloc();
+		packet->setReferenceCount( 1 + ClientWorker::parityChunkCount );
 		buffer.data = packet->data;
 		this->protocol.reqSet( buffer.size, instanceId, requestId, header.key, header.keySize, header.value, header.valueSize, buffer.data );
 		packet->size = buffer.size;
@@ -315,28 +315,28 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 	keyValue.dup( header.key, header.keySize, header.value, header.valueSize );
 	key = keyValue.key();
 
-	if ( ! MasterWorker::pending->insertKeyValue( PT_APPLICATION_SET, event.instanceId, event.requestId, ( void * ) event.socket, keyValue, true, true, Master::getInstance()->timestamp.nextVal() ) ) {
-		__ERROR__( "MasterWorker", "handleSetRequest", "Cannot insert into application SET pending map." );
+	if ( ! ClientWorker::pending->insertKeyValue( PT_APPLICATION_SET, event.instanceId, event.requestId, ( void * ) event.socket, keyValue, true, true, Master::getInstance()->timestamp.nextVal() ) ) {
+		__ERROR__( "ClientWorker", "handleSetRequest", "Cannot insert into application SET pending map." );
 	}
 
 	// key.dup( header.keySize, header.key );
 
-	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount + 1; i++ ) {
-		if ( ! MasterWorker::pending->insertKey(
+	for ( uint32_t i = 0; i < ClientWorker::parityChunkCount + 1; i++ ) {
+		if ( ! ClientWorker::pending->insertKey(
 			PT_SLAVE_SET, Master::instanceId, event.instanceId, requestId, event.requestId,
 			( void * )( i == 0 ? socket : this->parityServerSockets[ i - 1 ] ),
 			key
 		) ) {
-			__ERROR__( "MasterWorker", "handleSetRequest", "Cannot insert into slave SET pending map." );
+			__ERROR__( "ClientWorker", "handleSetRequest", "Cannot insert into slave SET pending map." );
 		}
 	}
 
 	// Send SET requests
-	if ( MasterWorker::parityChunkCount ) {
-		for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
-			if ( MasterWorker::updateInterval ) {
+	if ( ClientWorker::parityChunkCount ) {
+		for ( uint32_t i = 0; i < ClientWorker::parityChunkCount; i++ ) {
+			if ( ClientWorker::updateInterval ) {
 				// Mark the time when request is sent
-				MasterWorker::pending->recordRequestStartTime(
+				ClientWorker::pending->recordRequestStartTime(
 					PT_SLAVE_SET, Master::instanceId, event.instanceId, requestId, event.requestId,
 					( void * ) this->parityServerSockets[ i ],
 					this->parityServerSockets[ i ]->getAddr()
@@ -346,26 +346,26 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 #ifdef CLIENT_WORKER_SEND_REPLICAS_PARALLEL
 			ServerEvent serverEvent;
 			serverEvent.send( this->parityServerSockets[ i ], packet );
-			MasterWorker::eventQueue->prioritizedInsert( serverEvent );
+			ClientWorker::eventQueue->prioritizedInsert( serverEvent );
 		}
 
-		if ( MasterWorker::updateInterval )
-			MasterWorker::pending->recordRequestStartTime( PT_SLAVE_SET, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, socket->getAddr() );
+		if ( ClientWorker::updateInterval )
+			ClientWorker::pending->recordRequestStartTime( PT_SLAVE_SET, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, socket->getAddr() );
 		ServerEvent serverEvent;
 		serverEvent.send( socket, packet );
 		this->dispatch( serverEvent );
 #else
 			sentBytes = this->parityServerSockets[ i ]->send( buffer.data, buffer.size, connected );
 			if ( sentBytes != ( ssize_t ) buffer.size ) {
-				__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
+				__ERROR__( "ClientWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 			}
 		}
 
-		if ( MasterWorker::updateInterval )
-			MasterWorker::pending->recordRequestStartTime( PT_SLAVE_SET, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, socket->getAddr() );
+		if ( ClientWorker::updateInterval )
+			ClientWorker::pending->recordRequestStartTime( PT_SLAVE_SET, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, socket->getAddr() );
 		sentBytes = socket->send( buffer.data, buffer.size, connected );
 		if ( sentBytes != ( ssize_t ) buffer.size ) {
-			__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
+			__ERROR__( "ClientWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 
 			Master::getInstance()->remapMsgHandler.ackTransit( socket->getAddr() );
 
@@ -373,11 +373,11 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		}
 #endif
 	} else {
-		if ( MasterWorker::updateInterval )
-			MasterWorker::pending->recordRequestStartTime( PT_SLAVE_SET, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, socket->getAddr() );
+		if ( ClientWorker::updateInterval )
+			ClientWorker::pending->recordRequestStartTime( PT_SLAVE_SET, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, socket->getAddr() );
 		sentBytes = socket->send( buffer.data, buffer.size, connected );
 		if ( sentBytes != ( ssize_t ) buffer.size ) {
-			__ERROR__( "MasterWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
+			__ERROR__( "ClientWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 
 			Master::getInstance()->remapMsgHandler.ackTransit( socket->getAddr() );
 
@@ -390,14 +390,14 @@ bool MasterWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 	return true;
 }
 
-bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t size ) {
+bool ClientWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t size ) {
 	struct KeyHeader header;
 	if ( ! this->protocol.parseKeyHeader( header, buf, size ) ) {
-		__ERROR__( "MasterWorker", "handleGetRequest", "Invalid GET request." );
+		__ERROR__( "ClientWorker", "handleGetRequest", "Invalid GET request." );
 		return false;
 	}
 	__DEBUG__(
-		BLUE, "MasterWorker", "handleGetRequest",
+		BLUE, "ClientWorker", "handleGetRequest",
 		"[GET] Key: %.*s (key size = %u).",
 		( int ) header.keySize, header.key, header.keySize
 	);
@@ -426,17 +426,17 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 	ssize_t sentBytes;
 	bool connected;
 	uint16_t instanceId = Master::instanceId;
-	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
+	uint32_t requestId = ClientWorker::idGenerator->nextVal( this->workerId );
 
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
-	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_GET, event.instanceId, event.requestId, ( void * ) event.socket, key, true, true, Master::getInstance()->timestamp.nextVal() ) ) {
-		__ERROR__( "MasterWorker", "handleGetRequest", "Cannot insert into application GET pending map." );
+	if ( ! ClientWorker::pending->insertKey( PT_APPLICATION_GET, event.instanceId, event.requestId, ( void * ) event.socket, key, true, true, Master::getInstance()->timestamp.nextVal() ) ) {
+		__ERROR__( "ClientWorker", "handleGetRequest", "Cannot insert into application GET pending map." );
 	}
 
 	if ( useCoordinatedFlow ) {
 		// Acquire degraded lock from the coordinator
 		__DEBUG__(
-			BLUE, "MasterWorker", "handleGetRequest",
+			BLUE, "ClientWorker", "handleGetRequest",
 			"[GET] Key: %.*s (key size = %u): acquiring lock.",
 			( int ) header.keySize, header.key, header.keySize
 		);
@@ -451,19 +451,19 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 			header.key, header.keySize
 		);
 
-		if ( ! MasterWorker::pending->insertKey( PT_SLAVE_GET, instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, key ) ) {
-			__ERROR__( "MasterWorker", "handleGetRequest", "Cannot insert into slave GET pending map." );
+		if ( ! ClientWorker::pending->insertKey( PT_SLAVE_GET, instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, key ) ) {
+			__ERROR__( "ClientWorker", "handleGetRequest", "Cannot insert into slave GET pending map." );
 		}
 
-		if ( MasterWorker::updateInterval ) {
+		if ( ClientWorker::updateInterval ) {
 			// Mark the time when request is sent
-			MasterWorker::pending->recordRequestStartTime( PT_SLAVE_GET, instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, socket->getAddr() );
+			ClientWorker::pending->recordRequestStartTime( PT_SLAVE_GET, instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, socket->getAddr() );
 		}
 
 		// Send GET request
 		sentBytes = socket->send( buffer.data, buffer.size, connected );
 		if ( sentBytes != ( ssize_t ) buffer.size ) {
-			__ERROR__( "MasterWorker", "handleGetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
+			__ERROR__( "ClientWorker", "handleGetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 			return false;
 		}
 
@@ -471,14 +471,14 @@ bool MasterWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 	}
 }
 
-bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_t size ) {
+bool ClientWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_t size ) {
 	struct KeyValueUpdateHeader header;
 	if ( ! this->protocol.parseKeyValueUpdateHeader( header, true, buf, size ) ) {
-		__ERROR__( "MasterWorker", "handleUpdateRequest", "Invalid UPDATE request." );
+		__ERROR__( "ClientWorker", "handleUpdateRequest", "Invalid UPDATE request." );
 		return false;
 	}
 	__DEBUG__(
-		BLUE, "MasterWorker", "handleUpdateRequest",
+		BLUE, "ClientWorker", "handleUpdateRequest",
 		"[UPDATE] Key: %.*s (key size = %u); Value: (offset = %u, value update size = %u)",
 		( int ) header.keySize, header.key, header.keySize,
 		header.valueUpdateOffset, header.valueUpdateSize
@@ -511,7 +511,7 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 	ssize_t sentBytes;
 	bool connected;
 	uint16_t instanceId = Master::instanceId;
-	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
+	uint32_t requestId = ClientWorker::idGenerator->nextVal( this->workerId );
 	// TODO handle degraded mode
 	uint32_t requestTimestamp = socket->timestamp.current.nextVal();
 
@@ -520,8 +520,8 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 	keyValueUpdate.dup( header.keySize, header.key, valueUpdate );
 	keyValueUpdate.offset = header.valueUpdateOffset;
 	keyValueUpdate.length = header.valueUpdateSize;
-	if ( ! MasterWorker::pending->insertKeyValueUpdate( PT_APPLICATION_UPDATE, event.instanceId, event.requestId, ( void * ) event.socket, keyValueUpdate, true, true, Master::getInstance()->timestamp.nextVal() ) ) {
-		__ERROR__( "MasterWorker", "handleUpdateRequest", "Cannot insert into application UPDATE pending map." );
+	if ( ! ClientWorker::pending->insertKeyValueUpdate( PT_APPLICATION_UPDATE, event.instanceId, event.requestId, ( void * ) event.socket, keyValueUpdate, true, true, Master::getInstance()->timestamp.nextVal() ) ) {
+		__ERROR__( "ClientWorker", "handleUpdateRequest", "Cannot insert into application UPDATE pending map." );
 	}
 
 	if ( useCoordinatedFlow ) {
@@ -543,14 +543,14 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 		// add pending timestamp to ack
 		socket->timestamp.pendingAck.insertUpdate( Timestamp( requestTimestamp ) );
 
-		if ( ! MasterWorker::pending->insertKeyValueUpdate( PT_SLAVE_UPDATE, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, keyValueUpdate, true, true, requestTimestamp ) ) {
-			__ERROR__( "MasterWorker", "handleUpdateRequest", "Cannot insert into slave UPDATE pending map." );
+		if ( ! ClientWorker::pending->insertKeyValueUpdate( PT_SLAVE_UPDATE, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, keyValueUpdate, true, true, requestTimestamp ) ) {
+			__ERROR__( "ClientWorker", "handleUpdateRequest", "Cannot insert into slave UPDATE pending map." );
 		}
 
 		// Send UPDATE request
 		sentBytes = socket->send( buffer.data, buffer.size, connected );
 		if ( sentBytes != ( ssize_t ) buffer.size ) {
-			__ERROR__( "MasterWorker", "handleUpdateRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
+			__ERROR__( "ClientWorker", "handleUpdateRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 			return false;
 		}
 
@@ -558,14 +558,14 @@ bool MasterWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 	}
 }
 
-bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_t size ) {
+bool ClientWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_t size ) {
 	struct KeyHeader header;
 	if ( ! this->protocol.parseKeyHeader( header, buf, size ) ) {
-		__ERROR__( "MasterWorker", "handleDeleteRequest", "Invalid DELETE request." );
+		__ERROR__( "ClientWorker", "handleDeleteRequest", "Invalid DELETE request." );
 		return false;
 	}
 	__DEBUG__(
-		BLUE, "MasterWorker", "handleDeleteRequest",
+		BLUE, "ClientWorker", "handleDeleteRequest",
 		"[DELETE] Key: %.*s (key size = %u).",
 		( int ) header.keySize, header.key, header.keySize
 	);
@@ -595,13 +595,13 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 	ssize_t sentBytes;
 	bool connected;
 	uint16_t instanceId = Master::instanceId;
-	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
+	uint32_t requestId = ClientWorker::idGenerator->nextVal( this->workerId );
 	// TODO handle degraded mode
 	uint32_t requestTimestamp = socket->timestamp.current.nextVal();
 
 	key.dup( header.keySize, header.key, ( void * ) event.socket );
-	if ( ! MasterWorker::pending->insertKey( PT_APPLICATION_DEL, event.instanceId, event.requestId, ( void * ) event.socket, key, true, true, Master::getInstance()->timestamp.nextVal() ) ) {
-		__ERROR__( "MasterWorker", "handleDeleteRequest", "Cannot insert into application DELETE pending map." );
+	if ( ! ClientWorker::pending->insertKey( PT_APPLICATION_DEL, event.instanceId, event.requestId, ( void * ) event.socket, key, true, true, Master::getInstance()->timestamp.nextVal() ) ) {
+		__ERROR__( "ClientWorker", "handleDeleteRequest", "Cannot insert into application DELETE pending map." );
 	}
 
 	if ( useCoordinatedFlow ) {
@@ -620,14 +620,14 @@ bool MasterWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 		// add pending timestamp to ack.
 		socket->timestamp.pendingAck.insertDel( Timestamp( requestTimestamp ) );
 
-		if ( ! MasterWorker::pending->insertKey( PT_SLAVE_DEL, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, key, true, true, requestTimestamp ) ) {
-			__ERROR__( "MasterWorker", "handleDeleteRequest", "Cannot insert into slave DELETE pending map." );
+		if ( ! ClientWorker::pending->insertKey( PT_SLAVE_DEL, Master::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, key, true, true, requestTimestamp ) ) {
+			__ERROR__( "ClientWorker", "handleDeleteRequest", "Cannot insert into slave DELETE pending map." );
 		}
 
 		// Send DELETE requests
 		sentBytes = socket->send( buffer.data, buffer.size, connected );
 		if ( sentBytes != ( ssize_t ) buffer.size ) {
-			__ERROR__( "MasterWorker", "handleDeleteRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
+			__ERROR__( "ClientWorker", "handleDeleteRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 			return false;
 		}
 

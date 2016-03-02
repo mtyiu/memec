@@ -1,7 +1,7 @@
 #include "worker.hh"
 #include "../main/server.hh"
 
-void SlaveWorker::dispatch( ServerPeerEvent event ) {
+void ServerWorker::dispatch( ServerPeerEvent event ) {
 	bool success, connected, isSend, isCompleted = true;
 	ssize_t ret;
 	struct {
@@ -19,8 +19,8 @@ void SlaveWorker::dispatch( ServerPeerEvent event ) {
 			buffer.data = this->protocol.reqRegisterSlavePeer(
 				buffer.size,
 				Slave::instanceId,
-				SlaveWorker::idGenerator->nextVal( this->workerId ),
-				SlaveWorker::slaveServerAddr
+				ServerWorker::idGenerator->nextVal( this->workerId ),
+				ServerWorker::slaveServerAddr
 			);
 			break;
 		case SERVER_PEER_EVENT_TYPE_GET_CHUNK_REQUEST:
@@ -49,10 +49,10 @@ void SlaveWorker::dispatch( ServerPeerEvent event ) {
 				);
 
 				if ( event.message.chunk.needsFree ) {
-					SlaveWorker::chunkPool->free( event.message.chunk.chunk );
+					ServerWorker::chunkPool->free( event.message.chunk.chunk );
 				}
 			} else {
-				DegradedMap &map = SlaveWorker::degradedChunkBuffer->map;
+				DegradedMap &map = ServerWorker::degradedChunkBuffer->map;
 				buffer.data = this->protocol.reqSetChunk(
 					buffer.size,
 					event.instanceId, event.requestId,
@@ -184,7 +184,7 @@ void SlaveWorker::dispatch( ServerPeerEvent event ) {
 
 			if ( isRecovering ) {
 				// Hold all register requests
-				SlaveWorker::pending->insertSlavePeerRegistration( event.requestId, event.socket, success );
+				ServerWorker::pending->insertSlavePeerRegistration( event.requestId, event.socket, success );
 				return;
 			}
 		}
@@ -195,11 +195,11 @@ void SlaveWorker::dispatch( ServerPeerEvent event ) {
 			);
 			break;
 		case SERVER_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS:
-			__ERROR__( "SlaveWorker", "dispatch", "SERVER_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS is not supported." );
+			__ERROR__( "ServerWorker", "dispatch", "SERVER_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS is not supported." );
 			success = true; // default is false
 			break;
 		case SERVER_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE:
-			__ERROR__( "SlaveWorker", "dispatch", "SERVER_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE is not supported." );
+			__ERROR__( "ServerWorker", "dispatch", "SERVER_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE is not supported." );
 			// buffer.data = this->protocol.resRemappingSet(
 			// 	buffer.size,
 			// 	false, // toMaster
@@ -356,7 +356,7 @@ void SlaveWorker::dispatch( ServerPeerEvent event ) {
 				event.message.chunk.sealIndicator
 			);
 
-			// SlaveWorker::chunkBuffer
+			// ServerWorker::chunkBuffer
 			// 	->at( event.message.chunk.metadata.listId )
 			// 	->unlock( event.message.chunk.chunkBufferIndex );
 		}
@@ -370,7 +370,7 @@ void SlaveWorker::dispatch( ServerPeerEvent event ) {
 				event.message.chunk.metadata.stripeId,
 				event.message.chunk.metadata.chunkId
 			);
-			SlaveWorker::chunkBuffer
+			ServerWorker::chunkBuffer
 				->at( event.message.chunk.metadata.listId )
 				->unlock( event.message.chunk.chunkBufferIndex );
 			break;
@@ -438,7 +438,7 @@ void SlaveWorker::dispatch( ServerPeerEvent event ) {
 					);
 					break;
 				default:
-					__ERROR__( "SlaveWorker", "dispatch", "Undefined deferred event." );
+					__ERROR__( "ServerWorker", "dispatch", "Undefined deferred event." );
 			}
 			delete[] event.message.defer.buf;
 			break;
@@ -460,7 +460,7 @@ void SlaveWorker::dispatch( ServerPeerEvent event ) {
 			buffer.data = this->protocol.reqBatchGetChunks(
 				buffer.size,
 				instanceId,
-				SlaveWorker::idGenerator->nextVal( this->workerId ),
+				ServerWorker::idGenerator->nextVal( this->workerId ),
 				event.message.batchGetChunks.requestIds,
 				event.message.batchGetChunks.metadata,
 				chunksCount,
@@ -473,7 +473,7 @@ void SlaveWorker::dispatch( ServerPeerEvent event ) {
 					event.message.batchGetChunks.requestIds,
 					event.message.batchGetChunks.metadata
 				);
-				SlaveWorker::eventQueue->insert( event ); // Cannot use dispatch() because the send buffer is dirty
+				ServerWorker::eventQueue->insert( event ); // Cannot use dispatch() because the send buffer is dirty
 			}
 		}
 			break;
@@ -490,22 +490,22 @@ void SlaveWorker::dispatch( ServerPeerEvent event ) {
 		assert( ! event.socket->self );
 		ret = event.socket->send( buffer.data, buffer.size, connected );
 		if ( ret != ( ssize_t ) buffer.size )
-			__ERROR__( "SlaveWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+			__ERROR__( "ServerWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 
 		if ( event.type == SERVER_PEER_EVENT_TYPE_SEND ) {
-			SlaveWorker::packetPool->free( event.message.send.packet );
+			ServerWorker::packetPool->free( event.message.send.packet );
 		}
 	} else {
 		ProtocolHeader header;
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();
 		while ( buffer.size > 0 ) {
-			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "SlaveWorker (slave peer)" );
+			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "ServerWorker (slave peer)" );
 
 			buffer.data += PROTO_HEADER_SIZE;
 			buffer.size -= PROTO_HEADER_SIZE;
 			// Validate message
 			if ( header.from != PROTO_MAGIC_FROM_SERVER ) {
-				__ERROR__( "SlaveWorker", "dispatch", "Invalid protocol header." );
+				__ERROR__( "ServerWorker", "dispatch", "Invalid protocol header." );
 				goto quit_1;
 			}
 			event.instanceId = header.instanceId;
@@ -528,10 +528,10 @@ void SlaveWorker::dispatch( ServerPeerEvent event ) {
 						}
 							break;
 						case PROTO_MAGIC_RESPONSE_FAILURE:
-							__ERROR__( "SlaveWorker", "dispatch", "Failed to register with slave." );
+							__ERROR__( "ServerWorker", "dispatch", "Failed to register with slave." );
 							break;
 						default:
-							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
+							__ERROR__( "ServerWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
 							break;
 					}
 					break;
@@ -547,7 +547,7 @@ void SlaveWorker::dispatch( ServerPeerEvent event ) {
 							this->handleSealChunkResponse( event, false, buffer.data, buffer.size );
 							break;
 						default:
-							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
+							__ERROR__( "ServerWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
 							break;
 					}
 					break;
@@ -563,7 +563,7 @@ void SlaveWorker::dispatch( ServerPeerEvent event ) {
 							this->handleRemappingSetResponse( event, false, buffer.data, header.length );
 							break;
 						default:
-							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
+							__ERROR__( "ServerWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
 							break;
 					}
 					break;
@@ -579,7 +579,7 @@ void SlaveWorker::dispatch( ServerPeerEvent event ) {
 							this->handleForwardKeyResponse( event, false, buffer.data, buffer.size );
 							break;
 						default:
-							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x for SET.", header.magic );
+							__ERROR__( "ServerWorker", "dispatch", "Invalid magic code from slave: 0x%x for SET.", header.magic );
 							break;
 					}
 					break;
@@ -595,7 +595,7 @@ void SlaveWorker::dispatch( ServerPeerEvent event ) {
 							this->handleSetResponse( event, false, buffer.data, buffer.size );
 							break;
 						default:
-							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x for SET.", header.magic );
+							__ERROR__( "ServerWorker", "dispatch", "Invalid magic code from slave: 0x%x for SET.", header.magic );
 							break;
 					}
 					break;
@@ -611,7 +611,7 @@ void SlaveWorker::dispatch( ServerPeerEvent event ) {
 							this->handleGetResponse( event, false, buffer.data, buffer.size );
 							break;
 						default:
-							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
+							__ERROR__( "ServerWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
 							break;
 					}
 					break;
@@ -627,7 +627,7 @@ void SlaveWorker::dispatch( ServerPeerEvent event ) {
 							this->handleUpdateResponse( event, false, buffer.data, buffer.size );
 							break;
 						default:
-							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
+							__ERROR__( "ServerWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
 							break;
 					}
 					break;
@@ -643,7 +643,7 @@ void SlaveWorker::dispatch( ServerPeerEvent event ) {
 							this->handleDeleteResponse( event, false, buffer.data, buffer.size );
 							break;
 						default:
-							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
+							__ERROR__( "ServerWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
 							break;
 					}
 					break;
@@ -659,7 +659,7 @@ void SlaveWorker::dispatch( ServerPeerEvent event ) {
 							this->handleRemappedUpdateResponse( event, false, buffer.data, buffer.size );
 							break;
 						default:
-							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
+							__ERROR__( "ServerWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
 							break;
 					}
 					break;
@@ -675,7 +675,7 @@ void SlaveWorker::dispatch( ServerPeerEvent event ) {
 							this->handleRemappedDeleteResponse( event, false, buffer.data, buffer.size );
 							break;
 						default:
-							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
+							__ERROR__( "ServerWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
 							break;
 					}
 					break;
@@ -692,7 +692,7 @@ void SlaveWorker::dispatch( ServerPeerEvent event ) {
 							this->handleUpdateChunkResponse( event, false, buffer.data, buffer.size );
 							break;
 						default:
-							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
+							__ERROR__( "ServerWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
 							break;
 					}
 					break;
@@ -709,7 +709,7 @@ void SlaveWorker::dispatch( ServerPeerEvent event ) {
 							this->handleDeleteChunkResponse( event, false, buffer.data, buffer.size );
 							break;
 						default:
-							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
+							__ERROR__( "ServerWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
 							break;
 					}
 					break;
@@ -725,7 +725,7 @@ void SlaveWorker::dispatch( ServerPeerEvent event ) {
 							this->handleGetChunkResponse( event, false, buffer.data, buffer.size );
 							break;
 						default:
-							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
+							__ERROR__( "ServerWorker", "dispatch", "Invalid magic code from slave: 0x%x.", header.magic );
 							break;
 					}
 					break;
@@ -742,7 +742,7 @@ void SlaveWorker::dispatch( ServerPeerEvent event ) {
 							this->handleSetChunkResponse( event, false, buffer.data, buffer.size );
 							break;
 						default:
-							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave." );
+							__ERROR__( "ServerWorker", "dispatch", "Invalid magic code from slave." );
 							break;
 					}
 					break;
@@ -758,7 +758,7 @@ void SlaveWorker::dispatch( ServerPeerEvent event ) {
 							this->handleForwardChunkResponse( event, false, buffer.data, buffer.size );
 							break;
 						default:
-							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave." );
+							__ERROR__( "ServerWorker", "dispatch", "Invalid magic code from slave." );
 							break;
 					}
 					break;
@@ -776,13 +776,13 @@ void SlaveWorker::dispatch( ServerPeerEvent event ) {
 								buffer.data,
 								buffer.size
 							);
-							SlaveWorker::eventQueue->insert( deferredEvent );
+							ServerWorker::eventQueue->insert( deferredEvent );
 
 							// this->handleBatchChunksRequest( event, buffer.data, buffer.size );
 						}
 							break;
 						default:
-							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave." );
+							__ERROR__( "ServerWorker", "dispatch", "Invalid magic code from slave." );
 							break;
 					}
 					break;
@@ -798,12 +798,12 @@ void SlaveWorker::dispatch( ServerPeerEvent event ) {
 							this->handleBatchKeyValueResponse( event, false, buffer.data, buffer.size );
 							break;
 						default:
-							__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from slave." );
+							__ERROR__( "ServerWorker", "dispatch", "Invalid magic code from slave." );
 							break;
 					}
 					break;
 				default:
-					__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from slave. opcode = %x", header.opcode );
+					__ERROR__( "ServerWorker", "dispatch", "Invalid opcode from slave. opcode = %x", header.opcode );
 					goto quit_1;
 			}
 quit_1:
@@ -814,6 +814,6 @@ quit_1:
 	}
 	if ( ! connected ) {
 		event.socket->print();
-		__ERROR__( "SlaveWorker", "dispatch", "The slave is disconnected. Event type: %d.", event.type );
+		__ERROR__( "ServerWorker", "dispatch", "The slave is disconnected. Event type: %d.", event.type );
 	}
 }

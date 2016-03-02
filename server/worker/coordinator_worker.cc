@@ -1,7 +1,7 @@
 #include "worker.hh"
 #include "../main/server.hh"
 
-void SlaveWorker::dispatch( CoordinatorEvent event ) {
+void ServerWorker::dispatch( CoordinatorEvent event ) {
 	bool connected, isSend;
 	uint32_t requestId;
 	ssize_t ret;
@@ -10,11 +10,11 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 		char *data;
 	} buffer;
 
-	requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
+	requestId = ServerWorker::idGenerator->nextVal( this->workerId );
 
 	switch( event.type ) {
 		case COORDINATOR_EVENT_TYPE_REGISTER_REQUEST:
-			requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
+			requestId = ServerWorker::idGenerator->nextVal( this->workerId );
 			buffer.data = this->protocol.reqRegisterCoordinator(
 				buffer.size,
 				requestId,
@@ -28,22 +28,22 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 			uint32_t sealedCount, opsCount;
 			bool isCompleted;
 
-			uint32_t timestamp = SlaveWorker::timestamp->nextVal();
+			uint32_t timestamp = ServerWorker::timestamp->nextVal();
 
 			buffer.data = this->protocol.sendHeartbeat(
 				buffer.size,
 				event.instanceId, event.requestId,
 				timestamp,
-				&SlaveWorker::map->sealedLock, SlaveWorker::map->sealed, sealedCount,
-				&SlaveWorker::map->opsLock, SlaveWorker::map->ops, opsCount,
+				&ServerWorker::map->sealedLock, ServerWorker::map->sealed, sealedCount,
+				&ServerWorker::map->opsLock, ServerWorker::map->ops, opsCount,
 				isCompleted
 			);
 
 			if ( sealedCount || opsCount )
-				SlaveWorker::pendingAck->insert( timestamp );
+				ServerWorker::pendingAck->insert( timestamp );
 
 			if ( ! isCompleted )
-				SlaveWorker::eventQueue->insert( event );
+				ServerWorker::eventQueue->insert( event );
 
 			isSend = true;
 		}
@@ -96,7 +96,7 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 				ServerPeerSocket *socket;
 				bool success;
 			} registration;
-			while ( SlaveWorker::pending->eraseSlavePeerRegistration( registration.requestId, registration.socket, registration.success ) ) {
+			while ( ServerWorker::pending->eraseSlavePeerRegistration( registration.requestId, registration.socket, registration.success ) ) {
 				ServerPeerEvent slavePeerEvent;
 				slavePeerEvent.resRegister(
 					registration.socket,
@@ -104,7 +104,7 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 					registration.requestId,
 					registration.success
 				);
-				SlaveWorker::eventQueue->insert( slavePeerEvent );
+				ServerWorker::eventQueue->insert( slavePeerEvent );
 			}
 		}
 			buffer.data = this->protocol.resPromoteBackupSlave(
@@ -134,18 +134,18 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 	if ( isSend ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
 		if ( ret != ( ssize_t ) buffer.size )
-			__ERROR__( "SlaveWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+			__ERROR__( "ServerWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 	} else {
 		ProtocolHeader header;
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();
 		while ( buffer.size > 0 ) {
-			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "SlaveWorker" );
+			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "ServerWorker" );
 
 			buffer.data += PROTO_HEADER_SIZE;
 			buffer.size -= PROTO_HEADER_SIZE;
 			// Validate message
 			if ( header.from != PROTO_MAGIC_FROM_COORDINATOR ) {
-				__ERROR__( "SlaveWorker", "dispatch", "Invalid message source from coordinator." );
+				__ERROR__( "ServerWorker", "dispatch", "Invalid message source from coordinator." );
 			} else {
 				event.instanceId = header.instanceId;
 				event.requestId = header.requestId;
@@ -157,10 +157,10 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 								Slave::instanceId = header.instanceId;
 								break;
 							case PROTO_MAGIC_RESPONSE_FAILURE:
-								__ERROR__( "SlaveWorker", "dispatch", "Failed to register with coordinator." );
+								__ERROR__( "ServerWorker", "dispatch", "Failed to register with coordinator." );
 								break;
 							default:
-								__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from coordinator." );
+								__ERROR__( "ServerWorker", "dispatch", "Invalid magic code from coordinator." );
 								break;
 						}
 						break;
@@ -195,7 +195,7 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 								break;
 							case PROTO_MAGIC_RESPONSE_FAILURE:
 							default:
-								__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from coordinator." );
+								__ERROR__( "ServerWorker", "dispatch", "Invalid magic code from coordinator." );
 								break;
 						}
 						break;
@@ -207,7 +207,7 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 							case PROTO_MAGIC_RESPONSE_SUCCESS:
 							case PROTO_MAGIC_RESPONSE_FAILURE:
 							default:
-								__ERROR__( "SlaveWorker", "dispatch", "Invalid magic code from coordinator." );
+								__ERROR__( "ServerWorker", "dispatch", "Invalid magic code from coordinator." );
 								break;
 						}
 						break;
@@ -218,7 +218,7 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 						this->handleHeartbeatAck( event, buffer.data, header.length );
 						break;
 					default:
-						__ERROR__( "SlaveWorker", "dispatch", "Invalid opcode from coordinator." );
+						__ERROR__( "ServerWorker", "dispatch", "Invalid opcode from coordinator." );
 						break;
 				}
 			}
@@ -229,20 +229,20 @@ void SlaveWorker::dispatch( CoordinatorEvent event ) {
 		if ( connected ) event.socket->done();
 	}
 	if ( ! connected )
-		__ERROR__( "SlaveWorker", "dispatch", "The coordinator is disconnected." );
+		__ERROR__( "ServerWorker", "dispatch", "The coordinator is disconnected." );
 }
 
-bool SlaveWorker::handleSlaveConnectedMsg( CoordinatorEvent event, char *buf, size_t size ) {
+bool ServerWorker::handleSlaveConnectedMsg( CoordinatorEvent event, char *buf, size_t size ) {
 	struct AddressHeader header;
 	if ( ! this->protocol.parseAddressHeader( header, buf, size ) ) {
-		__ERROR__( "SlaveWorker", "handleSlaveConnectedMsg", "Invalid address header." );
+		__ERROR__( "ServerWorker", "handleSlaveConnectedMsg", "Invalid address header." );
 		return false;
 	}
 
 	char tmp[ 22 ];
 	Socket::ntoh_ip( header.addr, tmp, 16 );
 	Socket::ntoh_port( header.port, tmp + 16, 6 );
-	__DEBUG__( YELLOW, "SlaveWorker", "handleSlaveConnectedMsg", "Slave: %s:%s is connected.", tmp, tmp + 16 );
+	__DEBUG__( YELLOW, "ServerWorker", "handleSlaveConnectedMsg", "Slave: %s:%s is connected.", tmp, tmp + 16 );
 
 	// Find the slave peer socket in the array map
 	int index = -1;
@@ -253,7 +253,7 @@ bool SlaveWorker::handleSlaveConnectedMsg( CoordinatorEvent event, char *buf, si
 		}
 	}
 	if ( index == -1 ) {
-		__ERROR__( "SlaveWorker", "handleSlaveConnectedMsg", "The slave is not in the list. Ignoring this slave..." );
+		__ERROR__( "ServerWorker", "handleSlaveConnectedMsg", "The slave is not in the list. Ignoring this slave..." );
 		return false;
 	}
 
@@ -267,21 +267,21 @@ bool SlaveWorker::handleSlaveConnectedMsg( CoordinatorEvent event, char *buf, si
 	return true;
 }
 
-bool SlaveWorker::handleHeartbeatAck( CoordinatorEvent event, char *buf, size_t size ) {
+bool ServerWorker::handleHeartbeatAck( CoordinatorEvent event, char *buf, size_t size ) {
 	struct HeartbeatHeader header;
 	if ( ! this->protocol.parseHeartbeatHeader( header, buf, size ) ) {
-		__ERROR__( "SlaveWorker", "handleHeartbeatAck", "Invalid acknowledgement header." );
+		__ERROR__( "ServerWorker", "handleHeartbeatAck", "Invalid acknowledgement header." );
 		return false;
 	}
 
-	__DEBUG__( YELLOW, "SlaveWorker", "handleAcknowledgement", "Timestamp: %u.", header.timestamp );
+	__DEBUG__( YELLOW, "ServerWorker", "handleAcknowledgement", "Timestamp: %u.", header.timestamp );
 
 	uint32_t fromTimestamp;
-	if ( SlaveWorker::pendingAck->erase( header.timestamp, fromTimestamp ) ) {
+	if ( ServerWorker::pendingAck->erase( header.timestamp, fromTimestamp ) ) {
 		// Send ACK to masters
 		ClientEvent clientEvent;
 		uint16_t instanceId = Slave::instanceId;
-		uint32_t requestId = SlaveWorker::idGenerator->nextVal( this->workerId );
+		uint32_t requestId = ServerWorker::idGenerator->nextVal( this->workerId );
 
 		Slave *slave = Slave::getInstance();
 		LOCK_T *lock = &slave->sockets.masters.lock;
@@ -290,7 +290,7 @@ bool SlaveWorker::handleHeartbeatAck( CoordinatorEvent event, char *buf, size_t 
 		LOCK( lock );
 		for ( size_t i = 0, size = sockets.size(); i < size; i++ ) {
 			clientEvent.ackMetadata( sockets[ i ], instanceId, requestId, fromTimestamp, header.timestamp );
-			SlaveWorker::eventQueue->insert( clientEvent );
+			ServerWorker::eventQueue->insert( clientEvent );
 		}
 		UNLOCK( lock );
 	}

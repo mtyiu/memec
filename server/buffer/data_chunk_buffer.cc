@@ -44,7 +44,7 @@ void DataChunkBuffer::init() {
 	}
 }
 
-KeyMetadata DataChunkBuffer::set( SlaveWorker *worker, char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode, uint32_t &timestamp, uint32_t &stripeId, bool *isSealed, Metadata *sealed ) {
+KeyMetadata DataChunkBuffer::set( ServerWorker *worker, char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode, uint32_t &timestamp, uint32_t &stripeId, bool *isSealed, Metadata *sealed ) {
 	KeyMetadata keyMetadata;
 	uint32_t size = PROTO_KEY_VALUE_SIZE + keySize + valueSize, max = 0, tmp;
 	int index = -1;
@@ -182,7 +182,7 @@ KeyMetadata DataChunkBuffer::set( SlaveWorker *worker, char *key, uint8_t keySiz
 	return keyMetadata;
 }
 
-size_t DataChunkBuffer::seal( SlaveWorker *worker ) {
+size_t DataChunkBuffer::seal( ServerWorker *worker ) {
 	uint32_t count = 0;
 	Chunk *c;
 	LOCK( &this->lock );
@@ -212,7 +212,7 @@ size_t DataChunkBuffer::seal( SlaveWorker *worker ) {
 	return count;
 }
 
-bool DataChunkBuffer::reInsert( SlaveWorker *worker, Chunk *chunk, uint32_t sizeToBeFreed, bool needsLock, bool needsUnlock ) {
+bool DataChunkBuffer::reInsert( ServerWorker *worker, Chunk *chunk, uint32_t sizeToBeFreed, bool needsLock, bool needsUnlock ) {
 #ifdef REINSERTED_CHUNKS_IS_SET
 	std::unordered_set<Chunk *>::iterator it;
 	std::pair<std::unordered_set<Chunk *>::iterator, bool> ret;
@@ -307,7 +307,7 @@ void DataChunkBuffer::unlock( int index ) {
 	UNLOCK( &this->lock );
 }
 
-uint32_t DataChunkBuffer::flush( SlaveWorker *worker, bool lock, bool lockAtIndex, Metadata *sealed ) {
+uint32_t DataChunkBuffer::flush( ServerWorker *worker, bool lock, bool lockAtIndex, Metadata *sealed ) {
 	if ( lock )
 		LOCK( &this->lock );
 
@@ -338,7 +338,7 @@ uint32_t DataChunkBuffer::flush( SlaveWorker *worker, bool lock, bool lockAtInde
 	return index;
 }
 
-Chunk *DataChunkBuffer::flushAt( SlaveWorker *worker, int index, bool lock, Metadata *sealed ) {
+Chunk *DataChunkBuffer::flushAt( ServerWorker *worker, int index, bool lock, Metadata *sealed ) {
 	if ( lock ) {
 		LOCK( &this->lock );
 		LOCK( this->locks + index );

@@ -39,7 +39,7 @@ class Slave {
 private:
 	bool isRunning;
 	struct timespec startTime;
-	std::vector<SlaveWorker> workers;
+	std::vector<ServerWorker> workers;
 	int mySlaveIndex;
 
 	Slave();

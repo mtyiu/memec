@@ -19,7 +19,7 @@ bool CoordinatorWorker::handlePromoteBackupSlaveResponse( ServerEvent event, cha
 	ServerSocket *original;
 
 	if ( ! CoordinatorWorker::pending->eraseRecovery( event.instanceId, event.requestId, header.addr, header.port, header.chunkCount, header.unsealedCount, event.socket, remainingChunks, totalChunks, remainingKeys, totalKeys, elapsedTime, original ) ) {
-		__ERROR__( "SlaveWorker", "handlePromoteBackupSlaveResponse", "Cannot find a pending RECOVERY request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
+		__ERROR__( "ServerWorker", "handlePromoteBackupSlaveResponse", "Cannot find a pending RECOVERY request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		return false;
 	}
 

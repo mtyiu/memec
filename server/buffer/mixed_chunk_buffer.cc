@@ -12,7 +12,7 @@ MixedChunkBuffer::MixedChunkBuffer( ParityChunkBuffer *parityChunkBuffer ) {
 }
 
 bool MixedChunkBuffer::set(
-	SlaveWorker *worker,
+	ServerWorker *worker,
 	char *key, uint8_t keySize,
 	char *value, uint32_t valueSize,
 	uint8_t opcode, uint32_t &timestamp,
@@ -49,7 +49,7 @@ void MixedChunkBuffer::init() {
 		this->buffer.data->init();
 }
 
-size_t MixedChunkBuffer::seal( SlaveWorker *worker ) {
+size_t MixedChunkBuffer::seal( ServerWorker *worker ) {
 	switch( this->role ) {
 		case CBR_DATA:
 			return this->buffer.data->seal( worker );
@@ -59,7 +59,7 @@ size_t MixedChunkBuffer::seal( SlaveWorker *worker ) {
 	}
 }
 
-bool MixedChunkBuffer::reInsert( SlaveWorker *worker, Chunk *chunk, uint32_t sizeToBeFreed, bool needsLock, bool needsUnlock ) {
+bool MixedChunkBuffer::reInsert( ServerWorker *worker, Chunk *chunk, uint32_t sizeToBeFreed, bool needsLock, bool needsUnlock ) {
 	switch( this->role ) {
 		case CBR_DATA:
 			return this->buffer.data->reInsert( worker, chunk, sizeToBeFreed, needsLock, needsUnlock );

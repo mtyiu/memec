@@ -2,14 +2,14 @@
 #include "../main/client.hh"
 #include "../../common/ds/value.hh"
 
-bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf, size_t size ) {
+bool ClientWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf, size_t size ) {
 	struct KeyValueHeader header;
 	if ( ! this->protocol.parseKeyValueHeader( header, buf, size ) ) {
-		__ERROR__( "MasterWorker", "handleRemappingSetRequest", "Invalid SET request." );
+		__ERROR__( "ClientWorker", "handleRemappingSetRequest", "Invalid SET request." );
 		return false;
 	}
 	__DEBUG__(
-		BLUE, "MasterWorker", "handleRemappingSetRequest",
+		BLUE, "ClientWorker", "handleRemappingSetRequest",
 		"[REMAPPING_SET] Key: %.*s (key size = %u); Value: (value size = %u)",
 		( int ) header.keySize, header.key, header.keySize, header.valueSize
 	);
@@ -46,14 +46,14 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 	Key key;
 	KeyValue keyValue;
 	uint16_t instanceId = Master::instanceId;
-	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
+	uint32_t requestId = ClientWorker::idGenerator->nextVal( this->workerId );
 
 	keyValue.dup( header.key, header.keySize, header.value, header.valueSize );
 	key = keyValue.key();
 
 	// Insert the key into application SET pending map
-	if ( ! MasterWorker::pending->insertKeyValue( PT_APPLICATION_SET, event.instanceId, event.requestId, ( void * ) event.socket, keyValue ) ) {
-		__ERROR__( "MasterWorker", "handleRemappingSetRequest", "Cannot insert into application SET pending map. (%u, %u)", event.instanceId, event.requestId );
+	if ( ! ClientWorker::pending->insertKeyValue( PT_APPLICATION_SET, event.instanceId, event.requestId, ( void * ) event.socket, keyValue ) ) {
+		__ERROR__( "ClientWorker", "handleRemappingSetRequest", "Cannot insert into application SET pending map. (%u, %u)", event.instanceId, event.requestId );
 	}
 
 	// always acquire lock from coordinator first
@@ -69,11 +69,11 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 	for( uint32_t i = 0; i < Master::getInstance()->sockets.coordinators.size(); i++ ) {
 		CoordinatorSocket *coordinatorSocket = Master::getInstance()->sockets.coordinators.values[ i ];
 
-		MasterWorker::pending->insertRemapList( PT_KEY_REMAP_LIST, instanceId, event.instanceId, requestId, event.requestId, ( void * ) coordinatorSocket, remapList );
+		ClientWorker::pending->insertRemapList( PT_KEY_REMAP_LIST, instanceId, event.instanceId, requestId, event.requestId, ( void * ) coordinatorSocket, remapList );
 
 		sentBytes = coordinatorSocket->send( buffer.data, buffer.size, connected );
 		if ( sentBytes != ( ssize_t ) buffer.size )
-			__ERROR__( "MasterWorker", "handleRemappingSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
+			__ERROR__( "ClientWorker", "handleRemappingSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 		break; // Only send to one coordinator
 	}
 
@@ -82,14 +82,14 @@ bool MasterWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 	return true;
 }
 
-bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool success, char *buf, size_t size ) {
+bool ClientWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool success, char *buf, size_t size ) {
 	struct RemappingLockHeader header;
 	if ( ! this->protocol.parseRemappingLockHeader( header, buf, size ) ) {
-		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Invalid REMAPPING_SET_LOCK Response." );
+		__ERROR__( "ClientWorker", "handleRemappingSetLockResponse", "Invalid REMAPPING_SET_LOCK Response." );
 		return false;
 	}
 	__DEBUG__(
-		BLUE, "MasterWorker", "handleRemappingSetLockResponse",
+		BLUE, "ClientWorker", "handleRemappingSetLockResponse",
 		"[REMAPPING_SET_LOCK (%s)] [%u, %u] Key: %.*s (key size = %u)",
 		success ? "Success" : "Fail",
 		event.instanceId, event.requestId,
@@ -101,8 +101,8 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 	// Find the corresponding REMAPPING_SET_LOCK request //
 	PendingIdentifier pid;
 	RemapList remapList;
-	if ( ! MasterWorker::pending->eraseRemapList( PT_KEY_REMAP_LIST, event.instanceId, event.requestId, 0, &pid, &remapList ) ) {
-		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Cannot find a pending REMAPPING_SET_LOCK request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
+	if ( ! ClientWorker::pending->eraseRemapList( PT_KEY_REMAP_LIST, event.instanceId, event.requestId, 0, &pid, &remapList ) ) {
+		__ERROR__( "ClientWorker", "handleRemappingSetLockResponse", "Cannot find a pending REMAPPING_SET_LOCK request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		return false;
 	} else {
 		remapList.free();
@@ -112,11 +112,11 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 
 	// Handle the case when the lock cannot be acquired //
 	if ( ! success ) {
-		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "TODO: Handle the case when the lock cannot be acquired (ID: (%u, %u), key: %.*s).", event.instanceId, event.requestId, header.keySize, header.key );
+		__ERROR__( "ClientWorker", "handleRemappingSetLockResponse", "TODO: Handle the case when the lock cannot be acquired (ID: (%u, %u), key: %.*s).", event.instanceId, event.requestId, header.keySize, header.key );
 		// if lock fails report to application directly ..
 		KeyValue keyValue;
-		if ( ! MasterWorker::pending->eraseKeyValue( PT_APPLICATION_SET, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &keyValue, true, true, true, header.key ) ) {
-			__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded. (Key = %.*s, ID = (%u, %u))", header.keySize, header.key, pid.parentInstanceId, pid.parentRequestId );
+		if ( ! ClientWorker::pending->eraseKeyValue( PT_APPLICATION_SET, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &keyValue, true, true, true, header.key ) ) {
+			__ERROR__( "ClientWorker", "handleRemappingSetLockResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded. (Key = %.*s, ID = (%u, %u))", header.keySize, header.key, pid.parentInstanceId, pid.parentRequestId );
 			return false;
 		// } else {
 		// 	Master::getInstance()->printPending();
@@ -144,10 +144,10 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 			header.remapped[ i * 2     ],
 			header.remapped[ i * 2 + 1 ]
 		);
-		if ( header.original[ i * 2 + 1 ] < MasterWorker::dataChunkCount ) {
+		if ( header.original[ i * 2 + 1 ] < ClientWorker::dataChunkCount ) {
 			dataServerSocket = s;
 		} else {
-			this->parityServerSockets[ header.original[ i * 2 + 1 ] - MasterWorker::dataChunkCount ] = s;
+			this->parityServerSockets[ header.original[ i * 2 + 1 ] - ClientWorker::dataChunkCount ] = s;
 		}
 	}
 
@@ -157,21 +157,21 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 	uint8_t keySize;
 	uint32_t valueSize;
 	char *keyStr, *valueStr;
-	if ( ! MasterWorker::pending->findKeyValue( PT_APPLICATION_SET, pid.parentInstanceId, pid.parentRequestId, 0, &keyValue, true, header.key ) ) {
-		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded. (ID: (%u, %u))", pid.parentInstanceId, pid.parentRequestId );
+	if ( ! ClientWorker::pending->findKeyValue( PT_APPLICATION_SET, pid.parentInstanceId, pid.parentRequestId, 0, &keyValue, true, header.key ) ) {
+		__ERROR__( "ClientWorker", "handleRemappingSetLockResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded. (ID: (%u, %u))", pid.parentInstanceId, pid.parentRequestId );
 		return false;
 	}
 	key = keyValue.key();
 	keyValue.deserialize( keyStr, keySize, valueStr, valueSize );
 
 	// Insert pending SET requests for each involved slaves //
-	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount + 1; i++ ) {
-		if ( ! MasterWorker::pending->insertKey(
+	for ( uint32_t i = 0; i < ClientWorker::parityChunkCount + 1; i++ ) {
+		if ( ! ClientWorker::pending->insertKey(
 			PT_SLAVE_REMAPPING_SET, pid.instanceId, pid.parentInstanceId, pid.requestId, pid.parentRequestId,
 			( i == 0 ) ? dataServerSocket : this->parityServerSockets[ i - 1 ],
 			key
 		) ) {
-			__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "Cannot insert into slave SET pending map." );
+			__ERROR__( "ClientWorker", "handleRemappingSetLockResponse", "Cannot insert into slave SET pending map." );
 		}
 	}
 
@@ -181,12 +181,12 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 		char *data;
 		size_t size;
 	} buffer;
-	for ( uint32_t i = 0; i < MasterWorker::parityChunkCount; i++ ) {
-		packet = MasterWorker::packetPool->malloc();
+	for ( uint32_t i = 0; i < ClientWorker::parityChunkCount; i++ ) {
+		packet = ClientWorker::packetPool->malloc();
 		packet->setReferenceCount( 1 );
 		this->protocol.reqRemappingSet(
 			buffer.size, pid.instanceId, pid.requestId,
-			originalListId, i + MasterWorker::dataChunkCount, // Original list & chunk IDs
+			originalListId, i + ClientWorker::dataChunkCount, // Original list & chunk IDs
 			header.original, header.remapped, header.remappedCount,
 			keyStr, keySize,
 			valueStr, valueSize,
@@ -198,9 +198,9 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 		// this->parityServerSockets[ i ]->printAddress();
 		// printf( "\n" );
 
-		if ( MasterWorker::updateInterval ) {
+		if ( ClientWorker::updateInterval ) {
 			// Mark the time when request is sent
-			MasterWorker::pending->recordRequestStartTime(
+			ClientWorker::pending->recordRequestStartTime(
 				PT_SLAVE_REMAPPING_SET, pid.instanceId, pid.parentInstanceId, pid.requestId, pid.parentRequestId,
 				( void * ) this->parityServerSockets[ i ],
 				this->parityServerSockets[ i ]->getAddr()
@@ -210,7 +210,7 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 		ServerEvent serverEvent;
 		serverEvent.send( this->parityServerSockets[ i ], packet );
 #ifdef CLIENT_WORKER_SEND_REPLICAS_PARALLEL
-		MasterWorker::eventQueue->prioritizedInsert( serverEvent );
+		ClientWorker::eventQueue->prioritizedInsert( serverEvent );
 #else
 		this->dispatch( serverEvent );
 #endif
@@ -219,8 +219,8 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 	// Send the SET requests to the data server //
 	ssize_t sentBytes;
 	bool connected;
-	if ( MasterWorker::updateInterval ) {
-		MasterWorker::pending->recordRequestStartTime(
+	if ( ClientWorker::updateInterval ) {
+		ClientWorker::pending->recordRequestStartTime(
 			PT_SLAVE_REMAPPING_SET, pid.instanceId, pid.parentInstanceId, pid.requestId, pid.parentRequestId,
 			( void * ) dataServerSocket,
 			dataServerSocket->getAddr()
@@ -235,7 +235,7 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 	);
 	sentBytes = dataServerSocket->send( buffer.data, buffer.size, connected );
 	if ( sentBytes != ( ssize_t ) buffer.size ) {
-		__ERROR__( "MasterWorker", "handleRemappingSetLockResponse", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
+		__ERROR__( "ClientWorker", "handleRemappingSetLockResponse", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 	}
 
 	// printf( "[%u] Sending REMAPPING_SET request...\n", pid.requestId );
@@ -243,14 +243,14 @@ bool MasterWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 	return true;
 }
 
-bool MasterWorker::handleRemappingSetResponse( ServerEvent event, bool success, char *buf, size_t size ) {
+bool ClientWorker::handleRemappingSetResponse( ServerEvent event, bool success, char *buf, size_t size ) {
 	struct RemappingSetHeader header;
 	if ( ! this->protocol.parseRemappingSetHeader( header, buf, size ) ) {
-		__ERROR__( "MasterWorker", "handleRemappingSetResponse", "Invalid REMAPPING_SET Response." );
+		__ERROR__( "ClientWorker", "handleRemappingSetResponse", "Invalid REMAPPING_SET Response." );
 		return false;
 	}
 	__DEBUG__(
-		BLUE, "MasterWorker", "handleRemappingSetResponse",
+		BLUE, "ClientWorker", "handleRemappingSetResponse",
 		"[REMAPPING_SET (%s)] Key: %.*s (key size = %u).",
 		success ? "Success" : "Fail",
 		( int ) header.keySize, header.key, header.keySize
@@ -265,22 +265,22 @@ bool MasterWorker::handleRemappingSetResponse( ServerEvent event, bool success, 
 	// printf( "[%u] Handling REMAPPING_SET response...\n", event.requestId );
 
 	// Find the cooresponding request //
-	if ( ! MasterWorker::pending->eraseKey( PT_SLAVE_REMAPPING_SET, event.instanceId, event.requestId, ( void * ) event.socket, &pid, &key, true, false ) ) {
-		UNLOCK( &MasterWorker::pending->slaves.setLock );
-		__ERROR__( "MasterWorker", "handleRemappingSetResponse", "Cannot find a pending slave SET request that matches the response. This message will be discarded. (Key: %.*s; ID: (%u, %u); list ID: %u, chunk ID: %u)", header.keySize, header.key, event.instanceId, event.requestId, header.listId, header.chunkId );
+	if ( ! ClientWorker::pending->eraseKey( PT_SLAVE_REMAPPING_SET, event.instanceId, event.requestId, ( void * ) event.socket, &pid, &key, true, false ) ) {
+		UNLOCK( &ClientWorker::pending->slaves.setLock );
+		__ERROR__( "ClientWorker", "handleRemappingSetResponse", "Cannot find a pending slave SET request that matches the response. This message will be discarded. (Key: %.*s; ID: (%u, %u); list ID: %u, chunk ID: %u)", header.keySize, header.key, event.instanceId, event.requestId, header.listId, header.chunkId );
 		return false;
 	}
 	// Check pending slave SET requests //
-	pending = MasterWorker::pending->count( PT_SLAVE_REMAPPING_SET, pid.instanceId, pid.requestId, false, true );
+	pending = ClientWorker::pending->count( PT_SLAVE_REMAPPING_SET, pid.instanceId, pid.requestId, false, true );
 
 	// Mark the elapse time as latency //
 	Master *master = Master::getInstance();
-	if ( MasterWorker::updateInterval ) {
+	if ( ClientWorker::updateInterval ) {
 		struct timespec elapsedTime;
 		RequestStartTime rst;
 
-		if ( ! MasterWorker::pending->eraseRequestStartTime( PT_SLAVE_REMAPPING_SET, pid.instanceId, pid.requestId, ( void * ) event.socket, elapsedTime, 0, &rst ) ) {
-			__ERROR__( "MasterWorker", "handleRemappingSetResponse", "Cannot find a pending stats SET request that matches the response." );
+		if ( ! ClientWorker::pending->eraseRequestStartTime( PT_SLAVE_REMAPPING_SET, pid.instanceId, pid.requestId, ( void * ) event.socket, elapsedTime, 0, &rst ) ) {
+			__ERROR__( "ClientWorker", "handleRemappingSetResponse", "Cannot find a pending stats SET request that matches the response." );
 		} else {
 			int index = -1;
 			LOCK( &master->slaveLoading.lock );
@@ -300,13 +300,13 @@ bool MasterWorker::handleRemappingSetResponse( ServerEvent event, bool success, 
 	}
 
 	// if ( pending ) {
-	// 	__ERROR__( "MasterWorker", "handleRemappingSetResponse", "Pending slave REMAPPING_SET requests = %d (remapped count: %u).", pending, header.remappedCount );
+	// 	__ERROR__( "ClientWorker", "handleRemappingSetResponse", "Pending slave REMAPPING_SET requests = %d (remapped count: %u).", pending, header.remappedCount );
 	// }
 
 	if ( pending == 0 ) {
 		// Only send application SET response when the number of pending slave SET requests equal 0
-		if ( ! MasterWorker::pending->eraseKeyValue( PT_APPLICATION_SET, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &keyValue, true, true, true, header.key ) ) {
-			__ERROR__( "MasterWorker", "handleRemappingSetResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded." );
+		if ( ! ClientWorker::pending->eraseKeyValue( PT_APPLICATION_SET, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &keyValue, true, true, true, header.key ) ) {
+			__ERROR__( "ClientWorker", "handleRemappingSetResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded." );
 			return false;
 		}
 		key = keyValue.key();

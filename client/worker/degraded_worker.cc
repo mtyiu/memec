@@ -1,14 +1,14 @@
 #include "worker.hh"
 #include "../main/client.hh"
 
-bool MasterWorker::sendDegradedLockRequest(
+bool ClientWorker::sendDegradedLockRequest(
 	uint16_t parentInstanceId, uint32_t parentRequestId, uint8_t opcode,
 	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 	char *key, uint8_t keySize,
 	uint32_t valueUpdateSize, uint32_t valueUpdateOffset, char *valueUpdate
 ) {
 	uint16_t instanceId = Master::instanceId;
-	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
+	uint32_t requestId = ClientWorker::idGenerator->nextVal( this->workerId );
 	CoordinatorSocket *socket = Master::getInstance()->sockets.coordinators.values[ 0 ];
 
 	// Add the degraded lock request to the pending set
@@ -22,8 +22,8 @@ bool MasterWorker::sendDegradedLockRequest(
 	if ( valueUpdateSize != 0 && valueUpdate )
 		degradedLockData.set( valueUpdateSize, valueUpdateOffset, valueUpdate );
 
-	if ( ! MasterWorker::pending->insertDegradedLockData( PT_COORDINATOR_DEGRADED_LOCK_DATA, instanceId, parentInstanceId, requestId, parentRequestId, ( void * ) socket, degradedLockData ) ) {
-		__ERROR__( "MasterWorker", "handleDegradedRequest", "Cannot insert into slave degraded lock pending map." );
+	if ( ! ClientWorker::pending->insertDegradedLockData( PT_COORDINATOR_DEGRADED_LOCK_DATA, instanceId, parentInstanceId, requestId, parentRequestId, ( void * ) socket, degradedLockData ) ) {
+		__ERROR__( "ClientWorker", "handleDegradedRequest", "Cannot insert into slave degraded lock pending map." );
 	}
 
 	// Get degraded lock from the coordinator
@@ -43,19 +43,19 @@ bool MasterWorker::sendDegradedLockRequest(
 	// Send degraded lock request
 	sentBytes = socket->send( buffer.data, buffer.size, connected );
 	if ( sentBytes != ( ssize_t ) buffer.size ) {
-		__ERROR__( "MasterWorker", "handleDegradedRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
+		__ERROR__( "ClientWorker", "handleDegradedRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 		return false;
 	}
 
 	return true;
 }
 
-bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool success, char *buf, size_t size ) {
+bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool success, char *buf, size_t size ) {
 	uint32_t originalListId, originalChunkId;
 	ServerSocket *socket = 0;
 	struct DegradedLockResHeader header;
 	if ( ! this->protocol.parseDegradedLockResHeader( header, buf, size ) ) {
-		__ERROR__( "MasterWorker", "handleDegradedLockResponse", "Invalid DEGRADED_LOCK response." );
+		__ERROR__( "ClientWorker", "handleDegradedLockResponse", "Invalid DEGRADED_LOCK response." );
 		return false;
 	}
 
@@ -65,7 +65,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 		case PROTO_DEGRADED_LOCK_RES_IS_LOCKED:
 		case PROTO_DEGRADED_LOCK_RES_WAS_LOCKED:
 			__DEBUG__(
-				BLUE, "MasterWorker", "handleDegradedLockResponse",
+				BLUE, "ClientWorker", "handleDegradedLockResponse",
 				"[%s Locked] [%u, %u, %u] Key: %.*s (key size = %u); Is Sealed? %s.",
 				header.type == PROTO_DEGRADED_LOCK_RES_IS_LOCKED ? "Is" : "Was",
 				originalListId, header.stripeId, originalChunkId,
@@ -89,7 +89,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 			break;
 		case PROTO_DEGRADED_LOCK_RES_NOT_LOCKED:
 			__DEBUG__(
-				BLUE, "MasterWorker", "handleDegradedLockResponse",
+				BLUE, "ClientWorker", "handleDegradedLockResponse",
 				"[Not Locked] [%u, %u] Key: %.*s (key size = %u).",
 				originalListId, originalChunkId,
 				( int ) header.keySize, header.key, header.keySize
@@ -97,7 +97,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 			break;
 		case PROTO_DEGRADED_LOCK_RES_REMAPPED:
 			__DEBUG__(
-				BLUE, "MasterWorker", "handleDegradedLockResponse",
+				BLUE, "ClientWorker", "handleDegradedLockResponse",
 				"[Remapped] [%u, %u] Key: %.*s (key size = %u).",
 				originalListId, originalChunkId,
 				( int ) header.keySize, header.key, header.keySize
@@ -120,7 +120,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 		case PROTO_DEGRADED_LOCK_RES_NOT_EXIST:
 		default:
 			__DEBUG__(
-				BLUE, "MasterWorker", "handleDegradedLockResponse",
+				BLUE, "ClientWorker", "handleDegradedLockResponse",
 				"[Not Found] Key: %.*s (key size = %u)",
 				( int ) header.keySize, header.key, header.keySize
 			);
@@ -140,12 +140,12 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 	bool connected;
 	ApplicationEvent applicationEvent;
 	uint16_t instanceId = Master::instanceId;
-	uint32_t requestId = MasterWorker::idGenerator->nextVal( this->workerId );
+	uint32_t requestId = ClientWorker::idGenerator->nextVal( this->workerId );
 	uint32_t requestTimestamp = 0;
 
 	// Find the corresponding request
-	if ( ! MasterWorker::pending->eraseDegradedLockData( PT_COORDINATOR_DEGRADED_LOCK_DATA, event.instanceId, event.requestId, event.socket, &pid, &degradedLockData ) ) {
-		__ERROR__( "MasterWorker", "handleDegradedLockResponse", "Cannot find a pending coordinator DEGRADED_LOCK request that matches the response. This message will be discarded (key = %.*s).", header.keySize, header.key );
+	if ( ! ClientWorker::pending->eraseDegradedLockData( PT_COORDINATOR_DEGRADED_LOCK_DATA, event.instanceId, event.requestId, event.socket, &pid, &degradedLockData ) ) {
+		__ERROR__( "ClientWorker", "handleDegradedLockResponse", "Cannot find a pending coordinator DEGRADED_LOCK request that matches the response. This message will be discarded (key = %.*s).", header.keySize, header.key );
 		return false;
 	}
 
@@ -170,25 +170,25 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 						buffer.size, instanceId, requestId,
 						header.key, header.keySize
 					);
-					if ( MasterWorker::updateInterval ) {
-						MasterWorker::pending->recordRequestStartTime( PT_SLAVE_GET, instanceId, pid.parentInstanceId, requestId, pid.parentRequestId, ( void * ) socket, socket->getAddr() );
+					if ( ClientWorker::updateInterval ) {
+						ClientWorker::pending->recordRequestStartTime( PT_SLAVE_GET, instanceId, pid.parentInstanceId, requestId, pid.parentRequestId, ( void * ) socket, socket->getAddr() );
 					}
 					break;
 				case PROTO_DEGRADED_LOCK_RES_NOT_EXIST:
-					if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_GET, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &key, true, true, true, header.key ) ) {
-						__ERROR__( "MasterWorker", "handleDegradedLockResponse", "Cannot find a pending application GET request that matches the response. This message will be discarded (key = %.*s).", header.keySize, header.key );
+					if ( ! ClientWorker::pending->eraseKey( PT_APPLICATION_GET, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &key, true, true, true, header.key ) ) {
+						__ERROR__( "ClientWorker", "handleDegradedLockResponse", "Cannot find a pending application GET request that matches the response. This message will be discarded (key = %.*s).", header.keySize, header.key );
 						return false;
 					}
 					applicationEvent.resGet( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, key );
 					// printf( "handleDegradedLockResponse(): Key %.*s not found.\n", key.size, key.data );
-					MasterWorker::eventQueue->insert( applicationEvent );
+					ClientWorker::eventQueue->insert( applicationEvent );
 					return true;
 			}
 
 			// Insert into slave GET pending map
 			key.set( degradedLockData.keySize, degradedLockData.key, ( void * ) original );
-			if ( ! MasterWorker::pending->insertKey( PT_SLAVE_GET, instanceId, pid.parentInstanceId, requestId, pid.parentRequestId, ( void * ) socket, key ) ) {
-				__ERROR__( "MasterWorker", "handleDegradedLockResponse", "Cannot insert into slave GET pending map." );
+			if ( ! ClientWorker::pending->insertKey( PT_SLAVE_GET, instanceId, pid.parentInstanceId, requestId, pid.parentRequestId, ( void * ) socket, key ) ) {
+				__ERROR__( "ClientWorker", "handleDegradedLockResponse", "Cannot insert into slave GET pending map." );
 			}
 			break;
 		case PROTO_OPCODE_UPDATE:
@@ -217,13 +217,13 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 					);
 					break;
 				case PROTO_DEGRADED_LOCK_RES_NOT_EXIST:
-					if ( ! MasterWorker::pending->eraseKeyValueUpdate( PT_APPLICATION_UPDATE, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &keyValueUpdate, true, true, true, header.key ) ) {
-						__ERROR__( "MasterWorker", "handleDegradedLockResponse", "Cannot find a pending application UPDATE request that matches the response. This message will be discarded (key = %.*s).", header.keySize, header.key );
+					if ( ! ClientWorker::pending->eraseKeyValueUpdate( PT_APPLICATION_UPDATE, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &keyValueUpdate, true, true, true, header.key ) ) {
+						__ERROR__( "ClientWorker", "handleDegradedLockResponse", "Cannot find a pending application UPDATE request that matches the response. This message will be discarded (key = %.*s).", header.keySize, header.key );
 						return false;
 					}
 					delete[] ( ( char * )( keyValueUpdate.ptr ) );
 					applicationEvent.resUpdate( ( ApplicationSocket * ) pid.ptr, pid.parentInstanceId, pid.parentRequestId, keyValueUpdate, false );
-					MasterWorker::eventQueue->insert( applicationEvent );
+					ClientWorker::eventQueue->insert( applicationEvent );
 					return true;
 			}
 
@@ -231,8 +231,8 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 			keyValueUpdate.set( degradedLockData.keySize, degradedLockData.key, ( void * ) original );
 			keyValueUpdate.offset = degradedLockData.valueUpdateOffset;
 			keyValueUpdate.length = degradedLockData.valueUpdateSize;
-			if ( ! MasterWorker::pending->insertKeyValueUpdate( PT_SLAVE_UPDATE, instanceId, pid.parentInstanceId, requestId, pid.parentRequestId, ( void * ) socket, keyValueUpdate, true, true, requestTimestamp ) ) {
-				__ERROR__( "MasterWorker", "handleUpdateRequest", "Cannot insert into slave UPDATE pending map." );
+			if ( ! ClientWorker::pending->insertKeyValueUpdate( PT_SLAVE_UPDATE, instanceId, pid.parentInstanceId, requestId, pid.parentRequestId, ( void * ) socket, keyValueUpdate, true, true, requestTimestamp ) ) {
+				__ERROR__( "ClientWorker", "handleUpdateRequest", "Cannot insert into slave UPDATE pending map." );
 			}
 			break;
 		case PROTO_OPCODE_DELETE:
@@ -259,23 +259,23 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 					);
 					break;
 				case PROTO_DEGRADED_LOCK_RES_NOT_EXIST:
-					if ( ! MasterWorker::pending->eraseKey( PT_APPLICATION_DEL, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &key, true, true, true, header.key ) ) {
-						__ERROR__( "MasterWorker", "handleDegradedLockResponse", "Cannot find a pending application DELETE request that matches the response. This message will be discarded (key = %.*s).", header.keySize, header.key );
+					if ( ! ClientWorker::pending->eraseKey( PT_APPLICATION_DEL, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &key, true, true, true, header.key ) ) {
+						__ERROR__( "ClientWorker", "handleDegradedLockResponse", "Cannot find a pending application DELETE request that matches the response. This message will be discarded (key = %.*s).", header.keySize, header.key );
 						return false;
 					}
 					applicationEvent.resDelete( ( ApplicationSocket * ) pid.ptr, pid.parentInstanceId, pid.parentRequestId, key, false );
-					MasterWorker::eventQueue->insert( applicationEvent );
+					ClientWorker::eventQueue->insert( applicationEvent );
 					return true;
 			}
 
 			// Insert into slave DELETE pending map
 			key.set( degradedLockData.keySize, degradedLockData.key, ( void * ) original );
-			if ( ! MasterWorker::pending->insertKey( PT_SLAVE_DEL, instanceId, pid.parentInstanceId, requestId, pid.parentRequestId, ( void * ) socket, key, true, true, requestTimestamp ) ) {
-				__ERROR__( "MasterWorker", "handleDegradedLockResponse", "Cannot insert into slave DELETE pending map." );
+			if ( ! ClientWorker::pending->insertKey( PT_SLAVE_DEL, instanceId, pid.parentInstanceId, requestId, pid.parentRequestId, ( void * ) socket, key, true, true, requestTimestamp ) ) {
+				__ERROR__( "ClientWorker", "handleDegradedLockResponse", "Cannot insert into slave DELETE pending map." );
 			}
 			break;
 		default:
-			__ERROR__( "MasterWorker", "handleDegradedLockResponse", "Invalid opcode in DegradedLockData." );
+			__ERROR__( "ClientWorker", "handleDegradedLockResponse", "Invalid opcode in DegradedLockData." );
 			return false;
 	}
 
@@ -332,7 +332,7 @@ bool MasterWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 	}
 	sentBytes = socket->send( buffer.data, buffer.size, connected );
 	if ( sentBytes != ( ssize_t ) buffer.size ) {
-		__ERROR__( "MasterWorker", "handleGetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
+		__ERROR__( "ClientWorker", "handleGetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 		return false;
 	}
 

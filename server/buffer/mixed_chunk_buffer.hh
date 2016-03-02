@@ -23,7 +23,7 @@ public:
 	MixedChunkBuffer( ParityChunkBuffer *parityChunkBuffer );
 
 	bool set(
-		SlaveWorker *worker,
+		ServerWorker *worker,
 		char *key, uint8_t keySize,
 		char *value, uint32_t valueSize,
 		uint8_t opcode, uint32_t &timestamp,
@@ -35,8 +35,8 @@ public:
 
 	// For DataChunkBuffer only
 	void init();
-	size_t seal( SlaveWorker *worker );
-	bool reInsert( SlaveWorker *worker, Chunk *chunk, uint32_t sizeToBeFreed, bool needsLock, bool needsUnlock );
+	size_t seal( ServerWorker *worker );
+	bool reInsert( ServerWorker *worker, Chunk *chunk, uint32_t sizeToBeFreed, bool needsLock, bool needsUnlock );
 	// For ParityChunkBuffer only
 	bool seal( uint32_t stripeId, uint32_t chunkId, uint32_t count, char *sealData, size_t sealDataSize, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk );
 
