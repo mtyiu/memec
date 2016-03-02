@@ -9,11 +9,11 @@ function set_manual {
 	ssh testbed-node1 "screen -S coordinator -p 0 -X stuff \"manual$(printf '\r')\""
 }
 
-function set_slave {
+function set_server {
 	ssh testbed-node1 "screen -S coordinator -p 0 -X stuff \"overload$(printf '\r')7$(printf '\r')19$(printf '\r')0$(printf '\r')\""
 }
 
-function unset_slave {
+function unset_server {
 	ssh testbed-node1 "screen -S coordinator -p 0 -X stuff \"underload$(printf '\r')7$(printf '\r')19$(printf '\r')0$(printf '\r')\""
 }
 
@@ -83,7 +83,7 @@ for iter in {1..10}; do
 	# failure after SET
 	set_overload
 	if [ $IS_CONTROL -ne 1 ]; then
-		set_slave
+		set_server
 	fi
 
 	sleep 60

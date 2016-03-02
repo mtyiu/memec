@@ -6,7 +6,7 @@ CLIENT_PORT=9112
 CONFIG_PATH=bin/config/ncs
 MEMEC_PATH=~/mtyiu/memec
 
-echo "Starting master [${CLIENT_NAME}]..."
+echo "Starting client [${CLIENT_NAME}]..."
 
 cd ${MEMEC_PATH}
 
@@ -14,9 +14,9 @@ if [ $# -gt 0 ]; then
 	# Debug mode
 	gdb bin/client -ex "r -v \
 		-p ${CONFIG_PATH} \
-		-o master ${CLIENT_NAME} tcp://${CLIENT_IP}:${CLIENT_PORT}/"
+		-o client ${CLIENT_NAME} tcp://${CLIENT_IP}:${CLIENT_PORT}/"
 else
 	bin/client -v \
 		-p ${CONFIG_PATH} \
-		-o master ${CLIENT_NAME} tcp://${CLIENT_IP}:${CLIENT_PORT}/
+		-o client ${CLIENT_NAME} tcp://${CLIENT_IP}:${CLIENT_PORT}/
 fi

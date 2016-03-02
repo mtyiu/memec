@@ -9,10 +9,10 @@ delay=$1
 node=$2
 sleep_time=$3
 
-screen -S slave$node -p 0 -X stuff \
+screen -S server$node -p 0 -X stuff \
 		"delay$(printf '\r')100000$(printf '\r')"
 
 sleep $sleep_time
 
-screen -S slave$node -p 0 -X stuff \
+screen -S server$node -p 0 -X stuff \
 		"delay$(printf '\r')0$(printf '\r')"

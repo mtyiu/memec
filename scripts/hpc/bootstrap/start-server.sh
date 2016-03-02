@@ -7,7 +7,7 @@ STORAGE_PATH=/tmp/memec/${SERVER_NAME}
 CONFIG_PATH=bin/config/hpc
 MEMEC_PATH=~/mtyiu/memec
 
-echo "Starting slave [${SERVER_NAME}]..."
+echo "Starting server [${SERVER_NAME}]..."
 
 rm -rf ${STORAGE_PATH}
 mkdir -p ${STORAGE_PATH}
@@ -19,10 +19,10 @@ if [ $# -gt 0 ]; then
 	gdb bin/server -ex "r -v \
 		-p ${CONFIG_PATH} \
 		-o storage path ${STORAGE_PATH} \
-		-o slave ${SERVER_NAME} tcp://${SERVER_IP}:${SERVER_PORT}/"
+		-o server ${SERVER_NAME} tcp://${SERVER_IP}:${SERVER_PORT}/"
 else
 	bin/server -v \
 		-p ${CONFIG_PATH} \
 		-o storage path ${STORAGE_PATH} \
-		-o slave ${SERVER_NAME} tcp://${SERVER_IP}:${SERVER_PORT}/
+		-o server ${SERVER_NAME} tcp://${SERVER_IP}:${SERVER_PORT}/
 fi

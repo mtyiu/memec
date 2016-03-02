@@ -7,7 +7,7 @@ STORAGE_PATH=/tmp/memec/${SERVER_NAME}
 CONFIG_PATH=bin/config/ncs
 MEMEC_PATH=~/mtyiu/memec
 
-echo "Starting backup slave [${SERVER_NAME}]..."
+echo "Starting backup server [${SERVER_NAME}]..."
 
 rm -rf ${STORAGE_PATH}
 mkdir -p ${STORAGE_PATH}
@@ -20,11 +20,11 @@ if [ $# -gt 0 ]; then
 		-p ${CONFIG_PATH} \
 		-o pool chunks 4294967296 \
 		-o storage path ${STORAGE_PATH} \
-		-o slave ${SERVER_NAME} tcp://${SERVER_IP}:${SERVER_PORT}/"
+		-o server ${SERVER_NAME} tcp://${SERVER_IP}:${SERVER_PORT}/"
 else
 	bin/server -v \
 		-p ${CONFIG_PATH} \
 		-o pool chunks 4294967296 \
 		-o storage path ${STORAGE_PATH} \
-		-o slave ${SERVER_NAME} tcp://${SERVER_IP}:${SERVER_PORT}/
+		-o server ${SERVER_NAME} tcp://${SERVER_IP}:${SERVER_PORT}/
 fi

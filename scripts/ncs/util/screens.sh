@@ -14,13 +14,13 @@ function start_screens {
 
 	## SERVER & ETHTOOL ##
 	for i in {11..23} {37..39}; do
-		ssh testbed-node$i "if [ -z \"\`screen -ls | grep slave | grep -v grep\`\" ]; then echo \"[Node $i] Creating screen for slave\"; screen -dmS slave; else echo \"[Node $i] Slave screen exists\"; fi"
+		ssh testbed-node$i "if [ -z \"\`screen -ls | grep server | grep -v grep\`\" ]; then echo \"[Node $i] Creating screen for server\"; screen -dmS server; else echo \"[Node $i] Slave screen exists\"; fi"
 		ssh testbed-node$i "if [ -z \"\`screen -ls | grep ethtool | grep -v grep\`\" ]; then echo \"[Node $i] Creating screen for ethtool\"; screen -dmS ethtool; else echo \"[Node $i] Ethtool screen exists\"; fi"
 	done
 
 	## CLIENT & YCSB ##
 	for i in 3 4 8 9; do
-		ssh testbed-node$i "if [ -z \"\`screen -ls | grep master | grep -v grep\`\" ]; then echo \"[Node $i] Creating screen for master\"; screen -dmS master; else echo \"[Node $i] Master screen exists\"; fi"
+		ssh testbed-node$i "if [ -z \"\`screen -ls | grep client | grep -v grep\`\" ]; then echo \"[Node $i] Creating screen for client\"; screen -dmS client; else echo \"[Node $i] Master screen exists\"; fi"
 		ssh testbed-node$i "if [ -z \"\`screen -ls | grep ycsb | grep -v grep\`\" ]; then echo \"[Node $i] Creating screen for ycsb\"; screen -dmS ycsb; else echo \"[Node $i] YCSB screen exists\"; fi"
 	done
 
@@ -40,13 +40,13 @@ function stop_screens {
 
 	## SERVER & ETHTOOL ##
 	for i in {11..23} {37..39}; do
-		ssh testbed-node${i} "tmpid=\`screen -ls | grep slave | awk '{print \$1}' | awk -F '.' '{print \$1}'\`; if [ -z \"\$tmpid\" ]; then echo \"[Node ${i}] No screen for slave\"; else echo \"[Node ${i}] Kill slave screen\"; kill \$tmpid; fi"
+		ssh testbed-node${i} "tmpid=\`screen -ls | grep server | awk '{print \$1}' | awk -F '.' '{print \$1}'\`; if [ -z \"\$tmpid\" ]; then echo \"[Node ${i}] No screen for server\"; else echo \"[Node ${i}] Kill server screen\"; kill \$tmpid; fi"
 		ssh testbed-node${i} "tmpid=\`screen -ls | grep ethtool | awk '{print \$1}' | awk -F '.' '{print \$1}'\`; if [ -z \"\$tmpid\" ]; then echo \"[Node ${i}] No screen for ethtool\"; else echo \"[Node ${i}] Kill ethtool screen\"; kill \$tmpid; fi"
 	done
 
 	## CLIENT & YCSB ##
 	for i in 3 4 8 9; do
-		ssh testbed-node${i} "tmpid=\`screen -ls | grep master | awk '{print \$1}' | awk -F '.' '{print \$1}'\`; if [ -z \"\$tmpid\" ]; then echo \"[Node ${i}] No screen for master\"; else echo \"[Node ${i}] Kill master screen\"; kill \$tmpid; fi"
+		ssh testbed-node${i} "tmpid=\`screen -ls | grep client | awk '{print \$1}' | awk -F '.' '{print \$1}'\`; if [ -z \"\$tmpid\" ]; then echo \"[Node ${i}] No screen for client\"; else echo \"[Node ${i}] Kill client screen\"; kill \$tmpid; fi"
 		ssh testbed-node${i} "tmpid=\`screen -ls | grep ycsb | awk '{print \$1}' | awk -F '.' '{print \$1}'\`; if [ -z \"\$tmpid\" ]; then echo \"[Node ${i}] No screen for ycsb\"; else echo \"[Node ${i}] Kill ycsb screen\"; kill \$tmpid; fi"
 	done
 

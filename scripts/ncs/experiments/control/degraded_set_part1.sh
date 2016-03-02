@@ -22,11 +22,11 @@ function restore_overload {
 	done
 }
 
-function set_slave {
+function set_server {
 	ssh testbed-node1 "screen -S coordinator -p 0 -X stuff \"manual$(printf '\r')overload$(printf '\r')7$(printf '\r')19$(printf '\r')0$(printf '\r')\""
 }
 
-function unset_slave {
+function unset_server {
 	ssh testbed-node1 "screen -S coordinator -p 0 -X stuff \"manual$(printf '\r')underload$(printf '\r')7$(printf '\r')19$(printf '\r')0$(printf '\r')\""
 }
 
@@ -50,7 +50,7 @@ for iter in {1..10}; do
 	screen -S manage -p 0 -X stuff "${BASE_PATH}/scripts/util/start.sh $(printf '\r')"
 	sleep 30
 
-	#set_slave
+	#set_server
 	sleep 5
 
 	echo "-------------------- Load --------------------"

@@ -14,9 +14,9 @@ if [ $# -gt 0 ]; then
 	# Debug mode
 	gdb bin/application -ex "r -v \
 		-p ${CONFIG_PATH} \
-		-o master ${CLIENT_NAME} tcp://${CLIENT_IP}:${CLIENT_PORT}/"
+		-o client ${CLIENT_NAME} tcp://${CLIENT_IP}:${CLIENT_PORT}/"
 else
 	bin/application -v \
 		-p ${CONFIG_PATH} \
-		-o master ${CLIENT_NAME} tcp://${CLIENT_IP}:${CLIENT_PORT}/
+		-o client ${CLIENT_NAME} tcp://${CLIENT_IP}:${CLIENT_PORT}/
 fi
