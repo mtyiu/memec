@@ -135,72 +135,13 @@ void SlaveWorker::free() {
 
 void *SlaveWorker::run( void *argv ) {
 	SlaveWorker *worker = ( SlaveWorker * ) argv;
-	WorkerRole role = worker->getRole();
 	ServerEventQueue *eventQueue = SlaveWorker::eventQueue;
 
-#define SERVER_WORKER_EVENT_LOOP(_EVENT_TYPE_, _EVENT_QUEUE_) \
-	do { \
-		_EVENT_TYPE_ event; \
-		bool ret; \
-		while( worker->getIsRunning() | ( ret = _EVENT_QUEUE_->extract( event ) ) ) { \
-			if ( ret ) \
-				worker->dispatch( event ); \
-		} \
-	} while( 0 )
-
-	switch ( role ) {
-		case WORKER_ROLE_MIXED:
-			// SERVER_WORKER_EVENT_LOOP(
-			// 	MixedEvent,
-			// 	eventQueue->mixed
-			// );
-		{
-			MixedEvent event;
-			bool ret;
-			while( worker->getIsRunning() | ( ret = eventQueue->extractMixed( event ) ) ) {
-				if ( ret )
-					worker->dispatch( event );
-			}
-		}
-			break;
-		case WORKER_ROLE_CODING:
-			SERVER_WORKER_EVENT_LOOP(
-				CodingEvent,
-				eventQueue->separated.coding
-			);
-			break;
-		case WORKER_ROLE_COORDINATOR:
-			SERVER_WORKER_EVENT_LOOP(
-				CoordinatorEvent,
-				eventQueue->separated.coordinator
-			);
-			break;
-		case WORKER_ROLE_IO:
-			SERVER_WORKER_EVENT_LOOP(
-				IOEvent,
-				eventQueue->separated.io
-			);
-			break;
-		case WORKER_ROLE_CLIENT:
-			SERVER_WORKER_EVENT_LOOP(
-				ClientEvent,
-				eventQueue->separated.master
-			);
-			break;
-		case WORKER_ROLE_SERVER:
-			SERVER_WORKER_EVENT_LOOP(
-				ServerEvent,
-				eventQueue->separated.slave
-			);
-			break;
-		case WORKER_ROLE_SERVER_PEER:
-			SERVER_WORKER_EVENT_LOOP(
-				ServerPeerEvent,
-				eventQueue->separated.slavePeer
-			);
-			break;
-		default:
-			break;
+	MixedEvent event;
+	bool ret;
+	while( worker->getIsRunning() | ( ret = eventQueue->extractMixed( event ) ) ) {
+		if ( ret )
+			worker->dispatch( event );
 	}
 
 	worker->free();
@@ -215,12 +156,12 @@ bool SlaveWorker::init() {
 	SlaveWorker::dataChunkCount = slave->config.global.coding.params.getDataChunkCount();
 	SlaveWorker::parityChunkCount = slave->config.global.coding.params.getParityChunkCount();
 	SlaveWorker::chunkCount = SlaveWorker::dataChunkCount + SlaveWorker::parityChunkCount;
-	SlaveWorker::disableSeal = slave->config.slave.seal.disabled;
+	SlaveWorker::disableSeal = slave->config.server.seal.disabled;
 	SlaveWorker::delay = 0;
 	SlaveWorker::slavePeers = &slave->sockets.slavePeers;
 	SlaveWorker::pending = &slave->pending;
 	SlaveWorker::pendingAck = &slave->pendingAck;
-	SlaveWorker::slaveServerAddr = &slave->config.slave.slave.addr;
+	SlaveWorker::slaveServerAddr = &slave->config.server.server.addr;
 	SlaveWorker::coding = slave->coding;
 	SlaveWorker::eventQueue = &slave->eventQueue;
 	SlaveWorker::stripeList = slave->stripeList;
@@ -236,14 +177,13 @@ bool SlaveWorker::init() {
 	return true;
 }
 
-bool SlaveWorker::init( GlobalConfig &globalConfig, ServerConfig &serverConfig, WorkerRole role, uint32_t workerId ) {
+bool SlaveWorker::init( GlobalConfig &globalConfig, ServerConfig &serverConfig, uint32_t workerId ) {
 	this->protocol.init(
 		Protocol::getSuggestedBufferSize(
 			globalConfig.size.key,
 			globalConfig.size.chunk
 		)
 	);
-	this->role = role;
 	this->workerId = workerId;
 	this->buffer.data = new char[ globalConfig.size.chunk ];
 	this->buffer.size = globalConfig.size.chunk;
@@ -276,17 +216,11 @@ bool SlaveWorker::init( GlobalConfig &globalConfig, ServerConfig &serverConfig, 
 
 	this->dataServerSockets = new ServerPeerSocket*[ SlaveWorker::dataChunkCount ];
 	this->parityServerSockets = new ServerPeerSocket*[ SlaveWorker::parityChunkCount ];
-	switch( this->role ) {
-		case WORKER_ROLE_MIXED:
-		case WORKER_ROLE_IO:
-			this->storage = Storage::instantiate( serverConfig );
-			this->storage->start();
-			break;
-		default:
-			this->storage = 0;
-			break;
-	}
-	return role != WORKER_ROLE_UNDEFINED;
+
+	this->storage = Storage::instantiate( serverConfig );
+	this->storage->start();
+
+	return true;
 }
 
 bool SlaveWorker::start() {
@@ -303,31 +237,5 @@ void SlaveWorker::stop() {
 }
 
 void SlaveWorker::print( FILE *f ) {
-	char role[ 16 ];
-	switch( this->role ) {
-		case WORKER_ROLE_MIXED:
-			strcpy( role, "Mixed" );
-			break;
-		case WORKER_ROLE_CODING:
-			strcpy( role, "Coding" );
-			break;
-		case WORKER_ROLE_COORDINATOR:
-			strcpy( role, "Coordinator" );
-			break;
-		case WORKER_ROLE_IO:
-			strcpy( role, "I/O" );
-			break;
-		case WORKER_ROLE_CLIENT:
-			strcpy( role, "Master" );
-			break;
-		case WORKER_ROLE_SERVER:
-			strcpy( role, "Slave" );
-			break;
-		case WORKER_ROLE_SERVER_PEER:
-			strcpy( role, "Slave peer" );
-			break;
-		default:
-			return;
-	}
-	fprintf( f, "%11s worker (Thread ID = %lu): %srunning\n", role, this->tid, this->isRunning ? "" : "not " );
+	fprintf( f, "Worker (Thread ID = %lu): %srunning\n", this->tid, this->isRunning ? "" : "not " );
 }

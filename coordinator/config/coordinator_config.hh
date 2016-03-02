@@ -15,43 +15,14 @@ public:
 		ServerAddr addr;
 	} coordinator;
 	struct {
-		uint32_t maxEvents;
-		int32_t timeout;
-	} epoll;
-	struct {
-		WorkerType type;
+		bool isManual;
+		uint16_t maximum;
 		struct {
-			uint8_t mixed;
-			struct {
-				uint16_t total;
-				uint8_t coordinator;
-				uint8_t master;
-				uint8_t slave;
-			} separated;
-		} number;
-	} workers;
-	struct {
-		bool block;
-		struct {
-			uint32_t mixed;
-			uint32_t pMixed;
-			struct {
-				uint32_t coordinator;
-				uint32_t master;
-				uint32_t slave;
-			} separated;
-		} size;
-	} eventQueue;
-	struct {
-		uint32_t updateInterval;
-	} loadingStats;
-	struct {
-		uint32_t packets;
-	} pool;
-	struct {
-		uint32_t worker;
-		uint32_t queue;
-	} remap;
+			float start;
+			float stop;
+			float overload;
+		} threshold;
+	} states;
 
 	CoordinatorConfig();
 	bool merge( GlobalConfig &globalConfig );

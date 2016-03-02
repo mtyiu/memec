@@ -2,7 +2,6 @@
 #define __COORDINATOR_WORKER_WORKER_HH__
 
 #include <cstdio>
-#include "worker_role.hh"
 #include "../ds/pending.hh"
 #include "../ds/remapping_record_map.hh"
 #include "../event/event_queue.hh"
@@ -15,7 +14,6 @@
 class CoordinatorWorker : public Worker {
 private:
 	uint32_t workerId;
-	WorkerRole role;
 	CoordinatorProtocol protocol;
 	uint32_t *survivingChunkIds;
 	static uint32_t dataChunkCount;
@@ -59,11 +57,10 @@ public:
 
 	// ---------- worker.cc ----------
 	static bool init();
-	bool init( GlobalConfig &config, WorkerRole role, uint32_t workerId );
+	bool init( GlobalConfig &config, uint32_t workerId );
 	bool start();
 	void stop();
 	void print( FILE *f = stdout );
-	inline WorkerRole getRole() { return this->role; }
 };
 
 #endif

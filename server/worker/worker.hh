@@ -31,7 +31,6 @@
 class SlaveWorker : public Worker {
 private:
 	uint32_t workerId;
-	WorkerRole role;
 	SlaveProtocol protocol;
 	Storage *storage;
 	// Temporary variables
@@ -218,11 +217,10 @@ public:
 
 	// ---------- worker.cc ----------
 	static bool init();
-	bool init( GlobalConfig &globalConfig, ServerConfig &serverConfig, WorkerRole role, uint32_t workerId );
+	bool init( GlobalConfig &globalConfig, ServerConfig &serverConfig, uint32_t workerId );
 	bool start();
 	void stop();
 	void print( FILE *f = stdout );
-	inline WorkerRole getRole() { return this->role; }
 
 	// ---------- slave_peer_req_worker.cc ----------
 	bool issueSealChunkRequest( Chunk *chunk, uint32_t startPos = 0 );

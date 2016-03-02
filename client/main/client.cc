@@ -201,12 +201,12 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 		fd = socket->getSocket();
 		this->sockets.coordinators.set( fd, socket );
 	}
-	this->sockets.slaves.reserve( this->config.global.slaves.size() );
-	for ( int i = 0, len = this->config.global.slaves.size(); i < len; i++ ) {
+	this->sockets.slaves.reserve( this->config.global.servers.size() );
+	for ( int i = 0, len = this->config.global.servers.size(); i < len; i++ ) {
 		ServerSocket *socket = new ServerSocket();
 		int fd;
 
-		socket->init( this->config.global.slaves[ i ], &this->sockets.epoll );
+		socket->init( this->config.global.servers[ i ], &this->sockets.epoll );
 		fd = socket->getSocket();
 		this->sockets.slaves.set( fd, socket );
 	}
@@ -280,11 +280,11 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 	}
 
 	/* Remapping message handler; Remapping scheme */
-	if ( this->config.global.remap.enabled ) {
+	if ( this->config.global.states.enabled ) {
 		char masterName[ 11 ];
 		memset( masterName, 0, 11 );
 		sprintf( masterName, "%s%04d", CLIENT_PREFIX, this->config.master.master.addr.id );
-		remapMsgHandler.init( this->config.global.remap.spreaddAddr.addr, this->config.global.remap.spreaddAddr.port, masterName );
+		remapMsgHandler.init( this->config.global.states.spreaddAddr.addr, this->config.global.states.spreaddAddr.port, masterName );
 		BasicRemappingScheme::slaveLoading = &this->slaveLoading;
 		BasicRemappingScheme::overloadedSlave = &this->overloadedSlave;
 		BasicRemappingScheme::stripeList = this->stripeList;
@@ -299,7 +299,7 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 	}
 
 	/* Smoothing factor */
-	Latency::smoothingFactor = this->config.global.remap.smoothingFactor;
+	Latency::smoothingFactor = this->config.global.states.smoothingFactor;
 
 	/* Loading statistics update */
 	uint32_t sec, msec;
@@ -352,7 +352,7 @@ bool Master::start() {
 			ret = false;
 	}
 	// Connect to slaves
-	for ( int i = 0, len = this->config.global.slaves.size(); i < len; i++ ) {
+	for ( int i = 0, len = this->config.global.servers.size(); i < len; i++ ) {
 		this->sockets.slaves[ i ]->timestamp.current.setVal( 0 );
 		this->sockets.slaves[ i ]->timestamp.lastAck.setVal( 0 );
 		if ( ! this->sockets.slaves[ i ]->start() )
@@ -370,12 +370,12 @@ bool Master::start() {
 	}
 
 	// Register to slaves
-	for ( int i = 0, len = this->config.global.slaves.size(); i < len; i++ ) {
+	for ( int i = 0, len = this->config.global.servers.size(); i < len; i++ ) {
 		this->sockets.slaves[ i ]->registerMaster();
 	}
 
 	/* Remapping message handler */
-	if ( this->config.global.remap.enabled && ! this->remapMsgHandler.start() ) {
+	if ( this->config.global.states.enabled && ! this->remapMsgHandler.start() ) {
 		__ERROR__( "Master", "start", "Cannot start remapping message handler." );
 		ret = false;
 	}
@@ -429,7 +429,7 @@ bool Master::stop() {
 	this->sockets.slaves.clear();
 
 	 /* Remapping message handler */
-	if ( this->config.global.remap.enabled ) {
+	if ( this->config.global.states.enabled ) {
 		this->remapMsgHandler.stop();
 		this->remapMsgHandler.quit();
 	}

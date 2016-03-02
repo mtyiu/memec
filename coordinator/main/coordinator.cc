@@ -43,14 +43,14 @@ void Coordinator::switchPhaseForCrashedSlave( ServerSocket *serverSocket ) {
 
 void Coordinator::switchPhase( std::set<struct sockaddr_in> prevOverloadedSlaves ) {
 	// skip if remap feature is disabled
-	if ( ! this->config.global.remap.enabled )
+	if ( ! this->config.global.states.enabled )
 		return;
 
 	ClientEvent event;
 	LOCK( &this->overloadedSlaves.lock );
 
-	double startThreshold = this->config.global.remap.startThreshold;
-	double stopThreshold = this->config.global.remap.stopThreshold;
+	double startThreshold = this->config.coordinator.states.threshold.start;
+	double stopThreshold = this->config.coordinator.states.threshold.stop;
 	uint32_t totalSlaveCount = this->sockets.slaves.size();
 	uint32_t curOverloadedSlaveCount = this->overloadedSlaves.slaveSet.size();
 	uint32_t prevOverloadedSlaveCount = prevOverloadedSlaves.size();
@@ -58,7 +58,7 @@ void Coordinator::switchPhase( std::set<struct sockaddr_in> prevOverloadedSlaves
 	if ( curOverloadedSlaveCount > totalSlaveCount * startThreshold ) { // Phase 1 --> 2
 		// __INFO__( YELLOW, "Coordinator", "switchPhase", "%lf: Overload detected (overloaded slave = %u).", this->getElapsedTime(), curOverloadedSlaveCount );
 
-		if ( this->config.global.remap.maximum > 0 && ( curOverloadedSlaveCount > this->config.global.remap.maximum || this->remapMsgHandler->reachMaximumRemapped( this->config.global.remap.maximum ) ) ) {
+		if ( this->config.coordinator.states.maximum > 0 && ( curOverloadedSlaveCount > this->config.coordinator.states.maximum || this->remapMsgHandler->reachMaximumRemapped( this->config.coordinator.states.maximum ) ) ) {
 			// Limit the number of remapped slaves
 			UNLOCK( &this->overloadedSlaves.lock );
 			return;
@@ -107,7 +107,7 @@ std::set<struct sockaddr_in> Coordinator::updateOverloadedSlaveSet( ArrayMap<str
 
 	// what has past is left in the past
 	this->overloadedSlaves.slaveSet.clear();
-	double threshold = this->config.global.remap.overloadThreshold;
+	double threshold = this->config.coordinator.states.threshold.overload;
 
 	// compare each slave latency with the avg multipled by threshold
 #define GET_OVERLOADED_SLAVES( _TYPE_ ) { \
@@ -207,7 +207,7 @@ void Coordinator::signalHandler( int signal ) {
 		case SIGALRM:
 			coordinator->updateAverageSlaveLoading( slaveGetLatency, slaveSetLatency );
 			// start / stop remapping according to criteria ( in non-manual mode )
-			if ( coordinator->config.global.remap.manual == 0 ) {
+			if ( coordinator->config.coordinator.states.isManual == 0 ) {
 				coordinator->switchPhase( coordinator->updateOverloadedSlaveSet( slaveGetLatency, slaveSetLatency, overloadedSlaveSet ) );
 				// push the stats back to masters
 				// leave the free of ArrayMaps to workers after constructing the data buffer
@@ -252,13 +252,13 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 	// Initialize modules //
 	/* Socket */
 	if ( ! this->sockets.epoll.init(
-			this->config.coordinator.epoll.maxEvents,
-			this->config.coordinator.epoll.timeout
+			this->config.global.epoll.maxEvents,
+			this->config.global.epoll.timeout
 		) || ! this->sockets.self.init(
 			this->config.coordinator.coordinator.addr.type,
 			this->config.coordinator.coordinator.addr.addr,
 			this->config.coordinator.coordinator.addr.port,
-			this->config.global.slaves.size(),
+			this->config.global.servers.size(),
 			&this->sockets.epoll
 		) ) {
 		__ERROR__( "Coordinator", "init", "Cannot initialize socket." );
@@ -269,13 +269,13 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 	Socket::init( &this->sockets.epoll );
 	ClientSocket::setArrayMap( &this->sockets.masters );
 	ServerSocket::setArrayMap( &this->sockets.slaves );
-	this->sockets.masters.reserve( this->config.global.slaves.size() );
-	this->sockets.slaves.reserve( this->config.global.slaves.size() );
+	this->sockets.masters.reserve( this->config.global.servers.size() );
+	this->sockets.slaves.reserve( this->config.global.servers.size() );
 	this->sockets.backupSlaves.needsDelete = false;
-	for ( int i = 0, len = this->config.global.slaves.size(); i < len; i++ ) {
+	for ( int i = 0, len = this->config.global.servers.size(); i < len; i++ ) {
 		ServerSocket *socket = new ServerSocket();
 		int tmpfd = - ( i + 1 );
-		socket->init( tmpfd, this->config.global.slaves[ i ], &this->sockets.epoll );
+		socket->init( tmpfd, this->config.global.servers[ i ], &this->sockets.epoll );
 		this->sockets.slaves.set( tmpfd, socket );
 	}
 	Map::init( this->config.global.stripeList.count );
@@ -288,65 +288,36 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 	);
 	/* Packet Pool */
 	this->packetPool.init(
-		this->config.coordinator.pool.packets,
+		this->config.global.pool.packets,
 		Protocol::getSuggestedBufferSize(
 			this->config.global.size.key,
 			this->config.global.size.chunk
 		)
 	);
 	/* Workers, ID generator and event queues */
-	if ( this->config.coordinator.workers.type == WORKER_TYPE_MIXED ) {
-		this->idGenerator.init( this->config.coordinator.workers.number.mixed );
-		this->eventQueue.init(
-			this->config.coordinator.eventQueue.block,
-			this->config.coordinator.eventQueue.size.mixed,
-			this->config.coordinator.eventQueue.size.pMixed
+	this->idGenerator.init( this->config.global.workers.count );
+	this->eventQueue.init(
+		this->config.global.eventQueue.block,
+		this->config.global.eventQueue.size,
+		this->config.global.eventQueue.prioritized
+	);
+	CoordinatorWorker::init();
+	this->workers.reserve( this->config.global.workers.count );
+	for ( int i = 0, len = this->config.global.workers.count; i < len; i++ ) {
+		this->workers.push_back( CoordinatorWorker() );
+		this->workers[ i ].init(
+			this->config.global,
+			i // worker ID
 		);
-		CoordinatorWorker::init();
-		this->workers.reserve( this->config.coordinator.workers.number.mixed );
-		for ( int i = 0, len = this->config.coordinator.workers.number.mixed; i < len; i++ ) {
-			this->workers.push_back( CoordinatorWorker() );
-			this->workers[ i ].init(
-				this->config.global,
-				WORKER_ROLE_MIXED,
-				i // worker ID
-			);
-		}
-	} else {
-		this->idGenerator.init( this->config.coordinator.workers.number.separated.total );
-		this->workers.reserve( this->config.coordinator.workers.number.separated.total );
-		this->eventQueue.init(
-			this->config.coordinator.eventQueue.block,
-			this->config.coordinator.eventQueue.size.separated.coordinator,
-			this->config.coordinator.eventQueue.size.separated.master,
-			this->config.coordinator.eventQueue.size.separated.slave
-		);
-		CoordinatorWorker::init();
-
-		int index = 0;
-#define WORKER_INIT_LOOP( _FIELD_, _CONSTANT_ ) \
-		for ( int i = 0, len = this->config.coordinator.workers.number.separated._FIELD_; i < len; i++, index++ ) { \
-			this->workers.push_back( CoordinatorWorker() ); \
-			this->workers[ index ].init( \
-				this->config.global, \
-				_CONSTANT_, \
-				index \
-			); \
-		}
-
-		WORKER_INIT_LOOP( coordinator, WORKER_ROLE_COORDINATOR )
-		WORKER_INIT_LOOP( master, WORKER_ROLE_CLIENT )
-		WORKER_INIT_LOOP( slave, WORKER_ROLE_SERVER )
-#undef WORKER_INIT_LOOP
 	}
 
 	/* Remapping message handler */
-	if ( this->config.global.remap.enabled ) {
+	if ( this->config.global.states.enabled ) {
 		char coordName[ 11 ];
 		memset( coordName, 0, 11 );
 		sprintf( coordName, "%s%04d", COORD_PREFIX, this->config.coordinator.coordinator.addr.id );
 		remapMsgHandler = CoordinatorRemapMsgHandler::getInstance();
-		remapMsgHandler->init( this->config.global.remap.spreaddAddr.addr, this->config.global.remap.spreaddAddr.port, coordName );
+		remapMsgHandler->init( this->config.global.states.spreaddAddr.addr, this->config.global.states.spreaddAddr.port, coordName );
 		// add the slave addrs to remapMsgHandler
 		LOCK( &this->sockets.slaves.lock );
 		for ( uint32_t i = 0; i < this->sockets.slaves.size(); i++ ) {
@@ -357,14 +328,14 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 	}
 
 	/* Smoothing factor */
-	Latency::smoothingFactor = this->config.global.remap.smoothingFactor;
+	Latency::smoothingFactor = this->config.global.states.smoothingFactor;
 
 	/* Slave Loading stats */
 	LOCK_INIT( &this->slaveLoading.lock );
 	uint32_t sec, msec;
-	if ( this->config.coordinator.loadingStats.updateInterval > 0 ) {
-		sec = this->config.coordinator.loadingStats.updateInterval / 1000;
-		msec = this->config.coordinator.loadingStats.updateInterval % 1000;
+	if ( this->config.global.timeout.load > 0 ) {
+		sec = this->config.global.timeout.load / 1000;
+		msec = this->config.global.timeout.load % 1000;
 	} else {
 		sec = 0;
 		msec = 0;
@@ -393,14 +364,8 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 bool Coordinator::start() {
 	/* Workers and event queues */
 	this->eventQueue.start();
-	if ( this->config.coordinator.workers.type == WORKER_TYPE_MIXED ) {
-		for ( int i = 0, len = this->config.coordinator.workers.number.mixed; i < len; i++ ) {
-			this->workers[ i ].start();
-		}
-	} else {
-		for ( int i = 0, len = this->config.coordinator.workers.number.separated.total; i < len; i++ ) {
-			this->workers[ i ].start();
-		}
+	for ( int i = 0, len = this->config.global.workers.count; i < len; i++ ) {
+		this->workers[ i ].start();
 	}
 
 	/* Sockets */
@@ -410,7 +375,7 @@ bool Coordinator::start() {
 	}
 
 	/* Remapping message handler */
-	if ( this->config.global.remap.enabled && ! this->remapMsgHandler->start() ) {
+	if ( this->config.global.states.enabled && ! this->remapMsgHandler->start() ) {
 		__ERROR__( "Coordinator", "start", "Cannot start remapping message handler." );
 		return false;
 	}
@@ -462,7 +427,7 @@ bool Coordinator::stop() {
 
 	/* Remapping message handler */
 	printf( "Stopping remapping message handler...\n" );
-	if ( this->config.global.remap.enabled ) {
+	if ( this->config.global.states.enabled ) {
 		this->remapMsgHandler->stop();
 		this->remapMsgHandler->quit();
 	}
@@ -625,7 +590,7 @@ void Coordinator::debug( FILE *f ) {
 	fprintf( f, "\nOther threads\n--------------\n" );
 	this->sockets.self.printThread();
 
-	if ( this->config.global.remap.enabled ) {
+	if ( this->config.global.states.enabled ) {
 		fprintf( f, "\nRemapping handler event queue\n------------------\n" );
 		this->remapMsgHandler->eventQueue->print();
 	}
@@ -779,7 +744,7 @@ void Coordinator::printRemapping( FILE *f ) {
 	fprintf( f, "\nRemapping Records\n" );
 	fprintf( f, "----------------------------------------\n" );
 	this->remappingRecords.print( f );
-	if ( this->config.global.remap.enabled ) {
+	if ( this->config.global.states.enabled ) {
 		fprintf( f, "\nList of Tracking Slaves\n" );
 		fprintf( f, "----------------------------------------\n" );
 		this->remapMsgHandler->listAliveSlaves();
@@ -1033,16 +998,16 @@ void Coordinator::setSlave( bool overloaded ) {
 		printf( "\nWhich slave to %s (socket fd, enter 0 to exit) ? ", overloaded ? "overload" : "underload" );
 		fflush( stdout );
 	}
-	if ( this->config.global.remap.manual == 0 )
+	if ( this->config.coordinator.states.isManual == 0 )
 		printf( "\nWARNING: Not in manual state for setting overloaded slaves.\n" );
 	event.switchPhase( overloaded, slaves, false /* isCrushed */, true /* isforced */ );
 	this->eventQueue.insert( event );
 }
 
 void Coordinator::switchToManualOverload() {
-	this->config.global.remap.manual = true;
+	this->config.coordinator.states.isManual = true;
 }
 
 void Coordinator::switchToAutoOverload() {
-	this->config.global.remap.manual = false;
+	this->config.coordinator.states.isManual = false;
 }

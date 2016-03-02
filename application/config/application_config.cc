@@ -2,9 +2,7 @@
 #include "application_config.hh"
 
 bool ApplicationConfig::parse( const char *path ) {
-	if ( Config::parse( path, "application.ini" ) )
-		return true;
-	return false;
+	return Config::parse( path, "application.ini" );
 }
 
 bool ApplicationConfig::override( OptionList &options ) {

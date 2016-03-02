@@ -23,27 +23,33 @@ public:
 		int32_t timeout;
 	} epoll;
 	struct {
-		uint32_t timeout;
-	} sync;
+		uint16_t count;
+	} workers;
+	struct {
+		bool block;
+		uint32_t size;
+		uint32_t prioritized;
+	} eventQueue;
+	struct {
+		uint32_t packets;
+	} pool;
+	struct {
+		uint32_t metadata;
+		uint32_t load;
+	} timeout;
 	std::vector<ServerAddr> coordinators;
-	std::vector<ServerAddr> slaves;
-	struct {
-		bool enabled;
-		ServerAddr spreaddAddr;
-		float startThreshold;
-		float stopThreshold;
-		float overloadThreshold;
-		float smoothingFactor;
-		uint32_t maximum;
-		bool manual; // manual overload instead of using load stats 
-	} remap;
-	struct {
-		uint16_t chunksPerList;
-	} buffer;
+	std::vector<ServerAddr> servers;
 	struct {
 		CodingScheme scheme;
 		CodingParams params;
 	} coding;
+	struct {
+		bool enabled;
+		ServerAddr spreaddAddr;
+		uint16_t workers;
+		uint32_t queue;
+		float smoothingFactor;
+	} states;
 
 	GlobalConfig();
 	bool parse( const char *path );

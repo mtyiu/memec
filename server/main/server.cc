@@ -52,24 +52,24 @@ void Slave::signalHandler( int signal ) {
 bool Slave::init( char *path, OptionList &options, bool verbose ) {
 	// Parse configuration files //
 	if ( ( ! this->config.global.parse( path ) ) ||
-	     ( ! this->config.slave.merge( this->config.global ) ) ||
-	     ( ! this->config.slave.parse( path ) ) ||
-	     ( ! this->config.slave.override( options ) )
+	     ( ! this->config.server.merge( this->config.global ) ) ||
+	     ( ! this->config.server.parse( path ) ) ||
+	     ( ! this->config.server.override( options ) )
 	) {
 		return false;
 	}
-	this->mySlaveIndex = this->config.slave.validate( this->config.global.slaves );
+	this->mySlaveIndex = this->config.server.validate( this->config.global.servers );
 
 	// Initialize modules //
 	/* Socket */
 	if ( ! this->sockets.epoll.init(
-			this->config.slave.epoll.maxEvents,
-			this->config.slave.epoll.timeout
+			this->config.global.epoll.maxEvents,
+			this->config.global.epoll.timeout
 		) || ! this->sockets.self.init(
-			this->config.slave.slave.addr.type,
-			this->config.slave.slave.addr.addr,
-			this->config.slave.slave.addr.port,
-			this->config.slave.slave.addr.name,
+			this->config.server.server.addr.type,
+			this->config.server.server.addr.addr,
+			this->config.server.server.addr.port,
+			this->config.server.server.addr.name,
 			&this->sockets.epoll
 		) ) {
 		__ERROR__( "Slave", "init", "Cannot initialize socket." );
@@ -89,13 +89,13 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 		fd = socket->getSocket();
 		this->sockets.coordinators.set( fd, socket );
 	}
-	this->sockets.slavePeers.reserve( this->config.global.slaves.size() );
-	for ( int i = 0, len = this->config.global.slaves.size(); i < len; i++ ) {
+	this->sockets.slavePeers.reserve( this->config.global.servers.size() );
+	for ( int i = 0, len = this->config.global.servers.size(); i < len; i++ ) {
 		ServerPeerSocket *socket = new ServerPeerSocket();
 		int tmpfd = - ( i + 1 );
 		socket->init(
 			tmpfd,
-			this->config.global.slaves[ i ],
+			this->config.global.servers[ i ],
 			&this->sockets.epoll,
 			i == mySlaveIndex && mySlaveIndex != -1 // indicate whether this is a self-socket
 		);
@@ -122,7 +122,7 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 	this->chunkPool = MemoryPool<Chunk>::getInstance();
 	this->chunkPool->init(
 		MemoryPool<Chunk>::getCapacity(
-			this->config.slave.pool.chunks,
+			this->config.server.pool.chunks,
 			this->config.global.size.chunk
 		),
 		Chunk::initFn,
@@ -142,14 +142,14 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 			if ( this->stripeListIndex[ i ].isParity ) {
 				this->chunkBuffer[ listId ] = new MixedChunkBuffer(
 					new ParityChunkBuffer(
-						this->config.global.buffer.chunksPerList,
+						this->config.server.buffer.chunksPerList,
 						listId, stripeId, chunkId, true
 					)
 				);
 			} else {
 				this->chunkBuffer[ listId ] = new MixedChunkBuffer(
 					new DataChunkBuffer(
-						this->config.global.buffer.chunksPerList,
+						this->config.server.buffer.chunksPerList,
 						listId, stripeId, chunkId, true
 					)
 				);
@@ -162,78 +162,35 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 	this->degradedChunkBuffer.map.init( &this->map );
 
 	/* Workers, ID generator, packet pool and event queues */
-	if ( this->config.slave.workers.type == WORKER_TYPE_MIXED ) {
-		this->idGenerator.init( this->config.slave.workers.number.mixed );
-		this->packetPool.init(
-			this->config.slave.workers.number.mixed * this->config.global.coding.params.getChunkCount(),
-			Protocol::getSuggestedBufferSize(
-				this->config.global.size.key,
-				this->config.global.size.chunk
-			)
+	this->idGenerator.init( this->config.global.workers.count );
+	this->packetPool.init(
+		this->config.global.workers.count * this->config.global.coding.params.getChunkCount(),
+		Protocol::getSuggestedBufferSize(
+			this->config.global.size.key,
+			this->config.global.size.chunk
+		)
+	);
+	this->eventQueue.init(
+		this->config.global.eventQueue.block,
+		this->config.global.eventQueue.size,
+		this->config.global.eventQueue.prioritized
+	);
+	SlaveWorker::init();
+	this->workers.reserve( this->config.global.workers.count );
+	for ( int i = 0, len = this->config.global.workers.count; i < len; i++ ) {
+		this->workers.push_back( SlaveWorker() );
+		this->workers[ i ].init(
+			this->config.global,
+			this->config.server,
+			i // worker ID
 		);
-		this->eventQueue.init(
-			this->config.slave.eventQueue.block,
-			this->config.slave.eventQueue.size.mixed,
-			this->config.slave.eventQueue.size.pMixed
-		);
-		SlaveWorker::init();
-		this->workers.reserve( this->config.slave.workers.number.mixed );
-		for ( int i = 0, len = this->config.slave.workers.number.mixed; i < len; i++ ) {
-			this->workers.push_back( SlaveWorker() );
-			this->workers[ i ].init(
-				this->config.global,
-				this->config.slave,
-				WORKER_ROLE_MIXED,
-				i // worker ID
-			);
-		}
-	} else {
-		this->idGenerator.init( this->config.slave.workers.number.separated.total );
-		this->packetPool.init(
-			this->config.slave.workers.number.separated.total * this->config.global.coding.params.getChunkCount(),
-			Protocol::getSuggestedBufferSize(
-				this->config.global.size.key,
-				this->config.global.size.chunk
-			)
-		);
-		this->workers.reserve( this->config.slave.workers.number.separated.total );
-		this->eventQueue.init(
-			this->config.slave.eventQueue.block,
-			this->config.slave.eventQueue.size.separated.coding,
-			this->config.slave.eventQueue.size.separated.coordinator,
-			this->config.slave.eventQueue.size.separated.io,
-			this->config.slave.eventQueue.size.separated.master,
-			this->config.slave.eventQueue.size.separated.slave,
-			this->config.slave.eventQueue.size.separated.slavePeer
-		);
-		SlaveWorker::init();
-
-		int index = 0;
-#define WORKER_INIT_LOOP( _FIELD_, _CONSTANT_ ) \
-		for ( int i = 0, len = this->config.slave.workers.number.separated._FIELD_; i < len; i++, index++ ) { \
-			this->workers.push_back( SlaveWorker() ); \
-			this->workers[ index ].init( \
-				this->config.global, \
-				this->config.slave, \
-				_CONSTANT_, \
-				index \
-			); \
-		}
-
-		WORKER_INIT_LOOP( coding, WORKER_ROLE_CODING )
-		WORKER_INIT_LOOP( coordinator, WORKER_ROLE_COORDINATOR )
-		WORKER_INIT_LOOP( io, WORKER_ROLE_IO )
-		WORKER_INIT_LOOP( master, WORKER_ROLE_CLIENT )
-		WORKER_INIT_LOOP( slave, WORKER_ROLE_SERVER )
-		WORKER_INIT_LOOP( slavePeer, WORKER_ROLE_SERVER_PEER )
-#undef WORKER_INIT_LOOP
 	}
 	/* Remapping message handler; Remapping scheme */
-	if ( this->config.global.remap.enabled ) {
+	if ( this->config.global.states.enabled ) {
 		char slaveName[ 11 ];
 		memset( slaveName, 0, 11 );
-		sprintf( slaveName, "%s%04d", SLAVE_PREFIX, this->config.slave.slave.addr.id );
-		remapMsgHandler.init( this->config.global.remap.spreaddAddr.addr, this->config.global.remap.spreaddAddr.port, slaveName );
+		sprintf( slaveName, "%s%04d", SLAVE_PREFIX, this->config.server.server.addr.id );
+		remapMsgHandler.init( this->config.global.states.spreaddAddr.addr, this->config.global.states.spreaddAddr.port, slaveName );
 		LOCK( &this->sockets.slavePeers.lock );
 		for ( uint32_t i = 0; i < this->sockets.slavePeers.size(); i++ ) {
 			remapMsgHandler.addAliveSlave( this->sockets.slavePeers.values[ i ]->getAddr() );
@@ -274,7 +231,7 @@ bool Slave::init( int mySlaveIndex ) {
 			// The stripe ID is not used
 			this->chunkBuffer[ listId ] = new MixedChunkBuffer(
 				new ParityChunkBuffer(
-					this->config.global.buffer.chunksPerList,
+					this->config.server.buffer.chunksPerList,
 					listId, stripeId, chunkId, false
 				)
 			);
@@ -284,7 +241,7 @@ bool Slave::init( int mySlaveIndex ) {
 
 			this->chunkBuffer[ listId ] = new MixedChunkBuffer(
 				new DataChunkBuffer(
-					this->config.global.buffer.chunksPerList,
+					this->config.server.buffer.chunksPerList,
 					listId, stripeId, chunkId, false
 				)
 			);
@@ -309,14 +266,8 @@ bool Slave::initChunkBuffer() {
 bool Slave::start() {
 	/* Workers and event queues */
 	this->eventQueue.start();
-	if ( this->config.slave.workers.type == WORKER_TYPE_MIXED ) {
-		for ( int i = 0, len = this->config.slave.workers.number.mixed; i < len; i++ ) {
-			this->workers[ i ].start();
-		}
-	} else {
-		for ( int i = 0, len = this->config.slave.workers.number.separated.total; i < len; i++ ) {
-			this->workers[ i ].start();
-		}
+	for ( int i = 0, len = this->config.global.workers.count; i < len; i++ ) {
+		this->workers[ i ].start();
 	}
 
 	/* Sockets */
@@ -334,7 +285,7 @@ bool Slave::start() {
 	}
 
 	/* Remapping message handler */
-	if ( this->config.global.remap.enabled && ! this->remapMsgHandler.start() ) {
+	if ( this->config.global.states.enabled && ! this->remapMsgHandler.start() ) {
 		__ERROR__( "Slave", "start", "Cannot start remapping message handler." );
 		return false;
 	}
@@ -383,7 +334,7 @@ bool Slave::stop() {
 	this->sockets.slavePeers.clear();
 
 	 /* Remapping message handler */
-	if ( this->config.global.remap.enabled ) {
+	if ( this->config.global.states.enabled ) {
 		this->remapMsgHandler.stop();
 		this->remapMsgHandler.quit();
 	}
@@ -448,7 +399,7 @@ void Slave::metadata() {
 
 	this->map.getKeysMap( keys, lock );
 
-	snprintf( filename, sizeof( filename ), "%s.meta", this->config.slave.slave.addr.name );
+	snprintf( filename, sizeof( filename ), "%s.meta", this->config.server.server.addr.name );
 	f = fopen( filename, "w+" );
 	if ( ! f ) {
 		__ERROR__( "Slave", "metadata", "Cannot write to the file \"%s\".", filename );
@@ -531,7 +482,7 @@ double Slave::getElapsedTime() {
 
 void Slave::info( FILE *f ) {
 	this->config.global.print( f );
-	this->config.slave.print( f );
+	this->config.server.print( f );
 	this->stripeList->print( f );
 
 	fprintf( f, "\n### Stripe List Index ###\n" );
@@ -577,7 +528,7 @@ void Slave::debug( FILE *f ) {
 		f, "Count : %lu / %lu\n",
 		this->chunkPool->getCount(),
 		MemoryPool<Chunk>::getCapacity(
-			this->config.slave.pool.chunks,
+			this->config.server.pool.chunks,
 			this->config.global.size.chunk
 		)
 	);
@@ -1137,7 +1088,7 @@ void Slave::time() {
 }
 
 void Slave::alarm() {
-	::alarm( this->config.global.sync.timeout );
+	::alarm( this->config.global.timeout.metadata / 1000 );
 }
 
 void Slave::backupStat( FILE *f ) {

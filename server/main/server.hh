@@ -54,7 +54,7 @@ private:
 public:
 	struct {
 		GlobalConfig global;
-		ServerConfig slave;
+		ServerConfig server;
 	} config;
 	struct {
 		ServerSocket self;

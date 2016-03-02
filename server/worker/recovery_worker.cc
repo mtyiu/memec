@@ -41,7 +41,7 @@ bool SlaveWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *buf
 	original->stop();
 
 	ServerAddr serverAddr( slavePeers->values[ index ]->identifier, dstHeader.addr, dstHeader.port );
-	ServerAddr &me = slave->config.slave.slave.addr;
+	ServerAddr &me = slave->config.server.server.addr;
 
 	// Check if this is a self-socket
 	self = ( dstHeader.addr == me.addr && dstHeader.port == me.port );
@@ -50,8 +50,8 @@ bool SlaveWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *buf
 		ServerAddr src( 0, srcHeader.addr, srcHeader.port );
 		int mySlaveIndex = -1;
 
-		for ( int i = 0, len = slave->config.global.slaves.size(); i < len; i++ ) {
-			if ( ServerAddr::match( &slave->config.global.slaves[ i ], &src ) ) {
+		for ( int i = 0, len = slave->config.global.servers.size(); i < len; i++ ) {
+			if ( ServerAddr::match( &slave->config.global.servers[ i ], &src ) ) {
 				mySlaveIndex = i;
 				break;
 			}

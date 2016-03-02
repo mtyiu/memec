@@ -2,7 +2,32 @@
 #include "global_config.hh"
 
 GlobalConfig::GlobalConfig() {
-	this->remap.maximum = 0;
+	// Set default values
+	this->size.key = 255;
+	this->size.chunk = 4096;
+
+	this->stripeList.count = 16;
+	this->epoll.maxEvents = 64;
+	this->epoll.timeout = -1;
+
+	this->workers.count = 8;
+
+	this->eventQueue.block = true;
+	this->eventQueue.size = 1048576;
+	this->eventQueue.prioritized = 1024;
+
+	this->pool.packets = 1024;
+
+	this->timeout.metadata = 1000;
+	this->timeout.load = 50;
+
+	this->coding.scheme = CS_RAID0;
+	this->coding.params.setN( 1 );
+
+	this->states.enabled = false;
+	this->states.workers = 4;
+	this->states.queue = 256;
+	this->states.smoothingFactor = 0.3;
 }
 
 bool GlobalConfig::parse( const char *path ) {
@@ -29,9 +54,30 @@ bool GlobalConfig::set( const char *section, const char *name, const char *value
 			this->epoll.timeout = atoi( value );
 		else
 			return false;
-	} else if ( match( section, "sync" ) ) {
-		if ( match( name, "timeout" ) )
-			this->sync.timeout = atoi( value );
+	} else if ( match( section, "workers" ) ) {
+		if ( match( name, "count" ) )
+			this->workers.count = atoi( value );
+		else
+			return false;
+	} else if ( match( section, "event_queue" ) ) {
+		if ( match( name, "block" ) )
+			this->eventQueue.block = ! match( value, "false" );
+		else if ( match( name, "size" ) )
+			this->eventQueue.size = atoi( value );
+		else if ( match( name, "prioritized" ) )
+			this->eventQueue.prioritized = atoi( value );
+		else
+			return false;
+	} else if ( match( section, "pool" ) ) {
+		if ( match( name, "packets" ) )
+			this->pool.packets = atoi( value );
+		else
+			return false;
+	} else if ( match( section, "timeout" ) ) {
+		if ( match( name, "metadata" ) )
+			this->timeout.metadata = atoi( value );
+		else if ( match( name, "load" ) )
+			this->timeout.load = atoi( value );
 		else
 			return false;
 	} else if ( match( section, "coordinators" ) ) {
@@ -43,39 +89,27 @@ bool GlobalConfig::set( const char *section, const char *name, const char *value
 	} else if ( match( section, "servers" ) ) {
 		ServerAddr addr;
 		if ( addr.parse( name, value ) )
-			this->slaves.push_back( addr );
+			this->servers.push_back( addr );
 		else
 			return false;
-	} else if ( match( section, "remap" ) ) {
-		if ( match( name, "enabled" ) ) {
-			this->remap.enabled = ( atoi( value ) >= 1 );
-		} else if ( match( name, "spreadd" ) ) {
+	} else if ( match( section, "states" ) ) {
+		if ( match( name, "spreadd" ) ) {
 			ServerAddr addr;
 			if ( addr.parse( name, value ) )
-				this->remap.spreaddAddr = addr;
+				this->states.spreaddAddr = addr;
 			else
 				return false;
-		} else if ( match( name, "startThreshold" ) ) {
-			this->remap.startThreshold = atoi( value ) / 100.0;
-		} else if ( match( name, "stopThreshold" ) ) {
-			this->remap.stopThreshold = atoi( value ) / 100.0;
-		} else if ( match( name, "overloadThreshold" ) ) {
-			this->remap.overloadThreshold = atoi( value ) / 100.0;
-			if ( this->remap.overloadThreshold <= 1 )
-				return false;
-		} else if ( match( name, "smoothingFactor" ) ) {
-			this->remap.smoothingFactor = atof( value );
-		} else if ( match( name, "maximum" ) ) {
-			this->remap.maximum = atoi( value );
-		} else if ( match( name, "manual" ) ) {
-			this->remap.manual = ( atoi( value ) !=  0 );
-		} else
+		} else if ( match( name, "enabled" ) ) {
+			this->states.enabled = ( atoi( value ) >= 1 );
+		} else if ( match( name, "workers" ) ) {
+			this->states.workers = atoi( value );
+		} else if ( match( name, "queue_len" ) ) {
+			this->states.queue = atoi( value );
+		} else if ( match( name, "smoothing_factor" ) ) {
+			this->states.smoothingFactor = atof( value );
+		} else {
 			return false;
-	} else if ( match( section, "buffer" ) ) {
-		if ( match( name, "chunks_per_list" ) )
-			this->buffer.chunksPerList = atoi( value );
-		else
-			return false;
+		}
 	} else if ( match( section, "coding" ) ) {
 		if ( match( value, "raid0" ) ) {
 			this->coding.scheme = CS_RAID0;
@@ -148,37 +182,56 @@ bool GlobalConfig::validate() {
 		CFG_PARSE_ERROR( "GlobalConfig", "Key size should be at least 8 bytes." );
 	if ( this->size.key > 255 )
 		CFG_PARSE_ERROR( "GlobalConfig", "Key size should be at most 255 bytes." );
-
 	if ( this->size.chunk < 32 )
 		CFG_PARSE_ERROR( "GlobalConfig", "Chunk size should be at least 32 bytes." );
 	if ( this->size.chunk % 8 != 0 )
 		CFG_PARSE_ERROR( "GlobalConfig", "Chunk size should be a multiple of 8." );
+	if ( this->size.chunk < this->size.key + 4 ) // 2^24 bytes
+		CFG_PARSE_ERROR( "GlobalConfig", "Chunk size should be at least %u bytes.", this->size.key + 4 );
+	if ( this->size.chunk > 16777216 ) // 2^24 bytes
+		CFG_PARSE_ERROR( "GlobalConfig", "Key size should be at most 16777216 bytes." );
 
 	if ( this->stripeList.count < 1 )
 		CFG_PARSE_ERROR( "GlobalConfig", "The number of stripe lists should be at least 1." );
 
 	if ( this->epoll.maxEvents < 1 )
 		CFG_PARSE_ERROR( "GlobalConfig", "Maximum number of events in epoll should be at least 1." );
-
 	if ( this->epoll.timeout < -1 )
 		CFG_PARSE_ERROR( "GlobalConfig", "The timeout value of epoll should be either -1 (infinite blocking), 0 (non-blocking) or a positive value (representing the number of milliseconds to block)." );
 
-	if ( this->sync.timeout < 1 )
-		CFG_PARSE_ERROR( "GlobalConfig", "The synchronization timeout should be at least 1 second." );
+	if ( this->workers.count < 1 )
+		CFG_PARSE_ERROR( "GlobalConfig", "The number of workers should be at least 1." );
 
-	if ( this->size.chunk < this->size.key + 4 ) // 2^24 bytes
-		CFG_PARSE_ERROR( "GlobalConfig", "Chunk size should be at least %u bytes.", this->size.key + 4 );
-	if ( this->size.chunk > 16777216 ) // 2^24 bytes
-		CFG_PARSE_ERROR( "GlobalConfig", "Key size should be at most 16777216 bytes." );
+	if ( this->eventQueue.size < this->workers.count )
+		CFG_PARSE_ERROR( "GlobalConfig", "The size of the event queue should be at least the number of workers." );
+
+	if ( this->eventQueue.prioritized < this->workers.count )
+		CFG_PARSE_ERROR( "GlobalConfig", "The size of the prioritized event queue should be at least the number of workers." );
+
+	if ( this->pool.packets < 1 )
+		CFG_PARSE_ERROR( "GlobalConfig", "The size of packet pool should be at least 1." );
+
+	if ( this->timeout.metadata < 1 )
+		CFG_PARSE_ERROR( "GlobalConfig", "The metadata synchronization timeout should be at least 1 ms." );
+	if ( this->timeout.load < 1 )
+		CFG_PARSE_ERROR( "GlobalConfig", "The load statistics synchronization timeout should be at least 1 ms." );
 
 	if ( this->coordinators.empty() )
 		CFG_PARSE_ERROR( "GlobalConfig", "There should be at least one coordinator." );
 
-	if ( this->slaves.empty() )
+	if ( this->servers.empty() )
 		CFG_PARSE_ERROR( "GlobalConfig", "There should be at least one server." );
 
-	if ( this->buffer.chunksPerList < 1 )
-		CFG_PARSE_ERROR( "GlobalConfig", "The number of temporary chunks per stripe list should be at least 1." );
+	if ( this->states.enabled ) {
+		if ( ! this->states.spreaddAddr.isInitialized() )
+			CFG_PARSE_ERROR( "GlobalConfig", "The spread daemon address is not an valid address." );
+		if ( this->states.workers < 1 )
+			CFG_PARSE_ERROR( "GlobalConfig", "The number of state workers should be at least 1." );
+		if ( this->states.queue < this->states.workers )
+			CFG_PARSE_ERROR( "GlobalConfig", "The size of the state event queue should be at least the number of state workers." );
+		if ( this->states.smoothingFactor > 1 || this->states.smoothingFactor <= 0 )
+			CFG_PARSE_ERROR( "GlobalConfig", "The smoothing factor should be between 0 and 1." );
+	}
 
 	switch( this->coding.scheme ) {
 		case CS_RAID0:
@@ -266,19 +319,52 @@ void GlobalConfig::print( FILE *f ) {
 		"- epoll settings\n"
 		"\t- %-*s : %u\n"
 		"\t- %-*s : %d\n"
-		"- Synchronization\n"
+		"- Workers\n"
 		"\t- %-*s : %u\n"
-		"- Buffer\n"
+		"- Event queue"
+		"\t- %-*s : %s\n"
+		"\t- %-*s : %u; %u (prioritized)\n"
+		"- Timeout\n"
 		"\t- %-*s : %u\n"
-		"- Coding\n"
-		"\t- %-*s : ",
-		width, "Key size", this->size.key,
-		width, "Chunk size", this->size.chunk,
+		"\t- %-*s : %u\n"
+		"- States\n"
+		"\t- %-*s : %s\n",
+		width, "Key", this->size.key,
+		width, "Chunk", this->size.chunk,
 		width, "Count", this->stripeList.count,
 		width, "Maximum number of events", this->epoll.maxEvents,
 		width, "Timeout", this->epoll.timeout,
-		width, "Timeout", this->sync.timeout,
-		width, "Chunks per list", this->buffer.chunksPerList,
+		width, "Count", this->workers.count,
+		width, "Blocking?", this->eventQueue.block ? "Yes" : "No",
+		width, "Size", this->eventQueue.size, this->eventQueue.prioritized,
+		width, "Metadata", this->timeout.metadata,
+		width, "Load", this->timeout.load,
+		width, "Enabled?", this->states.enabled ? "Yes" : "No"
+	);
+
+	if ( this->states.enabled ) {
+		fprintf(
+			f,
+			"\t- %-*s : ",
+			width, "Spread daemon address"
+		);
+		this->states.spreaddAddr.print( f );
+
+		fprintf(
+			f,
+			"\t- %-*s : %u\n"
+			"\t- %-*s : %u\n"
+			"\t- %-*s : %f\n",
+			width, "Number of workers", this->states.workers,
+			width, "Size of event queue", this->states.queue,
+			width, "Smoothing factor", this->states.smoothingFactor
+		);
+	}
+
+	fprintf(
+		f,
+		"- Coding\n"
+		"\t- %-*s : ",
 		width, "Coding scheme"
 	);
 	switch( this->coding.scheme ) {
@@ -311,8 +397,6 @@ void GlobalConfig::print( FILE *f ) {
 			break;
 	}
 
-	fprintf( f, "- Manual state transition: %s\n", ( this->remap.manual )? "On" : "Off" );
-
 	fprintf( f, "- Coordinators\n" );
 	for ( int i = 0, len = this->coordinators.size(); i < len; i++ ) {
 		fprintf( f, "\t%d. ", ( i + 1 ) );
@@ -320,9 +404,9 @@ void GlobalConfig::print( FILE *f ) {
 	}
 
 	fprintf( f, "- Servers\n" );
-	for ( int i = 0, len = this->slaves.size(); i < len; i++ ) {
+	for ( int i = 0, len = this->servers.size(); i < len; i++ ) {
 		fprintf( f, "\t%d. ", ( i + 1 ) );
-		this->slaves[ i ].print( f );
+		this->servers[ i ].print( f );
 	}
 
 	fprintf( f, "\n" );
