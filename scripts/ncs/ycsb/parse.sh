@@ -1,5 +1,22 @@
 #!/bin/bash
 
+################################################
+#
+# Script for parsing YCSB results
+#
+# INPUT:     folder containing the results in ".txt" files
+# OUTPUT:    A line containing the following fields for each file, to a designated file
+#            1. File name (without extension)
+#            2. Runtime
+#            3. Length of fields
+#            4. Number of records
+#            5. Throughput ( ( ( length of fields + legnth of key ) * # of record ) / # of operations )
+#            6. Average Latency for INSERT
+#            7. Minimum Latency for INSERT
+#            8. Maximum Latency for INSERT
+#
+################################################
+
 if [ $# != 1 ]; then
 	echo "Usage: $0 [path to the log folder]"
 	exit 1

@@ -3,32 +3,34 @@
 BASE_PATH=${HOME}/mtyiu
 BOOTSTRAP_SCRIPT_PATH=${BASE_PATH}/scripts/bootstrap
 
-SLEEP_TIME=1
+SLEEP_TIME=2
 
 if [ $# -gt 0 ]; then
 	echo "*** Warning: Debug mode is enabled. ***"
 fi
 
-./set_config.sh
+# ./set_config.sh
 
-ssh testbed-node10 "screen -S coordinator -p 0 -X stuff \"$(printf '\r\r')${BOOTSTRAP_SCRIPT_PATH}/start-coordinator.sh ${1}$(printf '\r\r')\""
+ssh testbed-node1 "screen -S coordinator -p 0 -X stuff \"$(printf '\r\r')${BOOTSTRAP_SCRIPT_PATH}/start-coordinator.sh ${1}$(printf '\r\r')\""
 
 sleep ${SLEEP_TIME}
 
-for i in {1..8}; do
-	ssh testbed-node$i "screen -S server$i -p 0 -X stuff \"$(printf '\r\r')${BOOTSTRAP_SCRIPT_PATH}/start-server.sh ${1}$(printf '\r\r')\""
+for i in {11..23} {37..39}; do
+	ssh testbed-node$i "screen -S server -p 0 -X stuff \"$(printf '\r\r')${BOOTSTRAP_SCRIPT_PATH}/start-server.sh ${1}$(printf '\r\r')\""
 done
 
 sleep ${SLEEP_TIME}
 
-ssh testbed-node9 "screen -S client -p 0 -X stuff \"$(printf '\r\r')${BOOTSTRAP_SCRIPT_PATH}/start-client.sh ${1}$(printf '\r\r')\""
+for i in 3 4 8 9; do
+	ssh testbed-node$i "screen -S client -p 0 -X stuff \"$(printf '\r\r')${BOOTSTRAP_SCRIPT_PATH}/start-client.sh ${1}$(printf '\r\r')\""
+done
 
 sleep ${SLEEP_TIME}
 
 echo 1 > RUNNING
 read -p "Press Enter to terminate all instances..."
 
-for i in {1..10}; do
+for i in {1..23} {37..39}; do
 	ssh testbed-node$i 'killall -9 application coordinator client server ycsb 1>&2 2> /dev/null' &
 done
 
@@ -41,12 +43,14 @@ else
 	TERM_COMMAND="$(printf '\r\r')clear$(printf '\r')"
 fi
 
-for i in {1..8}; do
-	ssh testbed-node$i "screen -S server$i -p 0 -X stuff \"${TERM_COMMAND}\"" &
+for i in {11..23} {37..39}; do
+	ssh testbed-node$i "screen -S server -p 0 -X stuff \"${TERM_COMMAND}\"" &
 done
-ssh testbed-node9 "screen -S client -p 0 -X stuff \"${TERM_COMMAND}\"" &
-ssh testbed-node9 "screen -S ycsb -p 0 -X stuff \"${TERM_COMMAND}\"" &
-ssh testbed-node10 "screen -S coordinator -p 0 -X stuff \"${TERM_COMMAND}\"" &
+for i in 3 4 8 9; do
+	ssh testbed-node$i "screen -S client -p 0 -X stuff \"${TERM_COMMAND}\"" &
+	ssh testbed-node$i "screen -S ycsb -p 0 -X stuff \"${TERM_COMMAND}\"" &
+done
+ssh testbed-node1 "screen -S coordinator -p 0 -X stuff \"${TERM_COMMAND}\"" &
 
 sleep ${SLEEP_TIME}
 

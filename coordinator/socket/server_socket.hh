@@ -1,5 +1,5 @@
-#ifndef __COORDINATOR_SOCKET_SLAVE_SOCKET_HH__
-#define __COORDINATOR_SOCKET_SLAVE_SOCKET_HH__
+#ifndef __COORDINATOR_SOCKET_SERVER_SOCKET_HH__
+#define __COORDINATOR_SOCKET_SERVER_SOCKET_HH__
 
 #include <unordered_map>
 #include "../ds/map.hh"

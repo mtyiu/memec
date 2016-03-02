@@ -1,5 +1,5 @@
-#ifndef __MASTER_SOCKET_SLAVE_SOCKET_HH__
-#define __MASTER_SOCKET_SLAVE_SOCKET_HH__
+#ifndef __CLIENT_SOCKET_SERVER_SOCKET_HH__
+#define __CLIENT_SOCKET_SERVER_SOCKET_HH__
 
 #include <set>
 #include "../../common/ds/array_map.hh"

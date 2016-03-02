@@ -1,5 +1,5 @@
-#ifndef __SLAVE_SOCKET_SLAVE_SOCKET_HH__
-#define __SLAVE_SOCKET_SLAVE_SOCKET_HH__
+#ifndef __SERVER_SOCKET_SERVER_SOCKET_HH__
+#define __SERVER_SOCKET_SERVER_SOCKET_HH__
 
 #include <vector>
 #include <pthread.h>

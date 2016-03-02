@@ -1,5 +1,5 @@
-#ifndef __SLAVE_SOCKET_COORDINATOR_SOCKET_HH__
-#define __SLAVE_SOCKET_COORDINATOR_SOCKET_HH__
+#ifndef __SERVER_SOCKET_COORDINATOR_SOCKET_HH__
+#define __SERVER_SOCKET_COORDINATOR_SOCKET_HH__
 
 #include "../../common/ds/array_map.hh"
 #include "../../common/socket/socket.hh"
