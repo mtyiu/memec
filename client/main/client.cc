@@ -166,7 +166,6 @@ void Master::signalHandler( int signal ) {
 bool Master::init( char *path, OptionList &options, bool verbose ) {
 	// Parse configuration files //
 	if ( ( ! this->config.global.parse( path ) ) ||
-	     ( ! this->config.master.merge( this->config.global ) ) ||
 	     ( ! this->config.master.parse( path ) ) ||
 	     ( ! this->config.master.override( options ) ) ) {
 		return false;
@@ -214,7 +213,7 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 	this->stripeList = new StripeList<ServerSocket>(
 		this->config.global.coding.params.getChunkCount(),
 		this->config.global.coding.params.getDataChunkCount(),
-		this->config.global.stripeList.count,
+		this->config.global.stripeLists.count,
 		this->sockets.slaves.values
 	);
 	/* Workers, ID generator, packet pool and event queues */

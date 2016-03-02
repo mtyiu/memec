@@ -52,7 +52,6 @@ void Slave::signalHandler( int signal ) {
 bool Slave::init( char *path, OptionList &options, bool verbose ) {
 	// Parse configuration files //
 	if ( ( ! this->config.global.parse( path ) ) ||
-	     ( ! this->config.server.merge( this->config.global ) ) ||
 	     ( ! this->config.server.parse( path ) ) ||
 	     ( ! this->config.server.override( options ) )
 	) {
@@ -111,7 +110,7 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 	this->stripeList = new StripeList<ServerPeerSocket>(
 		this->config.global.coding.params.getChunkCount(),
 		this->config.global.coding.params.getDataChunkCount(),
-		this->config.global.stripeList.count,
+		this->config.global.stripeLists.count,
 		this->sockets.slavePeers.values
 	);
 	/* Stripe list index */
@@ -130,8 +129,8 @@ bool Slave::init( char *path, OptionList &options, bool verbose ) {
 	);
 	/* Chunk buffer */
 	ChunkBuffer::init();
-	this->chunkBuffer.reserve( this->config.global.stripeList.count );
-	for ( uint32_t i = 0; i < this->config.global.stripeList.count; i++ )
+	this->chunkBuffer.reserve( this->config.global.stripeLists.count );
+	for ( uint32_t i = 0; i < this->config.global.stripeLists.count; i++ )
 		this->chunkBuffer.push_back( 0 );
 
 	if ( mySlaveIndex != -1 ) {

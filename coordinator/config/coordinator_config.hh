@@ -25,7 +25,6 @@ public:
 	} states;
 
 	CoordinatorConfig();
-	bool merge( GlobalConfig &globalConfig );
 	bool parse( const char *path );
 	bool override( OptionList &options );
 	bool set( const char *section, const char *name, const char *value );

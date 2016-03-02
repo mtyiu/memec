@@ -6,7 +6,8 @@ GlobalConfig::GlobalConfig() {
 	this->size.key = 255;
 	this->size.chunk = 4096;
 
-	this->stripeList.count = 16;
+	this->stripeLists.count = 16;
+
 	this->epoll.maxEvents = 64;
 	this->epoll.timeout = -1;
 
@@ -36,15 +37,15 @@ bool GlobalConfig::parse( const char *path ) {
 
 bool GlobalConfig::set( const char *section, const char *name, const char *value ) {
 	if ( match( section, "size" ) ) {
-		if ( match( name, "key_size" ) )
+		if ( match( name, "key" ) )
 			this->size.key = atoi( value );
-		else if ( match( name, "chunk_size" ) )
+		else if ( match( name, "chunk" ) )
 			this->size.chunk = atoi( value );
 		else
 			return false;
-	} else if ( match( section, "stripe_list" ) ) {
+	} else if ( match( section, "stripe_lists" ) ) {
 		if ( match( name, "count" ) )
-			this->stripeList.count = atoi( value );
+			this->stripeLists.count = atoi( value );
 		else
 			return false;
 	} else if ( match( section, "epoll" ) ) {
@@ -93,14 +94,14 @@ bool GlobalConfig::set( const char *section, const char *name, const char *value
 		else
 			return false;
 	} else if ( match( section, "states" ) ) {
-		if ( match( name, "spreadd" ) ) {
+		if ( match( name, "enabled" ) ) {
+			this->states.enabled = ( atoi( value ) >= 1 );
+		} else if ( match( name, "spreadd" ) ) {
 			ServerAddr addr;
 			if ( addr.parse( name, value ) )
 				this->states.spreaddAddr = addr;
 			else
 				return false;
-		} else if ( match( name, "enabled" ) ) {
-			this->states.enabled = ( atoi( value ) >= 1 );
 		} else if ( match( name, "workers" ) ) {
 			this->states.workers = atoi( value );
 		} else if ( match( name, "queue_len" ) ) {
@@ -191,7 +192,7 @@ bool GlobalConfig::validate() {
 	if ( this->size.chunk > 16777216 ) // 2^24 bytes
 		CFG_PARSE_ERROR( "GlobalConfig", "Key size should be at most 16777216 bytes." );
 
-	if ( this->stripeList.count < 1 )
+	if ( this->stripeLists.count < 1 )
 		CFG_PARSE_ERROR( "GlobalConfig", "The number of stripe lists should be at least 1." );
 
 	if ( this->epoll.maxEvents < 1 )
@@ -204,7 +205,6 @@ bool GlobalConfig::validate() {
 
 	if ( this->eventQueue.size < this->workers.count )
 		CFG_PARSE_ERROR( "GlobalConfig", "The size of the event queue should be at least the number of workers." );
-
 	if ( this->eventQueue.prioritized < this->workers.count )
 		CFG_PARSE_ERROR( "GlobalConfig", "The size of the prioritized event queue should be at least the number of workers." );
 
@@ -331,7 +331,7 @@ void GlobalConfig::print( FILE *f ) {
 		"\t- %-*s : %s\n",
 		width, "Key", this->size.key,
 		width, "Chunk", this->size.chunk,
-		width, "Count", this->stripeList.count,
+		width, "Count", this->stripeLists.count,
 		width, "Maximum number of events", this->epoll.maxEvents,
 		width, "Timeout", this->epoll.timeout,
 		width, "Count", this->workers.count,

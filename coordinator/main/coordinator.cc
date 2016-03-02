@@ -242,7 +242,6 @@ void Coordinator::signalHandler( int signal ) {
 bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 	// Parse configuration files //
 	if ( ( ! this->config.global.parse( path ) ) ||
-	     ( ! this->config.coordinator.merge( this->config.global ) ) ||
 	     ( ! this->config.coordinator.parse( path ) ) ||
 	     ( ! this->config.coordinator.override( options ) ) ||
 	     ( ! this->config.coordinator.validate( this->config.global.coordinators ) ) ) {
@@ -278,12 +277,12 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 		socket->init( tmpfd, this->config.global.servers[ i ], &this->sockets.epoll );
 		this->sockets.slaves.set( tmpfd, socket );
 	}
-	Map::init( this->config.global.stripeList.count );
+	Map::init( this->config.global.stripeLists.count );
 	/* Stripe list */
 	this->stripeList = new StripeList<ServerSocket>(
 		this->config.global.coding.params.getChunkCount(),
 		this->config.global.coding.params.getDataChunkCount(),
-		this->config.global.stripeList.count,
+		this->config.global.stripeLists.count,
 		this->sockets.slaves.values
 	);
 	/* Packet Pool */

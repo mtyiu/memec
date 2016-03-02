@@ -19,12 +19,6 @@ ClientConfig::ClientConfig() {
 	this->backup.ackBatchSize = 100;
 }
 
-bool ClientConfig::merge( GlobalConfig &globalConfig ) {
-	this->epoll.maxEvents = globalConfig.epoll.maxEvents;
-	this->epoll.timeout = globalConfig.epoll.timeout;
-	return true;
-}
-
 bool ClientConfig::parse( const char *path ) {
 	if ( Config::parse( path, "client.ini" ) ) {
 		if ( this->workers.type == WORKER_TYPE_SEPARATED )

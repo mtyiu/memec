@@ -2,10 +2,11 @@
 #include "coordinator_config.hh"
 
 CoordinatorConfig::CoordinatorConfig() {
-}
-
-bool CoordinatorConfig::merge( GlobalConfig &globalConfig ) {
-	return true;
+	this->states.isManual = true;
+	this->states.maximum = 0;
+	this->states.threshold.start = 0;
+	this->states.threshold.stop = 0;
+	this->states.threshold.overload = 0;
 }
 
 bool CoordinatorConfig::parse( const char *path ) {

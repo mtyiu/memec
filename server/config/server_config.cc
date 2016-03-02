@@ -3,10 +3,10 @@
 #include "server_config.hh"
 
 ServerConfig::ServerConfig() {
-}
-
-bool ServerConfig::merge( GlobalConfig &globalConfig ) {
-	return true;
+	this->pool.chunks = 1073741824; // 1 GB
+	this->buffer.chunksPerList = 5;
+	this->seal.disabled = false;
+	this->storage.type = STORAGE_TYPE_LOCAL;
 }
 
 bool ServerConfig::parse( const char *path ) {

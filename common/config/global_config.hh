@@ -17,7 +17,7 @@ public:
 	} size;
 	struct {
 		uint32_t count;
-	} stripeList;
+	} stripeLists;
 	struct {
 		uint32_t maxEvents;
 		int32_t timeout;
