@@ -25,16 +25,16 @@ void CoordinatorWorker::dispatch( ClientEvent event ) {
 				buffer.size,
 				Coordinator::instanceId,
 				CoordinatorWorker::idGenerator->nextVal( this->workerId ),
-				event.message.slaveLoading.slaveGetLatency,
-				event.message.slaveLoading.slaveSetLatency,
-				event.message.slaveLoading.overloadedServerSet
+				event.message.serverLoading.serverGetLatency,
+				event.message.serverLoading.serverSetLatency,
+				event.message.serverLoading.overloadedServerSet
 			);
 			// release the ArrayMaps
-			event.message.slaveLoading.slaveGetLatency->clear();
-			event.message.slaveLoading.slaveSetLatency->clear();
-			delete event.message.slaveLoading.slaveGetLatency;
-			delete event.message.slaveLoading.slaveSetLatency;
-			delete event.message.slaveLoading.overloadedServerSet;
+			event.message.serverLoading.serverGetLatency->clear();
+			event.message.serverLoading.serverSetLatency->clear();
+			delete event.message.serverLoading.serverGetLatency;
+			delete event.message.serverLoading.serverSetLatency;
+			delete event.message.serverLoading.overloadedServerSet;
 			isSend = true;
 			break;
 		case CLIENT_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_SUCCESS:
@@ -55,22 +55,22 @@ void CoordinatorWorker::dispatch( ClientEvent event ) {
 		case CLIENT_EVENT_TYPE_SWITCH_PHASE:
 		{
 			Coordinator *coordinator = Coordinator::getInstance();
-			std::vector<struct sockaddr_in> *slaves = event.message.switchPhase.slaves;
+			std::vector<struct sockaddr_in> *servers = event.message.switchPhase.servers;
 
 			isSend = false;
-			if ( slaves == NULL || ! coordinator->remapMsgHandler )
+			if ( servers == NULL || ! coordinator->remapMsgHandler )
 				break;
 
 			// just trigger the handling of transition, no message need to be handled
 			if ( event.message.switchPhase.toRemap ) {
 				size_t numClients = coordinator->sockets.clients.size();
-				for ( size_t i = 0, numOverloadedServers = slaves->size(); i < numOverloadedServers; i++ ) {
+				for ( size_t i = 0, numOverloadedServers = servers->size(); i < numOverloadedServers; i++ ) {
 					uint16_t instanceId = 0;
 
-					for ( size_t j = 0, numServers = coordinator->sockets.slaves.size(); j < numServers; j++ ) {
-						struct sockaddr_in addr = slaves->at( i );
-						if ( coordinator->sockets.slaves[ j ]->equal( addr.sin_addr.s_addr, addr.sin_port ) ) {
-							instanceId = coordinator->sockets.slaves[ j ]->instanceId;
+					for ( size_t j = 0, numServers = coordinator->sockets.servers.size(); j < numServers; j++ ) {
+						struct sockaddr_in addr = servers->at( i );
+						if ( coordinator->sockets.servers[ j ]->equal( addr.sin_addr.s_addr, addr.sin_port ) ) {
+							instanceId = coordinator->sockets.servers[ j ]->instanceId;
 							break;
 						}
 					}
@@ -82,20 +82,20 @@ void CoordinatorWorker::dispatch( ClientEvent event ) {
 							true,       // isDegraded
 							numClients  // pending
 						) ) {
-							__ERROR__( "CoordinatorWorker", "dispatch", "Warning: This slave (instance ID = %u) is already under transition to degraded state.", instanceId );
+							__ERROR__( "CoordinatorWorker", "dispatch", "Warning: This server (instance ID = %u) is already under transition to degraded state.", instanceId );
 						}
 					}
 
 					if ( event.message.switchPhase.isCrashed )
-						coordinator->remapMsgHandler->addCrashedServer( slaves->at( i ) );
+						coordinator->remapMsgHandler->addCrashedServer( servers->at( i ) );
 				}
 
-				coordinator->remapMsgHandler->transitToDegraded( slaves, event.message.switchPhase.forced ); // Phase 1a --> 2
+				coordinator->remapMsgHandler->transitToDegraded( servers, event.message.switchPhase.forced ); // Phase 1a --> 2
 			} else {
-				coordinator->remapMsgHandler->transitToNormal( slaves, event.message.switchPhase.forced ); // Phase 1b --> 0
+				coordinator->remapMsgHandler->transitToNormal( servers, event.message.switchPhase.forced ); // Phase 1b --> 0
 			}
-			// free the vector of slaves
-			delete slaves;
+			// free the vector of servers
+			delete servers;
 		}
 			break;
 		// Degraded operation
@@ -215,19 +215,19 @@ void CoordinatorWorker::dispatch( ClientEvent event ) {
 				buffer.size -= PROTO_LOAD_STATS_SIZE;
 				if ( ! this->protocol.parseLoadingStats( loadStatsHeader, getLatency, setLatency, buffer.data, buffer.size ) )
 					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid amount of data received from client." );
-				//fprintf( stderr, "get stats GET %d SET %d\n", loadStatsHeader.slaveGetCount, loadStatsHeader.slaveSetCount );
+				//fprintf( stderr, "get stats GET %d SET %d\n", loadStatsHeader.serverGetCount, loadStatsHeader.serverSetCount );
 				// set the latest loading stats
 				//fprintf( stderr, "fd %d IP %u:%hu\n", event.socket->getSocket(), ntohl( event.socket->getAddr().sin_addr.s_addr ), ntohs( event.socket->getAddr().sin_port ) );
 
 #define SET_SERVER_LATENCY_FOR_CLIENT( _CLIENT_ADDR_, _SRC_, _DST_ ) \
 	for ( uint32_t i = 0; i < _SRC_.size(); i++ ) { \
-		coordinator->slaveLoading._DST_.get( _SRC_.keys[ i ], &index ); \
+		coordinator->serverLoading._DST_.get( _SRC_.keys[ i ], &index ); \
 		if ( index == -1 ) { \
-			coordinator->slaveLoading._DST_.set( _SRC_.keys[ i ], new ArrayMap<struct sockaddr_in, Latency> () ); \
-			index = coordinator->slaveLoading._DST_.size() - 1; \
-			coordinator->slaveLoading._DST_.values[ index ]->set( _CLIENT_ADDR_, _SRC_.values[ i ] ); \
+			coordinator->serverLoading._DST_.set( _SRC_.keys[ i ], new ArrayMap<struct sockaddr_in, Latency> () ); \
+			index = coordinator->serverLoading._DST_.size() - 1; \
+			coordinator->serverLoading._DST_.values[ index ]->set( _CLIENT_ADDR_, _SRC_.values[ i ] ); \
 		} else { \
-			latencyPool = coordinator->slaveLoading._DST_.values[ index ]; \
+			latencyPool = coordinator->serverLoading._DST_.values[ index ]; \
 			latencyPool->get( _CLIENT_ADDR_, &index ); \
 			if ( index == -1 ) { \
 				latencyPool->set( _CLIENT_ADDR_, _SRC_.values[ i ] ); \
@@ -239,10 +239,10 @@ void CoordinatorWorker::dispatch( ClientEvent event ) {
 	} \
 
 				clientAddr = event.socket->getAddr();
-				LOCK ( &coordinator->slaveLoading.lock );
+				LOCK ( &coordinator->serverLoading.lock );
 				SET_SERVER_LATENCY_FOR_CLIENT( clientAddr, getLatency, latestGet );
 				SET_SERVER_LATENCY_FOR_CLIENT( clientAddr, setLatency, latestSet );
-				UNLOCK ( &coordinator->slaveLoading.lock );
+				UNLOCK ( &coordinator->serverLoading.lock );
 
 				getLatency.needsDelete = false;
 				setLatency.needsDelete = false;
@@ -326,15 +326,15 @@ bool CoordinatorWorker::handleSyncMetadata( ClientEvent event, char *buf, size_t
 		heartbeat.sealed, heartbeat.keys
 	);
 
-	ArrayMap<int, ServerSocket> &slaves = Coordinator::getInstance()->sockets.slaves;
-	LOCK( &slaves.lock );
-	for ( uint32_t i = 0; i < slaves.size(); i++ ) {
-		if ( slaves.values[ i ]->equal( address.addr, address.port ) ) {
-			target = slaves.values[ i ];
+	ArrayMap<int, ServerSocket> &servers = Coordinator::getInstance()->sockets.servers;
+	LOCK( &servers.lock );
+	for ( uint32_t i = 0; i < servers.size(); i++ ) {
+		if ( servers.values[ i ]->equal( address.addr, address.port ) ) {
+			target = servers.values[ i ];
 			break;
 		}
 	}
-	UNLOCK( &slaves.lock );
+	UNLOCK( &servers.lock );
 	if ( ! target ) {
 		__ERROR__( "CoordinatorWorker", "handleSyncMetadata", "Server not found." );
 		return false;

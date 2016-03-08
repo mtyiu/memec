@@ -21,7 +21,7 @@ void CoordinatorWorker::dispatch( MixedEvent event ) {
 			this->dispatch( event.event.client );
 			break;
 		case EVENT_TYPE_SERVER:
-			this->dispatch( event.event.slave );
+			this->dispatch( event.event.server );
 			break;
 		default:
 			return;
@@ -50,8 +50,8 @@ void CoordinatorWorker::dispatch( CoordinatorEvent event ) {
 			);
 			packet->size = buffer.size;
 
-			LOCK( &coordinator->sockets.slaves.lock );
-			uint32_t numServers = coordinator->sockets.slaves.size();
+			LOCK( &coordinator->sockets.servers.lock );
+			uint32_t numServers = coordinator->sockets.servers.size();
 			coordinator->pending.insertRemappedDataRequest(
 				requestId,
 				event.message.parity.lock,
@@ -61,11 +61,11 @@ void CoordinatorWorker::dispatch( CoordinatorEvent event ) {
 			);
 			packet->setReferenceCount( numServers );
 			for ( uint32_t i = 0; i < numServers; i++ ) {
-				ServerSocket *socket = coordinator->sockets.slaves[ i ];
+				ServerSocket *socket = coordinator->sockets.servers[ i ];
 				serverEvent.syncRemappedData( socket, packet );
 				coordinator->eventQueue.insert( serverEvent );
 			}
-			UNLOCK( &coordinator->sockets.slaves.lock );
+			UNLOCK( &coordinator->sockets.servers.lock );
 
 		}
 			break;

@@ -55,7 +55,7 @@ struct RemappingRecord {
 class RemappingRecordMap {
 private:
 	std::unordered_map<Key, RemappingRecord> map;
-	std::unordered_map<struct sockaddr_in, std::unordered_set<Key>* > slaveToKeyMap;
+	std::unordered_map<struct sockaddr_in, std::unordered_set<Key>* > serverToKeyMap;
 	LOCK_T lock;
 
 public:
@@ -73,11 +73,11 @@ public:
 			key = it->first;
 			key.free();
 		}
-		for ( auto& it : slaveToKeyMap )
+		for ( auto& it : serverToKeyMap )
 			delete it.second;
 	}
 
-	bool insert( Key key, RemappingRecord record, struct sockaddr_in slave ) {
+	bool insert( Key key, RemappingRecord record, struct sockaddr_in server ) {
 		LOCK( &this->lock );
 		std::unordered_map<Key, RemappingRecord>::iterator it = this->map.find( key );
 		if ( it != map.end() ) {
@@ -88,10 +88,10 @@ public:
 			Key keyDup;
 			keyDup.dup( key.size, key.data );
 			map[ keyDup ] = record;
-			// add mapping from slave to key ( for erase by slave )
-			if ( slaveToKeyMap.count( slave ) < 1 )
-				slaveToKeyMap[ slave ] = new std::unordered_set<Key>();
-			slaveToKeyMap[ slave ]->insert( keyDup );
+			// add mapping from server to key ( for erase by server )
+			if ( serverToKeyMap.count( server ) < 1 )
+				serverToKeyMap[ server ] = new std::unordered_set<Key>();
+			serverToKeyMap[ server ]->insert( keyDup );
 		}
 		UNLOCK( &this->lock );
 		return true;
@@ -115,12 +115,12 @@ public:
 		return ret;
 	}
 
-	size_t erase( struct sockaddr_in slave ) {
+	size_t erase( struct sockaddr_in server ) {
 		size_t count = 0;
 		LOCK( &this->lock );
-		std::unordered_map<struct sockaddr_in, std::unordered_set<Key>* >::iterator sit = slaveToKeyMap.find( slave );
+		std::unordered_map<struct sockaddr_in, std::unordered_set<Key>* >::iterator sit = serverToKeyMap.find( server );
 		RemappingRecord record;
-		if ( sit != slaveToKeyMap.end() ) {
+		if ( sit != serverToKeyMap.end() ) {
 			std::unordered_set<Key>::iterator kit, saveptr;
 			std::unordered_set<Key>* keys = sit->second;
 			for ( kit = keys->begin(), saveptr = keys->begin(); kit != keys->end(); kit = saveptr ) {
@@ -129,7 +129,7 @@ public:
 				count++;
 			}
 			delete keys;
-			slaveToKeyMap.erase( sit );
+			serverToKeyMap.erase( sit );
 		}
 		UNLOCK( &this->lock );
 		return count;

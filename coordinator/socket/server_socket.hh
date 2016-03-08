@@ -12,7 +12,7 @@
 
 class ServerSocket : public Socket {
 private:
-	static ArrayMap<int, ServerSocket> *slaves;
+	static ArrayMap<int, ServerSocket> *servers;
 	struct sockaddr_in recvAddr;
 	char *identifier;
 
@@ -21,7 +21,7 @@ public:
 	Map map;
 	ServerSocket *failed;
 
-	static void setArrayMap( ArrayMap<int, ServerSocket> *slaves );
+	static void setArrayMap( ArrayMap<int, ServerSocket> *servers );
 	bool init( int tmpfd, ServerAddr &addr, EPoll *epoll );
 	bool start();
 	void stop();

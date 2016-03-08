@@ -39,14 +39,14 @@ private:
 
 	void free();
 
-	// Helper functions to determine slave loading
-	void updateAverageServerLoading( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
-			ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency );
-	// return previously overloaded slaves for per-slave phase change
+	// Helper functions to determine server loading
+	void updateAverageServerLoading( ArrayMap<struct sockaddr_in, Latency> *serverGetLatency,
+			ArrayMap<struct sockaddr_in, Latency> *serverSetLatency );
+	// return previously overloaded servers for per-server phase change
 	std::set<struct sockaddr_in> updateOverloadedServerSet(
-			ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
-			ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency,
-			std::set<struct sockaddr_in> *slaveSet
+			ArrayMap<struct sockaddr_in, Latency> *serverGetLatency,
+			ArrayMap<struct sockaddr_in, Latency> *serverSetLatency,
+			std::set<struct sockaddr_in> *serverSet
 	);
 	void switchPhase( std::set<struct sockaddr_in> prevOverloadedServers );
 
@@ -62,7 +62,7 @@ public:
 		CoordinatorSocket self;
 		EPoll epoll;
 		ArrayMap<int, ClientSocket> clients;
-		ArrayMap<int, ServerSocket> slaves;
+		ArrayMap<int, ServerSocket> servers;
 		ArrayMap<int, ServerSocket> backupServers;
 	} sockets;
 	IDGenerator idGenerator;
@@ -79,13 +79,13 @@ public:
 	PacketPool packetPool;
 	/* Loading statistics */
 	struct {
-		// ( slaveAddr, ( mastserAddr, Latency ) )
+		// ( serverAddr, ( mastserAddr, Latency ) )
 		ArrayMap< struct sockaddr_in, ArrayMap< struct sockaddr_in, Latency > > latestGet;
 		ArrayMap< struct sockaddr_in, ArrayMap< struct sockaddr_in, Latency > > latestSet;
 		LOCK_T lock;
-	} slaveLoading;
+	} serverLoading;
 	struct {
-		std::set< struct sockaddr_in > slaveSet;
+		std::set< struct sockaddr_in > serverSet;
 		LOCK_T lock;
 	} overloadedServers;
 	struct {
@@ -124,9 +124,9 @@ public:
 	void flush();
 	void metadata();
 	void printLog();
-	void syncServerMeta( struct sockaddr_in slave, bool *sync );
+	void syncServerMeta( struct sockaddr_in server, bool *sync );
 	void releaseDegradedLock();
-	void releaseDegradedLock( struct sockaddr_in slave, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done );
+	void releaseDegradedLock( struct sockaddr_in server, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done );
 	void syncRemappedData( struct sockaddr_in target, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done );
 	double getElapsedTime();
 	void hash();

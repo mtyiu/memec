@@ -22,7 +22,7 @@ public:
 	struct {
 		EventQueue<CoordinatorEvent> *coordinator;
 		EventQueue<ClientEvent> *client;
-		EventQueue<ServerEvent> *slave;
+		EventQueue<ServerEvent> *server;
 	} separated;
 
 	CoordinatorEventQueue() {
@@ -32,7 +32,7 @@ public:
 		this->priority.count = 0;
 		this->separated.coordinator = 0;
 		this->separated.client = 0;
-		this->separated.slave = 0;
+		this->separated.server = 0;
 	}
 
 	void init( bool block, uint32_t mixed, uint32_t pMixed ) {
@@ -43,11 +43,11 @@ public:
 		LOCK_INIT( &this->priority.lock );
 	}
 
-	void init( bool block, uint32_t coordinator, uint32_t client, uint32_t slave ) {
+	void init( bool block, uint32_t coordinator, uint32_t client, uint32_t server ) {
 		this->isMixed = false;
 		this->separated.coordinator = new EventQueue<CoordinatorEvent>( coordinator, block );
 		this->separated.client = new EventQueue<ClientEvent>( client, block );
-		this->separated.slave = new EventQueue<ServerEvent>( slave, block );
+		this->separated.server = new EventQueue<ServerEvent>( server, block );
 	}
 
 	void start() {
@@ -57,7 +57,7 @@ public:
 		} else {
 			this->separated.coordinator->start();
 			this->separated.client->start();
-			this->separated.slave->start();
+			this->separated.server->start();
 		}
 	}
 
@@ -68,7 +68,7 @@ public:
 		} else {
 			this->separated.coordinator->stop();
 			this->separated.client->stop();
-			this->separated.slave->stop();
+			this->separated.server->stop();
 		}
 	}
 
@@ -79,7 +79,7 @@ public:
 		} else {
 			delete this->separated.coordinator;
 			delete this->separated.client;
-			delete this->separated.slave;
+			delete this->separated.server;
 		}
 	}
 
@@ -95,7 +95,7 @@ public:
 			fprintf( f, "[     Client] " );
 			this->separated.client->print( f );
 			fprintf( f, "[      Server] " );
-			this->separated.slave->print( f );
+			this->separated.server->print( f );
 		}
 	}
 
@@ -112,7 +112,7 @@ public:
 
 	COORDINATOR_EVENT_QUEUE_INSERT( CoordinatorEvent, coordinator )
 	COORDINATOR_EVENT_QUEUE_INSERT( ClientEvent, client )
-	COORDINATOR_EVENT_QUEUE_INSERT( ServerEvent, slave )
+	COORDINATOR_EVENT_QUEUE_INSERT( ServerEvent, server )
 #undef COORDINATOR_EVENT_QUEUE_INSERT
 
 	bool prioritizedInsert( ClientEvent &event ) {

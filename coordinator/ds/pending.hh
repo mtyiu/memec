@@ -12,7 +12,7 @@
 #include "../../common/util/debug.hh"
 #include "../../common/util/time.hh"
 
-struct PendingAnnouncement { // For slave reconstructed announcement
+struct PendingAnnouncement { // For server reconstructed announcement
 	pthread_mutex_t *lock;
 	pthread_cond_t *cond;
 	std::unordered_set<ServerSocket *> *sockets;
