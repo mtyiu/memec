@@ -246,11 +246,11 @@ bool ServerWorker::handleRemappingSetResponse( ServerPeerEvent event, bool succe
 
 	__DEBUG__( BLUE, "ServerWorker", "handleRemappingSetResponse", "Pending server REMAPPING_SET requests = %d (%s).", pending, success ? "success" : "fail" );
 	if ( pending == 0 ) {
-		// Only send master REMAPPING_SET response when the number of pending server REMAPPING_SET requests equal 0
+		// Only send client REMAPPING_SET response when the number of pending server REMAPPING_SET requests equal 0
 		ClientEvent clientEvent;
 
 		if ( ! ServerWorker::pending->eraseRemappingRecordKey( PT_CLIENT_REMAPPING_SET, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &record ) ) {
-			__ERROR__( "ServerWorker", "handleRemappingSetResponse", "Cannot find a pending master REMAPPING_SET request that matches the response. This message will be discarded." );
+			__ERROR__( "ServerWorker", "handleRemappingSetResponse", "Cannot find a pending client REMAPPING_SET request that matches the response. This message will be discarded." );
 			return false;
 		}
 
@@ -339,14 +339,14 @@ bool ServerWorker::handleRemappedUpdateResponse( ServerPeerEvent event, bool suc
 
 	// erase data delta backup
 	// Server *server = Server::getInstance();
-	// LOCK( &server->sockets.mastersIdToSocketLock );
+	// LOCK( &server->sockets.clientsIdToSocketLock );
 	// try {
-	// 	ClientSocket *clientSocket = server->sockets.mastersIdToSocketMap.at( event.instanceId );
+	// 	ClientSocket *clientSocket = server->sockets.clientsIdToSocketMap.at( event.instanceId );
 	// 	clientSocket->backup.removeDataUpdate( event.requestId, event.socket );
 	// } catch ( std::out_of_range &e ) {
 	// 	__ERROR__( "ServerWorker", "handleUpdateResponse", "Cannot find a pending parity server UPDATE backup for instance ID = %hu, request ID = %u. (Socket mapping not found)", event.instanceId, event.requestId );
 	// }
-	// UNLOCK( &server->sockets.mastersIdToSocketLock );
+	// UNLOCK( &server->sockets.clientsIdToSocketLock );
 
 	// Check pending server UPDATE requests
 	pending = ServerWorker::pending->count( PT_SERVER_PEER_UPDATE, pid.instanceId, pid.requestId, false, true );
@@ -354,11 +354,11 @@ bool ServerWorker::handleRemappedUpdateResponse( ServerPeerEvent event, bool suc
 	__DEBUG__( YELLOW, "ServerWorker", "handleRemappedUpdateResponse", "Pending server UPDATE requests = %d (%s) (Key: %.*s).", pending, success ? "success" : "fail", ( int ) header.keySize, header.key );
 
 	if ( pending == 0 ) {
-		// Only send master UPDATE response when the number of pending server UPDATE requests equal 0
+		// Only send client UPDATE response when the number of pending server UPDATE requests equal 0
 		ClientEvent clientEvent;
 
 		if ( ! ServerWorker::pending->eraseKeyValueUpdate( PT_CLIENT_UPDATE, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &keyValueUpdate ) ) {
-			__ERROR__( "ServerWorker", "handleUpdateResponse", "Cannot find a pending master UPDATE request that matches the response. This message will be discarded." );
+			__ERROR__( "ServerWorker", "handleUpdateResponse", "Cannot find a pending client UPDATE request that matches the response. This message will be discarded." );
 			return false;
 		}
 

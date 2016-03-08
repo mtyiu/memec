@@ -48,7 +48,7 @@ void ServerWorker::dispatch( ClientEvent event ) {
 				return;
 			}
 		case CLIENT_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resRegisterMaster( buffer.size, Server::instanceId, event.requestId, success );
+			buffer.data = this->protocol.resRegisterClient( buffer.size, Server::instanceId, event.requestId, success );
 			break;
 		// GET
 		case CLIENT_EVENT_TYPE_GET_RESPONSE_SUCCESS:
@@ -230,11 +230,11 @@ void ServerWorker::dispatch( ClientEvent event ) {
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "ServerWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 	} else {
-		// Parse requests from masters
+		// Parse requests from clients
 		ProtocolHeader header;
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();
 		while ( buffer.size > 0 ) {
-			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "ServerWorker (master)" );
+			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "ServerWorker (client)" );
 
 			buffer.data += PROTO_HEADER_SIZE;
 			buffer.size -= PROTO_HEADER_SIZE;
@@ -283,7 +283,7 @@ void ServerWorker::dispatch( ClientEvent event ) {
 						this->handleRevertDelta( event, buffer.data, buffer.size );
 						break;
 					default:
-						__ERROR__( "ServerWorker", "dispatch", "Invalid opcode from master." );
+						__ERROR__( "ServerWorker", "dispatch", "Invalid opcode from client." );
 						break;
 				}
 			}
@@ -293,7 +293,7 @@ void ServerWorker::dispatch( ClientEvent event ) {
 		if ( connected ) event.socket->done();
 	}
 	if ( ! connected )
-		__ERROR__( "ServerWorker", "dispatch", "The master is disconnected." );
+		__ERROR__( "ServerWorker", "dispatch", "The client is disconnected." );
 }
 
 bool ServerWorker::handleGetRequest( ClientEvent event, char *buf, size_t size ) {
@@ -485,7 +485,7 @@ bool ServerWorker::handleUpdateRequest(
 			keyValueUpdate.isDegraded = reconstructedCount > 0;
 
 			if ( ! ServerWorker::pending->insertKeyValueUpdate( PT_CLIENT_UPDATE, event.instanceId, event.requestId, ( void * ) event.socket, keyValueUpdate ) ) {
-				__ERROR__( "ServerWorker", "handleUpdateRequest", "Cannot insert into master UPDATE pending map (ID = (%u, %u)).", event.instanceId, event.requestId );
+				__ERROR__( "ServerWorker", "handleUpdateRequest", "Cannot insert into client UPDATE pending map (ID = (%u, %u)).", event.instanceId, event.requestId );
 			}
 		} else {
 			key.set( header.keySize, header.key, ( void * ) event.socket );
@@ -565,7 +565,7 @@ bool ServerWorker::handleUpdateRequest(
 			keyValueUpdate.isDegraded = reconstructedCount > 0;
 
 			if ( ! ServerWorker::pending->insertKeyValueUpdate( PT_CLIENT_UPDATE, event.instanceId, event.requestId, ( void * ) event.socket, keyValueUpdate ) ) {
-				__ERROR__( "ServerWorker", "handleUpdateRequest", "Cannot insert into master UPDATE pending map (ID = (%u, %u)).", event.instanceId, event.requestId );
+				__ERROR__( "ServerWorker", "handleUpdateRequest", "Cannot insert into client UPDATE pending map (ID = (%u, %u)).", event.instanceId, event.requestId );
 			}
 
 			// Prepare the list of parity servers
@@ -589,7 +589,7 @@ bool ServerWorker::handleUpdateRequest(
 			packet->setReferenceCount( ServerWorker::parityChunkCount );
 			this->protocol.reqRemappedUpdate(
 				size,
-				event.instanceId, // master ID
+				event.instanceId, // client ID
 				requestId,        // server request ID
 				header.key,
 				header.keySize,
@@ -694,7 +694,7 @@ bool ServerWorker::handleDeleteRequest(
 		if ( ServerWorker::parityChunkCount ) {
 			key.dup( header.keySize, header.key, ( void * ) event.socket );
 			if ( ! ServerWorker::pending->insertKey( PT_CLIENT_DEL, event.instanceId, event.requestId, ( void * ) event.socket, key ) ) {
-				__ERROR__( "ServerWorker", "handleDeleteRequest", "Cannot insert into master DELETE pending map." );
+				__ERROR__( "ServerWorker", "handleDeleteRequest", "Cannot insert into client DELETE pending map." );
 			}
 			delta = this->buffer.data;
 		} else {
@@ -802,7 +802,7 @@ bool ServerWorker::handleAckParityDeltaBackup( ClientEvent event, char *buf, siz
 	} else {
 		__DEBUG__(
 			BLUE, "ServerWorker", "handleAckParityDeltaBackup",
-			"Ack. from master fd = %u from %u to %u for data server id = %hu.",
+			"Ack. from client fd = %u from %u to %u for data server id = %hu.",
 			event.socket->getSocket(), timestamps.at( 0 ), timestamps.at( 1 ), header.targetId
 		);
 
@@ -839,7 +839,7 @@ bool ServerWorker::handleRevertDelta( ClientEvent event, char *buf, size_t size 
 
 	__INFO__(
 		BLUE, "ServerWorker", "handleRevertDelta",
-		"Revert request from master fd = %u (UPDATE/DELETE) from %u to %u size = %u, and (SET) size = %u, for failed server id = %hu.",
+		"Revert request from client fd = %u (UPDATE/DELETE) from %u to %u size = %u, and (SET) size = %u, for failed server id = %hu.",
 		event.socket->getSocket(),
 		header.tsCount > 0 ? timestamps.at( 0 ) : 0,
 		header.tsCount > 1 ? timestamps.at( header.tsCount - 1 ) : UINT32_MAX,
@@ -931,7 +931,7 @@ bool ServerWorker::handleRevertDelta( ClientEvent event, char *buf, size_t size 
 			PendingIdentifier pid; \
 			if ( strcmp( #_OP_TYPE_, "update" ) == 0 || strcmp( #_OP_TYPE_, "updateChunk" ) == 0 ) { \
 				if ( ! ServerWorker::pending->eraseKeyValueUpdate( _PT_CLIENT_TYPE_, it->first.parentInstanceId, it->first.parentRequestId, 0, &pid, &keyValueUpdate ) ) { \
-					__ERROR__( "ServerWorker", "handleRevertDelta", "Cannot find a pending master UPDATE request that matches the response. This message will be discarded." ); \
+					__ERROR__( "ServerWorker", "handleRevertDelta", "Cannot find a pending client UPDATE request that matches the response. This message will be discarded." ); \
 					continue; \
 				} \
 				clientEvent.resUpdate( \
@@ -945,7 +945,7 @@ bool ServerWorker::handleRevertDelta( ClientEvent event, char *buf, size_t size 
 				__INFO__( YELLOW, "ServerWorker", "handleRevertDelta", "Skip waiting for key %.*s for failed server id=%u", keyValueUpdate.size, keyValueUpdate.data, header.targetId ); \
 			} else if ( strcmp( #_OP_TYPE_, "delete" ) == 0 || strcmp( #_OP_TYPE_, "deleteChunk" ) == 0 ) { \
 				if ( ! ServerWorker::pending->eraseKey( _PT_CLIENT_TYPE_, it->first.parentInstanceId, it->first.parentRequestId, 0, &pid, &key ) ) { \
-					__ERROR__( "ServerWorker", "handleRevertDelta", "Cannot find a pending master DELETE request that matches the response. This message will be discarded." ); \
+					__ERROR__( "ServerWorker", "handleRevertDelta", "Cannot find a pending client DELETE request that matches the response. This message will be discarded." ); \
 					continue; \
 				} \
 				clientEvent.resDelete( \

@@ -12,7 +12,7 @@ char *ServerProtocol::reqRegisterCoordinator( size_t &size, uint32_t requestId, 
 	return this->buffer.send;
 }
 
-char *ServerProtocol::resRegisterMaster( size_t &size, uint16_t instanceId, uint32_t requestId, bool success ) {
+char *ServerProtocol::resRegisterClient( size_t &size, uint16_t instanceId, uint32_t requestId, bool success ) {
 	// -- common/protocol/protocol.cc --
 	success = true; // always success
 	size = this->generateHeader(

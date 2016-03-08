@@ -24,10 +24,10 @@ int main () {
 	if ( ! ch->start() ) {
 		fprintf( stderr, "!! Cannot start reading message with message handler !!\n" );
 	} else {
-		fprintf( stderr, ".. wait for masters to join in %d seconds\n", JOIN_TIME_OUT );
+		fprintf( stderr, ".. wait for clients to join in %d seconds\n", JOIN_TIME_OUT );
 		sleep( JOIN_TIME_OUT );
 		fprintf( stderr, " .. Add random servers\n" );
-		std::vector<struct sockaddr_in> servers = addSlaves( ch );
+		std::vector<struct sockaddr_in> servers = addServers( ch );
 		for ( int i = 0; i < ROUNDS; i++ ) {
 			sleep( TIME_OUT );
 			fprintf( stderr, ".. Start remapping phase\n" );

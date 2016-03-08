@@ -18,12 +18,12 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_set<PendingId
 bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, Key> *&map ) {
 	switch( type ) {
 		case PT_CLIENT_GET:
-			lock = &this->masters.getLock;
-			map = &this->masters.get;
+			lock = &this->clients.getLock;
+			map = &this->clients.get;
 			break;
 		case PT_CLIENT_DEL:
-			lock = &this->masters.delLock;
-			map = &this->masters.del;
+			lock = &this->clients.delLock;
+			map = &this->clients.del;
 			break;
 		case PT_SERVER_PEER_GET:
 			lock = &this->serverPeers.getLock;
@@ -58,8 +58,8 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *&map ) {
 	switch( type ) {
 		case PT_CLIENT_UPDATE:
-			lock = &this->masters.updateLock;
-			map = &this->masters.update;
+			lock = &this->clients.updateLock;
+			map = &this->clients.update;
 			break;
 		case PT_SERVER_PEER_UPDATE:
 			lock = &this->serverPeers.updateLock;

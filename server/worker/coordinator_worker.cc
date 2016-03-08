@@ -278,14 +278,14 @@ bool ServerWorker::handleHeartbeatAck( CoordinatorEvent event, char *buf, size_t
 
 	uint32_t fromTimestamp;
 	if ( ServerWorker::pendingAck->erase( header.timestamp, fromTimestamp ) ) {
-		// Send ACK to masters
+		// Send ACK to clients
 		ClientEvent clientEvent;
 		uint16_t instanceId = Server::instanceId;
 		uint32_t requestId = ServerWorker::idGenerator->nextVal( this->workerId );
 
 		Server *server = Server::getInstance();
-		LOCK_T *lock = &server->sockets.masters.lock;
-		std::vector<ClientSocket *> &sockets = server->sockets.masters.values;
+		LOCK_T *lock = &server->sockets.clients.lock;
+		std::vector<ClientSocket *> &sockets = server->sockets.clients.values;
 
 		LOCK( lock );
 		for ( size_t i = 0, size = sockets.size(); i < size; i++ ) {

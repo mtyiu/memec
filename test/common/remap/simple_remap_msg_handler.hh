@@ -7,8 +7,8 @@
 
 class SimpleRemapMsgHandler : public RemapMsgHandler {
 private:
-	bool isMasterJoin( int service, char *msg, char *subject );
-	bool isSlaveJoin( int service, char *msg, char *subject );
+	bool isClientJoin( int service, char *msg, char *subject );
+	bool isServerJoin( int service, char *msg, char *subject );
 
 	static void *readMessages( void *argv );
 public:
@@ -20,8 +20,8 @@ public:
 	bool stop();
 	bool join( const char* group );
 
-	bool addAliveSlave( struct sockaddr_in server );
-	bool removeAliveSlave( struct sockaddr_in server );
+	bool addAliveServer( struct sockaddr_in server );
+	bool removeAliveServer( struct sockaddr_in server );
 
 	int sendStatePub ( std::vector<struct sockaddr_in> &servers, int numGroup, const char targetGroup[][ MAX_GROUP_NAME ] );
 

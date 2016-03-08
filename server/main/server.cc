@@ -77,7 +77,7 @@ bool Server::init( char *path, OptionList &options, bool verbose ) {
 	/* Vectors and other sockets */
 	Socket::init( &this->sockets.epoll );
 	CoordinatorSocket::setArrayMap( &this->sockets.coordinators );
-	ClientSocket::setArrayMap( &this->sockets.masters );
+	ClientSocket::setArrayMap( &this->sockets.clients );
 	ServerPeerSocket::setArrayMap( &this->sockets.serverPeers );
 	this->sockets.coordinators.reserve( this->config.global.coordinators.size() );
 	for ( int i = 0, len = this->config.global.coordinators.size(); i < len; i++ ) {
@@ -202,7 +202,7 @@ bool Server::init( char *path, OptionList &options, bool verbose ) {
 	Signal::setHandler( Server::signalHandler );
 
 	// Init lock for instance id to socket mapping //
-	LOCK_INIT( &this->sockets.mastersIdToSocketLock );
+	LOCK_INIT( &this->sockets.clientsIdToSocketLock );
 	LOCK_INIT( &this->sockets.serversIdToSocketLock );
 
 	// Set status //
@@ -323,9 +323,9 @@ bool Server::stop() {
 	for ( i = 0, len = this->sockets.coordinators.size(); i < len; i++ )
 		this->sockets.coordinators[ i ]->stop();
 	this->sockets.coordinators.clear();
-	for ( i = 0, len = this->sockets.masters.size(); i < len; i++ )
-		this->sockets.masters[ i ]->stop();
-	this->sockets.masters.clear();
+	for ( i = 0, len = this->sockets.clients.size(); i < len; i++ )
+		this->sockets.clients[ i ]->stop();
+	this->sockets.clients.clear();
 	for ( i = 0, len = this->sockets.serverPeers.size(); i < len; i++ ) {
 		this->sockets.serverPeers[ i ]->stop();
 		this->sockets.serverPeers[ i ]->free();
@@ -508,10 +508,10 @@ void Server::debug( FILE *f ) {
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
 
-	fprintf( f, "\nMaster sockets\n---------------\n" );
-	for ( i = 0, len = this->sockets.masters.size(); i < len; i++ ) {
+	fprintf( f, "\nClient sockets\n---------------\n" );
+	for ( i = 0, len = this->sockets.clients.size(); i < len; i++ ) {
 		fprintf( f, "%d. ", i + 1 );
-		this->sockets.masters[ i ]->print( f );
+		this->sockets.clients[ i ]->print( f );
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
 
@@ -669,18 +669,18 @@ void Server::printPending( FILE *f ) {
 	std::unordered_multimap<PendingIdentifier, ChunkUpdate>::iterator chunkUpdateIt;
 	std::unordered_multimap<PendingIdentifier, ChunkRequest>::iterator chunkRequestIt;
 
-	LOCK( &this->pending.masters.getLock );
+	LOCK( &this->pending.clients.getLock );
 	fprintf(
 		f,
-		"Pending requests for masters\n"
+		"Pending requests for clients\n"
 		"----------------------------\n"
 		"[GET] Pending: %lu\n",
-		this->pending.masters.get.size()
+		this->pending.clients.get.size()
 	);
 	i = 1;
 	for (
-		it = this->pending.masters.get.begin();
-		it != this->pending.masters.get.end();
+		it = this->pending.clients.get.begin();
+		it != this->pending.clients.get.end();
 		it++, i++
 	) {
 		const PendingIdentifier &pid = it->first;
@@ -696,18 +696,18 @@ void Server::printPending( FILE *f ) {
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
 	}
-	UNLOCK( &this->pending.masters.getLock );
+	UNLOCK( &this->pending.clients.getLock );
 
-	LOCK( &this->pending.masters.updateLock );
+	LOCK( &this->pending.clients.updateLock );
 	fprintf(
 		f,
 		"\n[UPDATE] Pending: %lu\n",
-		this->pending.masters.update.size()
+		this->pending.clients.update.size()
 	);
 	i = 1;
 	for (
-		keyValueUpdateIt = this->pending.masters.update.begin();
-		keyValueUpdateIt != this->pending.masters.update.end();
+		keyValueUpdateIt = this->pending.clients.update.begin();
+		keyValueUpdateIt != this->pending.clients.update.end();
 		keyValueUpdateIt++, i++
 	) {
 		const PendingIdentifier &pid = keyValueUpdateIt->first;
@@ -724,18 +724,18 @@ void Server::printPending( FILE *f ) {
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
 	}
-	UNLOCK( &this->pending.masters.updateLock );
+	UNLOCK( &this->pending.clients.updateLock );
 
-	LOCK( &this->pending.masters.delLock );
+	LOCK( &this->pending.clients.delLock );
 	fprintf(
 		f,
 		"\n[DELETE] Pending: %lu\n",
-		this->pending.masters.del.size()
+		this->pending.clients.del.size()
 	);
 	i = 1;
 	for (
-		it = this->pending.masters.del.begin();
-		it != this->pending.masters.del.end();
+		it = this->pending.clients.del.begin();
+		it != this->pending.clients.del.end();
 		it++, i++
 	) {
 		const PendingIdentifier &pid = it->first;
@@ -751,7 +751,7 @@ void Server::printPending( FILE *f ) {
 			fprintf( f, "(nil)\n" );
 		fprintf( f, "\n" );
 	}
-	UNLOCK( &this->pending.masters.delLock );
+	UNLOCK( &this->pending.clients.delLock );
 
 	LOCK( &this->pending.serverPeers.updateLock );
 	fprintf(
@@ -1092,12 +1092,12 @@ void Server::alarm() {
 
 void Server::backupStat( FILE *f ) {
 	fprintf( f, "\nServer delta backup stats\n============================\n" );
-	for ( int i = 0, len = this->sockets.masters.size(); i < len; i++ ) {
+	for ( int i = 0, len = this->sockets.clients.size(); i < len; i++ ) {
 		fprintf( f,
-			">> Master FD = %u\n-------------------\n",
-			this->sockets.masters.keys[ i ]
+			">> Client FD = %u\n-------------------\n",
+			this->sockets.clients.keys[ i ]
 		);
-		this->sockets.masters.values[ i ]->backup.print( f );
+		this->sockets.clients.values[ i ]->backup.print( f );
 		fprintf( f, "\n" );
 	}
 }

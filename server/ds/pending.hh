@@ -85,7 +85,7 @@ public:
 		Key key;
 		KeyValueUpdate keyValueUpdate;
 	} data;
-	uint32_t timestamp; // from Master
+	uint32_t timestamp; // from Client
 
 	void set(
 		uint8_t opcode, bool isSealed, ClientSocket *socket,
@@ -291,7 +291,7 @@ public:
 		LOCK_T getLock;
 		LOCK_T updateLock;
 		LOCK_T delLock;
-	} masters;
+	} clients;
    struct {
 		std::unordered_multimap<PendingIdentifier, DegradedOp> degradedOps;
 		std::unordered_multimap<PendingIdentifier, KeyValue> set; // Degraded SET for unsealed chunks
@@ -328,9 +328,9 @@ public:
 		LOCK_INIT( &this->coordinators.releaseDegradedLockLock );
 		LOCK_INIT( &this->coordinators.reconstructionLock );
 		LOCK_INIT( &this->coordinators.recoveryLock );
-		LOCK_INIT( &this->masters.getLock );
-		LOCK_INIT( &this->masters.updateLock );
-		LOCK_INIT( &this->masters.delLock );
+		LOCK_INIT( &this->clients.getLock );
+		LOCK_INIT( &this->clients.updateLock );
+		LOCK_INIT( &this->clients.delLock );
 		LOCK_INIT( &this->serverPeers.degradedOpsLock );
 		LOCK_INIT( &this->serverPeers.setLock );
 		LOCK_INIT( &this->serverPeers.getLock );
@@ -364,7 +364,7 @@ public:
 		uint32_t unsealedCount, char *keysBuf
 	);
 
-	// Insert (Master)
+	// Insert (Client)
 	bool insertKey(
 		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr,
 		Key &key,

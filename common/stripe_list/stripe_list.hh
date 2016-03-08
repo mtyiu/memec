@@ -27,7 +27,7 @@ typedef struct {
 // Need to know n, k, number of stripe list requested, number of servers, mapped servers
 template <class T> class StripeList {
 protected:
-	uint32_t n, k, numLists, numSlaves;
+	uint32_t n, k, numLists, numServers;
 	bool generated, useAlgo;
 	BitmaskArray data, parity;
 	unsigned int *load, *count;
@@ -41,7 +41,7 @@ protected:
 		int32_t index = -1;
 		uint32_t minLoad = UINT32_MAX;
 		uint32_t minCount = UINT32_MAX;
-		for ( uint32_t i = 0; i < this->numSlaves; i++ ) {
+		for ( uint32_t i = 0; i < this->numServers; i++ ) {
 			if (
 				(
 					( this->load[ i ] < minLoad ) ||
@@ -66,7 +66,7 @@ protected:
 		int32_t index = -1;
 		uint32_t i;
 		 while( index == -1 ) {
-			i = rand() % this->numSlaves;
+			i = rand() % this->numServers;
 			if (
 				! this->data.check( listIndex, i ) && // The server should not be selected before
 				! this->parity.check( listIndex, i ) // The server should not be selected before
@@ -101,7 +101,7 @@ protected:
 			// Implicitly sort the item
 			dataCount = 0;
 			parityCount = 0;
-			for ( j = 0; j < this->numSlaves; j++ ) {
+			for ( j = 0; j < this->numServers; j++ ) {
 				if ( this->data.check( i, j ) ) {
 					list[ dataCount++ ] = this->servers->at( j );
 					this->load[ j ] += 1;
@@ -126,18 +126,18 @@ public:
 		this->n = n;
 		this->k = k;
 		this->numLists = numLists;
-		this->numSlaves = servers.size();
+		this->numServers = servers.size();
 		this->generated = false;
 		this->useAlgo = useAlgo;
-		this->load = new unsigned int[ numSlaves ];
-		this->count = new unsigned int[ numSlaves ];
+		this->load = new unsigned int[ numServers ];
+		this->count = new unsigned int[ numServers ];
 		this->servers = &servers;
 		this->lists.reserve( numLists );
 		for ( uint32_t i = 0; i < numLists; i++ )
 			this->lists.push_back( new T*[ n ] );
 
-		memset( this->load, 0, sizeof( unsigned int ) * numSlaves );
-		memset( this->count, 0, sizeof( unsigned int ) * numSlaves );
+		memset( this->load, 0, sizeof( unsigned int ) * numServers );
+		memset( this->count, 0, sizeof( unsigned int ) * numServers );
 
 		this->generate( false /* verbose */, useAlgo );
 	}
@@ -224,7 +224,7 @@ public:
 				s.stripeId = 0;
 				s.chunkId = 0;
 				s.isParity = false;
-				for ( j = 0; j < this->numSlaves; j++ ) {
+				for ( j = 0; j < this->numServers; j++ ) {
 					if ( j == index )
 						break;
 					if ( this->data.check( i, j ) )
@@ -237,7 +237,7 @@ public:
 				s.stripeId = 0;
 				s.chunkId = this->k;
 				s.isParity = true;
-				for ( j = 0; j < this->numSlaves; j++ ) {
+				for ( j = 0; j < this->numServers; j++ ) {
 					if ( j == index )
 						break;
 					if ( this->parity.check( i, j ) )
@@ -261,7 +261,7 @@ public:
 			T **list = this->lists[ i ];
 			dataCount = 0;
 			parityCount = 0;
-			for ( j = 0; j < this->numSlaves; j++ ) {
+			for ( j = 0; j < this->numServers; j++ ) {
 				if ( this->data.check( i, j ) ) {
 					list[ dataCount++ ] = this->servers->at( j );
 				} else if ( this->parity.check( i, j ) ) {
@@ -272,7 +272,7 @@ public:
 	}
 
 	int32_t search( T *target ) {
-		for ( uint32_t i = 0; i < this->numSlaves; i++ ) {
+		for ( uint32_t i = 0; i < this->numServers; i++ ) {
 			if ( target == this->servers->at( i ) )
 				return i;
 		}
@@ -296,7 +296,7 @@ public:
 		for ( i = 0; i < this->numLists; i++ ) {
 			first = true;
 			fprintf( f, "#%u: ((", i );
-			for ( j = 0; j < this->numSlaves; j++ ) {
+			for ( j = 0; j < this->numServers; j++ ) {
 				if ( this->data.check( i, j ) ) {
 					fprintf( f, "%s%u", first ? "" : ", ", j );
 					first = false;
@@ -304,7 +304,7 @@ public:
 			}
 			fprintf( f, "), (" );
 			first = true;
-			for ( j = 0; j < this->numSlaves; j++ ) {
+			for ( j = 0; j < this->numServers; j++ ) {
 				if ( this->parity.check( i, j ) ) {
 					fprintf( f, "%s%u", first ? "" : ", ", j );
 					first = false;
@@ -314,10 +314,10 @@ public:
 		}
 
 		fprintf( f, "\n- Weight vector :" );
-		for ( uint32_t i = 0; i < this->numSlaves; i++ )
+		for ( uint32_t i = 0; i < this->numServers; i++ )
 			fprintf( f, " %d", this->load[ i ] );
 		fprintf( f, "\n- Cost vector   :" );
-		for ( uint32_t i = 0; i < this->numSlaves; i++ )
+		for ( uint32_t i = 0; i < this->numServers; i++ )
 			fprintf( f, " %d", this->count[ i ] );
 
 		fprintf( f, "\n\n" );

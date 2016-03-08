@@ -74,11 +74,11 @@ bool ServerWorker::handleForwardKeyResponse( struct ForwardKeyHeader &header, bo
 					);
 					char *valueUpdate = ( char * ) op.data.keyValueUpdate.ptr;
 
-					// Insert into master UPDATE pending set
+					// Insert into client UPDATE pending set
 					op.data.keyValueUpdate.ptr = op.socket;
 					op.data.keyValueUpdate.isDegraded = true;
 					if ( ! ServerWorker::pending->insertKeyValueUpdate( PT_CLIENT_UPDATE, pid.parentInstanceId, pid.parentRequestId, op.socket, op.data.keyValueUpdate ) ) {
-						__ERROR__( "ServerWorker", "handleForwardKeyResponse", "Cannot insert into master UPDATE pending map." );
+						__ERROR__( "ServerWorker", "handleForwardKeyResponse", "Cannot insert into client UPDATE pending map." );
 					}
 
 					// Compute data delta
@@ -132,10 +132,10 @@ bool ServerWorker::handleForwardKeyResponse( struct ForwardKeyHeader &header, bo
 				if ( success ) {
 					Metadata metadata;
 					metadata.set( op.listId, op.stripeId, op.chunkId );
-					// Insert into master DELETE pending set
+					// Insert into client DELETE pending set
 					op.data.key.ptr = op.socket;
 					if ( ! ServerWorker::pending->insertKey( PT_CLIENT_DEL, pid.parentInstanceId, pid.parentRequestId, op.socket, op.data.key ) ) {
-						__ERROR__( "ServerWorker", "handleForwardKeyResponse", "Cannot insert into master DELETE pending map." );
+						__ERROR__( "ServerWorker", "handleForwardKeyResponse", "Cannot insert into client DELETE pending map." );
 					}
 
 					this->sendModifyChunkRequest(
@@ -309,11 +309,11 @@ bool ServerWorker::handleGetResponse( ServerPeerEvent event, bool success, char 
 					);
 					char *valueUpdate = ( char * ) op.data.keyValueUpdate.ptr;
 
-					// Insert into master UPDATE pending set
+					// Insert into client UPDATE pending set
 					op.data.keyValueUpdate.ptr = op.socket;
 					op.data.keyValueUpdate.isDegraded = true;
 					if ( ! ServerWorker::pending->insertKeyValueUpdate( PT_CLIENT_UPDATE, pid.parentInstanceId, pid.parentRequestId, op.socket, op.data.keyValueUpdate ) ) {
-						__ERROR__( "ServerWorker", "handleGetResponse", "Cannot insert into master UPDATE pending map." );
+						__ERROR__( "ServerWorker", "handleGetResponse", "Cannot insert into client UPDATE pending map." );
 					}
 
 					// Compute data delta
@@ -401,10 +401,10 @@ bool ServerWorker::handleGetResponse( ServerPeerEvent event, bool success, char 
 				if ( success ) {
 					Metadata metadata;
 					metadata.set( op.listId, op.stripeId, op.chunkId );
-					// Insert into master DELETE pending set
+					// Insert into client DELETE pending set
 					op.data.key.ptr = op.socket;
 					if ( ! ServerWorker::pending->insertKey( PT_CLIENT_DEL, pid.parentInstanceId, pid.parentRequestId, op.socket, op.data.key ) ) {
-						__ERROR__( "ServerWorker", "handleGetChunkResponse", "Cannot insert into master DELETE pending map." );
+						__ERROR__( "ServerWorker", "handleGetChunkResponse", "Cannot insert into client DELETE pending map." );
 					}
 
 					this->sendModifyChunkRequest(
@@ -464,14 +464,14 @@ bool ServerWorker::handleUpdateResponse( ServerPeerEvent event, bool success, ch
 	// erase data delta backup
 	/* Seems that we don't need the data delta...
 	Server *server = Server::getInstance();
-	LOCK( &server->sockets.mastersIdToSocketLock );
+	LOCK( &server->sockets.clientsIdToSocketLock );
 	try {
-		ClientSocket *clientSocket = server->sockets.mastersIdToSocketMap.at( event.instanceId );
+		ClientSocket *clientSocket = server->sockets.clientsIdToSocketMap.at( event.instanceId );
 		clientSocket->backup.removeDataUpdate( event.requestId, event.instanceId, event.socket );
 	} catch ( std::out_of_range &e ) {
 		__ERROR__( "ServerWorker", "handleUpdateResponse", "Cannot find a pending parity server UPDATE backup for instance ID = %hu, request ID = %u. (Socket mapping not found)", event.instanceId, event.requestId );
 	}
-	UNLOCK( &server->sockets.mastersIdToSocketLock );
+	UNLOCK( &server->sockets.clientsIdToSocketLock );
 	*/
 
 	// Check pending server UPDATE requests
@@ -480,14 +480,14 @@ bool ServerWorker::handleUpdateResponse( ServerPeerEvent event, bool success, ch
 	__DEBUG__( YELLOW, "ServerWorker", "handleUpdateResponse", "Pending server UPDATE requests = %d (%s) (Key: %.*s).", pending, success ? "success" : "fail", ( int ) header.keySize, header.key );
 
 	if ( pending == 0 ) {
-		// Only send master UPDATE response when the number of pending server UPDATE requests equal 0
+		// Only send client UPDATE response when the number of pending server UPDATE requests equal 0
 		ClientEvent clientEvent;
 
 		// FOR TESTING REVERT ONLY (parity server fails and skip waiting)
 		//PendingIdentifier dpid = pid;
 
 		if ( ! ServerWorker::pending->eraseKeyValueUpdate( PT_CLIENT_UPDATE, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &keyValueUpdate ) ) {
-			__ERROR__( "ServerWorker", "handleUpdateResponse", "Cannot find a pending master UPDATE request that matches the response. This message will be discarded." );
+			__ERROR__( "ServerWorker", "handleUpdateResponse", "Cannot find a pending client UPDATE request that matches the response. This message will be discarded." );
 			return false;
 		}
 
@@ -542,26 +542,26 @@ bool ServerWorker::handleDeleteResponse( ServerPeerEvent event, bool success, ch
 
 	// erase data delta backup
 	Server *server = Server::getInstance();
-	LOCK( &server->sockets.mastersIdToSocketLock );
+	LOCK( &server->sockets.clientsIdToSocketLock );
 	try {
-		ClientSocket *clientSocket = server->sockets.mastersIdToSocketMap.at( event.instanceId );
+		ClientSocket *clientSocket = server->sockets.clientsIdToSocketMap.at( event.instanceId );
 		clientSocket->backup.removeDataDelete( event.requestId, event.instanceId, event.socket );
 	} catch ( std::out_of_range &e ) {
 		__ERROR__( "ServerWorker", "handleDeleteResponse", "Cannot find a pending parity server UPDATE backup for instance ID = %hu, request ID = %u. (Socket mapping not found)", event.instanceId, event.requestId );
 	}
-	UNLOCK( &server->sockets.mastersIdToSocketLock );
+	UNLOCK( &server->sockets.clientsIdToSocketLock );
 
 	// Check pending server UPDATE requests
 	pending = ServerWorker::pending->count( PT_SERVER_PEER_DEL, pid.instanceId, pid.requestId, false, true );
 
 	__DEBUG__( BLUE, "ServerWorker", "handleDeleteResponse", "Pending server DELETE requests = %d (%s).", pending, success ? "success" : "fail" );
 	if ( pending == 0 ) {
-		// Only send master DELETE response when the number of pending server DELETE requests equal 0
+		// Only send client DELETE response when the number of pending server DELETE requests equal 0
 		ClientEvent clientEvent;
 		Key key;
 
 		if ( ! ServerWorker::pending->eraseKey( PT_CLIENT_DEL, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &key ) ) {
-			__ERROR__( "ServerWorker", "handleDeleteResponse", "Cannot find a pending master DELETE request that matches the response. This message will be discarded." );
+			__ERROR__( "ServerWorker", "handleDeleteResponse", "Cannot find a pending client DELETE request that matches the response. This message will be discarded." );
 			return false;
 		}
 
@@ -1214,9 +1214,9 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 						);
 						char *valueUpdate = ( char * ) op.data.keyValueUpdate.ptr;
 						op.data.keyValueUpdate.ptr = op.socket;
-						// Insert into master UPDATE pending set
+						// Insert into client UPDATE pending set
 						if ( ! ServerWorker::pending->insertKeyValueUpdate( PT_CLIENT_UPDATE, pid.parentInstanceId, pid.parentRequestId, op.socket, op.data.keyValueUpdate ) ) {
-							__ERROR__( "ServerWorker", "handleGetChunkResponse", "Cannot insert into master UPDATE pending map." );
+							__ERROR__( "ServerWorker", "handleGetChunkResponse", "Cannot insert into client UPDATE pending map." );
 						}
 
 						if ( isKeyValueFound ) {
@@ -1349,10 +1349,10 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 						if ( isKeyValueFound ) {
 							uint32_t timestamp;
 
-							// Insert into master DELETE pending set
+							// Insert into client DELETE pending set
 							op.data.key.ptr = op.socket;
 							if ( ! ServerWorker::pending->insertKey( PT_CLIENT_DEL, pid.parentInstanceId, pid.parentRequestId, op.socket, op.data.key ) ) {
-								__ERROR__( "ServerWorker", "handleGetChunkResponse", "Cannot insert into master DELETE pending map." );
+								__ERROR__( "ServerWorker", "handleGetChunkResponse", "Cannot insert into client DELETE pending map." );
 							}
 
 							if ( dataChunkReconstructed ) {
@@ -1574,14 +1574,14 @@ bool ServerWorker::handleUpdateChunkResponse( ServerPeerEvent event, bool succes
 	// erase data delta backup
 	/* Seems that we don't need the data delta...
 	Server *server = Server::getInstance();
-	LOCK( &server->sockets.mastersIdToSocketLock );
+	LOCK( &server->sockets.clientsIdToSocketLock );
 	try {
-		ClientSocket *clientSocket = server->sockets.mastersIdToSocketMap.at( event.instanceId );
+		ClientSocket *clientSocket = server->sockets.clientsIdToSocketMap.at( event.instanceId );
 		clientSocket->backup.removeDataUpdate( event.requestId, event.instanceId, event.socket );
 	} catch ( std::out_of_range &e ) {
 		__ERROR__( "ServerWorker", "handleUpdateChunkResponse", "Cannot find a pending parity server UPDATE backup for instance ID = %hu, request ID = %u. (Socket mapping not found)", event.instanceId, event.requestId );
 	}
-	UNLOCK( &server->sockets.mastersIdToSocketLock );
+	UNLOCK( &server->sockets.clientsIdToSocketLock );
 	*/
 
 	// Check pending server UPDATE requests
@@ -1596,7 +1596,7 @@ bool ServerWorker::handleUpdateChunkResponse( ServerPeerEvent event, bool succes
 		ClientEvent clientEvent;
 
 		if ( ! ServerWorker::pending->eraseKeyValueUpdate( PT_CLIENT_UPDATE, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &keyValueUpdate ) ) {
-			__ERROR__( "ServerWorker", "handleUpdateChunkResponse", "Cannot find a pending master UPDATE request that matches the response. This message will be discarded." );
+			__ERROR__( "ServerWorker", "handleUpdateChunkResponse", "Cannot find a pending client UPDATE request that matches the response. This message will be discarded." );
 			return false;
 		}
 
@@ -1645,26 +1645,26 @@ bool ServerWorker::handleDeleteChunkResponse( ServerPeerEvent event, bool succes
 
 	// erase data delta backup
 	Server *server = Server::getInstance();
-	LOCK( &server->sockets.mastersIdToSocketLock );
+	LOCK( &server->sockets.clientsIdToSocketLock );
 	try {
-		ClientSocket *clientSocket = server->sockets.mastersIdToSocketMap.at( event.instanceId );
+		ClientSocket *clientSocket = server->sockets.clientsIdToSocketMap.at( event.instanceId );
 		clientSocket->backup.removeDataDelete( event.requestId, event.instanceId, event.socket );
 	} catch ( std::out_of_range &e ) {
 		__ERROR__( "ServerWorker", "handleDeleteChunkResponse", "Cannot find a pending parity server UPDATE backup for instance ID = %hu, request ID = %u. (Socket mapping not found)", event.instanceId, event.requestId );
 	}
-	UNLOCK( &server->sockets.mastersIdToSocketLock );
+	UNLOCK( &server->sockets.clientsIdToSocketLock );
 
 	// Check pending server UPDATE requests
 	pending = ServerWorker::pending->count( PT_SERVER_PEER_DEL_CHUNK, pid.instanceId, pid.requestId, false, true );
 
 	// __ERROR__( "ServerWorker", "handleDeleteChunkResponse", "Pending server DELETE_CHUNK requests = %d.", pending );
 	if ( pending == 0 ) {
-		// Only send master DELETE response when the number of pending server DELETE_CHUNK requests equal 0
+		// Only send client DELETE response when the number of pending server DELETE_CHUNK requests equal 0
 		ClientEvent clientEvent;
 		Key key;
 
 		if ( ! ServerWorker::pending->eraseKey( PT_CLIENT_DEL, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &key ) ) {
-			__ERROR__( "ServerWorker", "handleDeleteChunkResponse", "Cannot find a pending master DELETE request that matches the response. This message will be discarded." );
+			__ERROR__( "ServerWorker", "handleDeleteChunkResponse", "Cannot find a pending client DELETE request that matches the response. This message will be discarded." );
 			return false;
 		}
 

@@ -36,7 +36,7 @@ void ServerWorker::dispatch( MixedEvent event ) {
 			this->dispatch( event.event.io );
 			break;
 		case EVENT_TYPE_CLIENT:
-			this->dispatch( event.event.master );
+			this->dispatch( event.event.client );
 			break;
 		case EVENT_TYPE_SERVER:
 			this->dispatch( event.event.server );

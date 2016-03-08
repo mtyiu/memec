@@ -96,7 +96,7 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 				success,
 				event.message.set.key.size,
 				event.message.set.key.data,
-				false // to master
+				false // to client
 			);
 			break;
 		case SERVER_PEER_EVENT_TYPE_FORWARD_KEY_REQUEST:
@@ -202,7 +202,7 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 			__ERROR__( "ServerWorker", "dispatch", "SERVER_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE is not supported." );
 			// buffer.data = this->protocol.resRemappingSet(
 			// 	buffer.size,
-			// 	false, // toMaster
+			// 	false, // toClient
 			// 	event.instanceId, event.requestId,
 			// 	success,
 			// 	event.message.remap.listId,
@@ -228,7 +228,7 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 				false, // isDegraded
 				keySize, key,
 				valueSize, value,
-				false  // toMaster
+				false  // toClient
 			);
 		}
 			break;
@@ -241,7 +241,7 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 				event.message.get.key.size,
 				event.message.get.key.data,
 				0, 0,
-				false  // toMaster
+				false  // toClient
 			);
 			break;
 		// UPDATE_CHUNK

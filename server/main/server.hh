@@ -60,11 +60,11 @@ public:
 		ServerSocket self;
 		EPoll epoll;
 		ArrayMap<int, CoordinatorSocket> coordinators;
-		ArrayMap<int, ClientSocket> masters;
+		ArrayMap<int, ClientSocket> clients;
 		ArrayMap<int, ServerPeerSocket> serverPeers;
-		std::unordered_map<uint16_t, ClientSocket*> mastersIdToSocketMap;
+		std::unordered_map<uint16_t, ClientSocket*> clientsIdToSocketMap;
 		std::unordered_map<uint16_t, ServerPeerSocket*> serversIdToSocketMap;
-		LOCK_T mastersIdToSocketLock;
+		LOCK_T clientsIdToSocketLock;
 		LOCK_T serversIdToSocketLock;
 	} sockets;
 	IDGenerator idGenerator;

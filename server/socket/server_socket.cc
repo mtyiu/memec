@@ -74,7 +74,7 @@ bool ServerSocket::handler( int fd, uint32_t events, void *data ) {
 			::close( fd );
 			socket->sockets.removeAt( index );
 		} else {
-			ClientSocket *clientSocket = server->sockets.masters.get( fd );
+			ClientSocket *clientSocket = server->sockets.clients.get( fd );
 			CoordinatorSocket *coordinatorSocket = clientSocket ? 0 : server->sockets.coordinators.get( fd );
 			ServerPeerSocket *serverPeerSocket = ( clientSocket || coordinatorSocket ) ? 0 : server->sockets.serverPeers.get( fd );
 			if ( clientSocket ) {
@@ -113,7 +113,7 @@ bool ServerSocket::handler( int fd, uint32_t events, void *data ) {
 		struct sockaddr_in *addr;
 		if ( ( addr = socket->sockets.get( fd, &index ) ) ) {
 			// Read message immediately and add to appropriate socket list such that all "add" operations originate from the epoll thread
-			// Only master or server register message is expected
+			// Only client or server register message is expected
 			bool connected;
 			ssize_t ret;
 
@@ -132,12 +132,12 @@ bool ServerSocket::handler( int fd, uint32_t events, void *data ) {
 					if ( header.from == PROTO_MAGIC_FROM_CLIENT ) {
 						ClientSocket *clientSocket = new ClientSocket();
 						clientSocket->init( fd, *addr );
-						// Ignore the address header for master socket
-						server->sockets.masters.set( fd, clientSocket );
-						// add socket to the instance-id-to-master-socket mapping
-						LOCK( &server->sockets.mastersIdToSocketLock );
-						server->sockets.mastersIdToSocketMap[ header.instanceId ] = clientSocket;
-						UNLOCK( &server->sockets.mastersIdToSocketLock );
+						// Ignore the address header for client socket
+						server->sockets.clients.set( fd, clientSocket );
+						// add socket to the instance-id-to-client-socket mapping
+						LOCK( &server->sockets.clientsIdToSocketLock );
+						server->sockets.clientsIdToSocketMap[ header.instanceId ] = clientSocket;
+						UNLOCK( &server->sockets.clientsIdToSocketLock );
 						socket->sockets.removeAt( index );
 
 						socket->done( fd ); // The socket is valid
@@ -187,7 +187,7 @@ bool ServerSocket::handler( int fd, uint32_t events, void *data ) {
 			}
 		} else {
 			int index;
-			ClientSocket *clientSocket = server->sockets.masters.get( fd );
+			ClientSocket *clientSocket = server->sockets.clients.get( fd );
 			CoordinatorSocket *coordinatorSocket = clientSocket ? 0 : server->sockets.coordinators.get( fd );
 			ServerPeerSocket *serverPeerSocket = ( clientSocket || coordinatorSocket ) ? 0 : server->sockets.serverPeers.get( fd, &index );
 

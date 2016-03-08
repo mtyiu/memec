@@ -99,7 +99,7 @@ bool ServerBackup::insertData##_OP_TYPE_( Timestamp ts, Key key, Value value, Me
 		 *
 		 * (2) isData && target server id not in  parity servers (no need to check timstamps,
 		 *     since yet removed > yet all parity acked > must revert;
-		 *     TODO what if master send revert to parity before ack from data server reach master??
+		 *     TODO what if client send revert to parity before ack from data server reach client??
 		 */ \
 		if ( \
 			_SERVER_ID_ != 0 && \

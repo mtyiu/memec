@@ -152,7 +152,7 @@ bool ServerWorker::handleSetRequest( ServerPeerEvent event, char *buf, size_t si
 		"[SET] Key: %.*s (key size = %u); Value: (value size = %u)",
 		( int ) header.keySize, header.key, header.keySize, header.valueSize
 	);
-	// same flow as set from masters
+	// same flow as set from clients
 	ClientEvent clientEvent;
 	bool success = this->handleSetRequest( clientEvent, buf, size, false );
 
@@ -270,15 +270,15 @@ bool ServerWorker::handleUpdateRequest( ServerPeerEvent event, char *buf, size_t
 	Value value;
 	value.set( header.valueUpdateSize, header.valueUpdate );
 	Server *server = Server::getInstance();
-	LOCK( &server->sockets.mastersIdToSocketLock );
+	LOCK( &server->sockets.clientsIdToSocketLock );
 	try {
-		ClientSocket *clientSocket = server->sockets.mastersIdToSocketMap.at( event.instanceId );
+		ClientSocket *clientSocket = server->sockets.clientsIdToSocketMap.at( event.instanceId );
 		if ( clientSocket )
 			clientSocket->backup.insertParityUpdate( timestamp, key, value, metadata, isChunkDelta, header.valueUpdateOffset, header.chunkUpdateOffset, event.socket->instanceId, event.requestId );
 	} catch ( std::out_of_range &e ) {
 		__ERROR__( "ServerWorker", "handleUpdateRequest", "Failed to backup delta at parity server for instance ID = %hu request ID = %u (Socket mapping not found).", event.instanceId, event.requestId );
 	}
-	UNLOCK( &server->sockets.mastersIdToSocketLock );
+	UNLOCK( &server->sockets.clientsIdToSocketLock );
 
 	event.resUpdate(
 		event.socket, event.instanceId, event.requestId,
@@ -323,15 +323,15 @@ bool ServerWorker::handleDeleteRequest( ServerPeerEvent event, char *buf, size_t
 	Metadata metadata;
 	metadata.set( header.listId, header.stripeId, header.chunkId );
 	Server *server = Server::getInstance();
-	LOCK( &server->sockets.mastersIdToSocketLock );
+	LOCK( &server->sockets.clientsIdToSocketLock );
 	try {
-		ClientSocket *clientSocket = server->sockets.mastersIdToSocketMap.at( event.instanceId );
+		ClientSocket *clientSocket = server->sockets.clientsIdToSocketMap.at( event.instanceId );
 		if ( clientSocket )
 			clientSocket->backup.insertParityDelete( timestamp, key, value, metadata, false, 0, 0, event.socket->instanceId, event.requestId );
 	} catch ( std::out_of_range &e ) {
 		__ERROR__( "ServerWorker", "handleDeleteRequest", "Failed to backup delta at parity server for instance ID = %hu request ID = %u (Socket mapping not found).", event.instanceId, event.requestId );
 	}
-	UNLOCK( &server->sockets.mastersIdToSocketLock );
+	UNLOCK( &server->sockets.clientsIdToSocketLock );
 
 	ret = ServerWorker::chunkBuffer->at( header.listId )->deleteKey( header.key, header.keySize );
 
@@ -752,15 +752,15 @@ bool ServerWorker::handleUpdateChunkRequest( ServerPeerEvent event, char *buf, s
 		Value value;
 		value.set( header.length, header.delta );
 		Server *server = Server::getInstance();
-		LOCK( &server->sockets.mastersIdToSocketLock );
+		LOCK( &server->sockets.clientsIdToSocketLock );
 		try {
-			ClientSocket *clientSocket = server->sockets.mastersIdToSocketMap.at( event.instanceId );
+			ClientSocket *clientSocket = server->sockets.clientsIdToSocketMap.at( event.instanceId );
 			if ( clientSocket )
 			clientSocket->backup.insertParityUpdate( timestamp, key, value, metadata, true, 0, header.offset, event.socket->instanceId, event.requestId );
 		} catch ( std::out_of_range &e ) {
 			__ERROR__( "ServerWorker", "handleUpdateChunkRequest", "Failed to backup delta at parity server for instance ID = %hu request ID = %u (Socket mapping not found).", event.instanceId, event.requestId );
 		}
-		UNLOCK( &server->sockets.mastersIdToSocketLock );
+		UNLOCK( &server->sockets.clientsIdToSocketLock );
 	} else {
 		// Update to reconstructed chunk //
 		ret = ServerWorker::degradedChunkBuffer->update(
@@ -820,15 +820,15 @@ bool ServerWorker::handleDeleteChunkRequest( ServerPeerEvent event, char *buf, s
 		Value value;
 		value.set( header.length, header.delta );
 		Server *server = Server::getInstance();
-		LOCK( &server->sockets.mastersIdToSocketLock );
+		LOCK( &server->sockets.clientsIdToSocketLock );
 		try{
-			ClientSocket *clientSocket = server->sockets.mastersIdToSocketMap.at( event.instanceId );
+			ClientSocket *clientSocket = server->sockets.clientsIdToSocketMap.at( event.instanceId );
 			if ( clientSocket )
 				clientSocket->backup.insertParityDelete( timestamp, key, value, metadata, true, 0, header.offset, event.socket->instanceId, event.requestId );
 		} catch ( std::out_of_range &e ) {
 			__ERROR__( "ServerWorker", "handleDeleteChunkRequest", "Failed to backup delta at parity server for instance ID = %hu request ID = %u (Socket mapping not found).", event.instanceId, event.requestId );
 		}
-		UNLOCK( &server->sockets.mastersIdToSocketLock );
+		UNLOCK( &server->sockets.clientsIdToSocketLock );
 	} else {
 		// Update to reconstructed chunk //
 		ret = ServerWorker::degradedChunkBuffer->update(

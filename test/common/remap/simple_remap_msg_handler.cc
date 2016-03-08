@@ -33,19 +33,19 @@ bool SimpleRemapMsgHandler::join( const char *group ) {
 	return ( SP_join( this->mbox, group ) );
 }
 
-bool SimpleRemapMsgHandler::isMasterJoin( int service, char *msg, char *subject ) {
+bool SimpleRemapMsgHandler::isClientJoin( int service, char *msg, char *subject ) {
 	return ( this->isMemberJoin( service ) && strncmp( subject + 1, CLIENT_PREFIX, CLIENT_PREFIX_LEN ) == 0 );
 }
 
-bool SimpleRemapMsgHandler::isSlaveJoin( int service, char *msg, char *subject ) {
+bool SimpleRemapMsgHandler::isServerJoin( int service, char *msg, char *subject ) {
 	return ( this->isMemberJoin( service ) && strncmp( subject + 1, SERVER_PREFIX, SERVER_PREFIX_LEN ) == 0 );
 }
 
-bool SimpleRemapMsgHandler::addAliveSlave( struct sockaddr_in server ) {
+bool SimpleRemapMsgHandler::addAliveServer( struct sockaddr_in server ) {
 	return false;
 }
 
-bool SimpleRemapMsgHandler::removeAliveSlave( struct sockaddr_in server ) {
+bool SimpleRemapMsgHandler::removeAliveServer( struct sockaddr_in server ) {
 	return false;
 }
 
@@ -60,7 +60,7 @@ void *SimpleRemapMsgHandler::readMessages( void* argv ) {
     char targetGroups[ MAX_GROUP_NUM ][ MAX_GROUP_NAME ];
     char* subject;
 
-	bool regular = false, fromMaster = false, fromSlave = false;
+	bool regular = false, fromClient = false, fromServer = false;
 
 	while ( ret >= 0 ) {
 		ret = SP_receive( myself->mbox, &service, sender, MAX_GROUP_NUM, &groups, targetGroups, &msgType, &endian, MAX_MESSLEN, msg );
@@ -70,18 +70,18 @@ void *SimpleRemapMsgHandler::readMessages( void* argv ) {
 		}
 		subject = &msg[ SP_get_vs_set_offset_memb_mess() ];
         regular = myself->isRegularMessage( service );
-        fromMaster = ( strncmp( sender, CLIENT_GROUP, CLIENT_GROUP_LEN ) == 0 );
-        fromSlave = ( strncmp( sender, SERVER_GROUP, SERVER_GROUP_LEN ) == 0 );
+        fromClient = ( strncmp( sender, CLIENT_GROUP, CLIENT_GROUP_LEN ) == 0 );
+        fromServer = ( strncmp( sender, SERVER_GROUP, SERVER_GROUP_LEN ) == 0 );
 
 		if ( regular )
 			continue;
 
-		if ( fromMaster && myself->isMasterJoin( service, msg, subject ) ) {
+		if ( fromClient && myself->isClientJoin( service, msg, subject ) ) {
 			myself->clients++;
-			//printf( "Master %s joins (%d)\n", subject, ( int ) myself->clients );
-		} else if ( fromSlave && myself->isSlaveJoin( service, msg, subject ) ) {
+			//printf( "Client %s joins (%d)\n", subject, ( int ) myself->clients );
+		} else if ( fromServer && myself->isServerJoin( service, msg, subject ) ) {
 			myself->servers++;
-			//printf( "Slave %s joins (%d)\n", subject, ( int ) myself->servers );
+			//printf( "Server %s joins (%d)\n", subject, ( int ) myself->servers );
 		} else {
 		}
 	}

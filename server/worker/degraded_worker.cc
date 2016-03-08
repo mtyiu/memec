@@ -185,7 +185,7 @@ degraded_get_check:
 	);
 
 	if ( isKeyValueFound ) {
-		// Send the key-value pair to the master
+		// Send the key-value pair to the client
 		event.resGet(
 			event.socket, event.instanceId, event.requestId,
 			keyValue, true // isDegraded
@@ -455,9 +455,9 @@ bool ServerWorker::handleDegradedUpdateRequest( ClientEvent event, struct Degrad
 	if ( isKeyValueFound ) {
 		keyValueUpdate.dup( 0, 0, ( void * ) event.socket );
 		keyValueUpdate.isDegraded = true;
-		// Insert into master UPDATE pending set
+		// Insert into client UPDATE pending set
 		if ( ! ServerWorker::pending->insertKeyValueUpdate( PT_CLIENT_UPDATE, event.instanceId, event.requestId, ( void * ) event.socket, keyValueUpdate ) ) {
-			__ERROR__( "ServerWorker", "handleDegradedUpdateRequest", "Cannot insert into master UPDATE pending map." );
+			__ERROR__( "ServerWorker", "handleDegradedUpdateRequest", "Cannot insert into client UPDATE pending map." );
 		}
 
 		char *valueUpdate = header.data.keyValueUpdate.valueUpdate;
@@ -672,7 +672,7 @@ bool ServerWorker::handleDegradedDeleteRequest( ClientEvent event, char *buf, si
 	if ( isKeyValueFound ) {
 		key.dup( 0, 0, ( void * ) event.socket );
 		if ( ! ServerWorker::pending->insertKey( PT_CLIENT_DEL, event.instanceId, event.requestId, ( void * ) event.socket, key ) ) {
-			__ERROR__( "ServerWorker", "handleDegradedDeleteRequest", "Cannot insert into master DELETE pending map." );
+			__ERROR__( "ServerWorker", "handleDegradedDeleteRequest", "Cannot insert into client DELETE pending map." );
 		}
 
 		uint32_t timestamp;
@@ -889,7 +889,7 @@ bool ServerWorker::handleForwardChunkRequest( struct ChunkDataHeader &header, bo
 
 			if ( op.opcode == PROTO_OPCODE_DEGRADED_GET ) {
 				if ( isKeyValueFound ) {
-					// Send the key-value pair to the master
+					// Send the key-value pair to the client
 					clientEvent.resGet(
 						clientEvent.socket,
 						clientEvent.instanceId,
@@ -1347,7 +1347,7 @@ force_reconstruct_chunks:
 			} else {
 				switch( opcode ) {
 					case PROTO_OPCODE_DEGRADED_GET:
-						// Return failure to master
+						// Return failure to client
 						clientEvent.resGet( clientSocket, parentInstanceId, parentRequestId, mykey, true );
 						this->dispatch( clientEvent );
 						op.data.key.free();
@@ -1621,7 +1621,7 @@ bool ServerWorker::sendModifyChunkRequest(
 				if ( isUpdate ) {
 					this->protocol.reqUpdateChunk(
 						size,
-						parentInstanceId, 				// master Id
+						parentInstanceId, 				// client Id
 						requestId, 						// server request Id
 						metadata.listId,
 						metadata.stripeId,
@@ -1637,7 +1637,7 @@ bool ServerWorker::sendModifyChunkRequest(
 				} else {
 					this->protocol.reqDeleteChunk(
 						size,
-						parentInstanceId, 				// master Id
+						parentInstanceId, 				// client Id
 						requestId,						// server request Id
 						metadata.listId,
 						metadata.stripeId,
@@ -1678,7 +1678,7 @@ bool ServerWorker::sendModifyChunkRequest(
 				PendingIdentifier pid;
 
 				if ( ! ServerWorker::pending->eraseKeyValueUpdate( PT_CLIENT_UPDATE, parentInstanceId, parentRequestId, 0, &pid, &keyValueUpdate ) ) {
-					__ERROR__( "ServerWorker", "sendModifyChunkRequest", "Cannot find a pending master UPDATE request that matches the response. This message will be discarded." );
+					__ERROR__( "ServerWorker", "sendModifyChunkRequest", "Cannot find a pending client UPDATE request that matches the response. This message will be discarded." );
 					return false;
 				}
 
@@ -1768,7 +1768,7 @@ bool ServerWorker::sendModifyChunkRequest(
 			if ( isUpdate ) {
 				this->protocol.reqUpdate(
 					size,
-					parentInstanceId, /* master Id */
+					parentInstanceId, /* client Id */
 					requestId, /* server request Id */
 					metadata.listId,
 					metadata.stripeId,
@@ -1785,7 +1785,7 @@ bool ServerWorker::sendModifyChunkRequest(
 			} else {
 				this->protocol.reqDelete(
 					size,
-					parentInstanceId, /* master Id */
+					parentInstanceId, /* client Id */
 					requestId, /* server request Id */
 					metadata.listId,
 					metadata.stripeId,

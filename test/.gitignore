@@ -6,9 +6,13 @@ common/config/global_config
 common/config/server_addr
 common/ds/bitmask_array
 common/ds/id_generator
+common/hash/Hash.class
+common/hash/hash
 common/protocol/protocol
 common/remap/coordinator_remap
-common/remap/master_remap
+common/remap/client_remap
+common/remap/client_spread
+common/remap/coordinator_spread
 common/stripe_list/analysis_rand
 common/stripe_list/analysis_m_c
 common/stripe_list/fairness

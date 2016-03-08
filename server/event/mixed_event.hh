@@ -17,7 +17,7 @@ public:
 		CodingEvent coding;
 		CoordinatorEvent coordinator;
 		IOEvent io;
-		ClientEvent master;
+		ClientEvent client;
 		ServerEvent server;
 		ServerPeerEvent serverPeer;
 	} event;
@@ -31,7 +31,7 @@ public:
 	MIXED_EVENT_SET( CodingEvent, EVENT_TYPE_CODING, coding )
 	MIXED_EVENT_SET( CoordinatorEvent, EVENT_TYPE_COORDINATOR, coordinator )
 	MIXED_EVENT_SET( IOEvent, EVENT_TYPE_IO, io )
-	MIXED_EVENT_SET( ClientEvent, EVENT_TYPE_CLIENT, master )
+	MIXED_EVENT_SET( ClientEvent, EVENT_TYPE_CLIENT, client )
 	MIXED_EVENT_SET( ServerEvent, EVENT_TYPE_SERVER, server )
 	MIXED_EVENT_SET( ServerPeerEvent, EVENT_TYPE_SERVER_PEER, serverPeer )
 #undef MIXED_EVENT_SET

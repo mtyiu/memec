@@ -55,10 +55,10 @@ public:
 	}
 };
 
-int pickMin( int *weight, int numSlaves, int *selected, int selectedCount ) {
+int pickMin( int *weight, int numServers, int *selected, int selectedCount ) {
 	bool isSelected = false;
 	int i, j, min = weight[ 0 ], index = 0;
-	for ( i = 0; i < numSlaves; i++ ) {
+	for ( i = 0; i < numServers; i++ ) {
 		isSelected = false;
 		if ( weight[ i ] < min ) {
 			for ( j = 0; j < selectedCount; j++ ) {
@@ -76,7 +76,7 @@ int pickMin( int *weight, int numSlaves, int *selected, int selectedCount ) {
 	return index;
 }
 
-StripeList **generate( int numLists, int numSlaves, int n, int k, bool verbose = false ) {
+StripeList **generate( int numLists, int numServers, int n, int k, bool verbose = false ) {
 	int i, j, min, max;
 	double average;
 	string serializedList;
@@ -87,26 +87,26 @@ StripeList **generate( int numLists, int numSlaves, int n, int k, bool verbose =
 	StripeList **list = new StripeList*[ numLists ];
 
 	for ( i = 0; i < numLists; i++ ) {
-		load[ i ] = new int[ numSlaves ];
-		cost[ i ] = new int[ numSlaves ];
-		memset( load[ i ], 0, sizeof( int ) * numSlaves );
-		memset( cost[ i ], 0, sizeof( int ) * numSlaves );
+		load[ i ] = new int[ numServers ];
+		cost[ i ] = new int[ numServers ];
+		memset( load[ i ], 0, sizeof( int ) * numServers );
+		memset( cost[ i ], 0, sizeof( int ) * numServers );
 	}
 
 	for ( i = 0; i < numLists; i++ ) {
 		list[ i ] = new StripeList( n, k );
 		if ( i > 0 ) {
 			// Copy previous load and cost
-			memcpy( load[ i ], load[ i - 1 ], sizeof( int ) * numSlaves );
-			memcpy( cost[ i ], cost[ i - 1 ], sizeof( int ) * numSlaves );
+			memcpy( load[ i ], load[ i - 1 ], sizeof( int ) * numServers );
+			memcpy( cost[ i ], cost[ i - 1 ], sizeof( int ) * numServers );
 		}
 		for ( j = 0; j < n - k; j++ ) {
-			list[ i ]->parity[ j ] = pickMin( load[ i ], numSlaves, list[ i ]->parity, j );
+			list[ i ]->parity[ j ] = pickMin( load[ i ], numServers, list[ i ]->parity, j );
 			load[ i ][ list[ i ]->parity[ j ] ] += k;
 			cost[ i ][ list[ i ]->parity[ j ] ] += 1;
 		}
 		for ( j = 0; j < k; j++ ) {
-			list[ i ]->data[ j ] = pickMin( load[ i ], numSlaves, list[ i ]->data, j );
+			list[ i ]->data[ j ] = pickMin( load[ i ], numServers, list[ i ]->data, j );
 			load[ i ][ list[ i ]->data[ j ] ] += 1;
 			cost[ i ][ list[ i ]->data[ j ] ] += 1;
 		}
@@ -130,13 +130,13 @@ StripeList **generate( int numLists, int numSlaves, int n, int k, bool verbose =
 		min = load[ i ][ 0 ];
 		max = load[ i ][ 0 ];
 		average = 0.0;
-		for( j = 0; j < numSlaves; j++ ) {
+		for( j = 0; j < numServers; j++ ) {
 			printf( "%d ", load[ i ][ j ] );
 			min = load[ i ][ j ] < min ? load[ i ][ j ] : min;
 			max = load[ i ][ j ] > max ? load[ i ][ j ] : max;
 			average += load[ i ][ j ];
 		}
-		average /= numSlaves;
+		average /= numServers;
 		printf( " (min: %d, max: %d, average: %.1lf)\n", min, max, average );
 		if ( max - min > k ) {
 			printf( "*** Property violated: max - min > k ! ***\n" );
@@ -153,13 +153,13 @@ StripeList **generate( int numLists, int numSlaves, int n, int k, bool verbose =
 		min = cost[ i ][ 0 ];
 		max = cost[ i ][ 0 ];
 		average = 0.0;
-		for( j = 0; j < numSlaves; j++ ) {
+		for( j = 0; j < numServers; j++ ) {
 			printf( "%d ", cost[ i ][ j ] );
 			min = cost[ i ][ j ] < min ? cost[ i ][ j ] : min;
 			max = cost[ i ][ j ] > max ? cost[ i ][ j ] : max;
 			average += cost[ i ][ j ];
 		}
-		average /= numSlaves;
+		average /= numServers;
 		printf( " (min: %d, max: %d, average: %.1lf)\n", min, max, average );
 	}
 	printf( "\n" );
@@ -196,19 +196,19 @@ int main( int argc, char **argv ) {
 	if ( argc <= 4 )
 		goto usage;
 
-	int i, numLists, numSlaves, n, k;
+	int i, numLists, numServers, n, k;
 	StripeList **list;
 
 	numLists = atoi( argv[ 1 ] );
-	numSlaves = atoi( argv[ 2 ] );
+	numServers = atoi( argv[ 2 ] );
 	n = atoi( argv[ 3 ] );
 	k = atoi( argv[ 4 ] );
-	if ( numLists < 1 || numSlaves < n || n < k ) {
+	if ( numLists < 1 || numServers < n || n < k ) {
 		fprintf( stderr, "Invalid parameters.\n" );
 		goto usage;
 	}
 	
-	list = generate( numLists, numSlaves, n, k, true );
+	list = generate( numLists, numServers, n, k, true );
 	for ( i = 0; i < numLists; i++ )
 		delete list[ i ];
 	delete[] list;
@@ -216,6 +216,6 @@ int main( int argc, char **argv ) {
 	return 0;
 
 usage:
-	fprintf( stderr, "Usage: %s [Number of stripe lists] [Number of slaves] [n] [k]\n", argv[ 0 ] );
+	fprintf( stderr, "Usage: %s [Number of stripe lists] [Number of servers] [n] [k]\n", argv[ 0 ] );
 	return 1;
 }
