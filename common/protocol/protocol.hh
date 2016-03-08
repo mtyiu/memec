@@ -40,17 +40,15 @@
 #define PROTO_OPCODE_REGISTER                     0x00
 #define PROTO_OPCODE_SYNC                         0x31
 #define PROTO_OPCODE_SERVER_CONNECTED             0x32
-#define PROTO_OPCODE_CLIENT_PUSH_STATS            0x33
-#define PROTO_OPCODE_COORDINATOR_PUSH_STATS       0x34
-#define PROTO_OPCODE_SEAL_CHUNKS                  0x35
-#define PROTO_OPCODE_FLUSH_CHUNKS                 0x36
-#define PROTO_OPCODE_RECONSTRUCTION               0x37
-#define PROTO_OPCODE_RECONSTRUCTION_UNSEALED      0x38
-#define PROTO_OPCODE_SYNC_META                    0x39
-#define PROTO_OPCODE_RELEASE_DEGRADED_LOCKS       0x40
-#define PROTO_OPCODE_SERVER_RECONSTRUCTED         0x41
-#define PROTO_OPCODE_BACKUP_SERVER_PROMOTED       0x42
-#define PROTO_OPCODE_PARITY_MIGRATE               0x43
+#define PROTO_OPCODE_SEAL_CHUNKS                  0x33
+#define PROTO_OPCODE_FLUSH_CHUNKS                 0x34
+#define PROTO_OPCODE_RECONSTRUCTION               0x35
+#define PROTO_OPCODE_RECONSTRUCTION_UNSEALED      0x36
+#define PROTO_OPCODE_SYNC_META                    0x37
+#define PROTO_OPCODE_RELEASE_DEGRADED_LOCKS       0x38
+#define PROTO_OPCODE_SERVER_RECONSTRUCTED         0x39
+#define PROTO_OPCODE_BACKUP_SERVER_PROMOTED       0x40
+#define PROTO_OPCODE_PARITY_MIGRATE               0x41
 
 // Application <-> Client or Client <-> Server (0-19) //
 #define PROTO_OPCODE_GET                          0x01
@@ -63,19 +61,16 @@
 #define PROTO_OPCODE_DEGRADED_UPDATE              0x08
 #define PROTO_OPCODE_DEGRADED_DELETE              0x09
 // Client <-> Server //
-#define PROTO_OPCODE_REMAPPING_SET                0x12
-#define PROTO_OPCODE_DEGRADED_LOCK                0x13
-#define PROTO_OPCODE_DEGRADED_UNLOCK              0x14
-#define PROTO_OPCODE_ACK_METADATA                 0x15
-#define PROTO_OPCODE_ACK_REQUEST                  0x16
-#define PROTO_OPCODE_ACK_PARITY_DELTA             0x17
-#define PROTO_OPCODE_REVERT_DELTA                 0x18
+#define PROTO_OPCODE_REMAPPING_SET                0x10
+#define PROTO_OPCODE_DEGRADED_LOCK                0x11
+#define PROTO_OPCODE_ACK_METADATA                 0x12
+#define PROTO_OPCODE_ACK_PARITY_DELTA             0x13
+#define PROTO_OPCODE_REVERT_DELTA                 0x14
 
 // Client <-> Coordinator (20-29) //
 #define PROTO_OPCODE_REMAPPING_LOCK               0x20
 
 // Server <-> Server (50-69) //
-#define PROTO_OPCODE_REMAPPING_UNLOCK             0x50
 #define PROTO_OPCODE_SEAL_CHUNK                   0x51
 #define PROTO_OPCODE_UPDATE_CHUNK                 0x52
 #define PROTO_OPCODE_DELETE_CHUNK                 0x53

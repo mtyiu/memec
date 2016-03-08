@@ -209,7 +209,6 @@ void ClientWorker::dispatch( ServerEvent event ) {
 						this->handleDeleteResponse( event, success, header.opcode == PROTO_OPCODE_DEGRADED_DELETE, buffer.data, header.length );
 						break;
 					case PROTO_OPCODE_ACK_METADATA:
-					case PROTO_OPCODE_ACK_REQUEST:
 						this->handleAcknowledgement( event, header.opcode, buffer.data, header.length );
 						break;
 					case PROTO_OPCODE_ACK_PARITY_DELTA:
