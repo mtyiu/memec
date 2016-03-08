@@ -2,11 +2,11 @@
 #include "../main/client.hh"
 #include "server_socket.hh"
 
-ArrayMap<int, ServerSocket> *ServerSocket::slaves;
+ArrayMap<int, ServerSocket> *ServerSocket::servers;
 
-void ServerSocket::setArrayMap( ArrayMap<int, ServerSocket> *slaves ) {
-	ServerSocket::slaves = slaves;
-	slaves->needsDelete = false;
+void ServerSocket::setArrayMap( ArrayMap<int, ServerSocket> *servers ) {
+	ServerSocket::servers = servers;
+	servers->needsDelete = false;
 }
 
 bool ServerSocket::start() {
@@ -22,15 +22,15 @@ bool ServerSocket::start() {
 }
 
 void ServerSocket::registerClient() {
-	Client *master = Client::getInstance();
+	Client *client = Client::getInstance();
 	ServerEvent event;
-	event.reqRegister( this, master->config.client.client.addr.addr, master->config.client.client.addr.port );
-	master->eventQueue.insert( event );
+	event.reqRegister( this, client->config.client.client.addr.addr, client->config.client.client.addr.port );
+	client->eventQueue.insert( event );
 }
 
 void ServerSocket::stop() {
 	int newFd = -INT_MIN + this->sockfd;
-	ServerSocket::slaves->replaceKey( this->sockfd, newFd );
+	ServerSocket::servers->replaceKey( this->sockfd, newFd );
 	this->sockfd = newFd;
 	Socket::stop();
 }

@@ -17,7 +17,7 @@ public:
 	);
 	static bool isOverloaded( ServerSocket *socket );
 
-	static ServerLoading *slaveLoading;
+	static ServerLoading *serverLoading;
 	static OverloadedServer *overloadedServer;
 	static StripeList<ServerSocket> *stripeList;
 	static ClientRemapMsgHandler *remapMsgHandler;

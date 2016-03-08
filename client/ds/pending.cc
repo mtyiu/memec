@@ -11,20 +11,20 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 			map = &this->applications.del;
 			break;
 		case PT_SERVER_GET:
-			lock = &this->slaves.getLock;
-			map = &this->slaves.get;
+			lock = &this->servers.getLock;
+			map = &this->servers.get;
 			break;
 		case PT_SERVER_SET:
-			lock = &this->slaves.setLock;
-			map = &this->slaves.set;
+			lock = &this->servers.setLock;
+			map = &this->servers.set;
 			break;
 		case PT_SERVER_REMAPPING_SET:
-			lock = &this->slaves.remappingSetLock;
-			map = &this->slaves.remappingSet;
+			lock = &this->servers.remappingSetLock;
+			map = &this->servers.remappingSet;
 			break;
 		case PT_SERVER_DEL:
-			lock = &this->slaves.delLock;
-			map = &this->slaves.del;
+			lock = &this->servers.delLock;
+			map = &this->servers.del;
 			break;
 		default:
 			lock = 0;
@@ -55,8 +55,8 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 			map = &this->applications.update;
 			break;
 		case PT_SERVER_UPDATE:
-			lock = &this->slaves.updateLock;
-			map = &this->slaves.update;
+			lock = &this->servers.updateLock;
+			map = &this->servers.update;
 			break;
 		default:
 			lock = 0;
@@ -112,11 +112,11 @@ Pending::Pending() {
 	LOCK_INIT( &this->applications.setLock );
 	LOCK_INIT( &this->applications.updateLock );
 	LOCK_INIT( &this->applications.delLock );
-	LOCK_INIT( &this->slaves.getLock );
-	LOCK_INIT( &this->slaves.setLock );
-	LOCK_INIT( &this->slaves.remappingSetLock );
-	LOCK_INIT( &this->slaves.updateLock );
-	LOCK_INIT( &this->slaves.delLock );
+	LOCK_INIT( &this->servers.getLock );
+	LOCK_INIT( &this->servers.setLock );
+	LOCK_INIT( &this->servers.remappingSetLock );
+	LOCK_INIT( &this->servers.updateLock );
+	LOCK_INIT( &this->servers.delLock );
 	LOCK_INIT( &this->stats.getLock );
 	LOCK_INIT( &this->stats.setLock );
 	LOCK_INIT( &this->requests.remapListLock );

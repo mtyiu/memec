@@ -23,7 +23,7 @@ bool ClientWorker::sendDegradedLockRequest(
 		degradedLockData.set( valueUpdateSize, valueUpdateOffset, valueUpdate );
 
 	if ( ! ClientWorker::pending->insertDegradedLockData( PT_COORDINATOR_DEGRADED_LOCK_DATA, instanceId, parentInstanceId, requestId, parentRequestId, ( void * ) socket, degradedLockData ) ) {
-		__ERROR__( "ClientWorker", "handleDegradedRequest", "Cannot insert into slave degraded lock pending map." );
+		__ERROR__( "ClientWorker", "handleDegradedRequest", "Cannot insert into server degraded lock pending map." );
 	}
 
 	// Get degraded lock from the coordinator
@@ -73,7 +73,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 				header.isSealed ? "true" : "false"
 			);
 
-			// Get redirected data slave socket
+			// Get redirected data server socket
 			if ( header.reconstructedCount ) {
 				for ( uint32_t i = 0; i < header.reconstructedCount; i++ ) {
 					if ( header.original[ i * 2     ] == originalListId &&
@@ -103,7 +103,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 				( int ) header.keySize, header.key, header.keySize
 			);
 
-			// Get redirected data slave socket
+			// Get redirected data server socket
 			if ( header.remappedCount ) {
 				for ( uint32_t i = 0; i < header.remappedCount; i++ ) {
 					if ( header.original[ i * 2     ] == originalListId &&
@@ -149,7 +149,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 		return false;
 	}
 
-	// Send the degraded request to the slave
+	// Send the degraded request to the server
 	switch( degradedLockData.opcode ) {
 		case PROTO_OPCODE_GET:
 			// Prepare GET request
@@ -185,10 +185,10 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 					return true;
 			}
 
-			// Insert into slave GET pending map
+			// Insert into server GET pending map
 			key.set( degradedLockData.keySize, degradedLockData.key, ( void * ) original );
 			if ( ! ClientWorker::pending->insertKey( PT_SERVER_GET, instanceId, pid.parentInstanceId, requestId, pid.parentRequestId, ( void * ) socket, key ) ) {
-				__ERROR__( "ClientWorker", "handleDegradedLockResponse", "Cannot insert into slave GET pending map." );
+				__ERROR__( "ClientWorker", "handleDegradedLockResponse", "Cannot insert into server GET pending map." );
 			}
 			break;
 		case PROTO_OPCODE_UPDATE:
@@ -227,12 +227,12 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 					return true;
 			}
 
-			// Insert into slave UPDATE pending map
+			// Insert into server UPDATE pending map
 			keyValueUpdate.set( degradedLockData.keySize, degradedLockData.key, ( void * ) original );
 			keyValueUpdate.offset = degradedLockData.valueUpdateOffset;
 			keyValueUpdate.length = degradedLockData.valueUpdateSize;
 			if ( ! ClientWorker::pending->insertKeyValueUpdate( PT_SERVER_UPDATE, instanceId, pid.parentInstanceId, requestId, pid.parentRequestId, ( void * ) socket, keyValueUpdate, true, true, requestTimestamp ) ) {
-				__ERROR__( "ClientWorker", "handleUpdateRequest", "Cannot insert into slave UPDATE pending map." );
+				__ERROR__( "ClientWorker", "handleUpdateRequest", "Cannot insert into server UPDATE pending map." );
 			}
 			break;
 		case PROTO_OPCODE_DELETE:
@@ -268,10 +268,10 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 					return true;
 			}
 
-			// Insert into slave DELETE pending map
+			// Insert into server DELETE pending map
 			key.set( degradedLockData.keySize, degradedLockData.key, ( void * ) original );
 			if ( ! ClientWorker::pending->insertKey( PT_SERVER_DEL, instanceId, pid.parentInstanceId, requestId, pid.parentRequestId, ( void * ) socket, key, true, true, requestTimestamp ) ) {
-				__ERROR__( "ClientWorker", "handleDegradedLockResponse", "Cannot insert into slave DELETE pending map." );
+				__ERROR__( "ClientWorker", "handleDegradedLockResponse", "Cannot insert into server DELETE pending map." );
 			}
 			break;
 		default:
@@ -283,7 +283,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 
 	// Send request
 	if ( Client::getInstance()->isDegraded( socket ) ) {
-		printf( "ERROR Sending to failed slave socket (opcode = %u, key = %.*s)!\n", degradedLockData.opcode, header.keySize, header.key );
+		printf( "ERROR Sending to failed server socket (opcode = %u, key = %.*s)!\n", degradedLockData.opcode, header.keySize, header.key );
 		switch ( header.type ) {
 			case PROTO_DEGRADED_LOCK_RES_IS_LOCKED:
 				printf( "PROTO_DEGRADED_LOCK_RES_IS_LOCKED\n" );

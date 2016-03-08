@@ -21,42 +21,42 @@ bool ClientWorker::handleServerReconstructedMsg( CoordinatorEvent event, char *b
 		srcTmp, srcTmp + 16, dstTmp, dstTmp + 16
 	);
 
-	// Find the slave peer socket in the array map
+	// Find the server peer socket in the array map
 	int index = -1, sockfd = -1;
 	ServerSocket *original, *s;
-	Client *master = Client::getInstance();
-	ArrayMap<int, ServerSocket> *slaves = &master->sockets.slaves;
+	Client *client = Client::getInstance();
+	ArrayMap<int, ServerSocket> *servers = &client->sockets.servers;
 
-	// Remove the failed slave
-	for ( int i = 0, len = slaves->size(); i < len; i++ ) {
-		if ( slaves->values[ i ]->equal( srcHeader.addr, srcHeader.port ) ) {
+	// Remove the failed server
+	for ( int i = 0, len = servers->size(); i < len; i++ ) {
+		if ( servers->values[ i ]->equal( srcHeader.addr, srcHeader.port ) ) {
 			index = i;
-			original = slaves->values[ i ];
+			original = servers->values[ i ];
 			break;
 		}
 	}
 	if ( index == -1 ) {
-		__ERROR__( "ClientWorker", "handleServerReconstructedMsg", "The slave is not in the list. Ignoring this slave..." );
+		__ERROR__( "ClientWorker", "handleServerReconstructedMsg", "The server is not in the list. Ignoring this server..." );
 		return false;
 	}
 	original->stop();
 
-	// Create a new socket for the reconstructed slave
+	// Create a new socket for the reconstructed server
 	ServerAddr serverAddr( 0, dstHeader.addr, dstHeader.port );
 	s = new ServerSocket();
-	s->init( serverAddr, &master->sockets.epoll );
+	s->init( serverAddr, &client->sockets.epoll );
 
 	// Update sockfd in the array Map
 	sockfd = s->getSocket();
-	slaves->set( index, sockfd, s );
+	servers->set( index, sockfd, s );
 
-	// add the slave addrs to remapMsgHandler
-	master->remapMsgHandler.removeAliveServer( original->getAddr() );
-	master->remapMsgHandler.addAliveServer( s->getAddr() );
+	// add the server addrs to remapMsgHandler
+	client->remapMsgHandler.removeAliveServer( original->getAddr() );
+	client->remapMsgHandler.addAliveServer( s->getAddr() );
 
-	// Connect to the slave
-	slaves->values[ index ]->timestamp.current.setVal( 0 );
-	slaves->values[ index ]->timestamp.lastAck.setVal( 0 );
+	// Connect to the server
+	servers->values[ index ]->timestamp.current.setVal( 0 );
+	servers->values[ index ]->timestamp.lastAck.setVal( 0 );
 	if ( ! s->start() ) {
 		__ERROR__( "ClientWorker", "handleServerReconstructedMsg", "Cannot start socket." );
 	}

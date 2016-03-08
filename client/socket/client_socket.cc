@@ -59,7 +59,7 @@ void *ClientSocket::run( void *argv ) {
 
 bool ClientSocket::handler( int fd, uint32_t events, void *data ) {
 	ClientSocket *socket = ( ClientSocket * ) data;
-	static Client *master = Client::getInstance();
+	static Client *client = Client::getInstance();
 	static InstanceIdGenerator *generator = InstanceIdGenerator::getInstance();
 
 	///////////////////////////////////////////////////////////////////////////
@@ -70,9 +70,9 @@ bool ClientSocket::handler( int fd, uint32_t events, void *data ) {
 			::close( fd );
 			socket->sockets.removeAt( index );
 		} else {
-			ApplicationSocket *applicationSocket = master->sockets.applications.get( fd );
-			CoordinatorSocket *coordinatorSocket = applicationSocket ? 0 : master->sockets.coordinators.get( fd );
-			ServerSocket *serverSocket = ( applicationSocket || coordinatorSocket ) ? 0 : master->sockets.slaves.get( fd );
+			ApplicationSocket *applicationSocket = client->sockets.applications.get( fd );
+			CoordinatorSocket *coordinatorSocket = applicationSocket ? 0 : client->sockets.coordinators.get( fd );
+			ServerSocket *serverSocket = ( applicationSocket || coordinatorSocket ) ? 0 : client->sockets.servers.get( fd );
 			if ( applicationSocket ) {
 				applicationSocket->stop();
 			} else if ( coordinatorSocket ) {
@@ -127,7 +127,7 @@ bool ClientSocket::handler( int fd, uint32_t events, void *data ) {
 						ApplicationSocket *applicationSocket = new ApplicationSocket();
 						// fprintf( stderr, "new ApplicationSocket: 0x%p\n", applicationSocket );
 						applicationSocket->init( fd, *addr );
-						master->sockets.applications.set( fd, applicationSocket );
+						client->sockets.applications.set( fd, applicationSocket );
 
 						socket->sockets.removeAt( index );
 
@@ -136,7 +136,7 @@ bool ClientSocket::handler( int fd, uint32_t events, void *data ) {
 						ApplicationEvent event;
 						uint16_t instanceId = generator->generate( applicationSocket );
 						event.resRegister( applicationSocket, instanceId, header.requestId );
-						master->eventQueue.insert( event );
+						client->eventQueue.insert( event );
 					} else {
 						::close( fd );
 						socket->sockets.removeAt( index );
@@ -152,21 +152,21 @@ bool ClientSocket::handler( int fd, uint32_t events, void *data ) {
 				return false;
 			}
 		} else {
-			ApplicationSocket *applicationSocket = master->sockets.applications.get( fd );
-			CoordinatorSocket *coordinatorSocket = applicationSocket ? 0 : master->sockets.coordinators.get( fd );
-			ServerSocket *serverSocket = ( applicationSocket || coordinatorSocket ) ? 0 : master->sockets.slaves.get( fd );
+			ApplicationSocket *applicationSocket = client->sockets.applications.get( fd );
+			CoordinatorSocket *coordinatorSocket = applicationSocket ? 0 : client->sockets.coordinators.get( fd );
+			ServerSocket *serverSocket = ( applicationSocket || coordinatorSocket ) ? 0 : client->sockets.servers.get( fd );
 			if ( applicationSocket ) {
 				ApplicationEvent event;
 				event.pending( applicationSocket );
-				master->eventQueue.insert( event );
+				client->eventQueue.insert( event );
 			} else if ( coordinatorSocket ) {
 				CoordinatorEvent event;
 				event.pending( coordinatorSocket );
-				master->eventQueue.insert( event );
+				client->eventQueue.insert( event );
 			} else if ( serverSocket ) {
 				ServerEvent event;
 				event.pending( serverSocket );
-				master->eventQueue.prioritizedInsert( event );
+				client->eventQueue.prioritizedInsert( event );
 			} else {
 				__ERROR__( "ClientSocket", "handler", "Unknown socket." );
 				return false;

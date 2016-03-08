@@ -34,7 +34,7 @@ void ServerEvent::revertDelta( ServerSocket *socket, std::vector<uint32_t> times
 	this->socket = socket;
 	this->message.ack.timestamps = ( timestamps.empty() )? 0 : new std::vector<uint32_t>( timestamps );
 	this->message.ack.requests = ( requests.empty() )? 0 : new std::vector<Key>( requests );
-	this->message.ack.targetId = targetId;           // source data slave
+	this->message.ack.targetId = targetId;           // source data server
 	this->message.ack.condition = condition;
 	this->message.ack.lock = lock;
 	this->message.ack.counter = counter;

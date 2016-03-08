@@ -130,7 +130,7 @@ void ClientWorker::dispatch( ServerEvent event ) {
 				__ERROR__( "ClientWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 		}
 	} else {
-		// Parse responses from slaves
+		// Parse responses from servers
 		ClientRemapMsgHandler &mrmh = Client::getInstance()->remapMsgHandler;
 		const struct sockaddr_in &addr = event.socket->getAddr();
 
@@ -143,7 +143,7 @@ void ClientWorker::dispatch( ServerEvent event ) {
 			buffer.size -= PROTO_HEADER_SIZE;
 			// Validate message
 			if ( header.from != PROTO_MAGIC_FROM_SERVER ) {
-				__ERROR__( "ClientWorker", "dispatch", "Invalid message source from slave." );
+				__ERROR__( "ClientWorker", "dispatch", "Invalid message source from server." );
 			} else {
 				bool success;
 				switch( header.magic ) {
@@ -155,7 +155,7 @@ void ClientWorker::dispatch( ServerEvent event ) {
 						success = false;
 						break;
 					default:
-						__ERROR__( "ClientWorker", "dispatch", "Invalid magic code from slave." );
+						__ERROR__( "ClientWorker", "dispatch", "Invalid magic code from server." );
 						goto quit_1;
 				}
 
@@ -166,12 +166,12 @@ void ClientWorker::dispatch( ServerEvent event ) {
 						if ( success ) {
 							event.socket->registered = true;
 							event.socket->instanceId = header.instanceId;
-							Client *master = Client::getInstance();
-							LOCK( &master->sockets.slavesIdToSocketLock );
-							master->sockets.slavesIdToSocketMap[ header.instanceId ] = event.socket;
-							UNLOCK( &master->sockets.slavesIdToSocketLock );
+							Client *client = Client::getInstance();
+							LOCK( &client->sockets.serversIdToSocketLock );
+							client->sockets.serversIdToSocketMap[ header.instanceId ] = event.socket;
+							UNLOCK( &client->sockets.serversIdToSocketLock );
 						} else {
-							__ERROR__( "ClientWorker", "dispatch", "Failed to register with slave." );
+							__ERROR__( "ClientWorker", "dispatch", "Failed to register with server." );
 						}
 						break;
 					case PROTO_OPCODE_GET:
@@ -217,7 +217,7 @@ void ClientWorker::dispatch( ServerEvent event ) {
 						this->handleDeltaAcknowledgement( event, header.opcode, buffer.data, header.length );
 						break;
 					default:
-						__ERROR__( "ClientWorker", "dispatch", "Invalid opcode from slave." );
+						__ERROR__( "ClientWorker", "dispatch", "Invalid opcode from server." );
 						goto quit_1;
 				}
 			}
@@ -228,7 +228,7 @@ quit_1:
 		if ( connected ) event.socket->done();
 	}
 	if ( ! connected ) {
-		__ERROR__( "ClientWorker", "dispatch", "The slave is disconnected." );
+		__ERROR__( "ClientWorker", "dispatch", "The server is disconnected." );
 		this->removePending( event.socket );
 	}
 }
@@ -309,19 +309,19 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 	KeyValue keyValue;
 
 	if ( ! ClientWorker::pending->eraseKey( PT_SERVER_SET, event.instanceId, event.requestId, event.socket, &pid, &key, true, false ) ) {
-		UNLOCK( &ClientWorker::pending->slaves.setLock );
-		__ERROR__( "ClientWorker", "handleSetResponse", "Cannot find a pending slave SET request that matches the response. This message will be discarded. (ID: (%u, %u); key: %.*s)", event.instanceId, event.requestId, keySize, keyStr );
+		UNLOCK( &ClientWorker::pending->servers.setLock );
+		__ERROR__( "ClientWorker", "handleSetResponse", "Cannot find a pending server SET request that matches the response. This message will be discarded. (ID: (%u, %u); key: %.*s)", event.instanceId, event.requestId, keySize, keyStr );
 		return false;
 	}
 
 	// FOR REPLAY TESTING ONLY
 	//PendingIdentifier dpid = pid;
 
-	// Check pending slave SET requests
+	// Check pending server SET requests
 	pending = ClientWorker::pending->count( PT_SERVER_SET, pid.instanceId, pid.requestId, false, true );
 
 	// Mark the elapse time as latency
-	Client* master = Client::getInstance();
+	Client* client = Client::getInstance();
 	if ( ClientWorker::updateInterval ) {
 		struct timespec elapsedTime;
 		RequestStartTime rst;
@@ -330,26 +330,26 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 			__ERROR__( "ClientWorker", "handleSetResponse", "Cannot find a pending stats SET request that matches the response." );
 		} else {
 			int index = -1;
-			LOCK( &master->slaveLoading.lock );
-			std::set<Latency> *latencyPool = master->slaveLoading.past.set.get( rst.addr, &index );
+			LOCK( &client->serverLoading.lock );
+			std::set<Latency> *latencyPool = client->serverLoading.past.set.get( rst.addr, &index );
 			// init. the set if it is not there
 			if ( index == -1 ) {
-				master->slaveLoading.past.set.set( rst.addr, new std::set<Latency>() );
+				client->serverLoading.past.set.set( rst.addr, new std::set<Latency>() );
 			}
 			// insert the latency to the set
 			// TODO use time when Response came, i.e. event created for latency cal.
 			Latency latency = Latency ( elapsedTime );
 			if ( index == -1 )
-				latencyPool = master->slaveLoading.past.set.get( rst.addr );
+				latencyPool = client->serverLoading.past.set.get( rst.addr );
 			latencyPool->insert( latency );
-			UNLOCK( &master->slaveLoading.lock );
+			UNLOCK( &client->serverLoading.lock );
 		}
 	}
 
-	// __ERROR__( "ClientWorker", "handleSetResponse", "Pending slave SET requests = %d.", pending );
+	// __ERROR__( "ClientWorker", "handleSetResponse", "Pending server SET requests = %d.", pending );
 
 	if ( pending == 0 ) {
-		// Only send application SET response when the number of pending slave SET requests equal 0
+		// Only send application SET response when the number of pending server SET requests equal 0
 		if ( ! ClientWorker::pending->eraseKeyValue( PT_APPLICATION_SET, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &keyValue, true, true, true, keyStr ) ) {
 			__ERROR__( "ClientWorker", "handleSetResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded. (Key = %.*s, ID = (%u, %u))", key.size, key.data, pid.parentInstanceId, pid.parentRequestId );
 			return false;
@@ -374,17 +374,17 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 		}
 
 		// Check if all normal requests completes
-		ServerSocket *slave = 0;
+		ServerSocket *server = 0;
 		struct sockaddr_in addr;
 		ClientRemapMsgHandler *remapMsgHandler = &Client::getInstance()->remapMsgHandler;
 		this->stripeList->get( keyStr, key.size, 0, this->parityServerSockets );
 		for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
-			slave = this->parityServerSockets[ i ];
-			addr = slave->getAddr();
+			server = this->parityServerSockets[ i ];
+			addr = server->getAddr();
 			if ( ! remapMsgHandler->useCoordinatedFlow( addr ) || remapMsgHandler->stateTransitInfo.at( addr ).isCompleted() )
 				continue;
 			if ( remapMsgHandler->stateTransitInfo.at( addr ).removePendingRequest( event.requestId ) == 0 ) {
-				__INFO__( GREEN, "ClientWorker", "handleSetResponse", "Ack transition for slave id = %u.", slave->instanceId );
+				__INFO__( GREEN, "ClientWorker", "handleSetResponse", "Ack transition for server id = %u.", server->instanceId );
 				remapMsgHandler->stateTransitInfo.at( addr ).setCompleted();
 				remapMsgHandler->ackTransit( addr );
 			}
@@ -423,7 +423,7 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 	PendingIdentifier pid;
 
 	if ( ! ClientWorker::pending->eraseKey( PT_SERVER_GET, event.instanceId, event.requestId, event.socket, &pid, &key, true, true ) ) {
-		__ERROR__( "ClientWorker", "handleGetResponse", "Cannot find a pending slave GET request that matches the response. This message will be discarded (key = %.*s).", key.size, key.data );
+		__ERROR__( "ClientWorker", "handleGetResponse", "Cannot find a pending server GET request that matches the response. This message will be discarded (key = %.*s).", key.size, key.data );
 		return false;
 	}
 
@@ -432,7 +432,7 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 
 	// Mark the elapse time as latency
 	if ( ! isDegraded && ClientWorker::updateInterval ) {
-		Client* master = Client::getInstance();
+		Client* client = Client::getInstance();
 		struct timespec elapsedTime;
 		RequestStartTime rst;
 
@@ -440,19 +440,19 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 			__ERROR__( "ClientWorker", "handleGetResponse", "Cannot find a pending stats GET request that matches the response (ID: (%u, %u)).", pid.instanceId, pid.requestId );
 		} else {
 			int index = -1;
-			LOCK( &master->slaveLoading.lock );
-			std::set<Latency> *latencyPool = master->slaveLoading.past.get.get( rst.addr, &index );
+			LOCK( &client->serverLoading.lock );
+			std::set<Latency> *latencyPool = client->serverLoading.past.get.get( rst.addr, &index );
 			// init. the set if it is not there
 			if ( index == -1 ) {
-				master->slaveLoading.past.get.set( rst.addr, new std::set<Latency>() );
+				client->serverLoading.past.get.set( rst.addr, new std::set<Latency>() );
 			}
 			// insert the latency to the set
 			// TODO use time when Response came, i.e. event created for latency cal.
 			Latency latency = Latency ( elapsedTime );
 			if ( index == -1 )
-				latencyPool = master->slaveLoading.past.get.get( rst.addr );
+				latencyPool = client->serverLoading.past.get.get( rst.addr );
 			latencyPool->insert( latency );
-			UNLOCK( &master->slaveLoading.lock );
+			UNLOCK( &client->serverLoading.lock );
 		}
 	}
 
@@ -510,7 +510,7 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 
 	// Find the cooresponding request
 	if ( ! ClientWorker::pending->eraseKeyValueUpdate( PT_SERVER_UPDATE, event.instanceId, event.requestId, ( void * ) event.socket, &pid, &keyValueUpdate ) ) {
-		__ERROR__( "ClientWorker", "handleUpdateResponse", "Cannot find a pending slave UPDATE request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
+		__ERROR__( "ClientWorker", "handleUpdateResponse", "Cannot find a pending server UPDATE request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		return false;
 	}
 
@@ -529,7 +529,7 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 
 	// remove pending timestamp
 	// TODO handle degraded mode
-	Client *master = Client::getInstance();
+	Client *client = Client::getInstance();
 	if ( ! isDegraded ) {
 		event.socket->timestamp.pendingAck.eraseUpdate( timestamp );
 	}
@@ -550,17 +550,17 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 
 	// Check if all normal requests completes
 	if ( ! isDegraded ) {
-		ServerSocket *slave = 0;
+		ServerSocket *server = 0;
 		struct sockaddr_in addr;
 		ClientRemapMsgHandler *remapMsgHandler = &Client::getInstance()->remapMsgHandler;
 		this->stripeList->get( header.key, header.keySize, 0, this->parityServerSockets );
 		for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
-			slave = this->parityServerSockets[ i ];
-			addr = slave->getAddr();
+			server = this->parityServerSockets[ i ];
+			addr = server->getAddr();
 			if ( ! remapMsgHandler->useCoordinatedFlow( addr ) || remapMsgHandler->stateTransitInfo.at( addr ).isCompleted() )
 				continue;
 			if ( remapMsgHandler->stateTransitInfo.at( addr ).removePendingRequest( pid.requestId ) == 0 ) {
-				__INFO__( GREEN, "ClientWorker", "handleUpdateResponse", "Ack transition for slave id = %u.", slave->instanceId );
+				__INFO__( GREEN, "ClientWorker", "handleUpdateResponse", "Ack transition for server id = %u.", server->instanceId );
 				remapMsgHandler->stateTransitInfo.at( addr ).setCompleted();
 				remapMsgHandler->ackTransit( addr );
 			}
@@ -570,7 +570,7 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 	// check if ack is necessary
 	// TODO handle degraded mode
 	if ( ! isDegraded )
-		master->ackParityDelta( 0, event.socket );
+		client->ackParityDelta( 0, event.socket );
 
 	return true;
 }
@@ -624,7 +624,7 @@ bool ClientWorker::handleDeleteResponse( ServerEvent event, bool success, bool i
 	Key key;
 
 	if ( ! ClientWorker::pending->eraseKey( PT_SERVER_DEL, event.instanceId, event.requestId, ( void * ) event.socket, &pid, &key ) ) {
-		__ERROR__( "ClientWorker", "handleDeleteResponse", "Cannot find a pending slave DELETE request that matches the response. This message will be discarded." );
+		__ERROR__( "ClientWorker", "handleDeleteResponse", "Cannot find a pending server DELETE request that matches the response. This message will be discarded." );
 		return false;
 	}
 
@@ -637,7 +637,7 @@ bool ClientWorker::handleDeleteResponse( ServerEvent event, bool success, bool i
 
 	// remove pending timestamp
 	// TODO handle degraded mode
-	Client *master = Client::getInstance();
+	Client *client = Client::getInstance();
 	if ( !isDegraded ) {
 		event.socket->timestamp.pendingAck.eraseDel( timestamp );
 	}
@@ -648,17 +648,17 @@ bool ClientWorker::handleDeleteResponse( ServerEvent event, bool success, bool i
 	}
 
 	// Check if all normal requests completes
-	ServerSocket *slave = 0;
+	ServerSocket *server = 0;
 	struct sockaddr_in addr;
 	ClientRemapMsgHandler *remapMsgHandler = &Client::getInstance()->remapMsgHandler;
 	this->stripeList->get( keyStr, key.size, 0, this->parityServerSockets );
 	for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
-		slave = this->parityServerSockets[ i ];
-		addr = slave->getAddr();
+		server = this->parityServerSockets[ i ];
+		addr = server->getAddr();
 		if ( ! remapMsgHandler->useCoordinatedFlow( addr ) || remapMsgHandler->stateTransitInfo.at( addr ).isCompleted() )
 			continue;
 		if ( remapMsgHandler->stateTransitInfo.at( addr ).removePendingRequest( pid.requestId ) == 0 ) {
-			__INFO__( GREEN, "ClientWorker", "handleDeleteResponse", "Ack transition for slave id = %u.", slave->instanceId );
+			__INFO__( GREEN, "ClientWorker", "handleDeleteResponse", "Ack transition for server id = %u.", server->instanceId );
 			remapMsgHandler->stateTransitInfo.at( addr ).setCompleted();
 			remapMsgHandler->ackTransit( addr );
 		}
@@ -666,7 +666,7 @@ bool ClientWorker::handleDeleteResponse( ServerEvent event, bool success, bool i
 
 	// check if ack is necessary
 	// TODO handle degraded mode
-	if ( ! isDegraded ) master->ackParityDelta( 0, event.socket );
+	if ( ! isDegraded ) client->ackParityDelta( 0, event.socket );
 
 	return true;
 }
@@ -732,21 +732,21 @@ bool ClientWorker::handleDeltaAcknowledgement( ServerEvent event, uint8_t opcode
 	}
 	if ( ackInfo.lock ) UNLOCK( ackInfo.lock );
 
-	Client *master = Client::getInstance();
+	Client *client = Client::getInstance();
 	switch( opcode ) {
 		case PROTO_OPCODE_ACK_PARITY_DELTA:
 			break;
 		case PROTO_OPCODE_REVERT_DELTA:
-			LOCK( &master->sockets.slavesIdToSocketLock );
+			LOCK( &client->sockets.serversIdToSocketLock );
 			try {
-				struct sockaddr_in saddr = master->sockets.slavesIdToSocketMap.at( header.targetId )->getAddr();
-				master->remapMsgHandler.ackTransit( saddr );
+				struct sockaddr_in saddr = client->sockets.serversIdToSocketMap.at( header.targetId )->getAddr();
+				client->remapMsgHandler.ackTransit( saddr );
 			} catch ( std::out_of_range &e ) {
 				__ERROR__( "ClientWorker", "handleDeltaAcknowledgement",
-					"Cannot find slave socket for instacne id = %u", header.targetId
+					"Cannot find server socket for instacne id = %u", header.targetId
 				);
 			}
-			UNLOCK( &master->sockets.slavesIdToSocketLock );
+			UNLOCK( &client->sockets.serversIdToSocketLock );
 			break;
 		default:
 			return false;

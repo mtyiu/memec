@@ -55,7 +55,7 @@ private:
 	// 	char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, uint32_t &newChunkId,
 	// 	bool &useDegradedMode, ServerSocket *&original
 	// );
-	// For degraded UPDATE / DELETE (which may involve failed parity slaves)
+	// For degraded UPDATE / DELETE (which may involve failed parity servers)
 	// Return the data server for handling the request
 	// ServerSocket *getServers(
 	// 	char *data, uint8_t size, uint32_t &listId,
@@ -110,9 +110,9 @@ public:
 	void stop();
 	void print( FILE *f = stdout );
 
-	static void removePending( ServerSocket *slave, bool needsAck = true );
-	static void replayRequestPrepare( ServerSocket *slave );
-	static void replayRequest( ServerSocket *slave );
+	static void removePending( ServerSocket *server, bool needsAck = true );
+	static void replayRequestPrepare( ServerSocket *server );
+	static void replayRequest( ServerSocket *server );
 	static void gatherPendingNormalRequests( ServerSocket *target, bool needsAck = false );
 };
 

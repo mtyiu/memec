@@ -30,8 +30,8 @@ void ClientWorker::dispatch( CoordinatorEvent event ) {
 				buffer.size,
 				instanceId,
 				requestId,
-				event.message.loading.slaveGetLatency,
-				event.message.loading.slaveSetLatency
+				event.message.loading.serverGetLatency,
+				event.message.loading.serverSetLatency
 			);
 			isSend = true;
 			break;
@@ -51,7 +51,7 @@ void ClientWorker::dispatch( CoordinatorEvent event ) {
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();
 		ArrayMap<struct sockaddr_in, Latency> getLatency, setLatency;
 		struct LoadStatsHeader loadStatsHeader;
-		Client *master = Client::getInstance();
+		Client *client = Client::getInstance();
 
 		while ( buffer.size > 0 ) {
 			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "ClientWorker" );
@@ -91,11 +91,11 @@ void ClientWorker::dispatch( CoordinatorEvent event ) {
 								buffer.size -= PROTO_LOAD_STATS_SIZE;
 
 								// parse the loading stats and merge with existing stats
-								LOCK( &master->overloadedServer.lock );
-								master->overloadedServer.slaveSet.clear();
-								this->protocol.parseLoadingStats( loadStatsHeader, getLatency, setLatency, master->overloadedServer.slaveSet, buffer.data, buffer.size );
-								UNLOCK( &master->overloadedServer.lock );
-								master->mergeServerCumulativeLoading( &getLatency, &setLatency );
+								LOCK( &client->overloadedServer.lock );
+								client->overloadedServer.serverSet.clear();
+								this->protocol.parseLoadingStats( loadStatsHeader, getLatency, setLatency, client->overloadedServer.serverSet, buffer.data, buffer.size );
+								UNLOCK( &client->overloadedServer.lock );
+								client->mergeServerCumulativeLoading( &getLatency, &setLatency );
 
 								buffer.data -= PROTO_LOAD_STATS_SIZE;
 								buffer.size += PROTO_LOAD_STATS_SIZE;

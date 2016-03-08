@@ -40,7 +40,7 @@ private:
 	Client( Client const& );
 	void operator=( Client const& );
 
-	// helper function to update slave stats
+	// helper function to update server stats
 	void updateServersCurrentLoading();
 	void updateServersCumulativeLoading();
 
@@ -59,9 +59,9 @@ public:
 		EPoll epoll;
 		ArrayMap<int, ApplicationSocket> applications;
 		ArrayMap<int, CoordinatorSocket> coordinators;
-		ArrayMap<int, ServerSocket> slaves;
-		std::unordered_map<uint16_t, ServerSocket*> slavesIdToSocketMap;
-		LOCK_T slavesIdToSocketLock;
+		ArrayMap<int, ServerSocket> servers;
+		std::unordered_map<uint16_t, ServerSocket*> serversIdToSocketMap;
+		LOCK_T serversIdToSocketLock;
 	} sockets;
 	IDGenerator idGenerator;
 	Pending pending;
@@ -71,7 +71,7 @@ public:
 	/* Remapping */
 	ClientRemapMsgHandler remapMsgHandler;
 	/* Loading statistics */
-	ServerLoading slaveLoading;
+	ServerLoading serverLoading;
 	OverloadedServer overloadedServer;
 	Timer statsTimer;
 	/* Instance ID (assigned by coordinator) */
@@ -83,8 +83,8 @@ public:
 	Timestamp timestamp;
 
 	static Client *getInstance() {
-		static Client master;
-		return &master;
+		static Client client;
+		return &client;
 	}
 
 	static void signalHandler( int signal );
@@ -109,7 +109,7 @@ public:
 	// Helper function for detecting whether degraded mode is enabled
 	bool isDegraded( ServerSocket *socket );
 
-	// Helper function to update slave stats
+	// Helper function to update server stats
 	void mergeServerCumulativeLoading(
 		ArrayMap<struct sockaddr_in, Latency> *getLatency,
 		ArrayMap<struct sockaddr_in, Latency> *setLatency

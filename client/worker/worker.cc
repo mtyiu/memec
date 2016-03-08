@@ -26,10 +26,10 @@ void ClientWorker::dispatch( MixedEvent event ) {
 			this->dispatch( event.event.coordinator );
 			break;
 		case EVENT_TYPE_CLIENT:
-			this->dispatch( event.event.master );
+			this->dispatch( event.event.client );
 			break;
 		case EVENT_TYPE_SERVER:
-			this->dispatch( event.event.slave );
+			this->dispatch( event.event.server );
 			break;
 		default:
 			break;
@@ -61,7 +61,7 @@ bool ClientWorker::getServers(
 
 	useCoordinatedFlow = false;
 
-	// Determine original data slave
+	// Determine original data server
 	uint32_t originalListId, originalChunkId;
 	originalListId = ClientWorker::stripeList->get(
 		data, ( size_t ) size,
@@ -71,21 +71,21 @@ bool ClientWorker::getServers(
 	);
 	originalDataServerSocket = this->dataServerSockets[ originalChunkId ];
 
-	Client *master = Client::getInstance();
+	Client *client = Client::getInstance();
 	switch( opcode ) {
 		case PROTO_OPCODE_SET:
 			// already checked in ClientWorker::handleSetRequest()
 			useCoordinatedFlow = true;
 			break;
 		case PROTO_OPCODE_GET:
-			if ( master->isDegraded( originalDataServerSocket ) )
+			if ( client->isDegraded( originalDataServerSocket ) )
 				useCoordinatedFlow = true;
 			break;
 		case PROTO_OPCODE_UPDATE:
 		case PROTO_OPCODE_DELETE:
 			// Check the whole stripe
 			for ( uint32_t i = 0, chunkCount = ClientWorker::dataChunkCount + ClientWorker::parityChunkCount; i < chunkCount; i++ ) {
-				if ( master->isDegraded(
+				if ( client->isDegraded(
 						( i < ClientWorker::dataChunkCount ) ?
 						this->dataServerSockets[ i ] :
 						this->parityServerSockets[ i - ClientWorker::dataChunkCount ]
@@ -123,7 +123,7 @@ bool ClientWorker::getServers(
 		for ( uint32_t i = 0; i < ClientWorker::dataChunkCount; i++ ) {
 			if ( i == originalChunkId )
 				continue;
-			if ( master->isDegraded( this->dataServerSockets[ i ] ) ) {
+			if ( client->isDegraded( this->dataServerSockets[ i ] ) ) {
 				original[ numEntries * 2 ] = originalListId;
 				original[ numEntries * 2 + 1 ] = i;
 				numEntries++;
@@ -131,7 +131,7 @@ bool ClientWorker::getServers(
 		}
 	}
 
-	// Determine remapped data slave
+	// Determine remapped data server
 	BasicRemappingScheme::redirect(
 		this->original, this->remapped, numEntries, remappedCount,
 		ClientWorker::dataChunkCount, ClientWorker::parityChunkCount,
@@ -177,15 +177,15 @@ ServerSocket *ClientWorker::getServers( uint32_t listId, uint32_t chunkId ) {
 	return ret->ready() ? ret : 0;
 }
 
-void ClientWorker::removePending( ServerSocket *slave, bool needsAck ) {
+void ClientWorker::removePending( ServerSocket *server, bool needsAck ) {
 
-	struct sockaddr_in saddr = slave->getAddr();
+	struct sockaddr_in saddr = server->getAddr();
 	char buf[ INET_ADDRSTRLEN ];
 	inet_ntop( AF_INET, &saddr.sin_addr.s_addr, buf, INET_ADDRSTRLEN );
 	// remove pending ack
 	std::vector<AcknowledgementInfo> ackInfoList;
 	// remove parity backup ack
-	ClientWorker::pending->eraseAck( PT_ACK_REMOVE_PARITY, slave->instanceId, &ackInfoList );
+	ClientWorker::pending->eraseAck( PT_ACK_REMOVE_PARITY, server->instanceId, &ackInfoList );
 	for ( AcknowledgementInfo &it : ackInfoList ) {
 		if ( it.lock ) LOCK( it.lock );
 		if ( it.counter ) *it.counter -= 1;
@@ -193,7 +193,7 @@ void ClientWorker::removePending( ServerSocket *slave, bool needsAck ) {
 	}
 	// revert parity ack
 	ackInfoList.clear();
-	ClientWorker::pending->eraseAck( PT_ACK_REVERT_DELTA, slave->instanceId, &ackInfoList );
+	ClientWorker::pending->eraseAck( PT_ACK_REVERT_DELTA, server->instanceId, &ackInfoList );
 	for ( AcknowledgementInfo &it : ackInfoList ) {
 		if ( it.lock ) LOCK( it.lock );
 		if ( it.counter ) *it.counter -= 1;
@@ -204,8 +204,8 @@ void ClientWorker::removePending( ServerSocket *slave, bool needsAck ) {
 		Client::getInstance()->remapMsgHandler.ackTransit();
 }
 
-void ClientWorker::replayRequestPrepare( ServerSocket *slave ) {
-	uint16_t instanceId = slave->instanceId;
+void ClientWorker::replayRequestPrepare( ServerSocket *server ) {
+	uint16_t instanceId = server->instanceId;
 	Pending *pending = ClientWorker::pending;
 	if ( pending->replay.requestsLock.count( instanceId ) == 0 ) {
 		pending->replay.requestsLock[ instanceId ] = LOCK_T();
@@ -228,13 +228,13 @@ void ClientWorker::replayRequestPrepare( ServerSocket *slave ) {
 		bool needsDup = false; \
 		LOCK( pendingLock ); \
 		for ( \
-			std::unordered_multimap<PendingIdentifier, _SERVER_VALUE_TYPE_>::iterator it = pending->slaves._PENDING_SET_NAME_.begin(), safeIt = it; \
-			it != pending->slaves._PENDING_SET_NAME_.end(); it = safeIt \
+			std::unordered_multimap<PendingIdentifier, _SERVER_VALUE_TYPE_>::iterator it = pending->servers._PENDING_SET_NAME_.begin(), safeIt = it; \
+			it != pending->servers._PENDING_SET_NAME_.end(); it = safeIt \
 		) { \
 			/* hold a save ptr for safe erase */ \
 			safeIt++; \
-			/* skip requests other than those associated with target slave */ \
-			if ( it->first.ptr != slave ) \
+			/* skip requests other than those associated with target server */ \
+			if ( it->first.ptr != server ) \
 				continue; \
 			/* skip request if backup is not available */ \
 			if ( ! pending->erase##_APPLICATION_VALUE_TYPE_( PT_APPLICATION_##_PENDING_TYPE_, it->first.parentInstanceId, it->first.parentRequestId, ( void* ) 0, &pid, &_APPLICATION_VALUE_VAR_, true, true, true, it->second.data ) ) { \
@@ -259,23 +259,23 @@ void ClientWorker::replayRequestPrepare( ServerSocket *slave ) {
 			if ( pid.timestamp > currentTime && ( pid.timestamp < smallestTimeAfterCurrent || smallestTimeAfterCurrent == currentTime ) ) \
 				smallestTimeAfterCurrent = pid.timestamp; \
 			/* remove the pending ack */ \
-			pending->slaves._PENDING_SET_NAME_.erase( it ); \
+			pending->servers._PENDING_SET_NAME_.erase( it ); \
 		} \
 		UNLOCK( pendingLock ); \
 	} while( 0 )
 
 	LOCK( lock );
 	// SET
-	pendingLock = &pending->slaves.setLock;
+	pendingLock = &pending->servers.setLock;
 	SEARCH_MAP_FOR_REQUEST( SET, Key, KeyValue, keyValue, SET, set );
 	// GET
-	pendingLock = &pending->slaves.getLock;
+	pendingLock = &pending->servers.getLock;
 	SEARCH_MAP_FOR_REQUEST( GET, Key, Key, key, GET, get );
 	// UPDATE
-	pendingLock = &pending->slaves.updateLock;
+	pendingLock = &pending->servers.updateLock;
 	SEARCH_MAP_FOR_REQUEST( UPDATE, KeyValueUpdate, KeyValueUpdate, keyValueUpdate, UPDATE, update );
 	// DELETE
-	pendingLock = &pending->slaves.delLock;
+	pendingLock = &pending->servers.delLock;
 	SEARCH_MAP_FOR_REQUEST( DELETE, Key, Key, key, DEL, del );
 
 	/* mark the first timestamp to start the replay */
@@ -292,14 +292,14 @@ void ClientWorker::replayRequestPrepare( ServerSocket *slave ) {
 #undef SEARCH_MAP_FOR_REQUEST
 }
 
-void ClientWorker::replayRequest( ServerSocket *slave ) {
-	uint16_t instanceId = slave->instanceId;
+void ClientWorker::replayRequest( ServerSocket *server ) {
+	uint16_t instanceId = server->instanceId;
 
 	if (
 		ClientWorker::pending->replay.requestsLock.count( instanceId ) == 0 ||
 		ClientWorker::pending->replay.requests.count( instanceId ) == 0
 	) {
-		__ERROR__( "ClientWorker", "replayRequest", "Cannot replay request for slave with id = %u.", instanceId );
+		__ERROR__( "ClientWorker", "replayRequest", "Cannot replay request for server with id = %u.", instanceId );
 		return;
 	}
 	LOCK_T *lock = &ClientWorker::pending->replay.requestsLock.at( instanceId );
@@ -373,14 +373,14 @@ void ClientWorker::replayRequest( ServerSocket *slave ) {
 void ClientWorker::gatherPendingNormalRequests( ServerSocket *target, bool needsAck ) {
 
 	std::unordered_set<uint32_t> listIds;
-	// find the lists including the failed slave as parity server
+	// find the lists including the failed server as parity server
 	for ( uint32_t i = 0, len = stripeList->getNumList(); i < len; i++ ) {
 		for ( uint32_t j = 0; j < parityChunkCount; j++ ) {
 			if ( stripeList->get( i, j + dataChunkCount ) == target )
 				listIds.insert( i );
 		}
 	}
-	__DEBUG__( CYAN, "ClientWorker", "gatherPendingNormalRequest", "%lu list(s) included the slave as parity", listIds.size() );
+	__DEBUG__( CYAN, "ClientWorker", "gatherPendingNormalRequest", "%lu list(s) included the server as parity", listIds.size() );
 
 	uint32_t listId;
 	struct sockaddr_in addr = target->getAddr();
@@ -391,8 +391,8 @@ void ClientWorker::gatherPendingNormalRequests( ServerSocket *target, bool needs
 	LOCK ( &mh->stateTransitInfo[ addr ].counter.pendingNormalRequests.lock );
 
 #define GATHER_PENDING_NORMAL_REQUESTS( _OP_TYPE_, _MAP_VALUE_TYPE_ ) { \
-	LOCK ( &pending->slaves._OP_TYPE_##Lock ); \
-	std::unordered_multimap<PendingIdentifier, _MAP_VALUE_TYPE_> *map = &pending->slaves._OP_TYPE_; \
+	LOCK ( &pending->servers._OP_TYPE_##Lock ); \
+	std::unordered_multimap<PendingIdentifier, _MAP_VALUE_TYPE_> *map = &pending->servers._OP_TYPE_; \
 	std::unordered_multimap<PendingIdentifier, _MAP_VALUE_TYPE_>::iterator it, saveIt; \
 	for( it = map->begin(), saveIt = it; it != map->end(); it = saveIt ) { \
 		saveIt++; \
@@ -404,7 +404,7 @@ void ClientWorker::gatherPendingNormalRequests( ServerSocket *target, bool needs
 		__INFO__( CYAN, "ClientWorker", "gatherPendingNormalRequest", "Pending normal request id=%u for transit.", it->first.requestId ); \
 		hasPending = true; \
 	} \
-	UNLOCK ( &pending->slaves._OP_TYPE_##Lock ); \
+	UNLOCK ( &pending->servers._OP_TYPE_##Lock ); \
 }
 	// SET
 	GATHER_PENDING_NORMAL_REQUESTS( set, Key );
@@ -450,19 +450,19 @@ void *ClientWorker::run( void *argv ) {
 }
 
 bool ClientWorker::init() {
-	Client *master = Client::getInstance();
+	Client *client = Client::getInstance();
 
-	ClientWorker::idGenerator = &master->idGenerator;
-	ClientWorker::dataChunkCount = master->config.global.coding.params.getDataChunkCount();
-	ClientWorker::parityChunkCount = master->config.global.coding.params.getParityChunkCount();
-	ClientWorker::updateInterval = master->config.global.timeout.load;
-	ClientWorker::disableDegraded = master->config.client.degraded.disabled;
-	ClientWorker::pending = &master->pending;
-	ClientWorker::eventQueue = &master->eventQueue;
-	ClientWorker::stripeList = master->stripeList;
-	ClientWorker::serverSockets = &master->sockets.slaves;
-	ClientWorker::packetPool = &master->packetPool;
-	ClientWorker::remapMsgHandler = &master->remapMsgHandler;
+	ClientWorker::idGenerator = &client->idGenerator;
+	ClientWorker::dataChunkCount = client->config.global.coding.params.getDataChunkCount();
+	ClientWorker::parityChunkCount = client->config.global.coding.params.getParityChunkCount();
+	ClientWorker::updateInterval = client->config.global.timeout.load;
+	ClientWorker::disableDegraded = client->config.client.degraded.disabled;
+	ClientWorker::pending = &client->pending;
+	ClientWorker::eventQueue = &client->eventQueue;
+	ClientWorker::stripeList = client->stripeList;
+	ClientWorker::serverSockets = &client->sockets.servers;
+	ClientWorker::packetPool = &client->packetPool;
+	ClientWorker::remapMsgHandler = &client->remapMsgHandler;
 	return true;
 }
 

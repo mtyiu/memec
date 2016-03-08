@@ -34,7 +34,7 @@ typedef struct {
 } ServerLoading;
 
 typedef struct {
-	std::set< struct sockaddr_in > slaveSet;
+	std::set< struct sockaddr_in > serverSet;
 	LOCK_T lock;
 } OverloadedServer;
 

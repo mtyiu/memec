@@ -3,7 +3,7 @@
 #include "../../common/ds/sockaddr_in.hh"
 #include "../../common/util/debug.hh"
 
-ServerLoading *BasicRemappingScheme::slaveLoading = NULL;
+ServerLoading *BasicRemappingScheme::serverLoading = NULL;
 OverloadedServer *BasicRemappingScheme::overloadedServer = NULL;
 StripeList<ServerSocket> *BasicRemappingScheme::stripeList = NULL;
 ClientRemapMsgHandler *BasicRemappingScheme::remapMsgHandler = NULL;
@@ -16,29 +16,29 @@ void BasicRemappingScheme::redirect(
 	ServerSocket **dataServerSockets, ServerSocket **parityServerSockets,
 	bool isGet
 ) {
-	struct sockaddr_in slaveAddr;
+	struct sockaddr_in serverAddr;
 	std::unordered_set<struct sockaddr_in> selectedServers, redirectedServers;
 
-	if ( slaveLoading == NULL || overloadedServer == NULL || stripeList == NULL || remapMsgHandler == NULL ) {
+	if ( serverLoading == NULL || overloadedServer == NULL || stripeList == NULL || remapMsgHandler == NULL ) {
 		fprintf( stderr, "The scheme is not yet initialized!! Abort remapping!!\n" );
 		return;
 	}
 
-	LOCK( &slaveLoading->lock );
+	LOCK( &serverLoading->lock );
 	LOCK( &overloadedServer->lock );
 
 	remappedCount = 0;
 	for ( uint32_t i = 0; i < numEntries; i++ ) {
 		uint32_t chunkId = original[ i * 2 + 1 ];
 		if ( chunkId < dataChunkCount )
-			slaveAddr = dataServerSockets[ chunkId ]->getAddr();
+			serverAddr = dataServerSockets[ chunkId ]->getAddr();
 		else
-			slaveAddr = parityServerSockets[ chunkId - dataChunkCount ]->getAddr();
+			serverAddr = parityServerSockets[ chunkId - dataChunkCount ]->getAddr();
 
-		selectedServers.insert( slaveAddr ); // All original or failed slaves should not be selected as remapped slaves
+		selectedServers.insert( serverAddr ); // All original or failed servers should not be selected as remapped servers
 
 		// Check if remapping is allowed
-		if ( remapMsgHandler->allowRemapping( slaveAddr ) ) {
+		if ( remapMsgHandler->allowRemapping( serverAddr ) ) {
 			if ( ! isGet || chunkId < dataChunkCount ) {
 				remapped[ remappedCount * 2     ] = original[ i * 2     ];
 				remapped[ remappedCount * 2 + 1 ] = original[ i * 2 + 1 ];
@@ -48,7 +48,7 @@ void BasicRemappingScheme::redirect(
 	}
 
 	if ( ! remappedCount ) {
-		UNLOCK( &slaveLoading->lock );
+		UNLOCK( &serverLoading->lock );
 		UNLOCK( &overloadedServer->lock );
 		return;
 	}
@@ -61,8 +61,8 @@ void BasicRemappingScheme::redirect(
 	int index = -1, selected;
 	Latency *targetLatency, *nodeLatency;
 	for ( uint32_t i = 0; i < remappedCount; i++ ) {
-		slaveAddr = BasicRemappingScheme::stripeList->get( original[ i * 2 ], original[ i * 2 + 1 ] )->getAddr();
-		targetLatency = 0; // slaveLoading->cumulativeMirror.set.get( slaveAddr, &index );
+		serverAddr = BasicRemappingScheme::stripeList->get( original[ i * 2 ], original[ i * 2 + 1 ] )->getAddr();
+		targetLatency = 0; // serverLoading->cumulativeMirror.set.get( serverAddr, &index );
 
 		// Baseline
 		remapped[ i * 2     ] = original[ i * 2     ];
@@ -71,26 +71,26 @@ void BasicRemappingScheme::redirect(
 
 		for ( uint32_t j = 0; j < dataChunkCount + parityChunkCount; j++ ) {
 			if ( j < dataChunkCount )
-				slaveAddr = dataServerSockets[ j ]->getAddr();
+				serverAddr = dataServerSockets[ j ]->getAddr();
 			else
-				slaveAddr = parityServerSockets[ j - dataChunkCount ]->getAddr();
+				serverAddr = parityServerSockets[ j - dataChunkCount ]->getAddr();
 
-			if ( selectedServers.count( slaveAddr ) ) {
-				// Skip original slaves
+			if ( selectedServers.count( serverAddr ) ) {
+				// Skip original servers
 				// printf( "--- (%u, %u) is selected ---\n", original[ i * 2 ], j );
 				continue;
-			} else if ( redirectedServers.count( slaveAddr ) ) {
-				// Skip selected slaves
+			} else if ( redirectedServers.count( serverAddr ) ) {
+				// Skip selected servers
 				continue;
-			} else if ( remapMsgHandler->useCoordinatedFlow( slaveAddr ) ) {
-				// Skip overloaded slave
+			} else if ( remapMsgHandler->useCoordinatedFlow( serverAddr ) ) {
+				// Skip overloaded server
 				// printf( "--- (%u, %u) is overloaded ---\n", original[ i * 2 ], j );
 				continue;
 			}
 
-			nodeLatency = slaveLoading->cumulativeMirror.set.get( slaveAddr, &index );
+			nodeLatency = serverLoading->cumulativeMirror.set.get( serverAddr, &index );
 			if ( ( remapped[ i * 2     ] == original[ i * 2     ] ) && ( remapped[ i * 2 + 1 ] == original[ i * 2 + 1 ] ) ) {
-				// Always remap to another slave first
+				// Always remap to another server first
 				targetLatency = nodeLatency;
 				remapped[ i * 2     ] = original[ i * 2     ]; // List ID
 				remapped[ i * 2 + 1 ] = j;                     // Chunk ID
@@ -112,32 +112,32 @@ void BasicRemappingScheme::redirect(
 		     remapped[ i * 2 + 1 ] == original[ i * 2 + 1 ] ) {
 			__ERROR__( "BasicRemappingScheme", "redirect", "Cannot get remapping target for (%u, %u); i = %u / %u; selected: %s.", original[ i * 2 ], original[ i * 2 + 1 ], i, remappedCount, selected ? "true" : "false" );
 		} else {
-			slaveAddr = BasicRemappingScheme::stripeList->get( remapped[ i * 2 ], remapped[ i * 2 + 1 ] )->getAddr();
-			nodeLatency = slaveLoading->cumulativeMirror.set.get( slaveAddr, &index );
+			serverAddr = BasicRemappingScheme::stripeList->get( remapped[ i * 2 ], remapped[ i * 2 + 1 ] )->getAddr();
+			nodeLatency = serverLoading->cumulativeMirror.set.get( serverAddr, &index );
 			if ( nodeLatency )
 				*nodeLatency = *nodeLatency + increment;
 
-			redirectedServers.insert( slaveAddr );
+			redirectedServers.insert( serverAddr );
 		}
 	}
 
-	UNLOCK( &slaveLoading->lock );
+	UNLOCK( &serverLoading->lock );
 	UNLOCK( &overloadedServer->lock );
 }
 
 bool BasicRemappingScheme::isOverloaded( ServerSocket *socket ) {
-	struct sockaddr_in slaveAddr;
+	struct sockaddr_in serverAddr;
 
-	if ( slaveLoading == NULL || overloadedServer == NULL || stripeList == NULL || remapMsgHandler == NULL ) {
+	if ( serverLoading == NULL || overloadedServer == NULL || stripeList == NULL || remapMsgHandler == NULL ) {
 		fprintf( stderr, "The scheme is not yet initialized!! Abort degraded operation!\n" );
 		return false;
 	}
 
-	slaveAddr = socket->getAddr();
+	serverAddr = socket->getAddr();
 
 	// check if remapping is allowed
-	if ( ! remapMsgHandler->allowRemapping( slaveAddr ) )
+	if ( ! remapMsgHandler->allowRemapping( serverAddr ) )
 		return false;
 
-	return ( overloadedServer->slaveSet.count( slaveAddr ) >= 1 );
+	return ( overloadedServer->serverSet.count( serverAddr ) >= 1 );
 }

@@ -66,7 +66,7 @@ public:
 		return ret;
 	}
 
-	// add or remove pending request by id (assigned by master)
+	// add or remove pending request by id (assigned by client)
 	// return the number of pending requests after addition or removal
 	uint32_t addPendingRequest( uint32_t requestId, bool needsLock = true, bool needsUnlock = true ) {
 		if ( needsLock ) LOCK( &counter.pendingNormalRequests.lock );
@@ -123,7 +123,7 @@ private:
 	static void *readMessages( void *argv );
 	static void *ackTransitThread( void *argv );
 
-	/* return if master need to ack coordinator for server */
+	/* return if client need to ack coordinator for server */
 	bool checkAckForServer( struct sockaddr_in server );
 
 	/* send a list of states of servers */

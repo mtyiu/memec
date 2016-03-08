@@ -9,7 +9,7 @@ int main( int argc, char **argv ) {
 	int opt, ret = 0;
 	bool verbose = false;
 	char *path = NULL, path_default[] = "bin/config/local";
-	Client *master = 0;
+	Client *client = 0;
 	OptionList options;
 	struct option_t tmpOption;
 	static struct option long_options[] = {
@@ -61,17 +61,17 @@ int main( int argc, char **argv ) {
 	////////////////////////////////
 	// Pass control to the Client //
 	////////////////////////////////
-	master = Client::getInstance();
-	if ( ! master->init( path, options, verbose ) ) {
-		fprintf( stderr, "Error: Cannot initialize master.\n" );
+	client = Client::getInstance();
+	if ( ! client->init( path, options, verbose ) ) {
+		fprintf( stderr, "Error: Cannot initialize client.\n" );
 		return 1;
 	}
-	if ( ! master->start() ) {
-		fprintf( stderr, "Error: Cannot start master.\n" );
+	if ( ! client->start() ) {
+		fprintf( stderr, "Error: Cannot start client.\n" );
 		// return 1;
 	}
-	master->interactive();
-	master->stop();
+	client->interactive();
+	client->stop();
 
 	return 0;
 
@@ -83,7 +83,7 @@ usage:
 		"Mandatory arguments to long options are mandatory for short "
 		"options too.\n"
 		"  -p, --path         Specify the path to the directory containing the config files\n"
-		"  -o, --option       Override the options in the config file of master\n"
+		"  -o, --option       Override the options in the config file of client\n"
 		"  -v, --verbose      Show configuration\n"
 		"  -h, --help         Display this help and exit\n",
 		argv[ 0 ]

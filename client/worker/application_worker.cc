@@ -276,12 +276,12 @@ bool ClientWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		return false;
 	}
 
-	// decide whether any of the data / parity slave needs to use remapping flow
-	Client *master = Client::getInstance();
+	// decide whether any of the data / parity server needs to use remapping flow
+	Client *client = Client::getInstance();
 	if ( ! ClientWorker::disableDegraded ) {
 		for ( uint32_t i = 0; i < 1 + ClientWorker::parityChunkCount; i++ ) {
 			struct sockaddr_in addr = ( i == 0 ) ? socket->getAddr() : this->parityServerSockets[ i - 1 ]->getAddr();
-			if ( master->remapMsgHandler.useCoordinatedFlow( addr ) ) {
+			if ( client->remapMsgHandler.useCoordinatedFlow( addr ) ) {
 				// printf( "(%u, %u) is overloaded!\n", listId, i == 0 ? chunkId : i - 1 + ClientWorker::dataChunkCount );
 				return this->handleRemappingSetRequest( event, buf, size );
 			}
@@ -327,7 +327,7 @@ bool ClientWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 			( void * )( i == 0 ? socket : this->parityServerSockets[ i - 1 ] ),
 			key
 		) ) {
-			__ERROR__( "ClientWorker", "handleSetRequest", "Cannot insert into slave SET pending map." );
+			__ERROR__( "ClientWorker", "handleSetRequest", "Cannot insert into server SET pending map." );
 		}
 	}
 
@@ -452,7 +452,7 @@ bool ClientWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 		);
 
 		if ( ! ClientWorker::pending->insertKey( PT_SERVER_GET, instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, key ) ) {
-			__ERROR__( "ClientWorker", "handleGetRequest", "Cannot insert into slave GET pending map." );
+			__ERROR__( "ClientWorker", "handleGetRequest", "Cannot insert into server GET pending map." );
 		}
 
 		if ( ClientWorker::updateInterval ) {
@@ -544,7 +544,7 @@ bool ClientWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 		socket->timestamp.pendingAck.insertUpdate( Timestamp( requestTimestamp ) );
 
 		if ( ! ClientWorker::pending->insertKeyValueUpdate( PT_SERVER_UPDATE, Client::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, keyValueUpdate, true, true, requestTimestamp ) ) {
-			__ERROR__( "ClientWorker", "handleUpdateRequest", "Cannot insert into slave UPDATE pending map." );
+			__ERROR__( "ClientWorker", "handleUpdateRequest", "Cannot insert into server UPDATE pending map." );
 		}
 
 		// Send UPDATE request
@@ -621,7 +621,7 @@ bool ClientWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 		socket->timestamp.pendingAck.insertDel( Timestamp( requestTimestamp ) );
 
 		if ( ! ClientWorker::pending->insertKey( PT_SERVER_DEL, Client::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, key, true, true, requestTimestamp ) ) {
-			__ERROR__( "ClientWorker", "handleDeleteRequest", "Cannot insert into slave DELETE pending map." );
+			__ERROR__( "ClientWorker", "handleDeleteRequest", "Cannot insert into server DELETE pending map." );
 		}
 
 		// Send DELETE requests

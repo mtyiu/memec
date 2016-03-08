@@ -24,16 +24,16 @@ public:
 			uint16_t port;
 		} address;
 		struct {
-			ArrayMap< struct sockaddr_in, Latency >* slaveGetLatency;
-			ArrayMap< struct sockaddr_in, Latency >* slaveSetLatency;
+			ArrayMap< struct sockaddr_in, Latency >* serverGetLatency;
+			ArrayMap< struct sockaddr_in, Latency >* serverSetLatency;
 		} loading;
 	} message;
 
 	void reqRegister( CoordinatorSocket *socket, uint32_t addr, uint16_t port );
 	void reqSendLoadStats(
 		CoordinatorSocket *socket,
-		ArrayMap< struct sockaddr_in, Latency > *slaveGetLatency,
-		ArrayMap< struct sockaddr_in, Latency > *slaveSetLatency
+		ArrayMap< struct sockaddr_in, Latency > *serverGetLatency,
+		ArrayMap< struct sockaddr_in, Latency > *serverSetLatency
 	);
 	void pending( CoordinatorSocket *socket );
 };
