@@ -46,7 +46,7 @@ public:
 		struct {
 			ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency;
 			ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency;
-			std::set<struct sockaddr_in> *overloadedSlaveSet;
+			std::set<struct sockaddr_in> *overloadedServerSet;
 		} slaveLoading;
 		struct {
 			bool toRemap;
@@ -113,7 +113,7 @@ public:
 		uint32_t *original, uint32_t *remapped, uint32_t remappedCount, Key &key
 	);
 	// Recovery
-	void announceSlaveReconstructed( ServerSocket *srcSocket, ServerSocket *dstSocket );
+	void announceServerReconstructed( ServerSocket *srcSocket, ServerSocket *dstSocket );
 	// Pending
 	void pending( ClientSocket *socket );
 };

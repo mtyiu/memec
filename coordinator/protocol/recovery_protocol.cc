@@ -1,11 +1,11 @@
 #include "protocol.hh"
 
-char *CoordinatorProtocol::announceSlaveReconstructed( size_t &size, uint16_t instanceId, uint32_t requestId, ServerSocket *srcSocket, ServerSocket *dstSocket, bool toSlave ) {
+char *CoordinatorProtocol::announceServerReconstructed( size_t &size, uint16_t instanceId, uint32_t requestId, ServerSocket *srcSocket, ServerSocket *dstSocket, bool toServer ) {
 	// -- common/protocol/address_protocol.cc --
 	ServerAddr srcAddr = srcSocket->getServerAddr(), dstAddr = dstSocket->getServerAddr();
 	size = this->generateSrcDstAddressHeader(
 		PROTO_MAGIC_ANNOUNCEMENT,
-		toSlave ? PROTO_MAGIC_TO_SERVER : PROTO_MAGIC_TO_CLIENT,
+		toServer ? PROTO_MAGIC_TO_SERVER : PROTO_MAGIC_TO_CLIENT,
 		PROTO_OPCODE_SERVER_RECONSTRUCTED,
 		instanceId, requestId,
 		srcAddr.addr,
@@ -16,10 +16,10 @@ char *CoordinatorProtocol::announceSlaveReconstructed( size_t &size, uint16_t in
 	return this->buffer.send;
 }
 
-char *CoordinatorProtocol::promoteBackupSlave( size_t &size, uint16_t instanceId, uint32_t requestId, ServerSocket *srcSocket, std::unordered_set<Metadata> &chunks, std::unordered_set<Metadata>::iterator &chunksIt, std::unordered_set<Key> &keys, std::unordered_set<Key>::iterator &keysIt, bool &isCompleted ) {
+char *CoordinatorProtocol::promoteBackupServer( size_t &size, uint16_t instanceId, uint32_t requestId, ServerSocket *srcSocket, std::unordered_set<Metadata> &chunks, std::unordered_set<Metadata>::iterator &chunksIt, std::unordered_set<Key> &keys, std::unordered_set<Key>::iterator &keysIt, bool &isCompleted ) {
 	// -- common/protocol/recovery_protocol.cc --
 	ServerAddr srcAddr = srcSocket->getServerAddr();
-	size = this->generatePromoteBackupSlaveHeader(
+	size = this->generatePromoteBackupServerHeader(
 		PROTO_MAGIC_ANNOUNCEMENT,
 		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_BACKUP_SERVER_PROMOTED,

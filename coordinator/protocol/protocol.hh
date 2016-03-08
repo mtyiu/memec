@@ -22,16 +22,16 @@ public:
 	char *reqFlushChunks( size_t &size, uint16_t instanceId, uint32_t requestId );
 
 	// ---------- register_protocol.cc ----------
-	char *resRegisterMaster( size_t &size, uint16_t instanceId, uint32_t requestId, bool success );
-	char *resRegisterSlave( size_t &size, uint16_t instanceId, uint32_t requestId, bool success );
-	char *announceSlaveConnected( size_t &size, uint16_t instanceId, uint32_t requestId, ServerSocket *socket );
+	char *resRegisterClient( size_t &size, uint16_t instanceId, uint32_t requestId, bool success );
+	char *resRegisterServer( size_t &size, uint16_t instanceId, uint32_t requestId, bool success );
+	char *announceServerConnected( size_t &size, uint16_t instanceId, uint32_t requestId, ServerSocket *socket );
 
 	// ---------- load_protocol.cc ----------
 	char *reqPushLoadStats(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		ArrayMap< struct sockaddr_in, Latency > *slaveGetLatency,
 		ArrayMap< struct sockaddr_in, Latency > *slaveSetLatency,
-		std::set< struct sockaddr_in > *overloadedSlaveSet
+		std::set< struct sockaddr_in > *overloadedServerSet
 	);
 	bool parseLoadingStats(
 		const LoadStatsHeader& loadStatsHeader,
@@ -73,12 +73,12 @@ public:
 	char *reqSyncRemappedData( size_t &size, uint16_t instanceId, uint32_t requestId, struct sockaddr_in target, char* buffer = 0 );
 
 	// ---------- recovery_protocol.cc ----------
-	char *announceSlaveReconstructed(
+	char *announceServerReconstructed(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		ServerSocket *srcSocket, ServerSocket *dstSocket,
-		bool toSlave
+		bool toServer
 	);
-	char *promoteBackupSlave(
+	char *promoteBackupServer(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		ServerSocket *srcSocket,
 		std::unordered_set<Metadata> &chunks,

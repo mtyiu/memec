@@ -1,10 +1,10 @@
 #include "client_socket.hh"
 
-ArrayMap<int, ClientSocket> *ClientSocket::masters;
+ArrayMap<int, ClientSocket> *ClientSocket::clients;
 
-void ClientSocket::setArrayMap( ArrayMap<int, ClientSocket> *masters ) {
-	ClientSocket::masters = masters;
-	masters->needsDelete = false;
+void ClientSocket::setArrayMap( ArrayMap<int, ClientSocket> *clients ) {
+	ClientSocket::clients = clients;
+	clients->needsDelete = false;
 }
 
 bool ClientSocket::start() {
@@ -12,7 +12,7 @@ bool ClientSocket::start() {
 }
 
 void ClientSocket::stop() {
-	ClientSocket::masters->remove( this->sockfd );
+	ClientSocket::clients->remove( this->sockfd );
 	Socket::stop();
 	// TODO: Fix memory leakage!
 	// delete this;

@@ -27,9 +27,9 @@ bool CoordinatorRemapWorker::transitToDegraded( RemapStateEvent event ) { // Pha
 	crmh->transitToDegradedEnd( event.slave );
 
 	// wait for parity revert to complete
-	// obtaining ack from all masters to ensure all masters already complete reverting parity
+	// obtaining ack from all clients to ensure all clients already complete reverting parity
 	pthread_mutex_lock( &crmh->ackSignalLock );
-	if ( crmh->isAllMasterAcked( event.slave ) == false )
+	if ( crmh->isAllClientAcked( event.slave ) == false )
 		pthread_cond_wait( &crmh->ackSignal[ event.slave ], &crmh->ackSignalLock );
 	pthread_mutex_unlock( &crmh->ackSignalLock );
 
@@ -42,7 +42,7 @@ bool CoordinatorRemapWorker::transitToDegraded( RemapStateEvent event ) { // Pha
 		return false;
 	}
 
-	// broadcast to master: the transition is completed
+	// broadcast to client: the transition is completed
 	crmh->serversState[ event.slave ] = REMAP_DEGRADED; // Phase 2
 	if ( crmh->broadcastState( event.slave ) < 0 ) {
 		__ERROR__( "CoordinatorRemapWorker", "transitToDegraded",
@@ -67,7 +67,7 @@ bool CoordinatorRemapWorker::transitToNormal( RemapStateEvent event ) { // Phase
 
 	// wait for "all coordinated req. ack", release lock once acquired
 	pthread_mutex_lock( &crmh->ackSignalLock );
-	if ( crmh->isAllMasterAcked( event.slave ) == false )
+	if ( crmh->isAllClientAcked( event.slave ) == false )
 		pthread_cond_wait( &crmh->ackSignal[ event.slave ], &crmh->ackSignalLock );
 	pthread_mutex_unlock( &crmh->ackSignalLock );
 
@@ -88,7 +88,7 @@ bool CoordinatorRemapWorker::transitToNormal( RemapStateEvent event ) { // Phase
 	// any cleanup to be done
 	crmh->transitToNormalEnd( event.slave ); // Prepare for switching to Phase 1b from Phase 0
 
-	// ask master to use normal SET workflow
+	// ask client to use normal SET workflow
 	crmh->serversState[ event.slave ] = REMAP_NORMAL;
 	if ( crmh->broadcastState( event.slave ) < 0 ) {
 		__ERROR__( "CoordinatorRemapWorker", "transitToNormal",

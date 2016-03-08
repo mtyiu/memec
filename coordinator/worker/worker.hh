@@ -47,7 +47,7 @@ private:
 	bool handleReleaseDegradedLockResponse( ServerEvent event, char *buf, size_t size );
 
 	// ---------- recovery_worker.cc ----------
-	bool handlePromoteBackupSlaveResponse( ServerEvent event, char *buf, size_t size );
+	bool handlePromoteBackupServerResponse( ServerEvent event, char *buf, size_t size );
 	bool handleReconstructionRequest( ServerSocket *socket );
 	bool handleReconstructionResponse( ServerEvent event, char *buf, size_t size );
 	bool handleReconstructionUnsealedResponse( ServerEvent event, char *buf, size_t size );

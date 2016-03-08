@@ -2,14 +2,14 @@
 #include "../ds/log.hh"
 #include "../main/coordinator.hh"
 
-bool CoordinatorWorker::handlePromoteBackupSlaveResponse( ServerEvent event, char *buf, size_t size ) {
-	struct PromoteBackupSlaveHeader header;
-	if ( ! this->protocol.parsePromoteBackupSlaveHeader( header, false /* isRequest */, buf, size ) ) {
-		__ERROR__( "CoordinatorWorker", "handlePromoteBackupSlaveResponse", "Invalid PROMOTE_BACKUP_SERVER response (size = %lu).", size );
+bool CoordinatorWorker::handlePromoteBackupServerResponse( ServerEvent event, char *buf, size_t size ) {
+	struct PromoteBackupServerHeader header;
+	if ( ! this->protocol.parsePromoteBackupServerHeader( header, false /* isRequest */, buf, size ) ) {
+		__ERROR__( "CoordinatorWorker", "handlePromoteBackupServerResponse", "Invalid PROMOTE_BACKUP_SERVER response (size = %lu).", size );
 		return false;
 	}
 	__DEBUG__(
-		BLUE, "CoordinatorWorker", "handlePromoteBackupSlaveResponse",
+		BLUE, "CoordinatorWorker", "handlePromoteBackupServerResponse",
 		"[PROMOTE_BACKUP_SERVER] Request ID: (%u, %u); Count: %u (%u:%u)",
 		event.instanceId, event.requestId, header.count, header.addr, header.port
 	);
@@ -19,12 +19,12 @@ bool CoordinatorWorker::handlePromoteBackupSlaveResponse( ServerEvent event, cha
 	ServerSocket *original;
 
 	if ( ! CoordinatorWorker::pending->eraseRecovery( event.instanceId, event.requestId, header.addr, header.port, header.chunkCount, header.unsealedCount, event.socket, remainingChunks, totalChunks, remainingKeys, totalKeys, elapsedTime, original ) ) {
-		__ERROR__( "ServerWorker", "handlePromoteBackupSlaveResponse", "Cannot find a pending RECOVERY request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
+		__ERROR__( "ServerWorker", "handlePromoteBackupServerResponse", "Cannot find a pending RECOVERY request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		return false;
 	}
 
 	if ( remainingChunks == 0 && remainingKeys == 0 ) {
-		__INFO__( CYAN, "CoordinatorWorker", "handlePromoteBackupSlaveResponse", "Recovery is completed. Number of chunks reconstructed = %u; number of keys reconstructed = %u; elapsed time = %lf s.\n", totalChunks, totalKeys, elapsedTime );
+		__INFO__( CYAN, "CoordinatorWorker", "handlePromoteBackupServerResponse", "Recovery is completed. Number of chunks reconstructed = %u; number of keys reconstructed = %u; elapsed time = %lf s.\n", totalChunks, totalKeys, elapsedTime );
 		event.socket->printAddress();
 
 		event.ackCompletedReconstruction( event.socket, event.instanceId, event.requestId, true );
@@ -33,7 +33,7 @@ bool CoordinatorWorker::handlePromoteBackupSlaveResponse( ServerEvent event, cha
 		// notify the remap message handler of a "removed" slave
 		Coordinator *coordinator = Coordinator::getInstance();
 		if ( coordinator->remapMsgHandler )
-			coordinator->remapMsgHandler->removeAliveSlave( original->getAddr() );
+			coordinator->remapMsgHandler->removeAliveServer( original->getAddr() );
 
 		Log log;
 		log.setRecovery(
@@ -81,7 +81,7 @@ bool CoordinatorWorker::handleReconstructionRequest( ServerSocket *socket ) {
 	/////////////////////////////////////////////////////////////////////
 	Coordinator *coordinator = Coordinator::getInstance();
 	ArrayMap<int, ServerSocket> &slaves = coordinator->sockets.slaves;
-	ArrayMap<int, ServerSocket> &backupSlaves = coordinator->sockets.backupSlaves;
+	ArrayMap<int, ServerSocket> &backupServers = coordinator->sockets.backupServers;
 	int fd;
 	ServerSocket *backupServerSocket;
 
@@ -101,12 +101,12 @@ bool CoordinatorWorker::handleReconstructionRequest( ServerSocket *socket ) {
 	///////////////////////////////////////////////////////
 	// Choose a backup slave to replace the failed slave //
 	///////////////////////////////////////////////////////
-	if ( backupSlaves.size() == 0 ) {
+	if ( backupServers.size() == 0 ) {
 		__ERROR__( "CoordinatorWorker", "handleReconstructionRequest", "No backup node is available!" );
 		return false;
 	}
-	backupServerSocket = backupSlaves[ 0 ];
-	backupSlaves.removeAt( 0 );
+	backupServerSocket = backupServers[ 0 ];
+	backupServers.removeAt( 0 );
 
 	////////////////////////////
 	// Update ServerSocket map //
@@ -119,7 +119,7 @@ bool CoordinatorWorker::handleReconstructionRequest( ServerSocket *socket ) {
 	// Add the slave addrs to remapMsgHandler //
 	////////////////////////////////////////////
 	if ( coordinator->remapMsgHandler )
-		coordinator->remapMsgHandler->addAliveSlave( backupServerSocket->getAddr() );
+		coordinator->remapMsgHandler->addAliveServer( backupServerSocket->getAddr() );
 
 	////////////////////////////
 	// Announce to the slaves //
@@ -133,7 +133,7 @@ bool CoordinatorWorker::handleReconstructionRequest( ServerSocket *socket ) {
 
 	pthread_mutex_init( &annoucement.lock, 0 );
 	pthread_cond_init( &annoucement.cond, 0 );
-	serverEvent.announceSlaveReconstructed(
+	serverEvent.announceServerReconstructed(
 		Coordinator::instanceId, CoordinatorWorker::idGenerator->nextVal( this->workerId ),
 		&annoucement.lock, &annoucement.cond, &annoucement.sockets,
 		socket, backupServerSocket
@@ -147,10 +147,10 @@ bool CoordinatorWorker::handleReconstructionRequest( ServerSocket *socket ) {
 	// __INFO__( "CoordinatorWorker", "handleReconstructionRequest", "All announced." );
 
 	/////////////////////////////
-	// Announce to the masters //
+	// Announce to the clients //
 	/////////////////////////////
 	ClientEvent clientEvent;
-	clientEvent.announceSlaveReconstructed( socket, backupServerSocket );
+	clientEvent.announceServerReconstructed( socket, backupServerSocket );
 	CoordinatorWorker::eventQueue->insert( clientEvent );
 
 	////////////////////////////////////////////////////////////////////////////
@@ -257,7 +257,7 @@ bool CoordinatorWorker::handleReconstructionRequest( ServerSocket *socket ) {
 	chunksIt = socket->map.chunks.begin();
 	unsealedKeysIt = unsealedKeysAggregated.begin();
 	do {
-		buffer.data = this->protocol.promoteBackupSlave(
+		buffer.data = this->protocol.promoteBackupServer(
 			buffer.size,
 			Coordinator::instanceId,
 			requestId,
@@ -295,8 +295,8 @@ bool CoordinatorWorker::handleReconstructionRequest( ServerSocket *socket ) {
 	/////////////////////////////////////////////////////////////////
 	// Distribute the reconstruction task among the slaves in the same stripe list
 	for ( uint32_t i = 0, size = lists.size(); i < size; i++ ) {
-		uint32_t numSurvivingSlaves = 0;
-		uint32_t numStripePerSlave;
+		uint32_t numSurvivingServers = 0;
+		uint32_t numStripePerServer;
 		uint32_t numUnsealedKeys;
 
 		listId = lists[ i ].listId;
@@ -321,12 +321,12 @@ bool CoordinatorWorker::handleReconstructionRequest( ServerSocket *socket ) {
 		for ( uint32_t j = 0; j < CoordinatorWorker::chunkCount; j++ ) {
 			ServerSocket *s = sockets[ listId ][ j ];
 			if ( s && s->ready() && s != backupServerSocket )
-				numSurvivingSlaves++;
+				numSurvivingServers++;
 		}
 
-		numStripePerSlave = stripeIds[ listId ].size() / numSurvivingSlaves;
-		if ( stripeIds[ listId ].size() % numSurvivingSlaves > 0 )
-			numStripePerSlave++;
+		numStripePerServer = stripeIds[ listId ].size() / numSurvivingServers;
+		if ( stripeIds[ listId ].size() % numSurvivingServers > 0 )
+			numStripePerServer++;
 
 		// Insert into pending map
 		pthread_mutex_t *lock;
@@ -363,7 +363,7 @@ bool CoordinatorWorker::handleReconstructionRequest( ServerSocket *socket ) {
 						chunkId,
 						stripeIds[ listId ],
 						stripeIdSetIt,
-						numStripePerSlave,
+						numStripePerServer,
 						isCompleted
 					);
 
@@ -418,7 +418,7 @@ bool CoordinatorWorker::handleReconstructionRequest( ServerSocket *socket ) {
 		__INFO__(
 			YELLOW, "CoordinatorWorker", "handleReconstructionRequest",
 			"[%u] (%u, %u): Number of surviving slaves: %u; number of stripes per slave: %u; total number of stripes: %lu; total number of unsealed keys: %lu",
-			requestId, listId, chunkId, numSurvivingSlaves, numStripePerSlave, stripeIds[ listId ].size(), unsealed[ listId ].size()
+			requestId, listId, chunkId, numSurvivingServers, numStripePerServer, stripeIds[ listId ].size(), unsealed[ listId ].size()
 		);
 	}
 

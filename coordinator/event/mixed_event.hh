@@ -12,7 +12,7 @@ public:
 	EventType type;
 	union {
 		CoordinatorEvent coordinator;
-		ClientEvent master;
+		ClientEvent client;
 		ServerEvent slave;
 	} event;
 
@@ -23,7 +23,7 @@ public:
 	}
 
 	MIXED_EVENT_SET( CoordinatorEvent, EVENT_TYPE_COORDINATOR, coordinator )
-	MIXED_EVENT_SET( ClientEvent, EVENT_TYPE_CLIENT, master )
+	MIXED_EVENT_SET( ClientEvent, EVENT_TYPE_CLIENT, client )
 	MIXED_EVENT_SET( ServerEvent, EVENT_TYPE_SERVER, slave )
 #undef MIXED_EVENT_SET
 

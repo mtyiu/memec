@@ -78,13 +78,13 @@ public:
 	bool init( const char *spread = NULL, const char *user = NULL );
 	void quit();
 
-	void listAliveSlaves();
+	void listAliveServers();
 
 	virtual bool start() = 0;
 	virtual bool stop() = 0;
 
-	virtual bool addAliveSlave( struct sockaddr_in server ) = 0;
-	virtual bool removeAliveSlave( struct sockaddr_in server ) = 0;
+	virtual bool addAliveServer( struct sockaddr_in server ) = 0;
+	virtual bool removeAliveServer( struct sockaddr_in server ) = 0;
 
 	bool isRemapStarted( const struct sockaddr_in server ) {
 		if ( this->serversState.count( server ) == 0 )

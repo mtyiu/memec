@@ -78,7 +78,7 @@ void RemapMsgHandler::quit() {
 	}
 }
 
-void RemapMsgHandler::listAliveSlaves() {
+void RemapMsgHandler::listAliveServers() {
 	uint32_t serverCount = this->serversState.size();
 	char buf[ INET_ADDRSTRLEN ];
 	for ( auto server : this->serversState ) {

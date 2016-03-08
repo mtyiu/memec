@@ -12,12 +12,12 @@ void ServerEvent::resRegister( ServerSocket *socket, uint16_t instanceId, uint32
 	this->socket = socket;
 }
 
-void ServerEvent::announceSlaveConnected( ServerSocket *socket ) {
+void ServerEvent::announceServerConnected( ServerSocket *socket ) {
 	this->type = SERVER_EVENT_TYPE_ANNOUNCE_SERVER_CONNECTED;
 	this->socket = socket;
 }
 
-void ServerEvent::announceSlaveReconstructed(
+void ServerEvent::announceServerReconstructed(
 	uint16_t instanceId, uint32_t requestId,
 	pthread_mutex_t *lock, pthread_cond_t *cond, std::unordered_set<ServerSocket *> *sockets,
 	ServerSocket *srcSocket, ServerSocket *dstSocket

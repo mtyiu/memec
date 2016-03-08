@@ -25,33 +25,33 @@ private:
 
 	~CoordinatorRemapMsgHandler();
 
-	/* set of alive masters connected */
-	std::set<std::string> aliveMasters;
-	LOCK_T mastersLock;
+	/* set of alive clients connected */
+	std::set<std::string> aliveClients;
+	LOCK_T clientsLock;
 
-	/* ack map for each server, identify by server addr, and contains the set of acked masters */
-	std::map<struct sockaddr_in, std::set<std::string>* > ackMasters;
-	LOCK_T mastersAckLock;
+	/* ack map for each server, identify by server addr, and contains the set of acked clients */
+	std::map<struct sockaddr_in, std::set<std::string>* > ackClients;
+	LOCK_T clientsAckLock;
 
 	bool isListening;
 
 	CoordinatorRemapWorker *workers;
-	std::set<struct sockaddr_in> aliveSlaves;
-	std::set<struct sockaddr_in> crashedSlaves;
-	LOCK_T aliveSlavesLock;
+	std::set<struct sockaddr_in> aliveServers;
+	std::set<struct sockaddr_in> crashedServers;
+	LOCK_T aliveServersLock;
 
-	/* handle master join or leave */
-	bool isMasterJoin( int service, char *msg, char *subject );
-	bool isMasterLeft( int service, char *msg, char *subject );
-	bool isSlaveJoin( int service, char *msg, char *subject );
-	bool isSlaveLeft( int service, char *msg, char *subject );
+	/* handle client join or leave */
+	bool isClientJoin( int service, char *msg, char *subject );
+	bool isClientLeft( int service, char *msg, char *subject );
+	bool isServerJoin( int service, char *msg, char *subject );
+	bool isServerLeft( int service, char *msg, char *subject );
 
 	static void *readMessages( void *argv );
 	bool updateState( char *subject, char *msg, int len );
 
-	/* manage the set of alive masters connected */
-	void addAliveMaster( char *name );
-	void removeAliveMaster( char *name );
+	/* manage the set of alive clients connected */
+	void addAliveClient( char *name );
+	void removeAliveClient( char *name );
 
 	/* insert the same event for one or more servers */
 	bool insertRepeatedEvents ( RemapStateEvent event, std::vector<struct sockaddr_in> *servers );
@@ -79,21 +79,21 @@ public:
 	bool transitToDegradedEnd( const struct sockaddr_in &server );
 	bool transitToNormalEnd( const struct sockaddr_in &server );
 
-	// manage master ack
-	bool resetMasterAck( struct sockaddr_in server );
-	bool isAllMasterAcked( struct sockaddr_in server );
+	// manage client ack
+	bool resetClientAck( struct sockaddr_in server );
+	bool isAllClientAcked( struct sockaddr_in server );
 
-	// notify masters of servers' state
-	int sendStateToMasters( std::vector<struct sockaddr_in> servers );
-	int sendStateToMasters( struct sockaddr_in server );
-	// notify both masters and servers
+	// notify clients of servers' state
+	int sendStateToClients( std::vector<struct sockaddr_in> servers );
+	int sendStateToClients( struct sockaddr_in server );
+	// notify both clients and servers
 	int broadcastState( std::vector<struct sockaddr_in> servers );
 	int broadcastState( struct sockaddr_in server );
 
 	// keep track of the alive servers
-	bool addAliveSlave( struct sockaddr_in server );
-	bool addCrashedSlave( struct sockaddr_in server );
-	bool removeAliveSlave( struct sockaddr_in server );
+	bool addAliveServer( struct sockaddr_in server );
+	bool addCrashedServer( struct sockaddr_in server );
+	bool removeAliveServer( struct sockaddr_in server );
 
 	// check server state
 	bool isInTransition( const struct sockaddr_in &server );

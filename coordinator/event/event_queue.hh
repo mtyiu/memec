@@ -21,7 +21,7 @@ public:
 	} priority;
 	struct {
 		EventQueue<CoordinatorEvent> *coordinator;
-		EventQueue<ClientEvent> *master;
+		EventQueue<ClientEvent> *client;
 		EventQueue<ServerEvent> *slave;
 	} separated;
 
@@ -31,7 +31,7 @@ public:
 		this->priority.capacity = 0;
 		this->priority.count = 0;
 		this->separated.coordinator = 0;
-		this->separated.master = 0;
+		this->separated.client = 0;
 		this->separated.slave = 0;
 	}
 
@@ -43,10 +43,10 @@ public:
 		LOCK_INIT( &this->priority.lock );
 	}
 
-	void init( bool block, uint32_t coordinator, uint32_t master, uint32_t slave ) {
+	void init( bool block, uint32_t coordinator, uint32_t client, uint32_t slave ) {
 		this->isMixed = false;
 		this->separated.coordinator = new EventQueue<CoordinatorEvent>( coordinator, block );
-		this->separated.master = new EventQueue<ClientEvent>( master, block );
+		this->separated.client = new EventQueue<ClientEvent>( client, block );
 		this->separated.slave = new EventQueue<ServerEvent>( slave, block );
 	}
 
@@ -56,7 +56,7 @@ public:
 			this->priority.mixed->start();
 		} else {
 			this->separated.coordinator->start();
-			this->separated.master->start();
+			this->separated.client->start();
 			this->separated.slave->start();
 		}
 	}
@@ -67,7 +67,7 @@ public:
 			this->priority.mixed->stop();
 		} else {
 			this->separated.coordinator->stop();
-			this->separated.master->stop();
+			this->separated.client->stop();
 			this->separated.slave->stop();
 		}
 	}
@@ -78,7 +78,7 @@ public:
 			delete this->priority.mixed;
 		} else {
 			delete this->separated.coordinator;
-			delete this->separated.master;
+			delete this->separated.client;
 			delete this->separated.slave;
 		}
 	}
@@ -92,9 +92,9 @@ public:
 		} else {
 			fprintf( f, "[Coordinator] " );
 			this->separated.coordinator->print( f );
-			fprintf( f, "[     Master] " );
-			this->separated.master->print( f );
-			fprintf( f, "[      Slave] " );
+			fprintf( f, "[     Client] " );
+			this->separated.client->print( f );
+			fprintf( f, "[      Server] " );
 			this->separated.slave->print( f );
 		}
 	}
@@ -111,7 +111,7 @@ public:
 	}
 
 	COORDINATOR_EVENT_QUEUE_INSERT( CoordinatorEvent, coordinator )
-	COORDINATOR_EVENT_QUEUE_INSERT( ClientEvent, master )
+	COORDINATOR_EVENT_QUEUE_INSERT( ClientEvent, client )
 	COORDINATOR_EVENT_QUEUE_INSERT( ServerEvent, slave )
 #undef COORDINATOR_EVENT_QUEUE_INSERT
 
@@ -145,7 +145,7 @@ public:
 				return ret;
 			}
 		} else {
-			return this->separated.master->insert( event );
+			return this->separated.client->insert( event );
 		}
 	}
 

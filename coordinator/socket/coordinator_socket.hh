@@ -21,7 +21,7 @@ public:
 	} buffer;
 
 	CoordinatorSocket();
-	bool init( int type, uint32_t addr, uint16_t port, int numSlaves, EPoll *epoll );
+	bool init( int type, uint32_t addr, uint16_t port, int numServers, EPoll *epoll );
 	bool start();
 	void stop();
 	void print( FILE *f = stdout );

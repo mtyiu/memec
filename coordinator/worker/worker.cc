@@ -18,7 +18,7 @@ void CoordinatorWorker::dispatch( MixedEvent event ) {
 			this->dispatch( event.event.coordinator );
 			break;
 		case EVENT_TYPE_CLIENT:
-			this->dispatch( event.event.master );
+			this->dispatch( event.event.client );
 			break;
 		case EVENT_TYPE_SERVER:
 			this->dispatch( event.event.slave );
@@ -41,7 +41,7 @@ void CoordinatorWorker::dispatch( CoordinatorEvent event ) {
 			uint32_t requestId = coordinator->idGenerator.nextVal( this->workerId );
 			ServerEvent serverEvent;
 
-			// prepare the request for all master
+			// prepare the request for all client
 			Packet *packet = coordinator->packetPool.malloc();
 			buffer.data = packet->data;
 			this->protocol.reqSyncRemappedData(
@@ -51,16 +51,16 @@ void CoordinatorWorker::dispatch( CoordinatorEvent event ) {
 			packet->size = buffer.size;
 
 			LOCK( &coordinator->sockets.slaves.lock );
-			uint32_t numSlaves = coordinator->sockets.slaves.size();
+			uint32_t numServers = coordinator->sockets.slaves.size();
 			coordinator->pending.insertRemappedDataRequest(
 				requestId,
 				event.message.parity.lock,
 				event.message.parity.cond,
 				event.message.parity.done,
-				numSlaves
+				numServers
 			);
-			packet->setReferenceCount( numSlaves );
-			for ( uint32_t i = 0; i < numSlaves; i++ ) {
+			packet->setReferenceCount( numServers );
+			for ( uint32_t i = 0; i < numServers; i++ ) {
 				ServerSocket *socket = coordinator->sockets.slaves[ i ];
 				serverEvent.syncRemappedData( socket, packet );
 				coordinator->eventQueue.insert( serverEvent );

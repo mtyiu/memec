@@ -9,12 +9,12 @@ void ClientEvent::resRegister( ClientSocket *socket, uint16_t instanceId, uint32
 }
 
 void ClientEvent::reqPushLoadStats( ClientSocket *socket, ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
-		ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency, std::set<struct sockaddr_in> *overloadedSlaveSet ) {
+		ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency, std::set<struct sockaddr_in> *overloadedServerSet ) {
 	this->type = CLIENT_EVENT_TYPE_PUSH_LOADING_STATS;
 	this->socket = socket;
 	this->message.slaveLoading.slaveGetLatency = slaveGetLatency;
 	this->message.slaveLoading.slaveSetLatency = slaveSetLatency;
-	this->message.slaveLoading.overloadedSlaveSet = overloadedSlaveSet;
+	this->message.slaveLoading.overloadedServerSet = overloadedServerSet;
 }
 
 void ClientEvent::resRemappingSetLock( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, bool success, uint32_t *original, uint32_t *remapped, uint32_t remappedCount, Key &key ) {
@@ -79,7 +79,7 @@ void ClientEvent::resDegradedLock( ClientSocket *socket, uint16_t instanceId, ui
 	this->message.degradedLock.remapped = remapped;
 }
 
-void ClientEvent::announceSlaveReconstructed( ServerSocket *srcSocket, ServerSocket *dstSocket ) {
+void ClientEvent::announceServerReconstructed( ServerSocket *srcSocket, ServerSocket *dstSocket ) {
 	this->type = CLIENT_EVENT_TYPE_ANNOUNCE_SERVER_RECONSTRUCTED;
 	this->message.reconstructed.src = srcSocket;
 	this->message.reconstructed.dst = dstSocket;

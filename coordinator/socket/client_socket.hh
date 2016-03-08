@@ -6,7 +6,7 @@
 
 class ClientSocket : public Socket {
 private:
-	static ArrayMap<int, ClientSocket> *masters;
+	static ArrayMap<int, ClientSocket> *clients;
 
 public:
 	uint16_t instanceId;
@@ -15,7 +15,7 @@ public:
 		uint16_t port;
 	} listenAddr;
 
-	static void setArrayMap( ArrayMap<int, ClientSocket> *masters );
+	static void setArrayMap( ArrayMap<int, ClientSocket> *clients );
 	bool start();
 	void stop();
 	void setListenAddr( uint32_t addr, uint16_t port );

@@ -14,7 +14,7 @@ CoordinatorSocket::CoordinatorSocket() {
 	this->sockets.needsDelete = true;
 }
 
-bool CoordinatorSocket::init( int type, uint32_t addr, uint16_t port, int numSlaves, EPoll *epoll ) {
+bool CoordinatorSocket::init( int type, uint32_t addr, uint16_t port, int numServers, EPoll *epoll ) {
 	this->epoll = epoll;
 	bool ret = (
 		Socket::init( type, addr, port ) &&
@@ -22,7 +22,7 @@ bool CoordinatorSocket::init( int type, uint32_t addr, uint16_t port, int numSla
 		epoll->add( this->sockfd, EPOLL_EVENT_LISTEN )
 	);
 	if ( ret ) {
-		this->sockets.reserve( numSlaves );
+		this->sockets.reserve( numServers );
 	}
 	return ret;
 }
@@ -74,9 +74,9 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 			::close( fd );
 			socket->sockets.removeAt( index );
 		} else {
-			ClientSocket *clientSocket = coordinator->sockets.masters.get( fd );
+			ClientSocket *clientSocket = coordinator->sockets.clients.get( fd );
 			ServerSocket *serverSocket = clientSocket ? 0 : coordinator->sockets.slaves.get( fd );
-			serverSocket = serverSocket ? serverSocket : coordinator->sockets.backupSlaves.get( fd );
+			serverSocket = serverSocket ? serverSocket : coordinator->sockets.backupServers.get( fd );
 			if ( clientSocket ) {
 				clientSocket->stop();
 			} else if ( serverSocket ) {
@@ -113,7 +113,7 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 
 		if ( ( addr = socket->sockets.get( fd, &index ) ) ) {
 			// Read message immediately and add to appropriate socket list such that all "add" operations originate from the epoll thread
-			// Only master or slave register message is expected
+			// Only client or slave register message is expected
 			bool connected;
 			ssize_t ret;
 
@@ -132,7 +132,7 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 						ClientSocket *clientSocket = new ClientSocket();
 						clientSocket->init( fd, *addr );
 						clientSocket->setListenAddr( addressHeader.addr, addressHeader.port );
-						coordinator->sockets.masters.set( fd, clientSocket );
+						coordinator->sockets.clients.set( fd, clientSocket );
 						socket->sockets.removeAt( index );
 
 						socket->done( fd ); // The socket is valid
@@ -163,7 +163,7 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 							event.resRegister( s, instanceId, header.requestId );
 							coordinator->eventQueue.insert( event );
 
-							event.announceSlaveConnected( s );
+							event.announceServerConnected( s );
 							coordinator->eventQueue.insert( event );
 						} else {
 							// Treat it as backup slaves
@@ -171,7 +171,7 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 							s = new ServerSocket();
 							s->init( fd, serverAddr, socket->epoll );
 							s->setRecvFd( fd, addr );
-							coordinator->sockets.backupSlaves.set( fd, s );
+							coordinator->sockets.backupServers.set( fd, s );
 
 							socket->sockets.removeAt( index );
 							socket->done( fd );
@@ -201,9 +201,9 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 				return false;
 			}
 		} else {
-			ClientSocket *clientSocket = coordinator->sockets.masters.get( fd );
+			ClientSocket *clientSocket = coordinator->sockets.clients.get( fd );
 			ServerSocket *serverSocket = clientSocket ? 0 : coordinator->sockets.slaves.get( fd );
-			serverSocket = serverSocket ? serverSocket : coordinator->sockets.backupSlaves.get( fd );
+			serverSocket = serverSocket ? serverSocket : coordinator->sockets.backupServers.get( fd );
 			if ( clientSocket ) {
 				ClientEvent event;
 				event.pending( clientSocket );

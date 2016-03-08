@@ -59,8 +59,8 @@ public:
 
 	void pending( ServerSocket *socket );
 	void resRegister( ServerSocket *socket, uint16_t instanceId, uint32_t requestId, bool success = true );
-	void announceSlaveConnected( ServerSocket *socket );
-	void announceSlaveReconstructed(
+	void announceServerConnected( ServerSocket *socket );
+	void announceServerReconstructed(
 		uint16_t instanceId, uint32_t requestId,
 		pthread_mutex_t *lock, pthread_cond_t *cond, std::unordered_set<ServerSocket *> *sockets,
 		ServerSocket *srcSocket, ServerSocket *dstSocket

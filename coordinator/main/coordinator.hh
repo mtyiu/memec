@@ -40,15 +40,15 @@ private:
 	void free();
 
 	// Helper functions to determine slave loading
-	void updateAverageSlaveLoading( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
+	void updateAverageServerLoading( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
 			ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency );
 	// return previously overloaded slaves for per-slave phase change
-	std::set<struct sockaddr_in> updateOverloadedSlaveSet(
+	std::set<struct sockaddr_in> updateOverloadedServerSet(
 			ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
 			ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency,
 			std::set<struct sockaddr_in> *slaveSet
 	);
-	void switchPhase( std::set<struct sockaddr_in> prevOverloadedSlaves );
+	void switchPhase( std::set<struct sockaddr_in> prevOverloadedServers );
 
 	// Commands
 	void help();
@@ -61,9 +61,9 @@ public:
 	struct {
 		CoordinatorSocket self;
 		EPoll epoll;
-		ArrayMap<int, ClientSocket> masters;
+		ArrayMap<int, ClientSocket> clients;
 		ArrayMap<int, ServerSocket> slaves;
-		ArrayMap<int, ServerSocket> backupSlaves;
+		ArrayMap<int, ServerSocket> backupServers;
 	} sockets;
 	IDGenerator idGenerator;
 	CoordinatorEventQueue eventQueue;
@@ -87,7 +87,7 @@ public:
 	struct {
 		std::set< struct sockaddr_in > slaveSet;
 		LOCK_T lock;
-	} overloadedSlaves;
+	} overloadedServers;
 	struct {
 		std::vector<Log> items;
 		LOCK_T lock;
@@ -106,7 +106,7 @@ public:
 		return &coordinator;
 	}
 
-	void switchPhaseForCrashedSlave( ServerSocket *serverSocket );
+	void switchPhaseForCrashedServer( ServerSocket *serverSocket );
 
 	static void signalHandler( int signal );
 
@@ -124,7 +124,7 @@ public:
 	void flush();
 	void metadata();
 	void printLog();
-	void syncSlaveMeta( struct sockaddr_in slave, bool *sync );
+	void syncServerMeta( struct sockaddr_in slave, bool *sync );
 	void releaseDegradedLock();
 	void releaseDegradedLock( struct sockaddr_in slave, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done );
 	void syncRemappedData( struct sockaddr_in target, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done );
@@ -133,7 +133,7 @@ public:
 	void lookup();
 	void stripe();
 	void appendLog( Log log );
-	void setSlave( bool overloaded );
+	void setServer( bool overloaded );
 	void switchToManualOverload();
 	void switchToAutoOverload();
 	void interactive();
