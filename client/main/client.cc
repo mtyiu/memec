@@ -3,17 +3,17 @@
 #include "client.hh"
 #include "../remap/basic_remap_scheme.hh"
 
-uint16_t Master::instanceId;
+uint16_t Client::instanceId;
 
-Master::Master() {
+Client::Client() {
 	this->isRunning = false;
 	/* Set debug flag */
 	this->debugFlags.isDegraded = false;
 
-	Master::instanceId = 0;
+	Client::instanceId = 0;
 }
 
-void Master::updateSlavesCurrentLoading() {
+void Client::updateServersCurrentLoading() {
 	int index = -1;
 	Latency *tempLatency = NULL;
 
@@ -66,7 +66,7 @@ void Master::updateSlavesCurrentLoading() {
 	UNLOCK( &this->slaveLoading.lock );
 }
 
-void Master::updateSlavesCumulativeLoading () {
+void Client::updateServersCumulativeLoading () {
 	int index = -1;
 	Latency *tempLatency = NULL;
 
@@ -91,7 +91,7 @@ void Master::updateSlavesCumulativeLoading () {
 	UNLOCK( &this->slaveLoading.lock );
 }
 
-void Master::mergeSlaveCumulativeLoading ( ArrayMap< struct sockaddr_in, Latency > *getLatency, ArrayMap< struct sockaddr_in, Latency> *setLatency ) {
+void Client::mergeServerCumulativeLoading ( ArrayMap< struct sockaddr_in, Latency > *getLatency, ArrayMap< struct sockaddr_in, Latency> *setLatency ) {
 
 	LOCK( &this->slaveLoading.lock );
 
@@ -122,21 +122,21 @@ void Master::mergeSlaveCumulativeLoading ( ArrayMap< struct sockaddr_in, Latency
 	UNLOCK( &this->slaveLoading.lock );
 }
 
-void Master::free() {
+void Client::free() {
 	this->idGenerator.free();
 	this->eventQueue.free();
 	delete this->stripeList;
 }
 
-void Master::signalHandler( int signal ) {
+void Client::signalHandler( int signal ) {
 	//Signal::setHandler();
-	Master *master = Master::getInstance();
+	Client *master = Client::getInstance();
 	ArrayMap<int, CoordinatorSocket> &sockets = master->sockets.coordinators;
 	switch ( signal ) {
 		case SIGALRM:
 			// update the loading stats
-			master->updateSlavesCurrentLoading();
-			master->updateSlavesCumulativeLoading();
+			master->updateServersCurrentLoading();
+			master->updateServersCumulativeLoading();
 
 			// ask workers to send the loading stats to coordinators
 			LOCK( &master->slaveLoading.lock );
@@ -163,7 +163,7 @@ void Master::signalHandler( int signal ) {
 	}
 }
 
-bool Master::init( char *path, OptionList &options, bool verbose ) {
+bool Client::init( char *path, OptionList &options, bool verbose ) {
 	// Parse configuration files //
 	if ( ( ! this->config.global.parse( path ) ) ||
 	     ( ! this->config.client.parse( path ) ) ||
@@ -182,7 +182,7 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 			this->config.client.client.addr.port,
 			&this->sockets.epoll
 		) ) {
-		__ERROR__( "Master", "init", "Cannot initialize socket." );
+		__ERROR__( "Client", "init", "Cannot initialize socket." );
 		return false;
 	}
 	/* Vectors and other sockets */
@@ -247,16 +247,16 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 		sprintf( masterName, "%s%04d", CLIENT_PREFIX, this->config.client.client.addr.id );
 		remapMsgHandler.init( this->config.global.states.spreaddAddr.addr, this->config.global.states.spreaddAddr.port, masterName );
 		BasicRemappingScheme::slaveLoading = &this->slaveLoading;
-		BasicRemappingScheme::overloadedSlave = &this->overloadedSlave;
+		BasicRemappingScheme::overloadedServer = &this->overloadedServer;
 		BasicRemappingScheme::stripeList = this->stripeList;
 		BasicRemappingScheme::remapMsgHandler = &this->remapMsgHandler;
 		// add the slave addrs to remapMsgHandler
 		LOCK( &this->sockets.slaves.lock );
 		for ( uint32_t i = 0; i < this->sockets.slaves.size(); i++ ) {
-			remapMsgHandler.addAliveSlave( this->sockets.slaves.values[ i ]->getAddr() );
+			remapMsgHandler.addAliveServer( this->sockets.slaves.values[ i ]->getAddr() );
 		}
 		UNLOCK( &this->sockets.slaves.lock );
-		//remapMsgHandler.listAliveSlaves();
+		//remapMsgHandler.listAliveServers();
 	}
 
 	/* Smoothing factor */
@@ -284,7 +284,7 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 	LOCK_INIT( &this->sockets.slavesIdToSocketLock );
 
 	// Set signal handlers //
-	Signal::setHandler( Master::signalHandler );
+	Signal::setHandler( Client::signalHandler );
 
 	// Show configuration //
 	if ( verbose )
@@ -292,7 +292,7 @@ bool Master::init( char *path, OptionList &options, bool verbose ) {
 	return true;
 }
 
-bool Master::start() {
+bool Client::start() {
 	bool ret = true;
 	/* Workers and event queues */
 	this->eventQueue.start();
@@ -315,7 +315,7 @@ bool Master::start() {
 	}
 	// Start listening
 	if ( ! this->sockets.self.start() ) {
-		__ERROR__( "Master", "start", "Cannot start socket." );
+		__ERROR__( "Client", "start", "Cannot start socket." );
 		ret = false;
 	}
 
@@ -326,12 +326,12 @@ bool Master::start() {
 
 	// Register to slaves
 	for ( int i = 0, len = this->config.global.servers.size(); i < len; i++ ) {
-		this->sockets.slaves[ i ]->registerMaster();
+		this->sockets.slaves[ i ]->registerClient();
 	}
 
 	/* Remapping message handler */
 	if ( ! this->config.global.states.disabled && ! this->remapMsgHandler.start() ) {
-		__ERROR__( "Master", "start", "Cannot start remapping message handler." );
+		__ERROR__( "Client", "start", "Cannot start remapping message handler." );
 		ret = false;
 	}
 
@@ -346,7 +346,7 @@ bool Master::start() {
 	return ret;
 }
 
-bool Master::stop() {
+bool Client::stop() {
 	if ( ! this->isRunning )
 		return false;
 
@@ -399,20 +399,20 @@ bool Master::stop() {
 	return true;
 }
 
-double Master::getElapsedTime() {
+double Client::getElapsedTime() {
 	return get_elapsed_time( this->startTime );
 }
 
-void Master::info( FILE *f ) {
+void Client::info( FILE *f ) {
 	this->config.global.print( f );
 	this->config.client.print( f );
 	this->stripeList->print( f );
 }
 
-void Master::debug( FILE *f ) {
+void Client::debug( FILE *f ) {
 	int i, len;
 
-	fprintf( f, "Master socket\n-------------\n" );
+	fprintf( f, "Client socket\n-------------\n" );
 	this->sockets.self.print( f );
 
 	fprintf( f, "\nApplication sockets\n-------------------\n" );
@@ -429,14 +429,14 @@ void Master::debug( FILE *f ) {
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
 
-	fprintf( f, "\nSlave sockets\n-------------\n" );
+	fprintf( f, "\nServer sockets\n-------------\n" );
 	for ( i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
 		fprintf( f, "%d. ", i + 1 );
 		this->sockets.slaves[ i ]->print( f );
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
 
-	fprintf( f, "\nMaster event queue\n------------------\n" );
+	fprintf( f, "\nClient event queue\n------------------\n" );
 	this->eventQueue.print( f );
 
 	fprintf( f, "\nPacket pool\n-----------\n" );
@@ -454,7 +454,7 @@ void Master::debug( FILE *f ) {
 	fprintf( f, "\n" );
 }
 
-void Master::interactive() {
+void Client::interactive() {
 	char buf[ 4096 ];
 	char *command;
 	bool valid;
@@ -571,7 +571,7 @@ void Master::interactive() {
 	}
 }
 
-bool Master::setDebugFlag( char *input ) {
+bool Client::setDebugFlag( char *input ) {
 	bool ret = true;
 	char *token = 0, *key = 0, *value = 0;
 	int numOfTokens;
@@ -605,7 +605,7 @@ bool Master::setDebugFlag( char *input ) {
 	return ret;
 }
 
-bool Master::isDegraded( ServerSocket *socket ) {
+bool Client::isDegraded( ServerSocket *socket ) {
 	return (
 		( this->debugFlags.isDegraded )
 		||
@@ -616,11 +616,11 @@ bool Master::isDegraded( ServerSocket *socket ) {
 	);
 }
 
-void Master::printInstanceId( FILE *f ) {
-	fprintf( f, "Instance ID = %u\n", Master::instanceId );
+void Client::printInstanceId( FILE *f ) {
+	fprintf( f, "Instance ID = %u\n", Client::instanceId );
 }
 
-void Master::printPending( FILE *f ) {
+void Client::printPending( FILE *f ) {
 	size_t i;
 	std::unordered_multimap<PendingIdentifier, Key>::iterator it;
 	std::unordered_multimap<PendingIdentifier, KeyValue>::iterator keyValueIt;
@@ -864,17 +864,17 @@ void Master::printPending( FILE *f ) {
 	);
 }
 
-void Master::printRemapping( FILE *f ) {
+void Client::printRemapping( FILE *f ) {
 	fprintf(
 		f,
-		"\nList of Tracking Slaves\n"
+		"\nList of Tracking Servers\n"
 		"------------------------\n"
 	);
-	this->remapMsgHandler.listAliveSlaves();
+	this->remapMsgHandler.listAliveServers();
 
 	fprintf(
 		f,
-		"\nSlaves Transit. Info\n"
+		"\nServers Transit. Info\n"
 		"------------------------\n"
 	);
 	char buf[ 16 ];
@@ -890,7 +890,7 @@ void Master::printRemapping( FILE *f ) {
 	}
 }
 
-void Master::printBackup( FILE *f ) {
+void Client::printBackup( FILE *f ) {
 	ServerSocket *s;
 	LOCK( &this->sockets.slaves.lock );
 	std::vector<ServerSocket *> &sockets = this->sockets.slaves.values;
@@ -911,7 +911,7 @@ void Master::printBackup( FILE *f ) {
 	UNLOCK( &this->sockets.slaves.lock );
 }
 
-void Master::syncMetadata() {
+void Client::syncMetadata() {
 	uint32_t socketFromId, socketToId;
 	char tmp[ 16 ];
 	ServerEvent event;
@@ -949,7 +949,7 @@ void Master::syncMetadata() {
 	}
 }
 
-void Master::help() {
+void Client::help() {
 	fprintf(
 		stdout,
 		"Supported commands:\n"
@@ -970,7 +970,7 @@ void Master::help() {
 	fflush( stdout );
 }
 
-void Master::time() {
+void Client::time() {
 	fprintf( stdout, "Elapsed time: %12.6lf s\n", this->getElapsedTime() );
 	fflush( stdout );
 }
@@ -999,7 +999,7 @@ void Master::time() {
 	} \
 }
 
-void Master::ackParityDelta( FILE *f, ServerSocket *target, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter, bool force ) {
+void Client::ackParityDelta( FILE *f, ServerSocket *target, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter, bool force ) {
 	uint32_t from, to, update, del;
 	std::vector<uint32_t> timestamps;
 	std::vector<Key> requests;
@@ -1049,7 +1049,7 @@ void Master::ackParityDelta( FILE *f, ServerSocket *target, pthread_cond_t *cond
 	}
 }
 
-bool Master::revertDelta( FILE *f, ServerSocket *target, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter, bool force ) {
+bool Client::revertDelta( FILE *f, ServerSocket *target, pthread_cond_t *condition, LOCK_T *lock, uint32_t *counter, bool force ) {
 	std::vector<uint32_t> timestamps;
 	std::vector<Key> requests;
 	std::set<uint32_t> timestampSet;
@@ -1082,7 +1082,7 @@ bool Master::revertDelta( FILE *f, ServerSocket *target, pthread_cond_t *conditi
 	// SET
 	std::unordered_multimap<PendingIdentifier, Key>::iterator it, saveIt;
 	uint32_t listIndex, chunkIndex;
-	ServerSocket *dataSlave = 0;
+	ServerSocket *dataServer = 0;
 	LOCK ( &this->pending.slaves.setLock );
 	for( it = this->pending.slaves.set.begin(), saveIt = it; it != this->pending.slaves.set.end(); it = saveIt ) {
 		saveIt++;
@@ -1090,9 +1090,9 @@ bool Master::revertDelta( FILE *f, ServerSocket *target, pthread_cond_t *conditi
 		if ( it->first.ptr != target )
 			continue;
 		listIndex = this->stripeList->get( it->second.data, it->second.size, 0, 0, &chunkIndex );
-		dataSlave = this->stripeList->get( listIndex, chunkIndex );
+		dataServer = this->stripeList->get( listIndex, chunkIndex );
 		// skip revert if failed slave is not the data slave, but see if the request can be immediately replied
-		if ( dataSlave != target ) {
+		if ( dataServer != target ) {
 			if (
 				this->pending.count( PT_SERVER_SET, it->first.instanceId, it->first.requestId, false, false ) == 1 &&
 				this->pending.eraseKeyValue( PT_APPLICATION_SET, it->first.parentInstanceId, it->first.parentRequestId, 0, &pid, &keyValue, true, true, true, it->second.data )

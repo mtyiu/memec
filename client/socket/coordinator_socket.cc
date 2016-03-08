@@ -12,7 +12,7 @@ void CoordinatorSocket::setArrayMap( ArrayMap<int, CoordinatorSocket> *coordinat
 bool CoordinatorSocket::start() {
 	this->registered = false;
 	if ( this->connect() ) {
-		Master *master = Master::getInstance();
+		Client *master = Client::getInstance();
 		CoordinatorEvent event;
 		event.reqRegister( this, master->config.client.client.addr.addr, master->config.client.client.addr.port );
 		master->eventQueue.insert( event );

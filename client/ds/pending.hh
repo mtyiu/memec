@@ -287,7 +287,7 @@ public:
 		bool needsLock = true, bool needsUnlock = true,
 		uint32_t timestamp = 0
 	);
-	// Insert (Slaves)
+	// Insert (Servers)
 	bool insertKey(
 		PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
 		Key &key, bool needsLock = true, bool needsUnlock = true,

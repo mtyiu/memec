@@ -3,10 +3,10 @@
 #include "../../common/ds/sockaddr_in.hh"
 #include "../../common/util/debug.hh"
 
-SlaveLoading *BasicRemappingScheme::slaveLoading = NULL;
-OverloadedSlave *BasicRemappingScheme::overloadedSlave = NULL;
+ServerLoading *BasicRemappingScheme::slaveLoading = NULL;
+OverloadedServer *BasicRemappingScheme::overloadedServer = NULL;
 StripeList<ServerSocket> *BasicRemappingScheme::stripeList = NULL;
-MasterRemapMsgHandler *BasicRemappingScheme::remapMsgHandler = NULL;
+ClientRemapMsgHandler *BasicRemappingScheme::remapMsgHandler = NULL;
 
 Latency BasicRemappingScheme::increment ( 0, 100 );
 
@@ -17,15 +17,15 @@ void BasicRemappingScheme::redirect(
 	bool isGet
 ) {
 	struct sockaddr_in slaveAddr;
-	std::unordered_set<struct sockaddr_in> selectedSlaves, redirectedSlaves;
+	std::unordered_set<struct sockaddr_in> selectedServers, redirectedServers;
 
-	if ( slaveLoading == NULL || overloadedSlave == NULL || stripeList == NULL || remapMsgHandler == NULL ) {
+	if ( slaveLoading == NULL || overloadedServer == NULL || stripeList == NULL || remapMsgHandler == NULL ) {
 		fprintf( stderr, "The scheme is not yet initialized!! Abort remapping!!\n" );
 		return;
 	}
 
 	LOCK( &slaveLoading->lock );
-	LOCK( &overloadedSlave->lock );
+	LOCK( &overloadedServer->lock );
 
 	remappedCount = 0;
 	for ( uint32_t i = 0; i < numEntries; i++ ) {
@@ -35,7 +35,7 @@ void BasicRemappingScheme::redirect(
 		else
 			slaveAddr = parityServerSockets[ chunkId - dataChunkCount ]->getAddr();
 
-		selectedSlaves.insert( slaveAddr ); // All original or failed slaves should not be selected as remapped slaves
+		selectedServers.insert( slaveAddr ); // All original or failed slaves should not be selected as remapped slaves
 
 		// Check if remapping is allowed
 		if ( remapMsgHandler->allowRemapping( slaveAddr ) ) {
@@ -49,7 +49,7 @@ void BasicRemappingScheme::redirect(
 
 	if ( ! remappedCount ) {
 		UNLOCK( &slaveLoading->lock );
-		UNLOCK( &overloadedSlave->lock );
+		UNLOCK( &overloadedServer->lock );
 		return;
 	}
 
@@ -75,11 +75,11 @@ void BasicRemappingScheme::redirect(
 			else
 				slaveAddr = parityServerSockets[ j - dataChunkCount ]->getAddr();
 
-			if ( selectedSlaves.count( slaveAddr ) ) {
+			if ( selectedServers.count( slaveAddr ) ) {
 				// Skip original slaves
 				// printf( "--- (%u, %u) is selected ---\n", original[ i * 2 ], j );
 				continue;
-			} else if ( redirectedSlaves.count( slaveAddr ) ) {
+			} else if ( redirectedServers.count( slaveAddr ) ) {
 				// Skip selected slaves
 				continue;
 			} else if ( remapMsgHandler->useCoordinatedFlow( slaveAddr ) ) {
@@ -117,18 +117,18 @@ void BasicRemappingScheme::redirect(
 			if ( nodeLatency )
 				*nodeLatency = *nodeLatency + increment;
 
-			redirectedSlaves.insert( slaveAddr );
+			redirectedServers.insert( slaveAddr );
 		}
 	}
 
 	UNLOCK( &slaveLoading->lock );
-	UNLOCK( &overloadedSlave->lock );
+	UNLOCK( &overloadedServer->lock );
 }
 
 bool BasicRemappingScheme::isOverloaded( ServerSocket *socket ) {
 	struct sockaddr_in slaveAddr;
 
-	if ( slaveLoading == NULL || overloadedSlave == NULL || stripeList == NULL || remapMsgHandler == NULL ) {
+	if ( slaveLoading == NULL || overloadedServer == NULL || stripeList == NULL || remapMsgHandler == NULL ) {
 		fprintf( stderr, "The scheme is not yet initialized!! Abort degraded operation!\n" );
 		return false;
 	}
@@ -139,5 +139,5 @@ bool BasicRemappingScheme::isOverloaded( ServerSocket *socket ) {
 	if ( ! remapMsgHandler->allowRemapping( slaveAddr ) )
 		return false;
 
-	return ( overloadedSlave->slaveSet.count( slaveAddr ) >= 1 );
+	return ( overloadedServer->slaveSet.count( slaveAddr ) >= 1 );
 }

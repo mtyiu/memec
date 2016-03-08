@@ -102,9 +102,9 @@ public:
 			this->separated.application->print( f );
 			fprintf( f, "[Coordinator] " );
 			this->separated.coordinator->print( f );
-			fprintf( f, "[     Master] " );
+			fprintf( f, "[     Client] " );
 			this->separated.master->print( f );
-			fprintf( f, "[      Slave] " );
+			fprintf( f, "[      Server] " );
 			this->separated.slave->print( f );
 		}
 	}

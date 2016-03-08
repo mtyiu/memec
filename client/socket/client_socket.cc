@@ -59,7 +59,7 @@ void *ClientSocket::run( void *argv ) {
 
 bool ClientSocket::handler( int fd, uint32_t events, void *data ) {
 	ClientSocket *socket = ( ClientSocket * ) data;
-	static Master *master = Master::getInstance();
+	static Client *master = Client::getInstance();
 	static InstanceIdGenerator *generator = InstanceIdGenerator::getInstance();
 
 	///////////////////////////////////////////////////////////////////////////

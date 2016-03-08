@@ -9,7 +9,7 @@ int main( int argc, char **argv ) {
 	int opt, ret = 0;
 	bool verbose = false;
 	char *path = NULL, path_default[] = "bin/config/local";
-	Master *master = 0;
+	Client *master = 0;
 	OptionList options;
 	struct option_t tmpOption;
 	static struct option long_options[] = {
@@ -59,9 +59,9 @@ int main( int argc, char **argv ) {
 	path = path == NULL ? path_default : path;
 
 	////////////////////////////////
-	// Pass control to the Master //
+	// Pass control to the Client //
 	////////////////////////////////
-	master = Master::getInstance();
+	master = Client::getInstance();
 	if ( ! master->init( path, options, verbose ) ) {
 		fprintf( stderr, "Error: Cannot initialize master.\n" );
 		return 1;

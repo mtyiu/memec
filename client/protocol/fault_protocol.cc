@@ -1,6 +1,6 @@
 #include "protocol.hh"
 
-char *MasterProtocol::syncMetadataBackup(
+char *ClientProtocol::syncMetadataBackup(
 	size_t &size, uint16_t instanceId, uint32_t requestId,
 	uint32_t addr, uint16_t port,
 	LOCK_T *lock,
@@ -23,7 +23,7 @@ char *MasterProtocol::syncMetadataBackup(
 	return this->buffer.send;
 }
 
-char *MasterProtocol::ackParityDeltaBackup(
+char *ClientProtocol::ackParityDeltaBackup(
 	size_t &size, uint16_t instanceId, uint32_t requestId,
 	std::vector<uint32_t> timestamps,
 	uint16_t targetId
@@ -41,7 +41,7 @@ char *MasterProtocol::ackParityDeltaBackup(
 	return this->buffer.send;
 }
 
-char *MasterProtocol::revertDelta(
+char *ClientProtocol::revertDelta(
 	size_t &size, uint16_t instanceId, uint32_t requestId,
 	std::vector<uint32_t> timestamps,
 	std::vector<Key> requests,

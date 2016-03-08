@@ -8,11 +8,11 @@ void ClientWorker::dispatch( ServerEvent event ) {
 		size_t size;
 		char *data;
 	} buffer;
-	uint16_t instanceId = Master::instanceId;
+	uint16_t instanceId = Client::instanceId;
 
 	switch( event.type ) {
 		case SERVER_EVENT_TYPE_REGISTER_REQUEST:
-			buffer.data = this->protocol.reqRegisterSlave(
+			buffer.data = this->protocol.reqRegisterServer(
 				buffer.size,
 				instanceId,
 				ClientWorker::idGenerator->nextVal( this->workerId ),
@@ -122,7 +122,7 @@ void ClientWorker::dispatch( ServerEvent event ) {
 			// ClientWorker::packetPool->print( stderr );
 		}
 	} else if ( event.type == SERVER_EVENT_TYPE_SYNC_METADATA ) {
-		std::vector<CoordinatorSocket *> &coordinators = Master::getInstance()->sockets.coordinators.values;
+		std::vector<CoordinatorSocket *> &coordinators = Client::getInstance()->sockets.coordinators.values;
 		for ( int i = 0, len = coordinators.size(); i < len; i++ ) {
 			ret = coordinators[ i ]->send( buffer.data, buffer.size, connected );
 
@@ -131,7 +131,7 @@ void ClientWorker::dispatch( ServerEvent event ) {
 		}
 	} else {
 		// Parse responses from slaves
-		MasterRemapMsgHandler &mrmh = Master::getInstance()->remapMsgHandler;
+		ClientRemapMsgHandler &mrmh = Client::getInstance()->remapMsgHandler;
 		const struct sockaddr_in &addr = event.socket->getAddr();
 
 		ProtocolHeader header;
@@ -166,7 +166,7 @@ void ClientWorker::dispatch( ServerEvent event ) {
 						if ( success ) {
 							event.socket->registered = true;
 							event.socket->instanceId = header.instanceId;
-							Master *master = Master::getInstance();
+							Client *master = Client::getInstance();
 							LOCK( &master->sockets.slavesIdToSocketLock );
 							master->sockets.slavesIdToSocketMap[ header.instanceId ] = event.socket;
 							UNLOCK( &master->sockets.slavesIdToSocketLock );
@@ -176,7 +176,7 @@ void ClientWorker::dispatch( ServerEvent event ) {
 						break;
 					case PROTO_OPCODE_GET:
 						if ( ! mrmh.acceptNormalResponse( addr ) ) {
-							// __INFO__( YELLOW, "Master", "dispatch", "Ignoring normal GET response..." );
+							// __INFO__( YELLOW, "Client", "dispatch", "Ignoring normal GET response..." );
 							break;
 						}
 					case PROTO_OPCODE_DEGRADED_GET:
@@ -184,7 +184,7 @@ void ClientWorker::dispatch( ServerEvent event ) {
 						break;
 					case PROTO_OPCODE_SET:
 						if ( ! mrmh.acceptNormalResponse( addr ) ) {
-							// __INFO__( YELLOW, "Master", "dispatch", "Ignoring normal SET response..." );
+							// __INFO__( YELLOW, "Client", "dispatch", "Ignoring normal SET response..." );
 							break;
 						}
 						this->handleSetResponse( event, success, buffer.data, header.length );
@@ -194,7 +194,7 @@ void ClientWorker::dispatch( ServerEvent event ) {
 						break;
 					case PROTO_OPCODE_UPDATE:
 						if ( ! mrmh.acceptNormalResponse( addr ) ) {
-							__INFO__( YELLOW, "Master", "dispatch", "Ignoring normal UPDATE response..." );
+							__INFO__( YELLOW, "Client", "dispatch", "Ignoring normal UPDATE response..." );
 							break;
 						}
 					case PROTO_OPCODE_DEGRADED_UPDATE:
@@ -202,7 +202,7 @@ void ClientWorker::dispatch( ServerEvent event ) {
 						break;
 					case PROTO_OPCODE_DELETE:
 						if ( ! mrmh.acceptNormalResponse( addr ) ) {
-							// __INFO__( YELLOW, "Master", "dispatch", "Ignoring normal DELETE response..." );
+							// __INFO__( YELLOW, "Client", "dispatch", "Ignoring normal DELETE response..." );
 							break;
 						}
 					case PROTO_OPCODE_DEGRADED_DELETE:
@@ -321,7 +321,7 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 	pending = ClientWorker::pending->count( PT_SERVER_SET, pid.instanceId, pid.requestId, false, true );
 
 	// Mark the elapse time as latency
-	Master* master = Master::getInstance();
+	Client* master = Client::getInstance();
 	if ( ClientWorker::updateInterval ) {
 		struct timespec elapsedTime;
 		RequestStartTime rst;
@@ -376,7 +376,7 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 		// Check if all normal requests completes
 		ServerSocket *slave = 0;
 		struct sockaddr_in addr;
-		MasterRemapMsgHandler *remapMsgHandler = &Master::getInstance()->remapMsgHandler;
+		ClientRemapMsgHandler *remapMsgHandler = &Client::getInstance()->remapMsgHandler;
 		this->stripeList->get( keyStr, key.size, 0, this->parityServerSockets );
 		for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
 			slave = this->parityServerSockets[ i ];
@@ -432,7 +432,7 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 
 	// Mark the elapse time as latency
 	if ( ! isDegraded && ClientWorker::updateInterval ) {
-		Master* master = Master::getInstance();
+		Client* master = Client::getInstance();
 		struct timespec elapsedTime;
 		RequestStartTime rst;
 
@@ -529,7 +529,7 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 
 	// remove pending timestamp
 	// TODO handle degraded mode
-	Master *master = Master::getInstance();
+	Client *master = Client::getInstance();
 	if ( ! isDegraded ) {
 		event.socket->timestamp.pendingAck.eraseUpdate( timestamp );
 	}
@@ -552,7 +552,7 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 	if ( ! isDegraded ) {
 		ServerSocket *slave = 0;
 		struct sockaddr_in addr;
-		MasterRemapMsgHandler *remapMsgHandler = &Master::getInstance()->remapMsgHandler;
+		ClientRemapMsgHandler *remapMsgHandler = &Client::getInstance()->remapMsgHandler;
 		this->stripeList->get( header.key, header.keySize, 0, this->parityServerSockets );
 		for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
 			slave = this->parityServerSockets[ i ];
@@ -637,7 +637,7 @@ bool ClientWorker::handleDeleteResponse( ServerEvent event, bool success, bool i
 
 	// remove pending timestamp
 	// TODO handle degraded mode
-	Master *master = Master::getInstance();
+	Client *master = Client::getInstance();
 	if ( !isDegraded ) {
 		event.socket->timestamp.pendingAck.eraseDel( timestamp );
 	}
@@ -650,7 +650,7 @@ bool ClientWorker::handleDeleteResponse( ServerEvent event, bool success, bool i
 	// Check if all normal requests completes
 	ServerSocket *slave = 0;
 	struct sockaddr_in addr;
-	MasterRemapMsgHandler *remapMsgHandler = &Master::getInstance()->remapMsgHandler;
+	ClientRemapMsgHandler *remapMsgHandler = &Client::getInstance()->remapMsgHandler;
 	this->stripeList->get( keyStr, key.size, 0, this->parityServerSockets );
 	for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
 		slave = this->parityServerSockets[ i ];
@@ -732,7 +732,7 @@ bool ClientWorker::handleDeltaAcknowledgement( ServerEvent event, uint8_t opcode
 	}
 	if ( ackInfo.lock ) UNLOCK( ackInfo.lock );
 
-	Master *master = Master::getInstance();
+	Client *master = Client::getInstance();
 	switch( opcode ) {
 		case PROTO_OPCODE_ACK_PARITY_DELTA:
 			break;

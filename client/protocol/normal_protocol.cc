@@ -1,6 +1,6 @@
 #include "protocol.hh"
 
-char *MasterProtocol::reqSet( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf ) {
+char *ClientProtocol::reqSet( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf ) {
 	// -- common/protocol/normal_protocol.cc --
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateKeyValueHeader(
@@ -17,7 +17,7 @@ char *MasterProtocol::reqSet( size_t &size, uint16_t instanceId, uint32_t reques
 	return buf;
 }
 
-char *MasterProtocol::reqGet( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize ) {
+char *ClientProtocol::reqGet( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize ) {
 	// -- common/protocol/normal_protocol.cc --
 	size = this->generateKeyHeader(
 		PROTO_MAGIC_REQUEST,
@@ -30,7 +30,7 @@ char *MasterProtocol::reqGet( size_t &size, uint16_t instanceId, uint32_t reques
 	return this->buffer.send;
 }
 
-char *MasterProtocol::reqUpdate( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t timestamp, bool checkGetChunk ) {
+char *ClientProtocol::reqUpdate( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t timestamp, bool checkGetChunk ) {
 	// -- common/protocol/normal_protocol.cc --
 	size = this->generateKeyValueUpdateHeader(
 		PROTO_MAGIC_REQUEST,
@@ -48,7 +48,7 @@ char *MasterProtocol::reqUpdate( size_t &size, uint16_t instanceId, uint32_t req
 	return this->buffer.send;
 }
 
-char *MasterProtocol::reqDelete( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize, uint32_t timestamp, bool checkGetChunk ) {
+char *ClientProtocol::reqDelete( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize, uint32_t timestamp, bool checkGetChunk ) {
 	// -- common/protocol/normal_protocol.cc --
 	size = this->generateKeyHeader(
 		PROTO_MAGIC_REQUEST,
@@ -62,7 +62,7 @@ char *MasterProtocol::reqDelete( size_t &size, uint16_t instanceId, uint32_t req
 	return this->buffer.send;
 }
 
-char *MasterProtocol::resSet( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, uint8_t keySize, char *key ) {
+char *ClientProtocol::resSet( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, uint8_t keySize, char *key ) {
 	// -- common/protocol/normal_protocol.cc --
 	success = true;
 	size = this->generateKeyHeader(
@@ -76,7 +76,7 @@ char *MasterProtocol::resSet( size_t &size, uint16_t instanceId, uint32_t reques
 	return this->buffer.send;
 }
 
-char *MasterProtocol::resGet( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, uint8_t keySize, char *key, uint32_t valueSize, char *value ) {
+char *ClientProtocol::resGet( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, uint8_t keySize, char *key, uint32_t valueSize, char *value ) {
 	// -- common/protocol/normal_protocol.cc --
 	if ( success ) {
 		size = this->generateKeyValueHeader(
@@ -102,7 +102,7 @@ char *MasterProtocol::resGet( size_t &size, uint16_t instanceId, uint32_t reques
 	return this->buffer.send;
 }
 
-char *MasterProtocol::resUpdate( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize ) {
+char *ClientProtocol::resUpdate( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize ) {
 	// -- common/protocol/normal_protocol.cc --
 	size = this->generateKeyValueUpdateHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
@@ -115,7 +115,7 @@ char *MasterProtocol::resUpdate( size_t &size, uint16_t instanceId, uint32_t req
 	return this->buffer.send;
 }
 
-char *MasterProtocol::resDelete( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, uint8_t keySize, char *key ) {
+char *ClientProtocol::resDelete( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, uint8_t keySize, char *key ) {
 	// -- common/protocol/normal_protocol.cc --
 	size = this->generateKeyHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,

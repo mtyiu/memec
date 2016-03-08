@@ -20,7 +20,7 @@ bool ClientWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 	ssize_t sentBytes;
 	ServerSocket *originalDataServerSocket;
 
-	if ( ! this->getSlaves( PROTO_OPCODE_SET, header.key, header.keySize, original, remapped, remappedCount, originalDataServerSocket, useCoordinatedFlow ) ) {
+	if ( ! this->getServers( PROTO_OPCODE_SET, header.key, header.keySize, original, remapped, remappedCount, originalDataServerSocket, useCoordinatedFlow ) ) {
 		Key key;
 		key.set( header.keySize, header.key );
 		event.resSet( event.socket, event.instanceId, event.requestId, key, false, false );
@@ -45,7 +45,7 @@ bool ClientWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 	} buffer;
 	Key key;
 	KeyValue keyValue;
-	uint16_t instanceId = Master::instanceId;
+	uint16_t instanceId = Client::instanceId;
 	uint32_t requestId = ClientWorker::idGenerator->nextVal( this->workerId );
 
 	keyValue.dup( header.key, header.keySize, header.value, header.valueSize );
@@ -64,10 +64,10 @@ bool ClientWorker::handleRemappingSetRequest( ApplicationEvent event, char *buf,
 	);
 
 	// insert the list of remapped slaves into pending map
-	// Note: The original and remapped pointers are updated in getSlaves()
+	// Note: The original and remapped pointers are updated in getServers()
 	RemapList remapList( original, remapped, remappedCount );
-	for( uint32_t i = 0; i < Master::getInstance()->sockets.coordinators.size(); i++ ) {
-		CoordinatorSocket *coordinatorSocket = Master::getInstance()->sockets.coordinators.values[ i ];
+	for( uint32_t i = 0; i < Client::getInstance()->sockets.coordinators.size(); i++ ) {
+		CoordinatorSocket *coordinatorSocket = Client::getInstance()->sockets.coordinators.values[ i ];
 
 		ClientWorker::pending->insertRemapList( PT_KEY_REMAP_LIST, instanceId, event.instanceId, requestId, event.requestId, ( void * ) coordinatorSocket, remapList );
 
@@ -119,7 +119,7 @@ bool ClientWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 			__ERROR__( "ClientWorker", "handleRemappingSetLockResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded. (Key = %.*s, ID = (%u, %u))", header.keySize, header.key, pid.parentInstanceId, pid.parentRequestId );
 			return false;
 		// } else {
-		// 	Master::getInstance()->printPending();
+		// 	Client::getInstance()->printPending();
 		// 	printf( "Request found.\n" );
 		}
 
@@ -135,12 +135,12 @@ bool ClientWorker::handleRemappingSetLockResponse( CoordinatorEvent event, bool 
 
 	// Prepare the list of ServerSockets for the SET request //
 	uint32_t originalListId, originalChunkId;
-	ServerSocket *dataServerSocket = this->getSlaves(
+	ServerSocket *dataServerSocket = this->getServers(
 		header.key, header.keySize,
 		originalListId, originalChunkId
 	);
 	for ( uint32_t i = 0; i < header.remappedCount; i++ ) {
-		ServerSocket *s = this->getSlaves(
+		ServerSocket *s = this->getServers(
 			header.remapped[ i * 2     ],
 			header.remapped[ i * 2 + 1 ]
 		);
@@ -274,7 +274,7 @@ bool ClientWorker::handleRemappingSetResponse( ServerEvent event, bool success, 
 	pending = ClientWorker::pending->count( PT_SERVER_REMAPPING_SET, pid.instanceId, pid.requestId, false, true );
 
 	// Mark the elapse time as latency //
-	Master *master = Master::getInstance();
+	Client *master = Client::getInstance();
 	if ( ClientWorker::updateInterval ) {
 		struct timespec elapsedTime;
 		RequestStartTime rst;

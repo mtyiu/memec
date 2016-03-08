@@ -1,10 +1,10 @@
 #include "worker.hh"
 #include "../main/client.hh"
 
-bool ClientWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *buf, size_t size ) {
+bool ClientWorker::handleServerReconstructedMsg( CoordinatorEvent event, char *buf, size_t size ) {
 	struct AddressHeader srcHeader, dstHeader;
 	if ( ! this->protocol.parseSrcDstAddressHeader( srcHeader, dstHeader, buf, size ) ) {
-		__ERROR__( "ClientWorker", "handleSlaveReconstructedMsg", "Invalid address header." );
+		__ERROR__( "ClientWorker", "handleServerReconstructedMsg", "Invalid address header." );
 		return false;
 	}
 
@@ -16,15 +16,15 @@ bool ClientWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *bu
 	// __DEBUG__(
 	// 	YELLOW,
 	__ERROR__(
-		"ClientWorker", "handleSlaveReconstructedMsg",
-		"Slave: %s:%s is reconstructed at %s:%s.",
+		"ClientWorker", "handleServerReconstructedMsg",
+		"Server: %s:%s is reconstructed at %s:%s.",
 		srcTmp, srcTmp + 16, dstTmp, dstTmp + 16
 	);
 
 	// Find the slave peer socket in the array map
 	int index = -1, sockfd = -1;
 	ServerSocket *original, *s;
-	Master *master = Master::getInstance();
+	Client *master = Client::getInstance();
 	ArrayMap<int, ServerSocket> *slaves = &master->sockets.slaves;
 
 	// Remove the failed slave
@@ -36,7 +36,7 @@ bool ClientWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *bu
 		}
 	}
 	if ( index == -1 ) {
-		__ERROR__( "ClientWorker", "handleSlaveReconstructedMsg", "The slave is not in the list. Ignoring this slave..." );
+		__ERROR__( "ClientWorker", "handleServerReconstructedMsg", "The slave is not in the list. Ignoring this slave..." );
 		return false;
 	}
 	original->stop();
@@ -51,16 +51,16 @@ bool ClientWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *bu
 	slaves->set( index, sockfd, s );
 
 	// add the slave addrs to remapMsgHandler
-	master->remapMsgHandler.removeAliveSlave( original->getAddr() );
-	master->remapMsgHandler.addAliveSlave( s->getAddr() );
+	master->remapMsgHandler.removeAliveServer( original->getAddr() );
+	master->remapMsgHandler.addAliveServer( s->getAddr() );
 
 	// Connect to the slave
 	slaves->values[ index ]->timestamp.current.setVal( 0 );
 	slaves->values[ index ]->timestamp.lastAck.setVal( 0 );
 	if ( ! s->start() ) {
-		__ERROR__( "ClientWorker", "handleSlaveReconstructedMsg", "Cannot start socket." );
+		__ERROR__( "ClientWorker", "handleServerReconstructedMsg", "Cannot start socket." );
 	}
-	s->registerMaster();
+	s->registerClient();
 
 	ClientWorker::stripeList->update();
 	delete original;

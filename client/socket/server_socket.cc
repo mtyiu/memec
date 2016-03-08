@@ -21,8 +21,8 @@ bool ServerSocket::start() {
 	return false;
 }
 
-void ServerSocket::registerMaster() {
-	Master *master = Master::getInstance();
+void ServerSocket::registerClient() {
+	Client *master = Client::getInstance();
 	ServerEvent event;
 	event.reqRegister( this, master->config.client.client.addr.addr, master->config.client.client.addr.port );
 	master->eventQueue.insert( event );

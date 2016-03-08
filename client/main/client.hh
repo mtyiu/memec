@@ -29,20 +29,20 @@
 #include "../../common/util/time.hh"
 
 // Implement the singleton pattern
-class Master {
+class Client {
 private:
 	bool isRunning;
 	struct timespec startTime;
 	std::vector<ClientWorker> workers;
 
-	Master();
+	Client();
 	// Do not implement
-	Master( Master const& );
-	void operator=( Master const& );
+	Client( Client const& );
+	void operator=( Client const& );
 
 	// helper function to update slave stats
-	void updateSlavesCurrentLoading();
-	void updateSlavesCumulativeLoading();
+	void updateServersCurrentLoading();
+	void updateServersCumulativeLoading();
 
 	void free();
 	// Commands
@@ -69,10 +69,10 @@ public:
 	PacketPool packetPool;
 	StripeList<ServerSocket> *stripeList;
 	/* Remapping */
-	MasterRemapMsgHandler remapMsgHandler;
+	ClientRemapMsgHandler remapMsgHandler;
 	/* Loading statistics */
-	SlaveLoading slaveLoading;
-	OverloadedSlave overloadedSlave;
+	ServerLoading slaveLoading;
+	OverloadedServer overloadedServer;
 	Timer statsTimer;
 	/* Instance ID (assigned by coordinator) */
 	static uint16_t instanceId;
@@ -82,8 +82,8 @@ public:
 	} debugFlags;
 	Timestamp timestamp;
 
-	static Master *getInstance() {
-		static Master master;
+	static Client *getInstance() {
+		static Client master;
 		return &master;
 	}
 
@@ -110,7 +110,7 @@ public:
 	bool isDegraded( ServerSocket *socket );
 
 	// Helper function to update slave stats
-	void mergeSlaveCumulativeLoading(
+	void mergeServerCumulativeLoading(
 		ArrayMap<struct sockaddr_in, Latency> *getLatency,
 		ArrayMap<struct sockaddr_in, Latency> *setLatency
 	);

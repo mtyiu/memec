@@ -7,9 +7,9 @@ bool ClientWorker::sendDegradedLockRequest(
 	char *key, uint8_t keySize,
 	uint32_t valueUpdateSize, uint32_t valueUpdateOffset, char *valueUpdate
 ) {
-	uint16_t instanceId = Master::instanceId;
+	uint16_t instanceId = Client::instanceId;
 	uint32_t requestId = ClientWorker::idGenerator->nextVal( this->workerId );
-	CoordinatorSocket *socket = Master::getInstance()->sockets.coordinators.values[ 0 ];
+	CoordinatorSocket *socket = Client::getInstance()->sockets.coordinators.values[ 0 ];
 
 	// Add the degraded lock request to the pending set
 	DegradedLockData degradedLockData;
@@ -59,7 +59,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 		return false;
 	}
 
-	socket = this->getSlaves( header.key, header.keySize, originalListId, originalChunkId );
+	socket = this->getServers( header.key, header.keySize, originalListId, originalChunkId );
 
 	switch( header.type ) {
 		case PROTO_DEGRADED_LOCK_RES_IS_LOCKED:
@@ -78,7 +78,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 				for ( uint32_t i = 0; i < header.reconstructedCount; i++ ) {
 					if ( header.original[ i * 2     ] == originalListId &&
 					     header.original[ i * 2 + 1 ] == originalChunkId ) {
-						socket = this->getSlaves(
+						socket = this->getServers(
 							header.reconstructed[ i * 2     ],
 							header.reconstructed[ i * 2 + 1 ]
 						);
@@ -108,7 +108,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 				for ( uint32_t i = 0; i < header.remappedCount; i++ ) {
 					if ( header.original[ i * 2     ] == originalListId &&
 					     header.original[ i * 2 + 1 ] == originalChunkId ) {
-						socket = this->getSlaves(
+						socket = this->getServers(
 							header.remapped[ i * 2     ],
 							header.remapped[ i * 2 + 1 ]
 						);
@@ -139,7 +139,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 	ssize_t sentBytes;
 	bool connected;
 	ApplicationEvent applicationEvent;
-	uint16_t instanceId = Master::instanceId;
+	uint16_t instanceId = Client::instanceId;
 	uint32_t requestId = ClientWorker::idGenerator->nextVal( this->workerId );
 	uint32_t requestTimestamp = 0;
 
@@ -282,7 +282,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 	degradedLockData.free();
 
 	// Send request
-	if ( Master::getInstance()->isDegraded( socket ) ) {
+	if ( Client::getInstance()->isDegraded( socket ) ) {
 		printf( "ERROR Sending to failed slave socket (opcode = %u, key = %.*s)!\n", degradedLockData.opcode, header.keySize, header.key );
 		switch ( header.type ) {
 			case PROTO_DEGRADED_LOCK_RES_IS_LOCKED:
