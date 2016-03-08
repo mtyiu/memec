@@ -1,6 +1,6 @@
 #include "protocol.hh"
 
-char *SlaveProtocol::resSlaveReconstructedMsg( size_t &size, uint16_t instanceId, uint32_t requestId ) {
+char *ServerProtocol::resServerReconstructedMsg( size_t &size, uint16_t instanceId, uint32_t requestId ) {
 	// -- common/protocol/recovery_protocol.cc --
 	size = this->generateHeader(
 		PROTO_MAGIC_RESPONSE_SUCCESS,
@@ -12,7 +12,7 @@ char *SlaveProtocol::resSlaveReconstructedMsg( size_t &size, uint16_t instanceId
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::resReconstruction( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t numStripes ) {
+char *ServerProtocol::resReconstruction( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t numStripes ) {
 	// -- common/protocol/recovery_protocol.cc --
 	size = this->generateReconstructionHeader(
 		PROTO_MAGIC_RESPONSE_SUCCESS,
@@ -24,7 +24,7 @@ char *SlaveProtocol::resReconstruction( size_t &size, uint16_t instanceId, uint3
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::resReconstructionUnsealed( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t numUnsealedKeys ) {
+char *ServerProtocol::resReconstructionUnsealed( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t numUnsealedKeys ) {
 	// -- common/protocol/recovery_protocol.cc --
 	size = this->generateReconstructionHeader(
 		PROTO_MAGIC_RESPONSE_SUCCESS,
@@ -36,9 +36,9 @@ char *SlaveProtocol::resReconstructionUnsealed( size_t &size, uint16_t instanceI
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::resPromoteBackupSlave( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t numStripes, uint32_t numUnsealedKeys ) {
+char *ServerProtocol::resPromoteBackupServer( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t numStripes, uint32_t numUnsealedKeys ) {
 	// -- common/protocol/recovery_protocol.cc --
-	size = this->generatePromoteBackupSlaveHeader(
+	size = this->generatePromoteBackupServerHeader(
 		PROTO_MAGIC_RESPONSE_SUCCESS,
 		PROTO_MAGIC_TO_COORDINATOR,
 		PROTO_OPCODE_BACKUP_SERVER_PROMOTED,
@@ -48,7 +48,7 @@ char *SlaveProtocol::resPromoteBackupSlave( size_t &size, uint16_t instanceId, u
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::reqBatchGetChunks(
+char *ServerProtocol::reqBatchGetChunks(
 	size_t &size, uint16_t instanceId, uint32_t requestId,
 	std::vector<uint32_t> *requestIds,
 	std::vector<Metadata> *metadata,
@@ -68,7 +68,7 @@ char *SlaveProtocol::reqBatchGetChunks(
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::sendUnsealedKeys(
+char *ServerProtocol::sendUnsealedKeys(
 	size_t &size, uint16_t instanceId, uint32_t requestId,
 	std::unordered_set<Key> &keys, std::unordered_set<Key>::iterator &it,
 	std::unordered_map<Key, KeyValue> *values, LOCK_T *lock,
@@ -87,7 +87,7 @@ char *SlaveProtocol::sendUnsealedKeys(
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::resUnsealedKeys(
+char *ServerProtocol::resUnsealedKeys(
 	size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
 	struct BatchKeyValueHeader &header
 ) {

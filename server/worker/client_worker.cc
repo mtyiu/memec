@@ -42,13 +42,13 @@ void ServerWorker::dispatch( ClientEvent event ) {
 	switch( event.type ) {
 		// Register
 		case CLIENT_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
-			if ( Slave::instanceId == 0 ) {
-				// Wait until the slave get an instance ID
+			if ( Server::instanceId == 0 ) {
+				// Wait until the server get an instance ID
 				ServerWorker::eventQueue->insert( event );
 				return;
 			}
 		case CLIENT_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resRegisterMaster( buffer.size, Slave::instanceId, event.requestId, success );
+			buffer.data = this->protocol.resRegisterMaster( buffer.size, Server::instanceId, event.requestId, success );
 			break;
 		// GET
 		case CLIENT_EVENT_TYPE_GET_RESPONSE_SUCCESS:
@@ -188,7 +188,7 @@ void ServerWorker::dispatch( ClientEvent event ) {
 			std::vector<uint32_t> *timestamps = event.message.revert.timestamps;
 			buffer.data = this->protocol.ackParityDeltaBackup(
 				buffer.size,
-				Slave::instanceId, event.requestId,
+				Server::instanceId, event.requestId,
 				timestamps ? *timestamps : std::vector<uint32_t>(),
 				event.message.revert.targetId
 			);
@@ -203,7 +203,7 @@ void ServerWorker::dispatch( ClientEvent event ) {
 			std::vector<Key> *requests = event.message.revert.requests;
 			buffer.data = this->protocol.resRevertDelta(
 				buffer.size,
-				Slave::instanceId, event.requestId,
+				Server::instanceId, event.requestId,
 				success,
 				timestamps ? *timestamps : std::vector<uint32_t>(),
 				requests ? *requests : std::vector<Key>(),
@@ -569,7 +569,7 @@ bool ServerWorker::handleUpdateRequest(
 			}
 
 			// Prepare the list of parity servers
-			this->getSlaves( remappedKeyValue.listId );
+			this->getServers( remappedKeyValue.listId );
 			for ( uint32_t i = 0; i < remappedKeyValue.remappedCount; i++ ) {
 				uint32_t srcChunkId = remappedKeyValue.original[ i * 2 + 1 ];
 
@@ -583,14 +583,14 @@ bool ServerWorker::handleUpdateRequest(
 
 			// Prepare UPDATE request
 			size_t size;
-			uint16_t instanceId = Slave::instanceId;
+			uint16_t instanceId = Server::instanceId;
 			uint32_t requestId = ServerWorker::idGenerator->nextVal( this->workerId );
 			Packet *packet = ServerWorker::packetPool->malloc();
 			packet->setReferenceCount( ServerWorker::parityChunkCount );
 			this->protocol.reqRemappedUpdate(
 				size,
 				event.instanceId, // master ID
-				requestId,        // slave request ID
+				requestId,        // server request ID
 				header.key,
 				header.keySize,
 				header.valueUpdate,
@@ -601,30 +601,30 @@ bool ServerWorker::handleUpdateRequest(
 			);
 			packet->size = ( uint32_t ) size;
 
-			// Insert the UPDATE request to slave pending set
+			// Insert the UPDATE request to server pending set
 			for ( uint32_t i = 0; i < ServerWorker::parityChunkCount; i++ ) {
 				if ( ! ServerWorker::pending->insertKeyValueUpdate(
 					PT_SERVER_PEER_UPDATE, instanceId, event.instanceId, requestId, event.requestId,
 					( void * ) this->parityServerSockets[ i ],
 					keyValueUpdate
 				) ) {
-					__ERROR__( "ServerWorker", "handleUpdateRequest", "Cannot insert into slave UPDATE pending map." );
+					__ERROR__( "ServerWorker", "handleUpdateRequest", "Cannot insert into server UPDATE pending map." );
 				}
 			}
 
 			// Forward the request to the parity servers
 			for ( uint32_t i = 0; i < ServerWorker::parityChunkCount; i++ ) {
 				// Insert into event queue
-				ServerPeerEvent slavePeerEvent;
-				slavePeerEvent.send( this->parityServerSockets[ i ], packet );
+				ServerPeerEvent serverPeerEvent;
+				serverPeerEvent.send( this->parityServerSockets[ i ], packet );
 
 #ifdef SERVER_WORKER_SEND_REPLICAS_PARALLEL
 				if ( i == ServerWorker::parityChunkCount - 1 )
-					this->dispatch( slavePeerEvent );
+					this->dispatch( serverPeerEvent );
 				else
-					ServerWorker::eventQueue->prioritizedInsert( slavePeerEvent );
+					ServerWorker::eventQueue->prioritizedInsert( serverPeerEvent );
 #else
-				this->dispatch( slavePeerEvent );
+				this->dispatch( serverPeerEvent );
 #endif
 			}
 		} else {
@@ -802,7 +802,7 @@ bool ServerWorker::handleAckParityDeltaBackup( ClientEvent event, char *buf, siz
 	} else {
 		__DEBUG__(
 			BLUE, "ServerWorker", "handleAckParityDeltaBackup",
-			"Ack. from master fd = %u from %u to %u for data slave id = %hu.",
+			"Ack. from master fd = %u from %u to %u for data server id = %hu.",
 			event.socket->getSocket(), timestamps.at( 0 ), timestamps.at( 1 ), header.targetId
 		);
 
@@ -813,7 +813,7 @@ bool ServerWorker::handleAckParityDeltaBackup( ClientEvent event, char *buf, siz
 		event.socket->backup.removeParityDelete( from, to, header.targetId );
 	}
 
-	event.resAckParityDelta( event.socket, Slave::instanceId, event.requestId, std::vector<uint32_t>() , header.targetId );
+	event.resAckParityDelta( event.socket, Server::instanceId, event.requestId, std::vector<uint32_t>() , header.targetId );
 	this->dispatch( event );
 
 	return true;
@@ -832,14 +832,14 @@ bool ServerWorker::handleRevertDelta( ClientEvent event, char *buf, size_t size 
 
 	if ( header.tsCount == 0 && header.keyCount == 0 && header.targetId == 0 ) {
 		__ERROR__( "ServerWorker", "handleRevertDelta", "Invalid REVERT delta request." );
-		event.resRevertDelta( event.socket, Slave::instanceId, event.requestId, false /* success */, std::vector<uint32_t>(), std::vector<Key>(), header.targetId );
+		event.resRevertDelta( event.socket, Server::instanceId, event.requestId, false /* success */, std::vector<uint32_t>(), std::vector<Key>(), header.targetId );
 		this->dispatch( event );
 		return false;
 	}
 
 	__INFO__(
 		BLUE, "ServerWorker", "handleRevertDelta",
-		"Revert request from master fd = %u (UPDATE/DELETE) from %u to %u size = %u, and (SET) size = %u, for failed slave id = %hu.",
+		"Revert request from master fd = %u (UPDATE/DELETE) from %u to %u size = %u, and (SET) size = %u, for failed server id = %hu.",
 		event.socket->getSocket(),
 		header.tsCount > 0 ? timestamps.at( 0 ) : 0,
 		header.tsCount > 1 ? timestamps.at( header.tsCount - 1 ) : UINT32_MAX,
@@ -915,10 +915,10 @@ bool ServerWorker::handleRevertDelta( ClientEvent event, char *buf, size_t size 
 
 	// data response for UPDATE / DELETE //
 #define CHECK_RESPONSE_FOR_FAILED_PARITY( _PT_TYPE_, _PT_CLIENT_TYPE_, _OP_TYPE_, _MAP_VALUE_TYPE_ ) \
-	LOCK( &ServerWorker::pending->slavePeers._OP_TYPE_##Lock ); \
+	LOCK( &ServerWorker::pending->serverPeers._OP_TYPE_##Lock ); \
 	{ \
 	std::unordered_multimap<PendingIdentifier, _MAP_VALUE_TYPE_>::iterator it, saveIt; \
-	std::unordered_multimap<PendingIdentifier, _MAP_VALUE_TYPE_> *map = &ServerWorker::pending->slavePeers._OP_TYPE_; \
+	std::unordered_multimap<PendingIdentifier, _MAP_VALUE_TYPE_> *map = &ServerWorker::pending->serverPeers._OP_TYPE_; \
 	for ( it = map->begin(), saveIt = it; it != map->end(); it = saveIt ) { \
 		saveIt++; \
 		if ( ( ( ServerPeerSocket * ) ( it->first.ptr ) )->instanceId != header.targetId ) \
@@ -942,7 +942,7 @@ bool ServerWorker::handleRevertDelta( ClientEvent event, char *buf, size_t size 
 					success, true, false \
 				); \
 				this->dispatch( clientEvent ); \
-				__INFO__( YELLOW, "ServerWorker", "handleRevertDelta", "Skip waiting for key %.*s for failed slave id=%u", keyValueUpdate.size, keyValueUpdate.data, header.targetId ); \
+				__INFO__( YELLOW, "ServerWorker", "handleRevertDelta", "Skip waiting for key %.*s for failed server id=%u", keyValueUpdate.size, keyValueUpdate.data, header.targetId ); \
 			} else if ( strcmp( #_OP_TYPE_, "delete" ) == 0 || strcmp( #_OP_TYPE_, "deleteChunk" ) == 0 ) { \
 				if ( ! ServerWorker::pending->eraseKey( _PT_CLIENT_TYPE_, it->first.parentInstanceId, it->first.parentRequestId, 0, &pid, &key ) ) { \
 					__ERROR__( "ServerWorker", "handleRevertDelta", "Cannot find a pending master DELETE request that matches the response. This message will be discarded." ); \
@@ -956,12 +956,12 @@ bool ServerWorker::handleRevertDelta( ClientEvent event, char *buf, size_t size 
 					false /* isDegraded */ \
 				); \
 				this->dispatch( clientEvent ); \
-				__INFO__( YELLOW, "ServerWorker", "handleRevertDelta", "Skip waiting for key %.*s for failed slave id=%u", key.size, key.data, header.targetId ); \
+				__INFO__( YELLOW, "ServerWorker", "handleRevertDelta", "Skip waiting for key %.*s for failed server id=%u", key.size, key.data, header.targetId ); \
 			} \
 		} \
 		map->erase( it ); \
 	} \
-	UNLOCK( &ServerWorker::pending->slavePeers._OP_TYPE_##Lock ); \
+	UNLOCK( &ServerWorker::pending->serverPeers._OP_TYPE_##Lock ); \
 	}
 
 	CHECK_RESPONSE_FOR_FAILED_PARITY( PT_SERVER_PEER_UPDATE, PT_CLIENT_UPDATE, update, KeyValueUpdate );
@@ -974,14 +974,14 @@ bool ServerWorker::handleRevertDelta( ClientEvent event, char *buf, size_t size 
 
 	for( Key &k : requests ) {
 		listId = ServerWorker::stripeList->get( k.data, k.size, this->dataServerSockets, 0, &chunkId );
-		// check if this slave handles chunks for the stripe list
+		// check if this server handles chunks for the stripe list
 		if ( ServerWorker::chunkBuffer->size() < listId + 1 || ServerWorker::chunkBuffer->at( listId ) == 0 )
 			continue;
 
 		// revert normal SET via DELETE
 		bool ret = ServerWorker::chunkBuffer->at( listId )->deleteKey( k.data, k.size );
 		if ( ret )
-			__INFO__( YELLOW, "ServerWorker", "handleRevertDelta", "reverted delta for key %.*s for failed slave id=%u", k.size, k.data, header.targetId );
+			__INFO__( YELLOW, "ServerWorker", "handleRevertDelta", "reverted delta for key %.*s for failed server id=%u", k.size, k.data, header.targetId );
 
 		// TODO revert remapped SET (?)
 
@@ -989,7 +989,7 @@ bool ServerWorker::handleRevertDelta( ClientEvent event, char *buf, size_t size 
 	}
 	// UNLOCK PENDING
 
-	event.resRevertDelta( event.socket, Slave::instanceId, event.requestId, success, timestamps, std::vector<Key>(), header.targetId );
+	event.resRevertDelta( event.socket, Server::instanceId, event.requestId, success, timestamps, std::vector<Key>(), header.targetId );
 	this->dispatch( event );
 
 	return success;

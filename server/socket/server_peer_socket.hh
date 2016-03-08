@@ -6,7 +6,7 @@
 
 class ServerPeerSocket : public Socket {
 private:
-	static ArrayMap<int, ServerPeerSocket> *slavePeers;
+	static ArrayMap<int, ServerPeerSocket> *serverPeers;
 
 	bool received;
 	struct sockaddr_in recvAddr;
@@ -21,7 +21,7 @@ public:
 	uint16_t instanceId;
 
 	ServerPeerSocket();
-	static void setArrayMap( ArrayMap<int, ServerPeerSocket> *slavePeers );
+	static void setArrayMap( ArrayMap<int, ServerPeerSocket> *serverPeers );
 	bool init( int tmpfd, ServerAddr &addr, EPoll *epoll, bool self );
 	int init();
 	bool start();

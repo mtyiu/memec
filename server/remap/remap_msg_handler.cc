@@ -7,16 +7,16 @@
 #include "../main/server.hh"
 #include "remap_msg_handler.hh"
 
-SlaveRemapMsgHandler::SlaveRemapMsgHandler() :
+ServerRemapMsgHandler::ServerRemapMsgHandler() :
 		RemapMsgHandler() {
 	this->group = ( char* )SERVER_GROUP;
-	LOCK_INIT( &this->aliveSlavesLock );
+	LOCK_INIT( &this->aliveServersLock );
 }
 
-SlaveRemapMsgHandler::~SlaveRemapMsgHandler() {
+ServerRemapMsgHandler::~ServerRemapMsgHandler() {
 }
 
-bool SlaveRemapMsgHandler::init( const int ip, const int port, const char *user ) {
+bool ServerRemapMsgHandler::init( const int ip, const int port, const char *user ) {
 	char addrbuf[ 32 ], ipstr[ INET_ADDRSTRLEN ];
 	struct in_addr addr;
 	memset( addrbuf, 0, 32 );
@@ -26,7 +26,7 @@ bool SlaveRemapMsgHandler::init( const int ip, const int port, const char *user 
 	return RemapMsgHandler::init( addrbuf , user ) ;
 }
 
-void SlaveRemapMsgHandler::quit() {
+void ServerRemapMsgHandler::quit() {
 	RemapMsgHandler::quit();
 	if ( this->isListening ) {
 		this->stop();
@@ -36,21 +36,21 @@ void SlaveRemapMsgHandler::quit() {
 	this->reader = -1;
 }
 
-bool SlaveRemapMsgHandler::start() {
+bool ServerRemapMsgHandler::start() {
 	if ( ! this->isConnected )
 		return false;
 
 	this->isListening = true;
 	// read message using a background thread
-	if ( pthread_create( &this->reader, NULL, SlaveRemapMsgHandler::readMessages, this ) < 0 ){
-		__ERROR__( "SlaveRemapMsgHandler", "start", "Slave FAILED to start reading remapping messages\n" );
+	if ( pthread_create( &this->reader, NULL, ServerRemapMsgHandler::readMessages, this ) < 0 ){
+		__ERROR__( "ServerRemapMsgHandler", "start", "Server FAILED to start reading remapping messages\n" );
 		return false;
 	}
 
 	return true;
 }
 
-bool SlaveRemapMsgHandler::stop() {
+bool ServerRemapMsgHandler::stop() {
 	int ret = 0;
 	if ( ! this->isConnected || ! this->isListening )
 		return false;
@@ -60,8 +60,8 @@ bool SlaveRemapMsgHandler::stop() {
 
 	return ( ret == 0 );
 }
-void *SlaveRemapMsgHandler::readMessages( void *argv ) {
-	SlaveRemapMsgHandler *myself = ( SlaveRemapMsgHandler* ) argv;
+void *ServerRemapMsgHandler::readMessages( void *argv ) {
+	ServerRemapMsgHandler *myself = ( ServerRemapMsgHandler* ) argv;
 	int ret = 0;
 
 	int service, groups, endian;
@@ -77,7 +77,7 @@ void *SlaveRemapMsgHandler::readMessages( void *argv ) {
 			myself->setState( msg, ret );
 			myself->increMsgCount();
 		} else if ( ret < 0 ) {
-			__ERROR__( "SlaveRemapMsgHandler", "readMessages" , "Failed to receive message %d\n", ret );
+			__ERROR__( "ServerRemapMsgHandler", "readMessages" , "Failed to receive message %d\n", ret );
 		}
 	}
 
@@ -85,102 +85,102 @@ void *SlaveRemapMsgHandler::readMessages( void *argv ) {
 	return ( void* ) &myself->msgCount;
 }
 
-void SlaveRemapMsgHandler::setState( char* msg , int len ) {
+void ServerRemapMsgHandler::setState( char* msg , int len ) {
 	RemapState signal;
-	uint8_t slaveCount = ( uint8_t ) msg[0];
-	struct sockaddr_in slavePeer;
+	uint8_t serverCount = ( uint8_t ) msg[0];
+	struct sockaddr_in serverPeer;
 	int ofs = 1;
 	uint32_t recordSize = this->serverStateRecordSize;
 
-	for ( uint8_t i = 0; i < slaveCount; i++ ) {
-		slavePeer.sin_addr.s_addr = (*( ( uint32_t * )( msg + ofs ) ) );
-		slavePeer.sin_port = *( ( uint16_t * )( msg + ofs + 4 ) );
+	for ( uint8_t i = 0; i < serverCount; i++ ) {
+		serverPeer.sin_addr.s_addr = (*( ( uint32_t * )( msg + ofs ) ) );
+		serverPeer.sin_port = *( ( uint16_t * )( msg + ofs + 4 ) );
 		signal = ( RemapState ) msg[ ofs + 6 ];
 		ofs += recordSize;
 
 		char buf[ INET_ADDRSTRLEN ];
-		inet_ntop( AF_INET, &slavePeer.sin_addr.s_addr, buf, INET_ADDRSTRLEN );
-		if ( this->serversState.count( slavePeer ) == 0 ) {
-			__ERROR__( "SlaveRemapMsgHandler", "setState" , "Slave %s:%hu not found\n", buf, ntohs( slavePeer.sin_port ) );
+		inet_ntop( AF_INET, &serverPeer.sin_addr.s_addr, buf, INET_ADDRSTRLEN );
+		if ( this->serversState.count( serverPeer ) == 0 ) {
+			__ERROR__( "ServerRemapMsgHandler", "setState" , "Server %s:%hu not found\n", buf, ntohs( serverPeer.sin_port ) );
 			continue;
 		}
 
-		Slave *slave = Slave::getInstance();
-		LOCK_T &lock = slave->sockets.slavePeers.lock;
-		std::vector<ServerPeerSocket *> &slaves = slave->sockets.slavePeers.values;
+		Server *server = Server::getInstance();
+		LOCK_T &lock = server->sockets.serverPeers.lock;
+		std::vector<ServerPeerSocket *> &servers = server->sockets.serverPeers.values;
 		ServerPeerSocket *target = 0;
 
 		LOCK( &lock );
-		for ( size_t i = 0, count = slaves.size(); i < count; i++ ) {
-			if ( slaves[ i ]->equal( slavePeer.sin_addr.s_addr, slavePeer.sin_port ) ) {
-				target = slaves[ i ];
+		for ( size_t i = 0, count = servers.size(); i < count; i++ ) {
+			if ( servers[ i ]->equal( serverPeer.sin_addr.s_addr, serverPeer.sin_port ) ) {
+				target = servers[ i ];
 				break;
 			}
 		}
 		UNLOCK( &lock );
 
 		if ( ! target ) {
-			__ERROR__( "SlaveRemapMsgHandler", "setState" , "ServerSocket for %s:%hu not found\n", buf, ntohs( slavePeer.sin_port ) );
+			__ERROR__( "ServerRemapMsgHandler", "setState" , "ServerSocket for %s:%hu not found\n", buf, ntohs( serverPeer.sin_port ) );
 			continue;
 		}
 
-		LOCK( &this->serversStateLock[ slavePeer ] );
+		LOCK( &this->serversStateLock[ serverPeer ] );
 		switch ( signal ) {
 			case REMAP_NORMAL:
-				__DEBUG__( BLUE, "SlaveRemapMsgHandler", "setState", "REMAP_NORMAL %s:%hu", buf, ntohs( slavePeer.sin_port ) );
+				__DEBUG__( BLUE, "ServerRemapMsgHandler", "setState", "REMAP_NORMAL %s:%hu", buf, ntohs( serverPeer.sin_port ) );
 				break;
 			case REMAP_INTERMEDIATE:
-				__INFO__( BLUE, "SlaveRemapMsgHandler", "setState", "REMAP_INTERMEDIATE %s:%hu", buf, ntohs( slavePeer.sin_port ) );
+				__INFO__( BLUE, "ServerRemapMsgHandler", "setState", "REMAP_INTERMEDIATE %s:%hu", buf, ntohs( serverPeer.sin_port ) );
 				break;
 			case REMAP_COORDINATED:
 				break;
 			case REMAP_DEGRADED:
-				__INFO__( BLUE, "SlaveRemapMsgHandler", "setState", "REMAP_DEGRADED %s:%hu", buf, ntohs( slavePeer.sin_port ) );
+				__INFO__( BLUE, "ServerRemapMsgHandler", "setState", "REMAP_DEGRADED %s:%hu", buf, ntohs( serverPeer.sin_port ) );
 				break;
 			default:
-				__INFO__( BLUE, "SlaveRemapMsgHandler", "setState", "Unknown %d %s:%hu", signal, buf, ntohs( slavePeer.sin_port ) );
-				UNLOCK( &this->serversStateLock[ slavePeer ] );
+				__INFO__( BLUE, "ServerRemapMsgHandler", "setState", "Unknown %d %s:%hu", signal, buf, ntohs( serverPeer.sin_port ) );
+				UNLOCK( &this->serversStateLock[ serverPeer ] );
 				return;
 		}
-		this->serversState[ slavePeer ] = signal;
-		UNLOCK( &this->serversStateLock[ slavePeer ] );
+		this->serversState[ serverPeer ] = signal;
+		UNLOCK( &this->serversStateLock[ serverPeer ] );
 	}
 
 }
 
-bool SlaveRemapMsgHandler::addAliveSlave( struct sockaddr_in slave ) {
-	LOCK( &this->aliveSlavesLock );
-	if ( this->serversState.count( slave ) >= 1 ) {
-		UNLOCK( &this->aliveSlavesLock );
+bool ServerRemapMsgHandler::addAliveServer( struct sockaddr_in server ) {
+	LOCK( &this->aliveServersLock );
+	if ( this->serversState.count( server ) >= 1 ) {
+		UNLOCK( &this->aliveServersLock );
 		return false;
 	}
-	this->serversState[ slave ] = REMAP_NORMAL;
-	UNLOCK( &this->aliveSlavesLock );
+	this->serversState[ server ] = REMAP_NORMAL;
+	UNLOCK( &this->aliveServersLock );
 	return true;
 }
 
-bool SlaveRemapMsgHandler::removeAliveSlave( struct sockaddr_in slave ) {
-	LOCK( &this->aliveSlavesLock );
-	if ( this->serversState.count( slave ) < 1 ) {
-		UNLOCK( &this->aliveSlavesLock );
+bool ServerRemapMsgHandler::removeAliveServer( struct sockaddr_in server ) {
+	LOCK( &this->aliveServersLock );
+	if ( this->serversState.count( server ) < 1 ) {
+		UNLOCK( &this->aliveServersLock );
 		return false;
 	}
-	this->serversState.erase( slave );
-	UNLOCK( &this->aliveSlavesLock );
+	this->serversState.erase( server );
+	UNLOCK( &this->aliveServersLock );
 	return true;
 }
 
-bool SlaveRemapMsgHandler::useCoordinatedFlow( const struct sockaddr_in &slave ) {
-	if ( this->serversState.count( slave ) == 0 )
+bool ServerRemapMsgHandler::useCoordinatedFlow( const struct sockaddr_in &server ) {
+	if ( this->serversState.count( server ) == 0 )
 		return false;
-	return this->serversState[ slave ] != REMAP_NORMAL;
+	return this->serversState[ server ] != REMAP_NORMAL;
 }
 
-bool SlaveRemapMsgHandler::allowRemapping( const struct sockaddr_in &slave ) {
-	if ( this->serversState.count( slave ) == 0 )
+bool ServerRemapMsgHandler::allowRemapping( const struct sockaddr_in &server ) {
+	if ( this->serversState.count( server ) == 0 )
 		return false;
 
-	switch ( this->serversState[ slave ] ) {
+	switch ( this->serversState[ server ] ) {
 		case REMAP_INTERMEDIATE:
 		case REMAP_WAIT_DEGRADED:
 		case REMAP_DEGRADED:
@@ -192,11 +192,11 @@ bool SlaveRemapMsgHandler::allowRemapping( const struct sockaddr_in &slave ) {
 	return false;
 }
 
-bool SlaveRemapMsgHandler::acceptNormalResponse( const struct sockaddr_in &slave ) {
-	if ( this->serversState.count( slave ) == 0 )
+bool ServerRemapMsgHandler::acceptNormalResponse( const struct sockaddr_in &server ) {
+	if ( this->serversState.count( server ) == 0 )
 		return true;
 
-	switch( this->serversState[ slave ] ) {
+	switch( this->serversState[ server ] ) {
 		case REMAP_UNDEFINED:
 		case REMAP_NORMAL:
 		case REMAP_INTERMEDIATE:

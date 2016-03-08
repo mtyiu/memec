@@ -7,10 +7,10 @@ uint32_t ServerWorker::chunkCount;
 bool ServerWorker::disableSeal;
 unsigned int ServerWorker::delay;
 IDGenerator *ServerWorker::idGenerator;
-ArrayMap<int, ServerPeerSocket> *ServerWorker::slavePeers;
+ArrayMap<int, ServerPeerSocket> *ServerWorker::serverPeers;
 Pending *ServerWorker::pending;
 PendingAck *ServerWorker::pendingAck;
-ServerAddr *ServerWorker::slaveServerAddr;
+ServerAddr *ServerWorker::serverServerAddr;
 Coding *ServerWorker::coding;
 ServerEventQueue *ServerWorker::eventQueue;
 StripeList<ServerPeerSocket> *ServerWorker::stripeList;
@@ -39,10 +39,10 @@ void ServerWorker::dispatch( MixedEvent event ) {
 			this->dispatch( event.event.master );
 			break;
 		case EVENT_TYPE_SERVER:
-			this->dispatch( event.event.slave );
+			this->dispatch( event.event.server );
 			break;
 		case EVENT_TYPE_SERVER_PEER:
-			this->dispatch( event.event.slavePeer );
+			this->dispatch( event.event.serverPeer );
 			break;
 		default:
 			break;
@@ -75,7 +75,7 @@ void ServerWorker::dispatch( IOEvent event ) {
 void ServerWorker::dispatch( ServerEvent event ) {
 }
 
-ServerPeerSocket *ServerWorker::getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId ) {
+ServerPeerSocket *ServerWorker::getServers( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId ) {
 	ServerPeerSocket *ret;
 	listId = ServerWorker::stripeList->get(
 		data, ( size_t ) size,
@@ -89,7 +89,7 @@ ServerPeerSocket *ServerWorker::getSlaves( char *data, uint8_t size, uint32_t &l
 	return ret;
 }
 
-bool ServerWorker::getSlaves( uint32_t listId ) {
+bool ServerWorker::getServers( uint32_t listId ) {
 	ServerWorker::stripeList->get( listId, this->parityServerSockets, this->dataServerSockets );
 
 	for ( uint32_t i = 0; i < ServerWorker::parityChunkCount; i++ )
@@ -150,30 +150,30 @@ void *ServerWorker::run( void *argv ) {
 }
 
 bool ServerWorker::init() {
-	Slave *slave = Slave::getInstance();
+	Server *server = Server::getInstance();
 
-	ServerWorker::idGenerator = &slave->idGenerator;
-	ServerWorker::dataChunkCount = slave->config.global.coding.params.getDataChunkCount();
-	ServerWorker::parityChunkCount = slave->config.global.coding.params.getParityChunkCount();
+	ServerWorker::idGenerator = &server->idGenerator;
+	ServerWorker::dataChunkCount = server->config.global.coding.params.getDataChunkCount();
+	ServerWorker::parityChunkCount = server->config.global.coding.params.getParityChunkCount();
 	ServerWorker::chunkCount = ServerWorker::dataChunkCount + ServerWorker::parityChunkCount;
-	ServerWorker::disableSeal = slave->config.server.seal.disabled;
+	ServerWorker::disableSeal = server->config.server.seal.disabled;
 	ServerWorker::delay = 0;
-	ServerWorker::slavePeers = &slave->sockets.slavePeers;
-	ServerWorker::pending = &slave->pending;
-	ServerWorker::pendingAck = &slave->pendingAck;
-	ServerWorker::slaveServerAddr = &slave->config.server.server.addr;
-	ServerWorker::coding = slave->coding;
-	ServerWorker::eventQueue = &slave->eventQueue;
-	ServerWorker::stripeList = slave->stripeList;
-	ServerWorker::stripeListIndex = &slave->stripeListIndex;
-	ServerWorker::map = &slave->map;
-	ServerWorker::chunkPool = slave->chunkPool;
-	ServerWorker::chunkBuffer = &slave->chunkBuffer;
-	ServerWorker::getChunkBuffer = &slave->getChunkBuffer;
-	ServerWorker::degradedChunkBuffer = &slave->degradedChunkBuffer;
-	ServerWorker::remappedBuffer = &slave->remappedBuffer;
-	ServerWorker::packetPool = &slave->packetPool;
-	ServerWorker::timestamp = &slave->timestamp;
+	ServerWorker::serverPeers = &server->sockets.serverPeers;
+	ServerWorker::pending = &server->pending;
+	ServerWorker::pendingAck = &server->pendingAck;
+	ServerWorker::serverServerAddr = &server->config.server.server.addr;
+	ServerWorker::coding = server->coding;
+	ServerWorker::eventQueue = &server->eventQueue;
+	ServerWorker::stripeList = server->stripeList;
+	ServerWorker::stripeListIndex = &server->stripeListIndex;
+	ServerWorker::map = &server->map;
+	ServerWorker::chunkPool = server->chunkPool;
+	ServerWorker::chunkBuffer = &server->chunkBuffer;
+	ServerWorker::getChunkBuffer = &server->getChunkBuffer;
+	ServerWorker::degradedChunkBuffer = &server->degradedChunkBuffer;
+	ServerWorker::remappedBuffer = &server->remappedBuffer;
+	ServerWorker::packetPool = &server->packetPool;
+	ServerWorker::timestamp = &server->timestamp;
 	return true;
 }
 

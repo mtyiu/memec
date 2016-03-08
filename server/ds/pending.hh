@@ -322,7 +322,7 @@ public:
 		LOCK_T remappedDataLock;
 		LOCK_T remappedDataRequestLock;
 		LOCK_T registrationLock;
-	} slavePeers;
+	} serverPeers;
 
 	Pending() {
 		LOCK_INIT( &this->coordinators.releaseDegradedLockLock );
@@ -331,20 +331,20 @@ public:
 		LOCK_INIT( &this->masters.getLock );
 		LOCK_INIT( &this->masters.updateLock );
 		LOCK_INIT( &this->masters.delLock );
-		LOCK_INIT( &this->slavePeers.degradedOpsLock );
-		LOCK_INIT( &this->slavePeers.setLock );
-		LOCK_INIT( &this->slavePeers.getLock );
-		LOCK_INIT( &this->slavePeers.updateLock );
-		LOCK_INIT( &this->slavePeers.delLock );
-		LOCK_INIT( &this->slavePeers.getChunkLock );
-		LOCK_INIT( &this->slavePeers.setChunkLock );
-		LOCK_INIT( &this->slavePeers.forwardParityChunkLock );
-		LOCK_INIT( &this->slavePeers.forwardKeysLock );
-		LOCK_INIT( &this->slavePeers.updateChunkLock );
-		LOCK_INIT( &this->slavePeers.deleteChunkLock );
-		LOCK_INIT( &this->slavePeers.remappedDataLock );
-		LOCK_INIT( &this->slavePeers.remappedDataRequestLock );
-		LOCK_INIT( &this->slavePeers.registrationLock );
+		LOCK_INIT( &this->serverPeers.degradedOpsLock );
+		LOCK_INIT( &this->serverPeers.setLock );
+		LOCK_INIT( &this->serverPeers.getLock );
+		LOCK_INIT( &this->serverPeers.updateLock );
+		LOCK_INIT( &this->serverPeers.delLock );
+		LOCK_INIT( &this->serverPeers.getChunkLock );
+		LOCK_INIT( &this->serverPeers.setChunkLock );
+		LOCK_INIT( &this->serverPeers.forwardParityChunkLock );
+		LOCK_INIT( &this->serverPeers.forwardKeysLock );
+		LOCK_INIT( &this->serverPeers.updateChunkLock );
+		LOCK_INIT( &this->serverPeers.deleteChunkLock );
+		LOCK_INIT( &this->serverPeers.remappedDataLock );
+		LOCK_INIT( &this->serverPeers.remappedDataRequestLock );
+		LOCK_INIT( &this->serverPeers.registrationLock );
 	}
 
 	// Insert (Coordinator)
@@ -375,7 +375,7 @@ public:
 		KeyValueUpdate &keyValueUpdate,
 		bool needsLock = true, bool needsUnlock = true
 	);
-	// Insert (Slave Peers)
+	// Insert (Server Peers)
 	bool insertKey(
 		PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
 		Key &key,
@@ -414,7 +414,7 @@ public:
 		uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, uint32_t requestCount,
 		ServerPeerSocket *target
 	);
-	void insertSlavePeerRegistration( uint32_t requestId, ServerPeerSocket *socket, bool success );
+	void insertServerPeerRegistration( uint32_t requestId, ServerPeerSocket *socket, bool success );
 	bool insert(
 		PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
 		bool needsLock = true, bool needsUnlock = true
@@ -491,7 +491,7 @@ public:
 		ChunkUpdate *chunkUpdatePtr = 0,
 		bool needsLock = true, bool needsUnlock = true
 	);
-	bool eraseSlavePeerRegistration( uint32_t &requestId, ServerPeerSocket *&socket, bool &success );
+	bool eraseServerPeerRegistration( uint32_t &requestId, ServerPeerSocket *&socket, bool &success );
 	bool erase(
 		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr = 0,
 		PendingIdentifier *pidPtr = 0,

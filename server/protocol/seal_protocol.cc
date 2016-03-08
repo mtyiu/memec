@@ -1,7 +1,7 @@
 #include <cassert>
 #include "protocol.hh"
 
-char *SlaveProtocol::reqSealChunk( size_t &size, uint16_t instanceId, uint32_t requestId, Chunk *chunk, uint32_t startPos, char *buf ) {
+char *ServerProtocol::reqSealChunk( size_t &size, uint16_t instanceId, uint32_t requestId, Chunk *chunk, uint32_t startPos, char *buf ) {
 	// -- common/protocol/seal_protocol.cc --
 	if ( ! buf ) buf = this->buffer.send;
 

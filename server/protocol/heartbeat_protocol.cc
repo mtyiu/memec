@@ -1,6 +1,6 @@
 #include "protocol.hh"
 
-char *SlaveProtocol::sendHeartbeat(
+char *ServerProtocol::sendHeartbeat(
 	size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t timestamp,
 	LOCK_T *sealedLock, std::unordered_set<Metadata> &sealed, uint32_t &sealedCount,
 	LOCK_T *opsLock, std::unordered_map<Key, OpMetadata> &ops, uint32_t &opsCount,

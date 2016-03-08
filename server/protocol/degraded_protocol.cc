@@ -1,6 +1,6 @@
 #include "protocol.hh"
 
-char *SlaveProtocol::reqForwardKey(
+char *ServerProtocol::reqForwardKey(
 	size_t &size, uint16_t instanceId, uint32_t requestId,
 	uint8_t opcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 	uint8_t keySize, char *key,
@@ -21,7 +21,7 @@ char *SlaveProtocol::reqForwardKey(
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::resForwardKey(
+char *ServerProtocol::resForwardKey(
 	size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
 	uint8_t opcode, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 	uint8_t keySize, char *key,
@@ -42,7 +42,7 @@ char *SlaveProtocol::resForwardKey(
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::reqGet( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key ) {
+char *ServerProtocol::reqGet( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key ) {
 	// -- common/protocol/degraded_protocol.cc --
 	size = this->generateListStripeKeyHeader(
 		PROTO_MAGIC_REQUEST,
@@ -57,7 +57,7 @@ char *SlaveProtocol::reqGet( size_t &size, uint16_t instanceId, uint32_t request
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::resReleaseDegradedLock( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t count ) {
+char *ServerProtocol::resReleaseDegradedLock( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t count ) {
 	// -- common/protocol/degraded_protocol.cc --
 	size = this->generateDegradedReleaseResHeader(
 		PROTO_MAGIC_RESPONSE_SUCCESS,
@@ -69,7 +69,7 @@ char *SlaveProtocol::resReleaseDegradedLock( size_t &size, uint16_t instanceId, 
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::reqForwardChunk(
+char *ServerProtocol::reqForwardChunk(
 	size_t &size, uint16_t instanceId, uint32_t requestId,
 	uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 	uint32_t chunkSize, uint32_t chunkOffset, char *chunkData
@@ -86,7 +86,7 @@ char *SlaveProtocol::reqForwardChunk(
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::resForwardChunk(
+char *ServerProtocol::resForwardChunk(
 	size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
 	uint32_t listId, uint32_t stripeId, uint32_t chunkId
 ) {

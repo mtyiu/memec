@@ -1,10 +1,10 @@
 #include "worker.hh"
 #include "../main/server.hh"
 
-bool ServerWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *buf, size_t size ) {
+bool ServerWorker::handleServerReconstructedMsg( CoordinatorEvent event, char *buf, size_t size ) {
 	struct AddressHeader srcHeader, dstHeader;
 	if ( ! this->protocol.parseSrcDstAddressHeader( srcHeader, dstHeader, buf, size ) ) {
-		__ERROR__( "ServerWorker", "handleSlaveReconstructedMsg", "Invalid address header." );
+		__ERROR__( "ServerWorker", "handleServerReconstructedMsg", "Invalid address header." );
 		return false;
 	}
 
@@ -16,54 +16,54 @@ bool ServerWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *bu
 	// __DEBUG__(
 	// 	YELLOW,
 	__ERROR__(
-		"ServerWorker", "handleSlaveReconstructedMsg",
-		"Slave: %s:%s is reconstructed at %s:%s.",
+		"ServerWorker", "handleServerReconstructedMsg",
+		"Server: %s:%s is reconstructed at %s:%s.",
 		srcTmp, srcTmp + 16, dstTmp, dstTmp + 16
 	);
 
-	// Find the slave peer socket in the array map
+	// Find the server peer socket in the array map
 	int index = -1, sockfd = -1;
 	ServerPeerSocket *original, *s;
-	Slave *slave = Slave::getInstance();
+	Server *server = Server::getInstance();
 	bool self = false;
 
-	for ( int i = 0, len = slavePeers->size(); i < len; i++ ) {
-		if ( slavePeers->values[ i ]->equal( srcHeader.addr, srcHeader.port ) ) {
+	for ( int i = 0, len = serverPeers->size(); i < len; i++ ) {
+		if ( serverPeers->values[ i ]->equal( srcHeader.addr, srcHeader.port ) ) {
 			index = i;
-			original = slavePeers->values[ i ];
+			original = serverPeers->values[ i ];
 			break;
 		}
 	}
 	if ( index == -1 ) {
-		__ERROR__( "ServerWorker", "handleSlaveReconstructedMsg", "The slave is not in the list. Ignoring this slave..." );
+		__ERROR__( "ServerWorker", "handleServerReconstructedMsg", "The server is not in the list. Ignoring this server..." );
 		return false;
 	}
 	original->stop();
 
-	ServerAddr serverAddr( slavePeers->values[ index ]->identifier, dstHeader.addr, dstHeader.port );
-	ServerAddr &me = slave->config.server.server.addr;
+	ServerAddr serverAddr( serverPeers->values[ index ]->identifier, dstHeader.addr, dstHeader.port );
+	ServerAddr &me = server->config.server.server.addr;
 
 	// Check if this is a self-socket
 	self = ( dstHeader.addr == me.addr && dstHeader.port == me.port );
 
 	if ( self ) {
 		ServerAddr src( 0, srcHeader.addr, srcHeader.port );
-		int mySlaveIndex = -1;
+		int myServerIndex = -1;
 
-		for ( int i = 0, len = slave->config.global.servers.size(); i < len; i++ ) {
-			if ( ServerAddr::match( &slave->config.global.servers[ i ], &src ) ) {
-				mySlaveIndex = i;
+		for ( int i = 0, len = server->config.global.servers.size(); i < len; i++ ) {
+			if ( ServerAddr::match( &server->config.global.servers[ i ], &src ) ) {
+				myServerIndex = i;
 				break;
 			}
 		}
 
-		slave->init( mySlaveIndex );
+		server->init( myServerIndex );
 	}
 
 	s = new ServerPeerSocket();
 	s->init(
 		sockfd, serverAddr,
-		&Slave::getInstance()->sockets.epoll,
+		&Server::getInstance()->sockets.epoll,
 		self // self-socket
 	);
 
@@ -73,25 +73,25 @@ bool ServerWorker::handleSlaveReconstructedMsg( CoordinatorEvent event, char *bu
 	} else {
 		sockfd = s->init();
 	}
-	slavePeers->set( index, sockfd, s );
+	serverPeers->set( index, sockfd, s );
 	ServerWorker::stripeList->update();
 	delete original;
 
-	// Connect to the slave peer
+	// Connect to the server peer
 	if ( ! self )
 		s->start();
 
 	// Send response to the coordinator
-	event.resSlaveReconstructedMsg( event.socket, event.instanceId, event.requestId );
+	event.resServerReconstructedMsg( event.socket, event.instanceId, event.requestId );
 	this->dispatch( event );
 
 	return true;
 }
 
-bool ServerWorker::handleBackupSlavePromotedMsg( CoordinatorEvent event, char *buf, size_t size ) {
-	struct PromoteBackupSlaveHeader header;
-	if ( ! this->protocol.parsePromoteBackupSlaveHeader( header, true /* isRequest */, buf, size ) ) {
-		__ERROR__( "ServerWorker", "handleBackupSlavePromotedMsg", "Invalid promote backup slave header." );
+bool ServerWorker::handleBackupServerPromotedMsg( CoordinatorEvent event, char *buf, size_t size ) {
+	struct PromoteBackupServerHeader header;
+	if ( ! this->protocol.parsePromoteBackupServerHeader( header, true /* isRequest */, buf, size ) ) {
+		__ERROR__( "ServerWorker", "handleBackupServerPromotedMsg", "Invalid promote backup server header." );
 		return false;
 	}
 
@@ -101,38 +101,38 @@ bool ServerWorker::handleBackupSlavePromotedMsg( CoordinatorEvent event, char *b
 	// __DEBUG__(
 	// 	YELLOW,
 	__ERROR__(
-		"ServerWorker", "handleBackupSlavePromotedMsg",
-		"This slave is promoted to replace %s:%s (chunk count = %u, unsealed key count = %u).",
+		"ServerWorker", "handleBackupServerPromotedMsg",
+		"This server is promoted to replace %s:%s (chunk count = %u, unsealed key count = %u).",
 		tmp, tmp + 16, header.chunkCount, header.unsealedCount
 	);
 
-	// Find the slave peer socket in the array map
+	// Find the server peer socket in the array map
 	int index = -1, sockfd = -1;
 	ServerPeerSocket *original, *s;
-	Slave *slave = Slave::getInstance();
+	Server *server = Server::getInstance();
 	bool self = false;
 
-	for ( int i = 0, len = slavePeers->size(); i < len; i++ ) {
-		if ( slavePeers->values[ i ]->equal( header.addr, header.port ) ) {
+	for ( int i = 0, len = serverPeers->size(); i < len; i++ ) {
+		if ( serverPeers->values[ i ]->equal( header.addr, header.port ) ) {
 			index = i;
-			original = slavePeers->values[ i ];
+			original = serverPeers->values[ i ];
 			break;
 		}
 	}
 	if ( index == -1 ) {
-		__ERROR__( "ServerWorker", "handleBackupSlavePromotedMsg", "The slave is not in the list. Ignoring this slave..." );
+		__ERROR__( "ServerWorker", "handleBackupServerPromotedMsg", "The server is not in the list. Ignoring this server..." );
 		return false;
 	}
 	original->stop();
 
 	// Initialize
 	ServerAddr addr( 0, header.addr, header.port );
-	slave->init( index );
+	server->init( index );
 
 	s = new ServerPeerSocket();
 	s->init(
 		sockfd, addr,
-		&( slave->sockets.epoll ),
+		&( server->sockets.epoll ),
 		true
 	);
 
@@ -142,7 +142,7 @@ bool ServerWorker::handleBackupSlavePromotedMsg( CoordinatorEvent event, char *b
 	} else {
 		sockfd = s->init();
 	}
-	slavePeers->set( index, sockfd, s );
+	serverPeers->set( index, sockfd, s );
 	ServerWorker::stripeList->update();
 	delete original;
 
@@ -183,7 +183,7 @@ bool ServerWorker::handleReconstructionRequest( CoordinatorEvent event, char *bu
 		return true;
 	}
 
-	uint16_t instanceId = Slave::instanceId;
+	uint16_t instanceId = Server::instanceId;
 	uint32_t chunkId, myChunkId = ServerWorker::chunkCount, chunkCount, requestId;
 	ChunkRequest chunkRequest;
 	Metadata metadata;
@@ -223,7 +223,7 @@ bool ServerWorker::handleReconstructionRequest( CoordinatorEvent event, char *bu
 	}
 
 	// Send GET_CHUNK requests to surviving nodes
-	ServerPeerEvent slavePeerEvent;
+	ServerPeerEvent serverPeerEvent;
 	std::vector<uint32_t> **requestIds = new std::vector<uint32_t> *[ ServerWorker::chunkCount ];
 	std::vector<Metadata> **metadataList = new std::vector<Metadata> *[ ServerWorker::chunkCount ];
 	for ( uint32_t i = 0; i < ServerWorker::chunkCount; i++ ) {
@@ -242,14 +242,14 @@ bool ServerWorker::handleReconstructionRequest( CoordinatorEvent event, char *bu
 				socket = ( chunkId < ServerWorker::dataChunkCount ) ?
 						 ( this->dataServerSockets[ chunkId ] ) :
 						 ( this->parityServerSockets[ chunkId - ServerWorker::dataChunkCount ] );
-				if ( socket->ready() && ! socket->self ) { // use this slave
+				if ( socket->ready() && ! socket->self ) { // use this server
 					metadata.chunkId = chunkId;
 					chunkRequest.set(
 						metadata.listId, metadata.stripeId, metadata.chunkId,
 						socket, 0, false
 					);
 					if ( ! ServerWorker::pending->insertChunkRequest( PT_SERVER_PEER_GET_CHUNK, instanceId, event.instanceId, requestId, event.requestId, socket, chunkRequest ) ) {
-						__ERROR__( "ServerWorker", "handleReconstructionRequest", "Cannot insert into slave CHUNK_REQUEST pending map." );
+						__ERROR__( "ServerWorker", "handleReconstructionRequest", "Cannot insert into server CHUNK_REQUEST pending map." );
 					} else {
 						requestIds[ chunkId ]->push_back( requestId );
 						metadataList[ chunkId ]->push_back( metadata );
@@ -279,7 +279,7 @@ bool ServerWorker::handleReconstructionRequest( CoordinatorEvent event, char *bu
 			0, chunk, false
 		);
 		if ( ! ServerWorker::pending->insertChunkRequest( PT_SERVER_PEER_GET_CHUNK, instanceId, event.instanceId, requestId, event.requestId, 0, chunkRequest ) ) {
-			__ERROR__( "ServerWorker", "handleReconstructionRequest", "Cannot insert into slave CHUNK_REQUEST pending map." );
+			__ERROR__( "ServerWorker", "handleReconstructionRequest", "Cannot insert into server CHUNK_REQUEST pending map." );
 		}
 	}
 	// Send GET_CHUNK requests now
@@ -289,9 +289,9 @@ bool ServerWorker::handleReconstructionRequest( CoordinatorEvent event, char *bu
 					 ( this->dataServerSockets[ i ] ) :
 					 ( this->parityServerSockets[ i - ServerWorker::dataChunkCount ] );
 
-			slavePeerEvent.batchGetChunks( socket, requestIds[ i ], metadataList[ i ] );
-			// ServerWorker::eventQueue->insert( slavePeerEvent );
-			this->dispatch( slavePeerEvent );
+			serverPeerEvent.batchGetChunks( socket, requestIds[ i ], metadataList[ i ] );
+			// ServerWorker::eventQueue->insert( serverPeerEvent );
+			this->dispatch( serverPeerEvent );
 		} else {
 			delete requestIds[ i ];
 			delete metadataList[ i ];
@@ -316,7 +316,7 @@ bool ServerWorker::handleReconstructionUnsealedRequest( CoordinatorEvent event, 
 	std::unordered_set<Key>::iterator unsealedKeysIt;
 	std::unordered_set<uint32_t> stripeIds;
 	uint32_t listId, chunkId;
-	ServerPeerSocket *reconstructedSlave = 0;
+	ServerPeerSocket *reconstructedServer = 0;
 
 	std::unordered_map<Key, KeyValue> *keyValueMap;
 	LOCK_T *lock;
@@ -329,7 +329,7 @@ bool ServerWorker::handleReconstructionUnsealedRequest( CoordinatorEvent event, 
 		this->protocol.nextKeyInBatchKeyHeader( header, keySize, keyStr, offset );
 
 		if ( i == 0 ) {
-			reconstructedSlave = this->getSlaves( keyStr, keySize, listId, chunkId );
+			reconstructedServer = this->getServers( keyStr, keySize, listId, chunkId );
 
 			if ( ! ServerWorker::chunkBuffer->at( listId )->getKeyValueMap( keyValueMap, lock ) ) {
 				__ERROR__(
@@ -374,15 +374,15 @@ bool ServerWorker::handleReconstructionUnsealedRequest( CoordinatorEvent event, 
 		requestId = ServerWorker::idGenerator->nextVal( this->workerId );
 		if ( ! ServerWorker::pending->insert(
 			PT_SERVER_PEER_FORWARD_KEYS,
-			Slave::instanceId, event.instanceId,
+			Server::instanceId, event.instanceId,
 			requestId, event.requestId,
-			( void * ) reconstructedSlave
+			( void * ) reconstructedServer
 		) ) {
 			__ERROR__( "ServerWorker", "handleReconstructionUnsealedRequest", "Cannot insert into pending set." );
 		}
 
 		buffer.data = this->protocol.sendUnsealedKeys(
-			buffer.size, Slave::instanceId, requestId,
+			buffer.size, Server::instanceId, requestId,
 			unsealedKeys, unsealedKeysIt,
 			keyValueMap, lock,
 			keyValuesCount,
@@ -390,15 +390,15 @@ bool ServerWorker::handleReconstructionUnsealedRequest( CoordinatorEvent event, 
 		);
 		totalKeyValuesCount += keyValuesCount;
 
-		if ( reconstructedSlave ) {
+		if ( reconstructedServer ) {
 			bool connected;
 			ssize_t ret;
 
-			ret = reconstructedSlave->send( buffer.data, buffer.size, connected );
+			ret = reconstructedServer->send( buffer.data, buffer.size, connected );
 			if ( ret != ( ssize_t ) buffer.size )
 				__ERROR__( "ServerWorker", "handleReconstructionUnsealedRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 		} else {
-			__ERROR__( "ServerWorker", "handleReconstructionUnsealedRequest", "Reconstructed slave not available!" );
+			__ERROR__( "ServerWorker", "handleReconstructionUnsealedRequest", "Reconstructed server not available!" );
 		}
 	}
 	// printf( "Total number of unsealed key-values sent: %u\n", totalKeyValuesCount );
@@ -407,5 +407,5 @@ bool ServerWorker::handleReconstructionUnsealedRequest( CoordinatorEvent event, 
 }
 
 bool ServerWorker::handleCompletedReconstructionAck() {
-	return Slave::getInstance()->initChunkBuffer();
+	return Server::getInstance()->initChunkBuffer();
 }

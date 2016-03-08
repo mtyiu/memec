@@ -9,13 +9,13 @@ ServerEventQueue *ChunkBuffer::eventQueue;
 Map *ChunkBuffer::map;
 
 void ChunkBuffer::init() {
-	Slave *slave = Slave::getInstance();
-	ChunkBuffer::capacity = slave->config.global.size.chunk;
-	ChunkBuffer::dataChunkCount = slave->config.global.coding.params.getDataChunkCount();
-	ChunkBuffer::coding = slave->coding;
-	ChunkBuffer::chunkPool = slave->chunkPool;
-	ChunkBuffer::eventQueue = &slave->eventQueue;
-	ChunkBuffer::map = &slave->map;
+	Server *server = Server::getInstance();
+	ChunkBuffer::capacity = server->config.global.size.chunk;
+	ChunkBuffer::dataChunkCount = server->config.global.coding.params.getDataChunkCount();
+	ChunkBuffer::coding = server->coding;
+	ChunkBuffer::chunkPool = server->chunkPool;
+	ChunkBuffer::eventQueue = &server->eventQueue;
+	ChunkBuffer::map = &server->map;
 }
 
 ChunkBuffer::ChunkBuffer( bool isReady ) {

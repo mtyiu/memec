@@ -114,8 +114,8 @@ public:
 	void resDelete( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Key &key, bool needsFree, bool isDegraded );
 	void resDelete( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool needsFree, bool isDegraded );
 	// FAULT TOLERANCE
-	void resAckParityDelta( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, std::vector<uint32_t> timestamps, uint16_t dataSlaveId );
-	void resRevertDelta( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, bool success, std::vector<uint32_t> timestamps, std::vector<Key> requests, uint16_t dataSlaveId );
+	void resAckParityDelta( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, std::vector<uint32_t> timestamps, uint16_t dataServerId );
+	void resRevertDelta( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, bool success, std::vector<uint32_t> timestamps, std::vector<Key> requests, uint16_t dataServerId );
 	// ACK
 	void ackMetadata( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t fromTimestamp, uint32_t toTimestamp );
 

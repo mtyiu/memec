@@ -10,7 +10,7 @@ private:
 	static ArrayMap<int, ClientSocket> *masters;
 
 public:
-	SlaveBackup backup;
+	ServerBackup backup;
 
 	static void setArrayMap( ArrayMap<int, ClientSocket> *masters );
 	bool start();

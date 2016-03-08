@@ -8,12 +8,12 @@
 #include "../../common/remap/remap_msg_handler.hh"
 #include "../../common/remap/remap_group.hh"
 
-class SlaveRemapMsgHandler : public RemapMsgHandler {
+class ServerRemapMsgHandler : public RemapMsgHandler {
 private:
 	bool isListening;
 
 	/* lock on the list of alive servers connected */
-	LOCK_T aliveSlavesLock;
+	LOCK_T aliveServersLock;
 
 	/* parse a message and set state of servers accordingly */
 	void setState( char* msg, int len );
@@ -22,8 +22,8 @@ private:
 	static void *readMessages( void *argv );
 
 public:
-	SlaveRemapMsgHandler();
-	~SlaveRemapMsgHandler();
+	ServerRemapMsgHandler();
+	~ServerRemapMsgHandler();
 
 	bool init( const int ip, const int port, const char *user = NULL );
 	void quit();
@@ -31,8 +31,8 @@ public:
 	bool start();
 	bool stop();
 
-	bool addAliveSlave( struct sockaddr_in server );
-	bool removeAliveSlave( struct sockaddr_in server );
+	bool addAliveServer( struct sockaddr_in server );
+	bool removeAliveServer( struct sockaddr_in server );
 
 	bool useCoordinatedFlow( const struct sockaddr_in &server );
 	bool allowRemapping( const struct sockaddr_in &server );

@@ -35,17 +35,17 @@
 #include "../../common/util/time.hh"
 
 // Implement the singleton pattern
-class Slave {
+class Server {
 private:
 	bool isRunning;
 	struct timespec startTime;
 	std::vector<ServerWorker> workers;
-	int mySlaveIndex;
+	int myServerIndex;
 
-	Slave();
+	Server();
 	// Do not implement
-	Slave( Slave const& );
-	void operator=( Slave const& );
+	Server( Server const& );
+	void operator=( Server const& );
 
 	void free();
 	// Commands
@@ -61,11 +61,11 @@ public:
 		EPoll epoll;
 		ArrayMap<int, CoordinatorSocket> coordinators;
 		ArrayMap<int, ClientSocket> masters;
-		ArrayMap<int, ServerPeerSocket> slavePeers;
+		ArrayMap<int, ServerPeerSocket> serverPeers;
 		std::unordered_map<uint16_t, ClientSocket*> mastersIdToSocketMap;
-		std::unordered_map<uint16_t, ServerPeerSocket*> slavesIdToSocketMap;
+		std::unordered_map<uint16_t, ServerPeerSocket*> serversIdToSocketMap;
 		LOCK_T mastersIdToSocketLock;
-		LOCK_T slavesIdToSocketLock;
+		LOCK_T serversIdToSocketLock;
 	} sockets;
 	IDGenerator idGenerator;
 	Pending pending;
@@ -90,17 +90,17 @@ public:
 	/* Instance ID (assigned by coordinator) */
 	static uint16_t instanceId;
 	/* Remapping */
-	SlaveRemapMsgHandler remapMsgHandler;
+	ServerRemapMsgHandler remapMsgHandler;
 
-	static Slave *getInstance() {
-		static Slave slave;
-		return &slave;
+	static Server *getInstance() {
+		static Server server;
+		return &server;
 	}
 
 	static void signalHandler( int signal );
 
 	bool init( char *path, OptionList &options, bool verbose );
-	bool init( int mySlaveIndex );
+	bool init( int myServerIndex );
 	bool initChunkBuffer();
 	bool start();
 	bool stop();

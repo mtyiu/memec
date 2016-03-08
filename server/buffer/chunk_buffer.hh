@@ -20,7 +20,7 @@ protected:
 	static Coding *coding;                 // Coding module
 	static MemoryPool<Chunk> *chunkPool;   // Memory pool for chunks
 	static ServerEventQueue *eventQueue;    // Event queue
-	static Map *map;                       // Maps in slave
+	static Map *map;                       // Maps in server
 
 public:
 	static uint32_t capacity;              // Chunk size

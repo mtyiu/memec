@@ -372,7 +372,7 @@ Chunk *DataChunkBuffer::flushAt( ServerWorker *worker, int index, bool lock, Met
 	this->chunks[ index ] = newChunk;
 	this->stripeId = newChunk->metadata.stripeId + 1;
 
-	// Notify the parity slaves to seal the chunk
+	// Notify the parity servers to seal the chunk
 	if ( worker->issueSealChunkRequest( chunk ) ) {
 		ChunkBuffer::map->seal(
 			chunk->metadata.listId,

@@ -11,27 +11,27 @@ bool ServerWorker::handleRemappedData( CoordinatorEvent event, char *buf, size_t
 		return false;
 	}
 
-	ServerPeerEvent slavePeerEvent;
-	Slave *slave = Slave::getInstance();
+	ServerPeerEvent serverPeerEvent;
+	Server *server = Server::getInstance();
 
 	struct sockaddr_in target;
 	target.sin_addr.s_addr = header.addr;
 	target.sin_port = header.port;
 	ServerPeerSocket *socket = 0;
-	for ( uint32_t i = 0; i < slave->sockets.slavePeers.size(); i++ ) {
-		if ( slave->sockets.slavePeers.values[ i ]->getAddr() == target ) {
-			socket = slave->sockets.slavePeers.values[ i ];
+	for ( uint32_t i = 0; i < server->sockets.serverPeers.size(); i++ ) {
+		if ( server->sockets.serverPeers.values[ i ]->getAddr() == target ) {
+			socket = server->sockets.serverPeers.values[ i ];
 			break;
 		}
 	}
 	if ( socket == 0 )
-		__ERROR__( "ServerWorker", "handleRemappedData", "Cannot find slave sccket to send remapped data back." );
+		__ERROR__( "ServerWorker", "handleRemappedData", "Cannot find server sccket to send remapped data back." );
 
 	std::set<PendingData> *remappedData;
 	bool found = ServerWorker::pending->eraseRemapData( target, &remappedData );
 
 	if ( found && socket ) {
-		uint16_t instanceId = Slave::instanceId;
+		uint16_t instanceId = Server::instanceId;
 		uint32_t requestId = ServerWorker::idGenerator->nextVal( this->workerId );
 		// insert into pending set to wait for acknowledgement
 		ServerWorker::pending->insertRemapDataRequest( instanceId, event.instanceId, requestId, event.requestId, remappedData->size(), socket );
@@ -39,8 +39,8 @@ bool ServerWorker::handleRemappedData( CoordinatorEvent event, char *buf, size_t
 		// TODO : batched SET
 		uint32_t requestSent = 0;
 		for ( PendingData pendingData : *remappedData) {
-			slavePeerEvent.reqSet( socket, instanceId, requestId, pendingData.key, pendingData.value );
-			slave->eventQueue.insert( slavePeerEvent );
+			serverPeerEvent.reqSet( socket, instanceId, requestId, pendingData.key, pendingData.value );
+			server->eventQueue.insert( serverPeerEvent );
 			requestSent++;
 			if ( requestSent % BATCH_THRESHOLD == 0 ) {
 				nanosleep( &BATCH_INTVL, 0 );
@@ -51,7 +51,7 @@ bool ServerWorker::handleRemappedData( CoordinatorEvent event, char *buf, size_t
 	} else {
 		event.resRemappedData();
 		this->dispatch( event );
-		// slave not found, but remapped data found.. discard the data
+		// server not found, but remapped data found.. discard the data
 		if ( found ) delete remappedData;
 	}
 	return false;
@@ -72,7 +72,7 @@ bool ServerWorker::handleRemappingSetRequest( ClientEvent event, char *buf, size
 
 	// Check whether this is the remapping target //
 	bool isRemapped = true, bufferRemapData = true, success = true;
-	std::vector<StripeListIndex> &stripeListIndex = Slave::getInstance()->stripeListIndex;
+	std::vector<StripeListIndex> &stripeListIndex = Server::getInstance()->stripeListIndex;
 
 	for ( size_t j = 0, size = stripeListIndex.size(); j < size; j++ ) {
 		if ( header.listId == stripeListIndex[ j ].listId &&
@@ -179,7 +179,7 @@ bool ServerWorker::handleRemappingSetRequest( ClientEvent event, char *buf, size
 }
 
 bool ServerWorker::handleRemappingSetRequest( ServerPeerEvent event, char *buf, size_t size ) {
-	__ERROR__( "ServerWorker", "handleRemappingSetRequest", "Why remapping SET request is sent by slave peer?" );
+	__ERROR__( "ServerWorker", "handleRemappingSetRequest", "Why remapping SET request is sent by server peer?" );
 	return false;
 	/*
 	struct RemappingSetHeader header;
@@ -218,7 +218,7 @@ bool ServerWorker::handleRemappingSetRequest( ServerPeerEvent event, char *buf, 
 }
 
 bool ServerWorker::handleRemappingSetResponse( ServerPeerEvent event, bool success, char *buf, size_t size ) {
-	__ERROR__( "ServerWorker", "handleRemappingSetRequest", "Why remapping SET response is received by slave peer?" );
+	__ERROR__( "ServerWorker", "handleRemappingSetRequest", "Why remapping SET response is received by server peer?" );
 	return false;
 	/*
 	struct RemappingLockHeader header;
@@ -237,16 +237,16 @@ bool ServerWorker::handleRemappingSetResponse( ServerPeerEvent event, bool succe
 	RemappingRecordKey record;
 
 	if ( ! ServerWorker::pending->eraseRemappingRecordKey( PT_SERVER_PEER_REMAPPING_SET, event.instanceId, event.requestId, event.socket, &pid, &record, true, false ) ) {
-		UNLOCK( &ServerWorker::pending->slavePeers.remappingSetLock );
-		__ERROR__( "ServerWorker", "handleRemappingSetResponse", "Cannot find a pending slave REMAPPING_SET request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
+		UNLOCK( &ServerWorker::pending->serverPeers.remappingSetLock );
+		__ERROR__( "ServerWorker", "handleRemappingSetResponse", "Cannot find a pending server REMAPPING_SET request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		return false;
 	}
-	// Check pending slave UPDATE requests
+	// Check pending server UPDATE requests
 	pending = ServerWorker::pending->count( PT_SERVER_PEER_REMAPPING_SET, pid.instanceId, pid.requestId, false, true );
 
-	__DEBUG__( BLUE, "ServerWorker", "handleRemappingSetResponse", "Pending slave REMAPPING_SET requests = %d (%s).", pending, success ? "success" : "fail" );
+	__DEBUG__( BLUE, "ServerWorker", "handleRemappingSetResponse", "Pending server REMAPPING_SET requests = %d (%s).", pending, success ? "success" : "fail" );
 	if ( pending == 0 ) {
-		// Only send master REMAPPING_SET response when the number of pending slave REMAPPING_SET requests equal 0
+		// Only send master REMAPPING_SET response when the number of pending server REMAPPING_SET requests equal 0
 		ClientEvent clientEvent;
 
 		if ( ! ServerWorker::pending->eraseRemappingRecordKey( PT_CLIENT_REMAPPING_SET, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &record ) ) {
@@ -283,7 +283,7 @@ bool ServerWorker::handleRemappedUpdateRequest( ServerPeerEvent event, char *buf
 	uint32_t listId, chunkId;
 	Key key;
 
-	this->getSlaves( header.key, header.keySize, listId, chunkId );
+	this->getServers( header.key, header.keySize, listId, chunkId );
 	key.set( header.keySize, header.key );
 
 	if ( ServerWorker::chunkBuffer->at( listId )->updateKeyValue(
@@ -329,32 +329,32 @@ bool ServerWorker::handleRemappedUpdateResponse( ServerPeerEvent event, bool suc
 	int pending;
 	KeyValueUpdate keyValueUpdate;
 	PendingIdentifier pid;
-	uint16_t instanceId = Slave::instanceId;
+	uint16_t instanceId = Server::instanceId;
 
 	if ( ! ServerWorker::pending->eraseKeyValueUpdate( PT_SERVER_PEER_UPDATE, instanceId, event.requestId, event.socket, &pid, &keyValueUpdate, true, false ) ) {
-		UNLOCK( &ServerWorker::pending->slavePeers.updateLock );
-		__ERROR__( "ServerWorker", "handleRemappedUpdateResponse", "Cannot find a pending slave UPDATE request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
+		UNLOCK( &ServerWorker::pending->serverPeers.updateLock );
+		__ERROR__( "ServerWorker", "handleRemappedUpdateResponse", "Cannot find a pending server UPDATE request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		return false;
 	}
 
 	// erase data delta backup
-	// Slave *slave = Slave::getInstance();
-	// LOCK( &slave->sockets.mastersIdToSocketLock );
+	// Server *server = Server::getInstance();
+	// LOCK( &server->sockets.mastersIdToSocketLock );
 	// try {
-	// 	ClientSocket *clientSocket = slave->sockets.mastersIdToSocketMap.at( event.instanceId );
+	// 	ClientSocket *clientSocket = server->sockets.mastersIdToSocketMap.at( event.instanceId );
 	// 	clientSocket->backup.removeDataUpdate( event.requestId, event.socket );
 	// } catch ( std::out_of_range &e ) {
-	// 	__ERROR__( "ServerWorker", "handleUpdateResponse", "Cannot find a pending parity slave UPDATE backup for instance ID = %hu, request ID = %u. (Socket mapping not found)", event.instanceId, event.requestId );
+	// 	__ERROR__( "ServerWorker", "handleUpdateResponse", "Cannot find a pending parity server UPDATE backup for instance ID = %hu, request ID = %u. (Socket mapping not found)", event.instanceId, event.requestId );
 	// }
-	// UNLOCK( &slave->sockets.mastersIdToSocketLock );
+	// UNLOCK( &server->sockets.mastersIdToSocketLock );
 
-	// Check pending slave UPDATE requests
+	// Check pending server UPDATE requests
 	pending = ServerWorker::pending->count( PT_SERVER_PEER_UPDATE, pid.instanceId, pid.requestId, false, true );
 
-	__DEBUG__( YELLOW, "ServerWorker", "handleRemappedUpdateResponse", "Pending slave UPDATE requests = %d (%s) (Key: %.*s).", pending, success ? "success" : "fail", ( int ) header.keySize, header.key );
+	__DEBUG__( YELLOW, "ServerWorker", "handleRemappedUpdateResponse", "Pending server UPDATE requests = %d (%s) (Key: %.*s).", pending, success ? "success" : "fail", ( int ) header.keySize, header.key );
 
 	if ( pending == 0 ) {
-		// Only send master UPDATE response when the number of pending slave UPDATE requests equal 0
+		// Only send master UPDATE response when the number of pending server UPDATE requests equal 0
 		ClientEvent clientEvent;
 
 		if ( ! ServerWorker::pending->eraseKeyValueUpdate( PT_CLIENT_UPDATE, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &keyValueUpdate ) ) {

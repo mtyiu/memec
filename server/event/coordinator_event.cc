@@ -33,7 +33,7 @@ void CoordinatorEvent::resRemappedData( CoordinatorSocket *socket, uint16_t inst
 	this->requestId = requestId;
 }
 
-void CoordinatorEvent::resSlaveReconstructedMsg( CoordinatorSocket *socket, uint16_t instanceId, uint32_t requestId ) {
+void CoordinatorEvent::resServerReconstructedMsg( CoordinatorSocket *socket, uint16_t instanceId, uint32_t requestId ) {
 	this->type = COORDINATOR_EVENT_TYPE_SERVER_RECONSTRUCTED_MESSAGE_RESPONSE;
 	this->socket = socket;
 	this->instanceId = instanceId;
@@ -60,7 +60,7 @@ void CoordinatorEvent::resReconstructionUnsealed( CoordinatorSocket *socket, uin
 	this->message.reconstructionUnsealed.keysCount = keysCount;
 }
 
-void CoordinatorEvent::resPromoteBackupSlave( CoordinatorSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t numChunks, uint32_t numUnsealedKeys ) {
+void CoordinatorEvent::resPromoteBackupServer( CoordinatorSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t numChunks, uint32_t numUnsealedKeys ) {
 	this->type = COORDINATOR_EVENT_TYPE_PROMOTE_BACKUP_SERVER_RESPONSE_SUCCESS;
 	this->socket = socket;
 	this->instanceId = instanceId;

@@ -9,7 +9,7 @@ int main( int argc, char **argv ) {
 	int opt, ret = 0;
 	bool verbose = false;
 	char *path = NULL, path_default[] = "bin/config/local";
-	Slave *slave;
+	Server *server;
 	OptionList options;
 	struct option_t tmpOption;
 	static struct option long_options[] = {
@@ -59,19 +59,19 @@ int main( int argc, char **argv ) {
 	path = path == NULL ? path_default : path;
 
 	///////////////////////////////
-	// Pass control to the Slave //
+	// Pass control to the Server //
 	///////////////////////////////
-	slave = Slave::getInstance();
-	if ( ! slave->init( path, options, verbose ) ) {
-		fprintf( stderr, "Error: Cannot initialize slave.\n" );
+	server = Server::getInstance();
+	if ( ! server->init( path, options, verbose ) ) {
+		fprintf( stderr, "Error: Cannot initialize server.\n" );
 		return 1;
 	}
-	if ( ! slave->start() ) {
-		fprintf( stderr, "Error: Cannot start slave.\n" );
+	if ( ! server->start() ) {
+		fprintf( stderr, "Error: Cannot start server.\n" );
 		return 1;
 	}
-	slave->interactive();
-	slave->stop();
+	server->interactive();
+	server->stop();
 
 	return 0;
 
@@ -83,7 +83,7 @@ usage:
 		"Mandatory arguments to long options are mandatory for short "
 		"options too.\n"
 		"  -p, --path         Specify the path to the directory containing the config files\n"
-		"  -o, --option       Override the options in the config file of slave\n"
+		"  -o, --option       Override the options in the config file of server\n"
 		"  -v, --verbose      Show configuration\n"
 		"  -h, --help         Display this help and exit\n",
 		argv[ 0 ]
