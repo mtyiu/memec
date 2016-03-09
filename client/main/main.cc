@@ -10,10 +10,14 @@ int main( int argc, char **argv ) {
 	bool verbose = false;
 	char *path = NULL, path_default[] = "bin/config/local";
 	Client *client = 0;
-	OptionList options;
+	struct {
+		OptionList global;
+		OptionList client;
+	} options;
 	struct option_t tmpOption;
 	static struct option long_options[] = {
 		{ "path", required_argument, NULL, 'p' },
+		{ "global", required_argument, NULL, 'g' },
 		{ "option", required_argument, NULL, 'o' },
 		{ "help", no_argument, NULL, 'h' },
 		{ "verbose", no_argument, NULL, 'v' },
@@ -26,25 +30,34 @@ int main( int argc, char **argv ) {
 	//////////////////////////////////
 	opterr = 0;
 	while( ( opt = getopt_long( argc, argv,
-	                            "p:o:hv",
+	                            "p:g:o:hv",
 	                            long_options, NULL ) ) != -1 ) {
 		switch( opt ) {
 			case 'p':
 				path = optarg;
 				break;
+			case 'g':
 			case 'o':
 				tmpOption.section = 0;
 				tmpOption.name = 0;
 				tmpOption.value = 0;
 				for ( int i = optind - 1, j = 0; i < argc && argv[ i ][ 0 ] != '-'; i++, j++ ) {
 					switch( j ) {
-						case 0: tmpOption.section = argv[ i ]; break;
-						case 1: tmpOption.name = argv[ i ]; break;
-						case 2: tmpOption.value = argv[ i ]; break;
+						case 0:
+							tmpOption.section = argv[ i ];
+							break;
+						case 1:
+							tmpOption.name = argv[ i ];
+							break;
+						case 2:
+							tmpOption.value = argv[ i ];
+							if ( opt == 'g' )
+								options.global.push_back( tmpOption );
+							else
+								options.client.push_back( tmpOption );
+							break;
 					}
 				}
-				if ( tmpOption.value )
-					options.push_back( tmpOption );
 				break;
 			case 'h':
 				ret = 0;
@@ -62,7 +75,7 @@ int main( int argc, char **argv ) {
 	// Pass control to the Client //
 	////////////////////////////////
 	client = Client::getInstance();
-	if ( ! client->init( path, options, verbose ) ) {
+	if ( ! client->init( path, options.global, options.client, verbose ) ) {
 		fprintf( stderr, "Error: Cannot initialize client.\n" );
 		return 1;
 	}
@@ -83,7 +96,8 @@ usage:
 		"Mandatory arguments to long options are mandatory for short "
 		"options too.\n"
 		"  -p, --path         Specify the path to the directory containing the config files\n"
-		"  -o, --option       Override the options in the config file of client\n"
+		"  -g, --global       Override the options in the global config file (global.ini)\n"
+		"  -o, --option       Override the options in the config file of client (client.ini)\n"
 		"  -v, --verbose      Show configuration\n"
 		"  -h, --help         Display this help and exit\n",
 		argv[ 0 ]

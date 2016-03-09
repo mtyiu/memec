@@ -99,7 +99,7 @@ public:
 
 	static void signalHandler( int signal );
 
-	bool init( char *path, OptionList &options, bool verbose );
+	bool init( char *path, OptionList &globalOptions, OptionList &serverOptions, bool verbose );
 	bool init( int myServerIndex );
 	bool initChunkBuffer();
 	bool start();

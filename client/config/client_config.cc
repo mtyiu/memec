@@ -11,18 +11,6 @@ bool ClientConfig::parse( const char *path ) {
 	return Config::parse( path, "client.ini" );
 }
 
-bool ClientConfig::override( OptionList &options ) {
-	bool ret = true;
-	for ( int i = 0, size = options.size(); i < size; i++ ) {
-		ret &= this->set(
-			options[ i ].section,
-			options[ i ].name,
-			options[ i ].value
-		);
-	}
-	return ret;
-}
-
 bool ClientConfig::set( const char *section, const char *name, const char *value ) {
 	if ( match( section, "client" ) ) {
 		return this->client.addr.parse( name, value );

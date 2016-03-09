@@ -89,7 +89,7 @@ public:
 
 	static void signalHandler( int signal );
 
-	bool init( char *path, OptionList &options, bool verbose );
+	bool init( char *path, OptionList &globalOptions, OptionList &clientOptions, bool verbose );
 	bool start();
 	bool stop();
 	void info( FILE *f = stdout );

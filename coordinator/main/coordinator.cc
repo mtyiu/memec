@@ -239,11 +239,14 @@ void Coordinator::signalHandler( int signal ) {
 	delete overloadedServerSet;
 }
 
-bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
+bool Coordinator::init( char *path, OptionList &globalOptions, OptionList &coordinatorOptions, bool verbose ) {
 	// Parse configuration files //
 	if ( ( ! this->config.global.parse( path ) ) ||
+	     ( ! this->config.global.override( globalOptions ) ) ||
+	     ( ! this->config.global.validate() ) ||
 	     ( ! this->config.coordinator.parse( path ) ) ||
-	     ( ! this->config.coordinator.override( options ) ) ||
+	     ( ! this->config.coordinator.override( coordinatorOptions ) ) ||
+	     ( ! this->config.coordinator.validate() ) ||
 	     ( ! this->config.coordinator.validate( this->config.global.coordinators ) ) ) {
 		return false;
 	}
