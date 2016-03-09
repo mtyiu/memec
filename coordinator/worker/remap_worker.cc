@@ -35,27 +35,6 @@ bool CoordinatorWorker::handleRemappingSetLockRequest( ClientEvent event, char *
 		);
 		struct sockaddr_in addr = s->getAddr();
 		if ( ! crmh->allowRemapping( addr ) ) {
-			/*
-			if ( ! isPrinted ) {
-				for ( uint32_t i = 0; i < header.remappedCount; i++ ) {
-					printf(
-						"%s(%u, %u) |-> (%u, %u)%s",
-						i == 0 ? "Original: " : "; ",
-						header.original[ i * 2     ],
-						header.original[ i * 2 + 1 ],
-						header.remapped[ i * 2     ],
-						header.remapped[ i * 2 + 1 ],
-						i == header.remappedCount - 1 ? " || " : ""
-					);
-				}
-				isPrinted = true;
-			}
-			printf(
-				"** Not in intermediate or degraded state: (%u, %u) **",
-				header.original[ i * 2    ],
-				header.original[ i * 2 + 1 ]
-			);
-			*/
 			for ( uint32_t j = i; j < header.remappedCount - 1; j++ ) {
 				header.original[ j * 2     ] = header.original[ ( j + 1 ) * 2     ];
 				header.original[ j * 2 + 1 ] = header.original[ ( j + 1 ) * 2 + 1 ];
@@ -67,21 +46,6 @@ bool CoordinatorWorker::handleRemappingSetLockRequest( ClientEvent event, char *
 			i++;
 		}
 	}
-	/*
-	if ( isPrinted ) {
-		for ( uint32_t i = 0; i < header.remappedCount; i++ ) {
-			printf(
-				"%s(%u, %u) |-> (%u, %u)%s",
-				i == 0 ? "Modified: " : "; ",
-				header.original[ i * 2     ],
-				header.original[ i * 2 + 1 ],
-				header.remapped[ i * 2     ],
-				header.remapped[ i * 2 + 1 ],
-				i == header.remappedCount - 1 ? "\n" : ""
-			);
-		}
-	}
-	*/
 
 	if ( map->insertKey(
 		header.key, header.keySize,
@@ -102,11 +66,6 @@ bool CoordinatorWorker::handleRemappingSetLockRequest( ClientEvent event, char *
 				header.original, header.remapped, header.remappedCount, key
 			);
 		} else {
-			// event.resRemappingSetLock(
-			// 	event.socket, event.instanceId, event.requestId, false, // success
-			// 	0, 0, 0, key
-			// );
-
 			remappingRecord.free();
 
 			// ---------- HACK FOR YCSB which sends duplicated keys for SET ----------

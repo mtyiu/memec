@@ -127,9 +127,6 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 			if ( server->equal( event.message.reconstructed.dst ) || ! server->ready() )
 				continue; // No need to tell the backup server
 			event.message.reconstructed.sockets->insert( server );
-
-			// printf( "[%u, %u] Waiting for ", event.instanceId, event.requestId );
-			// server->print();
 		}
 		// Insert into pending set
 		CoordinatorWorker::pending->insertAnnouncement(
@@ -371,8 +368,6 @@ bool CoordinatorWorker::processHeartbeat( ServerEvent event, char *buf, size_t s
 	if ( failed ) {
 		__ERROR__( "CoordinatorWorker", "processHeartbeat", "Number of failed objects = %lu", failed );
 	} else {
-		// __ERROR__( "CoordinatorWorker", "processHeartbeat", "(sealed, keys, remap) = (%u, %u, %u)", heartbeat.sealed, heartbeat.keys, heartbeat.remap );
-
 		// Send ACK message
 		event.resHeartbeat( event.socket, heartbeat.timestamp, heartbeat.sealed, heartbeat.keys, heartbeat.isLast );
 		this->dispatch( event );
