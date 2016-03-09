@@ -199,12 +199,6 @@ struct KeyHeader {
 	char *key;
 };
 
-#define PROTO_KEY_SERVER_SIZE 17
-struct KeyServerHeader {
-    uint8_t keySize;
-    char *key;
-};
-
 #define PROTO_KEY_BACKUP_BASE_SIZE       2
 #define PROTO_KEY_BACKUP_FOR_DATA_SIZE   17
 #define PROTO_KEY_BACKUP_SEALED_SIZE     12
@@ -280,14 +274,6 @@ struct BatchChunkHeader {
 	uint32_t count;
 	char *chunks; // Array of (request ID + ChunkHeader)
 };
-
-/*
-#define PROTO_BATCH_CHUNK_DATA_SIZE 4
-struct BatchChunkDataHeader {
-	uint32_t count;
-	char *chunks; // Array of ChunkDataHeader
-};
-*/
 
 #define PROTO_BATCH_KEY_SIZE 4
 struct BatchKeyHeader {
