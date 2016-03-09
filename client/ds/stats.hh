@@ -31,11 +31,11 @@ typedef struct {
 		ArrayMap< struct sockaddr_in, Latency > set;
 	} cumulativeMirror;
 	LOCK_T lock;
-} SlaveLoading;
+} ServerLoading;
 
 typedef struct {
-	std::set< struct sockaddr_in > slaveSet;
+	std::set< struct sockaddr_in > serverSet;
 	LOCK_T lock;
-} OverloadedSlave;
+} OverloadedServer;
 
 #endif

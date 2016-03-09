@@ -9,7 +9,7 @@ DegradedMap::DegradedMap() {
 }
 
 void DegradedMap::init( Map *map ) {
-	this->slaveMap = map;
+	this->serverMap = map;
 }
 
 bool DegradedMap::findValueByKey( char *data, uint8_t size, bool &isSealed, KeyValue *keyValue, Key *keyPtr, KeyMetadata *keyMetadataPtr, Metadata *metadataPtr, Chunk **chunkPtr ) {
@@ -130,7 +130,7 @@ bool DegradedMap::deleteKey( Key key, uint8_t opcode, uint32_t &timestamp, KeyMe
 	}
 	if ( needsUnlock ) UNLOCK( &this->keysLock );
 
-	return this->slaveMap->insertOpMetadata( opcode, timestamp, key, keyMetadata );
+	return this->serverMap->insertOpMetadata( opcode, timestamp, key, keyMetadata );
 }
 
 bool DegradedMap::insertValue( KeyValue keyValue, Metadata metadata ) { // KeyValue's data is allocated by malloc()
@@ -190,7 +190,7 @@ re_insert:
 	KeyMetadata keyMetadata;
 	keyMetadata.set( metadata.listId, metadata.stripeId, metadata.chunkId );
 
-	return this->slaveMap->insertOpMetadata( opcode, timestamp, key, keyMetadata );
+	return this->serverMap->insertOpMetadata( opcode, timestamp, key, keyMetadata );
 }
 
 bool DegradedMap::insertDegradedChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint16_t instanceId, uint32_t requestId, bool &isReconstructed ) {

@@ -64,7 +64,7 @@ void *ServerSocket::run( void *argv ) {
 
 bool ServerSocket::handler( int fd, uint32_t events, void *data ) {
 	ServerSocket *socket = ( ServerSocket * ) data;
-	static Slave *slave = Slave::getInstance();
+	static Server *server = Server::getInstance();
 
 	///////////////////////////////////////////////////////////////////////////
 	if ( ! ( events & EPOLLIN ) && ( ( events & EPOLLERR ) || ( events & EPOLLHUP ) || ( events & EPOLLRDHUP ) ) ) {
@@ -74,9 +74,9 @@ bool ServerSocket::handler( int fd, uint32_t events, void *data ) {
 			::close( fd );
 			socket->sockets.removeAt( index );
 		} else {
-			ClientSocket *clientSocket = slave->sockets.masters.get( fd );
-			CoordinatorSocket *coordinatorSocket = clientSocket ? 0 : slave->sockets.coordinators.get( fd );
-			ServerPeerSocket *serverPeerSocket = ( clientSocket || coordinatorSocket ) ? 0 : slave->sockets.slavePeers.get( fd );
+			ClientSocket *clientSocket = server->sockets.clients.get( fd );
+			CoordinatorSocket *coordinatorSocket = clientSocket ? 0 : server->sockets.coordinators.get( fd );
+			ServerPeerSocket *serverPeerSocket = ( clientSocket || coordinatorSocket ) ? 0 : server->sockets.serverPeers.get( fd );
 			if ( clientSocket ) {
 				clientSocket->stop();
 			} else if ( coordinatorSocket ) {
@@ -113,7 +113,7 @@ bool ServerSocket::handler( int fd, uint32_t events, void *data ) {
 		struct sockaddr_in *addr;
 		if ( ( addr = socket->sockets.get( fd, &index ) ) ) {
 			// Read message immediately and add to appropriate socket list such that all "add" operations originate from the epoll thread
-			// Only master or slave register message is expected
+			// Only client or server register message is expected
 			bool connected;
 			ssize_t ret;
 
@@ -132,27 +132,27 @@ bool ServerSocket::handler( int fd, uint32_t events, void *data ) {
 					if ( header.from == PROTO_MAGIC_FROM_CLIENT ) {
 						ClientSocket *clientSocket = new ClientSocket();
 						clientSocket->init( fd, *addr );
-						// Ignore the address header for master socket
-						slave->sockets.masters.set( fd, clientSocket );
-						// add socket to the instance-id-to-master-socket mapping
-						LOCK( &slave->sockets.mastersIdToSocketLock );
-						slave->sockets.mastersIdToSocketMap[ header.instanceId ] = clientSocket;
-						UNLOCK( &slave->sockets.mastersIdToSocketLock );
+						// Ignore the address header for client socket
+						server->sockets.clients.set( fd, clientSocket );
+						// add socket to the instance-id-to-client-socket mapping
+						LOCK( &server->sockets.clientsIdToSocketLock );
+						server->sockets.clientsIdToSocketMap[ header.instanceId ] = clientSocket;
+						UNLOCK( &server->sockets.clientsIdToSocketLock );
 						socket->sockets.removeAt( index );
 
 						socket->done( fd ); // The socket is valid
 
 						ClientEvent event;
 						event.resRegister( clientSocket, header.instanceId, header.requestId );
-						slave->eventQueue.insert( event );
+						server->eventQueue.insert( event );
 					} else if ( header.from == PROTO_MAGIC_FROM_SERVER ) {
 						ServerPeerSocket *s = 0;
 
-						for ( int i = 0, len = slave->sockets.slavePeers.size(); i < len; i++ ) {
-							if ( slave->sockets.slavePeers[ i ]->equal( addressHeader.addr, addressHeader.port ) ) {
-								s = slave->sockets.slavePeers[ i ];
+						for ( int i = 0, len = server->sockets.serverPeers.size(); i < len; i++ ) {
+							if ( server->sockets.serverPeers[ i ]->equal( addressHeader.addr, addressHeader.port ) ) {
+								s = server->sockets.serverPeers[ i ];
 								int oldFd = s->getSocket();
-								slave->sockets.slavePeers.replaceKey( oldFd, fd );
+								server->sockets.serverPeers.replaceKey( oldFd, fd );
 								s->setRecvFd( fd, addr );
 								socket->sockets.removeAt( index );
 
@@ -164,9 +164,9 @@ bool ServerSocket::handler( int fd, uint32_t events, void *data ) {
 						if ( s ) {
 							ServerPeerEvent event;
 							event.resRegister( s, true, header.instanceId, header.requestId );
-							slave->eventQueue.insert( event );
+							server->eventQueue.insert( event );
 						} else {
-							__ERROR__( "ServerSocket", "handler", "Unexpected registration from slave." );
+							__ERROR__( "ServerSocket", "handler", "Unexpected registration from server." );
 							socket->sockets.removeAt( index );
 							::close( fd );
 							return false;
@@ -187,22 +187,22 @@ bool ServerSocket::handler( int fd, uint32_t events, void *data ) {
 			}
 		} else {
 			int index;
-			ClientSocket *clientSocket = slave->sockets.masters.get( fd );
-			CoordinatorSocket *coordinatorSocket = clientSocket ? 0 : slave->sockets.coordinators.get( fd );
-			ServerPeerSocket *serverPeerSocket = ( clientSocket || coordinatorSocket ) ? 0 : slave->sockets.slavePeers.get( fd, &index );
+			ClientSocket *clientSocket = server->sockets.clients.get( fd );
+			CoordinatorSocket *coordinatorSocket = clientSocket ? 0 : server->sockets.coordinators.get( fd );
+			ServerPeerSocket *serverPeerSocket = ( clientSocket || coordinatorSocket ) ? 0 : server->sockets.serverPeers.get( fd, &index );
 
 			if ( clientSocket ) {
 				ClientEvent event;
 				event.pending( clientSocket );
-				slave->eventQueue.insert( event );
+				server->eventQueue.insert( event );
 			} else if ( coordinatorSocket ) {
 				CoordinatorEvent event;
 				event.pending( coordinatorSocket );
-				slave->eventQueue.insert( event );
+				server->eventQueue.insert( event );
 			} else if ( serverPeerSocket ) {
 				ServerPeerEvent event;
 				event.pending( serverPeerSocket );
-				slave->eventQueue.insert( event );
+				server->eventQueue.insert( event );
 			} else {
 				// __ERROR__( "ServerSocket", "handler", "Unknown socket: fd = %d.", fd );
 				return false;

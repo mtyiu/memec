@@ -8,13 +8,13 @@
 #include "../../common/ds/sockaddr_in.hh"
 #include "../../common/protocol/protocol.hh"
 
-class MasterProtocol : public Protocol {
+class ClientProtocol : public Protocol {
 public:
-	MasterProtocol() : Protocol( ROLE_CLIENT ) {}
+	ClientProtocol() : Protocol( ROLE_CLIENT ) {}
 
 	// ---------- register_protocol.cc ----------
 	char *reqRegisterCoordinator( size_t &size, uint32_t requestId, uint32_t addr, uint16_t port );
-	char *reqRegisterSlave( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port );
+	char *reqRegisterServer( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port );
 	char *resRegisterApplication( size_t &size, uint16_t instanceId, uint32_t requestId, bool success );
 
 	// ---------- load_protocol.cc ----------
@@ -27,7 +27,7 @@ public:
 		const LoadStatsHeader& loadStatsHeader,
 		ArrayMap<struct sockaddr_in, Latency> &serverGetLatency,
 		ArrayMap<struct sockaddr_in, Latency> &serverSetLatency,
-		std::set<struct sockaddr_in> &overloadedSlaveSet,
+		std::set<struct sockaddr_in> &overloadedServerSet,
 		char* buffer, uint32_t size
 	);
 

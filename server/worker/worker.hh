@@ -31,7 +31,7 @@
 class ServerWorker : public Worker {
 private:
 	uint32_t workerId;
-	SlaveProtocol protocol;
+	ServerProtocol protocol;
 	Storage *storage;
 	// Temporary variables
 	struct { // Buffer for storing data delta
@@ -55,10 +55,10 @@ private:
 	static uint32_t chunkCount;
 	static bool disableSeal;
 	static IDGenerator *idGenerator;
-	static ArrayMap<int, ServerPeerSocket> *slavePeers;
+	static ArrayMap<int, ServerPeerSocket> *serverPeers;
 	static Pending *pending;
 	static PendingAck *pendingAck;
-	static ServerAddr *slaveServerAddr;
+	static ServerAddr *serverServerAddr;
 	static Coding *coding;
 	static ServerEventQueue *eventQueue;
 	static StripeList<ServerPeerSocket> *stripeList;
@@ -77,14 +77,14 @@ private:
 	void dispatch( CodingEvent event );
 	void dispatch( IOEvent event );
 	void dispatch( ServerEvent event );
-	ServerPeerSocket *getSlaves( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId );
-	bool getSlaves( uint32_t listId );
+	ServerPeerSocket *getServers( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId );
+	bool getServers( uint32_t listId );
 	void free();
 	static void *run( void *argv );
 
 	// ---------- coordinator_worker.cc ----------
 	void dispatch( CoordinatorEvent event );
-	bool handleSlaveConnectedMsg( CoordinatorEvent event, char *buf, size_t size );
+	bool handleServerConnectedMsg( CoordinatorEvent event, char *buf, size_t size );
 	bool handleHeartbeatAck( CoordinatorEvent event, char *buf, size_t size );
 
 	// ---------- client_worker.cc ----------
@@ -115,11 +115,11 @@ private:
 	bool handleAckParityDeltaBackup( ClientEvent event, char *buf, size_t size );
 	bool handleRevertDelta( ClientEvent event, char *buf, size_t size );
 
-	// ---------- slave_peer_worker.cc ----------
+	// ---------- server_peer_worker.cc ----------
 	void dispatch( ServerPeerEvent event );
 
-	// ---------- slave_peer_req_worker.cc ----------
-	bool handleSlavePeerRegisterRequest( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, char *buf, size_t size );
+	// ---------- server_peer_req_worker.cc ----------
+	bool handleServerPeerRegisterRequest( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, char *buf, size_t size );
 	bool handleForwardKeyRequest( ServerPeerEvent event, char *buf, size_t size );
 	bool handleForwardKeyRequest( ServerPeerEvent event, struct ForwardKeyHeader &header, bool self );
 	bool handleSetRequest( ServerPeerEvent event, char *buf, size_t size );
@@ -136,7 +136,7 @@ private:
 	bool handleBatchKeyValueRequest( ServerPeerEvent event, char *buf, size_t size );
 	bool handleBatchChunksRequest( ServerPeerEvent event, char *buf, size_t size );
 
-	// ---------- slave_peer_res_worker.cc ----------
+	// ---------- server_peer_res_worker.cc ----------
 	bool handleForwardKeyResponse( ServerPeerEvent event, bool success, char *buf, size_t size );
 	bool handleForwardKeyResponse( struct ForwardKeyHeader &header, bool success, bool self );
 	bool handleSetResponse( ServerPeerEvent event, bool success, char *buf, size_t size );
@@ -206,8 +206,8 @@ private:
 	bool handleUpdateRequestBySetChunk( ClientEvent event, KeyValueUpdateHeader &header );
 
 	// ---------- recovery_worker.cc ----------
-	bool handleSlaveReconstructedMsg( CoordinatorEvent event, char *buf, size_t size );
-	bool handleBackupSlavePromotedMsg( CoordinatorEvent event, char *buf, size_t size );
+	bool handleServerReconstructedMsg( CoordinatorEvent event, char *buf, size_t size );
+	bool handleBackupServerPromotedMsg( CoordinatorEvent event, char *buf, size_t size );
 	bool handleReconstructionRequest( CoordinatorEvent event, char *buf, size_t size );
 	bool handleReconstructionUnsealedRequest( CoordinatorEvent event, char *buf, size_t size );
 	bool handleCompletedReconstructionAck();
@@ -222,7 +222,7 @@ public:
 	void stop();
 	void print( FILE *f = stdout );
 
-	// ---------- slave_peer_req_worker.cc ----------
+	// ---------- server_peer_req_worker.cc ----------
 	bool issueSealChunkRequest( Chunk *chunk, uint32_t startPos = 0 );
 };
 

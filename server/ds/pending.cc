@@ -4,8 +4,8 @@
 bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_set<PendingIdentifier> *&map ) {
 	switch( type ) {
 		case PT_SERVER_PEER_FORWARD_KEYS:
-			lock = &this->slavePeers.forwardKeysLock;
-			map = &this->slavePeers.forwardKeys;
+			lock = &this->serverPeers.forwardKeysLock;
+			map = &this->serverPeers.forwardKeys;
 			break;
 		default:
 			lock = 0;
@@ -18,20 +18,20 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_set<PendingId
 bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, Key> *&map ) {
 	switch( type ) {
 		case PT_CLIENT_GET:
-			lock = &this->masters.getLock;
-			map = &this->masters.get;
+			lock = &this->clients.getLock;
+			map = &this->clients.get;
 			break;
 		case PT_CLIENT_DEL:
-			lock = &this->masters.delLock;
-			map = &this->masters.del;
+			lock = &this->clients.delLock;
+			map = &this->clients.del;
 			break;
 		case PT_SERVER_PEER_GET:
-			lock = &this->slavePeers.getLock;
-			map = &this->slavePeers.get;
+			lock = &this->serverPeers.getLock;
+			map = &this->serverPeers.get;
 			break;
 		case PT_SERVER_PEER_DEL:
-			lock = &this->slavePeers.delLock;
-			map = &this->slavePeers.del;
+			lock = &this->serverPeers.delLock;
+			map = &this->serverPeers.del;
 			break;
 		default:
 			lock = 0;
@@ -44,8 +44,8 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, KeyValue> *&map ) {
 	switch( type ) {
 		case PT_SERVER_PEER_SET:
-			lock = &this->slavePeers.setLock;
-			map = &this->slavePeers.set;
+			lock = &this->serverPeers.setLock;
+			map = &this->serverPeers.set;
 			break;
 		default:
 			lock = 0;
@@ -58,12 +58,12 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *&map ) {
 	switch( type ) {
 		case PT_CLIENT_UPDATE:
-			lock = &this->masters.updateLock;
-			map = &this->masters.update;
+			lock = &this->clients.updateLock;
+			map = &this->clients.update;
 			break;
 		case PT_SERVER_PEER_UPDATE:
-			lock = &this->slavePeers.updateLock;
-			map = &this->slavePeers.update;
+			lock = &this->serverPeers.updateLock;
+			map = &this->serverPeers.update;
 			break;
 		default:
 			lock = 0;
@@ -76,8 +76,8 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, DegradedOp> *&map ) {
 	switch( type ) {
 		case PT_SERVER_PEER_DEGRADED_OPS:
-			lock = &this->slavePeers.degradedOpsLock;
-			map = &this->slavePeers.degradedOps;
+			lock = &this->serverPeers.degradedOpsLock;
+			map = &this->serverPeers.degradedOps;
 			break;
 		default:
 			lock = 0;
@@ -90,16 +90,16 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, ChunkRequest> *&map ) {
 	switch( type ) {
 		case PT_SERVER_PEER_GET_CHUNK:
-			lock = &this->slavePeers.getChunkLock;
-			map = &this->slavePeers.getChunk;
+			lock = &this->serverPeers.getChunkLock;
+			map = &this->serverPeers.getChunk;
 			break;
 		case PT_SERVER_PEER_SET_CHUNK:
-			lock = &this->slavePeers.setChunkLock;
-			map = &this->slavePeers.setChunk;
+			lock = &this->serverPeers.setChunkLock;
+			map = &this->serverPeers.setChunk;
 			break;
 		case PT_SERVER_PEER_FORWARD_PARITY_CHUNK:
-			lock = &this->slavePeers.forwardParityChunkLock;
-			map = &this->slavePeers.forwardParityChunk;
+			lock = &this->serverPeers.forwardParityChunkLock;
+			map = &this->serverPeers.forwardParityChunk;
 			break;
 		default:
 			lock = 0;
@@ -112,12 +112,12 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, ChunkUpdate> *&map ) {
 	switch( type ) {
 		case PT_SERVER_PEER_UPDATE_CHUNK:
-			lock = &this->slavePeers.updateChunkLock;
-			map = &this->slavePeers.updateChunk;
+			lock = &this->serverPeers.updateChunkLock;
+			map = &this->serverPeers.updateChunk;
 			break;
 		case PT_SERVER_PEER_DEL_CHUNK:
-			lock = &this->slavePeers.deleteChunkLock;
-			map = &this->slavePeers.deleteChunk;
+			lock = &this->serverPeers.deleteChunkLock;
+			map = &this->serverPeers.deleteChunk;
 			break;
 		default:
 			lock = 0;
@@ -130,8 +130,8 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_map<struct sockaddr_in, std::set<PendingData>* > *&map ) {
 	switch( type ) {
 		case PT_SERVER_PEER_PARITY:
-			lock = &this->slavePeers.remappedDataLock;
-			map = &this->slavePeers.remappedData;
+			lock = &this->serverPeers.remappedDataLock;
+			map = &this->serverPeers.remappedData;
 			break;
 		default:
 			lock = 0;
@@ -306,36 +306,36 @@ bool Pending::insertRecovery( uint16_t instanceId, uint32_t requestId, Coordinat
 }
 
 bool Pending::insertRemapData( struct sockaddr_in target, uint32_t listId, uint32_t chunkId, Key key, Value value ) {
-	LOCK( &this->slavePeers.remappedDataLock );
-	if ( this->slavePeers.remappedData.count( target ) == 0 ) {
-		this->slavePeers.remappedData[ target ] = new std::set<PendingData>();
+	LOCK( &this->serverPeers.remappedDataLock );
+	if ( this->serverPeers.remappedData.count( target ) == 0 ) {
+		this->serverPeers.remappedData[ target ] = new std::set<PendingData>();
 	}
 	PendingData pendingData;
 	pendingData.set( listId, chunkId, key, value );
 	// check for duplicated insert?
-	this->slavePeers.remappedData[ target ]->insert( pendingData );
-	UNLOCK( &this->slavePeers.remappedDataLock );
+	this->serverPeers.remappedData[ target ]->insert( pendingData );
+	UNLOCK( &this->serverPeers.remappedDataLock );
 	return true;
 }
 
 bool Pending::insertRemapDataRequest( uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, uint32_t requestCount, ServerPeerSocket *target ) {
 	bool ret = false;
 	PendingIdentifier pid( instanceId, parentInstanceId, requestId, parentRequestId, target );
-	LOCK( &this->slavePeers.remappedDataRequestLock );
-	if ( this->slavePeers.remappedDataRequest.count( pid ) == 0 ){
+	LOCK( &this->serverPeers.remappedDataRequestLock );
+	if ( this->serverPeers.remappedDataRequest.count( pid ) == 0 ){
 		ret = true;
-		this->slavePeers.remappedDataRequest[ pid ] = requestCount;
+		this->serverPeers.remappedDataRequest[ pid ] = requestCount;
 	}
-	UNLOCK( &this->slavePeers.remappedDataRequestLock );
+	UNLOCK( &this->serverPeers.remappedDataRequestLock );
 	return ret;
 }
 
-void Pending::insertSlavePeerRegistration( uint32_t requestId, ServerPeerSocket *socket, bool success ) {
+void Pending::insertServerPeerRegistration( uint32_t requestId, ServerPeerSocket *socket, bool success ) {
 	PendingRegistration reg;
 	reg.set( socket, requestId, success );
-	LOCK( &this->slavePeers.registrationLock );
-	this->slavePeers.registration.push_back( reg );
-	UNLOCK( &this->slavePeers.registrationLock );
+	LOCK( &this->serverPeers.registrationLock );
+	this->serverPeers.registration.push_back( reg );
+	UNLOCK( &this->serverPeers.registrationLock );
 }
 
 bool Pending::insert(
@@ -378,31 +378,31 @@ bool Pending::eraseReleaseDegradedLock( uint16_t instanceId, uint32_t requestId,
 
 bool Pending::eraseRemapData( struct sockaddr_in target, std::set<PendingData> **pendingData ) {
 	bool found = false;
-	LOCK( &this->slavePeers.remappedDataLock );
-	if ( this->slavePeers.remappedData.count( target ) > 0 ) {
-		*pendingData = this->slavePeers.remappedData[ target ];
-		this->slavePeers.remappedData.erase( target );
+	LOCK( &this->serverPeers.remappedDataLock );
+	if ( this->serverPeers.remappedData.count( target ) > 0 ) {
+		*pendingData = this->serverPeers.remappedData[ target ];
+		this->serverPeers.remappedData.erase( target );
 		found = true;
 	} else {
 		pendingData = 0;
 	}
-	UNLOCK( &this->slavePeers.remappedDataLock );
+	UNLOCK( &this->serverPeers.remappedDataLock );
 	return found;
 }
 
 bool Pending::decrementRemapDataRequest( uint16_t instanceId, uint32_t requestId, PendingIdentifier *pidPtr, uint32_t *requestCount ) {
 	PendingIdentifier pid( instanceId, 0, requestId, 0, 0 );
 
-	LOCK( &this->slavePeers.remappedDataRequestLock );
-	auto it  = this->slavePeers.remappedDataRequest.find( pid );
-	bool ret = ( it != this->slavePeers.remappedDataRequest.end() );
+	LOCK( &this->serverPeers.remappedDataRequestLock );
+	auto it  = this->serverPeers.remappedDataRequest.find( pid );
+	bool ret = ( it != this->serverPeers.remappedDataRequest.end() );
 	// decrement remaining request count, remove counter if it reaches 0
 	if ( ret ) {
 		it->second--;
 		if ( requestCount ) *requestCount = it->second;
-		if ( it->second == 0 ) this->slavePeers.remappedDataRequest.erase( pid );
+		if ( it->second == 0 ) this->serverPeers.remappedDataRequest.erase( pid );
 	}
-	UNLOCK( &this->slavePeers.remappedDataRequestLock );
+	UNLOCK( &this->serverPeers.remappedDataRequestLock );
 
 	if ( ret ) {
 		if ( pidPtr ) *pidPtr = it->first;
@@ -552,13 +552,13 @@ bool Pending::eraseRecovery( uint8_t keySize, char *keyStr, uint16_t &instanceId
 	return ret;
 }
 
-bool Pending::eraseSlavePeerRegistration( uint32_t &requestId, ServerPeerSocket *&socket, bool &success ) {
+bool Pending::eraseServerPeerRegistration( uint32_t &requestId, ServerPeerSocket *&socket, bool &success ) {
 	bool ret = false;
-	LOCK( &this->slavePeers.registrationLock );
-	if ( this->slavePeers.registration.size() ) {
+	LOCK( &this->serverPeers.registrationLock );
+	if ( this->serverPeers.registration.size() ) {
 		ret = true;
-		PendingRegistration reg = this->slavePeers.registration.back();
-		this->slavePeers.registration.pop_back();
+		PendingRegistration reg = this->serverPeers.registration.back();
+		this->serverPeers.registration.pop_back();
 
 		requestId = reg.requestId;
 		socket = reg.socket;
@@ -566,7 +566,7 @@ bool Pending::eraseSlavePeerRegistration( uint32_t &requestId, ServerPeerSocket 
 	} else {
 		ret = false;
 	}
-	UNLOCK( &this->slavePeers.registrationLock );
+	UNLOCK( &this->serverPeers.registrationLock );
 	return ret;
 }
 

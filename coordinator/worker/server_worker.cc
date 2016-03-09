@@ -14,12 +14,12 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 	switch( event.type ) {
 		case SERVER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
 			event.socket->instanceId = event.instanceId;
-			buffer.data = this->protocol.resRegisterSlave( buffer.size, event.instanceId, event.requestId, true );
+			buffer.data = this->protocol.resRegisterServer( buffer.size, event.instanceId, event.requestId, true );
 			isSend = true;
 			break;
 		case SERVER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
 			event.socket->instanceId = event.instanceId;
-			buffer.data = this->protocol.resRegisterSlave( buffer.size, event.instanceId, event.requestId, false );
+			buffer.data = this->protocol.resRegisterServer( buffer.size, event.instanceId, event.requestId, false );
 			isSend = true;
 			break;
 		case SERVER_EVENT_TYPE_REQUEST_SEAL_CHUNKS:
@@ -89,47 +89,47 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 	}
 
 	if ( event.type == SERVER_EVENT_TYPE_ANNOUNCE_SERVER_CONNECTED ) {
-		ArrayMap<int, ServerSocket> &slaves = Coordinator::getInstance()->sockets.slaves;
+		ArrayMap<int, ServerSocket> &servers = Coordinator::getInstance()->sockets.servers;
 		uint32_t requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
 
-		buffer.data = this->protocol.announceSlaveConnected( buffer.size, instanceId, requestId, event.socket );
+		buffer.data = this->protocol.announceServerConnected( buffer.size, instanceId, requestId, event.socket );
 
-		LOCK( &slaves.lock );
-		for ( uint32_t i = 0; i < slaves.size(); i++ ) {
-			ServerSocket *slave = slaves.values[ i ];
-			if ( event.socket->equal( slave ) || ! slave->ready() )
+		LOCK( &servers.lock );
+		for ( uint32_t i = 0; i < servers.size(); i++ ) {
+			ServerSocket *server = servers.values[ i ];
+			if ( event.socket->equal( server ) || ! server->ready() )
 				continue; // No need to tell the new socket
 
-			ret = slave->send( buffer.data, buffer.size, connected );
+			ret = server->send( buffer.data, buffer.size, connected );
 			if ( ret != ( ssize_t ) buffer.size )
 				__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 		}
-		// notify the remap message handler of the new slave
-		struct sockaddr_in slaveAddr = event.socket->getAddr();
+		// notify the remap message handler of the new server
+		struct sockaddr_in serverAddr = event.socket->getAddr();
 		if ( Coordinator::getInstance()->remapMsgHandler )
-			Coordinator::getInstance()->remapMsgHandler->addAliveSlave( slaveAddr );
-		UNLOCK( &slaves.lock );
+			Coordinator::getInstance()->remapMsgHandler->addAliveServer( serverAddr );
+		UNLOCK( &servers.lock );
 	} else if ( event.type == SERVER_EVENT_TYPE_ANNOUNCE_SERVER_RECONSTRUCTED ) {
-		ArrayMap<int, ServerSocket> &slaves = Coordinator::getInstance()->sockets.slaves;
-		ArrayMap<int, ServerSocket> &backupSlaves = Coordinator::getInstance()->sockets.backupSlaves;
+		ArrayMap<int, ServerSocket> &servers = Coordinator::getInstance()->sockets.servers;
+		ArrayMap<int, ServerSocket> &backupServers = Coordinator::getInstance()->sockets.backupServers;
 
-		buffer.data = this->protocol.announceSlaveReconstructed(
+		buffer.data = this->protocol.announceServerReconstructed(
 			buffer.size, event.instanceId, event.requestId,
 			event.message.reconstructed.src,
 			event.message.reconstructed.dst,
-			true // toSlave
+			true // toServer
 		);
 
-		LOCK( &slaves.lock );
-		// Count the number of surviving slaves
-		for ( uint32_t i = 0, slavesSize = slaves.size(), size = slaves.size() + backupSlaves.size(); i < size; i++ ) {
-			ServerSocket *slave = i < slavesSize ? slaves.values[ i ] : backupSlaves.values[ i - slavesSize ];
-			if ( slave->equal( event.message.reconstructed.dst ) || ! slave->ready() )
+		LOCK( &servers.lock );
+		// Count the number of surviving servers
+		for ( uint32_t i = 0, serversSize = servers.size(), size = servers.size() + backupServers.size(); i < size; i++ ) {
+			ServerSocket *server = i < serversSize ? servers.values[ i ] : backupServers.values[ i - serversSize ];
+			if ( server->equal( event.message.reconstructed.dst ) || ! server->ready() )
 				continue; // No need to tell the backup server
-			event.message.reconstructed.sockets->insert( slave );
+			event.message.reconstructed.sockets->insert( server );
 
 			// printf( "[%u, %u] Waiting for ", event.instanceId, event.requestId );
-			// slave->print();
+			// server->print();
 		}
 		// Insert into pending set
 		CoordinatorWorker::pending->insertAnnouncement(
@@ -140,29 +140,29 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 		);
 
 		// Send requests
-		for ( uint32_t i = 0, slavesSize = slaves.size(), size = slaves.size() + backupSlaves.size(); i < size; i++ ) {
-			ServerSocket *slave = i < slavesSize ? slaves.values[ i ] : backupSlaves.values[ i - slavesSize ];
-			if ( slave->equal( event.message.reconstructed.dst ) || ! slave->ready() )
+		for ( uint32_t i = 0, serversSize = servers.size(), size = servers.size() + backupServers.size(); i < size; i++ ) {
+			ServerSocket *server = i < serversSize ? servers.values[ i ] : backupServers.values[ i - serversSize ];
+			if ( server->equal( event.message.reconstructed.dst ) || ! server->ready() )
 				continue; // No need to tell the backup server
 
-			ret = slave->send( buffer.data, buffer.size, connected );
+			ret = server->send( buffer.data, buffer.size, connected );
 			if ( ret != ( ssize_t ) buffer.size ) {
 				__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
-				CoordinatorWorker::pending->eraseAnnouncement( event.instanceId, event.requestId, slave );
+				CoordinatorWorker::pending->eraseAnnouncement( event.instanceId, event.requestId, server );
 			}
 		}
-		// notify the remap message handler of the new slave
-		struct sockaddr_in slaveAddr = event.message.reconstructed.dst->getAddr();
+		// notify the remap message handler of the new server
+		struct sockaddr_in serverAddr = event.message.reconstructed.dst->getAddr();
 		if ( Coordinator::getInstance()->remapMsgHandler )
-			Coordinator::getInstance()->remapMsgHandler->addAliveSlave( slaveAddr );
-		UNLOCK( &slaves.lock );
+			Coordinator::getInstance()->remapMsgHandler->addAliveServer( serverAddr );
+		UNLOCK( &servers.lock );
 	} else if ( event.type == SERVER_EVENT_TYPE_DISCONNECT ) {
-		// Remove the slave from the pending set of annoucement
+		// Remove the server from the pending set of annoucement
 		CoordinatorWorker::pending->eraseAnnouncement( event.socket );
 
 		// Mark it as failed
 		if ( ! Coordinator::getInstance()->config.global.states.disabled ) {
-			Coordinator::getInstance()->switchPhaseForCrashedSlave( event.socket );
+			Coordinator::getInstance()->switchPhaseForCrashedServer( event.socket );
 		} else {
 			ServerEvent serverEvent;
 			serverEvent.triggerReconstruction( event.socket->getAddr() );
@@ -170,21 +170,21 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 		}
 	} else if ( event.type == SERVER_EVENT_TYPE_TRIGGER_RECONSTRUCTION ) {
 		ServerSocket *s = 0;
-		ArrayMap<int, ServerSocket> &slaves = Coordinator::getInstance()->sockets.slaves;
+		ArrayMap<int, ServerSocket> &servers = Coordinator::getInstance()->sockets.servers;
 
-		LOCK( &slaves.lock );
-		for ( uint32_t i = 0, size = slaves.size(); i < size; i++ ) {
-			if ( slaves.values[ i ]->equal( event.message.addr.sin_addr.s_addr, event.message.addr.sin_port ) ) {
-				s = slaves.values[ i ];
+		LOCK( &servers.lock );
+		for ( uint32_t i = 0, size = servers.size(); i < size; i++ ) {
+			if ( servers.values[ i ]->equal( event.message.addr.sin_addr.s_addr, event.message.addr.sin_port ) ) {
+				s = servers.values[ i ];
 				break;
 			}
 		}
-		UNLOCK( &slaves.lock );
+		UNLOCK( &servers.lock );
 
 		if ( s ) {
 			this->handleReconstructionRequest( s );
 		} else {
-			__ERROR__( "CoordinatorWorker", "dispatch", "Unknown crashed slave." );
+			__ERROR__( "CoordinatorWorker", "dispatch", "Unknown crashed server." );
 		}
 	} else if ( event.type == SERVER_EVENT_TYPE_HANDLE_RECONSTRUCTION_REQUEST ) {
 		this->handleReconstructionRequest( event.socket );
@@ -193,11 +193,11 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 		if ( ! connected )
-			__ERROR__( "CoordinatorWorker", "dispatch", "The slave is disconnected." );
+			__ERROR__( "CoordinatorWorker", "dispatch", "The server is disconnected." );
 		if ( event.type == SERVER_EVENT_TYPE_PARITY_MIGRATE )
 			Coordinator::getInstance()->packetPool.free( event.message.parity.packet );
 	} else {
-		// Parse requests from slaves
+		// Parse requests from servers
 		ProtocolHeader header;
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();
 
@@ -209,7 +209,7 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 			buffer.size -= PROTO_HEADER_SIZE;
 			// Validate message
 			if ( header.from != PROTO_MAGIC_FROM_SERVER ) {
-				__ERROR__( "CoordinatorWorker", "dispatch", "Invalid message source from slave." );
+				__ERROR__( "CoordinatorWorker", "dispatch", "Invalid message source from server." );
 				goto quit_1;
 			}
 
@@ -222,7 +222,7 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 							this->handleReleaseDegradedLockResponse( event, buffer.data, header.length );
 							break;
 						default:
-							__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );
+							__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from server." );
 					}
 					break;
 				case PROTO_OPCODE_SERVER_RECONSTRUCTED:
@@ -233,7 +233,7 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 							CoordinatorWorker::pending->eraseAnnouncement( header.instanceId, header.requestId, event.socket );
 							break;
 						default:
-							__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );
+							__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from server." );
 					}
 					break;
 				case PROTO_OPCODE_RECONSTRUCTION:
@@ -242,7 +242,7 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 							this->handleReconstructionResponse( event, buffer.data, header.length );
 							break;
 						default:
-							__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );
+							__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from server." );
 					}
 					break;
 				case PROTO_OPCODE_RECONSTRUCTION_UNSEALED:
@@ -251,16 +251,16 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 							this->handleReconstructionUnsealedResponse( event, buffer.data, header.length );
 							break;
 						default:
-							__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );
+							__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from server." );
 					}
 					break;
 				case PROTO_OPCODE_BACKUP_SERVER_PROMOTED:
 					switch( header.magic ) {
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
-							this->handlePromoteBackupSlaveResponse( event, buffer.data, header.length );
+							this->handlePromoteBackupServerResponse( event, buffer.data, header.length );
 							break;
 						default:
-							__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );
+							__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from server." );
 					}
 					break;
 				case PROTO_OPCODE_SYNC:
@@ -269,7 +269,7 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 							this->processHeartbeat( event, buffer.data, header.length );
 							break;
 						default:
-							__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from slave." );
+							__ERROR__( "CoordinatorWorker", "dispatch", "Invalid magic code from server." );
 							break;
 					}
 					break;
@@ -297,7 +297,7 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 				}
 					break;
 				default:
-					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid opcode from slave." );
+					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid opcode from server." );
 					goto quit_1;
 			}
 quit_1:
@@ -307,7 +307,7 @@ quit_1:
 		if ( connected )
 			event.socket->done();
 		else
-			__ERROR__( "CoordinatorWorker", "dispatch", "The slave is disconnected." );
+			__ERROR__( "CoordinatorWorker", "dispatch", "The server is disconnected." );
 	}
 }
 

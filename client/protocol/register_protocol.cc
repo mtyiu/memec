@@ -1,6 +1,6 @@
 #include "protocol.hh"
 
-char *MasterProtocol::reqRegisterCoordinator( size_t &size, uint32_t requestId, uint32_t addr, uint16_t port ) {
+char *ClientProtocol::reqRegisterCoordinator( size_t &size, uint32_t requestId, uint32_t addr, uint16_t port ) {
 	// -- common/protocol/address_protocol.cc --
 	size = this->generateAddressHeader(
 		PROTO_MAGIC_REQUEST,
@@ -12,7 +12,7 @@ char *MasterProtocol::reqRegisterCoordinator( size_t &size, uint32_t requestId, 
 	return this->buffer.send;
 }
 
-char *MasterProtocol::reqRegisterSlave( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port ) {
+char *ClientProtocol::reqRegisterServer( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port ) {
 	// -- common/protocol/address_protocol.cc --
 	size = this->generateAddressHeader(
 		PROTO_MAGIC_REQUEST,
@@ -25,7 +25,7 @@ char *MasterProtocol::reqRegisterSlave( size_t &size, uint16_t instanceId, uint3
 	return this->buffer.send;
 }
 
-char *MasterProtocol::resRegisterApplication( size_t &size, uint16_t instanceId, uint32_t requestId, bool success ) {
+char *ClientProtocol::resRegisterApplication( size_t &size, uint16_t instanceId, uint32_t requestId, bool success ) {
 	// -- common/protocol/protocol.cc --
 	size = this->generateHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,

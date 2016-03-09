@@ -14,7 +14,7 @@ public:
 	pthread_t tid;
 	EPoll *epoll;
 	ArrayMap<int, struct sockaddr_in> sockets;
-	MasterProtocol protocol;
+	ClientProtocol protocol;
 	struct {
 		size_t size;
 		char data[ PROTO_HEADER_SIZE ];

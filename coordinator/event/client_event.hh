@@ -44,14 +44,14 @@ public:
 	ClientSocket *socket;
 	union {
 		struct {
-			ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency;
-			ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency;
-			std::set<struct sockaddr_in> *overloadedSlaveSet;
-		} slaveLoading;
+			ArrayMap<struct sockaddr_in, Latency> *serverGetLatency;
+			ArrayMap<struct sockaddr_in, Latency> *serverSetLatency;
+			std::set<struct sockaddr_in> *overloadedServerSet;
+		} serverLoading;
 		struct {
 			bool toRemap;
 			bool isCrashed;
-			std::vector<struct sockaddr_in> *slaves;
+			std::vector<struct sockaddr_in> *servers;
 			bool forced;
 		} switchPhase;
 		struct {
@@ -85,11 +85,11 @@ public:
 
 	void reqPushLoadStats (
 		ClientSocket *socket,
-		ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
-		ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency,
-		std::set<struct sockaddr_in> *slaveSet
+		ArrayMap<struct sockaddr_in, Latency> *serverGetLatency,
+		ArrayMap<struct sockaddr_in, Latency> *serverSetLatency,
+		std::set<struct sockaddr_in> *serverSet
 	);
-	void switchPhase( bool toRemap, std::set<struct sockaddr_in> slaves, bool isCrashed = false, bool forced = false );
+	void switchPhase( bool toRemap, std::set<struct sockaddr_in> servers, bool isCrashed = false, bool forced = false );
 	// Degraded lock
 	void resDegradedLock(
 		ClientSocket *socket, uint16_t instanceId, uint32_t requestId,
@@ -113,7 +113,7 @@ public:
 		uint32_t *original, uint32_t *remapped, uint32_t remappedCount, Key &key
 	);
 	// Recovery
-	void announceSlaveReconstructed( ServerSocket *srcSocket, ServerSocket *dstSocket );
+	void announceServerReconstructed( ServerSocket *srcSocket, ServerSocket *dstSocket );
 	// Pending
 	void pending( ClientSocket *socket );
 };

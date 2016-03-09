@@ -26,110 +26,110 @@ void Coordinator::free() {
 	Map::free();
 }
 
-void Coordinator::switchPhaseForCrashedSlave( ServerSocket *serverSocket ) {
+void Coordinator::switchPhaseForCrashedServer( ServerSocket *serverSocket ) {
 	struct sockaddr_in addr = serverSocket->getAddr();
 	ClientEvent event;
 
-	LOCK( &this->overloadedSlaves.lock );
-	std::set<struct sockaddr_in>::iterator it = this->overloadedSlaves.slaveSet.find( addr );
-	if ( it == this->overloadedSlaves.slaveSet.end() ) {
-		std::set<struct sockaddr_in> overloadedSlaves;
-		overloadedSlaves.insert( addr );
-		event.switchPhase( true, overloadedSlaves, true );
+	LOCK( &this->overloadedServers.lock );
+	std::set<struct sockaddr_in>::iterator it = this->overloadedServers.serverSet.find( addr );
+	if ( it == this->overloadedServers.serverSet.end() ) {
+		std::set<struct sockaddr_in> overloadedServers;
+		overloadedServers.insert( addr );
+		event.switchPhase( true, overloadedServers, true );
 		this->eventQueue.insert( event );
 	}
-	UNLOCK( &this->overloadedSlaves.lock );
+	UNLOCK( &this->overloadedServers.lock );
 }
 
-void Coordinator::switchPhase( std::set<struct sockaddr_in> prevOverloadedSlaves ) {
+void Coordinator::switchPhase( std::set<struct sockaddr_in> prevOverloadedServers ) {
 	// skip if remap feature is disabled
 	if ( this->config.global.states.disabled )
 		return;
 
 	ClientEvent event;
-	LOCK( &this->overloadedSlaves.lock );
+	LOCK( &this->overloadedServers.lock );
 
 	double startThreshold = this->config.coordinator.states.threshold.start;
 	double stopThreshold = this->config.coordinator.states.threshold.stop;
-	uint32_t totalSlaveCount = this->sockets.slaves.size();
-	uint32_t curOverloadedSlaveCount = this->overloadedSlaves.slaveSet.size();
-	uint32_t prevOverloadedSlaveCount = prevOverloadedSlaves.size();
+	uint32_t totalServerCount = this->sockets.servers.size();
+	uint32_t curOverloadedServerCount = this->overloadedServers.serverSet.size();
+	uint32_t prevOverloadedServerCount = prevOverloadedServers.size();
 
-	if ( curOverloadedSlaveCount > totalSlaveCount * startThreshold ) { // Phase 1 --> 2
-		// __INFO__( YELLOW, "Coordinator", "switchPhase", "%lf: Overload detected (overloaded slave = %u).", this->getElapsedTime(), curOverloadedSlaveCount );
+	if ( curOverloadedServerCount > totalServerCount * startThreshold ) { // Phase 1 --> 2
+		// __INFO__( YELLOW, "Coordinator", "switchPhase", "%lf: Overload detected (overloaded server = %u).", this->getElapsedTime(), curOverloadedServerCount );
 
-		if ( this->config.coordinator.states.maximum > 0 && ( curOverloadedSlaveCount > this->config.coordinator.states.maximum || this->remapMsgHandler->reachMaximumRemapped( this->config.coordinator.states.maximum ) ) ) {
-			// Limit the number of remapped slaves
-			UNLOCK( &this->overloadedSlaves.lock );
+		if ( this->config.coordinator.states.maximum > 0 && ( curOverloadedServerCount > this->config.coordinator.states.maximum || this->remapMsgHandler->reachMaximumRemapped( this->config.coordinator.states.maximum ) ) ) {
+			// Limit the number of remapped servers
+			UNLOCK( &this->overloadedServers.lock );
 			return;
 		}
 
 		// need to start remapping now
-		if ( prevOverloadedSlaveCount > totalSlaveCount * startThreshold ) {
-			std::set<struct sockaddr_in> newOverloadedSlaves = this->overloadedSlaves.slaveSet;
+		if ( prevOverloadedServerCount > totalServerCount * startThreshold ) {
+			std::set<struct sockaddr_in> newOverloadedServers = this->overloadedServers.serverSet;
 			// already started remapping
-			// start recently overloaded slaves for remapping
-			for ( auto slave : prevOverloadedSlaves )
-				newOverloadedSlaves.erase( slave );
-			if ( newOverloadedSlaves.size() > 0 ) {
-				event.switchPhase( true, newOverloadedSlaves );
+			// start recently overloaded servers for remapping
+			for ( auto server : prevOverloadedServers )
+				newOverloadedServers.erase( server );
+			if ( newOverloadedServers.size() > 0 ) {
+				event.switchPhase( true, newOverloadedServers );
 				this->eventQueue.insert( event );
 			}
-			// stop non-overloaded slaves from remapping
-			for ( auto slave : this->overloadedSlaves.slaveSet )
-				prevOverloadedSlaves.erase( slave );
-			if ( prevOverloadedSlaves.size() > 0 ) {
-				event.switchPhase( false, prevOverloadedSlaves ); // Phase 4 --> 3
+			// stop non-overloaded servers from remapping
+			for ( auto server : this->overloadedServers.serverSet )
+				prevOverloadedServers.erase( server );
+			if ( prevOverloadedServers.size() > 0 ) {
+				event.switchPhase( false, prevOverloadedServers ); // Phase 4 --> 3
 				this->eventQueue.insert( event );
 			}
 		} else {
 			// start remapping phase for all in the background
-			event.switchPhase( true, this->overloadedSlaves.slaveSet );
+			event.switchPhase( true, this->overloadedServers.serverSet );
 			this->eventQueue.insert( event );
 		}
-	} else if ( curOverloadedSlaveCount < totalSlaveCount * stopThreshold &&
-		prevOverloadedSlaveCount >= totalSlaveCount * startThreshold
+	} else if ( curOverloadedServerCount < totalServerCount * stopThreshold &&
+		prevOverloadedServerCount >= totalServerCount * startThreshold
 	) {
 		// no longer need remapping after remapping has started
 		// stop remapping phase for all in the background
-		event.switchPhase( false, prevOverloadedSlaves ); // Phase 4 --> 3
+		event.switchPhase( false, prevOverloadedServers ); // Phase 4 --> 3
 		this->eventQueue.insert( event );
 	}
-	UNLOCK( &this->overloadedSlaves.lock );
+	UNLOCK( &this->overloadedServers.lock );
 }
 
-std::set<struct sockaddr_in> Coordinator::updateOverloadedSlaveSet( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
-		ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency, std::set<struct sockaddr_in> *slaveSet ) {
+std::set<struct sockaddr_in> Coordinator::updateOverloadedServerSet( ArrayMap<struct sockaddr_in, Latency> *serverGetLatency,
+		ArrayMap<struct sockaddr_in, Latency> *serverSetLatency, std::set<struct sockaddr_in> *serverSet ) {
 	double avgSec = 0.0, avgNsec = 0.0;
-	LOCK( &this->overloadedSlaves.lock );
+	LOCK( &this->overloadedServers.lock );
 
-	std::set<struct sockaddr_in> prevOverloadedSlaves = this->overloadedSlaves.slaveSet;
+	std::set<struct sockaddr_in> prevOverloadedServers = this->overloadedServers.serverSet;
 
 	// what has past is left in the past
-	this->overloadedSlaves.slaveSet.clear();
+	this->overloadedServers.serverSet.clear();
 	double threshold = this->config.coordinator.states.threshold.overload;
 
-	// compare each slave latency with the avg multipled by threshold
+	// compare each server latency with the avg multipled by threshold
 #define GET_OVERLOADED_SERVERS( _TYPE_ ) { \
-	uint32_t slaveCount = slave##_TYPE_##Latency->size(); \
+	uint32_t serverCount = server##_TYPE_##Latency->size(); \
 	avgSec = 0.0; \
 	avgNsec = 0.0; \
-	/* get the average of slaves */ \
-	for ( uint32_t i = 0; i < slaveCount; i++ ) { \
-		avgSec += ( double ) slave##_TYPE_##Latency->values[ i ]->sec / slaveCount; \
-		avgNsec += ( double ) slave##_TYPE_##Latency->values[ i ]->nsec / slaveCount; \
+	/* get the average of servers */ \
+	for ( uint32_t i = 0; i < serverCount; i++ ) { \
+		avgSec += ( double ) server##_TYPE_##Latency->values[ i ]->sec / serverCount; \
+		avgNsec += ( double ) server##_TYPE_##Latency->values[ i ]->nsec / serverCount; \
 	} \
 	/* if the average is too small ( esp. there is no data ), skip overload set update */ \
 	if ( avgSec > FLOAT_THRESHOLD || avgNsec > FLOAT_THRESHOLD ) { \
 		/* printf( " AVG %.3lf %.3lf vs THS %.3lf %.3lf\n", avgSec, avgNsec, avgSec * threshold, avgNsec * threshold ); */ \
-		for ( uint32_t i = 0; i < slaveCount; i++ ) { \
+		for ( uint32_t i = 0; i < serverCount; i++ ) { \
 			/* if (1) sec > avgSec or (2) sec == avgSec && nsec > avgNsec */ \
-			if ( ( double ) slave##_TYPE_##Latency->values[ i ]->sec > avgSec * threshold || \
-					( ( A_EQUAL_B ( slave##_TYPE_##Latency->values[ i ]->sec, avgSec * threshold ) && \
-						(double) slave##_TYPE_##Latency->values[ i ]->nsec >= avgNsec * threshold ) ) ) { \
-				this->overloadedSlaves.slaveSet.insert( slave##_TYPE_##Latency->keys[ i ] ); \
-				slaveSet->insert( slave##_TYPE_##Latency->keys[ i ] ); \
-				/* printf( "Slave #%u overloaded %u %u !!!!\n", i, slave##_TYPE_##Latency->values[ i ]->sec, slave##_TYPE_##Latency->values[ i ]->nsec ); */ \
+			if ( ( double ) server##_TYPE_##Latency->values[ i ]->sec > avgSec * threshold || \
+					( ( A_EQUAL_B ( server##_TYPE_##Latency->values[ i ]->sec, avgSec * threshold ) && \
+						(double) server##_TYPE_##Latency->values[ i ]->nsec >= avgNsec * threshold ) ) ) { \
+				this->overloadedServers.serverSet.insert( server##_TYPE_##Latency->keys[ i ] ); \
+				serverSet->insert( server##_TYPE_##Latency->keys[ i ] ); \
+				/* printf( "Server #%u overloaded %u %u !!!!\n", i, server##_TYPE_##Latency->values[ i ]->sec, server##_TYPE_##Latency->values[ i ]->nsec ); */ \
 			} \
 		} \
 	} \
@@ -139,28 +139,28 @@ std::set<struct sockaddr_in> Coordinator::updateOverloadedSlaveSet( ArrayMap<str
 	GET_OVERLOADED_SERVERS( Set );
 
 #undef GET_OVERLOADED_SERVERS
-	UNLOCK( &this->overloadedSlaves.lock );
-	return prevOverloadedSlaves;
+	UNLOCK( &this->overloadedServers.lock );
+	return prevOverloadedServers;
 }
 
-void Coordinator::updateAverageSlaveLoading( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
-		ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency ) {
+void Coordinator::updateAverageServerLoading( ArrayMap<struct sockaddr_in, Latency> *serverGetLatency,
+		ArrayMap<struct sockaddr_in, Latency> *serverSetLatency ) {
 
-	LOCK( &this->slaveLoading.lock );
+	LOCK( &this->serverLoading.lock );
 	ArrayMap< struct sockaddr_in, ArrayMap< struct sockaddr_in, Latency > > *latest = NULL;
 	double avgSec = 0.0, avgNsec = 0.0;
 
-	// calculate the average from existing stat from masters
+	// calculate the average from existing stat from clients
 #define SET_AVG_SERVER_LATENCY( _TYPE_ ) \
-	latest = &this->slaveLoading.latest##_TYPE_; \
+	latest = &this->serverLoading.latest##_TYPE_; \
 	for ( uint32_t i = 0; i < latest->size(); i++ ) { \
 		avgSec = 0.0; \
 		avgNsec = 0.0; \
-		uint32_t masterCount = latest->values[ i ]->size(); \
-		/* calculate the average over masters with latency measurement for this slave */ \
-		for ( uint32_t j = 0; j < masterCount; j++ ) { \
-			avgSec += ( double ) latest->values[ i ]->values[ j ]->sec / masterCount; \
-			avgNsec += ( double ) latest->values[ i ]->values[ j ]->nsec / masterCount; \
+		uint32_t clientCount = latest->values[ i ]->size(); \
+		/* calculate the average over clients with latency measurement for this server */ \
+		for ( uint32_t j = 0; j < clientCount; j++ ) { \
+			avgSec += ( double ) latest->values[ i ]->values[ j ]->sec / clientCount; \
+			avgNsec += ( double ) latest->values[ i ]->values[ j ]->nsec / clientCount; \
 			if ( avgNsec >= GIGA ) { \
 				avgNsec -= GIGA; \
 				avgSec += 1; \
@@ -170,9 +170,9 @@ void Coordinator::updateAverageSlaveLoading( ArrayMap<struct sockaddr_in, Latenc
 		if ( avgSec > FLOAT_THRESHOLD || avgNsec > FLOAT_THRESHOLD ) { \
 			int idx = 0; \
 			/* directly insert latency if not exists, otherwise, replace */ \
-			Latency *oldLatency = slave##_TYPE_##Latency->get( latest->keys[ i ], &idx ); \
+			Latency *oldLatency = server##_TYPE_##Latency->get( latest->keys[ i ], &idx ); \
 			if ( idx == -1 ) \
-				slave##_TYPE_##Latency->set( latest->keys[ i ], new Latency( avgSec, avgNsec ) ); \
+				server##_TYPE_##Latency->set( latest->keys[ i ], new Latency( avgSec, avgNsec ) ); \
 			else { \
 				oldLatency->set( avgSec, avgNsec ); \
 			} \
@@ -191,36 +191,36 @@ void Coordinator::updateAverageSlaveLoading( ArrayMap<struct sockaddr_in, Latenc
 	} \
 	_DST_.clear();
 
-	CLEAN_2D_ARRAY_MAP( this->slaveLoading.latestGet );
-	CLEAN_2D_ARRAY_MAP( this->slaveLoading.latestSet );
+	CLEAN_2D_ARRAY_MAP( this->serverLoading.latestGet );
+	CLEAN_2D_ARRAY_MAP( this->serverLoading.latestSet );
 #undef CLEAN_2D_ARRAY_MAP
-	UNLOCK( &this->slaveLoading.lock );
+	UNLOCK( &this->serverLoading.lock );
 }
 
 void Coordinator::signalHandler( int signal ) {
 	Coordinator *coordinator = Coordinator::getInstance();
-	ArrayMap<int, ClientSocket> &sockets = coordinator->sockets.masters;
-	ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency = new ArrayMap<struct sockaddr_in, Latency>();
-	ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency = new ArrayMap<struct sockaddr_in, Latency>();
-	std::set<struct sockaddr_in> *overloadedSlaveSet = new std::set<struct sockaddr_in>();
+	ArrayMap<int, ClientSocket> &sockets = coordinator->sockets.clients;
+	ArrayMap<struct sockaddr_in, Latency> *serverGetLatency = new ArrayMap<struct sockaddr_in, Latency>();
+	ArrayMap<struct sockaddr_in, Latency> *serverSetLatency = new ArrayMap<struct sockaddr_in, Latency>();
+	std::set<struct sockaddr_in> *overloadedServerSet = new std::set<struct sockaddr_in>();
 	switch ( signal ) {
 		case SIGALRM:
-			coordinator->updateAverageSlaveLoading( slaveGetLatency, slaveSetLatency );
+			coordinator->updateAverageServerLoading( serverGetLatency, serverSetLatency );
 			// start / stop remapping according to criteria ( in non-manual mode )
 			if ( coordinator->config.coordinator.states.isManual == 0 ) {
-				coordinator->switchPhase( coordinator->updateOverloadedSlaveSet( slaveGetLatency, slaveSetLatency, overloadedSlaveSet ) );
-				// push the stats back to masters
+				coordinator->switchPhase( coordinator->updateOverloadedServerSet( serverGetLatency, serverSetLatency, overloadedServerSet ) );
+				// push the stats back to clients
 				// leave the free of ArrayMaps to workers after constructing the data buffer
 				LOCK( &sockets.lock );
-				//fprintf( stderr, "queuing events get %lu set %lu\n", slaveGetLatency->size(), slaveSetLatency->size() );
-				if ( slaveGetLatency->size() > 0 || slaveSetLatency->size() > 0 ) {
+				//fprintf( stderr, "queuing events get %lu set %lu\n", serverGetLatency->size(), serverSetLatency->size() );
+				if ( serverGetLatency->size() > 0 || serverSetLatency->size() > 0 ) {
 					ClientEvent event;
 					for ( uint32_t i = 0; i < sockets.size(); i++ ) {
 						event.reqPushLoadStats(
 							sockets.values[ i ],
-							new ArrayMap<struct sockaddr_in, Latency>( *slaveGetLatency ),
-							new ArrayMap<struct sockaddr_in, Latency>( *slaveSetLatency ),
-							new std::set<struct sockaddr_in>( *overloadedSlaveSet )
+							new ArrayMap<struct sockaddr_in, Latency>( *serverGetLatency ),
+							new ArrayMap<struct sockaddr_in, Latency>( *serverSetLatency ),
+							new std::set<struct sockaddr_in>( *overloadedServerSet )
 						);
 						coordinator->eventQueue.insert( event );
 					}
@@ -232,11 +232,11 @@ void Coordinator::signalHandler( int signal ) {
 			Coordinator::getInstance()->stop();
 			fclose( stdin );
 	}
-	slaveGetLatency->clear();
-	slaveSetLatency->clear();
-	delete slaveGetLatency;
-	delete slaveSetLatency;
-	delete overloadedSlaveSet;
+	serverGetLatency->clear();
+	serverSetLatency->clear();
+	delete serverGetLatency;
+	delete serverSetLatency;
+	delete overloadedServerSet;
 }
 
 bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
@@ -266,16 +266,16 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 
 	/* Vectors and other sockets */
 	Socket::init( &this->sockets.epoll );
-	ClientSocket::setArrayMap( &this->sockets.masters );
-	ServerSocket::setArrayMap( &this->sockets.slaves );
-	this->sockets.masters.reserve( this->config.global.servers.size() );
-	this->sockets.slaves.reserve( this->config.global.servers.size() );
-	this->sockets.backupSlaves.needsDelete = false;
+	ClientSocket::setArrayMap( &this->sockets.clients );
+	ServerSocket::setArrayMap( &this->sockets.servers );
+	this->sockets.clients.reserve( this->config.global.servers.size() );
+	this->sockets.servers.reserve( this->config.global.servers.size() );
+	this->sockets.backupServers.needsDelete = false;
 	for ( int i = 0, len = this->config.global.servers.size(); i < len; i++ ) {
 		ServerSocket *socket = new ServerSocket();
 		int tmpfd = - ( i + 1 );
 		socket->init( tmpfd, this->config.global.servers[ i ], &this->sockets.epoll );
-		this->sockets.slaves.set( tmpfd, socket );
+		this->sockets.servers.set( tmpfd, socket );
 	}
 	Map::init( this->config.global.stripeLists.count );
 	/* Stripe list */
@@ -283,7 +283,7 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 		this->config.global.coding.params.getChunkCount(),
 		this->config.global.coding.params.getDataChunkCount(),
 		this->config.global.stripeLists.count,
-		this->sockets.slaves.values
+		this->sockets.servers.values
 	);
 	/* Packet Pool */
 	this->packetPool.init(
@@ -317,20 +317,20 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 		sprintf( coordName, "%s%04d", COORD_PREFIX, this->config.coordinator.coordinator.addr.id );
 		remapMsgHandler = CoordinatorRemapMsgHandler::getInstance();
 		remapMsgHandler->init( this->config.global.states.spreaddAddr.addr, this->config.global.states.spreaddAddr.port, coordName );
-		// add the slave addrs to remapMsgHandler
-		LOCK( &this->sockets.slaves.lock );
-		for ( uint32_t i = 0; i < this->sockets.slaves.size(); i++ ) {
-			remapMsgHandler->addAliveSlave( this->sockets.slaves.values[ i ]->getAddr() );
+		// add the server addrs to remapMsgHandler
+		LOCK( &this->sockets.servers.lock );
+		for ( uint32_t i = 0; i < this->sockets.servers.size(); i++ ) {
+			remapMsgHandler->addAliveServer( this->sockets.servers.values[ i ]->getAddr() );
 		}
-		UNLOCK( &this->sockets.slaves.lock );
-		//remapMsgHandler->listAliveSlaves();
+		UNLOCK( &this->sockets.servers.lock );
+		//remapMsgHandler->listAliveServers();
 	}
 
 	/* Smoothing factor */
 	Latency::smoothingFactor = this->config.global.states.smoothingFactor;
 
-	/* Slave Loading stats */
-	LOCK_INIT( &this->slaveLoading.lock );
+	/* Server Loading stats */
+	LOCK_INIT( &this->serverLoading.lock );
 	uint32_t sec, msec;
 	if ( this->config.global.timeout.load > 0 ) {
 		sec = this->config.global.timeout.load / 1000;
@@ -382,7 +382,7 @@ bool Coordinator::start() {
 	this->startTime = start_timer();
 	this->isRunning = true;
 
-	/* Slave loading stats */
+	/* Server loading stats */
 	statsTimer.start();
 
 	return true;
@@ -414,15 +414,15 @@ bool Coordinator::stop() {
 		this->workers[ i ].join();
 
 	/* Sockets */
-	printf( "Stopping master sockets...\n" );
-	for ( i = 0, len = this->sockets.masters.size(); i < len; i++ )
-		this->sockets.masters[ i ]->stop();
-	this->sockets.masters.clear();
+	printf( "Stopping client sockets...\n" );
+	for ( i = 0, len = this->sockets.clients.size(); i < len; i++ )
+		this->sockets.clients[ i ]->stop();
+	this->sockets.clients.clear();
 
-	printf( "Stopping slave sockets...\n" );
-	for ( i = 0, len = this->sockets.slaves.size(); i < len; i++ )
-		this->sockets.slaves[ i ]->stop();
-	this->sockets.slaves.clear();
+	printf( "Stopping server sockets...\n" );
+	for ( i = 0, len = this->sockets.servers.size(); i < len; i++ )
+		this->sockets.servers[ i ]->stop();
+	this->sockets.servers.clear();
 
 	/* Remapping message handler */
 	printf( "Stopping remapping message handler...\n" );
@@ -441,23 +441,23 @@ bool Coordinator::stop() {
 	return true;
 }
 
-void Coordinator::syncSlaveMeta( struct sockaddr_in slave, bool *sync ) {
+void Coordinator::syncServerMeta( struct sockaddr_in server, bool *sync ) {
 	ServerEvent event;
 	ServerSocket *socket = NULL;
 	struct sockaddr_in addr;
 
-	// find the corresponding socket for slave by address
-	LOCK( &this->sockets.slaves.lock );
-	for( uint32_t i = 0; i < this->sockets.slaves.size(); i++ ) {
-		addr = this->sockets.slaves.values[ i ]->getAddr();
-		if ( slave == addr ) {
-			socket = this->sockets.slaves.values[ i ];
+	// find the corresponding socket for server by address
+	LOCK( &this->sockets.servers.lock );
+	for( uint32_t i = 0; i < this->sockets.servers.size(); i++ ) {
+		addr = this->sockets.servers.values[ i ]->getAddr();
+		if ( server == addr ) {
+			socket = this->sockets.servers.values[ i ];
 			break;
 		}
 	}
-	UNLOCK( &this->sockets.slaves.lock );
+	UNLOCK( &this->sockets.servers.lock );
 	if ( socket == NULL ) {
-		__ERROR__( "Coordinator", "syncSlaveMeta", "Cannot find slave socket\n" );
+		__ERROR__( "Coordinator", "syncServerMeta", "Cannot find server socket\n" );
 		*sync = true;
 		return;
 	}
@@ -471,25 +471,25 @@ void Coordinator::releaseDegradedLock() {
 	char tmp[ 16 ];
 	ServerEvent event;
 
-	printf( "Which socket ([0-%lu] or all)? ", this->sockets.slaves.size() - 1 );
+	printf( "Which socket ([0-%lu] or all)? ", this->sockets.servers.size() - 1 );
 	fflush( stdout );
 	if ( ! fgets( tmp, sizeof( tmp ), stdin ) )
 		return;
 	if ( strncmp( tmp, "all", 3 ) == 0 ) {
 		socketFromId = 0;
-		socketToId = this->sockets.slaves.size();
+		socketToId = this->sockets.servers.size();
 	} else if ( sscanf( tmp, "%u", &socketFromId ) != 1 ) {
 		fprintf( stderr, "Invalid socket ID.\n" );
 		return;
-	} else if ( socketFromId >= this->sockets.slaves.size() ) {
-		fprintf( stderr, "The specified socket ID exceeds the range [0-%lu].\n", this->sockets.slaves.size() - 1 );
+	} else if ( socketFromId >= this->sockets.servers.size() ) {
+		fprintf( stderr, "The specified socket ID exceeds the range [0-%lu].\n", this->sockets.servers.size() - 1 );
 		return;
 	} else {
 		socketToId = socketFromId + 1;
 	}
 
 	for ( uint32_t socketId = socketFromId; socketId < socketToId; socketId++ ) {
-		ServerSocket *socket = this->sockets.slaves.values[ socketId ];
+		ServerSocket *socket = this->sockets.servers.values[ socketId ];
 		if ( ! socket ) {
 			fprintf( stderr, "Unknown socket ID!\n" );
 			return;
@@ -504,15 +504,15 @@ void Coordinator::releaseDegradedLock() {
 	}
 }
 
-void Coordinator::releaseDegradedLock( struct sockaddr_in slave, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done ) {
+void Coordinator::releaseDegradedLock( struct sockaddr_in server, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done ) {
 	uint32_t index = 0;
 	ServerSocket *socket;
-	for ( uint32_t i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
-		socket = this->sockets.slaves.values[ i ];
+	for ( uint32_t i = 0, len = this->sockets.servers.size(); i < len; i++ ) {
+		socket = this->sockets.servers.values[ i ];
 		if ( ! socket )
 			continue;
 
-		if ( socket->equal( slave.sin_addr.s_addr, slave.sin_port ) ) {
+		if ( socket->equal( server.sin_addr.s_addr, server.sin_port ) ) {
 			index = i;
 			break;
 		} else {
@@ -534,9 +534,9 @@ void Coordinator::releaseDegradedLock( struct sockaddr_in slave, pthread_mutex_t
 	printf( "\n" );
 }
 
-void Coordinator::syncRemappedData( struct sockaddr_in slaveAddr, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done ) {
+void Coordinator::syncRemappedData( struct sockaddr_in serverAddr, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done ) {
 	CoordinatorEvent event;
-	event.syncRemappedData( slaveAddr, lock, cond, done );
+	event.syncRemappedData( serverAddr, lock, cond, done );
 	this->eventQueue.insert( event );
 }
 
@@ -556,24 +556,24 @@ void Coordinator::debug( FILE *f ) {
 	fprintf( f, "Coordinator socket\n------------------\n" );
 	this->sockets.self.print( f );
 
-	fprintf( f, "\nMaster sockets\n--------------\n" );
-	for ( i = 0, len = this->sockets.masters.size(); i < len; i++ ) {
+	fprintf( f, "\nClient sockets\n--------------\n" );
+	for ( i = 0, len = this->sockets.clients.size(); i < len; i++ ) {
 		fprintf( f, "%d. ", i + 1 );
-		this->sockets.masters[ i ]->print( f );
+		this->sockets.clients[ i ]->print( f );
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
 
-	fprintf( f, "\nSlave sockets\n-------------\n" );
-	for ( i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
+	fprintf( f, "\nServer sockets\n-------------\n" );
+	for ( i = 0, len = this->sockets.servers.size(); i < len; i++ ) {
 		fprintf( f, "%d. ", i + 1 );
-		this->sockets.slaves[ i ]->print( f );
+		this->sockets.servers[ i ]->print( f );
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
 
-	fprintf( f, "\nBackup slave sockets\n-------------\n" );
-	for ( i = 0, len = this->sockets.backupSlaves.size(); i < len; i++ ) {
+	fprintf( f, "\nBackup server sockets\n-------------\n" );
+	for ( i = 0, len = this->sockets.backupServers.size(); i < len; i++ ) {
 		fprintf( f, "%d. ", i + 1 );
-		this->sockets.backupSlaves[ i ]->print( f );
+		this->sockets.backupServers[ i ]->print( f );
 	}
 	if ( len == 0 ) fprintf( f, "(None)\n" );
 
@@ -680,18 +680,18 @@ void Coordinator::interactive() {
 			valid = true;
 			this->releaseDegradedLock();
 		} else if ( strcmp( command, "remapMigrate" ) == 0 ) {
-			for ( uint32_t i = 0; i < this->sockets.slaves.size(); i++ ){
+			for ( uint32_t i = 0; i < this->sockets.servers.size(); i++ ){
 				this->syncRemappedData(
-					this->sockets.slaves[ i ]->getAddr(),
+					this->sockets.servers[ i ]->getAddr(),
 					0, 0, 0
 				);
 			}
 			valid = true;
 		} else if ( strcmp( command, "overload" ) == 0 ) {
-			this->setSlave( true );
+			this->setServer( true );
 			valid = true;
 		} else if ( strcmp( command, "underload" ) == 0 ) {
-			this->setSlave( false );
+			this->setServer( false );
 			valid = true;
 		} else if ( strcmp( command, "manual" ) == 0 ) {
 			this->switchToManualOverload();
@@ -712,12 +712,12 @@ void Coordinator::interactive() {
 void Coordinator::dump() {
 	FILE *f = stdout;
 	size_t numKeys = 0;
-	for ( size_t i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
-		fprintf( f, "##### Slave #%lu: ", i + 1 );
-		this->sockets.slaves[ i ]->printAddress( f );
+	for ( size_t i = 0, len = this->sockets.servers.size(); i < len; i++ ) {
+		fprintf( f, "##### Server #%lu: ", i + 1 );
+		this->sockets.servers[ i ]->printAddress( f );
 		fprintf( f, " #####\n" );
 
-		numKeys += this->sockets.slaves[ i ]->map.dump();
+		numKeys += this->sockets.servers[ i ]->map.dump();
 	}
 	fprintf( f, "Total number of key-value pairs = %lu.\n", numKeys );
 
@@ -727,13 +727,13 @@ void Coordinator::dump() {
 void Coordinator::metadata() {
 	FILE *f = fopen( "coordinator.meta", "w+" );
 	if ( ! f ) {
-		__ERROR__( "Slave", "metadata", "Cannot write to the file \"coordinator.meta\"." );
+		__ERROR__( "Server", "metadata", "Cannot write to the file \"coordinator.meta\"." );
 	}
 
 	printf( "Writing log to coordinator.log..." );
 	fflush( stdout );
-	for ( size_t i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
-		this->sockets.slaves[ i ]->map.persist( f );
+	for ( size_t i = 0, len = this->sockets.servers.size(); i < len; i++ ) {
+		this->sockets.servers[ i ]->map.persist( f );
 	}
 	fclose( f );
 	printf( "Done.\n" );
@@ -744,9 +744,9 @@ void Coordinator::printRemapping( FILE *f ) {
 	fprintf( f, "----------------------------------------\n" );
 	this->remappingRecords.print( f );
 	if ( ! this->config.global.states.disabled ) {
-		fprintf( f, "\nList of Tracking Slaves\n" );
+		fprintf( f, "\nList of Tracking Servers\n" );
 		fprintf( f, "----------------------------------------\n" );
-		this->remapMsgHandler->listAliveSlaves();
+		this->remapMsgHandler->listAliveServers();
 	}
 }
 
@@ -777,18 +777,18 @@ void Coordinator::help() {
 		"- hash: Show the stripe list hashed by an input key\n"
 		"- lookup: Search for the metadata of an input key\n"
 		"- stripe: Query the seal status of a stripe\n"
-		"- seal: Force all slaves to seal all its chunks\n"
-		"- flush: Force all slaves to flush all its chunks\n"
+		"- seal: Force all servers to seal all its chunks\n"
+		"- flush: Force all servers to flush all its chunks\n"
 		"- log: Write the log to coordinator.log\n"
 		"- release: Release degraded locks at the specified socket\n"
 		"- metadata: Write metadata to disk\n"
 		"- remapping: Show remapping info\n"
-		"- remapRecordSync: Force all remapping records to masters\n"
+		"- remapRecordSync: Force all remapping records to clients\n"
 		"- remapMigrate: Force all remapped kv to migrate\n"
-		"- overload: Force a slave to overload ( normal > degraded )\n"
-		"- underload: Force a slave to underload ( degraded > normal) \n"
-		"- manual: Switch to overload slaves manually\n"
-		"- auto: Switch to detect overload slaves using loading statistics\n"
+		"- overload: Force a server to overload ( normal > degraded )\n"
+		"- underload: Force a server to underload ( degraded > normal) \n"
+		"- manual: Switch to overload servers manually\n"
+		"- auto: Switch to detect overload servers using loading statistics\n"
 		"- exit: Terminate this client\n"
 	);
 	fflush( stdout );
@@ -949,57 +949,57 @@ void Coordinator::printLog() {
 void Coordinator::seal() {
 	ServerEvent event;
 	size_t count = 0;
-	for ( size_t i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
-		if ( this->sockets.slaves[ i ]->ready() ) {
-			event.reqSealChunks( this->sockets.slaves[ i ] );
+	for ( size_t i = 0, len = this->sockets.servers.size(); i < len; i++ ) {
+		if ( this->sockets.servers[ i ]->ready() ) {
+			event.reqSealChunks( this->sockets.servers[ i ] );
 			this->eventQueue.insert( event );
 			count++;
 		}
 	}
-	printf( "Sending seal requests to %lu slaves...\n", count );
+	printf( "Sending seal requests to %lu servers...\n", count );
 }
 
 void Coordinator::flush() {
 	ServerEvent event;
 	size_t count = 0;
-	for ( size_t i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
-		if ( this->sockets.slaves[ i ]->ready() ) {
-			event.reqFlushChunks( this->sockets.slaves[ i ] );
+	for ( size_t i = 0, len = this->sockets.servers.size(); i < len; i++ ) {
+		if ( this->sockets.servers[ i ]->ready() ) {
+			event.reqFlushChunks( this->sockets.servers[ i ] );
 			this->eventQueue.insert( event );
 			count++;
 		}
 	}
-	printf( "Sending flush requests to %lu slaves...\n", count );
+	printf( "Sending flush requests to %lu servers...\n", count );
 }
 
-void Coordinator::setSlave( bool overloaded ) {
+void Coordinator::setServer( bool overloaded ) {
 	int socket, i, len;
 	ClientEvent event;
 
-	printf( "\nSlave sockets\n-------------\n" );
-	for ( i = 0, len = this->sockets.slaves.size(); i < len; i++ ) {
+	printf( "\nServer sockets\n-------------\n" );
+	for ( i = 0, len = this->sockets.servers.size(); i < len; i++ ) {
 		printf( "%d. ", i + 1 );
-		this->sockets.slaves[ i ]->print( stdout );
+		this->sockets.servers[ i ]->print( stdout );
 	}
 	if ( len == 0 ) printf( "(None)\n" );
 
-	printf( "Which slave to %s (socket fd, enter 0 to exit) ? ", overloaded ? "overload" : "underload" );
+	printf( "Which server to %s (socket fd, enter 0 to exit) ? ", overloaded ? "overload" : "underload" );
 	fflush( stdout );
-	std::set<struct sockaddr_in> slaves;
+	std::set<struct sockaddr_in> servers;
 	ServerSocket *s = 0;
 	while ( scanf( "%u", &socket) == 1 ) {
-		s = this->sockets.slaves.get( socket );
+		s = this->sockets.servers.get( socket );
 		if ( ! s ) break;
 
-		slaves.insert( s->getAddr() );
-		printf( "Added slave " );
+		servers.insert( s->getAddr() );
+		printf( "Added server " );
 		s->printAddress();
-		printf( "\nWhich slave to %s (socket fd, enter 0 to exit) ? ", overloaded ? "overload" : "underload" );
+		printf( "\nWhich server to %s (socket fd, enter 0 to exit) ? ", overloaded ? "overload" : "underload" );
 		fflush( stdout );
 	}
 	if ( this->config.coordinator.states.isManual == 0 )
-		printf( "\nWARNING: Not in manual state for setting overloaded slaves.\n" );
-	event.switchPhase( overloaded, slaves, false /* isCrushed */, true /* isforced */ );
+		printf( "\nWARNING: Not in manual state for setting overloaded servers.\n" );
+	event.switchPhase( overloaded, servers, false /* isCrushed */, true /* isforced */ );
 	this->eventQueue.insert( event );
 }
 

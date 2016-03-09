@@ -1,7 +1,7 @@
 #include <cassert>
 #include "protocol.hh"
 
-char *SlaveProtocol::reqUpdate( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t chunkUpdateOffset, char *buf, uint32_t timestamp ) {
+char *ServerProtocol::reqUpdate( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t chunkUpdateOffset, char *buf, uint32_t timestamp ) {
 	// -- common/protocol/normal_protocol.cc --
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateChunkKeyValueUpdateHeader(
@@ -24,7 +24,7 @@ char *SlaveProtocol::reqUpdate( size_t &size, uint16_t instanceId, uint32_t requ
 	return buf;
 }
 
-char *SlaveProtocol::resUpdate( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t chunkUpdateOffset, char *buf ) {
+char *ServerProtocol::resUpdate( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t chunkUpdateOffset, char *buf ) {
 	// -- common/protocol/normal_protocol.cc --
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateChunkKeyValueUpdateHeader(
@@ -45,7 +45,7 @@ char *SlaveProtocol::resUpdate( size_t &size, uint16_t instanceId, uint32_t requ
 	return buf;
 }
 
-char *SlaveProtocol::reqDelete( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, char *buf, uint32_t timestamp ) {
+char *ServerProtocol::reqDelete( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, char *buf, uint32_t timestamp ) {
 	// -- common/protocol/normal_protocol.cc --
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateChunkKeyHeader(
@@ -64,7 +64,7 @@ char *SlaveProtocol::reqDelete( size_t &size, uint16_t instanceId, uint32_t requ
 	return buf;
 }
 
-char *SlaveProtocol::resDelete( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, char *buf ) {
+char *ServerProtocol::resDelete( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *key, uint8_t keySize, char *buf ) {
 	// -- common/protocol/normal_protocol.cc --
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateChunkKeyHeader(
@@ -82,7 +82,7 @@ char *SlaveProtocol::resDelete( size_t &size, uint16_t instanceId, uint32_t requ
 	return buf;
 }
 
-char *SlaveProtocol::reqGetChunk( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *buf ) {
+char *ServerProtocol::reqGetChunk( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, char *buf ) {
 	// -- common/protocol/normal_protocol.cc --
 	size = this->generateChunkHeader(
 		PROTO_MAGIC_REQUEST,
@@ -95,7 +95,7 @@ char *SlaveProtocol::reqGetChunk( size_t &size, uint16_t instanceId, uint32_t re
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::resGetChunk( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t chunkSize, uint32_t chunkOffset, char *chunkData, uint8_t sealIndicatorCount, bool *sealIndicator ) {
+char *ServerProtocol::resGetChunk( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t chunkSize, uint32_t chunkOffset, char *chunkData, uint8_t sealIndicatorCount, bool *sealIndicator ) {
 	// -- common/protocol/normal_protocol.cc --
 	if ( success ) {
 		size = this->generateChunkDataHeader(
@@ -119,7 +119,7 @@ char *SlaveProtocol::resGetChunk( size_t &size, uint16_t instanceId, uint32_t re
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::reqSetChunk( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t chunkSize, uint32_t chunkOffset, char *chunkData ) {
+char *ServerProtocol::reqSetChunk( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t chunkSize, uint32_t chunkOffset, char *chunkData ) {
 	// -- common/protocol/normal_protocol.cc --
 	size = this->generateChunkDataHeader(
 		PROTO_MAGIC_REQUEST,
@@ -133,7 +133,7 @@ char *SlaveProtocol::reqSetChunk( size_t &size, uint16_t instanceId, uint32_t re
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::reqSetChunk( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, std::unordered_map<Key, KeyValue> *values, std::unordered_multimap<Metadata, Key> *metadataRev, std::unordered_set<Key> *deleted, LOCK_T *lock, bool &isCompleted ) {
+char *ServerProtocol::reqSetChunk( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, std::unordered_map<Key, KeyValue> *values, std::unordered_multimap<Metadata, Key> *metadataRev, std::unordered_set<Key> *deleted, LOCK_T *lock, bool &isCompleted ) {
 	// -- common/protocol/normal_protocol.cc --
 	size = this->generateChunkKeyValueHeader(
 		PROTO_MAGIC_REQUEST,
@@ -147,7 +147,7 @@ char *SlaveProtocol::reqSetChunk( size_t &size, uint16_t instanceId, uint32_t re
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::resSetChunk( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) {
+char *ServerProtocol::resSetChunk( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) {
 	// -- common/protocol/normal_protocol.cc --
 	size = this->generateChunkHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
@@ -159,7 +159,7 @@ char *SlaveProtocol::resSetChunk( size_t &size, uint16_t instanceId, uint32_t re
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::reqUpdateChunk( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta, char *buf, uint32_t timestamp, bool checkGetChunk ) {
+char *ServerProtocol::reqUpdateChunk( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta, char *buf, uint32_t timestamp, bool checkGetChunk ) {
 	// -- common/protocol/normal_protocol.cc --
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateChunkUpdateHeader(
@@ -176,7 +176,7 @@ char *SlaveProtocol::reqUpdateChunk( size_t &size, uint16_t instanceId, uint32_t
 	return buf;
 }
 
-char *SlaveProtocol::resUpdateChunk( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId ) {
+char *ServerProtocol::resUpdateChunk( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId ) {
 	// -- common/protocol/normal_protocol.cc --
 	size = this->generateChunkUpdateHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
@@ -189,7 +189,7 @@ char *SlaveProtocol::resUpdateChunk( size_t &size, uint16_t instanceId, uint32_t
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::reqDeleteChunk( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta, char *buf, uint32_t timestamp, bool checkGetChunk ) {
+char *ServerProtocol::reqDeleteChunk( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId, char *delta, char *buf, uint32_t timestamp, bool checkGetChunk ) {
 	// -- common/protocol/normal_protocol.cc --
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateChunkUpdateHeader(
@@ -206,7 +206,7 @@ char *SlaveProtocol::reqDeleteChunk( size_t &size, uint16_t instanceId, uint32_t
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::resDeleteChunk( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId ) {
+char *ServerProtocol::resDeleteChunk( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t length, uint32_t updatingChunkId ) {
 	// -- common/protocol/normal_protocol.cc --
 	size = this->generateChunkUpdateHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,

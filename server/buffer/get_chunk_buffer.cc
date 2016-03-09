@@ -5,7 +5,7 @@
 MemoryPool<Chunk> *GetChunkBuffer::chunkPool;
 
 void GetChunkBuffer::init() {
-	GetChunkBuffer::chunkPool = Slave::getInstance()->chunkPool;
+	GetChunkBuffer::chunkPool = Server::getInstance()->chunkPool;
 }
 
 GetChunkBuffer::GetChunkBuffer() {

@@ -54,7 +54,7 @@ bool ServerWorker::handleForwardKeyResponse( struct ForwardKeyHeader &header, bo
 		}
 
 		if ( ! ServerWorker::pending->eraseDegradedOp( PT_SERVER_PEER_DEGRADED_OPS, pids[ pidsIndex ].instanceId, pids[ pidsIndex ].requestId, 0, &pid, &op ) ) {
-			__ERROR__( "ServerWorker", "handleGetResponse", "Cannot find a pending slave DEGRADED_OPS request that matches the response. This message will be discarded." );
+			__ERROR__( "ServerWorker", "handleGetResponse", "Cannot find a pending server DEGRADED_OPS request that matches the response. This message will be discarded." );
 			continue;
 		}
 
@@ -74,11 +74,11 @@ bool ServerWorker::handleForwardKeyResponse( struct ForwardKeyHeader &header, bo
 					);
 					char *valueUpdate = ( char * ) op.data.keyValueUpdate.ptr;
 
-					// Insert into master UPDATE pending set
+					// Insert into client UPDATE pending set
 					op.data.keyValueUpdate.ptr = op.socket;
 					op.data.keyValueUpdate.isDegraded = true;
 					if ( ! ServerWorker::pending->insertKeyValueUpdate( PT_CLIENT_UPDATE, pid.parentInstanceId, pid.parentRequestId, op.socket, op.data.keyValueUpdate ) ) {
-						__ERROR__( "ServerWorker", "handleForwardKeyResponse", "Cannot insert into master UPDATE pending map." );
+						__ERROR__( "ServerWorker", "handleForwardKeyResponse", "Cannot insert into client UPDATE pending map." );
 					}
 
 					// Compute data delta
@@ -96,7 +96,7 @@ bool ServerWorker::handleForwardKeyResponse( struct ForwardKeyHeader &header, bo
 						op.data.keyValueUpdate.length
 					);
 
-					// Send UPDATE request to the parity slaves
+					// Send UPDATE request to the parity servers
 					this->sendModifyChunkRequest(
 						pid.parentInstanceId, pid.parentRequestId,
 						op.data.keyValueUpdate.size,
@@ -132,10 +132,10 @@ bool ServerWorker::handleForwardKeyResponse( struct ForwardKeyHeader &header, bo
 				if ( success ) {
 					Metadata metadata;
 					metadata.set( op.listId, op.stripeId, op.chunkId );
-					// Insert into master DELETE pending set
+					// Insert into client DELETE pending set
 					op.data.key.ptr = op.socket;
 					if ( ! ServerWorker::pending->insertKey( PT_CLIENT_DEL, pid.parentInstanceId, pid.parentRequestId, op.socket, op.data.key ) ) {
-						__ERROR__( "ServerWorker", "handleForwardKeyResponse", "Cannot insert into master DELETE pending map." );
+						__ERROR__( "ServerWorker", "handleForwardKeyResponse", "Cannot insert into client DELETE pending map." );
 					}
 
 					this->sendModifyChunkRequest(
@@ -175,9 +175,9 @@ bool ServerWorker::handleSetResponse( ServerPeerEvent event, bool success, char 
 	bool found = ServerWorker::pending->decrementRemapDataRequest( event.instanceId, event.requestId, &pid, &requestCount );
 	if ( found && requestCount == 0 ){
 		CoordinatorEvent coordinatorEvent;
-		Slave *slave = Slave::getInstance();
-		for ( uint32_t i = 0; i < slave->sockets.coordinators.size(); i++ ) {
-			CoordinatorSocket *socket = slave->sockets.coordinators.values[ i ];
+		Server *server = Server::getInstance();
+		for ( uint32_t i = 0; i < server->sockets.coordinators.size(); i++ ) {
+			CoordinatorSocket *socket = server->sockets.coordinators.values[ i ];
 			coordinatorEvent.resRemappedData( socket, pid.parentInstanceId, pid.parentRequestId );
 			this->dispatch( coordinatorEvent );
 		}
@@ -216,7 +216,7 @@ bool ServerWorker::handleGetResponse( ServerPeerEvent event, bool success, char 
 	uint32_t timestamp;
 
 	if ( ! ServerWorker::pending->eraseKey( PT_SERVER_PEER_GET, event.instanceId, event.requestId, event.socket, &pid ) ) {
-		__ERROR__( "ServerWorker", "handleGetResponse", "Cannot find a pending slave UNSEALED_GET request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
+		__ERROR__( "ServerWorker", "handleGetResponse", "Cannot find a pending server UNSEALED_GET request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		if ( success ) keyValue.free();
 		return false;
 	}
@@ -231,7 +231,7 @@ bool ServerWorker::handleGetResponse( ServerPeerEvent event, bool success, char 
 		}
 
 		if ( ! ServerWorker::pending->eraseDegradedOp( PT_SERVER_PEER_DEGRADED_OPS, pids[ pidsIndex ].instanceId, pids[ pidsIndex ].requestId, 0, &pid, &op ) ) {
-			__ERROR__( "ServerWorker", "handleGetResponse", "Cannot find a pending slave DEGRADED_OPS request that matches the response. This message will be discarded." );
+			__ERROR__( "ServerWorker", "handleGetResponse", "Cannot find a pending server DEGRADED_OPS request that matches the response. This message will be discarded." );
 			if ( success ) keyValue.free();
 			continue;
 		}
@@ -309,11 +309,11 @@ bool ServerWorker::handleGetResponse( ServerPeerEvent event, bool success, char 
 					);
 					char *valueUpdate = ( char * ) op.data.keyValueUpdate.ptr;
 
-					// Insert into master UPDATE pending set
+					// Insert into client UPDATE pending set
 					op.data.keyValueUpdate.ptr = op.socket;
 					op.data.keyValueUpdate.isDegraded = true;
 					if ( ! ServerWorker::pending->insertKeyValueUpdate( PT_CLIENT_UPDATE, pid.parentInstanceId, pid.parentRequestId, op.socket, op.data.keyValueUpdate ) ) {
-						__ERROR__( "ServerWorker", "handleGetResponse", "Cannot insert into master UPDATE pending map." );
+						__ERROR__( "ServerWorker", "handleGetResponse", "Cannot insert into client UPDATE pending map." );
 					}
 
 					// Compute data delta
@@ -349,7 +349,7 @@ bool ServerWorker::handleGetResponse( ServerPeerEvent event, bool success, char 
 						printf( "Intermediate: %.*s - %.*s (%p vs %p)\n", _keySize, _keyStr, _valueSize, _valueStr, kv.data, keyValue.data );
 					} */
 
-					// Send UPDATE request to the parity slaves
+					// Send UPDATE request to the parity servers
 					this->sendModifyChunkRequest(
 						pid.parentInstanceId, pid.parentRequestId,
 						op.data.keyValueUpdate.size,
@@ -401,10 +401,10 @@ bool ServerWorker::handleGetResponse( ServerPeerEvent event, bool success, char 
 				if ( success ) {
 					Metadata metadata;
 					metadata.set( op.listId, op.stripeId, op.chunkId );
-					// Insert into master DELETE pending set
+					// Insert into client DELETE pending set
 					op.data.key.ptr = op.socket;
 					if ( ! ServerWorker::pending->insertKey( PT_CLIENT_DEL, pid.parentInstanceId, pid.parentRequestId, op.socket, op.data.key ) ) {
-						__ERROR__( "ServerWorker", "handleGetChunkResponse", "Cannot insert into master DELETE pending map." );
+						__ERROR__( "ServerWorker", "handleGetChunkResponse", "Cannot insert into client DELETE pending map." );
 					}
 
 					this->sendModifyChunkRequest(
@@ -453,46 +453,46 @@ bool ServerWorker::handleUpdateResponse( ServerPeerEvent event, bool success, ch
 	int pending;
 	KeyValueUpdate keyValueUpdate;
 	PendingIdentifier pid;
-	uint16_t instanceId = Slave::instanceId;
+	uint16_t instanceId = Server::instanceId;
 
 	if ( ! ServerWorker::pending->eraseKeyValueUpdate( PT_SERVER_PEER_UPDATE, instanceId, event.requestId, event.socket, &pid, &keyValueUpdate, true, false ) ) {
-		UNLOCK( &ServerWorker::pending->slavePeers.updateLock );
-		__ERROR__( "ServerWorker", "handleUpdateResponse", "Cannot find a pending slave UPDATE request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
+		UNLOCK( &ServerWorker::pending->serverPeers.updateLock );
+		__ERROR__( "ServerWorker", "handleUpdateResponse", "Cannot find a pending server UPDATE request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		return false;
 	}
 
 	// erase data delta backup
 	/* Seems that we don't need the data delta...
-	Slave *slave = Slave::getInstance();
-	LOCK( &slave->sockets.mastersIdToSocketLock );
+	Server *server = Server::getInstance();
+	LOCK( &server->sockets.clientsIdToSocketLock );
 	try {
-		ClientSocket *clientSocket = slave->sockets.mastersIdToSocketMap.at( event.instanceId );
+		ClientSocket *clientSocket = server->sockets.clientsIdToSocketMap.at( event.instanceId );
 		clientSocket->backup.removeDataUpdate( event.requestId, event.instanceId, event.socket );
 	} catch ( std::out_of_range &e ) {
-		__ERROR__( "ServerWorker", "handleUpdateResponse", "Cannot find a pending parity slave UPDATE backup for instance ID = %hu, request ID = %u. (Socket mapping not found)", event.instanceId, event.requestId );
+		__ERROR__( "ServerWorker", "handleUpdateResponse", "Cannot find a pending parity server UPDATE backup for instance ID = %hu, request ID = %u. (Socket mapping not found)", event.instanceId, event.requestId );
 	}
-	UNLOCK( &slave->sockets.mastersIdToSocketLock );
+	UNLOCK( &server->sockets.clientsIdToSocketLock );
 	*/
 
-	// Check pending slave UPDATE requests
+	// Check pending server UPDATE requests
 	pending = ServerWorker::pending->count( PT_SERVER_PEER_UPDATE, pid.instanceId, pid.requestId, false, true );
 
-	__DEBUG__( YELLOW, "ServerWorker", "handleUpdateResponse", "Pending slave UPDATE requests = %d (%s) (Key: %.*s).", pending, success ? "success" : "fail", ( int ) header.keySize, header.key );
+	__DEBUG__( YELLOW, "ServerWorker", "handleUpdateResponse", "Pending server UPDATE requests = %d (%s) (Key: %.*s).", pending, success ? "success" : "fail", ( int ) header.keySize, header.key );
 
 	if ( pending == 0 ) {
-		// Only send master UPDATE response when the number of pending slave UPDATE requests equal 0
+		// Only send client UPDATE response when the number of pending server UPDATE requests equal 0
 		ClientEvent clientEvent;
 
-		// FOR TESTING REVERT ONLY (parity slave fails and skip waiting)
+		// FOR TESTING REVERT ONLY (parity server fails and skip waiting)
 		//PendingIdentifier dpid = pid;
 
 		if ( ! ServerWorker::pending->eraseKeyValueUpdate( PT_CLIENT_UPDATE, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &keyValueUpdate ) ) {
-			__ERROR__( "ServerWorker", "handleUpdateResponse", "Cannot find a pending master UPDATE request that matches the response. This message will be discarded." );
+			__ERROR__( "ServerWorker", "handleUpdateResponse", "Cannot find a pending client UPDATE request that matches the response. This message will be discarded." );
 			return false;
 		}
 
 
-		// FOR TESTING REVERT ONLY (parity slave fails and skip waiting)
+		// FOR TESTING REVERT ONLY (parity server fails and skip waiting)
 		//ServerPeerSocket *s = 0;
 		//this->stripeList->get( keyValueUpdate.data, keyValueUpdate.size, 0, this->parityServerSockets );
 		//for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
@@ -535,38 +535,38 @@ bool ServerWorker::handleDeleteResponse( ServerPeerEvent event, bool success, ch
 	PendingIdentifier pid;
 
 	if ( ! ServerWorker::pending->eraseKey( PT_SERVER_PEER_DEL, event.instanceId, event.requestId, event.socket, &pid, &key, true, false ) ) {
-		UNLOCK( &ServerWorker::pending->slavePeers.delLock );
-		__ERROR__( "ServerWorker", "handleDeleteResponse", "Cannot find a pending slave DELETE request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
+		UNLOCK( &ServerWorker::pending->serverPeers.delLock );
+		__ERROR__( "ServerWorker", "handleDeleteResponse", "Cannot find a pending server DELETE request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		return false;
 	}
 
 	// erase data delta backup
-	Slave *slave = Slave::getInstance();
-	LOCK( &slave->sockets.mastersIdToSocketLock );
+	Server *server = Server::getInstance();
+	LOCK( &server->sockets.clientsIdToSocketLock );
 	try {
-		ClientSocket *clientSocket = slave->sockets.mastersIdToSocketMap.at( event.instanceId );
+		ClientSocket *clientSocket = server->sockets.clientsIdToSocketMap.at( event.instanceId );
 		clientSocket->backup.removeDataDelete( event.requestId, event.instanceId, event.socket );
 	} catch ( std::out_of_range &e ) {
-		__ERROR__( "ServerWorker", "handleDeleteResponse", "Cannot find a pending parity slave UPDATE backup for instance ID = %hu, request ID = %u. (Socket mapping not found)", event.instanceId, event.requestId );
+		__ERROR__( "ServerWorker", "handleDeleteResponse", "Cannot find a pending parity server UPDATE backup for instance ID = %hu, request ID = %u. (Socket mapping not found)", event.instanceId, event.requestId );
 	}
-	UNLOCK( &slave->sockets.mastersIdToSocketLock );
+	UNLOCK( &server->sockets.clientsIdToSocketLock );
 
-	// Check pending slave UPDATE requests
+	// Check pending server UPDATE requests
 	pending = ServerWorker::pending->count( PT_SERVER_PEER_DEL, pid.instanceId, pid.requestId, false, true );
 
-	__DEBUG__( BLUE, "ServerWorker", "handleDeleteResponse", "Pending slave DELETE requests = %d (%s).", pending, success ? "success" : "fail" );
+	__DEBUG__( BLUE, "ServerWorker", "handleDeleteResponse", "Pending server DELETE requests = %d (%s).", pending, success ? "success" : "fail" );
 	if ( pending == 0 ) {
-		// Only send master DELETE response when the number of pending slave DELETE requests equal 0
+		// Only send client DELETE response when the number of pending server DELETE requests equal 0
 		ClientEvent clientEvent;
 		Key key;
 
 		if ( ! ServerWorker::pending->eraseKey( PT_CLIENT_DEL, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &key ) ) {
-			__ERROR__( "ServerWorker", "handleDeleteResponse", "Cannot find a pending master DELETE request that matches the response. This message will be discarded." );
+			__ERROR__( "ServerWorker", "handleDeleteResponse", "Cannot find a pending client DELETE request that matches the response. This message will be discarded." );
 			return false;
 		}
 
 		if ( success ) {
-			__ERROR__( "ServerWorker", "handleDeleteResponse", "TODO: server/worker/slave_peer_res_worker.cc - Line 289: Include the timestamp and metadata in the response.\n" );
+			__ERROR__( "ServerWorker", "handleDeleteResponse", "TODO: server/worker/server_peer_res_worker.cc - Line 289: Include the timestamp and metadata in the response.\n" );
 			// uint32_t timestamp = ServerWorker::timestamp->nextVal();
 			clientEvent.resDelete(
 				( ClientSocket * ) pid.ptr,
@@ -635,8 +635,8 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 
 	// Find the corresponding GET_CHUNK request from the pending set
 	if ( ! ServerWorker::pending->findChunkRequest( PT_SERVER_PEER_GET_CHUNK, event.instanceId, event.requestId, event.socket, it, true, false ) ) {
-		UNLOCK( &ServerWorker::pending->slavePeers.getChunkLock );
-		__ERROR__( "ServerWorker", "handleGetChunkResponse", "Cannot find a pending slave GET_CHUNK request that matches the response. This message will be discarded." );
+		UNLOCK( &ServerWorker::pending->serverPeers.getChunkLock );
+		__ERROR__( "ServerWorker", "handleGetChunkResponse", "Cannot find a pending server GET_CHUNK request that matches the response. This message will be discarded." );
 		return false;
 	}
 
@@ -652,11 +652,11 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 		this->sealIndicators[ i ] = 0;
 	}
 
-	// Check remaining slave GET_CHUNK requests in the pending set
+	// Check remaining server GET_CHUNK requests in the pending set
 	pending = 0;
 	tmp = it;
-	end = ServerWorker::pending->slavePeers.getChunk.end();
-	selfIt = ServerWorker::pending->slavePeers.getChunk.end();
+	end = ServerWorker::pending->serverPeers.getChunk.end();
+	selfIt = ServerWorker::pending->serverPeers.getChunk.end();
 	while( tmp != end && tmp->first.instanceId == event.instanceId && tmp->first.requestId == event.requestId ) {
 		if ( tmp->second.chunkId == chunkId ) {
 			// Store the chunk into the buffer
@@ -778,29 +778,29 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 					this->sealIndicators[ ServerWorker::parityChunkCount + 1 ][ i ]
 				);
 
-				ServerPeerEvent slavePeerEvent;
+				ServerPeerEvent serverPeerEvent;
 				Metadata tmpMetadata;
 
 				tmpMetadata.set( listId, stripeId, i );
 
-				slavePeerEvent.reqGetChunk(
+				serverPeerEvent.reqGetChunk(
 					this->dataServerSockets[ i ],
 					event.instanceId,
 					event.requestId,
 					tmpMetadata
 				);
-				ServerWorker::eventQueue->insert( slavePeerEvent );
+				ServerWorker::eventQueue->insert( serverPeerEvent );
 
 				getChunkAgain = true;
 			}
 		}
 
 		if ( getChunkAgain ) {
-			UNLOCK( &ServerWorker::pending->slavePeers.getChunkLock );
+			UNLOCK( &ServerWorker::pending->serverPeers.getChunkLock );
 			return false;
 		}
 
-		if ( selfIt != ServerWorker::pending->slavePeers.getChunk.end() ) {
+		if ( selfIt != ServerWorker::pending->serverPeers.getChunk.end() ) {
 			Metadata selfMetadata;
 			uint32_t selfChunkId = selfIt->second.chunkId;
 
@@ -850,8 +850,8 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 		}
 
 		// Do not erase before the above if-branch as selfIt is still in-use!
-		ServerWorker::pending->slavePeers.getChunk.erase( it, tmp );
-		UNLOCK( &ServerWorker::pending->slavePeers.getChunkLock );
+		ServerWorker::pending->serverPeers.getChunk.erase( it, tmp );
+		UNLOCK( &ServerWorker::pending->serverPeers.getChunkLock );
 
 		// Check seal indicator
 		bool valid = true;
@@ -909,7 +909,7 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 			*/
 		}
 	} else {
-		UNLOCK( &ServerWorker::pending->slavePeers.getChunkLock );
+		UNLOCK( &ServerWorker::pending->serverPeers.getChunkLock );
 	}
 
 	std::unordered_set<uint32_t> invalidChunks;
@@ -989,7 +989,7 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 			DegradedOp op;
 
 			if ( ! ServerWorker::pending->eraseDegradedOp( PT_SERVER_PEER_DEGRADED_OPS, event.instanceId, event.requestId, event.socket, &pid, &op ) ) {
-				__ERROR__( "ServerWorker", "handleGetChunkResponse", "Cannot find a pending slave DEGRADED_OPS request that matches the response. This message will be discarded." );
+				__ERROR__( "ServerWorker", "handleGetChunkResponse", "Cannot find a pending server DEGRADED_OPS request that matches the response. This message will be discarded." );
 			} else {
 				bool reconstructParity, reconstructData;
 				int index = this->findInRedirectedList(
@@ -1055,7 +1055,7 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 						// assert( pids[ pidsIndex ].instanceId == pid.instanceId && pids[ pidsIndex ].requestId == pid.requestId );
 					} else {
 						if ( ! ServerWorker::pending->eraseDegradedOp( PT_SERVER_PEER_DEGRADED_OPS, pids[ pidsIndex ].instanceId, pids[ pidsIndex ].requestId, 0, &pid, &op ) ) {
-							__ERROR__( "ServerWorker", "handleGetChunkResponse", "Cannot find a pending slave DEGRADED_OPS request that matches the response. This message will be discarded." );
+							__ERROR__( "ServerWorker", "handleGetChunkResponse", "Cannot find a pending server DEGRADED_OPS request that matches the response. This message will be discarded." );
 							continue;
 						}
 					}
@@ -1214,9 +1214,9 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 						);
 						char *valueUpdate = ( char * ) op.data.keyValueUpdate.ptr;
 						op.data.keyValueUpdate.ptr = op.socket;
-						// Insert into master UPDATE pending set
+						// Insert into client UPDATE pending set
 						if ( ! ServerWorker::pending->insertKeyValueUpdate( PT_CLIENT_UPDATE, pid.parentInstanceId, pid.parentRequestId, op.socket, op.data.keyValueUpdate ) ) {
-							__ERROR__( "ServerWorker", "handleGetChunkResponse", "Cannot insert into master UPDATE pending map." );
+							__ERROR__( "ServerWorker", "handleGetChunkResponse", "Cannot insert into client UPDATE pending map." );
 						}
 
 						if ( isKeyValueFound ) {
@@ -1349,10 +1349,10 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 						if ( isKeyValueFound ) {
 							uint32_t timestamp;
 
-							// Insert into master DELETE pending set
+							// Insert into client DELETE pending set
 							op.data.key.ptr = op.socket;
 							if ( ! ServerWorker::pending->insertKey( PT_CLIENT_DEL, pid.parentInstanceId, pid.parentRequestId, op.socket, op.data.key ) ) {
-								__ERROR__( "ServerWorker", "handleGetChunkResponse", "Cannot insert into master DELETE pending map." );
+								__ERROR__( "ServerWorker", "handleGetChunkResponse", "Cannot insert into client DELETE pending map." );
 							}
 
 							if ( dataChunkReconstructed ) {
@@ -1419,7 +1419,7 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 					} else {
 						metadata.chunkId = op.original[ i * 2 + 1 ];
 						event.reqForwardChunk(
-							s, Slave::instanceId, requestId,
+							s, Server::instanceId, requestId,
 							metadata, this->chunks[ op.original[ i * 2 + 1 ] ], false
 						);
 						this->dispatch( event );
@@ -1443,14 +1443,14 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 
 			if ( hasStripe ) {
 				// Send SET_CHUNK request
-				uint16_t instanceId = Slave::instanceId;
+				uint16_t instanceId = Server::instanceId;
 				uint32_t requestId = ServerWorker::idGenerator->nextVal( this->workerId );
 				chunkRequest.set(
 					listId, stripeId, chunkId, target,
 					0 /* chunk */, false /* isDegraded */
 				);
 				if ( ! ServerWorker::pending->insertChunkRequest( PT_SERVER_PEER_SET_CHUNK, instanceId, pid.parentInstanceId, requestId, pid.parentRequestId, target, chunkRequest ) ) {
-					__ERROR__( "ServerWorker", "handleGetChunkResponse", "Cannot insert into slave CHUNK_REQUEST pending map." );
+					__ERROR__( "ServerWorker", "handleGetChunkResponse", "Cannot insert into server CHUNK_REQUEST pending map." );
 				}
 
 				metadata.set( listId, stripeId, chunkId );
@@ -1498,7 +1498,7 @@ bool ServerWorker::handleSetChunkResponse( ServerPeerEvent event, bool success, 
 
 	PendingIdentifier pid;
 	ChunkRequest chunkRequest;
-	uint16_t instanceId = Slave::instanceId;
+	uint16_t instanceId = Server::instanceId;
 
 	chunkRequest.set(
 		header.listId, header.stripeId, header.chunkId,
@@ -1506,7 +1506,7 @@ bool ServerWorker::handleSetChunkResponse( ServerPeerEvent event, bool success, 
 	);
 
 	if ( ! ServerWorker::pending->eraseChunkRequest( PT_SERVER_PEER_SET_CHUNK, instanceId, event.requestId, event.socket, &pid, &chunkRequest ) ) {
-		__ERROR__( "ServerWorker", "handleSetChunkResponse", "Cannot find a pending slave SET_CHUNK request that matches the response. This message will be discarded." );
+		__ERROR__( "ServerWorker", "handleSetChunkResponse", "Cannot find a pending server SET_CHUNK request that matches the response. This message will be discarded." );
 	}
 
 	if ( chunkRequest.isDegraded ) {
@@ -1563,40 +1563,40 @@ bool ServerWorker::handleUpdateChunkResponse( ServerPeerEvent event, bool succes
 	int pending;
 	ChunkUpdate chunkUpdate;
 	PendingIdentifier pid;
-	uint16_t instanceId = Slave::instanceId;
+	uint16_t instanceId = Server::instanceId;
 
 	if ( ! ServerWorker::pending->eraseChunkUpdate( PT_SERVER_PEER_UPDATE_CHUNK, instanceId, event.requestId, event.socket, &pid, &chunkUpdate, true, false ) ) {
-		UNLOCK( &ServerWorker::pending->slavePeers.updateChunkLock );
-		__ERROR__( "ServerWorker", "handleUpdateChunkResponse", "Cannot find a pending slave UPDATE_CHUNK request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
+		UNLOCK( &ServerWorker::pending->serverPeers.updateChunkLock );
+		__ERROR__( "ServerWorker", "handleUpdateChunkResponse", "Cannot find a pending server UPDATE_CHUNK request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		return false;
 	}
 
 	// erase data delta backup
 	/* Seems that we don't need the data delta...
-	Slave *slave = Slave::getInstance();
-	LOCK( &slave->sockets.mastersIdToSocketLock );
+	Server *server = Server::getInstance();
+	LOCK( &server->sockets.clientsIdToSocketLock );
 	try {
-		ClientSocket *clientSocket = slave->sockets.mastersIdToSocketMap.at( event.instanceId );
+		ClientSocket *clientSocket = server->sockets.clientsIdToSocketMap.at( event.instanceId );
 		clientSocket->backup.removeDataUpdate( event.requestId, event.instanceId, event.socket );
 	} catch ( std::out_of_range &e ) {
-		__ERROR__( "ServerWorker", "handleUpdateChunkResponse", "Cannot find a pending parity slave UPDATE backup for instance ID = %hu, request ID = %u. (Socket mapping not found)", event.instanceId, event.requestId );
+		__ERROR__( "ServerWorker", "handleUpdateChunkResponse", "Cannot find a pending parity server UPDATE backup for instance ID = %hu, request ID = %u. (Socket mapping not found)", event.instanceId, event.requestId );
 	}
-	UNLOCK( &slave->sockets.mastersIdToSocketLock );
+	UNLOCK( &server->sockets.clientsIdToSocketLock );
 	*/
 
-	// Check pending slave UPDATE requests
+	// Check pending server UPDATE requests
 	pending = ServerWorker::pending->count( PT_SERVER_PEER_UPDATE_CHUNK, pid.instanceId, pid.requestId, false, true );
 
-	__DEBUG__( GREEN, "ServerWorker", "handleUpdateChunkResponse", "[%u, %u, %u] Pending slave UPDATE_CHUNK requests = %d (%s).", header.listId, header.stripeId, header.chunkId, pending, success ? "success" : "fail" );
+	__DEBUG__( GREEN, "ServerWorker", "handleUpdateChunkResponse", "[%u, %u, %u] Pending server UPDATE_CHUNK requests = %d (%s).", header.listId, header.stripeId, header.chunkId, pending, success ? "success" : "fail" );
 
 	if ( pending == 0 ) {
-		// Only send application UPDATE response when the number of pending slave UPDATE_CHUNK requests equal 0
+		// Only send application UPDATE response when the number of pending server UPDATE_CHUNK requests equal 0
 		Key key;
 		KeyValueUpdate keyValueUpdate;
 		ClientEvent clientEvent;
 
 		if ( ! ServerWorker::pending->eraseKeyValueUpdate( PT_CLIENT_UPDATE, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &keyValueUpdate ) ) {
-			__ERROR__( "ServerWorker", "handleUpdateChunkResponse", "Cannot find a pending master UPDATE request that matches the response. This message will be discarded." );
+			__ERROR__( "ServerWorker", "handleUpdateChunkResponse", "Cannot find a pending client UPDATE request that matches the response. This message will be discarded." );
 			return false;
 		}
 
@@ -1628,7 +1628,7 @@ bool ServerWorker::handleDeleteChunkResponse( ServerPeerEvent event, bool succes
 	int pending;
 	ChunkUpdate chunkUpdate;
 	PendingIdentifier pid;
-	uint16_t instanceId = Slave::instanceId;
+	uint16_t instanceId = Server::instanceId;
 
 	chunkUpdate.set(
 		header.listId, header.stripeId, header.updatingChunkId,
@@ -1638,33 +1638,33 @@ bool ServerWorker::handleDeleteChunkResponse( ServerPeerEvent event, bool succes
 	chunkUpdate.ptr = ( void * ) event.socket;
 
 	if ( ! ServerWorker::pending->eraseChunkUpdate( PT_SERVER_PEER_DEL_CHUNK, instanceId, event.requestId, event.socket, &pid, &chunkUpdate, true, false ) ) {
-		UNLOCK( &ServerWorker::pending->slavePeers.deleteChunkLock );
-		__ERROR__( "ServerWorker", "handleDeleteChunkResponse", "Cannot find a pending slave DELETE_CHUNK request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
+		UNLOCK( &ServerWorker::pending->serverPeers.deleteChunkLock );
+		__ERROR__( "ServerWorker", "handleDeleteChunkResponse", "Cannot find a pending server DELETE_CHUNK request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		return false;
 	}
 
 	// erase data delta backup
-	Slave *slave = Slave::getInstance();
-	LOCK( &slave->sockets.mastersIdToSocketLock );
+	Server *server = Server::getInstance();
+	LOCK( &server->sockets.clientsIdToSocketLock );
 	try {
-		ClientSocket *clientSocket = slave->sockets.mastersIdToSocketMap.at( event.instanceId );
+		ClientSocket *clientSocket = server->sockets.clientsIdToSocketMap.at( event.instanceId );
 		clientSocket->backup.removeDataDelete( event.requestId, event.instanceId, event.socket );
 	} catch ( std::out_of_range &e ) {
-		__ERROR__( "ServerWorker", "handleDeleteChunkResponse", "Cannot find a pending parity slave UPDATE backup for instance ID = %hu, request ID = %u. (Socket mapping not found)", event.instanceId, event.requestId );
+		__ERROR__( "ServerWorker", "handleDeleteChunkResponse", "Cannot find a pending parity server UPDATE backup for instance ID = %hu, request ID = %u. (Socket mapping not found)", event.instanceId, event.requestId );
 	}
-	UNLOCK( &slave->sockets.mastersIdToSocketLock );
+	UNLOCK( &server->sockets.clientsIdToSocketLock );
 
-	// Check pending slave UPDATE requests
+	// Check pending server UPDATE requests
 	pending = ServerWorker::pending->count( PT_SERVER_PEER_DEL_CHUNK, pid.instanceId, pid.requestId, false, true );
 
-	// __ERROR__( "ServerWorker", "handleDeleteChunkResponse", "Pending slave DELETE_CHUNK requests = %d.", pending );
+	// __ERROR__( "ServerWorker", "handleDeleteChunkResponse", "Pending server DELETE_CHUNK requests = %d.", pending );
 	if ( pending == 0 ) {
-		// Only send master DELETE response when the number of pending slave DELETE_CHUNK requests equal 0
+		// Only send client DELETE response when the number of pending server DELETE_CHUNK requests equal 0
 		ClientEvent clientEvent;
 		Key key;
 
 		if ( ! ServerWorker::pending->eraseKey( PT_CLIENT_DEL, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &key ) ) {
-			__ERROR__( "ServerWorker", "handleDeleteChunkResponse", "Cannot find a pending master DELETE request that matches the response. This message will be discarded." );
+			__ERROR__( "ServerWorker", "handleDeleteChunkResponse", "Cannot find a pending client DELETE request that matches the response. This message will be discarded." );
 			return false;
 		}
 

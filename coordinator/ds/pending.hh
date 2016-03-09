@@ -12,7 +12,7 @@
 #include "../../common/util/debug.hh"
 #include "../../common/util/time.hh"
 
-struct PendingAnnouncement { // For slave reconstructed announcement
+struct PendingAnnouncement { // For server reconstructed announcement
 	pthread_mutex_t *lock;
 	pthread_cond_t *cond;
 	std::unordered_set<ServerSocket *> *sockets;
@@ -128,7 +128,7 @@ private:
 
 	/*
 	 * State transition: (normal -> intermediate) or (degraded -> coordinated normal)
-	 * (Slave instance ID) |-> PendingTransition
+	 * (Server instance ID) |-> PendingTransition
 	 */
 	struct {
 		LOCK_T intermediateLock;
@@ -141,7 +141,7 @@ private:
 	 * syncRemappingRecordCounters: ( packet id, counter for a sync operation )
 	 * syncRemappingRecordCountersReverse: ( counter for a sync operation, set of packet ids associated )
 	 * syncRemappingRecordIndicators: ( counter for a sync operations, indicator whether the op is completed )
-	 * counter = map( master, no. of remaining packets to ack )
+	 * counter = map( client, no. of remaining packets to ack )
 	 */
 	std::map<uint32_t, std::map<struct sockaddr_in, uint32_t>* > syncRemappingRecordCounters;
 	std::map<std::map<struct sockaddr_in, uint32_t>*, std::set<uint32_t> > syncRemappingRecordCountersReverse;
@@ -484,17 +484,17 @@ public:
 		return true;
 	}
 
-	// decrement the counter for a packet acked by a master
+	// decrement the counter for a packet acked by a client
 	bool decrementRemappingRecords( uint32_t id, struct sockaddr_in addr, bool lock = true, bool unlock = true ) {
 		bool ret = false;
 		if ( lock ) LOCK( &this->syncRemappingRecordLock );
-		// check if the master needs to ack this packet
+		// check if the client needs to ack this packet
 		if ( this->syncRemappingRecordCounters.count( id ) > 0 &&
 			this->syncRemappingRecordCounters[ id ]->count( addr ) )
 		{
 			uint32_t &count = this->syncRemappingRecordCounters[ id ]->at( addr );
 			count--;
-			// if the master acked all packets, remove this master
+			// if the client acked all packets, remove this client
 			if ( count <= 0 ) {
 				this->syncRemappingRecordCounters[ id ]->erase( addr );
 			}
@@ -510,7 +510,7 @@ public:
 		std::map<struct sockaddr_in, uint32_t> *map = NULL;
 		bool *indicator = NULL;
 		if ( lock ) LOCK( &this->syncRemappingRecordLock );
-		// check if the packet exists, and the counter has "target" number of master remains
+		// check if the packet exists, and the counter has "target" number of client remains
 		if ( this->syncRemappingRecordCounters.count( id ) > 0 &&
 			this->syncRemappingRecordCounters[ id ]->size() == target )
 		{

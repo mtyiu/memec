@@ -8,13 +8,13 @@ void ClientEvent::resRegister( ClientSocket *socket, uint16_t instanceId, uint32
 	this->socket = socket;
 }
 
-void ClientEvent::reqPushLoadStats( ClientSocket *socket, ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
-		ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency, std::set<struct sockaddr_in> *overloadedSlaveSet ) {
+void ClientEvent::reqPushLoadStats( ClientSocket *socket, ArrayMap<struct sockaddr_in, Latency> *serverGetLatency,
+		ArrayMap<struct sockaddr_in, Latency> *serverSetLatency, std::set<struct sockaddr_in> *overloadedServerSet ) {
 	this->type = CLIENT_EVENT_TYPE_PUSH_LOADING_STATS;
 	this->socket = socket;
-	this->message.slaveLoading.slaveGetLatency = slaveGetLatency;
-	this->message.slaveLoading.slaveSetLatency = slaveSetLatency;
-	this->message.slaveLoading.overloadedSlaveSet = overloadedSlaveSet;
+	this->message.serverLoading.serverGetLatency = serverGetLatency;
+	this->message.serverLoading.serverSetLatency = serverSetLatency;
+	this->message.serverLoading.overloadedServerSet = overloadedServerSet;
 }
 
 void ClientEvent::resRemappingSetLock( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, bool success, uint32_t *original, uint32_t *remapped, uint32_t remappedCount, Key &key ) {
@@ -28,11 +28,11 @@ void ClientEvent::resRemappingSetLock( ClientSocket *socket, uint16_t instanceId
 	this->message.remap.key = key;
 }
 
-void ClientEvent::switchPhase( bool toRemap, std::set<struct sockaddr_in> slaves, bool isCrashed, bool forced ) {
+void ClientEvent::switchPhase( bool toRemap, std::set<struct sockaddr_in> servers, bool isCrashed, bool forced ) {
 	this->type = CLIENT_EVENT_TYPE_SWITCH_PHASE;
 	this->message.switchPhase.toRemap = toRemap;
 	this->message.switchPhase.isCrashed = isCrashed;
-	this->message.switchPhase.slaves = new std::vector<struct sockaddr_in>( slaves.begin(), slaves.end() );
+	this->message.switchPhase.servers = new std::vector<struct sockaddr_in>( servers.begin(), servers.end() );
 	this->message.switchPhase.forced = forced;
 }
 
@@ -79,7 +79,7 @@ void ClientEvent::resDegradedLock( ClientSocket *socket, uint16_t instanceId, ui
 	this->message.degradedLock.remapped = remapped;
 }
 
-void ClientEvent::announceSlaveReconstructed( ServerSocket *srcSocket, ServerSocket *dstSocket ) {
+void ClientEvent::announceServerReconstructed( ServerSocket *srcSocket, ServerSocket *dstSocket ) {
 	this->type = CLIENT_EVENT_TYPE_ANNOUNCE_SERVER_RECONSTRUCTED;
 	this->message.reconstructed.src = srcSocket;
 	this->message.reconstructed.dst = dstSocket;

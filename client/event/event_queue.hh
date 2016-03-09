@@ -24,8 +24,8 @@ public:
 	struct {
 		EventQueue<ApplicationEvent> *application;
 		EventQueue<CoordinatorEvent> *coordinator;
-		EventQueue<ClientEvent> *master;
-		EventQueue<ServerEvent> *slave;
+		EventQueue<ClientEvent> *client;
+		EventQueue<ServerEvent> *server;
 	} separated;
 
 	ClientEventQueue() {
@@ -35,8 +35,8 @@ public:
 		this->priority.count = 0;
 		this->separated.application = 0;
 		this->separated.coordinator = 0;
-		this->separated.master = 0;
-		this->separated.slave = 0;
+		this->separated.client = 0;
+		this->separated.server = 0;
 	}
 
 	void init( bool block, uint32_t mixed, uint32_t pMixed ) {
@@ -47,12 +47,12 @@ public:
 		LOCK_INIT( &this->priority.lock );
 	}
 
-	void init( bool block, uint32_t application, uint32_t coordinator, uint32_t master, uint32_t slave ) {
+	void init( bool block, uint32_t application, uint32_t coordinator, uint32_t client, uint32_t server ) {
 		this->isMixed = false;
 		this->separated.application = new EventQueue<ApplicationEvent>( application, block );
 		this->separated.coordinator = new EventQueue<CoordinatorEvent>( coordinator, block );
-		this->separated.master = new EventQueue<ClientEvent>( master, block );
-		this->separated.slave = new EventQueue<ServerEvent>( slave, block );
+		this->separated.client = new EventQueue<ClientEvent>( client, block );
+		this->separated.server = new EventQueue<ServerEvent>( server, block );
 	}
 
 	void start() {
@@ -62,8 +62,8 @@ public:
 		} else {
 			this->separated.application->start();
 			this->separated.coordinator->start();
-			this->separated.master->start();
-			this->separated.slave->start();
+			this->separated.client->start();
+			this->separated.server->start();
 		}
 	}
 
@@ -74,8 +74,8 @@ public:
 		} else {
 			this->separated.application->stop();
 			this->separated.coordinator->stop();
-			this->separated.master->stop();
-			this->separated.slave->stop();
+			this->separated.client->stop();
+			this->separated.server->stop();
 		}
 	}
 
@@ -86,8 +86,8 @@ public:
 		} else {
 			delete this->separated.application;
 			delete this->separated.coordinator;
-			delete this->separated.master;
-			delete this->separated.slave;
+			delete this->separated.client;
+			delete this->separated.server;
 		}
 	}
 
@@ -102,10 +102,10 @@ public:
 			this->separated.application->print( f );
 			fprintf( f, "[Coordinator] " );
 			this->separated.coordinator->print( f );
-			fprintf( f, "[     Master] " );
-			this->separated.master->print( f );
-			fprintf( f, "[      Slave] " );
-			this->separated.slave->print( f );
+			fprintf( f, "[     Client] " );
+			this->separated.client->print( f );
+			fprintf( f, "[      Server] " );
+			this->separated.server->print( f );
 		}
 	}
 
@@ -123,8 +123,8 @@ public:
 
 	CLIENT_EVENT_QUEUE_INSERT( ApplicationEvent, application )
 	CLIENT_EVENT_QUEUE_INSERT( CoordinatorEvent, coordinator )
-	CLIENT_EVENT_QUEUE_INSERT( ClientEvent, master )
-	CLIENT_EVENT_QUEUE_INSERT( ServerEvent, slave )
+	CLIENT_EVENT_QUEUE_INSERT( ClientEvent, client )
+	CLIENT_EVENT_QUEUE_INSERT( ServerEvent, server )
 #undef CLIENT_EVENT_QUEUE_INSERT
 
 	bool prioritizedInsert( ServerEvent &event ) {
@@ -157,7 +157,7 @@ public:
 				return ret;
 			}
 		} else {
-			return this->separated.slave->insert( event );
+			return this->separated.server->insert( event );
 		}
 	}
 

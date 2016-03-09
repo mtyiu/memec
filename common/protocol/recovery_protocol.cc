@@ -1,6 +1,6 @@
 #include "protocol.hh"
 
-size_t Protocol::generatePromoteBackupSlaveHeader(
+size_t Protocol::generatePromoteBackupServerHeader(
 	uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 	uint32_t addr, uint16_t port,
 	std::unordered_set<Metadata> &chunks,
@@ -63,7 +63,7 @@ size_t Protocol::generatePromoteBackupSlaveHeader(
 	return bytes;
 }
 
-size_t Protocol::generatePromoteBackupSlaveHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t numReconstructedChunks, uint32_t numReconstructedKeys ) {
+size_t Protocol::generatePromoteBackupServerHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t numReconstructedChunks, uint32_t numReconstructedKeys ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_PROMOTE_BACKUP_SERVER_SIZE, instanceId, requestId );
 
@@ -77,7 +77,7 @@ size_t Protocol::generatePromoteBackupSlaveHeader( uint8_t magic, uint8_t to, ui
 	return bytes;
 }
 
-bool Protocol::parsePromoteBackupSlaveHeader( size_t offset, uint32_t &addr, uint16_t &port, uint32_t &chunkCount, uint32_t &unsealedCount, uint32_t *&metadata, char *&keys, char *buf, size_t size ) {
+bool Protocol::parsePromoteBackupServerHeader( size_t offset, uint32_t &addr, uint16_t &port, uint32_t &chunkCount, uint32_t &unsealedCount, uint32_t *&metadata, char *&keys, char *buf, size_t size ) {
 	if ( size - offset < PROTO_PROMOTE_BACKUP_SERVER_SIZE )
 		return false;
 
@@ -102,7 +102,7 @@ bool Protocol::parsePromoteBackupSlaveHeader( size_t offset, uint32_t &addr, uin
 	return true;
 }
 
-bool Protocol::parsePromoteBackupSlaveHeader( size_t offset, uint32_t &addr, uint16_t &port, uint32_t &numReconstructedChunks, uint32_t &numReconstructedKeys, char *buf, size_t size ) {
+bool Protocol::parsePromoteBackupServerHeader( size_t offset, uint32_t &addr, uint16_t &port, uint32_t &numReconstructedChunks, uint32_t &numReconstructedKeys, char *buf, size_t size ) {
 	if ( size - offset < PROTO_PROMOTE_BACKUP_SERVER_SIZE )
 		return false;
 
@@ -115,13 +115,13 @@ bool Protocol::parsePromoteBackupSlaveHeader( size_t offset, uint32_t &addr, uin
 	return true;
 }
 
-bool Protocol::parsePromoteBackupSlaveHeader( struct PromoteBackupSlaveHeader &header, bool isRequest, char *buf, size_t size, size_t offset ) {
+bool Protocol::parsePromoteBackupServerHeader( struct PromoteBackupServerHeader &header, bool isRequest, char *buf, size_t size, size_t offset ) {
 	if ( ! buf || ! size ) {
 		buf = this->buffer.recv;
 		size = this->buffer.size;
 	}
 	if ( isRequest ) {
-		return this->parsePromoteBackupSlaveHeader(
+		return this->parsePromoteBackupServerHeader(
 			offset,
 			header.addr,
 			header.port,
@@ -132,7 +132,7 @@ bool Protocol::parsePromoteBackupSlaveHeader( struct PromoteBackupSlaveHeader &h
 			buf, size
 		);
 	} else {
-		return this->parsePromoteBackupSlaveHeader(
+		return this->parsePromoteBackupServerHeader(
 			offset,
 			header.addr,
 			header.port,

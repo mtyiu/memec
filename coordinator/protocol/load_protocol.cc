@@ -1,12 +1,12 @@
 #include "protocol.hh"
 #include "../../common/ds/sockaddr_in.hh"
 
-// TODO put into common/ as this is same as  MasterProtocol::reqPushLoadStats
+// TODO put into common/ as this is same as  ClientProtocol::reqPushLoadStats
 char *CoordinatorProtocol::reqPushLoadStats(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		ArrayMap< struct sockaddr_in, Latency > *serverGetLatency,
 		ArrayMap< struct sockaddr_in, Latency > *serverSetLatency,
-		std::set< struct sockaddr_in > *overloadedSlaveSet )
+		std::set< struct sockaddr_in > *overloadedServerSet )
 {
 	// -- common/protocol/load_protocol.cc --
 	size = this->generateLoadStatsHeader(
@@ -15,7 +15,7 @@ char *CoordinatorProtocol::reqPushLoadStats(
 		instanceId, requestId,
 		serverGetLatency->size(),
 		serverSetLatency->size(),
-		overloadedSlaveSet->size(),
+		overloadedServerSet->size(),
 		sizeof( uint32_t ) * 3 + sizeof( uint16_t ),
 		sizeof( uint32_t ) + sizeof( uint16_t )
 	);
@@ -54,7 +54,7 @@ char *CoordinatorProtocol::reqPushLoadStats(
 
 #undef SET_FIELDS_VAR
 
-	for ( std::set<struct sockaddr_in>::iterator it = overloadedSlaveSet->begin(); it != overloadedSlaveSet->end(); it++ ) {
+	for ( std::set<struct sockaddr_in>::iterator it = overloadedServerSet->begin(); it != overloadedServerSet->end(); it++ ) {
 		addr = (*it).sin_addr.s_addr;
 		port = (*it).sin_port;
 		*( ( uint32_t * )( this->buffer.send + size ) ) = addr; // htonl( addr );
@@ -70,7 +70,7 @@ char *CoordinatorProtocol::reqPushLoadStats(
 	return this->buffer.send;
 }
 
-// TODO put into common/ as this is same as  MasterProtocol::parseLoadingStats
+// TODO put into common/ as this is same as  ClientProtocol::parseLoadingStats
 bool CoordinatorProtocol::parseLoadingStats(
 		const LoadStatsHeader& loadStatsHeader,
 		ArrayMap< struct sockaddr_in, Latency >& serverGetLatency,

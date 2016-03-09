@@ -7,12 +7,12 @@
 
 class ClientSocket : public Socket {
 private:
-	static ArrayMap<int, ClientSocket> *masters;
+	static ArrayMap<int, ClientSocket> *clients;
 
 public:
-	SlaveBackup backup;
+	ServerBackup backup;
 
-	static void setArrayMap( ArrayMap<int, ClientSocket> *masters );
+	static void setArrayMap( ArrayMap<int, ClientSocket> *clients );
 	bool start();
 	void stop();
 	ssize_t send( char *buf, size_t ulen, bool &connected );

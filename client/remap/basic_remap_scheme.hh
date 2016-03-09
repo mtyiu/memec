@@ -17,10 +17,10 @@ public:
 	);
 	static bool isOverloaded( ServerSocket *socket );
 
-	static SlaveLoading *slaveLoading;
-	static OverloadedSlave *overloadedSlave;
+	static ServerLoading *serverLoading;
+	static OverloadedServer *overloadedServer;
 	static StripeList<ServerSocket> *stripeList;
-	static MasterRemapMsgHandler *remapMsgHandler;
+	static ClientRemapMsgHandler *remapMsgHandler;
 	static Latency increment;
 };
 

@@ -66,7 +66,7 @@ public:
 		return ret;
 	}
 
-	// add or remove pending request by id (assigned by master)
+	// add or remove pending request by id (assigned by client)
 	// return the number of pending requests after addition or removal
 	uint32_t addPendingRequest( uint32_t requestId, bool needsLock = true, bool needsUnlock = true ) {
 		if ( needsLock ) LOCK( &counter.pendingNormalRequests.lock );
@@ -105,7 +105,7 @@ public:
 	}
 };
 
-class MasterRemapMsgHandler : public RemapMsgHandler {
+class ClientRemapMsgHandler : public RemapMsgHandler {
 private:
 	bool isListening;
 
@@ -114,7 +114,7 @@ private:
 	uint32_t bgAckInterval;
 
 	/* lock on the list of alive servers connected */
-	LOCK_T aliveSlavesLock;
+	LOCK_T aliveServersLock;
 
 	/* parse a message and set state of servers accordingly */
 	void setState( char* msg, int len );
@@ -123,8 +123,8 @@ private:
 	static void *readMessages( void *argv );
 	static void *ackTransitThread( void *argv );
 
-	/* return if master need to ack coordinator for server */
-	bool checkAckForSlave( struct sockaddr_in server );
+	/* return if client need to ack coordinator for server */
+	bool checkAckForServer( struct sockaddr_in server );
 
 	/* send a list of states of servers */
 	int sendStateToCoordinator( std::vector<struct sockaddr_in> servers );
@@ -133,8 +133,8 @@ private:
 public:
 	std::unordered_map<struct sockaddr_in, StateTransitInfo> stateTransitInfo;
 
-	MasterRemapMsgHandler();
-	~MasterRemapMsgHandler();
+	ClientRemapMsgHandler();
+	~ClientRemapMsgHandler();
 
 	bool init( const int ip, const int port, const char *user = NULL );
 	void quit();
@@ -142,8 +142,8 @@ public:
 	bool start();
 	bool stop();
 
-	bool addAliveSlave( struct sockaddr_in server );
-	bool removeAliveSlave( struct sockaddr_in server );
+	bool addAliveServer( struct sockaddr_in server );
+	bool removeAliveServer( struct sockaddr_in server );
 
 	bool useCoordinatedFlow( const struct sockaddr_in &server );
 	bool allowRemapping( const struct sockaddr_in &server );

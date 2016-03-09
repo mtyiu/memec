@@ -1,7 +1,7 @@
 #include "protocol.hh"
 #include "../../common/util/debug.hh"
 
-char *MasterProtocol::reqPushLoadStats(
+char *ClientProtocol::reqPushLoadStats(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		ArrayMap< struct sockaddr_in, Latency > *serverGetLatency,
 		ArrayMap< struct sockaddr_in, Latency > *serverSetLatency )
@@ -53,17 +53,17 @@ char *MasterProtocol::reqPushLoadStats(
 #undef SET_FIELDS_VAR
 
 	if ( size > PROTO_BUF_MIN_SIZE ) {
-		__DEBUG__( CYAN, "MasterProtocol", "reqPushLoadStats", "Warning: Load stats exceeds minimum buffer size!\n" );
+		__DEBUG__( CYAN, "ClientProtocol", "reqPushLoadStats", "Warning: Load stats exceeds minimum buffer size!\n" );
 	}
 
 	return this->buffer.send;
 }
 
-bool MasterProtocol::parseLoadingStats(
+bool ClientProtocol::parseLoadingStats(
 		const LoadStatsHeader& loadStatsHeader,
 		ArrayMap< struct sockaddr_in, Latency > &serverGetLatency,
 		ArrayMap< struct sockaddr_in, Latency > &serverSetLatency,
-		std::set< struct sockaddr_in > &overloadedSlaveSet,
+		std::set< struct sockaddr_in > &overloadedServerSet,
 		char* buffer, uint32_t size )
 {
 	sockaddr_in addr;
@@ -96,7 +96,7 @@ bool MasterProtocol::parseLoadingStats(
 		addr.sin_addr.s_addr = *( uint32_t * )( buffer );
 		addr.sin_port = *( uint16_t * )( buffer + sizeof( uint32_t ) );
 
-		overloadedSlaveSet.insert( addr );
+		overloadedServerSet.insert( addr );
 
 		buffer += serverAddrSize;
 	}

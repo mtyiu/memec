@@ -3,7 +3,7 @@
 
 void ClientWorker::dispatch( CoordinatorEvent event ) {
 	bool connected, isSend;
-	uint16_t instanceId = Master::instanceId;
+	uint16_t instanceId = Client::instanceId;
 	uint32_t requestId;
 	ssize_t ret;
 	struct {
@@ -30,8 +30,8 @@ void ClientWorker::dispatch( CoordinatorEvent event ) {
 				buffer.size,
 				instanceId,
 				requestId,
-				event.message.loading.slaveGetLatency,
-				event.message.loading.slaveSetLatency
+				event.message.loading.serverGetLatency,
+				event.message.loading.serverSetLatency
 			);
 			isSend = true;
 			break;
@@ -51,7 +51,7 @@ void ClientWorker::dispatch( CoordinatorEvent event ) {
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();
 		ArrayMap<struct sockaddr_in, Latency> getLatency, setLatency;
 		struct LoadStatsHeader loadStatsHeader;
-		Master *master = Master::getInstance();
+		Client *client = Client::getInstance();
 
 		while ( buffer.size > 0 ) {
 			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "ClientWorker" );
@@ -80,7 +80,7 @@ void ClientWorker::dispatch( CoordinatorEvent event ) {
 						switch( header.magic ) {
 							case PROTO_MAGIC_RESPONSE_SUCCESS:
 								event.socket->registered = true;
-								Master::instanceId = header.instanceId;
+								Client::instanceId = header.instanceId;
 								break;
 							case PROTO_MAGIC_RESPONSE_FAILURE:
 								__ERROR__( "ClientWorker", "dispatch", "Failed to register with coordinator." );
@@ -91,11 +91,11 @@ void ClientWorker::dispatch( CoordinatorEvent event ) {
 								buffer.size -= PROTO_LOAD_STATS_SIZE;
 
 								// parse the loading stats and merge with existing stats
-								LOCK( &master->overloadedSlave.lock );
-								master->overloadedSlave.slaveSet.clear();
-								this->protocol.parseLoadingStats( loadStatsHeader, getLatency, setLatency, master->overloadedSlave.slaveSet, buffer.data, buffer.size );
-								UNLOCK( &master->overloadedSlave.lock );
-								master->mergeSlaveCumulativeLoading( &getLatency, &setLatency );
+								LOCK( &client->overloadedServer.lock );
+								client->overloadedServer.serverSet.clear();
+								this->protocol.parseLoadingStats( loadStatsHeader, getLatency, setLatency, client->overloadedServer.serverSet, buffer.data, buffer.size );
+								UNLOCK( &client->overloadedServer.lock );
+								client->mergeServerCumulativeLoading( &getLatency, &setLatency );
 
 								buffer.data -= PROTO_LOAD_STATS_SIZE;
 								buffer.size += PROTO_LOAD_STATS_SIZE;
@@ -129,7 +129,7 @@ void ClientWorker::dispatch( CoordinatorEvent event ) {
 						this->handleRemappingSetLockResponse( event, success, buffer.data, buffer.size );
 						break;
 					case PROTO_OPCODE_SERVER_RECONSTRUCTED:
-						this->handleSlaveReconstructedMsg( event, buffer.data, header.length );
+						this->handleServerReconstructedMsg( event, buffer.data, header.length );
 						break;
 					default:
 						__ERROR__( "ClientWorker", "dispatch", "Invalid opcode from coordinator." );

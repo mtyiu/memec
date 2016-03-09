@@ -2,11 +2,11 @@
 #include "../main/coordinator.hh"
 #include "../event/server_event.hh"
 
-ArrayMap<int, ServerSocket> *ServerSocket::slaves;
+ArrayMap<int, ServerSocket> *ServerSocket::servers;
 
-void ServerSocket::setArrayMap( ArrayMap<int, ServerSocket> *slaves ) {
-	ServerSocket::slaves = slaves;
-	slaves->needsDelete = false;
+void ServerSocket::setArrayMap( ArrayMap<int, ServerSocket> *servers ) {
+	ServerSocket::servers = servers;
+	servers->needsDelete = false;
 }
 
 bool ServerSocket::init( int tmpfd, ServerAddr &addr, EPoll *epoll ) {
@@ -29,7 +29,7 @@ bool ServerSocket::start() {
 void ServerSocket::stop() {
 	int newFd = - this->sockfd;
 
-	ServerSocket::slaves->replaceKey( this->sockfd, newFd );
+	ServerSocket::servers->replaceKey( this->sockfd, newFd );
 	Socket::stop();
 
 	ServerEvent event;

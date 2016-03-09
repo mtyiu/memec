@@ -57,7 +57,7 @@ void ServerWorker::dispatch( CoordinatorEvent event ) {
 			isSend = true;
 			break;
 		case COORDINATOR_EVENT_TYPE_SERVER_RECONSTRUCTED_MESSAGE_RESPONSE:
-			buffer.data = this->protocol.resSlaveReconstructedMsg(
+			buffer.data = this->protocol.resServerReconstructedMsg(
 				buffer.size,
 				event.instanceId, event.requestId
 			);
@@ -85,29 +85,29 @@ void ServerWorker::dispatch( CoordinatorEvent event ) {
 			break;
 		case COORDINATOR_EVENT_TYPE_PROMOTE_BACKUP_SERVER_RESPONSE_SUCCESS:
 		{
-			Slave *slave = Slave::getInstance();
-			LOCK( &slave->status.lock );
-			slave->status.isRecovering = false;
-			UNLOCK( &slave->status.lock );
+			Server *server = Server::getInstance();
+			LOCK( &server->status.lock );
+			server->status.isRecovering = false;
+			UNLOCK( &server->status.lock );
 
-			// Check if there are any held slave peer registration requests
+			// Check if there are any held server peer registration requests
 			struct {
 				uint32_t requestId;
 				ServerPeerSocket *socket;
 				bool success;
 			} registration;
-			while ( ServerWorker::pending->eraseSlavePeerRegistration( registration.requestId, registration.socket, registration.success ) ) {
-				ServerPeerEvent slavePeerEvent;
-				slavePeerEvent.resRegister(
+			while ( ServerWorker::pending->eraseServerPeerRegistration( registration.requestId, registration.socket, registration.success ) ) {
+				ServerPeerEvent serverPeerEvent;
+				serverPeerEvent.resRegister(
 					registration.socket,
-					Slave::instanceId,
+					Server::instanceId,
 					registration.requestId,
 					registration.success
 				);
-				ServerWorker::eventQueue->insert( slavePeerEvent );
+				ServerWorker::eventQueue->insert( serverPeerEvent );
 			}
 		}
-			buffer.data = this->protocol.resPromoteBackupSlave(
+			buffer.data = this->protocol.resPromoteBackupServer(
 				buffer.size,
 				event.instanceId, event.requestId,
 				event.message.promote.addr,
@@ -154,7 +154,7 @@ void ServerWorker::dispatch( CoordinatorEvent event ) {
 						switch( header.magic ) {
 							case PROTO_MAGIC_RESPONSE_SUCCESS:
 								event.socket->registered = true;
-								Slave::instanceId = header.instanceId;
+								Server::instanceId = header.instanceId;
 								break;
 							case PROTO_MAGIC_RESPONSE_FAILURE:
 								__ERROR__( "ServerWorker", "dispatch", "Failed to register with coordinator." );
@@ -165,22 +165,22 @@ void ServerWorker::dispatch( CoordinatorEvent event ) {
 						}
 						break;
 					case PROTO_OPCODE_SERVER_CONNECTED:
-						this->handleSlaveConnectedMsg( event, buffer.data, header.length );
+						this->handleServerConnectedMsg( event, buffer.data, header.length );
 						break;
 					case PROTO_OPCODE_SERVER_RECONSTRUCTED:
-						this->handleSlaveReconstructedMsg( event, buffer.data, header.length );
+						this->handleServerReconstructedMsg( event, buffer.data, header.length );
 						break;
 					case PROTO_OPCODE_BACKUP_SERVER_PROMOTED:
-						this->handleBackupSlavePromotedMsg( event, buffer.data, header.length );
+						this->handleBackupServerPromotedMsg( event, buffer.data, header.length );
 						break;
 					case PROTO_OPCODE_SEAL_CHUNKS:
-						Slave::getInstance()->seal();
+						Server::getInstance()->seal();
 						break;
 					case PROTO_OPCODE_FLUSH_CHUNKS:
-						Slave::getInstance()->flush();
+						Server::getInstance()->flush();
 						break;
 					case PROTO_OPCODE_SYNC_META:
-						Slave::getInstance()->sync( header.requestId );
+						Server::getInstance()->sync( header.requestId );
 						break;
 					case PROTO_OPCODE_RELEASE_DEGRADED_LOCKS:
 						this->handleReleaseDegradedLockRequest( event, buffer.data, header.length );
@@ -232,37 +232,37 @@ void ServerWorker::dispatch( CoordinatorEvent event ) {
 		__ERROR__( "ServerWorker", "dispatch", "The coordinator is disconnected." );
 }
 
-bool ServerWorker::handleSlaveConnectedMsg( CoordinatorEvent event, char *buf, size_t size ) {
+bool ServerWorker::handleServerConnectedMsg( CoordinatorEvent event, char *buf, size_t size ) {
 	struct AddressHeader header;
 	if ( ! this->protocol.parseAddressHeader( header, buf, size ) ) {
-		__ERROR__( "ServerWorker", "handleSlaveConnectedMsg", "Invalid address header." );
+		__ERROR__( "ServerWorker", "handleServerConnectedMsg", "Invalid address header." );
 		return false;
 	}
 
 	char tmp[ 22 ];
 	Socket::ntoh_ip( header.addr, tmp, 16 );
 	Socket::ntoh_port( header.port, tmp + 16, 6 );
-	__DEBUG__( YELLOW, "ServerWorker", "handleSlaveConnectedMsg", "Slave: %s:%s is connected.", tmp, tmp + 16 );
+	__DEBUG__( YELLOW, "ServerWorker", "handleServerConnectedMsg", "Server: %s:%s is connected.", tmp, tmp + 16 );
 
-	// Find the slave peer socket in the array map
+	// Find the server peer socket in the array map
 	int index = -1;
-	for ( int i = 0, len = slavePeers->size(); i < len; i++ ) {
-		if ( slavePeers->values[ i ]->equal( header.addr, header.port ) ) {
+	for ( int i = 0, len = serverPeers->size(); i < len; i++ ) {
+		if ( serverPeers->values[ i ]->equal( header.addr, header.port ) ) {
 			index = i;
 			break;
 		}
 	}
 	if ( index == -1 ) {
-		__ERROR__( "ServerWorker", "handleSlaveConnectedMsg", "The slave is not in the list. Ignoring this slave..." );
+		__ERROR__( "ServerWorker", "handleServerConnectedMsg", "The server is not in the list. Ignoring this server..." );
 		return false;
 	}
 
 	// Update sockfd in the array Map
-	int sockfd = slavePeers->values[ index ]->init();
-	slavePeers->keys[ index ] = sockfd;
+	int sockfd = serverPeers->values[ index ]->init();
+	serverPeers->keys[ index ] = sockfd;
 
-	// Connect to the slave peer
-	slavePeers->values[ index ]->start();
+	// Connect to the server peer
+	serverPeers->values[ index ]->start();
 
 	return true;
 }
@@ -278,14 +278,14 @@ bool ServerWorker::handleHeartbeatAck( CoordinatorEvent event, char *buf, size_t
 
 	uint32_t fromTimestamp;
 	if ( ServerWorker::pendingAck->erase( header.timestamp, fromTimestamp ) ) {
-		// Send ACK to masters
+		// Send ACK to clients
 		ClientEvent clientEvent;
-		uint16_t instanceId = Slave::instanceId;
+		uint16_t instanceId = Server::instanceId;
 		uint32_t requestId = ServerWorker::idGenerator->nextVal( this->workerId );
 
-		Slave *slave = Slave::getInstance();
-		LOCK_T *lock = &slave->sockets.masters.lock;
-		std::vector<ClientSocket *> &sockets = slave->sockets.masters.values;
+		Server *server = Server::getInstance();
+		LOCK_T *lock = &server->sockets.clients.lock;
+		std::vector<ClientSocket *> &sockets = server->sockets.clients.values;
 
 		LOCK( lock );
 		for ( size_t i = 0, size = sockets.size(); i < size; i++ ) {

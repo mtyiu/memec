@@ -48,7 +48,7 @@ private:
 	std::unordered_map<Metadata, std::unordered_set<uint32_t>> parity;
 	LOCK_T parityLock;
 
-	Map *slaveMap;
+	Map *serverMap;
 
 public:
 	/**

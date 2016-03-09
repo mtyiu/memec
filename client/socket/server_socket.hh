@@ -10,14 +10,14 @@
 
 class ServerSocket : public Socket {
 private:
-	static ArrayMap<int, ServerSocket> *slaves;
+	static ArrayMap<int, ServerSocket> *servers;
 
 public:
 	bool registered;
 	Backup backup;
 	struct {
 		Timestamp current;
-		Timestamp lastAck; // to slave
+		Timestamp lastAck; // to server
 		struct {
 			std::multiset<Timestamp> _update;
 			std::multiset<Timestamp> _del;
@@ -58,10 +58,10 @@ public:
 	LOCK_T ackParityDeltaBackupLock;
 	uint16_t instanceId;
 
-	static void setArrayMap( ArrayMap<int, ServerSocket> *slaves );
+	static void setArrayMap( ArrayMap<int, ServerSocket> *servers );
 	bool start();
 	void stop();
-	void registerMaster();
+	void registerClient();
 	ssize_t send( char *buf, size_t ulen, bool &connected );
 	ssize_t recv( char *buf, size_t ulen, bool &connected, bool wait );
 	ssize_t recvRem( char *buf, size_t expected, char *prevBuf, size_t prevSize, bool &connected );

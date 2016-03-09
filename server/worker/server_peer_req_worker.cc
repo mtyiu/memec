@@ -1,35 +1,35 @@
 #include "worker.hh"
 #include "../main/server.hh"
 
-bool ServerWorker::handleSlavePeerRegisterRequest( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, char *buf, size_t size ) {
+bool ServerWorker::handleServerPeerRegisterRequest( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, char *buf, size_t size ) {
 	struct AddressHeader header;
 	if ( ! this->protocol.parseAddressHeader( header, buf, size ) ) {
-		__ERROR__( "ServerWorker", "handleSlavePeerRegisterRequest", "Invalid address header." );
+		__ERROR__( "ServerWorker", "handleServerPeerRegisterRequest", "Invalid address header." );
 		return false;
 	}
 
-	// Find the slave peer socket in the array map
+	// Find the server peer socket in the array map
 	int index = -1;
-	for ( int i = 0, len = slavePeers->values.size(); i < len; i++ ) {
-		if ( slavePeers->values[ i ]->equal( header.addr, header.port ) ) {
+	for ( int i = 0, len = serverPeers->values.size(); i < len; i++ ) {
+		if ( serverPeers->values[ i ]->equal( header.addr, header.port ) ) {
 			index = i;
 			break;
 		}
 	}
 
 	socket->instanceId = instanceId;
-	Slave *slave = Slave::getInstance();
-	LOCK( &slave->sockets.slavesIdToSocketLock );
-	slave->sockets.slavesIdToSocketMap[ instanceId ] = socket;
-	UNLOCK( &slave->sockets.slavesIdToSocketLock );
+	Server *server = Server::getInstance();
+	LOCK( &server->sockets.serversIdToSocketLock );
+	server->sockets.serversIdToSocketMap[ instanceId ] = socket;
+	UNLOCK( &server->sockets.serversIdToSocketLock );
 
 	if ( index == -1 ) {
-		__ERROR__( "ServerWorker", "handleSlavePeerRegisterRequest", "The slave is not in the list. Ignoring this slave..." );
+		__ERROR__( "ServerWorker", "handleServerPeerRegisterRequest", "The server is not in the list. Ignoring this server..." );
 		return false;
 	}
 
 	ServerPeerEvent event;
-	event.resRegister( slavePeers->values[ index ], Slave::getInstance()->instanceId, requestId, true );
+	event.resRegister( serverPeers->values[ index ], Server::getInstance()->instanceId, requestId, true );
 	ServerWorker::eventQueue->insert( event );
 
 	return true;
@@ -144,15 +144,15 @@ bool ServerWorker::handleForwardKeyRequest( ServerPeerEvent event, struct Forwar
 bool ServerWorker::handleSetRequest( ServerPeerEvent event, char *buf, size_t size ) {
 	struct KeyValueHeader header;
 	if ( ! this->protocol.parseKeyValueHeader( header, buf, size ) ) {
-		__ERROR__( "ServerWorker", "handleSetRequest (SlavePeer)", "Invalid SET request (size = %lu).", size );
+		__ERROR__( "ServerWorker", "handleSetRequest (ServerPeer)", "Invalid SET request (size = %lu).", size );
 		return false;
 	}
 	__DEBUG__(
-		BLUE, "ServerWorker", "handleSetRequest (SlavePeer) ",
+		BLUE, "ServerWorker", "handleSetRequest (ServerPeer) ",
 		"[SET] Key: %.*s (key size = %u); Value: (value size = %u)",
 		( int ) header.keySize, header.key, header.keySize, header.valueSize
 	);
-	// same flow as set from masters
+	// same flow as set from clients
 	ClientEvent clientEvent;
 	bool success = this->handleSetRequest( clientEvent, buf, size, false );
 
@@ -265,20 +265,20 @@ bool ServerWorker::handleUpdateRequest( ServerPeerEvent event, char *buf, size_t
 
 	key.set( header.keySize, header.key );
 
-	// backup parity delta ( data delta from data slave )
+	// backup parity delta ( data delta from data server )
 	Timestamp timestamp( event.timestamp );
 	Value value;
 	value.set( header.valueUpdateSize, header.valueUpdate );
-	Slave *slave = Slave::getInstance();
-	LOCK( &slave->sockets.mastersIdToSocketLock );
+	Server *server = Server::getInstance();
+	LOCK( &server->sockets.clientsIdToSocketLock );
 	try {
-		ClientSocket *clientSocket = slave->sockets.mastersIdToSocketMap.at( event.instanceId );
+		ClientSocket *clientSocket = server->sockets.clientsIdToSocketMap.at( event.instanceId );
 		if ( clientSocket )
 			clientSocket->backup.insertParityUpdate( timestamp, key, value, metadata, isChunkDelta, header.valueUpdateOffset, header.chunkUpdateOffset, event.socket->instanceId, event.requestId );
 	} catch ( std::out_of_range &e ) {
-		__ERROR__( "ServerWorker", "handleUpdateRequest", "Failed to backup delta at parity slave for instance ID = %hu request ID = %u (Socket mapping not found).", event.instanceId, event.requestId );
+		__ERROR__( "ServerWorker", "handleUpdateRequest", "Failed to backup delta at parity server for instance ID = %hu request ID = %u (Socket mapping not found).", event.instanceId, event.requestId );
 	}
-	UNLOCK( &slave->sockets.mastersIdToSocketLock );
+	UNLOCK( &server->sockets.clientsIdToSocketLock );
 
 	event.resUpdate(
 		event.socket, event.instanceId, event.requestId,
@@ -288,7 +288,7 @@ bool ServerWorker::handleUpdateRequest( ServerPeerEvent event, char *buf, size_t
 		header.chunkUpdateOffset,
 		ret
 	);
-	if ( ! ret ) printf( "Failed UPDATE request by slave peer!\n" );
+	if ( ! ret ) printf( "Failed UPDATE request by server peer!\n" );
 	this->dispatch( event );
 
 	return ret;
@@ -318,20 +318,20 @@ bool ServerWorker::handleDeleteRequest( ServerPeerEvent event, char *buf, size_t
 	if ( ret )
 		keyValue.deserialize( key.data, key.size, value.data, value.size );
 
-	// backup parity delta ( data delta from data slave )
+	// backup parity delta ( data delta from data server )
 	Timestamp timestamp( event.timestamp );
 	Metadata metadata;
 	metadata.set( header.listId, header.stripeId, header.chunkId );
-	Slave *slave = Slave::getInstance();
-	LOCK( &slave->sockets.mastersIdToSocketLock );
+	Server *server = Server::getInstance();
+	LOCK( &server->sockets.clientsIdToSocketLock );
 	try {
-		ClientSocket *clientSocket = slave->sockets.mastersIdToSocketMap.at( event.instanceId );
+		ClientSocket *clientSocket = server->sockets.clientsIdToSocketMap.at( event.instanceId );
 		if ( clientSocket )
 			clientSocket->backup.insertParityDelete( timestamp, key, value, metadata, false, 0, 0, event.socket->instanceId, event.requestId );
 	} catch ( std::out_of_range &e ) {
-		__ERROR__( "ServerWorker", "handleDeleteRequest", "Failed to backup delta at parity slave for instance ID = %hu request ID = %u (Socket mapping not found).", event.instanceId, event.requestId );
+		__ERROR__( "ServerWorker", "handleDeleteRequest", "Failed to backup delta at parity server for instance ID = %hu request ID = %u (Socket mapping not found).", event.instanceId, event.requestId );
 	}
-	UNLOCK( &slave->sockets.mastersIdToSocketLock );
+	UNLOCK( &server->sockets.clientsIdToSocketLock );
 
 	ret = ServerWorker::chunkBuffer->at( header.listId )->deleteKey( header.key, header.keySize );
 
@@ -546,7 +546,7 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 
 			if ( remainingChunks == 0 ) {
 				notifyCoordinator = true;
-				coordinatorEvent.resPromoteBackupSlave( coordinatorSocket, instanceId, requestId, addr, port, totalChunks, 0 );
+				coordinatorEvent.resPromoteBackupServer( coordinatorSocket, instanceId, requestId, addr, port, totalChunks, 0 );
 			}
 		} else {
 			// __ERROR__( "ServerWorker", "handleSetChunkRequest", "Cannot find the chunk (%u, %u, %u) from pending chunk set.", metadata.listId, metadata.stripeId, metadata.chunkId );
@@ -745,22 +745,22 @@ bool ServerWorker::handleUpdateChunkRequest( ServerPeerEvent event, char *buf, s
 			this->chunks, this->dataChunk, this->parityChunk
 		);
 
-		// backup parity chunk delta ( data chunk delta from data slave )
+		// backup parity chunk delta ( data chunk delta from data server )
 		Timestamp timestamp( event.timestamp );
 		Key key;
 		key.set( 0, 0 );
 		Value value;
 		value.set( header.length, header.delta );
-		Slave *slave = Slave::getInstance();
-		LOCK( &slave->sockets.mastersIdToSocketLock );
+		Server *server = Server::getInstance();
+		LOCK( &server->sockets.clientsIdToSocketLock );
 		try {
-			ClientSocket *clientSocket = slave->sockets.mastersIdToSocketMap.at( event.instanceId );
+			ClientSocket *clientSocket = server->sockets.clientsIdToSocketMap.at( event.instanceId );
 			if ( clientSocket )
 			clientSocket->backup.insertParityUpdate( timestamp, key, value, metadata, true, 0, header.offset, event.socket->instanceId, event.requestId );
 		} catch ( std::out_of_range &e ) {
-			__ERROR__( "ServerWorker", "handleUpdateChunkRequest", "Failed to backup delta at parity slave for instance ID = %hu request ID = %u (Socket mapping not found).", event.instanceId, event.requestId );
+			__ERROR__( "ServerWorker", "handleUpdateChunkRequest", "Failed to backup delta at parity server for instance ID = %hu request ID = %u (Socket mapping not found).", event.instanceId, event.requestId );
 		}
-		UNLOCK( &slave->sockets.mastersIdToSocketLock );
+		UNLOCK( &server->sockets.clientsIdToSocketLock );
 	} else {
 		// Update to reconstructed chunk //
 		ret = ServerWorker::degradedChunkBuffer->update(
@@ -813,22 +813,22 @@ bool ServerWorker::handleDeleteChunkRequest( ServerPeerEvent event, char *buf, s
 			true // isDelete
 		);
 
-		// backup parity chunk delta ( data chunk delta from data slave )
+		// backup parity chunk delta ( data chunk delta from data server )
 		Timestamp timestamp( event.timestamp );
 		Key key;
 		key.set( 0, 0 );
 		Value value;
 		value.set( header.length, header.delta );
-		Slave *slave = Slave::getInstance();
-		LOCK( &slave->sockets.mastersIdToSocketLock );
+		Server *server = Server::getInstance();
+		LOCK( &server->sockets.clientsIdToSocketLock );
 		try{
-			ClientSocket *clientSocket = slave->sockets.mastersIdToSocketMap.at( event.instanceId );
+			ClientSocket *clientSocket = server->sockets.clientsIdToSocketMap.at( event.instanceId );
 			if ( clientSocket )
 				clientSocket->backup.insertParityDelete( timestamp, key, value, metadata, true, 0, header.offset, event.socket->instanceId, event.requestId );
 		} catch ( std::out_of_range &e ) {
-			__ERROR__( "ServerWorker", "handleDeleteChunkRequest", "Failed to backup delta at parity slave for instance ID = %hu request ID = %u (Socket mapping not found).", event.instanceId, event.requestId );
+			__ERROR__( "ServerWorker", "handleDeleteChunkRequest", "Failed to backup delta at parity server for instance ID = %hu request ID = %u (Socket mapping not found).", event.instanceId, event.requestId );
 		}
-		UNLOCK( &slave->sockets.mastersIdToSocketLock );
+		UNLOCK( &server->sockets.clientsIdToSocketLock );
 	} else {
 		// Update to reconstructed chunk //
 		ret = ServerWorker::degradedChunkBuffer->update(
@@ -895,7 +895,7 @@ bool ServerWorker::issueSealChunkRequest( Chunk *chunk, uint32_t startPos ) {
 	// Only issue seal chunk request when new key-value pairs are received
 	if ( ServerWorker::parityChunkCount && startPos < chunk->getSize() ) {
 		size_t size;
-		uint16_t instanceId = Slave::instanceId;
+		uint16_t instanceId = Server::instanceId;
 		uint32_t requestId = ServerWorker::idGenerator->nextVal( this->workerId );
 		Packet *packet = ServerWorker::packetPool->malloc();
 		packet->setReferenceCount( ServerWorker::parityChunkCount );
@@ -908,8 +908,8 @@ bool ServerWorker::issueSealChunkRequest( Chunk *chunk, uint32_t startPos ) {
 		// 	chunk->metadata.chunkId
 		// );
 
-		// Find parity slaves
-		this->getSlaves( chunk->metadata.listId );
+		// Find parity servers
+		this->getServers( chunk->metadata.listId );
 
 		// Prepare seal chunk request
 		this->protocol.reqSealChunk( size, instanceId, requestId, chunk, startPos, packet->data );
@@ -922,16 +922,16 @@ bool ServerWorker::issueSealChunkRequest( Chunk *chunk, uint32_t startPos ) {
 		}
 
 		for ( uint32_t i = 0; i < ServerWorker::parityChunkCount; i++ ) {
-			ServerPeerEvent slavePeerEvent;
-			slavePeerEvent.send( this->parityServerSockets[ i ], packet );
+			ServerPeerEvent serverPeerEvent;
+			serverPeerEvent.send( this->parityServerSockets[ i ], packet );
 
 #ifdef SERVER_WORKER_SEND_REPLICAS_PARALLEL
 			if ( i == ServerWorker::parityChunkCount - 1 )
-				this->dispatch( slavePeerEvent );
+				this->dispatch( serverPeerEvent );
 			else
-				ServerWorker::eventQueue->prioritizedInsert( slavePeerEvent );
+				ServerWorker::eventQueue->prioritizedInsert( serverPeerEvent );
 #else
-			this->dispatch( slavePeerEvent );
+			this->dispatch( serverPeerEvent );
 #endif
 		}
 	}
@@ -959,7 +959,7 @@ bool ServerWorker::handleBatchKeyValueRequest( ServerPeerEvent event, char *buf,
 		this->protocol.nextKeyValueInBatchKeyValueHeader( header, keySize, valueSize, keyStr, valueStr, offset );
 
 		if ( i == 0 )
-			this->getSlaves( keyStr, keySize, listId, chunkId );
+			this->getServers( keyStr, keySize, listId, chunkId );
 
 		if ( ServerWorker::disableSeal ) {
 			ServerWorker::chunkBuffer->at( listId )->set(
@@ -989,7 +989,7 @@ bool ServerWorker::handleBatchKeyValueRequest( ServerPeerEvent event, char *buf,
 		if ( ServerWorker::pending->eraseRecovery( keySize, keyStr, instanceId, requestId, coordinatorSocket, addr, port, remainingChunks, remainingKeys, totalChunks, totalKeys ) ) {
 			if ( remainingKeys == 0 ) {
 				CoordinatorEvent coordinatorEvent;
-				coordinatorEvent.resPromoteBackupSlave( coordinatorSocket, instanceId, requestId, addr, port, 0, totalKeys );
+				coordinatorEvent.resPromoteBackupServer( coordinatorSocket, instanceId, requestId, addr, port, 0, totalKeys );
 				this->dispatch( coordinatorEvent );
 			}
 		}
@@ -997,7 +997,7 @@ bool ServerWorker::handleBatchKeyValueRequest( ServerPeerEvent event, char *buf,
 
 	// printf( "handleBatchKeyValueRequest: Inserted objects = %u\n", header.count );
 
-	// Send response to the slave peer
+	// Send response to the server peer
 	event.resUnsealedKeys( event.socket, event.instanceId, event.requestId, header, true );
 	this->dispatch( event );
 

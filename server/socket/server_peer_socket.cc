@@ -4,18 +4,18 @@
 #include "../main/server.hh"
 #include "../../common/util/debug.hh"
 
-ArrayMap<int, ServerPeerSocket> *ServerPeerSocket::slavePeers;
+ArrayMap<int, ServerPeerSocket> *ServerPeerSocket::serverPeers;
 
-void ServerPeerSocket::setArrayMap( ArrayMap<int, ServerPeerSocket> *slavePeers ) {
-	ServerPeerSocket::slavePeers = slavePeers;
-	slavePeers->needsDelete = false;
+void ServerPeerSocket::setArrayMap( ArrayMap<int, ServerPeerSocket> *serverPeers ) {
+	ServerPeerSocket::serverPeers = serverPeers;
+	serverPeers->needsDelete = false;
 }
 
 void ServerPeerSocket::registerTo() {
-	Slave *slave = Slave::getInstance();
+	Server *server = Server::getInstance();
 	ServerPeerEvent event;
 	event.reqRegister( this );
-	slave->eventQueue.insert( event );
+	server->eventQueue.insert( event );
 }
 
 ServerPeerSocket::ServerPeerSocket() {
@@ -71,7 +71,7 @@ bool ServerPeerSocket::start() {
 void ServerPeerSocket::stop() {
 	if ( ! this->self ) {
 		int newFd = -INT_MIN + this->sockfd;
-		ServerPeerSocket::slavePeers->replaceKey( this->sockfd, newFd );
+		ServerPeerSocket::serverPeers->replaceKey( this->sockfd, newFd );
 		this->sockfd = newFd;
 	}
 	Socket::stop();

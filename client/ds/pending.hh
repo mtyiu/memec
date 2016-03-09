@@ -238,7 +238,7 @@ public:
 		LOCK_T remappingSetLock;
 		LOCK_T updateLock;
 		LOCK_T delLock;
-	} slaves;
+	} servers;
 	struct {
 		std::unordered_multimap<PendingIdentifier, RemapList> remapList;
 		LOCK_T remapListLock;
@@ -256,8 +256,8 @@ public:
 		LOCK_T revertLock;
 	} ack;
 	struct {
-		std::unordered_map<uint16_t, std::map<uint32_t, RequestInfo> > requests; // slave instance id -> (timestamp, request)
-		std::unordered_map<uint16_t, uint32_t> requestsStartTime; // slave instance id -> first timestamp to start remap
+		std::unordered_map<uint16_t, std::map<uint32_t, RequestInfo> > requests; // server instance id -> (timestamp, request)
+		std::unordered_map<uint16_t, uint32_t> requestsStartTime; // server instance id -> first timestamp to start remap
 		std::unordered_map<uint16_t, LOCK_T> requestsLock;
 	} replay;
 
@@ -287,7 +287,7 @@ public:
 		bool needsLock = true, bool needsUnlock = true,
 		uint32_t timestamp = 0
 	);
-	// Insert (Slaves)
+	// Insert (Servers)
 	bool insertKey(
 		PendingType type, uint16_t instanceId, uint16_t parentInstanceId, uint32_t requestId, uint32_t parentRequestId, void *ptr,
 		Key &key, bool needsLock = true, bool needsUnlock = true,

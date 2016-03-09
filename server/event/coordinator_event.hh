@@ -53,10 +53,10 @@ public:
 	void resRemappedData();
 	void resRemappedData( CoordinatorSocket *socket, uint16_t instanceId, uint32_t requestId );
 	void resReleaseDegradedLock( CoordinatorSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t count );
-	void resSlaveReconstructedMsg( CoordinatorSocket *socket, uint16_t instanceId, uint32_t requestId );
+	void resServerReconstructedMsg( CoordinatorSocket *socket, uint16_t instanceId, uint32_t requestId );
 	void resReconstruction( CoordinatorSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t numStripes );
 	void resReconstructionUnsealed( CoordinatorSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t keysCount );
-	void resPromoteBackupSlave( CoordinatorSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t numChunks, uint32_t numUnsealedKeys );
+	void resPromoteBackupServer( CoordinatorSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t numChunks, uint32_t numUnsealedKeys );
 	void pending( CoordinatorSocket *socket );
 };
 

@@ -27,9 +27,9 @@ public:
 		EventQueue<CodingEvent> *coding;
 		EventQueue<CoordinatorEvent> *coordinator;
 		EventQueue<IOEvent> *io;
-		EventQueue<ClientEvent> *master;
-		EventQueue<ServerEvent> *slave;
-		EventQueue<ServerPeerEvent> *slavePeer;
+		EventQueue<ClientEvent> *client;
+		EventQueue<ServerEvent> *server;
+		EventQueue<ServerPeerEvent> *serverPeer;
 	} separated;
 
 	ServerEventQueue() {
@@ -40,9 +40,9 @@ public:
 		this->separated.coding = 0;
 		this->separated.coordinator = 0;
 		this->separated.io = 0;
-		this->separated.master = 0;
-		this->separated.slave = 0;
-		this->separated.slavePeer = 0;
+		this->separated.client = 0;
+		this->separated.server = 0;
+		this->separated.serverPeer = 0;
 	}
 
 	void init( bool block, uint32_t mixed, uint32_t pMixed ) {
@@ -53,14 +53,14 @@ public:
 		LOCK_INIT( &this->priority.lock );
 	}
 
-	void init( bool block, uint32_t coding, uint32_t coordinator, uint32_t io, uint32_t master, uint32_t slave, uint32_t slavePeer ) {
+	void init( bool block, uint32_t coding, uint32_t coordinator, uint32_t io, uint32_t client, uint32_t server, uint32_t serverPeer ) {
 		this->isMixed = false;
 		this->separated.coding = new EventQueue<CodingEvent>( coding, block );
 		this->separated.coordinator = new EventQueue<CoordinatorEvent>( coordinator, block );
 		this->separated.io = new EventQueue<IOEvent>( io, block );
-		this->separated.master = new EventQueue<ClientEvent>( master, block );
-		this->separated.slave = new EventQueue<ServerEvent>( slave, block );
-		this->separated.slavePeer = new EventQueue<ServerPeerEvent>( slave, block );
+		this->separated.client = new EventQueue<ClientEvent>( client, block );
+		this->separated.server = new EventQueue<ServerEvent>( server, block );
+		this->separated.serverPeer = new EventQueue<ServerPeerEvent>( server, block );
 	}
 
 	void start() {
@@ -71,9 +71,9 @@ public:
 			this->separated.coding->start();
 			this->separated.coordinator->start();
 			this->separated.io->start();
-			this->separated.master->start();
-			this->separated.slave->start();
-			this->separated.slavePeer->start();
+			this->separated.client->start();
+			this->separated.server->start();
+			this->separated.serverPeer->start();
 		}
 	}
 
@@ -85,9 +85,9 @@ public:
 			this->separated.coding->stop();
 			this->separated.coordinator->stop();
 			this->separated.io->stop();
-			this->separated.master->stop();
-			this->separated.slave->stop();
-			this->separated.slavePeer->stop();
+			this->separated.client->stop();
+			this->separated.server->stop();
+			this->separated.serverPeer->stop();
 		}
 	}
 
@@ -99,9 +99,9 @@ public:
 			delete this->separated.coding;
 			delete this->separated.coordinator;
 			delete this->separated.io;
-			delete this->separated.master;
-			delete this->separated.slave;
-			delete this->separated.slavePeer;
+			delete this->separated.client;
+			delete this->separated.server;
+			delete this->separated.serverPeer;
 		}
 	}
 
@@ -118,12 +118,12 @@ public:
 			this->separated.coordinator->print( f );
 			fprintf( f, "[        I/O] " );
 			this->separated.io->print( f );
-			fprintf( f, "[     Master] " );
-			this->separated.master->print( f );
-			fprintf( f, "[      Slave] " );
-			this->separated.slave->print( f );
-			fprintf( f, "[ Slave Peer] " );
-			this->separated.slavePeer->print( f );
+			fprintf( f, "[     Client] " );
+			this->separated.client->print( f );
+			fprintf( f, "[      Server] " );
+			this->separated.server->print( f );
+			fprintf( f, "[ Server Peer] " );
+			this->separated.serverPeer->print( f );
 		}
 	}
 
@@ -141,9 +141,9 @@ public:
 	SERVER_EVENT_QUEUE_INSERT( CodingEvent, coding )
 	SERVER_EVENT_QUEUE_INSERT( CoordinatorEvent, coordinator )
 	SERVER_EVENT_QUEUE_INSERT( IOEvent, io )
-	SERVER_EVENT_QUEUE_INSERT( ClientEvent, master )
-	SERVER_EVENT_QUEUE_INSERT( ServerEvent, slave )
-	SERVER_EVENT_QUEUE_INSERT( ServerPeerEvent, slavePeer )
+	SERVER_EVENT_QUEUE_INSERT( ClientEvent, client )
+	SERVER_EVENT_QUEUE_INSERT( ServerEvent, server )
+	SERVER_EVENT_QUEUE_INSERT( ServerPeerEvent, serverPeer )
 #undef SERVER_EVENT_QUEUE_INSERT
 
 	bool prioritizedInsert( ServerPeerEvent &event ) {
@@ -174,7 +174,7 @@ public:
 				return this->mixed->insert( mixedEvent );
 			}
 		} else {
-			return this->separated.slavePeer->insert( event );
+			return this->separated.serverPeer->insert( event );
 		}
 	}
 

@@ -14,13 +14,13 @@ function start_screens {
 
 	## SERVER & ETHTOOL ##
 	for i in {11..23} {37..39}; do
-		ssh testbed-node$i "if [ -z \"\`screen -ls | grep server | grep -v grep\`\" ]; then echo \"[Node $i] Creating screen for server\"; screen -dmS server; else echo \"[Node $i] Slave screen exists\"; fi"
+		ssh testbed-node$i "if [ -z \"\`screen -ls | grep server | grep -v grep\`\" ]; then echo \"[Node $i] Creating screen for server\"; screen -dmS server; else echo \"[Node $i] Server screen exists\"; fi"
 		ssh testbed-node$i "if [ -z \"\`screen -ls | grep ethtool | grep -v grep\`\" ]; then echo \"[Node $i] Creating screen for ethtool\"; screen -dmS ethtool; else echo \"[Node $i] Ethtool screen exists\"; fi"
 	done
 
 	## CLIENT & YCSB ##
 	for i in 3 4 8 9; do
-		ssh testbed-node$i "if [ -z \"\`screen -ls | grep client | grep -v grep\`\" ]; then echo \"[Node $i] Creating screen for client\"; screen -dmS client; else echo \"[Node $i] Master screen exists\"; fi"
+		ssh testbed-node$i "if [ -z \"\`screen -ls | grep client | grep -v grep\`\" ]; then echo \"[Node $i] Creating screen for client\"; screen -dmS client; else echo \"[Node $i] Client screen exists\"; fi"
 		ssh testbed-node$i "if [ -z \"\`screen -ls | grep ycsb | grep -v grep\`\" ]; then echo \"[Node $i] Creating screen for ycsb\"; screen -dmS ycsb; else echo \"[Node $i] YCSB screen exists\"; fi"
 	done
 

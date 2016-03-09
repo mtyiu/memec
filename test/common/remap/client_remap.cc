@@ -17,10 +17,10 @@ int main ( int argc, char **argv ) {
 		return 1;
 	}
 
-	MasterRemapMsgHandler* mh = new MasterRemapMsgHandler();
+	ClientRemapMsgHandler* mh = new ClientRemapMsgHandler();
 	char namebuf[64];
 
-	fprintf( stderr, "START testing master remapping message handler\n");
+	fprintf( stderr, "START testing client remapping message handler\n");
 	// init. the hanlder with an address and a user name
 	struct in_addr addr;
 	inet_pton( AF_INET, "127.0.0.1", &addr );
@@ -32,7 +32,7 @@ int main ( int argc, char **argv ) {
 		fprintf( stderr, "!! Cannot start reading message with message handler !!\n" );
 	} else {
 		fprintf( stderr, ".. Add random servers\n" );
-		std::vector<struct sockaddr_in> servers = addSlaves( mh );
+		std::vector<struct sockaddr_in> servers = addServers( mh );
 		// simulate the flow of start/end of remapping phase
 		for ( int i = 0; i < ROUNDS; i++ ) {
 			fprintf( stderr, ".. Waiting start of remapping phase\n" );
@@ -53,7 +53,7 @@ int main ( int argc, char **argv ) {
 	mh->quit();
 	delete mh;
 
-	fprintf( stderr, "END testing master remapping message handler\n");
+	fprintf( stderr, "END testing client remapping message handler\n");
 
 	return 0;
 }

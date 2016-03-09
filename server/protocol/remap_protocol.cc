@@ -1,7 +1,7 @@
 #include "protocol.hh"
 
-char *SlaveProtocol::resRemappingSet(
-	size_t &size, bool toMaster,
+char *ServerProtocol::resRemappingSet(
+	size_t &size, bool toClient,
 	uint16_t instanceId, uint32_t requestId, bool success,
 	uint32_t listId, uint32_t chunkId,
 	uint32_t *original, uint32_t *remapped, uint32_t remappedCount,
@@ -10,7 +10,7 @@ char *SlaveProtocol::resRemappingSet(
 	// -- common/protocol/remap_protocol.cc --
 	size = this->generateRemappingSetHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
-		toMaster ? PROTO_MAGIC_TO_CLIENT : PROTO_MAGIC_TO_SERVER,
+		toClient ? PROTO_MAGIC_TO_CLIENT : PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_REMAPPING_SET,
 		instanceId, requestId,
 		listId, chunkId,
@@ -22,7 +22,7 @@ char *SlaveProtocol::resRemappingSet(
 	return this->buffer.send;
 }
 
-char *SlaveProtocol::resRemapParity( size_t &size, uint16_t instanceId, uint32_t requestId ) {
+char *ServerProtocol::resRemapParity( size_t &size, uint16_t instanceId, uint32_t requestId ) {
 	// -- common/protocol/protocol.cc --
 	size = this->generateHeader(
 		PROTO_MAGIC_RESPONSE_SUCCESS,
@@ -34,7 +34,7 @@ char *SlaveProtocol::resRemapParity( size_t &size, uint16_t instanceId, uint32_t
 	return this->buffer.send;
 };
 
-char *SlaveProtocol::reqSet( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf ) {
+char *ServerProtocol::reqSet( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf ) {
 	// -- common/protocol/normal_protocol.cc --
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateKeyValueHeader(
@@ -51,7 +51,7 @@ char *SlaveProtocol::reqSet( size_t &size, uint16_t instanceId, uint32_t request
 	return buf;
 }
 
-char *SlaveProtocol::reqRemappedUpdate( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *buf, uint32_t timestamp ) {
+char *ServerProtocol::reqRemappedUpdate( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *buf, uint32_t timestamp ) {
 	// -- common/protocol/normal_protocol.cc --
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateKeyValueUpdateHeader(
@@ -69,7 +69,7 @@ char *SlaveProtocol::reqRemappedUpdate( size_t &size, uint16_t instanceId, uint3
 	return buf;
 }
 
-char *SlaveProtocol::reqRemappedDelete( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize, char *buf, uint32_t timestamp ) {
+char *ServerProtocol::reqRemappedDelete( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize, char *buf, uint32_t timestamp ) {
 	// -- common/protocol/normal_protocol.cc --
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateKeyHeader(
@@ -84,7 +84,7 @@ char *SlaveProtocol::reqRemappedDelete( size_t &size, uint16_t instanceId, uint3
 	return buf;
 }
 
-char *SlaveProtocol::resRemappedUpdate( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, char *key, uint8_t keySize, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *buf, uint32_t timestamp ) {
+char *ServerProtocol::resRemappedUpdate( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, char *key, uint8_t keySize, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *buf, uint32_t timestamp ) {
 	// -- common/protocol/normal_protocol.cc --
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateKeyValueUpdateHeader(
@@ -99,7 +99,7 @@ char *SlaveProtocol::resRemappedUpdate( size_t &size, uint16_t instanceId, uint3
 	return buf;
 }
 
-char *SlaveProtocol::resRemappedDelete( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, char *key, uint8_t keySize, char *buf, uint32_t timestamp ) {
+char *ServerProtocol::resRemappedDelete( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, char *key, uint8_t keySize, char *buf, uint32_t timestamp ) {
 	// -- common/protocol/normal_protocol.cc --
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateKeyHeader(

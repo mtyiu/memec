@@ -14,8 +14,8 @@ public:
 	union {
 		ApplicationEvent application;
 		CoordinatorEvent coordinator;
-		ClientEvent master;
-		ServerEvent slave;
+		ClientEvent client;
+		ServerEvent server;
 	} event;
 
 #define MIXED_EVENT_SET(_EVENT_TYPE_, _TYPE_CONSTANT_, _FIELD_) \
@@ -26,8 +26,8 @@ public:
 
 	MIXED_EVENT_SET( ApplicationEvent, EVENT_TYPE_APPLICATION, application )
 	MIXED_EVENT_SET( CoordinatorEvent, EVENT_TYPE_COORDINATOR, coordinator )
-	MIXED_EVENT_SET( ClientEvent, EVENT_TYPE_CLIENT, master )
-	MIXED_EVENT_SET( ServerEvent, EVENT_TYPE_SERVER, slave )
+	MIXED_EVENT_SET( ClientEvent, EVENT_TYPE_CLIENT, client )
+	MIXED_EVENT_SET( ServerEvent, EVENT_TYPE_SERVER, server )
 #undef MIXED_EVENT_SET
 
 	void set() {

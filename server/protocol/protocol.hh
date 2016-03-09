@@ -6,15 +6,15 @@
 #include "../../common/lock/lock.hh"
 #include "../../common/protocol/protocol.hh"
 
-class SlaveProtocol : public Protocol {
+class ServerProtocol : public Protocol {
 public:
-	SlaveProtocol() : Protocol( ROLE_SERVER ) {}
+	ServerProtocol() : Protocol( ROLE_SERVER ) {}
 
 	// ---------- register_protocol.cc ----------
 	char *reqRegisterCoordinator( size_t &size, uint32_t requestId, uint32_t addr, uint16_t port );
-	char *resRegisterMaster( size_t &size, uint16_t instanceId, uint32_t requestId, bool success );
-	char *reqRegisterSlavePeer( size_t &size, uint16_t instanceId, uint32_t requestId, ServerAddr *addr );
-	char *resRegisterSlavePeer( size_t &size, uint16_t instanceId, uint32_t requestId, bool success );
+	char *resRegisterClient( size_t &size, uint16_t instanceId, uint32_t requestId, bool success );
+	char *reqRegisterServerPeer( size_t &size, uint16_t instanceId, uint32_t requestId, ServerAddr *addr );
+	char *resRegisterServerPeer( size_t &size, uint16_t instanceId, uint32_t requestId, bool success );
 
 	// ---------- heartbeat_protocol.cc ----------
 	char *sendHeartbeat(
@@ -33,12 +33,12 @@ public:
 	);
 	char *resSet(
 		size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
-		uint8_t keySize, char *key, bool toMaster = true
+		uint8_t keySize, char *key, bool toClient = true
 	);
 	char *resGet(
 		size_t &size, uint16_t instanceId, uint32_t requestId, bool success, bool isDegraded,
 		uint8_t keySize, char *key, uint32_t valueSize = 0, char *value = 0,
-		bool toMaster = true
+		bool toClient = true
 	);
 	char *resUpdate(
 		size_t &size, uint16_t instanceId, uint32_t requestId, bool success, bool isDegraded,
@@ -49,17 +49,17 @@ public:
 		size_t &size, uint16_t instanceId, uint32_t requestId, bool isDegraded,
 		uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		uint8_t keySize, char *key,
-		bool toMaster = true
+		bool toClient = true
 	);
 	char *resDelete(
 		size_t &size, uint16_t instanceId, uint32_t requestId, bool isDegraded,
 		uint8_t keySize, char *key,
-		bool toMaster = true
+		bool toClient = true
 	);
 
 	// ---------- remap_protocol.cc ----------
 	char *resRemappingSet(
-		size_t &size, bool toMaster,
+		size_t &size, bool toClient,
 		uint16_t instanceId, uint32_t requestId, bool success,
 		uint32_t listId, uint32_t chunkId,
 		uint32_t *original, uint32_t *remapped, uint32_t remappedCount,
@@ -134,10 +134,10 @@ public:
 	char *reqSealChunk( size_t &size, uint16_t instanceId, uint32_t requestId, Chunk *chunk, uint32_t startPos, char *buf = 0 );
 
 	// ---------- recovery_protocol.cc ----------
-	char *resSlaveReconstructedMsg( size_t &size, uint16_t instanceId, uint32_t requestId );
+	char *resServerReconstructedMsg( size_t &size, uint16_t instanceId, uint32_t requestId );
 	char *resReconstruction( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t numStripes );
 	char *resReconstructionUnsealed( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t numUnsealedKeys );
-	char *resPromoteBackupSlave( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t numStripes, uint32_t numUnsealedKeys );
+	char *resPromoteBackupServer( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t numStripes, uint32_t numUnsealedKeys );
 	char *reqBatchGetChunks(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		std::vector<uint32_t> *requestIds,
