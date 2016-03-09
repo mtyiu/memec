@@ -3,7 +3,6 @@
 
 #include <vector>
 #include <cstdio>
-#include "worker_role.hh"
 #include "../ack/pending_ack.hh"
 #include "../buffer/mixed_chunk_buffer.hh"
 #include "../buffer/degraded_chunk_buffer.hh"

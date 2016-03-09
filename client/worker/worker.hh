@@ -2,7 +2,6 @@
 #define __CLIENT_WORKER_WORKER_HH__
 
 #include <cstdio>
-#include "worker_role.hh"
 #include "../ds/pending.hh"
 #include "../event/event_queue.hh"
 #include "../protocol/protocol.hh"
@@ -50,19 +49,6 @@ private:
 	);
 	ServerSocket *getServers( uint32_t listId, uint32_t chunkId );
 
-	// For degraded GET
-	// ServerSocket *getServers(
-	// 	char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId, uint32_t &newChunkId,
-	// 	bool &useDegradedMode, ServerSocket *&original
-	// );
-	// For degraded UPDATE / DELETE (which may involve failed parity servers)
-	// Return the data server for handling the request
-	// ServerSocket *getServers(
-	// 	char *data, uint8_t size, uint32_t &listId,
-	// 	uint32_t &dataChunkId, uint32_t &newDataChunkId,
-	// 	uint32_t &parityChunkId, uint32_t &newParityChunkId,
-	// 	bool &useDegradedMode
-	// );
 	void free();
 	static void *run( void *argv );
 
