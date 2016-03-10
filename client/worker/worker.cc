@@ -25,18 +25,14 @@ void ClientWorker::dispatch( MixedEvent event ) {
 		case EVENT_TYPE_COORDINATOR:
 			this->dispatch( event.event.coordinator );
 			break;
-		case EVENT_TYPE_CLIENT:
-			this->dispatch( event.event.client );
-			break;
 		case EVENT_TYPE_SERVER:
 			this->dispatch( event.event.server );
 			break;
 		default:
+			__ERROR__( "ClientWorker", "dispatch", "Unsupported event type." );
 			break;
 	}
 }
-
-void ClientWorker::dispatch( ClientEvent event ) {}
 
 ServerSocket *ClientWorker::getServers( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId ) {
 	ServerSocket *ret;

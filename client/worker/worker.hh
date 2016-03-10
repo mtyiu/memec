@@ -38,7 +38,6 @@ private:
 
 	// ---------- worker.cc ----------
 	void dispatch( MixedEvent event );
-	void dispatch( ClientEvent event );
 	// For normal operations
 	ServerSocket *getServers( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId );
 	// For both remapping and degraded operations

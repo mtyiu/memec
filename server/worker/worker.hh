@@ -75,7 +75,6 @@ private:
 	void dispatch( MixedEvent event );
 	void dispatch( CodingEvent event );
 	void dispatch( IOEvent event );
-	void dispatch( ServerEvent event );
 	ServerPeerSocket *getServers( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId );
 	bool getServers( uint32_t listId );
 	void free();
@@ -152,10 +151,8 @@ private:
 	// ---------- remap_worker.cc ----------
 	bool handleRemappedData( CoordinatorEvent event, char *buf, size_t size );
 	bool handleRemappingSetRequest( ClientEvent event, char *buf, size_t size );
-	bool handleRemappingSetRequest( ServerPeerEvent event, char *buf, size_t size );
 	bool handleRemappedUpdateRequest( ServerPeerEvent event, char *buf, size_t size );
 	bool handleRemappedDeleteRequest( ServerPeerEvent event, char *buf, size_t size );
-	bool handleRemappingSetResponse( ServerPeerEvent event, bool success, char *buf, size_t size );
 	bool handleRemappedUpdateResponse( ServerPeerEvent event, bool success, char *buf, size_t size );
 	bool handleRemappedDeleteResponse( ServerPeerEvent event, bool success, char *buf, size_t size );
 

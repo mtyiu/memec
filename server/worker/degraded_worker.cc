@@ -267,22 +267,6 @@ bool ServerWorker::handleDegradedUpdateRequest( ClientEvent event, struct Degrad
 			chunkId, header.isSealed
 		);
 
-		/*
-		printf( "handleDegradedUpdateRequest(): (%u, %u, %u) %.*s: ", listId, stripeId, chunkId, header.data.keyValueUpdate.keySize, header.data.keyValueUpdate.key );
-		for ( uint32_t i = 0; i < header.reconstructedCount; i++ ) {
-			printf(
-				"%s(%u, %u) |-> (%u, %u)%s",
-				i == 0 ? "" : ", ",
-				header.original[ i * 2     ],
-				header.original[ i * 2 + 1 ],
-				header.reconstructed[ i * 2     ],
-				header.reconstructed[ i * 2 + 1 ],
-				i == header.reconstructedCount - 1 ? "\n" : ""
-			);
-		}
-		fflush( stdout );
-		*/
-
 		if ( reconstructParity ) {
 			inProgress = false;
 			for ( uint32_t i = 0; i < header.reconstructedCount; i++ ) {
@@ -307,7 +291,6 @@ bool ServerWorker::handleDegradedUpdateRequest( ClientEvent event, struct Degrad
 						);
 					}
 					if ( ! ret ) {
-						// printf( "Reconstruction and forwarding already in progress (%u, %u, %u).\n", listId, header.stripeId, chunkId );
 						inProgress = true;
 						break;
 					}
@@ -326,7 +309,6 @@ bool ServerWorker::handleDegradedUpdateRequest( ClientEvent event, struct Degrad
 				);
 			} else {
 				// UPDATE data chunk and reconstructed parity chunks
-				// fprintf( stderr, "handleDegradedUpdateRequest(): %.*s - 2\n", header.data.keyValueUpdate.keySize, header.data.keyValueUpdate.key );
 				return this->handleUpdateRequest(
 					event, header.data.keyValueUpdate,
 					header.original, header.reconstructed, header.reconstructedCount,
@@ -337,21 +319,6 @@ bool ServerWorker::handleDegradedUpdateRequest( ClientEvent event, struct Degrad
 				);
 			}
 		} else if ( ! reconstructData ) {
-			// UPDATE data chunk and reconstructed parity chunks
-			/*
-			for ( uint32_t i = 0; i < header.reconstructedCount; i++ ) {
-				printf(
-					"%s(%u, %u) |-> (%u, %u)%s",
-					i == 0 ? "" : ", ",
-					header.original[ i * 2     ],
-					header.original[ i * 2 + 1 ],
-					header.reconstructed[ i * 2     ],
-					header.reconstructed[ i * 2 + 1 ],
-					i == header.reconstructedCount - 1 ? "\n" : ""
-				);
-			}
-			*/
-			// fprintf( stderr, "handleDegradedUpdateRequest(): %.*s - 3\n", header.data.keyValueUpdate.keySize, header.data.keyValueUpdate.key );
 			return this->handleUpdateRequest(
 				event, header.data.keyValueUpdate,
 				header.original, header.reconstructed, header.reconstructedCount,
@@ -798,8 +765,6 @@ bool ServerWorker::handleForwardChunkRequest( struct ChunkDataHeader &header, bo
 	);
 	if ( chunk ) {
 		// Already exists
-		// __ERROR__( "ServerWorker", "handleForwardChunkRequest", "The chunk (%u, %u, %u) is forwarded multiple times.", header.listId, header.stripeId, header.chunkId );
-
 		xorIfExists = true;
 		if ( xorIfExists ) {
 			char *parity = chunk->getData();
@@ -938,32 +903,8 @@ bool ServerWorker::handleForwardChunkRequest( struct ChunkDataHeader &header, bo
 					);
 					this->dispatch( clientEvent );
 				}
-
-				// struct KeyValueUpdateHeader header;
-				// header.keySize = op.data.keyValueUpdate.size;
-				// header.valueUpdateSize = op.data.keyValueUpdate.length;
-				// header.valueUpdateOffset = op.data.keyValueUpdate.offset;
-				// header.key = op.data.keyValueUpdate.data;
-				// header.valueUpdate = ( char * ) op.data.keyValueUpdate.ptr;
-				//
-				// this->handleUpdateRequest(
-				// 	clientEvent, header,
-				// 	op.original, op.reconstructed, op.reconstructedCount,
-				// 	false,
-				// 	this->chunks,
-				// 	pidsIndex == len - 1
-				// );
 			} else if ( op.opcode == PROTO_OPCODE_DEGRADED_DELETE ) {
-				// struct KeyHeader header;
-				// header.keySize = op.data.key.size;
-				// header.key = op.data.key.data;
-				// this->handleDeleteRequest(
-				// 	clientEvent, header,
-				// 	op.original, op.reconstructed, op.reconstructedCount,
-				// 	false,
-				// 	this->chunks,
-				// 	pidsIndex == len - 1
-				// );
+				// TODO
 			}
 		}
 	}
@@ -1005,29 +946,6 @@ bool ServerWorker::performDegradedRead(
 
 	ServerWorker::stripeList->get( listId, this->parityServerSockets, this->dataServerSockets );
 
-	// fprintf( stderr, "performDegradedRead(): %u, %u, %u - isSealed? %s\n", listId, stripeId, chunkId, isSealed ? "true" : "false" );
-
-	/*
-	for ( uint32_t i = 0; i < reconstructedCount; ) {
-		uint32_t tmp = original[ i * 2 + 1 ];
-		bool toNext = true;
-		if ( tmp < ServerWorker::dataChunkCount ) {
-			if ( tmp != chunkId ) {
-				// Remove this entry as the reconstructed data chunk is not accessed in this request
-				for ( uint32_t j = i; j < reconstructedCount - 1; j++ ) {
-					original[ j * 2     ] = original[ ( j + 1 ) * 2     ];
-					original[ j * 2 + 1 ] = original[ ( j + 1 ) * 2 + 1 ];
-					reconstructed[ j * 2     ] = reconstructed[ ( j + 1 ) * 2     ];
-					reconstructed[ j * 2 + 1 ] = reconstructed[ ( j + 1 ) * 2 + 1 ];
-				}
-				reconstructedCount--;
-				toNext = false;
-			}
-		}
-		if ( toNext )
-			i++;
-	}
-	*/
 	// Determine the list of surviving nodes
 	for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
 		uint32_t originalChunkId = original[ i * 2 + 1 ];
@@ -1121,17 +1039,6 @@ bool ServerWorker::performDegradedRead(
 			);
 			needsContinue = false;
 			isReconstructed = false;
-			// __INFO__(
-			// 	YELLOW, "ServerWorker", "performDegradedRead",
-			// 	"[%u, %u/ parent: %u, %u] opcode: %x; Chunk ID mismatch for key at 0x%p: %.*s (%u, %u, %u) - ongoingAtChunk: %u, my chunk ID: %u.",
-			// 	instanceId, requestId,
-			// 	parentInstanceId, parentRequestId,
-			// 	op.opcode, op.data.key.data,
-			// 	op.data.key.size, op.data.key.data,
-			// 	listId, stripeId, chunkId,
-			// 	ongoingAtChunk,
-			// 	ServerWorker::chunkBuffer->at( listId )->getChunkId()
-			// );
 		} else {
 			needsContinue = ServerWorker::degradedChunkBuffer->map.insertDegradedChunk(
 				listId, stripeId, chunkId,
@@ -1148,7 +1055,6 @@ bool ServerWorker::performDegradedRead(
 	}
 
 	if ( isSealed ) {
-		// fprintf( stderr, "insertDegradedChunk(): (%u, %u, %u) - needsContinue: %s; isReconstructed: %s\n", listId, stripeId, chunkId, needsContinue ? "true" : "false", isReconstructed ? "true" : "false" );
 		if ( ! needsContinue ) {
 			if ( isReconstructed ) {
 				// The chunk is already reconstructed
@@ -1165,7 +1071,6 @@ force_reconstruct_chunks:
 		metadata.set( listId, stripeId, 0 );
 		selected = 0;
 
-		// printf( "Reconstructing (%u, %u, %u; key: %.*s) using: ", listId, stripeId, chunkId, key->size, key->data );
 		for ( uint32_t x = 0; x < numSurvivingChunkIds; x++ ) {
 			uint32_t i = survivingChunkIds[ x ];
 
@@ -1182,7 +1087,6 @@ force_reconstruct_chunks:
 			// Add to pending GET_CHUNK request set
 			ChunkRequest chunkRequest;
 			chunkRequest.set( listId, stripeId, i, socket, 0, true );
-			// printf( "(%u, %u, %u) ", listId, stripeId, i );
 			if ( socket->self ) {
 				chunkRequest.self = true;
 				assert( chunkRequest.chunkId == ServerWorker::chunkBuffer->at( listId )->getChunkId() );
@@ -1196,8 +1100,6 @@ force_reconstruct_chunks:
 			}
 			selected++;
 		}
-		// printf( "\n" );
-		// fflush( stdout );
 
 		selected = 0;
 		for ( uint32_t x = 0; x < numSurvivingChunkIds; x++ ) {
@@ -1225,14 +1127,12 @@ force_reconstruct_chunks:
 
 		return ( selected >= ServerWorker::dataChunkCount );
 	} else {
-		// fprintf( stderr, "performDegradedRead(): (%u, %u, %u) - %.*s - needsContinue: %s; isReconstructed: %s\n", listId, stripeId, chunkId, mykey.size, mykey.data, needsContinue ? "true" : "false", isReconstructed ? "true" : "false" );
 		////////// Key-value pairs in unsealed chunks //////////
 		if ( ! needsContinue || isReconstructed )
 			return false;
 
 		bool success = true;
 		if ( socket->self ) {
-			// printf( "performDegradedRead(): %.*s - 1\n", mykey.size, mykey.data );
 			// Get the requested key-value pairs from local key-value store
 			KeyValue keyValue;
 			ClientEvent clientEvent;
@@ -1269,7 +1169,6 @@ force_reconstruct_chunks:
 			// Forward the key-value pair to the reconstructed servers
 			if ( success ) {
 				// Need to send the key-value pair to reconstructed servers even if this is a DELETE request because of the need of creating backup
-
 				if ( ! ServerWorker::pending->insertDegradedOp( PT_SERVER_PEER_DEGRADED_OPS, instanceId, parentInstanceId, requestId, parentRequestId, 0, op ) ) {
 					__ERROR__( "ServerWorker", "performDegradedRead", "Cannot insert into server DEGRADED_OPS pending map." );
 				}
@@ -1391,7 +1290,6 @@ force_reconstruct_chunks:
 		if ( ongoingAtChunk == ServerWorker::chunkBuffer->at( listId )->getChunkId() ) {
 			// Check if there are any other lost data chunks
 			uint32_t lostDataChunkId = ServerWorker::chunkCount;
-			// fprintf( stderr, "performDegradedRead(): %u, %u, %u (ongoing: %u) ~ force_degraded_read! ~\n", listId, stripeId, chunkId, ongoingAtChunk );
 
 			needsContinue = false;
 			for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
@@ -1399,7 +1297,6 @@ force_reconstruct_chunks:
 					lostDataChunkId = original[ i * 2 + 1 ];
 				}
 				if ( original[ i * 2 + 1 ] < ServerWorker::dataChunkCount && original[ i * 2 + 1 ] != chunkId ) {
-				// if ( original[ i * 2 + 1 ] != chunkId ) {
 					needsContinue = true;
 					break;
 				}
@@ -1530,33 +1427,6 @@ bool ServerWorker::sendModifyChunkRequest(
 					offset + metadata.chunkId * Chunk::capacity + deltaSize
 				);
 
-				// Apply the parity delta
-				/*
-				if ( ! this->forward.chunks[ i + ServerWorker::dataChunkCount ] ) {
-					for ( uint32_t j = 0; j < ServerWorker::chunkCount; j++ ) {
-						printf( "%p ", this->forward.chunks[ j ] );
-					}
-					printf( "(reconstructParity = %s)\n", reconstructParity ? "true" : "false" );
-
-					for ( uint32_t j = 0; j < reconstructedCount; j++ ) {
-						printf(
-							"%s(%u, %u) |-> (%u, %u)%s",
-							j == 0 ? "" : ", ",
-							original[ i * 2     ],
-							original[ i * 2 + 1 ],
-							reconstructed[ i * 2     ],
-							reconstructed[ i * 2 + 1 ],
-							j == reconstructedCount - 1 ? "\n" : ""
-						);
-					}
-				}
-				*/
-				assert( this->forward.chunks[ i + ServerWorker::dataChunkCount ]->getData() );
-				assert( this->forward.chunks[ i + ServerWorker::dataChunkCount ] );
-				assert( this->forward.chunks[ i + ServerWorker::dataChunkCount ]->getData() );
-				assert( this->forward.parityChunk );
-				assert( this->forward.parityChunk->getData() );
-
 				char *parity = this->forward.chunks[ i + ServerWorker::dataChunkCount ]->getData();
 				Coding::bitwiseXOR(
 					parity,
@@ -1584,11 +1454,6 @@ bool ServerWorker::sendModifyChunkRequest(
 						ServerWorker::getChunkBuffer->insert( metadata, chunk, sealIndicatorCount, sealIndicator );
 						metadata.chunkId = tmpChunkId;
 
-						fprintf( stderr, "Storing backup for (%u, %u, %u / %u)\n", metadata.listId, metadata.stripeId, myChunkId, metadata.chunkId );
-						if ( chunk )
-							chunk->print();
-						fflush( stdout );
-
 						if ( parityChunkBufferLock )
 							UNLOCK( parityChunkBufferLock );
 					}
@@ -1604,19 +1469,6 @@ bool ServerWorker::sendModifyChunkRequest(
 				size_t size;
 				Packet *packet = ServerWorker::packetPool->malloc();
 				packet->setReferenceCount( 1 );
-
-				// backup data delta, insert a pending record for each parity server
-				/* Seems that we don't need the data delta...
-				if ( clientSocket != 0 ) {
-					Timestamp ts( timestamp );
-					Value value;
-					value.set( deltaSize, delta );
-					if ( isUpdate )
-						clientSocket->backup.insertDataUpdate( ts, key, value, metadata, isSealed, valueUpdateOffset, offset, requestId, this->parityServerSockets[ i ]->instanceId, this->parityServerSockets[ i ] );
-					else
-						clientSocket->backup.insertDataDelete( ts, key, value, metadata, isSealed, valueUpdateOffset, offset, requestId, this->parityServerSockets[ i ]->instanceId, this->parityServerSockets[ i ] );
-				}
-				*/
 
 				if ( isUpdate ) {
 					this->protocol.reqUpdateChunk(
@@ -1695,52 +1547,6 @@ bool ServerWorker::sendModifyChunkRequest(
 				printf( "TODO: Handle DELETE request.\n" );
 			}
 		}
-
-		/*
-		if ( isDegraded && endOfDegradedOp ) {
-			////////////////////////////////////////
-			// Forward the modified parity chunks //
-			////////////////////////////////////////
-			ServerPeerEvent event;
-			requestId = ServerWorker::idGenerator->nextVal( this->workerId );
-
-			for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
-				if ( original[ i * 2 + 1 ] >= ServerWorker::dataChunkCount ) {
-					fprintf( stderr, "Forwarding data chunk (%u, %u, %u)\n", metadata.listId, metadata.stripeId, original[ i * 2 + 1 ] );
-				}
-
-				ServerPeerSocket *s = ServerWorker::stripeList->get( reconstructed[ i * 2 ], reconstructed[ i * 2 + 1 ] );
-
-				if ( s->self ) {
-					struct ChunkDataHeader chunkDataHeader = {
-						.listId = metadata.listId,
-						.stripeId = metadata.stripeId,
-						.chunkId = original[ i * 2 + 1 ],
-						.size = chunks[ original[ i * 2 + 1 ] ]->getSize(),
-						.offset = 0,
-						.data = chunks[ original[ i * 2 + 1 ] ]->getData()
-					};
-					this->handleForwardChunkRequest( chunkDataHeader );
-				} else {
-					metadata.chunkId = original[ i * 2 + 1 ];
-					event.reqForwardChunk(
-						ServerWorker::stripeList->get( reconstructed[ i * 2 ], reconstructed[ i * 2 + 1 ] ),
-						instanceId, requestId,
-						metadata, chunks[ original[ i * 2 + 1 ] ], false
-					);
-
-					// printf(
-					// 	"Forwarding chunk (%u, %u, %u) to #%u...\n",
-					// 	metadata.listId, metadata.stripeId,
-					// 	original[ i * 2 + 1 ],
-					// 	reconstructed[ i * 2 + 1 ]
-					// );
-
-					this->dispatch( event );
-				}
-			}
-		}
-		*/
 	} else {
 		// Send UPDATE / DELETE request if the chunk is not yet sealed
 
@@ -1803,19 +1609,6 @@ bool ServerWorker::sendModifyChunkRequest(
 			if ( ! this->parityServerSockets[ i ] || this->parityServerSockets[ i ]->self )
 				continue;
 
-			// backup data delta, insert a pending record for each parity server
-			/* Seems that we don't need the data delta...
-			if ( clientSocket != 0 ) {
-				Timestamp ts ( timestamp );
-				Value value;
-				value.set( deltaSize, delta );
-				if ( isUpdate )
-					clientSocket->backup.insertDataUpdate( ts, key, value, metadata, isSealed, valueUpdateOffset, offset, requestId, this->parityServerSockets[ i ]->instanceId, this->parityServerSockets[ i ] );
-				else
-					clientSocket->backup.insertDataDelete( ts, key, value, metadata, isSealed, valueUpdateOffset, offset, requestId, this->parityServerSockets[ i ]->instanceId, this->parityServerSockets[ i ] );
-			}
-			*/
-
 			if ( isUpdate ) {
 				if ( ! ServerWorker::pending->insertKeyValueUpdate(
 					PT_SERVER_PEER_UPDATE, instanceId, parentInstanceId, requestId, parentRequestId,
@@ -1840,33 +1633,7 @@ bool ServerWorker::sendModifyChunkRequest(
 			if ( ! this->parityServerSockets[ i ] ) {
 				continue;
 			} else if ( this->parityServerSockets[ i ]->self ) {
-				if ( isUpdate ) {
-					/* Updated in the caller
-					bool r = false;
-					r = ServerWorker::chunkBuffer->at( metadata.listId )->updateKeyValue(
-						keyStr, keySize,
-						valueUpdateOffset, deltaSize, delta
-					);
-					if ( ! r ) {
-						KeyValue keyValue;
-						bool found;
-						found = map->findValueByKey( keyStr, keySize, &keyValue, 0 );
-						Metadata myMetadata = metadata;
-						myMetadata.chunkId = i + ServerWorker::dataChunkCount;
-
-						r = ServerWorker::degradedChunkBuffer->updateKeyValue(
-							keySize, keyStr,
-							deltaSize, valueUpdateOffset,
-							0,       // chunkUpdateOffset
-							delta,
-							0,       // chunk
-							false,   // isSealed
-							found ? &keyValue : 0,
-							found ? &myMetadata : 0
-						);
-					}
-					*/
-				} else {
+				if ( ! isUpdate ) {
 					__ERROR__( "ServerWorker", "sendModifyChunkRequest", "TODO: Handle DELETE request on self server socket." );
 				}
 			} else {
@@ -1884,40 +1651,6 @@ bool ServerWorker::sendModifyChunkRequest(
 #endif
 			}
 		}
-
-		/*
-		if ( isDegraded && endOfDegradedOp ) {
-			////////////////////////////////////////
-			// Forward the modified parity chunks //
-			////////////////////////////////////////
-			ServerPeerEvent event;
-			requestId = ServerWorker::idGenerator->nextVal( this->workerId );
-
-			for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
-				if ( original[ i * 2 + 1 ] >= ServerWorker::dataChunkCount ) {
-					metadata.chunkId = original[ i * 2 + 1 ];
-					event.reqForwardKey(
-						ServerWorker::stripeList->get( reconstructed[ i * 2 ], reconstructed[ i * 2 + 1 ] ),
-						instanceId, requestId,
-						metadata.listId, metadata.chunkId,
-
-					);
-
-					this->dispatch( event );
-
-					printf(
-						"Forwarding chunk (%u, %u, %u) to #%u...\n",
-						metadata.listId, metadata.stripeId,
-						original[ i * 2 + 1 ],
-						reconstructed[ i * 2 + 1 ]
-					);
-				} else {
-					// This case never happens
-					// this->dataServerSockets[ original[ i * 2 + 1 ] ] = 0;
-				}
-			}
-		}
-		*/
 
 		if ( ! self ) {
 			self--; // Get the self parity server index

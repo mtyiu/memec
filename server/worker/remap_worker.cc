@@ -100,17 +100,6 @@ bool ServerWorker::handleRemappingSetRequest( ClientEvent event, char *buf, size
 			}
 		}
 
-		// printf( "Remapping " );
-		// for ( uint32_t i = 0; i < header.remappedCount; i++ ) {
-		// 	if ( i ) printf( "; " );
-		// 	printf(
-		// 		"(%u, %u) |-> (%u, %u)",
-		// 		header.original[ i * 2 ], header.original[ i * 2 + 1 ],
-		// 		header.remapped[ i * 2 ], header.remapped[ i * 2 + 1 ]
-		// 	);
-		// }
-		// printf( " (count = %u).\n", header.remappedCount );
-
 		if ( bufferRemapData ) {
 			__ERROR__(
 				"ServerWorker", "handleRemappingSetRequest",
@@ -176,94 +165,6 @@ bool ServerWorker::handleRemappingSetRequest( ClientEvent event, char *buf, size
 	this->dispatch( event );
 
 	return true;
-}
-
-bool ServerWorker::handleRemappingSetRequest( ServerPeerEvent event, char *buf, size_t size ) {
-	__ERROR__( "ServerWorker", "handleRemappingSetRequest", "Why remapping SET request is sent by server peer?" );
-	return false;
-	/*
-	struct RemappingSetHeader header;
-	if ( ! this->protocol.parseRemappingSetHeader( header, buf, size ) ) {
-		__ERROR__( "ServerWorker", "handleRemappingSetRequest", "Invalid REMAPPING_SET request (size = %lu).", size );
-		return false;
-	}
-	__DEBUG__(
-		BLUE, "ServerWorker", "handleRemappingSetRequest",
-		"[SET] Key: %.*s (key size = %u); Value: (value size = %u); list ID = %u, chunk ID = %u; needs forwarding? %s",
-		( int ) header.keySize, header.key, header.keySize, header.valueSize,
-		header.listId, header.chunkId, header.needsForwarding ? "true" : "false"
-	);
-
-	bool isSealed;
-	Metadata sealed;
-	uint32_t timestamp, stripeId;
-	ServerWorker::chunkBuffer->at( header.listId )->set(
-		this,
-		header.key, header.keySize,
-		header.value, header.valueSize,
-		PROTO_OPCODE_REMAPPING_SET, timestamp,
-		stripeId,
-		ServerWorker::chunkBuffer->at( header.listId )->getChunkId(),
-		&isSealed, &sealed,
-		this->chunks, this->dataChunk, this->parityChunk
-	);
-
-	Key key;
-	key.set( header.keySize, header.key );
-	event.resRemappingSet( event.socket, event.instanceId, event.requestId, key, header.listId, header.chunkId, true );
-	this->dispatch( event );
-
-	return true;
-	*/
-}
-
-bool ServerWorker::handleRemappingSetResponse( ServerPeerEvent event, bool success, char *buf, size_t size ) {
-	__ERROR__( "ServerWorker", "handleRemappingSetRequest", "Why remapping SET response is received by server peer?" );
-	return false;
-	/*
-	struct RemappingLockHeader header;
-	if ( ! this->protocol.parseRemappingLockHeader( header, buf, size ) ) {
-		__ERROR__( "ServerWorker", "handleRemappingSetResponse", "Invalid REMAPPING_SET response (size = %lu).", size );
-		return false;
-	}
-	__DEBUG__(
-		BLUE, "ServerWorker", "handleRemappingSetResponse",
-		"[REMAPPING_SET] Key: %.*s (key size = %u); list ID: %u, chunk ID: %u",
-		( int ) header.keySize, header.key, header.keySize, header.listId, header.chunkId
-	);
-
-	int pending;
-	PendingIdentifier pid;
-	RemappingRecordKey record;
-
-	if ( ! ServerWorker::pending->eraseRemappingRecordKey( PT_SERVER_PEER_REMAPPING_SET, event.instanceId, event.requestId, event.socket, &pid, &record, true, false ) ) {
-		UNLOCK( &ServerWorker::pending->serverPeers.remappingSetLock );
-		__ERROR__( "ServerWorker", "handleRemappingSetResponse", "Cannot find a pending server REMAPPING_SET request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
-		return false;
-	}
-	// Check pending server UPDATE requests
-	pending = ServerWorker::pending->count( PT_SERVER_PEER_REMAPPING_SET, pid.instanceId, pid.requestId, false, true );
-
-	__DEBUG__( BLUE, "ServerWorker", "handleRemappingSetResponse", "Pending server REMAPPING_SET requests = %d (%s).", pending, success ? "success" : "fail" );
-	if ( pending == 0 ) {
-		// Only send client REMAPPING_SET response when the number of pending server REMAPPING_SET requests equal 0
-		ClientEvent clientEvent;
-
-		if ( ! ServerWorker::pending->eraseRemappingRecordKey( PT_CLIENT_REMAPPING_SET, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &record ) ) {
-			__ERROR__( "ServerWorker", "handleRemappingSetResponse", "Cannot find a pending client REMAPPING_SET request that matches the response. This message will be discarded." );
-			return false;
-		}
-
-		clientEvent.resRemappingSet(
-			( ClientSocket * ) pid.ptr, pid.instanceId, pid.requestId, record.key,
-			record.remap.listId, record.remap.chunkId, success, true,
-			header.sockfd, header.isRemapped
-		);
-		ServerWorker::eventQueue->insert( clientEvent );
-	}
-
-	return true;
-	*/
 }
 
 bool ServerWorker::handleRemappedUpdateRequest( ServerPeerEvent event, char *buf, size_t size ) {
@@ -336,17 +237,6 @@ bool ServerWorker::handleRemappedUpdateResponse( ServerPeerEvent event, bool suc
 		__ERROR__( "ServerWorker", "handleRemappedUpdateResponse", "Cannot find a pending server UPDATE request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		return false;
 	}
-
-	// erase data delta backup
-	// Server *server = Server::getInstance();
-	// LOCK( &server->sockets.clientsIdToSocketLock );
-	// try {
-	// 	ClientSocket *clientSocket = server->sockets.clientsIdToSocketMap.at( event.instanceId );
-	// 	clientSocket->backup.removeDataUpdate( event.requestId, event.socket );
-	// } catch ( std::out_of_range &e ) {
-	// 	__ERROR__( "ServerWorker", "handleUpdateResponse", "Cannot find a pending parity server UPDATE backup for instance ID = %hu, request ID = %u. (Socket mapping not found)", event.instanceId, event.requestId );
-	// }
-	// UNLOCK( &server->sockets.clientsIdToSocketLock );
 
 	// Check pending server UPDATE requests
 	pending = ServerWorker::pending->count( PT_SERVER_PEER_UPDATE, pid.instanceId, pid.requestId, false, true );

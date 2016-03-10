@@ -282,22 +282,6 @@ bool ServerWorker::handleGetResponse( ServerPeerEvent event, bool success, char 
 				break;
 			case PROTO_OPCODE_DEGRADED_UPDATE:
 				if ( success ) {
-					/* {
-						uint8_t _keySize;
-						uint32_t _valueSize;
-						char *_keyStr, *_valueStr;
-						KeyValue kv;
-						bool isSealed;
-						dmap->findValueByKey(
-							key.data,
-							key.size,
-							isSealed,
-							&kv
-						);
-						kv.deserialize( _keyStr, _keySize, _valueStr, _valueSize );
-						printf( "Before: %.*s - %.*s (%p vs %p) / update: %.*s (size = %u)\n", _keySize, _keyStr, _valueSize, _valueStr, kv.data, keyValue.data, op.data.keyValueUpdate.size, ( char * ) op.data.keyValueUpdate.ptr, op.data.keyValueUpdate.size );
-					} */
-
 					LOCK( &dmap->unsealed.lock );
 
 					Metadata metadata;
@@ -333,22 +317,6 @@ bool ServerWorker::handleGetResponse( ServerPeerEvent event, bool success, char 
 
 					UNLOCK( &dmap->unsealed.lock );
 
-					/* {
-						uint8_t _keySize;
-						uint32_t _valueSize;
-						char *_keyStr, *_valueStr;
-						KeyValue kv;
-						bool isSealed;
-						dmap->findValueByKey(
-							key.data,
-							key.size,
-							isSealed,
-							&kv
-						);
-						kv.deserialize( _keyStr, _keySize, _valueStr, _valueSize );
-						printf( "Intermediate: %.*s - %.*s (%p vs %p)\n", _keySize, _keyStr, _valueSize, _valueStr, kv.data, keyValue.data );
-					} */
-
 					// Send UPDATE request to the parity servers
 					this->sendModifyChunkRequest(
 						pid.parentInstanceId, pid.parentRequestId,
@@ -368,22 +336,6 @@ bool ServerWorker::handleGetResponse( ServerPeerEvent event, bool success, char 
 					);
 
 					delete[] valueUpdate;
-
-					/* {
-						uint8_t _keySize;
-						uint32_t _valueSize;
-						char *_keyStr, *_valueStr;
-						KeyValue kv;
-						bool isSealed;
-						dmap->findValueByKey(
-							key.data,
-							key.size,
-							isSealed,
-							&kv
-						);
-						kv.deserialize( _keyStr, _keySize, _valueStr, _valueSize );
-						printf( "After: %.*s - %.*s (%p vs %p)\n", _keySize, _keyStr, _valueSize, _valueStr, kv.data, keyValue.data );
-					} */
 				} else {
 					clientEvent.resUpdate(
 						op.socket, pid.parentInstanceId, pid.parentRequestId, key,
@@ -461,19 +413,6 @@ bool ServerWorker::handleUpdateResponse( ServerPeerEvent event, bool success, ch
 		return false;
 	}
 
-	// erase data delta backup
-	/* Seems that we don't need the data delta...
-	Server *server = Server::getInstance();
-	LOCK( &server->sockets.clientsIdToSocketLock );
-	try {
-		ClientSocket *clientSocket = server->sockets.clientsIdToSocketMap.at( event.instanceId );
-		clientSocket->backup.removeDataUpdate( event.requestId, event.instanceId, event.socket );
-	} catch ( std::out_of_range &e ) {
-		__ERROR__( "ServerWorker", "handleUpdateResponse", "Cannot find a pending parity server UPDATE backup for instance ID = %hu, request ID = %u. (Socket mapping not found)", event.instanceId, event.requestId );
-	}
-	UNLOCK( &server->sockets.clientsIdToSocketLock );
-	*/
-
 	// Check pending server UPDATE requests
 	pending = ServerWorker::pending->count( PT_SERVER_PEER_UPDATE, pid.instanceId, pid.requestId, false, true );
 
@@ -483,27 +422,10 @@ bool ServerWorker::handleUpdateResponse( ServerPeerEvent event, bool success, ch
 		// Only send client UPDATE response when the number of pending server UPDATE requests equal 0
 		ClientEvent clientEvent;
 
-		// FOR TESTING REVERT ONLY (parity server fails and skip waiting)
-		//PendingIdentifier dpid = pid;
-
 		if ( ! ServerWorker::pending->eraseKeyValueUpdate( PT_CLIENT_UPDATE, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &keyValueUpdate ) ) {
 			__ERROR__( "ServerWorker", "handleUpdateResponse", "Cannot find a pending client UPDATE request that matches the response. This message will be discarded." );
 			return false;
 		}
-
-
-		// FOR TESTING REVERT ONLY (parity server fails and skip waiting)
-		//ServerPeerSocket *s = 0;
-		//this->stripeList->get( keyValueUpdate.data, keyValueUpdate.size, 0, this->parityServerSockets );
-		//for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
-		//	if ( this->parityServerSockets[ i ]->instanceId == 2 ) {
-		//		s = this->parityServerSockets[ i ];
-		//		break;
-		//	}
-		//}
-		//ServerWorker::pending->insertKeyValueUpdate( PT_CLIENT_UPDATE, pid.instanceId, pid.requestId, pid.ptr , keyValueUpdate );
-		//ServerWorker::pending->insertKeyValueUpdate( PT_SERVER_PEER_UPDATE, dpid.instanceId, pid.instanceId, dpid.requestId, pid.requestId, ( void * ) s, keyValueUpdate );
-		//keyValueUpdate.dup();
 
 		clientEvent.resUpdate(
 			( ClientSocket * ) pid.ptr, pid.instanceId, pid.requestId,
@@ -738,23 +660,6 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 				}
 			}
 		}
-		// for ( uint32_t i = 0; i < ServerWorker::dataChunkCount; i++ ) {
-		// 	this->sealIndicators[ ServerWorker::parityChunkCount + 1 ][ i ] |= this->sealIndicators[ ServerWorker::parityChunkCount ][ i ];
-		// }
-
-		/*
-		fprintf( stderr, "SEAL INDICATOR OF %u, %u:\n", listId, stripeId );
-		for ( uint32_t j = 0; j < ServerWorker::parityChunkCount + 2; j++ ) {
-			if ( j < ServerWorker::parityChunkCount && ( ! this->chunks[ j + ServerWorker::dataChunkCount ] || this->chunks[ j + ServerWorker::dataChunkCount ] == Coding::zeros ) )
-				continue;
-
-			fprintf( stderr, "#%u:", j );
-			for ( uint32_t i = 0; i < ServerWorker::dataChunkCount; i++ ) {
-				fprintf( stderr, " %d", this->sealIndicators[ j ][ i ] );
-			}
-			fprintf( stderr, "\n" );
-		}
-		*/
 
 		bool getChunkAgain = false;
 		ServerWorker::stripeList->get( listId, this->parityServerSockets, this->dataServerSockets );
@@ -873,19 +778,6 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 		} else {
 			ServerWorker::stripeList->get( listId, this->parityServerSockets, this->dataServerSockets );
 
-			/*
-			fprintf( stderr, "[GET_CHUNK] (%u, %u) - Inconsistent chunks received. Seal indicators:\n", listId, stripeId );
-			for ( uint32_t j = 0; j < ServerWorker::parityChunkCount + 1; j++ ) {
-				if ( j == ServerWorker::parityChunkCount || this->chunks[ j + ServerWorker::dataChunkCount ] ) {
-					fprintf( stderr, "\t#%u:", j );
-					for ( uint32_t i = 0; i < ServerWorker::dataChunkCount; i++ ) {
-						fprintf( stderr, " %d", this->sealIndicators[ j ][ i ] ? 1 : 0 );
-					}
-					fprintf( stderr, "\n" );
-				}
-			}
-			*/
-
 			Coding::forceSeal(
 				ServerWorker::coding,
 				this->chunks,
@@ -894,19 +786,6 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 				ServerWorker::dataChunkCount,
 				ServerWorker::parityChunkCount
 			);
-
-			/*
-			fprintf( stderr, "[GET_CHUNK] (%u, %u) - Inconsistent chunks fixed. Seal indicators:\n", listId, stripeId );
-			for ( uint32_t j = 0; j < ServerWorker::parityChunkCount + 1; j++ ) {
-				if ( j == ServerWorker::parityChunkCount || this->chunks[ j + ServerWorker::dataChunkCount ] ) {
-					fprintf( stderr, "\t#%u (0x%p):", j, this->sealIndicators[ j ] );
-					for ( uint32_t i = 0; i < ServerWorker::dataChunkCount; i++ ) {
-						fprintf( stderr, " %d", this->sealIndicators[ j ][ i ] ? 1 : 0 );
-					}
-					fprintf( stderr, "\n" );
-				}
-			}
-			*/
 		}
 	} else {
 		UNLOCK( &ServerWorker::pending->serverPeers.getChunkLock );
@@ -973,8 +852,6 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 				// return true;
 			}
 		}
-
-		// fprintf( stderr, "Reconstructed: (%u, %u)\n", listId, stripeId );
 
 		for ( uint32_t i = ServerWorker::dataChunkCount; i < ServerWorker::chunkCount; i++ ) {
 			if ( this->chunks[ i ]->status == CHUNK_STATUS_RECONSTRUCTED ) {
@@ -1052,7 +929,6 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 								pid.requestId
 							);
 						}
-						// assert( pids[ pidsIndex ].instanceId == pid.instanceId && pids[ pidsIndex ].requestId == pid.requestId );
 					} else {
 						if ( ! ServerWorker::pending->eraseDegradedOp( PT_SERVER_PEER_DEGRADED_OPS, pids[ pidsIndex ].instanceId, pids[ pidsIndex ].requestId, 0, &pid, &op ) ) {
 							__ERROR__( "ServerWorker", "handleGetChunkResponse", "Cannot find a pending server DEGRADED_OPS request that matches the response. This message will be discarded." );
@@ -1134,11 +1010,8 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 							) ) {
 								__ERROR__( "ServerWorker", "handleGetChunkResponse", "Cannot insert into degraded chunk buffer's chunk map." );
 							}
-						// } else {
-							// __ERROR__( "ServerWorker", "handleGetChunkResponse", "The chunk already exist." );
 						}
 					} else {
-						// chunk = map->findChunkById( op.listId, op.stripeId, op.chunkId );
 						map->findValueByKey( key.data, key.size, 0, 0, &keyMetadata, 0, &chunk );
 						if ( ! (
 							chunk &&
@@ -1331,14 +1204,6 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
  								true
 							);
 
-							// ClientEvent event;
-							// event.resUpdate(
-							// 	op.socket, pid.parentInstanceId, pid.parentRequestId, key,
-							// 	op.data.keyValueUpdate.offset,
-							// 	op.data.keyValueUpdate.length,
-							// 	false, false, true
-							// );
-							// this->dispatch( event );
 							op.data.keyValueUpdate.free();
 							delete[] ( ( char * ) op.data.keyValueUpdate.ptr );
 						}
@@ -1431,15 +1296,10 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 
 			bool hasStripe = ServerWorker::pending->findReconstruction( pid.parentInstanceId, pid.parentRequestId, stripeId, listId, chunkId );
 
-			// printf( "%u\n", chunkId );
-			// fflush( stdout );
-
 			ServerWorker::stripeList->get( listId, this->parityServerSockets, this->dataServerSockets );
 			ServerPeerSocket *target = ( chunkId < ServerWorker::dataChunkCount ) ?
 				( this->dataServerSockets[ chunkId ] ) :
 				( this->parityServerSockets[ chunkId - ServerWorker::dataChunkCount ] );
-
-			// __ERROR__( "ServerWorker", "handleGetChunkResponse", "TODO: Handle the case for reconstruction: (%u, %u, %u); target = %p.", listId, stripeId, chunkId, target );
 
 			if ( hasStripe ) {
 				// Send SET_CHUNK request
@@ -1571,19 +1431,6 @@ bool ServerWorker::handleUpdateChunkResponse( ServerPeerEvent event, bool succes
 		return false;
 	}
 
-	// erase data delta backup
-	/* Seems that we don't need the data delta...
-	Server *server = Server::getInstance();
-	LOCK( &server->sockets.clientsIdToSocketLock );
-	try {
-		ClientSocket *clientSocket = server->sockets.clientsIdToSocketMap.at( event.instanceId );
-		clientSocket->backup.removeDataUpdate( event.requestId, event.instanceId, event.socket );
-	} catch ( std::out_of_range &e ) {
-		__ERROR__( "ServerWorker", "handleUpdateChunkResponse", "Cannot find a pending parity server UPDATE backup for instance ID = %hu, request ID = %u. (Socket mapping not found)", event.instanceId, event.requestId );
-	}
-	UNLOCK( &server->sockets.clientsIdToSocketLock );
-	*/
-
 	// Check pending server UPDATE requests
 	pending = ServerWorker::pending->count( PT_SERVER_PEER_UPDATE_CHUNK, pid.instanceId, pid.requestId, false, true );
 
@@ -1709,8 +1556,6 @@ bool ServerWorker::handleBatchKeyValueResponse( ServerPeerEvent event, bool succ
 		__ERROR__( "ServerWorker", "handleBatchKeyValueResponse", "Cannot insert find pending BATCH_KEY_VALUE request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 	}
 
-	// printf( "--- header.count = %u ---\n", header.count );
-
 	uint32_t listId, chunkId;
 	uint32_t remainingChunks, remainingKeys, totalChunks, totalKeys;
 	for ( uint32_t i = 0, offset = 0; i < header.count; i++ ) {
@@ -1747,8 +1592,6 @@ bool ServerWorker::handleBatchKeyValueResponse( ServerPeerEvent event, bool succ
 			);
 		}
 	}
-
-	// printf( "handleBatchKeyValueResponse(): Chunks: %u / %u; keys: %u / %u\n", remainingChunks, totalChunks, remainingKeys, totalKeys );
 
 	if ( remainingKeys == 0 ) {
 		CoordinatorEvent coordinatorEvent;

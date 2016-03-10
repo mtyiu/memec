@@ -133,16 +133,6 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 			);
 			break;
 		case SERVER_PEER_EVENT_TYPE_FORWARD_CHUNK_REQUEST:
-			// fprintf(
-			// 	stderr, "Forwarding the %s chunk (%u, %u, %u: %p; size: %u) to ",
-			// 	event.message.chunk.metadata.chunkId ? "parity" : "data",
-			// 	event.message.chunk.metadata.listId,
-			// 	event.message.chunk.metadata.stripeId,
-			// 	event.message.chunk.metadata.chunkId,
-			// 	event.message.chunk.chunk,
-			// 	event.message.chunk.chunk->getSize()
-			// );
-			// event.socket->print( stderr );
 			buffer.data = this->protocol.reqForwardChunk(
 				buffer.size,
 				event.instanceId, event.requestId,
@@ -200,19 +190,6 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 			break;
 		case SERVER_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE:
 			__ERROR__( "ServerWorker", "dispatch", "SERVER_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE is not supported." );
-			// buffer.data = this->protocol.resRemappingSet(
-			// 	buffer.size,
-			// 	false, // toClient
-			// 	event.instanceId, event.requestId,
-			// 	success,
-			// 	event.message.remap.listId,
-			// 	event.message.remap.chunkId,
-			// 	event.message.remap.original,
-			// 	event.message.remap.remapped,
-			// 	event.message.remap.remappedCount,
-			// 	event.message.remap.key.size,
-			// 	event.message.remap.key.data
-			// );
 			break;
 		// GET
 		case SERVER_PEER_EVENT_TYPE_GET_RESPONSE_SUCCESS:
@@ -355,10 +332,6 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 				event.message.chunk.sealIndicatorCount,
 				event.message.chunk.sealIndicator
 			);
-
-			// ServerWorker::chunkBuffer
-			// 	->at( event.message.chunk.metadata.listId )
-			// 	->unlock( event.message.chunk.chunkBufferIndex );
 		}
 			break;
 		case SERVER_PEER_EVENT_TYPE_GET_CHUNK_RESPONSE_FAILURE:
@@ -545,22 +518,6 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 							break;
 						case PROTO_MAGIC_RESPONSE_FAILURE:
 							this->handleSealChunkResponse( event, false, buffer.data, buffer.size );
-							break;
-						default:
-							__ERROR__( "ServerWorker", "dispatch", "Invalid magic code from server: 0x%x.", header.magic );
-							break;
-					}
-					break;
-				case PROTO_OPCODE_REMAPPING_SET:
-					switch( header.magic ) {
-						case PROTO_MAGIC_REQUEST:
-							this->handleRemappingSetRequest( event, buffer.data, header.length );
-							break;
-						case PROTO_MAGIC_RESPONSE_SUCCESS:
-							this->handleRemappingSetResponse( event, true, buffer.data, header.length );
-							break;
-						case PROTO_MAGIC_RESPONSE_FAILURE:
-							this->handleRemappingSetResponse( event, false, buffer.data, header.length );
 							break;
 						default:
 							__ERROR__( "ServerWorker", "dispatch", "Invalid magic code from server: 0x%x.", header.magic );
