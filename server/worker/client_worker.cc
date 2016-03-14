@@ -17,7 +17,7 @@ void ServerWorker::dispatch( ClientEvent event ) {
 		case CLIENT_EVENT_TYPE_GET_RESPONSE_SUCCESS:
 		case CLIENT_EVENT_TYPE_SET_RESPONSE_SUCCESS_DATA:
 		case CLIENT_EVENT_TYPE_SET_RESPONSE_SUCCESS_PARITY:
-		case CLIENT_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS:
+		case CLIENT_EVENT_TYPE_DEGRADED_SET_RESPONSE_SUCCESS:
 		case CLIENT_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
 		case CLIENT_EVENT_TYPE_DELETE_RESPONSE_SUCCESS:
 		case CLIENT_EVENT_TYPE_ACK_METADATA:
@@ -28,7 +28,7 @@ void ServerWorker::dispatch( ClientEvent event ) {
 		case CLIENT_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
 		case CLIENT_EVENT_TYPE_GET_RESPONSE_FAILURE:
 		case CLIENT_EVENT_TYPE_SET_RESPONSE_FAILURE:
-		case CLIENT_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE:
+		case CLIENT_EVENT_TYPE_DEGRADED_SET_RESPONSE_FAILURE:
 		case CLIENT_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
 		case CLIENT_EVENT_TYPE_DELETE_RESPONSE_FAILURE:
 		case CLIENT_EVENT_TYPE_REVERT_DELTA_FAILURE:
@@ -104,9 +104,9 @@ void ServerWorker::dispatch( ClientEvent event ) {
 				event.message.set.key.data
 			);
 			break;
-		case CLIENT_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS:
-		case CLIENT_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resRemappingSet(
+		case CLIENT_EVENT_TYPE_DEGRADED_SET_RESPONSE_SUCCESS:
+		case CLIENT_EVENT_TYPE_DEGRADED_SET_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resDegradedSet(
 				buffer.size,
 				true,
 				event.instanceId, event.requestId,
@@ -252,8 +252,8 @@ void ServerWorker::dispatch( ClientEvent event ) {
 					case PROTO_OPCODE_SET:
 						this->handleSetRequest( event, buffer.data, buffer.size );
 						break;
-					case PROTO_OPCODE_REMAPPING_SET:
-						this->handleRemappingSetRequest( event, buffer.data, buffer.size );
+					case PROTO_OPCODE_DEGRADED_SET:
+						this->handleDegradedSetRequest( event, buffer.data, buffer.size );
 						break;
 					case PROTO_OPCODE_UPDATE:
 						this->handleUpdateRequest( event, buffer.data, buffer.size, false );

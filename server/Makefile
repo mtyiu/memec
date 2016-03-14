@@ -21,7 +21,7 @@ OBJS= \
 	event/client_event.o \
 	event/server_event.o \
 	event/server_peer_event.o \
-	remap/remap_msg_handler.o \
+	state_transit/state_transit_handler.o \
 	protocol/ack_protocol.o \
 	protocol/degraded_protocol.o \
 	protocol/heartbeat_protocol.o \
@@ -59,7 +59,7 @@ EXTERNAL_LIB= \
 	$(MEMEC_SRC_ROOT)/common/ds/key_value.o \
 	$(MEMEC_SRC_ROOT)/common/ds/load.o \
 	$(MEMEC_SRC_ROOT)/common/ds/sockaddr_in.o \
-	$(MEMEC_SRC_ROOT)/common/remap/remap_msg_handler.o \
+	$(MEMEC_SRC_ROOT)/common/state_transit/state_transit_handler.o \
 	$(MEMEC_SRC_ROOT)/common/protocol/protocol.o \
 	$(MEMEC_SRC_ROOT)/common/protocol/ack_protocol.o \
 	$(MEMEC_SRC_ROOT)/common/protocol/address_protocol.o \

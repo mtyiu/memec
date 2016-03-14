@@ -19,9 +19,9 @@ enum ClientEventType {
 	CLIENT_EVENT_TYPE_SET_RESPONSE_SUCCESS_DATA,
 	CLIENT_EVENT_TYPE_SET_RESPONSE_SUCCESS_PARITY,
 	CLIENT_EVENT_TYPE_SET_RESPONSE_FAILURE,
-	// REMAPPING_SET
-	CLIENT_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS,
-	CLIENT_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE,
+	// DEGRADED_SET
+	CLIENT_EVENT_TYPE_DEGRADED_SET_RESPONSE_SUCCESS,
+	CLIENT_EVENT_TYPE_DEGRADED_SET_RESPONSE_FAILURE,
 	// UPDATE
 	CLIENT_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS,
 	CLIENT_EVENT_TYPE_UPDATE_RESPONSE_FAILURE,
@@ -101,8 +101,8 @@ public:
 	// SET
 	void resSet( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isSealed, uint32_t sealedListId, uint32_t sealedStripeId, uint32_t sealedChunkId, Key &key );
 	void resSet( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool success );
-	// REMAPPING_SET
-	void resRemappingSet(
+	// DEGRADED_SET
+	void resDegradedSet(
 		ClientSocket *socket, uint16_t instanceId, uint32_t requestId, bool success,
 		Key &key, uint32_t listId, uint32_t chunkId,
 		uint32_t *original, uint32_t *remapped, uint32_t remappedCount,

@@ -17,9 +17,9 @@ enum ServerPeerEventType {
 	SERVER_PEER_EVENT_TYPE_REGISTER_REQUEST,
 	SERVER_PEER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS,
 	SERVER_PEER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE,
-	// REMAPPING_SET
-	SERVER_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS,
-	SERVER_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE,
+	// DEGRADED_SET
+	SERVER_PEER_EVENT_TYPE_DEGRADED_SET_RESPONSE_SUCCESS,
+	SERVER_PEER_EVENT_TYPE_DEGRADED_SET_RESPONSE_FAILURE,
 	// SET
 	SERVER_PEER_EVENT_TYPE_SET_REQUEST,
 	SERVER_PEER_EVENT_TYPE_SET_RESPONSE_SUCCESS,
@@ -164,8 +164,8 @@ public:
 	// Register
 	void reqRegister( ServerPeerSocket *socket );
 	void resRegister( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, bool success = true );
-	// REMAPPING_SET
-	void resRemappingSet( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, uint32_t listId, uint32_t chunkId, bool success );
+	// DEGRADED_SET
+	void resDegradedSet( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, uint32_t listId, uint32_t chunkId, bool success );
 	// SET
 	void reqSet( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key key, Value value );
 	void resSet( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key key, bool success );

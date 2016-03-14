@@ -1,29 +1,29 @@
-#ifndef __COORDINATOR_REMAP_REMAP_MSG_HANDLER_HH__
-#define __COORDINATOR_REMAP_REMAP_MSG_HANDLER_HH__
+#ifndef __COORDINATOR_STATE_TRANSIT_STATE_TRANSIT_MSG_HANDLER_HH__
+#define __COORDINATOR_STATE_TRANSIT_STATE_TRANSIT_MSG_HANDLER_HH__
 
 #include <pthread.h>
 #include <string>
 #include <set>
 #include <map>
 #include <vector>
-#include "remap_worker.hh"
-#include "../event/remap_state_event.hh"
+#include "state_transit_worker.hh"
+#include "../event/state_transit_event.hh"
 #include "../../common/ds/sockaddr_in.hh"
 #include "../../common/event/event_queue.hh"
 #include "../../common/event/event_type.hh"
 #include "../../common/lock/lock.hh"
-#include "../../common/remap/remap_msg_handler.hh"
-#include "../../common/remap/remap_state.hh"
-#include "../../common/remap/remap_group.hh"
+#include "../../common/state_transit/state_transit_handler.hh"
+#include "../../common/state_transit/state_transit_state.hh"
+#include "../../common/state_transit/state_transit_group.hh"
 
-class CoordinatorRemapMsgHandler : public RemapMsgHandler {
+class CoordinatorStateTransitHandler : public StateTransitHandler {
 private:
-	CoordinatorRemapMsgHandler();
+	CoordinatorStateTransitHandler();
 	// Do not implement
-	CoordinatorRemapMsgHandler( CoordinatorRemapMsgHandler const & );
-	void operator=( CoordinatorRemapMsgHandler const & );
+	CoordinatorStateTransitHandler( CoordinatorStateTransitHandler const & );
+	void operator=( CoordinatorStateTransitHandler const & );
 
-	~CoordinatorRemapMsgHandler();
+	~CoordinatorStateTransitHandler();
 
 	/* set of alive clients connected */
 	std::set<std::string> aliveClients;
@@ -35,7 +35,7 @@ private:
 
 	bool isListening;
 
-	CoordinatorRemapWorker *workers;
+	CoordinatorStateTransitWorker *workers;
 	std::set<struct sockaddr_in> aliveServers;
 	std::set<struct sockaddr_in> crashedServers;
 	LOCK_T aliveServersLock;
@@ -54,16 +54,16 @@ private:
 	void removeAliveClient( char *name );
 
 	/* insert the same event for one or more servers */
-	bool insertRepeatedEvents ( RemapStateEvent event, std::vector<struct sockaddr_in> *servers );
+	bool insertRepeatedEvents ( StateTransitEvent event, std::vector<struct sockaddr_in> *servers );
 
 public:
-	EventQueue<RemapStateEvent> *eventQueue;
+	EventQueue<StateTransitEvent> *eventQueue;
 	std::map<struct sockaddr_in, pthread_cond_t> ackSignal;
 	pthread_mutex_t ackSignalLock; // dummy lock for pthread_cond_wait()
 
-	static CoordinatorRemapMsgHandler *getInstance() {
-		static CoordinatorRemapMsgHandler crmh;
-		return &crmh;
+	static CoordinatorStateTransitHandler *getInstance() {
+		static CoordinatorStateTransitHandler csth;
+		return &csth;
 	}
 
 	bool init( const int ip, const int port, const char *user = NULL );

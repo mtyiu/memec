@@ -18,7 +18,7 @@ bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<Pend
 			lock = &this->servers.setLock;
 			map = &this->servers.set;
 			break;
-		case PT_SERVER_REMAPPING_SET:
+		case PT_SERVER_DEGRADED_SET:
 			lock = &this->servers.remappingSetLock;
 			map = &this->servers.remappingSet;
 			break;
@@ -229,7 +229,7 @@ bool Pending::recordRequestStartTime( PendingType type, uint16_t instanceId, uin
 		LOCK( &this->stats.getLock );
 		ret = this->stats.get.insert( p );
 		UNLOCK( &this->stats.getLock );
-	} else if ( type == PT_SERVER_SET || type == PT_SERVER_REMAPPING_SET ) {
+	} else if ( type == PT_SERVER_SET || type == PT_SERVER_DEGRADED_SET ) {
 		LOCK( &this->stats.setLock );
 		ret = this->stats.set.insert( p );
 		UNLOCK( &this->stats.setLock );
@@ -264,7 +264,7 @@ bool Pending::eraseRequestStartTime( PendingType type, uint16_t instanceId, uint
 		LOCK( &this->stats.getLock );
 		DO_SEARCH_FOR_ID( get );
 		UNLOCK( &this->stats.getLock );
-	} else if ( type == PT_SERVER_SET || type == PT_SERVER_REMAPPING_SET ) {
+	} else if ( type == PT_SERVER_SET || type == PT_SERVER_DEGRADED_SET ) {
 		LOCK( &this->stats.setLock );
 		DO_SEARCH_FOR_ID( set );
 		UNLOCK( &this->stats.setLock );

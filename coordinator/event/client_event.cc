@@ -17,8 +17,8 @@ void ClientEvent::reqPushLoadStats( ClientSocket *socket, ArrayMap<struct sockad
 	this->message.serverLoading.overloadedServerSet = overloadedServerSet;
 }
 
-void ClientEvent::resRemappingSetLock( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, bool success, uint32_t *original, uint32_t *remapped, uint32_t remappedCount, Key &key ) {
-	this->type = success ? CLIENT_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_SUCCESS : CLIENT_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_FAILURE;
+void ClientEvent::resDegradedSetLock( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, bool success, uint32_t *original, uint32_t *remapped, uint32_t remappedCount, Key &key ) {
+	this->type = success ? CLIENT_EVENT_TYPE_DEGRADED_SET_LOCK_RESPONSE_SUCCESS : CLIENT_EVENT_TYPE_DEGRADED_SET_LOCK_RESPONSE_FAILURE;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;

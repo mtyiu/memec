@@ -131,7 +131,7 @@ void ClientWorker::dispatch( ServerEvent event ) {
 		}
 	} else {
 		// Parse responses from servers
-		ClientRemapMsgHandler &mrmh = Client::getInstance()->remapMsgHandler;
+		ClientStateTransitHandler &csth = Client::getInstance()->stateTransitHandler;
 		const struct sockaddr_in &addr = event.socket->getAddr();
 
 		ProtocolHeader header;
@@ -175,7 +175,7 @@ void ClientWorker::dispatch( ServerEvent event ) {
 						}
 						break;
 					case PROTO_OPCODE_GET:
-						if ( ! mrmh.acceptNormalResponse( addr ) ) {
+						if ( ! csth.acceptNormalResponse( addr ) ) {
 							// __INFO__( YELLOW, "Client", "dispatch", "Ignoring normal GET response..." );
 							break;
 						}
@@ -183,17 +183,17 @@ void ClientWorker::dispatch( ServerEvent event ) {
 						this->handleGetResponse( event, success, header.opcode == PROTO_OPCODE_DEGRADED_GET, buffer.data, header.length );
 						break;
 					case PROTO_OPCODE_SET:
-						if ( ! mrmh.acceptNormalResponse( addr ) ) {
+						if ( ! csth.acceptNormalResponse( addr ) ) {
 							// __INFO__( YELLOW, "Client", "dispatch", "Ignoring normal SET response..." );
 							break;
 						}
 						this->handleSetResponse( event, success, buffer.data, header.length );
 						break;
-					case PROTO_OPCODE_REMAPPING_SET:
-						this->handleRemappingSetResponse( event, success, buffer.data, header.length );
+					case PROTO_OPCODE_DEGRADED_SET:
+						this->handleDegradedSetResponse( event, success, buffer.data, header.length );
 						break;
 					case PROTO_OPCODE_UPDATE:
-						if ( ! mrmh.acceptNormalResponse( addr ) ) {
+						if ( ! csth.acceptNormalResponse( addr ) ) {
 							__INFO__( YELLOW, "Client", "dispatch", "Ignoring normal UPDATE response..." );
 							break;
 						}
@@ -201,7 +201,7 @@ void ClientWorker::dispatch( ServerEvent event ) {
 						this->handleUpdateResponse( event, success, header.opcode == PROTO_OPCODE_DEGRADED_UPDATE, buffer.data, header.length );
 						break;
 					case PROTO_OPCODE_DELETE:
-						if ( ! mrmh.acceptNormalResponse( addr ) ) {
+						if ( ! csth.acceptNormalResponse( addr ) ) {
 							// __INFO__( YELLOW, "Client", "dispatch", "Ignoring normal DELETE response..." );
 							break;
 						}
@@ -375,17 +375,17 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 		// Check if all normal requests completes
 		ServerSocket *server = 0;
 		struct sockaddr_in addr;
-		ClientRemapMsgHandler *remapMsgHandler = &Client::getInstance()->remapMsgHandler;
+		ClientStateTransitHandler *stateTransitHandler = &Client::getInstance()->stateTransitHandler;
 		this->stripeList->get( keyStr, key.size, 0, this->parityServerSockets );
 		for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
 			server = this->parityServerSockets[ i ];
 			addr = server->getAddr();
-			if ( ! remapMsgHandler->useCoordinatedFlow( addr ) || remapMsgHandler->stateTransitInfo.at( addr ).isCompleted() )
+			if ( ! stateTransitHandler->useCoordinatedFlow( addr ) || stateTransitHandler->stateTransitInfo.at( addr ).isCompleted() )
 				continue;
-			if ( remapMsgHandler->stateTransitInfo.at( addr ).removePendingRequest( event.requestId ) == 0 ) {
+			if ( stateTransitHandler->stateTransitInfo.at( addr ).removePendingRequest( event.requestId ) == 0 ) {
 				__INFO__( GREEN, "ClientWorker", "handleSetResponse", "Ack transition for server id = %u.", server->instanceId );
-				remapMsgHandler->stateTransitInfo.at( addr ).setCompleted();
-				remapMsgHandler->ackTransit( addr );
+				stateTransitHandler->stateTransitInfo.at( addr ).setCompleted();
+				stateTransitHandler->ackTransit( addr );
 			}
 		}
 
@@ -551,17 +551,17 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 	if ( ! isDegraded ) {
 		ServerSocket *server = 0;
 		struct sockaddr_in addr;
-		ClientRemapMsgHandler *remapMsgHandler = &Client::getInstance()->remapMsgHandler;
+		ClientStateTransitHandler *stateTransitHandler = &Client::getInstance()->stateTransitHandler;
 		this->stripeList->get( header.key, header.keySize, 0, this->parityServerSockets );
 		for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
 			server = this->parityServerSockets[ i ];
 			addr = server->getAddr();
-			if ( ! remapMsgHandler->useCoordinatedFlow( addr ) || remapMsgHandler->stateTransitInfo.at( addr ).isCompleted() )
+			if ( ! stateTransitHandler->useCoordinatedFlow( addr ) || stateTransitHandler->stateTransitInfo.at( addr ).isCompleted() )
 				continue;
-			if ( remapMsgHandler->stateTransitInfo.at( addr ).removePendingRequest( pid.requestId ) == 0 ) {
+			if ( stateTransitHandler->stateTransitInfo.at( addr ).removePendingRequest( pid.requestId ) == 0 ) {
 				__INFO__( GREEN, "ClientWorker", "handleUpdateResponse", "Ack transition for server id = %u.", server->instanceId );
-				remapMsgHandler->stateTransitInfo.at( addr ).setCompleted();
-				remapMsgHandler->ackTransit( addr );
+				stateTransitHandler->stateTransitInfo.at( addr ).setCompleted();
+				stateTransitHandler->ackTransit( addr );
 			}
 		}
 	}
@@ -649,17 +649,17 @@ bool ClientWorker::handleDeleteResponse( ServerEvent event, bool success, bool i
 	// Check if all normal requests completes
 	ServerSocket *server = 0;
 	struct sockaddr_in addr;
-	ClientRemapMsgHandler *remapMsgHandler = &Client::getInstance()->remapMsgHandler;
+	ClientStateTransitHandler *stateTransitHandler = &Client::getInstance()->stateTransitHandler;
 	this->stripeList->get( keyStr, key.size, 0, this->parityServerSockets );
 	for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
 		server = this->parityServerSockets[ i ];
 		addr = server->getAddr();
-		if ( ! remapMsgHandler->useCoordinatedFlow( addr ) || remapMsgHandler->stateTransitInfo.at( addr ).isCompleted() )
+		if ( ! stateTransitHandler->useCoordinatedFlow( addr ) || stateTransitHandler->stateTransitInfo.at( addr ).isCompleted() )
 			continue;
-		if ( remapMsgHandler->stateTransitInfo.at( addr ).removePendingRequest( pid.requestId ) == 0 ) {
+		if ( stateTransitHandler->stateTransitInfo.at( addr ).removePendingRequest( pid.requestId ) == 0 ) {
 			__INFO__( GREEN, "ClientWorker", "handleDeleteResponse", "Ack transition for server id = %u.", server->instanceId );
-			remapMsgHandler->stateTransitInfo.at( addr ).setCompleted();
-			remapMsgHandler->ackTransit( addr );
+			stateTransitHandler->stateTransitInfo.at( addr ).setCompleted();
+			stateTransitHandler->ackTransit( addr );
 		}
 	}
 
@@ -739,7 +739,7 @@ bool ClientWorker::handleDeltaAcknowledgement( ServerEvent event, uint8_t opcode
 			LOCK( &client->sockets.serversIdToSocketLock );
 			try {
 				struct sockaddr_in saddr = client->sockets.serversIdToSocketMap.at( header.targetId )->getAddr();
-				client->remapMsgHandler.ackTransit( saddr );
+				client->stateTransitHandler.ackTransit( saddr );
 			} catch ( std::out_of_range &e ) {
 				__ERROR__( "ClientWorker", "handleDeltaAcknowledgement",
 					"Cannot find server socket for instacne id = %u", header.targetId

@@ -6,7 +6,7 @@
 #include "../ds/pending.hh"
 #include "../event/event_queue.hh"
 #include "../protocol/protocol.hh"
-#include "../remap/remap_msg_handler.hh"
+#include "../state_transit/state_transit_handler.hh"
 #include "../socket/server_socket.hh"
 #include "../../common/worker/worker.hh"
 #include "../../common/config/global_config.hh"
@@ -35,7 +35,7 @@ private:
 	static StripeList<ServerSocket> *stripeList;
 	static ArrayMap<int, ServerSocket> *serverSockets;
 	static PacketPool *packetPool;
-	static ClientRemapMsgHandler *remapMsgHandler;
+	static ClientStateTransitHandler *stateTransitHandler;
 
 	// ---------- worker.cc ----------
 	void dispatch( MixedEvent event );
@@ -95,9 +95,9 @@ private:
 	bool handleDegradedLockResponse( CoordinatorEvent event, bool success, char *buf, size_t size );
 
 	// ---------- remap_worker.cc ----------
-	bool handleRemappingSetRequest( ApplicationEvent event, char *buf, size_t size );
-	bool handleRemappingSetLockResponse( CoordinatorEvent event, bool success, char *buf, size_t size );
-	bool handleRemappingSetResponse( ServerEvent event, bool success, char *buf, size_t size );
+	bool handleDegradedSetRequest( ApplicationEvent event, char *buf, size_t size );
+	bool handleDegradedSetLockResponse( CoordinatorEvent event, bool success, char *buf, size_t size );
+	bool handleDegradedSetResponse( ServerEvent event, bool success, char *buf, size_t size );
 
 	// ---------- recovery_worker.cc ----------
 	bool handleServerReconstructedMsg( CoordinatorEvent event, char *buf, size_t size );

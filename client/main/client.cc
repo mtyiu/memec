@@ -245,18 +245,18 @@ bool Client::init( char *path, OptionList &options, bool verbose ) {
 		char clientName[ 11 ];
 		memset( clientName, 0, 11 );
 		sprintf( clientName, "%s%04d", CLIENT_PREFIX, this->config.client.client.addr.id );
-		remapMsgHandler.init( this->config.global.states.spreaddAddr.addr, this->config.global.states.spreaddAddr.port, clientName );
+		stateTransitHandler.init( this->config.global.states.spreaddAddr.addr, this->config.global.states.spreaddAddr.port, clientName );
 		BasicRemappingScheme::serverLoading = &this->serverLoading;
 		BasicRemappingScheme::overloadedServer = &this->overloadedServer;
 		BasicRemappingScheme::stripeList = this->stripeList;
-		BasicRemappingScheme::remapMsgHandler = &this->remapMsgHandler;
-		// add the server addrs to remapMsgHandler
+		BasicRemappingScheme::stateTransitHandler = &this->stateTransitHandler;
+		// add the server addrs to stateTransitHandler
 		LOCK( &this->sockets.servers.lock );
 		for ( uint32_t i = 0; i < this->sockets.servers.size(); i++ ) {
-			remapMsgHandler.addAliveServer( this->sockets.servers.values[ i ]->getAddr() );
+			stateTransitHandler.addAliveServer( this->sockets.servers.values[ i ]->getAddr() );
 		}
 		UNLOCK( &this->sockets.servers.lock );
-		//remapMsgHandler.listAliveServers();
+		//stateTransitHandler.listAliveServers();
 	}
 
 	/* Smoothing factor */
@@ -330,7 +330,7 @@ bool Client::start() {
 	}
 
 	/* Remapping message handler */
-	if ( ! this->config.global.states.disabled && ! this->remapMsgHandler.start() ) {
+	if ( ! this->config.global.states.disabled && ! this->stateTransitHandler.start() ) {
 		__ERROR__( "Client", "start", "Cannot start remapping message handler." );
 		ret = false;
 	}
@@ -385,8 +385,8 @@ bool Client::stop() {
 
 	 /* Remapping message handler */
 	if ( ! this->config.global.states.disabled ) {
-		this->remapMsgHandler.stop();
-		this->remapMsgHandler.quit();
+		this->stateTransitHandler.stop();
+		this->stateTransitHandler.quit();
 	}
 
 	/* Loading statistics update */
@@ -610,7 +610,7 @@ bool Client::isDegraded( ServerSocket *socket ) {
 		( this->debugFlags.isDegraded )
 		||
 		(
-			this->remapMsgHandler.useCoordinatedFlow( socket->getAddr() ) &&
+			this->stateTransitHandler.useCoordinatedFlow( socket->getAddr() ) &&
 			! this->config.client.degraded.disabled
 		)
 	);
@@ -870,7 +870,7 @@ void Client::printRemapping( FILE *f ) {
 		"\nList of Tracking Servers\n"
 		"------------------------\n"
 	);
-	this->remapMsgHandler.listAliveServers();
+	this->stateTransitHandler.listAliveServers();
 
 	fprintf(
 		f,
@@ -878,7 +878,7 @@ void Client::printRemapping( FILE *f ) {
 		"------------------------\n"
 	);
 	char buf[ 16 ];
-	for ( auto &info : this->remapMsgHandler.stateTransitInfo ) {
+	for ( auto &info : this->stateTransitHandler.stateTransitInfo ) {
 		Socket::ntoh_ip( info.first.sin_addr.s_addr, buf, 16 );
 		fprintf(
 			f,
@@ -982,7 +982,7 @@ void Client::time() {
 		ServerSocket *p = this->sockets.servers[ j ]; \
 		struct sockaddr_in saddr = p->getAddr(); \
 		/* skip myself, and any node declared to be failed */ \
-		if ( p == _S_ || this->remapMsgHandler.useCoordinatedFlow( saddr ) ) continue; \
+		if ( p == _S_ || this->stateTransitHandler.useCoordinatedFlow( saddr ) ) continue; \
 		if ( _LOCK_ ) LOCK( _LOCK_ ); \
 		if ( _COUNTER_ ) *_COUNTER_ += 1; \
 		if ( _LOCK_ ) UNLOCK( _LOCK_ ); \

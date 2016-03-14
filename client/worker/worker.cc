@@ -15,7 +15,7 @@ ClientEventQueue *ClientWorker::eventQueue;
 StripeList<ServerSocket> *ClientWorker::stripeList;
 PacketPool *ClientWorker::packetPool;
 ArrayMap<int, ServerSocket> *ClientWorker::serverSockets;
-ClientRemapMsgHandler *ClientWorker::remapMsgHandler;
+ClientStateTransitHandler *ClientWorker::stateTransitHandler;
 
 void ClientWorker::dispatch( MixedEvent event ) {
 	switch( event.type ) {
@@ -201,7 +201,7 @@ void ClientWorker::removePending( ServerSocket *server, bool needsAck ) {
 	}
 
 	if ( needsAck )
-		Client::getInstance()->remapMsgHandler.ackTransit();
+		Client::getInstance()->stateTransitHandler.ackTransit();
 }
 
 void ClientWorker::replayRequestPrepare( ServerSocket *server ) {
@@ -386,7 +386,7 @@ void ClientWorker::gatherPendingNormalRequests( ServerSocket *target, bool needs
 	struct sockaddr_in addr = target->getAddr();
 	bool hasPending = false;
 
-	ClientRemapMsgHandler *mh = &Client::getInstance()->remapMsgHandler;
+	ClientStateTransitHandler *mh = &Client::getInstance()->stateTransitHandler;
 
 	LOCK ( &mh->stateTransitInfo[ addr ].counter.pendingNormalRequests.lock );
 
@@ -417,9 +417,9 @@ void ClientWorker::gatherPendingNormalRequests( ServerSocket *target, bool needs
 
 	if ( ! hasPending  ) {
 		__INFO__( GREEN, "ClientWorker", "gatherPendingNormalRequest", "No pending normal requests for transit." );
-		Client::getInstance()->remapMsgHandler.stateTransitInfo[ addr ].setCompleted();
+		Client::getInstance()->stateTransitHandler.stateTransitInfo[ addr ].setCompleted();
 		if ( needsAck )
-			Client::getInstance()->remapMsgHandler.ackTransit( addr );
+			Client::getInstance()->stateTransitHandler.ackTransit( addr );
 	}
 
 #undef GATHER_PENDING_NORMAL_REQUESTS
@@ -462,7 +462,7 @@ bool ClientWorker::init() {
 	ClientWorker::stripeList = client->stripeList;
 	ClientWorker::serverSockets = &client->sockets.servers;
 	ClientWorker::packetPool = &client->packetPool;
-	ClientWorker::remapMsgHandler = &client->remapMsgHandler;
+	ClientWorker::stateTransitHandler = &client->stateTransitHandler;
 	return true;
 }
 

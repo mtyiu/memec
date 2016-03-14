@@ -50,9 +50,9 @@ bool ClientWorker::handleServerReconstructedMsg( CoordinatorEvent event, char *b
 	sockfd = s->getSocket();
 	servers->set( index, sockfd, s );
 
-	// add the server addrs to remapMsgHandler
-	client->remapMsgHandler.removeAliveServer( original->getAddr() );
-	client->remapMsgHandler.addAliveServer( s->getAddr() );
+	// add the server addrs to stateTransitHandler
+	client->stateTransitHandler.removeAliveServer( original->getAddr() );
+	client->stateTransitHandler.addAliveServer( s->getAddr() );
 
 	// Connect to the server
 	servers->values[ index ]->timestamp.current.setVal( 0 );

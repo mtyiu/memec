@@ -14,7 +14,7 @@
 #include "../ds/map.hh"
 #include "../ds/pending.hh"
 #include "../event/event_queue.hh"
-#include "../remap/remap_msg_handler.hh"
+#include "../state_transit/state_transit_handler.hh"
 #include "../socket/coordinator_socket.hh"
 #include "../socket/client_socket.hh"
 #include "../socket/server_socket.hh"
@@ -90,7 +90,7 @@ public:
 	/* Instance ID (assigned by coordinator) */
 	static uint16_t instanceId;
 	/* Remapping */
-	ServerRemapMsgHandler remapMsgHandler;
+	ServerStateTransitHandler stateTransitHandler;
 
 	static Server *getInstance() {
 		static Server server;

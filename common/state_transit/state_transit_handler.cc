@@ -1,18 +1,18 @@
 #include <cstring>
 #include <arpa/inet.h>
-#include "remap_msg_handler.hh"
+#include "state_transit_handler.hh"
 
-RemapMsgHandler::RemapMsgHandler() {
+StateTransitHandler::StateTransitHandler() {
 	this->reader = -1;
 	this->isConnected = false;
 	this->msgCount = 0;
 	this->group = ( char* ) GROUP_NAME;
 }
 
-RemapMsgHandler::~RemapMsgHandler() {
+StateTransitHandler::~StateTransitHandler() {
 }
 
-int RemapMsgHandler::sendState( std::vector<struct sockaddr_in> &servers, int numGroup, const char targetGroup[][ MAX_GROUP_NAME ] ) {
+int StateTransitHandler::sendState( std::vector<struct sockaddr_in> &servers, int numGroup, const char targetGroup[][ MAX_GROUP_NAME ] ) {
 	char buf[ MAX_MESSLEN ];
 	int len = 0, ret = 0;
 	int recordSize = this->serverStateRecordSize;
@@ -35,7 +35,7 @@ int RemapMsgHandler::sendState( std::vector<struct sockaddr_in> &servers, int nu
 	return ret;
 }
 
-bool RemapMsgHandler::init( const char *spread, const char *user ) {
+bool StateTransitHandler::init( const char *spread, const char *user ) {
 	//this->quit();
 	if ( spread ) {
 		memcpy( this->spread, spread, MAX_SPREAD_NAME - 1 );
@@ -70,7 +70,7 @@ bool RemapMsgHandler::init( const char *spread, const char *user ) {
 	return true;
 }
 
-void RemapMsgHandler::quit() {
+void StateTransitHandler::quit() {
 	if ( isConnected ) {
 		isConnected = false;
 		SP_leave( mbox, GROUP_NAME );
@@ -78,7 +78,7 @@ void RemapMsgHandler::quit() {
 	}
 }
 
-void RemapMsgHandler::listAliveServers() {
+void StateTransitHandler::listAliveServers() {
 	uint32_t serverCount = this->serversState.size();
 	char buf[ INET_ADDRSTRLEN ];
 	for ( auto server : this->serversState ) {
@@ -90,26 +90,26 @@ void RemapMsgHandler::listAliveServers() {
 			ntohs( server.first.sin_port )
 		);
 		switch( server.second ) {
-			case REMAP_UNDEFINED:
-				fprintf( stderr, "REMAP_UNDEFINED\n" );
+			case STATE_UNDEFINED:
+				fprintf( stderr, "STATE_UNDEFINED\n" );
 				break;
-			case REMAP_NORMAL:
-				fprintf( stderr, "REMAP_NORMAL\n" );
+			case STATE_NORMAL:
+				fprintf( stderr, "STATE_NORMAL\n" );
 				break;
-			case REMAP_INTERMEDIATE:
-				fprintf( stderr, "REMAP_INTERMEDIATE\n" );
+			case STATE_INTERMEDIATE:
+				fprintf( stderr, "STATE_INTERMEDIATE\n" );
 				break;
-			case REMAP_COORDINATED:
-				fprintf( stderr, "REMAP_COORDINATED\n" );
+			case STATE_COORDINATED:
+				fprintf( stderr, "STATE_COORDINATED\n" );
 				break;
-			case REMAP_DEGRADED:
-				fprintf( stderr, "REMAP_DEGRADED\n" );
+			case STATE_DEGRADED:
+				fprintf( stderr, "STATE_DEGRADED\n" );
 				break;
-			case REMAP_WAIT_DEGRADED:
-				fprintf( stderr, "REMAP_WAIT_DEGRADED\n" );
+			case STATE_WAIT_DEGRADED:
+				fprintf( stderr, "STATE_WAIT_DEGRADED\n" );
 				break;
-			case REMAP_WAIT_NORMAL:
-				fprintf( stderr, "REMAP_WAIT_NORMAL\n" );
+			case STATE_WAIT_NORMAL:
+				fprintf( stderr, "STATE_WAIT_NORMAL\n" );
 				break;
 		}
 	}

@@ -17,8 +17,8 @@ OBJS= \
 	protocol/recovery_protocol.o \
 	protocol/register_protocol.o \
 	protocol/remap_protocol.o \
-	remap/remap_msg_handler.o \
-	remap/remap_worker.o \
+	state_transit/state_transit_handler.o \
+	state_transit/state_transit_worker.o \
 	socket/coordinator_socket.o \
 	socket/client_socket.o \
 	socket/server_socket.o \
@@ -52,7 +52,7 @@ EXTERNAL_LIB= \
 	$(MEMEC_SRC_ROOT)/common/protocol/normal_protocol.o \
 	$(MEMEC_SRC_ROOT)/common/protocol/recovery_protocol.o \
 	$(MEMEC_SRC_ROOT)/common/protocol/remap_protocol.o \
-	$(MEMEC_SRC_ROOT)/common/remap/remap_msg_handler.o \
+	$(MEMEC_SRC_ROOT)/common/state_transit/state_transit_handler.o \
 	$(MEMEC_SRC_ROOT)/common/socket/socket.o \
 	$(MEMEC_SRC_ROOT)/common/socket/epoll.o \
 	$(MEMEC_SRC_ROOT)/lib/death_handler/death_handler.o \

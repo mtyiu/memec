@@ -1,14 +1,14 @@
-#ifndef __SERVER_REMAP_REMAP_MSG_HANDLER_HH__
-#define __SERVER_REMAP_REMAP_MSG_HANDLER_HH__
+#ifndef __SERVER_STATE_TRANSIT_STATE_TRANSIT_MSG_HANDLER_HH__
+#define __SERVER_STATE_TRANSIT_STATE_TRANSIT_MSG_HANDLER_HH__
 
 #include <unordered_map>
 #include <unordered_set>
 #include "../../common/ds/sockaddr_in.hh"
 #include "../../common/lock/lock.hh"
-#include "../../common/remap/remap_msg_handler.hh"
-#include "../../common/remap/remap_group.hh"
+#include "../../common/state_transit/state_transit_handler.hh"
+#include "../../common/state_transit/state_transit_group.hh"
 
-class ServerRemapMsgHandler : public RemapMsgHandler {
+class ServerStateTransitHandler : public StateTransitHandler {
 private:
 	bool isListening;
 
@@ -22,8 +22,8 @@ private:
 	static void *readMessages( void *argv );
 
 public:
-	ServerRemapMsgHandler();
-	~ServerRemapMsgHandler();
+	ServerStateTransitHandler();
+	~ServerStateTransitHandler();
 
 	bool init( const int ip, const int port, const char *user = NULL );
 	void quit();

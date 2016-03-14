@@ -126,7 +126,7 @@ void ClientWorker::dispatch( CoordinatorEvent event ) {
 								__ERROR__( "ClientWorker", "dispatch", "Invalid magic code from coordinator." );
 								goto quit_1;
 						}
-						this->handleRemappingSetLockResponse( event, success, buffer.data, buffer.size );
+						this->handleDegradedSetLockResponse( event, success, buffer.data, buffer.size );
 						break;
 					case PROTO_OPCODE_SERVER_RECONSTRUCTED:
 						this->handleServerReconstructedMsg( event, buffer.data, header.length );

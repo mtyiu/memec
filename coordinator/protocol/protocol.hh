@@ -65,7 +65,7 @@ public:
 	);
 
 	// ---------- remap_protocol.cc ----------
-	char *resRemappingSetLock(
+	char *resDegradedSetLock(
 		size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
 		uint32_t *original, uint32_t *remapped, uint32_t remappedCount,
 		uint8_t keySize, char *key

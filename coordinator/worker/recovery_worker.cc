@@ -32,8 +32,8 @@ bool CoordinatorWorker::handlePromoteBackupServerResponse( ServerEvent event, ch
 
 		// notify the remap message handler of a "removed" server
 		Coordinator *coordinator = Coordinator::getInstance();
-		if ( coordinator->remapMsgHandler )
-			coordinator->remapMsgHandler->removeAliveServer( original->getAddr() );
+		if ( coordinator->stateTransitHandler )
+			coordinator->stateTransitHandler->removeAliveServer( original->getAddr() );
 
 		Log log;
 		log.setRecovery(
@@ -76,9 +76,9 @@ bool CoordinatorWorker::handleReconstructionRequest( ServerSocket *socket ) {
 
 	struct timespec startTime = start_timer();
 
-	/////////////////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////////
 	// Choose a backup server socket for reconstructing the failed node //
-	/////////////////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////////
 	Coordinator *coordinator = Coordinator::getInstance();
 	ArrayMap<int, ServerSocket> &servers = coordinator->sockets.servers;
 	ArrayMap<int, ServerSocket> &backupServers = coordinator->sockets.backupServers;
@@ -98,9 +98,9 @@ bool CoordinatorWorker::handleReconstructionRequest( ServerSocket *socket ) {
 	}
 	UNLOCK( &coordinator->waitingForRecovery.lock );
 
-	///////////////////////////////////////////////////////
+	/////////////////////////////////////////////////////////
 	// Choose a backup server to replace the failed server //
-	///////////////////////////////////////////////////////
+	/////////////////////////////////////////////////////////
 	if ( backupServers.size() == 0 ) {
 		__ERROR__( "CoordinatorWorker", "handleReconstructionRequest", "No backup node is available!" );
 		return false;
@@ -108,22 +108,22 @@ bool CoordinatorWorker::handleReconstructionRequest( ServerSocket *socket ) {
 	backupServerSocket = backupServers[ 0 ];
 	backupServers.removeAt( 0 );
 
-	////////////////////////////
+	/////////////////////////////
 	// Update ServerSocket map //
-	////////////////////////////
+	/////////////////////////////
 	fd = backupServerSocket->getSocket();
 	backupServerSocket->failed = socket;
 	servers.set( index, fd, backupServerSocket );
 
-	////////////////////////////////////////////
-	// Add the server addrs to remapMsgHandler //
-	////////////////////////////////////////////
-	if ( coordinator->remapMsgHandler )
-		coordinator->remapMsgHandler->addAliveServer( backupServerSocket->getAddr() );
+	/////////////////////////////////////////////////
+	// Add the server addrs to stateTransitHandler //
+	/////////////////////////////////////////////////
+	if ( coordinator->stateTransitHandler )
+		coordinator->stateTransitHandler->addAliveServer( backupServerSocket->getAddr() );
 
-	////////////////////////////
+	/////////////////////////////
 	// Announce to the servers //
-	////////////////////////////
+	/////////////////////////////
 	struct {
 		pthread_mutex_t lock;
 		pthread_cond_t cond;
@@ -178,11 +178,11 @@ bool CoordinatorWorker::handleReconstructionRequest( ServerSocket *socket ) {
 
 	ArrayMap<int, ServerSocket> &map = Coordinator::getInstance()->sockets.servers;
 
-	CoordinatorRemapMsgHandler *crmh = CoordinatorRemapMsgHandler::getInstance();
+	CoordinatorStateTransitHandler *csth = CoordinatorStateTransitHandler::getInstance();
 
-	//////////////////////////////////////////////////
+	////////////////////////////////////////////////////
 	// Get the ServerSockets of the surviving servers //
-	//////////////////////////////////////////////////
+	////////////////////////////////////////////////////
 	LOCK( &map.lock );
 	for ( uint32_t i = 0, size = lists.size(); i < size; i++ ) {
 		listId = lists[ i ].listId;
@@ -193,7 +193,7 @@ bool CoordinatorWorker::handleReconstructionRequest( ServerSocket *socket ) {
 			);
 
 			for ( uint32_t j = 0; j < CoordinatorWorker::chunkCount; j++ ) {
-				if ( ! s[ j ] || ! s[ j ]->ready() || crmh->allowRemapping( s[ j ]->getAddr() ) )
+				if ( ! s[ j ] || ! s[ j ]->ready() || csth->allowRemapping( s[ j ]->getAddr() ) )
 					s[ j ] = 0; // Don't use this server
 			}
 
@@ -290,9 +290,9 @@ bool CoordinatorWorker::handleReconstructionRequest( ServerSocket *socket ) {
 		__ERROR__( "CoordinatorWorker", "handleReconstructionRequest", "Cannot insert into pending recovery map." );
 	}
 
-	/////////////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////
 	// Distribute the reconstruction tasks to the surviving servers //
-	/////////////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////
 	// Distribute the reconstruction task among the servers in the same stripe list
 	for ( uint32_t i = 0, size = lists.size(); i < size; i++ ) {
 		uint32_t numSurvivingServers = 0;

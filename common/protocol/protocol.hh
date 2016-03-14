@@ -61,7 +61,7 @@
 #define PROTO_OPCODE_DEGRADED_UPDATE              0x08
 #define PROTO_OPCODE_DEGRADED_DELETE              0x09
 // Client <-> Server //
-#define PROTO_OPCODE_REMAPPING_SET                0x10
+#define PROTO_OPCODE_DEGRADED_SET                 0x10
 #define PROTO_OPCODE_DEGRADED_LOCK                0x11
 #define PROTO_OPCODE_ACK_METADATA                 0x12
 #define PROTO_OPCODE_ACK_PARITY_DELTA             0x13
@@ -299,8 +299,8 @@ struct RemappingLockHeader {
 	uint32_t *remapped;
 };
 
-#define PROTO_REMAPPING_SET_SIZE 16
-struct RemappingSetHeader {
+#define PROTO_DEGRADED_SET_SIZE 16
+struct DegradedSetHeader {
 	uint32_t listId;
 	uint32_t chunkId;
 	uint32_t remappedCount;
@@ -798,7 +798,7 @@ protected:
 		char *buf, size_t size
 	);
 
-	size_t generateRemappingSetHeader(
+	size_t generateDegradedSetHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t chunkId,
 		uint32_t *original, uint32_t *remapped, uint32_t remappedCount,
@@ -806,7 +806,7 @@ protected:
 		uint32_t valueSize, char *value,
 		char *sendBuf = 0
 	);
-	bool parseRemappingSetHeader(
+	bool parseDegradedSetHeader(
 		size_t offset, uint32_t &listId, uint32_t &chunkId,
 		uint32_t *&original, uint32_t *&remapped, uint32_t &remappedCount,
 		uint8_t &keySize, char *&key,
@@ -1226,8 +1226,8 @@ public:
 		struct RemappingLockHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
-	bool parseRemappingSetHeader(
-		struct RemappingSetHeader &header,
+	bool parseDegradedSetHeader(
+		struct DegradedSetHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0,
 		struct sockaddr_in *target = 0
 	);

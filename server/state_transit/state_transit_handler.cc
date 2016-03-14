@@ -2,32 +2,32 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <string.h>
-#include "../../common/remap/remap_group.hh"
+#include "../../common/state_transit/state_transit_group.hh"
 #include "../../common/util/debug.hh"
 #include "../main/server.hh"
-#include "remap_msg_handler.hh"
+#include "state_transit_handler.hh"
 
-ServerRemapMsgHandler::ServerRemapMsgHandler() :
-		RemapMsgHandler() {
+ServerStateTransitHandler::ServerStateTransitHandler() :
+		StateTransitHandler() {
 	this->group = ( char* )SERVER_GROUP;
 	LOCK_INIT( &this->aliveServersLock );
 }
 
-ServerRemapMsgHandler::~ServerRemapMsgHandler() {
+ServerStateTransitHandler::~ServerStateTransitHandler() {
 }
 
-bool ServerRemapMsgHandler::init( const int ip, const int port, const char *user ) {
+bool ServerStateTransitHandler::init( const int ip, const int port, const char *user ) {
 	char addrbuf[ 32 ], ipstr[ INET_ADDRSTRLEN ];
 	struct in_addr addr;
 	memset( addrbuf, 0, 32 );
 	addr.s_addr = ip;
 	inet_ntop( AF_INET, &addr, ipstr, INET_ADDRSTRLEN );
 	sprintf( addrbuf, "%u@%s", ntohs( port ), ipstr );
-	return RemapMsgHandler::init( addrbuf , user ) ;
+	return StateTransitHandler::init( addrbuf , user ) ;
 }
 
-void ServerRemapMsgHandler::quit() {
-	RemapMsgHandler::quit();
+void ServerStateTransitHandler::quit() {
+	StateTransitHandler::quit();
 	if ( this->isListening ) {
 		this->stop();
 	}
@@ -36,21 +36,21 @@ void ServerRemapMsgHandler::quit() {
 	this->reader = -1;
 }
 
-bool ServerRemapMsgHandler::start() {
+bool ServerStateTransitHandler::start() {
 	if ( ! this->isConnected )
 		return false;
 
 	this->isListening = true;
 	// read message using a background thread
-	if ( pthread_create( &this->reader, NULL, ServerRemapMsgHandler::readMessages, this ) < 0 ){
-		__ERROR__( "ServerRemapMsgHandler", "start", "Server FAILED to start reading remapping messages\n" );
+	if ( pthread_create( &this->reader, NULL, ServerStateTransitHandler::readMessages, this ) < 0 ){
+		__ERROR__( "ServerStateTransitHandler", "start", "Server FAILED to start reading state transiton messages\n" );
 		return false;
 	}
 
 	return true;
 }
 
-bool ServerRemapMsgHandler::stop() {
+bool ServerStateTransitHandler::stop() {
 	int ret = 0;
 	if ( ! this->isConnected || ! this->isListening )
 		return false;
@@ -60,8 +60,8 @@ bool ServerRemapMsgHandler::stop() {
 
 	return ( ret == 0 );
 }
-void *ServerRemapMsgHandler::readMessages( void *argv ) {
-	ServerRemapMsgHandler *myself = ( ServerRemapMsgHandler* ) argv;
+void *ServerStateTransitHandler::readMessages( void *argv ) {
+	ServerStateTransitHandler *myself = ( ServerStateTransitHandler* ) argv;
 	int ret = 0;
 
 	int service, groups, endian;
@@ -77,7 +77,7 @@ void *ServerRemapMsgHandler::readMessages( void *argv ) {
 			myself->setState( msg, ret );
 			myself->increMsgCount();
 		} else if ( ret < 0 ) {
-			__ERROR__( "ServerRemapMsgHandler", "readMessages" , "Failed to receive message %d\n", ret );
+			__ERROR__( "ServerStateTransitHandler", "readMessages" , "Failed to receive message %d\n", ret );
 		}
 	}
 
@@ -85,7 +85,7 @@ void *ServerRemapMsgHandler::readMessages( void *argv ) {
 	return ( void* ) &myself->msgCount;
 }
 
-void ServerRemapMsgHandler::setState( char* msg , int len ) {
+void ServerStateTransitHandler::setState( char* msg , int len ) {
 	RemapState signal;
 	uint8_t serverCount = ( uint8_t ) msg[0];
 	struct sockaddr_in serverPeer;
@@ -101,7 +101,7 @@ void ServerRemapMsgHandler::setState( char* msg , int len ) {
 		char buf[ INET_ADDRSTRLEN ];
 		inet_ntop( AF_INET, &serverPeer.sin_addr.s_addr, buf, INET_ADDRSTRLEN );
 		if ( this->serversState.count( serverPeer ) == 0 ) {
-			__ERROR__( "ServerRemapMsgHandler", "setState" , "Server %s:%hu not found\n", buf, ntohs( serverPeer.sin_port ) );
+			__ERROR__( "ServerStateTransitHandler", "setState" , "Server %s:%hu not found\n", buf, ntohs( serverPeer.sin_port ) );
 			continue;
 		}
 
@@ -120,25 +120,25 @@ void ServerRemapMsgHandler::setState( char* msg , int len ) {
 		UNLOCK( &lock );
 
 		if ( ! target ) {
-			__ERROR__( "ServerRemapMsgHandler", "setState" , "ServerSocket for %s:%hu not found\n", buf, ntohs( serverPeer.sin_port ) );
+			__ERROR__( "ServerStateTransitHandler", "setState" , "ServerSocket for %s:%hu not found\n", buf, ntohs( serverPeer.sin_port ) );
 			continue;
 		}
 
 		LOCK( &this->serversStateLock[ serverPeer ] );
 		switch ( signal ) {
-			case REMAP_NORMAL:
-				__DEBUG__( BLUE, "ServerRemapMsgHandler", "setState", "REMAP_NORMAL %s:%hu", buf, ntohs( serverPeer.sin_port ) );
+			case STATE_NORMAL:
+				__DEBUG__( BLUE, "ServerStateTransitHandler", "setState", "STATE_NORMAL %s:%hu", buf, ntohs( serverPeer.sin_port ) );
 				break;
-			case REMAP_INTERMEDIATE:
-				__INFO__( BLUE, "ServerRemapMsgHandler", "setState", "REMAP_INTERMEDIATE %s:%hu", buf, ntohs( serverPeer.sin_port ) );
+			case STATE_INTERMEDIATE:
+				__INFO__( BLUE, "ServerStateTransitHandler", "setState", "STATE_INTERMEDIATE %s:%hu", buf, ntohs( serverPeer.sin_port ) );
 				break;
-			case REMAP_COORDINATED:
+			case STATE_COORDINATED:
 				break;
-			case REMAP_DEGRADED:
-				__INFO__( BLUE, "ServerRemapMsgHandler", "setState", "REMAP_DEGRADED %s:%hu", buf, ntohs( serverPeer.sin_port ) );
+			case STATE_DEGRADED:
+				__INFO__( BLUE, "ServerStateTransitHandler", "setState", "STATE_DEGRADED %s:%hu", buf, ntohs( serverPeer.sin_port ) );
 				break;
 			default:
-				__INFO__( BLUE, "ServerRemapMsgHandler", "setState", "Unknown %d %s:%hu", signal, buf, ntohs( serverPeer.sin_port ) );
+				__INFO__( BLUE, "ServerStateTransitHandler", "setState", "Unknown %d %s:%hu", signal, buf, ntohs( serverPeer.sin_port ) );
 				UNLOCK( &this->serversStateLock[ serverPeer ] );
 				return;
 		}
@@ -148,18 +148,18 @@ void ServerRemapMsgHandler::setState( char* msg , int len ) {
 
 }
 
-bool ServerRemapMsgHandler::addAliveServer( struct sockaddr_in server ) {
+bool ServerStateTransitHandler::addAliveServer( struct sockaddr_in server ) {
 	LOCK( &this->aliveServersLock );
 	if ( this->serversState.count( server ) >= 1 ) {
 		UNLOCK( &this->aliveServersLock );
 		return false;
 	}
-	this->serversState[ server ] = REMAP_NORMAL;
+	this->serversState[ server ] = STATE_NORMAL;
 	UNLOCK( &this->aliveServersLock );
 	return true;
 }
 
-bool ServerRemapMsgHandler::removeAliveServer( struct sockaddr_in server ) {
+bool ServerStateTransitHandler::removeAliveServer( struct sockaddr_in server ) {
 	LOCK( &this->aliveServersLock );
 	if ( this->serversState.count( server ) < 1 ) {
 		UNLOCK( &this->aliveServersLock );
@@ -170,20 +170,20 @@ bool ServerRemapMsgHandler::removeAliveServer( struct sockaddr_in server ) {
 	return true;
 }
 
-bool ServerRemapMsgHandler::useCoordinatedFlow( const struct sockaddr_in &server ) {
+bool ServerStateTransitHandler::useCoordinatedFlow( const struct sockaddr_in &server ) {
 	if ( this->serversState.count( server ) == 0 )
 		return false;
-	return this->serversState[ server ] != REMAP_NORMAL;
+	return this->serversState[ server ] != STATE_NORMAL;
 }
 
-bool ServerRemapMsgHandler::allowRemapping( const struct sockaddr_in &server ) {
+bool ServerStateTransitHandler::allowRemapping( const struct sockaddr_in &server ) {
 	if ( this->serversState.count( server ) == 0 )
 		return false;
 
 	switch ( this->serversState[ server ] ) {
-		case REMAP_INTERMEDIATE:
-		case REMAP_WAIT_DEGRADED:
-		case REMAP_DEGRADED:
+		case STATE_INTERMEDIATE:
+		case STATE_WAIT_DEGRADED:
+		case STATE_DEGRADED:
 			return true;
 		default:
 			break;
@@ -192,19 +192,19 @@ bool ServerRemapMsgHandler::allowRemapping( const struct sockaddr_in &server ) {
 	return false;
 }
 
-bool ServerRemapMsgHandler::acceptNormalResponse( const struct sockaddr_in &server ) {
+bool ServerStateTransitHandler::acceptNormalResponse( const struct sockaddr_in &server ) {
 	if ( this->serversState.count( server ) == 0 )
 		return true;
 
 	switch( this->serversState[ server ] ) {
-		case REMAP_UNDEFINED:
-		case REMAP_NORMAL:
-		case REMAP_INTERMEDIATE:
-		case REMAP_COORDINATED:
-		case REMAP_WAIT_DEGRADED:
-		case REMAP_WAIT_NORMAL:
+		case STATE_UNDEFINED:
+		case STATE_NORMAL:
+		case STATE_INTERMEDIATE:
+		case STATE_COORDINATED:
+		case STATE_WAIT_DEGRADED:
+		case STATE_WAIT_NORMAL:
 			return true;
-		case REMAP_DEGRADED:
+		case STATE_DEGRADED:
 		default:
 			return false;
 	}

@@ -37,10 +37,10 @@ void CoordinatorWorker::dispatch( ClientEvent event ) {
 			delete event.message.serverLoading.overloadedServerSet;
 			isSend = true;
 			break;
-		case CLIENT_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_SUCCESS:
+		case CLIENT_EVENT_TYPE_DEGRADED_SET_LOCK_RESPONSE_SUCCESS:
 			success = true;
-		case CLIENT_EVENT_TYPE_REMAPPING_SET_LOCK_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resRemappingSetLock(
+		case CLIENT_EVENT_TYPE_DEGRADED_SET_LOCK_RESPONSE_FAILURE:
+			buffer.data = this->protocol.resDegradedSetLock(
 				buffer.size,
 				event.instanceId, event.requestId,
 				success,
@@ -58,7 +58,7 @@ void CoordinatorWorker::dispatch( ClientEvent event ) {
 			std::vector<struct sockaddr_in> *servers = event.message.switchPhase.servers;
 
 			isSend = false;
-			if ( servers == NULL || ! coordinator->remapMsgHandler )
+			if ( servers == NULL || ! coordinator->stateTransitHandler )
 				break;
 
 			// just trigger the handling of transition, no message need to be handled
@@ -87,12 +87,12 @@ void CoordinatorWorker::dispatch( ClientEvent event ) {
 					}
 
 					if ( event.message.switchPhase.isCrashed )
-						coordinator->remapMsgHandler->addCrashedServer( servers->at( i ) );
+						coordinator->stateTransitHandler->addCrashedServer( servers->at( i ) );
 				}
 
-				coordinator->remapMsgHandler->transitToDegraded( servers, event.message.switchPhase.forced ); // Phase 1a --> 2
+				coordinator->stateTransitHandler->transitToDegraded( servers, event.message.switchPhase.forced ); // Phase 1a --> 2
 			} else {
-				coordinator->remapMsgHandler->transitToNormal( servers, event.message.switchPhase.forced ); // Phase 1b --> 0
+				coordinator->stateTransitHandler->transitToNormal( servers, event.message.switchPhase.forced ); // Phase 1b --> 0
 			}
 			// free the vector of servers
 			delete servers;
@@ -256,7 +256,7 @@ void CoordinatorWorker::dispatch( ClientEvent event ) {
 				event.requestId = header.requestId;
 				switch( header.opcode ) {
 					case PROTO_OPCODE_REMAPPING_LOCK:
-						this->handleRemappingSetLockRequest( event, buffer.data, header.length );
+						this->handleDegradedSetLockRequest( event, buffer.data, header.length );
 						break;
 					case PROTO_OPCODE_DEGRADED_LOCK:
 						this->handleDegradedLockRequest( event, buffer.data, header.length );

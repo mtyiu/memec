@@ -152,11 +152,11 @@ private:
 
 	// ---------- remap_worker.cc ----------
 	bool handleRemappedData( CoordinatorEvent event, char *buf, size_t size );
-	bool handleRemappingSetRequest( ClientEvent event, char *buf, size_t size );
-	bool handleRemappingSetRequest( ServerPeerEvent event, char *buf, size_t size );
+	bool handleDegradedSetRequest( ClientEvent event, char *buf, size_t size );
+	bool handleDegradedSetRequest( ServerPeerEvent event, char *buf, size_t size );
 	bool handleRemappedUpdateRequest( ServerPeerEvent event, char *buf, size_t size );
 	bool handleRemappedDeleteRequest( ServerPeerEvent event, char *buf, size_t size );
-	bool handleRemappingSetResponse( ServerPeerEvent event, bool success, char *buf, size_t size );
+	bool handleDegradedSetResponse( ServerPeerEvent event, bool success, char *buf, size_t size );
 	bool handleRemappedUpdateResponse( ServerPeerEvent event, bool success, char *buf, size_t size );
 	bool handleRemappedDeleteResponse( ServerPeerEvent event, bool success, char *buf, size_t size );
 
