@@ -106,8 +106,8 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 		}
 		// notify the remap message handler of the new server
 		struct sockaddr_in serverAddr = event.socket->getAddr();
-		if ( Coordinator::getInstance()->remapMsgHandler )
-			Coordinator::getInstance()->remapMsgHandler->addAliveServer( serverAddr );
+		if ( Coordinator::getInstance()->stateTransitHandler )
+			Coordinator::getInstance()->stateTransitHandler->addAliveServer( serverAddr );
 		UNLOCK( &servers.lock );
 	} else if ( event.type == SERVER_EVENT_TYPE_ANNOUNCE_SERVER_RECONSTRUCTED ) {
 		ArrayMap<int, ServerSocket> &servers = Coordinator::getInstance()->sockets.servers;
@@ -153,8 +153,8 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 		}
 		// notify the remap message handler of the new server
 		struct sockaddr_in serverAddr = event.message.reconstructed.dst->getAddr();
-		if ( Coordinator::getInstance()->remapMsgHandler )
-			Coordinator::getInstance()->remapMsgHandler->addAliveServer( serverAddr );
+		if ( Coordinator::getInstance()->stateTransitHandler )
+			Coordinator::getInstance()->stateTransitHandler->addAliveServer( serverAddr );
 		UNLOCK( &servers.lock );
 	} else if ( event.type == SERVER_EVENT_TYPE_DISCONNECT ) {
 		// Remove the server from the pending set of annoucement

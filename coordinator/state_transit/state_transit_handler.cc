@@ -4,15 +4,15 @@
 #include <pthread.h>
 #include <sp.h>
 #include <unistd.h>
-#include "remap_msg_handler.hh"
-#include "remap_worker.hh"
+#include "state_transit_handler.hh"
+#include "state_transit_worker.hh"
 #include "../main/coordinator.hh"
-#include "../../common/remap/remap_group.hh"
+#include "../../common/state_transit/state_transit_group.hh"
 
 using namespace std;
 
-CoordinatorRemapMsgHandler::CoordinatorRemapMsgHandler() :
-		RemapMsgHandler() {
+CoordinatorStateTransitHandler::CoordinatorStateTransitHandler() :
+		StateTransitHandler() {
 	this->group = ( char* ) COORD_GROUP;
 
 	LOCK_INIT( &this->clientsLock );
@@ -21,45 +21,45 @@ CoordinatorRemapMsgHandler::CoordinatorRemapMsgHandler() :
 	aliveServers.clear();
 
 	Coordinator* coordinator = Coordinator::getInstance();
-	this->eventQueue = new EventQueue<RemapStateEvent>( coordinator->config.global.states.queue );
-	this->workers = new CoordinatorRemapWorker[ coordinator->config.global.states.workers ];
+	this->eventQueue = new EventQueue<StateTransitEvent>( coordinator->config.global.states.queue );
+	this->workers = new CoordinatorStateTransitWorker[ coordinator->config.global.states.workers ];
 }
 
-CoordinatorRemapMsgHandler::~CoordinatorRemapMsgHandler() {
+CoordinatorStateTransitHandler::~CoordinatorStateTransitHandler() {
 	delete this->eventQueue;
 	delete [] this->workers;
 }
 
-bool CoordinatorRemapMsgHandler::init( const int ip, const int port, const char *user ) {
+bool CoordinatorStateTransitHandler::init( const int ip, const int port, const char *user ) {
 	char addrbuf[ 32 ], ipstr[ INET_ADDRSTRLEN ];
 	struct in_addr addr;
 	memset( addrbuf, 0, 32 );
 	addr.s_addr = ip;
 	inet_ntop( AF_INET, &addr, ipstr, INET_ADDRSTRLEN );
 	sprintf( addrbuf, "%u@%s", ntohs( port ), ipstr );
-	RemapMsgHandler::init( addrbuf , user );
+	StateTransitHandler::init( addrbuf , user );
 	pthread_mutex_init( &this->ackSignalLock, 0 );
 
 	this->isListening = false;
 	return ( SP_join( this->mbox, CLIENT_GROUP ) == 0 );
 }
 
-void CoordinatorRemapMsgHandler::quit() {
+void CoordinatorStateTransitHandler::quit() {
 	SP_leave( mbox, COORD_GROUP );
-	RemapMsgHandler::quit();
+	StateTransitHandler::quit();
 	if ( reader > 0 ) {
 		pthread_join( this->reader, NULL );
 		reader = -1;
 	}
 }
 
-bool CoordinatorRemapMsgHandler::start() {
+bool CoordinatorStateTransitHandler::start() {
 	if ( ! this->isConnected )
 		return false;
 	// start event queue processing
 	this->eventQueue->start();
 	// read messages using a background thread
-	if ( pthread_create( &this->reader, NULL, CoordinatorRemapMsgHandler::readMessages, this ) < 0 ) {
+	if ( pthread_create( &this->reader, NULL, CoordinatorStateTransitHandler::readMessages, this ) < 0 ) {
 		fprintf( stderr, "Coordinator FAILED to start reading messages" );
 		return false;
 	}
@@ -72,7 +72,7 @@ bool CoordinatorRemapMsgHandler::start() {
 	return true;
 }
 
-bool CoordinatorRemapMsgHandler::stop() {
+bool CoordinatorStateTransitHandler::stop() {
 	fprintf( stderr, "Coordinator stop\n" );
 	int ret = 0;
 	if ( ! this->isConnected || ! this->isListening )
@@ -91,30 +91,24 @@ bool CoordinatorRemapMsgHandler::stop() {
 	return ( ret == 0 );
 }
 
-#define REMAP_PHASE_CHANGE_HANDLER( _ALL_SERVERS_, _CHECKED_SERVERS_, _EVENT_ ) \
+#define STATE_TRANSIT_PHASE_CHANGE_HANDLER( _ALL_SERVERS_, _CHECKED_SERVERS_, _EVENT_ ) \
 	do { \
 		_CHECKED_SERVERS_.clear(); \
 		\
 		bool start = _EVENT_.start; \
 		for ( uint32_t i = 0; i < _ALL_SERVERS_->size(); ) { \
 			LOCK( &this->serversStateLock[ _ALL_SERVERS_->at(i) ] ); \
-			/* check if server is alive  \
-			if ( this->serversState.count( _ALL_SERVERS_->at(i) ) == 0 ) { \
-				UNLOCK( &this->serversStateLock[ _ALL_SERVERS_->at(i) ] ); \
-				i++; \
-				continue; \
-			} */  \
 			RemapState state = this->serversState[ _ALL_SERVERS_->at(i) ]; \
-			/* no need to trigger remapping if is undefined / already entered / already exited remapping phase */ \
-			if ( ( state == REMAP_UNDEFINED ) || ( start && state != REMAP_NORMAL ) || \
-				( ( ! start ) && state != REMAP_DEGRADED ) ) \
+			/* no need to trigger transition if is undefined / already entered / already exited degraded state */ \
+			if ( ( state == STATE_UNDEFINED ) || ( start && state != STATE_NORMAL ) || \
+				( ( ! start ) && state != STATE_DEGRADED ) ) \
 			{ \
 				UNLOCK( &this->serversStateLock[ _ALL_SERVERS_->at(i) ] ); \
 				i++; \
 				continue; \
 			}  \
 			/* set state for sync. and to avoid multiple start from others */ \
-			this->serversState[ _ALL_SERVERS_->at(i) ] = ( start ) ? REMAP_INTERMEDIATE : REMAP_COORDINATED; \
+			this->serversState[ _ALL_SERVERS_->at(i) ] = ( start ) ? STATE_INTERMEDIATE : STATE_COORDINATED; \
 			/* reset ack pool anyway */\
 			this->resetClientAck( _ALL_SERVERS_->at(i) ); \
 			_CHECKED_SERVERS_.push_back( _ALL_SERVERS_->at(i) ); \
@@ -127,10 +121,10 @@ bool CoordinatorRemapMsgHandler::stop() {
 			for ( uint32_t i = 0; i < _CHECKED_SERVERS_.size() ; i++ ) { \
 				LOCK( &this->serversStateLock[ _ALL_SERVERS_->at(i) ] ); \
 				/* TODO is the previous state deterministic ?? */ \
-				if ( start && this->serversState[ _ALL_SERVERS_->at(i) ] == REMAP_INTERMEDIATE ) { \
-					this->serversState[ _ALL_SERVERS_->at(i) ] = REMAP_NORMAL; \
-				} else if ( ( ! start ) && this->serversState[ _ALL_SERVERS_->at(i) ] == REMAP_COORDINATED ) { \
-					this->serversState[ _ALL_SERVERS_->at(i) ] = REMAP_DEGRADED; \
+				if ( start && this->serversState[ _ALL_SERVERS_->at(i) ] == STATE_INTERMEDIATE ) { \
+					this->serversState[ _ALL_SERVERS_->at(i) ] = STATE_NORMAL; \
+				} else if ( ( ! start ) && this->serversState[ _ALL_SERVERS_->at(i) ] == STATE_COORDINATED ) { \
+					this->serversState[ _ALL_SERVERS_->at(i) ] = STATE_DEGRADED; \
 				} else { \
 					fprintf( stderr, "unexpected state of server %u as %d\n",  \
 						_ALL_SERVERS_->at(i).sin_addr.s_addr, this->serversState[ _ALL_SERVERS_->at(i) ]  \
@@ -148,27 +142,27 @@ bool CoordinatorRemapMsgHandler::stop() {
 	} while (0)
 
 
-bool CoordinatorRemapMsgHandler::transitToDegraded( std::vector<struct sockaddr_in> *servers, bool forced ) {
-	RemapStateEvent event;
+bool CoordinatorStateTransitHandler::transitToDegraded( std::vector<struct sockaddr_in> *servers, bool forced ) {
+	StateTransitEvent event;
 	event.start = true;
 	vector<struct sockaddr_in> serversToStart;
 
 	if ( forced ) {
 		for ( uint32_t i = 0, len = servers->size(); i < len; i++ ) {
 			LOCK( &this->serversStateLock[ servers->at(i) ] );
-			this->serversState[ servers->at( i ) ] = REMAP_INTERMEDIATE;
+			this->serversState[ servers->at( i ) ] = STATE_INTERMEDIATE;
 			UNLOCK( &this->serversStateLock[ servers->at(i) ] );
 		}
 		this->broadcastState( *servers );
 		this->insertRepeatedEvents( event, servers );
 	} else {
-		REMAP_PHASE_CHANGE_HANDLER( servers, serversToStart, event );
+		STATE_TRANSIT_PHASE_CHANGE_HANDLER( servers, serversToStart, event );
 	}
 
 	return true;
 }
 
-bool CoordinatorRemapMsgHandler::transitToDegradedEnd( const struct sockaddr_in &server ) {
+bool CoordinatorStateTransitHandler::transitToDegradedEnd( const struct sockaddr_in &server ) {
 	// all operation to server get lock from coordinator
 	Coordinator *coordinator = Coordinator::getInstance();
 	LOCK_T *lock = &coordinator->sockets.servers.lock;
@@ -213,8 +207,8 @@ bool CoordinatorRemapMsgHandler::transitToDegradedEnd( const struct sockaddr_in 
 	return true;
 }
 
-bool CoordinatorRemapMsgHandler::transitToNormal( std::vector<struct sockaddr_in> *servers, bool forced ) {
-	RemapStateEvent event;
+bool CoordinatorStateTransitHandler::transitToNormal( std::vector<struct sockaddr_in> *servers, bool forced ) {
+	StateTransitEvent event;
 	event.start = false;
 	vector<struct sockaddr_in> serversToStop;
 
@@ -232,19 +226,19 @@ bool CoordinatorRemapMsgHandler::transitToNormal( std::vector<struct sockaddr_in
 	if ( forced ) {
 		for ( uint32_t i = 0, len = servers->size(); i < len; i++ ) {
 			LOCK( &this->serversStateLock[ servers->at(i) ] );
-			this->serversState[ servers->at( i ) ] = REMAP_COORDINATED;
+			this->serversState[ servers->at( i ) ] = STATE_COORDINATED;
 			UNLOCK( &this->serversStateLock[ servers->at(i) ] );
 		}
 		this->broadcastState( *servers );
 		this->insertRepeatedEvents( event, servers );
 	} else {
-		REMAP_PHASE_CHANGE_HANDLER( servers, serversToStop, event );
+		STATE_TRANSIT_PHASE_CHANGE_HANDLER( servers, serversToStop, event );
 	}
 
 	return true;
 }
 
-bool CoordinatorRemapMsgHandler::transitToNormalEnd( const struct sockaddr_in &server ) {
+bool CoordinatorStateTransitHandler::transitToNormalEnd( const struct sockaddr_in &server ) {
 	// backward migration before getting back to normal
 	Coordinator *coordinator = Coordinator::getInstance();
 
@@ -255,7 +249,7 @@ bool CoordinatorRemapMsgHandler::transitToNormalEnd( const struct sockaddr_in &s
 	pthread_mutex_init( &lock, 0 );
 	pthread_cond_init( &cond, 0 );
 
-	// REMAP SET
+	// STATE_TRANSIT SET
 	done = false;
 	coordinator->syncRemappedData( server, &lock, &cond, &done );
 
@@ -280,9 +274,9 @@ bool CoordinatorRemapMsgHandler::transitToNormalEnd( const struct sockaddr_in &s
 	return true;
 }
 
-#undef REMAP_PHASE_CHANGE_HANDLER
+#undef STATE_TRANSIT_PHASE_CHANGE_HANDLER
 
-bool CoordinatorRemapMsgHandler::insertRepeatedEvents( RemapStateEvent event, std::vector<struct sockaddr_in> *servers ) {
+bool CoordinatorStateTransitHandler::insertRepeatedEvents( StateTransitEvent event, std::vector<struct sockaddr_in> *servers ) {
 	bool ret = true;
 	uint32_t i = 0;
 	for ( i = 0; i < servers->size(); i++ ) {
@@ -291,7 +285,7 @@ bool CoordinatorRemapMsgHandler::insertRepeatedEvents( RemapStateEvent event, st
 		if ( ! ret )
 			break;
 	}
-	// notify the caller if any server cannot start remapping
+	// notify the caller if any server cannot perform state transition
 	if ( ret )
 		servers->clear();
 	else
@@ -299,21 +293,21 @@ bool CoordinatorRemapMsgHandler::insertRepeatedEvents( RemapStateEvent event, st
 	return ret;
 }
 
-bool CoordinatorRemapMsgHandler::isClientJoin( int service, char *msg, char *subject ) {
+bool CoordinatorStateTransitHandler::isClientJoin( int service, char *msg, char *subject ) {
 	// assume clients name themselves "[PREFIX][0-9]*"
 	return ( this->isMemberJoin( service ) && strncmp( subject + 1, CLIENT_PREFIX , CLIENT_PREFIX_LEN ) == 0 );
 }
 
-bool CoordinatorRemapMsgHandler::isClientLeft( int service, char *msg, char *subject ) {
+bool CoordinatorStateTransitHandler::isClientLeft( int service, char *msg, char *subject ) {
 	// assume clients name themselves "[PREFIX][0-9]*"
 	return ( this->isMemberLeave( service ) && strncmp( subject + 1, CLIENT_PREFIX , CLIENT_PREFIX_LEN ) == 0 );
 }
 
-bool CoordinatorRemapMsgHandler::isServerJoin( int service, char *msg, char *subject ) {
+bool CoordinatorStateTransitHandler::isServerJoin( int service, char *msg, char *subject ) {
 	// assume clients name themselves "[PREFIX][0-9]*"
 	return ( this->isMemberJoin( service ) && strncmp( subject + 1, SERVER_PREFIX , SERVER_PREFIX_LEN ) == 0 );
 }
-bool CoordinatorRemapMsgHandler::isServerLeft( int service, char *msg, char *subject ) {
+bool CoordinatorStateTransitHandler::isServerLeft( int service, char *msg, char *subject ) {
 	// assume clients name themselves "[PREFIX][0-9]*"
 	return ( this->isMemberLeave( service ) && strncmp( subject + 1, SERVER_PREFIX , SERVER_PREFIX_LEN ) == 0 );
 }
@@ -321,7 +315,7 @@ bool CoordinatorRemapMsgHandler::isServerLeft( int service, char *msg, char *sub
 /*
  * packet: [# of servers](1) [ [ip addr](4) [port](2) [state](1) ](7) [..](7) [..](7) ...
  */
-int CoordinatorRemapMsgHandler::sendStateToClients( std::vector<struct sockaddr_in> servers ) {
+int CoordinatorStateTransitHandler::sendStateToClients( std::vector<struct sockaddr_in> servers ) {
 	char group[ 1 ][ MAX_GROUP_NAME ];
 	int recordSize = this->serverStateRecordSize;
 
@@ -336,13 +330,13 @@ int CoordinatorRemapMsgHandler::sendStateToClients( std::vector<struct sockaddr_
 	return sendState( servers, 1, group );
 }
 
-int CoordinatorRemapMsgHandler::sendStateToClients( struct sockaddr_in server ) {
+int CoordinatorStateTransitHandler::sendStateToClients( struct sockaddr_in server ) {
 	std::vector<struct sockaddr_in> servers;
 	servers.push_back( server );
 	return sendStateToClients( servers );
 }
 
-int CoordinatorRemapMsgHandler::broadcastState( std::vector<struct sockaddr_in> servers ) {
+int CoordinatorStateTransitHandler::broadcastState( std::vector<struct sockaddr_in> servers ) {
 	char groups[ MAX_GROUP_NUM ][ MAX_GROUP_NAME ];
 	int recordSize = this->serverStateRecordSize;
 	if ( servers.size() == 0 ) {
@@ -357,13 +351,13 @@ int CoordinatorRemapMsgHandler::broadcastState( std::vector<struct sockaddr_in> 
 	return sendState( servers, 2, groups );
 }
 
-int CoordinatorRemapMsgHandler::broadcastState( struct sockaddr_in server ) {
+int CoordinatorStateTransitHandler::broadcastState( struct sockaddr_in server ) {
 	std::vector<struct sockaddr_in> servers;
 	servers.push_back( server );
 	return broadcastState( servers );
 }
 
-void *CoordinatorRemapMsgHandler::readMessages( void *argv ) {
+void *CoordinatorStateTransitHandler::readMessages( void *argv ) {
 	int ret = 0;
 
 	int service, groups, endian;
@@ -374,7 +368,7 @@ void *CoordinatorRemapMsgHandler::readMessages( void *argv ) {
 
 	bool regular = false, fromClient = false;
 
-	CoordinatorRemapMsgHandler *myself = ( CoordinatorRemapMsgHandler* ) argv;
+	CoordinatorStateTransitHandler *myself = ( CoordinatorStateTransitHandler* ) argv;
 
 	while( myself->isListening ) {
 		ret = SP_receive( myself->mbox, &service, sender, MAX_GROUP_NUM, &groups, targetGroups, &msgType, &endian, MAX_MESSLEN, msg );
@@ -384,22 +378,22 @@ void *CoordinatorRemapMsgHandler::readMessages( void *argv ) {
 		fromClient = ( strncmp( sender, CLIENT_GROUP, CLIENT_GROUP_LEN ) == 0 );
 
 		if ( ret < 0 ) {
-			__ERROR__( "CoordinatorRemapMsgHandler", "readMessage", "Failed to receive messages %d\n", ret );
+			__ERROR__( "CoordinatorStateTransitHandler", "readMessage", "Failed to receive messages %d\n", ret );
 		} else if ( ! regular ) {
 			std::vector<struct sockaddr_in> servers;
 			if ( fromClient && myself->isClientJoin( service , msg, subject ) ) {
 				// client joined ( clients group )
 				myself->addAliveClient( subject );
-				// notify the new client about the remapping state
+				// notify the new client about the states
 				if ( ( ret = myself->sendStateToClients( servers ) ) < 0 )
-					__ERROR__( "CoordinatorRemapMsgHandler", "readMessages", "Failed to broadcast states to clients %d", ret );
+					__ERROR__( "CoordinatorStateTransitHandler", "readMessages", "Failed to broadcast states to clients %d", ret );
 			} else if ( myself->isClientLeft( service, msg, subject ) ) {
 				// client left
 				myself->removeAliveClient( subject );
 			} else if ( myself->isServerJoin( service, msg, subject ) ) {
 				// server join
 				if ( ( ret = myself->broadcastState( servers ) ) < 0 )
-					__ERROR__( "CoordinatorRemapMsgHandler", "readMessages", "Failed to broadcast states to clients %d", ret );
+					__ERROR__( "CoordinatorStateTransitHandler", "readMessages", "Failed to broadcast states to clients %d", ret );
 			} else if ( myself->isServerLeft( service, msg, subject ) ) {
 				// server left
 				// TODO: change state ?
@@ -420,7 +414,7 @@ void *CoordinatorRemapMsgHandler::readMessages( void *argv ) {
 /*
  * packet: [# of servers](1) [ [ip addr](4) [port](2) [state](1) ](7) [..](7) [..](7) ...
  */
-bool CoordinatorRemapMsgHandler::updateState( char *subject, char *msg, int len ) {
+bool CoordinatorStateTransitHandler::updateState( char *subject, char *msg, int len ) {
 
 	// ignore messages that not from clients
 	if ( strncmp( subject + 1, CLIENT_PREFIX, CLIENT_PREFIX_LEN ) != 0 ) {
@@ -442,14 +436,14 @@ bool CoordinatorRemapMsgHandler::updateState( char *subject, char *msg, int len 
 		// ignore changes for non-existing servers or servers in invalid state
 		// TODO sync state with client with invalid state of servers
 		if ( this->serversState.count( server ) == 0 ||
-			( this->serversState[ server ] != REMAP_INTERMEDIATE &&
-			this->serversState[ server ] != REMAP_COORDINATED )
+			( this->serversState[ server ] != STATE_INTERMEDIATE &&
+			this->serversState[ server ] != STATE_COORDINATED )
 		) {
 			continue;
 		}
 		// check if the ack is corresponding to a correct state
-		if ( ( this->serversState[ server ] == REMAP_INTERMEDIATE && state != REMAP_WAIT_DEGRADED ) ||
-			( this->serversState[ server ] == REMAP_COORDINATED && state != REMAP_WAIT_NORMAL ) ) {
+		if ( ( this->serversState[ server ] == STATE_INTERMEDIATE && state != STATE_WAIT_DEGRADED ) ||
+			( this->serversState[ server ] == STATE_COORDINATED && state != STATE_WAIT_NORMAL ) ) {
 			continue;
 		}
 
@@ -473,13 +467,13 @@ bool CoordinatorRemapMsgHandler::updateState( char *subject, char *msg, int len 
 	return true;
 }
 
-void CoordinatorRemapMsgHandler::addAliveClient( char *name ) {
+void CoordinatorStateTransitHandler::addAliveClient( char *name ) {
 	LOCK( &this->clientsLock );
 	aliveClients.insert( string( name ) );
 	UNLOCK( &this->clientsLock );
 }
 
-void CoordinatorRemapMsgHandler::removeAliveClient( char *name ) {
+void CoordinatorStateTransitHandler::removeAliveClient( char *name ) {
 	LOCK( &this->clientsLock );
 	aliveClients.erase( string( name ) );
 	UNLOCK( &this->clientsLock );
@@ -491,7 +485,7 @@ void CoordinatorRemapMsgHandler::removeAliveClient( char *name ) {
 	UNLOCK( &this->clientsAckLock );
 }
 
-bool CoordinatorRemapMsgHandler::addAliveServer( struct sockaddr_in server ) {
+bool CoordinatorStateTransitHandler::addAliveServer( struct sockaddr_in server ) {
 	// alive servers list
 	LOCK( &this->aliveServersLock );
 	if ( this->aliveServers.count( server ) > 0 ) {
@@ -503,7 +497,7 @@ bool CoordinatorRemapMsgHandler::addAliveServer( struct sockaddr_in server ) {
 	// add the state
 	LOCK_INIT( &this->serversStateLock[ server ] );
 	LOCK( &this->serversStateLock[ server ] );
-	serversState[ server ] = REMAP_NORMAL;
+	serversState[ server ] = STATE_NORMAL;
 	UNLOCK( &this->serversStateLock [ server ] );
 	// client ack pool
 	LOCK( &this->clientsAckLock );
@@ -514,7 +508,7 @@ bool CoordinatorRemapMsgHandler::addAliveServer( struct sockaddr_in server ) {
 	return true;
 }
 
-bool CoordinatorRemapMsgHandler::addCrashedServer( struct sockaddr_in server ) {
+bool CoordinatorStateTransitHandler::addCrashedServer( struct sockaddr_in server ) {
 	LOCK( &this->aliveServersLock );
 	if ( this->crashedServers.count( server ) > 0 ) {
 		UNLOCK( &this->aliveServersLock );
@@ -525,7 +519,7 @@ bool CoordinatorRemapMsgHandler::addCrashedServer( struct sockaddr_in server ) {
 	return true;
 }
 
-bool CoordinatorRemapMsgHandler::removeAliveServer( struct sockaddr_in server ) {
+bool CoordinatorStateTransitHandler::removeAliveServer( struct sockaddr_in server ) {
 	// alive servers list
 	LOCK( &this->aliveServersLock );
 	if ( this->aliveServers.count( server ) == 0 ) {
@@ -551,7 +545,7 @@ bool CoordinatorRemapMsgHandler::removeAliveServer( struct sockaddr_in server ) 
 	return true;
 }
 
-bool CoordinatorRemapMsgHandler::resetClientAck( struct sockaddr_in server ) {
+bool CoordinatorStateTransitHandler::resetClientAck( struct sockaddr_in server ) {
 	LOCK( &this->clientsAckLock );
 	// abort reset if server does not exists
 	if ( ackClients.count( server ) == 0 ) {
@@ -563,7 +557,7 @@ bool CoordinatorRemapMsgHandler::resetClientAck( struct sockaddr_in server ) {
 	return true;
 }
 
-bool CoordinatorRemapMsgHandler::isAllClientAcked( struct sockaddr_in server ) {
+bool CoordinatorStateTransitHandler::isAllClientAcked( struct sockaddr_in server ) {
 	bool allAcked = false;
 	char buf[ INET_ADDRSTRLEN ];
 	inet_ntop( AF_INET, &server.sin_addr.s_addr, buf, INET_ADDRSTRLEN );
@@ -575,58 +569,35 @@ bool CoordinatorRemapMsgHandler::isAllClientAcked( struct sockaddr_in server ) {
 	}
 	allAcked = ( aliveClients.size() == ackClients[ server ]->size() );
 	if ( allAcked ) {
-		/*
-		printf( "Server %s:%hu changes its state to: (%d) ", buf, ntohs( server.sin_port ), this->serversState[ server ] );
-		switch( this->serversState[ server ] ) {
-			case REMAP_UNDEFINED:
-				printf( "REMAP_UNDEFINED\n" );
-				break;
-			case REMAP_NORMAL:
-				printf( "REMAP_NORMAL\n" );
-				break;
-			case REMAP_INTERMEDIATE:
-				printf( "REMAP_INTERMEDIATE\n" );
-				break;
-			case REMAP_DEGRADED:
-				printf( "REMAP_DEGRADED\n" );
-				break;
-			case REMAP_COORDINATED:
-				printf( "REMAP_COORDINATED\n" );
-				break;
-			default:
-				printf( "UNKNOWN\n" );
-				break;
-		}
-		*/
 		pthread_cond_broadcast( &this->ackSignal[ server ] );
 	}
 	UNLOCK( &this->clientsAckLock );
 	return allAcked;
 }
 
-bool CoordinatorRemapMsgHandler::isInTransition( const struct sockaddr_in &server ) {
+bool CoordinatorStateTransitHandler::isInTransition( const struct sockaddr_in &server ) {
 	bool ret;
 	LOCK( &this->serversStateLock[ server ] );
-	ret = ( serversState[ server ] == REMAP_INTERMEDIATE ) || ( serversState[ server ] == REMAP_COORDINATED );
+	ret = ( serversState[ server ] == STATE_INTERMEDIATE ) || ( serversState[ server ] == STATE_COORDINATED );
 	UNLOCK( &this->serversStateLock[ server ] );
 	return ret;
 }
 
-bool CoordinatorRemapMsgHandler::allowRemapping( const struct sockaddr_in &server ) {
+bool CoordinatorStateTransitHandler::allowRemapping( const struct sockaddr_in &server ) {
 	bool ret;
 	LOCK( &this->serversStateLock[ server ] );
-	ret = ( serversState[ server ] == REMAP_INTERMEDIATE ) || ( serversState[ server ] == REMAP_DEGRADED );
+	ret = ( serversState[ server ] == STATE_INTERMEDIATE ) || ( serversState[ server ] == STATE_DEGRADED );
 	UNLOCK( &this->serversStateLock[ server ] );
 	return ret;
 }
 
-bool CoordinatorRemapMsgHandler::reachMaximumRemapped( uint32_t maximum ) {
+bool CoordinatorStateTransitHandler::reachMaximumRemapped( uint32_t maximum ) {
 	uint32_t count = 0;
 	LOCK( &this->aliveServersLock );
 	for ( auto it = this->aliveServers.begin(); it != this->aliveServers.end(); it++ ) {
 		const struct sockaddr_in &server = ( *it );
 		// LOCK( &this->serversStateLock[ server ] );
-		if ( serversState[ server ] != REMAP_NORMAL ) {
+		if ( serversState[ server ] != STATE_NORMAL ) {
 			count++;
 		}
 		// UNLOCK( &this->serversStateLock[ server ] );

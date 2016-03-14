@@ -8,7 +8,7 @@
 #include "../ds/pending.hh"
 #include "../ds/stats.hh"
 #include "../event/event_queue.hh"
-#include "../remap/remap_msg_handler.hh"
+#include "../state_transit/state_transit_handler.hh"
 #include "../socket/application_socket.hh"
 #include "../socket/coordinator_socket.hh"
 #include "../socket/client_socket.hh"
@@ -69,7 +69,7 @@ public:
 	PacketPool packetPool;
 	StripeList<ServerSocket> *stripeList;
 	/* Remapping */
-	ClientRemapMsgHandler remapMsgHandler;
+	ClientStateTransitHandler stateTransitHandler;
 	/* Loading statistics */
 	ServerLoading serverLoading;
 	OverloadedServer overloadedServer;

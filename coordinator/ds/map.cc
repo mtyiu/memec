@@ -67,12 +67,12 @@ bool Map::insertKey( char *keyStr, uint8_t keySize, uint32_t listId, uint32_t st
 
 	switch( opcode ) {
 		case PROTO_OPCODE_SET:
-		case PROTO_OPCODE_REMAPPING_SET:
+		case PROTO_OPCODE_DEGRADED_SET:
 			if ( exist ) {
 				if ( it->second.timestamp > timestamp ) {
 					switch( it->second.opcode ) {
 						case PROTO_OPCODE_SET:
-						case PROTO_OPCODE_REMAPPING_SET:
+						case PROTO_OPCODE_DEGRADED_SET:
 							// Replace with the latest record
 							it->second = opMetadata;
 							break;

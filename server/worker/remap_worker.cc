@@ -57,14 +57,14 @@ bool ServerWorker::handleRemappedData( CoordinatorEvent event, char *buf, size_t
 	return false;
 }
 
-bool ServerWorker::handleRemappingSetRequest( ClientEvent event, char *buf, size_t size ) {
-	struct RemappingSetHeader header;
-	if ( ! this->protocol.parseRemappingSetHeader( header, buf, size ) ) {
-		__ERROR__( "ServerWorker", "handleRemappingSetRequest", "Invalid REMAPPING_SET request (size = %lu).", size );
+bool ServerWorker::handleDegradedSetRequest( ClientEvent event, char *buf, size_t size ) {
+	struct DegradedSetHeader header;
+	if ( ! this->protocol.parseDegradedSetHeader( header, buf, size ) ) {
+		__ERROR__( "ServerWorker", "handleDegradedSetRequest", "Invalid DEGRADED_SET request (size = %lu).", size );
 		return false;
 	}
 	__DEBUG__(
-		BLUE, "ServerWorker", "handleRemappingSetRequest",
+		BLUE, "ServerWorker", "handleDegradedSetRequest",
 		"[SET] Key: %.*s (key size = %u); Value: (value size = %u); list ID = %u, chunk ID = %u.",
 		( int ) header.keySize, header.key, header.keySize, header.valueSize,
 		header.listId, header.chunkId
@@ -113,7 +113,7 @@ bool ServerWorker::handleRemappingSetRequest( ClientEvent event, char *buf, size
 
 		if ( bufferRemapData ) {
 			__ERROR__(
-				"ServerWorker", "handleRemappingSetRequest",
+				"ServerWorker", "handleDegradedSetRequest",
 				"Performing remapping data buffering: (original: (%u, %u)).",
 				header.listId, header.chunkId
 			);
@@ -148,7 +148,7 @@ bool ServerWorker::handleRemappingSetRequest( ClientEvent event, char *buf, size
 			this,
 			header.key, header.keySize,
 			header.value, header.valueSize,
-			PROTO_OPCODE_REMAPPING_SET, timestamp,
+			PROTO_OPCODE_DEGRADED_SET, timestamp,
 			stripeId, dataChunkId,
 			&isSealed, &sealed,
 			this->chunks, this->dataChunk, this->parityChunk,
@@ -167,7 +167,7 @@ bool ServerWorker::handleRemappingSetRequest( ClientEvent event, char *buf, size
 
 	Key key;
 	key.set( header.keySize, header.key );
-	event.resRemappingSet(
+	event.resDegradedSet(
 		event.socket, event.instanceId, event.requestId, success, key,
 		header.listId, header.chunkId,
 		header.original, header.remapped, header.remappedCount,
@@ -178,17 +178,17 @@ bool ServerWorker::handleRemappingSetRequest( ClientEvent event, char *buf, size
 	return true;
 }
 
-bool ServerWorker::handleRemappingSetRequest( ServerPeerEvent event, char *buf, size_t size ) {
-	__ERROR__( "ServerWorker", "handleRemappingSetRequest", "Why remapping SET request is sent by server peer?" );
+bool ServerWorker::handleDegradedSetRequest( ServerPeerEvent event, char *buf, size_t size ) {
+	__ERROR__( "ServerWorker", "handleDegradedSetRequest", "Why remapping SET request is sent by server peer?" );
 	return false;
 	/*
-	struct RemappingSetHeader header;
-	if ( ! this->protocol.parseRemappingSetHeader( header, buf, size ) ) {
-		__ERROR__( "ServerWorker", "handleRemappingSetRequest", "Invalid REMAPPING_SET request (size = %lu).", size );
+	struct DegradedSetHeader header;
+	if ( ! this->protocol.parseDegradedSetHeader( header, buf, size ) ) {
+		__ERROR__( "ServerWorker", "handleDegradedSetRequest", "Invalid DEGRADED_SET request (size = %lu).", size );
 		return false;
 	}
 	__DEBUG__(
-		BLUE, "ServerWorker", "handleRemappingSetRequest",
+		BLUE, "ServerWorker", "handleDegradedSetRequest",
 		"[SET] Key: %.*s (key size = %u); Value: (value size = %u); list ID = %u, chunk ID = %u; needs forwarding? %s",
 		( int ) header.keySize, header.key, header.keySize, header.valueSize,
 		header.listId, header.chunkId, header.needsForwarding ? "true" : "false"
@@ -201,7 +201,7 @@ bool ServerWorker::handleRemappingSetRequest( ServerPeerEvent event, char *buf, 
 		this,
 		header.key, header.keySize,
 		header.value, header.valueSize,
-		PROTO_OPCODE_REMAPPING_SET, timestamp,
+		PROTO_OPCODE_DEGRADED_SET, timestamp,
 		stripeId,
 		ServerWorker::chunkBuffer->at( header.listId )->getChunkId(),
 		&isSealed, &sealed,
@@ -210,25 +210,25 @@ bool ServerWorker::handleRemappingSetRequest( ServerPeerEvent event, char *buf, 
 
 	Key key;
 	key.set( header.keySize, header.key );
-	event.resRemappingSet( event.socket, event.instanceId, event.requestId, key, header.listId, header.chunkId, true );
+	event.resDegradedSet( event.socket, event.instanceId, event.requestId, key, header.listId, header.chunkId, true );
 	this->dispatch( event );
 
 	return true;
 	*/
 }
 
-bool ServerWorker::handleRemappingSetResponse( ServerPeerEvent event, bool success, char *buf, size_t size ) {
-	__ERROR__( "ServerWorker", "handleRemappingSetRequest", "Why remapping SET response is received by server peer?" );
+bool ServerWorker::handleDegradedSetResponse( ServerPeerEvent event, bool success, char *buf, size_t size ) {
+	__ERROR__( "ServerWorker", "handleDegradedSetRequest", "Why remapping SET response is received by server peer?" );
 	return false;
 	/*
 	struct RemappingLockHeader header;
 	if ( ! this->protocol.parseRemappingLockHeader( header, buf, size ) ) {
-		__ERROR__( "ServerWorker", "handleRemappingSetResponse", "Invalid REMAPPING_SET response (size = %lu).", size );
+		__ERROR__( "ServerWorker", "handleDegradedSetResponse", "Invalid DEGRADED_SET response (size = %lu).", size );
 		return false;
 	}
 	__DEBUG__(
-		BLUE, "ServerWorker", "handleRemappingSetResponse",
-		"[REMAPPING_SET] Key: %.*s (key size = %u); list ID: %u, chunk ID: %u",
+		BLUE, "ServerWorker", "handleDegradedSetResponse",
+		"[DEGRADED_SET] Key: %.*s (key size = %u); list ID: %u, chunk ID: %u",
 		( int ) header.keySize, header.key, header.keySize, header.listId, header.chunkId
 	);
 
@@ -236,25 +236,25 @@ bool ServerWorker::handleRemappingSetResponse( ServerPeerEvent event, bool succe
 	PendingIdentifier pid;
 	RemappingRecordKey record;
 
-	if ( ! ServerWorker::pending->eraseRemappingRecordKey( PT_SERVER_PEER_REMAPPING_SET, event.instanceId, event.requestId, event.socket, &pid, &record, true, false ) ) {
+	if ( ! ServerWorker::pending->eraseRemappingRecordKey( PT_SERVER_PEER_DEGRADED_SET, event.instanceId, event.requestId, event.socket, &pid, &record, true, false ) ) {
 		UNLOCK( &ServerWorker::pending->serverPeers.remappingSetLock );
-		__ERROR__( "ServerWorker", "handleRemappingSetResponse", "Cannot find a pending server REMAPPING_SET request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
+		__ERROR__( "ServerWorker", "handleDegradedSetResponse", "Cannot find a pending server DEGRADED_SET request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		return false;
 	}
 	// Check pending server UPDATE requests
-	pending = ServerWorker::pending->count( PT_SERVER_PEER_REMAPPING_SET, pid.instanceId, pid.requestId, false, true );
+	pending = ServerWorker::pending->count( PT_SERVER_PEER_DEGRADED_SET, pid.instanceId, pid.requestId, false, true );
 
-	__DEBUG__( BLUE, "ServerWorker", "handleRemappingSetResponse", "Pending server REMAPPING_SET requests = %d (%s).", pending, success ? "success" : "fail" );
+	__DEBUG__( BLUE, "ServerWorker", "handleDegradedSetResponse", "Pending server DEGRADED_SET requests = %d (%s).", pending, success ? "success" : "fail" );
 	if ( pending == 0 ) {
-		// Only send client REMAPPING_SET response when the number of pending server REMAPPING_SET requests equal 0
+		// Only send client DEGRADED_SET response when the number of pending server DEGRADED_SET requests equal 0
 		ClientEvent clientEvent;
 
-		if ( ! ServerWorker::pending->eraseRemappingRecordKey( PT_CLIENT_REMAPPING_SET, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &record ) ) {
-			__ERROR__( "ServerWorker", "handleRemappingSetResponse", "Cannot find a pending client REMAPPING_SET request that matches the response. This message will be discarded." );
+		if ( ! ServerWorker::pending->eraseRemappingRecordKey( PT_CLIENT_DEGRADED_SET, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &record ) ) {
+			__ERROR__( "ServerWorker", "handleDegradedSetResponse", "Cannot find a pending client DEGRADED_SET request that matches the response. This message will be discarded." );
 			return false;
 		}
 
-		clientEvent.resRemappingSet(
+		clientEvent.resDegradedSet(
 			( ClientSocket * ) pid.ptr, pid.instanceId, pid.requestId, record.key,
 			record.remap.listId, record.remap.chunkId, success, true,
 			header.sockfd, header.isRemapped

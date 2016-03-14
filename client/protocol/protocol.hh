@@ -76,12 +76,12 @@ public:
 	);
 
 	// ---------- remap_protocol.cc ----------
-	char *reqRemappingSetLock(
+	char *reqDegradedSetLock(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		uint32_t *original, uint32_t *remapped, uint32_t remappedCount,
 		char *key, uint8_t keySize
 	);
-	char *reqRemappingSet(
+	char *reqDegradedSet(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t chunkId,
 		uint32_t *original, uint32_t *remapped, uint32_t remappedCount,

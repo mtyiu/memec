@@ -49,13 +49,13 @@ void ClientEvent::resSet( ClientSocket *socket, uint16_t instanceId, uint32_t re
 	this->message.set.sealedChunkId = sealedChunkId;
 }
 
-void ClientEvent::resRemappingSet(
+void ClientEvent::resDegradedSet(
 	ClientSocket *socket, uint16_t instanceId, uint32_t requestId, bool success,
 	Key &key, uint32_t listId, uint32_t chunkId,
 	uint32_t *original, uint32_t *remapped, uint32_t remappedCount,
 	bool needsFree
 ) {
-	this->type = success ? CLIENT_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS : CLIENT_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE;
+	this->type = success ? CLIENT_EVENT_TYPE_DEGRADED_SET_RESPONSE_SUCCESS : CLIENT_EVENT_TYPE_DEGRADED_SET_RESPONSE_FAILURE;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->needsFree = needsFree;

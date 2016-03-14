@@ -28,7 +28,7 @@ OBJS= \
 	protocol/recovery_protocol.o \
 	protocol/remap_protocol.o \
 	protocol/seal_protocol.o \
-	remap/remap_msg_handler.o \
+	state_transit/state_transit_handler.o \
 	socket/socket.o \
 	socket/epoll.o
 

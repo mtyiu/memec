@@ -13,8 +13,8 @@ void ServerPeerEvent::resRegister( ServerPeerSocket *socket, uint16_t instanceId
 	this->socket = socket;
 }
 
-void ServerPeerEvent::resRemappingSet( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, uint32_t listId, uint32_t chunkId, bool success ) {
-	this->type = success ? SERVER_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS : SERVER_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE;
+void ServerPeerEvent::resDegradedSet( ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, uint32_t listId, uint32_t chunkId, bool success ) {
+	this->type = success ? SERVER_PEER_EVENT_TYPE_DEGRADED_SET_RESPONSE_SUCCESS : SERVER_PEER_EVENT_TYPE_DEGRADED_SET_RESPONSE_FAILURE;
 	this->instanceId = instanceId;
 	this->requestId = requestId;
 	this->socket = socket;

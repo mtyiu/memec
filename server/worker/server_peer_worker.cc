@@ -194,13 +194,13 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 				success
 			);
 			break;
-		case SERVER_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS:
-			__ERROR__( "ServerWorker", "dispatch", "SERVER_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_SUCCESS is not supported." );
+		case SERVER_PEER_EVENT_TYPE_DEGRADED_SET_RESPONSE_SUCCESS:
+			__ERROR__( "ServerWorker", "dispatch", "SERVER_PEER_EVENT_TYPE_DEGRADED_SET_RESPONSE_SUCCESS is not supported." );
 			success = true; // default is false
 			break;
-		case SERVER_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE:
-			__ERROR__( "ServerWorker", "dispatch", "SERVER_PEER_EVENT_TYPE_REMAPPING_SET_RESPONSE_FAILURE is not supported." );
-			// buffer.data = this->protocol.resRemappingSet(
+		case SERVER_PEER_EVENT_TYPE_DEGRADED_SET_RESPONSE_FAILURE:
+			__ERROR__( "ServerWorker", "dispatch", "SERVER_PEER_EVENT_TYPE_DEGRADED_SET_RESPONSE_FAILURE is not supported." );
+			// buffer.data = this->protocol.resDegradedSet(
 			// 	buffer.size,
 			// 	false, // toClient
 			// 	event.instanceId, event.requestId,
@@ -551,16 +551,16 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 							break;
 					}
 					break;
-				case PROTO_OPCODE_REMAPPING_SET:
+				case PROTO_OPCODE_DEGRADED_SET:
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
-							this->handleRemappingSetRequest( event, buffer.data, header.length );
+							this->handleDegradedSetRequest( event, buffer.data, header.length );
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
-							this->handleRemappingSetResponse( event, true, buffer.data, header.length );
+							this->handleDegradedSetResponse( event, true, buffer.data, header.length );
 							break;
 						case PROTO_MAGIC_RESPONSE_FAILURE:
-							this->handleRemappingSetResponse( event, false, buffer.data, header.length );
+							this->handleDegradedSetResponse( event, false, buffer.data, header.length );
 							break;
 						default:
 							__ERROR__( "ServerWorker", "dispatch", "Invalid magic code from server: 0x%x.", header.magic );

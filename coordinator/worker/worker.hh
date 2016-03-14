@@ -39,7 +39,7 @@ private:
 	bool processHeartbeat( ServerEvent event, char *buf, size_t size );
 
 	// ---------- remap_worker.cc ----------
-	bool handleRemappingSetLockRequest( ClientEvent event, char* buf, size_t size );
+	bool handleDegradedSetLockRequest( ClientEvent event, char* buf, size_t size );
 
 	// ---------- degraded_worker.cc ----------
 	bool handleDegradedLockRequest( ClientEvent event, char *buf, size_t size );

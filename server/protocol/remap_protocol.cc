@@ -1,6 +1,6 @@
 #include "protocol.hh"
 
-char *ServerProtocol::resRemappingSet(
+char *ServerProtocol::resDegradedSet(
 	size_t &size, bool toClient,
 	uint16_t instanceId, uint32_t requestId, bool success,
 	uint32_t listId, uint32_t chunkId,
@@ -8,10 +8,10 @@ char *ServerProtocol::resRemappingSet(
 	uint8_t keySize, char *key
 ) {
 	// -- common/protocol/remap_protocol.cc --
-	size = this->generateRemappingSetHeader(
+	size = this->generateDegradedSetHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 		toClient ? PROTO_MAGIC_TO_CLIENT : PROTO_MAGIC_TO_SERVER,
-		PROTO_OPCODE_REMAPPING_SET,
+		PROTO_OPCODE_DEGRADED_SET,
 		instanceId, requestId,
 		listId, chunkId,
 		original, remapped, remappedCount,

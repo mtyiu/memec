@@ -58,7 +58,7 @@ public:
 	);
 
 	// ---------- remap_protocol.cc ----------
-	char *resRemappingSet(
+	char *resDegradedSet(
 		size_t &size, bool toClient,
 		uint16_t instanceId, uint32_t requestId, bool success,
 		uint32_t listId, uint32_t chunkId,

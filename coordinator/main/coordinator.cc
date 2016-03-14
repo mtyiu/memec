@@ -58,7 +58,7 @@ void Coordinator::switchPhase( std::set<struct sockaddr_in> prevOverloadedServer
 	if ( curOverloadedServerCount > totalServerCount * startThreshold ) { // Phase 1 --> 2
 		// __INFO__( YELLOW, "Coordinator", "switchPhase", "%lf: Overload detected (overloaded server = %u).", this->getElapsedTime(), curOverloadedServerCount );
 
-		if ( this->config.coordinator.states.maximum > 0 && ( curOverloadedServerCount > this->config.coordinator.states.maximum || this->remapMsgHandler->reachMaximumRemapped( this->config.coordinator.states.maximum ) ) ) {
+		if ( this->config.coordinator.states.maximum > 0 && ( curOverloadedServerCount > this->config.coordinator.states.maximum || this->stateTransitHandler->reachMaximumRemapped( this->config.coordinator.states.maximum ) ) ) {
 			// Limit the number of remapped servers
 			UNLOCK( &this->overloadedServers.lock );
 			return;
@@ -315,15 +315,15 @@ bool Coordinator::init( char *path, OptionList &options, bool verbose ) {
 		char coordName[ 11 ];
 		memset( coordName, 0, 11 );
 		sprintf( coordName, "%s%04d", COORD_PREFIX, this->config.coordinator.coordinator.addr.id );
-		remapMsgHandler = CoordinatorRemapMsgHandler::getInstance();
-		remapMsgHandler->init( this->config.global.states.spreaddAddr.addr, this->config.global.states.spreaddAddr.port, coordName );
-		// add the server addrs to remapMsgHandler
+		stateTransitHandler = CoordinatorStateTransitHandler::getInstance();
+		stateTransitHandler->init( this->config.global.states.spreaddAddr.addr, this->config.global.states.spreaddAddr.port, coordName );
+		// add the server addrs to stateTransitHandler
 		LOCK( &this->sockets.servers.lock );
 		for ( uint32_t i = 0; i < this->sockets.servers.size(); i++ ) {
-			remapMsgHandler->addAliveServer( this->sockets.servers.values[ i ]->getAddr() );
+			stateTransitHandler->addAliveServer( this->sockets.servers.values[ i ]->getAddr() );
 		}
 		UNLOCK( &this->sockets.servers.lock );
-		//remapMsgHandler->listAliveServers();
+		//stateTransitHandler->listAliveServers();
 	}
 
 	/* Smoothing factor */
@@ -374,7 +374,7 @@ bool Coordinator::start() {
 	}
 
 	/* Remapping message handler */
-	if ( ! this->config.global.states.disabled && ! this->remapMsgHandler->start() ) {
+	if ( ! this->config.global.states.disabled && ! this->stateTransitHandler->start() ) {
 		__ERROR__( "Coordinator", "start", "Cannot start remapping message handler." );
 		return false;
 	}
@@ -427,8 +427,8 @@ bool Coordinator::stop() {
 	/* Remapping message handler */
 	printf( "Stopping remapping message handler...\n" );
 	if ( ! this->config.global.states.disabled ) {
-		this->remapMsgHandler->stop();
-		this->remapMsgHandler->quit();
+		this->stateTransitHandler->stop();
+		this->stateTransitHandler->quit();
 	}
 
 	/* Loading stats */
@@ -591,7 +591,7 @@ void Coordinator::debug( FILE *f ) {
 
 	if ( ! this->config.global.states.disabled ) {
 		fprintf( f, "\nRemapping handler event queue\n------------------\n" );
-		this->remapMsgHandler->eventQueue->print();
+		this->stateTransitHandler->eventQueue->print();
 	}
 
 	fprintf( f, "\n" );
@@ -746,7 +746,7 @@ void Coordinator::printRemapping( FILE *f ) {
 	if ( ! this->config.global.states.disabled ) {
 		fprintf( f, "\nList of Tracking Servers\n" );
 		fprintf( f, "----------------------------------------\n" );
-		this->remapMsgHandler->listAliveServers();
+		this->stateTransitHandler->listAliveServers();
 	}
 }
 

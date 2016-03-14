@@ -189,13 +189,13 @@ bool Server::init( char *path, OptionList &options, bool verbose ) {
 		char serverName[ 11 ];
 		memset( serverName, 0, 11 );
 		sprintf( serverName, "%s%04d", SERVER_PREFIX, this->config.server.server.addr.id );
-		remapMsgHandler.init( this->config.global.states.spreaddAddr.addr, this->config.global.states.spreaddAddr.port, serverName );
+		stateTransitHandler.init( this->config.global.states.spreaddAddr.addr, this->config.global.states.spreaddAddr.port, serverName );
 		LOCK( &this->sockets.serverPeers.lock );
 		for ( uint32_t i = 0; i < this->sockets.serverPeers.size(); i++ ) {
-			remapMsgHandler.addAliveServer( this->sockets.serverPeers.values[ i ]->getAddr() );
+			stateTransitHandler.addAliveServer( this->sockets.serverPeers.values[ i ]->getAddr() );
 		}
 		UNLOCK( &this->sockets.serverPeers.lock );
-		remapMsgHandler.listAliveServers();
+		stateTransitHandler.listAliveServers();
 	}
 
 	// Set signal handlers //
@@ -284,7 +284,7 @@ bool Server::start() {
 	}
 
 	/* Remapping message handler */
-	if ( ! this->config.global.states.disabled && ! this->remapMsgHandler.start() ) {
+	if ( ! this->config.global.states.disabled && ! this->stateTransitHandler.start() ) {
 		__ERROR__( "Server", "start", "Cannot start remapping message handler." );
 		return false;
 	}
@@ -334,8 +334,8 @@ bool Server::stop() {
 
 	 /* Remapping message handler */
 	if ( ! this->config.global.states.disabled ) {
-		this->remapMsgHandler.stop();
-		this->remapMsgHandler.quit();
+		this->stateTransitHandler.stop();
+		this->stateTransitHandler.quit();
 	}
 
 	/* Chunk buffer */
@@ -1078,7 +1078,7 @@ void Server::printRemapping( FILE *f ) {
 		"\nList of Tracking Servers\n"
 		"------------------------\n"
 	);
-	this->remapMsgHandler.listAliveServers();
+	this->stateTransitHandler.listAliveServers();
 }
 
 void Server::time() {

@@ -76,12 +76,12 @@ bool Protocol::parseRemappingLockHeader( struct RemappingLockHeader &header, cha
 	);
 }
 
-size_t Protocol::generateRemappingSetHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t *original, uint32_t *remapped, uint32_t remappedCount, uint8_t keySize, char *key, uint32_t valueSize, char *value, char *sendBuf ) {
+size_t Protocol::generateDegradedSetHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t *original, uint32_t *remapped, uint32_t remappedCount, uint8_t keySize, char *key, uint32_t valueSize, char *value, char *sendBuf ) {
 	if ( ! sendBuf ) sendBuf = this->buffer.send;
 	char *buf = sendBuf + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader(
 		magic, to, opcode,
-		PROTO_REMAPPING_SET_SIZE + keySize + valueSize + remappedCount * 4 * 4,
+		PROTO_DEGRADED_SET_SIZE + keySize + valueSize + remappedCount * 4 * 4,
 		instanceId, requestId, sendBuf
 	);
 
@@ -127,8 +127,8 @@ size_t Protocol::generateRemappingSetHeader( uint8_t magic, uint8_t to, uint8_t 
 	return bytes;
 }
 
-bool Protocol::parseRemappingSetHeader( size_t offset, uint32_t &listId, uint32_t &chunkId, uint32_t *&original, uint32_t *&remapped, uint32_t &remappedCount, uint8_t &keySize, char *&key, uint32_t &valueSize, char *&value, char *buf, size_t size ) {
-	if ( size - offset < PROTO_REMAPPING_SET_SIZE )
+bool Protocol::parseDegradedSetHeader( size_t offset, uint32_t &listId, uint32_t &chunkId, uint32_t *&original, uint32_t *&remapped, uint32_t &remappedCount, uint8_t &keySize, char *&key, uint32_t &valueSize, char *&value, char *buf, size_t size ) {
+	if ( size - offset < PROTO_DEGRADED_SET_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
@@ -147,7 +147,7 @@ bool Protocol::parseRemappingSetHeader( size_t offset, uint32_t &listId, uint32_
 	valueSize = ntohl( valueSize );
 	ptr += 3;
 
-	if ( size - offset < PROTO_REMAPPING_SET_SIZE + keySize + valueSize + remappedCount * 4 * 4 )
+	if ( size - offset < PROTO_DEGRADED_SET_SIZE + keySize + valueSize + remappedCount * 4 * 4 )
 		return false;
 
 	key = ptr;
@@ -171,12 +171,12 @@ bool Protocol::parseRemappingSetHeader( size_t offset, uint32_t &listId, uint32_
 	return true;
 }
 
-bool Protocol::parseRemappingSetHeader( struct RemappingSetHeader &header, char *buf, size_t size, size_t offset, struct sockaddr_in *target ) {
+bool Protocol::parseDegradedSetHeader( struct DegradedSetHeader &header, char *buf, size_t size, size_t offset, struct sockaddr_in *target ) {
 	if ( ! buf || ! size ) {
 		buf = this->buffer.recv;
 		size = this->buffer.size;
 	}
-	return this->parseRemappingSetHeader(
+	return this->parseDegradedSetHeader(
 		offset,
 		header.listId,
 		header.chunkId,

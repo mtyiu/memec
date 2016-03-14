@@ -41,11 +41,11 @@ bool CoordinatorWorker::handleDegradedLockRequest( ClientEvent event, char *buf,
 
 	uint8_t numSurvivingChunkIds = 0;
 	uint32_t ptr = 0;
-	CoordinatorRemapMsgHandler *crmh = CoordinatorRemapMsgHandler::getInstance();
+	CoordinatorStateTransitHandler *csth = CoordinatorStateTransitHandler::getInstance();
 	for ( uint32_t i = 0; i < CoordinatorWorker::chunkCount; i++ ) {
 		ServerSocket *s = CoordinatorWorker::stripeList->get( listId, i );
 		struct sockaddr_in addr = s->getAddr();
-		if ( ! crmh->allowRemapping( addr ) ) {
+		if ( ! csth->allowRemapping( addr ) ) {
 			numSurvivingChunkIds++;
 			this->survivingChunkIds[ ptr++ ] = i;
 		}
@@ -71,7 +71,7 @@ bool CoordinatorWorker::handleDegradedLockRequest( ClientEvent event, char *buf,
 				header.original[ i * 2 + 1 ]
 			);
 			struct sockaddr_in addr = s->getAddr();
-			if ( ! crmh->allowRemapping( addr ) ) {
+			if ( ! csth->allowRemapping( addr ) ) {
 				for ( uint32_t j = i; j < header.reconstructedCount - 1; j++ ) {
 					header.original[ j * 2     ] = header.original[ ( j + 1 ) * 2     ];
 					header.original[ j * 2 + 1 ] = header.original[ ( j + 1 ) * 2 + 1 ];

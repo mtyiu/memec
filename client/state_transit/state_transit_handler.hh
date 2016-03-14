@@ -1,12 +1,12 @@
-#ifndef __CLIENT_REMAP_REMAP_MSG_HANDLER_HH__
-#define __CLIENT_REMAP_REMAP_MSG_HANDLER_HH__
+#ifndef __CLIENT_STATE_TRANSIT_STATE_TRANSIT_MSG_HANDLER_HH__
+#define __CLIENT_STATE_TRANSIT_STATE_TRANSIT_MSG_HANDLER_HH__
 
 #include <unordered_map>
 #include <unordered_set>
 #include "../../common/ds/sockaddr_in.hh"
 #include "../../common/lock/lock.hh"
-#include "../../common/remap/remap_msg_handler.hh"
-#include "../../common/remap/remap_group.hh"
+#include "../../common/state_transit/state_transit_handler.hh"
+#include "../../common/state_transit/state_transit_group.hh"
 
 class StateTransitInfo {
 public:
@@ -105,7 +105,7 @@ public:
 	}
 };
 
-class ClientRemapMsgHandler : public RemapMsgHandler {
+class ClientStateTransitHandler : public StateTransitHandler {
 private:
 	bool isListening;
 
@@ -133,8 +133,8 @@ private:
 public:
 	std::unordered_map<struct sockaddr_in, StateTransitInfo> stateTransitInfo;
 
-	ClientRemapMsgHandler();
-	~ClientRemapMsgHandler();
+	ClientStateTransitHandler();
+	~ClientStateTransitHandler();
 
 	bool init( const int ip, const int port, const char *user = NULL );
 	void quit();

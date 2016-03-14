@@ -1,5 +1,5 @@
-#ifndef __COMMON_REMAP_REMAP_MSG_HANDLER_HH__
-#define __COMMON_REMAP_REMAP_MSG_HANDLER_HH__
+#ifndef __COMMON_STATE_TRANSIT_STATE_TRANSIT_MSG_HANDLER_HH__
+#define __COMMON_STATE_TRANSIT_STATE_TRANSIT_MSG_HANDLER_HH__
 
 #include <cstdio>
 #include <map>
@@ -8,7 +8,7 @@
 #include <sys/types.h>
 #include <pthread.h>
 #include <sp.h>
-#include "remap_state.hh"
+#include "state_transit_state.hh"
 #include "../lock/lock.hh"
 #include "../ds/sockaddr_in.hh"
 
@@ -18,7 +18,7 @@
 #define GROUP_NAME          "memec"          // default group
 #define MSG_TYPE            FIFO_MESS        // default message type
 
-class RemapMsgHandler {
+class StateTransitHandler {
 protected:
 	mailbox mbox;
 	char privateGroup[ MAX_GROUP_NAME ];
@@ -61,15 +61,15 @@ public:
 	std::map<struct sockaddr_in, RemapState> serversState;
 	std::map<struct sockaddr_in, LOCK_T> serversStateLock;
 
-	RemapMsgHandler();
-	virtual ~RemapMsgHandler();
+	StateTransitHandler();
+	virtual ~StateTransitHandler();
 
 	inline bool getIsConnected () {
 		return this->isConnected;
 	}
 
 	inline RemapState getState( struct sockaddr_in server ) {
-		RemapState state = REMAP_UNDEFINED;
+		RemapState state = STATE_UNDEFINED;
 		if ( this->serversState.count( server ) )
 			state = this->serversState[ server ];
 		return state;
@@ -90,9 +90,9 @@ public:
 		if ( this->serversState.count( server ) == 0 )
 			return false;
 		switch ( this->serversState[ server ] ) {
-			case REMAP_INTERMEDIATE:
-			case REMAP_COORDINATED:
-			case REMAP_DEGRADED:
+			case STATE_INTERMEDIATE:
+			case STATE_COORDINATED:
+			case STATE_DEGRADED:
 				return true;
 			default:
 				return false;
@@ -104,8 +104,8 @@ public:
 		if ( this->serversState.count( server ) == 0 )
 			return false;
 		switch ( this->serversState[ server ] ) {
-			case REMAP_NORMAL:
-			case REMAP_UNDEFINED:
+			case STATE_NORMAL:
+			case STATE_UNDEFINED:
 				return true;
 			default:
 				return false;

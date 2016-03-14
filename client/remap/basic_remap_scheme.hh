@@ -1,9 +1,9 @@
 #ifndef __CLIENT_REMAP_BASIC_REMAP_SCHEME_HH__
 #define __CLIENT_REMAP_BASIC_REMAP_SCHEME_HH__
 
-#include "remap_msg_handler.hh"
-#include "../socket/server_socket.hh"
 #include "../ds/stats.hh"
+#include "../socket/server_socket.hh"
+#include "../state_transit/state_transit_handler.hh"
 #include "../../common/lock/lock.hh"
 #include "../../common/stripe_list/stripe_list.hh"
 
@@ -20,7 +20,7 @@ public:
 	static ServerLoading *serverLoading;
 	static OverloadedServer *overloadedServer;
 	static StripeList<ServerSocket> *stripeList;
-	static ClientRemapMsgHandler *remapMsgHandler;
+	static ClientStateTransitHandler *stateTransitHandler;
 	static Latency increment;
 };
 

@@ -10,7 +10,7 @@
 #include "../ds/pending.hh"
 #include "../ds/remapping_record_map.hh"
 #include "../event/event_queue.hh"
-#include "../remap/remap_msg_handler.hh"
+#include "../state_transit/state_transit_handler.hh"
 #include "../socket/coordinator_socket.hh"
 #include "../socket/client_socket.hh"
 #include "../socket/server_socket.hh"
@@ -70,7 +70,7 @@ public:
 	/* Stripe list */
 	StripeList<ServerSocket> *stripeList;
 	/* Remapping */
-	CoordinatorRemapMsgHandler *remapMsgHandler;
+	CoordinatorStateTransitHandler *stateTransitHandler;
 	RemappingRecordMap remappingRecords;
 	struct {
 		std::unordered_map<Key, RemappingRecord> toSend;
