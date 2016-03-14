@@ -1,7 +1,7 @@
 #include "worker.hh"
 #include "../main/coordinator.hh"
 
-bool CoordinatorWorker::handleRemappingSetLockRequest( MasterEvent event, char *buf, size_t size ) {
+bool CoordinatorWorker::handleRemappingSetLockRequest( ClientEvent event, char *buf, size_t size ) {
 	struct RemappingLockHeader header;
 	if ( ! this->protocol.parseRemappingLockHeader( header, buf, size ) ) {
 		__ERROR__( "CoordinatorWorker", "handleRemappingSetLockRequest", "Invalid REMAPPING_SET_LOCK request (size = %lu).", size );
@@ -20,16 +20,16 @@ bool CoordinatorWorker::handleRemappingSetLockRequest( MasterEvent event, char *
 	uint32_t originalListId, originalChunkId;
 
 	// Get original list and chunk ID //
-	SlaveSocket *dataSlaveSocket;
-	originalListId = CoordinatorWorker::stripeList->get( header.key, header.keySize, &dataSlaveSocket, 0, &originalChunkId );
-	Map *map = &( dataSlaveSocket->map );
+	ServerSocket *dataServerSocket;
+	originalListId = CoordinatorWorker::stripeList->get( header.key, header.keySize, &dataServerSocket, 0, &originalChunkId );
+	Map *map = &( dataServerSocket->map );
 
 	// Check whether the "failed" servers are in intermediate or degraded state
 	CoordinatorRemapMsgHandler *crmh = CoordinatorRemapMsgHandler::getInstance();
 
 	// bool isPrinted = false;
 	for ( uint32_t i = 0; i < header.remappedCount; ) {
-		SlaveSocket *s = CoordinatorWorker::stripeList->get(
+		ServerSocket *s = CoordinatorWorker::stripeList->get(
 			header.original[ i * 2    ],
 			header.original[ i * 2 + 1 ]
 		);
@@ -88,6 +88,7 @@ bool CoordinatorWorker::handleRemappingSetLockRequest( MasterEvent event, char *
 		originalListId, -1 /* stripeId */, originalChunkId,
 		PROTO_OPCODE_REMAPPING_LOCK, 0 /* timestamp */,
 		true, true )
+		|| true /***** HACK FOR YCSB which sends duplicated keys for SET *****/
 	) {
 		RemappingRecord remappingRecord;
 		if ( header.remappedCount )
@@ -95,16 +96,36 @@ bool CoordinatorWorker::handleRemappingSetLockRequest( MasterEvent event, char *
 		else
 			remappingRecord.set( 0, 0, 0 );
 
-		if ( header.remappedCount == 0 /* no need to insert */ || CoordinatorWorker::remappingRecords->insert( key, remappingRecord, dataSlaveSocket->getAddr() ) ) {
+		if ( header.remappedCount == 0 /* no need to insert */ || CoordinatorWorker::remappingRecords->insert( key, remappingRecord, dataServerSocket->getAddr() ) ) {
 			event.resRemappingSetLock(
 				event.socket, event.instanceId, event.requestId, true, // success
 				header.original, header.remapped, header.remappedCount, key
 			);
 		} else {
-			event.resRemappingSetLock(
-				event.socket, event.instanceId, event.requestId, false, // success
-				0, 0, 0, key
-			);
+			// event.resRemappingSetLock(
+			// 	event.socket, event.instanceId, event.requestId, false, // success
+			// 	0, 0, 0, key
+			// );
+
+			remappingRecord.free();
+
+			// ---------- HACK FOR YCSB which sends duplicated keys for SET ----------
+			LOCK_T *lock;
+			if ( CoordinatorWorker::remappingRecords->find( key, &remappingRecord, &lock ) ) {
+				// Remapped
+				event.resRemappingSetLock(
+					event.socket, event.instanceId, event.requestId, true, // success
+					remappingRecord.original, remappingRecord.remapped, remappingRecord.remappedCount, key
+				);
+				this->dispatch( event );
+				UNLOCK( lock );
+				return true;
+			} else {
+				event.resRemappingSetLock(
+					event.socket, event.instanceId, event.requestId, false, // success
+					0, 0, 0, key
+				);
+			}
 		}
 	} else {
 		// The key already exists

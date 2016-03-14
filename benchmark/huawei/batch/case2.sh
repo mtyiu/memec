@@ -2,7 +2,7 @@
 
 BASE_PATH=${HOME}/mtyiu
 
-cd ${BASE_PATH}/plio/benchmark/huawei
+cd ${BASE_PATH}/memec/benchmark/huawei
 
 for NUM_CLIENTS in 1 3 5 10 20 30; do
 	ssh hpc15 "screen -S manage -p 0 -X stuff \"$(printf '\r\r')${BASE_PATH}/scripts/util/start.sh$(printf '\r\r')\""

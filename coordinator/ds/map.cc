@@ -120,11 +120,11 @@ bool Map::insertKey( char *keyStr, uint8_t keySize, uint32_t listId, uint32_t st
 			break;
 		case PROTO_OPCODE_REMAPPING_LOCK:
 			if ( exist ) {
-				fprintf(
-					stderr, "TODO: Map::insertKey(): opcode == PROTO_OPCODE_REMAPPING_LOCK && exist. Key = %.*s at (%u, %u, %u).\n",
-					it->first.size, it->first.data,
-					it->second.listId, it->second.stripeId, it->second.chunkId
-				);
+				// fprintf(
+				// 	stderr, "TODO: Map::insertKey(): opcode == PROTO_OPCODE_REMAPPING_LOCK && exist. Key = %.*s at (%u, %u, %u).\n",
+				// 	it->first.size, it->first.data,
+				// 	it->second.listId, it->second.stripeId, it->second.chunkId
+				// );
 				ret = false;
 			} else {
 				// check if lock is already acquired by others
@@ -149,7 +149,7 @@ bool Map::insertKey( char *keyStr, uint8_t keySize, uint32_t listId, uint32_t st
 }
 
 bool Map::insertDegradedLock( uint32_t listId, uint32_t stripeId,
-uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32_t ongoingAtChunk, bool needsLock, bool needsUnlock ) {
+uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32_t ongoingAtChunk, uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds, uint32_t chunkCount, bool needsLock, bool needsUnlock ) {
 	ListStripe listStripe;
 	DegradedLock degradedLock( original, reconstructed, reconstructedCount, ongoingAtChunk );
 	listStripe.set( listId, stripeId );
@@ -160,16 +160,42 @@ uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32
 	if ( needsLock ) LOCK( &this->degradedLocksLock );
 	it = this->degradedLocks.find( listStripe );
 	if ( it == this->degradedLocks.end() ) {
-		degradedLock.dup();
+		degradedLock.dup( numSurvivingChunkIds, survivingChunkIds, chunkCount );
 
 		std::pair<std::unordered_map<ListStripe, DegradedLock>::iterator, bool> r;
 		std::pair<ListStripe, DegradedLock> p( listStripe, degradedLock );
 
 		r = this->degradedLocks.insert( p );
 
+		// printf( "[%u, %u]: ", listId, stripeId );
+		// degradedLock.print();
+		// fflush( stdout );
+
 		ret = r.second;
 	} else {
 		ret = false;
+	}
+	if ( needsUnlock ) UNLOCK( &this->degradedLocksLock );
+
+	return ret;
+}
+
+bool Map::expandDegradedLock( uint32_t listId, uint32_t stripeId,
+uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32_t ongoingAtChunk, uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds, uint32_t chunkCount, DegradedLock &degradedLock, bool needsLock, bool needsUnlock ) {
+	ListStripe listStripe;
+	listStripe.set( listId, stripeId );
+
+	std::unordered_map<ListStripe, DegradedLock>::iterator it;
+	bool ret = true;
+
+	if ( needsLock ) LOCK( &this->degradedLocksLock );
+	it = this->degradedLocks.find( listStripe );
+	if ( it == this->degradedLocks.end() ) {
+		ret = false;
+	} else {
+		DegradedLock &d = it->second;
+		d.expand( original, reconstructed, reconstructedCount, ongoingAtChunk, numSurvivingChunkIds, survivingChunkIds, chunkCount );
+		degradedLock = d;
 	}
 	if ( needsUnlock ) UNLOCK( &this->degradedLocksLock );
 

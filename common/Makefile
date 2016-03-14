@@ -1,6 +1,6 @@
 CC=g++
 CFLAGS=-std=c++11 -Wall -O2
-PLIO_SRC_ROOT=..
+MEMEC_SRC_ROOT=..
 LIBS=-pthread
 EXTERNAL_LIBS=-ltspread
 

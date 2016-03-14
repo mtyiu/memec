@@ -1,5 +1,5 @@
-TARGET=lib common coordinator master slave application
-MAKEOPT= -j3 # speed up compiile
+TARGET=lib common coordinator client server application
+MAKEOPT= -j8 # speed up compiile
 
 .PHONY: all $(TARGET)
 

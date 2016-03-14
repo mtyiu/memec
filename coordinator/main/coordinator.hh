@@ -12,8 +12,8 @@
 #include "../event/event_queue.hh"
 #include "../remap/remap_msg_handler.hh"
 #include "../socket/coordinator_socket.hh"
-#include "../socket/master_socket.hh"
-#include "../socket/slave_socket.hh"
+#include "../socket/client_socket.hh"
+#include "../socket/server_socket.hh"
 #include "../worker/worker.hh"
 #include "../../common/config/global_config.hh"
 #include "../../common/ds/array_map.hh"
@@ -39,16 +39,16 @@ private:
 
 	void free();
 
-	// Helper functions to determine slave loading
-	void updateAverageSlaveLoading( ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
-			ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency );
-	// return previously overloaded slaves for per-slave phase change
-	std::set<struct sockaddr_in> updateOverloadedSlaveSet(
-			ArrayMap<struct sockaddr_in, Latency> *slaveGetLatency,
-			ArrayMap<struct sockaddr_in, Latency> *slaveSetLatency,
-			std::set<struct sockaddr_in> *slaveSet
+	// Helper functions to determine server loading
+	void updateAverageServerLoading( ArrayMap<struct sockaddr_in, Latency> *serverGetLatency,
+			ArrayMap<struct sockaddr_in, Latency> *serverSetLatency );
+	// return previously overloaded servers for per-server phase change
+	std::set<struct sockaddr_in> updateOverloadedServerSet(
+			ArrayMap<struct sockaddr_in, Latency> *serverGetLatency,
+			ArrayMap<struct sockaddr_in, Latency> *serverSetLatency,
+			std::set<struct sockaddr_in> *serverSet
 	);
-	void switchPhase( std::set<struct sockaddr_in> prevOverloadedSlaves );
+	void switchPhase( std::set<struct sockaddr_in> prevOverloadedServers );
 
 	// Commands
 	void help();
@@ -61,14 +61,14 @@ public:
 	struct {
 		CoordinatorSocket self;
 		EPoll epoll;
-		ArrayMap<int, MasterSocket> masters;
-		ArrayMap<int, SlaveSocket> slaves;
-		ArrayMap<int, SlaveSocket> backupSlaves;
+		ArrayMap<int, ClientSocket> clients;
+		ArrayMap<int, ServerSocket> servers;
+		ArrayMap<int, ServerSocket> backupServers;
 	} sockets;
 	IDGenerator idGenerator;
 	CoordinatorEventQueue eventQueue;
 	/* Stripe list */
-	StripeList<SlaveSocket> *stripeList;
+	StripeList<ServerSocket> *stripeList;
 	/* Remapping */
 	CoordinatorRemapMsgHandler *remapMsgHandler;
 	RemappingRecordMap remappingRecords;
@@ -79,19 +79,24 @@ public:
 	PacketPool packetPool;
 	/* Loading statistics */
 	struct {
-		// ( slaveAddr, ( mastserAddr, Latency ) )
+		// ( serverAddr, ( mastserAddr, Latency ) )
 		ArrayMap< struct sockaddr_in, ArrayMap< struct sockaddr_in, Latency > > latestGet;
 		ArrayMap< struct sockaddr_in, ArrayMap< struct sockaddr_in, Latency > > latestSet;
 		LOCK_T lock;
-	} slaveLoading;
+	} serverLoading;
 	struct {
-		std::set< struct sockaddr_in > slaveSet;
+		std::set< struct sockaddr_in > serverSet;
 		LOCK_T lock;
-	} overloadedSlaves;
+	} overloadedServers;
 	struct {
 		std::vector<Log> items;
 		LOCK_T lock;
 	} log;
+	struct {
+		bool isRecovering;
+		std::vector<ServerSocket *> sockets;
+		LOCK_T lock;
+	} waitingForRecovery;
 	Timer statsTimer;
 	Pending pending;
 	static uint16_t instanceId;
@@ -101,7 +106,7 @@ public:
 		return &coordinator;
 	}
 
-	void switchPhaseForCrashedSlave( SlaveSocket *slaveSocket );
+	void switchPhaseForCrashedServer( ServerSocket *serverSocket );
 
 	static void signalHandler( int signal );
 
@@ -119,15 +124,16 @@ public:
 	void flush();
 	void metadata();
 	void printLog();
-	void syncSlaveMeta( struct sockaddr_in slave, bool *sync );
+	void syncServerMeta( struct sockaddr_in server, bool *sync );
 	void releaseDegradedLock();
-	void releaseDegradedLock( struct sockaddr_in slave, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done );
+	void releaseDegradedLock( struct sockaddr_in server, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done );
 	void syncRemappedData( struct sockaddr_in target, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done );
 	double getElapsedTime();
 	void hash();
 	void lookup();
+	void stripe();
 	void appendLog( Log log );
-	void setSlave( bool overloaded );
+	void setServer( bool overloaded );
 	void switchToManualOverload();
 	void switchToAutoOverload();
 	void interactive();

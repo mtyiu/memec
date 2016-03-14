@@ -44,7 +44,7 @@ bool Protocol::parseChunkSealHeader( struct ChunkSealHeader &header, char *buf, 
 }
 
 bool Protocol::parseChunkSealHeaderData( size_t offset, uint8_t &keySize, uint32_t &keyOffset, char *&key, char *buf, size_t size ) {
-	// Note: Also implemented in slave/buffer/parity_chunk_buffer.cc
+	// Note: Also implemented in server/buffer/parity_chunk_buffer.cc
 	if ( size - offset < PROTO_CHUNK_SEAL_DATA_SIZE )
 		return false;
 

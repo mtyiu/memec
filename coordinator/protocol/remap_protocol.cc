@@ -4,7 +4,7 @@ char *CoordinatorProtocol::resRemappingSetLock( size_t &size, uint16_t instanceI
 	// -- common/protocol/remap_protocol.cc --
 	size = this->generateRemappingLockHeader(
 		success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
-		PROTO_MAGIC_TO_MASTER,
+		PROTO_MAGIC_TO_CLIENT,
 		PROTO_OPCODE_REMAPPING_LOCK,
 		instanceId, requestId,
 		original, remapped, remappedCount,
@@ -18,7 +18,7 @@ char *CoordinatorProtocol::reqSyncRemappedData( size_t &size, uint16_t instanceI
 	if ( ! buffer ) buffer = this->buffer.send;
 	size = this->generateAddressHeader(
 		PROTO_MAGIC_REMAPPING,
-		PROTO_MAGIC_TO_SLAVE,
+		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_PARITY_MIGRATE,
 		instanceId, requestId,
 		target.sin_addr.s_addr,

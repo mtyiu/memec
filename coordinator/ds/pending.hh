@@ -5,19 +5,19 @@
 #include <set>
 #include <unordered_set>
 #include <unordered_map>
-#include "../socket/slave_socket.hh"
+#include "../socket/server_socket.hh"
 #include "../../common/lock/lock.hh"
 #include "../../common/ds/sockaddr_in.hh"
 #include "../../common/ds/pending.hh"
 #include "../../common/util/debug.hh"
 #include "../../common/util/time.hh"
 
-struct PendingAnnouncement { // For slave reconstructed announcement
+struct PendingAnnouncement { // For server reconstructed announcement
 	pthread_mutex_t *lock;
 	pthread_cond_t *cond;
-	std::unordered_set<SlaveSocket *> *sockets;
+	std::unordered_set<ServerSocket *> *sockets;
 
-	void set( pthread_mutex_t *lock, pthread_cond_t *cond, std::unordered_set<SlaveSocket *> *sockets ) {
+	void set( pthread_mutex_t *lock, pthread_cond_t *cond, std::unordered_set<ServerSocket *> *sockets ) {
 		this->lock = lock;
 		this->cond = cond;
 		this->sockets = sockets;
@@ -73,10 +73,10 @@ public:
 		uint32_t total;
 	} unsealed;
 	struct timespec startTime;
-	SlaveSocket *socket;
-	SlaveSocket *original;
+	ServerSocket *socket;
+	ServerSocket *original;
 
-	PendingRecovery( uint32_t addr, uint16_t port, uint32_t chunkCount, uint32_t unsealedCount, struct timespec startTime, SlaveSocket *socket, SlaveSocket *original ) {
+	PendingRecovery( uint32_t addr, uint16_t port, uint32_t chunkCount, uint32_t unsealedCount, struct timespec startTime, ServerSocket *socket, ServerSocket *original ) {
 		this->addr = addr;
 		this->port = port;
 		this->chunks.remaining = chunkCount;
@@ -128,7 +128,7 @@ private:
 
 	/*
 	 * State transition: (normal -> intermediate) or (degraded -> coordinated normal)
-	 * (Slave instance ID) |-> PendingTransition
+	 * (Server instance ID) |-> PendingTransition
 	 */
 	struct {
 		LOCK_T intermediateLock;
@@ -141,7 +141,7 @@ private:
 	 * syncRemappingRecordCounters: ( packet id, counter for a sync operation )
 	 * syncRemappingRecordCountersReverse: ( counter for a sync operation, set of packet ids associated )
 	 * syncRemappingRecordIndicators: ( counter for a sync operations, indicator whether the op is completed )
-	 * counter = map( master, no. of remaining packets to ack )
+	 * counter = map( client, no. of remaining packets to ack )
 	 */
 	std::map<uint32_t, std::map<struct sockaddr_in, uint32_t>* > syncRemappingRecordCounters;
 	std::map<std::map<struct sockaddr_in, uint32_t>*, std::set<uint32_t> > syncRemappingRecordCountersReverse;
@@ -250,7 +250,7 @@ public:
 		return ret;
 	}
 
-	bool insertAnnouncement( uint16_t instanceId, uint32_t requestId, pthread_mutex_t *lock, pthread_cond_t *cond, std::unordered_set<SlaveSocket *> *sockets ) {
+	bool insertAnnouncement( uint16_t instanceId, uint32_t requestId, pthread_mutex_t *lock, pthread_cond_t *cond, std::unordered_set<ServerSocket *> *sockets ) {
 		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
 		PendingAnnouncement a;
 		a.set( lock, cond, sockets );
@@ -265,7 +265,7 @@ public:
 		return ret.second;
 	}
 
-	bool eraseAnnouncement( uint16_t instanceId, uint32_t requestId, SlaveSocket *socket ) {
+	bool eraseAnnouncement( uint16_t instanceId, uint32_t requestId, ServerSocket *socket ) {
 		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
 		std::unordered_map<PendingIdentifier, PendingAnnouncement>::iterator it;
 
@@ -288,7 +288,7 @@ public:
 		return true;
 	}
 
-	void eraseAnnouncement( SlaveSocket *socket ) {
+	void eraseAnnouncement( ServerSocket *socket ) {
 		std::unordered_map<PendingIdentifier, PendingAnnouncement>::iterator it;
 
 		LOCK( &this->announcementLock );
@@ -308,7 +308,7 @@ public:
 		UNLOCK( &this->announcementLock );
 	}
 
-	bool insertRecovery( uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t chunkCount, uint32_t unsealedCount, struct timespec startTime, SlaveSocket *socket, SlaveSocket *original ) {
+	bool insertRecovery( uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t chunkCount, uint32_t unsealedCount, struct timespec startTime, ServerSocket *socket, ServerSocket *original ) {
 		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
 		PendingRecovery r( addr, port, chunkCount, unsealedCount, startTime, socket, original );
 
@@ -322,7 +322,7 @@ public:
 		return ret.second;
 	}
 
-	bool eraseRecovery( uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t numReconstructedChunks, uint32_t numReconstructedKeys, SlaveSocket *socket, uint32_t &remainingChunks, uint32_t &totalChunks, uint32_t &remainingKeys, uint32_t &totalKeys, double &elapsedTime, SlaveSocket *&original ) {
+	bool eraseRecovery( uint16_t instanceId, uint32_t requestId, uint32_t addr, uint16_t port, uint32_t numReconstructedChunks, uint32_t numReconstructedKeys, ServerSocket *socket, uint32_t &remainingChunks, uint32_t &totalChunks, uint32_t &remainingKeys, uint32_t &totalKeys, double &elapsedTime, ServerSocket *&original ) {
 		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
 		std::unordered_map<PendingIdentifier, PendingRecovery>::iterator it;
 		bool ret;
@@ -484,17 +484,17 @@ public:
 		return true;
 	}
 
-	// decrement the counter for a packet acked by a master
+	// decrement the counter for a packet acked by a client
 	bool decrementRemappingRecords( uint32_t id, struct sockaddr_in addr, bool lock = true, bool unlock = true ) {
 		bool ret = false;
 		if ( lock ) LOCK( &this->syncRemappingRecordLock );
-		// check if the master needs to ack this packet
+		// check if the client needs to ack this packet
 		if ( this->syncRemappingRecordCounters.count( id ) > 0 &&
 			this->syncRemappingRecordCounters[ id ]->count( addr ) )
 		{
 			uint32_t &count = this->syncRemappingRecordCounters[ id ]->at( addr );
 			count--;
-			// if the master acked all packets, remove this master
+			// if the client acked all packets, remove this client
 			if ( count <= 0 ) {
 				this->syncRemappingRecordCounters[ id ]->erase( addr );
 			}
@@ -510,7 +510,7 @@ public:
 		std::map<struct sockaddr_in, uint32_t> *map = NULL;
 		bool *indicator = NULL;
 		if ( lock ) LOCK( &this->syncRemappingRecordLock );
-		// check if the packet exists, and the counter has "target" number of master remains
+		// check if the packet exists, and the counter has "target" number of client remains
 		if ( this->syncRemappingRecordCounters.count( id ) > 0 &&
 			this->syncRemappingRecordCounters[ id ]->size() == target )
 		{

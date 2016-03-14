@@ -1,6 +1,5 @@
 CC=g++
 CFLAGS=-Wall -O2
-PLIO_SRC_ROOT=../../..
 LIBS=
 
 OBJS= \

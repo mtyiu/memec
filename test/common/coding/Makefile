@@ -1,9 +1,9 @@
 CC=g++
 CFLAGS=-std=c++11 -Wall -O2
-PLIO_SRC_ROOT=../../..
+MEMEC_SRC_ROOT=../../..
 LIBS=
-EXTRA_LIB=$(PLIO_SRC_ROOT)/lib/isa-l-2.14.0/lib/libisal.a
-INCLUDE=-I$(PLIO_SRC_ROOT)/lib/jerasure/include -I$(PLIO_SRC_ROOT)/lib/gf_complete/include
+EXTRA_LIB=$(MEMEC_SRC_ROOT)/lib/isa-l-2.14.0/lib/libisal.a
+INCLUDE=-I$(MEMEC_SRC_ROOT)/lib/jerasure/include -I$(MEMEC_SRC_ROOT)/lib/gf_complete/include
 FLAGS=-DTEST_DELTA
 
 TARGETS= \
@@ -13,19 +13,19 @@ TARGETS= \
 	performance
 
 OBJS= \
-	$(wildcard $(PLIO_SRC_ROOT)/common/config/*.o) \
-	$(wildcard $(PLIO_SRC_ROOT)/common/coding/*.o) \
-	$(wildcard $(PLIO_SRC_ROOT)/common/ds/*.o) \
-	$(PLIO_SRC_ROOT)/lib/inih/ini.o \
+	$(wildcard $(MEMEC_SRC_ROOT)/common/config/*.o) \
+	$(wildcard $(MEMEC_SRC_ROOT)/common/coding/*.o) \
+	$(wildcard $(MEMEC_SRC_ROOT)/common/ds/*.o) \
+	$(MEMEC_SRC_ROOT)/lib/inih/ini.o \
 	-lrt
 
 all: $(TARGETS)
 
 jobjs:
-	make -C $(PLIO_SRC_ROOT)/common/coding
+	make -C $(MEMEC_SRC_ROOT)/common/coding
 
 jobjs_clean:
-	make -C $(PLIO_SRC_ROOT)/common/coding clean
+	make -C $(MEMEC_SRC_ROOT)/common/coding clean
 
 $(TARGETS): % : %.cc jobjs
 	$(CC) $(CFLAGS) $(INCLUDE) $(LIBS) $(FLAGS) -o $@ $< $(OBJS) $(EXTRA_LIB)

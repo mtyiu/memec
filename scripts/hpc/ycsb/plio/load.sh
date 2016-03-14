@@ -12,7 +12,7 @@ fi
 
 if [ $# == 1 ]; then
 	${YCSB_PATH}/bin/ycsb \
-		load plio \
+		load memec \
 		-s \
 		-P ${YCSB_PATH}/workloads/workloada \
 		-p fieldcount=1 \
@@ -21,15 +21,15 @@ if [ $# == 1 ]; then
 		-p fieldlength=${FIELD_LENGTH} \
 		-p recordcount=${RECORD_COUNT} \
 		-p threadcount=$1 \
-		-p plio.host=137.189.88.46 \
-		-p plio.port=9112 \
-		-p plio.key_size=255 \
-		-p plio.chunk_size=4096 \
+		-p memec.host=137.189.88.46 \
+		-p memec.port=9112 \
+		-p memec.key_size=255 \
+		-p memec.chunk_size=4096 \
 		-p table=usertable
 elif [ $# == 2 ]; then
 	INSERT_COUNT=$(expr ${RECORD_COUNT} \/ 6)
 	${YCSB_PATH}/bin/ycsb \
-		load plio \
+		load memec \
 		-s \
 		-P ${YCSB_PATH}/workloads/workloada \
 		-p fieldcount=1 \
@@ -40,9 +40,9 @@ elif [ $# == 2 ]; then
 		-p threadcount=$1 \
 		-p insertstart=$(expr ${INSERT_COUNT} \* $2) \
 		-p insertcount=${INSERT_COUNT} \
-		-p plio.host=$(hostname -I | xargs) \
-		-p plio.port=9112 \
-		-p plio.key_size=255 \
-		-p plio.chunk_size=4096 \
+		-p memec.host=$(hostname -I | xargs) \
+		-p memec.port=9112 \
+		-p memec.key_size=255 \
+		-p memec.chunk_size=4096 \
 		-p table=usertable
 fi

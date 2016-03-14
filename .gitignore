@@ -4,8 +4,8 @@
 *.bak
 bin/application
 bin/coordinator
-bin/master
-bin/slave
+bin/client
+bin/server
 benchmark/huawei/bin/benchmark
 benchmark/huawei/bin/test
 benchmark/huawei/bin/window

@@ -1,8 +1,8 @@
-#ifndef __MASTER_EVENT_MIXED_EVENT_HH__
-#define __MASTER_EVENT_MIXED_EVENT_HH__
+#ifndef __APPLICATION_EVENT_MIXED_EVENT_HH__
+#define __APPLICATION_EVENT_MIXED_EVENT_HH__
 
 #include "application_event.hh"
-#include "master_event.hh"
+#include "client_event.hh"
 #include "../../common/event/event.hh"
 #include "../../common/event/event_type.hh"
 
@@ -11,7 +11,7 @@ public:
 	EventType type;
 	union {
 		ApplicationEvent application;
-		MasterEvent master;
+		ClientEvent client;
 	} event;
 
 #define MIXED_EVENT_SET(_EVENT_TYPE_, _TYPE_CONSTANT_, _FIELD_) \
@@ -21,7 +21,7 @@ public:
 	}
 
 	MIXED_EVENT_SET( ApplicationEvent, EVENT_TYPE_APPLICATION, application )
-	MIXED_EVENT_SET( MasterEvent, EVENT_TYPE_MASTER, master )
+	MIXED_EVENT_SET( ClientEvent, EVENT_TYPE_CLIENT, client )
 #undef MIXED_EVENT_SET
 };
 

@@ -2,38 +2,38 @@
 #include "../ds/log.hh"
 #include "../main/coordinator.hh"
 
-bool CoordinatorWorker::handlePromoteBackupSlaveResponse( SlaveEvent event, char *buf, size_t size ) {
-	struct PromoteBackupSlaveHeader header;
-	if ( ! this->protocol.parsePromoteBackupSlaveHeader( header, false /* isRequest */, buf, size ) ) {
-		__ERROR__( "CoordinatorWorker", "handlePromoteBackupSlaveResponse", "Invalid PROMOTE_BACKUP_SLAVE response (size = %lu).", size );
+bool CoordinatorWorker::handlePromoteBackupServerResponse( ServerEvent event, char *buf, size_t size ) {
+	struct PromoteBackupServerHeader header;
+	if ( ! this->protocol.parsePromoteBackupServerHeader( header, false /* isRequest */, buf, size ) ) {
+		__ERROR__( "CoordinatorWorker", "handlePromoteBackupServerResponse", "Invalid PROMOTE_BACKUP_SERVER response (size = %lu).", size );
 		return false;
 	}
 	__DEBUG__(
-		BLUE, "CoordinatorWorker", "handlePromoteBackupSlaveResponse",
-		"[PROMOTE_BACKUP_SLAVE] Request ID: (%u, %u); Count: %u (%u:%u)",
+		BLUE, "CoordinatorWorker", "handlePromoteBackupServerResponse",
+		"[PROMOTE_BACKUP_SERVER] Request ID: (%u, %u); Count: %u (%u:%u)",
 		event.instanceId, event.requestId, header.count, header.addr, header.port
 	);
 
 	uint32_t remainingChunks, remainingKeys, totalChunks, totalKeys;
 	double elapsedTime;
-	SlaveSocket *original;
+	ServerSocket *original;
 
 	if ( ! CoordinatorWorker::pending->eraseRecovery( event.instanceId, event.requestId, header.addr, header.port, header.chunkCount, header.unsealedCount, event.socket, remainingChunks, totalChunks, remainingKeys, totalKeys, elapsedTime, original ) ) {
-		__ERROR__( "SlaveWorker", "handlePromoteBackupSlaveResponse", "Cannot find a pending RECOVERY request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
+		__ERROR__( "ServerWorker", "handlePromoteBackupServerResponse", "Cannot find a pending RECOVERY request that matches the response. This message will be discarded. (ID: (%u, %u))", event.instanceId, event.requestId );
 		return false;
 	}
 
 	if ( remainingChunks == 0 && remainingKeys == 0 ) {
-		__INFO__( CYAN, "CoordinatorWorker", "handlePromoteBackupSlaveResponse", "Recovery is completed. Number of chunks reconstructed = %u; number of keys reconstructed = %u; elapsed time = %lf s.\n", totalChunks, totalKeys, elapsedTime );
+		__INFO__( CYAN, "CoordinatorWorker", "handlePromoteBackupServerResponse", "Recovery is completed. Number of chunks reconstructed = %u; number of keys reconstructed = %u; elapsed time = %lf s.\n", totalChunks, totalKeys, elapsedTime );
 		event.socket->printAddress();
 
 		event.ackCompletedReconstruction( event.socket, event.instanceId, event.requestId, true );
 		this->dispatch( event );
 
-		// notify the remap message handler of a "removed" slave
+		// notify the remap message handler of a "removed" server
 		Coordinator *coordinator = Coordinator::getInstance();
 		if ( coordinator->remapMsgHandler )
-			coordinator->remapMsgHandler->removeAliveSlave( original->getAddr() );
+			coordinator->remapMsgHandler->removeAliveServer( original->getAddr() );
 
 		Log log;
 		log.setRecovery(
@@ -45,13 +45,29 @@ bool CoordinatorWorker::handlePromoteBackupSlaveResponse( SlaveEvent event, char
 		);
 		Coordinator::getInstance()->appendLog( log );
 
+		// Start recovery
+		ServerSocket *failedServerSocket = 0;
+		LOCK( &coordinator->waitingForRecovery.lock );
+		coordinator->waitingForRecovery.isRecovering = false;
+		if ( coordinator->waitingForRecovery.sockets.size() ) {
+			failedServerSocket = coordinator->waitingForRecovery.sockets[ 0 ];
+			coordinator->waitingForRecovery.sockets.erase( coordinator->waitingForRecovery.sockets.begin() );
+		}
+		UNLOCK( &coordinator->waitingForRecovery.lock );
+
 		// system( "ssh testbed-node10 'screen -S experiment -p 0 -X stuff \"$(printf '\r')\"'" );
+
+		if ( failedServerSocket ) {
+			event.handleReconstructionRequest( failedServerSocket );
+			// Must use another worker thread as the function call handleReconstructionRequest() blocks while waiting for the response from other servers
+			CoordinatorWorker::eventQueue->insert( event );
+		}
 	}
 
 	return true;
 }
 
-bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
+bool CoordinatorWorker::handleReconstructionRequest( ServerSocket *socket ) {
 	int index = CoordinatorWorker::stripeList->search( socket );
 	if ( index == -1 ) {
 		__ERROR__( "CoordinatorWorker", "handleReconstructionRequest", "The disconnected server does not exist in the consistent hash ring.\n" );
@@ -61,68 +77,81 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 	struct timespec startTime = start_timer();
 
 	/////////////////////////////////////////////////////////////////////
-	// Choose a backup slave socket for reconstructing the failed node //
+	// Choose a backup server socket for reconstructing the failed node //
 	/////////////////////////////////////////////////////////////////////
 	Coordinator *coordinator = Coordinator::getInstance();
-	ArrayMap<int, SlaveSocket> &slaves = coordinator->sockets.slaves;
-	ArrayMap<int, SlaveSocket> &backupSlaves = coordinator->sockets.backupSlaves;
+	ArrayMap<int, ServerSocket> &servers = coordinator->sockets.servers;
+	ArrayMap<int, ServerSocket> &backupServers = coordinator->sockets.backupServers;
 	int fd;
-	SlaveSocket *backupSlaveSocket;
+	ServerSocket *backupServerSocket;
+
+	//////////////////////////////////////////////
+	// Check if there is other ongoing recovery //
+	//////////////////////////////////////////////
+	LOCK( &coordinator->waitingForRecovery.lock );
+	if ( coordinator->waitingForRecovery.isRecovering ) {
+		coordinator->waitingForRecovery.sockets.push_back( socket );
+		UNLOCK( &coordinator->waitingForRecovery.lock );
+		return false;
+	} else {
+		coordinator->waitingForRecovery.isRecovering = true;
+	}
+	UNLOCK( &coordinator->waitingForRecovery.lock );
 
 	///////////////////////////////////////////////////////
-	// Choose a backup slave to replace the failed slave //
+	// Choose a backup server to replace the failed server //
 	///////////////////////////////////////////////////////
-	if ( backupSlaves.size() == 0 ) {
+	if ( backupServers.size() == 0 ) {
 		__ERROR__( "CoordinatorWorker", "handleReconstructionRequest", "No backup node is available!" );
 		return false;
 	}
-	backupSlaveSocket = backupSlaves[ 0 ];
-	backupSlaves.removeAt( 0 );
+	backupServerSocket = backupServers[ 0 ];
+	backupServers.removeAt( 0 );
 
 	////////////////////////////
-	// Update SlaveSocket map //
+	// Update ServerSocket map //
 	////////////////////////////
-	fd = backupSlaveSocket->getSocket();
-	backupSlaveSocket->failed = socket;
-	slaves.set( index, fd, backupSlaveSocket );
+	fd = backupServerSocket->getSocket();
+	backupServerSocket->failed = socket;
+	servers.set( index, fd, backupServerSocket );
 
 	////////////////////////////////////////////
-	// Add the slave addrs to remapMsgHandler //
+	// Add the server addrs to remapMsgHandler //
 	////////////////////////////////////////////
 	if ( coordinator->remapMsgHandler )
-		coordinator->remapMsgHandler->addAliveSlave( backupSlaveSocket->getAddr() );
+		coordinator->remapMsgHandler->addAliveServer( backupServerSocket->getAddr() );
 
 	////////////////////////////
-	// Announce to the slaves //
+	// Announce to the servers //
 	////////////////////////////
 	struct {
 		pthread_mutex_t lock;
 		pthread_cond_t cond;
-		std::unordered_set<SlaveSocket *> sockets;
+		std::unordered_set<ServerSocket *> sockets;
 	} annoucement;
-	SlaveEvent slaveEvent;
+	ServerEvent serverEvent;
 
 	pthread_mutex_init( &annoucement.lock, 0 );
 	pthread_cond_init( &annoucement.cond, 0 );
-	slaveEvent.announceSlaveReconstructed(
+	serverEvent.announceServerReconstructed(
 		Coordinator::instanceId, CoordinatorWorker::idGenerator->nextVal( this->workerId ),
 		&annoucement.lock, &annoucement.cond, &annoucement.sockets,
-		socket, backupSlaveSocket
+		socket, backupServerSocket
 	);
-	this->dispatch( slaveEvent );
+	this->dispatch( serverEvent );
 
 	pthread_mutex_lock( &annoucement.lock );
 	while( annoucement.sockets.size() )
 		pthread_cond_wait( &annoucement.cond, &annoucement.lock );
 	pthread_mutex_unlock( &annoucement.lock );
-	printf( "~~~ All announced ~~~\n" );
+	// __INFO__( "CoordinatorWorker", "handleReconstructionRequest", "All announced." );
 
 	/////////////////////////////
-	// Announce to the masters //
+	// Announce to the clients //
 	/////////////////////////////
-	MasterEvent masterEvent;
-	masterEvent.announceSlaveReconstructed( socket, backupSlaveSocket );
-	CoordinatorWorker::eventQueue->insert( masterEvent );
+	ClientEvent clientEvent;
+	clientEvent.announceServerReconstructed( socket, backupServerSocket );
+	CoordinatorWorker::eventQueue->insert( clientEvent );
 
 	////////////////////////////////////////////////////////////////////////////
 
@@ -139,7 +168,7 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 	std::unordered_map<uint32_t, std::unordered_set<uint32_t>> stripeIds;
 	std::unordered_map<uint32_t, std::unordered_set<uint32_t>>::iterator stripeIdsIt;
 	std::unordered_set<uint32_t>::iterator stripeIdSetIt;
-	std::unordered_map<uint32_t, SlaveSocket **> sockets;
+	std::unordered_map<uint32_t, ServerSocket **> sockets;
 	std::unordered_map<uint32_t, std::unordered_set<Key>> unsealed; // List ID |-> Key
 	std::unordered_map<uint32_t, std::unordered_set<Key>>::iterator unsealedIt;
 	std::unordered_set<Key> unsealedKeysAggregated;
@@ -147,25 +176,25 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 
 	std::vector<StripeListIndex> lists = CoordinatorWorker::stripeList->list( ( uint32_t ) index );
 
-	ArrayMap<int, SlaveSocket> &map = Coordinator::getInstance()->sockets.slaves;
+	ArrayMap<int, ServerSocket> &map = Coordinator::getInstance()->sockets.servers;
 
 	CoordinatorRemapMsgHandler *crmh = CoordinatorRemapMsgHandler::getInstance();
 
 	//////////////////////////////////////////////////
-	// Get the SlaveSockets of the surviving slaves //
+	// Get the ServerSockets of the surviving servers //
 	//////////////////////////////////////////////////
 	LOCK( &map.lock );
 	for ( uint32_t i = 0, size = lists.size(); i < size; i++ ) {
 		listId = lists[ i ].listId;
 		if ( sockets.find( listId ) == sockets.end() ) {
-			SlaveSocket **s = new SlaveSocket*[ CoordinatorWorker::chunkCount ];
+			ServerSocket **s = new ServerSocket*[ CoordinatorWorker::chunkCount ];
 			CoordinatorWorker::stripeList->get(
 				listId, s + CoordinatorWorker::dataChunkCount, s
 			);
 
 			for ( uint32_t j = 0; j < CoordinatorWorker::chunkCount; j++ ) {
 				if ( ! s[ j ] || ! s[ j ]->ready() || crmh->allowRemapping( s[ j ]->getAddr() ) )
-					s[ j ] = 0; // Don't use this slave
+					s[ j ] = 0; // Don't use this server
 			}
 
 			sockets[ listId ] = s;
@@ -222,13 +251,13 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 	printf( "Number of unsealed chunks: %lu\n", unsealed.size() );
 
 	//////////////////////////////
-	// Promote the backup slave //
+	// Promote the backup server //
 	//////////////////////////////
 	requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
 	chunksIt = socket->map.chunks.begin();
 	unsealedKeysIt = unsealedKeysAggregated.begin();
 	do {
-		buffer.data = this->protocol.promoteBackupSlave(
+		buffer.data = this->protocol.promoteBackupServer(
 			buffer.size,
 			Coordinator::instanceId,
 			requestId,
@@ -238,7 +267,7 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 			isCompleted
 		);
 
-		ret = backupSlaveSocket->send( buffer.data, buffer.size, connected );
+		ret = backupServerSocket->send( buffer.data, buffer.size, connected );
 		if ( ret != ( ssize_t ) buffer.size ) {
 			__ERROR__( "CoordinatorWorker", "handleReconstructionRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 			break;
@@ -255,19 +284,19 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 		socket->map.chunks.size(),
 		numLostUnsealedKeys,
 		startTime,
-		backupSlaveSocket,
+		backupServerSocket,
 		socket
 	) ) {
 		__ERROR__( "CoordinatorWorker", "handleReconstructionRequest", "Cannot insert into pending recovery map." );
 	}
 
 	/////////////////////////////////////////////////////////////////
-	// Distribute the reconstruction tasks to the surviving slaves //
+	// Distribute the reconstruction tasks to the surviving servers //
 	/////////////////////////////////////////////////////////////////
-	// Distribute the reconstruction task among the slaves in the same stripe list
+	// Distribute the reconstruction task among the servers in the same stripe list
 	for ( uint32_t i = 0, size = lists.size(); i < size; i++ ) {
-		uint32_t numSurvivingSlaves = 0;
-		uint32_t numStripePerSlave;
+		uint32_t numSurvivingServers = 0;
+		uint32_t numStripePerServer;
 		uint32_t numUnsealedKeys;
 
 		listId = lists[ i ].listId;
@@ -275,7 +304,7 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 
 		if ( chunkId >= CoordinatorWorker::dataChunkCount ) {
 			LOCK( &Map::stripesLock );
-			// Update stripeIds for parity slave
+			// Update stripeIds for parity server
 			stripeIdsIt = stripeIds.find( listId );
 			if ( stripeIdsIt == stripeIds.end() ) {
 				std::unordered_set<uint32_t> ids;
@@ -290,14 +319,14 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 		}
 
 		for ( uint32_t j = 0; j < CoordinatorWorker::chunkCount; j++ ) {
-			SlaveSocket *s = sockets[ listId ][ j ];
-			if ( s && s->ready() && s != backupSlaveSocket )
-				numSurvivingSlaves++;
+			ServerSocket *s = sockets[ listId ][ j ];
+			if ( s && s->ready() && s != backupServerSocket )
+				numSurvivingServers++;
 		}
 
-		numStripePerSlave = stripeIds[ listId ].size() / numSurvivingSlaves;
-		if ( stripeIds[ listId ].size() % numSurvivingSlaves > 0 )
-			numStripePerSlave++;
+		numStripePerServer = stripeIds[ listId ].size() / numSurvivingServers;
+		if ( stripeIds[ listId ].size() % numSurvivingServers > 0 )
+			numStripePerServer++;
 
 		// Insert into pending map
 		pthread_mutex_t *lock;
@@ -319,13 +348,13 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 		unsealedKeysIt = unsealed[ listId ].begin();
 		do {
 			isAllCompleted = true;
-			// Task to all slaves: Reconstruct sealed chunks
+			// Task to all servers: Reconstruct sealed chunks
 			for ( uint32_t j = 0; j < CoordinatorWorker::chunkCount; j++ ) {
 				if ( stripeIdSetIt == stripeIds[ listId ].end() )
 					break;
 
-				SlaveSocket *s = sockets[ listId ][ j ];
-				if ( s && s->ready() && s != backupSlaveSocket ) {
+				ServerSocket *s = sockets[ listId ][ j ];
+				if ( s && s->ready() && s != backupServerSocket ) {
 					buffer.data = this->protocol.reqReconstruction(
 						buffer.size,
 						Coordinator::instanceId,
@@ -334,7 +363,7 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 						chunkId,
 						stripeIds[ listId ],
 						stripeIdSetIt,
-						numStripePerSlave,
+						numStripePerServer,
 						isCompleted
 					);
 
@@ -354,13 +383,13 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 
 		do {
 			isAllCompleted = true;
-			// Task to parity slaves: Send unsealed keys
+			// Task to parity servers: Send unsealed keys
 			for ( uint32_t j = 0; j < CoordinatorWorker::parityChunkCount; j++ ) {
 				if ( unsealedKeysIt == unsealed[ listId ].end() )
 					break;
 
-				SlaveSocket *s = sockets[ listId ][ CoordinatorWorker::dataChunkCount + j ];
-				if ( s && s->ready() && s != backupSlaveSocket ) {
+				ServerSocket *s = sockets[ listId ][ CoordinatorWorker::dataChunkCount + j ];
+				if ( s && s->ready() && s != backupServerSocket ) {
 					buffer.data = this->protocol.reqReconstructionUnsealed(
 						buffer.size,
 						Coordinator::instanceId,
@@ -388,8 +417,8 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 
 		__INFO__(
 			YELLOW, "CoordinatorWorker", "handleReconstructionRequest",
-			"[%u] (%u, %u): Number of surviving slaves: %u; number of stripes per slave: %u; total number of stripes: %lu; total number of unsealed keys: %lu",
-			requestId, listId, chunkId, numSurvivingSlaves, numStripePerSlave, stripeIds[ listId ].size(), unsealed[ listId ].size()
+			"[%u] (%u, %u): Number of surviving servers: %u; number of stripes per server: %u; total number of stripes: %lu; total number of unsealed keys: %lu",
+			requestId, listId, chunkId, numSurvivingServers, numStripePerServer, stripeIds[ listId ].size(), unsealed[ listId ].size()
 		);
 	}
 
@@ -401,7 +430,7 @@ bool CoordinatorWorker::handleReconstructionRequest( SlaveSocket *socket ) {
 	return true;
 }
 
-bool CoordinatorWorker::handleReconstructionResponse( SlaveEvent event, char *buf, size_t size ) {
+bool CoordinatorWorker::handleReconstructionResponse( ServerEvent event, char *buf, size_t size ) {
 	struct ReconstructionHeader header;
 	if ( ! this->protocol.parseReconstructionHeader( header, false /* isRequest */, buf, size ) ) {
 		__ERROR__( "CoordinatorWorker", "handleReconstructionResponse", "Invalid RECONSTRUCTION response (size = %lu).", size );
@@ -424,7 +453,7 @@ bool CoordinatorWorker::handleReconstructionResponse( SlaveEvent event, char *bu
 	return true;
 }
 
-bool CoordinatorWorker::handleReconstructionUnsealedResponse( SlaveEvent event, char *buf, size_t size ) {
+bool CoordinatorWorker::handleReconstructionUnsealedResponse( ServerEvent event, char *buf, size_t size ) {
 	struct ReconstructionHeader header;
 	if ( ! this->protocol.parseReconstructionHeader( header, false /* isRequest */, buf, size ) ) {
 		__ERROR__( "CoordinatorWorker", "handleReconstructionUnsealedResponse", "Invalid RECONSTRUCTION_UNSEALED response (size = %lu).", size );

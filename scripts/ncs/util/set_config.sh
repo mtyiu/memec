@@ -1,8 +1,8 @@
 #!/bin/bash
 
 ## path to config files
-PLIO_ROOT=/home/ncsgroup/mtyiu/plio
-CONFIG_DIR=${PLIO_ROOT}/bin/config/ncs
+MEMEC_ROOT=/home/ncsgroup/mtyiu/memec
+CONFIG_DIR=${MEMEC_ROOT}/bin/config/ncs
 SCRIPT_DIR=/home/ncsgroup/mtyiu/scripts/util
 
 ## configurations
@@ -14,8 +14,8 @@ stop_th=12
 overload_th=130
 
 ## make the changes to specific files
-sed -i "s/\(updateInterval=\).*/\1${stats_interval}/" ${CONFIG_DIR}/master.ini
-sed -i "s/\(updateInterval=\).*/\1${stats_interval}/" ${CONFIG_DIR}/master.ini
+sed -i "s/\(updateInterval=\).*/\1${stats_interval}/" ${CONFIG_DIR}/client.ini
+sed -i "s/\(updateInterval=\).*/\1${stats_interval}/" ${CONFIG_DIR}/client.ini
 
 sed -i "s/\(scheme=\).*/\1${scheme}/" ${CONFIG_DIR}/global.ini
 sed -i "s/\(enabled=\).*/\1${remap}/" ${CONFIG_DIR}/global.ini

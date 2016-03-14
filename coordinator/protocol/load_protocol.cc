@@ -1,26 +1,26 @@
 #include "protocol.hh"
 #include "../../common/ds/sockaddr_in.hh"
 
-// TODO put into common/ as this is same as  MasterProtocol::reqPushLoadStats
+// TODO put into common/ as this is same as  ClientProtocol::reqPushLoadStats
 char *CoordinatorProtocol::reqPushLoadStats(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
-		ArrayMap< struct sockaddr_in, Latency > *slaveGetLatency,
-		ArrayMap< struct sockaddr_in, Latency > *slaveSetLatency,
-		std::set< struct sockaddr_in > *overloadedSlaveSet )
+		ArrayMap< struct sockaddr_in, Latency > *serverGetLatency,
+		ArrayMap< struct sockaddr_in, Latency > *serverSetLatency,
+		std::set< struct sockaddr_in > *overloadedServerSet )
 {
 	// -- common/protocol/load_protocol.cc --
 	size = this->generateLoadStatsHeader(
 		PROTO_MAGIC_LOADING_STATS,
-		PROTO_MAGIC_TO_MASTER,
+		PROTO_MAGIC_TO_CLIENT,
 		instanceId, requestId,
-		slaveGetLatency->size(),
-		slaveSetLatency->size(),
-		overloadedSlaveSet->size(),
+		serverGetLatency->size(),
+		serverSetLatency->size(),
+		overloadedServerSet->size(),
 		sizeof( uint32_t ) * 3 + sizeof( uint16_t ),
 		sizeof( uint32_t ) + sizeof( uint16_t )
 	);
 
-	// TODO only send stats of most heavily loaded slave in case buffer overflows
+	// TODO only send stats of most heavily loaded server in case buffer overflows
 
 	uint32_t addr, sec, nsec;
 	uint16_t port;
@@ -31,14 +31,14 @@ char *CoordinatorProtocol::reqPushLoadStats(
 	sec = _SRC_->values[ idx ]->sec; \
 	nsec = _SRC_->values[ idx ]->nsec; \
 
-	for ( uint32_t i = 0; i < slaveGetLatency->size() + slaveSetLatency->size(); i++ ) {
+	for ( uint32_t i = 0; i < serverGetLatency->size() + serverSetLatency->size(); i++ ) {
 		uint32_t idx = i;
 		// serialize the loading stats
-		if ( i < slaveGetLatency->size() ) {
-			SET_FIELDS_VAR( slaveGetLatency );
+		if ( i < serverGetLatency->size() ) {
+			SET_FIELDS_VAR( serverGetLatency );
 		} else {
-			idx = i - slaveGetLatency->size();
-			SET_FIELDS_VAR( slaveSetLatency );
+			idx = i - serverGetLatency->size();
+			SET_FIELDS_VAR( serverSetLatency );
 		}
 
 		//fprintf( stderr, "stats send %u:%hu %usec %unsec\n", ntohl( addr ), ntohs( port ), sec, nsec );
@@ -54,7 +54,7 @@ char *CoordinatorProtocol::reqPushLoadStats(
 
 #undef SET_FIELDS_VAR
 
-	for ( std::set<struct sockaddr_in>::iterator it = overloadedSlaveSet->begin(); it != overloadedSlaveSet->end(); it++ ) {
+	for ( std::set<struct sockaddr_in>::iterator it = overloadedServerSet->begin(); it != overloadedServerSet->end(); it++ ) {
 		addr = (*it).sin_addr.s_addr;
 		port = (*it).sin_port;
 		*( ( uint32_t * )( this->buffer.send + size ) ) = addr; // htonl( addr );
@@ -70,11 +70,11 @@ char *CoordinatorProtocol::reqPushLoadStats(
 	return this->buffer.send;
 }
 
-// TODO put into common/ as this is same as  MasterProtocol::parseLoadingStats
+// TODO put into common/ as this is same as  ClientProtocol::parseLoadingStats
 bool CoordinatorProtocol::parseLoadingStats(
 		const LoadStatsHeader& loadStatsHeader,
-		ArrayMap< struct sockaddr_in, Latency >& slaveGetLatency,
-		ArrayMap< struct sockaddr_in, Latency >& slaveSetLatency,
+		ArrayMap< struct sockaddr_in, Latency >& serverGetLatency,
+		ArrayMap< struct sockaddr_in, Latency >& serverSetLatency,
 		char* buffer, uint32_t size )
 {
 	struct sockaddr_in addr;
@@ -83,20 +83,20 @@ bool CoordinatorProtocol::parseLoadingStats(
 	uint32_t recordSize = sizeof( uint32_t ) * 3 + sizeof( uint16_t );
 
 	// check if the all stats are received properly
-	if ( size < ( loadStatsHeader.slaveGetCount + loadStatsHeader.slaveSetCount ) * recordSize )
+	if ( size < ( loadStatsHeader.serverGetCount + loadStatsHeader.serverSetCount ) * recordSize )
 		return false;
 
-	for ( uint32_t i = 0; i < loadStatsHeader.slaveGetCount + loadStatsHeader.slaveSetCount; i++ ) {
+	for ( uint32_t i = 0; i < loadStatsHeader.serverGetCount + loadStatsHeader.serverSetCount; i++ ) {
 		addr.sin_addr.s_addr = *( uint32_t * )( buffer );
 		addr.sin_port = *( uint16_t * )( buffer + sizeof( uint32_t ) );
 		tempLatency = new Latency();
 		tempLatency->sec = ntohl( *( uint32_t * )( buffer + sizeof( uint32_t ) + sizeof( uint16_t ) ) );
 		tempLatency->nsec = ntohl( *( uint32_t * )( buffer + sizeof( uint32_t ) * 2 + sizeof( uint16_t ) ) );
 
-		if ( i < loadStatsHeader.slaveGetCount )
-			slaveGetLatency.set( addr, tempLatency );
+		if ( i < loadStatsHeader.serverGetCount )
+			serverGetLatency.set( addr, tempLatency );
 		else
-			slaveSetLatency.set( addr, tempLatency );
+			serverSetLatency.set( addr, tempLatency );
 
 		buffer += recordSize;
 	}

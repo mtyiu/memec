@@ -233,7 +233,7 @@ void randomWorkload( MemEC &memec, size_t count, uint8_t keySize = 12, uint32_t 
 
 int main( int argc, char **argv ) {
 	if ( argc <= 7 ) {
-		fprintf( stderr, "Usage: %s [Key size] [Chunk size] [Batch size] [From ID] [To ID] [Master IP] [Master port]\n", argv[ 0 ] );
+		fprintf( stderr, "Usage: %s [Key size] [Chunk size] [Batch size] [From ID] [To ID] [Client IP] [Client port]\n", argv[ 0 ] );
 		return 1;
 	}
 	struct sockaddr_in addr;
@@ -261,7 +261,7 @@ int main( int argc, char **argv ) {
 		width, "Key Size", config.keySize,
 		width, "Chunk Size", config.chunkSize,
 		width, "Batch Size", config.batchSize,
-		width, "Master", ipStr, ntohs( config.port ),
+		width, "Client", ipStr, ntohs( config.port ),
 		width, "ID Range", config.fromId, config.toId
 	);
 

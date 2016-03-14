@@ -1,9 +1,0 @@
-#ifndef __SLAVE_STORAGE_STORAGE_TYPE_HH__
-#define __SLAVE_STORAGE_STORAGE_TYPE_HH__
-
-enum StorageType {
-	STORAGE_TYPE_UNDEFINED,
-	STORAGE_TYPE_LOCAL
-};
-
-#endif

@@ -2,25 +2,15 @@
 #include "coordinator_config.hh"
 
 CoordinatorConfig::CoordinatorConfig() {
-	this->eventQueue.size.pMixed = 1024;
-}
-
-bool CoordinatorConfig::merge( GlobalConfig &globalConfig ) {
-	this->epoll.maxEvents = globalConfig.epoll.maxEvents;
-	this->epoll.timeout = globalConfig.epoll.timeout;
-	return true;
+	this->states.isManual = true;
+	this->states.maximum = 0;
+	this->states.threshold.start = 0;
+	this->states.threshold.stop = 0;
+	this->states.threshold.overload = 0;
 }
 
 bool CoordinatorConfig::parse( const char *path ) {
-	if ( Config::parse( path, "coordinator.ini" ) ) {
-		if ( this->workers.type == WORKER_TYPE_SEPARATED )
-			this->workers.number.separated.total =
-				this->workers.number.separated.coordinator +
-				this->workers.number.separated.master +
-				this->workers.number.separated.slave;
-		return true;
-	}
-	return false;
+	return Config::parse( path, "coordinator.ini" );
 }
 
 bool CoordinatorConfig::override( OptionList &options ) {
@@ -38,61 +28,17 @@ bool CoordinatorConfig::override( OptionList &options ) {
 bool CoordinatorConfig::set( const char *section, const char *name, const char *value ) {
 	if ( match( section, "coordinator" ) ) {
 		return this->coordinator.addr.parse( name, value );
-	} else if ( match( section, "epoll" ) ) {
-		if ( match( name, "max_events" ) )
-			this->epoll.maxEvents = atoi( value );
-		else if ( match( name, "timeout" ) )
-			this->epoll.timeout = atoi( value );
-		else
-			return false;
-	} else if ( match( section, "workers" ) ) {
-		if ( match( name, "type" ) ) {
-			if ( match( value, "mixed" ) )
-				this->workers.type = WORKER_TYPE_MIXED;
-			else if ( match( value, "separated" ) )
-				this->workers.type = WORKER_TYPE_SEPARATED;
-			else
-				this->workers.type = WORKER_TYPE_UNDEFINED;
-		} else if ( match( name, "mixed" ) )
-			this->workers.number.mixed = atoi( value );
-		else if ( match( name, "prioritized_mixed" ) )
-			this->eventQueue.size.pMixed = atoi( value );
-		else if ( match( name, "coordinator" ) )
-			this->workers.number.separated.coordinator = atoi( value );
-		else if ( match( name, "master" ) )
-			this->workers.number.separated.master = atoi( value );
-		else if ( match( name, "slave" ) )
-			this->workers.number.separated.slave = atoi( value );
-		else
-			return false;
-	} else if ( match( section, "pool" ) ) {
-		if ( match ( name, "packets" ) )
-			this->pool.packets = atoi( value );
-		else
-			return false;
-	} else if ( match( section, "event_queue" ) ) {
-		if ( match( name, "block" ) )
-			this->eventQueue.block = ! match( value, "false" );
-		else if ( match( name, "mixed" ) )
-			this->eventQueue.size.mixed = atoi( value );
-		else if ( match( name, "coordinator" ) )
-			this->eventQueue.size.separated.coordinator = atoi( value );
-		else if ( match( name, "master" ) )
-			this->eventQueue.size.separated.master = atoi( value );
-		else if ( match( name, "slave" ) )
-			this->eventQueue.size.separated.slave = atoi( value );
-		else
-			return false;
-	} else if ( match( section, "loadingStats" ) ) {
-		if ( match( name, "updateInterval" ) )
-			this->loadingStats.updateInterval = atoi( value );
-		else
-			return false;
-	} else if ( match( section, "remap" ) ) {
-		if ( match( name, "concurrent" ) )
-			this->remap.worker = atoi( value );
-		else if ( match( name, "queue_len" ) )
-			this->remap.queue = atoi( value );
+	} else if ( match( section, "states" ) ) {
+		if ( match( name, "manual" ) )
+			this->states.isManual = match( value, "true" );
+		else if ( match( name, "maximum" ) )
+			this->states.maximum = atoi( value );
+		else if ( match( name, "start_threshold" ) )
+			this->states.threshold.start = atof( value );
+		else if ( match( name, "stop_threshold" ) )
+			this->states.threshold.stop = atof( value );
+		else if ( match( name, "overload_threshold" ) )
+			this->states.threshold.overload = atof( value );
 		else
 			return false;
 	} else {
@@ -105,38 +51,12 @@ bool CoordinatorConfig::validate() {
 	if ( ! this->coordinator.addr.isInitialized() )
 		CFG_PARSE_ERROR( "CoordinatorConfig", "The coordinator is not assigned with an valid address." );
 
-	if ( this->epoll.maxEvents < 1 )
-		CFG_PARSE_ERROR( "CoordinatorConfig", "Maximum number of events in epoll should be at least 1." );
+	if ( ! this->states.isManual ) {
+		if ( this->states.threshold.start > this->states.threshold.stop )
+			CFG_PARSE_ERROR( "CoordinatorConfig", "The start threshold should be smaller than the stop threshold." );
 
-	if ( this->epoll.timeout < -1 )
-		CFG_PARSE_ERROR( "CoordinatorConfig", "The timeout value of epoll should be either -1 (infinite blocking), 0 (non-blocking) or a positive value (representing the number of milliseconds to block)." );
-
-	switch( this->workers.type ) {
-		case WORKER_TYPE_MIXED:
-			if ( this->workers.number.mixed < 1 )
-				CFG_PARSE_ERROR( "CoordinatorConfig", "The number of workers should be at least 1." );
-			if ( this->eventQueue.size.mixed < this->workers.number.mixed )
-				CFG_PARSE_ERROR( "CoordinatorConfig", "The size of the event queue should be at least the number of workers." );
-			if ( this->eventQueue.size.pMixed < this->workers.number.mixed )
-				CFG_PARSE_ERROR( "MasterConfig", "The size of the prioritized event queue should be at least the number of workers." );
-			break;
-		case WORKER_TYPE_SEPARATED:
-			if ( this->workers.number.separated.coordinator < 1 )
-				CFG_PARSE_ERROR( "CoordinatorConfig", "The number of coordinator workers should be at least 1." );
-			if ( this->workers.number.separated.master < 1 )
-				CFG_PARSE_ERROR( "CoordinatorConfig", "The number of master workers should be at least 1." );
-			if ( this->workers.number.separated.slave < 1 )
-				CFG_PARSE_ERROR( "CoordinatorConfig", "The number of slave workers should be at least 1." );
-
-			if ( this->eventQueue.size.separated.coordinator < this->workers.number.separated.coordinator )
-				CFG_PARSE_ERROR( "CoordinatorConfig", "The size of the coordinator event queue should be at least the number of workers." );
-			if ( this->eventQueue.size.separated.master < this->workers.number.separated.master )
-				CFG_PARSE_ERROR( "CoordinatorConfig", "The size of the master event queue should be at least the number of workers." );
-			if ( this->eventQueue.size.separated.slave < this->workers.number.separated.slave )
-				CFG_PARSE_ERROR( "CoordinatorConfig", "The size of the slave event queue should be at least the number of workers." );
-			break;
-		default:
-			CFG_PARSE_ERROR( "CoordinatorConfig", "The type of event queue should be either \"mixed\" or \"separated\"." );
+		if ( this->states.threshold.overload <= 0 )
+			CFG_PARSE_ERROR( "CoordinatorConfig", "The overload threshold should be larger than 0." );
 	}
 
 	return true;
@@ -163,49 +83,25 @@ void CoordinatorConfig::print( FILE *f ) {
 		width, "Address"
 	);
 	this->coordinator.addr.print( f );
+
 	fprintf(
 		f,
-		"- epoll settings\n"
-		"\t- %-*s : %u\n"
-		"\t- %-*s : %d\n"
-		"- Workers\n"
+		"- States\n"
 		"\t- %-*s : %s\n",
-		width, "Maximum number of events", this->epoll.maxEvents,
-		width, "Timeout", this->epoll.timeout,
-		width, "Type", this->workers.type == WORKER_TYPE_MIXED ? "Mixed" : "Separated"
+		width, "Is manual?", this->states.isManual ? "Yes" : "No"
 	);
-
-	if ( this->workers.type == WORKER_TYPE_MIXED ) {
+	if ( ! this->states.isManual ) {
 		fprintf(
 			f,
 			"\t- %-*s : %u\n"
-			"- Event queues\n"
-			"\t- %-*s : %s\n"
-			"\t- %-*s : %u; %u (prioritized)\n",
-			width, "Number of workers", this->workers.number.mixed,
-			width, "Blocking?", this->eventQueue.block ? "Yes" : "No",
-			width, "Size", this->eventQueue.size.mixed, this->eventQueue.size.pMixed
-		);
-	} else {
-		fprintf(
-			f,
-			"\t- %-*s : %u\n"
-			"\t- %-*s : %u\n"
-			"\t- %-*s : %u\n"
-			"- Event queues\n"
-			"\t- %-*s : %s\n"
-			"\t- %-*s : %u\n"
-			"\t- %-*s : %u\n"
-			"\t- %-*s : %u\n",
-			width, "Number of coordinator workers", this->workers.number.separated.coordinator,
-			width, "Number of master workers", this->workers.number.separated.master,
-			width, "Number of slave workers", this->workers.number.separated.slave,
-			width, "Blocking?", this->eventQueue.block ? "Yes" : "No",
-			width, "Size for coordinator", this->eventQueue.size.separated.coordinator,
-			width, "Size for master", this->eventQueue.size.separated.master,
-			width, "Size for slave", this->eventQueue.size.separated.slave
+			"\t- %-*s : %f\n"
+			"\t- %-*s : %f\n"
+			"\t- %-*s : %f\n",
+			width, "Maximum", this->states.maximum,
+			width, "Start threshold", this->states.threshold.start,
+			width, "Stop threshold", this->states.threshold.stop,
+			width, "Overload threshold", this->states.threshold.overload
 		);
 	}
-
 	fprintf( f, "\n" );
 }

@@ -11,7 +11,7 @@
 size_t Protocol::generateHeader( uint8_t magic, uint8_t opcode, uint32_t length, uint16_t instanceId, uint32_t requestId, char *buf, uint32_t requestTimestamp ) {
 	size_t bytes = 0;
 
-	buf[ 0 ] = ( ( magic & 0x07 ) | ( PROTO_MAGIC_FROM_APPLICATION & 0x18 ) | ( PROTO_MAGIC_TO_MASTER & 0x60 ) );
+	buf[ 0 ] = ( ( magic & 0x07 ) | ( PROTO_MAGIC_FROM_APPLICATION & 0x18 ) | ( PROTO_MAGIC_TO_CLIENT & 0x60 ) );
 	buf[ 1 ] = opcode & 0xFF;
 	bytes = 2;
 
@@ -53,7 +53,7 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 			return false;
 	}
 
-	if ( from != PROTO_MAGIC_FROM_MASTER ) {
+	if ( from != PROTO_MAGIC_FROM_CLIENT ) {
 		fprintf( stderr, "Error #2: (magic, from, to, opcode, length, instanceId, requestId) = (%x, %x, %x, %x, %u, %u, %u)\n", magic, from, to, opcode, length, instanceId, requestId );
 		return false;
 	}

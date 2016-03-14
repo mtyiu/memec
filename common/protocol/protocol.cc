@@ -61,8 +61,8 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 	switch( from ) {
 		case PROTO_MAGIC_FROM_APPLICATION:
 		case PROTO_MAGIC_FROM_COORDINATOR:
-		case PROTO_MAGIC_FROM_MASTER:
-		case PROTO_MAGIC_FROM_SLAVE:
+		case PROTO_MAGIC_FROM_CLIENT:
+		case PROTO_MAGIC_FROM_SERVER:
 			break;
 		default:
 			fprintf( stderr, "Error #2: (magic, from, to, opcode, length, instanceId, requestId) = (%x, %x, %x, %x, %u, %u, %u)\n", magic, from, to, opcode, length, instanceId, requestId );
@@ -77,55 +77,50 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 	switch( opcode ) {
 		case PROTO_OPCODE_REGISTER:
 		case PROTO_OPCODE_SYNC:
-		case PROTO_OPCODE_SLAVE_CONNECTED:
-		case PROTO_OPCODE_MASTER_PUSH_STATS:
-		case PROTO_OPCODE_COORDINATOR_PUSH_STATS:
+		case PROTO_OPCODE_SERVER_CONNECTED:
 		case PROTO_OPCODE_SEAL_CHUNKS:
 		case PROTO_OPCODE_FLUSH_CHUNKS:
 		case PROTO_OPCODE_RECONSTRUCTION:
 		case PROTO_OPCODE_RECONSTRUCTION_UNSEALED:
 		case PROTO_OPCODE_SYNC_META:
 		case PROTO_OPCODE_RELEASE_DEGRADED_LOCKS:
-		case PROTO_OPCODE_SLAVE_RECONSTRUCTED:
-		case PROTO_OPCODE_BACKUP_SLAVE_PROMOTED:
+		case PROTO_OPCODE_SERVER_RECONSTRUCTED:
+		case PROTO_OPCODE_BACKUP_SERVER_PROMOTED:
 		case PROTO_OPCODE_PARITY_MIGRATE:
 
 		case PROTO_OPCODE_GET:
 		case PROTO_OPCODE_SET:
 		case PROTO_OPCODE_UPDATE:
 		case PROTO_OPCODE_DELETE:
-		case PROTO_OPCODE_REDIRECT_GET:
-		case PROTO_OPCODE_REDIRECT_UPDATE:
-		case PROTO_OPCODE_REDIRECT_DELETE:
+		case PROTO_OPCODE_UPDATE_CHECK:
+		case PROTO_OPCODE_DELETE_CHECK:
 		case PROTO_OPCODE_DEGRADED_GET:
 		case PROTO_OPCODE_DEGRADED_UPDATE:
 		case PROTO_OPCODE_DEGRADED_DELETE:
 
 		case PROTO_OPCODE_REMAPPING_SET:
 		case PROTO_OPCODE_DEGRADED_LOCK:
-		case PROTO_OPCODE_DEGRADED_UNLOCK:
 
 		case PROTO_OPCODE_ACK_METADATA:
-		case PROTO_OPCODE_ACK_REQUEST:
 		case PROTO_OPCODE_ACK_PARITY_DELTA:
 
 		case PROTO_OPCODE_REVERT_DELTA:
 
 		case PROTO_OPCODE_REMAPPING_LOCK:
-
-		case PROTO_OPCODE_REMAPPING_UNLOCK:
 		case PROTO_OPCODE_SEAL_CHUNK:
 		case PROTO_OPCODE_UPDATE_CHUNK:
 		case PROTO_OPCODE_DELETE_CHUNK:
 		case PROTO_OPCODE_GET_CHUNK:
-		case PROTO_OPCODE_GET_CHUNKS:
 		case PROTO_OPCODE_SET_CHUNK:
 		case PROTO_OPCODE_SET_CHUNK_UNSEALED:
 		case PROTO_OPCODE_FORWARD_CHUNK:
 		case PROTO_OPCODE_FORWARD_KEY:
 		case PROTO_OPCODE_REMAPPED_UPDATE:
 		case PROTO_OPCODE_REMAPPED_DELETE:
+		case PROTO_OPCODE_BATCH_CHUNKS:
 		case PROTO_OPCODE_BATCH_KEY_VALUES:
+		case PROTO_OPCODE_UPDATE_CHUNK_CHECK:
+		case PROTO_OPCODE_DELETE_CHUNK_CHECK:
 			break;
 		default:
 			fprintf( stderr, "Error #4: (magic, from, to, opcode, length, instanceId, requestId) = (%x, %x, %x, %x, %u, %u, %u)\n", magic, from, to, opcode, length, instanceId, requestId );
@@ -166,13 +161,13 @@ Protocol::Protocol( Role role ) {
 			this->from = PROTO_MAGIC_FROM_COORDINATOR;
 			this->to = PROTO_MAGIC_TO_COORDINATOR;
 			break;
-		case ROLE_MASTER:
-			this->from = PROTO_MAGIC_FROM_MASTER;
-			this->to = PROTO_MAGIC_TO_MASTER;
+		case ROLE_CLIENT:
+			this->from = PROTO_MAGIC_FROM_CLIENT;
+			this->to = PROTO_MAGIC_TO_CLIENT;
 			break;
-		case ROLE_SLAVE:
-			this->from = PROTO_MAGIC_FROM_SLAVE;
-			this->to = PROTO_MAGIC_TO_SLAVE;
+		case ROLE_SERVER:
+			this->from = PROTO_MAGIC_FROM_SERVER;
+			this->to = PROTO_MAGIC_TO_SERVER;
 			break;
 		default:
 			__ERROR__( "Protocol", "Protocol", "Unknown server role." );

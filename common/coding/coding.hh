@@ -26,7 +26,7 @@ public:
 	 * @param parity buffer for storing the encoded parity chunk
 	 * @param index  indicate which parity chunk should be generated (e.g., index = 2 if the 2nd parity chunk is needed)
 	 * @param startOff starting offset of the modified range of data in the stripe
-	 * @param endOff starting offset of the unmodified range of data following the range of modified data 
+	 * @param endOff starting offset of the unmodified range of data following the range of modified data
 	 */
 	virtual void encode( Chunk **data, Chunk *parity, uint32_t index, uint32_t startOff = 0, uint32_t endOff = 0 ) = 0;
 
@@ -52,6 +52,12 @@ public:
 	 */
 	static char *bitwiseXOR( char *dst, char *srcA, char *srcB, uint32_t len );
 	static Chunk *bitwiseXOR( Chunk *dst, Chunk *srcA, Chunk *srcB, uint32_t size );
+
+	static uint32_t forceSeal(
+		Coding *coding, Chunk **chunks, Chunk *tmpParityChunk,
+		bool **sealIndicator,
+		uint32_t dataChunkCount, uint32_t parityChunkCount
+	);
 };
 
 /**

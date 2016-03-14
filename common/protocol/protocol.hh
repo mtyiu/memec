@@ -24,13 +24,13 @@
 // (Bit: 3-4) //
 #define PROTO_MAGIC_FROM_APPLICATION              0x00 // ---00---
 #define PROTO_MAGIC_FROM_COORDINATOR              0x08 // ---01---
-#define PROTO_MAGIC_FROM_MASTER                   0x10 // ---10---
-#define PROTO_MAGIC_FROM_SLAVE                    0x18 // ---11---
+#define PROTO_MAGIC_FROM_CLIENT                   0x10 // ---10---
+#define PROTO_MAGIC_FROM_SERVER                   0x18 // ---11---
  // (Bit: 5-6) //
 #define PROTO_MAGIC_TO_APPLICATION                0x00 // -00-----
 #define PROTO_MAGIC_TO_COORDINATOR                0x20 // -01-----
-#define PROTO_MAGIC_TO_MASTER                     0x40 // -10-----
-#define PROTO_MAGIC_TO_SLAVE                      0x60 // -11-----
+#define PROTO_MAGIC_TO_CLIENT                     0x40 // -10-----
+#define PROTO_MAGIC_TO_SERVER                     0x60 // -11-----
 // (Bit: 7): Reserved //
 
 /*******************
@@ -39,56 +39,52 @@
 // Coordinator-specific opcodes (30-49) //
 #define PROTO_OPCODE_REGISTER                     0x00
 #define PROTO_OPCODE_SYNC                         0x31
-#define PROTO_OPCODE_SLAVE_CONNECTED              0x32
-#define PROTO_OPCODE_MASTER_PUSH_STATS            0x33
-#define PROTO_OPCODE_COORDINATOR_PUSH_STATS       0x34
-#define PROTO_OPCODE_SEAL_CHUNKS                  0x35
-#define PROTO_OPCODE_FLUSH_CHUNKS                 0x36
-#define PROTO_OPCODE_RECONSTRUCTION               0x37
-#define PROTO_OPCODE_RECONSTRUCTION_UNSEALED      0x38
-#define PROTO_OPCODE_SYNC_META                    0x39
-#define PROTO_OPCODE_RELEASE_DEGRADED_LOCKS       0x40
-#define PROTO_OPCODE_SLAVE_RECONSTRUCTED          0x41
-#define PROTO_OPCODE_BACKUP_SLAVE_PROMOTED        0x42
-#define PROTO_OPCODE_PARITY_MIGRATE               0x43
+#define PROTO_OPCODE_SERVER_CONNECTED             0x32
+#define PROTO_OPCODE_SEAL_CHUNKS                  0x33
+#define PROTO_OPCODE_FLUSH_CHUNKS                 0x34
+#define PROTO_OPCODE_RECONSTRUCTION               0x35
+#define PROTO_OPCODE_RECONSTRUCTION_UNSEALED      0x36
+#define PROTO_OPCODE_SYNC_META                    0x37
+#define PROTO_OPCODE_RELEASE_DEGRADED_LOCKS       0x38
+#define PROTO_OPCODE_SERVER_RECONSTRUCTED         0x39
+#define PROTO_OPCODE_BACKUP_SERVER_PROMOTED       0x40
+#define PROTO_OPCODE_PARITY_MIGRATE               0x41
 
-// Application <-> Master or Master <-> Slave (0-19) //
+// Application <-> Client or Client <-> Server (0-19) //
 #define PROTO_OPCODE_GET                          0x01
 #define PROTO_OPCODE_SET                          0x02
 #define PROTO_OPCODE_UPDATE                       0x03
 #define PROTO_OPCODE_DELETE                       0x04
-#define PROTO_OPCODE_REDIRECT_GET                 0x05
-#define PROTO_OPCODE_REDIRECT_UPDATE              0x06
-#define PROTO_OPCODE_REDIRECT_DELETE              0x07
-#define PROTO_OPCODE_DEGRADED_GET                 0x08
-#define PROTO_OPCODE_DEGRADED_UPDATE              0x09
-#define PROTO_OPCODE_DEGRADED_DELETE              0x10
-// Master <-> Slave //
-#define PROTO_OPCODE_REMAPPING_SET                0x12
-#define PROTO_OPCODE_DEGRADED_LOCK                0x13
-#define PROTO_OPCODE_DEGRADED_UNLOCK              0x14
-#define PROTO_OPCODE_ACK_METADATA                 0x15
-#define PROTO_OPCODE_ACK_REQUEST                  0x16
-#define PROTO_OPCODE_ACK_PARITY_DELTA             0x17
-#define PROTO_OPCODE_REVERT_DELTA                 0x18
+#define PROTO_OPCODE_UPDATE_CHECK                 0x05
+#define PROTO_OPCODE_DELETE_CHECK                 0x06
+#define PROTO_OPCODE_DEGRADED_GET                 0x07
+#define PROTO_OPCODE_DEGRADED_UPDATE              0x08
+#define PROTO_OPCODE_DEGRADED_DELETE              0x09
+// Client <-> Server //
+#define PROTO_OPCODE_REMAPPING_SET                0x10
+#define PROTO_OPCODE_DEGRADED_LOCK                0x11
+#define PROTO_OPCODE_ACK_METADATA                 0x12
+#define PROTO_OPCODE_ACK_PARITY_DELTA             0x13
+#define PROTO_OPCODE_REVERT_DELTA                 0x14
 
-// Master <-> Coordinator (20-29) //
+// Client <-> Coordinator (20-29) //
 #define PROTO_OPCODE_REMAPPING_LOCK               0x20
 
-// Slave <-> Slave (50-69) //
-#define PROTO_OPCODE_REMAPPING_UNLOCK             0x50
+// Server <-> Server (50-69) //
 #define PROTO_OPCODE_SEAL_CHUNK                   0x51
 #define PROTO_OPCODE_UPDATE_CHUNK                 0x52
 #define PROTO_OPCODE_DELETE_CHUNK                 0x53
 #define PROTO_OPCODE_GET_CHUNK                    0x54
-#define PROTO_OPCODE_GET_CHUNKS                   0x55
-#define PROTO_OPCODE_SET_CHUNK                    0x56
-#define PROTO_OPCODE_SET_CHUNK_UNSEALED           0x57
-#define PROTO_OPCODE_FORWARD_CHUNK                0x58
-#define PROTO_OPCODE_FORWARD_KEY                  0x59
-#define PROTO_OPCODE_REMAPPED_UPDATE              0x60
-#define PROTO_OPCODE_REMAPPED_DELETE              0x61
+#define PROTO_OPCODE_SET_CHUNK                    0x55
+#define PROTO_OPCODE_SET_CHUNK_UNSEALED           0x56
+#define PROTO_OPCODE_FORWARD_CHUNK                0x57
+#define PROTO_OPCODE_FORWARD_KEY                  0x58
+#define PROTO_OPCODE_REMAPPED_UPDATE              0x59
+#define PROTO_OPCODE_REMAPPED_DELETE              0x60
+#define PROTO_OPCODE_BATCH_CHUNKS                 0x61
 #define PROTO_OPCODE_BATCH_KEY_VALUES             0x62
+#define PROTO_OPCODE_UPDATE_CHUNK_CHECK           0x63
+#define PROTO_OPCODE_DELETE_CHUNK_CHECK           0x64
 
 #define PROTO_UNINITIALIZED_INSTANCE              0
 
@@ -116,8 +112,8 @@
 enum Role {
 	ROLE_APPLICATION,
 	ROLE_COORDINATOR,
-	ROLE_MASTER,
-	ROLE_SLAVE
+	ROLE_CLIENT,
+	ROLE_SERVER
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -143,8 +139,8 @@ struct AddressHeader {
 //////////////
 // Recovery //
 //////////////
-#define PROTO_PROMOTE_BACKUP_SLAVE_SIZE 14
-struct PromoteBackupSlaveHeader {
+#define PROTO_PROMOTE_BACKUP_SERVER_SIZE 14
+struct PromoteBackupServerHeader {
 	uint32_t addr;
 	uint16_t port;
 	uint32_t chunkCount;
@@ -182,16 +178,16 @@ struct KeyOpMetadataHeader {
 	char *key;
 };
 
-#define PROTO_SLAVE_REMAPPED_PARITY_SIZE PROTO_ADDRESS_SIZE
+#define PROTO_SERVER_REMAPPED_PARITY_SIZE PROTO_ADDRESS_SIZE
 
 //////////////////////////
 // Load synchronization //
 //////////////////////////
 #define PROTO_LOAD_STATS_SIZE 12
 struct LoadStatsHeader {
-	uint32_t slaveGetCount;
-	uint32_t slaveSetCount;
-	uint32_t slaveOverloadCount;
+	uint32_t serverGetCount;
+	uint32_t serverSetCount;
+	uint32_t serverOverloadCount;
 };
 
 ///////////////////////
@@ -201,12 +197,6 @@ struct LoadStatsHeader {
 struct KeyHeader {
 	uint8_t keySize;
 	char *key;
-};
-
-#define PROTO_KEY_SLAVE_SIZE 17
-struct KeySlaveHeader {
-    uint8_t keySize;
-    char *key;
 };
 
 #define PROTO_KEY_BACKUP_BASE_SIZE       2
@@ -279,6 +269,12 @@ struct ChunkUpdateHeader {
 //////////////////////
 // Batch operations //
 //////////////////////
+#define PROTO_BATCH_CHUNK_SIZE 4
+struct BatchChunkHeader {
+	uint32_t count;
+	char *chunks; // Array of (request ID + ChunkHeader)
+};
+
 #define PROTO_BATCH_KEY_SIZE 4
 struct BatchKeyHeader {
 	uint32_t count;
@@ -330,7 +326,7 @@ struct DegradedLockReqHeader {
 
 // Size
 #define PROTO_DEGRADED_LOCK_RES_BASE_SIZE   2 // type: 1, 2, 3, 4, 5
-#define PROTO_DEGRADED_LOCK_RES_LOCK_SIZE   13 // type: 1, 2
+#define PROTO_DEGRADED_LOCK_RES_LOCK_SIZE   14 // type: 1, 2
 #define PROTO_DEGRADED_LOCK_RES_REMAP_SIZE  4 // type: 4
 #define PROTO_DEGRADED_LOCK_RES_NOT_SIZE    0 // type: 3, 5
 // Type
@@ -350,13 +346,15 @@ struct DegradedLockResHeader {
 	uint32_t stripeId;             // type: 1, 2
 	uint32_t reconstructedCount;   // type: 1, 2
 	uint32_t ongoingAtChunk;       // type: 1, 2; this represents the server that is performing reconstruction on the parity chunks (if any; represented by its chunk ID), set as -1 if there are no such servers
+	uint8_t numSurvivingChunkIds;  // type: 1, 2
+	uint32_t *survivingChunkIds;   // type: 1, 2
 	uint32_t remappedCount;        // type: 4
 	uint32_t *original;            // type: 1, 2, 4
 	uint32_t *reconstructed;       // type: 1, 2
 	uint32_t *remapped;            // type: 4
 };
 
-#define PROTO_DEGRADED_REQ_BASE_SIZE 13
+#define PROTO_DEGRADED_REQ_BASE_SIZE 14
 struct DegradedReqHeader {
 	bool isSealed;
 	uint32_t stripeId;
@@ -364,6 +362,8 @@ struct DegradedReqHeader {
 	uint32_t *original;
 	uint32_t *reconstructed;
 	uint32_t ongoingAtChunk;
+	uint8_t numSurvivingChunkIds;
+	uint32_t *survivingChunkIds;
 	union {
 		struct KeyHeader key;
 		struct KeyValueUpdateHeader keyValueUpdate;
@@ -388,7 +388,7 @@ struct ForwardKeyHeader {
 	char *valueUpdate;
 };
 
-// For retrieving key-value pair in unsealed chunks from parity slave
+// For retrieving key-value pair in unsealed chunks from parity server
 #define PROTO_LIST_STRIPE_KEY_SIZE 9
 struct ListStripeKeyHeader {
 	uint32_t listId;
@@ -397,7 +397,7 @@ struct ListStripeKeyHeader {
 	char *key;
 };
 
-// For asking slaves to send back the modified reconstructed chunks to the overloaded slave
+// For asking servers to send back the modified reconstructed chunks to the overloaded server
 #define PROTO_DEGRADED_RELEASE_REQ_SIZE 20
 struct DegradedReleaseReqHeader {
 	uint32_t srcListId;
@@ -458,13 +458,15 @@ struct ChunksHeader {
 	uint32_t *stripeIds;
 };
 
-#define PROTO_CHUNK_DATA_SIZE 20
+#define PROTO_CHUNK_DATA_SIZE 21
 struct ChunkDataHeader {
+	uint8_t sealIndicatorCount;
 	uint32_t listId;
 	uint32_t stripeId;
 	uint32_t chunkId;
 	uint32_t size;
 	uint32_t offset;
+	bool *sealIndicator;
 	char *data;
 };
 
@@ -493,7 +495,7 @@ struct AcknowledgementHeader {
 struct DeltaAcknowledgementHeader {
 	uint32_t tsCount;         // number of timestamps
 	uint32_t keyCount;       // number of requests ids
-	uint16_t targetId;      // source data slave
+	uint16_t targetId;      // source data server
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -536,7 +538,7 @@ protected:
 		uint32_t dstAddr, uint16_t dstPort
 	);
 	// ---------- recovery_protocol.cc ----------
-	size_t generatePromoteBackupSlaveHeader(
+	size_t generatePromoteBackupServerHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t addr, uint16_t port,
 		std::unordered_set<Metadata> &chunks,
@@ -545,17 +547,17 @@ protected:
 		std::unordered_set<Key>::iterator &keysIt,
 		bool &isCompleted
 	);
-	size_t generatePromoteBackupSlaveHeader(
+	size_t generatePromoteBackupServerHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t addr, uint16_t port, uint32_t numReconstructedChunks, uint32_t numReconstructedKeys
 	);
-	bool parsePromoteBackupSlaveHeader(
+	bool parsePromoteBackupServerHeader(
 		size_t offset, uint32_t &addr, uint16_t &port,
 		uint32_t &chunkCount, uint32_t &unsealedCount,
 		uint32_t *&metadata, char *&keys,
 		char *buf, size_t size
 	);
-	bool parsePromoteBackupSlaveHeader(
+	bool parsePromoteBackupServerHeader(
 		size_t offset, uint32_t &addr, uint16_t &port,
 		uint32_t &numReconstructedChunks, uint32_t &numReconstructedKeys,
 		char *buf, size_t size
@@ -608,11 +610,11 @@ protected:
 	// ---------- load_protocol.cc ----------
 	size_t generateLoadStatsHeader(
 		uint8_t magic, uint8_t to, uint16_t instanceId, uint32_t requestId,
-		uint32_t slaveGetCount, uint32_t slaveSetCount, uint32_t slaveOverloadCount,
-		uint32_t recordSize, uint32_t slaveAddrSize
+		uint32_t serverGetCount, uint32_t serverSetCount, uint32_t serverOverloadCount,
+		uint32_t recordSize, uint32_t serverAddrSize
 	);
 	bool parseLoadStatsHeader(
-		size_t offset, uint32_t &slaveGetCount, uint32_t &slaveSetCount, uint32_t &slaveOverloadCount,
+		size_t offset, uint32_t &serverGetCount, uint32_t &serverSetCount, uint32_t &serverOverloadCount,
 		char *buf, size_t size
 	);
 
@@ -732,6 +734,25 @@ protected:
 	// Batch operations //
 	//////////////////////
 	// ---------- batch_protocol.cc ----------
+	size_t generateBatchChunkHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode,
+		uint16_t instanceId, uint32_t requestId,
+		std::vector<uint32_t> *requestIds,
+		std::vector<Metadata> *metadata,
+		uint32_t &chunksCount,
+		bool &isCompleted
+	);
+	bool parseBatchChunkHeader( size_t offset, uint32_t &count, char *&chunks, char *buf, size_t size );
+
+	/*
+	size_t generateBatchChunkDataHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode,
+		uint16_t instanceId, uint32_t requestId,
+		uint32_t chunksBytes
+	);
+	bool parseBatchChunkDataHeader( size_t offset, uint32_t &count, char *&chunks, char *buf, size_t size );
+	*/
+
 	size_t generateBatchKeyHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode,
 		uint16_t instanceId, uint32_t requestId,
@@ -815,9 +836,10 @@ protected:
 	size_t generateDegradedLockResHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		bool isLocked, uint8_t keySize, char *key,
-		bool isSealed, uint32_t stripeId,
+		bool isSealed, uint32_t stripeId, uint32_t dataChunkId, uint32_t dataChunkCount,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
-		uint32_t ongoingAtChunk
+		uint32_t ongoingAtChunk,
+		uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds
 	);
 	size_t generateDegradedLockResHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
@@ -838,6 +860,7 @@ protected:
 		uint32_t &stripeId,
 		uint32_t *&original, uint32_t *&reconstructed, uint32_t &reconstructedCount,
 		uint32_t &ongoingAtChunk,
+		uint8_t &numSurvivingChunkIds, uint32_t *&survivingChunkIds,
 		char *buf, size_t size
 	);
 	bool parseDegradedLockResHeader(
@@ -850,7 +873,7 @@ protected:
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		bool isSealed, uint32_t stripeId,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
-		uint32_t ongoingAtChunk,
+		uint32_t ongoingAtChunk, uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds,
 		uint8_t keySize, char *key,
 		uint32_t timestamp = 0
 	);
@@ -858,7 +881,7 @@ protected:
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		bool isSealed, uint32_t stripeId,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
-		uint32_t ongoingAtChunk,
+		uint32_t ongoingAtChunk, uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds,
 		uint8_t keySize, char *key,
 		uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate,
 		uint32_t timestamp = 0
@@ -867,7 +890,7 @@ protected:
 		size_t offset,
 		bool &isSealed, uint32_t &stripeId,
 		uint32_t *&original, uint32_t *&reconstructed, uint32_t &reconstructedCount,
-		uint32_t &ongoingAtChunk,
+		uint32_t &ongoingAtChunk, uint8_t &numSurvivingChunkIds, uint32_t *&survivingChunkIds,
 		char *buf, size_t size
 	);
 
@@ -1004,11 +1027,13 @@ protected:
 	size_t generateChunkDataHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
-		uint32_t chunkSize, uint32_t chunkOffset, char *chunkData
+		uint32_t chunkSize, uint32_t chunkOffset, char *chunkData,
+		uint8_t sealIndicatorCount, bool *sealIndicator
 	);
 	bool parseChunkDataHeader(
 		size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
 		uint32_t &chunkSize, uint32_t &chunkOffset, char *&chunkData,
+		uint8_t &sealIndicatorCount, bool *&sealIndicator,
 		char *buf, size_t size
 	);
 
@@ -1081,8 +1106,8 @@ public:
 	// Reconstruction //
 	////////////////////
 	// ---------- recovery_protocol.cc ----------
-	bool parsePromoteBackupSlaveHeader(
-		struct PromoteBackupSlaveHeader &header, bool isRequest,
+	bool parsePromoteBackupServerHeader(
+		struct PromoteBackupServerHeader &header, bool isRequest,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 	//////////////////////////////////////////
@@ -1151,6 +1176,30 @@ public:
 	// Batch operations //
 	//////////////////////
 	// ---------- batch_protocol.cc ----------
+	bool parseBatchChunkHeader(
+		struct BatchChunkHeader &header,
+		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
+	bool nextChunkInBatchChunkHeader(
+		struct BatchChunkHeader &header,
+		uint32_t &responseId,
+		struct ChunkHeader &chunkHeader,
+		uint32_t size, uint32_t &offset
+	);
+
+	/*
+	bool parseBatchChunkDataHeader(
+		struct BatchChunkDataHeader &header,
+		char *buf, size_t size, size_t offset
+	);
+	bool nextChunkDataInBatchChunkDataHeader(
+		struct BatchChunkDataHeader &header,
+		struct ChunkDataHeader &chunkDataHeader,
+		uint32_t size,
+		uint32_t &offset
+	);
+	*/
+
 	bool parseBatchKeyHeader(
 		struct BatchKeyHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0

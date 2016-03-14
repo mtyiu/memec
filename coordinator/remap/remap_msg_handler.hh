@@ -25,34 +25,36 @@ private:
 
 	~CoordinatorRemapMsgHandler();
 
-	/* set of alive masters connected */
-	std::set<std::string> aliveMasters;
-	LOCK_T mastersLock;
+	/* set of alive clients connected */
+	std::set<std::string> aliveClients;
+	LOCK_T clientsLock;
 
-	/* ack map for each slave, identify by slave addr, and contains the set of acked masters */
-	std::map<struct sockaddr_in, std::set<std::string>* > ackMasters;
-	LOCK_T mastersAckLock;
+	/* ack map for each server, identify by server addr, and contains the set of acked clients */
+	std::map<struct sockaddr_in, std::set<std::string>* > ackClients;
+	LOCK_T clientsAckLock;
 
 	bool isListening;
 
 	CoordinatorRemapWorker *workers;
-	std::set<struct sockaddr_in> aliveSlaves;
-	std::set<struct sockaddr_in> crashedSlaves;
-	LOCK_T aliveSlavesLock;
+	std::set<struct sockaddr_in> aliveServers;
+	std::set<struct sockaddr_in> crashedServers;
+	LOCK_T aliveServersLock;
 
-	/* handle master join or leave */
-	bool isMasterLeft( int service, char *msg, char *subject );
-	bool isMasterJoin( int service, char *msg, char *subject );
+	/* handle client join or leave */
+	bool isClientJoin( int service, char *msg, char *subject );
+	bool isClientLeft( int service, char *msg, char *subject );
+	bool isServerJoin( int service, char *msg, char *subject );
+	bool isServerLeft( int service, char *msg, char *subject );
 
 	static void *readMessages( void *argv );
 	bool updateState( char *subject, char *msg, int len );
 
-	/* manage the set of alive masters connected */
-	void addAliveMaster( char *name );
-	void removeAliveMaster( char *name );
+	/* manage the set of alive clients connected */
+	void addAliveClient( char *name );
+	void removeAliveClient( char *name );
 
-	/* insert the same event for one or more slaves */
-	bool insertRepeatedEvents ( RemapStateEvent event, std::vector<struct sockaddr_in> *slaves );
+	/* insert the same event for one or more servers */
+	bool insertRepeatedEvents ( RemapStateEvent event, std::vector<struct sockaddr_in> *servers );
 
 public:
 	EventQueue<RemapStateEvent> *eventQueue;
@@ -71,28 +73,31 @@ public:
 	bool stop();
 
 	// batch transit (start)
-	bool transitToDegraded( std::vector<struct sockaddr_in> *slaves, bool forced = false );
-	bool transitToNormal( std::vector<struct sockaddr_in> *slaves, bool froced = false );
+	bool transitToDegraded( std::vector<struct sockaddr_in> *servers, bool forced = false );
+	bool transitToNormal( std::vector<struct sockaddr_in> *servers, bool froced = false );
 	// clean up before transition ends
-	bool transitToDegradedEnd( const struct sockaddr_in &slave );
-	bool transitToNormalEnd( const struct sockaddr_in &slave );
+	bool transitToDegradedEnd( const struct sockaddr_in &server );
+	bool transitToNormalEnd( const struct sockaddr_in &server );
 
-	// manage master ack
-	bool resetMasterAck( struct sockaddr_in slave );
-	bool isAllMasterAcked( struct sockaddr_in slave );
+	// manage client ack
+	bool resetClientAck( struct sockaddr_in server );
+	bool isAllClientAcked( struct sockaddr_in server );
 
-	// notify master of slaves' state
-	bool sendStateToMasters( std::vector<struct sockaddr_in> slaves );
-	bool sendStateToMasters( struct sockaddr_in slave );
+	// notify clients of servers' state
+	int sendStateToClients( std::vector<struct sockaddr_in> servers );
+	int sendStateToClients( struct sockaddr_in server );
+	// notify both clients and servers
+	int broadcastState( std::vector<struct sockaddr_in> servers );
+	int broadcastState( struct sockaddr_in server );
 
-	// keep track of the alive slaves
-	bool addAliveSlave( struct sockaddr_in slave );
-	bool addCrashedSlave( struct sockaddr_in slave );
-	bool removeAliveSlave( struct sockaddr_in slave );
+	// keep track of the alive servers
+	bool addAliveServer( struct sockaddr_in server );
+	bool addCrashedServer( struct sockaddr_in server );
+	bool removeAliveServer( struct sockaddr_in server );
 
-	// check slave state
-	bool isInTransition( const struct sockaddr_in &slave );
-	bool allowRemapping( const struct sockaddr_in &slave );
+	// check server state
+	bool isInTransition( const struct sockaddr_in &server );
+	bool allowRemapping( const struct sockaddr_in &server );
 	bool reachMaximumRemapped( uint32_t maximum );
 
 };

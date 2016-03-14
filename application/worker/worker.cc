@@ -14,8 +14,8 @@ void ApplicationWorker::dispatch( MixedEvent event ) {
 		case EVENT_TYPE_APPLICATION:
 			this->dispatch( event.event.application );
 			break;
-		case EVENT_TYPE_MASTER:
-			this->dispatch( event.event.master );
+		case EVENT_TYPE_CLIENT:
+			this->dispatch( event.event.client );
 			break;
 		default:
 			break;
@@ -25,7 +25,7 @@ void ApplicationWorker::dispatch( MixedEvent event ) {
 void ApplicationWorker::dispatch( ApplicationEvent event ) {
 }
 
-void ApplicationWorker::dispatch( MasterEvent event ) {
+void ApplicationWorker::dispatch( ClientEvent event ) {
 	bool connected, isSend;
 	uint16_t instanceId = Application::instanceId;
 	uint32_t requestId;
@@ -36,15 +36,15 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 	} buffer;
 	size_t valueSize;
 
-	if ( event.type != MASTER_EVENT_TYPE_PENDING )
+	if ( event.type != CLIENT_EVENT_TYPE_PENDING )
 		requestId = ApplicationWorker::idGenerator->nextVal( this->workerId );
 
 	switch( event.type ) {
-		case MASTER_EVENT_TYPE_REGISTER_REQUEST:
-			buffer.data = this->protocol.reqRegisterMaster( buffer.size, requestId );
+		case CLIENT_EVENT_TYPE_REGISTER_REQUEST:
+			buffer.data = this->protocol.reqRegisterClient( buffer.size, requestId );
 			isSend = true;
 			break;
-		case MASTER_EVENT_TYPE_SET_REQUEST:
+		case CLIENT_EVENT_TYPE_SET_REQUEST:
 			// Read contents from file
 			ret = ::read( event.message.set.fd, this->buffer.value, this->buffer.valueSize );
 			::close( event.message.set.fd );
@@ -63,7 +63,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 			);
 			isSend = true;
 			break;
-		case MASTER_EVENT_TYPE_GET_REQUEST:
+		case CLIENT_EVENT_TYPE_GET_REQUEST:
 			buffer.data = this->protocol.reqGet(
 				buffer.size,
 				instanceId, requestId,
@@ -72,7 +72,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 			);
 			isSend = true;
 			break;
-		case MASTER_EVENT_TYPE_UPDATE_REQUEST:
+		case CLIENT_EVENT_TYPE_UPDATE_REQUEST:
 			// Read contents from file
 			ret = ::read( event.message.update.fd, this->buffer.value, this->buffer.valueSize );
 			::close( event.message.update.fd );
@@ -92,7 +92,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 			);
 			isSend = true;
 			break;
-		case MASTER_EVENT_TYPE_DELETE_REQUEST:
+		case CLIENT_EVENT_TYPE_DELETE_REQUEST:
 			buffer.data = this->protocol.reqDelete(
 				buffer.size,
 				instanceId, requestId,
@@ -101,7 +101,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 			);
 			isSend = true;
 			break;
-		case MASTER_EVENT_TYPE_PENDING:
+		case CLIENT_EVENT_TYPE_PENDING:
 			isSend = false;
 			break;
 		default:
@@ -112,7 +112,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 		Key key;
 		KeyValueUpdate keyValueUpdate;
 		switch( event.type ) {
-			case MASTER_EVENT_TYPE_SET_REQUEST:
+			case CLIENT_EVENT_TYPE_SET_REQUEST:
 				key.dup(
 					event.message.set.keySize,
 					event.message.set.key,
@@ -125,11 +125,11 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 
 				key.ptr = ( void * ) event.socket;
 
-				LOCK( &ApplicationWorker::pending->masters.setLock );
-				ApplicationWorker::pending->masters.set.insert( key );
-				UNLOCK( &ApplicationWorker::pending->masters.setLock );
+				LOCK( &ApplicationWorker::pending->clients.setLock );
+				ApplicationWorker::pending->clients.set.insert( key );
+				UNLOCK( &ApplicationWorker::pending->clients.setLock );
 				break;
-			case MASTER_EVENT_TYPE_GET_REQUEST:
+			case CLIENT_EVENT_TYPE_GET_REQUEST:
 				key.dup(
 					event.message.get.keySize,
 					event.message.get.key,
@@ -142,11 +142,11 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 
 				key.ptr = ( void * ) event.socket;
 
-				LOCK( &ApplicationWorker::pending->masters.getLock );
-				ApplicationWorker::pending->masters.get.insert( key );
-				UNLOCK( &ApplicationWorker::pending->masters.getLock );
+				LOCK( &ApplicationWorker::pending->clients.getLock );
+				ApplicationWorker::pending->clients.get.insert( key );
+				UNLOCK( &ApplicationWorker::pending->clients.getLock );
 				break;
-			case MASTER_EVENT_TYPE_UPDATE_REQUEST:
+			case CLIENT_EVENT_TYPE_UPDATE_REQUEST:
 				keyValueUpdate.dup(
 					event.message.update.keySize,
 					event.message.update.key,
@@ -161,11 +161,11 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 
 				keyValueUpdate.ptr = ( void * ) event.socket;
 
-				LOCK( &ApplicationWorker::pending->masters.updateLock );
-				ApplicationWorker::pending->masters.update.insert( keyValueUpdate );
-				UNLOCK( &ApplicationWorker::pending->masters.updateLock );
+				LOCK( &ApplicationWorker::pending->clients.updateLock );
+				ApplicationWorker::pending->clients.update.insert( keyValueUpdate );
+				UNLOCK( &ApplicationWorker::pending->clients.updateLock );
 				break;
-			case MASTER_EVENT_TYPE_DELETE_REQUEST:
+			case CLIENT_EVENT_TYPE_DELETE_REQUEST:
 				key.dup( event.message.del.keySize, event.message.del.key, 0 );
 
 				LOCK( &ApplicationWorker::pending->application.delLock );
@@ -174,9 +174,9 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 
 				key.ptr = ( void * ) event.socket;
 
-				LOCK( &ApplicationWorker::pending->masters.delLock );
-				ApplicationWorker::pending->masters.del.insert( key );
-				UNLOCK( &ApplicationWorker::pending->masters.delLock );
+				LOCK( &ApplicationWorker::pending->clients.delLock );
+				ApplicationWorker::pending->clients.del.insert( key );
+				UNLOCK( &ApplicationWorker::pending->clients.delLock );
 				break;
 			default:
 				break;
@@ -202,14 +202,14 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 
 			buffer.data += PROTO_HEADER_SIZE;
 			buffer.size -= PROTO_HEADER_SIZE;
-			if ( header.from != PROTO_MAGIC_FROM_MASTER ) {
-				__ERROR__( "ApplicationWorker", "dispatch", "Invalid message source from master." );
+			if ( header.from != PROTO_MAGIC_FROM_CLIENT ) {
+				__ERROR__( "ApplicationWorker", "dispatch", "Invalid message source from client." );
 				break;
 			}
 			bool success;
 			success = header.magic == PROTO_MAGIC_RESPONSE_SUCCESS;
 			if ( ! success && header.magic != PROTO_MAGIC_RESPONSE_FAILURE ) {
-				__ERROR__( "ApplicationWorker", "dispatch", "Invalid magic code from master." );
+				__ERROR__( "ApplicationWorker", "dispatch", "Invalid magic code from client." );
 				break;
 			}
 
@@ -219,7 +219,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 						event.socket->registered = true;
 						Application::instanceId = header.instanceId;
 					} else {
-						__ERROR__( "ApplicationWorker", "dispatch", "Failed to register with master." );
+						__ERROR__( "ApplicationWorker", "dispatch", "Failed to register with client." );
 					}
 					break;
 				case PROTO_OPCODE_SET:
@@ -228,14 +228,14 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 					key.data = keyHeader.key;
 					key.ptr = ( void * ) event.socket;
 
-					LOCK( &ApplicationWorker::pending->masters.setLock );
-					it = ApplicationWorker::pending->masters.set.find( key );
-					if ( it == ApplicationWorker::pending->masters.set.end() ) {
-						__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending master SET request that matches the response. This message will be discarded." );
+					LOCK( &ApplicationWorker::pending->clients.setLock );
+					it = ApplicationWorker::pending->clients.set.find( key );
+					if ( it == ApplicationWorker::pending->clients.set.end() ) {
+						__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending client SET request that matches the response. This message will be discarded." );
 						goto quit_1;
 					}
-					ApplicationWorker::pending->masters.set.erase( it );
-					UNLOCK( &ApplicationWorker::pending->masters.setLock );
+					ApplicationWorker::pending->clients.set.erase( it );
+					UNLOCK( &ApplicationWorker::pending->clients.setLock );
 
 					key.ptr = 0;
 
@@ -280,14 +280,14 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 						}
 					}
 
-					LOCK( &ApplicationWorker::pending->masters.getLock );
-					it = ApplicationWorker::pending->masters.get.find( key );
-					if ( it == ApplicationWorker::pending->masters.get.end() ) {
-						__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending master GET request that matches the response. This message will be discarded. (key = %.*s)", key.size, key.data );
+					LOCK( &ApplicationWorker::pending->clients.getLock );
+					it = ApplicationWorker::pending->clients.get.find( key );
+					if ( it == ApplicationWorker::pending->clients.get.end() ) {
+						__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending client GET request that matches the response. This message will be discarded. (key = %.*s)", key.size, key.data );
 						goto quit_1;
 					}
-					ApplicationWorker::pending->masters.get.erase( it );
-					UNLOCK( &ApplicationWorker::pending->masters.getLock );
+					ApplicationWorker::pending->clients.get.erase( it );
+					UNLOCK( &ApplicationWorker::pending->clients.getLock );
 
 					key.ptr = 0;
 
@@ -325,14 +325,14 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 						keyValueUpdate.length = keyValueUpdateHeader.valueUpdateSize;
 						keyValueUpdate.ptr = ( void * ) event.socket;
 
-						LOCK( &ApplicationWorker::pending->masters.updateLock );
-						keyValueUpdateIt = ApplicationWorker::pending->masters.update.find( keyValueUpdate );
-						if ( keyValueUpdateIt == ApplicationWorker::pending->masters.update.end() ) {
-							__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending master UPDATE request that matches the response. This message will be discarded. (key = %.*s)", keyValueUpdate.size, keyValueUpdate.data );
+						LOCK( &ApplicationWorker::pending->clients.updateLock );
+						keyValueUpdateIt = ApplicationWorker::pending->clients.update.find( keyValueUpdate );
+						if ( keyValueUpdateIt == ApplicationWorker::pending->clients.update.end() ) {
+							__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending client UPDATE request that matches the response. This message will be discarded. (key = %.*s)", keyValueUpdate.size, keyValueUpdate.data );
 							goto quit_1;
 						}
-						ApplicationWorker::pending->masters.update.erase( keyValueUpdateIt );
-						UNLOCK( &ApplicationWorker::pending->masters.updateLock );
+						ApplicationWorker::pending->clients.update.erase( keyValueUpdateIt );
+						UNLOCK( &ApplicationWorker::pending->clients.updateLock );
 
 						keyValueUpdate.ptr = 0;
 
@@ -362,14 +362,14 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 						key.data = keyHeader.key;
 						key.ptr = ( void * ) event.socket;
 
-						LOCK( &ApplicationWorker::pending->masters.delLock );
-						it = ApplicationWorker::pending->masters.del.find( key );
-						if ( it == ApplicationWorker::pending->masters.del.end() ) {
-							__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending master DELETE request that matches the response. This message will be discarded. (key = %.*s)", key.size, key.data );
+						LOCK( &ApplicationWorker::pending->clients.delLock );
+						it = ApplicationWorker::pending->clients.del.find( key );
+						if ( it == ApplicationWorker::pending->clients.del.end() ) {
+							__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending client DELETE request that matches the response. This message will be discarded. (key = %.*s)", key.size, key.data );
 							goto quit_1;
 						}
-						ApplicationWorker::pending->masters.del.erase( it );
-						UNLOCK( &ApplicationWorker::pending->masters.delLock );
+						ApplicationWorker::pending->clients.del.erase( it );
+						UNLOCK( &ApplicationWorker::pending->clients.delLock );
 
 						key.ptr = 0;
 
@@ -394,7 +394,7 @@ void ApplicationWorker::dispatch( MasterEvent event ) {
 					}
 					break;
 				default:
-					__ERROR__( "ApplicationWorker", "dispatch", "Invalid opcode from master." );
+					__ERROR__( "ApplicationWorker", "dispatch", "Invalid opcode from client." );
 					goto quit_1;
 			}
 quit_1:
@@ -404,7 +404,7 @@ quit_1:
 		if ( connected ) event.socket->done();
 	}
 	if ( ! connected )
-		__ERROR__( "ApplicationWorker", "dispatch", "The master is disconnected." );
+		__ERROR__( "ApplicationWorker", "dispatch", "The client is disconnected." );
 }
 
 
@@ -415,40 +415,13 @@ void ApplicationWorker::free() {
 
 void *ApplicationWorker::run( void *argv ) {
 	ApplicationWorker *worker = ( ApplicationWorker * ) argv;
-	WorkerRole role = worker->getRole();
 	ApplicationEventQueue *eventQueue = ApplicationWorker::eventQueue;
 
-#define MASTER_WORKER_EVENT_LOOP(_EVENT_TYPE_, _EVENT_QUEUE_) \
-	do { \
-		_EVENT_TYPE_ event; \
-		bool ret; \
-		while( worker->getIsRunning() | ( ret = _EVENT_QUEUE_->extract( event ) ) ) { \
-			if ( ret ) \
-				worker->dispatch( event ); \
-		} \
-	} while( 0 )
-
-	switch ( role ) {
-		case WORKER_ROLE_MIXED:
-			MASTER_WORKER_EVENT_LOOP(
-				MixedEvent,
-				eventQueue->mixed
-			);
-			break;
-		case WORKER_ROLE_APPLICATION:
-			MASTER_WORKER_EVENT_LOOP(
-				ApplicationEvent,
-				eventQueue->separated.application
-			);
-			break;
-		case WORKER_ROLE_MASTER:
-			MASTER_WORKER_EVENT_LOOP(
-				MasterEvent,
-				eventQueue->separated.master
-			);
-			break;
-		default:
-			break;
+	MixedEvent event;
+	bool ret;
+	while( worker->getIsRunning() | ( ret = eventQueue->mixed->extract( event ) ) ) {
+		if ( ret )
+			worker->dispatch( event );
 	}
 
 	worker->free();
@@ -466,7 +439,7 @@ bool ApplicationWorker::init() {
 	return true;
 }
 
-bool ApplicationWorker::init( ApplicationConfig &config, WorkerRole role, uint32_t workerId ) {
+bool ApplicationWorker::init( ApplicationConfig &config, uint32_t workerId ) {
 	this->buffer.value = new char[ config.size.chunk ];
 	this->buffer.valueSize = config.size.chunk;
 	this->protocol.init(
@@ -475,9 +448,8 @@ bool ApplicationWorker::init( ApplicationConfig &config, WorkerRole role, uint32
 			config.size.chunk
 		)
 	);
-	this->role = role;
 	this->workerId = workerId;
-	return role != WORKER_ROLE_UNDEFINED;
+	return true;
 }
 
 bool ApplicationWorker::start() {
@@ -494,19 +466,5 @@ void ApplicationWorker::stop() {
 }
 
 void ApplicationWorker::print( FILE *f ) {
-	char role[ 16 ];
-	switch( this->role ) {
-		case WORKER_ROLE_MIXED:
-			strcpy( role, "Mixed" );
-			break;
-		case WORKER_ROLE_APPLICATION:
-			strcpy( role, "Application" );
-			break;
-		case WORKER_ROLE_MASTER:
-			strcpy( role, "Master" );
-			break;
-		default:
-			return;
-	}
-	fprintf( f, "%11s worker (Thread ID = %lu): %srunning\n", role, this->tid, this->isRunning ? "" : "not " );
+	fprintf( f, "Worker #%u (Thread ID = %lu): %srunning\n", this->workerId, this->tid, this->isRunning ? "" : "not " );
 }

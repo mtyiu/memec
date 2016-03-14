@@ -7,7 +7,7 @@
 class RemapStateEvent : public Event {
 public:
 	bool start;
-	struct sockaddr_in slave;
+	struct sockaddr_in server;
 };
 
 #endif

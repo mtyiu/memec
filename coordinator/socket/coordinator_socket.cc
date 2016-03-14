@@ -14,7 +14,7 @@ CoordinatorSocket::CoordinatorSocket() {
 	this->sockets.needsDelete = true;
 }
 
-bool CoordinatorSocket::init( int type, uint32_t addr, uint16_t port, int numSlaves, EPoll *epoll ) {
+bool CoordinatorSocket::init( int type, uint32_t addr, uint16_t port, int numServers, EPoll *epoll ) {
 	this->epoll = epoll;
 	bool ret = (
 		Socket::init( type, addr, port ) &&
@@ -22,7 +22,7 @@ bool CoordinatorSocket::init( int type, uint32_t addr, uint16_t port, int numSla
 		epoll->add( this->sockfd, EPOLL_EVENT_LISTEN )
 	);
 	if ( ret ) {
-		this->sockets.reserve( numSlaves );
+		this->sockets.reserve( numServers );
 	}
 	return ret;
 }
@@ -74,13 +74,13 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 			::close( fd );
 			socket->sockets.removeAt( index );
 		} else {
-			MasterSocket *masterSocket = coordinator->sockets.masters.get( fd );
-			SlaveSocket *slaveSocket = masterSocket ? 0 : coordinator->sockets.slaves.get( fd );
-			slaveSocket = slaveSocket ? slaveSocket : coordinator->sockets.backupSlaves.get( fd );
-			if ( masterSocket ) {
-				masterSocket->stop();
-			} else if ( slaveSocket ) {
-				slaveSocket->stop();
+			ClientSocket *clientSocket = coordinator->sockets.clients.get( fd );
+			ServerSocket *serverSocket = clientSocket ? 0 : coordinator->sockets.servers.get( fd );
+			serverSocket = serverSocket ? serverSocket : coordinator->sockets.backupServers.get( fd );
+			if ( clientSocket ) {
+				clientSocket->stop();
+			} else if ( serverSocket ) {
+				serverSocket->stop();
 			} else {
 				__ERROR__( "CoordinatorSocket", "handler", "Unknown socket." );
 				return false;
@@ -113,7 +113,7 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 
 		if ( ( addr = socket->sockets.get( fd, &index ) ) ) {
 			// Read message immediately and add to appropriate socket list such that all "add" operations originate from the epoll thread
-			// Only master or slave register message is expected
+			// Only client or server register message is expected
 			bool connected;
 			ssize_t ret;
 
@@ -128,27 +128,27 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 				if ( ret && header.magic == PROTO_MAGIC_REQUEST && header.opcode == PROTO_OPCODE_REGISTER ) {
 					struct AddressHeader addressHeader;
 					socket->protocol.parseAddressHeader( addressHeader, socket->buffer.data + PROTO_HEADER_SIZE, socket->buffer.size - PROTO_HEADER_SIZE );
-					if ( header.from == PROTO_MAGIC_FROM_MASTER ) {
-						MasterSocket *masterSocket = new MasterSocket();
-						masterSocket->init( fd, *addr );
-						masterSocket->setListenAddr( addressHeader.addr, addressHeader.port );
-						coordinator->sockets.masters.set( fd, masterSocket );
+					if ( header.from == PROTO_MAGIC_FROM_CLIENT ) {
+						ClientSocket *clientSocket = new ClientSocket();
+						clientSocket->init( fd, *addr );
+						clientSocket->setListenAddr( addressHeader.addr, addressHeader.port );
+						coordinator->sockets.clients.set( fd, clientSocket );
 						socket->sockets.removeAt( index );
 
 						socket->done( fd ); // The socket is valid
 
-						MasterEvent event;
-						instanceId = generator->generate( masterSocket );
-						event.resRegister( masterSocket, instanceId, header.requestId );
+						ClientEvent event;
+						instanceId = generator->generate( clientSocket );
+						event.resRegister( clientSocket, instanceId, header.requestId );
 						coordinator->eventQueue.insert( event );
-					} else if ( header.from == PROTO_MAGIC_FROM_SLAVE ) {
-						SlaveSocket *s = 0;
+					} else if ( header.from == PROTO_MAGIC_FROM_SERVER ) {
+						ServerSocket *s = 0;
 
-						for ( int i = 0, len = coordinator->sockets.slaves.size(); i < len; i++ ) {
-							if ( coordinator->sockets.slaves[ i ]->equal( addressHeader.addr, addressHeader.port ) ) {
-								s = coordinator->sockets.slaves[ i ];
+						for ( int i = 0, len = coordinator->sockets.servers.size(); i < len; i++ ) {
+							if ( coordinator->sockets.servers[ i ]->equal( addressHeader.addr, addressHeader.port ) ) {
+								s = coordinator->sockets.servers[ i ];
 								int oldFd = s->getSocket();
-								coordinator->sockets.slaves.replaceKey( oldFd, fd );
+								coordinator->sockets.servers.replaceKey( oldFd, fd );
 								s->setRecvFd( fd, addr );
 								socket->sockets.removeAt( index );
 
@@ -158,30 +158,30 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 						}
 
 						if ( s ) {
-							SlaveEvent event;
+							ServerEvent event;
 							instanceId = generator->generate( s );
 							event.resRegister( s, instanceId, header.requestId );
 							coordinator->eventQueue.insert( event );
 
-							event.announceSlaveConnected( s );
+							event.announceServerConnected( s );
 							coordinator->eventQueue.insert( event );
 						} else {
-							// Treat it as backup slaves
+							// Treat it as backup servers
 							ServerAddr serverAddr( "backup", addressHeader.addr, addressHeader.port );
-							s = new SlaveSocket();
+							s = new ServerSocket();
 							s->init( fd, serverAddr, socket->epoll );
 							s->setRecvFd( fd, addr );
-							coordinator->sockets.backupSlaves.set( fd, s );
+							coordinator->sockets.backupServers.set( fd, s );
 
 							socket->sockets.removeAt( index );
 							socket->done( fd );
 
-							SlaveEvent event;
+							ServerEvent event;
 							instanceId = generator->generate( s );
 							event.resRegister( s, instanceId, header.requestId );
 							coordinator->eventQueue.insert( event );
 
-							// __ERROR__( "CoordinatorSocket", "handler", "Unexpected registration from slave." );
+							// __ERROR__( "CoordinatorSocket", "handler", "Unexpected registration from server." );
 							// socket->sockets.removeAt( index );
 							// ::close( fd );
 							// return false;
@@ -201,16 +201,16 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 				return false;
 			}
 		} else {
-			MasterSocket *masterSocket = coordinator->sockets.masters.get( fd );
-			SlaveSocket *slaveSocket = masterSocket ? 0 : coordinator->sockets.slaves.get( fd );
-			slaveSocket = slaveSocket ? slaveSocket : coordinator->sockets.backupSlaves.get( fd );
-			if ( masterSocket ) {
-				MasterEvent event;
-				event.pending( masterSocket );
+			ClientSocket *clientSocket = coordinator->sockets.clients.get( fd );
+			ServerSocket *serverSocket = clientSocket ? 0 : coordinator->sockets.servers.get( fd );
+			serverSocket = serverSocket ? serverSocket : coordinator->sockets.backupServers.get( fd );
+			if ( clientSocket ) {
+				ClientEvent event;
+				event.pending( clientSocket );
 				coordinator->eventQueue.insert( event );
-			} else if ( slaveSocket ) {
-				SlaveEvent event;
-				event.pending( slaveSocket );
+			} else if ( serverSocket ) {
+				ServerEvent event;
+				event.pending( serverSocket );
 				coordinator->eventQueue.insert( event );
 			} else {
 				__ERROR__( "CoordinatorSocket", "handler", "Unknown socket (fd = %d).", fd );

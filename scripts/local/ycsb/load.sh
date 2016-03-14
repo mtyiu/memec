@@ -8,7 +8,7 @@ if [ $# != 1 ]; then
 fi
 
 ${YCSB_PATH}/bin/ycsb \
-	load plio \
+	load memec \
 	-s \
 	-P ${YCSB_PATH}/workloads/workloada \
 	-p fieldcount=1 \
@@ -17,8 +17,8 @@ ${YCSB_PATH}/bin/ycsb \
 	-p fieldlength=100 \
 	-p recordcount=100000 \
 	-p threadcount=$1 \
-	-p plio.host=127.0.0.1 \
-	-p plio.port=10091 \
-	-p plio.key_size=255 \
-	-p plio.chunk_size=4096 \
+	-p memec.host=127.0.0.1 \
+	-p memec.port=10091 \
+	-p memec.key_size=255 \
+	-p memec.chunk_size=4096 \
 	-p table=usertable

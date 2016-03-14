@@ -39,7 +39,10 @@ LICENSE file.
     <dependency>
       <groupId>net.spy</groupId>
       <artifactId>spymemcached</artifactId>
-      <version>RELEASE</version>
+      <scope>system</scope>
+      <systemPath>${basedir}/lib/spymemcached-2.12.0.jar</systemPath>
+      <version>2.12.0</version>
+      <!-- <version>RELEASE</version> -->
     </dependency>
   </dependencies>
 </project>

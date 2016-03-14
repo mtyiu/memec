@@ -1,63 +1,65 @@
 CC=g++
 CFLAGS=-std=c++11 -Wall -O2
-PLIO_SRC_ROOT=../../..
+MEMEC_SRC_ROOT=../../..
 LIBS=-pthread
 
 TARGETS= \
 	coordinator_remap \
-	master_remap
+	client_remap \
+	coordinator_spread \
+	client_spread
 
-MSTR_OBJS= \
-	$(PLIO_SRC_ROOT)/master/config/master_config.o \
-	$(PLIO_SRC_ROOT)/master/ds/pending.o \
-	$(PLIO_SRC_ROOT)/master/event/application_event.o \
-	$(PLIO_SRC_ROOT)/master/event/coordinator_event.o \
-	$(PLIO_SRC_ROOT)/master/event/master_event.o \
-	$(PLIO_SRC_ROOT)/master/event/slave_event.o \
-	$(PLIO_SRC_ROOT)/master/protocol/protocol.o \
-	$(PLIO_SRC_ROOT)/master/remap/remap_msg_handler.o \
-	$(PLIO_SRC_ROOT)/master/remap/basic_remap_scheme.o \
-	$(PLIO_SRC_ROOT)/master/socket/application_socket.o \
-	$(PLIO_SRC_ROOT)/master/socket/coordinator_socket.o \
-	$(PLIO_SRC_ROOT)/master/socket/master_socket.o \
-	$(PLIO_SRC_ROOT)/master/socket/slave_socket.o \
-	$(PLIO_SRC_ROOT)/master/worker/worker.o \
-	$(PLIO_SRC_ROOT)/master/main/master.o 
+CLIENT_OBJS= \
+	$(MEMEC_SRC_ROOT)/client/backup/*.o \
+	$(MEMEC_SRC_ROOT)/client/config/client_config.o \
+	$(MEMEC_SRC_ROOT)/client/ds/pending.o \
+	$(MEMEC_SRC_ROOT)/client/event/application_event.o \
+	$(MEMEC_SRC_ROOT)/client/event/coordinator_event.o \
+	$(MEMEC_SRC_ROOT)/client/event/client_event.o \
+	$(MEMEC_SRC_ROOT)/client/event/server_event.o \
+	$(MEMEC_SRC_ROOT)/client/protocol/*.o \
+	$(MEMEC_SRC_ROOT)/client/remap/remap_msg_handler.o \
+	$(MEMEC_SRC_ROOT)/client/remap/basic_remap_scheme.o \
+	$(MEMEC_SRC_ROOT)/client/socket/*.o \
+	$(MEMEC_SRC_ROOT)/client/worker/*.o \
+	$(MEMEC_SRC_ROOT)/client/main/client.o
 
 COOR_OBJS= \
-	$(PLIO_SRC_ROOT)/coordinator/worker/worker.o \
-	$(PLIO_SRC_ROOT)/coordinator/main/coordinator.o \
-	$(PLIO_SRC_ROOT)/coordinator/config/coordinator_config.o \
-	$(PLIO_SRC_ROOT)/coordinator/ds/map.o \
-	$(PLIO_SRC_ROOT)/coordinator/event/coordinator_event.o \
-	$(PLIO_SRC_ROOT)/coordinator/event/master_event.o \
-	$(PLIO_SRC_ROOT)/coordinator/event/slave_event.o \
-	$(PLIO_SRC_ROOT)/coordinator/protocol/protocol.o \
-	$(PLIO_SRC_ROOT)/coordinator/socket/coordinator_socket.o \
-	$(PLIO_SRC_ROOT)/coordinator/socket/master_socket.o \
-	$(PLIO_SRC_ROOT)/coordinator/socket/slave_socket.o \
-	$(PLIO_SRC_ROOT)/coordinator/remap/remap_msg_handler.o \
-	$(PLIO_SRC_ROOT)/coordinator/remap/remap_worker.o
+	$(MEMEC_SRC_ROOT)/coordinator/worker/*.o \
+	$(MEMEC_SRC_ROOT)/coordinator/main/coordinator.o \
+	$(MEMEC_SRC_ROOT)/coordinator/config/coordinator_config.o \
+	$(MEMEC_SRC_ROOT)/coordinator/ds/map.o \
+	$(MEMEC_SRC_ROOT)/coordinator/event/coordinator_event.o \
+	$(MEMEC_SRC_ROOT)/coordinator/event/client_event.o \
+	$(MEMEC_SRC_ROOT)/coordinator/event/server_event.o \
+	$(MEMEC_SRC_ROOT)/coordinator/protocol/*.o \
+	$(MEMEC_SRC_ROOT)/coordinator/socket/*.o \
+	$(MEMEC_SRC_ROOT)/coordinator/remap/remap_msg_handler.o \
+	$(MEMEC_SRC_ROOT)/coordinator/remap/remap_worker.o
+
+EXTRA_OBJS= \
+	simple_remap_msg_handler.o
 
 OBJS= \
-	$(MSTR_OBJS) \
-	$(COOR_OBJS)
+	$(CLIENT_OBJS) \
+	$(COOR_OBJS) \
+	$(EXTRA_OBJS)
 
 EXTERNAL_LIBS = \
-	$(PLIO_SRC_ROOT)/common/config/config.o \
-	$(PLIO_SRC_ROOT)/common/config/global_config.o \
-	$(PLIO_SRC_ROOT)/common/config/server_addr.o \
-	$(PLIO_SRC_ROOT)/common/ds/bitmask_array.o \
-	$(PLIO_SRC_ROOT)/common/ds/key_value.o \
-	$(PLIO_SRC_ROOT)/common/ds/latency.o \
-	$(PLIO_SRC_ROOT)/common/ds/load.o \
-	$(PLIO_SRC_ROOT)/common/ds/sockaddr_in.o \
-	$(PLIO_SRC_ROOT)/common/protocol/protocol.o \
-	$(PLIO_SRC_ROOT)/common/remap/remap_msg_handler.o \
-	$(PLIO_SRC_ROOT)/common/socket/socket.o \
-	$(PLIO_SRC_ROOT)/common/socket/epoll.o \
-	$(PLIO_SRC_ROOT)/lib/death_handler/death_handler.o \
-	$(PLIO_SRC_ROOT)/lib/inih/ini.o \
+	$(MEMEC_SRC_ROOT)/common/config/config.o \
+	$(MEMEC_SRC_ROOT)/common/config/global_config.o \
+	$(MEMEC_SRC_ROOT)/common/config/server_addr.o \
+	$(MEMEC_SRC_ROOT)/common/ds/bitmask_array.o \
+	$(MEMEC_SRC_ROOT)/common/ds/instance_id_generator.o \
+	$(MEMEC_SRC_ROOT)/common/ds/key_value.o \
+	$(MEMEC_SRC_ROOT)/common/ds/latency.o \
+	$(MEMEC_SRC_ROOT)/common/ds/load.o \
+	$(MEMEC_SRC_ROOT)/common/ds/sockaddr_in.o \
+	$(MEMEC_SRC_ROOT)/common/protocol/*.o \
+	$(MEMEC_SRC_ROOT)/common/remap/remap_msg_handler.o \
+	$(MEMEC_SRC_ROOT)/common/socket/*.o \
+	$(MEMEC_SRC_ROOT)/lib/death_handler/death_handler.o \
+	$(MEMEC_SRC_ROOT)/lib/inih/ini.o \
 	-ldl \
 	-lrt \
 	-ltspread
@@ -67,11 +69,17 @@ all: $(OBJS) $(TARGETS)
 #$(TARGETS): % : %.cc $(OBJS)
 #	$(CC) $(CFLAGS) $(INCLUDE) $(LIBS) -o $@ $< $(OBJS) $(EXTERNAL_LIBS)
 
-master_remap: % : %.cc $(MSTR_OBJS)
-	$(CC) $(CFLAGS) $(INCLUDE) $(LIBS) -o $@ $< $(MSTR_OBJS) $(EXTERNAL_LIBS)
+client_remap: % : %.cc $(CLIENT_OBJS)
+	$(CC) $(CFLAGS) $(INCLUDE) $(LIBS) -o $@ $< $(CLIENT_OBJS) $(EXTERNAL_LIBS)
 
 coordinator_remap: % : %.cc $(CORD_OBJS)
 	$(CC) $(CFLAGS) $(INCLUDE) $(LIBS) -o $@ $< $(COOR_OBJS) $(EXTERNAL_LIBS)
+
+client_spread: % : %.cc $(CLIENT_OBJS)
+	$(CC) $(CFLAGS) $(INCLUDE) $(LIBS) -o $@ $< $(CLIENT_OBJS) $(EXTRA_OBJS) $(EXTERNAL_LIBS)
+
+coordinator_spread:% : %.cc $(CORD_OBJS)
+	$(CC) $(CFLAGS) $(INCLUDE) $(LIBS) -o $@ $< $(COOR_OBJS) $(EXTRA_OBJS) $(EXTERNAL_LIBS)
 
 $(OBJS): %.o: %.cc
 	$(CC) $(CFLAGS) $(INCLUDE) $(LIBS) -c -o $@ $<

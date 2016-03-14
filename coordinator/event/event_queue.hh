@@ -4,8 +4,8 @@
 #include <stdint.h>
 #include "mixed_event.hh"
 #include "coordinator_event.hh"
-#include "master_event.hh"
-#include "slave_event.hh"
+#include "client_event.hh"
+#include "server_event.hh"
 #include "../../common/event/event_queue.hh"
 
 class CoordinatorEventQueue {
@@ -21,8 +21,8 @@ public:
 	} priority;
 	struct {
 		EventQueue<CoordinatorEvent> *coordinator;
-		EventQueue<MasterEvent> *master;
-		EventQueue<SlaveEvent> *slave;
+		EventQueue<ClientEvent> *client;
+		EventQueue<ServerEvent> *server;
 	} separated;
 
 	CoordinatorEventQueue() {
@@ -31,8 +31,8 @@ public:
 		this->priority.capacity = 0;
 		this->priority.count = 0;
 		this->separated.coordinator = 0;
-		this->separated.master = 0;
-		this->separated.slave = 0;
+		this->separated.client = 0;
+		this->separated.server = 0;
 	}
 
 	void init( bool block, uint32_t mixed, uint32_t pMixed ) {
@@ -43,11 +43,11 @@ public:
 		LOCK_INIT( &this->priority.lock );
 	}
 
-	void init( bool block, uint32_t coordinator, uint32_t master, uint32_t slave ) {
+	void init( bool block, uint32_t coordinator, uint32_t client, uint32_t server ) {
 		this->isMixed = false;
 		this->separated.coordinator = new EventQueue<CoordinatorEvent>( coordinator, block );
-		this->separated.master = new EventQueue<MasterEvent>( master, block );
-		this->separated.slave = new EventQueue<SlaveEvent>( slave, block );
+		this->separated.client = new EventQueue<ClientEvent>( client, block );
+		this->separated.server = new EventQueue<ServerEvent>( server, block );
 	}
 
 	void start() {
@@ -56,8 +56,8 @@ public:
 			this->priority.mixed->start();
 		} else {
 			this->separated.coordinator->start();
-			this->separated.master->start();
-			this->separated.slave->start();
+			this->separated.client->start();
+			this->separated.server->start();
 		}
 	}
 
@@ -67,8 +67,8 @@ public:
 			this->priority.mixed->stop();
 		} else {
 			this->separated.coordinator->stop();
-			this->separated.master->stop();
-			this->separated.slave->stop();
+			this->separated.client->stop();
+			this->separated.server->stop();
 		}
 	}
 
@@ -78,8 +78,8 @@ public:
 			delete this->priority.mixed;
 		} else {
 			delete this->separated.coordinator;
-			delete this->separated.master;
-			delete this->separated.slave;
+			delete this->separated.client;
+			delete this->separated.server;
 		}
 	}
 
@@ -92,10 +92,10 @@ public:
 		} else {
 			fprintf( f, "[Coordinator] " );
 			this->separated.coordinator->print( f );
-			fprintf( f, "[     Master] " );
-			this->separated.master->print( f );
-			fprintf( f, "[      Slave] " );
-			this->separated.slave->print( f );
+			fprintf( f, "[     Client] " );
+			this->separated.client->print( f );
+			fprintf( f, "[      Server] " );
+			this->separated.server->print( f );
 		}
 	}
 
@@ -111,11 +111,11 @@ public:
 	}
 
 	COORDINATOR_EVENT_QUEUE_INSERT( CoordinatorEvent, coordinator )
-	COORDINATOR_EVENT_QUEUE_INSERT( MasterEvent, master )
-	COORDINATOR_EVENT_QUEUE_INSERT( SlaveEvent, slave )
+	COORDINATOR_EVENT_QUEUE_INSERT( ClientEvent, client )
+	COORDINATOR_EVENT_QUEUE_INSERT( ServerEvent, server )
 #undef COORDINATOR_EVENT_QUEUE_INSERT
 
-	bool prioritizedInsert( MasterEvent &event ) {
+	bool prioritizedInsert( ClientEvent &event ) {
 		bool ret;
 		if ( this->isMixed ) {
 			MixedEvent mixedEvent;
@@ -145,7 +145,7 @@ public:
 				return ret;
 			}
 		} else {
-			return this->separated.master->insert( event );
+			return this->separated.client->insert( event );
 		}
 	}
 

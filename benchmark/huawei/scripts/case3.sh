@@ -13,8 +13,8 @@ TOTAL_SIZE=$(expr $2 \* 1073741824) # 250 MB
 CLIENT_ID=0
 NUM_CLIENTS=1
 NUM_THREADS=$3
-MASTER_IP=$(head -n1 scripts/master.conf)
-MASTER_PORTS=$(tail -n +2 scripts/master.conf)
+CLIENT_IP=$(head -n1 scripts/client.conf)
+CLIENT_PORTS=$(tail -n +2 scripts/client.conf)
 
 echo "Test case #3 Specification:"
 echo "---------------------------"
@@ -35,5 +35,5 @@ bin/benchmark \
 	${NUM_CLIENTS} \
 	${NUM_THREADS} \
 	true \
-	${MASTER_IP} \
-	${MASTER_PORTS}
+	${CLIENT_IP} \
+	${CLIENT_PORTS}

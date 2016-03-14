@@ -106,40 +106,61 @@ bool Protocol::parseChunksHeader( struct ChunksHeader &header, char *buf, size_t
 	);
 }
 
-size_t Protocol::generateChunkDataHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t chunkSize, uint32_t chunkOffset, char *chunkData ) {
+size_t Protocol::generateChunkDataHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t chunkSize, uint32_t chunkOffset, char *chunkData, uint8_t sealIndicatorCount, bool *sealIndicator ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_CHUNK_DATA_SIZE + chunkSize, instanceId, requestId );
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_CHUNK_DATA_SIZE + chunkSize + sealIndicatorCount, instanceId, requestId );
+
+	buf[ 0 ] = sealIndicatorCount;
+	buf++;
+	bytes += 1;
 
 	*( ( uint32_t * )( buf      ) ) = htonl( listId );
 	*( ( uint32_t * )( buf +  4 ) ) = htonl( stripeId );
 	*( ( uint32_t * )( buf +  8 ) ) = htonl( chunkId );
 	*( ( uint32_t * )( buf + 12 ) ) = htonl( chunkSize );
 	*( ( uint32_t * )( buf + 16 ) ) = htonl( chunkOffset );
+	buf += 20;
+	bytes += 20;
 
-	buf += PROTO_CHUNK_DATA_SIZE;
+	if ( sealIndicatorCount ) {
+		for ( uint8_t i = 0; i < sealIndicatorCount; i++ )
+			buf[ i ] = sealIndicator[ i ];
+		buf += sealIndicatorCount;
+		bytes += sealIndicatorCount;
+	}
 
 	if ( chunkSize && chunkData )
 		memmove( buf, chunkData, chunkSize );
-	bytes += PROTO_CHUNK_DATA_SIZE + chunkSize;
+	bytes += chunkSize;
 
 	return bytes;
 }
 
-bool Protocol::parseChunkDataHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &chunkSize, uint32_t &chunkOffset, char *&chunkData, char *buf, size_t size ) {
+bool Protocol::parseChunkDataHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &chunkSize, uint32_t &chunkOffset, char *&chunkData, uint8_t &sealIndicatorCount, bool *&sealIndicator, char *buf, size_t size ) {
 	if ( size - offset < PROTO_CHUNK_DATA_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
+
+	sealIndicatorCount = ptr[ 0 ];
+	ptr++;
+
 	listId      = ntohl( *( ( uint32_t * )( ptr      ) ) );
 	stripeId    = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
 	chunkId     = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
 	chunkSize   = ntohl( *( ( uint32_t * )( ptr + 12 ) ) );
 	chunkOffset = ntohl( *( ( uint32_t * )( ptr + 16 ) ) );
+	ptr += 20;
 
-	if ( size - offset < PROTO_CHUNK_DATA_SIZE + chunkSize )
+	if ( sealIndicatorCount ) {
+		sealIndicator = ( bool * ) ptr;
+		ptr += sealIndicatorCount;
+	}
+
+	if ( size - offset < PROTO_CHUNK_DATA_SIZE + sealIndicatorCount + chunkSize )
 		return false;
 
-	chunkData = chunkSize ? ptr + PROTO_CHUNK_DATA_SIZE : 0;
+	chunkData = chunkSize ? ptr : 0;
 
 	return true;
 }
@@ -157,6 +178,8 @@ bool Protocol::parseChunkDataHeader( struct ChunkDataHeader &header, char *buf, 
 		header.size,
 		header.offset,
 		header.data,
+		header.sealIndicatorCount,
+		header.sealIndicator,
 		buf, size
 	);
 }

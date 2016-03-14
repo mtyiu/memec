@@ -2,8 +2,8 @@
 #define __COORDINATOR_EVENT_MIXED_EVENT_HH__
 
 #include "coordinator_event.hh"
-#include "master_event.hh"
-#include "slave_event.hh"
+#include "client_event.hh"
+#include "server_event.hh"
 #include "../../common/event/event.hh"
 #include "../../common/event/event_type.hh"
 
@@ -12,8 +12,8 @@ public:
 	EventType type;
 	union {
 		CoordinatorEvent coordinator;
-		MasterEvent master;
-		SlaveEvent slave;
+		ClientEvent client;
+		ServerEvent server;
 	} event;
 
 #define MIXED_EVENT_SET(_EVENT_TYPE_, _TYPE_CONSTANT_, _FIELD_) \
@@ -23,8 +23,8 @@ public:
 	}
 
 	MIXED_EVENT_SET( CoordinatorEvent, EVENT_TYPE_COORDINATOR, coordinator )
-	MIXED_EVENT_SET( MasterEvent, EVENT_TYPE_MASTER, master )
-	MIXED_EVENT_SET( SlaveEvent, EVENT_TYPE_SLAVE, slave )
+	MIXED_EVENT_SET( ClientEvent, EVENT_TYPE_CLIENT, client )
+	MIXED_EVENT_SET( ServerEvent, EVENT_TYPE_SERVER, server )
 #undef MIXED_EVENT_SET
 
 	void set() {

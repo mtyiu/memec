@@ -8,7 +8,7 @@
 
 class CoordinatorRemapWorker: public Worker {
 private:
-	// individual slaves
+	// individual servers
 	bool transitToDegraded( RemapStateEvent );
 	bool transitToNormal( RemapStateEvent );
 

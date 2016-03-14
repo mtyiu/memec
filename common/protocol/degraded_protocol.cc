@@ -108,14 +108,15 @@ size_t Protocol::generateDegradedLockResHeader( uint8_t magic, uint8_t to, uint8
 size_t Protocol::generateDegradedLockResHeader(
 	uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 	bool isLocked, uint8_t keySize, char *key,
-	bool isSealed, uint32_t stripeId,
+	bool isSealed, uint32_t stripeId, uint32_t dataChunkId, uint32_t dataChunkCount,
 	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
-	uint32_t ongoingAtChunk
+	uint32_t ongoingAtChunk,
+	uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds
 ) {
 	char *buf;
 	size_t bytes = this->generateDegradedLockResHeader(
 		magic, to, opcode, instanceId, requestId,
-		PROTO_DEGRADED_LOCK_RES_LOCK_SIZE + reconstructedCount * 4 * 4,
+		PROTO_DEGRADED_LOCK_RES_LOCK_SIZE + numSurvivingChunkIds * 4 + reconstructedCount * 4 * 4,
 		isLocked ? PROTO_DEGRADED_LOCK_RES_IS_LOCKED : PROTO_DEGRADED_LOCK_RES_WAS_LOCKED,
 		keySize, key, buf
 	);
@@ -130,17 +131,63 @@ size_t Protocol::generateDegradedLockResHeader(
 	buf += 12;
 	bytes += 12;
 
-	for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
-		*( ( uint32_t * )( buf     ) ) = htonl( original[ i * 2     ] );
-		*( ( uint32_t * )( buf + 4 ) ) = htonl( original[ i * 2 + 1 ] );
-		buf += 8;
-		bytes += 8;
+	buf[ 0 ] = numSurvivingChunkIds;
+	buf++;
+	bytes++;
+	for ( uint8_t i = 0; i < numSurvivingChunkIds; i++ ) {
+		*( ( uint32_t * )( buf ) ) = htonl( survivingChunkIds[ i ] );
+		buf += 4;
+		bytes += 4;
 	}
+
+	// Entries that are related to this key
 	for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
-		*( ( uint32_t * )( buf     ) ) = htonl( reconstructed[ i * 2     ] );
-		*( ( uint32_t * )( buf + 4 ) ) = htonl( reconstructed[ i * 2 + 1 ] );
-		buf += 8;
-		bytes += 8;
+		uint32_t chunkId = original[ i * 2 + 1 ];
+		if ( ( chunkId < dataChunkCount && chunkId == dataChunkId ) ||
+		     ( chunkId >= dataChunkCount ) ) {
+			*( ( uint32_t * )( buf     ) ) = htonl( original[ i * 2     ] );
+			*( ( uint32_t * )( buf + 4 ) ) = htonl( original[ i * 2 + 1 ] );
+			buf += 8;
+			bytes += 8;
+		}
+	}
+	// Entries that are not related to this key
+	for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
+		uint32_t chunkId = original[ i * 2 + 1 ];
+		if ( ( chunkId < dataChunkCount && chunkId == dataChunkId ) ||
+		     ( chunkId >= dataChunkCount ) ) {
+			// Copied
+		} else {
+			*( ( uint32_t * )( buf     ) ) = htonl( original[ i * 2     ] );
+			*( ( uint32_t * )( buf + 4 ) ) = htonl( original[ i * 2 + 1 ] );
+			buf += 8;
+			bytes += 8;
+		}
+	}
+
+	// Entries that are related to this key
+	for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
+		uint32_t chunkId = original[ i * 2 + 1 ];
+		if ( ( chunkId < dataChunkCount && chunkId == dataChunkId ) ||
+		     ( chunkId >= dataChunkCount ) ) {
+			*( ( uint32_t * )( buf     ) ) = htonl( reconstructed[ i * 2     ] );
+			*( ( uint32_t * )( buf + 4 ) ) = htonl( reconstructed[ i * 2 + 1 ] );
+			buf += 8;
+			bytes += 8;
+		}
+	}
+	// Entries that are not related to this key
+	for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
+		uint32_t chunkId = original[ i * 2 + 1 ];
+		if ( ( chunkId < dataChunkCount && chunkId == dataChunkId ) ||
+		     ( chunkId >= dataChunkCount ) ) {
+			// Copied
+		} else {
+			*( ( uint32_t * )( buf     ) ) = htonl( reconstructed[ i * 2     ] );
+			*( ( uint32_t * )( buf + 4 ) ) = htonl( reconstructed[ i * 2 + 1 ] );
+			buf += 8;
+			bytes += 8;
+		}
 	}
 
 	return bytes;
@@ -213,7 +260,7 @@ bool Protocol::parseDegradedLockResHeader(
 	size_t offset, bool &isSealed,
 	uint32_t &stripeId,
 	uint32_t *&original, uint32_t *&reconstructed, uint32_t &reconstructedCount,
-	uint32_t &ongoingAtChunk,
+	uint32_t &ongoingAtChunk, uint8_t &numSurvivingChunkIds, uint32_t *&survivingChunkIds,
 	char *buf, size_t size
 ) {
 	if ( size - offset < PROTO_DEGRADED_LOCK_RES_LOCK_SIZE )
@@ -228,6 +275,14 @@ bool Protocol::parseDegradedLockResHeader(
 	reconstructedCount = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
 	ongoingAtChunk     = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
 	ptr += 12;
+
+	numSurvivingChunkIds = ptr[ 0 ];
+	ptr++;
+	survivingChunkIds = ( uint32_t * )( ptr );
+	for ( uint8_t i = 0; i < numSurvivingChunkIds; i++ ) {
+		survivingChunkIds[ i ] = ntohl( survivingChunkIds[ i ] );
+	}
+	ptr += numSurvivingChunkIds * 4;
 
 	original = ( uint32_t * ) ptr;
 	reconstructed = ( ( uint32_t * ) ptr ) + reconstructedCount * 2;
@@ -293,6 +348,8 @@ bool Protocol::parseDegradedLockResHeader( struct DegradedLockResHeader &header,
 				header.reconstructed,
 				header.reconstructedCount,
 				header.ongoingAtChunk,
+				header.numSurvivingChunkIds,
+				header.survivingChunkIds,
 				buf, size
 			);
 			break;
@@ -318,14 +375,14 @@ size_t Protocol::generateDegradedReqHeader(
 	uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 	bool isSealed, uint32_t stripeId,
 	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
-	uint32_t ongoingAtChunk,
+	uint32_t ongoingAtChunk, uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds,
 	uint8_t keySize, char *key,
 	uint32_t timestamp
 ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader(
 		magic, to, opcode,
-		PROTO_DEGRADED_REQ_BASE_SIZE + reconstructedCount * 4 * 4 + PROTO_KEY_SIZE + keySize,
+		PROTO_DEGRADED_REQ_BASE_SIZE + numSurvivingChunkIds * 4 + reconstructedCount * 4 * 4 + PROTO_KEY_SIZE + keySize,
 		instanceId, requestId, 0,
 		timestamp
 	);
@@ -339,6 +396,15 @@ size_t Protocol::generateDegradedReqHeader(
 	*( ( uint32_t * )( buf +  8 ) ) = htonl( ongoingAtChunk );
 	buf += 12;
 	bytes += 12;
+
+	buf[ 0 ] = numSurvivingChunkIds;
+	buf++;
+	bytes++;
+	for ( uint8_t i = 0; i < numSurvivingChunkIds; i++ ) {
+		*( ( uint32_t * )( buf ) ) = htonl( survivingChunkIds[ i ] );
+		buf += 4;
+		bytes += 4;
+	}
 
 	for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
 		*( ( uint32_t * )( buf     ) ) = htonl( original[ i * 2     ] );
@@ -367,7 +433,7 @@ size_t Protocol::generateDegradedReqHeader(
 	uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 	bool isSealed, uint32_t stripeId,
 	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
-	uint32_t ongoingAtChunk,
+	uint32_t ongoingAtChunk, uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds,
 	uint8_t keySize, char *key,
 	uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate,
 	uint32_t timestamp
@@ -375,7 +441,7 @@ size_t Protocol::generateDegradedReqHeader(
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader(
 		magic, to, opcode,
-		PROTO_DEGRADED_REQ_BASE_SIZE + reconstructedCount * 4 * 4 + PROTO_KEY_VALUE_UPDATE_SIZE + keySize + valueUpdateSize,
+		PROTO_DEGRADED_REQ_BASE_SIZE + numSurvivingChunkIds * 4 + reconstructedCount * 4 * 4 + PROTO_KEY_VALUE_UPDATE_SIZE + keySize + valueUpdateSize,
 		instanceId, requestId,
 		0,
 		timestamp
@@ -390,6 +456,15 @@ size_t Protocol::generateDegradedReqHeader(
 	*( ( uint32_t * )( buf +  8 ) ) = htonl( ongoingAtChunk );
 	buf += 12;
 	bytes += 12;
+
+	buf[ 0 ] = numSurvivingChunkIds;
+	buf++;
+	bytes++;
+	for ( uint8_t i = 0; i < numSurvivingChunkIds; i++ ) {
+		*( ( uint32_t * )( buf ) ) = htonl( survivingChunkIds[ i ] );
+		buf += 4;
+		bytes += 4;
+	}
 
 	for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
 		*( ( uint32_t * )( buf     ) ) = htonl( original[ i * 2     ] );
@@ -436,7 +511,7 @@ bool Protocol::parseDegradedReqHeader(
 	size_t offset,
 	bool &isSealed, uint32_t &stripeId,
 	uint32_t *&original, uint32_t *&reconstructed, uint32_t &reconstructedCount,
-	uint32_t &ongoingAtChunk,
+	uint32_t &ongoingAtChunk, uint8_t &numSurvivingChunkIds, uint32_t *&survivingChunkIds,
 	char *buf, size_t size
 ) {
 	if ( size - offset < PROTO_DEGRADED_REQ_BASE_SIZE )
@@ -451,6 +526,14 @@ bool Protocol::parseDegradedReqHeader(
 	reconstructedCount = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
 	ongoingAtChunk     = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
 	ptr += 12;
+
+	numSurvivingChunkIds = ptr[ 0 ];
+	ptr++;
+	survivingChunkIds = ( uint32_t * )( ptr );
+	for ( uint8_t i = 0; i < numSurvivingChunkIds; i++ ) {
+		survivingChunkIds[ i ] = ntohl( survivingChunkIds[ i ] );
+	}
+	ptr += numSurvivingChunkIds * 4;
 
 	original = ( uint32_t * ) ptr;
 	reconstructed = ( ( uint32_t * ) ptr ) + reconstructedCount * 2;
@@ -477,11 +560,13 @@ bool Protocol::parseDegradedReqHeader( struct DegradedReqHeader &header, uint8_t
 		header.reconstructed,
 		header.reconstructedCount,
 		header.ongoingAtChunk,
+		header.numSurvivingChunkIds,
+		header.survivingChunkIds,
 		buf, size
 	);
 	if ( ! ret )
 		return false;
-	offset += PROTO_DEGRADED_REQ_BASE_SIZE + header.reconstructedCount * 4 * 4;
+	offset += PROTO_DEGRADED_REQ_BASE_SIZE + header.numSurvivingChunkIds * 4 + header.reconstructedCount * 4 * 4;
 
 	switch( opcode ) {
 		case PROTO_OPCODE_DEGRADED_GET:
@@ -559,11 +644,12 @@ size_t Protocol::generateForwardKeyReqHeader(
 		buf[ 2 ] = tmp[ 3 ];
 		valueUpdateSize = ntohl( valueUpdateSize );
 
+		valueUpdateOffset = htonl( valueUpdateOffset );
 		tmp = ( unsigned char * ) &valueUpdateOffset;
 		buf[ 3 ] = tmp[ 1 ];
 		buf[ 4 ] = tmp[ 2 ];
 		buf[ 5 ] = tmp[ 3 ];
-		valueUpdateSize = ntohl( valueUpdateOffset );
+		valueUpdateOffset = ntohl( valueUpdateOffset );
 
 		buf += PROTO_FORWARD_KEY_UPDATE_SIZE;
 		bytes += PROTO_FORWARD_KEY_UPDATE_SIZE;
@@ -714,11 +800,12 @@ size_t Protocol::generateForwardKeyResHeader(
 		buf[ 2 ] = tmp[ 3 ];
 		valueUpdateSize = ntohl( valueUpdateSize );
 
+		valueUpdateOffset = htonl( valueUpdateOffset );
 		tmp = ( unsigned char * ) &valueUpdateOffset;
 		buf[ 3 ] = tmp[ 1 ];
 		buf[ 4 ] = tmp[ 2 ];
 		buf[ 5 ] = tmp[ 3 ];
-		valueUpdateSize = ntohl( valueUpdateOffset );
+		valueUpdateOffset = ntohl( valueUpdateOffset );
 
 		buf += PROTO_FORWARD_KEY_UPDATE_SIZE;
 		bytes += PROTO_FORWARD_KEY_UPDATE_SIZE;

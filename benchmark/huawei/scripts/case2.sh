@@ -14,8 +14,8 @@ TOTAL_SIZE=1073741824 # 1 GB
 CLIENT_ID=0 #$2
 NUM_CLIENTS=1 #$3
 NUM_THREADS=$2
-MASTER_IP=$(head -n1 scripts/master.conf)
-MASTER_PORTS=$(tail -n +2 scripts/master.conf)
+CLIENT_IP=$(head -n1 scripts/client.conf)
+CLIENT_PORTS=$(tail -n +2 scripts/client.conf)
 
 if [ ${CLIENT_ID} -ge ${NUM_CLIENTS} ]; then
 	echo "The specified client ID is invalid. It should ranges from [0..$(expr ${NUM_CLIENTS} - 1)]"
@@ -42,5 +42,5 @@ bin/benchmark \
 	${NUM_CLIENTS} \
 	${NUM_THREADS} \
 	false \
-	${MASTER_IP} \
-	${MASTER_PORTS}
+	${CLIENT_IP} \
+	${CLIENT_PORTS}

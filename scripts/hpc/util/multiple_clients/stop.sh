@@ -3,7 +3,7 @@
 SLEEP_TIME=1
 
 for i in {9..15}; do
-	ssh hpc$i 'killall -9 application coordinator master slave ycsb >& /dev/null' &
+	ssh hpc$i 'killall -9 application coordinator client server ycsb >& /dev/null' &
 done
 
 sleep ${SLEEP_TIME}
@@ -17,8 +17,8 @@ fi
 
 for i in {1..7}; do
 	node_index=$(expr $i + 8)
-	ssh hpc${node_index} "screen -S slave$i -p 0 -X stuff \"${TERM_COMMAND}\"" &
-	ssh hpc${node_index} "screen -S master -p 0 -X stuff \"${TERM_COMMAND}\"" &
+	ssh hpc${node_index} "screen -S server$i -p 0 -X stuff \"${TERM_COMMAND}\"" &
+	ssh hpc${node_index} "screen -S client -p 0 -X stuff \"${TERM_COMMAND}\"" &
 	ssh hpc${node_index} "screen -S ycsb -p 0 -X stuff \"${TERM_COMMAND}\"" &
 done
 ssh hpc15 "screen -S coordinator -p 0 -X stuff \"${TERM_COMMAND}\"" &

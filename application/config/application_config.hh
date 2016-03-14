@@ -6,7 +6,6 @@
 #include "../../common/config/server_addr.hh"
 #include "../../common/config/config.hh"
 #include "../../common/util/option.hh"
-#include "../../common/worker/worker_type.hh"
 
 class ApplicationConfig : public Config {
 public:
@@ -19,28 +18,15 @@ public:
 		int32_t timeout;
 	} epoll;
 	struct {
-		WorkerType type;
-		struct {
-			uint8_t mixed;
-			struct {
-				uint16_t total;
-				uint8_t application;
-				uint8_t master;
-			} separated;
-		} number;
+		uint16_t count;
 	} workers;
 	struct {
 		bool block;
-		struct {
-			uint32_t mixed;
-			struct {
-				uint32_t application;
-				uint32_t master;
-			} separated;
-		} size;
+		uint32_t size;
 	} eventQueue;
-	std::vector<ServerAddr> masters;
+	std::vector<ServerAddr> clients;
 
+	ApplicationConfig();
 	bool parse( const char *path );
 	bool override( OptionList &options );
 	bool set( const char *section, const char *name, const char *value );

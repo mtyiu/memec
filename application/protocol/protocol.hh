@@ -7,9 +7,9 @@ class ApplicationProtocol : public Protocol {
 public:
 	ApplicationProtocol() : Protocol( ROLE_APPLICATION ) {}
 
-	/* Master */
+	/* Client */
 	// Register
-	char *reqRegisterMaster( size_t &size, uint32_t requestId );
+	char *reqRegisterClient( size_t &size, uint32_t requestId );
 	// SET
 	char *reqSet( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize, char *value, uint32_t valueSize );
 	// GET

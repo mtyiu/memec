@@ -13,8 +13,8 @@ public:
 class Pending {
 public:
 	struct {
-		std::set<Key> get;
 		std::set<Key> set;
+		std::set<Key> get;
 		std::set<KeyValueUpdate> update;
 		std::set<Key> del;
 		LOCK_T getLock;
@@ -31,17 +31,18 @@ public:
 		LOCK_T setLock;
 		LOCK_T updateLock;
 		LOCK_T delLock;
-	} masters;
+	} clients;
 
 	Pending() {
-		LOCK_INIT( &this->application.getLock );
 		LOCK_INIT( &this->application.setLock );
+		LOCK_INIT( &this->application.getLock );
 		LOCK_INIT( &this->application.updateLock );
 		LOCK_INIT( &this->application.delLock );
-		LOCK_INIT( &this->masters.getLock );
-		LOCK_INIT( &this->masters.setLock );
-		LOCK_INIT( &this->masters.updateLock );
-		LOCK_INIT( &this->masters.delLock );
+
+		LOCK_INIT( &this->clients.setLock );
+		LOCK_INIT( &this->clients.getLock );
+		LOCK_INIT( &this->clients.updateLock );
+		LOCK_INIT( &this->clients.delLock );
 	}
 };
 

@@ -1,25 +1,25 @@
 #include "protocol.hh"
 
-size_t Protocol::generateLoadStatsHeader( uint8_t magic, uint8_t to, uint16_t instanceId, uint32_t requestId, uint32_t slaveGetCount, uint32_t slaveSetCount, uint32_t slaveOverloadCount, uint32_t recordSize, uint32_t slaveAddrSize ) {
+size_t Protocol::generateLoadStatsHeader( uint8_t magic, uint8_t to, uint16_t instanceId, uint32_t requestId, uint32_t serverGetCount, uint32_t serverSetCount, uint32_t serverOverloadCount, uint32_t recordSize, uint32_t serverAddrSize ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, 0, PROTO_LOAD_STATS_SIZE + ( slaveGetCount + slaveSetCount ) * recordSize + ( slaveOverloadCount * slaveAddrSize ), instanceId, requestId );
+	size_t bytes = this->generateHeader( magic, to, 0, PROTO_LOAD_STATS_SIZE + ( serverGetCount + serverSetCount ) * recordSize + ( serverOverloadCount * serverAddrSize ), instanceId, requestId );
 
-	*( ( uint32_t * )( buf ) ) = htonl( slaveGetCount );
-	*( ( uint32_t * )( buf + sizeof( uint32_t ) ) ) = htonl( slaveSetCount );
-	*( ( uint32_t * )( buf + sizeof( uint32_t ) * 2 ) ) = htonl( slaveOverloadCount );
+	*( ( uint32_t * )( buf ) ) = htonl( serverGetCount );
+	*( ( uint32_t * )( buf + sizeof( uint32_t ) ) ) = htonl( serverSetCount );
+	*( ( uint32_t * )( buf + sizeof( uint32_t ) * 2 ) ) = htonl( serverOverloadCount );
 
 	bytes += PROTO_LOAD_STATS_SIZE;
 
 	return bytes;
 }
 
-bool Protocol::parseLoadStatsHeader( size_t offset, uint32_t &slaveGetCount, uint32_t &slaveSetCount, uint32_t &slaveOverloadCount, char *buf, size_t size ) {
+bool Protocol::parseLoadStatsHeader( size_t offset, uint32_t &serverGetCount, uint32_t &serverSetCount, uint32_t &serverOverloadCount, char *buf, size_t size ) {
 	if ( size - offset < PROTO_LOAD_STATS_SIZE )
 		return false;
 
-	slaveGetCount = ntohl( *( ( uint32_t * )( buf + offset ) ) );
-	slaveSetCount = ntohl( *( ( uint32_t * )( buf + offset + sizeof( uint32_t ) ) ) );
-	slaveOverloadCount = ntohl( *( ( uint32_t * )( buf + offset + sizeof( uint32_t ) * 2 ) ) );
+	serverGetCount = ntohl( *( ( uint32_t * )( buf + offset ) ) );
+	serverSetCount = ntohl( *( ( uint32_t * )( buf + offset + sizeof( uint32_t ) ) ) );
+	serverOverloadCount = ntohl( *( ( uint32_t * )( buf + offset + sizeof( uint32_t ) * 2 ) ) );
 
 	return true;
 }
@@ -31,9 +31,9 @@ bool Protocol::parseLoadStatsHeader( struct LoadStatsHeader &header, char *buf, 
 	}
 	return this->parseLoadStatsHeader(
 		offset,
-		header.slaveGetCount,
-		header.slaveSetCount,
-		header.slaveOverloadCount,
+		header.serverGetCount,
+		header.serverSetCount,
+		header.serverOverloadCount,
 		buf, size
 	);
 }
