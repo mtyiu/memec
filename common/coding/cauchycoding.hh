@@ -28,7 +28,7 @@ private:
 	uint32_t _chunkSize;
 
 #ifdef USE_ISAL
-	unsigned char _gftbl[ CRS_N_MAX * CRS_N_MAX ];
+	unsigned char _gftbl[ CRS_N_MAX * CRS_N_MAX * 32 ];
 	unsigned char _encodeMatrix[ CRS_N_MAX * CRS_N_MAX ];
 #else
 	int *_jmatrix;

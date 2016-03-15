@@ -146,13 +146,12 @@ bool RSCoding::decode( Chunk **chunks, BitmaskArray * chunkStatus ) {
 #ifdef USE_ISAL
 	dataType decodeMatrix[ RS_N_MAX * RS_N_MAX ];
 	dataType invertedMatrix[ RS_N_MAX * RS_N_MAX ];
-	dataType gftbl[ RS_N_MAX * RS_N_MAX ];
+	dataType gftbl[ RS_N_MAX * RS_N_MAX * 32 ];
 	// get the row where data is alive
 	for ( uint32_t i = 0, pos = 0, oi = 0; i < k+m; i++ ) {
 		if ( ( int ) i != erasures[ pos ] ) {
-			memcpy( decodeMatrix + k * oi, this->_encodeMatrix + k * i, k );
-			oi++;
-		} else if ( ( int ) i == erasures[ pos ] ) {
+			memcpy( decodeMatrix + k * oi++, this->_encodeMatrix + k * i, k );
+		} else {
 			pos++;
 		}
 	}

@@ -140,7 +140,7 @@ bool CauchyCoding::decode( Chunk **chunks, BitmaskArray * chunkStatus ) {
 #ifdef USE_ISAL
 	dataType decodeMatrix[ CRS_N_MAX * CRS_N_MAX ];
 	dataType invertedMatrix[ CRS_N_MAX * CRS_N_MAX ];
-	dataType gftbl[ CRS_N_MAX * CRS_N_MAX ];
+	dataType gftbl[ CRS_N_MAX * CRS_N_MAX * 32 ];
 	// get the row where data is alive
 	for ( uint32_t i = 0, pos = 0, oi = 0; i < k+m; i++ ) {
 		if ( ( int ) i != erasures[ pos ] ) {
