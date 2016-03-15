@@ -96,6 +96,24 @@ void gf_gen_cauchy1_matrix(unsigned char *a, int m, int k)
 
 }
 
+// Added by Helen
+void gf_gen_raid5_matrix(unsigned char *a, int m, int k)
+{
+	int i, j;
+	unsigned char *p;
+	memset(a, 0, k *m);
+
+	// Identity matrix in the high position
+	for (i = 0; i < k; i++)
+		a[k * i + i] = 1;
+
+	// For the rest, set all to 1
+	p = &a[k * k];
+	for (i = k; i < m; i++)
+		for (j = 0; j < k; j++)
+			*p++ = 1;
+}
+
 int gf_invert_matrix(unsigned char *in_mat, unsigned char *out_mat, const int n)
 {
 	int i, j, k;

@@ -913,6 +913,17 @@ void gf_gen_rs_matrix(unsigned char *a, int m, int k);
 void gf_gen_cauchy1_matrix(unsigned char *a, int m, int k);
 
 /**
+ * @brief Generate a RAID5 matrix of coefficients to be used for encoding.
+ *
+ * @param a  [mxk] array to hold coefficients
+ * @param m  number of rows in matrix corresponding to srcs + parity.
+ * @param k  number of columns in matrix corresponding to srcs.
+ * @returns  none
+ */
+
+void gf_gen_raid5_matrix(unsigned char *a, int m, int k);
+
+/**
  * @brief Invert a matrix in GF(2^8)
  *
  * @param in  input matrix
