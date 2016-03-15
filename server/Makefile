@@ -74,8 +74,11 @@ EXTERNAL_LIB= \
 	$(MEMEC_SRC_ROOT)/common/socket/socket.o \
 	$(MEMEC_SRC_ROOT)/common/socket/epoll.o \
 	$(MEMEC_SRC_ROOT)/lib/death_handler/death_handler.o \
-	$(MEMEC_SRC_ROOT)/lib/inih/ini.o \
-	$(MEMEC_SRC_ROOT)/lib/isa-l-2.14.0/lib/libisal.a
+	$(MEMEC_SRC_ROOT)/lib/inih/ini.o
+
+ifeq ($(USE_ISAL), 1)
+	EXTERNAL_LIB+= $(MEMEC_SRC_ROOT)/lib/isa-l-2.14.0/lib/libisal.a
+endif
 
 LD_LIB= \
 	-lrt \

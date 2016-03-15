@@ -31,6 +31,19 @@ Install packages,
 sudo apt-get install automake yasm 
 ```
 
+Check if `yasm` is of version 1.2 or above,
+```
+yasm --version
+```
+
+If not, install yasm from source,
+```
+wget http://www.tortall.net/projects/yasm/releases/yasm-1.2.0.tar.gz
+tar zxvf yasm-1.2.0.tar.gz
+make
+sudo make install
+```
+
 Configure under `lib/isa-l-2.14.0/`,
 
 ```
@@ -45,7 +58,7 @@ If you encounter the error "Libtool library used but 'LIBTOOL' is undefined",
 3. Add libtool support: `$ libtoolize`
 4. Continue to install: `$ ./configure --prefix=$(pwd); make install`
 
-The system uses Jerasure for coding by default (for RS and CRS), uncomment `-DUSE_ISAL` in `common/coding/Makefile` to use ISA-L instead
+The system uses Jerasure for coding by default (for RS and CRS), set `USE_ISAL` in `Makefile` to `1` to use ISA-L instead
 ```
-FLAGS= -DUSE_ISAL
+USE_ISAL= 1
 ``` 
