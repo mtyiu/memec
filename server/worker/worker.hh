@@ -3,7 +3,6 @@
 
 #include <vector>
 #include <cstdio>
-#include "worker_role.hh"
 #include "../ack/pending_ack.hh"
 #include "../buffer/mixed_chunk_buffer.hh"
 #include "../buffer/degraded_chunk_buffer.hh"
@@ -76,7 +75,6 @@ private:
 	void dispatch( MixedEvent event );
 	void dispatch( CodingEvent event );
 	void dispatch( IOEvent event );
-	void dispatch( ServerEvent event );
 	ServerPeerSocket *getServers( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId );
 	bool getServers( uint32_t listId );
 	void free();
@@ -153,10 +151,8 @@ private:
 	// ---------- remap_worker.cc ----------
 	bool handleRemappedData( CoordinatorEvent event, char *buf, size_t size );
 	bool handleDegradedSetRequest( ClientEvent event, char *buf, size_t size );
-	bool handleDegradedSetRequest( ServerPeerEvent event, char *buf, size_t size );
 	bool handleRemappedUpdateRequest( ServerPeerEvent event, char *buf, size_t size );
 	bool handleRemappedDeleteRequest( ServerPeerEvent event, char *buf, size_t size );
-	bool handleDegradedSetResponse( ServerPeerEvent event, bool success, char *buf, size_t size );
 	bool handleRemappedUpdateResponse( ServerPeerEvent event, bool success, char *buf, size_t size );
 	bool handleRemappedDeleteResponse( ServerPeerEvent event, bool success, char *buf, size_t size );
 

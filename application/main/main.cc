@@ -87,7 +87,7 @@ usage:
 		"Mandatory arguments to long options are mandatory for short "
 		"options too.\n"
 		"  -p, --path         Specify the path to the directory containing the config files\n"
-		"  -o, --option       Override the options in the config file of application\n"
+		"  -o, --option       Override the options in the config file of application (application.ini)\n"
 		"  -v, --verbose      Show configuration\n"
 		"  -h, --help         Display this help and exit\n",
 		argv[ 0 ]

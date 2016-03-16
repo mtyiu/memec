@@ -54,10 +54,6 @@ bool CoordinatorWorker::handleDegradedLockRequest( ClientEvent event, char *buf,
 	lock = 0;
 	if ( ! map->findMetadataByKey( header.key, header.keySize, srcMetadata ) ) {
 		// Key not found
-		// printf( "Key: %.*s not found at : ", header.keySize, header.key );
-		// socket->printAddress();
-		// printf( "\n" );
-
 		event.resDegradedLock(
 			event.socket, event.instanceId, event.requestId,
 			key, true
@@ -89,7 +85,6 @@ bool CoordinatorWorker::handleDegradedLockRequest( ClientEvent event, char *buf,
 				);
 
 				if ( ! map->isSealed( tmpMetadata ) && ongoingAtChunk != header.original[ i * 2 + 1 ] ) {
-					// fprintf( stderr, "Skip reconstructing (%u, %u, %u)\n", tmpMetadata.listId, tmpMetadata.stripeId, tmpMetadata.chunkId );
 					for ( uint32_t j = i; j < header.reconstructedCount - 1; j++ ) {
 						header.original[ j * 2     ] = header.original[ ( j + 1 ) * 2     ];
 						header.original[ j * 2 + 1 ] = header.original[ ( j + 1 ) * 2 + 1 ];
@@ -117,12 +112,6 @@ bool CoordinatorWorker::handleDegradedLockRequest( ClientEvent event, char *buf,
 				false, false
 			);
 
-			// if ( ! map->isSealed( srcMetadata ) ) {
-			// 	printf( "(Not sealed) [%u, %u]: ", srcMetadata.listId, srcMetadata.stripeId );
-			// 	degradedLock.print();
-			// 	fflush( stdout );
-			// }
-
 			// The chunk is already locked
 			event.resDegradedLock(
 				event.socket, event.instanceId, event.requestId, key,
@@ -145,23 +134,6 @@ bool CoordinatorWorker::handleDegradedLockRequest( ClientEvent event, char *buf,
 				key, true
 			);
 		} else {
-			/*
-			bool isPrinted = false;
-			if ( isPrinted ) {
-				for ( uint32_t i = 0; i < header.reconstructedCount; i++ ) {
-					printf(
-						"%s(%u, %u) |-> (%u, %u)%s",
-						i == 0 ? "Modified: " : "; ",
-						header.original[ i * 2     ],
-						header.original[ i * 2 + 1 ],
-						header.reconstructed[ i * 2     ],
-						header.reconstructed[ i * 2 + 1 ],
-						i == header.reconstructedCount - 1 ? "\n" : ""
-					);
-				}
-			}
-			*/
-
 			if ( ! header.reconstructedCount ) {
 				event.resDegradedLock(
 					event.socket, event.instanceId, event.requestId,

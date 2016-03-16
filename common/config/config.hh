@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <cstring>
 #include "../util/debug.hh"
+#include "../util/option.hh"
 
 #define STORAGE_PATH_MAX 256
 
@@ -37,6 +38,7 @@ protected:
 public:
 	static int handler( void *data, const char *section, const char *name, const char *value );
 
+	bool override( OptionList &options );
 	virtual bool set( const char *section, const char *name, const char *value ) = 0;
 	virtual bool validate() = 0;
 	const char *serialize( size_t &serializedStringLength );

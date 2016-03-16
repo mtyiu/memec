@@ -9,6 +9,18 @@ int Config::handler( void *data, const char *section, const char *name, const ch
 	return config->set( section, name, value ) ? 1 : 0;
 }
 
+bool Config::override( OptionList &options ) {
+	bool ret = true;
+	for ( int i = 0, size = options.size(); i < size; i++ ) {
+		ret &= this->set(
+			options[ i ].section,
+			options[ i ].name,
+			options[ i ].value
+		);
+	}
+	return ret;
+}
+
 bool Config::parse( const char *path, const char *filename ) {
 	size_t pathLength = strlen( path ), filenameLength = strlen( filename );
 	char *fullPath = ( char * ) calloc( pathLength + filenameLength + ( path[ pathLength - 1 ] == '/' ? 1 : 2 ), sizeof( char ) );
@@ -16,7 +28,7 @@ bool Config::parse( const char *path, const char *filename ) {
 		__ERROR__( "Config", "parse", "Cannot allocate memory." );
 		return false;
 	}
-	
+
 	strcpy( fullPath, path );
 	if ( path[ pathLength - 1 ] == '/' ) {
 		strcpy( fullPath + pathLength, filename );
@@ -43,7 +55,7 @@ bool Config::parse( const char *path, const char *filename ) {
 
 	free( fullPath );
 
-	return this->validate();
+	return true;
 }
 
 const char *Config::serialize( size_t &serializedStringLength ) {

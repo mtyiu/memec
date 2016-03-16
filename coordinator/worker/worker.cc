@@ -66,7 +66,6 @@ void CoordinatorWorker::dispatch( CoordinatorEvent event ) {
 				coordinator->eventQueue.insert( serverEvent );
 			}
 			UNLOCK( &coordinator->sockets.servers.lock );
-
 		}
 			break;
 		default:

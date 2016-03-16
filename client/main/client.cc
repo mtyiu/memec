@@ -163,11 +163,14 @@ void Client::signalHandler( int signal ) {
 	}
 }
 
-bool Client::init( char *path, OptionList &options, bool verbose ) {
+bool Client::init( char *path, OptionList &globalOptions, OptionList &clientOptions, bool verbose ) {
 	// Parse configuration files //
 	if ( ( ! this->config.global.parse( path ) ) ||
+	     ( ! this->config.global.override( globalOptions ) ) ||
+	     ( ! this->config.global.validate() ) ||
 	     ( ! this->config.client.parse( path ) ) ||
-	     ( ! this->config.client.override( options ) ) ) {
+	     ( ! this->config.client.override( clientOptions ) ) ||
+	     ( ! this->config.client.validate() ) ) {
 		return false;
 	}
 
