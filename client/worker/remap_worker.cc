@@ -26,17 +26,6 @@ bool ClientWorker::handleDegradedSetRequest( ApplicationEvent event, char *buf, 
 		event.resSet( event.socket, event.instanceId, event.requestId, key, false, false );
 		this->dispatch( event );
 		return false;
-	} else {
-		// printf( "Remapping " );
-		// for ( uint32_t i = 0; i < remappedCount; i++ ) {
-		// 	if ( i ) printf( "; " );
-		// 	printf(
-		// 		"(%u, %u) |-> (%u, %u)",
-		// 		original[ i * 2 ], original[ i * 2 + 1 ],
-		// 		remapped[ i * 2 ], remapped[ i * 2 + 1 ]
-		// 	);
-		// }
-		// printf( " (count = %u).\n", remappedCount );
 	}
 
 	struct {
@@ -77,8 +66,6 @@ bool ClientWorker::handleDegradedSetRequest( ApplicationEvent event, char *buf, 
 		break; // Only send to one coordinator
 	}
 
-	// printf( "[%u] Requesting DEGRADED_SET_LOCK...\n", requestId );
-
 	return true;
 }
 
@@ -96,8 +83,6 @@ bool ClientWorker::handleDegradedSetLockResponse( CoordinatorEvent event, bool s
 		( int ) header.keySize, header.key, header.keySize
 	);
 
-	// printf( "[%u, %u] Handling DEGRADED_SET_LOCK response...\n", event.instanceId, event.requestId );
-
 	// Find the corresponding DEGRADED_SET_LOCK request //
 	PendingIdentifier pid;
 	RemapList remapList;
@@ -108,8 +93,6 @@ bool ClientWorker::handleDegradedSetLockResponse( CoordinatorEvent event, bool s
 		remapList.free();
 	}
 
-	// printf( "[%u, %u] Handling DEGRADED_SET_LOCK response...\n", pid.instanceId, pid.requestId );
-
 	// Handle the case when the lock cannot be acquired //
 	if ( ! success ) {
 		__ERROR__( "ClientWorker", "handleDegradedSetLockResponse", "TODO: Handle the case when the lock cannot be acquired (ID: (%u, %u), key: %.*s).", event.instanceId, event.requestId, header.keySize, header.key );
@@ -118,9 +101,6 @@ bool ClientWorker::handleDegradedSetLockResponse( CoordinatorEvent event, bool s
 		if ( ! ClientWorker::pending->eraseKeyValue( PT_APPLICATION_SET, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &keyValue, true, true, true, header.key ) ) {
 			__ERROR__( "ClientWorker", "handleDegradedSetLockResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded. (Key = %.*s, ID = (%u, %u))", header.keySize, header.key, pid.parentInstanceId, pid.parentRequestId );
 			return false;
-		// } else {
-		// 	Client::getInstance()->printPending();
-		// 	printf( "Request found.\n" );
 		}
 
 		ApplicationEvent applicationEvent;
@@ -194,10 +174,6 @@ bool ClientWorker::handleDegradedSetLockResponse( CoordinatorEvent event, bool s
 		);
 		packet->size = buffer.size;
 
-		// printf( "[%u, %u] Sending %.*s to ", pid.parentInstanceId, pid.parentRequestId, keySize, keyStr );
-		// this->parityServerSockets[ i ]->printAddress();
-		// printf( "\n" );
-
 		if ( ClientWorker::updateInterval ) {
 			// Mark the time when request is sent
 			ClientWorker::pending->recordRequestStartTime(
@@ -238,8 +214,6 @@ bool ClientWorker::handleDegradedSetLockResponse( CoordinatorEvent event, bool s
 		__ERROR__( "ClientWorker", "handleDegradedSetLockResponse", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 	}
 
-	// printf( "[%u] Sending DEGRADED_SET request...\n", pid.requestId );
-
 	return true;
 }
 
@@ -261,8 +235,6 @@ bool ClientWorker::handleDegradedSetResponse( ServerEvent event, bool success, c
 	PendingIdentifier pid;
 	Key key;
 	KeyValue keyValue;
-
-	// printf( "[%u] Handling DEGRADED_SET response...\n", event.requestId );
 
 	// Find the cooresponding request //
 	if ( ! ClientWorker::pending->eraseKey( PT_SERVER_DEGRADED_SET, event.instanceId, event.requestId, ( void * ) event.socket, &pid, &key, true, false ) ) {
@@ -298,10 +270,6 @@ bool ClientWorker::handleDegradedSetResponse( ServerEvent event, bool success, c
 			UNLOCK( &client->serverLoading.lock );
 		}
 	}
-
-	// if ( pending ) {
-	// 	__ERROR__( "ClientWorker", "handleDegradedSetResponse", "Pending server DEGRADED_SET requests = %d (remapped count: %u).", pending, header.remappedCount );
-	// }
 
 	if ( pending == 0 ) {
 		// Only send application SET response when the number of pending server SET requests equal 0

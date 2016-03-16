@@ -13,18 +13,6 @@ bool ServerConfig::parse( const char *path ) {
 	return Config::parse( path, "server.ini" );
 }
 
-bool ServerConfig::override( OptionList &options ) {
-	bool ret = true;
-	for ( int i = 0, size = options.size(); i < size; i++ ) {
-		ret &= this->set(
-			options[ i ].section,
-			options[ i ].name,
-			options[ i ].value
-		);
-	}
-	return ret;
-}
-
 bool ServerConfig::set( const char *section, const char *name, const char *value ) {
 	if ( match( section, "server" ) ) {
 		return this->server.addr.parse( name, value );
@@ -76,8 +64,12 @@ bool ServerConfig::validate() {
 		CFG_PARSE_ERROR( "ServerConfig", "The specified storage type is invalid." );
 	} else if ( this->storage.type == STORAGE_TYPE_LOCAL ) {
 		struct stat st;
-		if ( stat( this->storage.path, &st ) != 0 )
-			CFG_PARSE_ERROR( "ServerConfig", "The specified storage path does not exist." );
+		while ( stat( this->storage.path, &st ) != 0 ) {
+			__INFO__( YELLOW, "ServerConfig", "validate", "The specified storage path does not exist. Creating the directory..." );
+			if ( mkdir( this->storage.path, 0700 ) != 0 ) {
+				CFG_PARSE_ERROR( "ServerConfig", "Failed to created a directory at the specified storage path." );
+			}
+		}
 
 		if ( ! S_ISDIR( st.st_mode ) )
 			CFG_PARSE_ERROR( "ServerConfig", "The specified storage path is not a directory." );
@@ -113,7 +105,7 @@ void ServerConfig::print( FILE *f ) {
 		"\t- %-*s : %lu\n"
 		"- Buffer\n"
 		"\t- %-*s : %u\n"
-		"- Seal"
+		"- Seal\n"
 		"\t- %-*s : %s\n"
 		"- Storage\n"
 		"\t- %-*s : %s\n"

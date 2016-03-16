@@ -310,8 +310,6 @@ bool ServerWorker::handleReconstructionUnsealedRequest( CoordinatorEvent event, 
 		return false;
 	}
 
-	// printf( "handleReconstructionUnsealedRequest: %u\n", header.count );
-
 	std::unordered_set<Key> unsealedKeys;
 	std::unordered_set<Key>::iterator unsealedKeysIt;
 	std::unordered_set<uint32_t> stripeIds;
@@ -343,11 +341,6 @@ bool ServerWorker::handleReconstructionUnsealedRequest( CoordinatorEvent event, 
 		key.set( keySize, keyStr );
 		key.dup();
 		unsealedKeys.insert( key );
-		// printf(
-		// 	"[%u] (%u) %.*s / (%u) %.*s\n",
-		// 	i, key.size, key.size, key.data,
-		// 	keySize, keySize, keyStr
-		// );
 	}
 
 	if ( ! ServerWorker::pending->insertReconstruction(
@@ -401,7 +394,6 @@ bool ServerWorker::handleReconstructionUnsealedRequest( CoordinatorEvent event, 
 			__ERROR__( "ServerWorker", "handleReconstructionUnsealedRequest", "Reconstructed server not available!" );
 		}
 	}
-	// printf( "Total number of unsealed key-values sent: %u\n", totalKeyValuesCount );
 
 	return true;
 }

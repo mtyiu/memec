@@ -49,11 +49,14 @@ void Server::signalHandler( int signal ) {
 	}
 }
 
-bool Server::init( char *path, OptionList &options, bool verbose ) {
+bool Server::init( char *path, OptionList &globalOptions, OptionList &serverOptions, bool verbose ) {
 	// Parse configuration files //
 	if ( ( ! this->config.global.parse( path ) ) ||
+	     ( ! this->config.global.override( globalOptions ) ) ||
+	     ( ! this->config.global.validate() ) ||
 	     ( ! this->config.server.parse( path ) ) ||
-	     ( ! this->config.server.override( options ) )
+	     ( ! this->config.server.override( serverOptions ) ) ||
+		 ( ! this->config.server.validate() )
 	) {
 		return false;
 	}

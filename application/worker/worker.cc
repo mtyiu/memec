@@ -11,18 +11,13 @@ Pending *ApplicationWorker::pending;
 
 void ApplicationWorker::dispatch( MixedEvent event ) {
 	switch( event.type ) {
-		case EVENT_TYPE_APPLICATION:
-			this->dispatch( event.event.application );
-			break;
 		case EVENT_TYPE_CLIENT:
 			this->dispatch( event.event.client );
 			break;
 		default:
+			__ERROR__( "ApplicationWorker", "dispatch", "Unsupported event type." );
 			break;
 	}
-}
-
-void ApplicationWorker::dispatch( ApplicationEvent event ) {
 }
 
 void ApplicationWorker::dispatch( ClientEvent event ) {

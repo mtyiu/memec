@@ -22,7 +22,6 @@ private:
 	static Pending *pending;
 
 	void dispatch( MixedEvent event );
-	void dispatch( ApplicationEvent event );
 	void dispatch( ClientEvent event );
 	void free();
 	static void *run( void *argv );

@@ -13,18 +13,6 @@ bool CoordinatorConfig::parse( const char *path ) {
 	return Config::parse( path, "coordinator.ini" );
 }
 
-bool CoordinatorConfig::override( OptionList &options ) {
-	bool ret = true;
-	for ( int i = 0, size = options.size(); i < size; i++ ) {
-		ret &= this->set(
-			options[ i ].section,
-			options[ i ].name,
-			options[ i ].value
-		);
-	}
-	return ret;
-}
-
 bool CoordinatorConfig::set( const char *section, const char *name, const char *value ) {
 	if ( match( section, "coordinator" ) ) {
 		return this->coordinator.addr.parse( name, value );
@@ -52,7 +40,7 @@ bool CoordinatorConfig::validate() {
 		CFG_PARSE_ERROR( "CoordinatorConfig", "The coordinator is not assigned with an valid address." );
 
 	if ( ! this->states.isManual ) {
-		if ( this->states.threshold.start > this->states.threshold.stop )
+		if ( this->states.threshold.start <= this->states.threshold.stop )
 			CFG_PARSE_ERROR( "CoordinatorConfig", "The start threshold should be smaller than the stop threshold." );
 
 		if ( this->states.threshold.overload <= 0 )
@@ -94,9 +82,9 @@ void CoordinatorConfig::print( FILE *f ) {
 		fprintf(
 			f,
 			"\t- %-*s : %u\n"
-			"\t- %-*s : %f\n"
-			"\t- %-*s : %f\n"
-			"\t- %-*s : %f\n",
+			"\t- %-*s : %.2f%%\n"
+			"\t- %-*s : %.2f%%\n"
+			"\t- %-*s : %.2f%%\n",
 			width, "Maximum", this->states.maximum,
 			width, "Start threshold", this->states.threshold.start,
 			width, "Stop threshold", this->states.threshold.stop,
