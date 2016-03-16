@@ -4,7 +4,7 @@
 bool RAID5Coding::init( uint32_t n ) {
 	this->n = n;
 #ifdef USE_ISAL
-	gf_gen_raid5_matrix( this->_encodeMatrix, n+n-1, n-1 );
+	gf_gen_raid5_matrix( this->_encodeMatrix, n, n-1 );
 	ec_init_tables( n - 1, n, &this->_encodeMatrix[ ( n - 1 ) * ( n - 1 ) ], this->_gftbl );
 #endif
 	return true;
