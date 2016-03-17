@@ -46,16 +46,16 @@ sudo make install
 cd ../
 ```
 
-Check if `automake` is of version 1.4 or above,
+Check if `automake` is of version 1.14 or above,
 ```
 automake --version
 ```
 
 If not, install automake from source,
 ```
-wget http://ftp.gnu.org/gnu/automake/automake-1.4.tar.gz
-tar zxf automake-1.4.tar.gz
-cd automake-1.4
+wget http://ftp.gnu.org/gnu/automake/automake-1.14.tar.gz
+tar zxf automake-1.14.tar.gz
+cd automake-1.14
 make
 sudo make install
 cd ../
