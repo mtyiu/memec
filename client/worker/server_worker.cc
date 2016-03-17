@@ -46,7 +46,6 @@ void ClientWorker::dispatch( ServerEvent event ) {
 			if ( ! isCompleted )
 				ClientWorker::eventQueue->insert( event );
 
-			// printf( "Sealed: %u; ops: %u\n", sealedCount, opsCount );
 			isSend = false; // Send to coordinator instead
 		}
 			break;
@@ -116,11 +115,8 @@ void ClientWorker::dispatch( ServerEvent event ) {
 		if ( ret != ( ssize_t ) buffer.size )
 			__ERROR__( "ClientWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 
-		if ( event.type == SERVER_EVENT_TYPE_SEND ) {
+		if ( event.type == SERVER_EVENT_TYPE_SEND )
 			ClientWorker::packetPool->free( event.message.send.packet );
-			// fprintf( stderr, "- After free(): " );
-			// ClientWorker::packetPool->print( stderr );
-		}
 	} else if ( event.type == SERVER_EVENT_TYPE_SYNC_METADATA ) {
 		std::vector<CoordinatorSocket *> &coordinators = Client::getInstance()->sockets.coordinators.values;
 		for ( int i = 0, len = coordinators.size(); i < len; i++ ) {
@@ -313,9 +309,6 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 		return false;
 	}
 
-	// FOR REPLAY TESTING ONLY
-	//PendingIdentifier dpid = pid;
-
 	// Check pending server SET requests
 	pending = ClientWorker::pending->count( PT_SERVER_SET, pid.instanceId, pid.requestId, false, true );
 
@@ -345,26 +338,12 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 		}
 	}
 
-	// __ERROR__( "ClientWorker", "handleSetResponse", "Pending server SET requests = %d.", pending );
-
 	if ( pending == 0 ) {
 		// Only send application SET response when the number of pending server SET requests equal 0
 		if ( ! ClientWorker::pending->eraseKeyValue( PT_APPLICATION_SET, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &keyValue, true, true, true, keyStr ) ) {
 			__ERROR__( "ClientWorker", "handleSetResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded. (Key = %.*s, ID = (%u, %u))", key.size, key.data, pid.parentInstanceId, pid.parentRequestId );
 			return false;
 		}
-
-		// FOR REPLAY TESTING ONLY
-		// SET //
-		//char *valueStr;
-		//uint32_t valueSize, chunkId;
-		//keyValue.deserialize( key.data, key.size, valueStr, valueSize );
-		//KeyValue kv;
-		//kv.dup( key.data, key.size, valueStr, valueSize );
-		//ClientWorker::pending->insertKeyValue( PT_APPLICATION_SET, pid.instanceId, pid.requestId, 0, kv, true, true, pid.timestamp );
-		//key = kv.key();
-		//this->stripeList->get( key.data, key.size, this->dataServerSockets, 0, &chunkId );
-		//ClientWorker::pending->insertKey( PT_SERVER_SET, dpid.instanceId, dpid.parentInstanceId, dpid.requestId, dpid.parentRequestId, this->dataServerSockets[ chunkId ], key );
 
 		// not to response if the request is "canceled" due to replay
 		if ( pid.ptr ) {
@@ -426,9 +405,6 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 		return false;
 	}
 
-	// FOR REPLAY TESTING ONLY
-	//PendingIdentifier dpid = pid;
-
 	// Mark the elapse time as latency
 	if ( ! isDegraded && ClientWorker::updateInterval ) {
 		Client* client = Client::getInstance();
@@ -459,13 +435,6 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 		__ERROR__( "ClientWorker", "handleGetResponse", "Cannot find a pending application GET request that matches the response. This message will be discarded (key = %.*s).", key.size, key.data );
 		return false;
 	}
-
-	// FOR REPLAY TESTING ONLY
-	// GET //
-	//Key k;
-	//k.dup( key.size, key.data, key.ptr );
-	//ClientWorker::pending->insertKey( PT_APPLICATION_GET, pid.instanceId, pid.requestId, 0, k, true, true, pid.timestamp );
-	//ClientWorker::pending->insertKey( PT_SERVER_GET, dpid.instanceId, dpid.parentInstanceId, dpid.requestId, dpid.parentRequestId, dpid.ptr, key );
 
 	if ( pid.ptr ) {
 		if ( success ) {
@@ -513,9 +482,6 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 		return false;
 	}
 
-	// FOR REPLAY TESTING ONLY
-	//PendingIdentifier dpid = pid;
-
 	uint32_t timestamp = pid.timestamp;
 
 	if ( ! ClientWorker::pending->eraseKeyValueUpdate( PT_APPLICATION_UPDATE, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &keyValueUpdate, true, true, true, header.key ) ) {
@@ -532,15 +498,6 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 	if ( ! isDegraded ) {
 		event.socket->timestamp.pendingAck.eraseUpdate( timestamp );
 	}
-
-		// FOR REPLAY TESTING ONLY
-		// UPDATE //
-		//KeyValueUpdate kvu;
-		//kvu.dup( keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.ptr );
-		//kvu.offset = keyValueUpdate.offset;
-		//kvu.length = keyValueUpdate.length;
-		//ClientWorker::pending->insertKeyValueUpdate( PT_APPLICATION_UPDATE, pid.instanceId, pid.requestId, 0, kvu, true, true, pid.timestamp );
-		//ClientWorker::pending->insertKeyValueUpdate( PT_SERVER_UPDATE, dpid.instanceId, dpid.parentInstanceId, dpid.requestId, dpid.parentRequestId, dpid.ptr, kvu );
 
 	if ( pid.ptr ) {
 		applicationEvent.resUpdate( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, keyValueUpdate, success );

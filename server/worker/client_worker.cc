@@ -126,11 +126,6 @@ void ServerWorker::dispatch( ClientEvent event ) {
 		// UPDATE
 		case CLIENT_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
 		case CLIENT_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
-			if ( ! success ) {
-				fprintf( stderr, "UPDATE FAILED: %.*s\n", event.message.keyValueUpdate.key.size,
-				event.message.keyValueUpdate.key.data );
-				// assert( success );
-			}
 			buffer.data = this->protocol.resUpdate(
 				buffer.size,
 				event.instanceId, event.requestId,

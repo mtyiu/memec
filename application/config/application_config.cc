@@ -19,18 +19,6 @@ bool ApplicationConfig::parse( const char *path ) {
 	return Config::parse( path, "application.ini" );
 }
 
-bool ApplicationConfig::override( OptionList &options ) {
-	bool ret = true;
-	for ( int i = 0, size = options.size(); i < size; i++ ) {
-		ret &= this->set(
-			options[ i ].section,
-			options[ i ].name,
-			options[ i ].value
-		);
-	}
-	return ret;
-}
-
 bool ApplicationConfig::set( const char *section, const char *name, const char *value ) {
 	if ( match( section, "size" ) ) {
 		if ( match( name, "key" ) )

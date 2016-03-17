@@ -1,6 +1,6 @@
 TARGET=lib common coordinator client server application
 MAKEOPT= -j8 # speed up compiile
-USE_ISAL= 1 # change to 1 for compiling with ISAL instead of Jearasure
+USE_ISAL= 0 # change to 1 for compiling with ISAL instead of Jearasure
 
 .PHONY: all $(TARGET)
 

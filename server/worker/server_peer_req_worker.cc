@@ -242,13 +242,6 @@ bool ServerWorker::handleUpdateRequest( ServerPeerEvent event, char *buf, size_t
 				ServerWorker::getChunkBuffer->insert( metadata, chunk, sealIndicatorCount, sealIndicator );
 				metadata.chunkId = header.chunkId;
 
-				/*
-				fprintf( stderr, "Storing backup for (%u, %u, %u / %u): %p - %.*s\n", header.listId, header.stripeId, myChunkId, header.chunkId, chunk, header.keySize, header.key );
-				if ( chunk )
-					chunk->print();
-				fflush( stdout );
-				*/
-
 				if ( parityChunkBufferLock )
 					UNLOCK( parityChunkBufferLock );
 			}
@@ -423,23 +416,6 @@ bool ServerWorker::handleGetChunkRequest( ServerPeerEvent event, struct ChunkHea
 		sealIndicatorCount, sealIndicator
 	);
 
-	/* if ( metadata.chunkId >= ServerWorker::dataChunkCount ) {
-		fprintf(
-			stderr,
-			"handleGetChunkRequest(): (%u, %u, %u: 0x%p; exists? %s) - sealIndicator (%u) =",
-			metadata.listId,
-			metadata.stripeId,
-			metadata.chunkId,
-			chunk,
-			exists ? "true" : "false",
-			sealIndicatorCount
-		);
-		for ( uint8_t i = 0; i < sealIndicatorCount; i++ ) {
-			fprintf( stderr, " %d", sealIndicator[ i ] ? 1 : 0 );
-		}
-		fprintf( stderr, "\n" );
-	} */
-
 	this->dispatch( event );
 
 	if ( ! exists ) {
@@ -542,14 +518,10 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 		uint16_t port;
 		CoordinatorSocket *coordinatorSocket;
 		if ( ServerWorker::pending->eraseRecovery( metadata.listId, metadata.stripeId, metadata.chunkId, instanceId, requestId, coordinatorSocket, addr, port, remainingChunks, remainingKeys, totalChunks, totalKeys ) ) {
-			// printf( "Received (%u, %u, %u). Number of remaining pending chunks = %u / %u.\n", metadata.listId, metadata.stripeId, metadata.chunkId, remaining, total );
-
 			if ( remainingChunks == 0 ) {
 				notifyCoordinator = true;
 				coordinatorEvent.resPromoteBackupServer( coordinatorSocket, instanceId, requestId, addr, port, totalChunks, 0 );
 			}
-		} else {
-			// __ERROR__( "ServerWorker", "handleSetChunkRequest", "Cannot find the chunk (%u, %u, %u) from pending chunk set.", metadata.listId, metadata.stripeId, metadata.chunkId );
 		}
 	}
 
@@ -899,14 +871,6 @@ bool ServerWorker::issueSealChunkRequest( Chunk *chunk, uint32_t startPos ) {
 		uint32_t requestId = ServerWorker::idGenerator->nextVal( this->workerId );
 		Packet *packet = ServerWorker::packetPool->malloc();
 		packet->setReferenceCount( ServerWorker::parityChunkCount );
-
-		// printf(
-		// 	"[%u, %u] issueSealChunkRequest(): (%u, %u, %u)\n",
-		// 	instanceId, requestId,
-		// 	chunk->metadata.listId,
-		// 	chunk->metadata.stripeId,
-		// 	chunk->metadata.chunkId
-		// );
 
 		// Find parity servers
 		this->getServers( chunk->metadata.listId );

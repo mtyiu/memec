@@ -38,13 +38,11 @@ void ServerWorker::dispatch( MixedEvent event ) {
 		case EVENT_TYPE_CLIENT:
 			this->dispatch( event.event.client );
 			break;
-		case EVENT_TYPE_SERVER:
-			this->dispatch( event.event.server );
-			break;
 		case EVENT_TYPE_SERVER_PEER:
 			this->dispatch( event.event.serverPeer );
 			break;
 		default:
+			__ERROR__( "ClientWorker", "dispatch", "Unsupported event type." );
 			break;
 	}
 }
@@ -69,10 +67,9 @@ void ServerWorker::dispatch( IOEvent event ) {
 			if ( event.clear )
 				event.chunk->status = CHUNK_STATUS_NEEDS_LOAD_FROM_DISK;
 			break;
+		default:
+			return;
 	}
-}
-
-void ServerWorker::dispatch( ServerEvent event ) {
 }
 
 ServerPeerSocket *ServerWorker::getServers( char *data, uint8_t size, uint32_t &listId, uint32_t &chunkId ) {

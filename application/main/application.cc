@@ -53,7 +53,9 @@ bool Application::epollHandler( int fd, uint32_t events, void *data ) {
 bool Application::init( char *path, OptionList &options, bool verbose ) {
 	// Parse configuration files //
 	if ( ( ! this->config.application.parse( path ) ) ||
-	     ( ! this->config.application.override( options ) ) ) {
+	     ( ! this->config.application.override( options ) ) ||
+	     ( ! this->config.application.validate() )
+	) {
 		return false;
 	}
 

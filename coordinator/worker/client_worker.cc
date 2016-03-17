@@ -89,12 +89,10 @@ void CoordinatorWorker::dispatch( ClientEvent event ) {
 					if ( event.message.switchPhase.isCrashed )
 						coordinator->stateTransitHandler->addCrashedServer( servers->at( i ) );
 				}
-
-				coordinator->stateTransitHandler->transitToDegraded( servers, event.message.switchPhase.forced ); // Phase 1a --> 2
+				coordinator->stateTransitHandler->transitToDegraded( servers, event.message.switchPhase.forced );
 			} else {
-				coordinator->stateTransitHandler->transitToNormal( servers, event.message.switchPhase.forced ); // Phase 1b --> 0
+				coordinator->stateTransitHandler->transitToNormal( servers, event.message.switchPhase.forced );
 			}
-			// free the vector of servers
 			delete servers;
 		}
 			break;
@@ -215,9 +213,6 @@ void CoordinatorWorker::dispatch( ClientEvent event ) {
 				buffer.size -= PROTO_LOAD_STATS_SIZE;
 				if ( ! this->protocol.parseLoadingStats( loadStatsHeader, getLatency, setLatency, buffer.data, buffer.size ) )
 					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid amount of data received from client." );
-				//fprintf( stderr, "get stats GET %d SET %d\n", loadStatsHeader.serverGetCount, loadStatsHeader.serverSetCount );
-				// set the latest loading stats
-				//fprintf( stderr, "fd %d IP %u:%hu\n", event.socket->getSocket(), ntohl( event.socket->getAddr().sin_addr.s_addr ), ntohs( event.socket->getAddr().sin_port ) );
 
 #define SET_SERVER_LATENCY_FOR_CLIENT( _CLIENT_ADDR_, _SRC_, _DST_ ) \
 	for ( uint32_t i = 0; i < _SRC_.size(); i++ ) { \
@@ -290,7 +285,6 @@ quit_1:
 		}
 
 		if ( connected ) event.socket->done();
-
 	}
 
 	if ( ! connected )
@@ -298,7 +292,6 @@ quit_1:
 }
 
 bool CoordinatorWorker::handleSyncMetadata( ClientEvent event, char *buf, size_t size ) {
-	// uint16_t instanceId = event.instanceId;
 	uint32_t count, requestId = event.requestId;
 	size_t processed, offset, failed = 0;
 	ServerSocket *target = 0;
@@ -343,12 +336,6 @@ bool CoordinatorWorker::handleSyncMetadata( ClientEvent event, char *buf, size_t
 	LOCK( &target->map.chunksLock );
 	for ( count = 0; count < heartbeat.sealed; count++ ) {
 		if ( this->protocol.parseMetadataHeader( header.metadata, processed, buf, size, offset ) ) {
-			// fprintf(
-			// 	stderr, "(%u, %u, %u)\n",
-			// 	header.metadata.listId,
-			// 	header.metadata.stripeId,
-			// 	header.metadata.chunkId
-			// );
 			target->map.insertChunk(
 				header.metadata.listId,
 				header.metadata.stripeId,
@@ -388,10 +375,6 @@ bool CoordinatorWorker::handleSyncMetadata( ClientEvent event, char *buf, size_t
 
 	if ( failed ) {
 		__ERROR__( "CoordinatorWorker", "handleSyncMetadata", "Number of failed objects = %lu", failed );
-	} else {
-		// Send ACK message
-		// event.resHeartbeat( target, heartbeat.timestamp, heartbeat.sealed, heartbeat.keys, heartbeat.isLast );
-		// this->dispatch( event );
 	}
 
 	// check if this is the last packet for a sync operation
@@ -408,8 +391,6 @@ bool CoordinatorWorker::handleSyncMetadata( ClientEvent event, char *buf, size_t
 		} else {
 			__ERROR__( "CoordinatorWorker", "handleSyncMetadata", "Pending transition not found (instance ID: %u).", target->instanceId );
 		}
-	// } else {
-	// 	printf( "requestId = %u, heartbeat.isLast = %d, failed = %lu\n", requestId, heartbeat.isLast, failed );
 	}
 
 	return failed == 0;
