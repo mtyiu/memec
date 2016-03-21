@@ -28,6 +28,8 @@ void ClientWorker::dispatch( MixedEvent event ) {
 		case EVENT_TYPE_SERVER:
 			this->dispatch( event.event.server );
 			break;
+		case EVENT_TYPE_DUMMY:
+			break;
 		default:
 			__ERROR__( "ClientWorker", "dispatch", "Unsupported event type." );
 			break;
