@@ -23,6 +23,8 @@ void CoordinatorWorker::dispatch( MixedEvent event ) {
 		case EVENT_TYPE_SERVER:
 			this->dispatch( event.event.server );
 			break;
+		case EVENT_TYPE_DUMMY:
+			break;
 		default:
 			return;
 	}

@@ -72,7 +72,7 @@ DATABASES = {
     "kudu"         : "com.yahoo.ycsb.db.KuduYCSBClient",
     "mapkeeper"    : "com.yahoo.ycsb.db.MapKeeperClient",
     "memcached"    : "com.yahoo.ycsb.db.MemcachedClient",
-    "memec"        : "com.yahoo.ycsb.db.memec.MemEC",
+    "memec"        : "com.yahoo.ycsb.db.MemECApplication",
     "mongodb"      : "com.yahoo.ycsb.db.MongoDbClient",
     "mongodb-async": "com.yahoo.ycsb.db.AsyncMongoDbClient",
     "nosqldb"      : "com.yahoo.ycsb.db.NoSqlDbClient",
