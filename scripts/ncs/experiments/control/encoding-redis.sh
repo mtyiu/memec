@@ -6,6 +6,7 @@ HOSTNAME=$(hostname)
 
 threads=64 # '16 32 64 128 256 512 1000'
 workloads='load workloada workloadc'
+c=raid0
 
 for iter in {1..10}; do
 	mkdir -p ${BASE_PATH}/results/encoding/redis/$iter

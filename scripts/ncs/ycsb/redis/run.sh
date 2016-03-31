@@ -20,7 +20,7 @@ OPERATION_COUNT=$(expr ${RECORD_COUNT} \/ 4)
 
 # Run the target workload
 ${YCSB_PATH}/bin/ycsb \
-	run redis-cluster \
+	run redis-cs \
 	-s \
 	-P ${YCSB_PATH}/workloads/$2 \
 	-p fieldcount=1 \
