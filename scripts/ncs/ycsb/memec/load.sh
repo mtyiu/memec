@@ -7,7 +7,7 @@
 #
 ###################################################
 
-YCSB_PATH=~/mtyiu/ycsb/0.3.0
+YCSB_PATH=~/mtyiu/ycsb/0.7.0
 
 if [ $# != 1 ]; then
 	echo "Usage: $0 [Number of threads]"

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-YCSB_PATH=~/mtyiu/ycsb/0.3.0
+YCSB_PATH=~/mtyiu/ycsb/0.7.0
 
 ###################################################
 #

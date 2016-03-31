@@ -2,7 +2,7 @@
 
 BASE_PATH=${HOME}/mtyiu
 MEMEC_PATH=${BASE_PATH}/memec
-DELAYS=("400" "800" "1200" "1600" "2000")
+DELAYS=("2000")
 IS_CONTROL=1
 
 function set_manual {
@@ -54,7 +54,6 @@ OUT_DIR=${BASE_PATH}/results/${OUT_NAME}/double/${DELAY_BASE}
 workloads='workloadd'
 #workloads=''
 
-iter=$1
 for iter in {1..10}; do
 	echo "******************** Iteration #$iter (`date`) ********************"
 	screen -S manage -p 0 -X stuff "${BASE_PATH}/scripts/util/start.sh $(printf '\r')"

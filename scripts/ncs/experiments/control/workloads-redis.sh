@@ -8,7 +8,7 @@ coding='raid0' # raid1 raid5 rdp cauchy rs evenodd'
 threads=64 # '16 32 64 128 256 512 1000'
 workloads='load workloada workloadb workloadc workloadf workloadd'
 
-for iter in {1..30}; do
+for iter in {1..10}; do
 	mkdir -p ${BASE_PATH}/results/workloads/redis/$iter
 
 	for c in $coding; do

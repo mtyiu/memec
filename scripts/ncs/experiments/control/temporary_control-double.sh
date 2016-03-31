@@ -22,7 +22,7 @@ function restore_overload {
 }
 
 workloads='workloada'
-delays='0.4 0.8 1.2 1.6 2.0'
+delays='2.0'
 
 for delay in $delays; do
 	for iter in {1..10}; do
