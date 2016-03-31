@@ -233,7 +233,7 @@ void ClientWorker::replayRequestPrepare( ServerSocket *server ) {
 				else \
 					needsDup = true; \
 			} \
-			__DEBUG__( YELLOW, "ClientWorker", "replayRequestPrepare", "Add %s request ID = (%u,%u) with timestamp %u to replay.", #_OPCODE_, pid.instanceId, pid.requestId, pid.timestamp ); \
+			__INFO__( YELLOW, "ClientWorker", "replayRequestPrepare", "Add %s request ID = (%u,%u) with timestamp %u to replay.", #_OPCODE_, pid.instanceId, pid.requestId, pid.timestamp ); \
 			/* insert the request into pending set for replay */ \
 			requestInfo.set( pid.ptr, pid.instanceId, pid.requestId, PROTO_OPCODE_##_OPCODE_, _APPLICATION_VALUE_VAR_, !needsDup ); \
 			map->insert( std::pair<uint32_t, RequestInfo>( pid.timestamp, requestInfo ) ); \
@@ -366,7 +366,7 @@ void ClientWorker::gatherPendingNormalRequests( ServerSocket *target, bool needs
 	}
 	__DEBUG__( CYAN, "ClientWorker", "gatherPendingNormalRequest", "%lu list(s) included the server as parity", listIds.size() );
 
-	uint32_t listId;
+	uint32_t listId, chunkId;
 	struct sockaddr_in addr = target->getAddr();
 	bool hasPending = false;
 
@@ -380,12 +380,16 @@ void ClientWorker::gatherPendingNormalRequests( ServerSocket *target, bool needs
 	std::unordered_multimap<PendingIdentifier, _MAP_VALUE_TYPE_>::iterator it, saveIt; \
 	for( it = map->begin(), saveIt = it; it != map->end(); it = saveIt ) { \
 		saveIt++; \
-		listId = stripeList->get( it->second.data, it->second.size, 0, 0 ); \
+		listId = stripeList->get( it->second.data, it->second.size, 0, 0, &chunkId ); \
+		/* skip requests not in stripes involving the failed server */ \
 		if ( listIds.count( listId ) == 0 ) \
 			continue; \
-		/* put the completion of request in account for state transition */\
-		mh->stateTransitInfo.at( addr ).addPendingRequest( it->first.requestId, false, false ); \
-		__INFO__( CYAN, "ClientWorker", "gatherPendingNormalRequest", "Pending normal request id=%u for transit.", it->first.requestId ); \
+		/* no need to wait for requests whose data server is failed */ \
+		if ( stripeList->get( listId, chunkId ) == target ) \
+			continue; \
+		/* put the completion of request in account for state transition */ \
+		mh->stateTransitInfo.at( addr ).addPendingRequest( it->first.parentRequestId, false, false ); \
+		__DEBUG__( CYAN, "ClientWorker", "gatherPendingNormalRequest", "Pending normal request id=%u parentid=%u for transit.", it->first.requestId, it->first.parentRequestId ); \
 		hasPending = true; \
 	} \
 	UNLOCK ( &pending->servers._OP_TYPE_##Lock ); \

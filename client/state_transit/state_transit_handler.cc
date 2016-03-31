@@ -194,7 +194,7 @@ void ClientStateTransitHandler::setState( char* msg , int len ) {
 			case STATE_INTERMEDIATE:
 				// clean up pending items associated with this server
 				// TODO handle the case when insert happened after cleanup ( useCoordinatedFlow returns false > erase > add )
-				// ClientWorker::removePending( target );
+				ClientWorker::removePending( target );
 				this->ackTransit();
 				break;
 			case STATE_COORDINATED:
@@ -203,8 +203,8 @@ void ClientStateTransitHandler::setState( char* msg , int len ) {
 				break;
 			case STATE_DEGRADED:
 				// start replaying the requests
-				// ClientWorker::replayRequestPrepare( target );
-				// ClientWorker::replayRequest( target );
+				ClientWorker::replayRequestPrepare( target );
+				ClientWorker::replayRequest( target );
 				break;
 			default:
 				break;
@@ -266,11 +266,11 @@ bool ClientStateTransitHandler::acceptNormalResponse( const struct sockaddr_in &
 	switch( this->serversState[ server ] ) {
 		case STATE_UNDEFINED:
 		case STATE_NORMAL:
-		case STATE_INTERMEDIATE:
 		case STATE_COORDINATED:
 		case STATE_WAIT_DEGRADED:
 		case STATE_WAIT_NORMAL:
 			return true;
+		case STATE_INTERMEDIATE:
 		case STATE_DEGRADED:
 		default:
 			return false;
@@ -342,6 +342,8 @@ bool ClientStateTransitHandler::checkAckForServer( struct sockaddr_in server ) {
 			)
 		) ||
 	    ( state == STATE_COORDINATED && false /* no operations are needed before completing transition */) ) {
+		//if ( state == STATE_INTERMEDIATE )
+			//printf( "addr: %s:%hu, count: %u, completed %u\n", buf, ntohs( server.sin_port ), this->stateTransitInfo[ server ].getParityRevertCounterVal(), this->stateTransitInfo[ server ].counter.pendingNormalRequests.completed );
 		UNLOCK( &this->serversStateLock[ server ] );
 		return false;
 	}
