@@ -32,7 +32,7 @@ fi
 
 # Load the store with key-value pairs
 ${YCSB_PATH}/bin/ycsb \
-	load redis-cluster \
+	load redis-cs \
 	-s \
 	-P ${YCSB_PATH}/workloads/workloada \
 	-p fieldcount=1 \
