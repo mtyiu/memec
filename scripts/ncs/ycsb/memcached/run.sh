@@ -22,7 +22,7 @@ OPERATION_COUNT=$(expr ${RECORD_COUNT} \/ 4)
 ${YCSB_PATH}/bin/ycsb \
 	run memcached \
 	-s \
-	-jvm-args '-Xmx3584m' \
+	-jvm-args '\-Xmx3584m' \
 	-P ${YCSB_PATH}/workloads/$2 \
 	-p fieldcount=1 \
 	-p readallfields=false \

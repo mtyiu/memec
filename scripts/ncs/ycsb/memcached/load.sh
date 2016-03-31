@@ -34,7 +34,7 @@ fi
 ${YCSB_PATH}/bin/ycsb \
 	load memcached \
 	-s \
-	-jvm-args '-Xmx3584m' \
+	-jvm-args '\-Xmx3584m' \
 	-P ${YCSB_PATH}/workloads/workloada \
 	-p fieldcount=1 \
 	-p readallfields=false \
