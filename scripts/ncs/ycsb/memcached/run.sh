@@ -33,4 +33,6 @@ ${YCSB_PATH}/bin/ycsb \
 	-p operationcount=${OPERATION_COUNT} \
 	-p threadcount=$1 \
 	-p histogram.buckets=200000 \
+	-java-args '-Xmx3584m' \
+	-p memcached.readBufferSize=524288 \
 	-p memcached.hosts=192.168.0.21,192.168.0.22,192.168.0.23,192.168.0.24,192.168.0.25,192.168.0.26,192.168.0.27,192.168.0.28,192.168.0.29,192.168.0.30,192.168.0.31,192.168.0.32,192.168.0.33,192.168.0.47,192.168.0.48,192.168.0.49
