@@ -21,7 +21,6 @@ function restore_overload {
 	done
 }
 
-workloads='workloada workloadc'
 workloads='workloadc'
 delays='2.0'
 

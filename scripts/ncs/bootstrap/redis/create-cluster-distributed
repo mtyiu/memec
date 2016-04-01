@@ -1,0 +1,100 @@
+#!/bin/bash
+
+# You may want to put the above config parameters into config.sh in order to
+# override the defaults without modifying this script.
+
+HOST_PREFIX="192.168.0."
+PORT=6379
+TIMEOUT=2000
+NODES=16
+REPLICAS=0
+REDIS_HOME=/home/ncsgroup/hwchan/redis
+
+if [ "$1" == "start" ]
+then
+	for i in {11..23} {37..39}; do
+		HOST=${HOST_PREFIX}$((i+10))
+        echo "Starting $HOST:$PORT"
+        # ssh $HOST "cd $REDIS_HOME; nohup $REDIS_HOME/src/redis-server --port $PORT --cluster-enabled yes --cluster-config-file nodes-${i}.conf --cluster-node-timeout $TIMEOUT --appendonly yes --appendfilename appendonly-${i}.aof --dbfilename dump-${i}.rdb --logfile ${i}.log --daemonize yes"
+        ssh $HOST "cd $REDIS_HOME; nohup $REDIS_HOME/src/redis-server ${REDIS_HOME}/redis.conf --port $PORT --cluster-enabled yes --cluster-config-file nodes-${i}.conf --cluster-node-timeout $TIMEOUT --appendonly no --rdbchecksum no --dbfilename dump-${i}.rdb --logfile ${i}.log --daemonize yes"
+    done
+    exit 0
+fi
+
+if [ "$1" == "create" ]
+then
+	HOST_STR=""
+	for i in {11..23} {37..39}; do
+		HOST=${HOST_PREFIX}$((i+10))
+        HOST_STR="$HOST_STR $HOST:$PORT"
+    done
+	echo $HOST_STR
+    $REDIS_HOME/src/redis-trib.rb create --replicas $REPLICAS $HOST_STR
+    exit 0
+fi
+
+if [ "$1" == "flush" ]; then
+	for i in {11..23} {37..39}; do
+		HOST=${HOST_PREFIX}$((i+10))
+        echo "Stopping $i"
+        $REDIS_HOME/src/redis-cli -h $HOST -p $PORT flushall
+    done
+    exit 0
+fi
+
+if [ "$1" == "stop" ]
+then
+	for i in {11..23} {37..39}; do
+		HOST=${HOST_PREFIX}$((i+10))
+        echo "Stopping $i"
+        $REDIS_HOME/src/redis-cli -h $HOST -p $PORT shutdown nosave 
+    done
+    exit 0
+fi
+
+if [ "$1" == "watch" ]
+then
+    PORT=$((PORT+1))
+	HOST=${IP_PREFIX}$((IP_ST))
+	ssh $HOST "while [ 1 ]; do date; $REDIS_HOME/src/redis-cli -h $HOST -p $PORT cluster nodes | head -30; sleep 1; done"
+    exit 0
+fi
+
+if [ "$1" == "tail" ]
+then
+    INSTANCE=$2
+    PORT=$((PORT+INSTANCE+1))
+	HOST=${IP_PREFIX}$((IP_ST+INSTANCE))
+    ssh $HOST "cd $REDIS_HOME; tail -f ${PORT}.log"
+    exit 0
+fi
+
+if [ "$1" == "call" ]
+then
+	echo "NOT SUPPORTED"
+	exit -1
+    while [ $((PORT < ENDPORT)) != "0" ]; do
+        PORT=$((PORT+1))
+        $REDIS_HOME/src/redis-cli -p $PORT $2 $3 $4 $5 $6 $7 $8 $9
+    done
+    exit 0
+fi
+
+if [ "$1" == "clean" ]
+then
+	for i in {11..23} {37..39}; do
+		HOST=${HOST_PREFIX}$((i+10))
+        echo "Cleaning $HOST:$PORT"
+        ssh $HOST "cd $REDIS_HOME; rm -rf *.log appendonly*.aof dump*.rdb nodes*.conf"
+    done
+    exit 0
+fi
+
+echo "Usage: $0 [start|create|flush|stop|watch|tail|clean]"
+echo "start       -- Launch Redis Cluster instances."
+echo "create      -- Create a cluster using redis-trib create."
+echo "flush       -- Remove all data in the cluster."
+echo "stop        -- Stop Redis Cluster instances."
+echo "watch       -- Show CLUSTER NODES output (first 30 lines) of first node."
+echo "tail <id>   -- Run tail -f of instance at base port + ID."
+echo "clean       -- Remove all instances data, logs, configs."

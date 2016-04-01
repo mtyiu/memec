@@ -7,7 +7,7 @@
 #
 ###################################################
 
-YCSB_PATH=~/mtyiu/ycsb/0.3.0
+YCSB_PATH=~/mtyiu/ycsb/0.7.0
 
 if [ $# != 2 ]; then
 	echo "Usage: $0 [Number of threads] [Workload] [Output file of raw datapoints]"
@@ -20,7 +20,7 @@ OPERATION_COUNT=$(expr ${RECORD_COUNT} \/ 4)
 
 # Run the target workload
 ${YCSB_PATH}/bin/ycsb \
-	run redis-cluster \
+	run redis-cs \
 	-s \
 	-P ${YCSB_PATH}/workloads/$2 \
 	-p fieldcount=1 \

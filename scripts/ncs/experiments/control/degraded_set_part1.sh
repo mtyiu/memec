@@ -2,9 +2,9 @@
 
 BASE_PATH=${HOME}/mtyiu
 MEMEC_PATH=${BASE_PATH}/memec
-DELAY_BASE="0.2ms"
-DELAY_VAR="0.1ms"
-DELAY=("400" "800" "1200" "1600" "2000")
+DELAY_BASE="2ms"
+DELAY_VAR="1ms"
+DELAY=("2000")
 
 function set_overload {
 	for n in 11 23; do
@@ -44,7 +44,6 @@ echo "$DELAY_BASE $DELAY_VAR"
 
 set_overload
 
-iter=$1
 for iter in {1..10}; do
 	echo "******************** Iteration #$iter ( `date` ) ********************"
 	screen -S manage -p 0 -X stuff "${BASE_PATH}/scripts/util/start.sh $(printf '\r')"

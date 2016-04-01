@@ -7,7 +7,7 @@
 #
 ###################################################
 
-YCSB_PATH=~/mtyiu/ycsb/0.3.0
+YCSB_PATH=~/mtyiu/ycsb/0.7.0
 
 if [ $# != 1 ]; then
 	echo "Usage: $0 [Number of threads] [Output file of raw datapoints]"
@@ -32,7 +32,7 @@ fi
 
 # Load the store with key-value pairs
 ${YCSB_PATH}/bin/ycsb \
-	load redis-cluster \
+	load redis-cs \
 	-s \
 	-P ${YCSB_PATH}/workloads/workloada \
 	-p fieldcount=1 \
