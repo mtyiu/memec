@@ -160,14 +160,15 @@ void ClientStateTransitHandler::setState( char* msg , int len ) {
 					Client::getInstance()->eventQueue.insert( event );
 					// revert parity deltas
 					this->stateTransitInfo[ server ].unsetCompleted( true );
-					Client::getInstance()->revertDelta(
-						0, target, 0,
-						&this->stateTransitInfo[ server ].counter.parityRevert.lock,
-						&this->stateTransitInfo[ server ].counter.parityRevert.value,
-						true
-					);
-					// scan for normal requests to be completed
-					ClientWorker::gatherPendingNormalRequests( target );
+					if ( Client::getInstance()->revertDelta(
+							0, target, 0,
+							&this->stateTransitInfo[ server ].counter.parityRevert.lock,
+							&this->stateTransitInfo[ server ].counter.parityRevert.value,
+							true
+						) == false 
+					) {
+						this->stateTransitInfo[ server ].setCompleted( true );
+					}
 				}
 				break;
 			case STATE_COORDINATED:
@@ -192,6 +193,8 @@ void ClientStateTransitHandler::setState( char* msg , int len ) {
 		// actions/cleanup after state change
 		switch ( state ) {
 			case STATE_INTERMEDIATE:
+				// scan for normal requests to be completed
+				ClientWorker::gatherPendingNormalRequests( target );
 				// clean up pending items associated with this server
 				// TODO handle the case when insert happened after cleanup ( useCoordinatedFlow returns false > erase > add )
 				ClientWorker::removePending( target );

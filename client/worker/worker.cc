@@ -369,6 +369,7 @@ void ClientWorker::gatherPendingNormalRequests( ServerSocket *target, bool needs
 	uint32_t listId, chunkId;
 	struct sockaddr_in addr = target->getAddr();
 	bool hasPending = false;
+	std::unordered_set<uint32_t> outdatedPendingRequests;
 
 	ClientStateTransitHandler *mh = &Client::getInstance()->stateTransitHandler;
 
@@ -378,18 +379,27 @@ void ClientWorker::gatherPendingNormalRequests( ServerSocket *target, bool needs
 	LOCK ( &pending->servers._OP_TYPE_##Lock ); \
 	std::unordered_multimap<PendingIdentifier, _MAP_VALUE_TYPE_> *map = &pending->servers._OP_TYPE_; \
 	std::unordered_multimap<PendingIdentifier, _MAP_VALUE_TYPE_>::iterator it, saveIt; \
+	std::unordered_set<uint32_t> processedId; \
 	for( it = map->begin(), saveIt = it; it != map->end(); it = saveIt ) { \
 		saveIt++; \
 		listId = stripeList->get( it->second.data, it->second.size, 0, 0, &chunkId ); \
+		ServerSocket *dataServerSocket = stripeList->get( listId, chunkId ); \
+		/* skip request whose data server fails, but if the data server is newly added, remove pending normal request for this server */ \
+		if ( target->instanceId == dataServerSocket->instanceId && processedId.count( it->first.parentRequestId ) == 0 ) { \
+			processedId.insert( it->first.parentRequestId ); \
+			outdatedPendingRequests.insert( it->first.parentRequestId ); \
+			continue; \
+		} \
 		/* skip requests not in stripes involving the failed server */ \
 		if ( listIds.count( listId ) == 0 ) \
 			continue; \
 		/* no need to wait for requests whose data server is failed */ \
-		if ( stripeList->get( listId, chunkId ) == target ) \
+		if ( mh->useCoordinatedFlow( dataServerSocket->getAddr() ) ) { \
 			continue; \
+		} \
 		/* put the completion of request in account for state transition */ \
 		mh->stateTransitInfo.at( addr ).addPendingRequest( it->first.parentRequestId, false, false ); \
-		__DEBUG__( CYAN, "ClientWorker", "gatherPendingNormalRequest", "Pending normal request id=%u parentid=%u for transit.", it->first.requestId, it->first.parentRequestId ); \
+		__DEBUG__( CYAN, "ClientWorker", "gatherPendingNormalRequest", "Pending normal instance=%d request id=%u parentid=%u dataServer=%d in list=%d for transit.", target->instanceId, it->first.requestId, it->first.parentRequestId, stripeList->get( listId, chunkId )->instanceId, listId ); \
 		hasPending = true; \
 	} \
 	UNLOCK ( &pending->servers._OP_TYPE_##Lock ); \
@@ -401,13 +411,26 @@ void ClientWorker::gatherPendingNormalRequests( ServerSocket *target, bool needs
 	// DELETE
 	GATHER_PENDING_NORMAL_REQUESTS( del, Key );
 
-	UNLOCK ( &mh->stateTransitInfo[ addr ].counter.pendingNormalRequests.lock );
-
 	if ( ! hasPending  ) {
 		__INFO__( GREEN, "ClientWorker", "gatherPendingNormalRequest", "No pending normal requests for transit." );
 		Client::getInstance()->stateTransitHandler.stateTransitInfo[ addr ].setCompleted();
 		if ( needsAck )
 			Client::getInstance()->stateTransitHandler.ackTransit( addr );
+	} else {
+		__DEBUG__( CYAN, "ClientWorker", "gatherPendingNormalRequest", "id=%d has %u request pending\n", target->instanceId, mh->stateTransitInfo.at( addr ).getPendingRequestCount( false, false ) );
+	}
+
+	UNLOCK ( &mh->stateTransitInfo[ addr ].counter.pendingNormalRequests.lock );
+
+	for ( uint32_t id : outdatedPendingRequests ) {
+		for ( auto &server : mh->stateTransitInfo ) {
+			if ( server.first == target->getAddr() )
+				continue;
+			if ( mh->stateTransitInfo[ server.first ].removePendingRequest( id ) == 0 ) {
+				stateTransitHandler->stateTransitInfo.at( server.first ).setCompleted();
+				stateTransitHandler->ackTransit( server.first );
+			}
+		}
 	}
 
 #undef GATHER_PENDING_NORMAL_REQUESTS
