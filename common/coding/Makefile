@@ -26,10 +26,10 @@ GFOBJS= $(foreach d,$(GFSRC_FILES),$(patsubst %.c,%.o,$(notdir $d)))
 all: $(JOBJS) $(GFOBJS) $(OBJS)
 
 $(JOBJS): %.o: $(JLIB_DIR)/src/%.c
-	$(GCC) $(INCLUDE) -c -o $@ $<
+	$(GCC) -O3 $(INCLUDE) -c -o $@ $<
 
 $(GFOBJS): %.o: $(GFLIB_DIR)/src/%.c
-	$(GCC) $(INCLUDE) -c -o $@ $<
+	$(GCC) -O3 $(INCLUDE) -c -o $@ $<
 
 $(OBJS): %.o: %.cc %.hh
 	$(CC) $(CFLAGS) $(INCLUDE) $(LIBS) -c -o $@ $<

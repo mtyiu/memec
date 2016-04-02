@@ -10,15 +10,15 @@ function set_manual {
 }
 
 function set_server {
-	ssh testbed-node1 "screen -S coordinator -p 0 -X stuff \"overload$(printf '\r')7$(printf '\r')19$(printf '\r')0$(printf '\r')\""
+	ssh testbed-node1 "screen -S coordinator -p 0 -X stuff \"overload$(printf '\r')7$(printf '\r')0$(printf '\r')\""
 }
 
 function unset_server {
-	ssh testbed-node1 "screen -S coordinator -p 0 -X stuff \"underload$(printf '\r')7$(printf '\r')19$(printf '\r')0$(printf '\r')\""
+	ssh testbed-node1 "screen -S coordinator -p 0 -X stuff \"underload$(printf '\r')7$(printf '\r')0$(printf '\r')\""
 }
 
 function set_overload {
-	for n in 11 23; do
+	for n in 11; do
 		echo "Adding ${DELAY_BASE} +- ${DELAY_VAR} network delay to node $n..."
 		ssh testbed-node$n "screen -S ethtool -p 0 -X stuff \"sudo tc qdisc add dev eth0 root netem delay ${DELAY_BASE} ${DELAY_VAR} distribution normal $(printf '\r')\""
 		sleep 10
@@ -26,7 +26,7 @@ function set_overload {
 }
 
 function restore_overload {
-	for n in 11 23; do
+	for n in 11; do
 		echo "Removing the network delay from node $n"
 		ssh testbed-node$n "screen -S ethtool -p 0 -X stuff \"sudo tc qdisc del root dev eth0 $(printf '\r')\""
 		sleep 10
@@ -44,12 +44,12 @@ else
 	OUT_NAME="exp4_part2"
 fi
 
-#OUT_NAME="exp4_normal2"
+OUT_NAME="exp4_part2"
 
 DELAY_VAR="$(expr ${DELAY_BASE} \/ 2)us"
 DELAY_BASE="${DELAY_BASE}us"
 
-OUT_DIR=${BASE_PATH}/results/${OUT_NAME}/double/${DELAY_BASE}
+OUT_DIR=${BASE_PATH}/results/${OUT_NAME}/${DELAY_BASE}
 
 workloads='workloadd'
 #workloads=''
