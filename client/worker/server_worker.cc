@@ -172,7 +172,7 @@ void ClientWorker::dispatch( ServerEvent event ) {
 						break;
 					case PROTO_OPCODE_GET:
 						if ( ! csth.acceptNormalResponse( addr ) ) {
-							// __INFO__( YELLOW, "Client", "dispatch", "Ignoring normal GET response..." );
+							//__INFO__( YELLOW, "Client", "dispatch", "Ignoring normal GET response..." );
 							break;
 						}
 					case PROTO_OPCODE_DEGRADED_GET:
@@ -180,7 +180,7 @@ void ClientWorker::dispatch( ServerEvent event ) {
 						break;
 					case PROTO_OPCODE_SET:
 						if ( ! csth.acceptNormalResponse( addr ) ) {
-							// __INFO__( YELLOW, "Client", "dispatch", "Ignoring normal SET response..." );
+							//__INFO__( YELLOW, "Client", "dispatch", "Ignoring normal SET response..." );
 							break;
 						}
 						this->handleSetResponse( event, success, buffer.data, header.length );
@@ -190,7 +190,7 @@ void ClientWorker::dispatch( ServerEvent event ) {
 						break;
 					case PROTO_OPCODE_UPDATE:
 						if ( ! csth.acceptNormalResponse( addr ) ) {
-							__INFO__( YELLOW, "Client", "dispatch", "Ignoring normal UPDATE response..." );
+							//__INFO__( YELLOW, "Client", "dispatch", "Ignoring normal UPDATE response..." );
 							break;
 						}
 					case PROTO_OPCODE_DEGRADED_UPDATE:
@@ -361,11 +361,17 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 			addr = server->getAddr();
 			if ( ! stateTransitHandler->useCoordinatedFlow( addr ) || stateTransitHandler->stateTransitInfo.at( addr ).isCompleted() )
 				continue;
-			if ( stateTransitHandler->stateTransitInfo.at( addr ).removePendingRequest( event.requestId ) == 0 ) {
+			if ( stateTransitHandler->stateTransitInfo.at( addr ).removePendingRequest( pid.requestId ) == 0 ) {
 				__INFO__( GREEN, "ClientWorker", "handleSetResponse", "Ack transition for server id = %u.", server->instanceId );
 				stateTransitHandler->stateTransitInfo.at( addr ).setCompleted();
 				stateTransitHandler->ackTransit( addr );
 			}
+			//__DEBUG__( BLUE, "ClientWorker", "handleSetResponse", "remove pending normal requests id=%u", pid.requestId );
+			//stateTransitHandler->stateTransitInfo.at( addr ).removePendingRequest( pid.requestId );
+			//if ( stateTransitHandler->stateTransitInfo.at( addr ).setCompleted() ) {
+			//	__INFO__( GREEN, "ClientWorker", "handleSetResponse", "Ack transition for server id = %u.", server->instanceId );
+			//	stateTransitHandler->ackTransit( addr );
+			//}
 		}
 
 	}

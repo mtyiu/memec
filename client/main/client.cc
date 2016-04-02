@@ -1090,10 +1090,10 @@ bool Client::revertDelta( FILE *f, ServerSocket *target, pthread_cond_t *conditi
 	for( it = this->pending.servers.set.begin(), saveIt = it; it != this->pending.servers.set.end(); it = saveIt ) {
 		saveIt++;
 		// skip if not pending for failed server
-		if ( it->first.ptr != target )
-			continue;
 		listIndex = this->stripeList->get( it->second.data, it->second.size, 0, 0, &chunkIndex );
 		dataServer = this->stripeList->get( listIndex, chunkIndex );
+		if ( it->first.ptr != target && dataServer != target )
+			continue;
 		// skip revert if failed server is not the data server, but see if the request can be immediately replied
 		if ( dataServer != target ) {
 			if (
@@ -1113,6 +1113,10 @@ bool Client::revertDelta( FILE *f, ServerSocket *target, pthread_cond_t *conditi
 			}
 			this->pending.servers.set.erase( it );
 			continue;
+		} else if ( it->first.ptr != target ) {
+			// data server failed, but this pending is for parity, directly revert and no need to wait anymore
+			//this->pending.servers.set.erase( it );
+			//continue;
 		}
 		// skip if no backup available to do the revert
 		if ( ! this->pending.findKeyValue( PT_APPLICATION_SET, it->first.parentInstanceId, it->first.parentRequestId, 0, &keyValue, true, it->second.data ) )
