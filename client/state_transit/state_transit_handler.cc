@@ -154,21 +154,21 @@ void ClientStateTransitHandler::setState( char* msg , int len ) {
 				if ( state == STATE_WAIT_DEGRADED )
 					signal = state;
 				else {
-					// Insert a new event
+					// Insert a new event to sync metadata
 					ServerEvent event;
 					event.syncMetadata( target );
 					Client::getInstance()->eventQueue.insert( event );
-					// revert parity deltas
+					// mark need to wait for pending requests first
 					this->stateTransitInfo[ server ].unsetCompleted( true );
-					if ( Client::getInstance()->revertDelta(
-							0, target, 0,
-							&this->stateTransitInfo[ server ].counter.parityRevert.lock,
-							&this->stateTransitInfo[ server ].counter.parityRevert.value,
-							true
-						) == false 
-					) {
-						this->stateTransitInfo[ server ].setCompleted( true );
-					}
+					// scan for normal requests to be completed
+					ClientWorker::gatherPendingNormalRequests( target );
+					// revert parity deltas
+					Client::getInstance()->revertDelta(
+						0, target, 0,
+						&this->stateTransitInfo[ server ].counter.parityRevert.lock,
+						&this->stateTransitInfo[ server ].counter.parityRevert.value,
+						true
+					);
 				}
 				break;
 			case STATE_COORDINATED:
@@ -193,8 +193,6 @@ void ClientStateTransitHandler::setState( char* msg , int len ) {
 		// actions/cleanup after state change
 		switch ( state ) {
 			case STATE_INTERMEDIATE:
-				// scan for normal requests to be completed
-				ClientWorker::gatherPendingNormalRequests( target );
 				// clean up pending items associated with this server
 				// TODO handle the case when insert happened after cleanup ( useCoordinatedFlow returns false > erase > add )
 				ClientWorker::removePending( target );
@@ -240,10 +238,13 @@ bool ClientStateTransitHandler::removeAliveServer( struct sockaddr_in server ) {
 	return true;
 }
 
-bool ClientStateTransitHandler::useCoordinatedFlow( const struct sockaddr_in &server ) {
+bool ClientStateTransitHandler::useCoordinatedFlow( const struct sockaddr_in &server, bool needsLock, bool needsUnlock ) {
 	if ( this->serversState.count( server ) == 0 )
 		return false;
-	return this->serversState[ server ] != STATE_NORMAL;
+	if ( needsLock ) LOCK( &this->serversStateLock[ server ] );
+	bool ret = this->serversState[ server ] != STATE_NORMAL;
+	if ( needsUnlock ) UNLOCK( &this->serversStateLock[ server ] );
+	return ret;
 }
 
 bool ClientStateTransitHandler::allowRemapping( const struct sockaddr_in &server ) {
@@ -364,6 +365,7 @@ bool ClientStateTransitHandler::checkAckForServer( struct sockaddr_in server ) {
 	}
 	this->serversState[ server ] = state;
 	UNLOCK( &this->serversStateLock[ server ] );
+	__INFO__( GREEN, "ClientStateTransitHandler", "checkAckForServer", "Ack transition for server [%s:%hu].", buf, ntohs( server.sin_port ) );
 
 	return true;
 }

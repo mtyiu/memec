@@ -360,8 +360,10 @@ void ClientWorker::gatherPendingNormalRequests( ServerSocket *target, bool needs
 	// find the lists including the failed server as parity server
 	for ( uint32_t i = 0, len = stripeList->getNumList(); i < len; i++ ) {
 		for ( uint32_t j = 0; j < parityChunkCount; j++ ) {
-			if ( stripeList->get( i, j + dataChunkCount ) == target )
+			if ( stripeList->get( i, j + dataChunkCount ) == target ) {
 				listIds.insert( i );
+				break;
+			}
 		}
 	}
 	__DEBUG__( CYAN, "ClientWorker", "gatherPendingNormalRequest", "%lu list(s) included the server as parity", listIds.size() );
@@ -379,14 +381,12 @@ void ClientWorker::gatherPendingNormalRequests( ServerSocket *target, bool needs
 	LOCK ( &pending->servers._OP_TYPE_##Lock ); \
 	std::unordered_multimap<PendingIdentifier, _MAP_VALUE_TYPE_> *map = &pending->servers._OP_TYPE_; \
 	std::unordered_multimap<PendingIdentifier, _MAP_VALUE_TYPE_>::iterator it, saveIt; \
-	std::unordered_set<uint32_t> processedId; \
 	for( it = map->begin(), saveIt = it; it != map->end(); it = saveIt ) { \
 		saveIt++; \
 		listId = stripeList->get( it->second.data, it->second.size, 0, 0, &chunkId ); \
 		ServerSocket *dataServerSocket = stripeList->get( listId, chunkId ); \
 		/* skip request whose data server fails, but if the data server is newly added, remove pending normal request for this server */ \
-		if ( target->instanceId == dataServerSocket->instanceId && processedId.count( it->first.parentRequestId ) == 0 ) { \
-			processedId.insert( it->first.parentRequestId ); \
+		if ( target->instanceId == dataServerSocket->instanceId ) { \
 			outdatedPendingRequests.insert( it->first.parentRequestId ); \
 			continue; \
 		} \
@@ -413,11 +413,11 @@ void ClientWorker::gatherPendingNormalRequests( ServerSocket *target, bool needs
 
 	if ( ! hasPending  ) {
 		__INFO__( GREEN, "ClientWorker", "gatherPendingNormalRequest", "No pending normal requests for transit." );
-		Client::getInstance()->stateTransitHandler.stateTransitInfo[ addr ].setCompleted();
+		Client::getInstance()->stateTransitHandler.stateTransitInfo[ addr ].setCompleted( false, false );
 		if ( needsAck )
 			Client::getInstance()->stateTransitHandler.ackTransit( addr );
 	} else {
-		__DEBUG__( CYAN, "ClientWorker", "gatherPendingNormalRequest", "id=%d has %u request pending\n", target->instanceId, mh->stateTransitInfo.at( addr ).getPendingRequestCount( false, false ) );
+		__DEBUG__( CYAN, "ClientWorker", "gatherPendingNormalRequest", "id=%d has %u request pending", target->instanceId, mh->stateTransitInfo.at( addr ).getPendingRequestCount( false, false ) );
 	}
 
 	UNLOCK ( &mh->stateTransitInfo[ addr ].counter.pendingNormalRequests.lock );
@@ -427,8 +427,9 @@ void ClientWorker::gatherPendingNormalRequests( ServerSocket *target, bool needs
 			if ( server.first == target->getAddr() )
 				continue;
 			if ( mh->stateTransitInfo[ server.first ].removePendingRequest( id ) == 0 ) {
-				stateTransitHandler->stateTransitInfo.at( server.first ).setCompleted();
-				stateTransitHandler->ackTransit( server.first );
+				if ( stateTransitHandler->stateTransitInfo.at( server.first ).setCompleted() ) {
+					stateTransitHandler->ackTransit( server.first );
+				}
 			}
 		}
 	}

@@ -281,7 +281,7 @@ bool ClientWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 	if ( ! ClientWorker::disableDegraded ) {
 		for ( uint32_t i = 0; i < 1 + ClientWorker::parityChunkCount; i++ ) {
 			struct sockaddr_in addr = ( i == 0 ) ? socket->getAddr() : this->parityServerSockets[ i - 1 ]->getAddr();
-			if ( client->stateTransitHandler.useCoordinatedFlow( addr ) ) {
+			if ( client->stateTransitHandler.useCoordinatedFlow( addr, true, true ) ) {
 				// printf( "(%u, %u) is overloaded!\n", listId, i == 0 ? chunkId : i - 1 + ClientWorker::dataChunkCount );
 				return this->handleDegradedSetRequest( event, buf, size );
 			}
@@ -367,8 +367,6 @@ bool ClientWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		if ( sentBytes != ( ssize_t ) buffer.size ) {
 			__ERROR__( "ClientWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 
-			Client::getInstance()->stateTransitHandler.ackTransit( socket->getAddr() );
-
 			return false;
 		}
 #endif
@@ -379,13 +377,9 @@ bool ClientWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		if ( sentBytes != ( ssize_t ) buffer.size ) {
 			__ERROR__( "ClientWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
 
-			Client::getInstance()->stateTransitHandler.ackTransit( socket->getAddr() );
-
 			return false;
 		}
 	}
-
-	Client::getInstance()->stateTransitHandler.ackTransit( socket->getAddr() );
 
 	return true;
 }

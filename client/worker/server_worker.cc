@@ -359,19 +359,12 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 		for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
 			server = this->parityServerSockets[ i ];
 			addr = server->getAddr();
-			if ( ! stateTransitHandler->useCoordinatedFlow( addr ) || stateTransitHandler->stateTransitInfo.at( addr ).isCompleted() )
+			if ( ! stateTransitHandler->useCoordinatedFlow( addr, true, true ) || stateTransitHandler->stateTransitInfo.at( addr ).isCompleted() )
 				continue;
-			if ( stateTransitHandler->stateTransitInfo.at( addr ).removePendingRequest( pid.requestId ) == 0 ) {
+			if ( stateTransitHandler->stateTransitInfo.at( addr ).removePendingRequest( pid.requestId ) == 0 && stateTransitHandler->stateTransitInfo.at( addr ).setCompleted() ) {
 				__INFO__( GREEN, "ClientWorker", "handleSetResponse", "Ack transition for server id = %u.", server->instanceId );
-				stateTransitHandler->stateTransitInfo.at( addr ).setCompleted();
 				stateTransitHandler->ackTransit( addr );
 			}
-			//__DEBUG__( BLUE, "ClientWorker", "handleSetResponse", "remove pending normal requests id=%u", pid.requestId );
-			//stateTransitHandler->stateTransitInfo.at( addr ).removePendingRequest( pid.requestId );
-			//if ( stateTransitHandler->stateTransitInfo.at( addr ).setCompleted() ) {
-			//	__INFO__( GREEN, "ClientWorker", "handleSetResponse", "Ack transition for server id = %u.", server->instanceId );
-			//	stateTransitHandler->ackTransit( addr );
-			//}
 		}
 
 	}

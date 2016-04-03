@@ -1085,7 +1085,9 @@ bool Client::revertDelta( FILE *f, ServerSocket *target, pthread_cond_t *conditi
 	// SET
 	std::unordered_multimap<PendingIdentifier, Key>::iterator it, saveIt;
 	uint32_t listIndex, chunkIndex;
+	std::unordered_set<uint32_t> outdatedRequestIds;
 	ServerSocket *dataServer = 0;
+
 	LOCK ( &this->pending.servers.setLock );
 	for( it = this->pending.servers.set.begin(), saveIt = it; it != this->pending.servers.set.end(); it = saveIt ) {
 		saveIt++;
@@ -1109,6 +1111,9 @@ bool Client::revertDelta( FILE *f, ServerSocket *target, pthread_cond_t *conditi
 					ApplicationEvent applicationEvent;
 					applicationEvent.resSet( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, keyValueDup, true, true );
 					this->eventQueue.insert( applicationEvent );
+					__DEBUG__( CYAN, "Client", "revertDelta", "Complete request id=%u without waiting failed server id=%u", pid.requestId, target->instanceId );
+					// mark the request as no need to wait further (already replied)
+					outdatedRequestIds.insert( pid.requestId );
 				}
 			}
 			this->pending.servers.set.erase( it );
@@ -1128,6 +1133,14 @@ bool Client::revertDelta( FILE *f, ServerSocket *target, pthread_cond_t *conditi
 	}
 	UNLOCK ( &this->pending.servers.setLock );
 
+	for ( uint32_t requestId : outdatedRequestIds ) {
+		this->stateTransitHandler.stateTransitInfo.at( target->getAddr() ).removePendingRequest( requestId, false );
+	}
+	if ( ! outdatedRequestIds.empty() ) { 
+		this->stateTransitHandler.stateTransitInfo.at( target->getAddr() ).setCompleted();
+	}
+
+
 	// force revert all parity for testing purpose
 	//for ( uint32_t i = target->timestamp.lastAck.getVal() ; i < target->timestamp.current.getVal(); i++ ) {
 	//	timestampSet.insert( i );
@@ -1138,9 +1151,9 @@ bool Client::revertDelta( FILE *f, ServerSocket *target, pthread_cond_t *conditi
 
 	if ( f ) {
 		target->printAddress();
-		fprintf( f, " revert parity delta for timestamps from %u to %u with count = %lu\n", *timestampSet.begin(), target->timestamp.current.getVal(), timestampSet.size() );
+		fprintf( f, "Revert parity delta for timestamps from %u to %u with count = %lu\n", *timestampSet.begin(), target->timestamp.current.getVal(), timestampSet.size() );
 	}
-	fprintf( stdout, " revert parity delta for timestamps from %u to %u with count = %lu\n", *timestampSet.begin(), target->timestamp.current.getVal(), timestampSet.size() );
+	//fprintf( stdout, "Revert parity delta for timestamps from %u to %u with count = %lu\n", *timestampSet.begin(), target->timestamp.current.getVal(), timestampSet.size() );
 
 	timestamps.insert( timestamps.begin(), timestampSet.begin(), timestampSet.end() ); // ordered timestamps
 
