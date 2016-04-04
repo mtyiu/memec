@@ -327,8 +327,6 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 				printf( "PROTO_DEGRADED_LOCK_RES_NOT_EXIST\n" );
 				break;
 		}
-
-		assert( false );
 	}
 	sentBytes = socket->send( buffer.data, buffer.size, connected );
 	if ( sentBytes != ( ssize_t ) buffer.size ) {

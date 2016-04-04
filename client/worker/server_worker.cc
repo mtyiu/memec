@@ -512,7 +512,7 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 		for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
 			server = this->parityServerSockets[ i ];
 			addr = server->getAddr();
-			if ( ! stateTransitHandler->useCoordinatedFlow( addr ) || stateTransitHandler->stateTransitInfo.at( addr ).isCompleted() )
+			if ( ! stateTransitHandler->useCoordinatedFlow( addr, true, true ) || stateTransitHandler->stateTransitInfo.at( addr ).isCompleted() )
 				continue;
 			if ( stateTransitHandler->stateTransitInfo.at( addr ).removePendingRequest( pid.requestId ) == 0 ) {
 				__INFO__( GREEN, "ClientWorker", "handleUpdateResponse", "Ack transition for server id = %u.", server->instanceId );
@@ -610,7 +610,7 @@ bool ClientWorker::handleDeleteResponse( ServerEvent event, bool success, bool i
 	for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
 		server = this->parityServerSockets[ i ];
 		addr = server->getAddr();
-		if ( ! stateTransitHandler->useCoordinatedFlow( addr ) || stateTransitHandler->stateTransitInfo.at( addr ).isCompleted() )
+		if ( ! stateTransitHandler->useCoordinatedFlow( addr, true, true ) || stateTransitHandler->stateTransitInfo.at( addr ).isCompleted() )
 			continue;
 		if ( stateTransitHandler->stateTransitInfo.at( addr ).removePendingRequest( pid.requestId ) == 0 ) {
 			__INFO__( GREEN, "ClientWorker", "handleDeleteResponse", "Ack transition for server id = %u.", server->instanceId );

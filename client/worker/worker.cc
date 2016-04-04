@@ -399,7 +399,7 @@ void ClientWorker::gatherPendingNormalRequests( ServerSocket *target, bool needs
 		} \
 		/* put the completion of request in account for state transition */ \
 		mh->stateTransitInfo.at( addr ).addPendingRequest( it->first.parentRequestId, false, false ); \
-		__DEBUG__( CYAN, "ClientWorker", "gatherPendingNormalRequest", "Pending normal instance=%d request id=%u parentid=%u dataServer=%d in list=%d for transit.", target->instanceId, it->first.requestId, it->first.parentRequestId, stripeList->get( listId, chunkId )->instanceId, listId ); \
+		__DEBUG__( CYAN, "ClientWorker", "gatherPendingNormalRequest", "Pending normal %s instance=%d request id=%u parentid=%u dataServer=%d in list=%d for transit.", #_OP_TYPE_, target->instanceId, it->first.requestId, it->first.parentRequestId, stripeList->get( listId, chunkId )->instanceId, listId ); \
 		hasPending = true; \
 	} \
 	UNLOCK ( &pending->servers._OP_TYPE_##Lock ); \
