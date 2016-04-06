@@ -963,6 +963,9 @@ size_t Protocol::generateDegradedReleaseReqHeader( uint8_t magic, uint8_t to, ui
 		buf += PROTO_DEGRADED_RELEASE_REQ_SIZE;
 		bytes += PROTO_DEGRADED_RELEASE_REQ_SIZE;
 	}
+	
+	// TODO: remove only after all servers acknowledge
+	chunks.erase( chunks.begin(), chunks.begin() + count );
 
 	bytes += this->generateHeader( magic, to, opcode, bytes, instanceId, requestId );
 
