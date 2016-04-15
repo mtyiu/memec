@@ -15,6 +15,7 @@ OBJS= \
 	ds/latency.o \
 	ds/load.o \
 	ds/sockaddr_in.o \
+	hash/cuckoo_hash.o \
 	protocol/protocol.o \
 	protocol/ack_protocol.o \
 	protocol/address_protocol.o \
