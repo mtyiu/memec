@@ -495,7 +495,7 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 	// TODO handle degraded mode
 	Client *client = Client::getInstance();
 	if ( ! isDegraded ) {
-		event.socket->timestamp.pendingAck.eraseUpdate( timestamp );
+		event.socket->timestamp.pendingAck.eraseUpdate( timestamp, pid.requestId );
 	}
 
 	if ( pid.ptr ) {
@@ -594,7 +594,7 @@ bool ClientWorker::handleDeleteResponse( ServerEvent event, bool success, bool i
 	// TODO handle degraded mode
 	Client *client = Client::getInstance();
 	if ( !isDegraded ) {
-		event.socket->timestamp.pendingAck.eraseDel( timestamp );
+		event.socket->timestamp.pendingAck.eraseDel( timestamp, pid.requestId );
 	}
 
 	if ( pid.ptr ) {

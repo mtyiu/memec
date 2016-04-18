@@ -179,7 +179,7 @@ void ClientStateTransitHandler::setState( char* msg , int len ) {
 			case STATE_DEGRADED:
 				__INFO__( BLUE, "ClientStateTransitHandler", "setState", "STATE_DEGRADED %s:%hu", buf, ntohs( server.sin_port ) );
 				if ( state == STATE_INTERMEDIATE )
-					__ERROR__( "ClientStateTransitHandler", "setState", "Not yet ready for transition to DEGRADED!\n" );
+					__ERROR__( "ClientStateTransitHandler", "setState", "Not yet ready for transition to DEGRADED!" );
 				break;
 			default:
 				__INFO__( BLUE, "ClientStateTransitHandler", "setState", "Unknown %d %s:%hu", signal, buf, ntohs( server.sin_port ) );

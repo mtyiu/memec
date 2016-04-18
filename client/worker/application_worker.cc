@@ -535,7 +535,7 @@ bool ClientWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 			header.valueUpdate, header.valueUpdateOffset, header.valueUpdateSize, requestTimestamp
 		);
 		// add pending timestamp to ack
-		socket->timestamp.pendingAck.insertUpdate( Timestamp( requestTimestamp ) );
+		socket->timestamp.pendingAck.insertUpdate( Timestamp( requestTimestamp ), event.requestId );
 
 		if ( ! ClientWorker::pending->insertKeyValueUpdate( PT_SERVER_UPDATE, Client::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, keyValueUpdate, true, true, requestTimestamp ) ) {
 			__ERROR__( "ClientWorker", "handleUpdateRequest", "Cannot insert into server UPDATE pending map." );
@@ -612,7 +612,7 @@ bool ClientWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 			requestTimestamp
 		);
 		// add pending timestamp to ack.
-		socket->timestamp.pendingAck.insertDel( Timestamp( requestTimestamp ) );
+		socket->timestamp.pendingAck.insertDel( Timestamp( requestTimestamp ), event.requestId );
 
 		if ( ! ClientWorker::pending->insertKey( PT_SERVER_DEL, Client::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, key, true, true, requestTimestamp ) ) {
 			__ERROR__( "ClientWorker", "handleDeleteRequest", "Cannot insert into server DELETE pending map." );

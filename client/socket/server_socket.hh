@@ -19,36 +19,40 @@ public:
 		Timestamp current;
 		Timestamp lastAck; // to server
 		struct {
-			std::multiset<Timestamp> _update;
-			std::multiset<Timestamp> _del;
+			std::multiset< std::pair<Timestamp, uint32_t> > _update; // ts, application request id
+			std::multiset< std::pair<Timestamp, uint32_t> > _del; // ts, application request id
 			LOCK_T updateLock;
 			LOCK_T delLock;
 
-			inline void insertUpdate( Timestamp timestamp ) {
+			inline void insertUpdate( Timestamp timestamp, uint32_t id ) {
+				std::pair<Timestamp, uint32_t> record ( timestamp, id );
 				LOCK( &this->updateLock );
-				this->_update.insert( timestamp );
+				this->_update.insert( record );
 				UNLOCK( &this->updateLock );
 			}
 
-			inline void insertDel( Timestamp timestamp ) {
+			inline void insertDel( Timestamp timestamp, uint32_t id ) {
+				std::pair<Timestamp, uint32_t> record ( timestamp, id );
 				LOCK( &this->delLock );
-				this->_del.insert( timestamp );
+				this->_del.insert( record );
 				UNLOCK( &this->delLock );
 			}
 
-			inline void eraseUpdate( uint32_t timestamp ) {
-				std::multiset<Timestamp>::iterator it;
+			inline void eraseUpdate( uint32_t timestamp, uint32_t id ) {
+				std::pair<Timestamp, uint32_t> record ( timestamp, id );
+				std::multiset< std::pair<Timestamp, uint32_t> >::iterator it;
 				LOCK( &this->updateLock );
-				it = this->_update.find( timestamp );
+				it = this->_update.find( record );
 				if ( it != this->_update.end() )
 					this->_update.erase( it );
 				UNLOCK( &this->updateLock );
 			}
 
-			inline void eraseDel( uint32_t timestamp ) {
-				std::multiset<Timestamp>::iterator it;
+			inline void eraseDel( uint32_t timestamp, uint32_t id ) {
+				std::pair<Timestamp, uint32_t> record ( timestamp, id );
+				std::multiset< std::pair<Timestamp, uint32_t> >::iterator it;
 				LOCK( &this->delLock );
-				it = this->_del.find( timestamp );
+				it = this->_del.find( record );
 				if ( it != this->_del.end() )
 					this->_del.erase( it );
 				UNLOCK( &this->delLock );
