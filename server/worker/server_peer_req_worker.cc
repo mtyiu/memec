@@ -687,6 +687,16 @@ bool ServerWorker::handleUpdateChunkRequest( ServerPeerEvent event, char *buf, s
 
 	uint32_t myChunkId = ServerWorker::chunkBuffer->at( header.listId )->getChunkId();
 
+	if ( Server::getInstance()->stateTransitHandler.useCoordinatedFlow( event.socket->getAddr() ) ) {
+		event.resUpdateChunk(
+			event.socket, event.instanceId, event.requestId, metadata,
+			header.offset, header.length,
+			header.updatingChunkId, false
+		);
+		ServerWorker::eventQueue->insert( event );
+		return false;
+	}
+
 	if ( header.updatingChunkId == myChunkId ) {
 		// Normal UPDATE_CHUNK request //
 		if ( checkGetChunk ) {

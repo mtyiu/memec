@@ -829,8 +829,26 @@ bool ServerWorker::handleRevertDelta( ClientEvent event, char *buf, size_t size 
 		__ERROR__( "ServerWorker", "handleRevertDelta", "Invalid REVERT delta request." );
 		event.resRevertDelta( event.socket, Server::instanceId, event.requestId, false /* success */, std::vector<uint32_t>(), std::vector<Key>(), header.targetId );
 		this->dispatch( event );
+		return true;
+	}
+
+	ServerPeerSocket *targetSocket = 0;
+	LOCK( &this->serverPeers->lock );
+	for ( uint32_t i = 0; i < this->serverPeers->size(); i++) {
+		if ( this->serverPeers->values[ i ]->instanceId == header.targetId ) {
+			targetSocket = this->serverPeers->values[ i ];
+			break;
+		}
+	}
+	UNLOCK( &this->serverPeers->lock );
+
+	if ( targetSocket == 0 ) {
+		__ERROR__( "ServerWorker", "handleRevertDelta", "Cannot find server with targetId %d.", header.targetId );
 		return false;
 	}
+
+	while( ! Server::getInstance()->stateTransitHandler.useCoordinatedFlow( targetSocket->getAddr() ) )
+		usleep(1);
 
 	__INFO__(
 		BLUE, "ServerWorker", "handleRevertDelta",
@@ -937,7 +955,7 @@ bool ServerWorker::handleRevertDelta( ClientEvent event, char *buf, size_t size 
 					success, true, false \
 				); \
 				this->dispatch( clientEvent ); \
-				__INFO__( YELLOW, "ServerWorker", "handleRevertDelta", "Skip waiting for key %.*s for failed server id=%u", keyValueUpdate.size, keyValueUpdate.data, header.targetId ); \
+				/*__INFO__( YELLOW, "ServerWorker", "handleRevertDelta", "Skip waiting for key %.*s for failed server id=%u", keyValueUpdate.size, keyValueUpdate.data, header.targetId ); */\
 			} else if ( strcmp( #_OP_TYPE_, "delete" ) == 0 || strcmp( #_OP_TYPE_, "deleteChunk" ) == 0 ) { \
 				if ( ! ServerWorker::pending->eraseKey( _PT_CLIENT_TYPE_, it->first.parentInstanceId, it->first.parentRequestId, 0, &pid, &key ) ) { \
 					__ERROR__( "ServerWorker", "handleRevertDelta", "Cannot find a pending client DELETE request that matches the response. This message will be discarded." ); \
@@ -951,7 +969,7 @@ bool ServerWorker::handleRevertDelta( ClientEvent event, char *buf, size_t size 
 					false /* isDegraded */ \
 				); \
 				this->dispatch( clientEvent ); \
-				__INFO__( YELLOW, "ServerWorker", "handleRevertDelta", "Skip waiting for key %.*s for failed server id=%u", key.size, key.data, header.targetId ); \
+				/* __INFO__( YELLOW, "ServerWorker", "handleRevertDelta", "Skip waiting for key %.*s for failed server id=%u", key.size, key.data, header.targetId ); */\
 			} \
 		} \
 		map->erase( it ); \

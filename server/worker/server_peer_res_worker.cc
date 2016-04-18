@@ -675,13 +675,13 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 				this->sealIndicators[ ServerWorker::parityChunkCount + 1 ][ i ] &&
 				this->sealIndicators[ ServerWorker::parityChunkCount ][ i ] != this->sealIndicators[ ServerWorker::parityChunkCount + 1 ][ i ]
 			) {
-				__INFO__(
-					GREEN, "ServerWorker", "handleGetChunkResponse",
-					"Need to retrieve the sealed data chunk (%u, %u, %u): %d vs %d.",
-					listId, stripeId, i,
-					this->sealIndicators[ ServerWorker::parityChunkCount ][ i ],
-					this->sealIndicators[ ServerWorker::parityChunkCount + 1 ][ i ]
-				);
+				//__INFO__(
+				//	GREEN, "ServerWorker", "handleGetChunkResponse",
+				//	"Need to retrieve the sealed data chunk (%u, %u, %u): %d vs %d.",
+				//	listId, stripeId, i,
+				//	this->sealIndicators[ ServerWorker::parityChunkCount ][ i ],
+				//	this->sealIndicators[ ServerWorker::parityChunkCount + 1 ][ i ]
+				//);
 
 				ServerPeerEvent serverPeerEvent;
 				Metadata tmpMetadata;

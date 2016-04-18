@@ -92,20 +92,22 @@ bool ServerBackup::insertData##_OP_TYPE_( Timestamp ts, Key key, Value value, Me
 		/*
 		 * skip if target server id is specified, and
 		 *
-		 * (1) (a) isParity && data source != target server id, and
-		 *     (b) a set of timestamps is specified but the backup timestamp is not in the set;
+		 * (1) (a) isParity && data source != target server id, 
+		 *     (b) isParity && data source == target server id && 
+		 *     range of timestamps is specified but the backup timestamp is not in the set;
 		 *
 		 * OR
 		 *
-		 * (2) isData && target server id not in  parity servers (no need to check timstamps,
+		 * (2) isData && target server id not in parity servers (no need to check timstamps,
 		 *     since yet removed > yet all parity acked > must revert;
 		 *     TODO what if client send revert to parity before ack from data server reach client??
 		 */ \
 		if ( \
 			_SERVER_ID_ != 0 && \
 			( \
-				( ( ! _IS_DATA_ && _LIT_->second.dataServerId != _SERVER_ID_ ) && \
-			  	  ( ! timestamps.empty() && timestamps.count( _LIT_->first.getVal() ) == 0 ) \
+				( ! _IS_DATA_ && \
+					( _LIT_->second.dataServerId != _SERVER_ID_ || \
+					( ! timestamps.empty() && timestamps.count( _LIT_->first.getVal() ) == 0 ) ) \
 				) || \
 				( _IS_DATA_ && _LIT_->second.parityServers.count( _SERVER_ID_ ) == 0 ) \
 			) \

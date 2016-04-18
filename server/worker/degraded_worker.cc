@@ -73,12 +73,12 @@ bool ServerWorker::handleReleaseDegradedLockRequest( CoordinatorEvent event, cha
 			__ERROR__( "ServerWorker", "handleReleaseDegradedLockRequest", "Invalid DEGRADED_RELEASE request." );
 			return false;
 		}
-		__INFO__(
-			BLUE, "ServerWorker", "handleReleaseDegradedLockRequest",
-			"[DEGRADED_RELEASE] (%u, %u, %u) (count = %u).",
-			header.listId, header.stripeId, header.chunkId,
-			count
-		);
+		//__INFO__(
+		//	BLUE, "ServerWorker", "handleReleaseDegradedLockRequest",
+		//	"[DEGRADED_RELEASE] (%u, %u, %u) (count = %u).",
+		//	header.listId, header.stripeId, header.chunkId,
+		//	count
+		//);
 		buf += PROTO_DEGRADED_RELEASE_REQ_SIZE;
 		size -= PROTO_DEGRADED_RELEASE_REQ_SIZE;
 

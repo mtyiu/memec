@@ -170,10 +170,13 @@ bool ServerStateTransitHandler::removeAliveServer( struct sockaddr_in server ) {
 	return true;
 }
 
-bool ServerStateTransitHandler::useCoordinatedFlow( const struct sockaddr_in &server ) {
+bool ServerStateTransitHandler::useCoordinatedFlow( const struct sockaddr_in &server, bool needsLock, bool needsUnlock ) {
 	if ( this->serversState.count( server ) == 0 )
 		return false;
-	return this->serversState[ server ] != STATE_NORMAL;
+	if ( needsLock ) LOCK( &this->serversStateLock[ server ] );
+	bool ret = this->serversState[ server ] != STATE_NORMAL;
+	if ( needsUnlock ) UNLOCK( &this->serversStateLock[ server ] );
+	return ret;
 }
 
 bool ServerStateTransitHandler::allowRemapping( const struct sockaddr_in &server ) {
