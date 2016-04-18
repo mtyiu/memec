@@ -71,13 +71,13 @@ public:
 		this->timestamp = timestamp;
 	}
 
-	bool findValueByKey( char *data, uint8_t size, KeyValue *keyValue, Key *keyPtr ) {
+	bool findValueByKey( char *data, uint8_t size, KeyValue *keyValuePtr, Key *keyPtr ) {
 		std::unordered_map<Key, KeyMetadata>::iterator keysIt;
 		std::unordered_map<Metadata, Chunk *>::iterator cacheIt;
 		Key key;
 
-		if ( keyValue )
-			keyValue->clear();
+		if ( keyValuePtr )
+			keyValuePtr->clear();
 		key.set( size, data );
 
 		LOCK( &this->keysLock );
@@ -91,19 +91,19 @@ public:
 		if ( keyPtr ) *keyPtr = keysIt->first;
 		UNLOCK( &this->keysLock );
 
-		Chunk *chunk = ( Chunk * ) keysIt->second.ptr;
-		if ( keyValue )
-			*keyValue = chunk->getKeyValue( keysIt->second.offset );
+		if ( keyValuePtr )
+			keyValuePtr->set( keysIt->second.obj );
+
 		return true;
 	}
 
-	bool findValueByKey( char *data, uint8_t size, KeyValue *keyValue, Key *keyPtr, KeyMetadata *keyMetadataPtr, Metadata *metadataPtr, Chunk **chunkPtr, bool needsLock = true, bool needsUnlock = true ) {
+	bool findValueByKey( char *data, uint8_t size, KeyValue *keyValuePtr, Key *keyPtr, KeyMetadata *keyMetadataPtr, Metadata *metadataPtr, Chunk **chunkPtr, bool needsLock = true, bool needsUnlock = true ) {
 		std::unordered_map<Key, KeyMetadata>::iterator keysIt;
 		std::unordered_map<Metadata, Chunk *>::iterator cacheIt;
 		Key key;
 
-		if ( keyValue )
-			keyValue->clear();
+		if ( keyValuePtr )
+			keyValuePtr->clear();
 		key.set( size, data );
 
 		if ( needsLock ) LOCK( &this->keysLock );
@@ -129,8 +129,8 @@ public:
 		if ( chunkPtr ) *chunkPtr = cacheIt->second;
 
 		Chunk *chunk = cacheIt->second;
-		if ( keyValue )
-			*keyValue = chunk->getKeyValue( keysIt->second.offset );
+		if ( keyValuePtr )
+			*keyValuePtr = chunk->getKeyValue( keysIt->second.offset );
 		if ( needsUnlock ) UNLOCK( &this->cacheLock );
 		return true;
 	}

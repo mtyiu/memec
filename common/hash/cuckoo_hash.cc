@@ -59,14 +59,19 @@ CuckooHash::~CuckooHash() {
 }
 
 char *CuckooHash::tryRead( char *key, uint8_t keySize, uint8_t tag, size_t i ) {
+#ifdef CUCKOO_HASH_ENABLE_TAG
 	volatile uint32_t tmp = *( ( uint32_t * ) &( buckets[ i ] ) );
+#endif
 	Key target;
 
 	target.set( keySize, key );
 
 	for ( size_t j = 0; j < BUCKET_SIZE; j++ ) {
+#ifdef CUCKOO_HASH_ENABLE_TAG
 		uint8_t ch = ( ( uint8_t * ) &tmp )[ j ];
-		if ( ch == tag ) {
+		if ( ch == tag )
+#endif
+		{
 			char *ptr = buckets[ i ].ptr[ j ];
 			if ( ! ptr ) return 0;
 
@@ -83,8 +88,9 @@ char *CuckooHash::tryRead( char *key, uint8_t keySize, uint8_t tag, size_t i ) {
 	return 0;
 }
 
-char *CuckooHash::find( char *key, uint8_t keySize, uint32_t hashValue ) {
+char *CuckooHash::find( char *key, uint8_t keySize ) {
 	Key target;
+	uint32_t hashValue = HashFunc::hash( key, keySize );
 	uint8_t tag = this->tagHash( hashValue );
 	size_t i1 = this->indexHash( hashValue );
 	size_t i2 = this->altIndex( i1, tag );
@@ -103,13 +109,18 @@ TryRead:
 	this->fg_lock( i1, i2 );
 #endif
 
+#ifdef CUCKOO_HASH_ENABLE_TAG
 	volatile uint32_t tags1, tags2;
 	tags1 = *( ( uint32_t * ) &( buckets[ i1 ] ) );
 	tags2 = *( ( uint32_t * ) &( buckets[ i2 ] ) );
+#endif
 
 	for ( size_t j = 0; j < 4; j++ ) {
+#ifdef CUCKOO_HASH_ENABLE_TAG
 		uint8_t ch = ( ( uint8_t * ) &tags1 )[ j ];
-		if ( ch == tag ) {
+		if ( ch == tag )
+#endif
+		{
 			char *ptr = buckets[ i1 ].ptr[ j ];
 
 			if ( ! ptr ) continue;
@@ -128,8 +139,11 @@ TryRead:
 
 	if ( ! result ) {
 		for ( size_t j = 0; j < 4; j++ ) {
+#ifdef CUCKOO_HASH_ENABLE_TAG
 			uint8_t ch = ( ( uint8_t * ) &tags2 )[ j ];
-			if ( ch == tag ) {
+			if ( ch == tag )
+#endif
+			{
 				char *ptr = buckets[ i2 ].ptr[ j ];
 
 				if ( ! ptr ) continue;
@@ -184,7 +198,22 @@ int CuckooHash::cpSearch( size_t depthStart, size_t *cpIndex ) {
 			j = rand() % BUCKET_SIZE;
 			this->cp[ depth ][ index ].slot = j;
 			this->cp[ depth ][ index ].ptr = this->buckets[ i ].ptr[ j ];
+#ifdef CUCKOO_HASH_ENABLE_TAG
 			to[ index ] = this->altIndex( i, this->buckets[ i ].tags[ j ] );
+#else
+			{
+				char *key, *value;
+				uint8_t keySize;
+				uint32_t valueSize;
+
+				KeyValue::deserialize( this->buckets[ i ].ptr[ j ], key, keySize, value, valueSize );
+
+				uint32_t hashValue = HashFunc::hash( key, keySize );
+				uint8_t tag = this->tagHash( hashValue );
+
+				to[ index ] = this->altIndex( i, tag );
+			}
+#endif
 		}
 
 		this->kickCount += CUCKOO_HASH_WIDTH;
@@ -217,10 +246,12 @@ int CuckooHash::cpBackmove( size_t depthStart, size_t index ) {
 		this->fg_lock( i1, i2 );
 #endif
 
+#ifdef CUCKOO_HASH_ENABLE_TAG
 		this->buckets[ i2 ].tags[ j2 ] = this->buckets[ i1 ].tags[ j1 ];
-		this->buckets[ i2 ].ptr[ j2 ] = this->buckets[ i1 ].ptr[ j1 ];
-
 		this->buckets[ i1 ].tags[ j1 ] = 0;
+#endif
+
+		this->buckets[ i2 ].ptr[ j2 ] = this->buckets[ i1 ].ptr[ j1 ];
 		this->buckets[ i1 ].ptr[ j1 ] = 0;
 
 #ifdef CUCKOO_HASH_LOCK_OPT
@@ -269,7 +300,9 @@ bool CuckooHash::tryAdd( char *ptr, uint8_t tag, size_t i, size_t lock ) {
 			this->fg_lock( i, i );
 #endif
 
+#ifdef CUCKOO_HASH_ENABLE_TAG
 			this->buckets[ i ].tags[ j ] = tag;
+#endif
 			this->buckets[ i ].ptr[ j ] = ptr;
 
 #ifdef CUCKOO_HASH_LOCK_OPT
@@ -287,7 +320,14 @@ bool CuckooHash::tryAdd( char *ptr, uint8_t tag, size_t i, size_t lock ) {
 	return false;
 }
 
-int CuckooHash::insert( char *ptr, uint32_t hashValue ) {
+int CuckooHash::insert( char *ptr ) {
+	char *key, *value;
+	uint8_t keySize;
+	uint32_t valueSize;
+
+	KeyValue::deserialize( ptr, key, keySize, value, valueSize );
+
+	uint32_t hashValue = HashFunc::hash( key, keySize );
 	uint8_t tag = this->tagHash( hashValue );
 	size_t i1 = this->indexHash( hashValue );
 	size_t i2 = this->altIndex( i1, tag );
@@ -326,7 +366,10 @@ bool CuckooHash::tryDel( char *key, uint8_t keySize, uint8_t tag, size_t i, size
 	target.set( keySize, key );
 
 	for ( size_t j = 0; j < BUCKET_SIZE; j++ ) {
-		if ( IS_TAG_EQUAL( this->buckets[ i ], j, tag ) ) {
+#ifdef CUCKOO_HASH_ENABLE_TAG
+		if ( IS_TAG_EQUAL( this->buckets[ i ], j, tag ) )
+#endif
+		{
 			char *ptr = this->buckets[ i ].ptr[ j ];
 			if ( ! ptr ) return false;
 
@@ -344,7 +387,10 @@ bool CuckooHash::tryDel( char *key, uint8_t keySize, uint8_t tag, size_t i, size
 				this->fg_lock( i, i );
 #endif
 
+#ifdef CUCKOO_HASH_ENABLE_TAG
 				this->buckets[ i ].tags[ j ] = 0;
+#endif
+
 				this->buckets[ i ].ptr[ j ] = 0;
 
 #ifdef CUCKOO_HASH_LOCK_OPT
@@ -362,7 +408,8 @@ bool CuckooHash::tryDel( char *key, uint8_t keySize, uint8_t tag, size_t i, size
 	return false;
 }
 
-void CuckooHash::del( char *key, uint8_t keySize, uint32_t hashValue ) {
+void CuckooHash::del( char *key, uint8_t keySize ) {
+	uint32_t hashValue = HashFunc::hash( key, keySize );
 	uint8_t tag = this->tagHash( hashValue );
 	size_t i1 = this->indexHash( hashValue );
 	size_t i2 = this->altIndex( i1, tag );

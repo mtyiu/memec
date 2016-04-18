@@ -139,12 +139,14 @@ KeyMetadata DataChunkBuffer::set( ServerWorker *worker, char *key, uint8_t keySi
 	keyMetadata.chunkId = chunk->metadata.chunkId;
 	keyMetadata.length = size;
 	keyMetadata.isParityRemapped = ( opcode == PROTO_OPCODE_DEGRADED_SET );
-	keyMetadata.ptr = ( char * ) chunk;
+	// keyMetadata.ptr = ( char * ) chunk;
 
 	// Allocate memory from chunk
 	ptr = chunk->alloc( size, keyMetadata.offset );
 	if ( index != -1 )
 		this->sizes[ index ] += size;
+
+	keyMetadata.obj = ptr;
 
 	// Copy data to the buffer
 	KeyValue::serialize( ptr, key, keySize, value, valueSize );

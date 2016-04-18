@@ -76,13 +76,13 @@ class KeyMetadata : public Metadata {
 public:
 	uint32_t offset, length;
 	bool isParityRemapped;
-	char *ptr;
+	char *obj;
+	// char *ptr;
 
 	KeyMetadata() {
 		this->offset = 0;
 		this->length = 0;
 		this->isParityRemapped = false;
-		this->ptr = 0;
 	}
 };
 

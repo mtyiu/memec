@@ -8,6 +8,8 @@
 // #define CUCKOO_HASH_LOCK_OPT
 #define CUCKOO_HASH_LOCK_FINEGRAIN
 
+// #define CUCKOO_HASH_ENABLE_TAG
+
 /********** Constants **********/
 #ifdef CUCKOO_HASH_LOCK_OPT
 	#define KEYVER_COUNT ( ( uint32_t ) 1 << 13 )
@@ -26,13 +28,19 @@
 
 /********** Data structures **********/
 struct Bucket {
+#ifdef CUCKOO_HASH_ENABLE_TAG
 	uint8_t tags[ BUCKET_SIZE ]; // Tag: 1-byte summary of key
 	char reserved[ 4 ];
+#endif
 	char *ptr[ BUCKET_SIZE ];    // ptr: Object pointer
 } __attribute__( ( __packed__ ) );
 
 /********** Macros **********/
-#define IS_SLOT_EMPTY( i, j ) ( buckets[ i ].tags[ j ] == 0 )
+#ifdef CUCKOO_HASH_ENABLE_TAG
+	#define IS_SLOT_EMPTY( i, j ) ( buckets[ i ].tags[ j ] == 0 )
+#else
+	#define IS_SLOT_EMPTY( i, j ) ( buckets[ i ].ptr[ j ] == 0 )
+#endif
 #define IS_TAG_EQUAL( bucket, j, tag ) ( ( bucket.tags[ j ] & TAG_MASK ) == tag )
 
 #ifdef CUCKOO_HASH_LOCK_OPT
@@ -119,9 +127,9 @@ public:
 	CuckooHash( uint32_t power );
 	~CuckooHash();
 
-	char *find( char *key, uint8_t keySize, uint32_t hashValue );
-	int insert( char *ptr, uint32_t hashValue );
-	void del( char *key, uint8_t keySize, uint32_t hashValue );
+	char *find( char *key, uint8_t keySize );
+	int insert( char *ptr );
+	void del( char *key, uint8_t keySize );
 };
 
 #endif

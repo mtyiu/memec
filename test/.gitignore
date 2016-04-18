@@ -6,6 +6,7 @@ common/config/global_config
 common/config/server_addr
 common/ds/bitmask_array
 common/ds/id_generator
+common/hash/cuckoo_hash
 common/hash/Hash.class
 common/hash/hash
 common/protocol/protocol
