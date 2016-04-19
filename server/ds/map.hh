@@ -6,6 +6,7 @@
 #include "../../common/ds/chunk.hh"
 #include "../../common/ds/key.hh"
 #include "../../common/ds/metadata.hh"
+#include "../../common/hash/cuckoo_hash.hh"
 #include "../../common/lock/lock.hh"
 #include "../../common/protocol/protocol.hh"
 #include "../../common/timestamp/timestamp.hh"
@@ -19,6 +20,7 @@ private:
 	 * Key |-> (list ID, stripe ID, chunk ID, offset, length, isPartyRemapped)
 	 */
 	std::unordered_map<Key, KeyMetadata> keys;
+	CuckooHash _keys;
 	LOCK_T keysLock;
 	/**
 	 * Store the cached chunks
@@ -71,16 +73,24 @@ public:
 		this->timestamp = timestamp;
 	}
 
-	bool findValueByKey( char *data, uint8_t size, KeyValue *keyValuePtr, Key *keyPtr ) {
-		std::unordered_map<Key, KeyMetadata>::iterator keysIt;
-		std::unordered_map<Metadata, Chunk *>::iterator cacheIt;
+	bool findValueByKey( char *keyStr, uint8_t keySize, KeyValue *keyValuePtr, Key *keyPtr ) {
 		Key key;
+		KeyValue keyValue;
 
 		if ( keyValuePtr )
 			keyValuePtr->clear();
-		key.set( size, data );
+		key.set( keySize, keyStr );
 
 		LOCK( &this->keysLock );
+		keyValue.data = this->_keys.find( keyStr, keySize );
+		if ( ! keyValue.data ) {
+			UNLOCK( &this->keysLock );
+			if ( keyPtr ) *keyPtr = key;
+			return false;
+		}
+		key = keyValue.key();
+		///// vvvvv Deprecated vvvvv /////
+		std::unordered_map<Key, KeyMetadata>::iterator keysIt;
 		keysIt = this->keys.find( key );
 		if ( keysIt == this->keys.end() ) {
 			UNLOCK( &this->keysLock );
@@ -89,6 +99,7 @@ public:
 		}
 
 		if ( keyPtr ) *keyPtr = keysIt->first;
+		///// ^^^^^ Deprecated ^^^^^ /////
 		UNLOCK( &this->keysLock );
 
 		if ( keyValuePtr )
@@ -160,11 +171,18 @@ public:
 		std::pair<std::unordered_map<Key, KeyMetadata>::iterator, bool> keyRet;
 
 		if ( needsLock ) LOCK( &this->keysLock );
+
+		if ( ! this->_keys.insert( key.data, key.size, keyMetadata.obj ) ) {
+			if ( needsUnlock ) UNLOCK( &this->keysLock );
+			return false;
+		}
+		///// vvvvv Deprecated vvvvv /////
 		keyRet = this->keys.insert( keyPair );
 		if ( ! keyRet.second ) {
 			if ( needsUnlock ) UNLOCK( &this->keysLock );
 			return false;
 		}
+		///// ^^^^^ Deprecated ^^^^^ /////
 		if ( needsUnlock ) UNLOCK( &this->keysLock );
 
 		return needsUpdateOpMetadata ? this->insertOpMetadata( opcode, timestamp, key, keyMetadata ) : true;

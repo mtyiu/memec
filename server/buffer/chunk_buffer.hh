@@ -18,8 +18,9 @@ protected:
 	bool isReady;
 
 	static Coding *coding;                 // Coding module
+	// static ChunkPool *chunkPool;           // Memory pool for chunks
 	static MemoryPool<Chunk> *chunkPool;   // Memory pool for chunks
-	static ServerEventQueue *eventQueue;    // Event queue
+	static ServerEventQueue *eventQueue;   // Event queue
 	static Map *map;                       // Maps in server
 
 public:

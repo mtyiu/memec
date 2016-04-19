@@ -7,6 +7,7 @@ BIN=$(MEMEC_SRC_ROOT)/bin/server
 OBJS= \
 	backup/backup.o \
 	buffer/chunk_buffer.o \
+	buffer/chunk_pool.o \
 	buffer/data_chunk_buffer.o \
 	buffer/degraded_chunk_buffer.o \
 	buffer/get_chunk_buffer.o \
@@ -59,6 +60,7 @@ EXTERNAL_LIB= \
 	$(MEMEC_SRC_ROOT)/common/ds/key_value.o \
 	$(MEMEC_SRC_ROOT)/common/ds/load.o \
 	$(MEMEC_SRC_ROOT)/common/ds/sockaddr_in.o \
+	$(MEMEC_SRC_ROOT)/common/hash/cuckoo_hash.o \
 	$(MEMEC_SRC_ROOT)/common/state_transit/state_transit_handler.o \
 	$(MEMEC_SRC_ROOT)/common/protocol/protocol.o \
 	$(MEMEC_SRC_ROOT)/common/protocol/ack_protocol.o \

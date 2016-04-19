@@ -320,13 +320,7 @@ bool CuckooHash::tryAdd( char *ptr, uint8_t tag, size_t i, size_t lock ) {
 	return false;
 }
 
-int CuckooHash::insert( char *ptr ) {
-	char *key, *value;
-	uint8_t keySize;
-	uint32_t valueSize;
-
-	KeyValue::deserialize( ptr, key, keySize, value, valueSize );
-
+bool CuckooHash::insert( char *key, uint8_t keySize, char *ptr ) {
 	uint32_t hashValue = HashFunc::hash( key, keySize );
 	uint8_t tag = this->tagHash( hashValue );
 	size_t i1 = this->indexHash( hashValue );
@@ -352,13 +346,13 @@ int CuckooHash::insert( char *ptr ) {
 			__ERROR__( "CuckooHash", "insert", "Error: this->buckets[ i1 ].ptr[ j ] != 0." );
 
 		if ( this->tryAdd( ptr, tag, i1, lock ) )
-			return 1;
+			return true;
 
 		__ERROR__( "CuckooHash", "insert", "Error: i1 = %zu, i = %d.", i1, index );
 	}
 
 	__ERROR__( "CuckooHash", "insert", "Error: Hash table is full: power = %d. Need to increase power...", this->hashPower );
-	return 0;
+	return false;
 }
 
 bool CuckooHash::tryDel( char *key, uint8_t keySize, uint8_t tag, size_t i, size_t lock ) {
@@ -418,4 +412,34 @@ void CuckooHash::del( char *key, uint8_t keySize ) {
 	if ( this->tryDel( key, keySize, tag, i1, lock ) ) return;
 	if ( this->tryDel( key, keySize, tag, i2, lock ) ) return;
 	assert( false );
+}
+
+char *CuckooHash::find( uint32_t listId, uint32_t stripeId ) {
+	uint64_t buf;
+	uint32_t *tmp = ( uint32_t * ) &buf;
+
+	tmp[ 0 ] = listId;
+	tmp[ 1 ] = stripeId;
+
+	return this->find( ( char * ) &buf, sizeof( buf ) );
+}
+
+bool CuckooHash::insert( uint32_t listId, uint32_t stripeId, char *ptr ) {
+	uint64_t buf;
+	uint32_t *tmp = ( uint32_t * ) &buf;
+
+	tmp[ 0 ] = listId;
+	tmp[ 1 ] = stripeId;
+
+	return this->insert( ( char * ) &buf, sizeof( buf ), ptr );
+}
+
+void CuckooHash::del( uint32_t listId, uint32_t stripeId ) {
+	uint64_t buf;
+	uint32_t *tmp = ( uint32_t * ) &buf;
+
+	tmp[ 0 ] = listId;
+	tmp[ 1 ] = stripeId;
+
+	return this->del( ( char * ) &buf, sizeof( buf ) );
 }
