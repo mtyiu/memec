@@ -463,13 +463,16 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 		__ERROR__( "ClientWorker", "handleUpdateResponse", "Invalid UPDATE Response." );
 		return false;
 	}
-	__DEBUG__(
-		BLUE, "ClientWorker", "handleUpdateResponse",
-		"[UPDATE (%s)] Updated key: %.*s (key size = %u); update value size = %u at offset: %u.",
-		success ? "Success" : "Fail",
-		( int ) header.keySize, header.key, header.keySize,
-		header.valueUpdateSize, header.valueUpdateOffset
-	);
+
+	if ( ! success ) {
+		__ERROR__( "ClientWorker", "handleUpdateResponse",
+			"[UPDATE (%s)] From %d Updated key: %.*s (key size = %u); update value size = %u at offset: %u.",
+			success ? "Success" : "Fail",
+			event.socket->instanceId,
+			( int ) header.keySize, header.key, header.keySize,
+			header.valueUpdateSize, header.valueUpdateOffset
+		);
+	}
 
 	KeyValueUpdate keyValueUpdate;
 	ApplicationEvent applicationEvent;

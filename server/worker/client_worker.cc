@@ -860,7 +860,6 @@ bool ServerWorker::handleRevertDelta( ClientEvent event, char *buf, size_t size 
 	);
 
 	uint32_t timestamp;
-	bool success = true;
 	std::vector<BackupDelta> update, del;
 
 	// parity revert for UDPATE / DELETE //
@@ -952,7 +951,7 @@ bool ServerWorker::handleRevertDelta( ClientEvent event, char *buf, size_t size 
 					keyValueUpdate, \
 					keyValueUpdate.offset, \
 					keyValueUpdate.length, \
-					success, true, false \
+					true, true, false \
 				); \
 				this->dispatch( clientEvent ); \
 				/*__INFO__( YELLOW, "ServerWorker", "handleRevertDelta", "Skip waiting for key %.*s for failed server id=%u", keyValueUpdate.size, keyValueUpdate.data, header.targetId ); */\
@@ -1002,8 +1001,8 @@ bool ServerWorker::handleRevertDelta( ClientEvent event, char *buf, size_t size 
 	}
 	// UNLOCK PENDING
 
-	event.resRevertDelta( event.socket, Server::instanceId, event.requestId, success, timestamps, std::vector<Key>(), header.targetId );
+	event.resRevertDelta( event.socket, Server::instanceId, event.requestId, true /* success */, timestamps, std::vector<Key>(), header.targetId );
 	this->dispatch( event );
 
-	return success;
+	return true;
 }

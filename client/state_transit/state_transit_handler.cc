@@ -271,10 +271,10 @@ bool ClientStateTransitHandler::acceptNormalResponse( const struct sockaddr_in &
 		case STATE_UNDEFINED:
 		case STATE_NORMAL:
 		case STATE_COORDINATED:
-		case STATE_WAIT_DEGRADED:
 		case STATE_WAIT_NORMAL:
 			return true;
 		case STATE_INTERMEDIATE:
+		case STATE_WAIT_DEGRADED:
 		case STATE_DEGRADED:
 		default:
 			return false;

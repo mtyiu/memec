@@ -612,7 +612,7 @@ bool Client::isDegraded( ServerSocket *socket ) {
 		( this->debugFlags.isDegraded )
 		||
 		(
-			this->stateTransitHandler.useCoordinatedFlow( socket->getAddr() ) &&
+			this->stateTransitHandler.useCoordinatedFlow( socket->getAddr(), true, true ) &&
 			! this->config.client.degraded.disabled
 		)
 	);
