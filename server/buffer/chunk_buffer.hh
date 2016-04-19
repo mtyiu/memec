@@ -3,11 +3,12 @@
 
 #include <cstdio>
 #include <pthread.h>
+#include "chunk_pool.hh"
 #include "../ds/map.hh"
 #include "../event/event_queue.hh"
 #include "../../common/coding/coding.hh"
 #include "../../common/ds/chunk.hh"
-#include "../../common/ds/memory_pool.hh"
+// #include "../../common/ds/memory_pool.hh"
 #include "../../common/lock/lock.hh"
 
 #define CHUNK_BUFFER_FLUSH_THRESHOLD	4 // excluding metadata (4 bytes)
@@ -18,8 +19,7 @@ protected:
 	bool isReady;
 
 	static Coding *coding;                 // Coding module
-	// static ChunkPool *chunkPool;           // Memory pool for chunks
-	static MemoryPool<Chunk> *chunkPool;   // Memory pool for chunks
+	static ChunkPool *chunkPool;           // Memory pool for chunks
 	static ServerEventQueue *eventQueue;   // Event queue
 	static Map *map;                       // Maps in server
 

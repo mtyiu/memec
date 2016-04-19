@@ -121,14 +121,10 @@ bool Server::init( char *path, OptionList &globalOptions, OptionList &serverOpti
 		this->stripeListIndex = this->stripeList->list( myServerIndex );
 	/* Chunk pool */
 	Chunk::init( this->config.global.size.chunk );
-	this->chunkPool = MemoryPool<Chunk>::getInstance();
+	this->chunkPool = new ChunkPool();
 	this->chunkPool->init(
-		MemoryPool<Chunk>::getCapacity(
-			this->config.server.pool.chunks,
-			this->config.global.size.chunk
-		),
-		Chunk::initFn,
-		0
+		this->config.global.size.chunk, // chunkSize
+		this->config.server.pool.chunks // capacity
 	);
 	/* Chunk buffer */
 	ChunkBuffer::init();
@@ -526,14 +522,7 @@ void Server::debug( FILE *f ) {
 	if ( len == 0 ) fprintf( f, "(None)\n" );
 
 	fprintf( f, "\nChunk pool\n----------\n" );
-	fprintf(
-		f, "Count : %lu / %lu\n",
-		this->chunkPool->getCount(),
-		MemoryPool<Chunk>::getCapacity(
-			this->config.server.pool.chunks,
-			this->config.global.size.chunk
-		)
-	);
+	this->chunkPool->print( f );
 
 	fprintf( f, "\nChunk buffer\n------------\n" );
 	for ( i = 0, len = this->chunkBuffer.size(); i < len; i++ ) {

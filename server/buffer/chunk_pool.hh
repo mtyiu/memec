@@ -4,6 +4,7 @@
 #include <atomic>
 #include <cstdio>
 #include <cstdlib>
+#include "../../common/ds/chunk.hh"
 
 struct ChunkMetadata {
 	uint32_t listId;
@@ -24,8 +25,15 @@ private:
 public:
 	ChunkPool();
 	~ChunkPool();
+
 	void init( uint32_t chunkSize, uint64_t capacity );
-	char *alloc( uint32_t listId, uint32_t stripeId, uint32_t chunkId );
+
+	Chunk *alloc();
+	Chunk *alloc( uint32_t listId, uint32_t stripeId, uint32_t chunkId );
+
+	void setChunk( Chunk *chunk, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t size = 0 );
+	Chunk *getChunk( char *ptr, uint32_t *listIdPtr = 0, uint32_t *stripeIdPtr = 0, uint32_t *sizePtr = 0, uint32_t *offsetPtr = 0 ); // Translate object pointer to chunk pointer
+
 	void print( FILE *f = stdout );
 };
 

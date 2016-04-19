@@ -7,9 +7,9 @@
 #include "../protocol/protocol.hh"
 #include "../util/debug.hh"
 
-uint32_t Chunk::capacity;
+uint32_t _Chunk::capacity;
 
-Chunk::Chunk() {
+_Chunk::_Chunk() {
 	this->data = 0;
 	this->size = 0;
 	this->status = CHUNK_STATUS_EMPTY;
@@ -21,56 +21,56 @@ Chunk::Chunk() {
 #endif
 }
 
-void Chunk::init( uint32_t capacity ) {
-	Chunk::capacity = capacity;
+void _Chunk::init( uint32_t capacity ) {
+	_Chunk::capacity = capacity;
 }
 
-void Chunk::init() {
-	this->data = new char[ Chunk::capacity ];
+void _Chunk::init() {
+	this->data = new char[ _Chunk::capacity ];
 	this->clear();
 }
 
-void Chunk::loadFromGetChunkRequest( uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isParity, uint32_t size, uint32_t offset, char *data ) {
+void _Chunk::loadFromGetChunkRequest( uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isParity, uint32_t size, uint32_t offset, char *data ) {
 #ifdef USE_CHUNK_LOCK
 	LOCK( &this->lock );
 #endif
 	this->status = CHUNK_STATUS_FROM_GET_CHUNK;
-	this->size = isParity ? Chunk::capacity : size;
+	this->size = isParity ? _Chunk::capacity : size;
 	this->metadata.set( listId, stripeId, chunkId );
 	this->isParity = isParity;
 	if ( offset > 0 )
 		memset( this->data, 0, offset );
 	memcpy( this->data + offset, data, size );
-	if ( offset + size < Chunk::capacity )
-		memset( this->data + offset + size, 0, Chunk::capacity - offset - size );
+	if ( offset + size < _Chunk::capacity )
+		memset( this->data + offset + size, 0, _Chunk::capacity - offset - size );
 #ifdef USE_CHUNK_LOCK
 	UNLOCK( &this->lock );
 #endif
 }
 
-void Chunk::loadFromSetChunkRequest( char *data, uint32_t size, uint32_t offset, bool isParity ) {
+void _Chunk::loadFromSetChunkRequest( char *data, uint32_t size, uint32_t offset, bool isParity ) {
 #ifdef USE_CHUNK_LOCK
 	LOCK( &this->lock );
 #endif
 	this->count = 0;
-	this->size = isParity ? Chunk::capacity : offset + size;
+	this->size = isParity ? _Chunk::capacity : offset + size;
 
 	if ( offset > 0 )
 		memset( this->data, 0, offset );
 	memcpy( this->data + offset, data, size );
-	if ( offset + size < Chunk::capacity )
-		memset( this->data + offset + size, 0, Chunk::capacity - offset - size );
+	if ( offset + size < _Chunk::capacity )
+		memset( this->data + offset + size, 0, _Chunk::capacity - offset - size );
 
 #ifdef USE_CHUNK_LOCK
 	UNLOCK( &this->lock );
 #endif
 }
 
-char *Chunk::getData( uint32_t &offset, uint32_t &size ) {
+char *_Chunk::getData( uint32_t &offset, uint32_t &size ) {
 #ifdef USE_CHUNK_LOCK
 	LOCK( &this->lock );
 #endif
-	uint32_t chunkSize = isParity ? Chunk::capacity : this->size;
+	uint32_t chunkSize = isParity ? _Chunk::capacity : this->size;
 
 	if ( chunkSize > 0 ) {
 		for ( offset = 0; offset < chunkSize; offset++ ) {
@@ -96,8 +96,8 @@ char *Chunk::getData( uint32_t &offset, uint32_t &size ) {
 	return this->data + offset;
 }
 
-void Chunk::swap( Chunk *c ) {
-	Chunk tmp;
+void _Chunk::swap( _Chunk *c ) {
+	_Chunk tmp;
 
 	tmp.status = c->status;
 	tmp.count = c->count;
@@ -133,7 +133,7 @@ void Chunk::swap( Chunk *c ) {
 #endif
 }
 
-void Chunk::copy( Chunk *c ) {
+void _Chunk::copy( _Chunk *c ) {
 	uint32_t size = c->getSize();
 
 	this->status = c->status;
@@ -142,11 +142,11 @@ void Chunk::copy( Chunk *c ) {
 	this->metadata = c->metadata;
 	this->isParity = c->isParity;
 	memcpy( this->data, c->getData(), size );
-	if ( size < Chunk::capacity )
-		memset( this->data + size, 0, Chunk::capacity - size );
+	if ( size < _Chunk::capacity )
+		memset( this->data + size, 0, _Chunk::capacity - size );
 }
 
-char *Chunk::alloc( uint32_t size, uint32_t &offset ) {
+char *_Chunk::alloc( uint32_t size, uint32_t &offset ) {
 #ifdef USE_CHUNK_LOCK
 	LOCK( &this->lock );
 #endif
@@ -164,9 +164,9 @@ char *Chunk::alloc( uint32_t size, uint32_t &offset ) {
 }
 
 #ifdef USE_CHUNK_LOCK
-int Chunk::next( int offset, char *&key, uint8_t &keySize, bool needsLock, bool needsUnlock )
+int _Chunk::next( int offset, char *&key, uint8_t &keySize, bool needsLock, bool needsUnlock )
 #else
-int Chunk::next( int offset, char *&key, uint8_t &keySize )
+int _Chunk::next( int offset, char *&key, uint8_t &keySize )
 #endif
 {
 #ifdef USE_CHUNK_LOCK
@@ -176,7 +176,7 @@ int Chunk::next( int offset, char *&key, uint8_t &keySize )
 	int ret = -1;
 	uint32_t valueSize;
 
-	if ( ptr < this->data + Chunk::capacity ) {
+	if ( ptr < this->data + _Chunk::capacity ) {
 		KeyValue::deserialize( ptr, key, keySize, value, valueSize );
 		if ( keySize )
 			ret = offset + PROTO_KEY_VALUE_SIZE + keySize + valueSize;
@@ -189,7 +189,7 @@ int Chunk::next( int offset, char *&key, uint8_t &keySize )
 	return ret;
 }
 
-uint32_t Chunk::updateData() {
+uint32_t _Chunk::updateData() {
 	uint8_t keySize;
 	uint32_t valueSize, tmp;
 	char *key, *value, *ptr = this->data;
@@ -200,12 +200,12 @@ uint32_t Chunk::updateData() {
 	LOCK( &this->lock );
 #endif
 	this->isParity = false;
-	while ( ptr < this->data + Chunk::capacity ) {
+	while ( ptr < this->data + _Chunk::capacity ) {
 		KeyValue::deserialize( ptr, key, keySize, value, valueSize );
 		if ( keySize == 0 && valueSize == 0 )
 			break;
 
-		// if ( valueSize > Chunk::capacity ) {
+		// if ( valueSize > _Chunk::capacity ) {
 		// 	fprintf(
 		// 		stderr, "[%s] Current position: %lu; key size = %u, value size = %u\n",
 		// 		this->status == CHUNK_STATUS_RECONSTRUCTED ? "Reconstructed" : "Normal",
@@ -220,8 +220,8 @@ uint32_t Chunk::updateData() {
 
 		ptr += tmp;
 	}
-	// if ( this->size > Chunk::capacity )
-	// 	this->size = Chunk::capacity;
+	// if ( this->size > _Chunk::capacity )
+	// 	this->size = _Chunk::capacity;
 	tmp = this->size;
 #ifdef USE_CHUNK_LOCK
 	UNLOCK( &this->lock );
@@ -229,7 +229,7 @@ uint32_t Chunk::updateData() {
 	return tmp;
 }
 
-void Chunk::computeDelta( char *delta, char *newData, uint32_t offset, uint32_t length, bool update ) {
+void _Chunk::computeDelta( char *delta, char *newData, uint32_t offset, uint32_t length, bool update ) {
 #ifdef USE_CHUNK_LOCK
 	LOCK( &this->lock );
 #endif
@@ -254,7 +254,7 @@ void Chunk::computeDelta( char *delta, char *newData, uint32_t offset, uint32_t 
 #endif
 }
 
-void Chunk::update( char *newData, uint32_t offset, uint32_t length ) {
+void _Chunk::update( char *newData, uint32_t offset, uint32_t length ) {
 #ifdef USE_CHUNK_LOCK
 	LOCK( &this->lock );
 #endif
@@ -264,7 +264,7 @@ void Chunk::update( char *newData, uint32_t offset, uint32_t length ) {
 #endif
 }
 
-uint32_t Chunk::deleteKeyValue( std::unordered_map<Key, KeyMetadata> *keys, KeyMetadata metadata, char *delta, size_t deltaBufSize ) {
+uint32_t _Chunk::deleteKeyValue( std::unordered_map<Key, KeyMetadata> *keys, KeyMetadata metadata, char *delta, size_t deltaBufSize ) {
 	uint32_t deltaSize, bytes;
 	char *startPtr, *src, *dst;
 	std::unordered_map<Key, KeyMetadata>::iterator it;
@@ -305,7 +305,7 @@ uint32_t Chunk::deleteKeyValue( std::unordered_map<Key, KeyMetadata> *keys, KeyM
 
 		it = keys->find( tmp );
 		if ( it == keys->end() ) {
-			printf( "Chunk::deleteKeyValue(): Key not found (%.*s, size = %u); current position: %lu [%s, (%u, %u, %u)]\n", keySize, key, keySize, src - this->data, this->status == CHUNK_STATUS_RECONSTRUCTED ? "Reconstructed" : "Normal", this->metadata.listId, this->metadata.stripeId, this->metadata.chunkId );
+			printf( "_Chunk::deleteKeyValue(): Key not found (%.*s, size = %u); current position: %lu [%s, (%u, %u, %u)]\n", keySize, key, keySize, src - this->data, this->status == CHUNK_STATUS_RECONSTRUCTED ? "Reconstructed" : "Normal", this->metadata.listId, this->metadata.stripeId, this->metadata.chunkId );
 		}
 		assert( it != keys->end() );
 		KeyMetadata &m = it->second;
@@ -339,7 +339,7 @@ uint32_t Chunk::deleteKeyValue( std::unordered_map<Key, KeyMetadata> *keys, KeyM
 	return deltaSize;
 }
 
-KeyValue Chunk::getKeyValue( uint32_t offset ) {
+KeyValue _Chunk::getKeyValue( uint32_t offset ) {
 	KeyValue ret;
 #ifdef USE_CHUNK_LOCK
 	LOCK( &this->lock );
@@ -351,37 +351,37 @@ KeyValue Chunk::getKeyValue( uint32_t offset ) {
 	return ret;
 }
 
-void Chunk::clear() {
+void _Chunk::clear() {
 #ifdef USE_CHUNK_LOCK
 	LOCK( &this->lock );
 #endif
 	this->status = CHUNK_STATUS_EMPTY;
 	this->count = 0;
 	this->size = 0;
-	memset( this->data, 0, Chunk::capacity );
+	memset( this->data, 0, _Chunk::capacity );
 #ifdef USE_CHUNK_LOCK
 	UNLOCK( &this->lock );
 #endif
 }
 
-void Chunk::setReconstructed( uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isParity ) {
+void _Chunk::setReconstructed( uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isParity ) {
 #ifdef USE_CHUNK_LOCK
 	LOCK( &this->lock );
 #endif
 	this->status = CHUNK_STATUS_RECONSTRUCTED;
 	this->count = 0;
-	this->size = isParity ? Chunk::capacity : 0;
+	this->size = isParity ? _Chunk::capacity : 0;
 	this->metadata.listId = listId;
 	this->metadata.stripeId = stripeId;
 	this->metadata.chunkId = chunkId;
 	this->isParity = isParity;
-	memset( this->data, 0, Chunk::capacity );
+	memset( this->data, 0, _Chunk::capacity );
 #ifdef USE_CHUNK_LOCK
 	UNLOCK( &this->lock );
 #endif
 }
 
-void Chunk::free() {
+void _Chunk::free() {
 #ifdef USE_CHUNK_LOCK
 	LOCK( &this->lock );
 #endif
@@ -392,9 +392,9 @@ void Chunk::free() {
 #endif
 }
 
-void Chunk::print( FILE *f ) {
+void _Chunk::print( FILE *f ) {
 	int width = 21, index;
-	unsigned int hash = HashFunc::hash( this->data, Chunk::capacity );
+	unsigned int hash = HashFunc::hash( this->data, _Chunk::capacity );
 	const char *statusStrs[] = {
 		"CHUNK_STATUS_EMPTY",
 		"CHUNK_STATUS_DIRTY",
@@ -446,11 +446,11 @@ void Chunk::print( FILE *f ) {
 	);
 }
 
-unsigned int Chunk::hash() {
-	return HashFunc::hash( this->data, Chunk::capacity );
+unsigned int _Chunk::hash() {
+	return HashFunc::hash( this->data, _Chunk::capacity );
 }
 
-bool Chunk::initFn( Chunk *chunk, void *argv ) {
+bool _Chunk::initFn( _Chunk *chunk, void *argv ) {
 	chunk->init();
 	return true;
 }

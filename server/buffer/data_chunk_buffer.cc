@@ -11,10 +11,11 @@ DataChunkBuffer::DataChunkBuffer( uint32_t count, uint32_t listId, uint32_t stri
 #endif
 	this->sizes = new uint32_t[ count ];
 
-	ChunkBuffer::chunkPool->malloc( this->chunks, this->count );
 	for ( uint32_t i = 0; i < count; i++ ) {
 		LOCK_INIT( this->locks + i );
 		this->sizes[ i ] = 0;
+		this->chunks[ i ] = ChunkBuffer::chunkPool->alloc();
+
 #ifndef REINSERTED_CHUNKS_IS_SET
 		this->reInsertedChunks[ i ] = 0;
 #endif
@@ -28,18 +29,19 @@ DataChunkBuffer::DataChunkBuffer( uint32_t count, uint32_t listId, uint32_t stri
 }
 
 void DataChunkBuffer::init() {
+	uint32_t stripeId;
+
 	for ( uint32_t i = 0; i < this->count; i++ ) {
-		Metadata &metadata = this->chunks[ i ]->metadata;
-		metadata.listId = this->listId;
-		metadata.stripeId = ChunkBuffer::map->nextStripeID( this->listId, this->stripeId );
-		metadata.chunkId = this->chunkId;
+		stripeId = ChunkBuffer::map->nextStripeID( this->listId, this->stripeId );
+
+		ChunkBuffer::chunkPool->setChunk( this->chunks[ i ], this->listId, stripeId, this->chunkId );
+
 		ChunkBuffer::map->setChunk(
-			metadata.listId,
-			metadata.stripeId,
-			metadata.chunkId,
+			this->listId, stripeId, this->chunkId,
 			this->chunks[ i ],
 			false // isParity
 		);
+
 		this->stripeId = metadata.stripeId + 1;
 	}
 }
@@ -48,7 +50,7 @@ KeyMetadata DataChunkBuffer::set( ServerWorker *worker, char *key, uint8_t keySi
 	KeyMetadata keyMetadata;
 	uint32_t size = PROTO_KEY_VALUE_SIZE + keySize + valueSize, max = 0, tmp;
 	int index = -1;
-	Chunk *reInsertedChunk = 0, *chunk = 0;
+	char *reInsertedChunk = 0, *chunk = 0;
 	char *ptr;
 
 	if ( isSealed ) *isSealed = false;

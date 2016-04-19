@@ -6,12 +6,13 @@ LIBS=-pthread
 OBJS= \
 	chunk_pool
 
-EXTERNAL_LIB=
+EXTERNAL_LIB= \
+	$(MEMEC_SRC_ROOT)/server/buffer/chunk_pool.o
 
 all: $(OBJS) $(EXTERNAL_LIB)
 
-chunk_pool: chunk_pool.cc $(MEMEC_SRC_ROOT)/server/buffer/chunk_pool.o
-	$(CC) $(CFLAGS) $(LIBS) -o $@ $^
+chunk_pool: chunk_pool.cc
+	$(CC) $(CFLAGS) $(LIBS) $(EXTERNAL_LIB) -o $@ $^
 
 clean:
 	rm -f $(OBJS)

@@ -16,6 +16,7 @@ OBJS= \
 	buffer/remapped_buffer.o \
 	config/server_config.o \
 	ds/pending.o \
+	ds/map.o \
 	event/coding_event.o \
 	event/coordinator_event.o \
 	event/io_event.o \

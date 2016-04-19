@@ -28,7 +28,9 @@ enum ChunkStatus {
 	CHUNK_STATUS_TEMPORARY
 };
 
-class Chunk {
+typedef char* Chunk;
+
+class _Chunk {
 private:
 	char *data;                 // Buffer
 	uint32_t size;              // Occupied data
@@ -45,11 +47,11 @@ public:
 	bool isParity;              // Indicate whether the chunk is a parity chunk
 
 	// Initialization
-	Chunk();
+	_Chunk();
 	static void init( uint32_t capacity );
 	void init();
-	void swap( Chunk *c );
-	void copy( Chunk *c );
+	void swap( _Chunk *c );
+	void copy( _Chunk *c );
 	void loadFromGetChunkRequest( uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isParity, uint32_t size, uint32_t offset, char *data );
 	void loadFromSetChunkRequest( char *data, uint32_t size, uint32_t offset, bool isParity );
 	// Access data inside the chunk
@@ -61,7 +63,7 @@ public:
 #endif
 	// Setters and getters
 	inline char *getData() { return this->data; }
-	inline uint32_t getSize() { return this->isParity ? Chunk::capacity : this->size; }
+	inline uint32_t getSize() { return this->isParity ? _Chunk::capacity : this->size; }
 	inline void setData( char *data ) { this->data = data; }
 	inline void setSize( uint32_t size ) {
 		if ( ! this->isParity )
@@ -89,7 +91,7 @@ public:
 	void print( FILE *f = stdout );
 	unsigned int hash();
 
-	static bool initFn( Chunk *chunk, void *argv );
+	static bool initFn( _Chunk *chunk, void *argv );
 };
 
 #endif

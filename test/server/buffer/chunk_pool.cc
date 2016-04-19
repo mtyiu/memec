@@ -23,10 +23,28 @@ void *run( void *argv ) {
 	printf( "* List ID = %u *\n", listId );
 	for ( uint32_t i = 0; i < numTrials; i++ ) {
 		if ( chunks[ i ] ) {
+			// Check metadata
 			uint32_t *metadata = ( uint32_t * ) chunks[ i ];
 			printf( "#%u: [%u, %u; size = %u] 0x%p\n", i, metadata[ 0 ], metadata[ 1 ], metadata[ 2 ], chunks[ i ] );
 
 			assert( listId == metadata[ 0 ] );
+
+			// Check getChunk() correctness
+			uint32_t offset = rand() % chunkSize;
+			struct {
+				uint32_t listId;
+				uint32_t stripeId;
+				uint32_t size;
+				uint32_t offset;
+				char *chunk;
+			} result;
+			result.chunk = chunkPool.getChunk( chunks[ i ] + offset, &result.listId, &result.stripeId, &result.size, &result.offset );
+
+			assert( result.listId   == metadata[ 0 ] );
+			assert( result.stripeId == metadata[ 1 ] );
+			assert( result.size     == metadata[ 2 ] );
+			assert( result.offset   == offset        );
+			assert( result.chunk    == chunks[ i ]   );
 
 			// for ( uint32_t j = 0; j < chunkSize; j++ )
 			// 	printf( "%d ", *( chunks[ i ] + CHUNK_METADATA_SIZE + j ) );
