@@ -371,6 +371,7 @@ bool Pending::eraseReleaseDegradedLock( uint16_t instanceId, uint32_t requestId,
 	it->second.count -= count;
 	remaining = it->second.count;
 	total = it->second.total;
+	if ( remaining == 0 ) it->second.total = 0;
 	UNLOCK( &this->coordinators.releaseDegradedLockLock );
 
 	return true;
