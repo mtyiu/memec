@@ -9,7 +9,7 @@ Map::Map() {
 	LOCK_INIT( &this->sealedLock );
 }
 
-Map::setTimestamp( Timestamp *timestamp ) {
+void Map::setTimestamp( Timestamp *timestamp ) {
 	this->timestamp = timestamp;
 }
 
@@ -122,7 +122,7 @@ bool Map::findValueByKey(
 
 	Chunk *chunk = cacheIt->second;
 	if ( keyValuePtr )
-		*keyValuePtr = chunk->getKeyValue( keysIt->second.offset );
+		*keyValuePtr = ChunkUtil::getKeyValue( chunk, keysIt->second.offset );
 	if ( needsUnlock ) UNLOCK( &this->cacheLock );
 	return true;
 }
@@ -178,13 +178,13 @@ void Map::setChunk(
 	if ( needsUnlock ) UNLOCK( &this->stripeIdsLock );
 
 	if ( ! isParity ) {
-		char *ptr = chunk->getData();
+		char *ptr = ChunkUtil::getData( chunk );
 		char *keyPtr, *valuePtr;
 		uint8_t keySize;
 		uint32_t valueSize, offset = 0, size;
 
 		if ( needsLock ) LOCK( &this->keysLock );
-		while( ptr < chunk->getData() + Chunk::capacity ) {
+		while( ptr < ChunkUtil::getData( chunk ) + ChunkUtil::chunkSize ) {
 			KeyValue::deserialize( ptr, keyPtr, keySize, valuePtr, valueSize );
 			if ( keySize == 0 && valueSize == 0 )
 				break;
@@ -422,14 +422,12 @@ void Map::dump( FILE *f ) {
 		fprintf( f, "(None)\n" );
 	} else {
 		for ( std::unordered_map<Metadata, Chunk *>::iterator it = this->cache.begin(); it != this->cache.end(); it++ ) {
+			Chunk *chunk = it->second;
+			Metadata metadata = ChunkUtil::getMetadata( chunk );
 			fprintf(
-				f, "(list ID: %u, stripe ID: %u, chunk ID: %u) --> %p (type: %s chunk, status: %s, count: %u, size: %u)\n",
-				it->first.listId, it->first.stripeId, it->first.chunkId,
-				it->second, it->second->isParity ? "parity" : "data",
-				( it->second->status == CHUNK_STATUS_EMPTY ? "empty" :
-					( it->second->status == CHUNK_STATUS_DIRTY ? "dirty" : "cached" )
-				),
-				it->second->count, it->second->getSize()
+				f, "(list ID: %u, stripe ID: %u, chunk ID: %u) --> %p (size: %u)\n",
+				metadata.listId, metadata.stripeId, metadata.chunkId,
+				chunk, ChunkUtil::getSize( chunk )
 			);
 		}
 	}

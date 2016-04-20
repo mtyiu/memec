@@ -4,6 +4,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include "local_storage.hh"
+#include "../buffer/chunk_pool.hh"
 #include "../../common/util/debug.hh"
 
 void LocalStorage::generatePath( uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isParity ) {
@@ -62,7 +63,7 @@ bool LocalStorage::read( Chunk *chunk, uint32_t listId, uint32_t stripeId, uint3
 			return false;
 		}
 	}
-	ret = ::read( fd, chunk->getData() + offset, length );
+	ret = ::read( fd, ChunkUtil::getData( chunk ) + offset, length );
 	if ( ret == -1 ) {
 		__ERROR__( "LocalStorage", "read", "read(): %s", strerror( errno ) );
 	} else if ( ret < ( ssize_t ) length ) {
@@ -74,13 +75,8 @@ bool LocalStorage::read( Chunk *chunk, uint32_t listId, uint32_t stripeId, uint3
 		__ERROR__( "LocalStorage", "read", "close(): %s", strerror( errno ) );
 	}
 
-	chunk->status = CHUNK_STATUS_CACHED;
-	chunk->metadata.listId = listId;
-	chunk->metadata.stripeId = stripeId;
-	chunk->metadata.chunkId = chunkId;
-	chunk->isParity = isParity;
-	if ( ! isParity )
-		chunk->updateData();
+	ChunkUtil::set( chunk, listId, stripeId, chunkId, 0 );
+	ChunkUtil::updateSize( chunk );
 
 	return ret != -1;
 }
@@ -90,19 +86,20 @@ ssize_t LocalStorage::write( Chunk *chunk, bool sync, long offset, size_t length
 	ssize_t ret;
 	uint32_t size;
 
+	Metadata metadata = ChunkUtil::getMetadata( chunk );
 	this->generatePath(
-		chunk->metadata.listId,
-		chunk->metadata.stripeId,
-		chunk->metadata.chunkId,
-		chunk->isParity
+		metadata.listId,
+		metadata.stripeId,
+		metadata.chunkId,
+		ChunkUtil::isParity( chunk )
 	);
 
 	// Determine the number of bytes to be written
 	offset = offset > 0 ? offset : 0;
-	size = chunk->getSize();
-	chunk->setSize( Chunk::capacity ); // Force the file size to be one complete chunk
-	length = length == 0 ? chunk->getSize() : ( chunk->getSize() - offset < ( off_t ) length ? chunk->getSize() - offset : length );
-	chunk->setSize( size );
+	size = ChunkUtil::getSize( chunk );
+	ChunkUtil::setSize( chunk, ChunkUtil::chunkSize ); // Force the file size to be one complete chunk
+	length = length == 0 ? ChunkUtil::getSize( chunk ) : ( ChunkUtil::getSize( chunk ) - offset < ( off_t ) length ? ChunkUtil::getSize( chunk ) - offset : length );
+	ChunkUtil::setSize( chunk, size );
 
 	fd = ::open( this->path, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR );
 	if ( fd == -1 ) {
@@ -117,9 +114,9 @@ ssize_t LocalStorage::write( Chunk *chunk, bool sync, long offset, size_t length
 			return -1;
 		}
 	}
-	ret = ::write( fd, chunk->getData() + offset, length );
+	ret = ::write( fd, ChunkUtil::getData( chunk ) + offset, length );
 	if ( ret == -1 ) {
-		__ERROR__( "LocalStorage", "write", "write(): %s (data: %p, offset = %ld)", strerror( errno ), chunk->getData(), offset );
+		__ERROR__( "LocalStorage", "write", "write(): %s (data: %p, offset = %ld)", strerror( errno ), ChunkUtil::getData( chunk ), offset );
 	} else {
 		if ( ret < ( ssize_t ) length ) {
 			__ERROR__( "LocalStorage", "write", "write(): Number of bytes written is fewer than the specified size." );
@@ -129,8 +126,6 @@ ssize_t LocalStorage::write( Chunk *chunk, bool sync, long offset, size_t length
 		if ( sync && ::syncfs( fd ) == -1 ) {
 			__ERROR__( "LocalStorage", "write", "syncfs(): %s", strerror( errno ) );
 		}
-
-		chunk->status = CHUNK_STATUS_CACHED;
 	}
 
 	if ( ::close( fd ) == -1 ) {

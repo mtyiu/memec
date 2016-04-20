@@ -1,8 +1,10 @@
 #include "chunk_pool.hh"
 #include "../../common/util/debug.hh"
 
+uint32_t ChunkUtil::chunkSize;
+uint32_t ChunkUtil::dataChunkCount;
+
 ChunkPool::ChunkPool() {
-	this->chunkSize = 0;
 	this->total = 0;
 	this->count = 0;
 	this->startAddress = 0;
@@ -11,14 +13,12 @@ ChunkPool::ChunkPool() {
 ChunkPool::~ChunkPool() {
 	if ( this->startAddress )
 		free( this->startAddress );
-	this->chunkSize = 0;
 	this->total = 0;
 	this->count = 0;
 	this->startAddress = 0;
 }
 
 void ChunkPool::init( uint32_t chunkSize, uint64_t capacity ) {
-	this->chunkSize = chunkSize;
 	chunkSize += CHUNK_METADATA_SIZE;
 	this->total = ( uint32_t )( capacity / chunkSize );
 	capacity = ( uint64_t ) this->total * chunkSize;
@@ -42,36 +42,24 @@ Chunk *ChunkPool::alloc() {
 	}
 
 	// Calculate memory address
-	return ( Chunk * )( this->startAddress + ( index * ( CHUNK_METADATA_SIZE + this->chunkSize ) ) );
-}
-
-Chunk *ChunkPool::alloc( uint32_t listId, uint32_t stripeId, uint32_t chunkId ) {
-	Chunk *chunk = this->alloc();
+	Chunk *chunk = ( Chunk * )( this->startAddress + ( index * ( CHUNK_METADATA_SIZE + ChunkUtil::chunkSize ) ) );
 	if ( chunk )
-		this->setChunk( chunk, listId, stripeId, chunkId );
+		ChunkUtil::clear( chunk );
 	return chunk;
 }
 
-void ChunkPool::setChunk( Chunk *chunk, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t size ) {
-	struct ChunkMetadata *chunkMetadata = ( struct ChunkMetadata * ) chunk;
-
-	chunkMetadata->listId = listId;
-	chunkMetadata->stripeId = stripeId;
-	chunkMetadata->size = size;
+Chunk *ChunkPool::alloc( uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t size ) {
+	Chunk *chunk = this->alloc();
+	if ( chunk )
+		ChunkUtil::set( chunk, listId, stripeId, chunkId, size );
+	return chunk;
 }
 
-Chunk *ChunkPool::getChunk( char *ptr, uint32_t *listIdPtr, uint32_t *stripeIdPtr, uint32_t *sizePtr, uint32_t *offsetPtr ) {
+Chunk *ChunkPool::getChunk( char *ptr, uint32_t &offset ) {
 	Chunk *chunk;
-	uint32_t *metadata;
-	uint32_t offset = ( uint64_t )( ( ( uint64_t )( ptr - this->startAddress ) ) % ( CHUNK_METADATA_SIZE + this->chunkSize ) );
+	offset = ( uint64_t )( ( ( uint64_t )( ptr - this->startAddress ) ) % ( CHUNK_METADATA_SIZE + ChunkUtil::chunkSize ) );
 
 	chunk = ( Chunk * )( ptr - offset );
-	metadata = ( uint32_t * ) chunk;
-
-	if ( listIdPtr )   *listIdPtr   = metadata[ 0 ];
-	if ( stripeIdPtr ) *stripeIdPtr = metadata[ 1 ];
-	if ( sizePtr )     *sizePtr     = metadata[ 2 ];
-	if ( offsetPtr )   *offsetPtr   = offset;
 
 	return chunk;
 }
@@ -84,7 +72,7 @@ void ChunkPool::print( FILE *f ) {
 		"Metadata size    : %u bytes\n"
 		"Allocated chunks : %u / %u\n"
 		"Start address    : 0x%p\n",
-		this->chunkSize,
+		ChunkUtil::chunkSize,
 		( uint32_t ) CHUNK_METADATA_SIZE,
 		count, this->total,
 		this->startAddress

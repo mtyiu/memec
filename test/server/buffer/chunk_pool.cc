@@ -12,11 +12,11 @@ pthread_mutex_t lock;
 
 void *run( void *argv ) {
 	uint32_t listId = ( uint32_t ) ( rand() % 2000 );
-	char **chunks = ( char ** ) malloc( sizeof( char * ) * numTrials );
+	Chunk **chunks = ( Chunk ** ) malloc( sizeof( Chunk * ) * numTrials );
 	for ( uint32_t i = 0; i < numTrials; i++ ) {
-		chunks[ i ] = chunkPool.alloc( listId, i, i );
+		chunks[ i ] = chunkPool.alloc( listId, i, i, 0 );
 		if ( chunks[ i ] )
-			memset( chunks[ i ] + CHUNK_METADATA_SIZE, 255, chunkSize );
+			memset( ( char * ) chunks[ i ] + CHUNK_METADATA_SIZE, 255, chunkSize );
 	}
 
 	pthread_mutex_lock( &lock );
@@ -25,7 +25,7 @@ void *run( void *argv ) {
 		if ( chunks[ i ] ) {
 			// Check metadata
 			uint32_t *metadata = ( uint32_t * ) chunks[ i ];
-			printf( "#%u: [%u, %u; size = %u] 0x%p\n", i, metadata[ 0 ], metadata[ 1 ], metadata[ 2 ], chunks[ i ] );
+			printf( "#%u: [%u, %u, %u; size = %u] 0x%p\n", i, metadata[ 0 ], metadata[ 1 ], metadata[ 2 ], metadata[ 3 ], chunks[ i ] );
 
 			assert( listId == metadata[ 0 ] );
 
@@ -34,15 +34,19 @@ void *run( void *argv ) {
 			struct {
 				uint32_t listId;
 				uint32_t stripeId;
+				uint32_t chunkId;
 				uint32_t size;
 				uint32_t offset;
-				char *chunk;
+				Chunk *chunk;
 			} result;
-			result.chunk = chunkPool.getChunk( chunks[ i ] + offset, &result.listId, &result.stripeId, &result.size, &result.offset );
+			result.chunk = chunkPool.getChunk( ( char * ) chunks[ i ] + offset, result.offset );
+
+			ChunkUtil::get( result.chunk, result.listId, result.stripeId, result.chunkId, result.size );
 
 			assert( result.listId   == metadata[ 0 ] );
 			assert( result.stripeId == metadata[ 1 ] );
-			assert( result.size     == metadata[ 2 ] );
+			assert( result.chunkId  == metadata[ 2 ] );
+			assert( result.size     == metadata[ 3 ] );
 			assert( result.offset   == offset        );
 			assert( result.chunk    == chunks[ i ]   );
 

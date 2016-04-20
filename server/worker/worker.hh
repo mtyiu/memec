@@ -4,6 +4,7 @@
 #include <vector>
 #include <cstdio>
 #include "../ack/pending_ack.hh"
+#include "../buffer/chunk_pool.hh"
 #include "../buffer/mixed_chunk_buffer.hh"
 #include "../buffer/degraded_chunk_buffer.hh"
 #include "../buffer/get_chunk_buffer.hh"
@@ -31,6 +32,7 @@ class ServerWorker : public Worker {
 private:
 	uint32_t workerId;
 	ServerProtocol protocol;
+	TempChunkPool tempChunkPool;
 	Storage *storage;
 	// Temporary variables
 	struct { // Buffer for storing data delta
@@ -44,7 +46,7 @@ private:
 		Chunk *dataChunk, *parityChunk;
 		Chunk **chunks;
 	} forward; // For forwarding parity chunk
-	Chunk *freeChunks;
+	Chunk **freeChunks;
 	ServerPeerSocket **dataServerSockets;
 	ServerPeerSocket **parityServerSockets;
 	bool **sealIndicators;
@@ -63,7 +65,6 @@ private:
 	static StripeList<ServerPeerSocket> *stripeList;
 	static std::vector<StripeListIndex> *stripeListIndex;
 	static Map *map;
-	static MemoryPool<Chunk> *chunkPool;
 	static std::vector<MixedChunkBuffer *> *chunkBuffer;
 	static GetChunkBuffer *getChunkBuffer;
 	static DegradedChunkBuffer *degradedChunkBuffer;

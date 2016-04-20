@@ -2,12 +2,6 @@
 #include "../main/server.hh"
 #include "../../common/util/debug.hh"
 
-MemoryPool<Chunk> *GetChunkBuffer::chunkPool;
-
-void GetChunkBuffer::init() {
-	GetChunkBuffer::chunkPool = Server::getInstance()->chunkPool;
-}
-
 GetChunkBuffer::GetChunkBuffer() {
 	LOCK_INIT( &this->lock );
 }
@@ -18,7 +12,7 @@ GetChunkBuffer::~GetChunkBuffer() {
 	LOCK( &this->lock );
 	for ( it = this->chunks.begin(); it != this->chunks.end(); it++ ) {
 		if ( it->second.chunk ) {
-			GetChunkBuffer::chunkPool->free( it->second.chunk );
+			this->chunkPool.free( it->second.chunk );
 			if ( it->second.sealIndicator )
 				delete[] it->second.sealIndicator;
 		}
@@ -41,8 +35,8 @@ bool GetChunkBuffer::insert( Metadata metadata, Chunk *chunk, uint8_t sealIndica
 		GetChunkWrapper wrapper;
 
 		if ( chunk ) {
-			newChunk = GetChunkBuffer::chunkPool->malloc();
-			newChunk->copy( chunk );
+			newChunk = this->chunkPool.alloc();
+			ChunkUtil::dup( newChunk, chunk );
 			wrapper.sealIndicatorCount = sealIndicatorCount;
 			wrapper.sealIndicator = sealIndicator;
 		} else {
@@ -57,8 +51,8 @@ bool GetChunkBuffer::insert( Metadata metadata, Chunk *chunk, uint8_t sealIndica
 	} else if ( ! it->second.acked ) {
 		if ( chunk ) {
 			if ( ! it->second.chunk ) {
-				it->second.chunk = GetChunkBuffer::chunkPool->malloc();
-				it->second.chunk->copy( chunk );
+				it->second.chunk = this->chunkPool.alloc();
+				ChunkUtil::dup( it->second.chunk, chunk );
 				it->second.sealIndicatorCount = sealIndicatorCount;
 				it->second.sealIndicator = sealIndicator;
 			}
@@ -106,7 +100,7 @@ bool GetChunkBuffer::ack( Metadata metadata, bool needsLock, bool needsUnlock, b
 	} else {
 		if ( needsFree ) {
 			if ( it->second.chunk )
-				GetChunkBuffer::chunkPool->free( it->second.chunk );
+				this->chunkPool.free( it->second.chunk );
 			if ( it->second.sealIndicator )
 				delete[] it->second.sealIndicator;
 		}
@@ -129,7 +123,7 @@ bool GetChunkBuffer::erase( Metadata metadata, bool needsLock, bool needsUnlock 
 		// Do nothing
 	} else {
 		if ( it->second.chunk )
-			GetChunkBuffer::chunkPool->free( it->second.chunk );
+			this->chunkPool.free( it->second.chunk );
 		if ( it->second.sealIndicator )
 			delete[] it->second.sealIndicator;
 		this->chunks.erase( it );

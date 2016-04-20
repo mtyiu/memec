@@ -12,9 +12,8 @@ class IOEvent : public Event {
 public:
 	IOEventType type;
 	Chunk *chunk;
-	bool clear;
 
-	void flush( Chunk *chunk, bool clear = false );
+	void flush( Chunk *chunk );
 };
 
 #endif

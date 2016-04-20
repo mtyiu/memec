@@ -34,7 +34,7 @@ void DataChunkBuffer::init() {
 	for ( uint32_t i = 0; i < this->count; i++ ) {
 		stripeId = ChunkBuffer::map->nextStripeID( this->listId, this->stripeId );
 
-		ChunkBuffer::chunkPool->setChunk( this->chunks[ i ], this->listId, stripeId, this->chunkId );
+		ChunkUtil::set( this->chunks[ i ], this->listId, stripeId, this->chunkId, 0 );
 
 		ChunkBuffer::map->setChunk(
 			this->listId, stripeId, this->chunkId,
@@ -42,7 +42,7 @@ void DataChunkBuffer::init() {
 			false // isParity
 		);
 
-		this->stripeId = metadata.stripeId + 1;
+		this->stripeId = stripeId + 1;
 	}
 }
 
@@ -50,7 +50,7 @@ KeyMetadata DataChunkBuffer::set( ServerWorker *worker, char *key, uint8_t keySi
 	KeyMetadata keyMetadata;
 	uint32_t size = PROTO_KEY_VALUE_SIZE + keySize + valueSize, max = 0, tmp;
 	int index = -1;
-	char *reInsertedChunk = 0, *chunk = 0;
+	Chunk *reInsertedChunk = 0, *chunk = 0;
 	char *ptr;
 
 	if ( isSealed ) *isSealed = false;
@@ -65,7 +65,7 @@ KeyMetadata DataChunkBuffer::set( ServerWorker *worker, char *key, uint8_t keySi
 		std::unordered_set<Chunk *>::iterator it;
 		for ( it = this->reInsertedChunks.begin(); it != this->reInsertedChunks.end(); it++ ) {
 			c = *it;
-			space = ChunkBuffer::capacity - c->getSize();
+			space = ChunkBuffer::capacity - ChunkUtil::getSize( c );
 			if ( space >= size && space < min ) {
 				min = space;
 				reInsertedChunk = c;
@@ -74,7 +74,7 @@ KeyMetadata DataChunkBuffer::set( ServerWorker *worker, char *key, uint8_t keySi
 #else
 		for ( uint32_t i = 0; i < this->count; i++ ) {
 			if ( ( c = this->reInsertedChunks[ i ] ) ) {
-				space = ChunkBuffer::capacity - c->getSize();
+				space = ChunkBuffer::capacity - ChunkUtil::getSize( c );
 				if ( space >= size && space < min ) {
 					min = space;
 					reInsertedChunk = c;
@@ -84,20 +84,20 @@ KeyMetadata DataChunkBuffer::set( ServerWorker *worker, char *key, uint8_t keySi
 #endif
 		if ( reInsertedChunk ) {
 			// Update reInsertedChunkMaxSpace if the chunk with reInsertedChunkMaxSpace is chosen
-			if ( ChunkBuffer::capacity - reInsertedChunk->getSize() == this->reInsertedChunkMaxSpace ) {
+			if ( ChunkBuffer::capacity - ChunkUtil::getSize( reInsertedChunk ) == this->reInsertedChunkMaxSpace ) {
 				this->reInsertedChunkMaxSpace = 0;
 
 #ifdef REINSERTED_CHUNKS_IS_SET
 				for ( it = this->reInsertedChunks.begin(); it != this->reInsertedChunks.end(); it++ ) {
 					c = *it;
-					space = ChunkBuffer::capacity - c->getSize();
+					space = ChunkBuffer::capacity - ChunkUtil::getSize( c );
 					if ( space > this->reInsertedChunkMaxSpace )
 						this->reInsertedChunkMaxSpace = space;
 				}
 #else
 				for ( uint32_t i = 0; i < this->count; i++ ) {
 					if ( ( c = this->reInsertedChunks[ i ] ) ) {
-						space = ChunkBuffer::capacity - c->getSize();
+						space = ChunkBuffer::capacity - ChunkUtil::getSize( c );
 						if ( space > this->reInsertedChunkMaxSpace )
 							this->reInsertedChunkMaxSpace = space;
 					}
@@ -118,7 +118,7 @@ KeyMetadata DataChunkBuffer::set( ServerWorker *worker, char *key, uint8_t keySi
 					max = tmp;
 					index = i;
 				} else if ( tmp == max && index != -1 ) {
-					if ( this->chunks[ i ]->metadata.stripeId < this->chunks[ index ]->metadata.stripeId )
+					if ( ChunkUtil::getStripeId( this->chunks[ i ] ) < ChunkUtil::getStripeId( this->chunks[ index ] ) )
 						index = i;
 				}
 			}
@@ -136,15 +136,15 @@ KeyMetadata DataChunkBuffer::set( ServerWorker *worker, char *key, uint8_t keySi
 	}
 
 	// Set up key metadata
-	keyMetadata.listId = chunk->metadata.listId;
-	keyMetadata.stripeId = chunk->metadata.stripeId;
-	keyMetadata.chunkId = chunk->metadata.chunkId;
+	keyMetadata.listId = this->listId;
+	keyMetadata.stripeId = ChunkUtil::getStripeId( chunk );
+	keyMetadata.chunkId = this->chunkId;
 	keyMetadata.length = size;
 	keyMetadata.isParityRemapped = ( opcode == PROTO_OPCODE_DEGRADED_SET );
 	// keyMetadata.ptr = ( char * ) chunk;
 
 	// Allocate memory from chunk
-	ptr = chunk->alloc( size, keyMetadata.offset );
+	ptr = ChunkUtil::alloc( chunk, size, keyMetadata.offset );
 	if ( index != -1 )
 		this->sizes[ index ] += size;
 
@@ -154,12 +154,13 @@ KeyMetadata DataChunkBuffer::set( ServerWorker *worker, char *key, uint8_t keySi
 	KeyValue::serialize( ptr, key, keySize, value, valueSize );
 
 	// Flush if the current buffer is full
-	if ( chunk->getSize() + PROTO_KEY_VALUE_SIZE + CHUNK_BUFFER_FLUSH_THRESHOLD >= ChunkBuffer::capacity ) {
+	if ( ChunkUtil::getSize( chunk ) + PROTO_KEY_VALUE_SIZE + CHUNK_BUFFER_FLUSH_THRESHOLD >= ChunkBuffer::capacity ) {
 		if ( index != -1 ) {
 			if ( isSealed ) *isSealed = true;
 			this->flushAt( worker, index, false, sealed );
 		} else {
-			worker->issueSealChunkRequest( chunk, chunk->lastDelPos );
+			__ERROR__( "DataChunkBuffer", "set", "TODO: Fix lastDelPos." );
+			// worker->issueSealChunkRequest( chunk, chunk->lastDelPos );
 #ifdef REINSERTED_CHUNKS_IS_SET
 			this->reInsertedChunks.erase( chunk );
 #else
@@ -201,13 +202,18 @@ size_t DataChunkBuffer::seal( ServerWorker *worker ) {
 		it++
 	) {
 		c = *it;
-		worker->issueSealChunkRequest( c, c->lastDelPos );
-		count++;
+		if ( c ) {
+			__ERROR__( "DataChunkBuffer", "set", "TODO: Fix lastDelPos." );
+			// worker->issueSealChunkRequest( c, c->lastDelPos );
+			count++;
+		}
 	}
 #else
 	for ( uint32_t i = 0; i < this->count; i++ ) {
-		if ( ( c = this->reInsertedChunks[ i ] ) ) {
-			worker->issueSealChunkRequest( c, c->lastDelPos );
+		c = this->reInsertedChunks[ i ];
+		if ( c ) {
+			__ERROR__( "DataChunkBuffer", "set", "TODO: Fix lastDelPos." );
+			// worker->issueSealChunkRequest( c, c->lastDelPos );
 			count++;
 		}
 	}
@@ -227,7 +233,7 @@ bool DataChunkBuffer::reInsert( ServerWorker *worker, Chunk *chunk, uint32_t siz
 
 	if ( needsLock ) LOCK( &this->lock );
 
-	space = ChunkBuffer::capacity - chunk->getSize() + sizeToBeFreed;
+	space = ChunkBuffer::capacity - ChunkUtil::getSize( chunk ) + sizeToBeFreed;
 
 #ifdef REINSERTED_CHUNKS_IS_SET
 	ret = this->reInsertedChunks.insert( chunk );
@@ -300,7 +306,7 @@ int DataChunkBuffer::lockChunk( Chunk *chunk, bool keepGlobalLock ) {
 }
 
 void DataChunkBuffer::updateAndUnlockChunk( int index ) {
-	this->sizes[ index ] = this->chunks[ index ]->getSize();
+	this->sizes[ index ] = ChunkUtil::getSize( this->chunks[ index ] );
 	UNLOCK( this->locks + index );
 	UNLOCK( &this->lock );
 }
@@ -323,7 +329,7 @@ uint32_t DataChunkBuffer::flush( ServerWorker *worker, bool lock, bool lockAtInd
 			max = this->sizes[ i ];
 			index = i;
 		} else if ( this->sizes[ i ] == max ) {
-			if ( this->chunks[ i ]->metadata.stripeId < this->chunks[ index ]->metadata.stripeId )
+			if ( ChunkUtil::getStripeId( this->chunks[ i ] ) < ChunkUtil::getStripeId( this->chunks[ index ] ) )
 					index = i;
 		}
 	}
@@ -349,40 +355,42 @@ Chunk *DataChunkBuffer::flushAt( ServerWorker *worker, int index, bool lock, Met
 	}
 
 	Chunk *chunk = this->chunks[ index ];
+	Metadata metadata;
+	uint32_t size;
+
 	if ( sealed ) {
+		ChunkUtil::get( chunk, metadata.listId, metadata.stripeId, metadata.chunkId, size );
 		sealed->set(
-			chunk->metadata.listId,
-			chunk->metadata.stripeId,
-			chunk->metadata.chunkId
+			metadata.listId,
+			metadata.stripeId,
+			metadata.chunkId
 		);
 	}
 
 	// Get a new chunk
 	this->sizes[ index ] = 0;
-	Chunk *newChunk = ChunkBuffer::chunkPool->malloc();
-	newChunk->clear();
-	newChunk->metadata.listId = this->listId;
-	newChunk->metadata.stripeId = ChunkBuffer::map->nextStripeID( this->listId, this->stripeId );
-	newChunk->metadata.chunkId = this->chunkId;
-	newChunk->isParity = false;
-	// ChunkBuffer::map->cache[ newChunk->metadata ] = newChunk;
+
+	metadata.set(
+		this->listId,
+		ChunkBuffer::map->nextStripeID( this->listId, this->stripeId ),
+		this->chunkId
+	);
+	Chunk *newChunk = ChunkBuffer::chunkPool->alloc( metadata.listId, metadata.stripeId, metadata.chunkId, 0 );
+
 	ChunkBuffer::map->setChunk(
-		newChunk->metadata.listId,
-		newChunk->metadata.stripeId,
-		newChunk->metadata.chunkId,
+		metadata.listId,
+		metadata.stripeId,
+		metadata.chunkId,
 		newChunk,
 		false // isParity
 	);
 	this->chunks[ index ] = newChunk;
-	this->stripeId = newChunk->metadata.stripeId + 1;
+	this->stripeId = metadata.stripeId + 1;
 
 	// Notify the parity servers to seal the chunk
 	if ( worker->issueSealChunkRequest( chunk ) ) {
-		ChunkBuffer::map->seal(
-			chunk->metadata.listId,
-			chunk->metadata.stripeId,
-			chunk->metadata.chunkId
-		);
+		ChunkUtil::get( chunk, metadata.listId, metadata.stripeId, metadata.chunkId, size );
+		ChunkBuffer::map->seal( metadata.listId, metadata.stripeId, metadata.chunkId );
 	}
 
 	if ( lock ) {
@@ -413,7 +421,9 @@ void DataChunkBuffer::print( FILE *f ) {
 		fprintf(
 			f,
 			"\t%u. [#%u] %u / %u (%5.2lf%%)\n",
-			( i + 1 ), this->chunks[ i ]->metadata.stripeId, size, ChunkBuffer::capacity, occupied
+			( i + 1 ),
+			ChunkUtil::getStripeId( this->chunks[ i ] ),
+			size, ChunkBuffer::capacity, occupied
 		);
 	}
 }
@@ -421,7 +431,6 @@ void DataChunkBuffer::print( FILE *f ) {
 void DataChunkBuffer::stop() {}
 
 DataChunkBuffer::~DataChunkBuffer() {
-	this->chunkPool->free( this->chunks, this->count );
 	delete[] this->locks;
 	delete[] this->chunks;
 	delete[] this->sizes;

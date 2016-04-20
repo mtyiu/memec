@@ -121,6 +121,10 @@ bool Server::init( char *path, OptionList &globalOptions, OptionList &serverOpti
 		this->stripeListIndex = this->stripeList->list( myServerIndex );
 	/* Chunk pool */
 	Chunk::init( this->config.global.size.chunk );
+	ChunkUtil::init(
+		this->config.global.size.chunk,
+		this->config.global.coding.params.getDataChunkCount()
+	);
 	this->chunkPool = new ChunkPool();
 	this->chunkPool->init(
 		this->config.global.size.chunk, // chunkSize

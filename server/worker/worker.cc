@@ -16,7 +16,6 @@ ServerEventQueue *ServerWorker::eventQueue;
 StripeList<ServerPeerSocket> *ServerWorker::stripeList;
 std::vector<StripeListIndex> *ServerWorker::stripeListIndex;
 Map *ServerWorker::map;
-MemoryPool<Chunk> *ServerWorker::chunkPool;
 std::vector<MixedChunkBuffer *> *ServerWorker::chunkBuffer;
 GetChunkBuffer *ServerWorker::getChunkBuffer;
 DegradedChunkBuffer *ServerWorker::degradedChunkBuffer;
@@ -66,8 +65,6 @@ void ServerWorker::dispatch( IOEvent event ) {
 				event.chunk,
 				false
 			);
-			if ( event.clear )
-				event.chunk->status = CHUNK_STATUS_NEEDS_LOAD_FROM_DISK;
 			break;
 		default:
 			return;
@@ -111,23 +108,23 @@ void ServerWorker::free() {
 	this->buffer.size = 0;
 	delete this->chunkStatus;
 
-	this->dataChunk->free();
-	this->parityChunk->free();
-	delete this->dataChunk;
-	delete this->parityChunk;
+	this->tempChunkPool.free( this->dataChunk );
+	this->tempChunkPool.free( this->parityChunk );
 	delete[] this->chunks;
 
 	delete[] this->sealIndicators[ ServerWorker::parityChunkCount ];
 	delete[] this->sealIndicators[ ServerWorker::parityChunkCount + 1 ];
 	delete[] this->sealIndicators;
 
-	this->forward.dataChunk->free();
-	this->forward.parityChunk->free();
-	delete this->forward.dataChunk;
-	delete this->forward.parityChunk;
+	this->tempChunkPool.free( this->forward.dataChunk );
+	this->tempChunkPool.free( this->forward.parityChunk );
 	delete[] this->forward.chunks;
 
+	for( uint32_t i = 0; i < ServerWorker::dataChunkCount; i++ ) {
+		this->tempChunkPool.free( this->freeChunks[ i ] );
+	}
 	delete[] this->freeChunks;
+
 	delete[] this->dataServerSockets;
 	delete[] this->parityServerSockets;
 }
@@ -166,7 +163,6 @@ bool ServerWorker::init() {
 	ServerWorker::stripeList = server->stripeList;
 	ServerWorker::stripeListIndex = &server->stripeListIndex;
 	ServerWorker::map = &server->map;
-	ServerWorker::chunkPool = server->chunkPool;
 	ServerWorker::chunkBuffer = &server->chunkBuffer;
 	ServerWorker::getChunkBuffer = &server->getChunkBuffer;
 	ServerWorker::degradedChunkBuffer = &server->degradedChunkBuffer;
@@ -188,26 +184,18 @@ bool ServerWorker::init( GlobalConfig &globalConfig, ServerConfig &serverConfig,
 	this->buffer.size = globalConfig.size.chunk;
 	this->chunkStatus = new BitmaskArray( ServerWorker::chunkCount, 1 );
 
-	this->dataChunk = new Chunk();
-	this->parityChunk = new Chunk();
+	this->dataChunk = this->tempChunkPool.alloc();
+	this->parityChunk = this->tempChunkPool.alloc();
 	this->chunks = new Chunk*[ ServerWorker::chunkCount ];
 
-	this->forward.dataChunk = new Chunk();
-	this->forward.parityChunk = new Chunk();
+	this->forward.dataChunk = this->tempChunkPool.alloc();
+	this->forward.parityChunk = this->tempChunkPool.alloc();
 	this->forward.chunks = new Chunk*[ ServerWorker::chunkCount ];
 
-	this->freeChunks = new Chunk[ ServerWorker::dataChunkCount ];
+	this->freeChunks = new Chunk*[ ServerWorker::dataChunkCount ];
 	for( uint32_t i = 0; i < ServerWorker::dataChunkCount; i++ ) {
-		this->freeChunks[ i ].init( globalConfig.size.chunk );
-		this->freeChunks[ i ].init();
+		this->freeChunks[ i ] = this->tempChunkPool.alloc();
 	}
-	this->dataChunk->init( globalConfig.size.chunk );
-	this->parityChunk->init( globalConfig.size.chunk );
-	this->dataChunk->init();
-	this->parityChunk->init();
-
-	this->forward.dataChunk->init();
-	this->forward.parityChunk->init();
 
 	this->sealIndicators = new bool*[ ServerWorker::parityChunkCount + 2 ];
 	this->sealIndicators[ ServerWorker::parityChunkCount ] = new bool[ ServerWorker::dataChunkCount ];

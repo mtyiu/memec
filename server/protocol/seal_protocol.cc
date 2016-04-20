@@ -1,5 +1,6 @@
 #include <cassert>
 #include "protocol.hh"
+#include "../buffer/chunk_pool.hh"
 
 char *ServerProtocol::reqSealChunk( size_t &size, uint16_t instanceId, uint32_t requestId, Chunk *chunk, uint32_t startPos, char *buf ) {
 	// -- common/protocol/seal_protocol.cc --
@@ -12,7 +13,7 @@ char *ServerProtocol::reqSealChunk( size_t &size, uint16_t instanceId, uint32_t 
 	uint32_t count = 0;
 	char *key;
 	uint8_t keySize;
-	while ( ( nextOffset = chunk->next( currentOffset, key, keySize ) ) != -1 ) {
+	while ( ( nextOffset = ChunkUtil::next( chunk, currentOffset, key, keySize ) ) != -1 ) {
 		ptr[ 0 ] = keySize;
 		*( ( uint32_t * )( ptr + 1 ) ) = htonl( currentOffset );
 		memmove( ptr + 5, key, keySize );
@@ -30,14 +31,15 @@ char *ServerProtocol::reqSealChunk( size_t &size, uint16_t instanceId, uint32_t 
 	// The seal request should not exceed the size of the send buffer
 	assert( bytes <= this->buffer.size );
 
+	Metadata metadata = ChunkUtil::getMetadata( chunk );
 	size = this->generateChunkSealHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_SEAL_CHUNK,
 		instanceId, requestId,
-		chunk->metadata.listId,
-		chunk->metadata.stripeId,
-		chunk->metadata.chunkId,
+		metadata.listId,
+		metadata.stripeId,
+		metadata.chunkId,
 		count,
 		bytes,
 		buf

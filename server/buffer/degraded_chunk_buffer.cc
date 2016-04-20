@@ -50,7 +50,7 @@ bool DegradedMap::findValueByKey( char *data, uint8_t size, bool &isSealed, KeyV
 
 	chunk = cacheIt->second;
 	if ( keyValue )
-		*keyValue = chunk->getKeyValue( keysIt->second.offset );
+		*keyValue = ChunkUtil::getKeyValue( chunk, keysIt->second.offset );
 	UNLOCK( &this->cacheLock );
 	return true;
 
@@ -379,13 +379,13 @@ bool DegradedMap::insertChunk( uint32_t listId, uint32_t stripeId, uint32_t chun
 	if ( needsUnlock ) UNLOCK( &this->cacheLock );
 
 	if ( ret.second && ! isParity ) {
-		char *ptr = chunk->getData();
+		char *ptr = ChunkUtil::getData( chunk );
 		char *keyPtr, *valuePtr;
 		uint8_t keySize;
 		uint32_t valueSize, offset = 0, size;
 
 		LOCK( &this->keysLock );
-		while( ptr < chunk->getData() + Chunk::capacity ) {
+		while( ptr < ChunkUtil::getData( chunk ) + ChunkBuffer::capacity ) {
 			KeyValue::deserialize( ptr, keyPtr, keySize, valuePtr, valueSize );
 			if ( keySize == 0 && valueSize == 0 )
 				break;
@@ -465,14 +465,12 @@ void DegradedMap::dump( FILE *f ) {
 		fprintf( f, "(None)\n" );
 	} else {
 		for ( std::unordered_map<Metadata, Chunk *>::iterator it = this->cache.begin(); it != this->cache.end(); it++ ) {
+			Chunk *chunk = it->second;
+			Metadata metadata = ChunkUtil::getMetadata( chunk );
 			fprintf(
-				f, "(list ID: %u, stripe ID: %u, chunk ID: %u) --> %p (type: %s chunk, status: %s, count: %u, size: %u)\n",
-				it->first.listId, it->first.stripeId, it->first.chunkId,
-				it->second, it->second->isParity ? "parity" : "data",
-				( it->second->status == CHUNK_STATUS_EMPTY ? "empty" :
-					( it->second->status == CHUNK_STATUS_DIRTY ? "dirty" : "cached" )
-				),
-				it->second->count, it->second->getSize()
+				f, "(list ID: %u, stripe ID: %u, chunk ID: %u) --> %p (size: %u)\n",
+				metadata.listId, metadata.stripeId, metadata.chunkId,
+				chunk, ChunkUtil::getSize( chunk )
 			);
 		}
 	}
@@ -503,7 +501,8 @@ bool DegradedChunkBuffer::updateKeyValue( uint8_t keySize, char *keyStr, uint32_
 
 	if ( isSealed ) {
 		LOCK( cacheLock );
-		chunk->computeDelta(
+		ChunkUtil::computeDelta(
+			chunk,
 			valueUpdate, // delta
 			valueUpdate, // new data
 			chunkUpdateOffset,
@@ -582,7 +581,7 @@ bool DegradedChunkBuffer::deleteKey( uint8_t opcode, uint32_t &timestamp, uint8_
 		LOCK( cacheLock );
 		ret = this->map.deleteKey( key, opcode, timestamp, keyMetadata, false, false );
 		if ( ret ) {
-			deltaSize = chunk->deleteKeyValue( keys, keyMetadata, delta, deltaSize );
+			deltaSize = ChunkUtil::deleteObject( chunk, keyMetadata.offset, delta );
 			ret = true;
 		}
 		UNLOCK( cacheLock );
@@ -609,16 +608,16 @@ bool DegradedChunkBuffer::update(
 	this->map.getCacheMap( cache, cacheLock );
 
 	// Prepare data delta
-	dataChunk->clear();
-	dataChunk->setSize( offset + size );
-	memcpy( dataChunk->getData() + offset, dataDelta, size );
+	ChunkUtil::clear( dataChunk );
+	ChunkUtil::setSize( dataChunk, offset + size );
+	ChunkUtil::copy( dataChunk, offset, dataDelta, size );
 
 	// Prepare the stripe
 	for ( uint32_t i = 0; i < ChunkBuffer::dataChunkCount; i++ )
 		dataChunks[ i ] = Coding::zeros;
 	dataChunks[ chunkId ] = dataChunk;
 
-	parityChunk->clear();
+	ChunkUtil::clear( parityChunk );
 
 	// Compute parity delta
 	ChunkBuffer::coding->encode(
@@ -632,20 +631,22 @@ bool DegradedChunkBuffer::update(
 	it = cache->find( metadata );
 	if ( it == cache->end() ) {
 		// Allocate new chunk
-		chunk = ChunkBuffer::chunkPool->malloc();
-		chunk->setReconstructed( listId, stripeId, chunkId, chunkId >= ChunkBuffer::dataChunkCount );
-		chunk->lastDelPos = 0;
+		chunk = ChunkBuffer::chunkPool->alloc();
+		ChunkUtil::set(
+			chunk, listId, stripeId, chunkId,
+			chunkId >= ChunkBuffer::dataChunkCount ? ChunkUtil::chunkSize : 0
+		);
 
 		std::pair<Metadata, Chunk *> p( metadata, chunk );
 		cache->insert( p );
 	} else {
 		chunk = it->second;
 	}
-	char *parity = chunk->getData();
+	char *parity = ChunkUtil::getData( chunk );
 	Coding::bitwiseXOR(
 		parity,
 		parity,
-		parityChunk->getData(),
+		ChunkUtil::getData( parityChunk ),
 		ChunkBuffer::capacity
 	);
 	UNLOCK( cacheLock );
