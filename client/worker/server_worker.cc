@@ -390,6 +390,9 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 		struct KeyHeader header;
 		if ( this->protocol.parseKeyHeader( header, buf, size ) ) {
 			key.set( header.keySize, header.key, ( void * ) event.socket );
+			if ( ! isDegraded ) {
+				__ERROR__( "ClientWorker", "handleGetResponse", "GET request id = %u failed ", event.requestId );
+			}
 		} else {
 			__ERROR__( "ClientWorker", "handleGetResponse", "Invalid GET response." );
 			return false;
@@ -447,9 +450,17 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 				false
 			);
 		} else {
-			// event.socket->printAddress();
-			// printf( ": handleGetResponse(): Key %.*s not found.\n", key.size, key.data );
-			applicationEvent.resGet( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, key, false );
+			uint32_t dataChunkIndex;
+			this->stripeList->get( key.data, key.size, this->dataServerSockets, 0, &dataChunkIndex );
+			if ( isDegraded && ! Client::getInstance()->stateTransitHandler.useCoordinatedFlow( this->dataServerSockets[ dataChunkIndex ]->getAddr() ) ) {
+				// degraded GET failed, but server returns to normal
+				__DEBUG__( CYAN, "ClientWorker", "handleGetResponse", "Retry on failed degraded GET request id = %u", pid.requestId );
+				applicationEvent.replayGetRequest( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, key );
+			} else {
+				// event.socket->printAddress();
+				// printf( ": handleGetResponse(): Key %.*s not found.\n", key.size, key.data );
+				applicationEvent.resGet( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, key, false );
+			}
 		}
 		this->dispatch( applicationEvent );
 	}

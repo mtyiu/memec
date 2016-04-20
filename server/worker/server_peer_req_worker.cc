@@ -626,12 +626,14 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 				}
 
 				// Update the key-value pair
-				if ( map->findValueByKey( keyValueHeader.key, keyValueHeader.keySize, &keyValue, 0, 0, 0, 0, false, false ) ) {
+				if ( ServerWorker::map->findValueByKey( keyValueHeader.key, keyValueHeader.keySize, &keyValue, 0, 0, 0, 0, false, false ) ) {
 					keyValue.deserialize( key.data, key.size, valueStr, valueSize );
 					assert( valueSize == keyValueHeader.valueSize );
 					memcpy( valueStr, keyValueHeader.value, valueSize );
 				} else {
-					__ERROR__( "ServerWorker", "handleSetChunkRequest", "The updated key-value pair does not exist." );
+					uint32_t chunkId, listId;
+					listId = this->stripeList->get( keyValueHeader.key, keyValueHeader.keySize, 0, 0, &chunkId );
+					__ERROR__( "ServerWorker", "handleSetChunkRequest", "The updated key-value pair does not exist %.*s, list = %u chunk %d", keyValueHeader.keySize, keyValueHeader.key, listId, chunkId );
 				}
 
 				offset += PROTO_KEY_VALUE_SIZE + keyValueHeader.keySize + keyValueHeader.valueSize;
@@ -694,6 +696,7 @@ bool ServerWorker::handleUpdateChunkRequest( ServerPeerEvent event, char *buf, s
 			header.updatingChunkId, false
 		);
 		ServerWorker::eventQueue->insert( event );
+		__INFO__( YELLOW, "ServerWorker", "handleUpdateChunkRequest", "Reply false to failed server id=%d", event.socket->instanceId );
 		return false;
 	}
 
@@ -726,6 +729,10 @@ bool ServerWorker::handleUpdateChunkRequest( ServerPeerEvent event, char *buf, s
 			header.offset, header.length, header.delta,
 			this->chunks, this->dataChunk, this->parityChunk
 		);
+
+		if ( ! ret ) {
+			__ERROR__( "ServerWorker", "handleUpdateChunkRequest", "Failed to update chunk for instance ID = %hu request ID = %u (Socket mapping not found).", event.instanceId, event.requestId );
+		}
 
 		// backup parity chunk delta ( data chunk delta from data server )
 		Timestamp timestamp( event.timestamp );

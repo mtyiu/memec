@@ -133,6 +133,7 @@ void ServerStateTransitHandler::setState( char* msg , int len ) {
 				__INFO__( BLUE, "ServerStateTransitHandler", "setState", "STATE_INTERMEDIATE %s:%hu", buf, ntohs( serverPeer.sin_port ) );
 				break;
 			case STATE_COORDINATED:
+				__INFO__( BLUE, "ServerStateTransitHandler", "setState", "STATE_COORDINATED %s:%hu", buf, ntohs( serverPeer.sin_port ) );
 				break;
 			case STATE_DEGRADED:
 				__INFO__( BLUE, "ServerStateTransitHandler", "setState", "STATE_DEGRADED %s:%hu", buf, ntohs( serverPeer.sin_port ) );

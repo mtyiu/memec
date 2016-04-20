@@ -92,13 +92,14 @@ bool ServerWorker::handleReleaseDegradedLockRequest( CoordinatorEvent event, cha
 
 	for ( size_t i = 0, len = chunks.size(); i < len; i++ ) {
 		// Determine the src
-		if ( i == 0 ) {
+		// TODO Helen: comment (i==0) for temp workaround (?)
+		//if ( i == 0 ) {
 			// The target is the same for all chunks in this request
 			this->getServers( chunks[ i ].listId );
 			socket =   chunks[ i ].chunkId < ServerWorker::dataChunkCount
 			         ? this->dataServerSockets[ chunks[ i ].chunkId ]
 			         : this->parityServerSockets[ chunks[ i ].chunkId - ServerWorker::dataChunkCount ];
-		}
+		//}
 
 		requestId = ServerWorker::idGenerator->nextVal( this->workerId );
 		chunk = ServerWorker::degradedChunkBuffer->map.deleteChunk(
@@ -215,7 +216,9 @@ degraded_get_check:
 
 		if ( ! ret ) {
 			if ( checked ) {
-				__ERROR__( "ServerWorker", "handleDegradedGetRequest", "Failed to perform degraded read on (%u, %u, %u).", listId, stripeId, chunkId );
+				__ERROR__( "ServerWorker", "handleDegradedGetRequest", "Failed to perform degraded read on (%u, %u, %u) requestId = %u from id = %u.", listId, stripeId, chunkId, event.requestId, event.instanceId );
+				event.resGet( event.socket, event.instanceId, event.requestId, key, true );
+				this->dispatch( event );
 			} else if ( isReconstructed ) {
 				// Check the degraded map again
 				checked = true;

@@ -1382,6 +1382,7 @@ bool ServerWorker::handleSetChunkResponse( ServerPeerEvent event, bool success, 
 			CoordinatorEvent coordinatorEvent;
 			coordinatorEvent.resReleaseDegradedLock( ( CoordinatorSocket * ) pid.ptr, pid.instanceId, pid.requestId, total );
 			ServerWorker::eventQueue->insert( coordinatorEvent );
+			__DEBUG__( YELLOW, "ServerWorker", "handleSetChunkResponse", "End of release degraded lock requests id = %u, total = %u.", pid.requestId, total );
 		}
 	} else {
 		// Reconstruction
@@ -1412,13 +1413,16 @@ bool ServerWorker::handleUpdateChunkResponse( ServerPeerEvent event, bool succes
 		__ERROR__( "ServerWorker", "handleUpdateChunkResponse", "Invalid UPDATE_CHUNK response." );
 		return false;
 	}
-	__DEBUG__(
-		BLUE, "ServerWorker", "handleUpdateChunkResponse",
-		"[UPDATE_CHUNK (%s)] List ID: %u, stripe ID: %u, chunk ID: %u; offset = %u, length = %u.",
-		success ? "success" : "failed",
-		header.listId, header.stripeId, header.chunkId,
-		header.offset, header.length
-	);
+	if ( ! success ) {
+		__ERROR__(
+			"ServerWorker", "handleUpdateChunkResponse",
+			"[UPDATE_CHUNK (%s)] From id: %d List ID: %u, stripe ID: %u, chunk ID: %u; offset = %u, length = %u.",
+			success ? "success" : "failed",
+			event.socket->instanceId,
+			header.listId, header.stripeId, header.chunkId,
+			header.offset, header.length
+		);
+	}
 
 	int pending;
 	ChunkUpdate chunkUpdate;

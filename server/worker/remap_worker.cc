@@ -25,7 +25,7 @@ bool ServerWorker::handleRemappedData( CoordinatorEvent event, char *buf, size_t
 		}
 	}
 	if ( socket == 0 )
-		__ERROR__( "ServerWorker", "handleRemappedData", "Cannot find server sccket to send remapped data back." );
+		__ERROR__( "ServerWorker", "handleRemappedData", "Cannot find server socket to send remapped data back." );
 
 	std::set<PendingData> *remappedData;
 	bool found = ServerWorker::pending->eraseRemapData( target, &remappedData );
@@ -38,7 +38,7 @@ bool ServerWorker::handleRemappedData( CoordinatorEvent event, char *buf, size_t
 		// dispatch one event for each key
 		// TODO : batched SET
 		uint32_t requestSent = 0;
-		for ( PendingData pendingData : *remappedData) {
+		for ( PendingData pendingData : *remappedData ) {
 			serverPeerEvent.reqSet( socket, instanceId, requestId, pendingData.key, pendingData.value );
 			server->eventQueue.insert( serverPeerEvent );
 			requestSent++;
