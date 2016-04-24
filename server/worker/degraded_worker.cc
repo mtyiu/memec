@@ -767,7 +767,7 @@ bool ServerWorker::handleForwardChunkRequest( struct ChunkDataHeader &header, bo
 		// Already exists
 		xorIfExists = true;
 		if ( xorIfExists ) {
-			char *parity = chunk->getData();
+			char *parity = ChunkUtil::getData( chunk );
 			Coding::bitwiseXOR(
 				parity + header.offset,
 				parity + header.offset,
@@ -776,14 +776,12 @@ bool ServerWorker::handleForwardChunkRequest( struct ChunkDataHeader &header, bo
 			);
 		}
 	} else {
-		chunk = ServerWorker::chunkPool->malloc();
-		chunk->status = CHUNK_STATUS_RECONSTRUCTED;
-		chunk->metadata.set( header.listId, header.stripeId, header.chunkId );
-		chunk->lastDelPos = 0;
-		chunk->loadFromSetChunkRequest(
-			header.data, header.size, header.offset,
-			header.chunkId >= ServerWorker::dataChunkCount
+		chunk = this->tempChunkPool.alloc();
+		ChunkUtil::set(
+			chunk, header.listId, header.stripeId, header.chunkId,
+			header.chunkId >= ServerWorker::dataChunkCount ? ChunkUtil::chunkSize : header.size
 		);
+		ChunkUtil::copy( chunk, header.offset, header.data, header.size );
 
 		bool ret = dmap->insertChunk(
 			header.listId, header.stripeId, header.chunkId, chunk,
@@ -797,7 +795,7 @@ bool ServerWorker::handleForwardChunkRequest( struct ChunkDataHeader &header, bo
 				"This chunk (%u, %u, %u) cannot be inserted to DegradedMap.",
 				header.listId, header.stripeId, header.chunkId
 			);
-			ServerWorker::chunkPool->free( chunk );
+			this->tempChunkPool.free( chunk );
 		}
 	}
 	UNLOCK( lock );
@@ -1407,9 +1405,9 @@ bool ServerWorker::sendModifyChunkRequest(
 				}
 
 				// Prepare the data delta
-				this->forward.dataChunk->clear();
-				this->forward.dataChunk->setSize( offset + deltaSize );
-				memcpy( this->forward.dataChunk->getData() + offset, delta, deltaSize );
+				ChunkUtil::clear( this->forward.dataChunk );
+				ChunkUtil::setSize( this->forward.dataChunk, offset + deltaSize );
+				ChunkUtil::copy( this->forward.dataChunk, offset, delta, deltaSize );
 
 				// Prepare the stripe
 				for ( uint32_t j = 0; j < ServerWorker::dataChunkCount; j++ ) {
@@ -1417,22 +1415,22 @@ bool ServerWorker::sendModifyChunkRequest(
 				}
 				this->forward.chunks[ metadata.chunkId ] = this->forward.dataChunk;
 
-				this->forward.parityChunk->clear();
+				ChunkUtil::clear( this->forward.parityChunk );
 
 				// Compute parity delta
 				ServerWorker::coding->encode(
 					this->forward.chunks, this->forward.parityChunk,
 					i + 1, // Parity chunk index
-					offset + metadata.chunkId * Chunk::capacity,
-					offset + metadata.chunkId * Chunk::capacity + deltaSize
+					offset + metadata.chunkId * ChunkUtil::chunkSize,
+					offset + metadata.chunkId * ChunkUtil::chunkSize + deltaSize
 				);
 
-				char *parity = this->forward.chunks[ i + ServerWorker::dataChunkCount ]->getData();
+				char *parity = ChunkUtil::getData( this->forward.chunks[ i + ServerWorker::dataChunkCount ] );
 				Coding::bitwiseXOR(
 					parity,
 					parity,
-					this->forward.parityChunk->getData(),
-					Chunk::capacity
+					ChunkUtil::getData( this->forward.parityChunk ),
+					ChunkUtil::chunkSize
 				);
 				/////////////////////////////////////////////////////
 			} else if ( this->parityServerSockets[ i ]->self ) {
