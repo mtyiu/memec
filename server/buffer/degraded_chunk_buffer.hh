@@ -24,6 +24,13 @@ private:
 	 */
 	std::unordered_map<Metadata, Chunk *> cache;
 	LOCK_T cacheLock;
+	/**
+	 * Store migrated cached chunks info
+	 * (list ID, stripe ID, chunk ID)
+	 **/
+	std::unordered_set<Metadata> removed;
+	LOCK_T removedLock;
+
 	struct {
 		/**
 		 * Store the set of reconstructed chunks and the list of IDs of pending requests
@@ -115,6 +122,8 @@ public:
 		bool needsLock = true, bool needsUnlock = true
 	);
 	Chunk *deleteChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, Metadata *metadataPtr = 0 );
+
+	bool findRemovedChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId );
 
 	void getKeysMap( std::unordered_map<Key, KeyMetadata> *&keys, LOCK_T *&lock );
 	void getCacheMap( std::unordered_map<Metadata, Chunk *> *&cache, LOCK_T *&lock );

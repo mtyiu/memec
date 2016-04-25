@@ -82,7 +82,7 @@ void BasicRemappingScheme::redirect(
 			} else if ( redirectedServers.count( serverAddr ) ) {
 				// Skip selected servers
 				continue;
-			} else if ( stateTransitHandler->useCoordinatedFlow( serverAddr ) ) {
+			} else if ( stateTransitHandler->useCoordinatedFlow( serverAddr, true, true ) ) {
 				// Skip overloaded server
 				continue;
 			}

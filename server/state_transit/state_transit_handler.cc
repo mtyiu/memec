@@ -141,7 +141,7 @@ void ServerStateTransitHandler::setState( char* msg , int len ) {
 			default:
 				__INFO__( BLUE, "ServerStateTransitHandler", "setState", "Unknown %d %s:%hu", signal, buf, ntohs( serverPeer.sin_port ) );
 				UNLOCK( &this->serversStateLock[ serverPeer ] );
-				return;
+				continue;
 		}
 		this->serversState[ serverPeer ] = signal;
 		UNLOCK( &this->serversStateLock[ serverPeer ] );

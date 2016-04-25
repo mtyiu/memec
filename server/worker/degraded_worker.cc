@@ -142,6 +142,7 @@ bool ServerWorker::handleDegradedGetRequest( ClientEvent event, char *buf, size_
 	bool reconstructParity, reconstructData;
 	uint32_t listId, stripeId, chunkId;
 	stripeId = header.stripeId;
+
 	if ( header.reconstructedCount ) {
 		this->getServers(
 			header.data.key.key,
@@ -194,6 +195,13 @@ degraded_get_check:
 		this->dispatch( event );
 	} else if ( chunk ) {
 		// Key not found
+		event.resGet(
+			event.socket, event.instanceId, event.requestId,
+			key, true // isDegraded
+		);
+		this->dispatch( event );
+	} else if ( dmap->findRemovedChunk( listId, stripeId, chunkId ) ) {
+		// Chunk migrated 
 		event.resGet(
 			event.socket, event.instanceId, event.requestId,
 			key, true // isDegraded
@@ -516,6 +524,17 @@ bool ServerWorker::handleDegradedUpdateRequest( ClientEvent event, struct Degrad
 		}
 	} else if ( chunk ) {
 		// Key not found
+		event.resUpdate(
+			event.socket, event.instanceId, event.requestId, key,
+			header.data.keyValueUpdate.valueUpdateOffset,
+			header.data.keyValueUpdate.valueUpdateSize,
+			false, /* success */
+			false, /* needsFree */
+			true   /* isDegraded */
+		);
+		this->dispatch( event );
+	} else if ( dmap->findRemovedChunk( listId, stripeId, chunkId ) ) {
+		// Chunk migrated
 		event.resUpdate(
 			event.socket, event.instanceId, event.requestId, key,
 			header.data.keyValueUpdate.valueUpdateOffset,
@@ -952,10 +971,11 @@ bool ServerWorker::performDegradedRead(
 	// Determine the list of surviving nodes
 	for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
 		uint32_t originalChunkId = original[ i * 2 + 1 ];
-		if ( originalChunkId < ServerWorker::dataChunkCount )
+		if ( originalChunkId < ServerWorker::dataChunkCount ) {
 			this->dataServerSockets[ originalChunkId ] = 0;
-		else
+		} else {
 			this->parityServerSockets[ originalChunkId - ServerWorker::dataChunkCount ] = 0;
+		}
 	}
 
 	if ( isSealed ) {
