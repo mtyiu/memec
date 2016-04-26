@@ -71,6 +71,7 @@ private:
 	static RemappedBuffer *remappedBuffer;
 	static PacketPool *packetPool;
 	static Timestamp *timestamp;
+	static ChunkPool *chunkPool;
 
 	// ---------- worker.cc ----------
 	void dispatch( MixedEvent event );

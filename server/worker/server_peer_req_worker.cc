@@ -398,6 +398,7 @@ bool ServerWorker::handleGetChunkRequest( ServerPeerEvent event, struct ChunkHea
 	// 	__ERROR__( "ServerWorker", "handleGetChunkRequest", "The chunk (%u, %u, %u) does not exist.", header.listId, header.stripeId, header.chunkId );
 	// }
 
+	/*
 	if ( chunk && chunk->status == CHUNK_STATUS_NEEDS_LOAD_FROM_DISK ) {
 		// printf( "Loading chunk: (%u, %u, %u) from disk.\n", header.listId, header.stripeId, header.chunkId );
 		this->storage->read(
@@ -408,6 +409,7 @@ bool ServerWorker::handleGetChunkRequest( ServerPeerEvent event, struct ChunkHea
 			chunk->isParity
 		);
 	}
+	*/
 
 	event.resGetChunk(
 		event.socket, event.instanceId, event.requestId,
@@ -500,15 +502,15 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 	ret = chunk;
 	if ( ! chunk ) {
 		// Allocate memory for this chunk
-		chunk = ServerWorker::chunkPool->malloc();
-		chunk->clear();
-		chunk->metadata.listId = metadata.listId;
-		chunk->metadata.stripeId = metadata.stripeId;
-		chunk->metadata.chunkId = metadata.chunkId;
-		chunk->isParity = metadata.chunkId >= ServerWorker::dataChunkCount;
+		chunk = ServerWorker::chunkPool->alloc(
+			metadata.listId,
+			metadata.stripeId,
+			metadata.chunkId,
+			0
+		);
 		ServerWorker::map->setChunk(
 			metadata.listId, metadata.stripeId, metadata.chunkId,
-			chunk, chunk->isParity,
+			chunk, metadata.chunkId >= ServerWorker::dataChunkCount,
 			false, false
 		);
 
@@ -530,9 +532,9 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 			uint32_t timestamp, originalChunkSize;
 			// Delete all keys in the chunk from the map
 			offset = 0;
-			originalChunkSize = chunkSize = chunk->getSize();
+			originalChunkSize = chunkSize = ChunkUtil::getSize( chunk );
 			while ( offset < chunkSize ) {
-				keyValue = chunk->getKeyValue( offset );
+				keyValue = ChunkUtil::getObject( chunk, offset );
 				keyValue.deserialize( key.data, key.size, valueStr, valueSize );
 
 				key.set( key.size, key.data );
@@ -548,11 +550,11 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 			}
 
 			// Replace chunk contents
-			chunk->loadFromSetChunkRequest(
-				header.chunkData.data,
-				header.chunkData.size,
+			ChunkUtil::load(
+				chunk,
 				header.chunkData.offset,
-				header.chunkData.chunkId >= ServerWorker::dataChunkCount
+				header.chunkData.data,
+				header.chunkData.size
 			);
 
 			// Add all keys in the new chunk to the map
@@ -561,7 +563,7 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 			while( offset < chunkSize ) {
 				uint32_t timestamp;
 
-				keyValue = chunk->getKeyValue( offset );
+				keyValue = ChunkUtil::getObject( chunk, offset );
 				keyValue.deserialize( key.data, key.size, valueStr, valueSize );
 				objSize = KEY_VALUE_METADATA_SIZE + key.size + valueSize;
 
@@ -580,18 +582,21 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 
 				offset += objSize;
 			}
-			chunk->updateData();
+			// chunk->updateData();
 
 			// Re-insert into data chunk buffer
 			assert( chunkBufferIndex == -1 );
 			if ( ! chunkBuffer->reInsert( this, chunk, originalChunkSize - chunkSize, false, false ) ) {
 				// The chunk is compacted before. Need to seal the chunk first
 				// Seal from chunk->lastDelPos
+				/*
 				if ( chunk->lastDelPos > 0 && chunk->lastDelPos < chunk->getSize() ) {
 					// printf( "chunk->lastDelPos = %u; chunk->getSize() = %u\n", chunk->lastDelPos, chunk->getSize() );
 					// Only issue seal chunk request when new key-value pairs are received
 					this->issueSealChunkRequest( chunk, chunk->lastDelPos );
 				}
+				*/
+				__ERROR__( "ServerWorker", "handleSetChunkRequest", "TODO: Handle DELETE request." );
 			}
 		} else {
 			struct KeyHeader keyHeader;
@@ -609,7 +614,7 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 
 				// Update key map and chunk
 				if ( ServerWorker::map->deleteKey( key, PROTO_OPCODE_DELETE, timestamp, keyMetadata, false, false, false ) ) {
-					chunk->deleteKeyValue( keys, keyMetadata );
+					ChunkUtil::deleteObject( chunk, keyMetadata.offset );
 				} else {
 					__ERROR__( "ServerWorker", "handleSetChunkRequest", "The deleted key does not exist." );
 				}
@@ -638,11 +643,11 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 		}
 	} else {
 		// Replace chunk contents for parity chunks
-		chunk->loadFromSetChunkRequest(
-			header.chunkData.data,
-			header.chunkData.size,
+		ChunkUtil::load(
+			chunk,
 			header.chunkData.offset,
-			header.chunkData.chunkId >= ServerWorker::dataChunkCount
+			header.chunkData.data,
+			header.chunkData.size
 		);
 	}
 
@@ -864,7 +869,7 @@ bool ServerWorker::issueSealChunkRequest( Chunk *chunk, uint32_t startPos ) {
 
 	// The chunk is locked when this function is called
 	// Only issue seal chunk request when new key-value pairs are received
-	if ( ServerWorker::parityChunkCount && startPos < chunk->getSize() ) {
+	if ( ServerWorker::parityChunkCount && startPos < ChunkUtil::getSize( chunk ) ) {
 		size_t size;
 		uint16_t instanceId = Server::instanceId;
 		uint32_t requestId = ServerWorker::idGenerator->nextVal( this->workerId );
@@ -872,7 +877,7 @@ bool ServerWorker::issueSealChunkRequest( Chunk *chunk, uint32_t startPos ) {
 		packet->setReferenceCount( ServerWorker::parityChunkCount );
 
 		// Find parity servers
-		this->getServers( chunk->metadata.listId );
+		this->getServers( ChunkUtil::getListId( chunk ) );
 
 		// Prepare seal chunk request
 		this->protocol.reqSealChunk( size, instanceId, requestId, chunk, startPos, packet->data );

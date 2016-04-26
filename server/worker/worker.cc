@@ -22,6 +22,7 @@ DegradedChunkBuffer *ServerWorker::degradedChunkBuffer;
 RemappedBuffer *ServerWorker::remappedBuffer;
 PacketPool *ServerWorker::packetPool;
 Timestamp *ServerWorker::timestamp;
+ChunkPool *ServerWorker::chunkPool;
 
 void ServerWorker::dispatch( MixedEvent event ) {
 	switch( event.type ) {
@@ -169,6 +170,7 @@ bool ServerWorker::init() {
 	ServerWorker::remappedBuffer = &server->remappedBuffer;
 	ServerWorker::packetPool = &server->packetPool;
 	ServerWorker::timestamp = &server->timestamp;
+	ServerWorker::chunkPool = &server->chunkPool;
 	return true;
 }
 

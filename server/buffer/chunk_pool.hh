@@ -56,13 +56,40 @@ public:
 	static inline uint32_t getSize( Chunk *chunk ) {
 		return ( ( struct ChunkMetadata * ) chunk )->size;
 	}
+	static inline uint32_t getCount( Chunk *chunk ) {
+		if ( ChunkUtil::isParity( chunk ) ) {
+			return 0;
+		} else {
+			// Scan whole chunk
+			uint8_t keySize;
+			uint32_t valueSize, tmp;
+			char *key, *value;
+			char *data, *ptr;
+			uint32_t count = 0;
+
+			data = ptr = ChunkUtil::getData( chunk );
+
+			while ( ptr < data + ChunkUtil::chunkSize ) {
+				KeyValue::deserialize( ptr, key, keySize, value, valueSize );
+				if ( keySize == 0 && valueSize == 0 )
+					break;
+
+				tmp = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
+				ptr += tmp;
+
+				count++;
+			}
+
+			return count;
+		}
+	}
 	static inline char *getData( Chunk *chunk ) {
 		return ( char * ) chunk + CHUNK_METADATA_SIZE;
 	}
 	static inline bool isParity( Chunk *chunk ) {
 		return ( ChunkUtil::getChunkId( chunk ) >= ChunkUtil::dataChunkCount );
 	}
-	static inline KeyValue getKeyValue( Chunk *chunk, uint32_t offset ) {
+	static inline KeyValue getObject( Chunk *chunk, uint32_t offset ) {
 		KeyValue keyValue;
 		keyValue.data = ( char * ) chunk + CHUNK_METADATA_SIZE + offset;
 		return keyValue;
@@ -162,7 +189,7 @@ public:
 	}
 
 	// Delete (return actual delta size)
-	static inline uint32_t deleteObject( Chunk *chunk, uint32_t offset, char *delta ) {
+	static inline uint32_t deleteObject( Chunk *chunk, uint32_t offset, char *delta = 0 ) {
 		char *data = getData( chunk ) + offset;
 		uint8_t keySize;
 		uint32_t valueSize, length;
@@ -171,43 +198,62 @@ public:
 		KeyValue::deserialize( data, key, keySize, value, valueSize );
 		length = keySize + valueSize;
 
-		// Calculate updated chunk data (delta)
-		memset( delta, 0, KEY_VALUE_METADATA_SIZE + length );
-		KeyValue::setSize( delta, 0, length );
+		if ( delta ) {
+			// Calculate updated chunk data (delta)
+			memset( delta, 0, KEY_VALUE_METADATA_SIZE + length );
+			KeyValue::setSize( delta, 0, length );
 
-		// Compute delta' := data XOR delta
-		Coding::bitwiseXOR(
-			delta,
-			data,  // original data
-			delta, // new data
-			length
-		);
+			// Compute delta' := data XOR delta
+			Coding::bitwiseXOR(
+				delta,
+				data,  // original data
+				delta, // new data
+				length
+			);
 
-		// Apply delta by setting data := data XOR delta' = data XOR ( data XOR delta ) = delta
-		Coding::bitwiseXOR(
-			data,
-			data,  // original data
-			delta, // new data
-			length
-		);
+			// Apply delta by setting data := data XOR delta' = data XOR ( data XOR delta ) = delta
+			Coding::bitwiseXOR(
+				data,
+				data,  // original data
+				delta, // new data
+				length
+			);
+		} else {
+			memset( data, 0, KEY_VALUE_METADATA_SIZE + length );
+		}
 
 		return length;
 	}
 
 	// Utilities
-	static inline void clear( Chunk *chunk ) {
-		memset( ( char * ) chunk, 0, CHUNK_METADATA_SIZE + ChunkUtil::chunkSize );
-	}
-	static inline void copy( Chunk *chunk, uint32_t offset, char *src, uint32_t n ) {
-		char *dst = ChunkUtil::getData( chunk ) + offset;
-		memcpy( dst, src, n );
-	}
 	static inline void dup( Chunk *dst, Chunk *src ) {
 		memcpy(
 			( char * ) dst,
 			( char * ) src,
 			CHUNK_METADATA_SIZE + ChunkUtil::chunkSize
 		);
+	}
+
+	static inline void copy( Chunk *chunk, uint32_t offset, char *src, uint32_t n ) {
+		char *dst = ChunkUtil::getData( chunk ) + offset;
+		memcpy( dst, src, n );
+	}
+
+	static inline void load( Chunk *chunk, uint32_t offset, char *src, uint32_t n ) {
+		char *dst = ChunkUtil::getData( chunk );
+		bool isParity = ChunkUtil::isParity( chunk );
+
+		ChunkUtil::setSize( chunk, isParity ? ChunkUtil::chunkSize : n );
+
+		if ( offset > 0 )
+			memset( dst, 0, offset );
+		memcpy( dst + offset, src, n );
+		if ( offset + n < ChunkUtil::chunkSize )
+			memset( dst + offset + n, 0, ChunkUtil::chunkSize - offset - n );
+	}
+
+	static inline void clear( Chunk *chunk ) {
+		memset( ( char * ) chunk, 0, CHUNK_METADATA_SIZE + ChunkUtil::chunkSize );
 	}
 };
 

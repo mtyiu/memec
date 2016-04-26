@@ -50,7 +50,7 @@ bool DegradedMap::findValueByKey( char *data, uint8_t size, bool &isSealed, KeyV
 
 	chunk = cacheIt->second;
 	if ( keyValue )
-		*keyValue = ChunkUtil::getKeyValue( chunk, keysIt->second.offset );
+		*keyValue = ChunkUtil::getObject( chunk, keysIt->second.offset );
 	UNLOCK( &this->cacheLock );
 	return true;
 

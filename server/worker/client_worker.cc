@@ -507,7 +507,8 @@ bool ServerWorker::handleUpdateRequest(
 			);
 		}
 
-		chunk->computeDelta(
+		ChunkUtil::computeDelta(
+			chunk,
 			header.valueUpdate, // delta
 			header.valueUpdate, // new data
 			offset, header.valueUpdateSize,
@@ -717,17 +718,17 @@ bool ServerWorker::handleDeleteRequest(
 			if ( ! chunkBuffer->reInsert( this, chunk, keyMetadata.length, false, false ) ) {
 				// The chunk is compacted before. Need to seal the chunk first
 				// Seal from chunk->lastDelPos
+				/*
 				if ( chunk->lastDelPos > 0 && chunk->lastDelPos < chunk->getSize() ) {
 					// Only issue seal chunk request when new key-value pairs are received
 					this->issueSealChunkRequest( chunk, chunk->lastDelPos );
 				}
+				*/
+				__ERROR__( "ServerWorker", "handleDeleteRequest", "TODO: Handle DELETE request." );
 			}
 		}
 		ServerWorker::map->deleteKey( key, PROTO_OPCODE_DELETE, timestamp, keyMetadata, false, false );
-		if ( ServerWorker::parityChunkCount )
-			deltaSize = chunk->deleteKeyValue( keys, keyMetadata, delta, this->buffer.size );
-		else
-			deltaSize = chunk->deleteKeyValue( keys, keyMetadata );
+		deltaSize = ChunkUtil::deleteObject( chunk, keyMetadata.offset, delta );
 		// Release the locks
 		UNLOCK( cacheLock );
 		UNLOCK( keysLock );

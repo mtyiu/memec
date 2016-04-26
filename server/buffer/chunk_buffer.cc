@@ -14,7 +14,7 @@ void ChunkBuffer::init() {
 	ChunkBuffer::capacity = server->config.global.size.chunk;
 	ChunkBuffer::dataChunkCount = server->config.global.coding.params.getDataChunkCount();
 	ChunkBuffer::coding = server->coding;
-	ChunkBuffer::chunkPool = server->chunkPool;
+	ChunkBuffer::chunkPool = &server->chunkPool;
 	ChunkBuffer::eventQueue = &server->eventQueue;
 	ChunkBuffer::map = &server->map;
 }

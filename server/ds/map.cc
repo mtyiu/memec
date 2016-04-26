@@ -122,7 +122,7 @@ bool Map::findValueByKey(
 
 	Chunk *chunk = cacheIt->second;
 	if ( keyValuePtr )
-		*keyValuePtr = ChunkUtil::getKeyValue( chunk, keysIt->second.offset );
+		*keyValuePtr = ChunkUtil::getObject( chunk, keysIt->second.offset );
 	if ( needsUnlock ) UNLOCK( &this->cacheLock );
 	return true;
 }

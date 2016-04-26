@@ -73,10 +73,10 @@ public:
 	Map map;
 	ServerEventQueue eventQueue;
 	PacketPool packetPool;
+	ChunkPool chunkPool;
 	Coding *coding;
 	StripeList<ServerPeerSocket> *stripeList;
 	std::vector<StripeListIndex> stripeListIndex;
-	ChunkPool *chunkPool;
 	std::vector<MixedChunkBuffer *> chunkBuffer;
 	GetChunkBuffer getChunkBuffer;
 	RemappedBuffer remappedBuffer;
