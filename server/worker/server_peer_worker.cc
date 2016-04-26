@@ -37,7 +37,7 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 				uint32_t offset, size;
 				char *data;
 
-				data = event.message.chunk.chunk->getData( offset, size );
+				data = ChunkUtil::getData( event.message.chunk.chunk, offset, size );
 				// The chunk is sealed
 				buffer.data = this->protocol.reqSetChunk(
 					buffer.size,
@@ -49,7 +49,7 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 				);
 
 				if ( event.message.chunk.needsFree ) {
-					ServerWorker::chunkPool->free( event.message.chunk.chunk );
+					this->tempChunkPool.free( event.message.chunk.chunk );
 				}
 			} else {
 				DegradedMap &map = ServerWorker::degradedChunkBuffer->map;
@@ -139,9 +139,9 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 				event.message.chunk.metadata.listId,
 				event.message.chunk.metadata.stripeId,
 				event.message.chunk.metadata.chunkId,
-				event.message.chunk.chunk->getSize(),
+				ChunkUtil::getSize( event.message.chunk.chunk ),
 				0,
-				event.message.chunk.chunk->getData()
+				ChunkUtil::getData( event.message.chunk.chunk )
 			);
 			break;
 		case SERVER_PEER_EVENT_TYPE_SEAL_CHUNK_REQUEST:
@@ -318,8 +318,9 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 			char *data = 0;
 			uint32_t size = 0, offset = 0;
 
-			if ( event.message.chunk.chunk )
-				data = event.message.chunk.chunk->getData( offset, size );
+			if ( event.message.chunk.chunk ) {
+				data = ChunkUtil::getData( event.message.chunk.chunk, offset, size );
+			}
 
 			buffer.data = this->protocol.resGetChunk(
 				buffer.size,

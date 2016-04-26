@@ -64,6 +64,14 @@ Chunk *ChunkPool::getChunk( char *ptr, uint32_t &offset ) {
 	return chunk;
 }
 
+bool ChunkPool::isInChunkPool( Chunk *chunk ) {
+	char *endAddress = this->startAddress + ( ChunkUtil::chunkSize * this->total );
+	return (
+		( char * ) chunk >= this->startAddress &&
+		( char * ) chunk < endAddress
+	);
+}
+
 void ChunkPool::print( FILE *f ) {
 	uint32_t count = this->count;
 	fprintf(

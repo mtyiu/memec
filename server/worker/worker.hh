@@ -40,6 +40,7 @@ private:
 		uint32_t size;
 	} buffer;
 	BitmaskArray *chunkStatus;
+	BitmaskArray *chunkStatusBackup;
 	Chunk *dataChunk, *parityChunk;
 	Chunk **chunks;
 	struct {

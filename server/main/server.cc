@@ -120,13 +120,12 @@ bool Server::init( char *path, OptionList &globalOptions, OptionList &serverOpti
 	if ( myServerIndex != -1 )
 		this->stripeListIndex = this->stripeList->list( myServerIndex );
 	/* Chunk pool */
-	Chunk::init( this->config.global.size.chunk );
+	// Chunk::init( this->config.global.size.chunk );
 	ChunkUtil::init(
 		this->config.global.size.chunk,
 		this->config.global.coding.params.getDataChunkCount()
 	);
-	this->chunkPool = new ChunkPool();
-	this->chunkPool->init(
+	this->chunkPool.init(
 		this->config.global.size.chunk, // chunkSize
 		this->config.server.pool.chunks // capacity
 	);
@@ -158,7 +157,6 @@ bool Server::init( char *path, OptionList &globalOptions, OptionList &serverOpti
 			}
 		}
 	}
-	GetChunkBuffer::init();
 	// Map //
 	this->map.setTimestamp( &this->timestamp );
 	this->degradedChunkBuffer.map.init( &this->map );
@@ -379,13 +377,11 @@ void Server::flush( bool parityOnly ) {
 	LOCK( lock );
 	for ( it = cache->begin(); it != cache->end(); it++ ) {
 		chunk = it->second;
-		if ( chunk->status == CHUNK_STATUS_DIRTY ) {
-			if ( parityOnly && ! chunk->isParity )
-				continue;
-			ioEvent.flush( chunk, parityOnly );
-			this->eventQueue.insert( ioEvent );
-			count++;
-		}
+		if ( parityOnly && ! ChunkUtil::isParity( chunk ) )
+			continue;
+		ioEvent.flush( chunk );
+		this->eventQueue.insert( ioEvent );
+		count++;
 	}
 	UNLOCK( lock );
 
@@ -431,14 +427,14 @@ void Server::memory( FILE *f ) {
 	LOCK( lock );
 	for ( it = cache->begin(); it != cache->end(); it++ ) {
 		Chunk *chunk = it->second;
-		if ( chunk->isParity ) {
+		if ( ChunkUtil::isParity( chunk ) ) {
 			numParityChunks++;
-			bytesParity += chunk->capacity;
+			bytesParity += ChunkUtil::chunkSize;
 		} else {
 			numDataChunks++;
-			numKeyValues += chunk->count;
-			occupied += chunk->getSize();
-			allocated += chunk->capacity;
+			numKeyValues += ChunkUtil::getCount( chunk );
+			occupied += ChunkUtil::getSize( chunk );
+			allocated += ChunkUtil::chunkSize;
 		}
 	}
 	UNLOCK( lock );
@@ -526,7 +522,7 @@ void Server::debug( FILE *f ) {
 	if ( len == 0 ) fprintf( f, "(None)\n" );
 
 	fprintf( f, "\nChunk pool\n----------\n" );
-	this->chunkPool->print( f );
+	this->chunkPool.print( f );
 
 	fprintf( f, "\nChunk buffer\n------------\n" );
 	for ( i = 0, len = this->chunkBuffer.size(); i < len; i++ ) {
@@ -948,7 +944,7 @@ void Server::printChunk() {
 	if ( scanf( "%u %u %u", &listId, &stripeId, &chunkId ) == 3 ) {
 		Chunk *chunk = this->map.findChunkById( listId, stripeId, chunkId );
 		if ( chunk ) {
-			chunk->print();
+			ChunkUtil::print( chunk );
 		} else {
 			printf( "Not found.\n" );
 		}

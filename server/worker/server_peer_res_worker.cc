@@ -518,6 +518,7 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 	ChunkRequest chunkRequest;
 	PendingIdentifier pid;
 	Chunk *toBeFreed = 0;
+	DegradedMap *dmap = &ServerWorker::degradedChunkBuffer->map;
 	union {
 		struct ChunkDataHeader chunkData;
 		struct ChunkHeader chunk;
@@ -585,16 +586,19 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 			if ( success ) {
 				if ( header.chunkData.size ) {
 					// The requested chunk is sealed
-					tmp->second.chunk = ServerWorker::chunkPool->malloc();
-					tmp->second.chunk->loadFromGetChunkRequest(
+					tmp->second.chunk = this->tempChunkPool.alloc(
 						header.chunkData.listId,
 						header.chunkData.stripeId,
 						header.chunkData.chunkId,
-						header.chunkData.chunkId >= ServerWorker::dataChunkCount, // isParity
-						header.chunkData.size,
-						header.chunkData.offset,
-						header.chunkData.data
+						header.chunkData.size
 					);
+					ChunkUtil::load(
+						tmp->second.chunk,
+						header.chunkData.offset,
+						header.chunkData.data,
+						header.chunkData.size
+					);
+
 					tmp->second.isSealed = true;
 					if ( header.chunkData.chunkId < ServerWorker::dataChunkCount ) {
 						this->sealIndicators[ ServerWorker::parityChunkCount ][ header.chunkData.chunkId ] = true;
@@ -735,8 +739,9 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 					if ( exists && backupChunk ) {
 						selfChunk = backupChunk;
 					} else {
-						Chunk *newChunk = ServerWorker::chunkPool->malloc();
-						newChunk->copy( selfChunk );
+						Chunk *newChunk = this->tempChunkPool.alloc();
+						ChunkUtil::dup( newChunk, selfChunk );
+
 						selfChunk = newChunk;
 						toBeFreed = newChunk;
 					}
@@ -781,7 +786,7 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 			Coding::forceSeal(
 				ServerWorker::coding,
 				this->chunks,
-				&( this->freeChunks[ 0 ] ),
+				this->freeChunks[ 0 ],
 				this->sealIndicators,
 				ServerWorker::dataChunkCount,
 				ServerWorker::parityChunkCount
@@ -796,15 +801,17 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 		// Set up chunk buffer for storing reconstructed chunks
 		for ( uint32_t i = 0, j = 0; i < ServerWorker::chunkCount; i++ ) {
 			if ( ! this->chunks[ i ] ) {
-				this->freeChunks[ j ].setReconstructed(
-					chunkRequest.listId, chunkRequest.stripeId, i,
-					i >= ServerWorker::dataChunkCount
+				ChunkUtil::set(
+					this->freeChunks[ j ],
+					chunkRequest.listId, chunkRequest.stripeId, i, 0
 				);
-				this->chunks[ i ] = this->freeChunks + j;
+				this->chunks[ i ] = this->freeChunks[ j ];
 				this->chunkStatus->unset( i );
+				this->chunkStatusBackup->unset( i );
 				j++;
 			} else {
 				this->chunkStatus->set( i );
+				this->chunkStatusBackup->set( i );
 			}
 		}
 
@@ -815,26 +822,30 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 
 		uint32_t maxChunkSize = 0, chunkSize;
 		for ( uint32_t i = 0; i < ServerWorker::dataChunkCount; i++ ) {
-			chunkSize = this->chunks[ i ]->status == CHUNK_STATUS_RECONSTRUCTED ?
-			            this->chunks[ i ]->updateData() :
-			            this->chunks[ i ]->getSize();
+			if ( this->chunkStatusBackup->check( i ) ) {
+				chunkSize = ChunkUtil::getSize( this->chunks[ i ] );
+			} else {
+				// Reconstructed
+				chunkSize = ChunkUtil::updateSize( this->chunks[ i ] );
+			}
+
 			maxChunkSize = ( chunkSize > maxChunkSize ) ? chunkSize : maxChunkSize;
-			if ( chunkSize > Chunk::capacity ) {
+			if ( chunkSize > ChunkUtil::chunkSize ) {
 				__ERROR__(
 					"ServerWorker", "handleGetChunkResponse",
 					"[%s] Invalid chunk size (%u, %u, %u): %u",
-					this->chunks[ i ]->status == CHUNK_STATUS_RECONSTRUCTED ? "Reconstructed" : "Normal",
+					this->chunkStatusBackup->check( i ) ? "Normal" : "Reconstructed",
 					chunkRequest.listId, chunkRequest.stripeId, i,
 					chunkSize
 				);
 				for ( uint32_t x = 0; x < ServerWorker::chunkCount; x++ )
-					this->chunks[ x ]->print();
+					ChunkUtil::print( this->chunks[ x ] );
 				printf( "\n" );
 				fflush( stdout );
 
 				fprintf( stderr, "Seal indicator for (%u, %u):\n", listId, stripeId );
 				for ( uint32_t j = 0; j < ServerWorker::parityChunkCount + 1; j++ ) {
-					if ( j == ServerWorker::parityChunkCount || this->chunks[ j + ServerWorker::dataChunkCount ]->status == CHUNK_STATUS_FROM_GET_CHUNK ) {
+					if ( j == ServerWorker::parityChunkCount || this->chunkStatusBackup->check( j ) ) {
 						fprintf( stderr, "\t#%u:", j );
 						for ( uint32_t i = 0; i < ServerWorker::dataChunkCount; i++ ) {
 							fprintf( stderr, " %d", this->sealIndicators[ j ][ i ] ? 1 : 0 );
@@ -847,16 +858,9 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 				this->chunkStatus->print();
 				fflush( stdout );
 
-				this->chunks[ i ]->clear();
+				ChunkUtil::clear( this->chunks[ i ] );
 				invalidChunks.insert( i );
 				// return true;
-			}
-		}
-
-		for ( uint32_t i = ServerWorker::dataChunkCount; i < ServerWorker::chunkCount; i++ ) {
-			if ( this->chunks[ i ]->status == CHUNK_STATUS_RECONSTRUCTED ) {
-				this->chunks[ i ]->isParity = true;
-				this->chunks[ i ]->setSize( maxChunkSize );
 			}
 		}
 
@@ -876,7 +880,6 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 				);
 
 				// Check whether the reconstructed parity chunks need to be forwarded
-				DegradedMap *dmap = &ServerWorker::degradedChunkBuffer->map;
 				bool isKeyValueFound, isSealed;
 				Key key;
 				KeyValue keyValue;
@@ -897,7 +900,7 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 
 					if ( invalidChunks.count( op.original[ i * 2 + 1 ] ) ) {
 						// Do nothing
-					} else if ( ! this->chunks[ op.original[ i * 2 + 1 ] ]->getSize() ) {
+					} else if ( ! ChunkUtil::getSize( this->chunks[ op.original[ i * 2 + 1 ] ] ) ) {
 						continue; // No need to send
 					}
 
@@ -906,9 +909,9 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 						chunkDataHeader.listId = metadata.listId;
 						chunkDataHeader.stripeId = metadata.stripeId;
 						chunkDataHeader.chunkId = op.original[ i * 2 + 1 ];
-						chunkDataHeader.size = this->chunks[ op.original[ i * 2 + 1 ] ]->getSize();
+						chunkDataHeader.size = ChunkUtil::getSize( this->chunks[ op.original[ i * 2 + 1 ] ] );
 						chunkDataHeader.offset = 0;
-						chunkDataHeader.data = this->chunks[ op.original[ i * 2 + 1 ] ]->getData();
+						chunkDataHeader.data = ChunkUtil::getData( this->chunks[ op.original[ i * 2 + 1 ] ] );
 						chunkDataHeader.sealIndicatorCount = 0;
 						chunkDataHeader.sealIndicator = 0;
 						this->handleForwardChunkRequest( chunkDataHeader, false );
@@ -999,10 +1002,8 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 						chunk = dmap->findChunkById( op.listId, op.stripeId, op.chunkId );
 
 						if ( ! chunk ) {
-							this->chunks[ op.chunkId ]->status = CHUNK_STATUS_RECONSTRUCTED;
-
-							chunk = ServerWorker::chunkPool->malloc();
-							chunk->swap( this->chunks[ op.chunkId ] );
+							chunk = ServerWorker::tempChunkPool.alloc();
+							ChunkUtil::dup( chunk, this->chunks[ op.chunkId ] );
 
 							if ( ! dmap->insertChunk(
 								op.listId, op.stripeId, op.chunkId, chunk,
@@ -1012,12 +1013,21 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 							}
 						}
 					} else {
+						Metadata tmp;
+						uint32_t tmpSize;
+
+						tmp.set( 0, 0, 0 );
+
 						map->findValueByKey( key.data, key.size, 0, 0, &keyMetadata, 0, &chunk );
+
+						if ( chunk )
+							ChunkUtil::get( chunk, tmp.listId, tmp.stripeId, tmp.chunkId, tmpSize );
+
 						if ( ! (
 							chunk &&
-							chunk->metadata.listId == op.listId &&
-							chunk->metadata.stripeId == op.stripeId &&
-							chunk->metadata.chunkId == op.chunkId
+							tmp.listId == op.listId &&
+							tmp.stripeId == op.stripeId &&
+							tmp.chunkId == op.chunkId
 						) ) {
 							printf(
 								"Key: %.*s (%u, %u, %u); ",
@@ -1033,16 +1043,16 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 								printf(
 									"chunk = %p (%u, %u, %u)\n",
 									chunk,
-									chunk->metadata.listId,
-									chunk->metadata.stripeId,
-									chunk->metadata.chunkId
+									tmp.listId,
+									tmp.stripeId,
+									tmp.chunkId
 								);
 						}
 						assert(
 							chunk &&
-							chunk->metadata.listId == op.listId &&
-							chunk->metadata.stripeId == op.stripeId &&
-							chunk->metadata.chunkId == op.chunkId
+							tmp.listId == op.listId &&
+							tmp.stripeId == op.stripeId &&
+							tmp.chunkId == op.chunkId
 						);
 					}
 
@@ -1144,12 +1154,13 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 						    MixedChunkBuffer *chunkBuffer = ServerWorker::chunkBuffer->at( metadata.listId );
 						    int chunkBufferIndex = chunkBuffer->lockChunk( chunk, true );
 						    // Compute delta and perform update
-						    chunk->computeDelta(
-						 	   valueUpdate, // delta
-						 	   valueUpdate, // new data
-						 	   offset, op.data.keyValueUpdate.length,
-						 	   true // perform update
-						    );
+							ChunkUtil::computeDelta(
+								chunk,
+								valueUpdate, // delta
+								valueUpdate, // new data
+								offset, op.data.keyValueUpdate.length,
+								true // perform update
+							);
 						    ///// ^^^^^ Copied from handleUpdateRequest() ^^^^^ /////
 
 							this->sendModifyChunkRequest(
@@ -1265,7 +1276,7 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 
 					if ( invalidChunks.count( op.original[ i * 2 + 1 ] ) ) {
 						// Do nothing
-					} else if ( ! this->chunks[ op.original[ i * 2 + 1 ] ]->getSize() ) {
+					} else if ( ! ChunkUtil::getSize( this->chunks[ op.original[ i * 2 + 1 ] ] ) ) {
 						continue; // No need to send
 					}
 
@@ -1275,9 +1286,9 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 						chunkDataHeader.listId = metadata.listId;
 						chunkDataHeader.stripeId = metadata.stripeId;
 						chunkDataHeader.chunkId = op.original[ i * 2 + 1 ];
-						chunkDataHeader.size = this->chunks[ op.original[ i * 2 + 1 ] ]->getSize();
+						chunkDataHeader.size = ChunkUtil::getSize( this->chunks[ op.original[ i * 2 + 1 ] ] );
 						chunkDataHeader.offset = 0;
-						chunkDataHeader.data = this->chunks[ op.original[ i * 2 + 1 ] ]->getData();
+						chunkDataHeader.data = ChunkUtil::getData( this->chunks[ op.original[ i * 2 + 1 ] ] );
 						chunkDataHeader.sealIndicatorCount = 0;
 						chunkDataHeader.sealIndicator = 0;
 						this->handleForwardChunkRequest( chunkDataHeader, false );
@@ -1326,20 +1337,23 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 		for ( uint32_t i = 0; i < ServerWorker::chunkCount; i++ ) {
 			if ( this->chunks[ i ] == toBeFreed )
 				continue;
-			switch( this->chunks[ i ]->status ) {
-				case CHUNK_STATUS_FROM_GET_CHUNK:
-					ServerWorker::chunkPool->free( this->chunks[ i ] );
-					this->chunks[ i ] = 0;
-					break;
-				case CHUNK_STATUS_RECONSTRUCTED:
-					break;
-				default:
-					break;
+
+			// Check whether the chunk is reconstructed, forwarded, or from GET_CHUNK requests
+			if ( ! ServerWorker::chunkPool->isInChunkPool( this->chunks[ i ] ) ) {
+				Metadata m;
+				uint32_t s;
+				ChunkUtil::get( this->chunks[ i ], m.listId, m.stripeId, m.chunkId, s );
+				if ( dmap->findChunkById( m.listId, m.stripeId, m.chunkId ) == this->chunks[ i ] ) {
+					// Reconstructed - need to keep the chunk
+				} else {
+					// Forwarded or from GET_CHUNK requests
+					this->tempChunkPool.free( this->chunks[ i ] );
+				}
 			}
 		}
 	}
 	if ( toBeFreed )
-		ServerWorker::chunkPool->free( toBeFreed );
+		this->tempChunkPool.free( toBeFreed );
 	return true;
 }
 

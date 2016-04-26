@@ -2,6 +2,7 @@
 #include "coding.hh"
 #include "all_coding.hh"
 #include "../util/debug.hh"
+#include "../../server/buffer/chunk_pool.hh"
 
 Chunk *Coding::zeros;
 
@@ -9,9 +10,8 @@ Coding::~Coding() {}
 
 Coding *Coding::instantiate( CodingScheme scheme, CodingParams &params, uint32_t chunkSize ) {
 	// Initialize zero block
-	Coding::zeros = new Chunk();
-	Coding::zeros->init( chunkSize );
-	Coding::zeros->init();
+	TempChunkPool tempChunkPool;
+	Coding::zeros = tempChunkPool.alloc();
 
 	switch( scheme ) {
 		case CS_RAID0:
@@ -111,12 +111,14 @@ char *Coding::bitwiseXOR( char *dst, char *srcA, char *srcB, uint32_t len ) {
 
 Chunk *Coding::bitwiseXOR( Chunk *dst, Chunk *srcA, Chunk *srcB, uint32_t size ) {
 	Coding::bitwiseXOR(
-		dst->getData(),
-		srcA->getData(),
-		srcB->getData(),
+		ChunkUtil::getData( dst ),
+		ChunkUtil::getData( srcA ),
+		ChunkUtil::getData( srcB ),
 		size
 	);
-	dst->setSize( size > dst->getSize() ? size : dst->getSize() );
+
+	uint32_t s = ChunkUtil::getSize( dst );
+	ChunkUtil::setSize( dst, size > s ? size : s );
 	return dst;
 }
 
@@ -161,19 +163,19 @@ uint32_t Coding::forceSeal( Coding *coding, Chunk **chunks, Chunk *tmpParityChun
 					tmpChunks[ k ] = ( k == j ) ? chunks[ j ] : Coding::zeros;
 				}
 
-				tmpParityChunk->clear();
+				ChunkUtil::clear( tmpParityChunk );
 
 				coding->encode(
 					tmpChunks, tmpParityChunk, i,
-					0, Chunk::capacity
+					0, ChunkUtil::chunkSize
 				);
 
-				char *parity = chunks[ i + dataChunkCount ]->getData();
+				char *parity = ChunkUtil::getData( chunks[ i + dataChunkCount ] );
 				Coding::bitwiseXOR(
 					parity,
 					parity,
-					tmpParityChunk->getData(),
-					Chunk::capacity
+					ChunkUtil::getData( tmpParityChunk ),
+					ChunkUtil::chunkSize
 				);
 				sealIndicator[ i ][ j ] = true;
 

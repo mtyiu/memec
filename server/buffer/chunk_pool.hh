@@ -4,8 +4,9 @@
 #include <atomic>
 #include <cstdio>
 #include <cstdlib>
-#include "../../common/ds/chunk.hh"
 #include "../../common/coding/coding.hh"
+#include "../../common/ds/chunk.hh"
+#include "../../common/hash/hash_func.hh"
 
 struct ChunkMetadata {
 	uint32_t listId;
@@ -85,6 +86,29 @@ public:
 	}
 	static inline char *getData( Chunk *chunk ) {
 		return ( char * ) chunk + CHUNK_METADATA_SIZE;
+	}
+	static inline char *getData( Chunk *chunk, uint32_t &offset, uint32_t &size ) {
+		uint32_t chunkSize = ChunkUtil::isParity( chunk ) ? ChunkUtil::chunkSize : ChunkUtil::getSize( chunk );
+		char *data = ChunkUtil::getData( chunk );
+
+		if ( chunkSize > 0 ) {
+			for ( offset = 0; offset < chunkSize; offset++ ) {
+				if ( data[ offset ] != 0 )
+					break;
+			}
+
+			for ( size = chunkSize - 1; size > offset; size-- ) {
+				if ( data[ size ] != 0 )
+					break;
+			}
+
+			size = size + 1 - offset;
+		} else {
+			offset = 0;
+			size = 0;
+		}
+
+		return data + offset;
 	}
 	static inline bool isParity( Chunk *chunk ) {
 		return ( ChunkUtil::getChunkId( chunk ) >= ChunkUtil::dataChunkCount );
@@ -167,8 +191,9 @@ public:
 
 	// Update
 	static inline void computeDelta(
-		Chunk *chunk, char *delta,
-		char *newData, uint32_t offset, uint32_t length,
+		Chunk *chunk,
+		char *delta, char *newData,
+		uint32_t offset, uint32_t length,
 		bool applyUpdate = true
 	) {
 		char *data = getData( chunk ) + offset;
@@ -255,6 +280,27 @@ public:
 	static inline void clear( Chunk *chunk ) {
 		memset( ( char * ) chunk, 0, CHUNK_METADATA_SIZE + ChunkUtil::chunkSize );
 	}
+
+	static inline void print( Chunk *chunk, FILE *f = stdout ) {
+		int width = 21;
+		char *data = ChunkUtil::getData( chunk );
+		unsigned int hash = HashFunc::hash( data, ChunkUtil::chunkSize );
+
+		fprintf(
+			f,
+			"---------- %s Chunk (%u, %u, %u) ----------\n"
+			"%-*s : %u\n"
+			"%-*s : %u\n"
+			"%-*s : %u\n",
+			ChunkUtil::isParity( chunk ) ? "Parity" : "Data",
+			ChunkUtil::getListId( chunk ),
+			ChunkUtil::getStripeId( chunk ),
+			ChunkUtil::getChunkId( chunk ),
+			width, "Data (Hash)", hash,
+			width, "Size", ChunkUtil::getSize( chunk ),
+			width, "Count", ChunkUtil::getCount( chunk )
+		);
+	}
 };
 
 class ChunkPool {
@@ -272,7 +318,11 @@ public:
 	Chunk *alloc();
 	Chunk *alloc( uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t size );
 
-	Chunk *getChunk( char *ptr, uint32_t &offset ); // Translate object pointer to chunk pointer
+	// Translate object pointer to chunk pointer
+	Chunk *getChunk( char *ptr, uint32_t &offset );
+
+	// Check whether the chunk is allocated by this chunk pool
+	bool isInChunkPool( Chunk *chunk );
 
 	void print( FILE *f = stdout );
 };
@@ -283,6 +333,12 @@ public:
 		Chunk *ret = ( Chunk * ) malloc( CHUNK_METADATA_SIZE + ChunkUtil::chunkSize );
 		if ( ret )
 			ChunkUtil::clear( ret );
+		return ret;
+	}
+
+	Chunk *alloc( uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t size ) {
+		Chunk *ret = this->alloc();
+		ChunkUtil::set( ret, listId, stripeId, chunkId, size );
 		return ret;
 	}
 

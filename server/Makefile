@@ -1,5 +1,5 @@
 CC=g++
-CFLAGS=-std=c++11 -Wall -O2
+CFLAGS=-std=c++11 -Wall -O2 -Wfatal-errors
 MEMEC_SRC_ROOT=..
 LIBS=-pthread
 BIN=$(MEMEC_SRC_ROOT)/bin/server

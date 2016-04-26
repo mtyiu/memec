@@ -108,6 +108,7 @@ void ServerWorker::free() {
 	this->buffer.data = 0;
 	this->buffer.size = 0;
 	delete this->chunkStatus;
+	delete this->chunkStatusBackup;
 
 	this->tempChunkPool.free( this->dataChunk );
 	this->tempChunkPool.free( this->parityChunk );
@@ -185,6 +186,7 @@ bool ServerWorker::init( GlobalConfig &globalConfig, ServerConfig &serverConfig,
 	this->buffer.data = new char[ globalConfig.size.chunk ];
 	this->buffer.size = globalConfig.size.chunk;
 	this->chunkStatus = new BitmaskArray( ServerWorker::chunkCount, 1 );
+	this->chunkStatusBackup = new BitmaskArray( ServerWorker::chunkCount, 1 );
 
 	this->dataChunk = this->tempChunkPool.alloc();
 	this->parityChunk = this->tempChunkPool.alloc();
