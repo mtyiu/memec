@@ -475,7 +475,7 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 		return false;
 	}
 
-	if ( ! success ) {
+	if ( ! success && ! isDegraded ) {
 		__ERROR__( "ClientWorker", "handleUpdateResponse",
 			"[UPDATE (%s)] From %d Updated key: %.*s (key size = %u); update value size = %u at offset: %u.",
 			success ? "Success" : "Fail",
@@ -502,9 +502,6 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 		return false;
 	}
 
-	// free the updated value
-	delete[] ( ( char * )( keyValueUpdate.ptr ) );
-
 	// remove pending timestamp
 	// TODO handle degraded mode
 	Client *client = Client::getInstance();
@@ -512,9 +509,30 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 		event.socket->timestamp.pendingAck.eraseUpdate( timestamp, pid.requestId );
 	}
 
+	uint32_t dataChunkIndex;
+	this->stripeList->get( header.key, header.keySize, this->dataServerSockets, 0, &dataChunkIndex );
+	bool needsReplay = pid.ptr && isDegraded && ! success && ! Client::getInstance()->stateTransitHandler.useCoordinatedFlow( this->dataServerSockets[ dataChunkIndex ]->getAddr() );
+
 	if ( pid.ptr ) {
-		applicationEvent.resUpdate( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, keyValueUpdate, success );
-		this->dispatch( applicationEvent );
+		if ( needsReplay ) {
+			// make a copy of the update
+			KeyValueUpdate kv;
+			kv.dup( keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.ptr );
+			kv.offset = keyValueUpdate.offset;
+			kv.length = keyValueUpdate.length;
+			kv.isDegraded = keyValueUpdate.isDegraded;
+			applicationEvent.replayUpdateRequest( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, kv );
+			// do not use dispatch, since ClientWorker::replayUpdate() overwrites recv buffer
+			ClientWorker::eventQueue->insert( applicationEvent );
+		} else {
+			applicationEvent.resUpdate( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, keyValueUpdate, success, false );
+			this->dispatch( applicationEvent );
+		}
+	}
+
+	if ( ! needsReplay ) {
+		// free the updated value
+		delete[] ( ( char * )( keyValueUpdate.ptr ) );
 	}
 
 	// Check if all normal requests completes

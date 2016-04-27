@@ -573,7 +573,6 @@ force_degraded_read:
 		if ( ! ret ) {
 			key.free();
 			delete[] valueUpdate;
-
 			if ( isReconstructed ) {
 				// UPDATE data chunk and reconstructed parity chunks
 				return this->handleUpdateRequest(
@@ -585,6 +584,15 @@ force_degraded_read:
 					true   // checkGetChunk
 				);
 			} else {
+				event.resUpdate(
+					event.socket, event.instanceId, event.requestId, key,
+					header.data.keyValueUpdate.valueUpdateOffset,
+					header.data.keyValueUpdate.valueUpdateSize,
+					false, /* success */
+					false, /* needsFree */
+					true   /* isDegraded */
+				);
+				this->dispatch( event );
 				__ERROR__( "ServerWorker", "handleDegradedUpdateRequest", "Failed to perform degraded read on (%u, %u, %u); key: %.*s.", listId, stripeId, chunkId, key.size, key.data );
 			}
 		}

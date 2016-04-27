@@ -28,11 +28,11 @@ char *ClientProtocol::replayGet( size_t &size, uint16_t instanceId, uint32_t req
 	return this->buffer.recv;
 }
 
-char *ClientProtocol::replayUpdate( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize) {
+char *ClientProtocol::replayUpdate( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize ) {
 	size = this->generateKeyValueUpdateHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_CLIENT,
-		PROTO_OPCODE_SET,
+		PROTO_OPCODE_UPDATE,
 		instanceId, requestId,
 		keySize,
 		key,
