@@ -184,7 +184,7 @@ public:
 	// Memory allocator for objects
 	static inline char *alloc( Chunk *chunk, uint32_t size, uint32_t &offset ) {
 		struct ChunkMetadata *chunkMetadata = ( struct ChunkMetadata * ) chunk;
-		offset = chunkMetadata->size;
+		offset = CHUNK_METADATA_SIZE + chunkMetadata->size;
 		chunkMetadata->size += size;
 		return ( ( char * ) chunk ) + offset;
 	}
@@ -289,6 +289,7 @@ public:
 		fprintf(
 			f,
 			"---------- %s Chunk (%u, %u, %u) ----------\n"
+			"%-*s : 0x%p\n"
 			"%-*s : %u\n"
 			"%-*s : %u\n"
 			"%-*s : %u\n",
@@ -296,6 +297,7 @@ public:
 			ChunkUtil::getListId( chunk ),
 			ChunkUtil::getStripeId( chunk ),
 			ChunkUtil::getChunkId( chunk ),
+			width, "Address", ( void * ) chunk,
 			width, "Data (Hash)", hash,
 			width, "Size", ChunkUtil::getSize( chunk ),
 			width, "Count", ChunkUtil::getCount( chunk )
