@@ -4,8 +4,8 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include "local_storage.hh"
-#include "../buffer/chunk_pool.hh"
 #include "../../common/util/debug.hh"
+#include "../../common/ds/chunk_pool.hh"
 
 void LocalStorage::generatePath( uint32_t listId, uint32_t stripeId, uint32_t chunkId, bool isParity ) {
 	snprintf(

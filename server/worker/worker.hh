@@ -4,7 +4,6 @@
 #include <vector>
 #include <cstdio>
 #include "../ack/pending_ack.hh"
-#include "../buffer/chunk_pool.hh"
 #include "../buffer/mixed_chunk_buffer.hh"
 #include "../buffer/degraded_chunk_buffer.hh"
 #include "../buffer/get_chunk_buffer.hh"
@@ -18,6 +17,7 @@
 #include "../../common/coding/coding.hh"
 #include "../../common/config/global_config.hh"
 #include "../../common/ds/chunk.hh"
+#include "../../common/ds/chunk_pool.hh"
 #include "../../common/ds/id_generator.hh"
 #include "../../common/ds/key.hh"
 #include "../../common/ds/memory_pool.hh"

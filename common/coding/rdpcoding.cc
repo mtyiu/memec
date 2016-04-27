@@ -48,14 +48,10 @@ void RDPCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t index, 
 		this->_raid5Coding->encode( dataChunks, parityChunk, index, startOff, endOff );
 
 	} else if ( index == 2 ) {
-
 		// need the row parity for encoding the diagonal parity
-		Chunk firstParity;
-		firstParity.setData( new char[ chunkSize ] );
-		firstParity.setSize( chunkSize );
+		Chunk *firstParity = this->tempChunkPool.alloc();
 
-		memset( firstParity.getData(), 0, chunkSize );
-		this->_raid5Coding->encode( dataChunks, &firstParity, 1 );
+		this->_raid5Coding->encode( dataChunks, firstParity, 1 );
 
 		// XOR symbols for diagonal parity, assume
 		//  (0)  (1)   (2)   (3)   (4)   .....   (p)  (p+1)
@@ -83,18 +79,22 @@ void RDPCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t index, 
 
 				//fprintf( stderr, " encode (%d, %d) on (%d, %d) with off %d len %d \n", cidx, sidx , p - 1, pidx, offset, len );
 				if ( cidx < k )
-					this->bitwiseXOR( parityChunk->getData() + pidx * symbolSize + offset,
-							dataChunks[ cidx ]->getData() + sidx * symbolSize + offset,
-							parityChunk->getData() + pidx * symbolSize + offset, len );
+					this->bitwiseXOR(
+						ChunkUtil::getData( parityChunk        ) + pidx * symbolSize + offset,
+						ChunkUtil::getData( dataChunks[ cidx ] ) + sidx * symbolSize + offset,
+						ChunkUtil::getData( parityChunk        ) + pidx * symbolSize + offset,
+						len
+					);
 				else
-					this->bitwiseXOR( parityChunk->getData() + pidx * symbolSize + offset,
-							firstParity.getData() + sidx * symbolSize + offset,
-							parityChunk->getData() + pidx * symbolSize + offset, len );
+					this->bitwiseXOR(
+						ChunkUtil::getData( parityChunk ) + pidx * symbolSize + offset,
+						ChunkUtil::getData( firstParity ) + sidx * symbolSize + offset,
+						ChunkUtil::getData( parityChunk ) + pidx * symbolSize + offset,
+						len
+					);
 			}
 		}
-
-		delete [] firstParity.getData();
-
+		this->tempChunkPool.free( firstParity );
 	} else {
 		// ignored
 	}
@@ -105,7 +105,6 @@ bool RDPCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
 
 	uint32_t k = this->_k;
 	uint32_t p = this->_p;
-	uint32_t chunkSize = this->_chunkSize;
 	uint32_t symbolSize = this->_symbolSize;
 	std::vector< uint32_t > failed;
 
@@ -146,7 +145,7 @@ bool RDPCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
 
 		// zero out the chunks for XOR
 		for ( uint32_t idx = 0 ; idx < failed.size() ; idx ++ ) {
-			memset( chunks[ failed [ idx ] ]->getData(), 0, chunkSize );
+			ChunkUtil::clear( chunks[ failed[ idx ] ] );
 		}
 
 		uint32_t chunkToRRepair = failed[ 0 ];
@@ -181,10 +180,12 @@ bool RDPCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
 
 				// diagonal, max. idx of symbols (within a chunk) is p-2
 				if ( sidx != p - 1 ) {
-					this->bitwiseXOR( chunks[ chunkToDRepair ]->getData() + sidxToRepair * symbolSize,
-							chunks[ cidx ]->getData() + sidx * symbolSize,
-							chunks[ chunkToDRepair ]->getData() + sidxToRepair * symbolSize,
-							symbolSize );
+					this->bitwiseXOR(
+						ChunkUtil::getData( chunks[ chunkToDRepair ] ) + sidxToRepair * symbolSize,
+						ChunkUtil::getData( chunks[ cidx ]           ) + sidx * symbolSize,
+						ChunkUtil::getData( chunks[ chunkToDRepair ] ) + sidxToRepair * symbolSize,
+						symbolSize
+					);
 
 				}
 
@@ -194,22 +195,31 @@ bool RDPCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
 
 				// row, XOR symbols in the same row
 				sidx = sidxToRepair;
-				this->bitwiseXOR( chunks[ chunkToRRepair ]->getData() + sidxToRepair * symbolSize,
-						chunks[ cidx ]->getData()  + sidxToRepair * symbolSize,
-						chunks[ chunkToRRepair ]->getData() + sidxToRepair * symbolSize, symbolSize );
+				this->bitwiseXOR(
+					ChunkUtil::getData( chunks[ chunkToRRepair ] ) + sidxToRepair * symbolSize,
+					ChunkUtil::getData( chunks[ cidx ]           )  + sidxToRepair * symbolSize,
+					ChunkUtil::getData( chunks[ chunkToRRepair ] ) + sidxToRepair * symbolSize,
+					symbolSize
+				);
 
 			}
 
 			// diagonal, XOR the diagonal parity
-			this->bitwiseXOR( chunks[ chunkToDRepair ]->getData() + sidxToRepair * symbolSize,
-					chunks[ k + 1 ]->getData() + didxToRepair * symbolSize,
-					chunks[ chunkToDRepair ]->getData() + sidxToRepair * symbolSize, symbolSize );
+			this->bitwiseXOR(
+				ChunkUtil::getData( chunks[ chunkToDRepair ] ) + sidxToRepair * symbolSize,
+				ChunkUtil::getData( chunks[ k + 1 ]          ) + didxToRepair * symbolSize,
+				ChunkUtil::getData( chunks[ chunkToDRepair ] ) + sidxToRepair * symbolSize,
+				symbolSize
+			);
 			//fprintf( stderr, " decode (%d, %d) on (%d, %d) with len %d \n", k + 1, didxToRepair , chunkToDRepair , sidxToRepair, len );
 
 			// row, add back the just recovered symbol from diagonal decoding
-			this->bitwiseXOR ( chunks[ chunkToRRepair ]->getData() + sidxToRepair * symbolSize,
-					chunks[ chunkToDRepair ]->getData() + sidxToRepair * symbolSize,
-					chunks[ chunkToRRepair ]->getData() + sidxToRepair * symbolSize, symbolSize );
+			this->bitwiseXOR (
+				ChunkUtil::getData( chunks[ chunkToRRepair ] ) + sidxToRepair * symbolSize,
+				ChunkUtil::getData( chunks[ chunkToDRepair ] ) + sidxToRepair * symbolSize,
+				ChunkUtil::getData( chunks[ chunkToRRepair ] ) + sidxToRepair * symbolSize,
+				symbolSize
+			);
 			//fprintf( stderr, " decode (%d, %d) on (%d, %d) with len %d \n", chunkToDRepair, sidxToRepair , chunkToRRepair , sidxToRepair, len );
 
 			// search for next symbol to recover
@@ -287,7 +297,11 @@ void RDPCoding::performXOR( Chunk **chunks, uint32_t target ) {
 	for ( uint32_t cidx = 0 ; cidx < k + 1 ; cidx ++ ) {
 		if ( cidx == target )
 			continue;
-		this->bitwiseXOR( chunks[ target ], chunks[ cidx ], chunks[ target ],
-				chunks[ cidx ]->getSize() );
+		this->bitwiseXOR(
+			chunks[ target ],
+			chunks[ cidx ],
+			chunks[ target ],
+			ChunkUtil::getSize( chunks[ cidx ] )
+		);
 	}
 }

@@ -6,7 +6,6 @@
 #include <cstdio>
 #include <unistd.h>
 #include "../ack/pending_ack.hh"
-#include "../buffer/chunk_pool.hh"
 #include "../buffer/mixed_chunk_buffer.hh"
 #include "../buffer/degraded_chunk_buffer.hh"
 #include "../buffer/get_chunk_buffer.hh"
@@ -25,6 +24,7 @@
 #include "../../common/config/global_config.hh"
 #include "../../common/ds/array_map.hh"
 #include "../../common/ds/chunk.hh"
+#include "../../common/ds/chunk_pool.hh"
 #include "../../common/ds/id_generator.hh"
 #include "../../common/ds/packet_pool.hh"
 #include "../../common/signal/signal.hh"

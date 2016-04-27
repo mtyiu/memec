@@ -10,6 +10,7 @@ OBJS= \
 	config/server_addr.o \
 	ds/bitmask_array.o \
 	ds/chunk.o \
+	ds/chunk_pool.o \
 	ds/instance_id_generator.o \
 	ds/key_value.o \
 	ds/latency.o \

@@ -7,7 +7,6 @@ BIN=$(MEMEC_SRC_ROOT)/bin/server
 OBJS= \
 	backup/backup.o \
 	buffer/chunk_buffer.o \
-	buffer/chunk_pool.o \
 	buffer/data_chunk_buffer.o \
 	buffer/degraded_chunk_buffer.o \
 	buffer/get_chunk_buffer.o \
@@ -58,6 +57,7 @@ EXTERNAL_LIB= \
 	$(MEMEC_SRC_ROOT)/common/config/server_addr.o \
 	$(MEMEC_SRC_ROOT)/common/ds/bitmask_array.o \
 	$(MEMEC_SRC_ROOT)/common/ds/chunk.o \
+	$(MEMEC_SRC_ROOT)/common/ds/chunk_pool.o \
 	$(MEMEC_SRC_ROOT)/common/ds/key_value.o \
 	$(MEMEC_SRC_ROOT)/common/ds/load.o \
 	$(MEMEC_SRC_ROOT)/common/ds/sockaddr_in.o \

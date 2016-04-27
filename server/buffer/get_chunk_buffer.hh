@@ -3,8 +3,8 @@
 
 #include <cstdio>
 #include <pthread.h>
-#include "chunk_pool.hh"
 #include "../../common/ds/chunk.hh"
+#include "../../common/ds/chunk_pool.hh"
 #include "../../common/lock/lock.hh"
 
 struct GetChunkWrapper {

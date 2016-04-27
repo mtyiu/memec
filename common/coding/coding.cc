@@ -2,7 +2,7 @@
 #include "coding.hh"
 #include "all_coding.hh"
 #include "../util/debug.hh"
-#include "../../server/buffer/chunk_pool.hh"
+#include "../ds/chunk_pool.hh"
 
 Chunk *Coding::zeros;
 

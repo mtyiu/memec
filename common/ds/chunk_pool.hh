@@ -1,5 +1,5 @@
-#ifndef __SERVER_BUFFRE_CHUNK_POOL_HH__
-#define __SERVER_BUFFRE_CHUNK_POOL_HH__
+#ifndef __COMMON_DS_CHUNK_POOL_HH__
+#define __COMMON_DS_CHUNK_POOL_HH__
 
 #include <atomic>
 #include <cstdio>

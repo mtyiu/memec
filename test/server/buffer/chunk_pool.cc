@@ -1,7 +1,7 @@
 #include <pthread.h>
 #include <string.h>
 #include <assert.h>
-#include "../../../server/buffer/chunk_pool.hh"
+#include "../../../common/ds/chunk_pool.hh"
 
 uint32_t chunkSize;
 uint32_t capacity;

@@ -3,8 +3,8 @@
 
 #include <unordered_map>
 #include <unordered_set>
-#include "../buffer/chunk_pool.hh"
 #include "../../common/ds/chunk.hh"
+#include "../../common/ds/chunk_pool.hh"
 #include "../../common/ds/key.hh"
 #include "../../common/ds/metadata.hh"
 #include "../../common/hash/cuckoo_hash.hh"

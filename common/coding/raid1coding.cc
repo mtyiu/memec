@@ -1,5 +1,5 @@
 #include "raid1coding.hh"
-#include "../../server/buffer/chunk_pool.hh"
+#include "../ds/chunk_pool.hh"
 
 bool RAID1Coding::init( uint32_t n ) {
 	this->n = n;

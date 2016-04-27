@@ -1,6 +1,6 @@
 #include <cassert>
 #include "protocol.hh"
-#include "../buffer/chunk_pool.hh"
+#include "../../common/ds/chunk_pool.hh"
 
 char *ServerProtocol::reqSealChunk( size_t &size, uint16_t instanceId, uint32_t requestId, Chunk *chunk, uint32_t startPos, char *buf ) {
 	// -- common/protocol/seal_protocol.cc --

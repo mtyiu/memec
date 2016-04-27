@@ -4,6 +4,7 @@
 #include <vector>
 #include "coding.hh"
 #include "raid5coding.hh"
+#include "../ds/chunk_pool.hh"
 
 class RDPCoding : public Coding {
 protected:
@@ -36,6 +37,7 @@ protected:
 	uint32_t _p;
 	uint32_t _chunkSize;
 	uint32_t _symbolSize;
+	TempChunkPool tempChunkPool;
 
 	// use some memory to save computation (assume p < 200)
 	static const uint32_t primeCount = 168;
