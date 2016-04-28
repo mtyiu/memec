@@ -45,20 +45,31 @@ void EvenOddCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t ind
 				//fprintf( stderr, " encode (%d, %d) on (%d, %d) with off %d len %d \n", cidx, sidx , p - 1, pidx, offset, len );
 				// missing diagonal
 				if ( pidx == p - 1 ) {
-					this->bitwiseXOR( s + offset, dataChunks[ cidx ]->getData() + sidx * symbolSize + offset,
-							s + offset, len );
+					this->bitwiseXOR(
+						s + offset,
+						ChunkUtil::getData( dataChunks[ cidx ] ) + sidx * symbolSize + offset,
+						s + offset,
+						len
+					);
 				} else {
-					this->bitwiseXOR( parityChunk->getData() + pidx * symbolSize + offset,
-							dataChunks[ cidx ]->getData() + sidx * symbolSize + offset,
-							parityChunk->getData() + pidx * symbolSize + offset, len );
+					this->bitwiseXOR(
+						ChunkUtil::getData( parityChunk ) + pidx * symbolSize + offset,
+						ChunkUtil::getData( dataChunks[ cidx ] ) + sidx * symbolSize + offset,
+						ChunkUtil::getData( parityChunk ) + pidx * symbolSize + offset,
+						len
+					);
 				}
 			}
 		}
 
 		// add S back
 		for ( uint32_t sidx = 0 ; sidx < p - 1 ; sidx ++ ) {
-			this->bitwiseXOR( parityChunk->getData() + sidx * symbolSize, s,
-					parityChunk->getData() + sidx * symbolSize, symbolSize );
+			this->bitwiseXOR(
+				ChunkUtil::getData( parityChunk ) + sidx * symbolSize,
+				s,
+				ChunkUtil::getData( parityChunk ) + sidx * symbolSize,
+				symbolSize
+			);
 		}
 
 		delete [] s;
@@ -90,7 +101,7 @@ bool EvenOddCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
 
 	// zero out the chunks for XOR
 	for ( uint32_t idx = 0 ; idx < failed.size() ; idx ++ ) {
-		memset( chunks[ failed[ idx ] ]->getData(), 0, chunkSize );
+		memset( ChunkUtil::getData( chunks[ failed[ idx ] ] ), 0, chunkSize );
 	}
 
 	char* s;
@@ -121,15 +132,15 @@ bool EvenOddCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
 			if ( cidx == failed[ 0 ] )
 				continue;
 			uint32_t sidx = ( pidx + p - cidx ) % p;
-			this->bitwiseXOR( s, chunks[ cidx ]->getData() + sidx * symbolSize, s , symbolSize );
+			this->bitwiseXOR( s, ChunkUtil::getData( chunks[ cidx ] ) + sidx * symbolSize, s , symbolSize );
 		}
 		// diagonal symbol
 		if ( pidx != p - 1 )
-			this->bitwiseXOR( s, chunks[ k + 1 ]->getData() + pidx * symbolSize, s , symbolSize );
+			this->bitwiseXOR( s, ChunkUtil::getData( chunks[ k + 1 ] ) + pidx * symbolSize, s , symbolSize );
 
 		// recover data using diagonal parity and S
 		for ( uint32_t sidxToRepair = 0 ; sidxToRepair < p - 1 ; sidxToRepair ++ ) {
-			char* failedSymbol = chunks[ failed[ 0 ] ]->getData() + sidxToRepair * symbolSize;
+			char* failedSymbol = ChunkUtil::getData( chunks[ failed[ 0 ] ] ) + sidxToRepair * symbolSize;
 			pidx = ( failed[ 0 ] +  sidxToRepair ) % p;
 			for ( uint32_t cidx = 0 ; cidx < k ; cidx ++ ) {
 				if ( cidx == failed[ 0 ] )
@@ -137,12 +148,21 @@ bool EvenOddCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
 				uint32_t sidx = ( pidx + p - cidx ) % p;
 				if ( sidx > p - 2 )
 					continue;
-				this->bitwiseXOR( failedSymbol, chunks[ cidx ]->getData() + sidx * symbolSize,
-						failedSymbol, symbolSize );
+				this->bitwiseXOR(
+					failedSymbol,
+					ChunkUtil::getData( chunks[ cidx ] ) + sidx * symbolSize,
+					failedSymbol,
+					symbolSize
+				);
 			}
-			if ( pidx != p - 1 )
-				this->bitwiseXOR( failedSymbol, chunks[ k + 1 ]->getData() + pidx * symbolSize,
-						failedSymbol, symbolSize );
+			if ( pidx != p - 1 ) {
+				this->bitwiseXOR(
+					failedSymbol,
+					ChunkUtil::getData( chunks[ k + 1 ] ) + pidx * symbolSize,
+					failedSymbol,
+					symbolSize
+				);
+			}
 			this->bitwiseXOR( failedSymbol, s, failedSymbol, symbolSize );
 		}
 
@@ -156,12 +176,12 @@ bool EvenOddCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
 		// get back S, xor all symbols in chunk[ k + 1 ] and chunk[ k ]
 		s = new char [ symbolSize ];
 		// first symbol
-		memcpy( s, chunks[ k ]->getData(), symbolSize );
-		this->bitwiseXOR( s, chunks[ k + 1 ]->getData(), s, symbolSize );
+		memcpy( s, ChunkUtil::getData( chunks[ k ] ), symbolSize );
+		this->bitwiseXOR( s, ChunkUtil::getData( chunks[ k + 1 ] ), s, symbolSize );
 		// remainging symbols
 		for ( uint32_t sidx = 1 ; sidx < p - 1 ; sidx ++ ) {
-			this->bitwiseXOR( s, chunks[ k ]->getData() + sidx * symbolSize, s, symbolSize );
-			this->bitwiseXOR( s, chunks[ k + 1 ]->getData() + sidx * symbolSize, s, symbolSize );
+			this->bitwiseXOR( s, ChunkUtil::getData( chunks[ k ] ) + sidx * symbolSize, s, symbolSize );
+			this->bitwiseXOR( s, ChunkUtil::getData( chunks[ k + 1 ] ) + sidx * symbolSize, s, symbolSize );
 		}
 
 		uint32_t idx = 1;
@@ -175,7 +195,7 @@ bool EvenOddCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
 				recoveredSymbolCount += 2 ) {
 
 			// diagonal
-			symbolToRepair = chunks[ cidxToRepair ]->getData() + sidxToRepair * symbolSize;
+			symbolToRepair = ChunkUtil::getData( chunks[ cidxToRepair ] ) + sidxToRepair * symbolSize;
 			// data symbols
 			for ( uint32_t cidx = 0 ; cidx < k ; cidx ++ ) {
 				if ( cidx == cidxToRepair )
@@ -185,12 +205,12 @@ bool EvenOddCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
 				if ( sidx == sidxToRepair || sidx == p - 1 )
 					continue;
 
-				this->bitwiseXOR( symbolToRepair, chunks[ cidx ]->getData() + sidx * symbolSize,
+				this->bitwiseXOR( symbolToRepair, ChunkUtil::getData( chunks[ cidx ] ) + sidx * symbolSize,
 						symbolToRepair, symbolSize );
 			}
 			// diagonal parity symbols
 			if ( pidx != p - 1 ) {
-				this->bitwiseXOR( symbolToRepair, chunks[ k + 1 ]->getData() + pidx * symbolSize,
+				this->bitwiseXOR( symbolToRepair, ChunkUtil::getData( chunks[ k + 1 ] ) + pidx * symbolSize,
 						symbolToRepair, symbolSize );
 			}
 			// S
@@ -198,13 +218,17 @@ bool EvenOddCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
 
 			// row
 			cidxToRepair = failed[ ( idx + 1 ) % 2 ];
-			symbolToRepair = chunks[ cidxToRepair ]->getData() + sidxToRepair * symbolSize;
+			symbolToRepair = ChunkUtil::getData( chunks[ cidxToRepair ] ) + sidxToRepair * symbolSize;
 
 			for ( uint32_t cidx = 0 ; cidx < k + 1 ; cidx ++ ) {
 				if ( cidx == cidxToRepair )
 					continue;
-				this->bitwiseXOR( symbolToRepair, chunks[ cidx ]->getData() + sidxToRepair * symbolSize,
-						symbolToRepair, symbolSize );
+				this->bitwiseXOR(
+					symbolToRepair,
+					ChunkUtil::getData( chunks[ cidx ] ) + sidxToRepair * symbolSize,
+					symbolToRepair,
+					symbolSize
+				);
 			}
 
 			// next ("row") symbol

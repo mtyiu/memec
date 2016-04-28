@@ -1,6 +1,7 @@
 #include <cstdlib>
 #include <vector>
 #include "cauchycoding.hh"
+#include "../ds/chunk_pool.hh"
 
 extern "C" {
 #include "../../lib/jerasure/include/galois.h"
@@ -49,9 +50,9 @@ void CauchyCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t inde
 
 	for ( uint32_t idx = 0 ; idx < k + m ; idx ++ ) {
 		if ( idx < k ) {
-			data[ idx ] = dataChunks[ idx ]->getData();
+			data[ idx ] = ChunkUtil::getData( dataChunks[ idx ] );
 		} else if ( idx - k == index - 1 ) {
-			code[ idx - k ] = parityChunk->getData();
+			code[ idx - k ] = ChunkUtil::getData( parityChunk );
 		} else {
 			code[ idx - k ] = chunk + ( idx - k ) * chunkSize;
 		}
@@ -102,9 +103,9 @@ bool CauchyCoding::decode( Chunk **chunks, BitmaskArray * chunkStatus ) {
 
 	for ( uint32_t idx = 0 ; idx < k + m ; idx ++ ) {
 		if ( idx < k )
-			data[ idx ] = chunks[ idx ]->getData();
+			data[ idx ] = ChunkUtil::getData( chunks[ idx ] );
 		else
-			code[ idx - k ] = chunks[ idx ]->getData();
+			code[ idx - k ] = ChunkUtil::getData( chunks[ idx ] );
 
 		if ( chunkStatus->check( idx ) == 0 ) {
 			erasures[ pos++ ] = idx;
