@@ -7,8 +7,7 @@
 
 int argv_ofs = 5;
 uint32_t n = 0, k = 0, csize = 0;
-Chunk **chunks = NULL;
-char *buf = NULL, *pbuf = NULL;
+Chunk **chunks = NULL, **input = NULL;
 
 Coding* handle;
 CodingParams params;
@@ -90,17 +89,18 @@ void print_chunks( Chunk *c1, Chunk *c2, uint32_t id = 0 ) {
 bool read_chunks( char** argv ) {
 	uint32_t i;
 	FILE *infile = NULL;
-	if ( n == 0 || k == 0 || csize == 0 || buf == NULL || chunks == NULL || pbuf == NULL )
+	if ( n == 0 || k == 0 || csize == 0 || chunks == NULL || input == NULL )
 		return false;
 
 	for ( i = 0; i < n ; i++ ) {
+		char *buf = ChunkUtil::getData( ( i < k ) ? chunks[ i ] : input[ i - k ] );
 		fprintf( stdout, "\tinput file [%s] as chunk %d (%s)\n", argv[ i + argv_ofs ], i, (i<k)?"DATA":"PARITY" );
 		infile = fopen( argv[ i + argv_ofs ], "r" );
 		if ( infile == NULL ) {
 			fprintf( stderr, "Cannot open file [%s]!!\n", argv[ i + argv_ofs ] );
 			return false;
 		}
-		if ( fread( buf + i * csize, 1, csize, infile ) < 1 ) {
+		if ( fread( buf, 1, csize, infile ) < 1 ) {
 			fprintf( stderr, "Cannot read file [%s]!!\n", argv[ i + argv_ofs ] );
 			return false;
 		}
@@ -113,29 +113,18 @@ bool read_chunks( char** argv ) {
 bool verify_chunks() {
 	uint32_t i;
 	bool all_correct = true;
-	TempChunkPool tempChunkPool;
-	Chunk *c = tempChunkPool.alloc();;
-	if ( n == 0 || k == 0 || csize == 0 || buf == NULL || chunks == NULL || pbuf == NULL )
+	if ( n == 0 || k == 0 || csize == 0 || chunks == NULL || input == NULL )
 		return false;
 
 	for ( i = 0; i < n - k ; i++ ) {
-		if ( memcmp( buf + ( i + k ) * csize, pbuf + i * csize, csize ) == 0 )
+		if ( memcmp( ChunkUtil::getData( chunks[ i + k ] ), ChunkUtil::getData( input[ i ] ), csize ) == 0 )
 			fprintf( stdout, "\tchunk %d [PARITY] correct\n", i + k );
 		else {
 			all_correct = false;
-			ChunkUtil::setSize( c, csize );
-			ChunkUtil::copy( c, 0, buf + ( i + k ) * csize, csize );
 			fprintf( stdout, "\tchunk %d [PARITY] wrong..\n", i + k );
-			/*
-			fprintf( stdout, "\tinput " );
-			print_chunk( &c, i + k );
-			fprintf( stdout, "\texpected " );
-			print_chunk( chunks[ i + k ], i + k );
-			*/
-			print_chunks( c, chunks[ i + k ], i + k );
+			print_chunks( input[ i ], chunks[ i + k ], i + k );
 		}
 	}
-	tempChunkPool.free( c );
 
 	return all_correct;
 }
@@ -152,15 +141,18 @@ int main( int argc, char** argv ) {
 	ChunkUtil::init( csize, k );
 
 	chunks = new Chunk*[ n ];
+	input = new Chunk*[ n - k ];
 	for ( uint32_t i = 0 ; i < n ; i ++ ) {
-		chunks[i] = tempChunkPool.alloc();
-		ChunkUtil::setSize( chunks[ i ], csize );
+		chunks[ i ] = tempChunkPool.alloc();
+		ChunkUtil::setSize( chunks[ i ], 4096 );
 	}
+	for ( uint32_t i = 0 ; i < n - k ; i ++ )
+		input[ i ] = tempChunkPool.alloc();
 
 	fprintf( stdout, "Start checking chunks\n" );
 	read_chunks( argv );
-	for (uint32_t i = 0 ; i < n - k ; i ++ ) {
-		handle->encode( chunks, chunks[ k + i ], i + 1);
+	for ( uint32_t i = 0 ; i < n - k ; i++ ) {
+		handle->encode( chunks, chunks[ k + i ], i + 1 );
 	}
 	fprintf( stdout, "Verify chunks\n");
 	if ( verify_chunks() ) {

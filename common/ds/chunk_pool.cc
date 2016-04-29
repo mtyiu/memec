@@ -31,7 +31,7 @@ void ChunkPool::init( uint32_t chunkSize, uint64_t capacity ) {
 	}
 }
 
-Chunk *ChunkPool::alloc() {
+Chunk *ChunkPool::alloc( uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t size ) {
 	// Update counter
 	uint32_t index = ( this->count++ ); // index = the value of this->count before increment
 
@@ -43,15 +43,10 @@ Chunk *ChunkPool::alloc() {
 
 	// Calculate memory address
 	Chunk *chunk = ( Chunk * )( this->startAddress + ( index * ( CHUNK_METADATA_SIZE + ChunkUtil::chunkSize ) ) );
-	if ( chunk )
+	if ( chunk ) {
 		ChunkUtil::clear( chunk );
-	return chunk;
-}
-
-Chunk *ChunkPool::alloc( uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t size ) {
-	Chunk *chunk = this->alloc();
-	if ( chunk )
 		ChunkUtil::set( chunk, listId, stripeId, chunkId, size );
+	}
 	return chunk;
 }
 

@@ -318,8 +318,7 @@ public:
 
 	void init( uint32_t chunkSize, uint64_t capacity );
 
-	Chunk *alloc();
-	Chunk *alloc( uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t size );
+	Chunk *alloc( uint32_t listId = 0, uint32_t stripeId = 0, uint32_t chunkId = 0, uint32_t size = 0 );
 
 	// Translate object pointer to chunk pointer
 	Chunk *getChunk( char *ptr, uint32_t &offset );
@@ -332,17 +331,14 @@ public:
 
 class TempChunkPool {
 public:
-	Chunk *alloc() {
-		Chunk *ret = ( Chunk * ) malloc( CHUNK_METADATA_SIZE + ChunkUtil::chunkSize );
-		if ( ret )
-			ChunkUtil::clear( ret );
-		return ret;
-	}
+	Chunk *alloc( uint32_t listId = 0, uint32_t stripeId = 0, uint32_t chunkId = 0, uint32_t size = 0 ) {
+		Chunk *chunk = ( Chunk * ) malloc( CHUNK_METADATA_SIZE + ChunkUtil::chunkSize );
 
-	Chunk *alloc( uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t size ) {
-		Chunk *ret = this->alloc();
-		ChunkUtil::set( ret, listId, stripeId, chunkId, size );
-		return ret;
+		if ( chunk ) {
+			ChunkUtil::clear( chunk );
+			ChunkUtil::set( chunk, listId, stripeId, chunkId, size );
+		}
+		return chunk;
 	}
 
 	void free( Chunk *chunk ) {
