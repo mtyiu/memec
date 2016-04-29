@@ -12,6 +12,10 @@ extern "C" {
 #define CAUCHY_W_LIMIT (32)
 
 CauchyCoding::CauchyCoding( uint32_t k, uint32_t m, uint32_t chunkSize ) {
+	this->_jmatrix = 0;
+	this->_jbitmatrix = 0;
+	this->_jschedule = 0;
+
 	// force init on gfp_array for w = { 8, 16, 32 }
 	galois_single_divide( 10, 2 , 8 );
 	galois_single_divide( 10, 2 , 16 );

@@ -72,11 +72,9 @@ public class Main implements Runnable {
 
 		while( i < numOps ) {
 			// rand = this.random.nextInt( 4 );
-			rand = this.random.nextInt( 2 );
+			rand = this.random.nextInt( 3 );
 			size = this.map.size();
 			ret = false;
-
-			if ( rand == 1 ) rand = 2;
 
 			/*
 			if ( size != numRecords ) rand = 0;

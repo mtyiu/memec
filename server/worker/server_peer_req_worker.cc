@@ -678,7 +678,7 @@ bool ServerWorker::handleUpdateChunkRequest( ServerPeerEvent event, char *buf, s
 		__ERROR__( "ServerWorker", "handleUpdateChunkRequest", "Invalid UPDATE_CHUNK request." );
 		return false;
 	}
-	__INFO__(
+	__DEBUG__(
 		BLUE, "ServerWorker", "handleUpdateChunkRequest",
 		"[UPDATE_CHUNK] List ID: %u; stripe ID: %u; chunk ID: %u; offset: %u; length: %u; updating chunk ID: %u",
 		header.listId, header.stripeId, header.chunkId,
@@ -720,7 +720,6 @@ bool ServerWorker::handleUpdateChunkRequest( ServerPeerEvent event, char *buf, s
 			header.offset, header.length, header.delta,
 			this->chunks, this->dataChunk, this->parityChunk
 		);
-		fprintf( stderr, "UPDATED: %u %u %u\n", header.listId, header.stripeId, header.chunkId );
 
 		// backup parity chunk delta ( data chunk delta from data server )
 		Timestamp timestamp( event.timestamp );

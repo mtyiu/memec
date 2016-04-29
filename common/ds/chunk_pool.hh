@@ -4,6 +4,7 @@
 #include <atomic>
 #include <cstdio>
 #include <cstdlib>
+#include <cassert>
 #include "../../common/coding/coding.hh"
 #include "../../common/ds/chunk.hh"
 #include "../../common/hash/hash_func.hh"
@@ -184,9 +185,9 @@ public:
 	// Memory allocator for objects
 	static inline char *alloc( Chunk *chunk, uint32_t size, uint32_t &offset ) {
 		struct ChunkMetadata *chunkMetadata = ( struct ChunkMetadata * ) chunk;
-		offset = CHUNK_METADATA_SIZE + chunkMetadata->size;
+		offset = chunkMetadata->size;
 		chunkMetadata->size += size;
-		return ( ( char * ) chunk ) + offset;
+		return ( ( char * ) chunk ) + CHUNK_METADATA_SIZE + offset;
 	}
 
 	// Update
