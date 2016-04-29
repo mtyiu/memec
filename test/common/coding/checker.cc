@@ -55,14 +55,14 @@ bool parse_args( int argc, char** argv ) {
 }
 
 void print_chunk( Chunk *chunk, uint32_t id = 0 ) {
-	char *prev = chunk->getData();
+	char *prev = ChunkUtil::getData( chunk );
 	char *data;
 	int prevPos = 0;
 	if (id != 0) {
 		printf("chunk %d:\n", id);
 	}
 	for (uint32_t i = 1; i < csize; i++) {
-		data = chunk->getData();
+		data = ChunkUtil::getData( chunk );
 		if ( data[i] != *prev ) {
 			printf("\t\t[%02x] from %8d to %8d\n", *prev, prevPos, i-1);
 			prevPos = i;
@@ -73,7 +73,7 @@ void print_chunk( Chunk *chunk, uint32_t id = 0 ) {
 }
 
 void print_chunks( Chunk *c1, Chunk *c2, uint32_t id = 0 ) {
-	char *d1 = c1->getData(), *d2 = c2->getData();
+	char *d1 = ChunkUtil::getData( c1 ), *d2 = ChunkUtil::getData( c2 );
 	int count = 0;
 	if (id != 0) {
 		printf("chunk %d:\n", id);
@@ -113,7 +113,8 @@ bool read_chunks( char** argv ) {
 bool verify_chunks() {
 	uint32_t i;
 	bool all_correct = true;
-	Chunk c;
+	TempChunkPool tempChunkPool;
+	Chunk *c = tempChunkPool.alloc();;
 	if ( n == 0 || k == 0 || csize == 0 || buf == NULL || chunks == NULL || pbuf == NULL )
 		return false;
 
@@ -122,8 +123,8 @@ bool verify_chunks() {
 			fprintf( stdout, "\tchunk %d [PARITY] correct\n", i + k );
 		else {
 			all_correct = false;
-			c.setSize( csize );
-			c.setData( buf + ( i + k ) * csize );
+			ChunkUtil::setSize( c, csize );
+			ChunkUtil::copy( c, 0, buf + ( i + k ) * csize, csize );
 			fprintf( stdout, "\tchunk %d [PARITY] wrong..\n", i + k );
 			/*
 			fprintf( stdout, "\tinput " );
@@ -131,9 +132,10 @@ bool verify_chunks() {
 			fprintf( stdout, "\texpected " );
 			print_chunk( chunks[ i + k ], i + k );
 			*/
-			print_chunks( &c, chunks[ i + k ], i + k );
+			print_chunks( c, chunks[ i + k ], i + k );
 		}
 	}
+	tempChunkPool.free( c );
 
 	return all_correct;
 }
@@ -146,13 +148,13 @@ int main( int argc, char** argv ) {
 
 	handle = Coding::instantiate( scheme, params, csize );
 
+	TempChunkPool tempChunkPool;
+	ChunkUtil::init( csize, k );
+
 	chunks = new Chunk*[ n ];
-	buf = ( char* ) calloc ( sizeof( char ) * csize, n );
-	pbuf = ( char* ) calloc ( sizeof( char ) * csize, n - k );
 	for ( uint32_t i = 0 ; i < n ; i ++ ) {
-		chunks[i] = new Chunk();
-		chunks[i]->setData( ( i < k )? buf + ( i * csize ) : pbuf + ( i - k ) * csize );
-		chunks[i]->setSize( csize );
+		chunks[i] = tempChunkPool.alloc();
+		ChunkUtil::setSize( chunks[ i ], csize );
 	}
 
 	fprintf( stdout, "Start checking chunks\n" );

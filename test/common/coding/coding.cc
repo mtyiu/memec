@@ -25,12 +25,12 @@ void usage( char* argv ) {
 }
 
 void printChunk( Chunk *chunk, uint32_t id = 0 ) {
-	char *prev = chunk->getData(), *data;
+	char *prev = ChunkUtil::getData( chunk ), *data;
 	int prevPos = 0;
 	if (id != 0) {
 		printf(" chunk %d:\n", id);
 	}
-	data = chunk->getData();
+	data = ChunkUtil::getData( chunk );
 	for (uint32_t i = 1; i < CHUNK_SIZE; i++) {
 		if ( data[i] != *prev ) {
 			printf("[%x] from %d to %d\n", *prev, prevPos, i-1);
@@ -80,13 +80,15 @@ int main( int argc, char **argv ) {
 	Chunk ** chunks = ( Chunk ** ) malloc ( sizeof( Chunk* ) * ( C_K + C_M ) );
 	BitmaskArray bitmap ( 1, C_K + C_M );
 
+	TempChunkPool tempChunkPool;
+	ChunkUtil::init( CHUNK_SIZE, C_K );
+
 	// set up the chunks
 	for ( uint32_t idx = 0 ; idx < C_K * 2 ; idx ++ ) {
 		memset( buf + idx * CHUNK_SIZE / 2, idx / 2 * 3 + 5 , CHUNK_SIZE / 2 );
 		if ( idx % 2 == 0 ) {
-			chunks[ idx / 2 ] = ( Chunk* ) malloc ( sizeof( Chunk ) );
-			chunks[ idx / 2 ]->setData( buf + ( idx / 2 ) * CHUNK_SIZE );
-			chunks[ idx / 2 ]->setSize( CHUNK_SIZE );
+			chunks[ idx / 2 ] = tempChunkPool.alloc();
+			ChunkUtil::setSize( chunks[ idx / 2 ], CHUNK_SIZE );
 
 			// mark the chunk status
 			bitmap.set ( idx / 2 , 0 );
@@ -94,10 +96,9 @@ int main( int argc, char **argv ) {
 	}
 
 	for ( uint32_t idx = C_K ; idx < C_K + C_M ; idx ++ ) {
-		memset( buf + idx * CHUNK_SIZE, 0, CHUNK_SIZE );
-		chunks[ idx ] = ( Chunk* ) malloc ( sizeof( Chunk ) );
-		chunks[ idx ]->setData( buf + idx * CHUNK_SIZE );
-		chunks[ idx ]->setSize( CHUNK_SIZE );
+		chunks[ idx ] = tempChunkPool.alloc();
+		ChunkUtil::setSize( chunks[ idx ], CHUNK_SIZE );
+
 		bitmap.set ( idx  , 0 );
 	}
 
@@ -144,14 +145,13 @@ int main( int argc, char **argv ) {
 	// always modifies the first data chunk to be lost to test if parities are correctly updated
 	// use read buf to hold the data delta and the parity delta
 	memset ( readbuf , 0, CHUNK_SIZE * C_M );
-	Chunk* shadowParity = new Chunk();
-	shadowParity->setData( readbuf + CHUNK_SIZE );
+	Chunk* shadowParity = tempChunkPool.alloc();
 	// zero block
 	char *zero = new char [ CHUNK_SIZE ];
 	memset( zero, 0, CHUNK_SIZE );
 	printf( "delta at chunk %u from %u to %u\n", failed[ 0 ], MODIFY_ST, MODIFY_ED );
 	// pointers to the start of data delta and modified data
-	char *odata = chunks[ failed[ 0 ] ]->getData() + MODIFY_ST;
+	char *odata = ChunkUtil::getData( chunks[ failed[ 0 ] ] ) + MODIFY_ST;
 	char *ndata = readbuf + MODIFY_ST;
 	uint32_t len = MODIFY_ED - MODIFY_ST;
 	// get data delta
@@ -161,19 +161,19 @@ int main( int argc, char **argv ) {
 	// zero unmodified data chunks
 	for ( uint32_t idx = 0 ; idx < C_K ; idx ++ ) {
 		if ( idx == failed[ 0 ] )
-			chunks[ failed[ 0 ] ]->setData( readbuf );
+			ChunkUtil::copy( chunks[ failed[ 0 ] ], 0, readbuf, CHUNK_SIZE );
 		else
-			chunks[ idx ]->setData( zero );
+			ChunkUtil::clear( chunks[ idx ] );
 	}
 	// get parity delta
 	for ( uint32_t idx = 0 ; idx < m ; idx ++ ) {
-		memset(shadowParity->getData(), 0, CHUNK_SIZE);
+		memset(ChunkUtil::getData( shadowParity ), 0, CHUNK_SIZE);
 		handle->encode( chunks, shadowParity, idx + 1, failed[ 0 ] * CHUNK_SIZE + MODIFY_ST, failed[ 0 ] * CHUNK_SIZE + MODIFY_ED );
 		Coding::bitwiseXOR( chunks[ C_K + idx ], shadowParity, chunks[ C_K + idx ], CHUNK_SIZE );
 	}
 	// restore the data chunks
 	for ( uint32_t idx = 0 ; idx < C_K ; idx ++ ) {
-		chunks[ idx ]->setData( buf + idx * CHUNK_SIZE );
+		ChunkUtil::copy( chunks[ idx ], 0, buf + idx * CHUNK_SIZE, CHUNK_SIZE );
 	}
 	delete [] shadowParity;
 	delete [] zero;
@@ -182,7 +182,7 @@ int main( int argc, char **argv ) {
 	memset ( readbuf , 0, CHUNK_SIZE * C_M );
 
 	printf( ">> fail disk %d ... ", failed[ 0 ] );
-	chunks[ failed[ 0 ] ]->setData( readbuf );
+	ChunkUtil::copy( chunks[ failed[ 0 ] ], 0, readbuf, CHUNK_SIZE );
 	bitmap.unset ( failed[ 0 ] , 0 );
 
 	handle->decode ( chunks, &bitmap );
@@ -197,7 +197,7 @@ int main( int argc, char **argv ) {
 
 	// reset size to avoid change in size by key-value compaction
 	for ( uint32_t idx = 0 ; idx < C_K ; idx ++ ) {
-		chunks[ idx ]->setSize( CHUNK_SIZE );
+		ChunkUtil::setSize( chunks[ idx ], CHUNK_SIZE );
 	}
 
 	// double failure
@@ -207,7 +207,7 @@ int main( int argc, char **argv ) {
 		bitmap.unset ( failed[ 0 ], 0 );
 		printf( "%d ... ", failed[ 1 ]);
 		bitmap.unset ( failed[ 1 ], 0 );
-		chunks[ failed[ 1 ] ]->setData( readbuf + CHUNK_SIZE );
+		ChunkUtil::copy( chunks[ failed[ 1 ] ], 0, readbuf + CHUNK_SIZE, CHUNK_SIZE );
 
 		handle->decode ( chunks, &bitmap );
 
@@ -229,7 +229,7 @@ int main( int argc, char **argv ) {
 
 	// reset size to avoid change in size by key-value compaction
 	for ( uint32_t idx = 0 ; idx < C_K ; idx ++ ) {
-		chunks[ idx ]->setSize( CHUNK_SIZE );
+		ChunkUtil::setSize( chunks[ idx ], CHUNK_SIZE );
 	}
 
 	// triple failure
@@ -241,7 +241,7 @@ int main( int argc, char **argv ) {
 		bitmap.unset ( failed[ 1 ], 0 );
 		printf( "%d ... ", failed[ 2 ]);
 		bitmap.unset ( failed[ 2 ], 0 );
-		chunks[ failed[ 2 ] ]->setData( readbuf + CHUNK_SIZE * 2 );
+		ChunkUtil::copy( chunks[ failed[ 2 ] ], 0, readbuf + CHUNK_SIZE * 2, CHUNK_SIZE );
 
 		handle->decode ( chunks, &bitmap );
 
@@ -272,8 +272,7 @@ int main( int argc, char **argv ) {
 	free( buf );
 	free( readbuf );
 	for ( uint32_t idx = 0 ; idx < C_M + C_K ; idx ++ ) {
-		chunks[ idx ]->setData( NULL );
-		free(chunks[ idx ]);
+		tempChunkPool.free(chunks[ idx ]);
 	}
 	free( chunks );
 
