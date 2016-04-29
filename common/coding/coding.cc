@@ -10,6 +10,7 @@ Coding::~Coding() {}
 
 Coding *Coding::instantiate( CodingScheme scheme, CodingParams &params, uint32_t chunkSize ) {
 	// Initialize zero block
+	ChunkUtil::chunkSize = chunkSize;
 	TempChunkPool tempChunkPool;
 	Coding::zeros = tempChunkPool.alloc();
 

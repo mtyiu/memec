@@ -61,9 +61,9 @@ void RSCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t index, u
 	// encode
 	jerasure_matrix_encode( k, m, w, matrix, data, code, chunkSize );
 
-	delete data;
-	delete code;
-	delete chunk;
+	delete[] data;
+	delete[] code;
+	delete[] chunk;
 }
 
 bool RSCoding::decode( Chunk **chunks, BitmaskArray * chunkStatus ) {
