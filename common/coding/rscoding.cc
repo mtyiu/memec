@@ -12,10 +12,12 @@ extern "C" {
 #define RS_W_LIMIT (32)
 
 RSCoding::RSCoding( uint32_t k, uint32_t m, uint32_t chunkSize ) {
+	this->_jmatrix = 0;
+
 	// force init on gfp_array for w = { 8, 16, 32 }
-	galois_single_divide( 10, 2 , 8 );
-	galois_single_divide( 10, 2 , 16 );
-	galois_single_divide( 10, 2 , 32 );
+	galois_single_divide( 10, 2, 8 );
+	galois_single_divide( 10, 2, 16 );
+	galois_single_divide( 10, 2, 32 );
 
 	this->_k = k;
 	this->_m = m;
