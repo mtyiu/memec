@@ -871,7 +871,7 @@ bool ServerWorker::handleRevertDelta( ClientEvent event, char *buf, size_t size 
 	timestamps.clear();
 
 	for ( auto& it : update ) {
-		it.print();
+		//it.print();
 		if ( it.isChunkDelta ) {
 			ServerWorker::chunkBuffer->at( it.metadata.listId )->update(
 				it.metadata.stripeId, it.metadata.chunkId,
@@ -897,7 +897,7 @@ bool ServerWorker::handleRevertDelta( ClientEvent event, char *buf, size_t size 
 	}
 
 	for ( auto& it : del ) {
-		it.print();
+		//it.print();
 		if ( it.isChunkDelta ) {
 			ServerWorker::chunkBuffer->at( it.metadata.listId )->update(
 				it.metadata.stripeId, it.metadata.chunkId,

@@ -390,9 +390,6 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 		struct KeyHeader header;
 		if ( this->protocol.parseKeyHeader( header, buf, size ) ) {
 			key.set( header.keySize, header.key, ( void * ) event.socket );
-			if ( ! isDegraded ) {
-				__ERROR__( "ClientWorker", "handleGetResponse", "GET request id = %u failed ", event.requestId );
-			}
 		} else {
 			__ERROR__( "ClientWorker", "handleGetResponse", "Invalid GET response." );
 			return false;
@@ -459,6 +456,9 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 			} else {
 				// event.socket->printAddress();
 				// printf( ": handleGetResponse(): Key %.*s not found.\n", key.size, key.data );
+				if ( ! isDegraded ) {
+					__ERROR__( "ClientWorker", "handleGetResponse", "GET request id = %u failed ", pid.requestId );
+				}
 				applicationEvent.resGet( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, key, false );
 			}
 		}
