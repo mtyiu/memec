@@ -991,9 +991,9 @@ bool ServerWorker::handleRevertDelta( ClientEvent event, char *buf, size_t size 
 			continue;
 
 		// revert normal SET via DELETE
-		bool ret = ServerWorker::chunkBuffer->at( listId )->deleteKey( k.data, k.size );
-		if ( ret )
-			__INFO__( YELLOW, "ServerWorker", "handleRevertDelta", "reverted delta for key %.*s for failed server id=%u", k.size, k.data, header.targetId );
+		// bool ret = ServerWorker::chunkBuffer->at( listId )->deleteKey( k.data, k.size );
+		// if ( ret )
+		// 	__INFO__( YELLOW, "ServerWorker", "handleRevertDelta", "reverted delta for key %.*s for failed server id=%u", k.size, k.data, header.targetId );
 
 		// TODO revert remapped SET (?)
 

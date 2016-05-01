@@ -272,8 +272,8 @@ bool ClientStateTransitHandler::acceptNormalResponse( const struct sockaddr_in &
 		case STATE_NORMAL:
 		case STATE_COORDINATED:
 		case STATE_WAIT_NORMAL:
-			return true;
 		case STATE_INTERMEDIATE:
+			return true;
 		case STATE_WAIT_DEGRADED:
 		case STATE_DEGRADED:
 		default:
@@ -346,8 +346,26 @@ bool ClientStateTransitHandler::checkAckForServer( struct sockaddr_in server ) {
 			)
 		) ||
 	    ( state == STATE_COORDINATED && false /* no operations are needed before completing transition */) ) {
-		//if ( state == STATE_INTERMEDIATE )
-			//printf( "addr: %s:%hu, count: %u, completed %u\n", buf, ntohs( server.sin_port ), this->stateTransitInfo[ server ].getParityRevertCounterVal(), this->stateTransitInfo[ server ].counter.pendingNormalRequests.completed );
+		if ( state == STATE_INTERMEDIATE ) {
+			// fprintf(
+			// 	stderr,
+			// 	"addr: %s:%hu, count: %u, completed? %s (pending = %lu)\n",
+			// 	buf, ntohs( server.sin_port ),
+			// 	this->stateTransitInfo[ server ].getParityRevertCounterVal(), this->stateTransitInfo[ server ].counter.pendingNormalRequests.completed ? "true" : "false",
+			// 	this->stateTransitInfo[ server ].counter.pendingNormalRequests.requestIds.size()
+			// );
+			if ( this->stateTransitInfo[ server ].counter.pendingNormalRequests.requestIds.size() ) {
+				std::unordered_set<uint32_t> &requestIds = this->stateTransitInfo[ server ].counter.pendingNormalRequests.requestIds;
+				std::unordered_set<uint32_t>::iterator it;
+				for ( it = requestIds.begin(); it != requestIds.end(); ) {
+					if ( ! ClientWorker::pending->findKeyValue( *it ) ) {
+						it = requestIds.erase( it );
+					} else {
+						it++;
+					}
+				}
+			}
+		}
 		UNLOCK( &this->serversStateLock[ server ] );
 		return false;
 	}

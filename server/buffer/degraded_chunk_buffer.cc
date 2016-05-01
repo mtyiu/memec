@@ -347,7 +347,7 @@ bool DegradedMap::insertDegradedKey( Key key, uint16_t instanceId, uint32_t requ
 	return ret;
 }
 
-bool DegradedMap::deleteDegradedKey( Key key, std::vector<struct pid_s> &pids ) {
+bool DegradedMap::deleteDegradedKey( Key key, std::vector<struct pid_s> &pids, bool success ) {
 	std::unordered_map<Key, std::vector<struct pid_s>>::iterator it;
 
 	LOCK( &this->degraded.keysLock );
@@ -359,9 +359,11 @@ bool DegradedMap::deleteDegradedKey( Key key, std::vector<struct pid_s> &pids ) 
 		pids = it->second;
 		this->degraded.keys.erase( it );
 
-		Key k = key;
-		k.dup();
-		this->degraded.reconstructedKeys.insert( k );
+		if ( success ) {
+			Key k = key;
+			k.dup();
+			this->degraded.reconstructedKeys.insert( k );
+		}
 	}
 	UNLOCK( &this->degraded.keysLock );
 
@@ -377,7 +379,7 @@ bool DegradedMap::insertChunk( uint32_t listId, uint32_t stripeId, uint32_t chun
 
 	if ( needsLock ) LOCK( &this->cacheLock );
 	ret = this->cache.insert( p );
-	// Mark the chunk as present 
+	// Mark the chunk as present
 	LOCK ( &this->removedLock );
 	this->removed.erase( metadata );
 	UNLOCK ( &this->removedLock );

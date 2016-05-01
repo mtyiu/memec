@@ -172,8 +172,8 @@ void ClientWorker::dispatch( ServerEvent event ) {
 						break;
 					case PROTO_OPCODE_GET:
 						if ( ! csth.acceptNormalResponse( addr ) ) {
-							//__INFO__( YELLOW, "Client", "dispatch", "Ignoring normal GET response..." );
-							break;
+							__INFO__( YELLOW, "Client", "dispatch", "Ignoring normal GET response: ID = %u (port: %u).", header.requestId, ntohs( addr.sin_port ) );
+							// break;
 						}
 					case PROTO_OPCODE_DEGRADED_GET:
 						this->handleGetResponse( event, success, header.opcode == PROTO_OPCODE_DEGRADED_GET, buffer.data, header.length );
@@ -297,11 +297,12 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 		keyStr = header.key;
 	}
 
-	int pending;
+	int pending = 0;
 	ApplicationEvent applicationEvent;
 	PendingIdentifier pid;
 	Key key;
 	KeyValue keyValue;
+	Client* client = Client::getInstance();
 
 	if ( ! ClientWorker::pending->eraseKey( PT_SERVER_SET, event.instanceId, event.requestId, event.socket, &pid, &key, true, false ) ) {
 		UNLOCK( &ClientWorker::pending->servers.setLock );
@@ -313,7 +314,6 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 	pending = ClientWorker::pending->count( PT_SERVER_SET, pid.instanceId, pid.requestId, false, true );
 
 	// Mark the elapse time as latency
-	Client* client = Client::getInstance();
 	if ( ClientWorker::updateInterval ) {
 		struct timespec elapsedTime;
 		RequestStartTime rst;
@@ -359,10 +359,11 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 		for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
 			server = this->parityServerSockets[ i ];
 			addr = server->getAddr();
-			if ( ! stateTransitHandler->useCoordinatedFlow( addr, true, true ) || stateTransitHandler->stateTransitInfo.at( addr ).isCompleted() )
-				continue;
+			// if ( ! stateTransitHandler->useCoordinatedFlow( addr, true, true ) || stateTransitHandler->stateTransitInfo.at( addr ).isCompleted() )
+			// 	continue;
+			__DEBUG__( GREEN, "ClientWorker", "handleSetResponse", "Ack transition for server id = %u (request ID = %u).", server->instanceId, pid.requestId );
 			if ( stateTransitHandler->stateTransitInfo.at( addr ).removePendingRequest( pid.requestId ) == 0 && stateTransitHandler->stateTransitInfo.at( addr ).setCompleted() ) {
-				__INFO__( GREEN, "ClientWorker", "handleSetResponse", "Ack transition for server id = %u.", server->instanceId );
+				// __INFO__( GREEN, "ClientWorker", "handleSetResponse", "Ack transition for server id = %u (request ID = %u).", server->instanceId, pid.requestId );
 				stateTransitHandler->ackTransit( addr );
 			}
 		}
