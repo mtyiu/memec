@@ -922,7 +922,7 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 								stderr,
 								"[%u, %u, %u] instanceId: %u vs. %u; "
 								"requestId:  %u vs. %u\n",
-								listId, stripeId, chunkId,
+								op.listId, op.stripeId, op.chunkId,
 								pids[ pidsIndex ].instanceId,
 								pid.instanceId,
 								pids[ pidsIndex ].requestId,

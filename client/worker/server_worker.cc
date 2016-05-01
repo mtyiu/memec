@@ -190,7 +190,7 @@ void ClientWorker::dispatch( ServerEvent event ) {
 						break;
 					case PROTO_OPCODE_UPDATE:
 						if ( ! csth.acceptNormalResponse( addr ) ) {
-							//__INFO__( YELLOW, "Client", "dispatch", "Ignoring normal UPDATE response..." );
+							// __INFO__( YELLOW, "Client", "dispatch", "[port: %u] Ignoring normal UPDATE response...", ntohs( addr.sin_port ) );
 							break;
 						}
 					case PROTO_OPCODE_DEGRADED_UPDATE:
@@ -531,6 +531,8 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 			( int ) header.keySize, header.key, header.keySize,
 			header.valueUpdateSize, header.valueUpdateOffset
 		);
+		fprintf( stderr, "----- WAITING FOR RETRY ----------\n" );
+		return false;
 	}
 
 	KeyValueUpdate keyValueUpdate;
