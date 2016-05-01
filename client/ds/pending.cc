@@ -448,6 +448,23 @@ bool Pending::eraseAck( PendingType type, uint16_t instanceId, std::vector<Ackno
 	return true;
 }
 
+bool Pending::findKeyValue( uint32_t requestId ) {
+	std::unordered_multimap<PendingIdentifier, KeyValue> *map = &this->applications.set;
+	std::unordered_multimap<PendingIdentifier, KeyValue>::iterator it;
+	bool ret = false;
+
+	LOCK( &this->applications.setLock );
+	for ( it = map->begin(); it != map->end(); it++ ) {
+		if ( it->first.requestId == requestId ) {
+			ret = true;
+			break;
+		}
+	}
+	UNLOCK( &this->applications.setLock );
+
+	return ret;
+}
+
 bool Pending::findKeyValue( PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr, KeyValue *keyValuePtr, bool checkKey, char* checkKeyPtr ) {
 	PendingIdentifier pid( instanceId, 0, requestId, 0, ptr );
 	LOCK_T *lock;

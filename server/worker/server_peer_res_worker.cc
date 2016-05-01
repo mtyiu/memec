@@ -37,7 +37,7 @@ bool ServerWorker::handleForwardKeyResponse( struct ForwardKeyHeader &header, bo
 
 	key.set( header.keySize, header.key );
 
-	if ( ! dmap->deleteDegradedKey( key, pids ) ) {
+	if ( ! dmap->deleteDegradedKey( key, pids, true ) ) {
 		// __ERROR__( "ServerWorker", "handleForwardKeyResponse", "ServerWorker::degradedChunkBuffer->deleteDegradedKey() failed: %.*s (self? %s).", header.keySize, header.key, self ? "yes" : "no" );
 		return false;
 	}
@@ -221,7 +221,7 @@ bool ServerWorker::handleGetResponse( ServerPeerEvent event, bool success, char 
 		return false;
 	}
 
-	if ( ! dmap->deleteDegradedKey( key, pids ) ) {
+	if ( ! dmap->deleteDegradedKey( key, pids, success ) ) {
 		__ERROR__( "ServerWorker", "handleGetResponse", "ServerWorker::degradedChunkBuffer->deleteDegradedKey() failed." );
 	}
 

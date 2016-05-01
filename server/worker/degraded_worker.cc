@@ -201,7 +201,7 @@ degraded_get_check:
 		);
 		this->dispatch( event );
 	} else if ( dmap->findRemovedChunk( listId, stripeId, chunkId ) ) {
-		// Chunk migrated 
+		// Chunk migrated
 		event.resGet(
 			event.socket, event.instanceId, event.requestId,
 			key, true // isDegraded
@@ -1061,6 +1061,7 @@ bool ServerWorker::performDegradedRead(
 	// Insert the degraded operation into degraded chunk buffer pending set
 	Key k;
 	bool needsContinue;
+
 	if ( isSealed ) {
 		if ( ongoingAtChunk != ServerWorker::chunkBuffer->at( listId )->getChunkId() ) {
 			ServerWorker::degradedChunkBuffer->map.insertDegradedChunk(
@@ -1077,18 +1078,11 @@ bool ServerWorker::performDegradedRead(
 				isReconstructed
 			);
 		}
-	} else {
-		if ( opcode == PROTO_OPCODE_DEGRADED_UPDATE )
-			k.set( keyValueUpdate->size, keyValueUpdate->data );
-		else
-			k = *key;
-		needsContinue = ServerWorker::degradedChunkBuffer->map.insertDegradedKey( k, instanceId, requestId, isReconstructed );
-	}
 
-	if ( isSealed ) {
 		if ( ! needsContinue ) {
 			if ( isReconstructed ) {
 				// The chunk is already reconstructed
+				// __INFO__( YELLOW, "ServerWorker", "performDegradedRead", "The chunk (%u, %u, %u) is already reconstructed.", listId, stripeId, chunkId );
 				return false;
 			} else {
 				// Reconstruction in progress
@@ -1158,9 +1152,17 @@ force_reconstruct_chunks:
 
 		return ( selected >= ServerWorker::dataChunkCount );
 	} else {
+		if ( opcode == PROTO_OPCODE_DEGRADED_UPDATE )
+			k.set( keyValueUpdate->size, keyValueUpdate->data );
+		else
+			k = *key;
+		needsContinue = ServerWorker::degradedChunkBuffer->map.insertDegradedKey( k, instanceId, requestId, isReconstructed );
+
 		////////// Key-value pairs in unsealed chunks //////////
-		if ( ! needsContinue || isReconstructed )
+		if ( ! needsContinue || isReconstructed ) {
+			// fprintf( stderr, "(%u, %u, %u): ! needsContinue (%s) || isReconstructed (%s)\n", listId, stripeId, chunkId, needsContinue ? "true" : "false", isReconstructed ? "true" : "false" );
 			return false;
+		}
 
 		bool success = true;
 		if ( socket->self ) {

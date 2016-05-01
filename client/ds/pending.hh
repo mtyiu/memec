@@ -371,6 +371,7 @@ public:
 	);
 
 	// Find
+	bool findKeyValue( uint32_t requestId );
 	bool findKeyValue(
 		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr,
 		KeyValue *keyValuePtr,

@@ -114,7 +114,7 @@ public:
 	);
 
 	bool insertDegradedKey( Key key, uint16_t instanceId, uint32_t requestId, bool &isReconstructed );
-	bool deleteDegradedKey( Key key, std::vector<struct pid_s> &pids );
+	bool deleteDegradedKey( Key key, std::vector<struct pid_s> &pids, bool success );
 
 	bool insertChunk(
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,

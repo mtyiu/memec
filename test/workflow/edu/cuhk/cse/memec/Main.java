@@ -72,10 +72,11 @@ public class Main implements Runnable {
 
 		while( i < numOps ) {
 			// rand = this.random.nextInt( 4 );
-			rand = this.random.nextInt( 3 );
+			rand = this.random.nextInt( 2 );
 			size = this.map.size();
 			ret = false;
 
+			/*
 			if ( size != numRecords ) rand = 0;
 			if ( i == numRecords * 3 / 4 ) {
 				System.err.println( "[" + this.id + "] Sleep for 4 seconds." );
@@ -85,6 +86,7 @@ public class Main implements Runnable {
 
 				// if ( rand == 0 ) rand = 1;
 			}
+			*/
 
 			if ( rand == 0 ) {
 				// SET
