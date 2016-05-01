@@ -110,6 +110,11 @@ void ClientStateTransitHandler::setState( char* msg , int len ) {
 	struct sockaddr_in server;
 	int ofs = 1;
 	uint32_t recordSize = this->serverStateRecordSize;
+	std::vector<struct sockaddr_in> updatedServers;
+
+	Client *client = Client::getInstance();
+	LOCK_T &lock = client->sockets.servers.lock;
+	std::vector<ServerSocket *> &servers = client->sockets.servers.values;
 
 	for ( uint8_t i = 0; i < serverCount; i++ ) {
 		server.sin_addr.s_addr = (*( ( uint32_t * )( msg + ofs ) ) );
@@ -124,9 +129,6 @@ void ClientStateTransitHandler::setState( char* msg , int len ) {
 			continue;
 		}
 
-		Client *client = Client::getInstance();
-		LOCK_T &lock = client->sockets.servers.lock;
-		std::vector<ServerSocket *> &servers = client->sockets.servers.values;
 		ServerSocket *target = 0;
 
 		LOCK( &lock );
@@ -142,6 +144,8 @@ void ClientStateTransitHandler::setState( char* msg , int len ) {
 			__ERROR__( "ClientStateTransitHandler", "setState" , "ServerSocket for %s:%hu not found\n", buf, ntohs( server.sin_port ) );
 			continue;
 		}
+
+		updatedServers.push_back( server );
 
 		LOCK( &this->serversStateLock[ server ] );
 		RemapState state = this->serversState[ server ];
@@ -188,9 +192,28 @@ void ClientStateTransitHandler::setState( char* msg , int len ) {
 		}
 		this->serversState[ server ] = signal;
 		state = this->serversState[ server ];
+	}
+
+	for ( int i = updatedServers.size() - 1; i >= 0; i-- ) {
+		server = updatedServers[ i ];
 		UNLOCK( &this->serversStateLock[ server ] );
+	}
+
+	for ( int i = updatedServers.size() - 1; i >= 0; i-- ) {
+		ServerSocket *target = 0;
+		server = updatedServers[ i ];
+
+		LOCK( &lock );
+		for ( size_t i = 0, count = servers.size(); i < count; i++ ) {
+			if ( servers[ i ]->equal( server.sin_addr.s_addr, server.sin_port ) ) {
+				target = servers[ i ];
+				break;
+			}
+		}
+		UNLOCK( &lock );
 
 		// actions/cleanup after state change
+		RemapState state = this->serversState[ server ];
 		switch ( state ) {
 			case STATE_INTERMEDIATE:
 				// clean up pending items associated with this server
