@@ -238,6 +238,7 @@ bool CoordinatorWorker::handleReleaseDegradedLockRequest( ServerSocket *socket, 
 	UNLOCK( &map.degradedLocksLock );
 
 	if ( chunks.size() == 0 ) {
+		__INFO__( GREEN, "CoordinatorWorker", "handleReleaseDegradedLockRequest", "Complete release degraded locks for server id:%u cond@%p lock@%p map@%p", socket->instanceId, cond, lock, &socket->map );
 		// No chunks needed to be sync.
 		if ( lock ) pthread_mutex_lock( lock );
 		if ( done ) *done = true;
@@ -286,15 +287,16 @@ bool CoordinatorWorker::handleReleaseDegradedLockResponse( ServerEvent event, ch
 		event.instanceId, event.requestId, header.count
 	);
 
-	pthread_mutex_t *lock;
-	pthread_cond_t *cond;
-	bool *done;
+	pthread_mutex_t *lock = 0;
+	pthread_cond_t *cond = 0;
+	bool *done = 0;
 
 	CoordinatorWorker::pending->removeReleaseDegradedLock( event.requestId, header.count, lock, cond, done );
 
 	if ( lock ) pthread_mutex_lock( lock );
 	if ( done ) *done = true;
 	if ( cond ) pthread_cond_signal( cond );
+	if ( cond ) __INFO__( GREEN, "CoordinatorWorker", "handleReleaseDegradedLockResponse", "Complete release for cond %p for request id = %u", cond, event.requestId );
 	if ( lock ) pthread_mutex_unlock( lock );
 
 	return true;

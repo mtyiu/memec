@@ -41,6 +41,7 @@ bool CoordinatorStateTransitHandler::init( const int ip, const int port, const c
 	pthread_mutex_init( &this->ackSignalLock, 0 );
 
 	this->isListening = false;
+
 	return ( SP_join( this->mbox, CLIENT_GROUP ) == 0 );
 }
 
@@ -244,29 +245,29 @@ bool CoordinatorStateTransitHandler::transitToNormalEnd( const struct sockaddr_i
 
 	pthread_mutex_t lock;
 	pthread_cond_t cond;
-	bool done;
+	// try to avoid the state "while( ! done )" being optmized to "while( true )"
+	volatile bool done;
 
 	pthread_mutex_init( &lock, 0 );
 	pthread_cond_init( &cond, 0 );
 
 	// STATE_TRANSIT SET
 	done = false;
-	coordinator->syncRemappedData( server, &lock, &cond, &done );
-
 	pthread_mutex_lock( &lock );
+	coordinator->syncRemappedData( server, &lock, &cond, ( bool * ) &done );
 	while( ! done )
 		pthread_cond_wait( &cond, &lock );
 	pthread_mutex_unlock( &lock );
 
 	size_t original = coordinator->remappingRecords.size();
 	size_t count = coordinator->remappingRecords.erase( server );
-	fprintf( stderr, "Erased %lu remapping records (original = %lu, remaining = %lu).\n", count, original, coordinator->remappingRecords.size() );
+
+	__INFO__( YELLOW, "CoordinatorStateTransitHandler", "transitToNormalEnd", "Erased %lu remapping records (original = %lu, remaining = %lu).", count, original, coordinator->remappingRecords.size() );
 
 	// DEGRADED
 	done = false;
-	coordinator->releaseDegradedLock( server, &lock, &cond, &done );
-
 	pthread_mutex_lock( &lock );
+	coordinator->releaseDegradedLock( server, &lock, &cond, ( bool * ) &done );
 	while( ! done )
 		pthread_cond_wait( &cond, &lock );
 	pthread_mutex_unlock( &lock );

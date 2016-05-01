@@ -695,7 +695,7 @@ bool ServerWorker::handleUpdateChunkRequest( ServerPeerEvent event, char *buf, s
 			header.updatingChunkId, false
 		);
 		ServerWorker::eventQueue->insert( event );
-		__INFO__( YELLOW, "ServerWorker", "handleUpdateChunkRequest", "Reply false to failed server id=%d", event.socket->instanceId );
+		__DEBUG__( YELLOW, "ServerWorker", "handleUpdateChunkRequest", "Reply false to failed server id=%d", event.socket->instanceId );
 		return false;
 	}
 

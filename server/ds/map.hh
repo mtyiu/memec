@@ -89,11 +89,11 @@ public:
 		}
 
 		if ( keyPtr ) *keyPtr = keysIt->first;
-		UNLOCK( &this->keysLock );
-
 		Chunk *chunk = ( Chunk * ) keysIt->second.ptr;
 		if ( keyValue )
 			*keyValue = chunk->getKeyValue( keysIt->second.offset );
+
+		UNLOCK( &this->keysLock );
 		return true;
 	}
 
@@ -146,7 +146,7 @@ public:
 		if ( needsLock ) LOCK( &this->cacheLock );
 		it = this->cache.find( metadata );
 		if ( it == this->cache.end() ) {
-			UNLOCK( &this->cacheLock );
+			if ( needsUnlock ) UNLOCK( &this->cacheLock );
 			return 0;
 		}
 		if ( needsUnlock ) UNLOCK( &this->cacheLock );

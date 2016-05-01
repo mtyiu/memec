@@ -504,6 +504,9 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 			} else {
 				// event.socket->printAddress();
 				// printf( ": handleGetResponse(): Key %.*s not found.\n", key.size, key.data );
+				if ( ! isDegraded ) {
+					__ERROR__( "ClientWorker", "handleGetResponse", "GET request id = %u failed ", pid.requestId );
+				}
 				applicationEvent.resGet( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, key, false );
 			}
 		}

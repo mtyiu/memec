@@ -97,6 +97,7 @@ bool ServerWorker::handleRemappedData( CoordinatorEvent event, char *buf, size_t
 		// fprintf( stderr, "ServerWorker::handleRemappedData(): not found: socket: %p\n", socket );
 		event.resRemappedData();
 		this->dispatch( event );
+		__INFO__( GREEN, "ServerWorker", "handleRemappedData", "Ack to sync remap for server %u", socket->instanceId );
 		// server not found, but remapped data found.. discard the data
 		if ( found ) delete remappedData;
 	} else {
