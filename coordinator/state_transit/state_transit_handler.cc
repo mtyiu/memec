@@ -260,7 +260,7 @@ bool CoordinatorStateTransitHandler::transitToNormalEnd( const struct sockaddr_i
 
 	size_t original = coordinator->remappingRecords.size();
 	size_t count = coordinator->remappingRecords.erase( server );
-	printf( "Erased %lu remapping records (original = %lu, remaining = %lu).\n", count, original, coordinator->remappingRecords.size() );
+	fprintf( stderr, "Erased %lu remapping records (original = %lu, remaining = %lu).\n", count, original, coordinator->remappingRecords.size() );
 
 	// DEGRADED
 	done = false;

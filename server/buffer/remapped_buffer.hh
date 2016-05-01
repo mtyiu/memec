@@ -42,6 +42,8 @@ public:
 		uint32_t valueUpdateSize, uint32_t valueUpdateOffset, char *valueUpdate,
 		RemappedKeyValue *remappedKeyValue = 0
 	);
+
+	std::unordered_map<Key, RemappedKeyValue>::iterator erase( std::unordered_map<Key, RemappedKeyValue>::iterator it, bool needsLock = false, bool needsUnlock = false );
 };
 
 #endif

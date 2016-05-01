@@ -141,3 +141,19 @@ bool RemappedBuffer::find( uint8_t keySize, char *keyStr, RemappingRecord *remap
 
 	return ret;
 }
+
+std::unordered_map<Key, RemappedKeyValue>::iterator RemappedBuffer::erase( std::unordered_map<Key, RemappedKeyValue>::iterator it, bool needsLock, bool needsUnlock ) {
+	if ( needsLock ) LOCK( &this->keysLock );
+
+	RemappedKeyValue v = it->second;
+
+	if ( v.original ) delete[] v.original;
+	if ( v.remapped ) delete[] v.remapped;
+	v.keyValue.free();
+
+	it = this->keys.erase( it );
+
+	if ( needsUnlock ) UNLOCK( &this->keysLock );
+
+	return it;
+}

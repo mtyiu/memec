@@ -1,7 +1,7 @@
 #include <cstring>
 #include <ctype.h>
 #include "client.hh"
-#include "../remap/basic_remap_scheme.hh" 
+#include "../remap/basic_remap_scheme.hh"
 uint16_t Client::instanceId;
 
 Client::Client() {
@@ -1146,7 +1146,7 @@ bool Client::revertDelta( FILE *f, ServerSocket *target, pthread_cond_t *conditi
 	for ( uint32_t requestId : outdatedRequestIds ) {
 		this->stateTransitHandler.stateTransitInfo.at( target->getAddr() ).removePendingRequest( requestId, false );
 	}
-	if ( ! outdatedRequestIds.empty() ) { 
+	if ( ! outdatedRequestIds.empty() ) {
 		this->stateTransitHandler.stateTransitInfo.at( target->getAddr() ).setCompleted();
 	}
 

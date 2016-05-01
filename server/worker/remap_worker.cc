@@ -29,15 +29,18 @@ bool ServerWorker::handleRemappedData( CoordinatorEvent event, char *buf, size_t
 
 	std::set<PendingData> *remappedData;
 	bool found = ServerWorker::pending->eraseRemapData( target, &remappedData );
+	size_t count = 0;
+	uint16_t instanceId = Server::instanceId;
+	uint32_t requestId = ServerWorker::idGenerator->nextVal( this->workerId );
+	uint32_t requestSent = 0;
 
 	if ( found && socket ) {
-		uint16_t instanceId = Server::instanceId;
-		uint32_t requestId = ServerWorker::idGenerator->nextVal( this->workerId );
+		fprintf( stderr, "ServerWorker::handleRemappedData(): %lu\n", remappedData->size() );
+
 		// insert into pending set to wait for acknowledgement
 		ServerWorker::pending->insertRemapDataRequest( instanceId, event.instanceId, requestId, event.requestId, remappedData->size(), socket );
 		// dispatch one event for each key
 		// TODO : batched SET
-		uint32_t requestSent = 0;
 		for ( PendingData pendingData : *remappedData ) {
 			serverPeerEvent.reqSet( socket, instanceId, requestId, pendingData.key, pendingData.value );
 			server->eventQueue.insert( serverPeerEvent );
@@ -48,11 +51,56 @@ bool ServerWorker::handleRemappedData( CoordinatorEvent event, char *buf, size_t
 			}
 		}
 		delete remappedData;
-	} else {
+	}
+
+	// Scan the remapped buffer
+	LOCK_T *lock = &( ServerWorker::remappedBuffer->keysLock );
+	std::unordered_map<Key, RemappedKeyValue> &keys = ServerWorker::remappedBuffer->keys;
+	std::unordered_map<Key, RemappedKeyValue>::iterator it;
+
+	LOCK( lock );
+
+	// Get counter
+	for ( it = keys.begin(); it != keys.end(); it++ ) {
+		RemappedKeyValue &v = it->second;
+		if ( ServerWorker::stripeList->get( v.listId, v.chunkId ) == socket )
+			count++;
+	}
+
+	ServerWorker::pending->insertRemapDataRequest( instanceId, event.instanceId, requestId, event.requestId, count, socket );
+
+	for ( it = keys.begin(); it != keys.end(); ) {
+		RemappedKeyValue &v = it->second;
+		if ( ServerWorker::stripeList->get( v.listId, v.chunkId ) == socket ) {
+			Key key;
+			Value value;
+
+			v.keyValue.deserialize( key.data, key.size, value.data, value.size );
+
+			serverPeerEvent.reqSet( socket, instanceId, requestId, key, value );
+			this->dispatch( serverPeerEvent );
+			requestSent++;
+			if ( requestSent % BATCH_THRESHOLD == 0 ) {
+				nanosleep( &BATCH_INTVL, 0 );
+				requestSent = 0;
+			}
+
+			it = ServerWorker::remappedBuffer->erase( it );
+		} else {
+			it++;
+		}
+	}
+
+	UNLOCK( lock );
+
+	if ( ! ( found && socket ) && count == 0 ) {
+		// fprintf( stderr, "ServerWorker::handleRemappedData(): not found: socket: %p\n", socket );
 		event.resRemappedData();
 		this->dispatch( event );
 		// server not found, but remapped data found.. discard the data
 		if ( found ) delete remappedData;
+	} else {
+		fprintf( stderr, "remapped key count: %lu\n", count );
 	}
 	return false;
 }

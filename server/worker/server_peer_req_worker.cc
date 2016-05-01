@@ -207,7 +207,6 @@ bool ServerWorker::handleUpdateRequest( ServerPeerEvent event, char *buf, size_t
 		header.chunkUpdateOffset
 	);
 
-
 	Key key;
 	bool isChunkDelta = false;
 	Metadata metadata;

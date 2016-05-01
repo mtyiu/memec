@@ -377,6 +377,9 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 	Key key;
 	uint32_t valueSize = 0;
 	char *valueStr = 0;
+	ApplicationEvent applicationEvent;
+	PendingIdentifier pid;
+
 	if ( success ) {
 		struct KeyValueHeader header;
 		if ( this->protocol.parseKeyValueHeader( header, buf, size ) ) {
@@ -391,17 +394,58 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 		struct KeyHeader header;
 		if ( this->protocol.parseKeyHeader( header, buf, size ) ) {
 			key.set( header.keySize, header.key, ( void * ) event.socket );
+
+			uint32_t listId, chunkId;
+			ServerSocket *originalDataServer = this->getServers( key.data, key.size, listId, chunkId );
+			if ( originalDataServer != event.socket ) {
+				// fprintf( stderr, "MISMATCH: key: %.*s!\n", key.size, key.data );
+
+				if ( ! ClientWorker::pending->eraseKey( PT_SERVER_GET, event.instanceId, event.requestId, event.socket, &pid, &key, true, true ) ) {
+					__ERROR__( "ClientWorker", "handleGetResponse", "Cannot find a pending server GET request that matches the response. This message will be discarded (key = %.*s).", key.size, key.data );
+					return false;
+				}
+
+				// Retry on original server
+				struct {
+					size_t size;
+					char *data;
+				} buffer;
+				ssize_t sentBytes;
+				bool connected;
+
+				buffer.data = this->protocol.reqGet(
+					buffer.size, pid.instanceId, pid.requestId,
+					key.data, key.size
+				);
+
+				if ( ! ClientWorker::pending->insertKey( PT_SERVER_GET, pid.instanceId, pid.parentInstanceId, pid.requestId, pid.parentRequestId, ( void * ) originalDataServer, key ) ) {
+					__ERROR__( "ClientWorker", "handleGetRequest", "Cannot insert into server GET pending map." );
+				}
+
+				if ( ClientWorker::updateInterval ) {
+					// Mark the time when request is sent
+					ClientWorker::pending->recordRequestStartTime( PT_SERVER_GET, pid.instanceId, pid.parentInstanceId, pid.requestId, pid.parentRequestId, ( void * ) originalDataServer, originalDataServer->getAddr() );
+				}
+
+				// Send GET request
+				sentBytes = originalDataServer->send( buffer.data, buffer.size, connected );
+				if ( sentBytes != ( ssize_t ) buffer.size ) {
+					__ERROR__( "ClientWorker", "handleGetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
+					return false;
+				}
+
+				return true;
+			}
+
 			if ( ! isDegraded ) {
-				__ERROR__( "ClientWorker", "handleGetResponse", "GET request id = %u failed ", event.requestId );
+				event.socket->printAddress( stderr );
+				__ERROR__( "ClientWorker", "handleGetResponse", "GET request id = %u failed: key = %.*s", event.requestId, header.keySize, header.key );
 			}
 		} else {
 			__ERROR__( "ClientWorker", "handleGetResponse", "Invalid GET response." );
 			return false;
 		}
 	}
-
-	ApplicationEvent applicationEvent;
-	PendingIdentifier pid;
 
 	if ( ! ClientWorker::pending->eraseKey( PT_SERVER_GET, event.instanceId, event.requestId, event.socket, &pid, &key, true, true ) ) {
 		__ERROR__( "ClientWorker", "handleGetResponse", "Cannot find a pending server GET request that matches the response. This message will be discarded (key = %.*s).", key.size, key.data );
