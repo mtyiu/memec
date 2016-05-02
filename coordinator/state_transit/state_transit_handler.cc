@@ -18,6 +18,8 @@ CoordinatorStateTransitHandler::CoordinatorStateTransitHandler() :
 	LOCK_INIT( &this->clientsLock );
 	LOCK_INIT( &this->clientsAckLock );
 	LOCK_INIT( &this->aliveServersLock );
+	LOCK_INIT( &this->failedServersLock );
+	LOCK_INIT( &this->updatedServersLock );
 	aliveServers.clear();
 
 	Coordinator* coordinator = Coordinator::getInstance();
