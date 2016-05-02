@@ -38,7 +38,8 @@ void BasicRemappingScheme::redirect(
 		// Both original and failed servers should not be selected as remapped servers
 		bool allowRemapping = stateTransitHandler->allowRemapping( serverAddr );
 
-		selectedServers.insert( serverAddr );
+		if ( numEntries <= dataChunkCount || i >= 1 + parityChunkCount )
+			selectedServers.insert( serverAddr );
 
 		// Check if remapping is allowed
 		if ( allowRemapping ) {

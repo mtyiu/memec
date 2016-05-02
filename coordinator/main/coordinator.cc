@@ -1002,7 +1002,7 @@ void Coordinator::setServer( bool overloaded ) {
 	}
 	if ( this->config.coordinator.states.isManual == 0 )
 		printf( "\nWARNING: Not in manual state for setting overloaded servers.\n" );
-	event.switchPhase( overloaded, servers, false /* isCrushed */, true /* isforced */ );
+	event.switchPhase( overloaded, servers, false /* isCrashed */, true /* isforced */ );
 	this->eventQueue.insert( event );
 }
 
