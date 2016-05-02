@@ -40,7 +40,7 @@ ParityChunkWrapper &ParityChunkBuffer::getWrapper( uint32_t stripeId, bool needs
 	std::unordered_map<uint32_t, ParityChunkWrapper>::iterator it = this->chunks.find( stripeId );
 	if ( it == this->chunks.end() ) {
 		ParityChunkWrapper wrapper;
-		wrapper.chunk = ChunkBuffer::chunkPool->alloc( this->listId, stripeId, this->chunkId, ChunkUtil::chunkSize );
+		wrapper.chunk = ChunkBuffer::chunkPool->alloc( this->listId, stripeId, this->chunkId );
 
 		ChunkBuffer::map->setChunk( this->listId, stripeId, this->chunkId, wrapper.chunk, true );
 		// Insert into the sealed map such that the coordinator knows the existence of the new parity chunk
@@ -97,7 +97,6 @@ bool ParityChunkBuffer::set( char *keyStr, uint8_t keySize, char *valueStr, uint
 			case PRT_SEAL:
 				// fprintf( stderr, "--- PRT_SEAL: Key = %.*s (%u, %u, %u) ---\n", keySize, keyStr, this->listId, pendingRequest.req.seal.stripeId, this->chunkId );
 				KeyValue::serialize( data + pendingRequest.req.seal.offset, keyStr, keySize, valueStr, valueSize );
-				ChunkUtil::setSize( dataChunk, pendingRequest.req.seal.offset + KEY_VALUE_METADATA_SIZE + keySize + valueSize );
 
 				// Update parity chunk
 				this->update(
@@ -204,7 +203,6 @@ bool ParityChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t coun
 		numOfKeys++;
 	}
 	assert( numOfKeys == count );
-	ChunkUtil::setSize( dataChunk, curPos );
 	this->update(
 		stripeId, chunkId,
 		0, curPos,
@@ -397,7 +395,6 @@ bool ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t of
 bool ParityChunkBuffer::update( uint32_t stripeId, uint32_t chunkId, uint32_t offset, uint32_t size, char *dataDelta, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, bool isDelete ) {
 	// Prepare data delta
 	ChunkUtil::clear( dataChunk );
-	ChunkUtil::setSize( dataChunk, offset + size );
 	memcpy( ChunkUtil::getData( dataChunk ) + offset, dataDelta, size );
 	return this->update(
 		stripeId, chunkId,

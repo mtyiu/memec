@@ -630,7 +630,6 @@ bool DegradedChunkBuffer::update(
 
 	// Prepare data delta
 	ChunkUtil::clear( dataChunk );
-	ChunkUtil::setSize( dataChunk, offset + size );
 	ChunkUtil::copy( dataChunk, offset, dataDelta, size );
 
 	// Prepare the stripe
@@ -653,10 +652,7 @@ bool DegradedChunkBuffer::update(
 	if ( it == cache->end() ) {
 		// Allocate new chunk
 		chunk = ChunkBuffer::chunkPool->alloc();
-		ChunkUtil::set(
-			chunk, listId, stripeId, chunkId,
-			chunkId >= ChunkBuffer::dataChunkCount ? ChunkUtil::chunkSize : 0
-		);
+		ChunkUtil::set( chunk, listId, stripeId, chunkId );
 
 		std::pair<Metadata, Chunk *> p( metadata, chunk );
 		cache->insert( p );

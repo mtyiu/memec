@@ -13,7 +13,6 @@ struct ChunkMetadata {
 	uint32_t listId;
 	uint32_t stripeId;
 	uint32_t chunkId;
-	uint32_t size;
 } __attribute__((__packed__));
 
 #define CHUNK_METADATA_SIZE sizeof( struct ChunkMetadata )
@@ -29,12 +28,11 @@ public:
 	}
 
 	// Getters
-	static inline void get( Chunk *chunk, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &size ) {
+	static inline void get( Chunk *chunk, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId ) {
 		struct ChunkMetadata *chunkMetadata = ( struct ChunkMetadata * ) chunk;
 		listId   = chunkMetadata->listId;
 		stripeId = chunkMetadata->stripeId;
 		chunkId  = chunkMetadata->chunkId;
-		size     = chunkMetadata->size;
 	}
 	static inline Metadata getMetadata( Chunk *chunk ) {
 		struct ChunkMetadata *chunkMetadata = ( struct ChunkMetadata * ) chunk;
@@ -56,7 +54,29 @@ public:
 		return ( ( struct ChunkMetadata * ) chunk )->chunkId;
 	}
 	static inline uint32_t getSize( Chunk *chunk ) {
-		return ( ( struct ChunkMetadata * ) chunk )->size;
+		if ( ChunkUtil::isParity( chunk ) )
+			return ChunkUtil::chunkSize;
+
+		// Scan the whole data chunk
+		uint8_t keySize;
+		uint32_t valueSize, tmp;
+		char *key, *value;
+		char *data, *ptr;
+		uint32_t chunkSize = 0;
+
+		data = ptr = ChunkUtil::getData( chunk );
+
+		while ( ptr < data + ChunkUtil::chunkSize ) {
+			KeyValue::deserialize( ptr, key, keySize, value, valueSize );
+			if ( keySize == 0 && valueSize == 0 )
+				break;
+
+			tmp = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
+			ptr += tmp;
+			chunkSize += tmp;
+		}
+
+		return chunkSize;
 	}
 	static inline uint32_t getCount( Chunk *chunk ) {
 		if ( ChunkUtil::isParity( chunk ) ) {
@@ -89,7 +109,7 @@ public:
 		return ( char * ) chunk + CHUNK_METADATA_SIZE;
 	}
 	static inline char *getData( Chunk *chunk, uint32_t &offset, uint32_t &size ) {
-		uint32_t chunkSize = ChunkUtil::isParity( chunk ) ? ChunkUtil::chunkSize : ChunkUtil::getSize( chunk );
+		uint32_t chunkSize = ChunkUtil::getSize( chunk );
 		char *data = ChunkUtil::getData( chunk );
 
 		if ( chunkSize > 0 ) {
@@ -136,12 +156,11 @@ public:
 	}
 
 	// Setters
-	static inline void set( Chunk *chunk, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t size ) {
+	static inline void set( Chunk *chunk, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) {
 		struct ChunkMetadata *chunkMetadata = ( struct ChunkMetadata * ) chunk;
 		chunkMetadata->listId   = listId;
 		chunkMetadata->stripeId = stripeId;
 		chunkMetadata->chunkId  = chunkId;
-		chunkMetadata->size     = size;
 	}
 	static inline void setListId( Chunk *chunk, uint32_t listId ) {
 		( ( struct ChunkMetadata * ) chunk )->listId = listId;
@@ -152,41 +171,11 @@ public:
 	static inline void setChunkId( Chunk *chunk, uint32_t chunkId ) {
 		( ( struct ChunkMetadata * ) chunk )->chunkId = chunkId;
 	}
-	static inline void setSize( Chunk *chunk, uint32_t size ) {
-		( ( struct ChunkMetadata * ) chunk )->size = size;
-	}
-	static inline uint32_t updateSize( Chunk *chunk ) {
-		uint32_t size = 0;
-		if ( ChunkUtil::isParity( chunk ) ) {
-			size = ChunkUtil::chunkSize;
-		} else {
-			// Scan whole chunk
-			uint8_t keySize;
-			uint32_t valueSize, tmp;
-			char *key, *value;
-			char *data, *ptr;
-
-			data = ptr = ChunkUtil::getData( chunk );
-
-			while ( ptr < data + ChunkUtil::chunkSize ) {
-				KeyValue::deserialize( ptr, key, keySize, value, valueSize );
-				if ( keySize == 0 && valueSize == 0 )
-					break;
-
-				tmp = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
-				size += tmp;
-				ptr += tmp;
-			}
-		}
-		ChunkUtil::setSize( chunk, size );
-		return size;
-	}
 
 	// Memory allocator for objects
 	static inline char *alloc( Chunk *chunk, uint32_t size, uint32_t &offset ) {
-		struct ChunkMetadata *chunkMetadata = ( struct ChunkMetadata * ) chunk;
-		offset = chunkMetadata->size;
-		chunkMetadata->size += size;
+		uint32_t chunkSize = ChunkUtil::getSize( chunk );
+		offset = chunkSize;
 		return ( ( char * ) chunk ) + CHUNK_METADATA_SIZE + offset;
 	}
 
@@ -267,10 +256,6 @@ public:
 
 	static inline void load( Chunk *chunk, uint32_t offset, char *src, uint32_t n ) {
 		char *dst = ChunkUtil::getData( chunk );
-		bool isParity = ChunkUtil::isParity( chunk );
-
-		ChunkUtil::setSize( chunk, isParity ? ChunkUtil::chunkSize : n );
-
 		if ( offset > 0 )
 			memset( dst, 0, offset );
 		memcpy( dst + offset, src, n );
@@ -318,7 +303,7 @@ public:
 
 	void init( uint32_t chunkSize, uint64_t capacity );
 
-	Chunk *alloc( uint32_t listId = 0, uint32_t stripeId = 0, uint32_t chunkId = 0, uint32_t size = 0 );
+	Chunk *alloc( uint32_t listId = 0, uint32_t stripeId = 0, uint32_t chunkId = 0 );
 
 	// Translate object pointer to chunk pointer
 	Chunk *getChunk( char *ptr, uint32_t &offset );
@@ -331,12 +316,12 @@ public:
 
 class TempChunkPool {
 public:
-	Chunk *alloc( uint32_t listId = 0, uint32_t stripeId = 0, uint32_t chunkId = 0, uint32_t size = 0 ) {
+	Chunk *alloc( uint32_t listId = 0, uint32_t stripeId = 0, uint32_t chunkId = 0 ) {
 		Chunk *chunk = ( Chunk * ) malloc( CHUNK_METADATA_SIZE + ChunkUtil::chunkSize );
 
 		if ( chunk ) {
 			ChunkUtil::clear( chunk );
-			ChunkUtil::set( chunk, listId, stripeId, chunkId, size );
+			ChunkUtil::set( chunk, listId, stripeId, chunkId );
 		}
 		return chunk;
 	}

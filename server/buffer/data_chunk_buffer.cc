@@ -34,7 +34,7 @@ void DataChunkBuffer::init() {
 	for ( uint32_t i = 0; i < this->count; i++ ) {
 		stripeId = ChunkBuffer::map->nextStripeID( this->listId, this->stripeId );
 
-		ChunkUtil::set( this->chunks[ i ], this->listId, stripeId, this->chunkId, 0 );
+		ChunkUtil::set( this->chunks[ i ], this->listId, stripeId, this->chunkId );
 
 		ChunkBuffer::map->setChunk(
 			this->listId, stripeId, this->chunkId,
@@ -375,7 +375,7 @@ Chunk *DataChunkBuffer::flushAt( ServerWorker *worker, int index, bool lock, Met
 		ChunkBuffer::map->nextStripeID( this->listId, this->stripeId ),
 		this->chunkId
 	);
-	Chunk *newChunk = ChunkBuffer::chunkPool->alloc( metadata.listId, metadata.stripeId, metadata.chunkId, 0 );
+	Chunk *newChunk = ChunkBuffer::chunkPool->alloc( metadata.listId, metadata.stripeId, metadata.chunkId );
 
 	ChunkBuffer::map->setChunk(
 		metadata.listId,

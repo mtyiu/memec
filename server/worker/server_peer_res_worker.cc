@@ -589,8 +589,7 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 					tmp->second.chunk = this->tempChunkPool.alloc(
 						header.chunkData.listId,
 						header.chunkData.stripeId,
-						header.chunkData.chunkId,
-						header.chunkData.size
+						header.chunkData.chunkId
 					);
 					ChunkUtil::load(
 						tmp->second.chunk,
@@ -803,7 +802,7 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 			if ( ! this->chunks[ i ] ) {
 				ChunkUtil::set(
 					this->freeChunks[ j ],
-					chunkRequest.listId, chunkRequest.stripeId, i, 0
+					chunkRequest.listId, chunkRequest.stripeId, i
 				);
 				this->chunks[ i ] = this->freeChunks[ j ];
 				this->chunkStatus->unset( i );
@@ -825,8 +824,7 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 			if ( this->chunkStatusBackup->check( i ) ) {
 				chunkSize = ChunkUtil::getSize( this->chunks[ i ] );
 			} else {
-				// Reconstructed
-				chunkSize = ChunkUtil::updateSize( this->chunks[ i ] );
+				chunkSize = 0;
 			}
 
 			maxChunkSize = ( chunkSize > maxChunkSize ) ? chunkSize : maxChunkSize;
@@ -1014,14 +1012,14 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 						}
 					} else {
 						Metadata tmp;
-						uint32_t tmpSize;
 
 						tmp.set( 0, 0, 0 );
 
 						map->findValueByKey( key.data, key.size, 0, 0, &keyMetadata, 0, &chunk );
 
-						if ( chunk )
-							ChunkUtil::get( chunk, tmp.listId, tmp.stripeId, tmp.chunkId, tmpSize );
+						if ( chunk ) {
+							ChunkUtil::get( chunk, tmp.listId, tmp.stripeId, tmp.chunkId );
+						}
 
 						if ( ! (
 							chunk &&
@@ -1335,14 +1333,24 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 
 		// Return chunks to chunk pool
 		for ( uint32_t i = 0; i < ServerWorker::chunkCount; i++ ) {
-			if ( this->chunks[ i ] == toBeFreed )
+			if ( this->chunks[ i ] == toBeFreed || this->chunks[ i ] == Coding::zeros )
+				continue;
+
+			bool isFreeChunks = false;
+			for ( uint32_t j = 0; j < ServerWorker::chunkCount; j++ ) {
+				if ( this->chunks[ i ] == this->freeChunks[ j ] ) {
+					isFreeChunks = true;
+					break;
+				}
+			}
+
+			if ( isFreeChunks )
 				continue;
 
 			// Check whether the chunk is reconstructed, forwarded, or from GET_CHUNK requests
 			if ( ! ServerWorker::chunkPool->isInChunkPool( this->chunks[ i ] ) ) {
 				Metadata m;
-				uint32_t s;
-				ChunkUtil::get( this->chunks[ i ], m.listId, m.stripeId, m.chunkId, s );
+				ChunkUtil::get( this->chunks[ i ], m.listId, m.stripeId, m.chunkId );
 				if ( dmap->findChunkById( m.listId, m.stripeId, m.chunkId ) == this->chunks[ i ] ) {
 					// Reconstructed - need to keep the chunk
 				} else {

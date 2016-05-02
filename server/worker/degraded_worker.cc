@@ -808,10 +808,7 @@ bool ServerWorker::handleForwardChunkRequest( struct ChunkDataHeader &header, bo
 		}
 	} else {
 		chunk = this->tempChunkPool.alloc();
-		ChunkUtil::set(
-			chunk, header.listId, header.stripeId, header.chunkId,
-			header.chunkId >= ServerWorker::dataChunkCount ? ChunkUtil::chunkSize : header.size
-		);
+		ChunkUtil::set( chunk, header.listId, header.stripeId, header.chunkId );
 		ChunkUtil::copy( chunk, header.offset, header.data, header.size );
 
 		bool ret = dmap->insertChunk(
@@ -1440,7 +1437,6 @@ bool ServerWorker::sendModifyChunkRequest(
 
 				// Prepare the data delta
 				ChunkUtil::clear( this->forward.dataChunk );
-				ChunkUtil::setSize( this->forward.dataChunk, offset + deltaSize );
 				ChunkUtil::copy( this->forward.dataChunk, offset, delta, deltaSize );
 
 				// Prepare the stripe

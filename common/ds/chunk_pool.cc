@@ -31,7 +31,7 @@ void ChunkPool::init( uint32_t chunkSize, uint64_t capacity ) {
 	}
 }
 
-Chunk *ChunkPool::alloc( uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t size ) {
+Chunk *ChunkPool::alloc( uint32_t listId, uint32_t stripeId, uint32_t chunkId ) {
 	// Update counter
 	uint32_t index = ( this->count++ ); // index = the value of this->count before increment
 
@@ -45,7 +45,7 @@ Chunk *ChunkPool::alloc( uint32_t listId, uint32_t stripeId, uint32_t chunkId, u
 	Chunk *chunk = ( Chunk * )( this->startAddress + ( index * ( CHUNK_METADATA_SIZE + ChunkUtil::chunkSize ) ) );
 	if ( chunk ) {
 		ChunkUtil::clear( chunk );
-		ChunkUtil::set( chunk, listId, stripeId, chunkId, size );
+		ChunkUtil::set( chunk, listId, stripeId, chunkId );
 	}
 	return chunk;
 }
