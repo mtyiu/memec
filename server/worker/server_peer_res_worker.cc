@@ -1138,11 +1138,12 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 						    ServerWorker::map->getKeysMap( keys, keysLock );
 						    ServerWorker::map->getCacheMap( cache, cacheLock );
 
-						    LOCK( keysLock );
-						    LOCK( cacheLock );
 						    // Lock the data chunk buffer
 						    MixedChunkBuffer *chunkBuffer = ServerWorker::chunkBuffer->at( metadata.listId );
 						    int chunkBufferIndex = chunkBuffer->lockChunk( chunk, true );
+
+						    LOCK( keysLock );
+						    LOCK( cacheLock );
 						    // Compute delta and perform update
 						    chunk->computeDelta(
 						 	   valueUpdate, // delta
@@ -1172,12 +1173,12 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 							);
 
 							// Release the locks
+							UNLOCK( cacheLock );
+						    UNLOCK( keysLock );
 							if ( chunkBufferIndex == -1 )
 						 		chunkBuffer->unlock();
 							else
 								chunkBuffer->updateAndUnlockChunk( chunkBufferIndex );
-						    UNLOCK( cacheLock );
-						    UNLOCK( keysLock );
 
 							delete[] valueUpdate;
 						} else {
