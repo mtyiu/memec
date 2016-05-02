@@ -428,7 +428,8 @@ void ClientWorker::gatherPendingNormalRequests( ServerSocket *target, bool needs
 				continue;
 			if ( mh->stateTransitInfo[ server.first ].removePendingRequest( id ) == 0 ) {
 				if ( stateTransitHandler->stateTransitInfo.at( server.first ).setCompleted() ) {
-					stateTransitHandler->ackTransit( server.first );
+					// Let the stateTransitHandler to perform ack after releasing all locks on server states
+					//stateTransitHandler->ackTransit( server.first );
 				}
 			}
 		}

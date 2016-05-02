@@ -18,6 +18,8 @@ CoordinatorStateTransitHandler::CoordinatorStateTransitHandler() :
 	LOCK_INIT( &this->clientsLock );
 	LOCK_INIT( &this->clientsAckLock );
 	LOCK_INIT( &this->aliveServersLock );
+	LOCK_INIT( &this->failedServersLock );
+	LOCK_INIT( &this->updatedServersLock );
 	aliveServers.clear();
 
 	Coordinator* coordinator = Coordinator::getInstance();
@@ -150,9 +152,10 @@ bool CoordinatorStateTransitHandler::transitToDegraded( std::vector<struct socka
 
 	if ( forced ) {
 		for ( uint32_t i = 0, len = servers->size(); i < len; i++ ) {
-			LOCK( &this->serversStateLock[ servers->at(i) ] );
+			this->addFailedServer( servers->at( i ) );
+			LOCK( &this->serversStateLock[ servers->at( i ) ] );
 			this->serversState[ servers->at( i ) ] = STATE_INTERMEDIATE;
-			UNLOCK( &this->serversStateLock[ servers->at(i) ] );
+			UNLOCK( &this->serversStateLock[ servers->at( i ) ] );
 		}
 		this->broadcastState( *servers );
 		this->insertRepeatedEvents( event, servers );
@@ -226,6 +229,7 @@ bool CoordinatorStateTransitHandler::transitToNormal( std::vector<struct sockadd
 
 	if ( forced ) {
 		for ( uint32_t i = 0, len = servers->size(); i < len; i++ ) {
+			this->addFailedServer( servers->at( i ) );
 			LOCK( &this->serversStateLock[ servers->at(i) ] );
 			this->serversState[ servers->at( i ) ] = STATE_COORDINATED;
 			UNLOCK( &this->serversStateLock[ servers->at(i) ] );
@@ -518,6 +522,39 @@ bool CoordinatorStateTransitHandler::addCrashedServer( struct sockaddr_in server
 	crashedServers.insert( server );
 	UNLOCK( &this->aliveServersLock );
 	return true;
+}
+
+uint32_t CoordinatorStateTransitHandler::addFailedServer( struct sockaddr_in server ) {
+	LOCK( &this->failedServersLock );
+	this->failedServers.insert( server );
+	return getFailedServerCount( false, true );
+}
+
+uint32_t CoordinatorStateTransitHandler::removeFailedServer( struct sockaddr_in server ) {
+	LOCK( &this->failedServersLock );
+	if ( this->failedServers.erase( server ) ) {
+		LOCK ( &this->updatedServersLock );
+		this->updatedServers.push_back( server );
+		UNLOCK ( &this->updatedServersLock );
+	}
+	return getFailedServerCount( false, true );
+}
+
+uint32_t CoordinatorStateTransitHandler::getFailedServerCount( bool needsLock, bool needsUnlock ) {
+	if ( needsLock ) LOCK( &this->failedServersLock );
+	uint32_t count = this->failedServers.size();
+	if ( needsUnlock ) UNLOCK( &this->failedServersLock );
+	return count;
+}
+
+uint32_t CoordinatorStateTransitHandler::eraseUpdatedServers( std::vector<struct sockaddr_in> * ret ) {
+	LOCK ( &this->updatedServersLock );
+	if ( ret ) {
+		std::swap( this->updatedServers, *ret );
+	}
+	this->updatedServers.clear();
+	UNLOCK ( &this->updatedServersLock );
+	return ( ret ? ret->size() : 0 );
 }
 
 bool CoordinatorStateTransitHandler::removeAliveServer( struct sockaddr_in server ) {

@@ -38,7 +38,11 @@ private:
 	CoordinatorStateTransitWorker *workers;
 	std::set<struct sockaddr_in> aliveServers;
 	std::set<struct sockaddr_in> crashedServers;
+	std::set<struct sockaddr_in> failedServers;
+	std::vector<struct sockaddr_in> updatedServers;
 	LOCK_T aliveServersLock;
+	LOCK_T failedServersLock;
+	LOCK_T updatedServersLock;
 
 	/* handle client join or leave */
 	bool isClientJoin( int service, char *msg, char *subject );
@@ -90,10 +94,19 @@ public:
 	int broadcastState( std::vector<struct sockaddr_in> servers );
 	int broadcastState( struct sockaddr_in server );
 
-	// keep track of the alive servers
+	// keep track of alive servers
 	bool addAliveServer( struct sockaddr_in server );
-	bool addCrashedServer( struct sockaddr_in server );
 	bool removeAliveServer( struct sockaddr_in server );
+
+	// keep track of crashed servers
+	bool addCrashedServer( struct sockaddr_in server );
+
+	// keep track of failed servers
+	uint32_t addFailedServer( struct sockaddr_in server );
+	uint32_t removeFailedServer( struct sockaddr_in server );
+	uint32_t getFailedServerCount( bool needsLock = false, bool needsUnlock = false );
+
+	uint32_t eraseUpdatedServers( std::vector<struct sockaddr_in> * ret = 0 );
 
 	// check server state
 	bool isInTransition( const struct sockaddr_in &server );
