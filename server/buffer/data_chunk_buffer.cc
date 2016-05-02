@@ -356,10 +356,9 @@ Chunk *DataChunkBuffer::flushAt( ServerWorker *worker, int index, bool lock, Met
 
 	Chunk *chunk = this->chunks[ index ];
 	Metadata metadata;
-	uint32_t size;
 
 	if ( sealed ) {
-		ChunkUtil::get( chunk, metadata.listId, metadata.stripeId, metadata.chunkId, size );
+		ChunkUtil::get( chunk, metadata.listId, metadata.stripeId, metadata.chunkId );
 		sealed->set(
 			metadata.listId,
 			metadata.stripeId,
@@ -389,7 +388,7 @@ Chunk *DataChunkBuffer::flushAt( ServerWorker *worker, int index, bool lock, Met
 
 	// Notify the parity servers to seal the chunk
 	if ( worker->issueSealChunkRequest( chunk ) ) {
-		ChunkUtil::get( chunk, metadata.listId, metadata.stripeId, metadata.chunkId, size );
+		ChunkUtil::get( chunk, metadata.listId, metadata.stripeId, metadata.chunkId );
 		ChunkBuffer::map->seal( metadata.listId, metadata.stripeId, metadata.chunkId );
 	}
 
