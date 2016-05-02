@@ -283,12 +283,13 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 
 	// Send request
 	if ( Client::getInstance()->isDegraded( socket ) ) {
-		printf( "ERROR Sending to failed server socket (opcode = %u, key = %.*s)!\n", degradedLockData.opcode, header.keySize, header.key );
+		fprintf( stderr, "ERROR Sending to failed server socket (opcode = %u, key = %.*s)!\n", degradedLockData.opcode, header.keySize, header.key );
 		switch ( header.type ) {
 			case PROTO_DEGRADED_LOCK_RES_IS_LOCKED:
-				printf( "PROTO_DEGRADED_LOCK_RES_IS_LOCKED\n" );
+				fprintf( stderr, "PROTO_DEGRADED_LOCK_RES_IS_LOCKED\n" );
 				for ( uint32_t i = 0; i < header.reconstructedCount; i++ ) {
-					printf(
+					fprintf(
+						stderr,
 						"%s(%u, %u) |-> (%u, %u)%s",
 						i == 0 ? "Original: " : "; ",
 						header.original[ i * 2     ],
@@ -298,13 +299,13 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 						i == header.reconstructedCount - 1 ? " || " : ""
 					);
 				}
-				printf( "\n" );
-				fflush( stdout );
+				fprintf( stderr, "\n" );
 				break;
 			case PROTO_DEGRADED_LOCK_RES_WAS_LOCKED:
-				printf( "PROTO_DEGRADED_LOCK_RES_WAS_LOCKED: %.*s\n", header.keySize, header.key );
+				fprintf( stderr, "PROTO_DEGRADED_LOCK_RES_WAS_LOCKED: %.*s\n", header.keySize, header.key );
 				for ( uint32_t i = 0; i < header.reconstructedCount; i++ ) {
-					printf(
+					fprintf(
+						stderr,
 						"%s(%u, %u) |-> (%u, %u)%s",
 						i == 0 ? "Original: " : "; ",
 						header.original[ i * 2     ],
@@ -314,21 +315,18 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 						i == header.reconstructedCount - 1 ? " || " : ""
 					);
 				}
-				printf( "\n" );
-				fflush( stdout );
+				fprintf( stderr, "\n" );
 				break;
 			case PROTO_DEGRADED_LOCK_RES_NOT_LOCKED:
-				printf( "PROTO_DEGRADED_LOCK_RES_NOT_LOCKED\n" );
+				fprintf( stderr, "PROTO_DEGRADED_LOCK_RES_NOT_LOCKED\n" );
 				break;
 			case PROTO_DEGRADED_LOCK_RES_REMAPPED:
-				printf( "PROTO_DEGRADED_LOCK_RES_REMAPPED\n" );
+				fprintf( stderr, "PROTO_DEGRADED_LOCK_RES_REMAPPED\n" );
 				break;
 			case PROTO_DEGRADED_LOCK_RES_NOT_EXIST:
-				printf( "PROTO_DEGRADED_LOCK_RES_NOT_EXIST\n" );
+				fprintf( stderr, "PROTO_DEGRADED_LOCK_RES_NOT_EXIST\n" );
 				break;
 		}
-
-		assert( false );
 	}
 	sentBytes = socket->send( buffer.data, buffer.size, connected );
 	if ( sentBytes != ( ssize_t ) buffer.size ) {

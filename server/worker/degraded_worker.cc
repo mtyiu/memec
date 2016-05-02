@@ -73,12 +73,12 @@ bool ServerWorker::handleReleaseDegradedLockRequest( CoordinatorEvent event, cha
 			__ERROR__( "ServerWorker", "handleReleaseDegradedLockRequest", "Invalid DEGRADED_RELEASE request." );
 			return false;
 		}
-		__INFO__(
-			BLUE, "ServerWorker", "handleReleaseDegradedLockRequest",
-			"[DEGRADED_RELEASE] (%u, %u, %u) (count = %u).",
-			header.listId, header.stripeId, header.chunkId,
-			count
-		);
+		//__INFO__(
+		//	BLUE, "ServerWorker", "handleReleaseDegradedLockRequest",
+		//	"[DEGRADED_RELEASE] (%u, %u, %u) (count = %u).",
+		//	header.listId, header.stripeId, header.chunkId,
+		//	count
+		//);
 		buf += PROTO_DEGRADED_RELEASE_REQ_SIZE;
 		size -= PROTO_DEGRADED_RELEASE_REQ_SIZE;
 
@@ -92,13 +92,14 @@ bool ServerWorker::handleReleaseDegradedLockRequest( CoordinatorEvent event, cha
 
 	for ( size_t i = 0, len = chunks.size(); i < len; i++ ) {
 		// Determine the src
-		if ( i == 0 ) {
+		// TODO Helen: comment (i==0) for temp workaround (?)
+		//if ( i == 0 ) {
 			// The target is the same for all chunks in this request
 			this->getServers( chunks[ i ].listId );
 			socket =   chunks[ i ].chunkId < ServerWorker::dataChunkCount
 			         ? this->dataServerSockets[ chunks[ i ].chunkId ]
 			         : this->parityServerSockets[ chunks[ i ].chunkId - ServerWorker::dataChunkCount ];
-		}
+		//}
 
 		requestId = ServerWorker::idGenerator->nextVal( this->workerId );
 		chunk = ServerWorker::degradedChunkBuffer->map.deleteChunk(
@@ -130,7 +131,8 @@ bool ServerWorker::handleDegradedGetRequest( ClientEvent event, char *buf, size_
 	}
 	__DEBUG__(
 		BLUE, "ServerWorker", "handleDegradedGetRequest",
-		"[GET] Key: %.*s (key size = %u); is sealed? %s.",
+		"[GET] (%u, %u) Key: %.*s (key size = %u); is sealed? %s.",
+		event.instanceId, event.requestId,
 		( int ) header.data.key.keySize,
 		header.data.key.key,
 		header.data.key.keySize,
@@ -141,6 +143,7 @@ bool ServerWorker::handleDegradedGetRequest( ClientEvent event, char *buf, size_
 	bool reconstructParity, reconstructData;
 	uint32_t listId, stripeId, chunkId;
 	stripeId = header.stripeId;
+
 	if ( header.reconstructedCount ) {
 		this->getServers(
 			header.data.key.key,
@@ -198,6 +201,13 @@ degraded_get_check:
 			key, true // isDegraded
 		);
 		this->dispatch( event );
+	} else if ( dmap->findRemovedChunk( listId, stripeId, chunkId ) ) {
+		// Chunk migrated
+		event.resGet(
+			event.socket, event.instanceId, event.requestId,
+			key, true // isDegraded
+		);
+		this->dispatch( event );
 	} else {
 		bool isReconstructed;
 		key.dup( key.size, key.data );
@@ -215,7 +225,9 @@ degraded_get_check:
 
 		if ( ! ret ) {
 			if ( checked ) {
-				__ERROR__( "ServerWorker", "handleDegradedGetRequest", "Failed to perform degraded read on (%u, %u, %u).", listId, stripeId, chunkId );
+				__ERROR__( "ServerWorker", "handleDegradedGetRequest", "Failed to perform degraded read on (%u, %u, %u) requestId = %u from id = %u.", listId, stripeId, chunkId, event.requestId, event.instanceId );
+				event.resGet( event.socket, event.instanceId, event.requestId, key, true );
+				this->dispatch( event );
 			} else if ( isReconstructed ) {
 				// Check the degraded map again
 				checked = true;
@@ -522,6 +534,17 @@ bool ServerWorker::handleDegradedUpdateRequest( ClientEvent event, struct Degrad
 			true   /* isDegraded */
 		);
 		this->dispatch( event );
+	} else if ( dmap->findRemovedChunk( listId, stripeId, chunkId ) ) {
+		// Chunk migrated
+		event.resUpdate(
+			event.socket, event.instanceId, event.requestId, key,
+			header.data.keyValueUpdate.valueUpdateOffset,
+			header.data.keyValueUpdate.valueUpdateSize,
+			false, /* success */
+			false, /* needsFree */
+			true   /* isDegraded */
+		);
+		this->dispatch( event );
 	} else {
 force_degraded_read:
 		bool isReconstructed;
@@ -551,7 +574,6 @@ force_degraded_read:
 		if ( ! ret ) {
 			key.free();
 			delete[] valueUpdate;
-
 			if ( isReconstructed ) {
 				// UPDATE data chunk and reconstructed parity chunks
 				return this->handleUpdateRequest(
@@ -563,6 +585,15 @@ force_degraded_read:
 					true   // checkGetChunk
 				);
 			} else {
+				event.resUpdate(
+					event.socket, event.instanceId, event.requestId, key,
+					header.data.keyValueUpdate.valueUpdateOffset,
+					header.data.keyValueUpdate.valueUpdateSize,
+					false, /* success */
+					false, /* needsFree */
+					true   /* isDegraded */
+				);
+				this->dispatch( event );
 				__ERROR__( "ServerWorker", "handleDegradedUpdateRequest", "Failed to perform degraded read on (%u, %u, %u); key: %.*s.", listId, stripeId, chunkId, key.size, key.data );
 			}
 		}
@@ -947,10 +978,11 @@ bool ServerWorker::performDegradedRead(
 	// Determine the list of surviving nodes
 	for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
 		uint32_t originalChunkId = original[ i * 2 + 1 ];
-		if ( originalChunkId < ServerWorker::dataChunkCount )
+		if ( originalChunkId < ServerWorker::dataChunkCount ) {
 			this->dataServerSockets[ originalChunkId ] = 0;
-		else
+		} else {
 			this->parityServerSockets[ originalChunkId - ServerWorker::dataChunkCount ] = 0;
+		}
 	}
 
 	if ( isSealed ) {
@@ -1028,6 +1060,7 @@ bool ServerWorker::performDegradedRead(
 	// Insert the degraded operation into degraded chunk buffer pending set
 	Key k;
 	bool needsContinue;
+
 	if ( isSealed ) {
 		if ( ongoingAtChunk != ServerWorker::chunkBuffer->at( listId )->getChunkId() ) {
 			ServerWorker::degradedChunkBuffer->map.insertDegradedChunk(
@@ -1044,18 +1077,11 @@ bool ServerWorker::performDegradedRead(
 				isReconstructed
 			);
 		}
-	} else {
-		if ( opcode == PROTO_OPCODE_DEGRADED_UPDATE )
-			k.set( keyValueUpdate->size, keyValueUpdate->data );
-		else
-			k = *key;
-		needsContinue = ServerWorker::degradedChunkBuffer->map.insertDegradedKey( k, instanceId, requestId, isReconstructed );
-	}
 
-	if ( isSealed ) {
 		if ( ! needsContinue ) {
 			if ( isReconstructed ) {
 				// The chunk is already reconstructed
+				// __INFO__( YELLOW, "ServerWorker", "performDegradedRead", "The chunk (%u, %u, %u) is already reconstructed.", listId, stripeId, chunkId );
 				return false;
 			} else {
 				// Reconstruction in progress
@@ -1125,9 +1151,17 @@ force_reconstruct_chunks:
 
 		return ( selected >= ServerWorker::dataChunkCount );
 	} else {
+		if ( opcode == PROTO_OPCODE_DEGRADED_UPDATE )
+			k.set( keyValueUpdate->size, keyValueUpdate->data );
+		else
+			k = *key;
+		needsContinue = ServerWorker::degradedChunkBuffer->map.insertDegradedKey( k, instanceId, requestId, isReconstructed );
+
 		////////// Key-value pairs in unsealed chunks //////////
-		if ( ! needsContinue || isReconstructed )
+		if ( ! needsContinue || isReconstructed ) {
+			// fprintf( stderr, "(%u, %u, %u): ! needsContinue (%s) || isReconstructed (%s)\n", listId, stripeId, chunkId, needsContinue ? "true" : "false", isReconstructed ? "true" : "false" );
 			return false;
+		}
 
 		bool success = true;
 		if ( socket->self ) {

@@ -133,6 +133,7 @@ void ServerStateTransitHandler::setState( char* msg , int len ) {
 				__INFO__( BLUE, "ServerStateTransitHandler", "setState", "STATE_INTERMEDIATE %s:%hu", buf, ntohs( serverPeer.sin_port ) );
 				break;
 			case STATE_COORDINATED:
+				__INFO__( BLUE, "ServerStateTransitHandler", "setState", "STATE_COORDINATED %s:%hu", buf, ntohs( serverPeer.sin_port ) );
 				break;
 			case STATE_DEGRADED:
 				__INFO__( BLUE, "ServerStateTransitHandler", "setState", "STATE_DEGRADED %s:%hu", buf, ntohs( serverPeer.sin_port ) );
@@ -140,7 +141,7 @@ void ServerStateTransitHandler::setState( char* msg , int len ) {
 			default:
 				__INFO__( BLUE, "ServerStateTransitHandler", "setState", "Unknown %d %s:%hu", signal, buf, ntohs( serverPeer.sin_port ) );
 				UNLOCK( &this->serversStateLock[ serverPeer ] );
-				return;
+				continue;
 		}
 		this->serversState[ serverPeer ] = signal;
 		UNLOCK( &this->serversStateLock[ serverPeer ] );
@@ -170,10 +171,13 @@ bool ServerStateTransitHandler::removeAliveServer( struct sockaddr_in server ) {
 	return true;
 }
 
-bool ServerStateTransitHandler::useCoordinatedFlow( const struct sockaddr_in &server ) {
+bool ServerStateTransitHandler::useCoordinatedFlow( const struct sockaddr_in &server, bool needsLock, bool needsUnlock ) {
 	if ( this->serversState.count( server ) == 0 )
 		return false;
-	return this->serversState[ server ] != STATE_NORMAL;
+	if ( needsLock ) LOCK( &this->serversStateLock[ server ] );
+	bool ret = this->serversState[ server ] != STATE_NORMAL;
+	if ( needsUnlock ) UNLOCK( &this->serversStateLock[ server ] );
+	return ret;
 }
 
 bool ServerStateTransitHandler::allowRemapping( const struct sockaddr_in &server ) {

@@ -272,9 +272,9 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 					break;
 				case PROTO_OPCODE_PARITY_MIGRATE:
 				{
-					pthread_mutex_t *lock;
-					pthread_cond_t *cond;
-					bool *done, isCompleted;
+					pthread_mutex_t *lock = 0;
+					pthread_cond_t *cond = 0;
+					bool *done = 0, isCompleted;
 
 					bool found = this->pending->decrementRemappedDataRequest(
 						event.requestId, event.socket->getAddr(),

@@ -110,6 +110,11 @@ void ClientStateTransitHandler::setState( char* msg , int len ) {
 	struct sockaddr_in server;
 	int ofs = 1;
 	uint32_t recordSize = this->serverStateRecordSize;
+	std::vector<struct sockaddr_in> updatedServers;
+
+	Client *client = Client::getInstance();
+	LOCK_T &lock = client->sockets.servers.lock;
+	std::vector<ServerSocket *> &servers = client->sockets.servers.values;
 
 	for ( uint8_t i = 0; i < serverCount; i++ ) {
 		server.sin_addr.s_addr = (*( ( uint32_t * )( msg + ofs ) ) );
@@ -124,9 +129,6 @@ void ClientStateTransitHandler::setState( char* msg , int len ) {
 			continue;
 		}
 
-		Client *client = Client::getInstance();
-		LOCK_T &lock = client->sockets.servers.lock;
-		std::vector<ServerSocket *> &servers = client->sockets.servers.values;
 		ServerSocket *target = 0;
 
 		LOCK( &lock );
@@ -142,6 +144,8 @@ void ClientStateTransitHandler::setState( char* msg , int len ) {
 			__ERROR__( "ClientStateTransitHandler", "setState" , "ServerSocket for %s:%hu not found\n", buf, ntohs( server.sin_port ) );
 			continue;
 		}
+
+		updatedServers.push_back( server );
 
 		LOCK( &this->serversStateLock[ server ] );
 		RemapState state = this->serversState[ server ];
@@ -179,7 +183,7 @@ void ClientStateTransitHandler::setState( char* msg , int len ) {
 			case STATE_DEGRADED:
 				__INFO__( BLUE, "ClientStateTransitHandler", "setState", "STATE_DEGRADED %s:%hu", buf, ntohs( server.sin_port ) );
 				if ( state == STATE_INTERMEDIATE )
-					__ERROR__( "ClientStateTransitHandler", "setState", "Not yet ready for transition to DEGRADED!\n" );
+					__ERROR__( "ClientStateTransitHandler", "setState", "Not yet ready for transition to DEGRADED!" );
 				break;
 			default:
 				__INFO__( BLUE, "ClientStateTransitHandler", "setState", "Unknown %d %s:%hu", signal, buf, ntohs( server.sin_port ) );
@@ -188,9 +192,28 @@ void ClientStateTransitHandler::setState( char* msg , int len ) {
 		}
 		this->serversState[ server ] = signal;
 		state = this->serversState[ server ];
+	}
+
+	for ( int i = updatedServers.size() - 1; i >= 0; i-- ) {
+		server = updatedServers[ i ];
 		UNLOCK( &this->serversStateLock[ server ] );
+	}
+
+	for ( int i = updatedServers.size() - 1; i >= 0; i-- ) {
+		ServerSocket *target = 0;
+		server = updatedServers[ i ];
+
+		LOCK( &lock );
+		for ( size_t i = 0, count = servers.size(); i < count; i++ ) {
+			if ( servers[ i ]->equal( server.sin_addr.s_addr, server.sin_port ) ) {
+				target = servers[ i ];
+				break;
+			}
+		}
+		UNLOCK( &lock );
 
 		// actions/cleanup after state change
+		RemapState state = this->serversState[ server ];
 		switch ( state ) {
 			case STATE_INTERMEDIATE:
 				// clean up pending items associated with this server
@@ -271,10 +294,10 @@ bool ClientStateTransitHandler::acceptNormalResponse( const struct sockaddr_in &
 		case STATE_UNDEFINED:
 		case STATE_NORMAL:
 		case STATE_COORDINATED:
-		case STATE_WAIT_DEGRADED:
 		case STATE_WAIT_NORMAL:
-			return true;
 		case STATE_INTERMEDIATE:
+			return true;
+		case STATE_WAIT_DEGRADED:
 		case STATE_DEGRADED:
 		default:
 			return false;
@@ -346,8 +369,26 @@ bool ClientStateTransitHandler::checkAckForServer( struct sockaddr_in server ) {
 			)
 		) ||
 	    ( state == STATE_COORDINATED && false /* no operations are needed before completing transition */) ) {
-		//if ( state == STATE_INTERMEDIATE )
-			//printf( "addr: %s:%hu, count: %u, completed %u\n", buf, ntohs( server.sin_port ), this->stateTransitInfo[ server ].getParityRevertCounterVal(), this->stateTransitInfo[ server ].counter.pendingNormalRequests.completed );
+		if ( state == STATE_INTERMEDIATE ) {
+			// fprintf(
+			// 	stderr,
+			// 	"addr: %s:%hu, count: %u, completed? %s (pending = %lu)\n",
+			// 	buf, ntohs( server.sin_port ),
+			// 	this->stateTransitInfo[ server ].getParityRevertCounterVal(), this->stateTransitInfo[ server ].counter.pendingNormalRequests.completed ? "true" : "false",
+			// 	this->stateTransitInfo[ server ].counter.pendingNormalRequests.requestIds.size()
+			// );
+			if ( this->stateTransitInfo[ server ].counter.pendingNormalRequests.requestIds.size() ) {
+				std::unordered_set<uint32_t> &requestIds = this->stateTransitInfo[ server ].counter.pendingNormalRequests.requestIds;
+				std::unordered_set<uint32_t>::iterator it;
+				for ( it = requestIds.begin(); it != requestIds.end(); ) {
+					if ( ! ClientWorker::pending->findKeyValue( *it ) ) {
+						it = requestIds.erase( it );
+					} else {
+						it++;
+					}
+				}
+			}
+		}
 		UNLOCK( &this->serversStateLock[ server ] );
 		return false;
 	}

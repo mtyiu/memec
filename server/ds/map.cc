@@ -73,10 +73,11 @@ bool Map::findValueByKey(
 
 	if ( keyPtr ) *keyPtr = keysIt->first;
 	///// ^^^^^ Deprecated ^^^^^ /////
-	UNLOCK( &this->keysLock );
 
 	if ( keyValuePtr )
 		keyValuePtr->set( keysIt->second.obj );
+
+	UNLOCK( &this->keysLock );
 
 	return true;
 }
@@ -224,7 +225,7 @@ Chunk *Map::findChunkById(
 	if ( needsLock ) LOCK( &this->cacheLock );
 	it = this->cache.find( metadata );
 	if ( it == this->cache.end() ) {
-		UNLOCK( &this->cacheLock );
+		if ( needsUnlock ) UNLOCK( &this->cacheLock );
 		return 0;
 	}
 	if ( needsUnlock ) UNLOCK( &this->cacheLock );

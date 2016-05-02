@@ -29,7 +29,6 @@ private:
 	static uint32_t updateInterval;
 	static bool disableDegraded;
 	static IDGenerator *idGenerator;
-	static Pending *pending;
 	static ClientEventQueue *eventQueue;
 	static StripeList<ServerSocket> *stripeList;
 	static ArrayMap<int, ServerSocket> *serverSockets;
@@ -88,6 +87,8 @@ private:
 	bool handleServerReconstructedMsg( CoordinatorEvent event, char *buf, size_t size );
 
 public:
+	static Pending *pending;
+
 	// ---------- worker.cc ----------
 	static bool init();
 	bool init( GlobalConfig &config, uint32_t workerId );

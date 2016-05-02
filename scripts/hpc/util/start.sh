@@ -14,9 +14,13 @@ ssh hpc15 "screen -S coordinator -p 0 -X stuff \"$(printf '\r\r')${BOOTSTRAP_SCR
 sleep ${SLEEP_TIME}
 
 for i in {1..7}; do
+	if [ $i == 6 ]; then
+		continue
+	fi
+
 	port=$(expr $i + 9110)
 	node_id=$(expr $i + 8)
-	ssh hpc${node_id} "screen -S server$i -p 0 -X stuff \"$(printf '\r\r')${BOOTSTRAP_SCRIPT_PATH}/start-server.sh ${1}$(printf '\r\r')\"" &
+	ssh hpc${node_id} "screen -S server -p 0 -X stuff \"$(printf '\r\r')${BOOTSTRAP_SCRIPT_PATH}/start-server.sh ${1}$(printf '\r\r')\"" &
 done
 
 sleep ${SLEEP_TIME}
@@ -30,6 +34,10 @@ sleep ${SLEEP_TIME}
 read -p "Press Enter to terminate all instances..."
 
 for i in {9..15}; do
+	if [ $i == 14 ]; then
+		continue
+	fi
+
 	ssh hpc$i 'killall -9 application coordinator client server ycsb >&/dev/null' &
 done
 
@@ -43,8 +51,12 @@ else
 fi
 
 for i in {1..7}; do
+	if [ $i == 6 ]; then
+		continue
+	fi
+
 	node_id=$(expr $i + 8)
-	ssh hpc${node_id} "screen -S server$i -p 0 -X stuff \"${TERM_COMMAND}\"" &
+	ssh hpc${node_id} "screen -S server -p 0 -X stuff \"${TERM_COMMAND}\"" &
 done
 ssh hpc15 "screen -S client -p 0 -X stuff \"${TERM_COMMAND}\"" &
 ssh hpc15 "screen -S ycsb -p 0 -X stuff \"${TERM_COMMAND}\"" &

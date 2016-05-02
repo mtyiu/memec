@@ -78,6 +78,7 @@ public class Main implements Runnable {
 
 			/*
 			if ( size != numRecords ) rand = 0;
+			/*
 			if ( i == numRecords * 3 / 4 ) {
 				System.err.println( "[" + this.id + "] Sleep for 4 seconds." );
 				try {

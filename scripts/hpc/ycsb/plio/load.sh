@@ -1,9 +1,9 @@
 #!/bin/bash
 
-YCSB_PATH=~/mtyiu/ycsb/0.3.0
+YCSB_PATH=~/mtyiu/ycsb/0.7.0
 
 FIELD_LENGTH=100
-RECORD_COUNT=12000000 # 1.68 GB
+RECORD_COUNT=1000000
 
 if [ $# -lt 1 ]; then
 	echo "Usage: $0 [Number of threads]"

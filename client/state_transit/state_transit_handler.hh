@@ -81,6 +81,13 @@ public:
 		return getPendingRequestCount( false, needsUnlock );
 	}
 
+	bool isPendingRequest( uint32_t requestId, bool needsLock = true, bool needsUnlock = true ) {
+		if ( needsLock ) LOCK( &counter.pendingNormalRequests.lock );
+		bool ret = counter.pendingNormalRequests.requestIds.count( requestId );
+		if ( needsUnlock ) UNLOCK( &counter.pendingNormalRequests.lock );
+		return ret;
+	}
+
 	bool isCompleted() {
 		return counter.pendingNormalRequests.completed;
 	}

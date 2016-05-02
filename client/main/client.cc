@@ -2,7 +2,6 @@
 #include <ctype.h>
 #include "client.hh"
 #include "../remap/basic_remap_scheme.hh"
-
 uint16_t Client::instanceId;
 
 Client::Client() {
@@ -613,7 +612,7 @@ bool Client::isDegraded( ServerSocket *socket ) {
 		( this->debugFlags.isDegraded )
 		||
 		(
-			this->stateTransitHandler.useCoordinatedFlow( socket->getAddr() ) &&
+			this->stateTransitHandler.useCoordinatedFlow( socket->getAddr(), true, true ) &&
 			! this->config.client.degraded.disabled
 		)
 	);
@@ -1020,12 +1019,12 @@ void Client::ackParityDelta( FILE *f, ServerSocket *target, pthread_cond_t *cond
 
 		LOCK( &s->timestamp.pendingAck.updateLock );
 		if ( ! s->timestamp.pendingAck._update.empty() )
-			update = s->timestamp.pendingAck._update.begin()->getVal() - 1;
+			update = s->timestamp.pendingAck._update.begin()->first.getVal() - 1;
 		UNLOCK( &s->timestamp.pendingAck.updateLock );
 
 		LOCK( &s->timestamp.pendingAck.delLock );
 		if ( ! s->timestamp.pendingAck._del.empty() )
-			del = s->timestamp.pendingAck._del.begin()->getVal() - 1;
+			del = s->timestamp.pendingAck._del.begin()->first.getVal() - 1;
 		UNLOCK( &s->timestamp.pendingAck.delLock );
 
 		/* find the small acked timestamp */
@@ -1069,17 +1068,28 @@ bool Client::revertDelta( FILE *f, ServerSocket *target, pthread_cond_t *conditi
 		return false;
 
 	// ack parity delta as well, but do not wait for it to complete
-	//this->ackParityDelta( f, target, 0, 0, 0, force );
+	this->ackParityDelta( f, target, 0, 0, 0, force );
 
 	// UPDATE / DELETE
 	LOCK( &target->timestamp.pendingAck.updateLock );
-	for ( auto &ts : target->timestamp.pendingAck._update )
-		timestampSet.insert( ts.getVal() );
+	for ( auto &rec : target->timestamp.pendingAck._update ) {
+		// skip reverting requests that are pending
+		if ( this->stateTransitHandler.stateTransitInfo[ target->getAddr() ].isPendingRequest( rec.second ) ) {
+			__INFO__( YELLOW, "Client", "revertDelta", "SKIP revert pending request id = %u", rec.second );
+			continue;
+		}
+		timestampSet.insert( rec.first.getVal() );
+	}
 	UNLOCK( &target->timestamp.pendingAck.updateLock );
 
 	LOCK( &target->timestamp.pendingAck.delLock );
-	for ( auto &ts : target->timestamp.pendingAck._del )
-		timestampSet.insert( ts.getVal() );
+	for ( auto &rec : target->timestamp.pendingAck._del ) {
+		// skip reverting requests that are pending
+		if ( this->stateTransitHandler.stateTransitInfo[ target->getAddr() ].isPendingRequest( rec.second ) ) {
+			continue;
+		}
+		timestampSet.insert( rec.first.getVal() );
+	}
 	UNLOCK( &target->timestamp.pendingAck.delLock );
 
 	// SET
@@ -1136,7 +1146,7 @@ bool Client::revertDelta( FILE *f, ServerSocket *target, pthread_cond_t *conditi
 	for ( uint32_t requestId : outdatedRequestIds ) {
 		this->stateTransitHandler.stateTransitInfo.at( target->getAddr() ).removePendingRequest( requestId, false );
 	}
-	if ( ! outdatedRequestIds.empty() ) { 
+	if ( ! outdatedRequestIds.empty() ) {
 		this->stateTransitHandler.stateTransitInfo.at( target->getAddr() ).setCompleted();
 	}
 

@@ -4,6 +4,7 @@ DegradedMap::DegradedMap() {
 	LOCK_INIT( &this->keysLock );
 	LOCK_INIT( &this->unsealed.lock );
 	LOCK_INIT( &this->cacheLock );
+	LOCK_INIT( &this->removedLock );
 	LOCK_INIT( &this->degraded.chunksLock );
 	LOCK_INIT( &this->degraded.keysLock );
 }
@@ -346,7 +347,7 @@ bool DegradedMap::insertDegradedKey( Key key, uint16_t instanceId, uint32_t requ
 	return ret;
 }
 
-bool DegradedMap::deleteDegradedKey( Key key, std::vector<struct pid_s> &pids ) {
+bool DegradedMap::deleteDegradedKey( Key key, std::vector<struct pid_s> &pids, bool success ) {
 	std::unordered_map<Key, std::vector<struct pid_s>>::iterator it;
 
 	LOCK( &this->degraded.keysLock );
@@ -358,9 +359,11 @@ bool DegradedMap::deleteDegradedKey( Key key, std::vector<struct pid_s> &pids ) 
 		pids = it->second;
 		this->degraded.keys.erase( it );
 
-		Key k = key;
-		k.dup();
-		this->degraded.reconstructedKeys.insert( k );
+		if ( success ) {
+			Key k = key;
+			k.dup();
+			this->degraded.reconstructedKeys.insert( k );
+		}
 	}
 	UNLOCK( &this->degraded.keysLock );
 
@@ -376,6 +379,10 @@ bool DegradedMap::insertChunk( uint32_t listId, uint32_t stripeId, uint32_t chun
 
 	if ( needsLock ) LOCK( &this->cacheLock );
 	ret = this->cache.insert( p );
+	// Mark the chunk as present
+	LOCK ( &this->removedLock );
+	this->removed.erase( metadata );
+	UNLOCK ( &this->removedLock );
 	if ( needsUnlock ) UNLOCK( &this->cacheLock );
 
 	if ( ret.second && ! isParity ) {
@@ -426,10 +433,24 @@ Chunk *DegradedMap::deleteChunk( uint32_t listId, uint32_t stripeId, uint32_t ch
 		// Chunk is found
 		chunk = it->second;
 		this->cache.erase( it );
+		// Mark the chunk as absent
+		LOCK ( &this->removedLock );
+		this->removed.insert( metadata );
+		UNLOCK ( &this->removedLock );
 	}
 	UNLOCK( &this->cacheLock );
 
 	return chunk;
+}
+
+bool DegradedMap::findRemovedChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId ) {
+	Metadata metadata;
+	bool ret = false;
+	metadata.set( listId, stripeId, chunkId );
+	LOCK ( &this->removedLock );
+	ret = this->removed.count( metadata ) > 0;
+	UNLOCK ( &this->removedLock );
+	return ret;
 }
 
 void DegradedMap::getKeysMap( std::unordered_map<Key, KeyMetadata> *&keys, LOCK_T *&lock ) {

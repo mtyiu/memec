@@ -36,10 +36,13 @@ void BasicRemappingScheme::redirect(
 			serverAddr = parityServerSockets[ chunkId - dataChunkCount ]->getAddr();
 
 		// Both original and failed servers should not be selected as remapped servers
-		selectedServers.insert( serverAddr ); 
+		bool allowRemapping = stateTransitHandler->allowRemapping( serverAddr );
+
+		if ( numEntries <= dataChunkCount || i >= 1 + parityChunkCount )
+			selectedServers.insert( serverAddr );
 
 		// Check if remapping is allowed
-		if ( stateTransitHandler->allowRemapping( serverAddr ) ) {
+		if ( allowRemapping ) {
 			if ( ! isGet || chunkId < dataChunkCount ) {
 				remapped[ remappedCount * 2     ] = original[ i * 2     ];
 				remapped[ remappedCount * 2 + 1 ] = original[ i * 2 + 1 ];
@@ -82,7 +85,7 @@ void BasicRemappingScheme::redirect(
 			} else if ( redirectedServers.count( serverAddr ) ) {
 				// Skip selected servers
 				continue;
-			} else if ( stateTransitHandler->useCoordinatedFlow( serverAddr ) ) {
+			} else if ( stateTransitHandler->useCoordinatedFlow( serverAddr, true, true ) ) {
 				// Skip overloaded server
 				continue;
 			}

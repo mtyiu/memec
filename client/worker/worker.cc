@@ -233,7 +233,7 @@ void ClientWorker::replayRequestPrepare( ServerSocket *server ) {
 				else \
 					needsDup = true; \
 			} \
-			__INFO__( YELLOW, "ClientWorker", "replayRequestPrepare", "Add %s request ID = (%u,%u) with timestamp %u to replay.", #_OPCODE_, pid.instanceId, pid.requestId, pid.timestamp ); \
+			__DEBUG__( YELLOW, "ClientWorker", "replayRequestPrepare", "Add %s request ID = (%u,%u) with timestamp %u to replay.", #_OPCODE_, pid.instanceId, pid.requestId, pid.timestamp ); \
 			/* insert the request into pending set for replay */ \
 			requestInfo.set( pid.ptr, pid.instanceId, pid.requestId, PROTO_OPCODE_##_OPCODE_, _APPLICATION_VALUE_VAR_, !needsDup ); \
 			map->insert( std::pair<uint32_t, RequestInfo>( pid.timestamp, requestInfo ) ); \
@@ -399,7 +399,7 @@ void ClientWorker::gatherPendingNormalRequests( ServerSocket *target, bool needs
 		} \
 		/* put the completion of request in account for state transition */ \
 		mh->stateTransitInfo.at( addr ).addPendingRequest( it->first.parentRequestId, false, false ); \
-		__DEBUG__( CYAN, "ClientWorker", "gatherPendingNormalRequest", "Pending normal instance=%d request id=%u parentid=%u dataServer=%d in list=%d for transit.", target->instanceId, it->first.requestId, it->first.parentRequestId, stripeList->get( listId, chunkId )->instanceId, listId ); \
+		__DEBUG__( CYAN, "ClientWorker", "gatherPendingNormalRequest", "Pending normal %s instance=%d request id=%u parentid=%u dataServer=%d in list=%d for transit.", #_OP_TYPE_, target->instanceId, it->first.requestId, it->first.parentRequestId, stripeList->get( listId, chunkId )->instanceId, listId ); \
 		hasPending = true; \
 	} \
 	UNLOCK ( &pending->servers._OP_TYPE_##Lock ); \

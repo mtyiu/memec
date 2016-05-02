@@ -172,8 +172,8 @@ void ClientWorker::dispatch( ServerEvent event ) {
 						break;
 					case PROTO_OPCODE_GET:
 						if ( ! csth.acceptNormalResponse( addr ) ) {
-							//__INFO__( YELLOW, "Client", "dispatch", "Ignoring normal GET response..." );
-							break;
+							__INFO__( YELLOW, "Client", "dispatch", "Ignoring normal GET response: ID = %u (port: %u).", header.requestId, ntohs( addr.sin_port ) );
+							// break;
 						}
 					case PROTO_OPCODE_DEGRADED_GET:
 						this->handleGetResponse( event, success, header.opcode == PROTO_OPCODE_DEGRADED_GET, buffer.data, header.length );
@@ -190,7 +190,7 @@ void ClientWorker::dispatch( ServerEvent event ) {
 						break;
 					case PROTO_OPCODE_UPDATE:
 						if ( ! csth.acceptNormalResponse( addr ) ) {
-							//__INFO__( YELLOW, "Client", "dispatch", "Ignoring normal UPDATE response..." );
+							// __INFO__( YELLOW, "Client", "dispatch", "[port: %u] Ignoring normal UPDATE response...", ntohs( addr.sin_port ) );
 							break;
 						}
 					case PROTO_OPCODE_DEGRADED_UPDATE:
@@ -297,11 +297,12 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 		keyStr = header.key;
 	}
 
-	int pending;
+	int pending = 0;
 	ApplicationEvent applicationEvent;
 	PendingIdentifier pid;
 	Key key;
 	KeyValue keyValue;
+	Client* client = Client::getInstance();
 
 	if ( ! ClientWorker::pending->eraseKey( PT_SERVER_SET, event.instanceId, event.requestId, event.socket, &pid, &key, true, false ) ) {
 		UNLOCK( &ClientWorker::pending->servers.setLock );
@@ -313,7 +314,6 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 	pending = ClientWorker::pending->count( PT_SERVER_SET, pid.instanceId, pid.requestId, false, true );
 
 	// Mark the elapse time as latency
-	Client* client = Client::getInstance();
 	if ( ClientWorker::updateInterval ) {
 		struct timespec elapsedTime;
 		RequestStartTime rst;
@@ -359,10 +359,11 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 		for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
 			server = this->parityServerSockets[ i ];
 			addr = server->getAddr();
-			if ( ! stateTransitHandler->useCoordinatedFlow( addr, true, true ) || stateTransitHandler->stateTransitInfo.at( addr ).isCompleted() )
-				continue;
+			// if ( ! stateTransitHandler->useCoordinatedFlow( addr, true, true ) || stateTransitHandler->stateTransitInfo.at( addr ).isCompleted() )
+			// 	continue;
+			__DEBUG__( GREEN, "ClientWorker", "handleSetResponse", "Ack transition for server id = %u (request ID = %u).", server->instanceId, pid.requestId );
 			if ( stateTransitHandler->stateTransitInfo.at( addr ).removePendingRequest( pid.requestId ) == 0 && stateTransitHandler->stateTransitInfo.at( addr ).setCompleted() ) {
-				__INFO__( GREEN, "ClientWorker", "handleSetResponse", "Ack transition for server id = %u.", server->instanceId );
+				// __INFO__( GREEN, "ClientWorker", "handleSetResponse", "Ack transition for server id = %u (request ID = %u).", server->instanceId, pid.requestId );
 				stateTransitHandler->ackTransit( addr );
 			}
 		}
@@ -376,6 +377,9 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 	Key key;
 	uint32_t valueSize = 0;
 	char *valueStr = 0;
+	ApplicationEvent applicationEvent;
+	PendingIdentifier pid;
+
 	if ( success ) {
 		struct KeyValueHeader header;
 		if ( this->protocol.parseKeyValueHeader( header, buf, size ) ) {
@@ -390,14 +394,58 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 		struct KeyHeader header;
 		if ( this->protocol.parseKeyHeader( header, buf, size ) ) {
 			key.set( header.keySize, header.key, ( void * ) event.socket );
+
+			uint32_t listId, chunkId;
+			ServerSocket *originalDataServer = this->getServers( key.data, key.size, listId, chunkId );
+			if ( originalDataServer != event.socket ) {
+				// fprintf( stderr, "MISMATCH: key: %.*s!\n", key.size, key.data );
+
+				if ( ! ClientWorker::pending->eraseKey( PT_SERVER_GET, event.instanceId, event.requestId, event.socket, &pid, &key, true, true ) ) {
+					__ERROR__( "ClientWorker", "handleGetResponse", "Cannot find a pending server GET request that matches the response. This message will be discarded (key = %.*s).", key.size, key.data );
+					return false;
+				}
+
+				// Retry on original server
+				struct {
+					size_t size;
+					char *data;
+				} buffer;
+				ssize_t sentBytes;
+				bool connected;
+
+				buffer.data = this->protocol.reqGet(
+					buffer.size, pid.instanceId, pid.requestId,
+					key.data, key.size
+				);
+
+				if ( ! ClientWorker::pending->insertKey( PT_SERVER_GET, pid.instanceId, pid.parentInstanceId, pid.requestId, pid.parentRequestId, ( void * ) originalDataServer, key ) ) {
+					__ERROR__( "ClientWorker", "handleGetRequest", "Cannot insert into server GET pending map." );
+				}
+
+				if ( ClientWorker::updateInterval ) {
+					// Mark the time when request is sent
+					ClientWorker::pending->recordRequestStartTime( PT_SERVER_GET, pid.instanceId, pid.parentInstanceId, pid.requestId, pid.parentRequestId, ( void * ) originalDataServer, originalDataServer->getAddr() );
+				}
+
+				// Send GET request
+				sentBytes = originalDataServer->send( buffer.data, buffer.size, connected );
+				if ( sentBytes != ( ssize_t ) buffer.size ) {
+					__ERROR__( "ClientWorker", "handleGetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
+					return false;
+				}
+
+				return true;
+			}
+
+			if ( ! isDegraded ) {
+				event.socket->printAddress( stderr );
+				__ERROR__( "ClientWorker", "handleGetResponse", "GET request id = %u failed: key = %.*s", event.requestId, header.keySize, header.key );
+			}
 		} else {
 			__ERROR__( "ClientWorker", "handleGetResponse", "Invalid GET response." );
 			return false;
 		}
 	}
-
-	ApplicationEvent applicationEvent;
-	PendingIdentifier pid;
 
 	if ( ! ClientWorker::pending->eraseKey( PT_SERVER_GET, event.instanceId, event.requestId, event.socket, &pid, &key, true, true ) ) {
 		__ERROR__( "ClientWorker", "handleGetResponse", "Cannot find a pending server GET request that matches the response. This message will be discarded (key = %.*s).", key.size, key.data );
@@ -447,9 +495,20 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 				false
 			);
 		} else {
-			// event.socket->printAddress();
-			// printf( ": handleGetResponse(): Key %.*s not found.\n", key.size, key.data );
-			applicationEvent.resGet( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, key, false );
+			uint32_t dataChunkIndex;
+			this->stripeList->get( key.data, key.size, this->dataServerSockets, 0, &dataChunkIndex );
+			if ( isDegraded && ! Client::getInstance()->stateTransitHandler.useCoordinatedFlow( this->dataServerSockets[ dataChunkIndex ]->getAddr() ) ) {
+				// degraded GET failed, but server returns to normal
+				__DEBUG__( CYAN, "ClientWorker", "handleGetResponse", "Retry on failed degraded GET request id = %u", pid.requestId );
+				applicationEvent.replayGetRequest( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, key );
+			} else {
+				// event.socket->printAddress();
+				// printf( ": handleGetResponse(): Key %.*s not found.\n", key.size, key.data );
+				if ( ! isDegraded ) {
+					__ERROR__( "ClientWorker", "handleGetResponse", "GET request id = %u failed ", pid.requestId );
+				}
+				applicationEvent.resGet( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, key, false );
+			}
 		}
 		this->dispatch( applicationEvent );
 	}
@@ -463,13 +522,18 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 		__ERROR__( "ClientWorker", "handleUpdateResponse", "Invalid UPDATE Response." );
 		return false;
 	}
-	__DEBUG__(
-		BLUE, "ClientWorker", "handleUpdateResponse",
-		"[UPDATE (%s)] Updated key: %.*s (key size = %u); update value size = %u at offset: %u.",
-		success ? "Success" : "Fail",
-		( int ) header.keySize, header.key, header.keySize,
-		header.valueUpdateSize, header.valueUpdateOffset
-	);
+
+	if ( ! success && ! isDegraded ) {
+		__ERROR__( "ClientWorker", "handleUpdateResponse",
+			"[UPDATE (%s)] From %d Updated key: %.*s (key size = %u); update value size = %u at offset: %u.",
+			success ? "Success" : "Fail",
+			event.socket->instanceId,
+			( int ) header.keySize, header.key, header.keySize,
+			header.valueUpdateSize, header.valueUpdateOffset
+		);
+		fprintf( stderr, "----- WAITING FOR RETRY ----------\n" );
+		return false;
+	}
 
 	KeyValueUpdate keyValueUpdate;
 	ApplicationEvent applicationEvent;
@@ -488,19 +552,37 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 		return false;
 	}
 
-	// free the updated value
-	delete[] ( ( char * )( keyValueUpdate.ptr ) );
-
 	// remove pending timestamp
 	// TODO handle degraded mode
 	Client *client = Client::getInstance();
 	if ( ! isDegraded ) {
-		event.socket->timestamp.pendingAck.eraseUpdate( timestamp );
+		event.socket->timestamp.pendingAck.eraseUpdate( timestamp, pid.requestId );
 	}
 
+	uint32_t dataChunkIndex;
+	this->stripeList->get( header.key, header.keySize, this->dataServerSockets, 0, &dataChunkIndex );
+	bool needsReplay = pid.ptr && isDegraded && ! success && ! Client::getInstance()->stateTransitHandler.useCoordinatedFlow( this->dataServerSockets[ dataChunkIndex ]->getAddr() );
+
 	if ( pid.ptr ) {
-		applicationEvent.resUpdate( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, keyValueUpdate, success );
-		this->dispatch( applicationEvent );
+		if ( needsReplay ) {
+			// make a copy of the update
+			KeyValueUpdate kv;
+			kv.dup( keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.ptr );
+			kv.offset = keyValueUpdate.offset;
+			kv.length = keyValueUpdate.length;
+			kv.isDegraded = keyValueUpdate.isDegraded;
+			applicationEvent.replayUpdateRequest( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, kv );
+			// do not use dispatch, since ClientWorker::replayUpdate() overwrites recv buffer
+			ClientWorker::eventQueue->insert( applicationEvent );
+		} else {
+			applicationEvent.resUpdate( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, keyValueUpdate, success, false );
+			this->dispatch( applicationEvent );
+		}
+	}
+
+	if ( ! needsReplay ) {
+		// free the updated value
+		delete[] ( ( char * )( keyValueUpdate.ptr ) );
 	}
 
 	// Check if all normal requests completes
@@ -512,7 +594,7 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 		for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
 			server = this->parityServerSockets[ i ];
 			addr = server->getAddr();
-			if ( ! stateTransitHandler->useCoordinatedFlow( addr ) || stateTransitHandler->stateTransitInfo.at( addr ).isCompleted() )
+			if ( ! stateTransitHandler->useCoordinatedFlow( addr, true, true ) || stateTransitHandler->stateTransitInfo.at( addr ).isCompleted() )
 				continue;
 			if ( stateTransitHandler->stateTransitInfo.at( addr ).removePendingRequest( pid.requestId ) == 0 ) {
 				__INFO__( GREEN, "ClientWorker", "handleUpdateResponse", "Ack transition for server id = %u.", server->instanceId );
@@ -594,7 +676,7 @@ bool ClientWorker::handleDeleteResponse( ServerEvent event, bool success, bool i
 	// TODO handle degraded mode
 	Client *client = Client::getInstance();
 	if ( !isDegraded ) {
-		event.socket->timestamp.pendingAck.eraseDel( timestamp );
+		event.socket->timestamp.pendingAck.eraseDel( timestamp, pid.requestId );
 	}
 
 	if ( pid.ptr ) {
@@ -610,7 +692,7 @@ bool ClientWorker::handleDeleteResponse( ServerEvent event, bool success, bool i
 	for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
 		server = this->parityServerSockets[ i ];
 		addr = server->getAddr();
-		if ( ! stateTransitHandler->useCoordinatedFlow( addr ) || stateTransitHandler->stateTransitInfo.at( addr ).isCompleted() )
+		if ( ! stateTransitHandler->useCoordinatedFlow( addr, true, true ) || stateTransitHandler->stateTransitInfo.at( addr ).isCompleted() )
 			continue;
 		if ( stateTransitHandler->stateTransitInfo.at( addr ).removePendingRequest( pid.requestId ) == 0 ) {
 			__INFO__( GREEN, "ClientWorker", "handleDeleteResponse", "Ack transition for server id = %u.", server->instanceId );

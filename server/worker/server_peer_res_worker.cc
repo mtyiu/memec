@@ -37,7 +37,7 @@ bool ServerWorker::handleForwardKeyResponse( struct ForwardKeyHeader &header, bo
 
 	key.set( header.keySize, header.key );
 
-	if ( ! dmap->deleteDegradedKey( key, pids ) ) {
+	if ( ! dmap->deleteDegradedKey( key, pids, true ) ) {
 		// __ERROR__( "ServerWorker", "handleForwardKeyResponse", "ServerWorker::degradedChunkBuffer->deleteDegradedKey() failed: %.*s (self? %s).", header.keySize, header.key, self ? "yes" : "no" );
 		return false;
 	}
@@ -221,7 +221,7 @@ bool ServerWorker::handleGetResponse( ServerPeerEvent event, bool success, char 
 		return false;
 	}
 
-	if ( ! dmap->deleteDegradedKey( key, pids ) ) {
+	if ( ! dmap->deleteDegradedKey( key, pids, success ) ) {
 		__ERROR__( "ServerWorker", "handleGetResponse", "ServerWorker::degradedChunkBuffer->deleteDegradedKey() failed." );
 	}
 
@@ -679,13 +679,13 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 				this->sealIndicators[ ServerWorker::parityChunkCount + 1 ][ i ] &&
 				this->sealIndicators[ ServerWorker::parityChunkCount ][ i ] != this->sealIndicators[ ServerWorker::parityChunkCount + 1 ][ i ]
 			) {
-				__INFO__(
-					GREEN, "ServerWorker", "handleGetChunkResponse",
-					"Need to retrieve the sealed data chunk (%u, %u, %u): %d vs %d.",
-					listId, stripeId, i,
-					this->sealIndicators[ ServerWorker::parityChunkCount ][ i ],
-					this->sealIndicators[ ServerWorker::parityChunkCount + 1 ][ i ]
-				);
+				//__INFO__(
+				//	GREEN, "ServerWorker", "handleGetChunkResponse",
+				//	"Need to retrieve the sealed data chunk (%u, %u, %u): %d vs %d.",
+				//	listId, stripeId, i,
+				//	this->sealIndicators[ ServerWorker::parityChunkCount ][ i ],
+				//	this->sealIndicators[ ServerWorker::parityChunkCount + 1 ][ i ]
+				//);
 
 				ServerPeerEvent serverPeerEvent;
 				Metadata tmpMetadata;
@@ -925,7 +925,7 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 								stderr,
 								"[%u, %u, %u] instanceId: %u vs. %u; "
 								"requestId:  %u vs. %u\n",
-								listId, stripeId, chunkId,
+								op.listId, op.stripeId, op.chunkId,
 								pids[ pidsIndex ].instanceId,
 								pid.instanceId,
 								pids[ pidsIndex ].requestId,
@@ -1396,6 +1396,7 @@ bool ServerWorker::handleSetChunkResponse( ServerPeerEvent event, bool success, 
 			CoordinatorEvent coordinatorEvent;
 			coordinatorEvent.resReleaseDegradedLock( ( CoordinatorSocket * ) pid.ptr, pid.instanceId, pid.requestId, total );
 			ServerWorker::eventQueue->insert( coordinatorEvent );
+			__DEBUG__( YELLOW, "ServerWorker", "handleSetChunkResponse", "End of release degraded lock requests id = %u, total = %u.", pid.requestId, total );
 		}
 	} else {
 		// Reconstruction
@@ -1426,13 +1427,16 @@ bool ServerWorker::handleUpdateChunkResponse( ServerPeerEvent event, bool succes
 		__ERROR__( "ServerWorker", "handleUpdateChunkResponse", "Invalid UPDATE_CHUNK response." );
 		return false;
 	}
-	__DEBUG__(
-		BLUE, "ServerWorker", "handleUpdateChunkResponse",
-		"[UPDATE_CHUNK (%s)] List ID: %u, stripe ID: %u, chunk ID: %u; offset = %u, length = %u.",
-		success ? "success" : "failed",
-		header.listId, header.stripeId, header.chunkId,
-		header.offset, header.length
-	);
+	if ( ! success ) {
+		__ERROR__(
+			"ServerWorker", "handleUpdateChunkResponse",
+			"[UPDATE_CHUNK (%s)] From id: %d List ID: %u, stripe ID: %u, chunk ID: %u; offset = %u, length = %u.",
+			success ? "success" : "failed",
+			event.socket->instanceId,
+			header.listId, header.stripeId, header.chunkId,
+			header.offset, header.length
+		);
+	}
 
 	int pending;
 	ChunkUpdate chunkUpdate;
