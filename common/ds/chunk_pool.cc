@@ -3,6 +3,7 @@
 
 uint32_t ChunkUtil::chunkSize;
 uint32_t ChunkUtil::dataChunkCount;
+LOCK_T ChunkUtil::lock;
 
 ChunkPool::ChunkPool() {
 	this->total = 0;

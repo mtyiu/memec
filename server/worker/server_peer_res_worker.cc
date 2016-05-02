@@ -591,6 +591,7 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 						header.chunkData.stripeId,
 						header.chunkData.chunkId
 					);
+
 					ChunkUtil::load(
 						tmp->second.chunk,
 						header.chunkData.offset,

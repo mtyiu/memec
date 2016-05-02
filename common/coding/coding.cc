@@ -117,9 +117,6 @@ Chunk *Coding::bitwiseXOR( Chunk *dst, Chunk *srcA, Chunk *srcB, uint32_t size )
 		ChunkUtil::getData( srcB ),
 		size
 	);
-
-	uint32_t s = ChunkUtil::getSize( dst );
-	ChunkUtil::setSize( dst, size > s ? size : s );
 	return dst;
 }
 

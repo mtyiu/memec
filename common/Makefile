@@ -34,7 +34,11 @@ OBJS= \
 	socket/socket.o \
 	socket/epoll.o
 
-all: $(OBJS)
+.PHONY: coding
+
+all: $(OBJS) coding
+
+coding:
 	$(MAKE) -C coding
 
 %.o: %.cc %.hh

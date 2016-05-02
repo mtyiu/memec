@@ -85,8 +85,10 @@ char *KeyValue::serialize( char *data, char *key, uint8_t keySize, char *value, 
 	data[ 3 ] = tmp[ 3 ];
 	valueSize = ntohl( valueSize );
 
-	memcpy( data + KEY_VALUE_METADATA_SIZE, key, keySize );
-	memcpy( data + KEY_VALUE_METADATA_SIZE + keySize, value, valueSize );
+	if ( key )
+		memcpy( data + KEY_VALUE_METADATA_SIZE, key, keySize );
+	if ( value )
+		memcpy( data + KEY_VALUE_METADATA_SIZE + keySize, value, valueSize );
 
 	return data;
 }

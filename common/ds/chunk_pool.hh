@@ -8,6 +8,7 @@
 #include "../../common/coding/coding.hh"
 #include "../../common/ds/chunk.hh"
 #include "../../common/hash/hash_func.hh"
+#include "../../common/lock/lock.hh"
 
 struct ChunkMetadata {
 	uint32_t listId;
@@ -21,10 +22,12 @@ class ChunkUtil {
 public:
 	static uint32_t chunkSize;
 	static uint32_t dataChunkCount;
+	static LOCK_T lock;
 
 	static inline void init( uint32_t chunkSize, uint32_t dataChunkCount ) {
 		ChunkUtil::chunkSize = chunkSize;
 		ChunkUtil::dataChunkCount = dataChunkCount;
+		LOCK_INIT( &ChunkUtil::lock );
 	}
 
 	// Getters
@@ -53,9 +56,11 @@ public:
 	static inline uint32_t getChunkId( Chunk *chunk ) {
 		return ( ( struct ChunkMetadata * ) chunk )->chunkId;
 	}
-	static inline uint32_t getSize( Chunk *chunk ) {
+	static inline uint32_t getSize( Chunk *chunk, bool needsLock = true, bool needsUnlock = true ) {
 		if ( ChunkUtil::isParity( chunk ) )
 			return ChunkUtil::chunkSize;
+
+		if ( needsLock ) LOCK( &ChunkUtil::lock );
 
 		// Scan the whole data chunk
 		uint8_t keySize;
@@ -66,7 +71,7 @@ public:
 
 		data = ptr = ChunkUtil::getData( chunk );
 
-		while ( ptr < data + ChunkUtil::chunkSize ) {
+		while ( ptr + KEY_VALUE_METADATA_SIZE < data + ChunkUtil::chunkSize ) {
 			KeyValue::deserialize( ptr, key, keySize, value, valueSize );
 			if ( keySize == 0 && valueSize == 0 )
 				break;
@@ -76,12 +81,16 @@ public:
 			chunkSize += tmp;
 		}
 
+		if ( needsUnlock ) UNLOCK( &ChunkUtil::lock );
+
 		return chunkSize;
 	}
 	static inline uint32_t getCount( Chunk *chunk ) {
 		if ( ChunkUtil::isParity( chunk ) ) {
 			return 0;
 		} else {
+			LOCK( &ChunkUtil::lock );
+
 			// Scan whole chunk
 			uint8_t keySize;
 			uint32_t valueSize, tmp;
@@ -91,7 +100,7 @@ public:
 
 			data = ptr = ChunkUtil::getData( chunk );
 
-			while ( ptr < data + ChunkUtil::chunkSize ) {
+			while ( ptr + KEY_VALUE_METADATA_SIZE < data + ChunkUtil::chunkSize ) {
 				KeyValue::deserialize( ptr, key, keySize, value, valueSize );
 				if ( keySize == 0 && valueSize == 0 )
 					break;
@@ -102,11 +111,13 @@ public:
 				count++;
 			}
 
+			UNLOCK( &ChunkUtil::lock );
+
 			return count;
 		}
 	}
 	static inline char *getData( Chunk *chunk ) {
-		return ( char * ) chunk + CHUNK_METADATA_SIZE;
+		return ( ( char * ) chunk ) + CHUNK_METADATA_SIZE;
 	}
 	static inline char *getData( Chunk *chunk, uint32_t &offset, uint32_t &size ) {
 		uint32_t chunkSize = ChunkUtil::getSize( chunk );
@@ -174,9 +185,15 @@ public:
 
 	// Memory allocator for objects
 	static inline char *alloc( Chunk *chunk, uint32_t size, uint32_t &offset ) {
-		uint32_t chunkSize = ChunkUtil::getSize( chunk );
-		offset = chunkSize;
-		return ( ( char * ) chunk ) + CHUNK_METADATA_SIZE + offset;
+		LOCK( &ChunkUtil::lock );
+
+		offset = ChunkUtil::getSize( chunk, false, false );
+		char *ptr = ( ( char * ) chunk ) + CHUNK_METADATA_SIZE + offset;
+
+		KeyValue::serialize( ptr, 0, 0, 0, size - CHUNK_METADATA_SIZE );
+
+		UNLOCK( &ChunkUtil::lock );
+		return ptr;
 	}
 
 	// Update
