@@ -8,6 +8,7 @@ char *ServerProtocol::reqSealChunk( size_t &size, uint16_t instanceId, uint32_t 
 
 	char *ptr = buf + PROTO_HEADER_SIZE + PROTO_CHUNK_SEAL_SIZE;
 	size_t bytes = 0; // data length only
+	Metadata metadata = ChunkUtil::getMetadata( chunk );
 
 	int currentOffset = startPos, nextOffset = 0;
 	uint32_t count = 0;
@@ -23,6 +24,13 @@ char *ServerProtocol::reqSealChunk( size_t &size, uint16_t instanceId, uint32_t 
 		ptr += PROTO_CHUNK_SEAL_DATA_SIZE + keySize;
 
 		// printf( "%.*s ", keySize, key );
+		// fprintf(
+		// 	stderr, "[%u, %u, %u] keySize = %u; currentOffset = %u\n",
+		// 	metadata.listId,
+		// 	metadata.stripeId,
+		// 	metadata.chunkId,
+		// 	keySize, currentOffset
+		// );
 
 		currentOffset = nextOffset;
 	}
@@ -31,7 +39,6 @@ char *ServerProtocol::reqSealChunk( size_t &size, uint16_t instanceId, uint32_t 
 	// The seal request should not exceed the size of the send buffer
 	assert( bytes <= this->buffer.size );
 
-	Metadata metadata = ChunkUtil::getMetadata( chunk );
 	size = this->generateChunkSealHeader(
 		PROTO_MAGIC_REQUEST,
 		PROTO_MAGIC_TO_SERVER,

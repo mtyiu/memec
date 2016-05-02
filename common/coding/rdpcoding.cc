@@ -301,7 +301,7 @@ void RDPCoding::performXOR( Chunk **chunks, uint32_t target ) {
 			chunks[ target ],
 			chunks[ cidx ],
 			chunks[ target ],
-			ChunkUtil::getSize( chunks[ cidx ] )
+			ChunkUtil::chunkSize
 		);
 	}
 }

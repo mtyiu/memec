@@ -133,6 +133,15 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 			);
 			break;
 		case SERVER_PEER_EVENT_TYPE_FORWARD_CHUNK_REQUEST:
+			// fprintf(
+			// 	stderr,
+			// 	"Forwarding chunk [%u, %u, %u]: size = %u\n",
+			// 	event.message.chunk.metadata.listId,
+			// 	event.message.chunk.metadata.stripeId,
+			// 	event.message.chunk.metadata.chunkId,
+			// 	ChunkUtil::getSize( event.message.chunk.chunk )
+			// );
+
 			buffer.data = this->protocol.reqForwardChunk(
 				buffer.size,
 				event.instanceId, event.requestId,
@@ -318,9 +327,8 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 			char *data = 0;
 			uint32_t size = 0, offset = 0;
 
-			if ( event.message.chunk.chunk ) {
+			if ( event.message.chunk.chunk )
 				data = ChunkUtil::getData( event.message.chunk.chunk, offset, size );
-			}
 
 			buffer.data = this->protocol.resGetChunk(
 				buffer.size,

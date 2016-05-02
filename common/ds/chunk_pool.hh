@@ -57,6 +57,9 @@ public:
 		return ( ( struct ChunkMetadata * ) chunk )->chunkId;
 	}
 	static inline uint32_t getSize( Chunk *chunk, bool needsLock = true, bool needsUnlock = true ) {
+		if ( chunk == Coding::zeros )
+			return 0;
+
 		if ( ChunkUtil::isParity( chunk ) )
 			return ChunkUtil::chunkSize;
 
@@ -67,7 +70,7 @@ public:
 		uint32_t valueSize, tmp;
 		char *key, *value;
 		char *data, *ptr;
-		uint32_t chunkSize = 0;
+		uint32_t _chunkSize = 0;
 
 		data = ptr = ChunkUtil::getData( chunk );
 
@@ -78,12 +81,12 @@ public:
 
 			tmp = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
 			ptr += tmp;
-			chunkSize += tmp;
+			_chunkSize += tmp;
 		}
 
 		if ( needsUnlock ) UNLOCK( &ChunkUtil::lock );
 
-		return chunkSize;
+		return _chunkSize;
 	}
 	static inline uint32_t getCount( Chunk *chunk ) {
 		if ( ChunkUtil::isParity( chunk ) ) {
@@ -120,16 +123,16 @@ public:
 		return ( ( char * ) chunk ) + CHUNK_METADATA_SIZE;
 	}
 	static inline char *getData( Chunk *chunk, uint32_t &offset, uint32_t &size ) {
-		uint32_t chunkSize = ChunkUtil::getSize( chunk );
+		uint32_t _chunkSize = ChunkUtil::getSize( chunk );
 		char *data = ChunkUtil::getData( chunk );
 
-		if ( chunkSize > 0 ) {
-			for ( offset = 0; offset < chunkSize; offset++ ) {
+		if ( _chunkSize > 0 ) {
+			for ( offset = 0; offset < _chunkSize; offset++ ) {
 				if ( data[ offset ] != 0 )
 					break;
 			}
 
-			for ( size = chunkSize - 1; size > offset; size-- ) {
+			for ( size = _chunkSize - 1; size > offset; size-- ) {
 				if ( data[ size ] != 0 )
 					break;
 			}
@@ -156,7 +159,7 @@ public:
 		int ret = -1;
 		uint32_t valueSize;
 
-		if ( ptr < data + ChunkUtil::chunkSize ) {
+		if ( ptr + KEY_VALUE_METADATA_SIZE < data + ChunkUtil::chunkSize ) {
 			KeyValue::deserialize( ptr, key, keySize, value, valueSize );
 			if ( keySize )
 				ret = offset + KEY_VALUE_METADATA_SIZE + keySize + valueSize;
@@ -305,6 +308,53 @@ public:
 			width, "Size", ChunkUtil::getSize( chunk ),
 			width, "Count", ChunkUtil::getCount( chunk )
 		);
+
+		if ( ! ChunkUtil::isParity( chunk ) ) {
+			uint8_t keySize;
+			uint32_t valueSize, tmp;
+			char *key, *value;
+			char *ptr;
+
+			ptr = data;
+
+			while ( ptr + KEY_VALUE_METADATA_SIZE < data + ChunkUtil::chunkSize ) {
+				KeyValue::deserialize( ptr, key, keySize, value, valueSize );
+				if ( keySize == 0 && valueSize == 0 )
+					break;
+
+				fprintf(
+					stderr, "[%u, %u, %u] Object: (k: %u, v: %u) at offset: %lu\n",
+					ChunkUtil::getListId( chunk ),
+					ChunkUtil::getStripeId( chunk ),
+					ChunkUtil::getChunkId( chunk ),
+					keySize, valueSize, ptr - data
+				);
+
+				tmp = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
+				ptr += tmp;
+			}
+		} else {
+			uint32_t i;
+			for ( i = ChunkUtil::chunkSize - 1; i >= 0; i-- ) {
+				if ( data[ i ] != 0 )
+					break;
+			}
+			if ( i == ChunkUtil::chunkSize )
+				fprintf(
+					stderr, "[%u, %u, %u] No zeros at the end.\n",
+					ChunkUtil::getListId( chunk ),
+					ChunkUtil::getStripeId( chunk ),
+					ChunkUtil::getChunkId( chunk )
+				);
+			else
+				fprintf(
+					stderr, "[%u, %u, %u] Zeros at: %u-%u.\n",
+					ChunkUtil::getListId( chunk ),
+					ChunkUtil::getStripeId( chunk ),
+					ChunkUtil::getChunkId( chunk ),
+					i + 1, ChunkUtil::chunkSize - 1
+				);
+		}
 	}
 };
 

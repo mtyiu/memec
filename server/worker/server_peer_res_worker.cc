@@ -801,6 +801,7 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 		// Set up chunk buffer for storing reconstructed chunks
 		for ( uint32_t i = 0, j = 0; i < ServerWorker::chunkCount; i++ ) {
 			if ( ! this->chunks[ i ] ) {
+				ChunkUtil::clear( this->freeChunks[ j ] );
 				ChunkUtil::set(
 					this->freeChunks[ j ],
 					chunkRequest.listId, chunkRequest.stripeId, i
@@ -822,12 +823,7 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 
 		uint32_t maxChunkSize = 0, chunkSize;
 		for ( uint32_t i = 0; i < ServerWorker::dataChunkCount; i++ ) {
-			if ( this->chunkStatusBackup->check( i ) ) {
-				chunkSize = ChunkUtil::getSize( this->chunks[ i ] );
-			} else {
-				chunkSize = 0;
-			}
-
+			chunkSize = ChunkUtil::getSize( this->chunks[ i ] );
 			maxChunkSize = ( chunkSize > maxChunkSize ) ? chunkSize : maxChunkSize;
 			if ( chunkSize > ChunkUtil::chunkSize ) {
 				__ERROR__(
@@ -838,9 +834,8 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 					chunkSize
 				);
 				for ( uint32_t x = 0; x < ServerWorker::chunkCount; x++ )
-					ChunkUtil::print( this->chunks[ x ] );
-				printf( "\n" );
-				fflush( stdout );
+					ChunkUtil::print( this->chunks[ x ], stderr );
+				fprintf( stderr, "\n" );
 
 				fprintf( stderr, "Seal indicator for (%u, %u):\n", listId, stripeId );
 				for ( uint32_t j = 0; j < ServerWorker::parityChunkCount + 1; j++ ) {
@@ -853,9 +848,8 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 					}
 				}
 
-				printf( "Chunk status: " );
-				this->chunkStatus->print();
-				fflush( stdout );
+				fprintf( stderr, "Chunk status: " );
+				this->chunkStatus->print( stderr );
 
 				ChunkUtil::clear( this->chunks[ i ] );
 				invalidChunks.insert( i );
