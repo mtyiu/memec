@@ -35,6 +35,14 @@ void Server::sync( uint32_t requestId ) {
 	}
 }
 
+void Server::syncHotnessStats( uint32_t requestId ) {
+	CoordinatorEvent event;
+	for ( int i = 0, len = this->config.global.coordinators.size(); i < len; i++ ) {
+		event.syncHotnessStat( this->sockets.coordinators[ i ], Server::instanceId, requestId );
+		this->eventQueue.insert( event );
+	}
+}
+
 void Server::signalHandler( int signal ) {
 	Server *server = Server::getInstance();
 	switch( signal ) {
@@ -211,6 +219,10 @@ bool Server::init( char *path, OptionList &globalOptions, OptionList &serverOpti
 	// Set status //
 	this->status.isRecovering = ( myServerIndex == -1 );
 	LOCK_INIT( &this->status.lock );
+
+	// Init hotness stats //
+	this->hotness.get = new LruHotness();
+	this->hotness.update = new LruHotness();
 
 	// Show configuration //
 	if ( verbose )
@@ -646,6 +658,12 @@ void Server::interactive() {
 		} else if ( strcmp( command, "sync" ) == 0 ) {
 			valid = true;
 			this->sync();
+		} else if ( strcmp( command, "syncHotness" ) == 0 ) {
+			valid = true;
+			this->syncHotnessStats();
+		} else if ( strcmp( command, "hotness" ) == 0 ) {
+			valid = true;
+			this->printHotnessStats();
 		} else if ( strcmp( command, "backup" ) == 0 ) {
 			valid = true;
 			this->backupStat( stdout );
@@ -986,9 +1004,11 @@ void Server::help() {
 		"- metadata: Write metadata to disk\n"
 		"- delay: Add constant delay to each client response\n"
 		"- sync: Synchronize with coordinator\n"
+		"- syncHotness: Synchronize hotness stats with coordinator\n"
 		"- chunk: Print the debug message for a chunk\n"
 		"- pending: Print all pending requests\n"
 		"- remapping: Show remapping info\n"
+		"- hotness: Show hotness stats\n"
 		"- dump: Dump all key-value pairs\n"
 		"- memory: Print memory usage\n"
 		"- backup : Show the backup stats\n"
@@ -1103,4 +1123,11 @@ void Server::backupStat( FILE *f ) {
 		this->sockets.clients.values[ i ]->backup.print( f );
 		fprintf( f, "\n" );
 	}
+}
+
+void Server::printHotnessStats( FILE *f ) {
+	fprintf( f, "\nHotness List\n==================================\n[GET]\n" );
+	this->hotness.get->print();
+	fprintf( f, "\nHotness List\n==================================\n[UPDATE]\n" );
+	this->hotness.update->print();
 }

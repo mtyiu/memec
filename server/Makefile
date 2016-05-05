@@ -21,10 +21,10 @@ OBJS= \
 	event/client_event.o \
 	event/server_event.o \
 	event/server_peer_event.o \
-	state_transit/state_transit_handler.o \
 	protocol/ack_protocol.o \
 	protocol/degraded_protocol.o \
 	protocol/heartbeat_protocol.o \
+	protocol/hotness_protocol.o \
 	protocol/normal_client_protocol.o \
 	protocol/normal_server_protocol.o \
 	protocol/recovery_protocol.o \
@@ -35,6 +35,7 @@ OBJS= \
 	socket/client_socket.o \
 	socket/server_socket.o \
 	socket/server_peer_socket.o \
+	state_transit/state_transit_handler.o \
 	storage/storage.o \
 	storage/local_storage.o \
 	worker/worker.o \
@@ -59,7 +60,7 @@ EXTERNAL_LIB= \
 	$(MEMEC_SRC_ROOT)/common/ds/key_value.o \
 	$(MEMEC_SRC_ROOT)/common/ds/load.o \
 	$(MEMEC_SRC_ROOT)/common/ds/sockaddr_in.o \
-	$(MEMEC_SRC_ROOT)/common/state_transit/state_transit_handler.o \
+	$(MEMEC_SRC_ROOT)/common/hotness/lru.o \
 	$(MEMEC_SRC_ROOT)/common/protocol/protocol.o \
 	$(MEMEC_SRC_ROOT)/common/protocol/ack_protocol.o \
 	$(MEMEC_SRC_ROOT)/common/protocol/address_protocol.o \
@@ -67,12 +68,14 @@ EXTERNAL_LIB= \
 	$(MEMEC_SRC_ROOT)/common/protocol/chunk_protocol.o \
 	$(MEMEC_SRC_ROOT)/common/protocol/degraded_protocol.o \
 	$(MEMEC_SRC_ROOT)/common/protocol/heartbeat_protocol.o \
+	$(MEMEC_SRC_ROOT)/common/protocol/load_protocol.o \
 	$(MEMEC_SRC_ROOT)/common/protocol/normal_protocol.o \
 	$(MEMEC_SRC_ROOT)/common/protocol/recovery_protocol.o \
 	$(MEMEC_SRC_ROOT)/common/protocol/remap_protocol.o \
 	$(MEMEC_SRC_ROOT)/common/protocol/seal_protocol.o \
 	$(MEMEC_SRC_ROOT)/common/socket/socket.o \
 	$(MEMEC_SRC_ROOT)/common/socket/epoll.o \
+	$(MEMEC_SRC_ROOT)/common/state_transit/state_transit_handler.o \
 	$(MEMEC_SRC_ROOT)/lib/death_handler/death_handler.o \
 	$(MEMEC_SRC_ROOT)/lib/inih/ini.o
 

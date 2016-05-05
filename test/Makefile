@@ -2,6 +2,7 @@ TARGET= \
 	common/coding \
 	common/config \
 	common/ds \
+	common/hotness \
 	common/protocol \
 	common/remap \
 	temp

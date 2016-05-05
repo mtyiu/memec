@@ -24,6 +24,13 @@ public:
 		bool &isCompleted
 	);
 
+	// ---------- hotness_protocol.cc ----------
+	char *sendHotnessStats(
+		size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t timestamp,
+		std::vector<Metadata> &getList, std::vector<Metadata> &updateList,
+		bool &isCompleted
+	);
+
 	// ---------- normal_client_protocol.cc ----------
 	char *resSet(
 		size_t &size, uint16_t instanceId, uint32_t requestId,

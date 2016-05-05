@@ -7,6 +7,7 @@
 enum CoordinatorEventType {
 	COORDINATOR_EVENT_TYPE_REGISTER_REQUEST,
 	COORDINATOR_EVENT_TYPE_SYNC,
+	COORDINATOR_EVENT_TYPE_SYNC_HOTNESS_STATS,
 	COORDINATOR_EVENT_TYPE_RELEASE_DEGRADED_LOCK_RESPONSE_SUCCESS,
 	COORDINATOR_EVENT_TYPE_SERVER_RECONSTRUCTED_MESSAGE_RESPONSE,
 	COORDINATOR_EVENT_TYPE_RECONSTRUCTION_RESPONSE_SUCCESS,
@@ -50,6 +51,7 @@ public:
 
 	void reqRegister( CoordinatorSocket *socket, uint32_t addr, uint16_t port );
 	void sync( CoordinatorSocket *socket, uint16_t instanceId, uint32_t requestId );
+	void syncHotnessStat( CoordinatorSocket *socket, uint16_t instanceId, uint32_t requestId );
 	void resRemappedData();
 	void resRemappedData( CoordinatorSocket *socket, uint16_t instanceId, uint32_t requestId );
 	void resReleaseDegradedLock( CoordinatorSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t count );

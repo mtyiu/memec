@@ -15,6 +15,7 @@ OBJS= \
 	ds/latency.o \
 	ds/load.o \
 	ds/sockaddr_in.o \
+	hotness/lru.o \
 	protocol/protocol.o \
 	protocol/ack_protocol.o \
 	protocol/address_protocol.o \

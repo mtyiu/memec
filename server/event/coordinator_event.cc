@@ -14,6 +14,13 @@ void CoordinatorEvent::sync( CoordinatorSocket *socket, uint16_t instanceId, uin
 	this->requestId = requestId;
 }
 
+void CoordinatorEvent::syncHotnessStat( CoordinatorSocket *socket, uint16_t instanceId, uint32_t requestId ) {
+	this->type = COORDINATOR_EVENT_TYPE_SYNC_HOTNESS_STATS;
+	this->socket = socket;
+	this->instanceId = instanceId;
+	this->requestId = requestId;
+}
+
 void CoordinatorEvent::resReleaseDegradedLock( CoordinatorSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t count ) {
 	this->type = COORDINATOR_EVENT_TYPE_RELEASE_DEGRADED_LOCK_RESPONSE_SUCCESS;
 	this->socket = socket;

@@ -48,6 +48,23 @@ void ServerWorker::dispatch( CoordinatorEvent event ) {
 			isSend = true;
 		}
 			break;
+		case COORDINATOR_EVENT_TYPE_SYNC_HOTNESS_STATS:
+		{
+			bool isCompleted;
+			uint32_t timestamp = ServerWorker::timestamp->getVal();
+			std::vector<Metadata> getList = Server::getInstance()->hotness.get->getItems();
+			std::vector<Metadata> updateList = Server::getInstance()->hotness.update->getItems();
+			buffer.data = this->protocol.sendHotnessStats(
+				buffer.size,
+				event.instanceId, event.requestId,
+				timestamp,
+				getList, updateList,
+				isCompleted
+			); 
+			// TODO handle ( isComplete == false )
+			isSend = true;
+		}
+			break;
 		case COORDINATOR_EVENT_TYPE_RELEASE_DEGRADED_LOCK_RESPONSE_SUCCESS:
 			buffer.data = this->protocol.resReleaseDegradedLock(
 				buffer.size,

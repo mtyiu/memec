@@ -87,6 +87,7 @@ bool Protocol::parseHeader( uint8_t &magic, uint8_t &from, uint8_t &to, uint8_t 
 		case PROTO_OPCODE_SERVER_RECONSTRUCTED:
 		case PROTO_OPCODE_BACKUP_SERVER_PROMOTED:
 		case PROTO_OPCODE_PARITY_MIGRATE:
+		case PROTO_OPCODE_SYNC_HOTNESS_STATS:
 
 		case PROTO_OPCODE_GET:
 		case PROTO_OPCODE_SET:

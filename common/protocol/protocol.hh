@@ -49,6 +49,7 @@
 #define PROTO_OPCODE_SERVER_RECONSTRUCTED         0x39
 #define PROTO_OPCODE_BACKUP_SERVER_PROMOTED       0x40
 #define PROTO_OPCODE_PARITY_MIGRATE               0x41
+#define PROTO_OPCODE_SYNC_HOTNESS_STATS           0x42
 
 // Application <-> Client or Client <-> Server (0-19) //
 #define PROTO_OPCODE_GET                          0x01
@@ -188,6 +189,15 @@ struct LoadStatsHeader {
 	uint32_t serverGetCount;
 	uint32_t serverSetCount;
 	uint32_t serverOverloadCount;
+};
+
+/////////////////////////////
+// Hotness synchronization //
+/////////////////////////////
+#define PROTO_HOTNESS_STATS_SIZE 4
+struct HotnessStatsHeader {
+	uint32_t getCount;
+	uint32_t updateCount;
 };
 
 ///////////////////////
@@ -604,9 +614,9 @@ protected:
 		bool &isCompleted
 	);
 
-	//////////////////////////
-	// Load synchronization //
-	//////////////////////////
+	////////////////////////////////////
+	// Load & Hotness synchronization //
+	////////////////////////////////////
 	// ---------- load_protocol.cc ----------
 	size_t generateLoadStatsHeader(
 		uint8_t magic, uint8_t to, uint16_t instanceId, uint32_t requestId,
@@ -615,6 +625,16 @@ protected:
 	);
 	bool parseLoadStatsHeader(
 		size_t offset, uint32_t &serverGetCount, uint32_t &serverSetCount, uint32_t &serverOverloadCount,
+		char *buf, size_t size
+	);
+	size_t generateHotnessStatsHeader(
+		uint8_t magic, uint8_t to, uint16_t instanceId, uint32_t requestId,
+		uint32_t timestamp = 0,
+		uint32_t getCount = 0, uint32_t updateCount = 0, 
+		uint32_t metadataSize = 0
+	);
+	bool parseHotnessStatsHeader(
+		size_t offset, uint32_t &getCount, uint32_t &updateCount,
 		char *buf, size_t size
 	);
 
@@ -1132,12 +1152,16 @@ public:
 		struct HeartbeatHeader &heartbeat,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
-	//////////////////////////
-	// Load synchronization //
-	//////////////////////////
+	////////////////////////////////////
+	// Load & Hotness synchronization //
+	////////////////////////////////////
 	// ---------- load_protocol.cc ----------
 	bool parseLoadStatsHeader(
 		struct LoadStatsHeader &header,
+		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
+	bool parseHotnessStatsHeader(
+		struct HotnessStatsHeader &header,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 	///////////////////////

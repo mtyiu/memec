@@ -27,6 +27,8 @@
 #include "../../common/ds/id_generator.hh"
 #include "../../common/ds/memory_pool.hh"
 #include "../../common/ds/packet_pool.hh"
+#include "../../common/hotness/hotness.hh"
+#include "../../common/hotness/lru.hh"
 #include "../../common/signal/signal.hh"
 #include "../../common/socket/epoll.hh"
 #include "../../common/stripe_list/stripe_list.hh"
@@ -91,6 +93,11 @@ public:
 	static uint16_t instanceId;
 	/* Remapping */
 	ServerStateTransitHandler stateTransitHandler;
+	/* Hotness */
+	struct {
+		Hotness *get;
+		Hotness *update;
+	} hotness;
 
 	static Server *getInstance() {
 		static Server server;
@@ -108,6 +115,7 @@ public:
 	void seal();
 	void flush( bool parityOnly = false );
 	void sync( uint32_t requestId = 0 );
+	void syncHotnessStats( uint32_t requestId = 0 );
 	void metadata();
 	void memory( FILE *f = stdout );
 	void setDelay();
@@ -120,6 +128,7 @@ public:
 	void printChunk();
 	void time();
 	void printRemapping( FILE *f = stdout );
+	void printHotnessStats( FILE *f = stdout );
 	void backupStat( FILE *f = stdout );
 	void lookup();
 

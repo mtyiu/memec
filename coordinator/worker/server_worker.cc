@@ -293,6 +293,12 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 					}
 				}
 					break;
+				case PROTO_OPCODE_SYNC_HOTNESS_STATS:
+				{
+					printf( "SYNC HOTNESS EVENT\n" );
+					//this->handleSyncHotnessStats( event, buffer.data, header.length );
+				}
+					break;
 				default:
 					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid opcode from server." );
 					goto quit_1;
