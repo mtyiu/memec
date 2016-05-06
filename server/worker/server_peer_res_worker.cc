@@ -1010,7 +1010,14 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 
 						tmp.set( 0, 0, 0 );
 
-						map->findValueByKey( key.data, key.size, 0, 0, &keyMetadata, 0, &chunk );
+						// map->findValueByKey( key.data, key.size, 0, 0, &keyMetadata, 0, &chunk );
+						char *obj = map->findObject( key.data, key.size );
+						if ( obj ) {
+							uint32_t offset;
+							chunk = ServerWorker::chunkPool->getChunk( obj, offset );
+						} else {
+							chunk = 0;
+						}
 
 						if ( chunk ) {
 							ChunkUtil::get( chunk, tmp.listId, tmp.stripeId, tmp.chunkId );

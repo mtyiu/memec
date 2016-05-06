@@ -16,7 +16,7 @@ void *run( void *argv ) {
 	for ( uint32_t i = 0; i < numTrials; i++ ) {
 		chunks[ i ] = chunkPool.alloc( listId, i, i, 0 );
 		if ( chunks[ i ] )
-			memset( ( char * ) chunks[ i ] + CHUNK_METADATA_SIZE, 255, chunkSize );
+			memset( ( char * ) chunks[ i ] + CHUNK_IDENTIFIER_SIZE, 255, chunkSize );
 	}
 
 	pthread_mutex_lock( &lock );
@@ -51,7 +51,7 @@ void *run( void *argv ) {
 			assert( result.chunk    == chunks[ i ]   );
 
 			// for ( uint32_t j = 0; j < chunkSize; j++ )
-			// 	printf( "%d ", *( chunks[ i ] + CHUNK_METADATA_SIZE + j ) );
+			// 	printf( "%d ", *( chunks[ i ] + CHUNK_IDENTIFIER_SIZE + j ) );
 			// printf( "\n" );
 		} else {
 			printf( "#%u: Cannot allocate memory\n", i );

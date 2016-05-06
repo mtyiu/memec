@@ -130,11 +130,6 @@ public:
 	char *find( char *key, uint8_t keySize );
 	bool insert( char *key, uint8_t keySize, char *ptr );
 	void del( char *key, uint8_t keySize );
-
-	// For using CuckooHash as chunk hashtable
-	char *find( uint32_t listId, uint32_t stripeId );
-	bool insert( uint32_t listId, uint32_t stripeId, char *ptr );
-	void del( uint32_t listId, uint32_t stripeId );
 };
 
 #endif

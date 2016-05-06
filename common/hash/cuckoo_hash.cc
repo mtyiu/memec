@@ -413,33 +413,3 @@ void CuckooHash::del( char *key, uint8_t keySize ) {
 	if ( this->tryDel( key, keySize, tag, i2, lock ) ) return;
 	assert( false );
 }
-
-char *CuckooHash::find( uint32_t listId, uint32_t stripeId ) {
-	uint64_t buf;
-	uint32_t *tmp = ( uint32_t * ) &buf;
-
-	tmp[ 0 ] = listId;
-	tmp[ 1 ] = stripeId;
-
-	return this->find( ( char * ) &buf, sizeof( buf ) );
-}
-
-bool CuckooHash::insert( uint32_t listId, uint32_t stripeId, char *ptr ) {
-	uint64_t buf;
-	uint32_t *tmp = ( uint32_t * ) &buf;
-
-	tmp[ 0 ] = listId;
-	tmp[ 1 ] = stripeId;
-
-	return this->insert( ( char * ) &buf, sizeof( buf ), ptr );
-}
-
-void CuckooHash::del( uint32_t listId, uint32_t stripeId ) {
-	uint64_t buf;
-	uint32_t *tmp = ( uint32_t * ) &buf;
-
-	tmp[ 0 ] = listId;
-	tmp[ 1 ] = stripeId;
-
-	return this->del( ( char * ) &buf, sizeof( buf ) );
-}

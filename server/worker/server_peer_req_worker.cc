@@ -629,7 +629,8 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 				}
 
 				// Update the key-value pair
-				if ( ServerWorker::map->findValueByKey( keyValueHeader.key, keyValueHeader.keySize, &keyValue, 0, 0, 0, 0, false, false ) ) {
+				// if ( ServerWorker::map->findValueByKey( keyValueHeader.key, keyValueHeader.keySize, &keyValue, 0, 0, 0, 0, false, false ) ) {
+				if ( ServerWorker::map->findObject( keyValueHeader.key, keyValueHeader.keySize, &keyValue, 0, false, false ) ) {
 					keyValue.deserialize( key.data, key.size, valueStr, valueSize );
 					assert( valueSize == keyValueHeader.valueSize );
 					memcpy( valueStr, keyValueHeader.value, valueSize );

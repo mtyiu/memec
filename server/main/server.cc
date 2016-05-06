@@ -990,6 +990,8 @@ void Server::help() {
 void Server::lookup() {
 	char key[ 256 ];
 	uint8_t keySize;
+	uint32_t offset;
+	char *obj = 0;
 
 	printf( "Input key: " );
 	fflush( stdout );
@@ -1002,11 +1004,25 @@ void Server::lookup() {
 	bool found = false;
 
 	KeyMetadata keyMetadata;
-	if ( this->map.findValueByKey( key, keySize, 0, 0, &keyMetadata, 0, 0 ) ) {
-		printf(
-			"Metadata: (%u, %u, %u); offset: %u, length: %u\n", keyMetadata.listId, keyMetadata.stripeId, keyMetadata.chunkId,
-			keyMetadata.offset, keyMetadata.length
-		);
+	// if ( this->map.findValueByKey( key, keySize, 0, 0, &keyMetadata, 0, 0 ) ) {
+	if ( ( obj = this->map.findObject( key, keySize ) ) ) {
+		Chunk *chunk = this->chunkPool.getChunk( obj, offset );
+		if ( chunk ) {
+			Metadata m = ChunkUtil::getMetadata( chunk );
+
+			keyMetadata.listId = m.listId;
+			keyMetadata.stripeId = m.stripeId;
+			keyMetadata.chunkId = m.chunkId;
+			keyMetadata.length = KeyValue::getSize( obj );
+			keyMetadata.offset = offset;
+			printf(
+				"Metadata: (%u, %u, %u); offset: %u, length: %u\n", keyMetadata.listId, keyMetadata.stripeId, keyMetadata.chunkId,
+				keyMetadata.offset, keyMetadata.length
+			);
+		} else {
+			printf( "Key is found but chunk is not found.\n" );
+		}
+
 		found = true;
 	}
 

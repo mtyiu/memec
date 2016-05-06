@@ -451,24 +451,31 @@ bool ServerWorker::handleUpdateRequest(
 
 	// checkGetChunk = true;
 
-	if ( map->findValueByKey( header.key, header.keySize, &keyValue, &key, &keyMetadata, &metadata, &chunk ) ) {
-		if ( keyMetadata.isParityRemapped ) {
+	// if ( map->findValueByKey( header.key, header.keySize, &keyValue, &key, &keyMetadata, &metadata, &chunk ) ) {
+	if ( map->findObject( header.key, header.keySize, &keyValue, &key ) ) {
+		// Set up KeyMetadata
+		keyMetadata.length = keyValue.getSize();
+		keyMetadata.obj = keyValue.data;
+		chunk = ServerWorker::chunkPool->getChunk( keyValue.data, keyMetadata.offset );
+
+		// Set up Metadata
+		metadata = ChunkUtil::getMetadata( chunk );
+
+		// Find remapping record and store it to {original, reconstructed, reconstructedCount}
+		if ( remappedBuffer->find( header.keySize, header.key, &remappingRecord ) ) {
 			assert( ! original && ! reconstructed && ! reconstructedCount );
 
-			// Find remapping record and store it to {original, reconstructed, reconstructedCount}
-			if ( remappedBuffer->find( header.keySize, header.key, &remappingRecord ) ) {
-				original = remappingRecord.original;
-				reconstructed = remappingRecord.remapped;
-				reconstructedCount = remappingRecord.remappedCount;
-			} else {
-				__ERROR__( "ServerWorker", "handleUpdateRequest", "[%u, %u] Cannot find remapping record for key: %.*s.", event.instanceId, event.requestId, header.keySize, header.key );
-			}
-
-			reconstructParity = false;
-			chunks = 0;
-			endOfDegradedOp = false;
-			checkGetChunk = true;
+			original = remappingRecord.original;
+			reconstructed = remappingRecord.remapped;
+			reconstructedCount = remappingRecord.remappedCount;
+		} else {
+			__ERROR__( "ServerWorker", "handleUpdateRequest", "[%u, %u] Cannot find remapping record for key: %.*s.", event.instanceId, event.requestId, header.keySize, header.key );
 		}
+
+		reconstructParity = false;
+		chunks = 0;
+		endOfDegradedOp = false;
+		checkGetChunk = true;
 
 		uint32_t offset = keyMetadata.offset + PROTO_KEY_VALUE_SIZE + header.keySize + header.valueUpdateOffset;
 
@@ -681,7 +688,16 @@ bool ServerWorker::handleDeleteRequest(
 	Metadata metadata;
 	RemappedKeyValue remappedKeyValue;
 	Chunk *chunk;
-	if ( map->findValueByKey( header.key, header.keySize, &keyValue, 0, &keyMetadata, &metadata, &chunk ) ) {
+	// if ( map->findValueByKey( header.key, header.keySize, &keyValue, 0, &keyMetadata, &metadata, &chunk ) ) {
+	if ( map->findObject( header.key, header.keySize, &keyValue, &key ) ) {
+		// Set up KeyMetadata
+		keyMetadata.length = keyValue.getSize();
+		keyMetadata.obj = keyValue.data;
+		chunk = ServerWorker::chunkPool->getChunk( keyValue.data, keyMetadata.offset );
+
+		// Set up Metadata
+		metadata = ChunkUtil::getMetadata( chunk );
+
 		uint32_t timestamp;
 		uint32_t deltaSize = 0;
 		char *delta = 0;

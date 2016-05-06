@@ -20,8 +20,10 @@ public:
 	void free();
 
 	void setSize( uint8_t keySize, uint32_t valueSize );
-	uint32_t getSize( uint8_t *keySizePtr = 0, uint32_t *valueSizePtr = 0 ) const;
 	static void setSize( char *data, uint8_t keySize, uint32_t valueSize );
+
+	uint32_t getSize( uint8_t *keySizePtr = 0, uint32_t *valueSizePtr = 0 ) const;
+	static uint32_t getSize( char *data, uint8_t *keySizePtr = 0, uint32_t *valueSizePtr = 0 );
 
 	char *serialize( char *key, uint8_t keySize, char *value, uint32_t valueSize );
 	static char *serialize( char *data, char *key, uint8_t keySize, char *value, uint32_t valueSize );

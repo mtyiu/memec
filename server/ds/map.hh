@@ -30,6 +30,9 @@ private:
 	std::unordered_map<Metadata, Chunk *> cache;
 	LOCK_T cacheLock;
 
+	CuckooHash chunks;
+	LOCK_T chunksLock;
+
 	/**
 	 * Store the used stripe IDs
 	 * (list ID) |-> std::unordered_set<(stripe ID)>
@@ -71,11 +74,18 @@ public:
 		bool needsLock = true, bool needsUnlock = true,
 		bool needsUpdateOpMetadata = true
 	);
+	char *findObject(
+		char *keyStr, uint8_t keySize,
+		KeyValue *keyValuePtr = 0,
+		Key *keyPtr = 0,
+		bool needsLock = true, bool needsUnlock = true
+	);
 	bool findValueByKey(
 		char *keyStr, uint8_t keySize,
-		KeyValue *keyValuePtr,
-		Key *keyPtr
+		KeyValue *keyValuePtr = 0,
+		Key *keyPtr = 0
 	);
+	/*
 	bool findValueByKey(
 		char *keyStr, uint8_t keySize,
 		KeyValue *keyValuePtr,
@@ -85,6 +95,7 @@ public:
 		Chunk **chunkPtr,
 		bool needsLock = true, bool needsUnlock = true
 	);
+	*/
 	bool deleteKey(
 		Key key, uint8_t opcode, uint32_t &timestamp,
 		KeyMetadata &keyMetadata,

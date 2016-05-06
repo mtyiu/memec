@@ -3,6 +3,7 @@
 Map::Map() {
 	LOCK_INIT( &this->keysLock );
 	LOCK_INIT( &this->cacheLock );
+	LOCK_INIT( &this->chunksLock );
 	LOCK_INIT( &this->stripeIdsLock );
 	LOCK_INIT( &this->forwarded.lock );
 	LOCK_INIT( &this->opsLock );
@@ -42,6 +43,37 @@ bool Map::insertKey(
 	return needsUpdateOpMetadata ? this->insertOpMetadata( opcode, timestamp, key, keyMetadata ) : true;
 }
 
+char *Map::findObject(
+	char *keyStr, uint8_t keySize,
+	KeyValue *keyValuePtr,
+	Key *keyPtr,
+	bool needsLock, bool needsUnlock
+) {
+	char *ret = 0;
+
+	if ( needsLock ) LOCK( &this->keysLock );
+	ret = this->_keys.find( keyStr, keySize );
+	if ( needsUnlock ) UNLOCK( &this->keysLock );
+
+	if ( keyValuePtr ) {
+		if ( ret )
+			keyValuePtr->set( ret );
+		else
+			keyValuePtr->clear();
+	}
+	if ( keyPtr ) {
+		if ( ret ) {
+			KeyValue keyValue;
+			keyValue.set( ret );
+			*keyPtr = keyValue.key();
+		} else {
+			keyPtr->set( keySize, keyStr );
+		}
+	}
+
+	return ret;
+}
+
 bool Map::findValueByKey(
 	char *keyStr, uint8_t keySize,
 	KeyValue *keyValuePtr,
@@ -62,6 +94,8 @@ bool Map::findValueByKey(
 		return false;
 	}
 	key = keyValue.key();
+	if ( keyPtr ) *keyPtr = key;
+
 	///// vvvvv Deprecated vvvvv /////
 	std::unordered_map<Key, KeyMetadata>::iterator keysIt;
 	keysIt = this->keys.find( key );
@@ -82,6 +116,7 @@ bool Map::findValueByKey(
 	return true;
 }
 
+/*
 bool Map::findValueByKey(
 	char *keyStr, uint8_t keySize,
 	KeyValue *keyValuePtr,
@@ -127,6 +162,7 @@ bool Map::findValueByKey(
 	if ( needsUnlock ) UNLOCK( &this->cacheLock );
 	return true;
 }
+*/
 
 bool Map::deleteKey(
 	Key key, uint8_t opcode, uint32_t &timestamp,
@@ -167,12 +203,22 @@ void Map::setChunk(
 	Metadata metadata;
 	metadata.set( listId, stripeId, chunkId );
 
+	if ( needsLock ) LOCK( &this->chunksLock );
+	if ( this->chunks.find( ( char * ) chunk, CHUNK_IDENTIFIER_SIZE ) ) {
+		__ERROR__( "Map", "setChunk", "This chunk (%u, %u, %u) already exists.", listId, stripeId, chunkId );
+	} else {
+		this->chunks.insert( ( char * ) chunk, CHUNK_IDENTIFIER_SIZE, ( char * ) chunk );
+	}
+	if ( needsUnlock ) UNLOCK( &this->chunksLock );
+
+	// vvvvv Deprecated vvvvv //
 	if ( needsLock ) LOCK( &this->cacheLock );
 	if ( this->cache.find( metadata ) != this->cache.end() ) {
 		__ERROR__( "Map", "setChunk", "This chunk (%u, %u, %u) already exists.", listId, stripeId, chunkId );
 	}
 	this->cache[ metadata ] = chunk;
 	if ( needsUnlock ) UNLOCK( &this->cacheLock );
+	// ^^^^^ Deprecated ^^^^^ //
 
 	if ( needsLock ) LOCK( &this->stripeIdsLock );
 	this->stripeIds[ listId ].insert( stripeId );
@@ -215,11 +261,27 @@ Chunk *Map::findChunkById(
 	Metadata *metadataPtr,
 	bool needsLock, bool needsUnlock, LOCK_T **lock
 ) {
+	Chunk *chunk = 0;
+	ChunkIdentifier id( listId, stripeId, chunkId );
+
+	if ( lock ) *lock = &this->chunksLock;
+	if ( needsLock ) LOCK( &this->chunksLock );
+	chunk = ( Chunk * ) this->chunks.find( ( char * ) &id, CHUNK_IDENTIFIER_SIZE );
+	if ( ! chunk ) {
+		if ( needsUnlock ) UNLOCK( &this->chunksLock );
+		return 0;
+	}
+	if ( needsUnlock ) UNLOCK( &this->chunksLock );
+
+	return chunk;
+
+	/*
+	// vvvvv Deprecated vvvvv //
 	std::unordered_map<Metadata, Chunk *>::iterator it;
 	Metadata metadata;
-
 	metadata.set( listId, stripeId, chunkId );
 	if ( metadataPtr ) *metadataPtr = metadata;
+
 	if ( lock ) *lock = &this->cacheLock;
 
 	if ( needsLock ) LOCK( &this->cacheLock );
@@ -229,7 +291,9 @@ Chunk *Map::findChunkById(
 		return 0;
 	}
 	if ( needsUnlock ) UNLOCK( &this->cacheLock );
+	// ^^^^^ Deprecated ^^^^^ //
 	return it->second;
+	*/
 }
 
 bool Map::seal( uint32_t listId, uint32_t stripeId, uint32_t chunkId ) {
