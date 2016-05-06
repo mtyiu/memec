@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <cstring>
 #include "rdpcoding.hh"
+#include "../ds/chunk_util.hh"
 
 const uint32_t RDPCoding::primeList[ primeCount ] = {
 			2, 3, 5, 7, 11, 13, 17, 19, 23, 29,

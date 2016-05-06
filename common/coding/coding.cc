@@ -3,6 +3,7 @@
 #include "all_coding.hh"
 #include "../util/debug.hh"
 #include "../ds/chunk_pool.hh"
+#include "../ds/chunk_util.hh"
 
 Chunk *Coding::zeros;
 

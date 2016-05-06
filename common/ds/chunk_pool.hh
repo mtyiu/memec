@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <cassert>
 #include "../../common/ds/chunk.hh"
+#include "../../common/ds/chunk_util.hh"
 #include "../../common/hash/hash_func.hh"
 #include "../../common/lock/lock.hh"
 
