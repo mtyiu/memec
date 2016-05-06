@@ -464,12 +464,9 @@ bool ServerWorker::handleUpdateRequest(
 		// Find remapping record and store it to {original, reconstructed, reconstructedCount}
 		if ( remappedBuffer->find( header.keySize, header.key, &remappingRecord ) ) {
 			assert( ! original && ! reconstructed && ! reconstructedCount );
-
 			original = remappingRecord.original;
 			reconstructed = remappingRecord.remapped;
 			reconstructedCount = remappingRecord.remappedCount;
-		} else {
-			__ERROR__( "ServerWorker", "handleUpdateRequest", "[%u, %u] Cannot find remapping record for key: %.*s.", event.instanceId, event.requestId, header.keySize, header.key );
 		}
 
 		reconstructParity = false;

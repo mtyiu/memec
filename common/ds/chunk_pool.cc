@@ -56,6 +56,7 @@ Chunk *ChunkPool::getChunk( char *ptr, uint32_t &offset ) {
 	offset = ( uint64_t )( ( ( uint64_t )( ptr - this->startAddress ) ) % ( CHUNK_IDENTIFIER_SIZE + ChunkUtil::chunkSize ) );
 
 	chunk = ( Chunk * )( ptr - offset );
+	offset -= CHUNK_IDENTIFIER_SIZE;
 
 	return chunk;
 }
