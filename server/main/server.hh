@@ -95,8 +95,8 @@ public:
 	ServerStateTransitHandler stateTransitHandler;
 	/* Hotness */
 	struct {
-		Hotness *get;
-		Hotness *update;
+		Hotness<KeyMetadata> *get;
+		Hotness<KeyMetadata> *update;
 	} hotness;
 
 	static Server *getInstance() {

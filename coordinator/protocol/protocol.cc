@@ -35,3 +35,28 @@ char *CoordinatorProtocol::reqFlushChunks( size_t &size, uint16_t instanceId, ui
 	);
 	return this->buffer.send;
 }
+
+char *CoordinatorProtocol::reqGet( size_t &size, uint16_t instanceId, uint32_t requestId, Key key ) {
+	size = this->generateKeyHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_CLIENT,
+		PROTO_OPCODE_GET,
+		instanceId, requestId,
+		key.size,
+		key.data
+	);
+	return this->buffer.send;
+}
+
+char *CoordinatorProtocol::reqUpdate( size_t &size, uint16_t instanceId, uint32_t requestId, Key key ) {
+	size = this->generateKeyValueUpdateHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_CLIENT,
+		PROTO_OPCODE_UPDATE,
+		instanceId, requestId,
+		key.size,
+		key.data,
+		0, 0, 0	
+	);
+	return this->buffer.send;
+}

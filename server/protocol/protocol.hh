@@ -27,7 +27,8 @@ public:
 	// ---------- hotness_protocol.cc ----------
 	char *sendHotnessStats(
 		size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t timestamp,
-		std::vector<Metadata> &getList, std::vector<Metadata> &updateList,
+		std::vector<KeyMetadata> &getList, std::vector<KeyMetadata> &updateList,
+		uint32_t &getCount, uint32_t &updateCount,
 		bool &isCompleted
 	);
 

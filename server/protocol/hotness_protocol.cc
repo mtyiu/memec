@@ -2,64 +2,55 @@
 
 char *ServerProtocol::sendHotnessStats(
 	size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t timestamp,
-	std::vector<Metadata> &getList, std::vector<Metadata> &updateList,
+	std::vector<KeyMetadata> &getList, std::vector<KeyMetadata> &updateList,
+	uint32_t &getCount, uint32_t &updateCount,
 	bool &isCompleted
 ) {
 	char *buffer = this->buffer.send;
-	uint32_t getCount = 0, updateCount = 0, metadataSize = sizeof( Metadata );
 	uint32_t i = 0;
+	Key key;
 
-	size = this->generateHotnessStatsHeader(
+	getCount = 0;
+	updateCount = 0;
+
+	buffer += PROTO_HEADER_SIZE + PROTO_HOTNESS_STATS_SIZE;
+	size = PROTO_HEADER_SIZE + PROTO_HOTNESS_STATS_SIZE;
+
+	for ( i = 0; i < getList.size(); i++, getCount++ ) {
+		key.set( getList[ i ].length, getList[ i ].ptr );
+		if ( size + 1 + key.size > this->buffer.size ) {
+			break;
+		}
+		*( ( uint8_t * ) ( buffer ) ) = key.size;
+		memcpy( buffer + 1, key.data, key.size );
+
+		buffer += 1 + key.size;
+		size += 1 + key.size;
+	}
+
+	for ( i = 0; i < updateList.size(); i++, updateCount++ ) {
+		key.set( updateList[ i ].length, updateList[ i ].ptr );
+		if ( size + 1 + key.size > this->buffer.size ) {
+			break;
+		}
+		*( ( uint8_t * ) ( buffer ) ) = key.size;
+		memcpy( buffer + 1, key.data, key.size );
+		buffer += 1 + key.size;
+		size += 1 + key.size;
+	}
+
+	isCompleted = ( getList.size() - getCount == 0 && updateList.size() - updateCount == 0 );
+
+	// avoid message receiver's buffer
+	this->generateHotnessStatsHeader(
 		PROTO_MAGIC_LOADING_STATS,
 		PROTO_MAGIC_TO_COORDINATOR,
 		PROTO_OPCODE_SYNC_HOTNESS_STATS,
 		instanceId, requestId, 
 		timestamp,
-		getList.size(), updateList.size(),
-		metadataSize
+		getCount, updateCount,
+		size - PROTO_HEADER_SIZE - PROTO_HOTNESS_STATS_SIZE
 	);
-
-	buffer += size;
-
-	for ( i = 0; i < getList.size() && size + metadataSize < this->buffer.size ; i++, getCount++ ) {
-		*( ( uint32_t * ) ( buffer )                          ) = htonl( getList[ i ].listId );
-		*( ( uint32_t * ) ( buffer + sizeof( uint32_t ) )     ) = htonl( getList[ i ].stripeId );
-		*( ( uint32_t * ) ( buffer + 2 * sizeof( uint32_t ) ) ) = htonl( getList[ i ].chunkId );
-
-		buffer += 3 * sizeof( uint32_t );
-		size += 3 * sizeof( uint32_t );
-	}
-
-	for ( i = 0; i < updateList.size() && size + metadataSize < this->buffer.size ; i++, updateCount++ ) {
-		*( ( uint32_t * ) ( buffer )                          ) = htonl( updateList[ i ].listId );
-		*( ( uint32_t * ) ( buffer + sizeof( uint32_t ) )     ) = htonl( updateList[ i ].stripeId );
-		*( ( uint32_t * ) ( buffer + 2 * sizeof( uint32_t ) ) ) = htonl( updateList[ i ].chunkId );
-
-		buffer += 3 * sizeof( uint32_t );
-		size += 3 * sizeof( uint32_t );
-	}
-
-	if ( getCount > 0 ) 
-		getList.erase( getList.begin(), getList.begin() + getCount );
-
-	if ( updateCount > 0 ) 
-		updateList.erase( updateList.begin(), updateList.begin() + updateCount );
-
-	isCompleted = ( getList.empty() && updateList.empty() );
-
-	// avoid message receiver's buffer
-	if ( ! isCompleted ) {
-		this->generateHotnessStatsHeader(
-			PROTO_MAGIC_LOADING_STATS,
-			PROTO_MAGIC_TO_COORDINATOR,
-			PROTO_OPCODE_SYNC_HOTNESS_STATS,
-			instanceId, requestId, 
-			timestamp,
-			getCount, updateCount,
-			metadataSize
-		);
-	}
-		
 
 	return buffer - size;
 }

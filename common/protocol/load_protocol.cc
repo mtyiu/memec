@@ -44,7 +44,7 @@ bool Protocol::parseLoadStatsHeader( struct LoadStatsHeader &header, char *buf, 
 
 size_t Protocol::generateHotnessStatsHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t timestamp, uint32_t getCount, uint32_t updateCount, uint32_t metadataSize ) {
 	char *buf = this->buffer.send;
-	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_HOTNESS_STATS_SIZE + ( getCount + updateCount ) * metadataSize, instanceId, requestId, buf, timestamp );
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_HOTNESS_STATS_SIZE + metadataSize, instanceId, requestId, buf, timestamp );
 
 	buf += bytes;
 

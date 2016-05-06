@@ -20,8 +20,9 @@ public:
 	uint16_t instanceId;
 	Map map;
 	struct {
-		std::unordered_set<Metadata> data;
-		std::unordered_set<Metadata> parity;
+		std::unordered_set<Key> get;
+		std::unordered_set<Key> update;
+		uint32_t timestamp;
 		LOCK_T lock;
 	} hotness;
 	ServerSocket *failed;

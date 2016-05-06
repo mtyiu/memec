@@ -50,19 +50,42 @@ void ServerWorker::dispatch( CoordinatorEvent event ) {
 			break;
 		case COORDINATOR_EVENT_TYPE_SYNC_HOTNESS_STATS:
 		{
-			bool isCompleted;
+			bool isCompleted = false;
 			uint32_t timestamp = ServerWorker::timestamp->getVal();
-			std::vector<Metadata> getList = Server::getInstance()->hotness.get->getItems();
-			std::vector<Metadata> updateList = Server::getInstance()->hotness.update->getItems();
-			buffer.data = this->protocol.sendHotnessStats(
-				buffer.size,
-				event.instanceId, event.requestId,
-				timestamp,
-				getList, updateList,
-				isCompleted
-			); 
-			// TODO handle ( isComplete == false )
-			isSend = true;
+			uint32_t getCount, updateCount, i;
+			ssize_t ret;
+
+			std::vector<KeyMetadata> getList = Server::getInstance()->hotness.get->getItems();
+			std::vector<KeyMetadata> updateList = Server::getInstance()->hotness.update->getItems();
+			//Server::getInstance()->printHotnessStats();
+
+			while ( ! isCompleted ) {
+
+				buffer.data = this->protocol.sendHotnessStats(
+					buffer.size,
+					event.instanceId, event.requestId,
+					timestamp,
+					getList, updateList,
+					getCount, updateCount,
+					isCompleted
+				); 
+
+				// free sent items
+				for ( i = 0; i < getCount; i++ ) {
+					delete getList[ i ].ptr;
+				}
+				for ( i = 0; i < updateCount; i++ ) {
+					delete updateList[ i ].ptr;
+				}
+
+				getList.erase( getList.begin(), getList.begin() + getCount );
+				updateList.erase( updateList.begin(), updateList.begin() + updateCount );
+
+				ret = event.socket->send( buffer.data, buffer.size, connected );
+				if ( ret != ( ssize_t ) buffer.size )
+					__ERROR__( "ServerWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+			}
+			isSend = false;
 		}
 			break;
 		case COORDINATOR_EVENT_TYPE_RELEASE_DEGRADED_LOCK_RESPONSE_SUCCESS:

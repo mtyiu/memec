@@ -145,7 +145,45 @@ void CoordinatorWorker::dispatch( ClientEvent event ) {
 			break;
 		// Recovery
 		case CLIENT_EVENT_TYPE_ANNOUNCE_SERVER_RECONSTRUCTED:
+			ret = event.socket->send( buffer.data, buffer.size, connected );
+			if ( ret != ( ssize_t ) buffer.size )
+				__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 			isSend = false;
+			break;
+		case CLIENT_EVENT_TYPE_RECOVER_CHUNKS:
+		{
+			ssize_t ret;
+
+			LOCK( &event.message.recovery.target->hotness.lock );
+			std::unordered_set<Key> get = event.message.recovery.target->hotness.get;
+			std::unordered_set<Key> update = event.message.recovery.target->hotness.update;
+			UNLOCK( &event.message.recovery.target->hotness.lock );
+			__INFO__( YELLOW, "CoordinatorWorker", "dispatch", "RECOVER CHUNK by %lu GET and %lu UPDATE\n", get.size(), update.size() );
+
+			std::unordered_set<Key>::iterator it;
+			for( it = get.begin(); it != get.end(); it++ ) {
+				buffer.data = this->protocol.reqGet(
+					buffer.size,
+					Coordinator::instanceId,  0,
+					*it
+				);
+				ret = event.socket->send( buffer.data, buffer.size, connected );
+				if ( ret != ( ssize_t ) buffer.size )
+					__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+			}
+
+			for( it = update.begin(); it != update.end(); it++ ) {
+				buffer.data = this->protocol.reqUpdate(
+					buffer.size,
+					Coordinator::instanceId,  0,
+					*it
+				);
+				ret = event.socket->send( buffer.data, buffer.size, connected );
+				if ( ret != ( ssize_t ) buffer.size )
+					__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+			}
+			isSend = false;
+		}
 			break;
 		// Pending
 		case CLIENT_EVENT_TYPE_PENDING:

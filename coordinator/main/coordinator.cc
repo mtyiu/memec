@@ -1032,5 +1032,8 @@ void Coordinator::recoverPopularChunks( struct sockaddr_in server ) {
 		return;
 	}
 
-	// TODO insert event to get chunk reconstructed
+	// insert event to get chunk reconstructed
+	ClientEvent event;
+	event.recoverChunksByKeys( this->sockets.clients.values[ 0 ], socket ); 
+	this->eventQueue.insert( event );
 }

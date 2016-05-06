@@ -131,6 +131,14 @@ void ClientWorker::dispatch( CoordinatorEvent event ) {
 					case PROTO_OPCODE_SERVER_RECONSTRUCTED:
 						this->handleServerReconstructedMsg( event, buffer.data, header.length );
 						break;
+					case PROTO_OPCODE_GET:
+						printf(" GET from coordinator !\n");
+						this->handleCoordinatorRequestOnKey( event, buffer.data, header.length, header.opcode );
+						break;
+					case PROTO_OPCODE_UPDATE:
+						printf(" UPDATE from coordinator !\n");
+						this->handleCoordinatorRequestOnKey( event, buffer.data, header.length, header.opcode );
+						break;
 					default:
 						__ERROR__( "ClientWorker", "dispatch", "Invalid opcode from coordinator." );
 						break;

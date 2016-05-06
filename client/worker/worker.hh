@@ -100,6 +100,8 @@ public:
 	static void replayRequestPrepare( ServerSocket *server );
 	static void replayRequest( ServerSocket *server );
 	static void gatherPendingNormalRequests( ServerSocket *target, bool needsAck = false );
+
+	bool handleCoordinatorRequestOnKey( CoordinatorEvent event, char *buf, size_t size, uint8_t opcode );
 };
 
 #endif

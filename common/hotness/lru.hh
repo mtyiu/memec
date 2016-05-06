@@ -3,6 +3,8 @@
 
 #include <unordered_map>
 #include "hotness.hh"
+#include "../../common/ds/key.hh"
+#include "../../common/ds/metadata.hh"
 #include "../../common/lock/lock.hh"
 
 extern "C" {
@@ -11,26 +13,27 @@ extern "C" {
 
 struct LruListRecord {
 	Metadata metadata;
+	Key key;
 	struct list_head listPtr;
 };
 
-class LruHotness : public Hotness {
+class LruHotness : public Hotness<KeyMetadata> {
 public:
 
 	LruHotness();
 	LruHotness( size_t maxItems );
 	~LruHotness();
 
-	bool insert( Metadata newItem );
+	bool insert( KeyMetadata newItem );
 	void reset();
 
-	std::vector<Metadata> getItems();
-	std::vector<Metadata> getTopNItems( size_t n );
+	std::vector<KeyMetadata> getItems();
+	std::vector<KeyMetadata> getTopNItems( size_t n );
 
 	size_t getItemCount();
 	size_t getFreeItemCount();
 
-	size_t getAndReset( std::vector<Metadata> &dest, size_t n = 0 );
+	size_t getAndReset( std::vector<KeyMetadata> &dest, size_t n = 0 );
 
 	void print( FILE *output = stdout );
 

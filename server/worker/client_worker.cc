@@ -309,12 +309,14 @@ bool ServerWorker::handleGetRequest( ClientEvent event, struct KeyHeader &header
 	Key key;
 	KeyValue keyValue;
 	RemappedKeyValue remappedKeyValue;
-	Metadata metadata;
+	KeyMetadata keyMetadata;
 	bool ret;
 	if ( map->findValueByKey( header.key, header.keySize, &keyValue, &key ) ) {
 		event.resGet( event.socket, event.instanceId, event.requestId, keyValue, isDegraded );
-		if ( map->findValueByKey( header.key, header.keySize, &keyValue, &key, 0, &metadata, 0 ) ) {
-			Server::getInstance()->hotness.get->insert( metadata );
+		if ( map->findValueByKey( header.key, header.keySize, &keyValue, &key, &keyMetadata, 0, 0 ) ) {
+			keyMetadata.ptr = key.data;
+			keyMetadata.length = key.size;
+			Server::getInstance()->hotness.get->insert( keyMetadata );
 		}
 		ret = true;
 	} else if ( remappedBuffer->find( header.keySize, header.key, &remappedKeyValue ) ) {
@@ -554,7 +556,9 @@ bool ServerWorker::handleUpdateRequest(
 			chunkBuffer->updateAndUnlockChunk( chunkBufferIndex );
 
 		// update hotness
-		Server::getInstance()->hotness.update->insert( metadata );
+		keyMetadata.ptr = key.data;
+		keyMetadata.length = key.size;
+		Server::getInstance()->hotness.update->insert( keyMetadata );
 	} else if ( remappedBuffer->update( header.keySize, header.key, header.valueUpdateSize, header.valueUpdateOffset, header.valueUpdate, &remappedKeyValue ) ) {
 		// Handle remapped key
 		// __INFO__( GREEN, "ServerWorker", "handleUpdateRequest", "Handle remapped key: %.*s!", header.keySize, header.key );

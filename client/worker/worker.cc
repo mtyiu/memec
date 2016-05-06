@@ -438,6 +438,45 @@ void ClientWorker::gatherPendingNormalRequests( ServerSocket *target, bool needs
 #undef GATHER_PENDING_NORMAL_REQUESTS
 }
 
+bool ClientWorker::handleCoordinatorRequestOnKey( CoordinatorEvent event, char *buf, size_t size, uint8_t opcode ) {
+	ApplicationEvent appEvent;
+	uint32_t requestId = ClientWorker::idGenerator->nextVal( this->workerId );
+	uint16_t instanceId = Client::getInstance()->instanceId;
+
+	switch( opcode ) {
+		case PROTO_OPCODE_GET:
+		{
+			KeyHeader header;
+			Key key;
+			if ( ! this->protocol.parseKeyHeader( header, buf, size ) ) {
+				__ERROR__( "ClientWorker", "handleCoordinatorRequest", "Invalid GET request" );
+				return false;
+			}
+			key.set( header.keySize, header.key );
+			appEvent.replayGetRequest( 0, instanceId, requestId, key );
+			this->dispatch( appEvent );
+		}
+			return true;
+		case PROTO_OPCODE_UPDATE:
+		{
+			KeyValueUpdateHeader header;
+			KeyValueUpdate keyValueUpdate;
+			if ( ! this->protocol.parseKeyValueUpdateHeader( header, false, buf, size ) ) {
+				__ERROR__( "ClientWorker", "handleCoordinatorRequest", "Invalid GET request" );
+				return false;
+			}
+			keyValueUpdate.set( header.keySize, header.key );
+			appEvent.replayUpdateRequest( 0, instanceId, requestId, keyValueUpdate );
+			this->dispatch( appEvent );
+		}
+			return true;
+		default:
+			__ERROR__( "ClientWorker", "handleCoordinatorRequest", "Invalid opcode of request" );
+			return false;
+	}
+	return false;
+}
+
 void ClientWorker::free() {
 	this->protocol.free();
 	delete[] original;

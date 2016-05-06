@@ -56,6 +56,7 @@ public:
 		} heartbeat;
 		struct sockaddr_in addr;
 	} message;
+	uint32_t timestamp;
 
 	void pending( ServerSocket *socket );
 	void resRegister( ServerSocket *socket, uint16_t instanceId, uint32_t requestId, bool success = true );

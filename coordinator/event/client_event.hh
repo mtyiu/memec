@@ -32,6 +32,7 @@ enum ClientEventType {
 	CLIENT_EVENT_TYPE_DEGRADED_SET_LOCK_RESPONSE_FAILURE,
 	// Recovery
 	CLIENT_EVENT_TYPE_ANNOUNCE_SERVER_RECONSTRUCTED,
+	CLIENT_EVENT_TYPE_RECOVER_CHUNKS,
 	// PENDING
 	CLIENT_EVENT_TYPE_PENDING
 };
@@ -79,6 +80,9 @@ public:
 			ServerSocket *src;
 			ServerSocket *dst;
 		} reconstructed;
+		struct {
+			ServerSocket *target;
+		} recovery;
 	} message;
 
 	void resRegister( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, bool success = true );
@@ -114,6 +118,7 @@ public:
 	);
 	// Recovery
 	void announceServerReconstructed( ServerSocket *srcSocket, ServerSocket *dstSocket );
+	void recoverChunksByKeys( ClientSocket *socket, ServerSocket *server );
 	// Pending
 	void pending( ClientSocket *socket );
 };

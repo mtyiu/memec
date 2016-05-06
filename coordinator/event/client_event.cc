@@ -89,3 +89,9 @@ void ClientEvent::pending( ClientSocket *socket ) {
 	this->type = CLIENT_EVENT_TYPE_PENDING;
 	this->socket = socket;
 }
+
+void ClientEvent::recoverChunksByKeys( ClientSocket *socket, ServerSocket *server ) {
+	this->type = CLIENT_EVENT_TYPE_RECOVER_CHUNKS;
+	this->socket = socket;
+	this->message.recovery.target = server;
+}

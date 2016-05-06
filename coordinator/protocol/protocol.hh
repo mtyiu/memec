@@ -20,6 +20,8 @@ public:
 	char *reqSyncMeta( size_t &size, uint16_t instanceId, uint32_t requestId );
 	char *reqSealChunks( size_t &size, uint16_t instanceId, uint32_t requestId );
 	char *reqFlushChunks( size_t &size, uint16_t instanceId, uint32_t requestId );
+	char *reqGet( size_t &size, uint16_t instanceId, uint32_t requestId, Key key );
+	char *reqUpdate( size_t &size, uint16_t instanceId, uint32_t requestId, Key key );
 
 	// ---------- register_protocol.cc ----------
 	char *resRegisterClient( size_t &size, uint16_t instanceId, uint32_t requestId, bool success );
