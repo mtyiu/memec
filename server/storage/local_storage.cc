@@ -95,7 +95,8 @@ ssize_t LocalStorage::write( Chunk *chunk, bool sync, long offset, size_t length
 
 	// Determine the number of bytes to be written
 	offset = offset > 0 ? offset : 0;
-	size = ChunkUtil::getSize( chunk );
+	// size = ChunkUtil::getSize( chunk );
+	size = ChunkUtil::chunkSize;
 	length = length == 0 ? size : ( size - offset < ( off_t ) length ? size - offset : length );
 
 	fd = ::open( this->path, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR );

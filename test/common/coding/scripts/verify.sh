@@ -26,7 +26,7 @@ for i in $(ls $5/*.0.chunk); do
 		processed=$(expr $processed + 1)
 		./checker $1 $2 $3 $4 $prefix* 1> /dev/null 2>&1
 		if [ $? != 0 ]; then
-			echo $prefix'*'
+			echo ": ./checker $1 $2 $3 $4 $prefix*"
 			# exit 1
 			echo -n
 		else

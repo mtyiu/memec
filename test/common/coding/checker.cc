@@ -144,7 +144,6 @@ int main( int argc, char** argv ) {
 	input = new Chunk*[ n - k ];
 	for ( uint32_t i = 0 ; i < n ; i ++ ) {
 		chunks[ i ] = tempChunkPool.alloc();
-		ChunkUtil::setSize( chunks[ i ], 4096 );
 	}
 	for ( uint32_t i = 0 ; i < n - k ; i ++ )
 		input[ i ] = tempChunkPool.alloc();

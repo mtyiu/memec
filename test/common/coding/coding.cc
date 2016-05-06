@@ -88,7 +88,6 @@ int main( int argc, char **argv ) {
 		memset( buf + idx * CHUNK_SIZE / 2, idx / 2 * 3 + 5 , CHUNK_SIZE / 2 );
 		if ( idx % 2 == 0 ) {
 			chunks[ idx / 2 ] = tempChunkPool.alloc();
-			ChunkUtil::setSize( chunks[ idx / 2 ], CHUNK_SIZE );
 
 			// mark the chunk status
 			bitmap.set ( idx / 2 , 0 );
@@ -97,7 +96,6 @@ int main( int argc, char **argv ) {
 
 	for ( uint32_t idx = C_K ; idx < C_K + C_M ; idx ++ ) {
 		chunks[ idx ] = tempChunkPool.alloc();
-		ChunkUtil::setSize( chunks[ idx ], CHUNK_SIZE );
 
 		bitmap.set ( idx  , 0 );
 	}
@@ -195,11 +193,6 @@ int main( int argc, char **argv ) {
 		return -1;
 	}
 
-	// reset size to avoid change in size by key-value compaction
-	for ( uint32_t idx = 0 ; idx < C_K ; idx ++ ) {
-		ChunkUtil::setSize( chunks[ idx ], CHUNK_SIZE );
-	}
-
 	// double failure
 	if ( scheme != CS_RAID5 ) {
 		memset ( readbuf , 0, CHUNK_SIZE * C_M );
@@ -225,11 +218,6 @@ int main( int argc, char **argv ) {
 			printChunk( chunks[ failed[ 1 ] ], failed[ 1 ] );
 			return -1;
 		}
-	}
-
-	// reset size to avoid change in size by key-value compaction
-	for ( uint32_t idx = 0 ; idx < C_K ; idx ++ ) {
-		ChunkUtil::setSize( chunks[ idx ], CHUNK_SIZE );
 	}
 
 	// triple failure
