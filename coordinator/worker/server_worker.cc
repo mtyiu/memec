@@ -295,8 +295,9 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 					break;
 				case PROTO_OPCODE_SYNC_HOTNESS_STATS:
 				{
-					printf( "SYNC HOTNESS EVENT\n" );
-					//this->handleSyncHotnessStats( event, buffer.data, header.length );
+					if ( Coordinator::getInstance()->config.global.recovery.popular.enabled ) {
+						this->handleSyncHotnessStats( event, buffer.data, header.length );
+					}
 				}
 					break;
 				default:
@@ -388,4 +389,63 @@ bool CoordinatorWorker::processHeartbeat( ServerEvent event, char *buf, size_t s
 	}
 
 	return failed == 0;
+}
+
+bool CoordinatorWorker::handleSyncHotnessStats( ServerEvent event, char *buf, size_t size ) {
+	struct HotnessStatsHeader header;
+	if ( ! this->protocol.parseHotnessStatsHeader( header, buf, size ) ) {
+		__ERROR__( "CoordinatorWOrker", "handleSyncHotnessStats", "Invalid sync hotness stats request\n" );
+		return false;
+	}
+
+	buf += PROTO_HOTNESS_STATS_SIZE;
+	size -= PROTO_HOTNESS_STATS_SIZE;
+
+	std::vector<Metadata> getList, updateList;
+	Metadata metadata;
+
+	if ( size > 0 ) printf(" get GET=%u UPDATE=%u\n message size=%u\n", header.getCount, header.updateCount, size );
+
+	LOCK( &event.socket->hotness.lock );
+	event.socket->hotness.data.clear();
+	event.socket->hotness.parity.clear();
+
+	for ( uint32_t i = 0; i < header.getCount; i++ ) {
+		if ( size - 3 * sizeof( uint32_t ) > size /* overflow */) {
+			__ERROR__( "CoordinatorWOrker", "handleSyncHotnessStats", "Invalid sync hotness stats request (less metadata than expected for GET)\n" );
+			UNLOCK( &event.socket->hotness.lock );
+			return false;
+		}
+		metadata.listId   = ntohl( *( ( uint32_t * )( buf ) ) );
+		metadata.stripeId = ntohl( *( ( uint32_t * )( buf + sizeof( uint32_t ) ) ) );
+		metadata.chunkId  = ntohl( *( ( uint32_t * )( buf + 2 * sizeof( uint32_t ) ) ) );
+		if ( metadata.chunkId < dataChunkCount ) {
+			event.socket->hotness.data.insert( metadata );
+		}
+
+		buf += 3 * sizeof( uint32_t );
+		size -= 3 * sizeof( uint32_t );
+	}
+
+	for ( uint32_t i = 0; i < header.updateCount; i++ ) {
+		if ( size - 3 * sizeof( uint32_t ) > size /* overflow */) {
+			__ERROR__( "CoordinatorWOrker", "handleSyncHotnessStats", "Invalid sync hotness stats request (less metadata than expected for update)\n" );
+			UNLOCK( &event.socket->hotness.lock );
+			return false;
+		}
+		metadata.listId   = ntohl( *( ( uint32_t * )( buf ) ) );
+		metadata.stripeId = ntohl( *( ( uint32_t * )( buf + sizeof( uint32_t ) ) ) );
+		metadata.chunkId  = ntohl( *( ( uint32_t * )( buf + 2 * sizeof( uint32_t ) ) ) );
+		if ( metadata.chunkId < dataChunkCount ) {
+			event.socket->hotness.data.insert( metadata );
+		} else {
+			event.socket->hotness.parity.insert( metadata );
+		}
+
+		buf += 3 * sizeof( uint32_t );
+		size -= 3 * sizeof( uint32_t );
+	}
+	UNLOCK( &event.socket->hotness.lock );
+
+	return true;
 }

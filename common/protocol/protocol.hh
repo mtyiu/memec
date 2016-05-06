@@ -194,10 +194,16 @@ struct LoadStatsHeader {
 /////////////////////////////
 // Hotness synchronization //
 /////////////////////////////
-#define PROTO_HOTNESS_STATS_SIZE 4
+#define PROTO_HOTNESS_STATS_SIZE 8
 struct HotnessStatsHeader {
-	uint32_t getCount;
-	uint32_t updateCount;
+	union {
+		uint32_t getCount;
+		uint32_t dataCount;
+	};
+	union {
+		uint32_t updateCount;
+		uint32_t parityCount;
+	};
 };
 
 ///////////////////////
@@ -628,7 +634,8 @@ protected:
 		char *buf, size_t size
 	);
 	size_t generateHotnessStatsHeader(
-		uint8_t magic, uint8_t to, uint16_t instanceId, uint32_t requestId,
+		uint8_t magic, uint8_t to, uint8_t opcode,
+		uint16_t instanceId, uint32_t requestId,
 		uint32_t timestamp = 0,
 		uint32_t getCount = 0, uint32_t updateCount = 0, 
 		uint32_t metadataSize = 0

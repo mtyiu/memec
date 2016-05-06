@@ -1,5 +1,6 @@
 #include "state_transit_handler.hh"
 #include "state_transit_worker.hh"
+#include "../main/coordinator.hh"
 #include "../../common/util/debug.hh"
 #include "arpa/inet.h"
 
@@ -64,6 +65,11 @@ bool CoordinatorStateTransitWorker::transitToDegraded( StateTransitEvent event )
 	}
 
 	UNLOCK( &csth->serversStateLock[ event.server ] );
+
+	if ( Coordinator::getInstance()->config.global.recovery.popular.enabled ) {
+		Coordinator::getInstance()->recoverPopularChunks( event.server );
+	}
+
 	return true;
 }
 

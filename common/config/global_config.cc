@@ -29,6 +29,8 @@ GlobalConfig::GlobalConfig() {
 	this->states.workers = 4;
 	this->states.queue = 256;
 	this->states.smoothingFactor = 0.3;
+
+	this->recovery.popular.enabled = false;
 }
 
 bool GlobalConfig::parse( const char *path ) {
@@ -108,6 +110,12 @@ bool GlobalConfig::set( const char *section, const char *name, const char *value
 			this->states.queue = atoi( value );
 		} else if ( match( name, "smoothing_factor" ) ) {
 			this->states.smoothingFactor = atof( value );
+		} else {
+			return false;
+		}
+	} else if ( match( section, "recovery" ) ) {
+		if ( match( name, "popular_recovery" ) ) {
+			this->recovery.popular.enabled = match( value, "true" );
 		} else {
 			return false;
 		}

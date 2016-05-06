@@ -101,6 +101,7 @@ public:
 		bool &isCompleted
 	);
 	char *ackCompletedReconstruction( size_t &size, uint16_t instanceId, uint32_t requestId, bool success );
+	void recoverPopularChunks( struct sockaddr_in server );
 
 	// ---------- heartbeat_protocol.cc ----------
 	char *resHeartbeat(

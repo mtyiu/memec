@@ -44,10 +44,15 @@ void Server::syncHotnessStats( uint32_t requestId ) {
 }
 
 void Server::signalHandler( int signal ) {
+	static bool count = false;
 	Server *server = Server::getInstance();
 	switch( signal ) {
 		case SIGALRM:
 			server->sync();
+			if ( count && Server::getInstance()->config.global.recovery.popular.enabled ) {
+				server->syncHotnessStats();
+			} 
+			count = ! count;
 			server->alarm();
 			break;
 		default:

@@ -37,6 +37,7 @@ private:
 	// ---------- server_worker.cc ----------
 	void dispatch( ServerEvent event );
 	bool processHeartbeat( ServerEvent event, char *buf, size_t size );
+	bool handleSyncHotnessStats( ServerEvent event, char *buf, size_t size );
 
 	// ---------- remap_worker.cc ----------
 	bool handleDegradedSetLockRequest( ClientEvent event, char* buf, size_t size );

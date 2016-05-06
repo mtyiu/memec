@@ -1013,3 +1013,24 @@ void Coordinator::switchToManualOverload() {
 void Coordinator::switchToAutoOverload() {
 	this->config.coordinator.states.isManual = false;
 }
+
+void Coordinator::recoverPopularChunks( struct sockaddr_in server ) {
+	ServerSocket *socket = 0;
+	LOCK( &this->sockets.servers.lock );
+	for ( uint32_t i = 0; i < this->sockets.servers.size(); i++ ) {
+		socket = this->sockets.servers.values[ i ];
+		if ( server == socket->getAddr() ) {
+			break;
+		}
+		socket = 0;
+	}
+	UNLOCK( &this->sockets.servers.lock );
+	if ( ! socket ) {
+		char buf[ INET_ADDRSTRLEN ];
+		inet_ntop( AF_INET, &server.sin_addr.s_addr, buf, INET_ADDRSTRLEN );
+		__ERROR__( "Coordinator", "recoverPopularChunks", "Failed to find server socket for %s:%u\n", buf, ntohs( server.sin_port ) );
+		return;
+	}
+
+	// TODO insert event to get chunk reconstructed
+}

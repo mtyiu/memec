@@ -12,6 +12,7 @@ char *ServerProtocol::sendHotnessStats(
 	size = this->generateHotnessStatsHeader(
 		PROTO_MAGIC_LOADING_STATS,
 		PROTO_MAGIC_TO_COORDINATOR,
+		PROTO_OPCODE_SYNC_HOTNESS_STATS,
 		instanceId, requestId, 
 		timestamp,
 		getList.size(), updateList.size(),
@@ -21,20 +22,21 @@ char *ServerProtocol::sendHotnessStats(
 	buffer += size;
 
 	for ( i = 0; i < getList.size() && size + metadataSize < this->buffer.size ; i++, getCount++ ) {
-		*( ( uint32_t * ) buffer                      ) = htonl( getList[ i ].listId );
-		*( ( uint32_t * ) buffer + sizeof( uint32_t ) ) = htonl( getList[ i ].stripeId );
-		*( ( uint32_t * ) buffer + sizeof( uint32_t ) ) = htonl( getList[ i ].chunkId );
-		size += 3 * sizeof( uint32_t );
-		buffer += 3 * sizeof( uint32_t );
+		*( ( uint32_t * ) ( buffer )                          ) = htonl( getList[ i ].listId );
+		*( ( uint32_t * ) ( buffer + sizeof( uint32_t ) )     ) = htonl( getList[ i ].stripeId );
+		*( ( uint32_t * ) ( buffer + 2 * sizeof( uint32_t ) ) ) = htonl( getList[ i ].chunkId );
 
+		buffer += 3 * sizeof( uint32_t );
+		size += 3 * sizeof( uint32_t );
 	}
 
 	for ( i = 0; i < updateList.size() && size + metadataSize < this->buffer.size ; i++, updateCount++ ) {
-		*( ( uint32_t * ) buffer                      ) = htonl( updateList[ i ].listId );
-		*( ( uint32_t * ) buffer + sizeof( uint32_t ) ) = htonl( updateList[ i ].stripeId );
-		*( ( uint32_t * ) buffer + sizeof( uint32_t ) ) = htonl( updateList[ i ].chunkId );
-		size += 3 * sizeof( uint32_t );
+		*( ( uint32_t * ) ( buffer )                          ) = htonl( updateList[ i ].listId );
+		*( ( uint32_t * ) ( buffer + sizeof( uint32_t ) )     ) = htonl( updateList[ i ].stripeId );
+		*( ( uint32_t * ) ( buffer + 2 * sizeof( uint32_t ) ) ) = htonl( updateList[ i ].chunkId );
+
 		buffer += 3 * sizeof( uint32_t );
+		size += 3 * sizeof( uint32_t );
 	}
 
 	if ( getCount > 0 ) 
@@ -43,13 +45,14 @@ char *ServerProtocol::sendHotnessStats(
 	if ( updateCount > 0 ) 
 		updateList.erase( updateList.begin(), updateList.begin() + updateCount );
 
-	isCompleted = ( ! getList.empty() || ! updateList.empty() );
+	isCompleted = ( getList.empty() && updateList.empty() );
 
 	// avoid message receiver's buffer
 	if ( ! isCompleted ) {
 		this->generateHotnessStatsHeader(
 			PROTO_MAGIC_LOADING_STATS,
 			PROTO_MAGIC_TO_COORDINATOR,
+			PROTO_OPCODE_SYNC_HOTNESS_STATS,
 			instanceId, requestId, 
 			timestamp,
 			getCount, updateCount,

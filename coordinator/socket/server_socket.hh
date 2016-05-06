@@ -19,6 +19,11 @@ private:
 public:
 	uint16_t instanceId;
 	Map map;
+	struct {
+		std::unordered_set<Metadata> data;
+		std::unordered_set<Metadata> parity;
+		LOCK_T lock;
+	} hotness;
 	ServerSocket *failed;
 
 	static void setArrayMap( ArrayMap<int, ServerSocket> *servers );

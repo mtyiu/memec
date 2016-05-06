@@ -42,14 +42,14 @@ bool Protocol::parseLoadStatsHeader( struct LoadStatsHeader &header, char *buf, 
 
 // ---------------------------- Hotness ----------------------------------
 
-size_t Protocol::generateHotnessStatsHeader( uint8_t magic, uint8_t to, uint16_t instanceId, uint32_t requestId, uint32_t timestamp, uint32_t getCount, uint32_t updateCount, uint32_t metadataSize ) {
+size_t Protocol::generateHotnessStatsHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t timestamp, uint32_t getCount, uint32_t updateCount, uint32_t metadataSize ) {
 	char *buf = this->buffer.send;
-	size_t bytes = this->generateHeader( magic, to, PROTO_OPCODE_SYNC_HOTNESS_STATS, PROTO_HOTNESS_STATS_SIZE + ( getCount + updateCount ) * metadataSize, instanceId, requestId, buf, timestamp );
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_HOTNESS_STATS_SIZE + ( getCount + updateCount ) * metadataSize, instanceId, requestId, buf, timestamp );
 
 	buf += bytes;
 
-	*( ( uint32_t * )( buf ) ) = htons( getCount );
-	*( ( uint32_t * )( buf + sizeof( uint32_t ) ) ) = htons( updateCount );
+	*( ( uint32_t * )( buf ) ) = htonl( getCount );
+	*( ( uint32_t * )( buf + sizeof( uint32_t ) ) ) = htonl( updateCount );
 
 	bytes += PROTO_HOTNESS_STATS_SIZE;
 
@@ -60,8 +60,8 @@ bool Protocol::parseHotnessStatsHeader( size_t offset, uint32_t &getCount, uint3
 	if ( size - offset < PROTO_HOTNESS_STATS_SIZE )
 		return false;
 
-	getCount = ntohl( *( ( uint16_t * )( buf + offset ) ) );
-	updateCount = ntohl( *( ( uint16_t * )( buf + offset + sizeof( uint32_t ) ) ) );
+	getCount    = ntohl( *( ( uint32_t * )( buf + offset ) ) );
+	updateCount = ntohl( *( ( uint32_t * )( buf + offset + sizeof( uint32_t ) ) ) );
 
 	return true;
 }

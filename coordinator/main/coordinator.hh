@@ -136,6 +136,7 @@ public:
 	void setServer( bool overloaded );
 	void switchToManualOverload();
 	void switchToAutoOverload();
+	void recoverPopularChunks( struct sockaddr_in server );
 	void interactive();
 };
 
