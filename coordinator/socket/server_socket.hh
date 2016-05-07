@@ -20,8 +20,8 @@ public:
 	uint16_t instanceId;
 	Map map;
 	struct {
-		std::unordered_set<Key> get;
-		std::unordered_set<Key> update;
+		std::vector<Key> get;
+		std::vector<Key> update;
 		uint32_t timestamp;
 		LOCK_T lock;
 	} hotness;

@@ -132,11 +132,9 @@ void ClientWorker::dispatch( CoordinatorEvent event ) {
 						this->handleServerReconstructedMsg( event, buffer.data, header.length );
 						break;
 					case PROTO_OPCODE_GET:
-						printf(" GET from coordinator !\n");
 						this->handleCoordinatorRequestOnKey( event, buffer.data, header.length, header.opcode );
 						break;
 					case PROTO_OPCODE_UPDATE:
-						printf(" UPDATE from coordinator !\n");
 						this->handleCoordinatorRequestOnKey( event, buffer.data, header.length, header.opcode );
 						break;
 					default:

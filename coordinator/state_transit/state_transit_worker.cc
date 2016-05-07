@@ -66,6 +66,7 @@ bool CoordinatorStateTransitWorker::transitToDegraded( StateTransitEvent event )
 
 	UNLOCK( &csth->serversStateLock[ event.server ] );
 
+	// recover some chunks first based on popularity
 	if ( Coordinator::getInstance()->config.global.recovery.popular.enabled ) {
 		Coordinator::getInstance()->recoverPopularChunks( event.server );
 	}

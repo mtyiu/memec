@@ -406,6 +406,10 @@ bool CoordinatorWorker::handleSyncHotnessStats( ServerEvent event, char *buf, si
 	LOCK( &event.socket->hotness.lock );
 	if ( event.socket->hotness.timestamp < event.timestamp ) {
 		// use new stats
+		for ( i = 0; i < event.socket->hotness.get.size(); i++ )
+			event.socket->hotness.get[ i ].free();
+		for ( i = 0; i < event.socket->hotness.update.size(); i++ )
+			event.socket->hotness.update[ i ].free();
 		event.socket->hotness.get.clear();
 		event.socket->hotness.update.clear();
 		event.socket->hotness.timestamp = event.timestamp;
@@ -430,7 +434,8 @@ bool CoordinatorWorker::handleSyncHotnessStats( ServerEvent event, char *buf, si
 		}
 		key.set( keyHeader.keySize, keyHeader.key );
 		key.dup();
-		event.socket->hotness.get.insert( key );
+		event.socket->hotness.get.push_back( key );
+		offset += PROTO_KEY_SIZE + key.size;
 	}
 
 	for ( i = 0; i < header.updateCount; i++ ) {
@@ -441,7 +446,8 @@ bool CoordinatorWorker::handleSyncHotnessStats( ServerEvent event, char *buf, si
 		}
 		key.set( keyHeader.keySize, keyHeader.key );
 		key.dup();
-		event.socket->hotness.update.insert( key );
+		event.socket->hotness.update.push_back( key );
+		offset += PROTO_KEY_SIZE + key.size;
 	}
 	UNLOCK( &event.socket->hotness.lock );
 

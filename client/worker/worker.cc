@@ -452,6 +452,7 @@ bool ClientWorker::handleCoordinatorRequestOnKey( CoordinatorEvent event, char *
 				__ERROR__( "ClientWorker", "handleCoordinatorRequest", "Invalid GET request" );
 				return false;
 			}
+			__DEBUG__( GREEN, "ClientWorker", "handleCoordinatorRequestOnKey", "GET on key %.*s replay", header.keySize, header.key );
 			key.set( header.keySize, header.key );
 			appEvent.replayGetRequest( 0, instanceId, requestId, key );
 			this->dispatch( appEvent );
@@ -465,7 +466,11 @@ bool ClientWorker::handleCoordinatorRequestOnKey( CoordinatorEvent event, char *
 				__ERROR__( "ClientWorker", "handleCoordinatorRequest", "Invalid GET request" );
 				return false;
 			}
+			__DEBUG__( GREEN, "ClientWorker", "handleCoordinatorRequestOnKey", "UPDATE on key %.*s replay", header.keySize, header.key );
 			keyValueUpdate.set( header.keySize, header.key );
+			keyValueUpdate.offset = 0;
+			keyValueUpdate.length = 0;
+			keyValueUpdate.ptr = 0;
 			appEvent.replayUpdateRequest( 0, instanceId, requestId, keyValueUpdate );
 			this->dispatch( appEvent );
 		}

@@ -155,12 +155,11 @@ void CoordinatorWorker::dispatch( ClientEvent event ) {
 			ssize_t ret;
 
 			LOCK( &event.message.recovery.target->hotness.lock );
-			std::unordered_set<Key> get = event.message.recovery.target->hotness.get;
-			std::unordered_set<Key> update = event.message.recovery.target->hotness.update;
+			std::vector<Key> get = event.message.recovery.target->hotness.get;
+			std::vector<Key> update = event.message.recovery.target->hotness.update;
 			UNLOCK( &event.message.recovery.target->hotness.lock );
-			__INFO__( YELLOW, "CoordinatorWorker", "dispatch", "RECOVER CHUNK by %lu GET and %lu UPDATE\n", get.size(), update.size() );
 
-			std::unordered_set<Key>::iterator it;
+			std::vector<Key>::iterator it;
 			for( it = get.begin(); it != get.end(); it++ ) {
 				buffer.data = this->protocol.reqGet(
 					buffer.size,
@@ -170,6 +169,7 @@ void CoordinatorWorker::dispatch( ClientEvent event ) {
 				ret = event.socket->send( buffer.data, buffer.size, connected );
 				if ( ret != ( ssize_t ) buffer.size )
 					__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+				__DEBUG__( YELLOW, "CoordinatorWorker", "dispatch", "RECOVER CHUNK by GET on key %.*s", it->size, it->data );
 			}
 
 			for( it = update.begin(); it != update.end(); it++ ) {
@@ -181,6 +181,7 @@ void CoordinatorWorker::dispatch( ClientEvent event ) {
 				ret = event.socket->send( buffer.data, buffer.size, connected );
 				if ( ret != ( ssize_t ) buffer.size )
 					__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+				__DEBUG__( YELLOW, "CoordinatorWorker", "dispatch", "RECOVER CHUNK by UPDATE on key %.*s", it->size, it->data );
 			}
 			isSend = false;
 		}

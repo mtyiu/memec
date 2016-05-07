@@ -511,6 +511,10 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 			}
 		}
 		this->dispatch( applicationEvent );
+	} else {
+		__DEBUG__( GREEN, "ClientWorker", "handleGetResponse", "GET key %.*s success %d isDegraded %d without replying app",
+			key.size, key.data, success, isDegraded
+		);
 	}
 	key.free();
 	return true;
@@ -578,6 +582,10 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 			applicationEvent.resUpdate( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, keyValueUpdate, success, false );
 			this->dispatch( applicationEvent );
 		}
+	} else {
+		__DEBUG__( GREEN, "ClientWorker", "handleUpdateResponse", "UPDATE key %.*s success %d isDegraded %d without replying app",
+			header.keySize, header.key, success, isDegraded
+		);
 	}
 
 	if ( ! needsReplay ) {
