@@ -17,13 +17,13 @@ struct ChunkIdentifier {
 
 	ChunkIdentifier( uint8_t listId, uint64_t stripeId, uint8_t chunkId ) {
 		this->listId = listId;
-		this->stripeId = chunkId;
+		this->stripeId = stripeId;
 		this->chunkId = chunkId;
 	}
 
 	ChunkIdentifier( uint32_t listId, uint32_t stripeId, uint32_t chunkId ) {
 		this->listId = ( uint8_t ) listId;
-		this->stripeId = ( uint64_t ) chunkId;
+		this->stripeId = ( uint64_t ) stripeId;
 		this->chunkId = ( uint8_t ) chunkId;
 	}
 } __attribute__((__packed__));

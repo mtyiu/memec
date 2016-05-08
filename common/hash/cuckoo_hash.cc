@@ -28,6 +28,10 @@ void CuckooHash::init( uint32_t power ) {
 	#endif
 }
 
+void CuckooHash::setKeySize( uint8_t keySize ) {
+	this->keySize = keySize;
+}
+
 size_t CuckooHash::indexHash( uint32_t hashValue ) {
 	return ( hashValue >> ( 32 - this->hashPower ) );
 }
@@ -75,13 +79,18 @@ char *CuckooHash::tryRead( char *key, uint8_t keySize, uint8_t tag, size_t i ) {
 			char *ptr = buckets[ i ].ptr[ j ];
 			if ( ! ptr ) return 0;
 
-			KeyValue keyValue;
-			keyValue.set( ptr );
+			if ( this->keySize == 0 ) {
+				KeyValue keyValue;
+				keyValue.set( ptr );
 
-			Key key = keyValue.key();
+				Key key = keyValue.key();
 
-			if ( key.equal( target ) )
-				return ptr;
+				if ( key.equal( target ) )
+					return ptr;
+			} else {
+				if ( memcmp( ptr, key, this->keySize ) == 0 )
+					return ptr;
+			}
 		}
 	}
 
@@ -125,14 +134,21 @@ TryRead:
 
 			if ( ! ptr ) continue;
 
-			KeyValue keyValue;
-			keyValue.set( ptr );
+			if ( this->keySize == 0 ) {
+				KeyValue keyValue;
+				keyValue.set( ptr );
 
-			Key key = keyValue.key();
+				Key key = keyValue.key();
 
-			if ( key.equal( target ) ) {
-				result = ptr;
-				break;
+				if ( key.equal( target ) ) {
+					result = ptr;
+					break;
+				}
+			} else {
+				if ( memcmp( ptr, key, this->keySize ) == 0 ) {
+					result = ptr;
+					break;
+				}
 			}
 		}
 	}
@@ -148,14 +164,21 @@ TryRead:
 
 				if ( ! ptr ) continue;
 
-				KeyValue keyValue;
-				keyValue.set( ptr );
+				if ( this->keySize == 0 ) {
+					KeyValue keyValue;
+					keyValue.set( ptr );
 
-				Key key = keyValue.key();
+					Key key = keyValue.key();
 
-				if ( key.equal( target ) ) {
-					result = ptr;
-					break;
+					if ( key.equal( target ) ) {
+						result = ptr;
+						break;
+					}
+				} else {
+					if ( memcmp( ptr, key, this->keySize ) == 0 ) {
+						result = ptr;
+						break;
+					}
 				}
 			}
 		}
@@ -201,7 +224,7 @@ int CuckooHash::cpSearch( size_t depthStart, size_t *cpIndex ) {
 #ifdef CUCKOO_HASH_ENABLE_TAG
 			to[ index ] = this->altIndex( i, this->buckets[ i ].tags[ j ] );
 #else
-			{
+			if ( this->keySize == 0 ) {
 				char *key, *value;
 				uint8_t keySize;
 				uint32_t valueSize;
@@ -209,6 +232,12 @@ int CuckooHash::cpSearch( size_t depthStart, size_t *cpIndex ) {
 				KeyValue::deserialize( this->buckets[ i ].ptr[ j ], key, keySize, value, valueSize );
 
 				uint32_t hashValue = HashFunc::hash( key, keySize );
+				uint8_t tag = this->tagHash( hashValue );
+
+				to[ index ] = this->altIndex( i, tag );
+			} else {
+				char *key = this->buckets[ i ].ptr[ j ];
+				uint32_t hashValue = HashFunc::hash( key, this->keySize );
 				uint8_t tag = this->tagHash( hashValue );
 
 				to[ index ] = this->altIndex( i, tag );
@@ -367,35 +396,63 @@ bool CuckooHash::tryDel( char *key, uint8_t keySize, uint8_t tag, size_t i, size
 			char *ptr = this->buckets[ i ].ptr[ j ];
 			if ( ! ptr ) return false;
 
-			KeyValue keyValue;
-			keyValue.set( ptr );
+			if ( this->keySize == 0 ) {
+				KeyValue keyValue;
+				keyValue.set( ptr );
 
-			Key key = keyValue.key();
+				Key key = keyValue.key();
 
-			if ( key.equal( target ) ) {
+				if ( key.equal( target ) ) {
 #ifdef CUCKOO_HASH_LOCK_OPT
-				INCR_KEYVER( lock );
+					INCR_KEYVER( lock );
 #endif
 
 #ifdef CUCKOO_HASH_LOCK_FINEGRAIN
-				this->fg_lock( i, i );
+					this->fg_lock( i, i );
 #endif
 
 #ifdef CUCKOO_HASH_ENABLE_TAG
-				this->buckets[ i ].tags[ j ] = 0;
+					this->buckets[ i ].tags[ j ] = 0;
 #endif
 
-				this->buckets[ i ].ptr[ j ] = 0;
+					this->buckets[ i ].ptr[ j ] = 0;
 
 #ifdef CUCKOO_HASH_LOCK_OPT
-				INCR_KEYVER( lock );
+					INCR_KEYVER( lock );
 #endif
 
 #ifdef CUCKOO_HASH_LOCK_FINEGRAIN
-				this->fg_unlock( i, i );
+					this->fg_unlock( i, i );
 #endif
 
-				return true;
+					return true;
+				}
+			} else {
+				if ( memcmp( ptr, key, this->keySize ) == 0 ) {
+#ifdef CUCKOO_HASH_LOCK_OPT
+					INCR_KEYVER( lock );
+#endif
+
+#ifdef CUCKOO_HASH_LOCK_FINEGRAIN
+					this->fg_lock( i, i );
+#endif
+
+#ifdef CUCKOO_HASH_ENABLE_TAG
+					this->buckets[ i ].tags[ j ] = 0;
+#endif
+
+					this->buckets[ i ].ptr[ j ] = 0;
+
+#ifdef CUCKOO_HASH_LOCK_OPT
+					INCR_KEYVER( lock );
+#endif
+
+#ifdef CUCKOO_HASH_LOCK_FINEGRAIN
+					this->fg_unlock( i, i );
+#endif
+
+					return true;
+				}
 			}
 		}
 	}

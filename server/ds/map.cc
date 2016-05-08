@@ -7,6 +7,9 @@ Map::Map() {
 	LOCK_INIT( &this->forwarded.lock );
 	LOCK_INIT( &this->opsLock );
 	LOCK_INIT( &this->sealedLock );
+
+	this->keys.setKeySize( 0 );
+	this->chunks.setKeySize( CHUNK_IDENTIFIER_SIZE );
 }
 
 void Map::setTimestamp( Timestamp *timestamp ) {
@@ -95,9 +98,6 @@ void Map::setChunk(
 	Chunk *chunk, bool isParity,
 	bool needsLock, bool needsUnlock
 ) {
-	Metadata metadata;
-	metadata.set( listId, stripeId, chunkId );
-
 	if ( needsLock ) LOCK( &this->chunksLock );
 	if ( this->chunks.find( ( char * ) chunk, CHUNK_IDENTIFIER_SIZE ) ) {
 		__ERROR__( "Map", "setChunk", "This chunk (%u, %u, %u) already exists.", listId, stripeId, chunkId );

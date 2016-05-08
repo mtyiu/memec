@@ -1213,7 +1213,7 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 							);
 
 							op.data.keyValueUpdate.free();
-							delete[] ( ( char * ) op.data.keyValueUpdate.ptr );
+							// delete[] ( ( char * ) op.data.keyValueUpdate.ptr );
 						}
 					} else if ( op.opcode == PROTO_OPCODE_DEGRADED_DELETE ) {
 						uint32_t deltaSize = this->buffer.size;

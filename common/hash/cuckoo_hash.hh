@@ -54,6 +54,7 @@ struct Bucket {
 /********** CuckooHash class definition **********/
 class CuckooHash {
 private:
+	uint8_t keySize; // If keySize is 0, then use KeyValue function to get key size
 	uint32_t size;
 	uint32_t hashPower;
 	uint32_t hashMask;
@@ -126,6 +127,8 @@ public:
 	CuckooHash();
 	CuckooHash( uint32_t power );
 	~CuckooHash();
+
+	void setKeySize( uint8_t keySize );
 
 	char *find( char *key, uint8_t keySize );
 	bool insert( char *key, uint8_t keySize, char *ptr );
