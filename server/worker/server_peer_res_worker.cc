@@ -997,7 +997,6 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 						if ( ! chunk ) {
 							chunk = ServerWorker::tempChunkPool.alloc();
 							ChunkUtil::dup( chunk, this->chunks[ op.chunkId ] );
-
 							if ( ! dmap->insertChunk(
 								op.listId, op.stripeId, op.chunkId, chunk,
 								op.chunkId >= ServerWorker::dataChunkCount
@@ -1138,6 +1137,13 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 								__ERROR__( "ServerWorker", "handleGetChunkResponse", "Undefined case." );
 							}
 						} else if ( ! dataChunkReconstructed ) {
+							char *obj = map->findObject( key.data, key.size, &keyValue, &key );
+							assert( obj );
+
+							keyMetadata.length = keyValue.getSize();
+							keyMetadata.obj = keyValue.data;
+							chunk = ServerWorker::chunkPool->getChunk( obj, keyMetadata.offset );
+
 							///// vvvvv Copied from handleUpdateRequest() vvvvv /////
 						    uint32_t offset = keyMetadata.offset + PROTO_KEY_VALUE_SIZE + key.size + op.data.keyValueUpdate.offset;
 
@@ -1158,6 +1164,7 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 								offset, op.data.keyValueUpdate.length,
 								true // perform update
 							);
+							chunkUpdateOffset = offset;
 						    ///// ^^^^^ Copied from handleUpdateRequest() ^^^^^ /////
 
 							this->sendModifyChunkRequest(

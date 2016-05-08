@@ -43,12 +43,15 @@ Chunk *ChunkPool::alloc( uint32_t listId, uint32_t stripeId, uint32_t chunkId ) 
 	}
 
 	// Calculate memory address
-	Chunk *chunk = ( Chunk * )( this->startAddress + ( index * ( CHUNK_IDENTIFIER_SIZE + ChunkUtil::chunkSize ) ) );
-	if ( chunk ) {
+	uint32_t chunkSize = CHUNK_IDENTIFIER_SIZE + ChunkUtil::chunkSize;
+	Chunk *chunk = ( Chunk * )( this->startAddress + ( index * chunkSize ) );
+	if ( ( char * ) chunk - this->startAddress + chunkSize <= this->total * chunkSize ) {
 		ChunkUtil::clear( chunk );
 		ChunkUtil::set( chunk, listId, stripeId, chunkId );
+		return chunk;
+	} else {
+		return 0;
 	}
-	return chunk;
 }
 
 Chunk *ChunkPool::getChunk( char *ptr, uint32_t &offset ) {
@@ -62,7 +65,8 @@ Chunk *ChunkPool::getChunk( char *ptr, uint32_t &offset ) {
 }
 
 bool ChunkPool::isInChunkPool( Chunk *chunk ) {
-	char *endAddress = this->startAddress + ( ChunkUtil::chunkSize * this->total );
+	uint32_t chunkSize = CHUNK_IDENTIFIER_SIZE + ChunkUtil::chunkSize;
+	char *endAddress = this->startAddress + ( chunkSize * ( this->total + 1 ) );
 	return (
 		( char * ) chunk >= this->startAddress &&
 		( char * ) chunk < endAddress

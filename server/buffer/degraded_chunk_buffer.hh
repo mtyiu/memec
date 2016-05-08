@@ -134,6 +134,7 @@ public:
 class DegradedChunkBuffer : public ChunkBuffer {
 public:
 	DegradedMap map;
+	TempChunkPool tempChunkPool;
 
 	DegradedChunkBuffer();
 

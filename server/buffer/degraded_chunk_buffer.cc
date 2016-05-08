@@ -651,8 +651,8 @@ bool DegradedChunkBuffer::update(
 	it = cache->find( metadata );
 	if ( it == cache->end() ) {
 		// Allocate new chunk
-		chunk = ChunkBuffer::chunkPool->alloc();
-		ChunkUtil::set( chunk, listId, stripeId, chunkId );
+		chunk = this->tempChunkPool.alloc();
+		ChunkUtil::set( chunk, listId, stripeId, updatingChunkId );
 
 		std::pair<Metadata, Chunk *> p( metadata, chunk );
 		cache->insert( p );

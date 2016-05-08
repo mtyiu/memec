@@ -499,7 +499,6 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 	ret = chunk;
 	if ( ! chunk ) {
 		// Allocate memory for this chunk
-		fprintf( stderr, "%u %u %u\n", metadata.listId, metadata.stripeId, metadata.chunkId );
 		chunk = ServerWorker::chunkPool->alloc(
 			metadata.listId,
 			metadata.stripeId,

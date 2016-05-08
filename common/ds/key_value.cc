@@ -114,3 +114,16 @@ char *KeyValue::deserialize( char *data, char *&key, uint8_t &keySize, char *&va
 uint32_t KeyValue::getChunkUpdateOffset( uint32_t chunkOffset, uint8_t keySize, uint32_t valueUpdateOffset ) {
 	return ( chunkOffset + KEY_VALUE_METADATA_SIZE + keySize + valueUpdateOffset );
 }
+
+void KeyValue::print( FILE *f ) {
+	uint8_t keySize;
+	uint32_t valueSize;
+	char *key, *value;
+
+	this->deserialize( key, keySize, value, valueSize );
+
+	fprintf(
+		f, "Key: %.*s; Value: %.*s\n",
+		keySize, key, valueSize, value
+	);
+}

@@ -508,6 +508,13 @@ bool ServerWorker::handleUpdateRequest(
 			);
 		}
 
+		{
+			// uint8_t _keySize;
+			// uint32_t _valueSize;
+			// char *_key, *_value;
+			// keyValue.deserialize( _keySize, _valueSize )
+			// fprintf( stderr, "Before: (%.*s) %.*s\n",  )
+		}
 		ChunkUtil::computeDelta(
 			chunk,
 			header.valueUpdate, // delta

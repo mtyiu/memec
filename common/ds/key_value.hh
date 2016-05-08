@@ -32,6 +32,8 @@ public:
 	static char *deserialize( char *data, char *&key, uint8_t &keySize, char *&value, uint32_t &valueSize );
 
 	static uint32_t getChunkUpdateOffset( uint32_t chunkOffset, uint8_t keySize, uint32_t valueUpdateOffset );
+
+	void print( FILE *f = stdout );
 };
 
 #endif
