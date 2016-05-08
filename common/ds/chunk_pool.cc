@@ -83,3 +83,9 @@ void ChunkPool::print( FILE *f ) {
 		this->startAddress
 	);
 }
+
+void ChunkPool::exportVars( uint32_t *total, std::atomic<unsigned int> *count, char **startAddress ) {
+	*total = this->total;
+	*count = this->count.load();
+	*startAddress = this->startAddress;
+}

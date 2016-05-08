@@ -43,7 +43,7 @@ bool ServerWorker::handleForwardKeyResponse( struct ForwardKeyHeader &header, bo
 	}
 
 	KeyValue keyValue;
-	if ( map->findValueByKey( header.key, header.keySize, &keyValue, &key ) ) {
+	if ( map->findObject( header.key, header.keySize, &keyValue, &key ) ) {
 	} else {
 		__ERROR__( "ServerWorker", "handleForwardKeyResponse", "Cannot find the forwarded object locally." );
 	}
@@ -1141,15 +1141,12 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 							///// vvvvv Copied from handleUpdateRequest() vvvvv /////
 						    uint32_t offset = keyMetadata.offset + PROTO_KEY_VALUE_SIZE + key.size + op.data.keyValueUpdate.offset;
 
-						    LOCK_T *keysLock, *cacheLock;
-						    std::unordered_map<Key, KeyMetadata> *keys;
-						    std::unordered_map<Metadata, Chunk *> *cache;
-
-						    ServerWorker::map->getKeysMap( keys, keysLock );
-						    ServerWorker::map->getCacheMap( cache, cacheLock );
+						    LOCK_T *keysLock, *chunksLock;
+						    ServerWorker::map->getKeysMap( 0, &keysLock );
+						    ServerWorker::map->getChunksMap( 0, &chunksLock );
 
 						    LOCK( keysLock );
-						    LOCK( cacheLock );
+						    LOCK( chunksLock );
 						    // Lock the data chunk buffer
 						    MixedChunkBuffer *chunkBuffer = ServerWorker::chunkBuffer->at( metadata.listId );
 						    int chunkBufferIndex = chunkBuffer->lockChunk( chunk, true );
@@ -1187,7 +1184,7 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 						 		chunkBuffer->unlock();
 							else
 								chunkBuffer->updateAndUnlockChunk( chunkBufferIndex );
-						    UNLOCK( cacheLock );
+						    UNLOCK( chunksLock );
 						    UNLOCK( keysLock );
 
 							delete[] valueUpdate;

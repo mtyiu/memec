@@ -108,13 +108,11 @@ public:
 	void seal();
 	void flush( bool parityOnly = false );
 	void sync( uint32_t requestId = 0 );
-	void metadata();
 	void memory( FILE *f = stdout );
 	void setDelay();
 
 	void info( FILE *f = stdout );
 	void debug( FILE *f = stdout );
-	void dump();
 	void printInstanceId( FILE *f = stdout );
 	void printPending( FILE *f = stdout );
 	void printChunk();

@@ -310,7 +310,7 @@ bool ServerWorker::handleGetRequest( ClientEvent event, struct KeyHeader &header
 	KeyValue keyValue;
 	RemappedKeyValue remappedKeyValue;
 	bool ret;
-	if ( map->findValueByKey( header.key, header.keySize, &keyValue, &key ) ) {
+	if ( map->findObject( header.key, header.keySize, &keyValue, &key ) ) {
 		event.resGet( event.socket, event.instanceId, event.requestId, keyValue, isDegraded );
 		ret = true;
 	} else if ( remappedBuffer->find( header.keySize, header.key, &remappedKeyValue ) ) {
@@ -349,7 +349,7 @@ bool ServerWorker::handleSetRequest( ClientEvent event, struct KeyValueHeader &h
 	listId = ServerWorker::stripeList->get( header.key, header.keySize, &dataServerSocket, 0, &chunkId );
 
 	if (
-		( map->findValueByKey( header.key, header.keySize, 0, 0 ) ) ||
+		( map->findObject( header.key, header.keySize ) ) ||
 		( ServerWorker::chunkBuffer->at( listId )->findValueByKey( header.key, header.keySize, 0, 0, false ) )
 	) {
 		exist = true;
@@ -451,7 +451,6 @@ bool ServerWorker::handleUpdateRequest(
 
 	// checkGetChunk = true;
 
-	// if ( map->findValueByKey( header.key, header.keySize, &keyValue, &key, &keyMetadata, &metadata, &chunk ) ) {
 	if ( map->findObject( header.key, header.keySize, &keyValue, &key ) ) {
 		// Set up KeyMetadata
 		keyMetadata.length = keyValue.getSize();
@@ -490,18 +489,16 @@ bool ServerWorker::handleUpdateRequest(
 			key.set( header.keySize, header.key, ( void * ) event.socket );
 		}
 
-		LOCK_T *keysLock, *cacheLock;
-		std::unordered_map<Key, KeyMetadata> *keys;
-		std::unordered_map<Metadata, Chunk *> *cache;
+		LOCK_T *keysLock, *chunksLock;
 
-		ServerWorker::map->getKeysMap( keys, keysLock );
-		ServerWorker::map->getCacheMap( cache, cacheLock );
+		ServerWorker::map->getKeysMap( 0, &keysLock );
+		ServerWorker::map->getChunksMap( 0, &chunksLock );
 		// Lock the data chunk buffer
 		MixedChunkBuffer *chunkBuffer = ServerWorker::chunkBuffer->at( metadata.listId );
 		int chunkBufferIndex = chunkBuffer->lockChunk( chunk, true );
 
 		LOCK( keysLock );
-		LOCK( cacheLock );
+		LOCK( chunksLock );
 		// Compute delta and perform update
 
 		if ( checkGetChunk ) {
@@ -519,7 +516,7 @@ bool ServerWorker::handleUpdateRequest(
 			true // perform update
 		);
 		// Release the locks
-		UNLOCK( cacheLock );
+		UNLOCK( chunksLock );
 		UNLOCK( keysLock );
 		if ( chunkBufferIndex == -1 )
 			chunkBuffer->unlock();
@@ -712,19 +709,17 @@ bool ServerWorker::handleDeleteRequest(
 		}
 
 		// Update data chunk and map
-		LOCK_T *keysLock, *cacheLock;
-		std::unordered_map<Key, KeyMetadata> *keys;
-		std::unordered_map<Metadata, Chunk *> *cache;
+		LOCK_T *keysLock, *chunksLock;
 		KeyMetadata keyMetadata;
 
-		ServerWorker::map->getKeysMap( keys, keysLock );
-		ServerWorker::map->getCacheMap( cache, cacheLock );
+		ServerWorker::map->getKeysMap( 0, &keysLock );
+		ServerWorker::map->getChunksMap( 0, &chunksLock );
 		// Lock the data chunk buffer
 		MixedChunkBuffer *chunkBuffer = ServerWorker::chunkBuffer->at( metadata.listId );
 		int chunkBufferIndex = chunkBuffer->lockChunk( chunk, true );
 		// Lock the keys and cache map
 		LOCK( keysLock );
-		LOCK( cacheLock );
+		LOCK( chunksLock );
 		// Delete the chunk and perform key-value compaction
 		if ( chunkBufferIndex == -1 ) {
 			// Only compute data delta if the chunk is not yet sealed
@@ -743,7 +738,7 @@ bool ServerWorker::handleDeleteRequest(
 		ServerWorker::map->deleteKey( key, PROTO_OPCODE_DELETE, timestamp, keyMetadata, false, false );
 		deltaSize = ChunkUtil::deleteObject( chunk, keyMetadata.offset, delta );
 		// Release the locks
-		UNLOCK( cacheLock );
+		UNLOCK( chunksLock );
 		UNLOCK( keysLock );
 		if ( chunkBufferIndex == -1 )
 			chunkBuffer->unlock();

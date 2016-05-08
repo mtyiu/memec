@@ -170,7 +170,7 @@ bool ServerWorker::handleDegradedSetRequest( ClientEvent event, char *buf, size_
 			);
 		}
 	} else if (
-		( map->findValueByKey( header.key, header.keySize, 0, 0 ) ) ||
+		( map->findObject( header.key, header.keySize ) ) ||
 		( ServerWorker::chunkBuffer->at( header.listId )->findValueByKey( header.key, header.keySize, 0, 0 ) )
 	) {
 		// success = false;

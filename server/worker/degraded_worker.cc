@@ -364,16 +364,6 @@ bool ServerWorker::handleDegradedUpdateRequest( ClientEvent event, struct Degrad
 		chunk = ServerWorker::chunkPool->getChunk( keyValue.data, offset );
 		metadata = ChunkUtil::getMetadata( chunk );
 
-	// if ( map->findValueByKey(
-	// 		header.data.keyValueUpdate.key,
-	// 		header.data.keyValueUpdate.keySize,
-	// 		0, // &keyValue
-	// 		0, // &key
-	// 		0, // &keyMetadata
-	// 		&metadata,
-	// 		&chunk
-	// 	)
-	// ) {
 		MixedChunkBuffer *chunkBuffer = ServerWorker::chunkBuffer->at( metadata.listId );
 		int chunkBufferIndex = chunkBuffer->lockChunk( chunk, true );
 		// Check whether the key is sealed
@@ -1178,7 +1168,7 @@ force_reconstruct_chunks:
 			uint8_t keySize = 0;
 			uint32_t valueSize = 0;
 
-			success = ServerWorker::map->findValueByKey( mykey.data, mykey.size, &keyValue, &mykey );
+			success = ServerWorker::map->findObject( mykey.data, mykey.size, &keyValue, &mykey ) != 0;
 			if ( ! success )
 				success = ServerWorker::chunkBuffer->at( listId )->findValueByKey( mykey.data, mykey.size, &keyValue, &mykey );
 

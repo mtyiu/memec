@@ -476,9 +476,7 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 	uint32_t offset, chunkSize, valueSize, objSize;
 	char *valueStr;
 	Chunk *chunk;
-	LOCK_T *keysLock, *cacheLock;
-	std::unordered_map<Key, KeyMetadata> *keys;
-	std::unordered_map<Metadata, Chunk *> *cache;
+	LOCK_T *keysLock, *chunksLock;
 	bool notifyCoordinator = false;
 	CoordinatorEvent coordinatorEvent;
 
@@ -488,15 +486,15 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 		true // needsUnlock
 	);
 
-	ServerWorker::map->getKeysMap( keys, keysLock );
-	ServerWorker::map->getCacheMap( cache, cacheLock );
+	ServerWorker::map->getKeysMap( 0, &keysLock );
+	ServerWorker::map->getChunksMap( 0, &chunksLock );
 
 	// Lock the data chunk buffer
 	MixedChunkBuffer *chunkBuffer = ServerWorker::chunkBuffer->at( metadata.listId );
 	int chunkBufferIndex = chunkBuffer->lockChunk( chunk, true );
 
 	LOCK( keysLock );
-	LOCK( cacheLock );
+	LOCK( chunksLock );
 
 	ret = chunk;
 	if ( ! chunk ) {
@@ -653,7 +651,7 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 		);
 	}
 
-	UNLOCK( cacheLock );
+	UNLOCK( chunksLock );
 	UNLOCK( keysLock );
 	if ( chunkBufferIndex != -1 )
 		chunkBuffer->updateAndUnlockChunk( chunkBufferIndex );

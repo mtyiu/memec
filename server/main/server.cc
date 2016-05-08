@@ -366,67 +366,50 @@ void Server::seal() {
 
 void Server::flush( bool parityOnly ) {
 	IOEvent ioEvent;
-	std::unordered_map<Metadata, Chunk *>::iterator it;
-	std::unordered_map<Metadata, Chunk *> *cache;
-	LOCK_T *lock;
 	Chunk *chunk;
-	size_t count = 0;
 
-	this->map.getCacheMap( cache, lock );
+	uint32_t total, numFlushed = 0;
+	std::atomic<unsigned int> count;
+	char *startAddress;
 
-	LOCK( lock );
-	for ( it = cache->begin(); it != cache->end(); it++ ) {
-		chunk = it->second;
+	this->chunkPool.exportVars( &total, &count, &startAddress );
+
+	for ( unsigned int i = 0; i < total; i++ ) {
+		chunk = ( Chunk * )( startAddress + i * ( CHUNK_IDENTIFIER_SIZE + ChunkUtil::chunkSize ) );
 		if ( parityOnly && ! ChunkUtil::isParity( chunk ) )
 			continue;
+
+		if ( ChunkUtil::getSize( chunk ) == 0 )
+			continue;
+
 		ioEvent.flush( chunk );
 		this->eventQueue.insert( ioEvent );
-		count++;
-	}
-	UNLOCK( lock );
 
-	printf( "Flushing %lu chunks...\n", count );
-}
-
-void Server::metadata() {
-	std::unordered_map<Key, KeyMetadata>::iterator it;
-	std::unordered_map<Key, KeyMetadata> *keys;
-	LOCK_T *lock;
-	FILE *f;
-	char filename[ 64 ];
-
-	this->map.getKeysMap( keys, lock );
-
-	snprintf( filename, sizeof( filename ), "%s.meta", this->config.server.server.addr.name );
-	f = fopen( filename, "w+" );
-	if ( ! f ) {
-		__ERROR__( "Server", "metadata", "Cannot write to the file \"%s\".", filename );
+		numFlushed++;
+		if ( numFlushed == count )
+			break;
 	}
 
-	LOCK( lock );
-	for ( it = keys->begin(); it != keys->end(); it++ ) {
-		Key key = it->first;
-		KeyMetadata keyMetadata = it->second;
-
-		fprintf( f, "%.*s\t%u\t%u\t%u\n", key.size, key.data, keyMetadata.listId, keyMetadata.stripeId, keyMetadata.chunkId );
-	}
-	UNLOCK( lock );
-
-	fclose( f );
+	printf( "Flushing %u chunks...\n", numFlushed );
 }
 
 void Server::memory( FILE *f ) {
-	std::unordered_map<Metadata, Chunk *> *cache;
-	std::unordered_map<Metadata, Chunk *>::iterator it;
-	LOCK_T *lock;
 	uint32_t numDataChunks = 0, numParityChunks = 0, numKeyValues = 0;
 	uint64_t occupied = 0, allocated = 0, bytesParity = 0;
+	Chunk *chunk;
 
-	this->map.getCacheMap( cache, lock );
+	uint32_t total, numFlushed = 0;
+	std::atomic<unsigned int> count;
+	char *startAddress;
 
-	LOCK( lock );
-	for ( it = cache->begin(); it != cache->end(); it++ ) {
-		Chunk *chunk = it->second;
+	this->chunkPool.exportVars( &total, &count, &startAddress );
+
+	for ( unsigned int i = 0; i < total; i++ ) {
+		chunk = ( Chunk * )( startAddress + i * ( CHUNK_IDENTIFIER_SIZE + ChunkUtil::chunkSize ) );
+
+		if ( ChunkUtil::getSize( chunk ) == 0 )
+			continue;
+
 		if ( ChunkUtil::isParity( chunk ) ) {
 			numParityChunks++;
 			bytesParity += ChunkUtil::chunkSize;
@@ -436,8 +419,11 @@ void Server::memory( FILE *f ) {
 			occupied += ChunkUtil::getSize( chunk );
 			allocated += ChunkUtil::chunkSize;
 		}
+
+		numFlushed++;
+		if ( numFlushed == count )
+			break;
 	}
-	UNLOCK( lock );
 
 	int width = 25;
 	fprintf(
@@ -598,9 +584,6 @@ void Server::interactive() {
 		} else if ( strcmp( command, "id" ) == 0 ) {
 			valid = true;
 			this->printInstanceId();
-		} else if ( strcmp( command, "dump" ) == 0 ) {
-			valid = true;
-			this->dump();
 		} else if ( strcmp( command, "lookup" ) == 0 ) {
 			valid = true;
 			this->lookup();
@@ -623,9 +606,6 @@ void Server::interactive() {
 		} else if ( strcmp( command, "delay" ) == 0 ) {
 			valid = true;
 			this->setDelay();
-		} else if ( strcmp( command, "metadata" ) == 0 ) {
-			valid = true;
-			this->metadata();
 		} else if ( strcmp( command, "pending" ) == 0 ) {
 			valid = true;
 			this->printPending();
@@ -953,10 +933,6 @@ void Server::printChunk() {
 	}
 }
 
-void Server::dump() {
-	this->map.dump();
-}
-
 void Server::printInstanceId( FILE *f ) {
 	fprintf( f, "Instance ID = %u\n", Server::instanceId );
 }
@@ -972,13 +948,11 @@ void Server::help() {
 		"- lookup: Search for the metadata of an input key\n"
 		"- seal: Seal all chunks in the chunk buffer\n"
 		"- flush: Flush all dirty chunks to disk\n"
-		"- metadata: Write metadata to disk\n"
 		"- delay: Add constant delay to each client response\n"
 		"- sync: Synchronize with coordinator\n"
 		"- chunk: Print the debug message for a chunk\n"
 		"- pending: Print all pending requests\n"
 		"- remapping: Show remapping info\n"
-		"- dump: Dump all key-value pairs\n"
 		"- memory: Print memory usage\n"
 		"- backup : Show the backup stats\n"
 		"- time: Show elapsed time\n"

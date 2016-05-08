@@ -20,16 +20,12 @@ private:
 	 * Store the mapping between keys and chunks
 	 * Key |-> (list ID, stripe ID, chunk ID, offset, length, isPartyRemapped)
 	 */
-	std::unordered_map<Key, KeyMetadata> keys;
-	CuckooHash _keys;
+	CuckooHash keys;
 	LOCK_T keysLock;
 	/**
 	 * Store the cached chunks
 	 * (list ID, stripe ID, chunk ID) |-> Chunk *
 	 */
-	std::unordered_map<Metadata, Chunk *> cache;
-	LOCK_T cacheLock;
-
 	CuckooHash chunks;
 	LOCK_T chunksLock;
 
@@ -80,29 +76,13 @@ public:
 		Key *keyPtr = 0,
 		bool needsLock = true, bool needsUnlock = true
 	);
-	bool findValueByKey(
-		char *keyStr, uint8_t keySize,
-		KeyValue *keyValuePtr = 0,
-		Key *keyPtr = 0
-	);
-	/*
-	bool findValueByKey(
-		char *keyStr, uint8_t keySize,
-		KeyValue *keyValuePtr,
-		Key *keyPtr,
-		KeyMetadata *keyMetadataPtr,
-		Metadata *metadataPtr,
-		Chunk **chunkPtr,
-		bool needsLock = true, bool needsUnlock = true
-	);
-	*/
 	bool deleteKey(
 		Key key, uint8_t opcode, uint32_t &timestamp,
 		KeyMetadata &keyMetadata,
 		bool needsLock, bool needsUnlock,
 		bool needsUpdateOpMetadata = true
 	);
-	void getKeysMap( std::unordered_map<Key, KeyMetadata> *&keys, LOCK_T *&lock );
+	void getKeysMap( CuckooHash **keys, LOCK_T **lock );
 
 	// Chunk hash table
 	void setChunk(
@@ -117,7 +97,7 @@ public:
 	);
 	bool seal( uint32_t listId, uint32_t stripeId, uint32_t chunkId );
 	uint32_t nextStripeID( uint32_t listId, uint32_t from = 0 );
-	void getCacheMap( std::unordered_map<Metadata, Chunk *> *&cache, LOCK_T *&lock );
+	void getChunksMap( CuckooHash **chunks, LOCK_T **lock );
 
 	// Operator & metadata
 	bool insertOpMetadata(
@@ -144,9 +124,6 @@ public:
 	);
 	bool findForwardedKey( uint8_t keySize, char *keyStr, Metadata &dstMetadata );
 	bool eraseForwardedKey( uint8_t keySize, char *keyStr );
-
-	// Debug
-	void dump( FILE *f = stdout );
 };
 
 #endif

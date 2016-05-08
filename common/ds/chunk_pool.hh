@@ -31,6 +31,8 @@ public:
 	bool isInChunkPool( Chunk *chunk );
 
 	void print( FILE *f = stdout );
+
+	void exportVars( uint32_t *total, std::atomic<unsigned int> *count, char **startAddress );
 };
 
 class TempChunkPool {
