@@ -110,7 +110,8 @@ void ClientStateTransitHandler::setState( char* msg , int len ) {
 	struct sockaddr_in server;
 	int ofs = 1;
 	uint32_t recordSize = this->serverStateRecordSize;
-	std::vector<struct sockaddr_in> updatedServers;
+	std::vector< std::pair<ServerSocket*, RemapState> > updatedServers;
+	char buf[ INET_ADDRSTRLEN ];
 
 	Client *client = Client::getInstance();
 	LOCK_T &lock = client->sockets.servers.lock;
@@ -122,7 +123,6 @@ void ClientStateTransitHandler::setState( char* msg , int len ) {
 		signal = ( RemapState ) msg[ ofs + 6 ];
 		ofs += recordSize;
 
-		char buf[ INET_ADDRSTRLEN ];
 		inet_ntop( AF_INET, &server.sin_addr.s_addr, buf, INET_ADDRSTRLEN );
 		if ( this->serversState.count( server ) == 0 ) {
 			__ERROR__( "ClientStateTransitHandler", "setState" , "Server %s:%hu not found\n", buf, ntohs( server.sin_port ) );
@@ -145,10 +145,21 @@ void ClientStateTransitHandler::setState( char* msg , int len ) {
 			continue;
 		}
 
-		updatedServers.push_back( server );
+		std::pair<ServerSocket*, RemapState> record( target, signal );
+		updatedServers.push_back( record );
 
 		LOCK( &this->serversStateLock[ server ] );
+	}
+
+	for ( uint8_t i = 0; i < updatedServers.size() ; i++ ) {
+		ServerSocket *target = updatedServers[ i ].first;
+		server = target->getAddr();
+
+		inet_ntop( AF_INET, &server.sin_addr.s_addr, buf, INET_ADDRSTRLEN );
+
+		RemapState signal = updatedServers[ i ].second;
 		RemapState state = this->serversState[ server ];
+
 		switch ( signal ) {
 			case STATE_NORMAL:
 				__DEBUG__( BLUE, "ClientStateTransitHandler", "setState", "STATE_NORMAL %s:%hu", buf, ntohs( server.sin_port ) );
@@ -195,22 +206,15 @@ void ClientStateTransitHandler::setState( char* msg , int len ) {
 	}
 
 	for ( int i = updatedServers.size() - 1; i >= 0; i-- ) {
-		server = updatedServers[ i ];
+		server = updatedServers[ i ].first->getAddr();
 		UNLOCK( &this->serversStateLock[ server ] );
 	}
 
 	for ( int i = updatedServers.size() - 1; i >= 0; i-- ) {
-		ServerSocket *target = 0;
-		server = updatedServers[ i ];
+		ServerSocket *target = updatedServers[ i ].first;
+		server = target->getAddr();
 
-		LOCK( &lock );
-		for ( size_t i = 0, count = servers.size(); i < count; i++ ) {
-			if ( servers[ i ]->equal( server.sin_addr.s_addr, server.sin_port ) ) {
-				target = servers[ i ];
-				break;
-			}
-		}
-		UNLOCK( &lock );
+		inet_ntop( AF_INET, &server.sin_addr.s_addr, buf, INET_ADDRSTRLEN );
 
 		// actions/cleanup after state change
 		RemapState state = this->serversState[ server ];
@@ -229,6 +233,7 @@ void ClientStateTransitHandler::setState( char* msg , int len ) {
 				// start replaying the requests
 				ClientWorker::replayRequestPrepare( target );
 				ClientWorker::replayRequest( target );
+				__INFO__( BLUE, "ClientStateTransitHandler", "setState", "Replay all incomplete requests STATE_DEGRADED %s:%hu", buf, ntohs( server.sin_port ) );
 				break;
 			default:
 				break;

@@ -44,7 +44,17 @@ bool CoordinatorStateTransitWorker::transitToDegraded( StateTransitEvent event )
 
 	// broadcast to client: the transition is completed
 	csth->serversState[ event.server ] = STATE_DEGRADED; // Phase 2
-	if ( csth->broadcastState( event.server ) < 0 ) {
+
+	// wait for others to complete the transition
+	if ( csth->removeFailedServer( event.server ) > 0 ) {
+		UNLOCK( &csth->serversStateLock[ event.server ] );
+		return true;
+	}
+
+	std::vector<struct sockaddr_in> updatedServers;
+	csth->eraseUpdatedServers( &updatedServers );
+
+	if ( csth->broadcastState( updatedServers ) < 0 ) {
 		__ERROR__( "CoordinatorStateTransitWorker", "transitToDegraded",
 			"Failed to broadcast state changes on server %s:%u!",
 			buf, ntohs( event.server.sin_port )
@@ -90,7 +100,17 @@ bool CoordinatorStateTransitWorker::transitToNormal( StateTransitEvent event ) {
 
 	// ask client to use normal SET workflow
 	csth->serversState[ event.server ] = STATE_NORMAL;
-	if ( csth->broadcastState( event.server ) < 0 ) {
+
+	// wait for others to complete the transition
+	if ( csth->removeFailedServer( event.server ) > 0 ) {
+		UNLOCK( &csth->serversStateLock[ event.server ] );
+		return true;
+	}
+
+	std::vector<struct sockaddr_in> updatedServers;
+	csth->eraseUpdatedServers( &updatedServers );
+
+	if ( csth->broadcastState( updatedServers ) < 0 ) {
 		__ERROR__( "CoordinatorStateTransitWorker", "transitToNormal",
 			"Failed to broadcast state changes on server %s:%u!",
 			buf, ntohs( event.server.sin_port )
