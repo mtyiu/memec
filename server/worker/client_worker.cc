@@ -333,8 +333,9 @@ bool ServerWorker::handleSetRequest( ClientEvent event, char *buf, size_t size, 
 	}
 	__DEBUG__(
 		BLUE, "ServerWorker", "handleSetRequest",
-		"[SET] Key: %.*s (key size = %u); Value: (value size = %u)",
-		( int ) header.keySize, header.key, header.keySize, header.valueSize
+		"[SET] Key: %.*s (key size = %u); Value: (value size = %u); Split offset = %u",
+		( int ) header.keySize, header.key, header.keySize, header.valueSize,
+		header.splitOffset
 	);
 	return this->handleSetRequest( event, header, needResSet );
 }
@@ -342,18 +343,30 @@ bool ServerWorker::handleSetRequest( ClientEvent event, char *buf, size_t size, 
 bool ServerWorker::handleSetRequest( ClientEvent event, struct KeyValueHeader &header, bool needResSet ) {
 	bool isSealed;
 	Metadata sealed;
-	uint32_t timestamp, listId, stripeId, chunkId;
+	uint32_t timestamp, listId, stripeId, chunkId, splitIndex;
 	ServerPeerSocket *dataServerSocket;
 	bool exist = false;
 
 	listId = ServerWorker::stripeList->get( header.key, header.keySize, &dataServerSocket, 0, &chunkId );
+
+	splitIndex = LargeObjectUtil::getSplitIndex( header.keySize, header.valueSize, header.splitOffset );
+	if ( splitIndex ) {
+		chunkId = ( chunkId + splitIndex ) % ServerWorker::dataChunkCount;
+		dataServerSocket = ServerWorker::stripeList->get( listId, chunkId );
+	}
+	__INFO__(
+		BLUE, "ServerWorker", "handleSetRequest",
+		"[SET] Key: %.*s (key size = %u); Value: (value size = %u); Split offset = %u (index: %u)",
+		( int ) header.keySize, header.key, header.keySize, header.valueSize,
+		header.splitOffset, splitIndex
+	);
 
 	if (
 		( map->findObject( header.key, header.keySize ) ) ||
 		( ServerWorker::chunkBuffer->at( listId )->findValueByKey( header.key, header.keySize, 0, 0, false ) )
 	) {
 		exist = true;
-		// printf( "The key already exists: %.*s\n", header.keySize, header.key );
+		fprintf( stderr, "The key already exists: %.*s\n", header.keySize, header.key );
 	} else {
 		if ( ServerWorker::disableSeal ) {
 			ServerWorker::chunkBuffer->at( listId )->set(

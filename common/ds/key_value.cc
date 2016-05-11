@@ -2,6 +2,8 @@
 #include <cstring>
 #include "key_value.hh"
 
+uint32_t LargeObjectUtil::chunkSize;
+
 Key KeyValue::key() {
 	Key key;
 	key.set( ( uint8_t ) this->data[ 0 ], this->data + KEY_VALUE_METADATA_SIZE, 0 );
@@ -126,4 +128,58 @@ void KeyValue::print( FILE *f ) {
 		f, "Key: %.*s; Value: %.*s\n",
 		keySize, key, valueSize, value
 	);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void LargeObjectUtil::init( uint32_t chunkSize ) {
+	LargeObjectUtil::chunkSize = chunkSize;
+}
+
+bool LargeObjectUtil::isLarge( uint8_t keySize, uint32_t valueSize, uint32_t *numOfSplitPtr, uint32_t *splitSizePtr ) {
+	uint32_t totalSize = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
+	uint32_t numOfSplit, splitSize;
+
+	if ( numOfSplitPtr ) *numOfSplitPtr = 1;
+	if ( splitSizePtr ) *splitSizePtr = valueSize;
+
+	if ( LargeObjectUtil::chunkSize < totalSize ) {
+		splitSize = LargeObjectUtil::chunkSize - KEY_VALUE_METADATA_SIZE - keySize;
+		numOfSplit = valueSize / splitSize;
+		if ( valueSize % splitSize ) numOfSplit++;
+
+		if ( numOfSplitPtr ) *numOfSplitPtr = numOfSplit;
+		if ( splitSizePtr ) *splitSizePtr = splitSize;
+
+		return true;
+	} else {
+		// No need to split
+		return false;
+	}
+}
+
+uint32_t LargeObjectUtil::getValueOffsetAtSplit( uint8_t keySize, uint32_t valueSize, uint32_t index ) {
+	uint32_t totalSize = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
+	uint32_t splitSize;
+
+	if ( LargeObjectUtil::chunkSize < totalSize ) {
+		splitSize = LargeObjectUtil::chunkSize - KEY_VALUE_METADATA_SIZE - keySize;
+		return ( index * splitSize );
+	} else {
+		// No need to split
+		return 0;
+	}
+}
+
+uint32_t LargeObjectUtil::getSplitIndex( uint8_t keySize, uint32_t valueSize, uint32_t offset ) {
+	uint32_t totalSize = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
+	uint32_t splitSize;
+
+	if ( LargeObjectUtil::chunkSize < totalSize ) {
+		splitSize = LargeObjectUtil::chunkSize - KEY_VALUE_METADATA_SIZE - keySize;
+		return ( offset / splitSize );
+	} else {
+		// No need to split
+		return 0;
+	}
 }

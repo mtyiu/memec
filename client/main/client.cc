@@ -218,6 +218,7 @@ bool Client::init( char *path, OptionList &globalOptions, OptionList &clientOpti
 		this->config.global.stripeLists.count,
 		this->sockets.servers.values
 	);
+	LargeObjectUtil::init( this->config.global.size.chunk );
 	/* Workers, ID generator, packet pool and event queues */
 	this->idGenerator.init( this->config.global.workers.count );
 	this->packetPool.init(

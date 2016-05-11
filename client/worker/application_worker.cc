@@ -248,7 +248,7 @@ void ClientWorker::dispatch( ApplicationEvent event ) {
 
 bool ClientWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t size ) {
 	struct KeyValueHeader header;
-	if ( ! this->protocol.parseKeyValueHeader( header, buf, size ) ) {
+	if ( ! this->protocol.parseKeyValueHeader( header, buf, size, 0, false ) ) {
 		__ERROR__( "ClientWorker", "handleSetRequest", "Invalid SET request." );
 		return false;
 	}
@@ -259,8 +259,6 @@ bool ClientWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 	);
 
 	uint32_t listId, chunkId;
-	bool connected;
-	ssize_t sentBytes;
 	ServerSocket *socket;
 
 	socket = this->getServers(
@@ -288,6 +286,17 @@ bool ClientWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		}
 	}
 
+	// Check whether the object size exceesd the chunk size
+	uint32_t numOfSplit, splitSize, splitOffset = 0;
+	bool isLarge = LargeObjectUtil::isLarge(
+		header.keySize, header.valueSize,
+		&numOfSplit, &splitSize
+	);
+	if ( isLarge ) {
+		// Value size exceeds the chunk size
+		__ERROR__( "ClientWorker", "handleSetRequest", "Value size (%u) exceeds the chunk size. Number of split = %u; split size = %u.", header.valueSize, numOfSplit, splitSize );
+	}
+
 	struct {
 		size_t size;
 		char *data;
@@ -297,87 +306,78 @@ bool ClientWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 	uint16_t instanceId = Client::instanceId;
 	uint32_t requestId = ClientWorker::idGenerator->nextVal( this->workerId );
 
-#ifdef CLIENT_WORKER_SEND_REPLICAS_PARALLEL
-	Packet *packet = 0;
-	if ( ClientWorker::parityChunkCount ) {
-		packet = ClientWorker::packetPool->malloc();
-		packet->setReferenceCount( 1 + ClientWorker::parityChunkCount );
-		buffer.data = packet->data;
-		this->protocol.reqSet( buffer.size, instanceId, requestId, header.key, header.keySize, header.value, header.valueSize, buffer.data );
-		packet->size = buffer.size;
-	} else {
-		buffer.data = this->protocol.reqSet( buffer.size, instanceId, requestId, header.key, header.keySize, header.value, header.valueSize );
-	}
-#else
-	buffer.data = this->protocol.reqSet( buffer.size, instanceId, requestId, header.key, header.keySize, header.value, header.valueSize );
-#endif
-
 	keyValue.dup( header.key, header.keySize, header.value, header.valueSize );
 	key = keyValue.key();
 
+	// Insert into application pending set
 	if ( ! ClientWorker::pending->insertKeyValue( PT_APPLICATION_SET, event.instanceId, event.requestId, ( void * ) event.socket, keyValue, true, true, Client::getInstance()->timestamp.nextVal() ) ) {
 		__ERROR__( "ClientWorker", "handleSetRequest", "Cannot insert into application SET pending map." );
 	}
 
-	// key.dup( header.keySize, header.key );
+	// Insert into server pending set
+	for ( uint32_t splitIndex = 0; splitIndex < numOfSplit; splitIndex++ ) {
+		socket = this->dataServerSockets[ ( chunkId + splitIndex ) % ClientWorker::dataChunkCount ];
 
-	for ( uint32_t i = 0; i < ClientWorker::parityChunkCount + 1; i++ ) {
-		if ( ! ClientWorker::pending->insertKey(
-			PT_SERVER_SET, Client::instanceId, event.instanceId, requestId, event.requestId,
-			( void * )( i == 0 ? socket : this->parityServerSockets[ i - 1 ] ),
-			key
-		) ) {
-			__ERROR__( "ClientWorker", "handleSetRequest", "Cannot insert into server SET pending map." );
+		for ( uint32_t i = 0; i < ClientWorker::parityChunkCount + 1; i++ ) {
+			if ( ! ClientWorker::pending->insertKey(
+				PT_SERVER_SET, Client::instanceId, event.instanceId, requestId, event.requestId,
+				( void * )( i == 0 ? socket : this->parityServerSockets[ i - 1 ] ),
+				key
+			) ) {
+				__ERROR__( "ClientWorker", "handleSetRequest", "Cannot insert into server SET pending map." );
+			}
 		}
 	}
 
-	// Send SET requests
-	if ( ClientWorker::parityChunkCount ) {
-		for ( uint32_t i = 0; i < ClientWorker::parityChunkCount; i++ ) {
+	for ( uint32_t splitIndex = 0; splitIndex < numOfSplit; splitIndex++ ) {
+		splitOffset = LargeObjectUtil::getValueOffsetAtSplit( header.keySize, header.valueSize, splitIndex );
+
+		// Split the value
+		Packet *packet = ClientWorker::packetPool->malloc();
+		packet->setReferenceCount( 1 + ClientWorker::parityChunkCount );
+		buffer.data = packet->data;
+		this->protocol.reqSet(
+			buffer.size, instanceId, requestId,
+			header.key, header.keySize,
+			header.value, header.valueSize,
+			splitOffset, splitSize,
+			buffer.data
+		);
+		packet->size = buffer.size;
+
+		fprintf(
+			stderr, "#%u: Offset at %u --> data server #%u; request size: %lu.\n",
+			splitIndex, splitOffset,
+			( chunkId + splitIndex ) % ClientWorker::dataChunkCount,
+			buffer.size
+		);
+
+		// Choose data server
+		socket = this->dataServerSockets[ ( chunkId + splitIndex ) % ClientWorker::dataChunkCount ];
+
+		// Send SET requests
+		for ( uint32_t i = 0; i < ClientWorker::parityChunkCount + 1; i++ ) {
 			if ( ClientWorker::updateInterval ) {
 				// Mark the time when request is sent
 				ClientWorker::pending->recordRequestStartTime(
-					PT_SERVER_SET, Client::instanceId, event.instanceId, requestId, event.requestId,
-					( void * ) this->parityServerSockets[ i ],
-					this->parityServerSockets[ i ]->getAddr()
+					PT_SERVER_SET,
+					Client::instanceId, event.instanceId,
+					requestId, event.requestId,
+					i < ClientWorker::parityChunkCount ? this->parityServerSockets[ i ] : socket,
+					i < ClientWorker::parityChunkCount ? this->parityServerSockets[ i ]->getAddr() : socket->getAddr()
 				);
 			}
 
-#ifdef CLIENT_WORKER_SEND_REPLICAS_PARALLEL
 			ServerEvent serverEvent;
-			serverEvent.send( this->parityServerSockets[ i ], packet );
+			serverEvent.send(
+				i < ClientWorker::parityChunkCount ? this->parityServerSockets[ i ] : socket,
+				packet
+			);
+#ifdef CLIENT_WORKER_SEND_REPLICAS_PARALLEL
 			ClientWorker::eventQueue->prioritizedInsert( serverEvent );
-		}
-
-		if ( ClientWorker::updateInterval )
-			ClientWorker::pending->recordRequestStartTime( PT_SERVER_SET, Client::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, socket->getAddr() );
-		ServerEvent serverEvent;
-		serverEvent.send( socket, packet );
-		this->dispatch( serverEvent );
 #else
-			sentBytes = this->parityServerSockets[ i ]->send( buffer.data, buffer.size, connected );
-			if ( sentBytes != ( ssize_t ) buffer.size ) {
-				__ERROR__( "ClientWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
-			}
-		}
-
-		if ( ClientWorker::updateInterval )
-			ClientWorker::pending->recordRequestStartTime( PT_SERVER_SET, Client::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, socket->getAddr() );
-		sentBytes = socket->send( buffer.data, buffer.size, connected );
-		if ( sentBytes != ( ssize_t ) buffer.size ) {
-			__ERROR__( "ClientWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
-
-			return false;
-		}
+			this->dispatch( serverEvent );
 #endif
-	} else {
-		if ( ClientWorker::updateInterval )
-			ClientWorker::pending->recordRequestStartTime( PT_SERVER_SET, Client::instanceId, event.instanceId, requestId, event.requestId, ( void * ) socket, socket->getAddr() );
-		sentBytes = socket->send( buffer.data, buffer.size, connected );
-		if ( sentBytes != ( ssize_t ) buffer.size ) {
-			__ERROR__( "ClientWorker", "handleSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
-
-			return false;
 		}
 	}
 

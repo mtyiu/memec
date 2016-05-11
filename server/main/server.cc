@@ -129,6 +129,7 @@ bool Server::init( char *path, OptionList &globalOptions, OptionList &serverOpti
 		this->config.global.size.chunk, // chunkSize
 		this->config.server.pool.chunks // capacity
 	);
+	LargeObjectUtil::init( this->config.global.size.chunk );
 	/* Chunk buffer */
 	ChunkBuffer::init();
 	this->chunkBuffer.reserve( this->config.global.stripeLists.count );

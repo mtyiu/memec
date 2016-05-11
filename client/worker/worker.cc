@@ -483,7 +483,8 @@ bool ClientWorker::init( GlobalConfig &config, uint32_t workerId ) {
 	this->protocol.init(
 		Protocol::getSuggestedBufferSize(
 			config.size.key,
-			config.size.chunk
+			config.size.chunk,
+			true
 		)
 	);
 	this->original = new uint32_t[ ( ClientWorker::dataChunkCount + ClientWorker::parityChunkCount ) * 2 ];

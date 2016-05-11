@@ -41,6 +41,7 @@ void ApplicationWorker::dispatch( ClientEvent event ) {
 			break;
 		case CLIENT_EVENT_TYPE_SET_REQUEST:
 			// Read contents from file
+			fprintf( stderr, "%u\n", this->buffer.valueSize );
 			ret = ::read( event.message.set.fd, this->buffer.value, this->buffer.valueSize );
 			::close( event.message.set.fd );
 			if ( ret == -1 ) {
@@ -435,14 +436,10 @@ bool ApplicationWorker::init() {
 }
 
 bool ApplicationWorker::init( ApplicationConfig &config, uint32_t workerId ) {
-	this->buffer.value = new char[ config.size.chunk ];
-	this->buffer.valueSize = config.size.chunk;
-	this->protocol.init(
-		Protocol::getSuggestedBufferSize(
-			config.size.key,
-			config.size.chunk
-		)
-	);
+	uint32_t bufferSize = Protocol::getSuggestedBufferSize( config.size.key, config.size.chunk, true );
+	this->buffer.value = new char[ bufferSize ];
+	this->buffer.valueSize = bufferSize;
+	this->protocol.init( bufferSize );
 	this->workerId = workerId;
 	return true;
 }

@@ -36,4 +36,15 @@ public:
 	void print( FILE *f = stdout );
 };
 
+class LargeObjectUtil {
+private:
+	static uint32_t chunkSize;
+
+public:
+	static void init( uint32_t chunkSize );
+	static bool isLarge( uint8_t keySize, uint32_t valueSize, uint32_t *numOfSplitPtr = 0, uint32_t *splitSizePtr = 0 );
+	static uint32_t getValueOffsetAtSplit( uint8_t keySize, uint32_t valueSize, uint32_t index );
+	static uint32_t getSplitIndex( uint8_t keySize, uint32_t valueSize, uint32_t offset );
+};
+
 #endif

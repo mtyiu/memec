@@ -36,6 +36,7 @@ public:
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		char *key, uint8_t keySize,
 		char *value, uint32_t valueSize,
+		uint32_t splitOffset, uint32_t splitSize,
 		char *buf = 0
 	);
 	char *reqGet(

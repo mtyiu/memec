@@ -239,9 +239,11 @@ struct ChunkKeyValueUpdateHeader {
 };
 
 #define PROTO_KEY_VALUE_SIZE 4
+#define PROTO_SPLIT_OFFSET_SIZE 3
 struct KeyValueHeader {
 	uint8_t keySize;
 	uint32_t valueSize; // 3 bytes
+    uint32_t splitOffset; // 3 bytes (only exists if total object size > chunkSize )
 	char *key;
 	char *value;
 };
@@ -687,12 +689,15 @@ protected:
 	size_t generateKeyValueHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint8_t keySize, char *key, uint32_t valueSize, char *value, char *sendBuf = 0,
-		uint32_t timestamp = 0
+		uint32_t timestamp = 0,
+        uint32_t splitOffset = 0, uint32_t splitSize = 0
 	);
 	bool parseKeyValueHeader(
 		size_t offset, uint8_t &keySize, char *&key,
 		uint32_t &valueSize, char *&value,
-		char *buf, size_t size
+        uint32_t &splitOffset,
+		char *buf, size_t size,
+        bool enableSplit
 	);
 
 	size_t generateKeyValueUpdateHeader(
@@ -1087,7 +1092,7 @@ public:
 	bool init( size_t size = 0 );
 	void free();
 	bool parseHeader( struct ProtocolHeader &header, char *buf = 0, size_t size = 0 );
-	static size_t getSuggestedBufferSize( uint32_t keySize, uint32_t chunkSize );
+	static size_t getSuggestedBufferSize( uint32_t keySize, uint32_t chunkSize, bool supportLargeObject = false );
 
 	//////////////
 	// Register //
@@ -1162,7 +1167,8 @@ public:
 	);
 	bool parseKeyValueHeader(
 		struct KeyValueHeader &header,
-		char *buf = 0, size_t size = 0, size_t offset = 0
+		char *buf = 0, size_t size = 0, size_t offset = 0,
+        bool enableSplit = true
 	);
 	bool parseKeyValueUpdateHeader(
 		struct KeyValueUpdateHeader &header, bool withValueUpdate,
