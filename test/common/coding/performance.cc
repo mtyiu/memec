@@ -153,11 +153,16 @@ int main( int argc, char **argv ) {
 	ChunkUtil::copy( chunks[ failed[ 0 ] ], 0, readbuf, CHUNK_SIZE );
 	bitmap.unset ( failed[ 0 ] , 0 );
 
+	uint32_t round;
 	st = start_timer();
-	for ( uint32_t round = 0 ; round < ROUNDS ; round ++ ) {
-		handle->decode ( chunks, &bitmap );
+	for ( round = 0 ; round < ROUNDS ; round ++ ) {
+		if ( handle->decode ( chunks, &bitmap ) == false )
+			break;
 	}
-	report( get_elapsed_time( st ) );
+	if ( round == ROUNDS )
+		report( get_elapsed_time( st ) );
+	else
+		printf( ">> !! failed to decode\n" );
 
 	// double failure
 	if ( scheme != CS_RAID5 ) {
@@ -169,10 +174,14 @@ int main( int argc, char **argv ) {
 		ChunkUtil::copy( chunks[ failed[ 1 ] ], 0, readbuf + CHUNK_SIZE, CHUNK_SIZE );
 
 		st = start_timer();
-		for ( uint32_t round = 0 ; round < ROUNDS ; round ++ ) {
-			handle->decode ( chunks, &bitmap );
+		for ( round = 0 ; round < ROUNDS ; round ++ ) {
+			if ( handle->decode ( chunks, &bitmap ) == false )
+				break;
 		}
-		report( get_elapsed_time( st ) );
+		if ( round == ROUNDS )
+			report( get_elapsed_time( st ) );
+		else
+			printf( ">> !! failed to decode\n" );
 	}
 
 	// triple failure
@@ -186,11 +195,13 @@ int main( int argc, char **argv ) {
 		bitmap.unset ( failed[ 2 ], 0 );
 		ChunkUtil::copy( chunks[ failed[ 2 ] ], 0, readbuf + CHUNK_SIZE * 2, CHUNK_SIZE );
 		st = start_timer();
-		for ( uint32_t round = 0 ; round < ROUNDS ; round ++ ) {
+		for ( round = 0 ; round < ROUNDS ; round ++ ) {
 			handle->decode ( chunks, &bitmap );
 		}
-		report( get_elapsed_time( st ) );
-
+		if ( round == ROUNDS )
+			report( get_elapsed_time( st ) );
+		else
+			printf( ">> !! failed to decode\n" );
 	}
 
 	// clean up

@@ -2,6 +2,7 @@
 #define __COMMON_CODING_CAUCHYCODING_HH__
 
 #include "coding.hh"
+#define CRS_N_MAX	(32)
 
 class CauchyCoding : public Coding {
 private:
@@ -26,9 +27,14 @@ private:
 	uint32_t _w;
 	uint32_t _chunkSize;
 
+#ifdef USE_ISAL
+	unsigned char _gftbl[ CRS_N_MAX * CRS_N_MAX * 32 ];
+	unsigned char _encodeMatrix[ CRS_N_MAX * CRS_N_MAX ];
+#else
 	int *_jmatrix;
 	int *_jbitmatrix;
 	int **_jschedule;
+#endif
 
 public:
 	CauchyCoding( uint32_t k = 0, uint32_t m = 0, uint32_t chunkSize = 0 );

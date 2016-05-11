@@ -3,79 +3,96 @@
 #include "rscoding.hh"
 #include "../ds/chunk_pool.hh"
 
+#ifndef USE_ISAL
 extern "C" {
 #include "../../lib/jerasure/include/galois.h"
 #include "../../lib/jerasure/include/reed_sol.h"
 #include "../../lib/jerasure/include/jerasure.h"
 }
+typedef char dataType;
+#else
+#include "../../lib/isa-l-2.14.0/include/erasure_code.h"
+typedef unsigned char dataType;
+#endif
 
 #define RS_W_LIMIT (32)
 
 RSCoding::RSCoding( uint32_t k, uint32_t m, uint32_t chunkSize ) {
-	this->_jmatrix = 0;
-
-	// force init on gfp_array for w = { 8, 16, 32 }
-	galois_single_divide( 10, 2, 8 );
-	galois_single_divide( 10, 2, 16 );
-	galois_single_divide( 10, 2, 32 );
 
 	this->_k = k;
 	this->_m = m;
 	this->_chunkSize = chunkSize;
+
+	if ( k + m > RS_N_MAX ) {
+		fprintf( stderr, "Only support N up to %u for RS coding.\n", RS_N_MAX );
+		exit( -1 );
+	}
+
+#ifndef USE_ISAL
 	this->_w = getW();
+	// force init on gfp_array for w = { 8, 16, 32 }
+	galois_single_divide( 10, 2 , 8 );
+	galois_single_divide( 10, 2 , 16 );
+	galois_single_divide( 10, 2 , 32 );
+
+#endif
 
 	// preallocate the matrix and schedule used by jerasure
 	generateCodeMatrix();
 }
 
 RSCoding::~RSCoding() {
+#ifndef USE_ISAL
 	free( this->_jmatrix );
+#endif
 }
 
 void RSCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t index, uint32_t startOff, uint32_t endOff ) {
 	uint32_t k = this->_k;
 	uint32_t m = this->_m;
-	uint32_t w = this->_w;
 	uint32_t chunkSize = this->_chunkSize;
+
+#ifndef USE_ISAL
+	uint32_t w = this->_w;
 
 	if ( this->_jmatrix == NULL )
 		generateCodeMatrix();
 
 	int* matrix = this->_jmatrix;
-	char** data = new char* [ k ];
-	char** code = new char* [ m ];
+#endif
+
+	dataType *data[ RS_N_MAX ], *code[ RS_N_MAX ];
 
 	// use local buffer for encoding correctness
-	char* chunk = new char [ m * chunkSize ];
+	dataType *chunk = new dataType[ m * chunkSize ];
 
 	for ( uint32_t idx = 0 ; idx < k + m ; idx ++ ) {
 		if ( idx < k ) {
-			data[ idx ] = ChunkUtil::getData( dataChunks[ idx ] );
+			data[ idx ] = ( dataType * ) ChunkUtil::getData( dataChunks[ idx ] );
 		} else if ( idx - k == index - 1 ) {
-			code[ idx - k ] = ChunkUtil::getData( parityChunk );
+			code[ idx - k ] = ( dataType * ) ChunkUtil::getData( parityChunk );
 		} else {
 			code[ idx - k ] = chunk + ( idx - k ) * chunkSize;
 		}
 	}
 
 	// encode
+#ifdef USE_ISAL
+	ec_encode_data( chunkSize, k, m, this->_gftbl, data, code );
+#else
 	jerasure_matrix_encode( k, m, w, matrix, data, code, chunkSize );
+#endif
 
-	delete[] data;
-	delete[] code;
-	delete[] chunk;
+	delete chunk;
 }
 
 bool RSCoding::decode( Chunk **chunks, BitmaskArray * chunkStatus ) {
 	uint32_t k = this->_k;
 	uint32_t m = this->_m;
+#ifndef USE_ISAL
 	uint32_t w = this->_w;
+#endif
 	uint32_t chunkSize = this->_chunkSize;
-
-	if ( this->_jmatrix == NULL )
-		generateCodeMatrix();
-
-	int* matrix = this->_jmatrix;
 
 	uint32_t failed = 0;
 	for ( uint32_t idx = 0 ; idx < k + m ; idx ++ ) {
@@ -94,35 +111,71 @@ bool RSCoding::decode( Chunk **chunks, BitmaskArray * chunkStatus ) {
 		return true;
 	}
 
-	int *erasures = new int[ failed + 1 ];
+	int erasures[ RS_N_MAX ];
 	int pos = 0;
-
-	char** data = new char* [ k ];
-	char** code = new char* [ m ];
+	dataType *data[ RS_N_MAX ], *code[ RS_N_MAX ]; 
+#ifdef USE_ISAL
+	int rpos = 0;
+	dataType *alive[ RS_N_MAX ], *missing[ RS_N_MAX ];
+#endif
 
 	for ( uint32_t idx = 0 ; idx < k + m ; idx ++ ) {
 		if ( idx < k )
-			data[ idx ] = ChunkUtil::getData( chunks[ idx ] );
+			data[ idx ] = ( dataType * ) ChunkUtil::getData( chunks[ idx ] );
 		else
-			code[ idx - k ] = ChunkUtil::getData( chunks[ idx ] );
+			code[ idx - k ] = ( dataType * ) ChunkUtil::getData( chunks[ idx ] );
 
+#ifdef USE_ISAL
+		if ( chunkStatus->check( idx ) == 0 ) {
+			erasures[ pos ] = idx;
+			missing[ pos++ ] = ( idx < k )? data[ idx ] : code[ idx - k ];
+		} else {
+			alive[ rpos++ ] = ( idx < k )? data[ idx ] : code[ idx - k ];
+		}
+#else
 		if ( chunkStatus->check( idx ) == 0 ) {
 			erasures[ pos++ ] = idx;
 		}
+#endif
+		
 	}
 
 	// required for jerasure
 	erasures[ failed ] = -1;
 
 	// decode
-	jerasure_matrix_decode( k, m, w, matrix, 1, erasures, data, code,
+#ifdef USE_ISAL
+	dataType decodeMatrix[ RS_N_MAX * RS_N_MAX ];
+	dataType invertedMatrix[ RS_N_MAX * RS_N_MAX ];
+	dataType gftbl[ RS_N_MAX * RS_N_MAX * 32 ];
+	// get the row where data is alive
+	for ( uint32_t i = 0, pos = 0, oi = 0; i < k+m; i++ ) {
+		if ( ( int ) i != erasures[ pos ] ) {
+			memcpy( decodeMatrix + k * oi++, this->_encodeMatrix + k * i, k );
+		} else {
+			pos++;
+		}
+	}
+	// get the inverse of the matrix of alive data
+	if ( gf_invert_matrix( decodeMatrix, invertedMatrix, k ) < 0 ) {
+		fprintf( stderr, "Cannot find the inverse for decoding ...\n" );
+		return false;
+	}
+	memset( decodeMatrix, 0, RS_N_MAX * RS_N_MAX );
+	for ( uint32_t i = 0; i < failed; i++ ) {
+		memcpy( decodeMatrix + k * i, invertedMatrix + k * erasures[ i ], k );
+	}
+	ec_init_tables( k, failed, decodeMatrix, gftbl );
+	ec_encode_data( chunkSize, k, failed, gftbl, alive, missing );
+#else
+	if ( this->_jmatrix == NULL )
+		generateCodeMatrix();
+
+	jerasure_matrix_decode( k, m, w, this->_jmatrix, 1, erasures, data, code,
 			chunkSize);
+#endif
 
-	delete [] erasures;
-	delete [] data;
-	delete [] code;
-
-	return false;
+	return true;
 }
 
 uint32_t RSCoding::getW() {
@@ -161,6 +214,11 @@ uint32_t RSCoding::getW() {
 void RSCoding::generateCodeMatrix() {
 	uint32_t k = this->_k;
 	uint32_t m = this->_m;
+
+#ifdef USE_ISAL
+	gf_gen_rs_matrix( this->_encodeMatrix, m+k, k );
+	ec_init_tables( k, m, &this->_encodeMatrix[ k * k ], this->_gftbl );
+#else
 	uint32_t w = this->_w;
 
 	if ( this->_jmatrix != NULL )
@@ -172,5 +230,5 @@ void RSCoding::generateCodeMatrix() {
 				k, m, w );
 		exit( -1 );
 	}
-
+#endif
 }

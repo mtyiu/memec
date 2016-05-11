@@ -38,7 +38,7 @@ OBJS= \
 all: $(OBJS) coding
 
 coding:
-	$(MAKE) -C coding
+	$(MAKE) USE_ISAL=$(USE_ISAL) -C coding
 
 %.o: %.cc %.hh
 	$(CC) $(CFLAGS) $(INCLUDE) $(LIBS) -c -o $@ $< $(EXTERNAL_LIBS)
@@ -48,3 +48,4 @@ coding:
 
 clean:
 	rm -f $(OBJS)
+	make -C coding clean

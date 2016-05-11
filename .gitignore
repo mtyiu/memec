@@ -11,3 +11,4 @@ benchmark/huawei/bin/test
 benchmark/huawei/bin/window
 .remote-sync.json
 .sync-config.cson
+lib/isa-l-2.14.0/

@@ -24,21 +24,24 @@ void usage( char* argv ) {
 	fprintf( stderr, "Usage: %s [raid5|cauchy|rdp|rs|evenodd]\n", argv);
 }
 
-void printChunk( Chunk *chunk, uint32_t id = 0 ) {
-	char *prev = ChunkUtil::getData( chunk ), *data;
+void printChunk( char *chunk, uint32_t id = 0 ) {
+	char *prev = chunk;
 	int prevPos = 0;
 	if (id != 0) {
 		printf(" chunk %d:\n", id);
 	}
-	data = ChunkUtil::getData( chunk );
 	for (uint32_t i = 1; i < CHUNK_SIZE; i++) {
-		if ( data[i] != *prev ) {
+		if ( chunk[i] != *prev ) {
 			printf("[%x] from %d to %d\n", *prev, prevPos, i-1);
 			prevPos = i;
-			prev = &data[i];
+			prev = &chunk[i];
 		}
 	}
 	printf("[%x] from %d to %d\n", *prev, prevPos, CHUNK_SIZE - 1);
+}
+
+void printChunk( Chunk *chunk, uint32_t id = 0 ) {
+	printChunk( ChunkUtil::getData( chunk ), id );
 }
 
 bool parseInput( char* arg ) {
@@ -173,7 +176,7 @@ int main( int argc, char **argv ) {
 	for ( uint32_t idx = 0 ; idx < C_K ; idx ++ ) {
 		ChunkUtil::copy( chunks[ idx ], 0, buf + idx * CHUNK_SIZE, CHUNK_SIZE );
 	}
-	delete [] shadowParity;
+	delete shadowParity;
 	delete [] zero;
 #endif
 
@@ -190,6 +193,7 @@ int main( int argc, char **argv ) {
 	} else {
 		fprintf( stdout, "FAILED to recover data!! O: [%x] R: [%x]\n", *(buf + FAIL * CHUNK_SIZE), *(readbuf) );
 		printChunk( chunks[ failed[ 0 ] ], failed[ 0 ] );
+		printChunk( buf + failed[ 0 ] * CHUNK_SIZE , failed[ 0 ] );
 		return -1;
 	}
 
@@ -209,6 +213,7 @@ int main( int argc, char **argv ) {
 		} else {
 			fprintf( stdout, "\nFAILED to recover data!! [%x] \n", *(buf + failed[ 0 ] * CHUNK_SIZE));
 			printChunk( chunks[ failed[ 0 ] ], failed[ 0 ] );
+			printChunk( buf + failed[ 1 ] * CHUNK_SIZE , failed[ 1 ] );
 			return -1;
 		}
 		if ( memcmp ( readbuf + CHUNK_SIZE , buf + ( failed[ 1 ] ) * CHUNK_SIZE , CHUNK_SIZE ) == 0 ) {
@@ -216,6 +221,7 @@ int main( int argc, char **argv ) {
 		} else {
 			fprintf( stdout, "FAILED to recover data!! [%x] \n", *(buf + failed[ 1 ] * CHUNK_SIZE));
 			printChunk( chunks[ failed[ 1 ] ], failed[ 1 ] );
+			printChunk( buf + failed[ 1 ] * CHUNK_SIZE , failed[ 1 ] );
 			return -1;
 		}
 	}
@@ -238,6 +244,7 @@ int main( int argc, char **argv ) {
 		} else {
 			fprintf( stdout, "\nFAILED to recover data!! [%x] \n", *(buf + failed[ 0 ] * CHUNK_SIZE));
 			printChunk( chunks[ failed[ 0 ] ], failed[ 0 ] );
+			printChunk( buf + failed[ 0 ] * CHUNK_SIZE , failed[ 0 ] );
 			return -1;
 		}
 		if ( memcmp ( readbuf + CHUNK_SIZE , buf + ( failed[ 1 ] ) * CHUNK_SIZE , CHUNK_SIZE ) == 0 ) {
@@ -245,6 +252,7 @@ int main( int argc, char **argv ) {
 		} else {
 			fprintf( stdout, "FAILED to recover data!! [%x] \n", *(buf + failed[ 1 ] * CHUNK_SIZE));
 			printChunk( chunks[ failed[ 1 ] ], failed[ 1 ] );
+			printChunk( buf + failed[ 1 ] * CHUNK_SIZE , failed[ 1 ] );
 			return -1;
 		}
 		if ( memcmp ( readbuf + CHUNK_SIZE * 2, buf + ( failed[ 2 ] ) * CHUNK_SIZE , CHUNK_SIZE ) == 0 ) {
@@ -252,6 +260,7 @@ int main( int argc, char **argv ) {
 		} else {
 			fprintf( stdout, "FAILED to recover data!! [%x] \n", *(buf + failed[ 2 ] * CHUNK_SIZE));
 			printChunk( chunks[ failed[ 2 ] ], failed[ 2 ] );
+			printChunk( buf + failed[ 1 ] * CHUNK_SIZE , failed[ 1 ] );
 			return -1;
 		}
 	}
