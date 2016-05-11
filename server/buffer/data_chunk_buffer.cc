@@ -46,7 +46,14 @@ void DataChunkBuffer::init() {
 	}
 }
 
-KeyMetadata DataChunkBuffer::set( ServerWorker *worker, char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode, uint32_t &timestamp, uint32_t &stripeId, bool *isSealed, Metadata *sealed ) {
+KeyMetadata DataChunkBuffer::set(
+	ServerWorker *worker,
+	char *key, uint8_t keySize,
+	char *value, uint32_t valueSize,
+	uint8_t opcode, uint32_t &timestamp,
+	uint32_t &stripeId, uint32_t splitOffset,
+	bool *isSealed, Metadata *sealed
+) {
 	KeyMetadata keyMetadata;
 	uint32_t size = PROTO_KEY_VALUE_SIZE + keySize + valueSize, max = 0, tmp;
 	int index = -1;
@@ -151,7 +158,7 @@ KeyMetadata DataChunkBuffer::set( ServerWorker *worker, char *key, uint8_t keySi
 	keyMetadata.obj = ptr;
 
 	// Copy data to the buffer
-	KeyValue::serialize( ptr, key, keySize, value, valueSize );
+	KeyValue::serialize( ptr, key, keySize, value, valueSize, splitOffset );
 
 	// Flush if the current buffer is full
 	if ( ChunkUtil::getSize( chunk ) + PROTO_KEY_VALUE_SIZE + CHUNK_BUFFER_FLUSH_THRESHOLD >= ChunkBuffer::capacity ) {

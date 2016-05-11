@@ -37,7 +37,7 @@ bool ClientWorker::handleDegradedSetRequest( ApplicationEvent event, char *buf, 
 	uint16_t instanceId = Client::instanceId;
 	uint32_t requestId = ClientWorker::idGenerator->nextVal( this->workerId );
 
-	keyValue.dup( header.key, header.keySize, header.value, header.valueSize );
+	keyValue._dup( header.key, header.keySize, header.value, header.valueSize );
 	key = keyValue.key();
 
 	// Insert the key into application SET pending map
@@ -142,7 +142,7 @@ bool ClientWorker::handleDegradedSetLockResponse( CoordinatorEvent event, bool s
 		return false;
 	}
 	key = keyValue.key();
-	keyValue.deserialize( keyStr, keySize, valueStr, valueSize );
+	keyValue._deserialize( keyStr, keySize, valueStr, valueSize );
 
 	// Insert pending SET requests for each involved servers //
 	for ( uint32_t i = 0; i < ClientWorker::parityChunkCount + 1; i++ ) {

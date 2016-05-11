@@ -10,10 +10,25 @@ Key KeyValue::key() {
 	return key;
 }
 
-void KeyValue::dup( char *key, uint8_t keySize, char *value, uint32_t valueSize, void *ptr ) {
-	this->data = ( char * ) malloc( sizeof( char ) * ( keySize + valueSize ) + KEY_VALUE_METADATA_SIZE );
+void KeyValue::dup( char *key, uint8_t keySize, char *value, uint32_t valueSize, uint32_t splitOffset, void *ptr ) {
+	uint32_t splitSize;
+	bool isLarge = LargeObjectUtil::isLarge( keySize, valueSize, 0, &splitSize );
+	if ( isLarge ) {
+		if ( splitOffset + splitSize > valueSize )
+			splitSize = valueSize - splitOffset;
+	} else {
+		splitSize = valueSize;
+	}
+
+	this->data = ( char * ) malloc( sizeof( char ) * ( keySize + splitSize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ) + KEY_VALUE_METADATA_SIZE ) );
 	this->ptr = ptr;
-	this->serialize( key, keySize, value, valueSize );
+	this->serialize( key, keySize, value, valueSize, splitOffset );
+}
+
+void KeyValue::_dup( char *key, uint8_t keySize, char *value, uint32_t valueSize, void *ptr ) {
+	this->data = ( char * ) malloc( sizeof( char ) * ( keySize + valueSize + KEY_VALUE_METADATA_SIZE ) );
+	this->ptr = ptr;
+	this->_serialize( key, keySize, value, valueSize );
 }
 
 void KeyValue::set( char *data, void *ptr ) {
@@ -70,11 +85,88 @@ uint32_t KeyValue::getSize( char *data, uint8_t *keySizePtr, uint32_t *valueSize
 	return ( KEY_VALUE_METADATA_SIZE + keySize + valueSize );
 }
 
-char *KeyValue::serialize( char *key, uint8_t keySize, char *value, uint32_t valueSize ) {
-	return KeyValue::serialize( this->data, key, keySize, value, valueSize );
+char *KeyValue::serialize( char *key, uint8_t keySize, char *value, uint32_t valueSize, uint32_t splitOffset ) {
+	return KeyValue::serialize( this->data, key, keySize, value, valueSize, splitOffset );
 }
 
-char *KeyValue::serialize( char *data, char *key, uint8_t keySize, char *value, uint32_t valueSize ) {
+char *KeyValue::serialize( char *data, char *key, uint8_t keySize, char *value, uint32_t valueSize, uint32_t splitOffset ) {
+	data[ 0 ] = ( char ) keySize;
+
+	valueSize = htonl( valueSize );
+	unsigned char *tmp = ( unsigned char * ) &valueSize;
+	data[ 1 ] = tmp[ 1 ];
+	data[ 2 ] = tmp[ 2 ];
+	data[ 3 ] = tmp[ 3 ];
+	valueSize = ntohl( valueSize );
+
+	uint32_t splitSize;
+	bool isLarge = LargeObjectUtil::isLarge( keySize, valueSize, 0, &splitSize );
+	if ( isLarge ) {
+		splitOffset = htonl( splitOffset );
+		tmp = ( unsigned char * ) &splitOffset;
+		data[ 4 ] = tmp[ 1 ];
+		data[ 5 ] = tmp[ 2 ];
+		data[ 6 ] = tmp[ 3 ];
+		splitOffset = ntohl( splitOffset );
+
+		data += KEY_VALUE_METADATA_SIZE + SPLIT_OFFSET_SIZE;
+
+		if ( splitOffset + splitSize > valueSize )
+			splitSize = valueSize - splitOffset;
+	} else {
+		data += KEY_VALUE_METADATA_SIZE;
+		splitSize = valueSize;
+	}
+
+	if ( key )
+		memcpy( data, key, keySize );
+	if ( value )
+		memcpy( data + keySize, value, splitSize );
+
+	return data;
+}
+
+char *KeyValue::deserialize( char *&key, uint8_t &keySize, char *&value, uint32_t &valueSize, uint32_t &splitOffset ) const {
+	return KeyValue::deserialize( this->data, key, keySize, value, valueSize, splitOffset );
+}
+
+char *KeyValue::deserialize( char *data, char *&key, uint8_t &keySize, char *&value, uint32_t &valueSize, uint32_t &splitOffset ) {
+	keySize = ( uint8_t ) data[ 0 ];
+
+	valueSize = 0;
+	unsigned char *tmp = ( unsigned char * ) &valueSize;
+	tmp[ 1 ] = data[ 1 ];
+	tmp[ 2 ] = data[ 2 ];
+	tmp[ 3 ] = data[ 3 ];
+	valueSize = ntohl( valueSize );
+
+	uint32_t splitSize;
+	bool isLarge = LargeObjectUtil::isLarge( keySize, valueSize, 0, &splitSize );
+	if ( isLarge ) {
+		splitOffset = 0;
+		tmp = ( unsigned char * ) &splitOffset;
+		tmp[ 1 ] = data[ 4 ];
+		tmp[ 2 ] = data[ 5 ];
+		tmp[ 3 ] = data[ 6 ];
+		splitOffset = ntohl( splitOffset );
+
+		data += KEY_VALUE_METADATA_SIZE + SPLIT_OFFSET_SIZE;
+	} else {
+		splitOffset = 0;
+		data += KEY_VALUE_METADATA_SIZE;
+	}
+
+	key = data;
+	value = data + keySize;
+
+	return data;
+}
+
+char *KeyValue::_serialize( char *key, uint8_t keySize, char *value, uint32_t valueSize ) {
+	return KeyValue::_serialize( this->data, key, keySize, value, valueSize );
+}
+
+char *KeyValue::_serialize( char *data, char *key, uint8_t keySize, char *value, uint32_t valueSize ) {
 	data[ 0 ] = ( char ) keySize;
 
 	valueSize = htonl( valueSize );
@@ -92,11 +184,11 @@ char *KeyValue::serialize( char *data, char *key, uint8_t keySize, char *value, 
 	return data;
 }
 
-char *KeyValue::deserialize( char *&key, uint8_t &keySize, char *&value, uint32_t &valueSize ) const {
-	return KeyValue::deserialize( this->data, key, keySize, value, valueSize );
+char *KeyValue::_deserialize( char *&key, uint8_t &keySize, char *&value, uint32_t &valueSize ) const {
+	return KeyValue::_deserialize( this->data, key, keySize, value, valueSize );
 }
 
-char *KeyValue::deserialize( char *data, char *&key, uint8_t &keySize, char *&value, uint32_t &valueSize ) {
+char *KeyValue::_deserialize( char *data, char *&key, uint8_t &keySize, char *&value, uint32_t &valueSize ) {
 	keySize = ( uint8_t ) data[ 0 ];
 
 	valueSize = 0;
@@ -107,7 +199,6 @@ char *KeyValue::deserialize( char *data, char *&key, uint8_t &keySize, char *&va
 	valueSize = ntohl( valueSize );
 
 	key = data + KEY_VALUE_METADATA_SIZE;
-
 	value = data + KEY_VALUE_METADATA_SIZE + keySize;
 
 	return data;
@@ -119,14 +210,14 @@ uint32_t KeyValue::getChunkUpdateOffset( uint32_t chunkOffset, uint8_t keySize, 
 
 void KeyValue::print( FILE *f ) {
 	uint8_t keySize;
-	uint32_t valueSize;
+	uint32_t valueSize, splitOffset;
 	char *key, *value;
 
-	this->deserialize( key, keySize, value, valueSize );
+	this->deserialize( key, keySize, value, valueSize, splitOffset );
 
 	fprintf(
-		f, "Key: %.*s; Value: %.*s\n",
-		keySize, key, valueSize, value
+		f, "Key: %.*s; Value: %.*s (split offset = %u)\n",
+		keySize, key, valueSize, value, splitOffset
 	);
 }
 
@@ -171,15 +262,17 @@ uint32_t LargeObjectUtil::getValueOffsetAtSplit( uint8_t keySize, uint32_t value
 	}
 }
 
-uint32_t LargeObjectUtil::getSplitIndex( uint8_t keySize, uint32_t valueSize, uint32_t offset ) {
+uint32_t LargeObjectUtil::getSplitIndex( uint8_t keySize, uint32_t valueSize, uint32_t offset, bool &isLarge ) {
 	uint32_t totalSize = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
 	uint32_t splitSize;
 
 	if ( LargeObjectUtil::chunkSize < totalSize ) {
+		isLarge = true;
 		splitSize = LargeObjectUtil::chunkSize - KEY_VALUE_METADATA_SIZE - keySize;
 		return ( offset / splitSize );
 	} else {
 		// No need to split
+		isLarge = false;
 		return 0;
 	}
 }

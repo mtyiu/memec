@@ -127,7 +127,7 @@ void ClientWorker::dispatch( ApplicationEvent event ) {
 				Key key;
 				char *valueStr;
 				uint32_t valueSize;
-				event.message.replay.set.keyValue.deserialize( key.data, key.size, valueStr, valueSize );
+				event.message.replay.set.keyValue._deserialize( key.data, key.size, valueStr, valueSize );
 				buffer.data = this->protocol.replaySet(
 					buffer.size,
 					event.instanceId, event.requestId,
@@ -306,7 +306,7 @@ bool ClientWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 	uint16_t instanceId = Client::instanceId;
 	uint32_t requestId = ClientWorker::idGenerator->nextVal( this->workerId );
 
-	keyValue.dup( header.key, header.keySize, header.value, header.valueSize );
+	keyValue._dup( header.key, header.keySize, header.value, header.valueSize );
 	key = keyValue.key();
 
 	// Insert into application pending set

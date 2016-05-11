@@ -206,7 +206,7 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 			char *key, *value;
 			uint8_t keySize;
 			uint32_t valueSize;
-			event.message.get.keyValue.deserialize( key, keySize, value, valueSize );
+			event.message.get.keyValue._deserialize( key, keySize, value, valueSize );
 			buffer.data = this->protocol.resGet(
 				buffer.size,
 				event.instanceId, event.requestId,

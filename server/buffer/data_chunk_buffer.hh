@@ -33,7 +33,14 @@ public:
 
 	inline uint32_t getChunkId() { return this->chunkId; }
 
-	KeyMetadata set( ServerWorker *worker, char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode, uint32_t &timestamp, uint32_t &stripeId, bool *isSealed = 0, Metadata *sealed = 0 );
+	KeyMetadata set(
+		ServerWorker *worker,
+		char *key, uint8_t keySize,
+		char *value, uint32_t valueSize,
+		uint8_t opcode, uint32_t &timestamp,
+		uint32_t &stripeId,  uint32_t splitOffset,
+		bool *isSealed = 0, Metadata *sealed = 0
+	);
 
 	size_t seal( ServerWorker *worker );
 

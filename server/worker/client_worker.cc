@@ -56,7 +56,7 @@ void ServerWorker::dispatch( ClientEvent event ) {
 			char *key, *value;
 			uint8_t keySize;
 			uint32_t valueSize;
-			event.message.keyValue.deserialize( key, keySize, value, valueSize );
+			event.message.keyValue._deserialize( key, keySize, value, valueSize );
 			buffer.data = this->protocol.resGet(
 				buffer.size,
 				event.instanceId, event.requestId,
@@ -345,20 +345,24 @@ bool ServerWorker::handleSetRequest( ClientEvent event, struct KeyValueHeader &h
 	Metadata sealed;
 	uint32_t timestamp, listId, stripeId, chunkId, splitIndex;
 	ServerPeerSocket *dataServerSocket;
-	bool exist = false;
+	bool exist = false, isLarge;
 
 	listId = ServerWorker::stripeList->get( header.key, header.keySize, &dataServerSocket, 0, &chunkId );
 
-	splitIndex = LargeObjectUtil::getSplitIndex( header.keySize, header.valueSize, header.splitOffset );
-	if ( splitIndex ) {
+	splitIndex = LargeObjectUtil::getSplitIndex( header.keySize, header.valueSize, header.splitOffset, isLarge );
+	if ( isLarge ) {
 		chunkId = ( chunkId + splitIndex ) % ServerWorker::dataChunkCount;
 		dataServerSocket = ServerWorker::stripeList->get( listId, chunkId );
+
+		header.keySize += PROTO_SPLIT_OFFSET_SIZE;
+		header.key     -= PROTO_SPLIT_OFFSET_SIZE;
 	}
 	__INFO__(
 		BLUE, "ServerWorker", "handleSetRequest",
-		"[SET] Key: %.*s (key size = %u); Value: (value size = %u); Split offset = %u (index: %u)",
+		"[SET] Key: %.*s (key size = %u); Value: (value size = %u); Split offset = %u (index: %u); Is large? %s",
 		( int ) header.keySize, header.key, header.keySize, header.valueSize,
-		header.splitOffset, splitIndex
+		header.splitOffset, splitIndex,
+		isLarge ? "Yes" : "No"
 	);
 
 	if (
@@ -366,7 +370,7 @@ bool ServerWorker::handleSetRequest( ClientEvent event, struct KeyValueHeader &h
 		( ServerWorker::chunkBuffer->at( listId )->findValueByKey( header.key, header.keySize, 0, 0, false ) )
 	) {
 		exist = true;
-		fprintf( stderr, "The key already exists: %.*s\n", header.keySize, header.key );
+		fprintf( stderr, "The key already exists: %.*s\n", header.keySize - ( isLarge ? PROTO_SPLIT_OFFSET_SIZE : 0 ), header.key + ( isLarge ? PROTO_SPLIT_OFFSET_SIZE : 0 ) );
 	} else {
 		if ( ServerWorker::disableSeal ) {
 			ServerWorker::chunkBuffer->at( listId )->set(
@@ -392,6 +396,12 @@ bool ServerWorker::handleSetRequest( ClientEvent event, struct KeyValueHeader &h
 				ServerWorker::getChunkBuffer
 			);
 		}
+	}
+
+	if ( isLarge ) {
+		// Restore
+		header.keySize -= PROTO_SPLIT_OFFSET_SIZE;
+		header.key     += PROTO_SPLIT_OFFSET_SIZE;
 	}
 
 	if ( ! needResSet )

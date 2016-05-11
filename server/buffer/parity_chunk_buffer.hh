@@ -89,7 +89,13 @@ public:
 
 	inline uint32_t getChunkId() { return this->chunkId; }
 
-	bool set( char *key, uint8_t keySize, char *value, uint32_t valueSize, uint32_t chunkId, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, GetChunkBuffer *getChunkBuffer );
+	bool set(
+		char *key, uint8_t keySize,
+		char *value, uint32_t valueSize,
+		uint32_t chunkId, uint32_t splitOffset,
+		Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk,
+		GetChunkBuffer *getChunkBuffer
+	);
 
 	bool seal( uint32_t stripeId, uint32_t chunkId, uint32_t count, char *sealData, size_t sealDataSize, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk );
 

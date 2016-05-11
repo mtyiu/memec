@@ -194,7 +194,7 @@ bool ServerWorker::handleGetResponse( ServerPeerEvent event, bool success, char 
 		struct KeyValueHeader header;
 		if ( this->protocol.parseKeyValueHeader( header, buf, size ) ) {
 			key.set( header.keySize, header.key, ( void * ) event.socket );
-			keyValue.dup( header.key, header.keySize, header.value, header.valueSize );
+			keyValue._dup( header.key, header.keySize, header.value, header.valueSize );
 		} else {
 			__ERROR__( "ServerWorker", "handleGetResponse", "Invalid GET response." );
 			return false;

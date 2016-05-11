@@ -54,7 +54,13 @@ ParityChunkWrapper &ParityChunkBuffer::getWrapper( uint32_t stripeId, bool needs
 	return wrapper;
 }
 
-bool ParityChunkBuffer::set( char *keyStr, uint8_t keySize, char *valueStr, uint32_t valueSize, uint32_t chunkId, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, GetChunkBuffer *getChunkBuffer ) {
+bool ParityChunkBuffer::set(
+	char *keyStr, uint8_t keySize,
+	char *valueStr, uint32_t valueSize,
+	uint32_t chunkId, uint32_t splitOffset,
+	Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk,
+	GetChunkBuffer *getChunkBuffer
+) {
 	Key key;
 	std::unordered_map<Key, PendingRequest>::iterator it;
 
@@ -69,8 +75,8 @@ bool ParityChunkBuffer::set( char *keyStr, uint8_t keySize, char *valueStr, uint
 		KeyValue keyValue;
 		std::pair<std::unordered_map<Key, KeyValue>::iterator, bool> ret;
 
-		keyValue.dup( keyStr, keySize, valueStr, valueSize );
-		keyValue.deserialize( keyStr, keySize, valueStr, valueSize );
+		keyValue.dup( keyStr, keySize, valueStr, valueSize, splitOffset );
+		keyValue.deserialize( keyStr, keySize, valueStr, valueSize, splitOffset );
 
 		key.set( keySize, keyStr );
 
@@ -96,7 +102,7 @@ bool ParityChunkBuffer::set( char *keyStr, uint8_t keySize, char *valueStr, uint
 		switch ( pendingRequest.type ) {
 			case PRT_SEAL:
 				// fprintf( stderr, "--- PRT_SEAL: Key = %.*s (%u, %u, %u) ---\n", keySize, keyStr, this->listId, pendingRequest.req.seal.stripeId, this->chunkId );
-				KeyValue::serialize( data + pendingRequest.req.seal.offset, keyStr, keySize, valueStr, valueSize );
+				KeyValue::serialize( data + pendingRequest.req.seal.offset, keyStr, keySize, valueStr, valueSize, splitOffset );
 
 				// Update parity chunk
 				this->update(
@@ -185,16 +191,27 @@ bool ParityChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t coun
 			keyValue = it->second;
 
 			// Get the value size
-			keyValue.deserialize( keyStr, keySize, valueStr, valueSize );
+			uint32_t splitOffset, splitSize;
+			keyValue.deserialize( keyStr, keySize, valueStr, valueSize, splitOffset );
+
+			bool isLarge = LargeObjectUtil::isLarge( keySize, valueSize, 0, &splitSize );
 
 			// Copy the key-value pair to the temporary data chunk
-			memcpy( data + offset, keyValue.data, KEY_VALUE_METADATA_SIZE + keySize + valueSize );
+			if ( isLarge ) {
+				if ( splitOffset + splitSize > valueSize )
+					splitSize = valueSize - splitOffset;
+				memcpy( data + offset, keyValue.data, KEY_VALUE_METADATA_SIZE + SPLIT_OFFSET_SIZE + keySize + splitSize );
+
+				curPos = offset + KEY_VALUE_METADATA_SIZE + SPLIT_OFFSET_SIZE + keySize + splitSize;
+			} else {
+				memcpy( data + offset, keyValue.data, KEY_VALUE_METADATA_SIZE + keySize + valueSize );
+
+				curPos = offset + KEY_VALUE_METADATA_SIZE + keySize + valueSize;
+			}
 
 			// Release memory
 			this->keys.erase( it );
 			keyValue.free();
-
-			curPos = offset + KEY_VALUE_METADATA_SIZE + keySize + valueSize;
 		}
 
 		// Update counter

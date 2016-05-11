@@ -11,7 +11,7 @@ bool RemappedBuffer::insert( uint32_t listId, uint32_t chunkId, uint32_t *origin
 	remappedKeyValue.listId = listId;
 	remappedKeyValue.chunkId = chunkId;
 	remappedKeyValue.remappedCount = remappedCount;
-	remappedKeyValue.keyValue.dup( keyStr, keySize, valueStr, valueSize );
+	remappedKeyValue.keyValue._dup( keyStr, keySize, valueStr, valueSize );
 
 	if ( remappedCount ) {
 		remappedKeyValue.original = new uint32_t[ remappedCount * 2 ];

@@ -227,11 +227,13 @@ int CuckooHash::cpSearch( size_t depthStart, size_t *cpIndex ) {
 			if ( this->keySize == 0 ) {
 				char *key, *value;
 				uint8_t keySize;
-				uint32_t valueSize;
+				uint32_t valueSize, splitOffset;
 
-				KeyValue::deserialize( this->buckets[ i ].ptr[ j ], key, keySize, value, valueSize );
+				KeyValue::deserialize( this->buckets[ i ].ptr[ j ], key, keySize, value, valueSize, splitOffset );
 
-				uint32_t hashValue = HashFunc::hash( key, keySize );
+				bool isLarge = LargeObjectUtil::isLarge( keySize, valueSize );
+
+				uint32_t hashValue = HashFunc::hash( key - ( isLarge ? SPLIT_OFFSET_SIZE : 0 ), keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ) );
 				uint8_t tag = this->tagHash( hashValue );
 
 				to[ index ] = this->altIndex( i, tag );

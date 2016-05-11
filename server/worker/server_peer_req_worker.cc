@@ -85,13 +85,13 @@ bool ServerWorker::handleForwardKeyRequest( ServerPeerEvent event, struct Forwar
 
 	switch( header.opcode ) {
 		case PROTO_OPCODE_DEGRADED_GET:
-			keyValue.dup( header.key, header.keySize, header.value, header.valueSize );
+			keyValue._dup( header.key, header.keySize, header.value, header.valueSize );
 			isInserted = dmap->insertValue( keyValue, metadata );
 			if ( ! isInserted )
 				keyValue.free();
 			break;
 		case PROTO_OPCODE_DEGRADED_UPDATE:
-			keyValue.dup( header.key, header.keySize, header.value, header.valueSize );
+			keyValue._dup( header.key, header.keySize, header.value, header.valueSize );
 
 			// Modify the key-value pair before inserting into DegradedMap
 			isInserted = dmap->insertValue( keyValue, metadata );
@@ -308,7 +308,7 @@ bool ServerWorker::handleDeleteRequest( ServerPeerEvent event, char *buf, size_t
 		header.key, header.keySize, &keyValue, &key
 	);
 	if ( ret )
-		keyValue.deserialize( key.data, key.size, value.data, value.size );
+		keyValue._deserialize( key.data, key.size, value.data, value.size );
 
 	// backup parity delta ( data delta from data server )
 	Timestamp timestamp( event.timestamp );
@@ -531,7 +531,7 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 			originalChunkSize = chunkSize = ChunkUtil::getSize( chunk );
 			while ( offset < chunkSize ) {
 				keyValue = ChunkUtil::getObject( chunk, offset );
-				keyValue.deserialize( key.data, key.size, valueStr, valueSize );
+				keyValue._deserialize( key.data, key.size, valueStr, valueSize );
 
 				key.set( key.size, key.data );
 				ServerWorker::map->deleteKey(
@@ -560,7 +560,7 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 				uint32_t timestamp;
 
 				keyValue = ChunkUtil::getObject( chunk, offset );
-				keyValue.deserialize( key.data, key.size, valueStr, valueSize );
+				keyValue._deserialize( key.data, key.size, valueStr, valueSize );
 				objSize = KEY_VALUE_METADATA_SIZE + key.size + valueSize;
 
 				key.set( key.size, key.data );
@@ -628,7 +628,7 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 				// Update the key-value pair
 				// if ( ServerWorker::map->findValueByKey( keyValueHeader.key, keyValueHeader.keySize, &keyValue, 0, 0, 0, 0, false, false ) ) {
 				if ( ServerWorker::map->findObject( keyValueHeader.key, keyValueHeader.keySize, &keyValue, 0, false, false ) ) {
-					keyValue.deserialize( key.data, key.size, valueStr, valueSize );
+					keyValue._deserialize( key.data, key.size, valueStr, valueSize );
 					assert( valueSize == keyValueHeader.valueSize );
 					memcpy( valueStr, keyValueHeader.value, valueSize );
 				} else {

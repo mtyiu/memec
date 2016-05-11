@@ -75,7 +75,7 @@ bool ServerWorker::handleRemappedData( CoordinatorEvent event, char *buf, size_t
 			Key key;
 			Value value;
 
-			v.keyValue.deserialize( key.data, key.size, value.data, value.size );
+			v.keyValue._deserialize( key.data, key.size, value.data, value.size );
 
 			serverPeerEvent.reqSet( socket, instanceId, requestId, key, value );
 			this->dispatch( serverPeerEvent );

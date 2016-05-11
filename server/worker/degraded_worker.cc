@@ -1173,8 +1173,8 @@ force_reconstruct_chunks:
 				success = ServerWorker::chunkBuffer->at( listId )->findValueByKey( mykey.data, mykey.size, &keyValue, &mykey );
 
 			if ( success ) {
-				keyValue.deserialize( keyStr, keySize, valueStr, valueSize );
-				keyValue.dup( keyStr, keySize, valueStr, valueSize );
+				keyValue._deserialize( keyStr, keySize, valueStr, valueSize );
+				keyValue._dup( keyStr, keySize, valueStr, valueSize );
 			} else {
 				__ERROR__( "ServerWorker", "performDegradedRead", "findValueByKey() failed (list ID: %u, key: %.*s).", listId, mykey.size, mykey.data );
 			}

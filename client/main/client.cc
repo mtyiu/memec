@@ -1114,7 +1114,7 @@ bool Client::revertDelta( FILE *f, ServerSocket *target, pthread_cond_t *conditi
 				this->pending.eraseKeyValue( PT_APPLICATION_SET, it->first.parentInstanceId, it->first.parentRequestId, 0, &pid, &keyValue, true, true, true, it->second.data )
 			) {
 
-				keyValue.deserialize( key.data, key.size, valueStr, valueSize );
+				keyValue._deserialize( key.data, key.size, valueStr, valueSize );
 				keyValueDup.dup( key.data, key.size, valueStr, valueSize, 0 );
 
 				// duplicate the key for reply

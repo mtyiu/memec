@@ -1008,7 +1008,7 @@ void Server::lookup() {
 			uint8_t keySize;
 			uint32_t valueSize;
 			char *keyStr, *valueStr;
-			remappedKeyValue.keyValue.deserialize( keyStr, keySize, valueStr, valueSize );
+			remappedKeyValue.keyValue._deserialize( keyStr, keySize, valueStr, valueSize );
 			printf(
 				"%s(%u, %u) |-> (%u, %u); length: %u%s",
 				i == 0 ? "" : "; ",
@@ -1030,7 +1030,7 @@ void Server::lookup() {
 			uint8_t keySize;
 			uint32_t valueSize;
 			char *keyStr, *valueStr;
-			keyValue.deserialize( keyStr, keySize, valueStr, valueSize );
+			keyValue._deserialize( keyStr, keySize, valueStr, valueSize );
 			printf(
 				"Reconstructed chunk found: (%u, %u, %u); offset: %u, length: %u; is sealed? %s\n",
 				keyMetadata.listId, keyMetadata.stripeId, keyMetadata.chunkId, keyMetadata.offset, keyMetadata.length,
@@ -1041,7 +1041,7 @@ void Server::lookup() {
 			uint8_t keySize;
 			uint32_t valueSize;
 			char *keyStr, *valueStr;
-			keyValue.deserialize( keyStr, keySize, valueStr, valueSize );
+			keyValue._deserialize( keyStr, keySize, valueStr, valueSize );
 			printf(
 				"Reconstructed key found: %.*s; key size: %u, value size: %u; is sealed? %s\n",
 				keySize, keyStr, keySize, valueSize,

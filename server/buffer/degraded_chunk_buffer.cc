@@ -393,7 +393,7 @@ bool DegradedMap::insertChunk( uint32_t listId, uint32_t stripeId, uint32_t chun
 
 		LOCK( &this->keysLock );
 		while( ptr + KEY_VALUE_METADATA_SIZE < ChunkUtil::getData( chunk ) + ChunkBuffer::capacity ) {
-			KeyValue::deserialize( ptr, keyPtr, keySize, valuePtr, valueSize );
+			KeyValue::_deserialize( ptr, keyPtr, keySize, valuePtr, valueSize );
 			if ( keySize == 0 && valueSize == 0 )
 				break;
 
@@ -548,9 +548,9 @@ bool DegradedChunkBuffer::updateKeyValue( uint8_t keySize, char *keyStr, uint32_
 			uint8_t tmpKeySize;
 			uint32_t tmpValueSize;
 			char *tmpKeyStr, *tmpValueStr;
-			keyValue.deserialize( tmpKeyStr, tmpKeySize, tmpValueStr, tmpValueSize );
+			keyValue._deserialize( tmpKeyStr, tmpKeySize, tmpValueStr, tmpValueSize );
 
-			keyValue.dup( tmpKeyStr, tmpKeySize, tmpValueStr, tmpValueSize );
+			keyValue._dup( tmpKeyStr, tmpKeySize, tmpValueStr, tmpValueSize );
 			key = keyValue.key();
 
 			std::pair<Key, KeyValue> p1( key, keyValue );

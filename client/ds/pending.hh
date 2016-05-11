@@ -91,8 +91,8 @@ public:
 			Key key;
 			char* valueStr;
 			uint32_t valueSize;
-			keyValue.deserialize( key.data, key.size, valueStr, valueSize );
-			this->keyValue.dup( key.data, key.size, valueStr, valueSize, keyValue.ptr );
+			keyValue._deserialize( key.data, key.size, valueStr, valueSize );
+			this->keyValue._dup( key.data, key.size, valueStr, valueSize, keyValue.ptr );
 		} else {
 			this->keyValue.set( keyValue.data, keyValue.ptr );
 		}

@@ -114,15 +114,26 @@ void Map::setChunk(
 		char *ptr = ChunkUtil::getData( chunk );
 		char *keyPtr, *valuePtr;
 		uint8_t keySize;
-		uint32_t valueSize, offset = 0, size;
+		uint32_t valueSize, offset = 0, size, splitSize, splitOffset;
+		bool isLarge;
 
 		if ( needsLock ) LOCK( &this->keysLock );
 		while( ptr + KEY_VALUE_METADATA_SIZE < ChunkUtil::getData( chunk ) + ChunkUtil::chunkSize ) {
-			KeyValue::deserialize( ptr, keyPtr, keySize, valuePtr, valueSize );
+			KeyValue::deserialize( ptr, keyPtr, keySize, valuePtr, valueSize, splitOffset );
 			if ( keySize == 0 && valueSize == 0 )
 				break;
 
-			size = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
+			isLarge = LargeObjectUtil::isLarge( keySize, valueSize, 0, &splitSize );
+			if ( isLarge ) {
+				if ( splitOffset + splitSize > valueSize )
+					splitSize = valueSize - splitOffset;
+
+				size = KEY_VALUE_METADATA_SIZE + SPLIT_OFFSET_SIZE + keySize + splitSize;
+			} else {
+				size = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
+			}
+
+
 			this->keys.insert( keyPtr, keySize, ptr );
 			offset += size;
 			ptr += size;

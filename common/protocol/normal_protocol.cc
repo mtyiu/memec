@@ -481,6 +481,7 @@ bool Protocol::parseKeyValueHeader( size_t offset, uint8_t &keySize, char *&key,
 	ptr += PROTO_KEY_VALUE_SIZE;
 
 	if ( enableSplit && LargeObjectUtil::isLarge( keySize, valueSize, &numOfSplit, &splitSize ) ) {
+		splitOffset = 0;
 		tmp = ( unsigned char * ) &splitOffset;
 		tmp[ 1 ] = ptr[ 0 ];
 		tmp[ 2 ] = ptr[ 1 ];
@@ -488,20 +489,11 @@ bool Protocol::parseKeyValueHeader( size_t offset, uint8_t &keySize, char *&key,
 		splitOffset = ntohl( splitOffset );
 		ptr += PROTO_SPLIT_OFFSET_SIZE;
 
-		fprintf( stderr, "splitOffset = %u / %u\n", splitOffset, htonl( splitOffset ) );
-
 		if ( splitOffset + splitSize > valueSize )
 			splitSize = valueSize - splitOffset;
 
-		if ( size - offset < PROTO_KEY_VALUE_SIZE + PROTO_SPLIT_OFFSET_SIZE + keySize + splitSize ) {
-			fprintf(
-				stderr,
-				"%u %u %u %u\n",
-				splitOffset, valueSize, size, splitSize
-			);
-
+		if ( size - offset < PROTO_KEY_VALUE_SIZE + PROTO_SPLIT_OFFSET_SIZE + keySize + splitSize )
 			return false;
-		}
 	} else {
 		splitOffset = 0;
 
