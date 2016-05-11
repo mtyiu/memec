@@ -217,7 +217,7 @@ bool EvenOddCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
 
 	}
 
-	return false;
+	return true;
 }
 
 uint32_t EvenOddCoding::getPrime() {

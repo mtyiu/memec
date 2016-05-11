@@ -2,8 +2,16 @@ CC=g++
 CFLAGS=-std=c++11 -Wall -O2
 MEMEC_SRC_ROOT=../../..
 LIBS=
-INCLUDE=-I$(MEMEC_SRC_ROOT)/lib/jerasure/include -I$(MEMEC_SRC_ROOT)/lib/gf_complete/include
+EXTRA_LIB=
+INCLUDE=
 FLAGS=-DTEST_DELTA
+ifeq ($(USE_ISAL),1)
+FLAGS+=-DUSE_ISAL
+INCLUDE+=-I$(MEMEC_SRC_ROOT)/lib/isal-l-2.14.0/include
+EXTRA_LIB+=$(MEMEC_SRC_ROOT)/lib/isa-l-2.14.0/lib/libisal.a
+else
+INCLUDE+=-I$(MEMEC_SRC_ROOT)/lib/jerasure/include -I$(MEMEC_SRC_ROOT)/lib/gf_complete/include
+endif
 
 TARGETS= \
 	checker \
@@ -27,7 +35,7 @@ jobjs_clean:
 	make -C $(MEMEC_SRC_ROOT)/common/coding clean
 
 $(TARGETS): % : %.cc jobjs
-	$(CC) $(CFLAGS) $(INCLUDE) $(LIBS) $(FLAGS) -o $@ $< $(OBJS)
+	$(CC) $(CFLAGS) $(INCLUDE) $(LIBS) $(FLAGS) -o $@ $< $(OBJS) $(EXTRA_LIB)
 
 clean: jobjs_clean
 	rm -f $(TARGETS)

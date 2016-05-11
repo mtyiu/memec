@@ -34,7 +34,7 @@ OBJS= \
 	socket/epoll.o
 
 all: $(OBJS)
-	$(MAKE) -C coding
+	$(MAKE) USE_ISAL=$(USE_ISAL) -C coding
 
 %.o: %.cc %.hh
 	$(CC) $(CFLAGS) $(INCLUDE) $(LIBS) -c -o $@ $< $(EXTERNAL_LIBS)
@@ -44,3 +44,4 @@ all: $(OBJS)
 
 clean:
 	rm -f $(OBJS)
+	make -C coding clean
