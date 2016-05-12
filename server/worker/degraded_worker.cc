@@ -356,6 +356,10 @@ bool ServerWorker::handleDegradedUpdateRequest( ClientEvent event, struct Degrad
 	DegradedMap *dmap = &ServerWorker::degradedChunkBuffer->map;
 	bool isSealed, isKeyValueFound;
 
+	uint32_t valueSize;
+	uint8_t keySize;
+	char *keyPtr, *valuePtr;
+
 	if ( ( keyValue.data = map->findObject(
 		header.data.keyValueUpdate.key,
 		header.data.keyValueUpdate.keySize
@@ -363,6 +367,12 @@ bool ServerWorker::handleDegradedUpdateRequest( ClientEvent event, struct Degrad
 		uint32_t offset;
 		chunk = ServerWorker::chunkPool->getChunk( keyValue.data, offset );
 		metadata = ChunkUtil::getMetadata( chunk );
+
+		// avoid update overruning the original length of value
+		keyValue.deserialize( keyPtr, keySize, valuePtr, valueSize );
+		if ( valueSize < header.data.keyValueUpdate.valueUpdateOffset + header.data.keyValueUpdate.valueUpdateSize ) {
+			header.data.keyValueUpdate.valueUpdateSize = valueSize - header.data.keyValueUpdate.valueUpdateOffset;
+		}
 
 		MixedChunkBuffer *chunkBuffer = ServerWorker::chunkBuffer->at( metadata.listId );
 		int chunkBufferIndex = chunkBuffer->lockChunk( chunk, true );
@@ -422,12 +432,22 @@ bool ServerWorker::handleDegradedUpdateRequest( ClientEvent event, struct Degrad
 		isSealed,
 		&keyValue, &key, &keyMetadata
 	);
+
+	// avoid update overruning the original length of value
+	if ( isKeyValueFound ) { 
+		keyValue.deserialize( keyPtr, keySize, valuePtr, valueSize );
+		if ( valueSize < header.data.keyValueUpdate.valueUpdateOffset + header.data.keyValueUpdate.valueUpdateSize ) {
+			header.data.keyValueUpdate.valueUpdateSize = valueSize - header.data.keyValueUpdate.valueUpdateOffset;
+		}
+	}
+
 	// Set up KeyValueUpdate
 	keyValueUpdate.set( key.size, key.data, ( void * ) event.socket );
 	keyValueUpdate.offset = header.data.keyValueUpdate.valueUpdateOffset;
 	keyValueUpdate.length = header.data.keyValueUpdate.valueUpdateSize;
 	// Set up metadata
 	metadata.set( listId, stripeId, chunkId );
+
 
 	if ( isKeyValueFound ) {
 		keyValueUpdate.dup( 0, 0, ( void * ) event.socket );
@@ -898,6 +918,7 @@ bool ServerWorker::handleForwardChunkRequest( struct ChunkDataHeader &header, bo
 				}
 			} else if ( op.opcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
 				if ( isKeyValueFound ) {
+
 					struct DegradedReqHeader header;
 					header.isSealed = chunk != 0;
 					header.stripeId = stripeId;
@@ -1175,6 +1196,10 @@ force_reconstruct_chunks:
 			if ( success ) {
 				keyValue.deserialize( keyStr, keySize, valueStr, valueSize );
 				keyValue.dup( keyStr, keySize, valueStr, valueSize );
+				// avoid overrunning the value
+				if ( valueSize < keyValueUpdate->offset + keyValueUpdate->length ) {
+					keyValueUpdate->length = valueSize - keyValueUpdate->offset;
+				}
 			} else {
 				__ERROR__( "ServerWorker", "performDegradedRead", "findValueByKey() failed (list ID: %u, key: %.*s).", listId, mykey.size, mykey.data );
 			}
@@ -1206,6 +1231,10 @@ force_reconstruct_chunks:
 						reconstructed[ i * 2 + 1 ]
 					);
 					if ( opcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
+						// avoid overrunning the value
+						//if ( valueSize < keyValueUpdate->offset + keyValueUpdate->length ) {
+						//	keyValueUpdate->length = valueSize - keyValueUpdate->offset;
+						//}
 						if ( s->self ) {
 							struct ForwardKeyHeader forwardKeyHeader;
 							ServerPeerEvent emptyEvent;

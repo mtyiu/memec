@@ -223,7 +223,7 @@ bool ServerWorker::handleRemappedUpdateRequest( ServerPeerEvent event, char *buf
 		__ERROR__( "ServerWorker", "handleRemappedUpdateRequest", "Invalid UPDATE request." );
 		return false;
 	}
-	__DEBUG__(
+	__INFO__(
 		BLUE, "ServerWorker", "handleRemappedUpdateRequest",
 		"[UPDATE] Key: %.*s (key size = %u); Value: (update size = %u, offset = %u).",
 		( int ) header.keySize, header.key, header.keySize,

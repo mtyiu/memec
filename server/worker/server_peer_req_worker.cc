@@ -96,6 +96,11 @@ bool ServerWorker::handleForwardKeyRequest( ServerPeerEvent event, struct Forwar
 			// Modify the key-value pair before inserting into DegradedMap
 			isInserted = dmap->insertValue( keyValue, metadata );
 			if ( isInserted ) {
+				// avoid update overruning the original length of value
+				if ( header.valueSize < header.valueUpdateOffset + header.valueUpdateSize ) {
+					header.valueUpdateSize = header.valueSize - header.valueUpdateOffset;
+				}
+				assert( header.valueSize > header.valueUpdateOffset );
 				uint32_t dataUpdateOffset = KeyValue::getChunkUpdateOffset(
 					0,                       // chunkOffset
 					header.keySize,          // keySize

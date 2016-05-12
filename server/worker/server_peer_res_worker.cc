@@ -35,6 +35,10 @@ bool ServerWorker::handleForwardKeyResponse( struct ForwardKeyHeader &header, bo
 	DegradedOp op;
 	std::vector<struct pid_s> pids;
 
+	char *keyPtr, *valuePtr;
+	uint8_t keySize;
+	uint32_t valueSize;
+
 	key.set( header.keySize, header.key );
 
 	if ( ! dmap->deleteDegradedKey( key, pids, true ) ) {
@@ -44,7 +48,10 @@ bool ServerWorker::handleForwardKeyResponse( struct ForwardKeyHeader &header, bo
 
 	KeyValue keyValue;
 	if ( map->findObject( header.key, header.keySize, &keyValue, &key ) ) {
+		// avoid update overruning the original length of value, get valueSize if key-value exists
+		keyValue.deserialize( keyPtr, keySize, valuePtr, valueSize );
 	} else {
+		valueSize = 0;
 		__ERROR__( "ServerWorker", "handleForwardKeyResponse", "Cannot find the forwarded object locally." );
 	}
 
@@ -65,6 +72,10 @@ bool ServerWorker::handleForwardKeyResponse( struct ForwardKeyHeader &header, bo
 		switch( op.opcode ) {
 			case PROTO_OPCODE_DEGRADED_UPDATE:
 				if ( success ) {
+					// avoid update overruning the original length of value
+					if ( valueSize && valueSize < op.data.keyValueUpdate.offset + op.data.keyValueUpdate.length ) {
+						op.data.keyValueUpdate.length = valueSize - op.data.keyValueUpdate.offset;
+					}
 					Metadata metadata;
 					metadata.set( op.listId, op.stripeId, op.chunkId );
 					uint32_t dataUpdateOffset = KeyValue::getChunkUpdateOffset(
@@ -283,6 +294,15 @@ bool ServerWorker::handleGetResponse( ServerPeerEvent event, bool success, char 
 			case PROTO_OPCODE_DEGRADED_UPDATE:
 				if ( success ) {
 					LOCK( &dmap->unsealed.lock );
+
+					char *keyPtr, *valuePtr;
+					uint8_t keySize;
+					uint32_t valueSize;
+					// avoid update overruning the original length of value
+					keyValue.deserialize( keyPtr, keySize, valuePtr, valueSize );
+					if ( valueSize < op.data.keyValueUpdate.offset + op.data.keyValueUpdate.length ) {
+						op.data.keyValueUpdate.length = valueSize - op.data.keyValueUpdate.offset ;
+					}
 
 					Metadata metadata;
 					metadata.set( op.listId, op.stripeId, op.chunkId );
@@ -857,6 +877,10 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 			}
 		}
 
+		char *keyPtr, *valuePtr;
+		uint8_t keySize;
+		uint32_t valueSize;
+
 		if ( chunkRequest.isDegraded ) {
 			// Respond the original GET/UPDATE/DELETE operation using the reconstructed data
 			PendingIdentifier pid;
@@ -1102,6 +1126,13 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 						}
 
 						if ( isKeyValueFound ) {
+
+							// avoid update overruning the original length of value
+							keyValue.deserialize( keyPtr, keySize, valuePtr, valueSize );
+							if ( valueSize < op.data.keyValueUpdate.offset + op.data.keyValueUpdate.length ) {
+								op.data.keyValueUpdate.length = valueSize - op.data.keyValueUpdate.offset;
+							}
+
 							if ( dataChunkReconstructed ) {
 								ServerWorker::degradedChunkBuffer->updateKeyValue(
 									key.size, key.data,
@@ -1139,6 +1170,12 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 						} else if ( ! dataChunkReconstructed ) {
 							char *obj = map->findObject( key.data, key.size, &keyValue, &key );
 							assert( obj );
+
+							// avoid update overruning the original length of value
+							keyValue.deserialize( keyPtr, keySize, valuePtr, valueSize );
+							if ( valueSize < op.data.keyValueUpdate.offset + op.data.keyValueUpdate.length ) {
+								op.data.keyValueUpdate.length = valueSize - op.data.keyValueUpdate.offset;
+							}
 
 							keyMetadata.length = keyValue.getSize();
 							keyMetadata.obj = keyValue.data;

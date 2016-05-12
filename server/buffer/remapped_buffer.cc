@@ -100,6 +100,15 @@ bool RemappedBuffer::update( uint8_t keySize, char *keyStr, uint32_t valueUpdate
 		// Perform update
 		uint32_t offset = KEY_VALUE_METADATA_SIZE + keySize + valueUpdateOffset;
 		KeyValue &keyValue = it->second.keyValue;
+		
+		// avoid update overruning the original length of value
+		uint32_t valueSize;
+		char *valueStr;
+		keyValue.deserialize( keyStr, keySize, valueStr, valueSize );
+		if ( valueSize < valueUpdateOffset + valueUpdateSize ) {
+			valueUpdateSize = valueSize - valueUpdateOffset;
+		}
+
 		memcpy( keyValue.data + offset, valueUpdate, valueUpdateSize );
 		if ( remappedKeyValue ) *remappedKeyValue = it->second;
 	}

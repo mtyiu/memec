@@ -448,6 +448,9 @@ bool ServerWorker::handleUpdateRequest(
 	RemappedKeyValue remappedKeyValue;
 	RemappingRecord remappingRecord;
 	Chunk *chunk;
+	char *keyPtr, *valuePtr;
+	uint8_t keySize;
+	uint32_t valueSize;
 
 	// checkGetChunk = true;
 
@@ -456,6 +459,12 @@ bool ServerWorker::handleUpdateRequest(
 		keyMetadata.length = keyValue.getSize();
 		keyMetadata.obj = keyValue.data;
 		chunk = ServerWorker::chunkPool->getChunk( keyValue.data, keyMetadata.offset );
+
+		// avoid update overruning the original length of value
+		keyValue.deserialize( keyPtr, keySize, valuePtr, valueSize );
+		if ( valueSize < header.valueUpdateOffset + header.valueUpdateSize ) {
+			header.valueUpdateSize = valueSize - header.valueUpdateOffset;
+		}
 
 		// Set up Metadata
 		metadata = ChunkUtil::getMetadata( chunk );
@@ -560,6 +569,12 @@ bool ServerWorker::handleUpdateRequest(
 	} else if ( remappedBuffer->update( header.keySize, header.key, header.valueUpdateSize, header.valueUpdateOffset, header.valueUpdate, &remappedKeyValue ) ) {
 		// Handle remapped key
 		// __INFO__( GREEN, "ServerWorker", "handleUpdateRequest", "Handle remapped key: %.*s!", header.keySize, header.key );
+
+		// avoid update overruning the original length of value
+		remappedKeyValue.keyValue.deserialize( keyPtr, keySize, valuePtr, valueSize );
+		if ( valueSize < header.valueUpdateOffset + header.valueUpdateSize ) {
+			header.valueUpdateSize = valueSize - header.valueUpdateOffset;
+		}
 
 		if ( ServerWorker::parityChunkCount ) {
 			// Add the current request to the pending set
