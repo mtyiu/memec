@@ -577,6 +577,7 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 				keyMetadata.set( metadata.listId, metadata.stripeId, metadata.chunkId );
 				keyMetadata.offset = offset;
 				keyMetadata.length = objSize;
+				keyMetadata.obj = ChunkUtil::getData( chunk ) + offset;
 
 				ServerWorker::map->insertKey(
 					key, 0, timestamp, keyMetadata,
