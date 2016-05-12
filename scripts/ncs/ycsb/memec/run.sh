@@ -19,7 +19,7 @@ ID=$(hostname | sed 's/testbed-node//g')
 # Evenly distribute the # of ops to YCSB clients ( 4 in the experiment setting )
 RECORD_COUNT=10000000
 INSERT_COUNT=$(expr ${RECORD_COUNT} \/ 4)
-OPERATION_COUNT=$(expr ${RECORD_COUNT} \/ 4)
+OPERATION_COUNT=$(expr ${RECORD_COUNT} \/ 4 )
 if [ $ID == 3 ]; then
 	INSERT_START=0
 elif [ $ID == 4 ]; then
@@ -39,8 +39,9 @@ ${YCSB_PATH}/bin/ycsb \
 	-p readallfields=false \
 	-p scanproportion=0 \
 	-p table=u \
-	-p fieldlength=200 \
+	-p fieldlength=1024 \
 	-p requestdistribution=zipfian \
+	-p fieldlengthdistribution=zipfian \
 	-p recordcount=${RECORD_COUNT} \
 	-p insertstart=${INSERT_START} \
 	-p insertcount=${INSERT_COUNT} \

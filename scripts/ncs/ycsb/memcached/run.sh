@@ -28,7 +28,8 @@ ${YCSB_PATH}/bin/ycsb \
 	-p readallfields=false \
 	-p scanproportion=0 \
 	-p table=u \
-	-p fieldlength=200 \
+	-p fieldlength=1024 \
+	-p fieldlengthdistribution=zipfian \
 	-p requestdistribution=zipfian \
 	-p recordcount=${RECORD_COUNT} \
 	-p operationcount=${OPERATION_COUNT} \
