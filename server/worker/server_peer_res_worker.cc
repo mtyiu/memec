@@ -484,14 +484,16 @@ bool ServerWorker::handleDeleteResponse( ServerPeerEvent event, bool success, ch
 
 	// erase data delta backup
 	Server *server = Server::getInstance();
-	LOCK( &server->sockets.clientsIdToSocketLock );
-	try {
-		ClientSocket *clientSocket = server->sockets.clientsIdToSocketMap.at( event.instanceId );
-		clientSocket->backup.removeDataDelete( event.requestId, event.instanceId, event.socket );
-	} catch ( std::out_of_range &e ) {
-		__ERROR__( "ServerWorker", "handleDeleteResponse", "Cannot find a pending parity server UPDATE backup for instance ID = %hu, request ID = %u. (Socket mapping not found)", event.instanceId, event.requestId );
+	if ( ! server->config.global.backup.disabled ) {
+		LOCK( &server->sockets.clientsIdToSocketLock );
+		try {
+			ClientSocket *clientSocket = server->sockets.clientsIdToSocketMap.at( event.instanceId );
+			clientSocket->backup.removeDataDelete( event.requestId, event.instanceId, event.socket );
+		} catch ( std::out_of_range &e ) {
+			__ERROR__( "ServerWorker", "handleDeleteResponse", "Cannot find a pending parity server UPDATE backup for instance ID = %hu, request ID = %u. (Socket mapping not found)", event.instanceId, event.requestId );
+		}
+		UNLOCK( &server->sockets.clientsIdToSocketLock );
 	}
-	UNLOCK( &server->sockets.clientsIdToSocketLock );
 
 	// Check pending server UPDATE requests
 	pending = ServerWorker::pending->count( PT_SERVER_PEER_DEL, pid.instanceId, pid.requestId, false, true );
@@ -1562,14 +1564,16 @@ bool ServerWorker::handleDeleteChunkResponse( ServerPeerEvent event, bool succes
 
 	// erase data delta backup
 	Server *server = Server::getInstance();
-	LOCK( &server->sockets.clientsIdToSocketLock );
-	try {
-		ClientSocket *clientSocket = server->sockets.clientsIdToSocketMap.at( event.instanceId );
-		clientSocket->backup.removeDataDelete( event.requestId, event.instanceId, event.socket );
-	} catch ( std::out_of_range &e ) {
-		__ERROR__( "ServerWorker", "handleDeleteChunkResponse", "Cannot find a pending parity server UPDATE backup for instance ID = %hu, request ID = %u. (Socket mapping not found)", event.instanceId, event.requestId );
+	if ( ! server->config.global.backup.disabled ) {
+		LOCK( &server->sockets.clientsIdToSocketLock );
+		try {
+			ClientSocket *clientSocket = server->sockets.clientsIdToSocketMap.at( event.instanceId );
+			clientSocket->backup.removeDataDelete( event.requestId, event.instanceId, event.socket );
+		} catch ( std::out_of_range &e ) {
+			__ERROR__( "ServerWorker", "handleDeleteChunkResponse", "Cannot find a pending parity server UPDATE backup for instance ID = %hu, request ID = %u. (Socket mapping not found)", event.instanceId, event.requestId );
+		}
+		UNLOCK( &server->sockets.clientsIdToSocketLock );
 	}
-	UNLOCK( &server->sockets.clientsIdToSocketLock );
 
 	// Check pending server UPDATE requests
 	pending = ServerWorker::pending->count( PT_SERVER_PEER_DEL_CHUNK, pid.instanceId, pid.requestId, false, true );

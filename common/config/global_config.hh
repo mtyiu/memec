@@ -50,6 +50,9 @@ public:
 		uint32_t queue;
 		float smoothingFactor;
 	} states;
+	struct {
+		bool disabled;
+	} backup;
 
 	GlobalConfig();
 	bool parse( const char *path );

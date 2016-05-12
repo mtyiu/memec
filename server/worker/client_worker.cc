@@ -272,10 +272,14 @@ void ServerWorker::dispatch( ClientEvent event ) {
 						this->handleDegradedDeleteRequest( event, buffer.data, buffer.size );
 						break;
 					case PROTO_OPCODE_ACK_PARITY_DELTA:
-						this->handleAckParityDeltaBackup( event, buffer.data, buffer.size );
+						if ( ! Server::getInstance()->config.global.backup.disabled ) {
+							this->handleAckParityDeltaBackup( event, buffer.data, buffer.size );
+						}
 						break;
 					case PROTO_OPCODE_REVERT_DELTA:
-						this->handleRevertDelta( event, buffer.data, buffer.size );
+						if ( ! Server::getInstance()->config.global.backup.disabled ) {
+							this->handleRevertDelta( event, buffer.data, buffer.size );
+						}
 						break;
 					default:
 						__ERROR__( "ServerWorker", "dispatch", "Invalid opcode from client." );

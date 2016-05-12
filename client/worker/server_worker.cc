@@ -258,27 +258,29 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 			keySize = header.keySize;
 			keyStr = header.key;
 
-			if ( header.isSealed ) {
-				event.socket->backup.insert(
-					keySize, keyStr,
-					PROTO_OPCODE_SET,
-					header.timestamp,
-					header.listId,
-					header.stripeId,
-					header.chunkId,
-					header.sealedListId,
-					header.sealedStripeId,
-					header.sealedChunkId
-				);
-			} else {
-				event.socket->backup.insert(
-					keySize, keyStr,
-					PROTO_OPCODE_SET,
-					header.timestamp,
-					header.listId,
-					header.stripeId,
-					header.chunkId
-				);
+			if ( ! Client::getInstance()->config.global.backup.disabled ) {
+				if ( header.isSealed ) {
+					event.socket->backup.insert(
+						keySize, keyStr,
+						PROTO_OPCODE_SET,
+						header.timestamp,
+						header.listId,
+						header.stripeId,
+						header.chunkId,
+						header.sealedListId,
+						header.sealedStripeId,
+						header.sealedChunkId
+					);
+				} else {
+					event.socket->backup.insert(
+						keySize, keyStr,
+						PROTO_OPCODE_SET,
+						header.timestamp,
+						header.listId,
+						header.stripeId,
+						header.chunkId
+					);
+				}
 			}
 		}
 	} else {
@@ -606,7 +608,7 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 
 	// check if ack is necessary
 	// TODO handle degraded mode
-	if ( ! isDegraded )
+	if ( ! isDegraded && ! Client::getInstance()->config.global.backup.disabled )
 		client->ackParityDelta( 0, event.socket );
 
 	return true;
@@ -624,27 +626,29 @@ bool ClientWorker::handleDeleteResponse( ServerEvent event, bool success, bool i
 		keyStr = header.key;
 		keySize = header.keySize;
 
-		if ( header.isSealed ) {
-			event.socket->backup.insert(
-				keySize, keyStr,
-				PROTO_OPCODE_DELETE,
-				header.timestamp,
-				header.listId,
-				header.stripeId,
-				header.chunkId,
-				header.sealedListId,
-				header.sealedStripeId,
-				header.sealedChunkId
-			);
-		} else {
-			event.socket->backup.insert(
-				keySize, keyStr,
-				PROTO_OPCODE_DELETE,
-				header.timestamp,
-				header.listId,
-				header.stripeId,
-				header.chunkId
-			);
+		if ( ! Client::getInstance()->config.global.backup.disabled ) {
+			if ( header.isSealed ) {
+				event.socket->backup.insert(
+					keySize, keyStr,
+					PROTO_OPCODE_DELETE,
+					header.timestamp,
+					header.listId,
+					header.stripeId,
+					header.chunkId,
+					header.sealedListId,
+					header.sealedStripeId,
+					header.sealedChunkId
+				);
+			} else {
+				event.socket->backup.insert(
+					keySize, keyStr,
+					PROTO_OPCODE_DELETE,
+					header.timestamp,
+					header.listId,
+					header.stripeId,
+					header.chunkId
+				);
+			}
 		}
 	} else {
 		struct KeyHeader header;
@@ -717,7 +721,10 @@ bool ClientWorker::handleAcknowledgement( ServerEvent event, uint8_t opcode, cha
 
 	__DEBUG__( YELLOW, "ClientWorker", "handleAcknowledgement", "Timestamp = (%u, %u).", header.fromTimestamp, header.toTimestamp );
 
-	event.socket->backup.erase( header.fromTimestamp, header.toTimestamp );
+
+	if ( ! Client::getInstance()->config.global.backup.disabled ) {
+		event.socket->backup.erase( header.fromTimestamp, header.toTimestamp );
+	}
 
 	return true;
 }

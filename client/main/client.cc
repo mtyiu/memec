@@ -893,6 +893,10 @@ void Client::printRemapping( FILE *f ) {
 }
 
 void Client::printBackup( FILE *f ) {
+	fprintf( f,
+		"Is backup enabled? %s\n",
+		this->config.global.backup.disabled? "No" : "Yes"
+	);
 	ServerSocket *s;
 	LOCK( &this->sockets.servers.lock );
 	std::vector<ServerSocket *> &sockets = this->sockets.servers.values;

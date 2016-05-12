@@ -29,6 +29,8 @@ GlobalConfig::GlobalConfig() {
 	this->states.workers = 4;
 	this->states.queue = 256;
 	this->states.smoothingFactor = 0.3;
+
+	this->backup.disabled = false;
 }
 
 bool GlobalConfig::parse( const char *path ) {
@@ -108,6 +110,12 @@ bool GlobalConfig::set( const char *section, const char *name, const char *value
 			this->states.queue = atoi( value );
 		} else if ( match( name, "smoothing_factor" ) ) {
 			this->states.smoothingFactor = atof( value );
+		} else {
+			return false;
+		}
+	} else if ( match( section, "backup" ) ) {
+		if ( match( name, "disabled" ) ) {
+			this->backup.disabled = match( value, "true" );
 		} else {
 			return false;
 		}
@@ -360,6 +368,13 @@ void GlobalConfig::print( FILE *f ) {
 			width, "Smoothing factor", this->states.smoothingFactor
 		);
 	}
+
+	fprintf(
+		f,
+		"- Backup\n"
+		"\t- %-*s : %s\n",
+		width, "Disabled?", this->backup.disabled ? "Yes" : "No"
+	);
 
 	fprintf(
 		f,
