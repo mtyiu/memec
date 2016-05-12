@@ -41,7 +41,6 @@ void ApplicationWorker::dispatch( ClientEvent event ) {
 			break;
 		case CLIENT_EVENT_TYPE_SET_REQUEST:
 			// Read contents from file
-			fprintf( stderr, "%u\n", this->buffer.valueSize );
 			ret = ::read( event.message.set.fd, this->buffer.value, this->buffer.valueSize );
 			::close( event.message.set.fd );
 			if ( ret == -1 ) {
@@ -257,7 +256,7 @@ void ApplicationWorker::dispatch( ClientEvent event ) {
 					break;
 				case PROTO_OPCODE_GET:
 					if ( success ) {
-						if ( this->protocol.parseKeyValueHeader( keyValueHeader, buffer.data, buffer.size ) ) {
+						if ( this->protocol.parseKeyValueHeader( keyValueHeader, buffer.data, buffer.size, 0, false ) ) {
 							key.size = keyValueHeader.keySize;
 							key.data = keyValueHeader.key;
 							key.ptr = ( void * ) event.socket;

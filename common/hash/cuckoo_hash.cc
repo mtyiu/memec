@@ -358,8 +358,6 @@ bool CuckooHash::insert( char *key, uint8_t keySize, char *ptr ) {
 	size_t i2 = this->altIndex( i1, tag );
 	size_t lock = this->lockIndex( i1, i2, tag );
 
-	fprintf( stderr, "insert(): hashValue = %u\n", hashValue );
-
 	if ( this->tryAdd( ptr, tag, i1, lock ) ) return 1;
 	if ( this->tryAdd( ptr, tag, i2, lock ) ) return 1;
 

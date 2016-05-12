@@ -383,7 +383,7 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 
 	if ( success ) {
 		struct KeyValueHeader header;
-		if ( this->protocol.parseKeyValueHeader( header, buf, size ) ) {
+		if ( this->protocol.parseKeyValueHeader( header, buf, size, 0, true ) ) {
 			key.set( header.keySize, header.key, ( void * ) event.socket );
 			valueSize = header.valueSize;
 			valueStr = header.value;

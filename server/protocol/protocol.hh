@@ -38,7 +38,8 @@ public:
 	char *resGet(
 		size_t &size, uint16_t instanceId, uint32_t requestId, bool success, bool isDegraded,
 		uint8_t keySize, char *key, uint32_t valueSize = 0, char *value = 0,
-		bool toClient = true
+		bool toClient = true,
+		uint32_t splitOffset = 0, uint32_t splitSize = 0
 	);
 	char *resUpdate(
 		size_t &size, uint16_t instanceId, uint32_t requestId, bool success, bool isDegraded,

@@ -55,15 +55,23 @@ void ServerWorker::dispatch( ClientEvent event ) {
 		{
 			char *key, *value;
 			uint8_t keySize;
-			uint32_t valueSize;
-			event.message.keyValue._deserialize( key, keySize, value, valueSize );
+			uint32_t valueSize, splitOffset, splitSize;
+			event.message.keyValue.deserialize( key, keySize, value, valueSize, splitOffset );
+
+			bool isLarge = LargeObjectUtil::isLarge( keySize, valueSize, 0, &splitSize );
+			if ( ! isLarge ) {
+				splitOffset = 0;
+				splitSize = 0;
+			}
 			buffer.data = this->protocol.resGet(
 				buffer.size,
 				event.instanceId, event.requestId,
 				success,
 				event.isDegraded,
 				keySize, key,
-				valueSize, value
+				valueSize, value,
+				true, // toClient
+				splitOffset, splitSize
 			);
 		}
 			break;
