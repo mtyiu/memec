@@ -533,8 +533,12 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 			( int ) header.keySize, header.key, header.keySize,
 			header.valueUpdateSize, header.valueUpdateOffset
 		);
-		fprintf( stderr, "----- WAITING FOR RETRY ----------\n" );
-		return false;
+		// wait for request replay if the server is in intermediate state or entering degraded state
+		if ( Client::getInstance()->stateTransitHandler.useCoordinatedFlow( event.socket->getAddr(), true, true ) ) {
+			fprintf( stderr, "Wait for retrying on key %.*s\n", header.keySize, header.key );
+			return false;
+		}
+		// else reply failure to application
 	}
 
 	KeyValueUpdate keyValueUpdate;

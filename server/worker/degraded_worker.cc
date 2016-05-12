@@ -1004,7 +1004,7 @@ bool ServerWorker::performDegradedRead(
 	if ( isSealed ) {
 		// Check whether the number of surviving nodes >= k
 		if ( ! ( ServerWorker::chunkCount - reconstructedCount >= ServerWorker::dataChunkCount ) ) {
-			__ERROR__( "ServerWorker", "performDegradedRead", "The number of surviving nodes is less than k. The data cannot be recovered." );
+			__ERROR__( "ServerWorker", "performDegradedRead", "The number of surviving nodes is %d, and is less than k=%d. The data cannot be recovered.", ServerWorker::chunkCount - reconstructedCount, ServerWorker::dataChunkCount );
 			return false;
 		}
 	} else {

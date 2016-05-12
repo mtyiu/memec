@@ -564,7 +564,7 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 
 			// Add all keys in the new chunk to the map
 			offset = 0;
-			chunkSize = header.chunkData.size;
+			chunkSize = ChunkUtil::getSize( chunk );
 			while( offset < chunkSize ) {
 				uint32_t timestamp;
 
