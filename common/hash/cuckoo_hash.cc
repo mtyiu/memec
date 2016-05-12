@@ -124,7 +124,7 @@ TryRead:
 	tags2 = *( ( uint32_t * ) &( buckets[ i2 ] ) );
 #endif
 
-	for ( size_t j = 0; j < 4; j++ ) {
+	for ( size_t j = 0; j < BUCKET_SIZE; j++ ) {
 #ifdef CUCKOO_HASH_ENABLE_TAG
 		uint8_t ch = ( ( uint8_t * ) &tags1 )[ j ];
 		if ( ch == tag )
@@ -396,7 +396,13 @@ bool CuckooHash::tryDel( char *key, uint8_t keySize, uint8_t tag, size_t i, size
 #endif
 		{
 			char *ptr = this->buckets[ i ].ptr[ j ];
-			if ( ! ptr ) return false;
+			if ( ! ptr ) {
+#ifdef CUCKOO_HASH_ENABLE_TAG
+				return false;
+#else
+				continue;
+#endif
+			}
 
 			if ( this->keySize == 0 ) {
 				KeyValue keyValue;
@@ -470,5 +476,4 @@ void CuckooHash::del( char *key, uint8_t keySize ) {
 
 	if ( this->tryDel( key, keySize, tag, i1, lock ) ) return;
 	if ( this->tryDel( key, keySize, tag, i2, lock ) ) return;
-	assert( false );
 }

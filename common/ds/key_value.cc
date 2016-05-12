@@ -134,7 +134,16 @@ char *KeyValue::serialize( char *data, char *key, uint8_t keySize, char *value, 
 
 	if ( value )
 		memcpy( data, value, splitSize );
-
+	fprintf(
+		stderr, "~~ %u %c (%d) | %c (%d) | %c (%d) | %c (%d) | %c (%d) | %c (%d)\n",
+		splitSize,
+		data[ splitSize - 6 ], data[ splitSize - 6 ],
+		data[ splitSize - 5 ], data[ splitSize - 5 ],
+		data[ splitSize - 4 ], data[ splitSize - 4 ],
+		data[ splitSize - 3 ], data[ splitSize - 3 ],
+		data[ splitSize - 2 ], data[ splitSize - 2 ],
+		data[ splitSize - 1 ], data[ splitSize - 1 ]
+	);
 	return ret;
 }
 
@@ -290,4 +299,23 @@ uint32_t LargeObjectUtil::getSplitIndex( uint8_t keySize, uint32_t valueSize, ui
 		isLarge = false;
 		return 0;
 	}
+}
+
+void LargeObjectUtil::writeSplitOffset( char *buf, uint32_t splitOffset ) {
+	splitOffset = htonl( splitOffset );
+	unsigned char *tmp = ( unsigned char * ) &splitOffset;
+	buf[ 0 ] = tmp[ 1 ];
+	buf[ 1 ] = tmp[ 2 ];
+	buf[ 2 ] = tmp[ 3 ];
+	splitOffset = ntohl( splitOffset );
+}
+
+uint32_t LargeObjectUtil::readSplitOffset( char *buf ) {
+	uint32_t splitOffset = 0;
+	unsigned char *tmp = ( unsigned char * ) &splitOffset;
+	tmp[ 1 ] = buf[ 0 ];
+	tmp[ 2 ] = buf[ 1 ];
+	tmp[ 3 ] = buf[ 2 ];
+	splitOffset = ntohl( splitOffset );
+	return splitOffset;
 }

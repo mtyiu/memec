@@ -58,7 +58,10 @@ void ServerWorker::dispatch( ClientEvent event ) {
 			uint32_t valueSize, splitOffset, splitSize;
 			event.message.keyValue.deserialize( key, keySize, value, valueSize, splitOffset );
 
-			bool isLarge = LargeObjectUtil::isLarge( keySize, valueSize, 0, &splitSize );
+			bool isLarge = LargeObjectUtil::isLarge(
+				keySize - ( splitOffset ? SPLIT_OFFSET_SIZE : 0 ),
+				valueSize, 0, &splitSize
+			);
 			if ( ! isLarge ) {
 				splitOffset = 0;
 				splitSize = 0;
@@ -73,6 +76,15 @@ void ServerWorker::dispatch( ClientEvent event ) {
 				true, // toClient
 				splitOffset, splitSize
 			);
+
+			for ( uint32_t i = 0; i < splitSize; i++ ) {
+				fprintf( stderr, "%c (%d) ", value[ i ], value[ i ] );
+				if ( i == 5 ) {
+					fprintf( stderr, "... " );
+					i = splitSize - 8;
+				}
+			}
+			fprintf( stderr, "\n" );
 		}
 			break;
 		case CLIENT_EVENT_TYPE_GET_RESPONSE_FAILURE:
@@ -344,6 +356,15 @@ bool ServerWorker::handleSetRequest( ClientEvent event, char *buf, size_t size, 
 		"[SET] Key: %.*s (key size = %u); Value: (value size = %u); Split offset = %u",
 		( int ) header.keySize, header.key, header.keySize, header.valueSize,
 		header.splitOffset
+	);
+	fprintf(
+		stderr, "%c (%d) | %c (%d) | %c (%d) | %c (%d) | %c (%d) | %c (%d)\n",
+		buf[ size - 6 ], buf[ size - 6 ],
+		buf[ size - 5 ], buf[ size - 5 ],
+		buf[ size - 4 ], buf[ size - 4 ],
+		buf[ size - 3 ], buf[ size - 3 ],
+		buf[ size - 2 ], buf[ size - 2 ],
+		buf[ size - 1 ], buf[ size - 1 ]
 	);
 	return this->handleSetRequest( event, header, needResSet );
 }

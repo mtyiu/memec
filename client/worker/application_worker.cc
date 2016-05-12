@@ -339,11 +339,22 @@ bool ClientWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		this->protocol.reqSet(
 			buffer.size, instanceId, requestId,
 			header.key, header.keySize,
-			header.value, header.valueSize,
+			header.value + splitOffset, header.valueSize,
 			splitOffset, splitSize,
 			buffer.data
 		);
 		packet->size = buffer.size;
+
+		fprintf(
+			stderr, "#%d : ...%c%c%c%c%c%c\n",
+			splitIndex,
+			buffer.data[ buffer.size - 6 ],
+			buffer.data[ buffer.size - 5 ],
+			buffer.data[ buffer.size - 4 ],
+			buffer.data[ buffer.size - 3 ],
+			buffer.data[ buffer.size - 2 ],
+			buffer.data[ buffer.size - 1 ]
+		);
 
 		fprintf(
 			stderr, "#%u: Offset at %u --> data server #%u; request size: %lu.\n",
@@ -396,6 +407,10 @@ bool ClientWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 		( int ) header.keySize, header.key, header.keySize
 	);
 
+	return this->handleGetRequest( event, header, false );
+}
+
+bool ClientWorker::handleGetRequest( ApplicationEvent event, struct KeyHeader &header, bool isGettingSplit ) {
 	uint32_t *original, *reconstructed, reconstructedCount;
 	bool useCoordinatedFlow;
 	ServerSocket *socket;
@@ -403,7 +418,8 @@ bool ClientWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 		PROTO_OPCODE_GET,
 		header.key, header.keySize,
 		original, reconstructed, reconstructedCount,
-		socket, useCoordinatedFlow
+		socket, useCoordinatedFlow,
+		isGettingSplit
 	) ) {
 		Key key;
 		key.set( header.keySize, header.key );
@@ -422,9 +438,11 @@ bool ClientWorker::handleGetRequest( ApplicationEvent event, char *buf, size_t s
 	uint16_t instanceId = Client::instanceId;
 	uint32_t requestId = ClientWorker::idGenerator->nextVal( this->workerId );
 
-	key.dup( header.keySize, header.key, ( void * ) event.socket );
-	if ( ! ClientWorker::pending->insertKey( PT_APPLICATION_GET, event.instanceId, event.requestId, ( void * ) event.socket, key, true, true, Client::getInstance()->timestamp.nextVal() ) ) {
-		__ERROR__( "ClientWorker", "handleGetRequest", "Cannot insert into application GET pending map." );
+	key.dup( header.keySize, header.key, 0 );
+	if ( ! isGettingSplit ) {
+		if ( ! ClientWorker::pending->insertKey( PT_APPLICATION_GET, event.instanceId, event.requestId, ( void * ) event.socket, key, true, true, Client::getInstance()->timestamp.nextVal() ) ) {
+			__ERROR__( "ClientWorker", "handleGetRequest", "Cannot insert into application GET pending map." );
+		}
 	}
 
 	if ( useCoordinatedFlow ) {

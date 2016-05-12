@@ -330,6 +330,31 @@ bool Pending::eraseKey( PendingType type, uint16_t instanceId, uint32_t requestI
 	return ret;
 }
 
+bool Pending::findKey( PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr, PendingIdentifier *pidPtr, Key *keyPtr, bool needsLock, bool needsUnlock, bool checkKey, char* checkKeyPtr, void *keyPtrToBeSet ) {
+	PendingIdentifier pid( instanceId, 0, requestId, 0, ptr );
+	LOCK_T *lock;
+	bool ret;
+
+	std::unordered_multimap<PendingIdentifier, Key> *map;
+	std::unordered_multimap<PendingIdentifier, Key>::iterator lit, rit;
+	if ( ! this->get( type, lock, map ) )
+		return false;
+
+	if ( needsLock ) LOCK( lock );
+	tie( lit, rit ) = map->equal_range( pid );
+	SEARCH_KEY_RANGE( map, lit, rit, ptr, checkKey, checkKeyPtr, ret );
+
+	if ( ret ) {
+		if ( pidPtr ) *pidPtr = lit->first;
+		if ( keyPtrToBeSet )
+			lit->second.ptr = keyPtrToBeSet;
+		if ( keyPtr ) *keyPtr = lit->second;
+	}
+	if ( needsUnlock ) UNLOCK( lock );
+
+	return ret;
+}
+
 bool Pending::eraseKeyValue( PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr, PendingIdentifier *pidPtr, KeyValue *keyValuePtr, bool needsLock, bool needsUnlock, bool checkKey, char* checkKeyPtr ) {
 	PendingIdentifier pid( instanceId, 0, requestId, 0, ptr );
 	LOCK_T *lock;

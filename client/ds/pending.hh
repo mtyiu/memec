@@ -330,6 +330,13 @@ public:
 		bool needsLock = true, bool needsUnlock = true,
 		bool checkKey = false, char *checkKeyPtr = 0
 	);
+	bool findKey(
+		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr,
+		PendingIdentifier *pidPtr, Key *keyPtr,
+		bool needsLock, bool needsUnlock,
+		bool checkKey, char *checkKeyPtr,
+		void *keyPtrToBeSet = 0
+	);
 	bool eraseKeyValue(
 		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr = 0,
 		PendingIdentifier *pidPtr = 0, KeyValue *keyValuePtr = 0,

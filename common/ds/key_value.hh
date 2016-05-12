@@ -53,6 +53,8 @@ public:
 	static bool isLarge( uint8_t keySize, uint32_t valueSize, uint32_t *numOfSplitPtr = 0, uint32_t *splitSizePtr = 0 );
 	static uint32_t getValueOffsetAtSplit( uint8_t keySize, uint32_t valueSize, uint32_t index );
 	static uint32_t getSplitIndex( uint8_t keySize, uint32_t valueSize, uint32_t offset, bool &isLarge );
+	static void writeSplitOffset( char *buf, uint32_t splitOffset );
+	static uint32_t readSplitOffset( char *buf );
 };
 
 #endif
