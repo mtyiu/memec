@@ -425,10 +425,11 @@ size_t Protocol::generateKeyValueHeader(
 	valueSize = ntohl( valueSize );
 	buf += PROTO_KEY_VALUE_SIZE;
 
+	memmove( buf, key, keySize );
+	buf += keySize;
+
 	if ( splitSize == 0 || splitSize == valueSize ) {
 		// No need to split
-		memmove( buf, key, keySize );
-		buf += keySize;
 		if ( valueSize )
 			memmove( buf, value, valueSize );
 		bytes += PROTO_KEY_VALUE_SIZE + keySize + valueSize;
@@ -441,9 +442,6 @@ size_t Protocol::generateKeyValueHeader(
 		buf[ 2 ] = tmp[ 3 ];
 		splitOffset = ntohl( splitOffset );
 		buf += PROTO_SPLIT_OFFSET_SIZE;
-
-		memmove( buf, key, keySize );
-		buf += keySize;
 
 		if ( splitOffset + splitSize > valueSize )
 			splitSize = valueSize - splitOffset;
@@ -480,6 +478,9 @@ bool Protocol::parseKeyValueHeader( size_t offset, uint8_t &keySize, char *&key,
 
 	ptr += PROTO_KEY_VALUE_SIZE;
 
+	key = ptr;
+	ptr += keySize;
+
 	if ( enableSplit && LargeObjectUtil::isLarge( keySize, valueSize, &numOfSplit, &splitSize ) ) {
 		splitOffset = 0;
 		tmp = ( unsigned char * ) &splitOffset;
@@ -501,8 +502,7 @@ bool Protocol::parseKeyValueHeader( size_t offset, uint8_t &keySize, char *&key,
 			return false;
 	}
 
-	key = ptr;
-	value = valueSize ? key + keySize : 0;
+	value = valueSize ? ptr : 0;
 
 	return true;
 }

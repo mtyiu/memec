@@ -13,7 +13,7 @@ char *ClientProtocol::reqDegradedSetLock( size_t &size, uint16_t instanceId, uin
 	return this->buffer.send;
 }
 
-char *ClientProtocol::reqDegradedSet( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t *original, uint32_t *remapped, uint32_t remappedCount, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf ) {
+char *ClientProtocol::reqDegradedSet( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t *original, uint32_t *remapped, uint32_t remappedCount, char *key, uint8_t keySize, char *value, uint32_t valueSize, uint32_t splitOffset, uint32_t splitSize, char *buf ) {
 	// -- common/protocol/remap_protocol.cc --
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateDegradedSetHeader(
@@ -25,6 +25,7 @@ char *ClientProtocol::reqDegradedSet( size_t &size, uint16_t instanceId, uint32_
 		original, remapped, remappedCount,
 		keySize, key,
 		valueSize, value,
+		splitOffset, splitSize,
 		buf
 	);
 	return buf;

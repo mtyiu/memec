@@ -68,6 +68,37 @@ char *Map::findObject(
 	return ret;
 }
 
+char *Map::findLargeObject(
+	char *keyStr, uint8_t keySize, uint32_t splitOffset,
+	KeyValue *keyValuePtr,
+	Key *keyPtr,
+	bool needsLock, bool needsUnlock
+) {
+	char *ret = 0;
+
+	if ( needsLock ) LOCK( &this->keysLock );
+	ret = this->keys.find( keyStr, keySize + ( splitOffset ? SPLIT_OFFSET_SIZE : 0 ) );
+	if ( needsUnlock ) UNLOCK( &this->keysLock );
+
+	if ( keyValuePtr ) {
+		if ( ret )
+			keyValuePtr->set( ret );
+		else
+			keyValuePtr->clear();
+	}
+	if ( keyPtr ) {
+		if ( ret ) {
+			KeyValue keyValue;
+			keyValue.set( ret );
+			*keyPtr = keyValue.key();
+		} else {
+			keyPtr->set( keySize, keyStr );
+		}
+	}
+
+	return ret;
+}
+
 bool Map::deleteKey(
 	Key key, uint8_t opcode, uint32_t &timestamp,
 	KeyMetadata &keyMetadata,

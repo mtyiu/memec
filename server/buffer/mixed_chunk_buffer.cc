@@ -16,7 +16,7 @@ bool MixedChunkBuffer::set(
 	char *key, uint8_t keySize,
 	char *value, uint32_t valueSize,
 	uint8_t opcode, uint32_t &timestamp,
-	uint32_t &stripeId, uint32_t chunkId,
+	uint32_t &stripeId, uint32_t chunkId, uint32_t splitOffset,
 	bool *isSealed, Metadata *sealed,
 	Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk,
 	GetChunkBuffer *getChunkBuffer
@@ -27,7 +27,8 @@ bool MixedChunkBuffer::set(
 				worker,
 				key, keySize,
 				value, valueSize,
-				opcode, timestamp, stripeId,
+				opcode, timestamp,
+				stripeId, splitOffset,
 				isSealed, sealed
 			);
 			return true;
@@ -35,7 +36,9 @@ bool MixedChunkBuffer::set(
 			timestamp = 0;
 			if ( isSealed ) *isSealed = false;
 			return this->buffer.parity->set(
-				key, keySize, value, valueSize, chunkId,
+				key, keySize,
+				value, valueSize,
+				chunkId, splitOffset,
 				dataChunks, dataChunk, parityChunk,
 				getChunkBuffer
 			);

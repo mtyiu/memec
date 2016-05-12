@@ -238,8 +238,7 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 			return false;
 		}
 		if ( header.isParity ) {
-			event.socket->printAddress( stderr );
-			__INFO__(
+			__DEBUG__(
 				BLUE, "ClientWorker", "handleSetResponse",
 				"[SET] Key: %.*s (key size = %u)",
 				( int ) header.keySize, header.key, header.keySize
@@ -248,8 +247,7 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 			keySize = header.keySize;
 			keyStr = header.key;
 		} else {
-			event.socket->printAddress( stderr );
-			__INFO__(
+			__DEBUG__(
 				BLUE, "ClientWorker", "handleSetResponse",
 				"[SET] [%u] Key: %.*s (key size = %u) at (%u, %u, %u)",
 				header.timestamp,
@@ -315,8 +313,6 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 
 	// Check pending server SET requests
 	pending = ClientWorker::pending->count( PT_SERVER_SET, pid.instanceId, pid.requestId, false, true );
-
-	fprintf( stderr, " *** pending = %u ***\n", pending );
 
 	// Mark the elapse time as latency
 	if ( ClientWorker::updateInterval ) {
@@ -391,6 +387,13 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 			key.set( header.keySize, header.key, ( void * ) event.socket );
 			valueSize = header.valueSize;
 			valueStr = header.value;
+
+			__INFO__(
+				BLUE, "ClientWorker", "handleGetResponse",
+				"[GET] Key: %.*s (key size = %u); Value: (value size = %u); split offset = %u.",
+				header.keySize, header.key, header.keySize,
+				header.valueSize, header.splitOffset
+			);
 		} else {
 			__ERROR__( "ClientWorker", "handleGetResponse", "Invalid GET response." );
 			return false;

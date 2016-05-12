@@ -76,7 +76,7 @@ bool Protocol::parseRemappingLockHeader( struct RemappingLockHeader &header, cha
 	);
 }
 
-size_t Protocol::generateDegradedSetHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t *original, uint32_t *remapped, uint32_t remappedCount, uint8_t keySize, char *key, uint32_t valueSize, char *value, char *sendBuf ) {
+size_t Protocol::generateDegradedSetHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t *original, uint32_t *remapped, uint32_t remappedCount, uint8_t keySize, char *key, uint32_t valueSize, char *value, uint32_t splitOffset, uint32_t splitSize, char *sendBuf ) {
 	if ( ! sendBuf ) sendBuf = this->buffer.send;
 	char *buf = sendBuf + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader(
@@ -106,9 +106,29 @@ size_t Protocol::generateDegradedSetHeader( uint8_t magic, uint8_t to, uint8_t o
 	bytes += keySize;
 	buf += keySize;
 
-	memmove( buf, value, valueSize );
-	bytes += valueSize;
-	buf += valueSize;
+	if ( splitSize == 0 || splitSize == valueSize ) {
+		// No need to split
+		memmove( buf, value, valueSize );
+		bytes += valueSize;
+		buf += valueSize;
+	} else {
+		// Include split offset
+		splitOffset = htonl( splitOffset );
+		unsigned char *tmp = ( unsigned char * ) &splitOffset;
+		buf[ 0 ] = tmp[ 1 ];
+		buf[ 1 ] = tmp[ 2 ];
+		buf[ 2 ] = tmp[ 3 ];
+		splitOffset = ntohl( splitOffset );
+		bytes += PROTO_SPLIT_OFFSET_SIZE;
+		buf += PROTO_SPLIT_OFFSET_SIZE;
+
+		if ( splitOffset + splitSize > valueSize )
+			splitSize = valueSize - splitOffset;
+
+		memmove( buf, value + splitOffset, splitSize );
+		bytes += splitSize;
+		buf += splitSize;
+	}
 
 	if ( remappedCount ) {
 		remappedCount *= 2; // Include both list ID and chunk ID
@@ -127,7 +147,7 @@ size_t Protocol::generateDegradedSetHeader( uint8_t magic, uint8_t to, uint8_t o
 	return bytes;
 }
 
-bool Protocol::parseDegradedSetHeader( size_t offset, uint32_t &listId, uint32_t &chunkId, uint32_t *&original, uint32_t *&remapped, uint32_t &remappedCount, uint8_t &keySize, char *&key, uint32_t &valueSize, char *&value, char *buf, size_t size ) {
+bool Protocol::parseDegradedSetHeader( size_t offset, uint32_t &listId, uint32_t &chunkId, uint32_t *&original, uint32_t *&remapped, uint32_t &remappedCount, uint8_t &keySize, char *&key, uint32_t &valueSize, char *&value, uint32_t &splitOffset, char *buf, size_t size ) {
 	if ( size - offset < PROTO_DEGRADED_SET_SIZE )
 		return false;
 
@@ -147,13 +167,37 @@ bool Protocol::parseDegradedSetHeader( size_t offset, uint32_t &listId, uint32_t
 	valueSize = ntohl( valueSize );
 	ptr += 3;
 
-	if ( size - offset < PROTO_DEGRADED_SET_SIZE + keySize + valueSize + remappedCount * 4 * 4 )
-		return false;
-
 	key = ptr;
-	value = ptr + keySize;
+	ptr += keySize;
 
-	ptr += keySize + valueSize;
+	uint32_t numOfSplit, splitSize;
+	if ( LargeObjectUtil::isLarge( keySize, valueSize, &numOfSplit, &splitSize ) ) {
+		splitOffset = 0;
+		tmp = ( unsigned char * ) &splitOffset;
+		tmp[ 1 ] = ptr[ 0 ];
+		tmp[ 2 ] = ptr[ 1 ];
+		tmp[ 3 ] = ptr[ 2 ];
+		splitOffset = ntohl( splitOffset );
+		ptr += PROTO_SPLIT_OFFSET_SIZE;
+
+		if ( splitOffset + splitSize > valueSize )
+			splitSize = valueSize - splitOffset;
+
+		if ( size - offset < PROTO_DEGRADED_SET_SIZE + PROTO_SPLIT_OFFSET_SIZE + keySize + splitSize + remappedCount * 4 * 4 )
+			return false;
+
+		value = ptr;
+
+		ptr += splitSize;
+	} else {
+		splitOffset = 0;
+
+		if ( size - offset < PROTO_DEGRADED_SET_SIZE + keySize + valueSize + remappedCount * 4 * 4 )
+			return false;
+
+		value = ptr;
+		ptr += valueSize;
+	}
 
 	if ( remappedCount ) {
 		uint32_t count = remappedCount * 2;
@@ -187,6 +231,7 @@ bool Protocol::parseDegradedSetHeader( struct DegradedSetHeader &header, char *b
 		header.key,
 		header.valueSize,
 		header.value,
+		header.splitOffset,
 		buf, size
 	);
 }

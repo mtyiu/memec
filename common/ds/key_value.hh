@@ -13,7 +13,7 @@ public:
 	char *data;
 	void *ptr; // Extra data to be augmented to the object
 
-	Key key();
+	Key key( bool enableSplit = false );
 
 	void dup( char *key, uint8_t keySize, char *value, uint32_t valueSize, uint32_t splitOffset, void *ptr = 0 );
 	void _dup( char *key, uint8_t keySize, char *value, uint32_t valueSize, void *ptr = 0 );

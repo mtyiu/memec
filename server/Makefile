@@ -56,7 +56,6 @@ EXTERNAL_LIB= \
 	$(MEMEC_SRC_ROOT)/common/config/global_config.o \
 	$(MEMEC_SRC_ROOT)/common/config/server_addr.o \
 	$(MEMEC_SRC_ROOT)/common/ds/bitmask_array.o \
-	$(MEMEC_SRC_ROOT)/common/ds/chunk.o \
 	$(MEMEC_SRC_ROOT)/common/ds/chunk_pool.o \
 	$(MEMEC_SRC_ROOT)/common/ds/key_value.o \
 	$(MEMEC_SRC_ROOT)/common/ds/load.o \

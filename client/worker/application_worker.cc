@@ -252,7 +252,7 @@ bool ClientWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		__ERROR__( "ClientWorker", "handleSetRequest", "Invalid SET request." );
 		return false;
 	}
-	__DEBUG__(
+	__INFO__(
 		BLUE, "ClientWorker", "handleSetRequest",
 		"[SET] Key: %.*s (key size = %u); Value: (value size = %u)",
 		( int ) header.keySize, header.key, header.keySize, header.valueSize

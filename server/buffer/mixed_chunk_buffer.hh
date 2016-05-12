@@ -27,7 +27,7 @@ public:
 		char *key, uint8_t keySize,
 		char *value, uint32_t valueSize,
 		uint8_t opcode, uint32_t &timestamp,
-		uint32_t &stripeId, uint32_t chunkId,
+		uint32_t &stripeId, uint32_t chunkId, uint32_t splitOffset,
 		bool *isSealed, Metadata *sealed,
 		Chunk **chunks, Chunk *dataChunk, Chunk *parityChunk,
 		GetChunkBuffer *getChunkBuffer

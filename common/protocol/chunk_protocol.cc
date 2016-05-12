@@ -282,21 +282,23 @@ size_t Protocol::generateChunkKeyValueHeader(
 				valueSize = ntohl( valueSize );
 
 				if ( isLarge ) {
-					splitSize = htonl( splitSize );
-					tmp = ( unsigned char * ) &splitSize;
-					buf[ 4 ] = tmp[ 1 ];
-					buf[ 5 ] = tmp[ 2 ];
-					buf[ 6 ] = tmp[ 3 ];
-					splitSize = ntohl( splitSize );
-
-					buf += PROTO_KEY_VALUE_SIZE + PROTO_SPLIT_OFFSET_SIZE;
+					buf += PROTO_KEY_VALUE_SIZE;
 
 					memmove( buf, keyStr, keySize );
-					memmove( buf + keySize, valueStr, splitSize );
+					buf += keySize;
 
-					buf += keySize + splitSize;
+					splitSize = htonl( splitSize );
+					tmp = ( unsigned char * ) &splitSize;
+					buf[ 0 ] = tmp[ 1 ];
+					buf[ 1 ] = tmp[ 2 ];
+					buf[ 2 ] = tmp[ 3 ];
+					splitSize = ntohl( splitSize );
+					buf += PROTO_SPLIT_OFFSET_SIZE;
 
-					bytes += PROTO_KEY_VALUE_SIZE + PROTO_SPLIT_OFFSET_SIZE + keySize + splitSize;
+					memmove( buf, valueStr, splitSize );
+					buf += splitSize;
+
+					bytes += PROTO_KEY_VALUE_SIZE + keySize + PROTO_SPLIT_OFFSET_SIZE + splitSize;
 				} else {
 					memmove( buf + 4, keyStr, keySize );
 					memmove( buf + 4 + keySize, valueStr, valueSize );

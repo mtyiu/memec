@@ -170,6 +170,7 @@ bool ClientWorker::handleDegradedSetLockResponse( CoordinatorEvent event, bool s
 			header.original, header.remapped, header.remappedCount,
 			keyStr, keySize,
 			valueStr, valueSize,
+			0, 0,
 			packet->data
 		);
 		packet->size = buffer.size;
@@ -207,7 +208,9 @@ bool ClientWorker::handleDegradedSetLockResponse( CoordinatorEvent event, bool s
 		originalListId, originalChunkId,
 		header.original, header.remapped, header.remappedCount,
 		keyStr, keySize,
-		valueStr, valueSize
+		valueStr, valueSize,
+		0, 0,
+		0
 	);
 	sentBytes = dataServerSocket->send( buffer.data, buffer.size, connected );
 	if ( sentBytes != ( ssize_t ) buffer.size ) {

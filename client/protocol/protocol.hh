@@ -88,7 +88,8 @@ public:
 		uint32_t *original, uint32_t *remapped, uint32_t remappedCount,
 		char *key, uint8_t keySize,
 		char *value, uint32_t valueSize,
-		char *buf = 0
+		uint32_t splitOffset, uint32_t splitSize,
+		char *buf
 	);
 
 	// ---------- degraded_protocol.cc ----------

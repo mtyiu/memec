@@ -187,7 +187,7 @@ bool ServerWorker::handleDegradedSetRequest( ClientEvent event, char *buf, size_
 			header.key, header.keySize,
 			header.value, header.valueSize,
 			PROTO_OPCODE_DEGRADED_SET, timestamp,
-			stripeId, dataChunkId,
+			stripeId, dataChunkId, header.splitOffset,
 			&isSealed, &sealed,
 			this->chunks, this->dataChunk, this->parityChunk,
 			ServerWorker::getChunkBuffer

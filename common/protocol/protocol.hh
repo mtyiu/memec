@@ -243,8 +243,8 @@ struct ChunkKeyValueUpdateHeader {
 struct KeyValueHeader {
 	uint8_t keySize;
 	uint32_t valueSize; // 3 bytes
+    char *key;
     uint32_t splitOffset; // 3 bytes (only exists if total object size > chunkSize )
-	char *key;
 	char *value;
 };
 
@@ -307,8 +307,9 @@ struct DegradedSetHeader {
 	uint32_t chunkId;
 	uint32_t remappedCount;
 	uint8_t keySize;
-	uint32_t valueSize; // 3 bytes
+	uint32_t valueSize;   // 3 bytes
 	char *key;
+    uint32_t splitOffset; // 3 bytes
 	char *value;
 	uint32_t *original;
 	uint32_t *remapped;
@@ -809,6 +810,7 @@ protected:
 		uint32_t *original, uint32_t *remapped, uint32_t remappedCount,
 		uint8_t keySize, char *key,
 		uint32_t valueSize, char *value,
+        uint32_t splitOffset = 0, uint32_t splitSize = 0,
 		char *sendBuf = 0
 	);
 	bool parseDegradedSetHeader(
@@ -816,6 +818,7 @@ protected:
 		uint32_t *&original, uint32_t *&remapped, uint32_t &remappedCount,
 		uint8_t &keySize, char *&key,
 		uint32_t &valueSize, char *&value,
+        uint32_t &splitOffset,
 		char *buf, size_t size
 	);
 

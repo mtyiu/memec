@@ -76,6 +76,12 @@ public:
 		Key *keyPtr = 0,
 		bool needsLock = true, bool needsUnlock = true
 	);
+	char *findLargeObject(
+		char *keyStr, uint8_t keySize, uint32_t splitOffset,
+		KeyValue *keyValuePtr = 0,
+		Key *keyPtr = 0,
+		bool needsLock = true, bool needsUnlock = true
+	);
 	bool deleteKey(
 		Key key, uint8_t opcode, uint32_t &timestamp,
 		KeyMetadata &keyMetadata,
