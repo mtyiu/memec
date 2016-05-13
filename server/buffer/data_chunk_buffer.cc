@@ -188,7 +188,11 @@ KeyMetadata DataChunkBuffer::set(
 	// Update key map
 	Key keyObj;
 	keyObj.set( keySize, key );
-	ChunkBuffer::map->insertKey( keyObj, opcode, timestamp, keyMetadata );
+	ChunkBuffer::map->insertKey(
+		keyObj, opcode, timestamp, keyMetadata,
+		true, true, true,
+		LargeObjectUtil::isLarge( keySize, valueSize )
+	);
 	stripeId = keyMetadata.stripeId;
 
 	return keyMetadata;

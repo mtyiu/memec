@@ -357,15 +357,6 @@ bool ServerWorker::handleSetRequest( ClientEvent event, char *buf, size_t size, 
 		( int ) header.keySize, header.key, header.keySize, header.valueSize,
 		header.splitOffset
 	);
-	fprintf(
-		stderr, "%c (%d) | %c (%d) | %c (%d) | %c (%d) | %c (%d) | %c (%d)\n",
-		buf[ size - 6 ], buf[ size - 6 ],
-		buf[ size - 5 ], buf[ size - 5 ],
-		buf[ size - 4 ], buf[ size - 4 ],
-		buf[ size - 3 ], buf[ size - 3 ],
-		buf[ size - 2 ], buf[ size - 2 ],
-		buf[ size - 1 ], buf[ size - 1 ]
-	);
 	return this->handleSetRequest( event, header, needResSet );
 }
 
@@ -400,8 +391,10 @@ bool ServerWorker::handleSetRequest( ClientEvent event, struct KeyValueHeader &h
 		fprintf( stderr, "The key already exists: %.*s\n", header.keySize, header.key );
 	} else {
 		if ( isLarge && header.splitOffset ) {
-			header.keySize += SPLIT_OFFSET_SIZE;
+			// header.keySize += SPLIT_OFFSET_SIZE;
 		}
+
+		fprintf( stderr, "header.value[ 0 ] = %c\n", header.value[ 0 ] );
 
 		if ( ServerWorker::disableSeal ) {
 			ServerWorker::chunkBuffer->at( listId )->set(

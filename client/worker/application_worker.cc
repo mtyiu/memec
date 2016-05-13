@@ -345,16 +345,7 @@ bool ClientWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		);
 		packet->size = buffer.size;
 
-		fprintf(
-			stderr, "#%d : ...%c%c%c%c%c%c\n",
-			splitIndex,
-			buffer.data[ buffer.size - 6 ],
-			buffer.data[ buffer.size - 5 ],
-			buffer.data[ buffer.size - 4 ],
-			buffer.data[ buffer.size - 3 ],
-			buffer.data[ buffer.size - 2 ],
-			buffer.data[ buffer.size - 1 ]
-		);
+		fprintf( stderr, "%c\n", header.value[ splitOffset ] );
 
 		fprintf(
 			stderr, "#%u: Offset at %u --> data server #%u; request size: %lu.\n",

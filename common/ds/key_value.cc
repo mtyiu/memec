@@ -132,18 +132,9 @@ char *KeyValue::serialize( char *data, char *key, uint8_t keySize, char *value, 
 		splitSize = valueSize;
 	}
 
-	if ( value )
+	if ( value ) {
 		memcpy( data, value, splitSize );
-	fprintf(
-		stderr, "~~ %u %c (%d) | %c (%d) | %c (%d) | %c (%d) | %c (%d) | %c (%d)\n",
-		splitSize,
-		data[ splitSize - 6 ], data[ splitSize - 6 ],
-		data[ splitSize - 5 ], data[ splitSize - 5 ],
-		data[ splitSize - 4 ], data[ splitSize - 4 ],
-		data[ splitSize - 3 ], data[ splitSize - 3 ],
-		data[ splitSize - 2 ], data[ splitSize - 2 ],
-		data[ splitSize - 1 ], data[ splitSize - 1 ]
-	);
+	}
 	return ret;
 }
 

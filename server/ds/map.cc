@@ -20,20 +20,20 @@ bool Map::insertKey(
 	Key key, uint8_t opcode, uint32_t &timestamp,
 	KeyMetadata &keyMetadata,
 	bool needsLock, bool needsUnlock,
-	bool needsUpdateOpMetadata
+	bool needsUpdateOpMetadata,
+	bool isLarge
 ) {
-	key.dup();
-
 	std::pair<Key, KeyMetadata> keyPair( key, keyMetadata );
 
 	if ( needsLock ) LOCK( &this->keysLock );
 
-	if ( ! this->keys.insert( key.data, key.size, keyMetadata.obj ) ) {
+	if ( ! this->keys.insert( key.data, key.size + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ), keyMetadata.obj ) ) {
 		if ( needsUnlock ) UNLOCK( &this->keysLock );
 		return false;
 	}
 	if ( needsUnlock ) UNLOCK( &this->keysLock );
 
+	key.dup();
 	return needsUpdateOpMetadata ? this->insertOpMetadata( opcode, timestamp, key, keyMetadata ) : true;
 }
 
