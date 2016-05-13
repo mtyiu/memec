@@ -18,5 +18,5 @@ if [ $# -gt 0 ]; then
 else
 	bin/coordinator \
 		-p ${CONFIG_PATH} \
-		-o coordinator ${COORDINATOR_NAME} tcp://${COORDINATOR_IP}:${COORDINATOR_PORT}/ 2>&1 | tee ${MEMEC_PATH}/coordinator.log
+		-o coordinator ${COORDINATOR_NAME} tcp://${COORDINATOR_IP}:${COORDINATOR_PORT}/ 2>&1 | tee ${MEMEC_PATH}/coordinator.std.log
 fi

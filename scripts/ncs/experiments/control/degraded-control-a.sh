@@ -46,7 +46,6 @@ for delay in $delays; do
 		done
 
 		set_overload $delay
-		ssh testbed-node1 "screen -S coordinator -p 0 -X stuff \"overload$(printf '\r')7$(printf '\r')0$(printf '\r')\""
 
 		for w in $workloads; do
 			for n in 3 4 8 9; do
@@ -72,8 +71,8 @@ for delay in $delays; do
 		sleep 30
 
 		for n in 3 4 8 9; do
-			mkdir -p ${BASE_PATH}/results/degraded-a/$delay/$iter/node$n
-			scp testbed-node$n:${BASE_PATH}/results/degraded/*.txt ${BASE_PATH}/results/degraded-a/$delay/$iter/node$n
+			mkdir -p ${BASE_PATH}/results/degraded-control-a/$delay/$iter/node$n
+			scp testbed-node$n:${BASE_PATH}/results/degraded/*.txt ${BASE_PATH}/results/degraded-control-a/$delay/$iter/node$n
 			ssh testbed-node$n 'rm -rf ${BASE_PATH}/results/*'
 		done
 	done

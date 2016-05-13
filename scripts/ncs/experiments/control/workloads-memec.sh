@@ -63,6 +63,6 @@ for iter in {1..10}; do
 	done
 done
 
-sed -i "s/^scheme=.*$/scheme=raid0/g" ${MEMEC_PATH}/bin/config/ncs/global.ini
+sed -i "s/^scheme=.*$/scheme=rdp/g" ${MEMEC_PATH}/bin/config/ncs/global.ini
 
 ${BASE_PATH}/scripts/util/rsync.sh
