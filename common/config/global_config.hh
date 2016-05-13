@@ -49,10 +49,20 @@ public:
 		uint16_t workers;
 		uint32_t queue;
 		float smoothingFactor;
+		struct {
+			struct {
+				bool enabled;
+			} transition;
+		} log;
 	} states;
 	struct {
 		bool disabled;
 	} backup;
+	struct {
+		struct {
+			bool enabled;
+		} log;
+	} recovery;
 
 	GlobalConfig();
 	bool parse( const char *path );

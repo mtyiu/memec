@@ -1,5 +1,7 @@
 #include "state_transit_handler.hh"
 #include "state_transit_worker.hh"
+#include "../main/coordinator.hh"
+#include "../ds/log.hh"
 #include "../../common/util/debug.hh"
 #include "arpa/inet.h"
 
@@ -64,6 +66,12 @@ bool CoordinatorStateTransitWorker::transitToDegraded( StateTransitEvent event )
 	}
 
 	UNLOCK( &csth->serversStateLock[ event.server ] );
+	double elapsedTime = get_elapsed_time( csth->transitStartTime ) * 1000;
+	if ( Coordinator::getInstance()->config.global.states.log.transition.enabled ) {
+		Log log;
+		log.setTransition( true /* isToDegraded */, elapsedTime );
+		Coordinator::getInstance()->appendLog( log );
+	}
 	return true;
 }
 
@@ -119,6 +127,14 @@ bool CoordinatorStateTransitWorker::transitToNormal( StateTransitEvent event ) {
 		return false;
 	}
 	UNLOCK( &csth->serversStateLock[ event.server ] );
+
+	double elapsedTime = get_elapsed_time( csth->transitStartTime ) * 1000;
+	if ( Coordinator::getInstance()->config.global.states.log.transition.enabled ) {
+		Log log;
+		log.setTransition( false /* isToDegraded */, elapsedTime );
+		Coordinator::getInstance()->appendLog( log );
+	}
+
 	return true;
 }
 

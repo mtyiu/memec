@@ -150,6 +150,7 @@ bool CoordinatorStateTransitHandler::transitToDegraded( std::vector<struct socka
 	event.start = true;
 	vector<struct sockaddr_in> serversToStart;
 
+	this->transitStartTime = get_timer();
 	if ( forced ) {
 		for ( uint32_t i = 0, len = servers->size(); i < len; i++ ) {
 			this->addFailedServer( servers->at( i ) );
@@ -227,6 +228,7 @@ bool CoordinatorStateTransitHandler::transitToNormal( std::vector<struct sockadd
 	}
 	UNLOCK( &this->aliveServersLock );
 
+	this->transitStartTime = get_timer();
 	if ( forced ) {
 		for ( uint32_t i = 0, len = servers->size(); i < len; i++ ) {
 			this->addFailedServer( servers->at( i ) );

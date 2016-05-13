@@ -29,8 +29,11 @@ GlobalConfig::GlobalConfig() {
 	this->states.workers = 4;
 	this->states.queue = 256;
 	this->states.smoothingFactor = 0.3;
+	this->states.log.transition.enabled = true;
 
 	this->backup.disabled = false;
+
+	this->recovery.log.enabled = true;
 }
 
 bool GlobalConfig::parse( const char *path ) {
@@ -110,6 +113,14 @@ bool GlobalConfig::set( const char *section, const char *name, const char *value
 			this->states.queue = atoi( value );
 		} else if ( match( name, "smoothing_factor" ) ) {
 			this->states.smoothingFactor = atof( value );
+		} else if ( match( name, "transition_log" ) ) {
+			this->states.log.transition.enabled = match( value, "true" );
+		} else {
+			return false;
+		}
+	} else if ( match( section, "recovery" ) ) {
+		if ( match( name, "log" ) ) {
+			this->recovery.log.enabled = match( value, "true" );
 		} else {
 			return false;
 		}

@@ -2,7 +2,8 @@
 #define __COORDINATOR_DS_LOG_HH__
 
 enum LogType {
-	LOG_TYPE_RECOVERY
+	LOG_TYPE_RECOVERY,
+	LOG_TYPE_STATE_TRANSITION
 };
 
 class Log {
@@ -17,6 +18,10 @@ private:
 			uint32_t numUnsealedKeys;
 			double elapsedTime;
 		} recovery;
+		struct {
+			bool isToDegraded;
+			double elapsedTime;
+		} transition;
 	} data;
 
 public:
@@ -33,6 +38,12 @@ public:
 		this->data.recovery.elapsedTime = elapsedTime;
 	}
 
+	void setTransition( bool isToDegraded, double elapsedTime ) {
+		this->type = LOG_TYPE_STATE_TRANSITION;
+		this->data.transition.isToDegraded = isToDegraded;
+		this->data.transition.elapsedTime = elapsedTime;
+	}
+
 	void print( FILE *f ) {
 		fprintf( f, "%lf\t", this->timestamp );
 		switch( this->type ) {
@@ -44,6 +55,13 @@ public:
 					this->data.recovery.numChunks,
 					this->data.recovery.numUnsealedKeys,
 					this->data.recovery.elapsedTime
+				);
+				break;
+			case LOG_TYPE_STATE_TRANSITION:
+				fprintf(
+					f, "%s: %lf\n",
+					this->data.transition.isToDegraded? "ToD" : "ToN",
+					this->data.transition.elapsedTime
 				);
 				break;
 			default:

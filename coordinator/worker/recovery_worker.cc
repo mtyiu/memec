@@ -35,15 +35,17 @@ bool CoordinatorWorker::handlePromoteBackupServerResponse( ServerEvent event, ch
 		if ( coordinator->stateTransitHandler )
 			coordinator->stateTransitHandler->removeAliveServer( original->getAddr() );
 
-		Log log;
-		log.setRecovery(
-			header.addr,
-			header.port,
-			header.chunkCount,
-			header.unsealedCount,
-			elapsedTime
-		);
-		Coordinator::getInstance()->appendLog( log );
+		if ( coordinator->config.global.recovery.log.enabled ) {
+			Log log;
+			log.setRecovery(
+				header.addr,
+				header.port,
+				header.chunkCount,
+				header.unsealedCount,
+				elapsedTime
+			);
+			Coordinator::getInstance()->appendLog( log );
+		}
 
 		// Start recovery
 		ServerSocket *failedServerSocket = 0;

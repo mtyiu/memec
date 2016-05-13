@@ -15,6 +15,7 @@
 #include "../../common/state_transit/state_transit_handler.hh"
 #include "../../common/state_transit/state_transit_state.hh"
 #include "../../common/state_transit/state_transit_group.hh"
+#include "../../common/util/time.hh"
 
 class CoordinatorStateTransitHandler : public StateTransitHandler {
 private:
@@ -64,6 +65,8 @@ public:
 	EventQueue<StateTransitEvent> *eventQueue;
 	std::map<struct sockaddr_in, pthread_cond_t> ackSignal;
 	pthread_mutex_t ackSignalLock; // dummy lock for pthread_cond_wait()
+
+	struct timespec transitStartTime;
 
 	static CoordinatorStateTransitHandler *getInstance() {
 		static CoordinatorStateTransitHandler csth;
