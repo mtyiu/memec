@@ -24,7 +24,7 @@ fi
 ${YCSB_PATH}/bin/ycsb \
 	run memec \
 	-s \
-	-P ${YCSB_PATH}/workloads/$2 \
+	-P ${YCSB_PATH}/workloads/workloada \
 	-p fieldcount=1 \
 	-p readallfields=false \
 	-p scanproportion=0 \
