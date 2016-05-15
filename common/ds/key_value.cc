@@ -10,9 +10,7 @@ Key KeyValue::key( bool enableSplit ) {
 		char *valueStr;
 		uint32_t valueSize, splitOffset;
 		this->deserialize( key.data, key.size, valueStr, valueSize, splitOffset );
-		if ( LargeObjectUtil::isLarge( key.size, valueSize ) ) {
-			key.isLarge = true;
-		}
+		key.isLarge = LargeObjectUtil::isLarge( key.size, valueSize );
 	} else {
 		key.set( ( uint8_t ) this->data[ 0 ], this->data + KEY_VALUE_METADATA_SIZE, 0 );
 	}

@@ -430,7 +430,7 @@ struct ReconstructionHeader {
 // Seal //
 //////////
 #define PROTO_CHUNK_SEAL_SIZE 16
-#define PROTO_CHUNK_SEAL_DATA_SIZE 5
+#define PROTO_CHUNK_SEAL_DATA_SIZE 6
 struct ChunkSealHeader {
 	uint32_t listId;
 	uint32_t stripeId;
@@ -440,6 +440,7 @@ struct ChunkSealHeader {
 struct ChunkSealHeaderData {
 	uint8_t keySize;
 	uint32_t offset;
+	bool isLarge;
 	char *key;
 };
 

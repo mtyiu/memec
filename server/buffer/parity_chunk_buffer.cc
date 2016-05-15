@@ -139,6 +139,7 @@ bool ParityChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t coun
 	uint8_t keySize;
 	uint32_t valueSize, offset, curPos = 0, numOfKeys = 0;
 	char *keyStr, *valueStr;
+	bool isLarge;
 	Key key;
 	KeyValue keyValue;
 	std::unordered_map<Key, KeyValue>::iterator it;
@@ -149,10 +150,11 @@ bool ParityChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t coun
 		// Parse the (key, offset) record
 		keySize = sealData[ 0 ];
 		offset = ntohl( *( ( uint32_t * )( sealData + 1 ) ) );
+		isLarge = sealData[ 5 ];
 		keyStr = sealData + PROTO_CHUNK_SEAL_DATA_SIZE;
 
 		// Find the key-value pair from the temporary buffer
-		key.set( keySize, keyStr );
+		key.set( keySize, keyStr, 0, isLarge );
 		it = this->keys.find( key );
 
 		prtIt = this->pending.find( key );
@@ -171,7 +173,7 @@ bool ParityChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t coun
 
 		if ( it == this->keys.end() ) {
 			// Defer the processing of this key
-			key.dup();
+			key.dup( 0, 0, 0, key.isLarge );
 			PendingRequest pendingRequest;
 			pendingRequest.seal( stripeId, offset );
 
@@ -181,8 +183,9 @@ bool ParityChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t coun
 			r = this->pending.insert( p );
 			if ( ! r.second ) {
 				__ERROR__(
-					"ParityChunkBuffer", "seal", "Key: %.*s (size = %u) cannot be inserted into pending keys map (stripe ID: %u vs. %u, offset: %u vs. %u).",
+					"ParityChunkBuffer", "seal", "Key: %.*s (size = %u%s) cannot be inserted into pending keys map (stripe ID: %u vs. %u, offset: %u vs. %u).",
 					keySize, keyStr, keySize,
+					key.isLarge ? "; is large" : "",
 					r.first->second.req.seal.stripeId, stripeId,
 					r.first->second.req.seal.offset, offset
 				);
@@ -216,8 +219,8 @@ bool ParityChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t coun
 		}
 
 		// Update counter
-		sealData += PROTO_CHUNK_SEAL_DATA_SIZE + keySize;
-		sealDataSize -= PROTO_CHUNK_SEAL_DATA_SIZE + keySize;
+		sealData += PROTO_CHUNK_SEAL_DATA_SIZE + keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 );
+		sealDataSize -= PROTO_CHUNK_SEAL_DATA_SIZE + keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 );
 		numOfKeys++;
 	}
 	assert( numOfKeys == count );

@@ -162,7 +162,7 @@ public:
 		keyValue.data = ( char * ) chunk + CHUNK_IDENTIFIER_SIZE + offset;
 		return keyValue;
 	}
-	static inline int next( Chunk *chunk, uint32_t offset, char *&key, uint8_t &keySize ) {
+	static inline int next( Chunk *chunk, uint32_t offset, char *&key, uint8_t &keySize, bool &isLarge ) {
 		char *data = ChunkUtil::getData( chunk );
 		char *ptr = data + offset, *value;
 		int ret = -1;
@@ -171,7 +171,7 @@ public:
 		if ( ptr + KEY_VALUE_METADATA_SIZE < data + ChunkUtil::chunkSize ) {
 			KeyValue::deserialize( ptr, key, keySize, value, valueSize, splitOffset );
 
-			bool isLarge = LargeObjectUtil::isLarge( keySize, valueSize, 0, &splitSize );
+			isLarge = LargeObjectUtil::isLarge( keySize, valueSize, 0, &splitSize );
 			if ( isLarge ) {
 				if ( splitOffset + splitSize > valueSize )
 					splitSize = valueSize - splitOffset;

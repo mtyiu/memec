@@ -328,6 +328,8 @@ bool ServerWorker::handleGetRequest( ClientEvent event, struct KeyHeader &header
 		ret = true;
 	} else {
 		// Try to search for large object
+		char backup[ SPLIT_OFFSET_SIZE ];
+		memcpy( backup, header.key + header.keySize, SPLIT_OFFSET_SIZE );
 		memset( header.key + header.keySize, 0, SPLIT_OFFSET_SIZE );
 		if ( map->findLargeObject( header.key, header.keySize, &keyValue, &key ) ) {
 			event.resGet( event.socket, event.instanceId, event.requestId, keyValue, isDegraded );
@@ -336,6 +338,7 @@ bool ServerWorker::handleGetRequest( ClientEvent event, struct KeyHeader &header
 			event.resGet( event.socket, event.instanceId, event.requestId, key, isDegraded );
 			ret = false;
 		}
+		memcpy( header.key + header.keySize, backup, SPLIT_OFFSET_SIZE );
 	}
 	this->dispatch( event );
 	return ret;

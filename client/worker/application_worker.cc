@@ -462,6 +462,7 @@ bool ClientWorker::handleGetRequest( ApplicationEvent event, struct KeyHeader &h
 		}
 
 		// Send GET request
+		assert( buffer.data[ 0 ] != 0 && buffer.data[ 1 ] != 0 );
 		sentBytes = socket->send( buffer.data, buffer.size, connected );
 		if ( sentBytes != ( ssize_t ) buffer.size ) {
 			__ERROR__( "ClientWorker", "handleGetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );

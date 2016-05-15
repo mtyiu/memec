@@ -24,10 +24,14 @@ public:
 		if ( ! data )
 			data = this->data;
 		this->size = size;
+		this->isLarge = isLarge;
+
+		if ( isLarge )
+			size += SPLIT_OFFSET_SIZE;
+
 		this->data = ( char * ) malloc( size );
 		memcpy( this->data, data, size );
 		this->ptr = ptr;
-		this->isLarge = isLarge;
 	}
 
 	inline void set( uint8_t size, char *data, void *ptr = 0, bool isLarge = false ) {
