@@ -446,8 +446,9 @@ size_t Protocol::generateKeyValueHeader(
 		if ( splitOffset + splitSize > valueSize )
 			splitSize = valueSize - splitOffset;
 
-		if ( valueSize )
+		if ( valueSize ) {
 			memmove( buf, value, splitSize );
+		}
 		bytes += PROTO_KEY_VALUE_SIZE + PROTO_SPLIT_OFFSET_SIZE + keySize + splitSize;
 	}
 

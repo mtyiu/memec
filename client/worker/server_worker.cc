@@ -390,10 +390,7 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 			valueSize = header.valueSize;
 			valueStr = header.value;
 
-			isLarge = LargeObjectUtil::isLarge(
-				header.keySize - ( header.splitOffset ? SPLIT_OFFSET_SIZE : 0 ),
-				header.valueSize, &numOfSplit, &splitSize
-			);
+			isLarge = LargeObjectUtil::isLarge( header.keySize, header.valueSize, &numOfSplit, &splitSize );
 
 			__DEBUG__(
 				BLUE, "ClientWorker", "handleGetResponse",

@@ -58,10 +58,7 @@ void ServerWorker::dispatch( ClientEvent event ) {
 			uint32_t valueSize, splitOffset, splitSize;
 			event.message.keyValue.deserialize( key, keySize, value, valueSize, splitOffset );
 
-			bool isLarge = LargeObjectUtil::isLarge(
-				keySize - ( splitOffset ? SPLIT_OFFSET_SIZE : 0 ),
-				valueSize, 0, &splitSize
-			);
+			bool isLarge = LargeObjectUtil::isLarge( keySize, valueSize, 0, &splitSize );
 			if ( ! isLarge ) {
 				splitOffset = 0;
 				splitSize = 0;
