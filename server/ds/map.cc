@@ -69,15 +69,13 @@ char *Map::findObject(
 }
 
 char *Map::findLargeObject(
-	char *keyStr, uint8_t keySize, uint32_t splitOffset,
+	char *keyStr, uint8_t keySize,
 	KeyValue *keyValuePtr,
 	Key *keyPtr,
 	bool needsLock, bool needsUnlock
 ) {
-	char *ret = 0;
-
 	if ( needsLock ) LOCK( &this->keysLock );
-	ret = this->keys.find( keyStr, keySize + ( splitOffset ? SPLIT_OFFSET_SIZE : 0 ) );
+	ret = this->keys.find( keyStr, keySize, true );
 	if ( needsUnlock ) UNLOCK( &this->keysLock );
 
 	if ( keyValuePtr ) {

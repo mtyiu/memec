@@ -62,6 +62,7 @@ KeyMetadata DataChunkBuffer::set(
 
 	if ( isSealed ) *isSealed = false;
 
+
 	// Choose one chunk buffer with minimum free space
 	LOCK( &this->lock );
 	if ( size <= this->reInsertedChunkMaxSpace ) {
@@ -186,12 +187,13 @@ KeyMetadata DataChunkBuffer::set(
 	UNLOCK( &this->lock );
 
 	// Update key map
+	bool isLarge = LargeObjectUtil::isLarge( keySize, valueSize );
 	Key keyObj;
-	keyObj.set( keySize, key );
+	keyObj.set( keySize, key, 0, isLarge );
 	ChunkBuffer::map->insertKey(
 		keyObj, opcode, timestamp, keyMetadata,
 		true, true, true,
-		LargeObjectUtil::isLarge( keySize, valueSize )
+		isLarge
 	);
 	stripeId = keyMetadata.stripeId;
 

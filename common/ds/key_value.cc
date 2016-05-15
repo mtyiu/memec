@@ -250,7 +250,7 @@ bool LargeObjectUtil::isLarge( uint8_t keySize, uint32_t valueSize, uint32_t *nu
 	if ( splitSizePtr ) *splitSizePtr = valueSize;
 
 	if ( LargeObjectUtil::chunkSize < totalSize ) {
-		splitSize = LargeObjectUtil::chunkSize - KEY_VALUE_METADATA_SIZE - keySize;
+		splitSize = LargeObjectUtil::chunkSize - KEY_VALUE_METADATA_SIZE - keySize - SPLIT_OFFSET_SIZE;
 		numOfSplit = valueSize / splitSize;
 		if ( valueSize % splitSize ) numOfSplit++;
 
@@ -269,7 +269,7 @@ uint32_t LargeObjectUtil::getValueOffsetAtSplit( uint8_t keySize, uint32_t value
 	uint32_t splitSize;
 
 	if ( LargeObjectUtil::chunkSize < totalSize ) {
-		splitSize = LargeObjectUtil::chunkSize - KEY_VALUE_METADATA_SIZE - keySize;
+		splitSize = LargeObjectUtil::chunkSize - KEY_VALUE_METADATA_SIZE - keySize - SPLIT_OFFSET_SIZE;
 		return ( index * splitSize );
 	} else {
 		// No need to split
@@ -278,12 +278,13 @@ uint32_t LargeObjectUtil::getValueOffsetAtSplit( uint8_t keySize, uint32_t value
 }
 
 uint32_t LargeObjectUtil::getSplitIndex( uint8_t keySize, uint32_t valueSize, uint32_t offset, bool &isLarge ) {
+	if ( ! valueSize ) valueSize = LargeObjectUtil::chunkSize;
 	uint32_t totalSize = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
 	uint32_t splitSize;
 
 	if ( LargeObjectUtil::chunkSize < totalSize ) {
 		isLarge = true;
-		splitSize = LargeObjectUtil::chunkSize - KEY_VALUE_METADATA_SIZE - keySize;
+		splitSize = LargeObjectUtil::chunkSize - KEY_VALUE_METADATA_SIZE - keySize - SPLIT_OFFSET_SIZE;
 		return ( offset / splitSize );
 	} else {
 		// No need to split

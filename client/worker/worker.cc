@@ -69,11 +69,11 @@ bool ClientWorker::getServers(
 		&originalChunkId, true
 	);
 
+	uint32_t splitOffset, splitIndex;
 	if ( isGettingSplit ) {
 		bool isLarge;
-		uint32_t splitOffset, splitIndex;
 		splitOffset = LargeObjectUtil::readSplitOffset( data + size - SPLIT_OFFSET_SIZE );
-		splitIndex = LargeObjectUtil::getSplitIndex( size - SPLIT_OFFSET_SIZE, splitOffset + 1, splitOffset, isLarge );
+		splitIndex = LargeObjectUtil::getSplitIndex( size - SPLIT_OFFSET_SIZE, 0, splitOffset, isLarge );
 
 		originalChunkId = ( originalChunkId + splitIndex ) % ClientWorker::dataChunkCount;
 	}

@@ -191,6 +191,8 @@ void ApplicationWorker::dispatch( ClientEvent event ) {
 		std::set<KeyValueUpdate>::iterator keyValueUpdateIt;
 		int fd;
 
+		keyValueUpdate.isLarge = false;
+
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();
 		while ( buffer.size > 0 ) {
 			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "ApplicationWorker" );

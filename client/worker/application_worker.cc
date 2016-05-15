@@ -348,8 +348,8 @@ bool ClientWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		fprintf( stderr, "%c\n", header.value[ splitOffset ] );
 
 		fprintf(
-			stderr, "#%u: Offset at %u --> data server #%u; request size: %lu.\n",
-			splitIndex, splitOffset,
+			stderr, "#%u [%.*s]: Offset at %u --> data server #%u; request size: %lu.\n",
+			splitIndex, header.keySize, header.key, splitOffset,
 			( chunkId + splitIndex ) % ClientWorker::dataChunkCount,
 			buffer.size
 		);

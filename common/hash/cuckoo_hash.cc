@@ -97,9 +97,9 @@ char *CuckooHash::tryRead( char *key, uint8_t keySize, uint8_t tag, size_t i ) {
 	return 0;
 }
 
-char *CuckooHash::find( char *key, uint8_t keySize ) {
+char *CuckooHash::find( char *key, uint8_t keySize, bool isLarge ) {
 	Key target;
-	uint32_t hashValue = HashFunc::hash( key, keySize );
+	uint32_t hashValue = HashFunc::hash( key, keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ) );
 	uint8_t tag = this->tagHash( hashValue );
 	size_t i1 = this->indexHash( hashValue );
 	size_t i2 = this->altIndex( i1, tag );
@@ -351,8 +351,8 @@ bool CuckooHash::tryAdd( char *ptr, uint8_t tag, size_t i, size_t lock ) {
 	return false;
 }
 
-bool CuckooHash::insert( char *key, uint8_t keySize, char *ptr ) {
-	uint32_t hashValue = HashFunc::hash( key, keySize );
+bool CuckooHash::insert( char *key, uint8_t keySize, char *ptr, bool isLarge ) {
+	uint32_t hashValue = HashFunc::hash( key, keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ) );
 	uint8_t tag = this->tagHash( hashValue );
 	size_t i1 = this->indexHash( hashValue );
 	size_t i2 = this->altIndex( i1, tag );
@@ -467,8 +467,8 @@ bool CuckooHash::tryDel( char *key, uint8_t keySize, uint8_t tag, size_t i, size
 	return false;
 }
 
-void CuckooHash::del( char *key, uint8_t keySize ) {
-	uint32_t hashValue = HashFunc::hash( key, keySize );
+void CuckooHash::del( char *key, uint8_t keySize, bool isLarge ) {
+	uint32_t hashValue = HashFunc::hash( key, keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ) );
 	uint8_t tag = this->tagHash( hashValue );
 	size_t i1 = this->indexHash( hashValue );
 	size_t i2 = this->altIndex( i1, tag );

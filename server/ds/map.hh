@@ -78,7 +78,7 @@ public:
 		bool needsLock = true, bool needsUnlock = true
 	);
 	char *findLargeObject(
-		char *keyStr, uint8_t keySize, uint32_t splitOffset,
+		char *keyStr, uint8_t keySize,
 		KeyValue *keyValuePtr = 0,
 		Key *keyPtr = 0,
 		bool needsLock = true, bool needsUnlock = true

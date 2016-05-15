@@ -64,7 +64,8 @@ bool ParityChunkBuffer::set(
 	Key key;
 	std::unordered_map<Key, PendingRequest>::iterator it;
 
-	key.set( keySize, keyStr );
+	bool isLarge = LargeObjectUtil::isLarge( keySize, valueSize );
+	key.set( keySize, keyStr, 0, isLarge );
 
 	LOCK( &this->lock );
 
@@ -78,7 +79,7 @@ bool ParityChunkBuffer::set(
 		keyValue.dup( keyStr, keySize, valueStr, valueSize, splitOffset );
 		keyValue.deserialize( keyStr, keySize, valueStr, valueSize, splitOffset );
 
-		key.set( keySize, keyStr );
+		key.set( keySize, keyStr, 0, isLarge );
 
 		std::pair<Key, KeyValue> p( key, keyValue );
 

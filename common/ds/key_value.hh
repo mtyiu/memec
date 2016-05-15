@@ -6,7 +6,6 @@
 #include "key.hh"
 
 #define KEY_VALUE_METADATA_SIZE	4
-#define SPLIT_OFFSET_SIZE       3
 
 class KeyValue {
 public:

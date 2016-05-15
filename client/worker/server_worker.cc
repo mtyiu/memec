@@ -238,7 +238,7 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 			return false;
 		}
 		if ( header.isParity ) {
-			__DEBUG__(
+			__INFO__(
 				BLUE, "ClientWorker", "handleSetResponse",
 				"[SET] Key: %.*s (key size = %u)",
 				( int ) header.keySize, header.key, header.keySize
@@ -247,7 +247,7 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 			keySize = header.keySize;
 			keyStr = header.key;
 		} else {
-			__DEBUG__(
+			__INFO__(
 				BLUE, "ClientWorker", "handleSetResponse",
 				"[SET] [%u] Key: %.*s (key size = %u) at (%u, %u, %u)",
 				header.timestamp,
@@ -394,15 +394,6 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 				header.keySize - ( header.splitOffset ? SPLIT_OFFSET_SIZE : 0 ),
 				header.valueSize, &numOfSplit, &splitSize
 			);
-
-			for ( uint32_t i = 0; i < splitSize; i++ ) {
-				fprintf( stderr, "%c (%d) ", header.value[ i ], header.value[ i ] );
-				if ( i == 5 ) {
-					fprintf( stderr, "... " );
-					i = splitSize - 8;
-				}
-			}
-			fprintf( stderr, "\n" );
 
 			__INFO__(
 				BLUE, "ClientWorker", "handleGetResponse",

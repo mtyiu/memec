@@ -76,15 +76,6 @@ void ServerWorker::dispatch( ClientEvent event ) {
 				true, // toClient
 				splitOffset, splitSize
 			);
-
-			for ( uint32_t i = 0; i < splitSize; i++ ) {
-				fprintf( stderr, "%c (%d) ", value[ i ], value[ i ] );
-				if ( i == 5 ) {
-					fprintf( stderr, "... " );
-					i = splitSize - 8;
-				}
-			}
-			fprintf( stderr, "\n" );
 		}
 			break;
 		case CLIENT_EVENT_TYPE_GET_RESPONSE_FAILURE:
@@ -330,7 +321,8 @@ bool ServerWorker::handleGetRequest( ClientEvent event, struct KeyHeader &header
 	KeyValue keyValue;
 	RemappedKeyValue remappedKeyValue;
 	bool ret;
-	if ( map->findObject( header.key, header.keySize, &keyValue, &key ) ) {
+	if ( ( map->findObject( header.key, header.keySize, &keyValue, &key ) ) ||
+	     ( header.keySize > SPLIT_OFFSET_SIZE && map->findLargeObject( header.key, header.keySize - SPLIT_OFFSET_SIZE, &keyValue, &key ) ) ) {
 		event.resGet( event.socket, event.instanceId, event.requestId, keyValue, isDegraded );
 		ret = true;
 	} else if ( remappedBuffer->find( header.keySize, header.key, &remappedKeyValue ) ) {
@@ -338,9 +330,17 @@ bool ServerWorker::handleGetRequest( ClientEvent event, struct KeyHeader &header
 		event.resGet( event.socket, event.instanceId, event.requestId, remappedKeyValue.keyValue, isDegraded );
 		ret = true;
 	} else {
-		event.resGet( event.socket, event.instanceId, event.requestId, key, isDegraded );
-		ret = false;
+		// Try to search for large object
+		memset( header.key + header.keySize, 0, SPLIT_OFFSET_SIZE );
+		if ( map->findLargeObject( header.key, header.keySize, &keyValue, &key ) ) {
+			event.resGet( event.socket, event.instanceId, event.requestId, keyValue, isDegraded );
+			ret = true;
+		} else {
+			event.resGet( event.socket, event.instanceId, event.requestId, key, isDegraded );
+			ret = false;
+		}
 	}
+	if ( ! ret ) fprintf( stderr, "%sfound\n", ret ? "" : "not " );
 	this->dispatch( event );
 	return ret;
 }
@@ -384,18 +384,11 @@ bool ServerWorker::handleSetRequest( ClientEvent event, struct KeyValueHeader &h
 
 	if (
 		( ! isLarge && map->findObject( header.key, header.keySize ) ) ||
-		( isLarge && map->findLargeObject( header.key, header.keySize, header.splitOffset ) ) ||
-		( ServerWorker::chunkBuffer->at( listId )->findValueByKey( header.key, header.keySize + ( isLarge && header.splitOffset ? SPLIT_OFFSET_SIZE : 0 ), 0, 0, false ) )
+		( ServerWorker::chunkBuffer->at( listId )->findValueByKey( header.key, header.keySize, 0, 0, false ) )
 	) {
 		exist = true;
 		fprintf( stderr, "The key already exists: %.*s\n", header.keySize, header.key );
 	} else {
-		if ( isLarge && header.splitOffset ) {
-			// header.keySize += SPLIT_OFFSET_SIZE;
-		}
-
-		fprintf( stderr, "header.value[ 0 ] = %c\n", header.value[ 0 ] );
-
 		if ( ServerWorker::disableSeal ) {
 			ServerWorker::chunkBuffer->at( listId )->set(
 				this,
@@ -419,10 +412,6 @@ bool ServerWorker::handleSetRequest( ClientEvent event, struct KeyValueHeader &h
 				this->chunks, this->dataChunk, this->parityChunk,
 				ServerWorker::getChunkBuffer
 			);
-		}
-
-		if ( isLarge && header.splitOffset ) {
-			header.keySize -= SPLIT_OFFSET_SIZE;
 		}
 	}
 
