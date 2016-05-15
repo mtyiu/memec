@@ -167,7 +167,7 @@ struct MetadataHeader {
 	uint32_t chunkId;
 };
 
-#define PROTO_KEY_OP_METADATA_SIZE 18
+#define PROTO_KEY_OP_METADATA_SIZE 19
 struct KeyOpMetadataHeader {
 	uint8_t keySize;
 	uint8_t opcode;
@@ -175,6 +175,7 @@ struct KeyOpMetadataHeader {
 	uint32_t stripeId;
 	uint32_t chunkId;
 	uint32_t timestamp;
+	bool isLarge;
 	char *key;
 };
 
@@ -292,10 +293,11 @@ struct BatchKeyValueHeader {
 ///////////////
 // Remapping //
 ///////////////
-#define PROTO_REMAPPING_LOCK_SIZE 5
+#define PROTO_REMAPPING_LOCK_SIZE 6
 struct RemappingLockHeader {
 	uint32_t remappedCount;
 	uint8_t keySize;
+	bool isLarge;
 	char *key;
 	uint32_t *original;
 	uint32_t *remapped;
@@ -318,17 +320,18 @@ struct DegradedSetHeader {
 ////////////////////////
 // Degraded operation //
 ////////////////////////
-#define PROTO_DEGRADED_LOCK_REQ_SIZE 5
+#define PROTO_DEGRADED_LOCK_REQ_SIZE 6
 struct DegradedLockReqHeader {
 	uint32_t reconstructedCount;
 	uint8_t keySize;
+	bool isLarge;
 	char *key;
 	uint32_t *original;
 	uint32_t *reconstructed;
 };
 
 // Size
-#define PROTO_DEGRADED_LOCK_RES_BASE_SIZE   2 // type: 1, 2, 3, 4, 5
+#define PROTO_DEGRADED_LOCK_RES_BASE_SIZE   3 // type: 1, 2, 3, 4, 5
 #define PROTO_DEGRADED_LOCK_RES_LOCK_SIZE   14 // type: 1, 2
 #define PROTO_DEGRADED_LOCK_RES_REMAP_SIZE  4 // type: 4
 #define PROTO_DEGRADED_LOCK_RES_NOT_SIZE    0 // type: 3, 5
@@ -343,6 +346,7 @@ struct DegradedLockReqHeader {
 struct DegradedLockResHeader {
 	uint8_t type;                  // type: 1, 2, 3, 4, 5
 	uint8_t keySize;               // type: 1, 2, 3, 4, 5
+	bool isLarge;                  // type: 1, 2, 3, 4, 5
 	char *key;                     // type: 1, 2, 3, 4, 5
 
 	bool isSealed;                 // type: 1, 2
@@ -357,8 +361,9 @@ struct DegradedLockResHeader {
 	uint32_t *remapped;            // type: 4
 };
 
-#define PROTO_DEGRADED_REQ_BASE_SIZE 14
+#define PROTO_DEGRADED_REQ_BASE_SIZE 15
 struct DegradedReqHeader {
+	bool isLarge;
 	bool isSealed;
 	uint32_t stripeId;
 	uint32_t reconstructedCount;
@@ -595,6 +600,7 @@ protected:
 	bool parseKeyOpMetadataHeader(
 		size_t offset, uint8_t &keySize, uint8_t &opcode,
 		uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &timestamp,
+		bool &isLarge,
 		char *&key, char *buf, size_t size
 	);
 	// ---------- fault_protocol.cc ----------
@@ -796,12 +802,12 @@ protected:
 	size_t generateRemappingLockHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t *original, uint32_t *remapped, uint32_t remappedCount,
-		uint8_t keySize, char *key
+		uint8_t keySize, char *key, bool isLarge
 	);
 	bool parseRemappingLockHeader(
 		size_t offset,
 		uint32_t *&original, uint32_t *&remapped, uint32_t &remappedCount,
-		uint8_t &keySize, char *&key,
+		uint8_t &keySize, char *&key, bool &isLarge,
 		char *buf, size_t size
 	);
 
@@ -830,21 +836,21 @@ protected:
 	size_t generateDegradedLockReqHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
-		uint8_t keySize, char *key
+		uint8_t keySize, char *key, bool isLarge
 	);
 	bool parseDegradedLockReqHeader(
 		size_t offset,
 		uint32_t *&original, uint32_t *&reconstructed, uint32_t &reconstructedCount,
-		uint8_t &keySize, char *&key, char *buf, size_t size
+		uint8_t &keySize, char *&key, bool &isLarge, char *buf, size_t size
 	);
 
 	size_t generateDegradedLockResHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
-		uint32_t length, uint8_t type, uint8_t keySize, char *key, char *&buf
+		uint32_t length, uint8_t type, uint8_t keySize, char *key, bool isLarge, char *&buf
 	);
 	size_t generateDegradedLockResHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
-		bool isLocked, uint8_t keySize, char *key,
+		bool isLocked, uint8_t keySize, char *key, bool isLarge,
 		bool isSealed, uint32_t stripeId, uint32_t dataChunkId, uint32_t dataChunkCount,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 		uint32_t ongoingAtChunk,
@@ -852,16 +858,16 @@ protected:
 	);
 	size_t generateDegradedLockResHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
-		bool exist, uint8_t keySize, char *key
+		bool exist, uint8_t keySize, char *key, bool isLarge
 	);
 	size_t generateDegradedLockResHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
-		uint8_t keySize, char *key,
+		uint8_t keySize, char *key, bool isLarge,
 		uint32_t *original, uint32_t *remapped, uint32_t remappedCount
 	);
 	bool parseDegradedLockResHeader(
 		size_t offset, uint8_t &type,
-		uint8_t &keySize, char *&key,
+		uint8_t &keySize, char *&key, bool &isLarge,
 		char *buf, size_t size
 	);
 	bool parseDegradedLockResHeader(
@@ -883,7 +889,7 @@ protected:
 		bool isSealed, uint32_t stripeId,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 		uint32_t ongoingAtChunk, uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds,
-		uint8_t keySize, char *key,
+		uint8_t keySize, char *key, bool isLarge,
 		uint32_t timestamp = 0
 	);
 	size_t generateDegradedReqHeader(
@@ -891,13 +897,13 @@ protected:
 		bool isSealed, uint32_t stripeId,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 		uint32_t ongoingAtChunk, uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds,
-		uint8_t keySize, char *key,
+		uint8_t keySize, char *key, bool isLarge,
 		uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate,
 		uint32_t timestamp = 0
 	);
 	bool parseDegradedReqHeader(
 		size_t offset,
-		bool &isSealed, uint32_t &stripeId,
+		bool &isSealed, uint32_t &stripeId, bool &isLarge,
 		uint32_t *&original, uint32_t *&reconstructed, uint32_t &reconstructedCount,
 		uint32_t &ongoingAtChunk, uint8_t &numSurvivingChunkIds, uint32_t *&survivingChunkIds,
 		char *buf, size_t size

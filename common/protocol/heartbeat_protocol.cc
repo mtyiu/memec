@@ -56,8 +56,13 @@ size_t Protocol::generateHeartbeatMessage(
 			*( ( uint32_t * )( buf + 6 ) ) = htonl( opMetadata.stripeId );
 			*( ( uint32_t * )( buf + 10 ) ) = htonl( opMetadata.chunkId );
 			*( ( uint32_t * )( buf + 14 ) ) = htonl( opMetadata.timestamp );
+			buf[ 18 ] = key.isLarge;
 
 			buf += PROTO_KEY_OP_METADATA_SIZE;
+
+			if ( key.isLarge )
+				key.size += SPLIT_OFFSET_SIZE;
+
 			memcpy( buf, key.data, key.size );
 			buf += key.size;
 			bytes += PROTO_KEY_OP_METADATA_SIZE + key.size;
@@ -119,7 +124,7 @@ bool Protocol::parseMetadataHeader( size_t offset, uint32_t &listId, uint32_t &s
 	return true;
 }
 
-bool Protocol::parseKeyOpMetadataHeader( size_t offset, uint8_t &keySize, uint8_t &opcode, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &timestamp, char *&key, char *buf, size_t size ) {
+bool Protocol::parseKeyOpMetadataHeader( size_t offset, uint8_t &keySize, uint8_t &opcode, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &timestamp, bool &isLarge, char *&key, char *buf, size_t size ) {
 	if ( size - offset < PROTO_KEY_OP_METADATA_SIZE )
 		return false;
 
@@ -130,6 +135,7 @@ bool Protocol::parseKeyOpMetadataHeader( size_t offset, uint8_t &keySize, uint8_
 	stripeId  = ntohl( *( ( uint32_t * )( ptr +  6 ) ) );
 	chunkId   = ntohl( *( ( uint32_t * )( ptr + 10 ) ) );
 	timestamp = ntohl( *( ( uint32_t * )( ptr + 14 ) ) );
+	isLarge   = ptr[ 18 ];
 
 	if ( size - offset < PROTO_KEY_OP_METADATA_SIZE + ( size_t ) keySize )
 		return false;
@@ -183,6 +189,7 @@ bool Protocol::parseKeyOpMetadataHeader( struct KeyOpMetadataHeader &header, siz
 		header.stripeId,
 		header.chunkId,
 		header.timestamp,
+		header.isLarge,
 		header.key,
 		buf, size
 	);

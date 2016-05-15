@@ -48,6 +48,7 @@ bool CoordinatorWorker::handleDegradedSetLockRequest( ClientEvent event, char *b
 	}
 
 	if ( map->insertKey(
+		header.isLarge,
 		header.key, header.keySize,
 		originalListId, -1 /* stripeId */, originalChunkId,
 		PROTO_OPCODE_REMAPPING_LOCK, 0 /* timestamp */,

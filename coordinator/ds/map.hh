@@ -308,7 +308,7 @@ public:
 		bool needsLock = true, bool needsUnlock = true
 	);
 	bool insertKey(
-		char *keyStr, uint8_t keySize,
+		bool isLarge, char *keyStr, uint8_t keySize,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		uint8_t opcode, uint32_t timestamp, bool needsLock = true, bool needsUnlock = true
 	);
@@ -327,7 +327,7 @@ public:
 	);
 
 	// Find //
-	bool findMetadataByKey( char *keyStr, uint8_t keySize, Metadata &metadata );
+	bool findMetadataByKey( char *keyStr, uint8_t keySize, bool isLarge, Metadata &metadata );
 	bool findDegradedLock(
 		uint32_t listId, uint32_t stripeId, DegradedLock &degradedLock,
 		bool needsLock = true, bool needsUnlock = true, LOCK_T **lock = 0

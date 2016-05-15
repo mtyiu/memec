@@ -80,7 +80,7 @@ public:
 	char *reqDegradedSetLock(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		uint32_t *original, uint32_t *remapped, uint32_t remappedCount,
-		char *key, uint8_t keySize
+		char *key, uint8_t keySize, bool isLarge
 	);
 	char *reqDegradedSet(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
@@ -96,21 +96,21 @@ public:
 	char *reqDegradedLock(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
-		char *key, uint8_t keySize
+		char *key, uint8_t keySize, bool isLarge
 	);
 	char *reqDegradedGet(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		bool isSealed, uint32_t stripeId,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 		uint32_t ongoingAtChunk, uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds,
-		char *key, uint8_t keySize
+		char *key, uint8_t keySize, bool isLarge
 	);
 	char *reqDegradedUpdate(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		bool isSealed, uint32_t stripeId,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 		uint32_t ongoingAtChunk, uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds,
-		char *key, uint8_t keySize,
+		char *key, uint8_t keySize, bool isLarge,
 		char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize,
 		uint32_t timestamp
 	);
@@ -119,7 +119,7 @@ public:
 		bool isSealed, uint32_t stripeId,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 		uint32_t ongoingAtChunk, uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds,
-		char *key, uint8_t keySize,
+		char *key, uint8_t keySize, bool isLarge,
 		uint32_t timestamp
 	);
 

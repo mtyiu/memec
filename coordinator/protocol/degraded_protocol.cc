@@ -2,7 +2,7 @@
 
 char *CoordinatorProtocol::resDegradedLock(
 	size_t &size, uint16_t instanceId, uint32_t requestId,
-	bool isLocked, uint8_t keySize, char *key,
+	bool isLocked, uint8_t keySize, char *key, bool isLarge,
 	bool isSealed, uint32_t stripeId, uint32_t dataChunkId, uint32_t dataChunkCount,
 	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 	uint32_t ongoingAtChunk, uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds
@@ -13,7 +13,7 @@ char *CoordinatorProtocol::resDegradedLock(
 		PROTO_MAGIC_TO_CLIENT,
 		PROTO_OPCODE_DEGRADED_LOCK,
 		instanceId, requestId,
-		isLocked, keySize, key,
+		isLocked, keySize, key, isLarge,
 		isSealed, stripeId, dataChunkId, dataChunkCount,
 		original, reconstructed, reconstructedCount,
 		ongoingAtChunk, numSurvivingChunkIds, survivingChunkIds
@@ -23,7 +23,7 @@ char *CoordinatorProtocol::resDegradedLock(
 
 char *CoordinatorProtocol::resDegradedLock(
 	size_t &size, uint16_t instanceId, uint32_t requestId,
-	uint8_t keySize, char *key,
+	uint8_t keySize, char *key, bool isLarge,
 	uint32_t *original, uint32_t *remapped, uint32_t remappedCount
 ) {
 	// -- common/protocol/degraded_protocol.cc --
@@ -32,7 +32,7 @@ char *CoordinatorProtocol::resDegradedLock(
 		PROTO_MAGIC_TO_CLIENT,
 		PROTO_OPCODE_DEGRADED_LOCK,
 		instanceId, requestId,
-		keySize, key,
+		keySize, key, isLarge,
 		original, remapped, remappedCount
 	);
 	return this->buffer.send;
@@ -41,7 +41,7 @@ char *CoordinatorProtocol::resDegradedLock(
 char *CoordinatorProtocol::resDegradedLock(
 	size_t &size, uint16_t instanceId, uint32_t requestId,
 	bool exist,
-	uint8_t keySize, char *key
+	uint8_t keySize, char *key, bool isLarge
 ) {
 	// -- common/protocol/degraded_protocol.cc --
 	size = this->generateDegradedLockResHeader(
@@ -50,7 +50,7 @@ char *CoordinatorProtocol::resDegradedLock(
 		PROTO_OPCODE_DEGRADED_LOCK,
 		instanceId, requestId,
 		exist,
-		keySize, key
+		keySize, key, isLarge
 	);
 	return this->buffer.send;
 }

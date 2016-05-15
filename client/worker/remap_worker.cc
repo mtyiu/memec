@@ -16,9 +16,11 @@ bool ClientWorker::handleDegradedSetRequest( ApplicationEvent event, char *buf, 
 
 	uint32_t *original, *remapped;
 	uint32_t remappedCount;
-	bool connected, useCoordinatedFlow;
+	bool connected, useCoordinatedFlow, isLarge;
 	ssize_t sentBytes;
 	ServerSocket *originalDataServerSocket;
+
+	isLarge = LargeObjectUtil::isLarge( header.keySize, header.valueSize );
 
 	if ( ! this->getServers( PROTO_OPCODE_SET, header.key, header.keySize, original, remapped, remappedCount, originalDataServerSocket, useCoordinatedFlow ) ) {
 		Key key;
@@ -49,7 +51,8 @@ bool ClientWorker::handleDegradedSetRequest( ApplicationEvent event, char *buf, 
 	buffer.data = this->protocol.reqDegradedSetLock(
 		buffer.size, instanceId, requestId,
 		original, remapped, remappedCount,
-		header.key, header.keySize
+		header.key, header.keySize,
+		isLarge
 	);
 
 	// insert the list of remapped servers into pending map

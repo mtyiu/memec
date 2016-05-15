@@ -75,7 +75,7 @@ private:
 	bool sendDegradedLockRequest(
 		uint16_t parentInstanceId, uint32_t parentRequestId, uint8_t opcode,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
-		char *key, uint8_t keySize,
+		char *key, uint8_t keySize, bool isLarge,
 		uint32_t valueUpdateSize = 0, uint32_t valueUpdateOffset = 0, char *valueUpdate = 0
 	);
 	bool handleDegradedLockResponse( CoordinatorEvent event, bool success, char *buf, size_t size );

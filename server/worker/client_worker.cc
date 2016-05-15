@@ -305,7 +305,7 @@ bool ServerWorker::handleGetRequest( ClientEvent event, char *buf, size_t size )
 		__ERROR__( "ServerWorker", "handleGetRequest", "Invalid GET request." );
 		return false;
 	}
-	__DEBUG__(
+	__INFO__(
 		BLUE, "ServerWorker", "handleGetRequest",
 		"[GET] Key: %.*s (key size = %u).",
 		( int ) header.keySize, header.key, header.keySize

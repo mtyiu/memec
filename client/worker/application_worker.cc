@@ -441,10 +441,14 @@ bool ClientWorker::handleGetRequest( ApplicationEvent event, struct KeyHeader &h
 			"[GET] Key: %.*s (key size = %u): acquiring lock.",
 			( int ) header.keySize, header.key, header.keySize
 		);
+		if ( isGettingSplit ) {
+			key.size -= SPLIT_OFFSET_SIZE;
+			key.isLarge = true;
+		}
 		return this->sendDegradedLockRequest(
 			event.instanceId, event.requestId, PROTO_OPCODE_GET,
 			original, reconstructed, reconstructedCount,
-			key.data, key.size
+			key.data, key.size, key.isLarge
 		);
 	} else {
 		buffer.data = this->protocol.reqGet(
@@ -528,10 +532,14 @@ bool ClientWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 
 	if ( useCoordinatedFlow ) {
 		// Acquire degraded lock from the coordinator
+		if ( false ) { // isGettingSplit
+			keyValueUpdate.size -= SPLIT_OFFSET_SIZE;
+			keyValueUpdate.isLarge = true;
+		}
 		return this->sendDegradedLockRequest(
 			event.instanceId, event.requestId, PROTO_OPCODE_UPDATE,
 			original, reconstructed, reconstructedCount,
-			keyValueUpdate.data, keyValueUpdate.size,
+			keyValueUpdate.data, keyValueUpdate.size, keyValueUpdate.isLarge,
 			keyValueUpdate.length,
 			keyValueUpdate.offset,
 			( char * ) keyValueUpdate.ptr
@@ -611,7 +619,7 @@ bool ClientWorker::handleDeleteRequest( ApplicationEvent event, char *buf, size_
 		return this->sendDegradedLockRequest(
 			event.instanceId, event.requestId, PROTO_OPCODE_DELETE,
 			original, reconstructed, reconstructedCount,
-			key.data, key.size
+			key.data, key.size, false
 		);
 	} else {
 		buffer.data = this->protocol.reqDelete(

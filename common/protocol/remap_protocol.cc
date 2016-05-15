@@ -1,6 +1,6 @@
 #include "protocol.hh"
 
-size_t Protocol::generateRemappingLockHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t *original, uint32_t *remapped, uint32_t remappedCount, uint8_t keySize, char *key ) {
+size_t Protocol::generateRemappingLockHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t *original, uint32_t *remapped, uint32_t remappedCount, uint8_t keySize, char *key, bool isLarge ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader(
 		magic, to, opcode,
@@ -10,8 +10,12 @@ size_t Protocol::generateRemappingLockHeader( uint8_t magic, uint8_t to, uint8_t
 
 	*( ( uint32_t * )( buf ) ) = htonl( remappedCount );
 	buf[ 4 ] = keySize;
+	buf[ 5 ] = isLarge;
 	bytes += PROTO_REMAPPING_LOCK_SIZE;
 	buf += PROTO_REMAPPING_LOCK_SIZE;
+
+	if ( isLarge )
+		keySize += SPLIT_OFFSET_SIZE;
 
 	memmove( buf, key, keySize );
 	buf += keySize;
@@ -33,7 +37,7 @@ size_t Protocol::generateRemappingLockHeader( uint8_t magic, uint8_t to, uint8_t
 	return bytes;
 }
 
-bool Protocol::parseRemappingLockHeader( size_t offset, uint32_t *&original, uint32_t *&remapped, uint32_t &remappedCount, uint8_t &keySize, char *&key, char *buf, size_t size ) {
+bool Protocol::parseRemappingLockHeader( size_t offset, uint32_t *&original, uint32_t *&remapped, uint32_t &remappedCount, uint8_t &keySize, char *&key, bool &isLarge, char *buf, size_t size ) {
 	if ( size - offset < PROTO_REMAPPING_LOCK_SIZE )
 		return false;
 
@@ -41,6 +45,7 @@ bool Protocol::parseRemappingLockHeader( size_t offset, uint32_t *&original, uin
 
 	remappedCount = ntohl( *( ( uint32_t * )( ptr      ) ) );
 	keySize = ptr[ 4 ];
+	isLarge = ptr[ 5 ];
 
 	if ( size - offset < ( size_t ) PROTO_REMAPPING_LOCK_SIZE + keySize + remappedCount * 4 * 4 )
 		return false;
@@ -72,6 +77,7 @@ bool Protocol::parseRemappingLockHeader( struct RemappingLockHeader &header, cha
 		header.remappedCount,
 		header.keySize,
 		header.key,
+		header.isLarge,
 		buf, size
 	);
 }

@@ -33,7 +33,7 @@ bool Map::insertKey(
 	}
 	if ( needsUnlock ) UNLOCK( &this->keysLock );
 
-	key.dup();
+	key.dup( 0, 0, 0, isLarge );
 	return needsUpdateOpMetadata ? this->insertOpMetadata( opcode, timestamp, key, keyMetadata ) : true;
 }
 
@@ -236,7 +236,7 @@ bool Map::insertOpMetadata( uint8_t opcode, uint32_t &timestamp, Key key, KeyMet
 		opMetadata.timestamp = this->timestamp->nextVal();
 		timestamp = opMetadata.timestamp;
 
-		if ( dup ) key.dup();
+		if ( dup ) key.dup( 0, 0, 0, key.isLarge );
 
 		std::pair<Key, OpMetadata> opsPair( key, opMetadata );
 		std::pair<std::unordered_map<Key, OpMetadata>::iterator, bool> opsRet;

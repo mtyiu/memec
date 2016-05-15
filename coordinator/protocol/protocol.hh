@@ -43,20 +43,20 @@ public:
 	// ---------- degraded_protocol.cc ----------
 	char *resDegradedLock(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
-		bool isLocked, uint8_t keySize, char *key,
+		bool isLocked, uint8_t keySize, char *key, bool isLarge,
 		bool isSealed, uint32_t stripeId, uint32_t dataChunkId, uint32_t dataChunkCount,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 		uint32_t ongoingAtChunk, uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds
 	);
 	char *resDegradedLock(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
-		uint8_t keySize, char *key,
+		uint8_t keySize, char *key, bool isLarge,
 		uint32_t *original, uint32_t *remapped, uint32_t remappedCount
 	);
 	char *resDegradedLock(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		bool exist,
-		uint8_t keySize, char *key
+		uint8_t keySize, char *key, bool isLarge
 	);
 	char *reqReleaseDegradedLock(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
@@ -68,7 +68,7 @@ public:
 	char *resDegradedSetLock(
 		size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
 		uint32_t *original, uint32_t *remapped, uint32_t remappedCount,
-		uint8_t keySize, char *key
+		uint8_t keySize, char *key, bool isLarge
 	);
 	char *reqSyncRemappedData( size_t &size, uint16_t instanceId, uint32_t requestId, struct sockaddr_in target, char* buffer = 0 );
 

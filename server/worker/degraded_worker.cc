@@ -129,14 +129,15 @@ bool ServerWorker::handleDegradedGetRequest( ClientEvent event, char *buf, size_
 		__ERROR__( "ServerWorker", "handleDegradedGetRequest", "Invalid degraded GET request." );
 		return false;
 	}
-	__DEBUG__(
+	__INFO__(
 		BLUE, "ServerWorker", "handleDegradedGetRequest",
-		"[GET] (%u, %u) Key: %.*s (key size = %u); is sealed? %s.",
+		"[GET] (%u, %u) Key: %.*s (key size = %u); is sealed? %s; is large? %s.",
 		event.instanceId, event.requestId,
 		( int ) header.data.key.keySize,
 		header.data.key.key,
 		header.data.key.keySize,
-		header.isSealed ? "true" : "false"
+		header.isSealed ? "true" : "false",
+		header.isLarge ? "true" : "false"
 	);
 
 	int index = -1;

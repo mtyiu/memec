@@ -7,17 +7,28 @@ bool CoordinatorWorker::handleDegradedLockRequest( ClientEvent event, char *buf,
 		__ERROR__( "CoordinatorWorker", "handleDegradedLockRequest", "Invalid DEGRADED_LOCK request (size = %lu).", size );
 		return false;
 	}
-	__DEBUG__(
-		BLUE, "CoordinatorWorker", "handleDegradedLockRequest",
-		"[DEGRADED_LOCK] Key: %.*s (key size = %u).",
-		( int ) header.keySize, header.key, header.keySize
-	);
+	if ( header.isLarge ) {
+		__INFO__(
+			BLUE, "CoordinatorWorker", "handleDegradedLockRequest",
+			"[DEGRADED_LOCK] Key: %.*s.%u (key size = %u)%s.",
+			( int ) header.keySize, header.key,
+			LargeObjectUtil::readSplitOffset( header.key + header.keySize ),
+			header.keySize,
+			header.isLarge ? "; is large" : ""
+		);
+	} else {
+		__INFO__(
+			BLUE, "CoordinatorWorker", "handleDegradedLockRequest",
+			"[DEGRADED_LOCK] Key: %.*s (key size = %u).",
+			( int ) header.keySize, header.key, header.keySize
+		);
+	}
 
 	// Metadata metadata;
 	LOCK_T *lock;
 	RemappingRecord remappingRecord;
 	Key key;
-	key.set( header.keySize, header.key );
+	key.set( header.keySize, header.key, 0, header.isLarge );
 
 	if ( CoordinatorWorker::remappingRecords->find( key, &remappingRecord, &lock ) ) {
 		// Remapped
@@ -34,6 +45,12 @@ bool CoordinatorWorker::handleDegradedLockRequest( ClientEvent event, char *buf,
 	ServerSocket *socket;
 	uint32_t ongoingAtChunk;
 	uint32_t listId = CoordinatorWorker::stripeList->get( header.key, header.keySize, &socket, 0, &ongoingAtChunk );
+	if ( header.isLarge ) {
+		uint32_t splitOffset = LargeObjectUtil::readSplitOffset( header.key + header.keySize );
+		uint32_t splitIndex = LargeObjectUtil::getSplitIndex( header.keySize, splitOffset, splitOffset, header.isLarge );
+		ongoingAtChunk = ( ongoingAtChunk + splitIndex ) % ( CoordinatorWorker::dataChunkCount );
+		socket = CoordinatorWorker::stripeList->get( listId, ongoingAtChunk );
+	}
 	Map *map = &( socket->map );
 	Metadata srcMetadata; // set via findMetadataByKey()
 	DegradedLock degradedLock;
@@ -52,7 +69,7 @@ bool CoordinatorWorker::handleDegradedLockRequest( ClientEvent event, char *buf,
 	}
 
 	lock = 0;
-	if ( ! map->findMetadataByKey( header.key, header.keySize, srcMetadata ) ) {
+	if ( ! map->findMetadataByKey( header.key, header.keySize, header.isLarge, srcMetadata ) ) {
 		// Key not found
 		event.resDegradedLock(
 			event.socket, event.instanceId, event.requestId,
