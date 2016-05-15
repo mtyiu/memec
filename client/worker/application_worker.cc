@@ -252,7 +252,7 @@ bool ClientWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		__ERROR__( "ClientWorker", "handleSetRequest", "Invalid SET request." );
 		return false;
 	}
-	__INFO__(
+	__DEBUG__(
 		BLUE, "ClientWorker", "handleSetRequest",
 		"[SET] Key: %.*s (key size = %u); Value: (value size = %u)",
 		( int ) header.keySize, header.key, header.keySize, header.valueSize
@@ -294,7 +294,7 @@ bool ClientWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 	);
 	if ( isLarge ) {
 		// Value size exceeds the chunk size
-		__ERROR__( "ClientWorker", "handleSetRequest", "Value size (%u) exceeds the chunk size. Number of split = %u; split size = %u.", header.valueSize, numOfSplit, splitSize );
+		__DEBUG__( YELLOW, "ClientWorker", "handleSetRequest", "Value size (%u) exceeds the chunk size. Number of split = %u; split size = %u.", header.valueSize, numOfSplit, splitSize );
 	}
 
 	struct {
@@ -345,14 +345,12 @@ bool ClientWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		);
 		packet->size = buffer.size;
 
-		fprintf( stderr, "%c\n", header.value[ splitOffset ] );
-
-		fprintf(
-			stderr, "#%u [%.*s]: Offset at %u --> data server #%u; request size: %lu.\n",
-			splitIndex, header.keySize, header.key, splitOffset,
-			( chunkId + splitIndex ) % ClientWorker::dataChunkCount,
-			buffer.size
-		);
+		// fprintf(
+		// 	stderr, "#%u [%.*s]: Offset at %u --> data server #%u; request size: %lu.\n",
+		// 	splitIndex, header.keySize, header.key, splitOffset,
+		// 	( chunkId + splitIndex ) % ClientWorker::dataChunkCount,
+		// 	buffer.size
+		// );
 
 		// Choose data server
 		socket = this->dataServerSockets[ ( chunkId + splitIndex ) % ClientWorker::dataChunkCount ];

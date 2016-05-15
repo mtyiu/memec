@@ -308,7 +308,7 @@ bool ServerWorker::handleGetRequest( ClientEvent event, char *buf, size_t size )
 		__ERROR__( "ServerWorker", "handleGetRequest", "Invalid GET request." );
 		return false;
 	}
-	__INFO__(
+	__DEBUG__(
 		BLUE, "ServerWorker", "handleGetRequest",
 		"[GET] Key: %.*s (key size = %u).",
 		( int ) header.keySize, header.key, header.keySize
@@ -340,7 +340,6 @@ bool ServerWorker::handleGetRequest( ClientEvent event, struct KeyHeader &header
 			ret = false;
 		}
 	}
-	if ( ! ret ) fprintf( stderr, "%sfound\n", ret ? "" : "not " );
 	this->dispatch( event );
 	return ret;
 }
@@ -374,7 +373,7 @@ bool ServerWorker::handleSetRequest( ClientEvent event, struct KeyValueHeader &h
 		chunkId = ( chunkId + splitIndex ) % ServerWorker::dataChunkCount;
 		dataServerSocket = ServerWorker::stripeList->get( listId, chunkId );
 	}
-	__INFO__(
+	__DEBUG__(
 		BLUE, "ServerWorker", "handleSetRequest",
 		"[SET] Key: %.*s (key size = %u); Value: (value size = %u); Split offset = %u (index: %u); Is large? %s",
 		( int ) header.keySize, header.key, header.keySize, header.valueSize,

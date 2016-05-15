@@ -27,7 +27,7 @@ bool Map::insertKey(
 
 	if ( needsLock ) LOCK( &this->keysLock );
 
-	if ( ! this->keys.insert( key.data, key.size + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ), keyMetadata.obj ) ) {
+	if ( ! this->keys.insert( key.data, key.size, keyMetadata.obj, isLarge ) ) {
 		if ( needsUnlock ) UNLOCK( &this->keysLock );
 		return false;
 	}
@@ -74,6 +74,8 @@ char *Map::findLargeObject(
 	Key *keyPtr,
 	bool needsLock, bool needsUnlock
 ) {
+	char *ret = 0;
+
 	if ( needsLock ) LOCK( &this->keysLock );
 	ret = this->keys.find( keyStr, keySize, true );
 	if ( needsUnlock ) UNLOCK( &this->keysLock );

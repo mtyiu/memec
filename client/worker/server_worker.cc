@@ -238,7 +238,7 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 			return false;
 		}
 		if ( header.isParity ) {
-			__INFO__(
+			__DEBUG__(
 				BLUE, "ClientWorker", "handleSetResponse",
 				"[SET] Key: %.*s (key size = %u)",
 				( int ) header.keySize, header.key, header.keySize
@@ -247,7 +247,7 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 			keySize = header.keySize;
 			keyStr = header.key;
 		} else {
-			__INFO__(
+			__DEBUG__(
 				BLUE, "ClientWorker", "handleSetResponse",
 				"[SET] [%u] Key: %.*s (key size = %u) at (%u, %u, %u)",
 				header.timestamp,
@@ -288,7 +288,7 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 			return false;
 		}
 		event.socket->printAddress( stderr );
-		__INFO__(
+		__DEBUG__(
 			BLUE, "ClientWorker", "handleSetResponse",
 			"[SET (failed)] Key: %.*s (key size = %u)",
 			( int ) header.keySize, header.key, header.keySize
@@ -395,7 +395,7 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 				header.valueSize, &numOfSplit, &splitSize
 			);
 
-			__INFO__(
+			__DEBUG__(
 				BLUE, "ClientWorker", "handleGetResponse",
 				"[GET] Key: %.*s (key size = %u); Value: (value size = %u); split offset = %u, split size = %u, is large? %s; buffer size = %lu.",
 				header.keySize, header.key, header.keySize,

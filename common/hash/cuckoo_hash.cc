@@ -100,12 +100,24 @@ char *CuckooHash::tryRead( char *key, uint8_t keySize, uint8_t tag, size_t i ) {
 char *CuckooHash::find( char *key, uint8_t keySize, bool isLarge ) {
 	Key target;
 	uint32_t hashValue = HashFunc::hash( key, keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ) );
+	if ( isLarge ) {
+		bool isFirstSplit = true;
+		for ( uint8_t i = 0; i < SPLIT_OFFSET_SIZE; i++ ) {
+			if ( *( key + keySize + i ) )
+				isFirstSplit = false;
+		}
+		if ( isFirstSplit )
+			hashValue = HashFunc::hash( key, keySize );
+	}
 	uint8_t tag = this->tagHash( hashValue );
 	size_t i1 = this->indexHash( hashValue );
 	size_t i2 = this->altIndex( i1, tag );
 	char *result = 0;
 
-	target.set( keySize, key );
+	// if ( CuckooHash::keySize == 0 )
+	// 	fprintf( stderr, "CuckooHash::find(): %.*s [%u] (%u)%s\n", keySize, key, hashValue, keySize, isLarge ? "; is large" : "" );
+
+	target.set( keySize, key, 0, isLarge );
 
 #ifdef CUCKOO_HASH_LOCK_OPT
 	size_t lock = this->lockIndex( i1, i2, tag );
@@ -353,13 +365,25 @@ bool CuckooHash::tryAdd( char *ptr, uint8_t tag, size_t i, size_t lock ) {
 
 bool CuckooHash::insert( char *key, uint8_t keySize, char *ptr, bool isLarge ) {
 	uint32_t hashValue = HashFunc::hash( key, keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ) );
+	if ( isLarge ) {
+		bool isFirstSplit = true;
+		for ( uint8_t i = 0; i < SPLIT_OFFSET_SIZE; i++ ) {
+			if ( *( key + keySize + i ) )
+				isFirstSplit = false;
+		}
+		if ( isFirstSplit )
+			hashValue = HashFunc::hash( key, keySize );
+	}
 	uint8_t tag = this->tagHash( hashValue );
 	size_t i1 = this->indexHash( hashValue );
 	size_t i2 = this->altIndex( i1, tag );
 	size_t lock = this->lockIndex( i1, i2, tag );
 
-	if ( this->tryAdd( ptr, tag, i1, lock ) ) return 1;
-	if ( this->tryAdd( ptr, tag, i2, lock ) ) return 1;
+	// if ( CuckooHash::keySize == 0 )
+	// 	fprintf( stderr, "CuckooHash::insert(): %.*s --> %p [%u] (%u)%s\n", keySize, key, ptr, hashValue, keySize, isLarge ? "; is large" : "" );
+
+	if ( this->tryAdd( ptr, tag, i1, lock ) ) { return 1; }
+	if ( this->tryAdd( ptr, tag, i2, lock ) ) { return 1; }
 
 	int index;
 	size_t depth = 0;
@@ -386,9 +410,9 @@ bool CuckooHash::insert( char *key, uint8_t keySize, char *ptr, bool isLarge ) {
 	return false;
 }
 
-bool CuckooHash::tryDel( char *key, uint8_t keySize, uint8_t tag, size_t i, size_t lock ) {
+bool CuckooHash::tryDel( char *key, uint8_t keySize, uint8_t tag, size_t i, size_t lock, bool isLarge ) {
 	Key target;
-	target.set( keySize, key );
+	target.set( keySize, key, 0, isLarge );
 
 	for ( size_t j = 0; j < BUCKET_SIZE; j++ ) {
 #ifdef CUCKOO_HASH_ENABLE_TAG
@@ -469,11 +493,20 @@ bool CuckooHash::tryDel( char *key, uint8_t keySize, uint8_t tag, size_t i, size
 
 void CuckooHash::del( char *key, uint8_t keySize, bool isLarge ) {
 	uint32_t hashValue = HashFunc::hash( key, keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ) );
+	if ( isLarge ) {
+		bool isFirstSplit = true;
+		for ( uint8_t i = 0; i < SPLIT_OFFSET_SIZE; i++ ) {
+			if ( *( key + keySize + i ) )
+				isFirstSplit = false;
+		}
+		if ( isFirstSplit )
+			hashValue = HashFunc::hash( key, keySize );
+	}
 	uint8_t tag = this->tagHash( hashValue );
 	size_t i1 = this->indexHash( hashValue );
 	size_t i2 = this->altIndex( i1, tag );
 	size_t lock = this->lockIndex( i1, i2, tag );
 
-	if ( this->tryDel( key, keySize, tag, i1, lock ) ) return;
-	if ( this->tryDel( key, keySize, tag, i2, lock ) ) return;
+	if ( this->tryDel( key, keySize, tag, i1, lock, isLarge ) ) return;
+	if ( this->tryDel( key, keySize, tag, i2, lock, isLarge ) ) return;
 }
