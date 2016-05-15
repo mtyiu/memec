@@ -55,13 +55,19 @@ KeyMetadata DataChunkBuffer::set(
 	bool *isSealed, Metadata *sealed
 ) {
 	KeyMetadata keyMetadata;
-	uint32_t size = PROTO_KEY_VALUE_SIZE + keySize + valueSize, max = 0, tmp;
+	uint32_t size = PROTO_KEY_VALUE_SIZE + keySize + valueSize, max = 0, tmp, splitSize;
 	int index = -1;
 	Chunk *reInsertedChunk = 0, *chunk = 0;
 	char *ptr;
+	bool isLarge = LargeObjectUtil::isLarge( keySize, valueSize, 0, &splitSize );
 
 	if ( isSealed ) *isSealed = false;
 
+	if ( isLarge ) {
+		size -= valueSize;
+		size += ( splitOffset + splitSize > valueSize ) ? ( valueSize - splitOffset ) : splitSize;
+		size += SPLIT_OFFSET_SIZE;
+	}
 
 	// Choose one chunk buffer with minimum free space
 	LOCK( &this->lock );
@@ -187,7 +193,6 @@ KeyMetadata DataChunkBuffer::set(
 	UNLOCK( &this->lock );
 
 	// Update key map
-	bool isLarge = LargeObjectUtil::isLarge( keySize, valueSize );
 	Key keyObj;
 	keyObj.set( keySize, key, 0, isLarge );
 	ChunkBuffer::map->insertKey(

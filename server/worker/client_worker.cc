@@ -449,7 +449,7 @@ bool ServerWorker::handleUpdateRequest( ClientEvent event, char *buf, size_t siz
 		__ERROR__( "ServerWorker", "handleUpdateRequest", "Invalid UPDATE request." );
 		return false;
 	}
-	__DEBUG__(
+	__INFO__(
 		BLUE, "ServerWorker", "handleUpdateRequest",
 		"[UPDATE] Key: %.*s (key size = %u); Value: (update size = %u, offset = %u).",
 		( int ) header.keySize, header.key, header.keySize,
@@ -484,7 +484,25 @@ bool ServerWorker::handleUpdateRequest(
 
 	// checkGetChunk = true;
 
-	if ( map->findObject( header.key, header.keySize, &keyValue, &key ) ) {
+	ret = ( map->findObject( header.key, header.keySize, &keyValue, &key ) ) ||
+	      ( header.keySize > SPLIT_OFFSET_SIZE && map->findLargeObject( header.key, header.keySize - SPLIT_OFFSET_SIZE, &keyValue, &key ) );
+
+	if ( ! ret ) {
+		char backup[ SPLIT_OFFSET_SIZE ];
+		memcpy( backup, header.key + header.keySize, SPLIT_OFFSET_SIZE );
+		memset( header.key + header.keySize, 0, SPLIT_OFFSET_SIZE );
+		ret = ( map->findLargeObject( header.key, header.keySize, &keyValue, &key ) );
+		memcpy( header.key + header.keySize, backup, SPLIT_OFFSET_SIZE );
+	}
+
+	if ( ret ) {
+		uint8_t _keySize;
+		uint32_t _valueSize, splitOffset, splitSize;
+		char *_key, *_value;
+		bool isLarge;
+		keyValue.deserialize( _key, _keySize, _value, _valueSize, splitOffset );
+		isLarge = LargeObjectUtil::isLarge( _keySize, _valueSize, 0, &splitSize );
+
 		// Set up KeyMetadata
 		keyMetadata.length = keyValue.getSize();
 		keyMetadata.obj = keyValue.data;
@@ -506,11 +524,33 @@ bool ServerWorker::handleUpdateRequest(
 		endOfDegradedOp = false;
 		checkGetChunk = true;
 
-		uint32_t offset = keyMetadata.offset + PROTO_KEY_VALUE_SIZE + header.keySize + header.valueUpdateOffset;
+		uint32_t offset = keyMetadata.offset + KEY_VALUE_METADATA_SIZE + header.keySize + header.valueUpdateOffset;
+
+		if ( isLarge ) {
+			uint32_t upper, lower;
+			lower = splitOffset;
+			upper = splitOffset + splitSize - 1;
+			if ( upper > _valueSize )
+				upper = _valueSize;
+
+			if ( header.valueUpdateOffset > lower )
+				lower = header.valueUpdateOffset;
+
+			if ( header.valueUpdateOffset + header.valueUpdateSize < upper )
+				upper = header.valueUpdateOffset + header.valueUpdateSize - 1;
+
+			header.valueUpdateSize = upper - lower + 1;
+			header.valueUpdateOffset = lower - splitOffset;
+
+			offset = keyMetadata.offset + KEY_VALUE_METADATA_SIZE + header.keySize + header.valueUpdateOffset;
+
+			// fprintf( stderr, "%u %u\n", lower, upper );
+			// fprintf( stderr, "%u %u\n", header.valueUpdateSize, offset );
+		}
 
 		if ( ServerWorker::parityChunkCount ) {
 			// Add the current request to the pending set
-			keyValueUpdate.dup( header.keySize, header.key, ( void * ) event.socket );
+			keyValueUpdate.dup( header.keySize, header.key, ( void * ) event.socket, isLarge );
 			keyValueUpdate.offset = header.valueUpdateOffset;
 			keyValueUpdate.length = header.valueUpdateSize;
 			keyValueUpdate.isDegraded = reconstructedCount > 0;
@@ -519,7 +559,7 @@ bool ServerWorker::handleUpdateRequest(
 				__ERROR__( "ServerWorker", "handleUpdateRequest", "Cannot insert into client UPDATE pending map (ID = (%u, %u)).", event.instanceId, event.requestId );
 			}
 		} else {
-			key.set( header.keySize, header.key, ( void * ) event.socket );
+			key.set( header.keySize, header.key, ( void * ) event.socket, isLarge );
 		}
 
 		LOCK_T *keysLock, *chunksLock;

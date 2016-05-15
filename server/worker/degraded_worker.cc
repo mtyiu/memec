@@ -152,11 +152,19 @@ bool ServerWorker::handleDegradedGetRequest( ClientEvent event, char *buf, size_
 			listId,
 			chunkId
 		);
+
+		if ( header.isLarge ) {
+			uint32_t splitOffset = LargeObjectUtil::readSplitOffset( header.data.key.key + header.data.key.keySize );
+			uint32_t splitIndex = LargeObjectUtil::getSplitIndex( header.data.key.keySize, 0, splitOffset, header.isLarge );
+			chunkId = ( chunkId + splitIndex ) % ( ServerWorker::dataChunkCount );
+		}
+
 		index = this->findInRedirectedList(
 			header.original, header.reconstructed, header.reconstructedCount,
 			header.ongoingAtChunk, reconstructParity, reconstructData,
 			chunkId, header.isSealed
 		);
+
 		if ( ( index == -1 ) ||
 		     ( header.original[ index * 2 + 1 ] >= ServerWorker::dataChunkCount ) ) {
 			// No need to perform degraded read if only the parity servers are redirected
@@ -184,6 +192,7 @@ degraded_get_check:
 	bool isKeyValueFound = dmap->findValueByKey(
 		header.data.key.key,
 		header.data.key.keySize,
+		header.isLarge,
 		isSealed,
 		&keyValue, &key, &keyMetadata
 	);
@@ -211,7 +220,7 @@ degraded_get_check:
 		this->dispatch( event );
 	} else {
 		bool isReconstructed;
-		key.dup( key.size, key.data );
+		key.dup( key.size, key.data, 0, header.isLarge );
 		ret = this->performDegradedRead(
 			PROTO_OPCODE_DEGRADED_GET,
 			event.socket,
@@ -420,6 +429,7 @@ bool ServerWorker::handleDegradedUpdateRequest( ClientEvent event, struct Degrad
 	isKeyValueFound = dmap->findValueByKey(
 		header.data.keyValueUpdate.key,
 		header.data.keyValueUpdate.keySize,
+		header.isLarge,
 		isSealed,
 		&keyValue, &key, &keyMetadata
 	);
@@ -660,6 +670,7 @@ bool ServerWorker::handleDegradedDeleteRequest( ClientEvent event, char *buf, si
 	isKeyValueFound = dmap->findValueByKey(
 		header.data.key.key,
 		header.data.key.keySize,
+		header.isLarge,
 		isSealed,
 		&keyValue, &key, &keyMetadata
 	);
@@ -842,10 +853,10 @@ bool ServerWorker::handleForwardChunkRequest( struct ChunkDataHeader &header, bo
 			switch( op.opcode ) {
 				case PROTO_OPCODE_DEGRADED_GET:
 				case PROTO_OPCODE_DEGRADED_DELETE:
-					key.set( op.data.key.size, op.data.key.data );
+					key.set( op.data.key.size, op.data.key.data, 0, op.data.key.isLarge );
 					break;
 				case PROTO_OPCODE_DEGRADED_UPDATE:
-					key.set( op.data.keyValueUpdate.size, op.data.keyValueUpdate.data );
+					key.set( op.data.keyValueUpdate.size, op.data.keyValueUpdate.data, 0, op.data.key.isLarge );
 					break;
 				default:
 					continue;
@@ -873,6 +884,7 @@ bool ServerWorker::handleForwardChunkRequest( struct ChunkDataHeader &header, bo
 			bool isSealed;
 			bool isKeyValueFound = dmap->findValueByKey(
 				key.data, key.size,
+				key.isLarge,
 				isSealed,
 				&keyValue, 0, &keyMetadata
 			);

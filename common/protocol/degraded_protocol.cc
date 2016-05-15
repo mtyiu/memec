@@ -395,7 +395,7 @@ size_t Protocol::generateDegradedReqHeader(
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader(
 		magic, to, opcode,
-		PROTO_DEGRADED_REQ_BASE_SIZE + numSurvivingChunkIds * 4 + reconstructedCount * 4 * 4 + PROTO_KEY_SIZE + keySize,
+		PROTO_DEGRADED_REQ_BASE_SIZE + numSurvivingChunkIds * 4 + reconstructedCount * 4 * 4 + PROTO_KEY_SIZE + keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ),
 		instanceId, requestId, 0,
 		timestamp
 	);
@@ -440,6 +440,9 @@ size_t Protocol::generateDegradedReqHeader(
 	buf += PROTO_KEY_SIZE;
 	bytes += PROTO_KEY_SIZE;
 
+	if ( isLarge )
+		keySize += SPLIT_OFFSET_SIZE;
+
 	memmove( buf, key, keySize );
 	bytes += keySize;
 
@@ -458,7 +461,7 @@ size_t Protocol::generateDegradedReqHeader(
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader(
 		magic, to, opcode,
-		PROTO_DEGRADED_REQ_BASE_SIZE + numSurvivingChunkIds * 4 + reconstructedCount * 4 * 4 + PROTO_KEY_VALUE_UPDATE_SIZE + keySize + valueUpdateSize,
+		PROTO_DEGRADED_REQ_BASE_SIZE + numSurvivingChunkIds * 4 + reconstructedCount * 4 * 4 + PROTO_KEY_VALUE_UPDATE_SIZE + keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ) + valueUpdateSize,
 		instanceId, requestId,
 		0,
 		timestamp
@@ -517,6 +520,9 @@ size_t Protocol::generateDegradedReqHeader(
 
 	buf += PROTO_KEY_VALUE_UPDATE_SIZE;
 	bytes += PROTO_KEY_VALUE_UPDATE_SIZE;
+
+	if ( isLarge )
+		keySize += SPLIT_OFFSET_SIZE;
 
 	memmove( buf, key, keySize );
 	buf += keySize;

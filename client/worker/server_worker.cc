@@ -527,6 +527,9 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 			keyHeader.key = header.key;
 			keyHeader.keySize = header.keySize + SPLIT_OFFSET_SIZE;
 
+			char backup[ SPLIT_OFFSET_SIZE ];
+			memcpy( backup, keyHeader.key + keyHeader.keySize - SPLIT_OFFSET_SIZE, SPLIT_OFFSET_SIZE );
+
 			for ( uint32_t sOffset = splitSize; sOffset < valueSize; sOffset += splitSize ) {
 				LargeObjectUtil::writeSplitOffset(
 					keyHeader.key + keyHeader.keySize - SPLIT_OFFSET_SIZE, // buf
@@ -538,6 +541,8 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 					true
 				);
 			}
+
+			memcpy( keyHeader.key + keyHeader.keySize - SPLIT_OFFSET_SIZE, backup, SPLIT_OFFSET_SIZE );
 
 			return true;
 		} else {
@@ -635,6 +640,8 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 		return false;
 	}
 
+	fprintf( stderr, "keyValueUpdate.remaining = %u\n", keyValueUpdate.remaining );
+
 	// remove pending timestamp
 	// TODO handle degraded mode
 	Client *client = Client::getInstance();
@@ -657,13 +664,13 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 			applicationEvent.replayUpdateRequest( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, kv );
 			// do not use dispatch, since ClientWorker::replayUpdate() overwrites recv buffer
 			ClientWorker::eventQueue->insert( applicationEvent );
-		} else {
+		} else if ( keyValueUpdate.remaining == 0 ) {
 			applicationEvent.resUpdate( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, keyValueUpdate, success, false );
 			this->dispatch( applicationEvent );
 		}
 	}
 
-	if ( ! needsReplay ) {
+	if ( ! needsReplay && keyValueUpdate.remaining == 0 ) {
 		// free the updated value
 		delete[] ( ( char * )( keyValueUpdate.ptr ) );
 	}

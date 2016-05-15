@@ -1033,7 +1033,7 @@ void Server::lookup() {
 
 	bool isSealed;
 	KeyValue keyValue;
-	if ( this->degradedChunkBuffer.map.findValueByKey( key, keySize, isSealed, &keyValue, 0, &keyMetadata ) ) {
+	if ( this->degradedChunkBuffer.map.findValueByKey( key, keySize, false, isSealed, &keyValue, 0, &keyMetadata ) ) {
 		if ( isSealed ) {
 			uint8_t keySize;
 			uint32_t valueSize;

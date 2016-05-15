@@ -279,7 +279,7 @@ uint32_t LargeObjectUtil::getValueOffsetAtSplit( uint8_t keySize, uint32_t value
 }
 
 uint32_t LargeObjectUtil::getSplitIndex( uint8_t keySize, uint32_t valueSize, uint32_t offset, bool &isLarge ) {
-	if ( ! valueSize ) valueSize = LargeObjectUtil::chunkSize;
+	if ( ! valueSize ) valueSize = LargeObjectUtil::chunkSize + offset;
 	uint32_t totalSize = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
 	uint32_t splitSize;
 

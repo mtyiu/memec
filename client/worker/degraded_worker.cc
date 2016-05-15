@@ -62,7 +62,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 	socket = this->getServers( header.key, header.keySize, originalListId, originalChunkId );
 	if ( header.isLarge ) {
 		uint32_t splitOffset = LargeObjectUtil::readSplitOffset( header.key + header.keySize );
-		uint32_t splitIndex = LargeObjectUtil::getSplitIndex( header.keySize, splitOffset, splitOffset, header.isLarge );
+		uint32_t splitIndex = LargeObjectUtil::getSplitIndex( header.keySize, 0, splitOffset, header.isLarge );
 		originalChunkId = ( originalChunkId + splitIndex ) % ( ClientWorker::dataChunkCount );
 		socket = this->dataServerSockets[ originalChunkId ];
 
@@ -170,9 +170,6 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 		return false;
 	}
 
-	if ( header.isLarge )
-		degradedLockData.keySize += SPLIT_OFFSET_SIZE;
-
 	// Send the degraded request to the server
 	switch( degradedLockData.opcode ) {
 		case PROTO_OPCODE_GET:
@@ -211,7 +208,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 			}
 
 			// Insert into server GET pending map
-			key.set( degradedLockData.keySize, degradedLockData.key, ( void * ) original );
+			key.set( degradedLockData.keySize, degradedLockData.key, 0 );
 			if ( ! ClientWorker::pending->insertKey( PT_SERVER_GET, instanceId, pid.parentInstanceId, requestId, pid.parentRequestId, ( void * ) socket, key ) ) {
 				__ERROR__( "ClientWorker", "handleDegradedLockResponse", "Cannot insert into server GET pending map." );
 			}
@@ -257,6 +254,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 			keyValueUpdate.set( degradedLockData.keySize, degradedLockData.key, ( void * ) original );
 			keyValueUpdate.offset = degradedLockData.valueUpdateOffset;
 			keyValueUpdate.length = degradedLockData.valueUpdateSize;
+			keyValueUpdate.remaining = 1;
 			if ( ! ClientWorker::pending->insertKeyValueUpdate( PT_SERVER_UPDATE, instanceId, pid.parentInstanceId, requestId, pid.parentRequestId, ( void * ) socket, keyValueUpdate, true, true, requestTimestamp ) ) {
 				__ERROR__( "ClientWorker", "handleUpdateRequest", "Cannot insert into server UPDATE pending map." );
 			}

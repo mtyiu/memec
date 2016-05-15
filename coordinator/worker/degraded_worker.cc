@@ -47,7 +47,7 @@ bool CoordinatorWorker::handleDegradedLockRequest( ClientEvent event, char *buf,
 	uint32_t listId = CoordinatorWorker::stripeList->get( header.key, header.keySize, &socket, 0, &ongoingAtChunk );
 	if ( header.isLarge ) {
 		uint32_t splitOffset = LargeObjectUtil::readSplitOffset( header.key + header.keySize );
-		uint32_t splitIndex = LargeObjectUtil::getSplitIndex( header.keySize, splitOffset, splitOffset, header.isLarge );
+		uint32_t splitIndex = LargeObjectUtil::getSplitIndex( header.keySize, 0, splitOffset, header.isLarge );
 		ongoingAtChunk = ( ongoingAtChunk + splitIndex ) % ( CoordinatorWorker::dataChunkCount );
 		socket = CoordinatorWorker::stripeList->get( listId, ongoingAtChunk );
 	}

@@ -75,6 +75,7 @@ public:
 
 	bool findValueByKey(
 		char *data, uint8_t size,
+		bool isLarge,
 		bool &isSealed,
 		KeyValue *keyValue,
 		Key *keyPtr = 0,

@@ -13,7 +13,7 @@ void DegradedMap::init( Map *map ) {
 	this->serverMap = map;
 }
 
-bool DegradedMap::findValueByKey( char *data, uint8_t size, bool &isSealed, KeyValue *keyValue, Key *keyPtr, KeyMetadata *keyMetadataPtr, Metadata *metadataPtr, Chunk **chunkPtr ) {
+bool DegradedMap::findValueByKey( char *data, uint8_t size, bool isLarge, bool &isSealed, KeyValue *keyValue, Key *keyPtr, KeyMetadata *keyMetadataPtr, Metadata *metadataPtr, Chunk **chunkPtr ) {
 	std::unordered_map<Key, KeyMetadata>::iterator keysIt;
 	std::unordered_map<Metadata, Chunk *>::iterator cacheIt;
 	Key key;
@@ -23,7 +23,7 @@ bool DegradedMap::findValueByKey( char *data, uint8_t size, bool &isSealed, KeyV
 
 	if ( keyValue )
 		keyValue->clear();
-	key.set( size, data );
+	key.set( size, data, 0, isLarge );
 
 	LOCK( &this->keysLock );
 	keysIt = this->keys.find( key );
