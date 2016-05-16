@@ -80,7 +80,7 @@ public class MemECApplication extends DB {
   public Status read(String table, String key, Set<String> fields, HashMap<String, ByteIterator> result) {
     Status ret = Status.OK;
     for (String f : fields) {
-      String value = memec.get(table + ":" + key + ":" + f);
+      String value = memec.get(table + key);
       if (value == null) {
         ret = Status.ERROR;
       }
@@ -93,7 +93,7 @@ public class MemECApplication extends DB {
   public Status insert(String table, String key, HashMap<String, ByteIterator> values) {
     Status ret = Status.OK;
     for (Map.Entry<String, ByteIterator> entry : values.entrySet()) {
-      if (!memec.set(table + ":" + key + ":" + entry.getKey(), entry.getValue().toString())) {
+      if (!memec.set(table + key, entry.getValue().toString())) {
         ret = Status.ERROR;
       }
     }
@@ -102,14 +102,14 @@ public class MemECApplication extends DB {
 
   @Override
   public Status delete(String table, String key) {
-    return memec.delete(key) ? Status.OK : Status.ERROR;
+    return memec.delete(table + key) ? Status.OK : Status.ERROR;
   }
 
   @Override
   public Status update(String table, String key, HashMap<String, ByteIterator> values) {
     Status ret = Status.OK;
     for (Map.Entry<String, ByteIterator> entry : values.entrySet()) {
-      if (!memec.update(table + ":" + key + ":" + entry.getKey(), entry.getValue().toString(), 0)) {
+      if (!memec.update(table + key, entry.getValue().toString(), 0)) {
         ret = Status.ERROR;
       }
     }

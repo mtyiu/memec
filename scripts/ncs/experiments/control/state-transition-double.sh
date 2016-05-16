@@ -27,7 +27,7 @@ workloads='workloada'
 delays='2.0'
 
 for delay in $delays; do
-	for iter in {1..1}; do
+	for iter in {1..10}; do
 		echo "******************** Iteration #$iter ********************"
 		screen -S manage -p 0 -X stuff "${BASE_PATH}/scripts/util/start.sh $(printf '\r')"
 		sleep 30

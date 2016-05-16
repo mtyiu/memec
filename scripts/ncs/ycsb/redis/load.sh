@@ -18,16 +18,20 @@ ID=$(hostname | sed 's/testbed-node//g')
 
 # Evenly distribute the # of ops to YCSB clients ( 4 in the experiment setting )
 # Each client inserts pairs of an independent key range
-RECORD_COUNT=10000000
-INSERT_COUNT=$(expr ${RECORD_COUNT} \/ 4)
+RECORD_COUNT=5000000
+INSERT_COUNT=$(expr ${RECORD_COUNT} \/ 2)
 if [ $ID == 3 ]; then
 	INSERT_START=0
+	EXTRA_OP="-p fieldlength=8 -p table=a"
 elif [ $ID == 4 ]; then
 	INSERT_START=${INSERT_COUNT}
+	EXTRA_OP="-p fieldlength=8 -p table=a"
 elif [ $ID == 8 ]; then
-	INSERT_START=$(expr ${INSERT_COUNT} \* 2)
+	INSERT_START=0
+	EXTRA_OP="-p fieldlength=32 -p table=b"
 elif [ $ID == 9 ]; then
-	INSERT_START=$(expr ${INSERT_COUNT} \* 3)
+	INSERT_START=${INSERT_COUNT}
+	EXTRA_OP="-p fieldlength=32 -p table=b"
 fi
 
 # Load the store with key-value pairs
@@ -38,15 +42,13 @@ ${YCSB_PATH}/bin/ycsb \
 	-p fieldcount=1 \
 	-p readallfields=false \
 	-p scanproportion=0 \
-	-p table=u \
-	-p fieldlength=1024 \
-	-p fieldlengthdistribution=zipfian \
 	-p requestdistribution=zipfian \
 	-p recordcount=${RECORD_COUNT} \
 	-p insertstart=${INSERT_START} \
 	-p insertcount=${INSERT_COUNT} \
 	-p threadcount=$1 \
 	-p histogram.buckets=200000 \
+	-p zeropadding=19 \
 	-p redis.serverCount=16 \
 	-p redis.host0=192.168.0.22 \
 	-p redis.port0=6379 \
@@ -79,4 +81,5 @@ ${YCSB_PATH}/bin/ycsb \
 	-p redis.host14=192.168.0.48 \
 	-p redis.port14=6379 \
 	-p redis.host15=192.168.0.49 \
-	-p redis.port15=6379
+	-p redis.port15=6379 \
+	${EXTRA_OP}

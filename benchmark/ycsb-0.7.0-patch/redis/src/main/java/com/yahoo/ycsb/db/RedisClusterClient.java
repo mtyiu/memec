@@ -113,10 +113,10 @@ public class RedisClusterClient extends DB {
   public Status read(String table, String key, Set<String> fields,
       HashMap<String, ByteIterator> result) {
     if (fields == null) {
-      StringByteIterator.putAllAsByteIterators(result, jedis.hgetAll(key));
+      StringByteIterator.putAllAsByteIterators(result, jedis.hgetAll(table + key));
     } else {
       String[] fieldArray = (String[])fields.toArray(new String[fields.size()]);
-      List<String> values = jedis.hmget(key, fieldArray);
+      List<String> values = jedis.hmget(table + key, fieldArray);
 
       Iterator<String> fieldIterator = fields.iterator();
       Iterator<String> valueIterator = values.iterator();
@@ -133,7 +133,7 @@ public class RedisClusterClient extends DB {
   public Status insert(String table, String key, HashMap<String, ByteIterator> values) {
     //System.out.format("key %s hash to server %d\n", key, hashSlot(key));
     if (jedis.hmset(key, StringByteIterator.getStringMap(values)).equals("OK")) {
-      jedis.zadd(INDEX_KEY, hash(key), key);
+      jedis.zadd(INDEX_KEY, hash(key), table + key);
       return Status.OK;
     }
     return Status.ERROR;
@@ -142,13 +142,13 @@ public class RedisClusterClient extends DB {
   @Override
   public Status delete(String table, String key) {
     return jedis.del(key) == 0
-      && jedis.zrem(INDEX_KEY, key) == 0
+      && jedis.zrem(INDEX_KEY, table + key) == 0
          ? Status.ERROR : Status.OK;
   }
 
   @Override
   public Status update(String table, String key, HashMap<String, ByteIterator> values) {
-    return jedis.hmset(key, StringByteIterator.getStringMap(values)).equals("OK") ? Status.OK : Status.NOT_FOUND;
+    return jedis.hmset(table+key, StringByteIterator.getStringMap(values)).equals("OK") ? Status.OK : Status.NOT_FOUND;
   }
 
 

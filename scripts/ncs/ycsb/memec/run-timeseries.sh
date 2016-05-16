@@ -17,17 +17,21 @@ fi
 ID=$(hostname | sed 's/testbed-node//g')
 
 # Evenly distribute the # of ops to YCSB clients ( 4 in the experiment setting )
-RECORD_COUNT=10000000
-INSERT_COUNT=$(expr ${RECORD_COUNT} \/ 4)
-OPERATION_COUNT=$(expr ${RECORD_COUNT} \/ 4)
+RECORD_COUNT=5000000
+INSERT_COUNT=$(expr ${RECORD_COUNT} \/ 2)
+OPERATION_COUNT=$(expr ${RECORD_COUNT} \* 2 \/ 2)
 if [ $ID == 3 ]; then
 	INSERT_START=0
+	EXTRA_OP="-p table=a -p fieldlength=8"
 elif [ $ID == 4 ]; then
 	INSERT_START=${INSERT_COUNT}
+	EXTRA_OP="-p table=a -p fieldlength=8"
 elif [ $ID == 8 ]; then
-	INSERT_START=$(expr ${INSERT_COUNT} \* 2)
+	INSERT_START=0
+	EXTRA_OP="-p table=b -p fieldlength=32"
 elif [ $ID == 9 ]; then
-	INSERT_START=$(expr ${INSERT_COUNT} \* 3)
+	INSERT_START=${INSERT_COUNT}
+	EXTRA_OP="-p table=b -p fieldlength=32"
 fi
 
 EXTRA=""
@@ -45,10 +49,7 @@ ${YCSB_PATH}/bin/ycsb \
 	-p fieldcount=1 \
 	-p readallfields=false \
 	-p scanproportion=0 \
-	-p table=u \
-	-p fieldlength=1024 \
 	-p requestdistribution=zipfian \
-	-p fieldlengthdistribution=zipfian \
 	-p recordcount=${RECORD_COUNT} \
 	-p insertstart=${INSERT_START} \
 	-p insertcount=${INSERT_COUNT} \
@@ -61,4 +62,5 @@ ${YCSB_PATH}/bin/ycsb \
 	-p memec.chunk_size=4096 \
 	-p measurementtype=timeseries \
 	-p timeseries.granularity=500 \
+	-p zeropadding=19 \
 	${EXTRA}

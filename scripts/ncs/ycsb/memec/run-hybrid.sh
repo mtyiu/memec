@@ -8,17 +8,21 @@ if [ $# != 2 ]; then
 fi
 
 ID=$(hostname | sed 's/testbed-node//g')
-RECORD_COUNT=10000000
-INSERT_COUNT=$(expr ${RECORD_COUNT} \/ 4)
-OPERATION_COUNT=$(expr ${RECORD_COUNT} \/ 4)
+RECORD_COUNT=5000000
+INSERT_COUNT=$(expr ${RECORD_COUNT} \/ 2)
+OPERATION_COUNT=$(expr ${RECORD_COUNT} \* 2 \/ 2)
 if [ $ID == 3 ]; then
 	INSERT_START=0
+	EXTRA_OP="-p table=a -p fieldlength=8"
 elif [ $ID == 4 ]; then
 	INSERT_START=${INSERT_COUNT}
+	EXTRA_OP="-p table=a -p fieldlength=8"
 elif [ $ID == 8 ]; then
-	INSERT_START=$(expr ${INSERT_COUNT} \* 2)
+	INSERT_START=0
+	EXTRA_OP="-p table=b -p fieldlength=32"
 elif [ $ID == 9 ]; then
-	INSERT_START=$(expr ${INSERT_COUNT} \* 3)
+	INSERT_START=${INSERT_COUNT}
+	EXTRA_OP="-p table=b -p fieldlength=32"
 fi
 
 ${YCSB_PATH}/bin/ycsb \
@@ -31,8 +35,6 @@ ${YCSB_PATH}/bin/ycsb \
 	-p readproportion=0.34 \
 	-p updateproportion=0.33 \
 	-p insertproportion=0.33 \
-	-p table=u \
-	-p fieldlength=200 \
 	-p requestdistribution=zipfian \
 	-p recordcount=${RECORD_COUNT} \
 	-p insertstart=${INSERT_START} \
@@ -43,4 +45,6 @@ ${YCSB_PATH}/bin/ycsb \
 	-p memec.host=$(hostname -I | xargs) \
 	-p memec.port=9112 \
 	-p memec.key_size=255 \
-	-p memec.chunk_size=4096
+	-p memec.chunk_size=4096 \
+	-p zeropadding=19 \
+	${EXTRA_OP}
