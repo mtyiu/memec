@@ -194,5 +194,7 @@ bool Protocol::parseKeyOpMetadataHeader( struct KeyOpMetadataHeader &header, siz
 		buf, size
 	);
 	bytes = PROTO_KEY_OP_METADATA_SIZE + header.keySize;
+	if ( header.isLarge )
+		bytes += SPLIT_OFFSET_SIZE;
 	return ret;
 }

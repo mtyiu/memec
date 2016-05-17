@@ -360,9 +360,9 @@ bool CoordinatorWorker::processHeartbeat( ServerEvent event, char *buf, size_t s
 				false, false
 			);
 
-			if ( header.op.isLarge ) {
-				fprintf( stderr, "%.*s (%u) . %u --> [%u, %u, %u]\n", header.op.keySize, header.op.key, header.op.keySize, LargeObjectUtil::readSplitOffset( header.op.key + header.op.keySize ), header.op.listId, header.op.stripeId, header.op.chunkId );
-			}
+			// if ( header.op.isLarge ) {
+			// 	fprintf( stderr, "%.*s (%u) . %u --> [%u, %u, %u]\n", header.op.keySize, header.op.key, header.op.keySize, LargeObjectUtil::readSplitOffset( header.op.key + header.op.keySize ), header.op.listId, header.op.stripeId, header.op.chunkId );
+			// }
 		} else {
 			failed++;
 		}

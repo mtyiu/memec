@@ -305,7 +305,7 @@ bool ServerWorker::handleGetRequest( ClientEvent event, char *buf, size_t size )
 		__ERROR__( "ServerWorker", "handleGetRequest", "Invalid GET request." );
 		return false;
 	}
-	__INFO__(
+	__DEBUG__(
 		BLUE, "ServerWorker", "handleGetRequest",
 		"[GET] Key: %.*s (key size = %u).",
 		( int ) header.keySize, header.key, header.keySize
@@ -449,7 +449,7 @@ bool ServerWorker::handleUpdateRequest( ClientEvent event, char *buf, size_t siz
 		__ERROR__( "ServerWorker", "handleUpdateRequest", "Invalid UPDATE request." );
 		return false;
 	}
-	__INFO__(
+	__DEBUG__(
 		BLUE, "ServerWorker", "handleUpdateRequest",
 		"[UPDATE] Key: %.*s (key size = %u); Value: (update size = %u, offset = %u).",
 		( int ) header.keySize, header.key, header.keySize,
