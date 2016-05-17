@@ -12,15 +12,19 @@ RECORD_COUNT=5000000
 INSERT_COUNT=$(expr ${RECORD_COUNT} \/ 2)
 OPERATION_COUNT=$(expr ${RECORD_COUNT} \* 2 \/ 2)
 if [ $ID == 3 ]; then
+	# INSERT_START=$(expr ${RECORD_COUNT})
 	INSERT_START=0
 	EXTRA_OP="-p table=a -p fieldlength=8"
 elif [ $ID == 4 ]; then
+	# INSERT_START=$(expr ${RECORD_COUNT} + ${INSERT_COUNT})
 	INSERT_START=${INSERT_COUNT}
 	EXTRA_OP="-p table=a -p fieldlength=8"
 elif [ $ID == 8 ]; then
+	# INSERT_START=$(expr ${RECORD_COUNT})
 	INSERT_START=0
 	EXTRA_OP="-p table=b -p fieldlength=32"
 elif [ $ID == 9 ]; then
+	# INSERT_START=$(expr ${RECORD_COUNT} + ${INSERT_COUNT})
 	INSERT_START=${INSERT_COUNT}
 	EXTRA_OP="-p table=b -p fieldlength=32"
 fi
