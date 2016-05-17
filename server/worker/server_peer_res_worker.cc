@@ -1317,6 +1317,7 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 				uint32_t requestId = ServerWorker::idGenerator->nextVal( this->workerId );
 				for ( uint32_t i = 0; i < op.reconstructedCount; i++ ) {
 					ServerPeerSocket *s = ServerWorker::stripeList->get( op.reconstructed[ i * 2 ], op.reconstructed[ i * 2 + 1 ] );
+					ChunkUtil::set( this->chunks[ op.original[ i * 2 + 1 ] ], metadata.listId, metadata.stripeId, op.original[ i * 2 + 1 ] );
 
 					if ( invalidChunks.count( op.original[ i * 2 + 1 ] ) ) {
 						// Do nothing
