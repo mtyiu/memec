@@ -257,6 +257,7 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 				event.message.update.listId,
 				event.message.update.stripeId,
 				event.message.update.chunkId,
+				event.message.update.key.isLarge,
 				event.message.update.key.data,
 				event.message.update.key.size,
 				event.message.update.valueUpdateOffset,

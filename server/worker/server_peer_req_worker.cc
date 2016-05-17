@@ -213,7 +213,7 @@ bool ServerWorker::handleUpdateRequest( ServerPeerEvent event, char *buf, size_t
 	metadata.set( header.listId, header.stripeId, header.chunkId );
 
 	bool ret = ServerWorker::chunkBuffer->at( header.listId )->updateKeyValue(
-		header.key, header.keySize,
+		header.key, header.keySize, header.isLarge,
 		header.valueUpdateOffset, header.valueUpdateSize, header.valueUpdate
 	);
 	if ( ! ret ) {

@@ -237,7 +237,7 @@ bool ServerWorker::handleRemappedUpdateRequest( ServerPeerEvent event, char *buf
 	key.set( header.keySize, header.key );
 
 	if ( ServerWorker::chunkBuffer->at( listId )->updateKeyValue(
-		header.key, header.keySize,
+		header.key, header.keySize, false,
 		header.valueUpdateOffset, header.valueUpdateSize, header.valueUpdate
 	) ) {
 		// Parity not remapped

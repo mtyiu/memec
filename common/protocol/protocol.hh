@@ -226,7 +226,7 @@ struct ChunkKeyHeader {
 	char *key;
 };
 
-#define PROTO_CHUNK_KEY_VALUE_UPDATE_SIZE 22
+#define PROTO_CHUNK_KEY_VALUE_UPDATE_SIZE 23
 struct ChunkKeyValueUpdateHeader {
 	uint32_t listId;
 	uint32_t stripeId;
@@ -235,6 +235,7 @@ struct ChunkKeyValueUpdateHeader {
 	uint32_t valueUpdateSize;   // 3 bytes
 	uint32_t valueUpdateOffset; // 3 bytes
 	uint32_t chunkUpdateOffset; // 3 bytes
+	bool isLarge;
 	char *key;
 	char *valueUpdate;
 };
@@ -677,19 +678,19 @@ protected:
 	size_t generateChunkKeyValueUpdateHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
-		uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize,
+		uint8_t keySize, bool isLarge, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize,
 		uint32_t chunkUpdateOffset, char *valueUpdate, char *sendBuf = 0,
 		uint32_t timestamp = 0
 	);
 	bool parseChunkKeyValueUpdateHeader(
 		size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
-		uint8_t &keySize, char *&key,
+		uint8_t &keySize, bool &isLarge, char *&key,
 		uint32_t &valueUpdateOffset, uint32_t &valueUpdateSize, uint32_t &chunkUpdateOffset,
 		char *buf, size_t size
 	);
 	bool parseChunkKeyValueUpdateHeader(
 		size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId,
-		uint8_t &keySize, char *&key,
+		uint8_t &keySize, bool &isLarge, char *&key,
 		uint32_t &valueUpdateOffset, uint32_t &valueUpdateSize, uint32_t &chunkUpdateOffset, char *&valueUpdate,
 		char *buf, size_t size
 	);

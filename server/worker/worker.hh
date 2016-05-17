@@ -187,7 +187,7 @@ private:
 	);
 	bool sendModifyChunkRequest(
 		uint16_t parentInstanceId, uint32_t parentRequestId,
-		uint8_t keySize, char *keyStr,
+		uint8_t keySize, bool isLarge, char *keyStr,
 		Metadata &metadata, uint32_t offset,
 		uint32_t deltaSize, // valueUpdateSize
 		uint32_t valueUpdateOffset,

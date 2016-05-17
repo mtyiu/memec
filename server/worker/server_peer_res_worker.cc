@@ -100,6 +100,7 @@ bool ServerWorker::handleForwardKeyResponse( struct ForwardKeyHeader &header, bo
 					this->sendModifyChunkRequest(
 						pid.parentInstanceId, pid.parentRequestId,
 						op.data.keyValueUpdate.size,
+						false,
 						op.data.keyValueUpdate.data,
 						metadata,
 						0, /* chunkUpdateOffset */
@@ -139,7 +140,7 @@ bool ServerWorker::handleForwardKeyResponse( struct ForwardKeyHeader &header, bo
 					}
 
 					this->sendModifyChunkRequest(
-						pid.parentInstanceId, pid.parentRequestId, key.size, key.data,
+						pid.parentInstanceId, pid.parentRequestId, key.size, false, key.data,
 						metadata,
 						// not needed for deleting a key-value pair in an unsealed chunk:
 						0, 0, 0, 0,
@@ -322,6 +323,7 @@ bool ServerWorker::handleGetResponse( ServerPeerEvent event, bool success, char 
 					this->sendModifyChunkRequest(
 						pid.parentInstanceId, pid.parentRequestId,
 						op.data.keyValueUpdate.size,
+						false,
 						op.data.keyValueUpdate.data,
 						metadata,
 						0, /* chunkUpdateOffset */
@@ -361,7 +363,7 @@ bool ServerWorker::handleGetResponse( ServerPeerEvent event, bool success, char 
 					}
 
 					this->sendModifyChunkRequest(
-						pid.parentInstanceId, pid.parentRequestId, key.size, key.data,
+						pid.parentInstanceId, pid.parentRequestId, key.size, false, key.data,
 						metadata,
 						// not needed for deleting a key-value pair in an unsealed chunk:
 						0, 0, 0, 0,
@@ -1116,7 +1118,7 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 
 								this->sendModifyChunkRequest(
 								   pid.parentInstanceId, pid.parentRequestId,
-								   key.size, key.data,
+								   key.size, false, key.data,
 								   metadata,
 								   chunkUpdateOffset,
 								   op.data.keyValueUpdate.length /* deltaSize */,
@@ -1171,7 +1173,7 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 
 							this->sendModifyChunkRequest(
 							   pid.parentInstanceId, pid.parentRequestId,
-							   key.size, key.data,
+							   key.size, false, key.data,
 							   metadata,
 							   chunkUpdateOffset,
 							   op.data.keyValueUpdate.length /* deltaSize */,
@@ -1250,7 +1252,7 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 							}
 
 							this->sendModifyChunkRequest(
-								pid.parentInstanceId, pid.parentRequestId, key.size, key.data,
+								pid.parentInstanceId, pid.parentRequestId, key.size, false, key.data,
 								metadata, keyMetadata.offset, deltaSize, 0, delta,
 								true /* isSealed */,
 								false /* isUpdate */,

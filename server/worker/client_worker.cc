@@ -503,6 +503,8 @@ bool ServerWorker::handleUpdateRequest(
 		keyValue.deserialize( _key, _keySize, _value, _valueSize, splitOffset );
 		isLarge = LargeObjectUtil::isLarge( _keySize, _valueSize, 0, &splitSize );
 
+		header.keySize = _keySize;
+
 		// Set up KeyMetadata
 		keyMetadata.length = keyValue.getSize();
 		keyMetadata.obj = keyValue.data;
@@ -542,7 +544,7 @@ bool ServerWorker::handleUpdateRequest(
 			header.valueUpdateSize = upper - lower + 1;
 			header.valueUpdateOffset = lower - splitOffset;
 
-			offset = keyMetadata.offset + KEY_VALUE_METADATA_SIZE + header.keySize + header.valueUpdateOffset;
+			offset = keyMetadata.offset + KEY_VALUE_METADATA_SIZE + header.keySize + header.valueUpdateOffset + SPLIT_OFFSET_SIZE;
 
 			// fprintf( stderr, "%u %u\n", lower, upper );
 			// fprintf( stderr, "%u %u\n", header.valueUpdateSize, offset );
@@ -604,7 +606,7 @@ bool ServerWorker::handleUpdateRequest(
 		if ( ServerWorker::parityChunkCount ) {
 			ret = this->sendModifyChunkRequest(
 				event.instanceId, event.requestId,
-				keyValueUpdate.size, keyValueUpdate.data,
+				keyValueUpdate.size, keyValueUpdate.isLarge, keyValueUpdate.data,
 				metadata, offset,
 				header.valueUpdateSize,    // deltaSize
 				header.valueUpdateOffset,
@@ -825,7 +827,7 @@ bool ServerWorker::handleDeleteRequest(
 
 		if ( ServerWorker::parityChunkCount ) {
 			ret = this->sendModifyChunkRequest(
-				event.instanceId, event.requestId, key.size, key.data,
+				event.instanceId, event.requestId, key.size, key.isLarge, key.data,
 				metadata, keyMetadata.offset, deltaSize, 0, delta,
 				chunkBufferIndex == -1, // isSealed
 				false,                  // isUpdate
@@ -969,7 +971,7 @@ bool ServerWorker::handleRevertDelta( ClientEvent event, char *buf, size_t size 
 			);
 		} else {
 			bool ret = ServerWorker::chunkBuffer->at( it.metadata.listId )->updateKeyValue(
-				it.key.data, it.key.size,
+				it.key.data, it.key.size, false,
 				it.delta.valueOffset, it.delta.data.size, it.delta.data.data
 			);
 			/* apply to chunk if seal after backup */

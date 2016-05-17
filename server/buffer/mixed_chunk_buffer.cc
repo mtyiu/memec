@@ -148,10 +148,10 @@ bool MixedChunkBuffer::deleteKey( char *keyStr, uint8_t keySize ) {
 	}
 }
 
-bool MixedChunkBuffer::updateKeyValue( char *keyStr, uint8_t keySize, uint32_t offset, uint32_t length, char *valueUpdate ) {
+bool MixedChunkBuffer::updateKeyValue( char *keyStr, uint8_t keySize, bool isLarge, uint32_t offset, uint32_t length, char *valueUpdate ) {
 	switch( this->role ) {
 		case CBR_PARITY:
-			return this->buffer.parity->updateKeyValue( keyStr, keySize, offset, length, valueUpdate );
+			return this->buffer.parity->updateKeyValue( keyStr, keySize, isLarge, offset, length, valueUpdate );
 		default:
 			return false;
 	}

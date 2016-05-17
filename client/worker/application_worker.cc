@@ -509,8 +509,6 @@ bool ClientWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 			header.valueUpdateOffset + header.valueUpdateSize - 1,
 			isLarge
 		);
-
-		fprintf( stderr, "From %u to %u\n", splitStartIndex, splitEndIndex );
 	} else {
 		splitStartIndex = splitEndIndex = 0;
 	}

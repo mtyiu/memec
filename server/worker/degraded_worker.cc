@@ -472,6 +472,7 @@ bool ServerWorker::handleDegradedUpdateRequest( ClientEvent event, struct Degrad
 			this->sendModifyChunkRequest(
 				event.instanceId, event.requestId,
 				keyValueUpdate.size,
+				false,
 				keyValueUpdate.data,
 				metadata,
 				chunkUpdateOffset,
@@ -515,6 +516,7 @@ bool ServerWorker::handleDegradedUpdateRequest( ClientEvent event, struct Degrad
 			this->sendModifyChunkRequest(
 				event.instanceId, event.requestId,
 				keyValueUpdate.size,
+				false,
 				keyValueUpdate.data,
 				metadata,
 				0, // chunkUpdateOffset
@@ -700,6 +702,7 @@ bool ServerWorker::handleDegradedDeleteRequest( ClientEvent event, char *buf, si
 			this->sendModifyChunkRequest(
 				event.instanceId, event.requestId,
 				key.size,
+				false,
 				key.data,
 				metadata,
 				keyMetadata.offset,
@@ -727,6 +730,7 @@ bool ServerWorker::handleDegradedDeleteRequest( ClientEvent event, char *buf, si
 			this->sendModifyChunkRequest(
 				event.instanceId, event.requestId,
 				key.size,
+				false,
 				key.data,
 				metadata,
 				// not needed for deleting a key-value pair in an unsealed chunk:
@@ -1365,7 +1369,7 @@ force_reconstruct_chunks:
 
 bool ServerWorker::sendModifyChunkRequest(
 	uint16_t parentInstanceId, uint32_t parentRequestId,
-	uint8_t keySize, char *keyStr,
+	uint8_t keySize, bool isLarge, char *keyStr,
 	Metadata &metadata, uint32_t offset,
 	uint32_t deltaSize, uint32_t valueUpdateOffset, char *delta,
 	bool isSealed, bool isUpdate,
@@ -1385,7 +1389,7 @@ bool ServerWorker::sendModifyChunkRequest(
 		isSealed = false;
 	}
 
-	key.set( keySize, keyStr );
+	key.set( keySize, keyStr, 0, isLarge );
 	keyValueUpdate.set( keySize, keyStr );
 	keyValueUpdate.offset = valueUpdateOffset;
 	keyValueUpdate.length = deltaSize;
@@ -1618,6 +1622,7 @@ bool ServerWorker::sendModifyChunkRequest(
 					metadata.listId,
 					metadata.stripeId,
 					metadata.chunkId,
+					isLarge,
 					keyStr,
 					keySize,
 					delta /* valueUpdate */,
@@ -1695,7 +1700,7 @@ bool ServerWorker::sendModifyChunkRequest(
 			self--; // Get the self parity server index
 			if ( isUpdate ) {
 				bool ret = ServerWorker::chunkBuffer->at( metadata.listId )->updateKeyValue(
-					keyStr, keySize,
+					keyStr, keySize, false,
 					valueUpdateOffset, deltaSize, delta
 				);
 				if ( ! ret ) {

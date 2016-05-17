@@ -513,8 +513,8 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 		// Store split
 		if ( header.splitOffset + splitSize > header.valueSize )
 			splitSize = header.valueSize - header.splitOffset;
-		( ( char * ) key.ptr )[ splitIndex ] = 1;
 		memcpy( ( char * ) key.ptr + numOfSplit + header.splitOffset, header.value, splitSize );
+		( ( char * ) key.ptr )[ splitIndex ] = 1;
 
 		if ( header.splitOffset == 0 ) {
 			// Get remaining split
@@ -565,7 +565,7 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 	}
 
 	if ( ! ClientWorker::pending->eraseKey( PT_APPLICATION_GET, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &key, true, true, true, key.data ) ) {
-		__ERROR__( "ClientWorker", "handleGetResponse", "Cannot find a pending application GET request that matches the response. This message will be discarded (key = %.*s).", key.size, key.data );
+		__ERROR__( "ClientWorker", "handleGetResponse", "Cannot find a pending application GET request that matches the response. This message will be discarded (key = %.*s, size = %u, is large? %s).", key.size, key.data, key.size, key.isLarge ? "true" : "false" );
 		return false;
 	}
 

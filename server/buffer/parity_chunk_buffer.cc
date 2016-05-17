@@ -299,11 +299,11 @@ bool ParityChunkBuffer::deleteKey( char *keyStr, uint8_t keySize ) {
 	return true;
 }
 
-bool ParityChunkBuffer::updateKeyValue( char *keyStr, uint8_t keySize, uint32_t offset, uint32_t length, char *valueUpdate ) {
+bool ParityChunkBuffer::updateKeyValue( char *keyStr, uint8_t keySize, bool isLarge, uint32_t offset, uint32_t length, char *valueUpdate ) {
 	std::unordered_map<Key, KeyValue>::iterator it;
 	Key key;
 
-	key.set( keySize, keyStr );
+	key.set( keySize, keyStr, 0, isLarge );
 
 	LOCK( &this->lock );
 	it = this->keys.find( key );
@@ -311,7 +311,7 @@ bool ParityChunkBuffer::updateKeyValue( char *keyStr, uint8_t keySize, uint32_t 
 		PendingRequest pendingRequest;
 		pendingRequest.update( offset, length, valueUpdate );
 
-		key.dup();
+		key.dup( 0, 0, 0, isLarge );
 
 		std::pair<Key, PendingRequest> p( key, pendingRequest );
 		std::pair<std::unordered_map<Key, PendingRequest>::iterator, bool> ret;

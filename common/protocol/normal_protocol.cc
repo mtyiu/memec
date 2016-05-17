@@ -238,10 +238,10 @@ bool Protocol::parseChunkKeyHeader( struct ChunkKeyHeader &header, char *buf, si
 	);
 }
 
-size_t Protocol::generateChunkKeyValueUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t chunkUpdateOffset, char *valueUpdate, char *sendBuf, uint32_t timestamp ) {
+size_t Protocol::generateChunkKeyValueUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint8_t keySize, bool isLarge, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t chunkUpdateOffset, char *valueUpdate, char *sendBuf, uint32_t timestamp ) {
 	if ( ! sendBuf ) sendBuf = this->buffer.send;
 	char *buf = sendBuf + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_CHUNK_KEY_VALUE_UPDATE_SIZE + keySize + ( valueUpdate ? valueUpdateSize : 0 ), instanceId, requestId, sendBuf, timestamp );
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_CHUNK_KEY_VALUE_UPDATE_SIZE + keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ) + ( valueUpdate ? valueUpdateSize : 0 ), instanceId, requestId, sendBuf, timestamp );
 
 	*( ( uint32_t * )( buf     ) ) = htonl( listId );
 	*( ( uint32_t * )( buf + 4 ) ) = htonl( stripeId );
@@ -269,10 +269,13 @@ size_t Protocol::generateChunkKeyValueUpdateHeader( uint8_t magic, uint8_t to, u
 	valueUpdateSize = ntohl( valueUpdateSize );
 	valueUpdateOffset = ntohl( valueUpdateOffset );
 	chunkUpdateOffset = ntohl( chunkUpdateOffset );
-
 	buf += 10;
-	memmove( buf, key, keySize );
-	buf += keySize;
+
+	buf[ 0 ] = isLarge;
+	buf++;
+
+	memmove( buf, key, keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ) );
+	buf += keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 );
 	if ( valueUpdateSize && valueUpdate ) {
 		memmove( buf, valueUpdate, valueUpdateSize );
 		bytes += PROTO_CHUNK_KEY_VALUE_UPDATE_SIZE + keySize + valueUpdateSize;
@@ -280,10 +283,12 @@ size_t Protocol::generateChunkKeyValueUpdateHeader( uint8_t magic, uint8_t to, u
 		bytes += PROTO_CHUNK_KEY_VALUE_UPDATE_SIZE + keySize;
 	}
 
+	bytes += ( isLarge ? SPLIT_OFFSET_SIZE : 0 );
+
 	return bytes;
 }
 
-bool Protocol::parseChunkKeyValueUpdateHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint8_t &keySize, char *&key, uint32_t &valueUpdateOffset, uint32_t &valueUpdateSize, uint32_t &chunkUpdateOffset, char *buf, size_t size ) {
+bool Protocol::parseChunkKeyValueUpdateHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint8_t &keySize, bool &isLarge, char *&key, uint32_t &valueUpdateOffset, uint32_t &valueUpdateSize, uint32_t &chunkUpdateOffset, char *buf, size_t size ) {
 	if ( size - offset < PROTO_CHUNK_KEY_VALUE_UPDATE_SIZE )
 		return false;
 
@@ -318,12 +323,14 @@ bool Protocol::parseChunkKeyValueUpdateHeader( size_t offset, uint32_t &listId, 
 	tmp[ 3 ] = ptr[ 9 ];
 	chunkUpdateOffset = ntohl( chunkUpdateOffset );
 
-	key = ptr + 10;
+	isLarge = ptr[ 10 ];
+
+	key = ptr + 11;
 
 	return true;
 }
 
-bool Protocol::parseChunkKeyValueUpdateHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint8_t &keySize, char *&key, uint32_t &valueUpdateOffset, uint32_t &valueUpdateSize, uint32_t &chunkUpdateOffset, char *&valueUpdate, char *buf, size_t size ) {
+bool Protocol::parseChunkKeyValueUpdateHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint8_t &keySize, bool &isLarge, char *&key, uint32_t &valueUpdateOffset, uint32_t &valueUpdateSize, uint32_t &chunkUpdateOffset, char *&valueUpdate, char *buf, size_t size ) {
 	if ( size - offset < PROTO_CHUNK_KEY_VALUE_UPDATE_SIZE )
 		return false;
 
@@ -358,11 +365,13 @@ bool Protocol::parseChunkKeyValueUpdateHeader( size_t offset, uint32_t &listId, 
 	tmp[ 3 ] = ptr[ 9 ];
 	chunkUpdateOffset = ntohl( chunkUpdateOffset );
 
+	isLarge = ptr[ 10 ];
+
 	if ( size - offset < PROTO_CHUNK_KEY_VALUE_UPDATE_SIZE + keySize + valueUpdateSize )
 		return false;
 
-	key = ptr + 10;
-	valueUpdate = valueUpdateSize ? key + keySize : 0;
+	key = ptr + 11;
+	valueUpdate = valueUpdateSize ? key + keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ) : 0;
 
 	return true;
 }
@@ -379,6 +388,7 @@ bool Protocol::parseChunkKeyValueUpdateHeader( struct ChunkKeyValueUpdateHeader 
 			header.stripeId,
 			header.chunkId,
 			header.keySize,
+			header.isLarge,
 			header.key,
 			header.valueUpdateOffset,
 			header.valueUpdateSize,
@@ -394,6 +404,7 @@ bool Protocol::parseChunkKeyValueUpdateHeader( struct ChunkKeyValueUpdateHeader 
 			header.stripeId,
 			header.chunkId,
 			header.keySize,
+			header.isLarge,
 			header.key,
 			header.valueUpdateOffset,
 			header.valueUpdateSize,

@@ -162,14 +162,14 @@ public:
 	char *reqUpdate(
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
-		char *key, uint8_t keySize,
+		bool isLarge, char *key, uint8_t keySize,
 		char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize,
 		uint32_t chunkUpdateOffset, char *buf = 0, uint32_t timestamp = 0
 	);
 	char *resUpdate(
 		size_t &size, uint16_t instanceId, uint32_t requestId, bool success,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
-		char *key, uint8_t keySize, uint32_t valueUpdateOffset, uint32_t valueUpdateSize,
+		bool isLarge, char *key, uint8_t keySize, uint32_t valueUpdateOffset, uint32_t valueUpdateSize,
 		uint32_t chunkUpdateOffset, char *buf = 0
 	);
 
