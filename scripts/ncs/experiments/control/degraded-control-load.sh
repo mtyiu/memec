@@ -74,7 +74,7 @@ for delay in $delays; do
 
 		for n in 3 4 8 9; do
 			mkdir -p ${BASE_PATH}/results/degraded-load/$delay/$iter/node$n
-			scp testbed-node$n:${BASE_PATH}/results/degraded/*.txt ${BASE_PATH}/results/degraded-load/$delay/$iter/node$n
+			scp testbed-node$n:${BASE_PATH}/results/degraded/*.txt ${BASE_PATH}/results/degraded-control-load/$delay/$iter/node$n
 			ssh testbed-node$n 'rm -rf ${BASE_PATH}/results/*'
 		done
 	done

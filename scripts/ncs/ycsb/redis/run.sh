@@ -14,20 +14,18 @@ if [ $# != 2 ]; then
 	exit 1
 fi
 
+ID=$(hostname | sed 's/testbed-node//g')
+
 # Evenly distribute the # of ops to YCSB clients ( 4 in the experiment setting )
 RECORD_COUNT=5000000
 OPERATION_COUNT=$(expr ${RECORD_COUNT} \* 2 \/ 2)
 if [ $ID == 3 ]; then
-	INSERT_START=0
 	EXTRA_OP="-p fieldlength=8 -p table=a"
 elif [ $ID == 4 ]; then
-	INSERT_START=${INSERT_COUNT}
 	EXTRA_OP="-p fieldlength=8 -p table=a"
 elif [ $ID == 8 ]; then
-	INSERT_START=0
 	EXTRA_OP="-p fieldlength=32 -p table=b"
 elif [ $ID == 9 ]; then
-	INSERT_START=${INSERT_COUNT}
 	EXTRA_OP="-p fieldlength=32 -p table=b"
 fi
 

@@ -41,6 +41,8 @@ if [ "$2" == "updateonly" ]; then
 	EXTRA="-p readproportion=0.0 -p updateproportion=1.0 -p insertproportion=0.0"
 fi
 
+EXTRA_OP="${EXTRA_OP} ${EXTRA}"
+
 # Run the target workload
 ${YCSB_PATH}/bin/ycsb \
 	run memec \
@@ -63,4 +65,4 @@ ${YCSB_PATH}/bin/ycsb \
 	-p measurementtype=timeseries \
 	-p timeseries.granularity=500 \
 	-p zeropadding=19 \
-	${EXTRA}
+	${EXTRA_OP}
