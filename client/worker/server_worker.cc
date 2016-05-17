@@ -640,8 +640,6 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 		return false;
 	}
 
-	fprintf( stderr, "keyValueUpdate.remaining = %u\n", keyValueUpdate.remaining );
-
 	// remove pending timestamp
 	// TODO handle degraded mode
 	Client *client = Client::getInstance();
