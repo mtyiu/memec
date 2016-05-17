@@ -14,10 +14,6 @@ ssh hpc15 "screen -S coordinator -p 0 -X stuff \"$(printf '\r\r')${BOOTSTRAP_SCR
 sleep ${SLEEP_TIME}
 
 for i in {1..7}; do
-	if [ $i == 6 ]; then
-		continue
-	fi
-
 	port=$(expr $i + 9110)
 	node_id=$(expr $i + 8)
 	ssh hpc${node_id} "screen -S server -p 0 -X stuff \"$(printf '\r\r')${BOOTSTRAP_SCRIPT_PATH}/start-server.sh ${1}$(printf '\r\r')\"" &

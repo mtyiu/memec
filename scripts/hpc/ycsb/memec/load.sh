@@ -3,7 +3,7 @@
 YCSB_PATH=~/mtyiu/ycsb/0.7.0
 
 FIELD_LENGTH=100
-RECORD_COUNT=1000000
+RECORD_COUNT=500000
 
 if [ $# -lt 1 ]; then
 	echo "Usage: $0 [Number of threads]"
