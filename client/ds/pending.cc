@@ -442,10 +442,14 @@ bool Pending::eraseKeyValueUpdate( PendingType type, uint16_t instanceId, uint32
 
 	if ( ret ) {
 		if ( pidPtr ) *pidPtr = lit->first;
-		lit->second.remaining--;
 		if ( keyValueUpdatePtr ) *keyValueUpdatePtr = lit->second;
-		if ( lit->second.remaining == 0 )
+		if ( type == PT_APPLICATION_UPDATE ) {
+			lit->second.remaining--;
+			if ( lit->second.remaining == 0 )
+				map->erase( lit );
+		} else {
 			map->erase( lit );
+		}
 	}
 	if ( needsUnlock ) UNLOCK( lock );
 
