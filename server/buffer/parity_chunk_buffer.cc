@@ -318,7 +318,7 @@ bool ParityChunkBuffer::updateKeyValue( char *keyStr, uint8_t keySize, bool isLa
 
 		ret = this->pending.insert( p );
 		if ( ! ret.second ) {
-			__ERROR__( "ParityChunkBuffer", "updateKeyValue", "Key: %.*s (size = %u) cannot be inserted into pending keys map.\n", keySize, keyStr, keySize );
+			// __ERROR__( "ParityChunkBuffer", "updateKeyValue", "Key: %.*s (size = %u) cannot be inserted into pending keys map.\n", keySize, keyStr, keySize );
 		}
 		UNLOCK( &this->lock );
 		return false;

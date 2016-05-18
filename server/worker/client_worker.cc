@@ -533,7 +533,7 @@ bool ServerWorker::handleUpdateRequest(
 			lower = splitOffset;
 			upper = splitOffset + splitSize - 1;
 			if ( upper > _valueSize )
-				upper = _valueSize;
+				upper = _valueSize - 1;
 
 			if ( header.valueUpdateOffset > lower )
 				lower = header.valueUpdateOffset;
@@ -546,8 +546,7 @@ bool ServerWorker::handleUpdateRequest(
 
 			offset = keyMetadata.offset + KEY_VALUE_METADATA_SIZE + header.keySize + header.valueUpdateOffset + SPLIT_OFFSET_SIZE;
 
-			// fprintf( stderr, "%u %u\n", lower, upper );
-			// fprintf( stderr, "%u %u\n", header.valueUpdateSize, offset );
+			// fprintf( stderr, "lower: %u; upper: %u; size: %u, offset: %u; actual offset: %u; chunk: %p - %p (%lu)\n", lower, upper, header.valueUpdateSize, header.valueUpdateOffset, offset, chunk, ( char * ) chunk + offset + header.valueUpdateSize - 1, ( char * ) chunk + offset + header.valueUpdateSize - 1 - ( char * ) chunk );
 		}
 
 		if ( ServerWorker::parityChunkCount ) {
