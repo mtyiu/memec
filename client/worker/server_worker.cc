@@ -639,7 +639,6 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 		__ERROR__( "ClientWorker", "handleUpdateResponse", "Cannot find a pending application UPDATE request that matches the response. This message will be discarded (%u, %u).", pid.parentInstanceId, pid.parentRequestId );
 		return false;
 	}
-
 	// remove pending timestamp
 	// TODO handle degraded mode
 	Client *client = Client::getInstance();
@@ -650,7 +649,7 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 	uint32_t dataChunkIndex;
 	this->stripeList->get( header.key, header.keySize, this->dataServerSockets, 0, &dataChunkIndex );
 	bool needsReplay = pid.ptr && isDegraded && ! success && ! Client::getInstance()->stateTransitHandler.useCoordinatedFlow( this->dataServerSockets[ dataChunkIndex ]->getAddr() );
-
+	
 	if ( pid.ptr ) {
 		if ( needsReplay ) {
 			// make a copy of the update
