@@ -1497,36 +1497,30 @@ bool ServerWorker::sendModifyChunkRequest(
 				packet->setReferenceCount( 1 );
 
 				if ( isUpdate ) {
-					this->protocol.reqUpdateChunk(
-						size,
-						parentInstanceId, 				// client Id
-						requestId, 						// server request Id
-						metadata.listId,
-						metadata.stripeId,
-						metadata.chunkId,
+					size = this->protocol.generateChunkUpdateHeader(
+						PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_SERVER,
+						checkGetChunk ? PROTO_OPCODE_UPDATE_CHUNK_CHECK : PROTO_OPCODE_UPDATE_CHUNK,
+						parentInstanceId, requestId,
+						metadata.listId, metadata.stripeId, metadata.chunkId,
 						offset,
-						deltaSize,                       // length
+						deltaSize,                        // length
 						ServerWorker::dataChunkCount + i, // updatingChunkId
 						delta,
 						packet->data,
-						timestamp,
-						checkGetChunk
+						timestamp
 					);
 				} else {
-					this->protocol.reqDeleteChunk(
-						size,
-						parentInstanceId, 				// client Id
-						requestId,						// server request Id
-						metadata.listId,
-						metadata.stripeId,
-						metadata.chunkId,
+					size = this->protocol.generateChunkUpdateHeader(
+						PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_SERVER,
+						checkGetChunk ? PROTO_OPCODE_DELETE_CHUNK_CHECK : PROTO_OPCODE_DELETE_CHUNK,
+						parentInstanceId, requestId,
+						metadata.listId, metadata.stripeId, metadata.chunkId,
 						offset,
 						deltaSize,                       // length
 						ServerWorker::dataChunkCount + i, // updatingChunkId
 						delta,
 						packet->data,
-						timestamp,
-						checkGetChunk
+						timestamp
 					);
 				}
 				packet->size = ( uint32_t ) size;
@@ -1598,32 +1592,26 @@ bool ServerWorker::sendModifyChunkRequest(
 			packet->setReferenceCount( parityServerCount );
 			// packet->setReferenceCount( self == 0 ? ServerWorker::parityChunkCount : ServerWorker::parityChunkCount - 1 );
 			if ( isUpdate ) {
-				this->protocol.reqUpdate(
-					size,
-					parentInstanceId, /* client Id */
-					requestId, /* server request Id */
-					metadata.listId,
-					metadata.stripeId,
-					metadata.chunkId,
-					keyStr,
-					keySize,
-					delta /* valueUpdate */,
+				size = this->protocol.generateChunkKeyValueUpdateHeader(
+					PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_SERVER,
+					PROTO_OPCODE_UPDATE,
+					parentInstanceId, requestId,
+					metadata.listId, metadata.stripeId, metadata.chunkId,
+					keySize, keyStr,
 					valueUpdateOffset,
-					deltaSize /* valueUpdateSize */,
-					offset, // Chunk update offset
+					deltaSize, // valueUpdateSize
+					offset,    // Chunk update offset
+					delta,     // valueUpdate
 					packet->data,
 					timestamp
 				);
 			} else {
-				this->protocol.reqDelete(
-					size,
-					parentInstanceId, /* client Id */
-					requestId, /* server request Id */
-					metadata.listId,
-					metadata.stripeId,
-					metadata.chunkId,
-					keyStr,
-					keySize,
+				size = this->protocol.generateChunkKeyHeader(
+					PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_SERVER,
+					PROTO_OPCODE_DELETE,
+					parentInstanceId, requestId,
+					metadata.listId, metadata.stripeId, metadata.chunkId,
+					keySize, keyStr,
 					packet->data,
 					timestamp
 				);

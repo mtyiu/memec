@@ -259,10 +259,16 @@ bool CoordinatorWorker::handleReleaseDegradedLockRequest( ServerSocket *socket, 
 		CoordinatorWorker::pending->addReleaseDegradedLock( requestId, srcs.size(), lock, cond, done );
 
 		isCompleted = true;
-		do {
 
-			buffer.data = this->protocol.reqReleaseDegradedLock(
-				buffer.size, instanceId, requestId, srcs, isCompleted
+		buffer.data = this->protocol.buffer.send;
+		do {
+			buffer.size = this->protocol.generateDegradedReleaseReqHeader(
+				PROTO_MAGIC_REQUEST,
+				PROTO_MAGIC_TO_SERVER,
+				PROTO_OPCODE_RELEASE_DEGRADED_LOCKS,
+				instanceId, requestId,
+				srcs,
+				isCompleted
 			);
 			ret = dstSocket->send( buffer.data, buffer.size, connected );
 			if ( ret != ( ssize_t ) buffer.size )

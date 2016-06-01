@@ -11,12 +11,6 @@ OBJS= \
 	event/client_event.o \
 	event/server_event.o \
 	protocol/protocol.o \
-	protocol/degraded_protocol.o \
-	protocol/load_protocol.o \
-	protocol/heartbeat_protocol.o \
-	protocol/recovery_protocol.o \
-	protocol/register_protocol.o \
-	protocol/remap_protocol.o \
 	state_transit/state_transit_handler.o \
 	state_transit/state_transit_worker.o \
 	socket/coordinator_socket.o \

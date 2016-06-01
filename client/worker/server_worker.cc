@@ -10,10 +10,14 @@ void ClientWorker::dispatch( ServerEvent event ) {
 	} buffer;
 	uint16_t instanceId = Client::instanceId;
 
+	buffer.data = this->protocol.buffer.send;
+
 	switch( event.type ) {
 		case SERVER_EVENT_TYPE_REGISTER_REQUEST:
-			buffer.data = this->protocol.reqRegisterServer(
-				buffer.size,
+			buffer.size = this->protocol.generateAddressHeader(
+				PROTO_MAGIC_REQUEST,
+				PROTO_MAGIC_TO_SERVER,
+				PROTO_OPCODE_REGISTER,
 				instanceId,
 				ClientWorker::idGenerator->nextVal( this->workerId ),
 				event.message.address.addr,
@@ -31,12 +35,11 @@ void ClientWorker::dispatch( ServerEvent event ) {
 			bool isCompleted;
 			struct sockaddr_in addr = event.socket->getAddr();
 
-			buffer.data = this->protocol.syncMetadataBackup(
-				buffer.size,
-				instanceId,
-				ClientWorker::idGenerator->nextVal( this->workerId ),
-				addr.sin_addr.s_addr,
-				addr.sin_port,
+			buffer.size = this->protocol.generateMetadataBackupMessage(
+				PROTO_MAGIC_HEARTBEAT, PROTO_MAGIC_TO_COORDINATOR,
+				PROTO_OPCODE_SYNC,
+				instanceId, ClientWorker::idGenerator->nextVal( this->workerId ),
+				addr.sin_addr.s_addr, addr.sin_port,
 				&event.socket->backup.lock,
 				event.socket->backup.sealed, sealedCount,
 				event.socket->backup.ops, opsCount,
@@ -76,15 +79,18 @@ void ClientWorker::dispatch( ServerEvent event ) {
 				event.message.ack.requests = &requests;
 
 			if ( isAck ) {
-				buffer.data = this->protocol.ackParityDeltaBackup(
-					buffer.size,
+				buffer.size = this->protocol.generateDeltaAcknowledgementHeader(
+					PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_SERVER,
+					PROTO_OPCODE_ACK_PARITY_DELTA,
 					instanceId, requestId,
 					*event.message.ack.timestamps,
+					std::vector<Key>(),
 					event.message.ack.targetId
 				);
 			} else {
-				buffer.data = this->protocol.revertDelta(
-					buffer.size,
+				buffer.size = this->protocol.generateDeltaAcknowledgementHeader(
+					PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_SERVER,
+					PROTO_OPCODE_REVERT_DELTA,
 					instanceId, requestId,
 					*event.message.ack.timestamps,
 					*event.message.ack.requests,

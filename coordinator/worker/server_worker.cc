@@ -11,30 +11,49 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 	uint16_t instanceId = Coordinator::instanceId;
 	uint32_t requestId;
 
+	buffer.data = this->protocol.buffer.send;
+
 	switch( event.type ) {
 		case SERVER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
-			event.socket->instanceId = event.instanceId;
-			buffer.data = this->protocol.resRegisterServer( buffer.size, event.instanceId, event.requestId, true );
-			isSend = true;
-			break;
 		case SERVER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
 			event.socket->instanceId = event.instanceId;
-			buffer.data = this->protocol.resRegisterServer( buffer.size, event.instanceId, event.requestId, false );
+			buffer.size = this->protocol.generateHeader(
+				event.type == SERVER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+				PROTO_MAGIC_TO_SERVER,
+				PROTO_OPCODE_REGISTER,
+				0, // length
+				event.instanceId, event.requestId
+			);
 			isSend = true;
 			break;
 		case SERVER_EVENT_TYPE_REQUEST_SEAL_CHUNKS:
 			requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
-			buffer.data = this->protocol.reqSealChunks( buffer.size, instanceId, requestId );
+			buffer.size = this->protocol.generateHeader(
+				PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_SERVER,
+				PROTO_OPCODE_SEAL_CHUNKS,
+				0, // length
+				instanceId, requestId
+			);
 			isSend = true;
 			break;
 		case SERVER_EVENT_TYPE_REQUEST_FLUSH_CHUNKS:
 			requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
-			buffer.data = this->protocol.reqFlushChunks( buffer.size, instanceId, requestId );
+			buffer.size = this->protocol.generateHeader(
+				PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_SERVER,
+				PROTO_OPCODE_FLUSH_CHUNKS,
+				0, // length
+				instanceId, requestId
+			);
 			isSend = true;
 			break;
 		case SERVER_EVENT_TYPE_REQUEST_SYNC_META:
 			requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
-			buffer.data = this->protocol.reqSyncMeta( buffer.size, instanceId, requestId );
+			buffer.size = this->protocol.generateHeader(
+				PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_SERVER,
+				PROTO_OPCODE_SYNC_META,
+				0, // length
+				instanceId, requestId
+			);
 			// add sync meta request to pending set
 			Coordinator::getInstance()->pending.addSyncMetaReq( requestId, event.message.sync );
 			isSend = true;
@@ -62,8 +81,10 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 			isSend = false;
 			break;
 		case SERVER_EVENT_TYPE_RESPONSE_HEARTBEAT:
-			buffer.data = this->protocol.resHeartbeat(
-				buffer.size, event.instanceId, event.requestId,
+			buffer.size = this->protocol.generateHeartbeatMessage(
+				PROTO_MAGIC_RESPONSE_SUCCESS, PROTO_MAGIC_TO_SERVER,
+				PROTO_OPCODE_SYNC,
+				event.instanceId, event.requestId,
 				event.message.heartbeat.timestamp,
 				event.message.heartbeat.sealed,
 				event.message.heartbeat.keys,
@@ -78,9 +99,12 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 			break;
 		case SERVER_EVENT_TYPE_ACK_RECONSTRUCTION_SUCCESS:
 		case SERVER_EVENT_TYPE_ACK_RECONSTRUCTION_FAILURE:
-			buffer.data = this->protocol.ackCompletedReconstruction(
-				buffer.size, event.instanceId, event.requestId,
-				event.type == SERVER_EVENT_TYPE_ACK_RECONSTRUCTION_SUCCESS
+			buffer.size = this->protocol.generateHeader(
+				event.type == SERVER_EVENT_TYPE_ACK_RECONSTRUCTION_SUCCESS ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+				PROTO_MAGIC_TO_SERVER,
+				PROTO_OPCODE_RECONSTRUCTION,
+				0, // length
+				event.instanceId, event.requestId
 			);
 			isSend = true;
 			break;
@@ -92,7 +116,15 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 		ArrayMap<int, ServerSocket> &servers = Coordinator::getInstance()->sockets.servers;
 		uint32_t requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
 
-		buffer.data = this->protocol.announceServerConnected( buffer.size, instanceId, requestId, event.socket );
+		ServerAddr addr = event.socket->getServerAddr();
+		buffer.data = this->protocol.buffer.send;
+		buffer.size = this->protocol.generateAddressHeader(
+			PROTO_MAGIC_ANNOUNCEMENT, PROTO_MAGIC_TO_SERVER,
+			PROTO_OPCODE_SERVER_CONNECTED,
+			instanceId, requestId,
+			addr.addr,
+			addr.port
+		);
 
 		LOCK( &servers.lock );
 		for ( uint32_t i = 0; i < servers.size(); i++ ) {

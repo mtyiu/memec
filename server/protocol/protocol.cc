@@ -23,18 +23,8 @@ char *ServerProtocol::reqSealChunk( size_t &size, uint16_t instanceId, uint32_t 
 		bytes += PROTO_CHUNK_SEAL_DATA_SIZE + keySize;
 		ptr += PROTO_CHUNK_SEAL_DATA_SIZE + keySize;
 
-		// printf( "%.*s ", keySize, key );
-		// fprintf(
-		// 	stderr, "[%u, %u, %u] keySize = %u; currentOffset = %u\n",
-		// 	metadata.listId,
-		// 	metadata.stripeId,
-		// 	metadata.chunkId,
-		// 	keySize, currentOffset
-		// );
-
 		currentOffset = nextOffset;
 	}
-	// printf( "\n" );
 
 	// The seal request should not exceed the size of the send buffer
 	assert( bytes <= this->buffer.size );
@@ -50,6 +40,21 @@ char *ServerProtocol::reqSealChunk( size_t &size, uint16_t instanceId, uint32_t 
 		count,
 		bytes,
 		buf
+	);
+	return buf;
+}
+
+char *ServerProtocol::reqRemappedDelete( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize, char *buf, uint32_t timestamp ) {
+	// -- common/protocol/normal_protocol.cc --
+	if ( ! buf ) buf = this->buffer.send;
+	size = this->generateKeyHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SERVER,
+		PROTO_OPCODE_REMAPPED_DELETE,
+		instanceId, requestId,
+		keySize,
+		key,
+		buf, timestamp
 	);
 	return buf;
 }

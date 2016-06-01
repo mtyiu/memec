@@ -46,10 +46,13 @@ bool ClientWorker::handleDegradedSetRequest( ApplicationEvent event, char *buf, 
 	}
 
 	// always acquire lock from coordinator first
-	buffer.data = this->protocol.reqDegradedSetLock(
-		buffer.size, instanceId, requestId,
+	buffer.data = this->protocol.buffer.send;
+	buffer.size = this->protocol.generateRemappingLockHeader(
+		PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_COORDINATOR,
+		PROTO_OPCODE_REMAPPING_LOCK,
+		instanceId, requestId,
 		original, remapped, remappedCount,
-		header.key, header.keySize
+		header.keySize, header.key
 	);
 
 	// insert the list of remapped servers into pending map
@@ -164,15 +167,16 @@ bool ClientWorker::handleDegradedSetLockResponse( CoordinatorEvent event, bool s
 	for ( uint32_t i = 0; i < ClientWorker::parityChunkCount; i++ ) {
 		packet = ClientWorker::packetPool->malloc();
 		packet->setReferenceCount( 1 );
-		this->protocol.reqDegradedSet(
-			buffer.size, pid.instanceId, pid.requestId,
+		packet->size = buffer.size = this->protocol.generateDegradedSetHeader(
+			PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_SERVER,
+			PROTO_OPCODE_DEGRADED_SET,
+			pid.instanceId, pid.requestId,
 			originalListId, i + ClientWorker::dataChunkCount, // Original list & chunk IDs
 			header.original, header.remapped, header.remappedCount,
-			keyStr, keySize,
-			valueStr, valueSize,
+			keySize, keyStr,
+			valueSize, valueStr,
 			packet->data
 		);
-		packet->size = buffer.size;
 
 		if ( ClientWorker::updateInterval ) {
 			// Mark the time when request is sent
@@ -202,13 +206,17 @@ bool ClientWorker::handleDegradedSetLockResponse( CoordinatorEvent event, bool s
 			dataServerSocket->getAddr()
 		);
 	}
-	buffer.data = this->protocol.reqDegradedSet(
-		buffer.size, pid.instanceId, pid.requestId,
+	buffer.data = this->protocol.buffer.send;
+	buffer.size = this->protocol.generateDegradedSetHeader(
+		PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_SERVER,
+		PROTO_OPCODE_DEGRADED_SET,
+		pid.instanceId, pid.requestId,
 		originalListId, originalChunkId,
 		header.original, header.remapped, header.remappedCount,
-		keyStr, keySize,
-		valueStr, valueSize
+		keySize, keyStr,
+		valueSize, valueStr
 	);
+
 	sentBytes = dataServerSocket->send( buffer.data, buffer.size, connected );
 	if ( sentBytes != ( ssize_t ) buffer.size ) {
 		__ERROR__( "ClientWorker", "handleDegradedSetLockResponse", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );

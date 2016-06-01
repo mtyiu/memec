@@ -38,21 +38,26 @@ void ClientWorker::dispatch( ApplicationEvent event ) {
 			break;
 	}
 
+	buffer.data = this->protocol.buffer.send;
+	buffer.size = 0;
+
 	switch( event.type ) {
 		case APPLICATION_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
 		case APPLICATION_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resRegisterApplication(
-				buffer.size,
+			buffer.size = this->protocol.generateHeader(
+				success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+				PROTO_MAGIC_TO_APPLICATION,
+				PROTO_OPCODE_REGISTER,
+				0, // length
 				InstanceIdGenerator::getInstance()->generate( event.socket ),
-				event.requestId,
-				success
+				event.requestId
 			);
 			break;
 		case APPLICATION_EVENT_TYPE_GET_RESPONSE_SUCCESS:
-			buffer.data = this->protocol.resGet(
-				buffer.size,
+			buffer.size = this->protocol.generateKeyValueHeader(
+				PROTO_MAGIC_RESPONSE_SUCCESS, PROTO_MAGIC_TO_APPLICATION,
+				PROTO_OPCODE_GET,
 				event.instanceId, event.requestId,
-				success,
 				event.message.get.keySize,
 				event.message.get.keyStr,
 				event.message.get.valueSize,
@@ -60,10 +65,10 @@ void ClientWorker::dispatch( ApplicationEvent event ) {
 			);
 			break;
 		case APPLICATION_EVENT_TYPE_GET_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resGet(
-				buffer.size,
+			buffer.size = this->protocol.generateKeyHeader(
+				PROTO_MAGIC_RESPONSE_FAILURE, PROTO_MAGIC_TO_APPLICATION,
+				PROTO_OPCODE_GET,
 				event.instanceId, event.requestId,
-				success,
 				event.message.key.size,
 				event.message.key.data
 			);
@@ -74,23 +79,23 @@ void ClientWorker::dispatch( ApplicationEvent event ) {
 		case APPLICATION_EVENT_TYPE_SET_RESPONSE_FAILURE:
 			if ( event.message.set.isKeyValue ) {
 				Key key = event.message.set.data.keyValue.key();
-				buffer.data = this->protocol.resSet(
-					buffer.size,
+				buffer.size = this->protocol.generateKeyHeader(
+					success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+					PROTO_MAGIC_TO_APPLICATION,
+					PROTO_OPCODE_SET,
 					event.instanceId, event.requestId,
-					success,
-					key.size,
-					key.data
+					key.size, key.data
 				);
 				if ( event.needsFree )
 					event.message.set.data.keyValue.free();
 			} else {
 				Key &key = event.message.set.data.key;
-				buffer.data = this->protocol.resSet(
-					buffer.size,
+				buffer.size = this->protocol.generateKeyHeader(
+					success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+					PROTO_MAGIC_TO_APPLICATION,
+					PROTO_OPCODE_SET,
 					event.instanceId, event.requestId,
-					success,
-					key.size,
-					key.data
+					key.size, key.data
 				);
 				if ( event.needsFree )
 					key.free();
@@ -98,10 +103,11 @@ void ClientWorker::dispatch( ApplicationEvent event ) {
 			break;
 		case APPLICATION_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
 		case APPLICATION_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resUpdate(
-				buffer.size,
+			buffer.size = this->protocol.generateKeyValueUpdateHeader(
+				success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+				PROTO_MAGIC_TO_APPLICATION,
+				PROTO_OPCODE_UPDATE,
 				event.instanceId, event.requestId,
-				success,
 				event.message.keyValueUpdate.size,
 				event.message.keyValueUpdate.data,
 				event.message.keyValueUpdate.offset,
@@ -112,10 +118,11 @@ void ClientWorker::dispatch( ApplicationEvent event ) {
 			break;
 		case APPLICATION_EVENT_TYPE_DELETE_RESPONSE_SUCCESS:
 		case APPLICATION_EVENT_TYPE_DELETE_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resDelete(
-				buffer.size,
+			buffer.size = this->protocol.generateKeyHeader(
+				success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+				PROTO_MAGIC_TO_APPLICATION,
+				PROTO_OPCODE_DELETE,
 				event.instanceId, event.requestId,
-				success,
 				event.message.key.size,
 				event.message.key.data
 			);
@@ -128,11 +135,17 @@ void ClientWorker::dispatch( ApplicationEvent event ) {
 				char *valueStr;
 				uint32_t valueSize;
 				event.message.replay.set.keyValue.deserialize( key.data, key.size, valueStr, valueSize );
-				buffer.data = this->protocol.replaySet(
-					buffer.size,
+
+				buffer.data = this->protocol.buffer.recv;
+				buffer.size = this->protocol.generateKeyValueHeader(
+					PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_CLIENT,
+					PROTO_OPCODE_SET,
 					event.instanceId, event.requestId,
-					key.data, key.size, valueStr, valueSize
+					key.size, key.data,
+					valueSize, valueStr,
+					this->protocol.buffer.recv
 				);
+
 				buffer.data += PROTO_HEADER_SIZE;
 				buffer.size -= PROTO_HEADER_SIZE;
 				this->handleSetRequest( event, buffer.data, buffer.size );
@@ -143,12 +156,16 @@ void ClientWorker::dispatch( ApplicationEvent event ) {
 			break;
 		case APPLICATION_EVENT_TYPE_REPLAY_GET:
 			{
-				buffer.data = this->protocol.replayGet(
-					buffer.size,
+				buffer.data = this->protocol.buffer.recv;
+				buffer.size = this->protocol.generateKeyHeader(
+					PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_CLIENT,
+					PROTO_OPCODE_GET,
 					event.instanceId, event.requestId,
+					event.message.replay.get.key.size,
 					event.message.replay.get.key.data,
-					event.message.replay.get.key.size
+					this->protocol.buffer.recv
 				);
+
 				buffer.data += PROTO_HEADER_SIZE;
 				buffer.size -= PROTO_HEADER_SIZE;
 				this->handleGetRequest( event, buffer.data, buffer.size );
@@ -159,15 +176,19 @@ void ClientWorker::dispatch( ApplicationEvent event ) {
 			break;
 		case APPLICATION_EVENT_TYPE_REPLAY_UPDATE:
 			{
-				buffer.data = this->protocol.replayUpdate(
-					buffer.size,
+				buffer.data = this->protocol.buffer.recv;
+				buffer.size = this->protocol.generateKeyValueUpdateHeader(
+					PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_CLIENT,
+					PROTO_OPCODE_UPDATE,
 					event.instanceId, event.requestId,
-					event.message.replay.update.keyValueUpdate.data,
 					event.message.replay.update.keyValueUpdate.size,
-					( char* ) event.message.replay.update.keyValueUpdate.ptr,
+					event.message.replay.update.keyValueUpdate.data,
 					event.message.replay.update.keyValueUpdate.offset,
-					event.message.replay.update.keyValueUpdate.length
+					event.message.replay.update.keyValueUpdate.length,
+					( char * ) event.message.replay.update.keyValueUpdate.ptr,
+					this->protocol.buffer.recv
 				);
+
 				buffer.data += PROTO_HEADER_SIZE;
 				buffer.size -= PROTO_HEADER_SIZE;
 				this->handleUpdateRequest( event, buffer.data, buffer.size );
@@ -178,12 +199,16 @@ void ClientWorker::dispatch( ApplicationEvent event ) {
 			break;
 		case APPLICATION_EVENT_TYPE_REPLAY_DEL:
 			{
-				buffer.data = this->protocol.replayDelete(
-					buffer.size,
+				buffer.data = this->protocol.buffer.recv;
+				buffer.size = this->protocol.generateKeyHeader(
+					PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_CLIENT,
+					PROTO_OPCODE_DELETE,
 					event.instanceId, event.requestId,
+					event.message.replay.del.key.size,
 					event.message.replay.del.key.data,
-					event.message.replay.del.key.size
+					this->protocol.buffer.recv
 				);
+
 				buffer.data += PROTO_HEADER_SIZE;
 				buffer.size -= PROTO_HEADER_SIZE;
 				this->handleDeleteRequest( event, buffer.data, buffer.size );

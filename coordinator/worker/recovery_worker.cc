@@ -256,12 +256,17 @@ bool CoordinatorWorker::handleReconstructionRequest( ServerSocket *socket ) {
 	requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
 	chunksIt = socket->map.chunks.begin();
 	unsealedKeysIt = unsealedKeysAggregated.begin();
+
+	buffer.data = this->protocol.buffer.send;
+	ServerAddr srcAddr = socket->getServerAddr();
 	do {
-		buffer.data = this->protocol.promoteBackupServer(
-			buffer.size,
-			Coordinator::instanceId,
-			requestId,
-			socket,
+		buffer.size = this->protocol.generatePromoteBackupServerHeader(
+			PROTO_MAGIC_ANNOUNCEMENT,
+			PROTO_MAGIC_TO_SERVER,
+			PROTO_OPCODE_BACKUP_SERVER_PROMOTED,
+			Coordinator::instanceId, requestId,
+			srcAddr.addr,
+			srcAddr.port,
 			socket->map.chunks, chunksIt,
 			unsealedKeysAggregated, unsealedKeysIt,
 			isCompleted
@@ -275,7 +280,6 @@ bool CoordinatorWorker::handleReconstructionRequest( ServerSocket *socket ) {
 	} while ( ! isCompleted );
 
 	// Insert into pending recovery map
-	ServerAddr srcAddr = socket->getServerAddr();
 	if ( ! CoordinatorWorker::pending->insertRecovery(
 		Coordinator::instanceId,
 		requestId,
@@ -346,6 +350,7 @@ bool CoordinatorWorker::handleReconstructionRequest( ServerSocket *socket ) {
 		// Distribute the task
 		stripeIdSetIt = stripeIds[ listId ].begin();
 		unsealedKeysIt = unsealed[ listId ].begin();
+		buffer.data = this->protocol.buffer.send;
 		do {
 			isAllCompleted = true;
 			// Task to all servers: Reconstruct sealed chunks
@@ -355,18 +360,15 @@ bool CoordinatorWorker::handleReconstructionRequest( ServerSocket *socket ) {
 
 				ServerSocket *s = sockets[ listId ][ j ];
 				if ( s && s->ready() && s != backupServerSocket ) {
-					buffer.data = this->protocol.reqReconstruction(
-						buffer.size,
-						Coordinator::instanceId,
-						requestId,
-						listId,
-						chunkId,
-						stripeIds[ listId ],
-						stripeIdSetIt,
+					buffer.size = this->protocol.generateReconstructionHeader(
+						PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_SERVER,
+						PROTO_OPCODE_RECONSTRUCTION,
+						Coordinator::instanceId, requestId,
+						listId, chunkId,
+						stripeIds[ listId ], stripeIdSetIt,
 						numStripePerServer,
 						isCompleted
 					);
-
 					ret = s->send( buffer.data, buffer.size, connected );
 					if ( ret != ( ssize_t ) buffer.size )
 						__ERROR__( "CoordinatorWorker", "handleReconstructionRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
@@ -390,13 +392,11 @@ bool CoordinatorWorker::handleReconstructionRequest( ServerSocket *socket ) {
 
 				ServerSocket *s = sockets[ listId ][ CoordinatorWorker::dataChunkCount + j ];
 				if ( s && s->ready() && s != backupServerSocket ) {
-					buffer.data = this->protocol.reqReconstructionUnsealed(
-						buffer.size,
-						Coordinator::instanceId,
-						requestId,
-						unsealed[ listId ],
-						unsealedKeysIt,
-						numUnsealedKeys,
+					buffer.size = this->protocol.generateBatchKeyHeader(
+						PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_SERVER,
+						PROTO_OPCODE_RECONSTRUCTION_UNSEALED,
+						Coordinator::instanceId, requestId,
+						unsealed[ listId ], unsealedKeysIt, numUnsealedKeys,
 						isCompleted
 					);
 					isAllCompleted &= isCompleted;

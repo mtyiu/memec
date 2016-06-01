@@ -12,12 +12,15 @@ void ServerWorker::dispatch( CoordinatorEvent event ) {
 
 	requestId = ServerWorker::idGenerator->nextVal( this->workerId );
 
+	buffer.data = this->protocol.buffer.send;
+
 	switch( event.type ) {
 		case COORDINATOR_EVENT_TYPE_REGISTER_REQUEST:
 			requestId = ServerWorker::idGenerator->nextVal( this->workerId );
-			buffer.data = this->protocol.reqRegisterCoordinator(
-				buffer.size,
-				requestId,
+			buffer.size = this->protocol.generateAddressHeader(
+				PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_COORDINATOR,
+				PROTO_OPCODE_REGISTER,
+				PROTO_UNINITIALIZED_INSTANCE, requestId,
 				event.message.address.addr,
 				event.message.address.port
 			);
@@ -30,10 +33,10 @@ void ServerWorker::dispatch( CoordinatorEvent event ) {
 
 			uint32_t timestamp = ServerWorker::timestamp->nextVal();
 
-			buffer.data = this->protocol.sendHeartbeat(
-				buffer.size,
-				event.instanceId, event.requestId,
-				timestamp,
+			buffer.size = this->protocol.generateHeartbeatMessage(
+				PROTO_MAGIC_HEARTBEAT, PROTO_MAGIC_TO_COORDINATOR,
+				PROTO_OPCODE_SYNC,
+				event.instanceId, event.requestId, timestamp,
 				&ServerWorker::map->sealedLock, ServerWorker::map->sealed, sealedCount,
 				&ServerWorker::map->opsLock, ServerWorker::map->ops, opsCount,
 				isCompleted
@@ -49,23 +52,27 @@ void ServerWorker::dispatch( CoordinatorEvent event ) {
 		}
 			break;
 		case COORDINATOR_EVENT_TYPE_RELEASE_DEGRADED_LOCK_RESPONSE_SUCCESS:
-			buffer.data = this->protocol.resReleaseDegradedLock(
-				buffer.size,
+			buffer.size = this->protocol.generateDegradedReleaseResHeader(
+				PROTO_MAGIC_RESPONSE_SUCCESS, PROTO_MAGIC_TO_COORDINATOR,
+				PROTO_OPCODE_RELEASE_DEGRADED_LOCKS,
 				event.instanceId, event.requestId,
 				event.message.degraded.count
 			);
 			isSend = true;
 			break;
 		case COORDINATOR_EVENT_TYPE_SERVER_RECONSTRUCTED_MESSAGE_RESPONSE:
-			buffer.data = this->protocol.resServerReconstructedMsg(
-				buffer.size,
+			buffer.size = this->protocol.generateHeader(
+				PROTO_MAGIC_RESPONSE_SUCCESS, PROTO_MAGIC_TO_COORDINATOR,
+				PROTO_OPCODE_SERVER_RECONSTRUCTED,
+				0, // length
 				event.instanceId, event.requestId
 			);
 			isSend = true;
 			break;
 		case COORDINATOR_EVENT_TYPE_RECONSTRUCTION_RESPONSE_SUCCESS:
-			buffer.data = this->protocol.resReconstruction(
-				buffer.size,
+			buffer.size = this->protocol.generateReconstructionHeader(
+				PROTO_MAGIC_RESPONSE_SUCCESS, PROTO_MAGIC_TO_COORDINATOR,
+				PROTO_OPCODE_RECONSTRUCTION,
 				event.instanceId, event.requestId,
 				event.message.reconstruction.listId,
 				event.message.reconstruction.chunkId,
@@ -74,8 +81,10 @@ void ServerWorker::dispatch( CoordinatorEvent event ) {
 			isSend = true;
 			break;
 		case COORDINATOR_EVENT_TYPE_RECONSTRUCTION_UNSEALED_RESPONSE_SUCCESS:
-			buffer.data = this->protocol.resReconstructionUnsealed(
-				buffer.size,
+			buffer.size = this->protocol.generateReconstructionHeader(
+				PROTO_MAGIC_RESPONSE_SUCCESS,
+				PROTO_MAGIC_TO_COORDINATOR,
+				PROTO_OPCODE_RECONSTRUCTION_UNSEALED,
 				event.instanceId, event.requestId,
 				event.message.reconstructionUnsealed.listId,
 				event.message.reconstructionUnsealed.chunkId,
@@ -107,8 +116,11 @@ void ServerWorker::dispatch( CoordinatorEvent event ) {
 				ServerWorker::eventQueue->insert( serverPeerEvent );
 			}
 		}
-			buffer.data = this->protocol.resPromoteBackupServer(
-				buffer.size,
+
+			buffer.size = this->protocol.generatePromoteBackupServerHeader(
+				PROTO_MAGIC_RESPONSE_SUCCESS,
+				PROTO_MAGIC_TO_COORDINATOR,
+				PROTO_OPCODE_BACKUP_SERVER_PROMOTED,
 				event.instanceId, event.requestId,
 				event.message.promote.addr,
 				event.message.promote.port,
@@ -118,8 +130,11 @@ void ServerWorker::dispatch( CoordinatorEvent event ) {
 			isSend = true;
 			break;
 		case COORDINATOR_EVENT_TYPE_RESPONSE_PARITY_MIGRATE:
-			buffer.data = this->protocol.resRemapParity(
-				buffer.size,
+			buffer.size = this->protocol.generateHeader(
+				PROTO_MAGIC_RESPONSE_SUCCESS,
+				PROTO_MAGIC_TO_COORDINATOR,
+				PROTO_OPCODE_PARITY_MIGRATE,
+				0,
 				event.instanceId, event.requestId
 			);
 			isSend = true;

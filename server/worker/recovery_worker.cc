@@ -374,8 +374,11 @@ bool ServerWorker::handleReconstructionUnsealedRequest( CoordinatorEvent event, 
 			__ERROR__( "ServerWorker", "handleReconstructionUnsealedRequest", "Cannot insert into pending set." );
 		}
 
-		buffer.data = this->protocol.sendUnsealedKeys(
-			buffer.size, Server::instanceId, requestId,
+		buffer.data = this->protocol.buffer.send;
+		buffer.size = this->protocol.generateBatchKeyValueHeader(
+			PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_SERVER,
+			PROTO_OPCODE_BATCH_KEY_VALUES,
+			Server::instanceId, requestId,
 			unsealedKeys, unsealedKeysIt,
 			keyValueMap, lock,
 			keyValuesCount,

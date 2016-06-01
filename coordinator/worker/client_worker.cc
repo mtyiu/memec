@@ -9,15 +9,19 @@ void CoordinatorWorker::dispatch( ClientEvent event ) {
 		char *data;
 	} buffer;
 
+	buffer.data = this->protocol.buffer.send;
+
 	switch( event.type ) {
 		case CLIENT_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
-			event.socket->instanceId = event.instanceId;
-			buffer.data = this->protocol.resRegisterClient( buffer.size, event.instanceId, event.requestId, true );
-			isSend = true;
-			break;
 		case CLIENT_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
 			event.socket->instanceId = event.instanceId;
-			buffer.data = this->protocol.resRegisterClient( buffer.size, event.instanceId, event.requestId, false );
+			buffer.size = this->protocol.generateHeader(
+				event.type == CLIENT_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+				PROTO_MAGIC_TO_CLIENT,
+				PROTO_OPCODE_REGISTER,
+				0, // length
+				event.instanceId, event.requestId
+			);
 			isSend = true;
 			break;
 		case CLIENT_EVENT_TYPE_PUSH_LOADING_STATS:
@@ -40,10 +44,11 @@ void CoordinatorWorker::dispatch( ClientEvent event ) {
 		case CLIENT_EVENT_TYPE_DEGRADED_SET_LOCK_RESPONSE_SUCCESS:
 			success = true;
 		case CLIENT_EVENT_TYPE_DEGRADED_SET_LOCK_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resDegradedSetLock(
-				buffer.size,
+			buffer.size = this->protocol.generateRemappingLockHeader(
+				success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+				PROTO_MAGIC_TO_CLIENT,
+				PROTO_OPCODE_REMAPPING_LOCK,
 				event.instanceId, event.requestId,
-				success,
 				event.message.remap.original,
 				event.message.remap.remapped,
 				event.message.remap.remappedCount,
@@ -100,10 +105,14 @@ void CoordinatorWorker::dispatch( ClientEvent event ) {
 		case CLIENT_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED:
 		case CLIENT_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_WAS_LOCKED:
 		{
-			buffer.data = this->protocol.resDegradedLock(
-				buffer.size,
+			bool isLocked = ( event.type == CLIENT_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED );
+
+			buffer.size = this->protocol.generateDegradedLockResHeader(
+				isLocked ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+				PROTO_MAGIC_TO_CLIENT,
+				PROTO_OPCODE_DEGRADED_LOCK,
 				event.instanceId, event.requestId,
-				event.type == CLIENT_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED, // success
+				isLocked,
 				event.message.degradedLock.key.size,
 				event.message.degradedLock.key.data,
 				event.message.degradedLock.isSealed,
@@ -122,8 +131,10 @@ void CoordinatorWorker::dispatch( ClientEvent event ) {
 			break;
 		case CLIENT_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_LOCKED:
 		case CLIENT_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_FOUND:
-			buffer.data = this->protocol.resDegradedLock(
-				buffer.size,
+			buffer.size = this->protocol.generateDegradedLockResHeader(
+				PROTO_MAGIC_RESPONSE_FAILURE,
+				PROTO_MAGIC_TO_CLIENT,
+				PROTO_OPCODE_DEGRADED_LOCK,
 				event.instanceId, event.requestId,
 				event.type == CLIENT_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_LOCKED, // exist
 				event.message.degradedLock.key.size,
@@ -132,8 +143,10 @@ void CoordinatorWorker::dispatch( ClientEvent event ) {
 			isSend = true;
 			break;
 		case CLIENT_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_REMAPPED:
-			buffer.data = this->protocol.resDegradedLock(
-				buffer.size,
+			buffer.size = this->protocol.generateDegradedLockResHeader(
+				PROTO_MAGIC_RESPONSE_FAILURE,
+				PROTO_MAGIC_TO_CLIENT,
+				PROTO_OPCODE_DEGRADED_LOCK,
 				event.instanceId, event.requestId,
 				event.message.degradedLock.key.size,
 				event.message.degradedLock.key.data,

@@ -4,26 +4,10 @@ size_t Protocol::generateChunkHeader( uint8_t magic, uint8_t to, uint8_t opcode,
 	if ( ! sendBuf ) sendBuf = this->buffer.send;
 	char *buf = sendBuf + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_CHUNK_SIZE, instanceId, requestId, sendBuf );
-
-	*( ( uint32_t * )( buf      ) ) = htonl( listId );
-	*( ( uint32_t * )( buf +  4 ) ) = htonl( stripeId );
-	*( ( uint32_t * )( buf +  8 ) ) = htonl( chunkId );
-
-	bytes += PROTO_CHUNK_SIZE;
-
+	bytes += ProtocolUtil::write4Bytes( buf, listId   );
+	bytes += ProtocolUtil::write4Bytes( buf, stripeId );
+	bytes += ProtocolUtil::write4Bytes( buf, chunkId  );
 	return bytes;
-}
-
-bool Protocol::parseChunkHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, char *buf, size_t size ) {
-	if ( size - offset < PROTO_CHUNK_SIZE )
-		return false;
-
-	char *ptr = buf + offset;
-	listId   = ntohl( *( ( uint32_t * )( ptr      ) ) );
-	stripeId = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
-	chunkId  = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
-
-	return true;
 }
 
 bool Protocol::parseChunkHeader( struct ChunkHeader &header, char *buf, size_t size, size_t offset ) {
@@ -31,64 +15,34 @@ bool Protocol::parseChunkHeader( struct ChunkHeader &header, char *buf, size_t s
 		buf = this->buffer.recv;
 		size = this->buffer.size;
 	}
-	return this->parseChunkHeader(
-		offset,
-		header.listId,
-		header.stripeId,
-		header.chunkId,
-		buf, size
-	);
+	if ( size - offset < PROTO_CHUNK_SIZE ) return false;
+	char *ptr = buf + offset;
+	header.listId   = ProtocolUtil::read4Bytes( ptr );
+	header.stripeId = ProtocolUtil::read4Bytes( ptr );
+	header.chunkId  = ProtocolUtil::read4Bytes( ptr );
+	return true;
 }
 
 size_t Protocol::generateChunksHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, std::vector<uint32_t> &stripeIds, uint32_t &count ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = PROTO_HEADER_SIZE;
-	uint32_t *tmp;
+	uint32_t *numStripesPtr;
 
 	count = 0;
+	bytes += ProtocolUtil::write4Bytes( buf, listId  );
+	bytes += ProtocolUtil::write4Bytes( buf, chunkId );
+	numStripesPtr = ( uint32_t * ) buf;
+	buf   += PROTO_CHUNKS_SIZE - 8;
+	bytes += PROTO_CHUNKS_SIZE - 8;
 
-	*( ( uint32_t * )( buf     ) ) = htonl( listId );
-	*( ( uint32_t * )( buf + 4 ) ) = htonl( chunkId );
-	tmp = ( uint32_t * )( buf + 8 );
-
-	buf += PROTO_CHUNKS_SIZE;
-	bytes += PROTO_CHUNKS_SIZE;
-
-	for ( size_t i = 0, len = stripeIds.size(); i < len; i++ ) {
-		if ( bytes + 4 > this->buffer.size ) // no more space
-			break;
-		*( ( uint32_t * )( buf ) ) = htonl( stripeIds[ i ] );
-		buf += 4;
-		bytes += 4;
-		count++;
+	for ( size_t i = 0, len = stripeIds.size(); i < len; i++, count++ ) {
+		if ( bytes + 4 > this->buffer.size ) break; // no more space
+		bytes += ProtocolUtil::write4Bytes( buf, stripeIds[ i ] );
 	}
 
-	*tmp = htonl( count );
+	*numStripesPtr = htonl( count );
 	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, instanceId, requestId );
-
 	return bytes;
-}
-
-bool Protocol::parseChunksHeader( size_t offset, uint32_t &listId, uint32_t &chunkId, uint32_t &numStripes, uint32_t *&stripeIds, char *buf, size_t size ) {
-	if ( size - offset < PROTO_CHUNKS_SIZE )
-		return false;
-
-	char *ptr = buf + offset;
-	listId     = ntohl( *( ( uint32_t * )( ptr     ) ) );
-	chunkId    = ntohl( *( ( uint32_t * )( ptr + 4 ) ) );
-	numStripes = ntohl( *( ( uint32_t * )( ptr + 8 ) ) );
-
-	ptr += PROTO_CHUNKS_SIZE;
-
-	if ( size - offset < PROTO_CHUNKS_SIZE + numStripes * 4 )
-		return false;
-
-	stripeIds = ( uint32_t * ) ptr;
-
-	for ( uint32_t i = 0; i < numStripes; i++ )
-		stripeIds[ i ] = ntohl( stripeIds[ i ] );
-
-	return true;
 }
 
 bool Protocol::parseChunksHeader( struct ChunksHeader &header, char *buf, size_t size, size_t offset ) {
@@ -96,73 +50,37 @@ bool Protocol::parseChunksHeader( struct ChunksHeader &header, char *buf, size_t
 		buf = this->buffer.recv;
 		size = this->buffer.size;
 	}
-	return this->parseChunksHeader(
-		offset,
-		header.listId,
-		header.chunkId,
-		header.numStripes,
-		header.stripeIds,
-		buf, size
-	);
+	if ( size - offset < PROTO_CHUNKS_SIZE ) return false;
+	char *ptr = buf + offset;
+	header.listId     = ProtocolUtil::read4Bytes( ptr );
+	header.chunkId    = ProtocolUtil::read4Bytes( ptr );
+	header.numStripes = ProtocolUtil::read4Bytes( ptr );
+
+	if ( size - offset < PROTO_CHUNKS_SIZE + header.numStripes * 4 ) return false;
+	header.stripeIds = ( uint32_t * ) ptr;
+	for ( uint32_t i = 0; i < header.numStripes; i++ )
+		header.stripeIds[ i ] = ntohl( header.stripeIds[ i ] );
+
+	return true;
 }
 
 size_t Protocol::generateChunkDataHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t chunkSize, uint32_t chunkOffset, char *chunkData, uint8_t sealIndicatorCount, bool *sealIndicator ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_CHUNK_DATA_SIZE + chunkSize + sealIndicatorCount, instanceId, requestId );
 
-	buf[ 0 ] = sealIndicatorCount;
-	buf++;
-	bytes += 1;
+	bytes += ProtocolUtil::write1Byte ( buf, sealIndicatorCount );
+	bytes += ProtocolUtil::write4Bytes( buf, listId             );
+	bytes += ProtocolUtil::write4Bytes( buf, stripeId           );
+	bytes += ProtocolUtil::write4Bytes( buf, chunkId            );
+	bytes += ProtocolUtil::write4Bytes( buf, chunkSize          );
+	bytes += ProtocolUtil::write4Bytes( buf, chunkOffset        );
 
-	*( ( uint32_t * )( buf      ) ) = htonl( listId );
-	*( ( uint32_t * )( buf +  4 ) ) = htonl( stripeId );
-	*( ( uint32_t * )( buf +  8 ) ) = htonl( chunkId );
-	*( ( uint32_t * )( buf + 12 ) ) = htonl( chunkSize );
-	*( ( uint32_t * )( buf + 16 ) ) = htonl( chunkOffset );
-	buf += 20;
-	bytes += 20;
-
-	if ( sealIndicatorCount ) {
+	if ( sealIndicatorCount )
 		for ( uint8_t i = 0; i < sealIndicatorCount; i++ )
-			buf[ i ] = sealIndicator[ i ];
-		buf += sealIndicatorCount;
-		bytes += sealIndicatorCount;
-	}
-
+			bytes += ProtocolUtil::write1Byte( buf, sealIndicator[ i ] );
 	if ( chunkSize && chunkData )
-		memmove( buf, chunkData, chunkSize );
-	bytes += chunkSize;
-
+		bytes += ProtocolUtil::write( buf, chunkData, chunkSize );
 	return bytes;
-}
-
-bool Protocol::parseChunkDataHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &chunkSize, uint32_t &chunkOffset, char *&chunkData, uint8_t &sealIndicatorCount, bool *&sealIndicator, char *buf, size_t size ) {
-	if ( size - offset < PROTO_CHUNK_DATA_SIZE )
-		return false;
-
-	char *ptr = buf + offset;
-
-	sealIndicatorCount = ptr[ 0 ];
-	ptr++;
-
-	listId      = ntohl( *( ( uint32_t * )( ptr      ) ) );
-	stripeId    = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
-	chunkId     = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
-	chunkSize   = ntohl( *( ( uint32_t * )( ptr + 12 ) ) );
-	chunkOffset = ntohl( *( ( uint32_t * )( ptr + 16 ) ) );
-	ptr += 20;
-
-	if ( sealIndicatorCount ) {
-		sealIndicator = ( bool * ) ptr;
-		ptr += sealIndicatorCount;
-	}
-
-	if ( size - offset < PROTO_CHUNK_DATA_SIZE + sealIndicatorCount + chunkSize )
-		return false;
-
-	chunkData = chunkSize ? ptr : 0;
-
-	return true;
 }
 
 bool Protocol::parseChunkDataHeader( struct ChunkDataHeader &header, char *buf, size_t size, size_t offset ) {
@@ -170,18 +88,21 @@ bool Protocol::parseChunkDataHeader( struct ChunkDataHeader &header, char *buf, 
 		buf = this->buffer.recv;
 		size = this->buffer.size;
 	}
-	return this->parseChunkDataHeader(
-		offset,
-		header.listId,
-		header.stripeId,
-		header.chunkId,
-		header.size,
-		header.offset,
-		header.data,
-		header.sealIndicatorCount,
-		header.sealIndicator,
-		buf, size
-	);
+	if ( size - offset < PROTO_CHUNK_DATA_SIZE ) return false;
+	char *ptr = buf + offset;
+
+	header.sealIndicatorCount = ProtocolUtil::read1Byte ( ptr );
+	header.listId             = ProtocolUtil::read4Bytes( ptr );
+	header.stripeId           = ProtocolUtil::read4Bytes( ptr );
+	header.chunkId            = ProtocolUtil::read4Bytes( ptr );
+	header.size               = ProtocolUtil::read4Bytes( ptr );
+	header.offset             = ProtocolUtil::read4Bytes( ptr );
+	if ( header.sealIndicatorCount ) {
+		header.sealIndicator = ( bool * ) ptr;
+		ptr += header.sealIndicatorCount;
+	}
+	header.data = header.size ? ptr : 0;
+	return ( size - offset >= PROTO_CHUNK_DATA_SIZE + header.sealIndicatorCount + header.size );
 }
 
 size_t Protocol::generateChunkKeyValueHeader(
@@ -203,7 +124,6 @@ size_t Protocol::generateChunkKeyValueHeader(
 	uint8_t keySize;
 	uint32_t valueSize;
 	char *keyStr, *valueStr;
-	unsigned char *tmp;
 
 	metadata.set( listId, stripeId, chunkId );
 	isCompleted = true;
@@ -229,17 +149,11 @@ size_t Protocol::generateChunkKeyValueHeader(
 			key = *deletedIt;
 
 			if ( this->buffer.size >= bytes + PROTO_KEY_SIZE + key.size ) {
-				buf[ 0 ] = key.size;
-				memmove( buf + 1, key.data, key.size );
-
-				buf += PROTO_KEY_SIZE + key.size;
-				bytes += PROTO_KEY_SIZE + key.size;
-
+				bytes += ProtocolUtil::write1Byte( buf, key.size );
+				bytes += ProtocolUtil::write( buf, key.data, key.size );
 				deleted->erase( deletedIt );
 				metadataRev->erase( current );
-
 				key.free();
-
 				numDeleted++;
 			} else {
 				isCompleted = false;
@@ -261,26 +175,13 @@ size_t Protocol::generateChunkKeyValueHeader(
 			keyValue.deserialize( keyStr, keySize, valueStr, valueSize );
 
 			if ( this->buffer.size >= bytes + PROTO_KEY_VALUE_SIZE + keySize + valueSize ) {
-				buf[ 0 ] = key.size;
-
-				valueSize = htonl( valueSize );
-				tmp = ( unsigned char * ) &valueSize;
-				buf[ 1 ] = tmp[ 1 ];
-				buf[ 2 ] = tmp[ 2 ];
-				buf[ 3 ] = tmp[ 3 ];
-				valueSize = ntohl( valueSize );
-
-				memmove( buf + 4, keyStr, keySize );
-				memmove( buf + 4 + keySize, valueStr, valueSize );
-
-				buf += PROTO_KEY_VALUE_SIZE + keySize + valueSize;
-				bytes += PROTO_KEY_VALUE_SIZE + keySize + valueSize;
-
+				bytes += ProtocolUtil::write1Byte ( buf, keySize       );
+				bytes += ProtocolUtil::write3Bytes( buf, valueSize     );
+				bytes += ProtocolUtil::write( buf, keyStr, keySize     );
+				bytes += ProtocolUtil::write( buf, valueStr, valueSize );
 				values->erase( keyValueIt );
 				metadataRev->erase( current );
-
 				keyValue.free();
-
 				numValues++;
 			} else {
 				isCompleted = false;
@@ -292,50 +193,29 @@ size_t Protocol::generateChunkKeyValueHeader(
 	UNLOCK( lock );
 
 	buf = this->buffer.send + PROTO_HEADER_SIZE;
-
 	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, instanceId, requestId );
-
-	*( ( uint32_t * )( buf      ) ) = htonl( listId );
-	*( ( uint32_t * )( buf +  4 ) ) = htonl( stripeId );
-	*( ( uint32_t * )( buf +  8 ) ) = htonl( chunkId );
-	*( ( uint32_t * )( buf + 12 ) ) = htonl( numDeleted );
-	*( ( uint32_t * )( buf + 16 ) ) = htonl( numValues );
-	buf[ 20 ] = isCompleted;
-
+	ProtocolUtil::write4Bytes( buf, listId      );
+	ProtocolUtil::write4Bytes( buf, stripeId    );
+	ProtocolUtil::write4Bytes( buf, chunkId     );
+	ProtocolUtil::write4Bytes( buf, numDeleted  );
+	ProtocolUtil::write4Bytes( buf, numValues   );
+	ProtocolUtil::write1Byte ( buf, isCompleted );
 	return bytes;
 }
 
-bool Protocol::parseChunkKeyValueHeader( size_t offset, uint32_t &listId, uint32_t &stripeId, uint32_t &chunkId, uint32_t &deleted, uint32_t &count, bool &isCompleted, char *&dataPtr, char *buf, size_t size ) {
-	if ( size - offset < PROTO_CHUNK_KEY_VALUE_SIZE )
-		return false;
-
-	char *ptr = buf + offset;
-	listId   = ntohl( *( ( uint32_t * )( ptr      ) ) );
-	stripeId = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
-	chunkId  = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
-	deleted  = ntohl( *( ( uint32_t * )( ptr + 12 ) ) );
-	count    = ntohl( *( ( uint32_t * )( ptr + 16 ) ) );
-	isCompleted = ptr[ 20 ];
-
-	dataPtr = ptr + PROTO_CHUNK_KEY_VALUE_SIZE;
-
-	return true;
-}
-
-bool Protocol::parseChunkKeyValueHeader( struct ChunkKeyValueHeader &header, char *&ptr, char *buf, size_t size, size_t offset ) {
+bool Protocol::parseChunkKeyValueHeader( struct ChunkKeyValueHeader &header, char *&dataPtr, char *buf, size_t size, size_t offset ) {
 	if ( ! buf || ! size ) {
 		buf = this->buffer.recv;
 		size = this->buffer.size;
 	}
-	return this->parseChunkKeyValueHeader(
-		offset,
-		header.listId,
-		header.stripeId,
-		header.chunkId,
-		header.deleted,
-		header.count,
-		header.isCompleted,
-		ptr,
-		buf, size
-	);
+	if ( size - offset < PROTO_CHUNK_KEY_VALUE_SIZE ) return false;
+	char *ptr = buf + offset;
+	header.listId      = ProtocolUtil::read4Bytes( ptr );
+	header.stripeId    = ProtocolUtil::read4Bytes( ptr );
+	header.chunkId     = ProtocolUtil::read4Bytes( ptr );
+	header.deleted     = ProtocolUtil::read4Bytes( ptr );
+	header.count       = ProtocolUtil::read4Bytes( ptr );
+	header.isCompleted = ProtocolUtil::read1Byte( ptr );
+	dataPtr            = ptr;
+	return true;
 }

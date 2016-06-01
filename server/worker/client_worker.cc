@@ -39,6 +39,9 @@ void ServerWorker::dispatch( ClientEvent event ) {
 			break;
 	}
 
+	buffer.data = this->protocol.buffer.send;
+	buffer.size = 0;
+
 	switch( event.type ) {
 		// Register
 		case CLIENT_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
@@ -48,7 +51,13 @@ void ServerWorker::dispatch( ClientEvent event ) {
 				return;
 			}
 		case CLIENT_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resRegisterClient( buffer.size, Server::instanceId, event.requestId, success );
+			buffer.size = this->protocol.generateHeader(
+				success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+				PROTO_MAGIC_TO_CLIENT,
+				PROTO_OPCODE_REGISTER,
+				0, // length
+				Server::instanceId, event.requestId
+			);
 			break;
 		// GET
 		case CLIENT_EVENT_TYPE_GET_RESPONSE_SUCCESS:
@@ -57,67 +66,86 @@ void ServerWorker::dispatch( ClientEvent event ) {
 			uint8_t keySize;
 			uint32_t valueSize;
 			event.message.keyValue.deserialize( key, keySize, value, valueSize );
-			buffer.data = this->protocol.resGet(
-				buffer.size,
+			buffer.size = this->protocol.generateKeyValueHeader(
+				PROTO_MAGIC_RESPONSE_SUCCESS,
+				PROTO_MAGIC_TO_CLIENT,
+				event.isDegraded ? PROTO_OPCODE_DEGRADED_GET : PROTO_OPCODE_GET,
 				event.instanceId, event.requestId,
-				success,
-				event.isDegraded,
 				keySize, key,
 				valueSize, value
 			);
 		}
 			break;
 		case CLIENT_EVENT_TYPE_GET_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resGet(
-				buffer.size,
+			buffer.size = this->protocol.generateKeyHeader(
+				PROTO_MAGIC_RESPONSE_FAILURE,
+				PROTO_MAGIC_TO_CLIENT,
+				event.isDegraded ? PROTO_OPCODE_DEGRADED_GET : PROTO_OPCODE_GET,
 				event.instanceId, event.requestId,
-				success,
-				event.isDegraded,
 				event.message.key.size,
 				event.message.key.data
 			);
 			break;
 		// SET
 		case CLIENT_EVENT_TYPE_SET_RESPONSE_SUCCESS_DATA:
-			buffer.data = this->protocol.resSet(
-				buffer.size,
-				event.instanceId, event.requestId,
-				event.message.set.timestamp,
-				event.message.set.listId,
-				event.message.set.stripeId,
-				event.message.set.chunkId,
-				event.message.set.isSealed,
-				event.message.set.sealedListId,
-				event.message.set.sealedStripeId,
-				event.message.set.sealedChunkId,
-				event.message.set.key.size,
-				event.message.set.key.data
-			);
+			if ( event.message.set.isSealed ) {
+				buffer.size = this->protocol.generateKeyBackupHeader(
+					success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+					PROTO_MAGIC_TO_CLIENT,
+					PROTO_OPCODE_SET,
+					event.instanceId, event.requestId,
+					event.message.set.timestamp,
+					event.message.set.listId,
+					event.message.set.stripeId,
+					event.message.set.chunkId,
+					event.message.set.sealedListId,
+					event.message.set.sealedStripeId,
+					event.message.set.sealedChunkId,
+					event.message.set.key.size,
+					event.message.set.key.data
+				);
+			} else {
+				buffer.size = this->protocol.generateKeyBackupHeader(
+					success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+					PROTO_MAGIC_TO_CLIENT,
+					PROTO_OPCODE_SET,
+					event.instanceId, event.requestId,
+					event.message.set.timestamp,
+					event.message.set.listId,
+					event.message.set.stripeId,
+					event.message.set.chunkId,
+					event.message.set.key.size,
+					event.message.set.key.data
+				);
+			}
 			break;
 		case CLIENT_EVENT_TYPE_SET_RESPONSE_SUCCESS_PARITY:
 		case CLIENT_EVENT_TYPE_SET_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resSet(
-				buffer.size,
+			buffer.size = this->protocol.generateKeyBackupHeader(
+				success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+				PROTO_MAGIC_TO_CLIENT,
+				PROTO_OPCODE_SET,
 				event.instanceId, event.requestId,
-				success,
 				event.message.set.key.size,
 				event.message.set.key.data
 			);
 			break;
 		case CLIENT_EVENT_TYPE_DEGRADED_SET_RESPONSE_SUCCESS:
 		case CLIENT_EVENT_TYPE_DEGRADED_SET_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resDegradedSet(
-				buffer.size,
-				true,
+			buffer.size = this->protocol.generateDegradedSetHeader(
+				success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+				PROTO_MAGIC_TO_CLIENT,
+				PROTO_OPCODE_DEGRADED_SET,
 				event.instanceId, event.requestId,
-				success,
 				event.message.remap.listId,
 				event.message.remap.chunkId,
 				event.message.remap.original,
 				event.message.remap.remapped,
 				event.message.remap.remappedCount,
 				event.message.remap.key.size,
-				event.message.remap.key.data
+				event.message.remap.key.data,
+				0, // valueSize
+				0  // value
 			);
 
 			if ( event.needsFree )
@@ -126,11 +154,11 @@ void ServerWorker::dispatch( ClientEvent event ) {
 		// UPDATE
 		case CLIENT_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
 		case CLIENT_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resUpdate(
-				buffer.size,
+			buffer.size = this->protocol.generateKeyValueUpdateHeader(
+				success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+				PROTO_MAGIC_TO_CLIENT,
+				event.isDegraded ? PROTO_OPCODE_DEGRADED_UPDATE : PROTO_OPCODE_UPDATE,
 				event.instanceId, event.requestId,
-				success,
-				event.isDegraded,
 				event.message.keyValueUpdate.key.size,
 				event.message.keyValueUpdate.key.data,
 				event.message.keyValueUpdate.valueUpdateOffset,
@@ -142,10 +170,10 @@ void ServerWorker::dispatch( ClientEvent event ) {
 			break;
 		// DELETE
 		case CLIENT_EVENT_TYPE_DELETE_RESPONSE_SUCCESS:
-			buffer.data = this->protocol.resDelete(
-				buffer.size,
+			buffer.size = this->protocol.generateKeyBackupHeader(
+				PROTO_MAGIC_RESPONSE_SUCCESS, PROTO_MAGIC_TO_CLIENT,
+				event.isDegraded ? PROTO_OPCODE_DEGRADED_DELETE : PROTO_OPCODE_DELETE,
 				event.instanceId, event.requestId,
-				event.isDegraded,
 				event.message.del.timestamp,
 				event.message.del.listId,
 				event.message.del.stripeId,
@@ -158,10 +186,10 @@ void ServerWorker::dispatch( ClientEvent event ) {
 				event.message.del.key.free();
 			break;
 		case CLIENT_EVENT_TYPE_DELETE_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resDelete(
-				buffer.size,
+			buffer.size = this->protocol.generateKeyBackupHeader(
+				PROTO_MAGIC_RESPONSE_FAILURE, PROTO_MAGIC_TO_CLIENT,
+				event.isDegraded ? PROTO_OPCODE_DEGRADED_DELETE : PROTO_OPCODE_DELETE,
 				event.instanceId, event.requestId,
-				event.isDegraded,
 				event.message.del.key.size,
 				event.message.del.key.data
 			);
@@ -171,8 +199,9 @@ void ServerWorker::dispatch( ClientEvent event ) {
 			break;
 		// ACK
 		case CLIENT_EVENT_TYPE_ACK_METADATA:
-			buffer.data = this->protocol.ackMetadata(
-				buffer.size,
+			buffer.size = this->protocol.generateAcknowledgementHeader(
+				PROTO_MAGIC_ACKNOWLEDGEMENT, PROTO_MAGIC_TO_CLIENT,
+				PROTO_OPCODE_ACK_METADATA,
 				event.instanceId, event.requestId,
 				event.message.ack.fromTimestamp,
 				event.message.ack.toTimestamp
@@ -181,10 +210,12 @@ void ServerWorker::dispatch( ClientEvent event ) {
 		case CLIENT_EVENT_TYPE_ACK_PARITY_BACKUP:
 		{
 			std::vector<uint32_t> *timestamps = event.message.revert.timestamps;
-			buffer.data = this->protocol.ackParityDeltaBackup(
-				buffer.size,
+			buffer.size = this->protocol.generateDeltaAcknowledgementHeader(
+				PROTO_MAGIC_ACKNOWLEDGEMENT, PROTO_MAGIC_TO_CLIENT,
+				PROTO_OPCODE_ACK_PARITY_DELTA,
 				Server::instanceId, event.requestId,
 				timestamps ? *timestamps : std::vector<uint32_t>(),
+				std::vector<Key>(),
 				event.message.revert.targetId
 			);
 			if ( timestamps )
@@ -196,10 +227,11 @@ void ServerWorker::dispatch( ClientEvent event ) {
 		{
 			std::vector<uint32_t> *timestamps = event.message.revert.timestamps;
 			std::vector<Key> *requests = event.message.revert.requests;
-			buffer.data = this->protocol.resRevertDelta(
-				buffer.size,
+			buffer.size = this->protocol.generateDeltaAcknowledgementHeader(
+				success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+				PROTO_MAGIC_TO_CLIENT,
+				PROTO_OPCODE_REVERT_DELTA,
 				Server::instanceId, event.requestId,
-				success,
 				timestamps ? *timestamps : std::vector<uint32_t>(),
 				requests ? *requests : std::vector<Key>(),
 				event.message.revert.targetId
@@ -591,17 +623,16 @@ bool ServerWorker::handleUpdateRequest(
 			uint32_t requestId = ServerWorker::idGenerator->nextVal( this->workerId );
 			Packet *packet = ServerWorker::packetPool->malloc();
 			packet->setReferenceCount( ServerWorker::parityChunkCount );
-			this->protocol.reqRemappedUpdate(
-				size,
-				event.instanceId, // client ID
-				requestId,        // server request ID
-				header.key,
+			size = this->protocol.generateKeyValueUpdateHeader(
+				PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_SERVER,
+				PROTO_OPCODE_REMAPPED_UPDATE,
+				event.instanceId, requestId,
 				header.keySize,
-				header.valueUpdate,
+				header.key,
 				header.valueUpdateOffset,
 				header.valueUpdateSize,
-				packet->data,
-				event.timestamp
+				header.valueUpdate,
+				packet->data, event.timestamp
 			);
 			packet->size = ( uint32_t ) size;
 

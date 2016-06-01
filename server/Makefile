@@ -23,15 +23,7 @@ OBJS= \
 	event/server_event.o \
 	event/server_peer_event.o \
 	state_transit/state_transit_handler.o \
-	protocol/ack_protocol.o \
-	protocol/degraded_protocol.o \
-	protocol/heartbeat_protocol.o \
-	protocol/normal_client_protocol.o \
-	protocol/normal_server_protocol.o \
-	protocol/recovery_protocol.o \
-	protocol/register_protocol.o \
-	protocol/remap_protocol.o \
-	protocol/seal_protocol.o \
+	protocol/protocol.o \
 	socket/coordinator_socket.o \
 	socket/client_socket.o \
 	socket/server_socket.o \
@@ -56,7 +48,6 @@ EXTERNAL_LIB= \
 	$(MEMEC_SRC_ROOT)/common/config/global_config.o \
 	$(MEMEC_SRC_ROOT)/common/config/server_addr.o \
 	$(MEMEC_SRC_ROOT)/common/ds/bitmask_array.o \
-	$(MEMEC_SRC_ROOT)/common/ds/chunk.o \
 	$(MEMEC_SRC_ROOT)/common/ds/chunk_pool.o \
 	$(MEMEC_SRC_ROOT)/common/ds/key_value.o \
 	$(MEMEC_SRC_ROOT)/common/ds/load.o \

@@ -7,57 +7,18 @@ size_t Protocol::generateRemappingLockHeader( uint8_t magic, uint8_t to, uint8_t
 		PROTO_REMAPPING_LOCK_SIZE + keySize + remappedCount * 4 * 4,
 		instanceId, requestId
 	);
-
-	*( ( uint32_t * )( buf ) ) = htonl( remappedCount );
-	buf[ 4 ] = keySize;
-	bytes += PROTO_REMAPPING_LOCK_SIZE;
-	buf += PROTO_REMAPPING_LOCK_SIZE;
-
-	memmove( buf, key, keySize );
-	buf += keySize;
-	bytes += keySize;
-
+	bytes += ProtocolUtil::write4Bytes( buf, remappedCount );
+	bytes += ProtocolUtil::write1Byte ( buf, keySize );
+	bytes += ProtocolUtil::write( buf, key, keySize );
 	for ( uint32_t i = 0; i < remappedCount; i++ ) {
-		*( ( uint32_t * )( buf     ) ) = htonl( original[ i * 2     ] );
-		*( ( uint32_t * )( buf + 4 ) ) = htonl( original[ i * 2 + 1 ] );
-		buf += 8;
-		bytes += 8;
+		bytes += ProtocolUtil::write4Bytes( buf, original[ i * 2     ] );
+		bytes += ProtocolUtil::write4Bytes( buf, original[ i * 2 + 1 ] );
 	}
 	for ( uint32_t i = 0; i < remappedCount; i++ ) {
-		*( ( uint32_t * )( buf     ) ) = htonl( remapped[ i * 2     ] );
-		*( ( uint32_t * )( buf + 4 ) ) = htonl( remapped[ i * 2 + 1 ] );
-		buf += 8;
-		bytes += 8;
+		bytes += ProtocolUtil::write4Bytes( buf, remapped[ i * 2     ] );
+		bytes += ProtocolUtil::write4Bytes( buf, remapped[ i * 2 + 1 ] );
 	}
-
 	return bytes;
-}
-
-bool Protocol::parseRemappingLockHeader( size_t offset, uint32_t *&original, uint32_t *&remapped, uint32_t &remappedCount, uint8_t &keySize, char *&key, char *buf, size_t size ) {
-	if ( size - offset < PROTO_REMAPPING_LOCK_SIZE )
-		return false;
-
-	char *ptr = buf + offset;
-
-	remappedCount = ntohl( *( ( uint32_t * )( ptr      ) ) );
-	keySize = ptr[ 4 ];
-
-	if ( size - offset < ( size_t ) PROTO_REMAPPING_LOCK_SIZE + keySize + remappedCount * 4 * 4 )
-		return false;
-
-	key = ptr + 5;
-	ptr += PROTO_REMAPPING_LOCK_SIZE + keySize;
-
-	original = ( uint32_t * ) ptr;
-	remapped = ( ( uint32_t * ) ptr ) + remappedCount * 2;
-	for ( uint32_t i = 0; i < remappedCount; i++ ) {
-		original[ i * 2     ] = ntohl( original[ i * 2     ] );
-		original[ i * 2 + 1 ] = ntohl( original[ i * 2 + 1 ] );
-		remapped[ i * 2     ] = ntohl( remapped[ i * 2     ] );
-		remapped[ i * 2 + 1 ] = ntohl( remapped[ i * 2 + 1 ] );
-	}
-
-	return true;
 }
 
 bool Protocol::parseRemappingLockHeader( struct RemappingLockHeader &header, char *buf, size_t size, size_t offset ) {
@@ -65,15 +26,22 @@ bool Protocol::parseRemappingLockHeader( struct RemappingLockHeader &header, cha
 		buf = this->buffer.recv;
 		size = this->buffer.size;
 	}
-	return this->parseRemappingLockHeader(
-		offset,
-		header.original,
-		header.remapped,
-		header.remappedCount,
-		header.keySize,
-		header.key,
-		buf, size
-	);
+	if ( size - offset < PROTO_REMAPPING_LOCK_SIZE ) return false;
+	char *ptr = buf + offset;
+	header.remappedCount = ProtocolUtil::read4Bytes( ptr );
+	header.keySize       = ProtocolUtil::read1Byte ( ptr );
+	if ( size - offset < ( size_t ) PROTO_REMAPPING_LOCK_SIZE + header.keySize + header.remappedCount * 4 * 4 ) return false;
+	header.key = ptr;
+	ptr += header.keySize;
+	header.original = ( uint32_t * ) ptr;
+	header.remapped = ( ( uint32_t * ) ptr ) + header.remappedCount * 2;
+	for ( uint32_t i = 0; i < header.remappedCount; i++ ) {
+		header.original[ i * 2     ] = ntohl( header.original[ i * 2     ] );
+		header.original[ i * 2 + 1 ] = ntohl( header.original[ i * 2 + 1 ] );
+		header.remapped[ i * 2     ] = ntohl( header.remapped[ i * 2     ] );
+		header.remapped[ i * 2 + 1 ] = ntohl( header.remapped[ i * 2 + 1 ] );
+	}
+	return true;
 }
 
 size_t Protocol::generateDegradedSetHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint32_t *original, uint32_t *remapped, uint32_t remappedCount, uint8_t keySize, char *key, uint32_t valueSize, char *value, char *sendBuf ) {
@@ -84,91 +52,21 @@ size_t Protocol::generateDegradedSetHeader( uint8_t magic, uint8_t to, uint8_t o
 		PROTO_DEGRADED_SET_SIZE + keySize + valueSize + remappedCount * 4 * 4,
 		instanceId, requestId, sendBuf
 	);
-
-	*( ( uint32_t * )( buf     ) ) = htonl( listId );
-	*( ( uint32_t * )( buf + 4 ) ) = htonl( chunkId );
-	*( ( uint32_t * )( buf + 8 ) ) = htonl( remappedCount );
-	bytes += 12;
-	buf += 12;
-
-	unsigned char *tmp;
-	valueSize = htonl( valueSize );
-	tmp = ( unsigned char * ) &valueSize;
-	buf[ 0 ] = keySize;
-	buf[ 1 ] = tmp[ 1 ];
-	buf[ 2 ] = tmp[ 2 ];
-	buf[ 3 ] = tmp[ 3 ];
-	bytes += 4;
-	buf += 4;
-	valueSize = ntohl( valueSize );
-
-	memmove( buf, key, keySize );
-	bytes += keySize;
-	buf += keySize;
-
-	memmove( buf, value, valueSize );
-	bytes += valueSize;
-	buf += valueSize;
-
+	bytes += ProtocolUtil::write4Bytes( buf, listId );
+	bytes += ProtocolUtil::write4Bytes( buf, chunkId );
+	bytes += ProtocolUtil::write4Bytes( buf, remappedCount );
+	bytes += ProtocolUtil::write1Byte ( buf, keySize );
+	bytes += ProtocolUtil::write3Bytes( buf, valueSize );
+	bytes += ProtocolUtil::write( buf, key, keySize );
+	bytes += ProtocolUtil::write( buf, value, valueSize );
 	if ( remappedCount ) {
 		remappedCount *= 2; // Include both list ID and chunk ID
-		for ( uint32_t i = 0; i < remappedCount; i++ ) {
-			*( ( uint32_t * )( buf ) ) = htonl( original[ i ] );
-			buf += 4;
-			bytes += 4;
-		}
-		for ( uint32_t i = 0; i < remappedCount; i++ ) {
-			*( ( uint32_t * )( buf ) ) = htonl( remapped[ i ] );
-			buf += 4;
-			bytes += 4;
-		}
+		for ( uint32_t i = 0; i < remappedCount; i++ )
+			bytes += ProtocolUtil::write4Bytes( buf, original[ i ] );
+		for ( uint32_t i = 0; i < remappedCount; i++ )
+			bytes += ProtocolUtil::write4Bytes( buf, remapped[ i ] );
 	}
-
 	return bytes;
-}
-
-bool Protocol::parseDegradedSetHeader( size_t offset, uint32_t &listId, uint32_t &chunkId, uint32_t *&original, uint32_t *&remapped, uint32_t &remappedCount, uint8_t &keySize, char *&key, uint32_t &valueSize, char *&value, char *buf, size_t size ) {
-	if ( size - offset < PROTO_DEGRADED_SET_SIZE )
-		return false;
-
-	char *ptr = buf + offset;
-	unsigned char *tmp;
-	listId        = ntohl( *( ( uint32_t * )( ptr      ) ) );
-	chunkId       = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
-	remappedCount = ntohl( *( ( uint32_t * )( ptr +  8 ) ) );
-	keySize = *( ptr + 12 );
-	ptr += 13;
-
-	valueSize = 0;
-	tmp = ( unsigned char * ) &valueSize;
-	tmp[ 1 ] = ptr[ 0 ];
-	tmp[ 2 ] = ptr[ 1 ];
-	tmp[ 3 ] = ptr[ 2 ];
-	valueSize = ntohl( valueSize );
-	ptr += 3;
-
-	if ( size - offset < PROTO_DEGRADED_SET_SIZE + keySize + valueSize + remappedCount * 4 * 4 )
-		return false;
-
-	key = ptr;
-	value = ptr + keySize;
-
-	ptr += keySize + valueSize;
-
-	if ( remappedCount ) {
-		uint32_t count = remappedCount * 2;
-		original = ( uint32_t * ) ptr;
-		remapped = ( ( uint32_t * ) ptr ) + count;
-		for ( uint32_t i = 0; i < count; i++ ) {
-			original[ i ] = ntohl( original[ i ] );
-			remapped[ i ] = ntohl( remapped[ i ] );
-		}
-	} else {
-		original = 0;
-		remapped = 0;
-	}
-
-	return true;
 }
 
 bool Protocol::parseDegradedSetHeader( struct DegradedSetHeader &header, char *buf, size_t size, size_t offset, struct sockaddr_in *target ) {
@@ -176,17 +74,28 @@ bool Protocol::parseDegradedSetHeader( struct DegradedSetHeader &header, char *b
 		buf = this->buffer.recv;
 		size = this->buffer.size;
 	}
-	return this->parseDegradedSetHeader(
-		offset,
-		header.listId,
-		header.chunkId,
-		header.original,
-		header.remapped,
-		header.remappedCount,
-		header.keySize,
-		header.key,
-		header.valueSize,
-		header.value,
-		buf, size
-	);
+	if ( size - offset < PROTO_DEGRADED_SET_SIZE ) return false;
+	char *ptr = buf + offset;
+	header.listId        = ProtocolUtil::read4Bytes( ptr );
+	header.chunkId       = ProtocolUtil::read4Bytes( ptr );
+	header.remappedCount = ProtocolUtil::read4Bytes( ptr );
+	header.keySize       = ProtocolUtil::read1Byte ( ptr );
+	header.valueSize     = ProtocolUtil::read3Bytes( ptr );
+	if ( size - offset < PROTO_DEGRADED_SET_SIZE + header.keySize + header.valueSize + header.remappedCount * 4 * 4 ) return false;
+	header.key   = ptr;
+	header.value = ptr + header.keySize;
+	ptr += header.keySize + header.valueSize;
+	if ( header.remappedCount ) {
+		uint32_t count = header.remappedCount * 2;
+		header.original = ( uint32_t * ) ptr;
+		header.remapped = ( ( uint32_t * ) ptr ) + count;
+		for ( uint32_t i = 0; i < count; i++ ) {
+			header.original[ i ] = ntohl( header.original[ i ] );
+			header.remapped[ i ] = ntohl( header.remapped[ i ] );
+		}
+	} else {
+		header.original = 0;
+		header.remapped = 0;
+	}
+	return true;
 }

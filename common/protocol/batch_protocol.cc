@@ -21,14 +21,10 @@ size_t Protocol::generateBatchChunkHeader(
 	size_t current, len;
 	for ( current = 0, len = metadata->size(); current < len; current++ ) {
 		if ( this->buffer.size >= bytes + PROTO_CHUNK_SIZE + 4 ) {
-			*( ( uint32_t * )( buf      ) ) = htonl( requestIds->at( current ) );
-			*( ( uint32_t * )( buf +  4 ) ) = htonl( metadata->at( current ).listId );
-			*( ( uint32_t * )( buf +  8 ) ) = htonl( metadata->at( current ).stripeId );
-			*( ( uint32_t * )( buf + 12 ) ) = htonl( metadata->at( current ).chunkId );
-
-			buf += PROTO_CHUNK_SIZE + 4;
-			bytes += PROTO_CHUNK_SIZE + 4;
-
+			bytes += ProtocolUtil::write4Bytes( buf, requestIds->at( current )        );
+			bytes += ProtocolUtil::write4Bytes( buf, metadata->at( current ).listId   );
+			bytes += ProtocolUtil::write4Bytes( buf, metadata->at( current ).stripeId );
+			bytes += ProtocolUtil::write4Bytes( buf, metadata->at( current ).chunkId  );
 			chunksCount++;
 		} else {
 			isCompleted = false;
@@ -46,21 +42,8 @@ size_t Protocol::generateBatchChunkHeader(
 	}
 
 	*chunksCountPtr = htonl( chunksCount );
-
 	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, instanceId, requestId );
-
 	return bytes;
-}
-
-bool Protocol::parseBatchChunkHeader( size_t offset, uint32_t &count, char *&chunks, char *buf, size_t size ) {
-	if ( size - offset < PROTO_BATCH_CHUNK_SIZE )
-		return false;
-
-	char *ptr = buf + offset;
-	count = ntohl( *( ( uint32_t * )( ptr ) ) );
-	chunks = ptr + PROTO_BATCH_CHUNK_SIZE;
-
-	return true;
 }
 
 bool Protocol::parseBatchChunkHeader( struct BatchChunkHeader &header, char *buf, size_t size, size_t offset ) {
@@ -68,18 +51,17 @@ bool Protocol::parseBatchChunkHeader( struct BatchChunkHeader &header, char *buf
 		buf = this->buffer.recv;
 		size = this->buffer.size;
 	}
-	return this->parseBatchChunkHeader(
-		offset,
-		header.count,
-		header.chunks,
-		buf, size
-	);
+	if ( size - offset < PROTO_BATCH_CHUNK_SIZE ) return false;
+	char *ptr = buf + offset;
+	header.count  = ProtocolUtil::read4Bytes( ptr );
+	header.chunks = ptr;
+	return true;
 }
 
 bool Protocol::nextChunkInBatchChunkHeader( struct BatchChunkHeader &header, uint32_t &responseId, struct ChunkHeader &chunkHeader, uint32_t size, uint32_t &offset ) {
 	char *ptr = header.chunks + offset;
 
-	responseId = ntohl( *( ( uint32_t * )( ptr ) ) );
+	responseId = ProtocolUtil::read4Bytes( ptr );
 	offset += 4;
 
 	bool ret = this->parseChunkHeader(
@@ -91,55 +73,6 @@ bool Protocol::nextChunkInBatchChunkHeader( struct BatchChunkHeader &header, uin
 	offset += PROTO_CHUNK_SIZE;
 	return ret;
 }
-
-/*
-size_t Protocol::generateBatchChunkDataHeader(
-	uint8_t magic, uint8_t to, uint8_t opcode,
-	uint16_t instanceId, uint32_t requestId,
-	uint32_t chunksBytes
-) {
-	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, chunksBytes, instanceId, requestId );
-
-	return ( bytes + chunksBytes );
-}
-
-bool Protocol::parseBatchChunkDataHeader( size_t offset, uint32_t &count, char *&chunks, char *buf, size_t size ) {
-	if ( size - offset < PROTO_BATCH_CHUNK_DATA_SIZE )
-		return false;
-
-	char *ptr = buf + offset;
-	count = ntohl( *( ( uint32_t * )( ptr ) ) );
-	chunks = ptr + PROTO_BATCH_CHUNK_DATA_SIZE;
-
-	return true;
-}
-
-bool Protocol::parseBatchChunkDataHeader( struct BatchChunkDataHeader &header, char *buf, size_t size, size_t offset ) {
-	if ( ! buf || ! size ) {
-		buf = this->buffer.recv;
-		size = this->buffer.size;
-	}
-	return this->parseBatchChunkDataHeader(
-		offset,
-		header.count,
-		header.chunks,
-		buf, size
-	);
-}
-
-bool Protocol::nextChunkDataInBatchChunkDataHeader( struct BatchChunkDataHeader &header, struct ChunkDataHeader &chunkDataHeader, uint32_t size, uint32_t &offset ) {
-	bool ret = this->parseChunkDataHeader(
-		chunkDataHeader,
-		header.chunks,
-		size,
-		offset
-	);
-	if ( ret )
-		offset += PROTO_CHUNK_DATA_SIZE + chunkDataHeader.size;
-	return ret;
-}
-*/
 
 size_t Protocol::generateBatchKeyHeader(
 	uint8_t magic, uint8_t to, uint8_t opcode,
@@ -160,12 +93,8 @@ size_t Protocol::generateBatchKeyHeader(
 	for ( ; it != keys.end(); it++ ) {
 		const Key &key = *it;
 		if ( this->buffer.size >= bytes + PROTO_KEY_SIZE + key.size ) {
-			buf[ 0 ] = key.size;
-			memcpy( buf + PROTO_KEY_SIZE, key.data, key.size );
-
-			buf += PROTO_KEY_SIZE + key.size;
-			bytes += PROTO_KEY_SIZE + key.size;
-
+			bytes += ProtocolUtil::write1Byte( buf, key.size );
+			bytes += ProtocolUtil::write( buf, key.data, key.size );
 			keysCount++;
 		} else {
 			isCompleted = false;
@@ -174,9 +103,7 @@ size_t Protocol::generateBatchKeyHeader(
 	}
 
 	*keysCountPtr = htonl( keysCount );
-
 	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, instanceId, requestId );
-
 	return bytes;
 }
 
@@ -188,44 +115,24 @@ size_t Protocol::generateBatchKeyHeader(
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = PROTO_HEADER_SIZE;
 	uint32_t *keysCountPtr = ( uint32_t * ) buf;
+	uint32_t keysCount = 0;
 
 	buf += PROTO_BATCH_KEY_SIZE;
 	bytes += PROTO_BATCH_KEY_SIZE;
-
-	uint32_t keysCount = 0;
 
 	for ( uint32_t i = 0, offset = 0; i < header.count; i++ ) {
 		uint8_t keySize;
 		uint32_t valueSize;
 		char *keyStr, *valueStr;
-
 		this->nextKeyValueInBatchKeyValueHeader( header, keySize, valueSize, keyStr, valueStr, offset );
-
-		buf[ 0 ] = keySize;
-		memcpy( buf + PROTO_KEY_SIZE, keyStr, keySize );
-
-		buf += PROTO_KEY_SIZE + keySize;
-		bytes += PROTO_KEY_SIZE + keySize;
-
+		bytes += ProtocolUtil::write1Byte( buf, keySize );
+		bytes += ProtocolUtil::write( buf, keyStr, keySize );
 		keysCount++;
 	}
 
 	*keysCountPtr = htonl( keysCount );
-
 	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, instanceId, requestId );
-
 	return bytes;
-}
-
-bool Protocol::parseBatchKeyHeader( size_t offset, uint32_t &count, char *&keys, char *buf, size_t size ) {
-	if ( size - offset < PROTO_BATCH_KEY_SIZE )
-		return false;
-
-	char *ptr = buf + offset;
-	count = ntohl( *( ( uint32_t * )( ptr ) ) );
-	keys = ptr + PROTO_BATCH_KEY_SIZE;
-
-	return true;
 }
 
 bool Protocol::parseBatchKeyHeader( struct BatchKeyHeader &header, char *buf, size_t size, size_t offset ) {
@@ -233,18 +140,17 @@ bool Protocol::parseBatchKeyHeader( struct BatchKeyHeader &header, char *buf, si
 		buf = this->buffer.recv;
 		size = this->buffer.size;
 	}
-	return this->parseBatchKeyHeader(
-		offset,
-		header.count,
-		header.keys,
-		buf, size
-	);
+	if ( size - offset < PROTO_BATCH_KEY_SIZE ) return false;
+	char *ptr = buf + offset;
+	header.count = ProtocolUtil::read4Bytes( ptr );
+	header.keys  = ptr;
+	return true;
 }
 
 void Protocol::nextKeyInBatchKeyHeader( struct BatchKeyHeader &header, uint8_t &keySize, char *&key, uint32_t &offset ) {
 	char *ptr = header.keys + offset;
-	keySize = ( uint8_t ) ptr[ 0 ];
-	key = ptr + PROTO_KEY_SIZE;
+	keySize = ProtocolUtil::read1Byte( ptr );
+	key = ptr;
 	offset += PROTO_KEY_SIZE + keySize;
 }
 
@@ -282,11 +188,7 @@ size_t Protocol::generateBatchKeyValueHeader(
 		keyValueSize = keyValue.getSize();
 
 		if ( this->buffer.size >= bytes + keyValueSize ) {
-			memcpy( buf, keyValue.data, keyValueSize );
-
-			buf += keyValueSize;
-			bytes += keyValueSize;
-
+			bytes += ProtocolUtil::write( buf, keyValue.data, keyValueSize );
 			keyValuesCount++;
 		} else {
 			isCompleted = false;
@@ -296,21 +198,8 @@ size_t Protocol::generateBatchKeyValueHeader(
 	UNLOCK( lock );
 
 	*keyValuesCountPtr = htonl( keyValuesCount );
-
 	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, instanceId, requestId );
-
 	return bytes;
-}
-
-bool Protocol::parseBatchKeyValueHeader( size_t offset, uint32_t &count, char *&keyValues, char *buf, size_t size ) {
-	if ( size - offset < PROTO_BATCH_KEY_VALUE_SIZE )
-		return false;
-
-	char *ptr = buf + offset;
-	count = ntohl( *( ( uint32_t * )( ptr ) ) );
-	keyValues = ptr + PROTO_BATCH_KEY_VALUE_SIZE;
-
-	return true;
 }
 
 bool Protocol::parseBatchKeyValueHeader( struct BatchKeyValueHeader &header, char *buf, size_t size, size_t offset ) {
@@ -318,28 +207,18 @@ bool Protocol::parseBatchKeyValueHeader( struct BatchKeyValueHeader &header, cha
 		buf = this->buffer.recv;
 		size = this->buffer.size;
 	}
-	return this->parseBatchKeyValueHeader(
-		offset,
-		header.count,
-		header.keyValues,
-		buf, size
-	);
+	if ( size - offset < PROTO_BATCH_KEY_VALUE_SIZE ) return false;
+	char *ptr = buf + offset;
+	header.count     = ProtocolUtil::read4Bytes( ptr );
+	header.keyValues = ptr;
+	return true;
 }
 
 void Protocol::nextKeyValueInBatchKeyValueHeader( struct BatchKeyValueHeader &header, uint8_t &keySize, uint32_t &valueSize, char *&key, char *&value, uint32_t &offset ) {
 	char *ptr = header.keyValues + offset;
-	unsigned char *tmp;
-
-	keySize = ( uint8_t ) ptr[ 0 ];
-	valueSize = 0;
-	tmp = ( unsigned char * ) &valueSize;
-	tmp[ 1 ] = ptr[ 1 ];
-	tmp[ 2 ] = ptr[ 2 ];
-	tmp[ 3 ] = ptr[ 3 ];
-	valueSize = ntohl( valueSize );
-
-	key = ptr + PROTO_KEY_VALUE_SIZE;
+	keySize   = ProtocolUtil::read1Byte( ptr );
+	valueSize = ProtocolUtil::read3Bytes( ptr );
+	key = ptr;
 	value = valueSize ? key + keySize : 0;
-
 	offset += PROTO_KEY_VALUE_SIZE + keySize + valueSize;
 }

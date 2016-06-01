@@ -103,3 +103,65 @@ bool ClientProtocol::parseLoadingStats(
 
 	return true;
 }
+
+char *ClientProtocol::reqSet( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf ) {
+	// -- common/protocol/normal_protocol.cc --
+	if ( ! buf ) buf = this->buffer.send;
+	size = this->generateKeyValueHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SERVER,
+		PROTO_OPCODE_SET,
+		instanceId, requestId,
+		keySize,
+		key,
+		valueSize,
+		value,
+		buf
+	);
+	return buf;
+}
+
+char *ClientProtocol::reqGet( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize ) {
+	// -- common/protocol/normal_protocol.cc --
+	size = this->generateKeyHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SERVER,
+		PROTO_OPCODE_GET,
+		instanceId, requestId,
+		keySize,
+		key
+	);
+	return this->buffer.send;
+}
+
+char *ClientProtocol::reqUpdate( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t timestamp, bool checkGetChunk ) {
+	// -- common/protocol/normal_protocol.cc --
+	size = this->generateKeyValueUpdateHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SERVER,
+		checkGetChunk ? PROTO_OPCODE_UPDATE_CHECK : PROTO_OPCODE_UPDATE,
+		instanceId, requestId,
+		keySize,
+		key,
+		valueUpdateOffset,
+		valueUpdateSize,
+		valueUpdate,
+		0,
+		timestamp
+	);
+	return this->buffer.send;
+}
+
+char *ClientProtocol::reqDelete( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize, uint32_t timestamp, bool checkGetChunk ) {
+	// -- common/protocol/normal_protocol.cc --
+	size = this->generateKeyHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_SERVER,
+		checkGetChunk ? PROTO_OPCODE_DELETE_CHECK : PROTO_OPCODE_DELETE,
+		instanceId, requestId,
+		keySize,
+		key, 0,
+		timestamp
+	);
+	return this->buffer.send;
+}

@@ -11,21 +11,28 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 
 	isSend = ( event.type != SERVER_PEER_EVENT_TYPE_PENDING && event.type != SERVER_PEER_EVENT_TYPE_DEFERRED );
 	success = false;
+
+	buffer.data = this->protocol.buffer.send;
+
 	switch( event.type ) {
 		//////////////
 		// Requests //
 		//////////////
 		case SERVER_PEER_EVENT_TYPE_REGISTER_REQUEST:
-			buffer.data = this->protocol.reqRegisterServerPeer(
-				buffer.size,
+			buffer.size = this->protocol.generateAddressHeader(
+				PROTO_MAGIC_REQUEST,
+				PROTO_MAGIC_TO_SERVER,
+				PROTO_OPCODE_REGISTER,
 				Server::instanceId,
 				ServerWorker::idGenerator->nextVal( this->workerId ),
-				ServerWorker::serverServerAddr
+				ServerWorker::serverServerAddr->addr,
+				ServerWorker::serverServerAddr->port
 			);
 			break;
 		case SERVER_PEER_EVENT_TYPE_GET_CHUNK_REQUEST:
-			buffer.data = this->protocol.reqGetChunk(
-				buffer.size,
+			buffer.size = this->protocol.generateChunkHeader(
+				PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_SERVER,
+				PROTO_OPCODE_GET_CHUNK,
 				event.instanceId, event.requestId,
 				event.message.chunk.metadata.listId,
 				event.message.chunk.metadata.stripeId,
@@ -39,13 +46,14 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 
 				data = ChunkUtil::getData( event.message.chunk.chunk, offset, size );
 				// The chunk is sealed
-				buffer.data = this->protocol.reqSetChunk(
-					buffer.size,
+				buffer.size = this->protocol.generateChunkDataHeader(
+					PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_SERVER,
+					PROTO_OPCODE_SET_CHUNK,
 					event.instanceId, event.requestId,
 					event.message.chunk.metadata.listId,
 					event.message.chunk.metadata.stripeId,
 					event.message.chunk.metadata.chunkId,
-					size, offset, data
+					size, offset, data, 0, 0
 				);
 
 				if ( event.message.chunk.needsFree ) {
@@ -53,8 +61,9 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 				}
 			} else {
 				DegradedMap &map = ServerWorker::degradedChunkBuffer->map;
-				buffer.data = this->protocol.reqSetChunk(
-					buffer.size,
+				buffer.size = this->protocol.generateChunkKeyValueHeader(
+					PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_SERVER,
+					PROTO_OPCODE_SET_CHUNK_UNSEALED,
 					event.instanceId, event.requestId,
 					event.message.chunk.metadata.listId,
 					event.message.chunk.metadata.stripeId,
@@ -78,30 +87,32 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 			}
 			break;
 		case SERVER_PEER_EVENT_TYPE_SET_REQUEST:
-			buffer.data = this->protocol.reqSet(
-				buffer.size,
+			buffer.size = this->protocol.generateKeyValueHeader(
+				PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_SERVER,
+				PROTO_OPCODE_SET,
 				event.instanceId, event.requestId,
-				event.message.set.key.data,
 				event.message.set.key.size,
-				event.message.set.value.data,
-				event.message.set.value.size
+				event.message.set.key.data,
+				event.message.set.value.size,
+				event.message.set.value.data
 			);
 			break;
 		case SERVER_PEER_EVENT_TYPE_SET_RESPONSE_SUCCESS:
 			success = true;
 		case SERVER_PEER_EVENT_TYPE_SET_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resSet(
-				buffer.size,
+			buffer.size = this->protocol.generateKeyBackupHeader(
+				success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+				PROTO_MAGIC_TO_SERVER,
+				PROTO_OPCODE_SET,
 				event.instanceId, event.requestId,
-				success,
 				event.message.set.key.size,
-				event.message.set.key.data,
-				false // to client
+				event.message.set.key.data
 			);
 			break;
 		case SERVER_PEER_EVENT_TYPE_FORWARD_KEY_REQUEST:
-			buffer.data = this->protocol.reqForwardKey(
-				buffer.size,
+			buffer.size = this->protocol.generateForwardKeyReqHeader(
+				PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_SERVER,
+				PROTO_OPCODE_FORWARD_KEY,
 				event.instanceId, event.requestId,
 				event.message.forwardKey.opcode,
 				event.message.forwardKey.listId,
@@ -119,46 +130,43 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 		case SERVER_PEER_EVENT_TYPE_FORWARD_KEY_RESPONSE_SUCCESS:
 			success = true;
 		case SERVER_PEER_EVENT_TYPE_FORWARD_KEY_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resForwardKey(
-				buffer.size,
+			buffer.size = this->protocol.generateForwardKeyResHeader(
+				success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+				PROTO_MAGIC_TO_SERVER,
+				PROTO_OPCODE_FORWARD_KEY,
 				event.instanceId, event.requestId,
-				success,
 				event.message.forwardKey.opcode,
 				event.message.forwardKey.listId,
 				event.message.forwardKey.stripeId,
 				event.message.forwardKey.chunkId,
 				event.message.forwardKey.keySize,
 				event.message.forwardKey.key,
-				event.message.forwardKey.valueSize
+				event.message.forwardKey.valueSize,
+				event.message.forwardKey.update.length,
+				event.message.forwardKey.update.offset
 			);
 			break;
 		case SERVER_PEER_EVENT_TYPE_FORWARD_CHUNK_REQUEST:
-			// fprintf(
-			// 	stderr,
-			// 	"Forwarding chunk [%u, %u, %u]: size = %u\n",
-			// 	event.message.chunk.metadata.listId,
-			// 	event.message.chunk.metadata.stripeId,
-			// 	event.message.chunk.metadata.chunkId,
-			// 	ChunkUtil::getSize( event.message.chunk.chunk )
-			// );
-
-			buffer.data = this->protocol.reqForwardChunk(
-				buffer.size,
+			buffer.size = this->protocol.generateChunkDataHeader(
+				PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_SERVER,
+				PROTO_OPCODE_FORWARD_CHUNK,
 				event.instanceId, event.requestId,
 				event.message.chunk.metadata.listId,
 				event.message.chunk.metadata.stripeId,
 				event.message.chunk.metadata.chunkId,
 				ChunkUtil::getSize( event.message.chunk.chunk ),
 				0,
-				ChunkUtil::getData( event.message.chunk.chunk )
+				ChunkUtil::getData( event.message.chunk.chunk ),
+				0, 0
 			);
 			break;
 		case SERVER_PEER_EVENT_TYPE_SEAL_CHUNK_REQUEST:
 			this->issueSealChunkRequest( event.message.chunk.chunk );
 			return;
 		case SERVER_PEER_EVENT_TYPE_GET_REQUEST:
-			buffer.data = this->protocol.reqGet(
-				buffer.size,
+			buffer.size = this->protocol.generateListStripeKeyHeader(
+				PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_SERVER,
+				PROTO_OPCODE_GET,
 				event.instanceId, event.requestId,
 				event.message.get.listId,
 				event.message.get.chunkId,
@@ -187,10 +195,13 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 				return;
 			}
 		}
-			buffer.data = this->protocol.resRegisterServerPeer(
-				buffer.size,
-				Server::instanceId, event.requestId,
-				success
+
+			buffer.size = this->protocol.generateHeader(
+				success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+				PROTO_MAGIC_TO_SERVER,
+				PROTO_OPCODE_REGISTER,
+				0, // length
+				Server::instanceId, event.requestId
 			);
 			break;
 		case SERVER_PEER_EVENT_TYPE_DEGRADED_SET_RESPONSE_SUCCESS:
@@ -207,37 +218,35 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 			uint8_t keySize;
 			uint32_t valueSize;
 			event.message.get.keyValue.deserialize( key, keySize, value, valueSize );
-			buffer.data = this->protocol.resGet(
-				buffer.size,
+			buffer.size = this->protocol.generateKeyValueHeader(
+				PROTO_MAGIC_RESPONSE_SUCCESS,
+				PROTO_MAGIC_TO_SERVER,
+				PROTO_OPCODE_GET,
 				event.instanceId, event.requestId,
-				true,  // success
-				false, // isDegraded
 				keySize, key,
-				valueSize, value,
-				false  // toClient
+				valueSize, value
 			);
 		}
 			break;
 		case SERVER_PEER_EVENT_TYPE_GET_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resGet(
-				buffer.size,
+			buffer.size = this->protocol.generateKeyHeader(
+				PROTO_MAGIC_RESPONSE_FAILURE,
+				PROTO_MAGIC_TO_SERVER,
+				PROTO_OPCODE_GET,
 				event.instanceId, event.requestId,
-				false, // success
-				false, // isDegraded
 				event.message.get.key.size,
-				event.message.get.key.data,
-				0, 0,
-				false  // toClient
+				event.message.get.key.data
 			);
 			break;
 		// UPDATE_CHUNK
 		case SERVER_PEER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_SUCCESS:
 			success = true; // default is false
 		case SERVER_PEER_EVENT_TYPE_UPDATE_CHUNK_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resUpdateChunk(
-				buffer.size,
+			buffer.size = this->protocol.generateChunkUpdateHeader(
+				success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+				PROTO_MAGIC_TO_SERVER,
+				PROTO_OPCODE_UPDATE_CHUNK,
 				event.instanceId, event.requestId,
-				success,
 				event.message.chunkUpdate.metadata.listId,
 				event.message.chunkUpdate.metadata.stripeId,
 				event.message.chunkUpdate.metadata.chunkId,
@@ -250,45 +259,48 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 		case SERVER_PEER_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
 			success = true; // default is false
 		case SERVER_PEER_EVENT_TYPE_UPDATE_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resUpdate(
-				buffer.size,
+			buffer.size = this->protocol.generateChunkKeyValueUpdateHeader(
+				success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+				PROTO_MAGIC_TO_SERVER,
+				PROTO_OPCODE_UPDATE,
 				event.instanceId, event.requestId,
-				success,
 				event.message.update.listId,
 				event.message.update.stripeId,
 				event.message.update.chunkId,
-				event.message.update.key.data,
 				event.message.update.key.size,
+				event.message.update.key.data,
 				event.message.update.valueUpdateOffset,
 				event.message.update.length,
-				event.message.update.chunkUpdateOffset
+				event.message.update.chunkUpdateOffset, 0
 			);
 			break;
 		// DELETE
 		case SERVER_PEER_EVENT_TYPE_DELETE_RESPONSE_SUCCESS:
 			success = true; // default is false
 		case SERVER_PEER_EVENT_TYPE_DELETE_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resDelete(
-				buffer.size,
+			buffer.size = this->protocol.generateChunkKeyHeader(
+				success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+				PROTO_MAGIC_TO_SERVER,
+				PROTO_OPCODE_DELETE,
 				event.instanceId, event.requestId,
-				success,
 				event.message.del.listId,
 				event.message.del.stripeId,
 				event.message.del.chunkId,
-				event.message.del.key.data,
-				event.message.del.key.size
+				event.message.del.key.size,
+				event.message.del.key.data
 			);
 			break;
 		// REMAPPING_UPDATE
 		case SERVER_PEER_EVENT_TYPE_REMAPPED_UPDATE_RESPONSE_SUCCESS:
 			success = true;
 		case SERVER_PEER_EVENT_TYPE_REMAPPED_UPDATE_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resRemappedUpdate(
-				buffer.size,
+			buffer.size = this->protocol.generateKeyValueUpdateHeader(
+				success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+				PROTO_MAGIC_TO_SERVER,
+				PROTO_OPCODE_REMAPPED_UPDATE,
 				event.instanceId, event.requestId,
-				success,
-				event.message.remappingUpdate.key.data,
 				event.message.remappingUpdate.key.size,
+				event.message.remappingUpdate.key.data,
 				event.message.remappingUpdate.valueUpdateOffset,
 				event.message.remappingUpdate.valueUpdateSize
 			);
@@ -297,22 +309,24 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 		case SERVER_PEER_EVENT_TYPE_REMAPPED_DELETE_RESPONSE_SUCCESS:
 			success = true;
 		case SERVER_PEER_EVENT_TYPE_REMAPPED_DELETE_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resRemappedDelete(
-				buffer.size,
+			buffer.size = this->protocol.generateKeyHeader(
+				success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+				PROTO_MAGIC_TO_SERVER,
+				PROTO_OPCODE_REMAPPED_DELETE,
 				event.instanceId, event.requestId,
-				success,
-				event.message.remappingDel.key.data,
-				event.message.remappingDel.key.size
+				event.message.remappingDel.key.size,
+				event.message.remappingDel.key.data
 			);
 			break;
 		// DELETE_CHUNK
 		case SERVER_PEER_EVENT_TYPE_DELETE_CHUNK_RESPONSE_SUCCESS:
 			success = true; // default is false
 		case SERVER_PEER_EVENT_TYPE_DELETE_CHUNK_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resDeleteChunk(
-				buffer.size,
+			buffer.size = this->protocol.generateChunkUpdateHeader(
+				success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+				PROTO_MAGIC_TO_SERVER,
+				PROTO_OPCODE_DELETE_CHUNK,
 				event.instanceId, event.requestId,
-				success,
 				event.message.chunkUpdate.metadata.listId,
 				event.message.chunkUpdate.metadata.stripeId,
 				event.message.chunkUpdate.metadata.chunkId,
@@ -330,10 +344,10 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 			if ( event.message.chunk.chunk )
 				data = ChunkUtil::getData( event.message.chunk.chunk, offset, size );
 
-			buffer.data = this->protocol.resGetChunk(
-				buffer.size,
+			buffer.size = this->protocol.generateChunkDataHeader(
+				PROTO_MAGIC_RESPONSE_SUCCESS, PROTO_MAGIC_TO_SERVER,
+				PROTO_OPCODE_GET_CHUNK,
 				event.instanceId, event.requestId,
-				true,
 				event.message.chunk.metadata.listId,
 				event.message.chunk.metadata.stripeId,
 				event.message.chunk.metadata.chunkId,
@@ -344,10 +358,10 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 		}
 			break;
 		case SERVER_PEER_EVENT_TYPE_GET_CHUNK_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resGetChunk(
-				buffer.size,
+			buffer.size = this->protocol.generateChunkHeader(
+				PROTO_MAGIC_RESPONSE_FAILURE, PROTO_MAGIC_TO_SERVER,
+				PROTO_OPCODE_GET_CHUNK,
 				event.instanceId, event.requestId,
-				false,
 				event.message.chunk.metadata.listId,
 				event.message.chunk.metadata.stripeId,
 				event.message.chunk.metadata.chunkId
@@ -360,10 +374,11 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 		case SERVER_PEER_EVENT_TYPE_SET_CHUNK_RESPONSE_SUCCESS:
 			success = true; // default is false
 		case SERVER_PEER_EVENT_TYPE_SET_CHUNK_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resSetChunk(
-				buffer.size,
+			buffer.size = this->protocol.generateChunkHeader(
+				success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+				PROTO_MAGIC_TO_SERVER,
+				PROTO_OPCODE_SET_CHUNK,
 				event.instanceId, event.requestId,
-				success,
 				event.message.chunk.metadata.listId,
 				event.message.chunk.metadata.stripeId,
 				event.message.chunk.metadata.chunkId
@@ -373,10 +388,11 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 		case SERVER_PEER_EVENT_TYPE_FORWARD_CHUNK_RESPONSE_SUCCESS:
 			success = true;
 		case SERVER_PEER_EVENT_TYPE_FORWARD_CHUNK_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resForwardChunk(
-				buffer.size,
+			buffer.size = this->protocol.generateChunkHeader(
+				success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+				PROTO_MAGIC_TO_SERVER,
+				PROTO_OPCODE_FORWARD_CHUNK,
 				event.instanceId, event.requestId,
-				success,
 				event.message.chunk.metadata.listId,
 				event.message.chunk.metadata.stripeId,
 				event.message.chunk.metadata.chunkId
@@ -400,10 +416,11 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 		case SERVER_PEER_EVENT_TYPE_UNSEALED_KEYS_RESPONSE_SUCCESS:
 			success = true;
 		case SERVER_PEER_EVENT_TYPE_UNSEALED_KEYS_RESPONSE_FAILURE:
-			buffer.data = this->protocol.resUnsealedKeys(
-				buffer.size,
+			buffer.size = this->protocol.generateBatchKeyHeader(
+				success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
+				PROTO_MAGIC_TO_SERVER,
+				PROTO_OPCODE_BATCH_KEY_VALUES,
 				event.instanceId, event.requestId,
-				success,
 				event.message.unsealedKeys.header
 			);
 			break;
@@ -439,10 +456,10 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 			uint32_t chunksCount = 0;
 			bool isCompleted = false;
 
-			buffer.data = this->protocol.reqBatchGetChunks(
-				buffer.size,
-				instanceId,
-				ServerWorker::idGenerator->nextVal( this->workerId ),
+			buffer.size = this->protocol.generateBatchChunkHeader(
+				PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_SERVER,
+				PROTO_OPCODE_BATCH_CHUNKS,
+				instanceId, ServerWorker::idGenerator->nextVal( this->workerId ),
 				event.message.batchGetChunks.requestIds,
 				event.message.batchGetChunks.metadata,
 				chunksCount,

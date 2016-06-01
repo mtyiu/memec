@@ -22,17 +22,13 @@ size_t Protocol::generateMetadataBackupMessage(
 	isCompleted = true;
 
 	// Already in network-byte order
-	*( ( uint32_t * )( buf     ) ) = addr;
-	*( ( uint16_t * )( buf + 4 ) ) = port;
-
-	buf += PROTO_ADDRESS_SIZE;
-	bytes += PROTO_ADDRESS_SIZE;
+	bytes += ProtocolUtil::write4Bytes( buf, addr, false );
+	bytes += ProtocolUtil::write2Bytes( buf, port, false );
 
 	timestampPtr    = ( uint32_t * )( buf      );
 	sealedPtr       = ( uint32_t * )( buf +  4 );
 	opsPtr          = ( uint32_t * )( buf +  8 );
 	isLastPtr       = ( uint8_t *  )( buf + 12 );
-
 	buf += PROTO_HEARTBEAT_SIZE;
 	bytes += PROTO_HEARTBEAT_SIZE;
 
@@ -40,17 +36,12 @@ size_t Protocol::generateMetadataBackupMessage(
 	LOCK( lock );
 	for ( sealedIt = sealed.begin(); sealedIt != sealed.end(); sealedIt++ ) {
 		const Metadata &metadata = sealedIt->second;
-
 		if ( maxTimestamp < sealedIt->first )
 			maxTimestamp = sealedIt->first;
-
 		if ( this->buffer.size >= bytes + PROTO_METADATA_SIZE ) {
-			// printf( "[%d] (%u, %u, %u)\n", current++, metadata.listId, metadata.stripeId, metadata.chunkId );
-			*( ( uint32_t * )( buf     ) ) = htonl( metadata.listId );
-			*( ( uint32_t * )( buf + 4 ) ) = htonl( metadata.stripeId );
-			*( ( uint32_t * )( buf + 8 ) ) = htonl( metadata.chunkId );
-			buf   += PROTO_METADATA_SIZE;
-			bytes += PROTO_METADATA_SIZE;
+			bytes += ProtocolUtil::write4Bytes( buf, metadata.listId   );
+			bytes += ProtocolUtil::write4Bytes( buf, metadata.stripeId );
+			bytes += ProtocolUtil::write4Bytes( buf, metadata.chunkId  );
 			sealedCount++;
 		} else {
 			isCompleted = false;
@@ -63,22 +54,16 @@ size_t Protocol::generateMetadataBackupMessage(
 	for ( opsIt = ops.begin(); opsIt != ops.end(); opsIt++ ) {
 		Key key = opsIt->first;
 		const MetadataBackup &metadataBackup = opsIt->second;
-
 		if ( maxTimestamp < metadataBackup.timestamp )
 			maxTimestamp = metadataBackup.timestamp;
-
 		if ( this->buffer.size >= bytes + PROTO_KEY_OP_METADATA_SIZE + key.size ) {
-			buf[ 0 ] = key.size;
-			buf[ 1 ] = metadataBackup.opcode;
-			*( ( uint32_t * )( buf + 2 ) ) = htonl( metadataBackup.listId );
-			*( ( uint32_t * )( buf + 6 ) ) = htonl( metadataBackup.stripeId );
-			*( ( uint32_t * )( buf + 10 ) ) = htonl( metadataBackup.chunkId );
-			*( ( uint32_t * )( buf + 14 ) ) = htonl( metadataBackup.timestamp );
-
-			buf += PROTO_KEY_OP_METADATA_SIZE;
-			memcpy( buf, key.data, key.size );
-			buf += key.size;
-			bytes += PROTO_KEY_OP_METADATA_SIZE + key.size;
+			bytes += ProtocolUtil::write1Byte ( buf, key.size                 );
+			bytes += ProtocolUtil::write1Byte ( buf, metadataBackup.opcode    );
+			bytes += ProtocolUtil::write4Bytes( buf, metadataBackup.listId    );
+			bytes += ProtocolUtil::write4Bytes( buf, metadataBackup.stripeId  );
+			bytes += ProtocolUtil::write4Bytes( buf, metadataBackup.chunkId   );
+			bytes += ProtocolUtil::write4Bytes( buf, metadataBackup.timestamp );
+			bytes += ProtocolUtil::write( buf, key.data, key.size );
 			opsCount++;
 			key.free();
 		} else {
@@ -93,11 +78,7 @@ size_t Protocol::generateMetadataBackupMessage(
 	*sealedPtr = htonl( sealedCount );
 	*opsPtr = htonl( opsCount );
 	*isLastPtr = isCompleted ? 1 : 0;
-
-	// printf( "isCompleted = %d; count = %lu\n", isCompleted, ops.size() );
-
 	this->generateHeader( magic, to, opcode, bytes - PROTO_HEADER_SIZE, instanceId, requestId );
-
 	return bytes;
 }
 
@@ -106,17 +87,5 @@ bool Protocol::parseMetadataBackupMessage( struct AddressHeader &address, struct
 		buf = this->buffer.recv;
 		size = this->buffer.size;
 	}
-	return this->parseAddressHeader(
-		offset,
-		address.addr,
-		address.port,
-		buf, size
-	) && this->parseHeartbeatHeader(
-		offset + PROTO_ADDRESS_SIZE,
-		heartbeat.timestamp,
-		heartbeat.sealed,
-		heartbeat.keys,
-		heartbeat.isLast,
-		buf, size
-	);
+	return this->parseAddressHeader( address, buf, size, offset ) && this->parseHeartbeatHeader( heartbeat, buf, size, offset + PROTO_ADDRESS_SIZE );
 }

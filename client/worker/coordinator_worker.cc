@@ -14,11 +14,14 @@ void ClientWorker::dispatch( CoordinatorEvent event ) {
 	if ( event.type != COORDINATOR_EVENT_TYPE_PENDING )
 		requestId = ClientWorker::idGenerator->nextVal( this->workerId );
 
+	buffer.data = this->protocol.buffer.send;
+
 	switch( event.type ) {
 		case COORDINATOR_EVENT_TYPE_REGISTER_REQUEST:
-			buffer.data = this->protocol.reqRegisterCoordinator(
-				buffer.size,
-				requestId,
+			buffer.size = this->protocol.generateAddressHeader(
+				PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_COORDINATOR,
+				PROTO_OPCODE_REGISTER,
+				PROTO_UNINITIALIZED_INSTANCE, requestId,
 				event.message.address.addr,
 				event.message.address.port
 			);

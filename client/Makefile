@@ -12,13 +12,7 @@ OBJS= \
 	event/coordinator_event.o \
 	event/client_event.o \
 	event/server_event.o \
-	protocol/degraded_protocol.o \
-	protocol/fault_protocol.o \
-	protocol/load_protocol.o \
-	protocol/normal_protocol.o \
-	protocol/register_protocol.o \
-	protocol/remap_protocol.o \
-	protocol/replay_protocol.o \
+	protocol/protocol.o \
 	remap/basic_remap_scheme.o \
 	state_transit/state_transit_handler.o \
 	socket/application_socket.o \

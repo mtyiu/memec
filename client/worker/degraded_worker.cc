@@ -34,10 +34,14 @@ bool ClientWorker::sendDegradedLockRequest(
 	ssize_t sentBytes;
 	bool connected;
 
-	buffer.data = this->protocol.reqDegradedLock(
-		buffer.size, instanceId, requestId,
+	buffer.data = this->protocol.buffer.send;
+	buffer.size = this->protocol.generateDegradedLockReqHeader(
+		PROTO_MAGIC_REQUEST,
+		PROTO_MAGIC_TO_COORDINATOR,
+		PROTO_OPCODE_DEGRADED_LOCK,
+		instanceId, requestId,
 		original, reconstructed, reconstructedCount,
-		key, keySize
+		keySize, key
 	);
 
 	// Send degraded lock request
@@ -150,18 +154,22 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 	}
 
 	// Send the degraded request to the server
+	buffer.data = this->protocol.buffer.send;
+
 	switch( degradedLockData.opcode ) {
 		case PROTO_OPCODE_GET:
 			// Prepare GET request
 			switch( header.type ) {
 				case PROTO_DEGRADED_LOCK_RES_IS_LOCKED:
 				case PROTO_DEGRADED_LOCK_RES_WAS_LOCKED:
-					buffer.data = this->protocol.reqDegradedGet(
-						buffer.size, instanceId, requestId,
+					buffer.size = this->protocol.generateDegradedReqHeader(
+						PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_SERVER,
+						PROTO_OPCODE_DEGRADED_GET,
+						instanceId, requestId,
 						header.isSealed, header.stripeId,
 						header.original, header.reconstructed, header.reconstructedCount,
 						header.ongoingAtChunk, header.numSurvivingChunkIds, header.survivingChunkIds,
-						degradedLockData.key, degradedLockData.keySize
+						degradedLockData.keySize, degradedLockData.key
 					);
 					break;
 				case PROTO_DEGRADED_LOCK_RES_NOT_LOCKED:
@@ -196,13 +204,17 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 			switch( header.type ) {
 				case PROTO_DEGRADED_LOCK_RES_IS_LOCKED:
 				case PROTO_DEGRADED_LOCK_RES_WAS_LOCKED:
-					buffer.data = this->protocol.reqDegradedUpdate(
-						buffer.size, instanceId, requestId,
+					buffer.size = this->protocol.generateDegradedReqHeader(
+						PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_SERVER,
+						PROTO_OPCODE_DEGRADED_UPDATE,
+						instanceId, requestId,
 						header.isSealed, header.stripeId,
 						header.original, header.reconstructed, header.reconstructedCount,
 						header.ongoingAtChunk, header.numSurvivingChunkIds, header.survivingChunkIds,
-						degradedLockData.key, degradedLockData.keySize,
-						degradedLockData.valueUpdate, degradedLockData.valueUpdateOffset, degradedLockData.valueUpdateSize,
+						degradedLockData.keySize, degradedLockData.key,
+						degradedLockData.valueUpdateOffset,
+						degradedLockData.valueUpdateSize,
+						degradedLockData.valueUpdate,
 						requestTimestamp
 					);
 					break;
@@ -240,12 +252,14 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 			switch( header.type ) {
 				case PROTO_DEGRADED_LOCK_RES_IS_LOCKED:
 				case PROTO_DEGRADED_LOCK_RES_WAS_LOCKED:
-					buffer.data = this->protocol.reqDegradedDelete(
-						buffer.size, instanceId, requestId,
+					buffer.size = this->protocol.generateDegradedReqHeader(
+						PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_SERVER,
+						PROTO_OPCODE_DEGRADED_DELETE,
+						instanceId, requestId,
 						header.isSealed, header.stripeId,
 						header.original, header.reconstructed, header.reconstructedCount,
 						header.ongoingAtChunk, header.numSurvivingChunkIds, header.survivingChunkIds,
-						degradedLockData.key, degradedLockData.keySize,
+						degradedLockData.keySize, degradedLockData.key,
 						requestTimestamp
 					);
 					break;

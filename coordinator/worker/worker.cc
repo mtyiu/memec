@@ -46,11 +46,15 @@ void CoordinatorWorker::dispatch( CoordinatorEvent event ) {
 			// prepare the request for all client
 			Packet *packet = coordinator->packetPool.malloc();
 			buffer.data = packet->data;
-			this->protocol.reqSyncRemappedData(
-				buffer.size, Coordinator::instanceId, requestId,
-				event.message.parity.target, buffer.data
+			packet->size = buffer.size = this->protocol.generateAddressHeader(
+				PROTO_MAGIC_REMAPPING,
+				PROTO_MAGIC_TO_SERVER,
+				PROTO_OPCODE_PARITY_MIGRATE,
+				Coordinator::instanceId, requestId,
+				event.message.parity.target.sin_addr.s_addr,
+				event.message.parity.target.sin_port,
+				buffer.data
 			);
-			packet->size = buffer.size;
 
 			LOCK( &coordinator->sockets.servers.lock );
 			uint32_t numServers = coordinator->sockets.servers.size();
