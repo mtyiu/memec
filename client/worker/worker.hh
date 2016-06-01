@@ -24,16 +24,13 @@ private:
 	uint32_t *original, *remapped;
 	ServerSocket **dataServerSockets;
 	ServerSocket **parityServerSockets;
+
 	static uint32_t dataChunkCount;
 	static uint32_t parityChunkCount;
 	static uint32_t updateInterval;
-	static bool disableDegraded;
 	static IDGenerator *idGenerator;
 	static ClientEventQueue *eventQueue;
-	static StripeList<ServerSocket> *stripeList;
-	static ArrayMap<int, ServerSocket> *serverSockets;
 	static PacketPool *packetPool;
-	static ClientStateTransitHandler *stateTransitHandler;
 
 	// ---------- worker.cc ----------
 	void dispatch( MixedEvent event );

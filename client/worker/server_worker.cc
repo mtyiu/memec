@@ -360,8 +360,8 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 		// Check if all normal requests completes
 		ServerSocket *server = 0;
 		struct sockaddr_in addr;
-		ClientStateTransitHandler *stateTransitHandler = &Client::getInstance()->stateTransitHandler;
-		this->stripeList->get( keyStr, key.size, 0, this->parityServerSockets );
+		ClientStateTransitHandler *stateTransitHandler = &client->stateTransitHandler;
+		client->stripeList->get( keyStr, key.size, 0, this->parityServerSockets );
 		for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
 			server = this->parityServerSockets[ i ];
 			addr = server->getAddr();
@@ -385,6 +385,7 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 	char *valueStr = 0;
 	ApplicationEvent applicationEvent;
 	PendingIdentifier pid;
+	Client* client = Client::getInstance();
 
 	if ( success ) {
 		struct KeyValueHeader header;
@@ -460,7 +461,6 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 
 	// Mark the elapse time as latency
 	if ( ! isDegraded && ClientWorker::updateInterval ) {
-		Client* client = Client::getInstance();
 		struct timespec elapsedTime;
 		RequestStartTime rst;
 
@@ -502,8 +502,8 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 			);
 		} else {
 			uint32_t dataChunkIndex;
-			this->stripeList->get( key.data, key.size, this->dataServerSockets, 0, &dataChunkIndex );
-			if ( isDegraded && ! Client::getInstance()->stateTransitHandler.useCoordinatedFlow( this->dataServerSockets[ dataChunkIndex ]->getAddr() ) ) {
+			client->stripeList->get( key.data, key.size, this->dataServerSockets, 0, &dataChunkIndex );
+			if ( isDegraded && ! client->stateTransitHandler.useCoordinatedFlow( this->dataServerSockets[ dataChunkIndex ]->getAddr() ) ) {
 				// degraded GET failed, but server returns to normal
 				__DEBUG__( CYAN, "ClientWorker", "handleGetResponse", "Retry on failed degraded GET request id = %u", pid.requestId );
 				applicationEvent.replayGetRequest( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, key );
@@ -566,8 +566,8 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 	}
 
 	uint32_t dataChunkIndex;
-	this->stripeList->get( header.key, header.keySize, this->dataServerSockets, 0, &dataChunkIndex );
-	bool needsReplay = pid.ptr && isDegraded && ! success && ! Client::getInstance()->stateTransitHandler.useCoordinatedFlow( this->dataServerSockets[ dataChunkIndex ]->getAddr() );
+	client->stripeList->get( header.key, header.keySize, this->dataServerSockets, 0, &dataChunkIndex );
+	bool needsReplay = pid.ptr && isDegraded && ! success && ! client->stateTransitHandler.useCoordinatedFlow( this->dataServerSockets[ dataChunkIndex ]->getAddr() );
 
 	if ( pid.ptr ) {
 		if ( needsReplay ) {
@@ -595,8 +595,8 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 	if ( ! isDegraded ) {
 		ServerSocket *server = 0;
 		struct sockaddr_in addr;
-		ClientStateTransitHandler *stateTransitHandler = &Client::getInstance()->stateTransitHandler;
-		this->stripeList->get( header.key, header.keySize, 0, this->parityServerSockets );
+		ClientStateTransitHandler *stateTransitHandler = &client->stateTransitHandler;
+		client->stripeList->get( header.key, header.keySize, 0, this->parityServerSockets );
 		for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
 			server = this->parityServerSockets[ i ];
 			addr = server->getAddr();
@@ -693,8 +693,8 @@ bool ClientWorker::handleDeleteResponse( ServerEvent event, bool success, bool i
 	// Check if all normal requests completes
 	ServerSocket *server = 0;
 	struct sockaddr_in addr;
-	ClientStateTransitHandler *stateTransitHandler = &Client::getInstance()->stateTransitHandler;
-	this->stripeList->get( keyStr, key.size, 0, this->parityServerSockets );
+	ClientStateTransitHandler *stateTransitHandler = &client->stateTransitHandler;
+	client->stripeList->get( keyStr, key.size, 0, this->parityServerSockets );
 	for ( uint32_t i = 0; i < this->parityChunkCount; i++ ) {
 		server = this->parityServerSockets[ i ];
 		addr = server->getAddr();

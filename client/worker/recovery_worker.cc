@@ -62,7 +62,7 @@ bool ClientWorker::handleServerReconstructedMsg( CoordinatorEvent event, char *b
 	}
 	s->registerClient();
 
-	ClientWorker::stripeList->update();
+	client->stripeList->update();
 	delete original;
 
 	return true;

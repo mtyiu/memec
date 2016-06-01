@@ -303,7 +303,7 @@ bool ClientWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 
 	// decide whether any of the data / parity server needs to use remapping flow
 	Client *client = Client::getInstance();
-	if ( ! ClientWorker::disableDegraded ) {
+	if ( ! client->config.client.degraded.disabled ) {
 		for ( uint32_t i = 0; i < 1 + ClientWorker::parityChunkCount; i++ ) {
 			struct sockaddr_in addr = ( i == 0 ) ? socket->getAddr() : this->parityServerSockets[ i - 1 ]->getAddr();
 			if ( client->stateTransitHandler.useCoordinatedFlow( addr, true, true ) ) {

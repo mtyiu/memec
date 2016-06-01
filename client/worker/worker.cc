@@ -8,14 +8,10 @@
 uint32_t ClientWorker::dataChunkCount;
 uint32_t ClientWorker::parityChunkCount;
 uint32_t ClientWorker::updateInterval;
-bool ClientWorker::disableDegraded;
 IDGenerator *ClientWorker::idGenerator;
 Pending *ClientWorker::pending;
 ClientEventQueue *ClientWorker::eventQueue;
-StripeList<ServerSocket> *ClientWorker::stripeList;
 PacketPool *ClientWorker::packetPool;
-ArrayMap<int, ServerSocket> *ClientWorker::serverSockets;
-ClientStateTransitHandler *ClientWorker::stateTransitHandler;
 
 void ClientWorker::dispatch( MixedEvent event ) {
 	switch( event.type ) {
@@ -40,7 +36,7 @@ ServerSocket *ClientWorker::getServers( char *data, uint8_t size, uint32_t &list
 	ServerSocket *ret;
 	Key key;
 	key.set( size, data );
-	listId = ClientWorker::stripeList->get(
+	listId = Client::getInstance()->stripeList->get(
 		data, ( size_t ) size,
 		this->dataServerSockets,
 		this->parityServerSockets,
@@ -61,7 +57,7 @@ bool ClientWorker::getServers(
 
 	// Determine original data server
 	uint32_t originalListId, originalChunkId;
-	originalListId = ClientWorker::stripeList->get(
+	originalListId = Client::getInstance()->stripeList->get(
 		data, ( size_t ) size,
 		this->dataServerSockets,
 		this->parityServerSockets,
@@ -156,7 +152,7 @@ bool ClientWorker::getServers(
 
 ServerSocket *ClientWorker::getServers( uint32_t listId, uint32_t chunkId ) {
 	ServerSocket *ret;
-	ClientWorker::stripeList->get( listId, this->parityServerSockets, this->dataServerSockets );
+	Client::getInstance()->stripeList->get( listId, this->parityServerSockets, this->dataServerSockets );
 	ret = chunkId < ClientWorker::dataChunkCount ? this->dataServerSockets[ chunkId ] : this->parityServerSockets[ chunkId - ClientWorker::dataChunkCount ];
 	return ret->ready() ? ret : 0;
 }
@@ -355,7 +351,8 @@ void ClientWorker::replayRequest( ServerSocket *server ) {
 }
 
 void ClientWorker::gatherPendingNormalRequests( ServerSocket *target, bool needsAck ) {
-
+	Client *client = Client::getInstance();
+	StripeList<ServerSocket> *stripeList = client->stripeList;
 	std::unordered_set<uint32_t> listIds;
 	// find the lists including the failed server as parity server
 	for ( uint32_t i = 0, len = stripeList->getNumList(); i < len; i++ ) {
@@ -373,7 +370,7 @@ void ClientWorker::gatherPendingNormalRequests( ServerSocket *target, bool needs
 	bool hasPending = false;
 	std::unordered_set<uint32_t> outdatedPendingRequests;
 
-	ClientStateTransitHandler *mh = &Client::getInstance()->stateTransitHandler;
+	ClientStateTransitHandler *mh = &client->stateTransitHandler;
 
 	LOCK ( &mh->stateTransitInfo[ addr ].counter.pendingNormalRequests.lock );
 
@@ -413,9 +410,9 @@ void ClientWorker::gatherPendingNormalRequests( ServerSocket *target, bool needs
 
 	if ( ! hasPending  ) {
 		__INFO__( GREEN, "ClientWorker", "gatherPendingNormalRequest", "No pending normal requests for transit." );
-		Client::getInstance()->stateTransitHandler.stateTransitInfo[ addr ].setCompleted( false, false );
+		mh->stateTransitInfo[ addr ].setCompleted( false, false );
 		if ( needsAck )
-			Client::getInstance()->stateTransitHandler.ackTransit( addr );
+			mh->ackTransit( addr );
 	} else {
 		__DEBUG__( CYAN, "ClientWorker", "gatherPendingNormalRequest", "id=%d has %u request pending", target->instanceId, mh->stateTransitInfo.at( addr ).getPendingRequestCount( false, false ) );
 	}
@@ -427,7 +424,7 @@ void ClientWorker::gatherPendingNormalRequests( ServerSocket *target, bool needs
 			if ( server.first == target->getAddr() )
 				continue;
 			if ( mh->stateTransitInfo[ server.first ].removePendingRequest( id ) == 0 ) {
-				if ( stateTransitHandler->stateTransitInfo.at( server.first ).setCompleted() ) {
+				if ( mh->stateTransitInfo.at( server.first ).setCompleted() ) {
 					// Let the stateTransitHandler to perform ack after releasing all locks on server states
 					//stateTransitHandler->ackTransit( server.first );
 				}
@@ -469,13 +466,9 @@ bool ClientWorker::init() {
 	ClientWorker::dataChunkCount = client->config.global.coding.params.getDataChunkCount();
 	ClientWorker::parityChunkCount = client->config.global.coding.params.getParityChunkCount();
 	ClientWorker::updateInterval = client->config.global.timeout.load;
-	ClientWorker::disableDegraded = client->config.client.degraded.disabled;
 	ClientWorker::pending = &client->pending;
 	ClientWorker::eventQueue = &client->eventQueue;
-	ClientWorker::stripeList = client->stripeList;
-	ClientWorker::serverSockets = &client->sockets.servers;
 	ClientWorker::packetPool = &client->packetPool;
-	ClientWorker::stateTransitHandler = &client->stateTransitHandler;
 	return true;
 }
 
