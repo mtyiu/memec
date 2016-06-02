@@ -573,6 +573,7 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 		if ( needsReplay ) {
 			// make a copy of the update
 			KeyValueUpdate kv;
+			kv.size = keyValueUpdate.size;
 			kv.dup( keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.ptr );
 			kv.offset = keyValueUpdate.offset;
 			kv.length = keyValueUpdate.length;

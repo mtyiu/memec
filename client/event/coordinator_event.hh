@@ -26,13 +26,32 @@ public:
 		} loading;
 	} message;
 
-	void reqRegister( CoordinatorSocket *socket, uint32_t addr, uint16_t port );
-	void reqSendLoadStats(
+	inline void reqRegister( CoordinatorSocket *socket, uint32_t addr, uint16_t port ) {
+		this->type = COORDINATOR_EVENT_TYPE_REGISTER_REQUEST;
+		this->socket = socket;
+		this->message.address = {
+			.addr = addr,
+			.port = port
+		};
+	}
+
+	inline void reqSendLoadStats(
 		CoordinatorSocket *socket,
 		ArrayMap< struct sockaddr_in, Latency > *serverGetLatency,
 		ArrayMap< struct sockaddr_in, Latency > *serverSetLatency
-	);
-	void pending( CoordinatorSocket *socket );
+	) {
+		this->type = COORDINATOR_EVENT_TYPE_PUSH_LOAD_STATS;
+		this->socket = socket;
+		this->message.loading = {
+			.serverGetLatency = serverGetLatency,
+			.serverSetLatency = serverSetLatency
+		};
+	}
+
+	inline void pending( CoordinatorSocket *socket ) {
+		this->type = COORDINATOR_EVENT_TYPE_PENDING;
+		this->socket = socket;
+	}
 };
 
 #endif

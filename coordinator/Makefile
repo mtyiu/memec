@@ -7,9 +7,6 @@ BIN=$(MEMEC_SRC_ROOT)/bin/coordinator
 OBJS= \
 	config/coordinator_config.o \
 	ds/map.o \
-	event/coordinator_event.o \
-	event/client_event.o \
-	event/server_event.o \
 	protocol/protocol.o \
 	state_transit/state_transit_handler.o \
 	state_transit/state_transit_worker.o \

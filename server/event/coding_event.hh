@@ -20,7 +20,13 @@ public:
 		} decode;
 	} message;
 
-	void decode( Chunk **chunks, BitmaskArray *status );
+	inline void decode( Chunk **chunks, BitmaskArray *status ) {
+		this->type = CODING_EVENT_TYPE_DECODE;
+		this->message.decode = {
+			.chunks = chunks,
+			.status = status
+		};
+	}
 };
 
 #endif

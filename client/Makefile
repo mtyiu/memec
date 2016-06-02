@@ -8,9 +8,6 @@ OBJS= \
 	backup/backup.o \
 	config/client_config.o \
 	ds/pending.o \
-	event/application_event.o \
-	event/coordinator_event.o \
-	event/server_event.o \
 	protocol/protocol.o \
 	remap/basic_remap_scheme.o \
 	state_transit/state_transit_handler.o \

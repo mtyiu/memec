@@ -54,24 +54,105 @@ public:
 		struct sockaddr_in addr;
 	} message;
 
-	void pending( ServerSocket *socket );
-	void resRegister( ServerSocket *socket, uint16_t instanceId, uint32_t requestId, bool success = true );
-	void announceServerConnected( ServerSocket *socket );
-	void announceServerReconstructed(
+	inline void pending( ServerSocket *socket ) {
+		this->type = SERVER_EVENT_TYPE_PENDING;
+		this->socket = socket;
+	}
+
+	inline void resRegister( ServerSocket *socket, uint16_t instanceId, uint32_t requestId, bool success = true ) {
+		this->type = success ? SERVER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS : SERVER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE;
+		this->set( instanceId, requestId, socket );
+	}
+
+	inline void announceServerConnected( ServerSocket *socket ) {
+		this->type = SERVER_EVENT_TYPE_ANNOUNCE_SERVER_CONNECTED;
+		this->socket = socket;
+	}
+
+	inline void announceServerReconstructed(
 		uint16_t instanceId, uint32_t requestId,
 		pthread_mutex_t *lock, pthread_cond_t *cond, std::unordered_set<ServerSocket *> *sockets,
 		ServerSocket *srcSocket, ServerSocket *dstSocket
-	);
-	void reqSealChunks( ServerSocket *socket );
-	void reqFlushChunks( ServerSocket *socket );
-	void reqSyncMeta( ServerSocket *socket, bool *sync );
-	void reqReleaseDegradedLock( ServerSocket *socket, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done );
-	void syncRemappedData( ServerSocket *socket, Packet *packet );
-	void resHeartbeat( ServerSocket *socket, uint32_t timestamp, uint32_t sealed, uint32_t keys, bool isLast );
-	void disconnect( ServerSocket *socket );
-	void triggerReconstruction( struct sockaddr_in addr );
-	void handleReconstructionRequest( ServerSocket *socket );
-	void ackCompletedReconstruction( ServerSocket *socket, uint16_t instanceId, uint32_t requestId, bool success );
+	) {
+		this->type = SERVER_EVENT_TYPE_ANNOUNCE_SERVER_RECONSTRUCTED;
+		this->set( instanceId, requestId );
+		this->message.reconstructed = {
+			.src = srcSocket,
+			.dst = dstSocket,
+			.lock = lock,
+			.cond = cond,
+			.sockets = sockets
+		};
+	}
+
+	inline void reqSealChunks( ServerSocket *socket ) {
+		this->type = SERVER_EVENT_TYPE_REQUEST_SEAL_CHUNKS;
+		this->socket = socket;
+	}
+
+	inline void reqFlushChunks( ServerSocket *socket ) {
+		this->type = SERVER_EVENT_TYPE_REQUEST_FLUSH_CHUNKS;
+		this->socket = socket;
+	}
+
+	inline void reqSyncMeta( ServerSocket *socket, bool *sync ) {
+		this->type = SERVER_EVENT_TYPE_REQUEST_SYNC_META;
+		this->socket = socket;
+		this->message.sync = sync;
+	}
+
+	inline void reqReleaseDegradedLock(
+		ServerSocket *socket,
+		pthread_mutex_t *lock, pthread_cond_t *cond, bool *done
+	) {
+		this->type = SERVER_EVENT_TYPE_REQUEST_RELEASE_DEGRADED_LOCK;
+		this->socket = socket;
+		this->message.degraded = {
+			.lock = lock,
+			.cond = cond,
+			.done = done
+		};
+	}
+
+	inline void syncRemappedData( ServerSocket *socket, Packet *packet ) {
+		this->type = SERVER_EVENT_TYPE_PARITY_MIGRATE;
+		this->socket = socket;
+		this->message.parity.packet = packet;
+	}
+
+	inline void resHeartbeat(
+		ServerSocket *socket,
+		uint32_t timestamp, uint32_t sealed, uint32_t keys, bool isLast
+	) {
+		this->type = SERVER_EVENT_TYPE_RESPONSE_HEARTBEAT;
+		this->socket = socket;
+		this->message.heartbeat = {
+			.timestamp = timestamp,
+			.sealed = sealed,
+			.keys = keys,
+			.isLast = isLast
+		};
+	}
+
+	inline void disconnect( ServerSocket *socket ) {
+		this->type = SERVER_EVENT_TYPE_DISCONNECT;
+		this->socket = socket;
+	}
+
+	inline void triggerReconstruction( struct sockaddr_in addr ) {
+		this->type = SERVER_EVENT_TYPE_TRIGGER_RECONSTRUCTION;
+		this->message.addr = addr;
+	}
+
+	inline void handleReconstructionRequest( ServerSocket *socket ) {
+		this->type = SERVER_EVENT_TYPE_HANDLE_RECONSTRUCTION_REQUEST;
+		this->socket = socket;
+	}
+
+	inline void ackCompletedReconstruction( ServerSocket *socket, uint16_t instanceId, uint32_t requestId, bool success ) {
+		this->type = success ? SERVER_EVENT_TYPE_ACK_RECONSTRUCTION_SUCCESS : SERVER_EVENT_TYPE_ACK_RECONSTRUCTION_FAILURE;
+		this->set( instanceId, requestId, socket );
+	}
 };
 
 #endif
