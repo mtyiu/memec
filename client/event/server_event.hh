@@ -16,12 +16,9 @@ enum ServerEventType {
 	SERVER_EVENT_TYPE_PENDING
 };
 
-class ServerEvent : public Event {
+class ServerEvent : public Event<ServerSocket> {
 public:
 	ServerEventType type;
-	ServerSocket *socket;
-	uint16_t instanceId;
-	uint32_t requestId;
 	uint32_t timestamp;
 	union {
 		struct {

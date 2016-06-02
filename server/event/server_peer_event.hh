@@ -81,12 +81,9 @@ enum ServerPeerEventType {
 	SERVER_PEER_EVENT_TYPE_PENDING
 };
 
-class ServerPeerEvent : public Event {
+class ServerPeerEvent : public Event<ServerPeerSocket> {
 public:
 	ServerPeerEventType type;
-	uint16_t instanceId;
-	uint32_t requestId;
-	ServerPeerSocket *socket;
 	uint32_t timestamp;
 	struct {
 		struct {

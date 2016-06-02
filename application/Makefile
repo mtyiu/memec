@@ -6,7 +6,6 @@ BIN=$(MEMEC_SRC_ROOT)/bin/application
 
 OBJS= \
 	config/application_config.o \
-	event/application_event.o \
 	event/client_event.o \
 	protocol/protocol.o \
 	socket/client_socket.o \

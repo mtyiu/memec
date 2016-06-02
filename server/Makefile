@@ -20,7 +20,6 @@ OBJS= \
 	event/coordinator_event.o \
 	event/io_event.o \
 	event/client_event.o \
-	event/server_event.o \
 	event/server_peer_event.o \
 	state_transit/state_transit_handler.o \
 	protocol/protocol.o \

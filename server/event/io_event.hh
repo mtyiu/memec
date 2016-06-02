@@ -8,7 +8,7 @@ enum IOEventType {
 	IO_EVENT_TYPE_FLUSH_CHUNK
 };
 
-class IOEvent : public Event {
+class IOEvent : public Event<void> {
 public:
 	IOEventType type;
 	Chunk *chunk;

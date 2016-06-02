@@ -3,9 +3,7 @@
 
 void ClientEvent::resRegister( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, bool success ) {
 	this->type = success ? CLIENT_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS : CLIENT_EVENT_TYPE_REGISTER_RESPONSE_FAILURE;
-	this->instanceId = instanceId;
-	this->requestId = requestId;
-	this->socket = socket;
+	this->set( instanceId, requestId, socket );
 }
 
 void ClientEvent::reqPushLoadStats( ClientSocket *socket, ArrayMap<struct sockaddr_in, Latency> *serverGetLatency,
@@ -19,8 +17,7 @@ void ClientEvent::reqPushLoadStats( ClientSocket *socket, ArrayMap<struct sockad
 
 void ClientEvent::resDegradedSetLock( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, bool success, uint32_t *original, uint32_t *remapped, uint32_t remappedCount, Key &key ) {
 	this->type = success ? CLIENT_EVENT_TYPE_DEGRADED_SET_LOCK_RESPONSE_SUCCESS : CLIENT_EVENT_TYPE_DEGRADED_SET_LOCK_RESPONSE_FAILURE;
-	this->instanceId = instanceId;
-	this->requestId = requestId;
+	this->set( instanceId, requestId );
 	this->socket = socket;
 	this->message.remap.original = original;
 	this->message.remap.remapped = remapped;
@@ -44,8 +41,7 @@ void ClientEvent::resDegradedLock(
 	uint32_t ongoingAtChunk, uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds
 ) {
 	this->type = isLocked ? CLIENT_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_IS_LOCKED : CLIENT_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_WAS_LOCKED;
-	this->instanceId = instanceId;
-	this->requestId = requestId;
+	this->set( instanceId, requestId );
 	this->socket = socket;
 	this->message.degradedLock.key = key;
 	this->message.degradedLock.isSealed = isSealed;
@@ -62,16 +58,14 @@ void ClientEvent::resDegradedLock(
 
 void ClientEvent::resDegradedLock( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, bool exist ) {
 	this->type = exist ? CLIENT_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_LOCKED : CLIENT_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_FOUND;
-	this->instanceId = instanceId;
-	this->requestId = requestId;
+	this->set( instanceId, requestId );
 	this->socket = socket;
 	this->message.degradedLock.key = key;
 }
 
 void ClientEvent::resDegradedLock( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, Key &key, uint32_t *original, uint32_t *remapped, uint32_t remappedCount ) {
 	this->type = CLIENT_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_REMAPPED;
-	this->instanceId = instanceId;
-	this->requestId = requestId;
+	this->set( instanceId, requestId );
 	this->socket = socket;
 	this->message.degradedLock.key = key;
 	this->message.degradedLock.remappedCount = remappedCount;

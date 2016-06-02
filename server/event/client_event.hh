@@ -38,14 +38,11 @@ enum ClientEventType {
 	CLIENT_EVENT_TYPE_PENDING
 };
 
-class ClientEvent : public Event {
+class ClientEvent : public Event<ClientSocket> {
 public:
 	ClientEventType type;
-	uint16_t instanceId;
-	uint32_t requestId;
 	bool needsFree;
 	bool isDegraded;
-	ClientSocket *socket;
 	uint32_t timestamp;
 	union {
 		Key key;

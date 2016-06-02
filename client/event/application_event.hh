@@ -26,12 +26,9 @@ enum ApplicationEventType {
 	APPLICATION_EVENT_TYPE_PENDING
 };
 
-class ApplicationEvent : public Event {
+class ApplicationEvent : public Event<ApplicationSocket> {
 public:
 	ApplicationEventType type;
-	uint16_t instanceId;
-	uint32_t requestId;
-	ApplicationSocket *socket;
 	bool needsFree;
 	union {
 		Key key;

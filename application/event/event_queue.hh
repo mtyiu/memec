@@ -3,7 +3,6 @@
 
 #include <stdint.h>
 #include "mixed_event.hh"
-#include "application_event.hh"
 #include "client_event.hh"
 #include "../../common/event/event_queue.hh"
 
@@ -43,7 +42,6 @@ public:
 		return this->mixed->insert( mixedEvent ); \
 	}
 
-	APPLICATION_EVENT_QUEUE_INSERT( ApplicationEvent )
 	APPLICATION_EVENT_QUEUE_INSERT( ClientEvent )
 #undef APPLICATION_EVENT_QUEUE_INSERT
 };

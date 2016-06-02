@@ -3,18 +3,16 @@
 
 #include "application_event.hh"
 #include "coordinator_event.hh"
-#include "client_event.hh"
 #include "server_event.hh"
 #include "../../common/event/event.hh"
 #include "../../common/event/event_type.hh"
 
-class MixedEvent : public Event {
+class MixedEvent {
 public:
 	EventType type;
 	union {
 		ApplicationEvent application;
 		CoordinatorEvent coordinator;
-		ClientEvent client;
 		ServerEvent server;
 	} event;
 
@@ -26,7 +24,6 @@ public:
 
 	MIXED_EVENT_SET( ApplicationEvent, EVENT_TYPE_APPLICATION, application )
 	MIXED_EVENT_SET( CoordinatorEvent, EVENT_TYPE_COORDINATOR, coordinator )
-	MIXED_EVENT_SET( ClientEvent, EVENT_TYPE_CLIENT, client )
 	MIXED_EVENT_SET( ServerEvent, EVENT_TYPE_SERVER, server )
 #undef MIXED_EVENT_SET
 

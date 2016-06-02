@@ -16,12 +16,9 @@ enum CoordinatorEventType {
 	COORDINATOR_EVENT_TYPE_PENDING
 };
 
-class CoordinatorEvent : public Event {
+class CoordinatorEvent : public Event<CoordinatorSocket> {
 public:
 	CoordinatorEventType type;
-	CoordinatorSocket *socket;
-	uint16_t instanceId;
-	uint32_t requestId;
 	union {
 		struct {
 			uint32_t addr;
