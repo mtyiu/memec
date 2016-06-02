@@ -3,7 +3,7 @@
 bool printServerState( RemapState state, char *mod, char *func, char *ip, short port ) {
 	char *stateString = 0;
 	char *unknown = ( char* ) "Unknown";
-	bool isUnknown = false;
+	bool valid = true;
 	switch( state ) {
 		case STATE_NORMAL:
 			stateString = ( char* ) "STATE_NORMAL";
@@ -28,13 +28,13 @@ bool printServerState( RemapState state, char *mod, char *func, char *ip, short 
 			break;
 		default:	
 			stateString = ( char* ) "STATE_UNKNOWN";
-			isUnknown = true;
+			valid = false;
 			break;
 	}
 	if ( mod == 0 ) mod = unknown;
 	if ( func == 0 ) func = unknown;
 	if ( ip == 0 ) ip = unknown;
 	__INFO__( BLUE, mod, func, "%s %s:%hu", stateString, ip, port );
-	return isUnknown;
+	return valid;
 }
 
