@@ -125,24 +125,7 @@ void ServerStateTransitHandler::setState( char* msg , int len ) {
 		}
 
 		LOCK( &this->serversStateLock[ serverPeer ] );
-		switch ( signal ) {
-			case STATE_NORMAL:
-				__DEBUG__( BLUE, "ServerStateTransitHandler", "setState", "STATE_NORMAL %s:%hu", buf, ntohs( serverPeer.sin_port ) );
-				break;
-			case STATE_INTERMEDIATE:
-				__INFO__( BLUE, "ServerStateTransitHandler", "setState", "STATE_INTERMEDIATE %s:%hu", buf, ntohs( serverPeer.sin_port ) );
-				break;
-			case STATE_COORDINATED:
-				__INFO__( BLUE, "ServerStateTransitHandler", "setState", "STATE_COORDINATED %s:%hu", buf, ntohs( serverPeer.sin_port ) );
-				break;
-			case STATE_DEGRADED:
-				__INFO__( BLUE, "ServerStateTransitHandler", "setState", "STATE_DEGRADED %s:%hu", buf, ntohs( serverPeer.sin_port ) );
-				break;
-			default:
-				__INFO__( BLUE, "ServerStateTransitHandler", "setState", "Unknown %d %s:%hu", signal, buf, ntohs( serverPeer.sin_port ) );
-				UNLOCK( &this->serversStateLock[ serverPeer ] );
-				continue;
-		}
+		printServerState( signal, ( char* ) "ServerStateTransitHandler", ( char* ) "setState", buf, ntohs( serverPeer.sin_port ) );
 		this->serversState[ serverPeer ] = signal;
 		UNLOCK( &this->serversStateLock[ serverPeer ] );
 	}
@@ -180,36 +163,3 @@ bool ServerStateTransitHandler::useCoordinatedFlow( const struct sockaddr_in &se
 	return ret;
 }
 
-bool ServerStateTransitHandler::allowRemapping( const struct sockaddr_in &server ) {
-	if ( this->serversState.count( server ) == 0 )
-		return false;
-
-	switch ( this->serversState[ server ] ) {
-		case STATE_INTERMEDIATE:
-		case STATE_WAIT_DEGRADED:
-		case STATE_DEGRADED:
-			return true;
-		default:
-			break;
-	}
-
-	return false;
-}
-
-bool ServerStateTransitHandler::acceptNormalResponse( const struct sockaddr_in &server ) {
-	if ( this->serversState.count( server ) == 0 )
-		return true;
-
-	switch( this->serversState[ server ] ) {
-		case STATE_UNDEFINED:
-		case STATE_NORMAL:
-		case STATE_INTERMEDIATE:
-		case STATE_COORDINATED:
-		case STATE_WAIT_DEGRADED:
-		case STATE_WAIT_NORMAL:
-			return true;
-		case STATE_DEGRADED:
-		default:
-			return false;
-	}
-}

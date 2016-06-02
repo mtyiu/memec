@@ -35,8 +35,6 @@ public:
 	bool removeAliveServer( struct sockaddr_in server );
 
 	bool useCoordinatedFlow( const struct sockaddr_in &server, bool needsLock = false, bool needsUnlock = false );
-	bool allowRemapping( const struct sockaddr_in &server );
-	bool acceptNormalResponse( const struct sockaddr_in &server );
 };
 
 #endif

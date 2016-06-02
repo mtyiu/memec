@@ -1,6 +1,8 @@
 #ifndef __COMMON_STATE_TRANSIT_STATE_TRANSIT_STATE_HH__
 #define __COMMON_STATE_TRANSIT_STATE_TRANSIT_STATE_HH__
 
+#include "../util/debug.hh"
+
 enum RemapState {
 	// core states
 	STATE_UNDEFINED,				// undefined
@@ -13,4 +15,6 @@ enum RemapState {
 	STATE_WAIT_NORMAL				// wait for return to normal
 };
 
+// return true if the state are listed in RemapState, otherwise, return false
+bool printServerState( RemapState state, char *mod = 0, char *func = 0, char *ip = 0, short port = 0 );
 #endif
