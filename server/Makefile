@@ -48,6 +48,7 @@ EXTERNAL_LIB= \
 	$(MEMEC_SRC_ROOT)/common/ds/sockaddr_in.o \
 	$(MEMEC_SRC_ROOT)/common/hash/cuckoo_hash.o \
 	$(MEMEC_SRC_ROOT)/common/state_transit/state_transit_handler.o \
+	$(MEMEC_SRC_ROOT)/common/state_transit/state_transit_state.o \
 	$(MEMEC_SRC_ROOT)/common/protocol/protocol.o \
 	$(MEMEC_SRC_ROOT)/common/protocol/ack_protocol.o \
 	$(MEMEC_SRC_ROOT)/common/protocol/address_protocol.o \

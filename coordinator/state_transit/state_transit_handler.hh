@@ -57,6 +57,8 @@ private:
 	void addAliveClient( char *name );
 	void removeAliveClient( char *name );
 
+	/* handle initiation of state changes */
+	void stateChangeInitHandler( std::vector<struct sockaddr_in> *allServers, std::vector<struct sockaddr_in> &checkedServers, StateTransitEvent event );
 	/* insert the same event for one or more servers */
 	bool insertRepeatedEvents ( StateTransitEvent event, std::vector<struct sockaddr_in> *servers );
 

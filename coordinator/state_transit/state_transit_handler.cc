@@ -94,74 +94,77 @@ bool CoordinatorStateTransitHandler::stop() {
 	return ( ret == 0 );
 }
 
-#define STATE_TRANSIT_PHASE_CHANGE_HANDLER( _ALL_SERVERS_, _CHECKED_SERVERS_, _EVENT_ ) \
-	do { \
-		_CHECKED_SERVERS_.clear(); \
-		\
-		bool start = _EVENT_.start; \
-		for ( uint32_t i = 0; i < _ALL_SERVERS_->size(); ) { \
-			LOCK( &this->serversStateLock[ _ALL_SERVERS_->at(i) ] ); \
-			RemapState state = this->serversState[ _ALL_SERVERS_->at(i) ]; \
-			/* no need to trigger transition if is undefined / already entered / already exited degraded state */ \
-			if ( ( state == STATE_UNDEFINED ) || ( start && state != STATE_NORMAL ) || \
-				( ( ! start ) && state != STATE_DEGRADED ) ) \
-			{ \
-				UNLOCK( &this->serversStateLock[ _ALL_SERVERS_->at(i) ] ); \
-				i++; \
-				continue; \
-			}  \
-			/* set state for sync. and to avoid multiple start from others */ \
-			this->serversState[ _ALL_SERVERS_->at(i) ] = ( start ) ? STATE_INTERMEDIATE : STATE_COORDINATED; \
-			/* reset ack pool anyway */\
-			this->resetClientAck( _ALL_SERVERS_->at(i) ); \
-			_CHECKED_SERVERS_.push_back( _ALL_SERVERS_->at(i) ); \
-			UNLOCK( &this->serversStateLock[ _ALL_SERVERS_->at(i) ] ); \
-			_ALL_SERVERS_->erase( _ALL_SERVERS_->begin() + i ); \
-		} \
-		/* ask client to change state */ \
-		if ( this->broadcastState( _CHECKED_SERVERS_ ) == false ) { \
-			/* revert the state if failed to start */ \
-			for ( uint32_t i = 0; i < _CHECKED_SERVERS_.size() ; i++ ) { \
-				LOCK( &this->serversStateLock[ _ALL_SERVERS_->at(i) ] ); \
-				/* TODO is the previous state deterministic ?? */ \
-				if ( start && this->serversState[ _ALL_SERVERS_->at(i) ] == STATE_INTERMEDIATE ) { \
-					this->serversState[ _ALL_SERVERS_->at(i) ] = STATE_NORMAL; \
-				} else if ( ( ! start ) && this->serversState[ _ALL_SERVERS_->at(i) ] == STATE_COORDINATED ) { \
-					this->serversState[ _ALL_SERVERS_->at(i) ] = STATE_DEGRADED; \
-				} else { \
-					fprintf( stderr, "unexpected state of server %u as %d\n",  \
-						_ALL_SERVERS_->at(i).sin_addr.s_addr, this->serversState[ _ALL_SERVERS_->at(i) ]  \
-					); \
-				} \
-				UNLOCK( &this->serversStateLock[ _ALL_SERVERS_->at(i) ] ); \
-			} \
-			/* let the caller know all servers failed */ \
-			_ALL_SERVERS_->insert( _ALL_SERVERS_->end(), _CHECKED_SERVERS_.begin(), _CHECKED_SERVERS_.end() ); \
-			return false; \
-		} \
-		/* keep retrying until success */ \
-		/* TODO reset only failed ones instead */ \
-		while ( ! this->insertRepeatedEvents( _EVENT_, &_CHECKED_SERVERS_ ) ); \
-	} while (0)
+void CoordinatorStateTransitHandler::stateChangeInitHandler( std::vector<struct sockaddr_in> *allServers, std::vector<struct sockaddr_in> &checkedServers, StateTransitEvent event ) {
+	bool start = event.start;
+	struct sockaddr_in server;
+
+	checkedServers.clear();
+
+	for ( uint32_t i = 0; i < allServers->size(); ) {
+		server = allServers->at(i);
+		LOCK( &this->serversStateLock[ server ] );
+		RemapState state = this->serversState[ server ]; \
+		// no need to trigger transition if is undefined / already entered / already exited degraded state
+		if ( state == STATE_UNDEFINED || ( start && state != STATE_NORMAL ) ||
+				( ( ! start ) && state != STATE_DEGRADED ) ) {
+			UNLOCK( &this->serversStateLock[ server ] );
+			i++;
+			continue;
+		}
+		// set state for sync. and to avoid multiple start from others
+		this->serversState[ server ] = ( start ) ? STATE_INTERMEDIATE : STATE_COORDINATED;
+		// reset ack pool anyway
+		this->resetClientAck( server );
+		checkedServers.push_back( server );
+		UNLOCK( &this->serversStateLock[ server ] );
+		// remove this server from list of servers to check
+		allServers->erase( allServers->begin() + i );
+	}
+	// ask client to change state
+	if ( this->broadcastState( checkedServers ) == false ) {
+		// revert the state if failed to start
+		for ( uint32_t i = 0; i < checkedServers.size(); i++ ) {
+			server = allServers->at(i);
+			LOCK( &this->serversStateLock[ server ] );
+			if ( start && this->serversState[ server ] == STATE_INTERMEDIATE ) {
+				this->serversState[ server ] = STATE_NORMAL;
+			} else if ( ( ! start ) && this->serversState[ server ] == STATE_COORDINATED ) {
+				this->serversState[ server ] = STATE_DEGRADED;
+			} else {
+				printServerState(
+					this->serversState[ server ], ( char* ) "CoordinatorStateTransitHandler",
+					( char* ) "phaseChangeHandler(unexpect revert state)"
+				);
+			}
+			UNLOCK( &this->serversStateLock[ server ] );
+		}
+		allServers->insert( allServers->end(), checkedServers.begin(), checkedServers.end() );
+	}
+	// keep retrying until success
+	// TODO reset only failed ones instead
+	while ( ! this->insertRepeatedEvents( event, &checkedServers ) );
+}
 
 
 bool CoordinatorStateTransitHandler::transitToDegraded( std::vector<struct sockaddr_in> *servers, bool forced ) {
 	StateTransitEvent event;
 	event.start = true;
-	vector<struct sockaddr_in> serversToStart;
+	vector<struct sockaddr_in> serversToTransit;
 
-	if ( forced ) {
-		for ( uint32_t i = 0, len = servers->size(); i < len; i++ ) {
-			this->addFailedServer( servers->at( i ) );
-			LOCK( &this->serversStateLock[ servers->at( i ) ] );
-			this->serversState[ servers->at( i ) ] = STATE_INTERMEDIATE;
-			UNLOCK( &this->serversStateLock[ servers->at( i ) ] );
-		}
-		this->broadcastState( *servers );
-		this->insertRepeatedEvents( event, servers );
-	} else {
-		STATE_TRANSIT_PHASE_CHANGE_HANDLER( servers, serversToStart, event );
-	}
+	this->stateChangeInitHandler( servers, serversToTransit, event );
+	//if ( forced ) {
+	//	for ( uint32_t i = 0, len = servers->size(); i < len; i++ ) {
+	//		this->addFailedServer( servers->at( i ) );
+	//		LOCK( &this->serversStateLock[ servers->at( i ) ] );
+	//		this->serversState[ servers->at( i ) ] = STATE_INTERMEDIATE;
+	//		UNLOCK( &this->serversStateLock[ servers->at( i ) ] );
+	//	}
+	//	this->broadcastState( *servers );
+	//	this->insertRepeatedEvents( event, servers );
+	//} else {
+	//	//STATE_TRANSIT_PHASE_CHANGE_HANDLER( servers, serversToTransit, event );
+	//	this->stateChangeInitHandler( servers, serversToTransit, event );
+	//}
 
 	return true;
 }
@@ -214,12 +217,13 @@ bool CoordinatorStateTransitHandler::transitToDegradedEnd( const struct sockaddr
 bool CoordinatorStateTransitHandler::transitToNormal( std::vector<struct sockaddr_in> *servers, bool forced ) {
 	StateTransitEvent event;
 	event.start = false;
-	vector<struct sockaddr_in> serversToStop;
+	vector<struct sockaddr_in> serversToTransit;
 
 	LOCK( &this->aliveServersLock );
+
+	// Never transit to normal state if it is crashed
 	for ( auto it = servers->begin(); it != servers->end(); ) {
 		if ( this->crashedServers.count( *it ) > 0 ) {
-			// Never transit to normal state if it is crashed
 			it = servers->erase( it );
 		} else {
 			it++;
@@ -227,18 +231,20 @@ bool CoordinatorStateTransitHandler::transitToNormal( std::vector<struct sockadd
 	}
 	UNLOCK( &this->aliveServersLock );
 
-	if ( forced ) {
-		for ( uint32_t i = 0, len = servers->size(); i < len; i++ ) {
-			this->addFailedServer( servers->at( i ) );
-			LOCK( &this->serversStateLock[ servers->at(i) ] );
-			this->serversState[ servers->at( i ) ] = STATE_COORDINATED;
-			UNLOCK( &this->serversStateLock[ servers->at(i) ] );
-		}
-		this->broadcastState( *servers );
-		this->insertRepeatedEvents( event, servers );
-	} else {
-		STATE_TRANSIT_PHASE_CHANGE_HANDLER( servers, serversToStop, event );
-	}
+	this->stateChangeInitHandler( servers, serversToTransit, event );
+	//if ( forced ) {
+	//	for ( uint32_t i = 0, len = servers->size(); i < len; i++ ) {
+	//		this->addFailedServer( servers->at( i ) );
+	//		LOCK( &this->serversStateLock[ servers->at(i) ] );
+	//		this->serversState[ servers->at( i ) ] = STATE_COORDINATED;
+	//		UNLOCK( &this->serversStateLock[ servers->at(i) ] );
+	//	}
+	//	this->broadcastState( *servers );
+	//	this->insertRepeatedEvents( event, servers );
+	//} else {
+	//	//STATE_TRANSIT_PHASE_CHANGE_HANDLER( servers, serversToTransit, event );
+	//	this->stateChangeInitHandler( servers, serversToTransit, event );
+	//}
 
 	return true;
 }

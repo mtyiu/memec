@@ -160,12 +160,13 @@ void ClientStateTransitHandler::setState( char* msg , int len ) {
 		RemapState signal = updatedServers[ i ].second;
 		RemapState state = this->serversState[ server ];
 
+		if ( ! printServerState( signal, ( char* ) "ClientStateTransitHandler", ( char* ) "setState", buf, ntohs( server.sin_port ) ) ) {
+			// skip unknown states
+			UNLOCK( &this->serversStateLock[ server ] );
+			continue;
+		}
 		switch ( signal ) {
-			case STATE_NORMAL:
-				__DEBUG__( BLUE, "ClientStateTransitHandler", "setState", "STATE_NORMAL %s:%hu", buf, ntohs( server.sin_port ) );
-				break;
 			case STATE_INTERMEDIATE:
-				__INFO__( BLUE, "ClientStateTransitHandler", "setState", "STATE_INTERMEDIATE %s:%hu", buf, ntohs( server.sin_port ) );
 				if ( state == STATE_WAIT_DEGRADED )
 					signal = state;
 				else {
@@ -187,19 +188,15 @@ void ClientStateTransitHandler::setState( char* msg , int len ) {
 				}
 				break;
 			case STATE_COORDINATED:
-				__INFO__( BLUE, "ClientStateTransitHandler", "setState", "STATE_COORDINATED %s:%hu", buf, ntohs( server.sin_port ) );
 				if ( state == STATE_WAIT_NORMAL )
 					signal = state;
 				break;
 			case STATE_DEGRADED:
-				__INFO__( BLUE, "ClientStateTransitHandler", "setState", "STATE_DEGRADED %s:%hu", buf, ntohs( server.sin_port ) );
 				if ( state == STATE_INTERMEDIATE )
 					__ERROR__( "ClientStateTransitHandler", "setState", "Not yet ready for transition to DEGRADED!" );
 				break;
 			default:
-				__INFO__( BLUE, "ClientStateTransitHandler", "setState", "Unknown %d %s:%hu", signal, buf, ntohs( server.sin_port ) );
-				UNLOCK( &this->serversStateLock[ server ] );
-				return;
+				break;
 		}
 		this->serversState[ server ] = signal;
 		state = this->serversState[ server ];
