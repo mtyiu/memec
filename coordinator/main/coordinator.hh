@@ -44,9 +44,9 @@ private:
 			ArrayMap<struct sockaddr_in, Latency> *serverSetLatency );
 	// return previously overloaded servers for per-server phase change
 	std::set<struct sockaddr_in> updateOverloadedServerSet(
-			ArrayMap<struct sockaddr_in, Latency> *serverGetLatency,
-			ArrayMap<struct sockaddr_in, Latency> *serverSetLatency,
-			std::set<struct sockaddr_in> *serverSet
+		ArrayMap<struct sockaddr_in, Latency> *serverGetLatency,
+		ArrayMap<struct sockaddr_in, Latency> *serverSetLatency,
+		std::set<struct sockaddr_in> *serverSet
 	);
 	void switchPhase( std::set<struct sockaddr_in> prevOverloadedServers );
 
@@ -72,10 +72,6 @@ public:
 	/* Remapping */
 	CoordinatorStateTransitHandler *stateTransitHandler;
 	RemappingRecordMap remappingRecords;
-	struct {
-		std::unordered_map<Key, RemappingRecord> toSend;
-		LOCK_T toSendLock;
-	} pendingRemappingRecords;
 	PacketPool packetPool;
 	/* Loading statistics */
 	struct {

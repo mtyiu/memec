@@ -115,6 +115,10 @@ ssize_t Socket::send( int sockfd, char *buf, size_t ulen, bool &connected ) {
 	return bytes;
 }
 
+ssize_t Socket::send( char *buf, size_t ulen, bool &connected ) {
+	return this->send( this->sockfd, buf, ulen, connected );
+}
+
 ssize_t Socket::recv( int sockfd, char *buf, size_t ulen, bool &connected, bool wait ) {
 	ssize_t ret = 0, bytes = 0, len = ulen;
 	do {
@@ -143,19 +147,27 @@ ssize_t Socket::recv( int sockfd, char *buf, size_t ulen, bool &connected, bool 
 	return bytes;
 }
 
-ssize_t Socket::recvRem( int sockfd, char *buf, size_t expected, char *prevBuf, size_t prevSize, bool &connected ) {
+ssize_t Socket::recv( char *buf, size_t ulen, bool &connected, bool wait ) {
+	return this->recv( this->sockfd, buf, ulen, connected, wait );
+}
+
+ssize_t Socket::recvRem( char *buf, size_t expected, char *prevBuf, size_t prevSize, bool &connected ) {
 	ssize_t bytes;
 	if ( buf != prevBuf )
 		memmove( buf, prevBuf, prevSize );
 	buf += prevSize;
 	expected -= prevSize;
 	bytes = prevSize;
-	bytes += this->recv( sockfd, buf, expected, connected, true );
+	bytes += this->recv( buf, expected, connected, true );
 	return bytes;
 }
 
 bool Socket::done( int sockfd ) {
 	return Socket::epoll->modify( sockfd, EPOLL_EVENT_SET );
+}
+
+bool Socket::done() {
+	return this->done( this->sockfd );
 }
 
 int Socket::accept( struct sockaddr_in *addrPtr, socklen_t *addrlenPtr ) {

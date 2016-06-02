@@ -47,7 +47,6 @@ private:
 	void free();
 	// Commands
 	void help();
-	// void time();
 
 public:
 	struct {

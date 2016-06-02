@@ -35,22 +35,6 @@ void ServerSocket::stop() {
 	Socket::stop();
 }
 
-ssize_t ServerSocket::send( char *buf, size_t ulen, bool &connected ) {
-	return Socket::send( this->sockfd, buf, ulen, connected );
-}
-
-ssize_t ServerSocket::recv( char *buf, size_t ulen, bool &connected, bool wait ) {
-	return Socket::recv( this->sockfd, buf, ulen, connected, wait );
-}
-
-ssize_t ServerSocket::recvRem( char *buf, size_t expected, char *prevBuf, size_t prevSize, bool &connected ) {
-	return Socket::recvRem( this->sockfd, buf, expected, prevBuf, prevSize, connected );
-}
-
-bool ServerSocket::done() {
-	return Socket::done( this->sockfd );
-}
-
 bool ServerSocket::ready() {
 	return this->connected && this->registered;
 }
