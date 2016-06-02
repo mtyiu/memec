@@ -325,7 +325,7 @@ bool ClientWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 #ifdef CLIENT_WORKER_SEND_REPLICAS_PARALLEL
 	Packet *packet = 0;
 	if ( ClientWorker::parityChunkCount ) {
-		packet = ClientWorker::packetPool->malloc();
+		packet = Client::getInstance()->packetPool.malloc();
 		packet->setReferenceCount( 1 + ClientWorker::parityChunkCount );
 		buffer.data = packet->data;
 		this->protocol.reqSet( buffer.size, instanceId, requestId, header.key, header.keySize, header.value, header.valueSize, buffer.data );

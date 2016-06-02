@@ -1368,9 +1368,8 @@ bool ServerWorker::sendModifyChunkRequest(
 	uint32_t requestId = ServerWorker::idGenerator->nextVal( this->workerId );
 	bool isDegraded = original && reconstructed && reconstructedCount;
 
-	if ( ServerWorker::disableSeal ) {
+	if ( Server::getInstance()->config.server.seal.disabled )
 		isSealed = false;
-	}
 
 	key.set( keySize, keyStr );
 	keyValueUpdate.set( keySize, keyStr );
@@ -1446,7 +1445,7 @@ bool ServerWorker::sendModifyChunkRequest(
 				ChunkUtil::clear( this->forward.parityChunk );
 
 				// Compute parity delta
-				ServerWorker::coding->encode(
+				Server::getInstance()->coding->encode(
 					this->forward.chunks, this->forward.parityChunk,
 					i + 1, // Parity chunk index
 					offset + metadata.chunkId * ChunkUtil::chunkSize,

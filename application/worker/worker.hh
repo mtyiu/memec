@@ -17,9 +17,6 @@ private:
 		char *value;
 		uint32_t valueSize;
 	} buffer;
-	static IDGenerator *idGenerator;
-	static ApplicationEventQueue *eventQueue;
-	static Pending *pending;
 
 	void dispatch( MixedEvent event );
 	void dispatch( ClientEvent event );
@@ -27,7 +24,6 @@ private:
 	static void *run( void *argv );
 
 public:
-	static bool init();
 	bool init( ApplicationConfig &config, uint32_t workerId );
 	bool start();
 	void stop();

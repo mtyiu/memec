@@ -11,7 +11,6 @@ uint32_t ClientWorker::updateInterval;
 IDGenerator *ClientWorker::idGenerator;
 Pending *ClientWorker::pending;
 ClientEventQueue *ClientWorker::eventQueue;
-PacketPool *ClientWorker::packetPool;
 
 void ClientWorker::dispatch( MixedEvent event ) {
 	switch( event.type ) {
@@ -468,7 +467,6 @@ bool ClientWorker::init() {
 	ClientWorker::updateInterval = client->config.global.timeout.load;
 	ClientWorker::pending = &client->pending;
 	ClientWorker::eventQueue = &client->eventQueue;
-	ClientWorker::packetPool = &client->packetPool;
 	return true;
 }
 

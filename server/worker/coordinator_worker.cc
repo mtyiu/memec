@@ -31,7 +31,7 @@ void ServerWorker::dispatch( CoordinatorEvent event ) {
 			uint32_t sealedCount, opsCount;
 			bool isCompleted;
 
-			uint32_t timestamp = ServerWorker::timestamp->nextVal();
+			uint32_t timestamp = Server::getInstance()->timestamp.nextVal();
 
 			buffer.size = this->protocol.generateHeartbeatMessage(
 				PROTO_MAGIC_HEARTBEAT, PROTO_MAGIC_TO_COORDINATOR,
@@ -43,7 +43,7 @@ void ServerWorker::dispatch( CoordinatorEvent event ) {
 			);
 
 			if ( sealedCount || opsCount )
-				ServerWorker::pendingAck->insert( timestamp );
+				Server::getInstance()->pendingAck.insert( timestamp );
 
 			if ( ! isCompleted )
 				ServerWorker::eventQueue->insert( event );
@@ -292,7 +292,7 @@ bool ServerWorker::handleHeartbeatAck( CoordinatorEvent event, char *buf, size_t
 	__DEBUG__( YELLOW, "ServerWorker", "handleAcknowledgement", "Timestamp: %u.", header.timestamp );
 
 	uint32_t fromTimestamp;
-	if ( ServerWorker::pendingAck->erase( header.timestamp, fromTimestamp ) ) {
+	if ( Server::getInstance()->pendingAck.erase( header.timestamp, fromTimestamp ) ) {
 		// Send ACK to clients
 		ClientEvent clientEvent;
 		uint16_t instanceId = Server::instanceId;

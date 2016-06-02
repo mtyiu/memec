@@ -5,10 +5,6 @@
 
 #define WORKER_COLOR	YELLOW
 
-IDGenerator *ApplicationWorker::idGenerator;
-ApplicationEventQueue *ApplicationWorker::eventQueue;
-Pending *ApplicationWorker::pending;
-
 void ApplicationWorker::dispatch( MixedEvent event ) {
 	switch( event.type ) {
 		case EVENT_TYPE_CLIENT:
@@ -31,8 +27,11 @@ void ApplicationWorker::dispatch( ClientEvent event ) {
 	} buffer;
 	size_t valueSize;
 
+	Application *application = Application::getInstance();
+	Pending &pending = application->pending;
+
 	if ( event.type != CLIENT_EVENT_TYPE_PENDING )
-		requestId = ApplicationWorker::idGenerator->nextVal( this->workerId );
+		requestId = Application::getInstance()->idGenerator.nextVal( this->workerId );
 
 	switch( event.type ) {
 		case CLIENT_EVENT_TYPE_REGISTER_REQUEST:
@@ -114,15 +113,15 @@ void ApplicationWorker::dispatch( ClientEvent event ) {
 					( void * ) ( uint64_t ) event.message.set.fd
 				);
 
-				LOCK( &ApplicationWorker::pending->application.setLock );
-				ApplicationWorker::pending->application.set.insert( key );
-				UNLOCK( &ApplicationWorker::pending->application.setLock );
+				LOCK( &pending.application.setLock );
+				pending.application.set.insert( key );
+				UNLOCK( &pending.application.setLock );
 
 				key.ptr = ( void * ) event.socket;
 
-				LOCK( &ApplicationWorker::pending->clients.setLock );
-				ApplicationWorker::pending->clients.set.insert( key );
-				UNLOCK( &ApplicationWorker::pending->clients.setLock );
+				LOCK( &pending.clients.setLock );
+				pending.clients.set.insert( key );
+				UNLOCK( &pending.clients.setLock );
 				break;
 			case CLIENT_EVENT_TYPE_GET_REQUEST:
 				key.dup(
@@ -131,15 +130,15 @@ void ApplicationWorker::dispatch( ClientEvent event ) {
 					( void * ) ( uint64_t ) event.message.set.fd
 				);
 
-				LOCK( &ApplicationWorker::pending->application.getLock );
-				ApplicationWorker::pending->application.get.insert( key );
-				UNLOCK( &ApplicationWorker::pending->application.getLock );
+				LOCK( &pending.application.getLock );
+				pending.application.get.insert( key );
+				UNLOCK( &pending.application.getLock );
 
 				key.ptr = ( void * ) event.socket;
 
-				LOCK( &ApplicationWorker::pending->clients.getLock );
-				ApplicationWorker::pending->clients.get.insert( key );
-				UNLOCK( &ApplicationWorker::pending->clients.getLock );
+				LOCK( &pending.clients.getLock );
+				pending.clients.get.insert( key );
+				UNLOCK( &pending.clients.getLock );
 				break;
 			case CLIENT_EVENT_TYPE_UPDATE_REQUEST:
 				keyValueUpdate.dup(
@@ -150,28 +149,28 @@ void ApplicationWorker::dispatch( ClientEvent event ) {
 				keyValueUpdate.offset = event.message.update.offset;
 				keyValueUpdate.length = valueSize;
 
-				LOCK( &ApplicationWorker::pending->application.updateLock );
-				ApplicationWorker::pending->application.update.insert( keyValueUpdate );
-				UNLOCK( &ApplicationWorker::pending->application.updateLock );
+				LOCK( &pending.application.updateLock );
+				pending.application.update.insert( keyValueUpdate );
+				UNLOCK( &pending.application.updateLock );
 
 				keyValueUpdate.ptr = ( void * ) event.socket;
 
-				LOCK( &ApplicationWorker::pending->clients.updateLock );
-				ApplicationWorker::pending->clients.update.insert( keyValueUpdate );
-				UNLOCK( &ApplicationWorker::pending->clients.updateLock );
+				LOCK( &pending.clients.updateLock );
+				pending.clients.update.insert( keyValueUpdate );
+				UNLOCK( &pending.clients.updateLock );
 				break;
 			case CLIENT_EVENT_TYPE_DELETE_REQUEST:
 				key.dup( event.message.del.keySize, event.message.del.key, 0 );
 
-				LOCK( &ApplicationWorker::pending->application.delLock );
-				ApplicationWorker::pending->application.del.insert( key );
-				UNLOCK( &ApplicationWorker::pending->application.delLock );
+				LOCK( &pending.application.delLock );
+				pending.application.del.insert( key );
+				UNLOCK( &pending.application.delLock );
 
 				key.ptr = ( void * ) event.socket;
 
-				LOCK( &ApplicationWorker::pending->clients.delLock );
-				ApplicationWorker::pending->clients.del.insert( key );
-				UNLOCK( &ApplicationWorker::pending->clients.delLock );
+				LOCK( &pending.clients.delLock );
+				pending.clients.del.insert( key );
+				UNLOCK( &pending.clients.delLock );
 				break;
 			default:
 				break;
@@ -223,26 +222,26 @@ void ApplicationWorker::dispatch( ClientEvent event ) {
 					key.data = keyHeader.key;
 					key.ptr = ( void * ) event.socket;
 
-					LOCK( &ApplicationWorker::pending->clients.setLock );
-					it = ApplicationWorker::pending->clients.set.find( key );
-					if ( it == ApplicationWorker::pending->clients.set.end() ) {
+					LOCK( &pending.clients.setLock );
+					it = pending.clients.set.find( key );
+					if ( it == pending.clients.set.end() ) {
 						__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending client SET request that matches the response. This message will be discarded." );
 						goto quit_1;
 					}
-					ApplicationWorker::pending->clients.set.erase( it );
-					UNLOCK( &ApplicationWorker::pending->clients.setLock );
+					pending.clients.set.erase( it );
+					UNLOCK( &pending.clients.setLock );
 
 					key.ptr = 0;
 
-					LOCK( &ApplicationWorker::pending->application.setLock );
-					it = ApplicationWorker::pending->application.set.lower_bound( key );
-					if ( it == ApplicationWorker::pending->application.set.end() || ! key.equal( *it ) ) {
+					LOCK( &pending.application.setLock );
+					it = pending.application.set.lower_bound( key );
+					if ( it == pending.application.set.end() || ! key.equal( *it ) ) {
 						__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending application SET request that matches the response. This message will be discarded." );
 						goto quit_1;
 					}
 					key = *it;
-					ApplicationWorker::pending->application.set.erase( it );
-					UNLOCK( &ApplicationWorker::pending->application.setLock );
+					pending.application.set.erase( it );
+					UNLOCK( &pending.application.setLock );
 
 					// Report result
 					if ( success ) {
@@ -275,26 +274,26 @@ void ApplicationWorker::dispatch( ClientEvent event ) {
 						}
 					}
 
-					LOCK( &ApplicationWorker::pending->clients.getLock );
-					it = ApplicationWorker::pending->clients.get.find( key );
-					if ( it == ApplicationWorker::pending->clients.get.end() ) {
+					LOCK( &pending.clients.getLock );
+					it = pending.clients.get.find( key );
+					if ( it == pending.clients.get.end() ) {
 						__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending client GET request that matches the response. This message will be discarded. (key = %.*s)", key.size, key.data );
 						goto quit_1;
 					}
-					ApplicationWorker::pending->clients.get.erase( it );
-					UNLOCK( &ApplicationWorker::pending->clients.getLock );
+					pending.clients.get.erase( it );
+					UNLOCK( &pending.clients.getLock );
 
 					key.ptr = 0;
 
-					LOCK( &ApplicationWorker::pending->application.getLock );
-					it = ApplicationWorker::pending->application.get.lower_bound( key );
-					if ( it == ApplicationWorker::pending->application.get.end() || ! key.equal( *it ) ) {
+					LOCK( &pending.application.getLock );
+					it = pending.application.get.lower_bound( key );
+					if ( it == pending.application.get.end() || ! key.equal( *it ) ) {
 						__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending application GET request that matches the response. This message will be discarded." );
 						goto quit_1;
 					}
 					key = *it;
-					ApplicationWorker::pending->application.get.erase( it );
-					UNLOCK( &ApplicationWorker::pending->application.getLock );
+					pending.application.get.erase( it );
+					UNLOCK( &pending.application.getLock );
 
 					fd = ( int )( uint64_t ) key.ptr;
 
@@ -320,26 +319,26 @@ void ApplicationWorker::dispatch( ClientEvent event ) {
 						keyValueUpdate.length = keyValueUpdateHeader.valueUpdateSize;
 						keyValueUpdate.ptr = ( void * ) event.socket;
 
-						LOCK( &ApplicationWorker::pending->clients.updateLock );
-						keyValueUpdateIt = ApplicationWorker::pending->clients.update.find( keyValueUpdate );
-						if ( keyValueUpdateIt == ApplicationWorker::pending->clients.update.end() ) {
+						LOCK( &pending.clients.updateLock );
+						keyValueUpdateIt = pending.clients.update.find( keyValueUpdate );
+						if ( keyValueUpdateIt == pending.clients.update.end() ) {
 							__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending client UPDATE request that matches the response. This message will be discarded. (key = %.*s)", keyValueUpdate.size, keyValueUpdate.data );
 							goto quit_1;
 						}
-						ApplicationWorker::pending->clients.update.erase( keyValueUpdateIt );
-						UNLOCK( &ApplicationWorker::pending->clients.updateLock );
+						pending.clients.update.erase( keyValueUpdateIt );
+						UNLOCK( &pending.clients.updateLock );
 
 						keyValueUpdate.ptr = 0;
 
-						LOCK( &ApplicationWorker::pending->application.updateLock );
-						keyValueUpdateIt = ApplicationWorker::pending->application.update.lower_bound( keyValueUpdate );
-						if ( keyValueUpdateIt == ApplicationWorker::pending->application.update.end() || ! keyValueUpdate.equal( *keyValueUpdateIt ) ) {
+						LOCK( &pending.application.updateLock );
+						keyValueUpdateIt = pending.application.update.lower_bound( keyValueUpdate );
+						if ( keyValueUpdateIt == pending.application.update.end() || ! keyValueUpdate.equal( *keyValueUpdateIt ) ) {
 							__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending application UPDATE request that matches the response. This message will be discarded. (key = %.*s, size = %u)", keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size );
 							goto quit_1;
 						}
 						keyValueUpdate = *keyValueUpdateIt;
-						ApplicationWorker::pending->application.update.erase( keyValueUpdateIt );
-						UNLOCK( &ApplicationWorker::pending->application.updateLock );
+						pending.application.update.erase( keyValueUpdateIt );
+						UNLOCK( &pending.application.updateLock );
 
 						if ( success ) {
 							__ERROR__( "ApplicationWorker", "dispatch", "The key: %.*s is UPDATE successfully.", keyValueUpdate.size, keyValueUpdate.data );
@@ -357,26 +356,26 @@ void ApplicationWorker::dispatch( ClientEvent event ) {
 						key.data = keyHeader.key;
 						key.ptr = ( void * ) event.socket;
 
-						LOCK( &ApplicationWorker::pending->clients.delLock );
-						it = ApplicationWorker::pending->clients.del.find( key );
-						if ( it == ApplicationWorker::pending->clients.del.end() ) {
+						LOCK( &pending.clients.delLock );
+						it = pending.clients.del.find( key );
+						if ( it == pending.clients.del.end() ) {
 							__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending client DELETE request that matches the response. This message will be discarded. (key = %.*s)", key.size, key.data );
 							goto quit_1;
 						}
-						ApplicationWorker::pending->clients.del.erase( it );
-						UNLOCK( &ApplicationWorker::pending->clients.delLock );
+						pending.clients.del.erase( it );
+						UNLOCK( &pending.clients.delLock );
 
 						key.ptr = 0;
 
-						LOCK( &ApplicationWorker::pending->application.delLock );
-						it = ApplicationWorker::pending->application.del.lower_bound( key );
-						if ( it == ApplicationWorker::pending->application.del.end() || ! key.equal( *it ) ) {
+						LOCK( &pending.application.delLock );
+						it = pending.application.del.lower_bound( key );
+						if ( it == pending.application.del.end() || ! key.equal( *it ) ) {
 							__ERROR__( "ApplicationWorker", "dispatch", "Cannot find a pending application DELETE request that matches the response. This message will be discarded." );
 							goto quit_1;
 						}
 						key = *it;
-						ApplicationWorker::pending->application.del.erase( it );
-						UNLOCK( &ApplicationWorker::pending->application.delLock );
+						pending.application.del.erase( it );
+						UNLOCK( &pending.application.delLock );
 
 						if ( success ) {
 							__ERROR__( "ApplicationWorker", "dispatch", "The key: %.*s is DELETE successfully.", key.size, key.data );
@@ -410,7 +409,7 @@ void ApplicationWorker::free() {
 
 void *ApplicationWorker::run( void *argv ) {
 	ApplicationWorker *worker = ( ApplicationWorker * ) argv;
-	ApplicationEventQueue *eventQueue = ApplicationWorker::eventQueue;
+	ApplicationEventQueue *eventQueue = &Application::getInstance()->eventQueue;
 
 	MixedEvent event;
 	bool ret;
@@ -422,16 +421,6 @@ void *ApplicationWorker::run( void *argv ) {
 	worker->free();
 	pthread_exit( 0 );
 	return 0;
-}
-
-bool ApplicationWorker::init() {
-	Application *application = Application::getInstance();
-
-	ApplicationWorker::idGenerator = &application->idGenerator;
-	ApplicationWorker::eventQueue = &application->eventQueue;
-	ApplicationWorker::pending = &application->pending;
-
-	return true;
 }
 
 bool ApplicationWorker::init( ApplicationConfig &config, uint32_t workerId ) {

@@ -19,7 +19,7 @@ bool CoordinatorWorker::handleDegradedLockRequest( ClientEvent event, char *buf,
 	Key key;
 	key.set( header.keySize, header.key );
 
-	if ( CoordinatorWorker::remappingRecords->find( key, &remappingRecord, &lock ) ) {
+	if ( Coordinator::getInstance()->remappingRecords.find( key, &remappingRecord, &lock ) ) {
 		// Remapped
 		event.resDegradedLock(
 			event.socket, event.instanceId, event.requestId, key,

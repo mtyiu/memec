@@ -387,7 +387,7 @@ bool ServerWorker::handleSetRequest( ClientEvent event, struct KeyValueHeader &h
 		exist = true;
 		// printf( "The key already exists: %.*s\n", header.keySize, header.key );
 	} else {
-		if ( ServerWorker::disableSeal ) {
+		if ( Server::getInstance()->config.server.seal.disabled ) {
 			ServerWorker::chunkBuffer->at( listId )->set(
 				this,
 				header.key, header.keySize,
@@ -794,7 +794,7 @@ bool ServerWorker::handleDeleteRequest(
 				chunks, endOfDegradedOp
 			);
 		} else {
-			uint32_t timestamp = ServerWorker::timestamp->nextVal();
+			uint32_t timestamp = Server::getInstance()->timestamp.nextVal();
 			event.resDelete(
 				event.socket,
 				event.instanceId, event.requestId,

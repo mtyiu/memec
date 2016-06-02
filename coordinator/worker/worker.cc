@@ -7,8 +7,6 @@ uint32_t CoordinatorWorker::dataChunkCount;
 uint32_t CoordinatorWorker::parityChunkCount;
 uint32_t CoordinatorWorker::chunkCount;
 IDGenerator *CoordinatorWorker::idGenerator;
-CoordinatorEventQueue *CoordinatorWorker::eventQueue;
-RemappingRecordMap *CoordinatorWorker::remappingRecords;
 StripeList<ServerSocket> *CoordinatorWorker::stripeList;
 Pending *CoordinatorWorker::pending;
 
@@ -87,7 +85,7 @@ void CoordinatorWorker::free() {
 
 void *CoordinatorWorker::run( void *argv ) {
 	CoordinatorWorker *worker = ( CoordinatorWorker * ) argv;
-	CoordinatorEventQueue *eventQueue = CoordinatorWorker::eventQueue;
+	CoordinatorEventQueue *eventQueue = &Coordinator::getInstance()->eventQueue;
 
 	MixedEvent event;
 	bool ret;
@@ -109,8 +107,6 @@ bool CoordinatorWorker::init() {
 	CoordinatorWorker::parityChunkCount = coordinator->config.global.coding.params.getParityChunkCount();
 	CoordinatorWorker::chunkCount = CoordinatorWorker::dataChunkCount + CoordinatorWorker::parityChunkCount;
 	CoordinatorWorker::idGenerator = &coordinator->idGenerator;
-	CoordinatorWorker::eventQueue = &coordinator->eventQueue;
-	CoordinatorWorker::remappingRecords = &coordinator->remappingRecords;
 	CoordinatorWorker::stripeList = coordinator->stripeList;
 	CoordinatorWorker::pending = &coordinator->pending;
 

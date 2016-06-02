@@ -877,7 +877,7 @@ bool ServerWorker::handleSealChunkRequest( ServerPeerEvent event, char *buf, siz
 }
 
 bool ServerWorker::issueSealChunkRequest( Chunk *chunk, uint32_t startPos ) {
-	if ( ServerWorker::disableSeal ) {
+	if ( Server::getInstance()->config.server.seal.disabled ) {
 		return false;
 	}
 
@@ -943,7 +943,7 @@ bool ServerWorker::handleBatchKeyValueRequest( ServerPeerEvent event, char *buf,
 		if ( i == 0 )
 			this->getServers( keyStr, keySize, listId, chunkId );
 
-		if ( ServerWorker::disableSeal ) {
+		if ( Server::getInstance()->config.server.seal.disabled ) {
 			ServerWorker::chunkBuffer->at( listId )->set(
 				this,
 				keyStr, keySize,

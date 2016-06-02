@@ -4,24 +4,18 @@
 uint32_t ServerWorker::dataChunkCount;
 uint32_t ServerWorker::parityChunkCount;
 uint32_t ServerWorker::chunkCount;
-bool ServerWorker::disableSeal;
 unsigned int ServerWorker::delay;
 IDGenerator *ServerWorker::idGenerator;
 ArrayMap<int, ServerPeerSocket> *ServerWorker::serverPeers;
 Pending *ServerWorker::pending;
-PendingAck *ServerWorker::pendingAck;
-ServerAddr *ServerWorker::serverServerAddr;
-Coding *ServerWorker::coding;
 ServerEventQueue *ServerWorker::eventQueue;
 StripeList<ServerPeerSocket> *ServerWorker::stripeList;
-std::vector<StripeListIndex> *ServerWorker::stripeListIndex;
 Map *ServerWorker::map;
 std::vector<MixedChunkBuffer *> *ServerWorker::chunkBuffer;
 GetChunkBuffer *ServerWorker::getChunkBuffer;
 DegradedChunkBuffer *ServerWorker::degradedChunkBuffer;
 RemappedBuffer *ServerWorker::remappedBuffer;
 PacketPool *ServerWorker::packetPool;
-Timestamp *ServerWorker::timestamp;
 ChunkPool *ServerWorker::chunkPool;
 
 void ServerWorker::dispatch( MixedEvent event ) {
@@ -52,7 +46,7 @@ void ServerWorker::dispatch( MixedEvent event ) {
 void ServerWorker::dispatch( CodingEvent event ) {
 	switch( event.type ) {
 		case CODING_EVENT_TYPE_DECODE:
-			ServerWorker::coding->decode( event.message.decode.chunks, event.message.decode.status );
+			Server::getInstance()->coding->decode( event.message.decode.chunks, event.message.decode.status );
 			break;
 		default:
 			return;
@@ -154,23 +148,17 @@ bool ServerWorker::init() {
 	ServerWorker::dataChunkCount = server->config.global.coding.params.getDataChunkCount();
 	ServerWorker::parityChunkCount = server->config.global.coding.params.getParityChunkCount();
 	ServerWorker::chunkCount = ServerWorker::dataChunkCount + ServerWorker::parityChunkCount;
-	ServerWorker::disableSeal = server->config.server.seal.disabled;
 	ServerWorker::delay = 0;
 	ServerWorker::serverPeers = &server->sockets.serverPeers;
 	ServerWorker::pending = &server->pending;
-	ServerWorker::pendingAck = &server->pendingAck;
-	ServerWorker::serverServerAddr = &server->config.server.server.addr;
-	ServerWorker::coding = server->coding;
 	ServerWorker::eventQueue = &server->eventQueue;
 	ServerWorker::stripeList = server->stripeList;
-	ServerWorker::stripeListIndex = &server->stripeListIndex;
 	ServerWorker::map = &server->map;
 	ServerWorker::chunkBuffer = &server->chunkBuffer;
 	ServerWorker::getChunkBuffer = &server->getChunkBuffer;
 	ServerWorker::degradedChunkBuffer = &server->degradedChunkBuffer;
 	ServerWorker::remappedBuffer = &server->remappedBuffer;
 	ServerWorker::packetPool = &server->packetPool;
-	ServerWorker::timestamp = &server->timestamp;
 	ServerWorker::chunkPool = &server->chunkPool;
 	return true;
 }

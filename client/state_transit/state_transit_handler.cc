@@ -383,7 +383,7 @@ bool ClientStateTransitHandler::checkAckForServer( struct sockaddr_in server ) {
 				std::unordered_set<uint32_t> &requestIds = this->stateTransitInfo[ server ].counter.pendingNormalRequests.requestIds;
 				std::unordered_set<uint32_t>::iterator it;
 				for ( it = requestIds.begin(); it != requestIds.end(); ) {
-					if ( ! ClientWorker::pending->findKeyValue( *it ) ) {
+					if ( ! Client::getInstance()->pending.findKeyValue( *it ) ) {
 						it = requestIds.erase( it );
 					} else {
 						it++;

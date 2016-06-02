@@ -489,7 +489,7 @@ bool ServerWorker::handleDeleteResponse( ServerPeerEvent event, bool success, ch
 
 		if ( success ) {
 			__ERROR__( "ServerWorker", "handleDeleteResponse", "TODO: server/worker/server_peer_res_worker.cc - Line 289: Include the timestamp and metadata in the response.\n" );
-			// uint32_t timestamp = ServerWorker::timestamp->nextVal();
+			// uint32_t timestamp = Server::getInstance()->timestamp.nextVal();
 			clientEvent.resDelete(
 				( ClientSocket * ) pid.ptr,
 				pid.instanceId, pid.requestId,
@@ -784,7 +784,7 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 			ServerWorker::stripeList->get( listId, this->parityServerSockets, this->dataServerSockets );
 
 			Coding::forceSeal(
-				ServerWorker::coding,
+				Server::getInstance()->coding,
 				this->chunks,
 				this->freeChunks[ 0 ],
 				this->sealIndicators,
@@ -1551,7 +1551,7 @@ bool ServerWorker::handleDeleteChunkResponse( ServerPeerEvent event, bool succes
 
 		// TODO: Include the timestamp and metadata in the response
 		if ( success ) {
-			uint32_t timestamp = ServerWorker::timestamp->nextVal();
+			uint32_t timestamp = Server::getInstance()->timestamp.nextVal();
 			clientEvent.resDelete(
 				( ClientSocket * ) pid.ptr, pid.instanceId, pid.requestId,
 				timestamp,

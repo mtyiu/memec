@@ -86,7 +86,6 @@ bool Application::init( char *path, OptionList &options, bool verbose ) {
 		this->config.application.eventQueue.block,
 		this->config.application.eventQueue.size
 	);
-	ApplicationWorker::init();
 	this->workers.reserve( this->config.application.workers.count );
 	for ( int i = 0, len = this->config.application.workers.count; i < len; i++ ) {
 		this->workers.push_back( ApplicationWorker() );

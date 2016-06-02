@@ -60,7 +60,7 @@ bool CoordinatorWorker::handlePromoteBackupServerResponse( ServerEvent event, ch
 		if ( failedServerSocket ) {
 			event.handleReconstructionRequest( failedServerSocket );
 			// Must use another worker thread as the function call handleReconstructionRequest() blocks while waiting for the response from other servers
-			CoordinatorWorker::eventQueue->insert( event );
+			coordinator->eventQueue.insert( event );
 		}
 	}
 
@@ -151,7 +151,7 @@ bool CoordinatorWorker::handleReconstructionRequest( ServerSocket *socket ) {
 	/////////////////////////////
 	ClientEvent clientEvent;
 	clientEvent.announceServerReconstructed( socket, backupServerSocket );
-	CoordinatorWorker::eventQueue->insert( clientEvent );
+	coordinator->eventQueue.insert( clientEvent );
 
 	////////////////////////////////////////////////////////////////////////////
 

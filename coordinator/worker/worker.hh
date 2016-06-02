@@ -20,7 +20,6 @@ private:
 	static uint32_t parityChunkCount;
 	static uint32_t chunkCount;
 	static IDGenerator *idGenerator;
-	static CoordinatorEventQueue *eventQueue;
 	static StripeList<ServerSocket> *stripeList;
 	static Pending *pending;
 
@@ -53,8 +52,6 @@ private:
 	bool handleReconstructionUnsealedResponse( ServerEvent event, char *buf, size_t size );
 
 public:
-	static RemappingRecordMap *remappingRecords;
-
 	// ---------- worker.cc ----------
 	static bool init();
 	bool init( GlobalConfig &config, uint32_t workerId );

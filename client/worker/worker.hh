@@ -30,7 +30,7 @@ private:
 	static uint32_t updateInterval;
 	static IDGenerator *idGenerator;
 	static ClientEventQueue *eventQueue;
-	static PacketPool *packetPool;
+	static Pending *pending;
 
 	// ---------- worker.cc ----------
 	void dispatch( MixedEvent event );
@@ -84,8 +84,6 @@ private:
 	bool handleServerReconstructedMsg( CoordinatorEvent event, char *buf, size_t size );
 
 public:
-	static Pending *pending;
-
 	// ---------- worker.cc ----------
 	static bool init();
 	bool init( GlobalConfig &config, uint32_t workerId );

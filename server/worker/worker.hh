@@ -55,23 +55,17 @@ private:
 	static uint32_t dataChunkCount;
 	static uint32_t parityChunkCount;
 	static uint32_t chunkCount;
-	static bool disableSeal;
 	static IDGenerator *idGenerator;
 	static ArrayMap<int, ServerPeerSocket> *serverPeers;
 	static Pending *pending;
-	static PendingAck *pendingAck;
-	static ServerAddr *serverServerAddr;
-	static Coding *coding;
 	static ServerEventQueue *eventQueue;
 	static StripeList<ServerPeerSocket> *stripeList;
-	static std::vector<StripeListIndex> *stripeListIndex;
 	static Map *map;
 	static std::vector<MixedChunkBuffer *> *chunkBuffer;
 	static GetChunkBuffer *getChunkBuffer;
 	static DegradedChunkBuffer *degradedChunkBuffer;
 	static RemappedBuffer *remappedBuffer;
 	static PacketPool *packetPool;
-	static Timestamp *timestamp;
 	static ChunkPool *chunkPool;
 
 	// ---------- worker.cc ----------

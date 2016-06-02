@@ -19,15 +19,17 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 		// Requests //
 		//////////////
 		case SERVER_PEER_EVENT_TYPE_REGISTER_REQUEST:
+		{
+			ServerAddr &serverAddr = Server::getInstance()->config.server.server.addr;
 			buffer.size = this->protocol.generateAddressHeader(
 				PROTO_MAGIC_REQUEST,
 				PROTO_MAGIC_TO_SERVER,
 				PROTO_OPCODE_REGISTER,
 				Server::instanceId,
 				ServerWorker::idGenerator->nextVal( this->workerId ),
-				ServerWorker::serverServerAddr->addr,
-				ServerWorker::serverServerAddr->port
+				serverAddr.addr, serverAddr.port
 			);
+		}
 			break;
 		case SERVER_PEER_EVENT_TYPE_GET_CHUNK_REQUEST:
 			buffer.size = this->protocol.generateChunkHeader(

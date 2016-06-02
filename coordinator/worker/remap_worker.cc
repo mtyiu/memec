@@ -60,7 +60,7 @@ bool CoordinatorWorker::handleDegradedSetLockRequest( ClientEvent event, char *b
 		else
 			remappingRecord.set( 0, 0, 0 );
 
-		if ( header.remappedCount == 0 /* no need to insert */ || CoordinatorWorker::remappingRecords->insert( key, remappingRecord, dataServerSocket->getAddr() ) ) {
+		if ( header.remappedCount == 0 /* no need to insert */ || Coordinator::getInstance()->remappingRecords.insert( key, remappingRecord, dataServerSocket->getAddr() ) ) {
 			event.resDegradedSetLock(
 				event.socket, event.instanceId, event.requestId, true, // success
 				header.original, header.remapped, header.remappedCount, key
@@ -70,7 +70,7 @@ bool CoordinatorWorker::handleDegradedSetLockRequest( ClientEvent event, char *b
 
 			// ---------- HACK FOR YCSB which sends duplicated keys for SET ----------
 			LOCK_T *lock;
-			if ( CoordinatorWorker::remappingRecords->find( key, &remappingRecord, &lock ) ) {
+			if ( Coordinator::getInstance()->remappingRecords.find( key, &remappingRecord, &lock ) ) {
 				// Remapped
 				event.resDegradedSetLock(
 					event.socket, event.instanceId, event.requestId, true, // success

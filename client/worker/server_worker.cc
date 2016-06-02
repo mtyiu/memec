@@ -122,7 +122,7 @@ void ClientWorker::dispatch( ServerEvent event ) {
 			__ERROR__( "ClientWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 
 		if ( event.type == SERVER_EVENT_TYPE_SEND )
-			ClientWorker::packetPool->free( event.message.send.packet );
+			Client::getInstance()->packetPool.free( event.message.send.packet );
 	} else if ( event.type == SERVER_EVENT_TYPE_SYNC_METADATA ) {
 		std::vector<CoordinatorSocket *> &coordinators = Client::getInstance()->sockets.coordinators.values;
 		for ( int i = 0, len = coordinators.size(); i < len; i++ ) {

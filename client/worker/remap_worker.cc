@@ -159,13 +159,14 @@ bool ClientWorker::handleDegradedSetLockResponse( CoordinatorEvent event, bool s
 	}
 
 	// Send the SET requests to all parity servers //
+	PacketPool &packetPool = Client::getInstance()->packetPool;
 	Packet *packet = 0;
 	struct {
 		char *data;
 		size_t size;
 	} buffer;
 	for ( uint32_t i = 0; i < ClientWorker::parityChunkCount; i++ ) {
-		packet = ClientWorker::packetPool->malloc();
+		packet = packetPool.malloc();
 		packet->setReferenceCount( 1 );
 		packet->size = buffer.size = this->protocol.generateDegradedSetHeader(
 			PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_SERVER,
