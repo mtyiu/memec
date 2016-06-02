@@ -31,7 +31,6 @@ public:
 			case CS_RAID0:
 			case CS_RAID1:
 			case CS_RAID5:
-			case CS_EMBR:
 			case CS_RDP:
 			case CS_EVENODD:
 				return this->set( 0, n );
@@ -45,8 +44,6 @@ public:
 			case CS_RS:
 			case CS_CAUCHY:
 				return this->set( 0, k );
-			case CS_EMBR:
-				return this->set( 1, k );
 			default:
 				return;
 		}
@@ -65,7 +62,6 @@ public:
 	inline void setW( uint32_t w ) {
 		switch( this->scheme ) {
 			case CS_RS:
-			case CS_EMBR:
 			case CS_CAUCHY:
 				return this->set( 2, w );
 			default:
@@ -78,7 +74,6 @@ public:
 			case CS_RAID0:
 			case CS_RAID1:
 			case CS_RAID5:
-			case CS_EMBR:
 			case CS_RDP:
 			case CS_EVENODD:
 				return this->get( 0 );
@@ -97,8 +92,6 @@ public:
 			case CS_RS:
 			case CS_CAUCHY:
 				return this->get( 0 );
-			case CS_EMBR:
-				return this->get( 1 );
 			default:
 				return 0;
 		}
@@ -117,7 +110,6 @@ public:
 	inline uint32_t getW() {
 		switch( this->scheme ) {
 			case CS_RS:
-			case CS_EMBR:
 			case CS_CAUCHY:
 				return this->get( 2 );
 			default:
@@ -126,20 +118,10 @@ public:
 	}
 
 	inline uint32_t getRS_K() {
-		if ( this->scheme == CS_EMBR ) {
-			uint32_t n = this->getN();
-			uint32_t k = this->getK();
-			return ( k * ( n - 1 ) - k * ( k - 1 ) / 2 );
-		}
 		return 0;
 	}
 
 	inline uint32_t getRS_M() {
-		if ( this->scheme == CS_EMBR ) {
-			uint32_t n = this->getN();
-			uint32_t k = this->getK();
-			return ( n * ( n - 1 ) / 2 - k * ( 2 * n - k - 1 ) / 2 );
-		}
 		return 0;
 	}
 
@@ -153,8 +135,6 @@ public:
 				return this->getN() - 1;
 			case CS_RS:
 				return this->getK();
-			case CS_EMBR:
-				return this->getRS_K();
 			case CS_RDP:
 				return this->getN() - 2;
 			case CS_EVENODD:
@@ -176,8 +156,6 @@ public:
 				return 1;
 			case CS_RS:
 				return this->getM();
-			case CS_EMBR:
-				return this->getRS_M();
 			case CS_RDP:
 				return 2;
 			case CS_EVENODD:

@@ -120,8 +120,6 @@ bool GlobalConfig::set( const char *section, const char *name, const char *value
 			this->coding.scheme = CS_RAID5;
 		} else if ( match( value, "rs" ) ) {
 			this->coding.scheme = CS_RS;
-		} else if ( match( value, "embr" ) ) {
-			this->coding.scheme = CS_EMBR;
 		} else if ( match( value, "rdp" ) ) {
 			this->coding.scheme = CS_RDP;
 		} else if ( match( value, "evenodd" ) ) {
@@ -149,13 +147,6 @@ bool GlobalConfig::set( const char *section, const char *name, const char *value
 				this->coding.params.setK( atoi( value ) );
 			else if ( match( name, "m" ) )
 				this->coding.params.setM( atoi( value ) );
-			else if ( match( name, "w" ) )
-				this->coding.params.setW( atoi( value ) );
-		} else if ( this->coding.scheme == CS_EMBR && match( section, "embr" ) ) {
-			if ( match( name, "n" ) )
-				this->coding.params.setN( atoi( value ) );
-			else if ( match( name, "k" ) )
-				this->coding.params.setK( atoi( value ) );
 			else if ( match( name, "w" ) )
 				this->coding.params.setW( atoi( value ) );
 		} else if ( this->coding.scheme == CS_RDP && match( section, "rdp" ) ) {
@@ -259,19 +250,6 @@ bool GlobalConfig::validate() {
 					CFG_PARSE_ERROR( "GlobalConfig", "Reed-Solomon Code: Parameter `w' should be either 8, 16 or 32." );
 				if ( w <= 16 && k + m > ( ( uint32_t ) 1 << w ) )
 					CFG_PARSE_ERROR( "GlobalConfig", "Reed-Solomon Code: Parameters `k', `m', and `w' should satisfy k + m <= ( 1 << w ) when w <= 16." );
-			}
-			break;
-		case CS_EMBR:
-			{
-				uint32_t n = this->coding.params.getN(),
-				         k = this->coding.params.getK(),
-				         w = this->coding.params.getW();
-				if ( n < 1 )
-					CFG_PARSE_ERROR( "GlobalConfig", "Exact Minimum Bandwidth Regenerating (E-MBR) Code: Parameter `n' should be at least 1." );
-				if ( k < 1 )
-					CFG_PARSE_ERROR( "GlobalConfig", "Exact Minimum Bandwidth Regenerating (E-MBR) Code: Parameter `k' should be at least 1." );
-				if ( w < 1 )
-					CFG_PARSE_ERROR( "GlobalConfig", "Exact Minimum Bandwidth Regenerating (E-MBR) Code: Parameter `w' should be at least 1." );
 			}
 			break;
 		case CS_RDP:
@@ -379,9 +357,6 @@ void GlobalConfig::print( FILE *f ) {
 			break;
 		case CS_RS:
 			fprintf( f, "Reed-Solomon Code (k = %u, m = %u, w = %u)\n", this->coding.params.getK(), this->coding.params.getM(), this->coding.params.getW() );
-			break;
-		case CS_EMBR:
-			fprintf( f, "Exact Minimum Bandwidth Regenerating (E-MBR) Code (n = %u, k = %u, w = %u)\n", this->coding.params.getN(), this->coding.params.getK(), this->coding.params.getW() );
 			break;
 		case CS_RDP:
 			fprintf( f, "Row-Diagonal Parity Code (n = %u)\n", this->coding.params.getN() );

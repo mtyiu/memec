@@ -53,8 +53,6 @@ EXTERNAL_LIBS = \
 	$(MEMEC_SRC_ROOT)/common/ds/instance_id_generator.o \
 	$(MEMEC_SRC_ROOT)/common/ds/key_value.o \
 	$(MEMEC_SRC_ROOT)/common/ds/latency.o \
-	$(MEMEC_SRC_ROOT)/common/ds/load.o \
-	$(MEMEC_SRC_ROOT)/common/ds/sockaddr_in.o \
 	$(MEMEC_SRC_ROOT)/common/protocol/*.o \
 	$(MEMEC_SRC_ROOT)/common/remap/remap_msg_handler.o \
 	$(MEMEC_SRC_ROOT)/common/socket/*.o \

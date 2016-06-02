@@ -39,8 +39,6 @@ Coding *Coding::instantiate( CodingScheme scheme, CodingParams &params, uint32_t
 		}
 		case CS_RS:
 			return new RSCoding( params.getK(), params.getM(), chunkSize );
-		case CS_EMBR:
-			break;
 		case CS_RDP:
 			return new RDPCoding( params.getK(), chunkSize );
 		case CS_EVENODD:
@@ -68,8 +66,6 @@ void Coding::destroy( Coding *coding ) {
 			break;
 		case CS_RS:
 			delete static_cast<RSCoding *>( coding );
-			break;
-		case CS_EMBR:
 			break;
 		case CS_RDP:
 			delete static_cast<RDPCoding *>( coding );

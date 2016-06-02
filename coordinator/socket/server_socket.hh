@@ -5,7 +5,6 @@
 #include "../ds/map.hh"
 #include "../../common/ds/array_map.hh"
 #include "../../common/ds/key.hh"
-#include "../../common/ds/load.hh"
 #include "../../common/ds/metadata.hh"
 #include "../../common/lock/lock.hh"
 #include "../../common/socket/socket.hh"

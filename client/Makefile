@@ -33,7 +33,6 @@ EXTERNAL_LIB= \
 	$(MEMEC_SRC_ROOT)/common/ds/instance_id_generator.o \
 	$(MEMEC_SRC_ROOT)/common/ds/key_value.o \
 	$(MEMEC_SRC_ROOT)/common/ds/latency.o \
-	$(MEMEC_SRC_ROOT)/common/ds/load.o \
 	$(MEMEC_SRC_ROOT)/common/ds/sockaddr_in.o \
 	$(MEMEC_SRC_ROOT)/common/protocol/protocol.o \
 	$(MEMEC_SRC_ROOT)/common/protocol/ack_protocol.o \

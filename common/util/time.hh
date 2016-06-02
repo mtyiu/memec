@@ -7,26 +7,6 @@
 
 #define MILLION	( 1000 * 1000 )
 
-#ifdef __MACH__
-// Workaround for Mac
-#include <mach/clock.h>
-#include <mach/mach.h>
-
-#define CLOCK_REALTIME 0
-
-static inline int clock_gettime( int clk_id, struct timespec *tp ) {
-	clock_serv_t cclock;
-	mach_timespec_t mts;
-	host_get_clock_service( mach_host_self(), CALENDAR_CLOCK, &cclock );
-	clock_get_time( cclock, &mts );
-	mach_port_deallocate( mach_task_self(), cclock );
-	tp->tv_sec = mts.tv_sec;
-	tp->tv_nsec = mts.tv_nsec;
-	return 0;
-}
-
-#endif
-
 #define start_timer() ( { \
 	struct timespec ts; \
 	clock_gettime( CLOCK_REALTIME, &ts ); \
@@ -69,7 +49,6 @@ public:
 	void setInterval( uint32_t sec, uint32_t msec ) {
 		this->setInterval( sec, msec, &this->timer );
 	}
-
 
 	int start() {
 		return timer_settime( this->id, 0, &this->timer, NULL );

@@ -6,7 +6,6 @@
 #include "../../common/config/server_addr.hh"
 #include "../../common/config/config.hh"
 #include "../../common/config/global_config.hh"
-#include "../../common/worker/worker_type.hh"
 
 class CoordinatorConfig : public Config {
 public:
