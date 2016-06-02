@@ -14,10 +14,9 @@ enum ClientEventType {
 	CLIENT_EVENT_TYPE_PENDING
 };
 
-class ClientEvent : public Event {
+class ClientEvent : public Event<ClientSocket> {
 public:
 	ClientEventType type;
-	ClientSocket *socket;
 	union {
 		struct {
 			char *key;

@@ -63,7 +63,7 @@ private:
 	bool insertRepeatedEvents ( StateTransitEvent event, std::vector<struct sockaddr_in> *servers );
 
 public:
-	EventQueue<StateTransitEvent> *eventQueue;
+	BasicEventQueueT<StateTransitEvent> *eventQueue;
 	std::map<struct sockaddr_in, pthread_cond_t> ackSignal;
 	pthread_mutex_t ackSignalLock; // dummy lock for pthread_cond_wait()
 

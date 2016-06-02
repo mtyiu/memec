@@ -7,8 +7,7 @@ void ServerEvent::pending( ServerSocket *socket ) {
 
 void ServerEvent::resRegister( ServerSocket *socket, uint16_t instanceId, uint32_t requestId, bool success ) {
 	this->type = success ? SERVER_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS : SERVER_EVENT_TYPE_REGISTER_RESPONSE_FAILURE;
-	this->instanceId = instanceId;
-	this->requestId = requestId;
+	this->set( instanceId, requestId );
 	this->socket = socket;
 }
 
@@ -23,8 +22,7 @@ void ServerEvent::announceServerReconstructed(
 	ServerSocket *srcSocket, ServerSocket *dstSocket
 ) {
 	this->type = SERVER_EVENT_TYPE_ANNOUNCE_SERVER_RECONSTRUCTED;
-	this->instanceId = instanceId;
-	this->requestId = requestId;
+	this->set( instanceId, requestId );
 	this->message.reconstructed.lock = lock;
 	this->message.reconstructed.cond = cond;
 	this->message.reconstructed.sockets = sockets;
@@ -88,7 +86,6 @@ void ServerEvent::handleReconstructionRequest( ServerSocket *socket ) {
 
 void ServerEvent::ackCompletedReconstruction( ServerSocket *socket, uint16_t instanceId, uint32_t requestId, bool success ) {
 	this->type = success ? SERVER_EVENT_TYPE_ACK_RECONSTRUCTION_SUCCESS : SERVER_EVENT_TYPE_ACK_RECONSTRUCTION_FAILURE;
-	this->instanceId = instanceId;
-	this->requestId = requestId;
+	this->set( instanceId, requestId );
 	this->socket = socket;
 }

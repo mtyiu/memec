@@ -10,7 +10,6 @@ OBJS= \
 	ds/pending.o \
 	event/application_event.o \
 	event/coordinator_event.o \
-	event/client_event.o \
 	event/server_event.o \
 	protocol/protocol.o \
 	remap/basic_remap_scheme.o \

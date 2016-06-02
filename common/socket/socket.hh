@@ -37,11 +37,11 @@ protected:
 
 	bool listen();
 	bool connect();
+	int accept( struct sockaddr_in *addrPtr = 0, socklen_t *addrlenPtr = 0 );
+
 	ssize_t send( int sockfd, char *buf, size_t ulen, bool &connected );
 	ssize_t recv( int sockfd, char *buf, size_t ulen, bool &connected, bool wait = false );
-	ssize_t recvRem( int sockfd, char *buf, size_t ulen, char *prevBuf, size_t prevSize, bool &connected );
 	bool done( int sockfd );
-	int accept( struct sockaddr_in *addrPtr = 0, socklen_t *addrlenPtr = 0 );
 
 public:
 	inline int getSocket() {
@@ -62,6 +62,11 @@ public:
 	bool equal( Socket *s );
 	bool equal( uint32_t addr, uint16_t port );
 	virtual ~Socket();
+
+	virtual ssize_t send( char *buf, size_t ulen, bool &connected );
+	virtual ssize_t recv( char *buf, size_t ulen, bool &connected, bool wait = false );
+	ssize_t recvRem( char *buf, size_t ulen, char *prevBuf, size_t prevSize, bool &connected );
+	bool done();
 
 	// Utilities
 	static bool setNonBlocking( int fd );

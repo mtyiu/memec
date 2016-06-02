@@ -23,7 +23,7 @@ CoordinatorStateTransitHandler::CoordinatorStateTransitHandler() :
 	aliveServers.clear();
 
 	Coordinator* coordinator = Coordinator::getInstance();
-	this->eventQueue = new EventQueue<StateTransitEvent>( coordinator->config.global.states.queue );
+	this->eventQueue = new BasicEventQueueT<StateTransitEvent>( coordinator->config.global.states.queue );
 	this->workers = new CoordinatorStateTransitWorker[ coordinator->config.global.states.workers ];
 }
 

@@ -1,16 +1,14 @@
 #ifndef __APPLICATION_EVENT_MIXED_EVENT_HH__
 #define __APPLICATION_EVENT_MIXED_EVENT_HH__
 
-#include "application_event.hh"
 #include "client_event.hh"
 #include "../../common/event/event.hh"
 #include "../../common/event/event_type.hh"
 
-class MixedEvent : public Event {
+class MixedEvent {
 public:
 	EventType type;
 	union {
-		ApplicationEvent application;
 		ClientEvent client;
 	} event;
 
@@ -20,7 +18,6 @@ public:
 		this->event._FIELD_ = event; \
 	}
 
-	MIXED_EVENT_SET( ApplicationEvent, EVENT_TYPE_APPLICATION, application )
 	MIXED_EVENT_SET( ClientEvent, EVENT_TYPE_CLIENT, client )
 #undef MIXED_EVENT_SET
 };

@@ -10,7 +10,7 @@ enum CodingEventType {
 	CODING_EVENT_TYPE_DECODE
 };
 
-class CodingEvent : public Event {
+class CodingEvent : public Event<void> {
 public:
 	CodingEventType type;
 	union {

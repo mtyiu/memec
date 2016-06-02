@@ -7,7 +7,7 @@
 #include "../../common/event/event.hh"
 #include "../../common/event/event_type.hh"
 
-class MixedEvent : public Event {
+class MixedEvent {
 public:
 	EventType type;
 	union {

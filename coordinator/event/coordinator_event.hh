@@ -9,14 +9,12 @@
 
 enum CoordinatorEventType {
 	COORDINATOR_EVENT_TYPE_UNDEFINED,
-	COORDINATOR_EVENT_TYPE_SYNC_REMAPPED_PARITY,
-	COORDINATOR_EVENT_TYPE_PENDING
+	COORDINATOR_EVENT_TYPE_SYNC_REMAPPED_PARITY
 };
 
-class CoordinatorEvent : public Event {
+class CoordinatorEvent : public Event<void> {
 public:
 	CoordinatorEventType type;
-	CoordinatorSocket *socket;
 
 	struct {
 		struct {
@@ -27,7 +25,6 @@ public:
 		} parity;
 	} message;
 
-	void pending( CoordinatorSocket *socket );
 	void syncRemappedData( struct sockaddr_in target, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done );
 };
 

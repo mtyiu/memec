@@ -25,12 +25,9 @@ enum ServerEventType {
 	SERVER_EVENT_TYPE_ACK_RECONSTRUCTION_FAILURE
 };
 
-class ServerEvent : public Event {
+class ServerEvent : public Event<ServerSocket> {
 public:
 	ServerEventType type;
-	uint16_t instanceId;
-	uint32_t requestId;
-	ServerSocket *socket;
 	union {
 		struct {
 			ServerSocket *src;

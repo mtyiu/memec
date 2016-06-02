@@ -36,12 +36,9 @@ enum ClientEventType {
 	CLIENT_EVENT_TYPE_PENDING
 };
 
-class ClientEvent : public Event {
+class ClientEvent : public Event<ClientSocket> {
 public:
 	ClientEventType type;
-	uint16_t instanceId;
-	uint32_t requestId;
-	ClientSocket *socket;
 	union {
 		struct {
 			ArrayMap<struct sockaddr_in, Latency> *serverGetLatency;

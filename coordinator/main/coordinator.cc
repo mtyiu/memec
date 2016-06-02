@@ -344,9 +344,6 @@ bool Coordinator::init( char *path, OptionList &globalOptions, OptionList &coord
 	}
 	statsTimer.setInterval( sec, msec );
 
-	/* Pending Remapping Record */
-	LOCK_INIT( &this->pendingRemappingRecords.toSendLock );
-
 	/* Log */
 	LOCK_INIT( &this->log.lock );
 
