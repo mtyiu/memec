@@ -6,6 +6,7 @@
 #include "../../../common/coding/all_coding.hh"
 #include "../../../common/coding/coding_params.hh"
 #include "../../../common/util/time.hh"
+#include "common.hh"
 
 #define CHUNK_SIZE (8192)
 #define C_K (4)
@@ -13,59 +14,10 @@
 #define FAIL (0)
 #define FAIL2 (1)
 #define FAIL3 (3)
-#define ROUNDS (5000)
-
-Coding* handle;
-CodingParams params;
-CodingScheme scheme;
-
+#define ROUNDS (1000 * 1000)
 
 void usage( char* argv ) {
 	fprintf( stderr, "Usage: %s [raid5|cauchy|rdp|rs|evenodd]\n", argv);
-}
-
-void report( double duration ) {
-	printf( " %.4lf Kop/s\t", ROUNDS / 1000 / duration );
-	printf( " %.4lf MB/s\n", C_K * CHUNK_SIZE / 1024.0 / 1024.0 * ROUNDS / duration );
-}
-
-void printChunk( Chunk *chunk, uint32_t id = 0 ) {
-	char *prev = ChunkUtil::getData( chunk ), *data;
-	int prevPos = 0;
-	if (id != 0) {
-		printf(" chunk %d:\n", id);
-	}
-	data = ChunkUtil::getData( chunk );
-	for (uint32_t i = 1; i < CHUNK_SIZE; i++) {
-		if ( data[i] != *prev ) {
-			printf("[%x] from %d to %d\n", *prev, prevPos, i-1);
-			prevPos = i;
-			prev = &data[i];
-		}
-	}
-	printf("[%x] from %d to %d\n", *prev, prevPos, CHUNK_SIZE - 1);
-}
-
-bool parseInput( char* arg ) {
-	if ( strcmp ( arg, "raid5" ) == 0 ) {
-		params.setScheme ( CS_RAID5 );
-		scheme  = CS_RAID5;
-	} else if ( strcmp ( arg, "cauchy" ) == 0 ) {
-		params.setScheme ( CS_CAUCHY );
-		scheme  = CS_CAUCHY;
-	} else if ( strcmp ( arg, "rdp" ) == 0 ) {
-		params.setScheme ( CS_RDP );
-		scheme  = CS_RDP;
-	} else if ( strcmp ( arg, "rs" ) == 0 ) {
-		params.setScheme ( CS_RS );
-		scheme  = CS_RS;
-	} else if ( strcmp ( arg, "evenodd" ) == 0 ) {
-		params.setScheme ( CS_EVENODD );
-		scheme  = CS_EVENODD;
-	} else
-		return false;
-
-	return true;
 }
 
 int main( int argc, char **argv ) {
@@ -75,7 +27,7 @@ int main( int argc, char **argv ) {
 		return 0;
 	}
 
-	if ( parseInput( argv[ 1 ] ) == false ) {
+	if ( parseInput( &argv[ 1 ] ) == false ) {
 		usage( argv[ 0 ]);
 		return -1;
 	}
@@ -85,7 +37,7 @@ int main( int argc, char **argv ) {
 	Chunk ** chunks = ( Chunk ** ) malloc ( sizeof( Chunk* ) * ( C_K + C_M ) );
 	BitmaskArray bitmap ( 1, C_K + C_M );
 
-	TempChunkPool tempChunkPool;
+    initChunkSize( CHUNK_SIZE );
 
 	// set up the chunks
 	for ( uint32_t idx = 0 ; idx < C_K * 2 ; idx ++ ) {
@@ -145,7 +97,7 @@ int main( int argc, char **argv ) {
 		}
 	}
 	// report time per encoding operations
-	report( get_elapsed_time( st ) / m );
+	report( get_elapsed_time( st ) / m, ROUNDS, C_K );
 
 	memset ( readbuf , 0, CHUNK_SIZE * C_M );
 
@@ -160,7 +112,7 @@ int main( int argc, char **argv ) {
 			break;
 	}
 	if ( round == ROUNDS )
-		report( get_elapsed_time( st ) );
+		report( get_elapsed_time( st ), ROUNDS, C_K );
 	else
 		printf( ">> !! failed to decode\n" );
 
@@ -179,7 +131,7 @@ int main( int argc, char **argv ) {
 				break;
 		}
 		if ( round == ROUNDS )
-			report( get_elapsed_time( st ) );
+			report( get_elapsed_time( st ), ROUNDS, C_K );
 		else
 			printf( ">> !! failed to decode\n" );
 	}
@@ -199,7 +151,7 @@ int main( int argc, char **argv ) {
 			handle->decode ( chunks, &bitmap );
 		}
 		if ( round == ROUNDS )
-			report( get_elapsed_time( st ) );
+			report( get_elapsed_time( st ), ROUNDS, C_K );
 		else
 			printf( ">> !! failed to decode\n" );
 	}
