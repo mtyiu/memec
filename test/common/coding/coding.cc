@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstdlib>
 #include <vector>
 #include "../../../common/config/global_config.hh"
@@ -7,14 +8,14 @@
 #include "../../../common/coding/coding_params.hh"
 
 #define CHUNK_SIZE (4096)
-#define C_K (4)
-#define C_M (2)
-#define FAIL (0)
-#define FAIL2 (1)
+#define C_K (8)
+#define C_M (3)
+#define FAIL (1)
+#define FAIL2 (2)
 #define FAIL3 (3)
 // range of data modified within a chunk
-#define MODIFY_ST (1000)
-#define MODIFY_ED (2000)
+#define MODIFY_ST (3012)
+#define MODIFY_ED (4096)
 
 Coding* handle;
 CodingParams params;
@@ -66,6 +67,12 @@ bool parseInput( char* arg ) {
 	return true;
 }
 
+void zeroChunks( Chunk **chunks ) {
+	for ( int i = 0; i < C_K + C_M; i++ ) {
+		ChunkUtil::clear( chunks[ i ] );
+	}
+}
+
 int main( int argc, char **argv ) {
 
 	if ( argc < 2 ) {
@@ -78,9 +85,9 @@ int main( int argc, char **argv ) {
 		return -1;
 	}
 
-	char* buf = ( char* ) malloc ( sizeof( char ) * CHUNK_SIZE * ( C_K + C_M ) );
-	char* readbuf = ( char* ) malloc ( sizeof( char ) * CHUNK_SIZE * ( C_M ) );
-	Chunk ** chunks = ( Chunk ** ) malloc ( sizeof( Chunk* ) * ( C_K + C_M ) );
+	char *buf = ( char* ) malloc ( sizeof( char ) * CHUNK_SIZE * ( C_K + C_M ) );
+	Chunk **chunks = ( Chunk ** ) malloc ( sizeof( Chunk* ) * ( C_K + C_M ) );
+	Chunk **readbuf = ( Chunk ** ) malloc ( sizeof( Chunk* ) * ( C_K + C_M ) );
 	BitmaskArray bitmap ( 1, C_K + C_M );
 
 	TempChunkPool tempChunkPool;
@@ -88,18 +95,20 @@ int main( int argc, char **argv ) {
 
 	// set up the chunks
 	for ( uint32_t idx = 0 ; idx < C_K * 2 ; idx ++ ) {
-		memset( buf + idx * CHUNK_SIZE / 2, idx / 2 * 3 + 5 , CHUNK_SIZE / 2 );
 		if ( idx % 2 == 0 ) {
 			chunks[ idx / 2 ] = tempChunkPool.alloc();
-
+			readbuf[ idx / 2 ] = tempChunkPool.alloc();
 			// mark the chunk status
 			bitmap.set ( idx / 2 , 0 );
 		}
+		// write data into "buf" and "chunks"
+		memset( buf + idx * CHUNK_SIZE / 2, idx / 2 * 3 + 5 , CHUNK_SIZE / 2 );
+		ChunkUtil::copy( chunks[ idx / 2 ], ( idx % 2 ) * ( CHUNK_SIZE / 2 ), buf + idx * CHUNK_SIZE / 2, CHUNK_SIZE / 2 );
 	}
 
 	for ( uint32_t idx = C_K ; idx < C_K + C_M ; idx ++ ) {
 		chunks[ idx ] = tempChunkPool.alloc();
-
+		readbuf[ idx ] = tempChunkPool.alloc();
 		bitmap.set ( idx  , 0 );
 	}
 
@@ -107,12 +116,17 @@ int main( int argc, char **argv ) {
 	failed.push_back( FAIL );
 	failed.push_back( FAIL2 );
 	failed.push_back( FAIL3 );
+	std::sort( failed.begin(), failed.end() );
 
 	uint32_t m = 0;
 	switch ( scheme ) {
 		case CS_RAID5:
 			m = 1;
 			printf( ">> encode K: %d   M: 1   ", C_K );
+			break;
+		case CS_EVENODD:
+			m = 2;
+			printf( ">> encode K: %d   M: 2   ", C_K );
 			break;
 		case CS_RDP:
 			m = 2;
@@ -126,10 +140,6 @@ int main( int argc, char **argv ) {
 			m = C_M;
 			printf( ">> encode K: %d   M: %d   ", C_K, C_M );
 			break;
-		case CS_EVENODD:
-			m = 2;
-			printf( ">> encode K: %d   M: 2   ", C_K );
-			break;
 		default:
 			return -1;
 	}
@@ -142,136 +152,135 @@ int main( int argc, char **argv ) {
 	}
 	printf( " done.\n");
 
-#if defined(TEST_DELTA) && FAIL < C_K
+#if defined(TEST_DELTA) && FAIL < C_K && ( MODIFY_ED <= CHUNK_SIZE )
 	// always modifies the first data chunk to be lost to test if parities are correctly updated
 	// use read buf to hold the data delta and the parity delta
-	memset ( readbuf , 0, CHUNK_SIZE * C_M );
-	Chunk* shadowParity = tempChunkPool.alloc();
-	// zero block
-	char *zero = new char [ CHUNK_SIZE ];
-	memset( zero, 0, CHUNK_SIZE );
-	printf( "delta at chunk %u from %u to %u\n", failed[ 0 ], MODIFY_ST, MODIFY_ED );
-	// pointers to the start of data delta and modified data
-	char *odata = ChunkUtil::getData( chunks[ failed[ 0 ] ] ) + MODIFY_ST;
-	char *ndata = readbuf + MODIFY_ST;
-	uint32_t len = MODIFY_ED - MODIFY_ST;
-	// get data delta
-	memcpy( ndata , odata, len );
-	memset( odata, 1, len );
-	Coding::bitwiseXOR( ndata, odata, ndata, len );
-	// zero unmodified data chunks
-	for ( uint32_t idx = 0 ; idx < C_K ; idx ++ ) {
-		if ( idx == failed[ 0 ] )
-			ChunkUtil::copy( chunks[ failed[ 0 ] ], 0, readbuf, CHUNK_SIZE );
-		else
-			ChunkUtil::clear( chunks[ idx ] );
+	
+	zeroChunks( readbuf );
+	for ( uint32_t i = 0; i < m; i++ ) {
+		// zero block
+		printf( "Update data at chunk %u from %u to %u\n", failed[ i ], MODIFY_ST, MODIFY_ED );
+		// get pointers to where data is going to be updated 
+		char *oldData = ChunkUtil::getData( chunks[ failed[ i ] ] ) + MODIFY_ST;
+		char *newData = ChunkUtil::getData( readbuf[ failed[ i ] ] ) + MODIFY_ST;
+		// get the delta len
+		uint32_t len = MODIFY_ED - MODIFY_ST;
+		// copy the old data out
+		memcpy( newData , oldData, len );
+		// update
+		memset( oldData, i+1, len );
+		// compute data delta
+		Coding::bitwiseXOR( newData, oldData, newData, len );
 	}
-	// get parity delta
+	// compute and apply parity delta
 	for ( uint32_t idx = 0 ; idx < m ; idx ++ ) {
-		memset(ChunkUtil::getData( shadowParity ), 0, CHUNK_SIZE);
-		handle->encode( chunks, shadowParity, idx + 1, failed[ 0 ] * CHUNK_SIZE + MODIFY_ST, failed[ 0 ] * CHUNK_SIZE + MODIFY_ED );
-		Coding::bitwiseXOR( chunks[ C_K + idx ], shadowParity, chunks[ C_K + idx ], CHUNK_SIZE );
+		handle->encode( readbuf, readbuf[ C_K + idx ], idx + 1, failed[ 0 ] * CHUNK_SIZE + MODIFY_ST, failed[ m - 1 ] * CHUNK_SIZE + MODIFY_ED );
+		Coding::bitwiseXOR( chunks[ C_K + idx ], readbuf[ C_K + idx ], chunks[ C_K + idx ], CHUNK_SIZE );
 	}
-	// restore the data chunks
-	for ( uint32_t idx = 0 ; idx < C_K ; idx ++ ) {
-		ChunkUtil::copy( chunks[ idx ], 0, buf + idx * CHUNK_SIZE, CHUNK_SIZE );
-	}
-	delete shadowParity;
-	delete [] zero;
+	zeroChunks( readbuf );
 #endif
 
-	memset ( readbuf , 0, CHUNK_SIZE * C_M );
-
 	printf( ">> fail disk %d ... ", failed[ 0 ] );
-	ChunkUtil::copy( chunks[ failed[ 0 ] ], 0, readbuf, CHUNK_SIZE );
+	for ( uint32_t idx = 0; idx < C_K + m; idx ++ ) {
+		if ( idx == failed[ 0 ] )
+			continue;
+		ChunkUtil::copy( readbuf[ idx ], 0, ChunkUtil::getData( chunks[ idx ] ), CHUNK_SIZE );
+	}
 	bitmap.unset ( failed[ 0 ] , 0 );
 
-	handle->decode ( chunks, &bitmap );
+	// do recovery
+	handle->decode ( readbuf, &bitmap );
 
-	if ( memcmp ( readbuf, buf + FAIL * CHUNK_SIZE, CHUNK_SIZE ) == 0 ) {
-		fprintf( stdout, "Data recovered\n" );
+	// check results
+	char *recoveredChunk =  ChunkUtil::getData( readbuf[ failed[ 0 ] ] );
+	char *oldChunk =  ChunkUtil::getData( chunks[ failed[ 0 ] ] );
+	if ( memcmp ( oldChunk , recoveredChunk, CHUNK_SIZE ) == 0 ) {
+		fprintf( stdout, "Data recovered" );
 	} else {
-		fprintf( stdout, "FAILED to recover data!! O: [%x] R: [%x]\n", *(buf + FAIL * CHUNK_SIZE), *(readbuf) );
+		fprintf( stdout, "FAILED to recover data!!\n correct:\n" );
 		printChunk( chunks[ failed[ 0 ] ], failed[ 0 ] );
-		printChunk( buf + failed[ 0 ] * CHUNK_SIZE , failed[ 0 ] );
+		fprintf( stdout, " vs recovered:\n" );
+		printChunk( readbuf[ failed[ 0 ] ] , failed[ 0 ] );
 		return -1;
 	}
+	fprintf( stdout, "\n" );
 
 	// double failure
 	if ( scheme != CS_RAID5 ) {
-		memset ( readbuf , 0, CHUNK_SIZE * C_M );
+		zeroChunks( readbuf );
 		printf( ">> fail disk %d, ", failed[ 0 ]);
 		bitmap.unset ( failed[ 0 ], 0 );
 		printf( "%d ... ", failed[ 1 ]);
 		bitmap.unset ( failed[ 1 ], 0 );
-		ChunkUtil::copy( chunks[ failed[ 1 ] ], 0, readbuf + CHUNK_SIZE, CHUNK_SIZE );
-
-		handle->decode ( chunks, &bitmap );
-
-		if ( memcmp ( readbuf, buf + failed[ 0 ] * CHUNK_SIZE, CHUNK_SIZE ) == 0 ) {
-			fprintf( stdout, "Data %d recovered ... ", failed[ 0 ] );
-		} else {
-			fprintf( stdout, "\nFAILED to recover data!! [%x] \n", *(buf + failed[ 0 ] * CHUNK_SIZE));
-			printChunk( chunks[ failed[ 0 ] ], failed[ 0 ] );
-			printChunk( buf + failed[ 1 ] * CHUNK_SIZE , failed[ 1 ] );
-			return -1;
+		for ( uint32_t idx = 0; idx < C_K + m; idx ++ ) {
+			if ( idx == failed[ 0 ] || idx == failed[ 1 ] )
+				continue;
+			ChunkUtil::copy( readbuf[ idx ], 0, ChunkUtil::getData( chunks[ idx ] ), CHUNK_SIZE );
 		}
-		if ( memcmp ( readbuf + CHUNK_SIZE , buf + ( failed[ 1 ] ) * CHUNK_SIZE , CHUNK_SIZE ) == 0 ) {
-			fprintf( stdout, "Data %d recovered\n", failed[ 1 ] );
-		} else {
-			fprintf( stdout, "FAILED to recover data!! [%x] \n", *(buf + failed[ 1 ] * CHUNK_SIZE));
-			printChunk( chunks[ failed[ 1 ] ], failed[ 1 ] );
-			printChunk( buf + failed[ 1 ] * CHUNK_SIZE , failed[ 1 ] );
-			return -1;
+
+		// do recovery
+		handle->decode ( readbuf, &bitmap );
+
+		// check results
+		for ( int i = 0; i < 2; i++ ) {
+			recoveredChunk =  ChunkUtil::getData( readbuf[ failed[ i ] ] );
+			oldChunk =  ChunkUtil::getData( chunks[ failed[ i ] ] );
+			if ( memcmp ( recoveredChunk, oldChunk, CHUNK_SIZE ) == 0 ) {
+				fprintf( stdout, ".. Data %d recovered ", failed[ i ] );
+			} else {
+				fprintf( stdout, "FAILED to recover data!!\n correct:\n" );
+				printChunk( chunks[ failed[ i ] ], failed[ i ] );
+				fprintf( stdout, " vs recovered:\n" );
+				printChunk( readbuf[ failed[ i ] ] , failed[ i ] );
+				return -1;
+			}
 		}
+		fprintf( stdout, "\n" );
 	}
 
 	// triple failure
-	if ( scheme != CS_RAID5 && scheme != CS_RDP && scheme != CS_EVENODD && C_M > 2) {
-		memset ( readbuf , 0, CHUNK_SIZE * C_M );
+	if ( scheme != CS_RAID5 && scheme != CS_RDP && scheme != CS_EVENODD && m > 2 ) {
+		zeroChunks( readbuf );
 		printf( ">> fail disk %d, ", failed[ 0 ]);
 		bitmap.unset ( failed[ 0 ], 0 );
 		printf( "%d, ", failed[ 1 ]);
 		bitmap.unset ( failed[ 1 ], 0 );
 		printf( "%d ... ", failed[ 2 ]);
 		bitmap.unset ( failed[ 2 ], 0 );
-		ChunkUtil::copy( chunks[ failed[ 2 ] ], 0, readbuf + CHUNK_SIZE * 2, CHUNK_SIZE );
+		for ( uint32_t idx = 0; idx < C_K + m; idx ++ ) {
+			if ( idx == failed[ 0 ] || idx == failed[ 1 ] || idx == failed[ 2 ] )
+				continue;
+			ChunkUtil::copy( readbuf[ idx ], 0, ChunkUtil::getData( chunks[ idx ] ), CHUNK_SIZE );
+		}
 
-		handle->decode ( chunks, &bitmap );
+		// do recovery
+		handle->decode ( readbuf, &bitmap );
 
-		if ( memcmp ( readbuf, buf + failed[ 0 ] * CHUNK_SIZE, CHUNK_SIZE ) == 0 ) {
-			fprintf( stdout, "Data %d recovered ... ", failed[ 0 ] );
-		} else {
-			fprintf( stdout, "\nFAILED to recover data!! [%x] \n", *(buf + failed[ 0 ] * CHUNK_SIZE));
-			printChunk( chunks[ failed[ 0 ] ], failed[ 0 ] );
-			printChunk( buf + failed[ 0 ] * CHUNK_SIZE , failed[ 0 ] );
-			return -1;
+		// check results
+		for ( int i = 0; i < 3; i++ ) {
+			recoveredChunk =  ChunkUtil::getData( readbuf[ failed[ i ] ] );
+			oldChunk =  ChunkUtil::getData( chunks[ failed[ i ] ] );
+			if ( memcmp ( recoveredChunk, oldChunk, CHUNK_SIZE ) == 0 ) {
+				fprintf( stdout, ".. Data %d recovered ", failed[ i ] );
+			} else {
+				fprintf( stdout, "FAILED to recover data!!\n correct:\n" );
+				printChunk( chunks[ failed[ i ] ], failed[ i ] );
+				fprintf( stdout, " vs recovered:\n" );
+				printChunk( readbuf[ failed[ i ] ] , failed[ i ] );
+				return -1;
+			}
 		}
-		if ( memcmp ( readbuf + CHUNK_SIZE , buf + ( failed[ 1 ] ) * CHUNK_SIZE , CHUNK_SIZE ) == 0 ) {
-			fprintf( stdout, "Data %d recovered ... ", failed[ 1 ] );
-		} else {
-			fprintf( stdout, "FAILED to recover data!! [%x] \n", *(buf + failed[ 1 ] * CHUNK_SIZE));
-			printChunk( chunks[ failed[ 1 ] ], failed[ 1 ] );
-			printChunk( buf + failed[ 1 ] * CHUNK_SIZE , failed[ 1 ] );
-			return -1;
-		}
-		if ( memcmp ( readbuf + CHUNK_SIZE * 2, buf + ( failed[ 2 ] ) * CHUNK_SIZE , CHUNK_SIZE ) == 0 ) {
-			fprintf( stdout, "Data %d recovered\n", failed[ 2 ] );
-		} else {
-			fprintf( stdout, "FAILED to recover data!! [%x] \n", *(buf + failed[ 2 ] * CHUNK_SIZE));
-			printChunk( chunks[ failed[ 2 ] ], failed[ 2 ] );
-			printChunk( buf + failed[ 1 ] * CHUNK_SIZE , failed[ 1 ] );
-			return -1;
-		}
+		fprintf( stdout, "\n" );
 	}
 
 	// clean up
 	free( buf );
-	free( readbuf );
-	for ( uint32_t idx = 0 ; idx < C_M + C_K ; idx ++ ) {
-		tempChunkPool.free(chunks[ idx ]);
+	for ( uint32_t idx = 0 ; idx < m + C_K ; idx ++ ) {
+		tempChunkPool.free( chunks[ idx ]);
+		tempChunkPool.free( readbuf[ idx ] );
 	}
 	free( chunks );
+	free( readbuf );
 
 	return 0;
 }

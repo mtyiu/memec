@@ -9,6 +9,8 @@ CodingScheme scheme;
 
 uint32_t batchSize;
 uint32_t updateSize;
+uint32_t workerNum;
+uint32_t rounds;
 
 TempChunkPool tempChunkPool;
 
@@ -16,8 +18,7 @@ void report( double duration, uint32_t rounds, uint32_t k, uint32_t writeSize = 
     uint32_t chunkSize = ChunkUtil::chunkSize;
     if ( writeSize == 0 )
         writeSize = k * chunkSize;
-	printf( " %.4lf Kop/s\t", rounds / 1000 / duration );
-	printf( " %.4lf MB/s\n", writeSize / 1024.0 / 1024.0 * rounds / duration );
+	printf( " %.4lf Kop/s\t %.4lf MB/s in %.4lf s\n", rounds / 1000 / duration, writeSize / 1024.0 / 1024.0 * rounds / duration, duration );
 }
 
 void printChunk( Chunk *chunk, uint32_t id = 0 ) {
@@ -72,6 +73,12 @@ bool parseInput( char **arg, int argc = 1 ) {
                     continue;
                 batchSize = atoi( arg[ i ] ) / updateSize;
                 break;
+			case 3:
+				workerNum = atoi( arg[ i ] );
+				break;
+			case 4:
+				rounds = atoi( arg[ i ] );
+				break;
             default:
                 printf( "Too many arguments.\n" );
                 return false;

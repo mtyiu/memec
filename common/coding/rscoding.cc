@@ -78,7 +78,14 @@ void RSCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t index, u
 
 	// encode
 #ifdef USE_ISAL
-	ec_encode_data( chunkSize, k, m, this->_gftbl, data, code );
+	if ( startOff == 0 && endOff == 0 ) {
+		ec_encode_data( chunkSize, k, m, this->_gftbl, data, code );
+	} else {
+		for ( uint32_t i = startOff / chunkSize; i <= ( endOff - 1 ) / chunkSize; i++ ) {
+			// note: the update is in-place "xor"ed on parityChunk
+			ec_encode_data_update( chunkSize, k, m, i, this->_gftbl, data[ i ], code );
+		}
+	}
 #else
 	jerasure_matrix_encode( k, m, w, matrix, data, code, chunkSize );
 #endif

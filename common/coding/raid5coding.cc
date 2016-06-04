@@ -18,7 +18,14 @@ void RAID5Coding::encode( Chunk **data, Chunk *parity, uint32_t index, uint32_t 
 		dataBuf[ i ] = ( dataType * ) ChunkUtil::getData( data[ i ] );
 	}
 	codeBuf[ 0 ] = ( dataType * ) ChunkUtil::getData( parity );
-	ec_encode_data( ChunkUtil::chunkSize, this->n - 1, 1, this->_gftbl, dataBuf, codeBuf );
+	if ( startOff == 0 && endOff == 0 ) {
+		ec_encode_data( ChunkUtil::chunkSize, this->n - 1, 1, this->_gftbl, dataBuf, codeBuf );
+	} else {
+		for ( uint32_t i = startOff / ChunkUtil::chunkSize; i <= endOff / ChunkUtil::chunkSize; i++ ) {
+			// note: the update is in-place "xor"ed on parityChunk
+			ec_encode_data_update( ChunkUtil::chunkSize, this->n - 1, 1, i, this->_gftbl, dataBuf[ i ], codeBuf );
+		}
+	}
 #else
 	for ( uint32_t i = 0; i < this->n - 1; i++ ) {
 		this->bitwiseXOR(

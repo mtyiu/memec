@@ -17,7 +17,8 @@ TARGETS= \
 	checker \
 	coding \
 	basic_op_performance \
-	performance
+	performance \
+	batch_performance
 
 OBJS= \
 	$(wildcard $(MEMEC_SRC_ROOT)/common/config/*.o) \
