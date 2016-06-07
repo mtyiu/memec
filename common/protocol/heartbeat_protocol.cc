@@ -106,6 +106,7 @@ bool Protocol::parseMetadataHeader( struct MetadataHeader &header, size_t &bytes
 	header.listId   = ProtocolUtil::read4Bytes( ptr );
 	header.stripeId = ProtocolUtil::read4Bytes( ptr );
 	header.chunkId  = ProtocolUtil::read4Bytes( ptr );
+	bytes = PROTO_METADATA_SIZE;
 	return true;
 }
 
@@ -123,5 +124,6 @@ bool Protocol::parseKeyOpMetadataHeader( struct KeyOpMetadataHeader &header, siz
 	header.chunkId   = ProtocolUtil::read4Bytes( ptr );
 	header.timestamp = ProtocolUtil::read4Bytes( ptr );
 	header.key = ptr;
+	bytes = PROTO_KEY_OP_METADATA_SIZE + ( size_t ) header.keySize;
 	return ( size - offset >= PROTO_KEY_OP_METADATA_SIZE + ( size_t ) header.keySize );
 }
