@@ -649,10 +649,8 @@ void Pending::print( PendingType type, FILE *f, bool needsLock, bool needsUnlock
 			Key key = keyValue.key();
 			fprintf(
 				f, "%lu. ID: (%u, %u), parent ID: (%u, %u); Key: %.*s (size = %u); Timestamp: %u; source/destination: ",
-				i, it->first.instanceId, it->first.requestId,
-				it->first.parentInstanceId, it->first.parentRequestId,
-				key.size, key.data, key.size,
-				it->first.timestamp
+				i, pid.instanceId, pid.requestId, pid.parentInstanceId, pid.parentRequestId,
+				key.size, key.data, key.size, pid.timestamp
 			);
 			if ( pid.ptr )
 				( ( Socket * ) pid.ptr )->printAddress( f );
@@ -673,8 +671,7 @@ void Pending::print( PendingType type, FILE *f, bool needsLock, bool needsUnlock
 			const Key &key = it->second;
 			fprintf(
 				f, "%lu. ID: (%u, %u), parent ID: (%u, %u); Key: %.*s (size = %u); source/destination: ",
-				i, it->first.instanceId, it->first.requestId,
-				it->first.parentInstanceId, it->first.parentRequestId,
+				i, pid.instanceId, pid.requestId, pid.parentInstanceId, pid.parentRequestId,
 				key.size, key.data, key.size
 			);
 			if ( pid.ptr )
@@ -696,8 +693,7 @@ void Pending::print( PendingType type, FILE *f, bool needsLock, bool needsUnlock
 			const KeyValueUpdate &keyValueUpdate = it->second;
 			fprintf(
 				f, "%lu. ID: (%u, %u), parent ID: (%u, %u); Key: %.*s (size = %u, offset = %u, length = %u); source/destination: ",
-				i, it->first.instanceId, it->first.requestId,
-				it->first.parentInstanceId, it->first.parentRequestId,
+				i, pid.instanceId, pid.requestId, pid.parentInstanceId, pid.parentRequestId,
 				keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
 				keyValueUpdate.offset, keyValueUpdate.length
 			);

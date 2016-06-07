@@ -666,79 +666,192 @@ bool Pending::findChunkRequest( PendingType type, uint16_t instanceId, uint32_t 
 }
 
 uint32_t Pending::count( PendingType type, uint16_t instanceId, uint32_t requestId, bool needsLock, bool needsUnlock ) {
+#define PENDING_MAP_COUNT() \
+	if ( ! this->get( type, lock, map ) ) return 0; \
+	if ( needsLock ) LOCK( lock ); \
+	ret = map->count( pid ); \
+	if ( needsUnlock ) UNLOCK( lock )
+
 	PendingIdentifier pid( instanceId, 0, requestId, 0, 0 );
 	LOCK_T *lock;
 	uint32_t ret = 0;
+
 	if ( type == PT_SERVER_PEER_DEGRADED_OPS ) {
 		std::unordered_multimap<PendingIdentifier, DegradedOp> *map;
-		std::unordered_multimap<PendingIdentifier, DegradedOp>::iterator it;
-
-		if ( ! this->get( type, lock, map ) ) return 0;
-
-		if ( needsLock ) LOCK( lock );
-		ret = map->count( pid );
-		// it = map->count( pid );
-		// for ( ret = 0; it != map->end() && it->first.instanceId == instanceId && it->first.requestId == requestId; ret++, it++ );
-		if ( needsUnlock ) UNLOCK( lock );
+		PENDING_MAP_COUNT();
 	} else if ( type == PT_SERVER_PEER_SET ) {
 		std::unordered_multimap<PendingIdentifier, KeyValue> *map;
-		std::unordered_multimap<PendingIdentifier, KeyValue>::iterator it;
-
-		if ( ! this->get( type, lock, map ) ) return 0;
-
-		if ( needsLock ) LOCK( lock );
-		ret = map->count( pid );
-		// it = map->count( pid );
-		// for ( ret = 0; it != map->end() && it->first.instanceId == instanceId && it->first.requestId == requestId; ret++, it++ );
-		if ( needsUnlock ) UNLOCK( lock );
+		PENDING_MAP_COUNT();
 	} else if ( type == PT_SERVER_PEER_UPDATE ) {
 		std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *map;
-		std::unordered_multimap<PendingIdentifier, KeyValueUpdate>::iterator it;
-
-		if ( ! this->get( type, lock, map ) ) return 0;
-
-		if ( needsLock ) LOCK( lock );
-		ret = map->count( pid );
-		// it = map->count( pid );
-		// for ( ret = 0; it != map->end() && it->first.instanceId == instanceId && it->first.requestId == requestId; ret++, it++ );
-		if ( needsUnlock ) UNLOCK( lock );
+		PENDING_MAP_COUNT();
 	} else if ( type == PT_SERVER_PEER_DEL ) {
 		std::unordered_multimap<PendingIdentifier, Key> *map;
-		std::unordered_multimap<PendingIdentifier, Key>::iterator it;
-
-		if ( ! this->get( type, lock, map ) ) return 0;
-
-		if ( needsLock ) LOCK( lock );
-		ret = map->count( pid );
-		// it = map->count( pid );
-		// for ( ret = 0; it != map->end() && it->first.instanceId == instanceId && it->first.requestId == requestId; ret++, it++ );
-		if ( needsUnlock ) UNLOCK( lock );
+		PENDING_MAP_COUNT();
 	} else if ( type == PT_SERVER_PEER_GET_CHUNK || type == PT_SERVER_PEER_SET_CHUNK ) {
 		std::unordered_multimap<PendingIdentifier, ChunkRequest> *map;
-		std::unordered_multimap<PendingIdentifier, ChunkRequest>::iterator it;
-
-		if ( ! this->get( type, lock, map ) ) return 0;
-
-		if ( needsLock ) LOCK( lock );
-		ret = map->count( pid );
-		// it = map->count( pid );
-		// for ( ret = 0; it != map->end() && it->first.instanceId == instanceId && it->first.requestId == requestId; ret++, it++ );
-		if ( needsUnlock ) UNLOCK( lock );
+		PENDING_MAP_COUNT();
 	} else if ( type == PT_SERVER_PEER_UPDATE_CHUNK || type == PT_SERVER_PEER_DEL_CHUNK ) {
 		std::unordered_multimap<PendingIdentifier, ChunkUpdate> *map;
-		std::unordered_multimap<PendingIdentifier, ChunkUpdate>::iterator it;
-
-		if ( ! this->get( type, lock, map ) ) return 0;
-
-		if ( needsLock ) LOCK( lock );
-		ret = map->count( pid );
-		// it = map->lower_bound( pid );
-		// for ( ret = 0; it != map->end() && it->first.instanceId == instanceId && it->first.requestId == requestId; ret++, it++ );
-		if ( needsUnlock ) UNLOCK( lock );
+		PENDING_MAP_COUNT();
 	} else {
 		__ERROR__( "Pending", "count", "The count function is not implemented for this type." );
 		return 0;
 	}
-
 	return ret;
+}
+
+void Pending::print( PendingType type, FILE *f, bool needsLock, bool needsUnlock ) {
+	LOCK_T *lock;
+	size_t i;
+
+	switch( type ) {
+		case PT_CLIENT_GET:
+			fprintf( f, "[GET] " );
+			break;
+		case PT_CLIENT_UPDATE:
+		case PT_SERVER_PEER_UPDATE:
+			fprintf( f, "[UPDATE] " );
+			break;
+		case PT_CLIENT_DEL:
+		case PT_SERVER_PEER_DEL:
+			fprintf( f, "[DELETE] " );
+			break;
+		case PT_SERVER_PEER_UPDATE_CHUNK:
+			fprintf( f, "[UPDATE_CHUNK] " );
+			break;
+		case PT_SERVER_PEER_DEL_CHUNK:
+			fprintf( f, "[DELETE_CHUNK] " );
+			break;
+		case PT_SERVER_PEER_GET_CHUNK:
+			fprintf( f, "[GET_CHUNK] " );
+			break;
+		case PT_SERVER_PEER_SET_CHUNK:
+			fprintf( f, "[SET_CHUNK] " );
+			break;
+		case PT_SERVER_PEER_PARITY:
+			fprintf( f, "[REMAP_DATA] " );
+			break;
+		default:
+			break;
+	}
+	fprintf( f, "Pending: " );
+
+	if ( type == PT_CLIENT_GET || type == PT_CLIENT_DEL || type == PT_SERVER_PEER_DEL ) {
+		std::unordered_multimap<PendingIdentifier, Key> *map;
+		std::unordered_multimap<PendingIdentifier, Key>::iterator it;
+		this->get( type, lock, map );
+		fprintf( f, "%lu\n", map->size() );
+
+		if ( needsLock ) LOCK( lock );
+		for ( i = 1, it = map->begin(); it != map->end(); it++, i++ ) {
+			const PendingIdentifier &pid = it->first;
+			const Key &key = it->second;
+			fprintf(
+				f, "%lu. ID: (%u, %u), parent ID: (%u, %u); Key: %.*s (size = %u); source/destination: ",
+				i, pid.instanceId, pid.requestId, pid.parentInstanceId, pid.parentRequestId,
+				key.size, key.data, key.size
+			);
+			if ( pid.ptr )
+				( ( Socket * ) pid.ptr )->printAddress( f );
+			else
+				fprintf( f, "[N/A]\n" );
+			fprintf( f, "\n" );
+		}
+		if ( needsUnlock ) UNLOCK( lock );
+	} else if ( type == PT_CLIENT_UPDATE || type == PT_SERVER_PEER_UPDATE ) {
+		std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *map;
+		std::unordered_multimap<PendingIdentifier, KeyValueUpdate>::iterator it;
+		this->get( type, lock, map );
+		fprintf( f, "%lu\n", map->size() );
+
+		if ( needsLock ) LOCK( lock );
+		for ( i = 1, it = map->begin(); it != map->end(); it++, i++ ) {
+			const PendingIdentifier &pid = it->first;
+			const KeyValueUpdate &keyValueUpdate = it->second;
+			fprintf(
+				f, "%lu. ID: (%u, %u), parent ID: (%u, %u); Key: %.*s (size = %u, offset = %u, length = %u); source/destination: ",
+				i, pid.instanceId, pid.requestId, pid.parentInstanceId, pid.parentRequestId,
+				keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
+				keyValueUpdate.offset, keyValueUpdate.length
+			);
+			if ( pid.ptr )
+				( ( Socket * ) pid.ptr )->printAddress( f );
+			else
+				fprintf( f, "(nil)\n" );
+			fprintf( f, "\n" );
+		}
+		if ( needsUnlock ) UNLOCK( lock );
+	} else if ( type == PT_SERVER_PEER_UPDATE_CHUNK || type == PT_SERVER_PEER_DEL_CHUNK ) {
+		std::unordered_multimap<PendingIdentifier, ChunkUpdate> *map;
+		std::unordered_multimap<PendingIdentifier, ChunkUpdate>::iterator it;
+		this->get( type, lock, map );
+		fprintf( f, "%lu\n", map->size() );
+
+		if ( needsLock ) LOCK( lock );
+		for ( i = 1, it = map->begin(); it != map->end(); it++, i++ ) {
+			const PendingIdentifier &pid = it->first;
+			const ChunkUpdate &chunkUpdate = it->second;
+			fprintf(
+				f, "%lu. ID: (%u, %u), parent ID: (%u, %u); List ID: %u, stripe ID: %u, chunk ID: %u; Key: %.*s (key size = %u, offset = %u, length = %u, value update offset = %u); source/destination: ",
+				i, pid.instanceId, pid.requestId, pid.parentInstanceId, pid.parentRequestId,
+				chunkUpdate.listId, chunkUpdate.stripeId, chunkUpdate.chunkId,
+				chunkUpdate.keySize, chunkUpdate.key, chunkUpdate.keySize,
+				chunkUpdate.offset, chunkUpdate.length, chunkUpdate.valueUpdateOffset
+			);
+			if ( pid.ptr )
+				( ( Socket * ) chunkUpdate.ptr )->printAddress( f );
+			else
+				fprintf( f, "(nil)\n" );
+			fprintf( f, "\n" );
+		}
+		if ( needsUnlock ) UNLOCK( lock );
+	} else if ( type == PT_SERVER_PEER_GET_CHUNK || type == PT_SERVER_PEER_SET_CHUNK ) {
+		std::unordered_multimap<PendingIdentifier, ChunkRequest> *map;
+		std::unordered_multimap<PendingIdentifier, ChunkRequest>::iterator it;
+		this->get( type, lock, map );
+		fprintf( f, "%lu\n", map->size() );
+
+		if ( needsLock ) LOCK( lock );
+		for ( i = 1, it = map->begin(); it != map->end(); it++, i++ ) {
+			const PendingIdentifier &pid = it->first;
+			const ChunkRequest &chunkRequest = it->second;
+			fprintf(
+				f, "%lu. ID: (%u, %u); List ID: %u, stripe ID: %u, chunk ID: %u; chunk: %p; target: ",
+				i, pid.instanceId, pid.requestId,
+				chunkRequest.listId, chunkRequest.stripeId, chunkRequest.chunkId, chunkRequest.chunk
+			);
+			if ( chunkRequest.socket )
+				chunkRequest.socket->printAddress( f );
+			else
+				fprintf( f, "(nil)\n" );
+			fprintf( f, "\n" );
+		}
+		if ( needsUnlock ) UNLOCK( lock );
+	} else if ( type == PT_SERVER_PEER_PARITY ) {
+		std::unordered_map<struct sockaddr_in, std::set<PendingData>*> *map;
+		std::unordered_map<struct sockaddr_in, std::set<PendingData>*>::iterator it;
+		std::set<PendingData>::iterator recordIt;
+		this->get( type, lock, map );
+		fprintf( f, "%lu\n", map->size() );
+
+		if ( needsLock ) LOCK( lock );
+		for ( i = 1, it = map->begin(); it != map->end(); it++, i++ ) {
+			const struct sockaddr_in &server = it->first;
+			const std::set<PendingData> *records = it->second;
+			char addrstr[ INET_ADDRSTRLEN ];
+			Socket::ntoh_ip( server.sin_addr.s_addr, addrstr, INET_ADDRSTRLEN );
+			fprintf( f, "\tServer %s:%hu\n", addrstr, ntohs( server.sin_port ) );
+
+			for ( recordIt = records->begin(); recordIt != records->end(); recordIt++ ) {
+				const PendingData &record = *recordIt;
+				fprintf(
+					f, "\t\t List ID: %u Chunk Id: %u Key: %.*s\n",
+					record.listId, record.chunkId,
+					record.key.size, record.key.data
+				);
+			}
+		}
+		if ( needsUnlock ) UNLOCK( lock );
+	}
 }
