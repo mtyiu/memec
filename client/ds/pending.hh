@@ -387,8 +387,9 @@ public:
 		RemapList *remapListPtr
 	);
 
-	// Count
 	uint32_t count( PendingType type, uint16_t instanceId, uint32_t requestId, bool needsLock = true, bool needsUnlock = true );
+
+	void print( PendingType type, FILE *f, bool needsLock = true, bool needsUnlock = true );
 };
 
 #endif

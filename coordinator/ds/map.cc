@@ -167,10 +167,6 @@ uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32
 
 		r = this->degradedLocks.insert( p );
 
-		// printf( "[%u, %u]: ", listId, stripeId );
-		// degradedLock.print();
-		// fflush( stdout );
-
 		ret = r.second;
 	} else {
 		ret = false;

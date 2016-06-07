@@ -180,11 +180,6 @@ bool CoordinatorSocket::handler( int fd, uint32_t events, void *data ) {
 							instanceId = generator->generate( s );
 							event.resRegister( s, instanceId, header.requestId );
 							coordinator->eventQueue.insert( event );
-
-							// __ERROR__( "CoordinatorSocket", "handler", "Unexpected registration from server." );
-							// socket->sockets.removeAt( index );
-							// ::close( fd );
-							// return false;
 						}
 					} else {
 						::close( fd );

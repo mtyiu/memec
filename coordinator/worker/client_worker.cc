@@ -272,18 +272,6 @@ void CoordinatorWorker::dispatch( ClientEvent event ) {
 					default:
 						goto quit_1;
 				}
-			} else if ( header.magic == PROTO_MAGIC_REMAPPING ) {
-				switch( header.opcode ) {
-					case PROTO_OPCODE_SYNC:
-					{
-						coordinator->pending.decrementRemappingRecords( header.requestId, event.socket->getAddr(), true, false );
-						coordinator->pending.checkAndRemoveRemappingRecords( header.requestId, 0, false, true );
-					}
-						break;
-					default:
-						__ERROR__( "CoordinatorWorker", "dispatch", "Invalid opcode from client." );
-						goto quit_1;
-				}
 			} else if ( header.magic == PROTO_MAGIC_HEARTBEAT && header.opcode == PROTO_OPCODE_SYNC ) {
 				this->handleSyncMetadata( event, buffer.data, header.length );
 			} else {

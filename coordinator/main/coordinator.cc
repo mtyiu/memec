@@ -55,9 +55,7 @@ void Coordinator::switchPhase( std::set<struct sockaddr_in> prevOverloadedServer
 	uint32_t curOverloadedServerCount = this->overloadedServers.serverSet.size();
 	uint32_t prevOverloadedServerCount = prevOverloadedServers.size();
 
-	if ( curOverloadedServerCount > totalServerCount * startThreshold ) { // Phase 1 --> 2
-		// __INFO__( YELLOW, "Coordinator", "switchPhase", "%lf: Overload detected (overloaded server = %u).", this->getElapsedTime(), curOverloadedServerCount );
-
+	if ( curOverloadedServerCount > totalServerCount * startThreshold ) {
 		if ( this->config.coordinator.states.maximum > 0 && ( curOverloadedServerCount > this->config.coordinator.states.maximum || this->stateTransitHandler->reachMaximumRemapped( this->config.coordinator.states.maximum ) ) ) {
 			// Limit the number of remapped servers
 			UNLOCK( &this->overloadedServers.lock );
@@ -79,7 +77,7 @@ void Coordinator::switchPhase( std::set<struct sockaddr_in> prevOverloadedServer
 			for ( auto server : this->overloadedServers.serverSet )
 				prevOverloadedServers.erase( server );
 			if ( prevOverloadedServers.size() > 0 ) {
-				event.switchPhase( false, prevOverloadedServers ); // Phase 4 --> 3
+				event.switchPhase( false, prevOverloadedServers );
 				this->eventQueue.insert( event );
 			}
 		} else {
@@ -92,7 +90,7 @@ void Coordinator::switchPhase( std::set<struct sockaddr_in> prevOverloadedServer
 	) {
 		// no longer need remapping after remapping has started
 		// stop remapping phase for all in the background
-		event.switchPhase( false, prevOverloadedServers ); // Phase 4 --> 3
+		event.switchPhase( false, prevOverloadedServers );
 		this->eventQueue.insert( event );
 	}
 	UNLOCK( &this->overloadedServers.lock );
@@ -121,15 +119,12 @@ std::set<struct sockaddr_in> Coordinator::updateOverloadedServerSet( ArrayMap<st
 	} \
 	/* if the average is too small ( esp. there is no data ), skip overload set update */ \
 	if ( avgSec > FLOAT_THRESHOLD || avgNsec > FLOAT_THRESHOLD ) { \
-		/* printf( " AVG %.3lf %.3lf vs THS %.3lf %.3lf\n", avgSec, avgNsec, avgSec * threshold, avgNsec * threshold ); */ \
 		for ( uint32_t i = 0; i < serverCount; i++ ) { \
-			/* if (1) sec > avgSec or (2) sec == avgSec && nsec > avgNsec */ \
 			if ( ( double ) server##_TYPE_##Latency->values[ i ]->sec > avgSec * threshold || \
 					( ( A_EQUAL_B ( server##_TYPE_##Latency->values[ i ]->sec, avgSec * threshold ) && \
 						(double) server##_TYPE_##Latency->values[ i ]->nsec >= avgNsec * threshold ) ) ) { \
 				this->overloadedServers.serverSet.insert( server##_TYPE_##Latency->keys[ i ] ); \
 				serverSet->insert( server##_TYPE_##Latency->keys[ i ] ); \
-				/* printf( "Server #%u overloaded %u %u !!!!\n", i, server##_TYPE_##Latency->values[ i ]->sec, server##_TYPE_##Latency->values[ i ]->nsec ); */ \
 			} \
 		} \
 	} \
@@ -184,11 +179,9 @@ void Coordinator::updateAverageServerLoading( ArrayMap<struct sockaddr_in, Laten
 #undef SET_AVG_SERVER_LATENCY
 
 	// clean up the current stats
-	// TODO release the arrayMaps??
 #define CLEAN_2D_ARRAY_MAP( _DST_ ) \
-	for ( uint32_t i = 0; i < _DST_.size();  i++ ) { \
+	for ( uint32_t i = 0; i < _DST_.size();  i++ ) \
 		_DST_.values.clear(); \
-	} \
 	_DST_.clear();
 
 	CLEAN_2D_ARRAY_MAP( this->serverLoading.latestGet );
@@ -212,7 +205,6 @@ void Coordinator::signalHandler( int signal ) {
 				// push the stats back to clients
 				// leave the free of ArrayMaps to workers after constructing the data buffer
 				LOCK( &sockets.lock );
-				//fprintf( stderr, "queuing events get %lu set %lu\n", serverGetLatency->size(), serverSetLatency->size() );
 				if ( serverGetLatency->size() > 0 || serverSetLatency->size() > 0 ) {
 					ClientEvent event;
 					for ( uint32_t i = 0; i < sockets.size(); i++ ) {
@@ -326,7 +318,6 @@ bool Coordinator::init( char *path, OptionList &globalOptions, OptionList &coord
 			stateTransitHandler->addAliveServer( this->sockets.servers.values[ i ]->getAddr() );
 		}
 		UNLOCK( &this->sockets.servers.lock );
-		//stateTransitHandler->listAliveServers();
 	}
 
 	/* Smoothing factor */
@@ -756,9 +747,6 @@ void Coordinator::printPending( FILE *f ) {
 	fprintf( f, "\nList of Sync Metadata Requests\n" );
 	fprintf( f, "----------------------------------------\n" );
 	this->pending.printSyncMetaRequests( f );
-	fprintf( f, "\nList of Remapping Record Counters \n" );
-	fprintf( f, "----------------------------------------\n" );
-	this->pending.printSyncRemappingRecords( f );
 }
 
 void Coordinator::printInstanceId( FILE *f ) {

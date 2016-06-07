@@ -137,17 +137,6 @@ private:
 		std::unordered_map<uint16_t, PendingTransition> coordinated;
 	} transition;
 
-	/*
-	 * syncRemappingRecordCounters: ( packet id, counter for a sync operation )
-	 * syncRemappingRecordCountersReverse: ( counter for a sync operation, set of packet ids associated )
-	 * syncRemappingRecordIndicators: ( counter for a sync operations, indicator whether the op is completed )
-	 * counter = map( client, no. of remaining packets to ack )
-	 */
-	std::map<uint32_t, std::map<struct sockaddr_in, uint32_t>* > syncRemappingRecordCounters;
-	std::map<std::map<struct sockaddr_in, uint32_t>*, std::set<uint32_t> > syncRemappingRecordCountersReverse;
-	std::map<std::map<struct sockaddr_in, uint32_t>*, bool*> syncRemappingRecordIndicators;
-	LOCK_T syncRemappingRecordLock;
-
 	std::unordered_map<PendingIdentifier, PendingReconstruction> reconstruction;
 	LOCK_T reconstructionLock;
 
@@ -169,7 +158,6 @@ public:
 		LOCK_INIT( &this->releaseDegradedLockLock );
 		LOCK_INIT( &this->transition.intermediateLock );
 		LOCK_INIT( &this->transition.coordinatedLock );
-		LOCK_INIT( &this->syncRemappingRecordLock );
 		LOCK_INIT( &this->reconstructionLock );
 		LOCK_INIT( &this->announcementLock );
 		LOCK_INIT( &this->recoveryLock );
@@ -467,80 +455,6 @@ public:
 		return sync;
 	}
 
-	// indicator is optional
-	bool addRemappingRecords( uint32_t id, std::map<struct sockaddr_in, uint32_t> *map, bool* indicator = 0 ) {
-		LOCK( &this->syncRemappingRecordLock );
-		if ( this->syncRemappingRecordCounters.count( id ) > 0 ) {
-			UNLOCK( &this->syncRemappingRecordLock );
-			return false;
-		}
-		this->syncRemappingRecordCounters[ id ] = map;
-		this->syncRemappingRecordIndicators[ map ] = indicator;
-		if ( this->syncRemappingRecordCountersReverse.count( map ) < 1 )
-			this->syncRemappingRecordCountersReverse[ map ] = std::set<uint32_t>();
-
-		this->syncRemappingRecordCountersReverse[ map ].insert( id );
-		UNLOCK( &this->syncRemappingRecordLock );
-		return true;
-	}
-
-	// decrement the counter for a packet acked by a client
-	bool decrementRemappingRecords( uint32_t id, struct sockaddr_in addr, bool lock = true, bool unlock = true ) {
-		bool ret = false;
-		if ( lock ) LOCK( &this->syncRemappingRecordLock );
-		// check if the client needs to ack this packet
-		if ( this->syncRemappingRecordCounters.count( id ) > 0 &&
-			this->syncRemappingRecordCounters[ id ]->count( addr ) )
-		{
-			uint32_t &count = this->syncRemappingRecordCounters[ id ]->at( addr );
-			count--;
-			// if the client acked all packets, remove this client
-			if ( count <= 0 ) {
-				this->syncRemappingRecordCounters[ id ]->erase( addr );
-			}
-			ret = true;
-		}
-		if ( unlock ) UNLOCK( &this->syncRemappingRecordLock );
-		return ret;
-	}
-
-	std::pair<std::map<struct sockaddr_in, uint32_t> *, bool*>
-		checkAndRemoveRemappingRecords( uint32_t id, uint32_t target = 0, bool lock = true, bool unlock = true )
-	{
-		std::map<struct sockaddr_in, uint32_t> *map = NULL;
-		bool *indicator = NULL;
-		if ( lock ) LOCK( &this->syncRemappingRecordLock );
-		// check if the packet exists, and the counter has "target" number of client remains
-		if ( this->syncRemappingRecordCounters.count( id ) > 0 &&
-			this->syncRemappingRecordCounters[ id ]->size() == target )
-		{
-			map = this->syncRemappingRecordCounters[ id ];
-			indicator = this->syncRemappingRecordIndicators[ map ];
-			std::set<uint32_t> idSet = this->syncRemappingRecordCountersReverse[ map ];
-			// remove all the id assocaited with the counter
-			for ( uint32_t id : idSet )
-				this->syncRemappingRecordCounters.erase( id );
-			// remove the counter
-			this->syncRemappingRecordCountersReverse.erase( map );
-			// flip the indicator if it exists
-			if ( indicator )
-				*indicator = ! *indicator;
-		}
-		if ( unlock ) UNLOCK( &this->syncRemappingRecordLock );
-		return std::pair<std::map<struct sockaddr_in, uint32_t> *, bool *>( map, indicator );
-	}
-
-	std::map<struct sockaddr_in, uint32_t> *removeRemappingRecords( uint32_t id ) {
-		std::map<struct sockaddr_in, uint32_t> *map = NULL;
-		LOCK( &this->syncRemappingRecordLock );
-		if ( this->syncRemappingRecordCounters.count( id ) > 0 ) {
-			map = this->syncRemappingRecordCounters[ id ];
-			this->syncRemappingRecordCounters.erase( id );
-		}
-		UNLOCK( &this->syncRemappingRecordLock );
-		return map;
-	}
-
 	bool insertRemappedDataRequest( uint32_t id, pthread_mutex_t *lock, pthread_cond_t *cond, bool *done, uint32_t count ) {
 		PendingRemapSync pendingRemapSync;
 		bool ret = false;
@@ -593,17 +507,8 @@ public:
 		fprintf( f, "total=%lu\n", this->syncMetaRequests.size() );
 	}
 
-	void printSyncRemappingRecords( FILE *f = stderr, bool list = false ) {
-		if ( list )
-			for ( auto it : this->syncRemappingRecordCounters ) {
-				fprintf( f, "id=%u of size=%lu", it.first, it.second->size() );
-			}
-		fprintf( f, "total=%lu\n", this->syncRemappingRecordCounters.size() );
-	}
-
 	void print( FILE *f = stderr, bool list = false ) {
 		printSyncMetaRequests( f, list );
-		printSyncRemappingRecords( f, list );
 	}
 };
 

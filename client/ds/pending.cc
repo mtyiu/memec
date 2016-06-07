@@ -1,4 +1,5 @@
 #include "pending.hh"
+#include "../../common/socket/socket.hh"
 
 bool Pending::get( PendingType type, LOCK_T *&lock, std::unordered_multimap<PendingIdentifier, Key> *&map ) {
 	switch( type ) {
@@ -607,4 +608,105 @@ uint32_t Pending::count( PendingType type, uint16_t instanceId, uint32_t request
 	}
 
 	return ret;
+}
+
+void Pending::print( PendingType type, FILE *f, bool needsLock, bool needsUnlock ) {
+	LOCK_T *lock;
+	size_t i;
+
+	switch( type ) {
+		case PT_APPLICATION_GET:
+		case PT_SERVER_GET:
+			fprintf( f, "[GET] " );
+			break;
+		case PT_APPLICATION_SET:
+		case PT_SERVER_SET:
+			fprintf( f, "[SET] " );
+			break;
+		case PT_APPLICATION_UPDATE:
+		case PT_SERVER_UPDATE:
+			fprintf( f, "[UPDATE] " );
+			break;
+		case PT_APPLICATION_DEL:
+		case PT_SERVER_DEL:
+			fprintf( f, "[DELETE] " );
+			break;
+		default:
+			break;
+	}
+	fprintf( f, "Pending: " );
+
+	if ( type == PT_APPLICATION_SET ) {
+		std::unordered_multimap<PendingIdentifier, KeyValue> *map;
+		std::unordered_multimap<PendingIdentifier, KeyValue>::iterator it;
+		this->get( type, lock, map );
+		fprintf( f, "%lu\n", map->size() );
+
+		if ( needsLock ) LOCK( lock );
+		for ( i = 1, it = map->begin(); it != map->end(); it++, i++ ) {
+			const PendingIdentifier &pid = it->first;
+			KeyValue &keyValue = it->second;
+			Key key = keyValue.key();
+			fprintf(
+				f, "%lu. ID: (%u, %u), parent ID: (%u, %u); Key: %.*s (size = %u); Timestamp: %u; source/destination: ",
+				i, it->first.instanceId, it->first.requestId,
+				it->first.parentInstanceId, it->first.parentRequestId,
+				key.size, key.data, key.size,
+				it->first.timestamp
+			);
+			if ( pid.ptr )
+				( ( Socket * ) pid.ptr )->printAddress( f );
+			else
+				fprintf( f, "[N/A]\n" );
+			fprintf( f, "\n" );
+		}
+		if ( needsUnlock ) UNLOCK( lock );
+	} else if ( type == PT_APPLICATION_GET || type == PT_APPLICATION_DEL || type == PT_SERVER_SET || type == PT_SERVER_GET || type == PT_SERVER_DEL ) {
+		std::unordered_multimap<PendingIdentifier, Key> *map;
+		std::unordered_multimap<PendingIdentifier, Key>::iterator it;
+		this->get( type, lock, map );
+		fprintf( f, "%lu\n", map->size() );
+
+		if ( needsLock ) LOCK( lock );
+		for ( i = 1, it = map->begin(); it != map->end(); it++, i++ ) {
+			const PendingIdentifier &pid = it->first;
+			const Key &key = it->second;
+			fprintf(
+				f, "%lu. ID: (%u, %u), parent ID: (%u, %u); Key: %.*s (size = %u); source/destination: ",
+				i, it->first.instanceId, it->first.requestId,
+				it->first.parentInstanceId, it->first.parentRequestId,
+				key.size, key.data, key.size
+			);
+			if ( pid.ptr )
+				( ( Socket * ) pid.ptr )->printAddress( f );
+			else
+				fprintf( f, "(nil)\n" );
+			fprintf( f, "\n" );
+		}
+		if ( needsUnlock ) UNLOCK( lock );
+	} else if ( type == PT_APPLICATION_UPDATE || type == PT_SERVER_UPDATE ) {
+		std::unordered_multimap<PendingIdentifier, KeyValueUpdate> *map;
+		std::unordered_multimap<PendingIdentifier, KeyValueUpdate>::iterator it;
+		this->get( type, lock, map );
+		fprintf( f, "%lu\n", map->size() );
+
+		if ( needsLock ) LOCK( lock );
+		for ( i = 1, it = map->begin(); it != map->end(); it++, i++ ) {
+			const PendingIdentifier &pid = it->first;
+			const KeyValueUpdate &keyValueUpdate = it->second;
+			fprintf(
+				f, "%lu. ID: (%u, %u), parent ID: (%u, %u); Key: %.*s (size = %u, offset = %u, length = %u); source/destination: ",
+				i, it->first.instanceId, it->first.requestId,
+				it->first.parentInstanceId, it->first.parentRequestId,
+				keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
+				keyValueUpdate.offset, keyValueUpdate.length
+			);
+			if ( pid.ptr )
+				( ( Socket * ) pid.ptr )->printAddress( f );
+			else
+				fprintf( f, "(nil)\n" );
+			fprintf( f, "\n" );
+		}
+		if ( needsUnlock ) UNLOCK( lock );
+	}
 }
