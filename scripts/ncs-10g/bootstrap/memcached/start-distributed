@@ -1,0 +1,30 @@
+#!/bin/bash
+
+HOST_PREFIX="192.168.10."
+PORT=11211
+MEMCACHED_HOME=/home/ncsgroup/hwchan/memcached
+THREAD_NUM=12
+
+if [ $# -lt 1 ]; then
+	echo "Usage: $0 [start|stop|detect]"
+	exit -1
+fi
+
+if [ "$1" != "start" ] && [ "$1" != "stop" ] && [ "$1" != "detect" ]; then
+	echo "Unknown command ($1)!"
+	exit -1
+fi
+
+for i in {11..20}; do
+	HOST=${HOST_PREFIX}$((i+10))
+	echo "host: $HOST IP:$PORT"
+	if [ "$1" == "start" ]; then
+		ssh $HOST "cd $MEMCACHED_HOME; ./memcached -d -p $PORT -t $THREAD_NUM -m 4096m; ps aux | grep memcached | grep -v grep "
+	elif [ "$1" == "stop" ]; then
+		# any better way that killing it?
+		# ssh $HOST "kill \$(ps aux | grep memcached | grep -v grep | awk '{print \$2}')"
+		ssh $HOST 'killall -9 memcached'
+	elif [ "$1" == "detect" ]; then
+		ssh $HOST "ps aux | grep memcached | grep -v grep"
+	fi
+done
