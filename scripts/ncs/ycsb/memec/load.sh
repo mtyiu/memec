@@ -46,7 +46,7 @@ ${YCSB_PATH}/bin/ycsb \
 	-p insertcount=${INSERT_COUNT} \
 	-p threadcount=$1 \
 	-p histogram.buckets=200000 \
-	-p memec.host=$(hostname -I | xargs) \
+	-p memec.host=$(hostname -I | sed 's/^.*\(192\.168\.0\.[0-9]*\).*$/\1/g') \
 	-p memec.port=9112 \
 	-p memec.key_size=255 \
 	-p memec.chunk_size=4096

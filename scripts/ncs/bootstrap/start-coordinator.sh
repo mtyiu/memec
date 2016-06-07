@@ -1,7 +1,7 @@
 #!/bin/bash
 
 COORDINATOR_NAME=$(hostname | sed 's/testbed-//g')
-COORDINATOR_IP=$(hostname -I | awk '{print $1}' | xargs)
+COORDINATOR_IP=$(hostname -I | sed 's/^.*\(192\.168\.0\.[0-9]*\).*$/\1/g')
 COORDINATOR_PORT=9110
 CONFIG_PATH=bin/config/ncs
 MEMEC_PATH=~/mtyiu/memec

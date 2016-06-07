@@ -1,7 +1,7 @@
 #!/bin/bash
 
 SERVER_NAME=$(hostname | sed 's/testbed-//g')
-SERVER_IP=$(hostname -I | awk '{print $1}' | xargs)
+SERVER_IP=$(hostname -I | sed 's/^.*\(192\.168\.0\.[0-9]*\).*$/\1/g')
 SERVER_PORT=9111
 STORAGE_PATH=/data/memec_blocks/${SERVER_NAME}
 CONFIG_PATH=bin/config/ncs
