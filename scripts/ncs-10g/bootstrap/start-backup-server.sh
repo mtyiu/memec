@@ -1,10 +1,10 @@
 #!/bin/bash
 
 SERVER_NAME=$(hostname | sed 's/testbed-//g')
-SERVER_IP=$(hostname -I | sed 's/^.*\(192\.168\.0\.[0-9]*\).*$/\1/g')
+SERVER_IP=$(hostname -I | sed 's/^.*\(192\.168\.10\.[0-9]*\).*$/\1/g')
 SERVER_PORT=9111
 STORAGE_PATH=/tmp/memec/${SERVER_NAME}
-CONFIG_PATH=bin/config/ncs
+CONFIG_PATH=bin/config/ncs-10g
 MEMEC_PATH=~/mtyiu/memec
 
 echo "Starting backup server [${SERVER_NAME}]..."

@@ -1,9 +1,9 @@
 #!/bin/bash
 
 COORDINATOR_NAME=$(hostname | sed 's/testbed-//g')
-COORDINATOR_IP=$(hostname -I | sed 's/^.*\(192\.168\.0\.[0-9]*\).*$/\1/g')
+COORDINATOR_IP=$(hostname -I | sed 's/^.*\(192\.168\.10\.[0-9]*\).*$/\1/g')
 COORDINATOR_PORT=9110
-CONFIG_PATH=bin/config/ncs
+CONFIG_PATH=bin/config/ncs-10g
 MEMEC_PATH=~/mtyiu/memec
 
 echo "Starting coordinator [${COORDINATOR_NAME}]..."

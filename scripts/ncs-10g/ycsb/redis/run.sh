@@ -10,29 +10,17 @@
 YCSB_PATH=~/mtyiu/ycsb/0.7.0
 
 if [ $# != 2 ]; then
-	echo "Usage: $0 [Number of threads] [Workload]"
+	echo "Usage: $0 [Number of threads] [Workload] [Output file of raw datapoints]"
 	exit 1
 fi
 
-ID=$(hostname | sed 's/testbed-node//g')
-
 # Evenly distribute the # of ops to YCSB clients ( 4 in the experiment setting )
 RECORD_COUNT=10000000
-INSERT_COUNT=$(expr ${RECORD_COUNT} \/ 4)
 OPERATION_COUNT=$(expr ${RECORD_COUNT} \/ 4)
-if [ $ID == 3 ]; then
-	INSERT_START=0
-elif [ $ID == 4 ]; then
-	INSERT_START=${INSERT_COUNT}
-elif [ $ID == 8 ]; then
-	INSERT_START=$(expr ${INSERT_COUNT} \* 2)
-elif [ $ID == 9 ]; then
-	INSERT_START=$(expr ${INSERT_COUNT} \* 3)
-fi
 
 # Run the target workload
 ${YCSB_PATH}/bin/ycsb \
-	run memec \
+	run redis-cs \
 	-s \
 	-P ${YCSB_PATH}/workloads/$2 \
 	-p fieldcount=1 \
@@ -42,12 +30,27 @@ ${YCSB_PATH}/bin/ycsb \
 	-p fieldlength=200 \
 	-p requestdistribution=zipfian \
 	-p recordcount=${RECORD_COUNT} \
-	-p insertstart=${INSERT_START} \
-	-p insertcount=${INSERT_COUNT} \
 	-p operationcount=${OPERATION_COUNT} \
 	-p threadcount=$1 \
 	-p histogram.buckets=200000 \
-	-p memec.host=$(hostname -I | sed 's/^.*\(192\.168\.0\.[0-9]*\).*$/\1/g') \
-	-p memec.port=9112 \
-	-p memec.key_size=255 \
-	-p memec.chunk_size=4096
+	-p redis.serverCount=10 \
+	-p redis.host0=192.168.10.22 \
+	-p redis.port0=6379 \
+	-p redis.host1=192.168.10.21 \
+	-p redis.port1=6379 \
+	-p redis.host2=192.168.10.23 \
+	-p redis.port2=6379 \
+	-p redis.host3=192.168.10.24 \
+	-p redis.port3=6379 \
+	-p redis.host4=192.168.10.25 \
+	-p redis.port4=6379 \
+	-p redis.host5=192.168.10.26 \
+	-p redis.port5=6379 \
+	-p redis.host6=192.168.10.27 \
+	-p redis.port6=6379 \
+	-p redis.host7=192.168.10.28 \
+	-p redis.port7=6379 \
+	-p redis.host8=192.168.10.29 \
+	-p redis.port8=6379 \
+	-p redis.host9=192.168.10.30 \
+	-p redis.port9=6379

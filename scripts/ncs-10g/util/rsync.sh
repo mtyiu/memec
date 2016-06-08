@@ -1,6 +1,6 @@
 #!/bin/bash
 
-for i in {1..10} {11..23} {30..34} {37..39}; do
+for i in {11..20} {30..34}; do
 	rsync \
 		--delete \
 		--force \
