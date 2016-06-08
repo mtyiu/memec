@@ -1003,17 +1003,6 @@ bool ServerWorker::performDegradedRead(
 					"There are no surviving parity servers. The data cannot be recovered. (numSurvivingParity = %u, reconstructedCount = %u)",
 					numSurvivingParity, reconstructedCount
 				);
-				for ( uint32_t j = 0; j < reconstructedCount; j++ ) {
-					printf(
-						"%s(%u, %u) |--> (%u, %u)%s",
-						j == 0 ? "" : ", ",
-						original[ j * 2     ],
-						original[ j * 2 + 1 ],
-						reconstructed[ j * 2     ],
-						reconstructed[ j * 2 + 1 ],
-						j == reconstructedCount - 1 ? "\n" : ""
-					);
-				}
 				return false;
 			} else {
 				for ( uint32_t i = 0; i < ServerWorker::parityChunkCount; i++ ) {
@@ -1076,7 +1065,6 @@ bool ServerWorker::performDegradedRead(
 		if ( ! needsContinue ) {
 			if ( isReconstructed ) {
 				// The chunk is already reconstructed
-				// __INFO__( YELLOW, "ServerWorker", "performDegradedRead", "The chunk (%u, %u, %u) is already reconstructed.", listId, stripeId, chunkId );
 				return false;
 			} else {
 				// Reconstruction in progress
@@ -1153,10 +1141,8 @@ force_reconstruct_chunks:
 		needsContinue = ServerWorker::degradedChunkBuffer->map.insertDegradedKey( k, instanceId, requestId, isReconstructed );
 
 		////////// Key-value pairs in unsealed chunks //////////
-		if ( ! needsContinue || isReconstructed ) {
-			// fprintf( stderr, "(%u, %u, %u): ! needsContinue (%s) || isReconstructed (%s)\n", listId, stripeId, chunkId, needsContinue ? "true" : "false", isReconstructed ? "true" : "false" );
+		if ( ! needsContinue || isReconstructed )
 			return false;
-		}
 
 		bool success = true;
 		if ( socket->self ) {
@@ -1367,9 +1353,6 @@ bool ServerWorker::sendModifyChunkRequest(
 	uint16_t instanceId = Server::instanceId;
 	uint32_t requestId = ServerWorker::idGenerator->nextVal( this->workerId );
 	bool isDegraded = original && reconstructed && reconstructedCount;
-
-	if ( Server::getInstance()->config.server.seal.disabled )
-		isSealed = false;
 
 	key.set( keySize, keyStr );
 	keyValueUpdate.set( keySize, keyStr );
@@ -1589,7 +1572,6 @@ bool ServerWorker::sendModifyChunkRequest(
 		if ( parityServerCount ) {
 			packet = ServerWorker::packetPool->malloc();
 			packet->setReferenceCount( parityServerCount );
-			// packet->setReferenceCount( self == 0 ? ServerWorker::parityChunkCount : ServerWorker::parityChunkCount - 1 );
 			if ( isUpdate ) {
 				size = this->protocol.generateChunkKeyValueUpdateHeader(
 					PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_SERVER,

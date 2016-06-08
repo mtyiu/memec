@@ -13,8 +13,6 @@ bool ServerWorker::handleServerReconstructedMsg( CoordinatorEvent event, char *b
 	Socket::ntoh_port( srcHeader.port, srcTmp + 16, 6 );
 	Socket::ntoh_ip( dstHeader.addr, dstTmp, 16 );
 	Socket::ntoh_port( dstHeader.port, dstTmp + 16, 6 );
-	// __DEBUG__(
-	// 	YELLOW,
 	__ERROR__(
 		"ServerWorker", "handleServerReconstructedMsg",
 		"Server: %s:%s is reconstructed at %s:%s.",
@@ -232,7 +230,6 @@ bool ServerWorker::handleReconstructionRequest( CoordinatorEvent event, char *bu
 	}
 	chunkId = 0;
 	for ( it = stripeIds.begin(); it != stripeIds.end(); it++ ) {
-		// printf( "Processing (%u, %u, %u)...\n", header.listId, *it, header.chunkId );
 		chunkCount = 0;
 		requestId = ServerWorker::idGenerator->nextVal( this->workerId );
 		metadata.listId = header.listId;

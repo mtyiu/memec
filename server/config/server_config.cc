@@ -5,7 +5,6 @@
 ServerConfig::ServerConfig() {
 	this->pool.chunks = 1073741824; // 1 GB
 	this->buffer.chunksPerList = 5;
-	this->seal.disabled = false;
 	this->storage.type = STORAGE_TYPE_LOCAL;
 }
 
@@ -24,11 +23,6 @@ bool ServerConfig::set( const char *section, const char *name, const char *value
 	} else if ( match( section, "buffer" ) ) {
 		if ( match( name, "chunks_per_list" ) )
 			this->buffer.chunksPerList = atoi( value );
-		else
-			return false;
-	} else if ( match( section, "seal" ) ) {
-		if ( match( name, "disabled" ) )
-			this->seal.disabled = match( value, "true" );
 		else
 			return false;
 	} else if ( match( section, "storage" ) ) {
@@ -105,14 +99,11 @@ void ServerConfig::print( FILE *f ) {
 		"\t- %-*s : %lu\n"
 		"- Buffer\n"
 		"\t- %-*s : %u\n"
-		"- Seal\n"
-		"\t- %-*s : %s\n"
 		"- Storage\n"
 		"\t- %-*s : %s\n"
 		"\t- %-*s : %s\n",
 		width, "Chunks", this->pool.chunks,
 		width, "Chunks per list", this->buffer.chunksPerList,
-		width, "Disabled", this->seal.disabled ? "Yes" : "No",
 		width, "Type", this->storage.type == STORAGE_TYPE_LOCAL ? "Local" : "Undefined",
 		width, "Path", this->storage.path
 	);

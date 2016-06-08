@@ -20,9 +20,6 @@ public:
 		uint32_t chunksPerList;
 	} buffer;
 	struct {
-		bool disabled;
-	} seal;
-	struct {
 		StorageType type;
 		char path[ STORAGE_PATH_MAX ];
 	} storage;

@@ -49,10 +49,6 @@ bool ServerWorker::handleForwardKeyResponse( struct ForwardKeyHeader &header, bo
 	}
 
 	for ( int pidsIndex = 0, len = pids.size(); pidsIndex < len; pidsIndex++ ) {
-		if ( pidsIndex == 0 ) {
-			// assert( pids[ pidsIndex ].instanceId == pid.instanceId && pids[ pidsIndex ].requestId == pid.requestId );
-		}
-
 		if ( ! ServerWorker::pending->eraseDegradedOp( PT_SERVER_PEER_DEGRADED_OPS, pids[ pidsIndex ].instanceId, pids[ pidsIndex ].requestId, 0, &pid, &op ) ) {
 			__ERROR__( "ServerWorker", "handleGetResponse", "Cannot find a pending server DEGRADED_OPS request that matches the response. This message will be discarded." );
 			continue;
@@ -489,7 +485,6 @@ bool ServerWorker::handleDeleteResponse( ServerPeerEvent event, bool success, ch
 
 		if ( success ) {
 			__ERROR__( "ServerWorker", "handleDeleteResponse", "TODO: server/worker/server_peer_res_worker.cc - Line 289: Include the timestamp and metadata in the response.\n" );
-			// uint32_t timestamp = Server::getInstance()->timestamp.nextVal();
 			clientEvent.resDelete(
 				( ClientSocket * ) pid.ptr,
 				pid.instanceId, pid.requestId,

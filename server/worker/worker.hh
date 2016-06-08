@@ -12,6 +12,7 @@
 #include "../event/event_queue.hh"
 #include "../ds/map.hh"
 #include "../ds/pending.hh"
+// #include "../helper/reconstruction_helper.hh"
 #include "../protocol/protocol.hh"
 #include "../storage/allstorage.hh"
 #include "../../common/coding/coding.hh"
@@ -39,6 +40,9 @@ private:
 		char *data;
 		uint32_t size;
 	} buffer;
+
+	// ReconstructionHelper recHelper;
+
 	BitmaskArray *chunkStatus;
 	BitmaskArray *chunkStatusBackup;
 	Chunk *dataChunk, *parityChunk;
@@ -48,9 +52,10 @@ private:
 		Chunk **chunks;
 	} forward; // For forwarding parity chunk
 	Chunk **freeChunks;
+	bool **sealIndicators;
+
 	ServerPeerSocket **dataServerSockets;
 	ServerPeerSocket **parityServerSockets;
-	bool **sealIndicators;
 
 	static uint32_t dataChunkCount;
 	static uint32_t parityChunkCount;

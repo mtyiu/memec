@@ -13,6 +13,7 @@ OBJS= \
 	ds/instance_id_generator.o \
 	ds/key_value.o \
 	ds/latency.o \
+	ds/redirection_list.o \
 	ds/sockaddr_in.o \
 	hash/cuckoo_hash.o \
 	protocol/protocol.o \
