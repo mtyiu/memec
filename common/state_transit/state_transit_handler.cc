@@ -78,40 +78,35 @@ void StateTransitHandler::quit() {
 	}
 }
 
-void StateTransitHandler::listAliveServers() {
+void StateTransitHandler::listAliveServers( FILE *f ) {
 	uint32_t serverCount = this->serversState.size();
 	char buf[ INET_ADDRSTRLEN ];
 	for ( auto server : this->serversState ) {
 		inet_ntop( AF_INET, &server.first.sin_addr, buf, INET_ADDRSTRLEN ),
-		fprintf(
-			stderr,
-			"\tServer %s:%hu --> ",
-			buf,
-			ntohs( server.first.sin_port )
-		);
+		fprintf( f, "Server %s:%hu --> ", buf, ntohs( server.first.sin_port ) );
 		switch( server.second ) {
 			case STATE_UNDEFINED:
-				fprintf( stderr, "STATE_UNDEFINED\n" );
+				fprintf( f, "STATE_UNDEFINED\n" );
 				break;
 			case STATE_NORMAL:
-				fprintf( stderr, "STATE_NORMAL\n" );
+				fprintf( f, "STATE_NORMAL\n" );
 				break;
 			case STATE_INTERMEDIATE:
-				fprintf( stderr, "STATE_INTERMEDIATE\n" );
+				fprintf( f, "STATE_INTERMEDIATE\n" );
 				break;
 			case STATE_COORDINATED:
-				fprintf( stderr, "STATE_COORDINATED\n" );
+				fprintf( f, "STATE_COORDINATED\n" );
 				break;
 			case STATE_DEGRADED:
-				fprintf( stderr, "STATE_DEGRADED\n" );
+				fprintf( f, "STATE_DEGRADED\n" );
 				break;
 			case STATE_WAIT_DEGRADED:
-				fprintf( stderr, "STATE_WAIT_DEGRADED\n" );
+				fprintf( f, "STATE_WAIT_DEGRADED\n" );
 				break;
 			case STATE_WAIT_NORMAL:
-				fprintf( stderr, "STATE_WAIT_NORMAL\n" );
+				fprintf( f, "STATE_WAIT_NORMAL\n" );
 				break;
 		}
 	}
-	fprintf( stderr, "No. of servers = %u\n", serverCount );
+	fprintf( f, "No. of servers = %u\n", serverCount );
 }

@@ -737,7 +737,7 @@ void Coordinator::printRemapping( FILE *f ) {
 	if ( ! this->config.global.states.disabled ) {
 		fprintf( f, "\nList of Tracking Servers\n" );
 		fprintf( f, "----------------------------------------\n" );
-		this->stateTransitHandler->listAliveServers();
+		this->stateTransitHandler->listAliveServers( f );
 	}
 }
 

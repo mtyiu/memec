@@ -196,7 +196,7 @@ bool Server::init( char *path, OptionList &globalOptions, OptionList &serverOpti
 			stateTransitHandler.addAliveServer( this->sockets.serverPeers.values[ i ]->getAddr() );
 		}
 		UNLOCK( &this->sockets.serverPeers.lock );
-		stateTransitHandler.listAliveServers();
+		// stateTransitHandler.listAliveServers();
 	}
 
 	// Set signal handlers //

@@ -78,7 +78,7 @@ public:
 	bool init( const char *spread = NULL, const char *user = NULL );
 	void quit();
 
-	void listAliveServers();
+	void listAliveServers( FILE *f = stdout );
 
 	virtual bool start() = 0;
 	virtual bool stop() = 0;
