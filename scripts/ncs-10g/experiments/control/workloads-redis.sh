@@ -19,9 +19,9 @@ for iter in {1..10}; do
 
 			# Run workload A, B, C, F, D first
 			# screen -S manage -p 0 -X stuff "${BASE_PATH}/scripts/util/start.sh $1$(printf '\r')"
-			screen -S manage -p 0 -X stuff "${HOME}/hwchan/util/redis/create-cluster-distributed start$(printf '\r')"
+			screen -S manage -p 0 -X stuff "${MEMEC_PATH}/scripts/ncs-10g/bootstrap/redis/create-cluster-distributed start$(printf '\r')"
 			sleep 10
-			screen -S manage -p 0 -X stuff "${HOME}/hwchan/util/redis/create-cluster-distributed create$(printf '\r')"
+			screen -S manage -p 0 -X stuff "${MEMEC_PATH}/scripts/ncs-10g/bootstrap/redis/create-cluster-distributed create$(printf '\r')"
 			sleep 5
 			screen -S manage -p 0 -X stuff "yes$(printf '\r')"
 			sleep 10
@@ -49,9 +49,9 @@ for iter in {1..10}; do
 			done
 
 			# screen -S manage -p 0 -X stuff "$(printf '\r\r')"
-			screen -S manage -p 0 -X stuff "${HOME}/hwchan/util/redis/create-cluster-distributed stop$(printf '\r')"
+			screen -S manage -p 0 -X stuff "${MEMEC_PATH}/scripts/ncs-10g/bootstrap/redis/create-cluster-distributed stop$(printf '\r')"
 			sleep 5
-			screen -S manage -p 0 -X stuff "${HOME}/hwchan/util/redis/create-cluster-distributed clean$(printf '\r')"
+			screen -S manage -p 0 -X stuff "${MEMEC_PATH}/scripts/ncs-10g/bootstrap/redis/create-cluster-distributed clean$(printf '\r')"
 			sleep 10
 
 			for n in {31..34}; do

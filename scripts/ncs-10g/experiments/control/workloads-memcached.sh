@@ -19,7 +19,7 @@ for iter in {1..10}; do
 
 			# Run workload A, B, C, F, D first
 			# screen -S manage -p 0 -X stuff "${BASE_PATH}/scripts/util/start.sh $1$(printf '\r')"
-			screen -S manage -p 0 -X stuff "${HOME}/hwchan/util/memcached/start-distributed start$(printf '\r')"
+			screen -S manage -p 0 -X stuff "${MEMEC_PATH}/scripts/ncs-10g/bootstrap/memcached/start-distributed start$(printf '\r')"
 			sleep 30
 
 			for w in $workloads; do
@@ -41,7 +41,7 @@ for iter in {1..10}; do
 			done
 
 			# screen -S manage -p 0 -X stuff "$(printf '\r\r')"
-			screen -S manage -p 0 -X stuff "${HOME}/hwchan/util/memcached/start-distributed stop$(printf '\r')"
+			screen -S manage -p 0 -X stuff "${MEMEC_PATH}/scripts/ncs-10g/bootstrap/memcached/start-distributed stop$(printf '\r')"
 			sleep 10
 
 			for n in {31..34}; do
