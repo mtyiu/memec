@@ -47,14 +47,15 @@ size_t Protocol::generateHeartbeatMessage(
 	for ( opsIt = ops.begin(); opsIt != ops.end(); opsIt++ ) {
 		Key key = opsIt->first;
 		const OpMetadata &opMetadata = opsIt->second;
-		if ( this->buffer.size >= bytes + PROTO_KEY_OP_METADATA_SIZE + key.size ) {
-			bytes += ProtocolUtil::write1Byte ( buf, key.size          );
-			bytes += ProtocolUtil::write1Byte ( buf, opMetadata.opcode );
-			bytes += ProtocolUtil::write4Bytes( buf, opMetadata.listId );
-			bytes += ProtocolUtil::write4Bytes( buf, opMetadata.stripeId );
-			bytes += ProtocolUtil::write4Bytes( buf, opMetadata.chunkId );
+		if ( this->buffer.size >= bytes + PROTO_KEY_OP_METADATA_SIZE + key.size + ( key.isLarge ? SPLIT_OFFSET_SIZE : 0 ) ) {
+			bytes += ProtocolUtil::write1Byte ( buf, key.size             );
+			bytes += ProtocolUtil::write1Byte ( buf, opMetadata.opcode    );
+			bytes += ProtocolUtil::write4Bytes( buf, opMetadata.listId    );
+			bytes += ProtocolUtil::write4Bytes( buf, opMetadata.stripeId  );
+			bytes += ProtocolUtil::write4Bytes( buf, opMetadata.chunkId   );
 			bytes += ProtocolUtil::write4Bytes( buf, opMetadata.timestamp );
-			bytes += ProtocolUtil::write( buf, key.data, key.size );
+			bytes += ProtocolUtil::write1Byte ( buf, key.isLarge          );
+			bytes += ProtocolUtil::write( buf, key.data, key.size + ( key.isLarge ? SPLIT_OFFSET_SIZE : 0 ) );
 			opsCount++;
 			key.free();
 		} else {
@@ -123,7 +124,8 @@ bool Protocol::parseKeyOpMetadataHeader( struct KeyOpMetadataHeader &header, siz
 	header.stripeId  = ProtocolUtil::read4Bytes( ptr );
 	header.chunkId   = ProtocolUtil::read4Bytes( ptr );
 	header.timestamp = ProtocolUtil::read4Bytes( ptr );
+	header.isLarge   = ProtocolUtil::read1Byte ( ptr );
 	header.key = ptr;
 	bytes = PROTO_KEY_OP_METADATA_SIZE + ( size_t ) header.keySize;
-	return ( size - offset >= PROTO_KEY_OP_METADATA_SIZE + ( size_t ) header.keySize );
+	return ( size - offset >= PROTO_KEY_OP_METADATA_SIZE + ( size_t ) header.keySize + ( header.isLarge ? SPLIT_OFFSET_SIZE : 0 ) );
 }

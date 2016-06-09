@@ -91,8 +91,8 @@ public:
 			Key key;
 			char* valueStr;
 			uint32_t valueSize;
-			keyValue.deserialize( key.data, key.size, valueStr, valueSize );
-			this->keyValue.dup( key.data, key.size, valueStr, valueSize, keyValue.ptr );
+			keyValue._deserialize( key.data, key.size, valueStr, valueSize );
+			this->keyValue._dup( key.data, key.size, valueStr, valueSize, keyValue.ptr );
 		} else {
 			this->keyValue.set( keyValue.data, keyValue.ptr );
 		}
@@ -329,6 +329,13 @@ public:
 		PendingIdentifier *pidPtr = 0, Key *keyPtr = 0,
 		bool needsLock = true, bool needsUnlock = true,
 		bool checkKey = false, char *checkKeyPtr = 0
+	);
+	bool findKey(
+		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr,
+		PendingIdentifier *pidPtr, Key *keyPtr,
+		bool needsLock, bool needsUnlock,
+		bool checkKey, char *checkKeyPtr,
+		void *keyPtrToBeSet = 0
 	);
 	bool eraseKeyValue(
 		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr = 0,

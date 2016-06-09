@@ -173,12 +173,12 @@ bool Protocol::parseHeader( struct ProtocolHeader &header, char *buf, size_t siz
 	return true;
 }
 
-size_t Protocol::getSuggestedBufferSize( uint32_t keySize, uint32_t chunkSize ) {
+size_t Protocol::getSuggestedBufferSize( uint32_t keySize, uint32_t chunkSize, bool supportLargeObject ) {
 	size_t ret = (
 		PROTO_HEADER_SIZE +
 		PROTO_KEY_VALUE_SIZE +
 		keySize +
-		chunkSize
+		( supportLargeObject ? 16777216 : chunkSize )
 	);
 	// Set ret = ceil( ret / 4096 ) * 4096
 	if ( ret & 4095 ) { // 0xFFF

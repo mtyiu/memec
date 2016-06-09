@@ -20,20 +20,20 @@ bool Map::insertKey(
 	Key key, uint8_t opcode, uint32_t &timestamp,
 	KeyMetadata &keyMetadata,
 	bool needsLock, bool needsUnlock,
-	bool needsUpdateOpMetadata
+	bool needsUpdateOpMetadata,
+	bool isLarge
 ) {
-	key.dup();
-
 	std::pair<Key, KeyMetadata> keyPair( key, keyMetadata );
 
 	if ( needsLock ) LOCK( &this->keysLock );
 
-	if ( ! this->keys.insert( key.data, key.size, keyMetadata.obj ) ) {
+	if ( ! this->keys.insert( key.data, key.size, keyMetadata.obj, isLarge ) ) {
 		if ( needsUnlock ) UNLOCK( &this->keysLock );
 		return false;
 	}
 	if ( needsUnlock ) UNLOCK( &this->keysLock );
 
+	key.dup( 0, 0, 0, isLarge );
 	return needsUpdateOpMetadata ? this->insertOpMetadata( opcode, timestamp, key, keyMetadata ) : true;
 }
 
@@ -47,6 +47,37 @@ char *Map::findObject(
 
 	if ( needsLock ) LOCK( &this->keysLock );
 	ret = this->keys.find( keyStr, keySize );
+	if ( needsUnlock ) UNLOCK( &this->keysLock );
+
+	if ( keyValuePtr ) {
+		if ( ret )
+			keyValuePtr->set( ret );
+		else
+			keyValuePtr->clear();
+	}
+	if ( keyPtr ) {
+		if ( ret ) {
+			KeyValue keyValue;
+			keyValue.set( ret );
+			*keyPtr = keyValue.key();
+		} else {
+			keyPtr->set( keySize, keyStr );
+		}
+	}
+
+	return ret;
+}
+
+char *Map::findLargeObject(
+	char *keyStr, uint8_t keySize,
+	KeyValue *keyValuePtr,
+	Key *keyPtr,
+	bool needsLock, bool needsUnlock
+) {
+	char *ret = 0;
+
+	if ( needsLock ) LOCK( &this->keysLock );
+	ret = this->keys.find( keyStr, keySize, true );
 	if ( needsUnlock ) UNLOCK( &this->keysLock );
 
 	if ( keyValuePtr ) {
@@ -114,15 +145,26 @@ void Map::setChunk(
 		char *ptr = ChunkUtil::getData( chunk );
 		char *keyPtr, *valuePtr;
 		uint8_t keySize;
-		uint32_t valueSize, offset = 0, size;
+		uint32_t valueSize, offset = 0, size, splitSize, splitOffset;
+		bool isLarge;
 
 		if ( needsLock ) LOCK( &this->keysLock );
 		while( ptr + KEY_VALUE_METADATA_SIZE < ChunkUtil::getData( chunk ) + ChunkUtil::chunkSize ) {
-			KeyValue::deserialize( ptr, keyPtr, keySize, valuePtr, valueSize );
+			KeyValue::deserialize( ptr, keyPtr, keySize, valuePtr, valueSize, splitOffset );
 			if ( keySize == 0 && valueSize == 0 )
 				break;
 
-			size = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
+			isLarge = LargeObjectUtil::isLarge( keySize, valueSize, 0, &splitSize );
+			if ( isLarge ) {
+				if ( splitOffset + splitSize > valueSize )
+					splitSize = valueSize - splitOffset;
+
+				size = KEY_VALUE_METADATA_SIZE + SPLIT_OFFSET_SIZE + keySize + splitSize;
+			} else {
+				size = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
+			}
+
+
 			this->keys.insert( keyPtr, keySize, ptr );
 			offset += size;
 			ptr += size;
@@ -194,7 +236,7 @@ bool Map::insertOpMetadata( uint8_t opcode, uint32_t &timestamp, Key key, KeyMet
 		opMetadata.timestamp = this->timestamp->nextVal();
 		timestamp = opMetadata.timestamp;
 
-		if ( dup ) key.dup();
+		if ( dup ) key.dup( 0, 0, 0, key.isLarge );
 
 		std::pair<Key, OpMetadata> opsPair( key, opMetadata );
 		std::pair<std::unordered_map<Key, OpMetadata>::iterator, bool> opsRet;

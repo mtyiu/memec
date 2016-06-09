@@ -48,7 +48,8 @@ ServerSocket *ClientWorker::getServers( char *data, uint8_t size, uint32_t &list
 bool ClientWorker::getServers(
 	uint8_t opcode, char *data, uint8_t size,
 	uint32_t *&original, uint32_t *&remapped, uint32_t &remappedCount,
-	ServerSocket *&originalDataServerSocket, bool &useCoordinatedFlow
+	ServerSocket *&originalDataServerSocket, bool &useCoordinatedFlow,
+	bool isGettingSplit
 ) {
 	bool ret = true;
 
@@ -56,12 +57,22 @@ bool ClientWorker::getServers(
 
 	// Determine original data server
 	uint32_t originalListId, originalChunkId;
-	originalListId = Client::getInstance()->stripeList->get(
-		data, ( size_t ) size,
+	originalListId = ClientWorker::stripeList->get(
+		data, ( size_t )( size - ( isGettingSplit ? SPLIT_OFFSET_SIZE : 0 ) ),
 		this->dataServerSockets,
 		this->parityServerSockets,
 		&originalChunkId, true
 	);
+
+	uint32_t splitOffset, splitIndex;
+	if ( isGettingSplit ) {
+		bool isLarge;
+		splitOffset = LargeObjectUtil::readSplitOffset( data + size - SPLIT_OFFSET_SIZE );
+		splitIndex = LargeObjectUtil::getSplitIndex( size - SPLIT_OFFSET_SIZE, 0, splitOffset, isLarge );
+
+		originalChunkId = ( originalChunkId + splitIndex ) % ClientWorker::dataChunkCount;
+	}
+
 	originalDataServerSocket = this->dataServerSockets[ originalChunkId ];
 
 	Client *client = Client::getInstance();
@@ -474,7 +485,8 @@ bool ClientWorker::init( GlobalConfig &config, uint32_t workerId ) {
 	this->protocol.init(
 		Protocol::getSuggestedBufferSize(
 			config.size.key,
-			config.size.chunk
+			config.size.chunk,
+			true
 		)
 	);
 	this->original = new uint32_t[ ( ClientWorker::dataChunkCount + ClientWorker::parityChunkCount ) * 2 ];

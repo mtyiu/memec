@@ -9,6 +9,7 @@
 class KeyValueUpdate : public Key {
 public:
 	uint32_t offset, length;
+	uint32_t remaining;
 	bool isDegraded;
 };
 

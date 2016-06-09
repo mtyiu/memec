@@ -129,14 +129,15 @@ bool ServerWorker::handleDegradedGetRequest( ClientEvent event, char *buf, size_
 		__ERROR__( "ServerWorker", "handleDegradedGetRequest", "Invalid degraded GET request." );
 		return false;
 	}
-	__DEBUG__(
+	__INFO__(
 		BLUE, "ServerWorker", "handleDegradedGetRequest",
-		"[GET] (%u, %u) Key: %.*s (key size = %u); is sealed? %s.",
+		"[GET] (%u, %u) Key: %.*s (key size = %u); is sealed? %s; is large? %s.",
 		event.instanceId, event.requestId,
 		( int ) header.data.key.keySize,
 		header.data.key.key,
 		header.data.key.keySize,
-		header.isSealed ? "true" : "false"
+		header.isSealed ? "true" : "false",
+		header.isLarge ? "true" : "false"
 	);
 
 	int index = -1;
@@ -151,11 +152,19 @@ bool ServerWorker::handleDegradedGetRequest( ClientEvent event, char *buf, size_
 			listId,
 			chunkId
 		);
+
+		if ( header.isLarge ) {
+			uint32_t splitOffset = LargeObjectUtil::readSplitOffset( header.data.key.key + header.data.key.keySize );
+			uint32_t splitIndex = LargeObjectUtil::getSplitIndex( header.data.key.keySize, 0, splitOffset, header.isLarge );
+			chunkId = ( chunkId + splitIndex ) % ( ServerWorker::dataChunkCount );
+		}
+
 		index = this->findInRedirectedList(
 			header.original, header.reconstructed, header.reconstructedCount,
 			header.ongoingAtChunk, reconstructParity, reconstructData,
 			chunkId, header.isSealed
 		);
+
 		if ( ( index == -1 ) ||
 		     ( header.original[ index * 2 + 1 ] >= ServerWorker::dataChunkCount ) ) {
 			// No need to perform degraded read if only the parity servers are redirected
@@ -183,6 +192,7 @@ degraded_get_check:
 	bool isKeyValueFound = dmap->findValueByKey(
 		header.data.key.key,
 		header.data.key.keySize,
+		header.isLarge,
 		isSealed,
 		&keyValue, &key, &keyMetadata
 	);
@@ -210,7 +220,7 @@ degraded_get_check:
 		this->dispatch( event );
 	} else {
 		bool isReconstructed;
-		key.dup( key.size, key.data );
+		key.dup( key.size, key.data, 0, header.isLarge );
 		ret = this->performDegradedRead(
 			PROTO_OPCODE_DEGRADED_GET,
 			event.socket,
@@ -419,6 +429,7 @@ bool ServerWorker::handleDegradedUpdateRequest( ClientEvent event, struct Degrad
 	isKeyValueFound = dmap->findValueByKey(
 		header.data.keyValueUpdate.key,
 		header.data.keyValueUpdate.keySize,
+		header.isLarge,
 		isSealed,
 		&keyValue, &key, &keyMetadata
 	);
@@ -461,6 +472,7 @@ bool ServerWorker::handleDegradedUpdateRequest( ClientEvent event, struct Degrad
 			this->sendModifyChunkRequest(
 				event.instanceId, event.requestId,
 				keyValueUpdate.size,
+				false,
 				keyValueUpdate.data,
 				metadata,
 				chunkUpdateOffset,
@@ -504,6 +516,7 @@ bool ServerWorker::handleDegradedUpdateRequest( ClientEvent event, struct Degrad
 			this->sendModifyChunkRequest(
 				event.instanceId, event.requestId,
 				keyValueUpdate.size,
+				false,
 				keyValueUpdate.data,
 				metadata,
 				0, // chunkUpdateOffset
@@ -659,6 +672,7 @@ bool ServerWorker::handleDegradedDeleteRequest( ClientEvent event, char *buf, si
 	isKeyValueFound = dmap->findValueByKey(
 		header.data.key.key,
 		header.data.key.keySize,
+		header.isLarge,
 		isSealed,
 		&keyValue, &key, &keyMetadata
 	);
@@ -688,6 +702,7 @@ bool ServerWorker::handleDegradedDeleteRequest( ClientEvent event, char *buf, si
 			this->sendModifyChunkRequest(
 				event.instanceId, event.requestId,
 				key.size,
+				false,
 				key.data,
 				metadata,
 				keyMetadata.offset,
@@ -715,6 +730,7 @@ bool ServerWorker::handleDegradedDeleteRequest( ClientEvent event, char *buf, si
 			this->sendModifyChunkRequest(
 				event.instanceId, event.requestId,
 				key.size,
+				false,
 				key.data,
 				metadata,
 				// not needed for deleting a key-value pair in an unsealed chunk:
@@ -841,10 +857,10 @@ bool ServerWorker::handleForwardChunkRequest( struct ChunkDataHeader &header, bo
 			switch( op.opcode ) {
 				case PROTO_OPCODE_DEGRADED_GET:
 				case PROTO_OPCODE_DEGRADED_DELETE:
-					key.set( op.data.key.size, op.data.key.data );
+					key.set( op.data.key.size, op.data.key.data, 0, op.data.key.isLarge );
 					break;
 				case PROTO_OPCODE_DEGRADED_UPDATE:
-					key.set( op.data.keyValueUpdate.size, op.data.keyValueUpdate.data );
+					key.set( op.data.keyValueUpdate.size, op.data.keyValueUpdate.data, 0, op.data.key.isLarge );
 					break;
 				default:
 					continue;
@@ -872,6 +888,7 @@ bool ServerWorker::handleForwardChunkRequest( struct ChunkDataHeader &header, bo
 			bool isSealed;
 			bool isKeyValueFound = dmap->findValueByKey(
 				key.data, key.size,
+				key.isLarge,
 				isSealed,
 				&keyValue, 0, &keyMetadata
 			);
@@ -1159,8 +1176,8 @@ force_reconstruct_chunks:
 				success = ServerWorker::chunkBuffer->at( listId )->findValueByKey( mykey.data, mykey.size, &keyValue, &mykey );
 
 			if ( success ) {
-				keyValue.deserialize( keyStr, keySize, valueStr, valueSize );
-				keyValue.dup( keyStr, keySize, valueStr, valueSize );
+				keyValue._deserialize( keyStr, keySize, valueStr, valueSize );
+				keyValue._dup( keyStr, keySize, valueStr, valueSize );
 			} else {
 				__ERROR__( "ServerWorker", "performDegradedRead", "findValueByKey() failed (list ID: %u, key: %.*s).", listId, mykey.size, mykey.data );
 			}
@@ -1338,7 +1355,7 @@ force_reconstruct_chunks:
 
 bool ServerWorker::sendModifyChunkRequest(
 	uint16_t parentInstanceId, uint32_t parentRequestId,
-	uint8_t keySize, char *keyStr,
+	uint8_t keySize, bool isLarge, char *keyStr,
 	Metadata &metadata, uint32_t offset,
 	uint32_t deltaSize, uint32_t valueUpdateOffset, char *delta,
 	bool isSealed, bool isUpdate,
@@ -1354,7 +1371,7 @@ bool ServerWorker::sendModifyChunkRequest(
 	uint32_t requestId = ServerWorker::idGenerator->nextVal( this->workerId );
 	bool isDegraded = original && reconstructed && reconstructedCount;
 
-	key.set( keySize, keyStr );
+	key.set( keySize, keyStr, 0, isLarge );
 	keyValueUpdate.set( keySize, keyStr );
 	keyValueUpdate.offset = valueUpdateOffset;
 	keyValueUpdate.length = deltaSize;
@@ -1578,7 +1595,7 @@ bool ServerWorker::sendModifyChunkRequest(
 					PROTO_OPCODE_UPDATE,
 					parentInstanceId, requestId,
 					metadata.listId, metadata.stripeId, metadata.chunkId,
-					keySize, keyStr,
+					keySize, isLarge, keyStr,
 					valueUpdateOffset,
 					deltaSize, // valueUpdateSize
 					offset,    // Chunk update offset
@@ -1651,7 +1668,7 @@ bool ServerWorker::sendModifyChunkRequest(
 			self--; // Get the self parity server index
 			if ( isUpdate ) {
 				bool ret = ServerWorker::chunkBuffer->at( metadata.listId )->updateKeyValue(
-					keyStr, keySize,
+					keyStr, keySize, false,
 					valueUpdateOffset, deltaSize, delta
 				);
 				if ( ! ret ) {

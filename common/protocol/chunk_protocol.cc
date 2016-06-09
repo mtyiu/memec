@@ -122,7 +122,7 @@ size_t Protocol::generateChunkKeyValueHeader(
 	Key key;
 	KeyValue keyValue;
 	uint8_t keySize;
-	uint32_t valueSize;
+	uint32_t valueSize, splitOffset, splitSize;
 	char *keyStr, *valueStr;
 
 	metadata.set( listId, stripeId, chunkId );
@@ -172,13 +172,38 @@ size_t Protocol::generateChunkKeyValueHeader(
 		keyValueIt = values->find( key );
 		if ( keyValueIt != values->end() ) {
 			keyValue = keyValueIt->second;
-			keyValue.deserialize( keyStr, keySize, valueStr, valueSize );
+			keyValue.deserialize( keyStr, keySize, valueStr, valueSize, splitOffset );
 
 			if ( this->buffer.size >= bytes + PROTO_KEY_VALUE_SIZE + keySize + valueSize ) {
 				bytes += ProtocolUtil::write1Byte ( buf, keySize       );
 				bytes += ProtocolUtil::write3Bytes( buf, valueSize     );
 				bytes += ProtocolUtil::write( buf, keyStr, keySize     );
 				bytes += ProtocolUtil::write( buf, valueStr, valueSize );
+
+			bool isLarge = LargeObjectUtil::isLarge( keySize, valueSize, 0, &splitSize );
+			uint32_t objSize;
+
+			if ( isLarge ) {
+				if ( splitOffset + splitSize > valueSize )
+					splitSize = valueSize - splitOffset;
+				objSize = PROTO_KEY_VALUE_SIZE + PROTO_SPLIT_OFFSET_SIZE + keySize + valueSize;
+			} else {
+				objSize = PROTO_KEY_VALUE_SIZE + keySize + valueSize;
+			}
+
+			if ( this->buffer.size >= bytes + objSize ) {
+				bytes += ProtocolUtil::write1Byte ( buf, keySize       );
+				bytes += ProtocolUtil::write3Bytes( buf, valueSize     );
+
+				if ( isLarge ) {
+					bytes += ProtocolUtil::write( buf, keyStr, keySize );
+					bytes += ProtocolUtil::write3Bytes( buf, splitSize );
+					bytes += ProtocolUtil::write( buf, valueStr, splitSize );
+				} else {
+					bytes += ProtocolUtil::write( buf, keyStr, keySize     );
+					bytes += ProtocolUtil::write( buf, valueStr, valueSize );
+				}
+
 				values->erase( keyValueIt );
 				metadataRev->erase( current );
 				keyValue.free();

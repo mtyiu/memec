@@ -54,11 +54,18 @@ ParityChunkWrapper &ParityChunkBuffer::getWrapper( uint32_t stripeId, bool needs
 	return wrapper;
 }
 
-bool ParityChunkBuffer::set( char *keyStr, uint8_t keySize, char *valueStr, uint32_t valueSize, uint32_t chunkId, Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk, GetChunkBuffer *getChunkBuffer ) {
+bool ParityChunkBuffer::set(
+	char *keyStr, uint8_t keySize,
+	char *valueStr, uint32_t valueSize,
+	uint32_t chunkId, uint32_t splitOffset,
+	Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk,
+	GetChunkBuffer *getChunkBuffer
+) {
 	Key key;
 	std::unordered_map<Key, PendingRequest>::iterator it;
 
-	key.set( keySize, keyStr );
+	bool isLarge = LargeObjectUtil::isLarge( keySize, valueSize );
+	key.set( keySize, keyStr, 0, isLarge );
 
 	LOCK( &this->lock );
 
@@ -69,10 +76,10 @@ bool ParityChunkBuffer::set( char *keyStr, uint8_t keySize, char *valueStr, uint
 		KeyValue keyValue;
 		std::pair<std::unordered_map<Key, KeyValue>::iterator, bool> ret;
 
-		keyValue.dup( keyStr, keySize, valueStr, valueSize );
-		keyValue.deserialize( keyStr, keySize, valueStr, valueSize );
+		keyValue.dup( keyStr, keySize, valueStr, valueSize, splitOffset );
+		keyValue.deserialize( keyStr, keySize, valueStr, valueSize, splitOffset );
 
-		key.set( keySize, keyStr );
+		key.set( keySize, keyStr, 0, isLarge );
 
 		std::pair<Key, KeyValue> p( key, keyValue );
 
@@ -96,7 +103,7 @@ bool ParityChunkBuffer::set( char *keyStr, uint8_t keySize, char *valueStr, uint
 		switch ( pendingRequest.type ) {
 			case PRT_SEAL:
 				// fprintf( stderr, "--- PRT_SEAL: Key = %.*s (%u, %u, %u) ---\n", keySize, keyStr, this->listId, pendingRequest.req.seal.stripeId, this->chunkId );
-				KeyValue::serialize( data + pendingRequest.req.seal.offset, keyStr, keySize, valueStr, valueSize );
+				KeyValue::serialize( data + pendingRequest.req.seal.offset, keyStr, keySize, valueStr, valueSize, splitOffset );
 
 				// Update parity chunk
 				this->update(
@@ -132,6 +139,7 @@ bool ParityChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t coun
 	uint8_t keySize;
 	uint32_t valueSize, offset, curPos = 0, numOfKeys = 0;
 	char *keyStr, *valueStr;
+	bool isLarge;
 	Key key;
 	KeyValue keyValue;
 	std::unordered_map<Key, KeyValue>::iterator it;
@@ -142,10 +150,11 @@ bool ParityChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t coun
 		// Parse the (key, offset) record
 		keySize = sealData[ 0 ];
 		offset = ntohl( *( ( uint32_t * )( sealData + 1 ) ) );
+		isLarge = sealData[ 5 ];
 		keyStr = sealData + PROTO_CHUNK_SEAL_DATA_SIZE;
 
 		// Find the key-value pair from the temporary buffer
-		key.set( keySize, keyStr );
+		key.set( keySize, keyStr, 0, isLarge );
 		it = this->keys.find( key );
 
 		prtIt = this->pending.find( key );
@@ -164,7 +173,7 @@ bool ParityChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t coun
 
 		if ( it == this->keys.end() ) {
 			// Defer the processing of this key
-			key.dup();
+			key.dup( 0, 0, 0, key.isLarge );
 			PendingRequest pendingRequest;
 			pendingRequest.seal( stripeId, offset );
 
@@ -174,8 +183,9 @@ bool ParityChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t coun
 			r = this->pending.insert( p );
 			if ( ! r.second ) {
 				__ERROR__(
-					"ParityChunkBuffer", "seal", "Key: %.*s (size = %u) cannot be inserted into pending keys map (stripe ID: %u vs. %u, offset: %u vs. %u).",
+					"ParityChunkBuffer", "seal", "Key: %.*s (size = %u%s) cannot be inserted into pending keys map (stripe ID: %u vs. %u, offset: %u vs. %u).",
 					keySize, keyStr, keySize,
+					key.isLarge ? "; is large" : "",
 					r.first->second.req.seal.stripeId, stripeId,
 					r.first->second.req.seal.offset, offset
 				);
@@ -185,21 +195,32 @@ bool ParityChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t coun
 			keyValue = it->second;
 
 			// Get the value size
-			keyValue.deserialize( keyStr, keySize, valueStr, valueSize );
+			uint32_t splitOffset, splitSize;
+			keyValue.deserialize( keyStr, keySize, valueStr, valueSize, splitOffset );
+
+			bool isLarge = LargeObjectUtil::isLarge( keySize, valueSize, 0, &splitSize );
 
 			// Copy the key-value pair to the temporary data chunk
-			memcpy( data + offset, keyValue.data, KEY_VALUE_METADATA_SIZE + keySize + valueSize );
+			if ( isLarge ) {
+				if ( splitOffset + splitSize > valueSize )
+					splitSize = valueSize - splitOffset;
+				memcpy( data + offset, keyValue.data, KEY_VALUE_METADATA_SIZE + SPLIT_OFFSET_SIZE + keySize + splitSize );
+
+				curPos = offset + KEY_VALUE_METADATA_SIZE + SPLIT_OFFSET_SIZE + keySize + splitSize;
+			} else {
+				memcpy( data + offset, keyValue.data, KEY_VALUE_METADATA_SIZE + keySize + valueSize );
+
+				curPos = offset + KEY_VALUE_METADATA_SIZE + keySize + valueSize;
+			}
 
 			// Release memory
 			this->keys.erase( it );
 			keyValue.free();
-
-			curPos = offset + KEY_VALUE_METADATA_SIZE + keySize + valueSize;
 		}
 
 		// Update counter
-		sealData += PROTO_CHUNK_SEAL_DATA_SIZE + keySize;
-		sealDataSize -= PROTO_CHUNK_SEAL_DATA_SIZE + keySize;
+		sealData += PROTO_CHUNK_SEAL_DATA_SIZE + keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 );
+		sealDataSize -= PROTO_CHUNK_SEAL_DATA_SIZE + keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 );
 		numOfKeys++;
 	}
 	assert( numOfKeys == count );
@@ -278,11 +299,11 @@ bool ParityChunkBuffer::deleteKey( char *keyStr, uint8_t keySize ) {
 	return true;
 }
 
-bool ParityChunkBuffer::updateKeyValue( char *keyStr, uint8_t keySize, uint32_t offset, uint32_t length, char *valueUpdate ) {
+bool ParityChunkBuffer::updateKeyValue( char *keyStr, uint8_t keySize, bool isLarge, uint32_t offset, uint32_t length, char *valueUpdate ) {
 	std::unordered_map<Key, KeyValue>::iterator it;
 	Key key;
 
-	key.set( keySize, keyStr );
+	key.set( keySize, keyStr, 0, isLarge );
 
 	LOCK( &this->lock );
 	it = this->keys.find( key );
@@ -290,14 +311,14 @@ bool ParityChunkBuffer::updateKeyValue( char *keyStr, uint8_t keySize, uint32_t 
 		PendingRequest pendingRequest;
 		pendingRequest.update( offset, length, valueUpdate );
 
-		key.dup();
+		key.dup( 0, 0, 0, isLarge );
 
 		std::pair<Key, PendingRequest> p( key, pendingRequest );
 		std::pair<std::unordered_map<Key, PendingRequest>::iterator, bool> ret;
 
 		ret = this->pending.insert( p );
 		if ( ! ret.second ) {
-			__ERROR__( "ParityChunkBuffer", "updateKeyValue", "Key: %.*s (size = %u) cannot be inserted into pending keys map.\n", keySize, keyStr, keySize );
+			// __ERROR__( "ParityChunkBuffer", "updateKeyValue", "Key: %.*s (size = %u) cannot be inserted into pending keys map.\n", keySize, keyStr, keySize );
 		}
 		UNLOCK( &this->lock );
 		return false;

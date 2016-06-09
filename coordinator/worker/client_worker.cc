@@ -53,7 +53,8 @@ void CoordinatorWorker::dispatch( ClientEvent event ) {
 				event.message.remap.remapped,
 				event.message.remap.remappedCount,
 				event.message.remap.key.size,
-				event.message.remap.key.data
+				event.message.remap.key.data,
+				event.message.remap.key.isLarge
 			);
 			isSend = true;
 			break;
@@ -115,6 +116,7 @@ void CoordinatorWorker::dispatch( ClientEvent event ) {
 				isLocked,
 				event.message.degradedLock.key.size,
 				event.message.degradedLock.key.data,
+				event.message.degradedLock.key.isLarge,
 				event.message.degradedLock.isSealed,
 				event.message.degradedLock.stripeId,
 				event.message.degradedLock.dataChunkId,
@@ -138,7 +140,8 @@ void CoordinatorWorker::dispatch( ClientEvent event ) {
 				event.instanceId, event.requestId,
 				event.type == CLIENT_EVENT_TYPE_DEGRADED_LOCK_RESPONSE_NOT_LOCKED, // exist
 				event.message.degradedLock.key.size,
-				event.message.degradedLock.key.data
+				event.message.degradedLock.key.data,
+				event.message.degradedLock.key.isLarge
 			);
 			isSend = true;
 			break;
@@ -150,6 +153,7 @@ void CoordinatorWorker::dispatch( ClientEvent event ) {
 				event.instanceId, event.requestId,
 				event.message.degradedLock.key.size,
 				event.message.degradedLock.key.data,
+				event.message.degradedLock.key.isLarge,
 				event.message.degradedLock.original,
 				event.message.degradedLock.remapped,
 				event.message.degradedLock.remappedCount
@@ -358,6 +362,7 @@ bool CoordinatorWorker::handleSyncMetadata( ClientEvent event, char *buf, size_t
 				s = CoordinatorWorker::stripeList->get( header.op.listId, header.op.chunkId );
 			}
 			s->map.insertKey(
+				header.op.isLarge,
 				header.op.key,
 				header.op.keySize,
 				header.op.listId,

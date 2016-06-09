@@ -46,14 +46,28 @@ void DataChunkBuffer::init() {
 	}
 }
 
-KeyMetadata DataChunkBuffer::set( ServerWorker *worker, char *key, uint8_t keySize, char *value, uint32_t valueSize, uint8_t opcode, uint32_t &timestamp, uint32_t &stripeId, bool *isSealed, Metadata *sealed ) {
+KeyMetadata DataChunkBuffer::set(
+	ServerWorker *worker,
+	char *key, uint8_t keySize,
+	char *value, uint32_t valueSize,
+	uint8_t opcode, uint32_t &timestamp,
+	uint32_t &stripeId, uint32_t splitOffset,
+	bool *isSealed, Metadata *sealed
+) {
 	KeyMetadata keyMetadata;
-	uint32_t size = PROTO_KEY_VALUE_SIZE + keySize + valueSize, max = 0, tmp;
+	uint32_t size = PROTO_KEY_VALUE_SIZE + keySize + valueSize, max = 0, tmp, splitSize;
 	int index = -1;
 	Chunk *reInsertedChunk = 0, *chunk = 0;
 	char *ptr;
+	bool isLarge = LargeObjectUtil::isLarge( keySize, valueSize, 0, &splitSize );
 
 	if ( isSealed ) *isSealed = false;
+
+	if ( isLarge ) {
+		size -= valueSize;
+		size += ( splitOffset + splitSize > valueSize ) ? ( valueSize - splitOffset ) : splitSize;
+		size += SPLIT_OFFSET_SIZE;
+	}
 
 	// Choose one chunk buffer with minimum free space
 	LOCK( &this->lock );
@@ -151,7 +165,7 @@ KeyMetadata DataChunkBuffer::set( ServerWorker *worker, char *key, uint8_t keySi
 	keyMetadata.obj = ptr;
 
 	// Copy data to the buffer
-	KeyValue::serialize( ptr, key, keySize, value, valueSize );
+	KeyValue::serialize( ptr, key, keySize, value, valueSize, splitOffset );
 
 	// Flush if the current buffer is full
 	if ( ChunkUtil::getSize( chunk ) + PROTO_KEY_VALUE_SIZE + CHUNK_BUFFER_FLUSH_THRESHOLD >= ChunkBuffer::capacity ) {
@@ -180,8 +194,12 @@ KeyMetadata DataChunkBuffer::set( ServerWorker *worker, char *key, uint8_t keySi
 
 	// Update key map
 	Key keyObj;
-	keyObj.set( keySize, key );
-	ChunkBuffer::map->insertKey( keyObj, opcode, timestamp, keyMetadata );
+	keyObj.set( keySize, key, 0, isLarge );
+	ChunkBuffer::map->insertKey(
+		keyObj, opcode, timestamp, keyMetadata,
+		true, true, true,
+		isLarge
+	);
 	stripeId = keyMetadata.stripeId;
 
 	return keyMetadata;

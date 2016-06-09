@@ -40,7 +40,8 @@ private:
 	bool getServers(
 		uint8_t opcode, char *data, uint8_t size,
 		uint32_t *&original, uint32_t *&remapped, uint32_t &remappedCount,
-		ServerSocket *&originalDataServerSocket, bool &useCoordinatedFlow
+		ServerSocket *&originalDataServerSocket, bool &useCoordinatedFlow,
+		bool isGettingSplit = false
 	);
 	ServerSocket *getServers( uint32_t listId, uint32_t chunkId );
 
@@ -54,6 +55,7 @@ private:
 	void dispatch( ApplicationEvent event );
 	bool handleSetRequest( ApplicationEvent event, char *buf, size_t size );
 	bool handleGetRequest( ApplicationEvent event, char *buf, size_t size );
+	bool handleGetRequest( ApplicationEvent event, struct KeyHeader &header, bool isGettingSplit = false );
 	bool handleUpdateRequest( ApplicationEvent event, char *buf, size_t size );
 	bool handleDeleteRequest( ApplicationEvent event, char *buf, size_t size );
 
@@ -70,7 +72,7 @@ private:
 	bool sendDegradedLockRequest(
 		uint16_t parentInstanceId, uint32_t parentRequestId, uint8_t opcode,
 		uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
-		char *key, uint8_t keySize,
+		char *key, uint8_t keySize, bool isLarge,
 		uint32_t valueUpdateSize = 0, uint32_t valueUpdateOffset = 0, char *valueUpdate = 0
 	);
 	bool handleDegradedLockResponse( CoordinatorEvent event, bool success, char *buf, size_t size );

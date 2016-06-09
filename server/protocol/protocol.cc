@@ -14,14 +14,23 @@ char *ServerProtocol::reqSealChunk( size_t &size, uint16_t instanceId, uint32_t 
 	uint32_t count = 0;
 	char *key;
 	uint8_t keySize;
-	while ( ( nextOffset = ChunkUtil::next( chunk, currentOffset, key, keySize ) ) != -1 ) {
+	bool isLarge;
+	while ( ( nextOffset = ChunkUtil::next( chunk, currentOffset, key, keySize, isLarge ) ) != -1 ) {
+		// fprintf(
+		// 	stderr, "reqSealChunk(): [%u, %u, %u] %.*s (%u) at %u%s\n",
+		// 	metadata.listId, metadata.stripeId, metadata.chunkId,
+		// 	keySize, key, keySize, currentOffset,
+		// 	isLarge ? "; is large" : ""
+		// );
+
 		ptr[ 0 ] = keySize;
 		*( ( uint32_t * )( ptr + 1 ) ) = htonl( currentOffset );
-		memmove( ptr + 5, key, keySize );
+		ptr[ 5 ] = isLarge; // isLarge
+		memmove( ptr + 6, key, keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ) );
 
 		count++;
-		bytes += PROTO_CHUNK_SEAL_DATA_SIZE + keySize;
-		ptr += PROTO_CHUNK_SEAL_DATA_SIZE + keySize;
+		bytes += PROTO_CHUNK_SEAL_DATA_SIZE + keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 );
+		ptr += PROTO_CHUNK_SEAL_DATA_SIZE + keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 );
 
 		currentOffset = nextOffset;
 	}

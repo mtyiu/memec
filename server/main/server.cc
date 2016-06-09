@@ -129,6 +129,7 @@ bool Server::init( char *path, OptionList &globalOptions, OptionList &serverOpti
 		this->config.global.size.chunk, // chunkSize
 		this->config.server.pool.chunks // capacity
 	);
+	LargeObjectUtil::init( this->config.global.size.chunk );
 	/* Chunk buffer */
 	ChunkBuffer::init();
 	this->chunkBuffer.reserve( this->config.global.stripeLists.count );
@@ -691,7 +692,7 @@ void Server::help() {
 }
 
 void Server::lookup() {
-	char key[ 256 ];
+	char key[ 256 + SPLIT_OFFSET_SIZE ];
 	uint8_t keySize;
 	uint32_t offset;
 	char *obj = 0;
@@ -703,12 +704,13 @@ void Server::lookup() {
 		return;
 	}
 	keySize = ( uint8_t ) strnlen( key, sizeof( key ) ) - 1;
+	memset( key + keySize, 0, SPLIT_OFFSET_SIZE );
 
 	bool found = false;
 
 	KeyMetadata keyMetadata;
 	// if ( this->map.findValueByKey( key, keySize, 0, 0, &keyMetadata, 0, 0 ) ) {
-	if ( ( obj = this->map.findObject( key, keySize ) ) ) {
+	if ( ( obj = this->map.findObject( key, keySize ) ) || ( obj = this->map.findLargeObject( key, keySize ) ) ) {
 		Chunk *chunk = this->chunkPool.getChunk( obj, offset );
 		if ( chunk ) {
 			Metadata m = ChunkUtil::getMetadata( chunk );
@@ -718,8 +720,15 @@ void Server::lookup() {
 			keyMetadata.chunkId = m.chunkId;
 			keyMetadata.length = KeyValue::getSize( obj );
 			keyMetadata.offset = offset;
+
+			uint8_t _keySize;
+			uint32_t _valueSize, _splitOffset;
+			char *_key, *_value;
+			KeyValue::deserialize( obj, _key, _keySize, _value, _valueSize, _splitOffset );
 			printf(
-				"Metadata: (%u, %u, %u); offset: %u, length: %u\n", keyMetadata.listId, keyMetadata.stripeId, keyMetadata.chunkId,
+				"Metadata: (%u, %u, %u); key size: %u, value size: %u, split offset: %u, offset: %u, length: %u\n",
+				keyMetadata.listId, keyMetadata.stripeId, keyMetadata.chunkId,
+				_keySize, _valueSize, _splitOffset,
 				keyMetadata.offset, keyMetadata.length
 			);
 		} else {
@@ -736,7 +745,7 @@ void Server::lookup() {
 			uint8_t keySize;
 			uint32_t valueSize;
 			char *keyStr, *valueStr;
-			remappedKeyValue.keyValue.deserialize( keyStr, keySize, valueStr, valueSize );
+			remappedKeyValue.keyValue._deserialize( keyStr, keySize, valueStr, valueSize );
 			printf(
 				"%s(%u, %u) |-> (%u, %u); length: %u%s",
 				i == 0 ? "" : "; ",
@@ -753,12 +762,12 @@ void Server::lookup() {
 
 	bool isSealed;
 	KeyValue keyValue;
-	if ( this->degradedChunkBuffer.map.findValueByKey( key, keySize, isSealed, &keyValue, 0, &keyMetadata ) ) {
+	if ( this->degradedChunkBuffer.map.findValueByKey( key, keySize, false, isSealed, &keyValue, 0, &keyMetadata ) ) {
 		if ( isSealed ) {
 			uint8_t keySize;
 			uint32_t valueSize;
 			char *keyStr, *valueStr;
-			keyValue.deserialize( keyStr, keySize, valueStr, valueSize );
+			keyValue._deserialize( keyStr, keySize, valueStr, valueSize );
 			printf(
 				"Reconstructed chunk found: (%u, %u, %u); offset: %u, length: %u; is sealed? %s\n",
 				keyMetadata.listId, keyMetadata.stripeId, keyMetadata.chunkId, keyMetadata.offset, keyMetadata.length,
@@ -769,7 +778,7 @@ void Server::lookup() {
 			uint8_t keySize;
 			uint32_t valueSize;
 			char *keyStr, *valueStr;
-			keyValue.deserialize( keyStr, keySize, valueStr, valueSize );
+			keyValue._deserialize( keyStr, keySize, valueStr, valueSize );
 			printf(
 				"Reconstructed key found: %.*s; key size: %u, value size: %u; is sealed? %s\n",
 				keySize, keyStr, keySize, valueSize,
