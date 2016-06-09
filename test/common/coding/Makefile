@@ -2,7 +2,7 @@ CC=g++
 CFLAGS=-std=c++11 -Wall -O2
 MEMEC_SRC_ROOT=../../..
 LIBS=
-EXTRA_LIB=
+EXTRA_LIB= -lpthread
 INCLUDE=
 FLAGS=-DTEST_DELTA
 ifeq ($(USE_ISAL),1)

@@ -1,5 +1,6 @@
 common/coding/coding
 common/coding/performance
+common/coding/batch_performance
 common/coding/basic_op_performance
 common/coding/checker
 common/config/global_config
