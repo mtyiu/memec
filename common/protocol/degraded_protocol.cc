@@ -1,22 +1,27 @@
+#include <cassert>
 #include "protocol.hh"
 
 size_t Protocol::generateDegradedLockReqHeader(
 	uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
-	uint8_t keySize, char *key
+	uint8_t keySize, char *key, bool isLarge
 ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader(
 		magic, to, opcode,
-		PROTO_DEGRADED_LOCK_REQ_SIZE + keySize + reconstructedCount * 4 * 4,
+		PROTO_DEGRADED_LOCK_REQ_SIZE + keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ) + reconstructedCount * 4 * 4,
 		instanceId, requestId
 	);
 
 	*( ( uint32_t * )( buf      ) ) = htonl( reconstructedCount );
 	buf[ 4 ] = keySize;
+	buf[ 5 ] = isLarge;
 
 	buf += PROTO_DEGRADED_LOCK_REQ_SIZE;
 	bytes += PROTO_DEGRADED_LOCK_REQ_SIZE;
+
+	if ( isLarge )
+		keySize += SPLIT_OFFSET_SIZE;
 
 	memmove( buf, key, keySize );
 	buf += keySize;
@@ -41,7 +46,7 @@ size_t Protocol::generateDegradedLockReqHeader(
 bool Protocol::parseDegradedLockReqHeader(
 	size_t offset,
 	uint32_t *&original, uint32_t *&reconstructed, uint32_t &reconstructedCount,
-	uint8_t &keySize, char *&key, char *buf, size_t size
+	uint8_t &keySize, char *&key, bool &isLarge, char *buf, size_t size
 ) {
 	if ( size - offset < PROTO_DEGRADED_LOCK_REQ_SIZE )
 		return false;
@@ -49,12 +54,13 @@ bool Protocol::parseDegradedLockReqHeader(
 	char *ptr = buf + offset;
 	reconstructedCount = ntohl( *( ( uint32_t * )( ptr      ) ) );
 	keySize = ptr[ 4 ];
+	isLarge = ptr[ 5 ];
 
 	if ( size - offset < ( size_t ) PROTO_DEGRADED_LOCK_REQ_SIZE + keySize + reconstructedCount * 4 * 4 )
 		return false;
 
 	key = ptr + PROTO_DEGRADED_LOCK_REQ_SIZE;
-	ptr += PROTO_DEGRADED_LOCK_REQ_SIZE + keySize;
+	ptr += PROTO_DEGRADED_LOCK_REQ_SIZE + keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 );
 
 	original = ( uint32_t * ) ptr;
 	reconstructed = ( ( uint32_t * ) ptr ) + reconstructedCount * 2;
@@ -80,23 +86,28 @@ bool Protocol::parseDegradedLockReqHeader( struct DegradedLockReqHeader &header,
 		header.reconstructedCount,
 		header.keySize,
 		header.key,
+		header.isLarge,
 		buf, size
 	);
 }
 
-size_t Protocol::generateDegradedLockResHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t length, uint8_t type, uint8_t keySize, char *key, char *&buf ) {
+size_t Protocol::generateDegradedLockResHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t length, uint8_t type, uint8_t keySize, char *key, bool isLarge, char *&buf ) {
 	buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader(
 		magic, to, opcode,
-		PROTO_DEGRADED_LOCK_RES_BASE_SIZE + keySize + length,
+		PROTO_DEGRADED_LOCK_RES_BASE_SIZE + keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ) + length,
 		instanceId, requestId
 	);
 
 	buf[ 0 ] = type;
 	buf[ 1 ] = keySize;
+	buf[ 2 ] = isLarge;
 
 	buf += PROTO_DEGRADED_LOCK_RES_BASE_SIZE;
 	bytes += PROTO_DEGRADED_LOCK_RES_BASE_SIZE;
+
+	if ( isLarge )
+		keySize += SPLIT_OFFSET_SIZE;
 
 	memmove( buf, key, keySize );
 	buf += keySize;
@@ -107,7 +118,7 @@ size_t Protocol::generateDegradedLockResHeader( uint8_t magic, uint8_t to, uint8
 
 size_t Protocol::generateDegradedLockResHeader(
 	uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
-	bool isLocked, uint8_t keySize, char *key,
+	bool isLocked, uint8_t keySize, char *key, bool isLarge,
 	bool isSealed, uint32_t stripeId, uint32_t dataChunkId, uint32_t dataChunkCount,
 	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 	uint32_t ongoingAtChunk,
@@ -118,7 +129,7 @@ size_t Protocol::generateDegradedLockResHeader(
 		magic, to, opcode, instanceId, requestId,
 		PROTO_DEGRADED_LOCK_RES_LOCK_SIZE + numSurvivingChunkIds * 4 + reconstructedCount * 4 * 4,
 		isLocked ? PROTO_DEGRADED_LOCK_RES_IS_LOCKED : PROTO_DEGRADED_LOCK_RES_WAS_LOCKED,
-		keySize, key, buf
+		keySize, key, isLarge, buf
 	);
 
 	buf[ 0 ] = isSealed;
@@ -195,21 +206,21 @@ size_t Protocol::generateDegradedLockResHeader(
 
 size_t Protocol::generateDegradedLockResHeader(
 	uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
-	bool exist, uint8_t keySize, char *key
+	bool exist, uint8_t keySize, char *key, bool isLarge
 ) {
 	char *buf;
 	size_t bytes = this->generateDegradedLockResHeader(
 		magic, to, opcode, instanceId, requestId,
 		PROTO_DEGRADED_LOCK_RES_NOT_SIZE,
 		exist ? PROTO_DEGRADED_LOCK_RES_NOT_LOCKED : PROTO_DEGRADED_LOCK_RES_NOT_EXIST,
-		keySize, key, buf
+		keySize, key, isLarge, buf
 	);
 	return bytes;
 }
 
 size_t Protocol::generateDegradedLockResHeader(
 	uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
-	uint8_t keySize, char *key,
+	uint8_t keySize, char *key, bool isLarge,
 	uint32_t *original, uint32_t *remapped, uint32_t remappedCount
 ) {
 	char *buf;
@@ -217,7 +228,7 @@ size_t Protocol::generateDegradedLockResHeader(
 		magic, to, opcode, instanceId, requestId,
 		PROTO_DEGRADED_LOCK_RES_REMAP_SIZE + remappedCount * 4 * 4,
 		PROTO_DEGRADED_LOCK_RES_REMAPPED,
-		keySize, key, buf
+		keySize, key, isLarge, buf
 	);
 
 	*( ( uint32_t * )( buf      ) ) = htonl( remappedCount );
@@ -240,13 +251,14 @@ size_t Protocol::generateDegradedLockResHeader(
 	return bytes;
 }
 
-bool Protocol::parseDegradedLockResHeader( size_t offset, uint8_t &type, uint8_t &keySize, char *&key, char *buf, size_t size ) {
+bool Protocol::parseDegradedLockResHeader( size_t offset, uint8_t &type, uint8_t &keySize, char *&key, bool &isLarge, char *buf, size_t size ) {
 	if ( size - offset < PROTO_DEGRADED_LOCK_RES_BASE_SIZE )
 		return false;
 
 	char *ptr = buf + offset;
 	type = ptr[ 0 ];
 	keySize = ptr[ 1 ];
+	isLarge = ptr[ 2 ];
 
 	if ( size - offset < PROTO_DEGRADED_LOCK_RES_BASE_SIZE + ( size_t ) keySize )
 		return false;
@@ -331,12 +343,13 @@ bool Protocol::parseDegradedLockResHeader( struct DegradedLockResHeader &header,
 		header.type,
 		header.keySize,
 		header.key,
+		header.isLarge,
 		buf, size
 	);
 	if ( ! ret )
 		return false;
 
-	offset += PROTO_DEGRADED_LOCK_RES_BASE_SIZE + header.keySize;
+	offset += PROTO_DEGRADED_LOCK_RES_BASE_SIZE + header.keySize + ( header.isLarge ? SPLIT_OFFSET_SIZE : 0 );
 	switch( header.type ) {
 		case PROTO_DEGRADED_LOCK_RES_IS_LOCKED:
 		case PROTO_DEGRADED_LOCK_RES_WAS_LOCKED:
@@ -376,16 +389,20 @@ size_t Protocol::generateDegradedReqHeader(
 	bool isSealed, uint32_t stripeId,
 	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 	uint32_t ongoingAtChunk, uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds,
-	uint8_t keySize, char *key,
+	uint8_t keySize, char *key, bool isLarge,
 	uint32_t timestamp
 ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader(
 		magic, to, opcode,
-		PROTO_DEGRADED_REQ_BASE_SIZE + numSurvivingChunkIds * 4 + reconstructedCount * 4 * 4 + PROTO_KEY_SIZE + keySize,
+		PROTO_DEGRADED_REQ_BASE_SIZE + numSurvivingChunkIds * 4 + reconstructedCount * 4 * 4 + PROTO_KEY_SIZE + keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ),
 		instanceId, requestId, 0,
 		timestamp
 	);
+
+	buf[ 0 ] = isLarge;
+	buf += 1;
+	bytes += 1;
 
 	buf[ 0 ] = isSealed;
 	buf += 1;
@@ -423,6 +440,9 @@ size_t Protocol::generateDegradedReqHeader(
 	buf += PROTO_KEY_SIZE;
 	bytes += PROTO_KEY_SIZE;
 
+	if ( isLarge )
+		keySize += SPLIT_OFFSET_SIZE;
+
 	memmove( buf, key, keySize );
 	bytes += keySize;
 
@@ -434,18 +454,22 @@ size_t Protocol::generateDegradedReqHeader(
 	bool isSealed, uint32_t stripeId,
 	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
 	uint32_t ongoingAtChunk, uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds,
-	uint8_t keySize, char *key,
+	uint8_t keySize, char *key, bool isLarge,
 	uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate,
 	uint32_t timestamp
 ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader(
 		magic, to, opcode,
-		PROTO_DEGRADED_REQ_BASE_SIZE + numSurvivingChunkIds * 4 + reconstructedCount * 4 * 4 + PROTO_KEY_VALUE_UPDATE_SIZE + keySize + valueUpdateSize,
+		PROTO_DEGRADED_REQ_BASE_SIZE + numSurvivingChunkIds * 4 + reconstructedCount * 4 * 4 + PROTO_KEY_VALUE_UPDATE_SIZE + keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ) + valueUpdateSize,
 		instanceId, requestId,
 		0,
 		timestamp
 	);
+
+	buf[ 0 ] = isLarge;
+	buf += 1;
+	bytes += 1;
 
 	buf[ 0 ] = isSealed;
 	buf += 1;
@@ -497,6 +521,9 @@ size_t Protocol::generateDegradedReqHeader(
 	buf += PROTO_KEY_VALUE_UPDATE_SIZE;
 	bytes += PROTO_KEY_VALUE_UPDATE_SIZE;
 
+	if ( isLarge )
+		keySize += SPLIT_OFFSET_SIZE;
+
 	memmove( buf, key, keySize );
 	buf += keySize;
 	bytes += keySize;
@@ -509,7 +536,7 @@ size_t Protocol::generateDegradedReqHeader(
 
 bool Protocol::parseDegradedReqHeader(
 	size_t offset,
-	bool &isSealed, uint32_t &stripeId,
+	bool &isSealed, uint32_t &stripeId, bool &isLarge,
 	uint32_t *&original, uint32_t *&reconstructed, uint32_t &reconstructedCount,
 	uint32_t &ongoingAtChunk, uint8_t &numSurvivingChunkIds, uint32_t *&survivingChunkIds,
 	char *buf, size_t size
@@ -519,8 +546,9 @@ bool Protocol::parseDegradedReqHeader(
 
 	char *ptr = buf + offset;
 
-	isSealed = ptr[ 0 ];
-	ptr += 1;
+	isLarge = ptr[ 0 ];
+	isSealed = ptr[ 1 ];
+	ptr += 2;
 
 	stripeId           = ntohl( *( ( uint32_t * )( ptr      ) ) );
 	reconstructedCount = ntohl( *( ( uint32_t * )( ptr +  4 ) ) );
@@ -556,6 +584,7 @@ bool Protocol::parseDegradedReqHeader( struct DegradedReqHeader &header, uint8_t
 		offset,
 		header.isSealed,
 		header.stripeId,
+		header.isLarge,
 		header.original,
 		header.reconstructed,
 		header.reconstructedCount,
@@ -963,7 +992,7 @@ size_t Protocol::generateDegradedReleaseReqHeader( uint8_t magic, uint8_t to, ui
 		buf += PROTO_DEGRADED_RELEASE_REQ_SIZE;
 		bytes += PROTO_DEGRADED_RELEASE_REQ_SIZE;
 	}
-	
+
 	// TODO: remove only after all servers acknowledge
 	chunks.erase( chunks.begin(), chunks.begin() + count );
 

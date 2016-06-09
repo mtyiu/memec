@@ -191,6 +191,8 @@ void ApplicationWorker::dispatch( ClientEvent event ) {
 		std::set<KeyValueUpdate>::iterator keyValueUpdateIt;
 		int fd;
 
+		keyValueUpdate.isLarge = false;
+
 		WORKER_RECEIVE_FROM_EVENT_SOCKET();
 		while ( buffer.size > 0 ) {
 			WORKER_RECEIVE_WHOLE_MESSAGE_FROM_EVENT_SOCKET( "ApplicationWorker" );
@@ -256,7 +258,7 @@ void ApplicationWorker::dispatch( ClientEvent event ) {
 					break;
 				case PROTO_OPCODE_GET:
 					if ( success ) {
-						if ( this->protocol.parseKeyValueHeader( keyValueHeader, buffer.data, buffer.size ) ) {
+						if ( this->protocol.parseKeyValueHeader( keyValueHeader, buffer.data, buffer.size, 0, false ) ) {
 							key.size = keyValueHeader.keySize;
 							key.data = keyValueHeader.key;
 							key.ptr = ( void * ) event.socket;
@@ -435,14 +437,10 @@ bool ApplicationWorker::init() {
 }
 
 bool ApplicationWorker::init( ApplicationConfig &config, uint32_t workerId ) {
-	this->buffer.value = new char[ config.size.chunk ];
-	this->buffer.valueSize = config.size.chunk;
-	this->protocol.init(
-		Protocol::getSuggestedBufferSize(
-			config.size.key,
-			config.size.chunk
-		)
-	);
+	uint32_t bufferSize = Protocol::getSuggestedBufferSize( config.size.key, config.size.chunk, true );
+	this->buffer.value = new char[ bufferSize ];
+	this->buffer.valueSize = bufferSize;
+	this->protocol.init( bufferSize );
 	this->workerId = workerId;
 	return true;
 }

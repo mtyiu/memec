@@ -1,6 +1,6 @@
 #include "protocol.hh"
 
-char *ClientProtocol::reqDegradedLock( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, char *key, uint8_t keySize ) {
+char *ClientProtocol::reqDegradedLock( size_t &size, uint16_t instanceId, uint32_t requestId, uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, char *key, uint8_t keySize, bool isLarge ) {
 	// -- common/protocol/degraded_protocol.cc --
 	size = this->generateDegradedLockReqHeader(
 		PROTO_MAGIC_REQUEST,
@@ -8,12 +8,12 @@ char *ClientProtocol::reqDegradedLock( size_t &size, uint16_t instanceId, uint32
 		PROTO_OPCODE_DEGRADED_LOCK,
 		instanceId, requestId,
 		original, reconstructed, reconstructedCount,
-		keySize, key
+		keySize, key, isLarge
 	);
 	return this->buffer.send;
 }
 
-char *ClientProtocol::reqDegradedGet( size_t &size, uint16_t instanceId, uint32_t requestId, bool isSealed, uint32_t stripeId, uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32_t ongoingAtChunk, uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds, char *key, uint8_t keySize ) {
+char *ClientProtocol::reqDegradedGet( size_t &size, uint16_t instanceId, uint32_t requestId, bool isSealed, uint32_t stripeId, uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32_t ongoingAtChunk, uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds, char *key, uint8_t keySize, bool isLarge ) {
 	// -- common/protocol/degraded_protocol.cc --
 	size = this->generateDegradedReqHeader(
 		PROTO_MAGIC_REQUEST,
@@ -23,12 +23,12 @@ char *ClientProtocol::reqDegradedGet( size_t &size, uint16_t instanceId, uint32_
 		isSealed, stripeId,
 		original, reconstructed, reconstructedCount,
 		ongoingAtChunk, numSurvivingChunkIds, survivingChunkIds,
-		keySize, key
+		keySize, key, isLarge
 	);
 	return this->buffer.send;
 }
 
-char *ClientProtocol::reqDegradedUpdate( size_t &size, uint16_t instanceId, uint32_t requestId, bool isSealed, uint32_t stripeId, uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32_t ongoingAtChunk, uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds, char *key, uint8_t keySize, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t timestamp ) {
+char *ClientProtocol::reqDegradedUpdate( size_t &size, uint16_t instanceId, uint32_t requestId, bool isSealed, uint32_t stripeId, uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32_t ongoingAtChunk, uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds, char *key, uint8_t keySize, bool isLarge, char *valueUpdate, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, uint32_t timestamp ) {
 	// -- common/protocol/degraded_protocol.cc --
 	size = this->generateDegradedReqHeader(
 		PROTO_MAGIC_REQUEST,
@@ -38,14 +38,14 @@ char *ClientProtocol::reqDegradedUpdate( size_t &size, uint16_t instanceId, uint
 		isSealed, stripeId,
 		original, reconstructed, reconstructedCount,
 		ongoingAtChunk, numSurvivingChunkIds, survivingChunkIds,
-		keySize, key,
+		keySize, key, isLarge,
 		valueUpdateOffset, valueUpdateSize, valueUpdate,
 		timestamp
 	);
 	return this->buffer.send;
 }
 
-char *ClientProtocol::reqDegradedDelete( size_t &size, uint16_t instanceId, uint32_t requestId, bool isSealed, uint32_t stripeId, uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32_t ongoingAtChunk, uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds, char *key, uint8_t keySize, uint32_t timestamp ) {
+char *ClientProtocol::reqDegradedDelete( size_t &size, uint16_t instanceId, uint32_t requestId, bool isSealed, uint32_t stripeId, uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32_t ongoingAtChunk, uint8_t numSurvivingChunkIds, uint32_t *survivingChunkIds, char *key, uint8_t keySize, bool isLarge, uint32_t timestamp ) {
 	// -- common/protocol/degraded_protocol.cc --
 	size = this->generateDegradedReqHeader(
 		PROTO_MAGIC_REQUEST,
@@ -55,7 +55,7 @@ char *ClientProtocol::reqDegradedDelete( size_t &size, uint16_t instanceId, uint
 		isSealed, stripeId,
 		original, reconstructed, reconstructedCount,
 		ongoingAtChunk, numSurvivingChunkIds, survivingChunkIds,
-		keySize, key,
+		keySize, key, isLarge,
 		timestamp
 	);
 	return this->buffer.send;

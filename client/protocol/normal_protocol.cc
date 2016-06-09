@@ -1,6 +1,12 @@
 #include "protocol.hh"
 
-char *ClientProtocol::reqSet( size_t &size, uint16_t instanceId, uint32_t requestId, char *key, uint8_t keySize, char *value, uint32_t valueSize, char *buf ) {
+char *ClientProtocol::reqSet(
+	size_t &size, uint16_t instanceId, uint32_t requestId,
+	char *key, uint8_t keySize,
+	char *value, uint32_t valueSize,
+	uint32_t splitOffset, uint32_t splitSize,
+	char *buf
+) {
 	// -- common/protocol/normal_protocol.cc --
 	if ( ! buf ) buf = this->buffer.send;
 	size = this->generateKeyValueHeader(
@@ -8,11 +14,10 @@ char *ClientProtocol::reqSet( size_t &size, uint16_t instanceId, uint32_t reques
 		PROTO_MAGIC_TO_SERVER,
 		PROTO_OPCODE_SET,
 		instanceId, requestId,
-		keySize,
-		key,
-		valueSize,
-		value,
-		buf
+		keySize, key,
+		valueSize, value,
+		buf, 0,
+		splitOffset, splitSize
 	);
 	return buf;
 }

@@ -201,7 +201,7 @@ size_t Protocol::generateChunkKeyValueHeader(
 	Key key;
 	KeyValue keyValue;
 	uint8_t keySize;
-	uint32_t valueSize;
+	uint32_t valueSize, splitOffset, splitSize;
 	char *keyStr, *valueStr;
 	unsigned char *tmp;
 
@@ -258,9 +258,20 @@ size_t Protocol::generateChunkKeyValueHeader(
 		keyValueIt = values->find( key );
 		if ( keyValueIt != values->end() ) {
 			keyValue = keyValueIt->second;
-			keyValue.deserialize( keyStr, keySize, valueStr, valueSize );
+			keyValue.deserialize( keyStr, keySize, valueStr, valueSize, splitOffset );
 
-			if ( this->buffer.size >= bytes + PROTO_KEY_VALUE_SIZE + keySize + valueSize ) {
+			bool isLarge = LargeObjectUtil::isLarge( keySize, valueSize, 0, &splitSize );
+			uint32_t objSize;
+
+			if ( isLarge ) {
+				if ( splitOffset + splitSize > valueSize )
+					splitSize = valueSize - splitOffset;
+				objSize = PROTO_KEY_VALUE_SIZE + PROTO_SPLIT_OFFSET_SIZE + keySize + valueSize;
+			} else {
+				objSize = PROTO_KEY_VALUE_SIZE + keySize + valueSize;
+			}
+
+			if ( this->buffer.size >= bytes + objSize ) {
 				buf[ 0 ] = key.size;
 
 				valueSize = htonl( valueSize );
@@ -270,11 +281,31 @@ size_t Protocol::generateChunkKeyValueHeader(
 				buf[ 3 ] = tmp[ 3 ];
 				valueSize = ntohl( valueSize );
 
-				memmove( buf + 4, keyStr, keySize );
-				memmove( buf + 4 + keySize, valueStr, valueSize );
+				if ( isLarge ) {
+					buf += PROTO_KEY_VALUE_SIZE;
 
-				buf += PROTO_KEY_VALUE_SIZE + keySize + valueSize;
-				bytes += PROTO_KEY_VALUE_SIZE + keySize + valueSize;
+					memmove( buf, keyStr, keySize );
+					buf += keySize;
+
+					splitSize = htonl( splitSize );
+					tmp = ( unsigned char * ) &splitSize;
+					buf[ 0 ] = tmp[ 1 ];
+					buf[ 1 ] = tmp[ 2 ];
+					buf[ 2 ] = tmp[ 3 ];
+					splitSize = ntohl( splitSize );
+					buf += PROTO_SPLIT_OFFSET_SIZE;
+
+					memmove( buf, valueStr, splitSize );
+					buf += splitSize;
+
+					bytes += PROTO_KEY_VALUE_SIZE + keySize + PROTO_SPLIT_OFFSET_SIZE + splitSize;
+				} else {
+					memmove( buf + 4, keyStr, keySize );
+					memmove( buf + 4 + keySize, valueStr, valueSize );
+
+					buf += PROTO_KEY_VALUE_SIZE + keySize + valueSize;
+					bytes += PROTO_KEY_VALUE_SIZE + keySize + valueSize;
+				}
 
 				values->erase( keyValueIt );
 				metadataRev->erase( current );

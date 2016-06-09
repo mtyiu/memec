@@ -49,9 +49,9 @@ bool Map::insertChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId, boo
 	return ret.second;
 }
 
-bool Map::insertKey( char *keyStr, uint8_t keySize, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint8_t opcode, uint32_t timestamp, bool needsLock, bool needsUnlock ) {
+bool Map::insertKey( bool isLarge, char *keyStr, uint8_t keySize, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint8_t opcode, uint32_t timestamp, bool needsLock, bool needsUnlock ) {
 	Key key;
-	key.set( keySize, keyStr );
+	key.set( keySize, keyStr, 0, isLarge );
 
 	OpMetadata opMetadata;
 	opMetadata.set( listId, stripeId, chunkId );
@@ -90,7 +90,7 @@ bool Map::insertKey( char *keyStr, uint8_t keySize, uint32_t listId, uint32_t st
 					it->second = opMetadata;
 				}
 			} else {
-				key.dup();
+				key.dup( 0, 0, 0, key.isLarge );
 
 				std::pair<Key, OpMetadata> p( key, opMetadata );
 				std::pair<std::unordered_map<Key, OpMetadata>::iterator, bool> r;
@@ -107,7 +107,7 @@ bool Map::insertKey( char *keyStr, uint8_t keySize, uint32_t listId, uint32_t st
 				key.free();
 				this->keys.erase( it );
 			} else {
-				key.dup();
+				key.dup( 0, 0, 0, key.isLarge );
 
 				std::pair<Key, OpMetadata> p( key, opMetadata );
 				std::pair<std::unordered_map<Key, OpMetadata>::iterator, bool> r;
@@ -131,7 +131,7 @@ bool Map::insertKey( char *keyStr, uint8_t keySize, uint32_t listId, uint32_t st
 				if ( this->lockedKeys.count( key ) ) {
 					ret = false;
 				} else {
-					key.dup();
+					key.dup( 0, 0, 0, key.isLarge );
 					this->lockedKeys.insert( key );
 				}
 			}
@@ -202,11 +202,11 @@ uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint32
 	return ret;
 }
 
-bool Map::findMetadataByKey( char *keyStr, uint8_t keySize, Metadata &metadata ) {
+bool Map::findMetadataByKey( char *keyStr, uint8_t keySize, bool isLarge, Metadata &metadata ) {
 	std::unordered_map<Key, OpMetadata>::iterator it;
 	Key key;
 
-	key.set( keySize, keyStr );
+	key.set( keySize, keyStr, 0, isLarge );
 
 	LOCK( &this->keysLock );
 	it = this->keys.find( key );

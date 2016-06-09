@@ -16,7 +16,7 @@ bool MixedChunkBuffer::set(
 	char *key, uint8_t keySize,
 	char *value, uint32_t valueSize,
 	uint8_t opcode, uint32_t &timestamp,
-	uint32_t &stripeId, uint32_t chunkId,
+	uint32_t &stripeId, uint32_t chunkId, uint32_t splitOffset,
 	bool *isSealed, Metadata *sealed,
 	Chunk **dataChunks, Chunk *dataChunk, Chunk *parityChunk,
 	GetChunkBuffer *getChunkBuffer
@@ -27,7 +27,8 @@ bool MixedChunkBuffer::set(
 				worker,
 				key, keySize,
 				value, valueSize,
-				opcode, timestamp, stripeId,
+				opcode, timestamp,
+				stripeId, splitOffset,
 				isSealed, sealed
 			);
 			return true;
@@ -35,7 +36,9 @@ bool MixedChunkBuffer::set(
 			timestamp = 0;
 			if ( isSealed ) *isSealed = false;
 			return this->buffer.parity->set(
-				key, keySize, value, valueSize, chunkId,
+				key, keySize,
+				value, valueSize,
+				chunkId, splitOffset,
 				dataChunks, dataChunk, parityChunk,
 				getChunkBuffer
 			);
@@ -145,10 +148,10 @@ bool MixedChunkBuffer::deleteKey( char *keyStr, uint8_t keySize ) {
 	}
 }
 
-bool MixedChunkBuffer::updateKeyValue( char *keyStr, uint8_t keySize, uint32_t offset, uint32_t length, char *valueUpdate ) {
+bool MixedChunkBuffer::updateKeyValue( char *keyStr, uint8_t keySize, bool isLarge, uint32_t offset, uint32_t length, char *valueUpdate ) {
 	switch( this->role ) {
 		case CBR_PARITY:
-			return this->buffer.parity->updateKeyValue( keyStr, keySize, offset, length, valueUpdate );
+			return this->buffer.parity->updateKeyValue( keyStr, keySize, isLarge, offset, length, valueUpdate );
 		default:
 			return false;
 	}

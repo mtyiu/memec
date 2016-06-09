@@ -16,9 +16,11 @@ bool ClientWorker::handleDegradedSetRequest( ApplicationEvent event, char *buf, 
 
 	uint32_t *original, *remapped;
 	uint32_t remappedCount;
-	bool connected, useCoordinatedFlow;
+	bool connected, useCoordinatedFlow, isLarge;
 	ssize_t sentBytes;
 	ServerSocket *originalDataServerSocket;
+
+	isLarge = LargeObjectUtil::isLarge( header.keySize, header.valueSize );
 
 	if ( ! this->getServers( PROTO_OPCODE_SET, header.key, header.keySize, original, remapped, remappedCount, originalDataServerSocket, useCoordinatedFlow ) ) {
 		Key key;
@@ -37,7 +39,7 @@ bool ClientWorker::handleDegradedSetRequest( ApplicationEvent event, char *buf, 
 	uint16_t instanceId = Client::instanceId;
 	uint32_t requestId = ClientWorker::idGenerator->nextVal( this->workerId );
 
-	keyValue.dup( header.key, header.keySize, header.value, header.valueSize );
+	keyValue._dup( header.key, header.keySize, header.value, header.valueSize );
 	key = keyValue.key();
 
 	// Insert the key into application SET pending map
@@ -49,7 +51,8 @@ bool ClientWorker::handleDegradedSetRequest( ApplicationEvent event, char *buf, 
 	buffer.data = this->protocol.reqDegradedSetLock(
 		buffer.size, instanceId, requestId,
 		original, remapped, remappedCount,
-		header.key, header.keySize
+		header.key, header.keySize,
+		isLarge
 	);
 
 	// insert the list of remapped servers into pending map
@@ -142,7 +145,7 @@ bool ClientWorker::handleDegradedSetLockResponse( CoordinatorEvent event, bool s
 		return false;
 	}
 	key = keyValue.key();
-	keyValue.deserialize( keyStr, keySize, valueStr, valueSize );
+	keyValue._deserialize( keyStr, keySize, valueStr, valueSize );
 
 	// Insert pending SET requests for each involved servers //
 	for ( uint32_t i = 0; i < ClientWorker::parityChunkCount + 1; i++ ) {
@@ -170,6 +173,7 @@ bool ClientWorker::handleDegradedSetLockResponse( CoordinatorEvent event, bool s
 			header.original, header.remapped, header.remappedCount,
 			keyStr, keySize,
 			valueStr, valueSize,
+			0, 0,
 			packet->data
 		);
 		packet->size = buffer.size;
@@ -207,7 +211,9 @@ bool ClientWorker::handleDegradedSetLockResponse( CoordinatorEvent event, bool s
 		originalListId, originalChunkId,
 		header.original, header.remapped, header.remappedCount,
 		keyStr, keySize,
-		valueStr, valueSize
+		valueStr, valueSize,
+		0, 0,
+		0
 	);
 	sentBytes = dataServerSocket->send( buffer.data, buffer.size, connected );
 	if ( sentBytes != ( ssize_t ) buffer.size ) {

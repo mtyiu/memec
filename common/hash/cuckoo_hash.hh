@@ -83,7 +83,7 @@ private:
 
 	char *tryRead( char *key, uint8_t keySize, uint8_t tag, size_t i );
 	bool tryAdd( char *ptr, uint8_t tag, size_t i, size_t lock );
-	bool tryDel( char *key, uint8_t keySize, uint8_t tag, size_t i, size_t lock );
+	bool tryDel( char *key, uint8_t keySize, uint8_t tag, size_t i, size_t lock, bool isLarge );
 
 	int cpSearch( size_t depthStart, size_t *cpIndex );
 	int cpBackmove( size_t depthStart, size_t index );
@@ -130,9 +130,9 @@ public:
 
 	void setKeySize( uint8_t keySize );
 
-	char *find( char *key, uint8_t keySize );
-	bool insert( char *key, uint8_t keySize, char *ptr );
-	void del( char *key, uint8_t keySize );
+	char *find( char *key, uint8_t keySize, bool isLarge = false );
+	bool insert( char *key, uint8_t keySize, char *ptr, bool isLarge = false );
+	void del( char *key, uint8_t keySize, bool isLarge = false );
 };
 
 #endif

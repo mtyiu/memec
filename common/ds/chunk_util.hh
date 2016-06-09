@@ -59,19 +59,28 @@ public:
 
 		// Scan the whole data chunk
 		uint8_t keySize;
-		uint32_t valueSize, tmp;
+		uint32_t valueSize, tmp, splitOffset, splitSize;
 		char *key, *value;
 		char *data, *ptr;
 		uint32_t _chunkSize = 0;
+		bool isLarge;
 
 		data = ptr = ChunkUtil::getData( chunk );
 
 		while ( ptr + KEY_VALUE_METADATA_SIZE < data + ChunkUtil::chunkSize ) {
-			KeyValue::deserialize( ptr, key, keySize, value, valueSize );
+			KeyValue::deserialize( ptr, key, keySize, value, valueSize, splitOffset );
 			if ( keySize == 0 && valueSize == 0 )
 				break;
 
-			tmp = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
+			isLarge = LargeObjectUtil::isLarge( keySize, valueSize, 0, &splitSize );
+			if ( isLarge ) {
+				if ( splitOffset + splitSize > valueSize )
+					splitSize = valueSize - splitOffset;
+				tmp = KEY_VALUE_METADATA_SIZE + SPLIT_OFFSET_SIZE + keySize + splitSize;
+			} else {
+				tmp = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
+			}
+
 			ptr += tmp;
 			_chunkSize += tmp;
 		}
@@ -88,21 +97,29 @@ public:
 
 			// Scan whole chunk
 			uint8_t keySize;
-			uint32_t valueSize, tmp;
+			uint32_t valueSize, tmp, splitOffset, splitSize;
 			char *key, *value;
 			char *data, *ptr;
 			uint32_t count = 0;
+			bool isLarge;
 
 			data = ptr = ChunkUtil::getData( chunk );
 
 			while ( ptr + KEY_VALUE_METADATA_SIZE < data + ChunkUtil::chunkSize ) {
-				KeyValue::deserialize( ptr, key, keySize, value, valueSize );
+				KeyValue::deserialize( ptr, key, keySize, value, valueSize, splitOffset );
 				if ( keySize == 0 && valueSize == 0 )
 					break;
 
-				tmp = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
-				ptr += tmp;
+				isLarge = LargeObjectUtil::isLarge( keySize, valueSize, 0, &splitSize );
+				if ( isLarge ) {
+					if ( splitOffset + splitSize > valueSize )
+						splitSize = valueSize - splitOffset;
+					tmp = KEY_VALUE_METADATA_SIZE + SPLIT_OFFSET_SIZE + keySize + splitSize;
+				} else {
+					tmp = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
+				}
 
+				ptr += tmp;
 				count++;
 			}
 
@@ -145,16 +162,26 @@ public:
 		keyValue.data = ( char * ) chunk + CHUNK_IDENTIFIER_SIZE + offset;
 		return keyValue;
 	}
-	static inline int next( Chunk *chunk, uint32_t offset, char *&key, uint8_t &keySize ) {
+	static inline int next( Chunk *chunk, uint32_t offset, char *&key, uint8_t &keySize, bool &isLarge ) {
 		char *data = ChunkUtil::getData( chunk );
 		char *ptr = data + offset, *value;
 		int ret = -1;
-		uint32_t valueSize;
+		uint32_t valueSize, splitOffset, splitSize, tmp;
 
 		if ( ptr + KEY_VALUE_METADATA_SIZE < data + ChunkUtil::chunkSize ) {
-			KeyValue::deserialize( ptr, key, keySize, value, valueSize );
+			KeyValue::deserialize( ptr, key, keySize, value, valueSize, splitOffset );
+
+			isLarge = LargeObjectUtil::isLarge( keySize, valueSize, 0, &splitSize );
+			if ( isLarge ) {
+				if ( splitOffset + splitSize > valueSize )
+					splitSize = valueSize - splitOffset;
+				tmp = KEY_VALUE_METADATA_SIZE + SPLIT_OFFSET_SIZE + keySize + splitSize;
+			} else {
+				tmp = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
+			}
+
 			if ( keySize )
-				ret = offset + KEY_VALUE_METADATA_SIZE + keySize + valueSize;
+				ret = offset + tmp;
 			else
 				key = 0;
 		}
@@ -185,7 +212,7 @@ public:
 		offset = ChunkUtil::getSize( chunk, false, false );
 		char *ptr = ( ( char * ) chunk ) + CHUNK_IDENTIFIER_SIZE + offset;
 
-		KeyValue::serialize( ptr, 0, 0, 0, size - CHUNK_IDENTIFIER_SIZE );
+		KeyValue::serialize( ptr, 0, 0, 0, size - CHUNK_IDENTIFIER_SIZE, 0 );
 
 		UNLOCK( &ChunkUtil::lock );
 		return ptr;
@@ -219,10 +246,10 @@ public:
 	static inline uint32_t deleteObject( Chunk *chunk, uint32_t offset, char *delta = 0 ) {
 		char *data = getData( chunk ) + offset;
 		uint8_t keySize;
-		uint32_t valueSize, length;
+		uint32_t valueSize, length, splitOffset;
 		char *key, *value;
 
-		KeyValue::deserialize( data, key, keySize, value, valueSize );
+		KeyValue::deserialize( data, key, keySize, value, valueSize, splitOffset );
 		length = keySize + valueSize;
 
 		if ( delta ) {
@@ -303,14 +330,14 @@ public:
 
 		if ( ! ChunkUtil::isParity( chunk ) ) {
 			uint8_t keySize;
-			uint32_t valueSize, tmp;
+			uint32_t valueSize, tmp, splitOffset;
 			char *key, *value;
 			char *ptr;
 
 			ptr = data;
 
 			while ( ptr + KEY_VALUE_METADATA_SIZE < data + ChunkUtil::chunkSize ) {
-				KeyValue::deserialize( ptr, key, keySize, value, valueSize );
+				KeyValue::deserialize( ptr, key, keySize, value, valueSize, splitOffset );
 				if ( keySize == 0 && valueSize == 0 )
 					break;
 

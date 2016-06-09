@@ -48,7 +48,7 @@ char *ServerProtocol::resSet( size_t &size, uint16_t instanceId, uint32_t reques
 	return this->buffer.send;
 }
 
-char *ServerProtocol::resGet( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, bool isDegraded, uint8_t keySize, char *key, uint32_t valueSize, char *value, bool toClient ) {
+char *ServerProtocol::resGet( size_t &size, uint16_t instanceId, uint32_t requestId, bool success, bool isDegraded, uint8_t keySize, char *key, uint32_t valueSize, char *value, bool toClient, uint32_t splitOffset, uint32_t splitSize ) {
 	// -- common/protocol/normal_protocol.cc --
 	if ( success ) {
 		size = this->generateKeyValueHeader(
@@ -56,10 +56,10 @@ char *ServerProtocol::resGet( size_t &size, uint16_t instanceId, uint32_t reques
 			toClient ? PROTO_MAGIC_TO_CLIENT : PROTO_MAGIC_TO_SERVER,
 			isDegraded ? PROTO_OPCODE_DEGRADED_GET : PROTO_OPCODE_GET,
 			instanceId, requestId,
-			keySize,
-			key,
-			valueSize,
-			value
+			keySize, key,
+			valueSize, value,
+			0, 0,
+			splitOffset, splitSize
 		);
 	} else {
 		size = this->generateKeyHeader(

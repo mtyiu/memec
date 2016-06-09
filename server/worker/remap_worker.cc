@@ -75,7 +75,7 @@ bool ServerWorker::handleRemappedData( CoordinatorEvent event, char *buf, size_t
 			Key key;
 			Value value;
 
-			v.keyValue.deserialize( key.data, key.size, value.data, value.size );
+			v.keyValue._deserialize( key.data, key.size, value.data, value.size );
 
 			serverPeerEvent.reqSet( socket, instanceId, requestId, key, value );
 			this->dispatch( serverPeerEvent );
@@ -187,7 +187,7 @@ bool ServerWorker::handleDegradedSetRequest( ClientEvent event, char *buf, size_
 			header.key, header.keySize,
 			header.value, header.valueSize,
 			PROTO_OPCODE_DEGRADED_SET, timestamp,
-			stripeId, dataChunkId,
+			stripeId, dataChunkId, header.splitOffset,
 			&isSealed, &sealed,
 			this->chunks, this->dataChunk, this->parityChunk,
 			ServerWorker::getChunkBuffer
@@ -237,7 +237,7 @@ bool ServerWorker::handleRemappedUpdateRequest( ServerPeerEvent event, char *buf
 	key.set( header.keySize, header.key );
 
 	if ( ServerWorker::chunkBuffer->at( listId )->updateKeyValue(
-		header.key, header.keySize,
+		header.key, header.keySize, false,
 		header.valueUpdateOffset, header.valueUpdateSize, header.valueUpdate
 	) ) {
 		// Parity not remapped

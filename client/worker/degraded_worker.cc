@@ -4,7 +4,7 @@
 bool ClientWorker::sendDegradedLockRequest(
 	uint16_t parentInstanceId, uint32_t parentRequestId, uint8_t opcode,
 	uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount,
-	char *key, uint8_t keySize,
+	char *key, uint8_t keySize, bool isLarge,
 	uint32_t valueUpdateSize, uint32_t valueUpdateOffset, char *valueUpdate
 ) {
 	uint16_t instanceId = Client::instanceId;
@@ -37,7 +37,7 @@ bool ClientWorker::sendDegradedLockRequest(
 	buffer.data = this->protocol.reqDegradedLock(
 		buffer.size, instanceId, requestId,
 		original, reconstructed, reconstructedCount,
-		key, keySize
+		key, keySize, isLarge
 	);
 
 	// Send degraded lock request
@@ -60,11 +60,19 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 	}
 
 	socket = this->getServers( header.key, header.keySize, originalListId, originalChunkId );
+	if ( header.isLarge ) {
+		uint32_t splitOffset = LargeObjectUtil::readSplitOffset( header.key + header.keySize );
+		uint32_t splitIndex = LargeObjectUtil::getSplitIndex( header.keySize, 0, splitOffset, header.isLarge );
+		originalChunkId = ( originalChunkId + splitIndex ) % ( ClientWorker::dataChunkCount );
+		socket = this->dataServerSockets[ originalChunkId ];
+
+		fprintf( stderr, "%u %u %u [%u, %u] %s\n", splitOffset, splitIndex, header.keySize, originalListId, originalChunkId, header.isLarge ? "is large" : "" );
+	}
 
 	switch( header.type ) {
 		case PROTO_DEGRADED_LOCK_RES_IS_LOCKED:
 		case PROTO_DEGRADED_LOCK_RES_WAS_LOCKED:
-			__DEBUG__(
+			__INFO__(
 				BLUE, "ClientWorker", "handleDegradedLockResponse",
 				"[%s Locked] [%u, %u, %u] Key: %.*s (key size = %u); Is Sealed? %s.",
 				header.type == PROTO_DEGRADED_LOCK_RES_IS_LOCKED ? "Is" : "Was",
@@ -86,9 +94,22 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 					}
 				}
 			}
+
+			for ( uint32_t i = 0; i < header.reconstructedCount; i++ ) {
+				fprintf(
+					stderr,
+					"%s(%u, %u) |-> (%u, %u)%s",
+					i == 0 ? "Original: " : "; ",
+					header.original[ i * 2     ],
+					header.original[ i * 2 + 1 ],
+					header.reconstructed[ i * 2     ],
+					header.reconstructed[ i * 2 + 1 ],
+					i == header.reconstructedCount - 1 ? " || " : ""
+				);
+			}
 			break;
 		case PROTO_DEGRADED_LOCK_RES_NOT_LOCKED:
-			__DEBUG__(
+			__INFO__(
 				BLUE, "ClientWorker", "handleDegradedLockResponse",
 				"[Not Locked] [%u, %u] Key: %.*s (key size = %u).",
 				originalListId, originalChunkId,
@@ -96,7 +117,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 			);
 			break;
 		case PROTO_DEGRADED_LOCK_RES_REMAPPED:
-			__DEBUG__(
+			__INFO__(
 				BLUE, "ClientWorker", "handleDegradedLockResponse",
 				"[Remapped] [%u, %u] Key: %.*s (key size = %u).",
 				originalListId, originalChunkId,
@@ -119,7 +140,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 			break;
 		case PROTO_DEGRADED_LOCK_RES_NOT_EXIST:
 		default:
-			__DEBUG__(
+			__INFO__(
 				BLUE, "ClientWorker", "handleDegradedLockResponse",
 				"[Not Found] Key: %.*s (key size = %u)",
 				( int ) header.keySize, header.key, header.keySize
@@ -161,7 +182,8 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 						header.isSealed, header.stripeId,
 						header.original, header.reconstructed, header.reconstructedCount,
 						header.ongoingAtChunk, header.numSurvivingChunkIds, header.survivingChunkIds,
-						degradedLockData.key, degradedLockData.keySize
+						degradedLockData.key, degradedLockData.keySize,
+						header.isLarge
 					);
 					break;
 				case PROTO_DEGRADED_LOCK_RES_NOT_LOCKED:
@@ -186,7 +208,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 			}
 
 			// Insert into server GET pending map
-			key.set( degradedLockData.keySize, degradedLockData.key, ( void * ) original );
+			key.set( degradedLockData.keySize, degradedLockData.key, 0 );
 			if ( ! ClientWorker::pending->insertKey( PT_SERVER_GET, instanceId, pid.parentInstanceId, requestId, pid.parentRequestId, ( void * ) socket, key ) ) {
 				__ERROR__( "ClientWorker", "handleDegradedLockResponse", "Cannot insert into server GET pending map." );
 			}
@@ -202,6 +224,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 						header.original, header.reconstructed, header.reconstructedCount,
 						header.ongoingAtChunk, header.numSurvivingChunkIds, header.survivingChunkIds,
 						degradedLockData.key, degradedLockData.keySize,
+						header.isLarge,
 						degradedLockData.valueUpdate, degradedLockData.valueUpdateOffset, degradedLockData.valueUpdateSize,
 						requestTimestamp
 					);
@@ -231,6 +254,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 			keyValueUpdate.set( degradedLockData.keySize, degradedLockData.key, ( void * ) original );
 			keyValueUpdate.offset = degradedLockData.valueUpdateOffset;
 			keyValueUpdate.length = degradedLockData.valueUpdateSize;
+			keyValueUpdate.remaining = 1;
 			if ( ! ClientWorker::pending->insertKeyValueUpdate( PT_SERVER_UPDATE, instanceId, pid.parentInstanceId, requestId, pid.parentRequestId, ( void * ) socket, keyValueUpdate, true, true, requestTimestamp ) ) {
 				__ERROR__( "ClientWorker", "handleUpdateRequest", "Cannot insert into server UPDATE pending map." );
 			}
@@ -246,6 +270,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 						header.original, header.reconstructed, header.reconstructedCount,
 						header.ongoingAtChunk, header.numSurvivingChunkIds, header.survivingChunkIds,
 						degradedLockData.key, degradedLockData.keySize,
+						header.isLarge,
 						requestTimestamp
 					);
 					break;

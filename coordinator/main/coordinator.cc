@@ -296,6 +296,7 @@ bool Coordinator::init( char *path, OptionList &globalOptions, OptionList &coord
 			this->config.global.size.chunk
 		)
 	);
+	LargeObjectUtil::init( this->config.global.size.chunk );
 	/* Workers, ID generator and event queues */
 	this->idGenerator.init( this->config.global.workers.count );
 	this->eventQueue.init(
@@ -857,7 +858,7 @@ void Coordinator::lookup() {
 	ServerSocket *dataServerSocket;
 	this->stripeList->get( key, keySize, &dataServerSocket );
 
-	if ( dataServerSocket->map.findMetadataByKey( key, keySize, metadata ) ) {
+	if ( dataServerSocket->map.findMetadataByKey( key, keySize, false, metadata ) ) {
 		printf( "Metadata: (%u, %u, %u); Is sealed? %s\n", metadata.listId, metadata.stripeId, metadata.chunkId, dataServerSocket->map.isSealed( metadata ) ? "yes" : "no" );
 
 		Key k;

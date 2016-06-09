@@ -68,9 +68,16 @@ public:
 		Key key, uint8_t opcode, uint32_t &timestamp,
 		KeyMetadata &keyMetadata,
 		bool needsLock = true, bool needsUnlock = true,
-		bool needsUpdateOpMetadata = true
+		bool needsUpdateOpMetadata = true,
+		bool isLarge = false
 	);
 	char *findObject(
+		char *keyStr, uint8_t keySize,
+		KeyValue *keyValuePtr = 0,
+		Key *keyPtr = 0,
+		bool needsLock = true, bool needsUnlock = true
+	);
+	char *findLargeObject(
 		char *keyStr, uint8_t keySize,
 		KeyValue *keyValuePtr = 0,
 		Key *keyPtr = 0,

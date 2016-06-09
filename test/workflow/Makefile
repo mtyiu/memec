@@ -4,6 +4,9 @@ all:
 run:
 	java -cp . edu.cuhk.cse.memec.Main 255 4096 127.0.0.1 10091 20000 10 100000 false
 
+large:
+	java -cp . edu.cuhk.cse.memec.Main 255 409600 127.0.0.1 10091 2000 10 10000 false
+
 ncs:
 	java -cp . edu.cuhk.cse.memec.Main 255 4096 192.168.0.19 9112 100000 1000 500000 false
 

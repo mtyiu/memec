@@ -287,9 +287,10 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 			__ERROR__( "ClientWorker", "handleSetResponse", "Invalid SET response." );
 			return false;
 		}
+		event.socket->printAddress( stderr );
 		__DEBUG__(
 			BLUE, "ClientWorker", "handleSetResponse",
-			"[SET] Key: %.*s (key size = %u)",
+			"[SET (failed)] Key: %.*s (key size = %u)",
 			( int ) header.keySize, header.key, header.keySize
 		);
 
@@ -375,17 +376,31 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 
 bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDegraded, char *buf, size_t size ) {
 	Key key;
-	uint32_t valueSize = 0;
+	uint32_t valueSize = 0, splitSize, numOfSplit;
 	char *valueStr = 0;
+	void *memToBeFreed = 0;
+	bool isLarge = false;
 	ApplicationEvent applicationEvent;
 	PendingIdentifier pid;
+	struct KeyValueHeader header;
 
 	if ( success ) {
-		struct KeyValueHeader header;
-		if ( this->protocol.parseKeyValueHeader( header, buf, size ) ) {
+		if ( this->protocol.parseKeyValueHeader( header, buf, size, 0, true ) ) {
 			key.set( header.keySize, header.key, ( void * ) event.socket );
 			valueSize = header.valueSize;
 			valueStr = header.value;
+
+			isLarge = LargeObjectUtil::isLarge( header.keySize, header.valueSize, &numOfSplit, &splitSize );
+
+			// event.socket->printAddress( stderr );
+			__DEBUG__(
+				BLUE, "ClientWorker", "handleGetResponse",
+				"[GET] Key: %.*s (key size = %u); Value: (value size = %u); split offset = %u, split size = %u, is large? %s; buffer size = %lu.",
+				header.keySize, header.key, header.keySize,
+				header.valueSize, header.splitOffset, splitSize,
+				isLarge ? "yes" : "no",
+				size
+			);
 		} else {
 			__ERROR__( "ClientWorker", "handleGetResponse", "Invalid GET response." );
 			return false;
@@ -478,8 +493,79 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 		}
 	}
 
+	Key serverKeyBackup = key;
+
+	if ( isLarge ) {
+		uint32_t splitIndex = LargeObjectUtil::getSplitIndex( header.keySize, header.valueSize, header.splitOffset, isLarge );
+		if ( header.splitOffset == 0 ) {
+			key.ptr = malloc( numOfSplit + valueSize );
+			memset( key.ptr, 0, numOfSplit + valueSize );
+		} else {
+			serverKeyBackup.free();
+		}
+
+		if ( ! ClientWorker::pending->findKey( PT_APPLICATION_GET, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &key, true, true, true, key.data, key.ptr ) ) {
+			::free( key.ptr );
+			__ERROR__( "ClientWorker", "handleGetResponse", "Cannot find a pending application GET request that matches the response. This message will be discarded (key = %.*s).", key.size, key.data );
+			return false;
+		}
+
+		// Store split
+		if ( header.splitOffset + splitSize > header.valueSize )
+			splitSize = header.valueSize - header.splitOffset;
+		memcpy( ( char * ) key.ptr + numOfSplit + header.splitOffset, header.value, splitSize );
+		( ( char * ) key.ptr )[ splitIndex ] = 1;
+
+		if ( header.splitOffset == 0 ) {
+			// Get remaining split
+			ApplicationEvent applicationEvent;
+			applicationEvent.socket = ( ApplicationSocket * ) pid.ptr;
+			applicationEvent.instanceId = pid.instanceId;
+			applicationEvent.requestId = pid.requestId;
+
+			struct KeyHeader keyHeader;
+			keyHeader.key = header.key;
+			keyHeader.keySize = header.keySize + SPLIT_OFFSET_SIZE;
+
+			char backup[ SPLIT_OFFSET_SIZE ];
+			memcpy( backup, keyHeader.key + keyHeader.keySize - SPLIT_OFFSET_SIZE, SPLIT_OFFSET_SIZE );
+
+			for ( uint32_t sOffset = splitSize; sOffset < valueSize; sOffset += splitSize ) {
+				LargeObjectUtil::writeSplitOffset(
+					keyHeader.key + keyHeader.keySize - SPLIT_OFFSET_SIZE, // buf
+					sOffset
+				);
+				this->handleGetRequest(
+					applicationEvent,
+					keyHeader,
+					true
+				);
+			}
+
+			memcpy( keyHeader.key + keyHeader.keySize - SPLIT_OFFSET_SIZE, backup, SPLIT_OFFSET_SIZE );
+
+			return true;
+		} else {
+			// Check if all split are received
+			bool isCompleted = true;
+			for ( uint32_t i = 0; i < numOfSplit; i++ ) {
+				if ( ! ( ( char * ) key.ptr )[ i ] ) {
+					isCompleted = false;
+					break;
+				}
+			}
+
+			if ( ! isCompleted )
+				return true;
+			else {
+				valueStr = ( char * )( key.ptr ) + numOfSplit;
+				memToBeFreed = key.ptr;
+			}
+		}
+	}
+
 	if ( ! ClientWorker::pending->eraseKey( PT_APPLICATION_GET, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &key, true, true, true, key.data ) ) {
-		__ERROR__( "ClientWorker", "handleGetResponse", "Cannot find a pending application GET request that matches the response. This message will be discarded (key = %.*s).", key.size, key.data );
+		__ERROR__( "ClientWorker", "handleGetResponse", "Cannot find a pending application GET request that matches the response. This message will be discarded (key = %.*s, size = %u, is large? %s).", key.size, key.data, key.size, key.isLarge ? "true" : "false" );
 		return false;
 	}
 
@@ -513,6 +599,8 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 		this->dispatch( applicationEvent );
 	}
 	key.free();
+	if ( memToBeFreed )
+		::free( memToBeFreed );
 	return true;
 }
 
@@ -551,7 +639,6 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 		__ERROR__( "ClientWorker", "handleUpdateResponse", "Cannot find a pending application UPDATE request that matches the response. This message will be discarded (%u, %u).", pid.parentInstanceId, pid.parentRequestId );
 		return false;
 	}
-
 	// remove pending timestamp
 	// TODO handle degraded mode
 	Client *client = Client::getInstance();
@@ -562,7 +649,7 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 	uint32_t dataChunkIndex;
 	this->stripeList->get( header.key, header.keySize, this->dataServerSockets, 0, &dataChunkIndex );
 	bool needsReplay = pid.ptr && isDegraded && ! success && ! Client::getInstance()->stateTransitHandler.useCoordinatedFlow( this->dataServerSockets[ dataChunkIndex ]->getAddr() );
-
+	
 	if ( pid.ptr ) {
 		if ( needsReplay ) {
 			// make a copy of the update
@@ -574,13 +661,13 @@ bool ClientWorker::handleUpdateResponse( ServerEvent event, bool success, bool i
 			applicationEvent.replayUpdateRequest( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, kv );
 			// do not use dispatch, since ClientWorker::replayUpdate() overwrites recv buffer
 			ClientWorker::eventQueue->insert( applicationEvent );
-		} else {
+		} else if ( keyValueUpdate.remaining == 0 ) {
 			applicationEvent.resUpdate( ( ApplicationSocket * ) pid.ptr, pid.instanceId, pid.requestId, keyValueUpdate, success, false );
 			this->dispatch( applicationEvent );
 		}
 	}
 
-	if ( ! needsReplay ) {
+	if ( ! needsReplay && keyValueUpdate.remaining == 0 ) {
 		// free the updated value
 		delete[] ( ( char * )( keyValueUpdate.ptr ) );
 	}
