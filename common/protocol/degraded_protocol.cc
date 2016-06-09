@@ -57,7 +57,7 @@ bool Protocol::parseDegradedLockReqHeader( struct DegradedLockReqHeader &header,
 	return true;
 }
 
-size_t Protocol::generateDegradedLockResHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t length, uint8_t type, uint8_t keySize, char *key, char *&buf ) {
+size_t Protocol::generateDegradedLockResHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t length, uint8_t type, uint8_t keySize, char *key, bool isLarge, char *&buf ) {
 	buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader(
 		magic, to, opcode,

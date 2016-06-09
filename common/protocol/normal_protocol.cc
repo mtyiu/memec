@@ -212,14 +212,14 @@ bool Protocol::parseKeyValueHeader( struct KeyValueHeader &header, char *buf, si
 	header.key       = ptr;
 	ptr += header.keySize;
 
-	if ( enableSplit && LargeObjectUtil::isLarge( keySize, valueSize, &numOfSplit, &splitSize ) ) {
+	if ( enableSplit && LargeObjectUtil::isLarge( header.keySize, header.valueSize, &numOfSplit, &splitSize ) ) {
 		header.splitOffset = ProtocolUtil::read3Bytes( ptr );
-		if ( header.splitOffset + splitSize > valueSize )
-			splitSize = valueSize - header.splitOffset;
+		if ( header.splitOffset + splitSize > header.valueSize )
+			splitSize = header.valueSize - header.splitOffset;
 		if ( size - offset < PROTO_KEY_VALUE_SIZE + PROTO_SPLIT_OFFSET_SIZE + header.keySize + splitSize )
 			return false;
 	} else {
-		splitOffset = 0;
+		header.splitOffset = 0;
 		if ( size - offset < PROTO_KEY_VALUE_SIZE + header.keySize + header.valueSize )
 			return false;
 	}

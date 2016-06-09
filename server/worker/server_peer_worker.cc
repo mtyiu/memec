@@ -220,8 +220,10 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 			uint8_t keySize;
 			uint32_t valueSize;
 			event.message.get.keyValue._deserialize( key, keySize, value, valueSize );
-			buffer.data = this->protocol.resGet(
-				buffer.size,
+			buffer.size = this->protocol.generateKeyValueHeader(
+				PROTO_MAGIC_RESPONSE_SUCCESS,
+				PROTO_MAGIC_TO_SERVER,
+				PROTO_OPCODE_GET,
 				event.instanceId, event.requestId,
 				keySize, key,
 				valueSize, value

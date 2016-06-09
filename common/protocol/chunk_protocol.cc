@@ -179,6 +179,7 @@ size_t Protocol::generateChunkKeyValueHeader(
 				bytes += ProtocolUtil::write3Bytes( buf, valueSize     );
 				bytes += ProtocolUtil::write( buf, keyStr, keySize     );
 				bytes += ProtocolUtil::write( buf, valueStr, valueSize );
+			}
 
 			bool isLarge = LargeObjectUtil::isLarge( keySize, valueSize, 0, &splitSize );
 			uint32_t objSize;

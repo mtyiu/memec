@@ -77,8 +77,7 @@ void ServerWorker::dispatch( ClientEvent event ) {
 				event.isDegraded ? PROTO_OPCODE_DEGRADED_GET : PROTO_OPCODE_GET,
 				event.instanceId, event.requestId,
 				keySize, key,
-				valueSize, value,
-				true, // toClient
+				valueSize, value, 0, 0,
 				splitOffset, splitSize
 			);
 		}

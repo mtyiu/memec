@@ -357,7 +357,7 @@ bool ClientWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		splitOffset = LargeObjectUtil::getValueOffsetAtSplit( header.keySize, header.valueSize, splitIndex );
 
 		// Split the value
-		Packet *packet = ClientWorker::packetPool->malloc();
+		Packet *packet = client->packetPool.malloc();
 		packet->setReferenceCount( 1 + ClientWorker::parityChunkCount );
 		buffer.data = packet->data;
 		this->protocol.reqSet(

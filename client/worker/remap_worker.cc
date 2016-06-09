@@ -219,7 +219,7 @@ bool ClientWorker::handleDegradedSetLockResponse( CoordinatorEvent event, bool s
 		originalListId, originalChunkId,
 		header.original, header.remapped, header.remappedCount,
 		keySize, keyStr,
-		valueSize, valueStr
+		valueSize, valueStr,
 		0, 0,
 		0
 	);

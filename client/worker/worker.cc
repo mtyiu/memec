@@ -52,12 +52,13 @@ bool ClientWorker::getServers(
 	bool isGettingSplit
 ) {
 	bool ret = true;
+	Client *client = Client::getInstance();
 
 	useCoordinatedFlow = false;
 
 	// Determine original data server
 	uint32_t originalListId, originalChunkId;
-	originalListId = ClientWorker::stripeList->get(
+	originalListId = client->stripeList->get(
 		data, ( size_t )( size - ( isGettingSplit ? SPLIT_OFFSET_SIZE : 0 ) ),
 		this->dataServerSockets,
 		this->parityServerSockets,
@@ -75,7 +76,6 @@ bool ClientWorker::getServers(
 
 	originalDataServerSocket = this->dataServerSockets[ originalChunkId ];
 
-	Client *client = Client::getInstance();
 	switch( opcode ) {
 		case PROTO_OPCODE_SET:
 			// already checked in ClientWorker::handleSetRequest()

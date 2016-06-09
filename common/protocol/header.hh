@@ -51,7 +51,7 @@ struct MetadataHeader {
 	uint32_t chunkId;
 };
 
-#define PROTO_KEY_OP_METADATA_SIZE 18
+#define PROTO_KEY_OP_METADATA_SIZE 19
 struct KeyOpMetadataHeader {
 	uint8_t keySize;
 	uint8_t opcode;
@@ -59,6 +59,7 @@ struct KeyOpMetadataHeader {
 	uint32_t stripeId;
 	uint32_t chunkId;
 	uint32_t timestamp;
+	bool isLarge;
 	char *key;
 };
 
@@ -109,7 +110,7 @@ struct ChunkKeyHeader {
 	char *key;
 };
 
-#define PROTO_CHUNK_KEY_VALUE_UPDATE_SIZE 22
+#define PROTO_CHUNK_KEY_VALUE_UPDATE_SIZE 23
 struct ChunkKeyValueUpdateHeader {
 	uint32_t listId;
 	uint32_t stripeId;
@@ -118,15 +119,18 @@ struct ChunkKeyValueUpdateHeader {
 	uint32_t valueUpdateSize;   // 3 bytes
 	uint32_t valueUpdateOffset; // 3 bytes
 	uint32_t chunkUpdateOffset; // 3 bytes
+	bool isLarge;
 	char *key;
 	char *valueUpdate;
 };
 
 #define PROTO_KEY_VALUE_SIZE 4
+#define PROTO_SPLIT_OFFSET_SIZE 3
 struct KeyValueHeader {
 	uint8_t keySize;
 	uint32_t valueSize; // 3 bytes
 	char *key;
+	uint32_t splitOffset; // 3 bytes (only exists if total object size > chunkSize )
 	char *value;
 };
 
@@ -174,10 +178,11 @@ struct BatchKeyValueHeader {
 ///////////////
 // Remapping //
 ///////////////
-#define PROTO_REMAPPING_LOCK_SIZE 5
+#define PROTO_REMAPPING_LOCK_SIZE 6
 struct RemappingLockHeader {
 	uint32_t remappedCount;
 	uint8_t keySize;
+	bool isLarge;
 	char *key;
 	uint32_t *original;
 	uint32_t *remapped;
@@ -189,8 +194,9 @@ struct DegradedSetHeader {
 	uint32_t chunkId;
 	uint32_t remappedCount;
 	uint8_t keySize;
-	uint32_t valueSize; // 3 bytes
+	uint32_t valueSize;   // 3 bytes
 	char *key;
+	uint32_t splitOffset; // 3 bytes
 	char *value;
 	uint32_t *original;
 	uint32_t *remapped;
@@ -199,17 +205,18 @@ struct DegradedSetHeader {
 ////////////////////////
 // Degraded operation //
 ////////////////////////
-#define PROTO_DEGRADED_LOCK_REQ_SIZE 5
+#define PROTO_DEGRADED_LOCK_REQ_SIZE 6
 struct DegradedLockReqHeader {
 	uint32_t reconstructedCount;
 	uint8_t keySize;
+	bool isLarge;
 	char *key;
 	uint32_t *original;
 	uint32_t *reconstructed;
 };
 
 // Size
-#define PROTO_DEGRADED_LOCK_RES_BASE_SIZE   2 // type: 1, 2, 3, 4, 5
+#define PROTO_DEGRADED_LOCK_RES_BASE_SIZE   3 // type: 1, 2, 3, 4, 5
 #define PROTO_DEGRADED_LOCK_RES_LOCK_SIZE   14 // type: 1, 2
 #define PROTO_DEGRADED_LOCK_RES_REMAP_SIZE  4 // type: 4
 #define PROTO_DEGRADED_LOCK_RES_NOT_SIZE    0 // type: 3, 5
@@ -224,6 +231,7 @@ struct DegradedLockReqHeader {
 struct DegradedLockResHeader {
 	uint8_t type;                  // type: 1, 2, 3, 4, 5
 	uint8_t keySize;               // type: 1, 2, 3, 4, 5
+	bool isLarge;                  // type: 1, 2, 3, 4, 5
 	char *key;                     // type: 1, 2, 3, 4, 5
 
 	bool isSealed;                 // type: 1, 2
@@ -238,8 +246,9 @@ struct DegradedLockResHeader {
 	uint32_t *remapped;            // type: 4
 };
 
-#define PROTO_DEGRADED_REQ_BASE_SIZE 14
+#define PROTO_DEGRADED_REQ_BASE_SIZE 15
 struct DegradedReqHeader {
+	bool isLarge;
 	bool isSealed;
 	uint32_t stripeId;
 	uint32_t reconstructedCount;
@@ -309,7 +318,7 @@ struct ReconstructionHeader {
 // Seal //
 //////////
 #define PROTO_CHUNK_SEAL_SIZE 16
-#define PROTO_CHUNK_SEAL_DATA_SIZE 5
+#define PROTO_CHUNK_SEAL_DATA_SIZE 6
 struct ChunkSealHeader {
 	uint32_t listId;
 	uint32_t stripeId;
@@ -319,6 +328,7 @@ struct ChunkSealHeader {
 struct ChunkSealHeaderData {
 	uint8_t keySize;
 	uint32_t offset;
+	bool isLarge;
 	char *key;
 };
 
