@@ -1,6 +1,7 @@
 #!/bin/bash
 
 BASE_PATH=${HOME}/mtyiu
+MEMEC_PATH=${BASE_PATH}/memec
 BOOTSTRAP_SCRIPT_PATH=${MEMEC_PATH}/scripts/ncs-10g/bootstrap
 
 ############
