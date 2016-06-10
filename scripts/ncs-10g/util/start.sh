@@ -1,7 +1,7 @@
 #!/bin/bash
 
 BASE_PATH=${HOME}/mtyiu
-BOOTSTRAP_SCRIPT_PATH=${BASE_PATH}/scripts/bootstrap
+BOOTSTRAP_SCRIPT_PATH=${MEMEC_PATH}/scripts/ncs-10g/bootstrap
 
 SLEEP_TIME=2
 

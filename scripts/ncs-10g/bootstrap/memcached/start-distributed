@@ -1,6 +1,6 @@
 #!/bin/bash
 
-HOST_PREFIX="192.168.10."
+HOST_PREFIX="192.168.0."
 PORT=11211
 MEMCACHED_HOME=/home/ncsgroup/hwchan/memcached
 THREAD_NUM=12

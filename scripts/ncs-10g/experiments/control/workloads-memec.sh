@@ -16,13 +16,13 @@ for iter in {1..10}; do
 
 		sed -i "s/^scheme=.*$/scheme=$c/g" ${MEMEC_PATH}/bin/config/ncs-10g/global.ini
 
-		${BASE_PATH}/scripts/util/rsync.sh
+		${MEMEC_PATH}/scripts/ncs-10g/util/rsync.sh
 
 		for t in $threads; do
 			echo "Running experiment with coding scheme = $c and thread count = $t..."
 
 			# Run workload A, B, C, F, D first
-			screen -S manage -p 0 -X stuff "${BASE_PATH}/scripts/util/start.sh $1$(printf '\r')"
+			screen -S manage -p 0 -X stuff "${MEMEC_PATH}/scripts/ncs-10g/util/start.sh $1$(printf '\r')"
 			sleep 30
 
 			for w in $workloads; do
@@ -33,7 +33,7 @@ for iter in {1..10}; do
 				fi
 
 				for n in {31..34}; do
-					ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/client/workloads-memec.sh $c $t $w $(printf '\r')\"" &
+					ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${MEMEC_PATH}/scripts/ncs-10g/experiments/client/workloads-memec.sh $c $t $w $(printf '\r')\"" &
 				done
 
 				pending=0
@@ -65,4 +65,4 @@ done
 
 sed -i "s/^scheme=.*$/scheme=raid0/g" ${MEMEC_PATH}/bin/config/ncs-10g/global.ini
 
-${BASE_PATH}/scripts/util/rsync.sh
+${MEMEC_PATH}/scripts/ncs-10g/util/rsync.sh
