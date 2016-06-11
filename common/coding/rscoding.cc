@@ -35,10 +35,10 @@ RSCoding::RSCoding( uint32_t k, uint32_t m, uint32_t chunkSize ) {
 	galois_single_divide( 10, 2 , 16 );
 	galois_single_divide( 10, 2 , 32 );
 
+	this->_jmatrix = 0;
 #endif
 
 	// preallocate the matrix and schedule used by jerasure
-	this->_jmatrix = 0;
 	generateCodeMatrix();
 }
 

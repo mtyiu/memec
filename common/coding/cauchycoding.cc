@@ -28,12 +28,13 @@ CauchyCoding::CauchyCoding( uint32_t k, uint32_t m, uint32_t chunkSize ) {
 	galois_single_divide( 10, 2 , 8 );
 	galois_single_divide( 10, 2 , 16 );
 	galois_single_divide( 10, 2 , 32 );
-#endif
-
-	// preallocate the matrix and schedule used by jerasure
+	
 	this->_jmatrix = 0;
 	this->_jbitmatrix = 0;
 	this->_jschedule = 0;
+#endif
+
+	// preallocate the matrix and schedule used by jerasure
 	generateCodeMatrix();
 }
 
