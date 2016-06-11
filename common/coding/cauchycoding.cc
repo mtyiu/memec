@@ -31,6 +31,9 @@ CauchyCoding::CauchyCoding( uint32_t k, uint32_t m, uint32_t chunkSize ) {
 #endif
 
 	// preallocate the matrix and schedule used by jerasure
+	this->_jmatrix = 0;
+	this->_jbitmatrix = 0;
+	this->_jschedule = 0;
 	generateCodeMatrix();
 }
 
@@ -72,7 +75,14 @@ void CauchyCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t inde
 
 	// encode
 #ifdef USE_ISAL
-	ec_encode_data( chunkSize, k, m, this->_gftbl, data, code );
+	if ( startOff == 0 && endOff == 0 ) {
+		ec_encode_data( chunkSize, k, m, this->_gftbl, data, code );
+	} else {
+		for ( uint32_t i = startOff / chunkSize; i <= endOff / chunkSize; i++ ) {
+			// note: the update is in-place "xor"ed on parityChunk
+			ec_encode_data_update( chunkSize, k, m, i, this->_gftbl, data[ i ], code );
+		}
+	}
 #else
 	jerasure_schedule_encode( k, m, w, schedule, data, code, chunkSize, chunkSize / w );
 #endif
@@ -107,7 +117,7 @@ bool CauchyCoding::decode( Chunk **chunks, BitmaskArray * chunkStatus ) {
 
 	int erasures[ CRS_N_MAX ];
 	int pos = 0;
-	dataType *data[ CRS_N_MAX ], *code[ CRS_N_MAX ]; 
+	dataType *data[ CRS_N_MAX ], *code[ CRS_N_MAX ];
 #ifdef USE_ISAL
 	int rpos = 0;
 	dataType *alive[ CRS_N_MAX ], *missing[ CRS_N_MAX ];
@@ -131,7 +141,7 @@ bool CauchyCoding::decode( Chunk **chunks, BitmaskArray * chunkStatus ) {
 			erasures[ pos++ ] = idx;
 		}
 #endif
-		
+
 	}
 
 	// required for jerasure

@@ -38,6 +38,7 @@ RSCoding::RSCoding( uint32_t k, uint32_t m, uint32_t chunkSize ) {
 #endif
 
 	// preallocate the matrix and schedule used by jerasure
+	this->_jmatrix = 0;
 	generateCodeMatrix();
 }
 
@@ -78,7 +79,14 @@ void RSCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t index, u
 
 	// encode
 #ifdef USE_ISAL
-	ec_encode_data( chunkSize, k, m, this->_gftbl, data, code );
+	if ( startOff == 0 && endOff == 0 ) {
+		ec_encode_data( chunkSize, k, m, this->_gftbl, data, code );
+	} else {
+		for ( uint32_t i = startOff / chunkSize; i <= ( endOff - 1 ) / chunkSize; i++ ) {
+			// note: the update is in-place "xor"ed on parityChunk
+			ec_encode_data_update( chunkSize, k, m, i, this->_gftbl, data[ i ], code );
+		}
+	}
 #else
 	jerasure_matrix_encode( k, m, w, matrix, data, code, chunkSize );
 #endif
@@ -113,7 +121,7 @@ bool RSCoding::decode( Chunk **chunks, BitmaskArray * chunkStatus ) {
 
 	int erasures[ RS_N_MAX ];
 	int pos = 0;
-	dataType *data[ RS_N_MAX ], *code[ RS_N_MAX ]; 
+	dataType *data[ RS_N_MAX ], *code[ RS_N_MAX ];
 #ifdef USE_ISAL
 	int rpos = 0;
 	dataType *alive[ RS_N_MAX ], *missing[ RS_N_MAX ];
@@ -137,7 +145,7 @@ bool RSCoding::decode( Chunk **chunks, BitmaskArray * chunkStatus ) {
 			erasures[ pos++ ] = idx;
 		}
 #endif
-		
+
 	}
 
 	// required for jerasure
