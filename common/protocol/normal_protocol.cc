@@ -225,7 +225,7 @@ bool Protocol::parseKeyValueHeader( struct KeyValueHeader &header, char *buf, si
 	}
 
 	header.value = header.valueSize ? ptr : 0;
-	return ( size - offset >= PROTO_KEY_VALUE_SIZE + header.keySize + header.valueSize );
+	return true;
 }
 
 size_t Protocol::generateKeyValueUpdateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint8_t keySize, char *key, uint32_t valueUpdateOffset, uint32_t valueUpdateSize, char *valueUpdate, char *sendBuf, uint32_t timestamp ) {

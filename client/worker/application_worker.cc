@@ -507,7 +507,7 @@ bool ClientWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 		__ERROR__( "ClientWorker", "handleUpdateRequest", "Invalid UPDATE request." );
 		return false;
 	}
-	__DEBUG__(
+	__INFO__(
 		BLUE, "ClientWorker", "handleUpdateRequest",
 		"[UPDATE] Key: %.*s (key size = %u); Value: (offset = %u, value update size = %u)",
 		( int ) header.keySize, header.key, header.keySize,
@@ -612,10 +612,22 @@ bool ClientWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 				( char * ) keyValueUpdate.ptr
 			);
 		} else {
+			uint32_t _offset = 0, _size;
+			if ( header.valueUpdateOffset > splitIndex * splitSize )
+				_offset = header.valueUpdateOffset - splitIndex * splitSize;
+			_size = header.valueUpdateOffset + header.valueUpdateSize - splitIndex * splitSize - _offset;
+			if ( _offset + _size > splitSize )
+				_size = splitSize - _offset;
+			if ( _size > splitSize )
+				_size = splitSize;
+
 			buffer.data = this->protocol.reqUpdate(
 				buffer.size, instanceId, requestId,
 				header.key, header.keySize,
-				header.valueUpdate, header.valueUpdateOffset, header.valueUpdateSize, requestTimestamp
+				valueUpdate + _offset + splitIndex * splitSize - header.valueUpdateOffset,
+				_offset, // header.valueUpdateOffset,
+				_size, // header.valueUpdateSize,
+				requestTimestamp
 			);
 			// add pending timestamp to ack
 			socket->timestamp.pendingAck.insertUpdate( Timestamp( requestTimestamp ), event.requestId );

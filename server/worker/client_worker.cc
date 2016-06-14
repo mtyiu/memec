@@ -376,7 +376,7 @@ bool ServerWorker::handleGetRequest( ClientEvent event, struct KeyHeader &header
 
 bool ServerWorker::handleSetRequest( ClientEvent event, char *buf, size_t size, bool needResSet ) {
 	struct KeyValueHeader header;
-	if ( ! this->protocol.parseKeyValueHeader( header, buf, size ) ) {
+	if ( ! this->protocol.parseKeyValueHeader( header, buf, size, 0, true ) ) {
 		__ERROR__( "ServerWorker", "handleSetRequest", "Invalid SET request (size = %lu).", size );
 		return false;
 	}
@@ -540,28 +540,7 @@ bool ServerWorker::handleUpdateRequest(
 		endOfDegradedOp = false;
 		checkGetChunk = true;
 
-		uint32_t offset = keyMetadata.offset + KEY_VALUE_METADATA_SIZE + header.keySize + header.valueUpdateOffset;
-
-		if ( isLarge ) {
-			uint32_t upper, lower;
-			lower = splitOffset;
-			upper = splitOffset + splitSize - 1;
-			if ( upper > _valueSize )
-				upper = _valueSize - 1;
-
-			if ( header.valueUpdateOffset > lower )
-				lower = header.valueUpdateOffset;
-
-			if ( header.valueUpdateOffset + header.valueUpdateSize < upper )
-				upper = header.valueUpdateOffset + header.valueUpdateSize - 1;
-
-			header.valueUpdateSize = upper - lower + 1;
-			header.valueUpdateOffset = lower - splitOffset;
-
-			offset = keyMetadata.offset + KEY_VALUE_METADATA_SIZE + header.keySize + header.valueUpdateOffset + SPLIT_OFFSET_SIZE;
-
-			// fprintf( stderr, "lower: %u; upper: %u; size: %u, offset: %u; actual offset: %u; chunk: %p - %p (%lu)\n", lower, upper, header.valueUpdateSize, header.valueUpdateOffset, offset, chunk, ( char * ) chunk + offset + header.valueUpdateSize - 1, ( char * ) chunk + offset + header.valueUpdateSize - 1 - ( char * ) chunk );
-		}
+		uint32_t offset = keyMetadata.offset + KEY_VALUE_METADATA_SIZE + header.keySize + header.valueUpdateOffset + ( isLarge ? SPLIT_OFFSET_SIZE : 0 );
 
 		if ( ServerWorker::parityChunkCount ) {
 			// Add the current request to the pending set

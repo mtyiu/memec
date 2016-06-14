@@ -126,6 +126,6 @@ bool Protocol::parseKeyOpMetadataHeader( struct KeyOpMetadataHeader &header, siz
 	header.timestamp = ProtocolUtil::read4Bytes( ptr );
 	header.isLarge   = ProtocolUtil::read1Byte ( ptr );
 	header.key = ptr;
-	bytes = PROTO_KEY_OP_METADATA_SIZE + ( size_t ) header.keySize;
+	bytes = PROTO_KEY_OP_METADATA_SIZE + ( size_t ) header.keySize + ( header.isLarge ? SPLIT_OFFSET_SIZE : 0 );
 	return ( size - offset >= PROTO_KEY_OP_METADATA_SIZE + ( size_t ) header.keySize + ( header.isLarge ? SPLIT_OFFSET_SIZE : 0 ) );
 }

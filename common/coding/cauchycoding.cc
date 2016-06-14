@@ -28,6 +28,10 @@ CauchyCoding::CauchyCoding( uint32_t k, uint32_t m, uint32_t chunkSize ) {
 	galois_single_divide( 10, 2 , 8 );
 	galois_single_divide( 10, 2 , 16 );
 	galois_single_divide( 10, 2 , 32 );
+
+	this->_jmatrix = 0;
+	this->_jbitmatrix = 0;
+	this->_jschedule = 0;
 #endif
 
 	// preallocate the matrix and schedule used by jerasure
@@ -114,7 +118,7 @@ bool CauchyCoding::decode( Chunk **chunks, BitmaskArray * chunkStatus ) {
 
 	int erasures[ CRS_N_MAX ];
 	int pos = 0;
-	dataType *data[ CRS_N_MAX ], *code[ CRS_N_MAX ]; 
+	dataType *data[ CRS_N_MAX ], *code[ CRS_N_MAX ];
 #ifdef USE_ISAL
 	int rpos = 0;
 	dataType *alive[ CRS_N_MAX ], *missing[ CRS_N_MAX ];
@@ -138,7 +142,7 @@ bool CauchyCoding::decode( Chunk **chunks, BitmaskArray * chunkStatus ) {
 			erasures[ pos++ ] = idx;
 		}
 #endif
-		
+
 	}
 
 	// required for jerasure
