@@ -9,7 +9,7 @@ size_t Protocol::generateDegradedLockReqHeader(
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader(
 		magic, to, opcode,
-		PROTO_DEGRADED_LOCK_REQ_SIZE + keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ) + reconstructedCount * 4 * 4,
+		PROTO_DEGRADED_LOCK_REQ_SIZE + keySize + SPLIT_OFFSET_SIZE + reconstructedCount * 4 * 4,
 		instanceId, requestId
 	);
 
@@ -17,6 +17,8 @@ size_t Protocol::generateDegradedLockReqHeader(
 	bytes += ProtocolUtil::write1Byte ( buf, keySize );
 	bytes += ProtocolUtil::write1Byte ( buf, isLarge );
 	bytes += ProtocolUtil::write( buf, key, keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ) );
+	if ( ! isLarge ) // 3-byte placeholder
+		bytes += ProtocolUtil::write3Bytes( buf, 0 );
 
 	for ( uint32_t i = 0; i < reconstructedCount; i++ ) {
 		bytes += ProtocolUtil::write4Bytes( buf, original[ i * 2     ] );
@@ -44,7 +46,11 @@ bool Protocol::parseDegradedLockReqHeader( struct DegradedLockReqHeader &header,
 	if ( size - offset < ( size_t ) PROTO_DEGRADED_LOCK_REQ_SIZE + header.keySize + header.reconstructedCount * 4 * 4 ) return false;
 
 	header.key = ptr;
-	ptr += header.keySize + ( header.isLarge ? SPLIT_OFFSET_SIZE : 0 );
+	ptr += header.keySize;
+
+	if ( ! header.isLarge )
+		memset( ptr, 0, SPLIT_OFFSET_SIZE );
+	ptr += SPLIT_OFFSET_SIZE;
 
 	header.original = ( uint32_t * ) ptr;
 	header.reconstructed = ( ( uint32_t * ) ptr ) + header.reconstructedCount * 2;

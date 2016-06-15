@@ -400,7 +400,7 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 			isLarge = LargeObjectUtil::isLarge( header.keySize, header.valueSize, &numOfSplit, &splitSize );
 
 			// event.socket->printAddress( stderr );
-			__DEBUG__(
+			__INFO__(
 				BLUE, "ClientWorker", "handleGetResponse",
 				"[GET] Key: %.*s (key size = %u); Value: (value size = %u); split offset = %u, split size = %u, is large? %s; buffer size = %lu.",
 				header.keySize, header.key, header.keySize,

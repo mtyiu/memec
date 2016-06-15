@@ -1084,7 +1084,7 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 							event.resGet( op.socket, pid.parentInstanceId, pid.parentRequestId, keyValue, true );
 							this->dispatch( event );
 						} else {
-							fprintf( stderr, "KEY NOT FOUND: %.*s (is large? %s)\n", key.size, key.data, key.isLarge ? "true" : "false" );
+							fprintf( stderr, "KEY NOT FOUND: %.*s.%u (is large? %s)\n", key.size, key.data, key.isLarge ? LargeObjectUtil::readSplitOffset( key.data + key.size ) : 0,  key.isLarge ? "true" : "false" );
 							// event.resGet( op.socket, pid.parentInstanceId, pid.parentRequestId, key, true );
 							event.instanceId = pid.parentInstanceId;
 							event.requestId = pid.parentRequestId;

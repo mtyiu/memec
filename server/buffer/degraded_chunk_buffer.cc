@@ -98,7 +98,7 @@ bool DegradedMap::insertKey( Key key, uint8_t opcode, KeyMetadata &keyMetadata )
 
 	Key k1;
 
-	k1.dup( key.size, key.data );
+	k1.dup( key.size, key.data, 0, key.isLarge );
 	std::pair<Key, KeyMetadata> keyPair( k1, keyMetadata );
 	std::pair<std::unordered_map<Key, KeyMetadata>::iterator, bool> keyRet;
 
@@ -181,7 +181,7 @@ bool DegradedMap::deleteValue( Key key, Metadata metadata, uint8_t opcode, uint3
 
 re_insert:
 	// Re-insert for synchronizing the unsealed chunks
-	key.dup();
+	key.dup( 0, 0, 0, key.isLarge );
 	std::pair<Metadata, Key> p( metadata, key );
 	this->unsealed.metadataRev.insert( p );
 	this->unsealed.deleted.insert( key );
@@ -361,7 +361,7 @@ bool DegradedMap::deleteDegradedKey( Key key, std::vector<struct pid_s> &pids, b
 
 		if ( success ) {
 			Key k = key;
-			k.dup();
+			k.dup( 0, 0, 0, key.isLarge );
 			this->degraded.reconstructedKeys.insert( k );
 		}
 	}

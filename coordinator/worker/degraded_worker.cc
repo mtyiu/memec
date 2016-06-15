@@ -73,15 +73,11 @@ bool CoordinatorWorker::handleDegradedLockRequest( ClientEvent event, char *buf,
 
 	if ( ! exist ) {
 		// Force header.isLarge to be true
-		char backup[ SPLIT_OFFSET_SIZE ];
-		memcpy( backup, header.key + header.keySize, SPLIT_OFFSET_SIZE );
-		memset( header.key + header.keySize, 0, SPLIT_OFFSET_SIZE );
 		if ( map->findMetadataByKey( header.key, header.keySize, true, srcMetadata ) ) {
 			header.isLarge = true;
 			key.isLarge = true;
 			exist = true;
 		}
-		memcpy( header.key + header.keySize, backup, SPLIT_OFFSET_SIZE );
 	}
 
 	if ( ! exist ) {
@@ -145,6 +141,7 @@ bool CoordinatorWorker::handleDegradedLockRequest( ClientEvent event, char *buf,
 			);
 
 			// The chunk is already locked
+			fprintf( stderr, "was locked?\n" );
 			event.resDegradedLock(
 				event.socket, event.instanceId, event.requestId, key,
 				false, // isLocked

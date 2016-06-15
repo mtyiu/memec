@@ -188,7 +188,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 						header.isSealed, header.stripeId,
 						header.original, header.reconstructed, header.reconstructedCount,
 						header.ongoingAtChunk, header.numSurvivingChunkIds, header.survivingChunkIds,
-						degradedLockData.keySize, degradedLockData.key,
+						degradedLockData.keySize, header.key, // degradedLockData.key,
 						header.isLarge
 					);
 					break;
