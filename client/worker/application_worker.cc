@@ -507,7 +507,7 @@ bool ClientWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 		__ERROR__( "ClientWorker", "handleUpdateRequest", "Invalid UPDATE request." );
 		return false;
 	}
-	__INFO__(
+	__DEBUG__(
 		BLUE, "ClientWorker", "handleUpdateRequest",
 		"[UPDATE] Key: %.*s (key size = %u); Value: (offset = %u, value update size = %u)",
 		( int ) header.keySize, header.key, header.keySize,

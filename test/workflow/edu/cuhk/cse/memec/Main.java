@@ -95,7 +95,7 @@ public class Main implements Runnable {
 					// Construct new key-value pair
 					keySize = Main.keySize >> 3;
 					valueSize = Main.fixedSize ? ( Main.chunkSize >> 5 ) : this.random.nextInt( Main.chunkSize >> 3 );
-					// valueSize = 5000;
+					valueSize = 5000;
 					if ( valueSize < 4 ) valueSize = 4;
 
 					// Store it in the HashMap
@@ -153,32 +153,32 @@ public class Main implements Runnable {
 					} while ( length <= 0 );
 
 					// Avoid boundary case
-					// if ( offset + length > 4050 && offset + length < 4080 )
-					// 	length += 20;
+					if ( offset + length > 4050 && offset + length < 4080 )
+						length += 20;
 
 					String valueUpdate = this.generate( length, true );
 					ret = memec.update( key, valueUpdate, offset );
 
-					// if ( ret ) {
-					// 	byte[] buffer = value.getBytes();
-					// 	byte[] valueUpdateBytes = valueUpdate.getBytes();
-					//
-					// 	for ( int j = 0; j < length; j++ )
-					// 		buffer[ offset + j ] = valueUpdateBytes[ j ];
-					//
-					// 	value = new String( buffer );
-					// 	this.map.put( key, value );
-					//
-					// 	// Test whether the key is still available
-					// 	String v = memec.get( key );
-					// 	if ( ! v.equals( value ) ) {
-					// 		System.out.println( "[UPDATE] Value mismatch (key: " + key + "): (wrong) " + v.length() + " vs. (correct) " + value.length() );
-					// 		System.out.println( "Key: " + key );
-					// 		System.out.println( "valueUpdate: " + valueUpdate );
-					// 		System.out.println( "offset: " + offset );
-					// 		System.out.println( v + " vs " + value );
-					// 	}
-					// }
+					if ( ret ) {
+						byte[] buffer = value.getBytes();
+						byte[] valueUpdateBytes = valueUpdate.getBytes();
+
+						for ( int j = 0; j < length; j++ )
+							buffer[ offset + j ] = valueUpdateBytes[ j ];
+
+						value = new String( buffer );
+						this.map.put( key, value );
+
+						// Test whether the key is still available
+						// String v = memec.get( key );
+						// if ( ! v.equals( value ) ) {
+						// 	System.out.println( "[UPDATE] Value mismatch (key: " + key + "): (wrong) " + v.length() + " vs. (correct) " + value.length() );
+						// 	System.out.println( "Key: " + key );
+						// 	System.out.println( "valueUpdate: " + valueUpdate );
+						// 	System.out.println( "offset: " + offset );
+						// 	System.out.println( v + " vs " + value );
+						// }
+					}
 
 					this.completed[ 2 ]++;
 					if ( ret ) this.succeeded[ 2 ]++;

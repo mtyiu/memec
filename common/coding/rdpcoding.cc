@@ -34,6 +34,7 @@ RDPCoding::RDPCoding( uint32_t k, uint32_t chunkSize ) {
 }
 
 RDPCoding::~RDPCoding() {
+	delete this->_raid5Coding;
 }
 
 void RDPCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t index, uint32_t startOff, uint32_t endOff ) {
@@ -45,13 +46,10 @@ void RDPCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t index, 
 
 	// first parity
 	if ( index == 1 ) {
-
 		this->_raid5Coding->encode( dataChunks, parityChunk, index, startOff, endOff );
-
 	} else if ( index == 2 ) {
 		// need the row parity for encoding the diagonal parity
 		Chunk *firstParity = this->tempChunkPool.alloc();
-
 		this->_raid5Coding->encode( dataChunks, firstParity, 1 );
 
 		// XOR symbols for diagonal parity, assume
@@ -99,7 +97,6 @@ void RDPCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t index, 
 	} else {
 		// ignored
 	}
-
 }
 
 bool RDPCoding::decode( Chunk **chunks, BitmaskArray *chunkStatus ) {
