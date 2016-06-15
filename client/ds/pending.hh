@@ -161,6 +161,7 @@ public:
 	uint8_t opcode;
 	uint8_t keySize;
 	char *key;
+	bool isLarge;
 	uint32_t valueUpdateSize;
 	uint32_t valueUpdateOffset;
 	char *valueUpdate;
@@ -171,6 +172,7 @@ public:
 		this->opcode = 0;
 		this->keySize = 0;
 		this->key = 0;
+		this->isLarge = false;
 		this->valueUpdateSize = 0;
 		this->valueUpdateOffset = 0;
 		this->valueUpdate = 0;
@@ -179,10 +181,11 @@ public:
 		this->reconstructedCount = 0;
 	}
 
-	void set( uint8_t opcode, uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint8_t keySize = 0, char *key = 0 ) {
+	void set( uint8_t opcode, uint32_t *original, uint32_t *reconstructed, uint32_t reconstructedCount, uint8_t keySize = 0, char *key = 0, bool isLarge = false ) {
 		this->opcode = opcode;
 		this->keySize = keySize;
 		this->key = key;
+		this->isLarge = isLarge;
 		this->original = original;
 		this->reconstructed = reconstructed;
 		this->reconstructedCount = reconstructedCount;

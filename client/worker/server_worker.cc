@@ -420,7 +420,8 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 			uint32_t listId, chunkId;
 			ServerSocket *originalDataServer = this->getServers( key.data, key.size, listId, chunkId );
 			if ( originalDataServer != event.socket ) {
-				// fprintf( stderr, "MISMATCH: key: %.*s!\n", key.size, key.data );
+				fprintf( stderr, "MISMATCH: key: %.*s (size=%u)!\n", key.size, key.data, key.size );
+				event.socket->printAddress( stderr );
 
 				if ( ! ClientWorker::pending->eraseKey( PT_SERVER_GET, event.instanceId, event.requestId, event.socket, &pid, &key, true, true ) ) {
 					__ERROR__( "ClientWorker", "handleGetResponse", "Cannot find a pending server GET request that matches the response. This message will be discarded (key = %.*s).", key.size, key.data );

@@ -1009,6 +1009,15 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 
 						// map->findValueByKey( key.data, key.size, 0, 0, &keyMetadata, 0, &chunk );
 						char *obj = map->findObject( key.data, key.size );
+
+						if ( ! obj ) {
+							char *_key = new char[ key.size + SPLIT_OFFSET_SIZE ];
+							memcpy( _key, key.data, key.size );
+							memset( _key + key.size, 0, SPLIT_OFFSET_SIZE );
+							obj = map->findLargeObject( _key, key.size );
+							delete[] _key;
+						}
+
 						if ( obj ) {
 							uint32_t offset;
 							chunk = ServerWorker::chunkPool->getChunk( obj, offset );
@@ -1075,7 +1084,7 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 							event.resGet( op.socket, pid.parentInstanceId, pid.parentRequestId, keyValue, true );
 							this->dispatch( event );
 						} else {
-							fprintf( stderr, "KEY NOT FOUND: %.*s\n", key.size, key.data );
+							fprintf( stderr, "KEY NOT FOUND: %.*s (is large? %s)\n", key.size, key.data, key.isLarge ? "true" : "false" );
 							// event.resGet( op.socket, pid.parentInstanceId, pid.parentRequestId, key, true );
 							event.instanceId = pid.parentInstanceId;
 							event.requestId = pid.parentRequestId;

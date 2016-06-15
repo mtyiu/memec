@@ -16,7 +16,7 @@ bool ClientWorker::sendDegradedLockRequest(
 	degradedLockData.set(
 		opcode,
 		original, reconstructed, reconstructedCount,
-		keySize, key
+		keySize, key, isLarge
 	);
 
 	if ( valueUpdateSize != 0 && valueUpdate )
@@ -69,8 +69,6 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 		uint32_t splitIndex = LargeObjectUtil::getSplitIndex( header.keySize, 0, splitOffset, header.isLarge );
 		originalChunkId = ( originalChunkId + splitIndex ) % ( ClientWorker::dataChunkCount );
 		socket = this->dataServerSockets[ originalChunkId ];
-
-		fprintf( stderr, "%u %u %u [%u, %u] %s\n", splitOffset, splitIndex, header.keySize, originalListId, originalChunkId, header.isLarge ? "is large" : "" );
 	}
 
 	switch( header.type ) {
@@ -216,7 +214,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 			}
 
 			// Insert into server GET pending map
-			key.set( degradedLockData.keySize, degradedLockData.key, 0 );
+			key.set( degradedLockData.keySize, degradedLockData.key, 0, degradedLockData.isLarge );
 			if ( ! ClientWorker::pending->insertKey( PT_SERVER_GET, instanceId, pid.parentInstanceId, requestId, pid.parentRequestId, ( void * ) socket, key ) ) {
 				__ERROR__( "ClientWorker", "handleDegradedLockResponse", "Cannot insert into server GET pending map." );
 			}

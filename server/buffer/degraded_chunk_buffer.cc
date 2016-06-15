@@ -389,20 +389,23 @@ bool DegradedMap::insertChunk( uint32_t listId, uint32_t stripeId, uint32_t chun
 		char *ptr = ChunkUtil::getData( chunk );
 		char *keyPtr, *valuePtr;
 		uint8_t keySize;
-		uint32_t valueSize, offset = 0, size;
+		uint32_t valueSize, splitOffset, offset = 0, size;
+		bool isLarge;
 
 		LOCK( &this->keysLock );
 		while( ptr + KEY_VALUE_METADATA_SIZE < ChunkUtil::getData( chunk ) + ChunkBuffer::capacity ) {
-			KeyValue::_deserialize( ptr, keyPtr, keySize, valuePtr, valueSize );
+			KeyValue::deserialize( ptr, keyPtr, keySize, valuePtr, valueSize, splitOffset );
 			if ( keySize == 0 && valueSize == 0 )
 				break;
+
+			isLarge = LargeObjectUtil::isLarge( keySize, valueSize );
 
 			Key key;
 			KeyMetadata keyMetadata;
 
 			size = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
 
-			key.dup( keySize, keyPtr );
+			key.dup( keySize, keyPtr, 0, isLarge );
 			keyMetadata.set( listId, stripeId, chunkId );
 			keyMetadata.offset = offset;
 			keyMetadata.length = size;

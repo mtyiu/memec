@@ -54,7 +54,7 @@ bool CoordinatorWorker::handleDegradedLockRequest( ClientEvent event, char *buf,
 	Map *map = &( socket->map );
 	Metadata srcMetadata; // set via findMetadataByKey()
 	DegradedLock degradedLock;
-	bool ret = true;
+	bool ret = true, exist;
 
 	uint8_t numSurvivingChunkIds = 0;
 	uint32_t ptr = 0;
@@ -69,7 +69,22 @@ bool CoordinatorWorker::handleDegradedLockRequest( ClientEvent event, char *buf,
 	}
 
 	lock = 0;
-	if ( ! map->findMetadataByKey( header.key, header.keySize, header.isLarge, srcMetadata ) ) {
+	exist = map->findMetadataByKey( header.key, header.keySize, header.isLarge, srcMetadata );
+
+	if ( ! exist ) {
+		// Force header.isLarge to be true
+		char backup[ SPLIT_OFFSET_SIZE ];
+		memcpy( backup, header.key + header.keySize, SPLIT_OFFSET_SIZE );
+		memset( header.key + header.keySize, 0, SPLIT_OFFSET_SIZE );
+		if ( map->findMetadataByKey( header.key, header.keySize, true, srcMetadata ) ) {
+			header.isLarge = true;
+			key.isLarge = true;
+			exist = true;
+		}
+		memcpy( header.key + header.keySize, backup, SPLIT_OFFSET_SIZE );
+	}
+
+	if ( ! exist ) {
 		// Key not found
 		event.resDegradedLock(
 			event.socket, event.instanceId, event.requestId,
