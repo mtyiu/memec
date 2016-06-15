@@ -323,8 +323,9 @@ bool ParityChunkBuffer::updateKeyValue( char *keyStr, uint8_t keySize, bool isLa
 		UNLOCK( &this->lock );
 		return false;
 	} else {
+		bool isLarge = it->first.isLarge;
 		KeyValue keyValue = it->second;
-		char *dst = keyValue.data + PROTO_KEY_VALUE_SIZE + keySize + offset;
+		char *dst = keyValue.data + PROTO_KEY_VALUE_SIZE + keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ) + offset;
 		Coding::bitwiseXOR(
 			dst,
 			dst,
