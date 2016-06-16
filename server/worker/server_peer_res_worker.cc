@@ -182,24 +182,27 @@ bool ServerWorker::handleSetResponse( ServerPeerEvent event, bool success, char 
 	return found;
 }
 
-bool ServerWorker::handleGetResponse( ServerPeerEvent event, bool success, char *buf, size_t size ) {
+bool ServerWorker::handleGetResponse( ServerPeerEvent event, bool success, bool isLarge, char *buf, size_t size ) {
 	Key key;
 	KeyValue keyValue;
 	Metadata metadata;
+	uint32_t splitOffset;
 	DegradedMap *dmap = &ServerWorker::degradedChunkBuffer->map;
 	if ( success ) {
 		struct KeyValueHeader header;
-		if ( this->protocol.parseKeyValueHeader( header, buf, size ) ) {
-			key.set( header.keySize, header.key, ( void * ) event.socket );
-			keyValue._dup( header.key, header.keySize, header.value, header.valueSize );
+		if ( this->protocol.parseKeyValueHeader( header, buf, size, 0, true, isLarge ) ) {
+			key.set( header.keySize, header.key, ( void * ) event.socket, isLarge );
+			splitOffset = LargeObjectUtil::readSplitOffset( header.key + header.keySize );
+			keyValue.dup( header.key, header.keySize, header.value, header.valueSize, splitOffset );
 		} else {
 			__ERROR__( "ServerWorker", "handleGetResponse", "Invalid GET response." );
 			return false;
 		}
 	} else {
 		struct KeyHeader header;
-		if ( this->protocol.parseKeyHeader( header, buf, size ) ) {
-			key.set( header.keySize, header.key, ( void * ) event.socket );
+		if ( this->protocol.parseKeyHeader( header, buf, size, 0 ) ) {
+			event.socket->printAddress( stderr );
+			key.set( header.keySize, header.key, ( void * ) event.socket, isLarge );
 		} else {
 			__ERROR__( "ServerWorker", "handleGetResponse", "Invalid GET response." );
 			return false;
@@ -218,6 +221,7 @@ bool ServerWorker::handleGetResponse( ServerPeerEvent event, bool success, char 
 		return false;
 	}
 
+	key.isLarge = true;
 	if ( ! dmap->deleteDegradedKey( key, pids, success ) ) {
 		__ERROR__( "ServerWorker", "handleGetResponse", "ServerWorker::degradedChunkBuffer->deleteDegradedKey() failed." );
 	}

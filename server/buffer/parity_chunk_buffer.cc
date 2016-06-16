@@ -236,13 +236,13 @@ bool ParityChunkBuffer::seal( uint32_t stripeId, uint32_t chunkId, uint32_t coun
 	return ret;
 }
 
-bool ParityChunkBuffer::findValueByKey( char *data, uint8_t size, KeyValue *keyValuePtr, Key *keyPtr ) {
+bool ParityChunkBuffer::findValueByKey( char *data, uint8_t size, bool isLarge, KeyValue *keyValuePtr, Key *keyPtr ) {
 	std::unordered_map<Key, KeyValue>::iterator it;
 	Key key;
 
 	if ( keyValuePtr )
 		keyValuePtr->clear();
-	key.set( size, data );
+	key.set( size, data, 0, isLarge );
 
 	LOCK( &this->lock );
 	it = this->keys.find( key );

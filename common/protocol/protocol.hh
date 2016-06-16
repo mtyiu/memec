@@ -198,7 +198,7 @@ public:
 	size_t generateHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode,
 		uint32_t length, uint16_t instanceId, uint32_t requestId,
-		char *sendBuf = 0, uint32_t requestTimestamp = 0
+		char *sendBuf = 0, uint32_t requestTimestamp = 0, bool isLarge = false
 	);
 	bool parseHeader( struct ProtocolHeader &header, char *buf = 0, size_t size = 0 );
 	static size_t getSuggestedBufferSize( uint32_t keySize, uint32_t chunkSize, bool supportLargeObject = false );
@@ -348,11 +348,11 @@ public:
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		uint8_t keySize, char *key, uint32_t valueSize, char *value, char *sendBuf = 0,
 		uint32_t timestamp = 0,
-        uint32_t splitOffset = 0, uint32_t splitSize = 0
+        uint32_t splitOffset = 0, uint32_t splitSize = 0, bool isLarge = false
 	);
 	bool parseKeyValueHeader(
 		struct KeyValueHeader &header,
-		char *buf = 0, size_t size = 0, size_t offset = 0, bool enableSplit = false
+		char *buf = 0, size_t size = 0, size_t offset = 0, bool enableSplit = false, bool isLarge = false
 	);
 
 	size_t generateKeyValueUpdateHeader(
@@ -580,10 +580,10 @@ public:
 
 	size_t generateListStripeKeyHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
-		uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key
+		uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key, bool isLarge
 	);
 	bool parseListStripeKeyHeader(
-		struct ListStripeKeyHeader &header,
+		struct ListStripeKeyHeader &header, bool isLarge,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 

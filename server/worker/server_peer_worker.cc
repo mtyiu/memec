@@ -173,7 +173,8 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 				event.message.get.listId,
 				event.message.get.chunkId,
 				event.message.get.key.size,
-				event.message.get.key.data
+				event.message.get.key.data,
+				event.message.get.key.isLarge
 			);
 			break;
 		///////////////
@@ -218,15 +219,21 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 		{
 			char *key, *value;
 			uint8_t keySize;
-			uint32_t valueSize;
-			event.message.get.keyValue._deserialize( key, keySize, value, valueSize );
+			uint32_t valueSize, splitOffset, splitSize;
+			event.message.get.keyValue.deserialize( key, keySize, value, valueSize, splitOffset );
+			bool isLarge = LargeObjectUtil::isLarge( keySize, valueSize, 0, &splitSize );
+			if ( ! isLarge ) {
+				splitOffset = 0;
+				splitSize = 0;
+			}
 			buffer.size = this->protocol.generateKeyValueHeader(
 				PROTO_MAGIC_RESPONSE_SUCCESS,
 				PROTO_MAGIC_TO_SERVER,
 				PROTO_OPCODE_GET,
 				event.instanceId, event.requestId,
 				keySize, key,
-				valueSize, value
+				valueSize, value, 0, 0,
+				splitOffset, splitSize
 			);
 		}
 			break;
@@ -588,13 +595,13 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 				case PROTO_OPCODE_GET:
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
-							this->handleGetRequest( event, buffer.data, buffer.size );
+							this->handleGetRequest( event, header.isLarge, buffer.data, buffer.size );
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
-							this->handleGetResponse( event, true, buffer.data, buffer.size );
+							this->handleGetResponse( event, true, header.isLarge, buffer.data, buffer.size );
 							break;
 						case PROTO_MAGIC_RESPONSE_FAILURE:
-							this->handleGetResponse( event, false, buffer.data, buffer.size );
+							this->handleGetResponse( event, false, header.isLarge, buffer.data, buffer.size );
 							break;
 						default:
 							__ERROR__( "ServerWorker", "dispatch", "Invalid magic code from server: 0x%x.", header.magic );

@@ -129,7 +129,7 @@ bool ServerWorker::handleDegradedGetRequest( ClientEvent event, char *buf, size_
 		__ERROR__( "ServerWorker", "handleDegradedGetRequest", "Invalid degraded GET request." );
 		return false;
 	}
-	__INFO__(
+	__DEBUG__(
 		BLUE, "ServerWorker", "handleDegradedGetRequest",
 		"[GET] (%u, %u) Key: %.*s (key size = %u); is sealed? %s; is large? %s.",
 		event.instanceId, event.requestId,
@@ -1046,10 +1046,10 @@ bool ServerWorker::performDegradedRead(
 	);
 	if ( opcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
 		op.data.keyValueUpdate = *keyValueUpdate;
-		mykey.set( keyValueUpdate->size, keyValueUpdate->data );
+		mykey.set( keyValueUpdate->size, keyValueUpdate->data, 0, keyValueUpdate->isLarge );
 	} else if ( opcode ) {
 		op.data.key = *key;
-		mykey.set( key->size, key->data );
+		mykey.set( key->size, key->data, 0, key->isLarge );
 	}
 
 	if ( isSealed || ! socket->self ) {
@@ -1152,7 +1152,7 @@ force_reconstruct_chunks:
 		return ( selected >= ServerWorker::dataChunkCount );
 	} else {
 		if ( opcode == PROTO_OPCODE_DEGRADED_UPDATE )
-			k.set( keyValueUpdate->size, keyValueUpdate->data );
+			k.set( keyValueUpdate->size, keyValueUpdate->data, 0, keyValueUpdate->isLarge );
 		else
 			k = *key;
 		needsContinue = ServerWorker::degradedChunkBuffer->map.insertDegradedKey( k, instanceId, requestId, isReconstructed );
@@ -1169,15 +1169,20 @@ force_reconstruct_chunks:
 			ServerPeerEvent serverPeerEvent;
 			char *keyStr = 0, *valueStr = 0;
 			uint8_t keySize = 0;
-			uint32_t valueSize = 0;
+			uint32_t valueSize = 0, splitOffset = 0;
 
-			success = ServerWorker::map->findObject( mykey.data, mykey.size, &keyValue, &mykey ) != 0;
+			if ( mykey.isLarge ) {
+				success = ServerWorker::map->findObject( mykey.data, mykey.size, &keyValue, &mykey ) != 0;
+			} else {
+				success = ServerWorker::map->findLargeObject( mykey.data, mykey.size, &keyValue, &mykey ) != 0;
+			}
+
 			if ( ! success )
-				success = ServerWorker::chunkBuffer->at( listId )->findValueByKey( mykey.data, mykey.size, &keyValue, &mykey );
+				success = ServerWorker::chunkBuffer->at( listId )->findValueByKey( mykey.data, mykey.size, mykey.isLarge, &keyValue, &mykey );
 
 			if ( success ) {
-				keyValue._deserialize( keyStr, keySize, valueStr, valueSize );
-				keyValue._dup( keyStr, keySize, valueStr, valueSize );
+				keyValue.deserialize( keyStr, keySize, valueStr, valueSize, splitOffset );
+				keyValue.dup( keyStr, keySize, valueStr, valueSize, splitOffset );
 			} else {
 				__ERROR__( "ServerWorker", "performDegradedRead", "findValueByKey() failed (list ID: %u, key: %.*s).", listId, mykey.size, mykey.data );
 			}

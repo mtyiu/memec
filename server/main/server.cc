@@ -709,7 +709,6 @@ void Server::lookup() {
 	bool found = false;
 
 	KeyMetadata keyMetadata;
-	// if ( this->map.findValueByKey( key, keySize, 0, 0, &keyMetadata, 0, 0 ) ) {
 	if ( ( obj = this->map.findObject( key, keySize ) ) || ( obj = this->map.findLargeObject( key, keySize ) ) ) {
 		Chunk *chunk = this->chunkPool.getChunk( obj, offset );
 		if ( chunk ) {

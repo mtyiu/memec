@@ -23,6 +23,7 @@
 #define PROTO_MAGIC_TO_COORDINATOR                0x20 // -01-----
 #define PROTO_MAGIC_TO_CLIENT                     0x40 // -10-----
 #define PROTO_MAGIC_TO_SERVER                     0x60 // -11-----
-// (Bit: 7): Reserved //
+// (Bit: 7) //
+#define PROTO_MAGIC_IS_LARGE                      0x80 // 1-------
 
 #endif

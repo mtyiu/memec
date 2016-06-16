@@ -173,7 +173,7 @@ size_t Protocol::generateKeyValueHeader(
 	uint8_t keySize, char *key,
 	uint32_t valueSize, char *value,
 	char *sendBuf, uint32_t timestamp,
-	uint32_t splitOffset, uint32_t splitSize
+	uint32_t splitOffset, uint32_t splitSize, bool isLarge
 ) {
 	if ( ! sendBuf ) sendBuf = this->buffer.send;
 	char *buf = sendBuf + PROTO_HEADER_SIZE;
@@ -193,12 +193,12 @@ size_t Protocol::generateKeyValueHeader(
 	bytes += this->generateHeader(
 		magic, to, opcode,
 		bytes,
-		instanceId, requestId, sendBuf, timestamp
+		instanceId, requestId, sendBuf, timestamp, isLarge
 	);
 	return bytes;
 }
 
-bool Protocol::parseKeyValueHeader( struct KeyValueHeader &header, char *buf, size_t size, size_t offset, bool enableSplit ) {
+bool Protocol::parseKeyValueHeader( struct KeyValueHeader &header, char *buf, size_t size, size_t offset, bool enableSplit, bool isLarge ) {
 	if ( ! buf || ! size ) {
 		buf = this->buffer.recv;
 		size = this->buffer.size;
@@ -222,6 +222,8 @@ bool Protocol::parseKeyValueHeader( struct KeyValueHeader &header, char *buf, si
 		header.splitOffset = 0;
 		if ( size - offset < PROTO_KEY_VALUE_SIZE + header.keySize + header.valueSize )
 			return false;
+		if ( isLarge )
+			ptr += SPLIT_OFFSET_SIZE;
 	}
 
 	header.value = header.valueSize ? ptr : 0;

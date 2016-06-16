@@ -74,7 +74,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 	switch( header.type ) {
 		case PROTO_DEGRADED_LOCK_RES_IS_LOCKED:
 		case PROTO_DEGRADED_LOCK_RES_WAS_LOCKED:
-			__INFO__(
+			__DEBUG__(
 				BLUE, "ClientWorker", "handleDegradedLockResponse",
 				"[%s Locked] [%u, %u, %u] Key: %.*s (key size = %u); Is Sealed? %s.",
 				header.type == PROTO_DEGRADED_LOCK_RES_IS_LOCKED ? "Is" : "Was",
@@ -97,21 +97,21 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 				}
 			}
 
-			for ( uint32_t i = 0; i < header.reconstructedCount; i++ ) {
-				fprintf(
-					stderr,
-					"%s(%u, %u) |-> (%u, %u)%s",
-					i == 0 ? "Original: " : "; ",
-					header.original[ i * 2     ],
-					header.original[ i * 2 + 1 ],
-					header.reconstructed[ i * 2     ],
-					header.reconstructed[ i * 2 + 1 ],
-					i == header.reconstructedCount - 1 ? " || " : ""
-				);
-			}
+			// for ( uint32_t i = 0; i < header.reconstructedCount; i++ ) {
+			// 	fprintf(
+			// 		stderr,
+			// 		"%s(%u, %u) |-> (%u, %u)%s",
+			// 		i == 0 ? "Original: " : "; ",
+			// 		header.original[ i * 2     ],
+			// 		header.original[ i * 2 + 1 ],
+			// 		header.reconstructed[ i * 2     ],
+			// 		header.reconstructed[ i * 2 + 1 ],
+			// 		i == header.reconstructedCount - 1 ? " || " : ""
+			// 	);
+			// }
 			break;
 		case PROTO_DEGRADED_LOCK_RES_NOT_LOCKED:
-			__INFO__(
+			__DEBUG__(
 				BLUE, "ClientWorker", "handleDegradedLockResponse",
 				"[Not Locked] [%u, %u] Key: %.*s (key size = %u).",
 				originalListId, originalChunkId,
@@ -119,7 +119,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 			);
 			break;
 		case PROTO_DEGRADED_LOCK_RES_REMAPPED:
-			__INFO__(
+			__DEBUG__(
 				BLUE, "ClientWorker", "handleDegradedLockResponse",
 				"[Remapped] [%u, %u] Key: %.*s (key size = %u).",
 				originalListId, originalChunkId,
@@ -142,7 +142,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 			break;
 		case PROTO_DEGRADED_LOCK_RES_NOT_EXIST:
 		default:
-			__INFO__(
+			__DEBUG__(
 				BLUE, "ClientWorker", "handleDegradedLockResponse",
 				"[Not Found] Key: %.*s (key size = %u)",
 				( int ) header.keySize, header.key, header.keySize

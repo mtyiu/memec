@@ -164,24 +164,24 @@ bool ServerWorker::handleSetRequest( ServerPeerEvent event, char *buf, size_t si
 	return success;
 }
 
-bool ServerWorker::handleGetRequest( ServerPeerEvent event, char *buf, size_t size ) {
+bool ServerWorker::handleGetRequest( ServerPeerEvent event, bool isLarge, char *buf, size_t size ) {
 	struct ListStripeKeyHeader header;
 	bool ret;
-	if ( ! this->protocol.parseListStripeKeyHeader( header, buf, size ) ) {
+	if ( ! this->protocol.parseListStripeKeyHeader( header, isLarge, buf, size ) ) {
 		__ERROR__( "ServerWorker", "handleGetRequest", "Invalid UNSEALED_GET request." );
 		return false;
 	}
 	__DEBUG__(
 		BLUE, "ServerWorker", "handleGetRequest",
-		"[UNSEALED_GET] List ID: %u, chunk ID: %u; key: %.*s.",
-		header.listId, header.chunkId, header.keySize, header.key
+		"[UNSEALED_GET] List ID: %u, chunk ID: %u; key: %.*s; is large? %s.",
+		header.listId, header.chunkId, header.keySize, header.key, isLarge ? "true" : "false"
 	);
 
 	Key key;
 	KeyValue keyValue;
 
 	ret = ServerWorker::chunkBuffer->at( header.listId )->findValueByKey(
-		header.key, header.keySize, &keyValue, &key
+		header.key, header.keySize, isLarge, &keyValue, &key
 	);
 
 	if ( ret )
@@ -305,7 +305,7 @@ bool ServerWorker::handleDeleteRequest( ServerPeerEvent event, char *buf, size_t
 
 	// read for backup before delete
 	bool ret = ServerWorker::chunkBuffer->at( header.listId )->findValueByKey(
-		header.key, header.keySize, &keyValue, &key
+		header.key, header.keySize, false, &keyValue, &key
 	);
 	if ( ret )
 		keyValue._deserialize( key.data, key.size, value.data, value.size );

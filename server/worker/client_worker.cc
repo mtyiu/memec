@@ -413,7 +413,7 @@ bool ServerWorker::handleSetRequest( ClientEvent event, struct KeyValueHeader &h
 
 	if (
 		( ! isLarge && map->findObject( header.key, header.keySize ) ) ||
-		( ServerWorker::chunkBuffer->at( listId )->findValueByKey( header.key, header.keySize, 0, 0, false ) )
+		( ServerWorker::chunkBuffer->at( listId )->findValueByKey( header.key, header.keySize, isLarge, 0, 0, false ) )
 	) {
 		exist = true;
 	} else {

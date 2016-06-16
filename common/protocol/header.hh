@@ -4,6 +4,7 @@
 #define PROTO_HEADER_SIZE 16
 struct ProtocolHeader {
 	uint8_t magic, from, to; // 1 byte
+	bool isLarge;
 	uint8_t opcode;          // 1 byte
 	uint32_t length;         // 4 bytes
 	uint16_t instanceId;     // 2 bytes

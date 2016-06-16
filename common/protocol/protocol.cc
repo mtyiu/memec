@@ -57,11 +57,11 @@ void Protocol::free() {
 	this->buffer.recv = 0;
 }
 
-size_t Protocol::generateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t length, uint16_t instanceId, uint32_t requestId, char *sendBuf, uint32_t requestTimestamp ) {
+size_t Protocol::generateHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint32_t length, uint16_t instanceId, uint32_t requestId, char *sendBuf, uint32_t requestTimestamp, bool isLarge ) {
 	size_t bytes = 0;
 	if ( ! sendBuf ) sendBuf = this->buffer.send;
 
-	sendBuf[ 0 ] = ( ( magic & 0x07 ) | ( this->from & 0x18 ) | ( to & 0x60 ) );
+	sendBuf[ 0 ] = ( ( magic & 0x07 ) | ( this->from & 0x18 ) | ( to & 0x60 ) | ( isLarge ? PROTO_MAGIC_IS_LARGE : 0 ) );
 	sendBuf[ 1 ] = opcode & 0xFF;
 	bytes = 2;
 	sendBuf += 2;
@@ -80,10 +80,11 @@ bool Protocol::parseHeader( struct ProtocolHeader &header, char *buf, size_t siz
 	}
 	if ( size < PROTO_HEADER_SIZE ) return false;
 
-	header.magic  = buf[ 0 ] & 0x07;
-	header.from   = buf[ 0 ] & 0x18;
-	header.to     = buf[ 0 ] & 0x60;
-	header.opcode = buf[ 1 ] & 0xFF;
+	header.magic   = buf[ 0 ] & 0x07;
+	header.from    = buf[ 0 ] & 0x18;
+	header.to      = buf[ 0 ] & 0x60;
+	header.isLarge = buf[ 0 ] & 0x80;
+	header.opcode  = buf[ 1 ] & 0xFF;
 	buf += 2;
 
 	header.length     = ProtocolUtil::read4Bytes( buf );

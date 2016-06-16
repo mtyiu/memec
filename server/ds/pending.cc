@@ -854,4 +854,5 @@ void Pending::print( PendingType type, FILE *f, bool needsLock, bool needsUnlock
 		}
 		if ( needsUnlock ) UNLOCK( lock );
 	}
+	fprintf( f, "\n" );
 }

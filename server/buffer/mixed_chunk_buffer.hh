@@ -46,7 +46,7 @@ public:
 	void updateAndUnlockChunk( int index );
 	void unlock( int index = -1 );
 
-	bool findValueByKey( char *data, uint8_t size, KeyValue *keyValuePtr, Key *keyPtr = 0, bool verbose = false );
+	bool findValueByKey( char *data, uint8_t size, bool isLarge, KeyValue *keyValuePtr, Key *keyPtr = 0, bool verbose = false );
 	bool getKeyValueMap( std::unordered_map<Key, KeyValue> *&map, LOCK_T *&lock, bool verbose = false );
 
 	bool deleteKey( char *keyStr, uint8_t keySize );

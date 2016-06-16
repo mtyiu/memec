@@ -123,7 +123,7 @@ private:
 	bool handleForwardKeyRequest( ServerPeerEvent event, char *buf, size_t size );
 	bool handleForwardKeyRequest( ServerPeerEvent event, struct ForwardKeyHeader &header, bool self );
 	bool handleSetRequest( ServerPeerEvent event, char *buf, size_t size );
-	bool handleGetRequest( ServerPeerEvent event, char *buf, size_t size );
+	bool handleGetRequest( ServerPeerEvent event, bool isLarge, char *buf, size_t size );
 	bool handleUpdateRequest( ServerPeerEvent event, char *buf, size_t size );
 	bool handleDeleteRequest( ServerPeerEvent event, char *buf, size_t size );
 
@@ -140,7 +140,7 @@ private:
 	bool handleForwardKeyResponse( ServerPeerEvent event, bool success, char *buf, size_t size );
 	bool handleForwardKeyResponse( struct ForwardKeyHeader &header, bool success, bool self );
 	bool handleSetResponse( ServerPeerEvent event, bool success, char *buf, size_t size );
-	bool handleGetResponse( ServerPeerEvent event, bool success, char *buf, size_t size );
+	bool handleGetResponse( ServerPeerEvent event, bool success, bool isLarge, char *buf, size_t size );
 	bool handleUpdateResponse( ServerPeerEvent event, bool success, char *buf, size_t size );
 	bool handleDeleteResponse( ServerPeerEvent event, bool success, char *buf, size_t size );
 	bool handleGetChunkResponse( ServerPeerEvent event, bool success, char *buf, size_t size );

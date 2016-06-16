@@ -543,17 +543,21 @@ bool Protocol::parseForwardKeyResHeader( struct ForwardKeyHeader &header, char *
 	return true;
 }
 
-size_t Protocol::generateListStripeKeyHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key ) {
+size_t Protocol::generateListStripeKeyHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t listId, uint32_t chunkId, uint8_t keySize, char *key, bool isLarge ) {
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_LIST_STRIPE_KEY_SIZE + keySize, instanceId, requestId );
+	size_t bytes = this->generateHeader(
+		magic, to, opcode,
+		PROTO_LIST_STRIPE_KEY_SIZE + keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ),
+		instanceId, requestId, 0, 0, isLarge
+	);
 	bytes += ProtocolUtil::write4Bytes( buf, listId  );
 	bytes += ProtocolUtil::write4Bytes( buf, chunkId );
 	bytes += ProtocolUtil::write1Byte ( buf, keySize );
-	bytes += ProtocolUtil::write( buf, key, keySize );
+	bytes += ProtocolUtil::write( buf, key, keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ) );
 	return bytes;
 }
 
-bool Protocol::parseListStripeKeyHeader( struct ListStripeKeyHeader &header, char *buf, size_t size, size_t offset ) {
+bool Protocol::parseListStripeKeyHeader( struct ListStripeKeyHeader &header, bool isLarge, char *buf, size_t size, size_t offset ) {
 	if ( ! buf || ! size ) {
 		buf = this->buffer.recv;
 		size = this->buffer.size;
@@ -564,7 +568,7 @@ bool Protocol::parseListStripeKeyHeader( struct ListStripeKeyHeader &header, cha
 	header.chunkId = ProtocolUtil::read4Bytes( ptr );
 	header.keySize = ProtocolUtil::read1Byte ( ptr );
 	header.key = ptr;
-	return ( size - offset >= ( size_t ) PROTO_LIST_STRIPE_KEY_SIZE + header.keySize );
+	return ( size - offset >= ( size_t ) PROTO_LIST_STRIPE_KEY_SIZE + header.keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ) );
 }
 
 size_t Protocol::generateDegradedReleaseReqHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, std::vector<Metadata> &chunks, bool &isCompleted ) {
