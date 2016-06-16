@@ -235,7 +235,7 @@ degraded_get_check:
 
 		if ( ! ret ) {
 			if ( checked ) {
-				__ERROR__( "ServerWorker", "handleDegradedGetRequest", "Failed to perform degraded read on (%u, %u, %u) requestId = %u from id = %u.", listId, stripeId, chunkId, event.requestId, event.instanceId );
+				__ERROR__( "ServerWorker", "handleDegradedGetRequest", "Failed to perform degraded read on (%u, %u, %u; key: %.*s.%u; chunk: %p) requestId = %u from id = %u.", listId, stripeId, chunkId, key.size, key.data, key.isLarge ? LargeObjectUtil::readSplitOffset( key.data + key.size ) : 0, chunk, event.requestId, event.instanceId );
 				event.resGet( event.socket, event.instanceId, event.requestId, key, true );
 				this->dispatch( event );
 			} else if ( isReconstructed ) {
@@ -1158,8 +1158,9 @@ force_reconstruct_chunks:
 		needsContinue = ServerWorker::degradedChunkBuffer->map.insertDegradedKey( k, instanceId, requestId, isReconstructed );
 
 		////////// Key-value pairs in unsealed chunks //////////
-		if ( ! needsContinue || isReconstructed )
+		if ( ! needsContinue || isReconstructed ) {
 			return false;
+		}
 
 		bool success = true;
 		if ( socket->self ) {

@@ -6,13 +6,13 @@ Backup::Backup() {
 	LOCK_INIT( &this->lock );
 }
 
-void Backup::insert( uint8_t keySize, char *keyStr, uint8_t opcode, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) {
+void Backup::insert( uint8_t keySize, char *keyStr, bool isLarge, uint8_t opcode, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId ) {
 	Key key;
 	MetadataBackup metadataBackup;
 	std::unordered_map<Key, MetadataBackup>::iterator it;
 
-	key.set( keySize, keyStr );
-	key.dup();
+	key.set( keySize, keyStr, 0, isLarge );
+	key.dup( 0, 0, 0, isLarge );
 
 	metadataBackup.opcode = opcode;
 	metadataBackup.timestamp = timestamp;
@@ -48,14 +48,15 @@ void Backup::insert( uint8_t keySize, char *keyStr, uint8_t opcode, uint32_t tim
 	UNLOCK( &this->lock );
 }
 
-void Backup::insert( uint8_t keySize, char *keyStr, uint8_t opcode, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t sealedListId, uint32_t sealedStripeId, uint32_t sealedChunkId ) {
+void Backup::insert( uint8_t keySize, char *keyStr, bool isLarge, uint8_t opcode, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t sealedListId, uint32_t sealedStripeId, uint32_t sealedChunkId ) {
 	Key key;
 	MetadataBackup metadataBackup;
 	Metadata metadata;
 	std::unordered_map<Key, MetadataBackup>::iterator opsIt;
 
-	key.set( keySize, keyStr );
-	key.dup();
+	key.set( keySize, keyStr, 0, isLarge );
+	key.dup( 0, 0, 0, isLarge );
+
 	metadataBackup.opcode = opcode;
 	metadataBackup.timestamp = timestamp;
 	metadataBackup.set( listId, stripeId, chunkId );

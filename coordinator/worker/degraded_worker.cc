@@ -141,7 +141,6 @@ bool CoordinatorWorker::handleDegradedLockRequest( ClientEvent event, char *buf,
 			);
 
 			// The chunk is already locked
-			fprintf( stderr, "was locked?\n" );
 			event.resDegradedLock(
 				event.socket, event.instanceId, event.requestId, key,
 				false, // isLocked

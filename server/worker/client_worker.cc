@@ -108,7 +108,8 @@ void ServerWorker::dispatch( ClientEvent event ) {
 					event.message.set.sealedStripeId,
 					event.message.set.sealedChunkId,
 					event.message.set.key.size,
-					event.message.set.key.data
+					event.message.set.key.data,
+					event.message.set.key.isLarge
 				);
 			} else {
 				buffer.size = this->protocol.generateKeyBackupHeader(
@@ -121,7 +122,8 @@ void ServerWorker::dispatch( ClientEvent event ) {
 					event.message.set.stripeId,
 					event.message.set.chunkId,
 					event.message.set.key.size,
-					event.message.set.key.data
+					event.message.set.key.data,
+					event.message.set.key.isLarge
 				);
 			}
 			break;
@@ -133,7 +135,8 @@ void ServerWorker::dispatch( ClientEvent event ) {
 				PROTO_OPCODE_SET,
 				event.instanceId, event.requestId,
 				event.message.set.key.size,
-				event.message.set.key.data
+				event.message.set.key.data,
+				event.message.set.key.isLarge
 			);
 			break;
 		case CLIENT_EVENT_TYPE_DEGRADED_SET_RESPONSE_SUCCESS:
@@ -185,7 +188,8 @@ void ServerWorker::dispatch( ClientEvent event ) {
 				event.message.del.stripeId,
 				event.message.del.chunkId,
 				event.message.del.key.size,
-				event.message.del.key.data
+				event.message.del.key.data,
+				event.message.del.key.isLarge
 			);
 
 			if ( event.needsFree )
@@ -197,7 +201,8 @@ void ServerWorker::dispatch( ClientEvent event ) {
 				event.isDegraded ? PROTO_OPCODE_DEGRADED_DELETE : PROTO_OPCODE_DELETE,
 				event.instanceId, event.requestId,
 				event.message.del.key.size,
-				event.message.del.key.data
+				event.message.del.key.data,
+				event.message.del.key.isLarge
 			);
 
 			if ( event.needsFree )
@@ -433,7 +438,7 @@ bool ServerWorker::handleSetRequest( ClientEvent event, struct KeyValueHeader &h
 		return true;
 
 	Key key;
-	key.set( header.keySize, header.key );
+	key.set( header.keySize, header.key, 0, isLarge );
 	if ( exist ) {
 		event.resSet(
 			event.socket, event.instanceId, event.requestId,

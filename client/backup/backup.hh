@@ -15,12 +15,12 @@ public:
 
 	Backup();
 	void insert(
-		uint8_t keySize, char *keyStr,
+		uint8_t keySize, char *keyStr, bool isLarge,
 		uint8_t opcode, uint32_t timestamp,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId
 	);
 	void insert(
-		uint8_t keySize, char *keyStr,
+		uint8_t keySize, char *keyStr, bool isLarge,
 		uint8_t opcode, uint32_t timestamp,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		uint32_t sealedListId, uint32_t sealedStripeId, uint32_t sealedChunkId

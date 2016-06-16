@@ -330,7 +330,8 @@ public:
 
 		if ( ! ChunkUtil::isParity( chunk ) ) {
 			uint8_t keySize;
-			uint32_t valueSize, tmp, splitOffset;
+			uint32_t valueSize, tmp, splitOffset, splitSize;
+			bool isLarge;
 			char *key, *value;
 			char *ptr;
 
@@ -341,15 +342,23 @@ public:
 				if ( keySize == 0 && valueSize == 0 )
 					break;
 
+				isLarge = LargeObjectUtil::isLarge( keySize, valueSize, 0, &splitSize );
+				if ( isLarge ) {
+					if ( splitOffset + splitSize > valueSize )
+						splitSize = valueSize - splitOffset;
+					tmp = KEY_VALUE_METADATA_SIZE + SPLIT_OFFSET_SIZE + keySize + splitSize;
+				} else {
+					tmp = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
+				}
+
 				fprintf(
-					stderr, "[%u, %u, %u] Object: (k: %u, v: %u) at offset: %lu\n",
+					stderr, "[%u, %u, %u] Object: %.*s.%u (k: %u, v: %u) at offset: %lu\n",
 					ChunkUtil::getListId( chunk ),
 					ChunkUtil::getStripeId( chunk ),
 					ChunkUtil::getChunkId( chunk ),
-					keySize, valueSize, ptr - data
+					keySize, key, splitOffset, keySize, valueSize, ptr - data
 				);
 
-				tmp = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
 				ptr += tmp;
 			}
 		} else {

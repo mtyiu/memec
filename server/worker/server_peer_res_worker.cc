@@ -221,7 +221,7 @@ bool ServerWorker::handleGetResponse( ServerPeerEvent event, bool success, bool 
 		return false;
 	}
 
-	key.isLarge = true;
+	key.isLarge = isLarge;
 	if ( ! dmap->deleteDegradedKey( key, pids, success ) ) {
 		__ERROR__( "ServerWorker", "handleGetResponse", "ServerWorker::degradedChunkBuffer->deleteDegradedKey() failed." );
 	}
@@ -259,7 +259,7 @@ bool ServerWorker::handleGetResponse( ServerPeerEvent event, bool success, bool 
 					bool isKeyValueFound = dmap->findValueByKey(
 						key.data,
 						key.size,
-						false,
+						isLarge,
 						isSealed,
 						&keyValue, &key, &keyMetadata
 					);
@@ -1089,7 +1089,7 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 							this->dispatch( event );
 						} else {
 							fprintf( stderr, "KEY NOT FOUND: %.*s.%u (is large? %s)\n", key.size, key.data, key.isLarge ? LargeObjectUtil::readSplitOffset( key.data + key.size ) : 0,  key.isLarge ? "true" : "false" );
-							// event.resGet( op.socket, pid.parentInstanceId, pid.parentRequestId, key, true );
+							// ChunkUtil::print( chunk, stderr );
 							event.instanceId = pid.parentInstanceId;
 							event.requestId = pid.parentRequestId;
 							event.socket = op.socket;

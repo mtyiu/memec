@@ -135,7 +135,7 @@ bool DegradedMap::deleteKey( Key key, uint8_t opcode, uint32_t &timestamp, KeyMe
 }
 
 bool DegradedMap::insertValue( KeyValue keyValue, Metadata metadata ) { // KeyValue's data is allocated by malloc()
-	Key key = keyValue.key();
+	Key key = keyValue.key( true );
 	std::pair<Key, KeyValue> p1( key, keyValue );
 	std::pair<Metadata, Key> p2( metadata, key );
 	std::pair<std::unordered_map<Key, KeyValue>::iterator, bool> ret;
@@ -389,7 +389,7 @@ bool DegradedMap::insertChunk( uint32_t listId, uint32_t stripeId, uint32_t chun
 		char *ptr = ChunkUtil::getData( chunk );
 		char *keyPtr, *valuePtr;
 		uint8_t keySize;
-		uint32_t valueSize, splitOffset, offset = 0, size;
+		uint32_t valueSize, splitOffset, splitSize, offset = 0, size;
 		bool isLarge;
 
 		LOCK( &this->keysLock );
@@ -398,12 +398,18 @@ bool DegradedMap::insertChunk( uint32_t listId, uint32_t stripeId, uint32_t chun
 			if ( keySize == 0 && valueSize == 0 )
 				break;
 
-			isLarge = LargeObjectUtil::isLarge( keySize, valueSize );
+			isLarge = LargeObjectUtil::isLarge( keySize, valueSize, 0, &splitSize );
 
 			Key key;
 			KeyMetadata keyMetadata;
 
-			size = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
+			if ( isLarge ) {
+				if ( splitOffset + splitSize > valueSize )
+					splitSize = valueSize - splitOffset;
+				size = KEY_VALUE_METADATA_SIZE + SPLIT_OFFSET_SIZE + keySize + splitSize;
+			} else {
+				size = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
+			}
 
 			key.dup( keySize, keyPtr, 0, isLarge );
 			keyMetadata.set( listId, stripeId, chunkId );

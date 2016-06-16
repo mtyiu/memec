@@ -108,7 +108,8 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 				PROTO_OPCODE_SET,
 				event.instanceId, event.requestId,
 				event.message.set.key.size,
-				event.message.set.key.data
+				event.message.set.key.data,
+				event.message.set.key.isLarge
 			);
 			break;
 		case SERVER_PEER_EVENT_TYPE_FORWARD_KEY_REQUEST:
@@ -233,7 +234,7 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 				event.instanceId, event.requestId,
 				keySize, key,
 				valueSize, value, 0, 0,
-				splitOffset, splitSize
+				splitOffset, splitSize, isLarge
 			);
 		}
 			break;

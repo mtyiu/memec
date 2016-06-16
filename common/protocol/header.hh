@@ -85,12 +85,13 @@ struct KeyHeader {
 	char *key;
 };
 
-#define PROTO_KEY_BACKUP_BASE_SIZE       2
+#define PROTO_KEY_BACKUP_BASE_SIZE       3
 #define PROTO_KEY_BACKUP_FOR_DATA_SIZE   17
 #define PROTO_KEY_BACKUP_SEALED_SIZE     12
 struct KeyBackupHeader {
     bool isParity;
 	uint8_t keySize;
+	bool isLarge;
     uint32_t timestamp;      // Only for data servers
     uint32_t listId;         // Only for data servers
     uint32_t stripeId;       // Only for data servers

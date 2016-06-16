@@ -305,17 +305,17 @@ public:
 		uint32_t timestamp,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
 		uint32_t sealedListId, uint32_t sealedStripeId, uint32_t sealedChunkId,
-		uint8_t keySize, char *key, char *sendBuf = 0
+		uint8_t keySize, char *key, bool isLarge, char *sendBuf = 0
 	);
 	size_t generateKeyBackupHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
         uint32_t timestamp,
         uint32_t listId, uint32_t stripeId, uint32_t chunkId,
-		uint8_t keySize, char *key, char *sendBuf = 0
+		uint8_t keySize, char *key, bool isLarge, char *sendBuf = 0
 	);
     size_t generateKeyBackupHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
-		uint8_t keySize, char *key, char *sendBuf = 0
+		uint8_t keySize, char *key, bool isLarge, char *sendBuf = 0
 	);
 	bool parseKeyBackupHeader(
 		struct KeyBackupHeader &header,

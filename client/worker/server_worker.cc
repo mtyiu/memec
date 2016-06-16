@@ -246,8 +246,9 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 		if ( header.isParity ) {
 			__DEBUG__(
 				BLUE, "ClientWorker", "handleSetResponse",
-				"[SET] Key: %.*s (key size = %u)",
-				( int ) header.keySize, header.key, header.keySize
+				"[SET] Key: %.*s (key size = %u); is large? %s",
+				( int ) header.keySize, header.key, header.keySize,
+				header.isLarge ? "true" : "false"
 			);
 
 			keySize = header.keySize;
@@ -255,10 +256,13 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 		} else {
 			__DEBUG__(
 				BLUE, "ClientWorker", "handleSetResponse",
-				"[SET] [%u] Key: %.*s (key size = %u) at (%u, %u, %u)",
+				"[SET] [%u] Key: %.*s.%u (key size = %u) at (%u, %u, %u); is large? %s",
 				header.timestamp,
-				( int ) header.keySize, header.key, header.keySize,
-				header.listId, header.stripeId, header.chunkId
+				( int ) header.keySize, header.key,
+				header.isLarge ? LargeObjectUtil::readSplitOffset( header.key + header.keySize ) : 0,
+				header.keySize,
+				header.listId, header.stripeId, header.chunkId,
+				header.isLarge ? "true" : "false"
 			);
 
 			keySize = header.keySize;
@@ -266,7 +270,7 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 
 			if ( header.isSealed ) {
 				event.socket->backup.insert(
-					keySize, keyStr,
+					keySize, keyStr, header.isLarge,
 					PROTO_OPCODE_SET,
 					header.timestamp,
 					header.listId,
@@ -278,7 +282,7 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 				);
 			} else {
 				event.socket->backup.insert(
-					keySize, keyStr,
+					keySize, keyStr, header.isLarge,
 					PROTO_OPCODE_SET,
 					header.timestamp,
 					header.listId,
@@ -720,7 +724,7 @@ bool ClientWorker::handleDeleteResponse( ServerEvent event, bool success, bool i
 
 		if ( header.isSealed ) {
 			event.socket->backup.insert(
-				keySize, keyStr,
+				keySize, keyStr, header.isLarge,
 				PROTO_OPCODE_DELETE,
 				header.timestamp,
 				header.listId,
@@ -732,7 +736,7 @@ bool ClientWorker::handleDeleteResponse( ServerEvent event, bool success, bool i
 			);
 		} else {
 			event.socket->backup.insert(
-				keySize, keyStr,
+				keySize, keyStr, header.isLarge,
 				PROTO_OPCODE_DELETE,
 				header.timestamp,
 				header.listId,
