@@ -131,11 +131,12 @@ bool ServerWorker::handleDegradedGetRequest( ClientEvent event, char *buf, size_
 	}
 	__DEBUG__(
 		BLUE, "ServerWorker", "handleDegradedGetRequest",
-		"[GET] (%u, %u) Key: %.*s (key size = %u); is sealed? %s; is large? %s.",
+		"[GET] (%u, %u) Key: %.*s (key size = %u) at stripe: %u; is sealed? %s; is large? %s.",
 		event.instanceId, event.requestId,
 		( int ) header.data.key.keySize,
 		header.data.key.key,
 		header.data.key.keySize,
+		header.stripeId,
 		header.isSealed ? "true" : "false",
 		header.isLarge ? "true" : "false"
 	);

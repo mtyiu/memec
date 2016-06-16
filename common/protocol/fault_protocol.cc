@@ -56,14 +56,15 @@ size_t Protocol::generateMetadataBackupMessage(
 		const MetadataBackup &metadataBackup = opsIt->second;
 		if ( maxTimestamp < metadataBackup.timestamp )
 			maxTimestamp = metadataBackup.timestamp;
-		if ( this->buffer.size >= bytes + PROTO_KEY_OP_METADATA_SIZE + key.size ) {
+		if ( this->buffer.size >= bytes + PROTO_KEY_OP_METADATA_SIZE + key.size + ( key.isLarge ? SPLIT_OFFSET_SIZE : 0 ) ) {
 			bytes += ProtocolUtil::write1Byte ( buf, key.size                 );
 			bytes += ProtocolUtil::write1Byte ( buf, metadataBackup.opcode    );
 			bytes += ProtocolUtil::write4Bytes( buf, metadataBackup.listId    );
 			bytes += ProtocolUtil::write4Bytes( buf, metadataBackup.stripeId  );
 			bytes += ProtocolUtil::write4Bytes( buf, metadataBackup.chunkId   );
 			bytes += ProtocolUtil::write4Bytes( buf, metadataBackup.timestamp );
-			bytes += ProtocolUtil::write( buf, key.data, key.size );
+			bytes += ProtocolUtil::write1Byte ( buf, key.isLarge              );
+			bytes += ProtocolUtil::write( buf, key.data, key.size + ( key.isLarge ? SPLIT_OFFSET_SIZE : 0 ) );
 			opsCount++;
 			key.free();
 		} else {

@@ -52,10 +52,8 @@ public:
 			uint32_t listId;
 			uint32_t stripeId;
 			uint32_t chunkId;
-			bool isSealed;
-			uint32_t sealedListId;
-			uint32_t sealedStripeId;
-			uint32_t sealedChunkId;
+			uint8_t sealedCount;
+			Metadata sealed[ 2 ];
 			Key key;
 		} set;
 		struct {
@@ -121,22 +119,22 @@ public:
 	inline void resSet(
 		ClientSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t timestamp,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
-		bool isSealed, uint32_t sealedListId, uint32_t sealedStripeId, uint32_t sealedChunkId,
+		uint8_t sealedCount, Metadata *sealed,
 		Key &key
 	) {
 		this->type = CLIENT_EVENT_TYPE_SET_RESPONSE_SUCCESS_DATA;
 		this->set( instanceId, requestId, socket );
-		this->message.set = {
-			.timestamp = timestamp,
-			.listId = listId,
-			.stripeId = stripeId,
-			.chunkId = chunkId,
-			.isSealed = isSealed,
-			.sealedListId = sealedListId,
-			.sealedStripeId = sealedStripeId,
-			.sealedChunkId = sealedChunkId,
-			.key = key
-		};
+		this->message.set.timestamp = timestamp;
+		this->message.set.listId = listId;
+		this->message.set.stripeId = stripeId;
+		this->message.set.chunkId = chunkId;
+		this->message.set.sealedCount = sealedCount;
+		if ( sealedCount ) {
+			for ( int i = 0; i < sealedCount; i++ ) {
+				this->message.set.sealed[ i ] = sealed[ i ];
+			}
+		}
+		this->message.set.key = key;
 	}
 
 	inline void resSet(

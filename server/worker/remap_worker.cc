@@ -177,8 +177,8 @@ bool ServerWorker::handleDegradedSetRequest( ClientEvent event, char *buf, size_
 	} else {
 		// Store the key-value pair
 		uint32_t timestamp, stripeId, dataChunkId;
-		bool isSealed;
-		Metadata sealed;
+		uint8_t sealedCount;
+		Metadata sealed[ 2 ];
 
 		ServerWorker::stripeList->get( header.key, header.keySize, 0, 0, &dataChunkId );
 
@@ -188,7 +188,7 @@ bool ServerWorker::handleDegradedSetRequest( ClientEvent event, char *buf, size_
 			header.value, header.valueSize,
 			PROTO_OPCODE_DEGRADED_SET, timestamp,
 			stripeId, dataChunkId, header.splitOffset,
-			&isSealed, &sealed,
+			&sealedCount, &sealed[ 0 ], &sealed[ 1 ],
 			this->chunks, this->dataChunk, this->parityChunk,
 			ServerWorker::getChunkBuffer
 		);

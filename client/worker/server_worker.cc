@@ -268,7 +268,7 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 			keySize = header.keySize;
 			keyStr = header.key;
 
-			if ( header.isSealed ) {
+			if ( header.sealedCount ) {
 				event.socket->backup.insert(
 					keySize, keyStr, header.isLarge,
 					PROTO_OPCODE_SET,
@@ -276,9 +276,8 @@ bool ClientWorker::handleSetResponse( ServerEvent event, bool success, char *buf
 					header.listId,
 					header.stripeId,
 					header.chunkId,
-					header.sealedListId,
-					header.sealedStripeId,
-					header.sealedChunkId
+					header.sealedCount,
+					header.sealed
 				);
 			} else {
 				event.socket->backup.insert(
@@ -722,7 +721,7 @@ bool ClientWorker::handleDeleteResponse( ServerEvent event, bool success, bool i
 		keyStr = header.key;
 		keySize = header.keySize;
 
-		if ( header.isSealed ) {
+		if ( header.sealedCount ) {
 			event.socket->backup.insert(
 				keySize, keyStr, header.isLarge,
 				PROTO_OPCODE_DELETE,
@@ -730,9 +729,8 @@ bool ClientWorker::handleDeleteResponse( ServerEvent event, bool success, bool i
 				header.listId,
 				header.stripeId,
 				header.chunkId,
-				header.sealedListId,
-				header.sealedStripeId,
-				header.sealedChunkId
+				header.sealedCount,
+				header.sealed
 			);
 		} else {
 			event.socket->backup.insert(

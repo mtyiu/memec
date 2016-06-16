@@ -50,7 +50,7 @@ bool ServerWorker::handleForwardKeyResponse( struct ForwardKeyHeader &header, bo
 
 	for ( int pidsIndex = 0, len = pids.size(); pidsIndex < len; pidsIndex++ ) {
 		if ( ! ServerWorker::pending->eraseDegradedOp( PT_SERVER_PEER_DEGRADED_OPS, pids[ pidsIndex ].instanceId, pids[ pidsIndex ].requestId, 0, &pid, &op ) ) {
-			__ERROR__( "ServerWorker", "handleGetResponse", "Cannot find a pending server DEGRADED_OPS request that matches the response. This message will be discarded." );
+			__ERROR__( "ServerWorker", "handleForwardKeyResponse", "Cannot find a pending server DEGRADED_OPS request that matches the response. This message will be discarded." );
 			continue;
 		}
 
@@ -201,7 +201,6 @@ bool ServerWorker::handleGetResponse( ServerPeerEvent event, bool success, bool 
 	} else {
 		struct KeyHeader header;
 		if ( this->protocol.parseKeyHeader( header, buf, size, 0 ) ) {
-			event.socket->printAddress( stderr );
 			key.set( header.keySize, header.key, ( void * ) event.socket, isLarge );
 		} else {
 			__ERROR__( "ServerWorker", "handleGetResponse", "Invalid GET response." );
@@ -223,7 +222,7 @@ bool ServerWorker::handleGetResponse( ServerPeerEvent event, bool success, bool 
 
 	key.isLarge = isLarge;
 	if ( ! dmap->deleteDegradedKey( key, pids, success ) ) {
-		__ERROR__( "ServerWorker", "handleGetResponse", "ServerWorker::degradedChunkBuffer->deleteDegradedKey() failed." );
+		__ERROR__( "ServerWorker", "handleGetResponse", "ServerWorker::degradedChunkBuffer->deleteDegradedKey() for key: %.*s.%u (is large? %s) failed; success: %s.", key.size, key.data, key.isLarge ? LargeObjectUtil::readSplitOffset( key.data + key.size ) : 0, key.isLarge ? "true" : "false", success ? "true" : "false" );
 	}
 
 	for ( int pidsIndex = 0, len = pids.size(); pidsIndex < len; pidsIndex++ ) {

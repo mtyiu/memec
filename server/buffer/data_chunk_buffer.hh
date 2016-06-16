@@ -39,7 +39,7 @@ public:
 		char *value, uint32_t valueSize,
 		uint8_t opcode, uint32_t &timestamp,
 		uint32_t &stripeId,  uint32_t splitOffset,
-		bool *isSealed = 0, Metadata *sealed = 0
+		uint8_t *sealedCount = 0, Metadata *sealed1 = 0, Metadata *sealed2 = 0
 	);
 
 	size_t seal( ServerWorker *worker );

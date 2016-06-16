@@ -28,7 +28,7 @@ public:
 		char *value, uint32_t valueSize,
 		uint8_t opcode, uint32_t &timestamp,
 		uint32_t &stripeId, uint32_t chunkId, uint32_t splitOffset,
-		bool *isSealed, Metadata *sealed,
+		uint8_t *sealedCount, Metadata *sealed1, Metadata *sealed2,
 		Chunk **chunks, Chunk *dataChunk, Chunk *parityChunk,
 		GetChunkBuffer *getChunkBuffer
 	);

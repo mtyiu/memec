@@ -245,7 +245,9 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 				PROTO_OPCODE_GET,
 				event.instanceId, event.requestId,
 				event.message.get.key.size,
-				event.message.get.key.data
+				event.message.get.key.data,
+				0, 0,
+				event.message.get.key.isLarge
 			);
 			break;
 		// UPDATE_CHUNK

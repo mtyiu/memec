@@ -23,7 +23,7 @@ public:
 		uint8_t keySize, char *keyStr, bool isLarge,
 		uint8_t opcode, uint32_t timestamp,
 		uint32_t listId, uint32_t stripeId, uint32_t chunkId,
-		uint32_t sealedListId, uint32_t sealedStripeId, uint32_t sealedChunkId
+		uint8_t sealedCount, Metadata *sealed
 	);
 	size_t erase( uint32_t fromTimestamp, uint32_t toTimestamp );
 	void print( FILE *f = stdout );

@@ -1,11 +1,11 @@
 #include "protocol.hh"
 
-size_t Protocol::generateKeyHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint8_t keySize, char *key, char *sendBuf, uint32_t timestamp ) {
+size_t Protocol::generateKeyHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint8_t keySize, char *key, char *sendBuf, uint32_t timestamp, bool isLarge ) {
 	if ( ! sendBuf ) sendBuf = this->buffer.send;
 	char *buf = sendBuf + PROTO_HEADER_SIZE;
-	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_KEY_SIZE + keySize, instanceId, requestId, sendBuf, timestamp );
+	size_t bytes = this->generateHeader( magic, to, opcode, PROTO_KEY_SIZE + keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ), instanceId, requestId, sendBuf, timestamp, isLarge );
 	bytes += ProtocolUtil::write1Byte( buf, keySize );
-	bytes += ProtocolUtil::write( buf, key, keySize );
+	bytes += ProtocolUtil::write( buf, key, keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ) );
 	return bytes;
 }
 
@@ -21,12 +21,12 @@ bool Protocol::parseKeyHeader( struct KeyHeader &header, char *buf, size_t size,
 	return ( size - offset >= ( size_t ) PROTO_KEY_SIZE + header.keySize );
 }
 
-size_t Protocol::generateKeyBackupHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t sealedListId, uint32_t sealedStripeId, uint32_t sealedChunkId, uint8_t keySize, char *key, bool isLarge, char *sendBuf ) {
+size_t Protocol::generateKeyBackupHeader( uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, Metadata *sealed, uint8_t sealedCount, uint8_t keySize, char *key, bool isLarge, char *sendBuf ) {
 	if ( ! sendBuf ) sendBuf = this->buffer.send;
 	char *buf = sendBuf + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader(
 		magic, to, opcode,
-		PROTO_KEY_BACKUP_BASE_SIZE + PROTO_KEY_BACKUP_FOR_DATA_SIZE + PROTO_KEY_BACKUP_SEALED_SIZE + keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ),
+		PROTO_KEY_BACKUP_BASE_SIZE + PROTO_KEY_BACKUP_FOR_DATA_SIZE + sealedCount * PROTO_KEY_BACKUP_SEALED_SIZE + keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ),
 		instanceId, requestId, sendBuf, 0, isLarge
 	);
 	bytes += ProtocolUtil::write1Byte ( buf, false          ); // isParity
@@ -36,10 +36,12 @@ size_t Protocol::generateKeyBackupHeader( uint8_t magic, uint8_t to, uint8_t opc
 	bytes += ProtocolUtil::write4Bytes( buf, listId         );
 	bytes += ProtocolUtil::write4Bytes( buf, stripeId       );
 	bytes += ProtocolUtil::write4Bytes( buf, chunkId        );
-	bytes += ProtocolUtil::write1Byte ( buf, true           ); // isSealed
-	bytes += ProtocolUtil::write4Bytes( buf, sealedListId   );
-	bytes += ProtocolUtil::write4Bytes( buf, sealedStripeId );
-	bytes += ProtocolUtil::write4Bytes( buf, sealedChunkId  );
+	bytes += ProtocolUtil::write1Byte ( buf, sealedCount    );
+	for ( uint8_t i = 0; i < sealedCount; i++ ) {
+		bytes += ProtocolUtil::write4Bytes( buf, sealed[ i ].listId   );
+		bytes += ProtocolUtil::write4Bytes( buf, sealed[ i ].stripeId );
+		bytes += ProtocolUtil::write4Bytes( buf, sealed[ i ].chunkId  );
+	}
 	bytes += ProtocolUtil::write( buf, key, keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ) );
 	return bytes;
 }
@@ -54,12 +56,12 @@ size_t Protocol::generateKeyBackupHeader( uint8_t magic, uint8_t to, uint8_t opc
 	);
 	bytes += ProtocolUtil::write1Byte ( buf, false     ); // isParity
 	bytes += ProtocolUtil::write1Byte ( buf, keySize   );
-	bytes += ProtocolUtil::write1Byte ( buf, isLarge );
+	bytes += ProtocolUtil::write1Byte ( buf, isLarge   );
 	bytes += ProtocolUtil::write4Bytes( buf, timestamp );
 	bytes += ProtocolUtil::write4Bytes( buf, listId    );
 	bytes += ProtocolUtil::write4Bytes( buf, stripeId  );
 	bytes += ProtocolUtil::write4Bytes( buf, chunkId   );
-	bytes += ProtocolUtil::write1Byte ( buf, false     ); // isSealed
+	bytes += ProtocolUtil::write1Byte ( buf, 0         ); // sealedCount
 	bytes += ProtocolUtil::write( buf, key, keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ) );
 	return bytes;
 }
@@ -90,16 +92,16 @@ bool Protocol::parseKeyBackupHeader( struct KeyBackupHeader &header, char *buf, 
 		header.key = ptr;
 	} else {
 		if ( size - offset < ( size_t ) PROTO_KEY_BACKUP_BASE_SIZE + PROTO_KEY_BACKUP_FOR_DATA_SIZE + header.keySize ) return false;
-		header.timestamp = ProtocolUtil::read4Bytes( ptr );
-		header.listId    = ProtocolUtil::read4Bytes( ptr );
-		header.stripeId  = ProtocolUtil::read4Bytes( ptr );
-		header.chunkId   = ProtocolUtil::read4Bytes( ptr );
-		header.isSealed  = ProtocolUtil::read1Byte ( ptr );
-		if ( header.isSealed ) {
-			header.sealedListId   = ProtocolUtil::read4Bytes( ptr );
-			header.sealedStripeId = ProtocolUtil::read4Bytes( ptr );
-			header.sealedChunkId  = ProtocolUtil::read4Bytes( ptr );
-			if ( size - offset < ( size_t ) PROTO_KEY_BACKUP_BASE_SIZE + PROTO_KEY_BACKUP_FOR_DATA_SIZE + PROTO_KEY_BACKUP_SEALED_SIZE + header.keySize ) return false;
+		header.timestamp   = ProtocolUtil::read4Bytes( ptr );
+		header.listId      = ProtocolUtil::read4Bytes( ptr );
+		header.stripeId    = ProtocolUtil::read4Bytes( ptr );
+		header.chunkId     = ProtocolUtil::read4Bytes( ptr );
+		header.sealedCount = ProtocolUtil::read1Byte ( ptr );
+		if ( size - offset < ( size_t ) PROTO_KEY_BACKUP_BASE_SIZE + PROTO_KEY_BACKUP_FOR_DATA_SIZE + header.sealedCount * PROTO_KEY_BACKUP_SEALED_SIZE + header.keySize ) return false;
+		for ( uint8_t i = 0; i < header.sealedCount; i++ ) {
+			header.sealed[ i ].listId   = ProtocolUtil::read4Bytes( ptr );
+			header.sealed[ i ].stripeId = ProtocolUtil::read4Bytes( ptr );
+			header.sealed[ i ].chunkId  = ProtocolUtil::read4Bytes( ptr );
 		}
 		header.key = ptr;
 	}

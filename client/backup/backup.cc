@@ -48,10 +48,9 @@ void Backup::insert( uint8_t keySize, char *keyStr, bool isLarge, uint8_t opcode
 	UNLOCK( &this->lock );
 }
 
-void Backup::insert( uint8_t keySize, char *keyStr, bool isLarge, uint8_t opcode, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint32_t sealedListId, uint32_t sealedStripeId, uint32_t sealedChunkId ) {
+void Backup::insert( uint8_t keySize, char *keyStr, bool isLarge, uint8_t opcode, uint32_t timestamp, uint32_t listId, uint32_t stripeId, uint32_t chunkId, uint8_t sealedCount, Metadata *sealed ) {
 	Key key;
 	MetadataBackup metadataBackup;
-	Metadata metadata;
 	std::unordered_map<Key, MetadataBackup>::iterator opsIt;
 
 	key.set( keySize, keyStr, 0, isLarge );
@@ -61,10 +60,7 @@ void Backup::insert( uint8_t keySize, char *keyStr, bool isLarge, uint8_t opcode
 	metadataBackup.timestamp = timestamp;
 	metadataBackup.set( listId, stripeId, chunkId );
 
-	metadata.set( sealedListId, sealedStripeId, sealedChunkId );
-
 	std::pair<Key, MetadataBackup> p1( key, metadataBackup );
-	std::pair<uint32_t, Metadata> p2( timestamp, metadata );
 
 	LOCK( &this->lock );
 
@@ -92,7 +88,12 @@ void Backup::insert( uint8_t keySize, char *keyStr, bool isLarge, uint8_t opcode
 			}
 		}
 	}
-	this->sealed.insert( p2 );
+
+	for ( uint8_t i = 0; i < sealedCount; i++ ) {
+		std::pair<uint32_t, Metadata> p2( timestamp, sealed[ i ] );
+		this->sealed.insert( p2 );
+	}
+
 	UNLOCK( &this->lock );
 }
 

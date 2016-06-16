@@ -52,7 +52,7 @@ KeyMetadata DataChunkBuffer::set(
 	char *value, uint32_t valueSize,
 	uint8_t opcode, uint32_t &timestamp,
 	uint32_t &stripeId, uint32_t splitOffset,
-	bool *isSealed, Metadata *sealed
+	uint8_t *sealedCount, Metadata *sealed1, Metadata *sealed2
 ) {
 	KeyMetadata keyMetadata;
 	uint32_t size = PROTO_KEY_VALUE_SIZE + keySize + valueSize, max = 0, tmp, splitSize;
@@ -61,7 +61,7 @@ KeyMetadata DataChunkBuffer::set(
 	char *ptr;
 	bool isLarge = LargeObjectUtil::isLarge( keySize, valueSize, 0, &splitSize );
 
-	if ( isSealed ) *isSealed = false;
+	if ( sealedCount ) *sealedCount = 0;
 
 	if ( isLarge ) {
 		size -= valueSize;
@@ -140,8 +140,12 @@ KeyMetadata DataChunkBuffer::set(
 
 		if ( index == -1 ) {
 			// A chunk is sealed
-			if ( isSealed ) *isSealed = true;
-			index = this->flush( worker, false, true, sealed );
+			if ( sealedCount ) {
+				index = this->flush( worker, false, true, *sealedCount == 0 ? sealed1 : sealed2 );
+				( *sealedCount )++;
+			} else {
+				index = this->flush( worker, false, true, 0 );
+			}
 		}
 
 		// Allocate memory in the selected chunk
@@ -170,8 +174,15 @@ KeyMetadata DataChunkBuffer::set(
 	// Flush if the current buffer is full
 	if ( ChunkUtil::getSize( chunk ) + PROTO_KEY_VALUE_SIZE + CHUNK_BUFFER_FLUSH_THRESHOLD >= ChunkBuffer::capacity ) {
 		if ( index != -1 ) {
-			if ( isSealed ) *isSealed = true;
-			this->flushAt( worker, index, false, sealed );
+			if ( sealedCount ) {
+				this->flushAt( worker, index, false, *sealedCount == 0 ? sealed1 : sealed2 );
+				( *sealedCount )++;
+			} else {
+				this->flushAt( worker, index, false, 0 );
+			}
+
+
+
 		} else {
 			__ERROR__( "DataChunkBuffer", "set", "TODO: Fix lastDelPos." );
 			// worker->issueSealChunkRequest( chunk, chunk->lastDelPos );

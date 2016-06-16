@@ -361,6 +361,17 @@ bool CoordinatorWorker::handleSyncMetadata( ClientEvent event, char *buf, size_t
 			if ( header.op.opcode == PROTO_OPCODE_DELETE ) { // Handle keys from degraded DELETE
 				s = CoordinatorWorker::stripeList->get( header.op.listId, header.op.chunkId );
 			}
+			// fprintf(
+			// 	stderr,
+			// 	"Key: %.*s.%u (size=%u) --> (%u, %u, %u)\n",
+			// 	header.op.keySize,
+			// 	header.op.key,
+			// 	LargeObjectUtil::readSplitOffset( header.op.key + header.op.keySize ),
+			// 	header.op.keySize,
+			// 	header.op.listId,
+			// 	header.op.stripeId,
+			// 	header.op.chunkId
+			// );
 			s->map.insertKey(
 				header.op.isLarge,
 				header.op.key,

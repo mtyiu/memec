@@ -96,10 +96,8 @@ struct KeyBackupHeader {
     uint32_t listId;         // Only for data servers
     uint32_t stripeId;       // Only for data servers
     uint32_t chunkId;        // Only for data servers
-	bool isSealed;           // Only for data servers
-	uint32_t sealedListId;   // Only for data servers && isSealed
-	uint32_t sealedStripeId; // Only for data servers && isSealed
-	uint32_t sealedChunkId;  // Only for data servers && isSealed
+	uint8_t sealedCount;     // Only for data servers
+	Metadata sealed[ 2 ];    // Only for data servers && isSealed
     char *key;
 };
 
