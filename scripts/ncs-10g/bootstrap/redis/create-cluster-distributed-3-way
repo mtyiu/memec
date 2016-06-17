@@ -3,7 +3,7 @@
 # You may want to put the above config parameters into config.sh in order to
 # override the defaults without modifying this script.
 
-HOST_PREFIX="192.168.10."
+HOST_PREFIX="192.168.0."
 PORT=6379
 TIMEOUT=2000
 NODES=15

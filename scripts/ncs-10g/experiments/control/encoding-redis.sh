@@ -15,7 +15,7 @@ for iter in {1..10}; do
 		echo "Running experiment with Redis (3-way replication) and thread count = $t..."
 
 		# Run workload A, B, C, F, D first
-		# screen -S manage -p 0 -X stuff "${BASE_PATH}/scripts/util/start.sh $1$(printf '\r')"
+		# screen -S manage -p 0 -X stuff "${MEMEC_PATH}/scripts/ncs-10g/util/start.sh $1$(printf '\r')"
 		screen -S manage -p 0 -X stuff "${MEMEC_PATH}/scripts/ncs-10g/bootstrap/redis/create-cluster-distributed-3-way start$(printf '\r')"
 		sleep 10
 		screen -S manage -p 0 -X stuff "${MEMEC_PATH}/scripts/ncs-10g/bootstrap/redis/create-cluster-distributed-3-way create$(printf '\r')"
@@ -31,7 +31,7 @@ for iter in {1..10}; do
 			fi
 
 			for n in {31..34}; do
-				ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/client/workloads-redis.sh $c $t $w $(printf '\r')\"" &
+				ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${MEMEC_PATH}/scripts/ncs-10g/experiments/client/workloads-redis.sh $c $t $w $(printf '\r')\"" &
 			done
 
 			pending=0

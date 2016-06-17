@@ -76,7 +76,14 @@ void CauchyCoding::encode( Chunk **dataChunks, Chunk *parityChunk, uint32_t inde
 
 	// encode
 #ifdef USE_ISAL
-	ec_encode_data( chunkSize, k, m, this->_gftbl, data, code );
+	if ( startOff == 0 && endOff == 0 ) {
+		ec_encode_data( chunkSize, k, m, this->_gftbl, data, code );
+	} else {
+		for ( uint32_t i = startOff / chunkSize; i <= endOff / chunkSize; i++ ) {
+			// note: the update is in-place "xor"ed on parityChunk
+			ec_encode_data_update( chunkSize, k, m, i, this->_gftbl, data[ i ], code );
+		}
+	}
 #else
 	jerasure_schedule_encode( k, m, w, schedule, data, code, chunkSize, chunkSize / w );
 #endif

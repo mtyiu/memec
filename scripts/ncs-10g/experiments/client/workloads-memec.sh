@@ -16,10 +16,10 @@ echo "Running experiment with coding scheme = $c and thread count = $t..."
 # Run workload A, B, C, F, D first
 if [ $w == "load" ]; then
 	echo "-------------------- Load (workloada) --------------------"
-	${BASE_PATH}/scripts/ycsb/memec/load.sh $t 2>&1 | tee ${BASE_PATH}/results/workloads/$c/$t/load.txt
+	${MEMEC_PATH}/scripts/ncs-10g/ycsb/memec/load.sh $t 2>&1 | tee ${BASE_PATH}/results/workloads/$c/$t/load.txt
 else
 	echo "-------------------- Run ($w) --------------------"
-	${BASE_PATH}/scripts/ycsb/memec/run.sh $t $w 2>&1 | tee ${BASE_PATH}/results/workloads/$c/$t/$w.txt
+	${MEMEC_PATH}/scripts/ncs-10g/ycsb/memec/run.sh $t $w 2>&1 | tee ${BASE_PATH}/results/workloads/$c/$t/$w.txt
 fi
 
 # Tell the control node that this iteration is finished

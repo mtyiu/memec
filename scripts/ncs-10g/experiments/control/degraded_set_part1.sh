@@ -46,7 +46,7 @@ set_overload
 
 for iter in {1..10}; do
 	echo "******************** Iteration #$iter ( `date` ) ********************"
-	screen -S manage -p 0 -X stuff "${BASE_PATH}/scripts/util/start.sh $(printf '\r')"
+	screen -S manage -p 0 -X stuff "${MEMEC_PATH}/scripts/ncs-10g/util/start.sh $(printf '\r')"
 	sleep 30
 
 	set_server
@@ -54,7 +54,7 @@ for iter in {1..10}; do
 
 	echo "-------------------- Load --------------------"
 	for n in {31..34}; do
-		ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/client/degraded.sh load $(printf '\r')\"" &
+		ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${MEMEC_PATH}/scripts/ncs-10g/experiments/client/degraded.sh load $(printf '\r')\"" &
 	done
 
 	pending=0
@@ -71,7 +71,7 @@ for iter in {1..10}; do
 
 	for w in $workloads; do
 		for n in {31..34}; do
-			ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${BASE_PATH}/scripts/experiments/client/degraded.sh $w $(printf '\r')\"" &
+			ssh testbed-node$n "screen -S ycsb -p 0 -X stuff \"${MEMEC_PATH}/scripts/ncs-10g/experiments/client/degraded.sh $w $(printf '\r')\"" &
 		done
 
 		pending=0
