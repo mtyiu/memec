@@ -256,16 +256,18 @@ bool ServerWorker::handleDegradedUpdateRequest( ClientEvent event, char *buf, si
 		__ERROR__( "ServerWorker", "handleDegradedUpdateRequest", "Invalid degraded UPDATE request." );
 		return false;
 	}
-	__DEBUG__(
+	__INFO__(
 		BLUE, "ServerWorker", "handleDegradedUpdateRequest",
-		"[UPDATE] Key: %.*s (key size = %u); Value: (update size = %u, offset = %u), reconstruction count = %u; stripe ID = %u.",
+		"[UPDATE] Key: %.*s.%u (key size = %u); Value: (update size = %u, offset = %u), reconstruction count = %u; stripe ID = %u; is large: %s.",
 		( int ) header.data.keyValueUpdate.keySize,
 		header.data.keyValueUpdate.key,
+		header.isLarge ? LargeObjectUtil::readSplitOffset( header.data.keyValueUpdate.key + header.data.keyValueUpdate.keySize ) : 0,
 		header.data.keyValueUpdate.keySize,
 		header.data.keyValueUpdate.valueUpdateSize,
 		header.data.keyValueUpdate.valueUpdateOffset,
 		header.reconstructedCount,
-		header.stripeId
+		header.stripeId,
+		header.isLarge ? "true" : "false"
 	);
 	return this->handleDegradedUpdateRequest( event, header );
 }
@@ -367,10 +369,14 @@ bool ServerWorker::handleDegradedUpdateRequest( ClientEvent event, struct Degrad
 	DegradedMap *dmap = &ServerWorker::degradedChunkBuffer->map;
 	bool isSealed, isKeyValueFound;
 
-	if ( ( keyValue.data = map->findObject(
-		header.data.keyValueUpdate.key,
-		header.data.keyValueUpdate.keySize
-	) ) ) {
+	if ( header.isLarge ) {
+		keyValue.data = map->findLargeObject( header.data.keyValueUpdate.key, header.data.keyValueUpdate.keySize );
+		header.data.keyValueUpdate.keySize += SPLIT_OFFSET_SIZE;
+	} else {
+		keyValue.data = map->findObject( header.data.keyValueUpdate.key, header.data.keyValueUpdate.keySize );
+	}
+
+	if ( keyValue.data ) {
 		uint32_t offset;
 		chunk = ServerWorker::chunkPool->getChunk( keyValue.data, offset );
 		metadata = ChunkUtil::getMetadata( chunk );
@@ -561,9 +567,9 @@ bool ServerWorker::handleDegradedUpdateRequest( ClientEvent event, struct Degrad
 force_degraded_read:
 		bool isReconstructed;
 
-		key.set( header.data.keyValueUpdate.keySize, header.data.keyValueUpdate.key );
-		key.dup();
-		keyValueUpdate.dup( key.size, key.data, ( void * ) event.socket );
+		key.set( header.data.keyValueUpdate.keySize, header.data.keyValueUpdate.key, 0, header.isLarge );
+		key.dup( 0, 0, 0, header.isLarge );
+		keyValueUpdate.dup( key.size, key.data, ( void * ) event.socket, header.isLarge );
 
 		// Backup valueUpdate
 		char *valueUpdate = new char[ keyValueUpdate.length ];

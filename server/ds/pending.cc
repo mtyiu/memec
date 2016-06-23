@@ -772,7 +772,8 @@ void Pending::print( PendingType type, FILE *f, bool needsLock, bool needsUnlock
 			fprintf(
 				f, "%lu. ID: (%u, %u), parent ID: (%u, %u); Key: %.*s (size = %u, offset = %u, length = %u); source/destination: ",
 				i, pid.instanceId, pid.requestId, pid.parentInstanceId, pid.parentRequestId,
-				keyValueUpdate.size, keyValueUpdate.data, keyValueUpdate.size,
+				keyValueUpdate.size, keyValueUpdate.data,
+				keyValueUpdate.size,
 				keyValueUpdate.offset, keyValueUpdate.length
 			);
 			if ( pid.ptr )

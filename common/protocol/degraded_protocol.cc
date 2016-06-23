@@ -304,7 +304,7 @@ size_t Protocol::generateDegradedReqHeader(
 		magic, to, opcode,
 		PROTO_DEGRADED_REQ_BASE_SIZE + numSurvivingChunkIds * 4 + reconstructedCount * 4 * 4 + PROTO_KEY_SIZE + keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ),
 		instanceId, requestId, 0,
-		timestamp
+		timestamp, isLarge
 	);
 	bytes += ProtocolUtil::write1Byte ( buf, isLarge              );
 	bytes += ProtocolUtil::write1Byte ( buf, isSealed             );
@@ -426,7 +426,10 @@ bool Protocol::parseDegradedReqHeader( struct DegradedReqHeader &header, uint8_t
 		case PROTO_OPCODE_DEGRADED_DELETE:
 			return this->parseKeyHeader( header.data.key, buf, size, offset );
 		case PROTO_OPCODE_DEGRADED_UPDATE:
-			return this->parseKeyValueUpdateHeader( header.data.keyValueUpdate, true, buf, size, offset );
+			ret = this->parseKeyValueUpdateHeader( header.data.keyValueUpdate, true, buf, size, offset );
+			if ( header.isLarge )
+				header.data.keyValueUpdate.valueUpdate += SPLIT_OFFSET_SIZE;
+			return ret;
 		default:
 			return false;
 	}

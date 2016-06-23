@@ -418,7 +418,7 @@ bool ServerWorker::handleUpdateResponse( ServerPeerEvent event, bool success, ch
 	// Check pending server UPDATE requests
 	pending = ServerWorker::pending->count( PT_SERVER_PEER_UPDATE, pid.instanceId, pid.requestId, false, true );
 
-	__DEBUG__( YELLOW, "ServerWorker", "handleUpdateResponse", "Pending server UPDATE requests = %d (%s) (Key: %.*s).", pending, success ? "success" : "fail", ( int ) header.keySize, header.key );
+	__INFO__( YELLOW, "ServerWorker", "handleUpdateResponse", "Pending server UPDATE requests = %d (%s) (Key: %.*s).", pending, success ? "success" : "fail", ( int ) header.keySize, header.key );
 
 	if ( pending == 0 ) {
 		// Only send client UPDATE response when the number of pending server UPDATE requests equal 0
@@ -784,6 +784,19 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 		} else {
 			ServerWorker::stripeList->get( listId, this->parityServerSockets, this->dataServerSockets );
 
+			// fprintf( stderr, "Seal indicator for (%u, %u):\n", listId, stripeId );
+			// for ( uint32_t j = 0; j < ServerWorker::parityChunkCount + 1; j++ ) {
+			// 	if ( j == ServerWorker::parityChunkCount || this->chunkStatusBackup->check( j ) ) {
+			// 		fprintf( stderr, "\t#%u:", j );
+			// 		for ( uint32_t i = 0; i < ServerWorker::dataChunkCount; i++ ) {
+			// 			fprintf( stderr, " %d", this->sealIndicators[ j ][ i ] ? 1 : 0 );
+			// 		}
+			// 		fprintf( stderr, "\n" );
+			// 	}
+			// }
+			// fprintf( stderr, "Chunk status: " );
+			// this->chunkStatus->print( stderr );
+
 			Coding::forceSeal(
 				Server::getInstance()->coding,
 				this->chunks,
@@ -964,7 +977,6 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 							header.valueUpdateOffset = op.data.keyValueUpdate.offset;
 							header.key = op.data.keyValueUpdate.data;
 							header.valueUpdate = ( char * ) op.data.keyValueUpdate.ptr;
-
 							this->handleUpdateRequest(
 								clientEvent, header,
 								op.original, op.reconstructed, op.reconstructedCount,
@@ -1102,7 +1114,8 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 						uint32_t chunkUpdateOffset = KeyValue::getChunkUpdateOffset(
 							keyMetadata.offset, // chunkOffset
 							key.size, // keySize
-							op.data.keyValueUpdate.offset // valueUpdateOffset
+							op.data.keyValueUpdate.offset, // valueUpdateOffset
+							key.isLarge
 						);
 						char *valueUpdate = ( char * ) op.data.keyValueUpdate.ptr;
 						op.data.keyValueUpdate.ptr = op.socket;
@@ -1148,6 +1161,10 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 							}
 						} else if ( ! dataChunkReconstructed ) {
 							char *obj = map->findObject( key.data, key.size, &keyValue, &key );
+							if ( ! obj )
+								obj = map->findLargeObject( key.data, key.size, &keyValue, &key );
+							// if ( ! obj )
+							// 	fprintf( stderr, "%.*s.%u\n", key.size, key.data, LargeObjectUtil::readSplitOffset( key.data + key.size ) );
 							assert( obj );
 
 							keyMetadata.length = keyValue.getSize();

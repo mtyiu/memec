@@ -76,11 +76,14 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 		case PROTO_DEGRADED_LOCK_RES_WAS_LOCKED:
 			__DEBUG__(
 				BLUE, "ClientWorker", "handleDegradedLockResponse",
-				"[%s Locked] [%u, %u, %u] Key: %.*s (key size = %u); Is Sealed? %s.",
+				"[%s Locked] [%u, %u, %u] Key: %.*s.%u (key size = %u); Is Sealed? %s; is large? %s.",
 				header.type == PROTO_DEGRADED_LOCK_RES_IS_LOCKED ? "Is" : "Was",
 				originalListId, header.stripeId, originalChunkId,
-				( int ) header.keySize, header.key, header.keySize,
-				header.isSealed ? "true" : "false"
+				( int ) header.keySize, header.key,
+				header.isLarge ? LargeObjectUtil::readSplitOffset( header.key + header.keySize ) : 0,
+				header.keySize,
+				header.isSealed ? "true" : "false",
+				header.isLarge ? "true" : "false"
 			);
 
 			// Get redirected data server socket
@@ -188,8 +191,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 						header.isSealed, header.stripeId,
 						header.original, header.reconstructed, header.reconstructedCount,
 						header.ongoingAtChunk, header.numSurvivingChunkIds, header.survivingChunkIds,
-						degradedLockData.keySize, header.key, // degradedLockData.key,
-						header.isLarge
+						header.keySize, header.key, header.isLarge
 					);
 					break;
 				case PROTO_DEGRADED_LOCK_RES_NOT_LOCKED:
@@ -231,8 +233,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 						header.isSealed, header.stripeId,
 						header.original, header.reconstructed, header.reconstructedCount,
 						header.ongoingAtChunk, header.numSurvivingChunkIds, header.survivingChunkIds,
-						degradedLockData.keySize, degradedLockData.key,
-						header.isLarge,
+						header.keySize, header.key, header.isLarge,
 						degradedLockData.valueUpdateOffset,
 						degradedLockData.valueUpdateSize,
 						degradedLockData.valueUpdate,
@@ -281,8 +282,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 						header.isSealed, header.stripeId,
 						header.original, header.reconstructed, header.reconstructedCount,
 						header.ongoingAtChunk, header.numSurvivingChunkIds, header.survivingChunkIds,
-						degradedLockData.keySize, degradedLockData.key,
-						header.isLarge,
+						header.keySize, header.key, header.isLarge,
 						requestTimestamp
 					);
 					break;

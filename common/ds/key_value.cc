@@ -220,8 +220,8 @@ char *KeyValue::_deserialize( char *data, char *&key, uint8_t &keySize, char *&v
 	return data;
 }
 
-uint32_t KeyValue::getChunkUpdateOffset( uint32_t chunkOffset, uint8_t keySize, uint32_t valueUpdateOffset ) {
-	return ( chunkOffset + KEY_VALUE_METADATA_SIZE + keySize + valueUpdateOffset );
+uint32_t KeyValue::getChunkUpdateOffset( uint32_t chunkOffset, uint8_t keySize, uint32_t valueUpdateOffset, bool isLarge ) {
+	return ( chunkOffset + KEY_VALUE_METADATA_SIZE + keySize + valueUpdateOffset + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ) );
 }
 
 void KeyValue::print( FILE *f ) {

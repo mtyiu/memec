@@ -16,6 +16,19 @@ bool CoordinatorWorker::handleDegradedLockRequest( ClientEvent event, char *buf,
 			header.keySize,
 			header.isLarge ? "; is large" : ""
 		);
+
+		// for ( uint32_t i = 0; i < header.reconstructedCount; i++ ) {
+		// 	fprintf(
+		// 		stderr,
+		// 		"%s(%u, %u) |-> (%u, %u)%s",
+		// 		i == 0 ? "Original: " : "; ",
+		// 		header.original[ i * 2     ],
+		// 		header.original[ i * 2 + 1 ],
+		// 		header.reconstructed[ i * 2     ],
+		// 		header.reconstructed[ i * 2 + 1 ],
+		// 		i == header.reconstructedCount - 1 ? " || " : "\n"
+		// 	);
+		// }
 	} else {
 		__DEBUG__(
 			BLUE, "CoordinatorWorker", "handleDegradedLockRequest",
@@ -112,7 +125,7 @@ bool CoordinatorWorker::handleDegradedLockRequest( ClientEvent event, char *buf,
 					header.original[ i * 2 + 1 ]
 				);
 
-				if ( ! map->isSealed( tmpMetadata ) && ongoingAtChunk != header.original[ i * 2 + 1 ] ) {
+				if ( ! s->map.isSealed( tmpMetadata ) && ongoingAtChunk != header.original[ i * 2 + 1 ] ) {
 					for ( uint32_t j = i; j < header.reconstructedCount - 1; j++ ) {
 						header.original[ j * 2     ] = header.original[ ( j + 1 ) * 2     ];
 						header.original[ j * 2 + 1 ] = header.original[ ( j + 1 ) * 2 + 1 ];

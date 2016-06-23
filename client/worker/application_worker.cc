@@ -597,30 +597,27 @@ bool ClientWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 
 		requestTimestamp = socket->timestamp.current.nextVal();
 
+		// Calculate offset for this split
+		uint32_t _offset = 0, _size;
+		if ( header.valueUpdateOffset > splitIndex * splitSize )
+			_offset = header.valueUpdateOffset - splitIndex * splitSize;
+		_size = header.valueUpdateOffset + header.valueUpdateSize - splitIndex * splitSize - _offset;
+		if ( _offset + _size > splitSize )
+			_size = splitSize - _offset;
+		if ( _size > splitSize )
+			_size = splitSize;
+
 		if ( useCoordinatedFlow ) {
 			// Acquire degraded lock from the coordinator
-			if ( false ) { // isGettingSplit
-				keyValueUpdate.size -= SPLIT_OFFSET_SIZE;
-				keyValueUpdate.isLarge = true;
-			}
 			this->sendDegradedLockRequest(
 				event.instanceId, event.requestId, PROTO_OPCODE_UPDATE,
 				original, reconstructed, reconstructedCount,
-				keyValueUpdate.data, keyValueUpdate.size, keyValueUpdate.isLarge,
-				keyValueUpdate.length,
-				keyValueUpdate.offset,
+				header.key, header.keySize - ( isLarge ? SPLIT_OFFSET_SIZE : 0 ), isLarge,
+				_size,   // keyValueUpdate.length,
+				_offset, // keyValueUpdate.offset,
 				( char * ) keyValueUpdate.ptr
 			);
 		} else {
-			uint32_t _offset = 0, _size;
-			if ( header.valueUpdateOffset > splitIndex * splitSize )
-				_offset = header.valueUpdateOffset - splitIndex * splitSize;
-			_size = header.valueUpdateOffset + header.valueUpdateSize - splitIndex * splitSize - _offset;
-			if ( _offset + _size > splitSize )
-				_size = splitSize - _offset;
-			if ( _size > splitSize )
-				_size = splitSize;
-
 			buffer.data = this->protocol.reqUpdate(
 				buffer.size, instanceId, requestId,
 				header.key, header.keySize,
