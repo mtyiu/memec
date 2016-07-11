@@ -512,18 +512,6 @@ bool ServerWorker::handleUpdateRequest(
 		memcpy( header.key + header.keySize, backup, SPLIT_OFFSET_SIZE );
 	}
 
-	__INFO__(
-		BLUE, "ServerWorker", "handleUpdateRequest",
-		"[UPDATE] Key: %.*s (key size = %u); Value: (update size = %u, offset = %u); ret: %s.",
-		( int ) header.keySize, header.key, header.keySize,
-		header.valueUpdateSize, header.valueUpdateOffset,
-		ret ? "true" : "false"
-	);
-
-	if ( ! ret ) {
-		fprintf( stderr, "splitOffset=%u / %u\n", LargeObjectUtil::readSplitOffset( header.key + header.keySize ), LargeObjectUtil::readSplitOffset( header.key + header.keySize - SPLIT_OFFSET_SIZE ) );
-	}
-
 	if ( ret ) {
 		uint8_t _keySize;
 		uint32_t _valueSize, splitOffset, splitSize;
