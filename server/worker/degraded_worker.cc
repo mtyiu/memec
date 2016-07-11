@@ -200,7 +200,6 @@ degraded_get_check:
 
 	if ( isKeyValueFound ) {
 		// Send the key-value pair to the client
-		keyValue.print( stderr );
 		event.resGet(
 			event.socket, event.instanceId, event.requestId,
 			keyValue, true // isDegraded
