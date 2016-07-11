@@ -126,11 +126,11 @@ public:
 
 	// Forwarded keys
 	bool insertForwardedKey(
-		uint8_t keySize, char *keyStr,
+		uint8_t keySize, char *keyStr, bool isLarge,
 		uint32_t dstListId, uint32_t dstChunkId
 	);
-	bool findForwardedKey( uint8_t keySize, char *keyStr, Metadata &dstMetadata );
-	bool eraseForwardedKey( uint8_t keySize, char *keyStr );
+	bool findForwardedKey( uint8_t keySize, char *keyStr, bool isLarge, Metadata &dstMetadata );
+	bool eraseForwardedKey( uint8_t keySize, char *keyStr, bool isLarge );
 };
 
 #endif

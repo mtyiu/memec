@@ -200,6 +200,7 @@ degraded_get_check:
 
 	if ( isKeyValueFound ) {
 		// Send the key-value pair to the client
+		keyValue.print( stderr );
 		event.resGet(
 			event.socket, event.instanceId, event.requestId,
 			keyValue, true // isDegraded
@@ -256,7 +257,7 @@ bool ServerWorker::handleDegradedUpdateRequest( ClientEvent event, char *buf, si
 		__ERROR__( "ServerWorker", "handleDegradedUpdateRequest", "Invalid degraded UPDATE request." );
 		return false;
 	}
-	__INFO__(
+	__DEBUG__(
 		BLUE, "ServerWorker", "handleDegradedUpdateRequest",
 		"[UPDATE] Key: %.*s.%u (key size = %u); Value: (update size = %u, offset = %u), reconstruction count = %u; stripe ID = %u; is large: %s.",
 		( int ) header.data.keyValueUpdate.keySize,
@@ -283,6 +284,17 @@ bool ServerWorker::handleDegradedUpdateRequest( ClientEvent event, struct Degrad
 		listId,
 		chunkId
 	);
+
+	if ( header.isLarge ) {
+		bool isLarge;
+		uint32_t splitOffset = LargeObjectUtil::readSplitOffset( header.data.keyValueUpdate.key + header.data.keyValueUpdate.keySize );
+		uint32_t splitIndex = LargeObjectUtil::getSplitIndex(
+			header.data.keyValueUpdate.keySize,
+			splitOffset * 2,
+			splitOffset, isLarge
+		);
+		chunkId = ( chunkId + splitIndex ) % ServerWorker::dataChunkCount;
+	}
 
 	if ( header.reconstructedCount ) {
 		stripeId = header.stripeId;
@@ -311,6 +323,7 @@ bool ServerWorker::handleDegradedUpdateRequest( ClientEvent event, struct Degrad
 						ret = ServerWorker::map->insertForwardedKey(
 							header.data.keyValueUpdate.keySize,
 							header.data.keyValueUpdate.key,
+							header.isLarge,
 							header.reconstructed[ i * 2     ],
 							header.reconstructed[ i * 2 + 1 ]
 						);
@@ -334,6 +347,8 @@ bool ServerWorker::handleDegradedUpdateRequest( ClientEvent event, struct Degrad
 				);
 			} else {
 				// UPDATE data chunk and reconstructed parity chunks
+				if ( header.isLarge )
+					header.data.keyValueUpdate.keySize += SPLIT_OFFSET_SIZE;
 				return this->handleUpdateRequest(
 					event, header.data.keyValueUpdate,
 					header.original, header.reconstructed, header.reconstructedCount,
@@ -344,6 +359,8 @@ bool ServerWorker::handleDegradedUpdateRequest( ClientEvent event, struct Degrad
 				);
 			}
 		} else if ( ! reconstructData ) {
+			if ( header.isLarge )
+				header.data.keyValueUpdate.keySize += SPLIT_OFFSET_SIZE;
 			return this->handleUpdateRequest(
 				event, header.data.keyValueUpdate,
 				header.original, header.reconstructed, header.reconstructedCount,
@@ -358,6 +375,7 @@ bool ServerWorker::handleDegradedUpdateRequest( ClientEvent event, struct Degrad
 		return this->handleUpdateRequest( event, header.data.keyValueUpdate );
 	}
 
+
 	////////// Degraded read //////////
 	Key key;
 	KeyValue keyValue;
@@ -371,7 +389,7 @@ bool ServerWorker::handleDegradedUpdateRequest( ClientEvent event, struct Degrad
 
 	if ( header.isLarge ) {
 		keyValue.data = map->findLargeObject( header.data.keyValueUpdate.key, header.data.keyValueUpdate.keySize );
-		header.data.keyValueUpdate.keySize += SPLIT_OFFSET_SIZE;
+		// header.data.keyValueUpdate.keySize += SPLIT_OFFSET_SIZE;
 	} else {
 		keyValue.data = map->findObject( header.data.keyValueUpdate.key, header.data.keyValueUpdate.keySize );
 	}
@@ -387,6 +405,10 @@ bool ServerWorker::handleDegradedUpdateRequest( ClientEvent event, struct Degrad
 		if ( chunkBufferIndex != -1 ) {
 			// Not sealed
 			chunkBuffer->unlock( chunkBufferIndex );
+
+			if ( header.isLarge )
+				header.data.keyValueUpdate.keySize += SPLIT_OFFSET_SIZE;
+
 			this->handleUpdateRequest(
 				event, header.data.keyValueUpdate,
 				header.original, header.reconstructed, header.reconstructedCount,
@@ -415,20 +437,22 @@ bool ServerWorker::handleDegradedUpdateRequest( ClientEvent event, struct Degrad
 		}
 	}
 
+
 	keyMetadata.offset = 0;
 
 	if ( index == -1 ) {
 		// Data chunk is NOT reconstructed
 
 		// Set up key
-		key.set( header.data.keyValueUpdate.keySize, header.data.keyValueUpdate.key );
+		key.set( header.data.keyValueUpdate.keySize, header.data.keyValueUpdate.key, 0, header.isLarge );
 		// Set up KeyValueUpdate
-		keyValueUpdate.set( key.size, key.data, ( void * ) event.socket );
+		keyValueUpdate.set( key.size, key.data, ( void * ) event.socket, header.isLarge );
 		keyValueUpdate.offset = header.data.keyValueUpdate.valueUpdateOffset;
 		keyValueUpdate.length = header.data.keyValueUpdate.valueUpdateSize;
 		if ( ! jump )
 			goto force_degraded_read;
 	}
+
 
 	// Check if the chunk is already fetched
 	chunk = dmap->findChunkById( listId, stripeId, chunkId );
@@ -441,14 +465,15 @@ bool ServerWorker::handleDegradedUpdateRequest( ClientEvent event, struct Degrad
 		&keyValue, &key, &keyMetadata
 	);
 	// Set up KeyValueUpdate
-	keyValueUpdate.set( key.size, key.data, ( void * ) event.socket );
+	keyValueUpdate.set( key.size, key.data, ( void * ) event.socket, header.isLarge );
 	keyValueUpdate.offset = header.data.keyValueUpdate.valueUpdateOffset;
 	keyValueUpdate.length = header.data.keyValueUpdate.valueUpdateSize;
 	// Set up metadata
 	metadata.set( listId, stripeId, chunkId );
 
+
 	if ( isKeyValueFound ) {
-		keyValueUpdate.dup( 0, 0, ( void * ) event.socket );
+		keyValueUpdate.dup( 0, 0, ( void * ) event.socket, keyValueUpdate.isLarge );
 		keyValueUpdate.isDegraded = true;
 		// Insert into client UPDATE pending set
 		if ( ! ServerWorker::pending->insertKeyValueUpdate( PT_CLIENT_UPDATE, event.instanceId, event.requestId, ( void * ) event.socket, keyValueUpdate ) ) {
@@ -460,9 +485,10 @@ bool ServerWorker::handleDegradedUpdateRequest( ClientEvent event, struct Degrad
 		if ( chunk ) {
 			// Send UPDATE_CHUNK request to the parity servers
 			uint32_t chunkUpdateOffset = KeyValue::getChunkUpdateOffset(
-				keyMetadata.offset, // chunkOffset
-				keyValueUpdate.size, // keySize
-				keyValueUpdate.offset // valueUpdateOffset
+				keyMetadata.offset,    // chunkOffset
+				keyValueUpdate.size,   // keySize
+				keyValueUpdate.offset, // valueUpdateOffset
+				keyValueUpdate.isLarge
 			);
 
 			ServerWorker::degradedChunkBuffer->updateKeyValue(
@@ -499,9 +525,10 @@ bool ServerWorker::handleDegradedUpdateRequest( ClientEvent event, struct Degrad
 		} else {
 			// Send UPDATE request to the parity servers
 			uint32_t dataUpdateOffset = KeyValue::getChunkUpdateOffset(
-				0,                            // chunkOffset
-				keyValueUpdate.size,  // keySize
-				keyValueUpdate.offset // valueUpdateOffset
+				0,                     // chunkOffset
+				keyValueUpdate.size,   // keySize
+				keyValueUpdate.offset, // valueUpdateOffset
+				keyValueUpdate.isLarge
 			);
 
 			// Compute data delta
@@ -593,6 +620,8 @@ force_degraded_read:
 			key.free();
 			delete[] valueUpdate;
 			if ( isReconstructed ) {
+				if ( header.isLarge )
+					header.data.keyValueUpdate.keySize += SPLIT_OFFSET_SIZE;
 				// UPDATE data chunk and reconstructed parity chunks
 				return this->handleUpdateRequest(
 					event, header.data.keyValueUpdate,

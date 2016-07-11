@@ -615,7 +615,7 @@ bool ClientWorker::handleUpdateRequest( ApplicationEvent event, char *buf, size_
 				header.key, header.keySize - ( isLarge ? SPLIT_OFFSET_SIZE : 0 ), isLarge,
 				_size,   // keyValueUpdate.length,
 				_offset, // keyValueUpdate.offset,
-				( char * ) keyValueUpdate.ptr
+				( char * ) keyValueUpdate.ptr + _offset + splitIndex * splitSize - header.valueUpdateOffset
 			);
 		} else {
 			buffer.data = this->protocol.reqUpdate(

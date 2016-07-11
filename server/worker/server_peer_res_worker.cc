@@ -64,9 +64,10 @@ bool ServerWorker::handleForwardKeyResponse( struct ForwardKeyHeader &header, bo
 					Metadata metadata;
 					metadata.set( op.listId, op.stripeId, op.chunkId );
 					uint32_t dataUpdateOffset = KeyValue::getChunkUpdateOffset(
-						0,                            // chunkOffset
-						op.data.keyValueUpdate.size,  // keySize
-						op.data.keyValueUpdate.offset // valueUpdateOffset
+						0,                             // chunkOffset
+						op.data.keyValueUpdate.size,   // keySize
+						op.data.keyValueUpdate.offset, // valueUpdateOffset
+						op.data.keyValueUpdate.isLarge
 					);
 					char *valueUpdate = ( char * ) op.data.keyValueUpdate.ptr;
 
@@ -288,9 +289,10 @@ bool ServerWorker::handleGetResponse( ServerPeerEvent event, bool success, bool 
 					Metadata metadata;
 					metadata.set( op.listId, op.stripeId, op.chunkId );
 					uint32_t dataUpdateOffset = KeyValue::getChunkUpdateOffset(
-						0,                            // chunkOffset
-						op.data.keyValueUpdate.size,  // keySize
-						op.data.keyValueUpdate.offset // valueUpdateOffset
+						0,                             // chunkOffset
+						op.data.keyValueUpdate.size,   // keySize
+						op.data.keyValueUpdate.offset, // valueUpdateOffset
+						op.data.keyValueUpdate.isLarge
 					);
 					char *valueUpdate = ( char * ) op.data.keyValueUpdate.ptr;
 
@@ -418,7 +420,7 @@ bool ServerWorker::handleUpdateResponse( ServerPeerEvent event, bool success, ch
 	// Check pending server UPDATE requests
 	pending = ServerWorker::pending->count( PT_SERVER_PEER_UPDATE, pid.instanceId, pid.requestId, false, true );
 
-	__INFO__( YELLOW, "ServerWorker", "handleUpdateResponse", "Pending server UPDATE requests = %d (%s) (Key: %.*s).", pending, success ? "success" : "fail", ( int ) header.keySize, header.key );
+	__DEBUG__( YELLOW, "ServerWorker", "handleUpdateResponse", "Pending server UPDATE requests = %d (%s) (Key: %.*s).", pending, success ? "success" : "fail", ( int ) header.keySize, header.key );
 
 	if ( pending == 0 ) {
 		// Only send client UPDATE response when the number of pending server UPDATE requests equal 0
@@ -835,6 +837,8 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 		codingEvent.decode( this->chunks, this->chunkStatus );
 		this->dispatch( codingEvent );
 
+		fprintf( stderr, "30\n" );
+
 		uint32_t maxChunkSize = 0, chunkSize;
 		for ( uint32_t i = 0; i < ServerWorker::dataChunkCount; i++ ) {
 			chunkSize = ChunkUtil::getSize( this->chunks[ i ] );
@@ -871,7 +875,10 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 			}
 		}
 
+		fprintf( stderr, "31\n" );
+
 		if ( chunkRequest.isDegraded ) {
+			fprintf( stderr, "32\n" );
 			// Respond the original GET/UPDATE/DELETE operation using the reconstructed data
 			PendingIdentifier pid;
 			DegradedOp op;
@@ -949,10 +956,10 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 					switch( op.opcode ) {
 						case PROTO_OPCODE_DEGRADED_GET:
 						case PROTO_OPCODE_DEGRADED_DELETE:
-							key.set( op.data.key.size, op.data.key.data );
+							key.set( op.data.key.size, op.data.key.data, 0, op.data.key.isLarge );
 							break;
 						case PROTO_OPCODE_DEGRADED_UPDATE:
-							key.set( op.data.keyValueUpdate.size, op.data.keyValueUpdate.data );
+							key.set( op.data.keyValueUpdate.size, op.data.keyValueUpdate.data, 0, op.data.keyValueUpdate.isLarge );
 							break;
 						default:
 							continue;
@@ -971,12 +978,17 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 							header.key = op.data.key.data;
 							this->handleGetRequest( clientEvent, header, true );
 						} else if ( op.opcode == PROTO_OPCODE_DEGRADED_UPDATE ) {
+							fprintf( stderr, "34\n" );
 							struct KeyValueUpdateHeader header;
 							header.keySize = op.data.keyValueUpdate.size;
 							header.valueUpdateSize = op.data.keyValueUpdate.length;
 							header.valueUpdateOffset = op.data.keyValueUpdate.offset;
 							header.key = op.data.keyValueUpdate.data;
 							header.valueUpdate = ( char * ) op.data.keyValueUpdate.ptr;
+
+							if ( op.data.keyValueUpdate.isLarge )
+								header.keySize += SPLIT_OFFSET_SIZE;
+
 							this->handleUpdateRequest(
 								clientEvent, header,
 								op.original, op.reconstructed, op.reconstructedCount,
@@ -1023,9 +1035,16 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 						tmp.set( 0, 0, 0 );
 
 						// map->findValueByKey( key.data, key.size, 0, 0, &keyMetadata, 0, &chunk );
-						char *obj = map->findObject( key.data, key.size );
+						char *obj;
+
+						if ( key.isLarge ) {
+							obj = map->findLargeObject( key.data, key.size );
+						} else {
+							obj = map->findObject( key.data, key.size );
+						}
 
 						if ( ! obj ) {
+							fprintf( stderr, "--- %.*s.%u\n", key.size, key.data, LargeObjectUtil::readSplitOffset( key.data + key.size ) );
 							char *_key = new char[ key.size + SPLIT_OFFSET_SIZE ];
 							memcpy( _key, key.data, key.size );
 							memset( _key + key.size, 0, SPLIT_OFFSET_SIZE );
@@ -1050,24 +1069,29 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 							tmp.stripeId == op.stripeId &&
 							tmp.chunkId == op.chunkId
 						) ) {
-							printf(
-								"Key: %.*s (%u, %u, %u); ",
+							fprintf(
+								stderr,
+								"Key: %.*s (size = %u) (%u, %u, %u); ",
 								key.size,
 								key.data,
+								key.size,
 								op.listId,
 								op.stripeId,
 								op.chunkId
 							);
 							if ( ! chunk )
-								printf( "chunk = (nil)\n" );
+								fprintf( stderr, "chunk = (nil)" );
 							else
-								printf(
-									"chunk = %p (%u, %u, %u)\n",
+								fprintf(
+									stderr,
+									"chunk = %p (%u, %u, %u)",
 									chunk,
 									tmp.listId,
 									tmp.stripeId,
 									tmp.chunkId
 								);
+
+							fprintf( stderr, "; obj = %p\n", obj );
 						}
 						assert(
 							chunk &&
@@ -1090,6 +1114,8 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 					}
 
 					isKeyValueFound = dmap->findValueByKey( key.data, key.size, key.isLarge, isSealed, &keyValue, &key, &keyMetadata );
+
+					fprintf( stderr, "key: %.*s (size=%u): %s\n", key.size, key.data, key.size, isKeyValueFound ? "found" : "not found" );
 
 					// Send response
 					if ( op.opcode == PROTO_OPCODE_DEGRADED_GET ) {
@@ -1237,6 +1263,8 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 							header.key = op.data.keyValueUpdate.data;
 							header.valueUpdate = ( char * ) op.data.keyValueUpdate.ptr;
 
+							fprintf( stderr, "35: %.*s\n", header.keySize, header.key );
+
 							this->handleUpdateRequest(
 								event,
 								header,
@@ -1336,6 +1364,7 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 				}
 			}
 		} else {
+			fprintf( stderr, "33\n" );
 			Metadata metadata;
 
 			bool hasStripe = ServerWorker::pending->findReconstruction( pid.parentInstanceId, pid.parentRequestId, stripeId, listId, chunkId );

@@ -307,13 +307,13 @@ bool Map::eraseForwardedChunk( uint32_t srcListId, uint32_t srcStripeId, uint32_
 }
 
 bool Map::insertForwardedKey(
-	uint8_t keySize, char *keyStr,
+	uint8_t keySize, char *keyStr, bool isLarge,
 	uint32_t dstListId, uint32_t dstChunkId
 ) {
 	Metadata dstMetadata;
 	Key key;
 
-	key.set( keySize, keyStr );
+	key.set( keySize, keyStr, 0, isLarge );
 	dstMetadata.set( dstListId, -1, dstChunkId );
 
 	std::pair<std::unordered_map<Key, Metadata>::iterator, bool> ret;
@@ -329,9 +329,9 @@ bool Map::insertForwardedKey(
 	return ret.second;
 }
 
-bool Map::findForwardedKey( uint8_t keySize, char *keyStr, Metadata &dstMetadata ) {
+bool Map::findForwardedKey( uint8_t keySize, char *keyStr, bool isLarge, Metadata &dstMetadata ) {
 	Key key;
-	key.set( keySize, keyStr );
+	key.set( keySize, keyStr, 0, isLarge );
 
 	std::unordered_map<Key, Metadata>::iterator it;
 	bool ret = false;
@@ -347,9 +347,9 @@ bool Map::findForwardedKey( uint8_t keySize, char *keyStr, Metadata &dstMetadata
 	return ret;
 }
 
-bool Map::eraseForwardedKey( uint8_t keySize, char *keyStr ) {
+bool Map::eraseForwardedKey( uint8_t keySize, char *keyStr, bool isLarge ) {
 	Key key;
-	key.set( keySize, keyStr );
+	key.set( keySize, keyStr, 0, isLarge );
 
 	std::unordered_map<Key, Metadata>::iterator it;
 	bool ret;

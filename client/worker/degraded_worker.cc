@@ -244,7 +244,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 				case PROTO_DEGRADED_LOCK_RES_REMAPPED:
 					buffer.data = this->protocol.reqUpdate(
 						buffer.size, instanceId, requestId,
-						degradedLockData.key, degradedLockData.keySize,
+						header.key, header.keySize + ( header.isLarge ? SPLIT_OFFSET_SIZE : 0 ),
 						degradedLockData.valueUpdate, degradedLockData.valueUpdateOffset, degradedLockData.valueUpdateSize,
 						requestTimestamp,
 						true

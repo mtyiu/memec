@@ -16,19 +16,6 @@ bool CoordinatorWorker::handleDegradedLockRequest( ClientEvent event, char *buf,
 			header.keySize,
 			header.isLarge ? "; is large" : ""
 		);
-
-		// for ( uint32_t i = 0; i < header.reconstructedCount; i++ ) {
-		// 	fprintf(
-		// 		stderr,
-		// 		"%s(%u, %u) |-> (%u, %u)%s",
-		// 		i == 0 ? "Original: " : "; ",
-		// 		header.original[ i * 2     ],
-		// 		header.original[ i * 2 + 1 ],
-		// 		header.reconstructed[ i * 2     ],
-		// 		header.reconstructed[ i * 2 + 1 ],
-		// 		i == header.reconstructedCount - 1 ? " || " : "\n"
-		// 	);
-		// }
 	} else {
 		__DEBUG__(
 			BLUE, "CoordinatorWorker", "handleDegradedLockRequest",
@@ -36,6 +23,19 @@ bool CoordinatorWorker::handleDegradedLockRequest( ClientEvent event, char *buf,
 			( int ) header.keySize, header.key, header.keySize
 		);
 	}
+
+	// for ( uint32_t i = 0; i < header.reconstructedCount; i++ ) {
+	// 	fprintf(
+	// 		stderr,
+	// 		"%s(%u, %u) |-> (%u, %u)%s",
+	// 		i == 0 ? "Original: " : "; ",
+	// 		header.original[ i * 2     ],
+	// 		header.original[ i * 2 + 1 ],
+	// 		header.reconstructed[ i * 2     ],
+	// 		header.reconstructed[ i * 2 + 1 ],
+	// 		i == header.reconstructedCount - 1 ? "\n" : " || "
+	// 	);
+	// }
 
 	// Metadata metadata;
 	LOCK_T *lock;

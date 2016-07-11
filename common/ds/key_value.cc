@@ -232,8 +232,8 @@ void KeyValue::print( FILE *f ) {
 	this->deserialize( key, keySize, value, valueSize, splitOffset );
 
 	fprintf(
-		f, "Key: %.*s; Value: %.*s (split offset = %u)\n",
-		keySize, key, valueSize, value, splitOffset
+		f, "Key: %.*s; Value: %.*s (key size = %u, value size = %u, split offset = %u)\n",
+		keySize, key, valueSize, value, keySize, valueSize, splitOffset
 	);
 }
 
