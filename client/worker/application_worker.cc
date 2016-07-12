@@ -284,6 +284,7 @@ bool ClientWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 
 	uint32_t listId, chunkId;
 	ServerSocket *socket;
+	Client *client = Client::getInstance();
 
 	socket = this->getServers(
 		header.key, header.keySize,
@@ -298,18 +299,6 @@ bool ClientWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		return false;
 	}
 
-	// decide whether any of the data / parity server needs to use remapping flow
-	Client *client = Client::getInstance();
-	if ( ! client->config.client.degraded.disabled ) {
-		for ( uint32_t i = 0; i < 1 + ClientWorker::parityChunkCount; i++ ) {
-			struct sockaddr_in addr = ( i == 0 ) ? socket->getAddr() : this->parityServerSockets[ i - 1 ]->getAddr();
-			if ( client->stateTransitHandler.useCoordinatedFlow( addr, true, true ) ) {
-				// printf( "(%u, %u) is overloaded!\n", listId, i == 0 ? chunkId : i - 1 + ClientWorker::dataChunkCount );
-				return this->handleDegradedSetRequest( event, buf, size );
-			}
-		}
-	}
-
 	// Check whether the object size exceesd the chunk size
 	uint32_t numOfSplit, splitSize, splitOffset = 0;
 	bool isLarge = LargeObjectUtil::isLarge(
@@ -319,6 +308,22 @@ bool ClientWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 	if ( isLarge ) {
 		// Value size exceeds the chunk size
 		__DEBUG__( YELLOW, "ClientWorker", "handleSetRequest", "Value size (%u) exceeds the chunk size. Number of split = %u; split size = %u.", header.valueSize, numOfSplit, splitSize );
+	}
+
+	// decide whether any of the data / parity server needs to use remapping flow
+	if ( ! client->config.client.degraded.disabled ) {
+		for ( uint32_t i = 0; i < ClientWorker::parityChunkCount; i++ ) {
+			struct sockaddr_in addr = this->parityServerSockets[ i ]->getAddr();
+			if ( client->stateTransitHandler.useCoordinatedFlow( addr, true, true ) ) {
+				return this->handleDegradedSetRequest( event, buf, size );
+			}
+		}
+		for ( uint32_t splitIndex = 0; splitIndex < numOfSplit; splitIndex++ ) {
+			struct sockaddr_in addr = this->dataServerSockets[ ( chunkId + splitIndex ) % ClientWorker::dataChunkCount ]->getAddr();
+			if ( client->stateTransitHandler.useCoordinatedFlow( addr, true, true ) ) {
+				return this->handleDegradedSetRequest( event, buf, size );
+			}
+			}
 	}
 
 	struct {
@@ -369,12 +374,12 @@ bool ClientWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		);
 		packet->size = buffer.size;
 
-		// fprintf(
-		// 	stderr, "#%u [%.*s]: Offset at %u --> data server #%u; request size: %lu.\n",
-		// 	splitIndex, header.keySize, header.key, splitOffset,
-		// 	( chunkId + splitIndex ) % ClientWorker::dataChunkCount,
-		// 	buffer.size
-		// );
+		fprintf(
+			stderr, "#%u [%.*s]: Offset at %u --> data server #%u; request size: %lu.\n",
+			splitIndex, header.keySize, header.key, splitOffset,
+			( chunkId + splitIndex ) % ClientWorker::dataChunkCount,
+			buffer.size
+		);
 
 		// Choose data server
 		socket = this->dataServerSockets[ ( chunkId + splitIndex ) % ClientWorker::dataChunkCount ];

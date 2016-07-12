@@ -133,19 +133,22 @@ public:
 
 class RemapList {
 public:
+	uint32_t splitIndex;
 	uint32_t *original, *remapped;
 	uint32_t remappedCount;
 
 	RemapList() {
+		this->splitIndex = 0;
 		this->original = 0;
 		this->remapped = 0;
 		this->remappedCount = 0;
 	}
 
-	RemapList( uint32_t *original, uint32_t *remapped, uint32_t remappedCount ) {
+	RemapList( uint32_t *original, uint32_t *remapped, uint32_t remappedCount, uint32_t splitIndex = 0 ) {
 		this->original = original;
 		this->remapped = remapped;
 		this->remappedCount = remappedCount;
+		this->splitIndex = splitIndex;
 	}
 
 	void free() {
@@ -153,6 +156,7 @@ public:
 		delete[] this->remapped;
 		this->original = 0;
 		this->remapped = 0;
+		this->splitIndex = 0;
 	}
 };
 

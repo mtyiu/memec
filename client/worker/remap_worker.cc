@@ -101,8 +101,6 @@ bool ClientWorker::handleDegradedSetLockResponse( CoordinatorEvent event, bool s
 
 	// Handle the case when the lock cannot be acquired //
 	if ( ! success ) {
-		__ERROR__( "ClientWorker", "handleDegradedSetLockResponse", "TODO: Handle the case when the lock cannot be acquired (ID: (%u, %u), key: %.*s).", event.instanceId, event.requestId, header.keySize, header.key );
-		// if lock fails report to application directly ..
 		KeyValue keyValue;
 		if ( ! ClientWorker::pending->eraseKeyValue( PT_APPLICATION_SET, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &keyValue, true, true, true, header.key ) ) {
 			__ERROR__( "ClientWorker", "handleDegradedSetLockResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded. (Key = %.*s, ID = (%u, %u))", header.keySize, header.key, pid.parentInstanceId, pid.parentRequestId );
@@ -143,12 +141,16 @@ bool ClientWorker::handleDegradedSetLockResponse( CoordinatorEvent event, bool s
 	uint8_t keySize;
 	uint32_t valueSize;
 	char *keyStr, *valueStr;
+	uint32_t numOfSplit, splitSize, splitOffset = 0;
+
 	if ( ! ClientWorker::pending->findKeyValue( PT_APPLICATION_SET, pid.parentInstanceId, pid.parentRequestId, 0, &keyValue, true, header.key ) ) {
 		__ERROR__( "ClientWorker", "handleDegradedSetLockResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded. (ID: (%u, %u))", pid.parentInstanceId, pid.parentRequestId );
 		return false;
 	}
+
 	key = keyValue.key();
 	keyValue._deserialize( keyStr, keySize, valueStr, valueSize );
+	LargeObjectUtil::isLarge( keySize, valueSize, &numOfSplit, &splitSize );
 
 	// Insert pending SET requests for each involved servers //
 	for ( uint32_t i = 0; i < ClientWorker::parityChunkCount + 1; i++ ) {

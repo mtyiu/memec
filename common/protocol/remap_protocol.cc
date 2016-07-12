@@ -59,6 +59,7 @@ size_t Protocol::generateDegradedSetHeader( uint8_t magic, uint8_t to, uint8_t o
 
 	if ( splitSize == 0 || splitSize == valueSize ) {
 		// No need to split
+		fprintf( stderr, "splitSize = %u\n", splitSize );
 		bytes += ProtocolUtil::write( buf, value, valueSize );
 	} else {
 		// Include split offset
@@ -93,7 +94,7 @@ bool Protocol::parseDegradedSetHeader( struct DegradedSetHeader &header, char *b
 	header.remappedCount = ProtocolUtil::read4Bytes( ptr );
 	header.keySize       = ProtocolUtil::read1Byte ( ptr );
 	header.valueSize     = ProtocolUtil::read3Bytes( ptr );
-	if ( size - offset < PROTO_DEGRADED_SET_SIZE + header.keySize + header.valueSize + header.remappedCount * 4 * 4 ) return false;
+
 	header.key = ptr;
 	ptr += header.keySize;
 
@@ -102,8 +103,18 @@ bool Protocol::parseDegradedSetHeader( struct DegradedSetHeader &header, char *b
 		header.splitOffset = ProtocolUtil::read3Bytes( ptr );
 		if ( header.splitOffset + splitSize > header.valueSize )
 			splitSize = header.valueSize - header.splitOffset;
-		if ( size - offset < PROTO_DEGRADED_SET_SIZE + PROTO_SPLIT_OFFSET_SIZE + header.keySize + splitSize + header.remappedCount * 4 * 4 )
+		if ( size - offset < PROTO_DEGRADED_SET_SIZE + PROTO_SPLIT_OFFSET_SIZE + header.keySize + splitSize + header.remappedCount * 4 * 4 ) {
+			fprintf(
+				stderr, "Error: key-%u value-%u splitOffset-%u %u %u vs. %lu\n",
+				header.keySize,
+				header.valueSize,
+				header.splitOffset,
+				splitSize,
+				header.remappedCount,
+				size
+			);
 			return false;
+		}
 		header.value = ptr;
 		ptr += splitSize;
 	} else {
