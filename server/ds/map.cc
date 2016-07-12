@@ -59,7 +59,7 @@ char *Map::findObject(
 		if ( ret ) {
 			KeyValue keyValue;
 			keyValue.set( ret );
-			*keyPtr = keyValue.key();
+			*keyPtr = keyValue.key( true );
 		} else {
 			keyPtr->set( keySize, keyStr );
 		}
@@ -90,9 +90,9 @@ char *Map::findLargeObject(
 		if ( ret ) {
 			KeyValue keyValue;
 			keyValue.set( ret );
-			*keyPtr = keyValue.key();
+			*keyPtr = keyValue.key( true );
 		} else {
-			keyPtr->set( keySize, keyStr );
+			keyPtr->set( keySize, keyStr, 0, true );
 		}
 	}
 

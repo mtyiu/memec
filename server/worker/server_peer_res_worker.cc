@@ -1181,8 +1181,6 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 							char *obj = map->findObject( key.data, key.size, &keyValue, &key );
 							if ( ! obj )
 								obj = map->findLargeObject( key.data, key.size, &keyValue, &key );
-							// if ( ! obj )
-							// 	fprintf( stderr, "%.*s.%u\n", key.size, key.data, LargeObjectUtil::readSplitOffset( key.data + key.size ) );
 							assert( obj );
 
 							keyMetadata.length = keyValue.getSize();
@@ -1190,7 +1188,7 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 							chunk = ServerWorker::chunkPool->getChunk( obj, keyMetadata.offset );
 
 							///// vvvvv Copied from handleUpdateRequest() vvvvv /////
-						    uint32_t offset = keyMetadata.offset + PROTO_KEY_VALUE_SIZE + key.size + op.data.keyValueUpdate.offset;
+						    uint32_t offset = keyMetadata.offset + PROTO_KEY_VALUE_SIZE + key.size + ( key.isLarge ? SPLIT_OFFSET_SIZE : 0 ) + op.data.keyValueUpdate.offset;
 
 						    LOCK_T *keysLock, *chunksLock;
 						    ServerWorker::map->getKeysMap( 0, &keysLock );
