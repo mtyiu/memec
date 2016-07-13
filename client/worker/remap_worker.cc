@@ -8,7 +8,7 @@ bool ClientWorker::handleDegradedSetRequest( ApplicationEvent event, char *buf, 
 		__ERROR__( "ClientWorker", "handleDegradedSetRequest", "Invalid SET request." );
 		return false;
 	}
-	__DEBUG__(
+	__INFO__(
 		BLUE, "ClientWorker", "handleDegradedSetRequest",
 		"[DEGRADED_SET] Key: %.*s (key size = %u); Value: (value size = %u)",
 		( int ) header.keySize, header.key, header.keySize, header.valueSize
@@ -18,9 +18,13 @@ bool ClientWorker::handleDegradedSetRequest( ApplicationEvent event, char *buf, 
 	uint32_t remappedCount;
 	bool connected, useCoordinatedFlow, isLarge;
 	ssize_t sentBytes;
+	uint32_t numOfSplit, splitSize, splitOffset = 0;
 	ServerSocket *originalDataServerSocket;
 
-	isLarge = LargeObjectUtil::isLarge( header.keySize, header.valueSize );
+	isLarge = LargeObjectUtil::isLarge(
+		header.keySize, header.valueSize,
+		&numOfSplit, &splitSize
+	);
 
 	if ( ! this->getServers( PROTO_OPCODE_SET, header.key, header.keySize, original, remapped, remappedCount, originalDataServerSocket, useCoordinatedFlow ) ) {
 		Key key;
@@ -47,29 +51,71 @@ bool ClientWorker::handleDegradedSetRequest( ApplicationEvent event, char *buf, 
 		__ERROR__( "ClientWorker", "handleDegradedSetRequest", "Cannot insert into application SET pending map. (%u, %u)", event.instanceId, event.requestId );
 	}
 
-	// always acquire lock from coordinator first
-	buffer.data = this->protocol.buffer.send;
-	buffer.size = this->protocol.generateRemappingLockHeader(
-		PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_COORDINATOR,
-		PROTO_OPCODE_REMAPPING_LOCK,
-		instanceId, requestId,
-		original, remapped, remappedCount,
-		header.keySize, header.key,
-		isLarge
-	);
+	if ( isLarge ) {
+		char backup[ SPLIT_OFFSET_SIZE ];
+		buffer.data = this->protocol.buffer.send;
 
-	// insert the list of remapped servers into pending map
-	// Note: The original and remapped pointers are updated in getServers()
-	RemapList remapList( original, remapped, remappedCount );
-	for( uint32_t i = 0; i < Client::getInstance()->sockets.coordinators.size(); i++ ) {
-		CoordinatorSocket *coordinatorSocket = Client::getInstance()->sockets.coordinators.values[ i ];
+		memcpy( backup, header.key + header.keySize, SPLIT_OFFSET_SIZE );
+		for ( uint32_t splitIndex = 0; splitIndex < numOfSplit; splitIndex++ ) {
+			splitOffset = LargeObjectUtil::getValueOffsetAtSplit( header.keySize, header.valueSize, splitIndex );
+			LargeObjectUtil::writeSplitOffset( header.key + header.keySize, splitOffset );
+			this->getServers(
+				PROTO_OPCODE_SET, header.key, header.keySize + SPLIT_OFFSET_SIZE,
+				original, remapped, remappedCount,
+				originalDataServerSocket, useCoordinatedFlow
+			);
 
-		ClientWorker::pending->insertRemapList( PT_KEY_REMAP_LIST, instanceId, event.instanceId, requestId, event.requestId, ( void * ) coordinatorSocket, remapList );
+			buffer.size = this->protocol.generateRemappingLockHeader(
+				PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_COORDINATOR,
+				PROTO_OPCODE_REMAPPING_LOCK,
+				instanceId, requestId,
+				original, remapped, remappedCount,
+				header.keySize, header.key,
+				isLarge
+			);
 
-		sentBytes = coordinatorSocket->send( buffer.data, buffer.size, connected );
-		if ( sentBytes != ( ssize_t ) buffer.size )
-			__ERROR__( "ClientWorker", "handleDegradedSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
-		break; // Only send to one coordinator
+			RemapList remapList( original, remapped, remappedCount );
+			for( uint32_t i = 0; i < Client::getInstance()->sockets.coordinators.size(); i++ ) {
+				CoordinatorSocket *coordinatorSocket = Client::getInstance()->sockets.coordinators.values[ i ];
+
+				ClientWorker::pending->insertRemapList(
+					PT_KEY_REMAP_LIST,
+					instanceId, event.instanceId, requestId, event.requestId,
+					( void * ) coordinatorSocket, remapList
+				);
+
+				sentBytes = coordinatorSocket->send( buffer.data, buffer.size, connected );
+				if ( sentBytes != ( ssize_t ) buffer.size )
+					__ERROR__( "ClientWorker", "handleDegradedSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
+				break; // Only send to one coordinator
+			}
+		}
+		memcpy( header.key + header.keySize, backup, SPLIT_OFFSET_SIZE );
+	} else {
+		// always acquire lock from coordinator first
+		buffer.data = this->protocol.buffer.send;
+		buffer.size = this->protocol.generateRemappingLockHeader(
+			PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_COORDINATOR,
+			PROTO_OPCODE_REMAPPING_LOCK,
+			instanceId, requestId,
+			original, remapped, remappedCount,
+			header.keySize, header.key,
+			isLarge
+		);
+
+		// insert the list of remapped servers into pending map
+		// Note: The original and remapped pointers are updated in getServers()
+		RemapList remapList( original, remapped, remappedCount );
+		for( uint32_t i = 0; i < Client::getInstance()->sockets.coordinators.size(); i++ ) {
+			CoordinatorSocket *coordinatorSocket = Client::getInstance()->sockets.coordinators.values[ i ];
+
+			ClientWorker::pending->insertRemapList( PT_KEY_REMAP_LIST, instanceId, event.instanceId, requestId, event.requestId, ( void * ) coordinatorSocket, remapList );
+
+			sentBytes = coordinatorSocket->send( buffer.data, buffer.size, connected );
+			if ( sentBytes != ( ssize_t ) buffer.size )
+				__ERROR__( "ClientWorker", "handleDegradedSetRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", sentBytes, buffer.size );
+			break; // Only send to one coordinator
+		}
 	}
 
 	return true;
@@ -81,12 +127,14 @@ bool ClientWorker::handleDegradedSetLockResponse( CoordinatorEvent event, bool s
 		__ERROR__( "ClientWorker", "handleDegradedSetLockResponse", "Invalid DEGRADED_SET_LOCK Response." );
 		return false;
 	}
-	__DEBUG__(
+	__INFO__(
 		BLUE, "ClientWorker", "handleDegradedSetLockResponse",
-		"[DEGRADED_SET_LOCK (%s)] [%u, %u] Key: %.*s (key size = %u)",
+		"[DEGRADED_SET_LOCK (%s)] [%u, %u] Key: %.*s.%u (key size = %u, is large? %s)",
 		success ? "Success" : "Fail",
 		event.instanceId, event.requestId,
-		( int ) header.keySize, header.key, header.keySize
+		( int ) header.keySize, header.key,
+		header.isLarge ? LargeObjectUtil::readSplitOffset( header.key + header.keySize ) : 0,
+		header.keySize, header.isLarge ? "yes" : "no"
 	);
 
 	// Find the corresponding DEGRADED_SET_LOCK request //
@@ -123,6 +171,34 @@ bool ClientWorker::handleDegradedSetLockResponse( CoordinatorEvent event, bool s
 		header.key, header.keySize,
 		originalListId, originalChunkId
 	);
+
+	// Find the corresponding SET request //
+	Key key;
+	KeyValue keyValue;
+	uint8_t keySize;
+	uint32_t valueSize;
+	char *keyStr, *valueStr;
+	uint32_t numOfSplit, splitSize, splitIndex, splitOffset = 0;
+
+	if ( ! ClientWorker::pending->findKeyValue( PT_APPLICATION_SET, pid.parentInstanceId, pid.parentRequestId, 0, &keyValue, true, header.key ) ) {
+		__ERROR__( "ClientWorker", "handleDegradedSetLockResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded. (ID: (%u, %u))", pid.parentInstanceId, pid.parentRequestId );
+		return false;
+	}
+
+	key = keyValue.key();
+	keyValue._deserialize( keyStr, keySize, valueStr, valueSize );
+	LargeObjectUtil::isLarge( keySize, valueSize, &numOfSplit, &splitSize );
+
+	// Update original chunk ID for large object
+	if ( header.isLarge ) {
+		bool isLarge;
+		splitOffset = LargeObjectUtil::readSplitOffset( header.key + header.keySize );
+		splitIndex = LargeObjectUtil::getSplitIndex( keySize, valueSize, splitOffset, isLarge );
+		originalChunkId = ( originalChunkId + splitIndex ) % ClientWorker::dataChunkCount;
+
+		dataServerSocket = this->dataServerSockets[ originalChunkId ];
+	}
+
 	for ( uint32_t i = 0; i < header.remappedCount; i++ ) {
 		ServerSocket *s = this->getServers(
 			header.remapped[ i * 2     ],
@@ -134,23 +210,6 @@ bool ClientWorker::handleDegradedSetLockResponse( CoordinatorEvent event, bool s
 			this->parityServerSockets[ header.original[ i * 2 + 1 ] - ClientWorker::dataChunkCount ] = s;
 		}
 	}
-
-	// Find the corresponding SET request //
-	Key key;
-	KeyValue keyValue;
-	uint8_t keySize;
-	uint32_t valueSize;
-	char *keyStr, *valueStr;
-	uint32_t numOfSplit, splitSize, splitOffset = 0;
-
-	if ( ! ClientWorker::pending->findKeyValue( PT_APPLICATION_SET, pid.parentInstanceId, pid.parentRequestId, 0, &keyValue, true, header.key ) ) {
-		__ERROR__( "ClientWorker", "handleDegradedSetLockResponse", "Cannot find a pending application SET request that matches the response. This message will be discarded. (ID: (%u, %u))", pid.parentInstanceId, pid.parentRequestId );
-		return false;
-	}
-
-	key = keyValue.key();
-	keyValue._deserialize( keyStr, keySize, valueStr, valueSize );
-	LargeObjectUtil::isLarge( keySize, valueSize, &numOfSplit, &splitSize );
 
 	// Insert pending SET requests for each involved servers //
 	for ( uint32_t i = 0; i < ClientWorker::parityChunkCount + 1; i++ ) {
@@ -181,7 +240,8 @@ bool ClientWorker::handleDegradedSetLockResponse( CoordinatorEvent event, bool s
 			header.original, header.remapped, header.remappedCount,
 			keySize, keyStr,
 			valueSize, valueStr,
-			0, 0,
+			header.isLarge ? LargeObjectUtil::readSplitOffset( header.key + header.keySize ) : 0,
+			header.isLarge ? splitSize : 0,
 			packet->data
 		);
 
@@ -222,7 +282,8 @@ bool ClientWorker::handleDegradedSetLockResponse( CoordinatorEvent event, bool s
 		header.original, header.remapped, header.remappedCount,
 		keySize, keyStr,
 		valueSize, valueStr,
-		0, 0,
+		header.isLarge ? LargeObjectUtil::readSplitOffset( header.key + header.keySize ) : 0,
+		header.isLarge ? splitSize : 0,
 		0
 	);
 
@@ -240,11 +301,13 @@ bool ClientWorker::handleDegradedSetResponse( ServerEvent event, bool success, c
 		__ERROR__( "ClientWorker", "handleDegradedSetResponse", "Invalid DEGRADED_SET Response." );
 		return false;
 	}
-	__DEBUG__(
+	__INFO__(
 		BLUE, "ClientWorker", "handleDegradedSetResponse",
-		"[DEGRADED_SET (%s)] Key: %.*s (key size = %u).",
+		"[DEGRADED_SET (%s)] Key: %.*s.%u (key size = %u).",
 		success ? "Success" : "Fail",
-		( int ) header.keySize, header.key, header.keySize
+		( int ) header.keySize, header.key,
+		LargeObjectUtil::readSplitOffset( header.key + header.keySize ),
+		header.keySize
 	);
 
 	int pending;

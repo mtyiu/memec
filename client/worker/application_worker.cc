@@ -77,6 +77,12 @@ void ClientWorker::dispatch( ApplicationEvent event ) {
 			break;
 		case APPLICATION_EVENT_TYPE_SET_RESPONSE_SUCCESS:
 		case APPLICATION_EVENT_TYPE_SET_RESPONSE_FAILURE:
+			if ( event.type == APPLICATION_EVENT_TYPE_SET_RESPONSE_FAILURE ) {
+				__ERROR__( "ClientWorker", "dispatch", "APPLICATION_EVENT_TYPE_SET_RESPONSE_FAILURE" );
+				assert( false );
+			} else {
+				__INFO__( GREEN, "ClientWorker", "dispatch", "APPLICATION_EVENT_TYPE_SET_RESPONSE_SUCCESS" );
+			}
 			if ( event.message.set.isKeyValue ) {
 				Key key = event.message.set.data.keyValue.key();
 				buffer.size = this->protocol.generateKeyHeader(
@@ -291,13 +297,13 @@ bool ClientWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		listId, chunkId
 	);
 
-	if ( ! socket ) {
-		Key key;
-		key.set( header.keySize, header.key );
-		event.resSet( event.socket, event.instanceId, event.requestId, key, false, false );
-		this->dispatch( event );
-		return false;
-	}
+	// if ( ! socket ) {
+	// 	Key key;
+	// 	key.set( header.keySize, header.key );
+	// 	event.resSet( event.socket, event.instanceId, event.requestId, key, false, false );
+	// 	this->dispatch( event );
+	// 	return false;
+	// }
 
 	// Check whether the object size exceesd the chunk size
 	uint32_t numOfSplit, splitSize, splitOffset = 0;
@@ -323,7 +329,7 @@ bool ClientWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 			if ( client->stateTransitHandler.useCoordinatedFlow( addr, true, true ) ) {
 				return this->handleDegradedSetRequest( event, buf, size );
 			}
-			}
+		}
 	}
 
 	struct {

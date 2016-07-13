@@ -10,12 +10,14 @@ bool CoordinatorWorker::handleDegradedSetLockRequest( ClientEvent event, char *b
 
 	__DEBUG__(
 		BLUE, "CoordinatorWorker", "handleDegradedSetLockRequest",
-		"[DEGRADED_SET_LOCK] Key: %.*s (key size = %u).",
-		( int ) header.keySize, header.key, header.keySize
+		"[DEGRADED_SET_LOCK] Key: %.*s.%u (key size = %u).",
+		( int ) header.keySize, header.key,
+		header.isLarge ? LargeObjectUtil::readSplitOffset( header.key + header.keySize ) : 0,
+		header.keySize
 	);
 
 	Key key;
-	key.set( header.keySize, header.key );
+	key.set( header.keySize, header.key, 0, header.isLarge );
 
 	uint32_t originalListId, originalChunkId;
 

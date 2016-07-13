@@ -4,13 +4,13 @@ size_t Protocol::generateRemappingLockHeader( uint8_t magic, uint8_t to, uint8_t
 	char *buf = this->buffer.send + PROTO_HEADER_SIZE;
 	size_t bytes = this->generateHeader(
 		magic, to, opcode,
-		PROTO_REMAPPING_LOCK_SIZE + keySize + remappedCount * 4 * 4,
+		PROTO_REMAPPING_LOCK_SIZE + keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ) + remappedCount * 4 * 4,
 		instanceId, requestId
 	);
 	bytes += ProtocolUtil::write4Bytes( buf, remappedCount );
 	bytes += ProtocolUtil::write1Byte ( buf, keySize );
 	bytes += ProtocolUtil::write1Byte ( buf, isLarge );
-	bytes += ProtocolUtil::write( buf, key, keySize );
+	bytes += ProtocolUtil::write( buf, key, keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ) );
 	for ( uint32_t i = 0; i < remappedCount; i++ ) {
 		bytes += ProtocolUtil::write4Bytes( buf, original[ i * 2     ] );
 		bytes += ProtocolUtil::write4Bytes( buf, original[ i * 2 + 1 ] );
@@ -34,7 +34,7 @@ bool Protocol::parseRemappingLockHeader( struct RemappingLockHeader &header, cha
 	header.isLarge       = ProtocolUtil::read1Byte ( ptr );
 	if ( size - offset < ( size_t ) PROTO_REMAPPING_LOCK_SIZE + header.keySize + header.remappedCount * 4 * 4 ) return false;
 	header.key = ptr;
-	ptr += header.keySize;
+	ptr += header.keySize + ( header.isLarge ? SPLIT_OFFSET_SIZE : 0 );
 	header.original = ( uint32_t * ) ptr;
 	header.remapped = ( ( uint32_t * ) ptr ) + header.remappedCount * 2;
 	for ( uint32_t i = 0; i < header.remappedCount; i++ ) {
@@ -50,16 +50,18 @@ size_t Protocol::generateDegradedSetHeader( uint8_t magic, uint8_t to, uint8_t o
 	if ( ! sendBuf ) sendBuf = this->buffer.send;
 	char *buf = sendBuf + PROTO_HEADER_SIZE;
 	size_t bytes = 0;
+	bool isLarge = ! ( splitSize == 0 || splitSize == valueSize );
 	bytes += ProtocolUtil::write4Bytes( buf, listId );
 	bytes += ProtocolUtil::write4Bytes( buf, chunkId );
 	bytes += ProtocolUtil::write4Bytes( buf, remappedCount );
 	bytes += ProtocolUtil::write1Byte ( buf, keySize );
 	bytes += ProtocolUtil::write3Bytes( buf, valueSize );
+	bytes += ProtocolUtil::write1Byte ( buf, isLarge );
 	bytes += ProtocolUtil::write( buf, key, keySize );
 
-	if ( splitSize == 0 || splitSize == valueSize ) {
+	fprintf( stderr, "splitSize = %u, splitOffset = %u\n", splitSize, splitOffset );
+	if ( ! isLarge ) {
 		// No need to split
-		fprintf( stderr, "splitSize = %u\n", splitSize );
 		bytes += ProtocolUtil::write( buf, value, valueSize );
 	} else {
 		// Include split offset
@@ -94,6 +96,7 @@ bool Protocol::parseDegradedSetHeader( struct DegradedSetHeader &header, char *b
 	header.remappedCount = ProtocolUtil::read4Bytes( ptr );
 	header.keySize       = ProtocolUtil::read1Byte ( ptr );
 	header.valueSize     = ProtocolUtil::read3Bytes( ptr );
+	header.isLarge       = ProtocolUtil::read1Byte ( ptr );
 
 	header.key = ptr;
 	ptr += header.keySize;

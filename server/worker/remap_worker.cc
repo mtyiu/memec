@@ -112,10 +112,12 @@ bool ServerWorker::handleDegradedSetRequest( ClientEvent event, char *buf, size_
 		__ERROR__( "ServerWorker", "handleDegradedSetRequest", "Invalid DEGRADED_SET request (size = %lu).", size );
 		return false;
 	}
-	__DEBUG__(
+	__INFO__(
 		BLUE, "ServerWorker", "handleDegradedSetRequest",
-		"[SET] Key: %.*s (key size = %u); Value: (value size = %u); list ID = %u, chunk ID = %u.",
-		( int ) header.keySize, header.key, header.keySize, header.valueSize,
+		"[SET] Key: %.*s.%u (key size = %u); Value: (value size = %u); list ID = %u, chunk ID = %u.",
+		( int ) header.keySize, header.key,
+		header.isLarge ? LargeObjectUtil::readSplitOffset( header.key + header.keySize ) : 0,
+		header.keySize, header.valueSize,
 		header.listId, header.chunkId
 	);
 

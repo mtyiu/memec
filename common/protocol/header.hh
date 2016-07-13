@@ -188,13 +188,14 @@ struct RemappingLockHeader {
 	uint32_t *remapped;
 };
 
-#define PROTO_DEGRADED_SET_SIZE 16
+#define PROTO_DEGRADED_SET_SIZE 17
 struct DegradedSetHeader {
 	uint32_t listId;
 	uint32_t chunkId;
 	uint32_t remappedCount;
 	uint8_t keySize;
 	uint32_t valueSize;   // 3 bytes
+	bool isLarge;
 	char *key;
 	uint32_t splitOffset; // 3 bytes
 	char *value;
