@@ -112,7 +112,7 @@ bool ServerWorker::handleDegradedSetRequest( ClientEvent event, char *buf, size_
 		__ERROR__( "ServerWorker", "handleDegradedSetRequest", "Invalid DEGRADED_SET request (size = %lu).", size );
 		return false;
 	}
-	__INFO__(
+	__DEBUG__(
 		BLUE, "ServerWorker", "handleDegradedSetRequest",
 		"[SET] Key: %.*s.%u (key size = %u); Value: (value size = %u); list ID = %u, chunk ID = %u.",
 		( int ) header.keySize, header.key,
@@ -167,7 +167,7 @@ bool ServerWorker::handleDegradedSetRequest( ClientEvent event, char *buf, size_
 			ServerWorker::remappedBuffer->insert(
 				header.listId, header.chunkId,
 				header.original, header.remapped, header.remappedCount,
-				header.key, header.keySize,
+				header.key, header.keySize, header.isLarge,
 				header.value, header.valueSize
 			);
 		}
@@ -200,7 +200,7 @@ bool ServerWorker::handleDegradedSetRequest( ClientEvent event, char *buf, size_
 			ServerWorker::remappedBuffer->insert(
 				header.listId, header.chunkId,
 				header.original, header.remapped, header.remappedCount,
-				header.key, header.keySize
+				header.key, header.keySize, header.isLarge
 			);
 		}
 	}
@@ -244,11 +244,28 @@ bool ServerWorker::handleRemappedUpdateRequest( ServerPeerEvent event, char *buf
 	) ) {
 		// Parity not remapped
 		ret = true;
-	} else if ( remappedBuffer->update( header.keySize, header.key, header.valueUpdateSize, header.valueUpdateOffset, header.valueUpdate ) ) {
+	} else if ( remappedBuffer->update( header.keySize, header.key, false, header.valueUpdateSize, header.valueUpdateOffset, header.valueUpdate ) ) {
 		// Parity remapped
 		ret = true;
 	} else {
 		ret = false;
+	}
+
+	if ( ! ret ) {
+		header.keySize -= SPLIT_OFFSET_SIZE;
+		this->getServers( header.key, header.keySize, listId, chunkId );
+		if ( ServerWorker::chunkBuffer->at( listId )->updateKeyValue(
+			header.key, header.keySize, true,
+			header.valueUpdateOffset, header.valueUpdateSize, header.valueUpdate
+		) ) {
+			// Parity not remapped
+			ret = true;
+		} else if ( remappedBuffer->update( header.keySize, header.key, true, header.valueUpdateSize, header.valueUpdateOffset, header.valueUpdate ) ) {
+			// Parity remapped
+			ret = true;
+		} else {
+			ret = false;
+		}
 	}
 
 	event.resRemappedUpdate(

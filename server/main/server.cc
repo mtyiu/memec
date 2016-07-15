@@ -738,7 +738,7 @@ void Server::lookup() {
 	}
 
 	RemappedKeyValue remappedKeyValue;
-	if ( this->remappedBuffer.find( keySize, key, &remappedKeyValue ) ) {
+	if ( this->remappedBuffer.find( keySize, key, false, &remappedKeyValue ) ) {
 		printf( "Remapped key found [%u, %u]: ", remappedKeyValue.listId, remappedKeyValue.chunkId );
 		for ( uint32_t i = 0; i < remappedKeyValue.remappedCount; i++ ) {
 			uint8_t keySize;

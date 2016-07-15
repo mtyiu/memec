@@ -8,7 +8,7 @@ bool CoordinatorWorker::handleDegradedLockRequest( ClientEvent event, char *buf,
 		return false;
 	}
 	if ( header.isLarge ) {
-		__DEBUG__(
+		__INFO__(
 			BLUE, "CoordinatorWorker", "handleDegradedLockRequest",
 			"[DEGRADED_LOCK] Key: %.*s.%u (key size = %u)%s.",
 			( int ) header.keySize, header.key,
@@ -17,7 +17,7 @@ bool CoordinatorWorker::handleDegradedLockRequest( ClientEvent event, char *buf,
 			header.isLarge ? "; is large" : ""
 		);
 	} else {
-		__DEBUG__(
+		__INFO__(
 			BLUE, "CoordinatorWorker", "handleDegradedLockRequest",
 			"[DEGRADED_LOCK] Key: %.*s (key size = %u).",
 			( int ) header.keySize, header.key, header.keySize
@@ -43,7 +43,10 @@ bool CoordinatorWorker::handleDegradedLockRequest( ClientEvent event, char *buf,
 	Key key;
 	key.set( header.keySize, header.key, 0, header.isLarge );
 
-	if ( Coordinator::getInstance()->remappingRecords.find( key, &remappingRecord, &lock ) ) {
+	bool isRemapped = Coordinator::getInstance()->remappingRecords.find( key, &remappingRecord, &lock );
+
+
+	if ( isRemapped ) {
 		// Remapped
 		event.resDegradedLock(
 			event.socket, event.instanceId, event.requestId, key,
@@ -52,6 +55,24 @@ bool CoordinatorWorker::handleDegradedLockRequest( ClientEvent event, char *buf,
 		this->dispatch( event );
 		UNLOCK( lock );
 		return false;
+	} else if ( ! header.isLarge ) {
+		char backup[ SPLIT_OFFSET_SIZE ];
+		key.isLarge = true;
+		memcpy( backup, key.data + key.size, SPLIT_OFFSET_SIZE );
+		memset( key.data + key.size, 0, SPLIT_OFFSET_SIZE );
+		isRemapped = Coordinator::getInstance()->remappingRecords.find( key, &remappingRecord, &lock );
+
+		if ( isRemapped ) {
+			event.resDegradedLock(
+				event.socket, event.instanceId, event.requestId, key,
+				remappingRecord.original, remappingRecord.remapped, remappingRecord.remappedCount
+			);
+			this->dispatch( event );
+		}
+		memcpy( key.data + key.size, backup, SPLIT_OFFSET_SIZE );
+		UNLOCK( lock );
+		if ( isRemapped )
+			return false;
 	}
 
 	// Find the ServerSocket which stores the stripe with listId and srcDataChunkId

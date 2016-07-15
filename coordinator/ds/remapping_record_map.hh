@@ -86,7 +86,7 @@ public:
 			return false;
 		} else {
 			Key keyDup;
-			keyDup.dup( key.size, key.data );
+			keyDup.dup( key.size, key.data, 0, key.isLarge );
 			map[ keyDup ] = record;
 			// add mapping from server to key ( for erase by server )
 			if ( serverToKeyMap.count( server ) < 1 )

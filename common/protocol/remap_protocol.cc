@@ -59,7 +59,6 @@ size_t Protocol::generateDegradedSetHeader( uint8_t magic, uint8_t to, uint8_t o
 	bytes += ProtocolUtil::write1Byte ( buf, isLarge );
 	bytes += ProtocolUtil::write( buf, key, keySize );
 
-	fprintf( stderr, "splitSize = %u, splitOffset = %u\n", splitSize, splitOffset );
 	if ( ! isLarge ) {
 		// No need to split
 		bytes += ProtocolUtil::write( buf, value, valueSize );

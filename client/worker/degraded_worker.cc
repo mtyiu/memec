@@ -74,7 +74,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 	switch( header.type ) {
 		case PROTO_DEGRADED_LOCK_RES_IS_LOCKED:
 		case PROTO_DEGRADED_LOCK_RES_WAS_LOCKED:
-			__DEBUG__(
+			__INFO__(
 				BLUE, "ClientWorker", "handleDegradedLockResponse",
 				"[%s Locked] [%u, %u, %u] Key: %.*s.%u (key size = %u); Is Sealed? %s; is large? %s.",
 				header.type == PROTO_DEGRADED_LOCK_RES_IS_LOCKED ? "Is" : "Was",
@@ -114,7 +114,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 			// }
 			break;
 		case PROTO_DEGRADED_LOCK_RES_NOT_LOCKED:
-			__DEBUG__(
+			__INFO__(
 				BLUE, "ClientWorker", "handleDegradedLockResponse",
 				"[Not Locked] [%u, %u] Key: %.*s (key size = %u).",
 				originalListId, originalChunkId,
@@ -122,7 +122,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 			);
 			break;
 		case PROTO_DEGRADED_LOCK_RES_REMAPPED:
-			__DEBUG__(
+			__INFO__(
 				BLUE, "ClientWorker", "handleDegradedLockResponse",
 				"[Remapped] [%u, %u] Key: %.*s (key size = %u).",
 				originalListId, originalChunkId,

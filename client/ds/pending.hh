@@ -342,7 +342,8 @@ public:
 		PendingIdentifier *pidPtr, Key *keyPtr,
 		bool needsLock, bool needsUnlock,
 		bool checkKey, char *checkKeyPtr,
-		void *keyPtrToBeSet = 0
+		uint32_t keyPtrSize = 0
+		// void *keyPtrToBeSet = 0
 	);
 	bool eraseKeyValue(
 		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr = 0,

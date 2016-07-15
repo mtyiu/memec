@@ -80,6 +80,7 @@ void ServerWorker::dispatch( ClientEvent event ) {
 				valueSize, value, 0, 0,
 				splitOffset, splitSize
 			);
+			fprintf( stderr, "GET (Success) : %.*s.%u\n", keySize, key, splitOffset );
 		}
 			break;
 		case CLIENT_EVENT_TYPE_GET_RESPONSE_FAILURE:
@@ -91,6 +92,7 @@ void ServerWorker::dispatch( ClientEvent event ) {
 				event.message.key.size,
 				event.message.key.data
 			);
+			fprintf( stderr, "GET (Fail) : %.*s\n", event.message.key.size, event.message.key.data );
 			break;
 		// SET
 		case CLIENT_EVENT_TYPE_SET_RESPONSE_SUCCESS_DATA:
@@ -356,7 +358,8 @@ bool ServerWorker::handleGetRequest( ClientEvent event, struct KeyHeader &header
 	     ( header.keySize > SPLIT_OFFSET_SIZE && map->findLargeObject( header.key, header.keySize - SPLIT_OFFSET_SIZE, &keyValue, &key ) ) ) {
 		event.resGet( event.socket, event.instanceId, event.requestId, keyValue, isDegraded );
 		ret = true;
-	} else if ( remappedBuffer->find( header.keySize, header.key, &remappedKeyValue ) ) {
+	} else if ( ( remappedBuffer->find( header.keySize, header.key, false, &remappedKeyValue ) ) ||
+                ( header.keySize > SPLIT_OFFSET_SIZE && remappedBuffer->find( header.keySize - SPLIT_OFFSET_SIZE, header.key, true, &remappedKeyValue ) ) ) {
 		// Handle remapped keys
 		event.resGet( event.socket, event.instanceId, event.requestId, remappedKeyValue.keyValue, isDegraded );
 		ret = true;
@@ -531,7 +534,8 @@ bool ServerWorker::handleUpdateRequest(
 		metadata = ChunkUtil::getMetadata( chunk );
 
 		// Find remapping record and store it to {original, reconstructed, reconstructedCount}
-		if ( remappedBuffer->find( header.keySize, header.key, &remappingRecord ) ) {
+		if ( ( remappedBuffer->find( header.keySize, header.key, false, &remappingRecord ) ) ||
+	         ( header.keySize > SPLIT_OFFSET_SIZE && remappedBuffer->find( header.keySize - SPLIT_OFFSET_SIZE, header.key, true, &remappingRecord ) ) ) {
 			assert( ! original && ! reconstructed && ! reconstructedCount );
 			original = remappingRecord.original;
 			reconstructed = remappingRecord.remapped;
@@ -620,7 +624,8 @@ bool ServerWorker::handleUpdateRequest(
 		}
 		if ( chunkBufferIndex != -1 )
 			chunkBuffer->updateAndUnlockChunk( chunkBufferIndex );
-	} else if ( remappedBuffer->update( header.keySize, header.key, header.valueUpdateSize, header.valueUpdateOffset, header.valueUpdate, &remappedKeyValue ) ) {
+	} else if ( ( remappedBuffer->update( header.keySize, header.key, false, header.valueUpdateSize, header.valueUpdateOffset, header.valueUpdate, &remappedKeyValue ) ) ||
+	            ( header.keySize > SPLIT_OFFSET_SIZE && remappedBuffer->update( header.keySize - SPLIT_OFFSET_SIZE, header.key, true, header.valueUpdateSize, header.valueUpdateOffset, header.valueUpdate, &remappedKeyValue ) ) ) {
 		// Handle remapped key
 		// __INFO__( GREEN, "ServerWorker", "handleUpdateRequest", "Handle remapped key: %.*s!", header.keySize, header.key );
 
@@ -842,7 +847,8 @@ bool ServerWorker::handleDeleteRequest(
 		}
 		if ( chunkBufferIndex != -1 )
 			chunkBuffer->updateAndUnlockChunk( chunkBufferIndex );
-	} else if ( remappedBuffer->find( header.keySize, header.key, &remappedKeyValue ) ) {
+	} else if ( ( remappedBuffer->find( header.keySize, header.key, false, &remappedKeyValue ) ) ||
+                ( header.keySize > SPLIT_OFFSET_SIZE && remappedBuffer->find( header.keySize - SPLIT_OFFSET_SIZE, header.key, true, &remappedKeyValue ) ) ) {
 		// __INFO__( GREEN, "ServerWorker", "handleDeleteRequest", "Handle remapped key: %.*s!", header.keySize, header.key );
 		ret = true;
 	} else {

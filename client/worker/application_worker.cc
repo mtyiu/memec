@@ -77,12 +77,6 @@ void ClientWorker::dispatch( ApplicationEvent event ) {
 			break;
 		case APPLICATION_EVENT_TYPE_SET_RESPONSE_SUCCESS:
 		case APPLICATION_EVENT_TYPE_SET_RESPONSE_FAILURE:
-			if ( event.type == APPLICATION_EVENT_TYPE_SET_RESPONSE_FAILURE ) {
-				__ERROR__( "ClientWorker", "dispatch", "APPLICATION_EVENT_TYPE_SET_RESPONSE_FAILURE" );
-				assert( false );
-			} else {
-				__INFO__( GREEN, "ClientWorker", "dispatch", "APPLICATION_EVENT_TYPE_SET_RESPONSE_SUCCESS" );
-			}
 			if ( event.message.set.isKeyValue ) {
 				Key key = event.message.set.data.keyValue.key();
 				buffer.size = this->protocol.generateKeyHeader(
@@ -380,12 +374,12 @@ bool ClientWorker::handleSetRequest( ApplicationEvent event, char *buf, size_t s
 		);
 		packet->size = buffer.size;
 
-		fprintf(
-			stderr, "#%u [%.*s]: Offset at %u --> data server #%u; request size: %lu.\n",
-			splitIndex, header.keySize, header.key, splitOffset,
-			( chunkId + splitIndex ) % ClientWorker::dataChunkCount,
-			buffer.size
-		);
+		// fprintf(
+		// 	stderr, "#%u [%.*s]: Offset at %u --> data server #%u; request size: %lu.\n",
+		// 	splitIndex, header.keySize, header.key, splitOffset,
+		// 	( chunkId + splitIndex ) % ClientWorker::dataChunkCount,
+		// 	buffer.size
+		// );
 
 		// Choose data server
 		socket = this->dataServerSockets[ ( chunkId + splitIndex ) % ClientWorker::dataChunkCount ];

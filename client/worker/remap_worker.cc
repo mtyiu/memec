@@ -8,7 +8,7 @@ bool ClientWorker::handleDegradedSetRequest( ApplicationEvent event, char *buf, 
 		__ERROR__( "ClientWorker", "handleDegradedSetRequest", "Invalid SET request." );
 		return false;
 	}
-	__INFO__(
+	__DEBUG__(
 		BLUE, "ClientWorker", "handleDegradedSetRequest",
 		"[DEGRADED_SET] Key: %.*s (key size = %u); Value: (value size = %u)",
 		( int ) header.keySize, header.key, header.keySize, header.valueSize
@@ -127,7 +127,7 @@ bool ClientWorker::handleDegradedSetLockResponse( CoordinatorEvent event, bool s
 		__ERROR__( "ClientWorker", "handleDegradedSetLockResponse", "Invalid DEGRADED_SET_LOCK Response." );
 		return false;
 	}
-	__INFO__(
+	__DEBUG__(
 		BLUE, "ClientWorker", "handleDegradedSetLockResponse",
 		"[DEGRADED_SET_LOCK (%s)] [%u, %u] Key: %.*s.%u (key size = %u, is large? %s)",
 		success ? "Success" : "Fail",
@@ -301,7 +301,7 @@ bool ClientWorker::handleDegradedSetResponse( ServerEvent event, bool success, c
 		__ERROR__( "ClientWorker", "handleDegradedSetResponse", "Invalid DEGRADED_SET Response." );
 		return false;
 	}
-	__INFO__(
+	__DEBUG__(
 		BLUE, "ClientWorker", "handleDegradedSetResponse",
 		"[DEGRADED_SET (%s)] Key: %.*s.%u (key size = %u).",
 		success ? "Success" : "Fail",

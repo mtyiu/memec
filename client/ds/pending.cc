@@ -331,7 +331,7 @@ bool Pending::eraseKey( PendingType type, uint16_t instanceId, uint32_t requestI
 	return ret;
 }
 
-bool Pending::findKey( PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr, PendingIdentifier *pidPtr, Key *keyPtr, bool needsLock, bool needsUnlock, bool checkKey, char* checkKeyPtr, void *keyPtrToBeSet ) {
+bool Pending::findKey( PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr, PendingIdentifier *pidPtr, Key *keyPtr, bool needsLock, bool needsUnlock, bool checkKey, char* checkKeyPtr, uint32_t keyPtrSize ) {
 	PendingIdentifier pid( instanceId, 0, requestId, 0, ptr );
 	LOCK_T *lock;
 	bool ret;
@@ -347,8 +347,12 @@ bool Pending::findKey( PendingType type, uint16_t instanceId, uint32_t requestId
 
 	if ( ret ) {
 		if ( pidPtr ) *pidPtr = lit->first;
-		if ( keyPtrToBeSet )
-			lit->second.ptr = keyPtrToBeSet;
+		if ( keyPtrSize ) {
+			if ( ! lit->second.ptr ) {
+				lit->second.ptr = malloc( keyPtrSize );
+				memset( lit->second.ptr, 0, keyPtrSize );
+			}
+		}
 		if ( keyPtr ) *keyPtr = lit->second;
 	}
 	if ( needsUnlock ) UNLOCK( lock );

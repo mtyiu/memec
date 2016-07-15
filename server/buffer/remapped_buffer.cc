@@ -5,13 +5,17 @@ RemappedBuffer::RemappedBuffer() {
 	LOCK_INIT( &this->recordsLock );
 }
 
-bool RemappedBuffer::insert( uint32_t listId, uint32_t chunkId, uint32_t *original, uint32_t *remapped, uint32_t remappedCount, char *keyStr, uint8_t keySize, char *valueStr, uint32_t valueSize ) {
+bool RemappedBuffer::insert( uint32_t listId, uint32_t chunkId, uint32_t *original, uint32_t *remapped, uint32_t remappedCount, char *keyStr, uint8_t keySize, bool isLarge, char *valueStr, uint32_t valueSize ) {
 	RemappedKeyValue remappedKeyValue;
+	uint32_t splitOffset = 0;
+
+	if ( isLarge )
+		splitOffset = LargeObjectUtil::readSplitOffset( keyStr + keySize );
 
 	remappedKeyValue.listId = listId;
 	remappedKeyValue.chunkId = chunkId;
 	remappedKeyValue.remappedCount = remappedCount;
-	remappedKeyValue.keyValue._dup( keyStr, keySize, valueStr, valueSize );
+	remappedKeyValue.keyValue.dup( keyStr, keySize, valueStr, valueSize, splitOffset );
 
 	if ( remappedCount ) {
 		remappedKeyValue.original = new uint32_t[ remappedCount * 2 ];
@@ -47,13 +51,13 @@ bool RemappedBuffer::insert( uint32_t listId, uint32_t chunkId, uint32_t *origin
 	return ret.second;
 }
 
-bool RemappedBuffer::insert( uint32_t listId, uint32_t chunkId, uint32_t *original, uint32_t *remapped, uint32_t remappedCount, char *keyStr, uint8_t keySize ) {
+bool RemappedBuffer::insert( uint32_t listId, uint32_t chunkId, uint32_t *original, uint32_t *remapped, uint32_t remappedCount, char *keyStr, uint8_t keySize, bool isLarge ) {
 	RemappingRecord remappingRecord;
 
 	remappingRecord.listId = listId;
 	remappingRecord.chunkId = chunkId;
 	remappingRecord.remappedCount = remappedCount;
-	remappingRecord.key.dup( keySize, keyStr );
+	remappingRecord.key.dup( keySize, keyStr, 0, isLarge );
 
 	if ( remappedCount ) {
 		remappingRecord.original = new uint32_t[ remappedCount * 2 ];
@@ -87,18 +91,18 @@ bool RemappedBuffer::insert( uint32_t listId, uint32_t chunkId, uint32_t *origin
 	return ret.second;
 }
 
-bool RemappedBuffer::update( uint8_t keySize, char *keyStr, uint32_t valueUpdateSize, uint32_t valueUpdateOffset, char *valueUpdate, RemappedKeyValue *remappedKeyValue ) {
+bool RemappedBuffer::update( uint8_t keySize, char *keyStr, bool isLarge, uint32_t valueUpdateSize, uint32_t valueUpdateOffset, char *valueUpdate, RemappedKeyValue *remappedKeyValue ) {
 	std::unordered_map<Key, RemappedKeyValue>::iterator it;
 	Key key;
 	bool ret;
-	key.set( keySize, keyStr );
+	key.set( keySize, keyStr, 0, isLarge );
 
 	LOCK( &this->keysLock );
 	it = this->keys.find( key );
 	ret = ( it != this->keys.end() );
 	if ( ret ) {
 		// Perform update
-		uint32_t offset = KEY_VALUE_METADATA_SIZE + keySize + valueUpdateOffset;
+		uint32_t offset = KEY_VALUE_METADATA_SIZE + keySize + ( isLarge ? SPLIT_OFFSET_SIZE : 0 ) + valueUpdateOffset;
 		KeyValue &keyValue = it->second.keyValue;
 		memcpy( keyValue.data + offset, valueUpdate, valueUpdateSize );
 		if ( remappedKeyValue ) *remappedKeyValue = it->second;
@@ -108,11 +112,11 @@ bool RemappedBuffer::update( uint8_t keySize, char *keyStr, uint32_t valueUpdate
 	return ret;
 }
 
-bool RemappedBuffer::find( uint8_t keySize, char *keyStr, RemappedKeyValue *remappedKeyValue ) {
+bool RemappedBuffer::find( uint8_t keySize, char *keyStr, bool isLarge, RemappedKeyValue *remappedKeyValue ) {
 	std::unordered_map<Key, RemappedKeyValue>::iterator it;
 	Key key;
 	bool ret;
-	key.set( keySize, keyStr );
+	key.set( keySize, keyStr, 0, isLarge );
 
 	LOCK( &this->keysLock );
 	it = this->keys.find( key );
@@ -125,11 +129,11 @@ bool RemappedBuffer::find( uint8_t keySize, char *keyStr, RemappedKeyValue *rema
 	return ret;
 }
 
-bool RemappedBuffer::find( uint8_t keySize, char *keyStr, RemappingRecord *remappingRecord ) {
+bool RemappedBuffer::find( uint8_t keySize, char *keyStr, bool isLarge, RemappingRecord *remappingRecord ) {
 	std::unordered_map<Key, RemappingRecord>::iterator it;
 	Key key;
 	bool ret;
-	key.set( keySize, keyStr );
+	key.set( keySize, keyStr, 0, isLarge );
 
 	LOCK( &this->recordsLock );
 	it = this->records.find( key );
