@@ -74,7 +74,7 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 	switch( header.type ) {
 		case PROTO_DEGRADED_LOCK_RES_IS_LOCKED:
 		case PROTO_DEGRADED_LOCK_RES_WAS_LOCKED:
-			__INFO__(
+			__DEBUG__(
 				BLUE, "ClientWorker", "handleDegradedLockResponse",
 				"[%s Locked] [%u, %u, %u] Key: %.*s.%u (key size = %u); Is Sealed? %s; is large? %s.",
 				header.type == PROTO_DEGRADED_LOCK_RES_IS_LOCKED ? "Is" : "Was",
@@ -114,19 +114,24 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 			// }
 			break;
 		case PROTO_DEGRADED_LOCK_RES_NOT_LOCKED:
-			__INFO__(
+			__DEBUG__(
 				BLUE, "ClientWorker", "handleDegradedLockResponse",
-				"[Not Locked] [%u, %u] Key: %.*s (key size = %u).",
+				"[Not Locked] [%u, %u] Key: %.*s.%u (key size = %u).",
 				originalListId, originalChunkId,
-				( int ) header.keySize, header.key, header.keySize
+				( int ) header.keySize, header.key,
+				header.isLarge ? LargeObjectUtil::readSplitOffset( header.key + header.keySize ) : 0,
+				header.keySize
 			);
 			break;
 		case PROTO_DEGRADED_LOCK_RES_REMAPPED:
-			__INFO__(
+			__DEBUG__(
 				BLUE, "ClientWorker", "handleDegradedLockResponse",
-				"[Remapped] [%u, %u] Key: %.*s (key size = %u).",
+				"[Remapped] [%u, %u] Key: %.*s.%u (key size = %u; is large? %s).",
 				originalListId, originalChunkId,
-				( int ) header.keySize, header.key, header.keySize
+				( int ) header.keySize, header.key,
+				header.isLarge ? LargeObjectUtil::readSplitOffset( header.key + header.keySize ) : 0,
+				header.keySize,
+				header.isLarge ? "yes" : "no"
 			);
 
 			// Get redirected data server socket
@@ -147,8 +152,10 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 		default:
 			__DEBUG__(
 				BLUE, "ClientWorker", "handleDegradedLockResponse",
-				"[Not Found] Key: %.*s (key size = %u)",
-				( int ) header.keySize, header.key, header.keySize
+				"[Not Found] Key: %.*s.%u (key size = %u)",
+				( int ) header.keySize, header.key,
+				header.isLarge ? LargeObjectUtil::readSplitOffset( header.key + header.keySize ) : 0,
+				header.keySize
 			);
 			break;
 	}
@@ -198,7 +205,8 @@ bool ClientWorker::handleDegradedLockResponse( CoordinatorEvent event, bool succ
 				case PROTO_DEGRADED_LOCK_RES_REMAPPED:
 					buffer.data = this->protocol.reqGet(
 						buffer.size, instanceId, requestId,
-						header.key, header.keySize
+						header.key,
+						header.keySize + ( header.isLarge ? SPLIT_OFFSET_SIZE : 0 )
 					);
 					if ( ClientWorker::updateInterval ) {
 						ClientWorker::pending->recordRequestStartTime( PT_SERVER_GET, instanceId, pid.parentInstanceId, requestId, pid.parentRequestId, ( void * ) socket, socket->getAddr() );

@@ -62,7 +62,8 @@ bool ClientWorker::handleDegradedSetRequest( ApplicationEvent event, char *buf, 
 			this->getServers(
 				PROTO_OPCODE_SET, header.key, header.keySize + SPLIT_OFFSET_SIZE,
 				original, remapped, remappedCount,
-				originalDataServerSocket, useCoordinatedFlow
+				originalDataServerSocket, useCoordinatedFlow,
+				true // isGettingSplit
 			);
 
 			buffer.size = this->protocol.generateRemappingLockHeader(
@@ -129,12 +130,13 @@ bool ClientWorker::handleDegradedSetLockResponse( CoordinatorEvent event, bool s
 	}
 	__DEBUG__(
 		BLUE, "ClientWorker", "handleDegradedSetLockResponse",
-		"[DEGRADED_SET_LOCK (%s)] [%u, %u] Key: %.*s.%u (key size = %u, is large? %s)",
+		"[DEGRADED_SET_LOCK (%s)] [%u, %u] Key: %.*s.%u (key size = %u, is large? %s); remapped count = %u.",
 		success ? "Success" : "Fail",
 		event.instanceId, event.requestId,
 		( int ) header.keySize, header.key,
 		header.isLarge ? LargeObjectUtil::readSplitOffset( header.key + header.keySize ) : 0,
-		header.keySize, header.isLarge ? "yes" : "no"
+		header.keySize, header.isLarge ? "yes" : "no",
+		header.remappedCount
 	);
 
 	// Find the corresponding DEGRADED_SET_LOCK request //

@@ -402,7 +402,7 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 
 			isLarge = LargeObjectUtil::isLarge( header.keySize, header.valueSize, &numOfSplit, &splitSize );
 
-			__INFO__(
+			__DEBUG__(
 				BLUE, "ClientWorker", "handleGetResponse",
 				"[GET] Key: %.*s (key size = %u); Value: (value size = %u); split offset = %u, split size = %u, is large? %s; buffer size = %lu.",
 				header.keySize, header.key, header.keySize,
@@ -419,7 +419,7 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 		if ( this->protocol.parseKeyHeader( header, buf, size ) ) {
 			key.set( header.keySize, header.key, ( void * ) event.socket );
 
-			__INFO__(
+			__DEBUG__(
 				BLUE, "ClientWorker", "handleGetResponse",
 				"[GET (Failed)] Key: %.*s (key size = %u).",
 				header.keySize, header.key, header.keySize
@@ -522,7 +522,7 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 		}
 
 		// Store split
-		fprintf( stderr, "key: %.*s; splitOffset = %u, splitIndex = %u; key.ptr = %p\n", header.keySize, header.key, header.splitOffset, splitIndex, key.ptr );
+		// fprintf( stderr, "key: %.*s; splitOffset = %u, splitIndex = %u; key.ptr = %p\n", header.keySize, header.key, header.splitOffset, splitIndex, key.ptr );
 		if ( header.splitOffset + splitSize > header.valueSize )
 			splitSize = header.valueSize - header.splitOffset;
 		memcpy( ( char * ) key.ptr + numOfSplit + header.splitOffset, header.value, splitSize );

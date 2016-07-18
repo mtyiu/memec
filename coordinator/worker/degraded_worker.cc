@@ -8,7 +8,7 @@ bool CoordinatorWorker::handleDegradedLockRequest( ClientEvent event, char *buf,
 		return false;
 	}
 	if ( header.isLarge ) {
-		__INFO__(
+		__DEBUG__(
 			BLUE, "CoordinatorWorker", "handleDegradedLockRequest",
 			"[DEGRADED_LOCK] Key: %.*s.%u (key size = %u)%s.",
 			( int ) header.keySize, header.key,
@@ -17,7 +17,7 @@ bool CoordinatorWorker::handleDegradedLockRequest( ClientEvent event, char *buf,
 			header.isLarge ? "; is large" : ""
 		);
 	} else {
-		__INFO__(
+		__DEBUG__(
 			BLUE, "CoordinatorWorker", "handleDegradedLockRequest",
 			"[DEGRADED_LOCK] Key: %.*s (key size = %u).",
 			( int ) header.keySize, header.key, header.keySize

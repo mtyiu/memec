@@ -80,7 +80,6 @@ void ServerWorker::dispatch( ClientEvent event ) {
 				valueSize, value, 0, 0,
 				splitOffset, splitSize
 			);
-			fprintf( stderr, "GET (Success) : %.*s.%u\n", keySize, key, splitOffset );
 		}
 			break;
 		case CLIENT_EVENT_TYPE_GET_RESPONSE_FAILURE:
@@ -358,11 +357,6 @@ bool ServerWorker::handleGetRequest( ClientEvent event, struct KeyHeader &header
 	     ( header.keySize > SPLIT_OFFSET_SIZE && map->findLargeObject( header.key, header.keySize - SPLIT_OFFSET_SIZE, &keyValue, &key ) ) ) {
 		event.resGet( event.socket, event.instanceId, event.requestId, keyValue, isDegraded );
 		ret = true;
-	} else if ( ( remappedBuffer->find( header.keySize, header.key, false, &remappedKeyValue ) ) ||
-                ( header.keySize > SPLIT_OFFSET_SIZE && remappedBuffer->find( header.keySize - SPLIT_OFFSET_SIZE, header.key, true, &remappedKeyValue ) ) ) {
-		// Handle remapped keys
-		event.resGet( event.socket, event.instanceId, event.requestId, remappedKeyValue.keyValue, isDegraded );
-		ret = true;
 	} else {
 		// Try to search for large object
 		char backup[ SPLIT_OFFSET_SIZE ];
@@ -376,6 +370,18 @@ bool ServerWorker::handleGetRequest( ClientEvent event, struct KeyHeader &header
 			ret = false;
 		}
 		memcpy( header.key + header.keySize, backup, SPLIT_OFFSET_SIZE );
+	}
+
+	if (
+		! ret &&
+		(
+			( remappedBuffer->find( header.keySize, header.key, false, &remappedKeyValue ) ) ||
+			( header.keySize > SPLIT_OFFSET_SIZE && remappedBuffer->find( header.keySize - SPLIT_OFFSET_SIZE, header.key, true, &remappedKeyValue ) )
+		)
+	) {
+		// Handle remapped keys
+		event.resGet( event.socket, event.instanceId, event.requestId, remappedKeyValue.keyValue, isDegraded );
+		ret = true;
 	}
 	this->dispatch( event );
 	return ret;

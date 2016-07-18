@@ -31,7 +31,7 @@ bool RemappedBuffer::insert( uint32_t listId, uint32_t chunkId, uint32_t *origin
 		remappedKeyValue.remapped = 0;
 	}
 
-	Key key = remappedKeyValue.keyValue.key();
+	Key key = remappedKeyValue.keyValue.key( true );
 
 	std::pair<Key, RemappedKeyValue> p( key, remappedKeyValue );
 	std::pair<std::unordered_map<Key, RemappedKeyValue>::iterator, bool> ret;
