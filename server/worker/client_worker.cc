@@ -196,12 +196,13 @@ void ServerWorker::dispatch( ClientEvent event ) {
 				event.message.del.key.free();
 			break;
 		case CLIENT_EVENT_TYPE_DELETE_RESPONSE_FAILURE:
-			buffer.size = this->protocol.generateKeyBackupHeader(
+			buffer.size = this->protocol.generateKeyHeader(
 				PROTO_MAGIC_RESPONSE_FAILURE, PROTO_MAGIC_TO_CLIENT,
 				event.isDegraded ? PROTO_OPCODE_DEGRADED_DELETE : PROTO_OPCODE_DELETE,
 				event.instanceId, event.requestId,
 				event.message.del.key.size,
 				event.message.del.key.data,
+				0, 0,
 				event.message.del.key.isLarge
 			);
 

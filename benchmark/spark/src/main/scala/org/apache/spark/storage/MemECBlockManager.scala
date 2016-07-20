@@ -71,9 +71,15 @@ private[spark] class MemECBlockManager() extends ExternalBlockManager with Loggi
 		}
 	}
 
+	def md5( b: Array[Byte] ) = {
+		MessageDigest.getInstance( "MD5" ).digest( b )
+	}
+
 	override def putBytes( blockId: BlockId, bytes: ByteBuffer ): Unit = {
 		val key = getKey( blockId ).getBytes
 		val value = bytes.array
+		// val hash = md5( value )
+		// logInfo( s"putBytes(): ${getKey(blockId)} - ${hash(0)} ${hash(1)} ${hash(2)} ${hash(3)} ${hash(4)} (value size = ${value.length})" )
 		memec.synchronized {
 			memec.set( key, key.length, value, value.length )
 		}
@@ -83,6 +89,8 @@ private[spark] class MemECBlockManager() extends ExternalBlockManager with Loggi
 		val key = getKey( blockId ).getBytes
 		memec.synchronized {
 			val value = memec.getRaw( key, key.length )
+			// val hash = md5( value )
+			// logInfo( s"getBytes(): ${getKey(blockId)} - ${hash(0)} ${hash(1)} ${hash(2)} ${hash(3)} ${hash(4)} (value size = ${value.length})" )
 			if ( value == null )
 				return None
 			return Some( ByteBuffer.wrap( value ) )
