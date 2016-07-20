@@ -60,29 +60,40 @@ private[spark] class MemECBlockManager() extends ExternalBlockManager with Loggi
 	}
 
 	override def removeBlock( blockId: BlockId ): Boolean = {
-		return memec.delete( getKey( blockId ) )
+		memec.synchronized {
+			return memec.delete( getKey( blockId ) )
+		}
 	}
 
 	override def blockExists( blockId: BlockId ): Boolean = {
-		return memec.get( getKey( blockId ) ) != null
+		memec.synchronized {
+			return memec.get( getKey( blockId ) ) != null
+		}
 	}
 
 	override def putBytes( blockId: BlockId, bytes: ByteBuffer ): Unit = {
 		val key = getKey( blockId ).getBytes
 		val value = bytes.array
-		memec.set( key, key.length, value, value.length )
+		memec.synchronized {
+			memec.set( key, key.length, value, value.length )
+		}
 	}
 
 	override def getBytes( blockId: BlockId ): Option[ ByteBuffer ] = {
 		val key = getKey( blockId ).getBytes
-		val value = memec.getRaw( key, key.length )
-		if ( value == null )
-			return None
-		return Some( ByteBuffer.wrap( value ) )
+		memec.synchronized {
+			val value = memec.getRaw( key, key.length )
+			if ( value == null )
+				return None
+			return Some( ByteBuffer.wrap( value ) )
+		}
 	}
 
 	override def getSize( blockId: BlockId ): Long = {
-		val ret = memec.get( getKey( blockId ) )
-		return ret.length
+		val key = getKey( blockId ).getBytes
+		memec.synchronized {
+			val value = memec.getRaw( key, key.length )
+			return value.length
+		}
 	}
 }
