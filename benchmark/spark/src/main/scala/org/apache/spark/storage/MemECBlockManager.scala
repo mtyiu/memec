@@ -95,8 +95,6 @@ private[spark] class MemECBlockManager() extends ExternalBlockManager with Loggi
 			if ( ! this.memecs( i ).connect() ) {
 				logError( "Failed to connect to the MemEC client" )
 				throw new IOException( "Failed to connect to the MemEC client" )
-			} else {
-				logInfo( s"Connecting: ${i} / ${this.memecs.length}" )
 			}
 		}
 
