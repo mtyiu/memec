@@ -4,16 +4,17 @@ YCSB_PATH=~/mtyiu/ycsb/0.7.0
 
 FIELD_LENGTH=100
 RECORD_COUNT=1000000
+OPERATION_COUNT=${RECORD_COUNT}
 
-if [ $# != 1 ]; then
-	echo "Usage: $0 [Number of threads]"
+if [ $# != 2 ]; then
+	echo "Usage: $0 [Number of threads] [Workload]"
 	exit 1
 fi
 
 ${YCSB_PATH}/bin/ycsb \
-	load redis-cs \
+	run redis-cs \
 	-s \
-	-P ${YCSB_PATH}/workloads/workloada \
+	-P ${YCSB_PATH}/workloads/$2 \
 	-p fieldcount=1 \
 	-p readallfields=false \
 	-p scanproportion=0 \
@@ -21,6 +22,7 @@ ${YCSB_PATH}/bin/ycsb \
 	-p requestdistribution=zipfian \
 	-p fieldlength=${FIELD_LENGTH} \
 	-p recordcount=${RECORD_COUNT} \
+	-p operationcount=${OPERATION_COUNT} \
 	-p threadcount=$1 \
 	-p redis.serverCount=8 \
 	-p redis.host0=137.189.88.38 \

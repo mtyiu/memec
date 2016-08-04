@@ -2,7 +2,7 @@
 
 SLEEP_TIME=1
 
-for i in {9..15}; do
+for i in {7..15}; do
 	ssh hpc$i 'killall -9 application coordinator client server ycsb >& /dev/null' &
 done
 
@@ -15,9 +15,9 @@ else
 	TERM_COMMAND="$(printf '\r\r')clear$(printf '\r')"
 fi
 
-for i in {1..7}; do
-	node_index=$(expr $i + 8)
-	ssh hpc${node_index} "screen -S server$i -p 0 -X stuff \"${TERM_COMMAND}\"" &
+for i in {7..14}; do
+	node_index=$i
+	ssh hpc${node_index} "screen -S server -p 0 -X stuff \"${TERM_COMMAND}\"" &
 done
 ssh hpc15 "screen -S client -p 0 -X stuff \"${TERM_COMMAND}\"" &
 ssh hpc15 "screen -S ycsb -p 0 -X stuff \"${TERM_COMMAND}\"" &
