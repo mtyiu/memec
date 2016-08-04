@@ -3,11 +3,11 @@
 YCSB_PATH=~/mtyiu/ycsb/0.7.0
 
 if [ $# != 2 ]; then
-	echo "Usage: $0 [Number of threads] [Workload]"
+	echo "Usage: $0 [Value size] [Workload]"
 	exit 1
 fi
 
-FIELD_LENGTH=100
+FIELD_LENGTH=$1
 RECORD_COUNT=5000000
 OPERATION_COUNT=$(expr ${RECORD_COUNT} \* 2)
 
@@ -23,7 +23,7 @@ ${YCSB_PATH}/bin/ycsb \
 	-p fieldlength=${FIELD_LENGTH} \
 	-p recordcount=${RECORD_COUNT} \
 	-p operationcount=${OPERATION_COUNT} \
-	-p threadcount=$1 \
+	-p threadcount=64 \
 	-p redis.serverCount=8 \
 	-p redis.host0=137.189.88.38 \
 	-p redis.port0=6379 \

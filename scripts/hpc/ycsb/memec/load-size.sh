@@ -3,11 +3,11 @@
 YCSB_PATH=~/mtyiu/ycsb/0.7.0
 
 if [ $# -lt 1 ]; then
-	echo "Usage: $0 [Number of threads]"
+	echo "Usage: $0 [Value size]"
 	exit 1
 fi
 
-FIELD_LENGTH=100
+FIELD_LENGTH=$1
 RECORD_COUNT=5000000
 
 ${YCSB_PATH}/bin/ycsb \
@@ -21,7 +21,7 @@ ${YCSB_PATH}/bin/ycsb \
 	-p requestdistribution=zipfian \
 	-p fieldlength=${FIELD_LENGTH} \
 	-p recordcount=${RECORD_COUNT} \
-	-p threadcount=$1 \
+	-p threadcount=64 \
 	-p memec.host=137.189.88.46 \
 	-p memec.port=9112 \
 	-p memec.key_size=255 \

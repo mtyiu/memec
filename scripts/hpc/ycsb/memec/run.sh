@@ -7,6 +7,10 @@ if [ $# != 2 ]; then
 	exit 1
 fi
 
+FIELD_LENGTH=100
+RECORD_COUNT=5000000
+OPERATION_COUNT=$(expr ${RECORD_COUNT} \* 2)
+
 ${YCSB_PATH}/bin/ycsb \
 	run memec \
 	-s \
@@ -14,9 +18,11 @@ ${YCSB_PATH}/bin/ycsb \
 	-p fieldcount=1 \
 	-p readallfields=false \
 	-p scanproportion=0 \
-	-p fieldlength=100 \
-	-p recordcount=1000000 \
-	-p operationcount=1000000 \
+	-p table=u \
+	-p requestdistribution=zipfian \
+	-p fieldlength=${FIELD_LENGTH} \
+	-p recordcount=${RECORD_COUNT} \
+	-p operationcount=${OPERATION_COUNT} \
 	-p threadcount=$1 \
 	-p memec.host=137.189.88.46 \
 	-p memec.port=9112 \

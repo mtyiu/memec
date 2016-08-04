@@ -2,13 +2,13 @@
 
 YCSB_PATH=~/mtyiu/ycsb/0.7.0
 
-FIELD_LENGTH=100
-RECORD_COUNT=1000000
-
 if [ $# != 1 ]; then
 	echo "Usage: $0 [Number of threads]"
 	exit 1
 fi
+
+FIELD_LENGTH=100
+RECORD_COUNT=5000000
 
 ${YCSB_PATH}/bin/ycsb \
 	load redis-cs \
