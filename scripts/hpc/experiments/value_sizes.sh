@@ -20,7 +20,7 @@ for s in $sizes; do
 	mkdir -p ${TARGET}
 
 	if [ "$1" == 'memec' ]; then
-		screen -S manage -p 0 -X stuff "${BASE_PATH}/scripts/util/start.sh $1$(printf '\r')"
+		screen -S manage -p 0 -X stuff "${BASE_PATH}/scripts/util/start.sh $(printf '\r')"
 		sleep 10
 		${BASE_PATH}/scripts/ycsb/memec/load-size.sh $s 2>&1 | tee ${TARGET}/load.txt
 
@@ -30,7 +30,7 @@ for s in $sizes; do
 
 		screen -S manage -p 0 -X stuff "$(printf '\r\r')"
 		sleep 10
-	else if [ "$1" == 'redis-rep' ]; then
+	elif [ "$1" == 'redis-rep' ]; then
 		screen -S manage -p 0 -X stuff "${REDIS_PATH}/utils/create-cluster-distributed-3-way start$(printf '\r')"
 		sleep 10
 		screen -S manage -p 0 -X stuff "${REDIS_PATH}/utils/create-cluster-distributed-3-way create$(printf '\r')"
