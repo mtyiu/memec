@@ -6,6 +6,7 @@ REDIS_PATH=${BASE_PATH}/redis
 
 if [ $# != 1 ]; then
 	echo "Usage: $1 [memec/redis]"
+	exit
 fi
 
 sizes='8 32 64 128 256 512 1024 2048 4096 8192 16384'
@@ -18,7 +19,7 @@ for s in $sizes; do
 
 	mkdir -p ${TARGET}
 
-	if [ $1 == 'memec' ]; then
+	if [ "$1" == 'memec' ]; then
 		screen -S manage -p 0 -X stuff "${BASE_PATH}/scripts/util/start.sh $1$(printf '\r')"
 		sleep 10
 		${BASE_PATH}/scripts/ycsb/memec/load-size.sh $s 2>&1 | tee ${TARGET}/load.txt
