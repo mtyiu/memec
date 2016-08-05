@@ -18,8 +18,7 @@ for i in {7..14}; do
 	ssh hpc${node_id} "screen -S server -p 0 -X stuff \"$(printf '\r\r')${BOOTSTRAP_SCRIPT_PATH}/start-server.sh ${1}$(printf '\r\r')\"" &
 done
 
-sleep ${SLEEP_TIME}
-sleep ${SLEEP_TIME}
+sleep 30
 
 ssh hpc15 "screen -S client -p 0 -X stuff \"$(printf '\r\r')${BOOTSTRAP_SCRIPT_PATH}/start-client.sh ${1}$(printf '\r\r')\""
 sleep 5
