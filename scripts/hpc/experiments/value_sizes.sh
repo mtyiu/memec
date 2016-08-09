@@ -10,6 +10,7 @@ if [ $# != 1 ]; then
 fi
 
 sizes='8 32 64 128 256 512 1024 2048 4096 8192 16384'
+sizes='8192 16384'
 workloads='workloada workloadc'
 
 for s in $sizes; do
@@ -21,7 +22,7 @@ for s in $sizes; do
 
 	if [ "$1" == 'memec' ]; then
 		screen -S manage -p 0 -X stuff "${BASE_PATH}/scripts/util/start.sh $(printf '\r')"
-		sleep 30
+		sleep 150
 		${BASE_PATH}/scripts/ycsb/memec/load-size.sh $s 2>&1 | tee ${TARGET}/load.txt
 
 		for w in $workloads; do
@@ -38,7 +39,7 @@ for s in $sizes; do
 		screen -S manage -p 0 -X stuff "yes$(printf '\r')"
 		sleep 10
 
-		${BASE_PATH}/scripts/ycsb/redis-3_way/load-size_3_way.sh $s 2>&1 | tee ${TARGET}/load.txt
+		${BASE_PATH}/scripts/ycsb/redis-3_way/load-size.sh $s 2>&1 | tee ${TARGET}/load.txt
 
 		for w in $workloads; do
 			${BASE_PATH}/scripts/ycsb/redis-3_way/run-size.sh $s $w 2>&1 | tee ${TARGET}/$w.txt
@@ -47,7 +48,7 @@ for s in $sizes; do
 		screen -S manage -p 0 -X stuff "${REDIS_PATH}/utils/create-cluster-distributed-3-way stop$(printf '\r')"
 		sleep 2
 		screen -S manage -p 0 -X stuff "${REDIS_PATH}/utils/create-cluster-distributed-3-way clean$(printf '\r')"
-		sleep 5
+		sleep 10
 	else
 		screen -S manage -p 0 -X stuff "${REDIS_PATH}/utils/create-cluster-distributed start$(printf '\r')"
 		sleep 10
