@@ -1,6 +1,6 @@
 #!/bin/bash
 
-YCSB_PATH=~/mtyiu/ycsb/0.7.0
+YCSB_PATH=~/mtyiu/ycsb/0.10.0
 
 if [ $# -lt 1 ]; then
 	echo "Usage: $0 [Number of threads]"
