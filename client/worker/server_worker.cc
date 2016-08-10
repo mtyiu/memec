@@ -517,18 +517,23 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 
 		if ( ! ClientWorker::pending->findKey( PT_APPLICATION_GET, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &key, true, true, true, key.data, numOfSplit + valueSize ) ) {
 			// ::free( key.ptr );
-			__ERROR__( "ClientWorker", "handleGetResponse", "Cannot find a pending application GET request that matches the response. This message will be discarded (key = %.*s).", key.size, key.data );
+			__ERROR__( "ClientWorker", "handleGetResponse", "1 Cannot find a pending application GET request that matches the response. This message will be discarded (key = %.*s).", key.size, key.data );
 			return false;
 		}
 
+		pthread_mutex_t *lock = ( pthread_mutex_t * )( ( char * ) key.ptr + numOfSplit + valueSize );
+
 		// Store split
 		// fprintf( stderr, "key: %.*s; splitOffset = %u, splitIndex = %u; key.ptr = %p\n", header.keySize, header.key, header.splitOffset, splitIndex, key.ptr );
+		pthread_mutex_lock( lock );
 		if ( header.splitOffset + splitSize > header.valueSize )
 			splitSize = header.valueSize - header.splitOffset;
 		memcpy( ( char * ) key.ptr + numOfSplit + header.splitOffset, header.value, splitSize );
 		( ( char * ) key.ptr )[ splitIndex ] = 1;
 
 		if ( header.splitOffset == 0 ) {
+			pthread_mutex_unlock( lock );
+
 			// Get remaining split
 			ApplicationEvent applicationEvent;
 			applicationEvent.socket = ( ApplicationSocket * ) pid.ptr;
@@ -567,6 +572,8 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 				}
 			}
 
+			pthread_mutex_unlock( lock );
+
 			if ( ! isCompleted )
 				return true;
 			else {
@@ -577,7 +584,7 @@ bool ClientWorker::handleGetResponse( ServerEvent event, bool success, bool isDe
 	}
 
 	if ( ! ClientWorker::pending->eraseKey( PT_APPLICATION_GET, pid.parentInstanceId, pid.parentRequestId, 0, &pid, &key, true, true, true, key.data ) ) {
-		__ERROR__( "ClientWorker", "handleGetResponse", "Cannot find a pending application GET request that matches the response. This message will be discarded (key = %.*s, size = %u, is large? %s).", key.size, key.data, key.size, key.isLarge ? "true" : "false" );
+		__ERROR__( "ClientWorker", "handleGetResponse", "2 Cannot find a pending application GET request that matches the response. This message will be discarded (key = %.*s, size = %u, is large? %s).", key.size, key.data, key.size, key.isLarge ? "true" : "false" );
 		return false;
 	}
 

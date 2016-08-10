@@ -349,8 +349,9 @@ bool Pending::findKey( PendingType type, uint16_t instanceId, uint32_t requestId
 		if ( pidPtr ) *pidPtr = lit->first;
 		if ( keyPtrSize ) {
 			if ( ! lit->second.ptr ) {
-				lit->second.ptr = malloc( keyPtrSize );
-				memset( lit->second.ptr, 0, keyPtrSize );
+				lit->second.ptr = malloc( keyPtrSize + sizeof( pthread_mutex_t ) );
+				memset( lit->second.ptr, 0, keyPtrSize + sizeof( pthread_mutex_t ) );
+				pthread_mutex_init( ( pthread_mutex_t * )( ( char * ) lit->second.ptr + keyPtrSize ), 0 );
 			}
 		}
 		if ( keyPtr ) *keyPtr = lit->second;
