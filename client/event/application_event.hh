@@ -10,6 +10,7 @@
 enum ApplicationEventType {
 	APPLICATION_EVENT_TYPE_UNDEFINED,
 	APPLICATION_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS,
+	APPLICATION_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS_WITH_NAMED_PIPE,
 	APPLICATION_EVENT_TYPE_REGISTER_RESPONSE_FAILURE,
 	APPLICATION_EVENT_TYPE_GET_RESPONSE_SUCCESS,
 	APPLICATION_EVENT_TYPE_GET_RESPONSE_FAILURE,
@@ -64,6 +65,11 @@ public:
 
 	inline void resRegister( ApplicationSocket *socket, uint16_t instanceId, uint32_t requestId, bool success = true ) {
 		this->type = success ? APPLICATION_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS : APPLICATION_EVENT_TYPE_REGISTER_RESPONSE_FAILURE;
+		this->set( instanceId, requestId, socket );
+	}
+
+	inline void resRegisterWithNamedPipe( ApplicationSocket *socket, uint16_t instanceId, uint32_t requestId ) {
+		this->type = APPLICATION_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS_WITH_NAMED_PIPE;
 		this->set( instanceId, requestId, socket );
 	}
 

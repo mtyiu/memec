@@ -206,6 +206,16 @@ public:
 	//////////////
 	// Register //
 	//////////////
+	// ---------- register_protocol.cc ----------
+	size_t generateNamedPipeHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
+		uint8_t length, char *pathname, char* buf = 0
+	);
+	bool parseNamedPipeHeader(
+		struct NamedPipeHeader &header,
+		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
+
 	// ---------- address_protocol.cc ----------
 	size_t generateAddressHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,

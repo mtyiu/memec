@@ -5,6 +5,8 @@ ClientConfig::ClientConfig() {
 	this->degraded.disabled = false;
 	this->states.ackTimeout = 1;
 	this->backup.ackBatchSize = 10000;
+	this->namedPipe.isEnabled = false;
+	memset( this->namedPipe.pathname, 0, NAMED_PIPE_PATHNAME_MAX_LENGTH );
 }
 
 bool ClientConfig::parse( const char *path ) {
@@ -27,6 +29,13 @@ bool ClientConfig::set( const char *section, const char *name, const char *value
 	} else if ( match ( section, "backup" ) ) {
 		if ( match( name, "ack_batch_size" ) )
 			this->backup.ackBatchSize = atoi( value );
+		else
+			return false;
+	} else if ( match ( section, "named_pipe" ) ) {
+		if ( match ( name, "isEnabled" ) )
+			this->namedPipe.isEnabled = match( value, "true" );
+		else if ( match( name, "pathname" ) )
+			strncpy( this->namedPipe.pathname, value, NAMED_PIPE_PATHNAME_MAX_LENGTH );
 		else
 			return false;
 	} else {
@@ -59,10 +68,19 @@ void ClientConfig::print( FILE *f ) {
 		"- States\n"
 		"\t- %-*s : %u\n"
 		"- Backup\n"
-		"\t- %-*s : %u\n",
+		"\t- %-*s : %u\n"
+		"- Named pipes\n"
+		"\t- %-*s : %s\n",
 		width, "Disabled", this->degraded.disabled ? "Yes" : "No",
 		width, "ACK timeout", this->states.ackTimeout,
-		width, "ACK batch size", this->backup.ackBatchSize
+		width, "ACK batch size", this->backup.ackBatchSize,
+		width, "Enabled", this->namedPipe.isEnabled ? "Yes" : "No"
 	);
+	if ( this->namedPipe.isEnabled ) {
+		fprintf(
+			f, "\t- %-*s : %s\n",
+			width, "Pathname", this->namedPipe.pathname
+		);
+	}
 	fprintf( f, "\n" );
 }

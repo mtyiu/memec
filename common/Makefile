@@ -27,10 +27,12 @@ OBJS= \
 	protocol/load_protocol.o \
 	protocol/normal_protocol.o \
 	protocol/recovery_protocol.o \
+	protocol/register_protocol.o \
 	protocol/remap_protocol.o \
 	protocol/seal_protocol.o \
 	state_transit/state_transit_handler.o \
 	state_transit/state_transit_state.o \
+	socket/named_pipe.o \
 	socket/socket.o \
 	socket/epoll.o
 

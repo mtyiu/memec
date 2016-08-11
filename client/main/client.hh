@@ -24,6 +24,7 @@
 #include "../../common/ds/sockaddr_in.hh"
 #include "../../common/stripe_list/stripe_list.hh"
 #include "../../common/socket/epoll.hh"
+#include "../../common/socket/named_pipe.hh"
 #include "../../common/signal/signal.hh"
 #include "../../common/util/option.hh"
 #include "../../common/util/time.hh"
@@ -56,9 +57,13 @@ public:
 	struct {
 		ClientSocket self;
 		EPoll epoll;
+
+		NamedPipe namedPipe;
+
 		ArrayMap<int, ApplicationSocket> applications;
 		ArrayMap<int, CoordinatorSocket> coordinators;
 		ArrayMap<int, ServerSocket> servers;
+
 		std::unordered_map<uint16_t, ServerSocket*> serversIdToSocketMap;
 		LOCK_T serversIdToSocketLock;
 	} sockets;

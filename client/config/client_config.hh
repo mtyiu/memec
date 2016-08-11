@@ -6,6 +6,7 @@
 #include "../../common/config/server_addr.hh"
 #include "../../common/config/config.hh"
 #include "../../common/config/global_config.hh"
+#include "../../common/socket/named_pipe.hh"
 
 class ClientConfig : public Config {
 public:
@@ -21,6 +22,10 @@ public:
 	struct {
 		uint32_t ackBatchSize;
 	} backup;
+	struct {
+		bool isEnabled;
+		char pathname[ NAMED_PIPE_PATHNAME_MAX_LENGTH ];
+	} namedPipe;
 
 	ClientConfig();
 	bool parse( const char *path );

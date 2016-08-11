@@ -125,6 +125,7 @@ bool Protocol::parseHeader( struct ProtocolHeader &header, char *buf, size_t siz
 
 	switch( header.opcode ) {
 		case PROTO_OPCODE_REGISTER:
+		case PROTO_OPCODE_REGISTER_NAMED_PIPE:
 		case PROTO_OPCODE_SYNC:
 		case PROTO_OPCODE_SERVER_CONNECTED:
 		case PROTO_OPCODE_SEAL_CHUNKS:

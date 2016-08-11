@@ -15,6 +15,12 @@ struct ProtocolHeader {
 //////////////
 // Register //
 //////////////
+#define PROTO_NAMED_PIPE_SIZE 1
+struct NamedPipeHeader {
+	uint8_t length;
+	char *pathname;
+};
+
 #define PROTO_ADDRESS_SIZE 6
 struct AddressHeader {
 	uint32_t addr;

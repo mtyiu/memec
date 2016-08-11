@@ -189,6 +189,9 @@ bool Client::init( char *path, OptionList &globalOptions, OptionList &clientOpti
 	}
 	/* Vectors and other sockets */
 	Socket::init( &this->sockets.epoll );
+	if ( this->config.client.namedPipe.isEnabled ) {
+		this->sockets.namedPipe.init( this->config.client.namedPipe.pathname );
+	}
 	ApplicationSocket::setArrayMap( &this->sockets.applications );
 	CoordinatorSocket::setArrayMap( &this->sockets.coordinators );
 	ServerSocket::setArrayMap( &this->sockets.servers );

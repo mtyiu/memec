@@ -4,8 +4,10 @@
 /*******************
  * Opcode (1 byte) *
  *******************/
-// Coordinator-specific opcodes (30-49) //
 #define PROTO_OPCODE_REGISTER                     0x00
+#define PROTO_OPCODE_REGISTER_NAMED_PIPE          0x70
+
+// Coordinator-specific opcodes (30-49) //
 #define PROTO_OPCODE_SYNC                         0x31
 #define PROTO_OPCODE_SERVER_CONNECTED             0x32
 #define PROTO_OPCODE_SEAL_CHUNKS                  0x33

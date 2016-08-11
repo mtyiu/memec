@@ -16,7 +16,8 @@
 enum SocketMode {
 	SOCKET_MODE_UNDEFINED,
 	SOCKET_MODE_LISTEN,
-	SOCKET_MODE_CONNECT
+	SOCKET_MODE_CONNECT,
+	SOCKET_MODE_NAMED_PIPE
 };
 
 class Socket {
@@ -27,6 +28,7 @@ protected:
 	int type;
 	struct sockaddr_in addr;
 	LOCK_T readLock, writeLock;
+	char *pathname;
 
 	static EPoll *epoll;
 
@@ -51,12 +53,17 @@ public:
 	Socket();
 	bool init( int type, uint32_t addr, uint16_t port, bool block = false );
 	bool init( int sockfd, struct sockaddr_in addr );
+	bool initAsNamedPipe( int pfd, char *pathname, bool block = false );
 	virtual bool init( ServerAddr &addr, EPoll *epoll );
 	virtual bool start() = 0;
 	virtual void stop();
 	virtual bool ready();
 	virtual void print( FILE *f = stdout );
 	void printAddress( FILE *f = stdout );
+	inline bool isNamedPipe() {
+		return this->mode == SOCKET_MODE_NAMED_PIPE;
+	}
+	char *getPathname();
 	struct sockaddr_in getAddr();
 	ServerAddr getServerAddr();
 	bool equal( Socket *s );

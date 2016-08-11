@@ -36,6 +36,7 @@ int main( int argc, char **argv ) {
 			case 'p':
 				path = optarg;
 				break;
+			case 'g':
 			case 'o':
 				tmpOption.section = 0;
 				tmpOption.name = 0;

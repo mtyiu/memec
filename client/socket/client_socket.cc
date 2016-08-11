@@ -122,7 +122,7 @@ bool ClientSocket::handler( int fd, uint32_t events, void *data ) {
 				ProtocolHeader header;
 				socket->protocol.parseHeader( header, socket->buffer.data, socket->buffer.size );
 				// Register message expected
-				if ( header.magic == PROTO_MAGIC_REQUEST && header.opcode == PROTO_OPCODE_REGISTER ) {
+				if ( header.magic == PROTO_MAGIC_REQUEST && ( header.opcode == PROTO_OPCODE_REGISTER || header.opcode == PROTO_OPCODE_REGISTER_NAMED_PIPE ) ) {
 					if ( header.from == PROTO_MAGIC_FROM_APPLICATION ) {
 						ApplicationSocket *applicationSocket = new ApplicationSocket();
 						// fprintf( stderr, "new ApplicationSocket: 0x%p\n", applicationSocket );
@@ -135,7 +135,12 @@ bool ClientSocket::handler( int fd, uint32_t events, void *data ) {
 
 						ApplicationEvent event;
 						uint16_t instanceId = generator->generate( applicationSocket );
-						event.resRegister( applicationSocket, instanceId, header.requestId );
+
+						if ( header.opcode == PROTO_OPCODE_REGISTER_NAMED_PIPE ) {
+							event.resRegisterWithNamedPipe( applicationSocket, instanceId, header.requestId );
+						} else {
+							event.resRegister( applicationSocket, instanceId, header.requestId );
+						}
 						client->eventQueue.insert( event );
 					} else {
 						::close( fd );

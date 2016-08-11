@@ -12,6 +12,7 @@ void ClientWorker::dispatch( ApplicationEvent event ) {
 
 	switch( event.type ) {
 		case APPLICATION_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
+		case APPLICATION_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS_WITH_NAMED_PIPE:
 		case APPLICATION_EVENT_TYPE_GET_RESPONSE_SUCCESS:
 		case APPLICATION_EVENT_TYPE_SET_RESPONSE_SUCCESS:
 		case APPLICATION_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
@@ -52,6 +53,26 @@ void ClientWorker::dispatch( ApplicationEvent event ) {
 				InstanceIdGenerator::getInstance()->generate( event.socket ),
 				event.requestId
 			);
+			break;
+		case APPLICATION_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS_WITH_NAMED_PIPE:
+		{
+			Client *client = Client::getInstance();
+			NamedPipe &namedPipe = client->sockets.namedPipe;
+			int fd;
+			char *tmp = namedPipe.open( fd );
+			char pathname[ NAMED_PIPE_PATHNAME_MAX_LENGTH ];
+			namedPipe.getFullPath( pathname, tmp );
+
+			buffer.size = this->protocol.generateNamedPipeHeader(
+				PROTO_MAGIC_RESPONSE_SUCCESS,
+				PROTO_MAGIC_TO_APPLICATION,
+				PROTO_OPCODE_REGISTER_NAMED_PIPE,
+				InstanceIdGenerator::getInstance()->generate( event.socket ),
+				event.requestId,
+				strlen( pathname ),
+				pathname
+			);
+		}
 			break;
 		case APPLICATION_EVENT_TYPE_GET_RESPONSE_SUCCESS:
 			buffer.size = this->protocol.generateKeyValueHeader(

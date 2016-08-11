@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <cerrno>
 #include <cassert>
@@ -13,6 +14,8 @@
 EPoll *Socket::epoll;
 
 bool Socket::setSockOpt( int level, int optionName ) {
+	if ( this->isNamedPipe() ) return true;
+
 	int optionValue = 1;
 	socklen_t optionLength = sizeof( optionValue );
 	if ( setsockopt( this->sockfd, level, optionName, &optionValue, optionLength ) == -1 ) {
@@ -53,6 +56,11 @@ bool Socket::setNonBlocking( int fd ) {
 }
 
 bool Socket::listen() {
+	if ( this->isNamedPipe() ) {
+		__ERROR__( "Socket", "listen", "A named pipe should not be used to listen." );
+		return false;
+	}
+
 	if ( this->mode != SOCKET_MODE_UNDEFINED ) {
 		__ERROR__( "Socket", "listen", "This mode of this socket is set before." );
 		return false;
@@ -70,6 +78,11 @@ bool Socket::listen() {
 }
 
 bool Socket::connect() {
+	if ( this->isNamedPipe() ) {
+		__ERROR__( "Socket", "listen", "A named pipe should not be used to connect." );
+		return false;
+	}
+
 	if ( this->mode != SOCKET_MODE_UNDEFINED ) {
 		__ERROR__( "Socket", "connect", "This mode of this socket is set before." );
 		return false;
@@ -171,6 +184,11 @@ bool Socket::done() {
 }
 
 int Socket::accept( struct sockaddr_in *addrPtr, socklen_t *addrlenPtr ) {
+	if ( this->isNamedPipe() ) {
+		__ERROR__( "Socket", "listen", "A named pipe should not be used to accept." );
+		return false;
+	}
+
 	struct sockaddr_in addr;
 	socklen_t addrlen;
 	int ret;
@@ -198,6 +216,7 @@ void Socket::init( EPoll *epoll ) {
 Socket::Socket() {
 	LOCK_INIT( &this->readLock );
 	LOCK_INIT( &this->writeLock );
+	this->pathname = 0;
 }
 
 bool Socket::init( int type, uint32_t addr, uint16_t port, bool block ) {
@@ -243,12 +262,30 @@ bool Socket::init( int sockfd, struct sockaddr_in addr ) {
 	return true;
 }
 
+bool Socket::initAsNamedPipe( int pfd, char *pathname, bool block ) {
+	this->connected = true;
+	this->mode = SOCKET_MODE_NAMED_PIPE;
+	this->sockfd = pfd;
+	this->type = -1;
+	memset( &this->addr, 0, sizeof( this->addr ) );
+	this->pathname = pathname;
+
+	if ( ! block ) {
+		if ( ! this->setNonBlocking() )
+			return false;
+	}
+	return true;
+}
+
 void Socket::stop() {
 	if ( this->sockfd >= 0 ) {
 		::close( this->sockfd );
 		this->sockfd = - this->sockfd;
 	}
 	this->connected = false;
+
+	if ( this->isNamedPipe() )
+		this->pathname = 0;
 }
 
 bool Socket::ready() {
@@ -256,31 +293,63 @@ bool Socket::ready() {
 }
 
 void Socket::print( FILE *f ) {
-	char buf[ 16 ];
-	Socket::ntoh_ip( this->addr.sin_addr.s_addr, buf, 16 );
-	fprintf( f, "[%4d] %s:%u (%sconnected)\n", this->sockfd, buf, Socket::ntoh_port( this->addr.sin_port ), this->connected ? "" : "dis" );
+	if ( this->isNamedPipe() ) {
+		fprintf( f, "[%4d] Named pipe: %s (%sconnected)\n", this->sockfd, this->pathname, this->connected ? "" : "dis" );
+	} else {
+		char buf[ 16 ];
+		Socket::ntoh_ip( this->addr.sin_addr.s_addr, buf, 16 );
+		fprintf( f, "[%4d] %s:%u (%sconnected)\n", this->sockfd, buf, Socket::ntoh_port( this->addr.sin_port ), this->connected ? "" : "dis" );
+	}
 }
 
 void Socket::printAddress( FILE *f ) {
-	char buf[ 16 ];
-	Socket::ntoh_ip( this->addr.sin_addr.s_addr, buf, 16 );
-	fprintf( f, "%s:%u", buf, Socket::ntoh_port( this->addr.sin_port ) );
+	if ( this->isNamedPipe() ) {
+		fprintf( f, "Named pipe: %s", this->pathname );
+	} else {
+		char buf[ 16 ];
+		Socket::ntoh_ip( this->addr.sin_addr.s_addr, buf, 16 );
+		fprintf( f, "%s:%u", buf, Socket::ntoh_port( this->addr.sin_port ) );
+	}
+}
+
+char *Socket::getPathname() {
+	if ( this->isNamedPipe() ) {
+		return this->pathname;
+	}
+	__ERROR__( "Socket", "getPathname", "Invalid operation." );
+	return 0;
 }
 
 struct sockaddr_in Socket::getAddr() {
+	if ( this->isNamedPipe() ) {
+		__ERROR__( "Socket", "getAddr", "Invalid operation." );
+	}
 	return this->addr;
 }
 
 ServerAddr Socket::getServerAddr() {
+	if ( this->isNamedPipe() ) {
+		__ERROR__( "Socket", "getServerAddr", "Invalid operation." );
+	}
 	return ServerAddr( 0, this->addr.sin_addr.s_addr, this->addr.sin_port, this->type );
 }
 
 bool Socket::equal( Socket *s ) {
-	struct sockaddr_in saddr = s->getAddr();
-	return this->equal( saddr.sin_addr.s_addr, saddr.sin_port );
+	if ( this->isNamedPipe() ) {
+		if ( s->isNamedPipe() )
+			return strcmp( this->pathname, s->getPathname() ) == 0;
+		return false;
+	} else {
+		struct sockaddr_in saddr = s->getAddr();
+		return this->equal( saddr.sin_addr.s_addr, saddr.sin_port );
+	}
 }
 
 bool Socket::equal( uint32_t addr, uint16_t port ) {
+	if ( this->isNamedPipe() ) {
+		__ERROR__( "Socket", "equal", "Invalid operation." );
+		return false;
+	}
 	return (
 		this->addr.sin_port == port &&
 		this->addr.sin_addr.s_addr == addr
