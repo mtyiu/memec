@@ -273,11 +273,11 @@ public class MemEC {
 			Protocol.PROTO_OPCODE_SET,
 			this.instanceId, qid,
 			keySize, key,
-			valueSize
+			valueSize, value
 		 );
 		try {
 			this.out.write( this.protocol.buf, 0, bytes );
-			this.out.write( value, 0, valueSize );
+			// this.out.write( value, 0, valueSize );
 		} catch( IOException e ) {
 			System.err.println( "MemEC.set(): [Error] Unable to send SET request to client." );
 			return false;
@@ -328,11 +328,11 @@ public class MemEC {
 			Protocol.PROTO_OPCODE_UPDATE,
 			this.instanceId, qid,
 			keySize, key,
-			valueUpdateOffset, valueUpdateSize
+			valueUpdateOffset, valueUpdateSize, valueUpdate
 		 );
 		try {
 			this.out.write( this.protocol.buf, 0, bytes );
-			this.out.write( valueUpdate, 0, valueUpdateSize );
+			// this.out.write( valueUpdate, 0, valueUpdateSize );
 		} catch( IOException e ) {
 			System.err.println( "MemEC.update(): [Error] Unable to send UPDATE request to client." );
 			return false;

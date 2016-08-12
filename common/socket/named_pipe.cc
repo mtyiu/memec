@@ -59,6 +59,8 @@ int NamedPipe::open( char *name, bool readMode ) {
 	this->pathnames.insert( p );
 	UNLOCK( &this->lock );
 
+	// fcntl( fd, F_SETPIPE_SZ, 1048576 );
+
 	return fd;
 }
 
