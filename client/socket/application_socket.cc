@@ -19,7 +19,6 @@ void ApplicationSocket::stop() {
 	Socket::stop();
 
 	if ( this->isNamedPipe() ) {
-		this->print( stderr );
 		NamedPipe &namedPipe = Client::getInstance()->sockets.namedPipe;
 		namedPipe.close( this->sockfd );
 		namedPipe.close( this->wPipefd );

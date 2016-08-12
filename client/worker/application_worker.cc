@@ -94,7 +94,6 @@ void ClientWorker::dispatch( ApplicationEvent event ) {
 
 			// Configure the named pipe
 			ClientSocket::setNonBlocking( pRead.fd );
-			clientSocket.sockets.set( pRead.fd, 0, false );
 			clientSocket.epoll->add( pRead.fd, EPOLL_EVENT_SET );
 
 			// Create named pipe ApplicationSocket wrapper
