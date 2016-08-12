@@ -103,7 +103,7 @@ ssize_t Socket::send( int sockfd, char *buf, size_t ulen, bool &connected ) {
 	ssize_t ret = 0, bytes = 0, len = ulen;
 	LOCK( &this->writeLock );
 	do {
-		ret = ::send( sockfd, buf + bytes, len - bytes, 0 );
+		ret = ::write( sockfd, buf + bytes, len - bytes );
 		if ( ret == -1 ) {
 			if ( errno == EWOULDBLOCK ) {
 				continue;
@@ -129,13 +129,13 @@ ssize_t Socket::send( int sockfd, char *buf, size_t ulen, bool &connected ) {
 }
 
 ssize_t Socket::send( char *buf, size_t ulen, bool &connected ) {
-	return this->send( this->sockfd, buf, ulen, connected );
+	return this->send( this->isNamedPipe() ? this->wPipefd : this->sockfd, buf, ulen, connected );
 }
 
 ssize_t Socket::recv( int sockfd, char *buf, size_t ulen, bool &connected, bool wait ) {
 	ssize_t ret = 0, bytes = 0, len = ulen;
 	do {
-		ret = ::recv( sockfd, buf + bytes, len - bytes, 0 );
+		ret = ::read( sockfd, buf + bytes, len - bytes );
 		if ( ret == -1 ) {
 			if ( errno != EAGAIN ) {
 				__ERROR__( "Socket", "recv", "[%d] %s", sockfd, strerror( errno ) );
@@ -216,7 +216,8 @@ void Socket::init( EPoll *epoll ) {
 Socket::Socket() {
 	LOCK_INIT( &this->readLock );
 	LOCK_INIT( &this->writeLock );
-	this->pathname = 0;
+	this->readPathname = 0;
+	this->writePathname = 0;
 }
 
 bool Socket::init( int type, uint32_t addr, uint16_t port, bool block ) {
@@ -262,13 +263,17 @@ bool Socket::init( int sockfd, struct sockaddr_in addr ) {
 	return true;
 }
 
-bool Socket::initAsNamedPipe( int pfd, char *pathname, bool block ) {
+bool Socket::initAsNamedPipe( int rfd, char *rPathname, int wfd, char *wPathname, bool block ) {
 	this->connected = true;
 	this->mode = SOCKET_MODE_NAMED_PIPE;
-	this->sockfd = pfd;
 	this->type = -1;
 	memset( &this->addr, 0, sizeof( this->addr ) );
-	this->pathname = pathname;
+
+	this->sockfd = rfd;
+	this->readPathname = rPathname;
+
+	this->wPipefd = wfd;
+	this->writePathname = wPathname;
 
 	if ( ! block ) {
 		if ( ! this->setNonBlocking() )
@@ -284,8 +289,13 @@ void Socket::stop() {
 	}
 	this->connected = false;
 
-	if ( this->isNamedPipe() )
-		this->pathname = 0;
+	if ( this->isNamedPipe() ) {
+		::close( this->wPipefd );
+		this->wPipefd = - this->wPipefd;
+
+		this->readPathname = 0;
+		this->writePathname = 0;
+	}
 }
 
 bool Socket::ready() {
@@ -294,7 +304,7 @@ bool Socket::ready() {
 
 void Socket::print( FILE *f ) {
 	if ( this->isNamedPipe() ) {
-		fprintf( f, "[%4d] Named pipe: %s (%sconnected)\n", this->sockfd, this->pathname, this->connected ? "" : "dis" );
+		fprintf( f, "[%4d] Named pipe: (read) %s; (write) %s (%sconnected)\n", this->sockfd, this->readPathname, this->writePathname, this->connected ? "" : "dis" );
 	} else {
 		char buf[ 16 ];
 		Socket::ntoh_ip( this->addr.sin_addr.s_addr, buf, 16 );
@@ -304,7 +314,7 @@ void Socket::print( FILE *f ) {
 
 void Socket::printAddress( FILE *f ) {
 	if ( this->isNamedPipe() ) {
-		fprintf( f, "Named pipe: %s", this->pathname );
+		fprintf( f, "Named pipe: (read) %s; (write) %s", this->readPathname, this->writePathname );
 	} else {
 		char buf[ 16 ];
 		Socket::ntoh_ip( this->addr.sin_addr.s_addr, buf, 16 );
@@ -312,11 +322,19 @@ void Socket::printAddress( FILE *f ) {
 	}
 }
 
-char *Socket::getPathname() {
+char *Socket::getReadPathname() {
 	if ( this->isNamedPipe() ) {
-		return this->pathname;
+		return this->readPathname;
 	}
-	__ERROR__( "Socket", "getPathname", "Invalid operation." );
+	__ERROR__( "Socket", "getReadPathname", "Invalid operation." );
+	return 0;
+}
+
+char *Socket::getWritePathname() {
+	if ( this->isNamedPipe() ) {
+		return this->writePathname;
+	}
+	__ERROR__( "Socket", "getWritePathname", "Invalid operation." );
 	return 0;
 }
 
@@ -337,7 +355,10 @@ ServerAddr Socket::getServerAddr() {
 bool Socket::equal( Socket *s ) {
 	if ( this->isNamedPipe() ) {
 		if ( s->isNamedPipe() )
-			return strcmp( this->pathname, s->getPathname() ) == 0;
+			return (
+				strcmp( this->readPathname, s->getReadPathname() ) == 0 &&
+				strcmp( this->writePathname, s->getWritePathname() ) == 0
+			);
 		return false;
 	} else {
 		struct sockaddr_in saddr = s->getAddr();

@@ -24,11 +24,11 @@ class Socket {
 protected:
 	bool connected;
 	SocketMode mode;
-	int sockfd;
+	int sockfd, wPipefd;
 	int type;
 	struct sockaddr_in addr;
 	LOCK_T readLock, writeLock;
-	char *pathname;
+	char *readPathname, *writePathname;
 
 	static EPoll *epoll;
 
@@ -53,7 +53,7 @@ public:
 	Socket();
 	bool init( int type, uint32_t addr, uint16_t port, bool block = false );
 	bool init( int sockfd, struct sockaddr_in addr );
-	bool initAsNamedPipe( int pfd, char *pathname, bool block = false );
+	bool initAsNamedPipe( int rfd, char *rPathname, int wfd, char *wPathname, bool block = false );
 	virtual bool init( ServerAddr &addr, EPoll *epoll );
 	virtual bool start() = 0;
 	virtual void stop();
@@ -63,7 +63,8 @@ public:
 	inline bool isNamedPipe() {
 		return this->mode == SOCKET_MODE_NAMED_PIPE;
 	}
-	char *getPathname();
+	char *getReadPathname();
+	char *getWritePathname();
 	struct sockaddr_in getAddr();
 	ServerAddr getServerAddr();
 	bool equal( Socket *s );

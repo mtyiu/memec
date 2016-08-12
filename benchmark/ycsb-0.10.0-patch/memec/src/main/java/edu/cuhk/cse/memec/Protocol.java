@@ -53,7 +53,7 @@ public class Protocol {
 	 * Protocol header size. *
 	 *************************/
 	public static final byte PROTO_HEADER_SIZE            = 16;
-	public static final byte PROTO_NAMED_PIPE_SIZE        = 1;
+	public static final byte PROTO_NAMED_PIPE_SIZE        = 2;
 	public static final byte PROTO_KEY_SIZE               = 1;
 	public static final byte PROTO_KEY_VALUE_SIZE         = 4;
 	public static final byte PROTO_KEY_VALUE_UPDATE_SIZE  = 7;
@@ -140,15 +140,19 @@ public class Protocol {
 	 * MemEC protocol header (named pipe).
 	 */
 	public static class NamedPipeHeader {
-		public int length;
+		public int readLength, writeLength;
 		byte[] data;
 
-		public String pathname() {
-			return new String( data, 1, length );
+		public String readPathname() {
+			return new String( data, 2, readLength );
+		}
+
+		public String writePathname() {
+			return new String( data, 2 + readLength, writeLength );
 		}
 
 		public String toString() {
-			return "Pathname: " + pathname() + " (length: " + length + ")";
+			return "Pathname: (read) " + readPathname() + " (length: " + readLength + ") " + "; (write) " + writePathname() + " (length: " + writeLength + ") ";
 		}
 	}
 
@@ -446,8 +450,9 @@ public class Protocol {
 	public boolean parseNamedPipeHeader( int size, int offset ) {
 		if ( size < PROTO_NAMED_PIPE_SIZE )
 			return false;
-		namedPipeHeader.length = this.buf[ offset ];
-		return ( size >= PROTO_NAMED_PIPE_SIZE + namedPipeHeader.length );
+		namedPipeHeader.readLength = this.buf[ offset ];
+		namedPipeHeader.writeLength = this.buf[ offset + 1 ];
+		return ( size >= PROTO_NAMED_PIPE_SIZE + namedPipeHeader.readLength + namedPipeHeader.writeLength );
 	}
 
 	public boolean parseKeyHeader( int size, int offset ) {

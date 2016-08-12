@@ -21,7 +21,8 @@ public:
 	NamedPipe();
 	void init( char *pathname );
 	void getFullPath( char *dst, char *name );
-	char *open( int &fd );
+	char *mkfifo();
+	int open( char *name, bool readMode );
 	bool close( int fd );
 };
 

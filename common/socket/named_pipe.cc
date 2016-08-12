@@ -1,4 +1,6 @@
+#include <cstdlib>
 #include <unistd.h>
+#include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 
@@ -20,6 +22,7 @@ char *NamedPipe::generate() {
 }
 
 NamedPipe::NamedPipe() {
+	srand( time( 0 ) );
 	LOCK_INIT( &this->lock );
 }
 
@@ -31,19 +34,32 @@ void NamedPipe::getFullPath( char *dst, char *name ) {
 	sprintf( dst, "%s/%s", this->pathname, name );
 }
 
-char *NamedPipe::open( int &fd ) {
+char *NamedPipe::mkfifo() {
 	char *ret = this->generate();
 	char pathname[ NAMED_PIPE_PATHNAME_MAX_LENGTH ];
 	this->getFullPath( pathname, ret );
 
-	fd = mkfifo( pathname, 0600 );
-	std::pair<int, char *> p( fd, ret );
+	if ( ::mkfifo( pathname, 0600 ) ) {
+		perror( "NamedPipe::open()" );
+		return 0;
+	}
+
+	return ret;
+}
+
+int NamedPipe::open( char *name, bool readMode ) {
+	int fd;
+	char pathname[ NAMED_PIPE_PATHNAME_MAX_LENGTH ];
+	this->getFullPath( pathname, name );
+
+	fd = ::open( pathname, readMode ? ( O_RDONLY | O_NONBLOCK ) : O_WRONLY );
+	std::pair<int, char *> p( fd, name );
 
 	LOCK( &this->lock );
 	this->pathnames.insert( p );
 	UNLOCK( &this->lock );
 
-	return ret;
+	return fd;
 }
 
 bool NamedPipe::close( int fd ) {

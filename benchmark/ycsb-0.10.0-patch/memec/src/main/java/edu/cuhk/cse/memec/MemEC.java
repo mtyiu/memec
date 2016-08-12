@@ -3,6 +3,10 @@ package edu.cuhk.cse.memec;
 import java.net.Socket;
 import java.net.UnknownHostException;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.FileNotFoundException;
 import java.io.BufferedInputStream;
 import java.io.OutputStream;
 import java.io.IOException;
@@ -22,6 +26,7 @@ public class MemEC {
 	private int toId;
     private boolean isNamedPipe;
 	private Socket socket;
+	private File readPipe, writePipe;
 	private BufferedInputStream in;
 	private OutputStream out;
 	private static final boolean IS_DEBUG_MODE = true;
@@ -147,11 +152,24 @@ public class MemEC {
 
 			if ( bytes == this.protocol.header.length ) {
 				this.protocol.parseNamedPipeHeader( bytes, 0 );
-				this.debug( this.protocol.namedPipeHeader.toString() );
+				// this.debug( this.protocol.namedPipeHeader.toString() );
 			}
 
 			// Initialize pipe
 			this.isNamedPipe = true;
+			this.readPipe = new File( this.protocol.namedPipeHeader.readPathname() );
+			this.writePipe = new File( this.protocol.namedPipeHeader.writePathname() );
+
+			try {
+				this.in = new BufferedInputStream( new FileInputStream( this.writePipe ) );
+				this.out = new FileOutputStream( this.readPipe );
+			} catch ( FileNotFoundException e ) {
+				return false;
+			}
+
+			try {
+				this.socket.close();
+			} catch( IOException e ) {}
 		}
 
 		return true;
@@ -159,7 +177,8 @@ public class MemEC {
 
 	public boolean disconnect() {
 		try {
-			this.socket.close();
+			if ( this.isNamedPipe )
+				this.socket.close();
 		} catch( IOException e ) {
 			return false;
 		}

@@ -209,7 +209,8 @@ public:
 	// ---------- register_protocol.cc ----------
 	size_t generateNamedPipeHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
-		uint8_t length, char *pathname, char* buf = 0
+		uint8_t readLength, uint8_t writeLength, char *readPathname, char *writePathname,
+		char* buf = 0
 	);
 	bool parseNamedPipeHeader(
 		struct NamedPipeHeader &header,

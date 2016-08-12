@@ -12,13 +12,16 @@ void ClientWorker::dispatch( ApplicationEvent event ) {
 
 	switch( event.type ) {
 		case APPLICATION_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS:
-		case APPLICATION_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS_WITH_NAMED_PIPE:
 		case APPLICATION_EVENT_TYPE_GET_RESPONSE_SUCCESS:
 		case APPLICATION_EVENT_TYPE_SET_RESPONSE_SUCCESS:
 		case APPLICATION_EVENT_TYPE_UPDATE_RESPONSE_SUCCESS:
 		case APPLICATION_EVENT_TYPE_DELETE_RESPONSE_SUCCESS:
 			success = true;
 			isSend = true;
+			break;
+		case APPLICATION_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS_WITH_NAMED_PIPE:
+			success = true;
+			isSend = false;
 			break;
 		case APPLICATION_EVENT_TYPE_REGISTER_RESPONSE_FAILURE:
 		case APPLICATION_EVENT_TYPE_GET_RESPONSE_FAILURE:
@@ -57,21 +60,51 @@ void ClientWorker::dispatch( ApplicationEvent event ) {
 		case APPLICATION_EVENT_TYPE_REGISTER_RESPONSE_SUCCESS_WITH_NAMED_PIPE:
 		{
 			Client *client = Client::getInstance();
+			ClientSocket &clientSocket = client->sockets.self;
 			NamedPipe &namedPipe = client->sockets.namedPipe;
-			int fd;
-			char *tmp = namedPipe.open( fd );
-			char pathname[ NAMED_PIPE_PATHNAME_MAX_LENGTH ];
-			namedPipe.getFullPath( pathname, tmp );
+			struct pipe_t {
+				int fd;
+				char *tmp;
+				char pathname[ NAMED_PIPE_PATHNAME_MAX_LENGTH ];
+			} pRead, pWrite;
 
+			pRead.tmp = namedPipe.mkfifo();
+			pWrite.tmp = namedPipe.mkfifo();
+
+			namedPipe.getFullPath( pRead.pathname, pRead.tmp );
+			namedPipe.getFullPath( pWrite.pathname, pWrite.tmp );
+
+			// Create response
 			buffer.size = this->protocol.generateNamedPipeHeader(
 				PROTO_MAGIC_RESPONSE_SUCCESS,
 				PROTO_MAGIC_TO_APPLICATION,
 				PROTO_OPCODE_REGISTER_NAMED_PIPE,
 				InstanceIdGenerator::getInstance()->generate( event.socket ),
 				event.requestId,
-				strlen( pathname ),
-				pathname
+				strlen( pRead.pathname ), strlen( pWrite.pathname ),
+				pRead.pathname, pWrite.pathname
 			);
+			ret = event.socket->send( buffer.data, buffer.size, connected );
+			if ( ret != ( ssize_t ) buffer.size )
+				__ERROR__( "ClientWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+
+			// Open the pipe
+			pRead.fd = namedPipe.open( pRead.tmp, true /* readMode */ );
+			pWrite.fd = namedPipe.open( pWrite.tmp, false /* readMode */ );
+
+			// Configure the named pipe
+			ClientSocket::setNonBlocking( pRead.fd );
+			clientSocket.sockets.set( pRead.fd, 0, false );
+			clientSocket.epoll->add( pRead.fd, EPOLL_EVENT_SET );
+
+			// Create named pipe ApplicationSocket wrapper
+			ApplicationSocket *applicationSocket = new ApplicationSocket();
+			applicationSocket->initAsNamedPipe(
+				pRead.fd, pRead.tmp,
+				pWrite.fd, pWrite.tmp
+			);
+			client->sockets.applications.set( pRead.fd, applicationSocket );
+			// clientSocket.done( pRead.fd );
 		}
 			break;
 		case APPLICATION_EVENT_TYPE_GET_RESPONSE_SUCCESS:
