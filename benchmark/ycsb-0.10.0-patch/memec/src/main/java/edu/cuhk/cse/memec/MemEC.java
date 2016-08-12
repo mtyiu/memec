@@ -177,8 +177,12 @@ public class MemEC {
 
 	public boolean disconnect() {
 		try {
-			if ( this.isNamedPipe )
+			if ( this.isNamedPipe ) {
+				this.in.close();
+				this.out.close();
+			} else {
 				this.socket.close();
+			}
 		} catch( IOException e ) {
 			return false;
 		}

@@ -283,18 +283,16 @@ bool Socket::initAsNamedPipe( int rfd, char *rPathname, int wfd, char *wPathname
 }
 
 void Socket::stop() {
-	if ( this->sockfd >= 0 ) {
+	if ( this->sockfd >= 0 )
 		::close( this->sockfd );
-		this->sockfd = - this->sockfd;
-	}
 	this->connected = false;
 
 	if ( this->isNamedPipe() ) {
 		::close( this->wPipefd );
-		this->wPipefd = - this->wPipefd;
-
 		this->readPathname = 0;
 		this->writePathname = 0;
+	} else {
+		this->sockfd = - this->sockfd;
 	}
 }
 
