@@ -2,6 +2,7 @@
 
 BASE_PATH=${HOME}/mtyiu
 MEMEC_PATH=${BASE_PATH}/memec
+REDIS_PATH=${BASE_PATH}/redis
 
 sizes='8 32 64 128 256 512 1024 2048 4040 4096 8192 16384'
 workloads='load workloada workloadc'
