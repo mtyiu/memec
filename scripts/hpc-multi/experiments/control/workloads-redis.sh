@@ -21,7 +21,6 @@ for iter in {1..10}; do
 			echo "Running experiment with coding scheme = $c and thread count = $t..."
 
 			# Run workload A, B, C, F, D first
-			# screen -S manage -p 0 -X stuff "${BASE_PATH}/scripts-multi/util/start.sh $1$(printf '\r')"
 			screen -S manage -p 0 -X stuff "${REDIS_PATH}/utils/create-cluster-distributed start$(printf '\r')"
 			sleep 10
 			screen -S manage -p 0 -X stuff "${REDIS_PATH}/utils/create-cluster-distributed create$(printf '\r')"
@@ -51,7 +50,6 @@ for iter in {1..10}; do
 				done
 			done
 
-			# screen -S manage -p 0 -X stuff "$(printf '\r\r')"
 			screen -S manage -p 0 -X stuff "${REDIS_PATH}/utils/create-cluster-distributed stop$(printf '\r')"
 			sleep 5
 			screen -S manage -p 0 -X stuff "${REDIS_PATH}/utils/create-cluster-distributed clean$(printf '\r')"

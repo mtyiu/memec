@@ -9,8 +9,7 @@ if [ $# != 1 ]; then
 	exit
 fi
 
-sizes='8 32 64 128 256 512 1024 2048 4096 8192 16384'
-sizes='8192 16384'
+sizes='8 32 64 128 256 512 1024 2048 4040 4096 8192 16384'
 workloads='workloada workloadc'
 
 for s in $sizes; do

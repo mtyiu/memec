@@ -13,7 +13,7 @@ FIELD_LENGTH=100
 RECORD_COUNT=5000000
 INSERT_COUNT=$(expr ${RECORD_COUNT} \/ 8)
 INSERT_START=$(expr ${INSERT_COUNT} \* $(expr ${ID} - 7 ))
-OPERATION_COUNT=$(expr ${RECORD_COUNT} \* 2)
+OPERATION_COUNT=$(expr ${INSERT_COUNT} \* 2)
 
 ${YCSB_PATH}/bin/ycsb \
 	run redis-cs \
