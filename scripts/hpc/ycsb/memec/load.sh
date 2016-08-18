@@ -25,4 +25,5 @@ ${YCSB_PATH}/bin/ycsb \
 	-p memec.host=137.189.88.46 \
 	-p memec.port=9112 \
 	-p memec.key_size=255 \
-	-p memec.chunk_size=4096
+	-p memec.chunk_size=4096 \
+	-p maxexecutiontime=600

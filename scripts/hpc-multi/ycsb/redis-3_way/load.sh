@@ -2,19 +2,22 @@
 
 YCSB_PATH=~/mtyiu/ycsb/0.10.0
 
-if [ $# != 2 ]; then
-	echo "Usage: $0 [Value size] [Workload]"
+if [ $# != 1 ]; then
+	echo "Usage: $0 [Number of threads]"
 	exit 1
 fi
 
-FIELD_LENGTH=$1
+ID=$(hostname | sed 's/hpc\([0-9]\+\).cse.cuhk.edu.hk/\1/g')
+
+FIELD_LENGTH=100
 RECORD_COUNT=5000000
-OPERATION_COUNT=$(expr ${RECORD_COUNT} \* 2)
+INSERT_COUNT=$(expr ${RECORD_COUNT} \/ 8)
+INSERT_START=$(expr ${INSERT_COUNT} \* $(expr ${ID} - 7 ))
 
 ${YCSB_PATH}/bin/ycsb \
-	run redis-cs \
+	load redis-cs \
 	-s \
-	-P ${YCSB_PATH}/workloads/$2 \
+	-P ${YCSB_PATH}/workloads/workloada \
 	-p fieldcount=1 \
 	-p readallfields=false \
 	-p scanproportion=0 \
@@ -22,9 +25,10 @@ ${YCSB_PATH}/bin/ycsb \
 	-p requestdistribution=zipfian \
 	-p fieldlength=${FIELD_LENGTH} \
 	-p recordcount=${RECORD_COUNT} \
-	-p operationcount=${OPERATION_COUNT} \
-	-p threadcount=64 \
-	-p redis.serverCount=8 \
+	-p insertstart=${INSERT_START} \
+	-p insertcount=${INSERT_COUNT} \
+	-p threadcount=$1 \
+	-p redis.serverCount=9 \
 	-p redis.host0=137.189.88.38 \
 	-p redis.port0=6379 \
 	-p redis.host1=137.189.88.39 \
@@ -41,4 +45,6 @@ ${YCSB_PATH}/bin/ycsb \
 	-p redis.port6=6379 \
 	-p redis.host7=137.189.88.45 \
 	-p redis.port7=6379 \
+	-p redis.host8=137.189.88.46 \
+	-p redis.port8=6379 \
 	-p maxexecutiontime=600

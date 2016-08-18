@@ -1,7 +1,7 @@
 #!/bin/bash
 
 BASE_PATH=${HOME}/mtyiu
-BOOTSTRAP_SCRIPT_PATH=${BASE_PATH}/scripts/bootstrap
+BOOTSTRAP_SCRIPT_PATH=${BASE_PATH}/scripts-multi/bootstrap
 
 SLEEP_TIME=2
 
@@ -19,6 +19,7 @@ for i in {7..14}; do
 done
 
 sleep ${SLEEP_TIME}
+sleep 120
 
 for i in {7..14}; do
 	node_id=$i

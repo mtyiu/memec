@@ -40,4 +40,5 @@ ${YCSB_PATH}/bin/ycsb \
 	-p redis.host6=137.189.88.44 \
 	-p redis.port6=6379 \
 	-p redis.host7=137.189.88.45 \
-	-p redis.port7=6379
+	-p redis.port7=6379 \
+	-p maxexecutiontime=600
