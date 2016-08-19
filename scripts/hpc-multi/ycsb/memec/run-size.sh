@@ -2,14 +2,18 @@
 
 YCSB_PATH=~/mtyiu/ycsb/0.10.0
 
-if [ $# != 2 ]; then
-	echo "Usage: $0 [Value size] [Workload]"
+if [ $# -lt 2 ]; then
+	echo "Usage: $0 [Value size] [Workload] [Number of clients (default: 8)]"
 	exit 1
 fi
 
 ID=$(hostname | sed 's/hpc\([0-9]\+\).cse.cuhk.edu.hk/\1/g')
 
 FIELD_LENGTH=$1
+NUM_CLIENTS=8
+if [ $# == 3 ]; then
+	NUM_CLIENTS=$3
+fi
 RECORD_COUNT=5000000
 
 if [ "$FIELD_LENGTH" == "1024" ]; then
@@ -26,7 +30,7 @@ elif [ "$FIELD_LENGTH" == "16384" ]; then
 	RECORD_COUNT=100000
 fi
 
-INSERT_COUNT=$(expr ${RECORD_COUNT} \/ 8)
+INSERT_COUNT=$(expr ${RECORD_COUNT} \/ ${NUM_CLIENTS})
 INSERT_START=$(expr ${INSERT_COUNT} \* $(expr ${ID} - 7 ))
 OPERATION_COUNT=$(expr ${INSERT_COUNT} \* 2)
 

@@ -7,6 +7,7 @@ CONTROL_NODE=hpc15
 
 s=$1
 w=$2
+c=$3
 
 mkdir -p ${BASE_PATH}/results-multi/value_sizes/tmp/${HOSTNAME}/$s
 
@@ -15,10 +16,10 @@ echo "Running experiment with size = $s for workload: $w..."
 # Run workload A, B, C, F, D first
 if [ $w == "load" ]; then
 	echo "-------------------- Load (workloada) --------------------"
-	${BASE_PATH}/scripts-multi/ycsb/redis/load-size.sh $s 2>&1 | tee ${BASE_PATH}/results-multi/value_sizes/tmp/${HOSTNAME}/$s/load.txt
+	${BASE_PATH}/scripts-multi/ycsb/redis/load-size.sh $s $c 2>&1 | tee ${BASE_PATH}/results-multi/value_sizes/tmp/${HOSTNAME}/$s/load.txt
 else
 	echo "-------------------- Run ($w) --------------------"
-	${BASE_PATH}/scripts-multi/ycsb/redis/run-size.sh $s $w 2>&1 | tee ${BASE_PATH}/results-multi/value_sizes/tmp/${HOSTNAME}/$s/$w.txt
+	${BASE_PATH}/scripts-multi/ycsb/redis/run-size.sh $s $w $c 2>&1 | tee ${BASE_PATH}/results-multi/value_sizes/tmp/${HOSTNAME}/$s/$w.txt
 fi
 
 # Tell the control node that this iteration is finished

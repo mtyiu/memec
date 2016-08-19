@@ -47,8 +47,8 @@ for s in $sizes; do
 		sleep 10
 
 		for n in {7..14}; do
-			mkdir -p ${BASE_PATH}/results-multi/value_sizes/memec/$TIMESTAMP/hpc$n
-			cp ${BASE_PATH}/results-multi/value_sizes/tmp/hpc$n/$s/*.txt ${BASE_PATH}/results-multi/value_sizes/memec/$TIMESTAMP/hpc$n
+			mkdir -p ${BASE_PATH}/results-multi/value_sizes/memec/$s/$TIMESTAMP/hpc$n
+			cp ${BASE_PATH}/results-multi/value_sizes/tmp/hpc$n/$s/*.txt ${BASE_PATH}/results-multi/value_sizes/memec/$s/$TIMESTAMP/hpc$n
 			rm -rf ${BASE_PATH}/results-multi/value_sizes/tmp/hpc$n/*
 		done
 	done

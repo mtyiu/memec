@@ -92,7 +92,7 @@ public class RedisClusterClient extends DB {
       count++;
     }
 
-    jedis = new JedisCluster(servers);
+    jedis = new JedisCluster(servers, Integer.MAX_VALUE, Integer.MAX_VALUE);
   }
 
   public void cleanup() throws DBException {
