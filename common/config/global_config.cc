@@ -299,7 +299,7 @@ void GlobalConfig::print( FILE *f ) {
 		"\t- %-*s : %d\n"
 		"- Workers\n"
 		"\t- %-*s : %u\n"
-		"- Event queue"
+		"- Event queue\n"
 		"\t- %-*s : %s\n"
 		"\t- %-*s : %u; %u (prioritized)\n"
 		"- Timeout\n"

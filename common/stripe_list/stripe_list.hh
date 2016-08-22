@@ -17,6 +17,17 @@
 #define UINT32_MAX 0xFFFFFFFF
 #endif
 
+enum GenerationAlgorithm {
+	ROUND_ROBIN,
+	LOAD_AWARE,
+	RANDOM
+};
+
+typedef struct {
+	uint32_t from;
+	uint32_t to;
+} HashPartition;
+
 typedef struct {
 	uint32_t listId;
 	uint32_t stripeId;
@@ -28,16 +39,22 @@ typedef struct {
 template <class T> class StripeList {
 protected:
 	uint32_t n, k, numLists, numServers;
-	bool generated, useAlgo;
+	bool generated;
+	GenerationAlgorithm algo;
 	BitmaskArray data, parity;
 	unsigned int *load, *count;
 	std::vector<T *> *servers;
 #ifdef USE_CONSISTENT_HASHING
 	ConsistentHash<uint32_t> listRing;
 #endif
-	std::vector<T **> lists;
+	std::vector<T **> lists, newLists;
+	std::vector<HashPartition> partitions;
 
-	inline uint32_t pickMin( int listIndex ) {
+	inline uint32_t pickNext( int listId, int chunkId ) {
+		return ( listId + chunkId ) % this->numServers;
+	}
+
+	inline uint32_t pickMin( int listId ) {
 		int32_t index = -1;
 		uint32_t minLoad = UINT32_MAX;
 		uint32_t minCount = UINT32_MAX;
@@ -47,8 +64,8 @@ protected:
 					( this->load[ i ] < minLoad ) ||
 					( this->load[ i ] == minLoad && this->count[ i ] < minCount )
 				) &&
-				! this->data.check( listIndex, i ) && // The server should not be selected before
-				! this->parity.check( listIndex, i ) // The server should not be selected before
+				! this->data.check( listId, i ) && // The server should not be selected before
+				! this->parity.check( listId, i ) // The server should not be selected before
 			) {
 				minLoad = this->load[ i ];
 				minCount = this->count[ i ];
@@ -56,32 +73,32 @@ protected:
 			}
 		}
 		if ( index == -1 ) {
-			fprintf( stderr, "Cannot assign a server for stripe list #%d.", listIndex );
+			fprintf( stderr, "Cannot assign a server for stripe list #%d.", listId );
 			return 0;
 		}
 		return ( uint32_t ) index;
 	}
 
-	inline uint32_t pickRand( int listIndex ) {
+	inline uint32_t pickRand( int listId ) {
 		int32_t index = -1;
 		uint32_t i;
 		 while( index == -1 ) {
 			i = rand() % this->numServers;
 			if (
-				! this->data.check( listIndex, i ) && // The server should not be selected before
-				! this->parity.check( listIndex, i ) // The server should not be selected before
+				! this->data.check( listId, i ) && // The server should not be selected before
+				! this->parity.check( listId, i ) // The server should not be selected before
 			) {
 				index = i;
 			}
 		}
 		if ( index == -1 ) {
-			fprintf( stderr, "Cannot assign a server for stripe list #%d.", listIndex );
+			fprintf( stderr, "Cannot assign a server for stripe list #%d.", listId );
 			return 0;
 		}
 		return ( uint32_t ) index;
 	}
 
-	void generate( bool verbose = false, bool useAlgo = true ) {
+	void generate( bool verbose = false, GenerationAlgorithm algo = ROUND_ROBIN ) {
 		if ( generated )
 			return;
 
@@ -90,11 +107,19 @@ protected:
 		for ( i = 0; i < this->numLists; i++ ) {
 			T **list = this->lists[ i ];
 			for ( j = 0; j < this->n - this->k; j++ ) {
-				index = useAlgo ? pickMin( i ) : pickRand( i );
+				switch ( algo ) {
+					case ROUND_ROBIN : index = pickNext( i, j + this->k ); break;
+					case LOAD_AWARE  : index = pickMin( i );               break;
+					case RANDOM      : index = pickRand( i );              break;
+				}
 				this->parity.set( i, index );
 			}
 			for ( j = 0; j < this->k; j++ ) {
-				index = useAlgo ? pickMin( i ) : pickRand( i );
+				switch ( algo ) {
+					case ROUND_ROBIN : index = pickNext( i, j ); break;
+					case LOAD_AWARE  : index = pickMin( i );     break;
+					case RANDOM      : index = pickRand( i );    break;
+				}
 				this->data.set( i, index );
 			}
 
@@ -119,16 +144,37 @@ protected:
 		}
 
 		this->generated = true;
+		this->assign();
+	}
+
+	void assign() {
+		uint32_t size = UINT32_MAX / this->numLists;
+		for ( uint32_t i = 0; i < this->numLists; i++ ) {
+			HashPartition partition = {
+				.from = i * size,
+				.to = ( i == this->numLists - 1 ) ? UINT32_MAX : ( ( i + 1 ) * size - 1 )
+			};
+			this->partitions.push_back( partition );
+		}
+	}
+
+	uint32_t getListId( uint32_t hashValue ) {
+		for ( uint32_t i = 0; i < this->numLists; i++ ) {
+			if ( this->partitions[ i ].from <= hashValue && this->partitions[ i ].to > hashValue )
+				return i;
+		}
+		fprintf( stderr, "StripeList::getListId(): Cannot get a partition for this hash value: %u.\n", hashValue );
+		return -1;
 	}
 
 public:
-	StripeList( uint32_t n, uint32_t k, uint32_t numLists, std::vector<T *> &servers, bool useAlgo = true ) : data( servers.size(), numLists ), parity( servers.size(), numLists ) {
+	StripeList( uint32_t n, uint32_t k, uint32_t numLists, std::vector<T *> &servers, GenerationAlgorithm algo = ROUND_ROBIN ) : data( servers.size(), numLists ), parity( servers.size(), numLists ) {
 		this->n = n;
 		this->k = k;
 		this->numLists = numLists;
 		this->numServers = servers.size();
 		this->generated = false;
-		this->useAlgo = useAlgo;
+		this->algo = algo;
 		this->load = new unsigned int[ numServers ];
 		this->count = new unsigned int[ numServers ];
 		this->servers = &servers;
@@ -139,18 +185,18 @@ public:
 		memset( this->load, 0, sizeof( unsigned int ) * numServers );
 		memset( this->count, 0, sizeof( unsigned int ) * numServers );
 
-		this->generate( false /* verbose */, useAlgo );
+		this->generate( false /* verbose */, algo );
 	}
 
 	unsigned int get( const char *key, uint8_t keySize, T **data = 0, T **parity = 0, uint32_t *dataIndexPtr = 0, bool full = false ) {
 		unsigned int hashValue = HashFunc::hash( key, keySize );
 		uint32_t dataIndex = hashValue % this->k;
 #ifdef USE_CONSISTENT_HASHING
-		uint32_t listIndex = this->listRing.get( key, keySize );
+		uint32_t listId = this->listRing.get( key, keySize );
 #else
-		uint32_t listIndex = HashFunc::hash( ( char * ) &hashValue, sizeof( hashValue ) ) % this->numLists;
+		uint32_t listId = this->getListId( HashFunc::hash( ( char * ) &hashValue, sizeof( hashValue ) ) );
 #endif
-		T **ret = this->lists[ listIndex ];
+		T **ret = this->lists[ listId ];
 
 		if ( dataIndexPtr )
 			*dataIndexPtr = dataIndex;
@@ -169,26 +215,26 @@ public:
 				*data = ret[ dataIndex ];
 			}
 		}
-		return listIndex;
+		return listId;
 	}
 
 	unsigned int getByHash( unsigned int hashValue, T **data, T **parity ) {
 #ifdef USE_CONSISTENT_HASHING
-		uint32_t listIndex = this->listRing.get( hashValue );
+		uint32_t listId = this->listRing.get( hashValue );
 #else
-		uint32_t listIndex = HashFunc::hash( ( char * ) &hashValue, sizeof( hashValue ) ) % this->numLists;
+		uint32_t listId = this->getListId( HashFunc::hash( ( char * ) &hashValue, sizeof( hashValue ) ) );
 #endif
-		T **ret = this->lists[ listIndex ];
+		T **ret = this->lists[ listId ];
 
 		for ( uint32_t i = 0; i < this->n - this->k; i++ )
 			parity[ i ] = ret[ this->k + i ];
 		for ( uint32_t i = 0; i < this->k; i++ )
 			data[ i ] = ret[ i ];
-		return listIndex;
+		return listId;
 	}
 
-	T *get( uint32_t listIndex, uint32_t dataIndex, uint32_t jump, uint32_t *serverIndex = 0 ) {
-		T **ret = this->lists[ listIndex ];
+	T *get( uint32_t listId, uint32_t dataIndex, uint32_t jump, uint32_t *serverIndex = 0 ) {
+		T **ret = this->lists[ listId ];
 		unsigned int index = HashFunc::hash( ( char * ) &dataIndex, sizeof( dataIndex ) );
 		index = ( index + jump ) % this->n;
 		if ( serverIndex )
@@ -196,13 +242,13 @@ public:
 		return ret[ index ];
 	}
 
-	T *get( uint32_t listIndex, uint32_t chunkIndex ) {
-		T **ret = this->lists[ listIndex ];
-		return ret[ chunkIndex ];
+	T *get( uint32_t listId, uint32_t chunkId ) {
+		T **ret = this->lists[ listId ];
+		return ret[ chunkId ];
 	}
 
-	T **get( uint32_t listIndex, T **parity, T **data = 0 ) {
-		T **ret = this->lists[ listIndex ];
+	T **get( uint32_t listId, T **parity, T **data = 0 ) {
+		T **ret = this->lists[ listId ];
 		for ( uint32_t i = 0; i < this->n - this->k; i++ ) {
 			parity[ i ] = ret[ this->k + i ];
 		}
@@ -292,10 +338,10 @@ public:
 			return;
 		}
 
-		fprintf( f, "### Stripe List (%s) ###\n", this->useAlgo ? "Load-aware" : "Random" );
+		fprintf( f, "### Stripe List (%s) ###\n", this->algo == ROUND_ROBIN ? "Round-robin" : ( this->algo == LOAD_AWARE ? "Load-aware" : "Random" ) );
 		for ( i = 0; i < this->numLists; i++ ) {
 			first = true;
-			fprintf( f, "#%u: ((", i );
+			fprintf( f, "#%u [%10u-%10u]: ((", i, this->partitions[ i ].from, this->partitions[ i ].to );
 			for ( j = 0; j < this->numServers; j++ ) {
 				if ( this->data.check( i, j ) ) {
 					fprintf( f, "%s%u", first ? "" : ", ", j );
