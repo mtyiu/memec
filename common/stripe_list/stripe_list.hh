@@ -35,40 +35,51 @@ typedef struct {
 	bool isParity;
 } StripeListIndex;
 
-// Need to know n, k, number of stripe list requested, number of servers, mapped servers
 template <class T> class StripeList {
 protected:
-	uint32_t n, k, numLists, numServers;
-	bool generated;
-	GenerationAlgorithm algo;
-	BitmaskArray data, parity;
-	unsigned int *load, *count;
-	std::vector<T *> *servers;
-#ifdef USE_CONSISTENT_HASHING
-	ConsistentHash<uint32_t> listRing;
-#endif
-	std::vector<T **> lists, newLists;
-	std::vector<HashPartition> partitions;
+	typedef struct {
+		uint32_t numServers;
+		std::vector<T *> *servers;
 
-	inline uint32_t pickNext( int listId, int chunkId ) {
-		return ( listId + chunkId ) % this->numServers;
+		uint32_t numLists;
+		BitmaskArray *data, *parity;
+		unsigned int *load, *count;
+		std::vector<T **> lists;
+		std::vector<HashPartition> partitions;
+	#ifdef USE_CONSISTENT_HASHING
+		ConsistentHash<uint32_t> listRing;
+	#endif
+	} StripeListState;
+
+	GenerationAlgorithm algo;
+	uint32_t n, k;
+	bool generated, isMigrating;
+	StripeListState base, migrating;
+
+	/*
+	 * Utility functions for generating stripe lists
+	 */
+	inline uint32_t pickNext( int listId, int chunkId, bool isMigrating = false ) {
+		return ( listId + chunkId ) % ( isMigrating ? this->migrating.numServers : this->base.numServers );
 	}
 
-	inline uint32_t pickMin( int listId ) {
+	inline uint32_t pickMin( int listId, bool isMigrating = false ) {
 		int32_t index = -1;
 		uint32_t minLoad = UINT32_MAX;
 		uint32_t minCount = UINT32_MAX;
-		for ( uint32_t i = 0; i < this->numServers; i++ ) {
+		StripeListState &state = isMigrating ? this->migrating : this->base;
+
+		for ( uint32_t i = 0; i < state.numServers; i++ ) {
 			if (
 				(
-					( this->load[ i ] < minLoad ) ||
-					( this->load[ i ] == minLoad && this->count[ i ] < minCount )
+					( state.load[ i ] < minLoad ) ||
+					( state.load[ i ] == minLoad && state.count[ i ] < minCount )
 				) &&
-				! this->data.check( listId, i ) && // The server should not be selected before
-				! this->parity.check( listId, i ) // The server should not be selected before
+				! state.data->check( listId, i ) && // The server should not be selected before
+				! state.parity->check( listId, i ) // The server should not be selected before
 			) {
-				minLoad = this->load[ i ];
-				minCount = this->count[ i ];
+				minLoad = state.load[ i ];
+				minCount = state.count[ i ];
 				index = i;
 			}
 		}
@@ -79,14 +90,16 @@ protected:
 		return ( uint32_t ) index;
 	}
 
-	inline uint32_t pickRand( int listId ) {
+	inline uint32_t pickRand( int listId, bool isMigrating = false ) {
 		int32_t index = -1;
 		uint32_t i;
-		 while( index == -1 ) {
-			i = rand() % this->numServers;
+		StripeListState &state = isMigrating ? this->migrating : this->base;
+
+		while( index == -1 ) {
+			i = rand() % state.numServers;
 			if (
-				! this->data.check( listId, i ) && // The server should not be selected before
-				! this->parity.check( listId, i ) // The server should not be selected before
+				! state.data->check( listId, i ) && // The server should not be selected before
+				! state.parity->check( listId, i ) // The server should not be selected before
 			) {
 				index = i;
 			}
@@ -98,69 +111,79 @@ protected:
 		return ( uint32_t ) index;
 	}
 
-	void generate( bool verbose = false, GenerationAlgorithm algo = ROUND_ROBIN ) {
-		if ( generated )
+	void generate( bool verbose = false, GenerationAlgorithm algo = ROUND_ROBIN, bool isMigrating = false ) {
+		if ( generated && ! isMigrating )
 			return;
 
 		uint32_t i, j, index, dataCount, parityCount;
+		StripeListState &state = isMigrating ? this->migrating : this->base;
 
-		for ( i = 0; i < this->numLists; i++ ) {
-			T **list = this->lists[ i ];
+		for ( i = 0; i < state.numLists; i++ ) {
+			T **list = state.lists[ i ];
 			for ( j = 0; j < this->n - this->k; j++ ) {
 				switch ( algo ) {
-					case ROUND_ROBIN : index = pickNext( i, j + this->k ); break;
-					case LOAD_AWARE  : index = pickMin( i );               break;
-					case RANDOM      : index = pickRand( i );              break;
+					case ROUND_ROBIN : index = pickNext( i, j + this->k, isMigrating ); break;
+					case LOAD_AWARE  : index = pickMin( i, isMigrating );               break;
+					case RANDOM      : index = pickRand( i, isMigrating );              break;
 				}
-				this->parity.set( i, index );
+				state.parity->set( i, index );
 			}
 			for ( j = 0; j < this->k; j++ ) {
 				switch ( algo ) {
-					case ROUND_ROBIN : index = pickNext( i, j ); break;
-					case LOAD_AWARE  : index = pickMin( i );     break;
-					case RANDOM      : index = pickRand( i );    break;
+					case ROUND_ROBIN : index = pickNext( i, j, isMigrating ); break;
+					case LOAD_AWARE  : index = pickMin( i, isMigrating );     break;
+					case RANDOM      : index = pickRand( i, isMigrating );    break;
 				}
-				this->data.set( i, index );
+				state.data->set( i, index );
 			}
 
-			// Implicitly sort the item
+			// Implicitly sort the item for LOAD_AWARE and RANDOM
 			dataCount = 0;
 			parityCount = 0;
-			for ( j = 0; j < this->numServers; j++ ) {
-				if ( this->data.check( i, j ) ) {
-					list[ dataCount++ ] = this->servers->at( j );
-					this->load[ j ] += 1;
-					this->count[ j ]++;
-				} else if ( this->parity.check( i, j ) ) {
-					list[ this->k + ( parityCount++ ) ] = this->servers->at( j );
-					this->load[ j ] += this->k;
-					this->count[ j ]++;
+			for ( j = 0; j < state.numServers; j++ ) {
+				uint32_t serverId = j;
+				if ( algo == ROUND_ROBIN )
+					serverId = ( serverId + i ) % state.numServers;
+
+				if ( state.data->check( i, serverId ) ) {
+					list[ dataCount++ ] = state.servers->at( serverId );
+					state.load[ serverId ] += 1;
+					state.count[ serverId ]++;
+				} else if ( state.parity->check( i, serverId ) ) {
+					list[ this->k + ( parityCount++ ) ] = state.servers->at( serverId );
+					state.load[ serverId ] += this->k;
+					state.count[ serverId ]++;
 				}
 			}
 
 #ifdef USE_CONSISTENT_HASHING
-			this->listRing.add( i );
+			state.listRing.add( i );
 #endif
 		}
 
 		this->generated = true;
-		this->assign();
+		this->assign( isMigrating );
 	}
 
-	void assign() {
-		uint32_t size = UINT32_MAX / this->numLists;
-		for ( uint32_t i = 0; i < this->numLists; i++ ) {
+	void assign( bool isMigrating = false ) {
+		StripeListState &state = isMigrating ? this->migrating : this->base;
+		uint32_t size = UINT32_MAX / state.numLists;
+		for ( uint32_t i = 0; i < state.numLists; i++ ) {
 			HashPartition partition = {
 				.from = i * size,
-				.to = ( i == this->numLists - 1 ) ? UINT32_MAX : ( ( i + 1 ) * size - 1 )
+				.to = ( i == state.numLists - 1 ) ? UINT32_MAX : ( ( i + 1 ) * size - 1 )
 			};
-			this->partitions.push_back( partition );
+			state.partitions.push_back( partition );
 		}
 	}
 
-	uint32_t getListId( uint32_t hashValue ) {
-		for ( uint32_t i = 0; i < this->numLists; i++ ) {
-			if ( this->partitions[ i ].from <= hashValue && this->partitions[ i ].to > hashValue )
+	/*
+	 * Map hash value to list ID
+	 */
+	uint32_t getListId( uint32_t hashValue, bool isMigrating = false ) {
+		StripeListState &state = isMigrating ? this->migrating : this->base;
+		for ( uint32_t i = 0; i < state.numLists; i++ ) {
+			if ( state.partitions[ i ].from <= hashValue && state.partitions[ i ].to > hashValue )
 				return i;
 		}
 		fprintf( stderr, "StripeList::getListId(): Cannot get a partition for this hash value: %u.\n", hashValue );
@@ -168,38 +191,83 @@ protected:
 	}
 
 public:
-	StripeList( uint32_t n, uint32_t k, uint32_t numLists, std::vector<T *> &servers, GenerationAlgorithm algo = ROUND_ROBIN ) : data( servers.size(), numLists ), parity( servers.size(), numLists ) {
+	/*
+	 * Initialization
+	 */
+	StripeList( uint32_t n, uint32_t k, uint32_t numLists, std::vector<T *> &servers, GenerationAlgorithm algo = ROUND_ROBIN ) {
+		this->algo = algo;
 		this->n = n;
 		this->k = k;
-		this->numLists = numLists;
-		this->numServers = servers.size();
+
+		this->base.numServers = servers.size();
+		this->base.servers = &servers;
+
 		this->generated = false;
-		this->algo = algo;
-		this->load = new unsigned int[ numServers ];
-		this->count = new unsigned int[ numServers ];
-		this->servers = &servers;
-		this->lists.reserve( numLists );
+		this->isMigrating = false;
+		this->base.numLists = numLists;
+		this->base.data = new BitmaskArray( this->base.numServers, numLists );
+		this->base.parity = new BitmaskArray( this->base.numServers, numLists );
+		this->base.load = new unsigned int[ this->base.numServers ];
+		this->base.count = new unsigned int[ this->base.numServers ];
+		memset( this->base.load, 0, sizeof( unsigned int ) * this->base.numServers );
+		memset( this->base.count, 0, sizeof( unsigned int ) * this->base.numServers );
+		this->base.lists.reserve( numLists );
 		for ( uint32_t i = 0; i < numLists; i++ )
-			this->lists.push_back( new T*[ n ] );
+			this->base.lists.push_back( new T*[ n ] );
+		this->base.partitions.reserve( numLists );
 
-		memset( this->load, 0, sizeof( unsigned int ) * numServers );
-		memset( this->count, 0, sizeof( unsigned int ) * numServers );
-
-		this->generate( false /* verbose */, algo );
+		this->generate( false /* verbose */, algo, false );
 	}
 
-	unsigned int get( const char *key, uint8_t keySize, T **data = 0, T **parity = 0, uint32_t *dataIndexPtr = 0, bool full = false ) {
+	/*
+	 * Scale up
+	 */
+	bool addNewServer( T *server ) {
+		if ( this->isMigrating ) {
+			fprintf( stderr, "StripeList::addNewServer(): Another data migration process is in-progress. Please try again later.\n" );
+			return false;
+		}
+
+		this->isMigrating = true;
+
+		uint32_t numServers = this->base.numServers + 1;
+		uint32_t numLists = this->base.numLists + 1;
+
+		this->migrating.numServers = numServers;
+		this->migrating.servers = this->base.servers;
+
+		this->migrating.numLists = numLists;
+		this->migrating.data = new BitmaskArray( numServers, numLists );
+		this->migrating.parity = new BitmaskArray( numServers, numLists );
+		this->migrating.load = new unsigned int[ numServers ];
+		this->migrating.count = new unsigned int[ numServers ];
+		memset( this->migrating.load, 0, sizeof( unsigned int ) * numServers );
+		memset( this->migrating.count, 0, sizeof( unsigned int ) * numServers );
+		this->migrating.lists.reserve( numLists );
+		for ( uint32_t i = 0; i < numLists; i++ )
+			this->migrating.lists.push_back( new T*[ this->n ] );
+		this->migrating.partitions.reserve( numLists );
+
+		this->generate( false /* verbose */, this->algo, true );
+
+		return true;
+	}
+
+	/*
+	 * Map key to stripe list
+	 */
+	unsigned int get( const char *key, uint8_t keySize, T **data = 0, T **parity = 0, uint32_t *dataChunkIdPtr = 0, bool full = false, bool isMigrating = false ) {
 		unsigned int hashValue = HashFunc::hash( key, keySize );
-		uint32_t dataIndex = hashValue % this->k;
+		uint32_t dataChunkId = hashValue % this->k;
 #ifdef USE_CONSISTENT_HASHING
 		uint32_t listId = this->listRing.get( key, keySize );
 #else
-		uint32_t listId = this->getListId( HashFunc::hash( ( char * ) &hashValue, sizeof( hashValue ) ) );
+		uint32_t listId = this->getListId( HashFunc::hash( ( char * ) &hashValue, sizeof( hashValue ) ), isMigrating );
 #endif
-		T **ret = this->lists[ listId ];
+		T **ret = isMigrating ? this->migrating.lists[ listId ] : this->base.lists[ listId ];
 
-		if ( dataIndexPtr )
-			*dataIndexPtr = dataIndex;
+		if ( dataChunkIdPtr )
+			*dataChunkIdPtr = dataChunkId;
 
 		if ( parity ) {
 			for ( uint32_t i = 0; i < this->n - this->k; i++ ) {
@@ -212,19 +280,22 @@ public:
 					data[ i ] = ret[ i ];
 				}
 			} else {
-				*data = ret[ dataIndex ];
+				*data = ret[ dataChunkId ];
 			}
 		}
 		return listId;
 	}
 
-	unsigned int getByHash( unsigned int hashValue, T **data, T **parity ) {
+	/*
+	 * Map hash value to stripe list
+	 */
+	unsigned int getByHash( unsigned int hashValue, T **data, T **parity, bool isMigrating = false ) {
 #ifdef USE_CONSISTENT_HASHING
 		uint32_t listId = this->listRing.get( hashValue );
 #else
-		uint32_t listId = this->getListId( HashFunc::hash( ( char * ) &hashValue, sizeof( hashValue ) ) );
+		uint32_t listId = this->getListId( HashFunc::hash( ( char * ) &hashValue, sizeof( hashValue ) ), isMigrating );
 #endif
-		T **ret = this->lists[ listId ];
+		T **ret = isMigrating ? this->migrating.lists[ listId ] : this->base.lists[ listId ];
 
 		for ( uint32_t i = 0; i < this->n - this->k; i++ )
 			parity[ i ] = ret[ this->k + i ];
@@ -233,22 +304,12 @@ public:
 		return listId;
 	}
 
-	T *get( uint32_t listId, uint32_t dataIndex, uint32_t jump, uint32_t *serverIndex = 0 ) {
-		T **ret = this->lists[ listId ];
-		unsigned int index = HashFunc::hash( ( char * ) &dataIndex, sizeof( dataIndex ) );
-		index = ( index + jump ) % this->n;
-		if ( serverIndex )
-			*serverIndex = index;
-		return ret[ index ];
+	T *get( uint32_t listId, uint32_t chunkId, bool isMigrating = false ) {
+		return ( isMigrating ? this->migrating.lists[ listId ][ chunkId ] : this->base.lists[ listId ][ chunkId ] );
 	}
 
-	T *get( uint32_t listId, uint32_t chunkId ) {
-		T **ret = this->lists[ listId ];
-		return ret[ chunkId ];
-	}
-
-	T **get( uint32_t listId, T **parity, T **data = 0 ) {
-		T **ret = this->lists[ listId ];
+	T **get( uint32_t listId, T **parity, T **data = 0, bool isMigrating = false ) {
+		T **ret = isMigrating ? this->migrating.lists[ listId ] : this->base.lists[ listId ];
 		for ( uint32_t i = 0; i < this->n - this->k; i++ ) {
 			parity[ i ] = ret[ this->k + i ];
 		}
@@ -260,33 +321,46 @@ public:
 		return parity;
 	}
 
-	std::vector<StripeListIndex> list( uint32_t index ) {
+	/*
+	 * Return the list and stripe IDs whose stripe list contains the specified server
+	 */
+	std::vector<StripeListIndex> list( uint32_t index, bool isMigrating = false ) {
 		uint32_t i, j;
 		std::vector<StripeListIndex> ret;
-		for ( i = 0; i < this->numLists; i++ ) {
-			if ( this->data.check( i, index ) ) {
+		StripeListState &state = isMigrating ? this->migrating : this->base;
+
+		for ( i = 0; i < state.numLists; i++ ) {
+			if ( state.data->check( i, index ) ) {
 				StripeListIndex s;
 				s.listId = i;
 				s.stripeId = 0;
 				s.chunkId = 0;
 				s.isParity = false;
-				for ( j = 0; j < this->numServers; j++ ) {
-					if ( j == index )
+				for ( j = 0; j < state.numServers; j++ ) {
+					uint32_t serverId = j;
+					if ( algo == ROUND_ROBIN )
+						serverId = ( serverId + i ) % state.numServers;
+
+					if ( serverId == index )
 						break;
-					if ( this->data.check( i, j ) )
+					if ( state.data->check( i, serverId ) )
 						s.chunkId++;
 				}
 				ret.push_back( s );
-			} else if ( this->parity.check( i, index ) ) {
+			} else if ( state.parity->check( i, index ) ) {
 				StripeListIndex s;
 				s.listId = i;
 				s.stripeId = 0;
 				s.chunkId = this->k;
 				s.isParity = true;
-				for ( j = 0; j < this->numServers; j++ ) {
-					if ( j == index )
+				for ( j = 0; j < state.numServers; j++ ) {
+					uint32_t serverId = j;
+					if ( algo == ROUND_ROBIN )
+						serverId = ( serverId + i ) % state.numServers;
+
+					if ( serverId == index )
 						break;
-					if ( this->parity.check( i, j ) )
+					if ( state.parity->check( i, serverId ) )
 						s.chunkId++;
 				}
 				ret.push_back( s );
@@ -295,43 +369,62 @@ public:
 		return ret;
 	}
 
-	void update() {
+	/*
+	 * Update stripe lists during recovery
+	 */
+	void update( bool isMigrating = false ) {
 		if ( ! this->generated ) {
 			this->generate();
 			return;
 		}
 
 		uint32_t i, j, dataCount, parityCount;
+		StripeListState &state = isMigrating ? this->migrating : this->base;
 
-		for ( i = 0; i < this->numLists; i++ ) {
-			T **list = this->lists[ i ];
+		for ( i = 0; i < state.numLists; i++ ) {
+			T **list = state.lists[ i ];
 			dataCount = 0;
 			parityCount = 0;
-			for ( j = 0; j < this->numServers; j++ ) {
-				if ( this->data.check( i, j ) ) {
-					list[ dataCount++ ] = this->servers->at( j );
-				} else if ( this->parity.check( i, j ) ) {
-					list[ this->k + ( parityCount++ ) ] = this->servers->at( j );
+			for ( j = 0; j < state.numServers; j++ ) {
+				uint32_t serverId = j;
+				if ( algo == ROUND_ROBIN )
+					serverId = ( serverId + i ) % state.numServers;
+
+				if ( state.data->check( i, serverId ) ) {
+					list[ dataCount++ ] = state.servers->at( serverId );
+				} else if ( state.parity->check( i, serverId ) ) {
+					list[ this->k + ( parityCount++ ) ] = state.servers->at( serverId );
 				}
 			}
 		}
 	}
 
-	int32_t search( T *target ) {
-		for ( uint32_t i = 0; i < this->numServers; i++ ) {
-			if ( target == this->servers->at( i ) )
+	/*
+	 * Search for a server in the server list
+	 */
+	int32_t search( T *target, bool isMigrating = false ) {
+		StripeListState &state = isMigrating ? this->migrating : this->base;
+		for ( uint32_t i = 0; i < state.numServers; i++ ) {
+			if ( target == state.servers->at( i ) )
 				return i;
 		}
 		return -1;
 	}
 
-	uint32_t getNumList() {
-		return this->numLists;
+	/*
+	 * Return the number of stripe lists
+	 */
+	inline uint32_t getNumList( bool isMigrating = false ) {
+		return isMigrating ? this->migrating.numLists : this->base.numLists;
 	}
 
-	void print( FILE *f = stdout ) {
+	/*
+	 * Print all internal states of the stripe list
+	 */
+	void print( FILE *f = stdout, bool isMigrating = false ) {
 		uint32_t i, j;
 		bool first;
+		StripeListState &state = isMigrating ? this->migrating : this->base;
 
 		if ( ! generated ) {
 			fprintf( f, "The stripe lists are not generated yet.\n" );
@@ -339,20 +432,28 @@ public:
 		}
 
 		fprintf( f, "### Stripe List (%s) ###\n", this->algo == ROUND_ROBIN ? "Round-robin" : ( this->algo == LOAD_AWARE ? "Load-aware" : "Random" ) );
-		for ( i = 0; i < this->numLists; i++ ) {
+		for ( i = 0; i < state.numLists; i++ ) {
 			first = true;
-			fprintf( f, "#%u [%10u-%10u]: ((", i, this->partitions[ i ].from, this->partitions[ i ].to );
-			for ( j = 0; j < this->numServers; j++ ) {
-				if ( this->data.check( i, j ) ) {
-					fprintf( f, "%s%u", first ? "" : ", ", j );
+			fprintf( f, "#%u [%10u-%10u]: ((", i, state.partitions[ i ].from, state.partitions[ i ].to );
+			for ( j = 0; j < state.numServers; j++ ) {
+				uint32_t serverId = j;
+				if ( algo == ROUND_ROBIN )
+					serverId = ( serverId + i ) % state.numServers;
+
+				if ( state.data->check( i, serverId ) ) {
+					fprintf( f, "%s%u", first ? "" : ", ", serverId );
 					first = false;
 				}
 			}
 			fprintf( f, "), (" );
 			first = true;
-			for ( j = 0; j < this->numServers; j++ ) {
-				if ( this->parity.check( i, j ) ) {
-					fprintf( f, "%s%u", first ? "" : ", ", j );
+			for ( j = 0; j < state.numServers; j++ ) {
+				uint32_t serverId = j;
+				if ( algo == ROUND_ROBIN )
+					serverId = ( serverId + i ) % state.numServers;
+
+				if ( state.parity->check( i, serverId ) ) {
+					fprintf( f, "%s%u", first ? "" : ", ", serverId );
 					first = false;
 				}
 			}
@@ -360,26 +461,28 @@ public:
 		}
 
 		fprintf( f, "\n- Weight vector :" );
-		for ( uint32_t i = 0; i < this->numServers; i++ )
-			fprintf( f, " %d", this->load[ i ] );
+		for ( uint32_t i = 0; i < state.numServers; i++ )
+			fprintf( f, " %d", state.load[ i ] );
 		fprintf( f, "\n- Cost vector   :" );
-		for ( uint32_t i = 0; i < this->numServers; i++ )
-			fprintf( f, " %d", this->count[ i ] );
+		for ( uint32_t i = 0; i < state.numServers; i++ )
+			fprintf( f, " %d", state.count[ i ] );
 
 		fprintf( f, "\n\n" );
 
 #ifdef USE_CONSISTENT_HASHING
-		this->listRing.print( f );
+		state.listRing.print( f );
 
 		fprintf( f, "\n" );
 #endif
 	}
 
 	~StripeList() {
-		delete[] this->load;
-		delete[] this->count;
-		for ( uint32_t i = 0; i < this->numLists; i++ )
-			delete[] this->lists[ i ];
+		delete this->base.data;
+		delete this->base.parity;
+		delete[] this->base.load;
+		delete[] this->base.count;
+		for ( uint32_t i = 0; i < this->base.numLists; i++ )
+			delete[] this->base.lists[ i ];
 	}
 };
 

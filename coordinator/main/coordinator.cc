@@ -656,6 +656,9 @@ void Coordinator::interactive() {
 		} else if ( strcmp( command, "time" ) == 0 ) {
 			valid = true;
 			this->time();
+		} else if ( strcmp( command, "add" ) == 0 ) {
+			valid = true;
+			this->add();
 		} else if ( strcmp( command, "seal" ) == 0 ) {
 			valid = true;
 			this->seal();
@@ -763,6 +766,7 @@ void Coordinator::help() {
 		"- debug: Show debug messages\n"
 		"- id: Print instance ID\n"
 		"- time: Show elapsed time\n"
+		"- add: Add new server\n"
 		"- hash: Show the stripe list hashed by an input key\n"
 		"- lookup: Search for the metadata of an input key\n"
 		"- stripe: Query the seal status of a stripe\n"
@@ -786,6 +790,51 @@ void Coordinator::help() {
 void Coordinator::time() {
 	fprintf( stdout, "Elapsed time (s): %12.6lf\n", this->getElapsedTime() );
 	fflush( stdout );
+}
+
+void Coordinator::add() {
+	ServerAddr addr;
+	char name[ SERVER_NAME_MAX_LEN + 1 ], addrStr[ 32 ];
+
+	printf( "Enter server name: " );
+	fflush( stdout );
+	if ( ! fgets( name, sizeof( name ), stdin ) ) {
+		fprintf( stderr, "Invalid input!\n" );
+		return;
+	}
+	name[ strnlen( name, sizeof( name ) ) - 1 ] = 0;
+
+	printf( "Enter server address (format: tcp://XXX.XXX.XXX.XXX:XXXXX/): " );
+	fflush( stdout );
+	if ( ! fgets( addrStr, sizeof( addrStr ), stdin ) ) {
+		fprintf( stderr, "Invalid input!\n" );
+		return;
+	}
+	addrStr[ strnlen( addrStr, sizeof( addrStr ) ) - 1 ] = 0;
+
+	if ( ! addr.parse( name, addrStr ) ) {
+		fprintf( stderr, "Invalid input!\n" );
+		return;
+	}
+
+	// Update global config
+	this->config.global.servers.push_back( addr );
+
+	// Add new server socket
+	ServerSocket *socket = new ServerSocket();
+	int tmpfd = - ( this->config.global.servers.size() );
+	socket->init( tmpfd, addr, &this->sockets.epoll );
+	this->sockets.servers.set( tmpfd, socket );
+
+	// Update stripe lists
+	this->stripeList->addNewServer( socket );
+
+	printf( "\nNew server added: " );
+	addr.print( stdout );
+	printf( "\n" );
+
+	this->stripeList->print( stdout, false );
+	this->stripeList->print( stdout, true );
 }
 
 void Coordinator::hash() {

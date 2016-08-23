@@ -116,6 +116,7 @@ public:
 	void printRemapping( FILE *f = stdout );
 	void printPending( FILE *f = stdout );
 	void time();
+	void add();
 	void seal();
 	void flush();
 	void metadata();
