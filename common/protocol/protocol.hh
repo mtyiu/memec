@@ -11,6 +11,7 @@
 #include "../ds/key_value.hh"
 #include "../ds/metadata.hh"
 #include "../lock/lock.hh"
+#include "../stripe_list/stripe_list.hh"
 #include "../timestamp/timestamp.hh"
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -741,6 +742,26 @@ public:
 		struct DeltaAcknowledgementHeader &header,
 		std::vector<uint32_t> *timestamps = 0,
 		std::vector<Key> *requests = 0,
+		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
+
+	/////////////
+	// Scaling //
+	/////////////
+	// ---------- scale_protocol.cc ----------
+	size_t generateStripeListScalingHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
+		bool isMigrating, uint32_t numServers, uint32_t numLists, uint32_t n, uint32_t k,
+		std::vector<struct StripeListPartition> &lists,
+		char* buf = 0
+	);
+	bool parseStripeListScalingHeader(
+		struct StripeListScalingHeader &header,
+		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
+	bool parseStripeListPartitionHeader(
+		struct StripeListPartitionHeader &header,
+		uint32_t n, uint32_t k,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 };

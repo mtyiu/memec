@@ -399,4 +399,25 @@ struct DeltaAcknowledgementHeader {
 	uint16_t targetId;      // source data server
 };
 
+/////////////
+// Scaling //
+/////////////
+#define PROTO_STRIPE_LIST_SCALING_SIZE 17
+struct StripeListScalingHeader {
+	bool isMigrating;
+	uint32_t numServers;
+	uint32_t numLists;
+	uint32_t n;
+	uint32_t k;
+};
+
+#define PROTO_STRIPE_LIST_PARTITION_SIZE 9
+struct StripeListPartitionHeader {
+	uint8_t listId;
+	uint32_t partitionFrom;
+	uint32_t partitionTo;
+	uint8_t *data;   // Server ID of data servers
+	uint8_t *parity; // Server ID of parity servers
+};
+
 #endif

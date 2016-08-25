@@ -120,3 +120,16 @@ char *CoordinatorProtocol::announceServerReconstructed( size_t &size, uint16_t i
 	);
 	return this->buffer.send;
 }
+
+char *CoordinatorProtocol::updateStripeList( size_t &size, uint16_t instanceId, uint32_t requestId, StripeList<ServerSocket> *stripeList, bool isMigrating, bool toServer ) {
+	uint32_t numServers = 0, numLists = 0, n = 0, k = 0;
+	std::vector<struct StripeListPartition> lists = stripeList->exportAll( numServers, numLists, n, k, isMigrating );
+	size = this->generateStripeListScalingHeader(
+		PROTO_MAGIC_REQUEST,
+		toServer ? PROTO_MAGIC_TO_SERVER : PROTO_MAGIC_TO_CLIENT,
+		PROTO_OPCODE_STRIPE_LIST_UPDATE,
+		instanceId, requestId,
+		isMigrating, numServers, numLists, n, k, lists
+	);
+	return this->buffer.send;
+}

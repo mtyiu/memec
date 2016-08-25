@@ -6,6 +6,7 @@
 #include "../../common/ds/latency.hh"
 #include "../../common/protocol/protocol.hh"
 #include "../../common/config/server_addr.hh"
+#include "../../common/stripe_list/stripe_list.hh"
 
 class CoordinatorProtocol : public Protocol {
 public:
@@ -29,6 +30,11 @@ public:
 		size_t &size, uint16_t instanceId, uint32_t requestId,
 		ServerSocket *srcSocket, ServerSocket *dstSocket,
 		bool toServer
+	);
+
+	char *updateStripeList(
+		size_t &size, uint16_t instanceId, uint32_t requestId,
+		StripeList<ServerSocket> *stripeList, bool isMigrating, bool toServer
 	);
 };
 

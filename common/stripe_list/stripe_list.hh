@@ -35,6 +35,13 @@ typedef struct {
 	bool isParity;
 } StripeListIndex;
 
+struct StripeListPartition {
+	uint8_t listId;
+	uint32_t partitionFrom;
+	uint32_t partitionTo;
+	std::vector<uint8_t> indices;
+};
+
 template <class T> class StripeList {
 protected:
 	typedef struct {
@@ -115,7 +122,7 @@ protected:
 		if ( generated && ! isMigrating )
 			return;
 
-		uint32_t i, j, index, dataCount, parityCount;
+		uint32_t i, j, index = 0, dataCount, parityCount;
 		StripeListState &state = isMigrating ? this->migrating : this->base;
 
 		for ( i = 0; i < state.numLists; i++ ) {
@@ -474,6 +481,41 @@ public:
 
 		fprintf( f, "\n" );
 #endif
+	}
+
+	std::vector<struct StripeListPartition> exportAll( uint32_t &numServers, uint32_t &numLists, uint32_t &n, uint32_t &k, bool isMigrating = false ) {
+		std::vector<struct StripeListPartition> ret;
+		StripeListState &state = isMigrating ? this->migrating : this->base;
+
+		ret.reserve( state.numLists );
+
+		for ( uint32_t i = 0; i < state.numLists; i++ ) {
+			struct StripeListPartition list;
+			list.listId = i;
+			list.partitionFrom = state.partitions[ i ].from;
+			list.partitionTo   = state.partitions[ i ].to;
+			list.indices.reserve( this->n );
+
+			for ( uint32_t j = 0; j < state.numServers; j++ ) {
+				uint32_t serverId = j;
+				if ( algo == ROUND_ROBIN )
+					serverId = ( serverId + i ) % state.numServers;
+				if ( state.data->check( i, serverId ) )
+					list.indices.push_back( ( uint8_t ) serverId );
+			}
+
+			for ( uint32_t j = 0; j < state.numServers; j++ ) {
+				uint32_t serverId = j;
+				if ( algo == ROUND_ROBIN )
+					serverId = ( serverId + i ) % state.numServers;
+				if ( state.parity->check( i, serverId ) )
+					list.indices.push_back( ( uint8_t ) serverId );
+			}
+
+			ret.push_back( list );
+		}
+
+		return ret;
 	}
 
 	~StripeList() {

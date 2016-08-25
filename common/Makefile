@@ -30,6 +30,7 @@ OBJS= \
 	protocol/register_protocol.o \
 	protocol/remap_protocol.o \
 	protocol/seal_protocol.o \
+	protocol/scale_protocol.o \
 	state_transit/state_transit_handler.o \
 	state_transit/state_transit_state.o \
 	socket/named_pipe.o \

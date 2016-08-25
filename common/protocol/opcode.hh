@@ -19,6 +19,7 @@
 #define PROTO_OPCODE_SERVER_RECONSTRUCTED         0x39
 #define PROTO_OPCODE_BACKUP_SERVER_PROMOTED       0x40
 #define PROTO_OPCODE_PARITY_MIGRATE               0x41
+#define PROTO_OPCODE_STRIPE_LIST_UPDATE           0x42
 
 // Application <-> Client or Client <-> Server (0-19) //
 #define PROTO_OPCODE_GET                          0x01
