@@ -818,6 +818,7 @@ void Coordinator::add() {
 	}
 
 	// Update global config
+	size_t index = this->config.global.servers.size();
 	this->config.global.servers.push_back( addr );
 
 	// Add new server socket
@@ -835,6 +836,19 @@ void Coordinator::add() {
 
 	this->stripeList->print( stdout, false );
 	this->stripeList->print( stdout, true );
+
+	char *namePtr = this->config.global.servers[ index ].name;
+	uint8_t nameLen = ( uint8_t ) strlen( name );
+
+	// Notify all servers
+	ServerEvent serverEvent;
+	serverEvent.scaling( nameLen, namePtr, socket, true );
+	this->eventQueue.insert( serverEvent );
+
+	// Notify all clients
+	ClientEvent clientEvent;
+	clientEvent.scaling( nameLen, namePtr, socket, true );
+	this->eventQueue.insert( clientEvent );
 }
 
 void Coordinator::hash() {

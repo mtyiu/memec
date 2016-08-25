@@ -134,6 +134,12 @@ void ClientWorker::dispatch( CoordinatorEvent event ) {
 					case PROTO_OPCODE_SERVER_RECONSTRUCTED:
 						this->handleServerReconstructedMsg( event, buffer.data, header.length );
 						break;
+					case PROTO_OPCODE_ADD_NEW_SERVER:
+						this->handleAddNewServerRequest( event, buffer.data, header.length );
+						break;
+					case PROTO_OPCODE_STRIPE_LIST_UPDATE:
+						this->handleStripeListUpdateRequest( event, buffer.data, header.length );
+						break;
 					default:
 						__ERROR__( "ClientWorker", "dispatch", "Invalid opcode from coordinator." );
 						break;
@@ -148,4 +154,12 @@ quit_1:
 	}
 	if ( ! connected )
 		__ERROR__( "ClientWorker", "dispatch", "The coordinator is disconnected." );
+}
+
+bool ClientWorker::handleAddNewServerRequest( CoordinatorEvent event, char *buf, size_t size ) {
+	return true;
+}
+
+bool ClientWorker::handleStripeListUpdateRequest( CoordinatorEvent event, char *buf, size_t size ) {
+	return true;
 }

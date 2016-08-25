@@ -487,6 +487,11 @@ public:
 		std::vector<struct StripeListPartition> ret;
 		StripeListState &state = isMigrating ? this->migrating : this->base;
 
+		numServers = state.numServers;
+		numLists = state.numLists;
+		n = this->n;
+		k = this->k;
+
 		ret.reserve( state.numLists );
 
 		for ( uint32_t i = 0; i < state.numLists; i++ ) {

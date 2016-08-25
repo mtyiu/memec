@@ -749,6 +749,16 @@ public:
 	// Scaling //
 	/////////////
 	// ---------- scale_protocol.cc ----------
+	size_t generateNewServerHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
+		uint8_t length, uint32_t addr, uint16_t port, char *name,
+		char *buf = 0
+	);
+	bool parseNewServerHeader(
+		struct NewServerHeader &header,
+		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
+
 	size_t generateStripeListScalingHeader(
 		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
 		bool isMigrating, uint32_t numServers, uint32_t numLists, uint32_t n, uint32_t k,
@@ -756,11 +766,11 @@ public:
 		char* buf = 0
 	);
 	bool parseStripeListScalingHeader(
-		struct StripeListScalingHeader &header,
+		struct StripeListScalingHeader &header, size_t &next,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
 	bool parseStripeListPartitionHeader(
-		struct StripeListPartitionHeader &header,
+		struct StripeListPartitionHeader &header, size_t &next,
 		uint32_t n, uint32_t k,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);

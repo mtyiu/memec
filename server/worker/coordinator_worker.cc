@@ -232,6 +232,12 @@ void ServerWorker::dispatch( CoordinatorEvent event ) {
 					case PROTO_OPCODE_SYNC:
 						this->handleHeartbeatAck( event, buffer.data, header.length );
 						break;
+					case PROTO_OPCODE_ADD_NEW_SERVER:
+						this->handleAddNewServerRequest( event, buffer.data, header.length );
+						break;
+					case PROTO_OPCODE_STRIPE_LIST_UPDATE:
+						this->handleStripeListUpdateRequest( event, buffer.data, header.length );
+						break;
 					default:
 						__ERROR__( "ServerWorker", "dispatch", "Invalid opcode from coordinator." );
 						break;
@@ -309,5 +315,62 @@ bool ServerWorker::handleHeartbeatAck( CoordinatorEvent event, char *buf, size_t
 		}
 		UNLOCK( lock );
 	}
+	return true;
+}
+
+bool ServerWorker::handleAddNewServerRequest( CoordinatorEvent event, char *buf, size_t size ) {
+	struct NewServerHeader header;
+	char ipStr[ 16 ], portStr[ 6 ];
+	if ( ! this->protocol.parseNewServerHeader( header, buf, size ) ) {
+		__ERROR__( "ServerWorker", "handleAddNewServerRequest", "Invalid new server header." );
+		return false;
+	}
+
+	Socket::ntoh_ip( header.addr, ipStr, sizeof( ipStr ) );
+	Socket::ntoh_port( header.port, portStr, sizeof( portStr ) );
+	__INFO__(
+		BLUE, "ServerWorker", "handleAddNewServerRequest",
+		"Server name: %.*s (length = %u); address: %s; port: %s.",
+		header.length, header.name, header.length,
+		ipStr, portStr
+	);
+
+	return true;
+}
+
+bool ServerWorker::handleStripeListUpdateRequest( CoordinatorEvent event, char *buf, size_t size ) {
+	struct StripeListScalingHeader header;
+	struct StripeListPartitionHeader list;
+	size_t next = 0;
+	if ( ! this->protocol.parseStripeListScalingHeader( header, next, buf, size ) ) {
+		__ERROR__( "ServerWorker", "handleAddNewServerRequest", "Invalid new server header." );
+		return false;
+	}
+	__INFO__(
+		BLUE, "ServerWorker", "handleStripeListUpdateRequest",
+		"Is migrating? %s; number of servers = %u, number of lists = %u, n = %u, k = %u.",
+		header.isMigrating ? "yes" : "no",
+		header.numServers, header.numLists,
+		header.n, header.k
+	);
+
+	for ( uint32_t i = 0; i < header.numLists; i++ ) {
+		this->protocol.parseStripeListPartitionHeader(
+			list, next,
+			header.n, header.k,
+			buf, size, next
+		);
+
+		__INFO__(
+			BLUE, "ServerWorker", "handleStripeListUpdateRequest",
+			"List #%3u [%10u-%10u]:",
+			list.listId, list.partitionFrom, list.partitionTo
+		);
+		for ( uint32_t j = 0; j < header.n; j++ ) {
+			fprintf( stderr, "%u ", j < header.k ? list.data[ j ] : list.parity[ j - header.k ] );
+		}
+		fprintf( stderr, "\n" );
+	}
+
 	return true;
 }

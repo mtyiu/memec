@@ -108,6 +108,9 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 			);
 			isSend = true;
 			break;
+		case SERVER_EVENT_TYPE_SCALING:
+			isSend = false;
+			break;
 		default:
 			return;
 	}
@@ -217,6 +220,43 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 		}
 	} else if ( event.type == SERVER_EVENT_TYPE_HANDLE_RECONSTRUCTION_REQUEST ) {
 		this->handleReconstructionRequest( event.socket );
+	} else if ( event.type == SERVER_EVENT_TYPE_SCALING ) {
+		ArrayMap<int, ServerSocket> &servers = Coordinator::getInstance()->sockets.servers;
+		uint32_t requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
+
+		bool isAddServer = true;
+		LOCK( &servers.lock );
+		do {
+			if ( isAddServer ) {
+				buffer.data = this->protocol.addNewServer(
+					buffer.size, Coordinator::instanceId, requestId,
+					event.message.scaling.name,
+					event.message.scaling.nameLen,
+					event.message.scaling.socket,
+					true
+				);
+			} else {
+				buffer.data = this->protocol.updateStripeList(
+					buffer.size, Coordinator::instanceId, requestId,
+					CoordinatorWorker::stripeList,
+					event.message.scaling.isMigrating,
+					true
+				);
+			}
+
+			for ( uint32_t i = 0, size = servers.size(); i < size; i++ ) {
+				ServerSocket *server = servers.values[ i ];
+				if ( ! server->ready() )
+					continue; // Skip failed clients
+
+				ret = server->send( buffer.data, buffer.size, connected );
+				if ( ret != ( ssize_t ) buffer.size )
+					__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+			}
+
+			isAddServer = ! isAddServer;
+		} while ( ! isAddServer );
+		UNLOCK( &servers.lock );
 	} else if ( isSend ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
 		if ( ret != ( ssize_t ) buffer.size )

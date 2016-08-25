@@ -22,7 +22,8 @@ enum ServerEventType {
 	SERVER_EVENT_TYPE_TRIGGER_RECONSTRUCTION,
 	SERVER_EVENT_TYPE_HANDLE_RECONSTRUCTION_REQUEST,
 	SERVER_EVENT_TYPE_ACK_RECONSTRUCTION_SUCCESS,
-	SERVER_EVENT_TYPE_ACK_RECONSTRUCTION_FAILURE
+	SERVER_EVENT_TYPE_ACK_RECONSTRUCTION_FAILURE,
+	SERVER_EVENT_TYPE_SCALING
 };
 
 class ServerEvent : public Event<ServerSocket> {
@@ -52,6 +53,12 @@ public:
 			bool isLast;
 		} heartbeat;
 		struct sockaddr_in addr;
+		struct {
+			uint8_t nameLen;
+			char *name;
+			ServerSocket *socket;
+			bool isMigrating;
+		} scaling;
 	} message;
 
 	inline void pending( ServerSocket *socket ) {
@@ -152,6 +159,16 @@ public:
 	inline void ackCompletedReconstruction( ServerSocket *socket, uint16_t instanceId, uint32_t requestId, bool success ) {
 		this->type = success ? SERVER_EVENT_TYPE_ACK_RECONSTRUCTION_SUCCESS : SERVER_EVENT_TYPE_ACK_RECONSTRUCTION_FAILURE;
 		this->set( instanceId, requestId, socket );
+	}
+
+	inline void scaling( uint8_t nameLen, char *name, ServerSocket *socket, bool isMigrating ) {
+		this->type = SERVER_EVENT_TYPE_SCALING;
+		this->message.scaling = {
+			.nameLen = nameLen,
+			.name = name,
+			.socket = socket,
+			.isMigrating = isMigrating
+		};
 	}
 };
 

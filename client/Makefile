@@ -44,6 +44,7 @@ EXTERNAL_LIB= \
 	$(MEMEC_SRC_ROOT)/common/protocol/normal_protocol.o \
 	$(MEMEC_SRC_ROOT)/common/protocol/remap_protocol.o \
 	$(MEMEC_SRC_ROOT)/common/protocol/register_protocol.o \
+	$(MEMEC_SRC_ROOT)/common/protocol/scale_protocol.o \
 	$(MEMEC_SRC_ROOT)/common/state_transit/state_transit_handler.o \
 	$(MEMEC_SRC_ROOT)/common/state_transit/state_transit_state.o \
 	$(MEMEC_SRC_ROOT)/common/socket/named_pipe.o \

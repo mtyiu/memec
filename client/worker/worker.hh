@@ -50,6 +50,8 @@ private:
 
 	// ---------- coordinator_worker.cc ----------
 	void dispatch( CoordinatorEvent event );
+	bool handleAddNewServerRequest( CoordinatorEvent event, char *buf, size_t size );
+	bool handleStripeListUpdateRequest( CoordinatorEvent event, char *buf, size_t size );
 
 	// ---------- application_worker.cc ----------
 	void dispatch( ApplicationEvent event );

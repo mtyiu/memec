@@ -32,6 +32,8 @@ enum ClientEventType {
 	CLIENT_EVENT_TYPE_DEGRADED_SET_LOCK_RESPONSE_FAILURE,
 	// Recovery
 	CLIENT_EVENT_TYPE_ANNOUNCE_SERVER_RECONSTRUCTED,
+	// Scaling
+	CLIENT_EVENT_TYPE_SCALING,
 	// PENDING
 	CLIENT_EVENT_TYPE_PENDING
 };
@@ -76,6 +78,12 @@ public:
 			ServerSocket *src;
 			ServerSocket *dst;
 		} reconstructed;
+		struct {
+			uint8_t nameLen;
+			char *name;
+			ServerSocket *socket;
+			bool isMigrating;
+		} scaling;
 	} message;
 
 	inline void resRegister( ClientSocket *socket, uint16_t instanceId, uint32_t requestId, bool success = true ) {
@@ -174,6 +182,16 @@ public:
 		this->message.reconstructed = {
 			.src = srcSocket,
 			.dst = dstSocket
+		};
+	}
+
+	inline void scaling( uint8_t nameLen, char *name, ServerSocket *socket, bool isMigrating ) {
+		this->type = CLIENT_EVENT_TYPE_SCALING;
+		this->message.scaling = {
+			.nameLen = nameLen,
+			.name = name,
+			.socket = socket,
+			.isMigrating = isMigrating
 		};
 	}
 

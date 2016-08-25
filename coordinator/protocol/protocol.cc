@@ -121,6 +121,18 @@ char *CoordinatorProtocol::announceServerReconstructed( size_t &size, uint16_t i
 	return this->buffer.send;
 }
 
+char *CoordinatorProtocol::addNewServer( size_t &size, uint16_t instanceId, uint32_t requestId, char *name, uint8_t nameLen, ServerSocket *socket, bool toServer ) {
+	struct sockaddr_in addr = socket->getAddr();
+	size = this->generateNewServerHeader(
+		PROTO_MAGIC_REQUEST,
+		toServer ? PROTO_MAGIC_TO_SERVER : PROTO_MAGIC_TO_CLIENT,
+		PROTO_OPCODE_ADD_NEW_SERVER,
+		instanceId, requestId,
+		nameLen, addr.sin_addr.s_addr, addr.sin_port, name
+	);
+	return this->buffer.send;
+}
+
 char *CoordinatorProtocol::updateStripeList( size_t &size, uint16_t instanceId, uint32_t requestId, StripeList<ServerSocket> *stripeList, bool isMigrating, bool toServer ) {
 	uint32_t numServers = 0, numLists = 0, n = 0, k = 0;
 	std::vector<struct StripeListPartition> lists = stripeList->exportAll( numServers, numLists, n, k, isMigrating );

@@ -402,6 +402,14 @@ struct DeltaAcknowledgementHeader {
 /////////////
 // Scaling //
 /////////////
+#define PROTO_NEW_SERVER_HEADER 7
+struct NewServerHeader {
+	uint8_t length;
+	uint32_t addr;
+	uint16_t port;
+	char *name;
+};
+
 #define PROTO_STRIPE_LIST_SCALING_SIZE 17
 struct StripeListScalingHeader {
 	bool isMigrating;

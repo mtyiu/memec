@@ -59,6 +59,7 @@ EXTERNAL_LIB= \
 	$(MEMEC_SRC_ROOT)/common/protocol/recovery_protocol.o \
 	$(MEMEC_SRC_ROOT)/common/protocol/remap_protocol.o \
 	$(MEMEC_SRC_ROOT)/common/protocol/seal_protocol.o \
+	$(MEMEC_SRC_ROOT)/common/protocol/scale_protocol.o \
 	$(MEMEC_SRC_ROOT)/common/socket/socket.o \
 	$(MEMEC_SRC_ROOT)/common/socket/epoll.o \
 	$(MEMEC_SRC_ROOT)/lib/death_handler/death_handler.o \

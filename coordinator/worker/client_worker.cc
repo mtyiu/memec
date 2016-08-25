@@ -164,6 +164,10 @@ void CoordinatorWorker::dispatch( ClientEvent event ) {
 		case CLIENT_EVENT_TYPE_ANNOUNCE_SERVER_RECONSTRUCTED:
 			isSend = false;
 			break;
+		// Scaling
+		case CLIENT_EVENT_TYPE_SCALING:
+			isSend = false;
+			break;
 		// Pending
 		case CLIENT_EVENT_TYPE_PENDING:
 			isSend = false;
@@ -199,6 +203,45 @@ void CoordinatorWorker::dispatch( ClientEvent event ) {
 			if ( ret != ( ssize_t ) buffer.size )
 				__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 		}
+		UNLOCK( &clients.lock );
+
+		connected = true; // just to avoid error message
+	} else if ( event.type == CLIENT_EVENT_TYPE_SCALING ) {
+		ArrayMap<int, ClientSocket> &clients = Coordinator::getInstance()->sockets.clients;
+		uint32_t requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
+
+		bool isAddServer = true;
+		LOCK( &clients.lock );
+		do {
+			if ( isAddServer ) {
+				buffer.data = this->protocol.addNewServer(
+					buffer.size, Coordinator::instanceId, requestId,
+					event.message.scaling.name,
+					event.message.scaling.nameLen,
+					event.message.scaling.socket,
+					false
+				);
+			} else {
+				buffer.data = this->protocol.updateStripeList(
+					buffer.size, Coordinator::instanceId, requestId,
+					CoordinatorWorker::stripeList,
+					event.message.scaling.isMigrating,
+					false
+				);
+			}
+
+			for ( uint32_t i = 0, size = clients.size(); i < size; i++ ) {
+				ClientSocket *client = clients.values[ i ];
+				if ( ! client->ready() )
+					continue; // Skip failed clients
+
+				ret = client->send( buffer.data, buffer.size, connected );
+				if ( ret != ( ssize_t ) buffer.size )
+					__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+			}
+
+			isAddServer = ! isAddServer;
+		} while ( ! isAddServer );
 		UNLOCK( &clients.lock );
 
 		connected = true; // just to avoid error message
