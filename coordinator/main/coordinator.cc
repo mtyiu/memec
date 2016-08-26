@@ -830,10 +830,10 @@ void Coordinator::add() {
 	// Update stripe lists
 	this->stripeList->addNewServer( socket );
 
+	// Debug messages
 	printf( "\nNew server added: " );
 	addr.print( stdout );
 	printf( "\n" );
-
 	this->stripeList->print( stdout, false );
 	this->stripeList->print( stdout, true );
 

@@ -171,16 +171,116 @@ protected:
 		this->assign( isMigrating );
 	}
 
-	void assign( bool isMigrating = false ) {
+	void assign( bool isMigrating = false, uint32_t numLists = 0 ) {
 		StripeListState &state = isMigrating ? this->migrating : this->base;
-		uint32_t size = UINT32_MAX / state.numLists;
+		numLists = ( numLists == 0 ) ? state.numLists : numLists;
+		uint32_t size = UINT32_MAX / numLists;
+
+		if ( state.partitions.size() )
+			state.partitions.clear();
+
 		for ( uint32_t i = 0; i < state.numLists; i++ ) {
-			HashPartition partition = {
-				.from = i * size,
-				.to = ( i == state.numLists - 1 ) ? UINT32_MAX : ( ( i + 1 ) * size - 1 )
-			};
+			HashPartition partition;
+			if ( i < numLists ) {
+				partition = {
+					.from = i * size,
+					.to = ( i == numLists - 1 ) ? UINT32_MAX : ( ( i + 1 ) * size - 1 )
+				};
+			} else {
+				partition = {
+					.from = 0,
+					.to = 0
+				};
+			}
 			state.partitions.push_back( partition );
 		}
+	}
+
+	uint32_t diff( FILE *f = stdout ) {
+		uint32_t ret = 0;
+		bool first;
+		fprintf(
+			f,
+			"Number of servers : %u (original) vs. %u (migrating)\n"
+			"Number of lists   : %u (original) vs. %u (migrating)\n",
+			this->base.numServers, this->migrating.numServers,
+			this->base.numLists, this->migrating.numLists
+		);
+
+		uint32_t minNumLists = this->base.numLists;
+		if ( this->migrating.numLists < minNumLists )
+			minNumLists = this->migrating.numLists;
+
+		for ( uint32_t i = 0; i < minNumLists; i++ ) {
+			uint32_t diff = 0;
+			T **l1 = this->base.lists[ i ], **l2 = this->migrating.lists[ i ];
+
+			for ( uint32_t j = 0; j < this->n; j++ ) {
+				if ( l1[ j ] != l2[ j ] ) {
+					ret++;
+					diff++;
+				}
+			}
+
+			fprintf(
+				f, "#%u [%10u-%10u vs. %10u-%10u]: ", i,
+				this->base.partitions[ i ].from,
+				this->base.partitions[ i ].to,
+				this->migrating.partitions[ i ].from,
+				this->migrating.partitions[ i ].to
+			);
+
+			bool isMigrating = false;
+			do {
+				StripeListState &state = isMigrating ? this->migrating : this->base;
+
+				first = true;
+				fprintf( f, "((" );
+				for ( uint32_t j = 0; j < state.numServers; j++ ) {
+					uint32_t serverId = j;
+					if ( algo == ROUND_ROBIN )
+						serverId = ( serverId + i ) % state.numServers;
+
+					if ( state.data->check( i, serverId ) ) {
+						fprintf( f, "%s%u", first ? "" : ", ", serverId );
+						first = false;
+					}
+				}
+
+				fprintf( f, "), (" );
+				first = true;
+				for ( uint32_t j = 0; j < state.numServers; j++ ) {
+					uint32_t serverId = j;
+					if ( algo == ROUND_ROBIN )
+						serverId = ( serverId + i ) % state.numServers;
+
+					if ( state.parity->check( i, serverId ) ) {
+						fprintf( f, "%s%u", first ? "" : ", ", serverId );
+						first = false;
+					}
+				}
+
+				if ( isMigrating ) {
+					fprintf( f, ")); diff = %u\n", diff );
+				} else {
+					fprintf( f, ")) vs. " );
+				}
+
+				isMigrating = ! isMigrating;
+			} while ( isMigrating );
+
+			// for ( uint32_t j = 0; j < this->n; j++ ) {
+			// 	l1[ j ]->printAddress( f );
+			// 	fprintf( f, " vs. " );
+			// 	l2[ j ]->printAddress( f );
+			// 	fprintf( f, "\n" );
+			// }
+			// fprintf( f, "\n" );
+		}
+
+		fprintf( stderr, "Number of differences: %u\n", ret );
+
+		return ret;
 	}
 
 	/*
@@ -240,8 +340,8 @@ public:
 		state.numServers = 0;
 		state.numLists = 0;
 
-		delete[] state.data;
-		delete[] state.parity;
+		delete state.data;
+		delete state.parity;
 		delete[] state.load;
 		delete[] state.count;
 		state.data = 0;
@@ -264,9 +364,80 @@ public:
 			return false;
 		}
 
+		StripeListState &state = this->migrating;
+
 		this->isMigrating = true;
 		this->initState( this->base.numServers + 1, this->base.numLists + 1, true );
 		this->generate( false /* verbose */, this->algo, true );
+
+		// Find the list that will be treated as a new list
+		uint32_t middlePos = this->n / 2;
+		uint32_t middleListId = 0;
+		if ( this->n % 2 == 0 ) middlePos--;
+		for ( uint32_t i = 0; i < state.numLists; i++ ) {
+			if ( state.lists[ i ][ middlePos ] == server ) {
+				middleListId = i;
+				break;
+			}
+		}
+		fprintf( stderr, "New server is at List #%u (position = %u)\n", middleListId, middlePos );
+
+		// Update bitmap
+		BitmaskArray dataBackup( state.numServers, 1 );
+		BitmaskArray parityBackup( state.numServers, 1 );
+		for ( uint32_t i = 0; i < state.numServers; i++ ) {
+			if ( state.data->check( middleListId, i ) )
+				dataBackup.set( 0, i );
+			else if ( state.parity->check( middleListId, i ) )
+				parityBackup.set( 0, i );
+		}
+
+		for ( uint32_t listId = middleListId; listId < state.numLists - 1; listId++ ) {
+			state.data->clear( listId );
+			state.parity->clear( listId );
+
+			for ( uint32_t i = 0; i < state.numServers; i++ ) {
+				if ( state.data->check( listId + 1, i ) )
+					state.data->set( listId, i );
+				else if ( state.parity->check( listId + 1, i ) )
+					state.parity->set( listId, i );
+			}
+		}
+
+		middleListId = state.numLists - 1;
+		state.data->clear( middleListId );
+		state.parity->clear( middleListId );
+		for ( uint32_t i = 0; i < state.numServers; i++ ) {
+			if ( dataBackup.check( 0, i ) )
+				state.data->set( middleListId, i );
+			else if ( parityBackup.check( 0, i ) )
+				state.parity->set( middleListId, i );
+		}
+
+		// Update list
+		uint32_t dataCount, parityCount;
+		for ( uint32_t i = 0; i < state.numLists; i++ ) {
+			T **list = state.lists[ i ];
+			dataCount = 0;
+			parityCount = 0;
+
+			for ( uint32_t j = 0; j < state.numServers; j++ ) {
+				uint32_t serverId = j;
+				if ( algo == ROUND_ROBIN )
+					serverId = ( serverId + i ) % state.numServers;
+
+				if ( state.data->check( i, serverId ) ) {
+					list[ dataCount++ ] = this->servers->at( serverId );
+				} else if ( state.parity->check( i, serverId ) ) {
+					list[ this->k + ( parityCount++ ) ] = this->servers->at( serverId );
+				}
+			}
+		}
+
+		// Update partitions
+		this->assign( true, this->base.numLists );
+
+		this->diff();
 
 		return true;
 	}
