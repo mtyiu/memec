@@ -157,6 +157,41 @@ quit_1:
 }
 
 bool ClientWorker::handleAddNewServerRequest( CoordinatorEvent event, char *buf, size_t size ) {
+	struct NewServerHeader header;
+	char ipStr[ 16 ], portStr[ 6 ];
+	if ( ! this->protocol.parseNewServerHeader( header, buf, size ) ) {
+		__ERROR__( "ClientWorker", "handleAddNewServerRequest", "Invalid new server header." );
+		return false;
+	}
+
+	Socket::ntoh_ip( header.addr, ipStr, sizeof( ipStr ) );
+	Socket::ntoh_port( header.port, portStr, sizeof( portStr ) );
+	__INFO__(
+		BLUE, "ClientWorker", "handleAddNewServerRequest",
+		"Server name: %.*s (length = %u); address: %s; port: %s.",
+		header.length, header.name, header.length,
+		ipStr, portStr
+	);
+
+	char backup = header.name[ header.length ];
+	header.name[ header.length ] = 0;
+	ServerAddr addr( header.name, header.addr, header.port );
+	header.name[ header.length ] = backup;
+
+	// Update global config
+	Client *client = Client::getInstance();
+	size_t index = client->config.global.servers.size();
+	client->config.global.servers.push_back( addr );
+
+	// Add new server socket
+	ServerSocket *socket = new ServerSocket();
+	socket->init(
+		client->config.global.servers[ index ],
+		&client->sockets.epoll
+	);
+	int fd = socket->getSocket();
+	client->sockets.servers.set( fd, socket );
+
 	return true;
 }
 

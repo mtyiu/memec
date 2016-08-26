@@ -328,12 +328,32 @@ bool ServerWorker::handleAddNewServerRequest( CoordinatorEvent event, char *buf,
 
 	Socket::ntoh_ip( header.addr, ipStr, sizeof( ipStr ) );
 	Socket::ntoh_port( header.port, portStr, sizeof( portStr ) );
-	__INFO__(
+	__DEBUG__(
 		BLUE, "ServerWorker", "handleAddNewServerRequest",
 		"Server name: %.*s (length = %u); address: %s; port: %s.",
 		header.length, header.name, header.length,
 		ipStr, portStr
 	);
+
+	char backup = header.name[ header.length ];
+	header.name[ header.length ] = 0;
+	ServerAddr addr( header.name, header.addr, header.port );
+	header.name[ header.length ] = backup;
+
+	// Update global config
+	Server *server = Server::getInstance();
+	size_t index = server->config.global.servers.size();
+	server->config.global.servers.push_back( addr );
+
+	// Add new server peer socket
+	int myServerIndex = server->getMyServerIndex();
+	ServerPeerSocket *socket = new ServerPeerSocket();
+	int tmpfd = - ( server->config.global.servers.size() );
+	socket->init(
+		tmpfd, addr, &server->sockets.epoll,
+		( int ) index == myServerIndex && myServerIndex != -1
+	);
+	server->sockets.serverPeers.set( tmpfd, socket );
 
 	return true;
 }

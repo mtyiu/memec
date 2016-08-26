@@ -125,6 +125,10 @@ public:
 
 	double getElapsedTime();
 	void interactive();
+
+	inline int getMyServerIndex() {
+		return this->myServerIndex;
+	}
 };
 
 #endif
