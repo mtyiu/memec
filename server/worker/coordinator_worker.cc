@@ -355,6 +355,11 @@ bool ServerWorker::handleAddNewServerRequest( CoordinatorEvent event, char *buf,
 	);
 	server->sockets.serverPeers.set( tmpfd, socket );
 
+	server->stripeList->addNewServer( socket );
+
+	server->stripeList->print( stderr, false );
+	server->stripeList->print( stderr, true );
+
 	return true;
 }
 
@@ -363,7 +368,7 @@ bool ServerWorker::handleStripeListUpdateRequest( CoordinatorEvent event, char *
 	struct StripeListPartitionHeader list;
 	size_t next = 0;
 	if ( ! this->protocol.parseStripeListScalingHeader( header, next, buf, size ) ) {
-		__ERROR__( "ServerWorker", "handleAddNewServerRequest", "Invalid new server header." );
+		__ERROR__( "ServerWorker", "handleStripeListUpdateRequest", "Invalid new server header." );
 		return false;
 	}
 	__INFO__(

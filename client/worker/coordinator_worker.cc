@@ -192,9 +192,47 @@ bool ClientWorker::handleAddNewServerRequest( CoordinatorEvent event, char *buf,
 	int fd = socket->getSocket();
 	client->sockets.servers.set( fd, socket );
 
+	client->stripeList->addNewServer( socket );
+
+	client->stripeList->print( stderr, false );
+	client->stripeList->print( stderr, true );
+
 	return true;
 }
 
 bool ClientWorker::handleStripeListUpdateRequest( CoordinatorEvent event, char *buf, size_t size ) {
+	struct StripeListScalingHeader header;
+	struct StripeListPartitionHeader list;
+	size_t next = 0;
+	if ( ! this->protocol.parseStripeListScalingHeader( header, next, buf, size ) ) {
+		__ERROR__( "ClientWorker", "handleStripeListUpdateRequest", "Invalid new server header." );
+		return false;
+	}
+	__INFO__(
+		BLUE, "ClientWorker", "handleStripeListUpdateRequest",
+		"Is migrating? %s; number of servers = %u, number of lists = %u, n = %u, k = %u.",
+		header.isMigrating ? "yes" : "no",
+		header.numServers, header.numLists,
+		header.n, header.k
+	);
+
+	for ( uint32_t i = 0; i < header.numLists; i++ ) {
+		this->protocol.parseStripeListPartitionHeader(
+			list, next,
+			header.n, header.k,
+			buf, size, next
+		);
+
+		__INFO__(
+			BLUE, "ClientWorker", "handleStripeListUpdateRequest",
+			"List #%3u [%10u-%10u]:",
+			list.listId, list.partitionFrom, list.partitionTo
+		);
+		for ( uint32_t j = 0; j < header.n; j++ ) {
+			fprintf( stderr, "%u ", j < header.k ? list.data[ j ] : list.parity[ j - header.k ] );
+		}
+		fprintf( stderr, "\n" );
+	}
+
 	return true;
 }

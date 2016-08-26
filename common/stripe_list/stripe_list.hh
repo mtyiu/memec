@@ -46,8 +46,6 @@ template <class T> class StripeList {
 protected:
 	typedef struct {
 		uint32_t numServers;
-		std::vector<T *> *servers;
-
 		uint32_t numLists;
 		BitmaskArray *data, *parity;
 		unsigned int *load, *count;
@@ -62,6 +60,7 @@ protected:
 	uint32_t n, k;
 	bool generated, isMigrating;
 	StripeListState base, migrating;
+	std::vector<T *> *servers;
 
 	/*
 	 * Utility functions for generating stripe lists
@@ -130,7 +129,7 @@ protected:
 			for ( j = 0; j < this->n - this->k; j++ ) {
 				switch ( algo ) {
 					case ROUND_ROBIN : index = pickNext( i, j + this->k, isMigrating ); break;
-					case LOAD_AWARE  : index = pickMin( i, isMigrating );               break;
+					case LOAD_AWARE  : index = pickMin ( i, isMigrating );               break;
 					case RANDOM      : index = pickRand( i, isMigrating );              break;
 				}
 				state.parity->set( i, index );
@@ -138,7 +137,7 @@ protected:
 			for ( j = 0; j < this->k; j++ ) {
 				switch ( algo ) {
 					case ROUND_ROBIN : index = pickNext( i, j, isMigrating ); break;
-					case LOAD_AWARE  : index = pickMin( i, isMigrating );     break;
+					case LOAD_AWARE  : index = pickMin ( i, isMigrating );    break;
 					case RANDOM      : index = pickRand( i, isMigrating );    break;
 				}
 				state.data->set( i, index );
@@ -153,11 +152,11 @@ protected:
 					serverId = ( serverId + i ) % state.numServers;
 
 				if ( state.data->check( i, serverId ) ) {
-					list[ dataCount++ ] = state.servers->at( serverId );
+					list[ dataCount++ ] = this->servers->at( serverId );
 					state.load[ serverId ] += 1;
 					state.count[ serverId ]++;
 				} else if ( state.parity->check( i, serverId ) ) {
-					list[ this->k + ( parityCount++ ) ] = state.servers->at( serverId );
+					list[ this->k + ( parityCount++ ) ] = this->servers->at( serverId );
 					state.load[ serverId ] += this->k;
 					state.count[ serverId ]++;
 				}
@@ -205,25 +204,55 @@ public:
 		this->algo = algo;
 		this->n = n;
 		this->k = k;
-
-		this->base.numServers = servers.size();
-		this->base.servers = &servers;
-
 		this->generated = false;
 		this->isMigrating = false;
-		this->base.numLists = numLists;
-		this->base.data = new BitmaskArray( this->base.numServers, numLists );
-		this->base.parity = new BitmaskArray( this->base.numServers, numLists );
-		this->base.load = new unsigned int[ this->base.numServers ];
-		this->base.count = new unsigned int[ this->base.numServers ];
-		memset( this->base.load, 0, sizeof( unsigned int ) * this->base.numServers );
-		memset( this->base.count, 0, sizeof( unsigned int ) * this->base.numServers );
-		this->base.lists.reserve( numLists );
-		for ( uint32_t i = 0; i < numLists; i++ )
-			this->base.lists.push_back( new T*[ n ] );
-		this->base.partitions.reserve( numLists );
-
+		this->servers = &servers;
+		this->initState( servers.size(), numLists, false );
 		this->generate( false /* verbose */, algo, false );
+	}
+
+	/*
+	 * Initialize state
+	 */
+	void initState( uint32_t numServers, uint32_t numLists, bool isMigrating = false ) {
+		StripeListState &state = isMigrating ? this->migrating : this->base;
+
+		state.numServers = numServers;
+		state.numLists = numLists;
+		state.data = new BitmaskArray( numServers, numLists );
+		state.parity = new BitmaskArray( numServers, numLists );
+		state.load = new unsigned int[ numServers ];
+		state.count = new unsigned int[ numServers ];
+		memset( state.load, 0, sizeof( unsigned int ) * numServers );
+		memset( state.count, 0, sizeof( unsigned int ) * numServers );
+		state.lists.reserve( numLists );
+		for ( uint32_t i = 0; i < numLists; i++ )
+			state.lists.push_back( new T*[ this->n ] );
+		state.partitions.reserve( numLists );
+	}
+
+	/*
+	 * Release memory allocated for state
+	 */
+	void destroyState( bool isMigrating ) {
+		StripeListState &state = isMigrating ? this->migrating : this->base;
+
+		state.numServers = 0;
+		state.numLists = 0;
+
+		delete[] state.data;
+		delete[] state.parity;
+		delete[] state.load;
+		delete[] state.count;
+		state.data = 0;
+		state.parity = 0;
+		state.load = 0;
+		state.count = 0;
+
+		for ( uint32_t i = 0; i < state.lists.size(); i++ )
+			delete[] state.lists[ i ];
+		state.lists.clear();
+		state.partitions.clear();
 	}
 
 	/*
@@ -236,28 +265,105 @@ public:
 		}
 
 		this->isMigrating = true;
-
-		uint32_t numServers = this->base.numServers + 1;
-		uint32_t numLists = this->base.numLists + 1;
-
-		this->migrating.numServers = numServers;
-		this->migrating.servers = this->base.servers;
-
-		this->migrating.numLists = numLists;
-		this->migrating.data = new BitmaskArray( numServers, numLists );
-		this->migrating.parity = new BitmaskArray( numServers, numLists );
-		this->migrating.load = new unsigned int[ numServers ];
-		this->migrating.count = new unsigned int[ numServers ];
-		memset( this->migrating.load, 0, sizeof( unsigned int ) * numServers );
-		memset( this->migrating.count, 0, sizeof( unsigned int ) * numServers );
-		this->migrating.lists.reserve( numLists );
-		for ( uint32_t i = 0; i < numLists; i++ )
-			this->migrating.lists.push_back( new T*[ this->n ] );
-		this->migrating.partitions.reserve( numLists );
-
+		this->initState( this->base.numServers + 1, this->base.numLists + 1, true );
 		this->generate( false /* verbose */, this->algo, true );
 
 		return true;
+	}
+
+	/*
+	 * Synchronize parameters from coordinator
+	 */
+	bool syncParams( bool isMigrating, uint32_t numServers, uint32_t numLists, uint32_t n, uint32_t k ) {
+		bool isMatched = true;
+		StripeListState &state = isMigrating ? this->migrating : this->base;
+
+		// Fatal error if coding parameters mismatch
+		assert( this->n == n && this->k == k );
+		isMatched = ( state.numServers == numServers && state.numLists == numLists );
+
+		if ( isMatched )
+			return true;
+
+		state.numServers = numServers;
+		state.numLists = numLists;
+
+		this->destroyState( true );
+		this->initState( numServers, numLists, true );
+		this->generate( false, this->algo, true );
+
+		return false;
+	}
+
+	/*
+	 * Synchronize a specific stripe list from coordinator
+	 */
+	bool syncStripeList( bool isMigrating, uint8_t listId, uint32_t partitionFrom, uint32_t partitionTo, uint8_t *data, uint8_t *parity ) {
+		StripeListState &state = isMigrating ? this->migrating : this->base;
+		bool isMatched = true;
+
+		if ( state.partitions[ listId ].from != partitionFrom || state.partitions[ listId ].to != partitionTo ) {
+			isMatched = false;
+		}
+
+		for ( uint32_t i = 0; isMatched && i < this->n; i++ ) {
+			if ( i < this->k ) {
+				if ( ! state.data->check( listId, data[ i ] ) ) {
+					fprintf( stderr, "Data mismatched!\n" );
+					isMatched = false;
+				}
+			} else {
+				if ( ! state.parity->check( listId, parity[ i - this->k ] ) ) {
+					fprintf( stderr, "Parity mismatched!\n" );
+					isMatched = false;
+				}
+			}
+		}
+
+		if ( ! isMatched ) {
+			// Reset load and count vectors
+			for ( uint32_t j = 0; j < state.numServers; j++ ) {
+				uint32_t serverId = j;
+				if ( algo == ROUND_ROBIN )
+					serverId = ( serverId + listId ) % state.numServers;
+
+				if ( state.data->check( listId, serverId ) ) {
+					state.load[ serverId ] -= 1;
+					state.count[ serverId ]--;
+					state.data->unset( listId, serverId );
+				} else if ( state.parity->check( listId, serverId ) ) {
+					state.load[ serverId ] -= this->k;
+					state.count[ serverId ]--;
+					state.parity->unset( listId, serverId );
+				}
+			}
+
+			// Update bitmap and list
+			uint32_t dataCount = 0, parityCount = 0;
+			T **list = state.lists[ listId ];
+			for ( uint32_t i = 0; i < this->n; i++ ) {
+				uint32_t serverId;
+				if ( i < this->k ) {
+					serverId = data[ i ];
+					state.data->set( listId, serverId );
+					list[ dataCount++ ] = this->servers->at( serverId );
+					state.load[ serverId ] += 1;
+					state.count[ serverId ]++;
+				} else {
+					serverId = parity[ i - this->k ];
+					state.parity->set( listId, serverId );
+					list[ this->k + ( parityCount++ ) ] = this->servers->at( serverId );
+					state.load[ serverId ] += this->k;
+					state.count[ serverId ]++;
+				}
+			}
+
+			// Update assigned partition
+			state.partitions[ listId ].from = partitionFrom;
+			state.partitions[ listId ].to   = partitionTo;
+		}
+
+		return isMatched;
 	}
 
 	/*
@@ -398,9 +504,9 @@ public:
 					serverId = ( serverId + i ) % state.numServers;
 
 				if ( state.data->check( i, serverId ) ) {
-					list[ dataCount++ ] = state.servers->at( serverId );
+					list[ dataCount++ ] = this->servers->at( serverId );
 				} else if ( state.parity->check( i, serverId ) ) {
-					list[ this->k + ( parityCount++ ) ] = state.servers->at( serverId );
+					list[ this->k + ( parityCount++ ) ] = this->servers->at( serverId );
 				}
 			}
 		}
@@ -412,7 +518,7 @@ public:
 	int32_t search( T *target, bool isMigrating = false ) {
 		StripeListState &state = isMigrating ? this->migrating : this->base;
 		for ( uint32_t i = 0; i < state.numServers; i++ ) {
-			if ( target == state.servers->at( i ) )
+			if ( target == this->servers->at( i ) )
 				return i;
 		}
 		return -1;
@@ -524,12 +630,9 @@ public:
 	}
 
 	~StripeList() {
-		delete this->base.data;
-		delete this->base.parity;
-		delete[] this->base.load;
-		delete[] this->base.count;
-		for ( uint32_t i = 0; i < this->base.numLists; i++ )
-			delete[] this->base.lists[ i ];
+		this->destroyState( false );
+		if ( this->isMigrating )
+			this->destroyState( true );
 	}
 };
 
