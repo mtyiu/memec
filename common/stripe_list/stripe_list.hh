@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <cassert>
 #include <stdint.h>
 #include "../ds/array_map.hh"
 #include "../ds/bitmask_array.hh"
@@ -358,7 +359,7 @@ public:
 	/*
 	 * Scale up
 	 */
-	bool addNewServer( T *server ) {
+	bool addNewServer( T *server, bool updateList = true ) {
 		if ( this->isMigrating ) {
 			fprintf( stderr, "StripeList::addNewServer(): Another data migration process is in-progress. Please try again later.\n" );
 			return false;
@@ -368,6 +369,10 @@ public:
 
 		this->isMigrating = true;
 		this->initState( this->base.numServers + 1, this->base.numLists + 1, true );
+
+		if ( ! updateList )
+			return true;
+
 		this->generate( false /* verbose */, this->algo, true );
 
 		// Find the list that will be treated as a new list
@@ -479,15 +484,11 @@ public:
 
 		for ( uint32_t i = 0; isMatched && i < this->n; i++ ) {
 			if ( i < this->k ) {
-				if ( ! state.data->check( listId, data[ i ] ) ) {
-					fprintf( stderr, "Data mismatched!\n" );
+				if ( ! state.data->check( listId, data[ i ] ) )
 					isMatched = false;
-				}
 			} else {
-				if ( ! state.parity->check( listId, parity[ i - this->k ] ) ) {
-					fprintf( stderr, "Parity mismatched!\n" );
+				if ( ! state.parity->check( listId, parity[ i - this->k ] ) )
 					isMatched = false;
-				}
 			}
 		}
 

@@ -166,7 +166,7 @@ bool ClientWorker::handleAddNewServerRequest( CoordinatorEvent event, char *buf,
 
 	Socket::ntoh_ip( header.addr, ipStr, sizeof( ipStr ) );
 	Socket::ntoh_port( header.port, portStr, sizeof( portStr ) );
-	__INFO__(
+	__DEBUG__(
 		BLUE, "ClientWorker", "handleAddNewServerRequest",
 		"Server name: %.*s (length = %u); address: %s; port: %s.",
 		header.length, header.name, header.length,
@@ -192,10 +192,10 @@ bool ClientWorker::handleAddNewServerRequest( CoordinatorEvent event, char *buf,
 	int fd = socket->getSocket();
 	client->sockets.servers.set( fd, socket );
 
-	client->stripeList->addNewServer( socket );
+	client->stripeList->addNewServer( socket, false );
 
-	client->stripeList->print( stderr, false );
-	client->stripeList->print( stderr, true );
+	// client->stripeList->print( stderr, false );
+	// client->stripeList->print( stderr, true );
 
 	return true;
 }
@@ -204,17 +204,20 @@ bool ClientWorker::handleStripeListUpdateRequest( CoordinatorEvent event, char *
 	struct StripeListScalingHeader header;
 	struct StripeListPartitionHeader list;
 	size_t next = 0;
+	Client *client = Client::getInstance();
 	if ( ! this->protocol.parseStripeListScalingHeader( header, next, buf, size ) ) {
 		__ERROR__( "ClientWorker", "handleStripeListUpdateRequest", "Invalid new server header." );
 		return false;
 	}
-	__INFO__(
+	__DEBUG__(
 		BLUE, "ClientWorker", "handleStripeListUpdateRequest",
 		"Is migrating? %s; number of servers = %u, number of lists = %u, n = %u, k = %u.",
 		header.isMigrating ? "yes" : "no",
 		header.numServers, header.numLists,
 		header.n, header.k
 	);
+
+	client->stripeList->syncParams( true, header.numServers, header.numLists, header.n, header.k );
 
 	for ( uint32_t i = 0; i < header.numLists; i++ ) {
 		this->protocol.parseStripeListPartitionHeader(
@@ -223,16 +226,21 @@ bool ClientWorker::handleStripeListUpdateRequest( CoordinatorEvent event, char *
 			buf, size, next
 		);
 
-		__INFO__(
+		__DEBUG__(
 			BLUE, "ClientWorker", "handleStripeListUpdateRequest",
 			"List #%3u [%10u-%10u]:",
 			list.listId, list.partitionFrom, list.partitionTo
 		);
-		for ( uint32_t j = 0; j < header.n; j++ ) {
-			fprintf( stderr, "%u ", j < header.k ? list.data[ j ] : list.parity[ j - header.k ] );
-		}
-		fprintf( stderr, "\n" );
+		// for ( uint32_t j = 0; j < header.n; j++ ) {
+		// 	fprintf( stderr, "%u ", j < header.k ? list.data[ j ] : list.parity[ j - header.k ] );
+		// }
+		// fprintf( stderr, "\n" );
+
+		client->stripeList->syncStripeList( true, list.listId, list.partitionFrom, list.partitionTo, list.data, list.parity );
 	}
+
+	// client->stripeList->print( stderr, false );
+	// client->stripeList->print( stderr, true );
 
 	return true;
 }

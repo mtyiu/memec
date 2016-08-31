@@ -355,10 +355,10 @@ bool ServerWorker::handleAddNewServerRequest( CoordinatorEvent event, char *buf,
 	);
 	server->sockets.serverPeers.set( tmpfd, socket );
 
-	server->stripeList->addNewServer( socket );
+	server->stripeList->addNewServer( socket, false );
 
-	server->stripeList->print( stderr, false );
-	server->stripeList->print( stderr, true );
+	// server->stripeList->print( stderr, false );
+	// server->stripeList->print( stderr, true );
 
 	return true;
 }
@@ -371,13 +371,15 @@ bool ServerWorker::handleStripeListUpdateRequest( CoordinatorEvent event, char *
 		__ERROR__( "ServerWorker", "handleStripeListUpdateRequest", "Invalid new server header." );
 		return false;
 	}
-	__INFO__(
+	__DEBUG__(
 		BLUE, "ServerWorker", "handleStripeListUpdateRequest",
 		"Is migrating? %s; number of servers = %u, number of lists = %u, n = %u, k = %u.",
 		header.isMigrating ? "yes" : "no",
 		header.numServers, header.numLists,
 		header.n, header.k
 	);
+
+	ServerWorker::stripeList->syncParams( true, header.numServers, header.numLists, header.n, header.k );
 
 	for ( uint32_t i = 0; i < header.numLists; i++ ) {
 		this->protocol.parseStripeListPartitionHeader(
@@ -386,16 +388,21 @@ bool ServerWorker::handleStripeListUpdateRequest( CoordinatorEvent event, char *
 			buf, size, next
 		);
 
-		__INFO__(
+		__DEBUG__(
 			BLUE, "ServerWorker", "handleStripeListUpdateRequest",
 			"List #%3u [%10u-%10u]:",
 			list.listId, list.partitionFrom, list.partitionTo
 		);
-		for ( uint32_t j = 0; j < header.n; j++ ) {
-			fprintf( stderr, "%u ", j < header.k ? list.data[ j ] : list.parity[ j - header.k ] );
-		}
-		fprintf( stderr, "\n" );
+		// for ( uint32_t j = 0; j < header.n; j++ ) {
+		// 	fprintf( stderr, "%u ", j < header.k ? list.data[ j ] : list.parity[ j - header.k ] );
+		// }
+		// fprintf( stderr, "\n" );
+
+		ServerWorker::stripeList->syncStripeList( true, list.listId, list.partitionFrom, list.partitionTo, list.data, list.parity );
 	}
+
+	// ServerWorker::stripeList->print( stderr, false );
+	// ServerWorker::stripeList->print( stderr, true );
 
 	return true;
 }
