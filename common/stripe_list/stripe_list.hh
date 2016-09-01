@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include "../ds/array_map.hh"
 #include "../ds/bitmask_array.hh"
+#include "../ds/list_stripe.hh"
 #include "../hash/consistent_hash.hh"
 #include "../hash/hash_func.hh"
 
@@ -41,6 +42,13 @@ struct StripeListPartition {
 	uint32_t partitionFrom;
 	uint32_t partitionTo;
 	std::vector<uint8_t> indices;
+};
+
+struct ListChunkMigration {
+	uint32_t listId;
+	uint32_t chunkId;
+	uint32_t dstServerIndex;
+	void *ptr;
 };
 
 template <class T> class StripeList {
@@ -195,93 +203,6 @@ protected:
 			}
 			state.partitions.push_back( partition );
 		}
-	}
-
-	uint32_t diff( FILE *f = stdout ) {
-		uint32_t ret = 0;
-		bool first;
-		fprintf(
-			f,
-			"Number of servers : %u (original) vs. %u (migrating)\n"
-			"Number of lists   : %u (original) vs. %u (migrating)\n",
-			this->base.numServers, this->migrating.numServers,
-			this->base.numLists, this->migrating.numLists
-		);
-
-		uint32_t minNumLists = this->base.numLists;
-		if ( this->migrating.numLists < minNumLists )
-			minNumLists = this->migrating.numLists;
-
-		for ( uint32_t i = 0; i < minNumLists; i++ ) {
-			uint32_t diff = 0;
-			T **l1 = this->base.lists[ i ], **l2 = this->migrating.lists[ i ];
-
-			for ( uint32_t j = 0; j < this->n; j++ ) {
-				if ( l1[ j ] != l2[ j ] ) {
-					ret++;
-					diff++;
-				}
-			}
-
-			fprintf(
-				f, "#%u [%10u-%10u vs. %10u-%10u]: ", i,
-				this->base.partitions[ i ].from,
-				this->base.partitions[ i ].to,
-				this->migrating.partitions[ i ].from,
-				this->migrating.partitions[ i ].to
-			);
-
-			bool isMigrating = false;
-			do {
-				StripeListState &state = isMigrating ? this->migrating : this->base;
-
-				first = true;
-				fprintf( f, "((" );
-				for ( uint32_t j = 0; j < state.numServers; j++ ) {
-					uint32_t serverId = j;
-					if ( algo == ROUND_ROBIN )
-						serverId = ( serverId + i ) % state.numServers;
-
-					if ( state.data->check( i, serverId ) ) {
-						fprintf( f, "%s%u", first ? "" : ", ", serverId );
-						first = false;
-					}
-				}
-
-				fprintf( f, "), (" );
-				first = true;
-				for ( uint32_t j = 0; j < state.numServers; j++ ) {
-					uint32_t serverId = j;
-					if ( algo == ROUND_ROBIN )
-						serverId = ( serverId + i ) % state.numServers;
-
-					if ( state.parity->check( i, serverId ) ) {
-						fprintf( f, "%s%u", first ? "" : ", ", serverId );
-						first = false;
-					}
-				}
-
-				if ( isMigrating ) {
-					fprintf( f, ")); diff = %u\n", diff );
-				} else {
-					fprintf( f, ")) vs. " );
-				}
-
-				isMigrating = ! isMigrating;
-			} while ( isMigrating );
-
-			// for ( uint32_t j = 0; j < this->n; j++ ) {
-			// 	l1[ j ]->printAddress( f );
-			// 	fprintf( f, " vs. " );
-			// 	l2[ j ]->printAddress( f );
-			// 	fprintf( f, "\n" );
-			// }
-			// fprintf( f, "\n" );
-		}
-
-		fprintf( stderr, "Number of differences: %u\n", ret );
-
-		return ret;
 	}
 
 	/*
@@ -441,9 +362,6 @@ public:
 
 		// Update partitions
 		this->assign( true, this->base.numLists );
-
-		this->diff();
-
 		return true;
 	}
 
@@ -536,6 +454,133 @@ public:
 		}
 
 		return isMatched;
+	}
+
+	uint32_t diff( FILE *f = stdout ) {
+		uint32_t ret = 0;
+		bool first;
+		fprintf(
+			f,
+			"Number of servers : %u (original) vs. %u (migrating)\n"
+			"Number of lists   : %u (original) vs. %u (migrating)\n",
+			this->base.numServers, this->migrating.numServers,
+			this->base.numLists, this->migrating.numLists
+		);
+
+		uint32_t minNumLists = this->base.numLists;
+		if ( this->migrating.numLists < minNumLists )
+			minNumLists = this->migrating.numLists;
+
+		for ( uint32_t i = 0; i < minNumLists; i++ ) {
+			uint32_t diff = 0;
+			T **l1 = this->base.lists[ i ], **l2 = this->migrating.lists[ i ];
+
+			for ( uint32_t j = 0; j < this->n; j++ ) {
+				if ( l1[ j ] != l2[ j ] ) {
+					ret++;
+					diff++;
+				}
+			}
+
+			fprintf(
+				f, "#%u [%10u-%10u vs. %10u-%10u]: ", i,
+				this->base.partitions[ i ].from,
+				this->base.partitions[ i ].to,
+				this->migrating.partitions[ i ].from,
+				this->migrating.partitions[ i ].to
+			);
+
+			bool isMigrating = false;
+			do {
+				StripeListState &state = isMigrating ? this->migrating : this->base;
+
+				first = true;
+				fprintf( f, "((" );
+				for ( uint32_t j = 0; j < state.numServers; j++ ) {
+					uint32_t serverId = j;
+					if ( algo == ROUND_ROBIN )
+						serverId = ( serverId + i ) % state.numServers;
+
+					if ( state.data->check( i, serverId ) ) {
+						fprintf( f, "%s%u", first ? "" : ", ", serverId );
+						first = false;
+					}
+				}
+
+				fprintf( f, "), (" );
+				first = true;
+				for ( uint32_t j = 0; j < state.numServers; j++ ) {
+					uint32_t serverId = j;
+					if ( algo == ROUND_ROBIN )
+						serverId = ( serverId + i ) % state.numServers;
+
+					if ( state.parity->check( i, serverId ) ) {
+						fprintf( f, "%s%u", first ? "" : ", ", serverId );
+						first = false;
+					}
+				}
+
+				if ( isMigrating ) {
+					fprintf( f, ")); diff = %u\n", diff );
+				} else {
+					fprintf( f, ")) vs. " );
+				}
+
+				isMigrating = ! isMigrating;
+			} while ( isMigrating );
+
+			// for ( uint32_t j = 0; j < this->n; j++ ) {
+			// 	l1[ j ]->printAddress( f );
+			// 	fprintf( f, " vs. " );
+			// 	l2[ j ]->printAddress( f );
+			// 	fprintf( f, "\n" );
+			// }
+			// fprintf( f, "\n" );
+		}
+
+		fprintf( f, "Number of differences: %u\n", ret );
+
+		return ret;
+	}
+
+	std::vector<ListChunkMigration> diff( uint32_t myServerIndex ) {
+		std::vector<ListChunkMigration> ret;
+		uint32_t minNumLists = this->base.numLists;
+		if ( this->migrating.numLists < minNumLists )
+			minNumLists = this->migrating.numLists;
+
+		T *self = this->servers->at( myServerIndex );
+		for ( uint32_t i = 0; i < minNumLists; i++ ) {
+			T **l1 = this->base.lists[ i ], **l2 = this->migrating.lists[ i ];
+			int chunkId = -1;
+			uint32_t dstServerIndex = 0;
+
+			for ( uint32_t j = 0; j < this->n; j++ ) {
+				if ( l1[ j ] == self && l1[ j ] != l2[ j ] ) {
+					assert( chunkId == -1 );
+					chunkId = j;
+				}
+			}
+
+			for ( uint32_t j = 0; j < this->migrating.numServers; j++ ) {
+				if ( l2[ chunkId ] == this->servers->at( j ) ) {
+					dstServerIndex = j;
+					break;
+				}
+			}
+
+			if ( chunkId != -1 ) {
+				struct ListChunkMigration migration = {
+					.listId = i,
+					.chunkId = ( uint32_t ) chunkId,
+					.dstServerIndex = dstServerIndex,
+					.ptr = ( void * ) this->servers->at( dstServerIndex )
+				};
+				ret.push_back( migration );
+			}
+		}
+
+		return ret;
 	}
 
 	/*

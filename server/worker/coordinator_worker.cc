@@ -404,5 +404,59 @@ bool ServerWorker::handleStripeListUpdateRequest( CoordinatorEvent event, char *
 	// ServerWorker::stripeList->print( stderr, false );
 	// ServerWorker::stripeList->print( stderr, true );
 
+	// Prepare migration
+	Server *server = Server::getInstance();
+	std::vector<ListChunkMigration> migration = ServerWorker::stripeList->diff( server->getMyServerIndex() );
+
+	for ( size_t i = 0, size = migration.size(); i < size; i++ ) {
+		__INFO__(
+			BLUE, "ServerWorker", "handleStripeListUpdateRequest",
+			"Migrating (%u, %u) to Server #%u.",
+			migration[ i ].listId,
+			migration[ i ].chunkId,
+			migration[ i ].dstServerIndex
+		);
+
+		ServerPeerSocket *socket = ( ServerPeerSocket * ) migration[ i ].ptr;
+
+		LOCK( &ServerWorker::map->sealedLock );
+		std::unordered_map<uint32_t, std::unordered_set<uint32_t>>::iterator it = ServerWorker::map->stripeIds.find( migration[ i ].listId );
+
+		if ( it != ServerWorker::map->stripeIds.end() ) {
+			std::unordered_set<uint32_t> stripeIds = it->second;
+			UNLOCK( &ServerWorker::map->sealedLock );
+
+			std::unordered_set<uint32_t>::iterator sit;
+			for ( sit = stripeIds.begin(); sit != stripeIds.end(); sit++ ) {
+				uint32_t stripeId = *sit;
+
+				// Get and lock the chunk
+				Chunk *chunk = ServerWorker::map->migrateChunk(
+					migration[ i ].listId,
+					stripeId,
+					migration[ i ].chunkId
+				);
+
+				fprintf(
+					stderr, "(%u, %u, %u) --> %u; chunk = %p\n",
+					migration[ i ].listId,
+					stripeId,
+					migration[ i ].chunkId,
+					migration[ i ].dstServerIndex,
+					chunk
+				);
+				socket->print( stderr );
+
+				// Send the chunk to the migrated server
+				// ServerPeerEvent serverPeerEvent;
+				// serverPeerEvent.reqSetChunk(
+				//
+				// );
+			}
+		} else {
+			UNLOCK( &ServerWorker::map->sealedLock );
+		}
+	}
+
 	return true;
 }

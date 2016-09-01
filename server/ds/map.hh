@@ -30,13 +30,6 @@ private:
 	LOCK_T chunksLock;
 
 	/**
-	 * Store the used stripe IDs
-	 * (list ID) |-> std::unordered_set<(stripe ID)>
-	 */
-	std::unordered_map<uint32_t, std::unordered_set<uint32_t>> stripeIds;
-	LOCK_T stripeIdsLock;
-
-	/**
 	 * Store the forwarded, reconstructed chunks
 	 * (list ID, stripe ID, chunk ID) (src) |-> (list ID, stripe ID, chunk ID) (dst)
 	 */
@@ -45,6 +38,14 @@ private:
 		std::unordered_map<Metadata, Metadata> chunks;
 		LOCK_T lock;
 	} forwarded;
+
+	struct {
+		CuckooHash keys;
+		LOCK_T keysLock;
+
+		CuckooHash chunks;
+		LOCK_T chunksLock;
+	} migrated;
 
 public:
 	/**
@@ -59,6 +60,13 @@ public:
 	 */
 	std::unordered_set<Metadata> sealed;
 	LOCK_T sealedLock;
+
+	/**
+	 * Store the used stripe IDs
+	 * (list ID) |-> std::unordered_set<(stripe ID)>
+	 */
+	std::unordered_map<uint32_t, std::unordered_set<uint32_t>> stripeIds;
+	LOCK_T stripeIdsLock;
 
 	Map();
 	void setTimestamp( Timestamp *timestamp );
@@ -131,6 +139,9 @@ public:
 	);
 	bool findForwardedKey( uint8_t keySize, char *keyStr, bool isLarge, Metadata &dstMetadata );
 	bool eraseForwardedKey( uint8_t keySize, char *keyStr, bool isLarge );
+
+	// Migrate chunks and keys
+	Chunk *migrateChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId );
 };
 
 #endif

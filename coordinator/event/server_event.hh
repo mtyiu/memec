@@ -23,7 +23,8 @@ enum ServerEventType {
 	SERVER_EVENT_TYPE_HANDLE_RECONSTRUCTION_REQUEST,
 	SERVER_EVENT_TYPE_ACK_RECONSTRUCTION_SUCCESS,
 	SERVER_EVENT_TYPE_ACK_RECONSTRUCTION_FAILURE,
-	SERVER_EVENT_TYPE_SCALING
+	SERVER_EVENT_TYPE_ADD_NEW_SERVER,
+	SERVER_EVENT_TYPE_UPDATE_STRIPE_LIST
 };
 
 class ServerEvent : public Event<ServerSocket> {
@@ -57,8 +58,8 @@ public:
 			uint8_t nameLen;
 			char *name;
 			ServerSocket *socket;
-			bool isMigrating;
-		} scaling;
+		} add;
+		bool isMigrating;
 	} message;
 
 	inline void pending( ServerSocket *socket ) {
@@ -161,14 +162,18 @@ public:
 		this->set( instanceId, requestId, socket );
 	}
 
-	inline void scaling( uint8_t nameLen, char *name, ServerSocket *socket, bool isMigrating ) {
-		this->type = SERVER_EVENT_TYPE_SCALING;
-		this->message.scaling = {
+	inline void addNewServer( uint8_t nameLen, char *name, ServerSocket *socket ) {
+		this->type = SERVER_EVENT_TYPE_ADD_NEW_SERVER;
+		this->message.add = {
 			.nameLen = nameLen,
 			.name = name,
-			.socket = socket,
-			.isMigrating = isMigrating
+			.socket = socket
 		};
+	}
+
+	inline void updateStripeList( bool isMigrating = true ) {
+		this->type = SERVER_EVENT_TYPE_UPDATE_STRIPE_LIST;
+		this->message.isMigrating = isMigrating;
 	}
 };
 

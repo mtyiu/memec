@@ -117,6 +117,7 @@ public:
 	void printPending( FILE *f = stdout );
 	void time();
 	void add();
+	void migrate();
 	void seal();
 	void flush();
 	void metadata();

@@ -659,6 +659,9 @@ void Coordinator::interactive() {
 		} else if ( strcmp( command, "add" ) == 0 ) {
 			valid = true;
 			this->add();
+		} else if ( strcmp( command, "migrate" ) == 0 ) {
+			valid = true;
+			this->migrate();
 		} else if ( strcmp( command, "seal" ) == 0 ) {
 			valid = true;
 			this->seal();
@@ -767,6 +770,7 @@ void Coordinator::help() {
 		"- id: Print instance ID\n"
 		"- time: Show elapsed time\n"
 		"- add: Add new server\n"
+		"- migrate: Migrate data to the new server(s)\n"
 		"- hash: Show the stripe list hashed by an input key\n"
 		"- lookup: Search for the metadata of an input key\n"
 		"- stripe: Query the seal status of a stripe\n"
@@ -836,19 +840,26 @@ void Coordinator::add() {
 	printf( "\n" );
 	this->stripeList->print( stdout, false );
 	this->stripeList->print( stdout, true );
+	this->stripeList->diff();
 
 	char *namePtr = this->config.global.servers[ index ].name;
 	uint8_t nameLen = ( uint8_t ) strlen( name );
 
 	// Notify all servers
 	ServerEvent serverEvent;
-	serverEvent.scaling( nameLen, namePtr, socket, true );
+	serverEvent.addNewServer( nameLen, namePtr, socket );
 	this->eventQueue.insert( serverEvent );
 
 	// Notify all clients
 	ClientEvent clientEvent;
 	clientEvent.scaling( nameLen, namePtr, socket, true );
 	this->eventQueue.insert( clientEvent );
+}
+
+void Coordinator::migrate() {
+	ServerEvent serverEvent;
+	serverEvent.updateStripeList();
+	this->eventQueue.insert( serverEvent );
 }
 
 void Coordinator::hash() {

@@ -360,3 +360,97 @@ bool Map::eraseForwardedKey( uint8_t keySize, char *keyStr, bool isLarge ) {
 
 	return ret;
 }
+
+Chunk *Map::migrateChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId ) {
+	Chunk *chunk;
+	ChunkIdentifier id( listId, stripeId, chunkId );
+
+	// Lock both keysLock and chunksLock
+	LOCK( &this->keysLock );
+	LOCK( &this->chunksLock );
+
+	// Find the chunk
+	chunk = ( Chunk * ) this->chunks.find( ( char * ) &id, CHUNK_IDENTIFIER_SIZE );
+	if ( ! chunk ) {
+		UNLOCK( &this->chunksLock );
+		UNLOCK( &this->keysLock );
+		return 0;
+	}
+
+	// Remove the chunk from chunks map
+	this->chunks.del( ( char * ) &id, CHUNK_IDENTIFIER_SIZE );
+
+	// Remove the keys in this chunk from keys map
+	if ( ! ChunkUtil::isParity( chunk ) ) {
+		char *ptr = ChunkUtil::getData( chunk );
+		char *keyPtr, *valuePtr;
+		uint8_t keySize;
+		uint32_t valueSize, offset = 0, size, splitSize, splitOffset;
+		bool isLarge;
+
+		while( ptr + KEY_VALUE_METADATA_SIZE < ChunkUtil::getData( chunk ) + ChunkUtil::chunkSize ) {
+			KeyValue::deserialize( ptr, keyPtr, keySize, valuePtr, valueSize, splitOffset );
+			if ( keySize == 0 && valueSize == 0 )
+				break;
+
+			isLarge = LargeObjectUtil::isLarge( keySize, valueSize, 0, &splitSize );
+			if ( isLarge ) {
+				if ( splitOffset + splitSize > valueSize )
+					splitSize = valueSize - splitOffset;
+
+				size = KEY_VALUE_METADATA_SIZE + SPLIT_OFFSET_SIZE + keySize + splitSize;
+			} else {
+				size = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
+			}
+
+			this->keys.del( keyPtr, keySize, isLarge );
+			offset += size;
+			ptr += size;
+
+			fprintf( stderr, "(%u, %u, %u): %.*s\n", listId, stripeId, chunkId, keySize, keyPtr );
+		}
+	}
+
+	// Unlock both keysLock and chunksLock
+	UNLOCK( &this->chunksLock );
+	UNLOCK( &this->keysLock );
+
+	// Lock both keysLock and chunksLock in the migrated struct
+	LOCK( &this->migrated.keysLock );
+	LOCK( &this->migrated.chunksLock );
+
+	// Insert the keys and chunks into the migrated struct
+	if ( ! ChunkUtil::isParity( chunk ) ) {
+		char *ptr = ChunkUtil::getData( chunk );
+		char *keyPtr, *valuePtr;
+		uint8_t keySize;
+		uint32_t valueSize, offset = 0, size, splitSize, splitOffset;
+		bool isLarge;
+
+		while( ptr + KEY_VALUE_METADATA_SIZE < ChunkUtil::getData( chunk ) + ChunkUtil::chunkSize ) {
+			KeyValue::deserialize( ptr, keyPtr, keySize, valuePtr, valueSize, splitOffset );
+			if ( keySize == 0 && valueSize == 0 )
+				break;
+
+			isLarge = LargeObjectUtil::isLarge( keySize, valueSize, 0, &splitSize );
+			if ( isLarge ) {
+				if ( splitOffset + splitSize > valueSize )
+					splitSize = valueSize - splitOffset;
+
+				size = KEY_VALUE_METADATA_SIZE + SPLIT_OFFSET_SIZE + keySize + splitSize;
+			} else {
+				size = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
+			}
+
+			this->migrated.keys.insert( keyPtr, keySize, ptr, isLarge );
+			offset += size;
+			ptr += size;
+		}
+	}
+
+	// Unlock both keysLock and chunksLock in the migrated struct
+	UNLOCK( &this->migrated.chunksLock );
+	UNLOCK( &this->migrated.keysLock );
+
+	return chunk;
+}
