@@ -238,6 +238,9 @@ void ServerWorker::dispatch( CoordinatorEvent event ) {
 					case PROTO_OPCODE_STRIPE_LIST_UPDATE:
 						this->handleStripeListUpdateRequest( event, buffer.data, header.length );
 						break;
+					case PROTO_OPCODE_MIGRATE:
+						this->handleMigrateRequest( event );
+						break;
 					default:
 						__ERROR__( "ServerWorker", "dispatch", "Invalid opcode from coordinator." );
 						break;
@@ -402,8 +405,12 @@ bool ServerWorker::handleStripeListUpdateRequest( CoordinatorEvent event, char *
 	}
 
 	// ServerWorker::stripeList->print( stderr, false );
-	// ServerWorker::stripeList->print( stderr, true );
+	ServerWorker::stripeList->print( stderr, true );
 
+	return true;
+}
+
+bool ServerWorker::handleMigrateRequest( CoordinatorEvent event ) {
 	// Prepare migration
 	Server *server = Server::getInstance();
 	std::vector<ListChunkMigration> migration = ServerWorker::stripeList->diff( server->getMyServerIndex() );
@@ -413,7 +420,7 @@ bool ServerWorker::handleStripeListUpdateRequest( CoordinatorEvent event, char *
 
 	for ( size_t i = 0, size = migration.size(); i < size; i++ ) {
 		__INFO__(
-			BLUE, "ServerWorker", "handleStripeListUpdateRequest",
+			BLUE, "ServerWorker", "handleMigrateRequest",
 			"Migrating (%u, %u) to Server #%u.",
 			migration[ i ].listId,
 			migration[ i ].chunkId,
@@ -438,11 +445,7 @@ bool ServerWorker::handleStripeListUpdateRequest( CoordinatorEvent event, char *
 				uint32_t requestId = ServerWorker::idGenerator->nextVal( this->workerId );
 				Chunk *chunk;
 
-				metadata.set(
-					migration[ i ].listId,
-					*sit,
-					migration[ i ].chunkId
-				);
+				metadata.set( migration[ i ].listId, *sit, migration[ i ].chunkId );
 
 				// Get and lock the chunk
 				chunk = ServerWorker::map->migrateChunk( metadata.listId, metadata.stripeId, metadata.chunkId );

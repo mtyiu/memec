@@ -21,6 +21,7 @@
 #define PROTO_OPCODE_PARITY_MIGRATE               0x41
 #define PROTO_OPCODE_ADD_NEW_SERVER               0x42
 #define PROTO_OPCODE_STRIPE_LIST_UPDATE           0x43
+#define PROTO_OPCODE_MIGRATE                      0x44
 
 // Application <-> Client or Client <-> Server (0-19) //
 #define PROTO_OPCODE_GET                          0x01

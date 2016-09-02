@@ -110,6 +110,7 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 			break;
 		case SERVER_EVENT_TYPE_ADD_NEW_SERVER:
 		case SERVER_EVENT_TYPE_UPDATE_STRIPE_LIST:
+		case SERVER_EVENT_TYPE_MIGRATE:
 			isSend = false;
 			break;
 		default:
@@ -221,26 +222,38 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 		}
 	} else if ( event.type == SERVER_EVENT_TYPE_HANDLE_RECONSTRUCTION_REQUEST ) {
 		this->handleReconstructionRequest( event.socket );
-	} else if ( event.type == SERVER_EVENT_TYPE_ADD_NEW_SERVER || event.type == SERVER_EVENT_TYPE_UPDATE_STRIPE_LIST ) {
+	} else if ( event.type == SERVER_EVENT_TYPE_ADD_NEW_SERVER || event.type == SERVER_EVENT_TYPE_UPDATE_STRIPE_LIST || event.type == SERVER_EVENT_TYPE_MIGRATE ) {
 		ArrayMap<int, ServerSocket> &servers = Coordinator::getInstance()->sockets.servers;
 		uint32_t requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
 
 		LOCK( &servers.lock );
-		if ( event.type == SERVER_EVENT_TYPE_ADD_NEW_SERVER ) {
-			buffer.data = this->protocol.addNewServer(
-				buffer.size, Coordinator::instanceId, requestId,
-				event.message.add.name,
-				event.message.add.nameLen,
-				event.message.add.socket,
-				true
-			);
-		} else {
-			buffer.data = this->protocol.updateStripeList(
-				buffer.size, Coordinator::instanceId, requestId,
-				CoordinatorWorker::stripeList,
-				event.message.isMigrating,
-				true
-			);
+		switch( event.type ) {
+			case SERVER_EVENT_TYPE_ADD_NEW_SERVER:
+				buffer.data = this->protocol.addNewServer(
+					buffer.size, Coordinator::instanceId, requestId,
+					event.message.add.name,
+					event.message.add.nameLen,
+					event.message.add.socket,
+					true
+				);
+				break;
+			case SERVER_EVENT_TYPE_UPDATE_STRIPE_LIST:
+				buffer.data = this->protocol.updateStripeList(
+					buffer.size, Coordinator::instanceId, requestId,
+					CoordinatorWorker::stripeList,
+					event.message.isMigrating,
+					true
+				);
+				break;
+			case SERVER_EVENT_TYPE_MIGRATE:
+				buffer.data = this->protocol.buffer.send;
+				buffer.size = this->protocol.generateHeader(
+					PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_SERVER, PROTO_OPCODE_MIGRATE,
+					0, Coordinator::instanceId, requestId
+				);
+				break;
+			default:
+				break;
 		}
 
 		for ( uint32_t i = 0, size = servers.size(); i < size; i++ ) {

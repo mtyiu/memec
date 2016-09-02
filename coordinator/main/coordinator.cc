@@ -850,6 +850,9 @@ void Coordinator::add() {
 	serverEvent.addNewServer( nameLen, namePtr, socket );
 	this->eventQueue.insert( serverEvent );
 
+	serverEvent.updateStripeList();
+	this->eventQueue.insert( serverEvent );
+
 	// Notify all clients
 	ClientEvent clientEvent;
 	clientEvent.scaling( nameLen, namePtr, socket, true );
@@ -858,7 +861,7 @@ void Coordinator::add() {
 
 void Coordinator::migrate() {
 	ServerEvent serverEvent;
-	serverEvent.updateStripeList();
+	serverEvent.migrate();
 	this->eventQueue.insert( serverEvent );
 }
 

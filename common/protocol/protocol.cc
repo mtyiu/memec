@@ -139,6 +139,7 @@ bool Protocol::parseHeader( struct ProtocolHeader &header, char *buf, size_t siz
 		case PROTO_OPCODE_PARITY_MIGRATE:
 		case PROTO_OPCODE_ADD_NEW_SERVER:
 		case PROTO_OPCODE_STRIPE_LIST_UPDATE:
+		case PROTO_OPCODE_MIGRATE:
 		case PROTO_OPCODE_GET:
 		case PROTO_OPCODE_SET:
 		case PROTO_OPCODE_UPDATE:

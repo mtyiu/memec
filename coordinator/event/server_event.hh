@@ -24,7 +24,8 @@ enum ServerEventType {
 	SERVER_EVENT_TYPE_ACK_RECONSTRUCTION_SUCCESS,
 	SERVER_EVENT_TYPE_ACK_RECONSTRUCTION_FAILURE,
 	SERVER_EVENT_TYPE_ADD_NEW_SERVER,
-	SERVER_EVENT_TYPE_UPDATE_STRIPE_LIST
+	SERVER_EVENT_TYPE_UPDATE_STRIPE_LIST,
+	SERVER_EVENT_TYPE_MIGRATE
 };
 
 class ServerEvent : public Event<ServerSocket> {
@@ -174,6 +175,10 @@ public:
 	inline void updateStripeList( bool isMigrating = true ) {
 		this->type = SERVER_EVENT_TYPE_UPDATE_STRIPE_LIST;
 		this->message.isMigrating = isMigrating;
+	}
+
+	inline void migrate() {
+		this->type = SERVER_EVENT_TYPE_MIGRATE;
 	}
 };
 
