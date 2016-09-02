@@ -42,18 +42,20 @@ public:
 	ServerPeerSocket *socket;
 	mutable Chunk *chunk;
 	bool isDegraded;
+	bool isMigrating;
 	bool isSealed;
 	bool self;
 	uint8_t sealIndicatorCount;
 	bool *sealIndicator;
 
-	void set( uint32_t listId, uint32_t stripeId, uint32_t chunkId, ServerPeerSocket *socket, Chunk *chunk = 0, bool isDegraded = true, bool self = false ) {
+	void set( uint32_t listId, uint32_t stripeId, uint32_t chunkId, ServerPeerSocket *socket, Chunk *chunk = 0, bool isDegraded = true, bool self = false, bool isMigrating = false ) {
 		this->listId = listId;
 		this->stripeId = stripeId;
 		this->chunkId = chunkId;
 		this->socket = socket;
 		this->chunk = chunk;
 		this->isDegraded = isDegraded;
+		this->isMigrating = isMigrating;
 		this->isSealed = false;
 		this->sealIndicatorCount = 0;
 		this->sealIndicator = 0;

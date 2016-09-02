@@ -1446,7 +1446,7 @@ bool ServerWorker::handleSetChunkResponse( ServerPeerEvent event, bool success, 
 		// Release degraded lock
 		uint32_t remaining, total;
 		if ( ! ServerWorker::pending->eraseReleaseDegradedLock( pid.parentInstanceId, pid.parentRequestId, 1, remaining, total, &pid ) ) {
-			__ERROR__( "ServerWorker", "handleSetChunkResponse", "Cannot find a pending coordinator release degraded lock request that matches the response. The message will be discarded." );
+			__ERROR__( "ServerWorker", "handleSetChunkResponse", "[%u, %u] Cannot find a pending coordinator release degraded lock request that matches the response. The message will be discarded.", event.instanceId, event.requestId );
 			return false;
 		}
 
@@ -1457,6 +1457,12 @@ bool ServerWorker::handleSetChunkResponse( ServerPeerEvent event, bool success, 
 			ServerWorker::eventQueue->insert( coordinatorEvent );
 			__DEBUG__( YELLOW, "ServerWorker", "handleSetChunkResponse", "End of release degraded lock requests id = %u, total = %u.", pid.requestId, total );
 		}
+	} else if ( chunkRequest.isMigrating ) {
+		// Migrating chunks during scaling up
+		// TODO...
+		// fprintf( stderr, "[%u, %u] isMigrating (%u, %u, %u)...\n", event.instanceId, event.requestId, header.listId, header.stripeId, header.chunkId );
+
+		// Clear the migrated chunk and update keys map
 	} else {
 		// Reconstruction
 		uint32_t remainingChunks, remainingKeys, totalChunks, totalKeys;

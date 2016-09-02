@@ -468,6 +468,15 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 		true // needsUnlock
 	);
 
+	if ( ! chunk ) {
+		// Allocate the chunk if it does not exist yet
+		chunk = ServerWorker::chunkPool->alloc( metadata.listId, metadata.stripeId, metadata.chunkId );
+		ServerWorker::map->setChunk(
+			metadata.listId, metadata.stripeId, metadata.chunkId,
+			chunk, ChunkUtil::isParity( chunk )
+		);
+	}
+
 	ServerWorker::map->getKeysMap( 0, &keysLock );
 	ServerWorker::map->getChunksMap( 0, &chunksLock );
 

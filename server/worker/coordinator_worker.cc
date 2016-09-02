@@ -408,6 +408,9 @@ bool ServerWorker::handleStripeListUpdateRequest( CoordinatorEvent event, char *
 	Server *server = Server::getInstance();
 	std::vector<ListChunkMigration> migration = ServerWorker::stripeList->diff( server->getMyServerIndex() );
 
+	// Insert into coordinator's migration pending map
+	// TODO...
+
 	for ( size_t i = 0, size = migration.size(); i < size; i++ ) {
 		__INFO__(
 			BLUE, "ServerWorker", "handleStripeListUpdateRequest",
@@ -428,39 +431,45 @@ bool ServerWorker::handleStripeListUpdateRequest( CoordinatorEvent event, char *
 
 			std::unordered_set<uint32_t>::iterator sit;
 			for ( sit = stripeIds.begin(); sit != stripeIds.end(); sit++ ) {
-				uint32_t stripeId = *sit;
+				Metadata metadata;
+				ServerPeerEvent serverPeerEvent;
+				ChunkRequest chunkRequest;
+				uint16_t instanceId = Server::instanceId;
+				uint32_t requestId = ServerWorker::idGenerator->nextVal( this->workerId );
+				Chunk *chunk;
 
-				// Get and lock the chunk
-				Chunk *chunk = ServerWorker::map->migrateChunk(
+				metadata.set(
 					migration[ i ].listId,
-					stripeId,
+					*sit,
 					migration[ i ].chunkId
 				);
 
+				// Get and lock the chunk
+				chunk = ServerWorker::map->migrateChunk( metadata.listId, metadata.stripeId, metadata.chunkId );
+
 				// fprintf(
-				// 	stderr, "(%u, %u, %u) --> %u; chunk = %p\n",
-				// 	migration[ i ].listId,
-				// 	stripeId,
-				// 	migration[ i ].chunkId,
+				// 	stderr, "[%u, %u] (%u, %u, %u) --> %u; chunk = %p\n",
+				// 	instanceId, requestId,
+				// 	metadata.listId, metadata.stripeId, metadata.chunkId,
 				// 	migration[ i ].dstServerIndex,
 				// 	chunk
 				// );
 				// socket->print( stderr );
 
-				// Send the chunk to the migrated server
-				Metadata metadata;
-				ServerPeerEvent serverPeerEvent;
+				// Add to ChunkRequest pending map
+				chunkRequest.set(
+					metadata.listId, metadata.stripeId, metadata.chunkId,
+					socket, chunk,
+					false, // isDegraded
+					false, // self,
+					true   // isMigrating
+				);
+				if ( ! ServerWorker::pending->insertChunkRequest( PT_SERVER_PEER_SET_CHUNK, instanceId, event.instanceId, requestId, event.requestId, socket, chunkRequest ) ) {
+					__ERROR__( "ServerWorker", "handleStripeListUpdateRequest", "Cannot insert into server CHUNK_REQUEST pending map." );
+				}
 
-				metadata.set(
-					migration[ i ].listId,
-					stripeId,
-					migration[ i ].chunkId
-				);
-				serverPeerEvent.reqSetChunk(
-					socket, Server::instanceId,
-					ServerWorker::idGenerator->nextVal( this->workerId ),
-					metadata, chunk, false
-				);
+				// Send the chunk to the migrated server
+				serverPeerEvent.reqSetChunk( socket, instanceId, requestId, metadata, chunk, false );
 				ServerWorker::eventQueue->insert( serverPeerEvent );
 			}
 		} else {
