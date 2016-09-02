@@ -432,7 +432,7 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 			return false;
 		}
 		metadata.set( header.chunkData.listId, header.chunkData.stripeId, header.chunkData.chunkId );
-		__DEBUG__(
+		__INFO__(
 			BLUE, "ServerWorker", "handleSetChunkRequest",
 			"[SET_CHUNK] List ID: %u; stripe ID: %u; chunk ID: %u; chunk size = %u.",
 			header.chunkData.listId, header.chunkData.stripeId, header.chunkData.chunkId, header.chunkData.size
@@ -443,7 +443,7 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 			return false;
 		}
 		metadata.set( header.chunkKeyValue.listId, header.chunkKeyValue.stripeId, header.chunkKeyValue.chunkId );
-		__DEBUG__(
+		__INFO__(
 			BLUE, "ServerWorker", "handleSetChunkRequest",
 			"[SET_CHUNK] List ID: %u; stripe ID: %u; chunk ID: %u; deleted = %u; count = %u.",
 			header.chunkKeyValue.listId, header.chunkKeyValue.stripeId, header.chunkKeyValue.chunkId,

@@ -437,21 +437,31 @@ bool ServerWorker::handleStripeListUpdateRequest( CoordinatorEvent event, char *
 					migration[ i ].chunkId
 				);
 
-				fprintf(
-					stderr, "(%u, %u, %u) --> %u; chunk = %p\n",
-					migration[ i ].listId,
-					stripeId,
-					migration[ i ].chunkId,
-					migration[ i ].dstServerIndex,
-					chunk
-				);
-				socket->print( stderr );
+				// fprintf(
+				// 	stderr, "(%u, %u, %u) --> %u; chunk = %p\n",
+				// 	migration[ i ].listId,
+				// 	stripeId,
+				// 	migration[ i ].chunkId,
+				// 	migration[ i ].dstServerIndex,
+				// 	chunk
+				// );
+				// socket->print( stderr );
 
 				// Send the chunk to the migrated server
-				// ServerPeerEvent serverPeerEvent;
-				// serverPeerEvent.reqSetChunk(
-				//
-				// );
+				Metadata metadata;
+				ServerPeerEvent serverPeerEvent;
+
+				metadata.set(
+					migration[ i ].listId,
+					stripeId,
+					migration[ i ].chunkId
+				);
+				serverPeerEvent.reqSetChunk(
+					socket, Server::instanceId,
+					ServerWorker::idGenerator->nextVal( this->workerId ),
+					metadata, chunk, false
+				);
+				ServerWorker::eventQueue->insert( serverPeerEvent );
 			}
 		} else {
 			UNLOCK( &ServerWorker::map->sealedLock );
