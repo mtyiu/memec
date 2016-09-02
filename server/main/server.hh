@@ -77,7 +77,9 @@ public:
 	Coding *coding;
 	StripeList<ServerPeerSocket> *stripeList;
 	std::vector<StripeListIndex> stripeListIndex;
+	std::vector<StripeListIndex> migratingStripeListIndex;
 	std::vector<MixedChunkBuffer *> chunkBuffer;
+	std::vector<MixedChunkBuffer *> migratingChunkBuffer;
 	GetChunkBuffer getChunkBuffer;
 	RemappedBuffer remappedBuffer;
 	DegradedChunkBuffer degradedChunkBuffer;
@@ -100,8 +102,8 @@ public:
 	static void signalHandler( int signal );
 
 	bool init( char *path, OptionList &globalOptions, OptionList &serverOptions, bool verbose );
-	bool init( int myServerIndex );
-	bool initChunkBuffer();
+	bool init( int myServerIndex, bool isMigrating );
+	bool initChunkBuffer( bool isMigrating );
 	bool start();
 	bool stop();
 

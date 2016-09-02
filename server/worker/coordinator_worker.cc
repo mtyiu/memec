@@ -405,7 +405,9 @@ bool ServerWorker::handleStripeListUpdateRequest( CoordinatorEvent event, char *
 	}
 
 	// ServerWorker::stripeList->print( stderr, false );
-	ServerWorker::stripeList->print( stderr, true );
+	// ServerWorker::stripeList->print( stderr, true );
+
+	// Initialize migratingChunkBuffer
 
 	return true;
 }

@@ -56,7 +56,7 @@ bool Server::init( char *path, OptionList &globalOptions, OptionList &serverOpti
 	     ( ! this->config.global.validate() ) ||
 	     ( ! this->config.server.parse( path ) ) ||
 	     ( ! this->config.server.override( serverOptions ) ) ||
-		 ( ! this->config.server.validate() )
+	     ( ! this->config.server.validate() )
 	) {
 		return false;
 	}
@@ -217,20 +217,26 @@ bool Server::init( char *path, OptionList &globalOptions, OptionList &serverOpti
 	return true;
 }
 
-bool Server::init( int myServerIndex ) {
+bool Server::init( int myServerIndex, bool isMigrating ) {
 	this->myServerIndex = myServerIndex;
 	if ( myServerIndex == -1 )
 		return false;
 
-	this->stripeListIndex = this->stripeList->list( myServerIndex );
+	if ( isMigrating )
+		this->migratingStripeListIndex = this->stripeList->list( myServerIndex, true );
+	else
+		this->stripeListIndex = this->stripeList->list( myServerIndex, false );
 
-	for ( uint32_t i = 0, size = this->stripeListIndex.size(); i < size; i++ ) {
-		uint32_t listId = this->stripeListIndex[ i ].listId,
-				 chunkId = this->stripeListIndex[ i ].chunkId;
+	std::vector<StripeListIndex> &stripeListIndex = isMigrating ? this->migratingStripeListIndex : this->stripeListIndex;
+	std::vector<MixedChunkBuffer *> &chunkBuffer = isMigrating ? this->migratingChunkBuffer : this->chunkBuffer;
+
+	for ( uint32_t i = 0, size = stripeListIndex.size(); i < size; i++ ) {
+		uint32_t listId  = stripeListIndex[ i ].listId,
+				 chunkId = stripeListIndex[ i ].chunkId;
 		uint32_t stripeId = 0;
-		if ( this->stripeListIndex[ i ].isParity ) {
+		if ( stripeListIndex[ i ].isParity ) {
 			// The stripe ID is not used
-			this->chunkBuffer[ listId ] = new MixedChunkBuffer(
+			chunkBuffer[ listId ] = new MixedChunkBuffer(
 				new ParityChunkBuffer(
 					this->config.server.buffer.chunksPerList,
 					listId, stripeId, chunkId, false
@@ -240,7 +246,7 @@ bool Server::init( int myServerIndex ) {
 			// Get minimum stripe ID
 			stripeId = 0;
 
-			this->chunkBuffer[ listId ] = new MixedChunkBuffer(
+			chunkBuffer[ listId ] = new MixedChunkBuffer(
 				new DataChunkBuffer(
 					this->config.server.buffer.chunksPerList,
 					listId, stripeId, chunkId, false
@@ -252,14 +258,14 @@ bool Server::init( int myServerIndex ) {
 	return true;
 }
 
-bool Server::initChunkBuffer() {
+bool Server::initChunkBuffer( bool isMigrating ) {
 	if ( this->myServerIndex == -1 )
 		return false;
 
-	for ( uint32_t i = 0, size = this->stripeListIndex.size(); i < size; i++ ) {
-		uint32_t listId = this->stripeListIndex[ i ].listId;
-		this->chunkBuffer[ listId ]->init();
-	}
+	std::vector<StripeListIndex> &stripeListIndex = isMigrating ? this->migratingStripeListIndex : this->stripeListIndex;
+	std::vector<MixedChunkBuffer *> &chunkBuffer = isMigrating ? this->migratingChunkBuffer : this->chunkBuffer;
+	for ( uint32_t i = 0, size = stripeListIndex.size(); i < size; i++ )
+		chunkBuffer[ stripeListIndex[ i ].listId ]->init();
 
 	return true;
 }

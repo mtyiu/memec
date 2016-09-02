@@ -55,7 +55,7 @@ bool ServerWorker::handleServerReconstructedMsg( CoordinatorEvent event, char *b
 			}
 		}
 
-		server->init( myServerIndex );
+		server->init( myServerIndex, false );
 	}
 
 	s = new ServerPeerSocket();
@@ -125,7 +125,7 @@ bool ServerWorker::handleBackupServerPromotedMsg( CoordinatorEvent event, char *
 
 	// Initialize
 	ServerAddr addr( 0, header.addr, header.port );
-	server->init( index );
+	server->init( index, false );
 
 	s = new ServerPeerSocket();
 	s->init(
@@ -399,5 +399,5 @@ bool ServerWorker::handleReconstructionUnsealedRequest( CoordinatorEvent event, 
 }
 
 bool ServerWorker::handleCompletedReconstructionAck() {
-	return Server::getInstance()->initChunkBuffer();
+	return Server::getInstance()->initChunkBuffer( false );
 }
