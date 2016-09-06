@@ -223,10 +223,7 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 	} else if ( event.type == SERVER_EVENT_TYPE_HANDLE_RECONSTRUCTION_REQUEST ) {
 		this->handleReconstructionRequest( event.socket );
 	} else if ( event.type == SERVER_EVENT_TYPE_ADD_NEW_SERVER || event.type == SERVER_EVENT_TYPE_UPDATE_STRIPE_LIST || event.type == SERVER_EVENT_TYPE_MIGRATE ) {
-		ArrayMap<int, ServerSocket> &servers = Coordinator::getInstance()->sockets.servers;
 		uint32_t requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
-
-		LOCK( &servers.lock );
 		switch( event.type ) {
 			case SERVER_EVENT_TYPE_ADD_NEW_SERVER:
 				buffer.data = this->protocol.addNewServer(
@@ -256,16 +253,21 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 				break;
 		}
 
-		for ( uint32_t i = 0, size = servers.size(); i < size; i++ ) {
-			ServerSocket *server = servers.values[ i ];
-			if ( ! server->ready() )
-				continue; // Skip failed clients
+		for ( uint32_t i = 0; i < 2; i++ ) {
+			ArrayMap<int, ServerSocket> &servers = ( i == 0 ? Coordinator::getInstance()->sockets.servers : Coordinator::getInstance()->sockets.backupServers );
 
-			ret = server->send( buffer.data, buffer.size, connected );
-			if ( ret != ( ssize_t ) buffer.size )
-				__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+			LOCK( &servers.lock );
+			for ( uint32_t j = 0, size = servers.size(); j < size; j++ ) {
+				ServerSocket *server = servers.values[ j ];
+				if ( ! server->ready() )
+					continue; // Skip failed clients
+
+				ret = server->send( buffer.data, buffer.size, connected );
+				if ( ret != ( ssize_t ) buffer.size )
+					__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+			}
+			UNLOCK( &servers.lock );
 		}
-		UNLOCK( &servers.lock );
 	} else if ( isSend ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
 		if ( ret != ( ssize_t ) buffer.size )

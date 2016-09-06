@@ -12,6 +12,7 @@ ServerEventQueue *ServerWorker::eventQueue;
 StripeList<ServerPeerSocket> *ServerWorker::stripeList;
 Map *ServerWorker::map;
 std::vector<MixedChunkBuffer *> *ServerWorker::chunkBuffer;
+std::vector<MixedChunkBuffer *> *ServerWorker::migratingChunkBuffer;
 GetChunkBuffer *ServerWorker::getChunkBuffer;
 DegradedChunkBuffer *ServerWorker::degradedChunkBuffer;
 RemappedBuffer *ServerWorker::remappedBuffer;
@@ -155,6 +156,7 @@ bool ServerWorker::init() {
 	ServerWorker::stripeList = server->stripeList;
 	ServerWorker::map = &server->map;
 	ServerWorker::chunkBuffer = &server->chunkBuffer;
+	ServerWorker::migratingChunkBuffer = &server->migratingChunkBuffer;
 	ServerWorker::getChunkBuffer = &server->getChunkBuffer;
 	ServerWorker::degradedChunkBuffer = &server->degradedChunkBuffer;
 	ServerWorker::remappedBuffer = &server->remappedBuffer;

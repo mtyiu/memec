@@ -67,6 +67,7 @@ private:
 	static StripeList<ServerPeerSocket> *stripeList;
 	static Map *map;
 	static std::vector<MixedChunkBuffer *> *chunkBuffer;
+	static std::vector<MixedChunkBuffer *> *migratingChunkBuffer;
 	static GetChunkBuffer *getChunkBuffer;
 	static DegradedChunkBuffer *degradedChunkBuffer;
 	static RemappedBuffer *remappedBuffer;

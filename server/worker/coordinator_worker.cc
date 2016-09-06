@@ -331,7 +331,7 @@ bool ServerWorker::handleAddNewServerRequest( CoordinatorEvent event, char *buf,
 
 	Socket::ntoh_ip( header.addr, ipStr, sizeof( ipStr ) );
 	Socket::ntoh_port( header.port, portStr, sizeof( portStr ) );
-	__DEBUG__(
+	__INFO__(
 		BLUE, "ServerWorker", "handleAddNewServerRequest",
 		"Server name: %.*s (length = %u); address: %s; port: %s.",
 		header.length, header.name, header.length,
@@ -367,9 +367,11 @@ bool ServerWorker::handleAddNewServerRequest( CoordinatorEvent event, char *buf,
 }
 
 bool ServerWorker::handleStripeListUpdateRequest( CoordinatorEvent event, char *buf, size_t size ) {
+	Server *server = Server::getInstance();
 	struct StripeListScalingHeader header;
 	struct StripeListPartitionHeader list;
 	size_t next = 0;
+	uint32_t myServerIndex = 0;
 	if ( ! this->protocol.parseStripeListScalingHeader( header, next, buf, size ) ) {
 		__ERROR__( "ServerWorker", "handleStripeListUpdateRequest", "Invalid new server header." );
 		return false;
@@ -383,6 +385,19 @@ bool ServerWorker::handleStripeListUpdateRequest( CoordinatorEvent event, char *
 	);
 
 	ServerWorker::stripeList->syncParams( true, header.numServers, header.numLists, header.n, header.k );
+
+	// Calculate server index
+	for ( uint32_t i = 0, size = server->sockets.serverPeers.size(); i < size; i++ ) {
+		if ( server->sockets.serverPeers[ i ]->equal( &server->sockets.self ) ) {
+			// set myServerIndex
+			myServerIndex = i;
+			break;
+		}
+	}
+	__DEBUG__(
+		BLUE, "ServerWorker", "handleStripeListUpdateRequest",
+		"My server index = %u", myServerIndex
+	);
 
 	for ( uint32_t i = 0; i < header.numLists; i++ ) {
 		this->protocol.parseStripeListPartitionHeader(
@@ -408,8 +423,7 @@ bool ServerWorker::handleStripeListUpdateRequest( CoordinatorEvent event, char *
 	// ServerWorker::stripeList->print( stderr, true );
 
 	// Initialize migratingChunkBuffer
-	Server *server = Server::getInstance();
-	server->init( server->getMyServerIndex(), true );
+	server->init( myServerIndex, true );
 	server->initChunkBuffer( true );
 
 	return true;
@@ -438,8 +452,6 @@ bool ServerWorker::handleMigrateRequest( CoordinatorEvent event ) {
 		std::unordered_map<uint32_t, std::unordered_set<uint32_t>>::iterator it = ServerWorker::map->stripeIds.find( migration[ i ].listId );
 
 		if ( it != ServerWorker::map->stripeIds.end() ) {
-			fprintf( stderr, "it != ServerWorker::map->stripeIds.end()\n" );
-
 			std::unordered_set<uint32_t> stripeIds = it->second;
 			UNLOCK( &ServerWorker::map->sealedLock );
 

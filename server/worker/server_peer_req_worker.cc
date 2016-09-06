@@ -472,18 +472,27 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 
 	if ( ! chunk ) {
 		// Allocate the chunk if it does not exist yet
+		fprintf( stderr, "1\n" );
 		chunk = ServerWorker::chunkPool->alloc( metadata.listId, metadata.stripeId, metadata.chunkId );
+		fprintf( stderr, "2\n" );
 		ServerWorker::map->setChunk(
 			metadata.listId, metadata.stripeId, metadata.chunkId,
 			chunk, ChunkUtil::isParity( chunk )
 		);
+		fprintf( stderr, "3\n" );
 	}
 
 	ServerWorker::map->getKeysMap( 0, &keysLock );
+	fprintf( stderr, "4\n" );
 	ServerWorker::map->getChunksMap( 0, &chunksLock );
+	fprintf( stderr, "5\n" );
 
 	// Lock the data chunk buffer
-	MixedChunkBuffer *chunkBuffer = ServerWorker::chunkBuffer->at( metadata.listId );
+	MixedChunkBuffer *chunkBuffer;
+	if ( isMigrating )
+		chunkBuffer = ServerWorker::migratingChunkBuffer->at( metadata.listId );
+	else
+		chunkBuffer = ServerWorker::chunkBuffer->at( metadata.listId );
 	fprintf( stderr, "chunkBuffer = %p; metadata.listId = %u; chunk = %p\n", chunkBuffer, metadata.listId, chunk );
 	int chunkBufferIndex = chunkBuffer->lockChunk( chunk, true );
 

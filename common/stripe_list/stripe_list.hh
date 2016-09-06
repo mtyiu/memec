@@ -549,6 +549,7 @@ public:
 		if ( this->migrating.numLists < minNumLists )
 			minNumLists = this->migrating.numLists;
 
+		fprintf( stderr, "StripeList::diff() - myServerIndex = %u\n", myServerIndex );
 		T *self = this->servers->at( myServerIndex );
 		for ( uint32_t i = 0; i < minNumLists; i++ ) {
 			T **l1 = this->base.lists[ i ], **l2 = this->migrating.lists[ i ];
