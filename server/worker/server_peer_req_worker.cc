@@ -418,7 +418,7 @@ bool ServerWorker::handleGetChunkRequest( ServerPeerEvent event, struct ChunkHea
 	return ret;
 }
 
-bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, char *buf, size_t size ) {
+bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, bool isMigrating, char *buf, size_t size ) {
 	union {
 		struct ChunkDataHeader chunkData;
 		struct ChunkKeyValueHeader chunkKeyValue;
@@ -468,6 +468,8 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 		true // needsUnlock
 	);
 
+	fprintf( stderr, "Allocating (%u, %u, %u); chunk = %p.\n", metadata.listId, metadata.stripeId, metadata.chunkId, chunk );
+
 	if ( ! chunk ) {
 		// Allocate the chunk if it does not exist yet
 		chunk = ServerWorker::chunkPool->alloc( metadata.listId, metadata.stripeId, metadata.chunkId );
@@ -482,6 +484,7 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 
 	// Lock the data chunk buffer
 	MixedChunkBuffer *chunkBuffer = ServerWorker::chunkBuffer->at( metadata.listId );
+	fprintf( stderr, "chunkBuffer = %p; metadata.listId = %u; chunk = %p\n", chunkBuffer, metadata.listId, chunk );
 	int chunkBufferIndex = chunkBuffer->lockChunk( chunk, true );
 
 	LOCK( keysLock );

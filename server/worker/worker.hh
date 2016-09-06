@@ -132,7 +132,7 @@ private:
 
 	bool handleGetChunkRequest( ServerPeerEvent event, char *buf, size_t size );
 	bool handleGetChunkRequest( ServerPeerEvent event, struct ChunkHeader &header );
-	bool handleSetChunkRequest( ServerPeerEvent event, bool isSealed, char *buf, size_t size );
+	bool handleSetChunkRequest( ServerPeerEvent event, bool isSealed, bool isMigrating, char *buf, size_t size );
 	bool handleUpdateChunkRequest( ServerPeerEvent event, char *buf, size_t size, bool checkGetChunk );
 	bool handleDeleteChunkRequest( ServerPeerEvent event, char *buf, size_t size, bool checkGetChunk );
 	bool handleSealChunkRequest( ServerPeerEvent event, char *buf, size_t size );

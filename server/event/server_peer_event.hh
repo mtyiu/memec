@@ -112,6 +112,7 @@ public:
 			bool needsFree;
 			uint8_t sealIndicatorCount;
 			bool *sealIndicator;
+			bool isMigrating;
 		} chunk;
 		MixedChunkBuffer *chunkBuffer;
 		struct {
@@ -416,13 +417,14 @@ public:
 	// SET_CHUNK
 	inline void reqSetChunk(
 		ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId,
-		Metadata &metadata, Chunk *chunk, bool needsFree
+		Metadata &metadata, Chunk *chunk, bool needsFree, bool isMigrating = false
 	) {
 		this->type = SERVER_PEER_EVENT_TYPE_SET_CHUNK_REQUEST;
 		this->set( instanceId, requestId, socket );
 		this->message.chunk.metadata = metadata;
 		this->message.chunk.chunk = chunk;
 		this->message.chunk.needsFree = needsFree;
+		this->message.chunk.isMigrating = isMigrating;
 	}
 
 	inline void resSetChunk(

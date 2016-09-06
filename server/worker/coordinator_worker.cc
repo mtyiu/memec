@@ -408,6 +408,9 @@ bool ServerWorker::handleStripeListUpdateRequest( CoordinatorEvent event, char *
 	// ServerWorker::stripeList->print( stderr, true );
 
 	// Initialize migratingChunkBuffer
+	Server *server = Server::getInstance();
+	server->init( server->getMyServerIndex(), true );
+	server->initChunkBuffer( true );
 
 	return true;
 }
@@ -435,6 +438,8 @@ bool ServerWorker::handleMigrateRequest( CoordinatorEvent event ) {
 		std::unordered_map<uint32_t, std::unordered_set<uint32_t>>::iterator it = ServerWorker::map->stripeIds.find( migration[ i ].listId );
 
 		if ( it != ServerWorker::map->stripeIds.end() ) {
+			fprintf( stderr, "it != ServerWorker::map->stripeIds.end()\n" );
+
 			std::unordered_set<uint32_t> stripeIds = it->second;
 			UNLOCK( &ServerWorker::map->sealedLock );
 
@@ -474,7 +479,7 @@ bool ServerWorker::handleMigrateRequest( CoordinatorEvent event ) {
 				}
 
 				// Send the chunk to the migrated server
-				serverPeerEvent.reqSetChunk( socket, instanceId, requestId, metadata, chunk, false );
+				serverPeerEvent.reqSetChunk( socket, instanceId, requestId, metadata, chunk, false, true );
 				ServerWorker::eventQueue->insert( serverPeerEvent );
 			}
 		} else {

@@ -50,7 +50,7 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 				// The chunk is sealed
 				buffer.size = this->protocol.generateChunkDataHeader(
 					PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_SERVER,
-					PROTO_OPCODE_SET_CHUNK,
+					event.message.chunk.isMigrating ? PROTO_OPCODE_SET_CHUNK_MIGRATING : PROTO_OPCODE_SET_CHUNK,
 					event.instanceId, event.requestId,
 					event.message.chunk.metadata.listId,
 					event.message.chunk.metadata.stripeId,
@@ -65,7 +65,7 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 				DegradedMap &map = ServerWorker::degradedChunkBuffer->map;
 				buffer.size = this->protocol.generateChunkKeyValueHeader(
 					PROTO_MAGIC_REQUEST, PROTO_MAGIC_TO_SERVER,
-					PROTO_OPCODE_SET_CHUNK_UNSEALED,
+					event.message.chunk.isMigrating ? PROTO_OPCODE_SET_CHUNK_UNSEALED_MIGRATING : PROTO_OPCODE_SET_CHUNK_UNSEALED,
 					event.instanceId, event.requestId,
 					event.message.chunk.metadata.listId,
 					event.message.chunk.metadata.stripeId,
@@ -83,7 +83,8 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 						event.instanceId, event.requestId,
 						event.message.chunk.metadata,
 						0, // unsealed chunk
-						false
+						false,
+						event.message.chunk.isMigrating
 					);
 				}
 			}
@@ -727,9 +728,16 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 					break;
 				case PROTO_OPCODE_SET_CHUNK:
 				case PROTO_OPCODE_SET_CHUNK_UNSEALED:
+				case PROTO_OPCODE_SET_CHUNK_MIGRATING:
+				case PROTO_OPCODE_SET_CHUNK_UNSEALED_MIGRATING:
 					switch( header.magic ) {
 						case PROTO_MAGIC_REQUEST:
-							this->handleSetChunkRequest( event, header.opcode == PROTO_OPCODE_SET_CHUNK, buffer.data, buffer.size );
+							this->handleSetChunkRequest(
+								event,
+								header.opcode == PROTO_OPCODE_SET_CHUNK || header.opcode == PROTO_OPCODE_SET_CHUNK_MIGRATING,
+								header.opcode == PROTO_OPCODE_SET_CHUNK_MIGRATING,
+								buffer.data, buffer.size
+							);
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
 							this->handleSetChunkResponse( event, true, buffer.data, buffer.size );

@@ -230,6 +230,10 @@ bool Server::init( int myServerIndex, bool isMigrating ) {
 	std::vector<StripeListIndex> &stripeListIndex = isMigrating ? this->migratingStripeListIndex : this->stripeListIndex;
 	std::vector<MixedChunkBuffer *> &chunkBuffer = isMigrating ? this->migratingChunkBuffer : this->chunkBuffer;
 
+	chunkBuffer.reserve( this->config.global.stripeLists.count );
+	for ( uint32_t i = 0; i < this->config.global.stripeLists.count; i++ )
+		chunkBuffer.push_back( 0 );
+
 	for ( uint32_t i = 0, size = stripeListIndex.size(); i < size; i++ ) {
 		uint32_t listId  = stripeListIndex[ i ].listId,
 				 chunkId = stripeListIndex[ i ].chunkId;

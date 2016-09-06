@@ -50,14 +50,16 @@
 #define PROTO_OPCODE_GET_CHUNK                    0x54
 #define PROTO_OPCODE_SET_CHUNK                    0x55
 #define PROTO_OPCODE_SET_CHUNK_UNSEALED           0x56
-#define PROTO_OPCODE_FORWARD_CHUNK                0x57
-#define PROTO_OPCODE_FORWARD_KEY                  0x58
-#define PROTO_OPCODE_REMAPPED_UPDATE              0x59
-#define PROTO_OPCODE_REMAPPED_DELETE              0x60
-#define PROTO_OPCODE_BATCH_CHUNKS                 0x61
-#define PROTO_OPCODE_BATCH_KEY_VALUES             0x62
-#define PROTO_OPCODE_UPDATE_CHUNK_CHECK           0x63
-#define PROTO_OPCODE_DELETE_CHUNK_CHECK           0x64
+#define PROTO_OPCODE_SET_CHUNK_MIGRATING          0x57
+#define PROTO_OPCODE_SET_CHUNK_UNSEALED_MIGRATING 0x58
+#define PROTO_OPCODE_FORWARD_CHUNK                0x59
+#define PROTO_OPCODE_FORWARD_KEY                  0x60
+#define PROTO_OPCODE_REMAPPED_UPDATE              0x61
+#define PROTO_OPCODE_REMAPPED_DELETE              0x62
+#define PROTO_OPCODE_BATCH_CHUNKS                 0x63
+#define PROTO_OPCODE_BATCH_KEY_VALUES             0x64
+#define PROTO_OPCODE_UPDATE_CHUNK_CHECK           0x65
+#define PROTO_OPCODE_DELETE_CHUNK_CHECK           0x66
 
 #define PROTO_UNINITIALIZED_INSTANCE              0
 
