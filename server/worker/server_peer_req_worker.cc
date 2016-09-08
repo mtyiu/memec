@@ -434,7 +434,8 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 		metadata.set( header.chunkData.listId, header.chunkData.stripeId, header.chunkData.chunkId );
 		__INFO__(
 			BLUE, "ServerWorker", "handleSetChunkRequest",
-			"[SET_CHUNK] List ID: %u; stripe ID: %u; chunk ID: %u; chunk size = %u.",
+			"[SET_CHUNK%s] List ID: %u; stripe ID: %u; chunk ID: %u; chunk size = %u.",
+			isMigrating ? " (Migrating)" : "",
 			header.chunkData.listId, header.chunkData.stripeId, header.chunkData.chunkId, header.chunkData.size
 		);
 	} else {
@@ -445,7 +446,8 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 		metadata.set( header.chunkKeyValue.listId, header.chunkKeyValue.stripeId, header.chunkKeyValue.chunkId );
 		__INFO__(
 			BLUE, "ServerWorker", "handleSetChunkRequest",
-			"[SET_CHUNK] List ID: %u; stripe ID: %u; chunk ID: %u; deleted = %u; count = %u.",
+			"[SET_CHUNK%s] List ID: %u; stripe ID: %u; chunk ID: %u; deleted = %u; count = %u.",
+			isMigrating ? " (Migrating)" : "",
 			header.chunkKeyValue.listId, header.chunkKeyValue.stripeId, header.chunkKeyValue.chunkId,
 			header.chunkKeyValue.deleted, header.chunkKeyValue.count
 		);
@@ -468,24 +470,8 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 		true // needsUnlock
 	);
 
-	fprintf( stderr, "Allocating (%u, %u, %u); chunk = %p.\n", metadata.listId, metadata.stripeId, metadata.chunkId, chunk );
-
-	if ( ! chunk ) {
-		// Allocate the chunk if it does not exist yet
-		fprintf( stderr, "1\n" );
-		chunk = ServerWorker::chunkPool->alloc( metadata.listId, metadata.stripeId, metadata.chunkId );
-		fprintf( stderr, "2\n" );
-		ServerWorker::map->setChunk(
-			metadata.listId, metadata.stripeId, metadata.chunkId,
-			chunk, ChunkUtil::isParity( chunk )
-		);
-		fprintf( stderr, "3\n" );
-	}
-
 	ServerWorker::map->getKeysMap( 0, &keysLock );
-	fprintf( stderr, "4\n" );
 	ServerWorker::map->getChunksMap( 0, &chunksLock );
-	fprintf( stderr, "5\n" );
 
 	// Lock the data chunk buffer
 	MixedChunkBuffer *chunkBuffer;
@@ -493,7 +479,6 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 		chunkBuffer = ServerWorker::migratingChunkBuffer->at( metadata.listId );
 	else
 		chunkBuffer = ServerWorker::chunkBuffer->at( metadata.listId );
-	fprintf( stderr, "chunkBuffer = %p; metadata.listId = %u; chunk = %p\n", chunkBuffer, metadata.listId, chunk );
 	int chunkBufferIndex = chunkBuffer->lockChunk( chunk, true );
 
 	LOCK( keysLock );
@@ -583,11 +568,14 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 			}
 
 			// Re-insert into data chunk buffer
+			/*
+			fprintf( stderr, "chunkBufferIndex = %u\n", chunkBufferIndex );
 			assert( chunkBufferIndex == -1 );
 			if ( ! chunkBuffer->reInsert( this, chunk, originalChunkSize - chunkSize, false, false ) ) {
 				// The chunk is compacted before. Need to seal the chunk first
 				__ERROR__( "ServerWorker", "handleSetChunkRequest", "TODO: Handle DELETE request." );
 			}
+			*/
 		} else {
 			struct KeyHeader keyHeader;
 			struct KeyValueHeader keyValueHeader;

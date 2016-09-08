@@ -268,10 +268,14 @@ bool ServerWorker::handleServerConnectedMsg( CoordinatorEvent event, char *buf, 
 	Socket::ntoh_port( header.port, tmp + 16, 6 );
 	__DEBUG__( YELLOW, "ServerWorker", "handleServerConnectedMsg", "Server: %s:%s is connected.", tmp, tmp + 16 );
 
+	return this->connectToServer( header.addr, header.port );
+}
+
+bool ServerWorker::connectToServer( uint32_t addr, uint16_t port ) {
 	// Find the server peer socket in the array map
 	int index = -1;
 	for ( int i = 0, len = serverPeers->size(); i < len; i++ ) {
-		if ( serverPeers->values[ i ]->equal( header.addr, header.port ) ) {
+		if ( serverPeers->values[ i ]->equal( addr, port ) ) {
 			index = i;
 			break;
 		}
@@ -348,8 +352,25 @@ bool ServerWorker::handleAddNewServerRequest( CoordinatorEvent event, char *buf,
 	size_t index = server->config.global.servers.size();
 	server->config.global.servers.push_back( addr );
 
-	// Add new server peer socket
+	// Calculate server index
 	int myServerIndex = server->getMyServerIndex();
+	if ( myServerIndex == -1 ) {
+		for ( uint32_t i = 0, size = server->sockets.serverPeers.size(); i < size; i++ ) {
+			if ( server->sockets.serverPeers[ i ]->self ) {
+				// set myServerIndex
+				myServerIndex = i;
+				break;
+			}
+		}
+		if ( myServerIndex == -1 )
+			myServerIndex = server->sockets.serverPeers.size();
+	}
+	__DEBUG__(
+		BLUE, "ServerWorker", "handleStripeListUpdateRequest",
+		"My server index = %u", myServerIndex
+	);
+
+	// Add new server peer socket
 	ServerPeerSocket *socket = new ServerPeerSocket();
 	int tmpfd = - ( server->config.global.servers.size() );
 	socket->init(
@@ -359,6 +380,9 @@ bool ServerWorker::handleAddNewServerRequest( CoordinatorEvent event, char *buf,
 	server->sockets.serverPeers.set( tmpfd, socket );
 
 	server->stripeList->addNewServer( socket, false );
+
+	if ( ( int ) index != myServerIndex )
+		return this->connectToServer( addr.addr, addr.port );
 
 	// server->stripeList->print( stderr, false );
 	// server->stripeList->print( stderr, true );
@@ -385,19 +409,6 @@ bool ServerWorker::handleStripeListUpdateRequest( CoordinatorEvent event, char *
 	);
 
 	ServerWorker::stripeList->syncParams( true, header.numServers, header.numLists, header.n, header.k );
-
-	// Calculate server index
-	for ( uint32_t i = 0, size = server->sockets.serverPeers.size(); i < size; i++ ) {
-		if ( server->sockets.serverPeers[ i ]->equal( &server->sockets.self ) ) {
-			// set myServerIndex
-			myServerIndex = i;
-			break;
-		}
-	}
-	__DEBUG__(
-		BLUE, "ServerWorker", "handleStripeListUpdateRequest",
-		"My server index = %u", myServerIndex
-	);
 
 	for ( uint32_t i = 0; i < header.numLists; i++ ) {
 		this->protocol.parseStripeListPartitionHeader(

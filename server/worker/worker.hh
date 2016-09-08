@@ -86,6 +86,7 @@ private:
 	// ---------- coordinator_worker.cc ----------
 	void dispatch( CoordinatorEvent event );
 	bool handleServerConnectedMsg( CoordinatorEvent event, char *buf, size_t size );
+	bool connectToServer( uint32_t addr, uint16_t port );
 	bool handleHeartbeatAck( CoordinatorEvent event, char *buf, size_t size );
 	bool handleAddNewServerRequest( CoordinatorEvent event, char *buf, size_t size );
 	bool handleStripeListUpdateRequest( CoordinatorEvent event, char *buf, size_t size );
