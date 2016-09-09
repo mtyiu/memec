@@ -735,7 +735,7 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 							this->handleSetChunkRequest(
 								event,
 								header.opcode == PROTO_OPCODE_SET_CHUNK || header.opcode == PROTO_OPCODE_SET_CHUNK_MIGRATING,
-								header.opcode == PROTO_OPCODE_SET_CHUNK_MIGRATING,
+								header.opcode == PROTO_OPCODE_SET_CHUNK_MIGRATING || header.opcode == PROTO_OPCODE_SET_CHUNK_UNSEALED_MIGRATING,
 								buffer.data, buffer.size
 							);
 							break;

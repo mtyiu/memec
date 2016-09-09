@@ -472,7 +472,7 @@ bool ServerWorker::handleMigrateRequest( CoordinatorEvent event ) {
 	// TODO...
 
 	for ( size_t i = 0, size = migration.size(); i < size; i++ ) {
-		__INFO__(
+		__DEBUG__(
 			BLUE, "ServerWorker", "handleMigrateRequest",
 			"Migrating (%u, %u) to Server #%u.",
 			migration[ i ].listId,
@@ -517,7 +517,7 @@ bool ServerWorker::handleMigrateRequest( CoordinatorEvent event ) {
 					metadata.listId, metadata.stripeId, metadata.chunkId,
 					socket, chunk,
 					false, // isDegraded
-					false, // self,
+					false, // self
 					true   // isMigrating
 				);
 				if ( ! ServerWorker::pending->insertChunkRequest( PT_SERVER_PEER_SET_CHUNK, instanceId, event.instanceId, requestId, event.requestId, socket, chunkRequest ) ) {

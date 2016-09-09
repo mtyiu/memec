@@ -222,10 +222,11 @@ bool Server::init( int myServerIndex, bool isMigrating ) {
 		LOCK( &this->status.lock );
 		this->status.isRecovering = false;
 		UNLOCK( &this->status.lock );
+
+		this->myServerIndex = myServerIndex;
 	}
 
-	this->myServerIndex = myServerIndex;
-	if ( myServerIndex == -1 )
+	if ( this->myServerIndex == -1 )
 		return false;
 
 	if ( isMigrating )
