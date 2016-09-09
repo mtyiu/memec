@@ -218,6 +218,12 @@ bool Server::init( char *path, OptionList &globalOptions, OptionList &serverOpti
 }
 
 bool Server::init( int myServerIndex, bool isMigrating ) {
+	if ( this->myServerIndex == -1 && myServerIndex != -1 && isMigrating ) {
+		LOCK( &this->status.lock );
+		this->status.isRecovering = false;
+		UNLOCK( &this->status.lock );
+	}
+
 	this->myServerIndex = myServerIndex;
 	if ( myServerIndex == -1 )
 		return false;

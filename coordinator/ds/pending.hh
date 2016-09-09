@@ -115,6 +115,16 @@ struct PendingTransition {
 	}
 };
 
+struct PendingNewServer {
+	// char *name;
+	// uint8_t nameLen;
+	// ServerSocket *socket;
+	pthread_mutex_t *lock;
+	pthread_cond_t *cond;
+	uint32_t *count;
+	uint32_t total;
+};
+
 class Pending {
 private:
 	/*
@@ -152,6 +162,9 @@ private:
 	std::unordered_map<PendingIdentifier, PendingRecovery> recovery;
 	LOCK_T recoveryLock;
 
+	std::unordered_map<PendingIdentifier, PendingNewServer> newServer;
+	LOCK_T newServerLock;
+
 public:
 	Pending() {
 		LOCK_INIT( &this->syncMetaLock );
@@ -163,6 +176,7 @@ public:
 		LOCK_INIT( &this->recoveryLock );
 		LOCK_INIT( &this->syncRemappedDataLock );
 		LOCK_INIT( &this->syncRemappedDataRequestLock );
+		LOCK_INIT( &this->newServerLock );
 	}
 
 	~Pending() {}
@@ -436,6 +450,48 @@ public:
 		pthread_mutex_unlock( lock );
 
 		return ret;
+	}
+
+	bool addPendingNewServer( uint16_t instanceId, uint32_t requestId, pthread_mutex_t *lock, pthread_cond_t *cond, uint32_t *count, uint32_t total ) {
+		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
+		PendingNewServer n;
+
+		n.lock = lock;
+		n.cond = cond;
+		n.count = count;
+		n.total = total;
+
+		std::pair<PendingIdentifier, PendingNewServer> p( pid, n );
+		std::pair<std::unordered_map<PendingIdentifier, PendingNewServer>::iterator, bool> ret;
+
+		LOCK( &this->newServerLock );
+		ret = this->newServer.insert( p );
+		UNLOCK( &this->newServerLock );
+
+		return ret.second;
+	}
+
+	bool erasePendingNewServer( uint16_t instanceId, uint32_t requestId ) {
+		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
+		std::unordered_map<PendingIdentifier, PendingNewServer>::iterator it;
+
+		LOCK( &this->newServerLock );
+		it = this->newServer.find( pid );
+		if ( it == this->newServer.end() ) {
+			UNLOCK( &this->newServerLock );
+			return false;
+		}
+		PendingNewServer &n = it->second;
+		LOCK( n.lock );
+		( *n.count )--;
+		if ( *n.count == n.total - 1 )
+			pthread_cond_signal( n.cond );
+		else if ( *n.count == 0 )
+			pthread_cond_signal( n.cond );
+		UNLOCK( n.lock );
+		UNLOCK( &this->newServerLock );
+
+		return true;
 	}
 
 	void addSyncMetaReq( uint32_t id, bool* sync ) {

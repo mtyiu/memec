@@ -362,8 +362,13 @@ bool ServerWorker::handleAddNewServerRequest( CoordinatorEvent event, char *buf,
 				break;
 			}
 		}
-		if ( myServerIndex == -1 )
+		if ( myServerIndex == -1 ) {
 			myServerIndex = server->sockets.serverPeers.size();
+
+			LOCK( &server->status.lock );
+			server->status.isRecovering = false;
+			UNLOCK( &server->status.lock );
+		}
 	}
 	__DEBUG__(
 		BLUE, "ServerWorker", "handleStripeListUpdateRequest",
@@ -380,6 +385,24 @@ bool ServerWorker::handleAddNewServerRequest( CoordinatorEvent event, char *buf,
 	server->sockets.serverPeers.set( tmpfd, socket );
 
 	server->stripeList->addNewServer( socket, false );
+
+	// Send response
+	struct {
+		size_t size;
+		char *data;
+	} buffer;
+	bool connected;
+	ssize_t ret;
+	buffer.data = this->protocol.buffer.send;
+	buffer.size = this->protocol.generateHeader(
+		PROTO_MAGIC_RESPONSE_SUCCESS,
+		PROTO_MAGIC_TO_COORDINATOR,
+		PROTO_OPCODE_ADD_NEW_SERVER,
+		0, event.instanceId, event.requestId
+	);
+	ret = event.socket->send( buffer.data, buffer.size, connected );
+	if ( ret != ( ssize_t ) buffer.size )
+		__ERROR__( "ServerWorker", "handleAddNewServerRequest", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
 
 	if ( ( int ) index != myServerIndex )
 		return this->connectToServer( addr.addr, addr.port );

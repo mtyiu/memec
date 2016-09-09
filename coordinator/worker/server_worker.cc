@@ -108,6 +108,7 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 			);
 			isSend = true;
 			break;
+		case SERVER_EVENT_TYPE_ADD_NEW_SERVER_FIRST:
 		case SERVER_EVENT_TYPE_ADD_NEW_SERVER:
 		case SERVER_EVENT_TYPE_UPDATE_STRIPE_LIST:
 		case SERVER_EVENT_TYPE_MIGRATE:
@@ -222,9 +223,22 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 		}
 	} else if ( event.type == SERVER_EVENT_TYPE_HANDLE_RECONSTRUCTION_REQUEST ) {
 		this->handleReconstructionRequest( event.socket );
-	} else if ( event.type == SERVER_EVENT_TYPE_ADD_NEW_SERVER || event.type == SERVER_EVENT_TYPE_UPDATE_STRIPE_LIST || event.type == SERVER_EVENT_TYPE_MIGRATE ) {
+	} else if (
+		event.type == SERVER_EVENT_TYPE_ADD_NEW_SERVER_FIRST ||
+		event.type == SERVER_EVENT_TYPE_ADD_NEW_SERVER ||
+		event.type == SERVER_EVENT_TYPE_UPDATE_STRIPE_LIST ||
+		event.type == SERVER_EVENT_TYPE_MIGRATE
+	) {
 		uint32_t requestId = CoordinatorWorker::idGenerator->nextVal( this->workerId );
+
+		if ( event.type == SERVER_EVENT_TYPE_ADD_NEW_SERVER_FIRST ) {
+			*event.message.add.requestIdPtr = requestId;
+		} else if ( event.type == SERVER_EVENT_TYPE_ADD_NEW_SERVER ) {
+			requestId = *event.message.add.requestIdPtr;
+		}
+
 		switch( event.type ) {
+			case SERVER_EVENT_TYPE_ADD_NEW_SERVER_FIRST:
 			case SERVER_EVENT_TYPE_ADD_NEW_SERVER:
 				buffer.data = this->protocol.addNewServer(
 					buffer.size, Coordinator::instanceId, requestId,
@@ -253,20 +267,37 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 				break;
 		}
 
-		for ( uint32_t i = 0; i < 2; i++ ) {
-			ArrayMap<int, ServerSocket> &servers = ( i == 0 ? Coordinator::getInstance()->sockets.servers : Coordinator::getInstance()->sockets.backupServers );
+		// Send to the new server first for initialization
+		if ( event.type == SERVER_EVENT_TYPE_ADD_NEW_SERVER_FIRST ) {
+			CoordinatorWorker::pending->addPendingNewServer(
+				Coordinator::instanceId, requestId,
+				event.message.add.lock,
+				event.message.add.cond,
+				event.message.add.count,
+				event.message.add.total
+			);
 
-			LOCK( &servers.lock );
-			for ( uint32_t j = 0, size = servers.size(); j < size; j++ ) {
-				ServerSocket *server = servers.values[ j ];
-				if ( ! server->ready() )
-					continue; // Skip failed clients
+			ret = event.message.add.socket->send( buffer.data, buffer.size, connected );
+			if ( ret != ( ssize_t ) buffer.size )
+				__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+		} else {
+			for ( uint32_t i = 0; i < 2; i++ ) {
+				ArrayMap<int, ServerSocket> &servers = ( i == 0 ? Coordinator::getInstance()->sockets.servers : Coordinator::getInstance()->sockets.backupServers );
 
-				ret = server->send( buffer.data, buffer.size, connected );
-				if ( ret != ( ssize_t ) buffer.size )
-					__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+				LOCK( &servers.lock );
+				for ( uint32_t j = 0, size = servers.size(); j < size; j++ ) {
+					ServerSocket *server = servers.values[ j ];
+					if ( ! server->ready() )
+						continue; // Skip failed clients
+					if ( event.type == SERVER_EVENT_TYPE_ADD_NEW_SERVER && server == event.message.add.socket )
+						continue; // Skip the new server as it already received
+
+					ret = server->send( buffer.data, buffer.size, connected );
+					if ( ret != ( ssize_t ) buffer.size )
+						__ERROR__( "CoordinatorWorker", "dispatch", "The number of bytes sent (%ld bytes) is not equal to the message size (%lu bytes).", ret, buffer.size );
+				}
+				UNLOCK( &servers.lock );
 			}
-			UNLOCK( &servers.lock );
 		}
 	} else if ( isSend ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
@@ -375,6 +406,9 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 						__ERROR__( "CoordinatorWorker", "dispatch", "Invalid id reply to parity migrate request." );
 					}
 				}
+					break;
+				case PROTO_OPCODE_ADD_NEW_SERVER:
+					this->pending->erasePendingNewServer( event.instanceId, event.requestId );
 					break;
 				default:
 					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid opcode from server." );

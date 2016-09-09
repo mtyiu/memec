@@ -825,11 +825,27 @@ void Coordinator::add() {
 	size_t index = this->config.global.servers.size();
 	this->config.global.servers.push_back( addr );
 
-	// Add new server socket
-	ServerSocket *socket = new ServerSocket();
-	int tmpfd = - ( this->config.global.servers.size() );
-	socket->init( tmpfd, addr, &this->sockets.epoll );
-	this->sockets.servers.set( tmpfd, socket );
+	// Find the server socket from backupServers
+	ServerSocket *socket = 0;
+	for ( uint32_t i = 0, size = this->sockets.backupServers.size(); i < size; i++ ) {
+		this->sockets.backupServers.values[ i ]->printAddress( stderr );
+		if ( this->sockets.backupServers.values[ i ]->equal( addr.addr, addr.port ) ) {
+			socket = this->sockets.backupServers.values[ i ];
+			int fd = socket->getSocket();
+
+			this->sockets.backupServers.removeAt( i );
+			this->sockets.servers.set( fd, socket );
+			break;
+		}
+	}
+	if ( ! socket ) {
+		socket = new ServerSocket();
+		int tmpfd = - ( this->config.global.servers.size() );
+		socket->init( tmpfd, addr, &this->sockets.epoll );
+		this->sockets.servers.set( tmpfd, socket );
+	}
+	if ( this->stateTransitHandler )
+		this->stateTransitHandler->addAliveServer( socket->getAddr() );
 
 	// Update stripe lists
 	this->stripeList->addNewServer( socket );
@@ -846,10 +862,36 @@ void Coordinator::add() {
 	uint8_t nameLen = ( uint8_t ) strlen( name );
 
 	// Notify all servers
+	LOCK_T lock;
+	pthread_cond_t cond;
+	uint32_t count = this->sockets.servers.size(), total;
+	total = count;
+	uint32_t requestId;
+
+	LOCK_INIT( &lock );
+	pthread_cond_init( &cond, 0 );
+
 	ServerEvent serverEvent;
-	serverEvent.addNewServer( nameLen, namePtr, socket );
+	serverEvent.addNewServer( &requestId, nameLen, namePtr, socket, &lock, &cond, &count, total, true );
 	this->eventQueue.insert( serverEvent );
 
+	LOCK( &lock );
+	while ( count == total ) {
+		// Wait until the new server receives the add new server request
+		pthread_cond_wait( &cond, &lock );
+	}
+
+	// Send to remaining servers
+	serverEvent.addNewServer( &requestId, nameLen, namePtr, socket, &lock, &cond, &count, total, false );
+	this->eventQueue.insert( serverEvent );
+
+	while ( count ) {
+		// Wait until all servers receives the add new server request
+		pthread_cond_wait( &cond, &lock );
+	}
+	UNLOCK( &lock );
+
+	fprintf( stderr, "Update stripe list...\n" );
 	serverEvent.updateStripeList();
 	this->eventQueue.insert( serverEvent );
 

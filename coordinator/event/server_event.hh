@@ -23,6 +23,7 @@ enum ServerEventType {
 	SERVER_EVENT_TYPE_HANDLE_RECONSTRUCTION_REQUEST,
 	SERVER_EVENT_TYPE_ACK_RECONSTRUCTION_SUCCESS,
 	SERVER_EVENT_TYPE_ACK_RECONSTRUCTION_FAILURE,
+	SERVER_EVENT_TYPE_ADD_NEW_SERVER_FIRST,
 	SERVER_EVENT_TYPE_ADD_NEW_SERVER,
 	SERVER_EVENT_TYPE_UPDATE_STRIPE_LIST,
 	SERVER_EVENT_TYPE_MIGRATE
@@ -56,9 +57,14 @@ public:
 		} heartbeat;
 		struct sockaddr_in addr;
 		struct {
+			uint32_t *requestIdPtr;
 			uint8_t nameLen;
 			char *name;
 			ServerSocket *socket;
+			LOCK_T *lock;
+			pthread_cond_t *cond;
+			uint32_t *count;
+			uint32_t total;
 		} add;
 		bool isMigrating;
 	} message;
@@ -163,12 +169,17 @@ public:
 		this->set( instanceId, requestId, socket );
 	}
 
-	inline void addNewServer( uint8_t nameLen, char *name, ServerSocket *socket ) {
-		this->type = SERVER_EVENT_TYPE_ADD_NEW_SERVER;
+	inline void addNewServer( uint32_t *requestIdPtr, uint8_t nameLen, char *name, ServerSocket *socket, LOCK_T *lock, pthread_cond_t *cond, uint32_t *count, uint32_t total, bool first ) {
+		this->type = first ? SERVER_EVENT_TYPE_ADD_NEW_SERVER_FIRST : SERVER_EVENT_TYPE_ADD_NEW_SERVER;
 		this->message.add = {
+			.requestIdPtr = requestIdPtr,
 			.nameLen = nameLen,
 			.name = name,
-			.socket = socket
+			.socket = socket,
+			.lock = lock,
+			.cond = cond,
+			.count = count,
+			.total = total
 		};
 	}
 
