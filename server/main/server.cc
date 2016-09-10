@@ -218,12 +218,23 @@ bool Server::init( char *path, OptionList &globalOptions, OptionList &serverOpti
 }
 
 bool Server::init( int myServerIndex, bool isMigrating ) {
-	if ( this->myServerIndex == -1 && myServerIndex != -1 && isMigrating ) {
-		LOCK( &this->status.lock );
-		this->status.isRecovering = false;
-		UNLOCK( &this->status.lock );
+	if ( isMigrating ) {
+		if ( this->myServerIndex == -1 ) {
+			LOCK( &this->status.lock );
+			this->status.isRecovering = false;
+			UNLOCK( &this->status.lock );
 
-		this->myServerIndex = myServerIndex;
+			// Find myServerIndex
+			for ( uint32_t i = 0; i < this->sockets.serverPeers.size(); i++ ) {
+				if ( this->sockets.serverPeers[ i ]->self ) {
+					this->myServerIndex = i;
+					myServerIndex = i;
+					break;
+				}
+			}
+		} else {
+			myServerIndex = this->myServerIndex;
+		}
 	}
 
 	if ( this->myServerIndex == -1 )

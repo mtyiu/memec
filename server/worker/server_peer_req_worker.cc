@@ -464,20 +464,14 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 	bool notifyCoordinator = false;
 	CoordinatorEvent coordinatorEvent;
 
-	fprintf( stderr, "handleSetChunkRequest() - 0\n" );
-
 	chunk = ServerWorker::map->findChunkById(
 		metadata.listId, metadata.stripeId, metadata.chunkId, 0,
 		true, // needsLock
 		true // needsUnlock
 	);
 
-	fprintf( stderr, "handleSetChunkRequest() - 1: chunk = %p\n", chunk );
-
 	ServerWorker::map->getKeysMap( 0, &keysLock );
 	ServerWorker::map->getChunksMap( 0, &chunksLock );
-
-	fprintf( stderr, "handleSetChunkRequest() - 2\n" );
 
 	// Lock the data chunk buffer
 	MixedChunkBuffer *chunkBuffer;
@@ -485,9 +479,8 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 		chunkBuffer = ServerWorker::migratingChunkBuffer->at( metadata.listId );
 	else
 		chunkBuffer = ServerWorker::chunkBuffer->at( metadata.listId );
-	int chunkBufferIndex = chunkBuffer->lockChunk( chunk, true );
 
-	fprintf( stderr, "handleSetChunkRequest() - 3: %p %p %p %d\n", keysLock, chunksLock, chunkBuffer, chunkBufferIndex );
+	int chunkBufferIndex = chunkBuffer->lockChunk( chunk, true );
 
 	LOCK( keysLock );
 	LOCK( chunksLock );
