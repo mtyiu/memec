@@ -1416,15 +1416,16 @@ bool ServerWorker::handleGetChunkResponse( ServerPeerEvent event, bool success, 
 	return true;
 }
 
-bool ServerWorker::handleSetChunkResponse( ServerPeerEvent event, bool success, char *buf, size_t size ) {
+bool ServerWorker::handleSetChunkResponse( ServerPeerEvent event, bool success, bool isMigrating, char *buf, size_t size ) {
 	struct ChunkHeader header;
 	if ( ! this->protocol.parseChunkHeader( header, buf, size ) ) {
 		__ERROR__( "ServerWorker", "handleSetChunkResponse", "Invalid SET_CHUNK response." );
 		return false;
 	}
-	__DEBUG__(
+	__INFO__(
 		BLUE, "ServerWorker", "handleSetChunkResponse",
-		"[SET_CHUNK (%s)] List ID: %u, stripe ID: %u, chunk ID: %u.",
+		"[SET_CHUNK (%s%s)] List ID: %u, stripe ID: %u, chunk ID: %u.",
+		isMigrating ? "Migrating, " : "",
 		success ? "success" : "failure",
 		header.listId, header.stripeId, header.chunkId
 	);
@@ -1459,10 +1460,31 @@ bool ServerWorker::handleSetChunkResponse( ServerPeerEvent event, bool success, 
 		}
 	} else if ( chunkRequest.isMigrating ) {
 		// Migrating chunks during scaling up
-		// TODO...
-		// fprintf( stderr, "[%u, %u] isMigrating (%u, %u, %u)...\n", event.instanceId, event.requestId, header.listId, header.stripeId, header.chunkId );
+		assert( isMigrating );
+		fprintf( stderr, "[%u, %u] isMigrating (%u, %u, %u)...\n", event.instanceId, event.requestId, header.listId, header.stripeId, header.chunkId );
 
 		// Clear the migrated chunk and update keys map
+		ServerWorker::map->eraseMigratedChunk( header.listId, header.stripeId, header.chunkId );
+
+		// Find pending ScalingMigration
+		uint32_t remaining, total;
+		if ( ! ServerWorker::pending->eraseScalingMigration( pid.parentInstanceId, pid.parentRequestId, 1, remaining, total, &pid ) ) {
+			__ERROR__( "ServerWorker", "handleSetChunkResponse", "[%u, %u] Cannot find a pending coordinator scaling migration request that matches the response. The message will be discarded.", event.instanceId, event.requestId );
+			return false;
+		}
+
+		__INFO__(
+			GREEN, "ServerWorker", "handleSetChunkResponse",
+			"[%u, %u] Remaining = %u / %u",
+			pid.instanceId, pid.requestId, remaining, total
+		);
+
+		if ( remaining == 0 ) {
+			// Tell the coordinator that all scaling migration is completed
+			CoordinatorEvent coordinatorEvent;
+			coordinatorEvent.resScalingMigration( ( CoordinatorSocket * ) pid.ptr, pid.instanceId, pid.requestId, total );
+			ServerWorker::eventQueue->insert( coordinatorEvent );
+		}
 	} else {
 		// Reconstruction
 		uint32_t remainingChunks, remainingKeys, totalChunks, totalKeys;

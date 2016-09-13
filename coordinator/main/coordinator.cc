@@ -902,9 +902,32 @@ void Coordinator::add() {
 }
 
 void Coordinator::migrate() {
+	struct timespec ts = start_timer();
+	double elapsedTime;
+
+	LOCK_T lock;
+	pthread_cond_t cond;
+	uint32_t count = this->sockets.servers.size(), total;
+	total = count;
+
+	LOCK_INIT( &lock );
+	pthread_cond_init( &cond, 0 );
+
 	ServerEvent serverEvent;
-	serverEvent.migrate();
+	serverEvent.migrate( &lock, &cond, &count, total );
 	this->eventQueue.insert( serverEvent );
+
+	fprintf( stderr, "Waiting for data migration to complete...\n" );
+	LOCK( &lock );
+	while ( count ) {
+		// Wait until the new server receives the add new server request
+		pthread_cond_wait( &cond, &lock );
+	}
+	UNLOCK( &lock );
+
+	elapsedTime = get_elapsed_time( ts );
+
+	fprintf( stderr, "Elapsed time: %.2lf s\n", elapsedTime );
 }
 
 void Coordinator::hash() {

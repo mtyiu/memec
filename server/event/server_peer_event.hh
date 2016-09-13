@@ -429,12 +429,13 @@ public:
 
 	inline void resSetChunk(
 		ServerPeerSocket *socket, uint16_t instanceId, uint32_t requestId,
-		Metadata &metadata, bool success
+		Metadata &metadata, bool success, bool isMigrating
 	) {
 		this->type = success ? SERVER_PEER_EVENT_TYPE_SET_CHUNK_RESPONSE_SUCCESS : SERVER_PEER_EVENT_TYPE_SET_CHUNK_RESPONSE_FAILURE;
 		this->set( instanceId, requestId, socket );
 		this->message.chunk.metadata = metadata;
 		this->message.chunk.chunk = 0;
+		this->message.chunk.isMigrating = isMigrating;
 	}
 
 	// FORWARD_CHUNK

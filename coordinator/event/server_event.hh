@@ -66,6 +66,12 @@ public:
 			uint32_t *count;
 			uint32_t total;
 		} add;
+		struct {
+			LOCK_T *lock;
+			pthread_cond_t *cond;
+			uint32_t *count;
+			uint32_t total;
+		} migrate;
 		bool isMigrating;
 	} message;
 
@@ -188,8 +194,14 @@ public:
 		this->message.isMigrating = isMigrating;
 	}
 
-	inline void migrate() {
+	inline void migrate( LOCK_T *lock, pthread_cond_t *cond, uint32_t *count, uint32_t total ) {
 		this->type = SERVER_EVENT_TYPE_MIGRATE;
+		this->message.migrate = {
+			.lock = lock,
+			.cond = cond,
+			.count = count,
+			.total = total
+		};
 	}
 };
 

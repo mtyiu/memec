@@ -410,6 +410,9 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 				case PROTO_OPCODE_ADD_NEW_SERVER:
 					this->pending->erasePendingNewServer( event.instanceId, event.requestId );
 					break;
+				case PROTO_OPCODE_MIGRATE:
+					this->postMigration( event, buffer.data, header.length );
+					break;
 				default:
 					__ERROR__( "CoordinatorWorker", "dispatch", "Invalid opcode from server." );
 					goto quit_1;
@@ -436,7 +439,7 @@ bool CoordinatorWorker::processHeartbeat( ServerEvent event, char *buf, size_t s
 
 	offset = 0;
 	if ( ! this->protocol.parseHeartbeatHeader( heartbeat, buf, size ) ) {
-		__ERROR__( "CoordinatorWorker", "dispatch", "Invalid heartbeat protocol header." );
+		__ERROR__( "CoordinatorWorker", "processHeartbeat", "Invalid heartbeat protocol header." );
 		return false;
 	}
 
@@ -504,4 +507,18 @@ bool CoordinatorWorker::processHeartbeat( ServerEvent event, char *buf, size_t s
 	}
 
 	return failed == 0;
+}
+
+bool CoordinatorWorker::postMigration( ServerEvent event, char *buf, size_t size ) {
+	ScalingMigrationHeader header;
+	if ( ! this->protocol.parseScalingMigrationHeader( header, buf, size ) ) {
+		__ERROR__( "CoordinatorWorker", "postMigration", "Invalid scaling migration protocol header." );
+		return false;
+	}
+	__INFO__(
+		BLUE, "CoordinatorWorker", "postMigration",
+		"[%u, %u] Count = %u",
+		event.instanceId, event.requestId, header.count
+	);
+	return true;
 }

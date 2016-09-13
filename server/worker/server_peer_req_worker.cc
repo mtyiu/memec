@@ -487,6 +487,7 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 
 	ret = chunk;
 	if ( ! chunk ) {
+		if ( isMigrating ) ret = true;
 		// Allocate memory for this chunk
 		chunk = ServerWorker::chunkPool->alloc(
 			metadata.listId,
@@ -514,10 +515,10 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 
 	if ( metadata.chunkId < ServerWorker::dataChunkCount ) {
 		if ( isSealed ) {
-			uint32_t timestamp, originalChunkSize;
+			uint32_t timestamp;
 			// Delete all keys in the chunk from the map
 			offset = 0;
-			originalChunkSize = chunkSize = ChunkUtil::getSize( chunk );
+			chunkSize = ChunkUtil::getSize( chunk );
 			while ( offset < chunkSize ) {
 				keyValue = ChunkUtil::getObject( chunk, offset );
 				keyValue._deserialize( key.data, key.size, valueStr, valueSize );
@@ -644,7 +645,7 @@ bool ServerWorker::handleSetChunkRequest( ServerPeerEvent event, bool isSealed, 
 	}
 
 	if ( isSealed || header.chunkKeyValue.isCompleted ) {
-		event.resSetChunk( event.socket, event.instanceId, event.requestId, metadata, ret );
+		event.resSetChunk( event.socket, event.instanceId, event.requestId, metadata, ret, isMigrating );
 		this->dispatch( event );
 	}
 

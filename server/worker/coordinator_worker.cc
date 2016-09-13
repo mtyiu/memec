@@ -139,6 +139,16 @@ void ServerWorker::dispatch( CoordinatorEvent event ) {
 			);
 			isSend = true;
 			break;
+		case COORDINATOR_EVENT_TYPE_RESPONSE_SCALING_MIGRATION:
+			buffer.size = this->protocol.generateScalingMigrationHeader(
+				PROTO_MAGIC_RESPONSE_SUCCESS,
+				PROTO_MAGIC_TO_COORDINATOR,
+				PROTO_OPCODE_MIGRATE,
+				event.instanceId, event.requestId,
+				event.message.migration.count
+			);
+			isSend = true;
+			break;
 		case COORDINATOR_EVENT_TYPE_PENDING:
 			isSend = false;
 			break;
@@ -467,70 +477,93 @@ bool ServerWorker::handleMigrateRequest( CoordinatorEvent event ) {
 	// Prepare migration
 	Server *server = Server::getInstance();
 	std::vector<ListChunkMigration> migration = ServerWorker::stripeList->diff( server->getMyServerIndex() );
+	size_t count = 0;
 
-	// Insert into coordinator's migration pending map
-	// TODO...
-
+	// Calculate the number of chunks to be migrated
 	for ( size_t i = 0, size = migration.size(); i < size; i++ ) {
-		__DEBUG__(
-			BLUE, "ServerWorker", "handleMigrateRequest",
-			"Migrating (%u, %u) to Server #%u.",
-			migration[ i ].listId,
-			migration[ i ].chunkId,
-			migration[ i ].dstServerIndex
-		);
-
-		ServerPeerSocket *socket = ( ServerPeerSocket * ) migration[ i ].ptr;
-
 		LOCK( &ServerWorker::map->sealedLock );
 		std::unordered_map<uint32_t, std::unordered_set<uint32_t>>::iterator it = ServerWorker::map->stripeIds.find( migration[ i ].listId );
-
 		if ( it != ServerWorker::map->stripeIds.end() ) {
 			std::unordered_set<uint32_t> stripeIds = it->second;
-			UNLOCK( &ServerWorker::map->sealedLock );
-
-			std::unordered_set<uint32_t>::iterator sit;
-			for ( sit = stripeIds.begin(); sit != stripeIds.end(); sit++ ) {
-				Metadata metadata;
-				ServerPeerEvent serverPeerEvent;
-				ChunkRequest chunkRequest;
-				uint16_t instanceId = Server::instanceId;
-				uint32_t requestId = ServerWorker::idGenerator->nextVal( this->workerId );
-				Chunk *chunk;
-
-				metadata.set( migration[ i ].listId, *sit, migration[ i ].chunkId );
-
-				// Get and lock the chunk
-				chunk = ServerWorker::map->migrateChunk( metadata.listId, metadata.stripeId, metadata.chunkId );
-
-				// fprintf(
-				// 	stderr, "[%u, %u] (%u, %u, %u) --> %u; chunk = %p\n",
-				// 	instanceId, requestId,
-				// 	metadata.listId, metadata.stripeId, metadata.chunkId,
-				// 	migration[ i ].dstServerIndex,
-				// 	chunk
-				// );
-				// socket->print( stderr );
-
-				// Add to ChunkRequest pending map
-				chunkRequest.set(
-					metadata.listId, metadata.stripeId, metadata.chunkId,
-					socket, chunk,
-					false, // isDegraded
-					false, // self
-					true   // isMigrating
-				);
-				if ( ! ServerWorker::pending->insertChunkRequest( PT_SERVER_PEER_SET_CHUNK, instanceId, event.instanceId, requestId, event.requestId, socket, chunkRequest ) ) {
-					__ERROR__( "ServerWorker", "handleStripeListUpdateRequest", "Cannot insert into server CHUNK_REQUEST pending map." );
-				}
-
-				// Send the chunk to the migrated server
-				serverPeerEvent.reqSetChunk( socket, instanceId, requestId, metadata, chunk, false, true );
-				ServerWorker::eventQueue->insert( serverPeerEvent );
-			}
-		} else {
-			UNLOCK( &ServerWorker::map->sealedLock );
+			count += stripeIds.size();
 		}
+		UNLOCK( &ServerWorker::map->sealedLock );
+	}
+
+	// Insert into coordinator's migration pending map
+	ServerWorker::pending->insertScalingMigration( event.instanceId, event.requestId, event.socket, count );
+
+	__INFO__(
+		GREEN, "ServerWorker", "handleMigrateRequest",
+		"Going to migrate %lu chunks.", count
+	);
+
+	if ( count ) {
+		for ( size_t i = 0, size = migration.size(); i < size; i++ ) {
+			__DEBUG__(
+				BLUE, "ServerWorker", "handleMigrateRequest",
+				"Migrating (%u, %u) to Server #%u.",
+				migration[ i ].listId,
+				migration[ i ].chunkId,
+				migration[ i ].dstServerIndex
+			);
+
+			ServerPeerSocket *socket = ( ServerPeerSocket * ) migration[ i ].ptr;
+
+			LOCK( &ServerWorker::map->sealedLock );
+			std::unordered_map<uint32_t, std::unordered_set<uint32_t>>::iterator it = ServerWorker::map->stripeIds.find( migration[ i ].listId );
+
+			if ( it != ServerWorker::map->stripeIds.end() ) {
+				std::unordered_set<uint32_t> stripeIds = it->second;
+				UNLOCK( &ServerWorker::map->sealedLock );
+
+				std::unordered_set<uint32_t>::iterator sit;
+				for ( sit = stripeIds.begin(); sit != stripeIds.end(); sit++ ) {
+					Metadata metadata;
+					ServerPeerEvent serverPeerEvent;
+					ChunkRequest chunkRequest;
+					uint16_t instanceId = Server::instanceId;
+					uint32_t requestId = ServerWorker::idGenerator->nextVal( this->workerId );
+					Chunk *chunk;
+
+					metadata.set( migration[ i ].listId, *sit, migration[ i ].chunkId );
+
+					// Get and lock the chunk
+					chunk = ServerWorker::map->migrateChunk( metadata.listId, metadata.stripeId, metadata.chunkId );
+
+					// fprintf(
+					// 	stderr, "[%u, %u] (%u, %u, %u) --> %u; chunk = %p\n",
+					// 	instanceId, requestId,
+					// 	metadata.listId, metadata.stripeId, metadata.chunkId,
+					// 	migration[ i ].dstServerIndex,
+					// 	chunk
+					// );
+					// socket->print( stderr );
+
+					// Add to ChunkRequest pending map
+					chunkRequest.set(
+						metadata.listId, metadata.stripeId, metadata.chunkId,
+						socket, chunk,
+						false, // isDegraded
+						false, // self
+						true   // isMigrating
+					);
+					if ( ! ServerWorker::pending->insertChunkRequest( PT_SERVER_PEER_SET_CHUNK, instanceId, event.instanceId, requestId, event.requestId, socket, chunkRequest ) ) {
+						__ERROR__( "ServerWorker", "handleStripeListUpdateRequest", "Cannot insert into server CHUNK_REQUEST pending map." );
+					}
+
+					// Send the chunk to the migrated server
+					serverPeerEvent.reqSetChunk( socket, instanceId, requestId, metadata, chunk, false, true );
+					ServerWorker::eventQueue->insert( serverPeerEvent );
+				}
+			} else {
+				UNLOCK( &ServerWorker::map->sealedLock );
+			}
+		}
+	} else {
+		CoordinatorEvent coordinatorEvent;
+		coordinatorEvent.resScalingMigration( event.socket, event.instanceId, event.requestId, 0 );
+		ServerWorker::eventQueue->insert( coordinatorEvent );
 	}
 
 	return true;

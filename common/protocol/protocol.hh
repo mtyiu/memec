@@ -774,6 +774,15 @@ public:
 		uint32_t n, uint32_t k,
 		char *buf = 0, size_t size = 0, size_t offset = 0
 	);
+
+	size_t generateScalingMigrationHeader(
+		uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
+		uint32_t count, char *buf = 0
+	);
+	bool parseScalingMigrationHeader(
+		struct ScalingMigrationHeader &header,
+		char *buf = 0, size_t size = 0, size_t offset = 0
+	);
 };
 
 #endif

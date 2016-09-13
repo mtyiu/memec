@@ -391,7 +391,7 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 			buffer.size = this->protocol.generateChunkHeader(
 				success ? PROTO_MAGIC_RESPONSE_SUCCESS : PROTO_MAGIC_RESPONSE_FAILURE,
 				PROTO_MAGIC_TO_SERVER,
-				PROTO_OPCODE_SET_CHUNK,
+				event.message.chunk.isMigrating ? PROTO_OPCODE_SET_CHUNK_MIGRATING : PROTO_OPCODE_SET_CHUNK,
 				event.instanceId, event.requestId,
 				event.message.chunk.metadata.listId,
 				event.message.chunk.metadata.stripeId,
@@ -740,10 +740,13 @@ void ServerWorker::dispatch( ServerPeerEvent event ) {
 							);
 							break;
 						case PROTO_MAGIC_RESPONSE_SUCCESS:
-							this->handleSetChunkResponse( event, true, buffer.data, buffer.size );
-							break;
 						case PROTO_MAGIC_RESPONSE_FAILURE:
-							this->handleSetChunkResponse( event, false, buffer.data, buffer.size );
+							this->handleSetChunkResponse(
+								event, header.magic == PROTO_MAGIC_RESPONSE_SUCCESS,
+								header.opcode == PROTO_OPCODE_SET_CHUNK_MIGRATING || header.opcode == PROTO_OPCODE_SET_CHUNK_UNSEALED_MIGRATING,
+								buffer.data, buffer.size
+							);
+							break;
 							break;
 						default:
 							__ERROR__( "ServerWorker", "dispatch", "Invalid magic code from server." );

@@ -107,3 +107,29 @@ bool Protocol::parseStripeListPartitionHeader( struct StripeListPartitionHeader 
 
 	return true;
 }
+
+size_t Protocol::generateScalingMigrationHeader(
+	uint8_t magic, uint8_t to, uint8_t opcode, uint16_t instanceId, uint32_t requestId,
+	uint32_t count, char *buf
+) {
+	if ( ! buf ) buf = this->buffer.send;
+	size_t bytes = this->generateHeader(
+		magic, to, opcode,
+		PROTO_SCALING_MIGRATION_SIZE,
+		instanceId, requestId, buf
+	);
+	buf += bytes;
+	bytes += ProtocolUtil::write4Bytes( buf, count );
+	return bytes;
+}
+
+bool Protocol::parseScalingMigrationHeader( struct ScalingMigrationHeader &header, char *buf, size_t size, size_t offset ) {
+	if ( ! buf || ! size ) {
+		buf = this->buffer.recv;
+		size = this->buffer.size;
+	}
+	if ( size - offset < PROTO_SCALING_MIGRATION_SIZE ) return false;
+	char *ptr = buf + offset;
+	header.count = ProtocolUtil::read4Bytes( ptr );
+	return true;
+}

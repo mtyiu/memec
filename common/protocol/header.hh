@@ -428,4 +428,9 @@ struct StripeListPartitionHeader {
 	uint8_t *parity; // Server ID of parity servers
 };
 
+#define PROTO_SCALING_MIGRATION_SIZE 4
+struct ScalingMigrationHeader {
+	uint32_t count;
+};
+
 #endif

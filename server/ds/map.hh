@@ -45,7 +45,10 @@ private:
 
 		CuckooHash chunks;
 		LOCK_T chunksLock;
-	} migrated;
+
+		std::unordered_set<Metadata> chunkMetas;
+		LOCK_T chunkMetasLock;
+	} migrating;
 
 public:
 	/**
@@ -142,6 +145,7 @@ public:
 
 	// Migrate chunks and keys
 	Chunk *migrateChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId );
+	size_t eraseMigratedChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId );
 };
 
 #endif

@@ -149,7 +149,7 @@ private:
 	bool handleUpdateResponse( ServerPeerEvent event, bool success, char *buf, size_t size );
 	bool handleDeleteResponse( ServerPeerEvent event, bool success, char *buf, size_t size );
 	bool handleGetChunkResponse( ServerPeerEvent event, bool success, char *buf, size_t size );
-	bool handleSetChunkResponse( ServerPeerEvent event, bool success, char *buf, size_t size );
+	bool handleSetChunkResponse( ServerPeerEvent event, bool success, bool isMigrating, char *buf, size_t size );
 	bool handleUpdateChunkResponse( ServerPeerEvent event, bool success, char *buf, size_t size );
 	bool handleDeleteChunkResponse( ServerPeerEvent event, bool success, char *buf, size_t size );
 	bool handleSealChunkResponse( ServerPeerEvent event, bool success, char *buf, size_t size );

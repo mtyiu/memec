@@ -305,6 +305,25 @@ bool Pending::insertRecovery( uint16_t instanceId, uint32_t requestId, Coordinat
 	return ret;
 }
 
+void Pending::insertScalingMigration( uint16_t instanceId, uint32_t requestId, CoordinatorSocket *socket, uint32_t count ) {
+	PendingIdentifier pid( instanceId, instanceId, requestId, requestId, socket );
+	std::unordered_map<PendingIdentifier, PendingScalingMigration>::iterator it;
+
+	LOCK( &this->coordinators.scalingMigrationLock );
+	it = this->coordinators.scalingMigration.find( pid );
+	if ( it == this->coordinators.scalingMigration.end() ) {
+		PendingScalingMigration m;
+		m.count = count;
+		m.total = count;
+
+		this->coordinators.scalingMigration[ pid ] = m;
+	} else {
+		it->second.count += count;
+		it->second.total += count;
+	}
+	UNLOCK( &this->coordinators.scalingMigrationLock );
+}
+
 bool Pending::insertRemapData( struct sockaddr_in target, uint32_t listId, uint32_t chunkId, Key key, Value value ) {
 	LOCK( &this->serverPeers.remappedDataLock );
 	if ( this->serverPeers.remappedData.count( target ) == 0 ) {
@@ -551,6 +570,27 @@ bool Pending::eraseRecovery( uint8_t keySize, char *keyStr, uint16_t &instanceId
 	UNLOCK( &this->coordinators.recoveryLock );
 
 	return ret;
+}
+
+bool Pending::eraseScalingMigration( uint16_t instanceId, uint32_t requestId, uint32_t count, uint32_t &remaining, uint32_t &total, PendingIdentifier *pidPtr ) {
+	PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
+	std::unordered_map<PendingIdentifier, PendingScalingMigration>::iterator it;
+
+	LOCK( &this->coordinators.scalingMigrationLock );
+	it = this->coordinators.scalingMigration.find( pid );
+	if ( it == this->coordinators.scalingMigration.end() ) {
+		UNLOCK( &this->coordinators.scalingMigrationLock );
+		return false;
+	}
+	if ( pidPtr ) *pidPtr = it->first;
+	it->second.count -= count;
+	remaining = it->second.count;
+	total = it->second.total;
+	if ( remaining == 0 )
+		this->coordinators.scalingMigration.erase( it );
+	UNLOCK( &this->coordinators.scalingMigrationLock );
+
+	return true;
 }
 
 bool Pending::eraseServerPeerRegistration( uint32_t &requestId, ServerPeerSocket *&socket, bool &success ) {

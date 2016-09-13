@@ -13,6 +13,7 @@ enum CoordinatorEventType {
 	COORDINATOR_EVENT_TYPE_RECONSTRUCTION_UNSEALED_RESPONSE_SUCCESS,
 	COORDINATOR_EVENT_TYPE_PROMOTE_BACKUP_SERVER_RESPONSE_SUCCESS,
 	COORDINATOR_EVENT_TYPE_RESPONSE_PARITY_MIGRATE,
+	COORDINATOR_EVENT_TYPE_RESPONSE_SCALING_MIGRATION,
 	COORDINATOR_EVENT_TYPE_PENDING
 };
 
@@ -43,6 +44,9 @@ public:
 			uint32_t numChunks;
 			uint32_t numUnsealedKeys;
 		} promote;
+		struct {
+			uint32_t count;
+		} migration;
 	} message;
 
 	inline void reqRegister( CoordinatorSocket *socket, uint32_t addr, uint16_t port ) {
@@ -118,6 +122,12 @@ public:
 			.numChunks = numChunks,
 			.numUnsealedKeys = numUnsealedKeys
 		};
+	}
+
+	inline void resScalingMigration( CoordinatorSocket *socket, uint16_t instanceId, uint32_t requestId, uint32_t count ) {
+		this->type = COORDINATOR_EVENT_TYPE_RESPONSE_SCALING_MIGRATION;
+		this->set( instanceId, requestId, socket );
+		this->message.migration.count = count;
 	}
 
 	inline void pending( CoordinatorSocket *socket ) {

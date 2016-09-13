@@ -3,13 +3,19 @@
 Map::Map() {
 	LOCK_INIT( &this->keysLock );
 	LOCK_INIT( &this->chunksLock );
-	LOCK_INIT( &this->stripeIdsLock );
 	LOCK_INIT( &this->forwarded.lock );
+	LOCK_INIT( &this->migrating.keysLock );
+	LOCK_INIT( &this->migrating.chunksLock );
+	LOCK_INIT( &this->migrating.chunkMetasLock );
 	LOCK_INIT( &this->opsLock );
 	LOCK_INIT( &this->sealedLock );
+	LOCK_INIT( &this->stripeIdsLock );
 
 	this->keys.setKeySize( 0 );
 	this->chunks.setKeySize( CHUNK_IDENTIFIER_SIZE );
+
+	this->migrating.keys.setKeySize( 0 );
+	this->migrating.chunks.setKeySize( CHUNK_IDENTIFIER_SIZE );
 }
 
 void Map::setTimestamp( Timestamp *timestamp ) {
@@ -407,7 +413,7 @@ Chunk *Map::migrateChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId )
 			offset += size;
 			ptr += size;
 
-			fprintf( stderr, "(%u, %u, %u): %.*s\n", listId, stripeId, chunkId, keySize, keyPtr );
+			// fprintf( stderr, "(%u, %u, %u): %.*s\n", listId, stripeId, chunkId, keySize, keyPtr );
 		}
 	}
 
@@ -415,11 +421,15 @@ Chunk *Map::migrateChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId )
 	UNLOCK( &this->chunksLock );
 	UNLOCK( &this->keysLock );
 
-	// Lock both keysLock and chunksLock in the migrated struct
-	LOCK( &this->migrated.keysLock );
-	LOCK( &this->migrated.chunksLock );
+	// Lock keysLock, chunksLock, and chunkMetasLock in the migrated struct
+	LOCK( &this->migrating.keysLock );
+	LOCK( &this->migrating.chunksLock );
+	LOCK( &this->migrating.chunkMetasLock );
 
-	// Insert the keys and chunks into the migrated struct
+	// Insert the chunk into the migrated struct
+	this->migrating.chunks.insert( ( char * ) chunk, CHUNK_IDENTIFIER_SIZE, ( char * ) chunk );
+
+	// Insert the keys into the migrated struct
 	if ( ! ChunkUtil::isParity( chunk ) ) {
 		char *ptr = ChunkUtil::getData( chunk );
 		char *keyPtr, *valuePtr;
@@ -442,15 +452,91 @@ Chunk *Map::migrateChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId )
 				size = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
 			}
 
-			this->migrated.keys.insert( keyPtr, keySize, ptr, isLarge );
+			this->migrating.keys.insert( keyPtr, keySize, ptr, isLarge );
 			offset += size;
 			ptr += size;
 		}
 	}
 
-	// Unlock both keysLock and chunksLock in the migrated struct
-	UNLOCK( &this->migrated.chunksLock );
-	UNLOCK( &this->migrated.keysLock );
+	// Insert the chunk metadata into the migrated struct
+	Metadata metadata;
+	metadata.set( listId, stripeId, chunkId );
+	this->migrating.chunkMetas.insert( metadata );
+
+	// fprintf( stderr, "Map::migrateChunk(): [%u, %u, %u] (remaining = %lu)\n", listId, stripeId, chunkId, this->migrating.chunkMetas.size() );
+
+	// Unlock keysLock, chunksLock, and chunkMetasLock in the migrated struct
+	UNLOCK( &this->migrating.chunkMetasLock );
+	UNLOCK( &this->migrating.chunksLock );
+	UNLOCK( &this->migrating.keysLock );
 
 	return chunk;
+}
+
+size_t Map::eraseMigratedChunk( uint32_t listId, uint32_t stripeId, uint32_t chunkId ) {
+	Chunk *chunk;
+	ChunkIdentifier id( listId, stripeId, chunkId );
+	size_t ret = 0;
+
+	// Lock both keysLock, chunksLock, and chunkMetasLock in the migrated struct
+	LOCK( &this->migrating.keysLock );
+	LOCK( &this->migrating.chunksLock );
+	LOCK( &this->migrating.chunkMetasLock );
+
+	// Find the chunk
+	chunk = ( Chunk * ) this->migrating.chunks.find( ( char * ) &id, CHUNK_IDENTIFIER_SIZE );
+	if ( ! chunk ) {
+		ret = this->migrating.chunkMetas.size();
+		UNLOCK( &this->migrating.chunkMetasLock );
+		UNLOCK( &this->migrating.chunksLock );
+		UNLOCK( &this->migrating.keysLock );
+		return 0;
+	}
+
+	// Remove the chunks from the migrated struct
+	this->migrating.chunks.del( ( char * ) &id, CHUNK_IDENTIFIER_SIZE );
+
+	// Remove the keys from the migrated struct
+	if ( ! ChunkUtil::isParity( chunk ) ) {
+		char *ptr = ChunkUtil::getData( chunk );
+		char *keyPtr, *valuePtr;
+		uint8_t keySize;
+		uint32_t valueSize, offset = 0, size, splitSize, splitOffset;
+		bool isLarge;
+
+		while( ptr + KEY_VALUE_METADATA_SIZE < ChunkUtil::getData( chunk ) + ChunkUtil::chunkSize ) {
+			KeyValue::deserialize( ptr, keyPtr, keySize, valuePtr, valueSize, splitOffset );
+			if ( keySize == 0 && valueSize == 0 )
+				break;
+
+			isLarge = LargeObjectUtil::isLarge( keySize, valueSize, 0, &splitSize );
+			if ( isLarge ) {
+				if ( splitOffset + splitSize > valueSize )
+					splitSize = valueSize - splitOffset;
+
+				size = KEY_VALUE_METADATA_SIZE + SPLIT_OFFSET_SIZE + keySize + splitSize;
+			} else {
+				size = KEY_VALUE_METADATA_SIZE + keySize + valueSize;
+			}
+
+			this->migrating.keys.del( keyPtr, keySize, isLarge );
+			offset += size;
+			ptr += size;
+		}
+	}
+
+	// Remove the chunk metadata into the migrated struct
+	Metadata metadata;
+	metadata.set( listId, stripeId, chunkId );
+	this->migrating.chunkMetas.erase( metadata );
+
+	ret = this->migrating.chunkMetas.size();
+	// fprintf( stderr, "Map::eraseMigratedChunk(): [%u, %u, %u] (remaining = %lu)\n", listId, stripeId, chunkId, ret );
+
+	// Unlock keysLock, chunksLock, and chunkMetasLock in the migrated struct
+	UNLOCK( &this->migrating.chunkMetasLock );
+	UNLOCK( &this->migrating.chunksLock );
+	UNLOCK( &this->migrating.keysLock );
+
+	return ret;
 }

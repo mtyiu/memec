@@ -244,8 +244,15 @@ public:
 	}
 };
 
+struct PendingScalingMigration {
+public:
+	uint32_t count;
+	uint32_t total;
+};
+
 enum PendingType {
 	PT_COORDINATOR_RECONSTRUCTION,
+	PT_COORDINATOR_SCALING_MIGRATION,
 	PT_CLIENT_DEGRADED_SET,
 	PT_CLIENT_GET,
 	PT_CLIENT_UPDATE,
@@ -280,11 +287,16 @@ private:
 public:
 	struct {
 		std::unordered_map<PendingIdentifier, PendingDegradedLock> releaseDegradedLock;
-		std::unordered_map<PendingIdentifier, PendingReconstruction> reconstruction;
-		std::unordered_map<PendingIdentifier, PendingRecovery> recovery;
 		LOCK_T releaseDegradedLockLock;
+
+		std::unordered_map<PendingIdentifier, PendingReconstruction> reconstruction;
 		LOCK_T reconstructionLock;
+
+		std::unordered_map<PendingIdentifier, PendingRecovery> recovery;
 		LOCK_T recoveryLock;
+
+		std::unordered_map<PendingIdentifier, PendingScalingMigration> scalingMigration;
+		LOCK_T scalingMigrationLock;
 	} coordinators;
 	struct {
 		std::unordered_multimap<PendingIdentifier, Key> get;
@@ -330,6 +342,7 @@ public:
 		LOCK_INIT( &this->coordinators.releaseDegradedLockLock );
 		LOCK_INIT( &this->coordinators.reconstructionLock );
 		LOCK_INIT( &this->coordinators.recoveryLock );
+		LOCK_INIT( &this->coordinators.scalingMigrationLock );
 		LOCK_INIT( &this->clients.getLock );
 		LOCK_INIT( &this->clients.updateLock );
 		LOCK_INIT( &this->clients.delLock );
@@ -364,6 +377,9 @@ public:
 		uint32_t addr, uint16_t port,
 		uint32_t chunkCount, uint32_t *metadataBuf,
 		uint32_t unsealedCount, char *keysBuf
+	);
+	void insertScalingMigration(
+		uint16_t instanceId, uint32_t requestId, CoordinatorSocket *socket, uint32_t count
 	);
 
 	// Insert (Client)
@@ -424,9 +440,7 @@ public:
 	// Erase
 	bool eraseReleaseDegradedLock(
 		uint16_t instanceId, uint32_t requestId, uint32_t count,
-		uint32_t &remaining,
-		uint32_t &total,
-		PendingIdentifier *pidPtr = 0
+		uint32_t &remaining, uint32_t &total, PendingIdentifier *pidPtr = 0
 	);
 	bool eraseReconstruction(
 		uint16_t instanceId, uint32_t requestId, CoordinatorSocket *&socket,
@@ -456,6 +470,10 @@ public:
 		uint32_t &addr, uint16_t &port,
 		uint32_t &remainingChunks, uint32_t &remainingKeys,
 		uint32_t &totalChunks, uint32_t &totalKeys
+	);
+	bool eraseScalingMigration(
+		uint16_t instanceId, uint32_t requestId, uint32_t count,
+		uint32_t &remaining, uint32_t &total, PendingIdentifier *pidPtr = 0
 	);
 	bool eraseKey(
 		PendingType type, uint16_t instanceId, uint32_t requestId, void *ptr = 0,
