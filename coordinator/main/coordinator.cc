@@ -927,7 +927,11 @@ void Coordinator::migrate() {
 
 	elapsedTime = get_elapsed_time( ts );
 
-	fprintf( stderr, "Elapsed time: %.2lf s; number of migrated chunks: %u\n", elapsedTime, numMigrated );
+	fprintf( stderr, "Elapsed time: %.8lf s; number of migrated chunks: %u\n", elapsedTime, numMigrated );
+
+	// FILE *f = fopen( "/uac/gds/mtyiu/mtyiu/results-multi/total_sizes/tmp/hpc15/migration.txt", "w+" );
+	// fprintf( f, "%.8lf\t%u\n", elapsedTime, numMigrated );
+	// fclose( f );
 }
 
 void Coordinator::hash() {

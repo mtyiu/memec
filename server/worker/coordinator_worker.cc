@@ -499,6 +499,7 @@ bool ServerWorker::handleMigrateRequest( CoordinatorEvent event ) {
 	);
 
 	if ( count ) {
+		uint32_t numSentChunks = 0;
 		for ( size_t i = 0, size = migration.size(); i < size; i++ ) {
 			__DEBUG__(
 				BLUE, "ServerWorker", "handleMigrateRequest",
@@ -518,7 +519,7 @@ bool ServerWorker::handleMigrateRequest( CoordinatorEvent event ) {
 				UNLOCK( &ServerWorker::map->sealedLock );
 
 				std::unordered_set<uint32_t>::iterator sit;
-				for ( sit = stripeIds.begin(); sit != stripeIds.end(); sit++ ) {
+				for ( sit = stripeIds.begin(); sit != stripeIds.end(); sit++, numSentChunks++ ) {
 					Metadata metadata;
 					ServerPeerEvent serverPeerEvent;
 					ChunkRequest chunkRequest;
@@ -555,6 +556,11 @@ bool ServerWorker::handleMigrateRequest( CoordinatorEvent event ) {
 					// Send the chunk to the migrated server
 					serverPeerEvent.reqSetChunk( socket, instanceId, requestId, metadata, chunk, false, true );
 					ServerWorker::eventQueue->insert( serverPeerEvent );
+
+					if ( numSentChunks % 10000 == 0 ) {
+					   fprintf( stderr, "Count = %u\n", count );
+					   sleep( 1 );
+					}
 				}
 			} else {
 				UNLOCK( &ServerWorker::map->sealedLock );

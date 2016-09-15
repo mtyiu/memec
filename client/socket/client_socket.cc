@@ -137,7 +137,8 @@ bool ClientSocket::handler( int fd, uint32_t events, void *data ) {
 						uint16_t instanceId = generator->generate( applicationSocket );
 
 						if ( header.opcode == PROTO_OPCODE_REGISTER_NAMED_PIPE ) {
-							event.resRegisterWithNamedPipe( applicationSocket, instanceId, header.requestId );
+							// event.resRegisterWithNamedPipe( applicationSocket, instanceId, header.requestId );
+							event.resRegister( applicationSocket, instanceId, header.requestId );
 						} else {
 							event.resRegister( applicationSocket, instanceId, header.requestId );
 						}
