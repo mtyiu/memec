@@ -125,6 +125,14 @@ struct PendingNewServer {
 	uint32_t total;
 };
 
+struct PendingScalingMigration {
+	pthread_mutex_t *lock;
+	pthread_cond_t *cond;
+	uint32_t *count;
+	uint32_t total;
+	uint32_t *numMigrated;
+};
+
 class Pending {
 private:
 	/*
@@ -165,6 +173,9 @@ private:
 	std::unordered_map<PendingIdentifier, PendingNewServer> newServer;
 	LOCK_T newServerLock;
 
+	std::unordered_map<PendingIdentifier, PendingScalingMigration> scalingMigration;
+	LOCK_T scalingMigrationLock;
+
 public:
 	Pending() {
 		LOCK_INIT( &this->syncMetaLock );
@@ -177,6 +188,7 @@ public:
 		LOCK_INIT( &this->syncRemappedDataLock );
 		LOCK_INIT( &this->syncRemappedDataRequestLock );
 		LOCK_INIT( &this->newServerLock );
+		LOCK_INIT( &this->scalingMigrationLock );
 	}
 
 	~Pending() {}
@@ -490,6 +502,48 @@ public:
 			pthread_cond_signal( n.cond );
 		UNLOCK( n.lock );
 		UNLOCK( &this->newServerLock );
+
+		return true;
+	}
+
+	bool addPendingScalingMigration( uint16_t instanceId, uint32_t requestId, pthread_mutex_t *lock, pthread_cond_t *cond, uint32_t *count, uint32_t total, uint32_t *numMigrated ) {
+		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
+		PendingScalingMigration m;
+
+		m.lock = lock;
+		m.cond = cond;
+		m.count = count;
+		m.total = total;
+		m.numMigrated = numMigrated;
+
+		std::pair<PendingIdentifier, PendingScalingMigration> p( pid, m );
+		std::pair<std::unordered_map<PendingIdentifier, PendingScalingMigration>::iterator, bool> ret;
+
+		LOCK( &this->scalingMigrationLock );
+		ret = this->scalingMigration.insert( p );
+		UNLOCK( &this->scalingMigrationLock );
+
+		return ret.second;
+	}
+
+	bool erasePendingScalingMigration( uint16_t instanceId, uint32_t requestId, uint32_t numMigrated ) {
+		PendingIdentifier pid( instanceId, instanceId, requestId, requestId, 0 );
+		std::unordered_map<PendingIdentifier, PendingScalingMigration>::iterator it;
+
+		LOCK( &this->scalingMigrationLock );
+		it = this->scalingMigration.find( pid );
+		if ( it == this->scalingMigration.end() ) {
+			UNLOCK( &this->scalingMigrationLock );
+			return false;
+		}
+		PendingScalingMigration &m = it->second;
+		LOCK( m.lock );
+		( *m.count )--;
+		( *m.numMigrated ) += numMigrated;
+		if ( *m.count == 0 )
+			pthread_cond_signal( m.cond );
+		UNLOCK( m.lock );
+		UNLOCK( &this->scalingMigrationLock );
 
 		return true;
 	}

@@ -71,6 +71,7 @@ public:
 			pthread_cond_t *cond;
 			uint32_t *count;
 			uint32_t total;
+			uint32_t *numMigrated;
 		} migrate;
 		bool isMigrating;
 	} message;
@@ -194,13 +195,14 @@ public:
 		this->message.isMigrating = isMigrating;
 	}
 
-	inline void migrate( LOCK_T *lock, pthread_cond_t *cond, uint32_t *count, uint32_t total ) {
+	inline void migrate( LOCK_T *lock, pthread_cond_t *cond, uint32_t *count, uint32_t total, uint32_t *numMigrated ) {
 		this->type = SERVER_EVENT_TYPE_MIGRATE;
 		this->message.migrate = {
 			.lock = lock,
 			.cond = cond,
 			.count = count,
-			.total = total
+			.total = total,
+			.numMigrated = numMigrated
 		};
 	}
 };

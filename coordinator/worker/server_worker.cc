@@ -298,6 +298,18 @@ void CoordinatorWorker::dispatch( ServerEvent event ) {
 				}
 				UNLOCK( &servers.lock );
 			}
+
+			if ( event.type == SERVER_EVENT_TYPE_MIGRATE ) {
+				// Add to pending map
+				CoordinatorWorker::pending->addPendingScalingMigration(
+					Coordinator::instanceId, requestId,
+					event.message.migrate.lock,
+					event.message.migrate.cond,
+					event.message.migrate.count,
+					event.message.migrate.total,
+					event.message.migrate.numMigrated
+				);
+			}
 		}
 	} else if ( isSend ) {
 		ret = event.socket->send( buffer.data, buffer.size, connected );
@@ -520,5 +532,9 @@ bool CoordinatorWorker::postMigration( ServerEvent event, char *buf, size_t size
 		"[%u, %u] Count = %u",
 		event.instanceId, event.requestId, header.count
 	);
+	if ( ! CoordinatorWorker::pending->erasePendingScalingMigration( event.instanceId, event.requestId, header.count ) ) {
+		__ERROR__( "CoordinatorWorker", "postMigration", "Cannot find a pending scaling migration request that matches the response. This message will be discarded." );
+		return false;
+	}
 	return true;
 }

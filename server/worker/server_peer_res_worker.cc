@@ -1422,7 +1422,7 @@ bool ServerWorker::handleSetChunkResponse( ServerPeerEvent event, bool success, 
 		__ERROR__( "ServerWorker", "handleSetChunkResponse", "Invalid SET_CHUNK response." );
 		return false;
 	}
-	__INFO__(
+	__DEBUG__(
 		BLUE, "ServerWorker", "handleSetChunkResponse",
 		"[SET_CHUNK (%s%s)] List ID: %u, stripe ID: %u, chunk ID: %u.",
 		isMigrating ? "Migrating, " : "",
@@ -1461,7 +1461,7 @@ bool ServerWorker::handleSetChunkResponse( ServerPeerEvent event, bool success, 
 	} else if ( chunkRequest.isMigrating ) {
 		// Migrating chunks during scaling up
 		assert( isMigrating );
-		fprintf( stderr, "[%u, %u] isMigrating (%u, %u, %u)...\n", event.instanceId, event.requestId, header.listId, header.stripeId, header.chunkId );
+		// fprintf( stderr, "[%u, %u] isMigrating (%u, %u, %u)...\n", event.instanceId, event.requestId, header.listId, header.stripeId, header.chunkId );
 
 		// Clear the migrated chunk and update keys map
 		ServerWorker::map->eraseMigratedChunk( header.listId, header.stripeId, header.chunkId );
@@ -1473,7 +1473,7 @@ bool ServerWorker::handleSetChunkResponse( ServerPeerEvent event, bool success, 
 			return false;
 		}
 
-		__INFO__(
+		__DEBUG__(
 			GREEN, "ServerWorker", "handleSetChunkResponse",
 			"[%u, %u] Remaining = %u / %u",
 			pid.instanceId, pid.requestId, remaining, total

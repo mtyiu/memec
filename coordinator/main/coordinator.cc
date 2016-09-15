@@ -907,14 +907,14 @@ void Coordinator::migrate() {
 
 	LOCK_T lock;
 	pthread_cond_t cond;
-	uint32_t count = this->sockets.servers.size(), total;
+	uint32_t count = this->sockets.servers.size(), total, numMigrated = 0;
 	total = count;
 
 	LOCK_INIT( &lock );
 	pthread_cond_init( &cond, 0 );
 
 	ServerEvent serverEvent;
-	serverEvent.migrate( &lock, &cond, &count, total );
+	serverEvent.migrate( &lock, &cond, &count, total, &numMigrated );
 	this->eventQueue.insert( serverEvent );
 
 	fprintf( stderr, "Waiting for data migration to complete...\n" );
@@ -927,7 +927,7 @@ void Coordinator::migrate() {
 
 	elapsedTime = get_elapsed_time( ts );
 
-	fprintf( stderr, "Elapsed time: %.2lf s\n", elapsedTime );
+	fprintf( stderr, "Elapsed time: %.2lf s; number of migrated chunks: %u\n", elapsedTime, numMigrated );
 }
 
 void Coordinator::hash() {
